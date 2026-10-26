@@ -1,0 +1,21 @@
+name: Core tests
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Unit tests
+        run: dotnet test DevTools/Game.Core.Tests --logger "console;verbosity=normal"
+
+      - name: Build sandbox
+        run: dotnet build DevTools/CoreSandbox
