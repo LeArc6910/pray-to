@@ -6,21 +6,12 @@ namespace Game.Core.Tests
 {
     public class ItemTests
     {
-        static readonly LootData Data = ShippedLoot.Load();
+        static readonly LootData Data = Gear.Data;
 
-        // An item with the lowest implicit rolls, no affixes and empty sockets.
-        static Item Plain(string baseId, int sockets, Rarity rarity = Rarity.Common, params ItemAffix[] affixes)
-        {
-            var itemBase = Data.FindBase(baseId);
-            var implicits = itemBase.Implicits.Select(r => new Modifier(r.Stat, r.Kind, r.Min, r.Tags)).ToList();
-            return new Item(itemBase, itemBase.Level, rarity, implicits, affixes, sockets);
-        }
+        static Item Plain(string baseId, int sockets, Rarity rarity = Rarity.Common, params ItemAffix[] affixes) =>
+            Gear.Plain(baseId, sockets, rarity, affixes);
 
-        static ItemAffix Affix(string id, int value)
-        {
-            var tier = Data.FindAffix(id).Tiers[0];
-            return new ItemAffix(tier, new Modifier(tier.Modifier.Stat, tier.Modifier.Kind, value, tier.Modifier.Tags));
-        }
+        static ItemAffix Affix(string id, int value) => Gear.Affix(id, value);
 
         [Test]
         public void RunesGiveStatsForTheKindOfSlotTheySitIn()

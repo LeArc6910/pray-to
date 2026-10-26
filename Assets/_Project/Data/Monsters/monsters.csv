@@ -1,0 +1,2 @@
+id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight
+slime,슬라임,1,30,9,0,2.4,0.4,8,0.5,0.5,1.0,100

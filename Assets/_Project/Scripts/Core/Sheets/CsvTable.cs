@@ -146,6 +146,12 @@ namespace Game.Core
             throw new FormatException($"{label} '{raw}'는 0 이상의 정수가 아닙니다.");
         }
 
+        public static float ParseDecimal(string raw, string label)
+        {
+            if (float.TryParse(raw, NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out float number)) return number;
+            throw new FormatException($"{label} '{raw}'는 0 이상의 수가 아닙니다.");
+        }
+
         public static bool IsValidId(string id) =>
             id.Length > 0 && id.All(c => c < 128 && (char.IsLetterOrDigit(c) || c == '_' || c == '-'));
     }

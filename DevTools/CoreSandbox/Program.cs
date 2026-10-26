@@ -10,6 +10,8 @@ namespace CoreSandbox
     // dotnet run -- --loot [level] [count] [seed]   rarity, socket, affix, tier and rune spread of many drops
     // dotnet run -- --progression [count] [seed]    rare weapon damage and chest armor by item level (the steps)
     // add --rarity <percent> to --item or --loot for the finder's item rarity bonus
+    // dotnet run -- --fight [seconds] [seed]        a bot fights slimes in a generated cave
+    // add --gear <base,base> to --fight to change its gear (copper_sword by default), --no-dodge to stand still
     static class Program
     {
         static void Main(string[] args)
@@ -25,6 +27,16 @@ namespace CoreSandbox
             int Number(int index, int fallback) => args.Length > index ? int.Parse(args[index]) : fallback;
             ulong Seed(int index) => args.Length > index ? ulong.Parse(args[index]) : (ulong)Environment.TickCount64;
 
+            string[] gear = { "copper_sword" };
+            int gearFlag = Array.IndexOf(args, "--gear");
+            if (gearFlag >= 0)
+            {
+                gear = args[gearFlag + 1].Split(',');
+                args = args.Where((_, i) => i != gearFlag && i != gearFlag + 1).ToArray();
+            }
+            bool dodge = !args.Contains("--no-dodge");
+            args = args.Where(a => a != "--no-dodge").ToArray();
+
             var data = LoadLoot();
             switch (args.Length > 0 ? args[0] : "")
             {
@@ -37,9 +49,13 @@ namespace CoreSandbox
                 case "--progression":
                     PrintProgression(data, Number(1, 2000), Seed(2));
                     break;
+                case "--fight":
+                    FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, dodge);
+                    break;
                 default:
                     Console.WriteLine("usage: dotnet run -- --item [level] [seed] | --loot [level] [count] [seed] | --progression [count] [seed]");
                     Console.WriteLine("       add --rarity <percent> to --item or --loot");
+                    Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--no-dodge]");
                     break;
             }
         }
@@ -148,6 +164,17 @@ namespace CoreSandbox
                 Read(LootSheets.AffixesFile),
                 Read(LootSheets.RunesFile),
                 Read(LootSheets.RunewordsFile));
+            if (data.Success) return data;
+
+            foreach (string error in data.Errors) Console.Error.WriteLine(error);
+            Environment.Exit(1);
+            return null;
+        }
+
+        static MonsterData LoadMonsters()
+        {
+            string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
+            var data = MonsterSheet.Parse(File.ReadAllText(Path.Combine(folder, MonsterSheet.File)));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

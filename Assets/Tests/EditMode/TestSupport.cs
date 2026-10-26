@@ -46,6 +46,69 @@ namespace Game.Core.Tests
         }
     }
 
+    public static class Gear
+    {
+        public static readonly LootData Data = ShippedLoot.Load();
+
+        // An item with the lowest implicit rolls, the given affixes and empty sockets.
+        public static Item Plain(string baseId, int sockets = 0, Rarity rarity = Rarity.Common, params ItemAffix[] affixes)
+        {
+            var itemBase = Data.FindBase(baseId);
+            var implicits = itemBase.Implicits.Select(r => new Modifier(r.Stat, r.Kind, r.Min, r.Tags)).ToList();
+            return new Item(itemBase, itemBase.Level, rarity, implicits, affixes, sockets);
+        }
+
+        // The affix's first tier with a chosen value.
+        public static ItemAffix Affix(string id, int value)
+        {
+            var tier = Data.FindAffix(id).Tiers[0];
+            return new ItemAffix(tier, new Modifier(tier.Modifier.Stat, tier.Modifier.Kind, value, tier.Modifier.Tags));
+        }
+
+        public static Equipment Wearing(params string[] baseIds)
+        {
+            var equipment = new Equipment();
+            foreach (string id in baseIds) equipment.Equip(Plain(id));
+            return equipment;
+        }
+    }
+
+    public static class Maps
+    {
+        // '#' is wall and anything else floor. The first row is the top of the map, as it reads on screen.
+        public static TileMap FromRows(params string[] rows)
+        {
+            var map = new TileMap(rows[0].Length, rows.Length, TileType.Floor);
+            for (int row = 0; row < rows.Length; row++)
+            {
+                for (int x = 0; x < rows[row].Length; x++)
+                {
+                    if (rows[row][x] == '#') map[x, rows.Length - 1 - row] = TileType.Wall;
+                }
+            }
+            return map;
+        }
+
+        // An open room with walls around it.
+        public static TileMap Room(int size)
+        {
+            var rows = Enumerable.Range(0, size)
+                .Select(row => row == 0 || row == size - 1 ? new string('#', size) : "#" + new string('.', size - 2) + "#")
+                .ToArray();
+            return FromRows(rows);
+        }
+    }
+
+    public static class Monsters
+    {
+        public static readonly MonsterData Shipped = MonsterSheet.Parse(File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Monsters/monsters.csv")));
+
+        public const string Header = "id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight\n";
+
+        // A slime that hits hard enough to drop a bare-handed player in one strike.
+        public static readonly MonsterData Brute = MonsterSheet.Parse(Header + "brute,깡패,1,1000,500,0,2,0.4,8,0.5,0.5,1,1\n");
+    }
+
     // Small hand-written sheets, so a test can see every row it depends on.
     public static class TestLoot
     {
