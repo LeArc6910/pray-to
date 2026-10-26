@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace Game.Core
 {
@@ -47,6 +48,22 @@ namespace Game.Core
         public float NextFloat() => (NextUInt() >> 8) * (1f / 16777216f);
 
         public bool Chance(float probability) => NextFloat() < probability;
+
+        // Each item is picked in proportion to its weight. Zero or negative weights are never picked.
+        public T PickWeighted<T>(IReadOnlyList<T> items, Func<T, int> weight)
+        {
+            int total = 0;
+            foreach (var item in items) total += Math.Max(0, weight(item));
+            if (total <= 0) throw new ArgumentException("Nothing to pick: every weight is zero.", nameof(items));
+
+            int roll = Next(total);
+            foreach (var item in items)
+            {
+                roll -= Math.Max(0, weight(item));
+                if (roll < 0) return item;
+            }
+            throw new InvalidOperationException("Weights changed while picking.");
+        }
 
         // Rejects the few values that would make some results more likely than others with a plain modulo.
         uint Bounded(uint bound)

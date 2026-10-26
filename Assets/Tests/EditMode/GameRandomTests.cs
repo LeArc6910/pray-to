@@ -63,6 +63,22 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void PickWeightedFollowsTheWeights()
+        {
+            var random = new GameRandom(3);
+            string[] items = { "never", "once", "thrice" };
+            int[] weights = { 0, 1, 3 };
+            int Weight(string item) => weights[Array.IndexOf(items, item)];
+
+            var counts = new int[items.Length];
+            for (int i = 0; i < 4000; i++) counts[Array.IndexOf(items, random.PickWeighted(items, Weight))]++;
+
+            Assert.AreEqual(0, counts[0]);
+            Assert.That(counts[2] / (double)counts[1], Is.InRange(2.6, 3.4));
+            Assert.Throws<ArgumentException>(() => random.PickWeighted(items, _ => 0));
+        }
+
+        [Test]
         public void RejectsEmptyRanges()
         {
             var random = new GameRandom(1);

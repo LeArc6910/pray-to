@@ -29,7 +29,7 @@
 
 ### 3. 컴파일·테스트 확인 후 커밋
 - [ ] Console에 컴파일 에러가 없는지 확인
-- [ ] Window > General > Test Runner > EditMode > Run All. 통과/실패 개수 보고 (클라우드 기준 6개 통과)
+- [ ] Window > General > Test Runner > EditMode > Run All. 통과/실패 개수 보고 (클라우드 기준 64개 통과)
 - [ ] 생성된 `.meta`, `Packages/packages-lock.json`, `ProjectSettings/`, `Assets/_Project/Settings/`를 커밋·푸시. `Library/`, `Temp/`, `Logs/`, `UserSettings/`는 커밋하지 않는다 (`.gitignore` 확인)
 
 ### 4. CI용 Unity 라이선스

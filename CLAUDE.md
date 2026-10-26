@@ -13,6 +13,7 @@
 ## 코드 구조
 
 - `Assets/_Project/Scripts/Core` (`Game.Core`): 게임 규칙과 시뮬레이션 전부. UnityEngine을 참조하지 않는다(`noEngineReferences`). netstandard2.1, C# 9.
+- `Assets/_Project/Data`: 데이터 시트(CSV). Core가 직접 읽는다. 루팅 시트 형식은 `Docs/Loot.md`에 있다.
 - `Assets/Tests/EditMode` (`Game.Core.Tests`): Core 테스트(NUnit). Unity Test Runner와 `dotnet test`가 같은 파일을 쓴다.
 - `DevTools/`: Unity 없이 Core를 빌드·테스트·시뮬레이션하는 .NET 프로젝트. 소스는 `Assets/`에서 가져다 쓰므로 여기에 게임 코드를 두지 않는다.
   - `Game.Core`: Core만 컴파일한다. 경고도 에러로 친다.
@@ -24,7 +25,9 @@
 
 ```
 dotnet test DevTools/Game.Core.Tests
-dotnet run --project DevTools/CoreSandbox -- --dice 42
+dotnet run --project DevTools/CoreSandbox -- --loot 25 10000
+dotnet run --project DevTools/CoreSandbox -- --progression
+dotnet run --project DevTools/CoreSandbox -- --item 25 7
 ```
 
 GitHub Actions(`.github/workflows/core-tests.yml`)가 푸시마다 같은 테스트를 돌린다.

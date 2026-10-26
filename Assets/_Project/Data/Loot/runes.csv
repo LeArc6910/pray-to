@@ -1,0 +1,8 @@
+id,name,level,weight,weapon,armor,jewelry
+ember,불씨 룬,1,1000,Fire:Damage+12%,Armor+4,Fire:Damage+6%
+frost,서리 룬,1,1000,Cold:Damage+12%,MaxHealth+10,Cold:Damage+6%
+spark,섬광 룬,1,1000,Lightning:Damage+12%,MoveSpeed+3%,Lightning:Damage+6%
+wind,바람 룬,10,600,AttackSpeed+6%,MoveSpeed+4%,AttackSpeed+3%
+earth,대지 룬,10,600,Damage+4,Armor+10,MaxHealth+15
+star,별 룬,20,300,CritChance+3,ItemRarity+10%,CritDamage+15
+abyss,심연 룬,30,120,Damage+15%,MaxHealth+8%,Damage+8%

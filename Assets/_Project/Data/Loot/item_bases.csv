@@ -1,0 +1,37 @@
+id,name,slot,level,tags,implicit,sockets,weight
+# 1단계: 구리
+copper_sword,구리 검,weapon,1,melee,Damage+4~6,3,100
+copper_bow,구리 활,weapon,1,ranged,Damage+3~5;AttackSpeed+5%,3,100
+copper_staff,구리 지팡이,weapon,1,magic,Damage+2~4;Magic:Damage+10%,3,100
+copper_helmet,구리 투구,helmet,1,,Armor+3~5,2,100
+copper_armor,구리 갑옷,chest,1,,Armor+6~9;MaxHealth+5~10,3,100
+copper_boots,구리 장화,boots,1,,Armor+2~3,2,100
+copper_ring,구리 반지,ring,1,,MaxHealth+5~8,1,60
+copper_amulet,구리 목걸이,amulet,1,,Damage+3~5%,1,60
+# 2단계: 철
+iron_sword,철 검,weapon,10,melee,Damage+9~12,3,100
+iron_bow,철 활,weapon,10,ranged,Damage+7~10;AttackSpeed+5%,3,100
+iron_staff,철 지팡이,weapon,10,magic,Damage+5~8;Magic:Damage+15%,3,100
+iron_helmet,철 투구,helmet,10,,Armor+7~10,2,100
+iron_armor,철 갑옷,chest,10,,Armor+13~17;MaxHealth+12~18,3,100
+iron_boots,철 장화,boots,10,,Armor+5~7,2,100
+iron_ring,철 반지,ring,10,,MaxHealth+10~15,1,60
+iron_amulet,철 목걸이,amulet,10,,Damage+5~7%,1,60
+# 3단계: 미스릴
+mithril_sword,미스릴 검,weapon,20,melee,Damage+17~22,3,100
+mithril_bow,미스릴 활,weapon,20,ranged,Damage+14~18;AttackSpeed+5%,3,100
+mithril_staff,미스릴 지팡이,weapon,20,magic,Damage+11~14;Magic:Damage+20%,3,100
+mithril_helmet,미스릴 투구,helmet,20,,Armor+14~18,2,100
+mithril_armor,미스릴 갑옷,chest,20,,Armor+25~31;MaxHealth+22~30,3,100
+mithril_boots,미스릴 장화,boots,20,,Armor+10~12,2,100
+mithril_ring,미스릴 반지,ring,20,,MaxHealth+20~26,1,60
+mithril_amulet,미스릴 목걸이,amulet,20,,Damage+7~9%,1,60
+# 4단계: 흑요석
+obsidian_sword,흑요석 검,weapon,30,melee,Damage+32~40,3,100
+obsidian_bow,흑요석 활,weapon,30,ranged,Damage+26~33;AttackSpeed+5%,3,100
+obsidian_staff,흑요석 지팡이,weapon,30,magic,Damage+21~26;Magic:Damage+25%,3,100
+obsidian_helmet,흑요석 투구,helmet,30,,Armor+26~32,2,100
+obsidian_armor,흑요석 갑옷,chest,30,,Armor+45~55;MaxHealth+40~50,3,100
+obsidian_boots,흑요석 장화,boots,30,,Armor+18~22,2,100
+obsidian_ring,흑요석 반지,ring,30,,MaxHealth+36~45,1,60
+obsidian_amulet,흑요석 목걸이,amulet,30,,Damage+9~12%,1,60

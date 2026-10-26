@@ -1,0 +1,5 @@
+id,name,slots,runes,modifiers
+storm,폭풍,weapon,wind|spark,Lightning:Damage+40%;AttackSpeed+10%
+insight,통찰,helmet,star|frost,ItemRarity+25%;CritChance+2
+fortress,요새,chest,earth|earth|frost,Armor+30%;MaxHealth+40
+comet,혜성,weapon,star|ember|wind,CritChance+5;CritDamage+40;Fire:Damage+25%
