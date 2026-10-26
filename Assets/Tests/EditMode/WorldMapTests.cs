@@ -40,6 +40,21 @@ namespace Game.Core.Tests
             Assert.That(floor / (double)(map.Width * map.Height), Is.InRange(0.25, 0.75));
         }
 
+        [TestCase(1UL)]
+        [TestCase(2UL)]
+        [TestCase(3UL)]
+        [TestCase(4UL)]
+        public void EveryCaveHasAnOpenArenaReachableFromTheSpawn(ulong seed)
+        {
+            var world = WorldGenerator.Generate(seed);
+
+            Assert.IsFalse(Collision.Overlaps(world.Map, world.Arena, world.ArenaRadius - 1), "the arena floor is clear");
+            Assert.Greater(Vec2.Distance(world.Arena, world.Spawn), 30);
+            var field = new FlowField(world.Map);
+            field.Build(new[] { world.Spawn }, int.MaxValue - 1);
+            Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(world.ArenaX, world.ArenaY));
+        }
+
         [Test]
         public void WallsStopMovementAtTheRadius()
         {

@@ -14,12 +14,16 @@ namespace Game.Client
         public TextAsset runes;
         public TextAsset runewords;
         public TextAsset monsters;
+        public TextAsset bosses;
+        public TextAsset bossAttacks;
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
         public LootData LoadLoot() => LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords));
 
         public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
+
+        public BossData LoadBosses(MonsterData monsterData) => BossSheet.Parse(Text(bosses), Text(bossAttacks), monsterData);
 
         static string Text(TextAsset asset) => asset != null ? asset.text : "";
     }

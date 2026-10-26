@@ -20,7 +20,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.2.0";
+        public const string Version = "0.3.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -49,6 +49,21 @@ namespace Game.Core
         }
 
         internal static Vec2 ReadVec2(this BinaryReader reader) => new Vec2(reader.ReadSingle(), reader.ReadSingle());
+
+        // 1/64 of a tile in 16 bits: enough for drawing, and covers ±512 tiles.
+        internal static void WriteCompact(this BinaryWriter writer, Vec2 value)
+        {
+            writer.Write(Sixtyfourths(value.X));
+            writer.Write(Sixtyfourths(value.Y));
+        }
+
+        internal static Vec2 ReadCompact(this BinaryReader reader) => new Vec2(reader.ReadInt16() / 64f, reader.ReadInt16() / 64f);
+
+        static short Sixtyfourths(float value) => (short)Math.Clamp((int)MathF.Round(value * 64), short.MinValue, short.MaxValue);
+
+        internal static ushort Whole(float value) => (ushort)Math.Clamp((int)MathF.Ceiling(value), 0, ushort.MaxValue);
+
+        internal static ushort Eighths(float value) => (ushort)Math.Clamp((int)MathF.Round(value * 8), 0, ushort.MaxValue);
 
         // A direction squeezed into one byte, 256 steps around the circle.
         internal static byte PackDirection(Vec2 direction)
@@ -181,29 +196,87 @@ namespace Game.Core
         });
     }
 
-    // Monster is an index into the monster sheet, which both sides load; -1 means a player.
+    public enum EntityKind : byte
+    {
+        Player,
+        Monster,
+        Boss,
+    }
+
+    // Positions travel as 1/64 of a tile in 16 bits and health as whole numbers, to keep a snapshot in one packet.
+    // Type is an index into the monster or boss sheet, which both sides load. State is an EnemyState or BossState.
     public readonly struct EntityState
     {
-        public EntityState(int id, int monster, Vec2 position, Vec2 facing, float health, float maxHealth, EnemyState state)
+        public EntityState(int id, EntityKind kind, int type, Vec2 position, Vec2 facing, float health, float maxHealth, byte state, int phase = 0)
         {
             Id = id;
-            Monster = monster;
+            Kind = kind;
+            Type = type;
             Position = position;
             Facing = facing;
             Health = health;
             MaxHealth = maxHealth;
             State = state;
+            Phase = phase;
         }
 
         public int Id { get; }
-        public int Monster { get; }
-        public bool IsPlayer => Monster < 0;
+        public EntityKind Kind { get; }
+        public int Type { get; }
+        public bool IsPlayer => Kind == EntityKind.Player;
         public Vec2 Position { get; }
         public Vec2 Facing { get; }
         public float Health { get; }
         public float MaxHealth { get; }
-        public EnemyState State { get; }
+        public byte State { get; }
+        // A boss's current phase.
+        public int Phase { get; }
         public bool IsDead => Health <= 0;
+    }
+
+    // Clients move projectiles on by their velocity between snapshots, so they are drawn where they really are.
+    public readonly struct ProjectileState
+    {
+        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius)
+        {
+            Id = id;
+            Position = position;
+            Velocity = velocity;
+            Radius = radius;
+        }
+
+        public int Id { get; }
+        public Vec2 Position { get; }
+        public Vec2 Velocity { get; }
+        public float Radius { get; }
+    }
+
+    // A telegraphed area. TicksLeft counts from the snapshot's tick to when it lands, out of Duration in all.
+    public readonly struct HazardState
+    {
+        public HazardState(int id, HazardShape shape, Vec2 position, Vec2 direction, float size, float width, int ticksLeft, int duration, bool harmful)
+        {
+            Id = id;
+            Shape = shape;
+            Position = position;
+            Direction = direction;
+            Size = size;
+            Width = width;
+            TicksLeft = ticksLeft;
+            Duration = duration;
+            Harmful = harmful;
+        }
+
+        public int Id { get; }
+        public HazardShape Shape { get; }
+        public Vec2 Position { get; }
+        public Vec2 Direction { get; }
+        public float Size { get; }
+        public float Width { get; }
+        public int TicksLeft { get; }
+        public int Duration { get; }
+        // False for a charge's path, which only shows where the boss will run.
+        public bool Harmful { get; }
     }
 
     // What only the receiving player needs about themselves.
@@ -228,17 +301,27 @@ namespace Game.Core
 
     public sealed class SnapshotMessage
     {
-        public SnapshotMessage(long tick, SelfState self, IReadOnlyList<EntityState> entities, IReadOnlyList<SimEvent> events)
+        public SnapshotMessage(
+            long tick,
+            SelfState self,
+            IReadOnlyList<EntityState> entities,
+            IReadOnlyList<ProjectileState> projectiles,
+            IReadOnlyList<HazardState> hazards,
+            IReadOnlyList<SimEvent> events)
         {
             Tick = tick;
             Self = self;
             Entities = entities;
+            Projectiles = projectiles;
+            Hazards = hazards;
             Events = events;
         }
 
         public long Tick { get; }
         public SelfState Self { get; }
         public IReadOnlyList<EntityState> Entities { get; }
+        public IReadOnlyList<ProjectileState> Projectiles { get; }
+        public IReadOnlyList<HazardState> Hazards { get; }
         public IReadOnlyList<SimEvent> Events { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Snapshot, w =>
@@ -254,12 +337,37 @@ namespace Game.Core
             foreach (var entity in Entities)
             {
                 w.Write(entity.Id);
-                w.Write((short)entity.Monster);
-                w.Write(entity.Position);
+                w.Write((byte)entity.Kind);
+                w.Write((byte)entity.Type);
+                w.WriteCompact(entity.Position);
                 w.Write(Protocol.PackDirection(entity.Facing));
-                w.Write(entity.Health);
-                w.Write(entity.MaxHealth);
-                w.Write((byte)entity.State);
+                w.Write(Protocol.Whole(entity.Health));
+                w.Write(Protocol.Whole(entity.MaxHealth));
+                w.Write(entity.State);
+                w.Write((byte)entity.Phase);
+            }
+
+            w.Write((ushort)Projectiles.Count);
+            foreach (var projectile in Projectiles)
+            {
+                w.Write(projectile.Id);
+                w.WriteCompact(projectile.Position);
+                w.WriteCompact(projectile.Velocity);
+                w.Write((byte)Math.Clamp((int)MathF.Round(projectile.Radius * 32), 0, 255));
+            }
+
+            w.Write((ushort)Hazards.Count);
+            foreach (var hazard in Hazards)
+            {
+                w.Write(hazard.Id);
+                w.Write((byte)hazard.Shape);
+                w.WriteCompact(hazard.Position);
+                w.Write(Protocol.PackDirection(hazard.Direction));
+                w.Write(Protocol.Eighths(hazard.Size));
+                w.Write(Protocol.Eighths(hazard.Width));
+                w.Write((short)Math.Clamp(hazard.TicksLeft, short.MinValue, short.MaxValue));
+                w.Write((short)Math.Clamp(hazard.Duration, 0, short.MaxValue));
+                w.Write(hazard.Harmful);
             }
 
             w.Write((ushort)Events.Count);
@@ -268,7 +376,7 @@ namespace Game.Core
                 w.Write((byte)e.Type);
                 w.Write(e.Source);
                 w.Write(e.Target);
-                w.Write(e.Amount);
+                w.Write((short)Math.Clamp(e.Amount, short.MinValue, short.MaxValue));
                 w.Write(e.Critical);
                 w.Write(Protocol.PackDirection(e.Direction));
             }
@@ -285,12 +393,37 @@ namespace Game.Core
             {
                 entities.Add(new EntityState(
                     r.ReadInt32(),
-                    r.ReadInt16(),
-                    r.ReadVec2(),
+                    (EntityKind)r.ReadByte(),
+                    r.ReadByte(),
+                    r.ReadCompact(),
                     Protocol.UnpackDirection(r.ReadByte()),
-                    r.ReadSingle(),
-                    r.ReadSingle(),
-                    (EnemyState)r.ReadByte()));
+                    r.ReadUInt16(),
+                    r.ReadUInt16(),
+                    r.ReadByte(),
+                    r.ReadByte()));
+            }
+
+            int projectileCount = r.ReadUInt16();
+            var projectiles = new List<ProjectileState>(projectileCount);
+            for (int i = 0; i < projectileCount; i++)
+            {
+                projectiles.Add(new ProjectileState(r.ReadInt32(), r.ReadCompact(), r.ReadCompact(), r.ReadByte() / 32f));
+            }
+
+            int hazardCount = r.ReadUInt16();
+            var hazards = new List<HazardState>(hazardCount);
+            for (int i = 0; i < hazardCount; i++)
+            {
+                hazards.Add(new HazardState(
+                    r.ReadInt32(),
+                    (HazardShape)r.ReadByte(),
+                    r.ReadCompact(),
+                    Protocol.UnpackDirection(r.ReadByte()),
+                    r.ReadUInt16() / 8f,
+                    r.ReadUInt16() / 8f,
+                    r.ReadInt16(),
+                    r.ReadInt16(),
+                    r.ReadBoolean()));
             }
 
             int eventCount = r.ReadUInt16();
@@ -300,11 +433,11 @@ namespace Game.Core
                 var type = (SimEventType)r.ReadByte();
                 int source = r.ReadInt32();
                 int target = r.ReadInt32();
-                int amount = r.ReadInt32();
+                int amount = r.ReadInt16();
                 bool critical = r.ReadBoolean();
                 events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte())));
             }
-            return new SnapshotMessage(tick, self, entities, events);
+            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events);
         });
     }
 }

@@ -13,7 +13,7 @@
 ## 코드 구조
 
 - `Assets/_Project/Scripts/Core` (`Game.Core`): 게임 규칙과 시뮬레이션 전부. UnityEngine을 참조하지 않는다(`noEngineReferences`). netstandard2.1, C# 9.
-- `Assets/_Project/Data`: 데이터 시트(CSV). Core가 직접 읽는다. 루팅 시트 형식은 `Docs/Loot.md`에 있다.
+- `Assets/_Project/Data`: 데이터 시트(CSV). Core가 직접 읽는다. 형식은 `Docs/Loot.md`(아이템), `Docs/Combat.md`(몬스터), `Docs/Bosses.md`(보스)에 있다. 시트를 새로 추가하면 `GameSheets`와 `SceneSetup`에도 넣는다.
 - `Assets/Tests/EditMode` (`Game.Core.Tests`): Core 테스트(NUnit). Unity Test Runner와 `dotnet test`가 같은 파일을 쓴다.
 - `DevTools/`: Unity 없이 Core를 빌드·테스트·시뮬레이션하는 .NET 프로젝트. 소스는 `Assets/`에서 가져다 쓰므로 여기에 게임 코드를 두지 않는다.
   - `Game.Core`: Core만 컴파일한다. 경고도 에러로 친다.
@@ -30,6 +30,7 @@ dotnet run --project DevTools/CoreSandbox -- --loot 25 10000
 dotnet run --project DevTools/CoreSandbox -- --progression
 dotnet run --project DevTools/CoreSandbox -- --item 25 7
 dotnet run --project DevTools/CoreSandbox -- --fight 120 42
+dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --players 2
 
 # Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(약 1분 반, 엔진 DLL만 .unity/에 받는다)
 DevTools/UnityCompileCheck/fetch-unity.sh

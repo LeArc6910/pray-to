@@ -15,6 +15,7 @@ namespace Game.Client
         static Sprite _ring;
         static Sprite _arc;
         static Sprite _square;
+        static readonly System.Collections.Generic.Dictionary<int, Sprite> Wedges = new System.Collections.Generic.Dictionary<int, Sprite>();
 
         public static Sprite Circle => _circle ??= Make((u, v) => Edge(1 - Radius(u, v)));
 
@@ -30,9 +31,23 @@ namespace Game.Client
 
         public static Sprite Square => _square ??= Make((u, v) => 1);
 
+        // A slice of a disc pointing along +x with its tip at the centre, for cone telegraphs.
+        public static Sprite Wedge(float degrees)
+        {
+            int key = Mathf.RoundToInt(degrees);
+            if (Wedges.TryGetValue(key, out var sprite)) return sprite;
+            float half = key * 0.5f * Mathf.Deg2Rad;
+            sprite = Make((u, v) => Mathf.Min(Edge(1 - Radius(u, v)), key >= 360 ? 1 : Edge((half - Mathf.Abs(Mathf.Atan2(v, u))) * 4)));
+            Wedges[key] = sprite;
+            return sprite;
+        }
+
         public static Tile FloorTile() => MakeTile(new Color32(58, 47, 40, 255), new Color32(66, 54, 46, 255), raised: false);
 
         public static Tile WallTile() => MakeTile(new Color32(104, 90, 76, 255), new Color32(132, 116, 98, 255), raised: true);
+
+        // The boss arena's floor, darker and redder so it reads as a different place.
+        public static Tile ArenaTile() => MakeTile(new Color32(52, 34, 34, 255), new Color32(64, 42, 40, 255), raised: false);
 
         static float Radius(float u, float v) => Mathf.Sqrt(u * u + v * v);
 

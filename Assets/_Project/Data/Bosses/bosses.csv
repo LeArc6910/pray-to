@@ -1,0 +1,2 @@
+id,name,health,health_per_player,armor,speed,radius,phases,roar,roar_radius,roar_damage
+cave_warden,동굴 수호자,650,60,0,2.2,1.2,66|33,1.5,3.5,15

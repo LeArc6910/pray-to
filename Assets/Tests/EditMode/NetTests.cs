@@ -13,12 +13,12 @@ namespace Game.Core.Tests
             public readonly WorldHost Host;
             public readonly Dictionary<ulong, WorldClient> Clients = new Dictionary<ulong, WorldClient>();
 
-            public Session(HostConfig config = null) =>
-                Host = new WorldHost(7, Monsters.Shipped, Gear.Data, config, new WorldConfig { EnemyTarget = 0 });
+            public Session(HostConfig config = null, BossData bosses = null) =>
+                Host = new WorldHost(7, Monsters.Shipped, Gear.Data, config, new WorldConfig { EnemyTarget = 0 }, bosses);
 
             public WorldClient Join(ulong connection, string name, string version = Protocol.Version)
             {
-                var client = new WorldClient("key" + connection, name, Monsters.Shipped);
+                var client = new WorldClient("key" + connection, name, Monsters.Shipped, Bosses.Shipped);
                 Clients[connection] = client;
                 Host.Receive(connection, new JoinMessage(client.PlayerKey, name, version).Encode());
                 Deliver();
@@ -65,12 +65,29 @@ namespace Game.Core.Tests
             var snapshot = SnapshotMessage.Decode(new SnapshotMessage(
                 99,
                 new SelfState(2, new Vec2(1, 2), 50, 100, 5),
-                new[] { new EntityState(7, 0, new Vec2(3, 4), new Vec2(-1, 0), 12, 30, EnemyState.Windup) },
+                new[] { new EntityState(7, EntityKind.Boss, 0, new Vec2(3.3f, 4.71f), new Vec2(-1, 0), 1234.2f, 2000, (byte)BossState.Telegraph, 2) },
+                new[] { new ProjectileState(8, new Vec2(5, 6), new Vec2(-7, 0.5f), 0.3f) },
+                new[] { new HazardState(9, HazardShape.Cone, new Vec2(3, 4), new Vec2(0, 1), 4.5f, 110, 12, 21, true) },
                 new[] { new SimEvent(SimEventType.Hit, 1, 7, 6, critical: true) }).Encode());
             Assert.AreEqual(99, snapshot.Tick);
             Assert.AreEqual(2, snapshot.Self.Corrections);
             var entity = snapshot.Entities.Single();
-            Assert.AreEqual(EnemyState.Windup, entity.State);
+            Assert.AreEqual(EntityKind.Boss, entity.Kind);
+            Assert.AreEqual((byte)BossState.Telegraph, entity.State);
+            Assert.AreEqual(2, entity.Phase);
+            Assert.AreEqual(1235, entity.Health, "health travels as a whole number, rounded up");
+            Assert.AreEqual(3.3f, entity.Position.X, 1 / 64f);
+            Assert.AreEqual(4.71f, entity.Position.Y, 1 / 64f);
+            var projectile = snapshot.Projectiles.Single();
+            Assert.AreEqual(-7, projectile.Velocity.X, 1 / 64f);
+            Assert.AreEqual(0.3f, projectile.Radius, 1 / 32f);
+            var hazard = snapshot.Hazards.Single();
+            Assert.AreEqual(HazardShape.Cone, hazard.Shape);
+            Assert.AreEqual(110, hazard.Width, 1 / 8f);
+            Assert.AreEqual(4.5f, hazard.Size, 1 / 8f);
+            Assert.AreEqual(12, hazard.TicksLeft);
+            Assert.AreEqual(21, hazard.Duration);
+            Assert.IsTrue(hazard.Harmful);
             Assert.AreEqual(-1, entity.Facing.X, 0.001f);
             Assert.AreEqual(0, entity.Facing.Y, 0.03f);
             Assert.IsTrue(snapshot.Events.Single().Critical);
@@ -206,6 +223,98 @@ namespace Game.Core.Tests
             }
 
             Assert.LessOrEqual(largest, 1200);
+        }
+
+        // Puts a player somewhere on the host at once, in steps the host accepts; its client is corrected after.
+        static void Walk(World world, Player player, Vec2 to)
+        {
+            for (int i = 0; i < 100 && Vec2.Distance(player.Position, to) > 0.001f; i++)
+            {
+                var step = (to - player.Position).ClampLength(2);
+                Assert.IsTrue(world.MovePlayer(player.Id, player.Position + step, step, 10));
+            }
+        }
+
+        [Test]
+        public void SnapshotsStayInsideOnePacketInABossFight()
+        {
+            // Strong gear, so the four of them get the boss through its phases while slimes crowd in.
+            var session = new Session(new HostConfig { StarterGear = new[] { "obsidian_sword", "obsidian_armor" } }, Bosses.Shipped);
+            var host = session.Host;
+            var world = host.World;
+            var boss = world.Bosses.Single();
+            for (ulong i = 1; i <= 4; i++) session.Join(i, "플레이어" + i);
+            for (int i = 0; i < 4; i++) Walk(world, world.Players[i], boss.Home + Vec2.FromAngle(i * 1.6f) * 2.5f);
+            for (int i = 0; i < 40; i++) world.SpawnEnemy(Monsters.Shipped.Find("slime"), boss.Home + Vec2.FromAngle(i) * 6);
+
+            int largest = 0;
+            var seen = new HashSet<SimEventType>();
+            for (int tick = 0; tick < 60 * World.TicksPerSecond && world.Bosses.Count > 0; tick++)
+            {
+                foreach (var player in world.Players)
+                {
+                    world.MovePlayer(player.Id, player.Position, boss.Position - player.Position, 1);
+                    world.SetAttacking(player.Id, true);
+                }
+                host.Tick();
+                foreach (var message in host.TakeOutgoing())
+                {
+                    largest = Math.Max(largest, message.Data.Length);
+                    if (Protocol.TypeOf(message.Data) == MessageType.Snapshot)
+                    {
+                        foreach (var e in SnapshotMessage.Decode(message.Data).Events) seen.Add(e.Type);
+                    }
+                }
+            }
+
+            Assert.LessOrEqual(largest, 1200);
+            Assert.IsTrue(seen.Contains(SimEventType.PhaseChanged), $"the fight got far enough to matter: boss {(world.Bosses.Count > 0 ? world.Bosses[0].Health + "/" + world.Bosses[0].MaxHealth + " phase " + world.Bosses[0].Phase + " " + world.Bosses[0].State : "gone")}, players {string.Join(",", world.Players.Select(p => p.Health))}, events {string.Join(",", seen)}");
+        }
+
+        [Test]
+        public void ClientsSeeTheBossAndItsTelegraphsCountingDown()
+        {
+            var session = new Session(bosses: Bosses.Shipped);
+            var alice = session.Join(1, "앨리스");
+            var world = session.Host.World;
+            var boss = world.Bosses.Single();
+            Walk(world, world.FindPlayer(alice.PlayerId), boss.Home + new Vec2(0, -4));
+
+            var progress = new List<float>();
+            for (int i = 0; i < 5 * World.TicksPerSecond && progress.Count < 5; i++)
+            {
+                session.Tick();
+                var hazards = alice.Hazards();
+                if (hazards.Count > 0) progress.Add(hazards[0].Progress);
+            }
+
+            var seenBoss = alice.Others().Single(e => e.Kind == EntityKind.Boss);
+            Assert.AreEqual(boss.Definition, seenBoss.Boss);
+            Assert.AreNotEqual(BossState.Dormant, seenBoss.BossState);
+            Assert.AreEqual(5, progress.Count, "a telegraph showed up");
+            Assert.That(progress, Is.Ordered);
+            Assert.Greater(progress[4], progress[0]);
+        }
+
+        [Test]
+        public void ProjectilesAreDrawnWhereTheyAreNow()
+        {
+            var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped);
+            client.Receive(new WelcomeMessage(1, 7, 32, 32, new Vec2(5, 5)).Encode());
+            client.Receive(new SnapshotMessage(
+                100,
+                new SelfState(0, new Vec2(5, 5), 100, 100, 5),
+                new EntityState[0],
+                new[] { new ProjectileState(3, new Vec2(10, 10), new Vec2(6, 0), 0.3f) },
+                new HazardState[0],
+                new SimEvent[0]).Encode());
+
+            client.AdvanceRenderClock(0.1f);
+            Assert.AreEqual(10.6f, client.Projectiles().Single().Position.X, 0.02f);
+
+            // Without news from the host, the guess stops after a quarter of a second.
+            client.AdvanceRenderClock(1);
+            Assert.AreEqual(11.5f, client.Projectiles().Single().Position.X, 0.02f);
         }
 
         [Test]

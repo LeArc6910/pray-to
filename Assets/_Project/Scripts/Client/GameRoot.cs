@@ -30,6 +30,7 @@ namespace Game.Client
         string _status = "";
         LootData _loot;
         MonsterData _monsters;
+        BossData _bosses;
         WorldHost _host;
         WorldClient _client;
         NetLink _net;
@@ -58,8 +59,10 @@ namespace Game.Client
             }
             _loot = sheets.LoadLoot();
             _monsters = sheets.LoadMonsters();
+            _bosses = sheets.LoadBosses(_monsters);
             var errors = new List<string>(_loot.Errors);
             errors.AddRange(_monsters.Errors);
+            errors.AddRange(_bosses.Errors);
             if (errors.Count > 0) _status = "데이터 시트 오류:\n" + string.Join("\n", errors);
         }
 
@@ -136,8 +139,8 @@ namespace Game.Client
             }
 
             ulong seed = (ulong)DateTime.UtcNow.Ticks;
-            _host = new WorldHost(seed, _monsters, _loot);
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters);
+            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
             _status = "";
@@ -151,7 +154,7 @@ namespace Game.Client
                 _status = "접속을 시작하지 못했습니다. 주소를 확인하세요.";
                 return;
             }
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses);
             _joinSent = false;
             _net.Connected += id =>
             {
@@ -198,13 +201,13 @@ namespace Game.Client
         {
             var area = new Rect(Screen.width / 2f - 180, Screen.height / 2f - 150, 360, 300);
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label("pray-to (M2 프로토타입)");
+            GUILayout.Label("pray-to (M3 프로토타입)");
             GUILayout.Space(8);
             GUILayout.Label("이름");
             _playerName = GUILayout.TextField(_playerName, 16);
             GUILayout.Space(8);
 
-            bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success;
+            bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success;
             GUI.enabled = ready;
             if (GUILayout.Button("혼자 하기")) StartSolo();
             if (GUILayout.Button($"호스트 (포트 {NetLink.DefaultPort})")) StartHosting(Mode.Host);
@@ -224,7 +227,7 @@ namespace Game.Client
 
         void DrawHud()
         {
-            GUILayout.BeginArea(new Rect(10, 10, 320, 140), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(10, 10, 340, 160), GUI.skin.box);
             if (_client.Status != ClientStatus.Playing)
             {
                 GUILayout.Label(_status);
@@ -235,9 +238,35 @@ namespace Game.Client
                 if (_client.IsDead) GUILayout.Label("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 string mode = _mode == Mode.Host ? $"호스트 중 (포트 {NetLink.DefaultPort})" : _mode == Mode.Join ? "참가 중" : "혼자 하기";
                 GUILayout.Label($"{mode} · 접속 {_client.Names.Count}명");
+                var toArena = _client.Arena - _client.Position;
+                if (toArena.Length > _client.ArenaRadius) GUILayout.Label($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
             }
             GUILayout.Label("WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Esc 메뉴");
             GUILayout.EndArea();
+
+            if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);
+        }
+
+        static void DrawBossBar(EntityView boss)
+        {
+            float width = Mathf.Min(600, Screen.width - 40);
+            var bar = new Rect((Screen.width - width) / 2, 20, width, 18);
+            GUI.Label(new Rect(bar.x, bar.y - 2, width, 22), $"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈");
+            var previous = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.7f);
+            GUI.DrawTexture(new Rect(bar.x, bar.y + 20, width, bar.height), Texture2D.whiteTexture);
+            GUI.color = new Color(0.85f, 0.25f, 0.2f);
+            float share = boss.MaxHealth > 0 ? Mathf.Clamp01(boss.Health / boss.MaxHealth) : 0;
+            GUI.DrawTexture(new Rect(bar.x + 2, bar.y + 22, (width - 4) * share, bar.height - 4), Texture2D.whiteTexture);
+            GUI.color = previous;
+        }
+
+        // Which of the eight directions an offset points, as a Korean word. Up on screen is north.
+        static string Compass(Vec2 offset)
+        {
+            string[] names = { "동", "북동", "북", "북서", "서", "남서", "남", "남동" };
+            int sector = Mathf.RoundToInt(offset.Angle / (Mathf.PI / 4));
+            return names[(sector % 8 + 8) % 8];
         }
     }
 }

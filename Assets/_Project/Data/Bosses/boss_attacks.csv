@@ -1,0 +1,9 @@
+boss,id,name,phases,shape,target,telegraph,damage,radius,length,angle,width,count,spread,speed,cooldown,weight,summon
+cave_warden,slam,내려찍기,,circle,nearest,1.0,22,2.0,,,,1,,,1.0,30,
+cave_warden,sweep,휩쓸기,,cone,nearest,0.9,16,,3.5,100,,,,,0.8,25,
+cave_warden,rock_burst,돌 파편,1|2,burst,self,0.6,10,0.3,,,,10,,7,1.0,20,
+cave_warden,quake,지진,2|3,circle,each,1.1,18,1.8,,,,1,,,1.0,20,
+cave_warden,charge,돌진,2|3,charge,farthest,1.0,25,,10,,2.4,,,16,1.2,20,
+cave_warden,rock_storm,돌 폭풍,3,burst,self,0.6,10,0.3,,,,18,,7,1.0,15,
+cave_warden,meteor,낙석,3,circle,random,1.2,20,1.6,,,,4,3.5,,1.0,15,
+cave_warden,call_slimes,슬라임 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,slime

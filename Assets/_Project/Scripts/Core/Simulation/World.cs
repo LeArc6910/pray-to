@@ -12,11 +12,14 @@ namespace Game.Core
         public float SpawnDistance { get; set; } = 12;
         public float RespawnSeconds { get; set; } = 5;
         public int ZoneLevel { get; set; } = 1;
+        // A defeated boss returns to its arena after this long.
+        public float BossRespawnSeconds { get; set; } = 120;
     }
 
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
-    // the one exception is a player's own position, which its client reports (see MovePlayer).
-    public sealed class World
+    // the one exception is a player's own position, which its client reports (see MovePlayer). Bosses, their
+    // telegraphed areas and projectiles are in World.Boss.cs.
+    public sealed partial class World
     {
         public const int TicksPerSecond = 30;
         public const float TickSeconds = 1f / TicksPerSecond;
@@ -126,12 +129,16 @@ namespace Game.Core
             Tick++;
             foreach (var player in _players) UpdatePlayer(player);
             _enemies.RemoveAll(e => e.IsDead);
+            RemoveDefeatedBosses();
 
             if (Tick % FlowFieldInterval == 1)
             {
                 _flow.Build(_players.Where(p => !p.IsDead).Select(p => p.Position), FlowFieldRange);
             }
             foreach (var enemy in _enemies) UpdateEnemy(enemy);
+            UpdateBosses();
+            UpdateHazards();
+            UpdateProjectiles();
             SeparateEnemies();
 
             if (--_spawnTimer <= 0)
@@ -168,14 +175,28 @@ namespace Game.Core
                 if (enemy.IsDead) continue;
                 if (!Combat.InArc(player.Position, player.Facing, enemy.Position, enemy.Definition.Radius, MeleeReach, MeleeArcDegrees)) continue;
 
-                bool critical = _random.Chance(stats.CritChance / 100f);
-                float damage = stats.Damage * (critical ? stats.CritDamage / 100f : 1f);
-                int amount = Combat.Mitigate(damage, enemy.Definition.Armor);
+                int amount = RollDamage(stats, enemy.Definition.Armor, out bool critical);
                 enemy.Health -= amount;
                 enemy.Knockback = (enemy.Position - player.Position).Normalized * KnockbackSpeed;
                 _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical));
                 if (enemy.IsDead) _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
             }
+
+            foreach (var boss in _bosses)
+            {
+                if (boss.IsDead) continue;
+                if (!Combat.InArc(player.Position, player.Facing, boss.Position, boss.Definition.Radius, MeleeReach, MeleeArcDegrees)) continue;
+                if (boss.State == BossState.Dormant) Wake(boss);
+                if (boss.Invulnerable) continue;
+                int amount = RollDamage(stats, boss.Definition.Armor, out bool critical);
+                DamageBoss(boss, player.Id, amount, critical);
+            }
+        }
+
+        int RollDamage(PlayerStats stats, float armor, out bool critical)
+        {
+            critical = _random.Chance(stats.CritChance / 100f);
+            return Combat.Mitigate(stats.Damage * (critical ? stats.CritDamage / 100f : 1f), armor);
         }
 
         void UpdateEnemy(Enemy enemy)
@@ -223,7 +244,7 @@ namespace Game.Core
                 case EnemyState.Windup:
                     if (--enemy.StateTicks > 0) break;
                     _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
-                    if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack) Strike(enemy, target);
+                    if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack) HurtPlayer(target, enemy.Id, definition.Damage);
                     enemy.State = EnemyState.Recover;
                     enemy.StateTicks = Ticks(definition.Cooldown);
                     break;
@@ -234,11 +255,12 @@ namespace Game.Core
             }
         }
 
-        void Strike(Enemy enemy, Player player)
+        void HurtPlayer(Player player, int source, float damage, int cause = 0)
         {
-            int amount = Combat.Mitigate(enemy.Definition.Damage, player.Stats.Armor);
+            if (player.IsDead) return;
+            int amount = Combat.Mitigate(damage, player.Stats.Armor);
             player.Health -= amount;
-            _events.Add(new SimEvent(SimEventType.Hit, enemy.Id, player.Id, amount));
+            _events.Add(new SimEvent(SimEventType.Hit, source, player.Id, amount, cause: cause));
             if (!player.IsDead) return;
 
             player.Health = 0;

@@ -12,10 +12,12 @@ namespace Game.Core
         public int SnapshotInterval { get; set; } = 2;
         // Entities further than this from a player are left out of that player's snapshots.
         public float ViewRange { get; set; } = 22;
-        // These two keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes): 32 entities
-        // of 24 bytes and 24 events of 15 bytes come to about 1.2 KB.
-        public int MaxEntitiesPerSnapshot { get; set; } = 32;
-        public int MaxEventsPerSnapshot { get; set; } = 24;
+        // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). At 17 bytes an
+        // entity, 13 a projectile, 19 a hazard and 13 an event, the maximum comes to about 1.15 KB.
+        public int MaxEntitiesPerSnapshot { get; set; } = 24;
+        public int MaxProjectilesPerSnapshot { get; set; } = 24;
+        public int MaxHazardsPerSnapshot { get; set; } = 10;
+        public int MaxEventsPerSnapshot { get; set; } = 16;
         public string[] StarterGear { get; set; } = { "copper_sword" };
     }
 
@@ -49,21 +51,25 @@ namespace Game.Core
         readonly List<Outgoing> _outgoing = new List<Outgoing>();
         readonly List<SimEvent> _pendingEvents = new List<SimEvent>();
         readonly MonsterData _monsters;
+        readonly BossData _bosses;
         readonly LootData _loot;
         readonly HostConfig _config;
         readonly GameRandom _gearRandom;
         readonly ulong _seed;
         readonly GeneratedWorld _generated;
 
-        public WorldHost(ulong seed, MonsterData monsters, LootData loot, HostConfig config = null, WorldConfig worldConfig = null)
+        // The first boss in the sheet waits in the arena; without boss data the caves have none.
+        public WorldHost(ulong seed, MonsterData monsters, LootData loot, HostConfig config = null, WorldConfig worldConfig = null, BossData bosses = null)
         {
             _seed = seed;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
+            _bosses = bosses;
             _loot = loot ?? throw new ArgumentNullException(nameof(loot));
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
             _generated = WorldGenerator.Generate(seed);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig);
+            if (bosses != null && bosses.Bosses.Count > 0) World.PlaceBoss(bosses.Bosses[0], _generated.Arena, _generated.ArenaRadius);
         }
 
         public World World { get; }
@@ -156,32 +162,58 @@ namespace Game.Core
 
         SnapshotMessage Snapshot(Player viewer)
         {
+            float Distance(Vec2 position) => Vec2.Distance(position, viewer.Position);
+            bool InView(Vec2 position, float size = 0) => Distance(position) <= _config.ViewRange + size;
+
             var self = new SelfState(viewer.Corrections, viewer.Position, viewer.Health, viewer.Stats.MaxHealth, viewer.Stats.MoveSpeed);
-            var entities = World.Players
-                .Select(p => new EntityState(p.Id, -1, p.Position, p.Facing, p.Health, p.Stats.MaxHealth, EnemyState.Idle))
-                .Concat(World.Enemies
-                    .Where(e => Vec2.Distance(e.Position, viewer.Position) <= _config.ViewRange)
-                    .OrderBy(e => Vec2.Distance(e.Position, viewer.Position))
-                    .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - World.Players.Count))
-                    .Select(e => new EntityState(e.Id, MonsterIndex(e.Definition), e.Position, e.Facing, e.Health, e.Definition.Health, e.State)))
+            var players = World.Players.Select(p => new EntityState(
+                p.Id, EntityKind.Player, 0, p.Position, p.Facing, p.Health, p.Stats.MaxHealth, 0));
+            var bosses = World.Bosses
+                .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
+                .Select(b => new EntityState(
+                    b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, (byte)b.State, b.Phase));
+            var shownSoFar = players.Concat(bosses).ToList();
+            var enemies = World.Enemies
+                .Where(e => InView(e.Position))
+                .OrderBy(e => Distance(e.Position))
+                .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
+                .Select(e => new EntityState(
+                    e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.Definition.Health, (byte)e.State));
+            var entities = shownSoFar.Concat(enemies).ToList();
+
+            var projectiles = World.Projectiles
+                .Where(p => InView(p.Position))
+                .OrderBy(p => Distance(p.Position))
+                .Take(_config.MaxProjectilesPerSnapshot)
+                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius))
                 .ToList();
+
+            var hazards = World.Hazards
+                .Where(h => InView(h.Position, h.Size))
+                .OrderBy(h => h.ResolveTick)
+                .Take(_config.MaxHazardsPerSnapshot)
+                .Select(h => new HazardState(
+                    h.Id, h.Shape, h.Position, h.Direction, h.Size, h.Width,
+                    (int)(h.ResolveTick - World.Tick), (int)(h.ResolveTick - h.StartTick), h.Damage > 0))
+                .ToList();
+
+            // When there are too many, what changes the fight matters most and swings least.
             var shown = new HashSet<int>(entities.Select(e => e.Id));
-            // When there are too many, deaths matter most and swings least.
             var events = _pendingEvents
                 .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target))
-                .OrderBy(e => e.Type == SimEventType.Died ? 0 : e.Type == SimEventType.Hit ? 1 : 2)
+                .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)
                 .ToList();
-            return new SnapshotMessage(World.Tick, self, entities, events);
+            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events);
         }
 
-        int MonsterIndex(MonsterDefinition definition)
+        static int IndexOf<T>(IReadOnlyList<T> list, T item) where T : class
         {
-            for (int i = 0; i < _monsters.Monsters.Count; i++)
+            for (int i = 0; list != null && i < list.Count; i++)
             {
-                if (_monsters.Monsters[i] == definition) return i;
+                if (list[i] == item) return i;
             }
-            throw new InvalidOperationException($"Monster '{definition.Id}' is not in the host's monster sheet.");
+            throw new InvalidOperationException($"{typeof(T).Name} is not in the host's sheets, so clients could not name it.");
         }
 
         void BroadcastRoster()

@@ -12,6 +12,8 @@ namespace CoreSandbox
     // add --rarity <percent> to --item or --loot for the finder's item rarity bonus
     // dotnet run -- --fight [seconds] [seed]        a bot fights slimes in a generated cave
     // add --gear <base,base> to --fight to change its gear (copper_sword by default), --no-dodge to stand still
+    // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss
+    // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
     static class Program
     {
         static void Main(string[] args)
@@ -34,6 +36,20 @@ namespace CoreSandbox
                 gear = args[gearFlag + 1].Split(',');
                 args = args.Where((_, i) => i != gearFlag && i != gearFlag + 1).ToArray();
             }
+            int players = 1;
+            int playersFlag = Array.IndexOf(args, "--players");
+            if (playersFlag >= 0)
+            {
+                players = int.Parse(args[playersFlag + 1]);
+                args = args.Where((_, i) => i != playersFlag && i != playersFlag + 1).ToArray();
+            }
+            float reaction = 0.25f;
+            int reactionFlag = Array.IndexOf(args, "--reaction");
+            if (reactionFlag >= 0)
+            {
+                reaction = float.Parse(args[reactionFlag + 1], System.Globalization.CultureInfo.InvariantCulture);
+                args = args.Where((_, i) => i != reactionFlag && i != reactionFlag + 1).ToArray();
+            }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();
 
@@ -52,10 +68,15 @@ namespace CoreSandbox
                 case "--fight":
                     FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, dodge);
                     break;
+                case "--boss":
+                    var monsters = LoadMonsters();
+                    BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, reaction, dodge);
+                    break;
                 default:
                     Console.WriteLine("usage: dotnet run -- --item [level] [seed] | --loot [level] [count] [seed] | --progression [count] [seed]");
                     Console.WriteLine("       add --rarity <percent> to --item or --loot");
                     Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--no-dodge]");
+                    Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--no-dodge]");
                     break;
             }
         }
@@ -175,6 +196,20 @@ namespace CoreSandbox
         {
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
             var data = MonsterSheet.Parse(File.ReadAllText(Path.Combine(folder, MonsterSheet.File)));
+            if (data.Success) return data;
+
+            foreach (string error in data.Errors) Console.Error.WriteLine(error);
+            Environment.Exit(1);
+            return null;
+        }
+
+        static BossData LoadBosses(MonsterData monsters)
+        {
+            string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Bosses"));
+            var data = BossSheet.Parse(
+                File.ReadAllText(Path.Combine(folder, BossSheet.BossesFile)),
+                File.ReadAllText(Path.Combine(folder, BossSheet.AttacksFile)),
+                monsters);
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

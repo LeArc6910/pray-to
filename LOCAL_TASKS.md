@@ -29,7 +29,7 @@
 
 ### 3. 컴파일·테스트 확인 후 커밋
 - [ ] Console에 컴파일 에러가 없는지 확인
-- [ ] Window > General > Test Runner > EditMode > Run All. 통과/실패 개수 보고 (클라우드 기준 97개 통과)
+- [ ] Window > General > Test Runner > EditMode > Run All. 통과/실패 개수 보고 (클라우드 기준 127개 통과)
 - [ ] 생성된 `.meta`, `Packages/packages-lock.json`, `ProjectSettings/`, `Assets/_Project/Settings/`를 커밋·푸시. `Library/`, `Temp/`, `Logs/`, `UserSettings/`는 커밋하지 않는다 (`.gitignore` 확인)
 
 ### 4. CI용 Unity 라이선스
@@ -46,6 +46,13 @@ GitHub Actions에서 Unity 테스트와 웹 빌드를 돌리려면 필요하다.
 - [ ] 2인 확인: Window > Multiplayer Play Mode에서 Player 2를 켠다. 메인 에디터는 "호스트", Player 2는 "참가"(주소 `127.0.0.1`). 서로 움직이는 게 보이는지, 한 쪽이 때린 슬라임이 양쪽에서 같이 줄어드는지, 참가한 쪽이 Esc로 나가면 호스트 화면에서 사라지는지
 - [ ] 결과 보고: Console 에러·경고 전부, 위 항목별 결과, 어색한 점(움직임이 끊기는지, 반응이 늦은지, 전투가 너무 쉽거나 어려운지). Game 뷰 스크린샷을 `Docs/Screenshots/m2_solo.png`, `m2_coop.png`로 커밋
 - [ ] 생성된 `Main.unity`, `GameSheets.asset`, `.meta`, 바뀐 `ProjectSettings/EditorBuildSettings.asset`을 커밋·푸시
+
+### 6. M3 보스전 확인 (2026-10-26 추가)
+5번과 같이 해도 된다. 시트가 늘었으므로 **Game > Set Up Main Scene**을 다시 실행한다(또는 Game > Update Sheets).
+- [ ] 혼자 하기 → HUD의 "보스 아레나: ○○쪽 ○칸"을 따라 붉은 바닥의 방으로 간다. 들어가면 "동굴 수호자 등장!" 배너와 화면 위 체력바가 나오는지
+- [ ] 확인할 것: ① 보스가 빛나는 동안 바닥에 빨간 원/부채꼴이 차오르고, 다 차면 맞는지, 그 전에 벗어나면 안 맞는지 ② 주황 돌 파편이 사방으로 날아가는지 ③ 체력 66%, 33%에서 "2페이즈!", "3페이즈!" 배너와 포효(빨갛게 깜박임, 그 동안 피해 안 들어감)가 나오는지 ④ 노란 길이 표시된 뒤 보스가 그 길로 돌진하는지(2페이즈부터) ⑤ 3페이즈에 슬라임을 부르는지 ⑥ 큰 공격이 떨어질 때 화면이 흔들리는지 ⑦ 아레나 밖으로 도망쳐 5초가 지나면 보스가 처음 상태로 돌아가는지
+- [ ] 2인(Multiplayer Play Mode): 둘 다 아레나에 들어가면 보스 체력이 1.6배가 되는지, 지진이 두 사람 발밑에 각각 떨어지는지, 양쪽 화면에서 예고 장판 타이밍이 맞아 보이는지
+- [ ] 결과 보고: 처치까지 걸린 시간, 어려웠던 공격과 이유(예고가 안 보였다, 피할 시간이 없었다 등), Console 에러·경고. 스크린샷 `Docs/Screenshots/m3_boss.png`
 
 ## 결과 보고
 

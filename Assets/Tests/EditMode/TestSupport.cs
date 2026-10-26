@@ -109,6 +109,23 @@ namespace Game.Core.Tests
         public static readonly MonsterData Brute = MonsterSheet.Parse(Header + "brute,깡패,1,1000,500,0,2,0.4,8,0.5,0.5,1,1\n");
     }
 
+    public static class Bosses
+    {
+        static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Bosses/" + file));
+
+        public static readonly BossData Shipped = BossSheet.Parse(Read(BossSheet.BossesFile), Read(BossSheet.AttacksFile), Monsters.Shipped);
+
+        public const string BossesHeader = "id,name,health,health_per_player,armor,speed,radius,phases,roar,roar_radius,roar_damage\n";
+        public const string AttacksHeader =
+            "boss,id,name,phases,shape,target,telegraph,damage,radius,length,angle,width,count,spread,speed,cooldown,weight,summon\n";
+
+        // A boss that only ever uses the given attack rows, for testing one pattern at a time.
+        public static BossDefinition With(string attackRows, string phases = "", int health = 1000) =>
+            Parse(BossesHeader + $"dummy,허수아비,{health},50,0,2,1,{phases},1,3,10\n", AttacksHeader + attackRows).Find("dummy");
+
+        public static BossData Parse(string bosses, string attacks) => BossSheet.Parse(bosses, attacks, Monsters.Shipped);
+    }
+
     // Small hand-written sheets, so a test can see every row it depends on.
     public static class TestLoot
     {
