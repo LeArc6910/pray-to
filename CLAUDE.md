@@ -19,7 +19,8 @@
   - `Game.Core`: Core만 컴파일한다. 경고도 에러로 친다.
   - `Game.Core.Tests`: 테스트
   - `CoreSandbox`: 밸런스 시뮬레이션 콘솔
-- Unity 쪽 코드(`Game.Client` 등)가 생기면 `DevTools/UnityCompileCheck`에 UnityEngine 스텁을 두고 컴파일만 확인한다.
+  - `UnityCompileCheck`: Unity 쪽 코드(`Scripts/Client`)를 Unity 실제 엔진 DLL로 컴파일만 해 본다. 패키지(Netcode, Input System, URP) API는 `Stubs/PackageStubs.cs`에 패키지 소스와 같은 시그니처로 적어 둔다. 새 패키지 API를 쓰면 여기에 추가한다.
+- `Assets/_Project/Scripts/Client` (`Game.Client`): 화면, 입력, 네트워크 전송만 맡는다. 게임 규칙을 두지 않는다. `Editor/`에는 씬과 에셋을 코드로 만드는 메뉴(`Game > Set Up Main Scene`)가 있다.
 
 ## 명령
 
@@ -28,9 +29,14 @@ dotnet test DevTools/Game.Core.Tests
 dotnet run --project DevTools/CoreSandbox -- --loot 25 10000
 dotnet run --project DevTools/CoreSandbox -- --progression
 dotnet run --project DevTools/CoreSandbox -- --item 25 7
+dotnet run --project DevTools/CoreSandbox -- --fight 120 42
+
+# Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(약 1분 반, 엔진 DLL만 .unity/에 받는다)
+DevTools/UnityCompileCheck/fetch-unity.sh
+dotnet build DevTools/UnityCompileCheck
 ```
 
-GitHub Actions(`.github/workflows/core-tests.yml`)가 푸시마다 같은 테스트를 돌린다.
+GitHub Actions(`.github/workflows/core-tests.yml`)가 푸시마다 테스트와 Unity 쪽 컴파일 확인을 돌린다. Unity DLL은 Actions 캐시에 남겨 두고 저장소에는 넣지 않는다.
 
 ## 규칙
 

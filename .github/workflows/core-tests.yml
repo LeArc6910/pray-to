@@ -19,3 +19,16 @@ jobs:
 
       - name: Build sandbox
         run: dotnet build DevTools/CoreSandbox
+
+      # Unity's engine assemblies for the project's version, extracted once and then cached.
+      - name: Cache Unity assemblies
+        uses: actions/cache@v4
+        with:
+          path: DevTools/UnityCompileCheck/.unity
+          key: unity-assemblies-${{ hashFiles('ProjectSettings/ProjectVersion.txt') }}
+
+      - name: Fetch Unity assemblies
+        run: bash DevTools/UnityCompileCheck/fetch-unity.sh
+
+      - name: Compile-check Unity scripts
+        run: dotnet build DevTools/UnityCompileCheck

@@ -45,3 +45,4 @@ DevTools/**/obj/
 # OS
 .DS_Store
 Thumbs.db
+DevTools/UnityCompileCheck/.unity/

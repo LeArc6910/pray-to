@@ -1,0 +1,26 @@
+using Game.Core;
+using UnityEngine;
+
+namespace Game.Client
+{
+    // The data sheets as TextAssets, so a built game can read them too. Game > Set Up Main Scene creates this in a
+    // Resources folder and fills it in; run it again after adding a sheet.
+    public sealed class GameSheets : ScriptableObject
+    {
+        public const string ResourcePath = "GameSheets";
+
+        public TextAsset itemBases;
+        public TextAsset affixes;
+        public TextAsset runes;
+        public TextAsset runewords;
+        public TextAsset monsters;
+
+        public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
+
+        public LootData LoadLoot() => LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords));
+
+        public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
+
+        static string Text(TextAsset asset) => asset != null ? asset.text : "";
+    }
+}
