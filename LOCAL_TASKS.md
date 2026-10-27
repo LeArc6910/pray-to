@@ -129,4 +129,6 @@ DevTools/Local/setup.sh --commit
   - `Assets\_Project\Scripts\Client\WorldView.cs(522,50): error CS0246: The type or namespace name 'Light2D' could not be found (are you missing a using directive or an assembly reference?)`
   - `Assets\_Project\Scripts\Client\WorldView.cs(523,31): error CS0103: The name 'Light2D' does not exist in the current context`
   - `Scripts have compiler errors.`
+- 라이선스 문제는 Unity Hub 로그인으로 풀렸다. 이번에는 프로젝트를 열고 컴파일하다 멈췄다. 테스트는 돌지 않았다.
+- 원인(로컬 판단): URP 17.6.0에서 `Light2D`, `Renderer2DData` 같은 2D 렌더러 타입은 네임스페이스는 그대로 `UnityEngine.Rendering.Universal`이지만 별도 어셈블리 `Unity.RenderPipelines.Universal.2D.Runtime`(패키지 안 `Runtime/2D/Unity.RenderPipelines.Universal.2D.Runtime.asmdef`)에 들어 있다. `Game.Client.asmdef`와 `Game.Client.Editor.asmdef`는 `Unity.RenderPipelines.Universal.Runtime`만 참조한다. `WorldView.cs`가 `Light2D`를, `Editor/ProjectSetup.cs`가 2D 렌더러 타입을 쓰므로 두 asmdef 모두에 `Unity.RenderPipelines.Universal.2D.Runtime` 참조가 필요해 보인다(Editor 쪽은 Game.Client가 먼저 실패해 아직 에러가 나오지 않았다). `UnityCompileCheck`의 스텁도 이 타입들을 같은 어셈블리로 나눠야 CI에서 잡힌다.
 - 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
