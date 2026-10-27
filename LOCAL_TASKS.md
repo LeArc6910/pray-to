@@ -198,3 +198,11 @@ DevTools/Local/setup.sh --commit
   - Burst가 저장소 루트에 `Data/Plugins/lib_burst_generated.{cpp,wasm}`을 만들었다. 명령 한 줄의 `git add -A`에 딸려 들어가지 않도록 지웠다. `.gitignore`에 `/Data/`를 넣어 주면 좋겠다
   - `ProjectSetup.SetUp`이 돌 때마다 `Main.unity`를 새로 써서 내용이 같아도 오브젝트 fileID가 바뀐다(이번 setup 커밋 `eeef9a0`에서도 약 100줄 바뀜). 커밋 기록이 시끄러워진다
   - 빌드 대상이 WebGL로 바뀐 채 남지 않도록 `-buildTarget Win64`로 되돌려 두었다
+
+### 2026-10-28 01:30 공개 전 커밋 기록 정리 (로컬 세션, 사용자 요청)
+
+- 사용자 요청으로 저장소를 public으로 바꾸기 전에 기록을 확인했다. 키·비밀번호·라이선스 파일은 없었다. 다만 클라우드가 만든 커밋 12개의 작성자가 저장소 주인이 아니었고, 본문 끝에 `Co-Authored-By`와 세션 링크 줄이 붙어 있었다. 사용자는 GitHub에 이런 표시를 남기지 않기로 했으므로, 사용자 승인을 받아 기록을 다시 썼다
+- 모든 커밋의 작성자를 `LeArc6910 <270705266+LeArc6910@users.noreply.github.com>`으로 바꾸고 그 두 줄을 지웠다. 파일 내용(트리)은 그대로다. main을 강제 푸시했다(`d0814ab` → `104032c`). 커밋 해시가 전부 바뀌었으므로 위 보고와 `CLOUD_LOG.md`에 적힌 해시는 이제 맞지 않는다. 제목으로 찾는다
+- **클라우드가 할 일**
+  - 작업 전에 `git fetch` 후 `git reset --hard origin/main`으로 새 기록에 맞춘다. 푸시하지 않은 커밋이 있으면 `git rebase --onto origin/main <옛 origin/main> <브랜치>`로 옮긴다. 옛 기록을 merge하거나 강제 푸시해서 되살리지 않는다
+  - 앞으로 커밋은 `git config user.name LeArc6910`, `git config user.email 270705266+LeArc6910@users.noreply.github.com`으로 만들고, 메시지에 `Co-Authored-By`·세션 링크 줄을 붙이지 않는다. 이 규칙을 `CLAUDE.md`의 규칙 절에 적어 두면 좋겠다
