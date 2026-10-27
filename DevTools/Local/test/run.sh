@@ -9,6 +9,8 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
 git init -q --bare "$work/remote.git"
+# CI checks out one commit; the remote has to accept a push of that shallow history.
+git -C "$work/remote.git" config receive.shallowUpdate true
 git clone -q "$root" "$work/clone"
 cd "$work/clone"
 git checkout -q -B main

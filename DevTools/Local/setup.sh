@@ -79,7 +79,9 @@ find_unity() {
 
 # Unity Hub의 명령줄 모드
 run_hub() {
-    [ -n "$hub" ] && [ -x "$hub" ] || fail "Unity Hub가 없습니다. https://unity.com/download 에서 설치하고 로그인한 뒤 다시 실행하세요."
+    if [ -z "$hub" ] || [ ! -x "$hub" ]; then
+        fail "Unity Hub가 없습니다. https://unity.com/download 에서 설치하고 로그인한 뒤 다시 실행하세요."
+    fi
     local architecture=()
     [ "$(uname -s)" = Darwin ] && [ "$(uname -m)" = arm64 ] && architecture=(--architecture arm64)
     "$hub" -- --headless "$@" "${architecture[@]}"
