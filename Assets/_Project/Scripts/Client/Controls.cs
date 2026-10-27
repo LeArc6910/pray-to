@@ -38,5 +38,8 @@ namespace Game.Client
         }
 
         public static bool LeavePressed() => Keyboard.current != null && Keyboard.current[Key.Escape].wasPressedThisFrame;
+
+        public static bool BagPressed() =>
+            Keyboard.current != null && (Keyboard.current[Key.Tab].wasPressedThisFrame || Keyboard.current[Key.I].wasPressedThisFrame);
     }
 }

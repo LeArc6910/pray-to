@@ -54,6 +54,7 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
 | windup | 예고 시간(초). 짧을수록 피하기 어렵다 |
 | cooldown | 공격 후 다시 쫓기까지 쉬는 시간(초) |
 | weight | 같은 구역에서 나올 비율 |
+| drop_chance, rune_chance | 죽을 때 아이템, 룬을 떨어뜨릴 확률(%). 비우면 0. 자세한 건 `Docs/Loot.md`의 드랍 절 |
 
 ## 조정하는 법
 

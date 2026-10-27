@@ -127,7 +127,11 @@ namespace Game.Core
             IReadOnlyList<int> thresholds,
             float roar,
             float roarRadius,
-            int roarDamage)
+            int roarDamage,
+            int dropCount,
+            int dropLevel,
+            Rarity dropRarity,
+            int runeCount)
         {
             Id = id;
             Name = name;
@@ -140,6 +144,10 @@ namespace Game.Core
             Roar = roar;
             RoarRadius = roarRadius;
             RoarDamage = roarDamage;
+            DropCount = dropCount;
+            DropLevel = dropLevel;
+            DropRarity = dropRarity;
+            RuneCount = runeCount;
         }
 
         public string Id { get; }
@@ -157,6 +165,13 @@ namespace Game.Core
         public float Roar { get; }
         public float RoarRadius { get; }
         public int RoarDamage { get; }
+        // Items dropped for each player in the fight, at this item level and at least this rarity. Beating the
+        // boss also raises every later drop to at least DropLevel, which is how a boss opens the next step of gear.
+        public int DropCount { get; }
+        public int DropLevel { get; }
+        public Rarity DropRarity { get; }
+        // Runes dropped for each player in the fight.
+        public int RuneCount { get; }
         public IReadOnlyList<BossAttack> Attacks => _attacks;
 
         internal void Add(BossAttack attack) => _attacks.Add(attack);
@@ -236,7 +251,11 @@ namespace Game.Core
                         thresholds,
                         SheetValues.ParseDecimal(row["roar"], "roar"),
                         SheetValues.ParseDecimal(row["roar_radius"], "roar_radius"),
-                        SheetValues.ParseNumber(row["roar_damage"], "roar_damage")));
+                        SheetValues.ParseNumber(row["roar_damage"], "roar_damage"),
+                        Whole(row, "drop_count"),
+                        Math.Max(1, Whole(row, "drop_level")),
+                        row["drop_rarity"].Length == 0 ? Rarity.Common : SheetValues.ParseEnum<Rarity>(row["drop_rarity"], "drop_rarity"),
+                        Whole(row, "rune_count")));
                 });
             }
             return bosses;

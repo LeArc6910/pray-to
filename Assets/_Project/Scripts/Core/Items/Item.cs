@@ -38,6 +38,8 @@ namespace Game.Core
             _sockets = new RuneDefinition[socketCount];
         }
 
+        // Given by the world when the item first appears there, so commands can name it. 0 until then.
+        public int Id { get; internal set; }
         public ItemBase Base { get; }
         public int Level { get; }
         public Rarity Rarity { get; }

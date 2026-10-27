@@ -13,6 +13,7 @@ namespace Game.Client
     {
         public const ushort DefaultPort = 7777;
         const string MessageName = "pray-to";
+        const int FragmentAbove = 1000;
 
         readonly GameObject _object;
         readonly NetworkManager _manager;
@@ -72,7 +73,10 @@ namespace Game.Client
             using var writer = new FastBufferWriter(data.Length + sizeof(int), Allocator.Temp);
             writer.WriteValueSafe(data.Length);
             writer.WriteBytesSafe(data);
-            var delivery = reliable ? NetworkDelivery.ReliableSequenced : NetworkDelivery.UnreliableSequenced;
+            // A full bag can be bigger than one packet; only reliable messages may be split up.
+            var delivery = !reliable ? NetworkDelivery.UnreliableSequenced
+                : data.Length > FragmentAbove ? NetworkDelivery.ReliableFragmentedSequenced
+                : NetworkDelivery.ReliableSequenced;
             try
             {
                 _manager.CustomMessagingManager.SendNamedMessage(MessageName, client, writer, delivery);

@@ -18,7 +18,7 @@ namespace Game.Core
 
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
     // the one exception is a player's own position, which its client reports (see MovePlayer). Bosses, their
-    // telegraphed areas and projectiles are in World.Boss.cs.
+    // telegraphed areas and projectiles are in World.Boss.cs; drops, pickups and inventory commands in World.Loot.cs.
     public sealed partial class World
     {
         public const int TicksPerSecond = 30;
@@ -47,13 +47,16 @@ namespace Game.Core
         int _nextId = 1;
         int _spawnTimer;
 
-        public World(TileMap map, Vec2 spawn, MonsterData monsters, ulong seed, WorldConfig config = null)
+        // Without loot data nothing drops.
+        public World(TileMap map, Vec2 spawn, MonsterData monsters, ulong seed, WorldConfig config = null, LootData loot = null)
         {
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Spawn = spawn;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _config = config ?? new WorldConfig();
             _random = new GameRandom(seed, stream: 2);
+            Loot = loot;
+            _lootGenerator = loot != null ? new LootGenerator(loot) : null;
             _flow = new FlowField(map);
             for (int i = 0; i < _config.EnemyTarget; i++) TrySpawnEnemy();
         }
@@ -69,6 +72,7 @@ namespace Game.Core
         public Player AddPlayer(string name, Equipment equipment)
         {
             var player = new Player(_nextId++, name, Spawn, equipment ?? new Equipment());
+            foreach (var item in player.Equipment.Items) Register(item);
             _players.Add(player);
             return player;
         }
@@ -139,6 +143,7 @@ namespace Game.Core
             UpdateBosses();
             UpdateHazards();
             UpdateProjectiles();
+            UpdateLoot();
             SeparateEnemies();
 
             if (--_spawnTimer <= 0)
@@ -179,7 +184,9 @@ namespace Game.Core
                 enemy.Health -= amount;
                 enemy.Knockback = (enemy.Position - player.Position).Normalized * KnockbackSpeed;
                 _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical));
-                if (enemy.IsDead) _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
+                if (!enemy.IsDead) continue;
+                _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
+                DropFrom(enemy, player);
             }
 
             foreach (var boss in _bosses)

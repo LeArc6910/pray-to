@@ -9,10 +9,12 @@ namespace Game.Core
     {
         Join = 1,
         Input = 2,
+        InventoryCommand = 3,
         Welcome = 10,
         Refused = 11,
         Snapshot = 12,
         Roster = 13,
+        Inventory = 14,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -20,7 +22,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.3.0";
+        public const string Version = "0.4.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -201,6 +203,14 @@ namespace Game.Core
         Player,
         Monster,
         Boss,
+        // Ground loot. Type is the item base's index and State its rarity, or for a rune the rune's index and
+        // State RuneDrop.
+        Drop,
+    }
+
+    public static class DropState
+    {
+        public const byte Rune = 255;
     }
 
     // Positions travel as 1/64 of a tile in 16 bits and health as whole numbers, to keep a snapshot in one packet.

@@ -11,7 +11,7 @@ namespace CoreSandbox
         public static void Run(LootData loot, MonsterData monsters, int seconds, ulong seed, string[] gear, bool dodge)
         {
             var generated = WorldGenerator.Generate(seed);
-            var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = 40, SpawnDistance = 6 });
+            var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = 40, SpawnDistance = 6 }, loot);
             var random = new GameRandom(seed, 99);
             var generator = new LootGenerator(loot);
             var equipment = new Equipment();
@@ -48,6 +48,8 @@ namespace CoreSandbox
             Console.WriteLine($"처치 {kills} (분당 {kills * 60.0 / seconds:0.0}), 사망 {deaths}");
             Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 휘두르기 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)");
             Console.WriteLine($"받은 피해 {taken} (초당 {taken / (double)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}");
+            Console.WriteLine($"주운 것: 아이템 {player.Inventory.Items.Count}개, 룬 {player.Inventory.Runes.Values.Sum()}개 (바닥에 남은 것 {world.GroundLoot.Count}개)");
+            foreach (var item in player.Inventory.Items.Where(i => i.Rarity >= Rarity.Rare)) Console.WriteLine("  " + ItemText.Describe(item)[0]);
         }
 
         static void Drive(World world, Player player, FlowField toEnemies, bool dodge)

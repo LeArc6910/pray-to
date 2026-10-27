@@ -22,6 +22,9 @@ namespace Game.Core
         public float Health { get; internal set; }
         public bool IsDead => Health <= 0;
         public Equipment Equipment { get; }
+        public Inventory Inventory { get; } = new Inventory();
+        // Goes up whenever the bag or the equipment changes, so the host knows when to send them again.
+        public int InventoryVersion { get; internal set; }
         public PlayerStats Stats { get; private set; }
         // Goes up whenever the host puts the player somewhere the owning client did not: a refused move or a
         // respawn. The client snaps to the host's position when it sees a new value.
@@ -34,10 +37,24 @@ namespace Game.Core
         public Item Equip(Item item)
         {
             var previous = Equipment.Equip(item);
+            RefreshStats();
+            return previous;
+        }
+
+        public Item Unequip(ItemSlot slot)
+        {
+            var item = Equipment.Unequip(slot);
+            RefreshStats();
+            return item;
+        }
+
+        // Works the numbers out again after the gear changed, keeping the same share of health.
+        internal void RefreshStats()
+        {
             float healthShare = Health / Stats.MaxHealth;
             Stats = PlayerStats.From(Equipment);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
-            return previous;
+            InventoryVersion++;
         }
     }
 
@@ -87,6 +104,8 @@ namespace Game.Core
         // Source, a boss, entered phase Amount.
         PhaseChanged,
         BossDefeated,
+        // Source, a player, picked up Target, a piece of ground loot.
+        Pickup,
     }
 
     public readonly struct SimEvent
@@ -220,6 +239,28 @@ namespace Game.Core
                     return along >= -radius && along <= Size + radius && across <= Width / 2 + radius;
             }
         }
+    }
+
+    // An item or a rune lying on the floor. Players pick it up by walking over it once ReadyTick has passed.
+    public sealed class GroundLoot
+    {
+        internal GroundLoot(int id, Vec2 position, Item item, RuneDefinition rune, long readyTick, long expireTick)
+        {
+            Id = id;
+            Position = position;
+            Item = item;
+            Rune = rune;
+            ReadyTick = readyTick;
+            ExpireTick = expireTick;
+        }
+
+        public int Id { get; }
+        public Vec2 Position { get; }
+        // Exactly one of these is set.
+        public Item Item { get; }
+        public RuneDefinition Rune { get; }
+        public long ReadyTick { get; }
+        public long ExpireTick { get; }
     }
 
     public sealed class Projectile

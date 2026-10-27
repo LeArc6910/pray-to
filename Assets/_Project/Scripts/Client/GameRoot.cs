@@ -23,6 +23,7 @@ namespace Game.Client
         const ulong LocalConnection = ulong.MaxValue;
         // After a long hitch, drop the backlog instead of fast-forwarding through it.
         const int MaxTicksPerFrame = 5;
+        const float AcquiredSeconds = 4;
 
         Mode _mode = Mode.Menu;
         string _playerName = "플레이어";
@@ -35,6 +36,9 @@ namespace Game.Client
         WorldClient _client;
         NetLink _net;
         WorldView _view;
+        InventoryWindow _inventory;
+        // "획득: …" lines for things picked up, each shown for a few seconds.
+        readonly List<(string Text, float Age)> _acquired = new List<(string, float)>();
         Camera _camera;
         float _tickClock;
         bool _joinSent;
@@ -84,6 +88,7 @@ namespace Game.Client
                 EndSession("참가 거절: " + _client.RefusedReason);
                 return;
             }
+            if (Controls.BagPressed()) _inventory.Open = !_inventory.Open;
 
             _tickClock += Time.deltaTime;
             int ticks = 0;
@@ -99,11 +104,21 @@ namespace Game.Client
             _view ??= new WorldView(_client, _camera);
             _client.AdvanceRenderClock(Time.deltaTime);
             _view.Render(_tickClock / World.TickSeconds, Time.deltaTime);
+
+            for (int i = _acquired.Count - 1; i >= 0; i--)
+            {
+                var (text, age) = _acquired[i];
+                if (age + Time.deltaTime > AcquiredSeconds) _acquired.RemoveAt(i);
+                else _acquired[i] = (text, age + Time.deltaTime);
+            }
+            foreach (string line in _client.TakeAcquired()) _acquired.Add((line, 0));
         }
 
         void FixedTick()
         {
             var (move, aim, attack) = Controls.Read(_camera, _client.Position);
+            // Clicking in the bag should not swing the sword.
+            if (_inventory.Open) attack = false;
             byte[] input = _client.Step(move, aim, attack);
             if (input != null) SendToHost(input);
 
@@ -119,7 +134,7 @@ namespace Game.Client
         void SendToHost(byte[] data)
         {
             if (_host != null) _host.Receive(LocalConnection, data);
-            else _net?.Send(NetworkManager.ServerClientId, data, reliable: Protocol.TypeOf(data) == MessageType.Join);
+            else _net?.Send(NetworkManager.ServerClientId, data, reliable: Protocol.TypeOf(data) != MessageType.Input);
         }
 
         void StartSolo() => StartHosting(Mode.Solo);
@@ -140,7 +155,8 @@ namespace Game.Client
 
             ulong seed = (ulong)DateTime.UtcNow.Ticks;
             _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses);
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot);
+            _inventory = new InventoryWindow(_client, SendToHost);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
             _status = "";
@@ -154,7 +170,8 @@ namespace Game.Client
                 _status = "접속을 시작하지 못했습니다. 주소를 확인하세요.";
                 return;
             }
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot);
+            _inventory = new InventoryWindow(_client, SendToHost);
             _joinSent = false;
             _net.Connected += id =>
             {
@@ -179,6 +196,8 @@ namespace Game.Client
             _net = null;
             _host = null;
             _client = null;
+            _inventory = null;
+            _acquired.Clear();
             _mode = Mode.Menu;
             _status = status;
             _endReason = null;
@@ -195,13 +214,22 @@ namespace Game.Client
             }
             _view?.DrawGui();
             DrawHud();
+            _inventory?.Draw();
+            for (int i = 0; i < _acquired.Count; i++)
+            {
+                var (text, age) = _acquired[i];
+                var previous = GUI.color;
+                GUI.color = new Color(1, 1, 1, Mathf.Clamp01((AcquiredSeconds - age) / 1f));
+                GUI.Label(new Rect(14, Screen.height - 40 - 22 * (_acquired.Count - 1 - i), 400, 22), text);
+                GUI.color = previous;
+            }
         }
 
         void DrawMenu()
         {
             var area = new Rect(Screen.width / 2f - 180, Screen.height / 2f - 150, 360, 300);
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label("pray-to (M3 프로토타입)");
+            GUILayout.Label("pray-to (M3b 프로토타입)");
             GUILayout.Space(8);
             GUILayout.Label("이름");
             _playerName = GUILayout.TextField(_playerName, 16);
@@ -241,7 +269,7 @@ namespace Game.Client
                 var toArena = _client.Arena - _client.Position;
                 if (toArena.Length > _client.ArenaRadius) GUILayout.Label($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
             }
-            GUILayout.Label("WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Esc 메뉴");
+            GUILayout.Label("WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Tab 가방 · Esc 메뉴");
             GUILayout.EndArea();
 
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);

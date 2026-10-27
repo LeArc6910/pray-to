@@ -26,7 +26,9 @@ namespace Game.Core
             float health,
             float maxHealth,
             byte state,
-            int phase)
+            int phase,
+            ItemBase dropBase = null,
+            RuneDefinition dropRune = null)
         {
             Id = id;
             Kind = kind;
@@ -39,6 +41,8 @@ namespace Game.Core
             MaxHealth = maxHealth;
             State = state;
             Phase = phase;
+            DropBase = dropBase;
+            DropRune = dropRune;
         }
 
         public int Id { get; }
@@ -56,8 +60,18 @@ namespace Game.Core
         public EnemyState EnemyState => (EnemyState)State;
         public BossState BossState => (BossState)State;
         public int Phase { get; }
+        // For ground loot: the item's base and rarity, or the rune.
+        public ItemBase DropBase { get; }
+        public RuneDefinition DropRune { get; }
+        public Rarity DropRarity => (Rarity)State;
         public bool IsDead => Health <= 0;
-        public float Radius => Kind == EntityKind.Boss ? Boss.Radius : Kind == EntityKind.Monster ? Monster.Radius : World.PlayerRadius;
+        public float Radius => Kind switch
+        {
+            EntityKind.Boss => Boss.Radius,
+            EntityKind.Monster => Monster.Radius,
+            EntityKind.Drop => 0.2f,
+            _ => World.PlayerRadius,
+        };
     }
 
     public readonly struct ProjectileView
@@ -101,6 +115,8 @@ namespace Game.Core
 
         readonly MonsterData _monsters;
         readonly BossData _bosses;
+        readonly LootData _loot;
+        readonly List<string> _acquired = new List<string>();
         readonly List<SnapshotMessage> _snapshots = new List<SnapshotMessage>();
         readonly List<SimEvent> _events = new List<SimEvent>();
         readonly Dictionary<int, string> _names = new Dictionary<int, string>();
@@ -109,12 +125,13 @@ namespace Game.Core
         double _renderTick = -1;
         float _sinceLatest;
 
-        public WorldClient(string playerKey, string name, MonsterData monsters, BossData bosses = null)
+        public WorldClient(string playerKey, string name, MonsterData monsters, BossData bosses = null, LootData loot = null)
         {
             PlayerKey = playerKey ?? "";
             Name = name ?? "";
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _bosses = bosses;
+            _loot = loot;
         }
 
         public string PlayerKey { get; }
@@ -155,6 +172,9 @@ namespace Game.Core
                     case MessageType.Roster:
                         _names.Clear();
                         foreach (var pair in RosterMessage.Decode(data).Names) _names[pair.Key] = pair.Value;
+                        break;
+                    case MessageType.Inventory:
+                        if (_loot != null) ApplyInventory(InventoryMessage.Decode(data, _loot));
                         break;
                     case MessageType.Snapshot:
                         if (Status == ClientStatus.Playing) Apply(SnapshotMessage.Decode(data));
@@ -221,7 +241,9 @@ namespace Game.Core
                     shown.Health,
                     shown.MaxHealth,
                     shown.State,
-                    shown.Phase));
+                    shown.Phase,
+                    entity.Kind == EntityKind.Drop && entity.State != DropState.Rune ? _loot.Bases[entity.Type] : null,
+                    entity.Kind == EntityKind.Drop && entity.State == DropState.Rune ? _loot.Runes[entity.Type] : null));
             }
             return views;
         }
@@ -261,6 +283,50 @@ namespace Game.Core
             return views;
         }
 
+        // What this player wears and carries, as of the host's last inventory message.
+        public Equipment Equipment { get; private set; } = new Equipment();
+        public Inventory Bag { get; private set; } = new Inventory();
+        public PlayerStats Stats { get; private set; } = PlayerStats.From(new Equipment());
+        // Goes up with every inventory message, so a screen knows to redraw.
+        public int InventoryVersion { get; private set; }
+
+        public byte[] EquipCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.Equip, itemId).Encode();
+
+        public byte[] UnequipCommand(ItemSlot slot) => new InventoryCommandMessage(InventoryCommand.Unequip, 0, slot).Encode();
+
+        public byte[] InsertRuneCommand(int itemId, RuneDefinition rune) =>
+            new InventoryCommandMessage(InventoryCommand.InsertRune, itemId, rune: ItemCodec.Index(_loot.Runes, rune)).Encode();
+
+        public byte[] DiscardCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.Discard, itemId).Encode();
+
+        // Lines like "획득: [희귀] 철 검" for whatever arrived in the bag since the last call.
+        public List<string> TakeAcquired()
+        {
+            var lines = new List<string>(_acquired);
+            _acquired.Clear();
+            return lines;
+        }
+
+        void ApplyInventory(InventoryMessage message)
+        {
+            if (InventoryVersion > 0)
+            {
+                var known = new HashSet<int>(Bag.Items.Concat(Equipment.Items).Select(item => item.Id));
+                foreach (var item in message.Bag.Items.Where(item => !known.Contains(item.Id)))
+                {
+                    _acquired.Add($"획득: [{ItemText.RarityName(item.Rarity)}] {ItemText.Name(item)}");
+                }
+                foreach (var pair in message.Bag.Runes.Where(pair => pair.Value > Bag.CountOf(pair.Key)))
+                {
+                    _acquired.Add($"획득: {pair.Key.Name}");
+                }
+            }
+            Equipment = message.Equipment;
+            Bag = message.Bag;
+            Stats = PlayerStats.From(Equipment);
+            InventoryVersion++;
+        }
+
         public List<SimEvent> TakeEvents()
         {
             var events = new List<SimEvent>(_events);
@@ -285,6 +351,9 @@ namespace Game.Core
             if (_snapshots.Count > 0 && snapshot.Tick <= _snapshots[_snapshots.Count - 1].Tick) return;
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Monster && e.Type >= _monsters.Monsters.Count))
                 throw new InvalidDataException("Snapshot names a monster this client does not know.");
+            if (snapshot.Entities.Any(e => e.Kind == EntityKind.Drop
+                && (_loot == null || e.Type >= (e.State == DropState.Rune ? _loot.Runes.Count : _loot.Bases.Count))))
+                throw new InvalidDataException("Snapshot names loot this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Boss && (_bosses == null || e.Type >= _bosses.Bosses.Count)))
                 throw new InvalidDataException("Snapshot names a boss this client does not know.");
 

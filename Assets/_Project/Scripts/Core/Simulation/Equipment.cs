@@ -12,6 +12,13 @@ namespace Game.Core
 
         public IEnumerable<Item> Items => _slots.Where(item => item != null);
 
+        public Item Unequip(ItemSlot slot)
+        {
+            var item = _slots[(int)slot];
+            _slots[(int)slot] = null;
+            return item;
+        }
+
         // Returns whatever the slot held before, or null.
         public Item Equip(Item item)
         {
@@ -43,6 +50,9 @@ namespace Game.Core
             AttacksPerSecond = (float)sheet.Get(StatType.AttackSpeed, BaseAttacksPerSecond, attackTags);
             CritChance = (float)sheet.Get(StatType.CritChance, BaseCritChance, attackTags);
             CritDamage = (float)sheet.Get(StatType.CritDamage, BaseCritDamage, attackTags);
+            // The sheets write item rarity as "+N%", an increase, so it is worked out on a base of 100 and given
+            // back as the bonus over that: two +50% affixes make +100%.
+            ItemRarity = (float)sheet.Get(StatType.ItemRarity, 100) - 100;
         }
 
         // Tags of the basic attack: the weapon's, or melee when bare-handed.
@@ -60,6 +70,8 @@ namespace Game.Core
         public float CritChance { get; }
         // Percent of normal damage a critical hit deals.
         public float CritDamage { get; }
+        // Percent bonus to the odds of better drops from what this player kills.
+        public float ItemRarity { get; }
 
         public static PlayerStats From(Equipment equipment)
         {

@@ -276,6 +276,7 @@ namespace Game.Core
             if (boss.IsDead)
             {
                 ClearAttacksFrom(boss);
+                DropFrom(boss);
                 _events.Add(new SimEvent(SimEventType.Died, boss.Id));
                 _events.Add(new SimEvent(SimEventType.BossDefeated, boss.Id));
                 return;

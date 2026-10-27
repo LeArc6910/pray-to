@@ -20,7 +20,7 @@ namespace CoreSandbox
         public static void Run(LootData loot, MonsterData monsters, BossData bosses, int seconds, ulong seed, int players, string[] gear, float reaction, bool dodge)
         {
             var generated = WorldGenerator.Generate(seed);
-            var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = 0 });
+            var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = 0 }, loot);
             var definition = bosses.Bosses[0];
             world.PlaceBoss(definition, generated.Arena, generated.ArenaRadius);
 
@@ -84,6 +84,14 @@ namespace CoreSandbox
             foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}");
             Console.WriteLine("  받은 피해 출처:");
             foreach (var pair in takenByAttack.OrderByDescending(p => p.Value)) Console.WriteLine($"    {pair.Key,-8} {pair.Value}");
+
+            if (killedAt == null) return;
+            Console.WriteLine($"  보상 (이후 드랍 레벨 {world.ProgressLevel}):");
+            var rewards = world.GroundLoot.Select(l => l.Item).Where(i => i != null)
+                .Concat(bots.SelectMany(b => b.Player.Inventory.Items))
+                .Where(i => i.Level == definition.DropLevel);
+            foreach (var item in rewards) Console.WriteLine("    " + ItemText.Describe(item)[0]);
+            foreach (var rune in world.GroundLoot.Where(l => l.Rune != null).Select(l => l.Rune)) Console.WriteLine("    " + rune.Name);
         }
 
         static void Drive(World world, Player player, FlowField toArena, Vec2 arena, int reactionTicks, bool dodge)

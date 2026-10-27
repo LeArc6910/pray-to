@@ -121,6 +121,8 @@ namespace UnityEngine.InputSystem
         None,
         Space,
         Enter,
+        Tab,
+        I,
         A,
         D,
         S,

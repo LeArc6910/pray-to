@@ -55,11 +55,12 @@ namespace Game.Core
         }
 
         // itemRarity is the finder's ItemRarity stat in percent. It raises the odds of everything above Common.
-        public Item RollItem(int level, GameRandom random, int itemRarity = 0)
+        // A roll below minimum is raised to it, which is how bosses guarantee good rewards.
+        public Item RollItem(int level, GameRandom random, int itemRarity = 0, Rarity minimum = Rarity.Common)
         {
             var itemBase = random.PickWeighted(BasesAt(level), b => b.Weight);
             var rarity = random.PickWeighted(Rarities, r => RarityWeight(r, itemRarity));
-            return RollItem(itemBase, level, rarity, random);
+            return RollItem(itemBase, level, rarity < minimum ? minimum : rarity, random);
         }
 
         // For drops whose base or rarity is already decided, such as boss rewards.

@@ -14,6 +14,17 @@ namespace Game.Core
             _ => rarity.ToString(),
         };
 
+        public static string SlotName(ItemSlot slot) => slot switch
+        {
+            ItemSlot.Weapon => "무기",
+            ItemSlot.Helmet => "투구",
+            ItemSlot.Chest => "갑옷",
+            ItemSlot.Boots => "장화",
+            ItemSlot.Ring => "반지",
+            ItemSlot.Amulet => "목걸이",
+            _ => slot.ToString(),
+        };
+
         // Uncommon items are named after their affixes ("신속의 날카로운 구리 검"). Rarer items have too many
         // affixes for that, so they keep the base name and list the affixes below it.
         public static string Name(Item item)

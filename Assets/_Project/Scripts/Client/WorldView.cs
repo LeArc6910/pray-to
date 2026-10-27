@@ -68,6 +68,8 @@ namespace Game.Client
         readonly Dictionary<int, Body> _others = new Dictionary<int, Body>();
         readonly Dictionary<int, Mark> _marks = new Dictionary<int, Mark>();
         readonly Dictionary<int, SpriteRenderer> _projectiles = new Dictionary<int, SpriteRenderer>();
+        readonly Dictionary<int, (SpriteRenderer Renderer, string Name, Color Color)> _drops =
+            new Dictionary<int, (SpriteRenderer, string, Color)>();
         readonly Dictionary<int, (BossState State, int Phase, string Name)> _bossesSeen = new Dictionary<int, (BossState, int, string)>();
         readonly List<Floating> _floating = new List<Floating>();
         readonly HashSet<int> _seen = new HashSet<int>();
@@ -140,6 +142,11 @@ namespace Game.Client
             {
                 if (!string.IsNullOrEmpty(body.Name)) Label(body.Position + new Vector3(0, body.Diameter * 0.5f + 0.4f, 0), body.Name, Color.white);
             }
+            foreach (var drop in _drops.Values)
+            {
+                var position = drop.Renderer.transform.localPosition;
+                if (Vector3.Distance(position, _self.Position) < 4) Label(position + new Vector3(0, 0.45f, 0), drop.Name, drop.Color);
+            }
             foreach (var text in _floating)
             {
                 float t = text.Age / FloatSeconds;
@@ -168,6 +175,11 @@ namespace Game.Client
             foreach (var view in _client.Others())
             {
                 _seen.Add(view.Id);
+                if (view.Kind == EntityKind.Drop)
+                {
+                    DrawDrop(view);
+                    continue;
+                }
                 if (!_others.TryGetValue(view.Id, out var body))
                 {
                     string name = view.Kind == EntityKind.Boss ? view.Boss.Id : view.Kind == EntityKind.Monster ? view.Monster.Id : "player";
@@ -215,6 +227,31 @@ namespace Game.Client
                 _gone.Add(pair.Key);
             }
             foreach (int id in _gone) _others.Remove(id);
+
+            _gone.Clear();
+            foreach (var pair in _drops)
+            {
+                if (_seen.Contains(pair.Key)) continue;
+                Object.Destroy(pair.Value.Renderer.gameObject);
+                _gone.Add(pair.Key);
+            }
+            foreach (int id in _gone) _drops.Remove(id);
+        }
+
+        // Loot is a small diamond in its rarity's colour, or an orange dot for a rune.
+        void DrawDrop(EntityView view)
+        {
+            if (!_drops.ContainsKey(view.Id))
+            {
+                bool rune = view.DropRune != null;
+                var color = rune ? Palette.Rune : Palette.Of(view.DropRarity);
+                var renderer = Renderer(_root.transform, "Drop", rune ? Shapes.Circle : Shapes.Square, color);
+                renderer.transform.localScale = Vector3.one * (rune ? 0.32f : 0.3f);
+                renderer.transform.localRotation = Quaternion.Euler(0, 0, rune ? 0 : 45);
+                renderer.transform.localPosition = new Vector3(view.Position.X, view.Position.Y, 0);
+                renderer.sortingOrder = -10;
+                _drops[view.Id] = (renderer, rune ? view.DropRune.Name : view.DropBase.Name, color);
+            }
         }
 
         static Color ColorOf(EntityView view) =>

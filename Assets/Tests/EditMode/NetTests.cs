@@ -18,7 +18,7 @@ namespace Game.Core.Tests
 
             public WorldClient Join(ulong connection, string name, string version = Protocol.Version)
             {
-                var client = new WorldClient("key" + connection, name, Monsters.Shipped, Bosses.Shipped);
+                var client = new WorldClient("key" + connection, name, Monsters.Shipped, Bosses.Shipped, Gear.Data);
                 Clients[connection] = client;
                 Host.Receive(connection, new JoinMessage(client.PlayerKey, name, version).Encode());
                 Deliver();
@@ -246,6 +246,7 @@ namespace Game.Core.Tests
             for (ulong i = 1; i <= 4; i++) session.Join(i, "플레이어" + i);
             for (int i = 0; i < 4; i++) Walk(world, world.Players[i], boss.Home + Vec2.FromAngle(i * 1.6f) * 2.5f);
             for (int i = 0; i < 40; i++) world.SpawnEnemy(Monsters.Shipped.Find("slime"), boss.Home + Vec2.FromAngle(i) * 6);
+            for (int i = 0; i < 30; i++) world.DropItem(Gear.Plain("iron_sword"), boss.Home + Vec2.FromAngle(i) * 3);
 
             int largest = 0;
             var seen = new HashSet<SimEventType>();
@@ -315,6 +316,88 @@ namespace Game.Core.Tests
             // Without news from the host, the guess stops after a quarter of a second.
             client.AdvanceRenderClock(1);
             Assert.AreEqual(11.5f, client.Projectiles().Single().Position.X, 0.02f);
+        }
+
+        [Test]
+        public void ItemsSurviveEncodingWithAffixesSocketsAndRunewords()
+        {
+            var sword = Gear.Plain("copper_sword", 2, Rarity.Common, Gear.Affix("sharp", 2));
+            sword.TryInsertRune(0, Gear.Data.FindRune("wind"), Gear.Data.Runewords);
+            sword.TryInsertRune(1, Gear.Data.FindRune("spark"), Gear.Data.Runewords);
+            var bag = new Inventory();
+            bag.TryAdd(sword);
+            bag.TryAdd(Gear.Plain("iron_armor", 1, Rarity.Rare, Gear.Affix("sturdy", 3), Gear.Affix("giant", 5)));
+            bag.AddRune(Gear.Data.FindRune("star"), 3);
+            var equipment = new Equipment();
+            equipment.Equip(Gear.Plain("copper_ring"));
+
+            var decoded = InventoryMessage.Decode(new InventoryMessage(equipment, bag).Encode(Gear.Data), Gear.Data);
+
+            Assert.AreEqual(2, decoded.Bag.Items.Count);
+            CollectionAssert.AreEqual(ItemText.Describe(bag.Items[0]), ItemText.Describe(decoded.Bag.Items[0]));
+            CollectionAssert.AreEqual(ItemText.Describe(bag.Items[1]), ItemText.Describe(decoded.Bag.Items[1]));
+            Assert.AreEqual("storm", decoded.Bag.Items[0].Runeword?.Id);
+            Assert.AreEqual(3, decoded.Bag.CountOf(Gear.Data.FindRune("star")));
+            Assert.AreEqual("copper_ring", decoded.Equipment[ItemSlot.Ring].Base.Id);
+            Assert.IsNull(decoded.Equipment[ItemSlot.Weapon]);
+        }
+
+        [Test]
+        public void ClientsLearnTheirGearAndWhatTheyPickUp()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            session.Tick();
+
+            var host = session.Host.World.FindPlayer(alice.PlayerId);
+            Assert.AreEqual("copper_sword", alice.Equipment[ItemSlot.Weapon].Base.Id);
+            Assert.AreEqual(host.Stats.Damage, alice.Stats.Damage);
+            alice.TakeAcquired();
+
+            session.Host.World.DropItem(Gear.Plain("iron_sword"), host.Position);
+            session.Host.World.DropRune(Gear.Data.FindRune("ember"), host.Position);
+            session.Tick(2);
+
+            Assert.AreEqual("iron_sword", alice.Bag.Items.Single().Base.Id);
+            CollectionAssert.AreEquivalent(new[] { "획득: [일반] 철 검", "획득: 불씨 룬" }, alice.TakeAcquired());
+        }
+
+        [Test]
+        public void GearCommandsGoThroughTheHost()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var world = session.Host.World;
+            var player = world.FindPlayer(alice.PlayerId);
+            world.DropItem(Gear.Plain("iron_sword", sockets: 1), player.Position);
+            world.DropRune(Gear.Data.FindRune("earth"), player.Position);
+            session.Tick(2);
+            var iron = alice.Bag.Items.Single();
+
+            session.Host.Receive(1, alice.EquipCommand(iron.Id));
+            session.Tick();
+            Assert.AreEqual(iron.Id, alice.Equipment[ItemSlot.Weapon].Id);
+            Assert.AreEqual("copper_sword", alice.Bag.Items.Single().Base.Id);
+
+            session.Host.Receive(1, alice.InsertRuneCommand(iron.Id, Gear.Data.FindRune("earth")));
+            session.Tick();
+            Assert.AreEqual("earth", alice.Equipment[ItemSlot.Weapon].Sockets[0].Id);
+            Assert.AreEqual(9 + 4, alice.Stats.Damage, 0.001f, "the earth rune adds 4 to a weapon");
+            Assert.AreEqual(player.Stats.Damage, alice.Stats.Damage);
+
+            var copper = alice.Bag.Items.Single();
+            session.Host.Receive(1, alice.DiscardCommand(copper.Id));
+            // Others are drawn a few ticks in the past, so wait for the drop to reach that point.
+            session.Tick(10);
+            Assert.AreEqual(0, alice.Bag.Items.Count);
+            var drop = alice.Others().Single(e => e.Kind == EntityKind.Drop);
+            Assert.AreEqual("copper_sword", drop.DropBase.Id);
+            Assert.AreEqual(Rarity.Common, drop.DropRarity);
+
+            session.Host.Receive(1, alice.UnequipCommand(ItemSlot.Weapon));
+            session.Tick();
+            Assert.IsNull(alice.Equipment[ItemSlot.Weapon]);
+            Assert.AreEqual(iron.Id, alice.Bag.Items.Single().Id);
         }
 
         [Test]

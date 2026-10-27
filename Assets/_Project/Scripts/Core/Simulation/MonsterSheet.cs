@@ -19,7 +19,9 @@ namespace Game.Core
             float reach,
             float windup,
             float cooldown,
-            int weight)
+            int weight,
+            float dropChance,
+            float runeChance)
         {
             Id = id;
             Name = name;
@@ -34,6 +36,8 @@ namespace Game.Core
             Windup = windup;
             Cooldown = cooldown;
             Weight = weight;
+            DropChance = dropChance;
+            RuneChance = runeChance;
         }
 
         public string Id { get; }
@@ -55,6 +59,9 @@ namespace Game.Core
         // Seconds after an attack before it chases again.
         public float Cooldown { get; }
         public int Weight { get; }
+        // Percent chance to drop an item, and separately a rune, when killed.
+        public float DropChance { get; }
+        public float RuneChance { get; }
     }
 
     public sealed class MonsterData
@@ -122,7 +129,9 @@ namespace Game.Core
                         SheetValues.ParseDecimal(row["reach"], "reach"),
                         SheetValues.ParseDecimal(row["windup"], "windup"),
                         SheetValues.ParseDecimal(row["cooldown"], "cooldown"),
-                        SheetValues.ParseNumber(row["weight"], "weight")));
+                        SheetValues.ParseNumber(row["weight"], "weight"),
+                        Percent(row, "drop_chance"),
+                        Percent(row, "rune_chance")));
                 }
                 catch (FormatException e)
                 {
@@ -130,6 +139,14 @@ namespace Game.Core
                 }
             }
             return new MonsterData(monsters, errors);
+        }
+
+        // Drop columns may be left out or blank, which means no drops.
+        static float Percent(CsvRow row, string column)
+        {
+            if (row[column].Length == 0) return 0;
+            float value = SheetValues.ParseDecimal(row[column], column);
+            return value <= 100 ? value : throw new FormatException($"{column}는 0~100 사이의 퍼센트입니다.");
         }
 
         static int Positive(int value, string label) =>

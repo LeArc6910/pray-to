@@ -13,11 +13,12 @@ namespace Game.Core
         // Entities further than this from a player are left out of that player's snapshots.
         public float ViewRange { get; set; } = 22;
         // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). At 17 bytes an
-        // entity, 13 a projectile, 19 a hazard and 13 an event, the maximum comes to about 1.15 KB.
-        public int MaxEntitiesPerSnapshot { get; set; } = 24;
-        public int MaxProjectilesPerSnapshot { get; set; } = 24;
+        // entity or drop, 13 a projectile, 19 a hazard and 13 an event, the maximum comes to about 1.15 KB.
+        public int MaxEntitiesPerSnapshot { get; set; } = 20;
+        public int MaxDropsPerSnapshot { get; set; } = 8;
+        public int MaxProjectilesPerSnapshot { get; set; } = 20;
         public int MaxHazardsPerSnapshot { get; set; } = 10;
-        public int MaxEventsPerSnapshot { get; set; } = 16;
+        public int MaxEventsPerSnapshot { get; set; } = 14;
         public string[] StarterGear { get; set; } = { "copper_sword" };
     }
 
@@ -45,6 +46,8 @@ namespace Game.Core
         {
             public Player Player;
             public int LastSequence;
+            // The player's InventoryVersion when their inventory was last sent.
+            public int SentInventory = -1;
         }
 
         readonly Dictionary<ulong, Connection> _connections = new Dictionary<ulong, Connection>();
@@ -68,7 +71,7 @@ namespace Game.Core
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
             _generated = WorldGenerator.Generate(seed);
-            World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig);
+            World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot);
             if (bosses != null && bosses.Bosses.Count > 0) World.PlaceBoss(bosses.Bosses[0], _generated.Arena, _generated.ArenaRadius);
         }
 
@@ -86,6 +89,9 @@ namespace Game.Core
                         break;
                     case MessageType.Input:
                         if (_connections.TryGetValue(connection, out var sender)) ApplyInput(sender, InputMessage.Decode(data));
+                        break;
+                    case MessageType.InventoryCommand:
+                        if (_connections.TryGetValue(connection, out var owner) && owner.Player != null) Apply(owner.Player, InventoryCommandMessage.Decode(data));
                         break;
                 }
             }
@@ -106,6 +112,15 @@ namespace Game.Core
         {
             World.Step();
             _pendingEvents.AddRange(World.TakeEvents());
+
+            foreach (var pair in _connections)
+            {
+                var player = pair.Value.Player;
+                if (player == null || pair.Value.SentInventory == player.InventoryVersion) continue;
+                pair.Value.SentInventory = player.InventoryVersion;
+                Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory).Encode(_loot), reliable: true);
+            }
+
             if (World.Tick % _config.SnapshotInterval != 0) return;
 
             foreach (var pair in _connections)
@@ -151,6 +166,25 @@ namespace Game.Core
             BroadcastRoster();
         }
 
+        void Apply(Player player, InventoryCommandMessage command)
+        {
+            switch (command.Command)
+            {
+                case InventoryCommand.Equip:
+                    World.EquipItem(player.Id, command.Item);
+                    break;
+                case InventoryCommand.Unequip:
+                    World.UnequipItem(player.Id, command.Slot);
+                    break;
+                case InventoryCommand.InsertRune:
+                    if (command.Rune < _loot.Runes.Count) World.InsertRune(player.Id, command.Item, _loot.Runes[command.Rune]);
+                    break;
+                case InventoryCommand.Discard:
+                    World.DiscardItem(player.Id, command.Item);
+                    break;
+            }
+        }
+
         void ApplyInput(Connection sender, InputMessage input)
         {
             if (sender.Player == null || input.Sequence <= sender.LastSequence) return;
@@ -179,7 +213,20 @@ namespace Game.Core
                 .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
                 .Select(e => new EntityState(
                     e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.Definition.Health, (byte)e.State));
-            var entities = shownSoFar.Concat(enemies).ToList();
+            var drops = World.GroundLoot
+                .Where(l => InView(l.Position))
+                .OrderBy(l => Distance(l.Position))
+                .Take(_config.MaxDropsPerSnapshot)
+                .Select(l => new EntityState(
+                    l.Id,
+                    EntityKind.Drop,
+                    l.Item != null ? IndexOf(_loot.Bases, l.Item.Base) : IndexOf(_loot.Runes, l.Rune),
+                    l.Position,
+                    Vec2.Zero,
+                    0,
+                    0,
+                    l.Item != null ? (byte)l.Item.Rarity : DropState.Rune));
+            var entities = shownSoFar.Concat(enemies).Concat(drops).ToList();
 
             var projectiles = World.Projectiles
                 .Where(p => InView(p.Position))
