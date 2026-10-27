@@ -49,16 +49,13 @@ DevTools/Local/setup.sh --commit
 
 ### 웹 데모(모바일 브라우저 테스트)용
 
-클라우드가 웹 빌드·배포 워크플로를 붙이면 푸시마다 GitHub Actions가 웹 빌드를 만들어 올린다. 그러려면 다음이 필요하다.
+배포처는 공개 저장소 + GitHub Pages로 정했다(2026-10-28). 빌드·배포 워크플로(`web-demo.yml`)는 클라우드가 붙였고, 아래 셋을 하면 푸시마다 https://learc6910.github.io/pray-to/ 가 갱신된다. 자세한 건 `Docs/WebDemo.md`.
 
-- [ ] **배포처 정하기.** 저장소가 private이라 GitHub Free 플랜으로는 GitHub Pages를 쓸 수 없다(2026-10-28 로컬 세션 확인). 셋 중 하나를 골라 클라우드 세션에 알려 준다
-  - 저장소를 public으로 바꾸고 GitHub Pages(무료). 코드가 공개된다
-  - GitHub 유료 플랜(Pro 이상)으로 private 저장소에서 Pages. 페이지 자체는 링크를 아는 누구나 볼 수 있다
-  - 다른 배포처(예: itch.io의 비공개 페이지). 그 서비스 계정과 API 키가 필요하다
+- [ ] **저장소를 public으로.** GitHub 저장소 Settings > General 맨 아래 Danger Zone > Change repository visibility > Make public. 클라우드 세션에는 이 권한이 없다. 로컬 세션에 맡긴다면 사람이 허락한 뒤 `gh repo edit LeArc6910/pray-to --visibility public --accept-visibility-change-consequences`. 공개 전에 기록을 확인했다: 커밋 이메일은 GitHub·Anthropic의 noreply 주소이고, 라이선스 파일·키·비밀번호는 없다
+- [ ] Settings > Pages > Build and deployment > Source를 **GitHub Actions**로 (public이 된 뒤에 고를 수 있다)
 - [ ] 라이선스 파일 찾기. Windows는 `C:\ProgramData\Unity\Unity_lic.ulf`, macOS는 `/Library/Application Support/Unity/Unity_lic.ulf`
-- [ ] GitHub 저장소 Settings > Secrets and variables > Actions에 시크릿 3개 추가: `UNITY_LICENSE`(ulf 파일 내용 전체), `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다**
-- [ ] (GitHub Pages로 정했다면) GitHub 저장소 Settings > Pages > Build and deployment > Source를 **GitHub Actions**로
-- [ ] 결과 보고에는 했는지 여부만 적는다
+- [ ] Settings > Secrets and variables > Actions에 시크릿 3개 추가: `UNITY_LICENSE`(ulf 파일 내용 전체), `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다
+- [ ] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
 
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
 
@@ -114,6 +111,24 @@ DevTools/Local/setup.sh --commit
 - [ ] 2인: 한쪽이 주운 아이템이 다른 쪽 바닥에서도 사라지는지, 참가한 쪽에서도 가방 명령이 되는지
 
 **결과 보고에 적을 것**: 항목별로 안 된 것, Console의 에러·경고, 어색한 점(움직임이 끊기는지, 반응이 늦은지, 전투가 너무 쉽거나 어려운지, 보스 처치까지 걸린 시간과 어려웠던 공격, 드랍이 너무 많거나 적은지, 가방 창이 불편한지). Game 뷰 스크린샷을 `Docs/Screenshots/m2_solo.png`, `m2_coop.png`, `m3_boss.png`, `m3b_bag.png`로 커밋한다.
+
+### 3. 새 파일 받아서 명령 한 줄 다시 실행 (2026-10-28 추가, 로컬 세션이 바로 할 수 있다)
+
+웹 데모 작업으로 글꼴, WebGL 플러그인, 스크립트가 늘었다. `.meta`를 만들고 PlayMode 테스트가 그대로 통과하는지 본다.
+
+- [ ] `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행
+- [ ] (선택) 에디터 메뉴 **Game > Build Web Demo**로 웹 빌드가 되는지 본다. 결과 `Builds/Web`은 커밋하지 않는다. 같은 Wi-Fi의 휴대폰으로 보려면 `python -m http.server 8000 --directory Builds/Web` 후 `http://<PC 주소>:8000`
+
+### 4. 웹 데모 확인 (사람, 휴대폰)
+
+위 "웹 데모용"을 마치고 첫 배포가 끝난 뒤, 휴대폰 브라우저로 https://learc6910.github.io/pray-to/ 를 가로로 연다. 조작은 `Docs/WebDemo.md`의 터치 조작 표.
+
+- [ ] 로딩이 끝나고 메뉴가 보이는지, 한글이 깨지지 않는지, 글자 크기가 읽을 만한지
+- [ ] [혼자 하기], [가방], [나가기] 버튼이 탭에 반응하는지
+- [ ] 왼쪽 드래그로 움직이고, 오른쪽을 누르고 있으면 그쪽으로 휘두르는지
+- [ ] 가방 창이 화면에 들어오는지, 장착·버리기 버튼이 눌리는지
+- [ ] 끊기지 않고 부드럽게 도는지
+- [ ] 결과 보고: 휴대폰 기종과 브라우저, 안 된 항목, 불편한 점. 스크린샷 `Docs/Screenshots/web_phone.png`
 
 ## 결과 보고
 

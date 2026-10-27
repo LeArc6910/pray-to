@@ -9,12 +9,18 @@ namespace Game.Client
     // host for the change; the window redraws from the next inventory message.
     sealed class InventoryWindow
     {
-        const float Width = 520;
+        const float MaxWidth = 520;
+        // Room for the title line above the scrolling part.
+        const float TitleHeight = 40;
+        const float TooltipWidth = 320;
+
+        static GUIStyle _tooltipStyle;
 
         readonly WorldClient _client;
         readonly Action<byte[]> _send;
         RuneDefinition _selectedRune;
         Vector2 _scroll;
+        float _nameWidth;
 
         public InventoryWindow(WorldClient client, Action<byte[]> send)
         {
@@ -29,8 +35,14 @@ namespace Game.Client
             if (!Open) return;
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
-            GUILayout.BeginArea(new Rect(Screen.width - Width - 20, 60, Width, Screen.height - 100), GUI.skin.box);
-            GUILayout.Label("가방 (Tab 또는 I로 닫기)");
+            // Narrower on phones; the whole window scrolls when it does not fit.
+            float width = Mathf.Min(MaxWidth, Ui.Width - 20);
+            _nameWidth = Mathf.Min(240, width - 200);
+            var area = new Rect(Ui.Width - width - 10, 60, width, Ui.Height - 70);
+            Controls.Block(area);
+            GUILayout.BeginArea(area, GUI.skin.box);
+            GUILayout.Label(Controls.UsingTouch ? "가방 (가방 버튼으로 닫기)" : "가방 (Tab 또는 I로 닫기)");
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(area.height - TitleHeight));
             DrawStats();
 
             GUILayout.Space(6);
@@ -55,7 +67,6 @@ namespace Game.Client
 
             GUILayout.Space(6);
             GUILayout.Label($"소지품 {_client.Bag.Items.Count}/{Inventory.Capacity}");
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(Mathf.Max(120, Screen.height - 560)));
             foreach (var item in _client.Bag.Items.ToList())
             {
                 GUILayout.BeginHorizontal();
@@ -65,7 +76,6 @@ namespace Game.Client
                 if (GUILayout.Button("버리기", GUILayout.Width(56))) _send(_client.DiscardCommand(item.Id));
                 GUILayout.EndHorizontal();
             }
-            GUILayout.EndScrollView();
 
             GUILayout.Label("룬");
             GUILayout.BeginHorizontal();
@@ -84,8 +94,26 @@ namespace Game.Client
             GUILayout.EndHorizontal();
             if (_selectedRune != null) GUILayout.Label($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 한 번 넣은 룬은 뺄 수 없습니다.");
 
-            if (!string.IsNullOrEmpty(GUI.tooltip)) GUILayout.Box(GUI.tooltip);
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
+            DrawTooltip(area);
+        }
+
+        // The hovered item's description (or how to see one), in a box beside the window. Drawn outside the layout
+        // so its changing height never shifts the window's controls.
+        static void DrawTooltip(Rect window)
+        {
+            string text = !string.IsNullOrEmpty(GUI.tooltip) ? GUI.tooltip
+                : Controls.UsingTouch ? "아이템 이름을 누르고 있으면 설명이 보입니다." : "아이템 이름에 마우스를 올리면 설명이 보입니다.";
+            var content = new GUIContent(text);
+            _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
+            // Left of the window when there is room, otherwise over its bottom edge.
+            float width = window.x >= TooltipWidth + 20 ? TooltipWidth : window.width - 20;
+            float height = _tooltipStyle.CalcHeight(content, width);
+            var rect = window.x >= TooltipWidth + 20
+                ? new Rect(window.x - width - 10, window.y, width, height)
+                : new Rect(window.x + 10, window.yMax - height - 10, width, height);
+            GUI.Box(rect, content, _tooltipStyle);
         }
 
         void DrawStats()
@@ -96,12 +124,12 @@ namespace Game.Client
                 $"피해 {stats.Damage:0.#} · 초당 공격 {stats.AttacksPerSecond:0.##} · 치명타 {stats.CritChance:0.#}% (×{stats.CritDamage:0}%) · 아이템 희귀도 +{stats.ItemRarity:0}%");
         }
 
-        static void ItemLabel(Item item)
+        void ItemLabel(Item item)
         {
             var previous = GUI.color;
             GUI.color = Palette.Of(item.Rarity);
             string sockets = item.Sockets.Count == 0 ? "" : " " + string.Concat(item.Sockets.Select(r => r == null ? "○" : "●"));
-            GUILayout.Label(new GUIContent(ItemText.Name(item) + sockets, string.Join("\n", ItemText.Describe(item))), GUILayout.Width(240));
+            GUILayout.Label(new GUIContent(ItemText.Name(item) + sockets, string.Join("\n", ItemText.Describe(item))), GUILayout.Width(_nameWidth));
             GUI.color = previous;
         }
 

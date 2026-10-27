@@ -24,6 +24,10 @@ namespace Game.Client
         // After a long hitch, drop the backlog instead of fast-forwarding through it.
         const int MaxTicksPerFrame = 5;
         const float AcquiredSeconds = 4;
+        // Half the view's height in tiles on a landscape screen. Portrait screens zoom out to keep this much width.
+        const float ViewSize = 7;
+        const float TouchButtonWidth = 64;
+        const float TouchButtonHeight = 40;
 
         Mode _mode = Mode.Menu;
         string _playerName = "플레이어";
@@ -51,7 +55,7 @@ namespace Game.Client
             _camera = Camera.main;
             if (_camera == null) _camera = new GameObject("Main Camera", typeof(Camera)).GetComponent<Camera>();
             _camera.orthographic = true;
-            _camera.orthographicSize = 7;
+            _camera.orthographicSize = ViewSize;
             _camera.clearFlags = CameraClearFlags.SolidColor;
             _camera.backgroundColor = new Color(0.04f, 0.04f, 0.06f);
 
@@ -72,6 +76,8 @@ namespace Game.Client
 
         void Update()
         {
+            Controls.UpdateTouches();
+            _camera.orthographicSize = ViewSize * Mathf.Max(1, (float)Screen.height / Screen.width);
             if (_endReason != null)
             {
                 EndSession(_endReason);
@@ -214,6 +220,7 @@ namespace Game.Client
 
         void OnGUI()
         {
+            Ui.Begin();
             if (_client == null)
             {
                 DrawMenu();
@@ -227,14 +234,31 @@ namespace Game.Client
                 var (text, age) = _acquired[i];
                 var previous = GUI.color;
                 GUI.color = new Color(1, 1, 1, Mathf.Clamp01((AcquiredSeconds - age) / 1f));
-                GUI.Label(new Rect(14, Screen.height - 40 - 22 * (_acquired.Count - 1 - i), 400, 22), text);
+                GUI.Label(new Rect(14, Ui.Height - 40 - 22 * (_acquired.Count - 1 - i), 400, 22), text);
                 GUI.color = previous;
             }
+            if (Controls.UsingTouch)
+            {
+                DrawTouchButtons();
+                Controls.DrawTouch();
+            }
+        }
+
+        // Stand-ins for Tab and Esc on phones.
+        void DrawTouchButtons()
+        {
+            var bag = new Rect(Ui.Width - 2 * TouchButtonWidth - 20, 10, TouchButtonWidth, TouchButtonHeight);
+            var leave = new Rect(Ui.Width - TouchButtonWidth - 10, 10, TouchButtonWidth, TouchButtonHeight);
+            Controls.Block(bag);
+            Controls.Block(leave);
+            if (GUI.Button(bag, "가방")) _inventory.Open = !_inventory.Open;
+            // Ends on the next Update, after this OnGUI has finished with the session.
+            if (GUI.Button(leave, "나가기")) _endReason = "";
         }
 
         void DrawMenu()
         {
-            var area = new Rect(Screen.width / 2f - 180, Screen.height / 2f - 150, 360, 300);
+            var area = new Rect(Ui.Width / 2f - 180, Ui.Height / 2f - 150, 360, 300);
             GUILayout.BeginArea(area, GUI.skin.box);
             GUILayout.Label("pray-to (M3b 프로토타입)");
             GUILayout.Space(8);
@@ -245,11 +269,20 @@ namespace Game.Client
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success;
             GUI.enabled = ready;
             if (GUILayout.Button("혼자 하기")) StartSolo();
-            if (GUILayout.Button($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
-            GUILayout.Space(8);
-            GUILayout.Label("호스트 주소");
-            _address = GUILayout.TextField(_address, 64);
-            if (GUILayout.Button("참가")) StartJoining();
+            if (Application.platform == RuntimePlatform.WebGLPlayer)
+            {
+                // A browser cannot listen for connections, and joining would need a WebSocket transport.
+                GUILayout.Space(8);
+                GUILayout.Label("웹 데모에서는 혼자 하기만 됩니다. 협동은 PC 버전에서 합니다.");
+            }
+            else
+            {
+                if (GUILayout.Button($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
+                GUILayout.Space(8);
+                GUILayout.Label("호스트 주소");
+                _address = GUILayout.TextField(_address, 64);
+                if (GUILayout.Button("참가")) StartJoining();
+            }
             GUI.enabled = true;
 
             if (_status.Length > 0)
@@ -276,16 +309,27 @@ namespace Game.Client
                 var toArena = _client.Arena - _client.Position;
                 if (toArena.Length > _client.ArenaRadius) GUILayout.Label($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
             }
-            GUILayout.Label("WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Tab 가방 · Esc 메뉴");
+            GUILayout.Label(Controls.UsingTouch
+                ? "왼쪽 드래그 이동 · 오른쪽 누르고 있기 공격"
+                : "WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Tab 가방 · Esc 메뉴");
             GUILayout.EndArea();
 
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);
         }
 
+        // Right of the HUD box and below the touch buttons; under the HUD when the screen is too narrow for that.
         static void DrawBossBar(EntityView boss)
         {
-            float width = Mathf.Min(600, Screen.width - 40);
-            var bar = new Rect((Screen.width - width) / 2, 20, width, 18);
+            float left = 360;
+            float right = Ui.Width - 20;
+            float top = Controls.UsingTouch ? 20 + TouchButtonHeight : 20;
+            if (right - left < 240)
+            {
+                left = 20;
+                top = 180;
+            }
+            float width = Mathf.Min(600, right - left);
+            var bar = new Rect(left + (right - left - width) / 2, top, width, 18);
             GUI.Label(new Rect(bar.x, bar.y - 2, width, 22), $"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈");
             var previous = GUI.color;
             GUI.color = new Color(0, 0, 0, 0.7f);

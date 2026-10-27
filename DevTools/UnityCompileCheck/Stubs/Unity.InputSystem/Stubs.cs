@@ -22,6 +22,36 @@ namespace UnityEngine.InputSystem.Controls
     public class Vector2Control : InputControl<Vector2>
     {
     }
+
+    public class IntegerControl : InputControl<int>
+    {
+    }
+
+    public class TouchPressControl : ButtonControl
+    {
+    }
+
+    // The real class is an InputControl<TouchState>; only the child controls are used.
+    public class TouchControl
+    {
+        public TouchPressControl press { get; set; }
+        public IntegerControl touchId { get; set; }
+        public Vector2Control position { get; set; }
+    }
+}
+
+namespace UnityEngine.InputSystem.Utilities
+{
+    using System.Collections;
+    using System.Collections.Generic;
+
+    public struct ReadOnlyArray<TValue> : IReadOnlyList<TValue>
+    {
+        public int Count => 0;
+        public TValue this[int index] => default;
+        public IEnumerator<TValue> GetEnumerator() => null;
+        IEnumerator IEnumerable.GetEnumerator() => null;
+    }
 }
 
 namespace UnityEngine.InputSystem
@@ -50,6 +80,12 @@ namespace UnityEngine.InputSystem
     {
         public static Keyboard current { get; private set; }
         public KeyControl this[Key key] => null;
+    }
+
+    public class Touchscreen
+    {
+        public static Touchscreen current { get; internal set; }
+        public UnityEngine.InputSystem.Utilities.ReadOnlyArray<TouchControl> touches { get; protected set; }
     }
 
     public class Mouse

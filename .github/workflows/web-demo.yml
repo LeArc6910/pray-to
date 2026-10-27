@@ -1,0 +1,100 @@
+name: Web demo
+
+# Builds the game for WebGL with GameCI and publishes it to GitHub Pages, so the latest main can be played in a
+# browser, phones included. Needs the Unity license secrets and Pages set to "GitHub Actions" (LOCAL_TASKS.md, 웹 데모용);
+# until the secrets exist the build is skipped with a notice instead of failing.
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'Docs/**'
+      - 'DevTools/**'
+  workflow_dispatch:
+
+concurrency:
+  group: web-demo
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      ready: ${{ steps.secrets.outputs.ready }}
+    steps:
+      - id: secrets
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        run: |
+          if [ -n "$UNITY_LICENSE" ] && [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice title=Web demo skipped::Add the UNITY_LICENSE, UNITY_EMAIL and UNITY_PASSWORD secrets to build the web demo (LOCAL_TASKS.md)."
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    needs: check
+    if: needs.check.outputs.ready == 'true'
+    runs-on: ubuntu-latest
+    outputs:
+      site: ${{ steps.site.outputs.path }}
+    steps:
+      # The Unity WebGL image is several GB; the runner's preinstalled SDKs are not needed here.
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+          df -h /
+
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Cache Unity Library
+        uses: actions/cache@v4
+        with:
+          path: Library
+          key: library-webgl-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
+          restore-keys: library-webgl-
+
+      - name: Build
+        uses: game-ci/unity-builder@v4
+        env:
+          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
+          UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
+          UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
+        with:
+          targetPlatform: WebGL
+          buildMethod: Game.Client.Editor.WebBuild.RunBatch
+          versioning: None
+
+      # GameCI writes the player to build/WebGL/<name>; find it by its index.html rather than assume the name.
+      - name: Find the site
+        id: site
+        run: |
+          index="$(find build -name index.html -print -quit)"
+          if [ -z "$index" ]; then echo "::error::The build produced no index.html"; exit 1; fi
+          echo "path=$(dirname "$index")" >> "$GITHUB_OUTPUT"
+          du -sh "$(dirname "$index")"
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ steps.site.outputs.path }}
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

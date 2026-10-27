@@ -158,7 +158,7 @@ namespace Game.Client
             if (_bannerAge < BannerSeconds)
             {
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
-                var rect = new Rect(0, Screen.height * 0.25f, Screen.width, 60);
+                var rect = new Rect(0, Ui.Height * 0.25f, Ui.Width, 60);
                 Shadowed(rect, _banner, new Color(1f, 0.85f, 0.4f, fade), _bannerStyle);
             }
         }
@@ -529,7 +529,8 @@ namespace Game.Client
         {
             Vector3 screen = _camera.WorldToScreenPoint(world);
             if (screen.z < 0) return;
-            Shadowed(new Rect(screen.x - 80, Screen.height - screen.y - 12, 160, 24), text, color, _labelStyle);
+            Vector2 point = Ui.FromScreen(screen);
+            Shadowed(new Rect(point.x - 80, point.y - 12, 160, 24), text, color, _labelStyle);
         }
 
         static void Shadowed(Rect rect, string text, Color color, GUIStyle style)

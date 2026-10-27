@@ -33,6 +33,10 @@ jobs:
       - name: Compile-check Unity scripts
         run: dotnet build DevTools/UnityCompileCheck
 
+      # Again as the web build sees them, for code behind #if UNITY_WEBGL.
+      - name: Compile-check Unity scripts for the web
+        run: dotnet build DevTools/UnityCompileCheck -p:DefineConstants=UNITY_WEBGL -o "$RUNNER_TEMP/webgl-check"
+
       # The local setup scripts, run against a stand-in for Unity. The runner image has ShellCheck and PowerShell.
       - name: Check local setup scripts
         run: |

@@ -10,6 +10,20 @@
 - **로컬에서 할 일**: 명령 한 줄을 다시 돌려야 하는지, 플레이로 확인할 것이 있는지. 없으면 "없음"
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
+## 2026-10-28 01:05 웹 데모: 빌드·배포 워크플로, 터치 조작, 한글 글꼴
+
+- **바뀐 것**
+  - `.github/workflows/web-demo.yml`: 푸시마다 GameCI로 WebGL 빌드를 만들어 GitHub Pages(https://learc6910.github.io/pray-to/)에 올린다. Unity 라이선스 시크릿이 없으면 건너뛰고 안내만 남긴다
+  - `Editor/WebBuild.cs`: `Game > Build Web Demo` 메뉴와 CI용 `RunBatch`. gzip + decompression fallback이라 Pages에서 그대로 돈다
+  - 터치 조작(`Controls.cs`): 왼쪽 드래그 이동, 오른쪽 누르고 있기 공격, 오른쪽 위 [가방]·[나가기] 버튼. 키보드·마우스는 그대로
+  - 화면 크기(`Ui.cs`, `Plugins/WebGL/Display.jslib`): 휴대폰의 픽셀 밀도만큼 UI를 키운다. 세로 화면은 카메라를 넓힌다. 가방 창은 화면 폭에 맞추고 통째로 스크롤한다
+  - 한글 글꼴: `Resources/Fonts/NotoSansKR-Game.ttf`(Noto Sans KR Medium 부분집합, 약 520 KB, Git LFS). 웹 빌드는 시스템 글꼴을 못 쓰기 때문이다. 에디터와 PC 빌드도 이 글꼴을 쓴다. 라이선스는 `Docs/Licenses/NotoSansKR-OFL.txt`
+  - 웹 메뉴에서는 호스트·참가를 숨긴다(브라우저는 호스트가 될 수 없다)
+  - CI가 `UNITY_WEBGL`을 정의한 채로도 Unity 쪽 코드를 컴파일해 본다
+  - 공개 전환 전에 기록을 확인했다: 커밋 이메일은 noreply 주소이고 키·비밀번호·라이선스 파일은 없다
+- **로컬에서 할 일**: `LOCAL_TASKS.md` 3번(명령 한 줄 다시 실행해 새 파일의 `.meta` 커밋). 사람은 "웹 데모용"(공개 전환, Pages 설정, 시크릿)과 4번(휴대폰 확인)
+- **로컬 확인**: [ ]
+
 ## 2026-10-28 01:00 로컬 결과 확인, 이 기록 시작
 
 - **바뀐 것**
