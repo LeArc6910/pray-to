@@ -227,3 +227,14 @@ DevTools/Local/setup.sh --commit
 - 원인(로컬 판단): 먼저 `UNITY_EMAIL`·`UNITY_PASSWORD`로 Unity 계정 로그인이 401로 거절됐다. 로그인 토큰이 없어서 그 뒤 라이선스 활성화도 실패한 것으로 보인다. 흔한 원인은 비밀번호 오타·앞뒤 공백, Google·Apple 같은 소셜 로그인으로 만든 계정이라 비밀번호가 없는 경우, 2단계 인증이다
 - 두 번째 의심: `UNITY_LICENSE`. 이 PC에는 문서에 적힌 `C:\ProgramData\Unity\Unity_lic.ulf`가 없다. Unity 6 Hub는 `%LOCALAPPDATA%\Unity\licenses\UnityEntitlementLicense.xml`만 남기는데, 이것은 ULF 형식이 아니다. 로그인을 고친 뒤에도 `Failed to activate ULF license`가 남으면 이쪽을 본다(클라우드: GameCI가 Unity 6 Personal에 요구하는 형식 확인 부탁)
 - 사람이 할 일: Unity 계정이 이메일·비밀번호로 로그인되는지 https://id.unity.com 에서 확인. 소셜 로그인 계정이면 비밀번호를 만들고, 2단계 인증이 켜져 있으면 확인한다. 그 뒤 `UNITY_EMAIL`·`UNITY_PASSWORD`를 다시 넣는다
+
+### 2026-10-28 02:12 웹 데모 두 번째 빌드 실패: 시리얼 오류 (로컬 세션)
+
+- 사람이 Unity 계정을 확인한 뒤 다시 돌렸다: https://github.com/LeArc6910/pray-to/actions/runs/40546236855 . 이번에도 `build`가 라이선스 활성화에서 멈췄다(5번 재시도, 약 12분). 저장소 시크릿의 수정 시각은 첫 입력(01:39) 그대로라 계정 쪽 조치로 로그인이 풀린 것으로 보인다
+- 첫 번째와 달리 로그인과 entitlement 활성화는 성공했다. 그 다음 시리얼 확인에서 실패한다:
+  - `[UnityConnect::TryLogin] Request Succeeded.`
+  - `[Licensing::Module] Successfully activated the entitlement license`
+  - `[Licensing::Client] Error: Code 20110 while processing request (status: serial invalid)`
+  - `[Licensing::Module] License activation has failed. Aborting.`
+- 원인(로컬 판단): GameCI는 Personal 라이선스일 때 `UNITY_LICENSE`(ULF 파일)의 `DeveloperData`에서 시리얼을 꺼내 넘긴다. 이 PC에는 ULF 파일이 없고 Unity 6 Hub가 남기는 `UnityEntitlementLicense.xml`은 ULF가 아니어서, 넘어간 시리얼이 잘못된 것으로 보인다. entitlement는 이미 활성화됐으므로 시리얼 없이 활성화하면 될 가능성이 있다
+- **클라우드에 부탁**: `web-demo.yml`의 라이선스 활성화를 Unity 6 Personal(entitlement, ULF 없음)에 맞게 고쳐 주세요. 예: `unity-builder`의 `skipActivation`을 켜고 이메일·비밀번호로만 활성화하는 단계를 따로 두는 방법. GameCI가 Unity 6 Personal을 어떻게 지원하는지 확인이 필요하다
