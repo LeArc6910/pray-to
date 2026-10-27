@@ -97,7 +97,7 @@ run_unity() {
 # 로그에서 원인이 될 만한 줄을 뽑는다
 log_errors() {
     [ -f "$logs/$1.log" ] || return 0
-    grep -E 'error CS[0-9]+|Exception|Aborting batchmode|No valid Unity Editor license|Multiple Unity instances|compiler errors|executeMethod (method|class)' "$logs/$1.log" \
+    grep -E 'error CS[0-9]+|Exception|Aborting batchmode|No valid Unity Editor license|Licensing::[A-Za-z]+\] Error|exit with return code|Multiple Unity instances|compiler errors|executeMethod (method|class)' "$logs/$1.log" \
         | sed 's/^[[:space:]]*//' | awk '!seen[$0]++' | head -15
 }
 
@@ -207,6 +207,9 @@ else
     all_ok=0
     echo "- 프로젝트 설정: **실패** (종료 코드 $setup_code). Logs/setup.log에서 뽑은 줄:" >> "$report"
     log_errors setup | code_bullets >> "$report"
+    if grep -qE 'Licensing::[A-Za-z]+\] Error' "$logs/setup.log" 2> /dev/null; then
+        echo "- 라이선스 문제로 보인다. Unity Hub에 다시 로그인하고 Preferences > Licenses에서 Personal 라이선스를 확인한 뒤 다시 실행한다." >> "$report"
+    fi
     summary="Project setup: failed with exit code $setup_code."
 fi
 packages="$(package_versions)"

@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <Asmdef>$(ProjectRoot)Assets/Tests/PlayMode/Game.Client.Tests.asmdef</Asmdef>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="$(ProjectRoot)Assets/Tests/PlayMode/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- The asmdef's precompiled nunit.framework.dll. Unity ships its own NUnit 3.5 build; the tests use only the
+         common subset. -->
+    <PackageReference Include="NUnit" Version="3.14.0" />
+  </ItemGroup>
+
+</Project>

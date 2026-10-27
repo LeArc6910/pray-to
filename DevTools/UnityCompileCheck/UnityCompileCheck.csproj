@@ -1,39 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Compiles the Unity-side scripts and play mode tests against Unity's real engine assemblies (fetched by
-       fetch-unity.sh) and hand-written stand-ins for the package APIs they use (Stubs/). Catches compile errors
-       before the editor does; nothing here runs. -->
-  <PropertyGroup>
-    <TargetFramework>netstandard2.1</TargetFramework>
-    <LangVersion>9.0</LangVersion>
-    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
-    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
-    <UnityAssemblies>$(MSBuildThisFileDirectory).unity/Managed/UnityEngine</UnityAssemblies>
-  </PropertyGroup>
-
+  <!-- Compiles the Unity-side scripts the way Unity splits them: one project per asmdef under Assemblies/, each
+       referencing only what its asmdef references (Directory.Build.targets reads them). Engine types come from
+       Unity's real assemblies (fetched by fetch-unity.sh); package types from hand-written stand-ins under Stubs/,
+       one project per package assembly. Catches compile errors before the editor does; nothing here runs. -->
   <ItemGroup>
-    <Compile Include="Stubs/*.cs" />
-    <Compile Include="../../Assets/_Project/Scripts/Client/**/*.cs" />
-    <Compile Include="../../Assets/Tests/PlayMode/**/*.cs" />
+    <ProjectReference Include="Assemblies/*/*.csproj" />
   </ItemGroup>
-
-  <ItemGroup>
-    <!-- Unity's test framework ships its own NUnit 3.5 build; the play mode tests only use the common subset. -->
-    <PackageReference Include="NUnit" Version="3.14.0" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <Reference Include="$(UnityAssemblies)/UnityEngine.*Module.dll" Private="false" />
-    <Reference Include="$(UnityAssemblies)/UnityEditor.*Module.dll" Private="false" />
-    <Reference Include="$(UnityAssemblies)/UnityEditor.dll" Private="false" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <ProjectReference Include="../Game.Core/Game.Core.csproj" />
-  </ItemGroup>
-
-  <Target Name="RequireUnityAssemblies" BeforeTargets="ResolveAssemblyReferences" Condition="!Exists('$(UnityAssemblies)/UnityEngine.CoreModule.dll')">
-    <Error Text="Unity assemblies are missing. Run DevTools/UnityCompileCheck/fetch-unity.sh first." />
-  </Target>
 
 </Project>

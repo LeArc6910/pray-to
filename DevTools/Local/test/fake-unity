@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stands in for the Unity editor in run.sh: reads the arguments the setup scripts pass and leaves behind what a real
-# run would (a log, an asset, packages-lock.json, NUnit results). FAKE_SETUP_FAIL, FAKE_PLAY_FAIL and FAKE_TOUCH_CS
-# switch on the failures the scripts must report.
+# run would (a log, an asset, packages-lock.json, NUnit results). FAKE_LICENSE_FAIL, FAKE_SETUP_FAIL, FAKE_PLAY_FAIL and
+# FAKE_TOUCH_CS switch on the failures the scripts must report.
 log=""
 results=""
 platform=""
@@ -20,9 +20,19 @@ done
 echo "fake unity: $mode $platform" > "$log"
 
 if [ "$mode" = setup ]; then
+    if [ -n "${FAKE_LICENSE_FAIL:-}" ]; then
+        {
+            echo "[Licensing::Module] Error: Access token is unavailable; failed to update"
+            echo "[Licensing::Module] Error: 'com.unity.editor.headless' was not found."
+            echo "Exiting without the bug reporter. Application will exit with return code 198"
+        } >> "$log"
+        exit 198
+    fi
     if [ -n "${FAKE_SETUP_FAIL:-}" ]; then
-        echo "Assets/_Project/Scripts/Client/GameRoot.cs(1,1): error CS0246: The type or namespace name 'Foo' could not be found" >> "$log"
-        echo "Aborting batchmode due to failure:" >> "$log"
+        {
+            echo "Assets/_Project/Scripts/Client/GameRoot.cs(1,1): error CS0246: The type or namespace name 'Foo' could not be found"
+            echo "Aborting batchmode due to failure:"
+        } >> "$log"
         exit 1
     fi
     mkdir -p "$project/Assets/_Project/Settings"

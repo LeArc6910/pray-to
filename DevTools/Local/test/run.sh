@@ -82,6 +82,12 @@ check_runner() {
     fi
 
     reset
+    FAKE_LICENSE_FAIL=1 case_run "$name: Unity has no license" 1 "$@"
+    expect LOCAL_TASKS.md "프로젝트 설정: **실패** (종료 코드 198)"
+    expect LOCAL_TASKS.md "[Licensing::Module] Error: 'com.unity.editor.headless' was not found."
+    expect LOCAL_TASKS.md "라이선스 문제로 보인다"
+
+    reset
     FAKE_SETUP_FAIL=1 case_run "$name: the project does not compile" 1 "$@"
     expect LOCAL_TASKS.md "프로젝트 설정: **실패** (종료 코드 1)"
     expect LOCAL_TASKS.md "error CS0246: The type or namespace name 'Foo' could not be found"

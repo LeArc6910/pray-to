@@ -20,7 +20,7 @@
   - `Game.Core`: Core만 컴파일한다. 경고도 에러로 친다.
   - `Game.Core.Tests`: 테스트
   - `CoreSandbox`: 밸런스 시뮬레이션 콘솔
-  - `UnityCompileCheck`: Unity 쪽 코드(`Scripts/Client`, `Tests/PlayMode`)를 Unity 실제 엔진 DLL로 컴파일만 해 본다. 패키지(Netcode, Input System, URP, Test Framework) API는 `Stubs/PackageStubs.cs`에 패키지 소스와 같은 시그니처로 적어 둔다. 새 패키지 API를 쓰면 여기에 추가한다.
+  - `UnityCompileCheck`: Unity 쪽 코드(`Scripts/Client`, `Tests/PlayMode`)를 Unity 실제 엔진 DLL로 컴파일만 해 본다. asmdef마다 `Assemblies/`에 프로젝트가 하나씩 있고, 참조는 asmdef의 `references`를 읽어 정한다(`Directory.Build.targets`, Unity처럼 전이되지 않는다). 패키지(Netcode, Input System, URP, Test Framework) API는 `Stubs/<어셈블리 이름>/`에 패키지 소스와 같은 시그니처로 적어 둔다. 타입은 패키지에서 실제로 들어 있는 어셈블리(패키지의 asmdef로 확인)의 스텁에 넣는다. 예: `Light2D`는 `Unity.RenderPipelines.Universal.2D.Runtime`. 새 패키지 API를 쓰면 여기에 추가한다.
   - `Local`: 로컬 컴퓨터에서 쓰는 명령 한 줄(`setup.ps1`, `setup.sh`). 둘은 같은 일을 하므로 하나를 고치면 다른 하나도 고친다. `test/run.sh`가 가짜 Unity(`test/fake-unity`)로 두 스크립트를 확인한다.
 - `Assets/_Project/Scripts/Client` (`Game.Client`): 화면, 입력, 네트워크 전송만 맡는다. 게임 규칙을 두지 않는다. `Editor/`에는 프로젝트 설정과 씬·에셋을 코드로 만드는 메뉴(`Game > Set Up Project`, `Game > Set Up Main Scene`)가 있다.
 

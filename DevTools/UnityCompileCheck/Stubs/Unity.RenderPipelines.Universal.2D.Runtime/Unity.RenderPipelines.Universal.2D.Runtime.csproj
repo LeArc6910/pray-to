@@ -1,0 +1,11 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <Compile Include="*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="../Unity.RenderPipelines.Universal.Runtime/Unity.RenderPipelines.Universal.Runtime.csproj" />
+  </ItemGroup>
+
+</Project>

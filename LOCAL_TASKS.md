@@ -41,7 +41,7 @@ DevTools/Local/setup.sh --commit
 
 ### 처음 한 번
 
-- [ ] **Unity Hub** 설치(https://unity.com/download), Unity 계정으로 로그인, Preferences > Licenses에서 **Personal 라이선스** 활성화. 명령 한 줄의 배치 모드도 이 라이선스로 돈다
+- [ ] **Unity Hub** 설치(https://unity.com/download), Unity 계정으로 로그인, Preferences > Licenses에서 **Personal 라이선스** 활성화. 명령 한 줄의 배치 모드도 이 라이선스로 돈다. Hub 로그인이 풀리면 배치 모드가 라이선스 에러(종료 코드 198)로 멈추니, 그때는 Hub에 다시 로그인한다
 - [ ] **Unity 6000.6.3f1**과 **Web Build Support** 설치. Hub에서 직접 하거나, 명령 한 줄에 `-InstallEditor`를 붙인다
 - [ ] **Git** 설치(Windows는 Git for Windows. Git LFS가 같이 들어 있다) 후 저장소 클론
 - [ ] 명령 한 줄 실행. 처음에 Windows 방화벽 창이 뜨면 Unity Editor를 **허용**한다(PlayMode 테스트가 호스트를 열기 때문이고, 같은 네트워크의 친구가 참가할 때도 필요하다)
@@ -76,7 +76,9 @@ DevTools/Local/setup.sh --commit
 
 예전 1~3번(프로젝트 열기, URP 2D 설정, 컴파일·테스트 확인 후 커밋)은 명령 한 줄이 한다.
 
-- [ ] 위 "명령 한 줄"을 `-Commit`과 함께 실행
+- [x] 첫 실행(2026-10-27 23:31, 23:34): 라이선스 에러, 그 뒤 `Light2D` 컴파일 에러로 멈췄다. 결과 보고 참고
+- 클라우드 조치: `Game.Client`와 `Game.Client.Editor` asmdef에 `Unity.RenderPipelines.Universal.2D.Runtime` 참조를 넣었다. 컴파일 확인도 asmdef마다 따로 빌드하도록 바꿔서 같은 실수를 CI가 잡는다. 라이선스 에러도 이제 보고에 원인과 함께 적힌다
+- [ ] `git pull` 후 위 "명령 한 줄"을 `-Commit`과 함께 다시 실행
 - [ ] 실패해도 그대로 둔다. 결과 보고에 로그에서 뽑은 에러 줄이 적혀 올라가고, 클라우드가 고친다
 - 클라우드 기준: EditMode 140개 통과. PlayMode 2개는 클라우드에서 돌릴 수 없어 이번이 처음이다
 

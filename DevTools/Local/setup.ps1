@@ -105,8 +105,8 @@ function Invoke-Unity([string]$name, [string[]]$extra) {
 function Get-LogErrors([string]$name) {
     $log = Join-Path $logs "$name.log"
     if (-not (Test-Path $log)) { return @() }
-    $patterns = @('error CS\d+', 'Exception', 'Aborting batchmode', 'No valid Unity Editor license', 'Multiple Unity instances',
-        'compiler errors', 'executeMethod (method|class)')
+    $patterns = @('error CS\d+', 'Exception', 'Aborting batchmode', 'No valid Unity Editor license', 'Licensing::\w+\] Error',
+        'exit with return code', 'Multiple Unity instances', 'compiler errors', 'executeMethod (method|class)')
     return @(Select-String -Path $log -Pattern $patterns | ForEach-Object { $_.Line.Trim() } | Select-Object -Unique | Select-Object -First 15)
 }
 
@@ -208,6 +208,9 @@ if ($setupOk) {
 else {
     $report.Add("- 프로젝트 설정: **실패** (종료 코드 $setupCode). Logs/setup.log에서 뽑은 줄:")
     foreach ($line in (Get-LogErrors 'setup')) { $report.Add("  - ``$line``") }
+    if (Select-String -Path (Join-Path $logs 'setup.log') -Pattern 'Licensing::\w+\] Error' -Quiet) {
+        $report.Add('- 라이선스 문제로 보인다. Unity Hub에 다시 로그인하고 Preferences > Licenses에서 Personal 라이선스를 확인한 뒤 다시 실행한다.')
+    }
     $summary.Add("Project setup: failed with exit code $setupCode.")
 }
 $packages = Get-PackageVersions
