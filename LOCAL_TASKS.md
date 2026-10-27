@@ -42,10 +42,10 @@ DevTools/Local/setup.sh --commit
 
 ### 처음 한 번
 
-- [ ] **Unity Hub** 설치(https://unity.com/download), Unity 계정으로 로그인, Preferences > Licenses에서 **Personal 라이선스** 활성화. 명령 한 줄의 배치 모드도 이 라이선스로 돈다. Hub 로그인이 풀리면 배치 모드가 라이선스 에러(종료 코드 198)로 멈추니, 그때는 Hub에 다시 로그인한다
-- [ ] **Unity 6000.6.3f1**과 **Web Build Support** 설치. Hub에서 직접 하거나, 명령 한 줄에 `-InstallEditor`를 붙인다
-- [ ] **Git** 설치(Windows는 Git for Windows. Git LFS가 같이 들어 있다) 후 저장소 클론
-- [ ] 명령 한 줄 실행. 처음에 Windows 방화벽 창이 뜨면 Unity Editor를 **허용**한다(PlayMode 테스트가 호스트를 열기 때문이고, 같은 네트워크의 친구가 참가할 때도 필요하다)
+- [x] **Unity Hub** 설치(https://unity.com/download), Unity 계정으로 로그인, Preferences > Licenses에서 **Personal 라이선스** 활성화. 명령 한 줄의 배치 모드도 이 라이선스로 돈다. Hub 로그인이 풀리면 배치 모드가 라이선스 에러(종료 코드 198)로 멈추니, 그때는 Hub에 다시 로그인한다
+- [x] **Unity 6000.6.3f1**과 **Web Build Support** 설치. Hub에서 직접 하거나, 명령 한 줄에 `-InstallEditor`를 붙인다
+- [x] **Git** 설치(Windows는 Git for Windows. Git LFS가 같이 들어 있다) 후 저장소 클론
+- [x] 명령 한 줄 실행. 처음에 Windows 방화벽 창이 뜨면 Unity Editor를 **허용**한다(PlayMode 테스트가 호스트를 열기 때문이고, 같은 네트워크의 친구가 참가할 때도 필요하다)
 
 ### 웹 데모(모바일 브라우저 테스트)용
 
@@ -116,8 +116,8 @@ DevTools/Local/setup.sh --commit
 
 웹 데모 작업으로 글꼴, WebGL 플러그인, 스크립트가 늘었다. `.meta`를 만들고 PlayMode 테스트가 그대로 통과하는지 본다.
 
-- [ ] `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행
-- [ ] (선택) 에디터 메뉴 **Game > Build Web Demo**로 웹 빌드가 되는지 본다. 결과 `Builds/Web`은 커밋하지 않는다. 같은 Wi-Fi의 휴대폰으로 보려면 `python -m http.server 8000 --directory Builds/Web` 후 `http://<PC 주소>:8000`
+- [x] `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행 (2026-10-28 01:13 성공: EditMode 140/140, PlayMode 2/2)
+- [x] (선택) 에디터 메뉴 **Game > Build Web Demo**로 웹 빌드가 되는지 본다. 결과 `Builds/Web`은 커밋하지 않는다. 같은 Wi-Fi의 휴대폰으로 보려면 `python -m http.server 8000 --directory Builds/Web` 후 `http://<PC 주소>:8000` (2026-10-28 로컬 세션이 배치 모드로 빌드하고 브라우저로 확인. 결과 보고 참고)
 
 ### 4. 웹 데모 확인 (사람, 휴대폰)
 
@@ -178,3 +178,23 @@ DevTools/Local/setup.sh --commit
 - 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
 - EditMode 테스트: 140개 중 140개 통과, 0개 실패
 - PlayMode 테스트: 2개 중 2개 통과, 0개 실패
+
+### 2026-10-28 01:20 웹 빌드 로컬 확인 (로컬 세션)
+
+3번 선택 항목. 에디터 메뉴 대신 배치 모드로 같은 메서드를 불렀다: `Unity.exe -batchmode -buildTarget WebGL -executeMethod Game.Client.Editor.WebBuild.RunBatch` (로그 `Logs/webbuild.log`, 커밋하지 않음).
+
+- 빌드: **성공** (`Build Finished, Result: Success`, 종료 코드 0). `Builds/Web` 약 15.5 MB (`Web.wasm.unityweb` 10.4 MB, `Web.data.unityweb` 5.4 MB)
+- `python -m http.server`로 띄워 데스크톱 Chromium 계열 브라우저(Claude 앱 내장 브라우저, 800×450 창)에서 열었다
+  - 로딩 후 메뉴가 뜬다. 한글(제목, 이름 칸, [혼자 하기], 안내문 "웹 데모에서는 혼자 하기만 됩니다…")이 깨지지 않는다. 호스트·참가 버튼은 숨겨져 있다
+  - [혼자 하기] 클릭으로 게임에 들어가고, 동굴 지형·플레이어·HUD(생명력, 보스 아레나 방향, 조작 안내)가 한글로 보인다. 스크린샷 `Docs/Screenshots/web_local_solo.jpg`
+  - Tab으로 가방 창이 열린다. 능력치 줄, 착용 칸(구리 검 [벗기]), 소지품 0/24가 보인다. 스크린샷 `Docs/Screenshots/web_local_bag.jpg`
+  - 브라우저 콘솔에 에러 없음. WebGL 2.0 컨텍스트로 돈다
+- 눈에 띈 점(클라우드 참고)
+  - 가방을 열면 위쪽 안내 상자 "아이템 이름에 마우스를 올리면 설명이 보입니다"가 왼쪽 위 HUD 상자와 겹쳐 "보스 아레나: 서쪽 38칸" 줄을 가린다
+  - 가방 창 배경이 반투명이라 뒤의 플레이어 이름표("플레이어")가 착용 칸 글자("갑옷") 위로 비친다
+- 확인하지 못한 것: 이동·공격. 자동 입력으로 짧게 누르는 키는 이동으로 이어지지 않았는데, 키를 누르고 있는 입력을 흉내 내지 못해서인지 게임 문제인지는 가리지 못했다. 사람 플레이(2번)와 휴대폰 확인(4번)에서 본다
+- 빌드 부작용(클라우드 참고)
+  - 빌드 뒤 이 파일들이 바뀌어 있었다. 커밋하지 않고 되돌렸다: `ProjectSettings/ProjectSettings.asset`(`webGLDecompressionFallback: 0 → 1`), `Assets/_Project/Settings/URP-2D.asset`(셰이더 프리필터 설정 `m_Prefiltering*`), `Assets/UniversalRenderPipelineGlobalSettings.asset`, `Assets/DefaultVolumeProfile.asset`(볼륨 컴포넌트 기본값 약 780줄 추가), `Assets/_Project/Scenes/Main.unity`. 웹 설정을 저장소에 남기려면 `ProjectSetup.SetUp`에서 정하는 편이 낫다
+  - Burst가 저장소 루트에 `Data/Plugins/lib_burst_generated.{cpp,wasm}`을 만들었다. 명령 한 줄의 `git add -A`에 딸려 들어가지 않도록 지웠다. `.gitignore`에 `/Data/`를 넣어 주면 좋겠다
+  - `ProjectSetup.SetUp`이 돌 때마다 `Main.unity`를 새로 써서 내용이 같아도 오브젝트 fileID가 바뀐다(이번 setup 커밋 `eeef9a0`에서도 약 100줄 바뀜). 커밋 기록이 시끄러워진다
+  - 빌드 대상이 WebGL로 바뀐 채 남지 않도록 `-buildTarget Win64`로 되돌려 두었다
