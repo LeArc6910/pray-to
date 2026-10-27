@@ -51,8 +51,8 @@ DevTools/Local/setup.sh --commit
 
 배포처는 공개 저장소 + GitHub Pages로 정했다(2026-10-28). 빌드·배포 워크플로(`web-demo.yml`)는 클라우드가 붙였고, 아래 셋을 하면 푸시마다 https://learc6910.github.io/pray-to/ 가 갱신된다. 자세한 건 `Docs/WebDemo.md`.
 
-- [ ] **저장소를 public으로.** GitHub 저장소 Settings > General 맨 아래 Danger Zone > Change repository visibility > Make public. 클라우드 세션에는 이 권한이 없다. 로컬 세션에 맡긴다면 사람이 허락한 뒤 `gh repo edit LeArc6910/pray-to --visibility public --accept-visibility-change-consequences`. 공개 전에 기록을 확인했다: 커밋 이메일은 GitHub·Anthropic의 noreply 주소이고, 라이선스 파일·키·비밀번호는 없다
-- [ ] Settings > Pages > Build and deployment > Source를 **GitHub Actions**로 (public이 된 뒤에 고를 수 있다)
+- [x] (2026-10-28 로컬 세션, 사용자 승인) **저장소를 public으로.** GitHub 저장소 Settings > General 맨 아래 Danger Zone > Change repository visibility > Make public. 클라우드 세션에는 이 권한이 없다. 로컬 세션에 맡긴다면 사람이 허락한 뒤 `gh repo edit LeArc6910/pray-to --visibility public --accept-visibility-change-consequences`. 공개 전에 기록을 확인했다: 커밋 이메일은 GitHub·Anthropic의 noreply 주소이고, 라이선스 파일·키·비밀번호는 없다
+- [x] (2026-10-28 로컬 세션, `gh api`로 build_type=workflow) Settings > Pages > Build and deployment > Source를 **GitHub Actions**로 (public이 된 뒤에 고를 수 있다)
 - [ ] 라이선스 파일 찾기. Windows는 `C:\ProgramData\Unity\Unity_lic.ulf`, macOS는 `/Library/Application Support/Unity/Unity_lic.ulf`
 - [ ] Settings > Secrets and variables > Actions에 시크릿 3개 추가: `UNITY_LICENSE`(ulf 파일 내용 전체), `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다
 - [ ] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
@@ -206,3 +206,10 @@ DevTools/Local/setup.sh --commit
 - **클라우드가 할 일**
   - 작업 전에 `git fetch` 후 `git reset --hard origin/main`으로 새 기록에 맞춘다. 푸시하지 않은 커밋이 있으면 `git rebase --onto origin/main <옛 origin/main> <브랜치>`로 옮긴다. 옛 기록을 merge하거나 강제 푸시해서 되살리지 않는다
   - 앞으로 커밋은 `git config user.name LeArc6910`, `git config user.email 270705266+LeArc6910@users.noreply.github.com`으로 만들고, 메시지에 `Co-Authored-By`·세션 링크 줄을 붙이지 않는다. 이 규칙을 `CLAUDE.md`의 규칙 절에 적어 두면 좋겠다
+
+### 2026-10-28 01:40 공개 전환과 Pages 설정 (로컬 세션, 사용자 승인)
+
+- 사람이 옛 커밋에 묶여 있던 Actions 실행 기록 13개를 지웠다. 확인 결과 남은 실행 12개 중 옛 작성자나 도구 표시 줄이 붙은 것은 없다. 원격 main의 커밋 22개도 모두 `LeArc6910` 작성이고 그런 줄이 없다
+- 저장소를 public으로 바꿨다(`gh repo edit --visibility public`)
+- GitHub Pages를 켜고 소스를 GitHub Actions로 정했다(`build_type: workflow`). 주소 https://learc6910.github.io/pray-to/ , HTTPS 강제
+- 남은 사람 작업: Unity 라이선스 시크릿 3개, 그 뒤 Actions 탭에서 Web demo 첫 실행. 시크릿이 들어가기 전에는 워크플로가 빌드를 건너뛴다
