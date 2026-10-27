@@ -171,3 +171,10 @@ DevTools/Local/setup.sh --commit
 - 저장소가 private이다. GitHub Free 플랜에서는 private 저장소에 Pages를 쓸 수 없고 유료 플랜이 필요하다. Pages로 올린 페이지는 저장소가 private이어도 링크를 아는 누구나 볼 수 있다. 계정 플랜은 `gh`로 조회되지 않아 확인하지 못했다. 웹 데모를 붙이기 전에 사용자와 정해야 한다(유료 플랜, 저장소 공개 전환, 또는 다른 배포처)
 - 이 PC의 Unity 6000.6.3f1에는 Web Build Support(`PlaybackEngines/WebGLSupport`)가 설치되어 있다. 로컬에서 웹 빌드를 만드는 에디터 메뉴가 생기면 배치 모드로 빌드해 로컬 서버로 띄워 볼 수 있다
 - `Docs/Design.md` 6절대로, 웹에서는 혼자 하기만 되고(브라우저는 호스트 불가) 한글 폰트와 터치 조작이 더 필요하다. 그래서 이번 2번 확인은 에디터에서 하도록 안내했다
+
+### 2026-10-28 01:13 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 140개 중 140개 통과, 0개 실패
+- PlayMode 테스트: 2개 중 2개 통과, 0개 실패
