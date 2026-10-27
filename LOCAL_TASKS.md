@@ -122,3 +122,11 @@ DevTools/Local/setup.sh --commit
   - `Exiting without the bug reporter. Application will exit with return code 198`
 - 원인(로컬 판단): Unity 라이선스 문제로 프로젝트를 열기 전에 끝났다. 코드 문제가 아니다. Unity Hub 로그인이 풀려 배치 모드에 쓸 라이선스(`com.unity.editor.headless`)를 받지 못한 것으로 보인다. 사람이 Unity Hub에 로그인하고 Personal 라이선스를 확인한 뒤 다시 실행한다.
 - 클라우드에 제안: `Get-LogErrors`(`setup.ps1`)와 `setup.sh`의 패턴에 `Licensing::.*Error`를 넣으면 이런 실패가 보고에 바로 잡힌다.
+
+### 2026-10-27 23:34 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: **실패** (종료 코드 1). Logs/setup.log에서 뽑은 줄:
+  - `Assets\_Project\Scripts\Client\WorldView.cs(522,50): error CS0246: The type or namespace name 'Light2D' could not be found (are you missing a using directive or an assembly reference?)`
+  - `Assets\_Project\Scripts\Client\WorldView.cs(523,31): error CS0103: The name 'Light2D' does not exist in the current context`
+  - `Scripts have compiler errors.`
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
