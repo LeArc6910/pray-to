@@ -1,0 +1,21 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9266d52bd83324e4fae2dee58a08c105, type: 3}
+  m_Name: GameSheets
+  m_EditorClassIdentifier: Game.Client::Game.Client.GameSheets
+  itemBases: {fileID: 4900000, guid: 007f72751eda07e43ab850e062ba1c48, type: 3}
+  affixes: {fileID: 4900000, guid: 38770912afde4d34ca1c400c58b38636, type: 3}
+  runes: {fileID: 4900000, guid: a9410578abfba1f4191bc787be91a6ea, type: 3}
+  runewords: {fileID: 4900000, guid: ddf74988cda9d6f4ab994e08d75ddfec, type: 3}
+  monsters: {fileID: 4900000, guid: 40686204d9b9dc740bbcdff13af5c326, type: 3}
+  bosses: {fileID: 4900000, guid: c2fed33ef540da34099bd6c4b0cbb5ac, type: 3}
+  bossAttacks: {fileID: 4900000, guid: 1c2415facedd5c54580087663f50c44d, type: 3}
