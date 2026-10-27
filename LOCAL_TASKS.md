@@ -54,7 +54,7 @@ DevTools/Local/setup.sh --commit
 - [x] (2026-10-28 로컬 세션, 사용자 승인) **저장소를 public으로.** GitHub 저장소 Settings > General 맨 아래 Danger Zone > Change repository visibility > Make public. 클라우드 세션에는 이 권한이 없다. 로컬 세션에 맡긴다면 사람이 허락한 뒤 `gh repo edit LeArc6910/pray-to --visibility public --accept-visibility-change-consequences`. 공개 전에 기록을 확인했다: 커밋 이메일은 GitHub·Anthropic의 noreply 주소이고, 라이선스 파일·키·비밀번호는 없다
 - [x] (2026-10-28 로컬 세션, `gh api`로 build_type=workflow) Settings > Pages > Build and deployment > Source를 **GitHub Actions**로 (public이 된 뒤에 고를 수 있다)
 - [ ] 라이선스 파일 찾기. Windows는 `C:\ProgramData\Unity\Unity_lic.ulf`, macOS는 `/Library/Application Support/Unity/Unity_lic.ulf`
-- [ ] Settings > Secrets and variables > Actions에 시크릿 3개 추가: `UNITY_LICENSE`(ulf 파일 내용 전체), `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다
+- [x] (2026-10-28 01:38 사람이 넣음. 값은 확인하지 않음) Settings > Secrets and variables > Actions에 시크릿 3개 추가: `UNITY_LICENSE`(ulf 파일 내용 전체), `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다
 - [ ] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
 
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
@@ -213,3 +213,17 @@ DevTools/Local/setup.sh --commit
 - 저장소를 public으로 바꿨다(`gh repo edit --visibility public`)
 - GitHub Pages를 켜고 소스를 GitHub Actions로 정했다(`build_type: workflow`). 주소 https://learc6910.github.io/pray-to/ , HTTPS 강제
 - 남은 사람 작업: Unity 라이선스 시크릿 3개, 그 뒤 Actions 탭에서 Web demo 첫 실행. 시크릿이 들어가기 전에는 워크플로가 빌드를 건너뛴다
+
+### 2026-10-28 01:52 웹 데모 첫 빌드 실패: Unity 라이선스 활성화 (로컬 세션)
+
+- Web demo 워크플로를 손으로 돌렸다: https://github.com/LeArc6910/pray-to/actions/runs/40543089823 . `check` 성공(시크릿 3개 있음), `build` 실패, `deploy` 건너뜀. 프로젝트를 열기 전, 라이선스 활성화 단계에서 5번 재시도 끝에 멈췄다(약 12분)
+- 로그에서 뽑은 줄:
+  - `UnityConnectLoginRequest: Failed to login - please check your username or password`
+  - `No sufficient permissions while processing request "https://core.cloud.unity3d.com/api/login", HTTP error code 401`
+  - `[Licensing::Module] Error: Access token is unavailable; failed to update`
+  - `[Licensing::Module] Error: Failed to activate entitlement license`
+  - `[Licensing::Module] Error: Failed to activate ULF license`
+  - `##[error]There was an error while trying to activate the Unity license.`
+- 원인(로컬 판단): 먼저 `UNITY_EMAIL`·`UNITY_PASSWORD`로 Unity 계정 로그인이 401로 거절됐다. 로그인 토큰이 없어서 그 뒤 라이선스 활성화도 실패한 것으로 보인다. 흔한 원인은 비밀번호 오타·앞뒤 공백, Google·Apple 같은 소셜 로그인으로 만든 계정이라 비밀번호가 없는 경우, 2단계 인증이다
+- 두 번째 의심: `UNITY_LICENSE`. 이 PC에는 문서에 적힌 `C:\ProgramData\Unity\Unity_lic.ulf`가 없다. Unity 6 Hub는 `%LOCALAPPDATA%\Unity\licenses\UnityEntitlementLicense.xml`만 남기는데, 이것은 ULF 형식이 아니다. 로그인을 고친 뒤에도 `Failed to activate ULF license`가 남으면 이쪽을 본다(클라우드: GameCI가 Unity 6 Personal에 요구하는 형식 확인 부탁)
+- 사람이 할 일: Unity 계정이 이메일·비밀번호로 로그인되는지 https://id.unity.com 에서 확인. 소셜 로그인 계정이면 비밀번호를 만들고, 2단계 인증이 켜져 있으면 확인한다. 그 뒤 `UNITY_EMAIL`·`UNITY_PASSWORD`를 다시 넣는다
