@@ -7,6 +7,7 @@
 ## 규칙
 
 - 작업 브랜치: `main`. 명령 한 줄이 시작할 때 `git pull`을 한다
+- 클라우드가 무엇을 바꿨는지는 `CLOUD_LOG.md`에 최신순으로 있다. 작업 전에 로컬 확인이 비어 있는 항목을 읽고 체크한다
 - 클라우드가 스크립트를 수정하므로 **로컬에서는 `.cs` 파일을 고치지 않는다**. 컴파일 에러나 버그는 결과 보고에 남기면 클라우드가 고친다. Unity가 스크립트를 자동으로 바꾸면 명령 한 줄이 그 파일을 커밋에서 빼고 보고에 적는다
 - 로컬이 커밋하는 것: 씬, 프리팹, `.asset`, `.meta`, `Packages/packages-lock.json`, `ProjectSettings/`, 스크린샷, 아트·사운드 파일
 - 이미지·오디오는 Git LFS로 올라간다. 명령 한 줄이 이 저장소에 LFS를 연결한다
@@ -48,11 +49,15 @@ DevTools/Local/setup.sh --commit
 
 ### 웹 데모(모바일 브라우저 테스트)용
 
-클라우드가 웹 빌드·배포 워크플로를 붙이면 푸시마다 GitHub Actions가 웹 빌드를 만들어 GitHub Pages에 올린다. 그러려면 다음이 필요하다.
+클라우드가 웹 빌드·배포 워크플로를 붙이면 푸시마다 GitHub Actions가 웹 빌드를 만들어 올린다. 그러려면 다음이 필요하다.
 
+- [ ] **배포처 정하기.** 저장소가 private이라 GitHub Free 플랜으로는 GitHub Pages를 쓸 수 없다(2026-10-28 로컬 세션 확인). 셋 중 하나를 골라 클라우드 세션에 알려 준다
+  - 저장소를 public으로 바꾸고 GitHub Pages(무료). 코드가 공개된다
+  - GitHub 유료 플랜(Pro 이상)으로 private 저장소에서 Pages. 페이지 자체는 링크를 아는 누구나 볼 수 있다
+  - 다른 배포처(예: itch.io의 비공개 페이지). 그 서비스 계정과 API 키가 필요하다
 - [ ] 라이선스 파일 찾기. Windows는 `C:\ProgramData\Unity\Unity_lic.ulf`, macOS는 `/Library/Application Support/Unity/Unity_lic.ulf`
 - [ ] GitHub 저장소 Settings > Secrets and variables > Actions에 시크릿 3개 추가: `UNITY_LICENSE`(ulf 파일 내용 전체), `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다**
-- [ ] GitHub 저장소 Settings > Pages > Build and deployment > Source를 **GitHub Actions**로
+- [ ] (GitHub Pages로 정했다면) GitHub 저장소 Settings > Pages > Build and deployment > Source를 **GitHub Actions**로
 - [ ] 결과 보고에는 했는지 여부만 적는다
 
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
