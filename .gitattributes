@@ -2,6 +2,8 @@
 
 *.cs         text diff=csharp
 *.asmdef     text eol=lf
+*.sh         text eol=lf
+DevTools/Local/test/fake-unity text eol=lf
 *.meta       text eol=lf
 *.unity      text merge=unityyamlmerge eol=lf
 *.prefab     text merge=unityyamlmerge eol=lf

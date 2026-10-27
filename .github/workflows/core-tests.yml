@@ -32,3 +32,9 @@ jobs:
 
       - name: Compile-check Unity scripts
         run: dotnet build DevTools/UnityCompileCheck
+
+      # The local setup scripts, run against a stand-in for Unity. The runner image has ShellCheck and PowerShell.
+      - name: Check local setup scripts
+        run: |
+          shellcheck DevTools/Local/setup.sh DevTools/Local/test/run.sh DevTools/Local/test/fake-unity
+          bash DevTools/Local/test/run.sh

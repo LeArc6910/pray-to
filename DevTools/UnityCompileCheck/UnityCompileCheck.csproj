@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <!-- Compiles the Unity-side scripts against Unity's real engine assemblies (fetched by fetch-unity.sh) and
-       hand-written stand-ins for the package APIs they use (Stubs/). Catches compile errors before the
-       editor does; nothing here runs. -->
+  <!-- Compiles the Unity-side scripts and play mode tests against Unity's real engine assemblies (fetched by
+       fetch-unity.sh) and hand-written stand-ins for the package APIs they use (Stubs/). Catches compile errors
+       before the editor does; nothing here runs. -->
   <PropertyGroup>
     <TargetFramework>netstandard2.1</TargetFramework>
     <LangVersion>9.0</LangVersion>
@@ -14,6 +14,12 @@
   <ItemGroup>
     <Compile Include="Stubs/*.cs" />
     <Compile Include="../../Assets/_Project/Scripts/Client/**/*.cs" />
+    <Compile Include="../../Assets/Tests/PlayMode/**/*.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Unity's test framework ships its own NUnit 3.5 build; the play mode tests only use the common subset. -->
+    <PackageReference Include="NUnit" Version="3.14.0" />
   </ItemGroup>
 
   <ItemGroup>

@@ -58,7 +58,7 @@ namespace Game.Client
             var sheets = GameSheets.Load();
             if (sheets == null)
             {
-                _status = "데이터가 없습니다. 에디터에서 Game > Set Up Main Scene을 실행하세요.";
+                _status = "데이터가 없습니다. 에디터에서 Game > Set Up Project를 실행하세요.";
                 return;
             }
             _loot = sheets.LoadLoot();
@@ -137,7 +137,14 @@ namespace Game.Client
             else _net?.Send(NetworkManager.ServerClientId, data, reliable: Protocol.TypeOf(data) != MessageType.Input);
         }
 
-        void StartSolo() => StartHosting(Mode.Solo);
+        // The menu buttons, also called by the play mode tests.
+        internal void StartSolo() => StartHosting(Mode.Solo);
+
+        internal void StartHost() => StartHosting(Mode.Host);
+
+        internal bool Playing => _client != null && _client.Status == ClientStatus.Playing;
+
+        internal string Status => _status;
 
         void StartHosting(Mode mode)
         {
@@ -238,7 +245,7 @@ namespace Game.Client
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success;
             GUI.enabled = ready;
             if (GUILayout.Button("혼자 하기")) StartSolo();
-            if (GUILayout.Button($"호스트 (포트 {NetLink.DefaultPort})")) StartHosting(Mode.Host);
+            if (GUILayout.Button($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
             GUILayout.Space(8);
             GUILayout.Label("호스트 주소");
             _address = GUILayout.TextField(_address, 64);

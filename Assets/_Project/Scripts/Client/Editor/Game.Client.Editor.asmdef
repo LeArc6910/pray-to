@@ -3,7 +3,9 @@
     "rootNamespace": "Game.Client.Editor",
     "references": [
         "Game.Core",
-        "Game.Client"
+        "Game.Client",
+        "Unity.RenderPipelines.Core.Runtime",
+        "Unity.RenderPipelines.Universal.Runtime"
     ],
     "includePlatforms": [
         "Editor"

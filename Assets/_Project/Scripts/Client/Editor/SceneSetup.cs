@@ -10,7 +10,7 @@ namespace Game.Client.Editor
     // the GameSheets asset pointing at the CSV sheets, and the Main scene with a camera and GameRoot.
     public static class SceneSetup
     {
-        const string ProjectFolder = "Assets/_Project";
+        public const string ProjectFolder = "Assets/_Project";
         const string ScenePath = ProjectFolder + "/Scenes/Main.unity";
         const string SheetsPath = ProjectFolder + "/Resources/" + GameSheets.ResourcePath + ".asset";
         const string LootFolder = ProjectFolder + "/Data/Loot/";
@@ -76,7 +76,7 @@ namespace Game.Client.Editor
             return asset;
         }
 
-        static void EnsureFolder(string parent, string name)
+        internal static void EnsureFolder(string parent, string name)
         {
             if (!AssetDatabase.IsValidFolder(parent + "/" + name)) AssetDatabase.CreateFolder(parent, name);
         }

@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+# Stands in for the Unity editor in run.sh: reads the arguments the setup scripts pass and leaves behind what a real
+# run would (a log, an asset, packages-lock.json, NUnit results). FAKE_SETUP_FAIL, FAKE_PLAY_FAIL and FAKE_TOUCH_CS
+# switch on the failures the scripts must report.
+log=""
+results=""
+platform=""
+project=""
+mode=setup
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -logFile) log="$2"; shift ;;
+        -testResults) results="$2"; shift ;;
+        -testPlatform) platform="$2"; shift ;;
+        -projectPath) project="$2"; shift ;;
+        -runTests) mode=tests ;;
+    esac
+    shift
+done
+echo "fake unity: $mode $platform" > "$log"
+
+if [ "$mode" = setup ]; then
+    if [ -n "${FAKE_SETUP_FAIL:-}" ]; then
+        echo "Assets/_Project/Scripts/Client/GameRoot.cs(1,1): error CS0246: The type or namespace name 'Foo' could not be found" >> "$log"
+        echo "Aborting batchmode due to failure:" >> "$log"
+        exit 1
+    fi
+    mkdir -p "$project/Assets/_Project/Settings"
+    echo "asset" > "$project/Assets/_Project/Settings/URP-2D.asset"
+    printf '{\n  "dependencies": {\n    "com.unity.netcode.gameobjects": {\n      "version": "2.13.3",\n      "depth": 0\n    }\n  }\n}\n' \
+        > "$project/Packages/packages-lock.json"
+    if [ -n "${FAKE_TOUCH_CS:-}" ]; then echo "// changed by the API updater" >> "$project/Assets/_Project/Scripts/Client/Palette.cs"; fi
+    exit 0
+fi
+
+if [ "$platform" = PlayMode ] && [ -n "${FAKE_PLAY_FAIL:-}" ]; then
+    cat > "$results" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="2" result="Failed(Child)" total="2" passed="1" failed="1" inconclusive="0" skipped="0">
+  <test-suite type="TestFixture" name="SessionTests" fullname="Game.Client.Tests.SessionTests">
+    <test-case id="1" name="SoloSessionRuns" fullname="Game.Client.Tests.SessionTests.SoloSessionRuns" result="Passed" />
+    <test-case id="2" name="HostSessionRuns" fullname="Game.Client.Tests.SessionTests.HostSessionRuns" result="Failed">
+      <failure>
+        <message><![CDATA[
+  The host session never started playing.
+  Expected: True]]></message>
+      </failure>
+    </test-case>
+  </test-suite>
+</test-run>
+XML
+    exit 2
+fi
+
+total=140
+[ "$platform" = PlayMode ] && total=2
+cat > "$results" <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="$total" result="Passed" total="$total" passed="$total" failed="0" inconclusive="0" skipped="0">
+</test-run>
+XML
+exit 0
