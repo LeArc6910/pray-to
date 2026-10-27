@@ -115,3 +115,10 @@ DevTools/Local/setup.sh --commit
 ### 2026-10-27 23:31 setup.ps1 (Unity 6000.6.3f1)
 
 - 프로젝트 설정: **실패** (종료 코드 198). Logs/setup.log에서 뽑은 줄:
+  - (스크립트의 패턴에 걸린 줄이 없어 비어 있었다. 아래는 로컬 세션이 로그에서 직접 옮긴 줄)
+  - `[Licensing::Module] Error: Access token is unavailable; failed to update`
+  - `[Licensing::Client] Error: Code 404 while processing request (status: Found 0 entitlement groups and 0 free entitlements matching requested entitlement ids)`
+  - `[Licensing::Module] Error: 'com.unity.editor.headless' was not found.`
+  - `Exiting without the bug reporter. Application will exit with return code 198`
+- 원인(로컬 판단): Unity 라이선스 문제로 프로젝트를 열기 전에 끝났다. 코드 문제가 아니다. Unity Hub 로그인이 풀려 배치 모드에 쓸 라이선스(`com.unity.editor.headless`)를 받지 못한 것으로 보인다. 사람이 Unity Hub에 로그인하고 Personal 라이선스를 확인한 뒤 다시 실행한다.
+- 클라우드에 제안: `Get-LogErrors`(`setup.ps1`)와 `setup.sh`의 패턴에 `Licensing::.*Error`를 넣으면 이런 실패가 보고에 바로 잡힌다.
