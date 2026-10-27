@@ -7,6 +7,8 @@ here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
+# The scripts never read binary assets, and a CI checkout has no LFS objects to give the clone.
+export GIT_LFS_SKIP_SMUDGE=1
 
 git init -q --bare "$work/remote.git"
 # CI checks out one commit; the remote has to accept a push of that shallow history.
