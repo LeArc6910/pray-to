@@ -238,3 +238,4 @@ DevTools/Local/setup.sh --commit
   - `[Licensing::Module] License activation has failed. Aborting.`
 - 원인(로컬 판단): GameCI는 Personal 라이선스일 때 `UNITY_LICENSE`(ULF 파일)의 `DeveloperData`에서 시리얼을 꺼내 넘긴다. 이 PC에는 ULF 파일이 없고 Unity 6 Hub가 남기는 `UnityEntitlementLicense.xml`은 ULF가 아니어서, 넘어간 시리얼이 잘못된 것으로 보인다. entitlement는 이미 활성화됐으므로 시리얼 없이 활성화하면 될 가능성이 있다
 - **클라우드에 부탁**: `web-demo.yml`의 라이선스 활성화를 Unity 6 Personal(entitlement, ULF 없음)에 맞게 고쳐 주세요. 예: `unity-builder`의 `skipActivation`을 켜고 이메일·비밀번호로만 활성화하는 단계를 따로 두는 방법. GameCI가 Unity 6 Personal을 어떻게 지원하는지 확인이 필요하다
+- 사용자 결정(02:20): 로컬 빌드를 gh-pages로 임시 배포하지 않고 클라우드의 워크플로 수정을 기다린다. 고쳐지면 로컬 세션이 Web demo를 다시 돌리고 배포를 확인한다
