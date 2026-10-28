@@ -17,6 +17,7 @@
   - 그래서 `unity-builder`를 빼고, 같은 GameCI 이미지(`unityci/editor:ubuntu-6000.6.3f1-webgl-3`) 안에서 `.github/scripts/build-web.sh`를 돌린다. 에디터에 들어 있는 Licensing Client로 `--activate-ulf --include-personal --username --password`(시리얼 없이) 활성화하고, `--showEntitlements`로 Unity Personal인지 확인한 뒤 빌드하고, 끝나면 성공·실패와 상관없이 `--return-ulf`로 돌려준다. 6000.6.3f1의 Licensing Client(1.18.3)를 직접 받아 이 옵션들이 있는 것을 확인했다. 실제 활성화는 비밀번호가 필요해 여기서는 못 해 봤다
   - 이제 시크릿은 `UNITY_EMAIL`, `UNITY_PASSWORD` 둘만 쓴다. `UNITY_LICENSE`는 필요 없다(지워도 된다)
   - 뒤이은 커밋: 이 푸시로 돈 Web demo에서 활성화는 성공했다(`Product: Unity Personal, Type: ULF`, 끝나고 반납도 됐다). 그 다음 에디터가 공유 메모리 부족(`Insufficient shared memory ... --shm-size=1025M`)으로 멈춰서 컨테이너에 `--shm-size=2g`를 줬다
+  - 그 뒤 Web demo가 처음으로 성공했다(18:47, https://github.com/LeArc6910/pray-to/actions/runs/40663963893): 활성화 → 빌드 15분(`Web build Succeeded ... 15.2 MB, 0 errors`) → 라이선스 반납 → Pages 배포. https://learc6910.github.io/pray-to/ 에서 `index.html`과 `Build/` 파일 4개(loader, framework, data 5.4 MB, wasm 10.4 MB)가 내려오는 것까지 확인했다
   - 커밋 기록 정리를 반영했다: 이 클라우드 세션도 새 기록으로 옮겼고(`reset --hard origin/main`, 파일 내용은 옛 기록과 같았다), 앞으로 커밋은 `LeArc6910` noreply 주소로 만들고 도구 표시 줄을 붙이지 않는다. `CLAUDE.md` 규칙 절에 적었다. 이 파일의 커밋 해시도 새 기록의 해시로 고쳤다
   - 로컬 웹 빌드 확인에서 나온 것들
     - 웹 빌드 설정(gzip, decompression fallback, 데이터 캐싱)을 `ProjectSetup.SetUp`에서 정한다. 다음 setup 커밋에 `ProjectSettings`로 들어가고, 그 뒤로는 빌드가 `ProjectSettings.asset`을 바꾸지 않는다
@@ -24,7 +25,7 @@
     - `.gitignore`에 `/Data/`(Burst가 웹 빌드 때 저장소 루트에 만드는 파일)
     - 가방 창의 설명 상자가 HUD를 가리지 않게 HUD 아래로 내렸고, 가방 창 배경을 불투명하게 해서 뒤의 이름표가 비치지 않는다
 - **로컬에서 할 일**
-  - 이 푸시는 `web-demo.yml`을 바꿨으므로 Web demo가 저절로 돈다. Actions 탭에서 결과를 확인하고 결과 보고에 적는다(실패하면 로그의 `::error` 줄과 Licensing Client 줄)
+  - Web demo는 클라우드가 확인했다(위). 사람이 휴대폰으로 `LOCAL_TASKS.md` 4번을 한다
   - `LOCAL_TASKS.md` 3번: 명령 한 줄을 다시 실행해 웹 설정이 들어간 `ProjectSettings`를 커밋한다
 - **로컬 확인**: [ ]
 

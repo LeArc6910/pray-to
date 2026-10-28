@@ -56,7 +56,7 @@ DevTools/Local/setup.sh --commit
 - [x] ~~라이선스 파일 찾기~~ 필요 없어졌다(2026-10-28). Unity 6 Personal에는 ULF 파일이 없고, 웹 데모 빌드는 이제 이메일·비밀번호로 Personal을 활성화한다
 - [x] (2026-10-28 01:38 사람이 넣음. 값은 확인하지 않음) Settings > Secrets and variables > Actions에 시크릿 추가: `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정. 소셜 로그인이나 2단계 인증 없이 https://id.unity.com 에 이메일·비밀번호로 들어가지는 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다. 처음에 넣었던 `UNITY_LICENSE`는 이제 쓰지 않으니 지워도 된다
 - [ ] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
-  - 2026-10-28 01:52, 02:12 두 번 실패(로그인 401, 이어서 serial invalid). 클라우드가 라이선스 활성화를 고쳤다(18:20, `CLOUD_LOG.md`). 그 푸시로 Web demo가 저절로 다시 돈다. 로컬 세션이 결과를 확인한다
+  - 2026-10-28 01:52, 02:12 두 번 실패(로그인 401, 이어서 serial invalid). 클라우드가 라이선스 활성화를 고쳤고(`CLOUD_LOG.md`), 18:47 첫 성공·배포를 클라우드가 확인했다: https://github.com/LeArc6910/pray-to/actions/runs/40663963893 . 이제 푸시마다 저절로 돈다
 
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
 
