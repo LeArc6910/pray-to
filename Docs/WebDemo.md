@@ -9,7 +9,9 @@
 3. GameCI의 Unity 이미지(`unityci/editor:ubuntu-<ProjectVersion의 버전>-webgl-3`) 안에서 `.github/scripts/build-web.sh`가 돈다.
    - **라이선스**: 에디터에 들어 있는 Licensing Client로 Unity Personal을 활성화한다(`--activate-ulf --include-personal --username --password`, 시리얼 없음). `--showEntitlements`로 확인하고, 빌드가 어떻게 끝나든 `--return-ulf`로 돌려준다. GameCI의 `unity-builder`는 Personal도 ULF 파일에서 꺼낸 시리얼로 활성화하는데, Unity 6 Personal은 시리얼이 없고 Hub가 ULF를 남기지 않아 "serial invalid"로 실패했다(2026-10-28). 계정은 소셜 로그인이나 2단계 인증 없이 이메일·비밀번호로 로그인할 수 있어야 한다
    - **빌드**: `Game.Client.Editor.WebBuild.RunBatch`. 먼저 `Game > Set Up Project`를 해서 씬과 시트 목록이 최신인지 맞춘 뒤 WebGL로 `build/web`에 빌드한다. `Library/`는 Actions 캐시에 남겨 다음 빌드를 줄인다
-4. 결과를 GitHub Pages에 올린다. 처음 빌드는 20분 안팎, 캐시가 있으면 그보다 짧다.
+4. 결과를 GitHub Pages에 올린다. 처음 빌드는 20분 안팎, `Library` 캐시가 있으면 job 전체가 12분쯤이다(이미지 받기 3분, 빌드 6분).
+
+드물게 에디터가 시작하자마자 `Killed`(종료 코드 137)로 끝난다(2026-10-28에 한 번. 같은 캐시로 다시 돌리니 됐다). 그러면 Actions 탭에서 Re-run failed jobs를 누른다. 되풀이되면 클라우드에 알린다.
 
 빌드 설정(`ProjectSetup.UseWebSettings`): gzip 압축에 decompression fallback을 켠다. GitHub Pages는 `.gz` 파일에 `Content-Encoding` 헤더를 붙이지 않으므로, 브라우저 대신 Unity 로더가 압축을 푼다. 데이터 캐싱도 켜서 두 번째 접속부터는 빨리 뜬다.
 
