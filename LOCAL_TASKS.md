@@ -291,3 +291,10 @@ DevTools/Local/setup.sh --commit
   - 누르기만 하고 거의 끌지 않았을 때 방향을 어떻게 할지(마지막 방향 유지 등)는 클라우드가 정한다
   - PC의 마우스 조준은 그대로 둔다
 - `Docs/WebDemo.md`의 터치 조작 표도 같이 고친다
+
+### 2026-10-28 19:41 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 140개 중 140개 통과, 0개 실패
+- PlayMode 테스트: 2개 중 2개 통과, 0개 실패
