@@ -70,12 +70,13 @@ jobs:
           docker pull --quiet "$image"
 
       # Activates Unity Personal, builds into build/web and returns the license (.github/scripts/build-web.sh).
+      # Unity needs about 1 GB of shared memory; Docker gives a container 64 MB unless told otherwise.
       - name: Build
         env:
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: >-
-          docker run --rm
+          docker run --rm --shm-size=2g
           --env UNITY_EMAIL --env UNITY_PASSWORD
           --volume "$GITHUB_WORKSPACE:/project" --workdir /project
           "${{ steps.image.outputs.image }}"

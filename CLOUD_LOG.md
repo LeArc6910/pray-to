@@ -16,6 +16,7 @@
   - 로컬의 두 번째 빌드 실패("serial invalid")를 고쳤다. GameCI(`unity-builder`)는 Personal 라이선스도 ULF 파일에서 꺼낸 시리얼로 활성화하는데, Unity 6 Personal은 시리얼이 없고 Hub가 ULF도 남기지 않는다. Unity 문서도 Personal은 명령줄 활성화를 지원하지 않는다고 적고 있다
   - 그래서 `unity-builder`를 빼고, 같은 GameCI 이미지(`unityci/editor:ubuntu-6000.6.3f1-webgl-3`) 안에서 `.github/scripts/build-web.sh`를 돌린다. 에디터에 들어 있는 Licensing Client로 `--activate-ulf --include-personal --username --password`(시리얼 없이) 활성화하고, `--showEntitlements`로 Unity Personal인지 확인한 뒤 빌드하고, 끝나면 성공·실패와 상관없이 `--return-ulf`로 돌려준다. 6000.6.3f1의 Licensing Client(1.18.3)를 직접 받아 이 옵션들이 있는 것을 확인했다. 실제 활성화는 비밀번호가 필요해 여기서는 못 해 봤다
   - 이제 시크릿은 `UNITY_EMAIL`, `UNITY_PASSWORD` 둘만 쓴다. `UNITY_LICENSE`는 필요 없다(지워도 된다)
+  - 뒤이은 커밋: 이 푸시로 돈 Web demo에서 활성화는 성공했다(`Product: Unity Personal, Type: ULF`, 끝나고 반납도 됐다). 그 다음 에디터가 공유 메모리 부족(`Insufficient shared memory ... --shm-size=1025M`)으로 멈춰서 컨테이너에 `--shm-size=2g`를 줬다
   - 커밋 기록 정리를 반영했다: 이 클라우드 세션도 새 기록으로 옮겼고(`reset --hard origin/main`, 파일 내용은 옛 기록과 같았다), 앞으로 커밋은 `LeArc6910` noreply 주소로 만들고 도구 표시 줄을 붙이지 않는다. `CLAUDE.md` 규칙 절에 적었다. 이 파일의 커밋 해시도 새 기록의 해시로 고쳤다
   - 로컬 웹 빌드 확인에서 나온 것들
     - 웹 빌드 설정(gzip, decompression fallback, 데이터 캐싱)을 `ProjectSetup.SetUp`에서 정한다. 다음 setup 커밋에 `ProjectSettings`로 들어가고, 그 뒤로는 빌드가 `ProjectSettings.asset`을 바꾸지 않는다
