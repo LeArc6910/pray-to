@@ -15,8 +15,32 @@ namespace Game.Client
 
         static Font _font;
 
-        // The status box in the top left corner during play. Other screens keep clear of it.
-        public static readonly Rect HudArea = new Rect(10, 10, 340, 160);
+        // The status box in the top left corner during play. Other screens keep clear of it. On a narrow (portrait)
+        // screen it gives way to the minimap column and grows taller for the wrapped lines.
+        public static Rect HudArea
+        {
+            get
+            {
+                float width = Mathf.Min(340, MinimapArea.x - 20);
+                return new Rect(10, 10, width, width < 340 ? 200 : 160);
+            }
+        }
+
+        public const float MinimapSize = 120;
+        public const float TouchButtonHeight = 40;
+        const float ColumnGap = 6;
+
+        // The top right column: the minimap, and on touch screens the bag and leave buttons under it.
+        public static Rect MinimapArea => new Rect(Width - MinimapSize - 10, 10, MinimapSize, MinimapSize);
+
+        public static Rect TouchButtonArea(int index, int count)
+        {
+            float width = (MinimapSize - ColumnGap * (count - 1)) / count;
+            var minimap = MinimapArea;
+            return new Rect(minimap.x + index * (width + ColumnGap), minimap.yMax + ColumnGap, width, TouchButtonHeight);
+        }
+
+        public static float RightColumnBottom => MinimapArea.yMax + (Controls.UsingTouch ? ColumnGap + TouchButtonHeight : 0);
 
         public static float Scale { get; private set; } = 1;
 

@@ -26,8 +26,6 @@ namespace Game.Client
         const float AcquiredSeconds = 4;
         // Half the view's height in tiles on a landscape screen. Portrait screens zoom out to keep this much width.
         const float ViewSize = 7;
-        const float TouchButtonWidth = 64;
-        const float TouchButtonHeight = 40;
 
         Mode _mode = Mode.Menu;
         string _playerName = "플레이어";
@@ -41,6 +39,7 @@ namespace Game.Client
         NetLink _net;
         WorldView _view;
         InventoryWindow _inventory;
+        MapView _map;
         // "획득: …" lines for things picked up, each shown for a few seconds.
         readonly List<(string Text, float Age)> _acquired = new List<(string, float)>();
         Camera _camera;
@@ -84,10 +83,22 @@ namespace Game.Client
                 return;
             }
             if (_client == null) return;
-            if (Controls.LeavePressed())
+            if (_map != null && Controls.MapPressed())
             {
-                EndSession("");
-                return;
+                _map.FullOpen = !_map.FullOpen;
+            }
+            else if (Controls.LeavePressed())
+            {
+                // Esc closes the full map first.
+                if (_map != null && _map.FullOpen)
+                {
+                    _map.FullOpen = false;
+                }
+                else
+                {
+                    EndSession("");
+                    return;
+                }
             }
             if (_client.Status == ClientStatus.Refused)
             {
@@ -108,8 +119,10 @@ namespace Game.Client
 
             if (_client.Status != ClientStatus.Playing) return;
             _view ??= new WorldView(_client, _camera);
+            _map ??= new MapView(_client);
             _client.AdvanceRenderClock(Time.deltaTime);
             _view.Render(_tickClock / World.TickSeconds, Time.deltaTime);
+            _map.Update();
 
             for (int i = _acquired.Count - 1; i >= 0; i--)
             {
@@ -123,8 +136,8 @@ namespace Game.Client
         void FixedTick()
         {
             var (move, aim, attack) = Controls.Read(_camera, _client.Position);
-            // Clicking in the bag should not swing the sword.
-            if (_inventory.Open) attack = false;
+            // Clicking in the bag or on the map should not swing the sword.
+            if (_inventory.Open || (_map != null && _map.FullOpen)) attack = false;
             byte[] input = _client.Step(move, aim, attack);
             if (input != null) SendToHost(input);
 
@@ -204,8 +217,10 @@ namespace Game.Client
         void EndSession(string status)
         {
             _view?.Dispose();
+            _map?.Dispose();
             _net?.Dispose();
             _view = null;
+            _map = null;
             _net = null;
             _host = null;
             _client = null;
@@ -228,6 +243,10 @@ namespace Game.Client
             }
             _view?.DrawGui();
             DrawHud();
+            // While the full map is up, the controls under it are drawn disabled: IMGUI hands a click to the first
+            // control drawn under the pointer, so a tap meant to close the map could press [나가기] instead.
+            bool mapOpen = _map != null && _map.FullOpen;
+            GUI.enabled = !mapOpen;
             _inventory?.Draw();
             for (int i = 0; i < _acquired.Count; i++)
             {
@@ -237,18 +256,22 @@ namespace Game.Client
                 GUI.Label(new Rect(14, Ui.Height - 40 - 22 * (_acquired.Count - 1 - i), 400, 22), text);
                 GUI.color = previous;
             }
+            _map?.DrawMinimap(Ui.MinimapArea);
             if (Controls.UsingTouch)
             {
                 DrawTouchButtons();
                 Controls.DrawTouch();
             }
+            GUI.enabled = true;
+            // Last, over everything else.
+            if (mapOpen) _map.DrawFull();
         }
 
-        // Stand-ins for Tab and Esc on phones.
+        // Stand-ins for Tab and Esc on phones, under the minimap.
         void DrawTouchButtons()
         {
-            var bag = new Rect(Ui.Width - 2 * TouchButtonWidth - 20, 10, TouchButtonWidth, TouchButtonHeight);
-            var leave = new Rect(Ui.Width - TouchButtonWidth - 10, 10, TouchButtonWidth, TouchButtonHeight);
+            var bag = Ui.TouchButtonArea(0, 2);
+            var leave = Ui.TouchButtonArea(1, 2);
             Controls.Block(bag);
             Controls.Block(leave);
             if (GUI.Button(bag, "가방")) _inventory.Open = !_inventory.Open;
@@ -310,19 +333,19 @@ namespace Game.Client
                 if (toArena.Length > _client.ArenaRadius) GUILayout.Label($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
             }
             GUILayout.Label(Controls.UsingTouch
-                ? "왼쪽 드래그 이동 · 오른쪽 누르고 있기 공격"
-                : "WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Tab 가방 · Esc 메뉴");
+                ? "왼쪽 스틱 이동 · 오른쪽 스틱 공격 방향(누르는 동안 공격) · 지도를 누르면 크게"
+                : "WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Tab 가방 · M 지도 · Esc 메뉴");
             GUILayout.EndArea();
 
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);
         }
 
-        // Right of the HUD box and below the touch buttons; under the HUD when the screen is too narrow for that.
+        // Between the HUD box and the minimap; under the HUD when the screen is too narrow for that.
         static void DrawBossBar(EntityView boss)
         {
             float left = Ui.HudArea.xMax + 10;
-            float right = Ui.Width - 20;
-            float top = Controls.UsingTouch ? 20 + TouchButtonHeight : 20;
+            float right = Ui.MinimapArea.x - 10;
+            float top = 20;
             if (right - left < 240)
             {
                 left = 20;

@@ -13,6 +13,8 @@ namespace Game.Client
         // Room for the title line above the scrolling part.
         const float TitleHeight = 40;
         const float TooltipWidth = 320;
+        // Narrower than this beside the minimap column, the window goes under it instead.
+        const float MinWidth = 300;
 
         static GUIStyle _tooltipStyle;
 
@@ -35,10 +37,21 @@ namespace Game.Client
             if (!Open) return;
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
-            // Narrower on phones; the whole window scrolls when it does not fit.
-            float width = Mathf.Min(MaxWidth, Ui.Width - 20);
-            _nameWidth = Mathf.Min(240, width - 200);
-            var area = new Rect(Ui.Width - width - 10, 60, width, Ui.Height - 70);
+            // Left of the minimap column, full height; on narrow screens under the column. The whole window scrolls
+            // when it does not fit.
+            Rect area;
+            float room = Ui.MinimapArea.x - 20;
+            if (room >= MinWidth)
+            {
+                float width = Mathf.Min(MaxWidth, room);
+                area = new Rect(Ui.MinimapArea.x - 10 - width, 10, width, Ui.Height - 20);
+            }
+            else
+            {
+                float top = Ui.RightColumnBottom + 10;
+                area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
+            }
+            _nameWidth = Mathf.Min(240, area.width - 200);
             Controls.Block(area);
             // The box style is see-through; names drawn over the world would show through the list.
             var tint = GUI.color;
@@ -112,9 +125,11 @@ namespace Game.Client
                 : Controls.UsingTouch ? "아이템 이름을 누르고 있으면 설명이 보입니다." : "아이템 이름에 마우스를 올리면 설명이 보입니다.";
             var content = new GUIContent(text);
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
-            // Left of the window and below the HUD when there is room, otherwise over the window's bottom edge.
+            // Left of the window and below the HUD when there is room, otherwise over the window's bottom edge. As wide
+            // as the longest line needs (CalcSize ignores wrapping), so short hints do not wrap their last word.
             bool besideWindow = window.x >= TooltipWidth + 20;
-            float width = besideWindow ? TooltipWidth : window.width - 20;
+            float room = besideWindow ? TooltipWidth : window.width - 20;
+            float width = Mathf.Min(room, Mathf.Ceil(_tooltipStyle.CalcSize(content).x) + 2);
             float height = _tooltipStyle.CalcHeight(content, width);
             var rect = besideWindow
                 ? new Rect(window.x - width - 10, Mathf.Max(window.y, Ui.HudArea.yMax + 10), width, height)
