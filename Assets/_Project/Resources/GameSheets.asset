@@ -19,3 +19,5 @@ MonoBehaviour:
   monsters: {fileID: 4900000, guid: 40686204d9b9dc740bbcdff13af5c326, type: 3}
   bosses: {fileID: 4900000, guid: c2fed33ef540da34099bd6c4b0cbb5ac, type: 3}
   bossAttacks: {fileID: 4900000, guid: 1c2415facedd5c54580087663f50c44d, type: 3}
+  classes: {fileID: 4900000, guid: a8d1e65ea716a0748a0d025c7f11abaa, type: 3}
+  skills: {fileID: 4900000, guid: c6c4bcdcccd1b0643ac37476090fe38c, type: 3}

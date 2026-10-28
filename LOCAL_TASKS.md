@@ -326,3 +326,10 @@ DevTools/Local/setup.sh --commit
 - 확인하지 못한 것: 공격 스틱, 터치로 지도 열고 닫기, 미니맵 아래 [가방]·[나가기]. 마우스로는 터치 UI가 나오지 않아 휴대폰 확인(사람)으로 남긴다
 - 브라우저 창이 좁고 길면(약 750×1200) 웹 페이지의 게임 화면이 창보다 넓어 오른쪽이 잘리고 가로 스크롤이 생겼다. 미니맵이 잘린 쪽에 있어 안 보였다. 휴대폰 세로 화면에서도 같은지는 사람이 본다
 - 사람(19:55): 휴대폰에서는 화면이 잘리지 않는다. 잘림은 데스크톱의 좁고 긴 브라우저 창에서만 본 것이다
+
+### 2026-10-29 00:04 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 157개 중 157개 통과, 0개 실패
+- PlayMode 테스트: 3개 중 3개 통과, 0개 실패
