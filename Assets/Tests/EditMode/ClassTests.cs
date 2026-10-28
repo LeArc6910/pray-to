@@ -9,8 +9,7 @@ namespace Game.Core.Tests
         static readonly ClassDefinition Warrior = Classes.Shipped.Find("warrior");
         static readonly ClassDefinition FireMage = Classes.Shipped.Find("fire_mage");
         static readonly MonsterDefinition Slime = Monsters.Shipped.Find("slime");
-        // Never notices anyone and takes a beating, so targets stay where they were put.
-        static readonly MonsterDefinition Dummy = MonsterSheet.Parse(Monsters.Header + "dummy,허수아비,1,1000,0,0,1,0.4,0,0.5,0.5,1,1\n").Find("dummy");
+        static readonly MonsterDefinition Dummy = Monsters.Dummy;
 
         static World Room(int size = 30, MonsterData monsters = null) =>
             new World(Maps.Room(size), TileMap.Center(size / 2, size / 2), monsters ?? Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 });
@@ -185,10 +184,10 @@ namespace Game.Core.Tests
             Assert.IsTrue(world.UseSkill(player.Id, Slot(player, "fireball"), new Vec2(1, 0)));
             var events = Run(world, World.TicksPerSecond);
 
-            // The staff's lowest roll is 2, raised by its own magic 10% and the fire mage's fire 15%: 2 × 125% × 120%
-            // = 3, or 4.5 on a crit. Everything in the burst takes the same roll.
+            // The staff's lowest roll is 3, raised by its own magic 30% and the fire mage's fire 15%: 3 × 145% × 120%
+            // = 5.2, or 7.8 on a crit. Everything in the burst takes the same roll.
             int dealt = Dummy.Health - (int)target.Health;
-            Assert.That(dealt, Is.EqualTo(3).Or.EqualTo(4));
+            Assert.That(dealt, Is.EqualTo(5).Or.EqualTo(8));
             Assert.AreEqual(target.Health, beside.Health);
             Assert.AreEqual(Dummy.Health, behind.Health);
             Assert.AreEqual(friend.Stats.MaxHealth, friend.Health);

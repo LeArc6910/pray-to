@@ -261,7 +261,7 @@ namespace Game.Core
                 .Where(p => InView(p.Position))
                 .OrderBy(p => Distance(p.Position))
                 .Take(_config.MaxProjectilesPerSnapshot)
-                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly ? IndexOf(_classes?.Skills, p.Skill) : -1))
+                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly, p.Tags))
                 .ToList();
 
             var hazards = World.Hazards

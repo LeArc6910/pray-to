@@ -399,11 +399,15 @@ namespace Game.Client
                 _seen.Add(projectile.Id);
                 if (!_projectiles.TryGetValue(projectile.Id, out var renderer))
                 {
-                    // A player's projectile in its skill's colour, a little larger than it really is so it reads.
-                    var skill = projectile.Skill;
-                    var color = skill != null ? Palette.Of(skill.Tags) : ProjectileColor;
-                    renderer = Renderer(_root.transform, "Projectile", Shapes.Circle, color);
-                    renderer.transform.localScale = Vector3.one * (projectile.Radius * (skill != null ? 2.6f : 2));
+                    // A player's in the colour of its tags, a little larger than it really is so it reads; an arrow
+                    // is a thin streak pointing the way it flies.
+                    bool arrow = projectile.Friendly && (projectile.Tags & SkillTag.Ranged) != 0;
+                    var color = projectile.Friendly ? Palette.Of(projectile.Tags) : ProjectileColor;
+                    renderer = Renderer(_root.transform, "Projectile", arrow ? Shapes.Square : Shapes.Circle, color);
+                    renderer.transform.localScale = arrow
+                        ? new Vector3(0.6f, projectile.Radius * 0.8f, 1)
+                        : Vector3.one * (projectile.Radius * (projectile.Friendly ? 2.6f : 2));
+                    renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
                     renderer.sortingOrder = 20000;
                     _projectiles[projectile.Id] = renderer;
                 }
@@ -426,7 +430,8 @@ namespace Game.Client
             {
                 case SimEventType.Attack:
                     var attacker = Find(e.Source);
-                    if (attacker == null) break;
+                    // Shots show as their projectile, so only swings draw the arc.
+                    if (attacker == null || e.Amount != (int)BasicAttackKind.Swing) break;
                     attacker.SwingTime = SwingSeconds;
                     attacker.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     break;

@@ -5,7 +5,8 @@ using Game.Core;
 namespace CoreSandbox
 {
     // One bot player in a generated cave full of monsters. It walks to the nearest enemy, holds attack once in
-    // reach, uses its class skills when ready and, unless told not to, backs out of wind-ups. Shows how fast gear
+    // reach (a bow or staff stops further off and steps back from enemies that get close), uses its class skills
+    // when ready and, unless told not to, backs out of wind-ups. Shows how fast gear
     // and classes kill and how much the bot gets hurt.
     static class FightSim
     {
@@ -51,7 +52,7 @@ namespace CoreSandbox
             Console.WriteLine($"seed = {seed}, {seconds}초, 장비: {string.Join(", ", gear)}, 클래스: {ClassNames(classes)}, 피하기: {(dodge ? "켬" : "끔")}");
             foreach (var item in equipment.Items) Console.WriteLine("  " + ItemText.Describe(item)[0] + " / " + string.Join(", ", item.Implicits.Select(StatText.Describe)));
             Console.WriteLine($"처치 {kills} (분당 {kills * 60.0 / seconds:0.0}), 사망 {deaths}");
-            Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 휘두르기 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)");
+            Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 기본 공격 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)");
             Console.WriteLine($"  나눠 보면: {skills.Summary()}");
             Console.WriteLine($"받은 피해 {taken} (초당 {taken / (double)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}");
             Console.WriteLine($"주운 것: 아이템 {player.Inventory.Items.Count}개, 룬 {player.Inventory.Runes.Values.Sum()}개 (바닥에 남은 것 {world.GroundLoot.Count}개)");
@@ -72,12 +73,17 @@ namespace CoreSandbox
 
             var toTarget = target.Position - player.Position;
             float gap = toTarget.Length - target.Definition.Radius - World.PlayerRadius;
+            float reach = Reach(player);
             var input = Vec2.Zero;
             if (dodge && target.State == EnemyState.Windup && gap < target.Definition.Reach + 0.6f)
             {
                 input = -toTarget.Normalized;
             }
-            else if (gap > World.MeleeReach * 0.7f)
+            else if (player.Stats.Attack.Shoots && gap < 1.5f)
+            {
+                input = -toTarget.Normalized;
+            }
+            else if (gap > reach * 0.7f)
             {
                 input = gap < 2 ? toTarget.Normalized : toEnemies.DirectionFrom(player.Position);
                 if (input.LengthSquared < 1e-6f) input = toTarget.Normalized;
@@ -85,7 +91,12 @@ namespace CoreSandbox
 
             var next = PlayerMotor.Step(world.Map, player.Position, input, player.Stats.MoveSpeed);
             world.MovePlayer(player.Id, next, toTarget, 1);
-            world.SetAttacking(player.Id, gap <= World.MeleeReach);
+            world.SetAttacking(player.Id, gap <= reach);
         }
+
+        // How close a bot gets before attacking: in swinging reach, or well inside a shot's range so the target
+        // cannot walk out of it.
+        public static float Reach(Player player) =>
+            player.Stats.Attack.Shoots ? player.Stats.Attack.Range * 0.6f : World.MeleeReach;
     }
 }

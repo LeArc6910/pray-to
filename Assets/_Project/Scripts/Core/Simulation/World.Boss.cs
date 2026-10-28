@@ -269,10 +269,10 @@ namespace Game.Core
             boss.Position = position;
         }
 
-        void DamageBoss(Boss boss, int source, int amount, bool critical)
+        void DamageBoss(Boss boss, int source, int amount, bool critical, int cause = 0)
         {
             boss.Health -= amount;
-            _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical));
+            _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical, cause: cause));
             if (boss.IsDead)
             {
                 ClearAttacksFrom(boss);

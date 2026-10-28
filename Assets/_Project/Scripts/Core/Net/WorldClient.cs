@@ -76,19 +76,24 @@ namespace Game.Core
 
     public readonly struct ProjectileView
     {
-        public ProjectileView(int id, Vec2 position, float radius, SkillDefinition skill)
+        public ProjectileView(int id, Vec2 position, Vec2 velocity, float radius, bool friendly, SkillTag tags)
         {
             Id = id;
             Position = position;
+            Velocity = velocity;
             Radius = radius;
-            Skill = skill;
+            Friendly = friendly;
+            Tags = tags;
         }
 
         public int Id { get; }
         public Vec2 Position { get; }
+        // For pointing arrows the way they fly.
+        public Vec2 Velocity { get; }
         public float Radius { get; }
-        // The player skill that fired it, or null for a boss's.
-        public SkillDefinition Skill { get; }
+        // A player's, and the tags it hits with; a boss's has none.
+        public bool Friendly { get; }
+        public SkillTag Tags { get; }
     }
 
     public readonly struct HazardView
@@ -319,8 +324,8 @@ namespace Game.Core
             float seconds = (float)((HostTick - latest.Tick) / World.TicksPerSecond);
             foreach (var projectile in latest.Projectiles)
             {
-                var skill = projectile.Skill >= 0 && _classes != null && projectile.Skill < _classes.Skills.Count ? _classes.Skills[projectile.Skill] : null;
-                views.Add(new ProjectileView(projectile.Id, projectile.Position + projectile.Velocity * seconds, projectile.Radius, skill));
+                views.Add(new ProjectileView(
+                    projectile.Id, projectile.Position + projectile.Velocity * seconds, projectile.Velocity, projectile.Radius, projectile.Friendly, projectile.Tags));
             }
             return views;
         }

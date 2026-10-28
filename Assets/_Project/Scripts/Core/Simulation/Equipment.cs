@@ -47,6 +47,7 @@ namespace Game.Core
         {
             _sheet = sheet;
             _armed = armed;
+            Attack = BasicAttack.For(weaponTags);
             GrantedTags = grantedTags;
             AttackTags = weaponTags | grantedTags;
             MaxHealth = (float)sheet.Get(StatType.MaxHealth, BaseHealth);
@@ -62,6 +63,8 @@ namespace Game.Core
             ItemRarity = (float)sheet.Get(StatType.ItemRarity, 100) - 100;
         }
 
+        // What the basic attack does: swing, arrow or bolt, from the weapon's own tags.
+        public BasicAttack Attack { get; }
         // Tags of the basic attack: the weapon's, or melee when bare-handed, plus whatever buffs grant.
         public SkillTag AttackTags { get; }
         // Tags buffs add to every attack and skill.
@@ -106,5 +109,45 @@ namespace Game.Core
             var weapon = equipment[ItemSlot.Weapon];
             return new PlayerStats(sheet, weapon?.Base.Tags ?? SkillTag.Melee, granted, weapon != null);
         }
+    }
+
+    public enum BasicAttackKind : byte
+    {
+        Swing,
+        Arrow,
+        Bolt,
+    }
+
+    // A weapon's basic attack, picked by its tags: melee (and bare hands) swings, ranged shoots arrows, magic shoots
+    // bolts; with several tags the first of those wins. Shots fly straight, hit the first enemy they touch and stop
+    // at walls. See Docs/Combat.md.
+    public sealed class BasicAttack
+    {
+        public static readonly BasicAttack Swing = new BasicAttack(BasicAttackKind.Swing, "휘두르기", 0, 0, 0);
+        public static readonly BasicAttack Arrow = new BasicAttack(BasicAttackKind.Arrow, "화살", 16, 8, 0.12f);
+        public static readonly BasicAttack Bolt = new BasicAttack(BasicAttackKind.Bolt, "마법 탄", 11, 7, 0.2f);
+
+        BasicAttack(BasicAttackKind kind, string name, float speed, float range, float radius)
+        {
+            Kind = kind;
+            Name = name;
+            Speed = speed;
+            Range = range;
+            Radius = radius;
+        }
+
+        public BasicAttackKind Kind { get; }
+        public string Name { get; }
+        // For shots: tiles per second, how far they fly, and how thick they are.
+        public float Speed { get; }
+        public float Range { get; }
+        public float Radius { get; }
+        public bool Shoots => Kind != BasicAttackKind.Swing;
+
+        public static BasicAttack For(SkillTag weaponTags) =>
+            (weaponTags & SkillTag.Melee) != 0 ? Swing
+            : (weaponTags & SkillTag.Ranged) != 0 ? Arrow
+            : (weaponTags & SkillTag.Magic) != 0 ? Bolt
+            : Swing;
     }
 }

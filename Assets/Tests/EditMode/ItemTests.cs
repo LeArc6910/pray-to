@@ -95,9 +95,9 @@ namespace Game.Core.Tests
             var sheet = new StatSheet();
             sheet.Add(item.Modifiers());
 
-            // Staff: Damage+2 and Magic:Damage+10%. Affixes: Damage+2 and Magic:Damage+10%.
-            Assert.AreEqual(4.8, sheet.Get(StatType.Damage, context: item.Base.Tags), 1e-9);
-            Assert.AreEqual(4, sheet.Get(StatType.Damage, context: SkillTag.Melee), 1e-9);
+            // Staff: Damage+3 and Magic:Damage+30%. Affixes: Damage+2 and Magic:Damage+10%.
+            Assert.AreEqual(7, sheet.Get(StatType.Damage, context: item.Base.Tags), 1e-9);
+            Assert.AreEqual(5, sheet.Get(StatType.Damage, context: SkillTag.Melee), 1e-9);
         }
     }
 }

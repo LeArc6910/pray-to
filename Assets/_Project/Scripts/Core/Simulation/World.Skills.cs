@@ -4,8 +4,8 @@ using System.Linq;
 namespace Game.Core
 {
     // Class skills: novas around the player, projectiles that burst where they land, and buffs. A skill rolls its
-    // damage and crit once when used; everything it hits takes that, less its own armor. Its SkillUsed or Burst event
-    // comes before the hits it causes. See Docs/Classes.md.
+    // damage and crit once when used; everything it hits takes that, less its own armor. Its hits carry the slot + 1
+    // as their Cause (0 is the basic attack), for balancing tools. See Docs/Classes.md.
     public sealed partial class World
     {
         const float SkillProjectileRadius = 0.25f;
@@ -33,7 +33,7 @@ namespace Game.Core
             {
                 case SkillKind.Nova:
                     float damage = RollSkill(player, skill, out bool critical);
-                    HitArea(player, player.Position, skill.Radius, damage, critical);
+                    HitArea(player, player.Position, skill.Radius, damage, critical, slot + 1);
                     break;
                 case SkillKind.Projectile:
                     Fire(player, skill, slot);
@@ -67,12 +67,15 @@ namespace Game.Core
                 SkillProjectileRadius,
                 damage,
                 Ticks(skill.Range / skill.Speed),
-                skill,
-                critical));
+                friendly: true,
+                tags: player.Stats.ContextFor(skill),
+                skill: skill,
+                critical: critical));
         }
 
-        // A player's projectile bursts on the first enemy or boss it touches, on a wall, or at the end of its
-        // range. Returns whether it is gone.
+        // A player's projectile stops at the first enemy or boss it touches, at a wall, or at the end of its range,
+        // and hits what it touches there; a skill's bursts and hits everything in its radius. Returns whether it is
+        // gone.
         bool FlyFriendly(Projectile projectile, bool ended)
         {
             var owner = FindPlayer(projectile.Source);
@@ -82,33 +85,33 @@ namespace Game.Core
                 || _bosses.Any(b => !b.IsDead && Vec2.Distance(b.Position, at) <= projectile.Radius + b.Definition.Radius);
             if (!touching && !ended) return false;
 
-            _events.Add(new SimEvent(SimEventType.Burst, owner.Id, amount: projectile.Cause, position: at));
-            HitArea(owner, at, Math.Max(projectile.Skill.Radius, projectile.Radius), projectile.Damage, projectile.Critical);
+            if (projectile.Skill != null) _events.Add(new SimEvent(SimEventType.Burst, owner.Id, amount: projectile.Cause, position: at));
+            HitArea(owner, at, Math.Max(projectile.Skill?.Radius ?? 0, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1);
             return true;
         }
 
         // Every enemy and boss touching the circle takes the hit.
-        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical)
+        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical, int cause)
         {
             foreach (var enemy in _enemies)
             {
                 if (enemy.IsDead || Vec2.Distance(enemy.Position, centre) > radius + enemy.Definition.Radius) continue;
-                HitEnemy(player, enemy, Combat.Mitigate(damage, enemy.Definition.Armor), critical, centre);
+                HitEnemy(player, enemy, Combat.Mitigate(damage, enemy.Definition.Armor), critical, centre, cause);
             }
             foreach (var boss in _bosses)
             {
                 if (boss.IsDead || Vec2.Distance(boss.Position, centre) > radius + boss.Definition.Radius) continue;
                 if (boss.State == BossState.Dormant) Wake(boss);
-                if (!boss.Invulnerable) DamageBoss(boss, player.Id, Combat.Mitigate(damage, boss.Definition.Armor), critical);
+                if (!boss.Invulnerable) DamageBoss(boss, player.Id, Combat.Mitigate(damage, boss.Definition.Armor), critical, cause);
             }
         }
 
         // Knocks the enemy away from where the hit came from.
-        void HitEnemy(Player player, Enemy enemy, int amount, bool critical, Vec2 from)
+        void HitEnemy(Player player, Enemy enemy, int amount, bool critical, Vec2 from, int cause = 0)
         {
             enemy.Health -= amount;
             enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed;
-            _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical));
+            _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
             if (!enemy.IsDead) return;
             _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
             DropFrom(enemy, player);

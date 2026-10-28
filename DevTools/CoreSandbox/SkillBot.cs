@@ -6,13 +6,11 @@ using Game.Core;
 namespace CoreSandbox
 {
     // How a bot uses its class skills: each one as soon as it is ready and worth using. Also credits damage to the
-    // basic attack or the skill that dealt it, from the order of events (an Attack, SkillUsed or Burst comes before
-    // its hits).
+    // basic attack or the skill that dealt it, from each hit's Cause (skill slot + 1, or 0).
     sealed class SkillBot
     {
         readonly Dictionary<string, int> _dealt = new Dictionary<string, int>();
         readonly Dictionary<string, int> _uses = new Dictionary<string, int>();
-        string _current = "기본 공격";
 
         public SkillBot(Player player) { Player = player; }
 
@@ -44,18 +42,13 @@ namespace CoreSandbox
             if (e.Source != Player.Id) return;
             switch (e.Type)
             {
-                case SimEventType.Attack:
-                    _current = "기본 공격";
-                    break;
                 case SimEventType.SkillUsed:
-                    _current = Player.Skills[e.Amount].Name;
-                    _uses[_current] = _uses.GetValueOrDefault(_current) + 1;
-                    break;
-                case SimEventType.Burst:
-                    _current = Player.Skills[e.Amount].Name;
+                    string used = Player.Skills[e.Amount].Name;
+                    _uses[used] = _uses.GetValueOrDefault(used) + 1;
                     break;
                 case SimEventType.Hit:
-                    _dealt[_current] = _dealt.GetValueOrDefault(_current) + e.Amount;
+                    string by = e.Cause == 0 ? "기본 공격" : Player.Skills[e.Cause - 1].Name;
+                    _dealt[by] = _dealt.GetValueOrDefault(by) + e.Amount;
                     break;
             }
         }

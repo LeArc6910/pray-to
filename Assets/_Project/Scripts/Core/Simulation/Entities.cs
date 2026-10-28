@@ -142,7 +142,7 @@ namespace Game.Core
 
     public enum SimEventType : byte
     {
-        // A player swung or an enemy struck; Direction is where.
+        // A player attacked or an enemy struck; Direction is where. For a player, Amount is the BasicAttackKind.
         Attack,
         // Source hit Target for Amount.
         Hit,
@@ -182,7 +182,8 @@ namespace Game.Core
         public int Amount { get; }
         public bool Critical { get; }
         public Vec2 Direction { get; }
-        // Which of the boss's attacks dealt a hit (its index + 1), for balancing tools. Not sent to clients.
+        // What dealt a hit, for balancing tools; not sent to clients. From a boss: its attack's index + 1 (0 for a
+        // roar). From a player: the skill slot + 1, or 0 for the basic attack.
         public int Cause { get; }
         // Only for events that happen somewhere rather than to someone (HasPosition).
         public Vec2 Position { get; }
@@ -322,10 +323,23 @@ namespace Game.Core
         public long ExpireTick { get; }
     }
 
-    // A boss's projectile hurts players. A player's (Skill set) flies through players and bursts on enemies.
+    // A boss's projectile hurts players. A player's (Friendly) flies through players and stops at the first enemy;
+    // a skill's bursts there.
     public sealed class Projectile
     {
-        internal Projectile(int id, int source, int cause, Vec2 position, Vec2 velocity, float radius, float damage, int ticks, SkillDefinition skill = null, bool critical = false)
+        internal Projectile(
+            int id,
+            int source,
+            int cause,
+            Vec2 position,
+            Vec2 velocity,
+            float radius,
+            float damage,
+            int ticks,
+            bool friendly = false,
+            SkillTag tags = SkillTag.None,
+            SkillDefinition skill = null,
+            bool critical = false)
         {
             Id = id;
             Source = source;
@@ -335,13 +349,16 @@ namespace Game.Core
             Radius = radius;
             Damage = damage;
             RemainingTicks = ticks;
+            Friendly = friendly;
+            Tags = tags;
             Skill = skill;
             Critical = critical;
         }
 
         public int Id { get; }
         public int Source { get; }
-        // Which of the boss's attacks fired it (its index + 1), or which of the player's skill slots.
+        // Which of the boss's attacks fired it (its index + 1), or which of the player's skill slots (-1 for a basic
+        // attack).
         public int Cause { get; }
         public Vec2 Position { get; internal set; }
         // Tiles per second.
@@ -349,9 +366,12 @@ namespace Game.Core
         public float Radius { get; }
         // Before armor. A player's projectile rolls its damage and crit when it is fired.
         public float Damage { get; }
+        public bool Friendly { get; }
+        // A player's: the tags it hits with, buffs included.
+        public SkillTag Tags { get; }
+        // The skill that fired it, or null for a basic attack or a boss's.
         public SkillDefinition Skill { get; }
         public bool Critical { get; }
-        public bool Friendly => Skill != null;
         internal int RemainingTicks { get; set; }
     }
 }

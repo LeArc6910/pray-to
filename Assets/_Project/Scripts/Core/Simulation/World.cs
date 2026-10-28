@@ -160,14 +160,42 @@ namespace Game.Core
 
             player.Health = Math.Min(player.Stats.MaxHealth, player.Health + player.Stats.HealthRegen * TickSeconds);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
-            if (player.Attacking && player.AttackCooldown == 0) Swing(player);
+            if (player.Attacking && player.AttackCooldown == 0) Attack(player);
+        }
+
+        void Attack(Player player)
+        {
+            var stats = player.Stats;
+            player.AttackCooldown = Math.Max(1, (int)MathF.Round(TicksPerSecond / Math.Max(0.1f, stats.AttacksPerSecond)));
+            _events.Add(new SimEvent(SimEventType.Attack, player.Id, amount: (int)stats.Attack.Kind, direction: player.Facing));
+            if (stats.Attack.Shoots) Shoot(player);
+            else Swing(player);
+        }
+
+        // An arrow or bolt toward where the player faces, its damage and crit rolled now (see FlyFriendly).
+        void Shoot(Player player)
+        {
+            var stats = player.Stats;
+            var shot = stats.Attack;
+            bool critical = _random.Chance(stats.CritChance / 100f);
+            float damage = stats.Damage * (critical ? stats.CritDamage / 100f : 1f);
+            var direction = player.Facing;
+            _projectiles.Add(new Projectile(
+                _nextId++,
+                player.Id,
+                -1,
+                player.Position + direction * PlayerRadius,
+                direction * shot.Speed,
+                shot.Radius,
+                damage,
+                Ticks(shot.Range / shot.Speed),
+                friendly: true,
+                tags: stats.AttackTags));
         }
 
         void Swing(Player player)
         {
             var stats = player.Stats;
-            player.AttackCooldown = Math.Max(1, (int)MathF.Round(TicksPerSecond / Math.Max(0.1f, stats.AttacksPerSecond)));
-            _events.Add(new SimEvent(SimEventType.Attack, player.Id, direction: player.Facing));
 
             foreach (var enemy in _enemies)
             {

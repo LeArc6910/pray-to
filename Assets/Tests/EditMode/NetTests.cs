@@ -90,7 +90,11 @@ namespace Game.Core.Tests
                 99,
                 new SelfState(2, new Vec2(1, 2), 50, 100, 5, new[] { 0, 120, 7, 0 }, new[] { 0, 0, 0, 240 }),
                 new[] { new EntityState(7, EntityKind.Boss, 0, new Vec2(3.3f, 4.71f), new Vec2(-1, 0), 1234.2f, 2000, (byte)BossState.Telegraph, 2) },
-                new[] { new ProjectileState(8, new Vec2(5, 6), new Vec2(-7, 0.5f), 0.3f), new ProjectileState(10, new Vec2(1, 1), new Vec2(12, 0), 0.25f, 2) },
+                new[]
+                {
+                    new ProjectileState(8, new Vec2(5, 6), new Vec2(-7, 0.5f), 0.3f),
+                    new ProjectileState(10, new Vec2(1, 1), new Vec2(12, 0), 0.25f, true, SkillTag.Ranged | SkillTag.Fire | SkillTag.Lightning),
+                },
                 new[] { new HazardState(9, HazardShape.Cone, new Vec2(3, 4), new Vec2(0, 1), 4.5f, 110, 12, 21, true) },
                 new[]
                 {
@@ -111,8 +115,10 @@ namespace Game.Core.Tests
             var projectile = snapshot.Projectiles[0];
             Assert.AreEqual(-7, projectile.Velocity.X, 1 / 64f);
             Assert.AreEqual(0.3f, projectile.Radius, 1 / 32f);
-            Assert.AreEqual(-1, projectile.Skill, "a boss's");
-            Assert.AreEqual(2, snapshot.Projectiles[1].Skill);
+            Assert.IsFalse(projectile.Friendly, "a boss's");
+            Assert.AreEqual(SkillTag.None, projectile.Tags);
+            Assert.IsTrue(snapshot.Projectiles[1].Friendly);
+            Assert.AreEqual(SkillTag.Ranged | SkillTag.Fire | SkillTag.Lightning, snapshot.Projectiles[1].Tags);
             var hazard = snapshot.Hazards.Single();
             Assert.AreEqual(HazardShape.Cone, hazard.Shape);
             Assert.AreEqual(110, hazard.Width, 1 / 8f);
@@ -280,7 +286,9 @@ namespace Game.Core.Tests
             session.Send(1, alice.SkillCommand(fireball, new Vec2(1, 0)));
             Assert.IsNull(alice.SkillCommand(fireball, new Vec2(1, 0)), "the cooldown starts on screen at once");
             session.Tick(4);
-            Assert.AreEqual("fireball", bob.Projectiles().Single().Skill.Id);
+            var flying = bob.Projectiles().Single();
+            Assert.IsTrue(flying.Friendly);
+            Assert.AreEqual(SkillTag.Magic | SkillTag.Fire, flying.Tags, "the fireball's tags, flame brand's fire included");
 
             var bursts = new List<SimEvent>();
             for (int i = 0; i < 20; i++)

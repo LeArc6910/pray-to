@@ -56,6 +56,75 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void WeaponTagsPickTheBasicAttack()
+        {
+            Assert.AreSame(BasicAttack.Swing, BasicAttack.For(SkillTag.Melee | SkillTag.Fire));
+            Assert.AreSame(BasicAttack.Arrow, BasicAttack.For(SkillTag.Ranged));
+            Assert.AreSame(BasicAttack.Bolt, BasicAttack.For(SkillTag.Magic));
+            Assert.AreSame(BasicAttack.Swing, BasicAttack.For(SkillTag.None));
+            Assert.AreSame(BasicAttack.Arrow, PlayerStats.From(Gear.Wearing("copper_bow")).Attack);
+            Assert.AreSame(BasicAttack.Swing, PlayerStats.From(new Equipment()).Attack, "bare hands swing");
+        }
+
+        [Test]
+        public void ArrowsFlyPastPlayersAndStopAtTheFirstEnemy()
+        {
+            var world = Room(size: 30);
+            var player = world.AddPlayer("a", Gear.Wearing("copper_bow"));
+            var friend = world.AddPlayer("b", null);
+            Assert.IsTrue(world.MovePlayer(friend.Id, friend.Position + new Vec2(2, 0), new Vec2(1, 0), 10));
+            var first = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(5, 0));
+            var behind = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(6.5f, 0));
+            Face(world, player, new Vec2(1, 0));
+
+            world.SetAttacking(player.Id, true);
+            var events = Run(world, 1);
+            world.SetAttacking(player.Id, false);
+            events.AddRange(Run(world, World.TicksPerSecond));
+
+            // The bow's lowest roll is 3; a critical hit deals 150%, rounded to even.
+            Assert.That(Monsters.Dummy.Health - first.Health, Is.EqualTo(3).Or.EqualTo(4));
+            Assert.AreEqual(Monsters.Dummy.Health, behind.Health);
+            Assert.AreEqual(friend.Stats.MaxHealth, friend.Health);
+            Assert.AreEqual((int)BasicAttackKind.Arrow, events.Single(e => e.Type == SimEventType.Attack).Amount);
+            Assert.IsEmpty(world.Projectiles);
+        }
+
+        [Test]
+        public void BoltsFallShortOfFarEnemies()
+        {
+            var world = Room(size: 30);
+            var player = world.AddPlayer("a", Gear.Wearing("copper_staff"));
+            var near = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(0, 6));
+            var far = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(-9, 0));
+
+            Face(world, player, new Vec2(0, 1));
+            world.SetAttacking(player.Id, true);
+            Run(world, 1);
+            Face(world, player, new Vec2(-1, 0));
+            Run(world, World.TicksPerSecond);
+            world.SetAttacking(player.Id, false);
+            Run(world, World.TicksPerSecond);
+
+            Assert.Less(near.Health, Monsters.Dummy.Health, "6 tiles is inside a bolt's 7");
+            Assert.AreEqual(Monsters.Dummy.Health, far.Health, "9 tiles is not");
+        }
+
+        [Test]
+        public void ShotsCarryTheTagsBuffsGrant()
+        {
+            var world = Room(size: 30);
+            var player = world.AddPlayer("a", Gear.Wearing("copper_bow"), Classes.Shipped.Find("fire_mage"));
+            world.UseSkill(player.Id, player.Skills.ToList().FindIndex(s => s.Id == "flame_brand"), Vec2.Zero);
+
+            world.SetAttacking(player.Id, true);
+            Run(world, 1);
+
+            Assert.AreEqual(SkillTag.Ranged | SkillTag.Fire, world.Projectiles.Single().Tags);
+            Assert.IsTrue(world.Projectiles.Single().Friendly);
+        }
+
+        [Test]
         public void EnemiesDieAndLeaveTheWorld()
         {
             var world = Room();

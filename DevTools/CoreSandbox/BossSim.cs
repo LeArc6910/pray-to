@@ -126,14 +126,19 @@ namespace CoreSandbox
             {
                 input = toArena.DirectionFrom(player.Position);
             }
-            else if (gap > World.MeleeReach * 0.7f)
+            else if (player.Stats.Attack.Shoots && gap < FightSim.Reach(player) * 0.5f)
+            {
+                // A bow or staff backs off from a boss that comes close.
+                input = -toTarget.Normalized;
+            }
+            else if (gap > FightSim.Reach(player) * 0.7f)
             {
                 input = toTarget.Normalized;
             }
 
             var next = PlayerMotor.Step(world.Map, player.Position, input, player.Stats.MoveSpeed);
             world.MovePlayer(player.Id, next, facing, 1);
-            bool inReach = slime != null || (boss != null && gap <= World.MeleeReach);
+            bool inReach = slime != null || (boss != null && gap <= FightSim.Reach(player));
             world.SetAttacking(player.Id, inReach);
         }
 

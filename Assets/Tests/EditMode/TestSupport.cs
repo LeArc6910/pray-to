@@ -107,6 +107,9 @@ namespace Game.Core.Tests
 
         // A slime that hits hard enough to drop a bare-handed player in one strike.
         public static readonly MonsterData Brute = MonsterSheet.Parse(Header + "brute,깡패,1,1000,500,0,2,0.4,8,0.5,0.5,1,1\n");
+
+        // Never notices anyone and takes a beating, so targets stay where they were put.
+        public static readonly MonsterDefinition Dummy = MonsterSheet.Parse(Header + "dummy,허수아비,1,1000,0,0,1,0.4,0,0.5,0.5,1,1\n").Find("dummy");
     }
 
     public static class Bosses

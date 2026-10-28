@@ -24,7 +24,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.5.0";
+        public const string Version = "0.6.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -322,21 +322,23 @@ namespace Game.Core
     // Clients move projectiles on by their velocity between snapshots, so they are drawn where they really are.
     public readonly struct ProjectileState
     {
-        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius, int skill = -1)
+        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius, bool friendly = false, SkillTag tags = SkillTag.None)
         {
             Id = id;
             Position = position;
             Velocity = velocity;
             Radius = radius;
-            Skill = skill;
+            Friendly = friendly;
+            Tags = tags;
         }
 
         public int Id { get; }
         public Vec2 Position { get; }
         public Vec2 Velocity { get; }
         public float Radius { get; }
-        // Which skill in the class sheet fired it, or -1 for a boss's.
-        public int Skill { get; }
+        // A player's, and the tags it hits with, which is all the screen needs to colour and shape it.
+        public bool Friendly { get; }
+        public SkillTag Tags { get; }
     }
 
     // A telegraphed area. TicksLeft counts from the snapshot's tick to when it lands, out of Duration in all.
@@ -453,7 +455,8 @@ namespace Game.Core
                 w.WriteCompact(projectile.Position);
                 w.WriteCompact(projectile.Velocity);
                 w.Write((byte)Math.Clamp((int)MathF.Round(projectile.Radius * 32), 0, 255));
-                w.Write((byte)(projectile.Skill + 1));
+                // The seven tags fit under the top bit, which says whose it is.
+                w.Write((byte)((projectile.Friendly ? 0x80 : 0) | ((int)projectile.Tags & 0x7f)));
             }
 
             w.Write((ushort)Hazards.Count);
@@ -521,7 +524,12 @@ namespace Game.Core
             var projectiles = new List<ProjectileState>(projectileCount);
             for (int i = 0; i < projectileCount; i++)
             {
-                projectiles.Add(new ProjectileState(r.ReadInt32(), r.ReadCompact(), r.ReadCompact(), r.ReadByte() / 32f, r.ReadByte() - 1));
+                int id = r.ReadInt32();
+                var at = r.ReadCompact();
+                var velocity = r.ReadCompact();
+                float radius = r.ReadByte() / 32f;
+                byte owner = r.ReadByte();
+                projectiles.Add(new ProjectileState(id, at, velocity, radius, (owner & 0x80) != 0, (SkillTag)(owner & 0x7f)));
             }
 
             int hazardCount = r.ReadUInt16();
