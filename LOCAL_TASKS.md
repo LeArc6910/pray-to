@@ -55,7 +55,7 @@ DevTools/Local/setup.sh --commit
 - [x] (2026-10-28 로컬 세션, `gh api`로 build_type=workflow) Settings > Pages > Build and deployment > Source를 **GitHub Actions**로 (public이 된 뒤에 고를 수 있다)
 - [x] ~~라이선스 파일 찾기~~ 필요 없어졌다(2026-10-28). Unity 6 Personal에는 ULF 파일이 없고, 웹 데모 빌드는 이제 이메일·비밀번호로 Personal을 활성화한다
 - [x] (2026-10-28 01:38 사람이 넣음. 값은 확인하지 않음) Settings > Secrets and variables > Actions에 시크릿 추가: `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정. 소셜 로그인이나 2단계 인증 없이 https://id.unity.com 에 이메일·비밀번호로 들어가지는 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다. 처음에 넣었던 `UNITY_LICENSE`는 이제 쓰지 않으니 지워도 된다
-- [ ] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
+- [x] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
   - 2026-10-28 01:52, 02:12 두 번 실패(로그인 401, 이어서 serial invalid). 클라우드가 라이선스 활성화를 고쳤고(`CLOUD_LOG.md`), 18:47 첫 성공·배포를 클라우드가 확인했다: https://github.com/LeArc6910/pray-to/actions/runs/40663963893 . 이제 푸시마다 저절로 돈다
 
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
@@ -248,3 +248,11 @@ DevTools/Local/setup.sh --commit
 - 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
 - EditMode 테스트: 140개 중 140개 통과, 0개 실패
 - PlayMode 테스트: 2개 중 2개 통과, 0개 실패
+
+### 2026-10-28 19:00 클라우드 18:18 작업 확인 (로컬 세션)
+
+- `git pull`로 클라우드 커밋 3개를 받았다. 모두 `LeArc6910` noreply 주소로 작성됐고 도구 표시 줄이 없다. 새 기록 위로 fast-forward 됐다
+- 명령 한 줄(위 18:59): 성공. 이번 커밋에서 `ProjectSettings.asset`은 `webGLDecompressionFallback: 0 → 1` 한 줄만 바뀌었고, `Main.unity`는 다시 쓰이지 않았다(씬 재생성 수정 확인)
+- 배포된 웹 데모 https://learc6910.github.io/pray-to/ 를 데스크톱 브라우저(800×450 창)에서 열었다. 로딩, 메뉴, 한글, [혼자 하기], Tab 가방 창이 되고 콘솔 에러가 없다. 지난번에 적은 두 가지가 고쳐졌다: 설명 상자가 HUD 아래로 내려가 겹치지 않고, 가방 창 배경이 불투명하다. 스크린샷 `Docs/Screenshots/web_pages_bag.jpg`
+- 사소한 점: 설명 상자 폭이 좁아 "…설명이 보입니다."의 마지막 글자 "다."가 다음 줄로 넘어간다
+- `UNITY_LICENSE` 시크릿은 이제 쓰지 않는다. 지울지는 사람이 정한다
