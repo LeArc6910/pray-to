@@ -50,7 +50,9 @@ GitHub Actions(`.github/workflows/core-tests.yml`)가 푸시마다 테스트, Un
 
 - Core에서는 `System.Random` 대신 `GameRandom`을 쓴다. 호스트, 클라이언트, 테스트가 같은 결과를 내야 한다. 시각(`DateTime.Now`, `Environment.TickCount` 등)도 Core 안에서 읽지 않고 밖에서 넘겨받는다.
 - 게임 상태는 호스트의 Core 시뮬레이션만 바꾼다. 자세한 내용은 `Docs/Design.md`의 멀티플레이 절에 있다.
+- PC와 모바일 크로스 플랫폼으로 만든다(사용자 결정, 2026-10-29). 새 기능은 키보드·마우스와 터치 둘 다로 쓸 수 있어야 하고, UI는 휴대폰 가로·세로와 작은 PC 창에 들어가야 한다. `Docs/Design.md` 기술 원칙 7.
 - 에디터에서 손으로 만드는 콘텐츠를 늘리지 않는다. 월드는 절차 생성, 아이템·몬스터·보스는 데이터, 에셋은 에디터 스크립트로 만든다.
+- 사용자에게는 한국어로 말한다(사용자 결정, 2026-10-28). 문서도 지금처럼 한국어로 쓴다.
 - 커밋 메시지는 영어로 쓴다. 첫 줄은 명령형 요약, 본문에는 무엇을 왜 바꿨는지 적는다.
 - 커밋 작성자는 저장소 주인으로 한다: `git config user.name LeArc6910`, `git config user.email 270705266+LeArc6910@users.noreply.github.com`. 메시지에 `Co-Authored-By`나 세션 링크 같은 도구 표시 줄을 붙이지 않는다(사용자 결정, 2026-10-28).
 - main 기록은 2026-10-28에 한 번 다시 썼다. 옛 기록의 커밋을 merge하거나 강제 푸시로 되살리지 않는다. 옛 기록 위에서 작업하던 클론은 `git fetch` 후 `git reset --hard origin/main`으로 옮긴다(푸시하지 않은 커밋은 `git rebase --onto`로).

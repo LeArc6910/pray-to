@@ -146,9 +146,10 @@ namespace Game.Client
         // Skills go to the host as soon as they are pressed, not with the next tick's input.
         void ReadSkillPress()
         {
-            int slot = Controls.TakeSkillPress();
-            if (slot < 0 || _inventory.Open || (_map != null && _map.FullOpen)) return;
-            UseSkill(slot, Controls.SkillAim(_camera, _client.Position));
+            var slots = Controls.TakeSkillPresses();
+            if (slots.Count == 0 || _inventory.Open || (_map != null && _map.FullOpen)) return;
+            var aim = Controls.SkillAim(_camera, _client.Position);
+            foreach (int slot in slots) UseSkill(slot, aim);
         }
 
         void FixedTick()
@@ -394,25 +395,44 @@ namespace Game.Client
             if (_chosenClasses.Count == 0) GUILayout.Label("고르지 않으면 기본 공격만 쓴다.");
         }
 
+        // The status box grows to fit its lines, so a narrow window wraps them instead of cutting them off.
         void DrawHud()
         {
-            GUILayout.BeginArea(Ui.HudArea, GUI.skin.box);
+            var lines = new List<string>();
             if (_client.Status != ClientStatus.Playing)
             {
-                GUILayout.Label(_status);
+                lines.Add(_status);
             }
             else
             {
-                GUILayout.Label($"생명력 {Mathf.CeilToInt(_client.Health)} / {Mathf.CeilToInt(_client.MaxHealth)}");
-                if (_client.IsDead) GUILayout.Label("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
+                lines.Add($"생명력 {Mathf.CeilToInt(_client.Health)} / {Mathf.CeilToInt(_client.MaxHealth)}");
+                if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 string mode = _mode == Mode.Host ? $"호스트 중 (포트 {NetLink.DefaultPort})" : _mode == Mode.Join ? "참가 중" : "혼자 하기";
-                GUILayout.Label($"{mode} · 접속 {_client.Names.Count}명");
+                lines.Add($"{mode} · 접속 {_client.Names.Count}명");
                 var toArena = _client.Arena - _client.Position;
-                if (toArena.Length > _client.ArenaRadius) GUILayout.Label($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
+                if (toArena.Length > _client.ArenaRadius) lines.Add($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
             }
-            GUILayout.Label(Controls.UsingTouch
-                ? "왼쪽 스틱 이동 · 오른쪽 스틱 공격 방향(누르는 동안 공격) · 오른쪽 아래 스킬 · 지도를 누르면 크게"
-                : "WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Q E R F 스킬 · Tab 가방 · M 지도 · Esc 메뉴");
+            if (Controls.UsingTouch)
+            {
+                lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로)");
+                lines.Add("오른쪽 아래 스킬 · 미니맵을 누르면 지도");
+            }
+            else
+            {
+                lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격");
+                lines.Add("Q E R F 스킬 · Tab 가방 · M 지도 · Esc 메뉴");
+            }
+
+            var box = GUI.skin.box;
+            var label = GUI.skin.label;
+            float width = Ui.HudArea.width - box.padding.horizontal - label.margin.horizontal;
+            float gap = Mathf.Max(label.margin.top, label.margin.bottom);
+            float height = box.padding.vertical + label.margin.top + label.margin.bottom + gap * (lines.Count - 1);
+            foreach (string line in lines) height += label.CalcHeight(new GUIContent(line), width);
+            Ui.HudHeight = Mathf.Ceil(height) + 2;
+
+            GUILayout.BeginArea(Ui.HudArea, box);
+            foreach (string line in lines) GUILayout.Label(line);
             GUILayout.EndArea();
 
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);

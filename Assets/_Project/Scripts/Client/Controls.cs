@@ -113,21 +113,18 @@ namespace Game.Client
         // The key letter for a skill slot, for the skill bar.
         public static string SkillKeyName(int slot) => slot < SkillKeys.Length ? SkillKeys[slot].ToString() : "";
 
-        // A skill slot asked for since the last call, by key this frame or by a tapped button, or -1 for none.
-        public static int TakeSkillPress()
+        // Every skill slot asked for this frame, by key or by a tapped button, in the order pressed as far as one
+        // frame can tell. Keys pressed together all count.
+        public static List<int> TakeSkillPresses()
         {
-            if (_skillTaps.Count > 0)
-            {
-                int slot = _skillTaps[0];
-                _skillTaps.RemoveAt(0);
-                return slot;
-            }
+            var slots = new List<int>(_skillTaps);
+            _skillTaps.Clear();
             var keyboard = Keyboard.current;
             for (int slot = 0; keyboard != null && slot < SkillKeys.Length; slot++)
             {
-                if (keyboard[SkillKeys[slot]].wasPressedThisFrame) return slot;
+                if (keyboard[SkillKeys[slot]].wasPressedThisFrame && !slots.Contains(slot)) slots.Add(slot);
             }
-            return -1;
+            return slots;
         }
 
         // Where a skill goes: where the attack stick is pulled, else at the mouse. Zero leaves it to the way the

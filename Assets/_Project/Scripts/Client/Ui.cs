@@ -16,15 +16,10 @@ namespace Game.Client
         static Font _font;
 
         // The status box in the top left corner during play. Other screens keep clear of it. On a narrow (portrait)
-        // screen it gives way to the minimap column and grows taller for the wrapped lines.
-        public static Rect HudArea
-        {
-            get
-            {
-                float width = Mathf.Min(340, MinimapArea.x - 20);
-                return new Rect(10, 10, width, width < 340 ? 200 : 160);
-            }
-        }
+        // screen it gives way to the minimap column. It is as tall as its lines needed when it was last drawn.
+        public static Rect HudArea => new Rect(10, 10, Mathf.Min(340, MinimapArea.x - 20), HudHeight);
+
+        public static float HudHeight { get; set; } = 160;
 
         public const float MinimapSize = 120;
         public const float TouchButtonHeight = 40;
