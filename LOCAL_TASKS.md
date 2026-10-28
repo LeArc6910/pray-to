@@ -150,7 +150,7 @@ DevTools/Local/setup.sh --commit
 
 전사와 화염 마법사를 자유롭게 섞어 고르고(지금은 최대 2개), 스킬 넷을 쓴다(`Docs/Classes.md`, `CLOUD_LOG.md`). 푸시되면 웹 데모가 저절로 다시 배포된다.
 
-- [ ] (로컬 세션) `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행. 새 스크립트(`ClassSheet.cs`, `World.Skills.cs`, `SkillBar.cs`, `ClassTests.cs`)와 새 폴더 `Data/Classes`(`classes.csv`, `skills.csv`)의 `.meta`가 생기고, `GameSheets.asset`에 두 시트가 들어가 커밋된다. PlayMode 테스트 `EverySkillCanBeUsed`가 새로 돈다
+- [x] (로컬 세션) `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행. 새 스크립트(`ClassSheet.cs`, `World.Skills.cs`, `SkillBar.cs`, `ClassTests.cs`)와 새 폴더 `Data/Classes`(`classes.csv`, `skills.csv`)의 `.meta`가 생기고, `GameSheets.asset`에 두 시트가 들어가 커밋된다. PlayMode 테스트 `EverySkillCanBeUsed`가 새로 돈다 (2026-10-29 00:04 성공, `94a4e64`: EditMode 157/157, PlayMode 3/3)
 - [x] (클라우드가 확인) 이번 푸시의 Web demo: 한 번에 성공, 20:33 배포(https://github.com/LeArc6910/pray-to/actions/runs/40679167188 )
 - [ ] (사람, PC나 휴대폰) https://learc6910.github.io/pray-to/ 나 에디터에서
   - 메뉴에 클래스가 [1] 전사, [2] 화염 마법사로 골라져 있는지. 눌러서 빼고 다시 넣으면 번호(스킬 칸 순서)가 바뀌는지. 화면이 넓으면 메뉴 오른쪽에, 좁으면 아래에 나오고, 휴대폰 가로 화면에서 잘리면 끌어서 내릴 수 있는지
@@ -333,3 +333,16 @@ DevTools/Local/setup.sh --commit
 - 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
 - EditMode 테스트: 157개 중 157개 통과, 0개 실패
 - PlayMode 테스트: 3개 중 3개 통과, 0개 실패
+
+### 2026-10-29 00:15 M4 클래스·스킬 받기 확인 (로컬 세션)
+
+- `git pull`로 클라우드 커밋 2개를 받았다. 작성자 `LeArc6910`, 도구 표시 줄 없음, fast-forward
+- 명령 한 줄(위 00:04): 성공. 새 `.meta` 7개와 `GameSheets.asset`(시트 두 개 추가)이 커밋됐다. 새 PlayMode 테스트 `EverySkillCanBeUsed`를 포함해 3개 모두 통과
+- 배포된 웹 데모를 데스크톱 브라우저(마우스·키보드)에서 확인했다. 콘솔 에러 없음
+  - 메뉴 제목이 "M4 프로토타입"이고 오른쪽에 클래스가 [1] 전사, [2] 화염 마법사로 골라져 있다. 전사를 눌러 빼면 "[ ] 전사, [1] 화염 마법사", 다시 넣으면 "[2] 전사, [1] 화염 마법사"로 번호가 바뀐다. 스크린샷 `Docs/Screenshots/web_m4_menu.jpg`
+  - 그 순서로 들어가니 생명력 120/120(전사 패시브 +20%)이고, 아래 가운데 칸이 Q 화염구, E 불꽃 부여, R 회전베기, F 전투 함성으로 고른 순서를 따른다
+  - 네 스킬 모두 나간다. 불꽃 부여는 주황 고리와 이름이 뜨고 칸에 남은 초(16)가 줄어든다. 화염구는 주황 불덩이가 날아간다. 회전베기, 전투 함성도 칸이 어두워지고 초가 줄어든다. 스크린샷 `Docs/Screenshots/web_m4_fireball.jpg`, `web_m4_skills.jpg`
+- 눈에 띈 점(클라우드 참고)
+  - E, F, R을 아주 빠르게 이어 누르면 E만 나가고 F, R은 나가지 않았다(재사용 대기 표시도 없음). 따로 누르면 모두 나간다. `Controls.cs` 126행 근처가 한 프레임에 눌린 키 중 첫 번째 칸만 돌려주므로 같은 프레임에 들어온 나머지는 버려지는 것으로 보인다. 자동 입력이라 한 프레임에 몰렸을 가능성이 크지만, 사람이 두 키를 거의 동시에 눌러도 생길 수 있다
+  - HUD 조작 안내 둘째 줄이 상자 폭을 넘어 "… M 지도 · Esc 메"에서 잘린다(800×600 정도 창)
+- 확인하지 못한 것: 휴대폰 2×2 스킬 버튼, 적·보스에게 스킬 피해가 들어가는지, 불꽃 부여 뒤 회전베기 색. 사람 확인으로 남긴다
