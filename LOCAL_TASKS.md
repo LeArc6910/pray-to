@@ -380,3 +380,10 @@ DevTools/Local/setup.sh --commit
   - E, F, R을 아주 빠르게 이어 누르면 E만 나가고 F, R은 나가지 않았다(재사용 대기 표시도 없음). 따로 누르면 모두 나간다. `Controls.cs` 126행 근처가 한 프레임에 눌린 키 중 첫 번째 칸만 돌려주므로 같은 프레임에 들어온 나머지는 버려지는 것으로 보인다. 자동 입력이라 한 프레임에 몰렸을 가능성이 크지만, 사람이 두 키를 거의 동시에 눌러도 생길 수 있다
   - HUD 조작 안내 둘째 줄이 상자 폭을 넘어 "… M 지도 · Esc 메"에서 잘린다(800×600 정도 창)
 - 확인하지 못한 것: 휴대폰 2×2 스킬 버튼, 적·보스에게 스킬 피해가 들어가는지, 불꽃 부여 뒤 회전베기 색. 사람 확인으로 남긴다
+
+### 2026-10-29 01:22 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 192개 중 192개 통과, 0개 실패
+- PlayMode 테스트: 3개 중 3개 통과, 0개 실패
