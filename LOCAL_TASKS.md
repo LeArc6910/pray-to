@@ -241,3 +241,10 @@ DevTools/Local/setup.sh --commit
 - 원인(로컬 판단): GameCI는 Personal 라이선스일 때 `UNITY_LICENSE`(ULF 파일)의 `DeveloperData`에서 시리얼을 꺼내 넘긴다. 이 PC에는 ULF 파일이 없고 Unity 6 Hub가 남기는 `UnityEntitlementLicense.xml`은 ULF가 아니어서, 넘어간 시리얼이 잘못된 것으로 보인다. entitlement는 이미 활성화됐으므로 시리얼 없이 활성화하면 될 가능성이 있다
 - **클라우드에 부탁**: `web-demo.yml`의 라이선스 활성화를 Unity 6 Personal(entitlement, ULF 없음)에 맞게 고쳐 주세요. 예: `unity-builder`의 `skipActivation`을 켜고 이메일·비밀번호로만 활성화하는 단계를 따로 두는 방법. GameCI가 Unity 6 Personal을 어떻게 지원하는지 확인이 필요하다
 - 사용자 결정(02:20): 로컬 빌드를 gh-pages로 임시 배포하지 않고 클라우드의 워크플로 수정을 기다린다. 고쳐지면 로컬 세션이 Web demo를 다시 돌리고 배포를 확인한다
+
+### 2026-10-28 18:59 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 140개 중 140개 통과, 0개 실패
+- PlayMode 테스트: 2개 중 2개 통과, 0개 실패
