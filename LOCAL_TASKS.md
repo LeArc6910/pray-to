@@ -136,7 +136,7 @@ DevTools/Local/setup.sh --commit
 
 19:10 요청을 클라우드가 구현했다(`CLOUD_LOG.md`). 푸시되면 웹 데모가 저절로 다시 배포된다.
 
-- [ ] (로컬 세션) `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행. 새 스크립트 `MapView.cs`의 `.meta`가 생겨 커밋된다
+- [x] (로컬 세션) `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행. 새 스크립트 `MapView.cs`의 `.meta`가 생겨 커밋된다 (2026-10-28 19:41 성공, `160f732`)
 - [x] (클라우드가 확인) 이번 푸시의 Web demo: 첫 시도가 에디터 `Killed`(137)로 끝나 실패한 job만 다시 돌렸고 성공, 19:37 배포
 - [ ] (사람, 휴대폰) https://learc6910.github.io/pray-to/ 에서
   - 오른쪽 위 미니맵에 주변이 보이고, 걸어 다니면 가 본 곳이 채워지는지. 흰 점(나)과 빨간 원(보스 아레나 쪽)이 보이는지
@@ -298,3 +298,15 @@ DevTools/Local/setup.sh --commit
 - 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
 - EditMode 테스트: 140개 중 140개 통과, 0개 실패
 - PlayMode 테스트: 2개 중 2개 통과, 0개 실패
+
+### 2026-10-28 19:50 미니맵·공격 스틱 받기 확인 (로컬 세션)
+
+- `git pull`로 클라우드 커밋 2개를 받았다. 작성자는 `LeArc6910`, 도구 표시 줄 없음, fast-forward
+- 명령 한 줄(위 19:41): 성공. `MapView.cs.meta`만 새로 생겨 커밋됐다
+- 배포된 웹 데모를 데스크톱 브라우저(1100×720 창, 마우스·키보드)에서 확인했다
+  - 오른쪽 위 미니맵에 시작 지점 주변의 가 본 곳과 흰 점이 보인다. HUD 안내에 "M 지도"가 들어갔다. 스크린샷 `Docs/Screenshots/web_minimap.jpg`
+  - M으로 전체 지도가 열린다. 제목 "지도 (클릭하거나 M·Esc로 닫기)", 아래 범례(나, 다른 플레이어, 보스 아레나), 가 보지 않은 보스 아레나의 빨간 원이 보인다. 스크린샷 `Docs/Screenshots/web_fullmap.jpg`
+  - Esc로 닫힌다. 미니맵 클릭으로 열리고, 지도 아무 데나 클릭하면 닫힌다
+  - 브라우저 콘솔에 에러 없음
+- 확인하지 못한 것: 공격 스틱, 터치로 지도 열고 닫기, 미니맵 아래 [가방]·[나가기]. 마우스로는 터치 UI가 나오지 않아 휴대폰 확인(사람)으로 남긴다
+- 브라우저 창이 좁고 길면(약 750×1200) 웹 페이지의 게임 화면이 창보다 넓어 오른쪽이 잘리고 가로 스크롤이 생겼다. 미니맵이 잘린 쪽에 있어 안 보였다. 휴대폰 세로 화면에서도 같은지는 사람이 본다
