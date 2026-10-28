@@ -3,9 +3,10 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // The skill slots: a row of Q E R F at the bottom middle, or on touch screens a block of buttons two wide in the
-    // bottom right corner, under the thumb that aims. Each shows the skill, a shade that shrinks as it cools down, and
-    // a coloured edge while its buff runs. Using a skill goes through Controls; this draws and marks the buttons.
+    // The quick slots: the skills, then the potion. On PC a row of Q E R F and C at the bottom middle; on touch
+    // screens the skills are a block of buttons two wide in the bottom right corner, under the thumb that aims, with
+    // the potion button left of its bottom row. Each shows a shade that shrinks as it cools down, a skill a coloured
+    // edge while its buff runs. Using them goes through Controls; this draws and marks the buttons.
     static class SkillBar
     {
         const float KeySize = 64;
@@ -19,27 +20,31 @@ namespace Game.Client
         static GUIStyle _keyStyle;
         static GUIStyle _tooltipStyle;
 
-        public static Rect Area(int slot, int count)
+        // Slot `skills` (one past the last skill) is the potion.
+        public static Rect Area(int slot, int skills)
         {
             if (Controls.UsingTouch)
             {
-                int rows = (count + 1) / 2;
-                float left = Ui.Width - Margin - 2 * ButtonSize - Gap;
-                float top = Ui.Height - Margin - rows * ButtonSize - (rows - 1) * Gap;
-                return new Rect(left + slot % 2 * (ButtonSize + Gap), top + slot / 2 * (ButtonSize + Gap), ButtonSize, ButtonSize);
+                int columns = Mathf.Min(2, skills);
+                float blockLeft = Ui.Width - Margin - columns * ButtonSize - Mathf.Max(0, columns - 1) * Gap;
+                float bottom = Ui.Height - Margin - ButtonSize;
+                if (slot == skills) return new Rect(blockLeft - (columns > 0 ? Gap : 0) - ButtonSize, bottom, ButtonSize, ButtonSize);
+                int rows = (skills + 1) / 2;
+                float top = bottom - (rows - 1) * (ButtonSize + Gap);
+                return new Rect(blockLeft + slot % 2 * (ButtonSize + Gap), top + slot / 2 * (ButtonSize + Gap), ButtonSize, ButtonSize);
             }
+            int count = skills + 1;
             float width = count * KeySize + (count - 1) * Gap;
             return new Rect((Ui.Width - width) / 2 + slot * (KeySize + Gap), Ui.Height - Margin - KeySize, KeySize, KeySize);
         }
 
         // Everything the slots cover, for keeping other text clear of them.
-        public static Rect Bounds(int count)
+        public static Rect Bounds(int skills)
         {
-            if (count == 0) return Rect.zero;
-            var bounds = Area(0, count);
-            for (int slot = 1; slot < count; slot++)
+            var bounds = Area(skills, skills);
+            for (int slot = 0; slot < skills; slot++)
             {
-                var area = Area(slot, count);
+                var area = Area(slot, skills);
                 bounds = Rect.MinMaxRect(
                     Mathf.Min(bounds.xMin, area.xMin), Mathf.Min(bounds.yMin, area.yMin), Mathf.Max(bounds.xMax, area.xMax), Mathf.Max(bounds.yMax, area.yMax));
             }
@@ -77,12 +82,7 @@ namespace Game.Client
                 GUI.color = previous;
                 if (!Controls.UsingTouch) GUI.Label(new Rect(area.x + 4, area.y + 2, 20, 18), Controls.SkillKeyName(slot), _keyStyle);
 
-                if (cooldown > 0)
-                {
-                    float share = Mathf.Clamp01(cooldown / Mathf.Max(0.01f, skill.Cooldown));
-                    Fill(new Rect(area.x, area.y, area.width, area.height * share), new Color(0, 0, 0, 0.5f));
-                    GUI.Label(area, cooldown >= 1 ? Mathf.CeilToInt(cooldown).ToString() : cooldown.ToString("0.0"), _timeStyle);
-                }
+                Shade(area, cooldown, skill.Cooldown);
                 if (buff > 0)
                 {
                     GUI.color = color;
@@ -90,15 +90,55 @@ namespace Game.Client
                     GUI.color = previous;
                 }
 
-                if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition)) DrawTooltip(skill, area);
+                if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
+                {
+                    string tags = skill.Tags == SkillTag.None ? "" : " · " + StatText.TagNames(skill.Tags);
+                    DrawTooltip($"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill)}", area);
+                }
+            }
+            DrawPotion(client, Area(count, count));
+        }
+
+        // The first consumable in the bag and how many there are; dim when there is none or it is still waiting.
+        static void DrawPotion(WorldClient client, Rect area)
+        {
+            if (Controls.UsingTouch)
+            {
+                Controls.Block(area);
+                Controls.PotionButton(area);
+            }
+            var potion = client.QuickConsumable;
+            int count = potion != null ? client.Bag.CountOf(potion) : 0;
+            float wait = client.ConsumableCooldownLeft;
+            Fill(area, new Color(0, 0, 0, 0.65f));
+            Fill(new Rect(area.x, area.yMax - 4, area.width, 4), Palette.Potion);
+
+            var previous = GUI.color;
+            GUI.color = count == 0 || wait > 0 || client.IsDead ? new Color(1, 1, 1, 0.45f) : Color.white;
+            GUI.Label(new Rect(area.x + 3, area.y + 10, area.width - 6, area.height - 18), $"{potion?.Name ?? "물약"}\n×{count}", _nameStyle);
+            GUI.color = previous;
+            if (!Controls.UsingTouch) GUI.Label(new Rect(area.x + 4, area.y + 2, 20, 18), Controls.PotionKeyName, _keyStyle);
+            Shade(area, wait, potion?.Cooldown ?? wait);
+
+            if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
+            {
+                DrawTooltip(potion != null ? $"{potion.Name} ×{count}\n{potion.Description}" : "물약이 없다. 몬스터와 보스가 떨어뜨린다", area);
             }
         }
 
-        // Above the hovered slot: what the skill does, its tags and numbers.
-        static void DrawTooltip(SkillDefinition skill, Rect slot)
+        // Darkens the share of the slot still cooling down and shows the seconds left.
+        static void Shade(Rect area, float left, float total)
         {
-            string tags = skill.Tags == SkillTag.None ? "" : " · " + StatText.TagNames(skill.Tags);
-            var content = new GUIContent($"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill)}");
+            if (left <= 0) return;
+            float share = Mathf.Clamp01(left / Mathf.Max(0.01f, total));
+            Fill(new Rect(area.x, area.y, area.width, area.height * share), new Color(0, 0, 0, 0.5f));
+            GUI.Label(area, left >= 1 ? Mathf.CeilToInt(left).ToString() : left.ToString("0.0"), _timeStyle);
+        }
+
+        // Above the hovered slot.
+        static void DrawTooltip(string text, Rect slot)
+        {
+            var content = new GUIContent(text);
             float height = _tooltipStyle.CalcHeight(content, TooltipWidth);
             float x = Mathf.Clamp(slot.center.x - TooltipWidth / 2, 10, Ui.Width - TooltipWidth - 10);
             GUI.Box(new Rect(x, slot.y - height - 8, TooltipWidth, height), content, _tooltipStyle);

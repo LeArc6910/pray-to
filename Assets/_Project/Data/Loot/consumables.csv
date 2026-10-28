@@ -1,0 +1,2 @@
+id,name,level,heal,seconds,cooldown,weight,description
+healing_potion,회복 물약,1,35,2,10,100,2초에 걸쳐 최대 생명력의 35%를 채운다

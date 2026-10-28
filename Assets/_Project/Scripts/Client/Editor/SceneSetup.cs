@@ -50,6 +50,7 @@ namespace Game.Client.Editor
             sheets.affixes = Sheet(LootFolder + LootSheets.AffixesFile);
             sheets.runes = Sheet(LootFolder + LootSheets.RunesFile);
             sheets.runewords = Sheet(LootFolder + LootSheets.RunewordsFile);
+            sheets.consumables = Sheet(LootFolder + LootSheets.ConsumablesFile);
             sheets.monsters = Sheet(MonstersFolder + MonsterSheet.File);
             sheets.bosses = Sheet(BossesFolder + BossSheet.BossesFile);
             sheets.bossAttacks = Sheet(BossesFolder + BossSheet.AttacksFile);

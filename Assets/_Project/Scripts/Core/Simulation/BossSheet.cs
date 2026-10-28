@@ -131,7 +131,8 @@ namespace Game.Core
             int dropCount,
             int dropLevel,
             Rarity dropRarity,
-            int runeCount)
+            int runeCount,
+            int potionCount)
         {
             Id = id;
             Name = name;
@@ -148,6 +149,7 @@ namespace Game.Core
             DropLevel = dropLevel;
             DropRarity = dropRarity;
             RuneCount = runeCount;
+            PotionCount = potionCount;
         }
 
         public string Id { get; }
@@ -170,8 +172,9 @@ namespace Game.Core
         public int DropCount { get; }
         public int DropLevel { get; }
         public Rarity DropRarity { get; }
-        // Runes dropped for each player in the fight.
+        // Runes and consumables dropped for each player in the fight.
         public int RuneCount { get; }
+        public int PotionCount { get; }
         public IReadOnlyList<BossAttack> Attacks => _attacks;
 
         internal void Add(BossAttack attack) => _attacks.Add(attack);
@@ -255,7 +258,8 @@ namespace Game.Core
                         Whole(row, "drop_count"),
                         Math.Max(1, Whole(row, "drop_level")),
                         row["drop_rarity"].Length == 0 ? Rarity.Common : SheetValues.ParseEnum<Rarity>(row["drop_rarity"], "drop_rarity"),
-                        Whole(row, "rune_count")));
+                        Whole(row, "rune_count"),
+                        Whole(row, "potion_count")));
                 });
             }
             return bosses;

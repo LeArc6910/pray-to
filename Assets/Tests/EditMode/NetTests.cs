@@ -88,7 +88,7 @@ namespace Game.Core.Tests
 
             var snapshot = SnapshotMessage.Decode(new SnapshotMessage(
                 99,
-                new SelfState(2, new Vec2(1, 2), 50, 100, 5, new[] { 0, 120, 7, 0 }, new[] { 0, 0, 0, 240 }),
+                new SelfState(2, new Vec2(1, 2), 50, 100, 5, new[] { 0, 120, 7, 0 }, new[] { 0, 0, 0, 240 }, 250),
                 new[] { new EntityState(7, EntityKind.Boss, 0, new Vec2(3.3f, 4.71f), new Vec2(-1, 0), 1234.2f, 2000, (byte)BossState.Telegraph, 2) },
                 new[]
                 {
@@ -105,6 +105,7 @@ namespace Game.Core.Tests
             Assert.AreEqual(2, snapshot.Self.Corrections);
             CollectionAssert.AreEqual(new[] { 0, 120, 7, 0 }, snapshot.Self.Cooldowns);
             CollectionAssert.AreEqual(new[] { 0, 0, 0, 240 }, snapshot.Self.Buffs);
+            Assert.AreEqual(250, snapshot.Self.ConsumableCooldown);
             var entity = snapshot.Entities.Single();
             Assert.AreEqual(EntityKind.Boss, entity.Kind);
             Assert.AreEqual((byte)BossState.Telegraph, entity.State);
@@ -303,6 +304,42 @@ namespace Game.Core.Tests
             Assert.Less(Vec2.Distance(burst.Position, target.Position), 1.5f);
             Assert.Less(target.Health, Monsters.Shipped.Find("slime").Health);
             Assert.IsEmpty(bob.Projectiles());
+        }
+
+        [Test]
+        public void PlayersStartWithPotionsAndDrinkThemThroughTheHost()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var world = session.Host.World;
+            var potion = Gear.Data.FindConsumable("healing_potion");
+            session.Tick(2);
+
+            Assert.AreEqual(3, alice.Bag.CountOf(potion), "HostConfig.StarterConsumables");
+            Assert.AreSame(potion, alice.QuickConsumable);
+            Assert.IsNull(alice.UseConsumableCommand(potion), "nothing to heal at full health");
+
+            // A slime's hit, then a potion.
+            world.SpawnEnemy(Monsters.Shipped.Find("slime"), alice.Position + new Vec2(0.9f, 0));
+            for (int i = 0; i < World.TicksPerSecond && alice.Health >= alice.MaxHealth; i++) session.Tick();
+            Assert.Less(alice.Health, alice.MaxHealth);
+            session.Send(1, alice.UseConsumableCommand(potion));
+            Assert.IsNull(alice.UseConsumableCommand(potion), "the wait starts on screen at once");
+            var events = new List<SimEvent>();
+            for (int i = 0; i < 4; i++)
+            {
+                session.Tick();
+                events.AddRange(alice.TakeEvents());
+            }
+
+            Assert.AreEqual(2, alice.Bag.CountOf(potion));
+            Assert.Greater(alice.ConsumableCooldownLeft, 9);
+            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Healed && e.Source == alice.PlayerId));
+
+            world.DropConsumable(potion, alice.Position + new Vec2(3, 0));
+            // Others() lags the newest snapshot by the interpolation delay.
+            session.Tick(10);
+            Assert.AreSame(potion, alice.Others().Single(e => e.Kind == EntityKind.Drop).DropConsumable);
         }
 
         [Test]

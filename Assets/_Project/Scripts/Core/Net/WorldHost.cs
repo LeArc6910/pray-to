@@ -14,7 +14,7 @@ namespace Game.Core
         public int SnapshotInterval { get; set; } = 2;
         // Entities further than this from a player are left out of that player's snapshots.
         public float ViewRange { get; set; } = 22;
-        // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). With 41 bytes for
+        // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). With 43 bytes for
         // the header and the player's own state, 17 an entity or drop, 14 a projectile, 19 a hazard and 13 an event,
         // the maximum comes to about 1.19 KB.
         public int MaxEntitiesPerSnapshot { get; set; } = 20;
@@ -23,6 +23,8 @@ namespace Game.Core
         public int MaxHazardsPerSnapshot { get; set; } = 10;
         public int MaxEventsPerSnapshot { get; set; } = 14;
         public string[] StarterGear { get; set; } = { "copper_sword" };
+        // One entry per consumable handed out on joining. Ids the sheet does not have are skipped.
+        public string[] StarterConsumables { get; set; } = { "healing_potion", "healing_potion", "healing_potion" };
     }
 
     public readonly struct Outgoing
@@ -180,6 +182,11 @@ namespace Game.Core
             string name = string.IsNullOrWhiteSpace(join.Name) ? "플레이어" : join.Name.Trim();
             var classes = ClassRules.Choose(_classes, join.Classes, _config.MaxClasses);
             var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, equipment, classes.ToArray());
+            foreach (string id in _config.StarterConsumables)
+            {
+                var consumable = _loot.Consumables.FirstOrDefault(c => c.Id == id);
+                if (consumable != null) player.Inventory.AddConsumable(consumable);
+            }
             _connections[connection] = new Connection { Player = player };
 
             var map = _generated.Map;
@@ -198,7 +205,10 @@ namespace Game.Core
                     World.UnequipItem(player.Id, command.Slot);
                     break;
                 case InventoryCommand.InsertRune:
-                    if (command.Rune < _loot.Runes.Count) World.InsertRune(player.Id, command.Item, _loot.Runes[command.Rune]);
+                    if (command.Index < _loot.Runes.Count) World.InsertRune(player.Id, command.Item, _loot.Runes[command.Index]);
+                    break;
+                case InventoryCommand.UseConsumable:
+                    if (command.Index < _loot.Consumables.Count) World.UseConsumable(player.Id, _loot.Consumables[command.Index]);
                     break;
                 case InventoryCommand.Discard:
                     World.DiscardItem(player.Id, command.Item);
@@ -228,7 +238,8 @@ namespace Game.Core
                 viewer.Stats.MaxHealth,
                 viewer.Stats.MoveSpeed,
                 slots.Select(viewer.CooldownTicks).ToList(),
-                slots.Select(viewer.BuffTicks).ToList());
+                slots.Select(viewer.BuffTicks).ToList(),
+                viewer.ConsumableCooldown);
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, 0, p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p)));
             var bosses = World.Bosses
@@ -249,12 +260,12 @@ namespace Game.Core
                 .Select(l => new EntityState(
                     l.Id,
                     EntityKind.Drop,
-                    l.Item != null ? IndexOf(_loot.Bases, l.Item.Base) : IndexOf(_loot.Runes, l.Rune),
+                    l.Item != null ? IndexOf(_loot.Bases, l.Item.Base) : l.Rune != null ? IndexOf(_loot.Runes, l.Rune) : IndexOf(_loot.Consumables, l.Consumable),
                     l.Position,
                     Vec2.Zero,
                     0,
                     0,
-                    l.Item != null ? (byte)l.Item.Rarity : DropState.Rune));
+                    l.Item != null ? (byte)l.Item.Rarity : l.Rune != null ? DropState.Rune : DropState.Consumable));
             var entities = shownSoFar.Concat(enemies).Concat(drops).ToList();
 
             var projectiles = World.Projectiles

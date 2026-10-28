@@ -147,9 +147,20 @@ namespace Game.Client
         void ReadSkillPress()
         {
             var slots = Controls.TakeSkillPresses();
-            if (slots.Count == 0 || _inventory.Open || (_map != null && _map.FullOpen)) return;
+            bool potion = Controls.TakePotionPress();
+            if (_inventory.Open || (_map != null && _map.FullOpen)) return;
             var aim = Controls.SkillAim(_camera, _client.Position);
             foreach (int slot in slots) UseSkill(slot, aim);
+            if (potion) DrinkPotion();
+        }
+
+        // Also called by the play mode tests. False when there is none, it is still waiting or health is full.
+        internal bool DrinkPotion()
+        {
+            byte[] command = _client?.UseConsumableCommand(_client.QuickConsumable);
+            if (command == null) return false;
+            SendToHost(command);
+            return true;
         }
 
         void FixedTick()
@@ -282,8 +293,8 @@ namespace Game.Client
             if (_client.Status == ClientStatus.Playing && !(Controls.UsingTouch && _inventory.Open)) SkillBar.Draw(_client);
             _inventory?.Draw();
             // Bottom left, or above the skill buttons where they reach that far.
-            var skills = SkillBar.Bounds(_client.Skills.Count);
-            float bottom = skills.width > 0 && skills.x < 14 + 400 ? skills.y - 30 : Ui.Height - 40;
+            var slots = SkillBar.Bounds(_client.Skills.Count);
+            float bottom = slots.x < 14 + 400 ? slots.y - 30 : Ui.Height - 40;
             for (int i = 0; i < _acquired.Count; i++)
             {
                 var (text, age) = _acquired[i];
@@ -415,12 +426,12 @@ namespace Game.Client
             if (Controls.UsingTouch)
             {
                 lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로)");
-                lines.Add("오른쪽 아래 스킬 · 미니맵을 누르면 지도");
+                lines.Add("오른쪽 아래 스킬·물약 · 미니맵을 누르면 지도");
             }
             else
             {
                 lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격");
-                lines.Add("Q E R F 스킬 · Tab 가방 · M 지도 · Esc 메뉴");
+                lines.Add("Q E R F 스킬 · C 물약 · Tab 가방 · M 지도 · Esc 메뉴");
             }
 
             var box = GUI.skin.box;

@@ -41,8 +41,16 @@ namespace Game.Core
         // One per skill slot, in slot order.
         public IReadOnlyList<SkillDefinition> Skills { get; }
 
+        // Ticks until any consumable can be used again.
+        public int ConsumableCooldown { get; internal set; }
+
         internal int AttackCooldown { get; set; }
         internal int RespawnTicks { get; set; }
+        // Health still to come from a consumable: so much each tick, for so many ticks.
+        internal float HealPerTick { get; set; }
+        internal int HealTicks { get; set; }
+        // Counts up while the player is not hurt, to when resting starts to heal.
+        internal int RestingTicks { get; set; }
 
         // Ticks until the skill in the slot can be used again, and until the buff it put on runs out.
         public int CooldownTicks(int slot) => _cooldowns[slot];
@@ -160,6 +168,8 @@ namespace Game.Core
         SkillUsed,
         // The skill in slot Amount of Source, a player, burst at Position.
         Burst,
+        // Source, a player, drank or ate something that heals Amount over the next moments.
+        Healed,
     }
 
     public readonly struct SimEvent
@@ -304,12 +314,13 @@ namespace Game.Core
     // An item or a rune lying on the floor. Players pick it up by walking over it once ReadyTick has passed.
     public sealed class GroundLoot
     {
-        internal GroundLoot(int id, Vec2 position, Item item, RuneDefinition rune, long readyTick, long expireTick)
+        internal GroundLoot(int id, Vec2 position, Item item, RuneDefinition rune, long readyTick, long expireTick, ConsumableDefinition consumable = null)
         {
             Id = id;
             Position = position;
             Item = item;
             Rune = rune;
+            Consumable = consumable;
             ReadyTick = readyTick;
             ExpireTick = expireTick;
         }
@@ -319,6 +330,7 @@ namespace Game.Core
         // Exactly one of these is set.
         public Item Item { get; }
         public RuneDefinition Rune { get; }
+        public ConsumableDefinition Consumable { get; }
         public long ReadyTick { get; }
         public long ExpireTick { get; }
     }

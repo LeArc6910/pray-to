@@ -5,7 +5,7 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // The bag screen, opened with Tab or I: stats, worn gear, carried items and runes. Every button only asks the
+    // The bag screen, opened with Tab or I: stats, consumables, worn gear, carried items and runes. Every button only asks the
     // host for the change; the window redraws from the next inventory message.
     sealed class InventoryWindow
     {
@@ -62,6 +62,7 @@ namespace Game.Client
             GUILayout.Label(Controls.UsingTouch ? "가방 (가방 버튼으로 닫기)" : "가방 (Tab 또는 I로 닫기)");
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(area.height - TitleHeight));
             DrawStats();
+            DrawConsumables();
 
             GUILayout.Space(6);
             GUILayout.Label("착용");
@@ -150,6 +151,25 @@ namespace Game.Client
                 .Where(skill => skill.Damage > 0)
                 .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f:0.#}");
             GUILayout.Label($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}");
+        }
+
+        void DrawConsumables()
+        {
+            if (_client.Bag.Consumables.Count == 0) return;
+            GUILayout.Space(6);
+            float wait = _client.ConsumableCooldownLeft;
+            GUILayout.Label(wait > 0 ? $"소모품 (다시 마시기까지 {Mathf.CeilToInt(wait)}초)" : "소모품");
+            foreach (var pair in _client.Bag.Consumables.ToList())
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
+                if (GUILayout.Button("마시기", GUILayout.Width(56)))
+                {
+                    byte[] command = _client.UseConsumableCommand(pair.Key);
+                    if (command != null) _send(command);
+                }
+                GUILayout.EndHorizontal();
+            }
         }
 
         void ItemLabel(Item item)

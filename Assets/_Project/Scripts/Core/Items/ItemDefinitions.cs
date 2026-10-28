@@ -153,6 +153,33 @@ namespace Game.Core
         public IReadOnlyList<Modifier> ModifiersFor(SlotCategory category) => _modifiers[(int)category];
     }
 
+    // Something a player drinks or eats from the bag: it fills Heal percent of their maximum health over Seconds, and
+    // then every consumable waits Cooldown seconds. See Docs/Combat.md (healing) and Docs/Loot.md.
+    public sealed class ConsumableDefinition
+    {
+        internal ConsumableDefinition(string id, string name, int level, int heal, float seconds, float cooldown, int weight, string description)
+        {
+            Id = id;
+            Name = name;
+            Level = level;
+            Heal = heal;
+            Seconds = seconds;
+            Cooldown = cooldown;
+            Weight = weight;
+            Description = description;
+        }
+
+        public string Id { get; }
+        public string Name { get; }
+        public int Level { get; }
+        // Percent of maximum health.
+        public int Heal { get; }
+        public float Seconds { get; }
+        public float Cooldown { get; }
+        public int Weight { get; }
+        public string Description { get; }
+    }
+
     // Filling every socket of a Common item with exactly these runes, in this order, adds the runeword's bonus on
     // top of the runes' own stats. Only Common items qualify, so plain drops with sockets are worth picking up.
     public sealed class Runeword

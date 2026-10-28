@@ -7,7 +7,7 @@ using UnityEngine.InputSystem;
 namespace Game.Client
 {
     // Keyboard and mouse: WASD or arrow keys to move, the mouse to aim, left button or space to attack (held to keep
-    // swinging), Q E R F for the skill slots, M for the map. Touch: two sticks that appear where a finger lands. The
+    // swinging), Q E R F for the skill slots, C to drink a potion, M for the map. Touch: two sticks that appear where a finger lands. The
     // left half moves; the right half attacks for as long as it is held and aims where it is pulled. Pressed without
     // pulling, the attack goes where the player walks, or where they already face when standing still. Touches that
     // start on a UI button or window, which OnGUI marks with Block, are left to the UI; ones on a skill button, which
@@ -55,6 +55,9 @@ namespace Game.Client
         static readonly List<(Rect Area, int Slot)> _skillButtons = new List<(Rect, int)>();
         static readonly List<int> _skillTaps = new List<int>();
         static readonly Key[] SkillKeys = { Key.Q, Key.E, Key.R, Key.F };
+        const Key PotionKey = Key.C;
+        static readonly List<Rect> _potionButtons = new List<Rect>();
+        static bool _potionTapped;
         static readonly Predicate<int> Released = id => !Held(id);
         static readonly Stick _move = new Stick();
         static readonly Stick _aim = new Stick();
@@ -69,6 +72,7 @@ namespace Game.Client
         {
             // A tap not taken in the frame it landed (the session ended, say) is dropped, not saved for later.
             _skillTaps.Clear();
+            _potionTapped = false;
             _touches.Clear();
             var screen = Touchscreen.current;
             if (screen != null)
@@ -96,6 +100,7 @@ namespace Game.Client
             }
             _blocked.Clear();
             _skillButtons.Clear();
+            _potionButtons.Clear();
         }
 
         // Marks a UI area, in points, where new touches belong to the UI. Call from OnGUI.
@@ -108,6 +113,22 @@ namespace Game.Client
         public static void SkillButton(Rect area, int slot)
         {
             if (Event.current.type == EventType.Repaint) _skillButtons.Add((area, slot));
+        }
+
+        // Marks the potion button, in points. Call from OnGUI.
+        public static void PotionButton(Rect area)
+        {
+            if (Event.current.type == EventType.Repaint) _potionButtons.Add(area);
+        }
+
+        public const string PotionKeyName = "C";
+
+        // Whether the potion key was pressed or the potion button tapped this frame.
+        public static bool TakePotionPress()
+        {
+            bool pressed = _potionTapped || (Keyboard.current != null && Keyboard.current[PotionKey].wasPressedThisFrame);
+            _potionTapped = false;
+            return pressed;
         }
 
         // The key letter for a skill slot, for the skill bar.
@@ -194,6 +215,13 @@ namespace Game.Client
             {
                 if (!area.Contains(point)) continue;
                 _skillTaps.Add(slot);
+                _ignored.Add(id);
+                return;
+            }
+            foreach (var area in _potionButtons)
+            {
+                if (!area.Contains(point)) continue;
+                _potionTapped = true;
                 _ignored.Add(id);
                 return;
             }

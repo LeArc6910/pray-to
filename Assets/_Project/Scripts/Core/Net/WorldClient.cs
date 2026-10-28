@@ -28,7 +28,8 @@ namespace Game.Core
             byte state,
             int phase,
             ItemBase dropBase = null,
-            RuneDefinition dropRune = null)
+            RuneDefinition dropRune = null,
+            ConsumableDefinition dropConsumable = null)
         {
             Id = id;
             Kind = kind;
@@ -43,6 +44,7 @@ namespace Game.Core
             Phase = phase;
             DropBase = dropBase;
             DropRune = dropRune;
+            DropConsumable = dropConsumable;
         }
 
         public int Id { get; }
@@ -60,9 +62,10 @@ namespace Game.Core
         public EnemyState EnemyState => (EnemyState)State;
         public BossState BossState => (BossState)State;
         public int Phase { get; }
-        // For ground loot: the item's base and rarity, or the rune.
+        // For ground loot: the item's base and rarity, the rune, or the consumable.
         public ItemBase DropBase { get; }
         public RuneDefinition DropRune { get; }
+        public ConsumableDefinition DropConsumable { get; }
         public Rarity DropRarity => (Rarity)State;
         public bool IsDead => Health <= 0;
         public float Radius => Kind switch
@@ -132,6 +135,7 @@ namespace Game.Core
         readonly Dictionary<int, List<ClassDefinition>> _rosterClasses = new Dictionary<int, List<ClassDefinition>>();
         int[] _cooldowns = Array.Empty<int>();
         int[] _buffs = Array.Empty<int>();
+        int _consumableCooldown;
         // The host tick the cooldowns and buffs above were true at.
         double _skillsTick;
         int _sequence;
@@ -273,8 +277,9 @@ namespace Game.Core
                     shown.MaxHealth,
                     shown.State,
                     shown.Phase,
-                    entity.Kind == EntityKind.Drop && entity.State != DropState.Rune ? _loot.Bases[entity.Type] : null,
-                    entity.Kind == EntityKind.Drop && entity.State == DropState.Rune ? _loot.Runes[entity.Type] : null));
+                    entity.Kind == EntityKind.Drop && entity.State != DropState.Rune && entity.State != DropState.Consumable ? _loot.Bases[entity.Type] : null,
+                    entity.Kind == EntityKind.Drop && entity.State == DropState.Rune ? _loot.Runes[entity.Type] : null,
+                    entity.Kind == EntityKind.Drop && entity.State == DropState.Consumable ? _loot.Consumables[entity.Type] : null));
             }
             return views;
         }
@@ -360,7 +365,23 @@ namespace Game.Core
         public byte[] UnequipCommand(ItemSlot slot) => new InventoryCommandMessage(InventoryCommand.Unequip, 0, slot).Encode();
 
         public byte[] InsertRuneCommand(int itemId, RuneDefinition rune) =>
-            new InventoryCommandMessage(InventoryCommand.InsertRune, itemId, rune: ItemCodec.Index(_loot.Runes, rune)).Encode();
+            new InventoryCommandMessage(InventoryCommand.InsertRune, itemId, index: ItemCodec.Index(_loot.Runes, rune)).Encode();
+
+        // The message that drinks or eats one, or null when it plainly cannot be used: none in the bag, still waiting,
+        // or health already full. The wait starts on screen at once, like a skill's cooldown.
+        public byte[] UseConsumableCommand(ConsumableDefinition consumable)
+        {
+            if (Status != ClientStatus.Playing || _snapshots.Count == 0 || IsDead || consumable == null || Bag.CountOf(consumable) == 0) return null;
+            if (ConsumableCooldownLeft > 0 || Health >= MaxHealth) return null;
+            _consumableCooldown = World.Ticks(consumable.Cooldown) + (int)Math.Ceiling(HostTick - _skillsTick);
+            return new InventoryCommandMessage(InventoryCommand.UseConsumable, 0, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode();
+        }
+
+        // What the quick key and button use: the first consumable in the sheet that the bag has, or null.
+        public ConsumableDefinition QuickConsumable => _loot?.Consumables.FirstOrDefault(c => Bag.CountOf(c) > 0);
+
+        // Seconds until any consumable can be used again.
+        public float ConsumableCooldownLeft => (float)Math.Max(0, (_consumableCooldown - (HostTick - _skillsTick)) / World.TicksPerSecond);
 
         public byte[] DiscardCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.Discard, itemId).Encode();
 
@@ -382,6 +403,10 @@ namespace Game.Core
                     _acquired.Add($"획득: [{ItemText.RarityName(item.Rarity)}] {ItemText.Name(item)}");
                 }
                 foreach (var pair in message.Bag.Runes.Where(pair => pair.Value > Bag.CountOf(pair.Key)))
+                {
+                    _acquired.Add($"획득: {pair.Key.Name}");
+                }
+                foreach (var pair in message.Bag.Consumables.Where(pair => pair.Value > Bag.CountOf(pair.Key)))
                 {
                     _acquired.Add($"획득: {pair.Key.Name}");
                 }
@@ -435,7 +460,9 @@ namespace Game.Core
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Monster && e.Type >= _monsters.Monsters.Count))
                 throw new InvalidDataException("Snapshot names a monster this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Drop
-                && (_loot == null || e.Type >= (e.State == DropState.Rune ? _loot.Runes.Count : _loot.Bases.Count))))
+                && (_loot == null || e.Type >= (e.State == DropState.Rune ? _loot.Runes.Count
+                    : e.State == DropState.Consumable ? _loot.Consumables.Count
+                    : _loot.Bases.Count))))
                 throw new InvalidDataException("Snapshot names loot this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Boss && (_bosses == null || e.Type >= _bosses.Bosses.Count)))
                 throw new InvalidDataException("Snapshot names a boss this client does not know.");
@@ -455,6 +482,7 @@ namespace Game.Core
                 _cooldowns[slot] = self.Cooldowns[slot];
                 _buffs[slot] = self.Buffs[slot];
             }
+            _consumableCooldown = self.ConsumableCooldown;
             _skillsTick = snapshot.Tick;
             if (buffsChanged) RefreshStats();
             Health = self.Health;

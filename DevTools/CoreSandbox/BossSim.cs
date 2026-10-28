@@ -39,7 +39,7 @@ namespace CoreSandbox
                     equipment.Equip(generator.RollItem(itemBase, itemBase.Level, Rarity.Common, random));
                 }
                 var player = world.AddPlayer("bot" + (i + 1), equipment, classes);
-                bots.Add(new Bot { Player = player, Skills = new SkillBot(player) });
+                bots.Add(new Bot { Player = player, Skills = new SkillBot(player, loot) });
             }
 
             var toArena = new FlowField(world.Map);
@@ -57,7 +57,8 @@ namespace CoreSandbox
                 {
                     Drive(world, bot.Player, toArena, generated.Arena, reactionTicks, dodge);
                     var boss = world.Bosses.FirstOrDefault();
-                    if (boss != null) bot.Skills.Use(world, boss.Position, Vec2.Distance(boss.Position, boss.Home) <= boss.ArenaRadius && Vec2.Distance(bot.Player.Position, boss.Home) <= boss.ArenaRadius + 2);
+                    bool fighting = boss != null && Vec2.Distance(bot.Player.Position, boss.Home) <= boss.ArenaRadius + 2;
+                    bot.Skills.Use(world, boss?.Position ?? generated.Arena, fighting);
                 }
                 world.Step();
                 foreach (var e in world.TakeEvents())
@@ -91,7 +92,7 @@ namespace CoreSandbox
                 : $"처치 못 함 ({seconds}초, 보스를 깨운 횟수 {wakes})");
             Console.WriteLine("  페이즈 시작: " + string.Join(", ", phaseStarts.Select(p => $"{p.Phase}페이즈 {p.Seconds:0.0}초")));
             Console.WriteLine($"  보스에게 준 피해 {dealt}");
-            foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}, 준 피해 {bot.Skills.Summary()}");
+            foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}, 마신 물약 {bot.Skills.Drunk}개, 준 피해 {bot.Skills.Summary()}");
             Console.WriteLine("  받은 피해 출처:");
             foreach (var pair in takenByAttack.OrderByDescending(p => p.Value)) Console.WriteLine($"    {pair.Key,-8} {pair.Value}");
 

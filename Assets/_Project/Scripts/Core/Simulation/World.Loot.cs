@@ -7,7 +7,7 @@ namespace Game.Core
     // Drops and the bag. Monsters roll their drop chances when killed; bosses drop a guaranteed reward for
     // every player in the fight and raise ProgressLevel, so everything afterwards drops the next step of gear.
     // Loot lies on the floor until someone walks over it, and the commands below are how a player's client
-    // asks the host to change their gear.
+    // asks the host to change their gear or use a consumable.
     public sealed partial class World
     {
         const float PickupRadius = 0.6f;
@@ -34,6 +34,8 @@ namespace Game.Core
 
         public GroundLoot DropRune(RuneDefinition rune, Vec2 position) => Place(null, rune, position, Tick);
 
+        public GroundLoot DropConsumable(ConsumableDefinition consumable, Vec2 position) => Place(null, null, position, Tick, consumable);
+
         Item Register(Item item)
         {
             if (item.Id == 0) item.Id = _nextId++;
@@ -54,6 +56,19 @@ namespace Game.Core
                 var rune = _lootGenerator.RollRune(level, _random);
                 if (rune != null) DropRune(rune, Scatter(enemy.Position));
             }
+            // Only rolled for monsters that can drop one, so older sheets keep their random sequence.
+            if (definition.PotionChance > 0 && _random.Chance(definition.PotionChance / 100f))
+            {
+                var consumable = RollConsumable(level);
+                if (consumable != null) DropConsumable(consumable, Scatter(enemy.Position));
+            }
+        }
+
+        // One of the consumables that drop at this level, by weight; null when there are none.
+        ConsumableDefinition RollConsumable(int level)
+        {
+            var choices = Loot.Consumables.Where(c => c.Level <= level && c.Weight > 0).ToList();
+            return choices.Count == 0 ? null : _random.PickWeighted(choices, c => c.Weight);
         }
 
         void DropFrom(Boss boss)
@@ -72,6 +87,11 @@ namespace Game.Core
                 var rune = _lootGenerator.RollRune(definition.DropLevel, _random);
                 if (rune != null) DropRune(rune, Scatter(boss.Position, 2));
             }
+            for (int i = 0; i < definition.PotionCount * fighters; i++)
+            {
+                var consumable = RollConsumable(definition.DropLevel);
+                if (consumable != null) DropConsumable(consumable, Scatter(boss.Position, 2));
+            }
         }
 
         Vec2 Scatter(Vec2 origin, float spread = ScatterRadius)
@@ -80,9 +100,9 @@ namespace Game.Core
             return Collision.Resolve(Map, origin + offset, 0.2f);
         }
 
-        GroundLoot Place(Item item, RuneDefinition rune, Vec2 position, long readyTick)
+        GroundLoot Place(Item item, RuneDefinition rune, Vec2 position, long readyTick, ConsumableDefinition consumable = null)
         {
-            var loot = new GroundLoot(_nextId++, position, item, rune, readyTick, Tick + Ticks(LootSeconds));
+            var loot = new GroundLoot(_nextId++, position, item, rune, readyTick, Tick + Ticks(LootSeconds), consumable);
             _groundLoot.Add(loot);
             // The oldest goes first when the floor fills up.
             if (_groundLoot.Count > MaxGroundLoot) _groundLoot.RemoveAt(0);
@@ -102,6 +122,7 @@ namespace Game.Core
                     if (Tick < loot.ReadyTick || Vec2.Distance(loot.Position, player.Position) > PickupRadius + PlayerRadius) continue;
                     if (loot.Item != null && !player.Inventory.TryAdd(loot.Item)) continue;
                     if (loot.Rune != null) player.Inventory.AddRune(loot.Rune);
+                    if (loot.Consumable != null) player.Inventory.AddConsumable(loot.Consumable);
                     _groundLoot.RemoveAt(i--);
                     player.InventoryVersion++;
                     _events.Add(new SimEvent(SimEventType.Pickup, player.Id, loot.Id));
@@ -144,6 +165,24 @@ namespace Game.Core
             item.TryInsertRune(socket, rune, Loot?.Runewords ?? Array.Empty<Runeword>());
             if (worn) player.RefreshStats();
             player.InventoryVersion++;
+            return true;
+        }
+
+        // Drinks or eats one from the bag: it heals over its seconds, and then every consumable waits its cooldown.
+        // False when the player cannot: dead, none left, still waiting, or already at full health.
+        public bool UseConsumable(int playerId, ConsumableDefinition consumable)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || consumable == null || player.ConsumableCooldown > 0) return false;
+            if (player.Health >= player.Stats.MaxHealth || !player.Inventory.TakeConsumable(consumable)) return false;
+
+            int ticks = Ticks(consumable.Seconds);
+            float amount = player.Stats.MaxHealth * consumable.Heal / 100f;
+            player.HealPerTick = amount / ticks;
+            player.HealTicks = ticks;
+            player.ConsumableCooldown = Ticks(consumable.Cooldown);
+            player.InventoryVersion++;
+            _events.Add(new SimEvent(SimEventType.Healed, player.Id, amount: (int)MathF.Round(amount)));
             return true;
         }
 

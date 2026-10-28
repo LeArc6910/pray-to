@@ -23,7 +23,7 @@ namespace CoreSandbox
                 equipment.Equip(generator.RollItem(itemBase, itemBase.Level, Rarity.Common, random));
             }
             var player = world.AddPlayer("bot", equipment, classes);
-            var skills = new SkillBot(player);
+            var skills = new SkillBot(player, loot);
             var toEnemies = new FlowField(world.Map);
 
             int kills = 0, deaths = 0, dealt = 0, taken = 0, swings = 0, hits = 0;
@@ -32,7 +32,7 @@ namespace CoreSandbox
                 if (tick % 10 == 0) toEnemies.Build(world.Enemies.Select(e => e.Position), 64);
                 Drive(world, player, toEnemies, dodge);
                 var nearest = world.Enemies.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
-                if (nearest != null) skills.Use(world, nearest.Position, Vec2.Distance(nearest.Position, player.Position) < 8);
+                skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
                 world.Step();
                 foreach (var e in world.TakeEvents())
                 {
@@ -54,8 +54,8 @@ namespace CoreSandbox
             Console.WriteLine($"처치 {kills} (분당 {kills * 60.0 / seconds:0.0}), 사망 {deaths}");
             Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 기본 공격 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)");
             Console.WriteLine($"  나눠 보면: {skills.Summary()}");
-            Console.WriteLine($"받은 피해 {taken} (초당 {taken / (double)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}");
-            Console.WriteLine($"주운 것: 아이템 {player.Inventory.Items.Count}개, 룬 {player.Inventory.Runes.Values.Sum()}개 (바닥에 남은 것 {world.GroundLoot.Count}개)");
+            Console.WriteLine($"받은 피해 {taken} (초당 {taken / (double)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}, 마신 물약 {skills.Drunk}개");
+            Console.WriteLine($"주운 것: 아이템 {player.Inventory.Items.Count}개, 룬 {player.Inventory.Runes.Values.Sum()}개, 남은 물약 {player.Inventory.Consumables.Values.Sum()}개 (바닥에 남은 것 {world.GroundLoot.Count}개)");
             foreach (var item in player.Inventory.Items.Where(i => i.Rarity >= Rarity.Rare)) Console.WriteLine("  " + ItemText.Describe(item)[0]);
         }
 

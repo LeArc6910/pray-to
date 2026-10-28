@@ -5,22 +5,37 @@ using Game.Core;
 
 namespace CoreSandbox
 {
-    // How a bot uses its class skills: each one as soon as it is ready and worth using. Also credits damage to the
-    // basic attack or the skill that dealt it, from each hit's Cause (skill slot + 1, or 0).
+    // How a bot uses its class skills and potions: each skill as soon as it is ready and worth using, a potion when
+    // below half health. Starts with the potions a host hands out. Also credits damage to the basic attack or the
+    // skill that dealt it, from each hit's Cause (skill slot + 1, or 0).
     sealed class SkillBot
     {
         readonly Dictionary<string, int> _dealt = new Dictionary<string, int>();
         readonly Dictionary<string, int> _uses = new Dictionary<string, int>();
 
-        public SkillBot(Player player) { Player = player; }
+        public SkillBot(Player player, LootData loot)
+        {
+            Player = player;
+            foreach (string id in new HostConfig().StarterConsumables)
+            {
+                var consumable = loot.Consumables.FirstOrDefault(c => c.Id == id);
+                if (consumable != null) player.Inventory.AddConsumable(consumable);
+            }
+        }
 
         public Player Player { get; }
+        public int Drunk { get; private set; }
 
         // target is what the bot is fighting; fighting says whether it is close enough to bother.
         public void Use(World world, Vec2 target, bool fighting)
         {
             var player = Player;
             if (player.IsDead) return;
+            if (player.Health < player.Stats.MaxHealth / 2)
+            {
+                var potion = player.Inventory.Consumables.Keys.FirstOrDefault();
+                if (potion != null) world.UseConsumable(player.Id, potion);
+            }
             var toTarget = target - player.Position;
             for (int slot = 0; slot < player.Skills.Count; slot++)
             {
@@ -45,6 +60,9 @@ namespace CoreSandbox
                 case SimEventType.SkillUsed:
                     string used = Player.Skills[e.Amount].Name;
                     _uses[used] = _uses.GetValueOrDefault(used) + 1;
+                    break;
+                case SimEventType.Healed:
+                    Drunk++;
                     break;
                 case SimEventType.Hit:
                     string by = e.Cause == 0 ? "기본 공격" : Player.Skills[e.Cause - 1].Name;

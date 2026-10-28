@@ -42,7 +42,8 @@ namespace Game.Core.Tests
                 Read(LootSheets.BasesFile),
                 Read(LootSheets.AffixesFile),
                 Read(LootSheets.RunesFile),
-                Read(LootSheets.RunewordsFile));
+                Read(LootSheets.RunewordsFile),
+                Read(LootSheets.ConsumablesFile));
         }
     }
 
@@ -165,8 +166,8 @@ namespace Game.Core.Tests
         public const string Runewords = RunewordsHeader +
             "storm,폭풍,weapon,wind|ember,Lightning:Damage+40%\n";
 
-        public static LootData Parse(string bases = Bases, string affixes = Affixes, string runes = Runes, string runewords = Runewords) =>
-            LootSheets.Parse(bases, affixes, runes, runewords);
+        public static LootData Parse(string bases = Bases, string affixes = Affixes, string runes = Runes, string runewords = Runewords, string consumables = "") =>
+            LootSheets.Parse(bases, affixes, runes, runewords, consumables);
 
         public static void AssertError(LootData data, params string[] parts)
         {

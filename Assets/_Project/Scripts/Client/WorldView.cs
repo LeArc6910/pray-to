@@ -270,19 +270,20 @@ namespace Game.Client
             foreach (int id in _gone) _drops.Remove(id);
         }
 
-        // Loot is a small diamond in its rarity's colour, or an orange dot for a rune.
+        // Loot is a small diamond in its rarity's colour, an orange dot for a rune or a pink dot for a potion.
         void DrawDrop(EntityView view)
         {
             if (!_drops.ContainsKey(view.Id))
             {
-                bool rune = view.DropRune != null;
-                var color = rune ? Palette.Rune : Palette.Of(view.DropRarity);
-                var renderer = Renderer(_root.transform, "Drop", rune ? Shapes.Circle : Shapes.Square, color);
-                renderer.transform.localScale = Vector3.one * (rune ? 0.32f : 0.3f);
-                renderer.transform.localRotation = Quaternion.Euler(0, 0, rune ? 0 : 45);
+                bool round = view.DropRune != null || view.DropConsumable != null;
+                var color = view.DropRune != null ? Palette.Rune : view.DropConsumable != null ? Palette.Potion : Palette.Of(view.DropRarity);
+                string name = view.DropRune?.Name ?? view.DropConsumable?.Name ?? view.DropBase.Name;
+                var renderer = Renderer(_root.transform, "Drop", round ? Shapes.Circle : Shapes.Square, color);
+                renderer.transform.localScale = Vector3.one * (round ? 0.32f : 0.3f);
+                renderer.transform.localRotation = Quaternion.Euler(0, 0, round ? 0 : 45);
                 renderer.transform.localPosition = new Vector3(view.Position.X, view.Position.Y, 0);
                 renderer.sortingOrder = -10;
-                _drops[view.Id] = (renderer, rune ? view.DropRune.Name : view.DropBase.Name, color);
+                _drops[view.Id] = (renderer, name, color);
             }
         }
 
@@ -451,6 +452,12 @@ namespace Game.Client
                     break;
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
+                    break;
+                case SimEventType.Healed:
+                    var drinker = Find(e.Source);
+                    if (drinker == null) break;
+                    _floating.Add(new Floating { Position = drinker.Position, Text = "+" + e.Amount, Color = Palette.Heal });
+                    AddFlash(drinker.Position, drinker.Diameter, Palette.Heal, Shapes.Ring);
                     break;
                 case SimEventType.Burst:
                     var burst = _client.SkillOf(e.Source, e.Amount);

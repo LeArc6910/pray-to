@@ -84,38 +84,39 @@ namespace Game.Core
         Unequip,
         InsertRune,
         Discard,
+        UseConsumable,
     }
 
-    // A player asking the host to change their gear. Item is an item id; Slot and Rune are used by Unequip and
-    // InsertRune (Rune is an index into the rune sheet).
+    // A player asking the host to change their gear or use a consumable. Item is an item id; Slot is used by
+    // Unequip; Index is the rune sheet index for InsertRune and the consumable sheet index for UseConsumable.
     public sealed class InventoryCommandMessage
     {
-        public InventoryCommandMessage(InventoryCommand command, int item, ItemSlot slot = ItemSlot.Weapon, int rune = 0)
+        public InventoryCommandMessage(InventoryCommand command, int item, ItemSlot slot = ItemSlot.Weapon, int index = 0)
         {
             Command = command;
             Item = item;
             Slot = slot;
-            Rune = rune;
+            Index = index;
         }
 
         public InventoryCommand Command { get; }
         public int Item { get; }
         public ItemSlot Slot { get; }
-        public int Rune { get; }
+        public int Index { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.InventoryCommand, w =>
         {
             w.Write((byte)Command);
             w.Write(Item);
             w.Write((byte)Slot);
-            w.Write((byte)Rune);
+            w.Write((byte)Index);
         });
 
         public static InventoryCommandMessage Decode(byte[] data) => Protocol.Read(data, MessageType.InventoryCommand, r =>
             new InventoryCommandMessage((InventoryCommand)r.ReadByte(), r.ReadInt32(), (ItemSlot)r.ReadByte(), r.ReadByte()));
     }
 
-    // Everything a player carries: what they wear, their bag and their runes. Sent whenever any of it changes.
+    // Everything a player carries: what they wear, their bag, runes and consumables. Sent whenever any of it changes.
     public sealed class InventoryMessage
     {
         public InventoryMessage(Equipment equipment, Inventory bag)
@@ -146,6 +147,14 @@ namespace Game.Core
                 w.Write((byte)ItemCodec.Index(data.Runes, pair.Key));
                 w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
             }
+
+            var consumables = Bag.Consumables.OrderBy(pair => ItemCodec.Index(data.Consumables, pair.Key)).ToList();
+            w.Write((byte)consumables.Count);
+            foreach (var pair in consumables)
+            {
+                w.Write((byte)ItemCodec.Index(data.Consumables, pair.Key));
+                w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
+            }
         });
 
         public static InventoryMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Inventory, r =>
@@ -172,6 +181,14 @@ namespace Game.Core
                 int index = r.ReadByte();
                 if (index >= loot.Runes.Count) throw new InvalidDataException("Unknown rune.");
                 bag.AddRune(loot.Runes[index], r.ReadUInt16());
+            }
+
+            int consumableKinds = r.ReadByte();
+            for (int i = 0; i < consumableKinds; i++)
+            {
+                int index = r.ReadByte();
+                if (index >= loot.Consumables.Count) throw new InvalidDataException("Unknown consumable.");
+                bag.AddConsumable(loot.Consumables[index], r.ReadUInt16());
             }
             return new InventoryMessage(equipment, bag);
         });

@@ -37,6 +37,9 @@ namespace Game.Core
         // Reach is measured from the player's position when the swing started; give a little slack for
         // the enemy and player having moved during the wind-up.
         const float StrikeSlack = 0.2f;
+        // A player who has not been hurt for this long heals this percent of their maximum health a second.
+        const float RestDelaySeconds = 6;
+        const float RestHealPercent = 3;
 
         readonly List<Player> _players = new List<Player>();
         readonly List<Enemy> _enemies = new List<Enemy>();
@@ -149,6 +152,7 @@ namespace Game.Core
         void UpdatePlayer(Player player)
         {
             player.TickSkills();
+            if (player.ConsumableCooldown > 0) player.ConsumableCooldown--;
             if (player.IsDead)
             {
                 if (--player.RespawnTicks > 0) return;
@@ -158,7 +162,7 @@ namespace Game.Core
                 return;
             }
 
-            player.Health = Math.Min(player.Stats.MaxHealth, player.Health + player.Stats.HealthRegen * TickSeconds);
+            Heal(player);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
             if (player.Attacking && player.AttackCooldown == 0) Attack(player);
         }
@@ -279,16 +283,36 @@ namespace Game.Core
             }
         }
 
+        // Gear's regeneration always, resting once the player has gone unhurt for a while, and whatever a consumable
+        // still has to give. See Docs/Combat.md (healing).
+        void Heal(Player player)
+        {
+            float perSecond = player.Stats.HealthRegen;
+            int restTicks = Ticks(RestDelaySeconds);
+            if (player.RestingTicks < restTicks) player.RestingTicks++;
+            else perSecond += player.Stats.MaxHealth * RestHealPercent / 100f;
+
+            float amount = perSecond * TickSeconds;
+            if (player.HealTicks > 0)
+            {
+                amount += player.HealPerTick;
+                player.HealTicks--;
+            }
+            player.Health = Math.Min(player.Stats.MaxHealth, player.Health + amount);
+        }
+
         void HurtPlayer(Player player, int source, float damage, int cause = 0)
         {
             if (player.IsDead) return;
             int amount = Combat.Mitigate(damage, player.Stats.Armor);
             player.Health -= amount;
+            player.RestingTicks = 0;
             _events.Add(new SimEvent(SimEventType.Hit, source, player.Id, amount, cause: cause));
             if (!player.IsDead) return;
 
             player.Health = 0;
             player.Attacking = false;
+            player.HealTicks = 0;
             player.ClearBuffs();
             player.RespawnTicks = Ticks(_config.RespawnSeconds);
             _events.Add(new SimEvent(SimEventType.Died, player.Id));

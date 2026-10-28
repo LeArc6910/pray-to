@@ -70,6 +70,7 @@ namespace UnityEngine.InputSystem
         E,
         R,
         F,
+        C,
         A,
         D,
         S,

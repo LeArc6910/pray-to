@@ -21,7 +21,8 @@ namespace Game.Core
             float cooldown,
             int weight,
             float dropChance,
-            float runeChance)
+            float runeChance,
+            float potionChance)
         {
             Id = id;
             Name = name;
@@ -38,6 +39,7 @@ namespace Game.Core
             Weight = weight;
             DropChance = dropChance;
             RuneChance = runeChance;
+            PotionChance = potionChance;
         }
 
         public string Id { get; }
@@ -59,9 +61,10 @@ namespace Game.Core
         // Seconds after an attack before it chases again.
         public float Cooldown { get; }
         public int Weight { get; }
-        // Percent chance to drop an item, and separately a rune, when killed.
+        // Percent chance to drop an item, and separately a rune and a consumable, when killed.
         public float DropChance { get; }
         public float RuneChance { get; }
+        public float PotionChance { get; }
     }
 
     public sealed class MonsterData
@@ -131,7 +134,8 @@ namespace Game.Core
                         SheetValues.ParseDecimal(row["cooldown"], "cooldown"),
                         SheetValues.ParseNumber(row["weight"], "weight"),
                         Percent(row, "drop_chance"),
-                        Percent(row, "rune_chance")));
+                        Percent(row, "rune_chance"),
+                        Percent(row, "potion_chance")));
                 }
                 catch (FormatException e)
                 {

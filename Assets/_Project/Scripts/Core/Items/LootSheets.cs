@@ -11,12 +11,14 @@ namespace Game.Core
             IReadOnlyList<Affix> affixes,
             IReadOnlyList<RuneDefinition> runes,
             IReadOnlyList<Runeword> runewords,
+            IReadOnlyList<ConsumableDefinition> consumables,
             IReadOnlyList<string> errors)
         {
             Bases = bases;
             Affixes = affixes;
             Runes = runes;
             Runewords = runewords;
+            Consumables = consumables;
             Errors = errors;
         }
 
@@ -24,6 +26,7 @@ namespace Game.Core
         public IReadOnlyList<Affix> Affixes { get; }
         public IReadOnlyList<RuneDefinition> Runes { get; }
         public IReadOnlyList<Runeword> Runewords { get; }
+        public IReadOnlyList<ConsumableDefinition> Consumables { get; }
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;
 
@@ -35,6 +38,9 @@ namespace Game.Core
 
         public RuneDefinition FindRune(string id) =>
             Runes.FirstOrDefault(r => r.Id == id) ?? throw new ArgumentException($"Unknown rune '{id}'.", nameof(id));
+
+        public ConsumableDefinition FindConsumable(string id) =>
+            Consumables.FirstOrDefault(c => c.Id == id) ?? throw new ArgumentException($"Unknown consumable '{id}'.", nameof(id));
     }
 
     // Reads the loot sheets in Assets/_Project/Data/Loot (columns and syntax in Docs/Loot.md). A bad row is skipped
@@ -45,17 +51,20 @@ namespace Game.Core
         public const string AffixesFile = "affixes.csv";
         public const string RunesFile = "runes.csv";
         public const string RunewordsFile = "runewords.csv";
+        public const string ConsumablesFile = "consumables.csv";
 
         const int MaxSockets = 6;
 
-        public static LootData Parse(string basesCsv, string affixesCsv, string runesCsv, string runewordsCsv)
+        // Without a consumables sheet there are no consumables.
+        public static LootData Parse(string basesCsv, string affixesCsv, string runesCsv, string runewordsCsv, string consumablesCsv = "")
         {
             var errors = new List<string>();
             var bases = ParseBases(basesCsv, errors);
             var affixes = ParseAffixes(affixesCsv, errors);
             var runes = ParseRunes(runesCsv, errors);
             var runewords = ParseRunewords(runewordsCsv, runes, bases, errors);
-            return new LootData(bases, affixes, runes, runewords, errors);
+            var consumables = ParseConsumables(consumablesCsv, errors);
+            return new LootData(bases, affixes, runes, runewords, consumables, errors);
         }
 
         static List<ItemBase> ParseBases(string csv, List<string> errors)
@@ -155,6 +164,35 @@ namespace Game.Core
                 });
             }
             return runes;
+        }
+
+        static List<ConsumableDefinition> ParseConsumables(string csv, List<string> errors)
+        {
+            var consumables = new List<ConsumableDefinition>();
+            if (string.IsNullOrWhiteSpace(csv)) return consumables;
+            var table = Read(csv, ConsumablesFile, errors, "id", "name", "level", "heal", "seconds", "cooldown", "weight", "description");
+            if (table == null) return consumables;
+
+            foreach (var row in table.Rows)
+            {
+                TryRow(ConsumablesFile, row, errors, () =>
+                {
+                    int heal = SheetValues.ParseNumber(row["heal"], "heal");
+                    if (heal < 1 || heal > 100) throw new FormatException("heal은 1~100(최대 생명력의 %)이어야 합니다.");
+                    float cooldown = SheetValues.ParseDecimal(row["cooldown"], "cooldown");
+                    if (cooldown <= 0) throw new FormatException("cooldown은 0보다 커야 합니다.");
+                    consumables.Add(new ConsumableDefinition(
+                        NewId(row, consumables.Select(c => c.Id)),
+                        Required(row, "name"),
+                        Level(row),
+                        heal,
+                        SheetValues.ParseDecimal(row["seconds"], "seconds"),
+                        cooldown,
+                        SheetValues.ParseNumber(row["weight"], "weight"),
+                        row["description"]));
+                });
+            }
+            return consumables;
         }
 
         static List<Runeword> ParseRunewords(string csv, List<RuneDefinition> runes, List<ItemBase> bases, List<string> errors)

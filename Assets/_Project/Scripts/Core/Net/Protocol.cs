@@ -24,7 +24,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.6.0";
+        public const string Version = "0.7.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -285,6 +285,8 @@ namespace Game.Core
     public static class DropState
     {
         public const byte Rune = 255;
+        // Type is then the consumable's index.
+        public const byte Consumable = 254;
     }
 
     // Positions travel as 1/64 of a tile in 16 bits and health as whole numbers, to keep a snapshot in one packet.
@@ -372,7 +374,15 @@ namespace Game.Core
     // What only the receiving player needs about themselves.
     public readonly struct SelfState
     {
-        public SelfState(int corrections, Vec2 position, float health, float maxHealth, float moveSpeed, IReadOnlyList<int> cooldowns = null, IReadOnlyList<int> buffs = null)
+        public SelfState(
+            int corrections,
+            Vec2 position,
+            float health,
+            float maxHealth,
+            float moveSpeed,
+            IReadOnlyList<int> cooldowns = null,
+            IReadOnlyList<int> buffs = null,
+            int consumableCooldown = 0)
         {
             Corrections = corrections;
             Position = position;
@@ -381,6 +391,7 @@ namespace Game.Core
             MoveSpeed = moveSpeed;
             Cooldowns = cooldowns ?? Array.Empty<int>();
             Buffs = buffs ?? Array.Empty<int>();
+            ConsumableCooldown = consumableCooldown;
         }
 
         public int Corrections { get; }
@@ -391,6 +402,8 @@ namespace Game.Core
         // Per skill slot: ticks until it is ready, and until the buff it put on runs out.
         public IReadOnlyList<int> Cooldowns { get; }
         public IReadOnlyList<int> Buffs { get; }
+        // Ticks until any consumable can be used again.
+        public int ConsumableCooldown { get; }
         public bool IsDead => Health <= 0;
     }
 
@@ -433,6 +446,7 @@ namespace Game.Core
                 w.Write(Protocol.Ticks(Self.Cooldowns[slot]));
                 w.Write(Protocol.Ticks(slot < Self.Buffs.Count ? Self.Buffs[slot] : 0));
             }
+            w.Write(Protocol.Ticks(Self.ConsumableCooldown));
 
             w.Write((ushort)Entities.Count);
             foreach (var entity in Entities)
@@ -502,7 +516,7 @@ namespace Game.Core
                 cooldowns.Add(r.ReadUInt16());
                 buffs.Add(r.ReadUInt16());
             }
-            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs);
+            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, r.ReadUInt16());
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);

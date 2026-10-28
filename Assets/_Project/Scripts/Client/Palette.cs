@@ -6,6 +6,8 @@ namespace Game.Client
     static class Palette
     {
         public static readonly Color Rune = new Color(1f, 0.65f, 0.3f);
+        public static readonly Color Potion = new Color(0.95f, 0.35f, 0.45f);
+        public static readonly Color Heal = new Color(0.45f, 1f, 0.5f);
 
         public static Color Of(Rarity rarity) => rarity switch
         {

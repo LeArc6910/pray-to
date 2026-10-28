@@ -13,6 +13,7 @@ namespace Game.Client
         public TextAsset affixes;
         public TextAsset runes;
         public TextAsset runewords;
+        public TextAsset consumables;
         public TextAsset monsters;
         public TextAsset bosses;
         public TextAsset bossAttacks;
@@ -21,7 +22,7 @@ namespace Game.Client
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
-        public LootData LoadLoot() => LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords));
+        public LootData LoadLoot() => LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables));
 
         public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
 
