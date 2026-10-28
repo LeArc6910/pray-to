@@ -151,7 +151,7 @@ DevTools/Local/setup.sh --commit
 전사와 화염 마법사를 자유롭게 섞어 고르고(지금은 최대 2개), 스킬 넷을 쓴다(`Docs/Classes.md`, `CLOUD_LOG.md`). 푸시되면 웹 데모가 저절로 다시 배포된다.
 
 - [ ] (로컬 세션) `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행. 새 스크립트(`ClassSheet.cs`, `World.Skills.cs`, `SkillBar.cs`, `ClassTests.cs`)와 새 폴더 `Data/Classes`(`classes.csv`, `skills.csv`)의 `.meta`가 생기고, `GameSheets.asset`에 두 시트가 들어가 커밋된다. PlayMode 테스트 `EverySkillCanBeUsed`가 새로 돈다
-- [ ] (클라우드가 확인) 이번 푸시의 Web demo
+- [x] (클라우드가 확인) 이번 푸시의 Web demo: 한 번에 성공, 20:33 배포(https://github.com/LeArc6910/pray-to/actions/runs/40679167188 )
 - [ ] (사람, PC나 휴대폰) https://learc6910.github.io/pray-to/ 나 에디터에서
   - 메뉴에 클래스가 [1] 전사, [2] 화염 마법사로 골라져 있는지. 눌러서 빼고 다시 넣으면 번호(스킬 칸 순서)가 바뀌는지. 화면이 넓으면 메뉴 오른쪽에, 좁으면 아래에 나오고, 휴대폰 가로 화면에서 잘리면 끌어서 내릴 수 있는지
   - PC는 화면 아래 가운데 Q E R F 칸, 휴대폰은 오른쪽 아래 2×2 버튼. 누르면 스킬이 나가고 칸이 어두워지며 남은 초가 줄어드는지. PC에서 칸에 마우스를 올리면 설명이 뜨는지
