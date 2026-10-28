@@ -36,6 +36,7 @@ namespace Game.Client
         MonsterData _monsters;
         BossData _bosses;
         ClassData _classes;
+        TileData _tiles;
         // Class ids in the order picked; the first one's skills take the first slots. Both to start with, so a new
         // player sees what mixing does.
         readonly List<string> _chosenClasses = new List<string> { "warrior", "fire_mage" };
@@ -74,11 +75,13 @@ namespace Game.Client
             _monsters = sheets.LoadMonsters();
             _bosses = sheets.LoadBosses(_monsters);
             _classes = sheets.LoadClasses();
+            _tiles = sheets.LoadTiles(_loot);
             _chosenClasses.RemoveAll(id => !_classes.Classes.Any(c => c.Id == id));
             var errors = new List<string>(_loot.Errors);
             errors.AddRange(_monsters.Errors);
             errors.AddRange(_bosses.Errors);
             errors.AddRange(_classes.Errors);
+            errors.AddRange(_tiles.Errors);
             if (errors.Count > 0) _status = "데이터 시트 오류:\n" + string.Join("\n", errors);
         }
 
@@ -131,6 +134,9 @@ namespace Game.Client
             _view ??= new WorldView(_client, _camera);
             _map ??= new MapView(_client);
             _client.AdvanceRenderClock(Time.deltaTime);
+            var changedTiles = _client.TakeChangedTiles();
+            _view.UpdateTiles(changedTiles);
+            _map.UpdateTiles(changedTiles);
             _view.Render(_tickClock / World.TickSeconds, Time.deltaTime);
             _map.Update();
 
@@ -221,7 +227,7 @@ namespace Game.Client
             }
 
             ulong seed = (ulong)DateTime.UtcNow.Ticks;
-            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes);
+            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles);
             _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses);
             _inventory = new InventoryWindow(_client, SendToHost);
             _host.Receive(LocalConnection, _client.JoinMessage());
@@ -346,7 +352,7 @@ namespace Game.Client
             GUILayout.Space(8);
 
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
-                && _classes != null && _classes.Success;
+                && _classes != null && _classes.Success && _tiles != null && _tiles.Success;
             GUI.enabled = ready;
             if (GUILayout.Button("혼자 하기")) StartSolo();
             if (Application.platform == RuntimePlatform.WebGLPlayer)
@@ -425,12 +431,12 @@ namespace Game.Client
             }
             if (Controls.UsingTouch)
             {
-                lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로)");
+                lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로, 벽이면 캔다)");
                 lines.Add("오른쪽 아래 스킬·물약 · 미니맵을 누르면 지도");
             }
             else
             {
-                lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격");
+                lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격(벽이면 캔다)");
                 lines.Add("Q E R F 스킬 · C 물약 · Tab 가방 · M 지도 · Esc 메뉴");
             }
 

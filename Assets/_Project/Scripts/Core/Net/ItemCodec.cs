@@ -85,10 +85,13 @@ namespace Game.Core
         InsertRune,
         Discard,
         UseConsumable,
+        Craft,
+        Place,
     }
 
-    // A player asking the host to change their gear or use a consumable. Item is an item id; Slot is used by
-    // Unequip; Index is the rune sheet index for InsertRune and the consumable sheet index for UseConsumable.
+    // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
+    // used by Unequip; Index is a sheet index: the rune for InsertRune, the consumable for UseConsumable, the
+    // recipe for Craft and the material for Place.
     public sealed class InventoryCommandMessage
     {
         public InventoryCommandMessage(InventoryCommand command, int item, ItemSlot slot = ItemSlot.Weapon, int index = 0)
@@ -116,7 +119,8 @@ namespace Game.Core
             new InventoryCommandMessage((InventoryCommand)r.ReadByte(), r.ReadInt32(), (ItemSlot)r.ReadByte(), r.ReadByte()));
     }
 
-    // Everything a player carries: what they wear, their bag, runes and consumables. Sent whenever any of it changes.
+    // Everything a player carries: what they wear, their bag, runes, consumables and materials. Sent whenever any of
+    // it changes.
     public sealed class InventoryMessage
     {
         public InventoryMessage(Equipment equipment, Inventory bag)
@@ -155,6 +159,14 @@ namespace Game.Core
                 w.Write((byte)ItemCodec.Index(data.Consumables, pair.Key));
                 w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
             }
+
+            var materials = Bag.Materials.OrderBy(pair => ItemCodec.Index(data.Materials, pair.Key)).ToList();
+            w.Write((byte)materials.Count);
+            foreach (var pair in materials)
+            {
+                w.Write((byte)ItemCodec.Index(data.Materials, pair.Key));
+                w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
+            }
         });
 
         public static InventoryMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Inventory, r =>
@@ -189,6 +201,14 @@ namespace Game.Core
                 int index = r.ReadByte();
                 if (index >= loot.Consumables.Count) throw new InvalidDataException("Unknown consumable.");
                 bag.AddConsumable(loot.Consumables[index], r.ReadUInt16());
+            }
+
+            int materialKinds = r.ReadByte();
+            for (int i = 0; i < materialKinds; i++)
+            {
+                int index = r.ReadByte();
+                if (index >= loot.Materials.Count) throw new InvalidDataException("Unknown material.");
+                bag.AddMaterial(loot.Materials[index], r.ReadUInt16());
             }
             return new InventoryMessage(equipment, bag);
         });

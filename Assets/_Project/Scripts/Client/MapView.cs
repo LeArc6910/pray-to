@@ -56,6 +56,18 @@ namespace Game.Client
 
         public void Dispose() => Object.Destroy(_texture);
 
+        // Redraws dug or built tiles that have already been explored.
+        public void UpdateTiles(IEnumerable<TileChange> changes)
+        {
+            foreach (var change in changes)
+            {
+                int index = change.Y * _map.Width + change.X;
+                if (!_explored[index]) continue;
+                _pixels[index] = TileColor(change.X, change.Y);
+                _dirty = true;
+            }
+        }
+
         // Once per frame: reveals the tiles around the player and notes where the other players are.
         public void Update()
         {
@@ -164,6 +176,8 @@ namespace Game.Client
 
         Color32 TileColor(int x, int y)
         {
+            if (_map[x, y] == TileType.CopperOre) return Palette.CopperOre;
+            if (_map[x, y] == TileType.IronOre) return Palette.IronOre;
             if (_map.IsSolid(x, y)) return Wall;
             return Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius ? ArenaFloor : Floor;
         }

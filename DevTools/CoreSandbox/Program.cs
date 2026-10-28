@@ -193,7 +193,9 @@ namespace CoreSandbox
                 Read(LootSheets.AffixesFile),
                 Read(LootSheets.RunesFile),
                 Read(LootSheets.RunewordsFile),
-                Read(LootSheets.ConsumablesFile));
+                Read(LootSheets.ConsumablesFile),
+                Read(LootSheets.MaterialsFile),
+                Read(LootSheets.RecipesFile));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

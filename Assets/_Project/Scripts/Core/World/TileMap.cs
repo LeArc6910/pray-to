@@ -2,10 +2,28 @@ using System;
 
 namespace Game.Core
 {
+    // Everything but floor is solid. Which solid tiles can be dug, and what they give, is in tiles.csv.
     public enum TileType : byte
     {
         Floor,
         Wall,
+        CopperOre,
+        IronOre,
+    }
+
+    // One tile that is no longer what the seed made it: dug out or built on.
+    public readonly struct TileChange
+    {
+        public TileChange(int x, int y, TileType type)
+        {
+            X = x;
+            Y = y;
+            Type = type;
+        }
+
+        public int X { get; }
+        public int Y { get; }
+        public TileType Type { get; }
     }
 
     public sealed class TileMap
@@ -38,7 +56,10 @@ namespace Game.Core
 
         public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
-        public bool IsSolid(int x, int y) => this[x, y] == TileType.Wall;
+        public bool IsSolid(int x, int y) => this[x, y] != TileType.Floor;
+
+        // The outermost ring, which nobody can dig through.
+        public bool IsEdge(int x, int y) => x <= 0 || y <= 0 || x >= Width - 1 || y >= Height - 1;
 
         public static int Cell(float coordinate) => (int)MathF.Floor(coordinate);
 

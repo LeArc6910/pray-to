@@ -46,6 +46,9 @@ namespace Game.Client
 
         public static Tile WallTile() => MakeTile(new Color32(104, 90, 76, 255), new Color32(132, 116, 98, 255), raised: true);
 
+        // Ore veins: rock with flecks in the ore's colour, so they stand out in a wall.
+        public static Tile OreTile(Color32 ore) => MakeTile(new Color32(104, 90, 76, 255), ore, raised: true, flecks: true);
+
         // The boss arena's floor, darker and redder so it reads as a different place.
         public static Tile ArenaTile() => MakeTile(new Color32(52, 34, 34, 255), new Color32(64, 42, 40, 255), raised: false);
 
@@ -76,8 +79,9 @@ namespace Game.Client
             return Sprite.Create(texture, new Rect(0, 0, Size, Size), new Vector2(0.5f, 0.5f), Size);
         }
 
-        // A 16-pixel tile with a speckled face. Walls get a lighter top edge so they read as raised.
-        static Tile MakeTile(Color32 dark, Color32 light, bool raised)
+        // A 16-pixel tile with a speckled face. Walls get a lighter top edge so they read as raised. Flecks are
+        // bigger, denser specks, for ore.
+        static Tile MakeTile(Color32 dark, Color32 light, bool raised, bool flecks = false)
         {
             const int tileSize = 16;
             var pixels = new Color32[tileSize * tileSize];
@@ -85,7 +89,7 @@ namespace Game.Client
             {
                 for (int x = 0; x < tileSize; x++)
                 {
-                    bool speck = ((x * 7 + y * 13) % 11) == 0;
+                    bool speck = flecks ? ((x / 2 * 5 + y / 2 * 3) % 4) == 0 : ((x * 7 + y * 13) % 11) == 0;
                     bool top = raised && y >= tileSize - 3;
                     pixels[y * tileSize + x] = top || speck ? light : dark;
                 }

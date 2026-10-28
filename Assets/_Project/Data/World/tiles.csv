@@ -1,0 +1,4 @@
+tile,name,hardness,material,count
+Wall,돌벽,3,stone,1
+CopperOre,구리 광맥,5,copper_ore,1
+IronOre,철 광맥,8,iron_ore,1

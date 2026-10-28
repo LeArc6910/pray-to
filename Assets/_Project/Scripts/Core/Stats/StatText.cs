@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
@@ -52,6 +53,16 @@ namespace Game.Core
                     string unit = IsPercentPoint(modifier.Stat) ? "%" : "";
                     return value >= 0 ? $"{subject} +{value}{unit}" : $"{subject} -{-value}{unit}";
             }
+        }
+
+        // A modifier as a sheet writes it, before it is rolled: "피해 +4~6".
+        public static string Describe(ModifierRange range)
+        {
+            string low = Describe(new Modifier(range.Stat, range.Kind, range.Min, range.Tags));
+            if (range.IsFixed) return low;
+            string number = Math.Abs(range.Min).ToString(CultureInfo.InvariantCulture);
+            int at = low.LastIndexOf(number, StringComparison.Ordinal);
+            return low.Substring(0, at + number.Length) + "~" + Math.Abs(range.Max) + low.Substring(at + number.Length);
         }
 
         // These stats are percentages themselves, so a flat +3 reads as +3%.

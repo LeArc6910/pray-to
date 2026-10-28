@@ -76,7 +76,8 @@ namespace Game.Core
             HostConfig config = null,
             WorldConfig worldConfig = null,
             BossData bosses = null,
-            ClassData classes = null)
+            ClassData classes = null,
+            TileData tiles = null)
         {
             _seed = seed;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
@@ -86,7 +87,7 @@ namespace Game.Core
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
             _generated = WorldGenerator.Generate(seed);
-            World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot);
+            World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles);
             if (bosses != null && bosses.Bosses.Count > 0) World.PlaceBoss(bosses.Bosses[0], _generated.Arena, _generated.ArenaRadius);
         }
 
@@ -134,6 +135,13 @@ namespace Game.Core
         {
             World.Step();
             _pendingEvents.AddRange(World.TakeEvents());
+
+            // Dug and built tiles go out before the snapshot, so nobody walks into a wall that is not there.
+            var tileChanges = World.TakeTileChanges();
+            foreach (byte[] message in TileChangesMessage.EncodeAll(tileChanges))
+            {
+                foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) Send(pair.Key, message, reliable: true);
+            }
 
             foreach (var pair in _connections)
             {
@@ -191,6 +199,7 @@ namespace Game.Core
 
             var map = _generated.Map;
             Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, player.Position, ClassIndexes(player)).Encode(), reliable: true);
+            foreach (byte[] message in TileChangesMessage.EncodeAll(World.ChangedTiles())) Send(connection, message, reliable: true);
             BroadcastRoster();
         }
 
@@ -209,6 +218,12 @@ namespace Game.Core
                     break;
                 case InventoryCommand.UseConsumable:
                     if (command.Index < _loot.Consumables.Count) World.UseConsumable(player.Id, _loot.Consumables[command.Index]);
+                    break;
+                case InventoryCommand.Craft:
+                    if (command.Index < _loot.Recipes.Count) World.Craft(player.Id, _loot.Recipes[command.Index]);
+                    break;
+                case InventoryCommand.Place:
+                    if (command.Index < _loot.Materials.Count) World.PlaceTile(player.Id, _loot.Materials[command.Index]);
                     break;
                 case InventoryCommand.Discard:
                     World.DiscardItem(player.Id, command.Item);
@@ -260,12 +275,15 @@ namespace Game.Core
                 .Select(l => new EntityState(
                     l.Id,
                     EntityKind.Drop,
-                    l.Item != null ? IndexOf(_loot.Bases, l.Item.Base) : l.Rune != null ? IndexOf(_loot.Runes, l.Rune) : IndexOf(_loot.Consumables, l.Consumable),
+                    l.Item != null ? IndexOf(_loot.Bases, l.Item.Base)
+                        : l.Rune != null ? IndexOf(_loot.Runes, l.Rune)
+                        : l.Consumable != null ? IndexOf(_loot.Consumables, l.Consumable)
+                        : IndexOf(_loot.Materials, l.Material),
                     l.Position,
                     Vec2.Zero,
                     0,
                     0,
-                    l.Item != null ? (byte)l.Item.Rarity : l.Rune != null ? DropState.Rune : DropState.Consumable));
+                    l.Item != null ? (byte)l.Item.Rarity : l.Rune != null ? DropState.Rune : l.Consumable != null ? DropState.Consumable : DropState.Material));
             var entities = shownSoFar.Concat(enemies).Concat(drops).ToList();
 
             var projectiles = World.Projectiles

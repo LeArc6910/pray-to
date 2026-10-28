@@ -17,6 +17,7 @@ namespace Game.Client.Editor
         const string MonstersFolder = ProjectFolder + "/Data/Monsters/";
         const string BossesFolder = ProjectFolder + "/Data/Bosses/";
         const string ClassesFolder = ProjectFolder + "/Data/Classes/";
+        const string WorldFolder = ProjectFolder + "/Data/World/";
 
         [MenuItem("Game/Set Up Main Scene")]
         public static void SetUp()
@@ -51,6 +52,9 @@ namespace Game.Client.Editor
             sheets.runes = Sheet(LootFolder + LootSheets.RunesFile);
             sheets.runewords = Sheet(LootFolder + LootSheets.RunewordsFile);
             sheets.consumables = Sheet(LootFolder + LootSheets.ConsumablesFile);
+            sheets.materials = Sheet(LootFolder + LootSheets.MaterialsFile);
+            sheets.recipes = Sheet(LootFolder + LootSheets.RecipesFile);
+            sheets.tiles = Sheet(WorldFolder + TileSheet.File);
             sheets.monsters = Sheet(MonstersFolder + MonsterSheet.File);
             sheets.bosses = Sheet(BossesFolder + BossSheet.BossesFile);
             sheets.bossAttacks = Sheet(BossesFolder + BossSheet.AttacksFile);

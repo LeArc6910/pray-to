@@ -1,0 +1,14 @@
+id,result,count,ingredients
+copper_sword,copper_sword,1,copper_ore:6|stone:2
+copper_bow,copper_bow,1,copper_ore:5|stone:3
+copper_staff,copper_staff,1,copper_ore:5|slime_gel:2
+copper_helmet,copper_helmet,1,copper_ore:4
+copper_armor,copper_armor,1,copper_ore:8
+copper_boots,copper_boots,1,copper_ore:4
+iron_sword,iron_sword,1,iron_ore:8|warden_core:1
+iron_bow,iron_bow,1,iron_ore:8|warden_core:1
+iron_staff,iron_staff,1,iron_ore:8|warden_core:1
+iron_helmet,iron_helmet,1,iron_ore:6|warden_core:1
+iron_armor,iron_armor,1,iron_ore:10|warden_core:1
+iron_boots,iron_boots,1,iron_ore:6|warden_core:1
+healing_potion,healing_potion,1,slime_gel:3

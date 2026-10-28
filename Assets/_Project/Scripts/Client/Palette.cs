@@ -8,6 +8,10 @@ namespace Game.Client
         public static readonly Color Rune = new Color(1f, 0.65f, 0.3f);
         public static readonly Color Potion = new Color(0.95f, 0.35f, 0.45f);
         public static readonly Color Heal = new Color(0.45f, 1f, 0.5f);
+        public static readonly Color Material = new Color(0.75f, 0.75f, 0.72f);
+        public static readonly Color32 CopperOre = new Color32(214, 120, 64, 255);
+        public static readonly Color32 IronOre = new Color32(168, 184, 204, 255);
+        public static readonly Color Dust = new Color(0.8f, 0.72f, 0.6f);
 
         public static Color Of(Rarity rarity) => rarity switch
         {

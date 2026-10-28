@@ -3,7 +3,8 @@ using System.Linq;
 
 namespace Game.Core
 {
-    // A player's bag: up to Capacity items in the order they arrived, and runes and consumables counted by kind.
+    // A player's bag: up to Capacity items in the order they arrived, and runes, consumables and materials counted
+    // by kind.
     public sealed class Inventory
     {
         public const int Capacity = 24;
@@ -11,10 +12,12 @@ namespace Game.Core
         readonly List<Item> _items = new List<Item>();
         readonly Dictionary<RuneDefinition, int> _runes = new Dictionary<RuneDefinition, int>();
         readonly Dictionary<ConsumableDefinition, int> _consumables = new Dictionary<ConsumableDefinition, int>();
+        readonly Dictionary<MaterialDefinition, int> _materials = new Dictionary<MaterialDefinition, int>();
 
         public IReadOnlyList<Item> Items => _items;
         public IReadOnlyDictionary<RuneDefinition, int> Runes => _runes;
         public IReadOnlyDictionary<ConsumableDefinition, int> Consumables => _consumables;
+        public IReadOnlyDictionary<MaterialDefinition, int> Materials => _materials;
         public bool IsFull => _items.Count >= Capacity;
 
         public bool TryAdd(Item item)
@@ -69,11 +72,28 @@ namespace Game.Core
             return true;
         }
 
+        public int CountOf(MaterialDefinition material) => _materials.TryGetValue(material, out int count) ? count : 0;
+
+        public void AddMaterial(MaterialDefinition material, int count = 1)
+        {
+            if (count > 0) _materials[material] = CountOf(material) + count;
+        }
+
+        public bool TakeMaterial(MaterialDefinition material, int count = 1)
+        {
+            int have = CountOf(material);
+            if (count < 1 || have < count) return false;
+            if (have == count) _materials.Remove(material);
+            else _materials[material] = have - count;
+            return true;
+        }
+
         internal void Clear()
         {
             _items.Clear();
             _runes.Clear();
             _consumables.Clear();
+            _materials.Clear();
         }
     }
 }

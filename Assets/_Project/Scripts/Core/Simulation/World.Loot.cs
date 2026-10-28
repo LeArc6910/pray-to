@@ -36,6 +36,8 @@ namespace Game.Core
 
         public GroundLoot DropConsumable(ConsumableDefinition consumable, Vec2 position) => Place(null, null, position, Tick, consumable);
 
+        public GroundLoot DropMaterial(MaterialDefinition material, Vec2 position) => Place(null, null, position, Tick, material: material);
+
         Item Register(Item item)
         {
             if (item.Id == 0) item.Id = _nextId++;
@@ -61,6 +63,11 @@ namespace Game.Core
             {
                 var consumable = RollConsumable(level);
                 if (consumable != null) DropConsumable(consumable, Scatter(enemy.Position));
+            }
+            if (definition.MaterialChance > 0 && _random.Chance(definition.MaterialChance / 100f))
+            {
+                var material = Loot.Materials.FirstOrDefault(m => m.Id == definition.MaterialId);
+                if (material != null) DropMaterial(material, Scatter(enemy.Position));
             }
         }
 
@@ -92,6 +99,11 @@ namespace Game.Core
                 var consumable = RollConsumable(definition.DropLevel);
                 if (consumable != null) DropConsumable(consumable, Scatter(boss.Position, 2));
             }
+            var bossMaterial = Loot.Materials.FirstOrDefault(m => m.Id == definition.MaterialId);
+            for (int i = 0; bossMaterial != null && i < definition.MaterialCount * fighters; i++)
+            {
+                DropMaterial(bossMaterial, Scatter(boss.Position, 2));
+            }
         }
 
         Vec2 Scatter(Vec2 origin, float spread = ScatterRadius)
@@ -100,9 +112,9 @@ namespace Game.Core
             return Collision.Resolve(Map, origin + offset, 0.2f);
         }
 
-        GroundLoot Place(Item item, RuneDefinition rune, Vec2 position, long readyTick, ConsumableDefinition consumable = null)
+        GroundLoot Place(Item item, RuneDefinition rune, Vec2 position, long readyTick, ConsumableDefinition consumable = null, MaterialDefinition material = null)
         {
-            var loot = new GroundLoot(_nextId++, position, item, rune, readyTick, Tick + Ticks(LootSeconds), consumable);
+            var loot = new GroundLoot(_nextId++, position, item, rune, readyTick, Tick + Ticks(LootSeconds), consumable, material);
             _groundLoot.Add(loot);
             // The oldest goes first when the floor fills up.
             if (_groundLoot.Count > MaxGroundLoot) _groundLoot.RemoveAt(0);
@@ -123,6 +135,7 @@ namespace Game.Core
                     if (loot.Item != null && !player.Inventory.TryAdd(loot.Item)) continue;
                     if (loot.Rune != null) player.Inventory.AddRune(loot.Rune);
                     if (loot.Consumable != null) player.Inventory.AddConsumable(loot.Consumable);
+                    if (loot.Material != null) player.Inventory.AddMaterial(loot.Material);
                     _groundLoot.RemoveAt(i--);
                     player.InventoryVersion++;
                     _events.Add(new SimEvent(SimEventType.Pickup, player.Id, loot.Id));

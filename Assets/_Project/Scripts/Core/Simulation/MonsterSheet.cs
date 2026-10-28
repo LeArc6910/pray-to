@@ -22,7 +22,9 @@ namespace Game.Core
             int weight,
             float dropChance,
             float runeChance,
-            float potionChance)
+            float potionChance,
+            string materialId,
+            float materialChance)
         {
             Id = id;
             Name = name;
@@ -40,6 +42,8 @@ namespace Game.Core
             DropChance = dropChance;
             RuneChance = runeChance;
             PotionChance = potionChance;
+            MaterialId = materialId;
+            MaterialChance = materialChance;
         }
 
         public string Id { get; }
@@ -65,6 +69,9 @@ namespace Game.Core
         public float DropChance { get; }
         public float RuneChance { get; }
         public float PotionChance { get; }
+        // A material from materials.csv (checked when the world drops it), and the percent chance to drop it.
+        public string MaterialId { get; }
+        public float MaterialChance { get; }
     }
 
     public sealed class MonsterData
@@ -135,7 +142,9 @@ namespace Game.Core
                         SheetValues.ParseNumber(row["weight"], "weight"),
                         Percent(row, "drop_chance"),
                         Percent(row, "rune_chance"),
-                        Percent(row, "potion_chance")));
+                        Percent(row, "potion_chance"),
+                        row["material"],
+                        Percent(row, "material_chance")));
                 }
                 catch (FormatException e)
                 {

@@ -76,6 +76,7 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
 | weight | 같은 구역에서 나올 비율 |
 | drop_chance, rune_chance | 죽을 때 아이템, 룬을 떨어뜨릴 확률(%). 비우면 0. 자세한 건 `Docs/Loot.md`의 드랍 절 |
 | potion_chance | 죽을 때 소모품(물약)을 떨어뜨릴 확률(%). 비우면 0 |
+| material, material_chance | 죽을 때 떨어뜨리는 재료 id(`materials.csv`)와 확률(%). 비우면 없음 |
 
 ## 조정하는 법
 

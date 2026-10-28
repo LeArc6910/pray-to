@@ -19,7 +19,8 @@ namespace Game.Core
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
     // the one exception is a player's own position, which its client reports (see MovePlayer). Bosses, their
     // telegraphed areas and projectiles are in World.Boss.cs; drops, pickups and inventory commands in World.Loot.cs;
-    // players joining with their classes and using skills in World.Skills.cs.
+    // players joining with their classes and using skills in World.Skills.cs; digging, building and crafting in
+    // World.Mining.cs.
     public sealed partial class World
     {
         public const int TicksPerSecond = 30;
@@ -51,9 +52,10 @@ namespace Game.Core
         int _nextId = 1;
         int _spawnTimer;
 
-        // Without loot data nothing drops.
-        public World(TileMap map, Vec2 spawn, MonsterData monsters, ulong seed, WorldConfig config = null, LootData loot = null)
+        // Without loot data nothing drops; without tile data no wall can be dug.
+        public World(TileMap map, Vec2 spawn, MonsterData monsters, ulong seed, WorldConfig config = null, LootData loot = null, TileData tiles = null)
         {
+            Tiles = tiles;
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Spawn = spawn;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
@@ -167,13 +169,16 @@ namespace Game.Core
             if (player.Attacking && player.AttackCooldown == 0) Attack(player);
         }
 
+        // Shots are not fired point-blank into rock: a bow or staff facing a wall digs it like a swing.
         void Attack(Player player)
         {
             var stats = player.Stats;
             player.AttackCooldown = Math.Max(1, (int)MathF.Round(TicksPerSecond / Math.Max(0.1f, stats.AttacksPerSecond)));
-            _events.Add(new SimEvent(SimEventType.Attack, player.Id, amount: (int)stats.Attack.Kind, direction: player.Facing));
-            if (stats.Attack.Shoots) Shoot(player);
-            else Swing(player);
+            bool shoot = stats.Attack.Shoots && DigTarget(player) == null;
+            var kind = shoot ? stats.Attack.Kind : BasicAttackKind.Swing;
+            _events.Add(new SimEvent(SimEventType.Attack, player.Id, amount: (int)kind, direction: player.Facing));
+            if (shoot) Shoot(player);
+            else if (stats.Attack.Shoots || !Swing(player)) Dig(player);
         }
 
         // An arrow or bolt toward where the player faces, its damage and crit rolled now (see FlyFriendly).
@@ -197,9 +202,11 @@ namespace Game.Core
                 tags: stats.AttackTags));
         }
 
-        void Swing(Player player)
+        // Returns whether anything was hit.
+        bool Swing(Player player)
         {
             var stats = player.Stats;
+            bool hit = false;
 
             foreach (var enemy in _enemies)
             {
@@ -208,17 +215,20 @@ namespace Game.Core
 
                 int amount = RollDamage(stats, enemy.Definition.Armor, out bool critical);
                 HitEnemy(player, enemy, amount, critical, player.Position);
+                hit = true;
             }
 
             foreach (var boss in _bosses)
             {
                 if (boss.IsDead) continue;
                 if (!Combat.InArc(player.Position, player.Facing, boss.Position, boss.Definition.Radius, MeleeReach, MeleeArcDegrees)) continue;
+                hit = true;
                 if (boss.State == BossState.Dormant) Wake(boss);
                 if (boss.Invulnerable) continue;
                 int amount = RollDamage(stats, boss.Definition.Armor, out bool critical);
                 DamageBoss(boss, player.Id, amount, critical);
             }
+            return hit;
         }
 
         int RollDamage(PlayerStats stats, float armor, out bool critical)

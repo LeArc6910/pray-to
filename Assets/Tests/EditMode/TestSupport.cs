@@ -43,7 +43,9 @@ namespace Game.Core.Tests
                 Read(LootSheets.AffixesFile),
                 Read(LootSheets.RunesFile),
                 Read(LootSheets.RunewordsFile),
-                Read(LootSheets.ConsumablesFile));
+                Read(LootSheets.ConsumablesFile),
+                Read(LootSheets.MaterialsFile),
+                Read(LootSheets.RecipesFile));
         }
     }
 
@@ -130,6 +132,12 @@ namespace Game.Core.Tests
         public static BossData Parse(string bosses, string attacks) => BossSheet.Parse(bosses, attacks, Monsters.Shipped);
     }
 
+    public static class Tiles
+    {
+        public static readonly TileData Shipped =
+            TileSheet.Parse(File.ReadAllText(RepoFile.Find("Assets/_Project/Data/World/" + TileSheet.File)), Gear.Data);
+    }
+
     public static class Classes
     {
         static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Classes/" + file));
@@ -166,8 +174,15 @@ namespace Game.Core.Tests
         public const string Runewords = RunewordsHeader +
             "storm,폭풍,weapon,wind|ember,Lightning:Damage+40%\n";
 
-        public static LootData Parse(string bases = Bases, string affixes = Affixes, string runes = Runes, string runewords = Runewords, string consumables = "") =>
-            LootSheets.Parse(bases, affixes, runes, runewords, consumables);
+        public static LootData Parse(
+            string bases = Bases,
+            string affixes = Affixes,
+            string runes = Runes,
+            string runewords = Runewords,
+            string consumables = "",
+            string materials = "",
+            string recipes = "") =>
+            LootSheets.Parse(bases, affixes, runes, runewords, consumables, materials, recipes);
 
         public static void AssertError(LootData data, params string[] parts)
         {

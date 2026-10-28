@@ -61,6 +61,7 @@ namespace Game.Core
             // The sheets write item rarity as "+N%", an increase, so it is worked out on a base of 100 and given
             // back as the bonus over that: two +50% affixes make +100%.
             ItemRarity = (float)sheet.Get(StatType.ItemRarity, 100) - 100;
+            MiningSpeed = (float)sheet.Get(StatType.MiningSpeed, 100) - 100;
         }
 
         // What the basic attack does: swing, arrow or bolt, from the weapon's own tags.
@@ -84,6 +85,8 @@ namespace Game.Core
         public float CritDamage { get; }
         // Percent bonus to the odds of better drops from what this player kills.
         public float ItemRarity { get; }
+        // Percent more wall each hit digs away, written like item rarity.
+        public float MiningSpeed { get; }
 
         // The tags a skill hits with: its own and whatever buffs grant.
         public SkillTag ContextFor(SkillDefinition skill) => skill.Tags | GrantedTags;

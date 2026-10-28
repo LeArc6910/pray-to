@@ -12,6 +12,8 @@ namespace Game.Core
             IReadOnlyList<RuneDefinition> runes,
             IReadOnlyList<Runeword> runewords,
             IReadOnlyList<ConsumableDefinition> consumables,
+            IReadOnlyList<MaterialDefinition> materials,
+            IReadOnlyList<Recipe> recipes,
             IReadOnlyList<string> errors)
         {
             Bases = bases;
@@ -19,6 +21,8 @@ namespace Game.Core
             Runes = runes;
             Runewords = runewords;
             Consumables = consumables;
+            Materials = materials;
+            Recipes = recipes;
             Errors = errors;
         }
 
@@ -27,6 +31,9 @@ namespace Game.Core
         public IReadOnlyList<RuneDefinition> Runes { get; }
         public IReadOnlyList<Runeword> Runewords { get; }
         public IReadOnlyList<ConsumableDefinition> Consumables { get; }
+        public IReadOnlyList<MaterialDefinition> Materials { get; }
+        // In the order the crafting list shows them.
+        public IReadOnlyList<Recipe> Recipes { get; }
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;
 
@@ -41,6 +48,9 @@ namespace Game.Core
 
         public ConsumableDefinition FindConsumable(string id) =>
             Consumables.FirstOrDefault(c => c.Id == id) ?? throw new ArgumentException($"Unknown consumable '{id}'.", nameof(id));
+
+        public MaterialDefinition FindMaterial(string id) =>
+            Materials.FirstOrDefault(m => m.Id == id) ?? throw new ArgumentException($"Unknown material '{id}'.", nameof(id));
     }
 
     // Reads the loot sheets in Assets/_Project/Data/Loot (columns and syntax in Docs/Loot.md). A bad row is skipped
@@ -52,11 +62,20 @@ namespace Game.Core
         public const string RunesFile = "runes.csv";
         public const string RunewordsFile = "runewords.csv";
         public const string ConsumablesFile = "consumables.csv";
+        public const string MaterialsFile = "materials.csv";
+        public const string RecipesFile = "recipes.csv";
 
         const int MaxSockets = 6;
 
-        // Without a consumables sheet there are no consumables.
-        public static LootData Parse(string basesCsv, string affixesCsv, string runesCsv, string runewordsCsv, string consumablesCsv = "")
+        // Without the consumables, materials or recipes sheet there are none of those.
+        public static LootData Parse(
+            string basesCsv,
+            string affixesCsv,
+            string runesCsv,
+            string runewordsCsv,
+            string consumablesCsv = "",
+            string materialsCsv = "",
+            string recipesCsv = "")
         {
             var errors = new List<string>();
             var bases = ParseBases(basesCsv, errors);
@@ -64,7 +83,9 @@ namespace Game.Core
             var runes = ParseRunes(runesCsv, errors);
             var runewords = ParseRunewords(runewordsCsv, runes, bases, errors);
             var consumables = ParseConsumables(consumablesCsv, errors);
-            return new LootData(bases, affixes, runes, runewords, consumables, errors);
+            var materials = ParseMaterials(materialsCsv, errors);
+            var recipes = ParseRecipes(recipesCsv, bases, consumables, materials, errors);
+            return new LootData(bases, affixes, runes, runewords, consumables, materials, recipes, errors);
         }
 
         static List<ItemBase> ParseBases(string csv, List<string> errors)
@@ -193,6 +214,70 @@ namespace Game.Core
                 });
             }
             return consumables;
+        }
+
+        static List<MaterialDefinition> ParseMaterials(string csv, List<string> errors)
+        {
+            var materials = new List<MaterialDefinition>();
+            if (string.IsNullOrWhiteSpace(csv)) return materials;
+            var table = Read(csv, MaterialsFile, errors, "id", "name", "places", "description");
+            if (table == null) return materials;
+
+            foreach (var row in table.Rows)
+            {
+                TryRow(MaterialsFile, row, errors, () =>
+                {
+                    TileType? places = null;
+                    if (row["places"].Length > 0)
+                    {
+                        places = SheetValues.ParseEnum<TileType>(row["places"], "칸 종류");
+                        if (places == TileType.Floor) throw new FormatException("places에는 벽 같은 단단한 칸만 적을 수 있습니다.");
+                    }
+                    materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"]));
+                });
+            }
+            return materials;
+        }
+
+        static List<Recipe> ParseRecipes(
+            string csv, List<ItemBase> bases, List<ConsumableDefinition> consumables, List<MaterialDefinition> materials, List<string> errors)
+        {
+            var recipes = new List<Recipe>();
+            if (string.IsNullOrWhiteSpace(csv)) return recipes;
+            var table = Read(csv, RecipesFile, errors, "id", "result", "count", "ingredients");
+            if (table == null) return recipes;
+
+            foreach (var row in table.Rows)
+            {
+                TryRow(RecipesFile, row, errors, () =>
+                {
+                    string id = NewId(row, recipes.Select(r => r.Id));
+                    string result = row["result"];
+                    var item = bases.FirstOrDefault(b => b.Id == result);
+                    var consumable = consumables.FirstOrDefault(c => c.Id == result);
+                    var material = materials.FirstOrDefault(m => m.Id == result);
+                    if (item == null && consumable == null && material == null)
+                        throw new FormatException($"result '{result}'가 아이템 베이스, 소모품, 재료 어디에도 없습니다.");
+                    int count = SheetValues.ParseNumber(row["count"], "count");
+                    if (count < 1) throw new FormatException("count는 1 이상이어야 합니다.");
+                    if (item != null && count != 1) throw new FormatException("장비는 하나씩 만듭니다. count를 1로 적습니다.");
+
+                    var ingredients = new List<(MaterialDefinition, int)>();
+                    foreach (string part in SplitList(row["ingredients"]))
+                    {
+                        string[] pieces = part.Split(':');
+                        if (pieces.Length != 2) throw new FormatException($"'{part}': 재료는 id:개수로 적습니다. 예: stone:3");
+                        var ingredient = materials.FirstOrDefault(m => m.Id == pieces[0].Trim())
+                            ?? throw new FormatException($"재료 '{pieces[0].Trim()}'가 {MaterialsFile}에 없습니다.");
+                        int amount = SheetValues.ParseNumber(pieces[1].Trim(), $"'{part}'의 개수");
+                        if (amount < 1) throw new FormatException($"'{part}': 개수는 1 이상이어야 합니다.");
+                        ingredients.Add((ingredient, amount));
+                    }
+                    if (ingredients.Count == 0) throw new FormatException("ingredients가 비어 있습니다.");
+                    recipes.Add(new Recipe(id, item, consumable, material, count, ingredients));
+                });
+            }
+            return recipes;
         }
 
         static List<Runeword> ParseRunewords(string csv, List<RuneDefinition> runes, List<ItemBase> bases, List<string> errors)

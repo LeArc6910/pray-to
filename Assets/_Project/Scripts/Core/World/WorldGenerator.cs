@@ -26,8 +26,9 @@ namespace Game.Core
     }
 
     // Caves from a seed: random fill, a few smoothing passes, a clearing around the spawn, a boss arena some way
-    // off with a tunnel to it, then every cave the spawn cannot reach is filled in. Only integer math, so the host and every client build the same map from
-    // the same seed and the host never has to send the tiles.
+    // off with a tunnel to it, every cave the spawn cannot reach filled in, then ore veins in the rock. Only integer
+    // math, so the host and every client build the same map from the same seed and the host only sends the tiles
+    // players have changed since.
     public static class WorldGenerator
     {
         public const int DefaultSize = 128;
@@ -38,6 +39,13 @@ namespace Game.Core
         public const int ArenaRadius = 10;
         const int ArenaDistance = 38;
         const int TunnelHalfWidth = 1;
+        // Ore gets its own random stream, so adding it left the caves exactly as they were.
+        const ulong OreStream = 4;
+        const int CopperVeins = 60;
+        const int IronVeins = 25;
+        // Iron is only found at least this far from the spawn.
+        const int IronDistance = 30;
+        const int VeinPercent = 60;
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -70,10 +78,39 @@ namespace Game.Core
             CarveTunnel(map, spawnX, spawnY, arenaX, arenaY);
 
             FillUnreachable(map, spawnX, spawnY);
+            var ore = new GameRandom(seed, OreStream);
+            PlaceVeins(map, ore, TileType.CopperOre, CopperVeins, spawnX, spawnY, 0);
+            PlaceVeins(map, ore, TileType.IronOre, IronVeins, spawnX, spawnY, IronDistance);
             return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius);
         }
 
         static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;
+
+        // Small patches of ore in plain rock: a random wall tile at least minDistance from the spawn, and each wall
+        // around it turned to ore at VeinPercent odds.
+        static void PlaceVeins(TileMap map, GameRandom random, TileType ore, int veins, int spawnX, int spawnY, int minDistance)
+        {
+            for (int vein = 0; vein < veins; vein++)
+            {
+                for (int attempt = 0; attempt < 50; attempt++)
+                {
+                    int x = 1 + random.Next(map.Width - 2);
+                    int y = 1 + random.Next(map.Height - 2);
+                    int dx = x - spawnX;
+                    int dy = y - spawnY;
+                    if (map[x, y] != TileType.Wall || dx * dx + dy * dy < minDistance * minDistance) continue;
+                    for (int vy = y - 1; vy <= y + 1; vy++)
+                    {
+                        for (int vx = x - 1; vx <= x + 1; vx++)
+                        {
+                            if (IsInside(map, vx, vy) && map[vx, vy] == TileType.Wall && (vx == x && vy == y || random.Next(100) < VeinPercent))
+                                map[vx, vy] = ore;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
 
         static void ClearDisc(TileMap map, int centerX, int centerY, int radius)
         {

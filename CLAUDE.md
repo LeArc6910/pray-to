@@ -13,7 +13,7 @@
 ## 코드 구조
 
 - `Assets/_Project/Scripts/Core` (`Game.Core`): 게임 규칙과 시뮬레이션 전부. UnityEngine을 참조하지 않는다(`noEngineReferences`). netstandard2.1, C# 9.
-- `Assets/_Project/Data`: 데이터 시트(CSV). Core가 직접 읽는다. 형식은 `Docs/Loot.md`(아이템), `Docs/Combat.md`(몬스터), `Docs/Bosses.md`(보스), `Docs/Classes.md`(클래스·스킬)에 있다. 시트를 새로 추가하면 `GameSheets`와 `SceneSetup`에도 넣는다.
+- `Assets/_Project/Data`: 데이터 시트(CSV). Core가 직접 읽는다. 형식은 `Docs/Loot.md`(아이템, 소모품), `Docs/Combat.md`(몬스터), `Docs/Bosses.md`(보스), `Docs/Classes.md`(클래스·스킬), `Docs/Crafting.md`(칸, 재료, 조합법)에 있다. 시트를 새로 추가하면 `GameSheets`와 `SceneSetup`에도 넣는다.
 - `Assets/Tests/EditMode` (`Game.Core.Tests`): Core 테스트(NUnit). Unity Test Runner와 `dotnet test`가 같은 파일을 쓴다.
 - `Assets/Tests/PlayMode` (`Game.Client.Tests`): 실제 클라이언트를 플레이 모드로 몇 초씩 돌려 에러가 없는지 보는 테스트. Unity에서만 돌고(명령 한 줄이 실행한다), 클라우드는 컴파일만 확인한다.
 - `DevTools/`: Unity 없이 Core를 빌드·테스트·시뮬레이션하는 .NET 프로젝트. 소스는 `Assets/`에서 가져다 쓰므로 여기에 게임 코드를 두지 않는다.

@@ -5,7 +5,8 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // The bag screen, opened with Tab or I: stats, consumables, worn gear, carried items and runes. Every button only asks the
+    // The bag screen, opened with Tab or I: stats, consumables, worn gear, carried items, runes, materials (with
+    // [놓기] for the ones that build) and the crafting list. Every button only asks the
     // host for the change; the window redraws from the next inventory message.
     sealed class InventoryWindow
     {
@@ -23,6 +24,7 @@ namespace Game.Client
         RuneDefinition _selectedRune;
         Vector2 _scroll;
         float _nameWidth;
+        float _recipeWidth;
 
         public InventoryWindow(WorldClient client, Action<byte[]> send)
         {
@@ -52,6 +54,7 @@ namespace Game.Client
                 area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
             }
             _nameWidth = Mathf.Min(240, area.width - 200);
+            _recipeWidth = area.width - 110;
             Controls.Block(area);
             // The box style is see-through; names drawn over the world would show through the list.
             var tint = GUI.color;
@@ -112,6 +115,8 @@ namespace Game.Client
             }
             GUILayout.EndHorizontal();
             if (_selectedRune != null) GUILayout.Label($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 한 번 넣은 룬은 뺄 수 없습니다.");
+            DrawMaterials();
+            DrawCrafting();
 
             GUILayout.EndScrollView();
             GUILayout.EndArea();
@@ -151,6 +156,48 @@ namespace Game.Client
                 .Where(skill => skill.Damage > 0)
                 .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f:0.#}");
             GUILayout.Label($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}");
+        }
+
+        // Materials, counted by kind; one that builds gets [놓기], which puts it on the tile the player faces.
+        void DrawMaterials()
+        {
+            if (_client.Bag.Materials.Count == 0) return;
+            GUILayout.Space(6);
+            GUILayout.Label("재료");
+            foreach (var pair in _client.Bag.Materials.ToList())
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
+                if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) _send(_client.PlaceCommand(pair.Key));
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        // Every recipe, with what it takes against what the bag holds. [만들기] only works with everything at hand.
+        void DrawCrafting()
+        {
+            var recipes = _client.Recipes;
+            if (recipes.Count == 0) return;
+            GUILayout.Space(6);
+            GUILayout.Label("제작");
+            var enabled = GUI.enabled;
+            foreach (var recipe in recipes)
+            {
+                string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Bag.CountOf(i.Material)}/{i.Count}"));
+                string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(new GUIContent($"{name}\n{needs}", RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
+                GUI.enabled = enabled && _client.CanCraft(recipe);
+                if (GUILayout.Button("만들기", GUILayout.Width(64))) _send(_client.CraftCommand(recipe));
+                GUI.enabled = enabled;
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        static string RecipeTooltip(Recipe recipe)
+        {
+            if (recipe.Item != null) return string.Join("\n", recipe.Item.Implicits.Select(StatText.Describe));
+            return recipe.Consumable?.Description ?? recipe.Material.Description;
         }
 
         void DrawConsumables()

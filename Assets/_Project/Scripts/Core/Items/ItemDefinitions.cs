@@ -180,6 +180,47 @@ namespace Game.Core
         public string Description { get; }
     }
 
+    // Something gathered to make things with: from walls, monsters and bosses. Some can be placed as a tile.
+    // See Docs/Crafting.md.
+    public sealed class MaterialDefinition
+    {
+        internal MaterialDefinition(string id, string name, TileType? places, string description)
+        {
+            Id = id;
+            Name = name;
+            Places = places;
+            Description = description;
+        }
+
+        public string Id { get; }
+        public string Name { get; }
+        // The tile [놓기] puts down, or null when it cannot be placed.
+        public TileType? Places { get; }
+        public string Description { get; }
+    }
+
+    // Turns materials into an item, a consumable or another material. Exactly one result is set.
+    public sealed class Recipe
+    {
+        internal Recipe(string id, ItemBase item, ConsumableDefinition consumable, MaterialDefinition material, int count, IReadOnlyList<(MaterialDefinition Material, int Count)> ingredients)
+        {
+            Id = id;
+            Item = item;
+            Consumable = consumable;
+            Material = material;
+            Count = count;
+            Ingredients = ingredients;
+        }
+
+        public string Id { get; }
+        public ItemBase Item { get; }
+        public ConsumableDefinition Consumable { get; }
+        public MaterialDefinition Material { get; }
+        public int Count { get; }
+        public IReadOnlyList<(MaterialDefinition Material, int Count)> Ingredients { get; }
+        public string Name => Item?.Name ?? Consumable?.Name ?? Material.Name;
+    }
+
     // Filling every socket of a Common item with exactly these runes, in this order, adds the runeword's bonus on
     // top of the runes' own stats. Only Common items qualify, so plain drops with sockets are worth picking up.
     public sealed class Runeword

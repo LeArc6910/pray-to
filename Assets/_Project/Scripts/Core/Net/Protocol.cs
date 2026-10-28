@@ -17,6 +17,7 @@ namespace Game.Core
         Snapshot = 12,
         Roster = 13,
         Inventory = 14,
+        TileChanges = 15,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -24,7 +25,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.7.0";
+        public const string Version = "0.8.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -135,6 +136,45 @@ namespace Game.Core
             }
             return new JoinMessage(key, name, classes, version);
         });
+    }
+
+    // Tiles players have dug out or built on. Sent reliably as they change, and all of them to a player who joins;
+    // each message holds at most MaxPerMessage so it stays small.
+    public sealed class TileChangesMessage
+    {
+        public const int MaxPerMessage = 200;
+
+        public TileChangesMessage(IReadOnlyList<TileChange> changes) { Changes = changes; }
+
+        public IReadOnlyList<TileChange> Changes { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.TileChanges, w =>
+        {
+            w.Write((ushort)Changes.Count);
+            foreach (var change in Changes)
+            {
+                w.Write((ushort)change.X);
+                w.Write((ushort)change.Y);
+                w.Write((byte)change.Type);
+            }
+        });
+
+        public static TileChangesMessage Decode(byte[] data) => Protocol.Read(data, MessageType.TileChanges, r =>
+        {
+            int count = r.ReadUInt16();
+            var changes = new List<TileChange>(count);
+            for (int i = 0; i < count; i++) changes.Add(new TileChange(r.ReadUInt16(), r.ReadUInt16(), (TileType)r.ReadByte()));
+            return new TileChangesMessage(changes);
+        });
+
+        // The changes split into messages of at most MaxPerMessage.
+        public static IEnumerable<byte[]> EncodeAll(IReadOnlyList<TileChange> changes)
+        {
+            for (int start = 0; start < changes.Count; start += MaxPerMessage)
+            {
+                yield return new TileChangesMessage(changes.Skip(start).Take(MaxPerMessage).ToList()).Encode();
+            }
+        }
     }
 
     // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.
@@ -287,6 +327,8 @@ namespace Game.Core
         public const byte Rune = 255;
         // Type is then the consumable's index.
         public const byte Consumable = 254;
+        // Type is then the material's index.
+        public const byte Material = 253;
     }
 
     // Positions travel as 1/64 of a tile in 16 bits and health as whole numbers, to keep a snapshot in one packet.

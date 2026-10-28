@@ -88,6 +88,10 @@ namespace Game.Client
         readonly List<Flash> _flashes = new List<Flash>();
         // Which skill slots of each other player have a buff running, from their snapshot state.
         readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
+        Tilemap _tilemap;
+        TileBase _floorTile;
+        TileBase _arenaTile;
+        readonly Dictionary<TileType, TileBase> _solidTiles = new Dictionary<TileType, TileBase>();
         readonly HashSet<int> _seen = new HashSet<int>();
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
@@ -270,14 +274,18 @@ namespace Game.Client
             foreach (int id in _gone) _drops.Remove(id);
         }
 
-        // Loot is a small diamond in its rarity's colour, an orange dot for a rune or a pink dot for a potion.
+        // Loot is a small diamond in its rarity's colour, or a dot: orange for a rune, pink for a potion, grey for a
+        // material.
         void DrawDrop(EntityView view)
         {
             if (!_drops.ContainsKey(view.Id))
             {
-                bool round = view.DropRune != null || view.DropConsumable != null;
-                var color = view.DropRune != null ? Palette.Rune : view.DropConsumable != null ? Palette.Potion : Palette.Of(view.DropRarity);
-                string name = view.DropRune?.Name ?? view.DropConsumable?.Name ?? view.DropBase.Name;
+                bool round = view.DropBase == null;
+                var color = view.DropRune != null ? Palette.Rune
+                    : view.DropConsumable != null ? Palette.Potion
+                    : view.DropMaterial != null ? Palette.Material
+                    : Palette.Of(view.DropRarity);
+                string name = view.DropRune?.Name ?? view.DropConsumable?.Name ?? view.DropMaterial?.Name ?? view.DropBase.Name;
                 var renderer = Renderer(_root.transform, "Drop", round ? Shapes.Circle : Shapes.Square, color);
                 renderer.transform.localScale = Vector3.one * (round ? 0.32f : 0.3f);
                 renderer.transform.localRotation = Quaternion.Euler(0, 0, round ? 0 : 45);
@@ -452,6 +460,11 @@ namespace Game.Client
                     break;
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
+                    break;
+                case SimEventType.Dug:
+                    // A puff of dust where the wall was struck, bigger when it gives way.
+                    var struck = new Vector3(e.Position.X, e.Position.Y, 0);
+                    AddFlash(struck, e.Amount == 1 ? 0.7f : 0.35f, Palette.Dust, Shapes.Circle);
                     break;
                 case SimEventType.Healed:
                     var drinker = Find(e.Source);
@@ -643,20 +656,32 @@ namespace Game.Client
             var tilesObject = new GameObject("Tiles", typeof(Tilemap), typeof(TilemapRenderer));
             tilesObject.transform.SetParent(grid.transform, false);
 
-            var floor = Shapes.FloorTile();
-            var arena = Shapes.ArenaTile();
-            var wall = Shapes.WallTile();
+            _floorTile = Shapes.FloorTile();
+            _arenaTile = Shapes.ArenaTile();
+            _solidTiles[TileType.Wall] = Shapes.WallTile();
+            _solidTiles[TileType.CopperOre] = Shapes.OreTile(Palette.CopperOre);
+            _solidTiles[TileType.IronOre] = Shapes.OreTile(Palette.IronOre);
             var tiles = new TileBase[map.Width * map.Height];
             for (int y = 0; y < map.Height; y++)
             {
-                for (int x = 0; x < map.Width; x++)
-                {
-                    bool inArena = Vec2.Distance(TileMap.Center(x, y), client.Arena) <= client.ArenaRadius;
-                    tiles[y * map.Width + x] = map.IsSolid(x, y) ? wall : inArena ? arena : floor;
-                }
+                for (int x = 0; x < map.Width; x++) tiles[y * map.Width + x] = TileAt(x, y);
             }
-            tilesObject.GetComponent<Tilemap>().SetTilesBlock(new BoundsInt(0, 0, 0, map.Width, map.Height, 1), tiles);
+            _tilemap = tilesObject.GetComponent<Tilemap>();
+            _tilemap.SetTilesBlock(new BoundsInt(0, 0, 0, map.Width, map.Height, 1), tiles);
             tilesObject.GetComponent<TilemapRenderer>().sortingOrder = -100;
+        }
+
+        TileBase TileAt(int x, int y)
+        {
+            var type = _client.Map[x, y];
+            if (type != TileType.Floor) return _solidTiles.TryGetValue(type, out var solid) ? solid : _solidTiles[TileType.Wall];
+            return Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius ? _arenaTile : _floorTile;
+        }
+
+        // Redraws tiles that were dug or built on.
+        public void UpdateTiles(IEnumerable<TileChange> changes)
+        {
+            foreach (var change in changes) _tilemap.SetTile(new Vector3Int(change.X, change.Y, 0), TileAt(change.X, change.Y));
         }
 
         // The project uses URP's 2D renderer, which draws sprites by 2D lights; one global light shows everything.

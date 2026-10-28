@@ -15,7 +15,7 @@ namespace Game.Core.Tests
             public readonly Dictionary<ulong, WorldClient> Clients = new Dictionary<ulong, WorldClient>();
 
             public Session(HostConfig config = null, BossData bosses = null) =>
-                Host = new WorldHost(7, Monsters.Shipped, Gear.Data, config, new WorldConfig { EnemyTarget = 0 }, bosses, Classes.Shipped);
+                Host = new WorldHost(7, Monsters.Shipped, Gear.Data, config, new WorldConfig { EnemyTarget = 0 }, bosses, Classes.Shipped, Tiles.Shipped);
 
             public WorldClient Join(ulong connection, string name, string version = Protocol.Version, params string[] classes)
             {
@@ -340,6 +340,69 @@ namespace Game.Core.Tests
             // Others() lags the newest snapshot by the interpolation delay.
             session.Tick(10);
             Assert.AreSame(potion, alice.Others().Single(e => e.Kind == EntityKind.Drop).DropConsumable);
+        }
+
+        [Test]
+        public void DugTilesReachEveryoneAndLateJoiners()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var world = session.Host.World;
+            var map = world.Map;
+            // The first rock east of the spawn along its row; the row up to it is open floor to walk.
+            int y = TileMap.Cell(world.Spawn.Y);
+            int x = TileMap.Cell(world.Spawn.X);
+            while (!map.IsSolid(x, y)) x++;
+            Walk(world, world.FindPlayer(alice.PlayerId), TileMap.Center(x - 1, y));
+            session.Tick(4);
+
+            for (int i = 0; i < 10 * World.TicksPerSecond && map.IsSolid(x, y); i++)
+            {
+                session.Tick(1, c => (Vec2.Zero, new Vec2(1, 0), true));
+            }
+            session.Tick(2);
+
+            Assert.AreEqual(TileType.Floor, map[x, y]);
+            Assert.AreEqual(TileType.Floor, alice.Map[x, y], "sent to whoever is playing");
+            Assert.AreEqual(1, alice.Bag.Materials.Values.Sum());
+            var bob = session.Join(2, "밥");
+            Assert.AreEqual(TileType.Floor, bob.Map[x, y], "and to whoever joins later");
+
+            // Build it back up from stone through the host.
+            var stone = Gear.Data.FindMaterial("stone");
+            world.DropMaterial(stone, world.FindPlayer(alice.PlayerId).Position);
+            session.Tick(2);
+            session.Send(1, alice.PlaceCommand(stone));
+            session.Tick(2);
+            Assert.AreEqual(TileType.Wall, alice.Map[x, y]);
+            Assert.AreEqual(TileType.Wall, bob.Map[x, y]);
+        }
+
+        [Test]
+        public void CraftingGoesThroughTheHost()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var host = session.Host.World.FindPlayer(alice.PlayerId);
+            var gel = Gear.Data.FindMaterial("slime_gel");
+            var potion = Gear.Data.FindConsumable("healing_potion");
+            var recipe = Gear.Data.Recipes.Single(r => r.Consumable == potion);
+            // Dropped at her feet, so she picks them up at once.
+            for (int i = 0; i < 3; i++) session.Host.World.DropMaterial(gel, host.Position);
+            session.Tick(2);
+
+            Assert.AreEqual(3, alice.Bag.CountOf(gel));
+            Assert.IsTrue(alice.CanCraft(recipe));
+            session.Send(1, alice.CraftCommand(recipe));
+            session.Tick(2);
+
+            Assert.AreEqual(4, alice.Bag.CountOf(potion), "three to start with and one made");
+            Assert.AreEqual(0, alice.Bag.CountOf(gel));
+            Assert.IsFalse(alice.CanCraft(recipe));
+
+            session.Host.World.DropMaterial(gel, alice.Position + new Vec2(3, 0));
+            session.Tick(10);
+            Assert.AreSame(gel, alice.Others().Single(e => e.Kind == EntityKind.Drop).DropMaterial);
         }
 
         [Test]

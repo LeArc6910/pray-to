@@ -40,6 +40,7 @@ M3에서 만든 보스전 규칙과 시트 작성법이다. 코드는 `Assets/_P
 | roar, roar_radius, roar_damage | 페이즈 전환 포효 시간(초)과 끝날 때 폭발의 반지름과 피해 |
 | drop_count, rune_count | 싸운 사람 한 명마다 떨어뜨리는 아이템, 룬 수 |
 | potion_count | 싸운 사람 한 명마다 떨어뜨리는 소모품(물약) 수. 비우면 0 |
+| material, material_count | 싸운 사람 한 명마다 떨어뜨리는 재료 id와 수. 동굴 수호자는 철 장비를 만드는 수호자의 핵 1개 |
 | drop_level | 보상 아이템의 레벨. 잡은 뒤로는 모든 드랍이 이 레벨 이상이 된다 |
 | drop_rarity | 보상 아이템의 최소 등급(`common`, `uncommon`, `rare`, `epic`) |
 

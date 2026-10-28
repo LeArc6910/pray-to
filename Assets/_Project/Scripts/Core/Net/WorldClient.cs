@@ -29,7 +29,8 @@ namespace Game.Core
             int phase,
             ItemBase dropBase = null,
             RuneDefinition dropRune = null,
-            ConsumableDefinition dropConsumable = null)
+            ConsumableDefinition dropConsumable = null,
+            MaterialDefinition dropMaterial = null)
         {
             Id = id;
             Kind = kind;
@@ -45,6 +46,7 @@ namespace Game.Core
             DropBase = dropBase;
             DropRune = dropRune;
             DropConsumable = dropConsumable;
+            DropMaterial = dropMaterial;
         }
 
         public int Id { get; }
@@ -62,10 +64,11 @@ namespace Game.Core
         public EnemyState EnemyState => (EnemyState)State;
         public BossState BossState => (BossState)State;
         public int Phase { get; }
-        // For ground loot: the item's base and rarity, the rune, or the consumable.
+        // For ground loot: the item's base and rarity, the rune, the consumable or the material.
         public ItemBase DropBase { get; }
         public RuneDefinition DropRune { get; }
         public ConsumableDefinition DropConsumable { get; }
+        public MaterialDefinition DropMaterial { get; }
         public Rarity DropRarity => (Rarity)State;
         public bool IsDead => Health <= 0;
         public float Radius => Kind switch
@@ -132,6 +135,7 @@ namespace Game.Core
         readonly List<SnapshotMessage> _snapshots = new List<SnapshotMessage>();
         readonly List<SimEvent> _events = new List<SimEvent>();
         readonly Dictionary<int, string> _names = new Dictionary<int, string>();
+        readonly List<TileChange> _changedTiles = new List<TileChange>();
         readonly Dictionary<int, List<ClassDefinition>> _rosterClasses = new Dictionary<int, List<ClassDefinition>>();
         int[] _cooldowns = Array.Empty<int>();
         int[] _buffs = Array.Empty<int>();
@@ -211,6 +215,9 @@ namespace Game.Core
                     case MessageType.Inventory:
                         if (_loot != null) ApplyInventory(InventoryMessage.Decode(data, _loot));
                         break;
+                    case MessageType.TileChanges:
+                        if (Map != null) ApplyTileChanges(TileChangesMessage.Decode(data));
+                        break;
                     case MessageType.Snapshot:
                         if (Status == ClientStatus.Playing) Apply(SnapshotMessage.Decode(data));
                         break;
@@ -277,9 +284,10 @@ namespace Game.Core
                     shown.MaxHealth,
                     shown.State,
                     shown.Phase,
-                    entity.Kind == EntityKind.Drop && entity.State != DropState.Rune && entity.State != DropState.Consumable ? _loot.Bases[entity.Type] : null,
+                    entity.Kind == EntityKind.Drop && entity.State < DropState.Material ? _loot.Bases[entity.Type] : null,
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Rune ? _loot.Runes[entity.Type] : null,
-                    entity.Kind == EntityKind.Drop && entity.State == DropState.Consumable ? _loot.Consumables[entity.Type] : null));
+                    entity.Kind == EntityKind.Drop && entity.State == DropState.Consumable ? _loot.Consumables[entity.Type] : null,
+                    entity.Kind == EntityKind.Drop && entity.State == DropState.Material ? _loot.Materials[entity.Type] : null));
             }
             return views;
         }
@@ -377,6 +385,27 @@ namespace Game.Core
             return new InventoryCommandMessage(InventoryCommand.UseConsumable, 0, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode();
         }
 
+        // In the order the crafting list shows them.
+        public IReadOnlyList<Recipe> Recipes => _loot?.Recipes ?? (IReadOnlyList<Recipe>)Array.Empty<Recipe>();
+
+        public byte[] CraftCommand(Recipe recipe) =>
+            new InventoryCommandMessage(InventoryCommand.Craft, 0, index: ItemCodec.Index(_loot.Recipes, recipe)).Encode();
+
+        public byte[] PlaceCommand(MaterialDefinition material) =>
+            new InventoryCommandMessage(InventoryCommand.Place, 0, index: ItemCodec.Index(_loot.Materials, material)).Encode();
+
+        // Whether the bag holds everything the recipe takes, and room for an item it makes.
+        public bool CanCraft(Recipe recipe) =>
+            recipe.Ingredients.All(i => Bag.CountOf(i.Material) >= i.Count) && (recipe.Item == null || !Bag.IsFull);
+
+        // Cells whose tile changed since the last call, for redrawing them.
+        public List<TileChange> TakeChangedTiles()
+        {
+            var changes = new List<TileChange>(_changedTiles);
+            _changedTiles.Clear();
+            return changes;
+        }
+
         // What the quick key and button use: the first consumable in the sheet that the bag has, or null.
         public ConsumableDefinition QuickConsumable => _loot?.Consumables.FirstOrDefault(c => Bag.CountOf(c) > 0);
 
@@ -410,6 +439,10 @@ namespace Game.Core
                 {
                     _acquired.Add($"획득: {pair.Key.Name}");
                 }
+                foreach (var pair in message.Bag.Materials.Where(pair => pair.Value > Bag.CountOf(pair.Key)))
+                {
+                    _acquired.Add($"획득: {pair.Key.Name} ×{pair.Value - Bag.CountOf(pair.Key)}");
+                }
             }
             Equipment = message.Equipment;
             Bag = message.Bag;
@@ -437,6 +470,16 @@ namespace Game.Core
             return indexes.Select(i => _classes.Classes[i]).ToList();
         }
 
+        void ApplyTileChanges(TileChangesMessage message)
+        {
+            foreach (var change in message.Changes)
+            {
+                if (!Map.InBounds(change.X, change.Y)) throw new InvalidDataException("Tile change outside the map.");
+                Map[change.X, change.Y] = change.Type;
+                _changedTiles.Add(change);
+            }
+        }
+
         void Welcome(WelcomeMessage welcome)
         {
             Classes = ClassesAt(welcome.Classes);
@@ -462,6 +505,7 @@ namespace Game.Core
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Drop
                 && (_loot == null || e.Type >= (e.State == DropState.Rune ? _loot.Runes.Count
                     : e.State == DropState.Consumable ? _loot.Consumables.Count
+                    : e.State == DropState.Material ? _loot.Materials.Count
                     : _loot.Bases.Count))))
                 throw new InvalidDataException("Snapshot names loot this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Boss && (_bosses == null || e.Type >= _bosses.Bosses.Count)))
