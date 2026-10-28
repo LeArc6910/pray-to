@@ -88,6 +88,7 @@ namespace Game.Client
         readonly List<Flash> _flashes = new List<Flash>();
         // Which skill slots of each other player have a buff running, from their snapshot state.
         readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
+        readonly Dictionary<int, SpriteRenderer> _crops = new Dictionary<int, SpriteRenderer>();
         Tilemap _tilemap;
         TileBase _floorTile;
         TileBase _arenaTile;
@@ -130,6 +131,7 @@ namespace Game.Client
             ShowAura(_self, _client.PlayerId, selfBuffs);
 
             DrawEntities(deltaTime);
+            DrawCrops();
             DrawMarks();
             DrawProjectiles();
 
@@ -400,6 +402,41 @@ namespace Game.Client
             return mark;
         }
 
+        // A crop is a dot on its tile that grows and turns from green to the crop's colour, and pulses once ripe.
+        void DrawCrops()
+        {
+            _seen.Clear();
+            double now = _client.HostTick;
+            foreach (var crop in _client.Crops)
+            {
+                int key = crop.Y * _client.Map.Width + crop.X;
+                _seen.Add(key);
+                if (!_crops.TryGetValue(key, out var renderer))
+                {
+                    renderer = Renderer(_root.transform, "Crop", Shapes.Circle, Palette.Sprout);
+                    renderer.transform.localPosition = new Vector3(crop.X + 0.5f, crop.Y + 0.5f, 0);
+                    renderer.sortingOrder = -20;
+                    _crops[key] = renderer;
+                }
+                float growth = crop.Growth(now);
+                bool ripe = crop.IsRipe(now);
+                // Four steps, as the docs describe: sprout, young, growing, ripe.
+                float step = ripe ? 1 : Mathf.Floor(growth * 3) / 3;
+                float size = 0.25f + 0.4f * step + (ripe ? 0.05f * Mathf.Sin(Time.time * 5) : 0);
+                renderer.transform.localScale = Vector3.one * size;
+                renderer.color = Color.Lerp(Palette.Sprout, Palette.Ripe, step);
+            }
+
+            _gone.Clear();
+            foreach (var pair in _crops)
+            {
+                if (_seen.Contains(pair.Key)) continue;
+                Object.Destroy(pair.Value.gameObject);
+                _gone.Add(pair.Key);
+            }
+            foreach (int key in _gone) _crops.Remove(key);
+        }
+
         void DrawProjectiles()
         {
             _seen.Clear();
@@ -465,6 +502,9 @@ namespace Game.Client
                     // A puff of dust where the wall was struck, bigger when it gives way.
                     var struck = new Vector3(e.Position.X, e.Position.Y, 0);
                     AddFlash(struck, e.Amount == 1 ? 0.7f : 0.35f, Palette.Dust, Shapes.Circle);
+                    break;
+                case SimEventType.Harvested:
+                    AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 0.6f, Palette.Ripe, Shapes.Ring);
                     break;
                 case SimEventType.Healed:
                     var drinker = Find(e.Source);

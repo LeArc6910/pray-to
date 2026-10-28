@@ -18,6 +18,7 @@ namespace Game.Core
         Roster = 13,
         Inventory = 14,
         TileChanges = 15,
+        CropChanges = 16,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -25,7 +26,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.8.0";
+        public const string Version = "0.9.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -173,6 +174,53 @@ namespace Game.Core
             for (int start = 0; start < changes.Count; start += MaxPerMessage)
             {
                 yield return new TileChangesMessage(changes.Skip(start).Take(MaxPerMessage).ToList()).Encode();
+            }
+        }
+    }
+
+    // Crops planted (with what and when, as an index into the crops sheet) or harvested. Sent like TileChanges; how
+    // far along a crop is, each side works out from the tick it was planted.
+    public sealed class CropChangesMessage
+    {
+        public const int MaxPerMessage = 150;
+        const byte Gone = 255;
+
+        public CropChangesMessage(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick)> changes) { Changes = changes; }
+
+        // Crop is -1 for a harvested one.
+        public IReadOnlyList<(int X, int Y, int Crop, long PlantedTick)> Changes { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.CropChanges, w =>
+        {
+            w.Write((ushort)Changes.Count);
+            foreach (var (x, y, crop, planted) in Changes)
+            {
+                w.Write((ushort)x);
+                w.Write((ushort)y);
+                w.Write(crop < 0 ? Gone : (byte)crop);
+                w.Write(planted);
+            }
+        });
+
+        public static CropChangesMessage Decode(byte[] data) => Protocol.Read(data, MessageType.CropChanges, r =>
+        {
+            int count = r.ReadUInt16();
+            var changes = new List<(int, int, int, long)>(count);
+            for (int i = 0; i < count; i++)
+            {
+                int x = r.ReadUInt16();
+                int y = r.ReadUInt16();
+                byte crop = r.ReadByte();
+                changes.Add((x, y, crop == Gone ? -1 : crop, r.ReadInt64()));
+            }
+            return new CropChangesMessage(changes);
+        });
+
+        public static IEnumerable<byte[]> EncodeAll(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick)> changes)
+        {
+            for (int start = 0; start < changes.Count; start += MaxPerMessage)
+            {
+                yield return new CropChangesMessage(changes.Skip(start).Take(MaxPerMessage).ToList()).Encode();
             }
         }
     }

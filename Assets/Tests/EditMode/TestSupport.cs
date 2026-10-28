@@ -134,8 +134,9 @@ namespace Game.Core.Tests
 
     public static class Tiles
     {
-        public static readonly TileData Shipped =
-            TileSheet.Parse(File.ReadAllText(RepoFile.Find("Assets/_Project/Data/World/" + TileSheet.File)), Gear.Data);
+        static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/World/" + file));
+
+        public static readonly TileData Shipped = TileSheet.Parse(Read(TileSheet.File), Gear.Data, Read(TileSheet.CropsFile));
     }
 
     public static class Classes

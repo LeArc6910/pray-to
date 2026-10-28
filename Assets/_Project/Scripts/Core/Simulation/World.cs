@@ -20,7 +20,7 @@ namespace Game.Core
     // the one exception is a player's own position, which its client reports (see MovePlayer). Bosses, their
     // telegraphed areas and projectiles are in World.Boss.cs; drops, pickups and inventory commands in World.Loot.cs;
     // players joining with their classes and using skills in World.Skills.cs; digging, building and crafting in
-    // World.Mining.cs.
+    // World.Mining.cs; farming in World.Farming.cs.
     public sealed partial class World
     {
         public const int TicksPerSecond = 30;
@@ -142,6 +142,7 @@ namespace Game.Core
             UpdateHazards();
             UpdateProjectiles();
             UpdateLoot();
+            UpdateCrops();
             SeparateEnemies();
 
             if (--_spawnTimer <= 0)

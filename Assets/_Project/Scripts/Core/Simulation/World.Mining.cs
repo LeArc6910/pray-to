@@ -62,11 +62,12 @@ namespace Game.Core
             _wallDamage.Remove(key);
             SetTile(x, y, TileType.Floor);
             player.Inventory.AddMaterial(tile.Material, tile.Count);
+            if (tile.Extra != null && tile.ExtraChance > 0 && _random.Chance(tile.ExtraChance / 100f)) player.Inventory.AddMaterial(tile.Extra);
             player.InventoryVersion++;
         }
 
         // Puts the material's tile on the floor ahead of the player. False when it cannot be placed there: not a
-        // floor, someone in the way, inside a boss arena, or no such material in the bag.
+        // floor, someone or a crop in the way, inside a boss arena, or no such material in the bag.
         public bool PlaceTile(int playerId, MaterialDefinition material)
         {
             var player = FindPlayer(playerId);
@@ -74,7 +75,7 @@ namespace Game.Core
             var ahead = player.Position + player.Facing * BuildReach;
             int x = TileMap.Cell(ahead.X);
             int y = TileMap.Cell(ahead.Y);
-            if (Map.IsEdge(x, y) || Map[x, y] != TileType.Floor) return false;
+            if (Map.IsEdge(x, y) || Map[x, y] != TileType.Floor || CropAt(x, y) != null) return false;
             if (_players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, x, y))
                 || _enemies.Any(e => !e.IsDead && Touches(e.Position, e.Definition.Radius, x, y))
                 || _bosses.Any(b => Touches(b.Position, b.Definition.Radius, x, y) || Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1))

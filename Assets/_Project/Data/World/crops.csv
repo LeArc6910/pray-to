@@ -1,0 +1,2 @@
+id,name,seed,grow_seconds,harvest,count,seeds,seed_chance
+mushroom,동굴 버섯,mushroom_spore,180,mushroom,2,1,50

@@ -87,11 +87,12 @@ namespace Game.Core
         UseConsumable,
         Craft,
         Place,
+        Plant,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
     // used by Unequip; Index is a sheet index: the rune for InsertRune, the consumable for UseConsumable, the
-    // recipe for Craft and the material for Place.
+    // recipe for Craft, the material for Place and the crop for Plant.
     public sealed class InventoryCommandMessage
     {
         public InventoryCommandMessage(InventoryCommand command, int item, ItemSlot slot = ItemSlot.Weapon, int index = 0)

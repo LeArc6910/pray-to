@@ -19,7 +19,7 @@ namespace Game.Core.Tests
 
             public WorldClient Join(ulong connection, string name, string version = Protocol.Version, params string[] classes)
             {
-                var client = new WorldClient("key" + connection, name, Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, classes);
+                var client = new WorldClient("key" + connection, name, Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, classes, Tiles.Shipped);
                 Clients[connection] = client;
                 Host.Receive(connection, version == Protocol.Version ? client.JoinMessage() : new JoinMessage(client.PlayerKey, name, null, version).Encode());
                 Deliver();
@@ -353,6 +353,7 @@ namespace Game.Core.Tests
             int y = TileMap.Cell(world.Spawn.Y);
             int x = TileMap.Cell(world.Spawn.X);
             while (!map.IsSolid(x, y)) x++;
+            var rock = Tiles.Shipped.Find(map[x, y]).Material;
             Walk(world, world.FindPlayer(alice.PlayerId), TileMap.Center(x - 1, y));
             session.Tick(4);
 
@@ -364,7 +365,7 @@ namespace Game.Core.Tests
 
             Assert.AreEqual(TileType.Floor, map[x, y]);
             Assert.AreEqual(TileType.Floor, alice.Map[x, y], "sent to whoever is playing");
-            Assert.AreEqual(1, alice.Bag.Materials.Values.Sum());
+            Assert.AreEqual(1, alice.Bag.CountOf(rock));
             var bob = session.Join(2, "밥");
             Assert.AreEqual(TileType.Floor, bob.Map[x, y], "and to whoever joins later");
 
@@ -403,6 +404,40 @@ namespace Game.Core.Tests
             session.Host.World.DropMaterial(gel, alice.Position + new Vec2(3, 0));
             session.Tick(10);
             Assert.AreSame(gel, alice.Others().Single(e => e.Kind == EntityKind.Drop).DropMaterial);
+        }
+
+        [Test]
+        public void CropsGrowTheSameForEveryone()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var world = session.Host.World;
+            var mushroom = Tiles.Shipped.Crops.Single();
+            var spore = mushroom.Seed;
+            session.Tick(2);
+
+            Assert.AreEqual(2, alice.Bag.CountOf(spore), "HostConfig.StarterMaterials");
+            Assert.AreSame(mushroom, alice.CropFrom(spore));
+            session.Send(1, alice.PlantCommand(mushroom));
+            session.Tick(2);
+
+            var crop = alice.Crops.Single();
+            Assert.AreSame(mushroom, crop.Definition);
+            Assert.AreEqual(1, alice.Bag.CountOf(spore));
+            var bob = session.Join(2, "밥");
+            Assert.AreEqual((crop.X, crop.Y, crop.PlantedTick), (bob.Crops.Single().X, bob.Crops.Single().Y, bob.Crops.Single().PlantedTick),
+                "a late joiner gets what is growing");
+
+            session.Tick(mushroom.GrowTicks / 2);
+            Assert.AreEqual(0.5f, alice.Crops.Single().Growth(alice.HostTick), 0.05f, "worked out from the tick, not sent");
+
+            // Alice walks onto it once it is ripe; everyone sees it go.
+            session.Tick(mushroom.GrowTicks / 2);
+            Walk(world, world.FindPlayer(alice.PlayerId), TileMap.Center(crop.X, crop.Y));
+            session.Tick(4);
+            Assert.IsEmpty(alice.Crops);
+            Assert.IsEmpty(bob.Crops);
+            Assert.AreEqual(2, alice.Bag.CountOf(Gear.Data.FindMaterial("mushroom")));
         }
 
         [Test]

@@ -158,7 +158,8 @@ namespace Game.Client
             GUILayout.Label($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}");
         }
 
-        // Materials, counted by kind; one that builds gets [놓기], which puts it on the tile the player faces.
+        // Materials, counted by kind. One that builds gets [놓기] and a seed gets [심기]; both act on the tile the
+        // player faces.
         void DrawMaterials()
         {
             if (_client.Bag.Materials.Count == 0) return;
@@ -169,6 +170,8 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
                 if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) _send(_client.PlaceCommand(pair.Key));
+                var crop = _client.CropFrom(pair.Key);
+                if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) _send(_client.PlantCommand(crop));
                 GUILayout.EndHorizontal();
             }
         }

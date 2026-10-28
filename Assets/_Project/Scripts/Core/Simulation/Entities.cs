@@ -172,6 +172,8 @@ namespace Game.Core
         Healed,
         // Source, a player, struck the wall at Position; Amount is 1 when it broke.
         Dug,
+        // Source, a player, harvested Amount from the crop at Position.
+        Harvested,
     }
 
     public readonly struct SimEvent
@@ -200,7 +202,8 @@ namespace Game.Core
         // Only for events that happen somewhere rather than to someone (HasPosition).
         public Vec2 Position { get; }
 
-        public static bool HasPosition(SimEventType type) => type == SimEventType.Burst || type == SimEventType.Dug;
+        public static bool HasPosition(SimEventType type) =>
+            type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested;
     }
 
     public enum BossState : byte

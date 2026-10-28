@@ -25,6 +25,8 @@ namespace Game.Core
         public string[] StarterGear { get; set; } = { "copper_sword" };
         // One entry per consumable handed out on joining. Ids the sheet does not have are skipped.
         public string[] StarterConsumables { get; set; } = { "healing_potion", "healing_potion", "healing_potion" };
+        // One entry per material handed out on joining, likewise.
+        public string[] StarterMaterials { get; set; } = { "mushroom_spore", "mushroom_spore" };
     }
 
     public readonly struct Outgoing
@@ -62,6 +64,7 @@ namespace Game.Core
         readonly BossData _bosses;
         readonly LootData _loot;
         readonly ClassData _classes;
+        readonly TileData _tiles;
         readonly HostConfig _config;
         readonly GameRandom _gearRandom;
         readonly ulong _seed;
@@ -83,6 +86,7 @@ namespace Game.Core
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _bosses = bosses;
             _classes = classes;
+            _tiles = tiles;
             _loot = loot ?? throw new ArgumentNullException(nameof(loot));
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
@@ -138,7 +142,8 @@ namespace Game.Core
 
             // Dug and built tiles go out before the snapshot, so nobody walks into a wall that is not there.
             var tileChanges = World.TakeTileChanges();
-            foreach (byte[] message in TileChangesMessage.EncodeAll(tileChanges))
+            var cropChanges = World.TakeCropChanges().Select(CropEntry).ToList();
+            foreach (byte[] message in TileChangesMessage.EncodeAll(tileChanges).Concat(CropChangesMessage.EncodeAll(cropChanges)))
             {
                 foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) Send(pair.Key, message, reliable: true);
             }
@@ -195,11 +200,18 @@ namespace Game.Core
                 var consumable = _loot.Consumables.FirstOrDefault(c => c.Id == id);
                 if (consumable != null) player.Inventory.AddConsumable(consumable);
             }
+            foreach (string id in _config.StarterMaterials)
+            {
+                var material = _loot.Materials.FirstOrDefault(m => m.Id == id);
+                if (material != null) player.Inventory.AddMaterial(material);
+            }
             _connections[connection] = new Connection { Player = player };
 
             var map = _generated.Map;
             Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, player.Position, ClassIndexes(player)).Encode(), reliable: true);
             foreach (byte[] message in TileChangesMessage.EncodeAll(World.ChangedTiles())) Send(connection, message, reliable: true);
+            var crops = World.Crops.Select(c => CropEntry(new CropChange(c.X, c.Y, c))).ToList();
+            foreach (byte[] message in CropChangesMessage.EncodeAll(crops)) Send(connection, message, reliable: true);
             BroadcastRoster();
         }
 
@@ -224,6 +236,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Place:
                     if (command.Index < _loot.Materials.Count) World.PlaceTile(player.Id, _loot.Materials[command.Index]);
+                    break;
+                case InventoryCommand.Plant:
+                    if (_tiles != null && command.Index < _tiles.Crops.Count) World.Plant(player.Id, _tiles.Crops[command.Index]);
                     break;
                 case InventoryCommand.Discard:
                     World.DiscardItem(player.Id, command.Item);
@@ -311,6 +326,9 @@ namespace Game.Core
                 .ToList();
             return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events);
         }
+
+        (int X, int Y, int Crop, long PlantedTick) CropEntry(CropChange change) =>
+            (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.PlantedTick ?? 0);
 
         static byte BuffBits(Player player)
         {

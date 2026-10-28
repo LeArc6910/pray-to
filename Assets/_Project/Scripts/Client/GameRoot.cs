@@ -228,7 +228,7 @@ namespace Game.Client
 
             ulong seed = (ulong)DateTime.UtcNow.Ticks;
             _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles);
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles);
             _inventory = new InventoryWindow(_client, SendToHost);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
@@ -243,7 +243,7 @@ namespace Game.Client
                 _status = "접속을 시작하지 못했습니다. 주소를 확인하세요.";
                 return;
             }
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles);
             _inventory = new InventoryWindow(_client, SendToHost);
             _joinSent = false;
             _net.Connected += id =>

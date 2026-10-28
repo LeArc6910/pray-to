@@ -1,2 +1,3 @@
 id,name,level,heal,seconds,cooldown,weight,description
 healing_potion,회복 물약,1,35,2,10,100,2초에 걸쳐 최대 생명력의 35%를 채운다
+roasted_mushroom,버섯 구이,1,25,4,10,0,4초에 걸쳐 최대 생명력의 25%를 채운다. 동굴 버섯 둘로 만든다

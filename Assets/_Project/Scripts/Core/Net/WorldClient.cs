@@ -131,6 +131,8 @@ namespace Game.Core
         readonly BossData _bosses;
         readonly LootData _loot;
         readonly ClassData _classes;
+        readonly TileData _tiles;
+        readonly Dictionary<int, Crop> _crops = new Dictionary<int, Crop>();
         readonly List<string> _acquired = new List<string>();
         readonly List<SnapshotMessage> _snapshots = new List<SnapshotMessage>();
         readonly List<SimEvent> _events = new List<SimEvent>();
@@ -155,7 +157,8 @@ namespace Game.Core
             BossData bosses = null,
             LootData loot = null,
             ClassData classes = null,
-            IEnumerable<string> chosenClasses = null)
+            IEnumerable<string> chosenClasses = null,
+            TileData tiles = null)
         {
             PlayerKey = playerKey ?? "";
             Name = name ?? "";
@@ -163,6 +166,7 @@ namespace Game.Core
             _bosses = bosses;
             _loot = loot;
             _classes = classes;
+            _tiles = tiles;
             ChosenClasses = (chosenClasses ?? Enumerable.Empty<string>()).ToList();
         }
 
@@ -217,6 +221,9 @@ namespace Game.Core
                         break;
                     case MessageType.TileChanges:
                         if (Map != null) ApplyTileChanges(TileChangesMessage.Decode(data));
+                        break;
+                    case MessageType.CropChanges:
+                        if (Map != null) ApplyCropChanges(CropChangesMessage.Decode(data));
                         break;
                     case MessageType.Snapshot:
                         if (Status == ClientStatus.Playing) Apply(SnapshotMessage.Decode(data));
@@ -388,6 +395,15 @@ namespace Game.Core
         // In the order the crafting list shows them.
         public IReadOnlyList<Recipe> Recipes => _loot?.Recipes ?? (IReadOnlyList<Recipe>)Array.Empty<Recipe>();
 
+        // What is growing, as of the host's last word. How ripe each is comes from HostTick.
+        public IReadOnlyCollection<Crop> Crops => _crops.Values;
+
+        // The crop this material grows, or null when it is not a seed.
+        public CropDefinition CropFrom(MaterialDefinition material) => _tiles?.CropFrom(material);
+
+        public byte[] PlantCommand(CropDefinition crop) =>
+            new InventoryCommandMessage(InventoryCommand.Plant, 0, index: ItemCodec.Index(_tiles.Crops, crop)).Encode();
+
         public byte[] CraftCommand(Recipe recipe) =>
             new InventoryCommandMessage(InventoryCommand.Craft, 0, index: ItemCodec.Index(_loot.Recipes, recipe)).Encode();
 
@@ -477,6 +493,22 @@ namespace Game.Core
                 if (!Map.InBounds(change.X, change.Y)) throw new InvalidDataException("Tile change outside the map.");
                 Map[change.X, change.Y] = change.Type;
                 _changedTiles.Add(change);
+            }
+        }
+
+        void ApplyCropChanges(CropChangesMessage message)
+        {
+            foreach (var (x, y, crop, planted) in message.Changes)
+            {
+                if (!Map.InBounds(x, y)) throw new InvalidDataException("Crop outside the map.");
+                int key = y * Map.Width + x;
+                if (crop < 0)
+                {
+                    _crops.Remove(key);
+                    continue;
+                }
+                if (_tiles == null || crop >= _tiles.Crops.Count) throw new InvalidDataException("The host names a crop this client does not know.");
+                _crops[key] = new Crop(_tiles.Crops[crop], x, y, planted);
             }
         }
 
