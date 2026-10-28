@@ -2,13 +2,30 @@
 
 클라우드 세션(코드·데이터·문서 담당)이 한 일을 최신순으로 적는다. 로컬 세션은 작업을 시작할 때 `git pull` 후 이 파일을 열고, **로컬 확인**이 비어 있는 항목을 읽는다. 해야 할 일이 있으면 `LOCAL_TASKS.md`에 있고, 다 읽으면 체크하고 커밋한다.
 
-시각은 한국 시간이다. 커밋은 `git log --oneline`의 제목이나 해시로 찾는다.
+시각은 한국 시간이다. 커밋은 `git log --oneline`의 제목이나 해시로 찾는다. 2026-10-28 기록을 다시 쓴 뒤의 해시다.
 
 항목 형식:
 
 - **바뀐 것**: 무엇을 왜 바꿨는지
 - **로컬에서 할 일**: 명령 한 줄을 다시 돌려야 하는지, 플레이로 확인할 것이 있는지. 없으면 "없음"
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
+
+## 2026-10-28 18:18 웹 데모 라이선스 활성화 수정, 기록 정리 반영
+
+- **바뀐 것**
+  - 로컬의 두 번째 빌드 실패("serial invalid")를 고쳤다. GameCI(`unity-builder`)는 Personal 라이선스도 ULF 파일에서 꺼낸 시리얼로 활성화하는데, Unity 6 Personal은 시리얼이 없고 Hub가 ULF도 남기지 않는다. Unity 문서도 Personal은 명령줄 활성화를 지원하지 않는다고 적고 있다
+  - 그래서 `unity-builder`를 빼고, 같은 GameCI 이미지(`unityci/editor:ubuntu-6000.6.3f1-webgl-3`) 안에서 `.github/scripts/build-web.sh`를 돌린다. 에디터에 들어 있는 Licensing Client로 `--activate-ulf --include-personal --username --password`(시리얼 없이) 활성화하고, `--showEntitlements`로 Unity Personal인지 확인한 뒤 빌드하고, 끝나면 성공·실패와 상관없이 `--return-ulf`로 돌려준다. 6000.6.3f1의 Licensing Client(1.18.3)를 직접 받아 이 옵션들이 있는 것을 확인했다. 실제 활성화는 비밀번호가 필요해 여기서는 못 해 봤다
+  - 이제 시크릿은 `UNITY_EMAIL`, `UNITY_PASSWORD` 둘만 쓴다. `UNITY_LICENSE`는 필요 없다(지워도 된다)
+  - 커밋 기록 정리를 반영했다: 이 클라우드 세션도 새 기록으로 옮겼고(`reset --hard origin/main`, 파일 내용은 옛 기록과 같았다), 앞으로 커밋은 `LeArc6910` noreply 주소로 만들고 도구 표시 줄을 붙이지 않는다. `CLAUDE.md` 규칙 절에 적었다. 이 파일의 커밋 해시도 새 기록의 해시로 고쳤다
+  - 로컬 웹 빌드 확인에서 나온 것들
+    - 웹 빌드 설정(gzip, decompression fallback, 데이터 캐싱)을 `ProjectSetup.SetUp`에서 정한다. 다음 setup 커밋에 `ProjectSettings`로 들어가고, 그 뒤로는 빌드가 `ProjectSettings.asset`을 바꾸지 않는다
+    - `Main.unity`는 없을 때만 만든다. setup 때마다 씬을 다시 저장해서 fileID가 바뀌던 것을 없앴다. 씬을 다시 만들려면 파일을 지우고 setup을 돌린다
+    - `.gitignore`에 `/Data/`(Burst가 웹 빌드 때 저장소 루트에 만드는 파일)
+    - 가방 창의 설명 상자가 HUD를 가리지 않게 HUD 아래로 내렸고, 가방 창 배경을 불투명하게 해서 뒤의 이름표가 비치지 않는다
+- **로컬에서 할 일**
+  - 이 푸시는 `web-demo.yml`을 바꿨으므로 Web demo가 저절로 돈다. Actions 탭에서 결과를 확인하고 결과 보고에 적는다(실패하면 로그의 `::error` 줄과 Licensing Client 줄)
+  - `LOCAL_TASKS.md` 3번: 명령 한 줄을 다시 실행해 웹 설정이 들어간 `ProjectSettings`를 커밋한다
+- **로컬 확인**: [ ]
 
 ## 2026-10-28 01:05 웹 데모: 빌드·배포 워크플로, 터치 조작, 한글 글꼴
 
@@ -37,7 +54,7 @@
 
 ## 2026-10-27 23:45 Light2D 컴파일 에러 수정
 
-커밋: `27c68c2` Reference URP's 2D assembly and compile-check each asmdef on its own
+커밋: `bb08eab` Reference URP's 2D assembly and compile-check each asmdef on its own
 
 - **바뀐 것**
   - URP 17.6은 `Light2D`, `Renderer2DData`를 별도 어셈블리 `Unity.RenderPipelines.Universal.2D.Runtime`에 둔다. `Game.Client`, `Game.Client.Editor` asmdef에 참조를 넣었다
@@ -48,7 +65,7 @@
 
 ## 2026-10-27 20:50 명령 한 줄
 
-커밋: `5248174` Add a one-command local setup that configures Unity and runs its tests, `99caee8` Fix the setup script check on the CI runner
+커밋: `114369b` Add a one-command local setup that configures Unity and runs its tests, `6fff389` Fix the setup script check on the CI runner
 
 - **바뀐 것**
   - `Game > Set Up Project`(`ProjectSetup.cs`): 입력 방식, Product Name, 2D 모드, URP 2D 렌더러, Main 씬과 시트 에셋을 코드로 만든다
@@ -60,7 +77,7 @@
 
 ## 2026-10-27 20:24 M3b 드랍과 가방
 
-커밋: `f873c58` Add drops, ground loot and a bag with equip, rune and discard commands
+커밋: `3d2dad5` Add drops, ground loot and a bag with equip, rune and discard commands
 
 - **바뀐 것**: 몬스터·보스 드랍, 바닥 아이템 자동 줍기, 가방(24칸, 룬은 종류별로 쌓임), 장착·벗기·룬 끼우기·버리기 명령, 보스 처치 뒤 진행 레벨 상승. 프로토콜 0.4. 자세한 규칙은 `Docs/Loot.md`의 드랍 절
 - **로컬에서 할 일**: `LOCAL_TASKS.md` 2번의 M3b 플레이 확인
@@ -68,7 +85,7 @@
 
 ## 2026-10-27 02:22 M3 첫 보스
 
-커밋: `eea473e` Add the first boss: an arena, telegraphed attacks, phases and the client side
+커밋: `cc6eb80` Add the first boss: an arena, telegraphed attacks, phases and the client side
 
 - **바뀐 것**: 보스 아레나 생성, 동굴 수호자(3페이즈, 예고 장판, 투사체, 돌진, 소환), 인원수에 따른 체력, 초기화와 재등장. `Docs/Bosses.md`
 - **로컬에서 할 일**: `LOCAL_TASKS.md` 2번의 M3 플레이 확인
@@ -76,7 +93,7 @@
 
 ## 2026-10-27 01:58 M2 월드, 전투, 협동 접속
 
-커밋: `2ad218f` Add the cave world, combat simulation and host/client netcode in Core, `53fe281` Add the Unity client for M2 and compile-check it against Unity's assemblies
+커밋: `718573a` Add the cave world, combat simulation and host/client netcode in Core, `0889c24` Add the Unity client for M2 and compile-check it against Unity's assemblies
 
 - **바뀐 것**: 절차 생성 동굴, 이동·충돌, 근접 전투, 슬라임, 호스트 권한 멀티플레이(Core 메시지 + Netcode 전송), Unity 클라이언트. `Docs/Combat.md`, `Docs/Multiplayer.md`
 - **로컬에서 할 일**: `LOCAL_TASKS.md` 2번의 M2 플레이 확인
@@ -84,7 +101,7 @@
 
 ## 2026-10-26 19:05 M0 뼈대, M1 아이템
 
-커밋: `5398fbd` Set up the repository skeleton with a Unity-free core and CI, `f641e79` Add item generation with affixes, runes and runewords
+커밋: `5ab7ea8` Set up the repository skeleton with a Unity-free core and CI, `d1e3a47` Add item generation with affixes, runes and runewords
 
 - **바뀐 것**: 저장소 구조, Unity 없이 도는 Core와 테스트, CI. 아이템 베이스·접사·룬·룬워드 시트와 생성기. `Docs/Design.md`, `Docs/Loot.md`
 - **로컬에서 할 일**: 없음

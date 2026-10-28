@@ -15,6 +15,9 @@ namespace Game.Client
 
         static Font _font;
 
+        // The status box in the top left corner during play. Other screens keep clear of it.
+        public static readonly Rect HudArea = new Rect(10, 10, 340, 160);
+
         public static float Scale { get; private set; } = 1;
 
         // Screen size in points.

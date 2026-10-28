@@ -5,13 +5,15 @@
 ## 흐름
 
 1. `main`에 푸시하면 `.github/workflows/web-demo.yml`이 돈다. 문서(`*.md`, `Docs/`)와 `DevTools/`만 바뀐 푸시는 건너뛴다. Actions 탭에서 손으로 돌릴 수도 있다(Run workflow).
-2. Unity 라이선스 시크릿이 없으면 빌드를 건너뛰고 안내만 남긴다(실패로 표시하지 않는다).
-3. GameCI(`game-ci/unity-builder`)가 `unityci/editor:ubuntu-6000.6.3f1-webgl-3` 이미지로 `Game.Client.Editor.WebBuild.RunBatch`를 실행한다. 먼저 `Game > Set Up Project`를 해서 씬과 시트 목록이 최신인지 맞춘 뒤 WebGL로 빌드한다. `Library/`는 Actions 캐시에 남겨 다음 빌드를 줄인다.
+2. 시크릿 `UNITY_EMAIL`, `UNITY_PASSWORD`가 없으면 빌드를 건너뛰고 안내만 남긴다(실패로 표시하지 않는다).
+3. GameCI의 Unity 이미지(`unityci/editor:ubuntu-<ProjectVersion의 버전>-webgl-3`) 안에서 `.github/scripts/build-web.sh`가 돈다.
+   - **라이선스**: 에디터에 들어 있는 Licensing Client로 Unity Personal을 활성화한다(`--activate-ulf --include-personal --username --password`, 시리얼 없음). `--showEntitlements`로 확인하고, 빌드가 어떻게 끝나든 `--return-ulf`로 돌려준다. GameCI의 `unity-builder`는 Personal도 ULF 파일에서 꺼낸 시리얼로 활성화하는데, Unity 6 Personal은 시리얼이 없고 Hub가 ULF를 남기지 않아 "serial invalid"로 실패했다(2026-10-28). 계정은 소셜 로그인이나 2단계 인증 없이 이메일·비밀번호로 로그인할 수 있어야 한다
+   - **빌드**: `Game.Client.Editor.WebBuild.RunBatch`. 먼저 `Game > Set Up Project`를 해서 씬과 시트 목록이 최신인지 맞춘 뒤 WebGL로 `build/web`에 빌드한다. `Library/`는 Actions 캐시에 남겨 다음 빌드를 줄인다
 4. 결과를 GitHub Pages에 올린다. 처음 빌드는 20분 안팎, 캐시가 있으면 그보다 짧다.
 
-빌드 설정: gzip 압축에 decompression fallback을 켠다. GitHub Pages는 `.gz` 파일에 `Content-Encoding` 헤더를 붙이지 않으므로, 브라우저 대신 Unity 로더가 압축을 푼다. 데이터 캐싱도 켜서 두 번째 접속부터는 빨리 뜬다.
+빌드 설정(`ProjectSetup.UseWebSettings`): gzip 압축에 decompression fallback을 켠다. GitHub Pages는 `.gz` 파일에 `Content-Encoding` 헤더를 붙이지 않으므로, 브라우저 대신 Unity 로더가 압축을 푼다. 데이터 캐싱도 켜서 두 번째 접속부터는 빨리 뜬다.
 
-로컬에서 빌드만 해 보려면 에디터 메뉴 **Game > Build Web Demo**(결과는 `Builds/Web`, 커밋하지 않는다). 아무 정적 서버로 그 폴더를 띄우면 된다. 예: `python -m http.server 8000 --directory Builds/Web` 후 같은 Wi-Fi의 휴대폰에서 `http://<PC 주소>:8000`.
+로컬에서 빌드만 해 보려면 에디터 메뉴 **Game > Build Web Demo**(결과는 `Builds/Web`, 커밋하지 않는다). 아무 정적 서버로 그 폴더를 띄우면 된다. 예: `python -m http.server 8000 --directory Builds/Web` 후 같은 Wi-Fi의 휴대폰에서 `http://<PC 주소>:8000`. 빌드하면 Unity가 URP 에셋 몇 개(`URP-2D.asset`의 셰이더 프리필터 설정, `UniversalRenderPipelineGlobalSettings.asset`, `DefaultVolumeProfile.asset`)를 고쳐 쓰는데, 게임에는 영향이 없으니 되돌려도 된다. Burst가 저장소 루트에 만드는 `Data/`는 무시된다.
 
 ## 웹에서 달라지는 것
 

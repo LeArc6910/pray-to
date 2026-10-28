@@ -40,6 +40,11 @@ namespace Game.Client
             _nameWidth = Mathf.Min(240, width - 200);
             var area = new Rect(Ui.Width - width - 10, 60, width, Ui.Height - 70);
             Controls.Block(area);
+            // The box style is see-through; names drawn over the world would show through the list.
+            var tint = GUI.color;
+            GUI.color = new Color(0.07f, 0.07f, 0.09f, 0.95f);
+            GUI.DrawTexture(area, Texture2D.whiteTexture);
+            GUI.color = tint;
             GUILayout.BeginArea(area, GUI.skin.box);
             GUILayout.Label(Controls.UsingTouch ? "가방 (가방 버튼으로 닫기)" : "가방 (Tab 또는 I로 닫기)");
             _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(area.height - TitleHeight));
@@ -107,11 +112,12 @@ namespace Game.Client
                 : Controls.UsingTouch ? "아이템 이름을 누르고 있으면 설명이 보입니다." : "아이템 이름에 마우스를 올리면 설명이 보입니다.";
             var content = new GUIContent(text);
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
-            // Left of the window when there is room, otherwise over its bottom edge.
-            float width = window.x >= TooltipWidth + 20 ? TooltipWidth : window.width - 20;
+            // Left of the window and below the HUD when there is room, otherwise over the window's bottom edge.
+            bool besideWindow = window.x >= TooltipWidth + 20;
+            float width = besideWindow ? TooltipWidth : window.width - 20;
             float height = _tooltipStyle.CalcHeight(content, width);
-            var rect = window.x >= TooltipWidth + 20
-                ? new Rect(window.x - width - 10, window.y, width, height)
+            var rect = besideWindow
+                ? new Rect(window.x - width - 10, Mathf.Max(window.y, Ui.HudArea.yMax + 10), width, height)
                 : new Rect(window.x + 10, window.yMax - height - 10, width, height);
             GUI.Box(rect, content, _tooltipStyle);
         }

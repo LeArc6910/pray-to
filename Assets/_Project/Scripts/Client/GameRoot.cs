@@ -295,7 +295,7 @@ namespace Game.Client
 
         void DrawHud()
         {
-            GUILayout.BeginArea(new Rect(10, 10, 340, 160), GUI.skin.box);
+            GUILayout.BeginArea(Ui.HudArea, GUI.skin.box);
             if (_client.Status != ClientStatus.Playing)
             {
                 GUILayout.Label(_status);
@@ -320,13 +320,13 @@ namespace Game.Client
         // Right of the HUD box and below the touch buttons; under the HUD when the screen is too narrow for that.
         static void DrawBossBar(EntityView boss)
         {
-            float left = 360;
+            float left = Ui.HudArea.xMax + 10;
             float right = Ui.Width - 20;
             float top = Controls.UsingTouch ? 20 + TouchButtonHeight : 20;
             if (right - left < 240)
             {
                 left = 20;
-                top = 180;
+                top = Ui.HudArea.yMax + 10;
             }
             float width = Mathf.Min(600, right - left);
             var bar = new Rect(left + (right - left - width) / 2, top, width, 18);

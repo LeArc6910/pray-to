@@ -21,7 +21,16 @@ namespace Game.Client.Editor
         public static void SetUp()
         {
             UpdateSheets();
-            CreateScene();
+            // Saving the scene again renumbers its objects even when nothing changed, which makes every setup
+            // commit noisy, so an existing scene is kept. GameRoot sets up the camera at runtime anyway.
+            // Delete the scene file to have it rebuilt.
+            if (AssetDatabase.LoadAssetAtPath<SceneAsset>(ScenePath) == null) CreateScene();
+            AddToBuild();
+            if (!Application.isBatchMode && EditorSceneManager.GetActiveScene().path != ScenePath
+                && EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo())
+            {
+                EditorSceneManager.OpenScene(ScenePath);
+            }
             Debug.Log($"Main scene ready at {ScenePath}. Press Play.");
         }
 
@@ -64,7 +73,14 @@ namespace Game.Client.Editor
             new GameObject("Game", typeof(GameRoot));
 
             EditorSceneManager.SaveScene(scene, ScenePath);
-            var scenes = EditorBuildSettings.scenes.Where(s => s.path != ScenePath).ToList();
+        }
+
+        // First and enabled in the build list. Leaves the list alone when it already is.
+        static void AddToBuild()
+        {
+            var scenes = EditorBuildSettings.scenes.ToList();
+            if (scenes.Count > 0 && scenes[0].path == ScenePath && scenes[0].enabled) return;
+            scenes.RemoveAll(s => s.path == ScenePath);
             scenes.Insert(0, new EditorBuildSettingsScene(ScenePath, true));
             EditorBuildSettings.scenes = scenes.ToArray();
         }

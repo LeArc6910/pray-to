@@ -7,8 +7,8 @@ using UnityEngine.Rendering.Universal;
 namespace Game.Client.Editor
 {
     // The project settings Unity would otherwise have someone click through after the first open: the Input System
-    // package as the only input backend, the product name, 2D editor mode, and a URP asset with the 2D renderer for
-    // every quality level. Then it builds the scene with SceneSetup. Safe to run again.
+    // package as the only input backend, the product name, 2D editor mode, a URP asset with the 2D renderer for
+    // every quality level, and the web build settings. Then it builds the scene with SceneSetup. Safe to run again.
     // The local setup script (DevTools/Local/setup.ps1, setup.sh) calls RunBatch through -executeMethod.
     public static class ProjectSetup
     {
@@ -25,6 +25,7 @@ namespace Game.Client.Editor
             bool inputChanged = UseNewInputSystem();
             PlayerSettings.productName = ProductName;
             EditorSettings.defaultBehaviorMode = EditorBehaviorMode.Mode2D;
+            UseWebSettings();
             UsePipeline(LoadOrCreatePipeline());
             AssetDatabase.SaveAssets();
             SceneSetup.SetUp();
@@ -47,6 +48,16 @@ namespace Game.Client.Editor
                 return;
             }
             EditorApplication.Exit(0);
+        }
+
+        // Files gzipped with the decompression fallback on, because static hosts such as GitHub Pages do not send the
+        // Content-Encoding header Unity's loader would otherwise need; cached in the browser after the first visit.
+        // Set here rather than only when building, so a build leaves the committed settings as they are.
+        public static void UseWebSettings()
+        {
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+            PlayerSettings.WebGL.decompressionFallback = true;
+            PlayerSettings.WebGL.dataCaching = true;
         }
 
         // Sets Project Settings > Player > Active Input Handling, which has no public API. This is the serialized

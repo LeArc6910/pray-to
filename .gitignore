@@ -12,6 +12,8 @@
 /Assets/[Ss]treaming[Aa]ssets/aa/
 /Assets/[Ss]treaming[Aa]ssets/aa.meta
 sysinfo.txt
+# Burst writes its generated web code here during WebGL builds
+/[Dd]ata/
 crashlytics-build.properties
 
 # IDE / solution files Unity regenerates at the project root

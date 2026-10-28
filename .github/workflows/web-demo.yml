@@ -1,8 +1,9 @@
 name: Web demo
 
-# Builds the game for WebGL with GameCI and publishes it to GitHub Pages, so the latest main can be played in a
-# browser, phones included. Needs the Unity license secrets and Pages set to "GitHub Actions" (LOCAL_TASKS.md, 웹 데모용);
-# until the secrets exist the build is skipped with a notice instead of failing.
+# Builds the game for WebGL in GameCI's Unity image and publishes it to GitHub Pages, so the latest main can be
+# played in a browser, phones included. Needs the UNITY_EMAIL and UNITY_PASSWORD secrets of a Unity account with a
+# Personal license, and Pages set to "GitHub Actions" (LOCAL_TASKS.md, 웹 데모용). Until the secrets exist the build
+# is skipped with a notice instead of failing.
 on:
   push:
     branches: [main]
@@ -27,14 +28,13 @@ jobs:
     steps:
       - id: secrets
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
         run: |
-          if [ -n "$UNITY_LICENSE" ] && [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
+          if [ -n "$UNITY_EMAIL" ] && [ -n "$UNITY_PASSWORD" ]; then
             echo "ready=true" >> "$GITHUB_OUTPUT"
           else
-            echo "::notice title=Web demo skipped::Add the UNITY_LICENSE, UNITY_EMAIL and UNITY_PASSWORD secrets to build the web demo (LOCAL_TASKS.md)."
+            echo "::notice title=Web demo skipped::Add the UNITY_EMAIL and UNITY_PASSWORD secrets to build the web demo (LOCAL_TASKS.md)."
             echo "ready=false" >> "$GITHUB_OUTPUT"
           fi
 
@@ -42,8 +42,6 @@ jobs:
     needs: check
     if: needs.check.outputs.ready == 'true'
     runs-on: ubuntu-latest
-    outputs:
-      site: ${{ steps.site.outputs.path }}
     steps:
       # The Unity WebGL image is several GB; the runner's preinstalled SDKs are not needed here.
       - name: Free disk space
@@ -62,29 +60,35 @@ jobs:
           key: library-webgl-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
           restore-keys: library-webgl-
 
+      # GameCI's image for the project's Unity version, with WebGL support.
+      - name: Pull the Unity image
+        id: image
+        run: |
+          version="$(sed -n 's/^m_EditorVersion: //p' ProjectSettings/ProjectVersion.txt)"
+          image="unityci/editor:ubuntu-$version-webgl-3"
+          echo "image=$image" >> "$GITHUB_OUTPUT"
+          docker pull --quiet "$image"
+
+      # Activates Unity Personal, builds into build/web and returns the license (.github/scripts/build-web.sh).
       - name: Build
-        uses: game-ci/unity-builder@v4
         env:
-          UNITY_LICENSE: ${{ secrets.UNITY_LICENSE }}
           UNITY_EMAIL: ${{ secrets.UNITY_EMAIL }}
           UNITY_PASSWORD: ${{ secrets.UNITY_PASSWORD }}
-        with:
-          targetPlatform: WebGL
-          buildMethod: Game.Client.Editor.WebBuild.RunBatch
-          versioning: None
+        run: >-
+          docker run --rm
+          --env UNITY_EMAIL --env UNITY_PASSWORD
+          --volume "$GITHUB_WORKSPACE:/project" --workdir /project
+          "${{ steps.image.outputs.image }}"
+          bash .github/scripts/build-web.sh build/web
 
-      # GameCI writes the player to build/WebGL/<name>; find it by its index.html rather than assume the name.
-      - name: Find the site
-        id: site
-        run: |
-          index="$(find build -name index.html -print -quit)"
-          if [ -z "$index" ]; then echo "::error::The build produced no index.html"; exit 1; fi
-          echo "path=$(dirname "$index")" >> "$GITHUB_OUTPUT"
-          du -sh "$(dirname "$index")"
+      # The container ran as root; hand the files back so the Library cache can be saved.
+      - name: Fix file ownership
+        if: always()
+        run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
 
       - uses: actions/upload-pages-artifact@v3
         with:
-          path: ${{ steps.site.outputs.path }}
+          path: build/web
 
   deploy:
     needs: build

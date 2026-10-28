@@ -53,9 +53,10 @@ DevTools/Local/setup.sh --commit
 
 - [x] (2026-10-28 로컬 세션, 사용자 승인) **저장소를 public으로.** GitHub 저장소 Settings > General 맨 아래 Danger Zone > Change repository visibility > Make public. 클라우드 세션에는 이 권한이 없다. 로컬 세션에 맡긴다면 사람이 허락한 뒤 `gh repo edit LeArc6910/pray-to --visibility public --accept-visibility-change-consequences`. 공개 전에 기록을 확인했다: 커밋 이메일은 GitHub·Anthropic의 noreply 주소이고, 라이선스 파일·키·비밀번호는 없다
 - [x] (2026-10-28 로컬 세션, `gh api`로 build_type=workflow) Settings > Pages > Build and deployment > Source를 **GitHub Actions**로 (public이 된 뒤에 고를 수 있다)
-- [ ] 라이선스 파일 찾기. Windows는 `C:\ProgramData\Unity\Unity_lic.ulf`, macOS는 `/Library/Application Support/Unity/Unity_lic.ulf`
-- [x] (2026-10-28 01:38 사람이 넣음. 값은 확인하지 않음) Settings > Secrets and variables > Actions에 시크릿 3개 추가: `UNITY_LICENSE`(ulf 파일 내용 전체), `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다
+- [x] ~~라이선스 파일 찾기~~ 필요 없어졌다(2026-10-28). Unity 6 Personal에는 ULF 파일이 없고, 웹 데모 빌드는 이제 이메일·비밀번호로 Personal을 활성화한다
+- [x] (2026-10-28 01:38 사람이 넣음. 값은 확인하지 않음) Settings > Secrets and variables > Actions에 시크릿 추가: `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정. 소셜 로그인이나 2단계 인증 없이 https://id.unity.com 에 이메일·비밀번호로 들어가지는 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다. 처음에 넣었던 `UNITY_LICENSE`는 이제 쓰지 않으니 지워도 된다
 - [ ] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
+  - 2026-10-28 01:52, 02:12 두 번 실패(로그인 401, 이어서 serial invalid). 클라우드가 라이선스 활성화를 고쳤다(18:20, `CLOUD_LOG.md`). 그 푸시로 Web demo가 저절로 다시 돈다. 로컬 세션이 결과를 확인한다
 
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
 
@@ -117,6 +118,7 @@ DevTools/Local/setup.sh --commit
 웹 데모 작업으로 글꼴, WebGL 플러그인, 스크립트가 늘었다. `.meta`를 만들고 PlayMode 테스트가 그대로 통과하는지 본다.
 
 - [x] `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행 (2026-10-28 01:13 성공: EditMode 140/140, PlayMode 2/2)
+- [ ] (2026-10-28 18:20 추가) 다시 `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행. 웹 빌드 설정이 `ProjectSetup`으로 옮겨 와서 `ProjectSettings.asset`이 한 번 바뀐다(`webGLDecompressionFallback: 1` 등). `Main.unity`는 이제 이미 있으면 다시 쓰지 않으므로 바뀌지 않아야 한다
 - [x] (선택) 에디터 메뉴 **Game > Build Web Demo**로 웹 빌드가 되는지 본다. 결과 `Builds/Web`은 커밋하지 않는다. 같은 Wi-Fi의 휴대폰으로 보려면 `python -m http.server 8000 --directory Builds/Web` 후 `http://<PC 주소>:8000` (2026-10-28 로컬 세션이 배치 모드로 빌드하고 브라우저로 확인. 결과 보고 참고)
 
 ### 4. 웹 데모 확인 (사람, 휴대폰)

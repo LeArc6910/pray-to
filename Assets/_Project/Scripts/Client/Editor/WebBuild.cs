@@ -6,10 +6,9 @@ using UnityEngine;
 
 namespace Game.Client.Editor
 {
-    // Builds the web demo: the scenes in the build list, for WebGL, into Builds/Web. The GitHub Actions workflow
-    // (web-demo.yml) calls RunBatch through GameCI, which passes the output folder as -customBuildPath.
-    // Files are gzipped with the decompression fallback on, because static hosts such as GitHub Pages do not send
-    // the Content-Encoding header Unity's loader would otherwise need.
+    // Builds the web demo: the scenes in the build list, for WebGL, into Builds/Web. The Web demo workflow calls
+    // RunBatch (.github/scripts/build-web.sh) with the output folder as -customBuildPath. Compression and caching
+    // come from ProjectSetup.UseWebSettings.
     public static class WebBuild
     {
         const string DefaultPath = "Builds/Web";
@@ -39,9 +38,7 @@ namespace Game.Client.Editor
 
         static BuildReport Build(string path)
         {
-            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
-            PlayerSettings.WebGL.decompressionFallback = true;
-            PlayerSettings.WebGL.dataCaching = true;
+            ProjectSetup.UseWebSettings();
 
             string[] scenes = EditorBuildSettings.scenes.Where(s => s.enabled).Select(s => s.path).ToArray();
             if (scenes.Length == 0) throw new InvalidOperationException("No scenes in the build list. Run Game > Set Up Project first.");
