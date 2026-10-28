@@ -45,13 +45,26 @@ for attempt in 1 2 3; do
     sleep $((attempt * 20))
 done
 
-"$editor" \
-    -quit \
-    -projectPath "$PWD" \
-    -buildTarget WebGL \
-    -executeMethod Game.Client.Editor.WebBuild.RunBatch \
-    -customBuildPath "$PWD/$output" \
-    -logFile /dev/stdout
+build() {
+    "$editor" \
+        -quit \
+        -projectPath "$PWD" \
+        -buildTarget WebGL \
+        -executeMethod Game.Client.Editor.WebBuild.RunBatch \
+        -customBuildPath "$PWD/$output" \
+        -logFile /dev/stdout
+}
+
+# The editor is sometimes killed (exit 137) a second after it starts, before it has done anything; it happened in
+# three of the first dozen builds (2026-10-28) and a second start has always worked. Only that is retried.
+for attempt in 1 2 3; do
+    status=0
+    build || status=$?
+    if [ "$status" -ne 137 ] || [ "$attempt" = 3 ]; then break; fi
+    echo "::warning::The editor was killed (exit 137) on attempt $attempt; starting it again"
+    sleep 10
+done
+if [ "$status" -ne 0 ]; then exit "$status"; fi
 
 if [ ! -f "$output/index.html" ]; then
     echo "::error::The build finished without $output/index.html"
