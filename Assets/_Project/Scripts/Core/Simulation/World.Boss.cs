@@ -361,20 +361,27 @@ namespace Game.Core
 
         void UpdateProjectiles()
         {
-            for (int i = _projectiles.Count - 1; i >= 0; i--)
+            // A player's projectile can fell a boss, which takes the boss's projectiles with it, so this goes
+            // through a copy of the list.
+            var flying = _projectiles.ToArray();
+            for (int i = flying.Length - 1; i >= 0; i--)
             {
-                var projectile = _projectiles[i];
+                var projectile = flying[i];
+                if (!_projectiles.Contains(projectile)) continue;
                 projectile.Position += projectile.Velocity * TickSeconds;
-                if (--projectile.RemainingTicks <= 0 || Collision.Overlaps(Map, projectile.Position, projectile.Radius * 0.5f))
-                {
-                    _projectiles.RemoveAt(i);
-                    continue;
-                }
-                var victim = _players.FirstOrDefault(p => !p.IsDead && Vec2.Distance(p.Position, projectile.Position) <= projectile.Radius + PlayerRadius);
-                if (victim == null) continue;
-                HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause);
-                _projectiles.RemoveAt(i);
+                bool ended = --projectile.RemainingTicks <= 0 || Collision.Overlaps(Map, projectile.Position, projectile.Radius * 0.5f);
+                bool gone = projectile.Friendly ? FlyFriendly(projectile, ended) : ended || StrikePlayer(projectile);
+                if (gone) _projectiles.Remove(projectile);
             }
+        }
+
+        // A boss's projectile stops at the first player it touches.
+        bool StrikePlayer(Projectile projectile)
+        {
+            var victim = _players.FirstOrDefault(p => !p.IsDead && Vec2.Distance(p.Position, projectile.Position) <= projectile.Radius + PlayerRadius);
+            if (victim == null) return false;
+            HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause);
+            return true;
         }
     }
 }

@@ -16,6 +16,8 @@ namespace Game.Client
         public TextAsset monsters;
         public TextAsset bosses;
         public TextAsset bossAttacks;
+        public TextAsset classes;
+        public TextAsset skills;
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
@@ -24,6 +26,8 @@ namespace Game.Client
         public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
 
         public BossData LoadBosses(MonsterData monsterData) => BossSheet.Parse(Text(bosses), Text(bossAttacks), monsterData);
+
+        public ClassData LoadClasses() => ClassSheet.Parse(Text(classes), Text(skills));
 
         static string Text(TextAsset asset) => asset != null ? asset.text : "";
     }

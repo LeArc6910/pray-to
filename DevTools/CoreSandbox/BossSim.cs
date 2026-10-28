@@ -5,19 +5,22 @@ using Game.Core;
 
 namespace CoreSandbox
 {
-    // A party of bots against the first boss in its arena. Each bot walks in, hits the boss, and steps out of a
-    // telegraph once it has had `reaction` seconds to notice it, the way a person would. Prints how long the kill
-    // took, how often the party wiped, and which attacks did the damage.
+    // A party of bots against the first boss in its arena. Each bot walks in, hits the boss, uses its class skills
+    // when ready, and steps out of a telegraph once it has had `reaction` seconds to notice it, the way a person
+    // would. Prints how long the kill took, how often the party wiped, which attacks did the damage, and how the
+    // bots' own damage splits between the basic attack and each skill.
     static class BossSim
     {
         sealed class Bot
         {
             public Player Player;
+            public SkillBot Skills;
             public int Deaths;
             public int Taken;
         }
 
-        public static void Run(LootData loot, MonsterData monsters, BossData bosses, int seconds, ulong seed, int players, string[] gear, float reaction, bool dodge)
+        public static void Run(
+            LootData loot, MonsterData monsters, BossData bosses, int seconds, ulong seed, int players, string[] gear, ClassDefinition[] classes, float reaction, bool dodge)
         {
             var generated = WorldGenerator.Generate(seed);
             var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = 0 }, loot);
@@ -35,7 +38,8 @@ namespace CoreSandbox
                     var itemBase = loot.FindBase(id);
                     equipment.Equip(generator.RollItem(itemBase, itemBase.Level, Rarity.Common, random));
                 }
-                bots.Add(new Bot { Player = world.AddPlayer("bot" + (i + 1), equipment) });
+                var player = world.AddPlayer("bot" + (i + 1), equipment, classes);
+                bots.Add(new Bot { Player = player, Skills = new SkillBot(player) });
             }
 
             var toArena = new FlowField(world.Map);
@@ -49,10 +53,16 @@ namespace CoreSandbox
 
             for (int tick = 0; tick < seconds * World.TicksPerSecond && killedAt == null; tick++)
             {
-                foreach (var bot in bots) Drive(world, bot.Player, toArena, generated.Arena, reactionTicks, dodge);
+                foreach (var bot in bots)
+                {
+                    Drive(world, bot.Player, toArena, generated.Arena, reactionTicks, dodge);
+                    var boss = world.Bosses.FirstOrDefault();
+                    if (boss != null) bot.Skills.Use(world, boss.Position, Vec2.Distance(boss.Position, boss.Home) <= boss.ArenaRadius && Vec2.Distance(bot.Player.Position, boss.Home) <= boss.ArenaRadius + 2);
+                }
                 world.Step();
                 foreach (var e in world.TakeEvents())
                 {
+                    foreach (var counting in bots) counting.Skills.Count(e);
                     var bot = bots.FirstOrDefault(b => b.Player.Id == e.Target);
                     if (e.Type == SimEventType.Hit && bot != null)
                     {
@@ -73,7 +83,7 @@ namespace CoreSandbox
                 }
             }
 
-            Console.WriteLine($"{definition.Name}: seed = {seed}, 봇 {players}명, 장비 {string.Join(", ", gear)}, 반응 {reaction}초, 피하기 {(dodge ? "켬" : "끔")}");
+            Console.WriteLine($"{definition.Name}: seed = {seed}, 봇 {players}명, 장비 {string.Join(", ", gear)}, 클래스 {FightSim.ClassNames(classes)}, 반응 {reaction}초, 피하기 {(dodge ? "켬" : "끔")}");
             var first = bots[0].Player.Stats;
             Console.WriteLine($"  봇 능력치: 생명력 {first.MaxHealth:0}, 피해 {first.Damage:0.#}, 초당 공격 {first.AttacksPerSecond:0.##}, 방어도 {first.Armor:0}");
             Console.WriteLine(killedAt.HasValue
@@ -81,7 +91,7 @@ namespace CoreSandbox
                 : $"처치 못 함 ({seconds}초, 보스를 깨운 횟수 {wakes})");
             Console.WriteLine("  페이즈 시작: " + string.Join(", ", phaseStarts.Select(p => $"{p.Phase}페이즈 {p.Seconds:0.0}초")));
             Console.WriteLine($"  보스에게 준 피해 {dealt}");
-            foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}");
+            foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}, 준 피해 {bot.Skills.Summary()}");
             Console.WriteLine("  받은 피해 출처:");
             foreach (var pair in takenByAttack.OrderByDescending(p => p.Value)) Console.WriteLine($"    {pair.Key,-8} {pair.Value}");
 
@@ -149,6 +159,7 @@ namespace CoreSandbox
             }
             foreach (var projectile in world.Projectiles)
             {
+                if (projectile.Friendly) continue;
                 var toPlayer = player.Position - projectile.Position;
                 var heading = projectile.Velocity.Normalized;
                 float along = Vec2.Dot(toPlayer, heading);

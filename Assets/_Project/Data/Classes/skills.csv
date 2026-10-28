@@ -1,0 +1,6 @@
+id,name,class,kind,tags,damage,cooldown,radius,speed,range,duration,modifiers,grants,description
+# 같은 클래스의 스킬은 적힌 순서대로 칸에 들어간다. 열은 Docs/Classes.md
+whirlwind,회전베기,warrior,nova,melee,150,4,1.8,,,,,,둘레의 적을 모두 벤다
+war_cry,전투 함성,warrior,buff,,,15,,,,6,Melee:Damage+30%;AttackSpeed+15%,,잠시 근접 피해와 공격 속도가 오른다
+fireball,화염구,fire_mage,projectile,magic|fire,120,1.5,1.2,12,10,,,,겨눈 쪽으로 불덩이를 날려 닿은 곳을 터뜨린다
+flame_brand,불꽃 부여,fire_mage,buff,fire,,16,,,,8,,fire,잠시 기본 공격과 모든 스킬에 화염 태그가 붙는다

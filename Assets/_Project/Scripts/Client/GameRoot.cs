@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Game.Core;
 using Unity.Netcode;
 using UnityEngine;
@@ -34,6 +35,11 @@ namespace Game.Client
         LootData _loot;
         MonsterData _monsters;
         BossData _bosses;
+        ClassData _classes;
+        // Class ids in the order picked; the first one's skills take the first slots. Both to start with, so a new
+        // player sees what mixing does.
+        readonly List<string> _chosenClasses = new List<string> { "warrior", "fire_mage" };
+        Vector2 _menuScroll;
         WorldHost _host;
         WorldClient _client;
         NetLink _net;
@@ -67,9 +73,12 @@ namespace Game.Client
             _loot = sheets.LoadLoot();
             _monsters = sheets.LoadMonsters();
             _bosses = sheets.LoadBosses(_monsters);
+            _classes = sheets.LoadClasses();
+            _chosenClasses.RemoveAll(id => !_classes.Classes.Any(c => c.Id == id));
             var errors = new List<string>(_loot.Errors);
             errors.AddRange(_monsters.Errors);
             errors.AddRange(_bosses.Errors);
+            errors.AddRange(_classes.Errors);
             if (errors.Count > 0) _status = "데이터 시트 오류:\n" + string.Join("\n", errors);
         }
 
@@ -106,6 +115,7 @@ namespace Game.Client
                 return;
             }
             if (Controls.BagPressed()) _inventory.Open = !_inventory.Open;
+            ReadSkillPress();
 
             _tickClock += Time.deltaTime;
             int ticks = 0;
@@ -131,6 +141,14 @@ namespace Game.Client
                 else _acquired[i] = (text, age + Time.deltaTime);
             }
             foreach (string line in _client.TakeAcquired()) _acquired.Add((line, 0));
+        }
+
+        // Skills go to the host as soon as they are pressed, not with the next tick's input.
+        void ReadSkillPress()
+        {
+            int slot = Controls.TakeSkillPress();
+            if (slot < 0 || _inventory.Open || (_map != null && _map.FullOpen)) return;
+            UseSkill(slot, Controls.SkillAim(_camera, _client.Position));
         }
 
         void FixedTick()
@@ -165,6 +183,17 @@ namespace Game.Client
 
         internal string Status => _status;
 
+        internal int SkillCount => _client?.Skills.Count ?? 0;
+
+        // False when the skill is not ready. Zero aim uses it the way the player faces.
+        internal bool UseSkill(int slot, Vec2 aim = default)
+        {
+            byte[] command = _client?.SkillCommand(slot, aim);
+            if (command == null) return false;
+            SendToHost(command);
+            return true;
+        }
+
         void StartHosting(Mode mode)
         {
             if (mode == Mode.Host)
@@ -180,8 +209,8 @@ namespace Game.Client
             }
 
             ulong seed = (ulong)DateTime.UtcNow.Ticks;
-            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses);
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot);
+            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses);
             _inventory = new InventoryWindow(_client, SendToHost);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
@@ -196,7 +225,7 @@ namespace Game.Client
                 _status = "접속을 시작하지 못했습니다. 주소를 확인하세요.";
                 return;
             }
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses);
             _inventory = new InventoryWindow(_client, SendToHost);
             _joinSent = false;
             _net.Connected += id =>
@@ -247,13 +276,19 @@ namespace Game.Client
             // control drawn under the pointer, so a tap meant to close the map could press [나가기] instead.
             bool mapOpen = _map != null && _map.FullOpen;
             GUI.enabled = !mapOpen;
+            // Under the bag window. On a touch screen the buttons go away while the bag is open, so a tap in the
+            // window cannot fire a skill.
+            if (_client.Status == ClientStatus.Playing && !(Controls.UsingTouch && _inventory.Open)) SkillBar.Draw(_client);
             _inventory?.Draw();
+            // Bottom left, or above the skill buttons where they reach that far.
+            var skills = SkillBar.Bounds(_client.Skills.Count);
+            float bottom = skills.width > 0 && skills.x < 14 + 400 ? skills.y - 30 : Ui.Height - 40;
             for (int i = 0; i < _acquired.Count; i++)
             {
                 var (text, age) = _acquired[i];
                 var previous = GUI.color;
                 GUI.color = new Color(1, 1, 1, Mathf.Clamp01((AcquiredSeconds - age) / 1f));
-                GUI.Label(new Rect(14, Ui.Height - 40 - 22 * (_acquired.Count - 1 - i), 400, 22), text);
+                GUI.Label(new Rect(14, bottom - 22 * (_acquired.Count - 1 - i), 400, 22), text);
                 GUI.color = previous;
             }
             _map?.DrawMinimap(Ui.MinimapArea);
@@ -279,17 +314,27 @@ namespace Game.Client
             if (GUI.Button(leave, "나가기")) _endReason = "";
         }
 
+        // Name and how to play on one side, classes on the other; one above the other on a narrow screen. Scrolls
+        // when the screen is too short for it.
         void DrawMenu()
         {
-            var area = new Rect(Ui.Width / 2f - 180, Ui.Height / 2f - 150, 360, 300);
+            bool wide = Ui.Width >= 760;
+            float width = wide ? 740 : Mathf.Min(380, Ui.Width - 20);
+            float height = Mathf.Min(wide ? 380 : 640, Ui.Height - 20);
+            var area = new Rect((Ui.Width - width) / 2, (Ui.Height - height) / 2, width, height);
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label("pray-to (M3b 프로토타입)");
+            _menuScroll = GUILayout.BeginScrollView(_menuScroll);
+            if (wide) GUILayout.BeginHorizontal();
+
+            GUILayout.BeginVertical(GUILayout.Width(wide ? 340 : width - 40));
+            GUILayout.Label("pray-to (M4 프로토타입)");
             GUILayout.Space(8);
             GUILayout.Label("이름");
             _playerName = GUILayout.TextField(_playerName, 16);
             GUILayout.Space(8);
 
-            bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success;
+            bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
+                && _classes != null && _classes.Success;
             GUI.enabled = ready;
             if (GUILayout.Button("혼자 하기")) StartSolo();
             if (Application.platform == RuntimePlatform.WebGLPlayer)
@@ -313,7 +358,40 @@ namespace Game.Client
                 GUILayout.Space(8);
                 GUILayout.Label(_status);
             }
+            GUILayout.EndVertical();
+
+            if (wide) GUILayout.Space(16);
+            GUILayout.BeginVertical();
+            if (_classes != null && _classes.Success) DrawClassPicker();
+            GUILayout.EndVertical();
+
+            if (wide) GUILayout.EndHorizontal();
+            GUILayout.EndScrollView();
             GUILayout.EndArea();
+        }
+
+        // A button per class; picking adds it after the ones already picked, picking again takes it out. The number
+        // on a picked class is its turn in the skill slots.
+        void DrawClassPicker()
+        {
+            int max = ClassRules.DefaultMaxClasses;
+            GUILayout.Label($"클래스 (최대 {max}개, 고른 순서대로 스킬 칸을 채운다)");
+            foreach (var option in _classes.Classes)
+            {
+                int order = _chosenClasses.IndexOf(option.Id);
+                bool full = order < 0 && _chosenClasses.Count >= max;
+                GUI.enabled = !full;
+                string mark = order >= 0 ? $"[{order + 1}] " : "[ ] ";
+                if (GUILayout.Button(mark + option.Name))
+                {
+                    if (order >= 0) _chosenClasses.RemoveAt(order);
+                    else _chosenClasses.Add(option.Id);
+                }
+                GUI.enabled = true;
+                GUILayout.Label($"{option.Description}\n패시브: {SkillText.Passive(option)}\n스킬: {string.Join(", ", option.Skills.Select(k => k.Name))}");
+                GUILayout.Space(4);
+            }
+            if (_chosenClasses.Count == 0) GUILayout.Label("고르지 않으면 기본 공격만 쓴다.");
         }
 
         void DrawHud()
@@ -333,8 +411,8 @@ namespace Game.Client
                 if (toArena.Length > _client.ArenaRadius) GUILayout.Label($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
             }
             GUILayout.Label(Controls.UsingTouch
-                ? "왼쪽 스틱 이동 · 오른쪽 스틱 공격 방향(누르는 동안 공격) · 지도를 누르면 크게"
-                : "WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Tab 가방 · M 지도 · Esc 메뉴");
+                ? "왼쪽 스틱 이동 · 오른쪽 스틱 공격 방향(누르는 동안 공격) · 오른쪽 아래 스킬 · 지도를 누르면 크게"
+                : "WASD 이동 · 마우스 조준 · 왼쪽 클릭/스페이스 공격 · Q E R F 스킬 · Tab 가방 · M 지도 · Esc 메뉴");
             GUILayout.EndArea();
 
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);

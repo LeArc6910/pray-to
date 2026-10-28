@@ -5,13 +5,20 @@ namespace Game.Core
 {
     public sealed class Player
     {
-        internal Player(int id, string name, Vec2 position, Equipment equipment)
+        readonly int[] _cooldowns;
+        readonly int[] _buffTicks;
+
+        internal Player(int id, string name, Vec2 position, Equipment equipment, IReadOnlyList<ClassDefinition> classes)
         {
             Id = id;
             Name = name;
             Position = position;
             Equipment = equipment;
-            Stats = PlayerStats.From(equipment);
+            Classes = classes;
+            Skills = ClassRules.SkillsFor(classes);
+            _cooldowns = new int[Skills.Count];
+            _buffTicks = new int[Skills.Count];
+            Stats = PlayerStats.From(equipment, classes);
             Health = Stats.MaxHealth;
         }
 
@@ -30,14 +37,23 @@ namespace Game.Core
         // respawn. The client snaps to the host's position when it sees a new value.
         public int Corrections { get; internal set; }
         public bool Attacking { get; internal set; }
+        public IReadOnlyList<ClassDefinition> Classes { get; }
+        // One per skill slot, in slot order.
+        public IReadOnlyList<SkillDefinition> Skills { get; }
 
         internal int AttackCooldown { get; set; }
         internal int RespawnTicks { get; set; }
+
+        // Ticks until the skill in the slot can be used again, and until the buff it put on runs out.
+        public int CooldownTicks(int slot) => _cooldowns[slot];
+        public int BuffTicks(int slot) => _buffTicks[slot];
+        public bool HasBuff(int slot) => _buffTicks[slot] > 0;
 
         public Item Equip(Item item)
         {
             var previous = Equipment.Equip(item);
             RefreshStats();
+            InventoryVersion++;
             return previous;
         }
 
@@ -45,16 +61,50 @@ namespace Game.Core
         {
             var item = Equipment.Unequip(slot);
             RefreshStats();
+            InventoryVersion++;
             return item;
         }
 
-        // Works the numbers out again after the gear changed, keeping the same share of health.
+        internal void StartCooldown(int slot) => _cooldowns[slot] = Skills[slot].CooldownTicks;
+
+        // Using a buff again starts its time over.
+        internal void StartBuff(int slot)
+        {
+            bool wasOn = HasBuff(slot);
+            _buffTicks[slot] = Skills[slot].DurationTicks;
+            if (!wasOn) RefreshStats();
+        }
+
+        // One tick of cooldowns and buffs.
+        internal void TickSkills()
+        {
+            bool expired = false;
+            for (int slot = 0; slot < Skills.Count; slot++)
+            {
+                if (_cooldowns[slot] > 0) _cooldowns[slot]--;
+                if (_buffTicks[slot] > 0 && --_buffTicks[slot] == 0) expired = true;
+            }
+            if (expired) RefreshStats();
+        }
+
+        internal void ClearBuffs()
+        {
+            if (Array.TrueForAll(_buffTicks, ticks => ticks == 0)) return;
+            Array.Clear(_buffTicks, 0, _buffTicks.Length);
+            RefreshStats();
+        }
+
+        // Works the numbers out again after the gear or buffs changed, keeping the same share of health.
         internal void RefreshStats()
         {
             float healthShare = Health / Stats.MaxHealth;
-            Stats = PlayerStats.From(Equipment);
+            var buffs = new List<SkillDefinition>();
+            for (int slot = 0; slot < Skills.Count; slot++)
+            {
+                if (HasBuff(slot)) buffs.Add(Skills[slot]);
+            }
+            Stats = PlayerStats.From(Equipment, Classes, buffs);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
-            InventoryVersion++;
         }
     }
 
@@ -106,11 +156,15 @@ namespace Game.Core
         BossDefeated,
         // Source, a player, picked up Target, a piece of ground loot.
         Pickup,
+        // Source, a player, used the skill in slot Amount; Direction is where they aimed.
+        SkillUsed,
+        // The skill in slot Amount of Source, a player, burst at Position.
+        Burst,
     }
 
     public readonly struct SimEvent
     {
-        public SimEvent(SimEventType type, int source, int target = 0, int amount = 0, bool critical = false, Vec2 direction = default, int cause = 0)
+        public SimEvent(SimEventType type, int source, int target = 0, int amount = 0, bool critical = false, Vec2 direction = default, int cause = 0, Vec2 position = default)
         {
             Type = type;
             Source = source;
@@ -119,6 +173,7 @@ namespace Game.Core
             Critical = critical;
             Direction = direction;
             Cause = cause;
+            Position = position;
         }
 
         public SimEventType Type { get; }
@@ -129,6 +184,10 @@ namespace Game.Core
         public Vec2 Direction { get; }
         // Which of the boss's attacks dealt a hit (its index + 1), for balancing tools. Not sent to clients.
         public int Cause { get; }
+        // Only for events that happen somewhere rather than to someone (HasPosition).
+        public Vec2 Position { get; }
+
+        public static bool HasPosition(SimEventType type) => type == SimEventType.Burst;
     }
 
     public enum BossState : byte
@@ -263,9 +322,10 @@ namespace Game.Core
         public long ExpireTick { get; }
     }
 
+    // A boss's projectile hurts players. A player's (Skill set) flies through players and bursts on enemies.
     public sealed class Projectile
     {
-        internal Projectile(int id, int source, int cause, Vec2 position, Vec2 velocity, float radius, int damage, int ticks)
+        internal Projectile(int id, int source, int cause, Vec2 position, Vec2 velocity, float radius, float damage, int ticks, SkillDefinition skill = null, bool critical = false)
         {
             Id = id;
             Source = source;
@@ -275,16 +335,23 @@ namespace Game.Core
             Radius = radius;
             Damage = damage;
             RemainingTicks = ticks;
+            Skill = skill;
+            Critical = critical;
         }
 
         public int Id { get; }
         public int Source { get; }
+        // Which of the boss's attacks fired it (its index + 1), or which of the player's skill slots.
         public int Cause { get; }
         public Vec2 Position { get; internal set; }
         // Tiles per second.
         public Vec2 Velocity { get; }
         public float Radius { get; }
-        public int Damage { get; }
+        // Before armor. A player's projectile rolls its damage and crit when it is fired.
+        public float Damage { get; }
+        public SkillDefinition Skill { get; }
+        public bool Critical { get; }
+        public bool Friendly => Skill != null;
         internal int RemainingTicks { get; set; }
     }
 }

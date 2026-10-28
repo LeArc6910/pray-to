@@ -1,0 +1,3 @@
+id,name,description,passive
+warrior,전사,단단한 몸으로 앞에서 싸운다. 근접 공격이 강하다,MaxHealth+20%;Melee:Damage+10%
+fire_mage,화염 마법사,불로 멀리서 적을 태운다. 화염 피해가 강하다,Fire:Damage+15%

@@ -8,12 +8,15 @@ namespace Game.Core
     public sealed class HostConfig
     {
         public int MaxPlayers { get; set; } = 4;
+        // How many classes one player may mix. See Docs/Classes.md before raising it.
+        public int MaxClasses { get; set; } = ClassRules.DefaultMaxClasses;
         // Ticks between snapshots. Clients interpolate between them.
         public int SnapshotInterval { get; set; } = 2;
         // Entities further than this from a player are left out of that player's snapshots.
         public float ViewRange { get; set; } = 22;
-        // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). At 17 bytes an
-        // entity or drop, 13 a projectile, 19 a hazard and 13 an event, the maximum comes to about 1.15 KB.
+        // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). With 41 bytes for
+        // the header and the player's own state, 17 an entity or drop, 14 a projectile, 19 a hazard and 13 an event,
+        // the maximum comes to about 1.19 KB.
         public int MaxEntitiesPerSnapshot { get; set; } = 20;
         public int MaxDropsPerSnapshot { get; set; } = 8;
         public int MaxProjectilesPerSnapshot { get; set; } = 20;
@@ -56,17 +59,27 @@ namespace Game.Core
         readonly MonsterData _monsters;
         readonly BossData _bosses;
         readonly LootData _loot;
+        readonly ClassData _classes;
         readonly HostConfig _config;
         readonly GameRandom _gearRandom;
         readonly ulong _seed;
         readonly GeneratedWorld _generated;
 
-        // The first boss in the sheet waits in the arena; without boss data the caves have none.
-        public WorldHost(ulong seed, MonsterData monsters, LootData loot, HostConfig config = null, WorldConfig worldConfig = null, BossData bosses = null)
+        // The first boss in the sheet waits in the arena; without boss data the caves have none. Without class data
+        // everyone plays classless.
+        public WorldHost(
+            ulong seed,
+            MonsterData monsters,
+            LootData loot,
+            HostConfig config = null,
+            WorldConfig worldConfig = null,
+            BossData bosses = null,
+            ClassData classes = null)
         {
             _seed = seed;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _bosses = bosses;
+            _classes = classes;
             _loot = loot ?? throw new ArgumentNullException(nameof(loot));
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
@@ -92,6 +105,13 @@ namespace Game.Core
                         break;
                     case MessageType.InventoryCommand:
                         if (_connections.TryGetValue(connection, out var owner) && owner.Player != null) Apply(owner.Player, InventoryCommandMessage.Decode(data));
+                        break;
+                    case MessageType.SkillCommand:
+                        if (_connections.TryGetValue(connection, out var caster) && caster.Player != null)
+                        {
+                            var command = SkillCommandMessage.Decode(data);
+                            World.UseSkill(caster.Player.Id, command.Slot, command.Aim);
+                        }
                         break;
                 }
             }
@@ -158,11 +178,12 @@ namespace Game.Core
                 equipment.Equip(new LootGenerator(_loot).RollItem(itemBase, itemBase.Level, Rarity.Common, _gearRandom));
             }
             string name = string.IsNullOrWhiteSpace(join.Name) ? "플레이어" : join.Name.Trim();
-            var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, equipment);
+            var classes = ClassRules.Choose(_classes, join.Classes, _config.MaxClasses);
+            var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, equipment, classes.ToArray());
             _connections[connection] = new Connection { Player = player };
 
             var map = _generated.Map;
-            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, player.Position).Encode(), reliable: true);
+            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, player.Position, ClassIndexes(player)).Encode(), reliable: true);
             BroadcastRoster();
         }
 
@@ -199,9 +220,17 @@ namespace Game.Core
             float Distance(Vec2 position) => Vec2.Distance(position, viewer.Position);
             bool InView(Vec2 position, float size = 0) => Distance(position) <= _config.ViewRange + size;
 
-            var self = new SelfState(viewer.Corrections, viewer.Position, viewer.Health, viewer.Stats.MaxHealth, viewer.Stats.MoveSpeed);
+            var slots = Enumerable.Range(0, viewer.Skills.Count).ToList();
+            var self = new SelfState(
+                viewer.Corrections,
+                viewer.Position,
+                viewer.Health,
+                viewer.Stats.MaxHealth,
+                viewer.Stats.MoveSpeed,
+                slots.Select(viewer.CooldownTicks).ToList(),
+                slots.Select(viewer.BuffTicks).ToList());
             var players = World.Players.Select(p => new EntityState(
-                p.Id, EntityKind.Player, 0, p.Position, p.Facing, p.Health, p.Stats.MaxHealth, 0));
+                p.Id, EntityKind.Player, 0, p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p)));
             var bosses = World.Bosses
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
@@ -232,7 +261,7 @@ namespace Game.Core
                 .Where(p => InView(p.Position))
                 .OrderBy(p => Distance(p.Position))
                 .Take(_config.MaxProjectilesPerSnapshot)
-                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius))
+                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly ? IndexOf(_classes?.Skills, p.Skill) : -1))
                 .ToList();
 
             var hazards = World.Hazards
@@ -254,6 +283,18 @@ namespace Game.Core
             return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events);
         }
 
+        static byte BuffBits(Player player)
+        {
+            int bits = 0;
+            for (int slot = 0; slot < Math.Min(8, player.Skills.Count); slot++)
+            {
+                if (player.HasBuff(slot)) bits |= 1 << slot;
+            }
+            return (byte)bits;
+        }
+
+        List<int> ClassIndexes(Player player) => player.Classes.Select(c => IndexOf(_classes?.Classes, c)).ToList();
+
         static int IndexOf<T>(IReadOnlyList<T> list, T item) where T : class
         {
             for (int i = 0; list != null && i < list.Count; i++)
@@ -265,8 +306,10 @@ namespace Game.Core
 
         void BroadcastRoster()
         {
-            var names = _connections.Values.Where(c => c.Player != null).ToDictionary(c => c.Player.Id, c => c.Player.Name);
-            byte[] roster = new RosterMessage(names).Encode();
+            var players = _connections.Values.Where(c => c.Player != null).Select(c => c.Player).ToList();
+            byte[] roster = new RosterMessage(
+                players.ToDictionary(p => p.Id, p => p.Name),
+                players.ToDictionary(p => p.Id, p => (IReadOnlyList<int>)ClassIndexes(p))).Encode();
             foreach (var pair in _connections)
             {
                 if (pair.Value.Player != null) Send(pair.Key, roster, reliable: true);

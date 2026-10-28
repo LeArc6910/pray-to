@@ -3,7 +3,7 @@ using System.Collections.Generic;
 
 namespace Game.Core
 {
-    // Adds up modifiers from gear and runes (and later class passives):
+    // Adds up modifiers from gear, runes, class passives and buffs:
     // final = (base + flat) × (1 + increased%) × each (1 + more%).
     public sealed class StatSheet
     {

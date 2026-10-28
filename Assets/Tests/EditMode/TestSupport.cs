@@ -126,6 +126,18 @@ namespace Game.Core.Tests
         public static BossData Parse(string bosses, string attacks) => BossSheet.Parse(bosses, attacks, Monsters.Shipped);
     }
 
+    public static class Classes
+    {
+        static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Classes/" + file));
+
+        public static readonly ClassData Shipped = ClassSheet.Parse(Read(ClassSheet.ClassesFile), Read(ClassSheet.SkillsFile));
+
+        public const string ClassesHeader = "id,name,description,passive\n";
+        public const string SkillsHeader = "id,name,class,kind,tags,damage,cooldown,radius,speed,range,duration,modifiers,grants,description\n";
+
+        public static SkillDefinition Skill(string id) => Shipped.Skills.First(s => s.Id == id);
+    }
+
     // Small hand-written sheets, so a test can see every row it depends on.
     public static class TestLoot
     {

@@ -76,16 +76,19 @@ namespace Game.Core
 
     public readonly struct ProjectileView
     {
-        public ProjectileView(int id, Vec2 position, float radius)
+        public ProjectileView(int id, Vec2 position, float radius, SkillDefinition skill)
         {
             Id = id;
             Position = position;
             Radius = radius;
+            Skill = skill;
         }
 
         public int Id { get; }
         public Vec2 Position { get; }
         public float Radius { get; }
+        // The player skill that fired it, or null for a boss's.
+        public SkillDefinition Skill { get; }
     }
 
     public readonly struct HazardView
@@ -116,26 +119,46 @@ namespace Game.Core
         readonly MonsterData _monsters;
         readonly BossData _bosses;
         readonly LootData _loot;
+        readonly ClassData _classes;
         readonly List<string> _acquired = new List<string>();
         readonly List<SnapshotMessage> _snapshots = new List<SnapshotMessage>();
         readonly List<SimEvent> _events = new List<SimEvent>();
         readonly Dictionary<int, string> _names = new Dictionary<int, string>();
+        readonly Dictionary<int, List<ClassDefinition>> _rosterClasses = new Dictionary<int, List<ClassDefinition>>();
+        int[] _cooldowns = Array.Empty<int>();
+        int[] _buffs = Array.Empty<int>();
+        // The host tick the cooldowns and buffs above were true at.
+        double _skillsTick;
         int _sequence;
         int _seenCorrections;
         double _renderTick = -1;
         float _sinceLatest;
 
-        public WorldClient(string playerKey, string name, MonsterData monsters, BossData bosses = null, LootData loot = null)
+        // chosenClasses are class ids in the order the player picked them; the host has the final say.
+        public WorldClient(
+            string playerKey,
+            string name,
+            MonsterData monsters,
+            BossData bosses = null,
+            LootData loot = null,
+            ClassData classes = null,
+            IEnumerable<string> chosenClasses = null)
         {
             PlayerKey = playerKey ?? "";
             Name = name ?? "";
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _bosses = bosses;
             _loot = loot;
+            _classes = classes;
+            ChosenClasses = (chosenClasses ?? Enumerable.Empty<string>()).ToList();
         }
 
         public string PlayerKey { get; }
         public string Name { get; }
+        public IReadOnlyList<string> ChosenClasses { get; }
+        // What the host accepted, and the skills that gives, one per slot.
+        public IReadOnlyList<ClassDefinition> Classes { get; private set; } = Array.Empty<ClassDefinition>();
+        public IReadOnlyList<SkillDefinition> Skills { get; private set; } = Array.Empty<SkillDefinition>();
         public ClientStatus Status { get; private set; } = ClientStatus.Joining;
         public string RefusedReason { get; private set; }
         public int PlayerId { get; private set; }
@@ -154,7 +177,7 @@ namespace Game.Core
         public bool IsDead => Status == ClientStatus.Playing && _snapshots.Count > 0 && Health <= 0;
         public IReadOnlyDictionary<int, string> Names => _names;
 
-        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name).Encode();
+        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name, ChosenClasses).Encode();
 
         public void Receive(byte[] data)
         {
@@ -170,8 +193,11 @@ namespace Game.Core
                         RefusedReason = RefusedMessage.Decode(data).Reason;
                         break;
                     case MessageType.Roster:
+                        var roster = RosterMessage.Decode(data);
                         _names.Clear();
-                        foreach (var pair in RosterMessage.Decode(data).Names) _names[pair.Key] = pair.Value;
+                        _rosterClasses.Clear();
+                        foreach (var pair in roster.Names) _names[pair.Key] = pair.Value;
+                        foreach (var pair in roster.Classes) _rosterClasses[pair.Key] = ClassesAt(pair.Value);
                         break;
                     case MessageType.Inventory:
                         if (_loot != null) ApplyInventory(InventoryMessage.Decode(data, _loot));
@@ -248,6 +274,38 @@ namespace Game.Core
             return views;
         }
 
+        // Seconds until the skill in the slot is ready, and until its buff runs out, counting down between snapshots.
+        public float CooldownLeft(int slot) => SkillTimeLeft(_cooldowns, slot);
+
+        public float BuffLeft(int slot) => SkillTimeLeft(_buffs, slot);
+
+        float SkillTimeLeft(int[] ticks, int slot)
+        {
+            if (slot < 0 || slot >= ticks.Length) return 0;
+            return (float)Math.Max(0, (ticks[slot] - (HostTick - _skillsTick)) / World.TicksPerSecond);
+        }
+
+        // The message that uses the skill in the slot, or null when it plainly cannot be used yet. The cooldown
+        // starts on screen at once; the host decides and the next snapshot says what really happened.
+        public byte[] SkillCommand(int slot, Vec2 aim)
+        {
+            if (Status != ClientStatus.Playing || IsDead || slot < 0 || slot >= Skills.Count || CooldownLeft(slot) > 0) return null;
+            _cooldowns[slot] = Skills[slot].CooldownTicks + (int)Math.Ceiling(HostTick - _skillsTick);
+            return new SkillCommandMessage(slot, aim).Encode();
+        }
+
+        // Another player's classes as the host's roster has them, and the skill in one of their slots.
+        public IReadOnlyList<ClassDefinition> ClassesOf(int playerId) =>
+            playerId == PlayerId ? Classes
+            : _rosterClasses.TryGetValue(playerId, out var classes) ? classes
+            : (IReadOnlyList<ClassDefinition>)Array.Empty<ClassDefinition>();
+
+        public SkillDefinition SkillOf(int playerId, int slot)
+        {
+            var skills = playerId == PlayerId ? Skills : ClassRules.SkillsFor(ClassesOf(playerId));
+            return slot >= 0 && slot < skills.Count ? skills[slot] : null;
+        }
+
         // The host's current tick as best this client can tell: the newest snapshot plus the time since it came.
         public double HostTick =>
             _snapshots.Count == 0 ? 0 : _snapshots[_snapshots.Count - 1].Tick + Math.Min(_sinceLatest, MaxGuessSeconds) * World.TicksPerSecond;
@@ -261,7 +319,8 @@ namespace Game.Core
             float seconds = (float)((HostTick - latest.Tick) / World.TicksPerSecond);
             foreach (var projectile in latest.Projectiles)
             {
-                views.Add(new ProjectileView(projectile.Id, projectile.Position + projectile.Velocity * seconds, projectile.Radius));
+                var skill = projectile.Skill >= 0 && _classes != null && projectile.Skill < _classes.Skills.Count ? _classes.Skills[projectile.Skill] : null;
+                views.Add(new ProjectileView(projectile.Id, projectile.Position + projectile.Velocity * seconds, projectile.Radius, skill));
             }
             return views;
         }
@@ -286,6 +345,7 @@ namespace Game.Core
         // What this player wears and carries, as of the host's last inventory message.
         public Equipment Equipment { get; private set; } = new Equipment();
         public Inventory Bag { get; private set; } = new Inventory();
+        // Worked out here the same way the host does, from the gear, classes and buffs it reported.
         public PlayerStats Stats { get; private set; } = PlayerStats.From(new Equipment());
         // Goes up with every inventory message, so a screen knows to redraw.
         public int InventoryVersion { get; private set; }
@@ -323,7 +383,7 @@ namespace Game.Core
             }
             Equipment = message.Equipment;
             Bag = message.Bag;
-            Stats = PlayerStats.From(Equipment);
+            RefreshStats();
             InventoryVersion++;
         }
 
@@ -334,8 +394,26 @@ namespace Game.Core
             return events;
         }
 
+        void RefreshStats()
+        {
+            var buffs = Enumerable.Range(0, Math.Min(Skills.Count, _buffs.Length)).Where(slot => _buffs[slot] > 0).Select(slot => Skills[slot]);
+            Stats = PlayerStats.From(Equipment, Classes, buffs);
+        }
+
+        List<ClassDefinition> ClassesAt(IReadOnlyList<int> indexes)
+        {
+            if (indexes.Count == 0) return new List<ClassDefinition>();
+            if (_classes == null || indexes.Any(i => i >= _classes.Classes.Count)) throw new InvalidDataException("The host names a class this client does not know.");
+            return indexes.Select(i => _classes.Classes[i]).ToList();
+        }
+
         void Welcome(WelcomeMessage welcome)
         {
+            Classes = ClassesAt(welcome.Classes);
+            Skills = ClassRules.SkillsFor(Classes);
+            _cooldowns = new int[Skills.Count];
+            _buffs = new int[Skills.Count];
+            RefreshStats();
             PlayerId = welcome.PlayerId;
             var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height);
             Map = generated.Map;
@@ -356,6 +434,8 @@ namespace Game.Core
                 throw new InvalidDataException("Snapshot names loot this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Boss && (_bosses == null || e.Type >= _bosses.Bosses.Count)))
                 throw new InvalidDataException("Snapshot names a boss this client does not know.");
+            if (snapshot.Self.Cooldowns.Count != Skills.Count)
+                throw new InvalidDataException("Snapshot has a different number of skill slots than this client.");
 
             _snapshots.Add(snapshot);
             _sinceLatest = 0;
@@ -363,6 +443,15 @@ namespace Game.Core
             _events.AddRange(snapshot.Events);
 
             var self = snapshot.Self;
+            bool buffsChanged = false;
+            for (int slot = 0; slot < Skills.Count; slot++)
+            {
+                buffsChanged |= _buffs[slot] > 0 != self.Buffs[slot] > 0;
+                _cooldowns[slot] = self.Cooldowns[slot];
+                _buffs[slot] = self.Buffs[slot];
+            }
+            _skillsTick = snapshot.Tick;
+            if (buffsChanged) RefreshStats();
             Health = self.Health;
             MaxHealth = self.MaxHealth;
             MoveSpeed = self.MoveSpeed;

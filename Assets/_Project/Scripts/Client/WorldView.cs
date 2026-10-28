@@ -9,8 +9,8 @@ using Object = UnityEngine.Object;
 namespace Game.Client
 {
     // Draws what a WorldClient knows: the cave tiles, every entity as a tinted shape with a health bar, swings,
-    // hit flashes, damage numbers, and in a boss fight the telegraphed areas, projectiles, screen shake and
-    // banners. Pure presentation; nothing here changes the game.
+    // hit flashes, damage numbers, skills (rings, bursts, buff auras, coloured by their tags), and in a boss fight
+    // the telegraphed areas, projectiles, screen shake and banners. Pure presentation; nothing here changes the game.
     sealed class WorldView : IDisposable
     {
         sealed class Body
@@ -21,6 +21,8 @@ namespace Game.Client
             public SpriteRenderer Swing;
             public SpriteRenderer HealthBack;
             public SpriteRenderer HealthFill;
+            // A ring while a buff runs, in the buff's colour.
+            public SpriteRenderer Aura;
             public float Diameter;
             public float SwingTime;
             public float FlashTime;
@@ -35,6 +37,16 @@ namespace Game.Client
             public SpriteRenderer Fill;
         }
 
+        // A skill's ring or burst, growing and fading out where it happened.
+        sealed class Flash
+        {
+            public SpriteRenderer Renderer;
+            public float Size;
+            public float Age;
+            public float Life;
+            public Color Color;
+        }
+
         sealed class Floating
         {
             public Vector3 Position;
@@ -47,6 +59,7 @@ namespace Game.Client
         const float FlashSeconds = 0.12f;
         const float FloatSeconds = 0.8f;
         const float BannerSeconds = 2.2f;
+        const float FlashLife = 0.35f;
         // Impacts further away than this do not shake the screen.
         const float ShakeRange = 16;
 
@@ -72,6 +85,9 @@ namespace Game.Client
             new Dictionary<int, (SpriteRenderer, string, Color)>();
         readonly Dictionary<int, (BossState State, int Phase, string Name)> _bossesSeen = new Dictionary<int, (BossState, int, string)>();
         readonly List<Floating> _floating = new List<Floating>();
+        readonly List<Flash> _flashes = new List<Flash>();
+        // Which skill slots of each other player have a buff running, from their snapshot state.
+        readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
         readonly HashSet<int> _seen = new HashSet<int>();
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
@@ -102,12 +118,19 @@ namespace Game.Client
             var selfPosition = Vec2.Lerp(_client.PreviousPosition, _client.Position, Mathf.Clamp01(tickFraction));
             Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, SelfColor, deltaTime);
             _self.Name = _client.Name;
+            int selfBuffs = 0;
+            for (int slot = 0; slot < _client.Skills.Count; slot++)
+            {
+                if (_client.BuffLeft(slot) > 0) selfBuffs |= 1 << slot;
+            }
+            ShowAura(_self, _client.PlayerId, selfBuffs);
 
             DrawEntities(deltaTime);
             DrawMarks();
             DrawProjectiles();
 
             foreach (var e in _client.TakeEvents()) Show(e);
+            UpdateFlashes(deltaTime);
             for (int i = _floating.Count - 1; i >= 0; i--)
             {
                 _floating[i].Age += deltaTime;
@@ -217,6 +240,11 @@ namespace Game.Client
                     if (view.BossState != BossState.Dormant) ActiveBoss = view;
                 }
                 Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, color, deltaTime, pulse, showHealth: view.Kind != EntityKind.Boss);
+                if (view.IsPlayer)
+                {
+                    _buffBits[view.Id] = view.State;
+                    ShowAura(body, view.Id, view.State);
+                }
             }
 
             _gone.Clear();
@@ -226,7 +254,11 @@ namespace Game.Client
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
             }
-            foreach (int id in _gone) _others.Remove(id);
+            foreach (int id in _gone)
+            {
+                _others.Remove(id);
+                _buffBits.Remove(id);
+            }
 
             _gone.Clear();
             foreach (var pair in _drops)
@@ -367,8 +399,11 @@ namespace Game.Client
                 _seen.Add(projectile.Id);
                 if (!_projectiles.TryGetValue(projectile.Id, out var renderer))
                 {
-                    renderer = Renderer(_root.transform, "Projectile", Shapes.Circle, ProjectileColor);
-                    renderer.transform.localScale = Vector3.one * (projectile.Radius * 2);
+                    // A player's projectile in its skill's colour, a little larger than it really is so it reads.
+                    var skill = projectile.Skill;
+                    var color = skill != null ? Palette.Of(skill.Tags) : ProjectileColor;
+                    renderer = Renderer(_root.transform, "Projectile", Shapes.Circle, color);
+                    renderer.transform.localScale = Vector3.one * (projectile.Radius * (skill != null ? 2.6f : 2));
                     renderer.sortingOrder = 20000;
                     _projectiles[projectile.Id] = renderer;
                 }
@@ -409,6 +444,16 @@ namespace Game.Client
                     if (source == null || Vector3.Distance(source.Position, _self.Position) > ShakeRange) break;
                     _shake = Mathf.Max(_shake, Mathf.Min(0.45f, e.Amount * 0.07f));
                     break;
+                case SimEventType.SkillUsed:
+                    ShowSkill(e);
+                    break;
+                case SimEventType.Burst:
+                    var burst = _client.SkillOf(e.Source, e.Amount);
+                    if (burst == null) break;
+                    var at = new Vector3(e.Position.X, e.Position.Y, 0);
+                    AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), Shapes.Circle);
+                    if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.08f);
+                    break;
                 case SimEventType.Died:
                     if (e.Source == _client.PlayerId) _floating.Add(new Floating { Position = _self.Position, Text = "쓰러짐", Color = Color.gray });
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
@@ -417,6 +462,93 @@ namespace Game.Client
                         _bossesSeen.Remove(e.Source);
                     }
                     break;
+            }
+        }
+
+        // The skill's name over whoever used it, a ring for a nova and a pulse for a buff.
+        void ShowSkill(SimEvent e)
+        {
+            var skill = _client.SkillOf(e.Source, e.Amount);
+            var caster = Find(e.Source);
+            if (skill == null || caster == null) return;
+            var color = Palette.Of(skill.Tags | skill.Grants | GrantedTags(e.Source));
+            _floating.Add(new Floating { Position = caster.Position + new Vector3(0, 0.4f, 0), Text = skill.Name, Color = color });
+            switch (skill.Kind)
+            {
+                case SkillKind.Nova:
+                    AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, Shapes.Ring);
+                    if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.06f);
+                    break;
+                case SkillKind.Buff:
+                    AddFlash(caster.Position, caster.Diameter, color, Shapes.Ring);
+                    break;
+                case SkillKind.Projectile:
+                    caster.SwingTime = SwingSeconds;
+                    caster.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
+                    break;
+            }
+        }
+
+        // Tags a player's running buffs add to their attacks, for colouring what they do.
+        SkillTag GrantedTags(int playerId)
+        {
+            if (playerId == _client.PlayerId) return _client.Stats.GrantedTags;
+            var tags = SkillTag.None;
+            if (!_buffBits.TryGetValue(playerId, out byte bits)) return tags;
+            for (int slot = 0; slot < 8; slot++)
+            {
+                if ((bits & (1 << slot)) != 0) tags |= _client.SkillOf(playerId, slot)?.Grants ?? SkillTag.None;
+            }
+            return tags;
+        }
+
+        // A ring around the player in the colours of the buffs running, mixed when there are several.
+        void ShowAura(Body body, int playerId, int bits)
+        {
+            var mixed = Color.clear;
+            int count = 0;
+            for (int slot = 0; slot < 8; slot++)
+            {
+                if ((bits & (1 << slot)) == 0) continue;
+                var skill = _client.SkillOf(playerId, slot);
+                if (skill == null) continue;
+                mixed += Palette.Of(skill.Tags | skill.Grants);
+                count++;
+            }
+            body.Aura.enabled = count > 0;
+            if (count == 0) return;
+            mixed /= count;
+            mixed.a = 0.55f + 0.25f * Mathf.Sin(Time.time * 6);
+            body.Aura.color = mixed;
+            body.Aura.sortingOrder = body.Shape.sortingOrder - 1;
+        }
+
+        void AddFlash(Vector3 position, float radius, Color color, Sprite sprite)
+        {
+            var renderer = Renderer(_root.transform, "Flash", sprite, color);
+            renderer.transform.localPosition = position;
+            renderer.sortingOrder = 19000;
+            _flashes.Add(new Flash { Renderer = renderer, Size = radius * 2, Life = FlashLife, Color = color });
+        }
+
+        // Each flash opens out to its full size and fades.
+        void UpdateFlashes(float deltaTime)
+        {
+            for (int i = _flashes.Count - 1; i >= 0; i--)
+            {
+                var flash = _flashes[i];
+                flash.Age += deltaTime;
+                float t = Mathf.Clamp01(flash.Age / flash.Life);
+                if (t >= 1)
+                {
+                    Object.Destroy(flash.Renderer.gameObject);
+                    _flashes.RemoveAt(i);
+                    continue;
+                }
+                flash.Renderer.transform.localScale = Vector3.one * (flash.Size * (0.6f + 0.4f * Mathf.Sqrt(t)));
+                var color = flash.Color;
+                color.a = 0.7f * (1 - t);
+                flash.Renderer.color = color;
             }
         }
 
@@ -469,7 +601,10 @@ namespace Game.Client
                 Swing = Renderer(root, "Swing", Shapes.Arc, Color.white),
                 HealthBack = Renderer(root, "HealthBack", Shapes.Square, new Color(0, 0, 0, 0.6f)),
                 HealthFill = Renderer(root, "HealthFill", Shapes.Square, Color.green),
+                Aura = Renderer(root, "Aura", Shapes.Ring, Color.clear),
             };
+            body.Aura.transform.localScale = Vector3.one * (diameter * 1.7f);
+            body.Aura.enabled = false;
             body.Pointer.transform.localScale = Vector3.one * Mathf.Max(0.18f, diameter * 0.15f);
             // The swing reaches MeleeReach past the edge of the body.
             body.Swing.transform.localScale = Vector3.one * (diameter + World.MeleeReach * 2);

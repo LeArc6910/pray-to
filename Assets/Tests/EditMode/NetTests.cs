@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using NUnit.Framework;
 
@@ -14,15 +15,22 @@ namespace Game.Core.Tests
             public readonly Dictionary<ulong, WorldClient> Clients = new Dictionary<ulong, WorldClient>();
 
             public Session(HostConfig config = null, BossData bosses = null) =>
-                Host = new WorldHost(7, Monsters.Shipped, Gear.Data, config, new WorldConfig { EnemyTarget = 0 }, bosses);
+                Host = new WorldHost(7, Monsters.Shipped, Gear.Data, config, new WorldConfig { EnemyTarget = 0 }, bosses, Classes.Shipped);
 
-            public WorldClient Join(ulong connection, string name, string version = Protocol.Version)
+            public WorldClient Join(ulong connection, string name, string version = Protocol.Version, params string[] classes)
             {
-                var client = new WorldClient("key" + connection, name, Monsters.Shipped, Bosses.Shipped, Gear.Data);
+                var client = new WorldClient("key" + connection, name, Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, classes);
                 Clients[connection] = client;
-                Host.Receive(connection, new JoinMessage(client.PlayerKey, name, version).Encode());
+                Host.Receive(connection, version == Protocol.Version ? client.JoinMessage() : new JoinMessage(client.PlayerKey, name, null, version).Encode());
                 Deliver();
                 return client;
+            }
+
+            // Hands a command from a client to the host, as the transport would.
+            public void Send(ulong connection, byte[] message)
+            {
+                Assert.IsNotNull(message);
+                Host.Receive(connection, message);
             }
 
             public void Deliver()
@@ -58,19 +66,41 @@ namespace Game.Core.Tests
             Assert.AreEqual(new Vec2(1.5f, -2), input.Position);
             Assert.IsTrue(input.Attacking);
 
-            var welcome = WelcomeMessage.Decode(new WelcomeMessage(3, ulong.MaxValue, 64, 32, new Vec2(5, 6)).Encode());
+            var join = JoinMessage.Decode(new JoinMessage("key", "앨리스", new[] { "warrior", "fire_mage" }).Encode());
+            Assert.AreEqual("앨리스", join.Name);
+            CollectionAssert.AreEqual(new[] { "warrior", "fire_mage" }, join.Classes);
+
+            var welcome = WelcomeMessage.Decode(new WelcomeMessage(3, ulong.MaxValue, 64, 32, new Vec2(5, 6), new[] { 1, 0 }).Encode());
             Assert.AreEqual(ulong.MaxValue, welcome.Seed);
             Assert.AreEqual(32, welcome.Height);
+            CollectionAssert.AreEqual(new[] { 1, 0 }, welcome.Classes);
+
+            var skill = SkillCommandMessage.Decode(new SkillCommandMessage(3, new Vec2(0.6f, -0.8f)).Encode());
+            Assert.AreEqual(3, skill.Slot);
+            Assert.AreEqual(new Vec2(0.6f, -0.8f), skill.Aim);
+
+            var roster = RosterMessage.Decode(new RosterMessage(
+                new Dictionary<int, string> { [4] = "앨리스", [5] = "밥" },
+                new Dictionary<int, IReadOnlyList<int>> { [4] = new[] { 1 } }).Encode());
+            Assert.AreEqual("밥", roster.Names[5]);
+            CollectionAssert.AreEqual(new[] { 1 }, roster.Classes[4]);
+            Assert.IsEmpty(roster.Classes[5]);
 
             var snapshot = SnapshotMessage.Decode(new SnapshotMessage(
                 99,
-                new SelfState(2, new Vec2(1, 2), 50, 100, 5),
+                new SelfState(2, new Vec2(1, 2), 50, 100, 5, new[] { 0, 120, 7, 0 }, new[] { 0, 0, 0, 240 }),
                 new[] { new EntityState(7, EntityKind.Boss, 0, new Vec2(3.3f, 4.71f), new Vec2(-1, 0), 1234.2f, 2000, (byte)BossState.Telegraph, 2) },
-                new[] { new ProjectileState(8, new Vec2(5, 6), new Vec2(-7, 0.5f), 0.3f) },
+                new[] { new ProjectileState(8, new Vec2(5, 6), new Vec2(-7, 0.5f), 0.3f), new ProjectileState(10, new Vec2(1, 1), new Vec2(12, 0), 0.25f, 2) },
                 new[] { new HazardState(9, HazardShape.Cone, new Vec2(3, 4), new Vec2(0, 1), 4.5f, 110, 12, 21, true) },
-                new[] { new SimEvent(SimEventType.Hit, 1, 7, 6, critical: true) }).Encode());
+                new[]
+                {
+                    new SimEvent(SimEventType.Hit, 1, 7, 6, critical: true),
+                    new SimEvent(SimEventType.Burst, 1, amount: 2, position: new Vec2(12.5f, -3.25f)),
+                }).Encode());
             Assert.AreEqual(99, snapshot.Tick);
             Assert.AreEqual(2, snapshot.Self.Corrections);
+            CollectionAssert.AreEqual(new[] { 0, 120, 7, 0 }, snapshot.Self.Cooldowns);
+            CollectionAssert.AreEqual(new[] { 0, 0, 0, 240 }, snapshot.Self.Buffs);
             var entity = snapshot.Entities.Single();
             Assert.AreEqual(EntityKind.Boss, entity.Kind);
             Assert.AreEqual((byte)BossState.Telegraph, entity.State);
@@ -78,9 +108,11 @@ namespace Game.Core.Tests
             Assert.AreEqual(1235, entity.Health, "health travels as a whole number, rounded up");
             Assert.AreEqual(3.3f, entity.Position.X, 1 / 64f);
             Assert.AreEqual(4.71f, entity.Position.Y, 1 / 64f);
-            var projectile = snapshot.Projectiles.Single();
+            var projectile = snapshot.Projectiles[0];
             Assert.AreEqual(-7, projectile.Velocity.X, 1 / 64f);
             Assert.AreEqual(0.3f, projectile.Radius, 1 / 32f);
+            Assert.AreEqual(-1, projectile.Skill, "a boss's");
+            Assert.AreEqual(2, snapshot.Projectiles[1].Skill);
             var hazard = snapshot.Hazards.Single();
             Assert.AreEqual(HazardShape.Cone, hazard.Shape);
             Assert.AreEqual(110, hazard.Width, 1 / 8f);
@@ -90,8 +122,14 @@ namespace Game.Core.Tests
             Assert.IsTrue(hazard.Harmful);
             Assert.AreEqual(-1, entity.Facing.X, 0.001f);
             Assert.AreEqual(0, entity.Facing.Y, 0.03f);
-            Assert.IsTrue(snapshot.Events.Single().Critical);
-            Assert.AreEqual(6, snapshot.Events.Single().Amount);
+            var hit = snapshot.Events[0];
+            Assert.IsTrue(hit.Critical);
+            Assert.AreEqual(6, hit.Amount);
+            Assert.AreEqual(7, hit.Target);
+            var burst = snapshot.Events[1];
+            Assert.AreEqual(SimEventType.Burst, burst.Type);
+            Assert.AreEqual(2, burst.Amount);
+            Assert.AreEqual(new Vec2(12.5f, -3.25f), burst.Position);
         }
 
         [Test]
@@ -174,6 +212,92 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void OlderClientsAreToldTheVersionDiffers()
+        {
+            // How a 0.4.0 client wrote its join, before classes.
+            using var stream = new MemoryStream();
+            using (var writer = new BinaryWriter(stream))
+            {
+                writer.Write((byte)MessageType.Join);
+                writer.Write("key");
+                writer.Write("옛날 사람");
+                writer.Write("0.4.0");
+            }
+            var session = new Session();
+            var old = new WorldClient("key", "옛날 사람", Monsters.Shipped);
+            session.Clients[1] = old;
+
+            session.Host.Receive(1, stream.ToArray());
+            session.Deliver();
+
+            Assert.AreEqual(ClientStatus.Refused, old.Status);
+            StringAssert.Contains("0.4.0", old.RefusedReason);
+        }
+
+        [Test]
+        public void TheHostKeepsTheClassesItsRulesAllow()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스", Protocol.Version, "fire_mage", "nobody", "fire_mage", "warrior");
+            var bob = session.Join(2, "밥");
+
+            CollectionAssert.AreEqual(new[] { "fire_mage", "warrior" }, alice.Classes.Select(c => c.Id));
+            CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "whirlwind", "war_cry" }, alice.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(alice.Skills, session.Host.World.FindPlayer(alice.PlayerId).Skills);
+            Assert.AreEqual(120, alice.Stats.MaxHealth, 0.001f, "the warrior passive counts on the client too");
+            CollectionAssert.AreEqual(alice.Classes, bob.ClassesOf(alice.PlayerId));
+            Assert.IsEmpty(bob.Skills);
+
+            var strict = new Session(new HostConfig { MaxClasses = 1 });
+            var carol = strict.Join(1, "캐롤", Protocol.Version, "warrior", "fire_mage");
+            CollectionAssert.AreEqual(new[] { "warrior" }, carol.Classes.Select(c => c.Id));
+            Assert.AreEqual(2, carol.Skills.Count);
+        }
+
+        [Test]
+        public void SkillsGoThroughTheHost()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스", Protocol.Version, "fire_mage");
+            var bob = session.Join(2, "밥");
+            var world = session.Host.World;
+            var host = world.FindPlayer(alice.PlayerId);
+            const int fireball = 0;
+            const int flameBrand = 1;
+
+            session.Send(1, alice.SkillCommand(flameBrand, Vec2.Zero));
+            session.Tick(4);
+
+            Assert.IsTrue(host.HasBuff(flameBrand));
+            Assert.Greater(alice.BuffLeft(flameBrand), 7);
+            Assert.Greater(alice.CooldownLeft(flameBrand), 15);
+            Assert.IsTrue((alice.Stats.AttackTags & SkillTag.Fire) != 0, "the client works the buff into its stats");
+            var seen = bob.Others().Single(e => e.Id == alice.PlayerId);
+            Assert.AreEqual(1 << flameBrand, seen.State, "others see which slots have a buff running");
+            Assert.AreEqual("flame_brand", bob.SkillOf(alice.PlayerId, flameBrand).Id);
+
+            var target = world.SpawnEnemy(Monsters.Shipped.Find("slime"), alice.Position + new Vec2(4, 0));
+            session.Send(1, alice.SkillCommand(fireball, new Vec2(1, 0)));
+            Assert.IsNull(alice.SkillCommand(fireball, new Vec2(1, 0)), "the cooldown starts on screen at once");
+            session.Tick(4);
+            Assert.AreEqual("fireball", bob.Projectiles().Single().Skill.Id);
+
+            var bursts = new List<SimEvent>();
+            for (int i = 0; i < 20; i++)
+            {
+                session.Tick();
+                bursts.AddRange(bob.TakeEvents().Where(e => e.Type == SimEventType.Burst));
+            }
+
+            var burst = bursts.Single();
+            Assert.AreEqual(alice.PlayerId, burst.Source);
+            Assert.AreEqual("fireball", bob.SkillOf(burst.Source, burst.Amount).Id);
+            Assert.Less(Vec2.Distance(burst.Position, target.Position), 1.5f);
+            Assert.Less(target.Health, Monsters.Shipped.Find("slime").Health);
+            Assert.IsEmpty(bob.Projectiles());
+        }
+
+        [Test]
         public void LeavingRemovesThePlayerForEveryone()
         {
             var session = new Session();
@@ -238,12 +362,13 @@ namespace Game.Core.Tests
         [Test]
         public void SnapshotsStayInsideOnePacketInABossFight()
         {
-            // Strong gear, so the four of them get the boss through its phases while slimes crowd in.
+            // Strong gear, so the four of them get the boss through its phases while slimes crowd in, and every skill
+            // used as soon as it is ready for fireballs and bursts on top.
             var session = new Session(new HostConfig { StarterGear = new[] { "obsidian_sword", "obsidian_armor" } }, Bosses.Shipped);
             var host = session.Host;
             var world = host.World;
             var boss = world.Bosses.Single();
-            for (ulong i = 1; i <= 4; i++) session.Join(i, "플레이어" + i);
+            for (ulong i = 1; i <= 4; i++) session.Join(i, "플레이어" + i, Protocol.Version, i % 2 == 0 ? "warrior" : "fire_mage", i % 2 == 0 ? "fire_mage" : "warrior");
             for (int i = 0; i < 4; i++) Walk(world, world.Players[i], boss.Home + Vec2.FromAngle(i * 1.6f) * 2.5f);
             for (int i = 0; i < 40; i++) world.SpawnEnemy(Monsters.Shipped.Find("slime"), boss.Home + Vec2.FromAngle(i) * 6);
             for (int i = 0; i < 30; i++) world.DropItem(Gear.Plain("iron_sword"), boss.Home + Vec2.FromAngle(i) * 3);
@@ -256,6 +381,7 @@ namespace Game.Core.Tests
                 {
                     world.MovePlayer(player.Id, player.Position, boss.Position - player.Position, 1);
                     world.SetAttacking(player.Id, true);
+                    for (int slot = 0; slot < player.Skills.Count; slot++) world.UseSkill(player.Id, slot, boss.Position - player.Position);
                 }
                 host.Tick();
                 foreach (var message in host.TakeOutgoing())
@@ -269,6 +395,7 @@ namespace Game.Core.Tests
             }
 
             Assert.LessOrEqual(largest, 1200);
+            Assert.IsTrue(seen.Contains(SimEventType.Burst));
             Assert.IsTrue(seen.Contains(SimEventType.PhaseChanged), $"the fight got far enough to matter: boss {(world.Bosses.Count > 0 ? world.Bosses[0].Health + "/" + world.Bosses[0].MaxHealth + " phase " + world.Bosses[0].Phase + " " + world.Bosses[0].State : "gone")}, players {string.Join(",", world.Players.Select(p => p.Health))}, events {string.Join(",", seen)}");
         }
 

@@ -7,10 +7,12 @@ using UnityEngine.InputSystem;
 namespace Game.Client
 {
     // Keyboard and mouse: WASD or arrow keys to move, the mouse to aim, left button or space to attack (held to keep
-    // swinging), M for the map. Touch: two sticks that appear where a finger lands. The left half moves; the right
-    // half attacks for as long as it is held and aims where it is pulled. Pressed without pulling, the attack goes
-    // where the player walks, or where they already face when standing still. Touches that start on a UI button or
-    // window, which OnGUI marks with Block, are left to the UI.
+    // swinging), Q E R F for the skill slots, M for the map. Touch: two sticks that appear where a finger lands. The
+    // left half moves; the right half attacks for as long as it is held and aims where it is pulled. Pressed without
+    // pulling, the attack goes where the player walks, or where they already face when standing still. Touches that
+    // start on a UI button or window, which OnGUI marks with Block, are left to the UI; ones on a skill button, which
+    // OnGUI marks with SkillButton, use that skill. Skill buttons read touches directly rather than through IMGUI so
+    // they work while another finger holds a stick.
     static class Controls
     {
         // A touch stick: where the finger landed and where it is now, in UI points.
@@ -50,6 +52,9 @@ namespace Game.Client
         static readonly List<(int Id, Vector2 Pixels)> _touches = new List<(int, Vector2)>();
         static readonly HashSet<int> _ignored = new HashSet<int>();
         static readonly List<Rect> _blocked = new List<Rect>();
+        static readonly List<(Rect Area, int Slot)> _skillButtons = new List<(Rect, int)>();
+        static readonly List<int> _skillTaps = new List<int>();
+        static readonly Key[] SkillKeys = { Key.Q, Key.E, Key.R, Key.F };
         static readonly Predicate<int> Released = id => !Held(id);
         static readonly Stick _move = new Stick();
         static readonly Stick _aim = new Stick();
@@ -62,6 +67,8 @@ namespace Game.Client
         // Once per frame, before Read: follows the fingers. Then drops last frame's UI areas; OnGUI marks them again.
         public static void UpdateTouches()
         {
+            // A tap not taken in the frame it landed (the session ended, say) is dropped, not saved for later.
+            _skillTaps.Clear();
             _touches.Clear();
             var screen = Touchscreen.current;
             if (screen != null)
@@ -88,12 +95,48 @@ namespace Game.Client
                 else if (!_ignored.Contains(id)) Begin(id, point);
             }
             _blocked.Clear();
+            _skillButtons.Clear();
         }
 
         // Marks a UI area, in points, where new touches belong to the UI. Call from OnGUI.
         public static void Block(Rect area)
         {
             if (Event.current.type == EventType.Repaint) _blocked.Add(area);
+        }
+
+        // Marks a skill button, in points: a finger landing on it uses the skill in the slot. Call from OnGUI.
+        public static void SkillButton(Rect area, int slot)
+        {
+            if (Event.current.type == EventType.Repaint) _skillButtons.Add((area, slot));
+        }
+
+        // The key letter for a skill slot, for the skill bar.
+        public static string SkillKeyName(int slot) => slot < SkillKeys.Length ? SkillKeys[slot].ToString() : "";
+
+        // A skill slot asked for since the last call, by key this frame or by a tapped button, or -1 for none.
+        public static int TakeSkillPress()
+        {
+            if (_skillTaps.Count > 0)
+            {
+                int slot = _skillTaps[0];
+                _skillTaps.RemoveAt(0);
+                return slot;
+            }
+            var keyboard = Keyboard.current;
+            for (int slot = 0; keyboard != null && slot < SkillKeys.Length; slot++)
+            {
+                if (keyboard[SkillKeys[slot]].wasPressedThisFrame) return slot;
+            }
+            return -1;
+        }
+
+        // Where a skill goes: where the attack stick is pulled, else at the mouse. Zero leaves it to the way the
+        // player faces.
+        public static Vec2 SkillAim(Camera camera, Vec2 player)
+        {
+            if (_aim.Held) return _aim.Direction;
+            var mouse = Time.unscaledTime - _lastTouch < MouseQuietSeconds ? null : Mouse.current;
+            return mouse != null ? Toward(camera, mouse.position.ReadValue(), player) : Vec2.Zero;
         }
 
         public static (Vec2 Move, Vec2 Aim, bool Attack) Read(Camera camera, Vec2 player)
@@ -146,10 +189,17 @@ namespace Game.Client
             _aim.Draw(AimColor);
         }
 
-        // A new finger, in UI points: the move stick on the left half, the attack stick on the right, unless that
-        // stick is taken or the UI owns the spot.
+        // A new finger, in UI points: a skill button's skill, or the move stick on the left half and the attack
+        // stick on the right, unless that stick is taken or the UI owns the spot.
         static void Begin(int id, Vector2 point)
         {
+            foreach (var (area, slot) in _skillButtons)
+            {
+                if (!area.Contains(point)) continue;
+                _skillTaps.Add(slot);
+                _ignored.Add(id);
+                return;
+            }
             var stick = point.x < Ui.Width / 2 ? _move : _aim;
             if (Blocked(point) || stick.Held)
             {

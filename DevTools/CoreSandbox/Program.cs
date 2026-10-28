@@ -14,6 +14,7 @@ namespace CoreSandbox
     // add --gear <base,base> to --fight to change its gear (copper_sword by default), --no-dodge to stand still
     // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss
     // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
+    // add --classes <class,class> to --fight or --boss to give the bots classes; they use every skill when it is ready
     static class Program
     {
         static void Main(string[] args)
@@ -50,6 +51,13 @@ namespace CoreSandbox
                 reaction = float.Parse(args[reactionFlag + 1], System.Globalization.CultureInfo.InvariantCulture);
                 args = args.Where((_, i) => i != reactionFlag && i != reactionFlag + 1).ToArray();
             }
+            string[] classIds = Array.Empty<string>();
+            int classesFlag = Array.IndexOf(args, "--classes");
+            if (classesFlag >= 0)
+            {
+                classIds = args[classesFlag + 1].Split(',');
+                args = args.Where((_, i) => i != classesFlag && i != classesFlag + 1).ToArray();
+            }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();
 
@@ -66,17 +74,17 @@ namespace CoreSandbox
                     PrintProgression(data, Number(1, 2000), Seed(2));
                     break;
                 case "--fight":
-                    FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, dodge);
+                    FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge);
                     break;
                 case "--boss":
                     var monsters = LoadMonsters();
-                    BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, reaction, dodge);
+                    BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge);
                     break;
                 default:
                     Console.WriteLine("usage: dotnet run -- --item [level] [seed] | --loot [level] [count] [seed] | --progression [count] [seed]");
                     Console.WriteLine("       add --rarity <percent> to --item or --loot");
-                    Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--no-dodge]");
-                    Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--no-dodge]");
+                    Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--classes warrior,fire_mage] [--no-dodge]");
+                    Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--classes ...] [--no-dodge]");
                     break;
             }
         }
@@ -215,6 +223,24 @@ namespace CoreSandbox
             foreach (string error in data.Errors) Console.Error.WriteLine(error);
             Environment.Exit(1);
             return null;
+        }
+
+        // The classes named on the command line, checked against the sheets.
+        static ClassDefinition[] LoadClasses(string[] ids)
+        {
+            string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
+            var data = ClassSheet.Parse(
+                File.ReadAllText(Path.Combine(folder, ClassSheet.ClassesFile)),
+                File.ReadAllText(Path.Combine(folder, ClassSheet.SkillsFile)));
+            foreach (string error in data.Errors) Console.Error.WriteLine(error);
+            if (!data.Success) Environment.Exit(1);
+            var unknown = ids.Where(id => data.Classes.All(c => c.Id != id)).ToList();
+            if (unknown.Count > 0)
+            {
+                Console.Error.WriteLine($"없는 클래스: {string.Join(", ", unknown)} (있는 것: {string.Join(", ", data.Classes.Select(c => c.Id))})");
+                Environment.Exit(1);
+            }
+            return ClassRules.Choose(data, ids, ids.Length).ToArray();
         }
 
         static string FindFolder(string relativePath)

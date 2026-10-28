@@ -137,12 +137,19 @@ namespace Game.Client
             GUI.Box(rect, content, _tooltipStyle);
         }
 
+        // With the classes, what each damaging skill would hit for now: the same tag rules as the host, so swapping
+        // gear or starting a buff shows its effect on every skill.
         void DrawStats()
         {
             var stats = _client.Stats;
             GUILayout.Label(
                 $"생명력 {stats.MaxHealth:0} · 재생 {stats.HealthRegen:0.#}/초 · 방어도 {stats.Armor:0} · 이동 {stats.MoveSpeed:0.#}\n" +
                 $"피해 {stats.Damage:0.#} · 초당 공격 {stats.AttacksPerSecond:0.##} · 치명타 {stats.CritChance:0.#}% (×{stats.CritDamage:0}%) · 아이템 희귀도 +{stats.ItemRarity:0}%");
+            if (_client.Classes.Count == 0) return;
+            var hits = _client.Skills
+                .Where(skill => skill.Damage > 0)
+                .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f:0.#}");
+            GUILayout.Label($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}");
         }
 
         void ItemLabel(Item item)

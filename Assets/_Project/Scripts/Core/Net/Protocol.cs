@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 
 namespace Game.Core
@@ -10,6 +11,7 @@ namespace Game.Core
         Join = 1,
         Input = 2,
         InventoryCommand = 3,
+        SkillCommand = 4,
         Welcome = 10,
         Refused = 11,
         Snapshot = 12,
@@ -22,7 +24,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.4.0";
+        public const string Version = "0.5.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -63,6 +65,8 @@ namespace Game.Core
 
         static short Sixtyfourths(float value) => (short)Math.Clamp((int)MathF.Round(value * 64), short.MinValue, short.MaxValue);
 
+        internal static ushort Ticks(int value) => (ushort)Math.Clamp(value, 0, ushort.MaxValue);
+
         internal static ushort Whole(float value) => (ushort)Math.Clamp((int)MathF.Ceiling(value), 0, ushort.MaxValue);
 
         internal static ushort Eighths(float value) => (ushort)Math.Clamp((int)MathF.Round(value * 8), 0, ushort.MaxValue);
@@ -76,30 +80,83 @@ namespace Game.Core
         }
 
         internal static Vec2 UnpackDirection(byte packed) => Vec2.FromAngle(packed / 256f * 2 * MathF.PI);
+
+        // A short list of sheet indexes, a byte each.
+        internal static void WriteIndexes(BinaryWriter writer, IReadOnlyList<int> indexes)
+        {
+            writer.Write((byte)Math.Min(indexes.Count, byte.MaxValue));
+            foreach (int index in indexes.Take(byte.MaxValue)) writer.Write((byte)index);
+        }
+
+        internal static List<int> ReadIndexes(BinaryReader reader)
+        {
+            var indexes = new List<int>();
+            for (int count = reader.ReadByte(); count > 0; count--) indexes.Add(reader.ReadByte());
+            return indexes;
+        }
     }
 
     public sealed class JoinMessage
     {
-        public JoinMessage(string playerKey, string name, string version = Protocol.Version)
+        public JoinMessage(string playerKey, string name, IReadOnlyList<string> classes = null, string version = Protocol.Version)
         {
             PlayerKey = playerKey ?? "";
             Name = name ?? "";
+            Classes = classes ?? Array.Empty<string>();
             Version = version ?? "";
         }
 
         public string PlayerKey { get; }
         public string Name { get; }
+        // Class ids the player picked, in order. The host keeps what its rules allow and says which in Welcome.
+        public IReadOnlyList<string> Classes { get; }
         public string Version { get; }
 
+        // Classes come after the version, so a host can still read an older client's version and say why it
+        // refuses it.
         public byte[] Encode() => Protocol.Build(MessageType.Join, w =>
         {
             w.Write(PlayerKey);
             w.Write(Name);
             w.Write(Version);
+            w.Write((byte)Math.Min(Classes.Count, byte.MaxValue));
+            foreach (string id in Classes.Take(byte.MaxValue)) w.Write(id ?? "");
         });
 
-        public static JoinMessage Decode(byte[] data) =>
-            Protocol.Read(data, MessageType.Join, r => new JoinMessage(r.ReadString(), r.ReadString(), r.ReadString()));
+        public static JoinMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Join, r =>
+        {
+            string key = r.ReadString();
+            string name = r.ReadString();
+            string version = r.ReadString();
+            var classes = new List<string>();
+            if (version == Protocol.Version)
+            {
+                for (int count = r.ReadByte(); count > 0; count--) classes.Add(r.ReadString());
+            }
+            return new JoinMessage(key, name, classes, version);
+        });
+    }
+
+    // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.
+    public sealed class SkillCommandMessage
+    {
+        public SkillCommandMessage(int slot, Vec2 aim)
+        {
+            Slot = slot;
+            Aim = aim;
+        }
+
+        public int Slot { get; }
+        public Vec2 Aim { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.SkillCommand, w =>
+        {
+            w.Write((byte)Slot);
+            w.Write(Aim);
+        });
+
+        public static SkillCommandMessage Decode(byte[] data) =>
+            Protocol.Read(data, MessageType.SkillCommand, r => new SkillCommandMessage(r.ReadByte(), r.ReadVec2()));
     }
 
     // Sent every tick. Sequence counts the client's ticks, so the host knows how far the player may have moved.
@@ -133,13 +190,14 @@ namespace Game.Core
     // The client builds the same caves from the seed, so the map itself is never sent.
     public sealed class WelcomeMessage
     {
-        public WelcomeMessage(int playerId, ulong seed, int width, int height, Vec2 spawn)
+        public WelcomeMessage(int playerId, ulong seed, int width, int height, Vec2 spawn, IReadOnlyList<int> classes = null)
         {
             PlayerId = playerId;
             Seed = seed;
             Width = width;
             Height = height;
             Spawn = spawn;
+            Classes = classes ?? Array.Empty<int>();
         }
 
         public int PlayerId { get; }
@@ -147,6 +205,8 @@ namespace Game.Core
         public int Width { get; }
         public int Height { get; }
         public Vec2 Spawn { get; }
+        // The classes the host accepted, as indexes into the class sheet.
+        public IReadOnlyList<int> Classes { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Welcome, w =>
         {
@@ -155,10 +215,11 @@ namespace Game.Core
             w.Write(Width);
             w.Write(Height);
             w.Write(Spawn);
+            Protocol.WriteIndexes(w, Classes);
         });
 
-        public static WelcomeMessage Decode(byte[] data) =>
-            Protocol.Read(data, MessageType.Welcome, r => new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2()));
+        public static WelcomeMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Welcome, r =>
+            new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2(), Protocol.ReadIndexes(r)));
     }
 
     public sealed class RefusedMessage
@@ -173,11 +234,17 @@ namespace Game.Core
             Protocol.Read(data, MessageType.Refused, r => new RefusedMessage(r.ReadString()));
     }
 
+    // Everyone in the game: their names, and their classes as indexes into the class sheet.
     public sealed class RosterMessage
     {
-        public RosterMessage(IReadOnlyDictionary<int, string> names) { Names = names; }
+        public RosterMessage(IReadOnlyDictionary<int, string> names, IReadOnlyDictionary<int, IReadOnlyList<int>> classes = null)
+        {
+            Names = names;
+            Classes = classes ?? new Dictionary<int, IReadOnlyList<int>>();
+        }
 
         public IReadOnlyDictionary<int, string> Names { get; }
+        public IReadOnlyDictionary<int, IReadOnlyList<int>> Classes { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Roster, w =>
         {
@@ -186,6 +253,7 @@ namespace Game.Core
             {
                 w.Write(pair.Key);
                 w.Write(pair.Value);
+                Protocol.WriteIndexes(w, Classes.TryGetValue(pair.Key, out var classes) ? classes : Array.Empty<int>());
             }
         });
 
@@ -193,8 +261,14 @@ namespace Game.Core
         {
             int count = r.ReadInt32();
             var names = new Dictionary<int, string>();
-            for (int i = 0; i < count; i++) names[r.ReadInt32()] = r.ReadString();
-            return new RosterMessage(names);
+            var classes = new Dictionary<int, IReadOnlyList<int>>();
+            for (int i = 0; i < count; i++)
+            {
+                int id = r.ReadInt32();
+                names[id] = r.ReadString();
+                classes[id] = Protocol.ReadIndexes(r);
+            }
+            return new RosterMessage(names, classes);
         });
     }
 
@@ -214,7 +288,8 @@ namespace Game.Core
     }
 
     // Positions travel as 1/64 of a tile in 16 bits and health as whole numbers, to keep a snapshot in one packet.
-    // Type is an index into the monster or boss sheet, which both sides load. State is an EnemyState or BossState.
+    // Type is an index into the monster or boss sheet, which both sides load. State is an EnemyState or BossState,
+    // or for a player which skill slots have a buff running (bit 0 for slot 0).
     public readonly struct EntityState
     {
         public EntityState(int id, EntityKind kind, int type, Vec2 position, Vec2 facing, float health, float maxHealth, byte state, int phase = 0)
@@ -247,18 +322,21 @@ namespace Game.Core
     // Clients move projectiles on by their velocity between snapshots, so they are drawn where they really are.
     public readonly struct ProjectileState
     {
-        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius)
+        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius, int skill = -1)
         {
             Id = id;
             Position = position;
             Velocity = velocity;
             Radius = radius;
+            Skill = skill;
         }
 
         public int Id { get; }
         public Vec2 Position { get; }
         public Vec2 Velocity { get; }
         public float Radius { get; }
+        // Which skill in the class sheet fired it, or -1 for a boss's.
+        public int Skill { get; }
     }
 
     // A telegraphed area. TicksLeft counts from the snapshot's tick to when it lands, out of Duration in all.
@@ -292,13 +370,15 @@ namespace Game.Core
     // What only the receiving player needs about themselves.
     public readonly struct SelfState
     {
-        public SelfState(int corrections, Vec2 position, float health, float maxHealth, float moveSpeed)
+        public SelfState(int corrections, Vec2 position, float health, float maxHealth, float moveSpeed, IReadOnlyList<int> cooldowns = null, IReadOnlyList<int> buffs = null)
         {
             Corrections = corrections;
             Position = position;
             Health = health;
             MaxHealth = maxHealth;
             MoveSpeed = moveSpeed;
+            Cooldowns = cooldowns ?? Array.Empty<int>();
+            Buffs = buffs ?? Array.Empty<int>();
         }
 
         public int Corrections { get; }
@@ -306,6 +386,9 @@ namespace Game.Core
         public float Health { get; }
         public float MaxHealth { get; }
         public float MoveSpeed { get; }
+        // Per skill slot: ticks until it is ready, and until the buff it put on runs out.
+        public IReadOnlyList<int> Cooldowns { get; }
+        public IReadOnlyList<int> Buffs { get; }
         public bool IsDead => Health <= 0;
     }
 
@@ -342,6 +425,12 @@ namespace Game.Core
             w.Write(Self.Health);
             w.Write(Self.MaxHealth);
             w.Write(Self.MoveSpeed);
+            w.Write((byte)Self.Cooldowns.Count);
+            for (int slot = 0; slot < Self.Cooldowns.Count; slot++)
+            {
+                w.Write(Protocol.Ticks(Self.Cooldowns[slot]));
+                w.Write(Protocol.Ticks(slot < Self.Buffs.Count ? Self.Buffs[slot] : 0));
+            }
 
             w.Write((ushort)Entities.Count);
             foreach (var entity in Entities)
@@ -364,6 +453,7 @@ namespace Game.Core
                 w.WriteCompact(projectile.Position);
                 w.WriteCompact(projectile.Velocity);
                 w.Write((byte)Math.Clamp((int)MathF.Round(projectile.Radius * 32), 0, 255));
+                w.Write((byte)(projectile.Skill + 1));
             }
 
             w.Write((ushort)Hazards.Count);
@@ -385,7 +475,9 @@ namespace Game.Core
             {
                 w.Write((byte)e.Type);
                 w.Write(e.Source);
-                w.Write(e.Target);
+                // An event that happens somewhere has no target, so its position takes the target's four bytes.
+                if (SimEvent.HasPosition(e.Type)) w.WriteCompact(e.Position);
+                else w.Write(e.Target);
                 w.Write((short)Math.Clamp(e.Amount, short.MinValue, short.MaxValue));
                 w.Write(e.Critical);
                 w.Write(Protocol.PackDirection(e.Direction));
@@ -395,7 +487,19 @@ namespace Game.Core
         public static SnapshotMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Snapshot, r =>
         {
             long tick = r.ReadInt64();
-            var self = new SelfState(r.ReadInt32(), r.ReadVec2(), r.ReadSingle(), r.ReadSingle(), r.ReadSingle());
+            int corrections = r.ReadInt32();
+            var position = r.ReadVec2();
+            float health = r.ReadSingle();
+            float maxHealth = r.ReadSingle();
+            float moveSpeed = r.ReadSingle();
+            var cooldowns = new List<int>();
+            var buffs = new List<int>();
+            for (int slots = r.ReadByte(); slots > 0; slots--)
+            {
+                cooldowns.Add(r.ReadUInt16());
+                buffs.Add(r.ReadUInt16());
+            }
+            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs);
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);
@@ -417,7 +521,7 @@ namespace Game.Core
             var projectiles = new List<ProjectileState>(projectileCount);
             for (int i = 0; i < projectileCount; i++)
             {
-                projectiles.Add(new ProjectileState(r.ReadInt32(), r.ReadCompact(), r.ReadCompact(), r.ReadByte() / 32f));
+                projectiles.Add(new ProjectileState(r.ReadInt32(), r.ReadCompact(), r.ReadCompact(), r.ReadByte() / 32f, r.ReadByte() - 1));
             }
 
             int hazardCount = r.ReadUInt16();
@@ -442,10 +546,12 @@ namespace Game.Core
             {
                 var type = (SimEventType)r.ReadByte();
                 int source = r.ReadInt32();
-                int target = r.ReadInt32();
+                bool located = SimEvent.HasPosition(type);
+                var at = located ? r.ReadCompact() : Vec2.Zero;
+                int target = located ? 0 : r.ReadInt32();
                 int amount = r.ReadInt16();
                 bool critical = r.ReadBoolean();
-                events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte())));
+                events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), position: at));
             }
             return new SnapshotMessage(tick, self, entities, projectiles, hazards, events);
         });

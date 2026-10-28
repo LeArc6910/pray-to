@@ -143,7 +143,7 @@ namespace Game.Core
             player.Inventory.TakeRune(rune);
             item.TryInsertRune(socket, rune, Loot?.Runewords ?? Array.Empty<Runeword>());
             if (worn) player.RefreshStats();
-            else player.InventoryVersion++;
+            player.InventoryVersion++;
             return true;
         }
 

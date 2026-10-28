@@ -29,7 +29,7 @@ DevTools/Local/setup.sh --commit
 1. `git pull`, Git LFS 연결
 2. `ProjectSettings/ProjectVersion.txt`의 Unity(6000.6.3f1)를 Unity Hub 설치 위치에서 찾는다
 3. 배치 모드로 프로젝트를 열어 **Game > Set Up Project**를 실행한다. Active Input Handling(Input System Package), Product Name, 2D 모드, URP 2D 렌더러 에셋과 Graphics·Quality 지정, `Main` 씬, `GameSheets` 에셋을 만든다
-4. EditMode 테스트(Core 규칙)와 PlayMode 테스트(실제 클라이언트로 혼자 하기와 호스트를 5초씩 돌려 에러가 없는지)를 돌린다
+4. EditMode 테스트(Core 규칙)와 PlayMode 테스트(실제 클라이언트로 혼자 하기와 호스트를 5초씩 돌리고, 혼자 하기에서 스킬 넷을 모두 써 보며 에러가 없는지)를 돌린다
 5. 결과를 이 파일의 "결과 보고"에 적고, 생성된 파일과 함께 커밋·푸시한다
 
 옵션: `-InstallEditor`(`--install-editor`)는 Unity가 없으면 Unity Hub로 설치한다(Web Build Support 포함). `-SkipTests`(`--skip-tests`), `-NoPull`(`--no-pull`). `-Commit`을 빼면 결과만 적고 커밋하지 않는다. Unity가 Hub 기본 위치가 아닌 곳에 있으면 환경 변수 `UNITY_EXE`에 실행 파일 경로를 넣는다. 로그는 `Logs/`에 남는다(커밋하지 않는다).
@@ -145,6 +145,21 @@ DevTools/Local/setup.sh --commit
   - [가방]·[나가기]가 미니맵 아래로 옮겨졌고 잘 눌리는지
   - PC 브라우저에서는 M으로 지도가 열리고 닫히는지
 - [ ] 결과 보고: 불편한 점(미니맵 크기, 스틱 위치·크기, 지도가 가리는 것)
+
+### 6. 클래스와 스킬 받기 (2026-10-28 추가, M4)
+
+전사와 화염 마법사를 자유롭게 섞어 고르고(지금은 최대 2개), 스킬 넷을 쓴다(`Docs/Classes.md`, `CLOUD_LOG.md`). 푸시되면 웹 데모가 저절로 다시 배포된다.
+
+- [ ] (로컬 세션) `git pull` 후 명령 한 줄을 `-Commit`과 함께 실행. 새 스크립트(`ClassSheet.cs`, `World.Skills.cs`, `SkillBar.cs`, `ClassTests.cs`)와 새 폴더 `Data/Classes`(`classes.csv`, `skills.csv`)의 `.meta`가 생기고, `GameSheets.asset`에 두 시트가 들어가 커밋된다. PlayMode 테스트 `EverySkillCanBeUsed`가 새로 돈다
+- [ ] (클라우드가 확인) 이번 푸시의 Web demo
+- [ ] (사람, PC나 휴대폰) https://learc6910.github.io/pray-to/ 나 에디터에서
+  - 메뉴에 클래스가 [1] 전사, [2] 화염 마법사로 골라져 있는지. 눌러서 빼고 다시 넣으면 번호(스킬 칸 순서)가 바뀌는지. 화면이 넓으면 메뉴 오른쪽에, 좁으면 아래에 나오고, 휴대폰 가로 화면에서 잘리면 끌어서 내릴 수 있는지
+  - PC는 화면 아래 가운데 Q E R F 칸, 휴대폰은 오른쪽 아래 2×2 버튼. 누르면 스킬이 나가고 칸이 어두워지며 남은 초가 줄어드는지. PC에서 칸에 마우스를 올리면 설명이 뜨는지
+  - 회전베기는 둘레에 고리, 화염구는 주황 불덩이가 날아가 터지고, 전투 함성·불꽃 부여는 내 둘레에 색 고리가 도는지. 불꽃 부여를 켠 뒤 회전베기가 주황으로 보이는지
+  - 휴대폰: 왼손으로 걸으면서 오른손으로 버튼을 누를 수 있는지. 공격 스틱과 버튼이 서로 방해하지 않는지
+  - 가방 창 능력치 아래에 "클래스 전사 + 화염 마법사 · 스킬 피해 …"가 나오고, 불꽃 부여를 켜면 숫자가 오르는지
+  - 보스가 클래스 없이 할 때보다 얼마나 쉬운지. 봇으로는 혼자 처치가 82~133초에서 38~55초로 줄었다. 너무 쉬우면 알려 준다
+- [ ] 결과 보고: 스킬 손맛, 버튼 위치·크기, 너무 세거나 약한 스킬, 더 있었으면 하는 클래스
 
 ## 결과 보고
 

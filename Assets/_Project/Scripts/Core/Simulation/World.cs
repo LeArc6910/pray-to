@@ -18,7 +18,8 @@ namespace Game.Core
 
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
     // the one exception is a player's own position, which its client reports (see MovePlayer). Bosses, their
-    // telegraphed areas and projectiles are in World.Boss.cs; drops, pickups and inventory commands in World.Loot.cs.
+    // telegraphed areas and projectiles are in World.Boss.cs; drops, pickups and inventory commands in World.Loot.cs;
+    // players joining with their classes and using skills in World.Skills.cs.
     public sealed partial class World
     {
         public const int TicksPerSecond = 30;
@@ -68,14 +69,6 @@ namespace Game.Core
         public IReadOnlyList<Enemy> Enemies => _enemies;
 
         public static int Ticks(float seconds) => Math.Max(1, (int)MathF.Round(seconds * TicksPerSecond));
-
-        public Player AddPlayer(string name, Equipment equipment)
-        {
-            var player = new Player(_nextId++, name, Spawn, equipment ?? new Equipment());
-            foreach (var item in player.Equipment.Items) Register(item);
-            _players.Add(player);
-            return player;
-        }
 
         public void RemovePlayer(int id) => _players.RemoveAll(p => p.Id == id);
 
@@ -155,6 +148,7 @@ namespace Game.Core
 
         void UpdatePlayer(Player player)
         {
+            player.TickSkills();
             if (player.IsDead)
             {
                 if (--player.RespawnTicks > 0) return;
@@ -181,12 +175,7 @@ namespace Game.Core
                 if (!Combat.InArc(player.Position, player.Facing, enemy.Position, enemy.Definition.Radius, MeleeReach, MeleeArcDegrees)) continue;
 
                 int amount = RollDamage(stats, enemy.Definition.Armor, out bool critical);
-                enemy.Health -= amount;
-                enemy.Knockback = (enemy.Position - player.Position).Normalized * KnockbackSpeed;
-                _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical));
-                if (!enemy.IsDead) continue;
-                _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
-                DropFrom(enemy, player);
+                HitEnemy(player, enemy, amount, critical, player.Position);
             }
 
             foreach (var boss in _bosses)
@@ -272,6 +261,7 @@ namespace Game.Core
 
             player.Health = 0;
             player.Attacking = false;
+            player.ClearBuffs();
             player.RespawnTicks = Ticks(_config.RespawnSeconds);
             _events.Add(new SimEvent(SimEventType.Died, player.Id));
         }
