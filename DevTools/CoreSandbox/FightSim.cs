@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Game.Core;
 
@@ -27,16 +28,22 @@ namespace CoreSandbox
             var toEnemies = new FlowField(world.Map);
 
             int kills = 0, deaths = 0, dealt = 0, taken = 0, swings = 0, hits = 0;
+            var killsByMonster = new Dictionary<string, int>();
+            var takenByMonster = new Dictionary<string, int>();
+            var names = new Dictionary<int, string>();
             for (int tick = 0; tick < seconds * World.TicksPerSecond; tick++)
             {
                 if (tick % 10 == 0) toEnemies.Build(world.Enemies.Select(e => e.Position), 64);
                 Drive(world, player, toEnemies, dodge);
                 var nearest = world.Enemies.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
                 skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
+                foreach (var enemy in world.Enemies) names[enemy.Id] = enemy.Definition.Name;
                 world.Step();
                 foreach (var e in world.TakeEvents())
                 {
                     skills.Count(e);
+                    if (e.Type == SimEventType.Died && names.TryGetValue(e.Source, out string killed)) killsByMonster[killed] = killsByMonster.GetValueOrDefault(killed) + 1;
+                    if (e.Type == SimEventType.Hit && e.Target == player.Id && names.TryGetValue(e.Source, out string hitter)) takenByMonster[hitter] = takenByMonster.GetValueOrDefault(hitter) + e.Amount;
                     if (e.Type == SimEventType.Attack && e.Source == player.Id) swings++;
                     if (e.Type == SimEventType.Hit && e.Source == player.Id)
                     {
@@ -52,6 +59,7 @@ namespace CoreSandbox
             Console.WriteLine($"seed = {seed}, {seconds}초, 장비: {string.Join(", ", gear)}, 클래스: {ClassNames(classes)}, 피하기: {(dodge ? "켬" : "끔")}");
             foreach (var item in equipment.Items) Console.WriteLine("  " + ItemText.Describe(item)[0] + " / " + string.Join(", ", item.Implicits.Select(StatText.Describe)));
             Console.WriteLine($"처치 {kills} (분당 {kills * 60.0 / seconds:0.0}), 사망 {deaths}");
+            Console.WriteLine("  몬스터별 처치: " + string.Join(", ", killsByMonster.Select(p => $"{p.Key} {p.Value}")) + " / 받은 피해: " + string.Join(", ", takenByMonster.Select(p => $"{p.Key} {p.Value}")));
             Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 기본 공격 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)");
             Console.WriteLine($"  나눠 보면: {skills.Summary()}");
             Console.WriteLine($"받은 피해 {taken} (초당 {taken / (double)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}, 마신 물약 {skills.Drunk}개");
@@ -75,7 +83,13 @@ namespace CoreSandbox
             float gap = toTarget.Length - target.Definition.Radius - World.PlayerRadius;
             float reach = Reach(player);
             var input = Vec2.Zero;
-            if (dodge && target.State == EnemyState.Windup && gap < target.Definition.Reach + 0.6f)
+            var escape = dodge ? BossSim.Escape(world, player, World.Ticks(0.25f)) : Vec2.Zero;
+            if (escape.LengthSquared > 0)
+            {
+                // Out of a charger's marked path or a shot's way.
+                input = escape;
+            }
+            else if (dodge && target.State == EnemyState.Windup && target.Definition.Behavior == MonsterBehavior.Melee && gap < target.Definition.Reach + 0.6f)
             {
                 input = -toTarget.Normalized;
             }

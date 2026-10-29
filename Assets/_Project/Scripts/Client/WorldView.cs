@@ -224,6 +224,7 @@ namespace Game.Client
                     color = WindupColor;
                     pulse = 0.12f;
                 }
+                if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) color = ChargeColor;
                 if (view.Kind == EntityKind.Boss)
                 {
                     WatchBoss(view);
@@ -297,8 +298,20 @@ namespace Game.Client
             }
         }
 
-        static Color ColorOf(EntityView view) =>
-            view.Kind == EntityKind.Boss ? BossColor : view.Kind == EntityKind.Monster ? SlimeColor : AllyColor;
+        static readonly Dictionary<MonsterDefinition, Color> MonsterColors = new Dictionary<MonsterDefinition, Color>();
+
+        // A monster's colour comes from its sheet row, so a new monster needs no code here.
+        static Color ColorOf(EntityView view)
+        {
+            if (view.Kind == EntityKind.Boss) return BossColor;
+            if (view.Kind != EntityKind.Monster) return AllyColor;
+            if (!MonsterColors.TryGetValue(view.Monster, out var color))
+            {
+                color = ColorUtility.TryParseHtmlString(view.Monster.Color, out var parsed) ? parsed : SlimeColor;
+                MonsterColors[view.Monster] = color;
+            }
+            return color;
+        }
 
         // Banners for a boss waking up and changing phase.
         void WatchBoss(EntityView view)

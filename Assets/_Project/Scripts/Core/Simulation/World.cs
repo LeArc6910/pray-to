@@ -12,6 +12,8 @@ namespace Game.Core
         public float SpawnDistance { get; set; } = 12;
         public float RespawnSeconds { get; set; } = 5;
         public int ZoneLevel { get; set; } = 1;
+        // The zone level rises by one every this many tiles from the spawn, so tougher monsters live further out.
+        public float ZoneRing { get; set; } = 30;
         // A defeated boss returns to its arena after this long.
         public float BossRespawnSeconds { get; set; } = 120;
     }
@@ -38,6 +40,7 @@ namespace Game.Core
         // Reach is measured from the player's position when the swing started; give a little slack for
         // the enemy and player having moved during the wind-up.
         const float StrikeSlack = 0.2f;
+        const float MonsterShotRadius = 0.2f;
         // A player who has not been hurt for this long heals this percent of their maximum health a second.
         const float RestDelaySeconds = 6;
         const float RestHealPercent = 3;
@@ -130,6 +133,7 @@ namespace Game.Core
         {
             Tick++;
             foreach (var player in _players) UpdatePlayer(player);
+            foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id);
             _enemies.RemoveAll(e => e.IsDead);
             RemoveDefeatedBosses();
 
@@ -267,14 +271,22 @@ namespace Game.Core
                         break;
                     }
                     var toTarget = target.Position - enemy.Position;
-                    if (Gap(enemy, target) <= definition.Reach)
+                    float gap = Gap(enemy, target);
+                    // A shooter backs away from a player who comes too close, and only shoots from there once it is
+                    // cornered.
+                    if (definition.Behavior == MonsterBehavior.Ranged && gap < definition.KeepDistance)
                     {
+                        var before = enemy.Position;
+                        enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, -toTarget.Normalized * (definition.Speed * TickSeconds));
                         enemy.Facing = toTarget.Normalized;
-                        enemy.State = EnemyState.Windup;
-                        enemy.StateTicks = Ticks(definition.Windup);
+                        if (Vec2.Distance(before, enemy.Position) > definition.Speed * TickSeconds * 0.3f) break;
+                    }
+                    if (gap <= definition.Reach && CanStrike(enemy, target))
+                    {
+                        StartWindup(enemy, toTarget.Normalized);
                         break;
                     }
-                    var direction = Gap(enemy, target) < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);
+                    var direction = gap < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);
                     if (direction.LengthSquared < 1e-6f) direction = toTarget.Normalized;
                     enemy.Facing = direction;
                     enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, direction * (definition.Speed * TickSeconds));
@@ -282,16 +294,93 @@ namespace Game.Core
 
                 case EnemyState.Windup:
                     if (--enemy.StateTicks > 0) break;
-                    _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
-                    if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack) HurtPlayer(target, enemy.Id, definition.Damage);
+                    switch (definition.Behavior)
+                    {
+                        case MonsterBehavior.Ranged:
+                            if (target != null && !target.IsDead) enemy.Facing = (target.Position - enemy.Position).Normalized;
+                            _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
+                            _projectiles.Add(new Projectile(
+                                _nextId++,
+                                enemy.Id,
+                                0,
+                                enemy.Position + enemy.Facing * definition.Radius,
+                                enemy.Facing * definition.ShotSpeed,
+                                MonsterShotRadius,
+                                definition.Damage,
+                                Ticks(definition.Reach * 1.5f / definition.ShotSpeed)));
+                            break;
+                        case MonsterBehavior.Charge:
+                            _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.ChargeDirection));
+                            enemy.State = EnemyState.Charge;
+                            enemy.StateTicks = Ticks(definition.ChargeLength / definition.ChargeSpeed);
+                            enemy.ChargeHits.Clear();
+                            return;
+                        default:
+                            _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
+                            if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack) HurtPlayer(target, enemy.Id, definition.Damage);
+                            break;
+                    }
                     enemy.State = EnemyState.Recover;
                     enemy.StateTicks = Ticks(definition.Cooldown);
+                    break;
+
+                case EnemyState.Charge:
+                    Charge(enemy);
                     break;
 
                 case EnemyState.Recover:
                     if (--enemy.StateTicks <= 0) enemy.State = EnemyState.Chase;
                     break;
             }
+        }
+
+        // Faces the target and starts the telegraph. A charger marks the path it is about to run along.
+        void StartWindup(Enemy enemy, Vec2 direction)
+        {
+            var definition = enemy.Definition;
+            enemy.Facing = direction;
+            enemy.State = EnemyState.Windup;
+            enemy.StateTicks = Ticks(definition.Windup);
+            if (definition.Behavior != MonsterBehavior.Charge) return;
+            enemy.ChargeDirection = direction;
+            _hazards.Add(new Hazard(_nextId++, enemy.Id, 0, HazardShape.Line, enemy.Position, direction, definition.ChargeLength,
+                definition.Radius * 2, 0, Tick, Tick + enemy.StateTicks));
+        }
+
+        // Shooters and chargers only start when nothing solid is in the way; otherwise they keep closing in.
+        bool CanStrike(Enemy enemy, Player target) =>
+            enemy.Definition.Behavior == MonsterBehavior.Melee
+            || ClearLine(enemy.Position, target.Position, enemy.Definition.Behavior == MonsterBehavior.Ranged ? MonsterShotRadius : enemy.Definition.Radius);
+
+        bool ClearLine(Vec2 from, Vec2 to, float radius)
+        {
+            float length = Vec2.Distance(from, to);
+            for (float along = 0; along < length; along += 0.25f)
+            {
+                if (Collision.Overlaps(Map, Vec2.Lerp(from, to, along / length), radius * 0.5f)) return false;
+            }
+            return true;
+        }
+
+        // The rush: straight along the marked path, hurting each player it runs into once, stopping at a wall.
+        void Charge(Enemy enemy)
+        {
+            var definition = enemy.Definition;
+            var before = enemy.Position;
+            var step = enemy.ChargeDirection * (definition.ChargeSpeed * TickSeconds);
+            enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, step);
+            enemy.Facing = enemy.ChargeDirection;
+            foreach (var player in _players)
+            {
+                if (player.IsDead || enemy.ChargeHits.Contains(player.Id)) continue;
+                if (Vec2.Distance(player.Position, enemy.Position) > definition.Radius + PlayerRadius) continue;
+                enemy.ChargeHits.Add(player.Id);
+                HurtPlayer(player, enemy.Id, definition.Damage);
+            }
+            bool blocked = Vec2.Distance(before, enemy.Position) < step.Length * 0.3f;
+            if (--enemy.StateTicks > 0 && !blocked) return;
+            enemy.State = EnemyState.Recover;
+            enemy.StateTicks = Ticks(definition.Cooldown);
         }
 
         // Gear's regeneration always, resting once the player has gone unhurt for a while, and whatever a consumable
@@ -353,10 +442,13 @@ namespace Game.Core
             }
         }
 
+        // The zone level at a place: ZoneLevel at the spawn, one more every ZoneRing tiles out.
+        public int ZoneLevelAt(Vec2 position) =>
+            _config.ZoneLevel + (_config.ZoneRing > 0 ? (int)(Vec2.Distance(position, Spawn) / _config.ZoneRing) : 0);
+
         void TrySpawnEnemy()
         {
-            var choices = _monsters.Monsters.Where(m => m.Level <= _config.ZoneLevel && m.Weight > 0).ToList();
-            if (choices.Count == 0) return;
+            if (!_monsters.Monsters.Any(m => m.Level <= _config.ZoneLevel && m.Weight > 0)) return;
 
             for (int attempt = 0; attempt < 30; attempt++)
             {
@@ -369,6 +461,8 @@ namespace Game.Core
                 {
                     continue;
                 }
+                int zone = ZoneLevelAt(position);
+                var choices = _monsters.Monsters.Where(m => m.Level <= zone && m.Weight > 0).ToList();
                 SpawnEnemy(_random.PickWeighted(choices, m => m.Weight), position);
                 return;
             }

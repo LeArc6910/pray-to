@@ -144,7 +144,7 @@ namespace CoreSandbox
         }
 
         // Where to step to get out of every noticed telegraph and the path of nearby projectiles.
-        static Vec2 Escape(World world, Player player, int reactionTicks)
+        internal static Vec2 Escape(World world, Player player, int reactionTicks)
         {
             var away = Vec2.Zero;
             foreach (var hazard in world.Hazards)

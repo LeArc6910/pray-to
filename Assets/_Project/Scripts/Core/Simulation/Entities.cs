@@ -124,6 +124,8 @@ namespace Game.Core
         // Telegraphing an attack. The hit lands when this ends, if the target is still in reach.
         Windup,
         Recover,
+        // A charging monster rushing along its marked path.
+        Charge,
     }
 
     public sealed class Enemy
@@ -147,6 +149,8 @@ namespace Game.Core
         public int TargetId { get; internal set; }
 
         internal Vec2 Knockback { get; set; }
+        internal Vec2 ChargeDirection { get; set; }
+        internal HashSet<int> ChargeHits { get; } = new HashSet<int>();
     }
 
     public enum SimEventType : byte

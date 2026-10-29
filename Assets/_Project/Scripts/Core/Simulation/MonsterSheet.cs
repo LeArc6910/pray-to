@@ -4,6 +4,16 @@ using System.Linq;
 
 namespace Game.Core
 {
+    public enum MonsterBehavior : byte
+    {
+        // Walks up, winds up, strikes whoever is still in reach.
+        Melee,
+        // Keeps its distance and shoots where the player was when the wind-up began.
+        Ranged,
+        // Marks a straight path, then rushes along it.
+        Charge,
+    }
+
     public sealed class MonsterDefinition
     {
         internal MonsterDefinition(
@@ -24,7 +34,12 @@ namespace Game.Core
             float runeChance,
             float potionChance,
             string materialId,
-            float materialChance)
+            float materialChance,
+            MonsterBehavior behavior = MonsterBehavior.Melee,
+            float shotSpeed = 0,
+            float keepDistance = 0,
+            float chargeSpeed = 0,
+            string color = "")
         {
             Id = id;
             Name = name;
@@ -44,6 +59,11 @@ namespace Game.Core
             PotionChance = potionChance;
             MaterialId = materialId;
             MaterialChance = materialChance;
+            Behavior = behavior;
+            ShotSpeed = shotSpeed;
+            KeepDistance = keepDistance;
+            ChargeSpeed = chargeSpeed;
+            Color = color;
         }
 
         public string Id { get; }
@@ -72,6 +92,15 @@ namespace Game.Core
         // A material from materials.csv (checked when the world drops it), and the percent chance to drop it.
         public string MaterialId { get; }
         public float MaterialChance { get; }
+        public MonsterBehavior Behavior { get; }
+        // Ranged: tiles per second its shots fly, and how close it lets a player come before backing off.
+        public float ShotSpeed { get; }
+        public float KeepDistance { get; }
+        // Charge: tiles per second it rushes; the rush covers ChargeLength.
+        public float ChargeSpeed { get; }
+        public float ChargeLength => Reach + 2;
+        // "#RRGGBB" for the screen, or empty for the default.
+        public string Color { get; }
     }
 
     public sealed class MonsterData
@@ -125,6 +154,13 @@ namespace Game.Core
                     if (radius <= 0 || radius > MaxRadius) throw new FormatException($"radius는 0보다 크고 {MaxRadius} 이하여야 합니다.");
                     float speed = SheetValues.ParseDecimal(row["speed"], "speed");
                     if (speed <= 0) throw new FormatException("speed는 0보다 커야 합니다.");
+                    var behavior = row["behavior"].Length == 0 ? MonsterBehavior.Melee : SheetValues.ParseEnum<MonsterBehavior>(row["behavior"], "behavior");
+                    float shotSpeed = Number(row, "shot_speed");
+                    float chargeSpeed = Number(row, "charge_speed");
+                    if (behavior == MonsterBehavior.Ranged && shotSpeed <= 0) throw new FormatException("ranged 몬스터는 shot_speed 칸을 채워야 합니다.");
+                    if (behavior == MonsterBehavior.Charge && chargeSpeed <= 0) throw new FormatException("charge 몬스터는 charge_speed 칸을 채워야 합니다.");
+                    string color = row["color"];
+                    if (color.Length > 0 && !IsColor(color)) throw new FormatException($"color '{color}'는 #RRGGBB로 적습니다.");
 
                     monsters.Add(new MonsterDefinition(
                         id,
@@ -144,7 +180,12 @@ namespace Game.Core
                         Percent(row, "rune_chance"),
                         Percent(row, "potion_chance"),
                         row["material"],
-                        Percent(row, "material_chance")));
+                        Percent(row, "material_chance"),
+                        behavior,
+                        shotSpeed,
+                        Number(row, "keep_distance"),
+                        chargeSpeed,
+                        color));
                 }
                 catch (FormatException e)
                 {
@@ -161,6 +202,11 @@ namespace Game.Core
             float value = SheetValues.ParseDecimal(row[column], column);
             return value <= 100 ? value : throw new FormatException($"{column}는 0~100 사이의 퍼센트입니다.");
         }
+
+        static float Number(CsvRow row, string column) => row[column].Length == 0 ? 0 : SheetValues.ParseDecimal(row[column], column);
+
+        static bool IsColor(string text) =>
+            text.Length == 7 && text[0] == '#' && text.Skip(1).All(c => Uri.IsHexDigit(c));
 
         static int Positive(int value, string label) =>
             value > 0 ? value : throw new FormatException($"{label}는 0보다 커야 합니다.");
