@@ -2,7 +2,7 @@ using System;
 
 namespace Game.Core
 {
-    // Everything but floor is solid. Which solid tiles can be dug, and what they give, is in tiles.csv.
+    // Everything but floor and conveyors is solid. Which tiles can be dug, and what they give, is in tiles.csv.
     public enum TileType : byte
     {
         Floor,
@@ -13,6 +13,10 @@ namespace Game.Core
         Workbench,
         Furnace,
         Chest,
+        // Machines (Docs/Automation.md). A conveyor is walked over like floor.
+        Drill,
+        Smelter,
+        Conveyor,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -60,7 +64,11 @@ namespace Game.Core
 
         public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
-        public bool IsSolid(int x, int y) => this[x, y] != TileType.Floor;
+        public bool IsSolid(int x, int y)
+        {
+            var type = this[x, y];
+            return type != TileType.Floor && type != TileType.Conveyor;
+        }
 
         // Whether a tile of this type has its centre within reach of the position.
         public bool Near(Vec2 position, TileType type, float reach)

@@ -1,0 +1,4 @@
+tile,seconds,capacity
+Drill,8,10
+Conveyor,0.5,1
+Smelter,4,10

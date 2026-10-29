@@ -7,15 +7,15 @@ using System.Text;
 namespace Game.Core
 {
     // A world as its host saves it: the seed to rebuild the caves from, the tiles players changed since, the crops
-    // and how long they had grown, what the chests hold, and how far the bosses have moved drops on. Monsters, ground loot and half-dug
+    // and how long they had grown, what the chests and machines hold, and how far the bosses have moved drops on. Monsters, ground loot and half-dug
     // walls are not kept. Tiles and crops are written by name, so a save still reads after the sheets change.
     // SavedAt is given by the caller (Core never reads the clock) and lets crops grow for the time the world was
     // closed. See Docs/Saving.md.
     public sealed class WorldSave
     {
         const string Magic = "PTWO";
-        // 2 added chests.
-        const int FormatVersion = 2;
+        // 2 added chests, 3 machines.
+        const int FormatVersion = 3;
 
         WorldSave(
             ulong seed,
@@ -24,9 +24,11 @@ namespace Game.Core
             List<TileChange> tiles,
             List<(CropDefinition Crop, int X, int Y, long Age)> crops,
             List<(int X, int Y, Inventory Contents)> chests,
+            List<SavedMachine> machines,
             List<string> warnings)
         {
             Chests = chests;
+            Machines = machines;
             Seed = seed;
             SavedAt = savedAt;
             ProgressLevel = progressLevel;
@@ -43,6 +45,32 @@ namespace Game.Core
         // Age is in ticks at the moment of saving.
         public IReadOnlyList<(CropDefinition Crop, int X, int Y, long Age)> Crops { get; }
         public IReadOnlyList<(int X, int Y, Inventory Contents)> Chests { get; }
+        public IReadOnlyList<SavedMachine> Machines { get; }
+
+        public sealed class SavedMachine
+        {
+            internal SavedMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
+                List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output)
+            {
+                X = x;
+                Y = y;
+                Direction = direction;
+                Timer = timer;
+                Carried = carried;
+                Progress = progress;
+                Input = input;
+                Output = output;
+            }
+
+            public int X { get; }
+            public int Y { get; }
+            public int Direction { get; }
+            public int Timer { get; }
+            public MaterialDefinition Carried { get; }
+            public float Progress { get; }
+            public IReadOnlyList<(MaterialDefinition Material, int Count)> Input { get; }
+            public IReadOnlyList<(MaterialDefinition Material, int Count)> Output { get; }
+        }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(World world, ulong seed, long savedAt)
@@ -91,6 +119,20 @@ namespace Game.Core
                     SavedItems.WriteCounts(w, contents.Runes.Select(p => (p.Key.Id, p.Value)));
                     SavedItems.WriteCounts(w, contents.Consumables.Select(p => (p.Key.Id, p.Value)));
                     SavedItems.WriteCounts(w, contents.Materials.Select(p => (p.Key.Id, p.Value)));
+                }
+
+                var machines = world.Machines.ToList();
+                w.Write(machines.Count);
+                foreach (var machine in machines)
+                {
+                    w.Write((ushort)machine.X);
+                    w.Write((ushort)machine.Y);
+                    w.Write((byte)machine.Direction);
+                    w.Write(machine.Timer);
+                    w.Write(machine.Carried?.Id ?? "");
+                    w.Write(machine.Progress);
+                    SavedItems.WriteCounts(w, machine.Inputs.Select(p => (p.Key.Id, p.Value)));
+                    SavedItems.WriteCounts(w, machine.Outputs.Select(p => (p.Key.Id, p.Value)));
                 }
             }
             return stream.ToArray();
@@ -162,7 +204,23 @@ namespace Game.Core
                     }
                     chests.Add((x, y, contents));
                 }
-                return new WorldSave(seed, savedAt, Math.Max(1, progress), tiles, crops, chests, warnings);
+                var machines = new List<SavedMachine>();
+                for (int count = version >= 3 ? r.ReadInt32() : 0; count > 0; count--)
+                {
+                    int x = r.ReadUInt16();
+                    int y = r.ReadUInt16();
+                    int direction = r.ReadByte();
+                    int timer = r.ReadInt32();
+                    string carried = r.ReadString();
+                    float along = r.ReadSingle();
+                    var input = SavedItems.ReadCounts(r);
+                    var output = SavedItems.ReadCounts(r);
+                    MaterialDefinition Find(string id) => loot?.Materials.FirstOrDefault(m => m.Id == id);
+                    List<(MaterialDefinition, int)> Resolve(List<(string Id, int Count)> stacks) =>
+                        stacks.Select(s => (Find(s.Id), s.Count)).Where(s => s.Item1 != null).ToList();
+                    machines.Add(new SavedMachine(x, y, direction, timer, carried.Length > 0 ? Find(carried) : null, along, Resolve(input), Resolve(output)));
+                }
+                return new WorldSave(seed, savedAt, Math.Max(1, progress), tiles, crops, chests, machines, warnings);
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

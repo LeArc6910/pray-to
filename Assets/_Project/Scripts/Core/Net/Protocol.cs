@@ -20,6 +20,7 @@ namespace Game.Core
         TileChanges = 15,
         CropChanges = 16,
         Chest = 17,
+        Machines = 18,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -27,7 +28,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.11.0";
+        public const string Version = "0.12.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -233,6 +234,62 @@ namespace Game.Core
                 yield return new CropChangesMessage(changes.Skip(start).Take(MaxPerMessage).ToList()).Encode();
             }
         }
+    }
+
+    // The machines near a player: which way each faces and what a conveyor carries how far along. Sent unreliably
+    // every few ticks, like a slower snapshot; each one replaces the last. Materials are sheet indexes + 1 (0 for
+    // none). See Docs/Automation.md.
+    public sealed class MachinesMessage
+    {
+        public MachinesMessage(IReadOnlyList<MachineState> machines) { Machines = machines; }
+
+        public IReadOnlyList<MachineState> Machines { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Machines, w =>
+        {
+            w.Write((ushort)Machines.Count);
+            foreach (var m in Machines)
+            {
+                w.Write((ushort)m.X);
+                w.Write((ushort)m.Y);
+                w.Write((byte)m.Kind);
+                w.Write((byte)m.Direction);
+                w.Write((byte)(m.Carried + 1));
+                w.Write((byte)Math.Clamp((int)MathF.Round(m.Progress * 255), 0, 255));
+            }
+        });
+
+        public static MachinesMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Machines, r =>
+        {
+            int count = r.ReadUInt16();
+            var machines = new List<MachineState>(count);
+            for (int i = 0; i < count; i++)
+            {
+                machines.Add(new MachineState(r.ReadUInt16(), r.ReadUInt16(), (TileType)r.ReadByte(), r.ReadByte() & 3, r.ReadByte() - 1, r.ReadByte() / 255f));
+            }
+            return new MachinesMessage(machines);
+        });
+    }
+
+    public readonly struct MachineState
+    {
+        public MachineState(int x, int y, TileType kind, int direction, int carried, float progress)
+        {
+            X = x;
+            Y = y;
+            Kind = kind;
+            Direction = direction;
+            Carried = carried;
+            Progress = progress;
+        }
+
+        public int X { get; }
+        public int Y { get; }
+        public TileType Kind { get; }
+        public int Direction { get; }
+        // A conveyor's load as a material sheet index, or -1.
+        public int Carried { get; }
+        public float Progress { get; }
     }
 
     // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.

@@ -63,6 +63,8 @@ namespace Game.Core
             }
 
             _wallDamage.Remove(key);
+            var machine = MachineAt(x, y);
+            if (machine != null) Empty(machine, player);
             SetTile(x, y, TileType.Floor);
             player.Inventory.AddMaterial(tile.Material, tile.Count);
             if (tile.Extra != null && tile.ExtraChance > 0 && _random.Chance(tile.ExtraChance / 100f)) player.Inventory.AddMaterial(tile.Extra);
@@ -89,6 +91,8 @@ namespace Game.Core
             player.Inventory.TakeMaterial(material);
             player.InventoryVersion++;
             SetTile(x, y, material.Places.Value);
+            var machine = MachineAt(x, y);
+            if (machine != null) machine.Direction = Machine.DirectionOf(player.Facing);
             return true;
         }
 
@@ -136,6 +140,7 @@ namespace Game.Core
         void SetTile(int x, int y, TileType type)
         {
             if (Map[x, y] == TileType.Chest || type == TileType.Chest) ChestTileChanged(x, y, type);
+            if (Tiles?.Machine(Map[x, y]) != null || Tiles?.Machine(type) != null) MachineTileChanged(x, y, type);
             Map[x, y] = type;
             _changedTiles[y * Map.Width + x] = type;
             _newTileChanges.Add(new TileChange(x, y, type));

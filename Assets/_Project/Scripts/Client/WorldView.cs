@@ -89,10 +89,12 @@ namespace Game.Client
         // Which skill slots of each other player have a buff running, from their snapshot state.
         readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
         readonly Dictionary<int, SpriteRenderer> _crops = new Dictionary<int, SpriteRenderer>();
+        // Per machine tile: an arrow showing which way it faces, and a dot for what a conveyor carries.
+        readonly Dictionary<int, (SpriteRenderer Arrow, SpriteRenderer Load)> _machines = new Dictionary<int, (SpriteRenderer, SpriteRenderer)>();
         Tilemap _tilemap;
         TileBase _floorTile;
         TileBase _arenaTile;
-        readonly Dictionary<TileType, TileBase> _solidTiles = new Dictionary<TileType, TileBase>();
+        readonly Dictionary<TileType, TileBase> _tileSprites = new Dictionary<TileType, TileBase>();
         readonly HashSet<int> _seen = new HashSet<int>();
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
@@ -132,6 +134,7 @@ namespace Game.Client
 
             DrawEntities(deltaTime);
             DrawCrops();
+            DrawMachines();
             DrawMarks();
             DrawProjectiles();
 
@@ -450,6 +453,44 @@ namespace Game.Client
             foreach (int key in _gone) _crops.Remove(key);
         }
 
+        // Each machine's arrow, and the load on each conveyor moving along it toward the front.
+        void DrawMachines()
+        {
+            _seen.Clear();
+            foreach (var machine in _client.Machines())
+            {
+                int key = machine.Y * _client.Map.Width + machine.X;
+                _seen.Add(key);
+                if (!_machines.TryGetValue(key, out var parts))
+                {
+                    var arrow = Renderer(_root.transform, "Machine", Shapes.Wedge(70), new Color(1, 1, 1, 0.55f));
+                    arrow.transform.localScale = Vector3.one * 0.55f;
+                    arrow.sortingOrder = -15;
+                    var load = Renderer(_root.transform, "Load", Shapes.Circle, Palette.Material);
+                    load.transform.localScale = Vector3.one * 0.3f;
+                    load.sortingOrder = -14;
+                    parts = (arrow, load);
+                    _machines[key] = parts;
+                }
+                var step = Machine.Steps[machine.Direction];
+                var center = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
+                parts.Arrow.transform.localPosition = center;
+                parts.Arrow.transform.localRotation = Quaternion.Euler(0, 0, machine.Direction * 90);
+                parts.Load.enabled = machine.Carried != null;
+                parts.Load.transform.localPosition = center + new Vector3(step.X, step.Y, 0) * (machine.Progress - 0.5f);
+            }
+
+            _gone.Clear();
+            foreach (var pair in _machines)
+            {
+                if (_seen.Contains(pair.Key)) continue;
+                Object.Destroy(pair.Value.Arrow.gameObject);
+                Object.Destroy(pair.Value.Load.gameObject);
+                _gone.Add(pair.Key);
+            }
+            foreach (int key in _gone) _machines.Remove(key);
+        }
+
         void DrawProjectiles()
         {
             _seen.Clear();
@@ -711,12 +752,15 @@ namespace Game.Client
 
             _floorTile = Shapes.FloorTile();
             _arenaTile = Shapes.ArenaTile();
-            _solidTiles[TileType.Wall] = Shapes.WallTile();
-            _solidTiles[TileType.CopperOre] = Shapes.OreTile(Palette.CopperOre);
-            _solidTiles[TileType.IronOre] = Shapes.OreTile(Palette.IronOre);
-            _solidTiles[TileType.Workbench] = Shapes.WorkbenchTile();
-            _solidTiles[TileType.Furnace] = Shapes.FurnaceTile();
-            _solidTiles[TileType.Chest] = Shapes.ChestTile();
+            _tileSprites[TileType.Wall] = Shapes.WallTile();
+            _tileSprites[TileType.CopperOre] = Shapes.OreTile(Palette.CopperOre);
+            _tileSprites[TileType.IronOre] = Shapes.OreTile(Palette.IronOre);
+            _tileSprites[TileType.Workbench] = Shapes.WorkbenchTile();
+            _tileSprites[TileType.Furnace] = Shapes.FurnaceTile();
+            _tileSprites[TileType.Chest] = Shapes.ChestTile();
+            _tileSprites[TileType.Drill] = Shapes.DrillTile();
+            _tileSprites[TileType.Smelter] = Shapes.SmelterTile();
+            _tileSprites[TileType.Conveyor] = Shapes.ConveyorTile();
             var tiles = new TileBase[map.Width * map.Height];
             for (int y = 0; y < map.Height; y++)
             {
@@ -730,7 +774,7 @@ namespace Game.Client
         TileBase TileAt(int x, int y)
         {
             var type = _client.Map[x, y];
-            if (type != TileType.Floor) return _solidTiles.TryGetValue(type, out var solid) ? solid : _solidTiles[TileType.Wall];
+            if (type != TileType.Floor) return _tileSprites.TryGetValue(type, out var solid) ? solid : _tileSprites[TileType.Wall];
             return Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius ? _arenaTile : _floorTile;
         }
 

@@ -18,6 +18,7 @@ namespace Game.Client
         public TextAsset recipes;
         public TextAsset tiles;
         public TextAsset crops;
+        public TextAsset machines;
         public TextAsset monsters;
         public TextAsset bosses;
         public TextAsset bossAttacks;
@@ -29,7 +30,7 @@ namespace Game.Client
         public LootData LoadLoot() =>
             LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes));
 
-        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops));
+        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines));
 
         public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
 

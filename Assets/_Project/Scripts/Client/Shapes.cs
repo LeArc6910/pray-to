@@ -57,6 +57,13 @@ namespace Game.Client
 
         public static Tile ChestTile() => MakeTile(new Color32(120, 78, 40, 255), Palette.Chest, raised: true);
 
+        // Machines: the drill in steel, the smelter like a hotter furnace, the conveyor a dark belt flat on the floor.
+        public static Tile DrillTile() => MakeTile(new Color32(80, 86, 96, 255), Palette.Drill, raised: true, flecks: true);
+
+        public static Tile SmelterTile() => MakeTile(new Color32(96, 70, 60, 255), Palette.Smelter, raised: true, flecks: true);
+
+        public static Tile ConveyorTile() => MakeTile(Palette.Conveyor, new Color32(110, 110, 120, 255), raised: false);
+
         // The boss arena's floor, darker and redder so it reads as a different place.
         public static Tile ArenaTile() => MakeTile(new Color32(52, 34, 34, 255), new Color32(64, 42, 40, 255), raised: false);
 

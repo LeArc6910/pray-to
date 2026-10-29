@@ -23,6 +23,9 @@ namespace Game.Core
         public int MaxHazardsPerSnapshot { get; set; } = 10;
         public int MaxEventsPerSnapshot { get; set; } = 14;
         public string[] StarterGear { get; set; } = { "copper_sword" };
+        // Machines nearer than ViewRange go out every MachineInterval ticks, at most this many, nearest first.
+        public int MachineInterval { get; set; } = 4;
+        public int MaxMachinesPerMessage { get; set; } = 60;
         // One entry per consumable handed out on joining. Ids the sheet does not have are skipped.
         public string[] StarterConsumables { get; set; } = { "healing_potion", "healing_potion", "healing_potion" };
         // One entry per material handed out on joining, likewise.
@@ -58,6 +61,8 @@ namespace Game.Core
             // The chest whose contents were last sent (its tile index, -1 for none) and that chest's version then.
             public int SentChest = -1;
             public int SentChestVersion = -1;
+            // Whether the last machines message had any, so an empty one is sent once when they go out of view.
+            public bool SentMachines;
         }
 
         readonly Dictionary<ulong, Connection> _connections = new Dictionary<ulong, Connection>();
@@ -159,6 +164,10 @@ namespace Game.Core
                 Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory).Encode(_loot), reliable: true);
             }
             foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendChest(pair.Key, pair.Value);
+            if (World.Tick % _config.MachineInterval == 0)
+            {
+                foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendMachines(pair.Key, pair.Value);
+            }
 
             if (World.Tick % _config.SnapshotInterval != 0) return;
 
@@ -254,6 +263,7 @@ namespace Game.Core
             // A month at most, so a clock that jumped years ahead does not grow everything forever.
             long closedTicks = Math.Clamp(now - save.SavedAt, 0, 30L * 24 * 3600) * World.TicksPerSecond;
             World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks)), save.ProgressLevel, save.Chests);
+            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output);
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -378,6 +388,20 @@ namespace Game.Core
 
         (int X, int Y, int Crop, long PlantedTick) CropEntry(CropChange change) =>
             (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.PlantedTick ?? 0);
+
+        void SendMachines(ulong connection, Connection sent)
+        {
+            var viewer = sent.Player.Position;
+            var near = World.Machines
+                .Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer) <= _config.ViewRange)
+                .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
+                .Take(_config.MaxMachinesPerMessage)
+                .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress))
+                .ToList();
+            if (near.Count == 0 && !sent.SentMachines) return;
+            sent.SentMachines = near.Count > 0;
+            Send(connection, new MachinesMessage(near).Encode(), reliable: false);
+        }
 
         // The chest the player stands by, when it is a different one or it changed; a closed message when they left it.
         void SendChest(ulong connection, Connection sent)

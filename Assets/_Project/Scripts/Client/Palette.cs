@@ -14,6 +14,9 @@ namespace Game.Client
         public static readonly Color32 Workbench = new Color32(176, 124, 72, 255);
         public static readonly Color32 Furnace = new Color32(232, 120, 48, 255);
         public static readonly Color32 Chest = new Color32(214, 170, 82, 255);
+        public static readonly Color32 Drill = new Color32(150, 160, 176, 255);
+        public static readonly Color32 Smelter = new Color32(250, 150, 60, 255);
+        public static readonly Color32 Conveyor = new Color32(70, 70, 78, 255);
         public static readonly Color Dust = new Color(0.8f, 0.72f, 0.6f);
         public static readonly Color Sprout = new Color(0.45f, 0.8f, 0.35f);
         public static readonly Color Ripe = new Color(0.95f, 0.75f, 0.55f);

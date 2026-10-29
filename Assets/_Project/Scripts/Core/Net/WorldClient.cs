@@ -102,6 +102,27 @@ namespace Game.Core
         public SkillTag Tags { get; }
     }
 
+    public readonly struct MachineView
+    {
+        public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress)
+        {
+            X = x;
+            Y = y;
+            Kind = kind;
+            Direction = direction;
+            Carried = carried;
+            Progress = progress;
+        }
+
+        public int X { get; }
+        public int Y { get; }
+        public TileType Kind { get; }
+        // 0 right, 1 up, 2 left, 3 down.
+        public int Direction { get; }
+        public MaterialDefinition Carried { get; }
+        public float Progress { get; }
+    }
+
     public readonly struct HazardView
     {
         public HazardView(HazardState state, float progress)
@@ -234,6 +255,10 @@ namespace Game.Core
                         break;
                     case MessageType.Chest:
                         if (_loot != null) Chest = ChestMessage.Decode(data, _loot);
+                        break;
+                    case MessageType.Machines:
+                        _machines = MachinesMessage.Decode(data).Machines;
+                        _machinesTick = HostTick;
                         break;
                     case MessageType.Snapshot:
                         if (Status == ClientStatus.Playing) Apply(SnapshotMessage.Decode(data));
@@ -404,6 +429,24 @@ namespace Game.Core
 
         // In the order the crafting list shows them.
         public IReadOnlyList<Recipe> Recipes => _loot?.Recipes ?? (IReadOnlyList<Recipe>)Array.Empty<Recipe>();
+
+        IReadOnlyList<MachineState> _machines = Array.Empty<MachineState>();
+        double _machinesTick;
+
+        // The machines in view, with conveyor loads moved on to where they are now.
+        public List<MachineView> Machines()
+        {
+            var views = new List<MachineView>(_machines.Count);
+            foreach (var m in _machines)
+            {
+                var carried = m.Carried >= 0 && _loot != null && m.Carried < _loot.Materials.Count ? _loot.Materials[m.Carried] : null;
+                float progress = m.Progress;
+                var definition = _tiles?.Machine(m.Kind);
+                if (carried != null && definition != null) progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks));
+                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress));
+            }
+            return views;
+        }
 
         // The chest this player stands by and what it holds, or a closed one.
         public ChestMessage Chest { get; private set; } = ChestMessage.Closed;
