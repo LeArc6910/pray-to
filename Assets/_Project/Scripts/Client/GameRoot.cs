@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Game.Core;
 using Unity.Netcode;
@@ -27,9 +28,18 @@ namespace Game.Client
         const float AcquiredSeconds = 4;
         // Half the view's height in tiles on a landscape screen. Portrait screens zoom out to keep this much width.
         const float ViewSize = 7;
+        // The host saves its world this often, and when the session ends. Characters save whenever the bag changes.
+        const float WorldSaveSeconds = 30;
 
         Mode _mode = Mode.Menu;
         string _playerName = "플레이어";
+        string _worldName = "내 월드";
+        // While hosting: the save the world goes to.
+        string _worldKey;
+        float _worldSaveClock;
+        int _savedInventoryVersion;
+        // [월드 지우기] asks once more before it deletes.
+        bool _confirmDelete;
         string _address = "127.0.0.1";
         string _status = "";
         LootData _loot;
@@ -131,6 +141,7 @@ namespace Game.Client
             if (ticks == MaxTicksPerFrame) _tickClock = 0;
 
             if (_client.Status != ClientStatus.Playing) return;
+            SaveProgress(Time.deltaTime);
             _view ??= new WorldView(_client, _camera);
             _map ??= new MapView(_client);
             _client.AdvanceRenderClock(Time.deltaTime);
@@ -214,6 +225,23 @@ namespace Game.Client
 
         void StartHosting(Mode mode)
         {
+            // Saves are read first, so a broken one stops the start with a reason instead of being overwritten.
+            if (!LoadCharacter(out byte[] character)) return;
+            WorldSave world = null;
+            byte[] worldData = SaveStore.Read(SaveStore.WorldKey(WorldName));
+            if (worldData != null)
+            {
+                try
+                {
+                    world = WorldSave.Read(worldData, _tiles);
+                }
+                catch (InvalidDataException e)
+                {
+                    _status = $"월드 '{WorldName}'의 저장본을 읽지 못했습니다: {e.Message} 다른 월드 이름을 쓰거나 [월드 지우기]로 지우세요.";
+                    return;
+                }
+            }
+
             if (mode == Mode.Host)
             {
                 _net = NetLink.Host(NetLink.DefaultPort);
@@ -226,9 +254,19 @@ namespace Game.Client
                 _net.Disconnected += id => _host?.Disconnect(id);
             }
 
-            ulong seed = (ulong)DateTime.UtcNow.Ticks;
+            ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
             _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles);
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles);
+            if (world != null)
+            {
+                _host.Restore(world, Now());
+                foreach (string warning in world.Warnings) _acquired.Add(("월드 저장본: " + warning, 0));
+            }
+            _worldKey = SaveStore.WorldKey(WorldName);
+            _worldSaveClock = 0;
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
+            {
+                Character = character,
+            };
             _inventory = new InventoryWindow(_client, SendToHost);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
@@ -237,13 +275,17 @@ namespace Game.Client
 
         void StartJoining()
         {
+            if (!LoadCharacter(out byte[] character)) return;
             _net = NetLink.Join(_address.Trim(), NetLink.DefaultPort);
             if (_net == null)
             {
                 _status = "접속을 시작하지 못했습니다. 주소를 확인하세요.";
                 return;
             }
-            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles);
+            _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
+            {
+                Character = character,
+            };
             _inventory = new InventoryWindow(_client, SendToHost);
             _joinSent = false;
             _net.Connected += id =>
@@ -261,8 +303,79 @@ namespace Game.Client
             _status = "접속 중…";
         }
 
+        string CharacterName => string.IsNullOrWhiteSpace(_playerName) ? "플레이어" : _playerName.Trim();
+
+        string WorldName => string.IsNullOrWhiteSpace(_worldName) ? "내 월드" : _worldName.Trim();
+
+        static long Now() => DateTimeOffset.UtcNow.ToUnixTimeSeconds();
+
+        // The saved character for this name, checked here so a broken save stops the start with a reason (and is
+        // never overwritten). Null data means a new character.
+        bool LoadCharacter(out byte[] data)
+        {
+            data = SaveStore.Read(SaveStore.CharacterKey(CharacterName));
+            if (data == null) return true;
+            try
+            {
+                foreach (string warning in CharacterSave.Read(data, _loot).Warnings) _acquired.Add(("캐릭터 저장본: " + warning, 0));
+                return true;
+            }
+            catch (InvalidDataException e)
+            {
+                _status = $"캐릭터 '{CharacterName}'의 저장본을 읽지 못했습니다: {e.Message} 다른 이름으로 새 캐릭터를 만드세요.";
+                return false;
+            }
+        }
+
+        // The character whenever the host sends a changed bag; the world every WorldSaveSeconds while hosting.
+        void SaveProgress(float deltaTime)
+        {
+            if (_client.InventoryVersion != _savedInventoryVersion)
+            {
+                _savedInventoryVersion = _client.InventoryVersion;
+                Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
+            }
+            if (_host == null) return;
+            _worldSaveClock += deltaTime;
+            if (_worldSaveClock < WorldSaveSeconds) return;
+            _worldSaveClock = 0;
+            Save(_worldKey, _host.SaveWorld(Now()));
+        }
+
+        static void Save(string key, byte[] data)
+        {
+            if (key == null || data == null) return;
+            try
+            {
+                SaveStore.Write(key, data);
+            }
+            catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
+            {
+                Debug.LogWarning($"Could not save {key}: {e.Message}");
+            }
+        }
+
+        // Also called by the play mode tests.
+        internal void Leave() => EndSession("");
+
+        internal string PlayerName
+        {
+            get => _playerName;
+            set => _playerName = value;
+        }
+
+        internal string WorldNameField
+        {
+            get => _worldName;
+            set => _worldName = value;
+        }
+
         void EndSession(string status)
         {
+            if (_client != null) Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
+            if (_host != null) Save(_worldKey, _host.SaveWorld(Now()));
+            _worldKey = null;
+            _savedInventoryVersion = 0;
             _view?.Dispose();
             _map?.Dispose();
             _net?.Dispose();
@@ -338,7 +451,7 @@ namespace Game.Client
         {
             bool wide = Ui.Width >= 760;
             float width = wide ? 740 : Mathf.Min(380, Ui.Width - 20);
-            float height = Mathf.Min(wide ? 380 : 640, Ui.Height - 20);
+            float height = Mathf.Min(wide ? 460 : 760, Ui.Height - 20);
             var area = new Rect((Ui.Width - width) / 2, (Ui.Height - height) / 2, width, height);
             GUILayout.BeginArea(area, GUI.skin.box);
             _menuScroll = GUILayout.BeginScrollView(_menuScroll);
@@ -347,8 +460,23 @@ namespace Game.Client
             GUILayout.BeginVertical(GUILayout.Width(wide ? 340 : width - 40));
             GUILayout.Label($"pray-to 프로토타입 (버전 {Protocol.Version})");
             GUILayout.Space(8);
-            GUILayout.Label("이름");
+            GUILayout.Label("이름 (캐릭터)");
             _playerName = GUILayout.TextField(_playerName, 16);
+            GUILayout.Label(SaveStore.Exists(SaveStore.CharacterKey(CharacterName)) ? "저장된 캐릭터로 이어한다" : "새 캐릭터로 시작한다");
+            GUILayout.Space(4);
+            GUILayout.Label("월드 (혼자 하기·호스트)");
+            string worldName = GUILayout.TextField(_worldName, 24);
+            if (worldName != _worldName) _confirmDelete = false;
+            _worldName = worldName;
+            bool worldSaved = SaveStore.Exists(SaveStore.WorldKey(WorldName));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(worldSaved ? "저장된 월드를 이어한다" : "새 월드를 만든다");
+            if (worldSaved && GUILayout.Button(_confirmDelete ? "한 번 더 누르면 지운다" : "월드 지우기"))
+            {
+                if (_confirmDelete) SaveStore.Delete(SaveStore.WorldKey(WorldName));
+                _confirmDelete = !_confirmDelete;
+            }
+            GUILayout.EndHorizontal();
             GUILayout.Space(8);
 
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success

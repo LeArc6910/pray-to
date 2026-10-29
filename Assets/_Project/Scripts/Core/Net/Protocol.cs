@@ -26,7 +26,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.9.0";
+        public const string Version = "0.10.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -100,12 +100,13 @@ namespace Game.Core
 
     public sealed class JoinMessage
     {
-        public JoinMessage(string playerKey, string name, IReadOnlyList<string> classes = null, string version = Protocol.Version)
+        public JoinMessage(string playerKey, string name, IReadOnlyList<string> classes = null, string version = Protocol.Version, byte[] character = null)
         {
             PlayerKey = playerKey ?? "";
             Name = name ?? "";
             Classes = classes ?? Array.Empty<string>();
             Version = version ?? "";
+            Character = character ?? Array.Empty<byte>();
         }
 
         public string PlayerKey { get; }
@@ -113,6 +114,8 @@ namespace Game.Core
         // Class ids the player picked, in order. The host keeps what its rules allow and says which in Welcome.
         public IReadOnlyList<string> Classes { get; }
         public string Version { get; }
+        // The player's saved character (CharacterSave), or empty for a new one.
+        public byte[] Character { get; }
 
         // Classes come after the version, so a host can still read an older client's version and say why it
         // refuses it.
@@ -123,6 +126,8 @@ namespace Game.Core
             w.Write(Version);
             w.Write((byte)Math.Min(Classes.Count, byte.MaxValue));
             foreach (string id in Classes.Take(byte.MaxValue)) w.Write(id ?? "");
+            w.Write(Character.Length);
+            w.Write(Character);
         });
 
         public static JoinMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Join, r =>
@@ -131,11 +136,15 @@ namespace Game.Core
             string name = r.ReadString();
             string version = r.ReadString();
             var classes = new List<string>();
+            byte[] character = null;
             if (version == Protocol.Version)
             {
                 for (int count = r.ReadByte(); count > 0; count--) classes.Add(r.ReadString());
+                int length = r.ReadInt32();
+                if (length < 0 || length > 1 << 20) throw new InvalidDataException("Character data too large.");
+                character = r.ReadBytes(length);
             }
-            return new JoinMessage(key, name, classes, version);
+            return new JoinMessage(key, name, classes, version, character);
         });
     }
 

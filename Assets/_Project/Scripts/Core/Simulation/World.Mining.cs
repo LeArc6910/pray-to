@@ -106,6 +106,24 @@ namespace Game.Core
             return true;
         }
 
+        // Puts back what a world save holds: changed tiles, crops planted the given number of ticks before now, and
+        // the drop level bosses had raised. Nothing is announced; players who join get it all as usual.
+        public void Restore(IEnumerable<TileChange> tiles, IEnumerable<(CropDefinition Crop, int X, int Y, long Age)> crops, int progressLevel)
+        {
+            foreach (var tile in tiles)
+            {
+                if (Map.InBounds(tile.X, tile.Y) && !Map.IsEdge(tile.X, tile.Y)) SetTile(tile.X, tile.Y, tile.Type);
+            }
+            foreach (var (crop, x, y, age) in crops)
+            {
+                if (!Map.InBounds(x, y) || Map[x, y] != TileType.Floor) continue;
+                _crops[y * Map.Width + x] = new Crop(crop, x, y, Tick - age);
+            }
+            ProgressLevel = Math.Max(ProgressLevel, progressLevel);
+            _newTileChanges.Clear();
+            _newCropChanges.Clear();
+        }
+
         void SetTile(int x, int y, TileType type)
         {
             Map[x, y] = type;

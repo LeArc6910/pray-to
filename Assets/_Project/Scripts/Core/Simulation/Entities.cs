@@ -8,12 +8,13 @@ namespace Game.Core
         readonly int[] _cooldowns;
         readonly int[] _buffTicks;
 
-        internal Player(int id, string name, Vec2 position, Equipment equipment, IReadOnlyList<ClassDefinition> classes)
+        internal Player(int id, string name, Vec2 position, Equipment equipment, IReadOnlyList<ClassDefinition> classes, Inventory bag = null)
         {
             Id = id;
             Name = name;
             Position = position;
             Equipment = equipment;
+            Inventory = bag ?? new Inventory();
             Classes = classes;
             Skills = ClassRules.SkillsFor(classes);
             _cooldowns = new int[Skills.Count];
@@ -29,7 +30,7 @@ namespace Game.Core
         public float Health { get; internal set; }
         public bool IsDead => Health <= 0;
         public Equipment Equipment { get; }
-        public Inventory Inventory { get; } = new Inventory();
+        public Inventory Inventory { get; }
         // Goes up whenever the bag or the equipment changes, so the host knows when to send them again.
         public int InventoryVersion { get; internal set; }
         public PlayerStats Stats { get; private set; }

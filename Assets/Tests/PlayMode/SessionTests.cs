@@ -57,6 +57,36 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Leaving saves the world and the character where SaveStore keeps them, and starting again reads them back.
+        [UnityTest]
+        public IEnumerator SoloSavesAndLoads()
+        {
+            const string name = "playmode-save-test";
+            SaveStore.Delete(SaveStore.WorldKey(name));
+            SaveStore.Delete(SaveStore.CharacterKey(name));
+            _root.PlayerName = name;
+            _root.WorldNameField = name;
+            try
+            {
+                _root.StartSolo();
+                yield return new WaitForSecondsRealtime(2);
+                Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
+                _root.Leave();
+                Assert.IsTrue(SaveStore.Exists(SaveStore.WorldKey(name)), "no world save");
+                Assert.IsTrue(SaveStore.Exists(SaveStore.CharacterKey(name)), "no character save");
+
+                _root.StartSolo();
+                yield return new WaitForSecondsRealtime(2);
+                Assert.IsTrue(_root.Playing, "The saved world did not load. " + _root.Status);
+                _root.Leave();
+            }
+            finally
+            {
+                SaveStore.Delete(SaveStore.WorldKey(name));
+                SaveStore.Delete(SaveStore.CharacterKey(name));
+            }
+        }
+
         [UnityTest]
         public IEnumerator HostSessionRuns()
         {

@@ -10,10 +10,13 @@ namespace Game.Core
     {
         const float SkillProjectileRadius = 0.25f;
 
-        public Player AddPlayer(string name, Equipment equipment, params ClassDefinition[] classes)
+        public Player AddPlayer(string name, Equipment equipment, params ClassDefinition[] classes) => AddPlayer(name, equipment, null, classes);
+
+        // A player who brings a bag along, as a loaded character does. Its items get ids in this world.
+        public Player AddPlayer(string name, Equipment equipment, Inventory bag, params ClassDefinition[] classes)
         {
-            var player = new Player(_nextId++, name, Spawn, equipment ?? new Equipment(), classes.ToList());
-            foreach (var item in player.Equipment.Items) Register(item);
+            var player = new Player(_nextId++, name, Spawn, equipment ?? new Equipment(), classes.ToList(), bag);
+            foreach (var item in player.Equipment.Items.Concat(player.Inventory.Items)) Register(item);
             _players.Add(player);
             return player;
         }

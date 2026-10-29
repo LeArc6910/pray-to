@@ -186,15 +186,47 @@ namespace Game.Core
                 return;
             }
 
+            // A saved character brings its own gear and bag; a new one gets the starter kit.
+            CharacterSave saved = null;
+            if (join.Character.Length > 0)
+            {
+                try
+                {
+                    saved = CharacterSave.Read(join.Character, _loot);
+                }
+                catch (InvalidDataException e)
+                {
+                    Send(connection, new RefusedMessage(e.Message).Encode(), reliable: true);
+                    return;
+                }
+            }
+            string name = string.IsNullOrWhiteSpace(join.Name) ? "플레이어" : join.Name.Trim();
+            var classes = ClassRules.Choose(_classes, join.Classes, _config.MaxClasses);
+            var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, saved?.Equipment ?? StarterGear(), saved?.Bag, classes.ToArray());
+            if (saved == null) GiveStarterStacks(player);
+            _connections[connection] = new Connection { Player = player };
+
+            var map = _generated.Map;
+            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, player.Position, ClassIndexes(player)).Encode(), reliable: true);
+            foreach (byte[] message in TileChangesMessage.EncodeAll(World.ChangedTiles())) Send(connection, message, reliable: true);
+            var crops = World.Crops.Select(c => CropEntry(new CropChange(c.X, c.Y, c))).ToList();
+            foreach (byte[] message in CropChangesMessage.EncodeAll(crops)) Send(connection, message, reliable: true);
+            BroadcastRoster();
+        }
+
+        Equipment StarterGear()
+        {
             var equipment = new Equipment();
             foreach (string id in _config.StarterGear)
             {
                 var itemBase = _loot.FindBase(id);
                 equipment.Equip(new LootGenerator(_loot).RollItem(itemBase, itemBase.Level, Rarity.Common, _gearRandom));
             }
-            string name = string.IsNullOrWhiteSpace(join.Name) ? "플레이어" : join.Name.Trim();
-            var classes = ClassRules.Choose(_classes, join.Classes, _config.MaxClasses);
-            var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, equipment, classes.ToArray());
+            return equipment;
+        }
+
+        void GiveStarterStacks(Player player)
+        {
             foreach (string id in _config.StarterConsumables)
             {
                 var consumable = _loot.Consumables.FirstOrDefault(c => c.Id == id);
@@ -205,14 +237,19 @@ namespace Game.Core
                 var material = _loot.Materials.FirstOrDefault(m => m.Id == id);
                 if (material != null) player.Inventory.AddMaterial(material);
             }
-            _connections[connection] = new Connection { Player = player };
+        }
 
-            var map = _generated.Map;
-            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, player.Position, ClassIndexes(player)).Encode(), reliable: true);
-            foreach (byte[] message in TileChangesMessage.EncodeAll(World.ChangedTiles())) Send(connection, message, reliable: true);
-            var crops = World.Crops.Select(c => CropEntry(new CropChange(c.X, c.Y, c))).ToList();
-            foreach (byte[] message in CropChangesMessage.EncodeAll(crops)) Send(connection, message, reliable: true);
-            BroadcastRoster();
+        // The world as a save file, stamped with the caller's clock (seconds since 1970).
+        public byte[] SaveWorld(long now) => WorldSave.Write(World, _seed, now);
+
+        // Puts a world save back into this freshly made host, which must have been made with the save's seed. Crops
+        // grow on by the time that passed between the save and now; a clock that went backwards grows nothing.
+        public void Restore(WorldSave save, long now)
+        {
+            if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
+            // A month at most, so a clock that jumped years ahead does not grow everything forever.
+            long closedTicks = Math.Clamp(now - save.SavedAt, 0, 30L * 24 * 3600) * World.TicksPerSecond;
+            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks)), save.ProgressLevel);
         }
 
         void Apply(Player player, InventoryCommandMessage command)

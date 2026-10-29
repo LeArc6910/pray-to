@@ -194,7 +194,14 @@ namespace Game.Core
         public bool IsDead => Status == ClientStatus.Playing && _snapshots.Count > 0 && Health <= 0;
         public IReadOnlyDictionary<int, string> Names => _names;
 
-        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name, ChosenClasses).Encode();
+        // The saved character (CharacterSave) to bring along when joining, or null for a new one.
+        public byte[] Character { get; set; }
+
+        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name, ChosenClasses, character: Character).Encode();
+
+        // What to save as this player's character: gear and bag as of the host's last inventory message, or null
+        // before the first one.
+        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag);
 
         public void Receive(byte[] data)
         {
