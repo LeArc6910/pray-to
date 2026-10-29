@@ -5,24 +5,35 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // The bag screen, opened with Tab or I: stats, consumables, worn gear, carried items, runes, materials (with
-    // [놓기] for the ones that build) and the crafting list. Every button only asks the
-    // host for the change; the window redraws from the next inventory message.
+    // The bag screen, opened with Tab or I, in two tabs: gear (stats, consumables, worn gear, carried items, runes)
+    // and materials (materials with [놓기]/[심기], and the crafting list). Every button only asks the host for the
+    // change; the window redraws from the next inventory message.
     sealed class InventoryWindow
     {
+        enum Page
+        {
+            Gear,
+            Materials,
+        }
+
         const float MaxWidth = 520;
-        // Room for the title line above the scrolling part.
-        const float TitleHeight = 40;
+        // Room for the title line and the tabs above the scrolling part.
+        const float HeaderHeight = 78;
+        const float TabHeight = 40;
         const float TooltipWidth = 320;
         // Narrower than this beside the minimap column, the window goes under it instead.
         const float MinWidth = 300;
+        // Points one notch of the mouse wheel scrolls; IMGUI's own step is a fraction of a line in browsers.
+        const float WheelStep = 30;
 
         static GUIStyle _tooltipStyle;
+        static readonly string[] PageNames = { "장비", "재료·제작" };
 
         readonly WorldClient _client;
         readonly Action<byte[]> _send;
+        readonly Vector2[] _scroll = new Vector2[PageNames.Length];
+        Page _page;
         RuneDefinition _selectedRune;
-        Vector2 _scroll;
         float _nameWidth;
         float _recipeWidth;
 
@@ -39,8 +50,8 @@ namespace Game.Client
             if (!Open) return;
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
-            // Left of the minimap column, full height; on narrow screens under the column. The whole window scrolls
-            // when it does not fit.
+            // Left of the minimap column, full height; on narrow screens under the column. The page scrolls when it
+            // does not fit.
             Rect area;
             float room = Ui.MinimapArea.x - 20;
             if (room >= MinWidth)
@@ -53,17 +64,44 @@ namespace Game.Client
                 float top = Ui.RightColumnBottom + 10;
                 area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
             }
+            bool besideWindow = area.x >= TooltipWidth + 20;
             _nameWidth = Mathf.Min(240, area.width - 200);
             _recipeWidth = area.width - 110;
             Controls.Block(area);
+            Wheel(area);
             // The box style is see-through; names drawn over the world would show through the list.
             var tint = GUI.color;
             GUI.color = new Color(0.07f, 0.07f, 0.09f, 0.95f);
             GUI.DrawTexture(area, Texture2D.whiteTexture);
             GUI.color = tint;
             GUILayout.BeginArea(area, GUI.skin.box);
-            GUILayout.Label(Controls.UsingTouch ? "가방 (가방 버튼으로 닫기)" : "가방 (Tab 또는 I로 닫기)");
-            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(area.height - TitleHeight));
+            string close = Controls.UsingTouch ? "가방 버튼으로 닫기" : "Tab 또는 I로 닫기";
+            // Without room beside the window the hint goes in the title, so nothing sits over the list.
+            string hint = besideWindow ? "" : Controls.UsingTouch ? " · 이름을 누르고 있으면 설명" : " · 이름에 마우스를 올리면 설명";
+            GUILayout.Label($"가방 ({close}){hint}");
+            _page = (Page)GUILayout.Toolbar((int)_page, PageNames, GUILayout.Height(TabHeight));
+            int page = (int)_page;
+            _scroll[page] = GUILayout.BeginScrollView(_scroll[page], GUILayout.Height(area.height - HeaderHeight));
+            if (_page == Page.Gear) DrawGear();
+            else DrawMaterialsPage();
+            GUILayout.EndScrollView();
+            GUILayout.EndArea();
+            DrawTooltip(area, besideWindow);
+        }
+
+        // Scrolls the open page by whole lines per notch while the pointer is over the window.
+        void Wheel(Rect area)
+        {
+            var e = Event.current;
+            if (e.type != EventType.ScrollWheel || !area.Contains(e.mousePosition)) return;
+            int page = (int)_page;
+            float notches = Mathf.Sign(e.delta.y) * Mathf.Clamp(Mathf.Abs(e.delta.y), 1, 3);
+            _scroll[page].y = Mathf.Max(0, _scroll[page].y + notches * WheelStep);
+            e.Use();
+        }
+
+        void DrawGear()
+        {
             DrawStats();
             DrawConsumables();
 
@@ -115,25 +153,26 @@ namespace Game.Client
             }
             GUILayout.EndHorizontal();
             if (_selectedRune != null) GUILayout.Label($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 한 번 넣은 룬은 뺄 수 없습니다.");
-            DrawMaterials();
-            DrawCrafting();
-
-            GUILayout.EndScrollView();
-            GUILayout.EndArea();
-            DrawTooltip(area);
         }
 
-        // The hovered item's description (or how to see one), in a box beside the window. Drawn outside the layout
-        // so its changing height never shifts the window's controls.
-        static void DrawTooltip(Rect window)
+        void DrawMaterialsPage()
         {
-            string text = !string.IsNullOrEmpty(GUI.tooltip) ? GUI.tooltip
+            DrawMaterials();
+            DrawCrafting();
+        }
+
+        // The hovered item's description: in a box beside the window, where the hint shows when nothing is hovered;
+        // without room there, over the window's bottom edge, and only while something is hovered or held. Drawn
+        // outside the layout so its changing height never shifts the window's controls.
+        static void DrawTooltip(Rect window, bool besideWindow)
+        {
+            bool hovering = !string.IsNullOrEmpty(GUI.tooltip);
+            if (!hovering && !besideWindow) return;
+            string text = hovering ? GUI.tooltip
                 : Controls.UsingTouch ? "아이템 이름을 누르고 있으면 설명이 보입니다." : "아이템 이름에 마우스를 올리면 설명이 보입니다.";
             var content = new GUIContent(text);
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
-            // Left of the window and below the HUD when there is room, otherwise over the window's bottom edge. As wide
-            // as the longest line needs (CalcSize ignores wrapping), so short hints do not wrap their last word.
-            bool besideWindow = window.x >= TooltipWidth + 20;
+            // As wide as the longest line needs (CalcSize ignores wrapping), so short hints do not wrap their last word.
             float room = besideWindow ? TooltipWidth : window.width - 20;
             float width = Mathf.Min(room, Mathf.Ceil(_tooltipStyle.CalcSize(content).x) + 2);
             float height = _tooltipStyle.CalcHeight(content, width);
@@ -162,9 +201,8 @@ namespace Game.Client
         // player faces.
         void DrawMaterials()
         {
-            if (_client.Bag.Materials.Count == 0) return;
-            GUILayout.Space(6);
             GUILayout.Label("재료");
+            if (_client.Bag.Materials.Count == 0) GUILayout.Label("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.");
             foreach (var pair in _client.Bag.Materials.ToList())
             {
                 GUILayout.BeginHorizontal();

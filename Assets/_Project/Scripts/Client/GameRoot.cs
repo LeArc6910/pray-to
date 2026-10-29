@@ -345,7 +345,7 @@ namespace Game.Client
             if (wide) GUILayout.BeginHorizontal();
 
             GUILayout.BeginVertical(GUILayout.Width(wide ? 340 : width - 40));
-            GUILayout.Label("pray-to (M4 프로토타입)");
+            GUILayout.Label($"pray-to 프로토타입 (버전 {Protocol.Version})");
             GUILayout.Space(8);
             GUILayout.Label("이름");
             _playerName = GUILayout.TextField(_playerName, 16);
