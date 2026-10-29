@@ -65,6 +65,48 @@ namespace Game.Core
             return item;
         }
 
+        // A bag or a chest: its items, then its runes, consumables and materials by sheet index and count.
+        public static void WriteBag(BinaryWriter w, Inventory bag, LootData data)
+        {
+            w.Write((byte)bag.Items.Count);
+            foreach (var item in bag.Items) Write(w, item, data);
+            WriteStacks(w, bag.Runes, data.Runes);
+            WriteStacks(w, bag.Consumables, data.Consumables);
+            WriteStacks(w, bag.Materials, data.Materials);
+        }
+
+        public static Inventory ReadBag(BinaryReader r, LootData loot)
+        {
+            var bag = new Inventory();
+            int count = r.ReadByte();
+            for (int i = 0; i < count; i++)
+            {
+                if (!bag.TryAdd(Read(r, loot))) throw new InvalidDataException("More items than a bag holds.");
+            }
+            foreach (var (rune, amount) in ReadStacks(r, loot.Runes)) bag.AddRune(rune, amount);
+            foreach (var (consumable, amount) in ReadStacks(r, loot.Consumables)) bag.AddConsumable(consumable, amount);
+            foreach (var (material, amount) in ReadStacks(r, loot.Materials)) bag.AddMaterial(material, amount);
+            return bag;
+        }
+
+        static void WriteStacks<T>(BinaryWriter w, IReadOnlyDictionary<T, int> stacks, IReadOnlyList<T> sheet) where T : class
+        {
+            var ordered = stacks.OrderBy(pair => Index(sheet, pair.Key)).ToList();
+            w.Write((byte)ordered.Count);
+            foreach (var pair in ordered)
+            {
+                w.Write((byte)Index(sheet, pair.Key));
+                w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
+            }
+        }
+
+        static List<(T, int)> ReadStacks<T>(BinaryReader r, IReadOnlyList<T> sheet)
+        {
+            var stacks = new List<(T, int)>();
+            for (int kinds = r.ReadByte(); kinds > 0; kinds--) stacks.Add((At(sheet, r.ReadByte()), r.ReadUInt16()));
+            return stacks;
+        }
+
         internal static int Index<T>(IReadOnlyList<T> list, T item) where T : class
         {
             for (int i = 0; i < list.Count; i++)
@@ -88,6 +130,11 @@ namespace Game.Core
         Craft,
         Place,
         Plant,
+        // Chest commands: Item is the item id, or for a stack its StackKind with Index its sheet index.
+        StoreItem,
+        TakeItem,
+        StoreStack,
+        TakeStack,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
@@ -141,33 +188,7 @@ namespace Game.Core
                 w.Write(item != null);
                 if (item != null) ItemCodec.Write(w, item, data);
             }
-
-            w.Write((byte)Bag.Items.Count);
-            foreach (var item in Bag.Items) ItemCodec.Write(w, item, data);
-
-            var runes = Bag.Runes.OrderBy(pair => ItemCodec.Index(data.Runes, pair.Key)).ToList();
-            w.Write((byte)runes.Count);
-            foreach (var pair in runes)
-            {
-                w.Write((byte)ItemCodec.Index(data.Runes, pair.Key));
-                w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
-            }
-
-            var consumables = Bag.Consumables.OrderBy(pair => ItemCodec.Index(data.Consumables, pair.Key)).ToList();
-            w.Write((byte)consumables.Count);
-            foreach (var pair in consumables)
-            {
-                w.Write((byte)ItemCodec.Index(data.Consumables, pair.Key));
-                w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
-            }
-
-            var materials = Bag.Materials.OrderBy(pair => ItemCodec.Index(data.Materials, pair.Key)).ToList();
-            w.Write((byte)materials.Count);
-            foreach (var pair in materials)
-            {
-                w.Write((byte)ItemCodec.Index(data.Materials, pair.Key));
-                w.Write((ushort)System.Math.Min(pair.Value, ushort.MaxValue));
-            }
+            ItemCodec.WriteBag(w, Bag, data);
         });
 
         public static InventoryMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Inventory, r =>
@@ -180,38 +201,38 @@ namespace Game.Core
                 if (item.Base.Slot != slot) throw new InvalidDataException("Item in the wrong slot.");
                 equipment.Equip(item);
             }
-
-            var bag = new Inventory();
-            int count = r.ReadByte();
-            for (int i = 0; i < count; i++)
-            {
-                if (!bag.TryAdd(ItemCodec.Read(r, loot))) throw new InvalidDataException("More items than a bag holds.");
-            }
-
-            int runeKinds = r.ReadByte();
-            for (int i = 0; i < runeKinds; i++)
-            {
-                int index = r.ReadByte();
-                if (index >= loot.Runes.Count) throw new InvalidDataException("Unknown rune.");
-                bag.AddRune(loot.Runes[index], r.ReadUInt16());
-            }
-
-            int consumableKinds = r.ReadByte();
-            for (int i = 0; i < consumableKinds; i++)
-            {
-                int index = r.ReadByte();
-                if (index >= loot.Consumables.Count) throw new InvalidDataException("Unknown consumable.");
-                bag.AddConsumable(loot.Consumables[index], r.ReadUInt16());
-            }
-
-            int materialKinds = r.ReadByte();
-            for (int i = 0; i < materialKinds; i++)
-            {
-                int index = r.ReadByte();
-                if (index >= loot.Materials.Count) throw new InvalidDataException("Unknown material.");
-                bag.AddMaterial(loot.Materials[index], r.ReadUInt16());
-            }
-            return new InventoryMessage(equipment, bag);
+            return new InventoryMessage(equipment, ItemCodec.ReadBag(r, loot));
         });
+    }
+
+    // What the chest the player stands by holds, sent when they come near it and whenever it changes; a closed
+    // message (no chest) when they walk away. See Docs/Crafting.md.
+    public sealed class ChestMessage
+    {
+        public ChestMessage(int x, int y, Inventory contents)
+        {
+            X = x;
+            Y = y;
+            Contents = contents;
+        }
+
+        public static ChestMessage Closed { get; } = new ChestMessage(-1, -1, null);
+
+        public int X { get; }
+        public int Y { get; }
+        public Inventory Contents { get; }
+        public bool IsOpen => Contents != null;
+
+        public byte[] Encode(LootData data) => Protocol.Build(MessageType.Chest, w =>
+        {
+            w.Write(IsOpen);
+            if (!IsOpen) return;
+            w.Write((ushort)X);
+            w.Write((ushort)Y);
+            ItemCodec.WriteBag(w, Contents, data);
+        });
+
+        public static ChestMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Chest, r =>
+            r.ReadBoolean() ? new ChestMessage(r.ReadUInt16(), r.ReadUInt16(), ItemCodec.ReadBag(r, loot)) : Closed);
     }
 }

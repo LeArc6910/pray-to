@@ -49,6 +49,14 @@ namespace Game.Client
         // Ore veins: rock with flecks in the ore's colour, so they stand out in a wall.
         public static Tile OreTile(Color32 ore) => MakeTile(new Color32(104, 90, 76, 255), ore, raised: true, flecks: true);
 
+        // Placed objects, on a darker ground so they read as things standing on the floor rather than rock: the
+        // workbench in wood, the furnace grey with fire, the chest in gold-trimmed wood.
+        public static Tile WorkbenchTile() => MakeTile(new Color32(110, 76, 44, 255), Palette.Workbench, raised: true);
+
+        public static Tile FurnaceTile() => MakeTile(new Color32(84, 84, 90, 255), Palette.Furnace, raised: true, flecks: true);
+
+        public static Tile ChestTile() => MakeTile(new Color32(120, 78, 40, 255), Palette.Chest, raised: true);
+
         // The boss arena's floor, darker and redder so it reads as a different place.
         public static Tile ArenaTile() => MakeTile(new Color32(52, 34, 34, 255), new Color32(64, 42, 40, 255), raised: false);
 

@@ -11,6 +11,9 @@ namespace Game.Client
         public static readonly Color Material = new Color(0.75f, 0.75f, 0.72f);
         public static readonly Color32 CopperOre = new Color32(214, 120, 64, 255);
         public static readonly Color32 IronOre = new Color32(168, 184, 204, 255);
+        public static readonly Color32 Workbench = new Color32(176, 124, 72, 255);
+        public static readonly Color32 Furnace = new Color32(232, 120, 48, 255);
+        public static readonly Color32 Chest = new Color32(214, 170, 82, 255);
         public static readonly Color Dust = new Color(0.8f, 0.72f, 0.6f);
         public static readonly Color Sprout = new Color(0.45f, 0.8f, 0.35f);
         public static readonly Color Ripe = new Color(0.95f, 0.75f, 0.55f);

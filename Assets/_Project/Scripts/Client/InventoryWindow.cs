@@ -5,8 +5,9 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // The bag screen, opened with Tab or I, in two tabs: gear (stats, consumables, worn gear, carried items, runes)
-    // and materials (materials with [놓기]/[심기], and the crafting list). Every button only asks the host for the
+    // The bag screen, opened with Tab or I, in tabs: gear (stats, consumables, worn gear, carried items, runes),
+    // materials (materials with [놓기]/[심기], and the crafting list), and while the player stands by a chest, the
+    // chest (what it holds with [꺼내기], what the bag holds with [넣기]). Every button only asks the host for the
     // change; the window redraws from the next inventory message.
     sealed class InventoryWindow
     {
@@ -14,6 +15,7 @@ namespace Game.Client
         {
             Gear,
             Materials,
+            Chest,
         }
 
         const float MaxWidth = 520;
@@ -27,7 +29,7 @@ namespace Game.Client
         const float WheelStep = 30;
 
         static GUIStyle _tooltipStyle;
-        static readonly string[] PageNames = { "장비", "재료·제작" };
+        static readonly string[] PageNames = { "장비", "재료·제작", "상자" };
 
         readonly WorldClient _client;
         readonly Action<byte[]> _send;
@@ -79,11 +81,15 @@ namespace Game.Client
             // Without room beside the window the hint goes in the title, so nothing sits over the list.
             string hint = besideWindow ? "" : Controls.UsingTouch ? " · 이름을 누르고 있으면 설명" : " · 이름에 마우스를 올리면 설명";
             GUILayout.Label($"가방 ({close}){hint}");
-            _page = (Page)GUILayout.Toolbar((int)_page, PageNames, GUILayout.Height(TabHeight));
+            // The chest tab is there only while a chest is in reach.
+            bool chest = _client.Chest.IsOpen;
+            if (!chest && _page == Page.Chest) _page = Page.Gear;
+            _page = (Page)GUILayout.Toolbar((int)_page, chest ? PageNames : PageNames.Take(2).ToArray(), GUILayout.Height(TabHeight));
             int page = (int)_page;
             _scroll[page] = GUILayout.BeginScrollView(_scroll[page], GUILayout.Height(area.height - HeaderHeight));
             if (_page == Page.Gear) DrawGear();
-            else DrawMaterialsPage();
+            else if (_page == Page.Materials) DrawMaterialsPage();
+            else DrawChest();
             GUILayout.EndScrollView();
             GUILayout.EndArea();
             DrawTooltip(area, besideWindow);
@@ -214,7 +220,46 @@ namespace Game.Client
             }
         }
 
-        // Every recipe, with what it takes against what the bag holds. [만들기] only works with everything at hand.
+        // Both sides of the chest: what it holds, each with [꺼내기], and what the bag holds, each with [넣기]. Stacks
+        // move whole.
+        void DrawChest()
+        {
+            var chest = _client.Chest.Contents;
+            GUILayout.Label($"상자 ({chest.Items.Count}/{Inventory.Capacity})");
+            DrawContents(chest, "꺼내기", item => _client.TakeItemCommand(item.Id), (kind, definition) => _client.TakeStackCommand(kind, definition));
+            GUILayout.Space(8);
+            GUILayout.Label($"가방 ({_client.Bag.Items.Count}/{Inventory.Capacity})");
+            DrawContents(_client.Bag, "넣기", item => _client.StoreItemCommand(item.Id), (kind, definition) => _client.StoreStackCommand(kind, definition));
+        }
+
+        void DrawContents(Inventory contents, string action, Func<Item, byte[]> moveItem, Func<StackKind, object, byte[]> moveStack)
+        {
+            if (contents.Items.Count == 0 && contents.Runes.Count == 0 && contents.Consumables.Count == 0 && contents.Materials.Count == 0)
+            {
+                GUILayout.Label("비어 있다.");
+                return;
+            }
+            foreach (var item in contents.Items.ToList())
+            {
+                GUILayout.BeginHorizontal();
+                ItemLabel(item);
+                if (GUILayout.Button(action, GUILayout.Width(64))) _send(moveItem(item));
+                GUILayout.EndHorizontal();
+            }
+            void Stack(StackKind kind, object definition, string name, int count, string description)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(new GUIContent($"{name} ×{count}", description), GUILayout.Width(_nameWidth));
+                if (GUILayout.Button(action, GUILayout.Width(64))) _send(moveStack(kind, definition));
+                GUILayout.EndHorizontal();
+            }
+            foreach (var pair in contents.Consumables.ToList()) Stack(StackKind.Consumable, pair.Key, pair.Key.Name, pair.Value, pair.Key.Description);
+            foreach (var pair in contents.Materials.ToList()) Stack(StackKind.Material, pair.Key, pair.Key.Name, pair.Value, pair.Key.Description);
+            foreach (var pair in contents.Runes.ToList()) Stack(StackKind.Rune, pair.Key, pair.Key.Name, pair.Value, "");
+        }
+
+        // Every recipe, with what it takes against what the bag holds, and the station it needs when that is not in
+        // reach. [만들기] only works with everything at hand.
         void DrawCrafting()
         {
             var recipes = _client.Recipes;
@@ -225,6 +270,8 @@ namespace Game.Client
             foreach (var recipe in recipes)
             {
                 string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Bag.CountOf(i.Material)}/{i.Count}"));
+                var station = _client.MissingStation(recipe);
+                if (station != null) needs += $" · {StationName(station.Value)} 필요";
                 string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(new GUIContent($"{name}\n{needs}", RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
@@ -234,6 +281,13 @@ namespace Game.Client
                 GUILayout.EndHorizontal();
             }
         }
+
+        static string StationName(TileType station) => station switch
+        {
+            TileType.Workbench => "작업대",
+            TileType.Furnace => "화로",
+            _ => station.ToString(),
+        };
 
         static string RecipeTooltip(Recipe recipe)
         {

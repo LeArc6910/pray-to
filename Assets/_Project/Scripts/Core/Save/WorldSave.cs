@@ -7,17 +7,26 @@ using System.Text;
 namespace Game.Core
 {
     // A world as its host saves it: the seed to rebuild the caves from, the tiles players changed since, the crops
-    // and how long they had grown, and how far the bosses have moved drops on. Monsters, ground loot and half-dug
+    // and how long they had grown, what the chests hold, and how far the bosses have moved drops on. Monsters, ground loot and half-dug
     // walls are not kept. Tiles and crops are written by name, so a save still reads after the sheets change.
     // SavedAt is given by the caller (Core never reads the clock) and lets crops grow for the time the world was
     // closed. See Docs/Saving.md.
     public sealed class WorldSave
     {
         const string Magic = "PTWO";
-        const int FormatVersion = 1;
+        // 2 added chests.
+        const int FormatVersion = 2;
 
-        WorldSave(ulong seed, long savedAt, int progressLevel, List<TileChange> tiles, List<(CropDefinition Crop, int X, int Y, long Age)> crops, List<string> warnings)
+        WorldSave(
+            ulong seed,
+            long savedAt,
+            int progressLevel,
+            List<TileChange> tiles,
+            List<(CropDefinition Crop, int X, int Y, long Age)> crops,
+            List<(int X, int Y, Inventory Contents)> chests,
+            List<string> warnings)
         {
+            Chests = chests;
             Seed = seed;
             SavedAt = savedAt;
             ProgressLevel = progressLevel;
@@ -33,6 +42,7 @@ namespace Game.Core
         public IReadOnlyList<TileChange> Tiles { get; }
         // Age is in ticks at the moment of saving.
         public IReadOnlyList<(CropDefinition Crop, int X, int Y, long Age)> Crops { get; }
+        public IReadOnlyList<(int X, int Y, Inventory Contents)> Chests { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(World world, ulong seed, long savedAt)
@@ -69,18 +79,32 @@ namespace Game.Core
                     w.Write(crop.Definition.Id);
                     w.Write(world.Tick - crop.PlantedTick);
                 }
+
+                var chests = world.Chests.ToList();
+                w.Write(chests.Count);
+                foreach (var (x, y, contents) in chests)
+                {
+                    w.Write((ushort)x);
+                    w.Write((ushort)y);
+                    w.Write((ushort)contents.Items.Count);
+                    foreach (var item in contents.Items) SavedItems.Write(w, item);
+                    SavedItems.WriteCounts(w, contents.Runes.Select(p => (p.Key.Id, p.Value)));
+                    SavedItems.WriteCounts(w, contents.Consumables.Select(p => (p.Key.Id, p.Value)));
+                    SavedItems.WriteCounts(w, contents.Materials.Select(p => (p.Key.Id, p.Value)));
+                }
             }
             return stream.ToArray();
         }
 
-        // Throws InvalidDataException when the data is not a world save this game can read.
-        public static WorldSave Read(byte[] data, TileData tileData)
+        // Throws InvalidDataException when the data is not a world save this game can read. Chests need the loot
+        // sheets to read their contents; without them chests come back empty.
+        public static WorldSave Read(byte[] data, TileData tileData, LootData loot = null)
         {
             var warnings = new List<string>();
             try
             {
                 using var r = new BinaryReader(new MemoryStream(data ?? Array.Empty<byte>()), Encoding.UTF8);
-                SavedItems.ReadHeader(r, Magic, FormatVersion, "월드");
+                int version = SavedItems.ReadHeader(r, Magic, FormatVersion, "월드");
                 ulong seed = r.ReadUInt64();
                 int width = r.ReadInt32();
                 int height = r.ReadInt32();
@@ -114,12 +138,59 @@ namespace Game.Core
                     if (crop != null) crops.Add((crop, x, y, Math.Max(0, age)));
                     else warnings.Add($"없어진 작물 '{id}'를 건너뛰었습니다.");
                 }
-                return new WorldSave(seed, savedAt, Math.Max(1, progress), tiles, crops, warnings);
+
+                var chests = new List<(int, int, Inventory)>();
+                for (int count = version >= 2 ? r.ReadInt32() : 0; count > 0; count--)
+                {
+                    int x = r.ReadUInt16();
+                    int y = r.ReadUInt16();
+                    var contents = new Inventory();
+                    int items = r.ReadUInt16();
+                    for (int i = 0; i < items; i++)
+                    {
+                        var item = loot == null ? SkipItem(r) : SavedItems.Read(r, loot, warnings);
+                        if (item != null) contents.TryAdd(item);
+                    }
+                    var runes = SavedItems.ReadCounts(r);
+                    var consumables = SavedItems.ReadCounts(r);
+                    var materials = SavedItems.ReadCounts(r);
+                    if (loot != null)
+                    {
+                        foreach (var (id, n) in runes) Add(loot.Runes.FirstOrDefault(d => d.Id == id), d => contents.AddRune(d, n), id);
+                        foreach (var (id, n) in consumables) Add(loot.Consumables.FirstOrDefault(d => d.Id == id), d => contents.AddConsumable(d, n), id);
+                        foreach (var (id, n) in materials) Add(loot.Materials.FirstOrDefault(d => d.Id == id), d => contents.AddMaterial(d, n), id);
+                    }
+                    chests.Add((x, y, contents));
+                }
+                return new WorldSave(seed, savedAt, Math.Max(1, progress), tiles, crops, chests, warnings);
+
+                void Add<T>(T definition, Action<T> add, string id) where T : class
+                {
+                    if (definition != null) add(definition);
+                    else warnings.Add($"상자 속 없어진 '{id}'를 건너뛰었습니다.");
+                }
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {
                 throw new InvalidDataException("월드 저장본이 깨졌습니다.", e);
             }
+        }
+
+        // Reads past an item without the sheets to build it.
+        static Item SkipItem(BinaryReader r)
+        {
+            r.ReadString();
+            r.ReadInt16();
+            r.ReadByte();
+            for (int count = r.ReadByte(); count > 0; count--) r.ReadInt32();
+            for (int count = r.ReadByte(); count > 0; count--)
+            {
+                r.ReadString();
+                r.ReadByte();
+                r.ReadInt32();
+            }
+            for (int count = r.ReadByte(); count > 0; count--) r.ReadString();
+            return null;
         }
     }
 }

@@ -241,7 +241,7 @@ namespace Game.Core.Tests
         [Test]
         public void CraftingTurnsMaterialsIntoGearAndPotions()
         {
-            var world = Room(out var player);
+            var world = Room(out var player, TileType.Workbench);
             player.Inventory.AddMaterial(CopperOre, 6);
             player.Inventory.AddMaterial(Stone, 2);
             player.Inventory.AddMaterial(SlimeGel, 3);
@@ -262,7 +262,7 @@ namespace Game.Core.Tests
         [Test]
         public void GearIsNotCraftedIntoAFullBag()
         {
-            var world = Room(out var player);
+            var world = Room(out var player, TileType.Workbench);
             while (!player.Inventory.IsFull) player.Inventory.TryAdd(Gear.Plain("copper_ring"));
             player.Inventory.AddMaterial(CopperOre, 6);
             player.Inventory.AddMaterial(Stone, 2);

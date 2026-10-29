@@ -99,11 +99,13 @@ namespace Game.Core
     // Items and stacks in save files, by id.
     static class SavedItems
     {
-        public static void ReadHeader(BinaryReader r, string magic, int version, string what)
+        // Returns the format version the save was written in.
+        public static int ReadHeader(BinaryReader r, string magic, int version, string what)
         {
             if (Encoding.ASCII.GetString(r.ReadBytes(magic.Length)) != magic) throw new InvalidDataException($"{what} 저장본이 아닙니다.");
             int saved = r.ReadInt32();
             if (saved > version) throw new InvalidDataException($"더 새 게임에서 만든 {what} 저장본입니다(형식 {saved}).");
+            return saved;
         }
 
         public static void Write(BinaryWriter w, Item item)

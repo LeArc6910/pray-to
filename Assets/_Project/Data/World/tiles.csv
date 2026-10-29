@@ -2,3 +2,6 @@ tile,name,hardness,material,count,extra,extra_chance
 Wall,돌벽,3,stone,1,mushroom_spore,8
 CopperOre,구리 광맥,5,copper_ore,1,,
 IronOre,철 광맥,8,iron_ore,1,,
+Workbench,작업대,1,workbench,1,,
+Furnace,화로,1,furnace,1,,
+Chest,상자,1,chest,1,,

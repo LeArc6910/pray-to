@@ -130,6 +130,7 @@ namespace Game.Core.Tests
         public void MushroomsRoastIntoFood()
         {
             var world = Room(out var player);
+            world.Map[3, 4] = TileType.Furnace;
             player.Inventory.AddMaterial(MushroomItem, 2);
 
             Assert.IsTrue(world.Craft(player.Id, Gear.Data.Recipes.Single(r => r.Id == "roasted_mushroom")));

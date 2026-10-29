@@ -202,8 +202,16 @@ namespace Game.Core
     // Turns materials into an item, a consumable or another material. Exactly one result is set.
     public sealed class Recipe
     {
-        internal Recipe(string id, ItemBase item, ConsumableDefinition consumable, MaterialDefinition material, int count, IReadOnlyList<(MaterialDefinition Material, int Count)> ingredients)
+        internal Recipe(
+            string id,
+            ItemBase item,
+            ConsumableDefinition consumable,
+            MaterialDefinition material,
+            int count,
+            IReadOnlyList<(MaterialDefinition Material, int Count)> ingredients,
+            TileType? station = null)
         {
+            Station = station;
             Id = id;
             Item = item;
             Consumable = consumable;
@@ -218,6 +226,8 @@ namespace Game.Core
         public MaterialDefinition Material { get; }
         public int Count { get; }
         public IReadOnlyList<(MaterialDefinition Material, int Count)> Ingredients { get; }
+        // The crafting station that must be nearby (World.StationReach), or null for anywhere.
+        public TileType? Station { get; }
         public string Name => Item?.Name ?? Consumable?.Name ?? Material.Name;
     }
 

@@ -49,6 +49,9 @@ namespace Game.Core
             var target = DigTarget(player);
             if (target == null) return;
             var (x, y, tile) = target.Value;
+            // A chest with something in it stays put, so nothing is lost.
+            var chest = ChestAt(x, y);
+            if (chest != null && !IsEmpty(chest)) return;
             int key = y * Map.Width + x;
             float damage = _wallDamage.GetValueOrDefault(key) + (100 + player.Stats.MiningSpeed) / 100f;
             bool broken = damage >= tile.Hardness - 1e-4f;
@@ -89,12 +92,13 @@ namespace Game.Core
             return true;
         }
 
-        // Makes the recipe from the player's materials. False when something is missing, or the bag has no room
-        // for an item.
+        // Makes the recipe from the player's materials. False when something is missing, its crafting station is not
+        // within StationReach, or the bag has no room for an item.
         public bool Craft(int playerId, Recipe recipe)
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || recipe == null) return false;
+            if (recipe.Station != null && !Map.Near(player.Position, recipe.Station.Value, StationReach)) return false;
             if (recipe.Ingredients.Any(i => player.Inventory.CountOf(i.Material) < i.Count)) return false;
             if (recipe.Item != null && (player.Inventory.IsFull || _lootGenerator == null)) return false;
 
@@ -108,12 +112,17 @@ namespace Game.Core
 
         // Puts back what a world save holds: changed tiles, crops planted the given number of ticks before now, and
         // the drop level bosses had raised. Nothing is announced; players who join get it all as usual.
-        public void Restore(IEnumerable<TileChange> tiles, IEnumerable<(CropDefinition Crop, int X, int Y, long Age)> crops, int progressLevel)
+        public void Restore(
+            IEnumerable<TileChange> tiles,
+            IEnumerable<(CropDefinition Crop, int X, int Y, long Age)> crops,
+            int progressLevel,
+            IEnumerable<(int X, int Y, Inventory Contents)> chests = null)
         {
             foreach (var tile in tiles)
             {
                 if (Map.InBounds(tile.X, tile.Y) && !Map.IsEdge(tile.X, tile.Y)) SetTile(tile.X, tile.Y, tile.Type);
             }
+            foreach (var (x, y, contents) in chests ?? Enumerable.Empty<(int, int, Inventory)>()) FillChest(x, y, contents);
             foreach (var (crop, x, y, age) in crops)
             {
                 if (!Map.InBounds(x, y) || Map[x, y] != TileType.Floor) continue;
@@ -126,6 +135,7 @@ namespace Game.Core
 
         void SetTile(int x, int y, TileType type)
         {
+            if (Map[x, y] == TileType.Chest || type == TileType.Chest) ChestTileChanged(x, y, type);
             Map[x, y] = type;
             _changedTiles[y * Map.Width + x] = type;
             _newTileChanges.Add(new TileChange(x, y, type));

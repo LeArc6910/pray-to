@@ -232,6 +232,9 @@ namespace Game.Core
                     case MessageType.CropChanges:
                         if (Map != null) ApplyCropChanges(CropChangesMessage.Decode(data));
                         break;
+                    case MessageType.Chest:
+                        if (_loot != null) Chest = ChestMessage.Decode(data, _loot);
+                        break;
                     case MessageType.Snapshot:
                         if (Status == ClientStatus.Playing) Apply(SnapshotMessage.Decode(data));
                         break;
@@ -402,6 +405,32 @@ namespace Game.Core
         // In the order the crafting list shows them.
         public IReadOnlyList<Recipe> Recipes => _loot?.Recipes ?? (IReadOnlyList<Recipe>)Array.Empty<Recipe>();
 
+        // The chest this player stands by and what it holds, or a closed one.
+        public ChestMessage Chest { get; private set; } = ChestMessage.Closed;
+
+        public byte[] StoreItemCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.StoreItem, itemId).Encode();
+
+        public byte[] TakeItemCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.TakeItem, itemId).Encode();
+
+        public byte[] StoreStackCommand(StackKind kind, object definition) => StackCommand(InventoryCommand.StoreStack, kind, definition);
+
+        public byte[] TakeStackCommand(StackKind kind, object definition) => StackCommand(InventoryCommand.TakeStack, kind, definition);
+
+        byte[] StackCommand(InventoryCommand command, StackKind kind, object definition)
+        {
+            int index = kind switch
+            {
+                StackKind.Rune => ItemCodec.Index(_loot.Runes, (RuneDefinition)definition),
+                StackKind.Consumable => ItemCodec.Index(_loot.Consumables, (ConsumableDefinition)definition),
+                _ => ItemCodec.Index(_loot.Materials, (MaterialDefinition)definition),
+            };
+            return new InventoryCommandMessage(command, (int)kind, index: index).Encode();
+        }
+
+        // The station the recipe needs and does not have in reach, or null when it can be made here.
+        public TileType? MissingStation(Recipe recipe) =>
+            recipe.Station != null && (Map == null || !Map.Near(Position, recipe.Station.Value, World.StationReach)) ? recipe.Station : null;
+
         // What is growing, as of the host's last word. How ripe each is comes from HostTick.
         public IReadOnlyCollection<Crop> Crops => _crops.Values;
 
@@ -419,7 +448,7 @@ namespace Game.Core
 
         // Whether the bag holds everything the recipe takes, and room for an item it makes.
         public bool CanCraft(Recipe recipe) =>
-            recipe.Ingredients.All(i => Bag.CountOf(i.Material) >= i.Count) && (recipe.Item == null || !Bag.IsFull);
+            recipe.Ingredients.All(i => Bag.CountOf(i.Material) >= i.Count) && (recipe.Item == null || !Bag.IsFull) && MissingStation(recipe) == null;
 
         // Cells whose tile changed since the last call, for redrawing them.
         public List<TileChange> TakeChangedTiles()

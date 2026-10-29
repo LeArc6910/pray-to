@@ -55,6 +55,9 @@ namespace Game.Core
             public int LastSequence;
             // The player's InventoryVersion when their inventory was last sent.
             public int SentInventory = -1;
+            // The chest whose contents were last sent (its tile index, -1 for none) and that chest's version then.
+            public int SentChest = -1;
+            public int SentChestVersion = -1;
         }
 
         readonly Dictionary<ulong, Connection> _connections = new Dictionary<ulong, Connection>();
@@ -155,6 +158,7 @@ namespace Game.Core
                 pair.Value.SentInventory = player.InventoryVersion;
                 Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory).Encode(_loot), reliable: true);
             }
+            foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendChest(pair.Key, pair.Value);
 
             if (World.Tick % _config.SnapshotInterval != 0) return;
 
@@ -249,7 +253,7 @@ namespace Game.Core
             if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
             // A month at most, so a clock that jumped years ahead does not grow everything forever.
             long closedTicks = Math.Clamp(now - save.SavedAt, 0, 30L * 24 * 3600) * World.TicksPerSecond;
-            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks)), save.ProgressLevel);
+            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks)), save.ProgressLevel, save.Chests);
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -276,6 +280,14 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Plant:
                     if (_tiles != null && command.Index < _tiles.Crops.Count) World.Plant(player.Id, _tiles.Crops[command.Index]);
+                    break;
+                case InventoryCommand.StoreItem:
+                case InventoryCommand.TakeItem:
+                    World.MoveItem(player.Id, command.Item, command.Command == InventoryCommand.StoreItem);
+                    break;
+                case InventoryCommand.StoreStack:
+                case InventoryCommand.TakeStack:
+                    World.MoveStack(player.Id, (StackKind)command.Item, command.Index, command.Command == InventoryCommand.StoreStack);
                     break;
                 case InventoryCommand.Discard:
                     World.DiscardItem(player.Id, command.Item);
@@ -366,6 +378,19 @@ namespace Game.Core
 
         (int X, int Y, int Crop, long PlantedTick) CropEntry(CropChange change) =>
             (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.PlantedTick ?? 0);
+
+        // The chest the player stands by, when it is a different one or it changed; a closed message when they left it.
+        void SendChest(ulong connection, Connection sent)
+        {
+            var near = World.ChestNear(sent.Player.Position);
+            int key = near == null ? -1 : near.Value.Y * World.Map.Width + near.Value.X;
+            int version = near == null ? 0 : World.ChestVersion(near.Value.X, near.Value.Y);
+            if (key == sent.SentChest && version == sent.SentChestVersion) return;
+            sent.SentChest = key;
+            sent.SentChestVersion = version;
+            var message = near == null ? ChestMessage.Closed : new ChestMessage(near.Value.X, near.Value.Y, World.ChestAt(near.Value.X, near.Value.Y));
+            Send(connection, message.Encode(_loot), reliable: true);
+        }
 
         static byte BuffBits(Player player)
         {

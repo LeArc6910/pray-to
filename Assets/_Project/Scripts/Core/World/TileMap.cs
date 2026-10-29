@@ -9,6 +9,10 @@ namespace Game.Core
         Wall,
         CopperOre,
         IronOre,
+        // Placed objects: solid like walls, but players build them and stand by them to use them.
+        Workbench,
+        Furnace,
+        Chest,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -57,6 +61,22 @@ namespace Game.Core
         public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
 
         public bool IsSolid(int x, int y) => this[x, y] != TileType.Floor;
+
+        // Whether a tile of this type has its centre within reach of the position.
+        public bool Near(Vec2 position, TileType type, float reach)
+        {
+            int range = (int)MathF.Ceiling(reach) + 1;
+            int cx = Cell(position.X);
+            int cy = Cell(position.Y);
+            for (int y = cy - range; y <= cy + range; y++)
+            {
+                for (int x = cx - range; x <= cx + range; x++)
+                {
+                    if (this[x, y] == type && InBounds(x, y) && Vec2.Distance(position, Center(x, y)) <= reach) return true;
+                }
+            }
+            return false;
+        }
 
         // The outermost ring, which nobody can dig through.
         public bool IsEdge(int x, int y) => x <= 0 || y <= 0 || x >= Width - 1 || y >= Height - 1;

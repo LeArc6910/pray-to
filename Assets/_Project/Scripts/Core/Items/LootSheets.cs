@@ -274,7 +274,13 @@ namespace Game.Core
                         ingredients.Add((ingredient, amount));
                     }
                     if (ingredients.Count == 0) throw new FormatException("ingredients가 비어 있습니다.");
-                    recipes.Add(new Recipe(id, item, consumable, material, count, ingredients));
+                    TileType? station = null;
+                    if (row["station"].Length > 0)
+                    {
+                        station = SheetValues.ParseEnum<TileType>(row["station"], "제작대");
+                        if (station == TileType.Floor) throw new FormatException("station에는 작업대 같은 칸 종류를 적습니다.");
+                    }
+                    recipes.Add(new Recipe(id, item, consumable, material, count, ingredients, station));
                 });
             }
             return recipes;

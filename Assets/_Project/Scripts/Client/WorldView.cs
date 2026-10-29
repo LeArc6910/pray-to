@@ -714,6 +714,9 @@ namespace Game.Client
             _solidTiles[TileType.Wall] = Shapes.WallTile();
             _solidTiles[TileType.CopperOre] = Shapes.OreTile(Palette.CopperOre);
             _solidTiles[TileType.IronOre] = Shapes.OreTile(Palette.IronOre);
+            _solidTiles[TileType.Workbench] = Shapes.WorkbenchTile();
+            _solidTiles[TileType.Furnace] = Shapes.FurnaceTile();
+            _solidTiles[TileType.Chest] = Shapes.ChestTile();
             var tiles = new TileBase[map.Width * map.Height];
             for (int y = 0; y < map.Height; y++)
             {

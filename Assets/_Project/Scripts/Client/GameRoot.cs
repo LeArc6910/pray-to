@@ -233,7 +233,7 @@ namespace Game.Client
             {
                 try
                 {
-                    world = WorldSave.Read(worldData, _tiles);
+                    world = WorldSave.Read(worldData, _tiles, _loot);
                 }
                 catch (InvalidDataException e)
                 {
