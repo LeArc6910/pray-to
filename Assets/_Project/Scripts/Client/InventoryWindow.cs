@@ -74,11 +74,7 @@ namespace Game.Client
             _recipeWidth = area.width - 110 - IconRoom;
             Controls.Block(area);
             Wheel(area);
-            // The box style is see-through; names drawn over the world would show through the list.
-            var tint = GUI.color;
-            GUI.color = new Color(0.07f, 0.07f, 0.09f, 0.95f);
-            GUI.DrawTexture(area, Texture2D.whiteTexture);
-            GUI.color = tint;
+            // The panel (UiSkin) is all but opaque, so names drawn over the world do not show through the list.
             GUILayout.BeginArea(area, GUI.skin.box);
             string close = Controls.UsingTouch ? "가방 버튼으로 닫기" : "Tab 또는 I로 닫기";
             // Without room beside the window the hint goes in the title, so nothing sits over the list.

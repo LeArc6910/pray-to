@@ -92,8 +92,9 @@ namespace Game.Client
         const float FlashLife = 0.35f;
         // Impacts further away than this do not shake the screen.
         const float ShakeRange = 16;
-        // The dark is a square of this many tiles around the camera, wider than any screen shows. It covers what
-        // stands in the world; projectiles, telegraphs and skill effects are drawn over it so they show in the dark.
+        // The dark is a square of at least this many tiles around the camera, and wider when the view is (a very wide
+        // window). It covers what stands in the world; projectiles, telegraphs and skill effects are drawn over it so
+        // they show in the dark.
         const int DarkSize = 64;
         const int DarkOrder = 15000;
         // How far a glowing shot lights its way.
@@ -133,7 +134,7 @@ namespace Game.Client
             new Dictionary<int, (TileType, SpriteRenderer, SpriteRenderer)>();
         Tilemap _ground;
         Tilemap _objects;
-        readonly LightMap _lightMap = new LightMap(DarkSize);
+        LightMap _lightMap;
         readonly List<LightSource> _lights = new List<LightSource>();
         readonly WorldLights _worldLights;
         readonly Func<int, int, float> _arenaGlow;
@@ -158,7 +159,7 @@ namespace Game.Client
             AddLight();
             _worldLights = new WorldLights(client.Tiles);
             _arenaGlow = WorldLights.ArenaAmbient(client.Arena, client.ArenaRadius);
-            BuildDark();
+            BuildDark(DarkSize);
             _self = MakeBody(BodyKind.Player, "나", 0, World.PlayerRadius, SelfTunic);
             var start = client.Position;
             _cameraTarget = new Vector3(start.X, start.Y, _camera.transform.position.z);
@@ -1008,17 +1009,20 @@ namespace Game.Client
             lightObject.SetActive(true);
         }
 
-        void BuildDark()
+        void BuildDark(int size)
         {
-            _darkTexture = new Texture2D(DarkSize, DarkSize, TextureFormat.RGBA32, false)
+            if (_darkTexture != null) Object.Destroy(_darkTexture);
+            if (_dark != null) Object.Destroy(_dark.gameObject);
+            _lightMap = new LightMap(size);
+            _darkTexture = new Texture2D(size, size, TextureFormat.RGBA32, false)
             {
                 // Smooth between tile centres, so light falls off softly instead of in squares.
                 filterMode = FilterMode.Bilinear,
                 wrapMode = TextureWrapMode.Clamp,
             };
-            _darkPixels = new Color32[DarkSize * DarkSize];
+            _darkPixels = new Color32[size * size];
             // One texel a world unit, so texel centres sit on tile centres when the corner is on a tile corner.
-            var sprite = Sprite.Create(_darkTexture, new Rect(0, 0, DarkSize, DarkSize), Vector2.zero, 1, 0, SpriteMeshType.FullRect);
+            var sprite = Sprite.Create(_darkTexture, new Rect(0, 0, size, size), Vector2.zero, 1, 0, SpriteMeshType.FullRect);
             _dark = Renderer(_root.transform, "Dark", sprite, Color.white);
             _dark.sortingOrder = DarkOrder;
         }
@@ -1029,15 +1033,19 @@ namespace Game.Client
         {
             _dark.enabled = Settings.Darkness;
             if (!_dark.enabled) return;
-            int left = Mathf.FloorToInt(_cameraTarget.x) - DarkSize / 2;
-            int bottom = Mathf.FloorToInt(_cameraTarget.y) - DarkSize / 2;
+            float halfHeight = _camera.orthographicSize;
+            int needed = Mathf.CeilToInt(Mathf.Max(halfHeight, halfHeight * _camera.aspect) * 2) + 8;
+            if (needed > _lightMap.Size) BuildDark(needed);
+            int size = _lightMap.Size;
+            int left = Mathf.FloorToInt(_cameraTarget.x) - size / 2;
+            int bottom = Mathf.FloorToInt(_cameraTarget.y) - size / 2;
             _lights.Clear();
             _lights.Add(WorldLights.Carried(self));
             foreach (var body in _others.Values)
             {
                 if (body.Kind == BodyKind.Player) _lights.Add(WorldLights.Carried(new Vec2(body.Position.x, body.Position.y)));
             }
-            _worldLights.AddTiles(_lights, _client.Map, left, bottom, DarkSize, Time.time);
+            _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time);
             foreach (var shot in _projectiles.Values)
             {
                 if (shot.sprite == ArrowSprite) continue;
@@ -1045,12 +1053,12 @@ namespace Game.Client
                 _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, Sprites.ToRgba(shot.color), tints: true));
             }
             _lightMap.Compute(_client.Map, left, bottom, _lights, _arenaGlow);
-            for (int j = 0; j < DarkSize; j++)
+            for (int j = 0; j < size; j++)
             {
-                for (int i = 0; i < DarkSize; i++)
+                for (int i = 0; i < size; i++)
                 {
                     var o = _lightMap.Overlay(i, j);
-                    _darkPixels[j * DarkSize + i] = new Color32(o.R, o.G, o.B, o.A);
+                    _darkPixels[j * size + i] = new Color32(o.R, o.G, o.B, o.A);
                 }
             }
             _darkTexture.SetPixels32(_darkPixels);

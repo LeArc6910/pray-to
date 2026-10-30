@@ -103,6 +103,11 @@ namespace Game.Client
             creatures.Add(CreatureArt.Boss("cave_warden", BossColor, 1));
             rows.Add(creatures);
 
+            rows.Add(new[]
+            {
+                UiArt.Panel, UiArt.Button(), UiArt.Button(hover: true), UiArt.Button(pressed: true), UiArt.Button(chosen: true), UiArt.Inset,
+                UiArt.BarFill(Rgba.Hex("#D24A3C")), UiArt.BarFill(Rgba.Hex("#A8324A")),
+            }.Select(UiArt.Enlarged).ToList());
             rows.Add(loot.Bases.Select(ItemArt.Gear).ToList());
             rows.Add(loot.Materials.Select(ItemArt.Material)
                 .Concat(loot.Consumables.Select(ItemArt.Consumable))

@@ -145,6 +145,15 @@ namespace Game.Client
             }
         }
 
+        // A texture of the drawing alone, for the GUI.
+        public static Texture2D TextureOf(PixelImage image)
+        {
+            var texture = Texture(image.Width, image.Height);
+            texture.SetPixels32(Pixels(image));
+            texture.Apply(false, true);
+            return texture;
+        }
+
         static Texture2D Texture(int width, int height) => new Texture2D(width, height, TextureFormat.RGBA32, false)
         {
             filterMode = FilterMode.Point,

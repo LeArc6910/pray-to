@@ -8,7 +8,8 @@ namespace Game.Client
     // Shared setup for the IMGUI screens. Layout is done in points, not pixels: a browser draws the game at the
     // device's full pixel density (about 3 pixels per point on phones), which would leave 13-pixel text unreadably
     // small, so the GUI matrix scales points up by that ratio. Elsewhere one point is one pixel.
-    // The font travels with the game because web builds cannot use the system's fonts (no Korean otherwise).
+    // The font travels with the game because web builds cannot use the system's fonts (no Korean otherwise). The
+    // pixel-art frames come from UiSkin.
     static class Ui
     {
         const string FontPath = "Fonts/NotoSansKR-Game";
@@ -23,7 +24,7 @@ namespace Game.Client
 
         public const float MinimapSize = 120;
         public const float TouchButtonHeight = 40;
-        const float ColumnGap = 6;
+        const float ColumnGap = 10;
 
         // The top right column: the minimap, and on touch screens the bag and leave buttons under it.
         public static Rect MinimapArea => new Rect(Width - MinimapSize - 10, 10, MinimapSize, MinimapSize);
@@ -47,6 +48,7 @@ namespace Game.Client
         public static void Begin()
         {
             if (_font == null) _font = Resources.Load<Font>(FontPath);
+            GUI.skin = UiSkin.Get();
             if (_font != null) GUI.skin.font = _font;
             Scale = PixelRatio();
             GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1));

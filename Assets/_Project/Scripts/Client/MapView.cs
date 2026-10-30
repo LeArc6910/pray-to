@@ -97,7 +97,7 @@ namespace Game.Client
         public void DrawMinimap(Rect area)
         {
             Controls.Block(area);
-            Fill(area, Backdrop);
+            Framed(area);
             float half = MinimapTiles / 2f;
             // Keep the window inside the map so the edges never smear.
             float left = Mathf.Clamp(_client.Position.X - half, 0, Mathf.Max(0, _map.Width - MinimapTiles));
@@ -115,7 +115,7 @@ namespace Game.Client
             Fill(screen, new Color(0, 0, 0, 0.6f));
             float size = Mathf.Min(Ui.Width, Ui.Height - 60) - 20;
             var area = new Rect((Ui.Width - size) / 2, 34, size, size);
-            Fill(area, Backdrop);
+            Framed(area);
             DrawTiles(area, new Rect(0, 0, _map.Width, _map.Height));
 
             string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
@@ -145,6 +145,14 @@ namespace Game.Client
             GUI.color = color;
             GUI.DrawTexture(new Rect(center.x - size / 2, center.y - size / 2, size, size), sprite.texture);
             GUI.color = previous;
+        }
+
+        // The pixel-art panel (UiSkin) around the map, and the dark under its unexplored tiles.
+        static void Framed(Rect area)
+        {
+            float frame = UiArt.PanelBorder * UiArt.Scale;
+            GUI.Box(new Rect(area.x - frame, area.y - frame, area.width + frame * 2, area.height + frame * 2), GUIContent.none);
+            Fill(area, Backdrop);
         }
 
         static void Fill(Rect area, Color color)

@@ -5,8 +5,9 @@ namespace Game.Client
 {
     // The quick slots: the skills, then the potion. On PC a row of Q E R F and C at the bottom middle; on touch
     // screens the skills are a block of buttons two wide in the bottom right corner, under the thumb that aims, with
-    // the potion button left of its bottom row. Each shows a shade that shrinks as it cools down, a skill a coloured
-    // edge while its buff runs. Using them goes through Controls; this draws and marks the buttons.
+    // the potion button left of its bottom row. Each is a panel (UiSkin) with a stripe in its colour, a shade that
+    // shrinks as it cools down, and for a skill a coloured edge while its buff runs; the potion shows its icon. Using
+    // them goes through Controls; this draws and marks the buttons.
     static class SkillBar
     {
         const float KeySize = 64;
@@ -14,6 +15,9 @@ namespace Game.Client
         const float Gap = 6;
         const float Margin = 12;
         const float TooltipWidth = 260;
+        // Inside the panel's frame.
+        const float Inner = UiArt.PanelBorder * UiArt.Scale;
+        const float IconSize = 28;
 
         static GUIStyle _nameStyle;
         static GUIStyle _timeStyle;
@@ -72,8 +76,7 @@ namespace Game.Client
                 float cooldown = client.CooldownLeft(slot);
                 float buff = client.BuffLeft(slot);
                 var color = Palette.Of(skill.Tags | skill.Grants);
-                Fill(area, new Color(0, 0, 0, 0.65f));
-                Fill(new Rect(area.x, area.yMax - 4, area.width, 4), color);
+                Panel(area, color);
                 if (buff > 0) Outline(area, color, 3);
 
                 var previous = GUI.color;
@@ -110,12 +113,19 @@ namespace Game.Client
             var potion = client.QuickConsumable;
             int count = potion != null ? client.Bag.CountOf(potion) : 0;
             float wait = client.ConsumableCooldownLeft;
-            Fill(area, new Color(0, 0, 0, 0.65f));
-            Fill(new Rect(area.x, area.yMax - 4, area.width, 4), Palette.Potion);
+            Panel(area, Palette.Potion);
 
             var previous = GUI.color;
             GUI.color = count == 0 || wait > 0 || client.IsDead ? new Color(1, 1, 1, 0.45f) : Color.white;
-            GUI.Label(new Rect(area.x + 3, area.y + 10, area.width - 6, area.height - 18), $"{potion?.Name ?? "물약"}\n×{count}", _nameStyle);
+            if (potion != null)
+            {
+                Sprites.DrawInGui(new Rect(area.center.x - IconSize / 2, area.y + 10, IconSize, IconSize), Sprites.Icon(potion));
+                GUI.Label(new Rect(area.x + 3, area.y + 38, area.width - 6, 18), $"×{count}", _nameStyle);
+            }
+            else
+            {
+                GUI.Label(new Rect(area.x + 3, area.y + 10, area.width - 6, area.height - 18), "물약\n×0", _nameStyle);
+            }
             GUI.color = previous;
             if (!Controls.UsingTouch) GUI.Label(new Rect(area.x + 4, area.y + 2, 20, 18), Controls.PotionKeyName, _keyStyle);
             Shade(area, wait, potion?.Cooldown ?? wait);
@@ -142,6 +152,13 @@ namespace Game.Client
             float height = _tooltipStyle.CalcHeight(content, TooltipWidth);
             float x = Mathf.Clamp(slot.center.x - TooltipWidth / 2, 10, Ui.Width - TooltipWidth - 10);
             GUI.Box(new Rect(x, slot.y - height - 8, TooltipWidth, height), content, _tooltipStyle);
+        }
+
+        // The slot's panel with a stripe of its colour along the bottom, inside the frame.
+        static void Panel(Rect area, Color color)
+        {
+            GUI.Box(area, GUIContent.none);
+            Fill(new Rect(area.x + Inner, area.yMax - Inner - 4, area.width - Inner * 2, 4), color);
         }
 
         static void Fill(Rect area, Color color)

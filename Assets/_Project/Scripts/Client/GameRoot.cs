@@ -26,8 +26,9 @@ namespace Game.Client
         // After a long hitch, drop the backlog instead of fast-forwarding through it.
         const int MaxTicksPerFrame = 5;
         const float AcquiredSeconds = 4;
-        // Half the view's height in tiles on a landscape screen. Portrait screens zoom out to keep this much width.
-        const float ViewSize = 7;
+        // The view keeps about this many tiles across the screen's short side, zoomed by a whole number (below).
+        const float ShortSideTiles = 14;
+        const float HealthBarHeight = 20;
         // The host saves its world this often, and when the session ends. Characters save whenever the bag changes.
         const float WorldSaveSeconds = 30;
 
@@ -71,7 +72,7 @@ namespace Game.Client
             _camera = Camera.main;
             if (_camera == null) _camera = new GameObject("Main Camera", typeof(Camera)).GetComponent<Camera>();
             _camera.orthographic = true;
-            _camera.orthographicSize = ViewSize;
+            _camera.orthographicSize = ViewHalfHeight(Screen.width, Screen.height);
             _camera.clearFlags = CameraClearFlags.SolidColor;
             _camera.backgroundColor = new Color(0.04f, 0.04f, 0.06f);
             // The scene's camera has no listener of its own; sounds are 2D and only need one.
@@ -100,7 +101,7 @@ namespace Game.Client
         void Update()
         {
             Controls.UpdateTouches();
-            _camera.orthographicSize = ViewSize * Mathf.Max(1, (float)Screen.height / Screen.width);
+            _camera.orthographicSize = ViewHalfHeight(Screen.width, Screen.height);
             if (_endReason != null)
             {
                 EndSession(_endReason);
@@ -164,6 +165,15 @@ namespace Game.Client
                 _acquired.Add((line, 0));
                 Sounds.Play(Sound.Pickup);
             }
+        }
+
+        // Half the view's height in tiles for a whole-number zoom: every pixel of the art (a sixteenth of a tile)
+        // covers zoom × zoom screen pixels, so pixels look even at any screen size. The zoom keeps about
+        // ShortSideTiles tiles across the short side, which also keeps a phone held upright showing as much width.
+        static float ViewHalfHeight(int width, int height)
+        {
+            int zoom = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(width, height) / (ShortSideTiles * Sprites.PixelsPerUnit)));
+            return height / (2f * Sprites.PixelsPerUnit * zoom);
         }
 
         // Skills go to the host as soon as they are pressed, not with the next tick's input.
@@ -484,8 +494,14 @@ namespace Game.Client
             }
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
-            Settings.Darkness = GUILayout.Toggle(Settings.Darkness, " 동굴 어둠과 빛 (끄면 어디나 밝다)");
-            Settings.Sound = GUILayout.Toggle(Settings.Sound, " 효과음");
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button($"어둠과 빛: {(Settings.Darkness ? "켜짐" : "꺼짐")}")) Settings.Darkness = !Settings.Darkness;
+            if (GUILayout.Button($"효과음: {(Settings.Sound ? "켜짐" : "꺼짐")}"))
+            {
+                Settings.Sound = !Settings.Sound;
+                Sounds.Play(Sound.Click);
+            }
+            GUILayout.EndHorizontal();
             GUILayout.Space(8);
 
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
@@ -549,17 +565,18 @@ namespace Game.Client
             if (_chosenClasses.Count == 0) GUILayout.Label("고르지 않으면 기본 공격만 쓴다.");
         }
 
-        // The status box grows to fit its lines, so a narrow window wraps them instead of cutting them off.
+        // The status box: a health bar, then lines that grow the box to fit, so a narrow window wraps them instead of
+        // cutting them off.
         void DrawHud()
         {
             var lines = new List<string>();
-            if (_client.Status != ClientStatus.Playing)
+            bool playing = _client.Status == ClientStatus.Playing;
+            if (!playing)
             {
                 lines.Add(_status);
             }
             else
             {
-                lines.Add($"생명력 {Mathf.CeilToInt(_client.Health)} / {Mathf.CeilToInt(_client.MaxHealth)}");
                 if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 string mode = _mode == Mode.Host ? $"호스트 중 (포트 {NetLink.DefaultPort})" : _mode == Mode.Join ? "참가 중" : "혼자 하기";
                 lines.Add($"{mode} · 접속 {_client.Names.Count}명");
@@ -583,9 +600,16 @@ namespace Game.Client
             float gap = Mathf.Max(label.margin.top, label.margin.bottom);
             float height = box.padding.vertical + label.margin.top + label.margin.bottom + gap * (lines.Count - 1);
             foreach (string line in lines) height += label.CalcHeight(new GUIContent(line), width);
+            if (playing) height += HealthBarHeight;
             Ui.HudHeight = Mathf.Ceil(height) + 2;
 
             GUILayout.BeginArea(Ui.HudArea, box);
+            if (playing)
+            {
+                var bar = GUILayoutUtility.GetRect(width, HealthBarHeight, GUILayout.ExpandWidth(true));
+                float share = _client.MaxHealth > 0 ? _client.Health / _client.MaxHealth : 0;
+                UiSkin.Bar(bar, share, $"생명력 {Mathf.CeilToInt(_client.Health)} / {Mathf.CeilToInt(_client.MaxHealth)}");
+            }
             foreach (string line in lines) GUILayout.Label(line);
             GUILayout.EndArea();
 
@@ -606,13 +630,8 @@ namespace Game.Client
             float width = Mathf.Min(600, right - left);
             var bar = new Rect(left + (right - left - width) / 2, top, width, 18);
             GUI.Label(new Rect(bar.x, bar.y - 2, width, 22), $"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈");
-            var previous = GUI.color;
-            GUI.color = new Color(0, 0, 0, 0.7f);
-            GUI.DrawTexture(new Rect(bar.x, bar.y + 20, width, bar.height), Texture2D.whiteTexture);
-            GUI.color = new Color(0.85f, 0.25f, 0.2f);
             float share = boss.MaxHealth > 0 ? Mathf.Clamp01(boss.Health / boss.MaxHealth) : 0;
-            GUI.DrawTexture(new Rect(bar.x + 2, bar.y + 22, (width - 4) * share, bar.height - 4), Texture2D.whiteTexture);
-            GUI.color = previous;
+            UiSkin.Bar(new Rect(bar.x, bar.y + 20, width, bar.height), share, "", boss: true);
         }
 
         // Which of the eight directions an offset points, as a Korean word. Up on screen is north.
