@@ -14,7 +14,10 @@ namespace Game.Client
         static readonly Rgba HealthColor = Rgba.Hex("#D24A3C");
         static readonly Rgba BossColor = Rgba.Hex("#A8324A");
 
+#if UNITY_EDITOR
+        // High-resolution backgrounds exist only in the editor; players have none to drop.
         static readonly Texture2D[] NoScaled = new Texture2D[0];
+#endif
 
         static GUISkin _skin;
         static GUIStyle _barWell;
@@ -55,7 +58,9 @@ namespace Game.Client
             Frame(skin.horizontalScrollbarThumb, UiArt.ButtonBorder, button, hover, pressed, button, hover, pressed);
             skin.label.normal.textColor = Text;
             skin.scrollView.normal.background = null;
+#if UNITY_EDITOR
             skin.scrollView.normal.scaledBackgrounds = NoScaled;
+#endif
 
             _barWell = new GUIStyle { border = new RectOffset(Edge(UiArt.InsetBorder), Edge(UiArt.InsetBorder), Edge(UiArt.InsetBorder), Edge(UiArt.InsetBorder)) };
             _barWell.normal.background = inset;
@@ -90,8 +95,8 @@ namespace Game.Client
         }
 
         // Sets a style's backgrounds for its states (off, then on as for a chosen tab) and how many texture pixels at
-        // each edge keep their size. The default skin's high-resolution backgrounds are dropped, or a high-density
-        // screen would still show them.
+        // each edge keep their size. In the editor the default skin's high-resolution backgrounds are dropped, or a
+        // high-density screen would still show them.
         static void Frame(GUIStyle style, int border, Texture2D normal, Texture2D hover, Texture2D active, Texture2D onNormal, Texture2D onHover, Texture2D onActive)
         {
             int edge = Edge(border);
@@ -109,7 +114,9 @@ namespace Game.Client
         static void Set(GUIStyleState state, Texture2D background)
         {
             state.background = background;
+#if UNITY_EDITOR
             state.scaledBackgrounds = NoScaled;
+#endif
             state.textColor = Text;
         }
 

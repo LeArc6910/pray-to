@@ -21,7 +21,7 @@
   - `Game.Core.Tests`: 테스트
   - `CoreSandbox`: 밸런스 시뮬레이션 콘솔
   - `ArtPreview`: 게임의 도트 그림과 효과음(`Scripts/Client/Art`, UnityEngine을 쓰지 않는 C#)을 PNG와 WAV로 만든다. Unity 없이 보고 듣고 고칠 때 쓴다. 그림이나 소리가 잘못되면 실패한다
-  - `UnityCompileCheck`: Unity 쪽 코드(`Scripts/Client`, `Tests/PlayMode`)를 Unity 실제 엔진 DLL로 컴파일만 해 본다. asmdef마다 `Assemblies/`에 프로젝트가 하나씩 있고, 참조는 asmdef의 `references`를 읽어 정한다(`Directory.Build.targets`, Unity처럼 전이되지 않는다). 패키지(Netcode, Input System, URP, Test Framework) API는 `Stubs/<어셈블리 이름>/`에 패키지 소스와 같은 시그니처로 적어 둔다. 타입은 패키지에서 실제로 들어 있는 어셈블리(패키지의 asmdef로 확인)의 스텁에 넣는다. 예: `Light2D`는 `Unity.RenderPipelines.Universal.2D.Runtime`. 새 패키지 API를 쓰면 여기에 추가한다.
+  - `UnityCompileCheck`: Unity 쪽 코드(`Scripts/Client`, `Tests/PlayMode`)를 Unity 실제 엔진 DLL로 컴파일만 해 본다. asmdef마다 `Assemblies/`에 프로젝트가 하나씩 있고, 참조는 asmdef의 `references`를 읽어 정한다(`Directory.Build.targets`, Unity처럼 전이되지 않는다). 패키지(Netcode, Input System, URP, Test Framework) API는 `Stubs/<어셈블리 이름>/`에 패키지 소스와 같은 시그니처로 적어 둔다. 타입은 패키지에서 실제로 들어 있는 어셈블리(패키지의 asmdef로 확인)의 스텁에 넣는다. 예: `Light2D`는 `Unity.RenderPipelines.Universal.2D.Runtime`. 새 패키지 API를 쓰면 여기에 추가한다. 에디터 DLL에는 플레이어에 없는 API도 있어서(예: `GUIStyleState.scaledBackgrounds`), 웹 빌드용 확인은 웹 플레이어의 DLL(`.unity/WebGL`)로 한다.
   - `Local`: 로컬 컴퓨터에서 쓰는 명령 한 줄(`setup.ps1`, `setup.sh`). 둘은 같은 일을 하므로 하나를 고치면 다른 하나도 고친다. `test/run.sh`가 가짜 Unity(`test/fake-unity`)로 두 스크립트를 확인한다.
 - `Assets/_Project/Scripts/Client` (`Game.Client`): 화면, 입력, 네트워크 전송만 맡는다. 게임 규칙을 두지 않는다. 그림은 `Art/`에 코드로 그린 16px 도트이고 `Sprites`가 Unity 스프라이트로 바꾼다. 효과음도 `Art/SoundArt.cs`가 합성하고 `Sounds`가 튼다(`Docs/ArtPipeline.md`). UI는 IMGUI이고 크기는 `Ui`의 점 단위로 잡는다(`Screen.width` 대신 `Ui.Width`). 입력은 `Controls`가 키보드·마우스와 터치를 함께 읽는다. `Editor/`에는 프로젝트 설정과 씬·에셋을 코드로 만드는 메뉴(`Game > Set Up Project`, `Game > Set Up Main Scene`)와 웹 빌드(`Game > Build Web Demo`)가 있다.
 - 웹 데모: `.github/workflows/web-demo.yml`이 GameCI로 빌드해 GitHub Pages에 올린다. 웹에서는 혼자 하기만 되고, 글꼴은 `Resources/Fonts`의 Noto Sans KR 부분집합(`DevTools/Fonts/make-korean-font.py`로 만든다)이다. `Docs/WebDemo.md`.
@@ -40,9 +40,11 @@ dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --classes warrior,fir
 # 도트 그림과 효과음을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, cave.png, cave_unlit.png, arena.png, sounds/)
 dotnet run --project DevTools/ArtPreview
 
-# Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(약 1분 반, 엔진 DLL만 .unity/에 받는다)
+# Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(몇 분, 에디터와 웹 플레이어의 엔진 DLL만 .unity/에 받는다)
 DevTools/UnityCompileCheck/fetch-unity.sh
 dotnet build DevTools/UnityCompileCheck
+# 웹 빌드처럼: 웹 플레이어의 DLL로 게임 어셈블리만. 에디터에만 있는 API를 쓰면 여기서 걸린다
+dotnet build DevTools/UnityCompileCheck/Assemblies/Game.Client -p:DefineConstants=UNITY_WEBGL -p:UnityAssemblies=$PWD/DevTools/UnityCompileCheck/.unity/WebGL -o /tmp/webgl-check
 
 # 로컬 명령 한 줄 스크립트 확인 (pwsh가 있으면 PowerShell 쪽도)
 bash DevTools/Local/test/run.sh

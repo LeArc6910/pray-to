@@ -30,12 +30,13 @@ jobs:
           name: art-preview
           path: ${{ runner.temp }}/art
 
-      # Unity's engine assemblies for the project's version, extracted once and then cached.
+      # Unity's engine assemblies for the project's version (the editor's and the web player's), extracted once and
+      # then cached.
       - name: Cache Unity assemblies
         uses: actions/cache@v4
         with:
           path: DevTools/UnityCompileCheck/.unity
-          key: unity-assemblies-${{ hashFiles('ProjectSettings/ProjectVersion.txt') }}
+          key: unity-assemblies-v2-${{ hashFiles('ProjectSettings/ProjectVersion.txt') }}
 
       - name: Fetch Unity assemblies
         run: bash DevTools/UnityCompileCheck/fetch-unity.sh
@@ -43,9 +44,14 @@ jobs:
       - name: Compile-check Unity scripts
         run: dotnet build DevTools/UnityCompileCheck
 
-      # Again as the web build sees them, for code behind #if UNITY_WEBGL.
+      # Again as the web build sees them: code behind #if UNITY_WEBGL, against the web player's own assemblies, which
+      # lack the editor-only API the editor's have. Only the game's assembly; editor and test code are not in it.
       - name: Compile-check Unity scripts for the web
-        run: dotnet build DevTools/UnityCompileCheck -p:DefineConstants=UNITY_WEBGL -o "$RUNNER_TEMP/webgl-check"
+        run: >-
+          dotnet build DevTools/UnityCompileCheck/Assemblies/Game.Client
+          -p:DefineConstants=UNITY_WEBGL
+          -p:UnityAssemblies="$PWD/DevTools/UnityCompileCheck/.unity/WebGL"
+          -o "$RUNNER_TEMP/webgl-check"
 
       # The local setup scripts, run against a stand-in for Unity. The runner image has ShellCheck and PowerShell.
       - name: Check local setup scripts
