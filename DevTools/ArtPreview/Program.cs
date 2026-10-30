@@ -8,7 +8,8 @@ namespace Game.Client
 {
     // Draws every sprite to sheet.png and two made-up scenes (the spawn with a small base, the boss arena) to
     // cave.png and arena.png, laid out and lit the way WorldView lays them out and lights them; cave_unlit.png is
-    // the first without the dark. Fails if any drawing is malformed.
+    // the first without the dark. Writes every sound effect to sounds/<name>.wav. Fails if any drawing is malformed
+    // or a sound comes out silent, too long or out of range.
     //
     //   dotnet run --project DevTools/ArtPreview [-- <output folder>]
     static class Program
@@ -39,8 +40,28 @@ namespace Game.Client
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
-            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png and arena.png to {output}");
+            if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
+            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png and sounds/ to {output}");
             return 0;
+        }
+
+        static bool WriteSounds(string folder)
+        {
+            Directory.CreateDirectory(folder);
+            bool fine = true;
+            foreach (Sound sound in Enum.GetValues(typeof(Sound)))
+            {
+                var samples = SoundArt.Make(sound);
+                float seconds = samples.Length / (float)SoundArt.SampleRate;
+                float loudest = samples.Max(Math.Abs);
+                if (samples.Length == 0 || seconds > 2 || loudest < 0.05f || loudest > 1 || samples.Any(float.IsNaN))
+                {
+                    Console.Error.WriteLine($"{sound}: {seconds:0.00}s, peak {loudest:0.00}");
+                    fine = false;
+                }
+                Wav.Save(samples, SoundArt.SampleRate, Path.Combine(folder, sound.ToString().ToLowerInvariant() + ".wav"));
+            }
+            return fine;
         }
 
         static void Save(PixelImage image, string path, int scale) => Png.Save(Scaled(image, scale), path);

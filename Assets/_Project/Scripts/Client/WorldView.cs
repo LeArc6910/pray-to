@@ -386,8 +386,16 @@ namespace Game.Client
         void WatchBoss(EntityView view)
         {
             bool known = _bossesSeen.TryGetValue(view.Id, out var before);
-            if (view.BossState != BossState.Dormant && (!known || before.State == BossState.Dormant)) ShowBanner($"{view.Boss.Name} 등장!");
-            else if (known && view.Phase > before.Phase) ShowBanner($"{view.Phase}페이즈!");
+            if (view.BossState != BossState.Dormant && (!known || before.State == BossState.Dormant))
+            {
+                ShowBanner($"{view.Boss.Name} 등장!");
+                Sounds.Play(Sound.Wake);
+            }
+            else if (known && view.Phase > before.Phase)
+            {
+                ShowBanner($"{view.Phase}페이즈!");
+                Sounds.Play(Sound.Roar);
+            }
             _bossesSeen[view.Id] = (view.BossState, view.Phase, view.Boss.Name);
         }
 
@@ -409,6 +417,7 @@ namespace Game.Client
                 {
                     mark = MakeMark(hazard);
                     _marks[hazard.Id] = mark;
+                    Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
                 }
 
                 var color = hazard.Harmful ? DangerColor : PathColor;
@@ -636,8 +645,11 @@ namespace Game.Client
             {
                 case SimEventType.Attack:
                     var attacker = Find(e.Source);
+                    if (attacker == null) break;
+                    var kind = (BasicAttackKind)e.Amount;
+                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : Sound.Swing, attacker.Position);
                     // Shots show as their projectile, so only swings draw the arc.
-                    if (attacker == null || e.Amount != (int)BasicAttackKind.Swing) break;
+                    if (kind != BasicAttackKind.Swing) break;
                     attacker.SwingTime = SwingSeconds;
                     attacker.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     break;
@@ -649,11 +661,13 @@ namespace Game.Client
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
                     _floating.Add(new Floating { Position = target.Position, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
                     if (hurtsMe) _shake = Mathf.Max(_shake, 0.12f);
+                    Hear(hurtsMe ? Sound.Hurt : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
                     break;
                 case SimEventType.Impact:
                     var source = Find(e.Source);
                     if (source == null || Vector3.Distance(source.Position, _self.Position) > ShakeRange) break;
                     _shake = Mathf.Max(_shake, Mathf.Min(0.45f, e.Amount * 0.07f));
+                    Hear(Sound.Boom, source.Position, Mathf.Min(1, 0.4f + e.Amount * 0.1f));
                     break;
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
@@ -662,14 +676,17 @@ namespace Game.Client
                     // A puff of dust where the wall was struck, bigger when it gives way.
                     var struck = new Vector3(e.Position.X, e.Position.Y, 0);
                     AddFlash(struck, e.Amount == 1 ? 0.7f : 0.35f, Palette.Dust, Shapes.Circle);
+                    Hear(e.Amount == 1 ? Sound.Break : Sound.Dig, struck);
                     break;
                 case SimEventType.Harvested:
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 0.6f, Palette.Ripe, Shapes.Ring);
+                    Hear(Sound.Harvest, new Vector3(e.Position.X, e.Position.Y, 0));
                     break;
                 case SimEventType.Healed:
                     var drinker = Find(e.Source);
                     if (drinker == null) break;
                     _floating.Add(new Floating { Position = drinker.Position, Text = "+" + e.Amount, Color = Palette.Heal });
+                    Hear(Sound.Heal, drinker.Position);
                     AddFlash(drinker.Position, drinker.Diameter, Palette.Heal, Shapes.Ring);
                     break;
                 case SimEventType.Burst:
@@ -678,11 +695,21 @@ namespace Game.Client
                     var at = new Vector3(e.Position.X, e.Position.Y, 0);
                     AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), Shapes.Circle);
                     if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.08f);
+                    Hear(Sound.Boom, at, 0.7f);
                     break;
                 case SimEventType.Died:
-                    if (e.Source == _client.PlayerId) _floating.Add(new Floating { Position = _self.Position, Text = "쓰러짐", Color = Color.gray });
+                    if (e.Source == _client.PlayerId)
+                    {
+                        _floating.Add(new Floating { Position = _self.Position, Text = "쓰러짐", Color = Color.gray });
+                        Sounds.Play(Sound.Down);
+                    }
+                    else if (!_bossesSeen.ContainsKey(e.Source) && Find(e.Source) is Body fallen)
+                    {
+                        Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position);
+                    }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
                     {
+                        Sounds.Play(Sound.Victory);
                         ShowBanner($"{boss.Name} 처치!");
                         _bossesSeen.Remove(e.Source);
                     }
@@ -698,6 +725,7 @@ namespace Game.Client
             if (skill == null || caster == null) return;
             var color = Palette.Of(skill.Tags | skill.Grants | GrantedTags(e.Source));
             _floating.Add(new Floating { Position = caster.Position + new Vector3(0, 0.4f, 0), Text = skill.Name, Color = color });
+            Hear(skill.Kind == SkillKind.Nova ? Sound.Nova : skill.Kind == SkillKind.Buff ? Sound.Buff : Sound.Zap, caster.Position);
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
@@ -713,6 +741,9 @@ namespace Game.Client
                     break;
             }
         }
+
+        // A sound where something happened, quieter the farther it is from the player (Sounds).
+        void Hear(Sound sound, Vector3 at, float volume = 1) => Sounds.PlayAt(sound, at, _self.Position, volume);
 
         // Tags a player's running buffs add to their attacks, for colouring what they do.
         SkillTag GrantedTags(int playerId)

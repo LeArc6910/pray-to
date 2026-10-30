@@ -7,8 +7,10 @@ namespace Game.Client
     static class Settings
     {
         const string DarknessKey = "settings.darkness";
+        const string SoundKey = "settings.sound";
 
         static bool? _darkness;
+        static bool? _sound;
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -19,6 +21,19 @@ namespace Game.Client
                 if (_darkness == value) return;
                 _darkness = value;
                 PlayerPrefs.SetInt(DarknessKey, value ? 1 : 0);
+                PlayerPrefs.Save();
+            }
+        }
+
+        // The sound effects.
+        public static bool Sound
+        {
+            get => _sound ??= PlayerPrefs.GetInt(SoundKey, 1) == 1;
+            set
+            {
+                if (_sound == value) return;
+                _sound = value;
+                PlayerPrefs.SetInt(SoundKey, value ? 1 : 0);
                 PlayerPrefs.Save();
             }
         }

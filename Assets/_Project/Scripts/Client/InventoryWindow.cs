@@ -129,7 +129,7 @@ namespace Game.Client
                 {
                     ItemLabel(item);
                     RuneButton(item);
-                    if (GUILayout.Button("벗기", GUILayout.Width(56))) _send(_client.UnequipCommand(slot));
+                    if (GUILayout.Button("벗기", GUILayout.Width(56))) Send(_client.UnequipCommand(slot), Sound.Click);
                 }
                 GUILayout.EndHorizontal();
             }
@@ -141,8 +141,8 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 ItemLabel(item);
                 RuneButton(item);
-                if (GUILayout.Button("장착", GUILayout.Width(56))) _send(_client.EquipCommand(item.Id));
-                if (GUILayout.Button("버리기", GUILayout.Width(56))) _send(_client.DiscardCommand(item.Id));
+                if (GUILayout.Button("장착", GUILayout.Width(56))) Send(_client.EquipCommand(item.Id), Sound.Place);
+                if (GUILayout.Button("버리기", GUILayout.Width(56))) Send(_client.DiscardCommand(item.Id), Sound.Click);
                 GUILayout.EndHorizontal();
             }
 
@@ -217,9 +217,9 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
-                if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) _send(_client.PlaceCommand(pair.Key));
+                if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
                 var crop = _client.CropFrom(pair.Key);
-                if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) _send(_client.PlantCommand(crop));
+                if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
                 GUILayout.EndHorizontal();
             }
         }
@@ -247,7 +247,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 ItemLabel(item);
-                if (GUILayout.Button(action, GUILayout.Width(64))) _send(moveItem(item));
+                if (GUILayout.Button(action, GUILayout.Width(64))) Send(moveItem(item), Sound.Click);
                 GUILayout.EndHorizontal();
             }
             void Stack(StackKind kind, object definition, Sprite icon, string name, int count, string description)
@@ -255,7 +255,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(icon);
                 GUILayout.Label(new GUIContent($"{name} ×{count}", description), GUILayout.Width(_nameWidth));
-                if (GUILayout.Button(action, GUILayout.Width(64))) _send(moveStack(kind, definition));
+                if (GUILayout.Button(action, GUILayout.Width(64))) Send(moveStack(kind, definition), Sound.Click);
                 GUILayout.EndHorizontal();
             }
             foreach (var pair in contents.Consumables.ToList()) Stack(StackKind.Consumable, pair.Key, Sprites.Icon(pair.Key), pair.Key.Name, pair.Value, pair.Key.Description);
@@ -282,7 +282,7 @@ namespace Game.Client
                 Icon(recipe.Item != null ? Sprites.Icon(recipe.Item) : recipe.Consumable != null ? Sprites.Icon(recipe.Consumable) : Sprites.Icon(recipe.Material));
                 GUILayout.Label(new GUIContent($"{name}\n{needs}", RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
                 GUI.enabled = enabled && _client.CanCraft(recipe);
-                if (GUILayout.Button("만들기", GUILayout.Width(64))) _send(_client.CraftCommand(recipe));
+                if (GUILayout.Button("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
                 GUI.enabled = enabled;
                 GUILayout.EndHorizontal();
             }
@@ -331,6 +331,15 @@ namespace Game.Client
             GUI.color = previous;
         }
 
+        // A command from a button, with a sound right away so the press is felt before the host answers. The host
+        // may still refuse it (no room, no station in reach).
+        void Send(byte[] command, Sound sound)
+        {
+            if (command == null) return;
+            Sounds.Play(sound);
+            _send(command);
+        }
+
         static void Icon(Sprite sprite)
         {
             var area = GUILayoutUtility.GetRect(IconSize, IconSize, GUILayout.Width(IconSize), GUILayout.Height(IconSize));
@@ -341,7 +350,7 @@ namespace Game.Client
         void RuneButton(Item item)
         {
             if (_selectedRune == null || !item.Sockets.Contains(null)) return;
-            if (GUILayout.Button("끼우기", GUILayout.Width(56))) _send(_client.InsertRuneCommand(item.Id, _selectedRune));
+            if (GUILayout.Button("끼우기", GUILayout.Width(56))) Send(_client.InsertRuneCommand(item.Id, _selectedRune), Sound.Craft);
         }
 
         static string CategoryName(SlotCategory category) => category switch

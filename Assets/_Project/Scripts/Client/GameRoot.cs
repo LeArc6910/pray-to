@@ -74,6 +74,8 @@ namespace Game.Client
             _camera.orthographicSize = ViewSize;
             _camera.clearFlags = CameraClearFlags.SolidColor;
             _camera.backgroundColor = new Color(0.04f, 0.04f, 0.06f);
+            // The scene's camera has no listener of its own; sounds are 2D and only need one.
+            if (_camera.GetComponent<AudioListener>() == null) _camera.gameObject.AddComponent<AudioListener>();
 
             var sheets = GameSheets.Load();
             if (sheets == null)
@@ -157,7 +159,11 @@ namespace Game.Client
                 if (age + Time.deltaTime > AcquiredSeconds) _acquired.RemoveAt(i);
                 else _acquired[i] = (text, age + Time.deltaTime);
             }
-            foreach (string line in _client.TakeAcquired()) _acquired.Add((line, 0));
+            foreach (string line in _client.TakeAcquired())
+            {
+                _acquired.Add((line, 0));
+                Sounds.Play(Sound.Pickup);
+            }
         }
 
         // Skills go to the host as soon as they are pressed, not with the next tick's input.
@@ -479,6 +485,7 @@ namespace Game.Client
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
             Settings.Darkness = GUILayout.Toggle(Settings.Darkness, " 동굴 어둠과 빛 (끄면 어디나 밝다)");
+            Settings.Sound = GUILayout.Toggle(Settings.Sound, " 효과음");
             GUILayout.Space(8);
 
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
