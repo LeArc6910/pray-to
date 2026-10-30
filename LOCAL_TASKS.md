@@ -446,3 +446,10 @@ DevTools/Local/setup.sh --commit
   - 가방 창 아래쪽의 "아이템 이름에 마우스를 올리면 설명이 보입니다." 안내가 목록 위에 겹쳐서, 끝까지 내려도 마지막 줄(버섯 구이와 그 재료 "동굴 버섯 0/2")이 가려진다. 중간 위치에서는 "재료"와 "버섯 포자 ×2 [심기]" 줄도 가린다
   - 가방 창을 마우스 휠로 내리면 아주 느리다(휠 20칸에 몇 줄). 스크롤 막대를 끌면 된다. 목록이 길어져 PC에서 휠로 내리기 불편하다
 - 확인하지 못한 것: 원거리 무기(드랍 필요), 쉬면 차는 생명력과 물약 마시기(맞아야 함), 채굴·돌벽 놓기·제작(벽까지 걸어가야 하는데 자동 입력으로는 키를 누르고 있을 수 없다), 버섯이 3분 동안 자라 거두기, 휴대폰. 7번의 사람 확인으로 남긴다
+
+### 2026-10-30 18:32 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 225개 중 225개 통과, 0개 실패
+- PlayMode 테스트: 4개 중 4개 통과, 0개 실패

@@ -21,6 +21,7 @@ MonoBehaviour:
   recipes: {fileID: 4900000, guid: 62df96d7c2c9ba64988b9fcfeedc40ea, type: 3}
   tiles: {fileID: 4900000, guid: 3a417955f3f67d54bbd05ac5f9926a52, type: 3}
   crops: {fileID: 4900000, guid: 5adddb4bb9f54f6438c96249f8e2436f, type: 3}
+  machines: {fileID: 4900000, guid: e6ba977065c4e364b9f8e11dbb9a170e, type: 3}
   monsters: {fileID: 4900000, guid: 40686204d9b9dc740bbcdff13af5c326, type: 3}
   bosses: {fileID: 4900000, guid: c2fed33ef540da34099bd6c4b0cbb5ac, type: 3}
   bossAttacks: {fileID: 4900000, guid: 1c2415facedd5c54580087663f50c44d, type: 3}
