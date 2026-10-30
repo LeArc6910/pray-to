@@ -38,6 +38,9 @@ namespace Game.Client
         RuneDefinition _selectedRune;
         float _nameWidth;
         float _recipeWidth;
+        // Each row starts with the thing's icon.
+        const float IconSize = 24;
+        const float IconRoom = IconSize + 4;
 
         public InventoryWindow(WorldClient client, Action<byte[]> send)
         {
@@ -67,8 +70,8 @@ namespace Game.Client
                 area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
             }
             bool besideWindow = area.x >= TooltipWidth + 20;
-            _nameWidth = Mathf.Min(240, area.width - 200);
-            _recipeWidth = area.width - 110;
+            _nameWidth = Mathf.Min(240, area.width - 200 - IconRoom);
+            _recipeWidth = area.width - 110 - IconRoom;
             Controls.Block(area);
             Wheel(area);
             // The box style is see-through; names drawn over the world would show through the list.
@@ -212,6 +215,7 @@ namespace Game.Client
             foreach (var pair in _client.Bag.Materials.ToList())
             {
                 GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
                 if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) _send(_client.PlaceCommand(pair.Key));
                 var crop = _client.CropFrom(pair.Key);
@@ -246,16 +250,17 @@ namespace Game.Client
                 if (GUILayout.Button(action, GUILayout.Width(64))) _send(moveItem(item));
                 GUILayout.EndHorizontal();
             }
-            void Stack(StackKind kind, object definition, string name, int count, string description)
+            void Stack(StackKind kind, object definition, Sprite icon, string name, int count, string description)
             {
                 GUILayout.BeginHorizontal();
+                Icon(icon);
                 GUILayout.Label(new GUIContent($"{name} ×{count}", description), GUILayout.Width(_nameWidth));
                 if (GUILayout.Button(action, GUILayout.Width(64))) _send(moveStack(kind, definition));
                 GUILayout.EndHorizontal();
             }
-            foreach (var pair in contents.Consumables.ToList()) Stack(StackKind.Consumable, pair.Key, pair.Key.Name, pair.Value, pair.Key.Description);
-            foreach (var pair in contents.Materials.ToList()) Stack(StackKind.Material, pair.Key, pair.Key.Name, pair.Value, pair.Key.Description);
-            foreach (var pair in contents.Runes.ToList()) Stack(StackKind.Rune, pair.Key, pair.Key.Name, pair.Value, "");
+            foreach (var pair in contents.Consumables.ToList()) Stack(StackKind.Consumable, pair.Key, Sprites.Icon(pair.Key), pair.Key.Name, pair.Value, pair.Key.Description);
+            foreach (var pair in contents.Materials.ToList()) Stack(StackKind.Material, pair.Key, Sprites.Icon(pair.Key), pair.Key.Name, pair.Value, pair.Key.Description);
+            foreach (var pair in contents.Runes.ToList()) Stack(StackKind.Rune, pair.Key, Sprites.Icon(pair.Key), pair.Key.Name, pair.Value, "");
         }
 
         // Every recipe, with what it takes against what the bag holds, and the station it needs when that is not in
@@ -274,6 +279,7 @@ namespace Game.Client
                 if (station != null) needs += $" · {StationName(station.Value)} 필요";
                 string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
                 GUILayout.BeginHorizontal();
+                Icon(recipe.Item != null ? Sprites.Icon(recipe.Item) : recipe.Consumable != null ? Sprites.Icon(recipe.Consumable) : Sprites.Icon(recipe.Material));
                 GUILayout.Label(new GUIContent($"{name}\n{needs}", RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
                 GUI.enabled = enabled && _client.CanCraft(recipe);
                 if (GUILayout.Button("만들기", GUILayout.Width(64))) _send(_client.CraftCommand(recipe));
@@ -304,6 +310,7 @@ namespace Game.Client
             foreach (var pair in _client.Bag.Consumables.ToList())
             {
                 GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
                 if (GUILayout.Button("마시기", GUILayout.Width(56)))
                 {
@@ -316,11 +323,18 @@ namespace Game.Client
 
         void ItemLabel(Item item)
         {
+            Icon(Sprites.Icon(item.Base));
             var previous = GUI.color;
             GUI.color = Palette.Of(item.Rarity);
             string sockets = item.Sockets.Count == 0 ? "" : " " + string.Concat(item.Sockets.Select(r => r == null ? "○" : "●"));
             GUILayout.Label(new GUIContent(ItemText.Name(item) + sockets, string.Join("\n", ItemText.Describe(item))), GUILayout.Width(_nameWidth));
             GUI.color = previous;
+        }
+
+        static void Icon(Sprite sprite)
+        {
+            var area = GUILayoutUtility.GetRect(IconSize, IconSize, GUILayout.Width(IconSize), GUILayout.Height(IconSize));
+            if (Event.current.type == EventType.Repaint) Sprites.DrawInGui(area, sprite);
         }
 
         // Shown while a rune is picked and the item still has room for it.

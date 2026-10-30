@@ -43,6 +43,7 @@ crashlytics-build.properties
 # .NET dev tools build output
 DevTools/**/bin/
 DevTools/**/obj/
+DevTools/ArtPreview/out/
 
 # OS
 .DS_Store

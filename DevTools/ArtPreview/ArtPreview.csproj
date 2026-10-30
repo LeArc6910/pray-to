@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Draws the game's pixel art (Assets/_Project/Scripts/Client/Art, plain C# with no Unity types) to PNG files,
+       so the art can be looked at and checked without Unity. -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0</TargetFramework>
+    <LangVersion>9.0</LangVersion>
+    <Nullable>disable</Nullable>
+    <RootNamespace>Game.Client</RootNamespace>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="../../Assets/_Project/Scripts/Client/Art/**/*.cs" />
+    <ProjectReference Include="../Game.Core/Game.Core.csproj" />
+  </ItemGroup>
+
+</Project>

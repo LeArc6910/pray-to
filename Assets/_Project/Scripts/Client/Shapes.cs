@@ -1,11 +1,11 @@
 using System;
 using UnityEngine;
-using UnityEngine.Tilemaps;
 
 namespace Game.Client
 {
-    // Stand-in graphics drawn from code until there is art: white shapes tinted by their SpriteRenderer, and two
-    // tiles. Every sprite is one world unit (one tile) across.
+    // Smooth white shapes for effects, tinted by their SpriteRenderer: swings, rings, bursts, telegraphs, health
+    // bars and the touch sticks. Everything that stands in the world is pixel art (Sprites, Art/). Every shape is
+    // one world unit (one tile) across.
     static class Shapes
     {
         const int Size = 64;
@@ -42,31 +42,6 @@ namespace Game.Client
             return sprite;
         }
 
-        public static Tile FloorTile() => MakeTile(new Color32(58, 47, 40, 255), new Color32(66, 54, 46, 255), raised: false);
-
-        public static Tile WallTile() => MakeTile(new Color32(104, 90, 76, 255), new Color32(132, 116, 98, 255), raised: true);
-
-        // Ore veins: rock with flecks in the ore's colour, so they stand out in a wall.
-        public static Tile OreTile(Color32 ore) => MakeTile(new Color32(104, 90, 76, 255), ore, raised: true, flecks: true);
-
-        // Placed objects, on a darker ground so they read as things standing on the floor rather than rock: the
-        // workbench in wood, the furnace grey with fire, the chest in gold-trimmed wood.
-        public static Tile WorkbenchTile() => MakeTile(new Color32(110, 76, 44, 255), Palette.Workbench, raised: true);
-
-        public static Tile FurnaceTile() => MakeTile(new Color32(84, 84, 90, 255), Palette.Furnace, raised: true, flecks: true);
-
-        public static Tile ChestTile() => MakeTile(new Color32(120, 78, 40, 255), Palette.Chest, raised: true);
-
-        // Machines: the drill in steel, the smelter like a hotter furnace, the conveyor a dark belt flat on the floor.
-        public static Tile DrillTile() => MakeTile(new Color32(80, 86, 96, 255), Palette.Drill, raised: true, flecks: true);
-
-        public static Tile SmelterTile() => MakeTile(new Color32(96, 70, 60, 255), Palette.Smelter, raised: true, flecks: true);
-
-        public static Tile ConveyorTile() => MakeTile(Palette.Conveyor, new Color32(110, 110, 120, 255), raised: false);
-
-        // The boss arena's floor, darker and redder so it reads as a different place.
-        public static Tile ArenaTile() => MakeTile(new Color32(52, 34, 34, 255), new Color32(64, 42, 40, 255), raised: false);
-
         static float Radius(float u, float v) => Mathf.Sqrt(u * u + v * v);
 
         // Soft one-pixel edge: 1 inside, 0 outside.
@@ -92,35 +67,6 @@ namespace Game.Client
             texture.SetPixels32(pixels);
             texture.Apply();
             return Sprite.Create(texture, new Rect(0, 0, Size, Size), new Vector2(0.5f, 0.5f), Size);
-        }
-
-        // A 16-pixel tile with a speckled face. Walls get a lighter top edge so they read as raised. Flecks are
-        // bigger, denser specks, for ore.
-        static Tile MakeTile(Color32 dark, Color32 light, bool raised, bool flecks = false)
-        {
-            const int tileSize = 16;
-            var pixels = new Color32[tileSize * tileSize];
-            for (int y = 0; y < tileSize; y++)
-            {
-                for (int x = 0; x < tileSize; x++)
-                {
-                    bool speck = flecks ? ((x / 2 * 5 + y / 2 * 3) % 4) == 0 : ((x * 7 + y * 13) % 11) == 0;
-                    bool top = raised && y >= tileSize - 3;
-                    pixels[y * tileSize + x] = top || speck ? light : dark;
-                }
-            }
-            var texture = new Texture2D(tileSize, tileSize, TextureFormat.RGBA32, false)
-            {
-                filterMode = FilterMode.Point,
-                wrapMode = TextureWrapMode.Clamp,
-            };
-            texture.SetPixels32(pixels);
-            texture.Apply();
-
-            var tile = ScriptableObject.CreateInstance<Tile>();
-            tile.sprite = Sprite.Create(texture, new Rect(0, 0, tileSize, tileSize), new Vector2(0.5f, 0.5f), tileSize);
-            tile.colliderType = Tile.ColliderType.None;
-            return tile;
         }
     }
 }

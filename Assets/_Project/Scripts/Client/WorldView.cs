@@ -8,26 +8,56 @@ using Object = UnityEngine.Object;
 
 namespace Game.Client
 {
-    // Draws what a WorldClient knows: the cave tiles, every entity as a tinted shape with a health bar, swings,
-    // hit flashes, damage numbers, skills (rings, bursts, buff auras, coloured by their tags), and in a boss fight
-    // the telegraphed areas, projectiles, screen shake and banners. Pure presentation; nothing here changes the game.
+    // Draws what a WorldClient knows: the cave tiles, every entity as a pixel-art sprite (Art/) with a shadow and a
+    // health bar, swings, hit flashes, damage numbers, skills (rings, bursts, buff auras, coloured by their tags),
+    // and in a boss fight the telegraphed areas, projectiles, screen shake and banners. Pure presentation; nothing
+    // here changes the game.
     sealed class WorldView : IDisposable
     {
+        enum BodyKind
+        {
+            Player,
+            Monster,
+            Boss,
+        }
+
         sealed class Body
         {
             public Transform Root;
             public SpriteRenderer Shape;
-            public SpriteRenderer Pointer;
+            // The same sprite in white over the shape, for flashes: hit, winding up, charging.
+            public SpriteRenderer Glow;
+            public SpriteRenderer Shadow;
             public SpriteRenderer Swing;
             public SpriteRenderer HealthBack;
             public SpriteRenderer HealthFill;
             // A ring while a buff runs, in the buff's colour.
             public SpriteRenderer Aura;
+            public BodyKind Kind;
+            public string Id;
+            // A player's tunic, a monster's sheet colour, the boss's stone.
+            public Rgba Color;
+            public int Seed;
             public float Diameter;
+            // How far below its centre it stands, and how far above its centre the top of its sprite is.
+            public float Feet;
+            public float Top;
             public float SwingTime;
             public float FlashTime;
             public Vector3 Position;
+            public Vector3 LastPosition;
+            public float Walked;
+            public int Frame = -1;
             public string Name;
+        }
+
+        sealed class Drop
+        {
+            public SpriteRenderer Renderer;
+            public SpriteRenderer Glow;
+            public Vector3 Position;
+            public string Name;
+            public Color Color;
         }
 
         sealed class Mark
@@ -63,16 +93,19 @@ namespace Game.Client
         // Impacts further away than this do not shake the screen.
         const float ShakeRange = 16;
 
-        static readonly Color SelfColor = new Color(0.35f, 0.65f, 1f);
-        static readonly Color AllyColor = new Color(0.4f, 0.9f, 0.55f);
-        static readonly Color SlimeColor = new Color(0.55f, 0.85f, 0.3f);
-        static readonly Color BossColor = new Color(0.62f, 0.56f, 0.5f);
+        // Tunics: blue for you, and a colour per player for the others so they can be told apart.
+        static readonly Rgba SelfTunic = Rgba.Hex("#3F7FD8");
+        static readonly Rgba[] OtherTunics = { Rgba.Hex("#4DB06A"), Rgba.Hex("#E08A3C"), Rgba.Hex("#A070DC"), Rgba.Hex("#3CB8B0") };
+        static readonly Rgba SlimeColor = Rgba.Hex("#8CD94D");
+        static readonly Rgba BossColor = new Rgba(158, 143, 128);
+        static readonly Color DormantTint = new Color(0.6f, 0.6f, 0.62f);
         static readonly Color WindupColor = new Color(1f, 0.3f, 0.2f);
         static readonly Color ChargeColor = new Color(1f, 0.6f, 0.2f);
         static readonly Color DeadColor = new Color(0.5f, 0.5f, 0.5f, 0.45f);
         static readonly Color DangerColor = new Color(1f, 0.25f, 0.2f);
         static readonly Color PathColor = new Color(1f, 0.85f, 0.3f);
         static readonly Color ProjectileColor = new Color(1f, 0.6f, 0.25f);
+        static readonly Color HitFlash = new Color(1, 1, 1, 0.85f);
 
         readonly WorldClient _client;
         readonly Camera _camera;
@@ -81,20 +114,19 @@ namespace Game.Client
         readonly Dictionary<int, Body> _others = new Dictionary<int, Body>();
         readonly Dictionary<int, Mark> _marks = new Dictionary<int, Mark>();
         readonly Dictionary<int, SpriteRenderer> _projectiles = new Dictionary<int, SpriteRenderer>();
-        readonly Dictionary<int, (SpriteRenderer Renderer, string Name, Color Color)> _drops =
-            new Dictionary<int, (SpriteRenderer, string, Color)>();
+        readonly Dictionary<int, Drop> _drops = new Dictionary<int, Drop>();
         readonly Dictionary<int, (BossState State, int Phase, string Name)> _bossesSeen = new Dictionary<int, (BossState, int, string)>();
         readonly List<Floating> _floating = new List<Floating>();
         readonly List<Flash> _flashes = new List<Flash>();
         // Which skill slots of each other player have a buff running, from their snapshot state.
         readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
         readonly Dictionary<int, SpriteRenderer> _crops = new Dictionary<int, SpriteRenderer>();
-        // Per machine tile: an arrow showing which way it faces, and a dot for what a conveyor carries.
-        readonly Dictionary<int, (SpriteRenderer Arrow, SpriteRenderer Load)> _machines = new Dictionary<int, (SpriteRenderer, SpriteRenderer)>();
-        Tilemap _tilemap;
-        TileBase _floorTile;
-        TileBase _arenaTile;
-        readonly Dictionary<TileType, TileBase> _tileSprites = new Dictionary<TileType, TileBase>();
+        // Per machine tile: the part that shows which way it faces (a drill's bit, a smelter's arrow, a conveyor's
+        // moving belt), and the icon of what a conveyor carries.
+        readonly Dictionary<int, (TileType Kind, SpriteRenderer Part, SpriteRenderer Load)> _machines =
+            new Dictionary<int, (TileType, SpriteRenderer, SpriteRenderer)>();
+        Tilemap _ground;
+        Tilemap _objects;
         readonly HashSet<int> _seen = new HashSet<int>();
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
@@ -111,7 +143,7 @@ namespace Game.Client
             _root = new GameObject("World");
             BuildTiles(client);
             AddLight();
-            _self = MakeBody("나", World.PlayerRadius * 2, SelfColor);
+            _self = MakeBody(BodyKind.Player, "나", 0, World.PlayerRadius, SelfTunic);
             var start = client.Position;
             _cameraTarget = new Vector3(start.X, start.Y, _camera.transform.position.z);
             _camera.transform.position = _cameraTarget;
@@ -123,7 +155,7 @@ namespace Game.Client
         public void Render(float tickFraction, float deltaTime)
         {
             var selfPosition = Vec2.Lerp(_client.PreviousPosition, _client.Position, Mathf.Clamp01(tickFraction));
-            Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, SelfColor, deltaTime);
+            Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, Color.white, Color.clear, deltaTime);
             _self.Name = _client.Name;
             int selfBuffs = 0;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
@@ -169,15 +201,14 @@ namespace Game.Client
                 fontSize = 34,
             };
 
-            Label(_self.Position + new Vector3(0, 0.75f, 0), _self.Name, Color.white);
+            Label(_self.Position + new Vector3(0, _self.Top + 0.4f, 0), _self.Name, Color.white);
             foreach (var body in _others.Values)
             {
-                if (!string.IsNullOrEmpty(body.Name)) Label(body.Position + new Vector3(0, body.Diameter * 0.5f + 0.4f, 0), body.Name, Color.white);
+                if (!string.IsNullOrEmpty(body.Name)) Label(body.Position + new Vector3(0, body.Top + 0.4f, 0), body.Name, Color.white);
             }
             foreach (var drop in _drops.Values)
             {
-                var position = drop.Renderer.transform.localPosition;
-                if (Vector3.Distance(position, _self.Position) < 4) Label(position + new Vector3(0, 0.45f, 0), drop.Name, drop.Color);
+                if (Vector3.Distance(drop.Position, _self.Position) < 4) Label(drop.Position + new Vector3(0, 0.5f, 0), drop.Name, drop.Color);
             }
             foreach (var text in _floating)
             {
@@ -214,42 +245,44 @@ namespace Game.Client
                 }
                 if (!_others.TryGetValue(view.Id, out var body))
                 {
-                    string name = view.Kind == EntityKind.Boss ? view.Boss.Id : view.Kind == EntityKind.Monster ? view.Monster.Id : "player";
-                    body = MakeBody(name, view.Radius * 2, ColorOf(view));
+                    body = view.Kind == EntityKind.Boss ? MakeBody(BodyKind.Boss, view.Boss.Id, view.Id, view.Radius, BossColor)
+                        : view.Kind == EntityKind.Monster ? MakeBody(BodyKind.Monster, view.Monster.Id, view.Id, view.Radius, ColorOf(view.Monster))
+                        : MakeBody(BodyKind.Player, "player", view.Id, view.Radius, OtherTunics[view.Id % OtherTunics.Length]);
                     _others[view.Id] = body;
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
 
-                var color = ColorOf(view);
+                var tint = Color.white;
+                var glow = Color.clear;
                 float pulse = 0;
                 if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Windup)
                 {
-                    color = WindupColor;
-                    pulse = 0.12f;
+                    glow = Faded(WindupColor, 0.35f + 0.25f * Mathf.Sin(Time.time * 30));
+                    pulse = 0.06f;
                 }
-                if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) color = ChargeColor;
+                if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) glow = Faded(ChargeColor, 0.45f);
                 if (view.Kind == EntityKind.Boss)
                 {
                     WatchBoss(view);
                     switch (view.BossState)
                     {
                         case BossState.Dormant:
-                            color = Color.Lerp(BossColor, Color.black, 0.4f);
+                            tint = DormantTint;
                             break;
                         case BossState.Telegraph:
-                            color = Color.Lerp(BossColor, Color.white, 0.5f + 0.5f * Mathf.Sin(Time.time * 20));
+                            glow = Faded(Color.white, 0.25f + 0.2f * Mathf.Sin(Time.time * 20));
                             break;
                         case BossState.Charge:
-                            color = ChargeColor;
+                            glow = Faded(ChargeColor, 0.5f);
                             break;
                         case BossState.Roar:
-                            color = WindupColor;
-                            pulse = 0.08f;
+                            glow = Faded(WindupColor, 0.45f);
+                            pulse = 0.05f;
                             break;
                     }
                     if (view.BossState != BossState.Dormant) ActiveBoss = view;
                 }
-                Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, color, deltaTime, pulse, showHealth: view.Kind != EntityKind.Boss);
+                Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, tint, glow, deltaTime, pulse, showHealth: view.Kind != EntityKind.Boss);
                 if (view.IsPlayer)
                 {
                     _buffBits[view.Id] = view.State;
@@ -275,43 +308,58 @@ namespace Game.Client
             {
                 if (_seen.Contains(pair.Key)) continue;
                 Object.Destroy(pair.Value.Renderer.gameObject);
+                if (pair.Value.Glow != null) Object.Destroy(pair.Value.Glow.gameObject);
                 _gone.Add(pair.Key);
             }
             foreach (int id in _gone) _drops.Remove(id);
         }
 
-        // Loot is a small diamond in its rarity's colour, or a dot: orange for a rune, pink for a potion, grey for a
-        // material.
+        static Color Faded(Color color, float alpha) => new Color(color.r, color.g, color.b, alpha);
+
+        // Loot is its icon, bobbing a little; gear better than common has a glow in its rarity's colour under it.
         void DrawDrop(EntityView view)
         {
-            if (!_drops.ContainsKey(view.Id))
+            if (!_drops.TryGetValue(view.Id, out var drop))
             {
-                bool round = view.DropBase == null;
                 var color = view.DropRune != null ? Palette.Rune
                     : view.DropConsumable != null ? Palette.Potion
                     : view.DropMaterial != null ? Palette.Material
                     : Palette.Of(view.DropRarity);
                 string name = view.DropRune?.Name ?? view.DropConsumable?.Name ?? view.DropMaterial?.Name ?? view.DropBase.Name;
-                var renderer = Renderer(_root.transform, "Drop", round ? Shapes.Circle : Shapes.Square, color);
-                renderer.transform.localScale = Vector3.one * (round ? 0.32f : 0.3f);
-                renderer.transform.localRotation = Quaternion.Euler(0, 0, round ? 0 : 45);
-                renderer.transform.localPosition = new Vector3(view.Position.X, view.Position.Y, 0);
-                renderer.sortingOrder = -10;
-                _drops[view.Id] = (renderer, name, color);
+                var icon = view.DropRune != null ? Sprites.Icon(view.DropRune)
+                    : view.DropConsumable != null ? Sprites.Icon(view.DropConsumable)
+                    : view.DropMaterial != null ? Sprites.Icon(view.DropMaterial)
+                    : Sprites.Icon(view.DropBase);
+                drop = new Drop
+                {
+                    Renderer = Renderer(_root.transform, "Drop", icon, Color.white),
+                    Position = new Vector3(view.Position.X, view.Position.Y, 0),
+                    Name = name,
+                    Color = color,
+                };
+                drop.Renderer.sortingOrder = -10;
+                if (view.DropBase != null && view.DropRarity != Rarity.Common)
+                {
+                    drop.Glow = Renderer(_root.transform, "DropGlow", Shapes.Circle, Faded(color, 0.35f));
+                    drop.Glow.transform.localPosition = drop.Position;
+                    drop.Glow.transform.localScale = Vector3.one * 0.8f;
+                    drop.Glow.sortingOrder = -11;
+                }
+                _drops[view.Id] = drop;
             }
+            float bob = 0.06f * Mathf.Sin(Time.time * 3 + view.Id);
+            drop.Renderer.transform.localPosition = drop.Position + new Vector3(0, bob, 0);
         }
 
-        static readonly Dictionary<MonsterDefinition, Color> MonsterColors = new Dictionary<MonsterDefinition, Color>();
+        static readonly Dictionary<MonsterDefinition, Rgba> MonsterColors = new Dictionary<MonsterDefinition, Rgba>();
 
         // A monster's colour comes from its sheet row, so a new monster needs no code here.
-        static Color ColorOf(EntityView view)
+        static Rgba ColorOf(MonsterDefinition monster)
         {
-            if (view.Kind == EntityKind.Boss) return BossColor;
-            if (view.Kind != EntityKind.Monster) return AllyColor;
-            if (!MonsterColors.TryGetValue(view.Monster, out var color))
+            if (!MonsterColors.TryGetValue(monster, out var color))
             {
-                color = ColorUtility.TryParseHtmlString(view.Monster.Color, out var parsed) ? parsed : SlimeColor;
-                MonsterColors[view.Monster] = color;
+                color = ColorUtility.TryParseHtmlString(monster.Color, out var parsed) ? Sprites.ToRgba(parsed) : SlimeColor;
+                MonsterColors[monster] = color;
             }
             return color;
         }
@@ -418,7 +466,7 @@ namespace Game.Client
             return mark;
         }
 
-        // A crop is a dot on its tile that grows and turns from green to the crop's colour, and pulses once ripe.
+        // A crop grows through four drawings on its patch of soil, and sways a little once ripe.
         void DrawCrops()
         {
             _seen.Clear();
@@ -429,18 +477,16 @@ namespace Game.Client
                 _seen.Add(key);
                 if (!_crops.TryGetValue(key, out var renderer))
                 {
-                    renderer = Renderer(_root.transform, "Crop", Shapes.Circle, Palette.Sprout);
-                    renderer.transform.localPosition = new Vector3(crop.X + 0.5f, crop.Y + 0.5f, 0);
+                    renderer = Renderer(_root.transform, "Crop", null, Color.white);
+                    renderer.transform.localPosition = new Vector3(crop.X + 0.5f, crop.Y + 1f / Sprites.PixelsPerUnit, 0);
                     renderer.sortingOrder = -20;
                     _crops[key] = renderer;
                 }
-                float growth = crop.Growth(now);
                 bool ripe = crop.IsRipe(now);
                 // Four steps, as the docs describe: sprout, young, growing, ripe.
-                float step = ripe ? 1 : Mathf.Floor(growth * 3) / 3;
-                float size = 0.25f + 0.4f * step + (ripe ? 0.05f * Mathf.Sin(Time.time * 5) : 0);
-                renderer.transform.localScale = Vector3.one * size;
-                renderer.color = Color.Lerp(Palette.Sprout, Palette.Ripe, step);
+                int stage = ripe ? 3 : Mathf.Min(2, Mathf.FloorToInt(crop.Growth(now) * 3));
+                renderer.sprite = CropSprites[stage];
+                renderer.transform.localScale = new Vector3(1, ripe ? 1 + 0.05f * Mathf.Sin(Time.time * 5 + key) : 1, 1);
             }
 
             _gone.Clear();
@@ -453,30 +499,52 @@ namespace Game.Client
             foreach (int key in _gone) _crops.Remove(key);
         }
 
-        // Each machine's arrow, and the load on each conveyor moving along it toward the front.
+        // Sprites are made on first use, not while the type loads: Unity only makes textures on the main thread.
+        static Sprite[] _cropSprites;
+
+        static Sprite[] CropSprites => _cropSprites ??= new[]
+        {
+            Sprites.Standing("crop/0", () => ItemArt.Crop(0)),
+            Sprites.Standing("crop/1", () => ItemArt.Crop(1)),
+            Sprites.Standing("crop/2", () => ItemArt.Crop(2)),
+            Sprites.Standing("crop/3", () => ItemArt.Crop(3)),
+        };
+
+        // Each machine's facing part, turned the way it faces, and the load on each conveyor moving along it toward
+        // the front. Belts run at their real speed: 2 pixels a frame of the belt, 16 frames a second, is a tile in
+        // half a second.
         void DrawMachines()
         {
             _seen.Clear();
+            int beltFrame = Mathf.FloorToInt(Time.time * 16) % ItemArt.BeltFrames;
             foreach (var machine in _client.Machines())
             {
                 int key = machine.Y * _client.Map.Width + machine.X;
                 _seen.Add(key);
-                if (!_machines.TryGetValue(key, out var parts))
+                if (_machines.TryGetValue(key, out var parts) && parts.Kind != machine.Kind)
                 {
-                    var arrow = Renderer(_root.transform, "Machine", Shapes.Wedge(70), new Color(1, 1, 1, 0.55f));
-                    arrow.transform.localScale = Vector3.one * 0.55f;
-                    arrow.sortingOrder = -15;
-                    var load = Renderer(_root.transform, "Load", Shapes.Circle, Palette.Material);
-                    load.transform.localScale = Vector3.one * 0.3f;
+                    Object.Destroy(parts.Part.gameObject);
+                    Object.Destroy(parts.Load.gameObject);
+                    _machines.Remove(key);
+                }
+                if (!_machines.TryGetValue(key, out parts))
+                {
+                    var part = Renderer(_root.transform, "Machine", null, Color.white);
+                    part.sortingOrder = -15;
+                    var load = Renderer(_root.transform, "Load", null, Color.white);
                     load.sortingOrder = -14;
-                    parts = (arrow, load);
+                    parts = (machine.Kind, part, load);
                     _machines[key] = parts;
                 }
                 var step = Machine.Steps[machine.Direction];
                 var center = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
-                parts.Arrow.transform.localPosition = center;
-                parts.Arrow.transform.localRotation = Quaternion.Euler(0, 0, machine.Direction * 90);
+                parts.Part.sprite = machine.Kind == TileType.Drill ? DrillBitSprite
+                    : machine.Kind == TileType.Conveyor ? BeltSprites[beltFrame]
+                    : ChevronSprite;
+                parts.Part.transform.localPosition = center;
+                parts.Part.transform.localRotation = Quaternion.Euler(0, 0, machine.Direction * 90);
                 parts.Load.enabled = machine.Carried != null;
+                if (machine.Carried != null) parts.Load.sprite = Sprites.Icon(machine.Carried);
                 parts.Load.transform.localPosition = center + new Vector3(step.X, step.Y, 0) * (machine.Progress - 0.5f);
             }
 
@@ -484,12 +552,26 @@ namespace Game.Client
             foreach (var pair in _machines)
             {
                 if (_seen.Contains(pair.Key)) continue;
-                Object.Destroy(pair.Value.Arrow.gameObject);
+                Object.Destroy(pair.Value.Part.gameObject);
                 Object.Destroy(pair.Value.Load.gameObject);
                 _gone.Add(pair.Key);
             }
             foreach (int key in _gone) _machines.Remove(key);
         }
+
+        static Sprite DrillBitSprite => Sprites.Centered("machine/drill", () => ItemArt.DrillBit);
+
+        static Sprite ChevronSprite => Sprites.Centered("machine/chevron", () => ItemArt.Chevron);
+
+        static Sprite[] _beltSprites;
+
+        static Sprite[] BeltSprites => _beltSprites ??= new[]
+        {
+            Sprites.Centered("machine/belt0", () => ItemArt.Belt(0)),
+            Sprites.Centered("machine/belt1", () => ItemArt.Belt(1)),
+            Sprites.Centered("machine/belt2", () => ItemArt.Belt(2)),
+            Sprites.Centered("machine/belt3", () => ItemArt.Belt(3)),
+        };
 
         void DrawProjectiles()
         {
@@ -499,14 +581,14 @@ namespace Game.Client
                 _seen.Add(projectile.Id);
                 if (!_projectiles.TryGetValue(projectile.Id, out var renderer))
                 {
-                    // A player's in the colour of its tags, a little larger than it really is so it reads; an arrow
-                    // is a thin streak pointing the way it flies.
+                    // A player's is a glowing ball in the colour of its tags, a little larger than it really is so it
+                    // reads, or an arrow pointing the way it flies; an enemy's is a spiked ball.
                     bool arrow = projectile.Friendly && (projectile.Tags & SkillTag.Ranged) != 0;
                     var color = projectile.Friendly ? Palette.Of(projectile.Tags) : ProjectileColor;
-                    renderer = Renderer(_root.transform, "Projectile", arrow ? Shapes.Square : Shapes.Circle, color);
-                    renderer.transform.localScale = arrow
-                        ? new Vector3(0.6f, projectile.Radius * 0.8f, 1)
-                        : Vector3.one * (projectile.Radius * (projectile.Friendly ? 2.6f : 2));
+                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : SporeSprite;
+                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : color);
+                    float across = sprite.rect.height / Sprites.PixelsPerUnit;
+                    renderer.transform.localScale = Vector3.one * (arrow ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
                     renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
                     renderer.sortingOrder = 20000;
                     _projectiles[projectile.Id] = renderer;
@@ -523,6 +605,12 @@ namespace Game.Client
             }
             foreach (int id in _gone) _projectiles.Remove(id);
         }
+
+        static Sprite ArrowSprite => Sprites.Centered("shot/arrow", () => ItemArt.Arrow);
+
+        static Sprite OrbSprite => Sprites.Centered("shot/orb", () => ItemArt.Orb);
+
+        static Sprite SporeSprite => Sprites.Centered("shot/spore", () => ItemArt.Spore);
 
         void Show(SimEvent e)
         {
@@ -673,21 +761,25 @@ namespace Game.Client
 
         Body Find(int id) => id == _client.PlayerId ? _self : _others.TryGetValue(id, out var body) ? body : null;
 
-        void Place(Body body, Vec2 position, Vec2 facing, float health, float maxHealth, Color color, float deltaTime, float pulse = 0, bool showHealth = true)
+        // Puts a body where it is this frame: picks its sprite (the way it faces, a step of its walk), tints it
+        // (grey when dormant or dead) and lays the glow over it for flashes, then the swing and health bar.
+        void Place(Body body, Vec2 position, Vec2 facing, float health, float maxHealth, Color tint, Color glow, float deltaTime, float pulse = 0, bool showHealth = true)
         {
+            body.LastPosition = body.Position;
             body.Position = new Vector3(position.X, position.Y, 0);
             body.Root.localPosition = body.Position;
             int order = 10000 - Mathf.RoundToInt(position.Y * 10);
 
             bool dead = health <= 0;
+            Animate(body, facing, deltaTime);
             float scale = 1 + pulse * Mathf.Sin(Time.time * 30);
-            body.Shape.transform.localScale = Vector3.one * (body.Diameter * scale);
-            body.Shape.color = dead ? DeadColor : body.FlashTime > 0 ? Color.white : color;
+            body.Shape.transform.localScale = new Vector3(1, scale, 1);
+            body.Shape.color = dead ? DeadColor : tint;
             body.Shape.sortingOrder = order;
-
-            body.Pointer.transform.localPosition = new Vector3(facing.X, facing.Y, 0) * (body.Diameter * 0.5f);
-            body.Pointer.enabled = !dead;
-            body.Pointer.sortingOrder = order + 1;
+            body.Glow.transform.localScale = body.Shape.transform.localScale;
+            body.Glow.color = dead ? Color.clear : body.FlashTime > 0 ? HitFlash : glow;
+            body.Glow.sortingOrder = order + 1;
+            body.Shadow.enabled = !dead;
 
             body.Swing.enabled = body.SwingTime > 0;
             body.Swing.color = new Color(1, 1, 1, Mathf.Clamp01(body.SwingTime / SwingSeconds) * 0.6f);
@@ -697,8 +789,9 @@ namespace Game.Client
             bool barVisible = showHealth && !dead && share < 0.999f;
             body.HealthBack.enabled = barVisible;
             body.HealthFill.enabled = barVisible;
+            body.HealthBack.transform.localPosition = new Vector3(0, body.Top + 0.15f, 0);
             body.HealthFill.transform.localScale = new Vector3(0.8f * share, 0.08f, 1);
-            body.HealthFill.transform.localPosition = new Vector3(-0.4f + 0.4f * share, body.Diameter * 0.5f + 0.15f, 0);
+            body.HealthFill.transform.localPosition = new Vector3(-0.4f + 0.4f * share, body.Top + 0.15f, 0);
             body.HealthFill.color = share > 0.5f ? new Color(0.4f, 0.9f, 0.4f) : share > 0.25f ? new Color(0.95f, 0.8f, 0.3f) : new Color(0.95f, 0.3f, 0.25f);
             body.HealthBack.sortingOrder = order + 3;
             body.HealthFill.sortingOrder = order + 4;
@@ -707,28 +800,81 @@ namespace Game.Client
             body.FlashTime = Mathf.Max(0, body.FlashTime - deltaTime);
         }
 
-        Body MakeBody(string name, float diameter, Color color)
+        // Players walk in three directions (left is right flipped) while they move and stand still otherwise;
+        // monsters face left or right and bob, faster while they move; the boss breathes.
+        void Animate(Body body, Vec2 facing, float deltaTime)
         {
-            var root = new GameObject(name).transform;
+            float speed = deltaTime > 0 ? Vector3.Distance(body.Position, body.LastPosition) / deltaTime : 0;
+            bool moving = speed > 0.3f && speed < 30;
+            body.Walked = moving ? body.Walked + deltaTime : 0;
+            bool left = facing.X < 0;
+            int frame;
+            var look = Look.Side;
+            switch (body.Kind)
+            {
+                case BodyKind.Player:
+                    look = Mathf.Abs(facing.X) >= Mathf.Abs(facing.Y) ? Look.Side : facing.Y > 0 ? Look.Up : Look.Down;
+                    frame = moving ? Mathf.FloorToInt(body.Walked * 8) % CreatureArt.WalkFrames : 0;
+                    left &= look == Look.Side;
+                    break;
+                case BodyKind.Monster:
+                    frame = Mathf.FloorToInt(Time.time * (moving ? 6 : 3) + body.Seed * 0.37f) % CreatureArt.IdleFrames;
+                    break;
+                default:
+                    frame = Mathf.FloorToInt(Time.time * 1.5f) % CreatureArt.IdleFrames;
+                    break;
+            }
+
+            int code = ((int)look * 16 + frame) * 2 + (left ? 1 : 0);
+            if (code == body.Frame) return;
+            body.Frame = code;
+            string key = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{look}/{frame}";
+            Func<PixelImage> draw = body.Kind switch
+            {
+                BodyKind.Player => () => CreatureArt.Player(look, frame, body.Color),
+                BodyKind.Monster => () => CreatureArt.Monster(body.Id, body.Color, frame),
+                _ => () => CreatureArt.Boss(body.Id, body.Color, frame),
+            };
+            body.Shape.sprite = Sprites.Standing(key, draw);
+            body.Glow.sprite = Sprites.Standing(key + "/white", () => draw().Silhouette());
+            body.Shape.flipX = left;
+            body.Glow.flipX = left;
+            body.Top = -body.Feet + body.Shape.sprite.rect.height / Sprites.PixelsPerUnit;
+        }
+
+        Body MakeBody(BodyKind kind, string id, int seed, float radius, Rgba color)
+        {
+            var root = new GameObject(id).transform;
             root.SetParent(_root.transform, false);
+            float diameter = radius * 2;
+            int shadowWidth = Mathf.Max(6, Mathf.RoundToInt(diameter * Sprites.PixelsPerUnit * 0.9f));
             var body = new Body
             {
                 Root = root,
+                Kind = kind,
+                Id = id,
+                Seed = seed,
+                Color = color,
                 Diameter = diameter,
-                Shape = Renderer(root, "Shape", Shapes.Circle, color),
-                Pointer = Renderer(root, "Pointer", Shapes.Circle, new Color(0.1f, 0.1f, 0.1f, 0.8f)),
+                // Bodies stand a little below their centre, so the round shape the game uses sits around their feet.
+                Feet = radius * 0.8f,
+                Shape = Renderer(root, "Shape", null, Color.white),
+                Glow = Renderer(root, "Glow", null, Color.clear),
+                Shadow = Renderer(root, "Shadow", Sprites.Centered("shadow/" + shadowWidth, () => CreatureArt.Shadow(shadowWidth)), Color.white),
                 Swing = Renderer(root, "Swing", Shapes.Arc, Color.white),
                 HealthBack = Renderer(root, "HealthBack", Shapes.Square, new Color(0, 0, 0, 0.6f)),
                 HealthFill = Renderer(root, "HealthFill", Shapes.Square, Color.green),
                 Aura = Renderer(root, "Aura", Shapes.Ring, Color.clear),
             };
+            body.Shape.transform.localPosition = new Vector3(0, -body.Feet, 0);
+            body.Glow.transform.localPosition = body.Shape.transform.localPosition;
+            body.Shadow.transform.localPosition = new Vector3(0, -body.Feet + 1f / Sprites.PixelsPerUnit, 0);
+            body.Shadow.sortingOrder = -30;
             body.Aura.transform.localScale = Vector3.one * (diameter * 1.7f);
             body.Aura.enabled = false;
-            body.Pointer.transform.localScale = Vector3.one * Mathf.Max(0.18f, diameter * 0.15f);
             // The swing reaches MeleeReach past the edge of the body.
             body.Swing.transform.localScale = Vector3.one * (diameter + World.MeleeReach * 2);
             body.HealthBack.transform.localScale = new Vector3(0.84f, 0.12f, 1);
-            body.HealthBack.transform.localPosition = new Vector3(0, diameter * 0.5f + 0.15f, 0);
             return body;
         }
 
@@ -742,46 +888,61 @@ namespace Game.Client
             return renderer;
         }
 
+        // Two tilemaps: the ground (floor and rock, each tile drawn to match its neighbours) and over it the things
+        // placed on the floor.
         void BuildTiles(WorldClient client)
         {
             var map = client.Map;
             var grid = new GameObject("Grid", typeof(Grid));
             grid.transform.SetParent(_root.transform, false);
-            var tilesObject = new GameObject("Tiles", typeof(Tilemap), typeof(TilemapRenderer));
-            tilesObject.transform.SetParent(grid.transform, false);
+            _ground = AddTilemap(grid.transform, "Ground", -100);
+            _objects = AddTilemap(grid.transform, "Objects", -90);
 
-            _floorTile = Shapes.FloorTile();
-            _arenaTile = Shapes.ArenaTile();
-            _tileSprites[TileType.Wall] = Shapes.WallTile();
-            _tileSprites[TileType.CopperOre] = Shapes.OreTile(Palette.CopperOre);
-            _tileSprites[TileType.IronOre] = Shapes.OreTile(Palette.IronOre);
-            _tileSprites[TileType.Workbench] = Shapes.WorkbenchTile();
-            _tileSprites[TileType.Furnace] = Shapes.FurnaceTile();
-            _tileSprites[TileType.Chest] = Shapes.ChestTile();
-            _tileSprites[TileType.Drill] = Shapes.DrillTile();
-            _tileSprites[TileType.Smelter] = Shapes.SmelterTile();
-            _tileSprites[TileType.Conveyor] = Shapes.ConveyorTile();
-            var tiles = new TileBase[map.Width * map.Height];
+            var ground = new TileBase[map.Width * map.Height];
+            var objects = new TileBase[map.Width * map.Height];
             for (int y = 0; y < map.Height; y++)
             {
-                for (int x = 0; x < map.Width; x++) tiles[y * map.Width + x] = TileAt(x, y);
+                for (int x = 0; x < map.Width; x++)
+                {
+                    ground[y * map.Width + x] = GroundAt(x, y);
+                    objects[y * map.Width + x] = Sprites.Object(map[x, y]);
+                }
             }
-            _tilemap = tilesObject.GetComponent<Tilemap>();
-            _tilemap.SetTilesBlock(new BoundsInt(0, 0, 0, map.Width, map.Height, 1), tiles);
-            tilesObject.GetComponent<TilemapRenderer>().sortingOrder = -100;
+            var bounds = new BoundsInt(0, 0, 0, map.Width, map.Height, 1);
+            _ground.SetTilesBlock(bounds, ground);
+            _objects.SetTilesBlock(bounds, objects);
         }
 
-        TileBase TileAt(int x, int y)
+        static Tilemap AddTilemap(Transform grid, string name, int order)
         {
-            var type = _client.Map[x, y];
-            if (type != TileType.Floor) return _tileSprites.TryGetValue(type, out var solid) ? solid : _tileSprites[TileType.Wall];
-            return Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius ? _arenaTile : _floorTile;
+            var tilesObject = new GameObject(name, typeof(Tilemap), typeof(TilemapRenderer));
+            tilesObject.transform.SetParent(grid, false);
+            tilesObject.GetComponent<TilemapRenderer>().sortingOrder = order;
+            return tilesObject.GetComponent<Tilemap>();
         }
 
-        // Redraws tiles that were dug or built on.
+        TileBase GroundAt(int x, int y)
+        {
+            bool inArena = Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius;
+            return Sprites.Ground(TileArt.GroundAt(_client.Map, x, y, inArena));
+        }
+
+        static readonly (int X, int Y)[] Neighbourhood = { (0, 0), (1, 0), (-1, 0), (0, 1), (0, -1) };
+
+        // Redraws tiles that were dug or built on, and their neighbours, whose edges and shadows depend on them.
         public void UpdateTiles(IEnumerable<TileChange> changes)
         {
-            foreach (var change in changes) _tilemap.SetTile(new Vector3Int(change.X, change.Y, 0), TileAt(change.X, change.Y));
+            var map = _client.Map;
+            foreach (var change in changes)
+            {
+                _objects.SetTile(new Vector3Int(change.X, change.Y, 0), Sprites.Object(map[change.X, change.Y]));
+                foreach (var (dx, dy) in Neighbourhood)
+                {
+                    int x = change.X + dx;
+                    int y = change.Y + dy;
+                    if (map.InBounds(x, y)) _ground.SetTile(new Vector3Int(x, y, 0), GroundAt(x, y));
+                }
+            }
         }
 
         // The project uses URP's 2D renderer, which draws sprites by 2D lights; one global light shows everything.
