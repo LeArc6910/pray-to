@@ -160,7 +160,7 @@ namespace Game.Core
                     if (behavior == MonsterBehavior.Ranged && shotSpeed <= 0) throw new FormatException("ranged 몬스터는 shot_speed 칸을 채워야 합니다.");
                     if (behavior == MonsterBehavior.Charge && chargeSpeed <= 0) throw new FormatException("charge 몬스터는 charge_speed 칸을 채워야 합니다.");
                     string color = row["color"];
-                    if (color.Length > 0 && !IsColor(color)) throw new FormatException($"color '{color}'는 #RRGGBB로 적습니다.");
+                    if (color.Length > 0 && !SheetValues.IsColor(color)) throw new FormatException($"color '{color}'는 #RRGGBB로 적습니다.");
 
                     monsters.Add(new MonsterDefinition(
                         id,
@@ -204,9 +204,6 @@ namespace Game.Core
         }
 
         static float Number(CsvRow row, string column) => row[column].Length == 0 ? 0 : SheetValues.ParseDecimal(row[column], column);
-
-        static bool IsColor(string text) =>
-            text.Length == 7 && text[0] == '#' && text.Skip(1).All(c => Uri.IsHexDigit(c));
 
         static int Positive(int value, string label) =>
             value > 0 ? value : throw new FormatException($"{label}는 0보다 커야 합니다.");

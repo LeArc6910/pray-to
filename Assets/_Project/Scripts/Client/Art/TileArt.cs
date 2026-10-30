@@ -81,6 +81,7 @@ namespace Game.Client
             TileType.Drill => Drill,
             TileType.Smelter => Smelter,
             TileType.Conveyor => ConveyorFrame,
+            TileType.Torch => Torch,
             _ => null,
         };
 
@@ -488,6 +489,39 @@ namespace Game.Client
             ".ommmmmmmmmmmmmo",
             "..ooooooooooooo.",
             "..______________");
+
+        static readonly Dictionary<char, Rgba> TorchPalette = new Dictionary<char, Rgba>
+        {
+            ['o'] = Rgba.Hex("#1A120C"),
+            ['h'] = Rgba.Hex("#9A6A3C"),
+            ['H'] = Rgba.Hex("#6A4424"),
+            ['g'] = Rgba.Hex("#9A9AA4"),
+            ['G'] = Rgba.Hex("#62626E"),
+            ['r'] = Rgba.Hex("#D8502A"),
+            ['f'] = Rgba.Hex("#FF9A30"),
+            ['F'] = Rgba.Hex("#FFD860"),
+            ['w'] = Rgba.Hex("#FFF6D0"),
+            ['_'] = Shadow,
+        };
+
+        // A post with a stone cup of burning slime gel. Its light comes from tiles.csv, not from the drawing.
+        static readonly PixelImage Torch = PixelImage.FromRows(TorchPalette,
+            "................",
+            ".......r........",
+            "......rfr.......",
+            ".....rfFfr......",
+            ".....fFwFf......",
+            ".....fFwwF......",
+            "....ogGGGgo.....",
+            ".....oGGGo......",
+            "......hH........",
+            "......hH........",
+            "......hH........",
+            "......hH........",
+            "......hH........",
+            ".....ohHo.......",
+            ".....oooo.......",
+            "....______......");
 
         static readonly Dictionary<char, Rgba> MetalPalette = new Dictionary<char, Rgba>
         {

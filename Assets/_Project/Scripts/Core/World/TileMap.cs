@@ -17,6 +17,8 @@ namespace Game.Core
         Drill,
         Smelter,
         Conveyor,
+        // Lights the cave around it (tiles.csv light).
+        Torch,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

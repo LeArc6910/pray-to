@@ -7,9 +7,13 @@ namespace Game.Core
     // A tile that can be dug: how many hits it takes and the material it gives, plus sometimes one extra.
     public sealed class TileDefinition
     {
-        internal TileDefinition(TileType tile, string name, int hardness, MaterialDefinition material, int count, MaterialDefinition extra, float extraChance, bool drillable)
+        internal TileDefinition(
+            TileType tile, string name, int hardness, MaterialDefinition material, int count, MaterialDefinition extra, float extraChance, bool drillable,
+            float light = 0, string lightColor = "")
         {
             Drillable = drillable;
+            Light = light;
+            LightColor = lightColor;
             Tile = tile;
             Name = name;
             Hardness = hardness;
@@ -30,6 +34,10 @@ namespace Game.Core
         public float ExtraChance { get; }
         // An ore vein a drill can pull Material from without using it up.
         public bool Drillable { get; }
+        // How far it lights the dark caves around it, in tiles; 0 for none. Only the view uses it.
+        public float Light { get; }
+        // #RRGGBB, or empty for the warm light of a flame.
+        public string LightColor { get; }
     }
 
     // A machine's numbers: seconds per ore, per tile moved or per smelt, and how much it holds. Docs/Automation.md.
@@ -156,7 +164,11 @@ namespace Game.Core
                         extraChance = Percent(row["extra_chance"], "extra_chance");
                     }
                     bool drillable = row["drill"].Length > 0 && row["drill"].ToLowerInvariant() == "yes";
-                    tiles.Add(new TileDefinition(tile, name, hardness, material, count, extra, extraChance, drillable));
+                    float light = row["light"].Length > 0 ? SheetValues.ParseDecimal(row["light"], "light") : 0;
+                    if (light < 0 || light > MaxLight) throw new FormatException($"light는 0~{MaxLight} 사이의 타일 수입니다.");
+                    string lightColor = row["light_color"];
+                    if (lightColor.Length > 0 && !SheetValues.IsColor(lightColor)) throw new FormatException($"light_color '{lightColor}'는 #RRGGBB로 적습니다.");
+                    tiles.Add(new TileDefinition(tile, name, hardness, material, count, extra, extraChance, drillable, light, lightColor));
                 }
                 catch (FormatException e)
                 {
@@ -165,6 +177,9 @@ namespace Game.Core
             }
             return new TileData(tiles, crops, machines, errors);
         }
+
+        // The view lights at most this far around a tile; more would not fit its light map.
+        const float MaxLight = 12;
 
         static readonly TileType[] MachineTiles = { TileType.Drill, TileType.Smelter, TileType.Conveyor };
 

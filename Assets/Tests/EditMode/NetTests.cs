@@ -417,6 +417,7 @@ namespace Game.Core.Tests
             session.Tick(2);
 
             Assert.AreEqual(2, alice.Bag.CountOf(spore), "HostConfig.StarterMaterials");
+            Assert.AreEqual(6, alice.Bag.CountOf(Gear.Data.FindMaterial("torch")), "torches for the dark");
             Assert.AreSame(mushroom, alice.CropFrom(spore));
             session.Send(1, alice.PlantCommand(mushroom));
             session.Tick(2);

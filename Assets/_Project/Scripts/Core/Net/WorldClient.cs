@@ -201,6 +201,8 @@ namespace Game.Core
         public string RefusedReason { get; private set; }
         public int PlayerId { get; private set; }
         public TileMap Map { get; private set; }
+        // What the tiles do (tiles.csv); null when the client was made without the sheet.
+        public TileData Tiles => _tiles;
         // Where the boss's arena is, known from the seed like the rest of the map.
         public Vec2 Arena { get; private set; }
         public float ArenaRadius { get; private set; }

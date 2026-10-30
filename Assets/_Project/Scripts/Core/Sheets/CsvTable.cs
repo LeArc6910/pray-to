@@ -154,5 +154,9 @@ namespace Game.Core
 
         public static bool IsValidId(string id) =>
             id.Length > 0 && id.All(c => c < 128 && (char.IsLetterOrDigit(c) || c == '_' || c == '-'));
+
+        // #RRGGBB.
+        public static bool IsColor(string text) =>
+            text.Length == 7 && text[0] == '#' && text.Skip(1).All(c => Uri.IsHexDigit(c));
     }
 }

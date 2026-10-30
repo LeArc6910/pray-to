@@ -19,4 +19,5 @@ drill,drill,1,iron_bar:4|copper_ore:6,Workbench
 smelter,smelter,1,iron_bar:3|stone:12,Workbench
 conveyor,conveyor,4,iron_bar:1|stone:2,Workbench
 healing_potion,healing_potion,1,slime_gel:3,
+torch,torch,4,stone:1|slime_gel:1,
 roasted_mushroom,roasted_mushroom,1,mushroom:2,Furnace

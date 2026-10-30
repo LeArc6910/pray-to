@@ -12,6 +12,7 @@ namespace Game.Core.Tests
         static readonly MaterialDefinition IronBar = Gear.Data.FindMaterial("iron_bar");
         static readonly MaterialDefinition ChestItem = Gear.Data.FindMaterial("chest");
         static readonly MaterialDefinition WorkbenchItem = Gear.Data.FindMaterial("workbench");
+        static readonly MaterialDefinition TorchItem = Gear.Data.FindMaterial("torch");
         static readonly ConsumableDefinition Potion = Gear.Data.FindConsumable("healing_potion");
 
         static Recipe RecipeFor(string id) => Gear.Data.Recipes.Single(r => r.Id == id);
@@ -46,6 +47,44 @@ namespace Game.Core.Tests
             Assert.AreEqual(TileType.Furnace, RecipeFor("iron_bar").Station);
             Assert.IsTrue(RecipeFor("iron_sword").Ingredients.Any(i => i.Material == IronBar));
             Assert.AreEqual(TileType.Workbench, WorkbenchItem.Places);
+        }
+
+        [Test]
+        public void TorchesAreMadeByHandAndLightTheCave()
+        {
+            Assert.IsNull(RecipeFor("torch").Station, "light is needed before any station");
+            Assert.AreEqual(4, RecipeFor("torch").Count);
+            Assert.AreEqual(TileType.Torch, TorchItem.Places);
+            var torch = Tiles.Shipped.Find(TileType.Torch);
+            Assert.Greater(torch.Light, 0);
+            Assert.AreEqual(0, Tiles.Shipped.Find(TileType.Wall).Light, "rock gives no light");
+            Assert.Greater(Tiles.Shipped.Find(TileType.Furnace).Light, 0, "fire does");
+
+            var world = Room(out var player);
+            player.Inventory.AddMaterial(TorchItem);
+            Assert.IsTrue(world.PlaceTile(player.Id, TorchItem));
+            Assert.AreEqual(TileType.Torch, world.Map[6, 5]);
+            Swing(world, player, 1);
+            Assert.AreEqual(TileType.Floor, world.Map[6, 5]);
+            Assert.AreEqual(1, player.Inventory.CountOf(TorchItem));
+        }
+
+        [Test]
+        public void LightColumnsAreChecked()
+        {
+            var data = TileSheet.Parse(
+                "tile,name,hardness,material,count,light,light_color\n" +
+                "Torch,횃불,1,torch,1,40,\n" +
+                "Furnace,화로,1,furnace,1,3,orange\n" +
+                "Chest,상자,1,chest,1,,\n",
+                Gear.Data);
+
+            Assert.AreEqual(2, data.Errors.Count, string.Join("\n", data.Errors));
+            StringAssert.Contains("2행", data.Errors[0]);
+            StringAssert.Contains("light", data.Errors[0]);
+            StringAssert.Contains("3행", data.Errors[1]);
+            StringAssert.Contains("light_color", data.Errors[1]);
+            Assert.AreEqual(0, data.Find(TileType.Chest).Light, "an empty light column is no light");
         }
 
         [Test]

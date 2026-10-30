@@ -1,10 +1,11 @@
-tile,name,hardness,material,count,extra,extra_chance,drill
-Wall,돌벽,3,stone,1,mushroom_spore,8,
-CopperOre,구리 광맥,5,copper_ore,1,,,yes
-IronOre,철 광맥,8,iron_ore,1,,,yes
-Workbench,작업대,1,workbench,1,,,
-Furnace,화로,1,furnace,1,,,
-Chest,상자,1,chest,1,,,
-Drill,채굴기,1,drill,1,,,
-Smelter,제련기,1,smelter,1,,,
-Conveyor,운반 벨트,1,conveyor,1,,,
+tile,name,hardness,material,count,extra,extra_chance,drill,light,light_color
+Wall,돌벽,3,stone,1,mushroom_spore,8,,,
+CopperOre,구리 광맥,5,copper_ore,1,,,yes,,
+IronOre,철 광맥,8,iron_ore,1,,,yes,,
+Workbench,작업대,1,workbench,1,,,,,
+Furnace,화로,1,furnace,1,,,,3.5,#FF9A48
+Chest,상자,1,chest,1,,,,,
+Drill,채굴기,1,drill,1,,,,,
+Smelter,제련기,1,smelter,1,,,,4,#FF8A3C
+Conveyor,운반 벨트,1,conveyor,1,,,,,
+Torch,횃불,1,torch,1,,,,6.5,#FFC27A

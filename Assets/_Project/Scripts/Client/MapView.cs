@@ -184,6 +184,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Drill) return Palette.Drill;
             if (_map[x, y] == TileType.Smelter) return Palette.Smelter;
             if (_map[x, y] == TileType.Conveyor) return Palette.Conveyor;
+            if (_map[x, y] == TileType.Torch) return Palette.Torch;
             if (_map.IsSolid(x, y)) return Wall;
             return Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius ? ArenaFloor : Floor;
         }

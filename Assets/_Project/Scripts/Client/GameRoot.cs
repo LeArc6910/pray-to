@@ -477,6 +477,8 @@ namespace Game.Client
                 _confirmDelete = !_confirmDelete;
             }
             GUILayout.EndHorizontal();
+            GUILayout.Space(4);
+            Settings.Darkness = GUILayout.Toggle(Settings.Darkness, " 동굴 어둠과 빛 (끄면 어디나 밝다)");
             GUILayout.Space(8);
 
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success

@@ -10,8 +10,8 @@ namespace Game.Client
 {
     // Draws what a WorldClient knows: the cave tiles, every entity as a pixel-art sprite (Art/) with a shadow and a
     // health bar, swings, hit flashes, damage numbers, skills (rings, bursts, buff auras, coloured by their tags),
-    // and in a boss fight the telegraphed areas, projectiles, screen shake and banners. Pure presentation; nothing
-    // here changes the game.
+    // the dark of the caves and the lights in it, and in a boss fight the telegraphed areas, projectiles, screen
+    // shake and banners. Pure presentation; nothing here changes the game.
     sealed class WorldView : IDisposable
     {
         enum BodyKind
@@ -92,6 +92,12 @@ namespace Game.Client
         const float FlashLife = 0.35f;
         // Impacts further away than this do not shake the screen.
         const float ShakeRange = 16;
+        // The dark is a square of this many tiles around the camera, wider than any screen shows. It covers what
+        // stands in the world; projectiles, telegraphs and skill effects are drawn over it so they show in the dark.
+        const int DarkSize = 64;
+        const int DarkOrder = 15000;
+        // How far a glowing shot lights its way.
+        const float ShotLight = 2.2f;
 
         // Tunics: blue for you, and a colour per player for the others so they can be told apart.
         static readonly Rgba SelfTunic = Rgba.Hex("#3F7FD8");
@@ -127,6 +133,13 @@ namespace Game.Client
             new Dictionary<int, (TileType, SpriteRenderer, SpriteRenderer)>();
         Tilemap _ground;
         Tilemap _objects;
+        readonly LightMap _lightMap = new LightMap(DarkSize);
+        readonly List<LightSource> _lights = new List<LightSource>();
+        readonly WorldLights _worldLights;
+        readonly Func<int, int, float> _arenaGlow;
+        Texture2D _darkTexture;
+        Color32[] _darkPixels;
+        SpriteRenderer _dark;
         readonly HashSet<int> _seen = new HashSet<int>();
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
@@ -143,6 +156,9 @@ namespace Game.Client
             _root = new GameObject("World");
             BuildTiles(client);
             AddLight();
+            _worldLights = new WorldLights(client.Tiles);
+            _arenaGlow = WorldLights.ArenaAmbient(client.Arena, client.ArenaRadius);
+            BuildDark();
             _self = MakeBody(BodyKind.Player, "나", 0, World.PlayerRadius, SelfTunic);
             var start = client.Position;
             _cameraTarget = new Vector3(start.X, start.Y, _camera.transform.position.z);
@@ -183,6 +199,7 @@ namespace Game.Client
             _shake *= Mathf.Exp(-10 * deltaTime);
             var jolt = (Vector3)(UnityEngine.Random.insideUnitCircle * _shake);
             _camera.transform.position = _cameraTarget + jolt;
+            UpdateDark(selfPosition);
         }
 
         // Names, damage numbers and banners. Call from OnGUI.
@@ -229,6 +246,7 @@ namespace Game.Client
         public void Dispose()
         {
             if (_root != null) Object.Destroy(_root);
+            if (_darkTexture != null) Object.Destroy(_darkTexture);
         }
 
         void DrawEntities(float deltaTime)
@@ -452,8 +470,8 @@ namespace Game.Client
                 Edge = Renderer(root, "Edge", edge, Color.clear),
                 Fill = Renderer(root, "Fill", fill, Color.clear),
             };
-            mark.Edge.sortingOrder = -50;
-            mark.Fill.sortingOrder = -49;
+            mark.Edge.sortingOrder = DarkOrder + 10;
+            mark.Fill.sortingOrder = DarkOrder + 11;
             if (hazard.Shape == HazardShape.Line)
             {
                 mark.Edge.transform.localScale = new Vector3(hazard.Size, hazard.Width, 1);
@@ -946,7 +964,8 @@ namespace Game.Client
         }
 
         // The project uses URP's 2D renderer, which draws sprites by 2D lights; one global light shows everything.
-        // Darker caves with a light around each player can come later.
+        // The dark of the caves is not done with 2D lights but with the overlay below, which works the same in a
+        // browser, lets walls block light, and leaves telegraphs bright.
         void AddLight()
         {
             var lightObject = new GameObject("Global Light");
@@ -956,6 +975,56 @@ namespace Game.Client
             light.lightType = Light2D.LightType.Global;
             light.intensity = 1;
             lightObject.SetActive(true);
+        }
+
+        void BuildDark()
+        {
+            _darkTexture = new Texture2D(DarkSize, DarkSize, TextureFormat.RGBA32, false)
+            {
+                // Smooth between tile centres, so light falls off softly instead of in squares.
+                filterMode = FilterMode.Bilinear,
+                wrapMode = TextureWrapMode.Clamp,
+            };
+            _darkPixels = new Color32[DarkSize * DarkSize];
+            // One texel a world unit, so texel centres sit on tile centres when the corner is on a tile corner.
+            var sprite = Sprite.Create(_darkTexture, new Rect(0, 0, DarkSize, DarkSize), Vector2.zero, 1, 0, SpriteMeshType.FullRect);
+            _dark = Renderer(_root.transform, "Dark", sprite, Color.white);
+            _dark.sortingOrder = DarkOrder;
+        }
+
+        // Every player carries a light, burning tiles (tiles.csv light) and glowing shots light their surroundings,
+        // and the boss arena glows. Off in the menu, everything is lit.
+        void UpdateDark(Vec2 self)
+        {
+            _dark.enabled = Settings.Darkness;
+            if (!_dark.enabled) return;
+            int left = Mathf.FloorToInt(_cameraTarget.x) - DarkSize / 2;
+            int bottom = Mathf.FloorToInt(_cameraTarget.y) - DarkSize / 2;
+            _lights.Clear();
+            _lights.Add(WorldLights.Carried(self));
+            foreach (var body in _others.Values)
+            {
+                if (body.Kind == BodyKind.Player) _lights.Add(WorldLights.Carried(new Vec2(body.Position.x, body.Position.y)));
+            }
+            _worldLights.AddTiles(_lights, _client.Map, left, bottom, DarkSize, Time.time);
+            foreach (var shot in _projectiles.Values)
+            {
+                if (shot.sprite == ArrowSprite) continue;
+                var at = shot.transform.localPosition;
+                _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, Sprites.ToRgba(shot.color), tints: true));
+            }
+            _lightMap.Compute(_client.Map, left, bottom, _lights, _arenaGlow);
+            for (int j = 0; j < DarkSize; j++)
+            {
+                for (int i = 0; i < DarkSize; i++)
+                {
+                    var o = _lightMap.Overlay(i, j);
+                    _darkPixels[j * DarkSize + i] = new Color32(o.R, o.G, o.B, o.A);
+                }
+            }
+            _darkTexture.SetPixels32(_darkPixels);
+            _darkTexture.Apply(false);
+            _dark.transform.localPosition = new Vector3(left, bottom, 0);
         }
 
         void Label(Vector3 world, string text, Color color)

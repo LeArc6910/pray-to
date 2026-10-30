@@ -29,7 +29,7 @@ namespace Game.Core
         // One entry per consumable handed out on joining. Ids the sheet does not have are skipped.
         public string[] StarterConsumables { get; set; } = { "healing_potion", "healing_potion", "healing_potion" };
         // One entry per material handed out on joining, likewise.
-        public string[] StarterMaterials { get; set; } = { "mushroom_spore", "mushroom_spore" };
+        public string[] StarterMaterials { get; set; } = { "mushroom_spore", "mushroom_spore", "torch", "torch", "torch", "torch", "torch", "torch" };
     }
 
     public readonly struct Outgoing

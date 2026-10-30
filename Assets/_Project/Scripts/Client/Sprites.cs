@@ -21,7 +21,7 @@ namespace Game.Client
         static readonly Dictionary<TileType, Tile> Objects = new Dictionary<TileType, Tile>();
         static readonly TileType[] ObjectTypes =
         {
-            TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor,
+            TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Torch,
         };
 
         // A sprite made from the drawing the first time its key is asked for. The pivot is in the sprite's own
