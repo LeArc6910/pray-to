@@ -1033,6 +1033,7 @@ namespace Game.Client
         {
             _dark.enabled = Settings.Darkness;
             if (!_dark.enabled) return;
+            var timer = System.Diagnostics.Stopwatch.StartNew();
             float halfHeight = _camera.orthographicSize;
             int needed = Mathf.CeilToInt(Mathf.Max(halfHeight, halfHeight * _camera.aspect) * 2) + 8;
             if (needed > _lightMap.Size) BuildDark(needed);
@@ -1064,6 +1065,7 @@ namespace Game.Client
             _darkTexture.SetPixels32(_darkPixels);
             _darkTexture.Apply(false);
             _dark.transform.localPosition = new Vector3(left, bottom, 0);
+            DevInfo.DarkTime((float)timer.Elapsed.TotalMilliseconds);
         }
 
         void Label(Vector3 world, string text, Color color)

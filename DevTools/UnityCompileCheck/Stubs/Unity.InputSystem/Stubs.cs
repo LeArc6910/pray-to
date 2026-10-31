@@ -13,6 +13,7 @@ namespace UnityEngine.InputSystem.Controls
     {
         public bool isPressed => false;
         public bool wasPressedThisFrame => false;
+        public bool wasReleasedThisFrame => false;
     }
 
     public class KeyControl : ButtonControl

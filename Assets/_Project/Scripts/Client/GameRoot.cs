@@ -105,6 +105,7 @@ namespace Game.Client
 
         void Update()
         {
+            DevInfo.Frame(Time.unscaledDeltaTime);
             Controls.UpdateTouches();
             _camera.orthographicSize = ViewHalfHeight(Screen.width, Screen.height);
             if (_endReason != null)
@@ -116,6 +117,7 @@ namespace Game.Client
             if (_map != null && Controls.MapPressed())
             {
                 _map.FullOpen = !_map.FullOpen;
+                DevInfo.Note(_map.FullOpen ? "지도 열림" : "지도 닫힘");
             }
             else if (Controls.LeavePressed())
             {
@@ -139,6 +141,7 @@ namespace Game.Client
             {
                 _inventory.Open = !_inventory.Open;
                 _dropFocus = true;
+                DevInfo.Note(_inventory.Open ? "가방 열림" : "가방 닫힘");
             }
             ReadSkillPress();
 
@@ -423,6 +426,13 @@ namespace Game.Client
         void OnGUI()
         {
             Ui.Begin();
+            DevInfo.Read(Event.current);
+            DrawScreen();
+            DevInfo.Draw();
+        }
+
+        void DrawScreen()
+        {
             if (_dropFocus)
             {
                 GUIUtility.keyboardControl = 0;
@@ -529,6 +539,8 @@ namespace Game.Client
                 Sounds.Play(Sound.Click);
             }
             GUILayout.EndHorizontal();
+            // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
+            if (GUILayout.Button($"개발 정보: {(Settings.DevInfo ? "켜짐" : "꺼짐")}")) Settings.DevInfo = !Settings.DevInfo;
             GUILayout.Space(8);
 
             GUI.enabled = ready;
