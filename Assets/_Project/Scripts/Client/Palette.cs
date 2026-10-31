@@ -37,6 +37,7 @@ namespace Game.Client
             if ((tags & SkillTag.Fire) != 0) return new Color(1f, 0.5f, 0.15f);
             if ((tags & SkillTag.Cold) != 0) return new Color(0.55f, 0.85f, 1f);
             if ((tags & SkillTag.Lightning) != 0) return new Color(1f, 0.95f, 0.4f);
+            if ((tags & SkillTag.Summon) != 0) return new Color(0.45f, 0.9f, 0.8f);
             if ((tags & SkillTag.Magic) != 0) return new Color(0.75f, 0.55f, 1f);
             if ((tags & SkillTag.Melee) != 0) return new Color(0.9f, 0.9f, 0.95f);
             return new Color(1f, 0.8f, 0.35f);

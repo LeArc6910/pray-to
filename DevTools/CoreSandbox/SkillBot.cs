@@ -46,6 +46,7 @@ namespace CoreSandbox
                     SkillKind.Nova => world.Enemies.Any(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) <= skill.Radius + e.Definition.Radius)
                         || world.Bosses.Any(b => !b.IsDead && b.State != BossState.Dormant && Vec2.Distance(b.Position, player.Position) <= skill.Radius + b.Definition.Radius),
                     SkillKind.Projectile => fighting && toTarget.Length <= skill.Range,
+                    SkillKind.Summon => fighting && toTarget.Length <= skill.Range,
                     _ => fighting && toTarget.Length <= 4,
                 };
                 if (worth) world.UseSkill(player.Id, slot, toTarget);

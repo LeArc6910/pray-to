@@ -153,6 +153,37 @@ namespace Game.Core
         internal HashSet<int> ChargeHits { get; } = new HashSet<int>();
     }
 
+    // A spirit a summon skill called. It follows its player, goes after enemies near them and lasts the skill's
+    // duration; nothing can hurt it. Its hits count as the player's. See Docs/Classes.md.
+    public sealed class Minion
+    {
+        internal Minion(int id, int ownerId, int slot, SkillDefinition skill, int index, Vec2 position)
+        {
+            Id = id;
+            OwnerId = ownerId;
+            Slot = slot;
+            Skill = skill;
+            Index = index;
+            Position = position;
+            TicksLeft = skill.DurationTicks;
+        }
+
+        public int Id { get; }
+        public int OwnerId { get; }
+        // The skill slot that called it, and the skill.
+        public int Slot { get; }
+        public SkillDefinition Skill { get; }
+        // Which of the skill's spirits it is: where it waits around its player.
+        public int Index { get; }
+        public Vec2 Position { get; internal set; }
+        public Vec2 Facing { get; internal set; } = new Vec2(0, -1);
+        public int TicksLeft { get; internal set; }
+        // The enemy or boss it is after, or 0.
+        public int TargetId { get; internal set; }
+
+        internal int AttackCooldown { get; set; }
+    }
+
     public enum SimEventType : byte
     {
         // A player attacked or an enemy struck; Direction is where. For a player, Amount is the BasicAttackKind.

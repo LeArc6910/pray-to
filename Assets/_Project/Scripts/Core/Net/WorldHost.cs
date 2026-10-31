@@ -340,7 +340,11 @@ namespace Game.Core
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
                     b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, (byte)b.State, b.Phase));
-            var shownSoFar = players.Concat(bosses).ToList();
+            var minions = World.Minions
+                .Where(m => InView(m.Position))
+                .Select(m => new EntityState(
+                    m.Id, EntityKind.Minion, IndexOf(_classes?.Skills, m.Skill), m.Position, m.Facing, m.TicksLeft, m.Skill.DurationTicks, 0));
+            var shownSoFar = players.Concat(bosses).Concat(minions).ToList();
             var enemies = World.Enemies
                 .Where(e => InView(e.Position))
                 .OrderBy(e => Distance(e.Position))

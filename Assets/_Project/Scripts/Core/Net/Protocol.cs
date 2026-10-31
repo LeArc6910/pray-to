@@ -28,7 +28,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.15.0";
+        public const string Version = "0.16.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -435,6 +435,9 @@ namespace Game.Core
         // Ground loot. Type is the item base's index and State its rarity, or for a rune the rune's index and
         // State RuneDrop.
         Drop,
+        // A player's summoned spirit. Type is its skill's index in the class data; Health counts down the ticks it
+        // has left, from MaxHealth.
+        Minion,
     }
 
     public static class DropState

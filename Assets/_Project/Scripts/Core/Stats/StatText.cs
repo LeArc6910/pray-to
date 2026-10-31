@@ -82,7 +82,7 @@ namespace Game.Core
                     parts.Add($"둘레 {Number(skill.Radius)}칸");
                     break;
                 case SkillKind.Projectile:
-                    parts.Add($"피해 {skill.Damage}%");
+                    parts.Add(skill.Count > 1 ? $"피해 {skill.Damage}% × {skill.Count}발" : $"피해 {skill.Damage}%");
                     parts.Add($"사거리 {Number(skill.Range)}칸");
                     if (skill.Radius > 0) parts.Add($"폭발 {Number(skill.Radius)}칸");
                     break;
@@ -90,6 +90,11 @@ namespace Game.Core
                     var effects = skill.Modifiers.Select(StatText.Describe).ToList();
                     if (skill.Grants != SkillTag.None) effects.Add($"모든 공격에 {StatText.TagNames(skill.Grants)} 태그");
                     parts.Add($"{Number(skill.Duration)}초 동안 {string.Join(", ", effects)}");
+                    break;
+                case SkillKind.Summon:
+                    parts.Add($"{skill.Count}마리 · {Number(skill.Duration)}초");
+                    parts.Add($"한 번에 피해 {skill.Damage}%");
+                    parts.Add($"{Number(skill.Range)}칸 안의 적");
                     break;
             }
             parts.Add($"재사용 {Number(skill.Cooldown)}초");

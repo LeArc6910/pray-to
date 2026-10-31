@@ -12,6 +12,8 @@ namespace Game.Core
         Projectile,
         // Puts modifiers and tags on the player for a while.
         Buff,
+        // Calls spirits that fight beside the player for a while (Minion).
+        Summon,
     }
 
     public sealed class SkillDefinition
@@ -30,7 +32,8 @@ namespace Game.Core
             float duration,
             IReadOnlyList<Modifier> modifiers,
             SkillTag grants,
-            string description)
+            string description,
+            int count = 1)
         {
             Id = id;
             Name = name;
@@ -46,6 +49,7 @@ namespace Game.Core
             Modifiers = modifiers;
             Grants = grants;
             Description = description;
+            Count = count;
         }
 
         public string Id { get; }
@@ -53,17 +57,20 @@ namespace Game.Core
         public ClassDefinition Class { get; }
         public SkillKind Kind { get; }
         public SkillTag Tags { get; }
-        // Percent of the player's damage for the skill's tags.
+        // Percent of the player's damage for the skill's tags: for a summon, each spirit's every hit.
         public int Damage { get; }
         // Seconds.
         public float Cooldown { get; }
         // A nova's reach, or how wide a projectile bursts (0: only what it hits).
         public float Radius { get; }
-        // A projectile's tiles per second and how far it flies.
+        // A projectile's tiles per second and how far it flies. For a summon, how fast its spirits move and how far
+        // from the player they go after enemies.
         public float Speed { get; }
         public float Range { get; }
-        // Seconds a buff lasts.
+        // Seconds a buff or a summon's spirits last.
         public float Duration { get; }
+        // How many projectiles fly at once, fanned out (1 for a single one), or how many spirits a summon calls.
+        public int Count { get; }
         public IReadOnlyList<Modifier> Modifiers { get; }
         // Tags a buff adds to all of the player's attacks and skills.
         public SkillTag Grants { get; }
@@ -150,6 +157,8 @@ namespace Game.Core
     {
         public const string ClassesFile = "classes.csv";
         public const string SkillsFile = "skills.csv";
+        // Most projectiles in one volley, or spirits in one summon.
+        public const int MaxCount = 8;
 
         public static ClassData Parse(string classesCsv, string skillsCsv)
         {
@@ -222,7 +231,8 @@ namespace Game.Core
                         Number(row, "duration"),
                         FixedModifiers(row["modifiers"]),
                         ParseTags(row["grants"]),
-                        row["description"]);
+                        row["description"],
+                        row["count"].Length == 0 ? 1 : Whole(row, "count"));
                     Validate(skill);
                     owner.Add(skill);
                     skills.Add(skill);
@@ -242,6 +252,7 @@ namespace Game.Core
             }
 
             if (skill.Cooldown <= 0) throw new FormatException("cooldown은 0보다 커야 합니다.");
+            if (skill.Count < 1 || skill.Count > MaxCount) throw new FormatException($"count는 1에서 {MaxCount} 사이여야 합니다.");
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
@@ -255,6 +266,12 @@ namespace Game.Core
                 case SkillKind.Buff:
                     Need(skill.Duration > 0, "duration");
                     Need(skill.Modifiers.Count > 0 || skill.Grants != SkillTag.None, "modifiers나 grants 중 하나");
+                    break;
+                case SkillKind.Summon:
+                    Need(skill.Damage > 0, "damage");
+                    Need(skill.Speed > 0, "speed");
+                    Need(skill.Range > 0, "range");
+                    Need(skill.Duration > 0, "duration");
                     break;
             }
         }

@@ -31,9 +31,11 @@ namespace Game.Core
             RuneDefinition dropRune = null,
             ConsumableDefinition dropConsumable = null,
             MaterialDefinition dropMaterial = null,
-            ItemBase weapon = null)
+            ItemBase weapon = null,
+            SkillDefinition skill = null)
         {
             Weapon = weapon;
+            Skill = skill;
             Id = id;
             Kind = kind;
             Monster = monster;
@@ -74,12 +76,15 @@ namespace Game.Core
         public Rarity DropRarity => (Rarity)State;
         // For a player: the weapon in their hands, or null.
         public ItemBase Weapon { get; }
+        // For a summoned spirit: the skill that called it. Its Health share is how much of its time is left.
+        public SkillDefinition Skill { get; }
         public bool IsDead => Health <= 0;
         public float Radius => Kind switch
         {
             EntityKind.Boss => Boss.Radius,
             EntityKind.Monster => Monster.Radius,
             EntityKind.Drop => 0.2f,
+            EntityKind.Minion => World.MinionRadius,
             _ => World.PlayerRadius,
         };
     }
@@ -340,7 +345,8 @@ namespace Game.Core
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Rune ? _loot.Runes[entity.Type] : null,
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Consumable ? _loot.Consumables[entity.Type] : null,
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Material ? _loot.Materials[entity.Type] : null,
-                    entity.IsPlayer && entity.Type > 0 ? _loot.Bases[entity.Type - 1] : null));
+                    entity.IsPlayer && entity.Type > 0 ? _loot.Bases[entity.Type - 1] : null,
+                    entity.Kind == EntityKind.Minion ? _classes.Skills[entity.Type] : null));
             }
             return views;
         }
@@ -634,6 +640,8 @@ namespace Game.Core
                 throw new InvalidDataException("Snapshot names loot this client does not know.");
             if (snapshot.Entities.Any(e => e.IsPlayer && e.Type > 0 && (_loot == null || e.Type > _loot.Bases.Count)))
                 throw new InvalidDataException("Snapshot names a weapon this client does not know.");
+            if (snapshot.Entities.Any(e => e.Kind == EntityKind.Minion && (_classes == null || e.Type >= _classes.Skills.Count)))
+                throw new InvalidDataException("Snapshot names a skill this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Boss && (_bosses == null || e.Type >= _bosses.Bosses.Count)))
                 throw new InvalidDataException("Snapshot names a boss this client does not know.");
             if (snapshot.Self.Cooldowns.Count != Skills.Count)

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -8,6 +9,8 @@ namespace Game.Core.Tests
     {
         static readonly ClassDefinition Warrior = Classes.Shipped.Find("warrior");
         static readonly ClassDefinition FireMage = Classes.Shipped.Find("fire_mage");
+        static readonly ClassDefinition Archer = Classes.Shipped.Find("archer");
+        static readonly ClassDefinition Summoner = Classes.Shipped.Find("summoner");
         static readonly MonsterDefinition Slime = Monsters.Shipped.Find("slime");
         static readonly MonsterDefinition Dummy = Monsters.Dummy;
 
@@ -38,6 +41,8 @@ namespace Game.Core.Tests
             Assert.IsTrue(Classes.Shipped.Success, string.Join("\n", Classes.Shipped.Errors));
             CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry" }, Warrior.Skills.Select(s => s.Id));
             CollectionAssert.AreEqual(new[] { "fireball", "flame_brand" }, FireMage.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "volley", "eagle_eye" }, Archer.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "spirits", "spirit_pact" }, Summoner.Skills.Select(s => s.Id));
         }
 
         [Test]
@@ -48,6 +53,8 @@ namespace Game.Core.Tests
             Assert.AreEqual("6초 동안 근접 피해 30% 증가, 공격 속도 15% 증가 · 재사용 15초", SkillText.Numbers(Classes.Skill("war_cry")));
             Assert.AreEqual("8초 동안 모든 공격에 화염 태그 · 재사용 16초", SkillText.Numbers(Classes.Skill("flame_brand")));
             Assert.AreEqual("최대 생명력 20% 증가, 근접 피해 10% 증가", SkillText.Passive(Warrior));
+            Assert.AreEqual("피해 70% × 5발 · 사거리 9칸 · 재사용 4초", SkillText.Numbers(Classes.Skill("volley")));
+            Assert.AreEqual("2마리 · 15초 · 한 번에 피해 40% · 7칸 안의 적 · 재사용 18초", SkillText.Numbers(Classes.Skill("spirits")));
         }
 
         [Test]
@@ -265,6 +272,136 @@ namespace Game.Core.Tests
 
             Assert.AreNotEqual(BossState.Dormant, boss.State);
             Assert.Less(boss.Health, boss.MaxHealth);
+        }
+    
+        [Test]
+        public void SummonAndVolleySheetErrors()
+        {
+            var data = ClassSheet.Parse(
+                Classes.ClassesHeader + "caller,부르는 이,,\n",
+                Classes.SkillsHeader.Replace("duration,", "duration,count,") +
+                "call,부르기,caller,summon,summon,40,10,,5,6,,2,,,\n" +
+                "rain,화살비,caller,projectile,ranged,50,3,,10,8,,9,,,\n");
+
+            AssertError(data, "skills.csv 2행", "summon", "duration");
+            AssertError(data, "skills.csv 3행", "count");
+        }
+
+        [Test]
+        public void VolleyFansItsArrowsOutAroundTheAim()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", Gear.Wearing("copper_bow"), Archer);
+            var ahead = world.SpawnEnemy(Dummy, player.Position + new Vec2(5, 0));
+            // 24 degrees off the aim, where the outermost arrows go.
+            var aside = world.SpawnEnemy(Dummy, player.Position + new Vec2(5 * 0.9135f, 5 * 0.4067f));
+
+            Assert.IsTrue(world.UseSkill(player.Id, Slot(player, "volley"), new Vec2(1, 0)));
+            Assert.AreEqual(5, world.Projectiles.Count);
+            var angles = world.Projectiles.Select(p => MathF.Atan2(p.Velocity.Y, p.Velocity.X) * 180 / MathF.PI).OrderBy(a => a).ToList();
+            for (int i = 0; i < 5; i++) Assert.AreEqual(-24 + 12 * i, angles[i], 0.01f);
+
+            Run(world, World.TicksPerSecond);
+            Assert.Less(ahead.Health, Dummy.Health);
+            Assert.Less(aside.Health, Dummy.Health);
+            Assert.IsEmpty(world.Projectiles);
+        }
+
+        [Test]
+        public void SpiritsGoAfterEnemiesNearTheirPlayerAndTheirHitsCountAsThePlayers()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"), Summoner);
+            var near = world.SpawnEnemy(Dummy, player.Position + new Vec2(4, 0));
+            var far = world.SpawnEnemy(Dummy, player.Position + new Vec2(-10, 0));
+            int slot = Slot(player, "spirits");
+
+            Assert.IsTrue(world.UseSkill(player.Id, slot, Vec2.Zero));
+            Assert.AreEqual(2, world.Minions.Count);
+            Assert.IsTrue(world.Minions.All(m => m.OwnerId == player.Id && m.Slot == slot));
+            var events = Run(world, World.TicksPerSecond * 3);
+
+            Assert.Less(near.Health, Dummy.Health);
+            Assert.AreEqual(Dummy.Health, far.Health, "beyond the skill's 7 tiles from the player");
+            var hits = events.Where(e => e.Type == SimEventType.Hit && e.Target == near.Id).ToList();
+            Assert.IsNotEmpty(hits);
+            Assert.IsTrue(hits.All(e => e.Source == player.Id && e.Cause == slot + 1));
+            // The sword's lowest roll is 4, raised by the summoner's summon 20%: 4 × 120% × 40% = 1.9, more on a crit.
+            Assert.IsTrue(hits.All(e => e.Amount >= 2), string.Join(", ", hits.Select(e => e.Amount)));
+            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Attack && world.Minions.Any(m => m.Id == e.Source)));
+            Assert.IsTrue(world.Minions.All(m => Vec2.Distance(m.Position, near.Position) < 1.2f), "close to what they strike");
+        }
+
+        [Test]
+        public void SpiritsFollowTheirPlayerAndLeaveWhenTheirTimeIsUp()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null, Summoner);
+            int slot = Slot(player, "spirits");
+            world.UseSkill(player.Id, slot, Vec2.Zero);
+            var first = world.Minions.Select(m => m.Id).ToList();
+
+            var moved = player.Position + new Vec2(3, 0);
+            for (int i = 0; i < 10; i++)
+            {
+                world.MovePlayer(player.Id, player.Position + new Vec2(0.3f, 0), new Vec2(1, 0), 3);
+                Run(world, 3);
+            }
+            Assert.AreEqual(moved.X, player.Position.X, 0.01f);
+            Run(world, World.TicksPerSecond);
+            Assert.IsTrue(world.Minions.All(m => Vec2.Distance(m.Position, player.Position) < 1.2f), "waiting around the player");
+
+            var events = Run(world, player.Skills[slot].DurationTicks - World.TicksPerSecond * 2);
+            Assert.IsEmpty(world.Minions);
+            CollectionAssert.AreEquivalent(first, events.Where(e => e.Type == SimEventType.Died).Select(e => e.Source));
+        }
+
+        [Test]
+        public void SummoningAgainSendsTheOldSpiritsAway()
+        {
+            var data = ClassSheet.Parse(
+                Classes.ClassesHeader + "caller,부르는 이,,\n",
+                Classes.SkillsHeader.Replace("duration,", "duration,count,") + "call,부르기,caller,summon,summon,40,1,,5,6,10,3,,,\n");
+            Assert.IsTrue(data.Success, string.Join("\n", data.Errors));
+            var world = Room();
+            var player = world.AddPlayer("a", null, data.Find("caller"));
+            world.UseSkill(player.Id, 0, Vec2.Zero);
+            var first = world.Minions.Select(m => m.Id).ToList();
+            Assert.AreEqual(3, first.Count);
+
+            Run(world, World.TicksPerSecond);
+            Assert.IsTrue(world.UseSkill(player.Id, 0, Vec2.Zero));
+            var events = world.TakeEvents();
+            Assert.AreEqual(3, world.Minions.Count);
+            CollectionAssert.IsEmpty(world.Minions.Select(m => m.Id).Intersect(first));
+            CollectionAssert.AreEquivalent(first, events.Where(e => e.Type == SimEventType.Died).Select(e => e.Source));
+        }
+
+        [Test]
+        public void SpiritsLeaveDormantBossesAlone()
+        {
+            var world = new World(Maps.Room(40), TileMap.Center(20, 16), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 });
+            var boss = world.PlaceBoss(Bosses.Shipped.Bosses[0], TileMap.Center(20, 20), 2);
+            var player = world.AddPlayer("a", null, Summoner);
+            world.UseSkill(player.Id, Slot(player, "spirits"), Vec2.Zero);
+
+            Run(world, World.TicksPerSecond * 2);
+            Assert.AreEqual(BossState.Dormant, boss.State);
+            Assert.AreEqual(boss.MaxHealth, boss.Health);
+        }
+
+        [Test]
+        public void SpiritsLeaveWithTheirFallenPlayer()
+        {
+            var world = Room(14, Monsters.Brute);
+            var player = world.AddPlayer("a", null, Summoner);
+            world.UseSkill(player.Id, Slot(player, "spirits"), Vec2.Zero);
+            world.SpawnEnemy(Monsters.Brute.Monsters[0], player.Position + new Vec2(1, 0));
+
+            Run(world, World.TicksPerSecond);
+
+            Assert.IsTrue(player.IsDead);
+            Assert.IsEmpty(world.Minions);
         }
     }
 }

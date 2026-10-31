@@ -320,6 +320,42 @@ namespace Game.Client
             },
         };
 
+        // A summoned spirit: a little ghost whose tail ripples between the frames.
+        static readonly string[][] Spirit =
+        {
+            new[]
+            {
+                "...LLLL...",
+                "..LwwMML..",
+                ".LwMMMMMm.",
+                ".MMeMMeMm.",
+                ".MMeMMeMm.",
+                ".MMMMMMMm.",
+                ".mMMMMMmm.",
+                ".mMmMMmMm.",
+                "..m.mm.m..",
+            },
+            new[]
+            {
+                "...LLLL...",
+                "..LwwMML..",
+                ".LwMMMMMm.",
+                ".MMeMMeMm.",
+                ".MMeMMeMm.",
+                ".MMMMMMMm.",
+                ".mMMMMMmm.",
+                ".mmMmmMmm.",
+                ".m..mm..m.",
+            },
+        };
+
+        // A spirit in its skill's colour. It faces right; the view flips it to face left.
+        public static PixelImage Minion(Rgba color, int frame)
+        {
+            var ramp = Ramp.Of(color);
+            return PixelImage.FromRows(RampColors(ramp), Spirit[frame % Spirit.Length]).Outlined(ramp.Outline);
+        }
+
         static readonly Dictionary<string, Dictionary<char, Rgba>> Extras = new Dictionary<string, Dictionary<char, Rgba>>
         {
             ["spore_shooter"] = new Dictionary<char, Rgba>

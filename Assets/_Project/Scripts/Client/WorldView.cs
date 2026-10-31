@@ -19,6 +19,7 @@ namespace Game.Client
             Player,
             Monster,
             Boss,
+            Minion,
         }
 
         sealed class Body
@@ -134,6 +135,8 @@ namespace Game.Client
         const int DarkOrder = 15000;
         // How far a glowing shot lights its way.
         const float ShotLight = 2.2f;
+        // A summoned spirit glows a little in its colour.
+        const float MinionLight = 3f;
 
         // Tunics: blue for you, and a colour per player for the others so they can be told apart.
         static readonly Rgba SelfTunic = Rgba.Hex("#3F7FD8");
@@ -305,6 +308,7 @@ namespace Game.Client
                 {
                     body = view.Kind == EntityKind.Boss ? MakeBody(BodyKind.Boss, view.Boss.Id, view.Id, view.Radius, BossColor)
                         : view.Kind == EntityKind.Monster ? MakeBody(BodyKind.Monster, view.Monster.Id, view.Id, view.Radius, ColorOf(view.Monster))
+                        : view.Kind == EntityKind.Minion ? MakeBody(BodyKind.Minion, view.Skill.Id, view.Id, view.Radius, Sprites.ToRgba(Palette.Of(view.Skill.Tags)))
                         : MakeBody(BodyKind.Player, "player", view.Id, view.Radius, OtherTunics[view.Id % OtherTunics.Length]);
                     _others[view.Id] = body;
                 }
@@ -319,6 +323,8 @@ namespace Game.Client
                     pulse = 0.06f;
                 }
                 if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) glow = Faded(ChargeColor, 0.45f);
+                // A spirit flickers in its last two seconds (its health counts down the ticks it has left).
+                if (view.Kind == EntityKind.Minion && view.Health < World.TicksPerSecond * 2) tint = new Color(1, 1, 1, 0.35f + 0.65f * Mathf.Abs(Mathf.Sin(Time.time * 12)));
                 if (view.Kind == EntityKind.Boss)
                 {
                     WatchBoss(view);
@@ -340,7 +346,8 @@ namespace Game.Client
                     }
                     if (view.BossState != BossState.Dormant) ActiveBoss = view;
                 }
-                Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, tint, glow, deltaTime, pulse, showHealth: view.Kind != EntityKind.Boss,
+                Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, tint, glow, deltaTime, pulse,
+                    showHealth: view.Kind != EntityKind.Boss && view.Kind != EntityKind.Minion,
                     weapon: view.Weapon);
                 if (view.IsPlayer)
                 {
@@ -689,10 +696,12 @@ namespace Game.Client
                 case SimEventType.Attack:
                     var attacker = Find(e.Source);
                     if (attacker == null) break;
-                    var kind = (BasicAttackKind)e.Amount;
-                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : Sound.Swing, attacker.Position);
                     attacker.LungeTime = LungeSeconds;
                     attacker.Lunge = new Vector2(e.Direction.X, e.Direction.Y).normalized;
+                    // A spirit just darts at what it strikes; the hit makes the sound.
+                    if (attacker.Kind == BodyKind.Minion) break;
+                    var kind = (BasicAttackKind)e.Amount;
+                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : Sound.Swing, attacker.Position);
                     // Shots show as their projectile, so only swings draw the arc.
                     if (kind != BasicAttackKind.Swing) break;
                     attacker.SwingTime = SwingSeconds;
@@ -750,13 +759,13 @@ namespace Game.Client
                     }
                     else if (Find(e.Source) is Body fallen)
                     {
-                        if (!_bossesSeen.ContainsKey(e.Source)) Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position);
-                        if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Diameter);
+                        if (!_bossesSeen.ContainsKey(e.Source)) Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position, fallen.Kind == BodyKind.Minion ? 0.4f : 1);
+                        if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Kind == BodyKind.Minion ? 0.6f : fallen.Diameter);
                     }
                     else if (_departed.TryGetValue(e.Source, out var gone))
                     {
-                        if (!_bossesSeen.ContainsKey(e.Source)) Hear(gone.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, gone.Position);
-                        if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : 0.8f);
+                        if (!_bossesSeen.ContainsKey(e.Source)) Hear(gone.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, gone.Position, gone.Kind == BodyKind.Minion ? 0.4f : 1);
+                        if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : gone.Kind == BodyKind.Minion ? 0.6f : 0.8f);
                     }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
                     {
@@ -784,7 +793,8 @@ namespace Game.Client
                     if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.06f);
                     break;
                 case SkillKind.Buff:
-                    AddFlash(caster.Position, caster.Diameter, color, Shapes.Ring);
+                case SkillKind.Summon:
+                    AddFlash(caster.Position, caster.Diameter * (skill.Kind == SkillKind.Summon ? 2 : 1), color, Shapes.Ring);
                     break;
                 case SkillKind.Projectile:
                     caster.SwingTime = SwingSeconds;
@@ -926,6 +936,7 @@ namespace Game.Client
                     left &= look == Look.Side;
                     break;
                 case BodyKind.Monster:
+                case BodyKind.Minion:
                     frame = Mathf.FloorToInt(Time.time * (moving ? 6 : 3) + body.Seed * 0.37f) % CreatureArt.IdleFrames;
                     break;
                 default:
@@ -941,6 +952,7 @@ namespace Game.Client
             {
                 BodyKind.Player => () => CreatureArt.Player(look, frame, body.Color),
                 BodyKind.Monster => () => CreatureArt.Monster(body.Id, body.Color, frame),
+                BodyKind.Minion => () => CreatureArt.Minion(body.Color, frame),
                 _ => () => CreatureArt.Boss(body.Id, body.Color, frame),
             };
             body.Shape.sprite = Sprites.Standing(key, draw);
@@ -1185,6 +1197,7 @@ namespace Game.Client
             foreach (var body in _others.Values)
             {
                 if (body.Kind == BodyKind.Player) _lights.Add(WorldLights.Carried(new Vec2(body.Position.x, body.Position.y)));
+                else if (body.Kind == BodyKind.Minion) _lights.Add(new LightSource(new Vec2(body.Position.x, body.Position.y), MinionLight, 0.7f, body.Color, tints: true));
             }
             _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time);
             foreach (var shot in _projectiles.Values)

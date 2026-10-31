@@ -424,6 +424,26 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void OthersSeeSummonedSpiritsUntilTheyLeave()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var bob = session.Join(2, "밥", Protocol.Version, "summoner");
+            session.Tick(4);
+
+            session.Send(2, bob.SkillCommand(0, Vec2.Zero));
+            session.Tick(4);
+
+            var spirits = alice.Others().Where(e => e.Kind == EntityKind.Minion).ToList();
+            Assert.AreEqual(2, spirits.Count);
+            Assert.IsTrue(spirits.All(e => e.Skill?.Id == "spirits" && !e.IsDead && e.Radius == World.MinionRadius));
+            Assert.AreEqual(2, bob.Others().Count(e => e.Kind == EntityKind.Minion), "its player sees them too");
+
+            session.Tick(Classes.Skill("spirits").DurationTicks);
+            Assert.IsFalse(alice.Others().Any(e => e.Kind == EntityKind.Minion));
+        }
+
+        [Test]
         public void CropsGrowTheSameForEveryone()
         {
             var session = new Session();

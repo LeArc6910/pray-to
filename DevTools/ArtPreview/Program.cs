@@ -99,6 +99,8 @@ namespace Game.Client
                 for (int frame = 0; frame < CreatureArt.IdleFrames; frame++) creatures.Add(CreatureArt.Monster(monster.Id, Rgba.Hex(monster.Color), frame));
             }
             creatures.Add(CreatureArt.Monster("unknown", Rgba.Hex("#D05050"), 0));
+            creatures.Add(CreatureArt.Minion(Rgba.Hex("#73E6CC"), 0));
+            creatures.Add(CreatureArt.Minion(Rgba.Hex("#73E6CC"), 1));
             creatures.Add(CreatureArt.Boss("cave_warden", BossColor, 0));
             creatures.Add(CreatureArt.Boss("cave_warden", BossColor, 1));
             creatures.Add(CreatureArt.Boss("crystal_queen", BossColor, 0));

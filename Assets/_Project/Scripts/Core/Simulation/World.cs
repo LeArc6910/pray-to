@@ -143,6 +143,7 @@ namespace Game.Core
             }
             foreach (var enemy in _enemies) UpdateEnemy(enemy);
             UpdateBosses();
+            UpdateMinions();
             UpdateHazards();
             UpdateProjectiles();
             UpdateLoot();
