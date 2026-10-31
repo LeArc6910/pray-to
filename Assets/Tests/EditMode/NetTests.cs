@@ -407,6 +407,23 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void OthersSeeTheWeaponInEachPlayersHands()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var bob = session.Join(2, "밥");
+            session.Tick(4);
+
+            var seen = alice.Others().Single(e => e.IsPlayer);
+            Assert.AreEqual("copper_sword", seen.Weapon?.Id, "HostConfig.StarterGear");
+
+            session.Send(2, bob.UnequipCommand(ItemSlot.Weapon));
+            session.Tick(4);
+
+            Assert.IsNull(alice.Others().Single(e => e.IsPlayer).Weapon, "empty-handed");
+        }
+
+        [Test]
         public void CropsGrowTheSameForEveryone()
         {
             var session = new Session();

@@ -30,8 +30,10 @@ namespace Game.Core
             ItemBase dropBase = null,
             RuneDefinition dropRune = null,
             ConsumableDefinition dropConsumable = null,
-            MaterialDefinition dropMaterial = null)
+            MaterialDefinition dropMaterial = null,
+            ItemBase weapon = null)
         {
+            Weapon = weapon;
             Id = id;
             Kind = kind;
             Monster = monster;
@@ -70,6 +72,8 @@ namespace Game.Core
         public ConsumableDefinition DropConsumable { get; }
         public MaterialDefinition DropMaterial { get; }
         public Rarity DropRarity => (Rarity)State;
+        // For a player: the weapon in their hands, or null.
+        public ItemBase Weapon { get; }
         public bool IsDead => Health <= 0;
         public float Radius => Kind switch
         {
@@ -335,7 +339,8 @@ namespace Game.Core
                     entity.Kind == EntityKind.Drop && entity.State < DropState.Material ? _loot.Bases[entity.Type] : null,
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Rune ? _loot.Runes[entity.Type] : null,
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Consumable ? _loot.Consumables[entity.Type] : null,
-                    entity.Kind == EntityKind.Drop && entity.State == DropState.Material ? _loot.Materials[entity.Type] : null));
+                    entity.Kind == EntityKind.Drop && entity.State == DropState.Material ? _loot.Materials[entity.Type] : null,
+                    entity.IsPlayer && entity.Type > 0 ? _loot.Bases[entity.Type - 1] : null));
             }
             return views;
         }
@@ -627,6 +632,8 @@ namespace Game.Core
                     : e.State == DropState.Material ? _loot.Materials.Count
                     : _loot.Bases.Count))))
                 throw new InvalidDataException("Snapshot names loot this client does not know.");
+            if (snapshot.Entities.Any(e => e.IsPlayer && e.Type > 0 && (_loot == null || e.Type > _loot.Bases.Count)))
+                throw new InvalidDataException("Snapshot names a weapon this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Boss && (_bosses == null || e.Type >= _bosses.Bosses.Count)))
                 throw new InvalidDataException("Snapshot names a boss this client does not know.");
             if (snapshot.Self.Cooldowns.Count != Skills.Count)

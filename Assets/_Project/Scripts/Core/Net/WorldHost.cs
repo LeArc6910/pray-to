@@ -333,8 +333,9 @@ namespace Game.Core
                 slots.Select(viewer.CooldownTicks).ToList(),
                 slots.Select(viewer.BuffTicks).ToList(),
                 viewer.ConsumableCooldown);
+            // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
-                p.Id, EntityKind.Player, 0, p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p)));
+                p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p)));
             var bosses = World.Bosses
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
@@ -418,6 +419,12 @@ namespace Game.Core
             sent.SentChestVersion = version;
             var message = near == null ? ChestMessage.Closed : new ChestMessage(near.Value.X, near.Value.Y, World.ChestAt(near.Value.X, near.Value.Y));
             Send(connection, message.Encode(_loot), reliable: true);
+        }
+
+        int HeldWeapon(Player player)
+        {
+            var weapon = player.Equipment[ItemSlot.Weapon];
+            return weapon == null ? 0 : IndexOf(_loot.Bases, weapon.Base) + 1;
         }
 
         static byte BuffBits(Player player)

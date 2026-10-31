@@ -28,6 +28,9 @@ namespace Game.Client
             // The same sprite in white over the shape, for flashes: hit, winding up, charging.
             public SpriteRenderer Glow;
             public SpriteRenderer Shadow;
+            // A player's weapon in hand, and which one it shows.
+            public SpriteRenderer Weapon;
+            public ItemBase Held;
             public SpriteRenderer Swing;
             public SpriteRenderer HealthBack;
             public SpriteRenderer HealthFill;
@@ -44,6 +47,9 @@ namespace Game.Client
             public float Top;
             public float SwingTime;
             public float FlashTime;
+            // A short lunge toward each attack: time left and which way.
+            public float LungeTime;
+            public Vector2 Lunge;
             public Vector3 Position;
             public Vector3 LastPosition;
             public float Walked;
@@ -77,6 +83,30 @@ namespace Game.Client
             public Color Color;
         }
 
+        // A bit flying off something that died, fading as it slows.
+        sealed class Bit
+        {
+            public SpriteRenderer Renderer;
+            public Vector3 Velocity;
+            public float Age;
+            public Color Color;
+        }
+
+        // Where a body was and what colour it was, kept for the frame it is removed in: its death event comes after.
+        readonly struct Departed
+        {
+            public Departed(Vector3 position, Color color, BodyKind kind)
+            {
+                Position = position;
+                Color = color;
+                Kind = kind;
+            }
+
+            public Vector3 Position { get; }
+            public Color Color { get; }
+            public BodyKind Kind { get; }
+        }
+
         sealed class Floating
         {
             public Vector3 Position;
@@ -90,6 +120,11 @@ namespace Game.Client
         const float FloatSeconds = 0.8f;
         const float BannerSeconds = 2.2f;
         const float FlashLife = 0.35f;
+        const float LungeSeconds = 0.14f;
+        // How far a body leans into an attack, in tiles (two pixels).
+        const float LungeDistance = 2f / Sprites.PixelsPerUnit;
+        const float BitSeconds = 0.5f;
+        const int BitsPerDeath = 10;
         // Impacts further away than this do not shake the screen.
         const float ShakeRange = 16;
         // The dark is a square of at least this many tiles around the camera, and wider when the view is (a very wide
@@ -125,6 +160,8 @@ namespace Game.Client
         readonly Dictionary<int, (BossState State, int Phase, string Name)> _bossesSeen = new Dictionary<int, (BossState, int, string)>();
         readonly List<Floating> _floating = new List<Floating>();
         readonly List<Flash> _flashes = new List<Flash>();
+        readonly List<Bit> _bits = new List<Bit>();
+        readonly Dictionary<int, Departed> _departed = new Dictionary<int, Departed>();
         // Which skill slots of each other player have a buff running, from their snapshot state.
         readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
         readonly Dictionary<int, SpriteRenderer> _crops = new Dictionary<int, SpriteRenderer>();
@@ -172,7 +209,8 @@ namespace Game.Client
         public void Render(float tickFraction, float deltaTime)
         {
             var selfPosition = Vec2.Lerp(_client.PreviousPosition, _client.Position, Mathf.Clamp01(tickFraction));
-            Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, Color.white, Color.clear, deltaTime);
+            Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, Color.white, Color.clear, deltaTime,
+                weapon: _client.Equipment[ItemSlot.Weapon]?.Base);
             _self.Name = _client.Name;
             int selfBuffs = 0;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
@@ -189,6 +227,7 @@ namespace Game.Client
 
             foreach (var e in _client.TakeEvents()) Show(e);
             UpdateFlashes(deltaTime);
+            UpdateBits(deltaTime);
             for (int i = _floating.Count - 1; i >= 0; i--)
             {
                 _floating[i].Age += deltaTime;
@@ -301,7 +340,8 @@ namespace Game.Client
                     }
                     if (view.BossState != BossState.Dormant) ActiveBoss = view;
                 }
-                Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, tint, glow, deltaTime, pulse, showHealth: view.Kind != EntityKind.Boss);
+                Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, tint, glow, deltaTime, pulse, showHealth: view.Kind != EntityKind.Boss,
+                    weapon: view.Weapon);
                 if (view.IsPlayer)
                 {
                     _buffBits[view.Id] = view.State;
@@ -310,9 +350,11 @@ namespace Game.Client
             }
 
             _gone.Clear();
+            _departed.Clear();
             foreach (var pair in _others)
             {
                 if (_seen.Contains(pair.Key)) continue;
+                _departed[pair.Key] = new Departed(pair.Value.Position, BodyColor(pair.Value), pair.Value.Kind);
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
             }
@@ -649,6 +691,8 @@ namespace Game.Client
                     if (attacker == null) break;
                     var kind = (BasicAttackKind)e.Amount;
                     Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : Sound.Swing, attacker.Position);
+                    attacker.LungeTime = LungeSeconds;
+                    attacker.Lunge = new Vector2(e.Direction.X, e.Direction.Y).normalized;
                     // Shots show as their projectile, so only swings draw the arc.
                     if (kind != BasicAttackKind.Swing) break;
                     attacker.SwingTime = SwingSeconds;
@@ -704,9 +748,15 @@ namespace Game.Client
                         _floating.Add(new Floating { Position = _self.Position, Text = "쓰러짐", Color = Color.gray });
                         Sounds.Play(Sound.Down);
                     }
-                    else if (!_bossesSeen.ContainsKey(e.Source) && Find(e.Source) is Body fallen)
+                    else if (Find(e.Source) is Body fallen)
                     {
-                        Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position);
+                        if (!_bossesSeen.ContainsKey(e.Source)) Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position);
+                        if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Diameter);
+                    }
+                    else if (_departed.TryGetValue(e.Source, out var gone))
+                    {
+                        if (!_bossesSeen.ContainsKey(e.Source)) Hear(gone.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, gone.Position);
+                        if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : 0.8f);
                     }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
                     {
@@ -813,7 +863,8 @@ namespace Game.Client
 
         // Puts a body where it is this frame: picks its sprite (the way it faces, a step of its walk), tints it
         // (grey when dormant or dead) and lays the glow over it for flashes, then the swing and health bar.
-        void Place(Body body, Vec2 position, Vec2 facing, float health, float maxHealth, Color tint, Color glow, float deltaTime, float pulse = 0, bool showHealth = true)
+        void Place(Body body, Vec2 position, Vec2 facing, float health, float maxHealth, Color tint, Color glow, float deltaTime, float pulse = 0, bool showHealth = true,
+            ItemBase weapon = null)
         {
             body.LastPosition = body.Position;
             body.Position = new Vector3(position.X, position.Y, 0);
@@ -824,6 +875,13 @@ namespace Game.Client
             Animate(body, facing, deltaTime);
             float scale = 1 + pulse * Mathf.Sin(Time.time * 30);
             body.Shape.transform.localScale = new Vector3(1, scale, 1);
+            // Leaning into an attack: out and back along its direction.
+            float lean = body.LungeTime > 0 ? Mathf.Sin(body.LungeTime / LungeSeconds * Mathf.PI) * LungeDistance : 0;
+            var offset = (Vector3)(body.Lunge * lean);
+            body.Shape.transform.localPosition = new Vector3(0, -body.Feet, 0) + offset;
+            body.Glow.transform.localPosition = body.Shape.transform.localPosition;
+            body.LungeTime = Mathf.Max(0, body.LungeTime - deltaTime);
+            ShowWeapon(body, weapon, facing, order, dead, offset);
             body.Shape.color = dead ? DeadColor : tint;
             body.Shape.sortingOrder = order;
             body.Glow.transform.localScale = body.Shape.transform.localScale;
@@ -833,7 +891,7 @@ namespace Game.Client
 
             body.Swing.enabled = body.SwingTime > 0;
             body.Swing.color = new Color(1, 1, 1, Mathf.Clamp01(body.SwingTime / SwingSeconds) * 0.6f);
-            body.Swing.sortingOrder = order + 2;
+            body.Swing.sortingOrder = order + 3;
 
             float share = maxHealth > 0 ? Mathf.Clamp01(health / maxHealth) : 0;
             bool barVisible = showHealth && !dead && share < 0.999f;
@@ -843,8 +901,8 @@ namespace Game.Client
             body.HealthFill.transform.localScale = new Vector3(0.8f * share, 0.08f, 1);
             body.HealthFill.transform.localPosition = new Vector3(-0.4f + 0.4f * share, body.Top + 0.15f, 0);
             body.HealthFill.color = share > 0.5f ? new Color(0.4f, 0.9f, 0.4f) : share > 0.25f ? new Color(0.95f, 0.8f, 0.3f) : new Color(0.95f, 0.3f, 0.25f);
-            body.HealthBack.sortingOrder = order + 3;
-            body.HealthFill.sortingOrder = order + 4;
+            body.HealthBack.sortingOrder = order + 4;
+            body.HealthFill.sortingOrder = order + 5;
 
             body.SwingTime = Mathf.Max(0, body.SwingTime - deltaTime);
             body.FlashTime = Mathf.Max(0, body.FlashTime - deltaTime);
@@ -892,6 +950,73 @@ namespace Game.Client
             body.Top = -body.Feet + body.Shape.sprite.rect.height / Sprites.PixelsPerUnit;
         }
 
+        // The weapon in a player's hand, beside them on the side they face (behind them when they face away). A swing
+        // sweeps it down through the attack; facing left mirrors it.
+        void ShowWeapon(Body body, ItemBase weapon, Vec2 facing, int order, bool dead, Vector3 offset)
+        {
+            if (weapon != body.Held)
+            {
+                body.Held = weapon;
+                body.Weapon.sprite = weapon == null ? null : HeldSprite(weapon);
+            }
+            body.Weapon.enabled = weapon != null && !dead;
+            if (!body.Weapon.enabled) return;
+            bool side = Mathf.Abs(facing.X) >= Mathf.Abs(facing.Y);
+            bool left = side && facing.X < 0;
+            bool away = !side && facing.Y > 0;
+            float x = away ? -0.22f : left ? -0.24f : 0.24f;
+            body.Weapon.transform.localPosition = new Vector3(x, -body.Feet + 0.3f, 0) + offset;
+            float sweep = body.SwingTime > 0 ? Mathf.Lerp(-80, 40, body.SwingTime / SwingSeconds) : 0;
+            body.Weapon.transform.localRotation = Quaternion.Euler(0, 0, left ? -sweep : sweep);
+            body.Weapon.flipX = left;
+            body.Weapon.sortingOrder = away ? order - 1 : order + 2;
+        }
+
+        // The weapon's icon held by its grip: the bottom left of a sword or staff, the middle of a bow.
+        static Sprite HeldSprite(ItemBase weapon)
+        {
+            bool bow = (weapon.Tags & SkillTag.Ranged) != 0;
+            return Sprites.Get("held/" + weapon.Id, () => ItemArt.Gear(weapon), bow ? new Vector2(0.35f, 0.5f) : new Vector2(0.2f, 0.2f));
+        }
+
+        static Color BodyColor(Body body) => new Color32(body.Color.R, body.Color.G, body.Color.B, 255);
+
+        // Bits flying out of something that died, in its colour, more for something bigger.
+        void Burst(Vector3 at, Color color, float size)
+        {
+            int count = Mathf.RoundToInt(BitsPerDeath * Mathf.Clamp(size, 0.6f, 2.5f));
+            for (int i = 0; i < count; i++)
+            {
+                float angle = (i + UnityEngine.Random.value * 0.5f) / count * Mathf.PI * 2;
+                float speed = (1.5f + UnityEngine.Random.value * 2.5f) * Mathf.Max(1, size * 0.6f);
+                var renderer = Renderer(_root.transform, "Bit", Shapes.Square, color);
+                renderer.transform.localPosition = at + new Vector3(0, 0.1f, 0);
+                renderer.transform.localScale = Vector3.one * (2f / Sprites.PixelsPerUnit);
+                renderer.sortingOrder = 19000;
+                _bits.Add(new Bit { Renderer = renderer, Velocity = new Vector3(Mathf.Cos(angle), Mathf.Sin(angle)) * speed, Color = color });
+            }
+        }
+
+        void UpdateBits(float deltaTime)
+        {
+            for (int i = _bits.Count - 1; i >= 0; i--)
+            {
+                var bit = _bits[i];
+                bit.Age += deltaTime;
+                if (bit.Age >= BitSeconds)
+                {
+                    Object.Destroy(bit.Renderer.gameObject);
+                    _bits.RemoveAt(i);
+                    continue;
+                }
+                bit.Velocity *= Mathf.Exp(-6 * deltaTime);
+                bit.Renderer.transform.localPosition += bit.Velocity * deltaTime;
+                var color = bit.Color;
+                color.a = 1 - bit.Age / BitSeconds;
+                bit.Renderer.color = color;
+            }
+        }
+
         Body MakeBody(BodyKind kind, string id, int seed, float radius, Rgba color)
         {
             var root = new GameObject(id).transform;
@@ -915,6 +1040,7 @@ namespace Game.Client
                 HealthBack = Renderer(root, "HealthBack", Shapes.Square, new Color(0, 0, 0, 0.6f)),
                 HealthFill = Renderer(root, "HealthFill", Shapes.Square, Color.green),
                 Aura = Renderer(root, "Aura", Shapes.Ring, Color.clear),
+                Weapon = Renderer(root, "Weapon", null, Color.white),
             };
             body.Shape.transform.localPosition = new Vector3(0, -body.Feet, 0);
             body.Glow.transform.localPosition = body.Shape.transform.localPosition;
@@ -925,6 +1051,9 @@ namespace Game.Client
             // The swing reaches MeleeReach past the edge of the body.
             body.Swing.transform.localScale = Vector3.one * (diameter + World.MeleeReach * 2);
             body.HealthBack.transform.localScale = new Vector3(0.84f, 0.12f, 1);
+            // A weapon icon is drawn to fill a bag slot; in the hand it is a little smaller than the body.
+            body.Weapon.transform.localScale = Vector3.one * 0.8f;
+            body.Weapon.enabled = false;
             return body;
         }
 
