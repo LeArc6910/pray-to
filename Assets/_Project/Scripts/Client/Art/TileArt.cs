@@ -621,5 +621,49 @@ namespace Game.Client
             ".odmmmmmmmmmmdo.",
             ".oooooooooooooo.",
             "................");
+
+        // ---- Cracks ----
+
+        public const int CrackStages = 4;
+
+        // Each crack line, from where it starts to where it ends, and the stage it shows from (1 to CrackStages): a
+        // small star where the pick bites, then longer cracks with more branches, reaching the edges at the last
+        // stage. Coordinates count from the top left.
+        static readonly (int Stage, int X0, int Y0, int X1, int Y1)[] CrackLines =
+        {
+            (1, 8, 8, 6, 10), (1, 8, 8, 10, 6),
+            (2, 6, 10, 4, 11), (2, 10, 6, 11, 4), (2, 8, 8, 9, 11),
+            (3, 4, 11, 2, 13), (3, 11, 4, 13, 3), (3, 9, 11, 10, 13), (3, 8, 8, 5, 6), (3, 5, 6, 4, 4),
+            (4, 2, 13, 1, 15), (4, 13, 3, 15, 2), (4, 10, 13, 12, 15), (4, 4, 4, 3, 1), (4, 5, 6, 2, 7), (4, 10, 6, 13, 8),
+            (4, 13, 8, 14, 11),
+        };
+
+        static readonly Rgba CrackDark = Rgba.Hex("#140F0C").WithAlpha(235);
+        static readonly Rgba CrackEdge = Rgba.Hex("#D2C4B4").WithAlpha(110);
+
+        // The cracks drawn over a rock tile that has taken some hits, more with each stage (1 to CrackStages). Each
+        // crack pixel is dark with a faint light pixel below it, so it reads as cut into the rock.
+        public static PixelImage Cracks(int stage)
+        {
+            var image = new PixelImage(Size, Size);
+            var dark = new List<(int X, int Y)>();
+            foreach (var (from, x0, y0, x1, y1) in CrackLines)
+            {
+                if (from > stage) continue;
+                int steps = System.Math.Max(System.Math.Abs(x1 - x0), System.Math.Abs(y1 - y0));
+                for (int i = 0; i <= steps; i++)
+                {
+                    int x = x0 + (int)System.MathF.Round((x1 - x0) * (float)i / System.Math.Max(1, steps));
+                    int y = y0 + (int)System.MathF.Round((y1 - y0) * (float)i / System.Math.Max(1, steps));
+                    if (x >= 0 && y >= 0 && x < Size && y < Size) dark.Add((x, y));
+                }
+            }
+            foreach (var (x, y) in dark)
+            {
+                if (y + 1 < Size && !dark.Contains((x, y + 1))) image[x, y + 1] = CrackEdge;
+            }
+            foreach (var (x, y) in dark) image[x, y] = CrackDark;
+            return image;
+        }
     }
 }

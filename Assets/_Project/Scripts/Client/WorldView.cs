@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Game.Core;
 using UnityEngine;
 using UnityEngine.Rendering.Universal;
@@ -168,6 +169,8 @@ namespace Game.Client
         // Which skill slots of each other player have a buff running, from their snapshot state.
         readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
         readonly Dictionary<int, SpriteRenderer> _crops = new Dictionary<int, SpriteRenderer>();
+        // Cracks over rock that has taken hits, by tile, until it breaks or changes.
+        readonly Dictionary<int, SpriteRenderer> _cracks = new Dictionary<int, SpriteRenderer>();
         // Per machine tile: the part that shows which way it faces (a drill's bit, a smelter's arrow, a conveyor's
         // moving belt), and the icon of what a conveyor carries.
         readonly Dictionary<int, (TileType Kind, SpriteRenderer Part, SpriteRenderer Load)> _machines =
@@ -766,8 +769,10 @@ namespace Game.Client
                         _floating.Add(new Floating { Position = struck, Text = "곡괭이가 필요하다", Color = new Color(1f, 0.85f, 0.5f) });
                         break;
                     }
-                    AddFlash(struck, e.Amount == 1 ? 0.7f : 0.35f, Palette.Dust, Shapes.Circle);
-                    Hear(e.Amount == 1 ? Sound.Break : Sound.Dig, struck);
+                    bool broke = e.Amount >= World.DugThrough;
+                    AddFlash(struck, broke ? 0.7f : 0.35f, Palette.Dust, Shapes.Circle);
+                    Hear(broke ? Sound.Break : Sound.Dig, struck);
+                    if (!broke) Crack(TileMap.Cell(e.Position.X), TileMap.Cell(e.Position.Y), e.Amount);
                     break;
                 case SimEventType.Harvested:
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 0.6f, Palette.Ripe, Shapes.Ring);
@@ -1182,12 +1187,42 @@ namespace Game.Client
 
         static readonly (int X, int Y)[] Neighbourhood = { (0, 0), (1, 0), (-1, 0), (0, 1), (0, -1) };
 
-        // Redraws tiles that were dug or built on, and their neighbours, whose edges and shadows depend on them.
+        // Cracks the rock at a tile as far as it is dug (percent): longer and more of them with each quarter.
+        void Crack(int x, int y, int percent)
+        {
+            if (!_client.Map.InBounds(x, y)) return;
+            int key = y * _client.Map.Width + x;
+            if (!_cracks.TryGetValue(key, out var renderer))
+            {
+                renderer = Renderer(_root.transform, "Crack", null, Color.white);
+                renderer.transform.localPosition = new Vector3(x + 0.5f, y + 0.5f, 0);
+                // Over the rock and what is built on it, under everything standing in front.
+                renderer.sortingOrder = -85;
+                _cracks[key] = renderer;
+            }
+            int stage = Mathf.Clamp(1 + percent * TileArt.CrackStages / 100, 1, TileArt.CrackStages);
+            renderer.sprite = CrackSprites[stage - 1];
+        }
+
+        static Sprite[] _crackSprites;
+
+        static Sprite[] CrackSprites => _crackSprites ??= Enumerable.Range(1, TileArt.CrackStages)
+            .Select(stage => Sprites.Centered("crack/" + stage, () => TileArt.Cracks(stage)))
+            .ToArray();
+
+        // Redraws tiles that were dug or built on, and their neighbours, whose edges and shadows depend on them. A
+        // changed tile loses its cracks.
         public void UpdateTiles(IEnumerable<TileChange> changes)
         {
             var map = _client.Map;
             foreach (var change in changes)
             {
+                int key = change.Y * map.Width + change.X;
+                if (_cracks.TryGetValue(key, out var crack))
+                {
+                    Object.Destroy(crack.gameObject);
+                    _cracks.Remove(key);
+                }
                 _objects.SetTile(new Vector3Int(change.X, change.Y, 0), Sprites.Object(map[change.X, change.Y]));
                 foreach (var (dx, dy) in Neighbourhood)
                 {

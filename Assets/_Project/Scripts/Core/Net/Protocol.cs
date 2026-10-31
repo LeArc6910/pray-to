@@ -28,7 +28,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.18.0";
+        public const string Version = "0.19.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 

@@ -86,7 +86,8 @@ namespace Game.Client
                     TileType.Splitter, TileType.Arm,
                 }
                 .Select(TileArt.Object).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(ItemArt.Belt))
-                .Concat(new[] { ItemArt.DrillBit, ItemArt.Chevron, ItemArt.SplitterArrows, ItemArt.RobotArm }).ToList());
+                .Concat(new[] { ItemArt.DrillBit, ItemArt.Chevron, ItemArt.SplitterArrows, ItemArt.RobotArm })
+                .Concat(Enumerable.Range(1, TileArt.CrackStages).Select(TileArt.Cracks)).ToList());
 
             var players = new List<PixelImage>();
             foreach (var look in new[] { Look.Down, Look.Side, Look.Up })
@@ -183,6 +184,9 @@ namespace Game.Client
             scene.Icon(sx + 6.8f, sy - 3.5f, ItemArt.Material(loot.FindMaterial("copper_ore")));
 
             for (int i = 0; i < 4; i++) scene.Crop(sx - 5 + i, sy - 2, i);
+            // Rock beside the drill, cracked by a few hits.
+            scene.Machine(sx + 1, sy - 3, 0, TileArt.Cracks(2));
+            scene.Machine(sx + 1, sy - 5, 0, TileArt.Cracks(TileArt.CrackStages));
 
             scene.Player(sx + 0.5f, sy + 0.5f, CreatureArt.Player(Look.Down, 0, Rgba.Hex("#3F7FD8")));
             scene.Player(sx + 2.5f, sy + 1.2f, CreatureArt.Player(Look.Side, 1, Rgba.Hex("#4DB06A")));

@@ -142,7 +142,8 @@ namespace Game.Core.Tests
 
             Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
             var digs = events.Where(e => e.Type == SimEventType.Dug).ToList();
-            CollectionAssert.AreEqual(new[] { 0, 0, 1 }, digs.Select(e => e.Amount));
+            // How far it is dug after each hit, for the cracks; 100 when it gives way.
+            CollectionAssert.AreEqual(new[] { 33, 67, World.DugThrough }, digs.Select(e => e.Amount));
             Assert.AreEqual(TileMap.Center(3, 2), digs[0].Position);
             Assert.AreEqual(1, player.Inventory.CountOf(Stone));
             var change = world.TakeTileChanges().Single();
@@ -155,9 +156,11 @@ namespace Game.Core.Tests
         {
             var world = Room(out var player, TileType.CopperOre);
 
-            Swing(world, player, 4);
+            var events = Swing(world, player, 4);
             Assert.AreEqual(TileType.CopperOre, world.Map[3, 2]);
-            Swing(world, player, 1);
+            events.AddRange(Swing(world, player, 1));
+            CollectionAssert.AreEqual(new[] { 20, 40, 60, 80, World.DugThrough },
+                events.Where(e => e.Type == SimEventType.Dug).Select(e => e.Amount), "a fifth more cracked with each hit");
 
             Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
             Assert.AreEqual(1, player.Inventory.CountOf(CopperOre));

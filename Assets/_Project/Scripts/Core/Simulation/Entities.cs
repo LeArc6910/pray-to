@@ -222,7 +222,8 @@ namespace Game.Core
         Burst,
         // Source, a player, drank or ate something that heals Amount over the next moments.
         Healed,
-        // Source, a player, struck the wall at Position; Amount is 1 when it broke, -1 when it needs a pickaxe.
+        // Source, a player, struck the wall at Position; Amount is how far it is dug in percent (World.DugThrough when
+        // it broke), or -1 when it needs a pickaxe.
         Dug,
         // Source, a player, harvested Amount from the crop at Position.
         Harvested,

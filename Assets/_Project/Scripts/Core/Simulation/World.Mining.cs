@@ -12,6 +12,8 @@ namespace Game.Core
         // How far ahead of the player's centre the tile to dig or build on is.
         const float DigReach = 0.9f;
         const float BuildReach = 1;
+        // A Dug event's Amount when the tile broke.
+        public const int DugThrough = 100;
 
         readonly Dictionary<int, float> _wallDamage = new Dictionary<int, float>();
         readonly Dictionary<int, TileType> _changedTiles = new Dictionary<int, TileType>();
@@ -55,7 +57,9 @@ namespace Game.Core
             int key = y * Map.Width + x;
             float damage = _wallDamage.GetValueOrDefault(key) + (100 + player.Stats.MiningSpeed) / 100f;
             bool broken = damage >= tile.Hardness - 1e-4f;
-            _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: broken ? 1 : 0, position: TileMap.Center(x, y)));
+            // How far it is dug now, so clients can crack it that much: 1 to 99, or 100 when it gives way.
+            int dug = broken ? DugThrough : Math.Clamp((int)MathF.Round(damage / tile.Hardness * 100), 1, DugThrough - 1);
+            _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: dug, position: TileMap.Center(x, y)));
             if (!broken)
             {
                 _wallDamage[key] = damage;
