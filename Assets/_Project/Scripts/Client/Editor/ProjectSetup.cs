@@ -18,6 +18,8 @@ namespace Game.Client.Editor
         const string PipelinePath = SceneSetup.ProjectFolder + "/" + SettingsFolder + "/URP-2D.asset";
         // Player settings value for "Input System Package (New)". 0 is the old Input Manager, 2 is both.
         const int NewInputSystem = 1;
+        // The web page: Assets/WebGLTemplates/Fit.
+        const string WebTemplate = "PROJECT:Fit";
 
         [MenuItem("Game/Set Up Project")]
         public static void SetUp()
@@ -52,12 +54,14 @@ namespace Game.Client.Editor
 
         // Files gzipped with the decompression fallback on, because static hosts such as GitHub Pages do not send the
         // Content-Encoding header Unity's loader would otherwise need; cached in the browser after the first visit.
-        // Set here rather than only when building, so a build leaves the committed settings as they are.
+        // The page is the project's own template (Assets/WebGLTemplates/Fit), which fills the browser window on a PC
+        // too. Set here rather than only when building, so a build leaves the committed settings as they are.
         public static void UseWebSettings()
         {
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.dataCaching = true;
+            PlayerSettings.WebGL.template = WebTemplate;
         }
 
         // Sets Project Settings > Player > Active Input Handling, which has no public API. This is the serialized

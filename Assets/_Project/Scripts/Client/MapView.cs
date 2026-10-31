@@ -107,20 +107,25 @@ namespace Game.Client
             if (GUI.Button(area, GUIContent.none, GUIStyle.none)) FullOpen = true;
         }
 
-        // The whole map over the game. Tapping or clicking anywhere closes it.
+        // The whole map over the game, in a panel with its title above it and its key below, so neither sits on what
+        // is under them. Tapping or clicking anywhere closes it.
         public void DrawFull()
         {
+            const float lineHeight = 26;
             var screen = new Rect(0, 0, Ui.Width, Ui.Height);
             Controls.Block(screen);
-            Fill(screen, new Color(0, 0, 0, 0.6f));
-            float size = Mathf.Min(Ui.Width, Ui.Height - 60) - 20;
-            var area = new Rect((Ui.Width - size) / 2, 34, size, size);
-            Framed(area);
+            Fill(screen, new Color(0, 0, 0, 0.75f));
+            float pad = UiSkin.PanelPadding;
+            float size = Mathf.Min(Ui.Width - 2 * (10 + pad), Ui.Height - 2 * (10 + pad) - lineHeight * 2);
+            var panel = new Rect((Ui.Width - size) / 2 - pad, (Ui.Height - size) / 2 - lineHeight - pad, size + pad * 2, size + lineHeight * 2 + pad * 2);
+            GUI.Box(panel, GUIContent.none);
+            var area = new Rect(panel.x + pad, panel.y + pad + lineHeight, size, size);
+            Fill(area, Backdrop);
             DrawTiles(area, new Rect(0, 0, _map.Width, _map.Height));
 
             string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
-            GUI.Label(new Rect(area.x, 8, area.width, 24), close);
-            GUI.Label(new Rect(area.x, area.yMax + 4, area.width, 24), "● 나   ● 다른 플레이어   ○ 보스 아레나");
+            GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
+            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나");
             if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
         }
 

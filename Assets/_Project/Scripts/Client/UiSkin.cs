@@ -11,6 +11,8 @@ namespace Game.Client
         static readonly Color Text = new Color(0.94f, 0.9f, 0.84f);
         static readonly Color TextBright = Color.white;
         static readonly Color TextPressed = new Color(1f, 0.9f, 0.68f);
+        // Space inside a panel's frame before its text.
+        public const int PanelPadding = 12;
         static readonly Rgba HealthColor = Rgba.Hex("#D24A3C");
         static readonly Rgba BossColor = Rgba.Hex("#A8324A");
 
@@ -41,6 +43,9 @@ namespace Game.Client
 
             Frame(skin.box, UiArt.PanelBorder, panel, panel, panel, panel, panel, panel);
             Frame(skin.window, UiArt.PanelBorder, panel, panel, panel, panel, panel, panel);
+            // Text keeps clear of the frame (six points wide) by as much again.
+            skin.box.padding = new RectOffset(PanelPadding, PanelPadding, PanelPadding - 2, PanelPadding - 2);
+            skin.window.padding = new RectOffset(PanelPadding, PanelPadding, PanelPadding - 2, PanelPadding - 2);
             // A toolbar draws its tabs with this style; the chosen tab is "on".
             Frame(skin.button, UiArt.ButtonBorder, button, hover, pressed, chosen, chosen, chosenPressed);
             skin.button.hover.textColor = TextBright;

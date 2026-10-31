@@ -52,6 +52,8 @@ namespace Game.Client
         // player sees what mixing does.
         readonly List<string> _chosenClasses = new List<string> { "warrior", "fire_mage" };
         Vector2 _menuScroll;
+        // Width of a line of text in a menu column this frame.
+        float _menuColumn;
         WorldHost _host;
         WorldClient _client;
         NetLink _net;
@@ -65,6 +67,9 @@ namespace Game.Client
         bool _joinSent;
         // Set from Netcode callbacks; the session ends on the next Update, outside the callback.
         string _endReason;
+        // Clears IMGUI's keyboard focus at the next OnGUI, so a name field left focused in the menu does not keep
+        // taking keys once the game starts.
+        bool _dropFocus;
 
         void Awake()
         {
@@ -130,7 +135,11 @@ namespace Game.Client
                 EndSession("참가 거절: " + _client.RefusedReason);
                 return;
             }
-            if (Controls.BagPressed()) _inventory.Open = !_inventory.Open;
+            if (Controls.BagPressed())
+            {
+                _inventory.Open = !_inventory.Open;
+                _dropFocus = true;
+            }
             ReadSkillPress();
 
             _tickClock += Time.deltaTime;
@@ -287,6 +296,7 @@ namespace Game.Client
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
             _status = "";
+            _dropFocus = true;
         }
 
         void StartJoining()
@@ -317,6 +327,7 @@ namespace Game.Client
             };
             _mode = Mode.Join;
             _status = "접속 중…";
+            _dropFocus = true;
         }
 
         string CharacterName => string.IsNullOrWhiteSpace(_playerName) ? "플레이어" : _playerName.Trim();
@@ -412,17 +423,25 @@ namespace Game.Client
         void OnGUI()
         {
             Ui.Begin();
+            if (_dropFocus)
+            {
+                GUIUtility.keyboardControl = 0;
+                _dropFocus = false;
+            }
             if (_client == null)
             {
                 DrawMenu();
                 return;
             }
+            // The full map covers everything, and nothing else is drawn under it: no HUD for its title to sit on,
+            // and no button a tap meant to close the map could press instead.
+            if (_map != null && _map.FullOpen)
+            {
+                _map.DrawFull();
+                return;
+            }
             _view?.DrawGui();
-            DrawHud();
-            // While the full map is up, the controls under it are drawn disabled: IMGUI hands a click to the first
-            // control drawn under the pointer, so a tap meant to close the map could press [나가기] instead.
-            bool mapOpen = _map != null && _map.FullOpen;
-            GUI.enabled = !mapOpen;
+            DrawHud(compact: _inventory.Open);
             // Under the bag window. On a touch screen the buttons go away while the bag is open, so a tap in the
             // window cannot fire a skill.
             if (_client.Status == ClientStatus.Playing && !(Controls.UsingTouch && _inventory.Open)) SkillBar.Draw(_client);
@@ -444,9 +463,6 @@ namespace Game.Client
                 DrawTouchButtons();
                 Controls.DrawTouch();
             }
-            GUI.enabled = true;
-            // Last, over everything else.
-            if (mapOpen) _map.DrawFull();
         }
 
         // Stand-ins for Tab and Esc on phones, under the minimap.
@@ -465,15 +481,20 @@ namespace Game.Client
         // when the screen is too short for it.
         void DrawMenu()
         {
-            bool wide = Ui.Width >= 760;
-            float width = wide ? 740 : Mathf.Min(380, Ui.Width - 20);
+            // Two columns side by side wherever they fit, a phone held sideways included.
+            bool wide = Ui.Width >= 700;
+            float width = wide ? Mathf.Min(740, Ui.Width - 20) : Mathf.Min(380, Ui.Width - 20);
             float height = Mathf.Min(wide ? 460 : 760, Ui.Height - 20);
+            // Both columns get a set width, so a long line wraps instead of widening its column past the frame.
+            float column = wide ? (width - GUI.skin.box.padding.horizontal - 40) / 2 : width - GUI.skin.box.padding.horizontal - 24;
+            // Text in a column is that wide less a label's margins.
+            _menuColumn = column - GUI.skin.label.margin.horizontal;
             var area = new Rect((Ui.Width - width) / 2, (Ui.Height - height) / 2, width, height);
             GUILayout.BeginArea(area, GUI.skin.box);
             _menuScroll = GUILayout.BeginScrollView(_menuScroll);
             if (wide) GUILayout.BeginHorizontal();
 
-            GUILayout.BeginVertical(GUILayout.Width(wide ? 340 : width - 40));
+            GUILayout.BeginVertical(GUILayout.Width(column));
             GUILayout.Label($"pray-to 프로토타입 (버전 {Protocol.Version})");
             GUILayout.Space(8);
             GUILayout.Label("이름 (캐릭터)");
@@ -512,7 +533,7 @@ namespace Game.Client
             {
                 // A browser cannot listen for connections, and joining would need a WebSocket transport.
                 GUILayout.Space(8);
-                GUILayout.Label("웹 데모에서는 혼자 하기만 됩니다. 협동은 PC 버전에서 합니다.");
+                GUILayout.Label(Ui.Wrap("웹 데모에서는 혼자 하기만 됩니다. 협동은 PC 버전에서 합니다.", GUI.skin.label, _menuColumn));
             }
             else
             {
@@ -527,12 +548,12 @@ namespace Game.Client
             if (_status.Length > 0)
             {
                 GUILayout.Space(8);
-                GUILayout.Label(_status);
+                GUILayout.Label(Ui.Wrap(_status, GUI.skin.label, _menuColumn));
             }
             GUILayout.EndVertical();
 
             if (wide) GUILayout.Space(16);
-            GUILayout.BeginVertical();
+            GUILayout.BeginVertical(GUILayout.Width(column));
             if (_classes != null && _classes.Success) DrawClassPicker();
             GUILayout.EndVertical();
 
@@ -546,7 +567,7 @@ namespace Game.Client
         void DrawClassPicker()
         {
             int max = ClassRules.DefaultMaxClasses;
-            GUILayout.Label($"클래스 (최대 {max}개, 고른 순서대로 스킬 칸을 채운다)");
+            GUILayout.Label(Ui.Wrap($"클래스 (최대 {max}개, 고른 순서대로 스킬 칸을 채운다)", GUI.skin.label, _menuColumn));
             foreach (var option in _classes.Classes)
             {
                 int order = _chosenClasses.IndexOf(option.Id);
@@ -559,21 +580,28 @@ namespace Game.Client
                     else _chosenClasses.Add(option.Id);
                 }
                 GUI.enabled = true;
-                GUILayout.Label($"{option.Description}\n패시브: {SkillText.Passive(option)}\n스킬: {string.Join(", ", option.Skills.Select(k => k.Name))}");
+                GUILayout.Label(Ui.Wrap(
+                    $"{option.Description}\n패시브: {SkillText.Passive(option)}\n스킬: {string.Join(", ", option.Skills.Select(k => k.Name))}", GUI.skin.label, _menuColumn));
                 GUILayout.Space(4);
             }
-            if (_chosenClasses.Count == 0) GUILayout.Label("고르지 않으면 기본 공격만 쓴다.");
+            if (_chosenClasses.Count == 0) GUILayout.Label(Ui.Wrap("고르지 않으면 기본 공격만 쓴다.", GUI.skin.label, _menuColumn));
         }
 
-        // The status box: a health bar, then lines that grow the box to fit, so a narrow window wraps them instead of
-        // cutting them off.
-        void DrawHud()
+        // The status box: a health bar, then lines that grow the box to fit, so a narrow window wraps them (between
+        // words) instead of cutting them off. Compact while the bag is open, so the bag can sit just under it: only the
+        // health bar, and the line saying so when the player is down. On a short screen (a phone held sideways) the
+        // how-to-play lines go, so the HUD does not cover half of it.
+        void DrawHud(bool compact)
         {
             var lines = new List<string>();
             bool playing = _client.Status == ClientStatus.Playing;
             if (!playing)
             {
                 lines.Add(_status);
+            }
+            else if (compact)
+            {
+                if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
             }
             else
             {
@@ -583,12 +611,12 @@ namespace Game.Client
                 var toArena = _client.Arena - _client.Position;
                 if (toArena.Length > _client.ArenaRadius) lines.Add($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
             }
-            if (Controls.UsingTouch)
+            if (!compact && !Ui.Short && Controls.UsingTouch)
             {
                 lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로, 벽이면 캔다)");
                 lines.Add("오른쪽 아래 스킬·물약 · 미니맵을 누르면 지도");
             }
-            else
+            else if (!compact && !Ui.Short)
             {
                 lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격(벽이면 캔다)");
                 lines.Add("Q E R F 스킬 · C 물약 · Tab 가방 · M 지도 · Esc 메뉴");
@@ -597,8 +625,9 @@ namespace Game.Client
             var box = GUI.skin.box;
             var label = GUI.skin.label;
             float width = Ui.HudArea.width - box.padding.horizontal - label.margin.horizontal;
+            for (int i = 0; i < lines.Count; i++) lines[i] = Ui.Wrap(lines[i], label, width);
             float gap = Mathf.Max(label.margin.top, label.margin.bottom);
-            float height = box.padding.vertical + label.margin.top + label.margin.bottom + gap * (lines.Count - 1);
+            float height = box.padding.vertical + (lines.Count > 0 ? label.margin.top + label.margin.bottom + gap * (lines.Count - 1) : 0);
             foreach (string line in lines) height += label.CalcHeight(new GUIContent(line), width);
             if (playing) height += HealthBarHeight;
             Ui.HudHeight = Mathf.Ceil(height) + 2;

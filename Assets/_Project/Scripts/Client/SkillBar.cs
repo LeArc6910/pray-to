@@ -81,15 +81,15 @@ namespace Game.Client
 
                 var previous = GUI.color;
                 GUI.color = cooldown > 0 || client.IsDead ? new Color(1, 1, 1, 0.45f) : Color.white;
-                GUI.Label(new Rect(area.x + 3, area.y + 10, area.width - 6, area.height - 18), skill.Name, _nameStyle);
+                GUI.Label(NameArea(area), Ui.Wrap(skill.Name, _nameStyle, area.width - 6), _nameStyle);
                 GUI.color = previous;
-                if (!Controls.UsingTouch) GUI.Label(new Rect(area.x + 4, area.y + 2, 20, 18), Controls.SkillKeyName(slot), _keyStyle);
+                if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.SkillKeyName(slot), _keyStyle);
 
                 Shade(area, cooldown, skill.Cooldown);
                 if (buff > 0)
                 {
                     GUI.color = color;
-                    GUI.Label(new Rect(area.x, area.yMax - 22, area.width - 4, 18), Mathf.CeilToInt(buff) + "초", _keyStyle);
+                    GUI.Label(new Rect(area.x + Inner, area.yMax - Inner - 22, area.width - Inner * 2, 18), Mathf.CeilToInt(buff) + "초", _keyStyle);
                     GUI.color = previous;
                 }
 
@@ -119,15 +119,15 @@ namespace Game.Client
             GUI.color = count == 0 || wait > 0 || client.IsDead ? new Color(1, 1, 1, 0.45f) : Color.white;
             if (potion != null)
             {
-                Sprites.DrawInGui(new Rect(area.center.x - IconSize / 2, area.y + 10, IconSize, IconSize), Sprites.Icon(potion));
-                GUI.Label(new Rect(area.x + 3, area.y + 38, area.width - 6, 18), $"×{count}", _nameStyle);
+                Sprites.DrawInGui(new Rect(area.center.x - IconSize / 2, area.y + Inner + 6, IconSize, IconSize), Sprites.Icon(potion));
+                GUI.Label(new Rect(area.x + 3, area.y + Inner + 32, area.width - 6, 18), $"×{count}", _nameStyle);
             }
             else
             {
-                GUI.Label(new Rect(area.x + 3, area.y + 10, area.width - 6, area.height - 18), "물약\n×0", _nameStyle);
+                GUI.Label(NameArea(area), "물약\n×0", _nameStyle);
             }
             GUI.color = previous;
-            if (!Controls.UsingTouch) GUI.Label(new Rect(area.x + 4, area.y + 2, 20, 18), Controls.PotionKeyName, _keyStyle);
+            if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.PotionKeyName, _keyStyle);
             Shade(area, wait, potion?.Cooldown ?? wait);
 
             if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
@@ -135,6 +135,12 @@ namespace Game.Client
                 DrawTooltip(potion != null ? $"{potion.Name} ×{count}\n{potion.Description}" : "물약이 없다. 몬스터와 보스가 떨어뜨린다", area);
             }
         }
+
+        // The key letter in the top left corner, inside the frame so its bevel does not hide the letter's top.
+        static Rect KeyArea(Rect slot) => new Rect(slot.x + Inner, slot.y + Inner - 2, 20, 18);
+
+        // The name, under the key letter and above the stripe.
+        static Rect NameArea(Rect slot) => new Rect(slot.x + 3, slot.y + Inner + 10, slot.width - 6, slot.height - Inner * 2 - 16);
 
         // Darkens the share of the slot still cooling down and shows the seconds left.
         static void Shade(Rect area, float left, float total)
@@ -145,13 +151,14 @@ namespace Game.Client
             GUI.Label(area, left >= 1 ? Mathf.CeilToInt(left).ToString() : left.ToString("0.0"), _timeStyle);
         }
 
-        // Above the hovered slot.
+        // Above the hovered slot, kept on the screen.
         static void DrawTooltip(string text, Rect slot)
         {
-            var content = new GUIContent(text);
+            var content = new GUIContent(Ui.Wrap(text, _tooltipStyle, TooltipWidth));
             float height = _tooltipStyle.CalcHeight(content, TooltipWidth);
             float x = Mathf.Clamp(slot.center.x - TooltipWidth / 2, 10, Ui.Width - TooltipWidth - 10);
-            GUI.Box(new Rect(x, slot.y - height - 8, TooltipWidth, height), content, _tooltipStyle);
+            float y = Mathf.Max(10, slot.y - height - 8);
+            GUI.Box(new Rect(x, y, TooltipWidth, height), content, _tooltipStyle);
         }
 
         // The slot's panel with a stripe of its colour along the bottom, inside the frame.

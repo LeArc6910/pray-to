@@ -17,7 +17,7 @@ namespace Game.Client
             ['L'] = Rgba.Hex("#7A6450"),
             ['M'] = Rgba.Hex("#52402F"),
             ['d'] = Rgba.Hex("#33281F"),
-            ['f'] = Rgba.Hex("#1C1612").WithAlpha(246),
+            ['f'] = Rgba.Hex("#1C1612"),
         };
 
         public const int PanelBorder = 3;

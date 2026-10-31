@@ -19,8 +19,6 @@ namespace Game.Client
         }
 
         const float MaxWidth = 520;
-        // Room for the title line and the tabs above the scrolling part.
-        const float HeaderHeight = 78;
         const float TabHeight = 40;
         const float TooltipWidth = 320;
         // Narrower than this beside the minimap column, the window goes under it instead.
@@ -30,6 +28,7 @@ namespace Game.Client
 
         static GUIStyle _tooltipStyle;
         static readonly string[] PageNames = { "장비", "재료·제작", "상자" };
+        static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
         readonly WorldClient _client;
         readonly Action<byte[]> _send;
@@ -38,6 +37,10 @@ namespace Game.Client
         RuneDefinition _selectedRune;
         float _nameWidth;
         float _recipeWidth;
+        // Width of a line of text in the scrolling list.
+        float _textWidth;
+        // Where the scrolling list is on the screen, for showing descriptions only while the pointer is over it.
+        Rect _rows;
         // Each row starts with the thing's icon.
         const float IconSize = 24;
         const float IconRoom = IconSize + 4;
@@ -69,30 +72,72 @@ namespace Game.Client
                 float top = Ui.RightColumnBottom + 10;
                 area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
             }
+            // Under the HUD where the two would overlap. While the bag is open the HUD is only its health bar.
+            var hud = Ui.HudArea;
+            if (area.x < hud.xMax + 10 && area.y < hud.yMax + 10) area = Rect.MinMaxRect(area.x, hud.yMax + 10, area.xMax, area.yMax);
             bool besideWindow = area.x >= TooltipWidth + 20;
-            _nameWidth = Mathf.Min(240, area.width - 200 - IconRoom);
-            _recipeWidth = area.width - 110 - IconRoom;
+            float inner = area.width - GUI.skin.box.padding.horizontal;
+            float scrollbar = GUI.skin.verticalScrollbar.fixedWidth + 8;
+            // A label in the list is that wide less its own margins.
+            _textWidth = inner - scrollbar - GUI.skin.label.margin.horizontal;
+            _nameWidth = Mathf.Clamp(_textWidth - IconRoom - 150, 60, 240);
+            _recipeWidth = _textWidth - IconRoom - 76;
             Controls.Block(area);
             Wheel(area);
-            // The panel (UiSkin) is all but opaque, so names drawn over the world do not show through the list.
             GUILayout.BeginArea(area, GUI.skin.box);
             string close = Controls.UsingTouch ? "가방 버튼으로 닫기" : "Tab 또는 I로 닫기";
             // Without room beside the window the hint goes in the title, so nothing sits over the list.
             string hint = besideWindow ? "" : Controls.UsingTouch ? " · 이름을 누르고 있으면 설명" : " · 이름에 마우스를 올리면 설명";
-            GUILayout.Label($"가방 ({close}){hint}");
+            GUILayout.Label(Fit($"가방 ({close}){hint}", inner));
             // The chest tab is there only while a chest is in reach.
             bool chest = _client.Chest.IsOpen;
             if (!chest && _page == Page.Chest) _page = Page.Gear;
-            _page = (Page)GUILayout.Toolbar((int)_page, chest ? PageNames : PageNames.Take(2).ToArray(), GUILayout.Height(TabHeight));
+            _page = Tabs(_page, chest ? 3 : 2);
             int page = (int)_page;
-            _scroll[page] = GUILayout.BeginScrollView(_scroll[page], GUILayout.Height(area.height - HeaderHeight));
+            // The list takes whatever height the title and tabs leave, so it never runs past the frame.
+            _scroll[page] = GUILayout.BeginScrollView(_scroll[page], GUILayout.ExpandHeight(true));
             if (_page == Page.Gear) DrawGear();
             else if (_page == Page.Materials) DrawMaterialsPage();
             else DrawChest();
             GUILayout.EndScrollView();
+            if (Event.current.type == EventType.Repaint)
+            {
+                var rows = GUILayoutUtility.GetLastRect();
+                _rows = new Rect(area.x + rows.x, area.y + rows.y, rows.width, rows.height);
+            }
             GUILayout.EndArea();
             DrawTooltip(area, besideWindow);
         }
+
+        // Tabs that switch as soon as they are pressed. IMGUI's toolbar switches on release, and in the browser its
+        // first click after the bag opened was sometimes lost (LOCAL_TASKS.md, the 2026-10-31 UI check).
+        Page Tabs(Page page, int count)
+        {
+            var row = GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true));
+            const float gap = 4;
+            float width = (row.width - gap * (count - 1)) / count;
+            var e = Event.current;
+            for (int i = 0; i < count; i++)
+            {
+                var tab = new Rect(row.x + i * (width + gap), row.y, width, row.height);
+                if (e.type == EventType.MouseDown && tab.Contains(e.mousePosition))
+                {
+                    if (page != (Page)i)
+                    {
+                        page = (Page)i;
+                        // A description from the old tab must not stay up over the new one.
+                        GUI.tooltip = "";
+                        Sounds.Play(Sound.Click);
+                    }
+                    e.Use();
+                }
+                if (e.type == EventType.Repaint) GUI.skin.button.Draw(tab, PageLabels[i], tab.Contains(e.mousePosition), false, page == (Page)i, false);
+            }
+            return page;
+        }
+
+        // Text broken between words to fit the width (Ui.Wrap).
+        static string Fit(string text, float width) => Ui.Wrap(text, GUI.skin.label, width);
 
         // Scrolls the open page by whole lines per notch while the pointer is over the window.
         void Wheel(Rect area)
@@ -157,7 +202,7 @@ namespace Game.Client
                 GUI.color = previous;
             }
             GUILayout.EndHorizontal();
-            if (_selectedRune != null) GUILayout.Label($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 한 번 넣은 룬은 뺄 수 없습니다.");
+            if (_selectedRune != null) GUILayout.Label(Fit($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 한 번 넣은 룬은 뺄 수 없습니다.", _textWidth));
         }
 
         void DrawMaterialsPage()
@@ -166,25 +211,41 @@ namespace Game.Client
             DrawCrafting();
         }
 
-        // The hovered item's description: in a box beside the window, where the hint shows when nothing is hovered;
-        // without room there, over the window's bottom edge, and only while something is hovered or held. Drawn
-        // outside the layout so its changing height never shifts the window's controls.
-        static void DrawTooltip(Rect window, bool besideWindow)
+        // The hovered or held item's description, only while the pointer is over the list, so a description left over
+        // from another tab never shows. Beside the window at the pointer's height when there is room there (a hint
+        // waits there while nothing is hovered); otherwise next to the pointer, above a finger so it is not under it,
+        // and kept on the screen. Drawn outside the layout so its changing size never shifts the window's controls.
+        void DrawTooltip(Rect window, bool besideWindow)
         {
-            bool hovering = !string.IsNullOrEmpty(GUI.tooltip);
+            var pointer = Event.current.mousePosition;
+            bool hovering = !string.IsNullOrEmpty(GUI.tooltip) && _rows.Contains(pointer);
             if (!hovering && !besideWindow) return;
+            _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
             string text = hovering ? GUI.tooltip
                 : Controls.UsingTouch ? "아이템 이름을 누르고 있으면 설명이 보입니다." : "아이템 이름에 마우스를 올리면 설명이 보입니다.";
-            var content = new GUIContent(text);
-            _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
-            // As wide as the longest line needs (CalcSize ignores wrapping), so short hints do not wrap their last word.
-            float room = besideWindow ? TooltipWidth : window.width - 20;
+            float room = Mathf.Min(TooltipWidth, Ui.Width - 20);
+            var content = new GUIContent(Ui.Wrap(text, _tooltipStyle, room));
+            // As wide as the longest line needs, so short descriptions get a small box.
             float width = Mathf.Min(room, Mathf.Ceil(_tooltipStyle.CalcSize(content).x) + 2);
             float height = _tooltipStyle.CalcHeight(content, width);
-            var rect = besideWindow
-                ? new Rect(window.x - width - 10, Mathf.Max(window.y, Ui.HudArea.yMax + 10), width, height)
-                : new Rect(window.x + 10, window.yMax - height - 10, width, height);
-            GUI.Box(rect, content, _tooltipStyle);
+            float x;
+            float y;
+            if (besideWindow)
+            {
+                x = window.x - width - 10;
+                y = hovering ? pointer.y - 12 : Mathf.Max(window.y, Ui.HudArea.yMax + 10);
+            }
+            else
+            {
+                x = pointer.x + 16;
+                if (x + width > Ui.Width - 10) x = pointer.x - width - 16;
+                y = Controls.UsingTouch ? pointer.y - height - 28 : pointer.y + 20;
+                if (y + height > Ui.Height - 10) y = pointer.y - height - 12;
+                if (y < 10) y = pointer.y + 28;
+            }
+            x = Mathf.Clamp(x, 10, Mathf.Max(10, Ui.Width - width - 10));
+            y = Mathf.Clamp(y, 10, Mathf.Max(10, Ui.Height - height - 10));
+            GUI.Box(new Rect(x, y, width, height), content, _tooltipStyle);
         }
 
         // With the classes, what each damaging skill would hit for now: the same tag rules as the host, so swapping
@@ -192,14 +253,15 @@ namespace Game.Client
         void DrawStats()
         {
             var stats = _client.Stats;
-            GUILayout.Label(
+            GUILayout.Label(Fit(
                 $"생명력 {stats.MaxHealth:0} · 재생 {stats.HealthRegen:0.#}/초 · 방어도 {stats.Armor:0} · 이동 {stats.MoveSpeed:0.#}\n" +
-                $"{stats.Attack.Name} 피해 {stats.Damage:0.#} · 초당 공격 {stats.AttacksPerSecond:0.##} · 치명타 {stats.CritChance:0.#}% (×{stats.CritDamage:0}%) · 아이템 희귀도 +{stats.ItemRarity:0}%");
+                $"{stats.Attack.Name} 피해 {stats.Damage:0.#} · 초당 공격 {stats.AttacksPerSecond:0.##} · 치명타 {stats.CritChance:0.#}% (×{stats.CritDamage:0}%) · 아이템 희귀도 +{stats.ItemRarity:0}%",
+                _textWidth));
             if (_client.Classes.Count == 0) return;
             var hits = _client.Skills
                 .Where(skill => skill.Damage > 0)
                 .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f:0.#}");
-            GUILayout.Label($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}");
+            GUILayout.Label(Fit($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}", _textWidth));
         }
 
         // Materials, counted by kind. One that builds gets [놓기] and a seed gets [심기]; both act on the tile the
@@ -207,12 +269,12 @@ namespace Game.Client
         void DrawMaterials()
         {
             GUILayout.Label("재료");
-            if (_client.Bag.Materials.Count == 0) GUILayout.Label("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.");
+            if (_client.Bag.Materials.Count == 0) GUILayout.Label(Fit("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.", _textWidth));
             foreach (var pair in _client.Bag.Materials.ToList())
             {
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
-                GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
+                GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
                 if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
                 var crop = _client.CropFrom(pair.Key);
                 if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
@@ -250,7 +312,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 Icon(icon);
-                GUILayout.Label(new GUIContent($"{name} ×{count}", description), GUILayout.Width(_nameWidth));
+                GUILayout.Label(new GUIContent(Fit($"{name} ×{count}", _nameWidth), description), GUILayout.Width(_nameWidth));
                 if (GUILayout.Button(action, GUILayout.Width(64))) Send(moveStack(kind, definition), Sound.Click);
                 GUILayout.EndHorizontal();
             }
@@ -276,7 +338,7 @@ namespace Game.Client
                 string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
                 GUILayout.BeginHorizontal();
                 Icon(recipe.Item != null ? Sprites.Icon(recipe.Item) : recipe.Consumable != null ? Sprites.Icon(recipe.Consumable) : Sprites.Icon(recipe.Material));
-                GUILayout.Label(new GUIContent($"{name}\n{needs}", RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
+                GUILayout.Label(new GUIContent(Fit($"{name}\n{needs}", _recipeWidth), RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
                 GUI.enabled = enabled && _client.CanCraft(recipe);
                 if (GUILayout.Button("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
                 GUI.enabled = enabled;
@@ -307,7 +369,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
-                GUILayout.Label(new GUIContent($"{pair.Key.Name} ×{pair.Value}", pair.Key.Description), GUILayout.Width(_nameWidth));
+                GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
                 if (GUILayout.Button("마시기", GUILayout.Width(56)))
                 {
                     byte[] command = _client.UseConsumableCommand(pair.Key);
@@ -323,7 +385,7 @@ namespace Game.Client
             var previous = GUI.color;
             GUI.color = Palette.Of(item.Rarity);
             string sockets = item.Sockets.Count == 0 ? "" : " " + string.Concat(item.Sockets.Select(r => r == null ? "○" : "●"));
-            GUILayout.Label(new GUIContent(ItemText.Name(item) + sockets, string.Join("\n", ItemText.Describe(item))), GUILayout.Width(_nameWidth));
+            GUILayout.Label(new GUIContent(Fit(ItemText.Name(item) + sockets, _nameWidth), string.Join("\n", ItemText.Describe(item))), GUILayout.Width(_nameWidth));
             GUI.color = previous;
         }
 

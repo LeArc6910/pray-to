@@ -21,6 +21,7 @@
 
 - **혼자 하기만 된다.** 브라우저는 연결을 받을 수 없어 호스트가 될 수 없고, 참가하려면 WebSocket 전송이 필요하다. 메뉴에서 호스트와 참가를 숨긴다
 - **글꼴**: 웹 빌드는 시스템 글꼴을 쓸 수 없어서 Noto Sans KR(SIL OFL 1.1, `Docs/Licenses/NotoSansKR-OFL.txt`)을 게임에 넣었다. 10 MB짜리 원본에서 Medium 굵기와 필요한 글자(ASCII, 기호, KS X 1001 한글 2,350자, 코드와 시트에 쓰인 모든 글자)만 남겨 약 520 KB다. 새 글자가 필요하면 `DevTools/Fonts/make-korean-font.py`로 다시 만든다. 에디터와 PC 빌드도 같은 글꼴을 쓴다
+- **페이지**: 프로젝트의 템플릿 `Assets/WebGLTemplates/Fit`(Unity의 Minimal 템플릿을 고친 것, `ProjectSetup.UseWebSettings`가 고른다). 게임이 PC에서도 브라우저 창을 꽉 채워서, 작은 창에서 960×600 고정 화면이 잘리고 스크롤 막대가 생기던 일이 없다(2026-10-31 UI 점검). 불러오는 동안 "불러오는 중…" 막대를 보여 준다. Tab은 가방을 여는 키라서 브라우저가 Tab으로 초점을 게임 밖으로 옮기지 않게 막는다
 - **화면 크기**: 브라우저는 기기의 실제 픽셀 밀도로 그리므로(휴대폰은 점 하나에 3픽셀쯤) 그대로면 글자가 아주 작다. `Ui`가 `window.devicePixelRatio`(`Plugins/WebGL/Display.jslib`)만큼 IMGUI를 키운다. 세로 화면에서는 카메라를 넓혀 가로로 보이는 범위를 지킨다. 가로로 들고 하는 쪽이 편하다
 
 ## 터치 조작
