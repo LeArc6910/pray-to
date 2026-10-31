@@ -81,7 +81,7 @@ namespace Game.Client
             {
                 if (p > 0) result.Append('\n');
                 line.Clear();
-                foreach (string word in paragraphs[p].Split(' '))
+                foreach (string word in Words(paragraphs[p]))
                 {
                     // A little short of the width, or Unity's own wrapping may still split the line's last word.
                     if (line.Length > 0 && TextWidth(style, line + " " + word) > width - 4)
@@ -100,6 +100,20 @@ namespace Game.Client
             wrapped = result.ToString();
             Wrapped[key] = wrapped;
             return wrapped;
+        }
+
+        // The words of a line, with a lone separator ("·", "+", "/") kept on the word before it, so no line starts
+        // with one.
+        static List<string> Words(string line)
+        {
+            var words = new List<string>();
+            foreach (string word in line.Split(' '))
+            {
+                bool separator = word.Length == 1 && !char.IsLetterOrDigit(word[0]);
+                if (separator && words.Count > 0) words[words.Count - 1] += " " + word;
+                else words.Add(word);
+            }
+            return words;
         }
 
         static float TextWidth(GUIStyle style, string text)

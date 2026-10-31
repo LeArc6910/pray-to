@@ -442,9 +442,9 @@ namespace Game.Client
             }
             _view?.DrawGui();
             DrawHud(compact: _inventory.Open);
-            // Under the bag window. On a touch screen the buttons go away while the bag is open, so a tap in the
-            // window cannot fire a skill.
-            if (_client.Status == ClientStatus.Playing && !(Controls.UsingTouch && _inventory.Open)) SkillBar.Draw(_client);
+            // Not while the bag is open: skills cannot be used then (ReadSkillPress), a tap in the window must not fire
+            // one, and a slot would show in the gap beside the window.
+            if (_client.Status == ClientStatus.Playing && !_inventory.Open) SkillBar.Draw(_client);
             _inventory?.Draw();
             // Bottom left, or above the skill buttons where they reach that far.
             var slots = SkillBar.Bounds(_client.Skills.Count);
@@ -478,20 +478,26 @@ namespace Game.Client
         }
 
         // Name and how to play on one side, classes on the other; one above the other on a narrow screen. Scrolls
-        // when the screen is too short for it.
+        // when the screen is too short for it, but [혼자 하기] (and what went wrong last) stays at the bottom, in view
+        // however short the screen is.
         void DrawMenu()
         {
             // Two columns side by side wherever they fit, a phone held sideways included.
             bool wide = Ui.Width >= 700;
             float width = wide ? Mathf.Min(740, Ui.Width - 20) : Mathf.Min(380, Ui.Width - 20);
             float height = Mathf.Min(wide ? 460 : 760, Ui.Height - 20);
-            // Both columns get a set width, so a long line wraps instead of widening its column past the frame.
-            float column = wide ? (width - GUI.skin.box.padding.horizontal - 40) / 2 : width - GUI.skin.box.padding.horizontal - 24;
+            // Both columns get a set width that leaves room for the scroll bar, so a long line wraps instead of
+            // widening its column, and the menu never scrolls sideways.
+            float inner = width - GUI.skin.box.padding.horizontal;
+            float list = inner - GUI.skin.verticalScrollbar.fixedWidth - 8;
+            float column = wide ? (list - 16) / 2 : list;
             // Text in a column is that wide less a label's margins.
             _menuColumn = column - GUI.skin.label.margin.horizontal;
+            bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
+                && _classes != null && _classes.Success && _tiles != null && _tiles.Success;
             var area = new Rect((Ui.Width - width) / 2, (Ui.Height - height) / 2, width, height);
             GUILayout.BeginArea(area, GUI.skin.box);
-            _menuScroll = GUILayout.BeginScrollView(_menuScroll);
+            _menuScroll = GUILayout.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
             if (wide) GUILayout.BeginHorizontal();
 
             GUILayout.BeginVertical(GUILayout.Width(column));
@@ -525,10 +531,7 @@ namespace Game.Client
             GUILayout.EndHorizontal();
             GUILayout.Space(8);
 
-            bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
-                && _classes != null && _classes.Success && _tiles != null && _tiles.Success;
             GUI.enabled = ready;
-            if (GUILayout.Button("혼자 하기")) StartSolo();
             if (Application.platform == RuntimePlatform.WebGLPlayer)
             {
                 // A browser cannot listen for connections, and joining would need a WebSocket transport.
@@ -544,12 +547,6 @@ namespace Game.Client
                 if (GUILayout.Button("참가")) StartJoining();
             }
             GUI.enabled = true;
-
-            if (_status.Length > 0)
-            {
-                GUILayout.Space(8);
-                GUILayout.Label(Ui.Wrap(_status, GUI.skin.label, _menuColumn));
-            }
             GUILayout.EndVertical();
 
             if (wide) GUILayout.Space(16);
@@ -559,6 +556,11 @@ namespace Game.Client
 
             if (wide) GUILayout.EndHorizontal();
             GUILayout.EndScrollView();
+
+            if (_status.Length > 0) GUILayout.Label(Ui.Wrap(_status, GUI.skin.label, inner - GUI.skin.label.margin.horizontal));
+            GUI.enabled = ready;
+            if (GUILayout.Button("혼자 하기", GUILayout.Height(36))) StartSolo();
+            GUI.enabled = true;
             GUILayout.EndArea();
         }
 

@@ -59,7 +59,17 @@ namespace Game.Client
         {
             _nameStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true, fontSize = 12 };
             _timeStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, fontSize = 20 };
-            _keyStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperLeft, fontStyle = FontStyle.Bold, fontSize = 12 };
+            // Unclipped and without padding: the Korean font's tall lines put a letter low in its box, and a clipped box
+            // cut the letter's lower half off (LOCAL_TASKS.md, the 2026-10-31 UI recheck).
+            _keyStyle ??= new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.UpperLeft,
+                fontStyle = FontStyle.Bold,
+                fontSize = 12,
+                clipping = TextClipping.Overflow,
+                padding = new RectOffset(0, 0, 0, 0),
+                wordWrap = false,
+            };
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
 
             int count = client.Skills.Count;
@@ -137,7 +147,7 @@ namespace Game.Client
         }
 
         // The key letter in the top left corner, inside the frame so its bevel does not hide the letter's top.
-        static Rect KeyArea(Rect slot) => new Rect(slot.x + Inner, slot.y + Inner - 2, 20, 18);
+        static Rect KeyArea(Rect slot) => new Rect(slot.x + Inner + 2, slot.y + Inner, 24, 20);
 
         // The name, under the key letter and above the stripe.
         static Rect NameArea(Rect slot) => new Rect(slot.x + 3, slot.y + Inner + 10, slot.width - 6, slot.height - Inner * 2 - 16);
