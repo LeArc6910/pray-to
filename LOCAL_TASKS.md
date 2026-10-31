@@ -555,3 +555,10 @@ DevTools/Local/setup.sh --commit
 13. 첫 입력이 한 번 먹지 않는 일이 이번 점검에서 네 번 있었다: 가방을 연 뒤 탭을 처음 누를 때(두 번), 게임에 들어간 뒤 처음 누른 Tab과 M. 두 번째부터는 된다. 메뉴 단추와 게임 안의 다른 클릭은 한 번에 됐다. 자동 입력 탓일 수도 있으니 사람이 같은 일을 겪는지 함께 본다
 
 → 클라우드가 1~13을 고쳤다(`CLOUD_LOG.md` "UI 점검(10-31 23:40) 고침"). 확인은 7번 15단계
+
+### 2026-10-31 23:30 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 227개 중 227개 통과, 0개 실패
+- PlayMode 테스트: 4개 중 4개 통과, 0개 실패
