@@ -18,6 +18,7 @@ namespace UnityEngine.InputSystem.Controls
 
     public class KeyControl : ButtonControl
     {
+        public UnityEngine.InputSystem.Key keyCode { get; set; }
     }
 
     public class Vector2Control : InputControl<Vector2>
@@ -87,6 +88,7 @@ namespace UnityEngine.InputSystem
     {
         public static Keyboard current { get; private set; }
         public KeyControl this[Key key] => null;
+        public UnityEngine.InputSystem.Utilities.ReadOnlyArray<KeyControl> allKeys => default;
     }
 
     public class Touchscreen

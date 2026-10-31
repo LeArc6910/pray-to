@@ -7,7 +7,7 @@ namespace Game.Client
     // Plays the sound effects (Art/SoundArt.cs). The clips are made once from code. A small pool of 2D audio sources
     // plays them, so sounds overlap without one cutting another off. A sound in the world gets quieter with
     // distance from the player and is not heard past Hearing. The same sound cannot start twice within MinGap, so
-    // a swing that hits five slimes does not play five hits at once. Off in the menu (Settings.Sound).
+    // a swing that hits five slimes does not play five hits at once. As loud as the menu says (Settings.Volume).
     static class Sounds
     {
         const int Voices = 16;
@@ -32,7 +32,7 @@ namespace Game.Client
             LastPlayed[index] = now;
             var source = NextSource();
             source.clip = Clip(sound);
-            source.volume = Mathf.Clamp01(volume);
+            source.volume = Mathf.Clamp01(volume) * Settings.Volume / Settings.MaxVolume;
             source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter);
             source.Play();
         }

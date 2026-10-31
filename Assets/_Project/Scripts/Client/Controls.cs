@@ -7,7 +7,8 @@ using UnityEngine.InputSystem;
 namespace Game.Client
 {
     // Keyboard and mouse: WASD or arrow keys to move, the mouse to aim, left button or space to attack (held to keep
-    // swinging), Q E R F for the skill slots, C to drink a potion, M for the map. Touch: two sticks that appear where a finger lands. The
+    // swinging), Q E R F for the skill slots, C to drink a potion, M for the map (those keys can be changed in the
+    // menu, KeyBindings). Touch: two sticks that appear where a finger lands. The
     // left half moves; the right half attacks for as long as it is held and aims where it is pulled. Pressed without
     // pulling, the attack goes where the player walks, or where they already face when standing still. Touches that
     // start on a UI button or window, which OnGUI marks with Block, are left to the UI; ones on a skill button, which
@@ -54,8 +55,6 @@ namespace Game.Client
         static readonly List<Rect> _blocked = new List<Rect>();
         static readonly List<(Rect Area, int Slot)> _skillButtons = new List<(Rect, int)>();
         static readonly List<int> _skillTaps = new List<int>();
-        static readonly Key[] SkillKeys = { Key.Q, Key.E, Key.R, Key.F };
-        const Key PotionKey = Key.C;
         static readonly List<Rect> _potionButtons = new List<Rect>();
         static bool _potionTapped;
         static readonly Predicate<int> Released = id => !Held(id);
@@ -121,18 +120,20 @@ namespace Game.Client
             if (Event.current.type == EventType.Repaint) _potionButtons.Add(area);
         }
 
-        public const string PotionKeyName = "C";
+        public static string PotionKeyName => KeyBindings.Name(KeyAction.Potion);
 
         // Whether the potion key was pressed or the potion button tapped this frame.
         public static bool TakePotionPress()
         {
-            bool pressed = _potionTapped || (Keyboard.current != null && Keyboard.current[PotionKey].wasPressedThisFrame);
+            bool pressed = _potionTapped || KeyBindings.Pressed(KeyAction.Potion);
             _potionTapped = false;
             return pressed;
         }
 
         // The key letter for a skill slot, for the skill bar.
-        public static string SkillKeyName(int slot) => slot < SkillKeys.Length ? SkillKeys[slot].ToString() : "";
+        public static string SkillKeyName(int slot) => slot < SkillKeyCount ? KeyBindings.Name(KeyAction.Skill1 + slot) : "";
+
+        const int SkillKeyCount = 4;
 
         // Every skill slot asked for this frame, by key or by a tapped button, in the order pressed as far as one
         // frame can tell. Keys pressed together all count.
@@ -140,10 +141,9 @@ namespace Game.Client
         {
             var slots = new List<int>(_skillTaps);
             _skillTaps.Clear();
-            var keyboard = Keyboard.current;
-            for (int slot = 0; keyboard != null && slot < SkillKeys.Length; slot++)
+            for (int slot = 0; slot < SkillKeyCount; slot++)
             {
-                if (keyboard[SkillKeys[slot]].wasPressedThisFrame && !slots.Contains(slot)) slots.Add(slot);
+                if (KeyBindings.Pressed(KeyAction.Skill1 + slot) && !slots.Contains(slot)) slots.Add(slot);
             }
             return slots;
         }
@@ -195,10 +195,12 @@ namespace Game.Client
 
         public static bool LeavePressed() => Keyboard.current != null && Keyboard.current[Key.Escape].wasPressedThisFrame;
 
+        // The bag's key, or I as well while no other action has it.
         public static bool BagPressed() =>
-            Keyboard.current != null && (Keyboard.current[Key.Tab].wasPressedThisFrame || Keyboard.current[Key.I].wasPressedThisFrame);
+            KeyBindings.Pressed(KeyAction.Bag)
+            || (KeyBindings.Capturing == null && !KeyBindings.IsBound(Key.I) && Keyboard.current != null && Keyboard.current[Key.I].wasPressedThisFrame);
 
-        public static bool MapPressed() => Keyboard.current != null && Keyboard.current[Key.M].wasPressedThisFrame;
+        public static bool MapPressed() => KeyBindings.Pressed(KeyAction.Map);
 
         // Both sticks over the game. Call from OnGUI.
         public static void DrawTouch()

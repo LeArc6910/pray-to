@@ -60,6 +60,8 @@ namespace Game.Client
         // Class ids in the order picked; the first one's skills take the first slots. Both to start with, so a new
         // player sees what mixing does.
         readonly List<string> _chosenClasses = new List<string> { "warrior", "fire_mage" };
+        // Whether the menu shows the keys in place of the classes.
+        bool _keysOpen;
         Vector2 _menuScroll;
         // Width of a line of text in a menu column this frame.
         float _menuColumn;
@@ -117,6 +119,7 @@ namespace Game.Client
         void Update()
         {
             DevInfo.Frame(Time.unscaledDeltaTime);
+            KeyBindings.Poll();
             Controls.UpdateTouches();
             _camera.orthographicSize = ViewHalfHeight(Screen.width, Screen.height);
             if (_endReason != null)
@@ -575,12 +578,15 @@ namespace Game.Client
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button($"어둠과 빛: {(Settings.Darkness ? "켜짐" : "꺼짐")}")) Settings.Darkness = !Settings.Darkness;
-            if (GUILayout.Button($"효과음: {(Settings.Sound ? "켜짐" : "꺼짐")}"))
+            // Each press turns it up a quarter, and from full back to off.
+            if (GUILayout.Button($"효과음: {Settings.VolumeText}"))
             {
-                Settings.Sound = !Settings.Sound;
+                Settings.Volume = (Settings.Volume + 1) % (Settings.MaxVolume + 1);
                 Sounds.Play(Sound.Click);
             }
             GUILayout.EndHorizontal();
+            // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
+            if (!Controls.UsingTouch && GUILayout.Button(_keysOpen ? "키 바꾸기 닫기" : "키 바꾸기")) _keysOpen = !_keysOpen;
             // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
             if (GUILayout.Button($"개발 정보: {(Settings.DevInfo ? "켜짐" : "꺼짐")}")) Settings.DevInfo = !Settings.DevInfo;
             GUILayout.Space(8);
@@ -605,7 +611,8 @@ namespace Game.Client
 
             if (wide) GUILayout.Space(16);
             GUILayout.BeginVertical(GUILayout.Width(column));
-            if (_classes != null && _classes.Success) DrawClassPicker();
+            if (_keysOpen && !Controls.UsingTouch) DrawKeys();
+            else if (_classes != null && _classes.Success) DrawClassPicker();
             GUILayout.EndVertical();
 
             if (wide) GUILayout.EndHorizontal();
@@ -616,6 +623,23 @@ namespace Game.Client
             if (GUILayout.Button("혼자 하기", GUILayout.Height(36))) StartSolo();
             GUI.enabled = true;
             GUILayout.EndArea();
+        }
+
+        // A row per changeable key: what it does and its key. Pressing the key's button waits for the next key pressed.
+        void DrawKeys()
+        {
+            GUILayout.Label(Ui.Wrap("키 바꾸기: 단추를 누른 뒤 쓸 키를 누른다. 다른 일에 쓰던 키면 서로 바뀐다. Esc는 그만두기", GUI.skin.label, _menuColumn));
+            foreach (var action in KeyBindings.Actions)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(KeyBindings.ActionName(action), GUILayout.Width(Mathf.Min(90, _menuColumn * 0.4f)));
+                bool waiting = KeyBindings.Capturing == action;
+                if (GUILayout.Button(waiting ? "키를 누르세요…" : KeyBindings.Name(action))) KeyBindings.StartCapture(action);
+                GUILayout.EndHorizontal();
+            }
+            if (KeyBindings.Message.Length > 0) GUILayout.Label(Ui.Wrap(KeyBindings.Message, GUI.skin.label, _menuColumn));
+            if (GUILayout.Button("처음 키로")) KeyBindings.ResetAll();
+            GUILayout.Label(Ui.Wrap("이동 WASD·화살표, 공격 스페이스·마우스, 메뉴 Esc는 바꿀 수 없다.", GUI.skin.label, _menuColumn));
         }
 
         // A button per class; picking adds it after the ones already picked, picking again takes it out. The number
@@ -698,7 +722,8 @@ namespace Game.Client
             else if (!compact && !Ui.Short)
             {
                 lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격(벽이면 캔다)");
-                lines.Add("Q E R F 스킬 · C 물약 · Tab 가방 · M 지도 · Esc 메뉴");
+                string skills = string.Join(" ", Enumerable.Range(0, 4).Select(Controls.SkillKeyName));
+                lines.Add($"{skills} 스킬 · {Controls.PotionKeyName} 물약 · {KeyBindings.Name(KeyAction.Bag)} 가방 · {KeyBindings.Name(KeyAction.Map)} 지도 · Esc 메뉴");
             }
 
             var box = GUI.skin.box;
