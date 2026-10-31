@@ -248,17 +248,22 @@ namespace Game.Client
         // Names, damage numbers and banners. Call from OnGUI.
         public void DrawGui()
         {
+            // Centred on their spot and allowed past their box, so a tall font is never cut off at the bottom.
             _labelStyle ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontStyle = FontStyle.Bold,
                 fontSize = 15,
+                wordWrap = false,
+                clipping = TextClipping.Overflow,
             };
             _bannerStyle ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
                 fontStyle = FontStyle.Bold,
                 fontSize = 34,
+                wordWrap = false,
+                clipping = TextClipping.Overflow,
             };
 
             Label(_self.Position + new Vector3(0, _self.Top + 0.4f, 0), _self.Name, Color.white);

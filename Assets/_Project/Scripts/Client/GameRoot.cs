@@ -501,23 +501,34 @@ namespace Game.Client
             // one, and a slot would show in the gap beside the window.
             if (_client.Status == ClientStatus.Playing && !_inventory.Open) SkillBar.Draw(_client);
             _inventory?.Draw();
-            // Bottom left, or above the skill buttons where they reach that far.
-            var slots = SkillBar.Bounds(_client.Skills.Count);
-            float bottom = slots.x < 14 + 400 ? slots.y - 30 : Ui.Height - 40;
-            for (int i = 0; i < _acquired.Count; i++)
-            {
-                var (text, age) = _acquired[i];
-                var previous = GUI.color;
-                GUI.color = new Color(1, 1, 1, Mathf.Clamp01((AcquiredSeconds - age) / 1f));
-                GUI.Label(new Rect(14, bottom - 22 * (_acquired.Count - 1 - i), 400, 22), text);
-                GUI.color = previous;
-            }
+            DrawAcquired();
             _map?.DrawMinimap(Ui.MinimapArea);
             if (Controls.UsingTouch)
             {
                 DrawTouchButtons();
                 Controls.DrawTouch();
             }
+        }
+
+        // The "획득: …" lines in the bottom left, or above the skill buttons where they reach that far, newest at the
+        // bottom. Each line is as tall as the font needs and a long one wraps between words, so none is cut off.
+        void DrawAcquired()
+        {
+            var label = GUI.skin.label;
+            float width = Mathf.Min(400, Ui.Width - 28);
+            var slots = SkillBar.Bounds(_client.Skills.Count);
+            float y = slots.x < 14 + width ? slots.y - 6 : Ui.Height - 10;
+            var previous = GUI.color;
+            for (int i = _acquired.Count - 1; i >= 0; i--)
+            {
+                var (text, age) = _acquired[i];
+                var content = new GUIContent(Ui.Wrap(text, label, width));
+                float height = label.CalcHeight(content, width);
+                y -= height;
+                GUI.color = new Color(1, 1, 1, Mathf.Clamp01((AcquiredSeconds - age) / 1f));
+                GUI.Label(new Rect(14, y, width, height), content);
+            }
+            GUI.color = previous;
         }
 
         // Stand-ins for Tab and Esc on phones, under the minimap.
@@ -761,10 +772,13 @@ namespace Game.Client
                 top = Ui.HudArea.yMax + 10;
             }
             float width = Mathf.Min(600, right - left);
-            var bar = new Rect(left + (right - left - width) / 2, top, width, 18);
-            GUI.Label(new Rect(bar.x, bar.y - 2, width, 22), $"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈");
+            float x = left + (right - left - width) / 2;
+            // The name line as tall as the font needs, so it is not cut off, and the bar under it.
+            var title = new GUIContent($"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈");
+            float titleHeight = GUI.skin.label.CalcHeight(title, width);
+            GUI.Label(new Rect(x, top, width, titleHeight), title);
             float share = boss.MaxHealth > 0 ? Mathf.Clamp01(boss.Health / boss.MaxHealth) : 0;
-            UiSkin.Bar(new Rect(bar.x, bar.y + 20, width, bar.height), share, "", boss: true);
+            UiSkin.Bar(new Rect(x, top + titleHeight, width, 18), share, "", boss: true);
         }
 
         // Which of the eight directions an offset points, as a Korean word. Up on screen is north.
