@@ -491,3 +491,10 @@ DevTools/Local/setup.sh --commit
   - 11단계: 도트 그래픽이 들어갔다. 벽은 윗면과 앞면이 구분되고, 구리 광맥 덩어리가 보이며, 캐릭터는 파란 옷 사람 그림으로 바라보는 쪽을 따른다. 심은 포자는 흙 위 싹으로 보인다. 800×600 창에서 픽셀 두께가 고르지 않거나 타일 사이 틈은 눈에 띄지 않았다. 스크린샷 `web_m6_pixelart.jpg`
 - 참고: 이 확인으로 Claude 앱 내장 브라우저에 "플레이어" 캐릭터와 "내 월드" 저장이 남았다. 사람의 휴대폰·PC 브라우저 저장과는 따로다
 - 확인하지 못한 것: 8단계 몬스터(30칸 넘게 가야 함), 9·10단계 실제 설치·제작·자동화(재료 모으기와 이동 필요), 휴대폰. 자동 입력으로는 키를 누르고 있을 수 없어 걸어 다니지 못했다. 7번의 사람 확인으로 남긴다
+
+### 2026-10-31 22:54 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 227개 중 227개 통과, 0개 실패
+- PlayMode 테스트: 4개 중 4개 통과, 0개 실패
