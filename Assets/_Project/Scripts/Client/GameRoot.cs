@@ -29,6 +29,9 @@ namespace Game.Client
         // The view keeps about this many tiles across the screen's short side, zoomed by a whole number (below).
         const float ShortSideTiles = 14;
         const float HealthBarHeight = 20;
+        const float GuideCheckSeconds = 0.5f;
+        // A goal's hint shows this long after the goal comes up; then only the goal stays.
+        const float GoalHintSeconds = 30;
         // The host saves its world this often, and when the session ends. Characters save whenever the bag changes.
         const float WorldSaveSeconds = 30;
 
@@ -48,6 +51,12 @@ namespace Game.Client
         BossData _bosses;
         ClassData _classes;
         TileData _tiles;
+        GuideData _guide;
+        // The guide for new players (Docs/Guide.md): how far this character has come, checked twice a second, and
+        // when its current goal came up, for showing the hint a while.
+        GuideProgress _guideProgress;
+        float _guideClock;
+        float _goalShownAt;
         // Class ids in the order picked; the first one's skills take the first slots. Both to start with, so a new
         // player sees what mixing does.
         readonly List<string> _chosenClasses = new List<string> { "warrior", "fire_mage" };
@@ -94,12 +103,14 @@ namespace Game.Client
             _bosses = sheets.LoadBosses(_monsters);
             _classes = sheets.LoadClasses();
             _tiles = sheets.LoadTiles(_loot);
+            _guide = sheets.LoadGuide(_loot);
             _chosenClasses.RemoveAll(id => !_classes.Classes.Any(c => c.Id == id));
             var errors = new List<string>(_loot.Errors);
             errors.AddRange(_monsters.Errors);
             errors.AddRange(_bosses.Errors);
             errors.AddRange(_classes.Errors);
             errors.AddRange(_tiles.Errors);
+            errors.AddRange(_guide.Errors);
             if (errors.Count > 0) _status = "데이터 시트 오류:\n" + string.Join("\n", errors);
         }
 
@@ -160,6 +171,7 @@ namespace Game.Client
             _view ??= new WorldView(_client, _camera);
             _map ??= new MapView(_client);
             _client.AdvanceRenderClock(Time.deltaTime);
+            UpdateGuide(Time.deltaTime);
             var changedTiles = _client.TakeChangedTiles();
             _view.UpdateTiles(changedTiles);
             _map.UpdateTiles(changedTiles);
@@ -186,6 +198,33 @@ namespace Game.Client
         {
             int zoom = Mathf.Max(1, Mathf.RoundToInt(Mathf.Min(width, height) / (ShortSideTiles * Sprites.PixelsPerUnit)));
             return height / (2f * Sprites.PixelsPerUnit * zoom);
+        }
+
+        // Passes the guide's goals the player has met, with a line and a sound for each, and keeps how far this
+        // character has come on this device.
+        void UpdateGuide(float deltaTime)
+        {
+            if (_guideProgress == null || _guideProgress.Current == null) return;
+            _guideClock += deltaTime;
+            if (_guideClock < GuideCheckSeconds) return;
+            _guideClock = 0;
+            var passed = _guideProgress.Update(GuideFacts.Of(_client));
+            if (passed.Count == 0) return;
+            foreach (var goal in passed) _acquired.Add(("목표 달성: " + goal.Text, 0));
+            if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
+            Sounds.Play(Sound.Craft);
+            _goalShownAt = Time.time;
+            PlayerPrefs.SetInt(GuideKey, _guideProgress.Done);
+            PlayerPrefs.Save();
+        }
+
+        string GuideKey => "guide." + CharacterName;
+
+        void StartGuide()
+        {
+            _guideProgress = _guide != null && _guide.Goals.Count > 0 ? new GuideProgress(_guide, PlayerPrefs.GetInt(GuideKey, 0)) : null;
+            _guideClock = GuideCheckSeconds;
+            _goalShownAt = Time.time;
         }
 
         // Skills go to the host as soon as they are pressed, not with the next tick's input.
@@ -300,6 +339,7 @@ namespace Game.Client
             _mode = mode;
             _status = "";
             _dropFocus = true;
+            StartGuide();
         }
 
         void StartJoining()
@@ -331,6 +371,7 @@ namespace Game.Client
             _mode = Mode.Join;
             _status = "접속 중…";
             _dropFocus = true;
+            StartGuide();
         }
 
         string CharacterName => string.IsNullOrWhiteSpace(_playerName) ? "플레이어" : _playerName.Trim();
@@ -415,6 +456,7 @@ namespace Game.Client
             _host = null;
             _client = null;
             _inventory = null;
+            _guideProgress = null;
             _acquired.Clear();
             _mode = Mode.Menu;
             _status = status;
@@ -624,6 +666,12 @@ namespace Game.Client
                 lines.Add($"{mode} · 접속 {_client.Names.Count}명");
                 var toArena = _client.Arena - _client.Position;
                 if (toArena.Length > _client.ArenaRadius) lines.Add($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
+                var goal = _guideProgress?.Current;
+                if (goal != null)
+                {
+                    lines.Add($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}: {goal.Text}");
+                    if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) lines.Add(goal.Hint);
+                }
             }
             if (!compact && !Ui.Short && Controls.UsingTouch)
             {

@@ -18,6 +18,7 @@ namespace Game.Client.Editor
         const string BossesFolder = ProjectFolder + "/Data/Bosses/";
         const string ClassesFolder = ProjectFolder + "/Data/Classes/";
         const string WorldFolder = ProjectFolder + "/Data/World/";
+        const string GuideFolder = ProjectFolder + "/Data/Guide/";
 
         [MenuItem("Game/Set Up Main Scene")]
         public static void SetUp()
@@ -62,6 +63,7 @@ namespace Game.Client.Editor
             sheets.bossAttacks = Sheet(BossesFolder + BossSheet.AttacksFile);
             sheets.classes = Sheet(ClassesFolder + ClassSheet.ClassesFile);
             sheets.skills = Sheet(ClassesFolder + ClassSheet.SkillsFile);
+            sheets.goals = Sheet(GuideFolder + GuideSheet.File);
             EditorUtility.SetDirty(sheets);
             AssetDatabase.SaveAssets();
         }

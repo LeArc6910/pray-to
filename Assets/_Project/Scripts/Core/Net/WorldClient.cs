@@ -203,6 +203,8 @@ namespace Game.Core
         public TileMap Map { get; private set; }
         // What the tiles do (tiles.csv); null when the client was made without the sheet.
         public TileData Tiles => _tiles;
+        // Where this player came into the world.
+        public Vec2 Spawn { get; private set; }
         // Where the boss's arena is, known from the seed like the rest of the map.
         public Vec2 Arena { get; private set; }
         public float ArenaRadius { get; private set; }
@@ -607,6 +609,7 @@ namespace Game.Core
             ArenaRadius = generated.ArenaRadius;
             Position = welcome.Spawn;
             PreviousPosition = welcome.Spawn;
+            Spawn = welcome.Spawn;
             Status = ClientStatus.Playing;
         }
 
