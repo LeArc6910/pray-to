@@ -433,6 +433,16 @@ namespace Game.Client
                 placed = placed.Copy();
                 placed.Draw(Belt(0), 0, 0);
             }
+            else if (placed != null && material.Places == TileType.Splitter)
+            {
+                placed = placed.Copy();
+                placed.Draw(SplitterArrows, 0, 0);
+            }
+            else if (placed != null && material.Places == TileType.Arm)
+            {
+                placed = placed.Copy();
+                placed.Draw(RobotArm, 0, 0);
+            }
             if (placed != null) return placed;
             switch (material.Id)
             {
@@ -667,6 +677,60 @@ namespace Game.Client
                 image[11 + i, 11 - i] = yellow;
                 image[12 + i, 11 - i] = yellow;
             }
+            return image.Outlined(Outline);
+        }
+
+        // A splitter's arrows: out of its front (+x) and both sides, the way it sends loads.
+        public static readonly PixelImage SplitterArrows = MakeSplitterArrows();
+
+        static PixelImage MakeSplitterArrows()
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            var yellow = Rgba.Hex("#F2C440");
+            for (int i = 0; i < 3; i++)
+            {
+                // Right edge, pointing right.
+                image[12 + i, 6 + i] = yellow;
+                image[12 + i, 9 - i] = yellow;
+                // Top edge, pointing up.
+                image[6 + i, 12 + i] = yellow;
+                image[9 - i, 12 + i] = yellow;
+                // Bottom edge, pointing down.
+                image[6 + i, 3 - i] = yellow;
+                image[9 - i, 3 - i] = yellow;
+            }
+            return image.Outlined(Outline);
+        }
+
+        // A robot arm reaching along +x from the middle of its tile, a claw at the end. The view swings it from the
+        // tile behind to the tile ahead while it carries something.
+        public static readonly PixelImage RobotArm = MakeRobotArm();
+
+        static PixelImage MakeRobotArm()
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            var joint = Rgba.Hex("#F2C440");
+            for (int x = 7; x < 13; x++)
+            {
+                image[x, 7] = SteelLight;
+                image[x, 8] = Steel;
+                image[x, 9] = SteelDark;
+            }
+            for (int y = 6; y < 11; y++)
+            {
+                image[6, y] = joint;
+                image[7, y] = y == 6 || y == 10 ? joint : image[7, y];
+            }
+            // The claw: two fingers.
+            for (int x = 13; x < 16; x++)
+            {
+                image[x, 5] = Steel;
+                image[x, 11] = Steel;
+            }
+            image[13, 6] = SteelDark;
+            image[13, 10] = SteelDark;
+            image[12, 6] = Steel;
+            image[12, 10] = Steel;
             return image.Outlined(Outline);
         }
 

@@ -129,6 +129,92 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void AnArmFeedsASplitterThatSendsEachLoadAnotherWay()
+        {
+            var world = Line(out var player);
+            var chest = Gear.Data.FindMaterial("chest");
+            // Chest (3, 8) → arm (4, 8) → splitter (5, 8), all facing right, with chests ahead (6, 8), to its left
+            // (5, 9) and to its right (5, 7). Placed front to back so there is always somewhere to stand.
+            Place(world, player, chest, 6, 8, new Vec2(1, 0));
+            Place(world, player, chest, 5, 9, new Vec2(0, 1));
+            Place(world, player, chest, 5, 7, new Vec2(0, -1));
+            Place(world, player, Gear.Data.FindMaterial("splitter"), 5, 8, new Vec2(1, 0));
+            Place(world, player, Gear.Data.FindMaterial("robot_arm"), 4, 8, new Vec2(1, 0));
+            Place(world, player, chest, 3, 8, new Vec2(1, 0));
+            world.ChestAt(3, 8).AddMaterial(IronOre, 6);
+
+            Run(world, 6 * Tiles.Shipped.Machine(TileType.Arm).Seconds + 2);
+
+            Assert.AreEqual(0, world.ChestAt(3, 8).CountOf(IronOre));
+            Assert.AreEqual(2, world.ChestAt(6, 8).CountOf(IronOre), "ahead");
+            Assert.AreEqual(2, world.ChestAt(5, 9).CountOf(IronOre), "left");
+            Assert.AreEqual(2, world.ChestAt(5, 7).CountOf(IronOre), "right");
+            Assert.IsFalse(world.Map.IsSolid(5, 8), "splitters are walked over like belts");
+            Assert.IsTrue(world.Map.IsSolid(4, 8), "an arm is not");
+        }
+
+        [Test]
+        public void ASplitterSkipsAWayThatCannotTakeItAndNeverSendsBack()
+        {
+            var world = Line(out var player);
+            var chest = Gear.Data.FindMaterial("chest");
+            var splitter = Gear.Data.FindMaterial("splitter");
+            // Chest (2, 8) → arm (3, 8) → splitter (4, 8) facing right, with a chest ahead (5, 8), nothing to its right
+            // and to its left a second splitter (4, 9), also facing right, with a chest ahead of it (5, 9). The first
+            // splitter is on the second's right: it must not hand loads back.
+            Place(world, player, chest, 5, 8, new Vec2(1, 0));
+            Place(world, player, chest, 5, 9, new Vec2(1, 0));
+            Place(world, player, splitter, 4, 9, new Vec2(1, 0));
+            Place(world, player, splitter, 4, 8, new Vec2(1, 0));
+            Place(world, player, Gear.Data.FindMaterial("robot_arm"), 3, 8, new Vec2(1, 0));
+            Place(world, player, chest, 2, 8, new Vec2(1, 0));
+            world.ChestAt(2, 8).AddMaterial(IronOre, 4);
+
+            Run(world, 4 * Tiles.Shipped.Machine(TileType.Arm).Seconds + 3);
+
+            Assert.AreEqual(2, world.ChestAt(5, 8).CountOf(IronOre), "every other load ahead");
+            Assert.AreEqual(2, world.ChestAt(5, 9).CountOf(IronOre), "the rest through the second splitter, none back");
+            Assert.IsNull(world.MachineAt(4, 8).Carried);
+            Assert.IsNull(world.MachineAt(4, 9).Carried);
+        }
+
+        [Test]
+        public void AnArmMovesOnlyWhatTheTileAheadTakes()
+        {
+            var world = Line(out var player);
+            // Chest (3, 8) → arm (4, 8) → smelter (5, 8) → chest (6, 8).
+            Place(world, player, Gear.Data.FindMaterial("chest"), 6, 8, new Vec2(1, 0));
+            Place(world, player, SmelterItem, 5, 8, new Vec2(1, 0));
+            Place(world, player, Gear.Data.FindMaterial("robot_arm"), 4, 8, new Vec2(1, 0));
+            Place(world, player, Gear.Data.FindMaterial("chest"), 3, 8, new Vec2(1, 0));
+            var stone = Gear.Data.FindMaterial("stone");
+            world.ChestAt(3, 8).AddMaterial(stone, 5);
+            world.ChestAt(3, 8).AddMaterial(IronOre, 4);
+
+            Run(world, 4 + Smelter.Seconds * 2 + 3);
+
+            Assert.AreEqual(5, world.ChestAt(3, 8).CountOf(stone), "a smelter cannot melt stone, so the arm leaves it");
+            Assert.AreEqual(0, world.ChestAt(3, 8).CountOf(IronOre));
+            Assert.AreEqual(2, world.ChestAt(6, 8).CountOf(IronBar));
+            Assert.IsNull(world.MachineAt(4, 8).Carried);
+        }
+
+        [Test]
+        public void AnArmTakesFromTheEndOfABeltFacingIt()
+        {
+            var world = Line(out var player);
+            // Drill (2, 3) on the vein → belt (3, 3) → arm (4, 3) → chest (5, 3).
+            Place(world, player, Gear.Data.FindMaterial("chest"), 5, 3, new Vec2(1, 0));
+            Place(world, player, Gear.Data.FindMaterial("robot_arm"), 4, 3, new Vec2(1, 0));
+            Place(world, player, BeltItem, 3, 3, new Vec2(1, 0));
+            Place(world, player, DrillItem, 2, 3, new Vec2(-1, 0));
+
+            Run(world, Drill.Seconds * 2 + Belt.Seconds + 2);
+
+            Assert.AreEqual(2, world.ChestAt(5, 3).CountOf(IronOre));
+        }
+
+        [Test]
         public void DiggingAMachineGivesBackItAndWhatItHeld()
         {
             var world = Line(out var player);

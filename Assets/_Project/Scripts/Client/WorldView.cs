@@ -614,12 +614,31 @@ namespace Game.Client
                 var center = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
                 parts.Part.sprite = machine.Kind == TileType.Drill ? DrillBitSprite
                     : machine.Kind == TileType.Conveyor ? BeltSprites[beltFrame]
+                    : machine.Kind == TileType.Splitter ? SplitterSprite
+                    : machine.Kind == TileType.Arm ? ArmSprite
                     : ChevronSprite;
                 parts.Part.transform.localPosition = center;
-                parts.Part.transform.localRotation = Quaternion.Euler(0, 0, machine.Direction * 90);
+                // A robot arm waits pointing back at where it picks up, and swings over to the front as it carries.
+                float swing = machine.Kind == TileType.Arm ? Mathf.Lerp(180, 0, machine.Carried != null ? machine.Progress : 0) : 0;
+                parts.Part.transform.localRotation = Quaternion.Euler(0, 0, machine.Direction * 90 + swing);
+                parts.Part.sortingOrder = machine.Kind == TileType.Arm ? -13 : -15;
+                parts.Load.sortingOrder = machine.Kind == TileType.Arm ? -12 : -14;
                 parts.Load.enabled = machine.Carried != null;
                 if (machine.Carried != null) parts.Load.sprite = Sprites.Icon(machine.Carried);
-                parts.Load.transform.localPosition = center + new Vector3(step.X, step.Y, 0) * (machine.Progress - 0.5f);
+                if (machine.Kind == TileType.Arm)
+                {
+                    // In the claw.
+                    float angle = (machine.Direction * 90 + swing) * Mathf.Deg2Rad;
+                    parts.Load.transform.localPosition = center + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0) * 0.45f;
+                }
+                else if (machine.Kind == TileType.Splitter)
+                {
+                    parts.Load.transform.localPosition = center;
+                }
+                else
+                {
+                    parts.Load.transform.localPosition = center + new Vector3(step.X, step.Y, 0) * (machine.Progress - 0.5f);
+                }
             }
 
             _gone.Clear();
@@ -636,6 +655,10 @@ namespace Game.Client
         static Sprite DrillBitSprite => Sprites.Centered("machine/drill", () => ItemArt.DrillBit);
 
         static Sprite ChevronSprite => Sprites.Centered("machine/chevron", () => ItemArt.Chevron);
+
+        static Sprite SplitterSprite => Sprites.Centered("machine/splitter", () => ItemArt.SplitterArrows);
+
+        static Sprite ArmSprite => Sprites.Centered("machine/arm", () => ItemArt.RobotArm);
 
         static Sprite[] _beltSprites;
 

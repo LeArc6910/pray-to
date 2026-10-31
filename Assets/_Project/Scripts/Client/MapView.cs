@@ -197,6 +197,8 @@ namespace Game.Client
             if (_map[x, y] == TileType.Drill) return Palette.Drill;
             if (_map[x, y] == TileType.Smelter) return Palette.Smelter;
             if (_map[x, y] == TileType.Conveyor) return Palette.Conveyor;
+            if (_map[x, y] == TileType.Splitter) return Palette.Splitter;
+            if (_map[x, y] == TileType.Arm) return Palette.Arm;
             if (_map[x, y] == TileType.Torch) return Palette.Torch;
             if (_map[x, y] == TileType.MithrilOre) return Palette.MithrilOre;
             if (_map.IsSolid(x, y)) return Wall;

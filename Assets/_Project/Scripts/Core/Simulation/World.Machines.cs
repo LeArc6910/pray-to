@@ -5,7 +5,8 @@ using System.Linq;
 namespace Game.Core
 {
     // A placed machine: which way it faces, and what it holds. A drill and a smelter keep what they made until it
-    // can go out; a smelter also keeps what came in; a conveyor carries one material along. See Docs/Automation.md.
+    // can go out; a smelter also keeps what came in; a conveyor, a splitter and a robot arm carry one material along.
+    // See Docs/Automation.md.
     public sealed class Machine
     {
         internal Machine(MachineDefinition definition, int x, int y, int direction)
@@ -22,10 +23,13 @@ namespace Game.Core
         public int Y { get; }
         // 0 right, 1 up, 2 left, 3 down: the way it faced when placed.
         public int Direction { get; internal set; }
-        // A conveyor's load and how far along the tile it has come, 0 to 1.
+        // A conveyor's, splitter's or arm's load and how far along the tile it has come (or the arm has swung), 0 to 1.
         public MaterialDefinition Carried { get; internal set; }
         public float Progress { get; internal set; }
+        // Ticks toward the next ore or bar; for a splitter, which of its ways out is next.
         internal int Timer { get; set; }
+        // For a splitter: the side its load came in from (a direction), so it never sends it back, or -1.
+        internal int CameFrom { get; set; } = -1;
         internal Dictionary<MaterialDefinition, int> Input { get; } = new Dictionary<MaterialDefinition, int>();
         internal Dictionary<MaterialDefinition, int> Output { get; } = new Dictionary<MaterialDefinition, int>();
 
@@ -42,7 +46,8 @@ namespace Game.Core
             Math.Abs(facing.X) >= Math.Abs(facing.Y) ? (facing.X >= 0 ? 0 : 2) : (facing.Y >= 0 ? 1 : 3);
     }
 
-    // Drills, conveyors and smelters, stepped every tick in tile order so the result never depends on anything else.
+    // Drills, conveyors, smelters, splitters and robot arms, stepped every tick in tile order so the result never
+    // depends on anything else.
     public sealed partial class World
     {
         readonly SortedDictionary<int, Machine> _machines = new SortedDictionary<int, Machine>();
@@ -86,8 +91,93 @@ namespace Game.Core
                     case TileType.Conveyor:
                         RunConveyor(machine);
                         break;
+                    case TileType.Splitter:
+                        RunSplitter(machine);
+                        break;
+                    case TileType.Arm:
+                        RunArm(machine);
+                        break;
                 }
             }
+        }
+
+        // A splitter sends each load out of its front, left and right in turn, skipping a side that cannot take it and
+        // the side it came in from.
+        void RunSplitter(Machine splitter)
+        {
+            if (splitter.Carried == null) return;
+            splitter.Progress = Math.Min(1, splitter.Progress + 1f / splitter.Definition.Ticks);
+            if (splitter.Progress < 1) return;
+            for (int k = 0; k < SplitterTurns.Length; k++)
+            {
+                int turn = (splitter.Timer + k) % SplitterTurns.Length;
+                int direction = (splitter.Direction + SplitterTurns[turn]) & 3;
+                if (direction == splitter.CameFrom) continue;
+                var (dx, dy) = Machine.Steps[direction];
+                if (!Push(splitter, splitter.Carried, splitter.X + dx, splitter.Y + dy)) continue;
+                splitter.Carried = null;
+                splitter.Progress = 0;
+                splitter.CameFrom = -1;
+                splitter.Timer = (turn + 1) % SplitterTurns.Length;
+                return;
+            }
+        }
+
+        // Front, left (a quarter turn anticlockwise) and right.
+        static readonly int[] SplitterTurns = { 0, 1, 3 };
+
+        // A robot arm picks one material up from the tile behind it, one that the tile ahead will take, swings it over
+        // and puts it down there. It takes from a chest (the first material in sheet order that fits), a drill's or
+        // smelter's output, a splitter, or the end of a conveyor that faces it.
+        void RunArm(Machine arm)
+        {
+            var (fx, fy) = arm.Front;
+            if (arm.Carried == null)
+            {
+                arm.Progress = 0;
+                arm.Carried = TakeFor(arm, fx, fy);
+                return;
+            }
+            arm.Progress = Math.Min(1, arm.Progress + 1f / arm.Definition.Ticks);
+            if (arm.Progress < 1) return;
+            if (!Push(arm, arm.Carried, fx, fy)) return;
+            arm.Carried = null;
+            arm.Progress = 0;
+        }
+
+        MaterialDefinition TakeFor(Machine arm, int fx, int fy)
+        {
+            var (bx, by) = arm.Back;
+            bool Fits(MaterialDefinition material) => Takes(arm, material, fx, fy);
+            var source = MachineAt(bx, by);
+            if (source != null)
+            {
+                switch (source.Kind)
+                {
+                    case TileType.Drill:
+                    case TileType.Smelter:
+                        var made = source.Output.Keys.FirstOrDefault(Fits);
+                        if (made != null) Add(source.Output, made, -1);
+                        return made;
+                    case TileType.Conveyor:
+                    case TileType.Splitter:
+                        var load = source.Carried;
+                        bool ready = source.Kind == TileType.Splitter || (source.Progress >= 1 && source.Front == (arm.X, arm.Y));
+                        if (load == null || !ready || !Fits(load)) return null;
+                        source.Carried = null;
+                        source.Progress = 0;
+                        return load;
+                    default:
+                        return null;
+                }
+            }
+            var chest = ChestAt(bx, by);
+            var taken = chest == null || Loot == null ? null : Loot.Materials.FirstOrDefault(m => chest.CountOf(m) > 0 && Fits(m));
+            if (taken == null) return null;
+            chest.TakeMaterial(taken);
+            int key = by * Map.Width + bx;
+            _chestVersions[key] = _chestVersions.GetValueOrDefault(key) + 1;
+            return taken;
         }
 
         // Pulls an ore from the vein ahead every so often, and sends one out of the back each tick it can.
@@ -137,8 +227,24 @@ namespace Game.Core
             if (first != null && Push(machine, first, to.X, to.Y)) Add(machine.Output, first, -1);
         }
 
-        // Hands one material to the tile: an empty conveyor not facing back at the sender, a chest, or a smelter that
-        // melts it and has room.
+        // Whether the tile ever takes the material from the sender, busy or not: a conveyor not facing back at it, a
+        // splitter, a chest, or a smelter that melts it. A robot arm only picks up what the tile ahead takes, so it
+        // never sits holding something that can go nowhere.
+        bool Takes(Machine from, MaterialDefinition material, int x, int y)
+        {
+            var target = MachineAt(x, y);
+            if (target == null) return ChestAt(x, y) != null;
+            return target.Kind switch
+            {
+                TileType.Conveyor => target.Front != (from.X, from.Y),
+                TileType.Splitter => true,
+                TileType.Smelter => Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)),
+                _ => false,
+            };
+        }
+
+        // Hands one material to the tile: an empty conveyor not facing back at the sender, an empty splitter, a chest,
+        // or a smelter that melts it and has room.
         bool Push(Machine from, MaterialDefinition material, int x, int y)
         {
             var target = MachineAt(x, y);
@@ -150,6 +256,12 @@ namespace Game.Core
                         if (target.Carried != null || target.Front == (from.X, from.Y)) return false;
                         target.Carried = material;
                         target.Progress = 0;
+                        return true;
+                    case TileType.Splitter:
+                        if (target.Carried != null) return false;
+                        target.Carried = material;
+                        target.Progress = 0;
+                        target.CameFrom = Array.FindIndex(Machine.Steps, s => (target.X + s.X, target.Y + s.Y) == (from.X, from.Y));
                         return true;
                     case TileType.Smelter:
                         if (!Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)) || Count(target.Input) >= target.Definition.Capacity) return false;

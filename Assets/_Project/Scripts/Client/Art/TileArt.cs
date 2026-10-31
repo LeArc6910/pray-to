@@ -85,6 +85,8 @@ namespace Game.Client
             TileType.Drill => Drill,
             TileType.Smelter => Smelter,
             TileType.Conveyor => ConveyorFrame,
+            TileType.Splitter => SplitterFrame,
+            TileType.Arm => ArmBase,
             TileType.Torch => Torch,
             _ => null,
         };
@@ -561,6 +563,44 @@ namespace Game.Client
             ".oDDDDDDDDDDDDo.",
             "..oooooooooooo..",
             "..____________..",
+            "................");
+
+        // A splitter: a low steel plate with a hub in the middle. Its arrows are drawn on top, turned the way it faces.
+        static readonly PixelImage SplitterFrame = PixelImage.FromRows(MetalPalette,
+            "................",
+            ".oooooooooooooo.",
+            ".omMMMMMMMMMMmo.",
+            ".obbbbbbbbbbbbo.",
+            ".obBbbbbbbbbBbo.",
+            ".obbbbbbbbbbbbo.",
+            ".obbbbkkkkbbbbo.",
+            ".obbbkMMMmkbbbo.",
+            ".obbbkMLMmkbbbo.",
+            ".obbbkmMmdkbbbo.",
+            ".obbbbkkkkbbbbo.",
+            ".obbbbbbbbbbbbo.",
+            ".obBbbbbbbbbBbo.",
+            ".odmmmmmmmmmmdo.",
+            ".oooooooooooooo.",
+            "................");
+
+        // A robot arm's base: a round steel pedestal with a hazard ring. The arm is drawn on top and swings.
+        static readonly PixelImage ArmBase = PixelImage.FromRows(MetalPalette,
+            "................",
+            "................",
+            ".....oooooo.....",
+            "...ooLLLLLLoo...",
+            "..oLLMMMMMMMmo..",
+            "..oLMykykykMmo..",
+            ".oLMkDDdDDDDkMo.",
+            ".oLMyDdDDDdDyMo.",
+            ".oLMkDDDDdDDkmo.",
+            ".oLMyDdDDDDdymo.",
+            "..oMkykykykymo..",
+            "..ommMMMMMmmdo..",
+            "...oodddddddo...",
+            ".....oooooo.....",
+            "....________....",
             "................");
 
         // The conveyor's frame: rails on both sides. The belt is drawn on top, running the way it faces.

@@ -21,6 +21,9 @@ namespace Game.Core
         Torch,
         // The third step's ore, only far from the spawn (WorldGenerator).
         MithrilOre,
+        // More machines: a splitter is walked over like a conveyor; a robot arm is solid.
+        Splitter,
+        Arm,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -71,7 +74,7 @@ namespace Game.Core
         public bool IsSolid(int x, int y)
         {
             var type = this[x, y];
-            return type != TileType.Floor && type != TileType.Conveyor;
+            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter;
         }
 
         // Whether a tile of this type has its centre within reach of the position.

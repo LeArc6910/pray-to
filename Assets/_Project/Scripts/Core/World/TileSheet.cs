@@ -181,7 +181,7 @@ namespace Game.Core
         // The view lights at most this far around a tile; more would not fit its light map.
         const float MaxLight = 12;
 
-        static readonly TileType[] MachineTiles = { TileType.Drill, TileType.Smelter, TileType.Conveyor };
+        static readonly TileType[] MachineTiles = { TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm };
 
         static List<MachineDefinition> ParseMachines(string csv, List<string> errors)
         {
@@ -199,7 +199,7 @@ namespace Game.Core
                 try
                 {
                     var tile = SheetValues.ParseEnum<TileType>(row["tile"], "칸 종류");
-                    if (!MachineTiles.Contains(tile)) throw new FormatException($"'{tile}'는 기계가 아닙니다(Drill, Smelter, Conveyor).");
+                    if (!MachineTiles.Contains(tile)) throw new FormatException($"'{tile}'는 기계가 아닙니다({string.Join(", ", MachineTiles)}).");
                     if (machines.Any(m => m.Tile == tile)) throw new FormatException($"'{tile}'가 이미 있습니다.");
                     float seconds = SheetValues.ParseDecimal(row["seconds"], "seconds");
                     if (seconds <= 0) throw new FormatException("seconds는 0보다 커야 합니다.");

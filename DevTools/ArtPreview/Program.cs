@@ -80,9 +80,13 @@ namespace Game.Client
                 }
             }
             rows.Add(tiles);
-            rows.Add(new[] { TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Torch }
+            rows.Add(new[]
+                {
+                    TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Torch,
+                    TileType.Splitter, TileType.Arm,
+                }
                 .Select(TileArt.Object).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(ItemArt.Belt))
-                .Concat(new[] { ItemArt.DrillBit, ItemArt.Chevron }).ToList());
+                .Concat(new[] { ItemArt.DrillBit, ItemArt.Chevron, ItemArt.SplitterArrows, ItemArt.RobotArm }).ToList());
 
             var players = new List<PixelImage>();
             foreach (var look in new[] { Look.Down, Look.Side, Look.Up })
