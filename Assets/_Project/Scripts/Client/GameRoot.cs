@@ -664,8 +664,20 @@ namespace Game.Client
                 if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 string mode = _mode == Mode.Host ? $"호스트 중 (포트 {NetLink.DefaultPort})" : _mode == Mode.Join ? "참가 중" : "혼자 하기";
                 lines.Add($"{mode} · 접속 {_client.Names.Count}명");
-                var toArena = _client.Arena - _client.Position;
-                if (toArena.Length > _client.ArenaRadius) lines.Add($"보스 아레나: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
+                // The nearest arena the player is not standing in: the first boss's from the spawn, the deep one's
+                // once there.
+                int next = -1;
+                for (int i = 0; i < _client.Arenas.Count; i++)
+                {
+                    float distance = Vec2.Distance(_client.Arenas[i], _client.Position);
+                    if (distance <= _client.ArenaRadius) continue;
+                    if (next < 0 || distance < Vec2.Distance(_client.Arenas[next], _client.Position)) next = i;
+                }
+                if (next >= 0)
+                {
+                    var toArena = _client.Arenas[next] - _client.Position;
+                    lines.Add($"{(next == 0 ? "보스 아레나" : "깊은 아레나")}: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
+                }
                 var goal = _guideProgress?.Current;
                 if (goal != null)
                 {

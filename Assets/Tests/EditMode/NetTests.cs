@@ -511,7 +511,7 @@ namespace Game.Core.Tests
             var session = new Session(new HostConfig { StarterGear = new[] { "obsidian_sword", "obsidian_armor" } }, Bosses.Shipped);
             var host = session.Host;
             var world = host.World;
-            var boss = world.Bosses.Single();
+            var boss = world.Bosses.First(b => b.Definition == Bosses.Shipped.Bosses[0]);
             for (ulong i = 1; i <= 4; i++) session.Join(i, "플레이어" + i, Protocol.Version, i % 2 == 0 ? "warrior" : "fire_mage", i % 2 == 0 ? "fire_mage" : "warrior");
             for (int i = 0; i < 4; i++) Walk(world, world.Players[i], boss.Home + Vec2.FromAngle(i * 1.6f) * 2.5f);
             for (int i = 0; i < 40; i++) world.SpawnEnemy(Monsters.Shipped.Find("slime"), boss.Home + Vec2.FromAngle(i) * 6);
@@ -549,7 +549,7 @@ namespace Game.Core.Tests
             var session = new Session(bosses: Bosses.Shipped);
             var alice = session.Join(1, "앨리스");
             var world = session.Host.World;
-            var boss = world.Bosses.Single();
+            var boss = world.Bosses.First(b => b.Definition == Bosses.Shipped.Bosses[0]);
             Walk(world, world.FindPlayer(alice.PlayerId), boss.Home + new Vec2(0, -4));
 
             var progress = new List<float>();

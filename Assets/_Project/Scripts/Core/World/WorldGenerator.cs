@@ -1,10 +1,11 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Game.Core
 {
     public sealed class GeneratedWorld
     {
-        public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius)
+        public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius, int deepArenaX, int deepArenaY)
         {
             Map = map;
             SpawnX = spawnX;
@@ -12,6 +13,7 @@ namespace Game.Core
             ArenaX = arenaX;
             ArenaY = arenaY;
             ArenaRadius = arenaRadius;
+            Arenas = new[] { TileMap.Center(arenaX, arenaY), TileMap.Center(deepArenaX, deepArenaY) };
         }
 
         public TileMap Map { get; }
@@ -23,6 +25,9 @@ namespace Game.Core
         public int ArenaY { get; }
         public int ArenaRadius { get; }
         public Vec2 Arena => TileMap.Center(ArenaX, ArenaY);
+        // Every boss arena in the order the bosses go in (bosses.csv): the first one's, then the deep one far out,
+        // reached by a tunnel from the first. All have ArenaRadius.
+        public IReadOnlyList<Vec2> Arenas { get; }
     }
 
     // Caves from a seed: random fill, a few smoothing passes, a clearing around the spawn, a boss arena some way
@@ -46,6 +51,15 @@ namespace Game.Core
         // Iron is only found at least this far from the spawn.
         const int IronDistance = 30;
         const int VeinPercent = 60;
+        // The deep zone (Docs/Bosses.md): mithril only this far out, which on the default map is its four corners,
+        // and the second boss's arena in one of them, about DeepArenaOffset tiles along each axis from the spawn. Both
+        // were added after the rest and use their own random streams, so the caves, the first arena and the copper
+        // and iron veins of every seed stayed exactly as they were.
+        const ulong DeepStream = 5;
+        const ulong MithrilStream = 6;
+        const int MithrilDistance = 60;
+        const int MithrilVeins = 30;
+        const int DeepArenaOffset = 50;
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -81,7 +95,19 @@ namespace Game.Core
             var ore = new GameRandom(seed, OreStream);
             PlaceVeins(map, ore, TileType.CopperOre, CopperVeins, spawnX, spawnY, 0);
             PlaceVeins(map, ore, TileType.IronOre, IronVeins, spawnX, spawnY, IronDistance);
-            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius);
+
+            // The deep arena: a far corner on the first arena's side, so the way there runs through the first.
+            var deep = new GameRandom(seed, DeepStream);
+            var corners = new[] { (1, 1), (-1, 1), (-1, -1), (1, -1) }
+                .Where(c => c.Item1 * offsetX + c.Item2 * offsetY > 0)
+                .ToArray();
+            var (cornerX, cornerY) = corners[deep.Next(corners.Length)];
+            int deepX = Clamp(spawnX + cornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
+            int deepY = Clamp(spawnY + cornerY * DeepArenaOffset, ArenaRadius + 2, height - ArenaRadius - 3);
+            CarveTunnel(map, arenaX, arenaY, deepX, deepY);
+            ClearDisc(map, deepX, deepY, ArenaRadius);
+            PlaceVeins(map, new GameRandom(seed, MithrilStream), TileType.MithrilOre, MithrilVeins, spawnX, spawnY, MithrilDistance);
+            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY);
         }
 
         static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;

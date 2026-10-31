@@ -10,3 +10,7 @@ boss,동굴 수호자 쓰러뜨리기,HUD에 보스 아레나 방향과 거리�
 iron_bar,철 주괴 만들기,시작 지점에서 30칸 넘게 가면 푸른 회색 철 광맥이 있다. 철 광석 2개를 화로에서 녹인다,have:iron_bar
 iron_gear,철 장비 하나 만들기,작업대 옆에서 철 주괴와 수호자의 핵으로 만든다,have:iron_sword|have:iron_bow|have:iron_staff|have:iron_helmet|have:iron_armor|have:iron_boots
 drill,채굴기 세우기,광맥을 바라보고 [놓기]로 세우고 뒤에 상자를 두면 광석이 저절로 쌓인다,place:Drill
+deep,깊은 곳 찾아가기,시작 지점에서 60칸 넘게 가면 빛나는 미스릴 광맥과 수정 박쥐·정령이 있는 깊은 곳이다. 횃불을 넉넉히 챙긴다,reach:60
+mithril_ore,미스릴 광석 4개 캐기,깊은 곳 벽에 박힌 하늘색으로 빛나는 덩어리가 미스릴 광맥이다. 단단해서 여러 번 쳐야 한다,have:mithril_ore:4
+queen,수정 거미 여왕 쓰러뜨리기,HUD의 깊은 아레나 방향으로 간다. 첫 보스보다 세니 철 장비와 물약을 갖춘다,have:queen_heart
+mithril_gear,미스릴 장비 하나 만들기,화로에서 미스릴 주괴를 녹이고 작업대에서 수정 심장과 함께 만든다,have:mithril_sword|have:mithril_bow|have:mithril_staff|have:mithril_helmet|have:mithril_armor|have:mithril_boots

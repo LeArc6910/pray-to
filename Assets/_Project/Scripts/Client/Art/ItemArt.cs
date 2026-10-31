@@ -267,6 +267,18 @@ namespace Game.Client
             "LMMMMMMmd.",
             "mmmmmmmd..").Outlined(Outline);
 
+        // An ingot in the ramp's colours, like the iron bar.
+        static PixelImage Bar(Ramp ramp)
+        {
+            var colors = new Dictionary<char, Rgba> { ['L'] = ramp.Light, ['M'] = ramp.Main, ['m'] = ramp.Shade, ['d'] = ramp.Dark };
+            return PixelImage.FromRows(colors,
+                "...LLLLL..",
+                "..LMMMMMm.",
+                ".LMMMMMmd.",
+                "LMMMMMMmd.",
+                "mmmmmmmd..").Outlined(Outline);
+        }
+
         static readonly string[] Goo =
         {
             "....L.....",
@@ -338,6 +350,9 @@ namespace Game.Client
                 case "copper_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#D6783F")), OreChunk).Outlined(Outline);
                 case "iron_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#B8CCE4")), OreChunk).Outlined(Outline);
                 case "iron_bar": return IronBar;
+                case "mithril_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#8FE6F2")), OreChunk).Outlined(Outline);
+                case "mithril_bar": return Bar(Ramp.Of("#7CD2E2"));
+                case "queen_heart": return Ramped(Gem, Ramp.Of("#FF6E9C"));
                 case "slime_gel": return Ramped(Goo, Ramp.Of("#8CD94D"));
                 case "warden_core": return Ramped(Gem, Ramp.Of("#FFA83A"));
                 case "mushroom_spore": return Ramped(Spores, Ramp.Of("#B07CE0"));

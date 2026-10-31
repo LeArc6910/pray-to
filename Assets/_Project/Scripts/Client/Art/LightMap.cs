@@ -221,7 +221,15 @@ namespace Game.Client
             }
         }
 
-        public static Func<int, int, float> ArenaAmbient(Vec2 arena, float arenaRadius) =>
-            (x, y) => Vec2.Distance(TileMap.Center(x, y), arena) <= arenaRadius + 1 ? ArenaGlow : 0;
+        public static Func<int, int, float> ArenaAmbient(IReadOnlyList<Vec2> arenas, float arenaRadius) =>
+            (x, y) =>
+            {
+                var center = TileMap.Center(x, y);
+                foreach (var arena in arenas)
+                {
+                    if (Vec2.Distance(center, arena) <= arenaRadius + 1) return ArenaGlow;
+                }
+                return 0;
+            };
     }
 }

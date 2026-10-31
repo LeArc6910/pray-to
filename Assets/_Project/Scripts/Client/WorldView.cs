@@ -158,7 +158,7 @@ namespace Game.Client
             BuildTiles(client);
             AddLight();
             _worldLights = new WorldLights(client.Tiles);
-            _arenaGlow = WorldLights.ArenaAmbient(client.Arena, client.ArenaRadius);
+            _arenaGlow = WorldLights.ArenaAmbient(client.Arenas, client.ArenaRadius);
             BuildDark(DarkSize);
             _self = MakeBody(BodyKind.Player, "나", 0, World.PlayerRadius, SelfTunic);
             var start = client.Position;
@@ -973,8 +973,19 @@ namespace Game.Client
 
         TileBase GroundAt(int x, int y)
         {
-            bool inArena = Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius;
+            bool inArena = InArena(_client, x, y);
             return Sprites.Ground(TileArt.GroundAt(_client.Map, x, y, inArena));
+        }
+
+        // Whether the tile is in any boss's arena.
+        public static bool InArena(WorldClient client, int x, int y)
+        {
+            var center = TileMap.Center(x, y);
+            foreach (var arena in client.Arenas)
+            {
+                if (Vec2.Distance(center, arena) <= client.ArenaRadius) return true;
+            }
+            return false;
         }
 
         static readonly (int X, int Y)[] Neighbourhood = { (0, 0), (1, 0), (-1, 0), (0, 1), (0, -1) };

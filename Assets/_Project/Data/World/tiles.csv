@@ -9,3 +9,4 @@ Drill,채굴기,1,drill,1,,,,,
 Smelter,제련기,1,smelter,1,,,,4,#FF8A3C
 Conveyor,운반 벨트,1,conveyor,1,,,,,
 Torch,횃불,1,torch,1,,,,6.5,#FFC27A
+MithrilOre,미스릴 광맥,12,mithril_ore,1,,,yes,2,#8FE6F2

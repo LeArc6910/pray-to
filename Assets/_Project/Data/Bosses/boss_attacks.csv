@@ -7,3 +7,10 @@ cave_warden,charge,돌진,2|3,charge,farthest,1.0,25,,10,,2.4,,,16,1.2,20,
 cave_warden,rock_storm,돌 폭풍,3,burst,self,0.6,10,0.3,,,,18,,7,1.0,15,
 cave_warden,meteor,낙석,3,circle,random,1.2,20,1.6,,,,4,3.5,,1.0,15,
 cave_warden,call_slimes,슬라임 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,slime
+crystal_queen,bite,물어뜯기,,cone,nearest,0.7,30,,3.2,90,,,,,0.7,30,
+crystal_queen,crystal_rain,수정 비,,circle,random,1.2,24,1.4,,,,5,4.5,,1.0,25,
+crystal_queen,shard_ring,수정 가시,1|2,burst,self,0.6,14,0.3,,,,12,,8,0.9,20,
+crystal_queen,pounce,덮치기,2|3,charge,farthest,0.9,32,,12,,2.4,,,18,1.1,20,
+crystal_queen,web_quake,거미줄 진동,2|3,circle,each,1.0,24,2.0,,,,1,,,1.0,20,
+crystal_queen,shard_storm,수정 폭풍,3,burst,self,0.6,14,0.3,,,,20,,8,0.9,15,
+crystal_queen,call_bats,박쥐 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,crystal_bat

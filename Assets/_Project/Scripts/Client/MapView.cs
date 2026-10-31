@@ -135,7 +135,7 @@ namespace Game.Client
             var uv = new Rect(window.x / _map.Width, window.y / _map.Height, window.width / _map.Width, window.height / _map.Height);
             GUI.DrawTextureWithTexCoords(area, _texture, uv);
 
-            Marker(area, window, _client.Arena, Shapes.Ring, ArenaMark, MarkerSize * 2.2f);
+            foreach (var arena in _client.Arenas) Marker(area, window, arena, Shapes.Ring, ArenaMark, MarkerSize * 2.2f);
             foreach (var position in _others) Marker(area, window, position, Shapes.Circle, OtherPlayer, MarkerSize);
             Marker(area, window, _client.Position, Shapes.Circle, Color.white, MarkerSize);
         }
@@ -198,8 +198,9 @@ namespace Game.Client
             if (_map[x, y] == TileType.Smelter) return Palette.Smelter;
             if (_map[x, y] == TileType.Conveyor) return Palette.Conveyor;
             if (_map[x, y] == TileType.Torch) return Palette.Torch;
+            if (_map[x, y] == TileType.MithrilOre) return Palette.MithrilOre;
             if (_map.IsSolid(x, y)) return Wall;
-            return Vec2.Distance(TileMap.Center(x, y), _client.Arena) <= _client.ArenaRadius ? ArenaFloor : Floor;
+            return WorldView.InArena(_client, x, y) ? ArenaFloor : Floor;
         }
     }
 }

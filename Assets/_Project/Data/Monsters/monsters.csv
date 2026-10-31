@@ -2,3 +2,5 @@ id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weigh
 slime,슬라임,1,30,9,0,2.4,0.4,8,0.5,0.5,1.0,100,20,6,8,slime_gel,30,melee,,,,#8CD94D
 spore_shooter,가시 버섯,2,24,8,0,1.6,0.35,9,6,0.8,2.0,60,20,6,8,mushroom_spore,25,ranged,7,4,,#B07CE0
 cave_beetle,동굴 딱정벌레,2,60,14,15,2.2,0.42,8,4,0.7,2.2,50,25,8,8,copper_ore,40,charge,,,10,#A0703C
+crystal_bat,수정 박쥐,3,75,17,10,3.6,0.3,9,0.5,0.35,0.9,60,25,8,10,mithril_ore,30,melee,,,,#7CD2E2
+crystal_wisp,수정 정령,3,60,18,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,mithril_ore,25,ranged,9,4.5,,#C8F4FF

@@ -101,6 +101,8 @@ namespace Game.Client
             creatures.Add(CreatureArt.Monster("unknown", Rgba.Hex("#D05050"), 0));
             creatures.Add(CreatureArt.Boss("cave_warden", BossColor, 0));
             creatures.Add(CreatureArt.Boss("cave_warden", BossColor, 1));
+            creatures.Add(CreatureArt.Boss("crystal_queen", BossColor, 0));
+            creatures.Add(CreatureArt.Boss("crystal_queen", BossColor, 1));
             rows.Add(creatures);
 
             rows.Add(new[]
@@ -201,7 +203,7 @@ namespace Game.Client
             int ay = world.ArenaY;
             var arena = world.Arena;
             var scene = new Scene(world.Map, ax - 13, ay - 8, 26, 16, p => Vec2.Distance(p, arena) <= world.ArenaRadius);
-            scene.Lit(lights, WorldLights.ArenaAmbient(arena, world.ArenaRadius));
+            scene.Lit(lights, WorldLights.ArenaAmbient(world.Arenas, world.ArenaRadius));
             scene.Body(ax + 0.5f, ay + 1.5f, 1.2f, CreatureArt.Boss("cave_warden", BossColor, 0));
             scene.Player(ax - 2.5f, ay - 3f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
             scene.Player(ax + 3.5f, ay - 2.5f, CreatureArt.Player(Look.Side, 0, Rgba.Hex("#4DB06A")).FlippedX());

@@ -15,6 +15,13 @@ iron_staff,iron_staff,1,iron_bar:4|warden_core:1,Workbench
 iron_helmet,iron_helmet,1,iron_bar:3|warden_core:1,Workbench
 iron_armor,iron_armor,1,iron_bar:5|warden_core:1,Workbench
 iron_boots,iron_boots,1,iron_bar:3|warden_core:1,Workbench
+mithril_bar,mithril_bar,1,mithril_ore:2,Furnace
+mithril_sword,mithril_sword,1,mithril_bar:4|queen_heart:1,Workbench
+mithril_bow,mithril_bow,1,mithril_bar:4|queen_heart:1,Workbench
+mithril_staff,mithril_staff,1,mithril_bar:4|queen_heart:1,Workbench
+mithril_helmet,mithril_helmet,1,mithril_bar:3|queen_heart:1,Workbench
+mithril_armor,mithril_armor,1,mithril_bar:5|queen_heart:1,Workbench
+mithril_boots,mithril_boots,1,mithril_bar:3|queen_heart:1,Workbench
 drill,drill,1,iron_bar:4|copper_ore:6,Workbench
 smelter,smelter,1,iron_bar:3|stone:12,Workbench
 conveyor,conveyor,4,iron_bar:1|stone:2,Workbench

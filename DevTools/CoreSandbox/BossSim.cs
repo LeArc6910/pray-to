@@ -5,7 +5,7 @@ using Game.Core;
 
 namespace CoreSandbox
 {
-    // A party of bots against the first boss in its arena. Each bot walks in, hits the boss, uses its class skills
+    // A party of bots against a boss in its arena (the first unless --boss-id names another). Each bot walks in, hits the boss, uses its class skills
     // when ready, and steps out of a telegraph once it has had `reaction` seconds to notice it, the way a person
     // would. Prints how long the kill took, how often the party wiped, which attacks did the damage, and how the
     // bots' own damage splits between the basic attack and each skill.
@@ -20,12 +20,16 @@ namespace CoreSandbox
         }
 
         public static void Run(
-            LootData loot, MonsterData monsters, BossData bosses, int seconds, ulong seed, int players, string[] gear, ClassDefinition[] classes, float reaction, bool dodge)
+            LootData loot, MonsterData monsters, BossData bosses, int seconds, ulong seed, int players, string[] gear, ClassDefinition[] classes, float reaction, bool dodge,
+            string bossId = null)
         {
             var generated = WorldGenerator.Generate(seed);
             var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = 0 }, loot);
-            var definition = bosses.Bosses[0];
-            world.PlaceBoss(definition, generated.Arena, generated.ArenaRadius);
+            int index = bossId == null ? 0 : bosses.Bosses.ToList().FindIndex(b => b.Id == bossId);
+            if (index < 0) throw new ArgumentException($"No boss '{bossId}' in bosses.csv.");
+            var definition = bosses.Bosses[index];
+            var arena = generated.Arenas[Math.Min(index, generated.Arenas.Count - 1)];
+            world.PlaceBoss(definition, arena, generated.ArenaRadius);
 
             var random = new GameRandom(seed, 99);
             var generator = new LootGenerator(loot);
@@ -43,7 +47,7 @@ namespace CoreSandbox
             }
 
             var toArena = new FlowField(world.Map);
-            toArena.Build(new[] { generated.Arena }, 200);
+            toArena.Build(new[] { arena }, 200);
             int reactionTicks = World.Ticks(reaction);
             var takenByAttack = new Dictionary<string, int>();
             var phaseStarts = new List<(int Phase, double Seconds)>();
@@ -55,10 +59,10 @@ namespace CoreSandbox
             {
                 foreach (var bot in bots)
                 {
-                    Drive(world, bot.Player, toArena, generated.Arena, reactionTicks, dodge);
+                    Drive(world, bot.Player, toArena, arena, reactionTicks, dodge);
                     var boss = world.Bosses.FirstOrDefault();
                     bool fighting = boss != null && Vec2.Distance(bot.Player.Position, boss.Home) <= boss.ArenaRadius + 2;
-                    bot.Skills.Use(world, boss?.Position ?? generated.Arena, fighting);
+                    bot.Skills.Use(world, boss?.Position ?? arena, fighting);
                 }
                 world.Step();
                 foreach (var e in world.TakeEvents())

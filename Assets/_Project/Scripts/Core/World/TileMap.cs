@@ -19,6 +19,8 @@ namespace Game.Core
         Conveyor,
         // Lights the cave around it (tiles.csv light).
         Torch,
+        // The third step's ore, only far from the spawn (WorldGenerator).
+        MithrilOre,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

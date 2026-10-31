@@ -260,6 +260,66 @@ namespace Game.Client
             },
         };
 
+        // Wings up, then down.
+        static readonly string[][] Bat =
+        {
+            new[]
+            {
+                "M.............M",
+                "Mm...L...L...mM",
+                ".Mm..LMMML..mM.",
+                "..Mm.MeMeM.mM..",
+                "...MmMMMMMmM...",
+                ".....MwMMm.....",
+                "......mmm......",
+                ".......d.......",
+            },
+            new[]
+            {
+                "...............",
+                ".....L...L.....",
+                ".....LMMML.....",
+                ".....MeMeM.....",
+                "..MmmMMMMMmmM..",
+                ".Mm..MwMMm..mM.",
+                "Mm....mmm....mM",
+                "M......d......M",
+            },
+        };
+
+        // A floating flame with a face; its wisps and tail flicker between the frames.
+        static readonly string[][] Wisp =
+        {
+            new[]
+            {
+                ".....LL.....",
+                "....LwwL....",
+                "...LwMMwL...",
+                "..LwMMMMwL..",
+                ".LMMMMMMMML.",
+                ".MMeMMMMeMM.",
+                ".MMeMMMMeMM.",
+                ".mMMMMMMMMm.",
+                "..mMMmmMMm..",
+                "...mm..mm...",
+                "....m..m....",
+            },
+            new[]
+            {
+                "....L..L....",
+                "....LwwL....",
+                "...LwMMwL...",
+                "..LwMMMMwL..",
+                ".LMMMMMMMML.",
+                ".MMeMMMMeMM.",
+                ".MMeMMMMeMM.",
+                ".mMMMMMMMMm.",
+                "..mMMmmMMm..",
+                "..mm..mm....",
+                "...m....m...",
+            },
+        };
+
         static readonly Dictionary<string, Dictionary<char, Rgba>> Extras = new Dictionary<string, Dictionary<char, Rgba>>
         {
             ["spore_shooter"] = new Dictionary<char, Rgba>
@@ -287,6 +347,8 @@ namespace Game.Client
             var frames = id switch
             {
                 "spore_shooter" => Mushroom,
+                "crystal_bat" => Bat,
+                "crystal_wisp" => Wisp,
                 "cave_beetle" => Beetle,
                 _ => Slime,
             };
@@ -297,7 +359,9 @@ namespace Game.Client
 
         // The cave warden, a golem of stacked stone blocks with a glowing core. Drawn from blocks rather than a
         // grid because it is big; the second frame breathes, raising the upper body a pixel.
-        public static PixelImage Boss(string id, Rgba color, int frame)
+        public static PixelImage Boss(string id, Rgba color, int frame) => id == "crystal_queen" ? Queen(frame) : Warden(color, frame);
+
+        static PixelImage Warden(Rgba color, int frame)
         {
             const int width = 36;
             const int height = 34;
@@ -349,6 +413,90 @@ namespace Game.Client
                 image[x, y + bob] = moss;
             }
             return image.Outlined(stone.Outline);
+        }
+
+        // The crystal spider queen: a dark round body grown over with crystals, a head with a row of pink eyes, and
+        // eight jointed legs. In the second frame her legs shift, pair by pair.
+        static PixelImage Queen(int frame)
+        {
+            const int width = 42;
+            const int height = 36;
+            var image = new PixelImage(width, height);
+            var body = Ramp.Of("#4E4062");
+            var leg = Ramp.Of("#6E5C88");
+            var crystal = Ramp.Of("#7CD2E2");
+            var eye = Rgba.Hex("#FF5C8A");
+            int shift = frame % 2;
+
+            // Legs first, under the body: from the body's sides out to a knee and down to a foot.
+            for (int i = 0; i < 4; i++)
+            {
+                int lift = (i + shift) % 2 == 0 ? -1 : 1;
+                int startY = 17 + i * 3;
+                int kneeY = 8 + i * 5 + lift;
+                int footY = 15 + i * 5 + lift;
+                foreach (int side in new[] { -1, 1 })
+                {
+                    int startX = 21 + side * 6;
+                    int kneeX = 21 + side * (14 + i);
+                    int footX = 21 + side * (19 + i / 2);
+                    Thick(image, startX, startY, kneeX, kneeY, leg.Main, leg.Light);
+                    Thick(image, kneeX, kneeY, footX, footY, leg.Shade, leg.Main);
+                }
+            }
+
+            Ellipse(image, 21, 13, 11, 9, body);
+            Ellipse(image, 21, 25, 7, 5, Ramp.Of("#5C4C72"));
+
+            // Crystals on her back.
+            foreach (var (x, y, h) in new[] { (15, 9, 5), (20, 6, 7), (26, 9, 5), (18, 14, 4), (24, 14, 4) })
+            {
+                for (int j = 0; j < h; j++)
+                {
+                    int half = (h - j) / 3;
+                    for (int dx = -half; dx <= half; dx++) image[x + dx, y - j + h / 2] = dx < 0 ? crystal.Light : dx > 0 ? crystal.Shade : crystal.Main;
+                }
+                image[x, y - h / 2] = Rgba.White;
+            }
+
+            foreach (int x in new[] { 17, 19, 23, 25 }) image[x, 24] = eye;
+            image[20, 23] = eye;
+            image[22, 23] = eye;
+            image[19, 29] = Rgba.Hex("#E8E0D0");
+            image[23, 29] = Rgba.Hex("#E8E0D0");
+            image[19, 30] = Rgba.Hex("#E8E0D0");
+            image[23, 30] = Rgba.Hex("#E8E0D0");
+            return image.Outlined(body.Outline);
+        }
+
+        // A filled oval lit from the top left.
+        static void Ellipse(PixelImage image, int cx, int cy, int rx, int ry, Ramp ramp)
+        {
+            for (int y = cy - ry; y <= cy + ry; y++)
+            {
+                for (int x = cx - rx; x <= cx + rx; x++)
+                {
+                    float u = (x - cx) / (float)rx;
+                    float v = (y - cy) / (float)ry;
+                    float d = u * u + v * v;
+                    if (d > 1) continue;
+                    float light = -u * 0.4f - v * 0.6f;
+                    image[x, y] = d > 0.8f ? ramp.Dark : light > 0.35f ? ramp.Light : light < -0.3f ? ramp.Shade : ramp.Main;
+                }
+            }
+        }
+
+        // A line two pixels thick, lit along its top edge.
+        static void Thick(PixelImage image, int x0, int y0, int x1, int y1, Rgba color, Rgba light)
+        {
+            int steps = System.Math.Max(System.Math.Abs(x1 - x0), System.Math.Abs(y1 - y0));
+            for (int i = 0; i <= steps; i++)
+            {
+                int x = x0 + (x1 - x0) * i / System.Math.Max(1, steps);
+                int y = y0 + (y1 - y0) * i / System.Math.Max(1, steps);
+                image[x, y] = light;
+                image[x, y + 1] = color;
+            }
         }
 
         // A stone block lit from the top left, with its corners knocked off and a few dark specks.

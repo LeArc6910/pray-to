@@ -12,7 +12,7 @@ namespace CoreSandbox
     // add --rarity <percent> to --item or --loot for the finder's item rarity bonus
     // dotnet run -- --fight [seconds] [seed]        a bot fights slimes in a generated cave
     // add --gear <base,base> to --fight to change its gear (copper_sword by default), --no-dodge to stand still
-    // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss
+    // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss (--boss-id for another)
     // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
     // add --classes <class,class> to --fight or --boss to give the bots classes; they use every skill when it is ready
     static class Program
@@ -51,6 +51,13 @@ namespace CoreSandbox
                 reaction = float.Parse(args[reactionFlag + 1], System.Globalization.CultureInfo.InvariantCulture);
                 args = args.Where((_, i) => i != reactionFlag && i != reactionFlag + 1).ToArray();
             }
+            string bossId = null;
+            int bossIdFlag = Array.IndexOf(args, "--boss-id");
+            if (bossIdFlag >= 0)
+            {
+                bossId = args[bossIdFlag + 1];
+                args = args.Where((_, i) => i != bossIdFlag && i != bossIdFlag + 1).ToArray();
+            }
             string[] classIds = Array.Empty<string>();
             int classesFlag = Array.IndexOf(args, "--classes");
             if (classesFlag >= 0)
@@ -78,13 +85,13 @@ namespace CoreSandbox
                     break;
                 case "--boss":
                     var monsters = LoadMonsters();
-                    BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge);
+                    BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge, bossId);
                     break;
                 default:
                     Console.WriteLine("usage: dotnet run -- --item [level] [seed] | --loot [level] [count] [seed] | --progression [count] [seed]");
                     Console.WriteLine("       add --rarity <percent> to --item or --loot");
                     Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--classes warrior,fire_mage] [--no-dodge]");
-                    Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--classes ...] [--no-dodge]");
+                    Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--classes ...] [--no-dodge] [--boss-id crystal_queen]");
                     break;
             }
         }

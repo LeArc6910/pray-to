@@ -100,7 +100,11 @@ namespace Game.Core
             _gearRandom = new GameRandom(seed, stream: 3);
             _generated = WorldGenerator.Generate(seed);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles);
-            if (bosses != null && bosses.Bosses.Count > 0) World.PlaceBoss(bosses.Bosses[0], _generated.Arena, _generated.ArenaRadius);
+            // Each boss in its own arena, in sheet order: the first near the spawn, the next in the deep zone.
+            for (int i = 0; bosses != null && i < bosses.Bosses.Count && i < _generated.Arenas.Count; i++)
+            {
+                World.PlaceBoss(bosses.Bosses[i], _generated.Arenas[i], _generated.ArenaRadius);
+            }
         }
 
         public World World { get; }

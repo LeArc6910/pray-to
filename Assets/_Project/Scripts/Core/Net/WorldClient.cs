@@ -207,6 +207,8 @@ namespace Game.Core
         public Vec2 Spawn { get; private set; }
         // Where the boss's arena is, known from the seed like the rest of the map.
         public Vec2 Arena { get; private set; }
+        // Every boss arena, the first one's first (GeneratedWorld.Arenas).
+        public IReadOnlyList<Vec2> Arenas { get; private set; } = new Vec2[0];
         public float ArenaRadius { get; private set; }
 
         // The local player, moved here first; PreviousPosition is where it was one tick earlier, for smoothing.
@@ -606,6 +608,7 @@ namespace Game.Core
             var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height);
             Map = generated.Map;
             Arena = generated.Arena;
+            Arenas = generated.Arenas;
             ArenaRadius = generated.ArenaRadius;
             Position = welcome.Spawn;
             PreviousPosition = welcome.Spawn;

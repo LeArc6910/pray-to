@@ -36,6 +36,7 @@ dotnet run --project DevTools/CoreSandbox -- --item 25 7
 dotnet run --project DevTools/CoreSandbox -- --fight 120 42
 dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --players 2
 dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --classes warrior,fire_mage
+dotnet run --project DevTools/CoreSandbox -- --boss 400 1 --boss-id crystal_queen --gear iron_sword,iron_armor --reaction 0.5
 
 # 도트 그림과 효과음을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, cave.png, cave_unlit.png, arena.png, sounds/)
 dotnet run --project DevTools/ArtPreview

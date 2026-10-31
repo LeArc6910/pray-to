@@ -13,6 +13,7 @@ namespace Game.Client
         CopperOre,
         IronOre,
         Bedrock,
+        MithrilOre,
     }
 
     // The cave tiles, 16 pixels a tile, seen from above and a little in front like Core Keeper: a wall shows its
@@ -25,7 +26,7 @@ namespace Game.Client
         public const int Size = 16;
         public const int Variants = 4;
         const int Masks = 16;
-        const int Kinds = 6;
+        const int Kinds = 7;
         // Neighbour bits: which sides are rock.
         public const int Up = 1;
         public const int Right = 2;
@@ -37,7 +38,8 @@ namespace Game.Client
 
         public static int Index(GroundKind kind, int mask, int variant) => ((int)kind * Masks + mask) * Variants + variant;
 
-        public static bool IsRock(TileType type) => type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre;
+        public static bool IsRock(TileType type) =>
+            type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre;
 
         // Which ground tile goes at (x, y). Outside the map reads as wall.
         public static int GroundAt(TileMap map, int x, int y, bool inArena)
@@ -51,6 +53,7 @@ namespace Game.Client
                 TileType.Wall => map.IsEdge(x, y) ? GroundKind.Bedrock : GroundKind.Rock,
                 TileType.CopperOre => GroundKind.CopperOre,
                 TileType.IronOre => GroundKind.IronOre,
+                TileType.MithrilOre => GroundKind.MithrilOre,
                 _ => inArena ? GroundKind.Arena : GroundKind.Floor,
             };
             return Index(kind, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants));
@@ -68,6 +71,7 @@ namespace Game.Client
                 GroundKind.Rock => Rock(mask, variant, RockColors),
                 GroundKind.Bedrock => Rock(mask, variant, BedrockColors),
                 GroundKind.CopperOre => Ore(Rock(mask, variant, RockColors), mask, variant, Ramp.Of("#D6783F")),
+                GroundKind.MithrilOre => Ore(Rock(mask, variant, RockColors), mask, variant, Ramp.Of("#7CD2E2"), sparkle: true),
                 _ => Ore(Rock(mask, variant, RockColors), mask, variant, Ramp.Of("#A9BDD6"), sparkle: true),
             };
         }
