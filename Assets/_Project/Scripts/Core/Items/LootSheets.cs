@@ -100,15 +100,20 @@ namespace Game.Core
                 {
                     int sockets = SheetValues.ParseNumber(row["sockets"], "sockets");
                     if (sockets > MaxSockets) throw new FormatException($"sockets는 {MaxSockets} 이하여야 합니다.");
+                    var slot = SheetValues.ParseEnum<ItemSlot>(row["slot"], "슬롯");
+                    string tool = row["tool"];
+                    if (tool.Length > 0 && tool != ItemBase.Pickaxe) throw new FormatException($"tool '{tool}'은 모릅니다(비우거나 {ItemBase.Pickaxe}).");
+                    if (tool == ItemBase.Pickaxe && slot != ItemSlot.Weapon) throw new FormatException("곡괭이는 weapon 슬롯이어야 합니다(손에 든다).");
                     bases.Add(new ItemBase(
                         NewId(row, bases.Select(b => b.Id)),
                         Required(row, "name"),
-                        SheetValues.ParseEnum<ItemSlot>(row["slot"], "슬롯"),
+                        slot,
                         Level(row),
                         ParseTags(row["tags"]),
                         ModifierSyntax.ParseList(row["implicit"]),
                         sockets,
-                        SheetValues.ParseNumber(row["weight"], "weight")));
+                        SheetValues.ParseNumber(row["weight"], "weight"),
+                        tool));
                 });
             }
             return bases;

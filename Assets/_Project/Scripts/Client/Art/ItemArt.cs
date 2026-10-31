@@ -58,6 +58,20 @@ namespace Game.Client
             ".....Ls...",
         };
 
+        // A pick head across the top, its handle running down to the bottom left where it is held.
+        static readonly string[] PickaxeRows =
+        {
+            "...LLMm...",
+            ".LMMMMMmm.",
+            "Lm..hHm.mm",
+            "L...hH...m",
+            "...hH.....",
+            "..hH......",
+            ".hH.......",
+            "hH........",
+            "H.........",
+        };
+
         static readonly string[] Staff =
         {
             ".......M..",
@@ -148,7 +162,7 @@ namespace Game.Client
             };
             string[] rows = item.Slot switch
             {
-                ItemSlot.Weapon => (item.Tags & SkillTag.Ranged) != 0 ? Bow : (item.Tags & SkillTag.Magic) != 0 ? Staff : Sword,
+                ItemSlot.Weapon => item.IsPickaxe ? PickaxeRows : (item.Tags & SkillTag.Ranged) != 0 ? Bow : (item.Tags & SkillTag.Magic) != 0 ? Staff : Sword,
                 ItemSlot.Helmet => Helmet,
                 ItemSlot.Chest => Armor,
                 ItemSlot.Boots => Boots,

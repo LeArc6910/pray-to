@@ -38,6 +38,14 @@ namespace Game.Core
 
         public GroundLoot DropMaterial(MaterialDefinition material, Vec2 position) => Place(null, null, position, Tick, material: material);
 
+        // Puts an item in the player's bag, or at their feet when the bag is full.
+        public void Give(Player player, Item item)
+        {
+            Register(item);
+            if (player.Inventory.TryAdd(item)) player.InventoryVersion++;
+            else Place(item, null, player.Position, Tick);
+        }
+
         Item Register(Item item)
         {
             if (item.Id == 0) item.Id = _nextId++;

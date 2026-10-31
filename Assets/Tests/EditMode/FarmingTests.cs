@@ -236,6 +236,7 @@ namespace Game.Core.Tests
         {
             var lucky = TileSheet.Parse("tile,name,hardness,material,count,extra,extra_chance\nWall,돌벽,1,stone,1,mushroom_spore,100\n", Gear.Data);
             var world = Room(out var player, lucky);
+            player.Equip(Gear.Plain("copper_pickaxe"));
             world.MovePlayer(player.Id, TileMap.Center(3, 3), new Vec2(0, 1), 10);
 
             world.SetAttacking(player.Id, true);

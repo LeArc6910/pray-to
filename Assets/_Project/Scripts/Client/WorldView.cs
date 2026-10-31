@@ -185,6 +185,8 @@ namespace Game.Client
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
         float _shake;
+        // When the "곡괭이가 필요하다" reminder may show again.
+        float _pickaxeHintAt;
         string _banner = "";
         float _bannerAge = BannerSeconds;
         GUIStyle _labelStyle;
@@ -754,6 +756,16 @@ namespace Game.Client
                 case SimEventType.Dug:
                     // A puff of dust where the wall was struck, bigger when it gives way.
                     var struck = new Vector3(e.Position.X, e.Position.Y, 0);
+                    if (e.Amount < 0)
+                    {
+                        // Rock struck without a pickaxe: a dull knock, and every few seconds the reminder.
+                        if (e.Source != _client.PlayerId) break;
+                        Hear(Sound.Hit, struck, 0.35f);
+                        if (Time.time < _pickaxeHintAt) break;
+                        _pickaxeHintAt = Time.time + 2.5f;
+                        _floating.Add(new Floating { Position = struck, Text = "곡괭이가 필요하다", Color = new Color(1f, 0.85f, 0.5f) });
+                        break;
+                    }
                     AddFlash(struck, e.Amount == 1 ? 0.7f : 0.35f, Palette.Dust, Shapes.Circle);
                     Hear(e.Amount == 1 ? Sound.Break : Sound.Dig, struck);
                     break;

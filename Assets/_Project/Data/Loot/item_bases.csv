@@ -1,8 +1,9 @@
-id,name,slot,level,tags,implicit,sockets,weight
+id,name,slot,level,tags,implicit,sockets,weight,tool
 # 1단계: 구리
 copper_sword,구리 검,weapon,1,melee,Damage+4~6,3,100
 copper_bow,구리 활,weapon,1,ranged,Damage+3~5;AttackSpeed+5%,3,100
 copper_staff,구리 지팡이,weapon,1,magic,Damage+3~5;Magic:Damage+30%;AttackSpeed-15%,3,100
+copper_pickaxe,구리 곡괭이,weapon,1,melee,Damage+2~3,1,0,pickaxe
 copper_helmet,구리 투구,helmet,1,,Armor+3~5,2,100
 copper_armor,구리 갑옷,chest,1,,Armor+6~9;MaxHealth+5~10,3,100
 copper_boots,구리 장화,boots,1,,Armor+2~3,2,100
@@ -12,6 +13,7 @@ copper_amulet,구리 목걸이,amulet,1,,Damage+3~5%,1,60
 iron_sword,철 검,weapon,10,melee,Damage+9~12,3,100
 iron_bow,철 활,weapon,10,ranged,Damage+7~10;AttackSpeed+5%,3,100
 iron_staff,철 지팡이,weapon,10,magic,Damage+7~10;Magic:Damage+35%;AttackSpeed-15%,3,100
+iron_pickaxe,철 곡괭이,weapon,10,melee,Damage+5~6;MiningSpeed+60%,1,0,pickaxe
 iron_helmet,철 투구,helmet,10,,Armor+7~10,2,100
 iron_armor,철 갑옷,chest,10,,Armor+13~17;MaxHealth+12~18,3,100
 iron_boots,철 장화,boots,10,,Armor+5~7,2,100
@@ -21,6 +23,7 @@ iron_amulet,철 목걸이,amulet,10,,Damage+5~7%,1,60
 mithril_sword,미스릴 검,weapon,20,melee,Damage+17~22,3,100
 mithril_bow,미스릴 활,weapon,20,ranged,Damage+14~18;AttackSpeed+5%,3,100
 mithril_staff,미스릴 지팡이,weapon,20,magic,Damage+14~18;Magic:Damage+40%;AttackSpeed-15%,3,100
+mithril_pickaxe,미스릴 곡괭이,weapon,20,melee,Damage+9~11;MiningSpeed+120%,1,0,pickaxe
 mithril_helmet,미스릴 투구,helmet,20,,Armor+14~18,2,100
 mithril_armor,미스릴 갑옷,chest,20,,Armor+25~31;MaxHealth+22~30,3,100
 mithril_boots,미스릴 장화,boots,20,,Armor+10~12,2,100

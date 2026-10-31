@@ -23,6 +23,8 @@ namespace Game.Core
         public int MaxHazardsPerSnapshot { get; set; } = 10;
         public int MaxEventsPerSnapshot { get; set; } = 14;
         public string[] StarterGear { get; set; } = { "copper_sword" };
+        // Put in the bag of a new character, and of a saved one that has no pickaxe (from before rock needed one).
+        public string StarterPickaxe { get; set; } = "copper_pickaxe";
         // Machines nearer than ViewRange go out every MachineInterval ticks, at most this many, nearest first.
         public int MachineInterval { get; set; } = 4;
         public int MaxMachinesPerMessage { get; set; } = 60;
@@ -221,6 +223,7 @@ namespace Game.Core
             var classes = ClassRules.Choose(_classes, join.Classes, _config.MaxClasses);
             var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, saved?.Equipment ?? StarterGear(), saved?.Bag, classes.ToArray());
             if (saved == null) GiveStarterStacks(player);
+            GivePickaxe(player);
             _connections[connection] = new Connection { Player = player };
 
             var map = _generated.Map;
@@ -240,6 +243,15 @@ namespace Game.Core
                 equipment.Equip(new LootGenerator(_loot).RollItem(itemBase, itemBase.Level, Rarity.Common, _gearRandom));
             }
             return equipment;
+        }
+
+        // Rock only gives way to a pickaxe, so nobody may be without one. A full bag gets it at the player's feet.
+        void GivePickaxe(Player player)
+        {
+            var pickaxe = _loot?.Bases.FirstOrDefault(b => b.Id == _config.StarterPickaxe);
+            if (pickaxe == null || player.Equipment.Items.Concat(player.Inventory.Items).Any(item => item.Base.IsPickaxe)) return;
+            var item = new LootGenerator(_loot).RollItem(pickaxe, pickaxe.Level, Rarity.Common, _gearRandom);
+            World.Give(player, item);
         }
 
         void GiveStarterStacks(Player player)

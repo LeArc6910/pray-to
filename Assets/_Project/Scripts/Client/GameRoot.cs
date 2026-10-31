@@ -727,12 +727,12 @@ namespace Game.Client
             }
             if (!compact && !Ui.Short && Controls.UsingTouch)
             {
-                lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로, 벽이면 캔다)");
+                lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로, 곡괭이를 들면 벽을 캔다)");
                 lines.Add("오른쪽 아래 스킬·물약 · 미니맵을 누르면 지도");
             }
             else if (!compact && !Ui.Short)
             {
-                lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격(벽이면 캔다)");
+                lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격(곡괭이를 들면 벽을 캔다)");
                 string skills = string.Join(" ", Enumerable.Range(0, 4).Select(Controls.SkillKeyName));
                 lines.Add($"{skills} 스킬 · {Controls.PotionKeyName} 물약 · {KeyBindings.Name(KeyAction.Bag)} 가방 · {KeyBindings.Name(KeyAction.Map)} 지도 · Esc 메뉴");
             }

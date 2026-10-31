@@ -55,6 +55,7 @@
 | implicit | 고유 능력치. 범위를 쓸 수 있다 |
 | sockets | 최대 소켓 수 (0~6) |
 | weight | 같은 단계 안에서 나올 비율 |
+| tool | (선택) 도구 종류. 지금은 `pickaxe`(곡괭이, `weapon` 슬롯만)뿐이다. 곡괭이를 손에 들어야 바위를 캔다(`Docs/Crafting.md`). 비우면 보통 장비 |
 
 ### affixes.csv
 

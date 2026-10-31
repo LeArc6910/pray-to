@@ -57,8 +57,10 @@ namespace Game.Core
             SkillTag tags,
             IReadOnlyList<ModifierRange> implicits,
             int maxSockets,
-            int weight)
+            int weight,
+            string tool = "")
         {
+            Tool = tool ?? "";
             Id = id;
             Name = name;
             Slot = slot;
@@ -81,6 +83,11 @@ namespace Game.Core
         public int MaxSockets { get; }
         public int Weight { get; }
         public SlotCategory Category => ItemSlots.CategoryOf(Slot);
+        // What else the item is for besides fighting: "pickaxe", or empty. Only a pickaxe in hand digs rock.
+        public string Tool { get; }
+        public bool IsPickaxe => Tool == Pickaxe;
+
+        public const string Pickaxe = "pickaxe";
     }
 
     public sealed class Affix

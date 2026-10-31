@@ -23,7 +23,7 @@ namespace Game.Core.Tests
                 "#######");
             map[3, 2] = inner;
             var world = new World(map, TileMap.Center(2, 2), monsters ?? Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
-            player = world.AddPlayer("a", gear ?? Gear.Wearing("copper_sword"));
+            player = world.AddPlayer("a", gear ?? Gear.Wearing("copper_pickaxe"));
             world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
             return world;
         }
@@ -64,8 +64,12 @@ namespace Game.Core.Tests
                 Assert.DoesNotThrow(() => Gear.Data.FindMaterial(monster.MaterialId), monster.Id);
             foreach (var boss in Bosses.Shipped.Bosses.Where(b => b.MaterialCount > 0))
                 Assert.DoesNotThrow(() => Gear.Data.FindMaterial(boss.MaterialId), boss.Id);
-            Assert.IsTrue(Gear.Data.Recipes.Where(r => r.Item?.Level == 10).All(r => r.Ingredients.Any(i => i.Material.Id == "warden_core")),
+            Assert.IsTrue(Gear.Data.Recipes.Where(r => r.Item?.Level == 10 && !r.Item.IsPickaxe).All(r => r.Ingredients.Any(i => i.Material.Id == "warden_core")),
                 "iron gear takes the boss's core");
+            var pickaxes = Gear.Data.Bases.Where(b => b.IsPickaxe).Select(b => b.Id).ToList();
+            CollectionAssert.AreEqual(new[] { "copper_pickaxe", "iron_pickaxe", "mithril_pickaxe" }, pickaxes);
+            Assert.IsTrue(pickaxes.All(id => Gear.Data.Recipes.Any(r => r.Item?.Id == id)), "every pickaxe can be made");
+            Assert.IsTrue(Gear.Data.Bases.Where(b => b.IsPickaxe).All(b => b.Slot == ItemSlot.Weapon && b.Weight == 0), "held, and made rather than dropped");
             Assert.AreEqual(TileType.Wall, Stone.Places);
         }
 
@@ -163,7 +167,7 @@ namespace Game.Core.Tests
         public void MiningSpeedDigsFaster()
         {
             var pick = new Equipment();
-            pick.Equip(Gear.Plain("copper_sword", 0, Rarity.Uncommon, Gear.Affix("miner", 50)));
+            pick.Equip(Gear.Plain("copper_pickaxe", 0, Rarity.Uncommon, Gear.Affix("miner", 50)));
             var world = Room(out var player, gear: pick);
 
             Swing(world, player, 2);
@@ -184,14 +188,63 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void BowsDigWhenFacingAWall()
+        public void OnlyAPickaxeDigsRock()
+        {
+            var world = Room(out var player, gear: Gear.Wearing("copper_sword"));
+
+            var events = Swing(world, player, 5);
+
+            Assert.AreEqual(TileType.Wall, world.Map[3, 2], "a sword does not dig");
+            var digs = events.Where(e => e.Type == SimEventType.Dug).ToList();
+            Assert.AreEqual(5, digs.Count);
+            Assert.IsTrue(digs.All(e => e.Amount == -1 && e.Position.Equals(TileMap.Center(3, 2))), "each swing says a pickaxe is needed");
+            Assert.AreEqual(0, player.Inventory.CountOf(Stone));
+
+            var iron = new Equipment();
+            iron.Equip(Gear.Plain("iron_pickaxe"));
+            world = Room(out player, gear: iron);
+            Swing(world, player, 2);
+            Assert.AreEqual(TileType.Floor, world.Map[3, 2], "the iron pickaxe's mining speed 60% takes a hardness 3 wall in two");
+        }
+
+        [Test]
+        public void PickaxeSheetErrors()
+        {
+            var data = LootSheets.Parse(
+                TestLoot.BasesHeader.Replace("weight\n", "weight,tool\n") +
+                "a,가,weapon,1,melee,Damage+1,0,1,shovel\n" +
+                "b,나,helmet,1,,Armor+1,0,1,pickaxe\n" +
+                "c,다,weapon,1,melee,Damage+1,0,1,pickaxe\n",
+                TestLoot.Affixes, TestLoot.Runes, TestLoot.Runewords);
+
+            AssertError(data.Errors, "item_bases.csv 2행", "shovel");
+            AssertError(data.Errors, "item_bases.csv 3행", "weapon");
+            Assert.IsTrue(data.Bases.Single(b => b.Id == "c").IsPickaxe);
+            Assert.IsFalse(Gear.Data.FindBase("copper_sword").IsPickaxe, "a sheet without the column has no tools");
+        }
+
+        [Test]
+        public void AnythingTakesDownPlacedThings()
+        {
+            var world = Room(out var player, TileType.Workbench, Gear.Wearing("copper_sword"));
+            Swing(world, player, 1);
+            Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
+            Assert.AreEqual(1, player.Inventory.CountOf(Gear.Data.FindMaterial("workbench")));
+        }
+
+        [Test]
+        public void BowsShootAtRockButTakeDownPlacedThingsLikeASwing()
         {
             var world = Room(out var player, gear: Gear.Wearing("copper_bow"));
-
             var events = Swing(world, player, 1);
+            Assert.AreEqual((int)BasicAttackKind.Arrow, events.First(e => e.Type == SimEventType.Attack).Amount);
+            Assert.IsFalse(events.Any(e => e.Type == SimEventType.Dug));
+            Assert.AreEqual(TileType.Wall, world.Map[3, 2]);
 
-            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Dug));
+            world = Room(out player, TileType.Chest, Gear.Wearing("copper_bow"));
+            events = Swing(world, player, 1);
             Assert.AreEqual((int)BasicAttackKind.Swing, events.First(e => e.Type == SimEventType.Attack).Amount);
+            Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
             Assert.IsEmpty(world.Projectiles);
         }
 
@@ -276,7 +329,7 @@ namespace Game.Core.Tests
         {
             var gelSlimes = MonsterSheet.Parse(
                 Monsters.Header.Replace("weight\n", "weight,material,material_chance\n") + "goo,젤리,1,1,0,0,1,0.3,0,0.5,0.5,1,1,slime_gel,100\n");
-            var world = Room(out var player, TileType.Floor, monsters: gelSlimes);
+            var world = Room(out var player, TileType.Floor, Gear.Wearing("copper_sword"), gelSlimes);
             world.SpawnEnemy(gelSlimes.Monsters[0], player.Position + new Vec2(0.9f, 0));
             Swing(world, player, 1);
             Assert.AreEqual(1, world.GroundLoot.Count(l => l.Material == SlimeGel) + player.Inventory.CountOf(SlimeGel));
@@ -284,7 +337,7 @@ namespace Game.Core.Tests
             var bosses = Bosses.Parse(
                 Bosses.BossesHeader.Replace("roar_damage\n", "roar_damage,material,material_count\n") + "dummy,허수아비,8,0,0,2,1,,1,3,10,warden_core,1\n",
                 Bosses.AttacksHeader + "dummy,slam,내려찍기,,circle,nearest,1,5,1,,,,1,,,1,1,\n");
-            var arena = Room(out var fighter, TileType.Floor);
+            var arena = Room(out var fighter, TileType.Floor, Gear.Wearing("copper_sword"));
             arena.PlaceBoss(bosses.Find("dummy"), new Vec2(3.6f, 2.5f), 3);
             Swing(arena, fighter, 3);
             Assert.IsEmpty(arena.Bosses.Where(b => !b.IsDead));

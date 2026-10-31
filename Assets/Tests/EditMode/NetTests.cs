@@ -356,6 +356,10 @@ namespace Game.Core.Tests
             var rock = Tiles.Shipped.Find(map[x, y]).Material;
             Walk(world, world.FindPlayer(alice.PlayerId), TileMap.Center(x - 1, y));
             session.Tick(4);
+            var pickaxe = alice.Bag.Items.Single(item => item.Base.IsPickaxe);
+            Assert.AreEqual("copper_pickaxe", pickaxe.Base.Id, "everyone starts with one in the bag");
+            session.Send(1, alice.EquipCommand(pickaxe.Id));
+            session.Tick(2);
 
             for (int i = 0; i < 10 * World.TicksPerSecond && map.IsSolid(x, y); i++)
             {
@@ -704,7 +708,7 @@ namespace Game.Core.Tests
             session.Host.World.DropRune(Gear.Data.FindRune("ember"), host.Position);
             session.Tick(2);
 
-            Assert.AreEqual("iron_sword", alice.Bag.Items.Single().Base.Id);
+            Assert.AreEqual("iron_sword", alice.Bag.Items.Single(item => !item.Base.IsPickaxe).Base.Id);
             CollectionAssert.AreEquivalent(new[] { "획득: [일반] 철 검", "획득: 불씨 룬" }, alice.TakeAcquired());
         }
 
@@ -718,12 +722,12 @@ namespace Game.Core.Tests
             world.DropItem(Gear.Plain("iron_sword", sockets: 1), player.Position);
             world.DropRune(Gear.Data.FindRune("earth"), player.Position);
             session.Tick(2);
-            var iron = alice.Bag.Items.Single();
+            var iron = alice.Bag.Items.Single(item => !item.Base.IsPickaxe);
 
             session.Host.Receive(1, alice.EquipCommand(iron.Id));
             session.Tick();
             Assert.AreEqual(iron.Id, alice.Equipment[ItemSlot.Weapon].Id);
-            Assert.AreEqual("copper_sword", alice.Bag.Items.Single().Base.Id);
+            Assert.AreEqual("copper_sword", alice.Bag.Items.Single(item => !item.Base.IsPickaxe).Base.Id);
 
             session.Host.Receive(1, alice.InsertRuneCommand(iron.Id, Gear.Data.FindRune("earth")));
             session.Tick();
@@ -731,11 +735,11 @@ namespace Game.Core.Tests
             Assert.AreEqual(9 + 4, alice.Stats.Damage, 0.001f, "the earth rune adds 4 to a weapon");
             Assert.AreEqual(player.Stats.Damage, alice.Stats.Damage);
 
-            var copper = alice.Bag.Items.Single();
+            var copper = alice.Bag.Items.Single(item => !item.Base.IsPickaxe);
             session.Host.Receive(1, alice.DiscardCommand(copper.Id));
             // Others are drawn a few ticks in the past, so wait for the drop to reach that point.
             session.Tick(10);
-            Assert.AreEqual(0, alice.Bag.Items.Count);
+            Assert.AreEqual(0, alice.Bag.Items.Count(item => !item.Base.IsPickaxe));
             var drop = alice.Others().Single(e => e.Kind == EntityKind.Drop);
             Assert.AreEqual("copper_sword", drop.DropBase.Id);
             Assert.AreEqual(Rarity.Common, drop.DropRarity);
@@ -743,7 +747,7 @@ namespace Game.Core.Tests
             session.Host.Receive(1, alice.UnequipCommand(ItemSlot.Weapon));
             session.Tick();
             Assert.IsNull(alice.Equipment[ItemSlot.Weapon]);
-            Assert.AreEqual(iron.Id, alice.Bag.Items.Single().Id);
+            Assert.AreEqual(iron.Id, alice.Bag.Items.Single(item => !item.Base.IsPickaxe).Id);
         }
 
         [Test]

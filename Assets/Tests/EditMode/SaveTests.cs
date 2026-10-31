@@ -168,7 +168,9 @@ namespace Game.Core.Tests
 
             var player = host.World.Players.Single();
             Assert.AreEqual("copper_sword", player.Equipment[ItemSlot.Weapon].Base.Id);
-            Assert.AreNotEqual(0, player.Inventory.Items.Single().Id, "bag items get ids in this world");
+            Assert.AreNotEqual(0, player.Inventory.Items.First().Id, "bag items get ids in this world");
+            Assert.AreEqual("copper_pickaxe", player.Inventory.Items.Single(item => item.Base.IsPickaxe).Base.Id,
+                "a character saved before rock needed a pickaxe is given one");
             Assert.AreEqual(4, player.Inventory.CountOf(Potion), "the saved four, not the starter three on top");
             Assert.AreEqual(0, player.Inventory.CountOf(Spore));
             var resaved = CharacterSave.Read(client.SaveCharacter(), Gear.Data);

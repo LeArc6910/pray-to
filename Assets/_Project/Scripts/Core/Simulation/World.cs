@@ -176,17 +176,33 @@ namespace Game.Core
             if (player.Attacking && player.AttackCooldown == 0) Attack(player);
         }
 
-        // Shots are not fired point-blank into rock: a bow or staff facing a wall digs it like a swing.
+        // A swing that hits nobody strikes the tile ahead. Rock (walls and ore veins) only gives way to a pickaxe in
+        // hand; anything takes down a placed object, and a bow or staff facing one takes it down like a swing instead
+        // of shooting it point-blank. Struck with something else, rock says so (a Dug event with Amount -1).
         void Attack(Player player)
         {
             var stats = player.Stats;
             player.AttackCooldown = Math.Max(1, (int)MathF.Round(TicksPerSecond / Math.Max(0.1f, stats.AttacksPerSecond)));
-            bool shoot = stats.Attack.Shoots && DigTarget(player) == null;
+            var target = DigTarget(player);
+            bool rock = target != null && IsRock(target.Value.Tile);
+            bool shoot = stats.Attack.Shoots && (target == null || rock);
             var kind = shoot ? stats.Attack.Kind : BasicAttackKind.Swing;
             _events.Add(new SimEvent(SimEventType.Attack, player.Id, amount: (int)kind, direction: player.Facing));
-            if (shoot) Shoot(player);
-            else if (stats.Attack.Shoots || !Swing(player)) Dig(player);
+            if (shoot)
+            {
+                Shoot(player);
+                return;
+            }
+            if (!stats.Attack.Shoots && Swing(player)) return;
+            if (target == null) return;
+            if (!rock || HoldsPickaxe(player)) Dig(player);
+            else _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: -1, position: TileMap.Center(target.Value.X, target.Value.Y)));
         }
+
+        public static bool HoldsPickaxe(Player player) => player.Equipment[ItemSlot.Weapon]?.Base.IsPickaxe == true;
+
+        // Walls and ore veins, which need a pickaxe; not the things players place.
+        static bool IsRock(TileDefinition tile) => tile.Tile == TileType.Wall || tile.Drillable;
 
         // An arrow or bolt toward where the player faces, its damage and crit rolled now (see FlyFriendly).
         void Shoot(Player player)
