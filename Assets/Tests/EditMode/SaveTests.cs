@@ -94,6 +94,8 @@ namespace Game.Core.Tests
             player.Inventory.AddMaterial(Spore);
             // Facing down from the spawn: plant there, then face up and build there.
             Assert.IsTrue(world.Plant(player.Id, Tiles.Shipped.CropFrom(Spore)));
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.WateringCan));
+            Assert.IsTrue(world.Water(player.Id));
             world.MovePlayer(player.Id, player.Position, new Vec2(0, 1), 1);
             Assert.IsTrue(world.PlaceTile(player.Id, Stone));
             for (int i = 0; i < World.TicksPerSecond * 10; i++) world.Step();
@@ -109,8 +111,9 @@ namespace Game.Core.Tests
             Assert.AreEqual(TileType.Wall, again.World.Map[wall.X, wall.Y]);
             var grown = again.World.Crops.Single();
             Assert.AreEqual((crop.X, crop.Y), (grown.X, grown.Y));
-            // Ten seconds of play and sixty with the world closed, of the mushroom's 180.
-            Assert.AreEqual(70f / 180, grown.Growth(again.World.Tick), 0.01f);
+            // Watered at once (half of the 180 seconds), then ten seconds of play and sixty with the world closed.
+            Assert.AreEqual(160f / 180, grown.Growth(again.World.Tick), 0.01f);
+            Assert.IsTrue(grown.Watered);
             Assert.AreEqual(1, again.World.ProgressLevel);
         }
 

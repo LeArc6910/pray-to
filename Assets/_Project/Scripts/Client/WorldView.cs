@@ -562,7 +562,7 @@ namespace Game.Client
                 bool ripe = crop.IsRipe(now);
                 // Four steps, as the docs describe: sprout, young, growing, ripe.
                 int stage = ripe ? 3 : Mathf.Min(2, Mathf.FloorToInt(crop.Growth(now) * 3));
-                renderer.sprite = CropSprites[stage];
+                renderer.sprite = CropSprite(crop, stage);
                 renderer.transform.localScale = new Vector3(1, ripe ? 1 + 0.05f * Mathf.Sin(Time.time * 5 + key) : 1, 1);
             }
 
@@ -577,15 +577,12 @@ namespace Game.Client
         }
 
         // Sprites are made on first use, not while the type loads: Unity only makes textures on the main thread.
-        static Sprite[] _cropSprites;
-
-        static Sprite[] CropSprites => _cropSprites ??= new[]
+        static Sprite CropSprite(Crop crop, int stage)
         {
-            Sprites.Standing("crop/0", () => ItemArt.Crop(0)),
-            Sprites.Standing("crop/1", () => ItemArt.Crop(1)),
-            Sprites.Standing("crop/2", () => ItemArt.Crop(2)),
-            Sprites.Standing("crop/3", () => ItemArt.Crop(3)),
-        };
+            string id = crop.Definition.Id;
+            bool wet = crop.Watered;
+            return Sprites.Standing($"crop/{id}/{stage}/{(wet ? "wet" : "dry")}", () => ItemArt.Crop(id, stage, wet));
+        }
 
         // Each machine's facing part, turned the way it faces, and the load on each conveyor moving along it toward
         // the front. Belts run at their real speed: 2 pixels a frame of the belt, 16 frames a second, is a tile in
@@ -735,6 +732,20 @@ namespace Game.Client
                 case SimEventType.Harvested:
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 0.6f, Palette.Ripe, Shapes.Ring);
                     Hear(Sound.Harvest, new Vector3(e.Position.X, e.Position.Y, 0));
+                    break;
+                case SimEventType.Watered:
+                    // A splash over the watered tiles. The one who poured already heard it when they pressed.
+                    var poured = new Vector3(e.Position.X, e.Position.Y, 0);
+                    AddFlash(poured, 2.6f, Palette.Water, Shapes.Circle);
+                    if (e.Source != _client.PlayerId) Hear(Sound.Water, poured);
+                    break;
+                case SimEventType.Ate:
+                    var eater = Find(e.Source);
+                    var food = _client.ConsumableAt(e.Amount);
+                    if (eater == null || food == null) break;
+                    _floating.Add(new Floating { Position = eater.Position + new Vector3(0, 0.4f, 0), Text = food.Name, Color = Palette.Food });
+                    Hear(Sound.Eat, eater.Position);
+                    AddFlash(eater.Position, eater.Diameter, Palette.Food, Shapes.Ring);
                     break;
                 case SimEventType.Healed:
                     var drinker = Find(e.Source);

@@ -199,7 +199,11 @@ namespace Game.Core
                 TryRow(ConsumablesFile, row, errors, () =>
                 {
                     int heal = SheetValues.ParseNumber(row["heal"], "heal");
-                    if (heal < 1 || heal > 100) throw new FormatException("heal은 1~100(최대 생명력의 %)이어야 합니다.");
+                    var buff = FixedModifiers(row["buff"]);
+                    float buffSeconds = row["buff_seconds"].Length == 0 ? 0 : SheetValues.ParseDecimal(row["buff_seconds"], "buff_seconds");
+                    if (buff.Count > 0 != buffSeconds > 0) throw new FormatException("buff와 buff_seconds는 함께 채우거나 함께 비웁니다.");
+                    if (heal < (buff.Count > 0 ? 0 : 1) || heal > 100)
+                        throw new FormatException("heal은 1~100(최대 생명력의 %)이어야 합니다. buff가 있으면 0도 됩니다.");
                     float cooldown = SheetValues.ParseDecimal(row["cooldown"], "cooldown");
                     if (cooldown <= 0) throw new FormatException("cooldown은 0보다 커야 합니다.");
                     consumables.Add(new ConsumableDefinition(
@@ -210,7 +214,9 @@ namespace Game.Core
                         SheetValues.ParseDecimal(row["seconds"], "seconds"),
                         cooldown,
                         SheetValues.ParseNumber(row["weight"], "weight"),
-                        row["description"]));
+                        row["description"],
+                        buff,
+                        buffSeconds));
                 });
             }
             return consumables;

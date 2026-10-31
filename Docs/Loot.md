@@ -76,15 +76,16 @@
 
 ### consumables.csv
 
-`id, name, level, heal, seconds, cooldown, weight, description`. 마시는 소모품이다(`Docs/Combat.md`의 회복 절).
+`id, name, level, heal, seconds, cooldown, weight, description, buff, buff_seconds`. 마시거나 먹는 소모품이다(`Docs/Combat.md`의 회복 절, 음식은 `Docs/Farming.md`).
 
 | 열 | 내용 |
 |---|---|
-| heal | 채우는 양. 최대 생명력의 % |
+| heal | 채우는 양. 최대 생명력의 %. `buff`가 있으면 0도 된다 |
 | seconds | 그만큼을 몇 초에 걸쳐 채우는지 |
 | cooldown | 마신 뒤 모든 소모품을 다시 쓸 수 있을 때까지(초) |
 | level, weight | 드랍 레벨이 level 이상일 때 나오고, 그중 weight 비율로 고른다 |
 | description | 가방 창에 보이는 설명 |
+| buff, buff_seconds | 음식이 거는 능력치(장비와 같은 문법, 범위는 안 됨)와 그 시간(초). 둘 다 채우거나 둘 다 비운다. 이 열이 없는 옛 시트도 읽는다 |
 
 ### runewords.csv
 

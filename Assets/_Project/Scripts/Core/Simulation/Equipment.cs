@@ -98,10 +98,15 @@ namespace Game.Core
 
         public float CritDamageFor(SkillTag context) => (float)_sheet.Get(StatType.CritDamage, BaseCritDamage, context);
 
-        public static PlayerStats From(Equipment equipment, IEnumerable<ClassDefinition> classes = null, IEnumerable<SkillDefinition> buffs = null)
+        public static PlayerStats From(
+            Equipment equipment,
+            IEnumerable<ClassDefinition> classes = null,
+            IEnumerable<SkillDefinition> buffs = null,
+            ConsumableDefinition food = null)
         {
             var sheet = new StatSheet();
             foreach (var item in equipment.Items) sheet.Add(item.Modifiers());
+            if (food != null) sheet.Add(food.Buff);
             foreach (var chosen in classes ?? Enumerable.Empty<ClassDefinition>()) sheet.Add(chosen.Passive);
             var granted = SkillTag.None;
             foreach (var buff in buffs ?? Enumerable.Empty<SkillDefinition>())

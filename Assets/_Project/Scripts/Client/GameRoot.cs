@@ -678,6 +678,11 @@ namespace Game.Client
                     var toArena = _client.Arenas[next] - _client.Position;
                     lines.Add($"{(next == 0 ? "보스 아레나" : "깊은 아레나")}: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
                 }
+                if (_client.Food != null)
+                {
+                    int left = Mathf.CeilToInt(_client.FoodLeft);
+                    lines.Add($"음식: {_client.Food.Name} {left / 60}:{left % 60:00}");
+                }
                 var goal = _guideProgress?.Current;
                 if (goal != null)
                 {

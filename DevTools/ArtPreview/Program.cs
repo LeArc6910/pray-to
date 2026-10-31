@@ -117,6 +117,7 @@ namespace Game.Client
                 .Concat(loot.Consumables.Select(ItemArt.Consumable))
                 .Concat(loot.Runes.Take(1).Select(ItemArt.Rune))
                 .Concat(Enumerable.Range(0, 4).Select(ItemArt.Crop))
+                .Concat(Enumerable.Range(0, 4).Select(stage => ItemArt.Crop("fire_pepper", stage, watered: stage % 2 == 1)))
                 .Concat(new[] { ItemArt.Arrow, ItemArt.Orb, ItemArt.Spore, CreatureArt.Shadow(12) }).ToList());
 
             const int gap = 4;

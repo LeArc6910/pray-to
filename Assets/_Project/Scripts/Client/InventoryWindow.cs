@@ -264,8 +264,8 @@ namespace Game.Client
             GUILayout.Label(Fit($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}", _textWidth));
         }
 
-        // Materials, counted by kind. One that builds gets [놓기] and a seed gets [심기]; both act on the tile the
-        // player faces.
+        // Materials, counted by kind. One that builds gets [놓기], a seed gets [심기] and the watering can [물 주기];
+        // all act on the tile the player faces.
         void DrawMaterials()
         {
             GUILayout.Label("재료");
@@ -278,6 +278,7 @@ namespace Game.Client
                 if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
                 var crop = _client.CropFrom(pair.Key);
                 if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
+                if (pair.Key.Id == World.WateringCan && GUILayout.Button("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
                 GUILayout.EndHorizontal();
             }
         }
@@ -364,13 +365,14 @@ namespace Game.Client
             if (_client.Bag.Consumables.Count == 0) return;
             GUILayout.Space(6);
             float wait = _client.ConsumableCooldownLeft;
-            GUILayout.Label(wait > 0 ? $"소모품 (다시 마시기까지 {Mathf.CeilToInt(wait)}초)" : "소모품");
+            GUILayout.Label(wait > 0 ? $"소모품 (다시 쓰기까지 {Mathf.CeilToInt(wait)}초)" : "소모품");
             foreach (var pair in _client.Bag.Consumables.ToList())
             {
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
-                if (GUILayout.Button("마시기", GUILayout.Width(56)))
+                // A potion is drunk; a food is eaten, and still gives its buff at full health.
+                if (GUILayout.Button(pair.Key.IsFood ? "먹기" : "마시기", GUILayout.Width(56)))
                 {
                     byte[] command = _client.UseConsumableCommand(pair.Key);
                     if (command != null) _send(command);

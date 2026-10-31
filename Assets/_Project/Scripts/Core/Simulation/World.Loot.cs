@@ -187,15 +187,24 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || consumable == null || player.ConsumableCooldown > 0) return false;
-            if (player.Health >= player.Stats.MaxHealth || !player.Inventory.TakeConsumable(consumable)) return false;
+            // A potion is no use at full health; a food still gives its buff.
+            if ((player.Health >= player.Stats.MaxHealth && !consumable.IsFood) || !player.Inventory.TakeConsumable(consumable)) return false;
 
-            int ticks = Ticks(consumable.Seconds);
-            float amount = player.Stats.MaxHealth * consumable.Heal / 100f;
-            player.HealPerTick = amount / ticks;
-            player.HealTicks = ticks;
+            if (consumable.IsFood)
+            {
+                player.Eat(consumable);
+                _events.Add(new SimEvent(SimEventType.Ate, player.Id, amount: Loot?.Consumables.ToList().IndexOf(consumable) ?? -1));
+            }
+            if (consumable.Heal > 0)
+            {
+                int ticks = Ticks(consumable.Seconds);
+                float amount = player.Stats.MaxHealth * consumable.Heal / 100f;
+                player.HealPerTick = amount / ticks;
+                player.HealTicks = ticks;
+                _events.Add(new SimEvent(SimEventType.Healed, player.Id, amount: (int)MathF.Round(amount)));
+            }
             player.ConsumableCooldown = Ticks(consumable.Cooldown);
             player.InventoryVersion++;
-            _events.Add(new SimEvent(SimEventType.Healed, player.Id, amount: (int)MathF.Round(amount)));
             return true;
         }
 

@@ -28,3 +28,6 @@ conveyor,conveyor,4,iron_bar:1|stone:2,Workbench
 healing_potion,healing_potion,1,slime_gel:3,
 torch,torch,4,stone:1|slime_gel:1,
 roasted_mushroom,roasted_mushroom,1,mushroom:2,Furnace
+watering_can,watering_can,1,copper_ore:4|stone:2,Workbench
+spicy_fry,spicy_fry,1,fire_pepper:2|mushroom:1,Furnace
+mushroom_soup,mushroom_soup,1,mushroom:3,Furnace

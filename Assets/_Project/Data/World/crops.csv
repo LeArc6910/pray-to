@@ -1,2 +1,3 @@
 id,name,seed,grow_seconds,harvest,count,seeds,seed_chance
 mushroom,동굴 버섯,mushroom_spore,180,mushroom,2,1,50
+fire_pepper,불꽃 고추,fire_pepper_seed,240,fire_pepper,2,1,40

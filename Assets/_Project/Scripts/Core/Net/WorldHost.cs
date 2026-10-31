@@ -266,7 +266,7 @@ namespace Game.Core
             if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
             // A month at most, so a clock that jumped years ahead does not grow everything forever.
             long closedTicks = Math.Clamp(now - save.SavedAt, 0, 30L * 24 * 3600) * World.TicksPerSecond;
-            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks)), save.ProgressLevel, save.Chests);
+            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks, c.Watered)), save.ProgressLevel, save.Chests);
             foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output);
         }
 
@@ -294,6 +294,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Plant:
                     if (_tiles != null && command.Index < _tiles.Crops.Count) World.Plant(player.Id, _tiles.Crops[command.Index]);
+                    break;
+                case InventoryCommand.Water:
+                    World.Water(player.Id);
                     break;
                 case InventoryCommand.StoreItem:
                 case InventoryCommand.TakeItem:
@@ -332,7 +335,9 @@ namespace Game.Core
                 viewer.Stats.MoveSpeed,
                 slots.Select(viewer.CooldownTicks).ToList(),
                 slots.Select(viewer.BuffTicks).ToList(),
-                viewer.ConsumableCooldown);
+                viewer.ConsumableCooldown,
+                viewer.Food == null ? -1 : IndexOf(_loot?.Consumables, viewer.Food),
+                viewer.FoodTicks);
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p)));
@@ -395,8 +400,9 @@ namespace Game.Core
             return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events);
         }
 
-        (int X, int Y, int Crop, long PlantedTick) CropEntry(CropChange change) =>
-            (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.PlantedTick ?? 0);
+        (int X, int Y, int Crop, long PlantedTick, bool Watered) CropEntry(CropChange change) =>
+            (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.PlantedTick ?? 0,
+                change.Crop?.Watered ?? false);
 
         void SendMachines(ulong connection, Connection sent)
         {

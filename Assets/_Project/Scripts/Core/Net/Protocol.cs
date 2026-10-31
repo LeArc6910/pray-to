@@ -28,7 +28,7 @@ namespace Game.Core
     public static class Protocol
     {
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.16.0";
+        public const string Version = "0.17.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -196,38 +196,40 @@ namespace Game.Core
         public const int MaxPerMessage = 150;
         const byte Gone = 255;
 
-        public CropChangesMessage(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick)> changes) { Changes = changes; }
+        public CropChangesMessage(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick, bool Watered)> changes) { Changes = changes; }
 
         // Crop is -1 for a harvested one.
-        public IReadOnlyList<(int X, int Y, int Crop, long PlantedTick)> Changes { get; }
+        public IReadOnlyList<(int X, int Y, int Crop, long PlantedTick, bool Watered)> Changes { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.CropChanges, w =>
         {
             w.Write((ushort)Changes.Count);
-            foreach (var (x, y, crop, planted) in Changes)
+            foreach (var (x, y, crop, planted, watered) in Changes)
             {
                 w.Write((ushort)x);
                 w.Write((ushort)y);
                 w.Write(crop < 0 ? Gone : (byte)crop);
                 w.Write(planted);
+                w.Write(watered);
             }
         });
 
         public static CropChangesMessage Decode(byte[] data) => Protocol.Read(data, MessageType.CropChanges, r =>
         {
             int count = r.ReadUInt16();
-            var changes = new List<(int, int, int, long)>(count);
+            var changes = new List<(int, int, int, long, bool)>(count);
             for (int i = 0; i < count; i++)
             {
                 int x = r.ReadUInt16();
                 int y = r.ReadUInt16();
                 byte crop = r.ReadByte();
-                changes.Add((x, y, crop == Gone ? -1 : crop, r.ReadInt64()));
+                long planted = r.ReadInt64();
+                changes.Add((x, y, crop == Gone ? -1 : crop, planted, r.ReadBoolean()));
             }
             return new CropChangesMessage(changes);
         });
 
-        public static IEnumerable<byte[]> EncodeAll(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick)> changes)
+        public static IEnumerable<byte[]> EncodeAll(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick, bool Watered)> changes)
         {
             for (int start = 0; start < changes.Count; start += MaxPerMessage)
             {
@@ -542,8 +544,12 @@ namespace Game.Core
             float moveSpeed,
             IReadOnlyList<int> cooldowns = null,
             IReadOnlyList<int> buffs = null,
-            int consumableCooldown = 0)
+            int consumableCooldown = 0,
+            int food = -1,
+            int foodTicks = 0)
         {
+            Food = food;
+            FoodTicks = foodTicks;
             Corrections = corrections;
             Position = position;
             Health = health;
@@ -564,6 +570,9 @@ namespace Game.Core
         public IReadOnlyList<int> Buffs { get; }
         // Ticks until any consumable can be used again.
         public int ConsumableCooldown { get; }
+        // The sheet index of the food whose buff is on (-1 for none), and the ticks it has left.
+        public int Food { get; }
+        public int FoodTicks { get; }
         public bool IsDead => Health <= 0;
     }
 
@@ -607,6 +616,8 @@ namespace Game.Core
                 w.Write(Protocol.Ticks(slot < Self.Buffs.Count ? Self.Buffs[slot] : 0));
             }
             w.Write(Protocol.Ticks(Self.ConsumableCooldown));
+            w.Write((ushort)(Self.Food + 1));
+            w.Write(Self.FoodTicks);
 
             w.Write((ushort)Entities.Count);
             foreach (var entity in Entities)
@@ -676,7 +687,7 @@ namespace Game.Core
                 cooldowns.Add(r.ReadUInt16());
                 buffs.Add(r.ReadUInt16());
             }
-            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, r.ReadUInt16());
+            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, r.ReadUInt16(), r.ReadUInt16() - 1, r.ReadInt32());
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);

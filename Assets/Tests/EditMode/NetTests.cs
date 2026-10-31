@@ -449,7 +449,7 @@ namespace Game.Core.Tests
             var session = new Session();
             var alice = session.Join(1, "앨리스");
             var world = session.Host.World;
-            var mushroom = Tiles.Shipped.Crops.Single();
+            var mushroom = Tiles.Shipped.Crops.Single(c => c.Id == "mushroom");
             var spore = mushroom.Seed;
             session.Tick(2);
 
@@ -476,6 +476,44 @@ namespace Game.Core.Tests
             Assert.IsEmpty(alice.Crops);
             Assert.IsEmpty(bob.Crops);
             Assert.AreEqual(2, alice.Bag.CountOf(Gear.Data.FindMaterial("mushroom")));
+        }
+
+        [Test]
+        public void WateredCropsAndFoodBuffsReachTheClients()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var bob = session.Join(2, "밥");
+            var world = session.Host.World;
+            var player = world.FindPlayer(alice.PlayerId);
+            var mushroom = Tiles.Shipped.Crops.Single(c => c.Id == "mushroom");
+            session.Tick(2);
+            session.Send(1, alice.PlantCommand(mushroom));
+            session.Tick(2);
+            Assert.IsFalse(alice.Crops.Single().Watered);
+
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.WateringCan));
+            session.Send(1, alice.WaterCommand());
+            session.Tick(2);
+            var wet = world.Crops.Single();
+            Assert.IsTrue(wet.Watered);
+            Assert.AreEqual((true, wet.PlantedTick), (bob.Crops.Single().Watered, bob.Crops.Single().PlantedTick));
+            Assert.IsTrue(alice.TakeEvents().Any(e => e.Type == SimEventType.Watered && e.Source == alice.PlayerId));
+
+            var soup = Gear.Data.FindConsumable("mushroom_soup");
+            player.Inventory.AddConsumable(soup);
+            // Taking off nothing still marks the bag as changed, so the host sends it with the soup.
+            player.Unequip(ItemSlot.Helmet);
+            session.Tick(2);
+            float before = alice.Stats.MaxHealth;
+            byte[] eat = alice.UseConsumableCommand(soup);
+            Assert.IsNotNull(eat, "food is eaten even at full health");
+            session.Send(1, eat);
+            session.Tick(4);
+            Assert.AreSame(soup, alice.Food);
+            Assert.AreEqual(180, alice.FoodLeft, 0.5f);
+            Assert.AreEqual(before * 1.15f, alice.Stats.MaxHealth, 0.01f, "the client works its stats out with the food");
+            Assert.IsTrue(alice.TakeEvents().Any(e => e.Type == SimEventType.Ate && e.Amount == Gear.Data.Consumables.ToList().IndexOf(soup)));
         }
 
         [Test]

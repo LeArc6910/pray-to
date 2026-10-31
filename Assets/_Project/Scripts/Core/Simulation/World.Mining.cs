@@ -118,7 +118,7 @@ namespace Game.Core
         // the drop level bosses had raised. Nothing is announced; players who join get it all as usual.
         public void Restore(
             IEnumerable<TileChange> tiles,
-            IEnumerable<(CropDefinition Crop, int X, int Y, long Age)> crops,
+            IEnumerable<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> crops,
             int progressLevel,
             IEnumerable<(int X, int Y, Inventory Contents)> chests = null)
         {
@@ -127,10 +127,10 @@ namespace Game.Core
                 if (Map.InBounds(tile.X, tile.Y) && !Map.IsEdge(tile.X, tile.Y)) SetTile(tile.X, tile.Y, tile.Type);
             }
             foreach (var (x, y, contents) in chests ?? Enumerable.Empty<(int, int, Inventory)>()) FillChest(x, y, contents);
-            foreach (var (crop, x, y, age) in crops)
+            foreach (var (crop, x, y, age, watered) in crops)
             {
                 if (!Map.InBounds(x, y) || Map[x, y] != TileType.Floor) continue;
-                _crops[y * Map.Width + x] = new Crop(crop, x, y, Tick - age);
+                _crops[y * Map.Width + x] = new Crop(crop, x, y, Tick - age, watered);
             }
             ProgressLevel = Math.Max(ProgressLevel, progressLevel);
             _newTileChanges.Clear();

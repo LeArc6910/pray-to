@@ -142,6 +142,96 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void WateringHalvesWhatIsLeftOnceForEachCropAround()
+        {
+            var world = Room(out var player);
+            var can = Gear.Data.FindMaterial(World.WateringCan);
+            player.Inventory.AddMaterial(Spore, 3);
+            world.Plant(player.Id, Mushroom);
+            // A second crop beside the first, and a third out of reach.
+            world.MovePlayer(player.Id, TileMap.Center(2, 3), new Vec2(1, 0), 10);
+            world.Plant(player.Id, Mushroom);
+            world.MovePlayer(player.Id, TileMap.Center(4, 3), new Vec2(1, 0), 10);
+            world.MovePlayer(player.Id, TileMap.Center(4, 2), new Vec2(1, 0), 10);
+            Assert.IsTrue(world.Plant(player.Id, Mushroom));
+            world.MovePlayer(player.Id, TileMap.Center(2, 2), new Vec2(1, 0), 10);
+            Run(world, Mushroom.GrowTicks / 2);
+            world.TakeCropChanges();
+
+            Assert.IsFalse(world.Water(player.Id), "no watering can");
+            player.Inventory.AddMaterial(can);
+            Assert.IsTrue(world.Water(player.Id));
+
+            Assert.IsTrue(world.CropAt(3, 2).Watered);
+            Assert.IsTrue(world.CropAt(3, 3).Watered);
+            Assert.IsFalse(world.CropAt(5, 2).Watered, "two tiles away");
+            // Half grown, then half of the other half: three quarters.
+            Assert.AreEqual(0.75f, world.CropAt(3, 2).Growth(world.Tick), 0.01f);
+            Assert.AreEqual(0.5f, world.CropAt(5, 2).Growth(world.Tick), 0.01f);
+            Assert.AreEqual(1, player.Inventory.CountOf(can), "a tool, not used up");
+            Assert.AreEqual(2, world.TakeCropChanges().Count(c => c.Crop != null && c.Crop.Watered));
+            var events = world.TakeEvents();
+            Assert.AreEqual(2, events.Single(e => e.Type == SimEventType.Watered).Amount);
+
+            Assert.IsFalse(world.Water(player.Id), "each crop takes water once");
+            Run(world, Mushroom.GrowTicks / 4 + 1);
+            Assert.IsTrue(world.CropAt(3, 2).IsRipe(world.Tick));
+            Assert.IsFalse(world.CropAt(5, 2).IsRipe(world.Tick));
+        }
+
+        [Test]
+        public void PeppersGrowFromIronAndCookIntoFoodThatBuffs()
+        {
+            var pepper = Tiles.Shipped.Crops.Single(c => c.Id == "fire_pepper");
+            Assert.AreSame(Gear.Data.FindMaterial("fire_pepper_seed"), pepper.Seed);
+            Assert.AreSame(pepper.Seed, Tiles.Shipped.Find(TileType.IronOre).Extra);
+
+            var world = Room(out var player);
+            world.Map[3, 4] = TileType.Furnace;
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("fire_pepper"), 2);
+            player.Inventory.AddMaterial(MushroomItem, 1);
+            Assert.IsTrue(world.Craft(player.Id, Gear.Data.Recipes.Single(r => r.Id == "spicy_fry")));
+            var fry = Gear.Data.FindConsumable("spicy_fry");
+            Assert.AreEqual(1, player.Inventory.CountOf(fry));
+
+            float damage = player.Stats.Damage;
+            Assert.IsTrue(world.UseConsumable(player.Id, fry), "eaten at full health");
+            Assert.AreSame(fry, player.Food);
+            Assert.AreEqual(damage * 1.1f, player.Stats.Damage, 0.001f);
+            Assert.AreEqual(0, player.Inventory.CountOf(fry));
+
+            // A new food replaces the old; the buff ends after its time.
+            var soup = Gear.Data.FindConsumable("mushroom_soup");
+            player.Inventory.AddConsumable(soup);
+            Run(world, World.Ticks(fry.Cooldown));
+            float health = player.Stats.MaxHealth;
+            Assert.IsTrue(world.UseConsumable(player.Id, soup));
+            Assert.AreSame(soup, player.Food);
+            Assert.AreEqual(damage, player.Stats.Damage, 0.001f);
+            Assert.AreEqual(health * 1.15f, player.Stats.MaxHealth, 0.01f);
+            Run(world, soup.BuffTicks);
+            Assert.IsNull(player.Food);
+            Assert.AreEqual(health, player.Stats.MaxHealth, 0.01f);
+        }
+
+        [Test]
+        public void FoodSheetErrors()
+        {
+            var data = LootSheets.Parse(
+                TestLoot.Bases, TestLoot.Affixes, TestLoot.Runes, TestLoot.Runewords,
+                "id,name,level,heal,seconds,cooldown,weight,description,buff,buff_seconds\n" +
+                "a,가,1,0,1,10,0,,Damage+10%,\n" +
+                "b,나,1,0,1,10,0,,,\n" +
+                "c,다,1,0,1,10,0,,Damage+5~10%,60\n" +
+                "d,라,1,0,1,10,0,,Damage+10%,60\n");
+
+            AssertError(data.Errors, "consumables.csv 2행", "buff_seconds");
+            AssertError(data.Errors, "consumables.csv 3행", "heal");
+            AssertError(data.Errors, "consumables.csv 4행", "범위");
+            Assert.IsTrue(data.Consumables.Single(c => c.Id == "d").IsFood);
+        }
+
+        [Test]
         public void DiggingStoneCanTurnUpSpores()
         {
             var lucky = TileSheet.Parse("tile,name,hardness,material,count,extra,extra_chance\nWall,돌벽,1,stone,1,mushroom_spore,100\n", Gear.Data);

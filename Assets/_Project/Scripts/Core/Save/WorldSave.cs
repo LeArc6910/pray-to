@@ -14,15 +14,15 @@ namespace Game.Core
     public sealed class WorldSave
     {
         const string Magic = "PTWO";
-        // 2 added chests, 3 machines.
-        const int FormatVersion = 3;
+        // 2 added chests, 3 machines, 4 whether each crop was watered.
+        const int FormatVersion = 4;
 
         WorldSave(
             ulong seed,
             long savedAt,
             int progressLevel,
             List<TileChange> tiles,
-            List<(CropDefinition Crop, int X, int Y, long Age)> crops,
+            List<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> crops,
             List<(int X, int Y, Inventory Contents)> chests,
             List<SavedMachine> machines,
             List<string> warnings)
@@ -43,7 +43,7 @@ namespace Game.Core
         public int ProgressLevel { get; }
         public IReadOnlyList<TileChange> Tiles { get; }
         // Age is in ticks at the moment of saving.
-        public IReadOnlyList<(CropDefinition Crop, int X, int Y, long Age)> Crops { get; }
+        public IReadOnlyList<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> Crops { get; }
         public IReadOnlyList<(int X, int Y, Inventory Contents)> Chests { get; }
         public IReadOnlyList<SavedMachine> Machines { get; }
 
@@ -106,6 +106,7 @@ namespace Game.Core
                     w.Write((ushort)crop.Y);
                     w.Write(crop.Definition.Id);
                     w.Write(world.Tick - crop.PlantedTick);
+                    w.Write(crop.Watered);
                 }
 
                 var chests = world.Chests.ToList();
@@ -169,15 +170,16 @@ namespace Game.Core
                 int unknownTiles = names.Count(name => !Enum.TryParse(name, out TileType _));
                 if (unknownTiles > 0) warnings.Add($"없어진 칸 종류 {unknownTiles}가지를 건너뛰었습니다.");
 
-                var crops = new List<(CropDefinition, int, int, long)>();
+                var crops = new List<(CropDefinition, int, int, long, bool)>();
                 for (int count = r.ReadInt32(); count > 0; count--)
                 {
                     int x = r.ReadUInt16();
                     int y = r.ReadUInt16();
                     string id = r.ReadString();
                     long age = r.ReadInt64();
+                    bool watered = version >= 4 && r.ReadBoolean();
                     var crop = tileData?.Crops.FirstOrDefault(c => c.Id == id);
-                    if (crop != null) crops.Add((crop, x, y, Math.Max(0, age)));
+                    if (crop != null) crops.Add((crop, x, y, Math.Max(0, age), watered));
                     else warnings.Add($"없어진 작물 '{id}'를 건너뛰었습니다.");
                 }
 

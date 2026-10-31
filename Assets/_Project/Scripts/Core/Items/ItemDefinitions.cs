@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -157,8 +158,20 @@ namespace Game.Core
     // then every consumable waits Cooldown seconds. See Docs/Combat.md (healing) and Docs/Loot.md.
     public sealed class ConsumableDefinition
     {
-        internal ConsumableDefinition(string id, string name, int level, int heal, float seconds, float cooldown, int weight, string description)
+        internal ConsumableDefinition(
+            string id,
+            string name,
+            int level,
+            int heal,
+            float seconds,
+            float cooldown,
+            int weight,
+            string description,
+            IReadOnlyList<Modifier> buff = null,
+            float buffSeconds = 0)
         {
+            Buff = buff ?? Array.Empty<Modifier>();
+            BuffSeconds = buffSeconds;
             Id = id;
             Name = name;
             Level = level;
@@ -178,6 +191,11 @@ namespace Game.Core
         public float Cooldown { get; }
         public int Weight { get; }
         public string Description { get; }
+        // What a food adds to its eater's stats, and for how long. Empty for a plain potion. See Docs/Farming.md.
+        public IReadOnlyList<Modifier> Buff { get; }
+        public float BuffSeconds { get; }
+        public bool IsFood => Buff.Count > 0;
+        public int BuffTicks => World.Ticks(BuffSeconds);
     }
 
     // Something gathered to make things with: from walls, monsters and bosses. Some can be placed as a tile.

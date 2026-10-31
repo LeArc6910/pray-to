@@ -29,6 +29,8 @@ namespace Game.Client
         Wake,
         Victory,
         Harvest,
+        Water,
+        Eat,
     }
 
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
@@ -169,6 +171,21 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Triangle, 0, 0.12f, 660, 660, 0.6f, decay: 4));
                     parts.Add(Tone(Wave.Triangle, 0.05f, 0.13f, 990, 990, 0.5f, decay: 4));
                     level = 0.6f;
+                    break;
+                case Sound.Water:
+                    // A soft pour with a few bubbles rising through it.
+                    parts.Add(Noise(0, 0.35f, 0.7f, 0.6f, attack: 0.04f, decay: 2.5f, seed: 7));
+                    parts.Add(Tone(Wave.Sine, 0.04f, 0.06f, 700, 1100, 0.35f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.12f, 0.06f, 850, 1300, 0.3f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.2f, 0.06f, 760, 1200, 0.25f, decay: 6));
+                    level = 0.5f;
+                    break;
+                case Sound.Eat:
+                    // Two crunchy bites and a pleased little rise.
+                    parts.Add(Noise(0, 0.05f, 0.8f, 0.35f, decay: 8, seed: 3));
+                    parts.Add(Noise(0.12f, 0.05f, 0.8f, 0.35f, decay: 8, seed: 5));
+                    parts.Add(Tone(Wave.Square, 0.24f, 0.14f, 440, 660, 0.3f, decay: 3));
+                    level = 0.55f;
                     break;
             }
             return Mix(parts, level);

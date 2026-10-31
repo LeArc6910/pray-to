@@ -5,21 +5,25 @@ using System.Linq;
 namespace Game.Core
 {
     // A crop growing on a floor tile since PlantedTick. Host and clients work out how far along it is from the tick,
-    // so only planting and harvesting are ever sent.
+    // so only planting, watering and harvesting are ever sent. Watering moves PlantedTick back by half the time it
+    // still had to grow.
     public sealed class Crop
     {
-        public Crop(CropDefinition definition, int x, int y, long plantedTick)
+        public Crop(CropDefinition definition, int x, int y, long plantedTick, bool watered = false)
         {
             Definition = definition;
             X = x;
             Y = y;
             PlantedTick = plantedTick;
+            Watered = watered;
         }
 
         public CropDefinition Definition { get; }
         public int X { get; }
         public int Y { get; }
         public long PlantedTick { get; }
+        // A crop takes water once.
+        public bool Watered { get; }
 
         // 0 when planted, 1 when ripe.
         public float Growth(double tick) => Math.Clamp((float)((tick - PlantedTick) / Definition.GrowTicks), 0, 1);
@@ -27,7 +31,7 @@ namespace Game.Core
         public bool IsRipe(double tick) => tick - PlantedTick >= Definition.GrowTicks;
     }
 
-    // A crop planted (Crop set) or harvested (Crop null) at a tile.
+    // A crop planted or watered (Crop set) or harvested (Crop null) at a tile.
     public readonly struct CropChange
     {
         public CropChange(int x, int y, Crop crop)
@@ -42,9 +46,13 @@ namespace Game.Core
         public Crop Crop { get; }
     }
 
-    // Planting seeds on the floor ahead and harvesting what is ripe by walking over it. See Docs/Farming.md.
+    // Planting seeds on the floor ahead, watering them and harvesting what is ripe by walking over it. See
+    // Docs/Farming.md.
     public sealed partial class World
     {
+        // The material that waters crops. It is a tool: watering does not use it up.
+        public const string WateringCan = "watering_can";
+
         readonly Dictionary<int, Crop> _crops = new Dictionary<int, Crop>();
         readonly List<CropChange> _newCropChanges = new List<CropChange>();
 
@@ -78,6 +86,34 @@ namespace Game.Core
             var planted = new Crop(crop, x, y, Tick);
             _crops[y * Map.Width + x] = planted;
             _newCropChanges.Add(new CropChange(x, y, planted));
+            return true;
+        }
+
+        // Waters the crops on the tile ahead of the player and the eight around it, with a watering can in the bag.
+        // Each crop not yet watered or ripe has the time it still needs halved. False when none could be watered.
+        public bool Water(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || !player.Inventory.Materials.Keys.Any(m => m.Id == WateringCan)) return false;
+            var ahead = player.Position + player.Facing * BuildReach;
+            int cx = TileMap.Cell(ahead.X);
+            int cy = TileMap.Cell(ahead.Y);
+            int watered = 0;
+            for (int y = cy - 1; y <= cy + 1; y++)
+            {
+                for (int x = cx - 1; x <= cx + 1; x++)
+                {
+                    var crop = Map.InBounds(x, y) ? CropAt(x, y) : null;
+                    if (crop == null || crop.Watered || crop.IsRipe(Tick)) continue;
+                    long left = crop.Definition.GrowTicks - (Tick - crop.PlantedTick);
+                    var wet = new Crop(crop.Definition, x, y, crop.PlantedTick - left / 2, watered: true);
+                    _crops[y * Map.Width + x] = wet;
+                    _newCropChanges.Add(new CropChange(x, y, wet));
+                    watered++;
+                }
+            }
+            if (watered == 0) return false;
+            _events.Add(new SimEvent(SimEventType.Watered, player.Id, amount: watered, position: TileMap.Center(cx, cy)));
             return true;
         }
 

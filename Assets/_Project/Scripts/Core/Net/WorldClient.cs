@@ -439,7 +439,7 @@ namespace Game.Core
         public byte[] UseConsumableCommand(ConsumableDefinition consumable)
         {
             if (Status != ClientStatus.Playing || _snapshots.Count == 0 || IsDead || consumable == null || Bag.CountOf(consumable) == 0) return null;
-            if (ConsumableCooldownLeft > 0 || Health >= MaxHealth) return null;
+            if (ConsumableCooldownLeft > 0 || (Health >= MaxHealth && !consumable.IsFood)) return null;
             _consumableCooldown = World.Ticks(consumable.Cooldown) + (int)Math.Ceiling(HostTick - _skillsTick);
             return new InventoryCommandMessage(InventoryCommand.UseConsumable, 0, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode();
         }
@@ -497,6 +497,8 @@ namespace Game.Core
         // The crop this material grows, or null when it is not a seed.
         public CropDefinition CropFrom(MaterialDefinition material) => _tiles?.CropFrom(material);
 
+        public byte[] WaterCommand() => new InventoryCommandMessage(InventoryCommand.Water, 0).Encode();
+
         public byte[] PlantCommand(CropDefinition crop) =>
             new InventoryCommandMessage(InventoryCommand.Plant, 0, index: ItemCodec.Index(_tiles.Crops, crop)).Encode();
 
@@ -522,6 +524,15 @@ namespace Game.Core
         public ConsumableDefinition QuickConsumable => _loot?.Consumables.FirstOrDefault(c => Bag.CountOf(c) > 0);
 
         // Seconds until any consumable can be used again.
+        // The consumable at a sheet index (as an Ate event names it), or null.
+        public ConsumableDefinition ConsumableAt(int index) =>
+            _loot != null && index >= 0 && index < _loot.Consumables.Count ? _loot.Consumables[index] : null;
+
+        // The food whose buff is on, or null, and the seconds it has left, counting down between snapshots.
+        public ConsumableDefinition Food { get; private set; }
+        int _foodTicks;
+        public float FoodLeft => Food == null ? 0 : (float)Math.Max(0, (_foodTicks - (HostTick - _skillsTick)) / World.TicksPerSecond);
+
         public float ConsumableCooldownLeft => (float)Math.Max(0, (_consumableCooldown - (HostTick - _skillsTick)) / World.TicksPerSecond);
 
         public byte[] DiscardCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.Discard, itemId).Encode();
@@ -572,7 +583,7 @@ namespace Game.Core
         void RefreshStats()
         {
             var buffs = Enumerable.Range(0, Math.Min(Skills.Count, _buffs.Length)).Where(slot => _buffs[slot] > 0).Select(slot => Skills[slot]);
-            Stats = PlayerStats.From(Equipment, Classes, buffs);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food);
         }
 
         List<ClassDefinition> ClassesAt(IReadOnlyList<int> indexes)
@@ -594,7 +605,7 @@ namespace Game.Core
 
         void ApplyCropChanges(CropChangesMessage message)
         {
-            foreach (var (x, y, crop, planted) in message.Changes)
+            foreach (var (x, y, crop, planted, watered) in message.Changes)
             {
                 if (!Map.InBounds(x, y)) throw new InvalidDataException("Crop outside the map.");
                 int key = y * Map.Width + x;
@@ -604,7 +615,7 @@ namespace Game.Core
                     continue;
                 }
                 if (_tiles == null || crop >= _tiles.Crops.Count) throw new InvalidDataException("The host names a crop this client does not know.");
-                _crops[key] = new Crop(_tiles.Crops[crop], x, y, planted);
+                _crops[key] = new Crop(_tiles.Crops[crop], x, y, planted, watered);
             }
         }
 
@@ -661,6 +672,10 @@ namespace Game.Core
                 _buffs[slot] = self.Buffs[slot];
             }
             _consumableCooldown = self.ConsumableCooldown;
+            var food = self.Food >= 0 && _loot != null && self.Food < _loot.Consumables.Count ? _loot.Consumables[self.Food] : null;
+            buffsChanged |= food != Food;
+            Food = food;
+            _foodTicks = self.FoodTicks;
             _skillsTick = snapshot.Tick;
             if (buffsChanged) RefreshStats();
             Health = self.Health;

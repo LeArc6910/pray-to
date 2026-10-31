@@ -44,6 +44,9 @@ namespace Game.Core
 
         // Ticks until any consumable can be used again.
         public int ConsumableCooldown { get; internal set; }
+        // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
+        public ConsumableDefinition Food { get; private set; }
+        public int FoodTicks { get; private set; }
 
         internal int AttackCooldown { get; set; }
         internal int RespawnTicks { get; set; }
@@ -84,10 +87,23 @@ namespace Game.Core
             if (!wasOn) RefreshStats();
         }
 
+        // A new food's buff replaces the one before.
+        internal void Eat(ConsumableDefinition food)
+        {
+            Food = food;
+            FoodTicks = food.BuffTicks;
+            RefreshStats();
+        }
+
         // One tick of cooldowns and buffs.
         internal void TickSkills()
         {
             bool expired = false;
+            if (FoodTicks > 0 && --FoodTicks == 0)
+            {
+                Food = null;
+                expired = true;
+            }
             for (int slot = 0; slot < Skills.Count; slot++)
             {
                 if (_cooldowns[slot] > 0) _cooldowns[slot]--;
@@ -112,7 +128,7 @@ namespace Game.Core
             {
                 if (HasBuff(slot)) buffs.Add(Skills[slot]);
             }
-            Stats = PlayerStats.From(Equipment, Classes, buffs);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
         }
     }
@@ -210,6 +226,10 @@ namespace Game.Core
         Dug,
         // Source, a player, harvested Amount from the crop at Position.
         Harvested,
+        // Source, a player, watered Amount crops around Position.
+        Watered,
+        // Source, a player, ate the consumable with sheet index Amount, which feeds them a buff.
+        Ate,
     }
 
     public readonly struct SimEvent
@@ -239,7 +259,7 @@ namespace Game.Core
         public Vec2 Position { get; }
 
         public static bool HasPosition(SimEventType type) =>
-            type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested;
+            type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered;
     }
 
     public enum BossState : byte

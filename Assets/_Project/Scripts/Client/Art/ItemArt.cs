@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Collections.Generic;
 using Game.Core;
 
@@ -217,7 +218,45 @@ namespace Game.Client
             "..hmmm....",
             ".h........").Outlined(Outline);
 
-        public static PixelImage Consumable(ConsumableDefinition consumable) => consumable.Id == "roasted_mushroom" ? RoastedMushroom : Potion;
+        static readonly Dictionary<char, Rgba> BowlColors = new Dictionary<char, Rgba>(Common)
+        {
+            ['b'] = Rgba.Hex("#D8C4A0"),
+            ['B'] = Rgba.Hex("#9C8462"),
+            ['o'] = Rgba.Hex("#FF9A5A"),
+            ['R'] = Rgba.Hex("#E0402A"),
+            ['g'] = Rgba.Hex("#7CC85A"),
+            ['L'] = Rgba.Hex("#F0D49C"),
+            ['M'] = Rgba.Hex("#D8A866"),
+            ['m'] = Rgba.Hex("#A8743E"),
+        };
+
+        // Peppers and mushroom fried in a bowl.
+        static readonly PixelImage SpicyFry = PixelImage.FromRows(BowlColors,
+            "...w..w...",
+            "..oR.gR...",
+            ".RoMgRoMg.",
+            "bbbbbbbbbb",
+            ".bBBBBBBb.",
+            "..bBBBBb..",
+            "...bbbb...").Outlined(Outline);
+
+        // A bowl of creamy soup with bits of mushroom.
+        static readonly PixelImage MushroomSoup = PixelImage.FromRows(BowlColors,
+            "..w...w...",
+            "...w...w..",
+            ".LLmLLLmL.",
+            "bbbbbbbbbb",
+            ".bBBBBBBb.",
+            "..bBBBBb..",
+            "...bbbb...").Outlined(Outline);
+
+        public static PixelImage Consumable(ConsumableDefinition consumable) => consumable.Id switch
+        {
+            "roasted_mushroom" => RoastedMushroom,
+            "spicy_fry" => SpicyFry,
+            "mushroom_soup" => MushroomSoup,
+            _ => Potion,
+        };
 
         // ---- Materials ----
 
@@ -325,6 +364,56 @@ namespace Game.Client
             "..sSSS....",
         };
 
+        static readonly string[] Seeds =
+        {
+            "..........",
+            "..LM...LM.",
+            ".LwMm.LwMm",
+            "..mm...mm.",
+            "....LM....",
+            "...LwMm...",
+            "....mm....",
+        };
+
+        static readonly Dictionary<char, Rgba> PepperColors = new Dictionary<char, Rgba>(Common)
+        {
+            ['g'] = Rgba.Hex("#8AD05A"),
+            ['G'] = Rgba.Hex("#4E8A34"),
+            ['L'] = Rgba.Hex("#FF8A5A"),
+            ['M'] = Rgba.Hex("#E0402A"),
+            ['m'] = Rgba.Hex("#A82418"),
+            ['d'] = Rgba.Hex("#6E140E"),
+        };
+
+        static readonly PixelImage Pepper = PixelImage.FromRows(PepperColors,
+            "....GG....",
+            "...GgG....",
+            "..LMMw....",
+            ".LMMMMm...",
+            ".MMMMMm...",
+            "..MMMmm...",
+            "...mmd....",
+            "....d.....").Outlined(Outline);
+
+        static readonly Dictionary<char, Rgba> CanColors = new Dictionary<char, Rgba>(Common)
+        {
+            ['L'] = Rgba.Hex("#9CD6EC"),
+            ['M'] = Rgba.Hex("#5AA0C8"),
+            ['m'] = Rgba.Hex("#3A6E9C"),
+            ['d'] = Rgba.Hex("#24466E"),
+        };
+
+        // A watering can, spout to the right.
+        static readonly PixelImage WateringCanIcon = PixelImage.FromRows(CanColors,
+            "...mmmm.....",
+            "..m....m....",
+            ".LLLLLLL...L",
+            ".LwMMMMM..Lm",
+            ".LMMMMMMLMm.",
+            ".MMMMMMMMm..",
+            ".MMMMMMMm...",
+            ".mmmmmmmd...").Outlined(Outline);
+
         static readonly Dictionary<string, PixelImage> MaterialIcons = new Dictionary<string, PixelImage>();
 
         public static PixelImage Material(MaterialDefinition material)
@@ -357,6 +446,9 @@ namespace Game.Client
                 case "warden_core": return Ramped(Gem, Ramp.Of("#FFA83A"));
                 case "mushroom_spore": return Ramped(Spores, Ramp.Of("#B07CE0"));
                 case "mushroom": return Ramped(CapMushroom, Ramp.Of("#E8A866"));
+                case "fire_pepper_seed": return Ramped(Seeds, Ramp.Of("#E8D27C"));
+                case "fire_pepper": return Pepper;
+                case "watering_can": return WateringCanIcon;
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);
             }
         }
@@ -389,6 +481,12 @@ namespace Game.Client
             ['S'] = Rgba.Hex("#C8B496"),
             ['t'] = Rgba.Hex("#4A3426"),
             ['T'] = Rgba.Hex("#33241A"),
+            // Watered soil, dark and a little blue.
+            ['u'] = Rgba.Hex("#2E2C40"),
+            ['U'] = Rgba.Hex("#1C1A2C"),
+            ['r'] = Rgba.Hex("#E0402A"),
+            ['R'] = Rgba.Hex("#A82418"),
+            ['o'] = Rgba.Hex("#FF8A5A"),
         };
 
         // Planted soil under every crop, so a field reads as a field.
@@ -438,11 +536,50 @@ namespace Game.Client
             },
         };
 
-        // Four steps as Docs/Farming.md describes: sprout, young, growing, ripe.
-        public static PixelImage Crop(int stage)
+        // A bushy pepper plant whose peppers redden as it ripens.
+        static readonly string[][] PepperStages =
         {
-            var rows = new List<string>(CropStages[System.Math.Clamp(stage, 0, CropStages.Length - 1)]);
-            rows.AddRange(Soil);
+            CropStagesSprout,
+            new[]
+            {
+                "............",
+                "............",
+                "............",
+                ".....g......",
+                "....gGg.....",
+                ".....G......",
+            },
+            new[]
+            {
+                "............",
+                "....g.g.....",
+                "...gGgGg....",
+                "....gGg.....",
+                "...g.G.g....",
+                ".....G......",
+            },
+            new[]
+            {
+                "....g..g....",
+                "...gGggGg...",
+                "..ro.gG.or..",
+                "..rR.G..rR..",
+                "...R.G...R..",
+                ".....G......",
+            },
+        };
+
+        static string[] CropStagesSprout => CropStages[0];
+
+        // Four steps as Docs/Farming.md describes: sprout, young, growing, ripe. Each crop has its own drawings (a
+        // crop without any looks like a mushroom); watered soil is darker.
+        public static PixelImage Crop(int stage) => Crop("mushroom", stage);
+
+        public static PixelImage Crop(string id, int stage, bool watered = false)
+        {
+            var stages = id == "fire_pepper" ? PepperStages : CropStages;
+            var rows = new List<string>(stages[System.Math.Clamp(stage, 0, stages.Length - 1)]);
+            rows.AddRange(watered ? Soil.Select(row => row.Replace('t', 'u').Replace('T', 'U')) : Soil);
             return PixelImage.FromRows(CropColors, rows.ToArray()).Outlined(Outline.WithAlpha(200));
         }
 
