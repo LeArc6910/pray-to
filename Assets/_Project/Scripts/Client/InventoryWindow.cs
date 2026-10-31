@@ -32,6 +32,7 @@ namespace Game.Client
 
         readonly WorldClient _client;
         readonly Action<byte[]> _send;
+        readonly Hotbar _hotbar;
         readonly Vector2[] _scroll = new Vector2[PageNames.Length];
         Page _page;
         RuneDefinition _selectedRune;
@@ -45,10 +46,11 @@ namespace Game.Client
         const float IconSize = 24;
         const float IconRoom = IconSize + 4;
 
-        public InventoryWindow(WorldClient client, Action<byte[]> send)
+        public InventoryWindow(WorldClient client, Action<byte[]> send, Hotbar hotbar = null)
         {
             _client = client;
             _send = send;
+            _hotbar = hotbar;
         }
 
         public bool Open { get; set; }
@@ -80,7 +82,8 @@ namespace Game.Client
             float scrollbar = GUI.skin.verticalScrollbar.fixedWidth + 8;
             // A label in the list is that wide less its own margins.
             _textWidth = inner - scrollbar - GUI.skin.label.margin.horizontal;
-            _nameWidth = Mathf.Clamp(_textWidth - IconRoom - 150, 60, 240);
+            // Room for two buttons and [퀵] beside each name.
+            _nameWidth = Mathf.Clamp(_textWidth - IconRoom - 150 - QuickWidth, 60, 240);
             _recipeWidth = _textWidth - IconRoom - 76;
             Controls.Block(area);
             Wheel(area);
@@ -93,6 +96,7 @@ namespace Game.Client
             bool chest = _client.Chest.IsOpen;
             if (!chest && _page == Page.Chest) _page = Page.Gear;
             _page = Tabs(_page, chest ? 3 : 2);
+            if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
             _scroll[page] = GUILayout.BeginScrollView(_scroll[page], GUILayout.ExpandHeight(true));
@@ -171,6 +175,7 @@ namespace Game.Client
                     ItemLabel(item);
                     RuneButton(item);
                     if (GUILayout.Button("벗기", GUILayout.Width(56))) Send(_client.UnequipCommand(slot), Sound.Click);
+                    QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
                 }
                 GUILayout.EndHorizontal();
             }
@@ -184,6 +189,7 @@ namespace Game.Client
                 RuneButton(item);
                 if (GUILayout.Button("장착", GUILayout.Width(56))) Send(_client.EquipCommand(item.Id), Sound.Place);
                 if (GUILayout.Button("버리기", GUILayout.Width(56))) Send(_client.DiscardCommand(item.Id), Sound.Click);
+                QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
                 GUILayout.EndHorizontal();
             }
 
@@ -279,6 +285,12 @@ namespace Game.Client
                 var crop = _client.CropFrom(pair.Key);
                 if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
                 if (pair.Key.Id == World.WateringCan && GUILayout.Button("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
+                // Only what a quick slot can use: things that build, seeds and the watering can.
+                if (pair.Key.Places != null || crop != null || pair.Key.Id == World.WateringCan)
+                {
+                    var material = pair.Key;
+                    QuickButton(_hotbar?.SlotOf(material), () => _hotbar.Toggle(material));
+                }
                 GUILayout.EndHorizontal();
             }
         }
@@ -377,8 +389,21 @@ namespace Game.Client
                     byte[] command = _client.UseConsumableCommand(pair.Key);
                     if (command != null) _send(command);
                 }
+                var consumable = pair.Key;
+                QuickButton(_hotbar?.SlotOf(consumable), () => _hotbar.Toggle(consumable));
                 GUILayout.EndHorizontal();
             }
+        }
+
+        const float QuickWidth = 50;
+
+        // [퀵] puts the thing in the first empty quick slot, or takes it out of the one it is in ([퀵2]).
+        void QuickButton(int? slot, Action toggle)
+        {
+            if (slot == null) return;
+            if (!GUILayout.Button(slot < 0 ? "퀵" : $"퀵{slot + 1}", GUILayout.Width(QuickWidth))) return;
+            toggle();
+            Sounds.Play(Sound.Click);
         }
 
         void ItemLabel(Item item)

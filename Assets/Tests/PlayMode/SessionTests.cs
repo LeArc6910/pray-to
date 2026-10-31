@@ -57,6 +57,41 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // A new character's quick slots start with its sword and pickaxe; using the second takes the pickaxe in hand
+        // and the first gives the sword back.
+        [UnityTest]
+        public IEnumerator QuickSlotsSwapWeapons()
+        {
+            const string name = "playmode-quick-test";
+            SaveStore.Delete(SaveStore.WorldKey(name));
+            SaveStore.Delete(SaveStore.CharacterKey(name));
+            PlayerPrefs.DeleteKey("hotbar." + name);
+            _root.PlayerName = name;
+            _root.WorldNameField = name;
+            try
+            {
+                _root.StartSolo();
+                yield return new WaitForSecondsRealtime(1);
+                Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
+                Assert.AreEqual("copper_sword", _root.HeldWeaponId);
+
+                Assert.IsTrue(_root.UseQuickSlot(1), "The second quick slot did not hold the pickaxe.");
+                yield return new WaitForSecondsRealtime(0.5f);
+                Assert.AreEqual("copper_pickaxe", _root.HeldWeaponId);
+
+                Assert.IsTrue(_root.UseQuickSlot(0), "The first quick slot did not hold the sword.");
+                yield return new WaitForSecondsRealtime(0.5f);
+                Assert.AreEqual("copper_sword", _root.HeldWeaponId);
+                _root.Leave();
+            }
+            finally
+            {
+                SaveStore.Delete(SaveStore.WorldKey(name));
+                SaveStore.Delete(SaveStore.CharacterKey(name));
+                PlayerPrefs.DeleteKey("hotbar." + name);
+            }
+        }
+
         // Leaving saves the world and the character where SaveStore keeps them, and starting again reads them back.
         [UnityTest]
         public IEnumerator SoloSavesAndLoads()

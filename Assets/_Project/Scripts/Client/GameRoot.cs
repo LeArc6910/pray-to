@@ -70,6 +70,7 @@ namespace Game.Client
         NetLink _net;
         WorldView _view;
         InventoryWindow _inventory;
+        Hotbar _hotbar;
         MapView _map;
         // "획득: …" lines for things picked up, each shown for a few seconds.
         readonly List<(string Text, float Age)> _acquired = new List<(string, float)>();
@@ -235,10 +236,22 @@ namespace Game.Client
         {
             var slots = Controls.TakeSkillPresses();
             bool potion = Controls.TakePotionPress();
+            var quick = Controls.TakeHotbarPresses();
             if (_inventory.Open || (_map != null && _map.FullOpen)) return;
             var aim = Controls.SkillAim(_camera, _client.Position);
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
+            foreach (int slot in quick) UseQuickSlot(slot);
+        }
+
+        // Does what the quick slot holds: puts on the gear, uses the potion or food, places, plants or waters.
+        internal bool UseQuickSlot(int slot)
+        {
+            var (command, sound) = _hotbar?.Use(slot) ?? (null, null);
+            if (command == null) return false;
+            if (sound is Sound played) Sounds.Play(played);
+            SendToHost(command);
+            return true;
         }
 
         // Also called by the play mode tests. False when there is none, it is still waiting or health is full.
@@ -283,6 +296,9 @@ namespace Game.Client
         internal string Status => _status;
 
         internal int SkillCount => _client?.Skills.Count ?? 0;
+
+        // The base of the weapon in hand, for the play mode tests.
+        internal string HeldWeaponId => _client?.Equipment[ItemSlot.Weapon]?.Base.Id;
 
         // False when the skill is not ready. Zero aim uses it the way the player faces.
         internal bool UseSkill(int slot, Vec2 aim = default)
@@ -337,7 +353,8 @@ namespace Game.Client
             {
                 Character = character,
             };
-            _inventory = new InventoryWindow(_client, SendToHost);
+            _hotbar = new Hotbar(_client, _loot, CharacterName);
+            _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
             _status = "";
@@ -358,7 +375,8 @@ namespace Game.Client
             {
                 Character = character,
             };
-            _inventory = new InventoryWindow(_client, SendToHost);
+            _hotbar = new Hotbar(_client, _loot, CharacterName);
+            _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
             _joinSent = false;
             _net.Connected += id =>
             {
@@ -499,7 +517,11 @@ namespace Game.Client
             DrawHud(compact: _inventory.Open);
             // Not while the bag is open: skills cannot be used then (ReadSkillPress), a tap in the window must not fire
             // one, and a slot would show in the gap beside the window.
-            if (_client.Status == ClientStatus.Playing && !_inventory.Open) SkillBar.Draw(_client);
+            if (_client.Status == ClientStatus.Playing && !_inventory.Open)
+            {
+                SkillBar.Draw(_client);
+                _hotbar?.Draw(_client.Skills.Count);
+            }
             _inventory?.Draw();
             DrawAcquired();
             _map?.DrawMinimap(Ui.MinimapArea);
@@ -516,7 +538,10 @@ namespace Game.Client
         {
             var label = GUI.skin.label;
             float width = Mathf.Min(400, Ui.Width - 28);
+            // Clear of the skill keys and the quick slots, wherever they are.
             var slots = SkillBar.Bounds(_client.Skills.Count);
+            var quick = Hotbar.Bounds(_client.Skills.Count);
+            slots = Rect.MinMaxRect(Mathf.Min(slots.xMin, quick.xMin), Mathf.Min(slots.yMin, quick.yMin), Mathf.Max(slots.xMax, quick.xMax), slots.yMax);
             float y = slots.x < 14 + width ? slots.y - 6 : Ui.Height - 10;
             var previous = GUI.color;
             for (int i = _acquired.Count - 1; i >= 0; i--)
@@ -734,7 +759,8 @@ namespace Game.Client
             {
                 lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격(곡괭이를 들면 벽을 캔다)");
                 string skills = string.Join(" ", Enumerable.Range(0, 4).Select(Controls.SkillKeyName));
-                lines.Add($"{skills} 스킬 · {Controls.PotionKeyName} 물약 · {KeyBindings.Name(KeyAction.Bag)} 가방 · {KeyBindings.Name(KeyAction.Map)} 지도 · Esc 메뉴");
+                string quickKeys = $"{KeyBindings.Name(KeyAction.Hotbar1)}~{KeyBindings.Name(KeyAction.Hotbar6)}";
+                lines.Add($"{skills} 스킬 · {Controls.PotionKeyName} 물약 · {quickKeys} 퀵슬롯 · {KeyBindings.Name(KeyAction.Bag)} 가방 · {KeyBindings.Name(KeyAction.Map)} 지도 · Esc 메뉴");
             }
 
             var box = GUI.skin.box;

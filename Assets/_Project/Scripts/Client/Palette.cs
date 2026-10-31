@@ -9,6 +9,8 @@ namespace Game.Client
         public static readonly Color Potion = new Color(0.95f, 0.35f, 0.45f);
         public static readonly Color Heal = new Color(0.45f, 1f, 0.5f);
         public static readonly Color Water = new Color(0.45f, 0.7f, 1f);
+        // The edge of a quick slot holding the gear worn now.
+        public static readonly Color Worn = new Color(0.95f, 0.78f, 0.3f);
         // A food's buff starting.
         public static readonly Color Food = new Color(1f, 0.75f, 0.35f);
         public static readonly Color Material = new Color(0.75f, 0.75f, 0.72f);

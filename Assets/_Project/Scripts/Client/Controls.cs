@@ -55,6 +55,10 @@ namespace Game.Client
         static readonly List<Rect> _blocked = new List<Rect>();
         static readonly List<(Rect Area, int Slot)> _skillButtons = new List<(Rect, int)>();
         static readonly List<int> _skillTaps = new List<int>();
+        static readonly List<(Rect Area, int Slot)> _hotbarButtons = new List<(Rect, int)>();
+        static readonly List<int> _hotbarTaps = new List<int>();
+        // The mouse is over the UI (a quick slot, the minimap…), so its button is not an attack.
+        static bool _mouseOverUi;
         static readonly List<Rect> _potionButtons = new List<Rect>();
         static bool _potionTapped;
         static readonly Predicate<int> Released = id => !Held(id);
@@ -71,6 +75,7 @@ namespace Game.Client
         {
             // A tap not taken in the frame it landed (the session ended, say) is dropped, not saved for later.
             _skillTaps.Clear();
+            _hotbarTaps.Clear();
             _potionTapped = false;
             _touches.Clear();
             var screen = Touchscreen.current;
@@ -97,9 +102,43 @@ namespace Game.Client
                 else if (id == _aim.Finger) _aim.Now = point;
                 else if (!_ignored.Contains(id)) Begin(id, point);
             }
+            // The mouse, as the last frame's UI left things: a click on a quick slot uses it and is no attack.
+            var mouse = Time.unscaledTime - _lastTouch < MouseQuietSeconds ? null : Mouse.current;
+            _mouseOverUi = false;
+            if (mouse != null)
+            {
+                Vector2 point = Ui.FromScreen(mouse.position.ReadValue());
+                _mouseOverUi = Blocked(point);
+                if (mouse.leftButton.wasPressedThisFrame)
+                {
+                    foreach (var (area, slot) in _hotbarButtons)
+                    {
+                        if (area.Contains(point)) _hotbarTaps.Add(slot);
+                    }
+                }
+            }
             _blocked.Clear();
             _skillButtons.Clear();
             _potionButtons.Clear();
+            _hotbarButtons.Clear();
+        }
+
+        // Marks a quick slot, in points: a finger landing on it or a click uses it. Call from OnGUI.
+        public static void HotbarButton(Rect area, int slot)
+        {
+            if (Event.current.type == EventType.Repaint) _hotbarButtons.Add((area, slot));
+        }
+
+        // Every quick slot asked for this frame, by key, click or tap.
+        public static List<int> TakeHotbarPresses()
+        {
+            var slots = new List<int>(_hotbarTaps);
+            _hotbarTaps.Clear();
+            for (int slot = 0; slot < Hotbar.Slots; slot++)
+            {
+                if (KeyBindings.Pressed(KeyAction.Hotbar1 + slot) && !slots.Contains(slot)) slots.Add(slot);
+            }
+            return slots;
         }
 
         // Marks a UI area, in points, where new touches belong to the UI. Call from OnGUI.
@@ -185,7 +224,7 @@ namespace Game.Client
             else if (mouse != null)
             {
                 aim = Toward(camera, mouse.position.ReadValue(), player);
-                attack |= mouse.leftButton.isPressed;
+                attack |= mouse.leftButton.isPressed && !_mouseOverUi;
             }
             // Keyboard-only players, and an attack stick pressed without pulling, face where they walk. Standing still,
             // a zero aim leaves the facing as it was.
@@ -224,6 +263,13 @@ namespace Game.Client
             {
                 if (!area.Contains(point)) continue;
                 _potionTapped = true;
+                _ignored.Add(id);
+                return;
+            }
+            foreach (var (area, slot) in _hotbarButtons)
+            {
+                if (!area.Contains(point)) continue;
+                _hotbarTaps.Add(slot);
                 _ignored.Add(id);
                 return;
             }

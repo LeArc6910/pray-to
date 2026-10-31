@@ -82,6 +82,12 @@ namespace UnityEngine.InputSystem
         RightArrow,
         UpArrow,
         DownArrow,
+        Digit1,
+        Digit2,
+        Digit3,
+        Digit4,
+        Digit5,
+        Digit6,
     }
 
     public class Keyboard

@@ -86,6 +86,12 @@ namespace Game.Client
         Potion,
         Bag,
         Map,
+        Hotbar1,
+        Hotbar2,
+        Hotbar3,
+        Hotbar4,
+        Hotbar5,
+        Hotbar6,
     }
 
     // Which key does what, changed in the menu and kept on this device (PlayerPrefs, by key name). Every action has
@@ -93,7 +99,10 @@ namespace Game.Client
     static class KeyBindings
     {
         public static readonly KeyAction[] Actions = (KeyAction[])Enum.GetValues(typeof(KeyAction));
-        static readonly Key[] Defaults = { Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M };
+        static readonly Key[] Defaults =
+        {
+            Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M, Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6,
+        };
         static readonly Key[] Fixed =
         {
             Key.W, Key.A, Key.S, Key.D, Key.UpArrow, Key.DownArrow, Key.LeftArrow, Key.RightArrow, Key.Space, Key.Escape,
@@ -110,7 +119,7 @@ namespace Game.Client
 
         public static Key KeyFor(KeyAction action) => Keys[(int)action];
 
-        public static string Name(KeyAction action) => KeyName(KeyFor(action));
+        public static string Name(KeyAction action) => KeyFor(action) == Key.None ? "-" : KeyName(KeyFor(action));
 
         public static bool IsBound(Key key) => Array.IndexOf(Keys, key) >= 0;
 
@@ -118,7 +127,8 @@ namespace Game.Client
         public static bool Pressed(KeyAction action)
         {
             var keyboard = Keyboard.current;
-            return keyboard != null && Capturing == null && keyboard[KeyFor(action)].wasPressedThisFrame;
+            var key = KeyFor(action);
+            return keyboard != null && Capturing == null && key != Key.None && keyboard[key].wasPressedThisFrame;
         }
 
         public static string ActionName(KeyAction action) => action switch
@@ -129,7 +139,8 @@ namespace Game.Client
             KeyAction.Skill4 => "스킬 4",
             KeyAction.Potion => "물약",
             KeyAction.Bag => "가방",
-            _ => "지도",
+            KeyAction.Map => "지도",
+            _ => $"퀵슬롯 {action - KeyAction.Hotbar1 + 1}",
         };
 
         // Short enough for a skill slot's corner: "1" for Digit1, "Num1", "LShift".
@@ -193,7 +204,7 @@ namespace Game.Client
             {
                 Keys[other] = old;
                 Save(Actions[other]);
-                Message = $"{ActionName(Actions[other])}은 {KeyName(old)}로 바꿨다";
+                Message = old == Key.None ? $"{ActionName(Actions[other])}은 키가 없어졌다" : $"{ActionName(Actions[other])}은 {KeyName(old)}로 바꿨다";
             }
             Keys[(int)action] = key;
             Save(action);
@@ -202,8 +213,9 @@ namespace Game.Client
 
         static void Save(KeyAction action) => PlayerPrefs.SetString("keys." + action, Keys[(int)action].ToString());
 
-        // Saved keys, or the defaults for any missing, unknown or fixed. If two actions end up on one key, all go back
-        // to the defaults.
+        // Saved keys, or the defaults for any missing, unknown or fixed. An action whose key an earlier one already has
+        // (a key chosen for a skill before the quick slots took the digits, say) is left without one ("-") until the
+        // player gives it one.
         static Key[] Load()
         {
             var keys = new Key[Actions.Length];
@@ -215,7 +227,7 @@ namespace Game.Client
             }
             for (int i = 0; i < keys.Length; i++)
             {
-                if (Array.IndexOf(keys, keys[i]) != i) return (Key[])Defaults.Clone();
+                if (keys[i] != Key.None && Array.IndexOf(keys, keys[i]) != i) keys[i] = Key.None;
             }
             return keys;
         }
