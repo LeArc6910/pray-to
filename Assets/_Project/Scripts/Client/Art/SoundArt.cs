@@ -31,6 +31,8 @@ namespace Game.Client
         Harvest,
         Water,
         Eat,
+        // The player's own footsteps, quietly.
+        Step,
     }
 
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
@@ -186,6 +188,12 @@ namespace Game.Client
                     parts.Add(Noise(0.12f, 0.05f, 0.8f, 0.35f, decay: 8, seed: 5));
                     parts.Add(Tone(Wave.Square, 0.24f, 0.14f, 440, 660, 0.3f, decay: 3));
                     level = 0.55f;
+                    break;
+                case Sound.Step:
+                    // A soft scuff on stone.
+                    parts.Add(Noise(0, 0.06f, 1, 0.18f, attack: 0.003f, decay: 6, seed: 7));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.05f, 120, 80, 0.4f, decay: 6));
+                    level = 0.35f;
                     break;
             }
             return Mix(parts, level);

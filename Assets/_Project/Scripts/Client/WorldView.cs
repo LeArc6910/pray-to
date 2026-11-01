@@ -204,6 +204,9 @@ namespace Game.Client
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
         float _shake;
+        // How far the player has walked since their last footstep.
+        float _stride;
+        const float StepLength = 0.6f;
         // When the "곡괭이가 필요하다" reminder may show again.
         float _pickaxeHintAt;
         string _banner = "";
@@ -239,6 +242,7 @@ namespace Game.Client
             Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, selfTint, selfGlow, deltaTime,
                 weapon: _client.Equipment[ItemSlot.Weapon]?.Base);
             _self.Name = _client.Name;
+            Footsteps(_self.Position - _self.LastPosition);
             int selfBuffs = 0;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
             {
@@ -924,6 +928,18 @@ namespace Game.Client
                     caster.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     break;
             }
+        }
+
+        // A quiet step every StepLength the player walks. A jump of more than a tile in one frame is a snap or a
+        // recall, not a walk.
+        void Footsteps(Vector3 moved)
+        {
+            float distance = moved.magnitude;
+            if (distance > 1 || _client.IsDead) return;
+            _stride += distance;
+            if (_stride < StepLength) return;
+            _stride -= StepLength;
+            Sounds.Play(Sound.Step, 0.35f);
         }
 
         // A sound where something happened, quieter the farther it is from the player (Sounds).

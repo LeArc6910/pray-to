@@ -129,6 +129,7 @@ namespace Game.Client
             DevInfo.Frame(Time.unscaledDeltaTime);
             KeyBindings.Poll();
             Controls.UpdateTouches();
+            UpdateMusic(Time.unscaledDeltaTime);
             _camera.orthographicSize = ViewHalfHeight(Screen.width, Screen.height);
             if (_endReason != null)
             {
@@ -231,6 +232,36 @@ namespace Game.Client
             _biomeAnnounced = biome;
             _view?.ShowBanner(BiomeMap.Name(biome));
         }
+
+        // The boss tune while a boss is awake on screen, else the biome's; the menu has the cave's. Under it the cave's
+        // drips or the lava's bubbles, and the hum of the nearest running machine in view.
+        void UpdateMusic(float deltaTime)
+        {
+            if (_client == null || _client.Status != ClientStatus.Playing || _client.Map == null)
+            {
+                Music.Update(Tune.Cave, null, 0, deltaTime);
+                return;
+            }
+            // The biome the player has settled in (UpdateBiome), so walking along a border does not keep switching.
+            var biome = _biomeAnnounced;
+            var tune = _view?.ActiveBoss != null ? Tune.Boss : biome switch
+            {
+                Biome.Mushroom => Tune.Mushroom,
+                Biome.Ice => Tune.Ice,
+                Biome.Crystal => Tune.Crystal,
+                Biome.Lava => Tune.Lava,
+                _ => Tune.Cave,
+            };
+            float nearest = float.MaxValue;
+            foreach (var machine in _client.Machines())
+            {
+                if (machine.On) nearest = Mathf.Min(nearest, Vec2.Distance(_client.Position, TileMap.Center(machine.X, machine.Y)));
+            }
+            Music.Update(tune, biome == Biome.Lava ? Ambience.Lava : Ambience.Cave, 1 - nearest / MachineHearing, deltaTime);
+        }
+
+        // How far off a running machine can be heard.
+        const float MachineHearing = 7;
 
         // After the host gives the player classes or an order, the menu picks those classes next time, and the order
         // is kept on this device for them (PlayerPrefs "skillorder.<character>": the classes it is for, then the order).
@@ -708,10 +739,14 @@ namespace Game.Client
                 Sounds.Play(Sound.Click);
             }
             GUILayout.EndHorizontal();
-            // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
-            if (!Controls.UsingTouch && GUILayout.Button(_keysOpen ? "키 바꾸기 닫기" : "키 바꾸기")) _keysOpen = !_keysOpen;
+            GUILayout.BeginHorizontal();
+            // The menu plays the cave's tune, so the change is heard at once.
+            if (GUILayout.Button($"음악: {Settings.MusicVolumeText}")) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
             // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
             if (GUILayout.Button($"개발 정보: {(Settings.DevInfo ? "켜짐" : "꺼짐")}")) Settings.DevInfo = !Settings.DevInfo;
+            GUILayout.EndHorizontal();
+            // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
+            if (!Controls.UsingTouch && GUILayout.Button(_keysOpen ? "키 바꾸기 닫기" : "키 바꾸기")) _keysOpen = !_keysOpen;
             GUILayout.Space(8);
 
             GUI.enabled = ready;

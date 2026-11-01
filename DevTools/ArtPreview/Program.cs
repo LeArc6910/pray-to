@@ -49,7 +49,8 @@ namespace Game.Client
             Save(effects, Path.Combine(output, "effects.png"), 3);
             if (!effectsFine) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
-            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png, effects.png and sounds/ to {output}");
+            if (!WriteMusic(Path.Combine(output, "music"))) return 1;
+            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png, effects.png, sounds/ and music/ to {output}");
             return 0;
         }
 
@@ -68,6 +69,35 @@ namespace Game.Client
                     fine = false;
                 }
                 Wav.Save(samples, SoundArt.SampleRate, Path.Combine(folder, sound.ToString().ToLowerInvariant() + ".wav"));
+            }
+            return fine;
+        }
+
+        // Every tune and ambience loop to music/<name>.wav. Each must be a real loop (a few seconds at least), in
+        // range, and must run on from its end into its start without a jump.
+        static bool WriteMusic(string folder)
+        {
+            Directory.CreateDirectory(folder);
+            bool fine = true;
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            var loops = ((Tune[])Enum.GetValues(typeof(Tune))).Select(t => ("tune_" + t, MusicArt.Make(t)))
+                .Concat(((Ambience[])Enum.GetValues(typeof(Ambience))).Select(a => ("ambience_" + a, MusicArt.Make(a))))
+                .ToList();
+            Console.WriteLine($"{loops.Count} music and ambience loops in {clock.ElapsedMilliseconds} ms");
+            foreach (var (name, samples) in loops)
+            {
+                float seconds = samples.Length / (float)SoundArt.SampleRate;
+                float loudest = samples.Max(Math.Abs);
+                float seam = Math.Abs(samples[0] - samples[samples.Length - 1]);
+                // The largest step between neighbouring samples inside the loop; the seam may not jump much more.
+                float step = 0;
+                for (int i = 1; i < samples.Length; i++) step = Math.Max(step, Math.Abs(samples[i] - samples[i - 1]));
+                if (seconds < 1.5f || seconds > 40 || loudest < 0.05f || loudest > 1 || samples.Any(float.IsNaN) || seam > step * 1.5f + 0.01f)
+                {
+                    Console.Error.WriteLine($"{name}: {seconds:0.00}s, peak {loudest:0.00}, seam {seam:0.000} (largest step {step:0.000})");
+                    fine = false;
+                }
+                Wav.Save(samples, SoundArt.SampleRate, Path.Combine(folder, name.ToLowerInvariant() + ".wav"));
             }
             return fine;
         }

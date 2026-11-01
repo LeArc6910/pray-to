@@ -14,6 +14,8 @@ namespace Game.Client
         const string VolumeKey = "settings.volume";
         public const int MaxVolume = 4;
         static int? _volume;
+        const string MusicKey = "settings.music";
+        static int? _music;
         static readonly Choice DevInfoChoice = new Choice("settings.devinfo", false);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
@@ -38,6 +40,22 @@ namespace Game.Client
         }
 
         public static bool Sound => Volume > 0;
+
+        // How loud the background music is, in quarters like Volume. Half to begin with.
+        public static int MusicVolume
+        {
+            get => _music ??= Mathf.Clamp(PlayerPrefs.GetInt(MusicKey, MaxVolume / 2), 0, MaxVolume);
+            set
+            {
+                value = Mathf.Clamp(value, 0, MaxVolume);
+                if (_music == value) return;
+                _music = value;
+                PlayerPrefs.SetInt(MusicKey, value);
+                PlayerPrefs.Save();
+            }
+        }
+
+        public static string MusicVolumeText => MusicVolume == 0 ? "끔" : $"{MusicVolume * 100 / MaxVolume}%";
 
         // "끔", "25%" … "100%".
         public static string VolumeText => Volume == 0 ? "끔" : $"{Volume * 100 / MaxVolume}%";
