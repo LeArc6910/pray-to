@@ -16,7 +16,7 @@ namespace Game.Core.Tests
         public void TheDeepArenaLiesBeyondTheFirstAndCanBeReached(ulong seed)
         {
             var world = WorldGenerator.Generate(seed);
-            Assert.AreEqual(2, world.Arenas.Count);
+            Assert.AreEqual(3, world.Arenas.Count, "the first, the deep and the lava arena");
             Assert.AreEqual(world.Arena, world.Arenas[0]);
             var deep = world.Arenas[1];
 
@@ -49,9 +49,10 @@ namespace Game.Core.Tests
             var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
             var arenas = WorldGenerator.Generate(7).Arenas;
 
-            Assert.AreEqual(2, host.World.Bosses.Count);
+            Assert.AreEqual(3, host.World.Bosses.Count);
             Assert.AreEqual(arenas[0], host.World.Bosses.Single(b => b.Definition == Warden).Position);
             Assert.AreEqual(arenas[1], host.World.Bosses.Single(b => b.Definition == Queen).Position);
+            Assert.AreEqual(arenas[2], host.World.Bosses.Single(b => b.Definition.Id == "lava_titan").Position);
         }
 
         [Test]

@@ -88,7 +88,7 @@ namespace Game.Client
             foreach (var biome in ((Biome[])Enum.GetValues(typeof(Biome))).Where(b => b != Biome.Cave))
             {
                 var row = new List<PixelImage>();
-                foreach (var kind in new[] { GroundKind.Floor, GroundKind.Rock, GroundKind.CopperOre, GroundKind.IronOre, GroundKind.MithrilOre })
+                foreach (var kind in new[] { GroundKind.Floor, GroundKind.Rock, GroundKind.CopperOre, GroundKind.IronOre, GroundKind.MithrilOre, GroundKind.ObsidianOre, GroundKind.Lava })
                 {
                     for (int variant = 0; variant < 2; variant++)
                     {
@@ -128,6 +128,8 @@ namespace Game.Client
             creatures.Add(CreatureArt.Boss("cave_warden", BossColor, 1));
             creatures.Add(CreatureArt.Boss("crystal_queen", BossColor, 0));
             creatures.Add(CreatureArt.Boss("crystal_queen", BossColor, 1));
+            creatures.Add(CreatureArt.Boss("lava_titan", BossColor, 0));
+            creatures.Add(CreatureArt.Boss("lava_titan", BossColor, 1));
             rows.Add(creatures);
 
             rows.Add(new[]

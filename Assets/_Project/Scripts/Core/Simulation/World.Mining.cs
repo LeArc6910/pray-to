@@ -12,8 +12,9 @@ namespace Game.Core
         // How far ahead of the player's centre the tile to dig or build on is.
         const float DigReach = 0.9f;
         const float BuildReach = 1;
-        // A Dug event's Amount when the tile broke.
+        // A Dug event's Amount when the tile broke, and when the pickaxe in hand is not good enough.
         public const int DugThrough = 100;
+        public const int NeedsBetterPickaxe = -2;
 
         readonly Dictionary<int, float> _wallDamage = new Dictionary<int, float>();
         readonly Dictionary<int, TileType> _changedTiles = new Dictionary<int, TileType>();
@@ -40,7 +41,7 @@ namespace Game.Core
             var ahead = player.Position + player.Facing * DigReach;
             int x = TileMap.Cell(ahead.X);
             int y = TileMap.Cell(ahead.Y);
-            if (Map.IsEdge(x, y)) return null;
+            if (Map.IsEdge(x, y) || Map[x, y] == TileType.Lava) return null;
             var tile = Tiles.Find(Map[x, y]);
             if (tile == null) return null;
             return (x, y, tile);
@@ -51,6 +52,13 @@ namespace Game.Core
             var target = DigTarget(player);
             if (target == null) return;
             var (x, y, tile) = target.Value;
+            // Obsidian and the like need a better pickaxe: a Dug event with Amount -2 says so.
+            int held = HoldsPickaxe(player) ? player.Equipment[ItemSlot.Weapon].Base.Level : 0;
+            if (tile.Pickaxe > 0 && held < tile.Pickaxe)
+            {
+                _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: NeedsBetterPickaxe, position: TileMap.Center(x, y)));
+                return;
+            }
             // A chest with something in it stays put, so nothing is lost.
             var chest = ChestAt(x, y);
             if (chest != null && !IsEmpty(chest)) return;

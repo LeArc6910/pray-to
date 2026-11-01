@@ -181,12 +181,25 @@ namespace Game.Core
         // A chilled monster skips some ticks altogether, moving and winding up more slowly.
         bool SkipsTick(Enemy enemy) => enemy.Afflictions.Chilled && Tick % ChillCycle < ChillSkip;
 
-        // A monster whose attacks carry an element burns or chills the player it hits.
-        void AfflictPlayer(Player player, MonsterDefinition attacker, int sourceId, int dealt)
+        // A monster or boss whose attacks carry an element burns or chills the player it hits.
+        void AfflictPlayer(Player player, int sourceId, int dealt)
         {
-            if (attacker == null || player.IsDead || dealt <= 0) return;
-            if (attacker.Element == SkillTag.Fire) player.Afflictions.Burn(dealt * BurnShare, Ticks(BurnSeconds), sourceId);
-            if (attacker.Element == SkillTag.Cold) player.Afflictions.ChillTicks = Math.Max(player.Afflictions.ChillTicks, Ticks(PlayerChillSeconds));
+            var element = ElementOf(sourceId);
+            if (element == SkillTag.None || player.IsDead || dealt <= 0) return;
+            if (element == SkillTag.Fire) player.Afflictions.Burn(dealt * BurnShare, Ticks(BurnSeconds), sourceId);
+            if (element == SkillTag.Cold) player.Afflictions.ChillTicks = Math.Max(player.Afflictions.ChillTicks, Ticks(PlayerChillSeconds));
+        }
+
+        SkillTag ElementOf(int sourceId) =>
+            FindEnemy(sourceId)?.Definition.Element ?? _bosses.FirstOrDefault(b => b.Id == sourceId)?.Definition.Element ?? SkillTag.None;
+
+        // Standing in lava keeps a burn going: about LavaBurn a second while in it, and a little after.
+        const float LavaBurn = 8;
+
+        void BurnInLava(Player player)
+        {
+            if (player.IsDead || Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)] != TileType.Lava) return;
+            player.Afflictions.Burn(LavaBurn, TicksPerSecond, 0);
         }
     }
 }

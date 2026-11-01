@@ -761,7 +761,8 @@ namespace Game.Client
                 if (next >= 0)
                 {
                     var toArena = _client.Arenas[next] - _client.Position;
-                    lines.Add($"{(next == 0 ? "보스 아레나" : "깊은 아레나")}: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
+                    string arena = next == 0 ? "보스 아레나" : next == 1 ? "깊은 아레나" : "용암 아레나";
+                    lines.Add($"{arena}: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
                 }
                 if (_client.Food != null)
                 {

@@ -8,3 +8,5 @@ myconid,버섯 병정,2,55,12,5,1.8,0.4,8,0.5,0.6,1.4,70,22,7,8,glow_spore,35,me
 glow_bat,빛 박쥐,3,70,16,5,3.8,0.3,9,0.5,0.35,0.9,60,25,8,10,glow_spore,30,melee,,,,#5FE0C8,mushroom,,
 ice_slime,얼음 슬라임,2,70,12,10,1.8,0.42,8,0.5,0.6,1.2,70,22,7,8,ice_crystal,25,melee,,,,#8CC8F0,ice,cold:75|fire:-25,cold
 frost_wisp,서리 정령,3,60,17,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,ice_crystal,30,ranged,9,4.5,,#BFE8FF,ice,cold:75|fire:-25,cold
+magma_slime,용암 슬라임,3,95,18,15,2.0,0.42,8,0.5,0.55,1.1,60,25,8,10,obsidian_ore,30,melee,,,,#E0541E,lava,fire:75|cold:-25,fire
+fire_bat,불 박쥐,3,70,17,5,3.8,0.3,9,0.5,0.35,0.9,50,25,8,10,obsidian_ore,20,melee,,,,#FF8A3A,lava,fire:75,fire

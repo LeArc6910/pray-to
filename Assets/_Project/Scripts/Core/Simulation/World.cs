@@ -180,6 +180,7 @@ namespace Game.Core
             }
 
             Heal(player);
+            BurnInLava(player);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
             if (player.Attacking && player.AttackCooldown == 0) Attack(player);
         }
@@ -345,7 +346,7 @@ namespace Game.Core
                             _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
                             if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack)
                             {
-                                AfflictPlayer(target, definition, enemy.Id, HurtPlayer(target, enemy.Id, definition.Damage));
+                                AfflictPlayer(target, enemy.Id, HurtPlayer(target, enemy.Id, definition.Damage));
                             }
                             break;
                     }
@@ -404,7 +405,7 @@ namespace Game.Core
                 if (player.IsDead || enemy.ChargeHits.Contains(player.Id)) continue;
                 if (Vec2.Distance(player.Position, enemy.Position) > definition.Radius + PlayerRadius) continue;
                 enemy.ChargeHits.Add(player.Id);
-                AfflictPlayer(player, definition, enemy.Id, HurtPlayer(player, enemy.Id, definition.Damage));
+                AfflictPlayer(player, enemy.Id, HurtPlayer(player, enemy.Id, definition.Damage));
             }
             bool blocked = Vec2.Distance(before, enemy.Position) < step.Length * 0.3f;
             if (--enemy.StateTicks > 0 && !blocked) return;
@@ -489,6 +490,7 @@ namespace Game.Core
                 int y = _random.Next(Map.Height);
                 var position = TileMap.Center(x, y);
                 if (Map.IsSolid(x, y)
+                    || Map[x, y] == TileType.Lava
                     || Vec2.Distance(position, Spawn) < _config.SpawnDistance
                     || _players.Any(p => Vec2.Distance(p.Position, position) < _config.SpawnDistance))
                 {

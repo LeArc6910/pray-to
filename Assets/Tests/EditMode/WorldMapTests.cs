@@ -31,7 +31,8 @@ namespace Game.Core.Tests
             }
             Assert.IsFalse(Collision.Overlaps(map, world.Spawn, 2f), "the spawn needs room around it");
 
-            int floor = Tiles(map).Count(t => t == TileType.Floor);
+            // Everything that can be walked on: floor, and the lava fields' pools.
+            int floor = Tiles(map).Count(t => t == TileType.Floor || t == TileType.Lava);
             var field = new FlowField(map);
             field.Build(new[] { world.Spawn }, int.MaxValue - 1);
             int reached = Enumerable.Range(0, map.Height)

@@ -14,6 +14,8 @@ namespace Game.Client
         IronOre,
         Bedrock,
         MithrilOre,
+        ObsidianOre,
+        Lava,
     }
 
     // The cave tiles, 16 pixels a tile, seen from above and a little in front like Core Keeper: a wall shows its
@@ -26,7 +28,7 @@ namespace Game.Client
         public const int Size = 16;
         public const int Variants = 4;
         const int Masks = 16;
-        const int Kinds = 7;
+        const int Kinds = 9;
         // Every kind is drawn once for each biome, in that biome's colours (Docs/Biomes.md).
         public static readonly int Biomes = System.Enum.GetValues(typeof(Biome)).Length;
         // Neighbour bits: which sides are rock.
@@ -46,7 +48,8 @@ namespace Game.Client
         }
 
         public static bool IsRock(TileType type) =>
-            type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre;
+            type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre
+            || type == TileType.ObsidianOre;
 
         // Which ground tile goes at (x, y), in the colours of its biome. Outside the map reads as wall.
         public static int GroundAt(TileMap map, int x, int y, bool inArena, Biome biome = Biome.Cave)
@@ -61,8 +64,18 @@ namespace Game.Client
                 TileType.CopperOre => GroundKind.CopperOre,
                 TileType.IronOre => GroundKind.IronOre,
                 TileType.MithrilOre => GroundKind.MithrilOre,
+                TileType.ObsidianOre => GroundKind.ObsidianOre,
+                TileType.Lava => GroundKind.Lava,
                 _ => inArena ? GroundKind.Arena : GroundKind.Floor,
             };
+            // Lava's edges are where it meets anything that is not lava.
+            if (kind == GroundKind.Lava)
+            {
+                mask = (map[x, y + 1] != TileType.Lava ? Up : 0)
+                    | (map[x + 1, y] != TileType.Lava ? Right : 0)
+                    | (map[x, y - 1] != TileType.Lava ? Down : 0)
+                    | (map[x - 1, y] != TileType.Lava ? Left : 0);
+            }
             return Index(kind, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants), biome);
         }
 
@@ -84,8 +97,47 @@ namespace Game.Client
                 GroundKind.Bedrock => Rock(mask, variant, BedrockColors),
                 GroundKind.CopperOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#D6783F")),
                 GroundKind.MithrilOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#7CD2E2"), sparkle: true),
+                GroundKind.ObsidianOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#4A3268"), sparkle: true),
+                GroundKind.Lava => Lava(mask, variant),
                 _ => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#A9BDD6"), sparkle: true),
             };
+        }
+
+        // ---- Lava ----
+
+        static readonly Rgba LavaHot = Rgba.Hex("#FFD24A");
+        static readonly Rgba LavaMain = Rgba.Hex("#FF7A1E");
+        static readonly Rgba LavaDeep = Rgba.Hex("#D8401A");
+        static readonly Rgba LavaCrust = Rgba.Hex("#5A2416");
+        static readonly Rgba LavaCrustDark = Rgba.Hex("#2E120C");
+
+        // Molten rock: bright and wavy in the middle, cooling to a dark crust where it meets the ground.
+        static PixelImage Lava(int mask, int variant)
+        {
+            var image = new PixelImage(Size, Size);
+            int salt = 700 + variant;
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    float n = Smooth(x, y, 4, salt, 700);
+                    image[x, y] = n > 0.78f ? LavaHot : n > 0.42f ? LavaMain : n > 0.2f ? LavaDeep : LavaCrust;
+                }
+            }
+            for (int i = 0; i < Size; i++)
+            {
+                if ((mask & Up) != 0) Crust(image, i, 0, i, 1);
+                if ((mask & Down) != 0) Crust(image, i, Size - 1, i, Size - 2);
+                if ((mask & Left) != 0) Crust(image, 0, i, 1, i);
+                if ((mask & Right) != 0) Crust(image, Size - 1, i, Size - 2, i);
+            }
+            return image;
+        }
+
+        static void Crust(PixelImage image, int x, int y, int innerX, int innerY)
+        {
+            image[x, y] = LavaCrustDark;
+            image[innerX, innerY] = LavaCrust;
         }
 
         // ---- Biomes ----

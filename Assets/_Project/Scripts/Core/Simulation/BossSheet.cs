@@ -134,8 +134,10 @@ namespace Game.Core
             int runeCount,
             int potionCount,
             string materialId,
-            int materialCount)
+            int materialCount,
+            SkillTag element = SkillTag.None)
         {
+            Element = element;
             Id = id;
             Name = name;
             Health = health;
@@ -182,6 +184,8 @@ namespace Game.Core
         // A material from materials.csv, and how many for each player in the fight.
         public string MaterialId { get; }
         public int MaterialCount { get; }
+        // The element of every attack (bosses.csv element): fire burns whoever it hits, cold slows them.
+        public SkillTag Element { get; }
         public IReadOnlyList<BossAttack> Attacks => _attacks;
 
         internal void Add(BossAttack attack) => _attacks.Add(attack);
@@ -268,7 +272,8 @@ namespace Game.Core
                         Whole(row, "rune_count"),
                         Whole(row, "potion_count"),
                         row["material"],
-                        Whole(row, "material_count")));
+                        Whole(row, "material_count"),
+                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])));
                 });
             }
             return bosses;
@@ -391,5 +396,13 @@ namespace Game.Core
 
         static float Positive(float value, string label) =>
             value > 0 ? value : throw new FormatException($"{label}는 0보다 커야 합니다.");
+
+        static SkillTag BossElement(string cell)
+        {
+            var tag = SheetValues.ParseEnum<SkillTag>(cell, "element");
+            return tag == SkillTag.Fire || tag == SkillTag.Cold || tag == SkillTag.Lightning
+                ? tag
+                : throw new FormatException($"element '{cell}'는 fire, cold, lightning 중 하나입니다.");
+        }
     }
 }

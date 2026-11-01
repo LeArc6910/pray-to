@@ -27,6 +27,13 @@ mithril_staff,mithril_staff,1,mithril_bar:4|queen_heart:1,Workbench
 mithril_helmet,mithril_helmet,1,mithril_bar:3|queen_heart:1,Workbench
 mithril_armor,mithril_armor,1,mithril_bar:5|queen_heart:1,Workbench
 mithril_boots,mithril_boots,1,mithril_bar:3|queen_heart:1,Workbench
+obsidian_bar,obsidian_bar,1,obsidian_ore:2,Furnace
+obsidian_sword,obsidian_sword,1,obsidian_bar:4|titan_heart:1,Workbench
+obsidian_bow,obsidian_bow,1,obsidian_bar:4|titan_heart:1,Workbench
+obsidian_staff,obsidian_staff,1,obsidian_bar:4|titan_heart:1,Workbench
+obsidian_helmet,obsidian_helmet,1,obsidian_bar:3|titan_heart:1,Workbench
+obsidian_armor,obsidian_armor,1,obsidian_bar:5|titan_heart:1,Workbench
+obsidian_boots,obsidian_boots,1,obsidian_bar:3|titan_heart:1,Workbench
 drill,drill,1,iron_bar:4|copper_ore:6,Workbench
 smelter,smelter,1,iron_bar:3|stone:12,Workbench
 conveyor,conveyor,4,iron_bar:1|stone:2,Workbench

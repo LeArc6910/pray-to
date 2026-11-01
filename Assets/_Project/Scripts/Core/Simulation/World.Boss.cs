@@ -248,7 +248,7 @@ namespace Game.Core
                 if (player.IsDead || boss.ChargeHits.Contains(player.Id)) continue;
                 if (Vec2.Distance(player.Position, boss.Position) > boss.Definition.Radius + PlayerRadius) continue;
                 boss.ChargeHits.Add(player.Id);
-                HurtPlayer(player, boss.Id, attack.Damage, Cause(boss, attack));
+                AfflictPlayer(player, boss.Id, HurtPlayer(player, boss.Id, attack.Damage, Cause(boss, attack)));
             }
 
             bool blocked = Vec2.Distance(before, boss.Position) < step.Length * 0.3f;
@@ -353,7 +353,10 @@ namespace Game.Core
                 if (hazard.Damage <= 0) continue;
                 foreach (var player in _players)
                 {
-                    if (!player.IsDead && hazard.Contains(player.Position, PlayerRadius)) HurtPlayer(player, hazard.Source, hazard.Damage, hazard.Cause);
+                    if (!player.IsDead && hazard.Contains(player.Position, PlayerRadius))
+                    {
+                        AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, hazard.Damage, hazard.Cause));
+                    }
                 }
                 _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size)));
             }
@@ -380,8 +383,7 @@ namespace Game.Core
         {
             var victim = _players.FirstOrDefault(p => !p.IsDead && Vec2.Distance(p.Position, projectile.Position) <= projectile.Radius + PlayerRadius);
             if (victim == null) return false;
-            int dealt = HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause);
-            AfflictPlayer(victim, FindEnemy(projectile.Source)?.Definition, projectile.Source, dealt);
+            AfflictPlayer(victim, projectile.Source, HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause));
             return true;
         }
     }

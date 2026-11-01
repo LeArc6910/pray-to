@@ -26,6 +26,10 @@ namespace Game.Core
         Arm,
         // A lamp of glowing spores from the mushroom forest (tiles.csv light).
         Lamp,
+        // The lava fields (Docs/Biomes.md): obsidian veins, which only a mithril pickaxe or better digs, and pools of
+        // lava, walked over like floor but burning whoever stands in them. Lava cannot be dug or built on.
+        ObsidianOre,
+        Lava,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -76,7 +80,7 @@ namespace Game.Core
         public bool IsSolid(int x, int y)
         {
             var type = this[x, y];
-            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter;
+            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter && type != TileType.Lava;
         }
 
         // Whether a tile of this type has its centre within reach of the position.

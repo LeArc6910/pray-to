@@ -1,3 +1,4 @@
-id,name,health,health_per_player,armor,speed,radius,phases,roar,roar_radius,roar_damage,drop_count,drop_level,drop_rarity,rune_count,potion_count,material,material_count
-cave_warden,동굴 수호자,650,60,0,2.2,1.2,66|33,1.5,3.5,15,2,10,rare,1,2,warden_core,1
-crystal_queen,수정 거미 여왕,1300,130,20,2.8,1.3,66|33,1.5,4,22,3,20,rare,2,3,queen_heart,1
+id,name,health,health_per_player,armor,speed,radius,phases,roar,roar_radius,roar_damage,drop_count,drop_level,drop_rarity,rune_count,potion_count,material,material_count,element
+cave_warden,동굴 수호자,650,60,0,2.2,1.2,66|33,1.5,3.5,15,2,10,rare,1,2,warden_core,1,
+crystal_queen,수정 거미 여왕,1300,130,20,2.8,1.3,66|33,1.5,4,22,3,20,rare,2,3,queen_heart,1,
+lava_titan,용암 거인,2400,240,30,2.4,1.4,66|33,1.5,4.5,28,3,30,rare,2,3,titan_heart,1,fire

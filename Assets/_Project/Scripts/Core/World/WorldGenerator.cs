@@ -6,7 +6,7 @@ namespace Game.Core
     public sealed class GeneratedWorld
     {
         public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius, int deepArenaX, int deepArenaY,
-            BiomeMap biomes = null)
+            BiomeMap biomes = null, (int X, int Y)? lavaArena = null)
         {
             Biomes = biomes ?? BiomeMap.Plain(map.Width, map.Height);
             Map = map;
@@ -15,7 +15,9 @@ namespace Game.Core
             ArenaX = arenaX;
             ArenaY = arenaY;
             ArenaRadius = arenaRadius;
-            Arenas = new[] { TileMap.Center(arenaX, arenaY), TileMap.Center(deepArenaX, deepArenaY) };
+            var arenas = new List<Vec2> { TileMap.Center(arenaX, arenaY), TileMap.Center(deepArenaX, deepArenaY) };
+            if (lavaArena is (int lx, int ly)) arenas.Add(TileMap.Center(lx, ly));
+            Arenas = arenas;
         }
 
         public TileMap Map { get; }
@@ -28,7 +30,8 @@ namespace Game.Core
         public int ArenaRadius { get; }
         public Vec2 Arena => TileMap.Center(ArenaX, ArenaY);
         // Every boss arena in the order the bosses go in (bosses.csv): the first one's, then the deep one far out,
-        // reached by a tunnel from the first. All have ArenaRadius.
+        // reached by a tunnel from the first, then the lava one in the opposite corner, reached from the spawn. All
+        // have ArenaRadius.
         public IReadOnlyList<Vec2> Arenas { get; }
         // Which kind of cave each tile is in (Docs/Biomes.md).
         public BiomeMap Biomes { get; }
@@ -66,6 +69,13 @@ namespace Game.Core
         const int DeepArenaOffset = 50;
         // Biomes came later still, from their own stream; they only say which kind of cave a tile is in.
         const ulong BiomeStream = 7;
+        // The lava fields (Docs/Biomes.md) were carved last of all, on their own stream: the third arena in the corner
+        // opposite the deep one with a tunnel from the spawn, obsidian veins and pools of lava.
+        const ulong LavaStream = 8;
+        const int ObsidianDistance = 55;
+        const int ObsidianVeins = 26;
+        const int LavaPoolDistance = 45;
+        const int LavaPools = 30;
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -115,7 +125,24 @@ namespace Game.Core
             PlaceVeins(map, new GameRandom(seed, MithrilStream), TileType.MithrilOre, MithrilVeins, spawnX, spawnY, MithrilDistance);
             bool mushroomFirst = new GameRandom(seed, BiomeStream).Next(2) == 0;
             var biomes = BiomeMap.Make(seed, width, height, spawnX, spawnY, (cornerX, cornerY), mushroomFirst);
-            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes);
+
+            var lava = new GameRandom(seed, LavaStream);
+            int lavaX = Clamp(spawnX - cornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
+            int lavaY = Clamp(spawnY - cornerY * DeepArenaOffset, ArenaRadius + 2, height - ArenaRadius - 3);
+            CarveTunnel(map, spawnX, spawnY, lavaX, lavaY);
+            ClearDisc(map, lavaX, lavaY, ArenaRadius);
+            bool InLava(int x, int y, int distance)
+            {
+                int dx = x - spawnX;
+                int dy = y - spawnY;
+                return biomes[x, y] == Biome.Lava && dx * dx + dy * dy >= distance * distance;
+            }
+            bool NearArena(int x, int y) =>
+                new[] { (arenaX, arenaY), (deepX, deepY), (lavaX, lavaY) }
+                    .Any(a => (x - a.Item1) * (x - a.Item1) + (y - a.Item2) * (y - a.Item2) <= (ArenaRadius + 2) * (ArenaRadius + 2));
+            PlaceVeins(map, lava, TileType.ObsidianOre, ObsidianVeins, (x, y) => map[x, y] == TileType.Wall && InLava(x, y, ObsidianDistance));
+            PlaceLava(map, lava, (x, y) => map[x, y] == TileType.Floor && InLava(x, y, LavaPoolDistance) && !NearArena(x, y));
+            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY));
         }
 
         static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;
@@ -139,6 +166,52 @@ namespace Game.Core
                         {
                             if (IsInside(map, vx, vy) && map[vx, vy] == TileType.Wall && (vx == x && vy == y || random.Next(100) < VeinPercent))
                                 map[vx, vy] = ore;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Ore veins only where the test allows: a centre tile that passes it, and walls around it that pass it.
+        static void PlaceVeins(TileMap map, GameRandom random, TileType ore, int veins, System.Func<int, int, bool> allowed)
+        {
+            for (int vein = 0; vein < veins; vein++)
+            {
+                for (int attempt = 0; attempt < 80; attempt++)
+                {
+                    int x = 1 + random.Next(map.Width - 2);
+                    int y = 1 + random.Next(map.Height - 2);
+                    if (!allowed(x, y)) continue;
+                    for (int vy = y - 1; vy <= y + 1; vy++)
+                    {
+                        for (int vx = x - 1; vx <= x + 1; vx++)
+                        {
+                            if (IsInside(map, vx, vy) && allowed(vx, vy) && (vx == x && vy == y || random.Next(100) < VeinPercent)) map[vx, vy] = ore;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
+        // Pools of lava on open floor: a centre and some of the floor around it, two rings out.
+        static void PlaceLava(TileMap map, GameRandom random, System.Func<int, int, bool> allowed)
+        {
+            for (int pool = 0; pool < LavaPools; pool++)
+            {
+                for (int attempt = 0; attempt < 80; attempt++)
+                {
+                    int x = 2 + random.Next(map.Width - 4);
+                    int y = 2 + random.Next(map.Height - 4);
+                    if (!allowed(x, y)) continue;
+                    for (int vy = y - 2; vy <= y + 2; vy++)
+                    {
+                        for (int vx = x - 2; vx <= x + 2; vx++)
+                        {
+                            int ring = System.Math.Max(System.Math.Abs(vx - x), System.Math.Abs(vy - y));
+                            int odds = ring == 0 ? 100 : ring == 1 ? 60 : 25;
+                            if (IsInside(map, vx, vy) && allowed(vx, vy) && random.Next(100) < odds) map[vx, vy] = TileType.Lava;
                         }
                     }
                     break;

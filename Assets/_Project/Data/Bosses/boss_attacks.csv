@@ -14,3 +14,11 @@ crystal_queen,pounce,덮치기,2|3,charge,farthest,0.9,32,,12,,2.4,,,18,1.1,20,
 crystal_queen,web_quake,거미줄 진동,2|3,circle,each,1.0,24,2.0,,,,1,,,1.0,20,
 crystal_queen,shard_storm,수정 폭풍,3,burst,self,0.6,14,0.3,,,,20,,8,0.9,15,
 crystal_queen,call_bats,박쥐 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,crystal_bat
+lava_titan,slam,내려찍기,,circle,nearest,1.0,32,2.2,,,,1,,,0.9,30,
+lava_titan,fire_wave,불꽃 휩쓸기,,cone,nearest,0.9,26,,3.8,110,,,,,0.8,25,
+lava_titan,meteor,유성 낙하,,circle,random,1.3,28,1.6,,,,5,5,,1.0,25,
+lava_titan,magma_ring,용암 고리,1|2,burst,self,0.6,15,0.3,,,,14,,8,0.9,20,
+lava_titan,charge,돌진,2|3,charge,farthest,1.1,34,,12,,2.6,,,16,1.2,20,
+lava_titan,eruption,분화,2|3,circle,each,1.1,28,2.2,,,,1,,,1.0,20,
+lava_titan,magma_storm,용암 폭풍,3,burst,self,0.6,15,0.3,,,,22,,8,0.9,15,
+lava_titan,call_slimes,용암 슬라임 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,magma_slime

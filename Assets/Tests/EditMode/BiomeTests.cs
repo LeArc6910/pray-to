@@ -59,21 +59,28 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void TheCavesThemselvesDidNotChange()
+        public void OnlyTheLavaFieldsChangedTheCaves()
         {
-            // Biomes only say what kind of cave a tile is in; the tiles of a seed are what they were before them.
-            var map = WorldGenerator.Generate(7).Map;
+            // Biomes only say what kind of cave a tile is in. The lava fields carved their arena, a tunnel from the
+            // spawn and pools of lava, all in the plain cave and the lava fields; the other three biomes' caves are
+            // what they were before.
+            var world = WorldGenerator.Generate(7);
             int floors = 0;
-            for (int y = 0; y < map.Height; y++)
+            for (int y = 0; y < world.Map.Height; y++)
             {
-                for (int x = 0; x < map.Width; x++) floors += map[x, y] == TileType.Floor ? 1 : 0;
+                for (int x = 0; x < world.Map.Width; x++)
+                {
+                    var biome = world.Biomes[x, y];
+                    bool elsewhere = biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Crystal;
+                    if (elsewhere && world.Map[x, y] == TileType.Floor) floors++;
+                }
             }
-            Assert.AreEqual(FloorsOfSeedSeven, floors);
+            Assert.AreEqual(FloorsElsewhereOfSeedSeven, floors);
         }
 
-        // The floor tiles of seed 7 before biomes (and every addition since, which all kept the caves), so a change
-        // to the caves shows up here.
-        const int FloorsOfSeedSeven = 10929;
+        // Floor tiles of seed 7 in the mushroom forest, ice caves and crystal caverns before the lava fields, counted
+        // with the code of that time, so a change to those caves shows up here.
+        const int FloorsElsewhereOfSeedSeven = 6073;
 
         [Test]
         public void BiomeMonstersOnlyLiveInTheirBiome()
@@ -85,7 +92,7 @@ namespace Game.Core.Tests
             var placed = world.Enemies.Where(e => e.Definition.Biome != null).ToList();
             Assert.IsNotEmpty(placed);
             Assert.IsTrue(placed.All(e => biomes.At(e.Position) == e.Definition.Biome), "each in its own biome");
-            foreach (string id in new[] { "myconid", "glow_bat", "ice_slime", "frost_wisp", "crystal_bat", "crystal_wisp" })
+            foreach (string id in new[] { "myconid", "glow_bat", "ice_slime", "frost_wisp", "crystal_bat", "crystal_wisp", "magma_slime", "fire_bat" })
             {
                 Assert.IsTrue(world.Enemies.Any(e => e.Definition.Id == id), id);
             }

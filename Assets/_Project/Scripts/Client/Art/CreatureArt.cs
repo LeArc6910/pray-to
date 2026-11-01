@@ -391,6 +391,7 @@ namespace Game.Client
                 "myconid" => Mushroom,
                 "crystal_bat" => Bat,
                 "glow_bat" => Bat,
+                "fire_bat" => Bat,
                 "crystal_wisp" => Wisp,
                 "frost_wisp" => Wisp,
                 "cave_beetle" => Beetle,
@@ -403,9 +404,15 @@ namespace Game.Client
 
         // The cave warden, a golem of stacked stone blocks with a glowing core. Drawn from blocks rather than a
         // grid because it is big; the second frame breathes, raising the upper body a pixel.
-        public static PixelImage Boss(string id, Rgba color, int frame) => id == "crystal_queen" ? Queen(frame) : Warden(color, frame);
+        public static PixelImage Boss(string id, Rgba color, int frame) => id switch
+        {
+            "crystal_queen" => Queen(frame),
+            // The lava titan: the warden's build in black basalt, its seams and core burning.
+            "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, molten: true),
+            _ => Warden(color, frame),
+        };
 
-        static PixelImage Warden(Rgba color, int frame)
+        static PixelImage Warden(Rgba color, int frame, bool molten = false)
         {
             const int width = 36;
             const int height = 34;
@@ -452,9 +459,18 @@ namespace Game.Client
             // Cracks and moss.
             Line(image, 8, 14 + bob, new[] { (1, 1), (1, 0), (1, 1), (0, 1), (1, 1) }, stone.Dark);
             Line(image, 26, 20 + bob, new[] { (-1, 1), (0, 1), (-1, 1), (-1, 0) }, stone.Dark);
+            if (molten) moss = Rgba.Hex("#FF7A1E");
             foreach (var (x, y) in new[] { (2, 8), (3, 8), (4, 8), (3, 9), (29, 8), (30, 8), (13, 2), (14, 2), (15, 2), (14, 3), (22, 11), (23, 11) })
             {
                 image[x, y + bob] = moss;
+            }
+            if (molten)
+            {
+                // Glowing seams down the body and arms.
+                Line(image, 10, 12 + bob, new[] { (1, 1), (0, 1), (1, 1), (1, 0), (0, 1) }, Rgba.Hex("#FFB040"));
+                Line(image, 24, 12 + bob, new[] { (1, 1), (0, 1), (-1, 1), (0, 1), (1, 1) }, Rgba.Hex("#FFB040"));
+                Line(image, 3, 18 + bob, new[] { (1, 1), (0, 1), (1, 1) }, Rgba.Hex("#FF7A1E"));
+                Line(image, 31, 18 + bob, new[] { (-1, 1), (0, 1), (-1, 1) }, Rgba.Hex("#FF7A1E"));
             }
             return image.Outlined(stone.Outline);
         }

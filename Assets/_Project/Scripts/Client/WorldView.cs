@@ -766,12 +766,13 @@ namespace Game.Client
                     var struck = new Vector3(e.Position.X, e.Position.Y, 0);
                     if (e.Amount < 0)
                     {
-                        // Rock struck without a pickaxe: a dull knock, and every few seconds the reminder.
+                        // Rock struck without a (good enough) pickaxe: a dull knock, and every few seconds the reminder.
                         if (e.Source != _client.PlayerId) break;
                         Hear(Sound.Hit, struck, 0.35f);
                         if (Time.time < _pickaxeHintAt) break;
                         _pickaxeHintAt = Time.time + 2.5f;
-                        _floating.Add(new Floating { Position = struck, Text = "곡괭이가 필요하다", Color = new Color(1f, 0.85f, 0.5f) });
+                        string hint = e.Amount == World.NeedsBetterPickaxe ? "더 좋은 곡괭이가 필요하다(미스릴 이상)" : "곡괭이가 필요하다";
+                        _floating.Add(new Floating { Position = struck, Text = hint, Color = new Color(1f, 0.85f, 0.5f) });
                         break;
                     }
                     bool broke = e.Amount >= World.DugThrough;

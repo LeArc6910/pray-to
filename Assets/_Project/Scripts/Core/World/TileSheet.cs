@@ -9,8 +9,9 @@ namespace Game.Core
     {
         internal TileDefinition(
             TileType tile, string name, int hardness, MaterialDefinition material, int count, MaterialDefinition extra, float extraChance, bool drillable,
-            float light = 0, string lightColor = "")
+            float light = 0, string lightColor = "", int pickaxe = 0)
         {
+            Pickaxe = pickaxe;
             Drillable = drillable;
             Light = light;
             LightColor = lightColor;
@@ -34,6 +35,8 @@ namespace Game.Core
         public float ExtraChance { get; }
         // An ore vein a drill can pull Material from without using it up.
         public bool Drillable { get; }
+        // The item level a pickaxe needs to dig it (tiles.csv pickaxe), 0 for any pickaxe.
+        public int Pickaxe { get; }
         // How far it lights the dark caves around it, in tiles; 0 for none. Only the view uses it.
         public float Light { get; }
         // #RRGGBB, or empty for the warm light of a flame.
@@ -168,7 +171,8 @@ namespace Game.Core
                     if (light < 0 || light > MaxLight) throw new FormatException($"light는 0~{MaxLight} 사이의 타일 수입니다.");
                     string lightColor = row["light_color"];
                     if (lightColor.Length > 0 && !SheetValues.IsColor(lightColor)) throw new FormatException($"light_color '{lightColor}'는 #RRGGBB로 적습니다.");
-                    tiles.Add(new TileDefinition(tile, name, hardness, material, count, extra, extraChance, drillable, light, lightColor));
+                    int pickaxe = row["pickaxe"].Length > 0 ? SheetValues.ParseNumber(row["pickaxe"], "pickaxe") : 0;
+                    tiles.Add(new TileDefinition(tile, name, hardness, material, count, extra, extraChance, drillable, light, lightColor, pickaxe));
                 }
                 catch (FormatException e)
                 {
