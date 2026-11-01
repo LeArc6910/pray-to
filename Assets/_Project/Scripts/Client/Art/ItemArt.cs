@@ -470,6 +470,16 @@ namespace Game.Client
                 placed = placed.Copy();
                 placed.Draw(RobotArm, 0, 0);
             }
+            else if (placed != null && material.Places == TileType.Sprinkler)
+            {
+                placed = placed.Copy();
+                placed.Draw(SprinklerHead, 0, 0);
+            }
+            else if (placed != null && material.Places == TileType.Harvester)
+            {
+                placed = placed.Copy();
+                placed.Draw(HarvesterReel, 0, 0);
+            }
             if (placed != null) return placed;
             switch (material.Id)
             {
@@ -758,6 +768,51 @@ namespace Game.Client
             image[13, 10] = SteelDark;
             image[12, 6] = Steel;
             image[12, 10] = Steel;
+            return image.Outlined(Outline);
+        }
+
+        // A sprinkler's head: four arms from a hub in the middle of the tile, a nozzle at each end. The view spins it
+        // while the sprinkler runs.
+        public static readonly PixelImage SprinklerHead = MakeSprinklerHead();
+
+        static PixelImage MakeSprinklerHead()
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            var hub = Rgba.Hex("#F2C440");
+            var nozzle = Rgba.Hex("#8CC4F4");
+            for (int i = 2; i < 6; i++)
+            {
+                image[7 + i, 8] = Steel;
+                image[8 - i, 7] = Steel;
+                image[8, 8 - i] = Steel;
+                image[7, 7 + i] = Steel;
+            }
+            image[13, 8] = image[13, 9] = nozzle;
+            image[2, 7] = image[2, 6] = nozzle;
+            image[8, 2] = image[7, 2] = nozzle;
+            image[7, 13] = image[8, 13] = nozzle;
+            for (int y = 6; y < 10; y++)
+            {
+                for (int x = 6; x < 10; x++) image[x, y] = (x == 6 || y == 9) ? SteelLight : (x == 9 || y == 6) ? SteelDark : hub;
+            }
+            return image.Outlined(Outline);
+        }
+
+        // A harvester's reel: a toothed bar across the +x edge of the tile, on an axle from the middle. The view
+        // turns it to face the field.
+        public static readonly PixelImage HarvesterReel = MakeHarvesterReel();
+
+        static PixelImage MakeHarvesterReel()
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            for (int x = 8; x < 12; x++) image[x, 8] = SteelDark;
+            for (int y = 3; y < 13; y++)
+            {
+                image[12, y] = SteelDark;
+                image[13, y] = Steel;
+                if (y % 2 == 1) image[14, y] = SteelLight;
+            }
+            image[12, 8] = Rgba.Hex("#F2C440");
             return image.Outlined(Outline);
         }
 

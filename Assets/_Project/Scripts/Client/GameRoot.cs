@@ -293,11 +293,37 @@ namespace Game.Client
             var slots = Controls.TakeSkillPresses();
             bool potion = Controls.TakePotionPress();
             var quick = Controls.TakeHotbarPresses();
+            bool machine = Controls.MachinePressed();
             if (_inventory.Open || (_map != null && _map.FullOpen)) return;
             var aim = Controls.SkillAim(_camera, _client.Position);
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
             foreach (int slot in quick) UseQuickSlot(slot);
+            if (machine) ToggleMachine();
+        }
+
+        // Switches the machine ahead off or on: the key, or the button over it. False when there is none.
+        internal bool ToggleMachine()
+        {
+            if (_client?.MachineAhead() == null) return false;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.ToggleMachineCommand());
+            return true;
+        }
+
+        // A button over the machine ahead that switches it off or on, for a finger or the mouse. The key does the
+        // same; on a keyboard the button shows which key.
+        void DrawMachineSwitch()
+        {
+            if (_client.MachineAhead() is not MachineView machine) return;
+            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(machine.X + 0.5f, machine.Y + 1.35f, 0));
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            string text = machine.On ? "끄기" : "켜기";
+            if (!Controls.UsingTouch) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
+            var rect = new Rect(point.x - 40, point.y - 13, 80, 26);
+            Controls.Block(rect);
+            if (GUI.Button(rect, text)) ToggleMachine();
         }
 
         // Does what the quick slot holds: puts on the gear, uses the potion or food, places, plants or waters.
@@ -579,6 +605,7 @@ namespace Game.Client
             // one, and a slot would show in the gap beside the window.
             if (_client.Status == ClientStatus.Playing && !_inventory.Open)
             {
+                DrawMachineSwitch();
                 SkillBar.Draw(_client);
                 _hotbar?.Draw(_client.Skills.Count);
             }

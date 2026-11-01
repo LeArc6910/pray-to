@@ -92,6 +92,7 @@ namespace Game.Client
         Hotbar4,
         Hotbar5,
         Hotbar6,
+        Machine,
     }
 
     // Which key does what, changed in the menu and kept on this device (PlayerPrefs, by key name). Every action has
@@ -101,7 +102,7 @@ namespace Game.Client
         public static readonly KeyAction[] Actions = (KeyAction[])Enum.GetValues(typeof(KeyAction));
         static readonly Key[] Defaults =
         {
-            Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M, Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6,
+            Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M, Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.G,
         };
         static readonly Key[] Fixed =
         {
@@ -140,6 +141,7 @@ namespace Game.Client
             KeyAction.Potion => "물약",
             KeyAction.Bag => "가방",
             KeyAction.Map => "지도",
+            KeyAction.Machine => "기계 켜기/끄기",
             _ => $"퀵슬롯 {action - KeyAction.Hotbar1 + 1}",
         };
 

@@ -4,9 +4,9 @@ using System.Linq;
 
 namespace Game.Core
 {
-    // A placed machine: which way it faces, and what it holds. A drill and a smelter keep what they made until it
-    // can go out; a smelter also keeps what came in; a conveyor, a splitter and a robot arm carry one material along.
-    // See Docs/Automation.md.
+    // A placed machine: which way it faces, whether it is running, and what it holds. A drill, a smelter and a
+    // harvester keep what they made until it can go out; a smelter also keeps what came in; a conveyor, a splitter
+    // and a robot arm carry one material along. See Docs/Automation.md.
     public sealed class Machine
     {
         internal Machine(MachineDefinition definition, int x, int y, int direction)
@@ -23,6 +23,9 @@ namespace Game.Core
         public int Y { get; }
         // 0 right, 1 up, 2 left, 3 down: the way it faced when placed.
         public int Direction { get; internal set; }
+        // A machine switched off does nothing by itself, but keeps what it holds, and others still put things in and
+        // take them out.
+        public bool Enabled { get; internal set; } = true;
         // A conveyor's, splitter's or arm's load and how far along the tile it has come (or the arm has swung), 0 to 1.
         public MaterialDefinition Carried { get; internal set; }
         public float Progress { get; internal set; }
@@ -41,15 +44,21 @@ namespace Game.Core
 
         public static readonly (int X, int Y)[] Steps = { (1, 0), (0, 1), (-1, 0), (0, -1) };
 
+        // Set on the direction byte, in a world save and on the wire, for a machine that is switched off.
+        public const int OffBit = 0x80;
+
         // The nearest of the four directions to a facing.
         public static int DirectionOf(Vec2 facing) =>
             Math.Abs(facing.X) >= Math.Abs(facing.Y) ? (facing.X >= 0 ? 0 : 2) : (facing.Y >= 0 ? 1 : 3);
     }
 
-    // Drills, conveyors, smelters, splitters and robot arms, stepped every tick in tile order so the result never
-    // depends on anything else.
+    // Drills, conveyors, smelters, splitters, robot arms, sprinklers and harvesters, stepped every tick in tile order
+    // so the result never depends on anything else.
     public sealed partial class World
     {
+        // How far a sprinkler waters: the crops in the square this many tiles around it.
+        public const int SprinklerReach = 2;
+
         readonly SortedDictionary<int, Machine> _machines = new SortedDictionary<int, Machine>();
         List<Recipe> _smelts;
 
@@ -80,6 +89,7 @@ namespace Game.Core
         {
             foreach (var machine in _machines.Values)
             {
+                if (!machine.Enabled) continue;
                 switch (machine.Kind)
                 {
                     case TileType.Drill:
@@ -96,6 +106,12 @@ namespace Game.Core
                         break;
                     case TileType.Arm:
                         RunArm(machine);
+                        break;
+                    case TileType.Sprinkler:
+                        RunSprinkler(machine);
+                        break;
+                    case TileType.Harvester:
+                        RunHarvester(machine);
                         break;
                 }
             }
@@ -127,8 +143,8 @@ namespace Game.Core
         static readonly int[] SplitterTurns = { 0, 1, 3 };
 
         // A robot arm picks one material up from the tile behind it, one that the tile ahead will take, swings it over
-        // and puts it down there. It takes from a chest (the first material in sheet order that fits), a drill's or
-        // smelter's output, a splitter, or the end of a conveyor that faces it.
+        // and puts it down there. It takes from a chest (the first material in sheet order that fits), a drill's,
+        // smelter's or harvester's output, a splitter, or the end of a conveyor that faces it.
         void RunArm(Machine arm)
         {
             var (fx, fy) = arm.Front;
@@ -156,6 +172,7 @@ namespace Game.Core
                 {
                     case TileType.Drill:
                     case TileType.Smelter:
+                    case TileType.Harvester:
                         var made = source.Output.Keys.FirstOrDefault(Fits);
                         if (made != null) Add(source.Output, made, -1);
                         return made;
@@ -210,6 +227,87 @@ namespace Game.Core
                 Add(smelter.Output, recipe.Material, recipe.Count);
             }
             SendOut(smelter, smelter.Front);
+        }
+
+        // Every so often waters the crops around it that still take water (World.WaterCrop).
+        void RunSprinkler(Machine sprinkler)
+        {
+            if (++sprinkler.Timer < sprinkler.Definition.Ticks) return;
+            sprinkler.Timer = 0;
+            int watered = 0;
+            for (int y = sprinkler.Y - SprinklerReach; y <= sprinkler.Y + SprinklerReach; y++)
+            {
+                for (int x = sprinkler.X - SprinklerReach; x <= sprinkler.X + SprinklerReach; x++)
+                {
+                    if (WaterCrop(x, y)) watered++;
+                }
+            }
+            // From no one: the view splashes the whole square.
+            if (watered > 0) _events.Add(new SimEvent(SimEventType.Watered, 0, amount: watered, position: TileMap.Center(sprinkler.X, sprinkler.Y)));
+        }
+
+        // Every so often reaps one ripe crop in the three rows of three tiles ahead of it (nearest row first), plants
+        // it again from one of the seeds, and keeps the harvest and the other seeds; it sends one out of the back each
+        // tick it can, like a drill. It waits while what a crop gives would not fit, and passes over crops that give
+        // food rather than a material.
+        void RunHarvester(Machine harvester)
+        {
+            if (++harvester.Timer >= harvester.Definition.Ticks)
+            {
+                harvester.Timer = 0;
+                var crop = HarvesterTiles(harvester).Select(t => CropAt(t.X, t.Y)).FirstOrDefault(c => c != null && c.IsRipe(Tick)
+                    && c.Definition.HarvestMaterial != null
+                    && Count(harvester.Output) + c.Definition.Count + c.Definition.Seeds + 1 <= harvester.Definition.Capacity);
+                if (crop != null)
+                {
+                    var definition = crop.Definition;
+                    int seeds = Reap(crop);
+                    Add(harvester.Output, definition.HarvestMaterial, definition.Count);
+                    if (seeds > 0)
+                    {
+                        PlantCrop(definition, crop.X, crop.Y);
+                        seeds--;
+                    }
+                    Add(harvester.Output, definition.Seed, seeds);
+                    _events.Add(new SimEvent(SimEventType.Harvested, 0, amount: definition.Count, position: TileMap.Center(crop.X, crop.Y)));
+                }
+            }
+            SendOut(harvester, harvester.Back);
+        }
+
+        // The nine tiles a harvester reaps, in the order it looks at them: three rows ahead of it, nearest first.
+        public IEnumerable<(int X, int Y)> HarvesterTiles(Machine harvester)
+        {
+            var (dx, dy) = Machine.Steps[harvester.Direction];
+            // A quarter turn anticlockwise from the way it faces: its left.
+            var (lx, ly) = Machine.Steps[(harvester.Direction + 1) & 3];
+            for (int ahead = 1; ahead <= 3; ahead++)
+            {
+                for (int side = -1; side <= 1; side++)
+                {
+                    int x = harvester.X + dx * ahead + lx * side;
+                    int y = harvester.Y + dy * ahead + ly * side;
+                    if (Map.InBounds(x, y)) yield return (x, y);
+                }
+            }
+        }
+
+        // Turns the machine ahead of the player (or the one they stand on) off, or back on. False when there is none.
+        public bool ToggleMachine(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            var machine = player == null || player.IsDead ? null : MachineFacing(player.Position, player.Facing);
+            if (machine == null) return false;
+            machine.Enabled = !machine.Enabled;
+            return true;
+        }
+
+        // The machine on the tile ahead, the one a player would build on, or else the one underfoot (a belt or a
+        // splitter).
+        public Machine MachineFacing(Vec2 position, Vec2 facing)
+        {
+            var (x, y) = TileAhead(position, facing);
+            return (Map.InBounds(x, y) ? MachineAt(x, y) : null) ?? MachineAt(TileMap.Cell(position.X), TileMap.Cell(position.Y));
         }
 
         void RunConveyor(Machine belt)
@@ -295,6 +393,7 @@ namespace Game.Core
             var machine = MachineAt(x, y);
             if (machine == null) return;
             machine.Direction = direction & 3;
+            machine.Enabled = (direction & Machine.OffBit) == 0;
             machine.Timer = timer;
             machine.Carried = carried;
             machine.Progress = progress;

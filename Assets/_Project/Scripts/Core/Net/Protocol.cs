@@ -34,7 +34,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.24.0";
+        public const string Version = "0.25.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -268,7 +268,7 @@ namespace Game.Core
                 w.Write((ushort)m.X);
                 w.Write((ushort)m.Y);
                 w.Write((byte)m.Kind);
-                w.Write((byte)m.Direction);
+                w.Write((byte)(m.Direction | (m.On ? 0 : Machine.OffBit)));
                 w.Write((byte)(m.Carried + 1));
                 w.Write((byte)Math.Clamp((int)MathF.Round(m.Progress * 255), 0, 255));
             }
@@ -280,7 +280,11 @@ namespace Game.Core
             var machines = new List<MachineState>(count);
             for (int i = 0; i < count; i++)
             {
-                machines.Add(new MachineState(r.ReadUInt16(), r.ReadUInt16(), (TileType)r.ReadByte(), r.ReadByte() & 3, r.ReadByte() - 1, r.ReadByte() / 255f));
+                int x = r.ReadUInt16();
+                int y = r.ReadUInt16();
+                var kind = (TileType)r.ReadByte();
+                int direction = r.ReadByte();
+                machines.Add(new MachineState(x, y, kind, direction & 3, r.ReadByte() - 1, r.ReadByte() / 255f, (direction & Machine.OffBit) == 0));
             }
             return new MachinesMessage(machines);
         });
@@ -288,7 +292,7 @@ namespace Game.Core
 
     public readonly struct MachineState
     {
-        public MachineState(int x, int y, TileType kind, int direction, int carried, float progress)
+        public MachineState(int x, int y, TileType kind, int direction, int carried, float progress, bool on = true)
         {
             X = x;
             Y = y;
@@ -296,6 +300,7 @@ namespace Game.Core
             Direction = direction;
             Carried = carried;
             Progress = progress;
+            On = on;
         }
 
         public int X { get; }
@@ -305,6 +310,8 @@ namespace Game.Core
         // A conveyor's load as a material sheet index, or -1.
         public int Carried { get; }
         public float Progress { get; }
+        // Switched on (World.ToggleMachine).
+        public bool On { get; }
     }
 
     // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.

@@ -11,7 +11,7 @@ namespace Game.Core
     {
         // How far ahead of the player's centre the tile to dig or build on is.
         const float DigReach = 0.9f;
-        const float BuildReach = 1;
+        public const float BuildReach = 1;
         // A Dug event's Amount when the tile broke, and when the pickaxe in hand is not good enough.
         public const int DugThrough = 100;
         public const int NeedsBetterPickaxe = -2;
@@ -23,6 +23,13 @@ namespace Game.Core
         public TileData Tiles { get; }
 
         // Every tile that differs from what the seed made, for players who join later.
+        // The tile a player at this position facing this way builds, plants and waters on, and switches machines on.
+        public static (int X, int Y) TileAhead(Vec2 position, Vec2 facing)
+        {
+            var ahead = position + facing * BuildReach;
+            return (TileMap.Cell(ahead.X), TileMap.Cell(ahead.Y));
+        }
+
         public List<TileChange> ChangedTiles() =>
             _changedTiles.Select(pair => new TileChange(pair.Key % Map.Width, pair.Key / Map.Width, pair.Value)).ToList();
 
@@ -89,9 +96,7 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || material?.Places == null || player.Inventory.CountOf(material) == 0) return false;
-            var ahead = player.Position + player.Facing * BuildReach;
-            int x = TileMap.Cell(ahead.X);
-            int y = TileMap.Cell(ahead.Y);
+            var (x, y) = TileAhead(player.Position, player.Facing);
             if (Map.IsEdge(x, y) || Map[x, y] != TileType.Floor || CropAt(x, y) != null) return false;
             if (_players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, x, y))
                 || _enemies.Any(e => !e.IsDead && Touches(e.Position, e.Definition.Radius, x, y))

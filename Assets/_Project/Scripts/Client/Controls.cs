@@ -241,6 +241,8 @@ namespace Game.Client
 
         public static bool MapPressed() => KeyBindings.Pressed(KeyAction.Map);
 
+        public static bool MachinePressed() => KeyBindings.Pressed(KeyAction.Machine);
+
         // Both sticks over the game. Call from OnGUI.
         public static void DrawTouch()
         {

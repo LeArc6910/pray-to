@@ -288,6 +288,8 @@ namespace Game.Client
             TileType.Torch => Torch,
             TileType.Lamp => Lamp,
             TileType.Bed => Bed,
+            TileType.Sprinkler => SprinklerBase,
+            TileType.Harvester => HarvesterBody,
             _ => null,
         };
 
@@ -888,6 +890,54 @@ namespace Game.Client
             "...oodddddddo...",
             ".....oooooo.....",
             "....________....",
+            "................");
+
+        static readonly Dictionary<char, Rgba> FarmMetalPalette = new Dictionary<char, Rgba>(MetalPalette)
+        {
+            ['w'] = Rgba.Hex("#3E7FD0"),
+            ['W'] = Rgba.Hex("#8CC4F4"),
+            ['E'] = Rgba.Hex("#9AD46A"),
+            ['G'] = Rgba.Hex("#5E9A3E"),
+            ['e'] = Rgba.Hex("#3A6428"),
+        };
+
+        // A sprinkler: a round water tank on a short steel stand. Its spinning head is drawn on top.
+        static readonly PixelImage SprinklerBase = PixelImage.FromRows(FarmMetalPalette,
+            "................",
+            "................",
+            "................",
+            ".....oooooo.....",
+            "....oWWWWWWo....",
+            "...oWwwwwwwwo...",
+            "...oWwwwwwwdo...",
+            "...owwwwwwwdo...",
+            "...owwwwwwwdo...",
+            "...odwwwwwddo...",
+            "....oddddddo....",
+            ".....oLMMmo.....",
+            "....oLMMMMmo....",
+            "....odddddDo....",
+            "....oooooooo....",
+            "....________....");
+
+        // A harvester: a green steel box with a window and a hazard stripe. Its reel is drawn on top, at the side it
+        // faces.
+        static readonly PixelImage HarvesterBody = PixelImage.FromRows(FarmMetalPalette,
+            "................",
+            "................",
+            "..oooooooooooo..",
+            ".oEEEEEEEEEEEEo.",
+            ".oEGGGGGGGGGGeo.",
+            ".oEGkkkkkkkkGeo.",
+            ".oEGkDDDDDDkGeo.",
+            ".oEGkDLLMDDkGeo.",
+            ".oEGkDDDDDDkGeo.",
+            ".oeeeeeeeeeeeeo.",
+            ".oykykykykykyko.",
+            ".odddddgdddrddo.",
+            ".oDDDDDDDDDDDDo.",
+            "..oooooooooooo..",
+            "..____________..",
             "................");
 
         // The conveyor's frame: rails on both sides. The belt is drawn on top, running the way it faces.

@@ -32,6 +32,10 @@ namespace Game.Core
         Lava,
         // Where its owner gets up (World.Home.cs).
         Bed,
+        // Farm machines (Docs/Farming.md): a sprinkler waters the crops around it, a harvester reaps those ahead of it
+        // and plants them again.
+        Sprinkler,
+        Harvester,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

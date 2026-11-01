@@ -118,7 +118,7 @@ namespace Game.Core
 
     public readonly struct MachineView
     {
-        public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress)
+        public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true)
         {
             X = x;
             Y = y;
@@ -126,6 +126,7 @@ namespace Game.Core
             Direction = direction;
             Carried = carried;
             Progress = progress;
+            On = on;
         }
 
         public int X { get; }
@@ -135,6 +136,7 @@ namespace Game.Core
         public int Direction { get; }
         public MaterialDefinition Carried { get; }
         public float Progress { get; }
+        public bool On { get; }
     }
 
     public readonly struct HazardView
@@ -500,11 +502,29 @@ namespace Game.Core
                 var carried = m.Carried >= 0 && _loot != null && m.Carried < _loot.Materials.Count ? _loot.Materials[m.Carried] : null;
                 float progress = m.Progress;
                 var definition = _tiles?.Machine(m.Kind);
-                if (carried != null && definition != null) progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks));
-                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress));
+                if (carried != null && definition != null && m.On) progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks));
+                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On));
             }
             return views;
         }
+
+        // The machine a switch press would turn off or on (World.MachineFacing), as of the host's last word, or null.
+        public MachineView? MachineAhead()
+        {
+            if (Map == null) return null;
+            var (x, y) = World.TileAhead(Position, Facing);
+            int ux = TileMap.Cell(Position.X);
+            int uy = TileMap.Cell(Position.Y);
+            MachineView? under = null;
+            foreach (var m in Machines())
+            {
+                if (m.X == x && m.Y == y) return m;
+                if (m.X == ux && m.Y == uy) under = m;
+            }
+            return under;
+        }
+
+        public byte[] ToggleMachineCommand() => new InventoryCommandMessage(InventoryCommand.ToggleMachine, 0).Encode();
 
         // The chest this player stands by and what it holds, or a closed one.
         public ChestMessage Chest { get; private set; } = ChestMessage.Closed;

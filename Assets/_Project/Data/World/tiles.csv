@@ -16,3 +16,5 @@ Lamp,버섯 등불,1,glow_lamp,1,,,,8,#6FE8D0,
 ObsidianOre,흑요석 광맥,18,obsidian_ore,1,,,yes,1.5,#B070FF,20
 Lava,용암,1,stone,1,,,,3.5,#FF6A20,
 Bed,침대,1,bed,1,,,,,,
+Sprinkler,스프링클러,1,sprinkler,1,,,,,,
+Harvester,수확기,1,harvester,1,,,,,,

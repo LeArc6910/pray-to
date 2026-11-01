@@ -284,6 +284,11 @@ namespace Game.Client
             {
                 if (Vector3.Distance(drop.Position, _self.Position) < 4) Label(drop.Position + new Vector3(0, 0.5f, 0), drop.Name, drop.Color);
             }
+            foreach (var machine in _client.Machines())
+            {
+                var at = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
+                if (!machine.On && Vector3.Distance(at, _self.Position) < 6) Label(at, "꺼짐", OffLabel);
+            }
             foreach (var text in _floating)
             {
                 float t = text.Age / FloatSeconds;
@@ -628,14 +633,20 @@ namespace Game.Client
                 var step = Machine.Steps[machine.Direction];
                 var center = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
                 parts.Part.sprite = machine.Kind == TileType.Drill ? DrillBitSprite
-                    : machine.Kind == TileType.Conveyor ? BeltSprites[beltFrame]
+                    : machine.Kind == TileType.Conveyor ? BeltSprites[machine.On ? beltFrame : 0]
                     : machine.Kind == TileType.Splitter ? SplitterSprite
                     : machine.Kind == TileType.Arm ? ArmSprite
+                    : machine.Kind == TileType.Sprinkler ? SprinklerSprite
+                    : machine.Kind == TileType.Harvester ? ReelSprite
                     : ChevronSprite;
                 parts.Part.transform.localPosition = center;
+                // Switched off, the moving part stands still and greys out.
+                parts.Part.color = machine.On ? Color.white : OffTint;
                 // A robot arm waits pointing back at where it picks up, and swings over to the front as it carries.
                 float swing = machine.Kind == TileType.Arm ? Mathf.Lerp(180, 0, machine.Carried != null ? machine.Progress : 0) : 0;
-                parts.Part.transform.localRotation = Quaternion.Euler(0, 0, machine.Direction * 90 + swing);
+                // A sprinkler's head spins while it runs, whichever way it was placed.
+                float turn = machine.Kind == TileType.Sprinkler ? (machine.On ? Time.time * 240 % 360 : 0) : machine.Direction * 90 + swing;
+                parts.Part.transform.localRotation = Quaternion.Euler(0, 0, turn);
                 parts.Part.sortingOrder = machine.Kind == TileType.Arm ? -13 : -15;
                 parts.Load.sortingOrder = machine.Kind == TileType.Arm ? -12 : -14;
                 parts.Load.enabled = machine.Carried != null;
@@ -674,6 +685,13 @@ namespace Game.Client
         static Sprite SplitterSprite => Sprites.Centered("machine/splitter", () => ItemArt.SplitterArrows);
 
         static Sprite ArmSprite => Sprites.Centered("machine/arm", () => ItemArt.RobotArm);
+
+        static Sprite SprinklerSprite => Sprites.Centered("machine/sprinkler", () => ItemArt.SprinklerHead);
+
+        static Sprite ReelSprite => Sprites.Centered("machine/reel", () => ItemArt.HarvesterReel);
+
+        static readonly Color OffTint = new Color(0.5f, 0.5f, 0.56f);
+        static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
 
         static Sprite[] _beltSprites;
 
@@ -787,7 +805,8 @@ namespace Game.Client
                 case SimEventType.Watered:
                     // A splash over the watered tiles. The one who poured already heard it when they pressed.
                     var poured = new Vector3(e.Position.X, e.Position.Y, 0);
-                    AddFlash(poured, 2.6f, Palette.Water, Shapes.Circle);
+                    // From no player: a sprinkler, watering the 5×5 square around it.
+                    AddFlash(poured, e.Source == 0 ? 3.6f : 2.6f, Palette.Water, Shapes.Circle);
                     if (e.Source != _client.PlayerId) Hear(Sound.Water, poured);
                     break;
                 case SimEventType.Ate:

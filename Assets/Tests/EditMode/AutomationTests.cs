@@ -15,6 +15,13 @@ namespace Game.Core.Tests
         static readonly MachineDefinition Drill = Tiles.Shipped.Machine(TileType.Drill);
         static readonly MachineDefinition Belt = Tiles.Shipped.Machine(TileType.Conveyor);
         static readonly MachineDefinition Smelter = Tiles.Shipped.Machine(TileType.Smelter);
+        static readonly MachineDefinition Sprinkler = Tiles.Shipped.Machine(TileType.Sprinkler);
+        static readonly MachineDefinition Harvester = Tiles.Shipped.Machine(TileType.Harvester);
+        static readonly MaterialDefinition SprinklerItem = Gear.Data.FindMaterial("sprinkler");
+        static readonly MaterialDefinition HarvesterItem = Gear.Data.FindMaterial("harvester");
+        static readonly MaterialDefinition Spore = Gear.Data.FindMaterial("mushroom_spore");
+        static readonly MaterialDefinition MushroomItem = Gear.Data.FindMaterial("mushroom");
+        static readonly CropDefinition Mushroom = Tiles.Shipped.Crops.Single(c => c.Id == "mushroom");
 
         // A long room with an iron vein at its left end (1, 3).
         static World Line(out Player player)
@@ -29,15 +36,28 @@ namespace Game.Core.Tests
         // Stands the player on the tile beside the target facing it, and places the material there.
         static void Place(World world, Player player, MaterialDefinition material, int x, int y, Vec2 facing)
         {
+            Face(world, player, x, y, facing);
+            player.Inventory.AddMaterial(material);
+            Assert.IsTrue(world.PlaceTile(player.Id, material), $"{material.Id} at ({x}, {y})");
+            Assert.AreEqual(material.Places, world.Map[x, y], $"{material.Id} landed somewhere else");
+        }
+
+        // Stands the player on the tile beside (x, y), facing it that way.
+        static void Face(World world, Player player, int x, int y, Vec2 facing)
+        {
             var stand = TileMap.Center(x, y) - facing;
             for (int i = 0; i < 20 && Vec2.Distance(player.Position, stand) > 0.01f; i++)
             {
                 world.MovePlayer(player.Id, player.Position + (stand - player.Position).ClampLength(1.5f), facing, 10);
             }
             world.MovePlayer(player.Id, player.Position, facing, 1);
-            player.Inventory.AddMaterial(material);
-            Assert.IsTrue(world.PlaceTile(player.Id, material), $"{material.Id} at ({x}, {y})");
-            Assert.AreEqual(material.Places, world.Map[x, y], $"{material.Id} landed somewhere else");
+        }
+
+        static void Sow(World world, Player player, int x, int y, Vec2 facing)
+        {
+            Face(world, player, x, y, facing);
+            player.Inventory.AddMaterial(Spore);
+            Assert.IsTrue(world.Plant(player.Id, Mushroom), $"a spore at ({x}, {y})");
         }
 
         static void Run(World world, float seconds)
@@ -56,6 +76,11 @@ namespace Game.Core.Tests
             Assert.IsTrue(Tiles.Shipped.Find(TileType.IronOre).Drillable);
             Assert.IsFalse(Tiles.Shipped.Find(TileType.Wall).Drillable, "plain rock gives nothing to a drill");
             Assert.AreEqual(4, Gear.Data.Recipes.Single(r => r.Id == "conveyor").Count);
+            Assert.AreEqual(3, Sprinkler.Seconds, 0.001f);
+            Assert.AreEqual(1, Harvester.Seconds, 0.001f);
+            Assert.AreEqual(20, Harvester.Capacity);
+            Assert.AreEqual(TileType.Sprinkler, SprinklerItem.Places);
+            Assert.AreEqual(TileType.Harvester, HarvesterItem.Places);
         }
 
         [Test]
@@ -274,6 +299,124 @@ namespace Game.Core.Tests
             Assert.AreEqual(TileType.Conveyor, seen.Kind);
             Assert.AreEqual(3, seen.Direction, "it faced down, the way the player first faces");
             Assert.IsNull(seen.Carried);
+        }
+            [Test]
+        public void ASprinklerWatersTheCropsAroundIt()
+        {
+            var world = Line(out var player);
+            Sow(world, player, 8, 6, new Vec2(1, 0));
+            Sow(world, player, 12, 6, new Vec2(1, 0));
+            Place(world, player, SprinklerItem, 9, 8, new Vec2(0, 1));
+            var events = new List<SimEvent>();
+            for (int i = 0; i < World.Ticks(Sprinkler.Seconds) + 1; i++)
+            {
+                world.Step();
+                events.AddRange(world.TakeEvents());
+            }
+
+            Assert.IsTrue(world.CropAt(8, 6).Watered, "two tiles off, inside the square");
+            Assert.IsFalse(world.CropAt(12, 6).Watered, "three tiles off along x");
+            var splash = events.Single(e => e.Type == SimEventType.Watered);
+            Assert.AreEqual(0, splash.Source, "from no player");
+            Assert.AreEqual(1, splash.Amount);
+            Assert.AreEqual(TileMap.Center(9, 8), splash.Position);
+
+            Run(world, Sprinkler.Seconds * 2);
+            Assert.IsTrue(world.CropAt(8, 6).Watered, "a crop takes water once; nothing else happens to it");
+        }
+
+        [Test]
+        public void AHarvesterReapsRipeCropsPlantsThemAgainAndSendsTheHarvestBack()
+        {
+            var world = Line(out var player);
+            // Facing right from (5, 8), a chest behind it at (4, 8); crops on its left and right two and three tiles
+            // ahead, and one four tiles ahead, out of its reach.
+            Sow(world, player, 7, 9, new Vec2(1, 0));
+            Sow(world, player, 8, 7, new Vec2(1, 0));
+            Sow(world, player, 9, 8, new Vec2(1, 0));
+            Place(world, player, HarvesterItem, 5, 8, new Vec2(1, 0));
+            Place(world, player, Gear.Data.FindMaterial("chest"), 4, 8, new Vec2(1, 0));
+            CollectionAssert.AreEqual(new[] { (6, 7), (6, 8), (6, 9), (7, 7), (7, 8), (7, 9), (8, 7), (8, 8), (8, 9) },
+                world.HarvesterTiles(world.MachineAt(5, 8)).ToArray(), "three rows ahead, nearest first, each from its right to its left");
+            // Out of the way, so no one walks over a ripe crop.
+            world.MovePlayer(player.Id, TileMap.Center(12, 12), new Vec2(1, 0), 20);
+            long planted = world.CropAt(7, 9).PlantedTick;
+
+            Run(world, Mushroom.GrowSeconds + Harvester.Seconds * 2 + 1);
+
+            var chest = world.ChestAt(4, 8);
+            Assert.AreEqual(Mushroom.Count * 2, chest.CountOf(MushroomItem), "both crops in reach");
+            Assert.That(chest.CountOf(Spore), Is.InRange(0, 2), "each gave a seed or two, and one went back in the ground");
+            foreach (var (x, y) in new[] { (7, 9), (8, 7) })
+            {
+                var again = world.CropAt(x, y);
+                Assert.IsNotNull(again, $"planted again at ({x}, {y})");
+                Assert.Greater(again.PlantedTick, planted);
+                Assert.IsFalse(again.IsRipe(world.Tick));
+            }
+            Assert.IsTrue(world.CropAt(9, 8).IsRipe(world.Tick), "out of reach, left alone");
+        }
+
+        [Test]
+        public void ASwitchedOffMachineStopsButKeepsWhatItHolds()
+        {
+            var world = Line(out var player);
+            Place(world, player, DrillItem, 2, 3, new Vec2(-1, 0));
+            Run(world, Drill.Seconds + 0.5f);
+            var drill = world.MachineAt(2, 3);
+            Assert.AreEqual(1, drill.Outputs.Values.Sum(), "nowhere to send it yet");
+
+            // From below, facing up at it.
+            Face(world, player, 2, 3, new Vec2(0, 1));
+            Assert.AreSame(drill, world.MachineFacing(player.Position, player.Facing), $"at {player.Position} facing {player.Facing}");
+            Assert.IsTrue(world.ToggleMachine(player.Id));
+            Assert.IsFalse(drill.Enabled);
+            Place(world, player, Gear.Data.FindMaterial("chest"), 3, 3, new Vec2(-1, 0));
+            Run(world, Drill.Seconds * 2 + 0.5f);
+            Assert.AreEqual(0, world.ChestAt(3, 3).CountOf(IronOre), "off: it neither digs nor sends out");
+            Assert.AreEqual(1, drill.Outputs.Values.Sum());
+
+            // Round the chest, then below the drill again.
+            Face(world, player, 3, 3, new Vec2(0, 1));
+            Face(world, player, 2, 3, new Vec2(0, 1));
+            Assert.IsTrue(world.ToggleMachine(player.Id));
+            Assert.IsTrue(drill.Enabled);
+            Run(world, Drill.Seconds + 0.5f);
+            Assert.AreEqual(2, world.ChestAt(3, 3).CountOf(IronOre));
+
+            world.MovePlayer(player.Id, TileMap.Center(10, 10), new Vec2(1, 0), 20);
+            Assert.IsFalse(world.ToggleMachine(player.Id), "no machine ahead or underfoot");
+        }
+
+        [Test]
+        public void AMachineSwitchedOffStaysOffThroughASaveAndClientsSeeIt()
+        {
+            var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
+            var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped);
+            host.Receive(1, client.JoinMessage());
+            var player = host.World.Players.Single();
+            player.Inventory.AddMaterial(BeltItem);
+            Assert.IsTrue(host.World.PlaceTile(player.Id, BeltItem));
+            host.Receive(1, client.ToggleMachineCommand());
+            var belt = host.World.Machines.Single();
+            Assert.IsFalse(belt.Enabled);
+
+            for (int i = 0; i < 8; i++)
+            {
+                host.Tick();
+                foreach (var message in host.TakeOutgoing()) client.Receive(message.Data);
+            }
+            var seen = client.Machines().Single();
+            Assert.IsFalse(seen.On);
+            Assert.AreEqual(3, seen.Direction, "the switch rides on the direction byte without changing it");
+            Assert.AreEqual(seen.X, client.MachineAhead()?.X);
+
+            var save = WorldSave.Read(host.SaveWorld(now: 0), Tiles.Shipped, Gear.Data);
+            var again = new WorldHost(save.Seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
+            again.Restore(save, now: 0);
+            var restored = again.World.MachineAt(belt.X, belt.Y);
+            Assert.IsFalse(restored.Enabled);
+            Assert.AreEqual(belt.Direction, restored.Direction);
         }
     }
 }

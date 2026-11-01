@@ -185,7 +185,10 @@ namespace Game.Core
         // The view lights at most this far around a tile; more would not fit its light map.
         const float MaxLight = 12;
 
-        static readonly TileType[] MachineTiles = { TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm };
+        static readonly TileType[] MachineTiles =
+        {
+            TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester,
+        };
 
         static List<MachineDefinition> ParseMachines(string csv, List<string> errors)
         {

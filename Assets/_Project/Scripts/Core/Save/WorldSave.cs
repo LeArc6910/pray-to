@@ -132,7 +132,8 @@ namespace Game.Core
                 {
                     w.Write((ushort)machine.X);
                     w.Write((ushort)machine.Y);
-                    w.Write((byte)machine.Direction);
+                    // The high bit is set for a machine switched off; saves from before switches have it clear.
+                    w.Write((byte)(machine.Direction | (machine.Enabled ? 0 : Machine.OffBit)));
                     w.Write(machine.Timer);
                     w.Write(machine.Carried?.Id ?? "");
                     w.Write(machine.Progress);

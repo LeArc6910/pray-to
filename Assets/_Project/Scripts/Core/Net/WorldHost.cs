@@ -319,6 +319,9 @@ namespace Game.Core
                 case InventoryCommand.Water:
                     World.Water(player.Id);
                     break;
+                case InventoryCommand.ToggleMachine:
+                    World.ToggleMachine(player.Id);
+                    break;
                 case InventoryCommand.StoreItem:
                 case InventoryCommand.TakeItem:
                     World.MoveItem(player.Id, command.Item, command.Command == InventoryCommand.StoreItem);
@@ -436,7 +439,7 @@ namespace Game.Core
                 .Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer) <= _config.ViewRange)
                 .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
                 .Take(_config.MaxMachinesPerMessage)
-                .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress))
+                .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled))
                 .ToList();
             if (near.Count == 0 && !sent.SentMachines) return;
             sent.SentMachines = near.Count > 0;
