@@ -403,5 +403,45 @@ namespace Game.Core.Tests
             Assert.IsTrue(player.IsDead);
             Assert.IsEmpty(world.Minions);
         }
-    }
+    
+        [Test]
+        public void SkillsCanBeReorderedAnywhereAndKeepTheirCooldowns()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null, Warrior, FireMage);
+            CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "fireball", "flame_brand" }, player.Skills.Select(s => s.Id));
+            world.UseSkill(player.Id, Slot(player, "whirlwind"), Vec2.Zero);
+            int cooling = player.CooldownTicks(0);
+
+            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 2, 0, 3, 1 }));
+            CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "flame_brand", "war_cry" }, player.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { 2, 0, 3, 1 }, player.SkillOrder);
+            Assert.AreEqual(cooling, player.CooldownTicks(1), "whirlwind's cooldown went with it");
+            Assert.AreEqual(0, player.CooldownTicks(0));
+
+            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 0, 0, 1, 2 }), "not a reordering: the classes' own order");
+            CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "fireball", "flame_brand" }, player.Skills.Select(s => s.Id));
+        }
+
+        [Test]
+        public void OtherClassesOnlyBesideAWorkbenchAndTheirSkillsStartCoolingDown()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null, Warrior);
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { FireMage }, null), "no workbench near");
+            Assert.AreSame(Warrior, player.Classes.Single());
+
+            int x = TileMap.Cell(player.Position.X) + 1;
+            int y = TileMap.Cell(player.Position.Y);
+            world.Map[x, y] = TileType.Workbench;
+            world.UseSkill(player.Id, Slot(player, "war_cry"), Vec2.Zero);
+            Assert.IsTrue(player.HasBuff(Slot(player, "war_cry")));
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { FireMage, Warrior }, null));
+
+            CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "whirlwind", "war_cry" }, player.Skills.Select(s => s.Id));
+            Assert.AreEqual(Classes.Skill("fireball").CooldownTicks, player.CooldownTicks(0), "a new skill starts as if just used");
+            Assert.IsTrue(player.HasBuff(3), "war cry stayed, buff and all");
+            CollectionAssert.AreEqual(new[] { FireMage, Warrior }, player.Classes);
+        }
+}
 }

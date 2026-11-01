@@ -1,12 +1,13 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Game.Core
 {
     public sealed class Player
     {
-        readonly int[] _cooldowns;
-        readonly int[] _buffTicks;
+        int[] _cooldowns;
+        int[] _buffTicks;
 
         internal Player(int id, string name, Vec2 position, Equipment equipment, IReadOnlyList<ClassDefinition> classes, Inventory bag = null)
         {
@@ -17,6 +18,7 @@ namespace Game.Core
             Inventory = bag ?? new Inventory();
             Classes = classes;
             Skills = ClassRules.SkillsFor(classes);
+            SkillOrder = Enumerable.Range(0, Skills.Count).ToList();
             _cooldowns = new int[Skills.Count];
             _buffTicks = new int[Skills.Count];
             Stats = PlayerStats.From(equipment, classes);
@@ -38,9 +40,33 @@ namespace Game.Core
         // respawn. The client snaps to the host's position when it sees a new value.
         public int Corrections { get; internal set; }
         public bool Attacking { get; internal set; }
-        public IReadOnlyList<ClassDefinition> Classes { get; }
+        public IReadOnlyList<ClassDefinition> Classes { get; private set; }
         // One per skill slot, in slot order.
-        public IReadOnlyList<SkillDefinition> Skills { get; }
+        public IReadOnlyList<SkillDefinition> Skills { get; private set; }
+        // Which of the classes' skills (ClassRules.SkillsFor) is in each slot.
+        public IReadOnlyList<int> SkillOrder { get; private set; }
+
+        // New classes, or the same in a new order (ClassRules.SkillsFor). A skill that stays keeps its cooldown and
+        // buff; a new one starts as if just used, so changing back and forth never skips a cooldown.
+        internal void ChangeKit(IReadOnlyList<ClassDefinition> classes, IReadOnlyList<int> order)
+        {
+            var skills = ClassRules.SkillsFor(classes, order);
+            var cooldowns = new int[skills.Count];
+            var buffs = new int[skills.Count];
+            for (int slot = 0; slot < skills.Count; slot++)
+            {
+                int old = Skills.ToList().IndexOf(skills[slot]);
+                cooldowns[slot] = old >= 0 ? _cooldowns[old] : skills[slot].CooldownTicks;
+                buffs[slot] = old >= 0 ? _buffTicks[old] : 0;
+            }
+            Classes = classes;
+            Skills = skills;
+            var natural = ClassRules.SkillsFor(classes);
+            SkillOrder = skills.Select(s => natural.IndexOf(s)).ToList();
+            _cooldowns = cooldowns;
+            _buffTicks = buffs;
+            RefreshStats();
+        }
 
         // Ticks until any consumable can be used again.
         public int ConsumableCooldown { get; internal set; }

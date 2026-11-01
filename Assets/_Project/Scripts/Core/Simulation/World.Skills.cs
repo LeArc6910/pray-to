@@ -34,6 +34,18 @@ namespace Game.Core
             return player;
         }
 
+        // Reorders the player's skills, anywhere; or gives them other classes, only beside a workbench. False when it
+        // cannot: dead, or new classes away from a workbench. See Docs/Classes.md (게임 중에 바꾸기).
+        public bool ChangeClasses(int playerId, IReadOnlyList<ClassDefinition> classes, IReadOnlyList<int> order)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || classes == null) return false;
+            bool same = classes.SequenceEqual(player.Classes);
+            if (!same && !Map.Near(player.Position, TileType.Workbench, StationReach)) return false;
+            player.ChangeKit(classes, order);
+            return true;
+        }
+
         // Uses the skill in the slot, toward aim or the way the player faces when aim is zero. False when the
         // player cannot: dead, no such slot, or the skill is still cooling down.
         public bool UseSkill(int playerId, int slot, Vec2 aim)

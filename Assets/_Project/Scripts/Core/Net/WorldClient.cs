@@ -242,7 +242,35 @@ namespace Game.Core
         // The saved character (CharacterSave) to bring along when joining, or null for a new one.
         public byte[] Character { get; set; }
 
-        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name, ChosenClasses, character: Character).Encode();
+        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name, ChosenClasses, character: Character, skillOrder: JoinSkillOrder).Encode();
+
+        // Every class in the sheet, for choosing others in the game.
+        public IReadOnlyList<ClassDefinition> AllClasses => _classes?.Classes ?? (IReadOnlyList<ClassDefinition>)Array.Empty<ClassDefinition>();
+
+        // The order to put the skills in when joining (ClassRules.SkillsFor), or null.
+        public IReadOnlyList<int> JoinSkillOrder { get; set; }
+
+        // Which of the classes' skills is in each slot, as the host has them.
+        public IReadOnlyList<int> SkillOrder { get; private set; } = Array.Empty<int>();
+
+        // Goes up whenever the classes or the order change, so the screen can keep them.
+        public int KitVersion { get; private set; }
+
+        // Asks for other classes, or the same in another order (World.ChangeClasses).
+        public byte[] ClassCommand(IReadOnlyList<ClassDefinition> classes, IReadOnlyList<int> order) =>
+            new KitMessage(MessageType.ClassCommand, classes.Select(c => _classes.Classes.ToList().IndexOf(c)).Where(i => i >= 0).ToList(), order).Encode();
+
+        void ApplyKit(IReadOnlyList<int> classes, IReadOnlyList<int> order)
+        {
+            Classes = ClassesAt(classes);
+            Skills = ClassRules.SkillsFor(Classes, order);
+            var natural = ClassRules.SkillsFor(Classes);
+            SkillOrder = Skills.Select(s => natural.IndexOf(s)).ToList();
+            _cooldowns = new int[Skills.Count];
+            _buffs = new int[Skills.Count];
+            RefreshStats();
+            KitVersion++;
+        }
 
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
         // before the first one.
@@ -260,6 +288,10 @@ namespace Game.Core
                     case MessageType.Refused:
                         Status = ClientStatus.Refused;
                         RefusedReason = RefusedMessage.Decode(data).Reason;
+                        break;
+                    case MessageType.Kit:
+                        var kit = KitMessage.Decode(data, MessageType.Kit);
+                        ApplyKit(kit.Classes, kit.SkillOrder);
                         break;
                     case MessageType.Roster:
                         var roster = RosterMessage.Decode(data);
@@ -630,11 +662,7 @@ namespace Game.Core
 
         void Welcome(WelcomeMessage welcome)
         {
-            Classes = ClassesAt(welcome.Classes);
-            Skills = ClassRules.SkillsFor(Classes);
-            _cooldowns = new int[Skills.Count];
-            _buffs = new int[Skills.Count];
-            RefreshStats();
+            ApplyKit(welcome.Classes, welcome.SkillOrder);
             PlayerId = welcome.PlayerId;
             var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height);
             Map = generated.Map;
@@ -665,8 +693,8 @@ namespace Game.Core
                 throw new InvalidDataException("Snapshot names a skill this client does not know.");
             if (snapshot.Entities.Any(e => e.Kind == EntityKind.Boss && (_bosses == null || e.Type >= _bosses.Bosses.Count)))
                 throw new InvalidDataException("Snapshot names a boss this client does not know.");
-            if (snapshot.Self.Cooldowns.Count != Skills.Count)
-                throw new InvalidDataException("Snapshot has a different number of skill slots than this client.");
+            // A snapshot sent before a change of classes reached here: the next one will match.
+            if (snapshot.Self.Cooldowns.Count != Skills.Count) return;
 
             _snapshots.Add(snapshot);
             _sinceLatest = 0;

@@ -521,6 +521,62 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void ClassesChangeBesideAWorkbenchAndSkillsKeepTheirOrder()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스", Protocol.Version, "warrior");
+            var world = session.Host.World;
+            var player = world.FindPlayer(alice.PlayerId);
+            session.Tick(2);
+            int kits = alice.KitVersion;
+
+            session.Send(1, alice.ClassCommand(new[] { Classes.Shipped.Find("fire_mage") }, null));
+            session.Tick(2);
+            Assert.AreEqual("warrior", alice.Classes.Single().Id, "away from a workbench nothing changes");
+            Assert.Greater(alice.KitVersion, kits, "but the host answers");
+
+            world.Map[TileMap.Cell(player.Position.X) + 1, TileMap.Cell(player.Position.Y)] = TileType.Workbench;
+            var both = new[] { Classes.Shipped.Find("fire_mage"), Classes.Shipped.Find("warrior") };
+            session.Send(1, alice.ClassCommand(both, new[] { 3, 2, 1, 0 }));
+            session.Tick(4);
+            CollectionAssert.AreEqual(new[] { "war_cry", "whirlwind", "flame_brand", "fireball" }, alice.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(player.Skills, alice.Skills);
+            CollectionAssert.AreEqual(new[] { "fire_mage", "warrior" }, alice.ClassesOf(alice.PlayerId).Select(c => c.Id), "the roster too");
+
+            // Coming back with the same classes and order keeps them.
+            var bob = new WorldClient("key2", "밥", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, new[] { "fire_mage", "warrior" }, Tiles.Shipped)
+            {
+                JoinSkillOrder = new[] { 3, 2, 1, 0 },
+            };
+            session.Host.Receive(2, bob.JoinMessage());
+            session.Host.Tick();
+            foreach (var message in session.Host.TakeOutgoing().Where(m => m.Connection == 2)) bob.Receive(message.Data);
+            CollectionAssert.AreEqual(new[] { "war_cry", "whirlwind", "flame_brand", "fireball" }, bob.Skills.Select(s => s.Id));
+        }
+
+        [Test]
+        public void APlayerWithABedIsWelcomedWithTheWorldsSpawn()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var world = session.Host.World;
+            var player = world.FindPlayer(alice.PlayerId);
+            int bx = TileMap.Cell(world.Spawn.X) + 2;
+            int by = TileMap.Cell(world.Spawn.Y) + 2;
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("bed"));
+            Walk(world, player, TileMap.Center(bx, by - 1));
+            world.MovePlayer(player.Id, player.Position, new Vec2(0, 1), 1);
+            Assert.IsTrue(world.PlaceTile(player.Id, Gear.Data.FindMaterial("bed")));
+            session.Host.Disconnect(1);
+            session.Clients.Remove(1);
+
+            var again = session.Join(3, "앨리스");
+            session.Tick(4);
+            Assert.AreEqual(world.Spawn, again.Spawn, "the guide measures from the spawn, not the bed");
+            Assert.Less(Vec2.Distance(again.Position, TileMap.Center(bx, by)), 1.6f, "but the player stands by the bed");
+        }
+
+        [Test]
         public void LeavingRemovesThePlayerForEveryone()
         {
             var session = new Session();

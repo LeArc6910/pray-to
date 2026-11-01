@@ -15,6 +15,7 @@ namespace Game.Client
         {
             Gear,
             Materials,
+            Classes,
             Chest,
         }
 
@@ -27,7 +28,7 @@ namespace Game.Client
         const float WheelStep = 30;
 
         static GUIStyle _tooltipStyle;
-        static readonly string[] PageNames = { "장비", "재료·제작", "상자" };
+        static readonly string[] PageNames = { "장비", "재료·제작", "클래스", "상자" };
         static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
         readonly WorldClient _client;
@@ -95,13 +96,14 @@ namespace Game.Client
             // The chest tab is there only while a chest is in reach.
             bool chest = _client.Chest.IsOpen;
             if (!chest && _page == Page.Chest) _page = Page.Gear;
-            _page = Tabs(_page, chest ? 3 : 2);
+            _page = Tabs(_page, chest ? 4 : 3);
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
             _scroll[page] = GUILayout.BeginScrollView(_scroll[page], GUILayout.ExpandHeight(true));
             if (_page == Page.Gear) DrawGear();
             else if (_page == Page.Materials) DrawMaterialsPage();
+            else if (_page == Page.Classes) DrawClasses();
             else DrawChest();
             GUILayout.EndScrollView();
             if (Event.current.type == EventType.Repaint)
@@ -392,6 +394,71 @@ namespace Game.Client
                 var consumable = pair.Key;
                 QuickButton(_hotbar?.SlotOf(consumable), () => _hotbar.Toggle(consumable));
                 GUILayout.EndHorizontal();
+            }
+        }
+
+        // The classes picked here but not yet taken, as ids; null shows the ones the player has.
+        System.Collections.Generic.List<string> _pickedClasses;
+        int _pickedForKit = -1;
+
+        // The skills in their slots, each with buttons to move it up or down (anywhere, at once), and the classes,
+        // which change beside a workbench (Docs/Classes.md, 게임 중에 바꾸기).
+        void DrawClasses()
+        {
+            if (_pickedForKit != _client.KitVersion)
+            {
+                _pickedClasses = null;
+                _pickedForKit = _client.KitVersion;
+            }
+            GUILayout.Label(Fit($"지금 클래스: {(_client.Classes.Count == 0 ? "없음" : string.Join(" + ", _client.Classes.Select(c => c.Name)))}", _textWidth));
+            GUILayout.Space(4);
+            GUILayout.Label(Fit("스킬 칸 순서(어디서나 바꾼다)", _textWidth));
+            var order = _client.SkillOrder.ToList();
+            for (int slot = 0; slot < _client.Skills.Count; slot++)
+            {
+                GUILayout.BeginHorizontal();
+                string key = Controls.UsingTouch ? $"{slot + 1}" : Controls.SkillKeyName(slot);
+                GUILayout.Label(Fit($"{key}  {_client.Skills[slot].Name}", _nameWidth), GUILayout.Width(_nameWidth));
+                GUI.enabled = slot > 0;
+                if (GUILayout.Button("▲", GUILayout.Width(40))) Swap(order, slot, slot - 1);
+                GUI.enabled = slot < _client.Skills.Count - 1;
+                if (GUILayout.Button("▼", GUILayout.Width(40))) Swap(order, slot, slot + 1);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
+
+            GUILayout.Space(8);
+            bool near = _client.Map != null && _client.Map.Near(_client.Position, TileType.Workbench, World.StationReach);
+            GUILayout.Label(Fit(near
+                ? $"클래스 바꾸기(최대 {ClassRules.DefaultMaxClasses}개, 고른 순서대로 칸을 채운다. 새 스킬은 재사용 대기부터 시작한다)"
+                : "클래스는 작업대 곁에서 바꿀 수 있다", _textWidth));
+            _pickedClasses ??= _client.Classes.Select(c => c.Id).ToList();
+            GUI.enabled = near;
+            foreach (var option in _client.AllClasses)
+            {
+                int picked = _pickedClasses.IndexOf(option.Id);
+                bool full = picked < 0 && _pickedClasses.Count >= ClassRules.DefaultMaxClasses;
+                GUI.enabled = near && !full;
+                if (GUILayout.Button(new GUIContent((picked >= 0 ? $"[{picked + 1}] " : "[ ] ") + option.Name, option.Description)))
+                {
+                    if (picked >= 0) _pickedClasses.RemoveAt(picked);
+                    else _pickedClasses.Add(option.Id);
+                    Sounds.Play(Sound.Click);
+                }
+            }
+            bool differs = !_pickedClasses.SequenceEqual(_client.Classes.Select(c => c.Id));
+            GUI.enabled = near && differs;
+            if (GUILayout.Button("이대로 바꾸기"))
+            {
+                var classes = _pickedClasses.Select(id => _client.AllClasses.First(c => c.Id == id)).ToList();
+                Send(_client.ClassCommand(classes, null), Sound.Buff);
+            }
+            GUI.enabled = true;
+
+            void Swap(System.Collections.Generic.List<int> list, int a, int b)
+            {
+                (list[a], list[b]) = (list[b], list[a]);
+                Send(_client.ClassCommand(_client.Classes, list), Sound.Click);
             }
         }
 

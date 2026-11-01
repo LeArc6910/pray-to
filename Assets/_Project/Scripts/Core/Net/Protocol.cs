@@ -12,6 +12,7 @@ namespace Game.Core
         Input = 2,
         InventoryCommand = 3,
         SkillCommand = 4,
+        ClassCommand = 5,
         Welcome = 10,
         Refused = 11,
         Snapshot = 12,
@@ -21,6 +22,7 @@ namespace Game.Core
         CropChanges = 16,
         Chest = 17,
         Machines = 18,
+        Kit = 19,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -32,7 +34,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.23.0";
+        public const string Version = "0.24.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -106,8 +108,10 @@ namespace Game.Core
 
     public sealed class JoinMessage
     {
-        public JoinMessage(string playerKey, string name, IReadOnlyList<string> classes = null, string version = Protocol.Version, byte[] character = null)
+        public JoinMessage(string playerKey, string name, IReadOnlyList<string> classes = null, string version = Protocol.Version, byte[] character = null,
+            IReadOnlyList<int> skillOrder = null)
         {
+            SkillOrder = skillOrder ?? Array.Empty<int>();
             PlayerKey = playerKey ?? "";
             Name = name ?? "";
             Classes = classes ?? Array.Empty<string>();
@@ -122,6 +126,8 @@ namespace Game.Core
         public string Version { get; }
         // The player's saved character (CharacterSave), or empty for a new one.
         public byte[] Character { get; }
+        // The order of the skills in the slots (ClassRules.SkillsFor), or empty for the classes' own order.
+        public IReadOnlyList<int> SkillOrder { get; }
 
         // Classes come after the version, so a host can still read an older client's version and say why it
         // refuses it.
@@ -134,6 +140,7 @@ namespace Game.Core
             foreach (string id in Classes.Take(byte.MaxValue)) w.Write(id ?? "");
             w.Write(Character.Length);
             w.Write(Character);
+            Protocol.WriteIndexes(w, SkillOrder);
         });
 
         public static JoinMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Join, r =>
@@ -143,14 +150,16 @@ namespace Game.Core
             string version = r.ReadString();
             var classes = new List<string>();
             byte[] character = null;
+            IReadOnlyList<int> order = null;
             if (version == Protocol.Version)
             {
                 for (int count = r.ReadByte(); count > 0; count--) classes.Add(r.ReadString());
                 int length = r.ReadInt32();
                 if (length < 0 || length > 1 << 20) throw new InvalidDataException("Character data too large.");
                 character = r.ReadBytes(length);
+                order = Protocol.ReadIndexes(r);
             }
-            return new JoinMessage(key, name, classes, version, character);
+            return new JoinMessage(key, name, classes, version, character, order);
         });
     }
 
@@ -351,8 +360,9 @@ namespace Game.Core
     // The client builds the same caves from the seed, so the map itself is never sent.
     public sealed class WelcomeMessage
     {
-        public WelcomeMessage(int playerId, ulong seed, int width, int height, Vec2 spawn, IReadOnlyList<int> classes = null)
+        public WelcomeMessage(int playerId, ulong seed, int width, int height, Vec2 spawn, IReadOnlyList<int> classes = null, IReadOnlyList<int> skillOrder = null)
         {
+            SkillOrder = skillOrder ?? Array.Empty<int>();
             PlayerId = playerId;
             Seed = seed;
             Width = width;
@@ -368,6 +378,8 @@ namespace Game.Core
         public Vec2 Spawn { get; }
         // The classes the host accepted, as indexes into the class sheet.
         public IReadOnlyList<int> Classes { get; }
+        // The order the host put the skills in (ClassRules.SkillsFor).
+        public IReadOnlyList<int> SkillOrder { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Welcome, w =>
         {
@@ -377,10 +389,36 @@ namespace Game.Core
             w.Write(Height);
             w.Write(Spawn);
             Protocol.WriteIndexes(w, Classes);
+            Protocol.WriteIndexes(w, SkillOrder);
         });
 
         public static WelcomeMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Welcome, r =>
-            new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2(), Protocol.ReadIndexes(r)));
+            new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2(), Protocol.ReadIndexes(r), Protocol.ReadIndexes(r)));
+    }
+
+    // A player asking for other classes (indexes into the class sheet) or another order of their skills; and the
+    // host telling them the classes and order they have now (MessageType.Kit). See Docs/Classes.md.
+    public sealed class KitMessage
+    {
+        public KitMessage(MessageType type, IReadOnlyList<int> classes, IReadOnlyList<int> skillOrder)
+        {
+            Type = type;
+            Classes = classes ?? Array.Empty<int>();
+            SkillOrder = skillOrder ?? Array.Empty<int>();
+        }
+
+        public MessageType Type { get; }
+        public IReadOnlyList<int> Classes { get; }
+        public IReadOnlyList<int> SkillOrder { get; }
+
+        public byte[] Encode() => Protocol.Build(Type, w =>
+        {
+            Protocol.WriteIndexes(w, Classes);
+            Protocol.WriteIndexes(w, SkillOrder);
+        });
+
+        public static KitMessage Decode(byte[] data, MessageType type) =>
+            Protocol.Read(data, type, r => new KitMessage(type, Protocol.ReadIndexes(r), Protocol.ReadIndexes(r)));
     }
 
     public sealed class RefusedMessage

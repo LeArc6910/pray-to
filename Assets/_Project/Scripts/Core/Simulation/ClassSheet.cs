@@ -149,6 +149,17 @@ namespace Game.Core
         // The skills in slot order: each class's skills, in the order the classes were chosen.
         public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes) =>
             classes.SelectMany(c => c.Skills).Take(SkillSlots).ToList();
+
+        // The skills in the order the player chose: order[i] is which of the classes' skills (in SkillsFor's order)
+        // goes in slot i. Anything but a full reordering of them leaves them as SkillsFor has them.
+        public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes, IReadOnlyList<int> order)
+        {
+            var skills = SkillsFor(classes);
+            return IsOrder(order, skills.Count) ? order.Select(i => skills[i]).ToList() : skills;
+        }
+
+        public static bool IsOrder(IReadOnlyList<int> order, int count) =>
+            order != null && order.Count == count && order.All(i => i >= 0 && i < count) && order.Distinct().Count() == count;
     }
 
     // Reads Assets/_Project/Data/Classes: classes.csv for the classes and skills.csv for their skills.

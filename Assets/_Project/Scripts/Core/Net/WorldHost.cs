@@ -127,6 +127,9 @@ namespace Game.Core
                     case MessageType.InventoryCommand:
                         if (_connections.TryGetValue(connection, out var owner) && owner.Player != null) Apply(owner.Player, InventoryCommandMessage.Decode(data));
                         break;
+                    case MessageType.ClassCommand:
+                        if (_connections.TryGetValue(connection, out var learner) && learner.Player != null) ChangeKit(connection, learner.Player, data);
+                        break;
                     case MessageType.SkillCommand:
                         if (_connections.TryGetValue(connection, out var caster) && caster.Player != null)
                         {
@@ -224,12 +227,15 @@ namespace Game.Core
             var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, saved?.Equipment ?? StarterGear(), saved?.Bag, classes.ToArray());
             if (saved == null) GiveStarterStacks(player);
             GivePickaxe(player);
-            // Someone coming back to a world where they have a bed starts beside it.
+            // The skills in the order the player keeps them in.
+            World.ChangeClasses(player.Id, player.Classes, join.SkillOrder);
+            // Someone coming back to a world where they have a bed starts beside it (the client snaps there).
             World.SendHome(player);
             _connections[connection] = new Connection { Player = player };
 
             var map = _generated.Map;
-            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, player.Position, ClassIndexes(player)).Encode(), reliable: true);
+            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, World.Spawn, ClassIndexes(player), player.SkillOrder).Encode(),
+                reliable: true);
             foreach (byte[] message in TileChangesMessage.EncodeAll(World.ChangedTiles())) Send(connection, message, reliable: true);
             var crops = World.Crops.Select(c => CropEntry(new CropChange(c.X, c.Y, c))).ToList();
             foreach (byte[] message in CropChangesMessage.EncodeAll(crops)) Send(connection, message, reliable: true);
@@ -475,6 +481,18 @@ namespace Game.Core
                 if (list[i] == item) return i;
             }
             throw new InvalidOperationException($"{typeof(T).Name} is not in the host's sheets, so clients could not name it.");
+        }
+
+        // New classes or a new order of skills. The player always hears back what they have now, done or not, so the
+        // screen never shows a kit the host did not take.
+        void ChangeKit(ulong connection, Player player, byte[] data)
+        {
+            var request = KitMessage.Decode(data, MessageType.ClassCommand);
+            var ids = request.Classes.Where(i => _classes != null && i >= 0 && i < _classes.Classes.Count).Select(i => _classes.Classes[i].Id);
+            var classes = ClassRules.Choose(_classes, ids, _config.MaxClasses);
+            bool changed = World.ChangeClasses(player.Id, classes, request.SkillOrder);
+            Send(connection, new KitMessage(MessageType.Kit, ClassIndexes(player), player.SkillOrder).Encode(), reliable: true);
+            if (changed) BroadcastRoster();
         }
 
         void BroadcastRoster()

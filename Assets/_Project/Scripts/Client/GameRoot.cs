@@ -76,6 +76,8 @@ namespace Game.Client
         Biome _biomeAnnounced;
         const float BiomeBannerDelay = 1.5f;
         Hotbar _hotbar;
+        // The kit last kept (RememberKit).
+        int _kitSeen = -1;
         MapView _map;
         // "획득: …" lines for things picked up, each shown for a few seconds.
         readonly List<(string Text, float Age)> _acquired = new List<(string, float)>();
@@ -182,6 +184,7 @@ namespace Game.Client
             _client.AdvanceRenderClock(Time.deltaTime);
             UpdateGuide(Time.deltaTime);
             UpdateBiome(Time.deltaTime);
+            RememberKit();
             var changedTiles = _client.TakeChangedTiles();
             _view.UpdateTiles(changedTiles);
             _map.UpdateTiles(changedTiles);
@@ -227,6 +230,34 @@ namespace Game.Client
             if (_biomeTime < BiomeBannerDelay || biome == _biomeAnnounced) return;
             _biomeAnnounced = biome;
             _view?.ShowBanner(BiomeMap.Name(biome));
+        }
+
+        // After the host gives the player classes or an order, the menu picks those classes next time, and the order
+        // is kept on this device for them (PlayerPrefs "skillorder.<character>": the classes it is for, then the order).
+        void RememberKit()
+        {
+            if (_client.KitVersion == _kitSeen) return;
+            _kitSeen = _client.KitVersion;
+            _chosenClasses.Clear();
+            _chosenClasses.AddRange(_client.Classes.Select(c => c.Id));
+            PlayerPrefs.SetString(SkillOrderKey, string.Join(",", _chosenClasses) + "|" + string.Join(",", _client.SkillOrder));
+            PlayerPrefs.Save();
+        }
+
+        string SkillOrderKey => "skillorder." + CharacterName;
+
+        // The skill order kept for this character, if it is for the classes picked now.
+        IReadOnlyList<int> KeptSkillOrder()
+        {
+            string[] parts = PlayerPrefs.GetString(SkillOrderKey, "").Split('|');
+            if (parts.Length != 2 || parts[0] != string.Join(",", _chosenClasses)) return null;
+            var order = new List<int>();
+            foreach (string part in parts[1].Split(','))
+            {
+                if (!int.TryParse(part, out int index)) return null;
+                order.Add(index);
+            }
+            return order;
         }
 
         void UpdateGuide(float deltaTime)
@@ -377,7 +408,9 @@ namespace Game.Client
             _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
             {
                 Character = character,
+                JoinSkillOrder = KeptSkillOrder(),
             };
+            _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
             _host.Receive(LocalConnection, _client.JoinMessage());
@@ -399,7 +432,9 @@ namespace Game.Client
             _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
             {
                 Character = character,
+                JoinSkillOrder = KeptSkillOrder(),
             };
+            _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
             _joinSent = false;
