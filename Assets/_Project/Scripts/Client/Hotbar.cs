@@ -222,7 +222,8 @@ namespace Game.Client
                     var consumable = ConsumableOf(entry);
                     if (consumable == null) return (null, -1, false, false, "", "");
                     int left = _client.Bag.CountOf(consumable);
-                    return (Sprites.Icon(consumable), left, left > 0, false, consumable.Name, consumable.IsFood ? "먹는다" : "마신다");
+                    string action = consumable.IsFood ? "먹는다" : consumable.Recalls ? "침대(없으면 시작 지점)로 돌아간다" : "마신다";
+                    return (Sprites.Icon(consumable), left, left > 0, false, consumable.Name, action);
                 case Kind.Material:
                     var material = MaterialOf(entry);
                     if (material == null) return (null, -1, false, false, "", "");

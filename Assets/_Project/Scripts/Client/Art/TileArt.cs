@@ -287,6 +287,7 @@ namespace Game.Client
             TileType.Arm => ArmBase,
             TileType.Torch => Torch,
             TileType.Lamp => Lamp,
+            TileType.Bed => Bed,
             _ => null,
         };
 
@@ -737,6 +738,36 @@ namespace Game.Client
             ['w'] = Rgba.Hex("#FFF6D0"),
             ['_'] = Shadow,
         };
+
+        // A bed of slime-gel mattress on a stone frame, with a pillow and a blanket.
+        static readonly PixelImage Bed = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['o'] = Rgba.Hex("#1A1410"),
+                ['s'] = Rgba.Hex("#8A7562"),
+                ['S'] = Rgba.Hex("#5C4D41"),
+                ['w'] = Rgba.Hex("#F0ECE0"),
+                ['W'] = Rgba.Hex("#C8C0B0"),
+                ['b'] = Rgba.Hex("#4A7AC8"),
+                ['B'] = Rgba.Hex("#2E5498"),
+                ['L'] = Rgba.Hex("#7AA8E8"),
+                ['_'] = Shadow,
+            },
+            "................",
+            ".oooooooooooooo.",
+            ".osSSSSSSSSSSso.",
+            ".oswwwwwWWwwwso.",
+            ".oswwwwwwWwwWso.",
+            ".osWWWWWWWWWWso.",
+            ".osLLLLLLLLLLso.",
+            ".osbbbbbbbbbbso.",
+            ".osbbBbbbbBbbso.",
+            ".osbbbbbbbbbbso.",
+            ".osbBbbbbBbbbso.",
+            ".osBBBBBBBBBBso.",
+            ".osSSSSSSSSSSso.",
+            ".oSo........oSo.",
+            ".ooo........ooo.",
+            "..__________....");
 
         // A lantern of glowing spores from the mushroom forest on an iron post.
         static readonly PixelImage Lamp = PixelImage.FromRows(new Dictionary<char, Rgba>

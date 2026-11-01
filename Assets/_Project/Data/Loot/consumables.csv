@@ -1,5 +1,6 @@
-id,name,level,heal,seconds,cooldown,weight,description,buff,buff_seconds
-healing_potion,회복 물약,1,35,2,10,100,2초에 걸쳐 최대 생명력의 35%를 채운다
-roasted_mushroom,버섯 구이,1,25,4,10,0,4초에 걸쳐 최대 생명력의 25%를 채운다. 동굴 버섯 둘로 만든다
-spicy_fry,매운 볶음,1,10,2,10,0,3분 동안 피해 10% 증가 · 공격 속도 5% 증가. 불꽃 고추 둘과 동굴 버섯 하나로 만든다,Damage+10%;AttackSpeed+5%,180
-mushroom_soup,버섯 수프,1,15,3,10,0,3분 동안 최대 생명력 15% 증가 · 초당 생명력 회복 +1. 동굴 버섯 셋으로 만든다,MaxHealth+15%;HealthRegen+1,180
+id,name,level,heal,seconds,cooldown,weight,description,buff,buff_seconds,effect
+healing_potion,회복 물약,1,35,2,10,100,2초에 걸쳐 최대 생명력의 35%를 채운다,
+roasted_mushroom,버섯 구이,1,25,4,10,0,4초에 걸쳐 최대 생명력의 25%를 채운다. 동굴 버섯 둘로 만든다,
+spicy_fry,매운 볶음,1,10,2,10,0,3분 동안 피해 10% 증가 · 공격 속도 5% 증가. 불꽃 고추 둘과 동굴 버섯 하나로 만든다,Damage+10%;AttackSpeed+5%,180,
+mushroom_soup,버섯 수프,1,15,3,10,0,3분 동안 최대 생명력 15% 증가 · 초당 생명력 회복 +1. 동굴 버섯 셋으로 만든다,MaxHealth+15%;HealthRegen+1,180,
+recall_scroll,귀환 두루마리,1,0,1,5,0,2초 뒤 내 침대 옆(없으면 시작 지점)으로 돌아간다. 그 사이 맞으면 끊긴다,,,recall

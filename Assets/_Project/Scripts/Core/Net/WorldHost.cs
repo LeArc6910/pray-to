@@ -224,6 +224,8 @@ namespace Game.Core
             var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, saved?.Equipment ?? StarterGear(), saved?.Bag, classes.ToArray());
             if (saved == null) GiveStarterStacks(player);
             GivePickaxe(player);
+            // Someone coming back to a world where they have a bed starts beside it.
+            World.SendHome(player);
             _connections[connection] = new Connection { Player = player };
 
             var map = _generated.Map;
@@ -278,7 +280,8 @@ namespace Game.Core
             if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
             // A month at most, so a clock that jumped years ahead does not grow everything forever.
             long closedTicks = Math.Clamp(now - save.SavedAt, 0, 30L * 24 * 3600) * World.TicksPerSecond;
-            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks, c.Watered)), save.ProgressLevel, save.Chests);
+            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks, c.Watered)), save.ProgressLevel, save.Chests,
+                save.Beds);
             foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output);
         }
 
@@ -350,7 +353,7 @@ namespace Game.Core
                 viewer.ConsumableCooldown,
                 viewer.Food == null ? -1 : IndexOf(_loot?.Consumables, viewer.Food),
                 viewer.FoodTicks,
-                viewer.Afflictions.Bits);
+                (byte)(viewer.Afflictions.Bits | (viewer.Recalling ? StatusBits.Recalling : 0)));
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),

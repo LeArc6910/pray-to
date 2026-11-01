@@ -448,7 +448,7 @@ namespace Game.Core
         public byte[] UseConsumableCommand(ConsumableDefinition consumable)
         {
             if (Status != ClientStatus.Playing || _snapshots.Count == 0 || IsDead || consumable == null || Bag.CountOf(consumable) == 0) return null;
-            if (ConsumableCooldownLeft > 0 || (Health >= MaxHealth && !consumable.IsFood)) return null;
+            if (ConsumableCooldownLeft > 0 || (Health >= MaxHealth && !consumable.UsableAtFullHealth)) return null;
             _consumableCooldown = World.Ticks(consumable.Cooldown) + (int)Math.Ceiling(HostTick - _skillsTick);
             return new InventoryCommandMessage(InventoryCommand.UseConsumable, 0, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode();
         }

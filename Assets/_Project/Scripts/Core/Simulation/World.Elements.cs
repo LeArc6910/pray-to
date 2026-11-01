@@ -53,6 +53,8 @@ namespace Game.Core
     {
         public const byte Burning = 1;
         public const byte Chilled = 2;
+        // Only in the player's own state: on the way home.
+        public const byte Recalling = 4;
     }
 
     // Fire burns for a share of the hit over a few seconds, cold slows, lightning jumps to enemies nearby. A monster

@@ -798,6 +798,27 @@ namespace Game.Client
                     Hear(Sound.Eat, eater.Position);
                     AddFlash(eater.Position, eater.Diameter, Palette.Food, Shapes.Ring);
                     break;
+                case SimEventType.Recall:
+                    var traveller = Find(e.Source);
+                    var place = new Vector3(e.Position.X, e.Position.Y, 0);
+                    bool mine = e.Source == _client.PlayerId;
+                    if (e.Amount == World.RecallStarted)
+                    {
+                        AddFlash(place, 1.6f, RecallColor, Shapes.Ring);
+                        Hear(Sound.Buff, place);
+                        if (traveller != null) _floating.Add(new Floating { Position = traveller.Position, Text = "귀환…", Color = RecallColor });
+                    }
+                    else if (e.Amount == World.RecallArrived)
+                    {
+                        AddFlash(place, 2.2f, RecallColor, Shapes.Circle);
+                        if (mine) Sounds.Play(Sound.Wake);
+                        else Hear(Sound.Wake, place);
+                    }
+                    else if (mine)
+                    {
+                        _floating.Add(new Floating { Position = place, Text = "귀환이 끊겼다", Color = Color.gray });
+                    }
+                    break;
                 case SimEventType.Chained:
                     // A jagged line of light from what was struck to where the lightning jumped.
                     var from = Find(e.Source);
@@ -1072,6 +1093,7 @@ namespace Game.Client
         static readonly Color ChillTint = new Color(0.62f, 0.82f, 1f);
         static readonly Color BurnColor = new Color(1f, 0.5f, 0.15f);
         static readonly Color BoltColor = new Color(1f, 0.95f, 0.5f);
+        static readonly Color RecallColor = new Color(0.55f, 0.75f, 1f);
 
         // Lightning's jump: little squares along a jagged path that vanish in a moment.
         void Bolt(Vector3 from, Vector3 to)

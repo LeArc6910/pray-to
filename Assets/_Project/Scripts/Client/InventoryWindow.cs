@@ -384,7 +384,7 @@ namespace Game.Client
                 Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
                 // A potion is drunk; a food is eaten, and still gives its buff at full health.
-                if (GUILayout.Button(pair.Key.IsFood ? "먹기" : "마시기", GUILayout.Width(56)))
+                if (GUILayout.Button(pair.Key.IsFood ? "먹기" : pair.Key.Recalls ? "쓰기" : "마시기", GUILayout.Width(56)))
                 {
                     byte[] command = _client.UseConsumableCommand(pair.Key);
                     if (command != null) _send(command);

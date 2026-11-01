@@ -764,6 +764,7 @@ namespace Game.Client
                     string arena = next == 0 ? "보스 아레나" : next == 1 ? "깊은 아레나" : "용암 아레나";
                     lines.Add($"{arena}: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
                 }
+                if ((_client.SelfStatus & StatusBits.Recalling) != 0) lines.Add("귀환 중… 맞으면 끊긴다");
                 if (_client.Food != null)
                 {
                     int left = Mathf.CeilToInt(_client.FoodLeft);

@@ -46,3 +46,5 @@ watering_can,watering_can,1,copper_ore:4|stone:2,Workbench
 spicy_fry,spicy_fry,1,fire_pepper:2|mushroom:1,Furnace
 mushroom_soup,mushroom_soup,1,mushroom:3,Furnace
 glow_lamp,glow_lamp,2,glow_spore:2|stone:2,Workbench
+bed,bed,1,stone:6|slime_gel:3,Workbench
+recall_scroll,recall_scroll,2,slime_gel:2|stone:2,Workbench

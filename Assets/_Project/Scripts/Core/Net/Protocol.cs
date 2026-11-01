@@ -28,11 +28,11 @@ namespace Game.Core
     public static class Protocol
     {
         // An entity's phase byte also carries its burning and chilled marks (StatusBits) in its top two bits.
-        public static int WithStatus(int phase, byte status) => (phase & PhaseMask) | (status << 6);
+        public static int WithStatus(int phase, byte status) => (phase & PhaseMask) | ((status & 3) << 6);
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.22.0";
+        public const string Version = "0.23.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 

@@ -14,8 +14,8 @@ namespace Game.Core
     public sealed class WorldSave
     {
         const string Magic = "PTWO";
-        // 2 added chests, 3 machines, 4 whether each crop was watered.
-        const int FormatVersion = 4;
+        // 2 added chests, 3 machines, 4 whether each crop was watered, 5 beds and their owners.
+        const int FormatVersion = 5;
 
         WorldSave(
             ulong seed,
@@ -25,8 +25,10 @@ namespace Game.Core
             List<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> crops,
             List<(int X, int Y, Inventory Contents)> chests,
             List<SavedMachine> machines,
-            List<string> warnings)
+            List<string> warnings,
+            List<(int X, int Y, string Owner)> beds = null)
         {
+            Beds = beds ?? new List<(int, int, string)>();
             Chests = chests;
             Machines = machines;
             Seed = seed;
@@ -45,6 +47,8 @@ namespace Game.Core
         // Age is in ticks at the moment of saving.
         public IReadOnlyList<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> Crops { get; }
         public IReadOnlyList<(int X, int Y, Inventory Contents)> Chests { get; }
+        // Whose bed is where, by player name.
+        public IReadOnlyList<(int X, int Y, string Owner)> Beds { get; }
         public IReadOnlyList<SavedMachine> Machines { get; }
 
         public sealed class SavedMachine
@@ -135,6 +139,15 @@ namespace Game.Core
                     SavedItems.WriteCounts(w, machine.Inputs.Select(p => (p.Key.Id, p.Value)));
                     SavedItems.WriteCounts(w, machine.Outputs.Select(p => (p.Key.Id, p.Value)));
                 }
+
+                var beds = world.Beds.ToList();
+                w.Write(beds.Count);
+                foreach (var (x, y, owner) in beds)
+                {
+                    w.Write((ushort)x);
+                    w.Write((ushort)y);
+                    w.Write(owner);
+                }
             }
             return stream.ToArray();
         }
@@ -222,7 +235,14 @@ namespace Game.Core
                         stacks.Select(s => (Find(s.Id), s.Count)).Where(s => s.Item1 != null).ToList();
                     machines.Add(new SavedMachine(x, y, direction, timer, carried.Length > 0 ? Find(carried) : null, along, Resolve(input), Resolve(output)));
                 }
-                return new WorldSave(seed, savedAt, Math.Max(1, progress), tiles, crops, chests, machines, warnings);
+                var beds = new List<(int, int, string)>();
+                for (int count = version >= 5 ? r.ReadInt32() : 0; count > 0; count--)
+                {
+                    int x = r.ReadUInt16();
+                    int y = r.ReadUInt16();
+                    beds.Add((x, y, r.ReadString()));
+                }
+                return new WorldSave(seed, savedAt, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds);
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

@@ -207,8 +207,10 @@ namespace Game.Core
                     var buff = FixedModifiers(row["buff"]);
                     float buffSeconds = row["buff_seconds"].Length == 0 ? 0 : SheetValues.ParseDecimal(row["buff_seconds"], "buff_seconds");
                     if (buff.Count > 0 != buffSeconds > 0) throw new FormatException("buff와 buff_seconds는 함께 채우거나 함께 비웁니다.");
-                    if (heal < (buff.Count > 0 ? 0 : 1) || heal > 100)
-                        throw new FormatException("heal은 1~100(최대 생명력의 %)이어야 합니다. buff가 있으면 0도 됩니다.");
+                    string effect = row["effect"];
+                    if (effect.Length > 0 && effect != ConsumableDefinition.Recall) throw new FormatException($"effect '{effect}'는 모릅니다(비우거나 recall).");
+                    if (heal < (buff.Count > 0 || effect.Length > 0 ? 0 : 1) || heal > 100)
+                        throw new FormatException("heal은 1~100(최대 생명력의 %)이어야 합니다. buff나 effect가 있으면 0도 됩니다.");
                     float cooldown = SheetValues.ParseDecimal(row["cooldown"], "cooldown");
                     if (cooldown <= 0) throw new FormatException("cooldown은 0보다 커야 합니다.");
                     consumables.Add(new ConsumableDefinition(
@@ -221,7 +223,8 @@ namespace Game.Core
                         SheetValues.ParseNumber(row["weight"], "weight"),
                         row["description"],
                         buff,
-                        buffSeconds));
+                        buffSeconds,
+                        effect));
                 });
             }
             return consumables;

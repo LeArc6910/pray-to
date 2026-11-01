@@ -46,6 +46,9 @@ namespace Game.Core
         public int ConsumableCooldown { get; internal set; }
         // Burns and chills from monsters' elements.
         public Afflictions Afflictions { get; } = new Afflictions();
+        // Ticks until a recall scroll takes the player home, or 0.
+        public int RecallTicks { get; internal set; }
+        public bool Recalling => RecallTicks > 0;
         // How fast the player may move now: slower while chilled.
         public float MoveSpeed => Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1);
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
@@ -239,6 +242,9 @@ namespace Game.Core
         Ate,
         // Lightning jumped from Source (a monster or boss) to Target, a monster.
         Chained,
+        // Source, a player, began going home (Amount World.RecallStarted), got there (RecallArrived) or was stopped by
+        // a hit (RecallBroken), at Position.
+        Recall,
     }
 
     public readonly struct SimEvent
@@ -268,7 +274,8 @@ namespace Game.Core
         public Vec2 Position { get; }
 
         public static bool HasPosition(SimEventType type) =>
-            type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered;
+            type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
+            || type == SimEventType.Recall;
     }
 
     public enum BossState : byte

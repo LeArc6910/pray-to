@@ -213,6 +213,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.MithrilOre) return Palette.MithrilOre;
             if (_map[x, y] == TileType.ObsidianOre) return new Color32(110, 70, 150, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);
+            if (_map[x, y] == TileType.Bed) return new Color32(80, 130, 220, 255);
             if (_map.IsSolid(x, y)) return Wall;
             return WorldView.InArena(_client, x, y) ? ArenaFloor : BiomeFloor(_client.Biomes[x, y]);
         }

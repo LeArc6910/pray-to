@@ -86,6 +86,7 @@
 | cooldown | 마신 뒤 모든 소모품을 다시 쓸 수 있을 때까지(초) |
 | level, weight | 드랍 레벨이 level 이상일 때 나오고, 그중 weight 비율로 고른다 |
 | description | 가방 창에 보이는 설명 |
+| effect | (선택) 그 밖에 하는 일. 지금은 `recall`(침대나 시작 지점으로 귀환, `Docs/Crafting.md`)뿐이다. 있으면 heal이 0이어도 되고 생명력이 가득해도 쓴다 |
 | buff, buff_seconds | 음식이 거는 능력치(장비와 같은 문법, 범위는 안 됨)와 그 시간(초). 둘 다 채우거나 둘 다 비운다. 이 열이 없는 옛 시트도 읽는다 |
 
 ### runewords.csv

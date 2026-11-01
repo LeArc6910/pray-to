@@ -30,6 +30,8 @@ namespace Game.Core
         // lava, walked over like floor but burning whoever stands in them. Lava cannot be dug or built on.
         ObsidianOre,
         Lava,
+        // Where its owner gets up (World.Home.cs).
+        Bed,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

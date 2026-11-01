@@ -175,8 +175,10 @@ namespace Game.Core
             int weight,
             string description,
             IReadOnlyList<Modifier> buff = null,
-            float buffSeconds = 0)
+            float buffSeconds = 0,
+            string effect = "")
         {
+            Effect = effect ?? "";
             Buff = buff ?? Array.Empty<Modifier>();
             BuffSeconds = buffSeconds;
             Id = id;
@@ -202,6 +204,12 @@ namespace Game.Core
         public IReadOnlyList<Modifier> Buff { get; }
         public float BuffSeconds { get; }
         public bool IsFood => Buff.Count > 0;
+        // Something else it does (consumables.csv effect): "recall" takes its user home. Empty for none.
+        public string Effect { get; }
+        public bool Recalls => Effect == Recall;
+        public const string Recall = "recall";
+        // Whether it is any use at full health.
+        public bool UsableAtFullHealth => IsFood || Effect.Length > 0;
         public int BuffTicks => World.Ticks(BuffSeconds);
     }
 

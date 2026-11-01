@@ -195,8 +195,11 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || consumable == null || player.ConsumableCooldown > 0) return false;
-            // A potion is no use at full health; a food still gives its buff.
-            if ((player.Health >= player.Stats.MaxHealth && !consumable.IsFood) || !player.Inventory.TakeConsumable(consumable)) return false;
+            // A potion is no use at full health; a food still gives its buff, a recall scroll still takes them home.
+            if (player.Health >= player.Stats.MaxHealth && !consumable.UsableAtFullHealth) return false;
+            if (consumable.Recalls && player.Recalling) return false;
+            if (!player.Inventory.TakeConsumable(consumable)) return false;
+            if (consumable.Recalls) StartRecall(player);
 
             if (consumable.IsFood)
             {

@@ -105,6 +105,7 @@ namespace Game.Core
             SetTile(x, y, material.Places.Value);
             var machine = MachineAt(x, y);
             if (machine != null) machine.Direction = Machine.DirectionOf(player.Facing);
+            if (material.Places == TileType.Bed) ClaimBed(player, x, y);
             return true;
         }
 
@@ -132,7 +133,8 @@ namespace Game.Core
             IEnumerable<TileChange> tiles,
             IEnumerable<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> crops,
             int progressLevel,
-            IEnumerable<(int X, int Y, Inventory Contents)> chests = null)
+            IEnumerable<(int X, int Y, Inventory Contents)> chests = null,
+            IEnumerable<(int X, int Y, string Owner)> beds = null)
         {
             foreach (var tile in tiles)
             {
@@ -144,6 +146,7 @@ namespace Game.Core
                 if (!Map.InBounds(x, y) || Map[x, y] != TileType.Floor) continue;
                 _crops[y * Map.Width + x] = new Crop(crop, x, y, Tick - age, watered);
             }
+            foreach (var (x, y, owner) in beds ?? Enumerable.Empty<(int, int, string)>()) RestoreBed(x, y, owner);
             ProgressLevel = Math.Max(ProgressLevel, progressLevel);
             _newTileChanges.Clear();
             _newCropChanges.Clear();
@@ -152,6 +155,7 @@ namespace Game.Core
         void SetTile(int x, int y, TileType type)
         {
             if (Map[x, y] == TileType.Chest || type == TileType.Chest) ChestTileChanged(x, y, type);
+            if (Map[x, y] == TileType.Bed) BedTileChanged(x, y, type);
             if (Tiles?.Machine(Map[x, y]) != null || Tiles?.Machine(type) != null) MachineTileChanged(x, y, type);
             Map[x, y] = type;
             _changedTiles[y * Map.Width + x] = type;

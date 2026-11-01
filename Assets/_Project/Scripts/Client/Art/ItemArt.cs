@@ -254,6 +254,18 @@ namespace Game.Client
             "..bBBBBb..",
             "...bbbb...").Outlined(Outline);
 
+        // A rolled scroll tied with a blue ribbon.
+        static readonly PixelImage RecallScroll = PixelImage.FromRows(BowlColors,
+            "..bbbbbb..",
+            ".bLLLLLLb.",
+            ".bLMmMMLb.",
+            ".bLLLLLLb.",
+            ".bLMMmMLb.",
+            "..bbwwbb..",
+            ".bLLLLLLb.",
+            ".bLMmMMLb.",
+            "..bbbbbb..").Outlined(Outline);
+
         // A bowl of creamy soup with bits of mushroom.
         static readonly PixelImage MushroomSoup = PixelImage.FromRows(BowlColors,
             "..w...w...",
@@ -269,6 +281,7 @@ namespace Game.Client
             "roasted_mushroom" => RoastedMushroom,
             "spicy_fry" => SpicyFry,
             "mushroom_soup" => MushroomSoup,
+            "recall_scroll" => RecallScroll,
             _ => Potion,
         };
 
