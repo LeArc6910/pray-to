@@ -46,7 +46,8 @@ namespace Game.Core
             Health = health;
             MaxHealth = maxHealth;
             State = state;
-            Phase = phase;
+            Phase = phase & Protocol.PhaseMask;
+            Status = (byte)(phase >> 6);
             DropBase = dropBase;
             DropRune = dropRune;
             DropConsumable = dropConsumable;
@@ -68,6 +69,10 @@ namespace Game.Core
         public EnemyState EnemyState => (EnemyState)State;
         public BossState BossState => (BossState)State;
         public int Phase { get; }
+        // Burning, chilled (StatusBits).
+        public byte Status { get; }
+        public bool Burning => (Status & StatusBits.Burning) != 0;
+        public bool Chilled => (Status & StatusBits.Chilled) != 0;
         // For ground loot: the item's base and rarity, the rune, the consumable or the material.
         public ItemBase DropBase { get; }
         public RuneDefinition DropRune { get; }
@@ -229,6 +234,8 @@ namespace Game.Core
         public float Health { get; private set; }
         public float MaxHealth { get; private set; } = 1;
         public float MoveSpeed { get; private set; } = PlayerStats.BaseMoveSpeed;
+        // The player's own burning and chilled marks (StatusBits).
+        public byte SelfStatus { get; private set; }
         public bool IsDead => Status == ClientStatus.Playing && _snapshots.Count > 0 && Health <= 0;
         public IReadOnlyDictionary<int, string> Names => _names;
 
@@ -684,6 +691,7 @@ namespace Game.Core
             Health = self.Health;
             MaxHealth = self.MaxHealth;
             MoveSpeed = self.MoveSpeed;
+            SelfStatus = self.Status;
             if (self.Corrections != _seenCorrections)
             {
                 _seenCorrections = self.Corrections;

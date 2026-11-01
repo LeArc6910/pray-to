@@ -44,6 +44,10 @@ namespace Game.Core
 
         // Ticks until any consumable can be used again.
         public int ConsumableCooldown { get; internal set; }
+        // Burns and chills from monsters' elements.
+        public Afflictions Afflictions { get; } = new Afflictions();
+        // How fast the player may move now: slower while chilled.
+        public float MoveSpeed => Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1);
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
         public ConsumableDefinition Food { get; private set; }
         public int FoodTicks { get; private set; }
@@ -164,6 +168,8 @@ namespace Game.Core
         public int StateTicks { get; internal set; }
         public int TargetId { get; internal set; }
 
+        public Afflictions Afflictions { get; } = new Afflictions();
+
         internal Vec2 Knockback { get; set; }
         internal Vec2 ChargeDirection { get; set; }
         internal HashSet<int> ChargeHits { get; } = new HashSet<int>();
@@ -231,6 +237,8 @@ namespace Game.Core
         Watered,
         // Source, a player, ate the consumable with sheet index Amount, which feeds them a buff.
         Ate,
+        // Lightning jumped from Source (a monster or boss) to Target, a monster.
+        Chained,
     }
 
     public readonly struct SimEvent
@@ -289,6 +297,8 @@ namespace Game.Core
             Health = definition.Health;
             MaxHealth = definition.Health;
         }
+
+        public Afflictions Afflictions { get; } = new Afflictions();
 
         public int Id { get; }
         public BossDefinition Definition { get; }

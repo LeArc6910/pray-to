@@ -49,7 +49,7 @@ namespace Game.Core
             {
                 case SkillKind.Nova:
                     float damage = RollSkill(player, skill, out bool critical);
-                    HitArea(player, player.Position, skill.Radius, damage, critical, slot + 1);
+                    HitArea(player, player.Position, skill.Radius, damage, critical, slot + 1, player.Stats.ContextFor(skill));
                     break;
                 case SkillKind.Projectile:
                     Fire(player, skill, slot);
@@ -220,14 +220,15 @@ namespace Game.Core
             minion.AttackCooldown = Ticks(MinionAttackSeconds);
             _events.Add(new SimEvent(SimEventType.Attack, minion.Id, direction: minion.Facing));
             float damage = RollSkill(owner, minion.Skill, out bool critical);
+            var tags = owner.Stats.ContextFor(minion.Skill);
             var enemy = FindEnemy(targetId);
             if (enemy != null)
             {
-                HitEnemy(owner, enemy, Combat.Mitigate(damage, enemy.Definition.Armor), critical, minion.Position, minion.Slot + 1, knockback: false);
+                HitEnemy(owner, enemy, damage, critical, minion.Position, tags, minion.Slot + 1, knockback: false);
                 return;
             }
             var boss = _bosses.FirstOrDefault(b => b.Id == targetId);
-            if (boss != null && !boss.Invulnerable) DamageBoss(boss, owner.Id, Combat.Mitigate(damage, boss.Definition.Armor), critical, minion.Slot + 1);
+            if (boss != null) HitBoss(owner, boss, damage, critical, tags, minion.Slot + 1);
         }
 
         // A player's projectile stops at the first enemy or boss it touches, at a wall, or at the end of its range,
@@ -243,36 +244,54 @@ namespace Game.Core
             if (!touching && !ended) return false;
 
             if (projectile.Skill?.Radius > 0) _events.Add(new SimEvent(SimEventType.Burst, owner.Id, amount: projectile.Cause, position: at));
-            HitArea(owner, at, Math.Max(projectile.Skill?.Radius ?? 0, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1);
+            HitArea(owner, at, Math.Max(projectile.Skill?.Radius ?? 0, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1,
+                projectile.Tags);
             return true;
         }
 
         // Every enemy and boss touching the circle takes the hit.
-        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical, int cause)
+        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical, int cause, SkillTag tags)
         {
-            foreach (var enemy in _enemies)
+            foreach (var enemy in _enemies.ToList())
             {
                 if (enemy.IsDead || Vec2.Distance(enemy.Position, centre) > radius + enemy.Definition.Radius) continue;
-                HitEnemy(player, enemy, Combat.Mitigate(damage, enemy.Definition.Armor), critical, centre, cause);
+                HitEnemy(player, enemy, damage, critical, centre, tags, cause);
             }
             foreach (var boss in _bosses)
             {
                 if (boss.IsDead || Vec2.Distance(boss.Position, centre) > radius + boss.Definition.Radius) continue;
                 if (boss.State == BossState.Dormant) Wake(boss);
-                if (!boss.Invulnerable) DamageBoss(boss, player.Id, Combat.Mitigate(damage, boss.Definition.Armor), critical, cause);
+                HitBoss(player, boss, damage, critical, tags, cause);
             }
         }
 
-        // Knocks the enemy away from where the hit came from, unless a spirit struck it: spirits strike often and would
-        // keep it from ever reaching anyone.
-        void HitEnemy(Player player, Enemy enemy, int amount, bool critical, Vec2 from, int cause = 0, bool knockback = true)
+        // damage is before the monster's resistance to the hit's elements and its armor. Knocks the enemy away from
+        // where the hit came from, unless a spirit struck it (spirits strike often and would keep it from ever
+        // reaching anyone) or lightning jumped to it. Then the elements do their part (World.Elements.cs).
+        void HitEnemy(Player player, Enemy enemy, float damage, bool critical, Vec2 from, SkillTag tags, int cause = 0, bool knockback = true,
+            bool chained = false)
         {
+            if (enemy.IsDead) return;
+            int amount = Combat.Mitigate(damage * ElementFactor(enemy.Definition, tags), enemy.Definition.Armor);
             enemy.Health -= amount;
             if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed;
             _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
-            if (!enemy.IsDead) return;
-            _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
-            DropFrom(enemy, player);
+            if (enemy.IsDead)
+            {
+                _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
+                DropFrom(enemy, player);
+            }
+            Afflict(player, enemy, tags, amount, damage, critical, cause, chained);
+            if (enemy.IsDead && (tags & SkillTag.Lightning) != 0 && !chained) Chain(player, enemy.Id, enemy.Position, damage, critical, tags, cause);
+        }
+
+        // A boss takes the hit less its armor, burns, and passes lightning on; an invulnerable one takes nothing.
+        void HitBoss(Player player, Boss boss, float damage, bool critical, SkillTag tags, int cause = 0)
+        {
+            if (boss.IsDead || boss.Invulnerable) return;
+            int amount = Combat.Mitigate(damage, boss.Definition.Armor);
+            DamageBoss(boss, player.Id, amount, critical, cause);
+            AfflictBoss(player, boss, tags, amount, damage, critical, cause);
         }
     }
 }

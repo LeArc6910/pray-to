@@ -8,3 +8,5 @@ volley,연발 사격,archer,projectile,ranged,70,4,,16,9,,5,,,부채꼴로 화�
 eagle_eye,매의 눈,archer,buff,ranged,,14,,,,6,,Ranged:Damage+25%;CritChance+8,,잠시 원거리 피해와 치명타 확률이 오른다
 spirits,정령 부르기,summoner,summon,summon|magic,40,18,,6,7,15,2,,,정령 둘을 불러 곁에서 함께 싸우게 한다
 spirit_pact,영혼 결속,summoner,buff,summon,,16,,,,8,,Summon:Damage+40%,,잠시 소환수의 피해가 크게 오른다
+chain_lightning,연쇄 번개,storm_caller,projectile,magic|lightning,110,2,,14,10,,,,,겨눈 쪽으로 번개를 쏜다. 맞은 적에게서 둘레 적 둘에게 튄다
+frost_ring,서리 고리,storm_caller,nova,magic|cold,130,6,2.2,,,,,,,둘레를 얼려 적을 치고 느리게 한다

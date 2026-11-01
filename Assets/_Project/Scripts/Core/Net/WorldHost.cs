@@ -344,19 +344,22 @@ namespace Game.Core
                 viewer.Position,
                 viewer.Health,
                 viewer.Stats.MaxHealth,
-                viewer.Stats.MoveSpeed,
+                viewer.MoveSpeed,
                 slots.Select(viewer.CooldownTicks).ToList(),
                 slots.Select(viewer.BuffTicks).ToList(),
                 viewer.ConsumableCooldown,
                 viewer.Food == null ? -1 : IndexOf(_loot?.Consumables, viewer.Food),
-                viewer.FoodTicks);
+                viewer.FoodTicks,
+                viewer.Afflictions.Bits);
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
-                p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p)));
+                p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),
+                Protocol.WithStatus(0, p.Afflictions.Bits)));
             var bosses = World.Bosses
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
-                    b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, (byte)b.State, b.Phase));
+                    b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, (byte)b.State,
+                    Protocol.WithStatus(b.Phase, b.Afflictions.Bits)));
             var minions = World.Minions
                 .Where(m => InView(m.Position))
                 .Select(m => new EntityState(
@@ -367,7 +370,8 @@ namespace Game.Core
                 .OrderBy(e => Distance(e.Position))
                 .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
                 .Select(e => new EntityState(
-                    e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.Definition.Health, (byte)e.State));
+                    e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.Definition.Health, (byte)e.State,
+                    Protocol.WithStatus(0, e.Afflictions.Bits)));
             var drops = World.GroundLoot
                 .Where(l => InView(l.Position))
                 .OrderBy(l => Distance(l.Position))

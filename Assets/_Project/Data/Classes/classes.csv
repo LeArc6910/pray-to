@@ -3,3 +3,4 @@ warrior,전사,단단한 몸으로 앞에서 싸운다. 근접 공격이 강하�
 fire_mage,화염 마법사,불로 멀리서 적을 태운다. 화염 피해가 강하다,Fire:Damage+15%
 archer,궁수,멀리서 화살을 퍼붓는다. 원거리 공격이 강하다,Ranged:Damage+15%;AttackSpeed+10%
 summoner,소환사,정령을 불러 함께 싸운다. 소환수가 강하다,Summon:Damage+20%;MaxHealth+10%
+storm_caller,폭풍술사,번개와 냉기를 부린다. 냉기는 느리게 하고 번개는 옆으로 튄다,Cold:Damage+10%;Lightning:Damage+10%

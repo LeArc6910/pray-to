@@ -1,10 +1,10 @@
-id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight,drop_chance,rune_chance,potion_chance,material,material_chance,behavior,shot_speed,keep_distance,charge_speed,color,biome
-slime,슬라임,1,30,9,0,2.4,0.4,8,0.5,0.5,1.0,100,20,6,8,slime_gel,30,melee,,,,#8CD94D,
-spore_shooter,가시 버섯,2,24,8,0,1.6,0.35,9,6,0.8,2.0,60,20,6,8,mushroom_spore,25,ranged,7,4,,#B07CE0,
-cave_beetle,동굴 딱정벌레,2,60,14,15,2.2,0.42,8,4,0.7,2.2,50,25,8,8,copper_ore,40,charge,,,10,#A0703C,
-crystal_bat,수정 박쥐,3,75,17,10,3.6,0.3,9,0.5,0.35,0.9,60,25,8,10,mithril_ore,30,melee,,,,#7CD2E2,crystal
-crystal_wisp,수정 정령,3,60,18,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,mithril_ore,25,ranged,9,4.5,,#C8F4FF,crystal
-myconid,버섯 병정,2,55,12,5,1.8,0.4,8,0.5,0.6,1.4,70,22,7,8,glow_spore,35,melee,,,,#C86ED8,mushroom
-glow_bat,빛 박쥐,3,70,16,5,3.8,0.3,9,0.5,0.35,0.9,60,25,8,10,glow_spore,30,melee,,,,#5FE0C8,mushroom
-ice_slime,얼음 슬라임,2,70,12,10,1.8,0.42,8,0.5,0.6,1.2,70,22,7,8,ice_crystal,25,melee,,,,#8CC8F0,ice
-frost_wisp,서리 정령,3,60,17,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,ice_crystal,30,ranged,9,4.5,,#BFE8FF,ice
+id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight,drop_chance,rune_chance,potion_chance,material,material_chance,behavior,shot_speed,keep_distance,charge_speed,color,biome,resist,element
+slime,슬라임,1,30,9,0,2.4,0.4,8,0.5,0.5,1.0,100,20,6,8,slime_gel,30,melee,,,,#8CD94D,,,
+spore_shooter,가시 버섯,2,24,8,0,1.6,0.35,9,6,0.8,2.0,60,20,6,8,mushroom_spore,25,ranged,7,4,,#B07CE0,,fire:-25,
+cave_beetle,동굴 딱정벌레,2,60,14,15,2.2,0.42,8,4,0.7,2.2,50,25,8,8,copper_ore,40,charge,,,10,#A0703C,,,
+crystal_bat,수정 박쥐,3,75,17,10,3.6,0.3,9,0.5,0.35,0.9,60,25,8,10,mithril_ore,30,melee,,,,#7CD2E2,crystal,,
+crystal_wisp,수정 정령,3,60,18,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,mithril_ore,25,ranged,9,4.5,,#C8F4FF,crystal,lightning:50,
+myconid,버섯 병정,2,55,12,5,1.8,0.4,8,0.5,0.6,1.4,70,22,7,8,glow_spore,35,melee,,,,#C86ED8,mushroom,fire:-25,
+glow_bat,빛 박쥐,3,70,16,5,3.8,0.3,9,0.5,0.35,0.9,60,25,8,10,glow_spore,30,melee,,,,#5FE0C8,mushroom,,
+ice_slime,얼음 슬라임,2,70,12,10,1.8,0.42,8,0.5,0.6,1.2,70,22,7,8,ice_crystal,25,melee,,,,#8CC8F0,ice,cold:75|fire:-25,cold
+frost_wisp,서리 정령,3,60,17,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,ice_crystal,30,ranged,9,4.5,,#BFE8FF,ice,cold:75|fire:-25,cold

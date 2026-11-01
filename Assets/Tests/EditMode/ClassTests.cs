@@ -192,8 +192,8 @@ namespace Game.Core.Tests
             var events = Run(world, World.TicksPerSecond);
 
             // The staff's lowest roll is 3, raised by its own magic 30% and the fire mage's fire 15%: 3 × 145% × 120%
-            // = 5.2, or 7.8 on a crit. Everything in the burst takes the same roll.
-            int dealt = Dummy.Health - (int)target.Health;
+            // = 5.2, or 7.8 on a crit. Everything in the burst takes the same roll (and the same burn after it).
+            int dealt = events.First(e => e.Type == SimEventType.Hit && e.Target == target.Id).Amount;
             Assert.That(dealt, Is.EqualTo(5).Or.EqualTo(8));
             Assert.AreEqual(target.Health, beside.Health);
             Assert.AreEqual(Dummy.Health, behind.Health);

@@ -14,6 +14,8 @@ iron_sword,철 검,weapon,10,melee,Damage+9~12,3,100
 iron_bow,철 활,weapon,10,ranged,Damage+7~10;AttackSpeed+5%,3,100
 iron_staff,철 지팡이,weapon,10,magic,Damage+7~10;Magic:Damage+35%;AttackSpeed-15%,3,100
 iron_pickaxe,철 곡괭이,weapon,10,melee,Damage+5~6;MiningSpeed+60%,1,0,pickaxe
+frost_staff,서리 지팡이,weapon,10,magic|cold,Damage+7~10;Magic:Damage+30%;AttackSpeed-15%,3,0,
+storm_bow,폭풍 활,weapon,10,ranged|lightning,Damage+6~9;AttackSpeed+5%,3,0,
 iron_helmet,철 투구,helmet,10,,Armor+7~10,2,100
 iron_armor,철 갑옷,chest,10,,Armor+13~17;MaxHealth+12~18,3,100
 iron_boots,철 장화,boots,10,,Armor+5~7,2,100

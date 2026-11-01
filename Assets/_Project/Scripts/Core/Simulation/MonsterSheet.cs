@@ -40,9 +40,13 @@ namespace Game.Core
             float keepDistance = 0,
             float chargeSpeed = 0,
             string color = "",
-            Biome? biome = null)
+            Biome? biome = null,
+            IReadOnlyDictionary<SkillTag, int> resists = null,
+            SkillTag element = SkillTag.None)
         {
             Biome = biome;
+            _resists = resists ?? new Dictionary<SkillTag, int>();
+            Element = element;
             Id = id;
             Name = name;
             Level = level;
@@ -74,6 +78,12 @@ namespace Game.Core
         public int Level { get; }
         // Only spawns in this biome, or anywhere when null.
         public Biome? Biome { get; }
+        // The element its attacks carry (fire burns, cold chills), or None.
+        public SkillTag Element { get; }
+        readonly IReadOnlyDictionary<SkillTag, int> _resists;
+
+        // How much less damage it takes from an element, in percent; negative for a weakness.
+        public int Resist(SkillTag element) => _resists.TryGetValue(element, out int percent) ? percent : 0;
         public int Health { get; }
         public int Damage { get; }
         public int Armor { get; }
@@ -166,6 +176,8 @@ namespace Game.Core
                     string color = row["color"];
                     if (color.Length > 0 && !SheetValues.IsColor(color)) throw new FormatException($"color '{color}'는 #RRGGBB로 적습니다.");
                     Biome? biome = row["biome"].Length == 0 ? (Biome?)null : SheetValues.ParseEnum<Biome>(row["biome"], "biome");
+                    var resists = Resists(row["resist"]);
+                    var element = row["element"].Length == 0 ? SkillTag.None : Element(SheetValues.ParseEnum<SkillTag>(row["element"], "element"));
 
                     monsters.Add(new MonsterDefinition(
                         id,
@@ -191,7 +203,9 @@ namespace Game.Core
                         Number(row, "keep_distance"),
                         chargeSpeed,
                         color,
-                        biome));
+                        biome,
+                        resists,
+                        element));
                 }
                 catch (FormatException e)
                 {
@@ -199,6 +213,29 @@ namespace Game.Core
                 }
             }
             return new MonsterData(monsters, errors);
+        }
+
+        static readonly SkillTag[] ElementTags = { SkillTag.Fire, SkillTag.Cold, SkillTag.Lightning };
+
+        static SkillTag Element(SkillTag tag) =>
+            Array.IndexOf(ElementTags, tag) >= 0 ? tag : throw new FormatException($"element '{tag}'는 fire, cold, lightning 중 하나입니다.");
+
+        // "fire:75|cold:-25": percent less damage from each element, negative for more.
+        static Dictionary<SkillTag, int> Resists(string cell)
+        {
+            var resists = new Dictionary<SkillTag, int>();
+            foreach (string part in cell.Split('|').Select(p => p.Trim()).Where(p => p.Length > 0))
+            {
+                string[] pieces = part.Split(':');
+                if (pieces.Length != 2) throw new FormatException($"resist '{part}'는 fire:50처럼 적습니다.");
+                var element = Element(SheetValues.ParseEnum<SkillTag>(pieces[0].Trim(), "resist의 원소"));
+                string number = pieces[1].Trim();
+                bool negative = number.StartsWith("-");
+                int percent = SheetValues.ParseNumber(negative ? number.Substring(1) : number, "resist");
+                if (percent > 100) throw new FormatException("resist는 100 이하입니다.");
+                resists[element] = negative ? -percent : percent;
+            }
+            return resists;
         }
 
         // Drop columns may be left out or blank, which means no drops.

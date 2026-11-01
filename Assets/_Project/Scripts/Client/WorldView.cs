@@ -92,6 +92,7 @@ namespace Game.Client
             public Vector3 Velocity;
             public float Age;
             public Color Color;
+            public float Life = BitSeconds;
         }
 
         // Where a body was and what colour it was, kept for the frame it is removed in: its death event comes after.
@@ -219,7 +220,8 @@ namespace Game.Client
         public void Render(float tickFraction, float deltaTime)
         {
             var selfPosition = Vec2.Lerp(_client.PreviousPosition, _client.Position, Mathf.Clamp01(tickFraction));
-            Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, Color.white, Color.clear, deltaTime,
+            var (selfTint, selfGlow) = StatusLook(_client.SelfStatus, Color.white, Color.clear);
+            Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, selfTint, selfGlow, deltaTime,
                 weapon: _client.Equipment[ItemSlot.Weapon]?.Base);
             _self.Name = _client.Name;
             int selfBuffs = 0;
@@ -335,6 +337,7 @@ namespace Game.Client
                     pulse = 0.06f;
                 }
                 if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) glow = Faded(ChargeColor, 0.45f);
+                (tint, glow) = StatusLook(view.Status, tint, glow);
                 // A spirit flickers in its last two seconds (its health counts down the ticks it has left).
                 if (view.Kind == EntityKind.Minion && view.Health < World.TicksPerSecond * 2) tint = new Color(1, 1, 1, 0.35f + 0.65f * Mathf.Abs(Mathf.Sin(Time.time * 12)));
                 if (view.Kind == EntityKind.Boss)
@@ -794,6 +797,12 @@ namespace Game.Client
                     Hear(Sound.Eat, eater.Position);
                     AddFlash(eater.Position, eater.Diameter, Palette.Food, Shapes.Ring);
                     break;
+                case SimEventType.Chained:
+                    // A jagged line of light from what was struck to where the lightning jumped.
+                    var from = Find(e.Source);
+                    var to = Find(e.Target);
+                    if (from != null && to != null) Bolt(from.Position + new Vector3(0, 0.3f, 0), to.Position + new Vector3(0, 0.3f, 0));
+                    break;
                 case SimEventType.Healed:
                     var drinker = Find(e.Source);
                     if (drinker == null) break;
@@ -1051,6 +1060,37 @@ namespace Game.Client
 
         static Color BodyColor(Body body) => new Color32(body.Color.R, body.Color.G, body.Color.B, 255);
 
+        // Burning flickers orange over a body; chilled tints it icy blue. A telegraph's glow wins over the burn.
+        static (Color Tint, Color Glow) StatusLook(byte status, Color tint, Color glow)
+        {
+            if ((status & StatusBits.Chilled) != 0) tint *= ChillTint;
+            if ((status & StatusBits.Burning) != 0 && glow.a <= 0) glow = Faded(BurnColor, 0.18f + 0.14f * Mathf.Abs(Mathf.Sin(Time.time * 17)));
+            return (tint, glow);
+        }
+
+        static readonly Color ChillTint = new Color(0.62f, 0.82f, 1f);
+        static readonly Color BurnColor = new Color(1f, 0.5f, 0.15f);
+        static readonly Color BoltColor = new Color(1f, 0.95f, 0.5f);
+
+        // Lightning's jump: little squares along a jagged path that vanish in a moment.
+        void Bolt(Vector3 from, Vector3 to)
+        {
+            float length = Vector3.Distance(from, to);
+            int steps = Mathf.Max(3, Mathf.RoundToInt(length * 6));
+            var side = Vector3.Cross(to - from, Vector3.forward).normalized;
+            for (int i = 0; i <= steps; i++)
+            {
+                float t = (float)i / steps;
+                float jag = i == 0 || i == steps ? 0 : (UnityEngine.Random.value - 0.5f) * 0.25f;
+                var renderer = Renderer(_root.transform, "Bolt", Shapes.Square, BoltColor);
+                renderer.transform.localPosition = Vector3.Lerp(from, to, t) + side * jag;
+                renderer.transform.localScale = Vector3.one * (2f / Sprites.PixelsPerUnit);
+                renderer.sortingOrder = 19001;
+                _bits.Add(new Bit { Renderer = renderer, Velocity = Vector3.zero, Color = BoltColor, Life = 0.18f });
+            }
+            Hear(Sound.Zap, to, 0.5f);
+        }
+
         // Bits flying out of something that died, in its colour, more for something bigger.
         void Burst(Vector3 at, Color color, float size)
         {
@@ -1073,7 +1113,7 @@ namespace Game.Client
             {
                 var bit = _bits[i];
                 bit.Age += deltaTime;
-                if (bit.Age >= BitSeconds)
+                if (bit.Age >= bit.Life)
                 {
                     Object.Destroy(bit.Renderer.gameObject);
                     _bits.RemoveAt(i);
@@ -1082,7 +1122,7 @@ namespace Game.Client
                 bit.Velocity *= Mathf.Exp(-6 * deltaTime);
                 bit.Renderer.transform.localPosition += bit.Velocity * deltaTime;
                 var color = bit.Color;
-                color.a = 1 - bit.Age / BitSeconds;
+                color.a = 1 - bit.Age / bit.Life;
                 bit.Renderer.color = color;
             }
         }

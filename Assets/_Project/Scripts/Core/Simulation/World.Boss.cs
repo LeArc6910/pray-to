@@ -380,7 +380,8 @@ namespace Game.Core
         {
             var victim = _players.FirstOrDefault(p => !p.IsDead && Vec2.Distance(p.Position, projectile.Position) <= projectile.Radius + PlayerRadius);
             if (victim == null) return false;
-            HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause);
+            int dealt = HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause);
+            AfflictPlayer(victim, FindEnemy(projectile.Source)?.Definition, projectile.Source, dealt);
             return true;
         }
     }

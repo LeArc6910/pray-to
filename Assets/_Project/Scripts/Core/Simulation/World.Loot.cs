@@ -59,7 +59,7 @@ namespace Game.Core
             int level = Math.Max(definition.Level, ProgressLevel);
             if (_random.Chance(definition.DropChance / 100f))
             {
-                DropItem(_lootGenerator.RollItem(level, _random, (int)killer.Stats.ItemRarity), Scatter(enemy.Position));
+                DropItem(_lootGenerator.RollItem(level, _random, (int)(killer?.Stats.ItemRarity ?? 0)), Scatter(enemy.Position));
             }
             if (_random.Chance(definition.RuneChance / 100f))
             {

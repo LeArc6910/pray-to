@@ -105,7 +105,7 @@ namespace Game.Core
             if (facing.LengthSquared > 1e-6f && !player.IsDead) player.Facing = facing.Normalized;
             if (reported.Equals(player.Position)) return true;
 
-            float allowed = player.Stats.MoveSpeed * TickSeconds * Math.Clamp(elapsedTicks, 1, 10) * 1.25f + 0.05f;
+            float allowed = player.MoveSpeed * TickSeconds * Math.Clamp(elapsedTicks, 1, 10) * 1.25f + 0.05f;
             bool valid = !player.IsDead
                 && reported.IsFinite
                 && Vec2.Distance(player.Position, reported) <= allowed
@@ -145,9 +145,13 @@ namespace Game.Core
             {
                 _flow.Build(_players.Where(p => !p.IsDead).Select(p => p.Position), FlowFieldRange);
             }
-            foreach (var enemy in _enemies) UpdateEnemy(enemy);
+            foreach (var enemy in _enemies)
+            {
+                if (!SkipsTick(enemy)) UpdateEnemy(enemy);
+            }
             UpdateBosses();
             UpdateMinions();
+            UpdateAfflictions();
             UpdateHazards();
             UpdateProjectiles();
             UpdateLoot();
@@ -240,8 +244,8 @@ namespace Game.Core
                 if (enemy.IsDead) continue;
                 if (!Combat.InArc(player.Position, player.Facing, enemy.Position, enemy.Definition.Radius, MeleeReach, MeleeArcDegrees)) continue;
 
-                int amount = RollDamage(stats, enemy.Definition.Armor, out bool critical);
-                HitEnemy(player, enemy, amount, critical, player.Position);
+                float damage = RollDamage(stats, out bool critical);
+                HitEnemy(player, enemy, damage, critical, player.Position, stats.AttackTags);
                 hit = true;
             }
 
@@ -252,16 +256,16 @@ namespace Game.Core
                 hit = true;
                 if (boss.State == BossState.Dormant) Wake(boss);
                 if (boss.Invulnerable) continue;
-                int amount = RollDamage(stats, boss.Definition.Armor, out bool critical);
-                DamageBoss(boss, player.Id, amount, critical);
+                HitBoss(player, boss, RollDamage(stats, out bool critical), critical, stats.AttackTags);
             }
             return hit;
         }
 
-        int RollDamage(PlayerStats stats, float armor, out bool critical)
+        // A basic attack's damage before armor and resistances.
+        float RollDamage(PlayerStats stats, out bool critical)
         {
             critical = _random.Chance(stats.CritChance / 100f);
-            return Combat.Mitigate(stats.Damage * (critical ? stats.CritDamage / 100f : 1f), armor);
+            return stats.Damage * (critical ? stats.CritDamage / 100f : 1f);
         }
 
         void UpdateEnemy(Enemy enemy)
@@ -339,7 +343,10 @@ namespace Game.Core
                             return;
                         default:
                             _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
-                            if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack) HurtPlayer(target, enemy.Id, definition.Damage);
+                            if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack)
+                            {
+                                AfflictPlayer(target, definition, enemy.Id, HurtPlayer(target, enemy.Id, definition.Damage));
+                            }
                             break;
                     }
                     enemy.State = EnemyState.Recover;
@@ -397,7 +404,7 @@ namespace Game.Core
                 if (player.IsDead || enemy.ChargeHits.Contains(player.Id)) continue;
                 if (Vec2.Distance(player.Position, enemy.Position) > definition.Radius + PlayerRadius) continue;
                 enemy.ChargeHits.Add(player.Id);
-                HurtPlayer(player, enemy.Id, definition.Damage);
+                AfflictPlayer(player, definition, enemy.Id, HurtPlayer(player, enemy.Id, definition.Damage));
             }
             bool blocked = Vec2.Distance(before, enemy.Position) < step.Length * 0.3f;
             if (--enemy.StateTicks > 0 && !blocked) return;
@@ -423,21 +430,24 @@ namespace Game.Core
             player.Health = Math.Min(player.Stats.MaxHealth, player.Health + amount);
         }
 
-        void HurtPlayer(Player player, int source, float damage, int cause = 0)
+        // Returns the damage dealt. A burn's damage is not lessened by armor.
+        int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true)
         {
-            if (player.IsDead) return;
-            int amount = Combat.Mitigate(damage, player.Stats.Armor);
+            if (player.IsDead) return 0;
+            int amount = armor ? Combat.Mitigate(damage, player.Stats.Armor) : Math.Max(1, (int)MathF.Round(damage));
             player.Health -= amount;
             player.RestingTicks = 0;
             _events.Add(new SimEvent(SimEventType.Hit, source, player.Id, amount, cause: cause));
-            if (!player.IsDead) return;
+            if (!player.IsDead) return amount;
 
             player.Health = 0;
             player.Attacking = false;
             player.HealTicks = 0;
             player.ClearBuffs();
+            player.Afflictions.Clear();
             player.RespawnTicks = Ticks(_config.RespawnSeconds);
             _events.Add(new SimEvent(SimEventType.Died, player.Id));
+            return amount;
         }
 
         static float Gap(Enemy enemy, Player player) =>
