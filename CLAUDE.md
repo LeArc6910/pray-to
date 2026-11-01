@@ -38,7 +38,7 @@ dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --players 2
 dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --classes warrior,fire_mage
 dotnet run --project DevTools/CoreSandbox -- --boss 400 1 --boss-id crystal_queen --gear iron_sword,iron_armor --reaction 0.5
 
-# 도트 그림과 효과음을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, cave.png, cave_unlit.png, arena.png, sounds/)
+# 도트 그림과 효과음을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, cave.png, cave_unlit.png, arena.png, effects.png, sounds/)
 dotnet run --project DevTools/ArtPreview
 
 # Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(몇 분, 에디터와 웹 플레이어의 엔진 DLL만 .unity/에 받는다)

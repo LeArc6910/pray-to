@@ -3,31 +3,21 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // Smooth white shapes for effects, tinted by their SpriteRenderer: swings, rings, bursts, telegraphs, health
-    // bars and the touch sticks. Everything that stands in the world is pixel art (Sprites, Art/). Every shape is
-    // one world unit (one tile) across.
+    // Smooth white shapes, tinted by their SpriteRenderer: a boss's telegraphs, health bars, the glow under loot and
+    // the touch sticks, where a clean edge reads better. Everything that stands in the world is pixel art (Sprites,
+    // Art/), and so are the effects of swings and skills (EffectArt). Every shape is one world unit (one tile) across.
     static class Shapes
     {
         const int Size = 64;
-        const float ArcHalfAngle = 60 * Mathf.Deg2Rad;
 
         static Sprite _circle;
         static Sprite _ring;
-        static Sprite _arc;
         static Sprite _square;
         static readonly System.Collections.Generic.Dictionary<int, Sprite> Wedges = new System.Collections.Generic.Dictionary<int, Sprite>();
 
         public static Sprite Circle => _circle ??= Make((u, v) => Edge(1 - Radius(u, v)));
 
         public static Sprite Ring => _ring ??= Make((u, v) => Mathf.Min(Edge(1 - Radius(u, v)), Edge(Radius(u, v) - 0.75f)));
-
-        // A 120 degree slice of a ring pointing along +x, the shape of a melee swing.
-        public static Sprite Arc => _arc ??= Make((u, v) =>
-        {
-            float radius = Radius(u, v);
-            float angle = Mathf.Abs(Mathf.Atan2(v, u));
-            return Mathf.Min(Edge(1 - radius), Edge(radius - 0.45f), Edge((ArcHalfAngle - angle) * 4));
-        });
 
         public static Sprite Square => _square ??= Make((u, v) => 1);
 

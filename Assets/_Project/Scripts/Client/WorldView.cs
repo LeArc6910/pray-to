@@ -38,6 +38,9 @@ namespace Game.Client
             public SpriteRenderer HealthFill;
             // A ring while a buff runs, in the buff's colour.
             public SpriteRenderer Aura;
+            // Sizes of the swing and the buff ring, in pixels (EffectArt).
+            public int SwingDiameter;
+            public int AuraDiameter;
             public BodyKind Kind;
             public string Id;
             // A player's tunic, a monster's sheet colour, the boss's stone.
@@ -79,10 +82,22 @@ namespace Game.Client
         sealed class Flash
         {
             public SpriteRenderer Renderer;
-            public float Size;
+            public FlashKind Kind;
+            public int Diameter;
             public float Age;
             public float Life;
             public Color Color;
+        }
+
+        // What a flash looks like: a pixel effect from EffectArt, run frame by frame.
+        enum FlashKind
+        {
+            // A blast: skill bursts, dust, splashes.
+            Burst,
+            // A ring opening out: novas, summons, a harvest.
+            Ring,
+            // Sparkles rising: healing, food, buffs.
+            Sparkles,
         }
 
         // A bit flying off something that died, fading as it slows.
@@ -794,19 +809,19 @@ namespace Game.Client
                         break;
                     }
                     bool broke = e.Amount >= World.DugThrough;
-                    AddFlash(struck, broke ? 0.7f : 0.35f, Palette.Dust, Shapes.Circle);
+                    AddFlash(struck, broke ? 0.7f : 0.35f, Palette.Dust, FlashKind.Burst);
                     Hear(broke ? Sound.Break : Sound.Dig, struck);
                     if (!broke) Crack(TileMap.Cell(e.Position.X), TileMap.Cell(e.Position.Y), e.Amount);
                     break;
                 case SimEventType.Harvested:
-                    AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 0.6f, Palette.Ripe, Shapes.Ring);
+                    AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 0.6f, Palette.Ripe, FlashKind.Sparkles);
                     Hear(Sound.Harvest, new Vector3(e.Position.X, e.Position.Y, 0));
                     break;
                 case SimEventType.Watered:
                     // A splash over the watered tiles. The one who poured already heard it when they pressed.
                     var poured = new Vector3(e.Position.X, e.Position.Y, 0);
                     // From no player: a sprinkler, watering the 5×5 square around it.
-                    AddFlash(poured, e.Source == 0 ? 3.6f : 2.6f, Palette.Water, Shapes.Circle);
+                    AddFlash(poured, e.Source == 0 ? 3.6f : 2.6f, Palette.Water, FlashKind.Ring);
                     if (e.Source != _client.PlayerId) Hear(Sound.Water, poured);
                     break;
                 case SimEventType.Ate:
@@ -815,7 +830,7 @@ namespace Game.Client
                     if (eater == null || food == null) break;
                     _floating.Add(new Floating { Position = eater.Position + new Vector3(0, 0.4f, 0), Text = food.Name, Color = Palette.Food });
                     Hear(Sound.Eat, eater.Position);
-                    AddFlash(eater.Position, eater.Diameter, Palette.Food, Shapes.Ring);
+                    AddFlash(eater.Position, eater.Diameter, Palette.Food, FlashKind.Sparkles);
                     break;
                 case SimEventType.Recall:
                     var traveller = Find(e.Source);
@@ -823,13 +838,13 @@ namespace Game.Client
                     bool mine = e.Source == _client.PlayerId;
                     if (e.Amount == World.RecallStarted)
                     {
-                        AddFlash(place, 1.6f, RecallColor, Shapes.Ring);
+                        AddFlash(place, 1.6f, RecallColor, FlashKind.Sparkles);
                         Hear(Sound.Buff, place);
                         if (traveller != null) _floating.Add(new Floating { Position = traveller.Position, Text = "귀환…", Color = RecallColor });
                     }
                     else if (e.Amount == World.RecallArrived)
                     {
-                        AddFlash(place, 2.2f, RecallColor, Shapes.Circle);
+                        AddFlash(place, 2.2f, RecallColor, FlashKind.Ring);
                         if (mine) Sounds.Play(Sound.Wake);
                         else Hear(Sound.Wake, place);
                     }
@@ -849,13 +864,13 @@ namespace Game.Client
                     if (drinker == null) break;
                     _floating.Add(new Floating { Position = drinker.Position, Text = "+" + e.Amount, Color = Palette.Heal });
                     Hear(Sound.Heal, drinker.Position);
-                    AddFlash(drinker.Position, drinker.Diameter, Palette.Heal, Shapes.Ring);
+                    AddFlash(drinker.Position, drinker.Diameter, Palette.Heal, FlashKind.Sparkles);
                     break;
                 case SimEventType.Burst:
                     var burst = _client.SkillOf(e.Source, e.Amount);
                     if (burst == null) break;
                     var at = new Vector3(e.Position.X, e.Position.Y, 0);
-                    AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), Shapes.Circle);
+                    AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), FlashKind.Burst);
                     if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.08f);
                     Hear(Sound.Boom, at, 0.7f);
                     break;
@@ -897,12 +912,12 @@ namespace Game.Client
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
-                    AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, Shapes.Ring);
+                    AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, FlashKind.Ring);
                     if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.06f);
                     break;
                 case SkillKind.Buff:
                 case SkillKind.Summon:
-                    AddFlash(caster.Position, caster.Diameter * (skill.Kind == SkillKind.Summon ? 2 : 1), color, Shapes.Ring);
+                    AddFlash(caster.Position, caster.Diameter * (skill.Kind == SkillKind.Summon ? 2 : 1), color, skill.Kind == SkillKind.Summon ? FlashKind.Ring : FlashKind.Sparkles);
                     break;
                 case SkillKind.Projectile:
                     caster.SwingTime = SwingSeconds;
@@ -943,20 +958,26 @@ namespace Game.Client
             body.Aura.enabled = count > 0;
             if (count == 0) return;
             mixed /= count;
-            mixed.a = 0.55f + 0.25f * Mathf.Sin(Time.time * 6);
+            mixed.a = 0.7f + 0.2f * Mathf.Sin(Time.time * 6);
             body.Aura.color = mixed;
+            // Its dashes walk round, a step every tenth of a second.
+            int frame = Mathf.FloorToInt(Time.time * 10) % EffectArt.AuraFrames;
+            body.Aura.sprite = Sprites.Centered($"fx/aura/{body.AuraDiameter}/{frame}", () => EffectArt.Aura(body.AuraDiameter, frame));
             body.Aura.sortingOrder = body.Shape.sortingOrder - 1;
         }
 
-        void AddFlash(Vector3 position, float radius, Color color, Sprite sprite)
+        void AddFlash(Vector3 position, float radius, Color color, FlashKind kind)
         {
-            var renderer = Renderer(_root.transform, "Flash", sprite, color);
+            int diameter = EffectArt.Diameter(radius * 2);
+            var renderer = Renderer(_root.transform, "Flash", EffectSprite(kind, diameter, 0), color);
             renderer.transform.localPosition = position;
             renderer.sortingOrder = 19000;
-            _flashes.Add(new Flash { Renderer = renderer, Size = radius * 2, Life = FlashLife, Color = color });
+            // Sparkles drift up for a little longer than a blast lasts.
+            float life = kind == FlashKind.Sparkles ? FlashLife * 1.6f : FlashLife;
+            _flashes.Add(new Flash { Renderer = renderer, Kind = kind, Diameter = diameter, Life = life, Color = color });
         }
 
-        // Each flash opens out to its full size and fades.
+        // Each flash runs through its frames, drawn at its own size, and fades over the last of them.
         void UpdateFlashes(float deltaTime)
         {
             for (int i = _flashes.Count - 1; i >= 0; i--)
@@ -970,12 +991,20 @@ namespace Game.Client
                     _flashes.RemoveAt(i);
                     continue;
                 }
-                flash.Renderer.transform.localScale = Vector3.one * (flash.Size * (0.6f + 0.4f * Mathf.Sqrt(t)));
+                int frame = Mathf.Min(EffectArt.Frames - 1, Mathf.FloorToInt(t * EffectArt.Frames));
+                flash.Renderer.sprite = EffectSprite(flash.Kind, flash.Diameter, frame);
                 var color = flash.Color;
-                color.a = 0.7f * (1 - t);
+                color.a = t < 0.7f ? 0.9f : 0.9f * (1 - t) / 0.3f;
                 flash.Renderer.color = color;
             }
         }
+
+        static Sprite EffectSprite(FlashKind kind, int diameter, int frame) => kind switch
+        {
+            FlashKind.Ring => Sprites.Centered($"fx/ring/{diameter}/{frame}", () => EffectArt.Ring(diameter, frame)),
+            FlashKind.Sparkles => Sprites.Centered($"fx/sparkles/{diameter}/{frame}", () => EffectArt.Sparkles(diameter, frame)),
+            _ => Sprites.Centered($"fx/burst/{diameter}/{frame}", () => EffectArt.Burst(diameter, frame)),
+        };
 
         Body Find(int id) => id == _client.PlayerId ? _self : _others.TryGetValue(id, out var body) ? body : null;
 
@@ -1008,7 +1037,14 @@ namespace Game.Client
             body.Shadow.enabled = !dead;
 
             body.Swing.enabled = body.SwingTime > 0;
-            body.Swing.color = new Color(1, 1, 1, Mathf.Clamp01(body.SwingTime / SwingSeconds) * 0.6f);
+            if (body.SwingTime > 0)
+            {
+                // The frame for how far through the swing it is (EffectArt.Swing).
+                int frame = Mathf.Clamp(Mathf.FloorToInt((1 - body.SwingTime / SwingSeconds) * EffectArt.SwingFrames), 0, EffectArt.SwingFrames - 1);
+                int size = body.SwingDiameter;
+                body.Swing.sprite = Sprites.Centered($"fx/swing/{size}/{frame}", () => EffectArt.Swing(size, frame));
+            }
+            body.Swing.color = new Color(1, 1, 1, 0.85f);
             body.Swing.sortingOrder = order + 3;
 
             float share = maxHealth > 0 ? Mathf.Clamp01(health / maxHealth) : 0;
@@ -1188,20 +1224,20 @@ namespace Game.Client
                 Shape = Renderer(root, "Shape", null, Color.white),
                 Glow = Renderer(root, "Glow", null, Color.clear),
                 Shadow = Renderer(root, "Shadow", Sprites.Centered("shadow/" + shadowWidth, () => CreatureArt.Shadow(shadowWidth)), Color.white),
-                Swing = Renderer(root, "Swing", Shapes.Arc, Color.white),
+                Swing = Renderer(root, "Swing", null, Color.white),
+                // The swing reaches MeleeReach past the edge of the body; the buff ring sits a little outside it.
+                SwingDiameter = EffectArt.Diameter(diameter + World.MeleeReach * 2),
+                AuraDiameter = EffectArt.Diameter(diameter * 1.7f),
                 HealthBack = Renderer(root, "HealthBack", Shapes.Square, new Color(0, 0, 0, 0.6f)),
                 HealthFill = Renderer(root, "HealthFill", Shapes.Square, Color.green),
-                Aura = Renderer(root, "Aura", Shapes.Ring, Color.clear),
+                Aura = Renderer(root, "Aura", null, Color.clear),
                 Weapon = Renderer(root, "Weapon", null, Color.white),
             };
             body.Shape.transform.localPosition = new Vector3(0, -body.Feet, 0);
             body.Glow.transform.localPosition = body.Shape.transform.localPosition;
             body.Shadow.transform.localPosition = new Vector3(0, -body.Feet + 1f / Sprites.PixelsPerUnit, 0);
             body.Shadow.sortingOrder = -30;
-            body.Aura.transform.localScale = Vector3.one * (diameter * 1.7f);
             body.Aura.enabled = false;
-            // The swing reaches MeleeReach past the edge of the body.
-            body.Swing.transform.localScale = Vector3.one * (diameter + World.MeleeReach * 2);
             body.HealthBack.transform.localScale = new Vector3(0.84f, 0.12f, 1);
             // A weapon icon is drawn to fill a bag slot; in the hand it is a little smaller than the body.
             body.Weapon.transform.localScale = Vector3.one * 0.8f;

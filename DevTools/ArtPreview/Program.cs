@@ -8,8 +8,9 @@ namespace Game.Client
 {
     // Draws every sprite to sheet.png and two made-up scenes (the spawn with a small base, the boss arena) to
     // cave.png and arena.png, laid out and lit the way WorldView lays them out and lights them; cave_unlit.png is
-    // the first without the dark. Writes every sound effect to sounds/<name>.wav. Fails if any drawing is malformed
-    // or a sound comes out silent, too long or out of range.
+    // the first without the dark. Draws every frame of the pixel effects, tinted as the game tints them, to
+    // effects.png. Writes every sound effect to sounds/<name>.wav. Fails if any drawing is malformed, an effect frame
+    // is empty or spills out of its circle, or a sound comes out silent, too long or out of range.
     //
     //   dotnet run --project DevTools/ArtPreview [-- <output folder>]
     static class Program
@@ -44,8 +45,11 @@ namespace Game.Client
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
+            var effects = Effects(out bool effectsFine);
+            Save(effects, Path.Combine(output, "effects.png"), 3);
+            if (!effectsFine) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
-            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png and sounds/ to {output}");
+            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png, effects.png and sounds/ to {output}");
             return 0;
         }
 
@@ -69,6 +73,92 @@ namespace Game.Client
         }
 
         static void Save(PixelImage image, string path, int scale) => Png.Save(Scaled(image, scale), path);
+
+        // ---- Effects ----
+
+        // Each effect's frames in a row, small and large, tinted in a colour the game uses for it.
+        static PixelImage Effects(out bool fine)
+        {
+            fine = true;
+            var rows = new List<(string Name, int Diameter, Rgba Tint, int Frames, Func<int, int, PixelImage> Draw)>
+            {
+                ("swing", EffectArt.Diameter(0.8f + 2 * 0.75f), Rgba.White, EffectArt.SwingFrames, EffectArt.Swing),
+                ("burst (fire)", EffectArt.Diameter(2 * 1.6f), Rgba.Hex("#FF8A3C"), EffectArt.Frames, EffectArt.Burst),
+                ("burst (dust)", EffectArt.Diameter(2 * 0.35f), Rgba.Hex("#B8A890"), EffectArt.Frames, EffectArt.Burst),
+                ("ring (frost)", EffectArt.Diameter(2 * 2.8f), Rgba.Hex("#8CD8FF"), EffectArt.Frames, EffectArt.Ring),
+                ("sparkles (heal)", EffectArt.Diameter(2 * 0.8f), Rgba.Hex("#7CE07C"), EffectArt.Frames, EffectArt.Sparkles),
+                ("aura (buff)", EffectArt.Diameter(0.8f * 1.7f), Rgba.Hex("#F2C440"), EffectArt.AuraFrames, EffectArt.Aura),
+            };
+            var images = new List<List<PixelImage>>();
+            foreach (var (name, diameter, tint, frames, draw) in rows)
+            {
+                var row = new List<PixelImage>();
+                for (int frame = 0; frame < frames; frame++)
+                {
+                    var image = draw(diameter, frame);
+                    string problem = EffectProblem(image, diameter);
+                    if (problem != null)
+                    {
+                        Console.Error.WriteLine($"{name} frame {frame}: {problem}");
+                        fine = false;
+                    }
+                    row.Add(Tinted(image, tint));
+                }
+                images.Add(row);
+            }
+            const int gap = 4;
+            int width = images.Max(row => row.Sum(image => image.Width + gap)) + gap;
+            int height = images.Sum(row => row.Max(image => image.Height) + gap) + gap;
+            var sheet = new PixelImage(width, height);
+            sheet.Fill(0, 0, width, height, Rgba.Hex("#24202A"));
+            int y = gap;
+            foreach (var row in images)
+            {
+                int x = gap;
+                foreach (var image in row)
+                {
+                    sheet.Draw(image, x, y);
+                    x += image.Width + gap;
+                }
+                y += row.Max(image => image.Height) + gap;
+            }
+            return sheet;
+        }
+
+        // Why an effect frame is wrong: the wrong size, nothing drawn, or pixels outside the circle it fills.
+        static string EffectProblem(PixelImage image, int diameter)
+        {
+            if (image.Width != diameter || image.Height != diameter) return $"{image.Width}x{image.Height}, not {diameter}";
+            int set = 0;
+            float centre = diameter / 2f;
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    if (!image.IsSet(x, y)) continue;
+                    set++;
+                    float u = x + 0.5f - centre;
+                    float v = y + 0.5f - centre;
+                    if (u * u + v * v > centre * centre + 1) return $"a pixel at ({x}, {y}) is outside the circle";
+                }
+            }
+            return set == 0 ? "empty" : null;
+        }
+
+        // As a SpriteRenderer tints it: each channel multiplied.
+        static PixelImage Tinted(PixelImage image, Rgba tint)
+        {
+            var tinted = new PixelImage(image.Width, image.Height);
+            for (int y = 0; y < image.Height; y++)
+            {
+                for (int x = 0; x < image.Width; x++)
+                {
+                    var c = image[x, y];
+                    if (c.A > 0) tinted[x, y] = new Rgba(c.R * tint.R / 255, c.G * tint.G / 255, c.B * tint.B / 255, c.A);
+                }
+            }
+            return tinted;
+        }
 
         // ---- Every sprite ----
 
