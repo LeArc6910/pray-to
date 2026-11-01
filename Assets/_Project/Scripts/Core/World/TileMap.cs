@@ -24,6 +24,8 @@ namespace Game.Core
         // More machines: a splitter is walked over like a conveyor; a robot arm is solid.
         Splitter,
         Arm,
+        // A lamp of glowing spores from the mushroom forest (tiles.csv light).
+        Lamp,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

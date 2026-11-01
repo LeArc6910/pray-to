@@ -39,8 +39,10 @@ namespace Game.Core
             float shotSpeed = 0,
             float keepDistance = 0,
             float chargeSpeed = 0,
-            string color = "")
+            string color = "",
+            Biome? biome = null)
         {
+            Biome = biome;
             Id = id;
             Name = name;
             Level = level;
@@ -70,6 +72,8 @@ namespace Game.Core
         public string Name { get; }
         // Monsters spawn where the zone level has reached their level.
         public int Level { get; }
+        // Only spawns in this biome, or anywhere when null.
+        public Biome? Biome { get; }
         public int Health { get; }
         public int Damage { get; }
         public int Armor { get; }
@@ -161,6 +165,7 @@ namespace Game.Core
                     if (behavior == MonsterBehavior.Charge && chargeSpeed <= 0) throw new FormatException("charge 몬스터는 charge_speed 칸을 채워야 합니다.");
                     string color = row["color"];
                     if (color.Length > 0 && !SheetValues.IsColor(color)) throw new FormatException($"color '{color}'는 #RRGGBB로 적습니다.");
+                    Biome? biome = row["biome"].Length == 0 ? (Biome?)null : SheetValues.ParseEnum<Biome>(row["biome"], "biome");
 
                     monsters.Add(new MonsterDefinition(
                         id,
@@ -185,7 +190,8 @@ namespace Game.Core
                         shotSpeed,
                         Number(row, "keep_distance"),
                         chargeSpeed,
-                        color));
+                        color,
+                        biome));
                 }
                 catch (FormatException e)
                 {

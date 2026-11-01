@@ -203,7 +203,9 @@ namespace Game.Client
             BuildTiles(client);
             AddLight();
             _worldLights = new WorldLights(client.Tiles);
-            _arenaGlow = WorldLights.ArenaAmbient(client.Arenas, client.ArenaRadius);
+            // The arenas are always dimly lit; the mushroom forest and the lava fields glow a little of themselves.
+            var arenas = WorldLights.ArenaAmbient(client.Arenas, client.ArenaRadius);
+            _arenaGlow = (x, y) => Mathf.Max(arenas(x, y), WorldLights.BiomeGlow(client.Biomes[x, y]));
             BuildDark(DarkSize);
             _self = MakeBody(BodyKind.Player, "나", 0, World.PlayerRadius, SelfTunic);
             var start = client.Position;
@@ -459,7 +461,7 @@ namespace Game.Client
             _bossesSeen[view.Id] = (view.BossState, view.Phase, view.Boss.Name);
         }
 
-        void ShowBanner(string text)
+        public void ShowBanner(string text)
         {
             _banner = text;
             _bannerAge = 0;
@@ -1171,7 +1173,7 @@ namespace Game.Client
         TileBase GroundAt(int x, int y)
         {
             bool inArena = InArena(_client, x, y);
-            return Sprites.Ground(TileArt.GroundAt(_client.Map, x, y, inArena));
+            return Sprites.Ground(TileArt.GroundAt(_client.Map, x, y, inArena, _client.Biomes[x, y]));
         }
 
         // Whether the tile is in any boss's arena.

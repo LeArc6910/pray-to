@@ -36,6 +36,10 @@ namespace Game.Client
             }
 
             var lights = new WorldLights(tiles);
+            // How long the game takes to draw every ground tile when it builds its atlas (Sprites).
+            var clock = System.Diagnostics.Stopwatch.StartNew();
+            for (int i = 0; i < TileArt.GroundCount; i++) TileArt.Ground(i);
+            Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
             Save(Sheet(loot, monsters), Path.Combine(output, "sheet.png"), 4);
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
@@ -80,6 +84,20 @@ namespace Game.Client
                 }
             }
             rows.Add(tiles);
+            // Each biome's floor, rock and ores.
+            foreach (var biome in ((Biome[])Enum.GetValues(typeof(Biome))).Where(b => b != Biome.Cave))
+            {
+                var row = new List<PixelImage>();
+                foreach (var kind in new[] { GroundKind.Floor, GroundKind.Rock, GroundKind.CopperOre, GroundKind.IronOre, GroundKind.MithrilOre })
+                {
+                    for (int variant = 0; variant < 2; variant++)
+                    {
+                        row.Add(TileArt.Ground(TileArt.Index(kind, 0, variant, biome)));
+                        row.Add(TileArt.Ground(TileArt.Index(kind, 15 & ~TileArt.Down, variant, biome)));
+                    }
+                }
+                rows.Add(row);
+            }
             rows.Add(new[]
                 {
                     TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Torch,

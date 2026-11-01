@@ -19,6 +19,16 @@ namespace Game.Client
         const float MarkerSize = 7;
 
         static readonly Color32 Floor = new Color32(96, 80, 66, 255);
+
+        // Each biome's floor on the map, so its regions show.
+        static Color32 BiomeFloor(Biome biome) => biome switch
+        {
+            Biome.Mushroom => new Color32(92, 72, 104, 255),
+            Biome.Ice => new Color32(84, 108, 128, 255),
+            Biome.Crystal => new Color32(70, 70, 108, 255),
+            Biome.Lava => new Color32(96, 64, 56, 255),
+            _ => Floor,
+        };
         static readonly Color32 Wall = new Color32(158, 140, 118, 255);
         static readonly Color32 ArenaFloor = new Color32(120, 52, 46, 255);
         static readonly Color Backdrop = new Color(0.05f, 0.05f, 0.07f, 0.85f);
@@ -199,10 +209,10 @@ namespace Game.Client
             if (_map[x, y] == TileType.Conveyor) return Palette.Conveyor;
             if (_map[x, y] == TileType.Splitter) return Palette.Splitter;
             if (_map[x, y] == TileType.Arm) return Palette.Arm;
-            if (_map[x, y] == TileType.Torch) return Palette.Torch;
+            if (_map[x, y] == TileType.Torch || _map[x, y] == TileType.Lamp) return Palette.Torch;
             if (_map[x, y] == TileType.MithrilOre) return Palette.MithrilOre;
             if (_map.IsSolid(x, y)) return Wall;
-            return WorldView.InArena(_client, x, y) ? ArenaFloor : Floor;
+            return WorldView.InArena(_client, x, y) ? ArenaFloor : BiomeFloor(_client.Biomes[x, y]);
         }
     }
 }

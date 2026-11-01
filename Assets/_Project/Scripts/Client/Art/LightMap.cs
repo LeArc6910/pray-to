@@ -221,6 +221,16 @@ namespace Game.Client
             }
         }
 
+        // How much a biome lights itself: glowing mushrooms, lava's red glow, a little light off ice and crystal.
+        public static float BiomeGlow(Biome biome) => biome switch
+        {
+            Biome.Mushroom => 0.12f,
+            Biome.Lava => 0.14f,
+            Biome.Ice => 0.06f,
+            Biome.Crystal => 0.06f,
+            _ => 0,
+        };
+
         public static Func<int, int, float> ArenaAmbient(IReadOnlyList<Vec2> arenas, float arenaRadius) =>
             (x, y) =>
             {

@@ -56,8 +56,10 @@ namespace Game.Core
         int _spawnTimer;
 
         // Without loot data nothing drops; without tile data no wall can be dug.
-        public World(TileMap map, Vec2 spawn, MonsterData monsters, ulong seed, WorldConfig config = null, LootData loot = null, TileData tiles = null)
+        public World(TileMap map, Vec2 spawn, MonsterData monsters, ulong seed, WorldConfig config = null, LootData loot = null, TileData tiles = null,
+            BiomeMap biomes = null)
         {
+            Biomes = biomes ?? BiomeMap.Plain(map?.Width ?? 1, map?.Height ?? 1);
             Tiles = tiles;
             Map = map ?? throw new ArgumentNullException(nameof(map));
             Spawn = spawn;
@@ -72,6 +74,8 @@ namespace Game.Core
 
         public TileMap Map { get; }
         public Vec2 Spawn { get; }
+        // Which biome each tile is in, for monsters that only live in one. Without one everything is plain cave.
+        public BiomeMap Biomes { get; }
         public long Tick { get; private set; }
         public IReadOnlyList<Player> Players => _players;
         public IReadOnlyList<Enemy> Enemies => _enemies;
@@ -467,6 +471,7 @@ namespace Game.Core
         void TrySpawnEnemy()
         {
             if (!_monsters.Monsters.Any(m => m.Level <= _config.ZoneLevel && m.Weight > 0)) return;
+            var biomes = Biomes;
 
             for (int attempt = 0; attempt < 30; attempt++)
             {
@@ -480,7 +485,9 @@ namespace Game.Core
                     continue;
                 }
                 int zone = ZoneLevelAt(position);
-                var choices = _monsters.Monsters.Where(m => m.Level <= zone && m.Weight > 0).ToList();
+                var biome = biomes[x, y];
+                var choices = _monsters.Monsters.Where(m => m.Level <= zone && m.Weight > 0 && (m.Biome == null || m.Biome == biome)).ToList();
+                if (choices.Count == 0) continue;
                 SpawnEnemy(_random.PickWeighted(choices, m => m.Weight), position);
                 return;
             }

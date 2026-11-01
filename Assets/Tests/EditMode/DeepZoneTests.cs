@@ -75,7 +75,10 @@ namespace Game.Core.Tests
         [Test]
         public void DeepMonstersOnlyLiveInTheDeepZone()
         {
-            var world = new World(Maps.Room(130), TileMap.Center(65, 65), Monsters.Shipped, 3, new WorldConfig { EnemyTarget = 400, SpawnDistance = 5 });
+            // Every corner its own biome, as in a generated world, so each kind of deep monster has somewhere to live.
+            var biomes = BiomeMap.Make(3, 130, 130, 65, 65, (1, 1), true);
+            var world = new World(Maps.Room(130), TileMap.Center(65, 65), Monsters.Shipped, 3, new WorldConfig { EnemyTarget = 400, SpawnDistance = 5 },
+                biomes: biomes);
 
             Assert.AreEqual(3, world.ZoneLevelAt(world.Spawn + new Vec2(61, 0)));
             var deep = world.Enemies.Where(e => e.Definition.Level >= 3).ToList();

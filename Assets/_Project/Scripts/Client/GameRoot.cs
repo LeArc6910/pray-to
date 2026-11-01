@@ -70,6 +70,11 @@ namespace Game.Client
         NetLink _net;
         WorldView _view;
         InventoryWindow _inventory;
+        // The biome the player is in, how long they have been there, and the last one announced (UpdateBiome).
+        Biome _biomeHere;
+        float _biomeTime;
+        Biome _biomeAnnounced;
+        const float BiomeBannerDelay = 1.5f;
         Hotbar _hotbar;
         MapView _map;
         // "획득: …" lines for things picked up, each shown for a few seconds.
@@ -176,6 +181,7 @@ namespace Game.Client
             _map ??= new MapView(_client);
             _client.AdvanceRenderClock(Time.deltaTime);
             UpdateGuide(Time.deltaTime);
+            UpdateBiome(Time.deltaTime);
             var changedTiles = _client.TakeChangedTiles();
             _view.UpdateTiles(changedTiles);
             _map.UpdateTiles(changedTiles);
@@ -206,6 +212,23 @@ namespace Game.Client
 
         // Passes the guide's goals the player has met, with a line and a sound for each, and keeps how far this
         // character has come on this device.
+        // A banner with a biome's name when the player has been in it a moment, once until they go somewhere else, so
+        // walking along a border does not keep showing it.
+        void UpdateBiome(float deltaTime)
+        {
+            var biome = _client.Biomes.At(_client.Position);
+            if (biome != _biomeHere)
+            {
+                _biomeHere = biome;
+                _biomeTime = 0;
+                return;
+            }
+            _biomeTime += deltaTime;
+            if (_biomeTime < BiomeBannerDelay || biome == _biomeAnnounced) return;
+            _biomeAnnounced = biome;
+            _view?.ShowBanner(BiomeMap.Name(biome));
+        }
+
         void UpdateGuide(float deltaTime)
         {
             if (_guideProgress == null || _guideProgress.Current == null) return;
@@ -226,6 +249,8 @@ namespace Game.Client
 
         void StartGuide()
         {
+            _biomeHere = _biomeAnnounced = Biome.Cave;
+            _biomeTime = 0;
             _guideProgress = _guide != null && _guide.Goals.Count > 0 ? new GuideProgress(_guide, PlayerPrefs.GetInt(GuideKey, 0)) : null;
             _guideClock = GuideCheckSeconds;
             _goalShownAt = Time.time;
@@ -723,7 +748,7 @@ namespace Game.Client
             {
                 if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 string mode = _mode == Mode.Host ? $"호스트 중 (포트 {NetLink.DefaultPort})" : _mode == Mode.Join ? "참가 중" : "혼자 하기";
-                lines.Add($"{mode} · 접속 {_client.Names.Count}명");
+                lines.Add($"{BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode} · 접속 {_client.Names.Count}명");
                 // The nearest arena the player is not standing in: the first boss's from the spawn, the deep one's
                 // once there.
                 int next = -1;

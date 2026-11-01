@@ -218,6 +218,8 @@ namespace Game.Core
         public Vec2 Arena { get; private set; }
         // Every boss arena, the first one's first (GeneratedWorld.Arenas).
         public IReadOnlyList<Vec2> Arenas { get; private set; } = new Vec2[0];
+        // Which kind of cave each tile is in, worked out from the seed like the map.
+        public BiomeMap Biomes { get; private set; } = BiomeMap.Plain(1, 1);
         public float ArenaRadius { get; private set; }
 
         // The local player, moved here first; PreviousPosition is where it was one tick earlier, for smoothing.
@@ -631,6 +633,7 @@ namespace Game.Core
             Map = generated.Map;
             Arena = generated.Arena;
             Arenas = generated.Arenas;
+            Biomes = generated.Biomes;
             ArenaRadius = generated.ArenaRadius;
             Position = welcome.Spawn;
             PreviousPosition = welcome.Spawn;

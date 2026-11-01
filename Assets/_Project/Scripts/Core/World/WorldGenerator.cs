@@ -5,8 +5,10 @@ namespace Game.Core
 {
     public sealed class GeneratedWorld
     {
-        public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius, int deepArenaX, int deepArenaY)
+        public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius, int deepArenaX, int deepArenaY,
+            BiomeMap biomes = null)
         {
+            Biomes = biomes ?? BiomeMap.Plain(map.Width, map.Height);
             Map = map;
             SpawnX = spawnX;
             SpawnY = spawnY;
@@ -28,6 +30,8 @@ namespace Game.Core
         // Every boss arena in the order the bosses go in (bosses.csv): the first one's, then the deep one far out,
         // reached by a tunnel from the first. All have ArenaRadius.
         public IReadOnlyList<Vec2> Arenas { get; }
+        // Which kind of cave each tile is in (Docs/Biomes.md).
+        public BiomeMap Biomes { get; }
     }
 
     // Caves from a seed: random fill, a few smoothing passes, a clearing around the spawn, a boss arena some way
@@ -60,6 +64,8 @@ namespace Game.Core
         const int MithrilDistance = 60;
         const int MithrilVeins = 30;
         const int DeepArenaOffset = 50;
+        // Biomes came later still, from their own stream; they only say which kind of cave a tile is in.
+        const ulong BiomeStream = 7;
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -107,7 +113,9 @@ namespace Game.Core
             CarveTunnel(map, arenaX, arenaY, deepX, deepY);
             ClearDisc(map, deepX, deepY, ArenaRadius);
             PlaceVeins(map, new GameRandom(seed, MithrilStream), TileType.MithrilOre, MithrilVeins, spawnX, spawnY, MithrilDistance);
-            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY);
+            bool mushroomFirst = new GameRandom(seed, BiomeStream).Next(2) == 0;
+            var biomes = BiomeMap.Make(seed, width, height, spawnX, spawnY, (cornerX, cornerY), mushroomFirst);
+            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes);
         }
 
         static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;

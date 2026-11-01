@@ -27,6 +27,8 @@ namespace Game.Client
         public const int Variants = 4;
         const int Masks = 16;
         const int Kinds = 7;
+        // Every kind is drawn once for each biome, in that biome's colours (Docs/Biomes.md).
+        public static readonly int Biomes = System.Enum.GetValues(typeof(Biome)).Length;
         // Neighbour bits: which sides are rock.
         public const int Up = 1;
         public const int Right = 2;
@@ -34,15 +36,20 @@ namespace Game.Client
         public const int Left = 8;
         const int FaceHeight = 6;
 
-        public static int GroundCount => Kinds * Masks * Variants;
+        public static int GroundCount => Biomes * Kinds * Masks * Variants;
 
-        public static int Index(GroundKind kind, int mask, int variant) => ((int)kind * Masks + mask) * Variants + variant;
+        // The arena floor and bedrock look the same everywhere, so they always use the plain cave's.
+        public static int Index(GroundKind kind, int mask, int variant, Biome biome = Biome.Cave)
+        {
+            if (kind == GroundKind.Arena || kind == GroundKind.Bedrock) biome = Biome.Cave;
+            return (((int)biome * Kinds + (int)kind) * Masks + mask) * Variants + variant;
+        }
 
         public static bool IsRock(TileType type) =>
             type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre;
 
-        // Which ground tile goes at (x, y). Outside the map reads as wall.
-        public static int GroundAt(TileMap map, int x, int y, bool inArena)
+        // Which ground tile goes at (x, y), in the colours of its biome. Outside the map reads as wall.
+        public static int GroundAt(TileMap map, int x, int y, bool inArena, Biome biome = Biome.Cave)
         {
             int mask = (IsRock(map[x, y + 1]) ? Up : 0)
                 | (IsRock(map[x + 1, y]) ? Right : 0)
@@ -56,24 +63,163 @@ namespace Game.Client
                 TileType.MithrilOre => GroundKind.MithrilOre,
                 _ => inArena ? GroundKind.Arena : GroundKind.Floor,
             };
-            return Index(kind, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants));
+            return Index(kind, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants), biome);
         }
 
         public static PixelImage Ground(int index)
         {
-            var kind = (GroundKind)(index / (Masks * Variants));
+            var biome = (Biome)(index / (Kinds * Masks * Variants));
+            var kind = (GroundKind)(index / (Masks * Variants) % Kinds);
             int mask = index / Variants % Masks;
             int variant = index % Variants;
+            // Kinds that look the same in every biome are only ever asked for as the plain cave's; the other
+            // biomes' slots get a blank.
+            if (biome != Biome.Cave && (kind == GroundKind.Arena || kind == GroundKind.Bedrock)) return new PixelImage(Size, Size);
+            var rock = RockOf(biome);
             return kind switch
             {
-                GroundKind.Floor => Floor(mask, variant),
+                GroundKind.Floor => Floor(mask, variant, FloorOf(biome), biome),
                 GroundKind.Arena => ArenaFloor(mask, variant),
-                GroundKind.Rock => Rock(mask, variant, RockColors),
+                GroundKind.Rock => Decorated(Rock(mask, variant, rock), mask, variant, biome),
                 GroundKind.Bedrock => Rock(mask, variant, BedrockColors),
-                GroundKind.CopperOre => Ore(Rock(mask, variant, RockColors), mask, variant, Ramp.Of("#D6783F")),
-                GroundKind.MithrilOre => Ore(Rock(mask, variant, RockColors), mask, variant, Ramp.Of("#7CD2E2"), sparkle: true),
-                _ => Ore(Rock(mask, variant, RockColors), mask, variant, Ramp.Of("#A9BDD6"), sparkle: true),
+                GroundKind.CopperOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#D6783F")),
+                GroundKind.MithrilOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#7CD2E2"), sparkle: true),
+                _ => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#A9BDD6"), sparkle: true),
             };
+        }
+
+        // ---- Biomes ----
+
+        sealed class FloorPalette
+        {
+            public Rgba Base;
+            public Rgba Dark;
+            public Rgba Light;
+            public Rgba Pebble;
+            public Rgba PebbleLight;
+            public Rgba PebbleShadow;
+            // A biome's small things on the floor: mushrooms, frost, crystal chips, embers.
+            public Rgba Decor;
+            public Rgba DecorLight;
+        }
+
+        static readonly FloorPalette CaveFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#352B24"), Dark = Rgba.Hex("#2E251F"), Light = Rgba.Hex("#3C3129"),
+            Pebble = Rgba.Hex("#4A3D33"), PebbleLight = Rgba.Hex("#5C4D40"), PebbleShadow = Rgba.Hex("#241C17"),
+        };
+
+        static readonly FloorPalette MushroomFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#2C2532"), Dark = Rgba.Hex("#251F2B"), Light = Rgba.Hex("#362D3D"),
+            Pebble = Rgba.Hex("#43384A"), PebbleLight = Rgba.Hex("#54465C"), PebbleShadow = Rgba.Hex("#1C1722"),
+            Decor = Rgba.Hex("#C86ED8"), DecorLight = Rgba.Hex("#7FF0D8"),
+        };
+
+        static readonly FloorPalette IceFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#2E3A46"), Dark = Rgba.Hex("#28323D"), Light = Rgba.Hex("#374552"),
+            Pebble = Rgba.Hex("#4A5A68"), PebbleLight = Rgba.Hex("#6A7E8E"), PebbleShadow = Rgba.Hex("#1E262E"),
+            Decor = Rgba.Hex("#A8D8F0"), DecorLight = Rgba.Hex("#EAF8FF"),
+        };
+
+        static readonly FloorPalette CrystalFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#262536"), Dark = Rgba.Hex("#201F2E"), Light = Rgba.Hex("#2E2D42"),
+            Pebble = Rgba.Hex("#3C3A55"), PebbleLight = Rgba.Hex("#4C4A6A"), PebbleShadow = Rgba.Hex("#18172A"),
+            Decor = Rgba.Hex("#7CD2E2"), DecorLight = Rgba.Hex("#E0FAFF"),
+        };
+
+        static readonly FloorPalette LavaFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#2A2220"), Dark = Rgba.Hex("#231C1A"), Light = Rgba.Hex("#332926"),
+            Pebble = Rgba.Hex("#3E3230"), PebbleLight = Rgba.Hex("#4E3E3A"), PebbleShadow = Rgba.Hex("#181210"),
+            Decor = Rgba.Hex("#E0541E"), DecorLight = Rgba.Hex("#FFC04A"),
+        };
+
+        static FloorPalette FloorOf(Biome biome) => biome switch
+        {
+            Biome.Mushroom => MushroomFloor,
+            Biome.Ice => IceFloor,
+            Biome.Crystal => CrystalFloor,
+            Biome.Lava => LavaFloor,
+            _ => CaveFloor,
+        };
+
+        static RockPalette RockOf(Biome biome) => biome switch
+        {
+            Biome.Mushroom => MushroomRock,
+            Biome.Ice => IceRock,
+            Biome.Crystal => CrystalRock,
+            Biome.Lava => LavaRock,
+            _ => RockColors,
+        };
+
+        static readonly RockPalette MushroomRock = new RockPalette
+        {
+            Top = Rgba.Hex("#4E4458"), TopDark = Rgba.Hex("#453C4E"), TopLight = Rgba.Hex("#5A4F66"), Rim = Rgba.Hex("#8E7EA4"),
+            FaceTop = Rgba.Hex("#7A6A8E"), FaceBottom = Rgba.Hex("#5A4E6A"), Strata = Rgba.Hex("#4C4258"), FaceSpeck = Rgba.Hex("#9A8AB0"),
+            Contact = Rgba.Hex("#241E2C"), Outline = Rgba.Hex("#16121C"),
+        };
+
+        static readonly RockPalette IceRock = new RockPalette
+        {
+            Top = Rgba.Hex("#5E7488"), TopDark = Rgba.Hex("#546A7E"), TopLight = Rgba.Hex("#6E869A"), Rim = Rgba.Hex("#C8E4F4"),
+            FaceTop = Rgba.Hex("#9CB8CC"), FaceBottom = Rgba.Hex("#7690A6"), Strata = Rgba.Hex("#6A8296"), FaceSpeck = Rgba.Hex("#D8F0FF"),
+            Contact = Rgba.Hex("#22303C"), Outline = Rgba.Hex("#121A22"),
+        };
+
+        static readonly RockPalette CrystalRock = new RockPalette
+        {
+            Top = Rgba.Hex("#3E3C58"), TopDark = Rgba.Hex("#36344E"), TopLight = Rgba.Hex("#4A4866"), Rim = Rgba.Hex("#7E7AA8"),
+            FaceTop = Rgba.Hex("#66628C"), FaceBottom = Rgba.Hex("#4C496C"), Strata = Rgba.Hex("#3E3B5A"), FaceSpeck = Rgba.Hex("#9AD8E8"),
+            Contact = Rgba.Hex("#1C1A2C"), Outline = Rgba.Hex("#100F1A"),
+        };
+
+        static readonly RockPalette LavaRock = new RockPalette
+        {
+            Top = Rgba.Hex("#3A3232"), TopDark = Rgba.Hex("#322A2A"), TopLight = Rgba.Hex("#463C3A"), Rim = Rgba.Hex("#7A5A4A"),
+            FaceTop = Rgba.Hex("#5C4A44"), FaceBottom = Rgba.Hex("#403432"), Strata = Rgba.Hex("#9A3A1E"), FaceSpeck = Rgba.Hex("#FF8A3A"),
+            Contact = Rgba.Hex("#1A1212"), Outline = Rgba.Hex("#100A0A"),
+        };
+
+        // A biome's touch on the top of its rock: caps of mushrooms growing on it, frost, crystal points, glowing
+        // seams. Only on some variants, so walls are not all alike.
+        static PixelImage Decorated(PixelImage rock, int mask, int variant, Biome biome)
+        {
+            if (biome == Biome.Cave || variant % 2 == 1) return rock;
+            var floor = FloorOf(biome);
+            int top = (mask & Down) == 0 ? Size - FaceHeight : Size;
+            int salt = 500 + variant;
+            int x = 3 + (int)(PixelNoise.Hash(variant, 11, salt) % 9);
+            int y = 3 + (int)(PixelNoise.Hash(variant, 12, salt) % System.Math.Max(1, top - 6));
+            switch (biome)
+            {
+                case Biome.Mushroom:
+                    rock[x, y] = floor.Decor;
+                    rock[x + 1, y] = floor.Decor;
+                    rock[x + 2, y] = floor.Decor.Scale(0.8f);
+                    rock[x + 1, y - 1] = floor.DecorLight;
+                    rock[x + 1, y + 1] = Rgba.Hex("#E8DCC8");
+                    break;
+                case Biome.Ice:
+                    rock[x, y] = floor.DecorLight;
+                    rock[x + 1, y + 1] = floor.Decor;
+                    rock[x + 2, y] = floor.DecorLight;
+                    rock[x + 3, y + 1] = floor.Decor;
+                    break;
+                case Biome.Crystal:
+                    rock[x + 1, y - 2] = floor.DecorLight;
+                    rock[x + 1, y - 1] = floor.Decor;
+                    rock[x, y] = floor.Decor.Scale(0.8f);
+                    rock[x + 1, y] = floor.Decor;
+                    rock[x + 2, y] = floor.Decor.Scale(0.7f);
+                    break;
+                case Biome.Lava:
+                    for (int i = 0; i < 4; i++) rock[x + i, y + (i % 2)] = i % 2 == 0 ? floor.Decor : floor.DecorLight;
+                    break;
+            }
+            return rock;
         }
 
         // Placed things that sit on the floor, or null for tiles that are only ground.
@@ -88,19 +234,13 @@ namespace Game.Client
             TileType.Splitter => SplitterFrame,
             TileType.Arm => ArmBase,
             TileType.Torch => Torch,
+            TileType.Lamp => Lamp,
             _ => null,
         };
 
         // ---- Floors ----
 
-        static readonly Rgba FloorBase = Rgba.Hex("#352B24");
-        static readonly Rgba FloorDark = Rgba.Hex("#2E251F");
-        static readonly Rgba FloorLight = Rgba.Hex("#3C3129");
-        static readonly Rgba Pebble = Rgba.Hex("#4A3D33");
-        static readonly Rgba PebbleLight = Rgba.Hex("#5C4D40");
-        static readonly Rgba PebbleShadow = Rgba.Hex("#241C17");
-
-        static PixelImage Floor(int mask, int variant)
+        static PixelImage Floor(int mask, int variant, FloorPalette colors, Biome biome)
         {
             var image = new PixelImage(Size, Size);
             int salt = 100 + variant;
@@ -109,7 +249,7 @@ namespace Game.Client
                 for (int x = 0; x < Size; x++)
                 {
                     float n = Smooth(x, y, 4, salt, 100);
-                    image[x, y] = n < 0.3f ? FloorDark : n > 0.72f ? FloorLight : FloorBase;
+                    image[x, y] = n < 0.3f ? colors.Dark : n > 0.72f ? colors.Light : colors.Base;
                 }
             }
             int pebbles = (int)(PixelNoise.Hash(variant, 1, salt) % 3);
@@ -118,25 +258,61 @@ namespace Game.Client
                 int px = 1 + (int)(PixelNoise.Hash(i, 2, salt) % 13);
                 int py = 1 + (int)(PixelNoise.Hash(i, 3, salt) % 13);
                 bool big = PixelNoise.Hash(i, 4, salt) % 3 == 0;
-                image[px, py] = PebbleLight;
-                image[px + 1, py] = Pebble;
+                image[px, py] = colors.PebbleLight;
+                image[px + 1, py] = colors.Pebble;
                 if (big)
                 {
-                    image[px, py + 1] = Pebble;
-                    image[px + 1, py + 1] = Pebble;
-                    image[px + 2, py + 1] = PebbleShadow;
-                    image[px, py + 2] = PebbleShadow;
-                    image[px + 1, py + 2] = PebbleShadow;
+                    image[px, py + 1] = colors.Pebble;
+                    image[px + 1, py + 1] = colors.Pebble;
+                    image[px + 2, py + 1] = colors.PebbleShadow;
+                    image[px, py + 2] = colors.PebbleShadow;
+                    image[px + 1, py + 2] = colors.PebbleShadow;
                 }
                 else
                 {
-                    image[px, py + 1] = PebbleShadow;
-                    image[px + 1, py + 1] = PebbleShadow;
+                    image[px, py + 1] = colors.PebbleShadow;
+                    image[px + 1, py + 1] = colors.PebbleShadow;
                 }
             }
-            if (variant == 3) Crack(image, salt, FloorDark.Scale(0.8f));
+            if (variant == 3) Crack(image, salt, colors.Dark.Scale(0.8f));
+            FloorDecor(image, variant, colors, biome);
             CastShadow(image, mask);
             return image;
+        }
+
+        // Small things on a biome's floor: a glowing mushroom, frost glints, a crystal chip, embers.
+        static void FloorDecor(PixelImage image, int variant, FloorPalette colors, Biome biome)
+        {
+            if (biome == Biome.Cave) return;
+            int salt = 600 + variant;
+            int x = 3 + (int)(PixelNoise.Hash(variant, 13, salt) % 10);
+            int y = 4 + (int)(PixelNoise.Hash(variant, 14, salt) % 9);
+            switch (biome)
+            {
+                case Biome.Mushroom when variant != 1:
+                    image[x, y - 1] = colors.Decor;
+                    image[x + 1, y - 1] = colors.Decor;
+                    image[x - 1, y - 1] = colors.Decor.Scale(0.75f);
+                    image[x, y - 2] = colors.DecorLight;
+                    image[x, y] = Rgba.Hex("#D8CCB8");
+                    image[x, y + 1] = colors.PebbleShadow;
+                    break;
+                case Biome.Ice:
+                    image[x, y] = colors.DecorLight;
+                    image[x + 3, y + 2] = colors.Decor;
+                    if (variant % 2 == 0) image[x - 2, y + 3] = colors.Decor;
+                    break;
+                case Biome.Crystal when variant != 2:
+                    image[x, y - 1] = colors.DecorLight;
+                    image[x, y] = colors.Decor;
+                    image[x + 1, y] = colors.Decor.Scale(0.7f);
+                    break;
+                case Biome.Lava:
+                    image[x, y] = colors.Decor;
+                    if (variant % 2 == 0) image[x + 1, y] = colors.DecorLight;
+                    image[x - 3, y + 2] = colors.Decor.Scale(0.6f);
+                    break;
+            }
         }
 
         static readonly Rgba Slab = Rgba.Hex("#4A302D");
@@ -509,6 +685,34 @@ namespace Game.Client
             ['w'] = Rgba.Hex("#FFF6D0"),
             ['_'] = Shadow,
         };
+
+        // A lantern of glowing spores from the mushroom forest on an iron post.
+        static readonly PixelImage Lamp = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['o'] = Rgba.Hex("#141018"),
+                ['g'] = Rgba.Hex("#9A9AA4"),
+                ['G'] = Rgba.Hex("#62626E"),
+                ['c'] = Rgba.Hex("#5FE0C8"),
+                ['C'] = Rgba.Hex("#2E9E8C"),
+                ['w'] = Rgba.Hex("#E8FFF8"),
+                ['_'] = Shadow,
+            },
+            "................",
+            "......oooo......",
+            ".....oGggGo.....",
+            ".....ocwwco.....",
+            ".....ocwcCo.....",
+            ".....ocCcCo.....",
+            ".....oGggGo.....",
+            "......oGGo......",
+            ".......gG.......",
+            ".......gG.......",
+            ".......gG.......",
+            ".......gG.......",
+            "......ogGo......",
+            ".....oGGGGo.....",
+            ".....oooooo.....",
+            "....________....");
 
         // A post with a stone cup of burning slime gel. Its light comes from tiles.csv, not from the drawing.
         static readonly PixelImage Torch = PixelImage.FromRows(TorchPalette,

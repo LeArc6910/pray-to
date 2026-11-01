@@ -82,6 +82,7 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
 | shot_speed, keep_distance | ranged의 투사체 속도(초당 타일)와 물러나는 거리(타일) |
 | charge_speed | charge의 돌진 속도(초당 타일) |
 | color | 화면에서 칠할 색, `#RRGGBB`. 비우면 초록 |
+| biome | (선택) 이 생물군계에서만 나온다: `cave`, `mushroom`, `ice`, `crystal`, `lava`. 비우면 어디서나(`Docs/Biomes.md`) |
 | weight | 같은 구역에서 나올 비율 |
 | drop_chance, rune_chance | 죽을 때 아이템, 룬을 떨어뜨릴 확률(%). 비우면 0. 자세한 건 `Docs/Loot.md`의 드랍 절 |
 | potion_chance | 죽을 때 소모품(물약)을 떨어뜨릴 확률(%). 비우면 0 |

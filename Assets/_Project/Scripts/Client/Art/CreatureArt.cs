@@ -363,6 +363,11 @@ namespace Game.Client
                 ['c'] = Rgba.Hex("#ECDCC4"),
                 ['C'] = Rgba.Hex("#BFA88C"),
             },
+            ["myconid"] = new Dictionary<char, Rgba>
+            {
+                ['c'] = Rgba.Hex("#F0E2D0"),
+                ['C'] = Rgba.Hex("#C8B49C"),
+            },
             ["cave_beetle"] = new Dictionary<char, Rgba>
             {
                 ['K'] = Rgba.Hex("#58422E"),
@@ -383,8 +388,11 @@ namespace Game.Client
             var frames = id switch
             {
                 "spore_shooter" => Mushroom,
+                "myconid" => Mushroom,
                 "crystal_bat" => Bat,
+                "glow_bat" => Bat,
                 "crystal_wisp" => Wisp,
+                "frost_wisp" => Wisp,
                 "cave_beetle" => Beetle,
                 _ => Slime,
             };
