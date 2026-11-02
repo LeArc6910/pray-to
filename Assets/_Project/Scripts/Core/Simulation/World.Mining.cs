@@ -175,7 +175,7 @@ namespace Game.Core
             foreach (var (x, y, contents) in chests ?? Enumerable.Empty<(int, int, Inventory)>()) FillChest(x, y, contents);
             foreach (var (crop, x, y, age, watered) in crops)
             {
-                if (!Map.InBounds(x, y) || Map[x, y] != TileType.Floor) continue;
+                if (!Map.InBounds(x, y) || !TileMap.IsFarmland(Map[x, y])) continue;
                 _crops[y * Map.Width + x] = new Crop(crop, x, y, Tick - age, watered);
             }
             foreach (var (x, y, owner) in beds ?? Enumerable.Empty<(int, int, string)>()) RestoreBed(x, y, owner);

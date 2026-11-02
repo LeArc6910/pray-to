@@ -261,8 +261,8 @@ namespace Game.Core
                 if (crop != null)
                 {
                     var definition = crop.Definition;
-                    int seeds = Reap(crop);
-                    Add(harvester.Output, definition.HarvestMaterial, definition.Count);
+                    int seeds = Reap(crop, out int count);
+                    Add(harvester.Output, definition.HarvestMaterial, count);
                     if (seeds > 0)
                     {
                         PlantCrop(definition, crop.X, crop.Y);

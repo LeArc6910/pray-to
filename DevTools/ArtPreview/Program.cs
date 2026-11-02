@@ -222,7 +222,7 @@ namespace Game.Client
                 {
                     TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Torch,
                     TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester, TileType.StoneFloor, TileType.BrickFloor,
-                    TileType.GlowFloor, TileType.Door, TileType.Table, TileType.Banner, TileType.Pot,
+                    TileType.GlowFloor, TileType.Door, TileType.Table, TileType.Banner, TileType.Pot, TileType.Soil, TileType.FertileSoil,
                 }
                 .Select(TileArt.Object).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(ItemArt.Belt))
                 .Concat(new[] { ItemArt.DrillBit, ItemArt.Chevron, ItemArt.SplitterArrows, ItemArt.RobotArm, ItemArt.SprinklerHead, ItemArt.HarvesterReel })
@@ -266,6 +266,7 @@ namespace Game.Client
                 .Concat(loot.Runes.Take(1).Select(ItemArt.Rune))
                 .Concat(Enumerable.Range(0, 4).Select(ItemArt.Crop))
                 .Concat(Enumerable.Range(0, 4).Select(stage => ItemArt.Crop("fire_pepper", stage, watered: stage % 2 == 1)))
+                .Concat(new[] { "glow_cap", "frost_berry", "star_melon" }.SelectMany(id => Enumerable.Range(0, 4).Select(stage => ItemArt.Crop(id, stage))))
                 .Concat(new[] { ItemArt.Arrow, ItemArt.Orb, ItemArt.Spore, CreatureArt.Shadow(12) }).ToList());
 
             const int gap = 4;

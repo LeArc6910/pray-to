@@ -373,6 +373,8 @@ namespace Game.Client
             TileType.Table => TableTile,
             TileType.Banner => BannerTile,
             TileType.Pot => PotTile,
+            TileType.Soil => SoilTile,
+            TileType.FertileSoil => FertileSoilTile,
             _ => null,
         };
 
@@ -1140,6 +1142,39 @@ namespace Game.Client
             "MMMdMMMMMMMdMMMM",
             "dddddddddddddddd",
         };
+
+        // Turned soil: ridges and furrows across the tile; fertile soil is darker, with flecks of what was worked in.
+        static readonly string[] SoilRows =
+        {
+            "LdLLLdLLLdLLLdLL",
+            "MMmMMMmMMMmMMMmM",
+            "dddddddddddddddd",
+            "LLdLLLdLLLdLLLdL",
+            "MmMMMmMMMmMMMmMM",
+            "dddddddddddddddd",
+            "LdLLLdLLLdLLLdLL",
+            "MMmMMMmMMMmMMMmM",
+            "dddddddddddddddd",
+            "LLdLLLdLLLdLLLdL",
+            "MmMMMmMMMmMMMmMM",
+            "dddddddddddddddd",
+            "LdLLLdLLLdLLLdLL",
+            "MMmMMMmMMMmMMMmM",
+            "dddddddddddddddd",
+            "LLLdLLLdLLLdLLLd",
+        };
+
+        static readonly PixelImage SoilTile = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['L'] = Rgba.Hex("#6E5038"), ['M'] = Rgba.Hex("#5A402C"), ['m'] = Rgba.Hex("#4C3624"), ['d'] = Rgba.Hex("#3A2818"),
+            },
+            SoilRows);
+
+        static readonly PixelImage FertileSoilTile = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['L'] = Rgba.Hex("#4E3A2A"), ['M'] = Rgba.Hex("#40301F"), ['m'] = Rgba.Hex("#8AB04A"), ['d'] = Rgba.Hex("#2A1E14"),
+            },
+            SoilRows);
 
         static readonly PixelImage StoneFloorTile = Slabs("#7E7468", "#948A7C", "#6A6156", "#4E4740");
         static readonly PixelImage BrickFloorTile = Slabs("#A0563E", "#B86A50", "#8A4834", "#5A2E22");

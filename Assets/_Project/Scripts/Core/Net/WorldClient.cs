@@ -537,6 +537,10 @@ namespace Game.Core
             return under;
         }
 
+        public byte[] TillCommand() => new InventoryCommandMessage(InventoryCommand.Till, 0).Encode();
+
+        public byte[] FertilizeCommand() => new InventoryCommandMessage(InventoryCommand.Fertilize, 0).Encode();
+
         // Casts, lands a biting fish or reels in (World.Fish).
         public byte[] FishCommand() => new InventoryCommandMessage(InventoryCommand.Fish, 0).Encode();
 

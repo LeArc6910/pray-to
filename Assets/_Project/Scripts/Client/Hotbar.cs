@@ -120,6 +120,8 @@ namespace Game.Client
                     if (crop != null) return (_client.PlantCommand(crop), Sound.Place);
                     if (material.Id == World.WateringCan) return (_client.WaterCommand(), Sound.Water);
                     if (material.Id == World.FishingRod) return (_client.FishCommand(), _client.Fishing < 0 ? Sound.Cast : (Sound?)null);
+                    if (material.Id == World.Hoe) return (_client.TillCommand(), Sound.Dig);
+                    if (material.Id == World.Fertilizer) return (_client.FertilizeCommand(), Sound.Place);
                     return (null, null);
                 default:
                     return (null, null);
@@ -233,6 +235,8 @@ namespace Game.Client
                         : _client.CropFrom(material) != null ? "앞에 심는다"
                         : material.Id == World.WateringCan ? "앞 3×3칸에 물을 준다"
                         : material.Id == World.FishingRod ? "앞의 물에 던지고, 입질(!)이 오면 다시 눌러 낚는다"
+                        : material.Id == World.Hoe ? "앞 바닥을 밭으로 만든다(밭이면 바닥으로)"
+                        : material.Id == World.Fertilizer ? "앞 3×3칸의 밭에 거름을 준다"
                         : "쓸 수 없다(재료)";
                     return (Sprites.Icon(material), have, have > 0, false, material.Name, use);
                 default:

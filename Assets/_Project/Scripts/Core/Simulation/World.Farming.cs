@@ -52,6 +52,11 @@ namespace Game.Core
     {
         // The material that waters crops. It is a tool: watering does not use it up.
         public const string WateringCan = "watering_can";
+        // The tool that turns floor into soil and back, and what is worked into soil to make it fertile.
+        public const string Hoe = "hoe";
+        public const string Fertilizer = "fertilizer";
+        // A crop planted in soil starts this fraction of its time grown (one over it).
+        const int SoilHeadStart = 4;
 
         readonly Dictionary<int, Crop> _crops = new Dictionary<int, Crop>();
         readonly List<CropChange> _newCropChanges = new List<CropChange>();
@@ -76,7 +81,7 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || crop == null || player.Inventory.CountOf(crop.Seed) == 0) return false;
             var (x, y) = TileAhead(player.Position, player.Facing);
-            if (Map.IsEdge(x, y) || Map[x, y] != TileType.Floor || CropAt(x, y) != null) return false;
+            if (Map.IsEdge(x, y) || !TileMap.IsFarmland(Map[x, y]) || CropAt(x, y) != null) return false;
             if (_bosses.Any(b => Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1)) return false;
 
             player.Inventory.TakeMaterial(crop.Seed);
@@ -85,9 +90,11 @@ namespace Game.Core
             return true;
         }
 
+        // On turned soil a crop starts a quarter grown.
         void PlantCrop(CropDefinition crop, int x, int y)
         {
-            var planted = new Crop(crop, x, y, Tick);
+            long head = TileMap.IsSoil(Map[x, y]) ? crop.GrowTicks / SoilHeadStart : 0;
+            var planted = new Crop(crop, x, y, Tick - head);
             _crops[y * Map.Width + x] = planted;
             _newCropChanges.Add(new CropChange(x, y, planted));
         }
@@ -124,6 +131,45 @@ namespace Game.Core
             return true;
         }
 
+        // Turns the floor ahead into soil, or soil with nothing growing back into floor, with a hoe in the bag. False
+        // when it cannot: no hoe, or the tile ahead is neither, or something grows there.
+        public bool Till(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || !player.Inventory.Materials.Keys.Any(m => m.Id == Hoe)) return false;
+            var (x, y) = TileAhead(player.Position, player.Facing);
+            if (Map.IsEdge(x, y) || CropAt(x, y) != null) return false;
+            if (_bosses.Any(b => Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1)) return false;
+            if (Map[x, y] == TileType.Floor) SetTile(x, y, TileType.Soil);
+            else if (TileMap.IsSoil(Map[x, y])) SetTile(x, y, TileType.Floor);
+            else return false;
+            return true;
+        }
+
+        // Works fertilizer into the soil ahead and the eight tiles around it, growing or not; one fertilizer for all
+        // of them. False when none of them was plain soil.
+        public bool Fertilize(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            var fertilizer = player?.Inventory.Materials.Keys.FirstOrDefault(m => m.Id == Fertilizer);
+            if (player == null || player.IsDead || fertilizer == null) return false;
+            var (cx, cy) = TileAhead(player.Position, player.Facing);
+            int done = 0;
+            for (int y = cy - 1; y <= cy + 1; y++)
+            {
+                for (int x = cx - 1; x <= cx + 1; x++)
+                {
+                    if (!Map.InBounds(x, y) || Map[x, y] != TileType.Soil) continue;
+                    SetTile(x, y, TileType.FertileSoil);
+                    done++;
+                }
+            }
+            if (done == 0) return false;
+            player.Inventory.TakeMaterial(fertilizer);
+            player.InventoryVersion++;
+            return true;
+        }
+
         // Anyone standing on a ripe crop harvests it.
         void UpdateCrops()
         {
@@ -139,20 +185,27 @@ namespace Game.Core
         void Harvest(Player player, Crop crop)
         {
             var definition = crop.Definition;
-            int seeds = Reap(crop);
-            if (definition.HarvestMaterial != null) player.Inventory.AddMaterial(definition.HarvestMaterial, definition.Count);
-            else player.Inventory.AddConsumable(definition.HarvestConsumable, definition.Count);
+            int seeds = Reap(crop, out int count);
+            if (definition.HarvestMaterial != null) player.Inventory.AddMaterial(definition.HarvestMaterial, count);
+            else player.Inventory.AddConsumable(definition.HarvestConsumable, count);
             player.Inventory.AddMaterial(definition.Seed, seeds);
             player.InventoryVersion++;
             _events.Add(new SimEvent(SimEventType.Harvested, player.Id, amount: definition.Count, position: TileMap.Center(crop.X, crop.Y)));
         }
 
-        // Takes the crop off its tile; returns how many seeds it gave back.
-        int Reap(Crop crop)
+        // Takes the crop off its tile; returns how many seeds it gave back, and how much of the harvest: one more on
+        // fertile soil, which the harvest uses up.
+        int Reap(Crop crop, out int count)
         {
             _crops.Remove(crop.Y * Map.Width + crop.X);
             _newCropChanges.Add(new CropChange(crop.X, crop.Y, null));
             var definition = crop.Definition;
+            count = definition.Count;
+            if (Map[crop.X, crop.Y] == TileType.FertileSoil)
+            {
+                count++;
+                SetTile(crop.X, crop.Y, TileType.Soil);
+            }
             int seeds = definition.Seeds;
             if (definition.SeedChance > 0 && _random.Chance(definition.SeedChance / 100f)) seeds++;
             return seeds;

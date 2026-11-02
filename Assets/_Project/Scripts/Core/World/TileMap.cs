@@ -49,6 +49,10 @@ namespace Game.Core
         Pot,
         // Pools at the edges of the caves, fished from the floor beside them (Docs/Fishing.md). Nothing walks in them.
         Water,
+        // Floor turned with a hoe, where crops start a quarter grown, and the same with fertilizer worked in, which
+        // gives one more of the harvest and is used up by it (Docs/Farming.md).
+        Soil,
+        FertileSoil,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -100,8 +104,13 @@ namespace Game.Core
         {
             var type = this[x, y];
             return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter && type != TileType.Lava && !IsPaving(type)
-                && type != TileType.Door;
+                && type != TileType.Door && !IsSoil(type);
         }
+
+        public static bool IsSoil(TileType type) => type == TileType.Soil || type == TileType.FertileSoil;
+
+        // Where crops are planted: bare floor or turned soil.
+        public static bool IsFarmland(TileType type) => type == TileType.Floor || IsSoil(type);
 
         // What stops a monster: everything solid, and doors.
         public bool BlocksMonsters(int x, int y) => IsSolid(x, y) || this[x, y] == TileType.Door;

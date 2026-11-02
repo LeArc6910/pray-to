@@ -287,6 +287,9 @@ namespace Game.Client
             "fish_stew" => MushroomSoup,
             "eel_skewer" => SpicyFry,
             "abyss_feast" => MushroomSoup,
+            "glow_stirfry" => SpicyFry,
+            "frost_sorbet" => MushroomSoup,
+            "star_punch" => MushroomSoup,
             _ => Potion,
         };
 
@@ -300,6 +303,23 @@ namespace Game.Client
             ".mmmmmm.m.",
             "...mm.....",
         };
+
+        // A hoe: a wooden handle and a copper blade.
+        static readonly PixelImage HoeIcon = PixelImage.FromRows(new Dictionary<char, Rgba>(Common)
+            {
+                ['h'] = Rgba.Hex("#9A7452"),
+                ['H'] = Rgba.Hex("#6A4A32"),
+                ['c'] = Rgba.Hex("#D6783F"),
+                ['C'] = Rgba.Hex("#9A4E22"),
+            },
+            "......cccc",
+            "......hCC.",
+            ".....h....",
+            "....h.....",
+            "...h......",
+            "..h.......",
+            ".H........",
+            "H.........").Outlined(Outline);
 
         // A rod with its line and float.
         static readonly PixelImage FishingRodIcon = PixelImage.FromRows(new Dictionary<char, Rgba>(Common)
@@ -546,6 +566,13 @@ namespace Game.Client
                 case "fire_pepper": return Pepper;
                 case "watering_can": return WateringCanIcon;
                 case "fishing_rod": return FishingRodIcon;
+                case "hoe": return HoeIcon;
+                case "fertilizer": return Ramped(Goo, Ramp.Of("#8A6A3A"));
+                case "glow_cap": return Ramped(CapMushroom, Ramp.Of("#6FE8D0"));
+                case "frost_berry_seed": return Ramped(Seeds, Ramp.Of("#A8D8F0"));
+                case "frost_berry": return Ramped(Gem, Ramp.Of("#8CD8FF"));
+                case "star_melon_seed": return Ramped(Seeds, Ramp.Of("#F2E08C"));
+                case "star_melon": return Ramped(Goo, Ramp.Of("#F2C440"));
                 case "cave_minnow": return Ramped(FishRows, Ramp.Of("#A8B4C0"));
                 case "spore_catfish": return Ramped(FishRows, Ramp.Of("#9A7CB8"));
                 case "ice_trout": return Ramped(FishRows, Ramp.Of("#8CD8FF"));
@@ -679,11 +706,28 @@ namespace Game.Client
 
         public static PixelImage Crop(string id, int stage, bool watered = false)
         {
-            var stages = id == "fire_pepper" ? PepperStages : CropStages;
+            // The new crops are the mushroom's and the pepper's drawings in colours of their own.
+            var stages = id == "fire_pepper" || id == "frost_berry" || id == "star_melon" ? PepperStages : CropStages;
             var rows = new List<string>(stages[System.Math.Clamp(stage, 0, stages.Length - 1)]);
             rows.AddRange(watered ? Soil.Select(row => row.Replace('t', 'u').Replace('T', 'U')) : Soil);
-            return PixelImage.FromRows(CropColors, rows.ToArray()).Outlined(Outline.WithAlpha(200));
+            var colors = CropColors;
+            if (CropTints.TryGetValue(id, out var tint))
+            {
+                colors = new Dictionary<char, Rgba>(CropColors);
+                foreach (var pair in tint) colors[pair.Key] = pair.Value;
+            }
+            return PixelImage.FromRows(colors, rows.ToArray()).Outlined(Outline.WithAlpha(200));
         }
+
+        static readonly Dictionary<string, Dictionary<char, Rgba>> CropTints = new Dictionary<string, Dictionary<char, Rgba>>
+        {
+            // A glowing teal cap.
+            ["glow_cap"] = new Dictionary<char, Rgba> { ['L'] = Rgba.Hex("#C8FFF0"), ['M'] = Rgba.Hex("#6FE8D0"), ['m'] = Rgba.Hex("#2EA890") },
+            // Pale blue berries.
+            ["frost_berry"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#8CD8FF"), ['R'] = Rgba.Hex("#4A8CC8"), ['o'] = Rgba.Hex("#E0F6FF") },
+            // Round yellow melons with a pale star.
+            ["star_melon"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#F2C440"), ['R'] = Rgba.Hex("#B88A20"), ['o'] = Rgba.Hex("#FFF4C0") },
+        };
 
         // ---- Projectiles ----
 

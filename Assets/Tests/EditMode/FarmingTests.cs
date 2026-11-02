@@ -245,5 +245,65 @@ namespace Game.Core.Tests
             Assert.AreEqual(TileType.Floor, world.Map[3, 4]);
             Assert.AreEqual(1, player.Inventory.CountOf(Spore));
         }
-    }
+            [Test]
+        public void AHoeTurnsFloorIntoSoilWhereCropsStartAQuarterGrown()
+        {
+            var world = Room(out var player);
+            var hoe = Gear.Data.FindMaterial(World.Hoe);
+            Assert.IsFalse(world.Till(player.Id), "no hoe");
+            player.Inventory.AddMaterial(hoe);
+            Assert.IsTrue(world.Till(player.Id));
+            Assert.AreEqual(TileType.Soil, world.Map[3, 2]);
+            Assert.IsFalse(world.Map.IsSolid(3, 2), "walked on");
+
+            player.Inventory.AddMaterial(Spore);
+            Assert.IsTrue(world.Plant(player.Id, Mushroom));
+            var crop = world.CropAt(3, 2);
+            Assert.AreEqual(0.25f, crop.Growth(world.Tick), 0.01f);
+            Assert.IsFalse(world.Till(player.Id), "not while something grows");
+
+            // Back to floor once it is gone.
+            world.MovePlayer(player.Id, TileMap.Center(3, 2), new Vec2(1, 0), 10);
+            Run(world, (int)(Mushroom.GrowTicks * 0.75f) + 2);
+            Assert.IsNull(world.CropAt(3, 2), "harvested by walking over it");
+            world.MovePlayer(player.Id, TileMap.Center(2, 2), new Vec2(1, 0), 10);
+            Assert.IsTrue(world.Till(player.Id));
+            Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
+        }
+
+        [Test]
+        public void FertileSoilGivesOneMoreAndIsUsedUpByTheHarvest()
+        {
+            var world = Room(out var player);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.Hoe));
+            var fertilizer = Gear.Data.FindMaterial(World.Fertilizer);
+            Assert.IsTrue(world.Till(player.Id));
+            player.Inventory.AddMaterial(Spore);
+            Assert.IsTrue(world.Plant(player.Id, Mushroom));
+            Assert.IsFalse(world.Fertilize(player.Id), "no fertilizer");
+            player.Inventory.AddMaterial(fertilizer, 2);
+            Assert.IsTrue(world.Fertilize(player.Id), "growing or not");
+            Assert.AreEqual(TileType.FertileSoil, world.Map[3, 2]);
+            Assert.AreEqual(1, player.Inventory.CountOf(fertilizer));
+            Assert.IsFalse(world.Fertilize(player.Id), "nothing plain left to fertilize");
+            Assert.AreEqual(1, player.Inventory.CountOf(fertilizer));
+
+            world.MovePlayer(player.Id, TileMap.Center(3, 2), new Vec2(1, 0), 10);
+            Run(world, Mushroom.GrowTicks);
+            Assert.AreEqual(Mushroom.Count + 1, player.Inventory.CountOf(MushroomItem));
+            Assert.AreEqual(TileType.Soil, world.Map[3, 2], "used up");
+        }
+
+        [Test]
+        public void TheNewCropsGrowFromSeedsPlayersCanGet()
+        {
+            foreach (var (id, seed) in new[] { ("glow_cap", "glow_spore"), ("frost_berry", "frost_berry_seed"), ("star_melon", "star_melon_seed") })
+            {
+                var crop = Tiles.Shipped.Crops.Single(c => c.Id == id);
+                Assert.AreEqual(seed, crop.Seed.Id);
+                Assert.IsTrue(seed == "glow_spore" || Gear.Data.Recipes.Any(r => r.Material?.Id == seed), $"{seed} can be made");
+                Assert.IsTrue(Gear.Data.Recipes.Any(r => r.Consumable != null && r.Ingredients.Any(i => i.Material == crop.HarvestMaterial)), $"{id} is cooked");
+            }
+        }
+}
 }
