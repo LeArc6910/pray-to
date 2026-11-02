@@ -58,6 +58,14 @@ DevTools/Local/setup.sh --commit
 - [x] Actions 탭 > Web demo > Run workflow로 첫 빌드를 돌린다(이후에는 푸시마다 돈다). 결과 보고에는 위를 했는지와 빌드 성공 여부만 적는다
   - 2026-10-28 01:52, 02:12 두 번 실패(로그인 401, 이어서 serial invalid). 클라우드가 라이선스 활성화를 고쳤고(`CLOUD_LOG.md`), 18:47 첫 성공·배포를 클라우드가 확인했다: https://github.com/LeArc6910/pray-to/actions/runs/40663963893 . 이제 푸시마다 저절로 돈다
 
+### 온라인 협동(Unity Relay)용
+
+웹 데모와 PC 버전의 [온라인 방 만들기]·[코드로 참가]가 쓰는 Unity Relay를 켠다(2026-11-02, `Docs/Multiplayer.md`의 "온라인"). Unity 계정으로 한 번만 하면 된다.
+
+- [ ] Unity 에디터에서 Edit > Project Settings > **Services**: 조직을 고르고 **새 클라우드 프로젝트를 만들어 연결**한다(이미 있으면 그것에 연결). `ProjectSettings/ProjectSettings.asset`에 프로젝트 ID가 들어가니, 로컬 세션이 커밋하고 푸시한다(그래야 웹 빌드에도 들어간다)
+- [ ] https://cloud.unity.com 에서 그 프로젝트를 열고 **Multiplayer > Relay**를 켠다(환경은 production). 무료 한도가 있다. 결제 수단을 요구하면 진행하기 전에 정한다(결과 보고에 적어 주면 클라우드가 다른 방법을 찾는다)
+- [ ] 결과 보고에는 연결했는지, Relay를 켰는지만 적는다. 프로젝트 ID는 비밀이 아니지만 적지 않아도 된다
+
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
 
 이 컴퓨터에서 Claude Code를 켜 두면 휴대폰 Claude 앱에서 그 세션에 일을 시킬 수 있다. 명령 한 줄 실행과 결과 확인을 밖에서 할 수 있다. Pro, Max, Team, Enterprise 플랜이 필요하다.
@@ -398,6 +406,12 @@ DevTools/Local/setup.sh --commit
   - (사람) 버섯 숲·얼음 동굴·수정 동굴·용암 지대에 들어가 잠시 있으면 곡이 겹치며 바뀌는지, 보스가 깨어나면 보스 곡이 되는지, 끝나면 돌아오는지
   - (사람) 동굴의 물방울, 용암 지대의 거품, 돌아가는 기계 곁의 기계 소리(끄면 멈춤), 걸을 때 발걸음이 들리는지. 효과음을 끄면 환경음도 꺼지는지
   - (사람) 휴대폰 웹에서 처음 들어선 생물군계에서 눈에 띄게 멈칫하는지
+- [ ] 37단계: 온라인 협동(Unity Relay)(`Docs/Multiplayer.md`의 "온라인")
+  - (로컬 세션) 새 패키지 Multiplayer Services(`Packages/manifest.json`)를 받도록 명령 한 줄을 `-Commit`과 함께 돌린다. `Packages/packages-lock.json`이 바뀌면 커밋한다. Console에 컴파일 에러가 나면 결과 보고에 붙인다
+  - (사람) 위 "온라인 협동용"을 먼저 한다. 그 전에는 [온라인 방 만들기]가 "온라인 기능이 아직 설정되지 않았습니다"를 보여 주는지만 본다
+  - (사람) PC 에디터에서 [온라인 방 만들기] → HUD에 방 코드가 보이는지. 휴대폰 웹 데모에서 그 코드로 [코드로 참가] → 서로 보이고 함께 싸울 수 있는지
+  - (사람) 반대로 웹에서 방을 만들고 PC나 다른 브라우저가 참가하는지. 없는 코드를 넣으면 "그 코드의 방이 없습니다"가 나오는지
+  - (사람) 움직임이 많이 끊기거나 늦는지(Relay를 거치면 LAN보다 조금 늦다)
 
 ## 결과 보고
 

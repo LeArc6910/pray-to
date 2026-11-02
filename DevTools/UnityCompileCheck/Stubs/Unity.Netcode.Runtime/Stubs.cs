@@ -85,6 +85,8 @@ namespace Unity.Netcode.Transports.UTP
 {
     public class UnityTransport : Unity.Netcode.NetworkTransport
     {
+        public bool UseWebSockets { get; set; }
         public void SetConnectionData(string ipv4Address, ushort port, string listenAddress = null) { }
+        public void SetRelayServerData(Unity.Networking.Transport.Relay.RelayServerData serverData) { }
     }
 }

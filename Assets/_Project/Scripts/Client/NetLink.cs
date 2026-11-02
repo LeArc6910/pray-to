@@ -1,7 +1,12 @@
 using System;
+using System.Threading.Tasks;
 using Unity.Collections;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using Unity.Services.Authentication;
+using Unity.Services.Core;
+using Unity.Services.Relay;
+using Unity.Services.Relay.Models;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -50,6 +55,112 @@ namespace Game.Client
             var link = new NetLink();
             link.Transport.SetConnectionData(address, port);
             return link.Start(host: false) ? link : link.Fail();
+        }
+
+        // ---- Online, through Unity Relay ----
+        //
+        // Over the internet nobody listens on a port of their own: the host and the players who join all connect out to
+        // a Unity Relay server, which passes their messages on. The host gets a short room code to give the others.
+        // Everyone connects by secure WebSocket ("wss"), the one way a browser can, so the web demo and the PC version
+        // play together. It needs the project linked to Unity Gaming Services with Relay switched on
+        // (Docs/Multiplayer.md, 온라인).
+
+        // Makes a room for this many others and returns the started host link and its code, or an error to show.
+        public static async Task<(NetLink Link, string Code, string Error)> HostOnline(int guests)
+        {
+            string error = await SignIn();
+            if (error != null) return (null, null, error);
+            NetLink link = null;
+            try
+            {
+                var allocation = await RelayService.Instance.CreateAllocationAsync(guests);
+                string code = await RelayService.Instance.GetJoinCodeAsync(allocation.AllocationId);
+                link = new NetLink();
+                link.Transport.UseWebSockets = true;
+                link.Transport.SetRelayServerData(allocation.ToRelayServerData(RelayConnection));
+                return link.Start(host: true) ? (link, code, null) : (link.Fail(), null, "호스트를 시작하지 못했습니다.");
+            }
+            catch (Exception e)
+            {
+                link?.Dispose();
+                return (null, null, Explain(e));
+            }
+        }
+
+        // Looks up the room and returns a link ready to connect to it, not yet started, so the caller can listen for
+        // its events first (StartClient); or an error to show.
+        public static async Task<(NetLink Link, string Error)> JoinOnline(string code)
+        {
+            string error = await SignIn();
+            if (error != null) return (null, error);
+            try
+            {
+                var allocation = await RelayService.Instance.JoinAllocationAsync(code.Trim().ToUpperInvariant());
+                var link = new NetLink();
+                link.Transport.UseWebSockets = true;
+                link.Transport.SetRelayServerData(allocation.ToRelayServerData(RelayConnection));
+                return (link, null);
+            }
+            catch (Exception e)
+            {
+                return (null, Explain(e));
+            }
+        }
+
+        // Starts a link from JoinOnline. False when it could not; the link is then closed.
+        public bool StartClient()
+        {
+            if (Start(host: false)) return true;
+            Dispose();
+            return false;
+        }
+
+        const string RelayConnection = "wss";
+
+        // Signs in to Unity Gaming Services once a run, as a new anonymous player each time: two tabs of the same
+        // browser (or two copies on one PC) are then two players. Null when it worked, else what went wrong.
+        static async Task<string> SignIn()
+        {
+            try
+            {
+                if (UnityServices.State == ServicesInitializationState.Uninitialized)
+                {
+                    var options = new InitializationOptions().SetProfile("p" + Guid.NewGuid().ToString("N").Substring(0, 12));
+                    await UnityServices.InitializeAsync(options);
+                }
+                if (!AuthenticationService.Instance.IsSignedIn) await AuthenticationService.Instance.SignInAnonymouslyAsync();
+                return null;
+            }
+            catch (Exception e)
+            {
+                return Explain(e);
+            }
+        }
+
+        // A reason a player can act on, with the service's own message for the rest.
+        static string Explain(Exception e)
+        {
+            Debug.LogWarning($"Online play: {e}");
+            if (e is RelayServiceException relay)
+            {
+                switch (relay.Reason)
+                {
+                    case RelayExceptionReason.JoinCodeNotFound:
+                    case RelayExceptionReason.AllocationNotFound:
+                    case RelayExceptionReason.InvalidRequest:
+                        return "그 코드의 방이 없습니다. 코드를 확인하세요.";
+                    case RelayExceptionReason.InactiveProject:
+                    case RelayExceptionReason.Unauthorized:
+                    case RelayExceptionReason.Forbidden:
+                        return "온라인 기능이 아직 켜지지 않았습니다(Unity 대시보드의 Relay). (" + e.Message + ")";
+                    case RelayExceptionReason.NetworkError:
+                        return "인터넷에 연결할 수 없습니다. (" + e.Message + ")";
+                }
+                return "방을 열거나 찾지 못했습니다. (" + e.Message + ")";
+            }
+            if (e is AuthenticationException) return "Unity 서비스에 로그인하지 못했습니다. (" + e.Message + ")";
+            if (e is ServicesInitializationException) return "온라인 기능이 아직 설정되지 않았습니다(Unity 프로젝트 연결). (" + e.Message + ")";
+            return e.Message;
         }
 
         UnityTransport Transport => (UnityTransport)_manager.NetworkConfig.NetworkTransport;

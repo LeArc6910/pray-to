@@ -45,6 +45,13 @@ namespace Game.Client
         // [월드 지우기] asks once more before it deletes.
         bool _confirmDelete;
         string _address = "127.0.0.1";
+        // Online play (NetLink.HostOnline): the code typed in to join, the code of the room this host made, and
+        // whether a room is being made or looked up.
+        string _codeInput = "";
+        string _roomCode;
+        bool _connecting;
+        // A room holds the host and this many others.
+        const int OnlineGuests = 3;
         string _status = "";
         LootData _loot;
         MonsterData _monsters;
@@ -422,28 +429,64 @@ namespace Game.Client
             return true;
         }
 
-        void StartHosting(Mode mode)
+        // Makes an online room and hosts in it; the code shows in the HUD for the others.
+        async void StartOnlineHost()
+        {
+            if (_connecting || _client != null) return;
+            _connecting = true;
+            _status = "온라인 방을 만드는 중…";
+            var (link, code, error) = await NetLink.HostOnline(OnlineGuests);
+            _connecting = false;
+            if (link == null)
+            {
+                _status = "온라인 방을 만들지 못했습니다. " + error;
+                return;
+            }
+            // Something else started while the room was being made.
+            if (_client != null)
+            {
+                link.Dispose();
+                return;
+            }
+            _roomCode = code;
+            StartHosting(Mode.Host, link);
+        }
+
+        async void StartOnlineJoin()
+        {
+            string code = _codeInput.Trim();
+            if (_connecting || _client != null || code.Length == 0) return;
+            _connecting = true;
+            _status = "방을 찾는 중…";
+            var (link, error) = await NetLink.JoinOnline(code);
+            _connecting = false;
+            if (link == null)
+            {
+                _status = "참가하지 못했습니다. " + error;
+                return;
+            }
+            if (_client != null)
+            {
+                link.Dispose();
+                return;
+            }
+            StartJoining(link);
+        }
+
+        // Solo, a LAN host on the port, or a host in an online room whose link is already started.
+        void StartHosting(Mode mode, NetLink online = null)
         {
             // Saves are read first, so a broken one stops the start with a reason instead of being overwritten.
-            if (!LoadCharacter(out byte[] character)) return;
-            WorldSave world = null;
-            byte[] worldData = SaveStore.Read(SaveStore.WorldKey(WorldName));
-            if (worldData != null)
+            if (!LoadCharacter(out byte[] character) || !ReadWorld(out var world))
             {
-                try
-                {
-                    world = WorldSave.Read(worldData, _tiles, _loot);
-                }
-                catch (InvalidDataException e)
-                {
-                    _status = $"월드 '{WorldName}'의 저장본을 읽지 못했습니다: {e.Message} 다른 월드 이름을 쓰거나 [월드 지우기]로 지우세요.";
-                    return;
-                }
+                online?.Dispose();
+                _roomCode = null;
+                return;
             }
 
             if (mode == Mode.Host)
             {
-                _net = NetLink.Host(NetLink.DefaultPort);
+                _net = online ?? NetLink.Host(NetLink.DefaultPort);
                 if (_net == null)
                 {
                     _status = $"호스트를 시작하지 못했습니다. 포트 {NetLink.DefaultPort}를 다른 프로그램이 쓰고 있는지 확인하세요.";
@@ -454,6 +497,7 @@ namespace Game.Client
             }
 
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
+
             _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles);
             if (world != null)
             {
@@ -477,10 +521,34 @@ namespace Game.Client
             StartGuide();
         }
 
-        void StartJoining()
+        // The world save of this name, or null for a new world. False when there is one that cannot be read.
+        bool ReadWorld(out WorldSave world)
         {
-            if (!LoadCharacter(out byte[] character)) return;
-            _net = NetLink.Join(_address.Trim(), NetLink.DefaultPort);
+            world = null;
+            byte[] worldData = SaveStore.Read(SaveStore.WorldKey(WorldName));
+            if (worldData == null) return true;
+            try
+            {
+                world = WorldSave.Read(worldData, _tiles, _loot);
+                return true;
+            }
+            catch (InvalidDataException e)
+            {
+                _status = $"월드 '{WorldName}'의 저장본을 읽지 못했습니다: {e.Message} 다른 월드 이름을 쓰거나 [월드 지우기]로 지우세요.";
+                return false;
+            }
+        }
+
+        // To a LAN host at the address, or into an online room through a link from NetLink.JoinOnline, started here
+        // once its events are heard.
+        void StartJoining(NetLink online = null)
+        {
+            if (!LoadCharacter(out byte[] character))
+            {
+                online?.Dispose();
+                return;
+            }
+            _net = online ?? NetLink.Join(_address.Trim(), NetLink.DefaultPort);
             if (_net == null)
             {
                 _status = "접속을 시작하지 못했습니다. 주소를 확인하세요.";
@@ -506,6 +574,15 @@ namespace Game.Client
             {
                 if (id == _net.LocalClientId || id == NetworkManager.ServerClientId) _endReason = "호스트와 연결이 끊어졌습니다. " + _net.DisconnectReason;
             };
+            if (online != null && !online.StartClient())
+            {
+                _net = null;
+                _client = null;
+                _inventory = null;
+                _hotbar = null;
+                _status = "방에 접속하지 못했습니다.";
+                return;
+            }
             _mode = Mode.Join;
             _status = "접속 중…";
             _dropFocus = true;
@@ -591,6 +668,7 @@ namespace Game.Client
             _view = null;
             _map = null;
             _net = null;
+            _roomCode = null;
             _host = null;
             _client = null;
             _inventory = null;
@@ -749,17 +827,20 @@ namespace Game.Client
             if (!Controls.UsingTouch && GUILayout.Button(_keysOpen ? "키 바꾸기 닫기" : "키 바꾸기")) _keysOpen = !_keysOpen;
             GUILayout.Space(8);
 
-            GUI.enabled = ready;
-            if (Application.platform == RuntimePlatform.WebGLPlayer)
+            GUI.enabled = ready && !_connecting;
+            // Online, through Unity Relay: the same on the web and on PC, so they play together.
+            GUILayout.Label(Ui.Wrap("온라인 협동: 방을 만들면 코드가 나온다. 친구는 그 코드로 참가한다(웹과 PC가 함께)", GUI.skin.label, _menuColumn));
+            if (GUILayout.Button(_connecting ? "연결하는 중…" : "온라인 방 만들기")) StartOnlineHost();
+            GUILayout.BeginHorizontal();
+            _codeInput = GUILayout.TextField(_codeInput, 12, GUILayout.MinWidth(80));
+            if (GUILayout.Button("코드로 참가", GUILayout.Width(110))) StartOnlineJoin();
+            GUILayout.EndHorizontal();
+            // A browser cannot listen for connections, so the LAN way is only on PC.
+            if (Application.platform != RuntimePlatform.WebGLPlayer)
             {
-                // A browser cannot listen for connections, and joining would need a WebSocket transport.
                 GUILayout.Space(8);
-                GUILayout.Label(Ui.Wrap("웹 데모에서는 혼자 하기만 됩니다. 협동은 PC 버전에서 합니다.", GUI.skin.label, _menuColumn));
-            }
-            else
-            {
+                GUILayout.Label("같은 네트워크(LAN)");
                 if (GUILayout.Button($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
-                GUILayout.Space(8);
                 GUILayout.Label("호스트 주소");
                 _address = GUILayout.TextField(_address, 64);
                 if (GUILayout.Button("참가")) StartJoining();
@@ -844,7 +925,8 @@ namespace Game.Client
             else
             {
                 if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
-                string mode = _mode == Mode.Host ? $"호스트 중 (포트 {NetLink.DefaultPort})" : _mode == Mode.Join ? "참가 중" : "혼자 하기";
+                string mode = _mode == Mode.Host ? (_roomCode != null ? $"온라인 방 코드 {_roomCode}" : $"호스트 중 (포트 {NetLink.DefaultPort})")
+                    : _mode == Mode.Join ? "참가 중" : "혼자 하기";
                 lines.Add($"{BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode} · 접속 {_client.Names.Count}명");
                 // The nearest arena the player is not standing in: the first boss's from the spawn, the deep one's
                 // once there.
