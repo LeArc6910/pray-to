@@ -106,10 +106,10 @@ run_attribute() {
     grep -o '<test-run [^>]*' "$1" | head -1 | grep -o " $2=\"[0-9]*\"" | grep -o '[0-9][0-9]*'
 }
 
-# 실패한 테스트마다 "이름: 메시지 첫 줄"
-failures() {
-    awk '
-        /<test-case / && /result="Failed"/ {
+# 결과($2: Failed, Inconclusive)가 그것인 테스트마다 "이름: 메시지 첫 줄"
+cases_with() {
+    awk -v result="$2" '
+        /<test-case / && index($0, "result=\"" result "\"") {
             name = $0; sub(/.* fullname="/, "", name); sub(/".*/, "", name); want = 1; next
         }
         # 메시지는 CDATA 안에 있고, 첫 줄이 비어 있을 수 있다
@@ -121,6 +121,11 @@ failures() {
         }
     ' "$1"
 }
+
+failures() { cases_with "$1" Failed; }
+
+# Assume가 걸려 통과도 실패도 아닌 테스트. 준비가 잘못돼 아무것도 확인하지 못한 것일 수 있다
+inconclusives() { cases_with "$1" Inconclusive | sed 's/^/결과 없음: /'; }
 
 # 줄마다 "  - `줄`" 목록 항목으로 만든다
 # shellcheck disable=SC2016
@@ -228,10 +233,15 @@ for i in "${!platforms[@]}"; do
     total="$(run_attribute "$results" total)"
     passed="$(run_attribute "$results" passed)"
     failed="$(run_attribute "$results" failed)"
+    inconclusive="$(run_attribute "$results" inconclusive)"
     [ "${failed:-0}" = 0 ] || all_ok=0
-    echo "- $platform 테스트: ${total}개 중 ${passed}개 통과, ${failed}개 실패" >> "$report"
+    line="- $platform 테스트: ${total}개 중 ${passed}개 통과, ${failed}개 실패"
+    [ "${inconclusive:-0}" = 0 ] || line="$line, **결과 없음 ${inconclusive}개**"
+    echo "$line" >> "$report"
     failures "$results" | code_bullets >> "$report"
+    inconclusives "$results" | code_bullets >> "$report"
     summary="$summary $platform: $passed/$total passed."
+    [ "${inconclusive:-0}" = 0 ] || summary="$summary $inconclusive inconclusive."
 done
 [ "$skip_tests" = 1 ] && echo "- 테스트: 건너뜀" >> "$report"
 # 로컬은 스크립트를 고치지 않는다. Unity가 API 업데이트로 .cs를 바꿨다면 보고하고 커밋에서 뺀다.

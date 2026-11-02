@@ -91,7 +91,32 @@ namespace UnityEngine.InputSystem
         Digit6,
     }
 
-    public class Keyboard
+    public class InputDevice
+    {
+    }
+
+    public class InputSettings : ScriptableObject
+    {
+        public enum BackgroundBehavior
+        {
+            ResetAndDisableNonBackgroundDevices = 0,
+            ResetAndDisableAllDevices = 1,
+            IgnoreFocus = 2,
+        }
+
+        public BackgroundBehavior backgroundBehavior { get; set; }
+    }
+
+    public static partial class InputSystem
+    {
+        public static InputSettings settings { get; set; }
+
+        public static void ResetDevice(InputDevice device, bool alsoResetDontResetControls = false)
+        {
+        }
+    }
+
+    public class Keyboard : InputDevice
     {
         public static Keyboard current { get; private set; }
         public KeyControl this[Key key] => null;

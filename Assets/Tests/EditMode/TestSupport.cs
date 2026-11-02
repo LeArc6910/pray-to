@@ -76,6 +76,20 @@ namespace Game.Core.Tests
         }
     }
 
+    // Moves a player somewhere in steps the host accepts: it takes only about two tiles a move (World.MovePlayer), and
+    // a longer jump is refused and leaves the player where they were.
+    public static class Moves
+    {
+        public static void Walk(World world, Player player, Vec2 to)
+        {
+            for (int i = 0; i < 200 && Vec2.Distance(player.Position, to) > 0.001f; i++)
+            {
+                var step = (to - player.Position).ClampLength(2);
+                Assert.IsTrue(world.MovePlayer(player.Id, player.Position + step, player.Facing, 10), "the host refused a step");
+            }
+        }
+    }
+
     public static class Maps
     {
         // '#' is wall and anything else floor. The first row is the top of the map, as it reads on screen.

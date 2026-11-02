@@ -84,6 +84,11 @@ check_runner() {
     fi
 
     reset
+    FAKE_EDIT_INCONCLUSIVE=1 case_run "$name: a test ends without a result" 0 "$@" "$commit"
+    expect LOCAL_TASKS.md "EditMode 테스트: 140개 중 139개 통과, 0개 실패, **결과 없음 1개**"
+    expect LOCAL_TASKS.md "결과 없음: Game.Core.Tests.ElementTests.ColdSlowsAMonsterDown: the frost bolt landed"
+
+    reset
     FAKE_LICENSE_FAIL=1 case_run "$name: Unity has no license" 1 "$@"
     expect LOCAL_TASKS.md "프로젝트 설정: **실패** (종료 코드 198)"
     expect LOCAL_TASKS.md "[Licensing::Module] Error: 'com.unity.editor.headless' was not found."

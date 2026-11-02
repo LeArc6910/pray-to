@@ -116,16 +116,23 @@ function Read-TestResults([string]$name) {
     if (-not (Test-Path $path)) { return $null }
     [xml]$xml = Get-Content $path -Raw -Encoding UTF8
     $run = $xml.SelectSingleNode('/test-run')
-    $failures = @($xml.SelectNodes("//test-case[@result='Failed']") | ForEach-Object {
-        $message = $_.SelectSingleNode('failure/message')
-        $first = if ($message) { ($message.InnerText.Trim() -split "`n")[0].Trim() } else { '' }
-        "$($_.GetAttribute('fullname')): $first"
-    })
+    # 결과가 그것인 테스트마다 "이름: 메시지 첫 줄"
+    $casesWith = {
+        param([string]$result, [string]$messagePath)
+        @($xml.SelectNodes("//test-case[@result='$result']") | ForEach-Object {
+            $message = $_.SelectSingleNode($messagePath)
+            $first = if ($message) { ($message.InnerText.Trim() -split "`n")[0].Trim() } else { '' }
+            "$($_.GetAttribute('fullname')): $first"
+        })
+    }
     return [pscustomobject]@{
         Total = [int]$run.GetAttribute('total')
         Passed = [int]$run.GetAttribute('passed')
         Failed = [int]$run.GetAttribute('failed')
-        Failures = $failures
+        Inconclusive = [int]$run.GetAttribute('inconclusive')
+        Failures = & $casesWith 'Failed' 'failure/message'
+        # Assume가 걸려 통과도 실패도 아닌 테스트. 준비가 잘못돼 아무것도 확인하지 못한 것일 수 있다
+        Inconclusives = & $casesWith 'Inconclusive' 'reason/message'
     }
 }
 
@@ -226,9 +233,13 @@ foreach ($platform in $results.Keys) {
         continue
     }
     if ($result.Failed -gt 0) { $allOk = $false }
-    $report.Add("- $platform 테스트: $($result.Total)개 중 $($result.Passed)개 통과, $($result.Failed)개 실패")
+    $line = "- $platform 테스트: $($result.Total)개 중 $($result.Passed)개 통과, $($result.Failed)개 실패"
+    if ($result.Inconclusive -gt 0) { $line += ", **결과 없음 $($result.Inconclusive)개**" }
+    $report.Add($line)
     foreach ($failure in $result.Failures) { $report.Add("  - ``$failure``") }
+    foreach ($case in $result.Inconclusives) { $report.Add("  - ``결과 없음: $case``") }
     $summary.Add("${platform}: $($result.Passed)/$($result.Total) passed.")
+    if ($result.Inconclusive -gt 0) { $summary.Add("$($result.Inconclusive) inconclusive.") }
 }
 if ($SkipTests) { $report.Add('- 테스트: 건너뜀') }
 # 로컬은 스크립트를 고치지 않는다. Unity가 API 업데이트로 .cs를 바꿨다면 보고하고 커밋에서 뺀다.

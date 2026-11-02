@@ -54,6 +54,9 @@
         companyName: {{{ JSON.stringify(COMPANY_NAME) }}},
         productName: {{{ JSON.stringify(PRODUCT_NAME) }}},
         productVersion: {{{ JSON.stringify(PRODUCT_VERSION) }}},
+        // Saves and settings are files in persistentDataPath (DeviceFiles.cs); Unity carries every change to them
+        // into the browser's IndexedDB, where they outlast the page.
+        autoSyncPersistentDataPath: true,
       }, function (progress) {
         loading.querySelector(".fill").style.width = Math.round(progress * 100) + "%";
       }).then(function () {

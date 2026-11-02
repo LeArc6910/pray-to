@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Stands in for the Unity editor in run.sh: reads the arguments the setup scripts pass and leaves behind what a real
-# run would (a log, an asset, packages-lock.json, NUnit results). FAKE_LICENSE_FAIL, FAKE_SETUP_FAIL, FAKE_PLAY_FAIL and
-# FAKE_TOUCH_CS switch on the failures the scripts must report.
+# run would (a log, an asset, packages-lock.json, NUnit results). FAKE_LICENSE_FAIL, FAKE_SETUP_FAIL, FAKE_PLAY_FAIL,
+# FAKE_EDIT_INCONCLUSIVE and FAKE_TOUCH_CS switch on the failures and doubtful results the scripts must report.
 log=""
 results=""
 platform=""
@@ -60,6 +60,23 @@ if [ "$platform" = PlayMode ] && [ -n "${FAKE_PLAY_FAIL:-}" ]; then
 </test-run>
 XML
     exit 2
+fi
+
+if [ "$platform" = EditMode ] && [ -n "${FAKE_EDIT_INCONCLUSIVE:-}" ]; then
+    cat > "$results" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="140" result="Passed" total="140" passed="139" failed="0" inconclusive="1" skipped="0">
+  <test-suite type="TestFixture" name="ElementTests" fullname="Game.Core.Tests.ElementTests">
+    <test-case id="1" name="ColdSlowsAMonsterDown" fullname="Game.Core.Tests.ElementTests.ColdSlowsAMonsterDown" result="Inconclusive">
+      <reason>
+        <message><![CDATA[  the frost bolt landed
+  Expected: True]]></message>
+      </reason>
+    </test-case>
+  </test-suite>
+</test-run>
+XML
+    exit 0
 fi
 
 total=140

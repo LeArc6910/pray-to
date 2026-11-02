@@ -40,7 +40,11 @@
 | 플랫폼 | 위치 |
 |---|---|
 | PC | `Application.persistentDataPath/saves/`의 파일. 이름은 저장본 이름을 UTF-8 16진수로 바꾼 것(한글 이름도 파일 이름이 된다) |
-| 웹 | 브라우저 저장소(PlayerPrefs, IndexedDB). 같은 브라우저·같은 주소에서만 이어진다. 브라우저 데이터를 지우면 사라진다 |
+| 웹 | PC와 같은 파일인데, 웹에서는 `persistentDataPath`가 브라우저의 IndexedDB 안에 있다. 파일이 바뀔 때마다 Unity가 IndexedDB로 옮긴다(페이지의 `autoSyncPersistentDataPath`, `Assets/WebGLTemplates/Fit`). 같은 브라우저·같은 주소에서만 이어지고, 브라우저 데이터를 지우면 사라진다. 같은 게임을 두 탭에서 동시에 하지 않는다(탭마다 자기가 아는 파일로 저장소를 맞춘다) |
+
+- **설정도 파일**(2026-11-02, `Prefs`): 메뉴 설정, 키 배치, 퀵슬롯, 스킬 순서, 목표 안내 진행은 `persistentDataPath/settings.txt` 한 파일에 "키, 탭, 값" 줄로 둔다(`DeviceFiles`가 쓴다)
+- **왜 PlayerPrefs를 그만뒀나**(2026-11-02): 웹 저장본은 PlayerPrefs(IndexedDB 안의 파일 하나)에 있었다. 그런데 0.32.0을 배포한 뒤 처음 열자 그 파일에 Unity 자신의 키(`unity_connect.*`)만 남고 저장본이 사라졌다. 같은 버전에서 새로고침할 때는 남았으니, 새 빌드를 처음 열 때 무엇인가가 그 파일을 빈 채로 다시 쓴 것이다. 정확한 원인은 찾지 못했다. PlayerPrefs는 무엇이든 키 하나를 바꾸면 파일 전체를 다시 쓰므로, 저장본을 거기서 빼 게임만, 바뀔 때만 쓰는 각자의 파일로 옮겼다. 사라진 저장본은 되살릴 수 없다
+- **옮겨 오기**: 예전 버전이 PlayerPrefs에 둔 저장본(`save.<16진수>`, base64)과 설정 키는 처음 찾을 때 파일로 옮기고 PlayerPrefs에서 지운다. 저장본을 지우면 PlayerPrefs에 남은 사본도 지워서 되살아나지 않는다(PlayMode `DeviceStorageTests`)
 
 ## 메뉴
 

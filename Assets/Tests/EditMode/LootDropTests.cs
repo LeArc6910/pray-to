@@ -302,12 +302,13 @@ namespace Game.Core.Tests
         [Test]
         public void MonstersGiveExperienceToEveryoneNearAndMoreAfterABoss()
         {
-            var world = Room();
+            // Wide enough for one player to stand beyond the share range of the other.
+            var world = Room(44);
             var near = world.AddPlayer("near", Gear.Wearing("mithril_sword"));
             var far = world.AddPlayer("far", null);
-            world.MovePlayer(far.Id, near.Position + new Vec2(Leveling.ShareRange + 2, 0), new Vec2(1, 0), 30);
+            Moves.Walk(world, far, near.Position + new Vec2(Leveling.ShareRange + 2, 0));
             var slime = Monsters.Shipped.Find("slime");
-            Assume.That(Vec2.Distance(far.Position, near.Position), Is.GreaterThan(Leveling.ShareRange));
+            Assert.That(Vec2.Distance(far.Position, near.Position), Is.GreaterThan(Leveling.ShareRange));
             var target = world.SpawnEnemy(slime, near.Position + new Vec2(0, -1));
             world.SetAttacking(near.Id, true);
             for (int i = 0; i < 60 && !target.IsDead; i++) world.Step();

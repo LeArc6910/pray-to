@@ -85,13 +85,10 @@ namespace Game.Core.Tests
             // Two lanes far apart: in each a player shoots a slime six tiles off once, with cold in one and not the other.
             var frost = world.AddPlayer("frost", Gear.Wearing("frost_staff"));
             var plain = world.AddPlayer("plain", Gear.Wearing("copper_staff"));
-            world.MovePlayer(frost.Id, TileMap.Center(5, 10), new Vec2(1, 0), 10);
-            world.MovePlayer(plain.Id, TileMap.Center(5, 30), new Vec2(1, 0), 10);
-            for (int i = 0; i < 40; i++)
-            {
-                world.MovePlayer(frost.Id, Vec2.Lerp(frost.Position, TileMap.Center(5, 10), 1), new Vec2(1, 0), 10);
-                world.MovePlayer(plain.Id, Vec2.Lerp(plain.Position, TileMap.Center(5, 30), 1), new Vec2(1, 0), 10);
-            }
+            Moves.Walk(world, frost, TileMap.Center(5, 10));
+            Moves.Walk(world, plain, TileMap.Center(5, 30));
+            world.MovePlayer(frost.Id, frost.Position, new Vec2(1, 0), 1);
+            world.MovePlayer(plain.Id, plain.Position, new Vec2(1, 0), 1);
             var chilled = world.SpawnEnemy(Slime, TileMap.Center(11, 10));
             var free = world.SpawnEnemy(Slime, TileMap.Center(11, 30));
             world.SetAttacking(frost.Id, true);
@@ -100,7 +97,7 @@ namespace Game.Core.Tests
             world.SetAttacking(frost.Id, false);
             world.SetAttacking(plain.Id, false);
             Run(world, 0.7f);
-            Assume.That(chilled.Afflictions.Chilled, "the frost bolt landed");
+            Assert.IsTrue(chilled.Afflictions.Chilled, "the frost bolt landed");
             Assert.IsFalse(free.Afflictions.Chilled);
 
             Run(world, 1.2f);

@@ -65,7 +65,7 @@ namespace Game.Client.Tests
             const string name = "playmode-quick-test";
             SaveStore.Delete(SaveStore.WorldKey(name));
             SaveStore.Delete(SaveStore.CharacterKey(name));
-            PlayerPrefs.DeleteKey("hotbar." + name);
+            Prefs.Delete("hotbar." + name);
             _root.PlayerName = name;
             _root.WorldNameField = name;
             try
@@ -88,7 +88,7 @@ namespace Game.Client.Tests
             {
                 SaveStore.Delete(SaveStore.WorldKey(name));
                 SaveStore.Delete(SaveStore.CharacterKey(name));
-                PlayerPrefs.DeleteKey("hotbar." + name);
+                Prefs.Delete("hotbar." + name);
             }
         }
 

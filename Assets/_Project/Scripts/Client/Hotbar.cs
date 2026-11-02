@@ -11,7 +11,7 @@ namespace Game.Client
     // builds is placed, a seed planted and the watering can pours, all on the tile ahead.
     //
     // A slot names what it holds, not where it is: an item is found again wherever it is, in the bag or worn, and
-    // when it is gone another of the same kind takes its place. Kept per character on this device (PlayerPrefs);
+    // when it is gone another of the same kind takes its place. Kept per character on this device (Prefs);
     // the host never hears of the slots, only of what using one does, as if the bag's button had been pressed.
     sealed class Hotbar
     {
@@ -76,8 +76,8 @@ namespace Game.Client
             _client = client;
             _loot = loot;
             _key = "hotbar." + character;
-            if (!PlayerPrefs.HasKey(_key)) return;
-            string[] lines = PlayerPrefs.GetString(_key, "").Split('\n');
+            if (!Prefs.Has(_key)) return;
+            string[] lines = Prefs.Get(_key, "").Split('\n');
             for (int slot = 0; slot < Slots && slot < lines.Length; slot++) _entries[slot] = Entry.Parse(lines[slot]);
             _ready = true;
         }
@@ -292,8 +292,7 @@ namespace Game.Client
 
         void Save()
         {
-            PlayerPrefs.SetString(_key, string.Join("\n", _entries.Select(e => e.ToString())));
-            PlayerPrefs.Save();
+            Prefs.Set(_key, string.Join("\n", _entries.Select(e => e.ToString())));
         }
 
         Entry GearEntry(Item item) => new Entry(Kind.Gear, item.Base.Id, Signature(item));

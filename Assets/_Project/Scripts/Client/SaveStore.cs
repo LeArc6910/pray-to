@@ -5,9 +5,10 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // Where saves live: files under persistentDataPath/saves on PC, the browser's own storage (PlayerPrefs, kept in
-    // IndexedDB) on the web, where a file would not outlast the page. Saves are named by a key such as
-    // "world:내 월드"; the key goes into file names as UTF-8 hex, so any name works. See Docs/Saving.md.
+    // Where saves live: files under persistentDataPath/saves on every platform (DeviceFiles; in a browser that is
+    // IndexedDB). Saves are named by a key such as "world:내 월드"; the key goes into file names as UTF-8 hex, so any
+    // name works. Web saves from before 2026-11-02 sat in PlayerPrefs ("save.<hex>"); one still there becomes a file
+    // the first time it is asked for. See Docs/Saving.md.
     static class SaveStore
     {
         public static string CharacterKey(string name) => "character:" + name;
@@ -19,49 +20,57 @@ namespace Game.Client
 
         public static bool Exists(string key)
         {
-#if UNITY_WEBGL && !UNITY_EDITOR
-            return PlayerPrefs.HasKey(PrefsKey(key));
-#else
+            MoveFromPlayerPrefs(key);
             return File.Exists(PathOf(key));
-#endif
         }
 
         // Null when there is no such save.
         public static byte[] Read(string key)
         {
-#if UNITY_WEBGL && !UNITY_EDITOR
-            string text = PlayerPrefs.GetString(PrefsKey(key), "");
-            return text.Length == 0 ? null : Convert.FromBase64String(text);
-#else
+            MoveFromPlayerPrefs(key);
             string path = PathOf(key);
             return File.Exists(path) ? File.ReadAllBytes(path) : null;
-#endif
         }
 
-        public static void Write(string key, byte[] data)
-        {
-#if UNITY_WEBGL && !UNITY_EDITOR
-            PlayerPrefs.SetString(PrefsKey(key), Convert.ToBase64String(data));
-            PlayerPrefs.Save();
-#else
-            string path = PathOf(key);
-            Directory.CreateDirectory(Path.GetDirectoryName(path));
-            // Written beside and then moved over, so a crash mid-write cannot leave half a save.
-            File.WriteAllBytes(path + ".new", data);
-            if (File.Exists(path)) File.Delete(path);
-            File.Move(path + ".new", path);
-#endif
-        }
+        public static void Write(string key, byte[] data) => DeviceFiles.Write(PathOf(key), data);
 
+        // Also forgets a copy left in PlayerPrefs, or it would come back.
         public static void Delete(string key)
         {
-#if UNITY_WEBGL && !UNITY_EDITOR
-            PlayerPrefs.DeleteKey(PrefsKey(key));
+            DeviceFiles.Delete(PathOf(key));
+            if (!PlayerPrefs.HasKey(OldKey(key))) return;
+            PlayerPrefs.DeleteKey(OldKey(key));
             PlayerPrefs.Save();
-#else
-            string path = PathOf(key);
-            if (File.Exists(path)) File.Delete(path);
-#endif
+        }
+
+        internal static string PathOf(string key) => DeviceFiles.PathOf(Path.Combine("saves", Hex(key) + ".sav"));
+
+        // Where a web save was before it was a file: base64 in PlayerPrefs.
+        internal static string OldKey(string key) => "save." + Hex(key);
+
+        // A save still in PlayerPrefs becomes a file (unless the file is already there) and leaves PlayerPrefs.
+        static void MoveFromPlayerPrefs(string key)
+        {
+            string old = OldKey(key);
+            if (!PlayerPrefs.HasKey(old)) return;
+            if (!File.Exists(PathOf(key)))
+            {
+                string text = PlayerPrefs.GetString(old, "");
+                if (text.Length == 0) return;
+                byte[] data;
+                try
+                {
+                    data = Convert.FromBase64String(text);
+                }
+                catch (FormatException)
+                {
+                    Debug.LogWarning($"Save {key} in PlayerPrefs is not base64; left where it is.");
+                    return;
+                }
+                DeviceFiles.Write(PathOf(key), data);
+            }
+            PlayerPrefs.DeleteKey(old);
+            PlayerPrefs.Save();
         }
 
         static string Hex(string key)
@@ -70,11 +79,5 @@ namespace Game.Client
             foreach (byte b in Encoding.UTF8.GetBytes(key)) hex.Append(b.ToString("x2"));
             return hex.ToString();
         }
-
-#if UNITY_WEBGL && !UNITY_EDITOR
-        static string PrefsKey(string key) => "save." + Hex(key);
-#else
-        static string PathOf(string key) => Path.Combine(Application.persistentDataPath, "saves", Hex(key) + ".sav");
-#endif
     }
 }

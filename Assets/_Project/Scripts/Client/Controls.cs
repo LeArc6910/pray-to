@@ -232,6 +232,28 @@ namespace Game.Client
             return (move, aim, attack);
         }
 
+        // A browser gives keys only to the page that has its focus, but Unity counts the page unfocused whenever its
+        // window is not the system's active one, and the Input System then drops keys until a click brings focus back
+        // (the first keys after starting went unheard in the 2026-11-02 check). In a web build keys that arrive count,
+        // and the keyboard lets go of any held key when the page loses focus, so a key released elsewhere does not
+        // stay down. Call once at start.
+        public static void HearKeysWithoutFocus()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            if (_hearingWithoutFocus) return;
+            _hearingWithoutFocus = true;
+            InputSystem.settings.backgroundBehavior = InputSettings.BackgroundBehavior.IgnoreFocus;
+            Application.focusChanged += focused =>
+            {
+                if (!focused && Keyboard.current != null) InputSystem.ResetDevice(Keyboard.current);
+            };
+#endif
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        static bool _hearingWithoutFocus;
+#endif
+
         public static bool LeavePressed() => Keyboard.current != null && Keyboard.current[Key.Escape].wasPressedThisFrame;
 
         // The bag's key, or I as well while no other action has it.

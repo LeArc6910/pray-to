@@ -28,10 +28,13 @@ namespace Game.Client
         const float AcquiredSeconds = 4;
         // The view keeps about this many tiles across the screen's short side, zoomed by a whole number (below).
         const float ShortSideTiles = 14;
-        const float HealthBarHeight = 20;
+        // Its frame is 4 points thick at top and bottom, which leaves a 14-point well for a 12-point line of text.
+        const float HealthBarHeight = 22;
         const float GuideCheckSeconds = 0.5f;
         // A goal's hint shows this long after the goal comes up; then only the goal stays.
         const float GoalHintSeconds = 30;
+        // The how-to-play lines show this long after the game starts, and for a new character until its first goal.
+        const float ControlsSeconds = 60;
         // The host saves its world this often, and when the session ends. Characters save whenever the bag changes.
         const float WorldSaveSeconds = 30;
 
@@ -97,10 +100,13 @@ namespace Game.Client
         // Clears IMGUI's keyboard focus at the next OnGUI, so a name field left focused in the menu does not keep
         // taking keys once the game starts.
         bool _dropFocus;
+        // Until when the HUD shows the how-to-play lines (ControlsSeconds).
+        float _controlsUntil;
 
         void Awake()
         {
             Application.runInBackground = true;
+            Controls.HearKeysWithoutFocus();
             _camera = Camera.main;
             if (_camera == null) _camera = new GameObject("Main Camera", typeof(Camera)).GetComponent<Camera>();
             _camera.orthographic = true;
@@ -273,15 +279,14 @@ namespace Game.Client
         const float MachineHearing = 7;
 
         // After the host gives the player classes or an order, the menu picks those classes next time, and the order
-        // is kept on this device for them (PlayerPrefs "skillorder.<character>": the classes it is for, then the order).
+        // is kept on this device for them (Prefs "skillorder.<character>": the classes it is for, then the order).
         void RememberKit()
         {
             if (_client.KitVersion == _kitSeen) return;
             _kitSeen = _client.KitVersion;
             _chosenClasses.Clear();
             _chosenClasses.AddRange(_client.Classes.Select(c => c.Id));
-            PlayerPrefs.SetString(SkillOrderKey, string.Join(",", _chosenClasses) + "|" + string.Join(",", _client.SkillOrder));
-            PlayerPrefs.Save();
+            Prefs.Set(SkillOrderKey, string.Join(",", _chosenClasses) + "|" + string.Join(",", _client.SkillOrder));
         }
 
         string SkillOrderKey => "skillorder." + CharacterName;
@@ -289,7 +294,7 @@ namespace Game.Client
         // The skill order kept for this character, if it is for the classes picked now.
         IReadOnlyList<int> KeptSkillOrder()
         {
-            string[] parts = PlayerPrefs.GetString(SkillOrderKey, "").Split('|');
+            string[] parts = Prefs.Get(SkillOrderKey, "").Split('|');
             if (parts.Length != 2 || parts[0] != string.Join(",", _chosenClasses)) return null;
             var order = new List<int>();
             foreach (string part in parts[1].Split(','))
@@ -317,8 +322,7 @@ namespace Game.Client
             if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
             Sounds.Play(Sound.Craft);
             _goalShownAt = Time.time;
-            PlayerPrefs.SetInt(GuideKey, _guideProgress.Done);
-            PlayerPrefs.Save();
+            Prefs.Set(GuideKey, _guideProgress.Done);
         }
 
         string GuideKey => "guide." + CharacterName;
@@ -334,9 +338,10 @@ namespace Game.Client
 
         void StartGuide()
         {
+            _controlsUntil = Time.time + ControlsSeconds;
             _biomeHere = _biomeAnnounced = Biome.Cave;
             _biomeTime = 0;
-            _guideProgress = _guide != null && _guide.Goals.Count > 0 ? new GuideProgress(_guide, PlayerPrefs.GetInt(GuideKey, 0)) : null;
+            _guideProgress = _guide != null && _guide.Goals.Count > 0 ? new GuideProgress(_guide, Prefs.Get(GuideKey, 0)) : null;
             _guideClock = GuideCheckSeconds;
             _goalShownAt = Time.time;
         }
@@ -937,8 +942,10 @@ namespace Game.Client
 
         // The status box: a health bar, then lines that grow the box to fit, so a narrow window wraps them (between
         // words) instead of cutting them off. Compact while the bag is open, so the bag can sit just under it: only the
-        // health bar, and the line saying so when the player is down. On a short screen (a phone held sideways) the
-        // how-to-play lines go, so the HUD does not cover half of it.
+        // health bar, and the line saying so when the player is down. The how-to-play lines show only for a while
+        // (ControlsSeconds), and never on a short screen (a phone held sideways), so the HUD does not cover a big part
+        // of the screen (a fifth of an 800×600 window once they go; 2026-11-02 check). Lines sit close together, and a
+        // key stays on one line with what it does (Keyed).
         void DrawHud(bool compact)
         {
             var lines = new List<string>();
@@ -956,7 +963,8 @@ namespace Game.Client
                 if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 string mode = _mode == Mode.Host ? (_roomCode != null ? $"온라인 방 코드 {_roomCode}" : $"호스트 중 (포트 {NetLink.DefaultPort})")
                     : _mode == Mode.Join ? "참가 중" : "혼자 하기";
-                lines.Add($"Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode} · 접속 {_client.Names.Count}명");
+                string players = _mode == Mode.Solo ? "" : $" · 접속 {_client.Names.Count}명";
+                lines.Add($"Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
                 // The nearest arena the player is not standing in: the first boss's from the spawn, the deep one's
                 // once there.
                 int next = -1;
@@ -986,21 +994,29 @@ namespace Game.Client
                     if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) lines.Add(goal.Hint);
                 }
             }
-            if (!compact && !Ui.Short && Controls.UsingTouch)
+            bool showControls = !compact && !Ui.Short && playing
+                && (Time.time < _controlsUntil || _guideProgress != null && _guideProgress.Done == 0);
+            if (showControls && Controls.UsingTouch)
             {
-                lines.Add("왼쪽 스틱 이동 · 오른쪽 스틱 공격(끄는 쪽으로, 곡괭이를 들면 벽을 캔다)");
-                lines.Add("오른쪽 아래 스킬·물약 · 미니맵을 누르면 지도");
+                lines.Add($"{Keyed("왼쪽 스틱", "이동")} · {Keyed("오른쪽 스틱", "공격")}(끄는 쪽으로, 곡괭이를 들면 벽을 캔다)");
+                lines.Add($"{Keyed("오른쪽 아래", "스킬·물약")} · 미니맵을 누르면 지도");
             }
-            else if (!compact && !Ui.Short)
+            else if (showControls)
             {
-                lines.Add("WASD 이동 · 마우스 조준 · 클릭/스페이스 공격(곡괭이를 들면 벽을 캔다)");
+                lines.Add($"{Keyed("WASD", "이동")} · {Keyed("마우스", "조준")} · {Keyed("클릭/스페이스", "공격")}(곡괭이를 들면 벽을 캔다)");
                 string skills = string.Join(" ", Enumerable.Range(0, 4).Select(Controls.SkillKeyName));
                 string quickKeys = $"{KeyBindings.Name(KeyAction.Hotbar1)}~{KeyBindings.Name(KeyAction.Hotbar6)}";
-                lines.Add($"{skills} 스킬 · {Controls.PotionKeyName} 물약 · {quickKeys} 퀵슬롯 · {KeyBindings.Name(KeyAction.Bag)} 가방 · {KeyBindings.Name(KeyAction.Map)} 지도 · Esc 메뉴");
+                lines.Add($"{Keyed(skills, "스킬")} · {Keyed(Controls.PotionKeyName, "물약")} · {Keyed(quickKeys, "퀵슬롯")} · {Keyed(KeyBindings.Name(KeyAction.Bag), "가방")} · {Keyed(KeyBindings.Name(KeyAction.Map), "지도")} · {Keyed("Esc", "메뉴")}");
             }
 
             var box = GUI.skin.box;
-            var label = GUI.skin.label;
+            // Lines a point apart rather than the label's usual gap.
+            _hudLine ??= new GUIStyle(GUI.skin.label)
+            {
+                margin = new RectOffset(GUI.skin.label.margin.left, GUI.skin.label.margin.right, 1, 1),
+                padding = new RectOffset(GUI.skin.label.padding.left, GUI.skin.label.padding.right, 0, 0),
+            };
+            var label = _hudLine;
             float width = Ui.HudArea.width - box.padding.horizontal - label.margin.horizontal;
             for (int i = 0; i < lines.Count; i++) lines[i] = Ui.Wrap(lines[i], label, width);
             float gap = Mathf.Max(label.margin.top, label.margin.bottom);
@@ -1016,11 +1032,17 @@ namespace Game.Client
                 float share = _client.MaxHealth > 0 ? _client.Health / _client.MaxHealth : 0;
                 UiSkin.Bar(bar, share, $"생명력 {Mathf.CeilToInt(_client.Health)} / {Mathf.CeilToInt(_client.MaxHealth)}");
             }
-            foreach (string line in lines) GUILayout.Label(line);
+            foreach (string line in lines) GUILayout.Label(line, label);
             GUILayout.EndArea();
 
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);
         }
+
+        GUIStyle _hudLine;
+
+        // A key and what it does, joined by a space no line breaks at (Ui.Wrap breaks only at plain spaces), so the
+        // line never ends between them ("· M / 지도"); the spaces inside the key ("Q E R F") hold too.
+        static string Keyed(string key, string meaning) => (key + " " + meaning).Replace(' ', '\u00A0');
 
         // Between the HUD box and the minimap; under the HUD when the screen is too narrow for that.
         static void DrawBossBar(EntityView boss)

@@ -4,8 +4,7 @@ using UnityEngine.InputSystem;
 
 namespace Game.Client
 {
-    // Choices a player makes in the menu that stay on this device (PlayerPrefs, which a browser keeps in its own
-    // storage). Read once, then kept here.
+    // Choices a player makes in the menu that stay on this device (Prefs). Read once, then kept here.
     static class Settings
     {
         static readonly Choice DarknessChoice = new Choice("settings.darkness", true);
@@ -29,14 +28,13 @@ namespace Game.Client
         // How loud the sound effects are, in quarters: 0 is off, MaxVolume full.
         public static int Volume
         {
-            get => _volume ??= Mathf.Clamp(PlayerPrefs.GetInt(VolumeKey, SoundChoice.Value ? MaxVolume : 0), 0, MaxVolume);
+            get => _volume ??= Mathf.Clamp(Prefs.Get(VolumeKey, SoundChoice.Value ? MaxVolume : 0), 0, MaxVolume);
             set
             {
                 value = Mathf.Clamp(value, 0, MaxVolume);
                 if (_volume == value) return;
                 _volume = value;
-                PlayerPrefs.SetInt(VolumeKey, value);
-                PlayerPrefs.Save();
+                Prefs.Set(VolumeKey, value);
             }
         }
 
@@ -45,14 +43,13 @@ namespace Game.Client
         // How loud the background music is, in quarters like Volume. Half to begin with.
         public static int MusicVolume
         {
-            get => _music ??= Mathf.Clamp(PlayerPrefs.GetInt(MusicKey, MaxVolume / 2), 0, MaxVolume);
+            get => _music ??= Mathf.Clamp(Prefs.Get(MusicKey, MaxVolume / 2), 0, MaxVolume);
             set
             {
                 value = Mathf.Clamp(value, 0, MaxVolume);
                 if (_music == value) return;
                 _music = value;
-                PlayerPrefs.SetInt(MusicKey, value);
-                PlayerPrefs.Save();
+                Prefs.Set(MusicKey, value);
             }
         }
 
@@ -90,13 +87,12 @@ namespace Game.Client
 
             public bool Value
             {
-                get => _value ??= PlayerPrefs.GetInt(_key, _default ? 1 : 0) == 1;
+                get => _value ??= Prefs.Get(_key, _default ? 1 : 0) == 1;
                 set
                 {
                     if (_value == value) return;
                     _value = value;
-                    PlayerPrefs.SetInt(_key, value ? 1 : 0);
-                    PlayerPrefs.Save();
+                    Prefs.Set(_key, value ? 1 : 0);
                 }
             }
         }
@@ -121,7 +117,7 @@ namespace Game.Client
         Machine,
     }
 
-    // Which key does what, changed in the menu and kept on this device (PlayerPrefs, by key name). Every action has
+    // Which key does what, changed in the menu and kept on this device (Prefs, by key name). Every action has
     // one key and no key does two things: giving an action a key another one has swaps them.
     static class KeyBindings
     {
@@ -219,7 +215,6 @@ namespace Game.Client
             Capturing = null;
             _keys = (Key[])Defaults.Clone();
             foreach (var action in Actions) Save(action);
-            PlayerPrefs.Save();
             Message = "처음 키로 돌렸다";
         }
 
@@ -236,10 +231,9 @@ namespace Game.Client
             }
             Keys[(int)action] = key;
             Save(action);
-            PlayerPrefs.Save();
         }
 
-        static void Save(KeyAction action) => PlayerPrefs.SetString("keys." + action, Keys[(int)action].ToString());
+        static void Save(KeyAction action) => Prefs.Set("keys." + action, Keys[(int)action].ToString());
 
         // Saved keys, or the defaults for any missing, unknown or fixed. An action whose key an earlier one already has
         // (a key chosen for a skill before the quick slots took the digits, say) is left without one ("-") until the
@@ -249,7 +243,7 @@ namespace Game.Client
             var keys = new Key[Actions.Length];
             for (int i = 0; i < keys.Length; i++)
             {
-                string saved = PlayerPrefs.GetString("keys." + Actions[i], "");
+                string saved = Prefs.Get("keys." + Actions[i], "");
                 bool known = Enum.TryParse(saved, out Key key) && key != Key.None && Array.IndexOf(Fixed, key) < 0;
                 keys[i] = known ? key : Defaults[i];
             }
