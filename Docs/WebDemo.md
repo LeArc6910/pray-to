@@ -11,6 +11,8 @@
    - **빌드**: `Game.Client.Editor.WebBuild.RunBatch`. 먼저 `Game > Set Up Project`를 해서 씬과 시트 목록이 최신인지 맞춘 뒤 WebGL로 `build/web`에 빌드한다. `Library/`는 Actions 캐시에 남겨 다음 빌드를 줄인다
 4. 결과를 GitHub Pages에 올린다. 처음 빌드는 20분 안팎, `Library` 캐시가 있으면 job 전체가 12분쯤이다(이미지 받기 3분, 빌드 6분).
 
+배포가 끝난 직후 잠깐은 GitHub Pages가 게임 데이터 파일(`web.data.unityweb`)을 요청받아도 503 오류 페이지를 줄 수 있다. 그러면 페이지에 "불러오지 못했습니다: Unknown data format (id=" <!DOCTYPE html>")"가 뜬다. 2026-11-02에 다시 배포한 뒤 바로 열었을 때 한 번 나왔고, 브라우저 캐시에 그 응답이 503으로 남아 있었다. 새로고침하자 바로 떴다. 배포 직후가 아닌데도 되풀이되면 클라우드에 알린다.
+
 에디터가 시작 1초 만에 `Killed`(종료 코드 137)로 끝나는 일이 있다(2026-10-28 첫 열두 번 중 세 번. 다시 띄우면 늘 됐다). 원인은 아직 모른다. 그래서 `build-web.sh`가 137로 끝났을 때만 같은 라이선스로 에디터를 세 번까지 다시 띄운다. 세 번 모두 그러면 Actions 탭에서 Re-run failed jobs를 누르고 클라우드에 알린다.
 
 빌드 설정(`ProjectSetup.UseWebSettings`): gzip 압축에 decompression fallback을 켠다. GitHub Pages는 `.gz` 파일에 `Content-Encoding` 헤더를 붙이지 않으므로, 브라우저 대신 Unity 로더가 압축을 푼다. 데이터 캐싱도 켜서 두 번째 접속부터는 빨리 뜬다.
