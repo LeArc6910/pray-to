@@ -283,8 +283,53 @@ namespace Game.Client
             "spicy_fry" => SpicyFry,
             "mushroom_soup" => MushroomSoup,
             "recall_scroll" => RecallScroll,
+            "grilled_fish" => Ramped(FishRows, Ramp.Of("#C4783E")),
+            "fish_stew" => MushroomSoup,
+            "eel_skewer" => SpicyFry,
+            "abyss_feast" => MushroomSoup,
             _ => Potion,
         };
+
+        // A fish, facing left, in its colour.
+        static readonly string[] FishRows =
+        {
+            "...LL.....",
+            ".LLMMLL.L.",
+            "LwMMMMMLL.",
+            "MMMMMMmmM.",
+            ".mmmmmm.m.",
+            "...mm.....",
+        };
+
+        // A rod with its line and float.
+        static readonly PixelImage FishingRodIcon = PixelImage.FromRows(new Dictionary<char, Rgba>(Common)
+            {
+                ['h'] = Rgba.Hex("#9A7452"),
+                ['H'] = Rgba.Hex("#6A4A32"),
+                ['l'] = Rgba.Hex("#C8D0DC"),
+                ['r'] = Rgba.Hex("#E8485A"),
+            },
+            ".........h",
+            "........hl",
+            ".......h.l",
+            "......h..l",
+            ".....h...l",
+            "....h....l",
+            "...h.....r",
+            "..h......w",
+            ".HH.......",
+            "HH........").Outlined(Outline);
+
+        // The float on a line in the water, red over white, drawn in the world where a line went in.
+        public static readonly PixelImage Bobber = PixelImage.FromRows(new Dictionary<char, Rgba>(Common)
+            {
+                ['r'] = Rgba.Hex("#E8485A"),
+                ['R'] = Rgba.Hex("#A8243A"),
+            },
+            "..r..",
+            ".rrR.",
+            ".wwR.",
+            "..w..").Outlined(Outline);
 
         // ---- Materials ----
 
@@ -500,6 +545,12 @@ namespace Game.Client
                 case "fire_pepper_seed": return Ramped(Seeds, Ramp.Of("#E8D27C"));
                 case "fire_pepper": return Pepper;
                 case "watering_can": return WateringCanIcon;
+                case "fishing_rod": return FishingRodIcon;
+                case "cave_minnow": return Ramped(FishRows, Ramp.Of("#A8B4C0"));
+                case "spore_catfish": return Ramped(FishRows, Ramp.Of("#9A7CB8"));
+                case "ice_trout": return Ramped(FishRows, Ramp.Of("#8CD8FF"));
+                case "crystal_eel": return Ramped(FishRows, Ramp.Of("#7CD2E2"));
+                case "void_angler": return Ramped(FishRows, Ramp.Of("#7A5CC8"));
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);
             }
         }

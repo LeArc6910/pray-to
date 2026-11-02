@@ -335,6 +335,9 @@ namespace Game.Core
                 case InventoryCommand.ToggleMachine:
                     World.ToggleMachine(player.Id);
                     break;
+                case InventoryCommand.Fish:
+                    World.Fish(player.Id);
+                    break;
                 case InventoryCommand.StoreItem:
                 case InventoryCommand.TakeItem:
                     World.MoveItem(player.Id, command.Item, command.Command == InventoryCommand.StoreItem);

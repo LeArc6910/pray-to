@@ -17,6 +17,7 @@ namespace Game.Client
         ObsidianOre,
         Lava,
         VoidOre,
+        Water,
     }
 
     // The cave tiles, 16 pixels a tile, seen from above and a little in front like Core Keeper: a wall shows its
@@ -29,7 +30,7 @@ namespace Game.Client
         public const int Size = 16;
         public const int Variants = 4;
         const int Masks = 16;
-        const int Kinds = 10;
+        const int Kinds = 11;
         // Every kind is drawn once for each biome, in that biome's colours (Docs/Biomes.md).
         public static readonly int Biomes = System.Enum.GetValues(typeof(Biome)).Length;
         // Neighbour bits: which sides are rock.
@@ -68,8 +69,17 @@ namespace Game.Client
                 TileType.ObsidianOre => GroundKind.ObsidianOre,
                 TileType.VoidOre => GroundKind.VoidOre,
                 TileType.Lava => GroundKind.Lava,
+                TileType.Water => GroundKind.Water,
                 _ => inArena ? GroundKind.Arena : GroundKind.Floor,
             };
+            // Water's edges are where it meets anything else, like lava's.
+            if (kind == GroundKind.Water)
+            {
+                mask = (map[x, y + 1] != TileType.Water ? Up : 0)
+                    | (map[x + 1, y] != TileType.Water ? Right : 0)
+                    | (map[x, y - 1] != TileType.Water ? Down : 0)
+                    | (map[x - 1, y] != TileType.Water ? Left : 0);
+            }
             // Lava's edges are where it meets anything that is not lava.
             if (kind == GroundKind.Lava)
             {
@@ -102,8 +112,46 @@ namespace Game.Client
                 GroundKind.ObsidianOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#4A3268"), sparkle: true),
                 GroundKind.Lava => Lava(mask, variant),
                 GroundKind.VoidOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#B48CFF"), sparkle: true),
+                GroundKind.Water => Water(mask, variant, biome),
                 _ => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#A9BDD6"), sparkle: true),
             };
+        }
+
+        // ---- Water ----
+
+        // A pool: deep water with lighter ripples, a dark lip where it meets the ground, coloured by its biome.
+        static PixelImage Water(int mask, int variant, Biome biome)
+        {
+            var (deep, main, light) = biome switch
+            {
+                Biome.Ice => ("#2E6A8C", "#4E9CC4", "#A8E0F4"),
+                Biome.Mushroom => ("#1E4E5A", "#2E7A84", "#7CC8C0"),
+                Biome.Crystal => ("#22386E", "#3A5CA8", "#9AC0F0"),
+                Biome.Abyss => ("#1A1438", "#2E2460", "#8A74D8"),
+                _ => ("#1C3A5C", "#2C5C8C", "#7CA8D8"),
+            };
+            var deepColor = Rgba.Hex(deep);
+            var mainColor = Rgba.Hex(main);
+            var lightColor = Rgba.Hex(light);
+            var image = new PixelImage(Size, Size);
+            int salt = 900 + variant;
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    float n = Smooth(x, y, 4, salt, 900);
+                    image[x, y] = n > 0.8f ? lightColor : n > 0.35f ? mainColor : deepColor;
+                }
+            }
+            var lip = deepColor.Scale(0.6f);
+            for (int i = 0; i < Size; i++)
+            {
+                if ((mask & Up) != 0) image[i, 0] = lip;
+                if ((mask & Down) != 0) image[i, Size - 1] = lip;
+                if ((mask & Left) != 0) image[0, i] = lip;
+                if ((mask & Right) != 0) image[Size - 1, i] = lip;
+            }
+            return image;
         }
 
         // ---- Lava ----

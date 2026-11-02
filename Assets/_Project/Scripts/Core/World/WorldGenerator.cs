@@ -81,6 +81,11 @@ namespace Game.Core
         // one of the two corners beside the lava fields, reached by a tunnel from the lava arena, and void ore there.
         const ulong AbyssStream = 9;
         const int VoidVeins = 22;
+        // Pools of water (Docs/Fishing.md), last of all on their own stream: set into the rock at the edge of the
+        // caves, so no way through is ever closed, away from the spawn and the arenas and not in the lava fields.
+        const ulong WaterStream = 10;
+        const int WaterPools = 40;
+        const int WaterDistance = 10;
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -157,6 +162,14 @@ namespace Game.Core
             ClearDisc(map, abyssX, abyssY, ArenaRadius);
             PlaceVeins(map, abyss, TileType.VoidOre, VoidVeins, (x, y) => map[x, y] == TileType.Wall && biomes[x, y] == Biome.Abyss
                 && (x - abyssX) * (x - abyssX) + (y - abyssY) * (y - abyssY) > (ArenaRadius + 2) * (ArenaRadius + 2));
+            var arenas = new[] { (arenaX, arenaY), (deepX, deepY), (lavaX, lavaY), (abyssX, abyssY) };
+            bool Shore(int x, int y)
+            {
+                if (map[x, y] != TileType.Wall || biomes[x, y] == Biome.Lava) return false;
+                if ((x - spawnX) * (x - spawnX) + (y - spawnY) * (y - spawnY) < WaterDistance * WaterDistance) return false;
+                return !arenas.Any(a => (x - a.Item1) * (x - a.Item1) + (y - a.Item2) * (y - a.Item2) <= (ArenaRadius + 3) * (ArenaRadius + 3));
+            }
+            PlaceWater(map, new GameRandom(seed, WaterStream), Shore);
             return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY), (abyssX, abyssY));
         }
 
@@ -211,6 +224,31 @@ namespace Game.Core
         }
 
         // Pools of lava on open floor: a centre and some of the floor around it, two rings out.
+        // Each pool starts in rock right beside a floor tile and spreads a little into the rock around it.
+        static void PlaceWater(TileMap map, GameRandom random, System.Func<int, int, bool> allowed)
+        {
+            for (int pool = 0; pool < WaterPools; pool++)
+            {
+                for (int attempt = 0; attempt < 200; attempt++)
+                {
+                    int x = 2 + random.Next(map.Width - 4);
+                    int y = 2 + random.Next(map.Height - 4);
+                    bool shore = map[x + 1, y] == TileType.Floor || map[x - 1, y] == TileType.Floor || map[x, y + 1] == TileType.Floor || map[x, y - 1] == TileType.Floor;
+                    if (!shore || !allowed(x, y)) continue;
+                    for (int vy = y - 2; vy <= y + 2; vy++)
+                    {
+                        for (int vx = x - 2; vx <= x + 2; vx++)
+                        {
+                            int ring = System.Math.Max(System.Math.Abs(vx - x), System.Math.Abs(vy - y));
+                            int odds = ring == 0 ? 100 : ring == 1 ? 70 : 30;
+                            if (IsInside(map, vx, vy) && allowed(vx, vy) && random.Next(100) < odds) map[vx, vy] = TileType.Water;
+                        }
+                    }
+                    break;
+                }
+            }
+        }
+
         static void PlaceLava(TileMap map, GameRandom random, System.Func<int, int, bool> allowed)
         {
             for (int pool = 0; pool < LavaPools; pool++)

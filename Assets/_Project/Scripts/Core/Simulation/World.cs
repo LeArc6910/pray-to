@@ -182,6 +182,7 @@ namespace Game.Core
             Heal(player);
             BurnInLava(player);
             UpdateRecall(player);
+            UpdateFishing(player);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
             if (player.Attacking && player.AttackCooldown == 0) Attack(player);
         }
@@ -438,6 +439,7 @@ namespace Game.Core
             if (player.IsDead) return 0;
             int amount = armor ? Combat.Mitigate(damage, player.Stats.Armor) : Math.Max(1, (int)MathF.Round(damage));
             BreakRecall(player);
+            EndFishing(player, FishingReeled);
             player.Health -= amount;
             player.RestingTicks = 0;
             _events.Add(new SimEvent(SimEventType.Hit, source, player.Id, amount, cause: cause));

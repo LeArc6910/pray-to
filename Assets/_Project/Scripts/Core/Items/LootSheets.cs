@@ -256,7 +256,8 @@ namespace Game.Core
                         places = SheetValues.ParseEnum<TileType>(row["places"], "칸 종류");
                         if (places == TileType.Floor) throw new FormatException("places에는 벽 같은 단단한 칸만 적을 수 있습니다.");
                     }
-                    materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"]));
+                    Biome? fish = row["fish"].Length > 0 ? SheetValues.ParseEnum<Biome>(row["fish"], "fish") : (Biome?)null;
+                    materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"], fish));
                 });
             }
             return materials;

@@ -36,6 +36,8 @@ namespace Game.Core
         // Goes up whenever the bag or the equipment changes, so the host knows when to send them again.
         public int InventoryVersion { get; internal set; }
         public PlayerStats Stats { get; private set; }
+        // The line in the water, or null when not fishing (World.Fish).
+        public FishingLine Fishing { get; internal set; }
         // Experience gathered over the character's life; the level follows from it (Leveling).
         public int Experience { get; internal set; }
         public int Level => Leveling.LevelFor(Experience);
@@ -276,6 +278,9 @@ namespace Game.Core
         Recall,
         // Source, a player, reached a new level; Amount is the level (World.GainExperience).
         LevelUp,
+        // Source, a player, cast (Amount World.FishingCast), had a bite, landed a fish, lost it or reeled in, with the
+        // line's spot at Position (World.Fish).
+        Fishing,
     }
 
     public readonly struct SimEvent
@@ -306,7 +311,7 @@ namespace Game.Core
 
         public static bool HasPosition(SimEventType type) =>
             type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
-            || type == SimEventType.Recall;
+            || type == SimEventType.Recall || type == SimEventType.Fishing;
     }
 
     public enum BossState : byte

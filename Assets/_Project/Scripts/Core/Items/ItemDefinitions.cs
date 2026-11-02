@@ -233,12 +233,13 @@ namespace Game.Core
     // See Docs/Crafting.md.
     public sealed class MaterialDefinition
     {
-        internal MaterialDefinition(string id, string name, TileType? places, string description)
+        internal MaterialDefinition(string id, string name, TileType? places, string description, Biome? fish = null)
         {
             Id = id;
             Name = name;
             Places = places;
             Description = description;
+            Fish = fish;
         }
 
         public string Id { get; }
@@ -246,6 +247,8 @@ namespace Game.Core
         // The tile [놓기] puts down, or null when it cannot be placed.
         public TileType? Places { get; }
         public string Description { get; }
+        // A fish caught in the water of this biome (materials.csv fish), or null.
+        public Biome? Fish { get; }
     }
 
     // Turns materials into an item, a consumable or another material. Exactly one result is set.

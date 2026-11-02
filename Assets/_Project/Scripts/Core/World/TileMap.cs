@@ -47,6 +47,8 @@ namespace Game.Core
         Table,
         Banner,
         Pot,
+        // Pools at the edges of the caves, fished from the floor beside them (Docs/Fishing.md). Nothing walks in them.
+        Water,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

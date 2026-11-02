@@ -291,8 +291,9 @@ namespace Game.Client
                 var crop = _client.CropFrom(pair.Key);
                 if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
                 if (pair.Key.Id == World.WateringCan && GUILayout.Button("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
-                // Only what a quick slot can use: things that build, seeds and the watering can.
-                if (pair.Key.Places != null || crop != null || pair.Key.Id == World.WateringCan)
+                if (pair.Key.Id == World.FishingRod && GUILayout.Button(FishingLabel(_client), GUILayout.Width(72))) Send(_client.FishCommand(), Sound.Cast);
+                // Only what a quick slot can use: things that build, seeds, the watering can and the rod.
+                if (pair.Key.Places != null || crop != null || pair.Key.Id == World.WateringCan || pair.Key.Id == World.FishingRod)
                 {
                     var material = pair.Key;
                     QuickButton(_hotbar?.SlotOf(material), () => _hotbar.Toggle(material));
@@ -370,6 +371,10 @@ namespace Game.Client
         }
 
         const int BulkCraft = 5;
+
+        // What pressing the rod does now: cast, reel in, or land the fish that is biting.
+        internal static string FishingLabel(WorldClient client) =>
+            client.Fishing == World.FishingBite ? "낚아채기!" : client.Fishing == World.FishingCast ? "걷기" : "낚시";
 
         static string StationName(TileType station) => station switch
         {

@@ -119,6 +119,7 @@ namespace Game.Client
                     var crop = _client.CropFrom(material);
                     if (crop != null) return (_client.PlantCommand(crop), Sound.Place);
                     if (material.Id == World.WateringCan) return (_client.WaterCommand(), Sound.Water);
+                    if (material.Id == World.FishingRod) return (_client.FishCommand(), _client.Fishing < 0 ? Sound.Cast : (Sound?)null);
                     return (null, null);
                 default:
                     return (null, null);
@@ -231,6 +232,7 @@ namespace Game.Client
                     string use = material.Places != null ? "앞에 놓는다"
                         : _client.CropFrom(material) != null ? "앞에 심는다"
                         : material.Id == World.WateringCan ? "앞 3×3칸에 물을 준다"
+                        : material.Id == World.FishingRod ? "앞의 물에 던지고, 입질(!)이 오면 다시 눌러 낚는다"
                         : "쓸 수 없다(재료)";
                     return (Sprites.Icon(material), have, have > 0, false, material.Name, use);
                 default:

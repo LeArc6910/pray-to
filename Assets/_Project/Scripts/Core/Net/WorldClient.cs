@@ -537,6 +537,12 @@ namespace Game.Core
             return under;
         }
 
+        // Casts, lands a biting fish or reels in (World.Fish).
+        public byte[] FishCommand() => new InventoryCommandMessage(InventoryCommand.Fish, 0).Encode();
+
+        // Where this player's line is at: World.FishingCast while waiting, World.FishingBite while a fish bites, or -1.
+        public int Fishing { get; private set; } = -1;
+
         public byte[] ToggleMachineCommand() => new InventoryCommandMessage(InventoryCommand.ToggleMachine, 0).Encode();
 
         // The chest this player stands by and what it holds, or a closed one.
@@ -753,6 +759,10 @@ namespace Game.Core
             _sinceLatest = 0;
             if (_snapshots.Count > KeptSnapshots) _snapshots.RemoveAt(0);
             _events.AddRange(snapshot.Events);
+            foreach (var e in snapshot.Events)
+            {
+                if (e.Type == SimEventType.Fishing && e.Source == PlayerId) Fishing = e.Amount == World.FishingCast || e.Amount == World.FishingBite ? e.Amount : -1;
+            }
 
             var self = snapshot.Self;
             bool buffsChanged = false;

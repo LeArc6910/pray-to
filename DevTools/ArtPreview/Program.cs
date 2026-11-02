@@ -208,7 +208,7 @@ namespace Game.Client
             foreach (var biome in ((Biome[])Enum.GetValues(typeof(Biome))).Where(b => b != Biome.Cave))
             {
                 var row = new List<PixelImage>();
-                foreach (var kind in new[] { GroundKind.Floor, GroundKind.Rock, GroundKind.CopperOre, GroundKind.IronOre, GroundKind.MithrilOre, GroundKind.ObsidianOre, GroundKind.VoidOre, GroundKind.Lava })
+                foreach (var kind in new[] { GroundKind.Floor, GroundKind.Rock, GroundKind.CopperOre, GroundKind.IronOre, GroundKind.MithrilOre, GroundKind.ObsidianOre, GroundKind.VoidOre, GroundKind.Lava, GroundKind.Water })
                 {
                     for (int variant = 0; variant < 2; variant++)
                     {

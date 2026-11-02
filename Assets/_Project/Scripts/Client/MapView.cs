@@ -234,6 +234,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Door) return new Color32(170, 120, 70, 255);
             if (_map[x, y] == TileType.Table || _map[x, y] == TileType.Banner || _map[x, y] == TileType.Pot) return new Color32(200, 160, 110, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);
+            if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);
             if (_map[x, y] == TileType.Bed) return new Color32(80, 130, 220, 255);
             if (_map[x, y] == TileType.Sprinkler) return new Color32(90, 150, 230, 255);
             if (_map[x, y] == TileType.Harvester) return new Color32(110, 170, 80, 255);

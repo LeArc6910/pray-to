@@ -139,6 +139,8 @@ namespace Game.Core
         Water,
         // Switches the machine ahead off or on (World.ToggleMachine).
         ToggleMachine,
+        // Casts, lands or reels in (World.Fish).
+        Fish,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

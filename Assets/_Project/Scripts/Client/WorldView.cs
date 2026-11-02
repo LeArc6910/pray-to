@@ -187,6 +187,8 @@ namespace Game.Client
         readonly Dictionary<int, SpriteRenderer> _crops = new Dictionary<int, SpriteRenderer>();
         // Cracks over rock that has taken hits, by tile, until it breaks or changes.
         readonly Dictionary<int, SpriteRenderer> _cracks = new Dictionary<int, SpriteRenderer>();
+        // Each player's float on the water while they fish, by player id.
+        readonly Dictionary<int, SpriteRenderer> _bobbers = new Dictionary<int, SpriteRenderer>();
         // Per machine tile: the part that shows which way it faces (a drill's bit, a smelter's arrow, a conveyor's
         // moving belt), and the icon of what a conveyor carries.
         readonly Dictionary<int, (TileType Kind, SpriteRenderer Part, SpriteRenderer Load)> _machines =
@@ -258,6 +260,7 @@ namespace Game.Client
 
             foreach (var e in _client.TakeEvents()) Show(e);
             UpdateFlashes(deltaTime);
+            BobBobbers();
             UpdateBits(deltaTime);
             for (int i = _floating.Count - 1; i >= 0; i--)
             {
@@ -837,6 +840,9 @@ namespace Game.Client
                     Hear(Sound.Eat, eater.Position);
                     AddFlash(eater.Position, eater.Diameter, Palette.Food, FlashKind.Sparkles);
                     break;
+                case SimEventType.Fishing:
+                    ShowFishing(e);
+                    break;
                 case SimEventType.LevelUp:
                     var climber = Find(e.Source);
                     if (climber == null) break;
@@ -950,6 +956,61 @@ namespace Game.Client
             if (_stride < StepLength) return;
             _stride -= StepLength;
             Sounds.Play(Sound.Step, 0.35f);
+        }
+
+        // A float where a line goes in; a splash and a "!" when a fish bites; a splash when one is landed; the float
+        // gone when the line comes out.
+        void ShowFishing(SimEvent e)
+        {
+            var spot = new Vector3(e.Position.X, e.Position.Y, 0);
+            bool mine = e.Source == _client.PlayerId;
+            switch (e.Amount)
+            {
+                case World.FishingCast:
+                    if (!_bobbers.TryGetValue(e.Source, out var bobber))
+                    {
+                        bobber = Renderer(_root.transform, "Bobber", Sprites.Centered("bobber", () => ItemArt.Bobber), Color.white);
+                        bobber.sortingOrder = -9;
+                        _bobbers[e.Source] = bobber;
+                    }
+                    bobber.transform.localPosition = spot;
+                    AddFlash(spot, 0.4f, Palette.Water, FlashKind.Ring);
+                    if (!mine) Hear(Sound.Cast, spot, 0.6f);
+                    break;
+                case World.FishingBite:
+                    AddFlash(spot, 0.5f, Palette.Water, FlashKind.Burst);
+                    _floating.Add(new Floating { Position = spot + new Vector3(0, 0.3f, 0), Text = "!", Color = Color.white });
+                    if (mine) Sounds.Play(Sound.Bite);
+                    break;
+                default:
+                    if (_bobbers.TryGetValue(e.Source, out var gone))
+                    {
+                        Object.Destroy(gone.gameObject);
+                        _bobbers.Remove(e.Source);
+                    }
+                    if (e.Amount == World.FishingCaught)
+                    {
+                        AddFlash(spot, 0.8f, Palette.Water, FlashKind.Ring);
+                        Hear(Sound.Splash, spot);
+                    }
+                    else if (e.Amount == World.FishingEscaped)
+                    {
+                        AddFlash(spot, 0.4f, Palette.Water, FlashKind.Ring);
+                        if (mine) _floating.Add(new Floating { Position = spot + new Vector3(0, 0.3f, 0), Text = "놓쳤다", Color = Color.gray });
+                    }
+                    break;
+            }
+        }
+
+        // Floats rock gently on the water.
+        void BobBobbers()
+        {
+            float bob = Mathf.Round(Mathf.Sin(Time.time * 4) * 1.5f) / Sprites.PixelsPerUnit;
+            foreach (var bobber in _bobbers.Values)
+            {
+                var p = bobber.transform.localPosition;
+                bobber.transform.localPosition = new Vector3(p.x, Mathf.Floor(p.y) + 0.5f + bob, 0);
+            }
         }
 
         // A sound where something happened, quieter the farther it is from the player (Sounds).

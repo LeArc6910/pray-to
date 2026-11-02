@@ -35,6 +35,10 @@ namespace Game.Client
         Step,
         // A new character level.
         LevelUp,
+        // Fishing: the line going out, a bite, a fish landed.
+        Cast,
+        Bite,
+        Splash,
     }
 
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
@@ -195,6 +199,23 @@ namespace Game.Client
                     // A bright run up two octaves.
                     Arpeggio(parts, Wave.Square, 0.06f, 0.1f, 0.35f, 392, 523, 659, 784, 1047);
                     parts.Add(Tone(Wave.Triangle, 0.3f, 0.4f, 1568, 1568, 0.3f, decay: 2, vibrato: 0.01f, vibratoRate: 7));
+                    level = 0.7f;
+                    break;
+                case Sound.Cast:
+                    // A whip of the rod and a plop.
+                    parts.Add(Noise(0, 0.12f, 0.7f, 0.5f, attack: 0.02f, decay: 3, seed: 11));
+                    parts.Add(Tone(Wave.Sine, 0.18f, 0.08f, 900, 300, 0.5f, decay: 4));
+                    level = 0.5f;
+                    break;
+                case Sound.Bite:
+                    // Two quick bloops: something took it.
+                    parts.Add(Tone(Wave.Sine, 0, 0.07f, 300, 700, 0.7f, decay: 3));
+                    parts.Add(Tone(Wave.Sine, 0.1f, 0.07f, 300, 800, 0.7f, decay: 3));
+                    level = 0.8f;
+                    break;
+                case Sound.Splash:
+                    parts.Add(Noise(0, 0.3f, 1, 0.35f, attack: 0.005f, decay: 4, seed: 12));
+                    parts.Add(Tone(Wave.Sine, 0, 0.12f, 500, 1200, 0.4f, decay: 3));
                     level = 0.7f;
                     break;
                 case Sound.Step:

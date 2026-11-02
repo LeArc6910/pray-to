@@ -87,6 +87,7 @@ namespace Game.Core.Tests
                 for (int x = 0; x < rows[row].Length; x++)
                 {
                     if (rows[row][x] == '#') map[x, rows.Length - 1 - row] = TileType.Wall;
+                    if (rows[row][x] == '~') map[x, rows.Length - 1 - row] = TileType.Water;
                 }
             }
             return map;
