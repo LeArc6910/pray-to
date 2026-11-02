@@ -17,6 +17,8 @@ namespace Game.Client
         static int? _music;
         static readonly Choice DevInfoChoice = new Choice("settings.devinfo", false);
         static readonly Choice PixelFontChoice = new Choice("settings.pixelfont", true);
+        static readonly Choice GuideChoice = new Choice("settings.guide", true);
+        static readonly Choice ScreenShakeChoice = new Choice("settings.shake", true);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -70,6 +72,21 @@ namespace Game.Client
         {
             get => PixelFontChoice.Value;
             set => PixelFontChoice.Value = value;
+        }
+
+        // The goals for new players in the HUD (Docs/Guide.md). Off, they are not shown or announced, but goals met
+        // still count and still bring their rewards, so turning it back on carries on where the character is.
+        public static bool Guide
+        {
+            get => GuideChoice.Value;
+            set => GuideChoice.Value = value;
+        }
+
+        // The view jolting when the player is hurt or something heavy lands nearby (WorldView).
+        public static bool ScreenShake
+        {
+            get => ScreenShakeChoice.Value;
+            set => ScreenShakeChoice.Value = value;
         }
 
         // One on-or-off choice, saved under its key when it changes.

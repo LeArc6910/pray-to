@@ -13,7 +13,7 @@ namespace Game.Core
     // closed. See Docs/Saving.md.
     public sealed class WorldSave
     {
-        const string Magic = "PTWO";
+        internal const string Magic = "PTWO";
         // 2 added chests, 3 machines, 4 whether each crop was watered, 5 beds and their owners.
         // 6: a filter's chosen material on each machine.
         const int FormatVersion = 6;

@@ -12,7 +12,7 @@ namespace Game.Core
     // the first tile, each as a 7-bit varint. A cave explored in patches comes to a few kilobytes at most.
     public static class MapSave
     {
-        const uint Magic = 0x504D5450; // "PTMP"
+        const uint Magic = 0x504D5450; // "PTMP" as written (little-endian); SaveKeys.MagicOf has it as text
         const int FormatVersion = 1;
 
         public static byte[] Write(IReadOnlyList<bool> seen, int width, int height)

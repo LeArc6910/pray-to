@@ -283,7 +283,8 @@ namespace Game.Client
             _bannerAge += deltaTime;
 
             _cameraTarget = Vector3.Lerp(_cameraTarget, new Vector3(selfPosition.X, selfPosition.Y, _cameraTarget.z), 1 - Mathf.Exp(-12 * deltaTime));
-            _shake *= Mathf.Exp(-10 * deltaTime);
+            // Off in the menu (Settings.ScreenShake), hits still flash and sound but the view holds still.
+            _shake = Settings.ScreenShake ? _shake * Mathf.Exp(-10 * deltaTime) : 0;
             var jolt = (Vector3)(UnityEngine.Random.insideUnitCircle * _shake);
             _camera.transform.position = _cameraTarget + jolt;
             UpdateDark(selfPosition);

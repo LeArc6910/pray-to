@@ -71,9 +71,21 @@ namespace Game.Client
         // Class ids in the order picked; the first one's skills take the first slots. Both to start with, so a new
         // player sees what mixing does.
         readonly List<string> _chosenClasses = new List<string> { "warrior", "fire_mage" };
-        // Whether the menu shows the keys in place of the classes.
-        bool _keysOpen;
+        // What the menu's second column shows: the classes, the keys to change, or the saves on this device.
+        enum MenuSide
+        {
+            Classes,
+            Keys,
+            Saves,
+        }
+
+        MenuSide _side;
+        SaveMenu _saveMenu;
         Vector2 _menuScroll;
+        // On a narrow screen the second column is under the first: where it starts, and whether to scroll there once
+        // (after a button opened the keys or the saves).
+        float _sideTop;
+        bool _scrollToSide;
         // Width of a line of text in a menu column this frame.
         float _menuColumn;
         WorldHost _host;
@@ -315,14 +327,16 @@ namespace Game.Client
             if (passed.Count == 0) return;
             foreach (var goal in passed)
             {
-                _acquired.Add(("목표 달성: " + goal.Text, 0));
+                if (Settings.Guide) _acquired.Add(("목표 달성: " + goal.Text, 0));
                 // The host gives the reward once, if it sees the goal met too.
                 if (goal.Rewards.Count > 0 && !_client.ClaimedGoals.Contains(goal.Id)) SendToHost(_client.ClaimGoalCommand(IndexOfGoal(goal)));
             }
-            if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
-            Sounds.Play(Sound.Craft);
             _goalShownAt = Time.time;
             Prefs.Set(GuideKey, _guideProgress.Done);
+            // Turned off in the menu, goals still count and bring their rewards, but nothing is said.
+            if (!Settings.Guide) return;
+            if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
+            Sounds.Play(Sound.Craft);
         }
 
         string GuideKey => "guide." + CharacterName;
@@ -813,6 +827,11 @@ namespace Game.Client
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
                 && _classes != null && _classes.Success && _tiles != null && _tiles.Success;
             var area = new Rect((Ui.Width - width) / 2, (Ui.Height - height) / 2, width, height);
+            if (_scrollToSide && Event.current.type == EventType.Layout)
+            {
+                _menuScroll.y = wide ? 0 : _sideTop;
+                _scrollToSide = false;
+            }
             GUILayout.BeginArea(area, GUI.skin.box);
             _menuScroll = GUILayout.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
             if (wide) GUILayout.BeginHorizontal();
@@ -837,6 +856,8 @@ namespace Game.Client
                 _confirmDelete = !_confirmDelete;
             }
             GUILayout.EndHorizontal();
+            // The saves on this device: pick one, carry them off in a file, bring a file's in (SaveMenu).
+            if (GUILayout.Button(_side == MenuSide.Saves ? "저장본 닫기" : "저장본: 고르기·내보내기·가져오기")) OpenSide(MenuSide.Saves);
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
             if (GUILayout.Button($"어둠과 빛: {(Settings.Darkness ? "켜짐" : "꺼짐")}")) Settings.Darkness = !Settings.Darkness;
@@ -856,8 +877,13 @@ namespace Game.Client
             GUILayout.BeginHorizontal();
             // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
             if (GUILayout.Button($"글꼴: {(Settings.PixelFont ? "도트" : "매끈")}")) Settings.PixelFont = !Settings.PixelFont;
+            // The goals for new players in the HUD; met goals still count while it is off (Settings.Guide).
+            if (GUILayout.Button($"목표 안내: {(Settings.Guide ? "켜짐" : "꺼짐")}")) Settings.Guide = !Settings.Guide;
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (GUILayout.Button($"화면 흔들림: {(Settings.ScreenShake ? "켜짐" : "꺼짐")}")) Settings.ScreenShake = !Settings.ScreenShake;
             // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
-            if (!Controls.UsingTouch && GUILayout.Button(_keysOpen ? "키 바꾸기 닫기" : "키 바꾸기")) _keysOpen = !_keysOpen;
+            if (!Controls.UsingTouch && GUILayout.Button(_side == MenuSide.Keys ? "키 바꾸기 닫기" : "키 바꾸기")) OpenSide(MenuSide.Keys);
             GUILayout.EndHorizontal();
             GUILayout.Space(8);
 
@@ -881,10 +907,12 @@ namespace Game.Client
             }
             GUI.enabled = true;
             GUILayout.EndVertical();
+            if (!wide && Event.current.type == EventType.Repaint) _sideTop = GUILayoutUtility.GetLastRect().yMax;
 
             if (wide) GUILayout.Space(16);
             GUILayout.BeginVertical(GUILayout.Width(column));
-            if (_keysOpen && !Controls.UsingTouch) DrawKeys();
+            if (_side == MenuSide.Keys && !Controls.UsingTouch) DrawKeys();
+            else if (_side == MenuSide.Saves) DrawSaves();
             else if (_classes != null && _classes.Success) DrawClassPicker();
             GUILayout.EndVertical();
 
@@ -896,6 +924,25 @@ namespace Game.Client
             if (GUILayout.Button("혼자 하기", GUILayout.Height(36))) StartSolo();
             GUI.enabled = true;
             GUILayout.EndArea();
+        }
+
+        // Opens that in the second column, or the classes again when it is already open. The GUI pass ends here, so
+        // the column is laid out anew before it is drawn (IMGUI cannot draw controls it did not lay out).
+        void OpenSide(MenuSide side)
+        {
+            _side = _side == side ? MenuSide.Classes : side;
+            _scrollToSide = _side != MenuSide.Classes;
+            GUIUtility.ExitGUI();
+        }
+
+        void DrawSaves()
+        {
+            _saveMenu ??= new SaveMenu(name => _playerName = name, name =>
+            {
+                _worldName = name;
+                _confirmDelete = false;
+            });
+            _saveMenu.Draw(_menuColumn, CharacterName, WorldName);
         }
 
         // A row per changeable key: what it does and its key. Pressing the key's button waits for the next key pressed.
@@ -986,7 +1033,7 @@ namespace Game.Client
                     int left = Mathf.CeilToInt(_client.FoodLeft);
                     lines.Add($"음식: {_client.Food.Name} {left / 60}:{left % 60:00}");
                 }
-                var goal = _guideProgress?.Current;
+                var goal = Settings.Guide ? _guideProgress?.Current : null;
                 if (goal != null)
                 {
                     string reward = goal.Rewards.Count > 0 ? $" (보상: {goal.RewardText})" : "";
@@ -995,7 +1042,7 @@ namespace Game.Client
                 }
             }
             bool showControls = !compact && !Ui.Short && playing
-                && (Time.time < _controlsUntil || _guideProgress != null && _guideProgress.Done == 0);
+                && (Time.time < _controlsUntil || Settings.Guide && _guideProgress != null && _guideProgress.Done == 0);
             if (showControls && Controls.UsingTouch)
             {
                 lines.Add($"{Keyed("왼쪽 스틱", "이동")} · {Keyed("오른쪽 스틱", "공격")}(끄는 쪽으로, 곡괭이를 들면 벽을 캔다)");

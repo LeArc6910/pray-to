@@ -11,7 +11,7 @@ namespace Game.Core
     // whatever the sheets no longer have is skipped and reported in Warnings. See Docs/Saving.md.
     public sealed class CharacterSave
     {
-        const string Magic = "PTCH";
+        internal const string Magic = "PTCH";
         // 2: experience (character levels). 3: the guide goals whose rewards it has had.
         const int FormatVersion = 3;
 
