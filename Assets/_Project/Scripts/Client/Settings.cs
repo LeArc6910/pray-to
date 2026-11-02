@@ -17,6 +17,7 @@ namespace Game.Client
         const string MusicKey = "settings.music";
         static int? _music;
         static readonly Choice DevInfoChoice = new Choice("settings.devinfo", false);
+        static readonly Choice PixelFontChoice = new Choice("settings.pixelfont", true);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -65,6 +66,13 @@ namespace Game.Client
         {
             get => DevInfoChoice.Value;
             set => DevInfoChoice.Value = value;
+        }
+
+        // The pixel font (Galmuri11 Bold) for every screen's text; off, the smooth one (Noto Sans KR) as before (Ui).
+        public static bool PixelFont
+        {
+            get => PixelFontChoice.Value;
+            set => PixelFontChoice.Value = value;
         }
 
         // One on-or-off choice, saved under its key when it changes.

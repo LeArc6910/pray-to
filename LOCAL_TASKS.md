@@ -446,6 +446,10 @@ DevTools/Local/setup.sh --commit
   - (로컬 세션) 새 파일 `Core/Guide/World.Guide.cs`의 `.meta` 때문에 명령 한 줄을 `-Commit`과 함께 한 번 돌린다
   - (사람) 새 캐릭터로 시작하면 HUD 목표 옆에 "(보상: …)"이 보이고, 목표를 이루면 그 보상이 가방에 들어오는지. 같은 목표 보상을 두 번 받지 않는지
   - (사람) 바닥 깔기·밭 갈기·낚시·침대·레벨 같은 새 목표가 차례로 나오는지. 힌트 문장이 잘리지 않는지
+- [ ] 46단계: 도트 글꼴(`Docs/WebDemo.md`의 "도트 글꼴")
+  - (로컬 세션) 새 글꼴 `Resources/Fonts/Galmuri11Bold-Game.ttf`의 `.meta` 때문에 명령 한 줄을 `-Commit`과 함께 한 번 돌린다. `ProjectSetup`이 가져오기 설정을 맞춘다: Inspector에서 Font Size 12, Rendering Mode "Hinted Raster", Character "Dynamic", Fallback에 NotoSansKR-Game이 보이는지 적는다
+  - (사람) 메뉴와 HUD 글씨가 도트 글꼴로 또렷한지(흐리거나 가장자리가 번지지 않는지). PC 창과 휴대폰(가로·세로)에서 글이 상자 밖으로 넘치거나 잘리지 않는지. 특히 HUD 목표, 가방 설명, 스킬 칸 이름, 퀵슬롯 숫자, 체력 막대 글씨
+  - (사람) 메뉴의 [글꼴: 도트]를 누르면 [글꼴: 매끈]이 되며 예전 글꼴로 바로 바뀌는지, 다시 켜도 그대로 남는지. 도트 글꼴이 너무 작으면 적어 준다(지금은 12px, 큰 글씨는 24·36px)
 
 ## 결과 보고
 

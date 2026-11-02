@@ -10,13 +10,25 @@ namespace Game.Client
     // Shared setup for the IMGUI screens. Layout is done in points, not pixels: a browser draws the game at the
     // device's full pixel density (about 3 pixels per point on phones), which would leave 13-pixel text unreadably
     // small, so the GUI matrix scales points up by that ratio. Elsewhere one point is one pixel.
-    // The font travels with the game because web builds cannot use the system's fonts (no Korean otherwise). The
-    // pixel-art frames come from UiSkin.
+    // The font travels with the game because web builds cannot use the system's fonts (no Korean otherwise): the
+    // pixel font Galmuri11 Bold, or the smooth Noto Sans KR when the menu says so (Settings.PixelFont). The pixel font
+    // is drawn at its 12-pixel design size or a whole multiple, unsmoothed and sampled to the nearest pixel, so its
+    // pixels stay square however far the GUI matrix scales it (Text, Docs/WebDemo.md). The pixel-art frames come
+    // from UiSkin.
     static class Ui
     {
-        const string FontPath = "Fonts/NotoSansKR-Game";
+        const string SmoothFontPath = "Fonts/NotoSansKR-Game";
+        const string PixelFontPath = "Fonts/Galmuri11Bold-Game";
+        // Galmuri11's design size in pixels (the editor imports it at this size, ProjectSetup).
+        public const int PixelFontSize = 12;
 
         static Font _font;
+        // The menu's choice the font was loaded for, so a change loads the other one.
+        static bool? _fontChoice;
+
+        // Whether the text is in the pixel font. Not when the menu asks for the smooth one, or before the pixel font
+        // is in the project.
+        public static bool PixelFont { get; private set; }
 
         // The status box in the top left corner during play. Other screens keep clear of it. On a narrow (portrait)
         // screen it gives way to the minimap column, and on a wide but short one (a phone held sideways) it takes
@@ -53,11 +65,52 @@ namespace Game.Client
         // Call at the start of every OnGUI.
         public static void Begin()
         {
-            if (_font == null) _font = Resources.Load<Font>(FontPath);
+            if (_font == null || _fontChoice != Settings.PixelFont) LoadFont(Settings.PixelFont);
             GUI.skin = UiSkin.Get();
             if (_font != null) GUI.skin.font = _font;
             Scale = PixelRatio();
             GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1));
+        }
+
+        static void LoadFont(bool pixel)
+        {
+            _fontChoice = pixel;
+            var font = pixel ? Resources.Load<Font>(PixelFontPath) : null;
+            PixelFont = font != null;
+            _font = font != null ? font : Resources.Load<Font>(SmoothFontPath);
+            // Lines broken for the other font no longer fit.
+            Wrapped.Clear();
+            if (!PixelFont) return;
+            if (!_watchingFontTextures)
+            {
+                Font.textureRebuilt += Sharpen;
+                _watchingFontTextures = true;
+            }
+            Sharpen(_font);
+        }
+
+        static bool _watchingFontTextures;
+
+        // A dynamic font draws its letters into a texture it rebuilds as it meets new ones; the pixel font's is
+        // sampled to the nearest pixel, or scaling would blur it.
+        static void Sharpen(Font font)
+        {
+            if (font != _font || !PixelFont || font.material == null || font.material.mainTexture == null) return;
+            font.material.mainTexture.filterMode = FilterMode.Point;
+        }
+
+        // A text size for the font in use: the pixel font's to the nearest whole multiple of its design size (13 and
+        // 15 are 12, 20 is 24), the smooth font's as asked.
+        public static int TextSize(int size) =>
+            PixelFont ? Mathf.Max(1, Mathf.RoundToInt(size / (float)PixelFontSize)) * PixelFontSize : size;
+
+        // Sets a style's size and boldness for the font in use; call each time before drawing with it, since the menu
+        // may change the font. The pixel font is already bold, and Unity would smear it bolder.
+        public static GUIStyle Text(GUIStyle style, int size, bool bold = false)
+        {
+            style.fontSize = TextSize(size);
+            style.fontStyle = bold && !PixelFont ? FontStyle.Bold : FontStyle.Normal;
+            return style;
         }
 
         static readonly Dictionary<(string, int, int, FontStyle), string> Wrapped = new Dictionary<(string, int, int, FontStyle), string>();

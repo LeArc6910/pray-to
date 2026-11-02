@@ -283,19 +283,17 @@ namespace Game.Client
             _labelStyle ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Bold,
-                fontSize = 15,
                 wordWrap = false,
                 clipping = TextClipping.Overflow,
             };
             _bannerStyle ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Bold,
-                fontSize = 34,
                 wordWrap = false,
                 clipping = TextClipping.Overflow,
             };
+            Ui.Text(_labelStyle, 15, bold: true);
+            Ui.Text(_bannerStyle, 34, bold: true);
 
             Label(_self.Position + new Vector3(0, _self.Top + 0.4f, 0), _self.Name, Color.white);
             foreach (var body in _others.Values)

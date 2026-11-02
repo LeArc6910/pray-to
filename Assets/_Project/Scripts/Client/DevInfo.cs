@@ -74,7 +74,8 @@ namespace Game.Client
         public static void Draw()
         {
             if (!Settings.DevInfo) return;
-            _style ??= new GUIStyle(GUI.skin.box) { alignment = TextAnchor.UpperLeft, fontSize = 11, wordWrap = false };
+            _style ??= new GUIStyle(GUI.skin.box) { alignment = TextAnchor.UpperLeft, wordWrap = false };
+            Ui.Text(_style, 11);
             float fps = _frameMs > 0 ? 1000 / _frameMs : 0;
             string text = $"{fps:0} fps · 프레임 {_frameMs:0.0}ms · 어둠 {_darkMs:0.0}ms\n"
                 + $"화면 {Screen.width}×{Screen.height}px · {Ui.Width:0}×{Ui.Height:0}점 · 배율 {Ui.Scale:0.##}\n"

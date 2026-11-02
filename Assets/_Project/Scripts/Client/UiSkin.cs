@@ -82,11 +82,10 @@ namespace Game.Client
             _barText ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.MiddleCenter,
-                fontStyle = FontStyle.Bold,
-                fontSize = 13,
                 padding = new RectOffset(0, 0, 0, 0),
                 margin = new RectOffset(0, 0, 0, 0),
             };
+            Ui.Text(_barText, 13, bold: true);
             GUI.Box(area, GUIContent.none, _barWell);
             float edge = UiArt.InsetBorder * UiArt.Scale;
             var inside = new Rect(area.x + edge, area.y + edge, area.width - edge * 2, area.height - edge * 2);

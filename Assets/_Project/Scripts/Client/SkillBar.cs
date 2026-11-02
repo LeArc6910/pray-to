@@ -57,19 +57,20 @@ namespace Game.Client
 
         public static void Draw(WorldClient client)
         {
-            _nameStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true, fontSize = 12 };
-            _timeStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, fontStyle = FontStyle.Bold, fontSize = 20 };
+            _nameStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            _timeStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
             // Unclipped and without padding: the Korean font's tall lines put a letter low in its box, and a clipped box
             // cut the letter's lower half off (LOCAL_TASKS.md, the 2026-10-31 UI recheck).
             _keyStyle ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.UpperLeft,
-                fontStyle = FontStyle.Bold,
-                fontSize = 12,
                 clipping = TextClipping.Overflow,
                 padding = new RectOffset(0, 0, 0, 0),
                 wordWrap = false,
             };
+            Ui.Text(_nameStyle, 12);
+            Ui.Text(_timeStyle, 20, bold: true);
+            Ui.Text(_keyStyle, 12, bold: true);
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
 
             int count = client.Skills.Count;

@@ -21,6 +21,7 @@
 
 - **협동은 온라인 방으로.** 브라우저는 연결을 받을 수 없어 LAN 호스트는 숨기고, Unity Relay를 거치는 [온라인 방 만들기]와 [코드로 참가]만 둔다. PC 버전과도 한 방에서 논다(`Docs/Multiplayer.md`의 "온라인", 2026-11-02). 프로젝트를 Unity Cloud에 연결하고 Relay를 켜기 전에는 오류 문장만 나온다
 - **글꼴**: 웹 빌드는 시스템 글꼴을 쓸 수 없어서 Noto Sans KR(SIL OFL 1.1, `Docs/Licenses/NotoSansKR-OFL.txt`)을 게임에 넣었다. 10 MB짜리 원본에서 Medium 굵기와 필요한 글자(ASCII, 기호, KS X 1001 한글 2,350자, 코드와 시트에 쓰인 모든 글자)만 남겨 약 520 KB다. 새 글자가 필요하면 `DevTools/Fonts/make-korean-font.py`로 다시 만든다. 에디터와 PC 빌드도 같은 글꼴을 쓴다
+- **도트 글꼴**(2026-11-02): 기본 글꼴은 도트 글꼴 Galmuri11 Bold(quiple, SIL OFL 1.1, `Docs/Licenses/Galmuri-OFL.txt`)다. 메뉴의 "글꼴: 도트/매끈"으로 위의 Noto Sans KR로 바꿀 수 있고 기기에 남는다(`Settings.PixelFont`). Galmuri 가운데 Bold를 고른 것은 모든 글리프가 지은이의 창작이어서다(보통 굵기의 한글 2,355자는 닌텐도 DS 글꼴에서 왔다). 같은 글자 범위로 줄여 약 300 KB이고 `DevTools/Fonts/make-pixel-font.py`로 다시 만든다. 도트가 네모로 남도록 12px(설계 크기)이나 그 정수배로만 그린다: 코드의 글자 크기는 `Ui.Text`가 12의 배수로 맞추고(13·15→12, 20→24, 34→36), 굵게는 이미 굵은 글꼴이라 끈다. 가져오기 설정(12px, Hinted Raster, 없는 글자는 Noto로)은 `ProjectSetup`이 하고, 글꼴 텍스처는 가장 가까운 픽셀로 읽어 화면 배율로 커져도 흐려지지 않는다. 도트 글꼴이 아직 프로젝트에 없으면 Noto로 그린다
 - **페이지**: 프로젝트의 템플릿 `Assets/WebGLTemplates/Fit`(Unity의 Minimal 템플릿을 고친 것, `ProjectSetup.UseWebSettings`가 고른다). 게임이 PC에서도 브라우저 창을 꽉 채워서, 작은 창에서 960×600 고정 화면이 잘리고 스크롤 막대가 생기던 일이 없다(2026-10-31 UI 점검). 불러오는 동안 "불러오는 중…" 막대를 보여 준다. Tab은 가방을 여는 키라서 브라우저가 Tab으로 초점을 게임 밖으로 옮기지 않게 막는다
 - **화면 크기**: 브라우저는 기기의 실제 픽셀 밀도로 그리므로(휴대폰은 점 하나에 3픽셀쯤) 그대로면 글자가 아주 작다. `Ui`가 `window.devicePixelRatio`(`Plugins/WebGL/Display.jslib`)만큼 IMGUI를 키운다. 세로 화면에서는 카메라를 넓혀 가로로 보이는 범위를 지킨다. 가로로 들고 하는 쪽이 편하다
 

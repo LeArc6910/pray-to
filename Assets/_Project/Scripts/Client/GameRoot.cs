@@ -848,8 +848,12 @@ namespace Game.Client
             // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
             if (GUILayout.Button($"개발 정보: {(Settings.DevInfo ? "켜짐" : "꺼짐")}")) Settings.DevInfo = !Settings.DevInfo;
             GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
+            if (GUILayout.Button($"글꼴: {(Settings.PixelFont ? "도트" : "매끈")}")) Settings.PixelFont = !Settings.PixelFont;
             // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
             if (!Controls.UsingTouch && GUILayout.Button(_keysOpen ? "키 바꾸기 닫기" : "키 바꾸기")) _keysOpen = !_keysOpen;
+            GUILayout.EndHorizontal();
             GUILayout.Space(8);
 
             GUI.enabled = ready && !_connecting;

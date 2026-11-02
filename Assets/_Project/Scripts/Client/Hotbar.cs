@@ -163,13 +163,13 @@ namespace Game.Client
             _countStyle ??= new GUIStyle(GUI.skin.label)
             {
                 alignment = TextAnchor.LowerRight,
-                fontSize = 12,
-                fontStyle = FontStyle.Bold,
                 clipping = TextClipping.Overflow,
                 padding = new RectOffset(0, 0, 0, 0),
                 wordWrap = false,
             };
             _keyStyle ??= new GUIStyle(_countStyle) { alignment = TextAnchor.UpperLeft };
+            Ui.Text(_countStyle, 12, bold: true);
+            Ui.Text(_keyStyle, 12, bold: true);
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
 
             string tooltip = null;

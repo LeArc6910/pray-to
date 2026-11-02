@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using UnityEditor;
 using UnityEngine;
 using UnityEngine.Rendering;
@@ -20,6 +21,11 @@ namespace Game.Client.Editor
         const int NewInputSystem = 1;
         // The web page: Assets/WebGLTemplates/Fit.
         const string WebTemplate = "PROJECT:Fit";
+        const string FontFolder = SceneSetup.ProjectFolder + "/Resources/Fonts";
+        const string PixelFontPath = FontFolder + "/Galmuri11Bold-Game.ttf";
+        const string SmoothFontPath = FontFolder + "/NotoSansKR-Game.ttf";
+        // Galmuri11's design size in pixels, as Ui.PixelFontSize.
+        const int PixelFontSize = 12;
 
         [MenuItem("Game/Set Up Project")]
         public static void SetUp()
@@ -28,6 +34,7 @@ namespace Game.Client.Editor
             PlayerSettings.productName = ProductName;
             EditorSettings.defaultBehaviorMode = EditorBehaviorMode.Mode2D;
             UseWebSettings();
+            UsePixelFont();
             UsePipeline(LoadOrCreatePipeline());
             AssetDatabase.SaveAssets();
             SceneSetup.SetUp();
@@ -62,6 +69,35 @@ namespace Game.Client.Editor
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.dataCaching = true;
             PlayerSettings.WebGL.template = WebTemplate;
+        }
+
+        // The pixel font's import settings (Ui): its 12-pixel design size and no smoothing, so each of its pixels is a
+        // whole number of screen pixels, and the smooth font behind it for any character it lacks. Reimports only
+        // when something changed.
+        static void UsePixelFont()
+        {
+            if (!(AssetImporter.GetAtPath(PixelFontPath) is TrueTypeFontImporter importer))
+            {
+                Debug.LogWarning($"No font at {PixelFontPath}; the game falls back to the smooth font.");
+                return;
+            }
+            var smooth = AssetDatabase.LoadAssetAtPath<Font>(SmoothFontPath);
+            var fallbacks = smooth != null ? new[] { smooth } : new Font[0];
+            string[] names = smooth != null ? new[] { "Noto Sans KR" } : new string[0];
+            if (importer.fontSize == PixelFontSize
+                && importer.fontRenderingMode == FontRenderingMode.HintedRaster
+                && importer.fontTextureCase == FontTextureCase.Dynamic
+                && importer.includeFontData
+                && importer.fontNames.SequenceEqual(names)
+                && importer.fontReferences.SequenceEqual(fallbacks))
+                return;
+            importer.fontSize = PixelFontSize;
+            importer.fontRenderingMode = FontRenderingMode.HintedRaster;
+            importer.fontTextureCase = FontTextureCase.Dynamic;
+            importer.includeFontData = true;
+            importer.fontNames = names;
+            importer.fontReferences = fallbacks;
+            importer.SaveAndReimport();
         }
 
         // Sets Project Settings > Player > Active Input Handling, which has no public API. This is the serialized
