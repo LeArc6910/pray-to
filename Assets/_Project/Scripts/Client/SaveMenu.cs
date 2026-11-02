@@ -40,11 +40,8 @@ namespace Game.Client
         // The panel, in a column this wide; character and world are the names the menu has now.
         public void Draw(float width, string character, string world)
         {
-            if (Event.current.type == EventType.Layout)
-            {
-                PollPicker();
-                if (Time.unscaledTime - _listedAt > ListSeconds) Relist();
-            }
+            // Only this panel's own rows change here, before any of them is laid out.
+            if (Event.current.type == EventType.Layout && Time.unscaledTime - _listedAt > ListSeconds) Relist();
             var label = GUI.skin.label;
             GUILayout.Label("저장본 (이 기기)");
             GUILayout.Label(Ui.Wrap(
@@ -202,7 +199,10 @@ namespace Game.Client
             _message = "";
         }
 
-        void PollPicker()
+        // In a browser: takes the picked file once it is there. Called from Update, before the menu is laid out, since
+        // bringing saves in changes the menu's other column too (a world now saved has [월드 지우기]), and IMGUI must
+        // draw what it laid out.
+        public void Poll()
         {
             switch (SaveTransfer.PollPick(out byte[] file))
             {

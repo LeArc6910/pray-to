@@ -162,7 +162,11 @@ namespace Game.Client
                 EndSession(_endReason);
                 return;
             }
-            if (_client == null) return;
+            if (_client == null)
+            {
+                _saveMenu?.Poll();
+                return;
+            }
             if (_map != null && Controls.MapPressed())
             {
                 _map.FullOpen = !_map.FullOpen;
