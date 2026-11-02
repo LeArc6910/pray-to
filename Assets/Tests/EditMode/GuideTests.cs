@@ -35,7 +35,7 @@ namespace Game.Core.Tests
             var passed = progress.Update(Facts(new Dictionary<string, int> { ["stone"] = 12 }, new[] { TileType.Workbench, TileType.Torch }));
 
             CollectionAssert.AreEqual(new[] { "stone", "workbench", "torch" }, passed.Select(goal => goal.Id));
-            Assert.AreEqual("copper", progress.Current.Id);
+            Assert.AreEqual("floor", progress.Current.Id, "laying a floor comes next");
         }
 
         [Test]
@@ -103,5 +103,53 @@ namespace Game.Core.Tests
             StringAssert.Contains("7행", data.Errors[4]);
             StringAssert.Contains("이미", data.Errors[4]);
         }
-    }
+            [Test]
+        public void GoalsGiveTheirRewardOnceAndOnlyWhenMet()
+        {
+            var stone = Guide.Shipped.Goals.Single(g => g.Id == "stone");
+            Assert.AreEqual("회복 물약 1", stone.RewardText);
+            var world = new World(Maps.Room(12), TileMap.Center(6, 6), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null);
+            var potion = Gear.Data.Consumables.Single(c => c.Id == "healing_potion");
+            int before = player.Inventory.CountOf(potion);
+
+            Assert.IsFalse(world.ClaimGoal(player.Id, stone, 0), "not met yet");
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("stone"), 10);
+            Assert.IsTrue(world.ClaimGoal(player.Id, stone, 0));
+            Assert.AreEqual(before + 1, player.Inventory.CountOf(potion));
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.GoalReward && e.Source == player.Id && e.Amount == 0));
+            Assert.IsFalse(world.ClaimGoal(player.Id, stone, 0), "once");
+            Assert.AreEqual(before + 1, player.Inventory.CountOf(potion));
+
+            // Experience rewards and the level condition.
+            var level5 = Guide.Shipped.Goals.Single(g => g.Id == "level5");
+            Assert.IsFalse(world.ClaimGoal(player.Id, level5, 1));
+            world.GainExperience(player, Leveling.TotalFor(5));
+            Assert.IsTrue(world.ClaimGoal(player.Id, level5, 1));
+            var copper = Guide.Shipped.Goals.Single(g => g.Id == "copper");
+            Assert.IsTrue(copper.Rewards.Single().IsExperience);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("copper_ore"), 6);
+            int xp = player.Experience;
+            Assert.IsTrue(world.ClaimGoal(player.Id, copper, 2));
+            Assert.AreEqual(xp + 20, player.Experience);
+
+            // Claims ride in the character save.
+            var saved = CharacterSave.Read(CharacterSave.Write(player.Equipment, player.Inventory, player.Experience, player.ClaimedGoals), Gear.Data);
+            CollectionAssert.AreEquivalent(new[] { "stone", "level5", "copper" }, saved.ClaimedGoals);
+        }
+
+        [Test]
+        public void EveryGoalHasARewardAndTheNewContentIsInTheGuide()
+        {
+            Assert.IsTrue(Guide.Shipped.Success, string.Join("\n", Guide.Shipped.Errors));
+            Assert.IsTrue(Guide.Shipped.Goals.All(g => g.Rewards.Count > 0));
+            foreach (string id in new[] { "floor", "hoe", "fishing", "bed", "sprinkler", "generator", "void_lord" })
+            {
+                Assert.IsTrue(Guide.Shipped.Goals.Any(g => g.Id == id), id);
+            }
+            var broken = GuideSheet.Parse("id,text,hint,done,reward\na,가,,plant,nothing:1\nb,나,,level:99,xp:5\n", Gear.Data);
+            Assert.IsTrue(broken.Errors.Any(e => e.Contains("nothing")), string.Join("\n", broken.Errors));
+            Assert.IsTrue(broken.Errors.Any(e => e.Contains("레벨")), string.Join("\n", broken.Errors));
+        }
+}
 }

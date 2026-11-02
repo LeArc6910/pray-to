@@ -284,7 +284,31 @@ namespace Game.Core
 
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
         // before the first one.
-        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience);
+        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals);
+
+        // The guide, to name the goals whose rewards come back (GoalReward events carry their index).
+        public GuideData Guide { get; set; }
+
+        // The guide goals this character has had rewards for: from its save, and as the host gives them.
+        public HashSet<string> ClaimedGoals => _claimed ??= Character != null && Character.Length > 0 && _loot != null
+            ? new HashSet<string>(ReadClaims())
+            : new HashSet<string>();
+
+        HashSet<string> _claimed;
+
+        IEnumerable<string> ReadClaims()
+        {
+            try
+            {
+                return CharacterSave.Read(Character, _loot).ClaimedGoals;
+            }
+            catch (System.IO.InvalidDataException)
+            {
+                return Array.Empty<string>();
+            }
+        }
+
+        public byte[] ClaimGoalCommand(int index) => new InventoryCommandMessage(InventoryCommand.ClaimGoal, 0, index: index).Encode();
 
         // As of the host's last word (SelfState). The level follows from it.
         public int Experience { get; private set; }
@@ -784,6 +808,11 @@ namespace Game.Core
             foreach (var e in snapshot.Events)
             {
                 if (e.Type == SimEventType.Fishing && e.Source == PlayerId) Fishing = e.Amount == World.FishingCast || e.Amount == World.FishingBite ? e.Amount : -1;
+                if (e.Type == SimEventType.GoalReward && e.Source == PlayerId && Guide != null && e.Amount >= 0 && e.Amount < Guide.Goals.Count)
+                {
+                    ClaimedGoals.Add(Guide.Goals[e.Amount].Id);
+                    InventoryVersion++;
+                }
             }
 
             var self = snapshot.Self;

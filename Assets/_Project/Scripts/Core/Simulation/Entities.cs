@@ -36,6 +36,8 @@ namespace Game.Core
         // Goes up whenever the bag or the equipment changes, so the host knows when to send them again.
         public int InventoryVersion { get; internal set; }
         public PlayerStats Stats { get; private set; }
+        // The guide goals whose rewards the character has had (World.ClaimGoal), by goal id. Kept in its save.
+        public HashSet<string> ClaimedGoals { get; } = new HashSet<string>();
         // The line in the water, or null when not fishing (World.Fish).
         public FishingLine Fishing { get; internal set; }
         // Experience gathered over the character's life; the level follows from it (Leveling).
@@ -281,6 +283,8 @@ namespace Game.Core
         // Source, a player, cast (Amount World.FishingCast), had a bite, landed a fish, lost it or reeled in, with the
         // line's spot at Position (World.Fish).
         Fishing,
+        // Source, a player, was given a guide goal's reward; Amount is the goal's index (World.ClaimGoal).
+        GoalReward,
     }
 
     public readonly struct SimEvent

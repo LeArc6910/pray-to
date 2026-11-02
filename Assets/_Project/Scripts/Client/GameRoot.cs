@@ -308,7 +308,12 @@ namespace Game.Client
             _guideClock = 0;
             var passed = _guideProgress.Update(GuideFacts.Of(_client));
             if (passed.Count == 0) return;
-            foreach (var goal in passed) _acquired.Add(("목표 달성: " + goal.Text, 0));
+            foreach (var goal in passed)
+            {
+                _acquired.Add(("목표 달성: " + goal.Text, 0));
+                // The host gives the reward once, if it sees the goal met too.
+                if (goal.Rewards.Count > 0 && !_client.ClaimedGoals.Contains(goal.Id)) SendToHost(_client.ClaimGoalCommand(IndexOfGoal(goal)));
+            }
             if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
             Sounds.Play(Sound.Craft);
             _goalShownAt = Time.time;
@@ -317,6 +322,15 @@ namespace Game.Client
         }
 
         string GuideKey => "guide." + CharacterName;
+
+        int IndexOfGoal(Goal goal)
+        {
+            for (int i = 0; i < _guide.Goals.Count; i++)
+            {
+                if (_guide.Goals[i] == goal) return i;
+            }
+            return -1;
+        }
 
         void StartGuide()
         {
@@ -500,7 +514,7 @@ namespace Game.Client
 
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
 
-            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles);
+            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide);
             if (world != null)
             {
                 _host.Restore(world, Now());
@@ -512,6 +526,7 @@ namespace Game.Client
             {
                 Character = character,
                 JoinSkillOrder = KeptSkillOrder(),
+                Guide = _guide,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
@@ -560,6 +575,7 @@ namespace Game.Client
             {
                 Character = character,
                 JoinSkillOrder = KeptSkillOrder(),
+                Guide = _guide,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
@@ -961,7 +977,8 @@ namespace Game.Client
                 var goal = _guideProgress?.Current;
                 if (goal != null)
                 {
-                    lines.Add($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}: {goal.Text}");
+                    string reward = goal.Rewards.Count > 0 ? $" (보상: {goal.RewardText})" : "";
+                    lines.Add($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}: {goal.Text}{reward}");
                     if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) lines.Add(goal.Hint);
                 }
             }

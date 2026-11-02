@@ -78,6 +78,8 @@ namespace Game.Core
         readonly MonsterData _monsters;
         readonly BossData _bosses;
         readonly LootData _loot;
+        // The guide's goals, for their rewards; null gives none.
+        readonly GuideData _guide;
         readonly ClassData _classes;
         readonly TileData _tiles;
         readonly HostConfig _config;
@@ -95,8 +97,10 @@ namespace Game.Core
             WorldConfig worldConfig = null,
             BossData bosses = null,
             ClassData classes = null,
-            TileData tiles = null)
+            TileData tiles = null,
+            GuideData guide = null)
         {
+            _guide = guide;
             _seed = seed;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _bosses = bosses;
@@ -237,6 +241,7 @@ namespace Game.Core
             if (saved == null) GiveStarterStacks(player);
             // A character from before levels starts at a level that lets it keep wearing what it has.
             player.Experience = saved == null ? 0 : saved.Experience >= 0 ? saved.Experience : Leveling.TotalFor(Leveling.StartFor(saved.Equipment, saved.Bag));
+            foreach (string goal in saved?.ClaimedGoals ?? new List<string>()) player.ClaimedGoals.Add(goal);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -344,6 +349,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Refuel:
                     if (command.Index < _loot.Materials.Count) World.Refuel(player.Id, _loot.Materials[command.Index]);
+                    break;
+                case InventoryCommand.ClaimGoal:
+                    if (_guide != null && command.Index < _guide.Goals.Count) World.ClaimGoal(player.Id, _guide.Goals[command.Index], command.Index);
                     break;
                 case InventoryCommand.Till:
                     World.Till(player.Id);

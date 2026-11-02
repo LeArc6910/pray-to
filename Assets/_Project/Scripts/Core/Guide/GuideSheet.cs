@@ -15,11 +15,11 @@ namespace Game.Core
             Tile = tile;
         }
 
-        // "have", "place", "plant" or "reach".
+        // "have", "place", "plant", "reach" or "level".
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
-        // How many to have, or how many tiles from the spawn to reach.
+        // How many to have, how many tiles from the spawn to reach, or the character level.
         public int Count { get; }
         // What to place.
         public TileType Tile { get; }
@@ -29,18 +29,42 @@ namespace Game.Core
     // conditions).
     public sealed class Goal
     {
-        internal Goal(string id, string text, string hint, IReadOnlyList<GoalCondition> conditions)
+        internal Goal(string id, string text, string hint, IReadOnlyList<GoalCondition> conditions, IReadOnlyList<GoalReward> rewards = null)
         {
             Id = id;
             Text = text;
             Hint = hint;
             Conditions = conditions;
+            Rewards = rewards ?? Array.Empty<GoalReward>();
         }
 
         public string Id { get; }
         public string Text { get; }
         public string Hint { get; }
         public IReadOnlyList<GoalCondition> Conditions { get; }
+        // What the host gives the first time the goal is done (goals.csv reward), maybe nothing.
+        public IReadOnlyList<GoalReward> Rewards { get; }
+
+        // "구리 광석 6 · 회복 물약 2 · 경험치 50", or empty.
+        public string RewardText => string.Join(" · ", Rewards.Select(r => r.Text));
+    }
+
+    // One reward: some of a material or consumable, or experience.
+    public sealed class GoalReward
+    {
+        internal GoalReward(MaterialDefinition material, ConsumableDefinition consumable, int count)
+        {
+            Material = material;
+            Consumable = consumable;
+            Count = count;
+        }
+
+        public MaterialDefinition Material { get; }
+        public ConsumableDefinition Consumable { get; }
+        // How many, or how much experience when there is neither.
+        public int Count { get; }
+        public bool IsExperience => Material == null && Consumable == null;
+        public string Text => IsExperience ? $"경험치 {Count}" : $"{Material?.Name ?? Consumable.Name} {Count}";
     }
 
     public sealed class GuideData
@@ -59,8 +83,9 @@ namespace Game.Core
     // What the guide checks goals against, read from what a client knows about its own player and the world.
     public sealed class GuideFacts
     {
-        public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn)
+        public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1)
         {
+            Level = level;
             CountOf = countOf;
             HasTile = hasTile;
             HasCrop = hasCrop;
@@ -73,6 +98,7 @@ namespace Game.Core
         public Func<TileType, bool> HasTile { get; }
         public bool HasCrop { get; }
         public float DistanceFromSpawn { get; }
+        public int Level { get; }
 
         // The facts for a client's player: the bag and worn gear, the map, the crops and where the player stands.
         public static GuideFacts Of(WorldClient client)
@@ -100,7 +126,36 @@ namespace Game.Core
                 return false;
             }
 
-            return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn));
+            return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level);
+        }
+
+        // The same facts as the host sees them, to check a claimed reward.
+        public static GuideFacts Of(World world, Player player)
+        {
+            int CountOf(string id)
+            {
+                var bag = player.Inventory;
+                var material = bag.Materials.Keys.FirstOrDefault(m => m.Id == id);
+                if (material != null) return bag.CountOf(material);
+                var consumable = bag.Consumables.Keys.FirstOrDefault(c => c.Id == id);
+                if (consumable != null) return bag.CountOf(consumable);
+                return bag.Items.Concat(player.Equipment.Items).Count(item => item.Base.Id == id);
+            }
+
+            bool HasTile(TileType type)
+            {
+                var map = world.Map;
+                for (int y = 0; y < map.Height; y++)
+                {
+                    for (int x = 0; x < map.Width; x++)
+                    {
+                        if (map[x, y] == type) return true;
+                    }
+                }
+                return false;
+            }
+
+            return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level);
         }
     }
 
@@ -142,6 +197,7 @@ namespace Game.Core
             "place" => facts.HasTile(condition.Tile),
             "plant" => facts.HasCrop,
             "reach" => facts.DistanceFromSpawn >= condition.Count,
+            "level" => facts.Level >= condition.Count,
             _ => false,
         };
     }
@@ -174,7 +230,8 @@ namespace Game.Core
                     string text = row["text"];
                     if (text.Length == 0) throw new FormatException("'text' 칸이 비어 있습니다.");
                     var conditions = row["done"].Split('|').Select(part => Condition(part.Trim(), loot)).ToList();
-                    goals.Add(new Goal(id, text, row["hint"], conditions));
+                    var rewards = row["reward"].Length == 0 ? new List<GoalReward>() : row["reward"].Split('|').Select(part => Reward(part.Trim(), loot)).ToList();
+                    goals.Add(new Goal(id, text, row["hint"], conditions, rewards));
                 }
                 catch (FormatException e)
                 {
@@ -209,9 +266,28 @@ namespace Game.Core
                     int tiles = SheetValues.ParseNumber(parts[1], "타일 수");
                     if (tiles < 1) throw new FormatException("타일 수는 1 이상이어야 합니다.");
                     return new GoalCondition("reach", null, tiles, default);
+                case "level":
+                    if (parts.Length != 2) throw new FormatException($"'{text}'는 level:<레벨>로 적습니다.");
+                    int level = SheetValues.ParseNumber(parts[1], "레벨");
+                    if (level < 1 || level > Leveling.MaxLevel) throw new FormatException($"레벨은 1~{Leveling.MaxLevel}이어야 합니다.");
+                    return new GoalCondition("level", null, level, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level 중 하나)");
             }
+        }
+
+        // "copper_ore:6", "healing_potion:2" or "xp:50".
+        static GoalReward Reward(string text, LootData loot)
+        {
+            string[] parts = text.Split(':');
+            if (parts.Length != 2) throw new FormatException($"보상 '{text}'는 <id>:<개수> 또는 xp:<경험치>로 적습니다.");
+            int count = SheetValues.ParseNumber(parts[1], "개수");
+            if (count < 1) throw new FormatException("보상의 개수는 1 이상이어야 합니다.");
+            if (parts[0] == "xp") return new GoalReward(null, null, count);
+            var material = loot.Materials.FirstOrDefault(m => m.Id == parts[0]);
+            var consumable = loot.Consumables.FirstOrDefault(c => c.Id == parts[0]);
+            if (material == null && consumable == null) throw new FormatException($"보상 '{parts[0]}'는 재료나 소모품이 아닙니다.");
+            return new GoalReward(material, consumable, count);
         }
     }
 }

@@ -12,11 +12,12 @@ namespace Game.Core
     public sealed class CharacterSave
     {
         const string Magic = "PTCH";
-        // 2: experience (character levels).
-        const int FormatVersion = 2;
+        // 2: experience (character levels). 3: the guide goals whose rewards it has had.
+        const int FormatVersion = 3;
 
-        CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings)
+        CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null)
         {
+            ClaimedGoals = claimed ?? new List<string>();
             Equipment = equipment;
             Bag = bag;
             Experience = experience;
@@ -27,9 +28,10 @@ namespace Game.Core
         public Inventory Bag { get; }
         // -1 for a save from before levels (Leveling.StartFor decides then).
         public int Experience { get; }
+        public IReadOnlyList<string> ClaimedGoals { get; }
         public IReadOnlyList<string> Warnings { get; }
 
-        public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0)
+        public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -45,6 +47,9 @@ namespace Game.Core
                 SavedItems.WriteCounts(w, bag.Consumables.Select(p => (p.Key.Id, p.Value)));
                 SavedItems.WriteCounts(w, bag.Materials.Select(p => (p.Key.Id, p.Value)));
                 w.Write(experience);
+                var claimed = (claimedGoals ?? Enumerable.Empty<string>()).ToList();
+                w.Write((ushort)claimed.Count);
+                foreach (string goal in claimed) w.Write(goal);
             }
             return stream.ToArray();
         }
@@ -93,7 +98,9 @@ namespace Game.Core
                     else warnings.Add($"없어진 재료 '{id}' {count}개를 건너뛰었습니다.");
                 }
                 int experience = version >= 2 ? Math.Max(0, r.ReadInt32()) : -1;
-                return new CharacterSave(equipment, bag, experience, warnings);
+                var claimed = new List<string>();
+                for (int count = version >= 3 ? r.ReadUInt16() : 0; count > 0; count--) claimed.Add(r.ReadString());
+                return new CharacterSave(equipment, bag, experience, warnings, claimed);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

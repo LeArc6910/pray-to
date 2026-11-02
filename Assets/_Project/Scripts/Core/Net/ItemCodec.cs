@@ -147,6 +147,8 @@ namespace Game.Core
         // Sets the filter ahead to a material (World.SetFilter), and puts fuel into the generator ahead (World.Refuel).
         SetFilter,
         Refuel,
+        // Asks for the reward of the guide goal at Index (World.ClaimGoal).
+        ClaimGoal,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

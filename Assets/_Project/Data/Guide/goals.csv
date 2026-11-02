@@ -1,20 +1,33 @@
-id,text,hint,done
-stone,돌 10개 모으기,아래 퀵슬롯의 곡괭이(PC는 2)로 바꿔 들고 벽 쪽을 공격하면 캔다. PC는 클릭이나 스페이스·휴대폰은 공격 스틱을 벽 쪽으로,have:stone:10
-workbench,작업대 세우기,가방(Tab)의 [재료·제작]에서 작업대를 만들고 재료 목록의 [놓기]로 세운다,place:Workbench
-torch,횃불 세우기,가방의 횃불을 [놓기]로 세우면 둘레가 밝아진다. 돌 1과 슬라임 젤 1로 4개를 더 만든다,place:Torch
-copper,구리 광석 6개 캐기,주황 덩어리가 박힌 벽이 구리 광맥이다,have:copper_ore:6
-copper_gear,구리 장비 하나 만들기,작업대 옆에서 구리 투구·갑옷·장화·활·지팡이 가운데 하나를 만들어 [장착]한다,have:copper_helmet|have:copper_armor|have:copper_boots|have:copper_bow|have:copper_staff
-plant,버섯 심기,가방 재료의 버섯 포자를 [심기]로 바닥에 심는다. 3분 뒤 그 위를 지나가면 거둔다,plant
-furnace,화로 세우기,작업대 옆에서 돌 15와 구리 광석 2로 만든다. 버섯을 굽고 철을 녹인다,place:Furnace
-boss,동굴 수호자 쓰러뜨리기,HUD에 보스 아레나 방향과 거리가 나온다. 바닥에 붉게 차오르는 예고를 피한다,have:warden_core
-iron_bar,철 주괴 만들기,시작 지점에서 30칸 넘게 가면 푸른 회색 철 광맥이 있다. 철 광석 2개를 화로에서 녹인다,have:iron_bar
-iron_gear,철 장비 하나 만들기,작업대 옆에서 철 주괴와 수호자의 핵으로 만든다,have:iron_sword|have:iron_bow|have:iron_staff|have:iron_helmet|have:iron_armor|have:iron_boots
-drill,채굴기 세우기,광맥을 바라보고 [놓기]로 세우고 뒤에 상자를 두면 광석이 저절로 쌓인다,place:Drill
-deep,깊은 곳 찾아가기,시작 지점에서 60칸 넘게 가면 빛나는 미스릴 광맥과 수정 박쥐·정령이 있는 깊은 곳이다. 횃불을 넉넉히 챙긴다,reach:60
-mithril_ore,미스릴 광석 4개 캐기,깊은 곳 벽에 박힌 하늘색으로 빛나는 덩어리가 미스릴 광맥이다. 단단해서 여러 번 쳐야 한다,have:mithril_ore:4
-queen,수정 거미 여왕 쓰러뜨리기,HUD의 깊은 아레나 방향으로 간다. 첫 보스보다 세니 철 장비와 물약을 갖춘다,have:queen_heart
-mithril_gear,미스릴 장비 하나 만들기,화로에서 미스릴 주괴를 녹이고 작업대에서 수정 심장과 함께 만든다,have:mithril_sword|have:mithril_bow|have:mithril_staff|have:mithril_helmet|have:mithril_armor|have:mithril_boots
-mithril_pickaxe,미스릴 곡괭이 만들기,용암 지대의 흑요석은 미스릴 곡괭이 이상이어야 캐진다. 작업대에서 미스릴 주괴 3개로 만든다,have:mithril_pickaxe
-obsidian_ore,흑요석 원석 캐기,깊은 아레나 반대쪽 모퉁이가 용암 지대다. 붉게 빛나는 용암 웅덩이는 밟으면 불타니 피해 간다,have:obsidian_ore:3
-titan,용암 거인 쓰러뜨리기,HUD의 용암 아레나 방향으로 간다. 맞으면 불타니 미스릴 장비와 물약·버섯 수프를 챙긴다,have:titan_heart
-obsidian_gear,흑요석 장비 하나 만들기,화로에서 흑요석 주괴를 녹이고 작업대에서 용암 심장과 함께 만든다,have:obsidian_sword|have:obsidian_bow|have:obsidian_staff|have:obsidian_helmet|have:obsidian_armor|have:obsidian_boots
+id,text,hint,done,reward
+stone,돌 10개 모으기,아래 퀵슬롯의 곡괭이(PC는 2)로 바꿔 들고 벽 쪽을 공격하면 캔다. PC는 클릭이나 스페이스·휴대폰은 공격 스틱을 벽 쪽으로,have:stone:10,healing_potion:1
+workbench,작업대 세우기,가방(Tab)의 [재료·제작]에서 작업대를 만들고 재료 목록의 [놓기]로 세운다,place:Workbench,torch:4
+torch,횃불 세우기,가방의 횃불을 [놓기]로 세우면 둘레가 밝아진다. 돌 1과 슬라임 젤 1로 4개를 더 만든다,place:Torch,slime_gel:2
+floor,돌 바닥 깔기,작업대에서 돌 2로 돌 바닥 4장을 만들어 [놓기]로 깐다. 그 위에 무엇이든 세울 수 있다,place:StoneFloor,stone:6
+copper,구리 광석 6개 캐기,주황 덩어리가 박힌 벽이 구리 광맥이다,have:copper_ore:6,xp:20
+copper_gear,구리 장비 하나 만들기,작업대 옆에서 구리 투구·갑옷·장화·활·지팡이 가운데 하나를 만들어 [장착]한다,have:copper_helmet|have:copper_armor|have:copper_boots|have:copper_bow|have:copper_staff,healing_potion:2
+plant,버섯 심기,가방 재료의 버섯 포자를 [심기]로 바닥에 심는다. 3분 뒤 그 위를 지나가면 거둔다,plant,mushroom_spore:2
+hoe,밭 갈기,작업대에서 호미를 만들고 [밭 갈기]로 바닥을 밭으로 만든다. 밭에 심으면 빨리 자란다,place:Soil,fertilizer:3
+fishing,물고기 낚기,작업대에서 낚싯대를 만들고 동굴 가장자리 물웅덩이를 바라보고 [낚시]. 입질(!)이 오면 바로 다시 누른다,have:cave_minnow|have:spore_catfish|have:ice_trout|have:crystal_eel|have:void_angler,xp:30
+furnace,화로 세우기,작업대 옆에서 돌 15와 구리 광석 2로 만든다. 버섯을 굽고 철을 녹인다,place:Furnace,copper_ore:4
+boss,동굴 수호자 쓰러뜨리기,HUD에 보스 아레나 방향과 거리가 나온다. 바닥에 붉게 차오르는 예고를 피한다,have:warden_core,recall_scroll:2
+bed,침대 세우기,작업대에서 돌 6과 슬라임 젤 3으로 만든다. 쓰러지면 침대 옆에서 일어나고 귀환 두루마리로 돌아올 수 있다,place:Bed,recall_scroll:2
+level5,레벨 5 되기,몬스터를 잡으면 경험치가 오른다. 철 장비는 레벨 5부터 입는다,level:5,healing_potion:3
+iron_bar,철 주괴 만들기,시작 지점에서 30칸 넘게 가면 푸른 회색 철 광맥이 있다. 철 광석 2개를 화로에서 녹인다,have:iron_bar,iron_ore:4
+iron_gear,철 장비 하나 만들기,작업대 옆에서 철 주괴와 수호자의 핵으로 만든다,have:iron_sword|have:iron_bow|have:iron_staff|have:iron_helmet|have:iron_armor|have:iron_boots,xp:60
+drill,채굴기 세우기,광맥을 바라보고 [놓기]로 세우고 뒤에 상자를 두면 광석이 저절로 쌓인다,place:Drill,conveyor:4
+sprinkler,스프링클러 세우기,물뿌리개와 철 주괴로 만든다. 둘레 5×5칸 작물에 저절로 물을 준다,place:Sprinkler,fertilizer:3
+generator,발전기 돌리기,철 주괴 5·구리 광석 6·돌 6으로 만들고 슬라임 젤을 [연료]로 넣으면 둘레 기계가 두 배로 빨라진다,place:Generator,slime_gel:10
+biome,빛 포자나 얼음 결정 얻기,흙 동굴 바깥 버섯 숲(빛 박쥐)이나 얼음 동굴(얼음 슬라임)의 몬스터가 떨어뜨린다. 들어서면 이름이 뜬다,have:glow_spore|have:ice_crystal,xp:40
+deep,깊은 곳 찾아가기,시작 지점에서 60칸 넘게 가면 빛나는 미스릴 광맥과 수정 박쥐·정령이 있는 깊은 곳이다. 횃불을 넉넉히 챙긴다,reach:60,torch:6
+mithril_ore,미스릴 광석 4개 캐기,깊은 곳 벽에 박힌 하늘색으로 빛나는 덩어리가 미스릴 광맥이다. 단단해서 여러 번 쳐야 한다,have:mithril_ore:4,xp:60
+queen,수정 거미 여왕 쓰러뜨리기,HUD의 깊은 아레나 방향으로 간다. 첫 보스보다 세니 철 장비와 물약을 갖춘다,have:queen_heart,healing_potion:4
+mithril_gear,미스릴 장비 하나 만들기,화로에서 미스릴 주괴를 녹이고 작업대에서 수정 심장과 함께 만든다,have:mithril_sword|have:mithril_bow|have:mithril_staff|have:mithril_helmet|have:mithril_armor|have:mithril_boots,xp:100
+level15,레벨 15 되기,보스를 잡을 때마다 몬스터가 주는 경험치가 늘어난다. 미스릴 장비는 레벨 15부터 입는다,level:15,healing_potion:4
+mithril_pickaxe,미스릴 곡괭이 만들기,용암 지대의 흑요석은 미스릴 곡괭이 이상이어야 캐진다. 작업대에서 미스릴 주괴 3개로 만든다,have:mithril_pickaxe,xp:60
+obsidian_ore,흑요석 원석 캐기,깊은 아레나 반대쪽 모퉁이가 용암 지대다. 붉게 빛나는 용암 웅덩이는 밟으면 불타니 피해 간다,have:obsidian_ore:3,xp:80
+titan,용암 거인 쓰러뜨리기,HUD의 용암 아레나 방향으로 간다. 맞으면 불타니 미스릴 장비와 물약·버섯 수프를 챙긴다,have:titan_heart,healing_potion:5
+obsidian_gear,흑요석 장비 하나 만들기,화로에서 흑요석 주괴를 녹이고 작업대에서 용암 심장과 함께 만든다,have:obsidian_sword|have:obsidian_bow|have:obsidian_staff|have:obsidian_helmet|have:obsidian_armor|have:obsidian_boots,xp:150
+obsidian_pickaxe,흑요석 곡괭이 만들기,공허석은 흑요석 곡괭이 이상이어야 캐진다. 작업대에서 흑요석 주괴 3과 용암 심장 1로 만든다,have:obsidian_pickaxe,xp:80
+void_ore,공허석 원석 캐기,용암 아레나에서 굴을 따라가면 보랏빛 별이 박힌 공허의 심연이다,have:void_ore:3,xp:120
+void_lord,공허의 군주 쓰러뜨리기,HUD의 심연 아레나로 간다. 맞으면 느려지니 흑요석 장비와 음식을 챙긴다,have:void_essence,healing_potion:6
+void_gear,공허 장비 하나 만들기,화로에서 공허석 주괴를 녹이고 작업대에서 공허의 정수와 함께 만든다,have:void_sword|have:void_bow|have:void_staff|have:void_helmet|have:void_armor|have:void_boots,xp:300
