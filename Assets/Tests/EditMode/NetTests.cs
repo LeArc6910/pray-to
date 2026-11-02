@@ -779,6 +779,7 @@ namespace Game.Core.Tests
             world.DropRune(Gear.Data.FindRune("earth"), player.Position);
             session.Tick(2);
             var iron = alice.Bag.Items.Single(item => !item.Base.IsPickaxe);
+            world.GainExperience(player, Leveling.TotalFor(iron.Base.RequiredLevel));
 
             session.Host.Receive(1, alice.EquipCommand(iron.Id));
             session.Tick();

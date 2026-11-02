@@ -189,7 +189,11 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 ItemLabel(item);
                 RuneButton(item);
-                if (GUILayout.Button("장착", GUILayout.Width(56))) Send(_client.EquipCommand(item.Id), Sound.Place);
+                // Too high a level to wear yet: the button says which level instead.
+                bool wearable = item.Base.RequiredLevel <= _client.Level;
+                GUI.enabled = wearable;
+                if (GUILayout.Button(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", GUILayout.Width(56))) Send(_client.EquipCommand(item.Id), Sound.Place);
+                GUI.enabled = true;
                 if (GUILayout.Button("버리기", GUILayout.Width(56))) Send(_client.DiscardCommand(item.Id), Sound.Click);
                 QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
                 GUILayout.EndHorizontal();

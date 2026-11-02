@@ -36,6 +36,9 @@ namespace Game.Core
         // Goes up whenever the bag or the equipment changes, so the host knows when to send them again.
         public int InventoryVersion { get; internal set; }
         public PlayerStats Stats { get; private set; }
+        // Experience gathered over the character's life; the level follows from it (Leveling).
+        public int Experience { get; internal set; }
+        public int Level => Leveling.LevelFor(Experience);
         // Goes up whenever the host puts the player somewhere the owning client did not: a refused move or a
         // respawn. The client snaps to the host's position when it sees a new value.
         public int Corrections { get; internal set; }
@@ -161,7 +164,7 @@ namespace Game.Core
             {
                 if (HasBuff(slot)) buffs.Add(Skills[slot]);
             }
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
         }
     }
@@ -271,6 +274,8 @@ namespace Game.Core
         // Source, a player, began going home (Amount World.RecallStarted), got there (RecallArrived) or was stopped by
         // a hit (RecallBroken), at Position.
         Recall,
+        // Source, a player, reached a new level; Amount is the level (World.GainExperience).
+        LevelUp,
     }
 
     public readonly struct SimEvent

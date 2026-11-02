@@ -33,6 +33,8 @@ namespace Game.Client
         Eat,
         // The player's own footsteps, quietly.
         Step,
+        // A new character level.
+        LevelUp,
     }
 
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
@@ -188,6 +190,12 @@ namespace Game.Client
                     parts.Add(Noise(0.12f, 0.05f, 0.8f, 0.35f, decay: 8, seed: 5));
                     parts.Add(Tone(Wave.Square, 0.24f, 0.14f, 440, 660, 0.3f, decay: 3));
                     level = 0.55f;
+                    break;
+                case Sound.LevelUp:
+                    // A bright run up two octaves.
+                    Arpeggio(parts, Wave.Square, 0.06f, 0.1f, 0.35f, 392, 523, 659, 784, 1047);
+                    parts.Add(Tone(Wave.Triangle, 0.3f, 0.4f, 1568, 1568, 0.3f, decay: 2, vibrato: 0.01f, vibratoRate: 7));
+                    level = 0.7f;
                     break;
                 case Sound.Step:
                     // A soft scuff on stone.

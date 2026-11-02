@@ -1,4 +1,4 @@
-id,name,slot,level,tags,implicit,sockets,weight,tool
+id,name,slot,level,tags,implicit,sockets,weight,tool,legendary,chance,require
 # 1단계: 구리
 copper_sword,구리 검,weapon,1,melee,Damage+4~6,3,100
 copper_bow,구리 활,weapon,1,ranged,Damage+3~5;AttackSpeed+5%,3,100
@@ -40,3 +40,10 @@ obsidian_armor,흑요석 갑옷,chest,30,,Armor+45~55;MaxHealth+40~50,3,100
 obsidian_boots,흑요석 장화,boots,30,,Armor+18~22,2,100
 obsidian_ring,흑요석 반지,ring,30,,MaxHealth+36~45,1,60
 obsidian_amulet,흑요석 목걸이,amulet,30,,Damage+9~12%,1,60
+# 전설: 보스만 떨어뜨린다(legendary, chance%). 정해진 능력치, 소켓은 모두 열려 있다
+warden_maul,수호자의 바위망치,weapon,10,melee,Damage+15~18;Armor+8~10;AttackSpeed-10%,2,0,,cave_warden,25,
+warden_heart,수호자의 심장석,amulet,10,,MaxHealth+20~25;HealthRegen+2;Armor+4~6,1,0,,cave_warden,25,
+queen_fang,여왕의 독니,weapon,20,ranged,Damage+20~24;AttackSpeed+15%;CritChance+4,2,0,,crystal_queen,25,
+queen_crown,수정 왕관,helmet,20,,Armor+16~20;Magic:Damage+20%;CritDamage+20,2,0,,crystal_queen,25,
+titan_cinder,거인의 불씨,weapon,30,magic|fire,Damage+30~36;Magic:Damage+50%;Fire:Damage+25%;AttackSpeed-15%,3,0,,lava_titan,25,
+titan_plate,용암 거인의 갑주,chest,30,,Armor+50~60;MaxHealth+45~55;HealthRegen+3,3,0,,lava_titan,25,

@@ -150,15 +150,16 @@ namespace Game.Client
 
         public static PixelImage Gear(ItemBase item)
         {
-            var metal = Metal(item.Level);
+            // A legendary is gold, with fiery stones.
+            var metal = item.IsLegendary ? Ramp.Of("#E8B23A") : Metal(item.Level);
             var colors = new Dictionary<char, Rgba>(Common)
             {
                 ['L'] = metal.Light,
                 ['M'] = metal.Main,
                 ['m'] = metal.Shade,
                 ['d'] = metal.Dark,
-                ['g'] = item.Slot == ItemSlot.Weapon ? Rgba.Hex("#C88CFF") : Rgba.Hex("#E8485A"),
-                ['G'] = item.Slot == ItemSlot.Weapon ? Rgba.Hex("#7E46D0") : Rgba.Hex("#9A2234"),
+                ['g'] = item.IsLegendary ? Rgba.Hex("#FF8A3C") : item.Slot == ItemSlot.Weapon ? Rgba.Hex("#C88CFF") : Rgba.Hex("#E8485A"),
+                ['G'] = item.IsLegendary ? Rgba.Hex("#B83A10") : item.Slot == ItemSlot.Weapon ? Rgba.Hex("#7E46D0") : Rgba.Hex("#9A2234"),
             };
             string[] rows = item.Slot switch
             {

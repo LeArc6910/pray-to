@@ -54,6 +54,7 @@ namespace Game.Core
 
         void DropFrom(Enemy enemy, Player killer)
         {
+            ExperienceFrom(enemy);
             if (_lootGenerator == null) return;
             var definition = enemy.Definition;
             int level = Math.Max(definition.Level, ProgressLevel);
@@ -90,9 +91,11 @@ namespace Game.Core
         {
             var definition = boss.Definition;
             ProgressLevel = Math.Max(ProgressLevel, definition.DropLevel);
+            var everyone = Fighters(boss);
+            ExperienceFrom(boss, everyone);
             if (_lootGenerator == null) return;
 
-            int fighters = Math.Max(1, Fighters(boss).Count);
+            int fighters = Math.Max(1, everyone.Count);
             for (int i = 0; i < definition.DropCount * fighters; i++)
             {
                 DropItem(_lootGenerator.RollItem(definition.DropLevel, _random, 0, definition.DropRarity), Scatter(boss.Position, 2));
@@ -111,6 +114,14 @@ namespace Game.Core
             for (int i = 0; bossMaterial != null && i < definition.MaterialCount * fighters; i++)
             {
                 DropMaterial(bossMaterial, Scatter(boss.Position, 2));
+            }
+            // Its legendaries, each with its own chance for every fighter.
+            foreach (var legendary in _lootGenerator.LegendariesOf(definition.Id).ToList())
+            {
+                for (int i = 0; i < fighters; i++)
+                {
+                    if (_random.Next(100) < legendary.LegendaryChance) DropItem(_lootGenerator.RollLegendary(legendary, _random), Scatter(boss.Position, 2));
+                }
             }
         }
 
@@ -156,7 +167,7 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             var item = player?.Inventory.Find(itemId);
-            if (item == null || player.IsDead) return false;
+            if (item == null || player.IsDead || item.Base.RequiredLevel > player.Level) return false;
             player.Inventory.Replace(item, player.Equipment[item.Base.Slot]);
             player.Equip(item);
             return true;

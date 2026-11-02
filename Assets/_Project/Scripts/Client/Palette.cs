@@ -35,6 +35,7 @@ namespace Game.Client
             Rarity.Uncommon => new Color(0.45f, 0.95f, 0.45f),
             Rarity.Rare => new Color(0.45f, 0.7f, 1f),
             Rarity.Epic => new Color(0.8f, 0.5f, 1f),
+            Rarity.Legendary => new Color(1f, 0.62f, 0.18f),
             _ => new Color(0.85f, 0.85f, 0.85f),
         };
 

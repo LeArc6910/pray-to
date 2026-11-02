@@ -278,7 +278,11 @@ namespace Game.Core
 
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
         // before the first one.
-        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag);
+        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience);
+
+        // As of the host's last word (SelfState). The level follows from it.
+        public int Experience { get; private set; }
+        public int Level => Leveling.LevelFor(Experience);
 
         public void Receive(byte[] data)
         {
@@ -646,7 +650,7 @@ namespace Game.Core
         void RefreshStats()
         {
             var buffs = Enumerable.Range(0, Math.Min(Skills.Count, _buffs.Length)).Where(slot => _buffs[slot] > 0).Select(slot => Skills[slot]);
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level);
         }
 
         List<ClassDefinition> ClassesAt(IReadOnlyList<int> indexes)
@@ -738,6 +742,8 @@ namespace Game.Core
             Food = food;
             _foodTicks = self.FoodTicks;
             _skillsTick = snapshot.Tick;
+            buffsChanged |= Leveling.LevelFor(self.Experience) != Level;
+            Experience = self.Experience;
             if (buffsChanged) RefreshStats();
             Health = self.Health;
             MaxHealth = self.MaxHealth;

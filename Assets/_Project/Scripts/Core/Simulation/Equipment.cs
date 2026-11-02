@@ -102,9 +102,11 @@ namespace Game.Core
             Equipment equipment,
             IEnumerable<ClassDefinition> classes = null,
             IEnumerable<SkillDefinition> buffs = null,
-            ConsumableDefinition food = null)
+            ConsumableDefinition food = null,
+            int level = 1)
         {
             var sheet = new StatSheet();
+            if (level > 1) sheet.Add(new Modifier(StatType.MaxHealth, ModifierKind.Flat, (level - 1) * Leveling.HealthPerLevel));
             foreach (var item in equipment.Items) sheet.Add(item.Modifiers());
             if (food != null) sheet.Add(food.Buff);
             foreach (var chosen in classes ?? Enumerable.Empty<ClassDefinition>()) sheet.Add(chosen.Passive);

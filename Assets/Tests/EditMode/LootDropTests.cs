@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -133,6 +134,8 @@ namespace Game.Core.Tests
             world.Step();
             int version = player.InventoryVersion;
 
+            Assert.IsFalse(world.EquipItem(player.Id, iron.Id), "iron asks for level 5");
+            world.GainExperience(player, Leveling.TotalFor(5));
             Assert.IsTrue(world.EquipItem(player.Id, iron.Id));
 
             Assert.AreSame(iron, player.Equipment[ItemSlot.Weapon]);
@@ -231,5 +234,95 @@ namespace Game.Core.Tests
             Assert.That(plain, Is.InRange(0.06, 0.10));
             Assert.That(lucky, Is.InRange(0.12, 0.18));
         }
-    }
+            [Test]
+        public void BossesHaveLegendariesThatNeverDropAtRandom()
+        {
+            Assert.IsTrue(Gear.Data.Success, string.Join("\n", Gear.Data.Errors));
+            var generator = new LootGenerator(Gear.Data);
+            foreach (string boss in new[] { "cave_warden", "crystal_queen", "lava_titan" })
+            {
+                var legendaries = generator.LegendariesOf(boss).ToList();
+                Assert.AreEqual(2, legendaries.Count, boss);
+                Assert.IsTrue(legendaries.All(b => b.LegendaryChance > 0 && b.RequiredLevel == b.Level), boss);
+            }
+            for (int level = 1; level <= 40; level++) Assert.IsFalse(generator.BasesAt(level).Any(b => b.IsLegendary), $"level {level}");
+
+            var maul = Gear.Data.FindBase("warden_maul");
+            var item = generator.RollLegendary(maul, new GameRandom(3));
+            Assert.AreEqual(Rarity.Legendary, item.Rarity);
+            Assert.AreEqual(maul.MaxSockets, item.Sockets.Count, "every socket open");
+            Assert.AreEqual(0, item.Affixes.Count);
+            Assert.AreEqual(maul.Implicits.Count, item.Implicits.Count);
+            Assert.AreEqual("[전설] 수호자의 바위망치 (레벨 10)", ItemText.Describe(item)[0]);
+
+            var broken = TestLoot.Parse(TestLoot.Bases.Replace("weight\n", "weight,tool,legendary,chance,require\n") + "odd,이상한 검,weapon,1,melee,Damage+1~2,1,0,,dummy,0,\n");
+            TestLoot.AssertError(broken, "chance");
+        }
+
+        [Test]
+        public void ABossDropsItsLegendariesAndEveryoneLevelsUp()
+        {
+            var bases = TestLoot.Bases.Replace("weight\n", "weight,tool,legendary,chance,require\n") + "dummy_blade,허수아비의 칼,weapon,10,melee,Damage+20,2,0,,dummy,100,\n";
+            var loot = TestLoot.Parse(bases);
+            Assert.IsTrue(loot.Success, string.Join("\n", loot.Errors));
+            var world = new World(Maps.Room(40), TileMap.Center(20, 20), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, loot);
+            var definition = Bosses.Parse(
+                Bosses.BossesHeader.TrimEnd('\n') + ",drop_count,drop_level,drop_rarity,rune_count\n" +
+                "dummy,허수아비,10,0,0,2,1,,1,3,10,0,10,rare,0\n",
+                Bosses.AttacksHeader + "dummy,a,가,,circle,nearest,1,1,1,,,,1,,,1,1,\n").Find("dummy");
+            var boss = world.PlaceBoss(definition, TileMap.Center(20, 20), 8);
+            var alice = world.AddPlayer("a", Gear.Wearing("copper_sword"));
+            var bob = world.AddPlayer("b", null);
+            world.MovePlayer(alice.Id, boss.Position + new Vec2(0, -2), new Vec2(0, 1), 10);
+            world.MovePlayer(bob.Id, boss.Position + new Vec2(0, 2), new Vec2(0, -1), 10);
+            float health = alice.Stats.MaxHealth;
+
+            world.SetAttacking(alice.Id, true);
+            var events = new List<SimEvent>();
+            for (int i = 0; i < 300 && !boss.IsDead; i++)
+            {
+                world.Step();
+                events.AddRange(world.TakeEvents());
+            }
+
+            Assert.IsTrue(boss.IsDead);
+            var blades = world.GroundLoot.Where(l => l.Item != null).Select(l => l.Item).Concat(alice.Inventory.Items).Concat(bob.Inventory.Items)
+                .Where(i => i.Base.Id == "dummy_blade").ToList();
+            Assert.AreEqual(2, blades.Count, "one for each fighter at 100%");
+            Assert.IsTrue(blades.All(i => i.Rarity == Rarity.Legendary));
+            foreach (var player in new[] { alice, bob })
+            {
+                Assert.AreEqual(Leveling.ForBoss(definition), player.Experience, "the boss's experience to each fighter");
+                Assert.AreEqual(Leveling.LevelFor(300), player.Level);
+                Assert.IsTrue(events.Count(e => e.Type == SimEventType.LevelUp && e.Source == player.Id) == player.Level - 1);
+            }
+            Assert.AreEqual(health + (alice.Level - 1) * Leveling.HealthPerLevel, alice.Stats.MaxHealth, 0.01f, "a little more health a level");
+        }
+
+        [Test]
+        public void MonstersGiveExperienceToEveryoneNearAndMoreAfterABoss()
+        {
+            var world = Room();
+            var near = world.AddPlayer("near", Gear.Wearing("mithril_sword"));
+            var far = world.AddPlayer("far", null);
+            world.MovePlayer(far.Id, near.Position + new Vec2(Leveling.ShareRange + 2, 0), new Vec2(1, 0), 30);
+            var slime = Monsters.Shipped.Find("slime");
+            Assume.That(Vec2.Distance(far.Position, near.Position), Is.GreaterThan(Leveling.ShareRange));
+            var target = world.SpawnEnemy(slime, near.Position + new Vec2(0, -1));
+            world.SetAttacking(near.Id, true);
+            for (int i = 0; i < 60 && !target.IsDead; i++) world.Step();
+            Assert.IsTrue(target.IsDead);
+            Assert.AreEqual(Leveling.ForMonster(slime.Level), near.Experience);
+            Assert.AreEqual(0, far.Experience, "too far away");
+
+            Assert.AreEqual(3 * 10 + 6, Leveling.ForMonster(Math.Max(slime.Level, 10)), "after the first boss");
+            Assert.AreEqual(1, Leveling.LevelFor(0));
+            Assert.AreEqual(5, Leveling.LevelFor(Leveling.TotalFor(5)));
+            Assert.AreEqual(4, Leveling.LevelFor(Leveling.TotalFor(5) - 1));
+            Assert.AreEqual(Leveling.MaxLevel, Leveling.LevelFor(int.MaxValue));
+            Assert.AreEqual(5, Gear.Data.FindBase("iron_sword").RequiredLevel);
+            Assert.AreEqual(15, Gear.Data.FindBase("mithril_sword").RequiredLevel);
+            Assert.AreEqual(1, Gear.Data.FindBase("copper_sword").RequiredLevel);
+        }
+}
 }

@@ -83,11 +83,23 @@ namespace Game.Core
 
         // Growth comes in steps: only the newest step of bases that the level has reached drops, so older gear
         // stops cluttering the floor once a boss opens the next tier. Below every step, the first one drops.
+        // The bases of the highest step the level reaches. Legendaries never drop at random.
         public IReadOnlyList<ItemBase> BasesAt(int level)
         {
-            var reached = _data.Bases.Where(b => b.Level <= level).ToList();
-            int step = reached.Count > 0 ? reached.Max(b => b.Level) : _data.Bases.Min(b => b.Level);
-            return _data.Bases.Where(b => b.Level == step).ToList();
+            var ordinary = _data.Bases.Where(b => !b.IsLegendary).ToList();
+            var reached = ordinary.Where(b => b.Level <= level).ToList();
+            int step = reached.Count > 0 ? reached.Max(b => b.Level) : ordinary.Min(b => b.Level);
+            return ordinary.Where(b => b.Level == step).ToList();
+        }
+
+        // The boss's legendaries.
+        public IEnumerable<ItemBase> LegendariesOf(string bossId) => _data.Bases.Where(b => b.Legendary == bossId);
+
+        // A legendary as the boss drops it: its own stats, rolled within their ranges, every socket, no affixes.
+        public Item RollLegendary(ItemBase itemBase, GameRandom random)
+        {
+            var implicits = itemBase.Implicits.Select(range => range.Roll(random)).ToList();
+            return new Item(itemBase, itemBase.Level, Rarity.Legendary, implicits, new List<ItemAffix>(), itemBase.MaxSockets);
         }
 
         int RarityWeight(Rarity rarity, int itemRarity)

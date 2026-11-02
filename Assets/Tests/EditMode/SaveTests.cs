@@ -225,5 +225,21 @@ namespace Game.Core.Tests
             Assert.IsNull(MapSave.Read(new byte[] { 1, 2, 3 }, width, height));
             Assert.IsNull(MapSave.Read(null, width, height));
         }
+        [Test]
+        public void ACharacterKeepsItsExperienceAndOldOnesStartAtTheirGearsLevel()
+        {
+            var gear = Gear.Wearing("iron_sword");
+            var bag = new Inventory();
+            bag.TryAdd(Gear.Plain("mithril_armor"));
+            Assert.AreEqual(1234, CharacterSave.Read(CharacterSave.Write(gear, bag, 1234), Gear.Data).Experience);
+
+            // A format 1 save: the same bytes without the experience at the end, and version 1 in the header.
+            byte[] old = CharacterSave.Write(gear, bag, 0);
+            old = old.Take(old.Length - 4).ToArray();
+            BitConverter.GetBytes(1).CopyTo(old, 4);
+            var loaded = CharacterSave.Read(old, Gear.Data);
+            Assert.AreEqual(-1, loaded.Experience);
+            Assert.AreEqual(15, Leveling.StartFor(loaded.Equipment, loaded.Bag), "enough for the mithril armour in the bag");
+        }
 }
 }

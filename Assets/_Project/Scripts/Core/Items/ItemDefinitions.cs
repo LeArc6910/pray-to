@@ -28,6 +28,8 @@ namespace Game.Core
         Uncommon,
         Rare,
         Epic,
+        // A boss's own item: fixed stats under its own name, never rolled at random (item_bases.csv legendary).
+        Legendary,
     }
 
     public enum AffixKind
@@ -58,9 +60,15 @@ namespace Game.Core
             IReadOnlyList<ModifierRange> implicits,
             int maxSockets,
             int weight,
-            string tool = "")
+            string tool = "",
+            string legendary = "",
+            int legendaryChance = 0,
+            int requiredLevel = 0)
         {
             Tool = tool ?? "";
+            Legendary = legendary ?? "";
+            LegendaryChance = legendaryChance;
+            RequiredLevel = requiredLevel > 0 ? requiredLevel : Legendary.Length > 0 ? level : Math.Max(1, level - 5);
             Id = id;
             Name = name;
             Slot = slot;
@@ -86,6 +94,14 @@ namespace Game.Core
         // What else the item is for besides fighting: "pickaxe", or empty. Only a pickaxe in hand digs rock.
         public string Tool { get; }
         public bool IsPickaxe => Tool == Pickaxe;
+        // The boss that drops this as a legendary, or empty for an ordinary base; and the chance (%) each fighter
+        // gets one when it falls.
+        public string Legendary { get; }
+        public int LegendaryChance { get; }
+        public bool IsLegendary => Legendary.Length > 0;
+        // The character level it takes to wear: five below the base's step (iron, step 10, from level 5), or a
+        // legendary's own step, unless the sheet says (require).
+        public int RequiredLevel { get; }
 
         public const string Pickaxe = "pickaxe";
     }

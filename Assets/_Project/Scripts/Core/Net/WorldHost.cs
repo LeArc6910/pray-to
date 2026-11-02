@@ -226,6 +226,9 @@ namespace Game.Core
             var classes = ClassRules.Choose(_classes, join.Classes, _config.MaxClasses);
             var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, saved?.Equipment ?? StarterGear(), saved?.Bag, classes.ToArray());
             if (saved == null) GiveStarterStacks(player);
+            // A character from before levels starts at a level that lets it keep wearing what it has.
+            player.Experience = saved == null ? 0 : saved.Experience >= 0 ? saved.Experience : Leveling.TotalFor(Leveling.StartFor(saved.Equipment, saved.Bag));
+            player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
             World.ChangeClasses(player.Id, player.Classes, join.SkillOrder);
@@ -362,7 +365,8 @@ namespace Game.Core
                 viewer.ConsumableCooldown,
                 viewer.Food == null ? -1 : IndexOf(_loot?.Consumables, viewer.Food),
                 viewer.FoodTicks,
-                (byte)(viewer.Afflictions.Bits | (viewer.Recalling ? StatusBits.Recalling : 0)));
+                (byte)(viewer.Afflictions.Bits | (viewer.Recalling ? StatusBits.Recalling : 0)),
+                viewer.Experience);
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),

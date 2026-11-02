@@ -42,6 +42,7 @@ namespace Game.Client
         string _worldKey;
         float _worldSaveClock;
         int _savedInventoryVersion;
+        int _savedExperience;
         // [월드 지우기] asks once more before it deletes.
         bool _confirmDelete;
         string _address = "127.0.0.1";
@@ -616,9 +617,11 @@ namespace Game.Client
         // The character whenever the host sends a changed bag; the world every WorldSaveSeconds while hosting.
         void SaveProgress(float deltaTime)
         {
-            if (_client.InventoryVersion != _savedInventoryVersion)
+            // The character is kept when its gear or bag changes, and when it gains experience.
+            if (_client.InventoryVersion != _savedInventoryVersion || (_client.Experience != _savedExperience && _client.InventoryVersion > 0))
             {
                 _savedInventoryVersion = _client.InventoryVersion;
+                _savedExperience = _client.Experience;
                 Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
             }
             _worldSaveClock += deltaTime;
@@ -666,6 +669,7 @@ namespace Game.Client
             if (_map != null && _client != null && _client.Status == ClientStatus.Playing) Save(MapKey, _map.Save());
             _worldKey = null;
             _savedInventoryVersion = 0;
+            _savedExperience = 0;
             _view?.Dispose();
             _map?.Dispose();
             _net?.Dispose();
@@ -931,7 +935,7 @@ namespace Game.Client
                 if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 string mode = _mode == Mode.Host ? (_roomCode != null ? $"온라인 방 코드 {_roomCode}" : $"호스트 중 (포트 {NetLink.DefaultPort})")
                     : _mode == Mode.Join ? "참가 중" : "혼자 하기";
-                lines.Add($"{BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode} · 접속 {_client.Names.Count}명");
+                lines.Add($"Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode} · 접속 {_client.Names.Count}명");
                 // The nearest arena the player is not standing in: the first boss's from the spawn, the deep one's
                 // once there.
                 int next = -1;

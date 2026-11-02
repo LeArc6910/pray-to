@@ -34,7 +34,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.25.0";
+        public const string Version = "0.26.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -596,9 +596,11 @@ namespace Game.Core
             int consumableCooldown = 0,
             int food = -1,
             int foodTicks = 0,
-            byte status = 0)
+            byte status = 0,
+            int experience = 0)
         {
             Status = status;
+            Experience = experience;
             Food = food;
             FoodTicks = foodTicks;
             Corrections = corrections;
@@ -623,6 +625,8 @@ namespace Game.Core
         public int ConsumableCooldown { get; }
         // Burning, chilled (StatusBits).
         public byte Status { get; }
+        // All the experience the character has; the level follows (Leveling).
+        public int Experience { get; }
         // The sheet index of the food whose buff is on (-1 for none), and the ticks it has left.
         public int Food { get; }
         public int FoodTicks { get; }
@@ -672,6 +676,7 @@ namespace Game.Core
             w.Write((ushort)(Self.Food + 1));
             w.Write(Self.FoodTicks);
             w.Write(Self.Status);
+            w.Write(Self.Experience);
 
             w.Write((ushort)Entities.Count);
             foreach (var entity in Entities)
@@ -741,7 +746,7 @@ namespace Game.Core
                 cooldowns.Add(r.ReadUInt16());
                 buffs.Add(r.ReadUInt16());
             }
-            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, r.ReadUInt16(), r.ReadUInt16() - 1, r.ReadInt32(), r.ReadByte());
+            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, r.ReadUInt16(), r.ReadUInt16() - 1, r.ReadInt32(), r.ReadByte(), r.ReadInt32());
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);

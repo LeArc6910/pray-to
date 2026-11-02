@@ -71,6 +71,7 @@ namespace Game.Core.Tests
                 new List<string>
                 {
                     "[고급] 신속의 날카로운 구리 검 (레벨 1)",
+                    "  착용 레벨 1",
                     "  피해 +4",
                     "  · 피해 +2",
                     "  · 공격 속도 4% 증가",

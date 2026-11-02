@@ -710,6 +710,7 @@ namespace Game.Client
         static Sprite ReelSprite => Sprites.Centered("machine/reel", () => ItemArt.HarvesterReel);
 
         static readonly Color OffTint = new Color(0.5f, 0.5f, 0.56f);
+        static readonly Color LevelColor = new Color(1f, 0.85f, 0.35f);
         static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
 
         static Sprite[] _beltSprites;
@@ -835,6 +836,15 @@ namespace Game.Client
                     _floating.Add(new Floating { Position = eater.Position + new Vector3(0, 0.4f, 0), Text = food.Name, Color = Palette.Food });
                     Hear(Sound.Eat, eater.Position);
                     AddFlash(eater.Position, eater.Diameter, Palette.Food, FlashKind.Sparkles);
+                    break;
+                case SimEventType.LevelUp:
+                    var climber = Find(e.Source);
+                    if (climber == null) break;
+                    AddFlash(climber.Position, climber.Diameter * 1.6f, LevelColor, FlashKind.Ring);
+                    _floating.Add(new Floating { Position = climber.Position + new Vector3(0, 0.6f, 0), Text = $"Lv {e.Amount}", Color = LevelColor });
+                    if (e.Source != _client.PlayerId) break;
+                    Sounds.Play(Sound.LevelUp);
+                    ShowBanner($"레벨 {e.Amount}!");
                     break;
                 case SimEventType.Recall:
                     var traveller = Find(e.Source);

@@ -11,6 +11,7 @@ namespace Game.Core
             Rarity.Uncommon => "고급",
             Rarity.Rare => "희귀",
             Rarity.Epic => "영웅",
+            Rarity.Legendary => "전설",
             _ => rarity.ToString(),
         };
 
@@ -39,7 +40,7 @@ namespace Game.Core
 
         public static List<string> Describe(Item item, bool showTiers = false)
         {
-            var lines = new List<string> { $"[{RarityName(item.Rarity)}] {Name(item)} (레벨 {item.Level})" };
+            var lines = new List<string> { $"[{RarityName(item.Rarity)}] {Name(item)} (레벨 {item.Level})", $"  착용 레벨 {item.Base.RequiredLevel}" };
             lines.AddRange(item.Implicits.Select(m => "  " + StatText.Describe(m)));
 
             foreach (var affix in item.Affixes.OrderBy(a => a.Affix.Kind))

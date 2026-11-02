@@ -104,6 +104,12 @@ namespace Game.Core
                     string tool = row["tool"];
                     if (tool.Length > 0 && tool != ItemBase.Pickaxe) throw new FormatException($"tool '{tool}'은 모릅니다(비우거나 {ItemBase.Pickaxe}).");
                     if (tool == ItemBase.Pickaxe && slot != ItemSlot.Weapon) throw new FormatException("곡괭이는 weapon 슬롯이어야 합니다(손에 든다).");
+                    string legendary = row["legendary"];
+                    int chance = row["chance"].Length > 0 ? SheetValues.ParseNumber(row["chance"], "chance") : 0;
+                    if (legendary.Length > 0 && (chance < 1 || chance > 100)) throw new FormatException("전설 아이템은 chance가 1~100이어야 합니다.");
+                    if (legendary.Length == 0 && chance > 0) throw new FormatException("chance는 legendary(떨어뜨리는 보스)와 함께 씁니다.");
+                    int require = row["require"].Length > 0 ? SheetValues.ParseNumber(row["require"], "require") : 0;
+                    if (row["require"].Length > 0 && (require < 1 || require > Leveling.MaxLevel)) throw new FormatException($"require는 1~{Leveling.MaxLevel}이어야 합니다.");
                     bases.Add(new ItemBase(
                         NewId(row, bases.Select(b => b.Id)),
                         Required(row, "name"),
@@ -113,7 +119,10 @@ namespace Game.Core
                         ModifierSyntax.ParseList(row["implicit"]),
                         sockets,
                         SheetValues.ParseNumber(row["weight"], "weight"),
-                        tool));
+                        tool,
+                        legendary,
+                        chance,
+                        require));
                 });
             }
             return bases;

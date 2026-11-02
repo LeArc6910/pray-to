@@ -107,7 +107,7 @@ namespace Game.Client
             {
                 case Kind.Gear:
                     var item = FindItem(entry);
-                    if (item == null || IsWorn(item)) return (null, null);
+                    if (item == null || IsWorn(item) || item.Base.RequiredLevel > _client.Level) return (null, null);
                     return (_client.EquipCommand(item.Id), Sound.Place);
                 case Kind.Consumable:
                     var consumable = ConsumableOf(entry);

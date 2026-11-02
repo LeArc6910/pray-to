@@ -12,20 +12,24 @@ namespace Game.Core
     public sealed class CharacterSave
     {
         const string Magic = "PTCH";
-        const int FormatVersion = 1;
+        // 2: experience (character levels).
+        const int FormatVersion = 2;
 
-        CharacterSave(Equipment equipment, Inventory bag, List<string> warnings)
+        CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings)
         {
             Equipment = equipment;
             Bag = bag;
+            Experience = experience;
             Warnings = warnings;
         }
 
         public Equipment Equipment { get; }
         public Inventory Bag { get; }
+        // -1 for a save from before levels (Leveling.StartFor decides then).
+        public int Experience { get; }
         public IReadOnlyList<string> Warnings { get; }
 
-        public static byte[] Write(Equipment equipment, Inventory bag)
+        public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -40,6 +44,7 @@ namespace Game.Core
                 SavedItems.WriteCounts(w, bag.Runes.Select(p => (p.Key.Id, p.Value)));
                 SavedItems.WriteCounts(w, bag.Consumables.Select(p => (p.Key.Id, p.Value)));
                 SavedItems.WriteCounts(w, bag.Materials.Select(p => (p.Key.Id, p.Value)));
+                w.Write(experience);
             }
             return stream.ToArray();
         }
@@ -51,7 +56,7 @@ namespace Game.Core
             try
             {
                 using var r = new BinaryReader(new MemoryStream(data ?? Array.Empty<byte>()), Encoding.UTF8);
-                SavedItems.ReadHeader(r, Magic, FormatVersion, "캐릭터");
+                int version = SavedItems.ReadHeader(r, Magic, FormatVersion, "캐릭터");
 
                 var equipment = new Equipment();
                 var bag = new Inventory();
@@ -87,7 +92,8 @@ namespace Game.Core
                     if (material != null) bag.AddMaterial(material, count);
                     else warnings.Add($"없어진 재료 '{id}' {count}개를 건너뛰었습니다.");
                 }
-                return new CharacterSave(equipment, bag, warnings);
+                int experience = version >= 2 ? Math.Max(0, r.ReadInt32()) : -1;
+                return new CharacterSave(equipment, bag, experience, warnings);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {
