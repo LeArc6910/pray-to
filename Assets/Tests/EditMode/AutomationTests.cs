@@ -272,7 +272,7 @@ namespace Game.Core.Tests
             var save = WorldSave.Read(host.SaveWorld(now: 0), Tiles.Shipped, Gear.Data);
 
             var again = new WorldHost(save.Seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
-            again.Restore(save, now: 0);
+            again.Restore(save);
 
             var restored = again.World.MachineAt(belt.X, belt.Y);
             Assert.AreEqual(TileType.Conveyor, restored.Kind);
@@ -300,29 +300,40 @@ namespace Game.Core.Tests
             Assert.AreEqual(3, seen.Direction, "it faced down, the way the player first faces");
             Assert.IsNull(seen.Carried);
         }
-            [Test]
-        public void ASprinklerWatersTheCropsAroundIt()
+        [Test]
+        public void ASprinklerKeepsTheCropsAroundItFromDrying()
         {
             var world = Line(out var player);
             Sow(world, player, 8, 6, new Vec2(1, 0));
             Sow(world, player, 12, 6, new Vec2(1, 0));
             Place(world, player, SprinklerItem, 9, 8, new Vec2(0, 1));
             var events = new List<SimEvent>();
-            for (int i = 0; i < World.Ticks(Sprinkler.Seconds) + 1; i++)
+            void Step(long ticks)
             {
-                world.Step();
-                events.AddRange(world.TakeEvents());
+                for (long i = 0; i < ticks; i++)
+                {
+                    world.Step();
+                    events.AddRange(world.TakeEvents().Where(e => e.Type == SimEventType.Watered));
+                }
             }
+            Step(World.Ticks(Sprinkler.Seconds) + 1);
 
-            Assert.IsTrue(world.CropAt(8, 6).Watered, "two tiles off, inside the square");
-            Assert.IsFalse(world.CropAt(12, 6).Watered, "three tiles off along x");
-            var splash = events.Single(e => e.Type == SimEventType.Watered);
+            Assert.IsTrue(world.CropAt(8, 6).IsWet(world.Tick), "two tiles off, inside the square");
+            Assert.IsFalse(world.CropAt(12, 6).IsWet(world.Tick), "three tiles off along x");
+            var splash = events.Single();
             Assert.AreEqual(0, splash.Source, "from no player");
             Assert.AreEqual(1, splash.Amount);
             Assert.AreEqual(TileMap.Center(9, 8), splash.Position);
 
-            Run(world, Sprinkler.Seconds * 2);
-            Assert.IsTrue(world.CropAt(8, 6).Watered, "a crop takes water once; nothing else happens to it");
+            // While its water lasts it is left alone, then topped up before it dries.
+            events.Clear();
+            Step(World.Ticks(Sprinkler.Seconds) * 10);
+            Assert.IsEmpty(events, "still wet: no water, no message");
+            Step(Calendar.TicksPerDay);
+            Assert.AreEqual(1, events.Count, "once more, as the day's water ran low");
+            Assert.IsTrue(world.CropAt(8, 6).IsWet(world.Tick));
+            Assert.AreEqual(Calendar.TicksPerDay / (float)Mushroom.GrowTicks + World.Ticks(Sprinkler.Seconds) * 11f / Mushroom.GrowTicks,
+                world.CropAt(8, 6).Growth(world.Tick), 0.01f, "it never stopped growing");
         }
 
         [Test]
@@ -330,19 +341,21 @@ namespace Game.Core.Tests
         {
             var world = Line(out var player);
             // Facing right from (5, 8), a chest behind it at (4, 8); crops on its left and right two and three tiles
-            // ahead, and one four tiles ahead, out of its reach.
+            // ahead, and one four tiles ahead, out of its reach. A sprinkler keeps them all wet.
             Sow(world, player, 7, 9, new Vec2(1, 0));
             Sow(world, player, 8, 7, new Vec2(1, 0));
             Sow(world, player, 9, 8, new Vec2(1, 0));
+            Place(world, player, SprinklerItem, 8, 9, new Vec2(1, 0));
             Place(world, player, HarvesterItem, 5, 8, new Vec2(1, 0));
             Place(world, player, Gear.Data.FindMaterial("chest"), 4, 8, new Vec2(1, 0));
             CollectionAssert.AreEqual(new[] { (6, 7), (6, 8), (6, 9), (7, 7), (7, 8), (7, 9), (8, 7), (8, 8), (8, 9) },
                 world.HarvesterTiles(world.MachineAt(5, 8)).ToArray(), "three rows ahead, nearest first, each from its right to its left");
             // Out of the way, so no one walks over a ripe crop.
-            world.MovePlayer(player.Id, TileMap.Center(12, 12), new Vec2(1, 0), 20);
-            long planted = world.CropAt(7, 9).PlantedTick;
+            Moves.Walk(world, player, TileMap.Center(3, 12));
+            Moves.Walk(world, player, TileMap.Center(12, 12));
+            var first = world.CropAt(7, 9);
 
-            Run(world, Mushroom.GrowSeconds + Harvester.Seconds * 2 + 1);
+            Run(world, Mushroom.GrowDays * Calendar.DaySeconds + Sprinkler.Seconds + Harvester.Seconds * 2 + 1);
 
             var chest = world.ChestAt(4, 8);
             Assert.AreEqual(Mushroom.Count * 2, chest.CountOf(MushroomItem), "both crops in reach");
@@ -351,7 +364,7 @@ namespace Game.Core.Tests
             {
                 var again = world.CropAt(x, y);
                 Assert.IsNotNull(again, $"planted again at ({x}, {y})");
-                Assert.Greater(again.PlantedTick, planted);
+                Assert.AreNotSame(first, again);
                 Assert.IsFalse(again.IsRipe(world.Tick));
             }
             Assert.IsTrue(world.CropAt(9, 8).IsRipe(world.Tick), "out of reach, left alone");
@@ -413,7 +426,7 @@ namespace Game.Core.Tests
 
             var save = WorldSave.Read(host.SaveWorld(now: 0), Tiles.Shipped, Gear.Data);
             var again = new WorldHost(save.Seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
-            again.Restore(save, now: 0);
+            again.Restore(save);
             var restored = again.World.MachineAt(belt.X, belt.Y);
             Assert.IsFalse(restored.Enabled);
             Assert.AreEqual(belt.Direction, restored.Direction);
@@ -503,7 +516,7 @@ namespace Game.Core.Tests
             var placed = host.World.Machines.Single();
             var save = WorldSave.Read(host.SaveWorld(now: 0), Tiles.Shipped, Gear.Data);
             var again = new WorldHost(save.Seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
-            again.Restore(save, now: 0);
+            again.Restore(save);
             Assert.AreSame(IronBar, again.World.MachineAt(placed.X, placed.Y).Setting);
         }
 }

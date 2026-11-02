@@ -149,6 +149,9 @@ namespace Game.Core
         Refuel,
         // Asks for the reward of the guide goal at Index (World.ClaimGoal).
         ClaimGoal,
+        // Lies down in the player's bed, and gets up again (World.Sleep, World.Wake).
+        Sleep,
+        Wake,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

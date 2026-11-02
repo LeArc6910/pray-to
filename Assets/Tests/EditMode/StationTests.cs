@@ -210,7 +210,7 @@ namespace Game.Core.Tests
 
             var save = WorldSave.Read(host.SaveWorld(now: 0), Tiles.Shipped, Gear.Data);
             var again = new WorldHost(save.Seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
-            again.Restore(save, now: 0);
+            again.Restore(save);
 
             var chest = again.World.ChestAt(x, y);
             Assert.AreEqual("iron_bow", chest.Items.Single().Base.Id);

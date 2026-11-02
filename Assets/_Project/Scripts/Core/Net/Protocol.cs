@@ -35,7 +35,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.32.0";
+        public const string Version = "0.33.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -203,47 +203,50 @@ namespace Game.Core
         }
     }
 
-    // Crops planted (with what and when, as an index into the crops sheet) or harvested. Sent like TileChanges; how
-    // far along a crop is, each side works out from the tick it was planted.
+    // Crops planted or watered (with what, as an index into the crops sheet, how far it had grown and its water's
+    // span in host ticks) or harvested. Sent like TileChanges; how far along a crop is now, each side works out from
+    // those and the tick (Crop).
     public sealed class CropChangesMessage
     {
-        public const int MaxPerMessage = 150;
+        public const int MaxPerMessage = 120;
         const byte Gone = 255;
 
-        public CropChangesMessage(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick, bool Watered)> changes) { Changes = changes; }
+        public CropChangesMessage(IReadOnlyList<(int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil)> changes) { Changes = changes; }
 
         // Crop is -1 for a harvested one.
-        public IReadOnlyList<(int X, int Y, int Crop, long PlantedTick, bool Watered)> Changes { get; }
+        public IReadOnlyList<(int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil)> Changes { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.CropChanges, w =>
         {
             w.Write((ushort)Changes.Count);
-            foreach (var (x, y, crop, planted, watered) in Changes)
+            foreach (var (x, y, crop, grown, wetFrom, wetUntil) in Changes)
             {
                 w.Write((ushort)x);
                 w.Write((ushort)y);
                 w.Write(crop < 0 ? Gone : (byte)crop);
-                w.Write(planted);
-                w.Write(watered);
+                w.Write((int)Math.Clamp(grown, 0, int.MaxValue));
+                w.Write(wetFrom);
+                w.Write(wetUntil);
             }
         });
 
         public static CropChangesMessage Decode(byte[] data) => Protocol.Read(data, MessageType.CropChanges, r =>
         {
             int count = r.ReadUInt16();
-            var changes = new List<(int, int, int, long, bool)>(count);
+            var changes = new List<(int, int, int, long, long, long)>(count);
             for (int i = 0; i < count; i++)
             {
                 int x = r.ReadUInt16();
                 int y = r.ReadUInt16();
                 byte crop = r.ReadByte();
-                long planted = r.ReadInt64();
-                changes.Add((x, y, crop == Gone ? -1 : crop, planted, r.ReadBoolean()));
+                long grown = r.ReadInt32();
+                long wetFrom = r.ReadInt64();
+                changes.Add((x, y, crop == Gone ? -1 : crop, grown, wetFrom, r.ReadInt64()));
             }
             return new CropChangesMessage(changes);
         });
 
-        public static IEnumerable<byte[]> EncodeAll(IReadOnlyList<(int X, int Y, int Crop, long PlantedTick, bool Watered)> changes)
+        public static IEnumerable<byte[]> EncodeAll(IReadOnlyList<(int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil)> changes)
         {
             for (int start = 0; start < changes.Count; start += MaxPerMessage)
             {
@@ -532,6 +535,12 @@ namespace Game.Core
         Minion,
     }
 
+    // A player entity's phase (under its StatusBits).
+    public static class PlayerPhase
+    {
+        public const int Sleeping = 1;
+    }
+
     public static class DropState
     {
         public const byte Rune = 255;
@@ -638,10 +647,14 @@ namespace Game.Core
             int food = -1,
             int foodTicks = 0,
             byte status = 0,
-            int experience = 0)
+            int experience = 0,
+            int bedX = -1,
+            int bedY = -1)
         {
             Status = status;
             Experience = experience;
+            BedX = bedX;
+            BedY = bedY;
             Food = food;
             FoodTicks = foodTicks;
             Corrections = corrections;
@@ -671,6 +684,9 @@ namespace Game.Core
         // The sheet index of the food whose buff is on (-1 for none), and the ticks it has left.
         public int Food { get; }
         public int FoodTicks { get; }
+        // The tile of the player's bed, or -1 (World.BedOf), so the client can offer to sleep beside it.
+        public int BedX { get; }
+        public int BedY { get; }
         public bool IsDead => Health <= 0;
     }
 
@@ -682,9 +698,13 @@ namespace Game.Core
             IReadOnlyList<EntityState> entities,
             IReadOnlyList<ProjectileState> projectiles,
             IReadOnlyList<HazardState> hazards,
-            IReadOnlyList<SimEvent> events)
+            IReadOnlyList<SimEvent> events,
+            long clock = 0,
+            int sleepers = 0)
         {
             Tick = tick;
+            Clock = clock;
+            Sleepers = sleepers;
             Self = self;
             Entities = entities;
             Projectiles = projectiles;
@@ -693,6 +713,9 @@ namespace Game.Core
         }
 
         public long Tick { get; }
+        // The world's clock (Calendar) at Tick, and how many players are lying in their beds.
+        public long Clock { get; }
+        public int Sleepers { get; }
         public SelfState Self { get; }
         public IReadOnlyList<EntityState> Entities { get; }
         public IReadOnlyList<ProjectileState> Projectiles { get; }
@@ -702,6 +725,8 @@ namespace Game.Core
         public byte[] Encode() => Protocol.Build(MessageType.Snapshot, w =>
         {
             w.Write(Tick);
+            w.Write(Clock);
+            w.Write((byte)Math.Clamp(Sleepers, 0, 255));
             w.Write(Self.Corrections);
             w.Write(Self.Position);
             w.Write(Self.Health);
@@ -718,6 +743,8 @@ namespace Game.Core
             w.Write(Self.FoodTicks);
             w.Write(Self.Status);
             w.Write(Self.Experience);
+            w.Write((short)Math.Clamp(Self.BedX, -1, short.MaxValue));
+            w.Write((short)Math.Clamp(Self.BedY, -1, short.MaxValue));
 
             w.Write((ushort)Entities.Count);
             foreach (var entity in Entities)
@@ -775,6 +802,8 @@ namespace Game.Core
         public static SnapshotMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Snapshot, r =>
         {
             long tick = r.ReadInt64();
+            long clock = r.ReadInt64();
+            int sleepers = r.ReadByte();
             int corrections = r.ReadInt32();
             var position = r.ReadVec2();
             float health = r.ReadSingle();
@@ -787,7 +816,15 @@ namespace Game.Core
                 cooldowns.Add(r.ReadUInt16());
                 buffs.Add(r.ReadUInt16());
             }
-            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, r.ReadUInt16(), r.ReadUInt16() - 1, r.ReadInt32(), r.ReadByte(), r.ReadInt32());
+            int consumableCooldown = r.ReadUInt16();
+            int food = r.ReadUInt16() - 1;
+            int foodTicks = r.ReadInt32();
+            byte status = r.ReadByte();
+            int experience = r.ReadInt32();
+            int bedX = r.ReadInt16();
+            int bedY = r.ReadInt16();
+            var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, consumableCooldown, food, foodTicks, status, experience,
+                bedX, bedY);
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);
@@ -846,7 +883,7 @@ namespace Game.Core
                 bool critical = r.ReadBoolean();
                 events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), position: at));
             }
-            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events);
+            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers);
         });
     }
 }

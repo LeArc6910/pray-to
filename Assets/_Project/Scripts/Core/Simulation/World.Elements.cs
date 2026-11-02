@@ -53,8 +53,9 @@ namespace Game.Core
     {
         public const byte Burning = 1;
         public const byte Chilled = 2;
-        // Only in the player's own state: on the way home.
+        // Only in the player's own state: on the way home, and lying in bed (World.Sleep).
         public const byte Recalling = 4;
+        public const byte Sleeping = 8;
     }
 
     // Fire burns for a share of the hit over a few seconds, cold slows, lightning jumps to enemies nearby. A monster

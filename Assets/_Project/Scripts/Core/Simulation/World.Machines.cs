@@ -328,7 +328,8 @@ namespace Game.Core
             SendOut(smelter, smelter.Front);
         }
 
-        // Every so often waters the crops around it that still take water (World.WaterCrop).
+        // Every so often waters the crops around it whose water would run out before it comes round again
+        // (World.WaterCrop), so they never dry.
         void RunSprinkler(Machine sprinkler)
         {
             if (++sprinkler.Timer < sprinkler.Definition.Ticks) return;
@@ -338,7 +339,8 @@ namespace Game.Core
             {
                 for (int x = sprinkler.X - SprinklerReach; x <= sprinkler.X + SprinklerReach; x++)
                 {
-                    if (WaterCrop(x, y)) watered++;
+                    var crop = Map.InBounds(x, y) ? CropAt(x, y) : null;
+                    if (crop != null && crop.WetLeft(Tick) <= sprinkler.Definition.Ticks && WaterCrop(x, y)) watered++;
                 }
             }
             // From no one: the view splashes the whole square.

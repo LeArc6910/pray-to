@@ -47,6 +47,17 @@ namespace Game.Core
         // Everything plain cave, for worlds made without a seed (tests, rooms).
         public static BiomeMap Plain(int width, int height) => new BiomeMap(width, height, new Biome[width * height]);
 
+        // Each tile as the function says, for rooms with biomes laid out by hand (tests).
+        public static BiomeMap Of(int width, int height, Func<int, int, Biome> biome)
+        {
+            var tiles = new Biome[width * height];
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++) tiles[y * width + x] = biome(x, y);
+            }
+            return new BiomeMap(width, height, tiles);
+        }
+
         // corner is the deep arena's corner as signs (±1, ±1): the crystal caverns lie there, the lava fields
         // opposite; mushroomFirst picks which of the other two corners gets the mushroom forest.
         // abyss is the corner whose far end is the abyss, or null for none.

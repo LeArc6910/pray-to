@@ -215,6 +215,7 @@ namespace Game.Client
             _client.AdvanceRenderClock(Time.deltaTime);
             UpdateGuide(Time.deltaTime);
             UpdateBiome(Time.deltaTime);
+            UpdateDay();
             RememberKit();
             var changedTiles = _client.TakeChangedTiles();
             _view.UpdateTiles(changedTiles);
@@ -233,6 +234,7 @@ namespace Game.Client
                 _acquired.Add((line, 0));
                 Sounds.Play(Sound.Pickup);
             }
+            foreach (string line in _client.TakeNotices()) _acquired.Add((line, 0));
         }
 
         // Half the view's height in tiles for a whole-number zoom: every pixel of the art (a sixteenth of a tile)
@@ -261,6 +263,34 @@ namespace Game.Client
             if (_biomeTime < BiomeBannerDelay || biome == _biomeAnnounced) return;
             _biomeAnnounced = biome;
             _view?.ShowBanner(BiomeMap.Name(biome));
+        }
+
+        // Says so when night falls and when morning comes, whether by the clock or by everyone sleeping (Docs/Time.md).
+        void UpdateDay()
+        {
+            var phase = Calendar.Phase(_client.Clock);
+            if (_dayPhase == phase) return;
+            bool first = _dayPhase == null;
+            _dayPhase = phase;
+            if (first) return;
+            if (phase == DayPhase.Night) _view?.ShowBanner("밤이 되었다");
+            else if (phase == DayPhase.Morning) _view?.ShowBanner($"{Calendar.Day(_client.Clock)}일째 아침");
+        }
+
+        DayPhase? _dayPhase;
+
+        // Lies down in the player's own bed, or gets up: the button over the bed, for a finger or the mouse.
+        void DrawBedButton()
+        {
+            if (_client.Bed is not (int x, int y) || !(_client.Sleeping || _client.CanSleep)) return;
+            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(x + 0.5f, y + 1.35f, 0));
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            var rect = new Rect(point.x - 44, point.y - 13, 88, 26);
+            Controls.Block(rect);
+            if (!GUI.Button(rect, _client.Sleeping ? "일어나기" : "잠자기")) return;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.Sleeping ? _client.WakeCommand() : _client.SleepCommand());
         }
 
         // The boss tune while a boss is awake on screen, else the biome's; the menu has the cave's. Under it the cave's
@@ -540,7 +570,7 @@ namespace Game.Client
             _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide);
             if (world != null)
             {
-                _host.Restore(world, Now());
+                _host.Restore(world);
                 foreach (string warning in world.Warnings) _acquired.Add(("월드 저장본: " + warning, 0));
             }
             _worldKey = SaveStore.WorldKey(WorldName);
@@ -721,6 +751,7 @@ namespace Game.Client
             _client = null;
             _inventory = null;
             _guideProgress = null;
+            _dayPhase = null;
             _acquired.Clear();
             _mode = Mode.Menu;
             _status = status;
@@ -763,6 +794,7 @@ namespace Game.Client
             if (_client.Status == ClientStatus.Playing && !_inventory.Open)
             {
                 DrawMachineSwitch();
+                DrawBedButton();
                 SkillBar.Draw(_client);
                 _hotbar?.Draw(_client.Skills.Count);
             }
@@ -1015,7 +1047,13 @@ namespace Game.Client
                 string mode = _mode == Mode.Host ? (_roomCode != null ? $"온라인 방 코드 {_roomCode}" : $"호스트 중 (포트 {NetLink.DefaultPort})")
                     : _mode == Mode.Join ? "참가 중" : "혼자 하기";
                 string players = _mode == Mode.Solo ? "" : $" · 접속 {_client.Names.Count}명";
-                lines.Add($"Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
+                long clock = _client.Clock;
+                lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
+                if (_client.Sleeping)
+                {
+                    int everyone = Math.Max(1, _client.Names.Count);
+                    lines.Add(everyone > 1 ? $"자는 중… 모두 누우면 아침이 된다 ({_client.Sleepers}/{everyone}명)" : "자는 중…");
+                }
                 // The nearest arena the player is not standing in: the first boss's from the spawn, the deep one's
                 // once there.
                 int next = -1;

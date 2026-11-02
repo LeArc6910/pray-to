@@ -15,6 +15,7 @@ namespace CoreSandbox
     // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss (--boss-id for another)
     // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
     // add --classes <class,class> to --fight or --boss to give the bots classes; they use every skill when it is ready
+    // dotnet run -- --farm [minutes] [crop]          a plot of soil kept by a sprinkler and a harvester: harvest an hour
     static class Program
     {
         static void Main(string[] args)
@@ -83,6 +84,9 @@ namespace CoreSandbox
                 case "--fight":
                     FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge);
                     break;
+                case "--farm":
+                    FarmSim.Run(data, LoadTiles(data), LoadMonsters(), Number(1, 120), args.Length > 2 ? args[2] : "mushroom");
+                    break;
                 case "--boss":
                     var monsters = LoadMonsters();
                     BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge, bossId);
@@ -92,6 +96,7 @@ namespace CoreSandbox
                     Console.WriteLine("       add --rarity <percent> to --item or --loot");
                     Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--classes warrior,fire_mage] [--no-dodge]");
                     Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--classes ...] [--no-dodge] [--boss-id crystal_queen]");
+                    Console.WriteLine("       dotnet run -- --farm [minutes] [crop]");
                     break;
             }
         }
@@ -203,6 +208,18 @@ namespace CoreSandbox
                 Read(LootSheets.ConsumablesFile),
                 Read(LootSheets.MaterialsFile),
                 Read(LootSheets.RecipesFile));
+            if (data.Success) return data;
+
+            foreach (string error in data.Errors) Console.Error.WriteLine(error);
+            Environment.Exit(1);
+            return null;
+        }
+
+        static TileData LoadTiles(LootData loot)
+        {
+            string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "World"));
+            string Read(string file) => File.ReadAllText(Path.Combine(folder, file));
+            var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

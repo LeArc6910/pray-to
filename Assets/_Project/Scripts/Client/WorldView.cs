@@ -58,6 +58,8 @@ namespace Game.Client
             // A player's poses (CreatureArt.Pose): time left in a strike, a cast and a flinch.
             public float StrikeTime;
             public float CastTime;
+            // A player lying in their bed (World.Sleep): "Zz" over them.
+            public bool Sleeping;
             public float HurtTime;
             public Vector3 Position;
             public Vector3 LastPosition;
@@ -257,6 +259,7 @@ namespace Game.Client
             Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, selfTint, selfGlow, deltaTime,
                 weapon: _client.Equipment[ItemSlot.Weapon]?.Base);
             _self.Name = _client.Name;
+            _self.Sleeping = _client.Sleeping;
             Footsteps(_self.Position - _self.LastPosition);
             int selfBuffs = 0;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
@@ -314,6 +317,11 @@ namespace Game.Client
             {
                 if (!string.IsNullOrEmpty(body.Name)) Label(body.Position + new Vector3(0, body.Top + 0.4f, 0), body.Name, Color.white);
             }
+            // Whoever is lying in bed, with a slow "Zz" rising over them.
+            foreach (var body in _others.Values.Append(_self))
+            {
+                if (body.Sleeping) Label(body.Position + new Vector3(0.3f, body.Top + 0.8f + 0.1f * Mathf.Sin(Time.time * 2), 0), "Zz", SleepLabel);
+            }
             foreach (var drop in _drops.Values)
             {
                 if (Vector3.Distance(drop.Position, _self.Position) < 4) Label(drop.Position + new Vector3(0, 0.5f, 0), drop.Name, drop.Color);
@@ -366,6 +374,7 @@ namespace Game.Client
                     _others[view.Id] = body;
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
+                body.Sleeping = view.IsPlayer && view.Phase == PlayerPhase.Sleeping;
 
                 var tint = Color.white;
                 var glow = Color.clear;
@@ -616,7 +625,7 @@ namespace Game.Client
                 bool ripe = crop.IsRipe(now);
                 // Four steps, as the docs describe: sprout, young, growing, ripe.
                 int stage = ripe ? 3 : Mathf.Min(2, Mathf.FloorToInt(crop.Growth(now) * 3));
-                renderer.sprite = CropSprite(crop, stage);
+                renderer.sprite = CropSprite(crop, stage, crop.IsWet(now));
                 renderer.transform.localScale = new Vector3(1, ripe ? 1 + 0.05f * Mathf.Sin(Time.time * 5 + key) : 1, 1);
             }
 
@@ -631,10 +640,9 @@ namespace Game.Client
         }
 
         // Sprites are made on first use, not while the type loads: Unity only makes textures on the main thread.
-        static Sprite CropSprite(Crop crop, int stage)
+        static Sprite CropSprite(Crop crop, int stage, bool wet)
         {
             string id = crop.Definition.Id;
-            bool wet = crop.Watered;
             return Sprites.Standing($"crop/{id}/{stage}/{(wet ? "wet" : "dry")}", () => ItemArt.Crop(id, stage, wet));
         }
 
@@ -749,6 +757,7 @@ namespace Game.Client
         static readonly Color OffTint = new Color(0.5f, 0.5f, 0.56f);
         static readonly Color LevelColor = new Color(1f, 0.85f, 0.35f);
         static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
+        static readonly Color SleepLabel = new Color(0.75f, 0.85f, 1f);
 
         static Sprite[] _beltSprites;
 
@@ -878,6 +887,10 @@ namespace Game.Client
                     break;
                 case SimEventType.Fishing:
                     ShowFishing(e);
+                    break;
+                case SimEventType.Morning:
+                    // Everyone slept: the next day's morning (GameRoot shows the banner, as for any morning).
+                    Sounds.Play(Sound.Heal);
                     break;
                 case SimEventType.LevelUp:
                     var climber = Find(e.Source);

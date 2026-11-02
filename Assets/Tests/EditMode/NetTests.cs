@@ -467,19 +467,68 @@ namespace Game.Core.Tests
             Assert.AreSame(mushroom, crop.Definition);
             Assert.AreEqual(1, alice.Bag.CountOf(spore));
             var bob = session.Join(2, "밥");
-            Assert.AreEqual((crop.X, crop.Y, crop.PlantedTick), (bob.Crops.Single().X, bob.Crops.Single().Y, bob.Crops.Single().PlantedTick),
+            Assert.AreEqual((crop.X, crop.Y, crop.Grown), (bob.Crops.Single().X, bob.Crops.Single().Y, bob.Crops.Single().Grown),
                 "a late joiner gets what is growing");
 
-            session.Tick(mushroom.GrowTicks / 2);
-            Assert.AreEqual(0.5f, alice.Crops.Single().Growth(alice.HostTick), 0.05f, "worked out from the tick, not sent");
+            world.FindPlayer(alice.PlayerId).Inventory.AddMaterial(Gear.Data.FindMaterial(World.WateringCan));
+            session.Send(1, alice.WaterCommand());
+            session.Tick(2);
+            var hosted = world.Crops.Single();
+            Assert.AreEqual((hosted.WetFrom, hosted.WetUntil), (bob.Crops.Single().WetFrom, bob.Crops.Single().WetUntil));
+            // A day of play, quickly: the host's world on its own, then a snapshot.
+            for (long i = 0; i < Calendar.TicksPerDay / 2; i++) world.Step();
+            session.Tick(2);
+            Assert.AreEqual(hosted.Growth(world.Tick), alice.Crops.Single().Growth(alice.HostTick), 0.001f, "worked out from the tick, not sent");
+            Assert.AreEqual(0.25f, bob.Crops.Single().Growth(bob.HostTick), 0.01f);
 
-            // Alice walks onto it once it is ripe; everyone sees it go.
-            session.Tick(mushroom.GrowTicks / 2);
+            // Alice walks onto it once it is ripe; everyone sees it go. One day's water takes it halfway, so she
+            // waters it again for the second.
+            for (long i = 0; i < Calendar.TicksPerDay / 2; i++) world.Step();
+            session.Send(1, alice.WaterCommand());
+            for (long i = 0; i < Calendar.TicksPerDay; i++) world.Step();
+            session.Tick(2);
+            Assert.IsTrue(alice.Crops.Single().IsRipe(alice.HostTick));
             Walk(world, world.FindPlayer(alice.PlayerId), TileMap.Center(crop.X, crop.Y));
             session.Tick(4);
             Assert.IsEmpty(alice.Crops);
             Assert.IsEmpty(bob.Crops);
             Assert.AreEqual(2, alice.Bag.CountOf(Gear.Data.FindMaterial("mushroom")));
+        }
+
+        [Test]
+        public void TheClockSleepersAndYourBedReachTheClients()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var bob = session.Join(2, "밥");
+            var world = session.Host.World;
+            session.Tick(2);
+            Assert.AreEqual(world.Clock, alice.Clock, 2);
+            Assert.IsNull(alice.Bed);
+
+            var player = world.FindPlayer(alice.PlayerId);
+            var bed = Gear.Data.FindMaterial("bed");
+            player.Inventory.AddMaterial(bed);
+            Assert.IsTrue(world.PlaceTile(player.Id, bed));
+            var (x, y) = world.BedOf(player).Value;
+            for (long i = 0; i < Calendar.TicksPerDay / 24 * 13; i++) world.Step();
+            session.Tick(2);
+            Assert.AreEqual((x, y), alice.Bed);
+            Assert.IsNull(bob.Bed, "only your own");
+            Assert.AreEqual(DayPhase.Evening, Calendar.Phase(alice.Clock));
+            Assert.IsTrue(alice.CanSleep, "beside the bed in the evening");
+
+            session.Send(1, alice.SleepCommand());
+            session.Tick(2);
+            Assert.IsTrue(alice.Sleeping);
+            Assert.AreEqual(1, bob.Sleepers);
+            session.Tick(10);
+            bob.AdvanceRenderClock(1);
+            Assert.AreEqual(PlayerPhase.Sleeping, bob.Others().Single(e => e.Id == alice.PlayerId).Phase, "others see her lying down");
+            session.Send(1, alice.WakeCommand());
+            session.Tick(2);
+            Assert.IsFalse(alice.Sleeping);
+            Assert.AreEqual(0, bob.Sleepers);
         }
 
         [Test]
@@ -494,14 +543,14 @@ namespace Game.Core.Tests
             session.Tick(2);
             session.Send(1, alice.PlantCommand(mushroom));
             session.Tick(2);
-            Assert.IsFalse(alice.Crops.Single().Watered);
+            Assert.IsFalse(alice.Crops.Single().IsWet(alice.HostTick));
 
             player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.WateringCan));
             session.Send(1, alice.WaterCommand());
             session.Tick(2);
             var wet = world.Crops.Single();
-            Assert.IsTrue(wet.Watered);
-            Assert.AreEqual((true, wet.PlantedTick), (bob.Crops.Single().Watered, bob.Crops.Single().PlantedTick));
+            Assert.IsTrue(wet.IsWet(world.Tick));
+            Assert.AreEqual((true, wet.WetUntil), (bob.Crops.Single().IsWet(bob.HostTick), bob.Crops.Single().WetUntil));
             Assert.IsTrue(alice.TakeEvents().Any(e => e.Type == SimEventType.Watered && e.Source == alice.PlayerId));
 
             var soup = Gear.Data.FindConsumable("mushroom_soup");
@@ -515,7 +564,7 @@ namespace Game.Core.Tests
             session.Send(1, eat);
             session.Tick(4);
             Assert.AreSame(soup, alice.Food);
-            Assert.AreEqual(180, alice.FoodLeft, 0.5f);
+            Assert.AreEqual(soup.BuffSeconds, alice.FoodLeft, 0.5f);
             Assert.AreEqual(before * 1.15f, alice.Stats.MaxHealth, 0.01f, "the client works its stats out with the food");
             Assert.IsTrue(alice.TakeEvents().Any(e => e.Type == SimEventType.Ate && e.Amount == Gear.Data.Consumables.ToList().IndexOf(soup)));
         }

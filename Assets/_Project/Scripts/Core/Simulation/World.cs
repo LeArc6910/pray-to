@@ -22,7 +22,8 @@ namespace Game.Core
     // the one exception is a player's own position, which its client reports (see MovePlayer). Bosses, their
     // telegraphed areas and projectiles are in World.Boss.cs; drops, pickups and inventory commands in World.Loot.cs;
     // players joining with their classes and using skills in World.Skills.cs; digging, building and crafting in
-    // World.Mining.cs; farming in World.Farming.cs; chests in World.Chests.cs; machines in World.Machines.cs.
+    // World.Mining.cs; farming in World.Farming.cs; chests in World.Chests.cs; machines in World.Machines.cs; the
+    // clock and sleeping in World.Time.cs.
     public sealed partial class World
     {
         public const int TicksPerSecond = 30;
@@ -158,11 +159,12 @@ namespace Game.Core
             UpdateCrops();
             UpdateMachines();
             SeparateEnemies();
+            UpdateClock();
 
             if (--_spawnTimer <= 0)
             {
                 _spawnTimer = Ticks(_config.SpawnIntervalSeconds);
-                if (_enemies.Count < _config.EnemyTarget) TrySpawnEnemy();
+                if (_enemies.Count < EnemyTargetNow) TrySpawnEnemy();
             }
         }
 
@@ -440,6 +442,7 @@ namespace Game.Core
             int amount = armor ? Combat.Mitigate(damage, player.Stats.Armor) : Math.Max(1, (int)MathF.Round(damage));
             BreakRecall(player);
             EndFishing(player, FishingReeled);
+            player.Sleeping = false;
             player.Health -= amount;
             player.RestingTicks = 0;
             _events.Add(new SimEvent(SimEventType.Hit, source, player.Id, amount, cause: cause));

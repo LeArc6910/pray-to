@@ -59,16 +59,18 @@ namespace Game.Core
         public int Capacity { get; }
     }
 
-    // Something that grows from a seed on a floor tile. See Docs/Farming.md.
+    // Something that grows from a seed on a floor tile of its biomes. See Docs/Farming.md and Docs/Time.md.
     public sealed class CropDefinition
     {
         internal CropDefinition(
-            string id, string name, MaterialDefinition seed, float growSeconds, MaterialDefinition material, ConsumableDefinition consumable, int count, int seeds, float seedChance)
+            string id, string name, MaterialDefinition seed, float growDays, MaterialDefinition material, ConsumableDefinition consumable, int count, int seeds,
+            float seedChance, IReadOnlyList<Biome> biomes = null)
         {
             Id = id;
             Name = name;
             Seed = seed;
-            GrowSeconds = growSeconds;
+            GrowDays = growDays;
+            Biomes = biomes ?? Array.Empty<Biome>();
             HarvestMaterial = material;
             HarvestConsumable = consumable;
             Count = count;
@@ -79,8 +81,16 @@ namespace Game.Core
         public string Id { get; }
         public string Name { get; }
         public MaterialDefinition Seed { get; }
-        public float GrowSeconds { get; }
-        public int GrowTicks => World.Ticks(GrowSeconds);
+        // Days of play (Calendar.DaySeconds, real time) it must have water for to ripen.
+        public float GrowDays { get; }
+        public long GrowTicks => Math.Max(1, (long)Math.Round(GrowDays * Calendar.TicksPerDay));
+        // Where it can be planted; none means anywhere.
+        public IReadOnlyList<Biome> Biomes { get; }
+
+        public bool GrowsIn(Biome biome) => Biomes.Count == 0 || Biomes.Contains(biome);
+
+        // "흙 동굴, 버섯 숲", or "어디서나".
+        public string BiomeNames => Biomes.Count == 0 ? "어디서나" : string.Join(", ", Biomes.Select(BiomeMap.Name));
         // What a harvest gives: one of these, Count of it.
         public MaterialDefinition HarvestMaterial { get; }
         public ConsumableDefinition HarvestConsumable { get; }
@@ -228,7 +238,7 @@ namespace Game.Core
             var crops = new List<CropDefinition>();
             if (string.IsNullOrWhiteSpace(csv)) return crops;
             var table = CsvTable.Read(csv);
-            var missing = table.MissingColumns("id", "name", "seed", "grow_seconds", "harvest", "count", "seeds", "seed_chance");
+            var missing = table.MissingColumns("id", "name", "seed", "grow_days", "biomes", "harvest", "count", "seeds", "seed_chance");
             if (missing.Count > 0)
             {
                 errors.Add($"{CropsFile}: 열이 없습니다: {string.Join(", ", missing)}");
@@ -247,15 +257,18 @@ namespace Game.Core
                     var seed = loot.Materials.FirstOrDefault(m => m.Id == row["seed"])
                         ?? throw new FormatException($"씨앗 '{row["seed"]}'가 {LootSheets.MaterialsFile}에 없습니다.");
                     if (crops.Any(c => c.Seed == seed)) throw new FormatException($"'{seed.Id}'는 이미 다른 작물의 씨앗입니다.");
-                    float grow = SheetValues.ParseDecimal(row["grow_seconds"], "grow_seconds");
-                    if (grow <= 0) throw new FormatException("grow_seconds는 0보다 커야 합니다.");
+                    float grow = SheetValues.ParseDecimal(row["grow_days"], "grow_days");
+                    if (grow <= 0) throw new FormatException("grow_days는 0보다 커야 합니다.");
+                    var biomes = row["biomes"].Length == 0 ? new List<Biome>()
+                        : row["biomes"].Split('|').Select(b => SheetValues.ParseEnum<Biome>(b.Trim(), "biomes")).Distinct().ToList();
                     var material = loot.Materials.FirstOrDefault(m => m.Id == row["harvest"]);
                     var consumable = material == null ? loot.Consumables.FirstOrDefault(c => c.Id == row["harvest"]) : null;
                     if (material == null && consumable == null) throw new FormatException($"harvest '{row["harvest"]}'가 재료나 소모품에 없습니다.");
                     int count = SheetValues.ParseNumber(row["count"], "count");
                     if (count < 1) throw new FormatException("count는 1 이상이어야 합니다.");
                     crops.Add(new CropDefinition(
-                        id, name, seed, grow, material, consumable, count, SheetValues.ParseNumber(row["seeds"], "seeds"), Percent(row["seed_chance"], "seed_chance")));
+                        id, name, seed, grow, material, consumable, count, SheetValues.ParseNumber(row["seeds"], "seeds"), Percent(row["seed_chance"], "seed_chance"),
+                        biomes));
                 }
                 catch (FormatException e)
                 {

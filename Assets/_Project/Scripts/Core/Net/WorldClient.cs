@@ -187,6 +187,8 @@ namespace Game.Core
         int _consumableCooldown;
         // The host tick the cooldowns and buffs above were true at.
         double _skillsTick;
+        long _clock;
+        long _clockTick;
         int _sequence;
         int _seenCorrections;
         double _renderTick = -1;
@@ -246,6 +248,22 @@ namespace Game.Core
         public float MoveSpeed { get; private set; } = PlayerStats.BaseMoveSpeed;
         // The player's own burning and chilled marks (StatusBits).
         public byte SelfStatus { get; private set; }
+        public bool Sleeping => (SelfStatus & StatusBits.Sleeping) != 0;
+        // How many players are lying in their beds, and this player's bed (null without one).
+        public int Sleepers { get; private set; }
+        public (int X, int Y)? Bed { get; private set; }
+
+        // The world's clock (Calendar) now, as the host's last word plus the time since.
+        public long Clock => _clock + (long)Math.Max(0, HostTick - _clockTick);
+
+        // Beside their own bed in the evening or at night, so they may lie down (World.Sleep says the same).
+        public bool CanSleep =>
+            !IsDead && Bed is (int x, int y) && Vec2.Distance(Position, TileMap.Center(x, y)) <= World.BedReach
+            && (Calendar.Phase(Clock) == DayPhase.Evening || Calendar.Phase(Clock) == DayPhase.Night);
+
+        public byte[] SleepCommand() => new InventoryCommandMessage(InventoryCommand.Sleep, 0).Encode();
+
+        public byte[] WakeCommand() => new InventoryCommandMessage(InventoryCommand.Wake, 0).Encode();
         public bool IsDead => Status == ClientStatus.Playing && _snapshots.Count > 0 && Health <= 0;
         public IReadOnlyDictionary<int, string> Names => _names;
 
@@ -625,8 +643,34 @@ namespace Game.Core
 
         public byte[] WaterCommand() => new InventoryCommandMessage(InventoryCommand.Water, 0).Encode();
 
-        public byte[] PlantCommand(CropDefinition crop) =>
-            new InventoryCommandMessage(InventoryCommand.Plant, 0, index: ItemCodec.Index(_tiles.Crops, crop)).Encode();
+        // Null, with a notice saying where it grows, when the tile ahead is not one of the crop's biomes (the host would
+        // refuse it the same way, World.Plant).
+        public byte[] PlantCommand(CropDefinition crop)
+        {
+            if (!GrowsAhead(crop))
+            {
+                _notices.Add($"{crop.Name}: {crop.BiomeNames}에서만 자란다. 그곳의 흙을 가져와 깔아도 된다");
+                return null;
+            }
+            return new InventoryCommandMessage(InventoryCommand.Plant, 0, index: ItemCodec.Index(_tiles.Crops, crop)).Encode();
+        }
+
+        // Whether the crop grows on the tile ahead: its biome, or the biome of a soil laid there (World.FarmBiomeAt).
+        public bool GrowsAhead(CropDefinition crop)
+        {
+            if (Map == null || crop == null) return false;
+            var (x, y) = World.TileAhead(Position, Facing);
+            if (!Map.InBounds(x, y)) return false;
+            return crop.GrowsIn(TileMap.SoilBiome(Map[x, y]) ?? Biomes[x, y]);
+        }
+
+        // Things to tell the player that came from this side, not the host: why a seed was not planted.
+        public List<string> TakeNotices()
+        {
+            var lines = new List<string>(_notices);
+            _notices.Clear();
+            return lines;
+        }
 
         // times over makes it that many times, as far as the materials go (WorldHost.MaxCraftAtOnce at most).
         public byte[] CraftCommand(Recipe recipe, int times = 1) =>
@@ -681,6 +725,8 @@ namespace Game.Core
         public float ConsumableCooldownLeft => (float)Math.Max(0, (_consumableCooldown - (HostTick - _skillsTick)) / World.TicksPerSecond);
 
         public byte[] DiscardCommand(int itemId) => new InventoryCommandMessage(InventoryCommand.Discard, itemId).Encode();
+
+        readonly List<string> _notices = new List<string>();
 
         // Lines like "획득: [희귀] 철 검" for whatever arrived in the bag since the last call.
         public List<string> TakeAcquired()
@@ -750,7 +796,7 @@ namespace Game.Core
 
         void ApplyCropChanges(CropChangesMessage message)
         {
-            foreach (var (x, y, crop, planted, watered) in message.Changes)
+            foreach (var (x, y, crop, grown, wetFrom, wetUntil) in message.Changes)
             {
                 if (!Map.InBounds(x, y)) throw new InvalidDataException("Crop outside the map.");
                 int key = y * Map.Width + x;
@@ -760,7 +806,7 @@ namespace Game.Core
                     continue;
                 }
                 if (_tiles == null || crop >= _tiles.Crops.Count) throw new InvalidDataException("The host names a crop this client does not know.");
-                _crops[key] = new Crop(_tiles.Crops[crop], x, y, planted, watered);
+                _crops[key] = new Crop(_tiles.Crops[crop], x, y, grown, wetFrom, wetUntil);
             }
         }
 
@@ -836,6 +882,10 @@ namespace Game.Core
             MaxHealth = self.MaxHealth;
             MoveSpeed = self.MoveSpeed;
             SelfStatus = self.Status;
+            Bed = self.BedX >= 0 && self.BedY >= 0 ? (self.BedX, self.BedY) : ((int, int)?)null;
+            _clock = snapshot.Clock;
+            _clockTick = snapshot.Tick;
+            Sleepers = snapshot.Sleepers;
             if (self.Corrections != _seenCorrections)
             {
                 _seenCorrections = self.Corrections;

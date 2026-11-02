@@ -1,6 +1,6 @@
-id,name,seed,grow_seconds,harvest,count,seeds,seed_chance
-mushroom,동굴 버섯,mushroom_spore,180,mushroom,2,1,50
-fire_pepper,불꽃 고추,fire_pepper_seed,240,fire_pepper,2,1,40
-glow_cap,빛 버섯,glow_spore,200,glow_cap,2,1,50
-frost_berry,서리 열매,frost_berry_seed,240,frost_berry,2,1,40
-star_melon,별 수박,star_melon_seed,300,star_melon,1,1,30
+id,name,seed,grow_days,biomes,harvest,count,seeds,seed_chance
+mushroom,동굴 버섯,mushroom_spore,2,cave|mushroom,mushroom,2,1,50
+fire_pepper,불꽃 고추,fire_pepper_seed,4,lava,fire_pepper,2,1,40
+glow_cap,빛 버섯,glow_spore,3,mushroom,glow_cap,2,1,50
+frost_berry,서리 열매,frost_berry_seed,4,ice,frost_berry,2,1,40
+star_melon,별 수박,star_melon_seed,6,abyss,star_melon,1,1,30

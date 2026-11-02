@@ -15,15 +15,26 @@ namespace Game.Core
     {
         internal const string Magic = "PTWO";
         // 2 added chests, 3 machines, 4 whether each crop was watered, 5 beds and their owners.
-        // 6: a filter's chosen material on each machine.
-        const int FormatVersion = 6;
+        // 6: a filter's chosen material on each machine. 7: the world's clock (Calendar), and crops as how far they have
+        // grown and the water they have left (Docs/Time.md).
+        const int FormatVersion = 7;
+        // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
+        static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
+        {
+            ["mushroom"] = 180,
+            ["fire_pepper"] = 240,
+            ["glow_cap"] = 200,
+            ["frost_berry"] = 240,
+            ["star_melon"] = 300,
+        };
 
         WorldSave(
             ulong seed,
             long savedAt,
+            long clock,
             int progressLevel,
             List<TileChange> tiles,
-            List<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> crops,
+            List<(CropDefinition Crop, int X, int Y, long Grown, long WetLeft)> crops,
             List<(int X, int Y, Inventory Contents)> chests,
             List<SavedMachine> machines,
             List<string> warnings,
@@ -34,6 +45,7 @@ namespace Game.Core
             Machines = machines;
             Seed = seed;
             SavedAt = savedAt;
+            Clock = clock;
             ProgressLevel = progressLevel;
             Tiles = tiles;
             Crops = crops;
@@ -41,12 +53,14 @@ namespace Game.Core
         }
 
         public ulong Seed { get; }
-        // Seconds since 1970 when it was saved, as the caller counted them.
+        // Seconds since 1970 when it was saved, as the caller counted them. Nothing grows by it: a closed world waits.
         public long SavedAt { get; }
+        // The world's clock (Calendar); 0, the first morning, for a save from before days.
+        public long Clock { get; }
         public int ProgressLevel { get; }
         public IReadOnlyList<TileChange> Tiles { get; }
-        // Age is in ticks at the moment of saving.
-        public IReadOnlyList<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> Crops { get; }
+        // How many ticks each crop had grown, and the ticks of water it had left.
+        public IReadOnlyList<(CropDefinition Crop, int X, int Y, long Grown, long WetLeft)> Crops { get; }
         public IReadOnlyList<(int X, int Y, Inventory Contents)> Chests { get; }
         // Whose bed is where, by player name.
         public IReadOnlyList<(int X, int Y, string Owner)> Beds { get; }
@@ -92,6 +106,7 @@ namespace Game.Core
                 w.Write(world.Map.Width);
                 w.Write(world.Map.Height);
                 w.Write(savedAt);
+                w.Write(world.Clock);
                 w.Write(world.ProgressLevel);
 
                 var tiles = world.ChangedTiles();
@@ -113,8 +128,8 @@ namespace Game.Core
                     w.Write((ushort)crop.X);
                     w.Write((ushort)crop.Y);
                     w.Write(crop.Definition.Id);
-                    w.Write(world.Tick - crop.PlantedTick);
-                    w.Write(crop.Watered);
+                    w.Write((long)crop.GrownAt(world.Tick));
+                    w.Write(crop.WetLeft(world.Tick));
                 }
 
                 var chests = world.Chests.ToList();
@@ -171,6 +186,7 @@ namespace Game.Core
                 int width = r.ReadInt32();
                 int height = r.ReadInt32();
                 long savedAt = r.ReadInt64();
+                long clock = version >= 7 ? r.ReadInt64() : 0;
                 int progress = r.ReadInt32();
 
                 var names = new List<string>();
@@ -189,17 +205,26 @@ namespace Game.Core
                 int unknownTiles = names.Count(name => !Enum.TryParse(name, out TileType _));
                 if (unknownTiles > 0) warnings.Add($"없어진 칸 종류 {unknownTiles}가지를 건너뛰었습니다.");
 
-                var crops = new List<(CropDefinition, int, int, long, bool)>();
+                var crops = new List<(CropDefinition, int, int, long, long)>();
                 for (int count = r.ReadInt32(); count > 0; count--)
                 {
                     int x = r.ReadUInt16();
                     int y = r.ReadUInt16();
                     string id = r.ReadString();
-                    long age = r.ReadInt64();
-                    bool watered = version >= 4 && r.ReadBoolean();
+                    long grown = Math.Max(0, r.ReadInt64());
+                    long wetLeft = 0;
+                    if (version >= 7) wetLeft = Math.Max(0, r.ReadInt64());
+                    else if (version >= 4) r.ReadBoolean();
                     var crop = tileData?.Crops.FirstOrDefault(c => c.Id == id);
-                    if (crop != null) crops.Add((crop, x, y, Math.Max(0, age), watered));
-                    else warnings.Add($"없어진 작물 '{id}'를 건너뛰었습니다.");
+                    if (crop == null)
+                    {
+                        warnings.Add($"없어진 작물 '{id}'를 건너뛰었습니다.");
+                        continue;
+                    }
+                    // Before days a crop's age was ticks since planting; it comes back as far along, dry.
+                    if (version < 7 && SecondsBeforeDays.TryGetValue(id, out float before))
+                        grown = (long)Math.Min(crop.GrowTicks, grown / (before * World.TicksPerSecond) * crop.GrowTicks);
+                    crops.Add((crop, x, y, grown, wetLeft));
                 }
 
                 var chests = new List<(int, int, Inventory)>();
@@ -250,7 +275,7 @@ namespace Game.Core
                     int y = r.ReadUInt16();
                     beds.Add((x, y, r.ReadString()));
                 }
-                return new WorldSave(seed, savedAt, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds);
+                return new WorldSave(seed, savedAt, clock, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds);
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

@@ -296,15 +296,13 @@ namespace Game.Core
         // The world as a save file, stamped with the caller's clock (seconds since 1970).
         public byte[] SaveWorld(long now) => WorldSave.Write(World, _seed, now);
 
-        // Puts a world save back into this freshly made host, which must have been made with the save's seed. Crops
-        // grow on by the time that passed between the save and now; a clock that went backwards grows nothing.
-        public void Restore(WorldSave save, long now)
+        // Puts a world save back into this freshly made host, which must have been made with the save's seed. The world
+        // carries on where it was: while it was closed no time passed, for the clock or the crops (Docs/Time.md).
+        public void Restore(WorldSave save)
         {
             if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
-            // A month at most, so a clock that jumped years ahead does not grow everything forever.
-            long closedTicks = Math.Clamp(now - save.SavedAt, 0, 30L * 24 * 3600) * World.TicksPerSecond;
-            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks, c.Watered)), save.ProgressLevel, save.Chests,
-                save.Beds);
+            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds);
+            World.RestoreClock(save.Clock);
             foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting);
         }
 
@@ -359,6 +357,12 @@ namespace Game.Core
                 case InventoryCommand.Fertilize:
                     World.Fertilize(player.Id);
                     break;
+                case InventoryCommand.Sleep:
+                    World.Sleep(player.Id);
+                    break;
+                case InventoryCommand.Wake:
+                    World.Wake(player.Id);
+                    break;
                 case InventoryCommand.StoreItem:
                 case InventoryCommand.TakeItem:
                     World.MoveItem(player.Id, command.Item, command.Command == InventoryCommand.StoreItem);
@@ -399,12 +403,14 @@ namespace Game.Core
                 viewer.ConsumableCooldown,
                 viewer.Food == null ? -1 : IndexOf(_loot?.Consumables, viewer.Food),
                 viewer.FoodTicks,
-                (byte)(viewer.Afflictions.Bits | (viewer.Recalling ? StatusBits.Recalling : 0)),
-                viewer.Experience);
+                (byte)(viewer.Afflictions.Bits | (viewer.Recalling ? StatusBits.Recalling : 0) | (viewer.Sleeping ? StatusBits.Sleeping : 0)),
+                viewer.Experience,
+                World.BedOf(viewer)?.X ?? -1,
+                World.BedOf(viewer)?.Y ?? -1);
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),
-                Protocol.WithStatus(0, p.Afflictions.Bits)));
+                Protocol.WithStatus(p.Sleeping ? PlayerPhase.Sleeping : 0, p.Afflictions.Bits)));
             var bosses = World.Bosses
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
@@ -459,16 +465,16 @@ namespace Game.Core
             // When there are too many, what changes the fight matters most and swings least.
             var shown = new HashSet<int>(entities.Select(e => e.Id));
             var events = _pendingEvents
-                .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target))
+                .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning)
                 .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)
                 .ToList();
-            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events);
+            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers);
         }
 
-        (int X, int Y, int Crop, long PlantedTick, bool Watered) CropEntry(CropChange change) =>
-            (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.PlantedTick ?? 0,
-                change.Crop?.Watered ?? false);
+        (int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil) CropEntry(CropChange change) =>
+            (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.Grown ?? 0,
+                change.Crop?.WetFrom ?? 0, change.Crop?.WetUntil ?? 0);
 
         void SendStock(ulong connection, Connection sent)
         {

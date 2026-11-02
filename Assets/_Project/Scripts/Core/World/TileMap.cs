@@ -59,6 +59,12 @@ namespace Game.Core
         Filter,
         Generator,
         Lever,
+        // Soil brought from another biome and laid at home, where that biome's crops grow (Docs/Time.md). Turned
+        // soil like Soil, but never fertile.
+        MushroomSoil,
+        FrostSoil,
+        AshSoil,
+        VoidSoil,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -113,7 +119,17 @@ namespace Game.Core
                 && type != TileType.Door && !IsSoil(type);
         }
 
-        public static bool IsSoil(TileType type) => type == TileType.Soil || type == TileType.FertileSoil;
+        public static bool IsSoil(TileType type) => type == TileType.Soil || type == TileType.FertileSoil || SoilBiome(type) != null;
+
+        // The biome a laid soil counts as for crops, or null for any other tile.
+        public static Biome? SoilBiome(TileType type) => type switch
+        {
+            TileType.MushroomSoil => Biome.Mushroom,
+            TileType.FrostSoil => Biome.Ice,
+            TileType.AshSoil => Biome.Lava,
+            TileType.VoidSoil => Biome.Abyss,
+            _ => null,
+        };
 
         // Where crops are planted: bare floor or turned soil.
         public static bool IsFarmland(TileType type) => type == TileType.Floor || IsSoil(type);

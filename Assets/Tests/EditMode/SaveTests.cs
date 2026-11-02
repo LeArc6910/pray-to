@@ -106,32 +106,75 @@ namespace Game.Core.Tests
             byte[] data = host.SaveWorld(now: 1_000);
             var save = WorldSave.Read(data, Tiles.Shipped);
             var again = Host(save.Seed);
-            again.Restore(save, now: 1_000 + 60);
+            again.Restore(save);
 
             Assert.IsEmpty(save.Warnings);
             Assert.AreEqual(TileType.Wall, again.World.Map[wall.X, wall.Y]);
             var grown = again.World.Crops.Single();
             Assert.AreEqual((crop.X, crop.Y), (grown.X, grown.Y));
-            // Watered at once (half of the 180 seconds), then ten seconds of play and sixty with the world closed.
-            Assert.AreEqual(160f / 180, grown.Growth(again.World.Tick), 0.01f);
-            Assert.IsTrue(grown.Watered);
+            // Watered at once, then ten seconds of play; nothing for the time the world was closed.
+            Assert.AreEqual(300f / crop.Definition.GrowTicks, grown.Growth(again.World.Tick), 0.0001f);
+            Assert.AreEqual(Calendar.TicksPerDay - 300, grown.WetLeft(again.World.Tick), "the water it had left");
+            Assert.AreEqual(world.Clock, again.World.Clock, "the clock carries on where it was");
             Assert.AreEqual(1, again.World.ProgressLevel);
         }
 
         [Test]
-        public void AClockThatWentBackGrowsNothing()
+        public void AClosedWorldWaits()
         {
             var host = Host();
             var player = host.World.AddPlayer("a", null);
             player.Inventory.AddMaterial(Spore);
             host.World.Plant(player.Id, Tiles.Shipped.CropFrom(Spore));
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.WateringCan));
+            host.World.Water(player.Id);
             var save = WorldSave.Read(host.SaveWorld(now: 5_000), Tiles.Shipped);
+            Assert.AreEqual(5_000, save.SavedAt);
 
+            // However long it stays closed, nothing grows and the day does not move on.
             var again = Host(save.Seed);
-            again.Restore(save, now: 4_000);
+            again.Restore(save);
 
             Assert.AreEqual(0, again.World.Crops.Single().Growth(again.World.Tick), 0.001f);
-            Assert.Throws<System.ArgumentException>(() => Host(8).Restore(save, now: 5_000), "another seed's host");
+            Assert.AreEqual(Calendar.TicksPerDay, again.World.Crops.Single().WetLeft(again.World.Tick));
+            Assert.AreEqual(0, again.World.Clock);
+            Assert.Throws<System.ArgumentException>(() => Host(8).Restore(save), "another seed's host");
+        }
+
+        [Test]
+        public void CropsFromBeforeDaysComeBackAsFarAlong()
+        {
+            // A format 6 world save: no clock, and a mushroom 90 seconds into the 180 it took then, watered.
+            using var stream = new MemoryStream();
+            using (var w = new BinaryWriter(stream, System.Text.Encoding.UTF8))
+            {
+                w.Write(System.Text.Encoding.ASCII.GetBytes("PTWO"));
+                w.Write(6);
+                w.Write(7UL);
+                w.Write(64);
+                w.Write(64);
+                w.Write(1_000L);
+                w.Write(1);
+                w.Write((ushort)0);
+                w.Write(0);
+                w.Write(1);
+                w.Write((ushort)10);
+                w.Write((ushort)12);
+                w.Write("mushroom");
+                w.Write(90L * World.TicksPerSecond);
+                w.Write(true);
+                w.Write(0);
+                w.Write(0);
+                w.Write(0);
+            }
+
+            var save = WorldSave.Read(stream.ToArray(), Tiles.Shipped);
+
+            Assert.AreEqual(0, save.Clock, "the first morning");
+            var crop = save.Crops.Single();
+            Assert.AreEqual((10, 12), (crop.X, crop.Y));
+            Assert.AreEqual(crop.Crop.GrowTicks / 2, crop.Grown, "half of what it needs now");
+            Assert.AreEqual(0, crop.WetLeft, "dry");
         }
 
         [Test]
@@ -145,7 +188,7 @@ namespace Game.Core.Tests
             var save = WorldSave.Read(host.SaveWorld(now: 0), Tiles.Shipped);
 
             var again = Host(save.Seed);
-            again.Restore(save, now: 0);
+            again.Restore(save);
             var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped);
             again.Receive(1, client.JoinMessage());
             foreach (var message in again.TakeOutgoing()) client.Receive(message.Data);

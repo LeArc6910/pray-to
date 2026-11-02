@@ -223,7 +223,7 @@ namespace Game.Client
                     TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Torch,
                     TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester, TileType.StoneFloor, TileType.BrickFloor,
                     TileType.GlowFloor, TileType.Door, TileType.Table, TileType.Banner, TileType.Pot, TileType.Soil, TileType.FertileSoil,
-                    TileType.Filter, TileType.Generator, TileType.Lever,
+                    TileType.Filter, TileType.Generator, TileType.Lever, TileType.MushroomSoil, TileType.FrostSoil, TileType.AshSoil, TileType.VoidSoil,
                 }
                 .Select(TileArt.Object).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(ItemArt.Belt))
                 .Concat(new[] { ItemArt.DrillBit, ItemArt.Chevron, ItemArt.SplitterArrows, ItemArt.RobotArm, ItemArt.SprinklerHead, ItemArt.HarvesterReel,

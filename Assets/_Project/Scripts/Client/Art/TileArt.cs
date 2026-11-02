@@ -375,6 +375,10 @@ namespace Game.Client
             TileType.Pot => PotTile,
             TileType.Soil => SoilTile,
             TileType.FertileSoil => FertileSoilTile,
+            TileType.MushroomSoil => MushroomSoilTile,
+            TileType.FrostSoil => FrostSoilTile,
+            TileType.AshSoil => AshSoilTile,
+            TileType.VoidSoil => VoidSoilTile,
             TileType.Filter => FilterFrame,
             TileType.Generator => GeneratorBody,
             TileType.Lever => LeverBase,
@@ -1235,6 +1239,18 @@ namespace Game.Client
                 ['L'] = Rgba.Hex("#4E3A2A"), ['M'] = Rgba.Hex("#40301F"), ['m'] = Rgba.Hex("#8AB04A"), ['d'] = Rgba.Hex("#2A1E14"),
             },
             SoilRows);
+
+        // Soil from the other biomes, in their colours, with flecks of what makes each (Docs/Time.md).
+        static PixelImage BiomeSoil(string ridge, string furrow, string fleck, string deep) => PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['L'] = Rgba.Hex(ridge), ['M'] = Rgba.Hex(furrow), ['m'] = Rgba.Hex(fleck), ['d'] = Rgba.Hex(deep),
+            },
+            SoilRows);
+
+        static readonly PixelImage MushroomSoilTile = BiomeSoil("#5E4A70", "#4C3A5E", "#6FE8D0", "#30243E");
+        static readonly PixelImage FrostSoilTile = BiomeSoil("#6A7E92", "#56687C", "#E6F4FF", "#36465A");
+        static readonly PixelImage AshSoilTile = BiomeSoil("#4A4444", "#3A3434", "#FF8A3C", "#221E1E");
+        static readonly PixelImage VoidSoilTile = BiomeSoil("#3E3254", "#30264A", "#B48CFF", "#1C1630");
 
         static readonly PixelImage StoneFloorTile = Slabs("#7E7468", "#948A7C", "#6A6156", "#4E4740");
         static readonly PixelImage BrickFloorTile = Slabs("#A0563E", "#B86A50", "#8A4834", "#5A2E22");

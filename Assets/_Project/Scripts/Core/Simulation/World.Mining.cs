@@ -159,11 +159,11 @@ namespace Game.Core
             return made;
         }
 
-        // Puts back what a world save holds: changed tiles, crops planted the given number of ticks before now, and
-        // the drop level bosses had raised. Nothing is announced; players who join get it all as usual.
+        // Puts back what a world save holds: changed tiles, crops with how far they had grown and the water they had
+        // left, and the drop level bosses had raised. Nothing is announced; players who join get it all as usual.
         public void Restore(
             IEnumerable<TileChange> tiles,
-            IEnumerable<(CropDefinition Crop, int X, int Y, long Age, bool Watered)> crops,
+            IEnumerable<(CropDefinition Crop, int X, int Y, long Grown, long WetLeft)> crops,
             int progressLevel,
             IEnumerable<(int X, int Y, Inventory Contents)> chests = null,
             IEnumerable<(int X, int Y, string Owner)> beds = null)
@@ -173,10 +173,10 @@ namespace Game.Core
                 if (Map.InBounds(tile.X, tile.Y) && !Map.IsEdge(tile.X, tile.Y)) SetTile(tile.X, tile.Y, tile.Type);
             }
             foreach (var (x, y, contents) in chests ?? Enumerable.Empty<(int, int, Inventory)>()) FillChest(x, y, contents);
-            foreach (var (crop, x, y, age, watered) in crops)
+            foreach (var (crop, x, y, grown, wetLeft) in crops)
             {
                 if (!Map.InBounds(x, y) || !TileMap.IsFarmland(Map[x, y])) continue;
-                _crops[y * Map.Width + x] = new Crop(crop, x, y, Tick - age, watered);
+                _crops[y * Map.Width + x] = new Crop(crop, x, y, grown, Tick, Tick + Math.Clamp(wetLeft, 0, WaterTicks));
             }
             foreach (var (x, y, owner) in beds ?? Enumerable.Empty<(int, int, string)>()) RestoreBed(x, y, owner);
             ProgressLevel = Math.Max(ProgressLevel, progressLevel);

@@ -130,7 +130,7 @@ namespace Game.Core.Tests
             CollectionAssert.AreEqual(new[] { (sx + 2, sy + 2, "앨리스") }, save.Beds);
             var again = new WorldHost(save.Seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped,
                 Tiles.Shipped);
-            again.Restore(save, now: 100);
+            again.Restore(save);
 
             var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped);
             again.Receive(1, client.JoinMessage());

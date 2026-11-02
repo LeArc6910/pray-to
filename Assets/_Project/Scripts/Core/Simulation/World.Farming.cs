@@ -4,31 +4,41 @@ using System.Linq;
 
 namespace Game.Core
 {
-    // A crop growing on a floor tile since PlantedTick. Host and clients work out how far along it is from the tick,
-    // so only planting, watering and harvesting are ever sent. Watering moves PlantedTick back by half the time it
-    // still had to grow.
+    // A crop on a tile. It grows only while it has water, by the ticks that really pass: the world's clock and
+    // sleeping through the night play no part (Docs/Time.md). Grown is how far it had grown when it last took water
+    // (or was planted), and the water lasts from tick WetFrom until WetUntil. Host and clients work out how far along
+    // it is from those, so only planting, watering and harvesting are ever sent.
     public sealed class Crop
     {
-        public Crop(CropDefinition definition, int x, int y, long plantedTick, bool watered = false)
+        public Crop(CropDefinition definition, int x, int y, long grown, long wetFrom = 0, long wetUntil = 0)
         {
             Definition = definition;
             X = x;
             Y = y;
-            PlantedTick = plantedTick;
-            Watered = watered;
+            Grown = Math.Max(0, grown);
+            WetFrom = wetFrom;
+            WetUntil = wetUntil;
         }
 
         public CropDefinition Definition { get; }
         public int X { get; }
         public int Y { get; }
-        public long PlantedTick { get; }
-        // A crop takes water once.
-        public bool Watered { get; }
+        public long Grown { get; }
+        public long WetFrom { get; }
+        public long WetUntil { get; }
+
+        // How many ticks it has grown by the given tick.
+        public double GrownAt(double tick) => Grown + Math.Max(0, Math.Min(tick, WetUntil) - WetFrom);
 
         // 0 when planted, 1 when ripe.
-        public float Growth(double tick) => Math.Clamp((float)((tick - PlantedTick) / Definition.GrowTicks), 0, 1);
+        public float Growth(double tick) => Math.Clamp((float)(GrownAt(tick) / Definition.GrowTicks), 0, 1);
 
-        public bool IsRipe(double tick) => tick - PlantedTick >= Definition.GrowTicks;
+        public bool IsRipe(double tick) => GrownAt(tick) >= Definition.GrowTicks;
+
+        public bool IsWet(double tick) => tick < WetUntil;
+
+        // Ticks of water it has left at the given tick.
+        public long WetLeft(long tick) => Math.Max(0, WetUntil - tick);
     }
 
     // A crop planted or watered (Crop set) or harvested (Crop null) at a tile.
@@ -46,8 +56,8 @@ namespace Game.Core
         public Crop Crop { get; }
     }
 
-    // Planting seeds on the floor ahead, watering them and harvesting what is ripe by walking over it. See
-    // Docs/Farming.md.
+    // Planting seeds on the floor ahead, watering them and harvesting what is ripe by walking over it. Each crop grows
+    // only in its own biomes. See Docs/Farming.md and Docs/Time.md.
     public sealed partial class World
     {
         // The material that waters crops. It is a tool: watering does not use it up.
@@ -55,8 +65,8 @@ namespace Game.Core
         // The tool that turns floor into soil and back, and what is worked into soil to make it fertile.
         public const string Hoe = "hoe";
         public const string Fertilizer = "fertilizer";
-        // A crop planted in soil starts this fraction of its time grown (one over it).
-        const int SoilHeadStart = 4;
+        // Water keeps a crop growing for a day of play (Calendar.DaySeconds), real ticks, whatever the clock does.
+        public const long WaterTicks = Calendar.TicksPerDay;
 
         readonly Dictionary<int, Crop> _crops = new Dictionary<int, Crop>();
         readonly List<CropChange> _newCropChanges = new List<CropChange>();
@@ -73,15 +83,19 @@ namespace Game.Core
             return changes;
         }
 
+        // The biome a crop on this tile takes for its own: a laid soil's, or the biome the tile lies in.
+        public Biome FarmBiomeAt(int x, int y) => TileMap.SoilBiome(Map[x, y]) ?? Biomes[x, y];
+
         // Plants one of the crop's seeds on the floor ahead of the player. False when it cannot: no seed, not a
-        // floor, something already growing there, or inside a boss arena. Crops do not block, so anyone may stand
-        // on the tile.
+        // floor, not one of the crop's biomes, something already growing there, or inside a boss arena. Crops do not
+        // block, so anyone may stand on the tile.
         public bool Plant(int playerId, CropDefinition crop)
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || crop == null || player.Inventory.CountOf(crop.Seed) == 0) return false;
             var (x, y) = TileAhead(player.Position, player.Facing);
             if (Map.IsEdge(x, y) || !TileMap.IsFarmland(Map[x, y]) || CropAt(x, y) != null) return false;
+            if (!crop.GrowsIn(FarmBiomeAt(x, y))) return false;
             if (_bosses.Any(b => Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1)) return false;
 
             player.Inventory.TakeMaterial(crop.Seed);
@@ -90,17 +104,20 @@ namespace Game.Core
             return true;
         }
 
-        // On turned soil a crop starts a quarter grown.
+        // On turned soil a crop starts a day grown, but never with less than a day left to grow. It starts dry.
         void PlantCrop(CropDefinition crop, int x, int y)
         {
-            long head = TileMap.IsSoil(Map[x, y]) ? crop.GrowTicks / SoilHeadStart : 0;
-            var planted = new Crop(crop, x, y, Tick - head);
+            long head = TileMap.IsSoil(Map[x, y]) ? SoilHeadStart(crop) : 0;
+            var planted = new Crop(crop, x, y, head);
             _crops[y * Map.Width + x] = planted;
             _newCropChanges.Add(new CropChange(x, y, planted));
         }
 
+        public static long SoilHeadStart(CropDefinition crop) =>
+            crop.GrowTicks > Calendar.TicksPerDay ? Math.Min(Calendar.TicksPerDay, crop.GrowTicks - Calendar.TicksPerDay) : 0;
+
         // Waters the crops on the tile ahead of the player and the eight around it, with a watering can in the bag.
-        // Each crop not yet watered or ripe has the time it still needs halved. False when none could be watered.
+        // Each crop not yet ripe has water for WaterTicks from now. False when none could be watered.
         public bool Water(int playerId)
         {
             var player = FindPlayer(playerId);
@@ -119,20 +136,21 @@ namespace Game.Core
             return true;
         }
 
-        // Halves the time the crop on the tile still needs, when there is one not yet watered or ripe.
+        // Gives the crop on the tile water for WaterTicks from now, keeping what it has grown, when there is one not
+        // yet ripe.
         bool WaterCrop(int x, int y)
         {
             var crop = Map.InBounds(x, y) ? CropAt(x, y) : null;
-            if (crop == null || crop.Watered || crop.IsRipe(Tick)) return false;
-            long left = crop.Definition.GrowTicks - (Tick - crop.PlantedTick);
-            var wet = new Crop(crop.Definition, x, y, crop.PlantedTick - left / 2, watered: true);
+            if (crop == null || crop.IsRipe(Tick)) return false;
+            var wet = new Crop(crop.Definition, x, y, (long)crop.GrownAt(Tick), Tick, Tick + WaterTicks);
             _crops[y * Map.Width + x] = wet;
             _newCropChanges.Add(new CropChange(x, y, wet));
             return true;
         }
 
-        // Turns the floor ahead into soil, or soil with nothing growing back into floor, with a hoe in the bag. False
-        // when it cannot: no hoe, or the tile ahead is neither, or something grows there.
+        // Turns the floor ahead into soil, or soil with nothing growing back into floor, with a hoe in the bag; a laid
+        // biome soil comes back up into the bag. False when it cannot: no hoe, or the tile ahead is neither, or
+        // something grows there.
         public bool Till(int playerId)
         {
             var player = FindPlayer(playerId);
@@ -140,9 +158,15 @@ namespace Game.Core
             var (x, y) = TileAhead(player.Position, player.Facing);
             if (Map.IsEdge(x, y) || CropAt(x, y) != null) return false;
             if (_bosses.Any(b => Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1)) return false;
+            var laid = TileMap.SoilBiome(Map[x, y]) != null ? Loot?.Materials.FirstOrDefault(m => m.Places == Map[x, y]) : null;
             if (Map[x, y] == TileType.Floor) SetTile(x, y, TileType.Soil);
             else if (TileMap.IsSoil(Map[x, y])) SetTile(x, y, TileType.Floor);
             else return false;
+            if (laid != null)
+            {
+                player.Inventory.AddMaterial(laid);
+                player.InventoryVersion++;
+            }
             return true;
         }
 

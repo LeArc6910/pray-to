@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 
 namespace Game.Core
@@ -64,13 +65,16 @@ namespace Game.Core
             if (--fishing.BiteTicks <= 0) EndFishing(player, FishingEscaped);
         }
 
-        // The fish of the biome the water is in (materials.csv fish); the plain cave's where that biome has none.
+        // A fish of the biome the water is in (materials.csv fish), night fish among them at night (Docs/Time.md); the
+        // plain cave's where that biome has none.
         void Land(Player player)
         {
             var fishing = player.Fishing;
             var biome = Biomes[fishing.X, fishing.Y];
-            var catches = Loot?.Materials.Where(m => m.Fish == biome).ToList();
-            if (catches == null || catches.Count == 0) catches = Loot?.Materials.Where(m => m.Fish == Biome.Cave).ToList();
+            bool night = Calendar.IsNight(Clock);
+            List<MaterialDefinition> Catches(Biome water) => Loot?.Materials.Where(m => m.Fish == water && (!m.FishAtNight || night)).ToList();
+            var catches = Catches(biome);
+            if (catches == null || catches.Count == 0) catches = Catches(Biome.Cave);
             if (catches != null && catches.Count > 0)
             {
                 var fish = catches[_random.Next(catches.Count)];

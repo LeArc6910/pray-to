@@ -60,10 +60,15 @@ fishing_rod,fishing_rod,1,copper_ore:2|slime_gel:2|stone:1,Workbench
 hoe,hoe,1,copper_ore:2|stone:2,Workbench
 fertilizer,fertilizer,3,slime_gel:1|mushroom_spore:1,Workbench
 frost_berry_seed,frost_berry_seed,2,ice_crystal:1|mushroom_spore:1,Workbench
+mushroom_soil,mushroom_soil,2,glow_spore:2|stone:2,Workbench
+frost_soil,frost_soil,2,ice_crystal:2|stone:2,Workbench
+ash_soil,ash_soil,2,obsidian_ore:1|stone:2,Workbench
+void_soil,void_soil,2,void_ore:1|stone:2,Workbench
 star_melon_seed,star_melon_seed,2,void_ore:1|mushroom_spore:1,Workbench
 spicy_fry,spicy_fry,1,fire_pepper:2|mushroom:1,Furnace
 mushroom_soup,mushroom_soup,1,mushroom:3,Furnace
 grilled_fish,grilled_fish,1,cave_minnow:2,Furnace
+grilled_firefly,grilled_fish,2,firefly_catfish:1,Furnace
 fish_stew,fish_stew,1,spore_catfish:1|ice_trout:1,Furnace
 eel_skewer,eel_skewer,1,crystal_eel:2,Furnace
 abyss_feast,abyss_feast,1,void_angler:1|mushroom:1,Furnace

@@ -593,6 +593,7 @@ namespace Game.Client
                 case "ice_trout": return Ramped(FishRows, Ramp.Of("#8CD8FF"));
                 case "crystal_eel": return Ramped(FishRows, Ramp.Of("#7CD2E2"));
                 case "void_angler": return Ramped(FishRows, Ramp.Of("#7A5CC8"));
+                case "firefly_catfish": return Ramped(FishRows, Ramp.Of("#E8D86A"));
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);
             }
         }

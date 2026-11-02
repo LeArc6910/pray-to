@@ -233,13 +233,15 @@ namespace Game.Core
     // See Docs/Crafting.md.
     public sealed class MaterialDefinition
     {
-        internal MaterialDefinition(string id, string name, TileType? places, string description, Biome? fish = null, float fuel = 0)
+        internal MaterialDefinition(string id, string name, TileType? places, string description, Biome? fish = null, float fuel = 0,
+            bool fishAtNight = false)
         {
             Id = id;
             Name = name;
             Places = places;
             Description = description;
             Fish = fish;
+            FishAtNight = fishAtNight;
             Fuel = fuel;
         }
 
@@ -248,8 +250,9 @@ namespace Game.Core
         // The tile [놓기] puts down, or null when it cannot be placed.
         public TileType? Places { get; }
         public string Description { get; }
-        // A fish caught in the water of this biome (materials.csv fish), or null.
+        // A fish caught in the water of this biome (materials.csv fish), or null; only at night when FishAtNight.
         public Biome? Fish { get; }
+        public bool FishAtNight { get; }
         // Seconds a generator runs on one of it (materials.csv fuel), or 0 when it does not burn.
         public float Fuel { get; }
     }

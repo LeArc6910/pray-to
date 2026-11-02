@@ -256,10 +256,16 @@ namespace Game.Core
                         places = SheetValues.ParseEnum<TileType>(row["places"], "칸 종류");
                         if (places == TileType.Floor) throw new FormatException("places에는 벽 같은 단단한 칸만 적을 수 있습니다.");
                     }
-                    Biome? fish = row["fish"].Length > 0 ? SheetValues.ParseEnum<Biome>(row["fish"], "fish") : (Biome?)null;
+                    // "cave", or "cave:night" for a fish only caught at night (Docs/Time.md).
+                    string[] fishing = row["fish"].Split(':');
+                    Biome? fish = fishing[0].Length > 0 ? SheetValues.ParseEnum<Biome>(fishing[0], "fish") : (Biome?)null;
+                    if (fishing.Length > 2 || fishing.Length == 2 && fishing[1] != "night")
+                        throw new FormatException($"fish '{row["fish"]}'는 생물군계나 '생물군계:night'로 적습니다.");
+                    bool atNight = fishing.Length == 2;
                     float fuel = row["fuel"].Length > 0 ? SheetValues.ParseDecimal(row["fuel"], "fuel") : 0;
                     if (fuel < 0) throw new FormatException("fuel은 0 이상이어야 합니다.");
-                    materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"], fish, fuel));
+                    materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"], fish, fuel,
+                        atNight));
                 });
             }
             return materials;

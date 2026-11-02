@@ -82,6 +82,9 @@ namespace Game.Core
         // Ticks until a recall scroll takes the player home, or 0.
         public int RecallTicks { get; internal set; }
         public bool Recalling => RecallTicks > 0;
+        // Lying in their bed, waiting for everyone else to, and where they lay down (World.Sleep).
+        public bool Sleeping { get; internal set; }
+        internal Vec2 SleptAt { get; set; }
         // How fast the player may move now: slower while chilled.
         public float MoveSpeed => Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1);
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
@@ -285,6 +288,8 @@ namespace Game.Core
         Fishing,
         // Source, a player, was given a guide goal's reward; Amount is the goal's index (World.ClaimGoal).
         GoalReward,
+        // Everyone slept, and it is morning of day Amount (World.Sleep).
+        Morning,
     }
 
     public readonly struct SimEvent

@@ -40,16 +40,44 @@ namespace Game.Core.Tests
         static void AssertError(IReadOnlyList<string> errors, params string[] parts) =>
             Assert.IsTrue(errors.Any(error => parts.All(error.Contains)), $"No error mentions {string.Join(" + ", parts)}. Errors:\n{string.Join("\n", errors)}");
 
+        // A crop that ripens after a hundredth of a day of water (360 ticks), for the rules rather than the numbers.
+        static readonly CropDefinition Quick = TileSheet.Parse(
+            "tile,name,hardness,material,count,extra,extra_chance\nWall,돌벽,3,stone,1,,\n",
+            Gear.Data,
+            "id,name,seed,grow_days,biomes,harvest,count,seeds,seed_chance\nquick,빠른 버섯,mushroom_spore,0.01,,mushroom,2,1,50\n").Crops.Single();
+
+        static void Water(World world, Player player)
+        {
+            if (player.Inventory.CountOf(Gear.Data.FindMaterial(World.WateringCan)) == 0) player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.WateringCan));
+            Assert.IsTrue(world.Water(player.Id), "watered");
+        }
+
         [Test]
-        public void ShippedMushroomsGrowFromSporesInThreeMinutes()
+        public void ShippedCropsGrowInDaysInTheirOwnBiomes()
         {
             Assert.IsTrue(Tiles.Shipped.Success, string.Join("\n", Tiles.Shipped.Errors));
             Assert.AreSame(Spore, Mushroom.Seed);
-            Assert.AreEqual(180, Mushroom.GrowSeconds, 0.001f);
+            Assert.AreEqual(2, Mushroom.GrowDays, 0.001f);
+            Assert.AreEqual(2 * Calendar.TicksPerDay, Mushroom.GrowTicks);
+            CollectionAssert.AreEquivalent(new[] { Biome.Cave, Biome.Mushroom }, Mushroom.Biomes);
             Assert.AreSame(MushroomItem, Mushroom.HarvestMaterial);
             Assert.AreEqual(2, Mushroom.Count);
             Assert.AreSame(Mushroom, Tiles.Shipped.CropFrom(Spore));
             Assert.AreSame(Spore, Tiles.Shipped.Find(TileType.Wall).Extra);
+
+            var expected = new Dictionary<string, (float Days, Biome Biome)>
+            {
+                ["glow_cap"] = (3, Biome.Mushroom),
+                ["fire_pepper"] = (4, Biome.Lava),
+                ["frost_berry"] = (4, Biome.Ice),
+                ["star_melon"] = (6, Biome.Abyss),
+            };
+            foreach (var (id, (days, biome)) in expected)
+            {
+                var crop = Tiles.Shipped.Crops.Single(c => c.Id == id);
+                Assert.AreEqual(days, crop.GrowDays, 0.001f, id);
+                CollectionAssert.AreEqual(new[] { biome }, crop.Biomes, id);
+            }
         }
 
         [Test]
@@ -58,18 +86,21 @@ namespace Game.Core.Tests
             var data = TileSheet.Parse(
                 "tile,name,hardness,material,count,extra,extra_chance\nWall,돌벽,3,stone,1,gold,5\n",
                 Gear.Data,
-                "id,name,seed,grow_seconds,harvest,count,seeds,seed_chance\n" +
-                "a,가,nothing,10,mushroom,1,1,0\n" +
-                "b,나,mushroom_spore,0,mushroom,1,1,0\n" +
-                "c,다,mushroom_spore,10,gold,1,1,0\n" +
-                "d,라,mushroom_spore,10,mushroom,1,1,0\n" +
-                "e,마,mushroom_spore,10,mushroom,1,1,0\n");
+                "id,name,seed,grow_days,biomes,harvest,count,seeds,seed_chance\n" +
+                "a,가,nothing,1,,mushroom,1,1,0\n" +
+                "b,나,mushroom_spore,0,,mushroom,1,1,0\n" +
+                "c,다,mushroom_spore,1,,gold,1,1,0\n" +
+                "d,라,mushroom_spore,1,cave|desert,mushroom,1,1,0\n" +
+                "e,마,mushroom_spore,1,cave|ice,mushroom,1,1,0\n" +
+                "f,바,mushroom_spore,1,,mushroom,1,1,0\n");
 
             AssertError(data.Errors, "tiles.csv 2행", "재료 'gold'");
             AssertError(data.Errors, "crops.csv 2행", "씨앗 'nothing'");
-            AssertError(data.Errors, "crops.csv 3행", "grow_seconds");
+            AssertError(data.Errors, "crops.csv 3행", "grow_days");
             AssertError(data.Errors, "crops.csv 4행", "harvest 'gold'");
-            AssertError(data.Errors, "crops.csv 6행", "이미 다른 작물의 씨앗");
+            AssertError(data.Errors, "crops.csv 5행", "biomes", "desert");
+            AssertError(data.Errors, "crops.csv 7행", "이미 다른 작물의 씨앗");
+            CollectionAssert.AreEqual(new[] { Biome.Cave, Biome.Ice }, data.Crops.Single().Biomes);
         }
 
         [Test]
@@ -102,21 +133,29 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void RipeCropsAreHarvestedByWalkingOverThem()
+        public void CropsGrowOnlyWhileWateredAndAreHarvestedByWalkingOverThem()
         {
             var world = Room(out var player);
             player.Inventory.AddMaterial(Spore);
-            world.Plant(player.Id, Mushroom);
-            var crop = world.CropAt(3, 2);
+            Assert.IsTrue(world.Plant(player.Id, Quick));
             world.TakeCropChanges();
 
-            Run(world, Mushroom.GrowTicks / 2);
+            // Dry, it waits.
+            Run(world, (int)Quick.GrowTicks * 2);
+            Assert.AreEqual(0, world.CropAt(3, 2).Growth(world.Tick), 0.001f);
+            Assert.IsFalse(world.CropAt(3, 2).IsWet(world.Tick));
+
+            Water(world, player);
+            var crop = world.CropAt(3, 2);
+            Assert.IsTrue(crop.IsWet(world.Tick));
+            Run(world, (int)Quick.GrowTicks / 2);
             Assert.AreEqual(0.5f, crop.Growth(world.Tick), 0.02f);
             world.MovePlayer(player.Id, TileMap.Center(3, 2), new Vec2(1, 0), 10);
             Run(world, 1);
             Assert.AreSame(crop, world.CropAt(3, 2), "not ripe yet");
+            world.TakeCropChanges();
 
-            var events = Run(world, Mushroom.GrowTicks / 2 + 1);
+            var events = Run(world, (int)Quick.GrowTicks / 2 + 1);
 
             Assert.IsNull(world.CropAt(3, 2));
             Assert.AreEqual(2, player.Inventory.CountOf(MushroomItem));
@@ -124,6 +163,27 @@ namespace Game.Core.Tests
             var harvest = events.Single(e => e.Type == SimEventType.Harvested);
             Assert.AreEqual(TileMap.Center(3, 2), harvest.Position);
             Assert.IsNull(world.TakeCropChanges().Single().Crop, "the crop is gone");
+        }
+
+        [Test]
+        public void WaterLastsADayOfPlay()
+        {
+            var world = Room(out var player);
+            player.Inventory.AddMaterial(Spore);
+            world.Plant(player.Id, Mushroom);
+            Water(world, player);
+            var crop = world.CropAt(3, 2);
+            Assert.AreEqual(world.Tick + Calendar.TicksPerDay, crop.WetUntil);
+
+            Run(world, (int)Calendar.TicksPerDay + 600);
+            Assert.IsFalse(crop.IsWet(world.Tick), "dry after a day");
+            Assert.AreEqual(0.5f, crop.Growth(world.Tick), 0.001f, "one day of the two, no more for the time it was dry");
+
+            // Watering again carries on from there.
+            Water(world, player);
+            Assert.AreEqual(0.5f, world.CropAt(3, 2).Growth(world.Tick), 0.001f);
+            Run(world, (int)Calendar.TicksPerDay);
+            Assert.IsTrue(world.CropAt(3, 2).IsRipe(world.Tick));
         }
 
         [Test]
@@ -142,7 +202,7 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void WateringHalvesWhatIsLeftOnceForEachCropAround()
+        public void WateringGivesEachCropAroundADayOfWater()
         {
             var world = Room(out var player);
             var can = Gear.Data.FindMaterial(World.WateringCan);
@@ -155,28 +215,56 @@ namespace Game.Core.Tests
             world.MovePlayer(player.Id, TileMap.Center(4, 2), new Vec2(1, 0), 10);
             Assert.IsTrue(world.Plant(player.Id, Mushroom));
             world.MovePlayer(player.Id, TileMap.Center(2, 2), new Vec2(1, 0), 10);
-            Run(world, Mushroom.GrowTicks / 2);
             world.TakeCropChanges();
 
             Assert.IsFalse(world.Water(player.Id), "no watering can");
             player.Inventory.AddMaterial(can);
             Assert.IsTrue(world.Water(player.Id));
 
-            Assert.IsTrue(world.CropAt(3, 2).Watered);
-            Assert.IsTrue(world.CropAt(3, 3).Watered);
-            Assert.IsFalse(world.CropAt(5, 2).Watered, "two tiles away");
-            // Half grown, then half of the other half: three quarters.
-            Assert.AreEqual(0.75f, world.CropAt(3, 2).Growth(world.Tick), 0.01f);
-            Assert.AreEqual(0.5f, world.CropAt(5, 2).Growth(world.Tick), 0.01f);
+            Assert.IsTrue(world.CropAt(3, 2).IsWet(world.Tick));
+            Assert.IsTrue(world.CropAt(3, 3).IsWet(world.Tick));
+            Assert.IsFalse(world.CropAt(5, 2).IsWet(world.Tick), "two tiles away");
             Assert.AreEqual(1, player.Inventory.CountOf(can), "a tool, not used up");
-            Assert.AreEqual(2, world.TakeCropChanges().Count(c => c.Crop != null && c.Crop.Watered));
+            Assert.AreEqual(2, world.TakeCropChanges().Count(c => c.Crop != null && c.Crop.IsWet(world.Tick)));
             var events = world.TakeEvents();
             Assert.AreEqual(2, events.Single(e => e.Type == SimEventType.Watered).Amount);
 
-            Assert.IsFalse(world.Water(player.Id), "each crop takes water once");
-            Run(world, Mushroom.GrowTicks / 4 + 1);
-            Assert.IsTrue(world.CropAt(3, 2).IsRipe(world.Tick));
-            Assert.IsFalse(world.CropAt(5, 2).IsRipe(world.Tick));
+            Run(world, 900);
+            Assert.AreEqual(900f / Mushroom.GrowTicks, world.CropAt(3, 2).Growth(world.Tick), 0.0001f);
+            Assert.AreEqual(0, world.CropAt(5, 2).Growth(world.Tick), "dry, so still");
+            // Watering again tops it up to a whole day from now, keeping what it grew.
+            Assert.IsTrue(world.Water(player.Id));
+            Assert.AreEqual(world.Tick + Calendar.TicksPerDay, world.CropAt(3, 2).WetUntil);
+            Assert.AreEqual(900f / Mushroom.GrowTicks, world.CropAt(3, 2).Growth(world.Tick), 0.0001f);
+        }
+
+        [Test]
+        public void CropsGrowOnlyInTheirOwnBiomes()
+        {
+            var map = Maps.FromRows(
+                "#######",
+                "#.....#",
+                "#.....#",
+                "#######");
+            // The left half is ice cave, the right half plain cave.
+            var biomes = BiomeMap.Of(map.Width, map.Height, (x, y) => x < 3 ? Biome.Ice : Biome.Cave);
+            var world = new World(map, TileMap.Center(1, 1), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped, biomes);
+            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"));
+            var berry = Tiles.Shipped.Crops.Single(c => c.Id == "frost_berry");
+            player.Inventory.AddMaterial(Spore, 2);
+            player.Inventory.AddMaterial(berry.Seed, 2);
+            world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
+
+            Assert.AreEqual(Biome.Ice, world.FarmBiomeAt(2, 1));
+            Assert.IsFalse(world.Plant(player.Id, Mushroom), "mushrooms do not grow in the ice caves");
+            Assert.IsTrue(world.Plant(player.Id, berry));
+            Assert.AreEqual(2, player.Inventory.CountOf(Spore), "the spore is kept");
+
+            world.MovePlayer(player.Id, TileMap.Center(3, 1), new Vec2(1, 0), 10);
+            Assert.IsFalse(world.Plant(player.Id, berry), "frost berries only in the ice caves");
+            Assert.IsTrue(world.Plant(player.Id, Mushroom));
+            Assert.AreEqual("얼음 동굴", berry.BiomeNames);
+            Assert.AreEqual("흙 동굴, 버섯 숲", Mushroom.BiomeNames);
         }
 
         [Test]
@@ -245,8 +333,48 @@ namespace Game.Core.Tests
             Assert.AreEqual(TileType.Floor, world.Map[3, 4]);
             Assert.AreEqual(1, player.Inventory.CountOf(Spore));
         }
-            [Test]
-        public void AHoeTurnsFloorIntoSoilWhereCropsStartAQuarterGrown()
+        [Test]
+        public void SoilBroughtFromAnotherBiomeGrowsItsCropsAtHome()
+        {
+            var world = Room(out var player);
+            var frostSoil = Gear.Data.FindMaterial("frost_soil");
+            var berry = Tiles.Shipped.Crops.Single(c => c.Id == "frost_berry");
+            Assert.AreEqual(TileType.FrostSoil, frostSoil.Places);
+            Assert.IsTrue(Gear.Data.Recipes.Any(r => r.Material == frostSoil && r.Ingredients.Any(i => i.Material.Id == "ice_crystal")), "made from ice");
+            player.Inventory.AddMaterial(berry.Seed);
+            Assert.IsFalse(world.Plant(player.Id, berry), "the plain cave is no place for frost berries");
+
+            player.Inventory.AddMaterial(frostSoil);
+            Assert.IsTrue(world.PlaceTile(player.Id, frostSoil));
+            Assert.AreEqual(TileType.FrostSoil, world.Map[3, 2]);
+            Assert.AreEqual(Biome.Ice, world.FarmBiomeAt(3, 2));
+            Assert.IsFalse(world.Map.IsSolid(3, 2), "walked on");
+            Assert.IsTrue(world.Plant(player.Id, berry));
+            Assert.AreEqual(World.SoilHeadStart(berry) / (float)berry.GrowTicks, world.CropAt(3, 2).Growth(world.Tick), 0.001f, "a soil's day sooner");
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.Fertilizer));
+            Assert.IsFalse(world.Fertilize(player.Id), "never fertile");
+
+            // Watered each of the three days it still needs, then harvested, it comes up again with the hoe, back
+            // into the bag.
+            for (int day = 0; day < 3; day++)
+            {
+                Water(world, player);
+                Run(world, (int)Calendar.TicksPerDay);
+            }
+            Assert.IsTrue(world.CropAt(3, 2).IsRipe(world.Tick));
+            Moves.Walk(world, player, TileMap.Center(3, 2));
+            Run(world, 1);
+            Assert.IsNull(world.CropAt(3, 2));
+            Moves.Walk(world, player, TileMap.Center(2, 2));
+            world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.Hoe));
+            Assert.IsTrue(world.Till(player.Id));
+            Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
+            Assert.AreEqual(1, player.Inventory.CountOf(frostSoil));
+        }
+
+        [Test]
+        public void AHoeTurnsFloorIntoSoilWhereCropsGrowADaySooner()
         {
             var world = Room(out var player);
             var hoe = Gear.Data.FindMaterial(World.Hoe);
@@ -259,12 +387,17 @@ namespace Game.Core.Tests
             player.Inventory.AddMaterial(Spore);
             Assert.IsTrue(world.Plant(player.Id, Mushroom));
             var crop = world.CropAt(3, 2);
-            Assert.AreEqual(0.25f, crop.Growth(world.Tick), 0.01f);
+            Assert.AreEqual(0.5f, crop.Growth(world.Tick), 0.001f, "a day of its two");
             Assert.IsFalse(world.Till(player.Id), "not while something grows");
 
+            // Never less than a day left: a crop of a day or less gets no head start.
+            Assert.AreEqual(0, World.SoilHeadStart(Quick));
+            Assert.AreEqual(Calendar.TicksPerDay, World.SoilHeadStart(Tiles.Shipped.Crops.Single(c => c.Id == "star_melon")));
+
             // Back to floor once it is gone.
+            Water(world, player);
             world.MovePlayer(player.Id, TileMap.Center(3, 2), new Vec2(1, 0), 10);
-            Run(world, (int)(Mushroom.GrowTicks * 0.75f) + 2);
+            Run(world, (int)Calendar.TicksPerDay + 2);
             Assert.IsNull(world.CropAt(3, 2), "harvested by walking over it");
             world.MovePlayer(player.Id, TileMap.Center(2, 2), new Vec2(1, 0), 10);
             Assert.IsTrue(world.Till(player.Id));
@@ -279,7 +412,7 @@ namespace Game.Core.Tests
             var fertilizer = Gear.Data.FindMaterial(World.Fertilizer);
             Assert.IsTrue(world.Till(player.Id));
             player.Inventory.AddMaterial(Spore);
-            Assert.IsTrue(world.Plant(player.Id, Mushroom));
+            Assert.IsTrue(world.Plant(player.Id, Quick));
             Assert.IsFalse(world.Fertilize(player.Id), "no fertilizer");
             player.Inventory.AddMaterial(fertilizer, 2);
             Assert.IsTrue(world.Fertilize(player.Id), "growing or not");
@@ -288,9 +421,10 @@ namespace Game.Core.Tests
             Assert.IsFalse(world.Fertilize(player.Id), "nothing plain left to fertilize");
             Assert.AreEqual(1, player.Inventory.CountOf(fertilizer));
 
+            Water(world, player);
             world.MovePlayer(player.Id, TileMap.Center(3, 2), new Vec2(1, 0), 10);
-            Run(world, Mushroom.GrowTicks);
-            Assert.AreEqual(Mushroom.Count + 1, player.Inventory.CountOf(MushroomItem));
+            Run(world, (int)Quick.GrowTicks + 1);
+            Assert.AreEqual(Quick.Count + 1, player.Inventory.CountOf(MushroomItem));
             Assert.AreEqual(TileType.Soil, world.Map[3, 2], "used up");
         }
 
