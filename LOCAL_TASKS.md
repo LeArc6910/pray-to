@@ -774,3 +774,10 @@ DevTools/Local/setup.sh --commit
   - 스킬 칸 설명 상자도 안쪽 여백과 낱말 단위 줄바꿈이 들어가 화면 안에 머문다
 - 첫 입력: 이번 PC 확인에서는 게임에 들어간 뒤 Tab을 1초 간격으로 세 번 눌러서야 가방이 열렸다. 지난번 세로 화면에서는 첫 Tab에 열렸다. 같은 자동 입력인데 결과가 들쭉날쭉해서, 자동 입력의 짧은 키 누름 탓일 가능성이 있다. 사람 손으로도 생기는지 보는 것이 먼저다
 - 이번 확인으로 23:40 UI 점검에서 남았던 화면 문제는 모두 고쳐진 것으로 보인다(첫 입력 문제만 남음)
+
+### 2026-11-02 17:33 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 328개 중 326개 통과, 0개 실패
+- PlayMode 테스트: 5개 중 5개 통과, 0개 실패

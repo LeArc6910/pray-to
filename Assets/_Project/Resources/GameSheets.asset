@@ -27,3 +27,4 @@ MonoBehaviour:
   bossAttacks: {fileID: 4900000, guid: 1c2415facedd5c54580087663f50c44d, type: 3}
   classes: {fileID: 4900000, guid: a8d1e65ea716a0748a0d025c7f11abaa, type: 3}
   skills: {fileID: 4900000, guid: c6c4bcdcccd1b0643ac37476090fe38c, type: 3}
+  goals: {fileID: 4900000, guid: 30380aca99dadf4488c637430e2cc860, type: 3}
