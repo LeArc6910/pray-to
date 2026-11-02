@@ -328,42 +328,147 @@ namespace Game.Client
             },
         };
 
-        static readonly string[][] Mushroom =
+        // An ice slime: a cube of ice with a cluster of frost shards on top. It squats lower and wider in the second frame.
+        static readonly string[][] IceCube =
         {
             new[]
             {
-                "....LLLL....",
-                "..LLMMMMLL..",
-                ".LMMwMMMMMm.",
-                "LMMwwMMLLMMm",
-                "LMMMMMMLLMmm",
-                "MLLMMMMMMMmm",
-                "mLLMMMMMMmmd",
+                "....w.........",
+                "...LwL.w......",
+                ".LLLLLLLLLLLm.",
+                ".LwwMMMMMMMMm.",
+                ".LwMMMMMMMMMm.",
+                ".LMMeMMMMeMMm.",
+                ".LMMeMMMMeMMm.",
+                ".LMMMMMMMMMmm.",
+                ".mMMMMMMMMmmd.",
+                ".mmmmmmmmmmmd.",
+                "..dddddddddd..",
+            },
+            new[]
+            {
+                "..............",
+                "....w.........",
+                "...LwL.w......",
+                "LLLLLLLLLLLLLm",
+                "LwwMMMMMMMMMMm",
+                "LMMeMMMMMMeMMm",
+                "LMMeMMMMMMeMmm",
+                "LMMMMMMMMMMMmm",
+                "mMMMMMMMMMMmmd",
+                "mmmmmmmmmmmmmd",
+                ".dddddddddddd.",
+            },
+        };
+
+        // A magma slime: a crust of cooled rock on top, glowing cracks, and a bubble that bursts.
+        static readonly string[][] MagmaBlob =
+        {
+            new[]
+            {
+                "..............",
+                "....kkkkkk....",
+                "..kkkykkkkk...",
+                ".kkkMyyMkkkm..",
+                ".MMyMMMMyMMMm.",
+                "MMMMeMMMMeMMMm",
+                "MMMMeMMMMeMMmm",
+                "MMMyMMMMMMMmmm",
+                "mMMMMMMMyMmmmd",
+                ".mmmymmmmmmmd.",
+                "..dddyddddddd.",
+            },
+            new[]
+            {
+                ".....y.y......",
+                "....kkykkk....",
+                "..kkkkkkkkk...",
+                ".kkkMyyMkkkm..",
+                "LMMyMMMMMyMMMm",
+                "MMMMeMMMMMeMMm",
+                "MMMMeMMMMMeMmm",
+                "MMMyMMMMMMMMmm",
+                "mMMMMMMMMyMmmd",
+                "mmmmymmmmmmmmd",
+                ".ddddyddddddd.",
+            },
+        };
+
+        // A spore shooter: a cap bristling with thorns over one big eye. The thorns flare and spores puff as it fires.
+        static readonly string[][] ThornCap =
+        {
+            new[]
+            {
+                "............",
+                "..L..L..L...",
+                "..LL.LL.LL..",
+                ".LMMMMMMMMm.",
+                "LMwwMMMMMMMm",
+                "LMwMMdMMMdMm",
+                "MMMMMMMMMMmm",
+                "mMdMMMMdMmmd",
                 ".dmmmmmmmmd.",
                 "...cccccC...",
-                "...cecceC...",
-                "...cecceC...",
-                "...cccccC...",
+                "...cweccC...",
+                "...ceeccC...",
                 "..CCCCCCCC..",
             },
             new[]
             {
-                "............",
-                "....LLLL....",
-                ".LLLMMMMLLL.",
-                "LMMwwMMMMMMm",
-                "LMwwMMMLLMMm",
-                "MMMMMMMLLMmm",
-                "MLLMMMMMMMmm",
-                "mdmmmmmmmmmd",
-                "...cecceC...",
-                "...cecceC...",
+                ".w...w..w...",
+                ".L..L..L..L.",
+                "LL.LL.LL.LL.",
+                ".LMMMMMMMMm.",
+                "LMwwMMMMMMMm",
+                "LMwMMdMMMdMm",
+                "MMMMMMMMMMmm",
+                "mMdMMMMdMmmd",
+                ".dmmmmmmmmd.",
                 "...cccccC...",
-                "...cccccC...",
+                "...cweccC...",
+                "...ceeccC...",
                 "..CCCCCCCC..",
             },
         };
 
+        // A myconid: a mushroom soldier on two legs with a spear. Its legs step between the frames.
+        static readonly string[][] MushroomSoldier =
+        {
+            new[]
+            {
+                "...........h.",
+                "...LLLLLL..h.",
+                "..LMwwMMML.K.",
+                ".LMwwMMLLMmK.",
+                ".MMMMMMLLMmK.",
+                ".mLLMMMMMmmK.",
+                "..dmmmmmmmdK.",
+                "...cecceC..K.",
+                "...ccccccccK.",
+                "...cccccC..K.",
+                "...cccccC..K.",
+                "...cC..cC..K.",
+                "..CC....CC.K.",
+            },
+            new[]
+            {
+                "...........h.",
+                "...LLLLLL..h.",
+                "..LMwwMMML.K.",
+                ".LMwwMMLLMmK.",
+                ".MMMMMMLLMmK.",
+                ".mLLMMMMMmmK.",
+                "..dmmmmmmmdK.",
+                "...cecceC..K.",
+                "...ccccccccK.",
+                "...cccccC..K.",
+                "...cccccC..K.",
+                "....cCcC...K.",
+                "...CC.CC...K.",
+            },
+        };
+
+        // A cave beetle: a round shell, a horned head and six legs that step between the frames.
         static readonly string[][] Beetle =
         {
             new[]
@@ -394,63 +499,216 @@ namespace Game.Client
             },
         };
 
-        // Wings up, then down.
-        static readonly string[][] Bat =
+        // An abyss stalker: a low shell on many legs, claws out front and a glowing sting curled over its back.
+        static readonly string[][] Scorpion =
         {
             new[]
             {
-                "M.............M",
-                "Mm...L...L...mM",
-                ".Mm..LMMML..mM.",
-                "..Mm.MeMeM.mM..",
-                "...MmMMMMMmM...",
+                "...MMM..........",
+                "..M...r.........",
+                ".mM.............",
+                ".mM.............",
+                "..mM.LLLLLL.....",
+                "...MLMwwMMMLm...",
+                "...MMMMMMMMMMrKh",
+                "...mMMMMMMMMMmKK",
+                "....mmmmmmmmmKKh",
+                "....K.K.K.K.K...",
+                "...K.K.K.K.K....",
+            },
+            new[]
+            {
+                "..MMM...........",
+                ".M...r..........",
+                ".mM.............",
+                ".mM.............",
+                "..mM.LLLLLL.....",
+                "...MLMwwMMMLm...",
+                "...MMMMMMMMMMrKh",
+                "...mMMMMMMMMMmKK",
+                "....mmmmmmmmmKKh",
+                ".....K.K.K.K.K..",
+                "....K.K.K.K.K...",
+            },
+        };
+
+        // A crystal bat: wings edged and tipped with crystal, a crystal horn. Wings up, then down.
+        static readonly string[][] CrystalBat =
+        {
+            new[]
+            {
+                "w......w......w",
+                "Lm...L.w.L...mL",
+                ".Lw..LMMML..wL.",
+                "..Lm.MeMeM.mL..",
+                "...LmMMMMMmL...",
                 ".....MwMMm.....",
                 "......mmm......",
                 ".......d.......",
             },
             new[]
             {
-                "...............",
-                ".....L...L.....",
+                ".......w.......",
+                ".....L.w.L.....",
                 ".....LMMML.....",
                 ".....MeMeM.....",
-                "..MmmMMMMMmmM..",
-                ".Mm..MwMMm..mM.",
+                "..LwmMMMMMmwL..",
+                ".Lw..MwMMm..wL.",
+                "Lw....mmm....wL",
+                "w......d......w",
+            },
+        };
+
+        // A glow bat: glowing feelers and a glowing belly. Wings up, then down.
+        static readonly string[][] GlowBat =
+        {
+            new[]
+            {
+                "....y.....y....",
+                "Mm...m...m...mM",
+                ".Mm..LMMML..mM.",
+                "..Mm.MeMeM.mM..",
+                "...MmMyyMMmM...",
+                ".....MyyMm.....",
+                "......mmm......",
+                ".......d.......",
+            },
+            new[]
+            {
+                "....y.....y....",
+                ".....m...m.....",
+                ".....LMMML.....",
+                ".....MeMeM.....",
+                "..MmmMyyMMmmM..",
+                ".Mm..MyyMm..mM.",
                 "Mm....mmm....mM",
                 "M......d......M",
             },
         };
 
-        // A floating flame with a face; its wisps and tail flicker between the frames.
-        static readonly string[][] Wisp =
+        // A fire bat: horns, glowing eyes, flames at the wing tips and the tail. Wings up, then down.
+        static readonly string[][] FireBat =
+        {
+            new[]
+            {
+                "y.............y",
+                "My...d...d...yM",
+                ".Mm..LMMML..mM.",
+                "..Mm.MyMyM.mM..",
+                "...MmMMMMMmM...",
+                ".....MwMMm.....",
+                "......mmm......",
+                ".......y.......",
+            },
+            new[]
+            {
+                "...............",
+                ".....d...d.....",
+                ".....LMMML.....",
+                ".....MyMyM.....",
+                "..MmmMMMMMmmM..",
+                ".Mm..MwMMm..mM.",
+                "Mm....mmm....mM",
+                "y......y......y",
+            },
+        };
+
+        // A crystal wisp: a floating gem with a face, sparkles turning about it.
+        static readonly string[][] Gem =
         {
             new[]
             {
                 ".....LL.....",
                 "....LwwL....",
-                "...LwMMwL...",
-                "..LwMMMMwL..",
-                ".LMMMMMMMML.",
-                ".MMeMMMMeMM.",
-                ".MMeMMMMeMM.",
-                ".mMMMMMMMMm.",
-                "..mMMmmMMm..",
-                "...mm..mm...",
-                "....m..m....",
+                "...LwwMML...",
+                "..LwMMMMMm..",
+                ".LwMMMMMMMm.",
+                ".MMeMMMMeMm.",
+                "..MeMMMMeM..",
+                "...mMMMMm...",
+                "....mMMm....",
+                ".....mm.....",
+                "w.........w.",
             },
             new[]
             {
-                "....L..L....",
+                "w....LL....w",
                 "....LwwL....",
-                "...LwMMwL...",
-                "..LwMMMMwL..",
-                ".LMMMMMMMML.",
-                ".MMeMMMMeMM.",
-                ".MMeMMMMeMM.",
+                "...LwwMML...",
+                "..LwMMMMMm..",
+                ".LwMMMMMMMm.",
+                ".MMeMMMMeMm.",
+                "..MeMMMMeM..",
+                "...mMMMMm...",
+                "....mMMm....",
+                ".....mm.....",
+                "............",
+            },
+        };
+
+        // A frost wisp: a cold ghost with a frost crown and icicles hanging from its hem.
+        static readonly string[][] FrostWisp =
+        {
+            new[]
+            {
+                "....w..w....",
+                ".....ww.....",
+                "...LLLLLL...",
+                "..LwwMMMMm..",
+                ".LwMMMMMMMm.",
+                ".MMeMMMMeMm.",
+                ".MMeMMMMeMm.",
+                ".MMMMMMMMMm.",
+                ".mMmMMmMMmm.",
+                "..L.L..L.L..",
+                "..L....L....",
+            },
+            new[]
+            {
+                "...w....w...",
+                ".....ww.....",
+                "...LLLLLL...",
+                "..LwwMMMMm..",
+                ".LwMMMMMMMm.",
+                ".MMeMMMMeMm.",
+                ".MMeMMMMeMm.",
+                ".MMMMMMMMMm.",
+                ".mMmMMmMMmm.",
+                "..L.L..L.L..",
+                "....L....L..",
+            },
+        };
+
+        // A void wisp: one great eye in a dark orb, its tendrils swaying.
+        static readonly string[][] EyeWisp =
+        {
+            new[]
+            {
+                "....mmmm....",
+                "..mmMMMMmm..",
                 ".mMMMMMMMMm.",
-                "..mMMmmMMm..",
-                "..mm..mm....",
-                "...m....m...",
+                "mMMLLLLLLMMm",
+                "mMLLweeLLLMm",
+                "mMLLeeeLLLMm",
+                "mMMLLLLLLMMm",
+                ".mMMMMMMMMm.",
+                "..mmMmmMmm..",
+                "..d.m..m.d..",
+                ".d..d..d..d.",
+            },
+            new[]
+            {
+                "....mmmm....",
+                "..mmMMMMmm..",
+                ".mMMMMMMMMm.",
+                "mMMLLLLLLMMm",
+                "mMLLweeLLLMm",
+                "mMLLeeeLLLMm",
+                "mMMLLLLLLMMm",
+                ".mMMMMMMMMm.",
+                "..mmMmmMmm..",
+                "...dm..md...",
+                "..d..dd..d..",
             },
         };
 
@@ -497,23 +755,40 @@ namespace Game.Client
                 ['c'] = Rgba.Hex("#ECDCC4"),
                 ['C'] = Rgba.Hex("#BFA88C"),
             },
-            ["myconid"] = new Dictionary<char, Rgba>
-            {
-                ['c'] = Rgba.Hex("#F0E2D0"),
-                ['C'] = Rgba.Hex("#C8B49C"),
-            },
             ["cave_beetle"] = new Dictionary<char, Rgba>
             {
                 ['K'] = Rgba.Hex("#58422E"),
                 ['r'] = Rgba.Hex("#F05A3A"),
                 ['h'] = Rgba.Hex("#EADCBC"),
             },
-            // A beetle of the abyss: a shell of night, cold eyes.
+            // A stalker of the abyss: legs and claws of night, a cold glowing eye and sting.
             ["abyss_stalker"] = new Dictionary<char, Rgba>
             {
                 ['K'] = Rgba.Hex("#22183A"),
                 ['r'] = Rgba.Hex("#BFF4FF"),
                 ['h'] = Rgba.Hex("#C8B4FF"),
+            },
+            // The spear: a wooden shaft and an iron head.
+            ["myconid"] = new Dictionary<char, Rgba>
+            {
+                ['c'] = Rgba.Hex("#F0E2D0"),
+                ['C'] = Rgba.Hex("#C8B49C"),
+                ['K'] = Rgba.Hex("#7A5230"),
+                ['h'] = Rgba.Hex("#D8DCE8"),
+            },
+            // Cooled crust and the glow of the cracks.
+            ["magma_slime"] = new Dictionary<char, Rgba>
+            {
+                ['k'] = Rgba.Hex("#3A1C16"),
+                ['y'] = Rgba.Hex("#FFD45A"),
+            },
+            ["glow_bat"] = new Dictionary<char, Rgba>
+            {
+                ['y'] = Rgba.Hex("#F4FFB8"),
+            },
+            ["fire_bat"] = new Dictionary<char, Rgba>
+            {
+                ['y'] = Rgba.Hex("#FFE070"),
             },
         };
 
@@ -528,16 +803,18 @@ namespace Game.Client
             }
             var frames = id switch
             {
-                "spore_shooter" => Mushroom,
-                "myconid" => Mushroom,
-                "crystal_bat" => Bat,
-                "glow_bat" => Bat,
-                "fire_bat" => Bat,
-                "crystal_wisp" => Wisp,
-                "frost_wisp" => Wisp,
-                "void_wisp" => Wisp,
-                "abyss_stalker" => Beetle,
+                "ice_slime" => IceCube,
+                "magma_slime" => MagmaBlob,
+                "spore_shooter" => ThornCap,
+                "myconid" => MushroomSoldier,
                 "cave_beetle" => Beetle,
+                "abyss_stalker" => Scorpion,
+                "crystal_bat" => CrystalBat,
+                "glow_bat" => GlowBat,
+                "fire_bat" => FireBat,
+                "crystal_wisp" => Gem,
+                "frost_wisp" => FrostWisp,
+                "void_wisp" => EyeWisp,
                 _ => Slime,
             };
             return PixelImage.FromRows(colors, frames[frame % frames.Length]).Outlined(ramp.Outline);
