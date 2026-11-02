@@ -36,6 +36,8 @@ namespace Game.Core
         // and plants them again.
         Sprinkler,
         Harvester,
+        // The abyss's ore, which only an obsidian pickaxe or better digs (tiles.csv pickaxe).
+        VoidOre,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

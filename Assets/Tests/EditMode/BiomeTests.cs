@@ -29,11 +29,20 @@ namespace Game.Core.Tests
             var deep = world.Arenas[1] - world.Spawn;
             var opposite = world.Spawn - deep;
             Assert.AreEqual(Biome.Lava, biomes.At(opposite), "the lava fields lie opposite");
-            var sides = new[] { world.Spawn + new Vec2(deep.X, -deep.Y), world.Spawn + new Vec2(-deep.X, deep.Y) }.Select(biomes.At).ToList();
+            // The two other corners, partway out: the mushroom forest and the ice caves. The far end of one of them is
+            // the abyss, with the fourth arena.
+            var sides = new[] { world.Spawn + new Vec2(deep.X, -deep.Y) * 0.7f, world.Spawn + new Vec2(-deep.X, deep.Y) * 0.7f }.Select(biomes.At).ToList();
             CollectionAssert.AreEquivalent(new[] { Biome.Mushroom, Biome.Ice }, sides);
+            Assert.AreEqual(Biome.Abyss, biomes.At(world.Arenas[3]));
+            var abyss = world.Arenas[3] - world.Spawn;
+            Assert.AreEqual(0, Vec2.Distance(abyss, new Vec2(deep.X, -deep.Y)) * Vec2.Distance(abyss, new Vec2(-deep.X, deep.Y)), 0.01f,
+                "in one of the corners beside the lava fields");
 
             var counts = Count(biomes);
-            foreach (Biome biome in System.Enum.GetValues(typeof(Biome))) Assert.Greater(counts.GetValueOrDefault(biome), 1000, biome.ToString());
+            foreach (Biome biome in System.Enum.GetValues(typeof(Biome)))
+            {
+                Assert.Greater(counts.GetValueOrDefault(biome), biome == Biome.Abyss ? 300 : 1000, biome.ToString());
+            }
         }
 
         [Test]
@@ -59,28 +68,60 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void OnlyTheLavaFieldsChangedTheCaves()
+        public void OnlyTheLavaFieldsAndTheAbyssChangedTheCaves()
         {
             // Biomes only say what kind of cave a tile is in. The lava fields carved their arena, a tunnel from the
-            // spawn and pools of lava, all in the plain cave and the lava fields; the other three biomes' caves are
-            // what they were before.
+            // spawn and pools of lava, all in the plain cave and the lava fields; the abyss its arena, veins and a
+            // tunnel from the lava arena. The caves of the other three biomes, away from that tunnel, are what they were.
             var world = WorldGenerator.Generate(7);
+            var tunnel = NearLine(world, world.Arenas[2], world.Arenas[3], 2);
             int floors = 0;
             for (int y = 0; y < world.Map.Height; y++)
             {
                 for (int x = 0; x < world.Map.Width; x++)
                 {
                     var biome = world.Biomes[x, y];
-                    bool elsewhere = biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Crystal;
+                    bool elsewhere = (biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Crystal) && !tunnel[y * world.Map.Width + x];
                     if (elsewhere && world.Map[x, y] == TileType.Floor) floors++;
                 }
             }
             Assert.AreEqual(FloorsElsewhereOfSeedSeven, floors);
         }
 
-        // Floor tiles of seed 7 in the mushroom forest, ice caves and crystal caverns before the lava fields, counted
-        // with the code of that time, so a change to those caves shows up here.
-        const int FloorsElsewhereOfSeedSeven = 6073;
+        // Floor tiles of seed 7 in the mushroom forest, ice caves and crystal caverns away from the abyss tunnel,
+        // counted on these tiles with the code from before the abyss (5367; before the lava fields the same biomes
+        // held 6073), so a change to those caves shows up here.
+        const int FloorsElsewhereOfSeedSeven = 5367;
+
+        // Tiles within reach of the straight line between two points, drawn the way tunnels are.
+        static bool[] NearLine(GeneratedWorld world, Vec2 from, Vec2 to, int reach)
+        {
+            var near = new bool[world.Map.Width * world.Map.Height];
+            int x = TileMap.Cell(from.X), y = TileMap.Cell(from.Y), toX = TileMap.Cell(to.X), toY = TileMap.Cell(to.Y);
+            int dx = System.Math.Abs(toX - x), dy = -System.Math.Abs(toY - y), stepX = x < toX ? 1 : -1, stepY = y < toY ? 1 : -1, error = dx + dy;
+            while (true)
+            {
+                for (int ty = y - reach; ty <= y + reach; ty++)
+                {
+                    for (int tx = x - reach; tx <= x + reach; tx++)
+                    {
+                        if (world.Map.InBounds(tx, ty)) near[ty * world.Map.Width + tx] = true;
+                    }
+                }
+                if (x == toX && y == toY) return near;
+                int doubled = 2 * error;
+                if (doubled >= dy)
+                {
+                    error += dy;
+                    x += stepX;
+                }
+                if (doubled <= dx)
+                {
+                    error += dx;
+                    y += stepY;
+                }
+            }
+        }
 
         [Test]
         public void BiomeMonstersOnlyLiveInTheirBiome()

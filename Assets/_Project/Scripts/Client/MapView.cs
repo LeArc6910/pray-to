@@ -27,6 +27,7 @@ namespace Game.Client
             Biome.Ice => new Color32(84, 108, 128, 255),
             Biome.Crystal => new Color32(70, 70, 108, 255),
             Biome.Lava => new Color32(96, 64, 56, 255),
+            Biome.Abyss => new Color32(48, 38, 72, 255),
             _ => Floor,
         };
         static readonly Color32 Wall = new Color32(158, 140, 118, 255);
@@ -228,6 +229,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Torch || _map[x, y] == TileType.Lamp) return Palette.Torch;
             if (_map[x, y] == TileType.MithrilOre) return Palette.MithrilOre;
             if (_map[x, y] == TileType.ObsidianOre) return new Color32(110, 70, 150, 255);
+            if (_map[x, y] == TileType.VoidOre) return new Color32(180, 140, 255, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);
             if (_map[x, y] == TileType.Bed) return new Color32(80, 130, 220, 255);
             if (_map[x, y] == TileType.Sprinkler) return new Color32(90, 150, 230, 255);

@@ -27,8 +27,8 @@ namespace Game.Client
 
         // ---- Gear ----
 
-        // Tiers by item level (item_bases.csv): copper, iron, mithril, obsidian.
-        static Ramp Metal(int level) => Ramp.Of(level >= 30 ? "#6E5A9E" : level >= 20 ? "#7CD2E2" : level >= 10 ? "#B4BECC" : "#D27C46");
+        // Tiers by item level (item_bases.csv): copper, iron, mithril, obsidian, void.
+        static Ramp Metal(int level) => Ramp.Of(level >= 40 ? "#B48CFF" : level >= 30 ? "#6E5A9E" : level >= 20 ? "#7CD2E2" : level >= 10 ? "#B4BECC" : "#D27C46");
 
         static readonly string[] Sword =
         {
@@ -490,6 +490,9 @@ namespace Game.Client
                 case "mithril_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#8FE6F2")), OreChunk).Outlined(Outline);
                 case "mithril_bar": return Bar(Ramp.Of("#7CD2E2"));
                 case "queen_heart": return Ramped(Gem, Ramp.Of("#FF6E9C"));
+                case "void_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#B48CFF")), OreChunk).Outlined(Outline);
+                case "void_bar": return Bar(Ramp.Of("#9A74F0"));
+                case "void_essence": return Ramped(Gem, Ramp.Of("#C8A8FF"));
                 case "slime_gel": return Ramped(Goo, Ramp.Of("#8CD94D"));
                 case "warden_core": return Ramped(Gem, Ramp.Of("#FFA83A"));
                 case "mushroom_spore": return Ramped(Spores, Ramp.Of("#B07CE0"));

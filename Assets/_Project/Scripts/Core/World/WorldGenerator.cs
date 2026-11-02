@@ -6,7 +6,7 @@ namespace Game.Core
     public sealed class GeneratedWorld
     {
         public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius, int deepArenaX, int deepArenaY,
-            BiomeMap biomes = null, (int X, int Y)? lavaArena = null)
+            BiomeMap biomes = null, (int X, int Y)? lavaArena = null, (int X, int Y)? abyssArena = null)
         {
             Biomes = biomes ?? BiomeMap.Plain(map.Width, map.Height);
             Map = map;
@@ -17,6 +17,7 @@ namespace Game.Core
             ArenaRadius = arenaRadius;
             var arenas = new List<Vec2> { TileMap.Center(arenaX, arenaY), TileMap.Center(deepArenaX, deepArenaY) };
             if (lavaArena is (int lx, int ly)) arenas.Add(TileMap.Center(lx, ly));
+            if (abyssArena is (int ax, int ay)) arenas.Add(TileMap.Center(ax, ay));
             Arenas = arenas;
         }
 
@@ -76,6 +77,10 @@ namespace Game.Core
         const int ObsidianVeins = 26;
         const int LavaPoolDistance = 45;
         const int LavaPools = 30;
+        // The abyss (Docs/Biomes.md), carved after the lava fields on its own stream: the fourth arena at the far end of
+        // one of the two corners beside the lava fields, reached by a tunnel from the lava arena, and void ore there.
+        const ulong AbyssStream = 9;
+        const int VoidVeins = 22;
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -124,7 +129,10 @@ namespace Game.Core
             ClearDisc(map, deepX, deepY, ArenaRadius);
             PlaceVeins(map, new GameRandom(seed, MithrilStream), TileType.MithrilOre, MithrilVeins, spawnX, spawnY, MithrilDistance);
             bool mushroomFirst = new GameRandom(seed, BiomeStream).Next(2) == 0;
-            var biomes = BiomeMap.Make(seed, width, height, spawnX, spawnY, (cornerX, cornerY), mushroomFirst);
+            var abyss = new GameRandom(seed, AbyssStream);
+            // One of the two corners beside both the crystal caverns and the lava fields.
+            var (abyssCornerX, abyssCornerY) = abyss.Next(2) == 0 ? (cornerX, -cornerY) : (-cornerX, cornerY);
+            var biomes = BiomeMap.Make(seed, width, height, spawnX, spawnY, (cornerX, cornerY), mushroomFirst, (abyssCornerX, abyssCornerY));
 
             var lava = new GameRandom(seed, LavaStream);
             int lavaX = Clamp(spawnX - cornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
@@ -142,7 +150,14 @@ namespace Game.Core
                     .Any(a => (x - a.Item1) * (x - a.Item1) + (y - a.Item2) * (y - a.Item2) <= (ArenaRadius + 2) * (ArenaRadius + 2));
             PlaceVeins(map, lava, TileType.ObsidianOre, ObsidianVeins, (x, y) => map[x, y] == TileType.Wall && InLava(x, y, ObsidianDistance));
             PlaceLava(map, lava, (x, y) => map[x, y] == TileType.Floor && InLava(x, y, LavaPoolDistance) && !NearArena(x, y));
-            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY));
+
+            int abyssX = Clamp(spawnX + abyssCornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
+            int abyssY = Clamp(spawnY + abyssCornerY * DeepArenaOffset, ArenaRadius + 2, height - ArenaRadius - 3);
+            CarveTunnel(map, lavaX, lavaY, abyssX, abyssY);
+            ClearDisc(map, abyssX, abyssY, ArenaRadius);
+            PlaceVeins(map, abyss, TileType.VoidOre, VoidVeins, (x, y) => map[x, y] == TileType.Wall && biomes[x, y] == Biome.Abyss
+                && (x - abyssX) * (x - abyssX) + (y - abyssY) * (y - abyssY) > (ArenaRadius + 2) * (ArenaRadius + 2));
+            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY), (abyssX, abyssY));
         }
 
         static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;

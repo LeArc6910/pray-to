@@ -374,6 +374,13 @@ namespace Game.Client
                 ['r'] = Rgba.Hex("#F05A3A"),
                 ['h'] = Rgba.Hex("#EADCBC"),
             },
+            // A beetle of the abyss: a shell of night, cold eyes.
+            ["abyss_stalker"] = new Dictionary<char, Rgba>
+            {
+                ['K'] = Rgba.Hex("#22183A"),
+                ['r'] = Rgba.Hex("#BFF4FF"),
+                ['h'] = Rgba.Hex("#C8B4FF"),
+            },
         };
 
         // Monsters face right; the view flips them to face left.
@@ -394,6 +401,8 @@ namespace Game.Client
                 "fire_bat" => Bat,
                 "crystal_wisp" => Wisp,
                 "frost_wisp" => Wisp,
+                "void_wisp" => Wisp,
+                "abyss_stalker" => Beetle,
                 "cave_beetle" => Beetle,
                 _ => Slime,
             };
@@ -409,8 +418,82 @@ namespace Game.Client
             "crystal_queen" => Queen(frame),
             // The lava titan: the warden's build in black basalt, its seams and core burning.
             "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, molten: true),
+            "void_lord" => VoidLord(frame),
             _ => Warden(color, frame),
         };
+
+        // The void lord: a hooded shape in a long cloak that floats over the ground, two cold eyes in the dark of the
+        // hood, an orb of the void held before it and stars turning round its head. The second frame rises a pixel
+        // and turns the stars.
+        static PixelImage VoidLord(int frame)
+        {
+            const int width = 40;
+            const int height = 40;
+            var image = new PixelImage(width, height);
+            var cloak = Ramp.Of("#3A2C5C");
+            var trim = Ramp.Of("#9A7CFF");
+            var orb = Ramp.Of("#C8A8FF");
+            var eye = Rgba.Hex("#BFF4FF");
+            int bob = frame % 2 == 1 ? -1 : 0;
+            const int cx = 20;
+
+            // The cloak: wider towards the hem, frayed at the bottom, with a lit edge down each side.
+            for (int y = 10; y < 36; y++)
+            {
+                int half = 5 + (y - 10) * 9 / 26;
+                bool frayed = y >= 33;
+                for (int x = cx - half; x <= cx + half; x++)
+                {
+                    if (frayed && (x + y) % 3 == 0) continue;
+                    var color = x <= cx - half + 1 ? cloak.Light : x >= cx + half - 1 ? cloak.Dark : (x + y) % 7 == 0 ? cloak.Shade : cloak.Main;
+                    image[x, y + bob] = color;
+                }
+                if (!frayed)
+                {
+                    image[cx - half, y + bob] = trim.Main;
+                    image[cx + half, y + bob] = trim.Shade;
+                }
+            }
+            // The hood, dark inside, and the eyes.
+            for (int y = 3; y < 13; y++)
+            {
+                int half = y < 6 ? y - 1 : 6;
+                for (int x = cx - half; x <= cx + half; x++) image[x, y + bob] = cloak.Main;
+            }
+            for (int y = 6; y < 12; y++)
+            {
+                for (int x = cx - 3; x <= cx + 3; x++) image[x, y + bob] = Rgba.Hex("#08060C");
+            }
+            image[cx - 2, 8 + bob] = eye;
+            image[cx + 2, 8 + bob] = eye;
+            image[cx - 2, 9 + bob] = trim.Main;
+            image[cx + 2, 9 + bob] = trim.Main;
+            // The orb in front, with sleeves reaching to it.
+            for (int dy = -3; dy <= 3; dy++)
+            {
+                for (int dx = -3; dx <= 3; dx++)
+                {
+                    int d = dx * dx + dy * dy;
+                    if (d > 10) continue;
+                    image[cx + dx, 21 + dy + bob] = d <= 1 ? Rgba.White : d <= 4 ? orb.Light : d <= 7 ? orb.Main : orb.Shade;
+                }
+            }
+            for (int i = 0; i < 5; i++)
+            {
+                image[cx - 9 + i, 18 + i / 2 + bob] = cloak.Light;
+                image[cx + 9 - i, 18 + i / 2 + bob] = cloak.Shade;
+            }
+            // Stars turning round the head.
+            for (int i = 0; i < 6; i++)
+            {
+                double angle = (i + frame * 0.5) / 6 * System.Math.PI * 2;
+                int sx = cx + (int)System.Math.Round(System.Math.Cos(angle) * 13);
+                int sy = 8 + (int)System.Math.Round(System.Math.Sin(angle) * 4) + bob;
+                if (!image.Inside(sx, sy)) continue;
+                image[sx, sy] = i % 2 == 0 ? Rgba.White : trim.Light;
+            }
+            return image.Outlined(Rgba.Hex("#08060C"));
+        }
 
         static PixelImage Warden(Rgba color, int frame, bool molten = false)
         {

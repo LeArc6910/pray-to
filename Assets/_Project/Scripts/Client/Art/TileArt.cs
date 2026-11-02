@@ -16,6 +16,7 @@ namespace Game.Client
         MithrilOre,
         ObsidianOre,
         Lava,
+        VoidOre,
     }
 
     // The cave tiles, 16 pixels a tile, seen from above and a little in front like Core Keeper: a wall shows its
@@ -28,7 +29,7 @@ namespace Game.Client
         public const int Size = 16;
         public const int Variants = 4;
         const int Masks = 16;
-        const int Kinds = 9;
+        const int Kinds = 10;
         // Every kind is drawn once for each biome, in that biome's colours (Docs/Biomes.md).
         public static readonly int Biomes = System.Enum.GetValues(typeof(Biome)).Length;
         // Neighbour bits: which sides are rock.
@@ -49,7 +50,7 @@ namespace Game.Client
 
         public static bool IsRock(TileType type) =>
             type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre
-            || type == TileType.ObsidianOre;
+            || type == TileType.ObsidianOre || type == TileType.VoidOre;
 
         // Which ground tile goes at (x, y), in the colours of its biome. Outside the map reads as wall.
         public static int GroundAt(TileMap map, int x, int y, bool inArena, Biome biome = Biome.Cave)
@@ -65,6 +66,7 @@ namespace Game.Client
                 TileType.IronOre => GroundKind.IronOre,
                 TileType.MithrilOre => GroundKind.MithrilOre,
                 TileType.ObsidianOre => GroundKind.ObsidianOre,
+                TileType.VoidOre => GroundKind.VoidOre,
                 TileType.Lava => GroundKind.Lava,
                 _ => inArena ? GroundKind.Arena : GroundKind.Floor,
             };
@@ -99,6 +101,7 @@ namespace Game.Client
                 GroundKind.MithrilOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#7CD2E2"), sparkle: true),
                 GroundKind.ObsidianOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#4A3268"), sparkle: true),
                 GroundKind.Lava => Lava(mask, variant),
+                GroundKind.VoidOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#B48CFF"), sparkle: true),
                 _ => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#A9BDD6"), sparkle: true),
             };
         }
@@ -195,6 +198,7 @@ namespace Game.Client
             Biome.Ice => IceFloor,
             Biome.Crystal => CrystalFloor,
             Biome.Lava => LavaFloor,
+            Biome.Abyss => AbyssFloor,
             _ => CaveFloor,
         };
 
@@ -204,6 +208,7 @@ namespace Game.Client
             Biome.Ice => IceRock,
             Biome.Crystal => CrystalRock,
             Biome.Lava => LavaRock,
+            Biome.Abyss => AbyssRock,
             _ => RockColors,
         };
 
@@ -226,6 +231,21 @@ namespace Game.Client
             Top = Rgba.Hex("#3E3C58"), TopDark = Rgba.Hex("#36344E"), TopLight = Rgba.Hex("#4A4866"), Rim = Rgba.Hex("#7E7AA8"),
             FaceTop = Rgba.Hex("#66628C"), FaceBottom = Rgba.Hex("#4C496C"), Strata = Rgba.Hex("#3E3B5A"), FaceSpeck = Rgba.Hex("#9AD8E8"),
             Contact = Rgba.Hex("#1C1A2C"), Outline = Rgba.Hex("#100F1A"),
+        };
+
+        // The abyss: near-black stone with a violet cast, and specks of starlight.
+        static readonly FloorPalette AbyssFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#16121F"), Dark = Rgba.Hex("#120F19"), Light = Rgba.Hex("#1C1727"),
+            Pebble = Rgba.Hex("#282036"), PebbleLight = Rgba.Hex("#362A48"), PebbleShadow = Rgba.Hex("#0B0910"),
+            Decor = Rgba.Hex("#9A7CFF"), DecorLight = Rgba.Hex("#F0E8FF"),
+        };
+
+        static readonly RockPalette AbyssRock = new RockPalette
+        {
+            Top = Rgba.Hex("#2A2238"), TopDark = Rgba.Hex("#241D30"), TopLight = Rgba.Hex("#342A46"), Rim = Rgba.Hex("#6A54A0"),
+            FaceTop = Rgba.Hex("#46386A"), FaceBottom = Rgba.Hex("#30264A"), Strata = Rgba.Hex("#5A3CA0"), FaceSpeck = Rgba.Hex("#C8B4FF"),
+            Contact = Rgba.Hex("#0E0B14"), Outline = Rgba.Hex("#08060C"),
         };
 
         static readonly RockPalette LavaRock = new RockPalette
@@ -269,6 +289,14 @@ namespace Game.Client
                     break;
                 case Biome.Lava:
                     for (int i = 0; i < 4; i++) rock[x + i, y + (i % 2)] = i % 2 == 0 ? floor.Decor : floor.DecorLight;
+                    break;
+                case Biome.Abyss:
+                    // A star caught in the rock.
+                    rock[x + 1, y] = floor.DecorLight;
+                    rock[x, y] = floor.Decor.Scale(0.7f);
+                    rock[x + 2, y] = floor.Decor.Scale(0.7f);
+                    rock[x + 1, y - 1] = floor.Decor.Scale(0.7f);
+                    rock[x + 1, y + 1] = floor.Decor.Scale(0.7f);
                     break;
             }
             return rock;
@@ -366,6 +394,12 @@ namespace Game.Client
                     image[x, y] = colors.Decor;
                     if (variant % 2 == 0) image[x + 1, y] = colors.DecorLight;
                     image[x - 3, y + 2] = colors.Decor.Scale(0.6f);
+                    break;
+                case Biome.Abyss:
+                    // Motes of light on the floor, one bright.
+                    image[x, y] = variant % 2 == 0 ? colors.DecorLight : colors.Decor;
+                    image[x - 3, y + 2] = colors.Decor.Scale(0.6f);
+                    if (variant == 3) image[x + 3, y - 2] = colors.Decor.Scale(0.8f);
                     break;
             }
         }

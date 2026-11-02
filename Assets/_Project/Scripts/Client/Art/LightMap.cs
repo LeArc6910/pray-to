@@ -226,6 +226,7 @@ namespace Game.Client
         {
             Biome.Mushroom => 0.12f,
             Biome.Lava => 0.14f,
+            Biome.Abyss => 0.06f,
             Biome.Ice => 0.06f,
             Biome.Crystal => 0.06f,
             _ => 0,

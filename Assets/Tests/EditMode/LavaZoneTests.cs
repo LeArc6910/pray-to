@@ -105,5 +105,39 @@ namespace Game.Core.Tests
             for (int i = 0; i < World.TicksPerSecond * 20 && !player.Afflictions.Burning && !player.IsDead; i++) world.Step();
             Assert.IsTrue(player.Afflictions.Burning || player.IsDead, "its blows set the player alight");
         }
-    }
+            [TestCase(1UL)]
+        [TestCase(2UL)]
+        [TestCase(7UL)]
+        public void TheAbyssLiesBeyondTheLavaArenaWithVoidOre(ulong seed)
+        {
+            var world = WorldGenerator.Generate(seed);
+            var abyss = world.Arenas[3];
+            Assert.AreEqual(Biome.Abyss, world.Biomes.At(abyss));
+            var field = new FlowField(world.Map);
+            field.Build(new[] { world.Arenas[2] }, int.MaxValue - 1);
+            Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(TileMap.Cell(abyss.X), TileMap.Cell(abyss.Y)), "a tunnel runs from the lava arena");
+            var veins = TilesOf(world.Map, TileType.VoidOre).ToList();
+            Assert.Greater(veins.Count, 5);
+            Assert.IsTrue(veins.All(v => world.Biomes[v.X, v.Y] == Biome.Abyss), "void ore only in the abyss");
+            Assert.IsTrue(veins.All(v => Vec2.Distance(TileMap.Center(v.X, v.Y), abyss) > WorldGenerator.ArenaRadius), "none in the arena");
+        }
+
+        [Test]
+        public void TheVoidLordEndsTheClimb()
+        {
+            var lord = Bosses.Shipped.Bosses.Single(b => b.Id == "void_lord");
+            Assert.AreSame(lord, Bosses.Shipped.Bosses[3], "fourth, for the fourth arena");
+            Assert.AreEqual(40, lord.DropLevel);
+            Assert.Greater(lord.Health, Titan.Health);
+            Assert.AreEqual(SkillTag.Cold, lord.Element);
+            Assert.AreEqual(30, Tiles.Shipped.Find(TileType.VoidOre).Pickaxe, "an obsidian pickaxe or better");
+            Assert.AreEqual(30, Gear.Data.FindBase("obsidian_pickaxe").Level);
+            Assert.IsTrue(Gear.Data.Recipes.Where(r => r.Item?.Level == 40).All(r => r.Ingredients.Any(i => i.Material.Id == "void_essence")),
+                "void gear takes the lord's essence");
+            Assert.AreEqual(6, Gear.Data.Recipes.Count(r => r.Item?.Level == 40));
+            Assert.AreEqual(2, new LootGenerator(Gear.Data).LegendariesOf("void_lord").Count());
+            foreach (string id in new[] { "void_wisp", "abyss_stalker" }) Assert.AreEqual(Biome.Abyss, Monsters.Shipped.Find(id).Biome, id);
+            Assert.AreEqual("공허의 심연", BiomeMap.Name(Biome.Abyss));
+        }
+}
 }

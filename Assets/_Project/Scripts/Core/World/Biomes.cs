@@ -12,6 +12,8 @@ namespace Game.Core
         Ice,
         Crystal,
         Lava,
+        // The far end of one of the corners beside the lava fields, past AbyssDistance (Docs/Biomes.md).
+        Abyss,
     }
 
     // Which biome every tile is in, worked out from the seed with integer math only, so the host and every client
@@ -20,6 +22,8 @@ namespace Game.Core
     {
         // Plain cave this far around the spawn (give or take the wobble).
         public const int CaveRadius = 32;
+        // The abyss takes its corner this far from the spawn, along either axis.
+        public const int AbyssDistance = 40;
         const int Wobble = 8;
         const int Cell = 16;
 
@@ -45,7 +49,9 @@ namespace Game.Core
 
         // corner is the deep arena's corner as signs (±1, ±1): the crystal caverns lie there, the lava fields
         // opposite; mushroomFirst picks which of the other two corners gets the mushroom forest.
-        public static BiomeMap Make(ulong seed, int width, int height, int spawnX, int spawnY, (int X, int Y) corner, bool mushroomFirst)
+        // abyss is the corner whose far end is the abyss, or null for none.
+        public static BiomeMap Make(ulong seed, int width, int height, int spawnX, int spawnY, (int X, int Y) corner, bool mushroomFirst,
+            (int X, int Y)? abyss = null)
         {
             var tiles = new Biome[width * height];
             for (int y = 0; y < height; y++)
@@ -61,6 +67,13 @@ namespace Game.Core
                     if (sx == corner.X && sy == corner.Y) biome = Biome.Crystal;
                     else if (sx == -corner.X && sy == -corner.Y) biome = Biome.Lava;
                     else biome = (sx == corner.X) == mushroomFirst ? Biome.Mushroom : Biome.Ice;
+                    // The square at the far end of the abyss corner, with a wobbly edge of its own.
+                    if (abyss is (int ax, int ay) && sx == ax && sy == ay
+                        && Math.Min(Math.Abs(dx), Math.Abs(dy)) + Noise(seed, x, y, 3) / 2 >= AbyssDistance - 8
+                        && Math.Max(Math.Abs(dx), Math.Abs(dy)) >= AbyssDistance)
+                    {
+                        biome = Biome.Abyss;
+                    }
                     tiles[y * width + x] = biome;
                 }
             }
@@ -98,6 +111,7 @@ namespace Game.Core
             Biome.Ice => "얼음 동굴",
             Biome.Crystal => "수정 동굴",
             Biome.Lava => "용암 지대",
+            Biome.Abyss => "공허의 심연",
             _ => "흙 동굴",
         };
     }

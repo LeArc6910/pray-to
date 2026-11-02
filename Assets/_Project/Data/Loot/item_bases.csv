@@ -40,6 +40,16 @@ obsidian_armor,흑요석 갑옷,chest,30,,Armor+45~55;MaxHealth+40~50,3,100
 obsidian_boots,흑요석 장화,boots,30,,Armor+18~22,2,100
 obsidian_ring,흑요석 반지,ring,30,,MaxHealth+36~45,1,60
 obsidian_amulet,흑요석 목걸이,amulet,30,,Damage+9~12%,1,60
+obsidian_pickaxe,흑요석 곡괭이,weapon,30,melee,Damage+14~16;MiningSpeed+180%,1,0,pickaxe
+# 5단계: 공허
+void_sword,공허 검,weapon,40,melee,Damage+55~65,3,100
+void_bow,공허 활,weapon,40,ranged,Damage+45~55;AttackSpeed+5%,3,100
+void_staff,공허 지팡이,weapon,40,magic,Damage+45~55;Magic:Damage+50%;AttackSpeed-15%,3,100
+void_helmet,공허 투구,helmet,40,,Armor+42~50,2,100
+void_armor,공허 갑옷,chest,40,,Armor+70~85;MaxHealth+60~75,3,100
+void_boots,공허 장화,boots,40,,Armor+28~34,2,100
+void_ring,공허 반지,ring,40,,MaxHealth+55~65,1,60
+void_amulet,공허 목걸이,amulet,40,,Damage+12~15%,1,60
 # 전설: 보스만 떨어뜨린다(legendary, chance%). 정해진 능력치, 소켓은 모두 열려 있다
 warden_maul,수호자의 바위망치,weapon,10,melee,Damage+15~18;Armor+8~10;AttackSpeed-10%,2,0,,cave_warden,25,
 warden_heart,수호자의 심장석,amulet,10,,MaxHealth+20~25;HealthRegen+2;Armor+4~6,1,0,,cave_warden,25,
@@ -47,3 +57,5 @@ queen_fang,여왕의 독니,weapon,20,ranged,Damage+20~24;AttackSpeed+15%;CritCh
 queen_crown,수정 왕관,helmet,20,,Armor+16~20;Magic:Damage+20%;CritDamage+20,2,0,,crystal_queen,25,
 titan_cinder,거인의 불씨,weapon,30,magic|fire,Damage+30~36;Magic:Damage+50%;Fire:Damage+25%;AttackSpeed-15%,3,0,,lava_titan,25,
 titan_plate,용암 거인의 갑주,chest,30,,Armor+50~60;MaxHealth+45~55;HealthRegen+3,3,0,,lava_titan,25,
+lord_scepter,공허 군주의 홀,weapon,40,magic|lightning,Damage+55~62;Magic:Damage+60%;Lightning:Damage+30%;AttackSpeed-15%,3,0,,void_lord,25,
+void_band,공허의 고리,ring,40,,MaxHealth+50~60;Damage+12%;CritChance+5;AttackSpeed+8%,1,0,,void_lord,25,

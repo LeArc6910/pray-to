@@ -59,7 +59,8 @@ namespace Game.Core.Tests
         [TestCase(9, 1)]
         [TestCase(10, 10)]
         [TestCase(25, 20)]
-        [TestCase(99, 30)]
+        [TestCase(35, 30)]
+        [TestCase(99, 40)]
         public void OnlyTheNewestStepOfBasesDrops(int level, int step)
         {
             var bases = new LootGenerator(Data).BasesAt(level);

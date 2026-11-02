@@ -67,7 +67,7 @@ namespace Game.Core.Tests
             Assert.IsTrue(Gear.Data.Recipes.Where(r => r.Item?.Level == 10 && !r.Item.IsPickaxe).All(r => r.Ingredients.Any(i => i.Material.Id == "warden_core")),
                 "iron gear takes the boss's core");
             var pickaxes = Gear.Data.Bases.Where(b => b.IsPickaxe).Select(b => b.Id).ToList();
-            CollectionAssert.AreEqual(new[] { "copper_pickaxe", "iron_pickaxe", "mithril_pickaxe" }, pickaxes);
+            CollectionAssert.AreEqual(new[] { "copper_pickaxe", "iron_pickaxe", "mithril_pickaxe", "obsidian_pickaxe" }, pickaxes);
             Assert.IsTrue(pickaxes.All(id => Gear.Data.Recipes.Any(r => r.Item?.Id == id)), "every pickaxe can be made");
             Assert.IsTrue(Gear.Data.Bases.Where(b => b.IsPickaxe).All(b => b.Slot == ItemSlot.Weapon && b.Weight == 0), "held, and made rather than dropped");
             Assert.AreEqual(TileType.Wall, Stone.Places);

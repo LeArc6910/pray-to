@@ -12,6 +12,7 @@ namespace Game.Client
         Crystal,
         Lava,
         Boss,
+        Abyss,
     }
 
     // Sound that loops under the music: the cave's wind and drips, the lava's rumble and bubbles, and the hum of a
@@ -97,6 +98,12 @@ namespace Game.Client
             {
                 Bpm = 92, Root = 40, Scale = Phrygian, Chords = new[] { 0, 1, 0, 6 }, Bass = Wave.Saw, BassNotes = 8, Lead = Wave.Square,
                 LeadVolume = 0.2f, Arp = Wave.Pulse, ArpVolume = 0.08f, Rest = 0.45f, Drums = true, Echo = 0.2f, Seed = 5,
+            },
+            // Slow and cold: a sine melody high over a held bass, wide echoes.
+            Tune.Abyss => new Style
+            {
+                Bpm = 60, Root = 47, Scale = Phrygian, Chords = new[] { 0, 1, 5, 6 }, Lead = Wave.Sine, LeadOctave = 2, LeadVolume = 0.24f,
+                Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 1, Rest = 0.55f, Echo = 0.5f, Seed = 7,
             },
             Tune.Boss => new Style
             {

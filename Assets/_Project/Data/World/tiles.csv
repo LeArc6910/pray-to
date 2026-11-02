@@ -18,3 +18,4 @@ Lava,용암,1,stone,1,,,,3.5,#FF6A20,
 Bed,침대,1,bed,1,,,,,,
 Sprinkler,스프링클러,1,sprinkler,1,,,,,,
 Harvester,수확기,1,harvester,1,,,,,,
+VoidOre,공허석 광맥,24,void_ore,1,,,yes,1.5,#9A6CFF,30

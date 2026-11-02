@@ -22,3 +22,11 @@ lava_titan,charge,돌진,2|3,charge,farthest,1.1,34,,12,,2.6,,,16,1.2,20,
 lava_titan,eruption,분화,2|3,circle,each,1.1,28,2.2,,,,1,,,1.0,20,
 lava_titan,magma_storm,용암 폭풍,3,burst,self,0.6,15,0.3,,,,22,,8,0.9,15,
 lava_titan,call_slimes,용암 슬라임 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,magma_slime
+void_lord,grasp,공허의 손아귀,,cone,nearest,0.8,44,,3.8,110,,,,,0.8,25,
+void_lord,star_fall,별똥별,,circle,random,1.2,38,1.8,,,,8,5,,1.0,25,
+void_lord,beam,공허 광선,1|2,line,nearest,0.9,46,,13,,1.6,,,,1.0,20,
+void_lord,void_ring,공허 고리,1|2,burst,self,0.6,22,0.3,,,,20,,9.5,0.9,20,
+void_lord,blink,돌진,2|3,charge,farthest,0.9,48,,14,,2.6,,,20,1.1,20,
+void_lord,collapse,붕괴,2|3,circle,each,1.0,40,2.6,,,,1,,,1.0,20,
+void_lord,void_storm,공허 폭풍,3,burst,self,0.6,22,0.3,,,,32,,9.5,0.8,15,
+void_lord,call_wisps,정령 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,void_wisp
