@@ -55,6 +55,10 @@ namespace Game.Client
             // A short lunge toward each attack: time left and which way.
             public float LungeTime;
             public Vector2 Lunge;
+            // A player's poses (CreatureArt.Pose): time left in a strike, a cast and a flinch.
+            public float StrikeTime;
+            public float CastTime;
+            public float HurtTime;
             public Vector3 Position;
             public Vector3 LastPosition;
             public float Walked;
@@ -139,6 +143,15 @@ namespace Game.Client
         const float BannerSeconds = 2.2f;
         const float FlashLife = 0.35f;
         const float LungeSeconds = 0.14f;
+        // How long a player holds each pose: a strike (the first part with the weapon raised), a cast, a flinch.
+        const float StrikeSeconds = 0.24f;
+        const float WindUpSeconds = 0.07f;
+        const float CastSeconds = 0.3f;
+        const float HurtSeconds = 0.25f;
+        // A standing player breathes in every other BreathSeconds and blinks for BlinkSeconds every BlinkEvery.
+        const float BreathSeconds = 0.8f;
+        const float BlinkEvery = 3.4f;
+        const float BlinkSeconds = 0.13f;
         // How far a body leans into an attack, in tiles (two pixels).
         const float LungeDistance = 2f / Sprites.PixelsPerUnit;
         const float BitSeconds = 0.5f;
@@ -794,6 +807,7 @@ namespace Game.Client
                     if (attacker == null) break;
                     attacker.LungeTime = LungeSeconds;
                     attacker.Lunge = new Vector2(e.Direction.X, e.Direction.Y).normalized;
+                    attacker.StrikeTime = StrikeSeconds;
                     // A spirit just darts at what it strikes; the hit makes the sound.
                     if (attacker.Kind == BodyKind.Minion) break;
                     var kind = (BasicAttackKind)e.Amount;
@@ -807,6 +821,7 @@ namespace Game.Client
                     var target = Find(e.Target);
                     if (target == null) break;
                     target.FlashTime = FlashSeconds;
+                    target.HurtTime = HurtSeconds;
                     bool hurtsMe = e.Target == _client.PlayerId;
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
                     _floating.Add(new Floating { Position = target.Position, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
@@ -952,14 +967,17 @@ namespace Game.Client
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
+                    caster.CastTime = CastSeconds;
                     AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, FlashKind.Ring);
                     if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.06f);
                     break;
                 case SkillKind.Buff:
                 case SkillKind.Summon:
+                    caster.CastTime = CastSeconds;
                     AddFlash(caster.Position, caster.Diameter * (skill.Kind == SkillKind.Summon ? 2 : 1), color, skill.Kind == SkillKind.Summon ? FlashKind.Ring : FlashKind.Sparkles);
                     break;
                 case SkillKind.Projectile:
+                    caster.StrikeTime = StrikeSeconds;
                     caster.SwingTime = SwingSeconds;
                     caster.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     break;
@@ -1126,7 +1144,7 @@ namespace Game.Client
             int order = 10000 - Mathf.RoundToInt(position.Y * 10);
 
             bool dead = health <= 0;
-            Animate(body, facing, deltaTime);
+            Animate(body, facing, deltaTime, dead);
             float scale = 1 + pulse * Mathf.Sin(Time.time * 30);
             body.Shape.transform.localScale = new Vector3(1, scale, 1);
             // Leaning into an attack: out and back along its direction.
@@ -1167,11 +1185,14 @@ namespace Game.Client
 
             body.SwingTime = Mathf.Max(0, body.SwingTime - deltaTime);
             body.FlashTime = Mathf.Max(0, body.FlashTime - deltaTime);
+            body.StrikeTime = Mathf.Max(0, body.StrikeTime - deltaTime);
+            body.CastTime = Mathf.Max(0, body.CastTime - deltaTime);
+            body.HurtTime = Mathf.Max(0, body.HurtTime - deltaTime);
         }
 
-        // Players walk in three directions (left is right flipped) while they move and stand still otherwise;
+        // Players look three ways (left is right flipped) and strike, cast, flinch, walk or stand (CreatureArt.Pose);
         // monsters face left or right and bob, faster while they move; the boss breathes.
-        void Animate(Body body, Vec2 facing, float deltaTime)
+        void Animate(Body body, Vec2 facing, float deltaTime, bool dead)
         {
             float speed = deltaTime > 0 ? Vector3.Distance(body.Position, body.LastPosition) / deltaTime : 0;
             bool moving = speed > 0.3f && speed < 30;
@@ -1179,11 +1200,12 @@ namespace Game.Client
             bool left = facing.X < 0;
             int frame;
             var look = Look.Side;
+            var pose = Pose.Stand;
             switch (body.Kind)
             {
                 case BodyKind.Player:
                     look = Mathf.Abs(facing.X) >= Mathf.Abs(facing.Y) ? Look.Side : facing.Y > 0 ? Look.Up : Look.Down;
-                    frame = moving ? Mathf.FloorToInt(body.Walked * 8) % CreatureArt.WalkFrames : 0;
+                    (pose, frame) = PlayerPose(body, moving, dead);
                     left &= look == Look.Side;
                     break;
                 case BodyKind.Monster:
@@ -1195,13 +1217,13 @@ namespace Game.Client
                     break;
             }
 
-            int code = ((int)look * 16 + frame) * 2 + (left ? 1 : 0);
+            int code = (((int)pose * 3 + (int)look) * 16 + frame) * 2 + (left ? 1 : 0);
             if (code == body.Frame) return;
             body.Frame = code;
-            string key = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{look}/{frame}";
+            string key = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{look}/{pose}/{frame}";
             Func<PixelImage> draw = body.Kind switch
             {
-                BodyKind.Player => () => CreatureArt.Player(look, frame, body.Color),
+                BodyKind.Player => () => CreatureArt.Player(look, frame, body.Color, pose),
                 BodyKind.Monster => () => CreatureArt.Monster(body.Id, body.Color, frame),
                 BodyKind.Minion => () => CreatureArt.Minion(body.Color, frame),
                 _ => () => CreatureArt.Boss(body.Id, body.Color, frame),
@@ -1211,6 +1233,20 @@ namespace Game.Client
             body.Shape.flipX = left;
             body.Glow.flipX = left;
             body.Top = -body.Feet + body.Shape.sprite.rect.height / Sprites.PixelsPerUnit;
+        }
+
+        // What a player is doing, most pressing first: flinching from a hit, striking (a swing, a shot, a thrown
+        // skill), casting, walking; standing, they breathe and now and then blink, each at their own moment.
+        static (Pose, int) PlayerPose(Body body, bool moving, bool dead)
+        {
+            if (dead) return (Pose.Stand, 0);
+            if (body.HurtTime > 0) return (Pose.Hurt, 0);
+            if (body.StrikeTime > 0) return (Pose.Strike, body.StrikeTime > StrikeSeconds - WindUpSeconds ? 0 : 1);
+            if (body.CastTime > 0) return (Pose.Cast, 0);
+            if (moving) return (Pose.Walk, Mathf.FloorToInt(body.Walked * 8) % CreatureArt.WalkFrames);
+            float time = Time.time + body.Seed * 0.61f;
+            if (time % BlinkEvery < BlinkSeconds) return (Pose.Stand, CreatureArt.Blink);
+            return (Pose.Stand, Mathf.FloorToInt(time / BreathSeconds) % 2 == 1 ? CreatureArt.Breath : 0);
         }
 
         // The weapon in a player's hand, beside them on the side they face (behind them when they face away). A swing

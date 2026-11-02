@@ -10,6 +10,18 @@ namespace Game.Client
         Side,
     }
 
+    // What a player is doing, which decides the frame drawn (WorldView picks it). The frames of each:
+    // Stand: 0 still, 1 breathing in (a pixel taller), 2 blinking. Walk: the WalkFrames of a step cycle.
+    // Strike: 0 the weapon raised, 1 brought through. Cast: arms raised. Hurt: flinching, eyes shut.
+    enum Pose
+    {
+        Stand,
+        Walk,
+        Strike,
+        Cast,
+        Hurt,
+    }
+
     // Players, monsters and the boss, at the tiles' 16 pixels a tile. Each comes in a few frames: players walk in
     // three directions, monsters bob or squash on the spot. Monsters are drawn in their sheet colour
     // (monsters.csv), so a recoloured monster needs no change here, and a monster with no drawing of its own is a
@@ -18,6 +30,10 @@ namespace Game.Client
     {
         public const int WalkFrames = 4;
         public const int IdleFrames = 2;
+        public const int StandFrames = 3;
+        public const int Breath = 1;
+        public const int Blink = 2;
+        public const int StrikeFrames = 2;
 
         static readonly Rgba Eye = Rgba.Hex("#1C1626");
         static readonly Rgba Shine = Rgba.Hex("#FFFFFF");
@@ -57,11 +73,12 @@ namespace Game.Client
             "..hSsssS..",
         };
 
+        // The bodies without hands: Hands puts them where the pose has them.
         static readonly string[] BodyDown =
         {
             ".tTTUUTTt.",
             "tTTTUUTTTt",
-            "sTTTTTTTTs",
+            "tTTTTTTTTt",
             ".bbbBBbbb.",
             ".tTTTTTTt.",
         };
@@ -70,7 +87,7 @@ namespace Game.Client
         {
             ".tTTTTTTt.",
             "tTTTTTTTTt",
-            "sTTTTTTTTs",
+            "tTTTTTTTTt",
             ".bbbbbbbb.",
             ".tTTTTTTt.",
         };
@@ -79,10 +96,13 @@ namespace Game.Client
         {
             "..tTTTTt..",
             "..tTTUTt..",
-            "..tTTsTt..",
+            "..tTTTTt..",
             "..bbbBbb..",
             "..tTTTTt..",
         };
+
+        // The head's row with the upper half of the eyes; a blink or a flinch leaves only the lower half.
+        const int EyeRow = 4;
 
         // Legs for the walk cycle: stand, step with one foot, stand, step with the other.
         static readonly string[][] LegsFront =
@@ -101,6 +121,11 @@ namespace Game.Client
             new[] { "...PpP....", "..oo.oo..." },
         };
 
+        // Feet planted apart for a strike, and drawn together in a flinch (facing down or up; side on, a strike
+        // takes a stride and a flinch stands).
+        static readonly string[] LegsWide = { ".pP....Pp.", ".oo....oo." };
+        static readonly string[] LegsTogether = { "...pPPp...", "...oooo..." };
+
         static readonly Dictionary<char, Rgba> PlayerColors = new Dictionary<char, Rgba>
         {
             ['h'] = Rgba.Hex("#6B4226"),
@@ -115,8 +140,9 @@ namespace Game.Client
             ['o'] = Rgba.Hex("#5A3A24"),
         };
 
-        // A player in a tunic of the given colour: blue for you, other colours for the others.
-        public static PixelImage Player(Look look, int frame, Rgba tunic)
+        // A player in a tunic of the given colour (blue for you, other colours for the others), in a pose and its
+        // frame (Pose).
+        public static PixelImage Player(Look look, int frame, Rgba tunic, Pose pose = Pose.Walk)
         {
             var ramp = Ramp.Of(tunic);
             var colors = new Dictionary<char, Rgba>(PlayerColors)
@@ -127,15 +153,123 @@ namespace Game.Client
             };
             var head = look == Look.Down ? HeadDown : look == Look.Up ? HeadUp : HeadSide;
             var body = look == Look.Down ? BodyDown : look == Look.Up ? BodyUp : BodySide;
-            var legs = (look == Look.Side ? LegsSide : LegsFront)[frame % WalkFrames];
+            var legs = Legs(look, pose, frame);
             // An empty row on top, so a step can lift the head and body a pixel without clipping the hair.
-            var rows = new List<string> { new string('.', head[0].Length) };
-            rows.AddRange(head);
-            rows.AddRange(body);
-            rows.AddRange(legs);
-            var image = PixelImage.FromRows(colors, rows.ToArray());
-            if (frame % 2 == 1) image = Lift(image, rows.Count - legs.Length);
+            var rows = new List<char[]> { new string('.', head[0].Length).ToCharArray() };
+            foreach (string row in head) rows.Add(row.ToCharArray());
+            int bodyTop = rows.Count;
+            foreach (string row in body) rows.Add(row.ToCharArray());
+            foreach (string row in legs) rows.Add(row.ToCharArray());
+            if (pose == Pose.Hurt || pose == Pose.Stand && frame == Blink)
+            {
+                var eyes = rows[1 + EyeRow];
+                for (int x = 0; x < eyes.Length; x++) if (eyes[x] == 'e') eyes[x] = 's';
+            }
+            foreach (var (x, y, c) in Hands(look, pose, frame)) rows[bodyTop + y][x] = c;
+
+            var grid = new string[rows.Count];
+            for (int y = 0; y < rows.Count; y++) grid[y] = new string(rows[y]);
+            var image = PixelImage.FromRows(colors, grid);
+            // A step's bob, and breathing in: the head and body a pixel up over the same legs.
+            if (pose == Pose.Walk && frame % 2 == 1 || pose == Pose.Stand && frame == Breath) image = Lift(image, bodyTop + body.Length);
             return image.Outlined(Rgba.Hex("#140E10"));
+        }
+
+        static string[] Legs(Look look, Pose pose, int frame)
+        {
+            bool side = look == Look.Side;
+            return pose switch
+            {
+                Pose.Walk => (side ? LegsSide : LegsFront)[frame % WalkFrames],
+                Pose.Strike => side ? LegsSide[1] : LegsWide,
+                Pose.Hurt => side ? LegsSide[0] : LegsTogether,
+                _ => (side ? LegsSide : LegsFront)[0],
+            };
+        }
+
+        // The hands, and the sleeves that move with them, in rows from the top of the body (−1 is beside the chin;
+        // '.' clears a sleeve the arm has left). At the sides they swing against the legs as the player walks; the
+        // weapon hand goes up and then through a strike; both go up for a cast; a flinch draws them in. Facing down
+        // the weapon is on the right of the picture and facing up on the left, as WorldView.ShowWeapon holds it;
+        // side on, only the near hand shows.
+        static IEnumerable<(int X, int Y, char C)> Hands(Look look, Pose pose, int frame)
+        {
+            if (look == Look.Side)
+            {
+                switch (pose)
+                {
+                    case Pose.Walk:
+                        yield return (frame == 1 ? 7 : frame == 3 ? 2 : 5, 2, 's');
+                        break;
+                    case Pose.Strike when frame == 0:
+                        yield return (3, 0, 's');
+                        break;
+                    case Pose.Strike:
+                        yield return (8, 2, 's');
+                        break;
+                    case Pose.Cast:
+                        yield return (8, 1, 't');
+                        yield return (8, 0, 's');
+                        break;
+                    case Pose.Hurt:
+                        yield return (3, 1, 's');
+                        break;
+                    default:
+                        yield return (5, 2, 's');
+                        break;
+                }
+                yield break;
+            }
+
+            int weapon = look == Look.Down ? 9 : 0;
+            int other = 9 - weapon;
+            switch (pose)
+            {
+                case Pose.Walk when frame % 2 == 1:
+                    // The hand on the side of the lifted foot swings back (up, shorter), the other forward (down).
+                    int back = frame == 1 ? 9 : 0;
+                    yield return (back, 1, 's');
+                    yield return (back, 2, '.');
+                    yield return (9 - back, 3, 's');
+                    break;
+                case Pose.Strike:
+                    yield return (other, 2, 's');
+                    if (frame == 0)
+                    {
+                        yield return (weapon, -1, 's');
+                        yield return (weapon, 0, 't');
+                        yield return (weapon, 2, '.');
+                    }
+                    else
+                    {
+                        yield return (weapon, 3, 's');
+                    }
+                    break;
+                case Pose.Cast:
+                    foreach (int x in new[] { 0, 9 })
+                    {
+                        yield return (x, -1, 's');
+                        yield return (x, 0, 't');
+                        yield return (x, 2, '.');
+                    }
+                    break;
+                case Pose.Hurt when look == Look.Down:
+                    yield return (0, 2, '.');
+                    yield return (9, 2, '.');
+                    yield return (2, 1, 's');
+                    yield return (7, 1, 's');
+                    break;
+                case Pose.Hurt:
+                    yield return (0, 1, 's');
+                    yield return (0, 2, '.');
+                    yield return (9, 1, 's');
+                    yield return (9, 2, '.');
+                    break;
+                default:
+                    yield return (0, 2, 's');
+                    yield return (9, 2, 's');
+                    break;
+            }
         }
 
         // Moves the rows above the legs up by one pixel. The lowest of them stays as well, so the body stretches

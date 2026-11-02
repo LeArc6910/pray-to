@@ -239,6 +239,18 @@ namespace Game.Client
             players.Add(CreatureArt.Player(Look.Down, 0, Rgba.Hex("#E08A3C")));
             rows.Add(players);
 
+            // Every pose but walking, in each direction: standing (still, breathing in, blinking), the strike's two
+            // frames, casting, flinching.
+            var poses = new List<PixelImage>();
+            foreach (var look in new[] { Look.Down, Look.Side, Look.Up })
+            {
+                for (int frame = 0; frame < CreatureArt.StandFrames; frame++) poses.Add(CreatureArt.Player(look, frame, Rgba.Hex("#3F7FD8"), Pose.Stand));
+                for (int frame = 0; frame < CreatureArt.StrikeFrames; frame++) poses.Add(CreatureArt.Player(look, frame, Rgba.Hex("#3F7FD8"), Pose.Strike));
+                poses.Add(CreatureArt.Player(look, 0, Rgba.Hex("#3F7FD8"), Pose.Cast));
+                poses.Add(CreatureArt.Player(look, 0, Rgba.Hex("#3F7FD8"), Pose.Hurt));
+            }
+            rows.Add(poses);
+
             var creatures = new List<PixelImage>();
             foreach (var monster in monsters.Monsters)
             {
