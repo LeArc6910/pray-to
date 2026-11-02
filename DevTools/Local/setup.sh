@@ -237,9 +237,11 @@ for i in "${!platforms[@]}"; do
     [ "${failed:-0}" = 0 ] || all_ok=0
     line="- $platform 테스트: ${total}개 중 ${passed}개 통과, ${failed}개 실패"
     [ "${inconclusive:-0}" = 0 ] || line="$line, **결과 없음 ${inconclusive}개**"
-    echo "$line" >> "$report"
-    failures "$results" | code_bullets >> "$report"
-    inconclusives "$results" | code_bullets >> "$report"
+    {
+        echo "$line"
+        failures "$results" | code_bullets
+        inconclusives "$results" | code_bullets
+    } >> "$report"
     summary="$summary $platform: $passed/$total passed."
     [ "${inconclusive:-0}" = 0 ] || summary="$summary $inconclusive inconclusive."
 done
