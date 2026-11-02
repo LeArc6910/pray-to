@@ -6,3 +6,6 @@ Splitter,0.5,1
 Arm,1,1
 Sprinkler,3,1
 Harvester,1,20
+Filter,0.5,1
+Generator,1,10
+Lever,1,1

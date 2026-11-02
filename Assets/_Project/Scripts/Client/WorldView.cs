@@ -660,26 +660,39 @@ namespace Game.Client
                     : machine.Kind == TileType.Arm ? ArmSprite
                     : machine.Kind == TileType.Sprinkler ? SprinklerSprite
                     : machine.Kind == TileType.Harvester ? ReelSprite
+                    : machine.Kind == TileType.Filter ? SplitterSprite
+                    // A generator's flame only while it burns.
+                    : machine.Kind == TileType.Generator ? (machine.On && machine.Progress > 0 ? FlameSprites[Mathf.FloorToInt(Time.time * 8) % ItemArt.FlameFrames] : null)
+                    : machine.Kind == TileType.Lever ? LeverSprite
                     : ChevronSprite;
                 parts.Part.transform.localPosition = center;
-                // Switched off, the moving part stands still and greys out.
-                parts.Part.color = machine.On ? Color.white : OffTint;
+                // Switched off, the moving part stands still and greys out; powered by a generator, it glows a little.
+                parts.Part.color = !machine.On ? OffTint : machine.Powered ? PoweredTint : Color.white;
                 // A robot arm waits pointing back at where it picks up, and swings over to the front as it carries.
                 float swing = machine.Kind == TileType.Arm ? Mathf.Lerp(180, 0, machine.Carried != null ? machine.Progress : 0) : 0;
                 // A sprinkler's head spins while it runs, whichever way it was placed.
-                float turn = machine.Kind == TileType.Sprinkler ? (machine.On ? Time.time * 240 % 360 : 0) : machine.Direction * 90 + swing;
+                float turn = machine.Kind == TileType.Sprinkler ? (machine.On ? Time.time * 240 % 360 : 0)
+                    // A lever leans right when on, left when off, and is not turned by its direction.
+                    : machine.Kind == TileType.Lever ? (machine.On ? -30 : 30)
+                    : machine.Kind == TileType.Generator ? 0
+                    : machine.Direction * 90 + swing;
                 parts.Part.transform.localRotation = Quaternion.Euler(0, 0, turn);
                 parts.Part.sortingOrder = machine.Kind == TileType.Arm ? -13 : -15;
                 parts.Load.sortingOrder = machine.Kind == TileType.Arm ? -12 : -14;
-                parts.Load.enabled = machine.Carried != null;
-                if (machine.Carried != null) parts.Load.sprite = Sprites.Icon(machine.Carried);
+                // A filter shows the material it picks out while it carries nothing; a generator's fuel is not shown.
+                bool carrying = machine.Carried != null && machine.Kind != TileType.Generator;
+                bool picking = machine.Kind == TileType.Filter && !carrying && machine.Setting != null;
+                parts.Load.enabled = carrying || picking;
+                if (carrying) parts.Load.sprite = Sprites.Icon(machine.Carried);
+                else if (picking) parts.Load.sprite = Sprites.Icon(machine.Setting);
+                parts.Load.transform.localScale = Vector3.one * (picking ? 0.6f : 1);
                 if (machine.Kind == TileType.Arm)
                 {
                     // In the claw.
                     float angle = (machine.Direction * 90 + swing) * Mathf.Deg2Rad;
                     parts.Load.transform.localPosition = center + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0) * 0.45f;
                 }
-                else if (machine.Kind == TileType.Splitter)
+                else if (machine.Kind == TileType.Splitter || machine.Kind == TileType.Filter)
                 {
                     parts.Load.transform.localPosition = center;
                 }
@@ -711,6 +724,15 @@ namespace Game.Client
         static Sprite SprinklerSprite => Sprites.Centered("machine/sprinkler", () => ItemArt.SprinklerHead);
 
         static Sprite ReelSprite => Sprites.Centered("machine/reel", () => ItemArt.HarvesterReel);
+
+        static Sprite LeverSprite => Sprites.Centered("machine/lever", () => ItemArt.LeverHandle);
+
+        static Sprite[] _flameSprites;
+
+        static Sprite[] FlameSprites => _flameSprites ??= Enumerable.Range(0, ItemArt.FlameFrames)
+            .Select(frame => Sprites.Centered("machine/flame" + frame, () => ItemArt.Flame(frame))).ToArray();
+
+        static readonly Color PoweredTint = new Color(1f, 1f, 0.7f);
 
         static readonly Color OffTint = new Color(0.5f, 0.5f, 0.56f);
         static readonly Color LevelColor = new Color(1f, 0.85f, 0.35f);

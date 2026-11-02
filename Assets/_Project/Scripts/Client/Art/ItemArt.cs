@@ -546,6 +546,21 @@ namespace Game.Client
                 placed = placed.Copy();
                 placed.Draw(HarvesterReel, 0, 0);
             }
+            else if (placed != null && material.Places == TileType.Filter)
+            {
+                placed = placed.Copy();
+                placed.Draw(SplitterArrows, 0, 0);
+            }
+            else if (placed != null && material.Places == TileType.Generator)
+            {
+                placed = placed.Copy();
+                placed.Draw(Flame(0), 0, 0);
+            }
+            else if (placed != null && material.Places == TileType.Lever)
+            {
+                placed = placed.Copy();
+                placed.Draw(LeverHandle, 0, 0);
+            }
             if (placed != null) return placed;
             switch (material.Id)
             {
@@ -912,6 +927,43 @@ namespace Game.Client
                 if (y % 2 == 1) image[14, y] = SteelLight;
             }
             image[12, 8] = Rgba.Hex("#F2C440");
+            return image.Outlined(Outline);
+        }
+
+        // A generator's flame behind its grate, flickering between two frames.
+        public const int FlameFrames = 2;
+
+        public static PixelImage Flame(int frame)
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            var hot = Rgba.Hex("#FFE07A");
+            var main = Rgba.Hex("#FF8A3C");
+            var deep = Rgba.Hex("#C8401E");
+            // Rows 5 to 7 of the tile from the top, inside the grate (x 5 to 10).
+            for (int x = 5; x <= 10; x++)
+            {
+                int top = 5 + ((x + frame) % 3 == 0 ? 0 : 1);
+                for (int y = top; y <= 7; y++) image[x, y] = y == 7 ? deep : (x + y + frame) % 2 == 0 ? hot : main;
+            }
+            return image;
+        }
+
+        // A lever's handle: a steel rod standing up from the middle of the base, with a red knob. The view leans it.
+        public static readonly PixelImage LeverHandle = MakeLeverHandle();
+
+        static PixelImage MakeLeverHandle()
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            for (int y = 3; y <= 9; y++)
+            {
+                image[7, y] = SteelLight;
+                image[8, y] = Steel;
+            }
+            var knob = Rgba.Hex("#E05040");
+            for (int y = 1; y <= 3; y++)
+            {
+                for (int x = 6; x <= 9; x++) image[x, y] = y == 1 && (x == 6 || x == 9) ? image[x, y] : knob;
+            }
             return image.Outlined(Outline);
         }
 

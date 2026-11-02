@@ -144,6 +144,9 @@ namespace Game.Core
         // Turns the floor ahead into soil or back (World.Till), and works fertilizer into the soil ahead (World.Fertilize).
         Till,
         Fertilize,
+        // Sets the filter ahead to a material (World.SetFilter), and puts fuel into the generator ahead (World.Refuel).
+        SetFilter,
+        Refuel,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

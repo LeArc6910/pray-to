@@ -375,6 +375,9 @@ namespace Game.Client
             TileType.Pot => PotTile,
             TileType.Soil => SoilTile,
             TileType.FertileSoil => FertileSoilTile,
+            TileType.Filter => FilterFrame,
+            TileType.Generator => GeneratorBody,
+            TileType.Lever => LeverBase,
             _ => null,
         };
 
@@ -1029,6 +1032,63 @@ namespace Game.Client
             ".oDDDDDDDDDDDDo.",
             "..oooooooooooo..",
             "..____________..",
+            "................");
+
+        // A filter: a splitter's plate with a mesh over it. Its arrows and chosen material are drawn on top.
+        static readonly PixelImage FilterFrame = PixelImage.FromRows(MetalPalette,
+            "................",
+            ".oooooooooooooo.",
+            ".omMMMMMMMMMMmo.",
+            ".obbbbbbbbbbbbo.",
+            ".obkbkbkbkbkbbo.",
+            ".obbkbkbkbkbkbo.",
+            ".obkbkbkbkbkbbo.",
+            ".obbkbkbkbkbkbo.",
+            ".obkbkbkbkbkbbo.",
+            ".obbkbkbkbkbkbo.",
+            ".obkbkbkbkbkbbo.",
+            ".obbkbkbkbkbkbo.",
+            ".obbbbbbbbbbbbo.",
+            ".odmmmmmmmmmmdo.",
+            ".oooooooooooooo.",
+            "................");
+
+        // A generator: a steel box with a firebox behind a grate; its flame is drawn on top while it burns.
+        static readonly PixelImage GeneratorBody = PixelImage.FromRows(MetalPalette,
+            "................",
+            "..oooooooooooo..",
+            ".oLLLLLLLLLLLLo.",
+            ".oLMMMMMMMMMMmo.",
+            ".oLMkkkkkkkkMmo.",
+            ".oLMkbbbbbbkMmo.",
+            ".oLMkbbbbbbkMmo.",
+            ".oLMkbbbbbbkMmo.",
+            ".oLMkkkkkkkkMmo.",
+            ".oLMMMMMMMMMMmo.",
+            ".oykykykykykyko.",
+            ".oDdddrdddgdddo.",
+            ".oDDDDDDDDDDDDo.",
+            "..oooooooooooo..",
+            "..____________..",
+            "................");
+
+        // A lever's base; the handle is drawn on top, leaning one way when on and the other when off.
+        static readonly PixelImage LeverBase = PixelImage.FromRows(MetalPalette,
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "....oooooooo....",
+            "...oLLLLLLLLo...",
+            "...oLMMMMMMmo...",
+            "...oMkkkkkkmo...",
+            "...oddddddddo...",
+            "....oooooooo....",
+            "....________....",
             "................");
 
         // The conveyor's frame: rails on both sides. The belt is drawn on top, running the way it faces.

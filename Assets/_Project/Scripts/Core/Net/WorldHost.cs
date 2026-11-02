@@ -300,7 +300,7 @@ namespace Game.Core
             long closedTicks = Math.Clamp(now - save.SavedAt, 0, 30L * 24 * 3600) * World.TicksPerSecond;
             World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Age + closedTicks, c.Watered)), save.ProgressLevel, save.Chests,
                 save.Beds);
-            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output);
+            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting);
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -337,6 +337,13 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Fish:
                     World.Fish(player.Id);
+                    break;
+                case InventoryCommand.SetFilter:
+                    // Index is the material's sheet index; Item 0 clears the filter.
+                    World.SetFilter(player.Id, command.Item == 0 || command.Index >= _loot.Materials.Count ? null : _loot.Materials[command.Index]);
+                    break;
+                case InventoryCommand.Refuel:
+                    if (command.Index < _loot.Materials.Count) World.Refuel(player.Id, _loot.Materials[command.Index]);
                     break;
                 case InventoryCommand.Till:
                     World.Till(player.Id);
@@ -476,7 +483,8 @@ namespace Game.Core
                 .Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer) <= _config.ViewRange)
                 .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
                 .Take(_config.MaxMachinesPerMessage)
-                .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled))
+                .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled,
+                    m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting), World.IsPowered(m)))
                 .ToList();
             if (near.Count == 0 && !sent.SentMachines) return;
             sent.SentMachines = near.Count > 0;

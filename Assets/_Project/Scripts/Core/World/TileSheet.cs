@@ -188,6 +188,7 @@ namespace Game.Core
         static readonly TileType[] MachineTiles =
         {
             TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester,
+            TileType.Filter, TileType.Generator, TileType.Lever,
         };
 
         static List<MachineDefinition> ParseMachines(string csv, List<string> errors)

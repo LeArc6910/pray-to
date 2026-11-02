@@ -53,6 +53,12 @@ namespace Game.Core
         // gives one more of the harvest and is used up by it (Docs/Farming.md).
         Soil,
         FertileSoil,
+        // More machines (Docs/Automation.md): a filter, walked over like a splitter, that sends one chosen material
+        // ahead and the rest aside; a generator that burns fuel and speeds up the machines around it; and a lever that
+        // switches the machines around it off and on together.
+        Filter,
+        Generator,
+        Lever,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -103,7 +109,7 @@ namespace Game.Core
         public bool IsSolid(int x, int y)
         {
             var type = this[x, y];
-            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter && type != TileType.Lava && !IsPaving(type)
+            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
                 && type != TileType.Door && !IsSoil(type);
         }
 

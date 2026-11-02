@@ -35,7 +35,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.30.0";
+        public const string Version = "0.31.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -284,6 +284,9 @@ namespace Game.Core
     // none). See Docs/Automation.md.
     public sealed class MachinesMessage
     {
+        // Beside Machine.OffBit on the direction byte: powered by a generator.
+        const int PoweredBit = 0x40;
+
         public MachinesMessage(IReadOnlyList<MachineState> machines) { Machines = machines; }
 
         public IReadOnlyList<MachineState> Machines { get; }
@@ -296,9 +299,10 @@ namespace Game.Core
                 w.Write((ushort)m.X);
                 w.Write((ushort)m.Y);
                 w.Write((byte)m.Kind);
-                w.Write((byte)(m.Direction | (m.On ? 0 : Machine.OffBit)));
+                w.Write((byte)(m.Direction | (m.On ? 0 : Machine.OffBit) | (m.Powered ? PoweredBit : 0)));
                 w.Write((byte)(m.Carried + 1));
                 w.Write((byte)Math.Clamp((int)MathF.Round(m.Progress * 255), 0, 255));
+                w.Write((ushort)(m.Setting + 1));
             }
         });
 
@@ -312,7 +316,10 @@ namespace Game.Core
                 int y = r.ReadUInt16();
                 var kind = (TileType)r.ReadByte();
                 int direction = r.ReadByte();
-                machines.Add(new MachineState(x, y, kind, direction & 3, r.ReadByte() - 1, r.ReadByte() / 255f, (direction & Machine.OffBit) == 0));
+                int carried = r.ReadByte() - 1;
+                float progress = r.ReadByte() / 255f;
+                int setting = r.ReadUInt16() - 1;
+                machines.Add(new MachineState(x, y, kind, direction & 3, carried, progress, (direction & Machine.OffBit) == 0, setting, (direction & PoweredBit) != 0));
             }
             return new MachinesMessage(machines);
         });
@@ -320,8 +327,10 @@ namespace Game.Core
 
     public readonly struct MachineState
     {
-        public MachineState(int x, int y, TileType kind, int direction, int carried, float progress, bool on = true)
+        public MachineState(int x, int y, TileType kind, int direction, int carried, float progress, bool on = true, int setting = -1, bool powered = false)
         {
+            Setting = setting;
+            Powered = powered;
             X = x;
             Y = y;
             Kind = kind;
@@ -340,6 +349,10 @@ namespace Game.Core
         public float Progress { get; }
         // Switched on (World.ToggleMachine).
         public bool On { get; }
+        // A filter's chosen material as a sheet index, or -1.
+        public int Setting { get; }
+        // Working twice as fast beside a running generator.
+        public bool Powered { get; }
     }
 
     // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.

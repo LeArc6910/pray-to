@@ -26,6 +26,8 @@ namespace Game.Core
         // A machine switched off does nothing by itself, but keeps what it holds, and others still put things in and
         // take them out.
         public bool Enabled { get; internal set; } = true;
+        // A filter's chosen material, sent straight on; null lets everything go aside.
+        public MaterialDefinition Setting { get; internal set; }
         // A conveyor's, splitter's or arm's load and how far along the tile it has come (or the arm has swung), 0 to 1.
         public MaterialDefinition Carried { get; internal set; }
         public float Progress { get; internal set; }
@@ -58,6 +60,10 @@ namespace Game.Core
     {
         // How far a sprinkler waters: the crops in the square this many tiles around it.
         public const int SprinklerReach = 2;
+        // A running generator powers the machines this far from it, which then work twice as fast; a lever switches
+        // the machines this far from it.
+        public const float PowerReach = 6;
+        public const float LeverReach = 5;
 
         readonly SortedDictionary<int, Machine> _machines = new SortedDictionary<int, Machine>();
         List<Recipe> _smelts;
@@ -87,34 +93,126 @@ namespace Game.Core
 
         void UpdateMachines()
         {
+            var generators = _machines.Values.Where(m => m.Kind == TileType.Generator && m.Enabled).ToList();
+            foreach (var generator in generators) RunGenerator(generator);
+            var running = generators.Where(g => g.Timer > 0).ToList();
             foreach (var machine in _machines.Values)
             {
-                if (!machine.Enabled) continue;
-                switch (machine.Kind)
+                if (!machine.Enabled || machine.Kind == TileType.Generator) continue;
+                // Powered: a second step every tick.
+                bool powered = running.Count > 0 && running.Any(g => Distance(g, machine) <= PowerReach);
+                Run(machine);
+                if (powered) Run(machine);
+            }
+        }
+
+        static float Distance(Machine a, Machine b) => Vec2.Distance(TileMap.Center(a.X, a.Y), TileMap.Center(b.X, b.Y));
+
+        // Whether the machine is powered by a running generator nearby, for the view.
+        public bool IsPowered(Machine machine) =>
+            machine.Kind != TileType.Generator && _machines.Values.Any(g => g.Kind == TileType.Generator && g.Enabled && g.Timer > 0 && Distance(g, machine) <= PowerReach);
+
+        void Run(Machine machine)
+        {
+            switch (machine.Kind)
+            {
+                case TileType.Drill:
+                    RunDrill(machine);
+                    break;
+                case TileType.Smelter:
+                    RunSmelter(machine);
+                    break;
+                case TileType.Conveyor:
+                    RunConveyor(machine);
+                    break;
+                case TileType.Splitter:
+                    RunSplitter(machine);
+                    break;
+                case TileType.Arm:
+                    RunArm(machine);
+                    break;
+                case TileType.Sprinkler:
+                    RunSprinkler(machine);
+                    break;
+                case TileType.Harvester:
+                    RunHarvester(machine);
+                    break;
+                case TileType.Filter:
+                    RunFilter(machine);
+                    break;
+            }
+        }
+
+        // Burns one fuel when the last has burnt out; runs (Timer above 0) while it burns. Progress is how much of
+        // the fuel is left, for the view.
+        void RunGenerator(Machine generator)
+        {
+            if (generator.Timer > 0) generator.Timer--;
+            if (generator.Timer == 0)
+            {
+                var fuel = generator.Input.Keys.FirstOrDefault(m => m.Fuel > 0);
+                if (fuel != null)
                 {
-                    case TileType.Drill:
-                        RunDrill(machine);
-                        break;
-                    case TileType.Smelter:
-                        RunSmelter(machine);
-                        break;
-                    case TileType.Conveyor:
-                        RunConveyor(machine);
-                        break;
-                    case TileType.Splitter:
-                        RunSplitter(machine);
-                        break;
-                    case TileType.Arm:
-                        RunArm(machine);
-                        break;
-                    case TileType.Sprinkler:
-                        RunSprinkler(machine);
-                        break;
-                    case TileType.Harvester:
-                        RunHarvester(machine);
-                        break;
+                    Add(generator.Input, fuel, -1);
+                    generator.Timer = Ticks(fuel.Fuel);
+                    generator.Carried = fuel;
+                }
+                else
+                {
+                    generator.Carried = null;
                 }
             }
+            generator.Progress = generator.Carried == null || generator.Timer == 0 ? 0 : generator.Timer / (float)Ticks(generator.Carried.Fuel);
+        }
+
+        // A filter sends its chosen material straight ahead, and anything else left and right in turn, never back the
+        // way it came. It waits while the way it should go cannot take it.
+        void RunFilter(Machine filter)
+        {
+            if (filter.Carried == null) return;
+            filter.Progress = Math.Min(1, filter.Progress + 1f / filter.Definition.Ticks);
+            if (filter.Progress < 1) return;
+            int[] turns = filter.Carried == filter.Setting ? new[] { 0 } : new[] { 1, 3 };
+            for (int k = 0; k < turns.Length; k++)
+            {
+                int turn = turns[(filter.Timer + k) % turns.Length];
+                int direction = (filter.Direction + turn) & 3;
+                if (direction == filter.CameFrom) continue;
+                var (dx, dy) = Machine.Steps[direction];
+                if (!Push(filter, filter.Carried, filter.X + dx, filter.Y + dy)) continue;
+                filter.Carried = null;
+                filter.Progress = 0;
+                filter.CameFrom = -1;
+                filter.Timer = (filter.Timer + k + 1) % turns.Length;
+                return;
+            }
+        }
+
+        // Sets the filter ahead of the player to pass this material straight on (null for none). False when the
+        // machine ahead is not a filter.
+        public bool SetFilter(int playerId, MaterialDefinition material)
+        {
+            var player = FindPlayer(playerId);
+            var filter = player == null || player.IsDead ? null : MachineFacing(player.Position, player.Facing);
+            if (filter == null || filter.Kind != TileType.Filter) return false;
+            filter.Setting = material;
+            return true;
+        }
+
+        // Puts the player's fuel of this kind into the generator ahead, as much as it holds. False when the machine
+        // ahead is not a generator, the material does not burn, or there is no room.
+        public bool Refuel(int playerId, MaterialDefinition fuel)
+        {
+            var player = FindPlayer(playerId);
+            var generator = player == null || player.IsDead || fuel == null || fuel.Fuel <= 0 ? null : MachineFacing(player.Position, player.Facing);
+            if (generator == null || generator.Kind != TileType.Generator) return false;
+            int room = generator.Definition.Capacity - Count(generator.Input);
+            int moved = Math.Min(room, player.Inventory.CountOf(fuel));
+            if (moved <= 0) return false;
+            player.Inventory.TakeMaterial(fuel, moved);
+            player.InventoryVersion++;
+            Add(generator.Input, fuel, moved);
+            return true;
         }
 
         // A splitter sends each load out of its front, left and right in turn, skipping a side that cannot take it and
@@ -178,8 +276,9 @@ namespace Game.Core
                         return made;
                     case TileType.Conveyor:
                     case TileType.Splitter:
+                    case TileType.Filter:
                         var load = source.Carried;
-                        bool ready = source.Kind == TileType.Splitter || (source.Progress >= 1 && source.Front == (arm.X, arm.Y));
+                        bool ready = source.Kind != TileType.Conveyor || (source.Progress >= 1 && source.Front == (arm.X, arm.Y));
                         if (load == null || !ready || !Fits(load)) return null;
                         source.Carried = null;
                         source.Progress = 0;
@@ -299,6 +398,11 @@ namespace Game.Core
             var machine = player == null || player.IsDead ? null : MachineFacing(player.Position, player.Facing);
             if (machine == null) return false;
             machine.Enabled = !machine.Enabled;
+            // A lever takes every machine in its reach with it.
+            if (machine.Kind == TileType.Lever)
+            {
+                foreach (var other in _machines.Values.Where(m => m != machine && Distance(m, machine) <= LeverReach)) other.Enabled = machine.Enabled;
+            }
             return true;
         }
 
@@ -336,6 +440,8 @@ namespace Game.Core
             {
                 TileType.Conveyor => target.Front != (from.X, from.Y),
                 TileType.Splitter => true,
+                TileType.Filter => true,
+                TileType.Generator => material.Fuel > 0,
                 TileType.Smelter => Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)),
                 _ => false,
             };
@@ -356,10 +462,15 @@ namespace Game.Core
                         target.Progress = 0;
                         return true;
                     case TileType.Splitter:
+                    case TileType.Filter:
                         if (target.Carried != null) return false;
                         target.Carried = material;
                         target.Progress = 0;
                         target.CameFrom = Array.FindIndex(Machine.Steps, s => (target.X + s.X, target.Y + s.Y) == (from.X, from.Y));
+                        return true;
+                    case TileType.Generator:
+                        if (material.Fuel <= 0 || Count(target.Input) >= target.Definition.Capacity) return false;
+                        Add(target.Input, material, 1);
                         return true;
                     case TileType.Smelter:
                         if (!Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)) || Count(target.Input) >= target.Definition.Capacity) return false;
@@ -388,12 +499,14 @@ namespace Game.Core
 
         // Puts back a machine as a world save held it.
         internal void RestoreMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
-            IEnumerable<(MaterialDefinition Material, int Count)> input, IEnumerable<(MaterialDefinition Material, int Count)> output)
+            IEnumerable<(MaterialDefinition Material, int Count)> input, IEnumerable<(MaterialDefinition Material, int Count)> output,
+            MaterialDefinition setting = null)
         {
             var machine = MachineAt(x, y);
             if (machine == null) return;
             machine.Direction = direction & 3;
             machine.Enabled = (direction & Machine.OffBit) == 0;
+            machine.Setting = setting;
             machine.Timer = timer;
             machine.Carried = carried;
             machine.Progress = progress;

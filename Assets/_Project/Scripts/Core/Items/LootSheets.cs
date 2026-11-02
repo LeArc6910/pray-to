@@ -257,7 +257,9 @@ namespace Game.Core
                         if (places == TileType.Floor) throw new FormatException("places에는 벽 같은 단단한 칸만 적을 수 있습니다.");
                     }
                     Biome? fish = row["fish"].Length > 0 ? SheetValues.ParseEnum<Biome>(row["fish"], "fish") : (Biome?)null;
-                    materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"], fish));
+                    float fuel = row["fuel"].Length > 0 ? SheetValues.ParseDecimal(row["fuel"], "fuel") : 0;
+                    if (fuel < 0) throw new FormatException("fuel은 0 이상이어야 합니다.");
+                    materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"], fish, fuel));
                 });
             }
             return materials;

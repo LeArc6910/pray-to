@@ -282,6 +282,15 @@ namespace Game.Client
         {
             GUILayout.Label("재료");
             if (_client.Bag.Materials.Count == 0) GUILayout.Label(Fit("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.", _textWidth));
+            // The machine the player faces, for the filter and generator buttons.
+            var ahead = _client.MachineAhead();
+            if (ahead?.Kind == TileType.Filter)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Fit($"거름망 분배기: {ahead.Value.Setting?.Name ?? "정하지 않음"} (재료의 [거르기]로 정한다)", _textWidth - 64));
+                if (ahead.Value.Setting != null && GUILayout.Button("비우기", GUILayout.Width(56))) Send(_client.SetFilterCommand(null), Sound.Click);
+                GUILayout.EndHorizontal();
+            }
             foreach (var pair in _client.Bag.Materials.ToList())
             {
                 GUILayout.BeginHorizontal();
@@ -293,6 +302,9 @@ namespace Game.Client
                 if (pair.Key.Id == World.WateringCan && GUILayout.Button("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
                 if (pair.Key.Id == World.FishingRod && GUILayout.Button(FishingLabel(_client), GUILayout.Width(72))) Send(_client.FishCommand(), Sound.Cast);
                 if (pair.Key.Id == World.Hoe && GUILayout.Button("밭 갈기", GUILayout.Width(64))) Send(_client.TillCommand(), Sound.Dig);
+                // Facing a filter, any material can be what it picks out; facing a generator, fuel goes in.
+                if (ahead?.Kind == TileType.Filter && GUILayout.Button("거르기", GUILayout.Width(56))) Send(_client.SetFilterCommand(pair.Key), Sound.Click);
+                if (ahead?.Kind == TileType.Generator && pair.Key.Fuel > 0 && GUILayout.Button("연료", GUILayout.Width(48))) Send(_client.RefuelCommand(pair.Key), Sound.Place);
                 if (pair.Key.Id == World.Fertilizer && GUILayout.Button("거름 주기", GUILayout.Width(72))) Send(_client.FertilizeCommand(), Sound.Place);
                 // Only what a quick slot can use: things that build, seeds and the tools.
                 if (pair.Key.Places != null || crop != null || IsTool(pair.Key))

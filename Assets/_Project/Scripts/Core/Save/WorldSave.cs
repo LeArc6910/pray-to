@@ -15,7 +15,8 @@ namespace Game.Core
     {
         const string Magic = "PTWO";
         // 2 added chests, 3 machines, 4 whether each crop was watered, 5 beds and their owners.
-        const int FormatVersion = 5;
+        // 6: a filter's chosen material on each machine.
+        const int FormatVersion = 6;
 
         WorldSave(
             ulong seed,
@@ -54,8 +55,9 @@ namespace Game.Core
         public sealed class SavedMachine
         {
             internal SavedMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
-                List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output)
+                List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output, MaterialDefinition setting = null)
             {
+                Setting = setting;
                 X = x;
                 Y = y;
                 Direction = direction;
@@ -73,6 +75,8 @@ namespace Game.Core
             public MaterialDefinition Carried { get; }
             public float Progress { get; }
             public IReadOnlyList<(MaterialDefinition Material, int Count)> Input { get; }
+            // A filter's chosen material, or null.
+            public MaterialDefinition Setting { get; }
             public IReadOnlyList<(MaterialDefinition Material, int Count)> Output { get; }
         }
         public IReadOnlyList<string> Warnings { get; }
@@ -139,6 +143,7 @@ namespace Game.Core
                     w.Write(machine.Progress);
                     SavedItems.WriteCounts(w, machine.Inputs.Select(p => (p.Key.Id, p.Value)));
                     SavedItems.WriteCounts(w, machine.Outputs.Select(p => (p.Key.Id, p.Value)));
+                    w.Write(machine.Setting?.Id ?? "");
                 }
 
                 var beds = world.Beds.ToList();
@@ -234,7 +239,9 @@ namespace Game.Core
                     MaterialDefinition Find(string id) => loot?.Materials.FirstOrDefault(m => m.Id == id);
                     List<(MaterialDefinition, int)> Resolve(List<(string Id, int Count)> stacks) =>
                         stacks.Select(s => (Find(s.Id), s.Count)).Where(s => s.Item1 != null).ToList();
-                    machines.Add(new SavedMachine(x, y, direction, timer, carried.Length > 0 ? Find(carried) : null, along, Resolve(input), Resolve(output)));
+                    string setting = version >= 6 ? r.ReadString() : "";
+                    machines.Add(new SavedMachine(x, y, direction, timer, carried.Length > 0 ? Find(carried) : null, along, Resolve(input), Resolve(output),
+                        setting.Length > 0 ? Find(setting) : null));
                 }
                 var beds = new List<(int, int, string)>();
                 for (int count = version >= 5 ? r.ReadInt32() : 0; count > 0; count--)

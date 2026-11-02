@@ -118,8 +118,11 @@ namespace Game.Core
 
     public readonly struct MachineView
     {
-        public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true)
+        public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true,
+            MaterialDefinition setting = null, bool powered = false)
         {
+            Setting = setting;
+            Powered = powered;
             X = x;
             Y = y;
             Kind = kind;
@@ -137,6 +140,9 @@ namespace Game.Core
         public MaterialDefinition Carried { get; }
         public float Progress { get; }
         public bool On { get; }
+        // A filter's chosen material, or null.
+        public MaterialDefinition Setting { get; }
+        public bool Powered { get; }
     }
 
     public readonly struct HazardView
@@ -515,8 +521,13 @@ namespace Game.Core
                 var carried = m.Carried >= 0 && _loot != null && m.Carried < _loot.Materials.Count ? _loot.Materials[m.Carried] : null;
                 float progress = m.Progress;
                 var definition = _tiles?.Machine(m.Kind);
-                if (carried != null && definition != null && m.On) progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks));
-                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On));
+                // Loads move on between messages (twice as fast with power); a generator's fuel does not.
+                if (carried != null && definition != null && m.On && m.Kind != TileType.Generator)
+                {
+                    progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks * (m.Powered ? 2 : 1)));
+                }
+                var setting = m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
+                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered));
             }
             return views;
         }
@@ -536,6 +547,13 @@ namespace Game.Core
             }
             return under;
         }
+
+        // Sets the filter ahead to pass this material straight on, or nothing.
+        public byte[] SetFilterCommand(MaterialDefinition material) =>
+            new InventoryCommandMessage(InventoryCommand.SetFilter, material == null ? 0 : 1, index: material == null ? 0 : ItemCodec.Index(_loot.Materials, material)).Encode();
+
+        public byte[] RefuelCommand(MaterialDefinition fuel) =>
+            new InventoryCommandMessage(InventoryCommand.Refuel, 0, index: ItemCodec.Index(_loot.Materials, fuel)).Encode();
 
         public byte[] TillCommand() => new InventoryCommandMessage(InventoryCommand.Till, 0).Encode();
 

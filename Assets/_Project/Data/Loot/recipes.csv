@@ -49,6 +49,9 @@ splitter,splitter,1,iron_bar:2|copper_ore:4,Workbench
 robot_arm,robot_arm,1,iron_bar:3|copper_ore:4,Workbench
 sprinkler,sprinkler,1,watering_can:1|iron_bar:2|slime_gel:2,Workbench
 harvester,harvester,1,iron_bar:4|copper_ore:6,Workbench
+filter,filter,1,iron_bar:2|copper_ore:4|slime_gel:1,Workbench
+generator,generator,1,iron_bar:5|copper_ore:6|stone:6,Workbench
+lever,lever,1,iron_bar:1|copper_ore:2,Workbench
 healing_potion,healing_potion,1,slime_gel:3,
 torch,torch,4,stone:1|slime_gel:1,
 roasted_mushroom,roasted_mushroom,1,mushroom:2,Furnace

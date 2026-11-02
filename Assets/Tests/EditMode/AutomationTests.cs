@@ -418,5 +418,93 @@ namespace Game.Core.Tests
             Assert.IsFalse(restored.Enabled);
             Assert.AreEqual(belt.Direction, restored.Direction);
         }
-    }
+            [Test]
+        public void AFilterSendsItsMaterialAheadAndTheRestAside()
+        {
+            var world = Line(out var player);
+            var chest = Gear.Data.FindMaterial("chest");
+            var stone = Gear.Data.FindMaterial("stone");
+            // A chest at (5, 8), an arm at (6, 8) and a filter at (7, 8) facing right, chests ahead and to both sides.
+            // Placed so the player always has somewhere to stand, and the filter set before it is closed in.
+            Place(world, player, Gear.Data.FindMaterial("filter"), 7, 8, new Vec2(1, 0));
+            Assert.IsTrue(world.SetFilter(player.Id, IronOre));
+            Place(world, player, chest, 7, 9, new Vec2(0, -1));
+            Place(world, player, chest, 8, 8, new Vec2(-1, 0));
+            Place(world, player, chest, 7, 7, new Vec2(0, 1));
+            Place(world, player, Gear.Data.FindMaterial("robot_arm"), 6, 8, new Vec2(1, 0));
+            Place(world, player, chest, 5, 8, new Vec2(1, 0));
+            Assert.AreSame(IronOre, world.MachineAt(7, 8).Setting);
+            world.MovePlayer(player.Id, TileMap.Center(12, 12), new Vec2(1, 0), 30);
+            world.ChestAt(5, 8).AddMaterial(IronOre, 3);
+            world.ChestAt(5, 8).AddMaterial(stone, 4);
+
+            Run(world, 20);
+
+            Assert.AreEqual(3, world.ChestAt(8, 8).CountOf(IronOre), "iron straight on");
+            Assert.AreEqual(0, world.ChestAt(8, 8).CountOf(stone));
+            Assert.AreEqual(2, world.ChestAt(7, 9).CountOf(stone), "stone left and right in turn");
+            Assert.AreEqual(2, world.ChestAt(7, 7).CountOf(stone));
+        }
+
+        [Test]
+        public void AGeneratorBurnsFuelAndDoublesTheMachinesAroundIt()
+        {
+            var world = Line(out var player);
+            var gel = Gear.Data.FindMaterial("slime_gel");
+            Place(world, player, DrillItem, 2, 3, new Vec2(-1, 0));
+            Place(world, player, Gear.Data.FindMaterial("chest"), 3, 3, new Vec2(-1, 0));
+            Place(world, player, Gear.Data.FindMaterial("generator"), 4, 5, new Vec2(0, 1));
+            Assert.IsFalse(world.IsPowered(world.MachineAt(2, 3)), "no fuel yet");
+            player.Inventory.AddMaterial(gel, 1);
+            Assert.IsTrue(world.Refuel(player.Id, gel));
+            Assert.AreEqual(0, player.Inventory.CountOf(gel));
+            Assert.IsFalse(world.Refuel(player.Id, Gear.Data.FindMaterial("stone")), "stone does not burn");
+
+            Run(world, Drill.Seconds * 2 + 0.2f);
+            Assert.IsTrue(world.IsPowered(world.MachineAt(2, 3)));
+            Assert.AreEqual(4, world.ChestAt(3, 3).CountOf(IronOre), "two ores in each drill time");
+
+            // One gel burns for 20 seconds; then the drill is back to its own speed.
+            Run(world, gel.Fuel);
+            Assert.IsFalse(world.IsPowered(world.MachineAt(2, 3)));
+            int before = world.ChestAt(3, 3).CountOf(IronOre);
+            Run(world, Drill.Seconds * 2 + 0.2f);
+            Assert.AreEqual(before + 2, world.ChestAt(3, 3).CountOf(IronOre), 1);
+        }
+
+        [Test]
+        public void ALeverSwitchesTheMachinesAroundItTogether()
+        {
+            var world = Line(out var player);
+            Place(world, player, BeltItem, 4, 3, new Vec2(1, 0));
+            Place(world, player, BeltItem, 3, 3, new Vec2(1, 0));
+            Place(world, player, DrillItem, 2, 3, new Vec2(-1, 0));
+            Place(world, player, Gear.Data.FindMaterial("lever"), 4, 5, new Vec2(0, 1));
+            Place(world, player, BeltItem, 13, 13, new Vec2(1, 0));
+            Face(world, player, 4, 5, new Vec2(0, 1));
+
+            Assert.IsTrue(world.ToggleMachine(player.Id));
+            var near = new[] { world.MachineAt(2, 3), world.MachineAt(3, 3), world.MachineAt(4, 3) };
+            Assert.IsTrue(near.All(m => !m.Enabled), "all off with the lever");
+            Assert.IsTrue(world.MachineAt(13, 13).Enabled, "out of its reach");
+            Assert.IsTrue(world.ToggleMachine(player.Id));
+            Assert.IsTrue(near.All(m => m.Enabled));
+        }
+
+        [Test]
+        public void AFilterKeepsItsMaterialThroughASave()
+        {
+            var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
+            var player = host.World.AddPlayer("a", null);
+            var filter = Gear.Data.FindMaterial("filter");
+            player.Inventory.AddMaterial(filter);
+            Assert.IsTrue(host.World.PlaceTile(player.Id, filter));
+            Assert.IsTrue(host.World.SetFilter(player.Id, IronBar));
+            var placed = host.World.Machines.Single();
+            var save = WorldSave.Read(host.SaveWorld(now: 0), Tiles.Shipped, Gear.Data);
+            var again = new WorldHost(save.Seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
+            again.Restore(save, now: 0);
+            Assert.AreSame(IronBar, again.World.MachineAt(placed.X, placed.Y).Setting);
+        }
+}
 }

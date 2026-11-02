@@ -233,13 +233,14 @@ namespace Game.Core
     // See Docs/Crafting.md.
     public sealed class MaterialDefinition
     {
-        internal MaterialDefinition(string id, string name, TileType? places, string description, Biome? fish = null)
+        internal MaterialDefinition(string id, string name, TileType? places, string description, Biome? fish = null, float fuel = 0)
         {
             Id = id;
             Name = name;
             Places = places;
             Description = description;
             Fish = fish;
+            Fuel = fuel;
         }
 
         public string Id { get; }
@@ -249,6 +250,8 @@ namespace Game.Core
         public string Description { get; }
         // A fish caught in the water of this biome (materials.csv fish), or null.
         public Biome? Fish { get; }
+        // Seconds a generator runs on one of it (materials.csv fuel), or 0 when it does not burn.
+        public float Fuel { get; }
     }
 
     // Turns materials into an item, a consumable or another material. Exactly one result is set.
