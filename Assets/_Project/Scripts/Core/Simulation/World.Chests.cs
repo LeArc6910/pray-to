@@ -18,6 +18,8 @@ namespace Game.Core
         // How close a player must be to use a crafting station or a chest, from their centre to the tile's.
         public const float StationReach = 2.5f;
         public const float ChestReach = 2;
+        // Crafting takes materials from chests this far from the player.
+        public const float CraftChestReach = 6;
 
         readonly Dictionary<int, Inventory> _chests = new Dictionary<int, Inventory>();
         readonly Dictionary<int, int> _chestVersions = new Dictionary<int, int>();
@@ -43,6 +45,25 @@ namespace Game.Core
                 best = (x, y);
             }
             return best;
+        }
+
+        // The chests within CraftChestReach, nearest first, with their tile keys.
+        List<(int Key, Inventory Chest)> ChestsNear(Vec2 position) =>
+            _chests.Where(pair => Vec2.Distance(position, TileMap.Center(pair.Key % Map.Width, pair.Key / Map.Width)) <= CraftChestReach)
+                .OrderBy(pair => Vec2.Distance(position, TileMap.Center(pair.Key % Map.Width, pair.Key / Map.Width)))
+                .ThenBy(pair => pair.Key)
+                .Select(pair => (pair.Key, pair.Value))
+                .ToList();
+
+        // What the chests within CraftChestReach hold of each material, for the crafting list.
+        public Dictionary<MaterialDefinition, int> StockNear(Vec2 position)
+        {
+            var stock = new Dictionary<MaterialDefinition, int>();
+            foreach (var (_, chest) in ChestsNear(position))
+            {
+                foreach (var pair in chest.Materials) stock[pair.Key] = stock.GetValueOrDefault(pair.Key) + pair.Value;
+            }
+            return stock;
         }
 
         // Goes up whenever the chest's contents change.

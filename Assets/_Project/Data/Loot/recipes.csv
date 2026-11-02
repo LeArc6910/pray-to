@@ -57,4 +57,11 @@ spicy_fry,spicy_fry,1,fire_pepper:2|mushroom:1,Furnace
 mushroom_soup,mushroom_soup,1,mushroom:3,Furnace
 glow_lamp,glow_lamp,2,glow_spore:2|stone:2,Workbench
 bed,bed,1,stone:6|slime_gel:3,Workbench
+stone_floor,stone_floor,4,stone:2,Workbench
+brick_floor,brick_floor,4,stone:2|copper_ore:1,Workbench
+glow_floor,glow_floor,4,stone:2|glow_spore:1,Workbench
+door,door,1,stone:4|iron_bar:1,Workbench
+stone_table,stone_table,1,stone:5,Workbench
+banner,banner,1,slime_gel:2|copper_ore:2,Workbench
+mushroom_pot,mushroom_pot,1,stone:2|mushroom:1,Workbench
 recall_scroll,recall_scroll,2,slime_gel:2|stone:2,Workbench

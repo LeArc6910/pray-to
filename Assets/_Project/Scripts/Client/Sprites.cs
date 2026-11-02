@@ -23,6 +23,7 @@ namespace Game.Client
         {
             TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Torch,
             TileType.Splitter, TileType.Arm, TileType.Lamp, TileType.Bed, TileType.Sprinkler, TileType.Harvester,
+            TileType.StoneFloor, TileType.BrickFloor, TileType.GlowFloor, TileType.Door, TileType.Table, TileType.Banner, TileType.Pot,
         };
 
         // A sprite made from the drawing the first time its key is asked for. The pivot is in the sprite's own

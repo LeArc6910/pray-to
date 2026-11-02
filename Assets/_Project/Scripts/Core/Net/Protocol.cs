@@ -23,6 +23,7 @@ namespace Game.Core
         Chest = 17,
         Machines = 18,
         Kit = 19,
+        Stock = 20,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -34,7 +35,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.27.0";
+        public const string Version = "0.28.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -252,6 +253,33 @@ namespace Game.Core
     }
 
     // The machines near a player: which way each faces and what a conveyor carries how far along. Sent unreliably
+    // What the chests near the player hold, by material sheet index, so the crafting list can count them
+    // (World.StockNear). Sent when it changes; each replaces the last.
+    public sealed class StockMessage
+    {
+        public StockMessage(IReadOnlyList<(int Material, int Count)> stock) { Stock = stock; }
+
+        public IReadOnlyList<(int Material, int Count)> Stock { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Stock, w =>
+        {
+            w.Write((ushort)Stock.Count);
+            foreach (var (material, count) in Stock)
+            {
+                w.Write((ushort)material);
+                w.Write(count);
+            }
+        });
+
+        public static StockMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Stock, r =>
+        {
+            int n = r.ReadUInt16();
+            var stock = new List<(int, int)>(n);
+            for (int i = 0; i < n; i++) stock.Add((r.ReadUInt16(), r.ReadInt32()));
+            return new StockMessage(stock);
+        });
+    }
+
     // every few ticks, like a slower snapshot; each one replaces the last. Materials are sheet indexes + 1 (0 for
     // none). See Docs/Automation.md.
     public sealed class MachinesMessage

@@ -318,6 +318,13 @@ namespace Game.Client
             TileType.Bed => Bed,
             TileType.Sprinkler => SprinklerBase,
             TileType.Harvester => HarvesterBody,
+            TileType.StoneFloor => StoneFloorTile,
+            TileType.BrickFloor => BrickFloorTile,
+            TileType.GlowFloor => GlowFloorTile,
+            TileType.Door => DoorTile,
+            TileType.Table => TableTile,
+            TileType.Banner => BannerTile,
+            TileType.Pot => PotTile,
             _ => null,
         };
 
@@ -1036,5 +1043,154 @@ namespace Game.Client
             foreach (var (x, y) in dark) image[x, y] = CrackDark;
             return image;
         }
+            // ---- Base building (Docs/Crafting.md, 기지 꾸미기) ----
+
+        // Laid floors: slabs with grout lines, drawn edge to edge so a floor reads as one surface.
+        static PixelImage Slabs(string main, string light, string shade, string grout, bool glow = false) => PixelImage.FromRows(
+            new Dictionary<char, Rgba>
+            {
+                ['M'] = Rgba.Hex(main), ['L'] = Rgba.Hex(light), ['m'] = Rgba.Hex(shade), ['d'] = Rgba.Hex(grout), ['g'] = Rgba.Hex("#8FE8D8"),
+            },
+            glow ? GlowSlabRows : SlabRows);
+
+        static readonly string[] SlabRows =
+        {
+            "MMMMMMMdMMMMMMMd",
+            "MLLMMMMdMLMMMMMd",
+            "MLMMMMMdMMMMMmMd",
+            "MMMMMmMdMMMMMMMd",
+            "MMMMMMMdMMMmMMMd",
+            "MMmMMMMdMMMMMMMd",
+            "MMMMMMMdMMMMMMMd",
+            "dddddddddddddddd",
+            "MMMdMMMMMMMdMMMM",
+            "MLMdMMMMLMMdMMMM",
+            "MMMdMMMMMMMdMMmM",
+            "MMMdMmMMMMMdMMMM",
+            "MMMdMMMMMMMdMMMM",
+            "MMmdMMMMMMMdMLMM",
+            "MMMdMMMMMMMdMMMM",
+            "dddddddddddddddd",
+        };
+
+        static readonly string[] GlowSlabRows =
+        {
+            "MMMMMMMdMMMMMMMd",
+            "MLLMMMMdMLMMMMMd",
+            "MLMMMgMdMMMMMmMd",
+            "MMMMMmMdMMMMMMMd",
+            "MMMMMMMdMMMmMMMd",
+            "MMmMMMMdMMgMMMMd",
+            "MMMMMMMdMMMMMMMd",
+            "dddddddddddddddd",
+            "MMMdMMMMMMMdMMMM",
+            "MLMdMMMMLMMdMMMM",
+            "MgMdMMMMMMMdMMmM",
+            "MMMdMmMMMMMdMMMM",
+            "MMMdMMMMMMMdMMMM",
+            "MMmdMMMMMgMdMLMM",
+            "MMMdMMMMMMMdMMMM",
+            "dddddddddddddddd",
+        };
+
+        static readonly PixelImage StoneFloorTile = Slabs("#7E7468", "#948A7C", "#6A6156", "#4E4740");
+        static readonly PixelImage BrickFloorTile = Slabs("#A0563E", "#B86A50", "#8A4834", "#5A2E22");
+        static readonly PixelImage GlowFloorTile = Slabs("#5E6A6E", "#727F84", "#4E585C", "#363E42", glow: true);
+
+        static readonly Dictionary<char, Rgba> BasePalette = new Dictionary<char, Rgba>
+        {
+            ['o'] = Rgba.Hex("#1A1410"),
+            ['S'] = Rgba.Hex("#8A7562"),
+            ['w'] = Rgba.Hex("#5C4D41"),
+            ['W'] = Rgba.Hex("#7A6656"),
+            ['k'] = Rgba.Hex("#3A3E46"),
+            ['y'] = Rgba.Hex("#F2C440"),
+            ['L'] = Rgba.Hex("#A89C8C"),
+            ['M'] = Rgba.Hex("#8E8274"),
+            ['m'] = Rgba.Hex("#76695C"),
+            ['d'] = Rgba.Hex("#5A4F45"),
+            ['H'] = Rgba.Hex("#9A8C7C"),
+            ['h'] = Rgba.Hex("#6A5E52"),
+            ['r'] = Rgba.Hex("#A8323A"),
+            ['R'] = Rgba.Hex("#D2464E"),
+            ['C'] = Rgba.Hex("#E8A866"),
+            ['c'] = Rgba.Hex("#F6E2C0"),
+            ['P'] = Rgba.Hex("#B8664A"),
+            ['p'] = Rgba.Hex("#8A4A34"),
+            ['_'] = Shadow,
+        };
+
+        // A door: a stone frame and an iron-banded slab. Players walk through it; monsters cannot.
+        static readonly PixelImage DoorTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "..oooooooooooo..",
+            ".oSSSSSSSSSSSSo.",
+            ".oSwwwwwwwwwwSo.",
+            ".oSwWWWWWWWWwSo.",
+            ".oSwkkkkkkkkwSo.",
+            ".oSwWWWWWWWWwSo.",
+            ".oSwWWWWWWyWwSo.",
+            ".oSwWWWWWWyWwSo.",
+            ".oSwWWWWWWWWwSo.",
+            ".oSwkkkkkkkkwSo.",
+            ".oSwWWWWWWWWwSo.",
+            ".oSwWWWWWWWWwSo.",
+            ".oSwwwwwwwwwwSo.",
+            ".oSSSSSSSSSSSSo.",
+            "..____________..");
+
+        static readonly PixelImage TableTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "................",
+            "................",
+            "..oooooooooooo..",
+            ".oLLLLLLLLLLLLo.",
+            ".oLMMMMMMMMMMmo.",
+            ".oMMMMMMMMMMMmo.",
+            ".ommmmmmmmmmmdo.",
+            ".oddddddddddddo.",
+            "..oMmo....oMmo..",
+            "..oMmo....oMmo..",
+            "..oMmo....oMmo..",
+            "..oMmo....oMmo..",
+            "..oddo....oddo..",
+            "..oooo....oooo..",
+            "..____....____..");
+
+        static readonly PixelImage BannerTile = PixelImage.FromRows(BasePalette,
+            "....oo..........",
+            "...oyyo.........",
+            "....oo..........",
+            "....oHoooooooo..",
+            "....oHorrrrrrro.",
+            "....oHorRRRRRro.",
+            "....oHorRyyRRro.",
+            "....oHorRyyRRro.",
+            "....oHorRRRRRro.",
+            "....oHorrrrrrro.",
+            "....oHoorrorroo.",
+            "....oHo.oo.oo...",
+            "....oHo.........",
+            "...oHHho........",
+            "..oooooooo......",
+            "..________......");
+
+        static readonly PixelImage PotTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "......oooo......",
+            "....ooCCCCoo....",
+            "...oCCcCCCCCo...",
+            "...oCCCCCcCCo...",
+            "....ooowwooo....",
+            "......owwo......",
+            "......owwo......",
+            "...oooooooooo...",
+            "...oPPPPPPPPo...",
+            "...oPpPPPPPPo...",
+            "....oPPPPPPo....",
+            "....oPPPPPPo....",
+            "....oppppppo....",
+            ".....oooooo.....",
+            "....________....");
     }
 }

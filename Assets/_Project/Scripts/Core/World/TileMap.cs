@@ -38,6 +38,15 @@ namespace Game.Core
         Harvester,
         // The abyss's ore, which only an obsidian pickaxe or better digs (tiles.csv pickaxe).
         VoidOre,
+        // Base building (Docs/Crafting.md, 기지 꾸미기): floors laid over bare floor and walked on; a door players walk
+        // through and monsters cannot; and things that only look nice.
+        StoneFloor,
+        BrickFloor,
+        GlowFloor,
+        Door,
+        Table,
+        Banner,
+        Pot,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -88,8 +97,18 @@ namespace Game.Core
         public bool IsSolid(int x, int y)
         {
             var type = this[x, y];
-            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter && type != TileType.Lava;
+            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter && type != TileType.Lava && !IsPaving(type)
+                && type != TileType.Door;
         }
+
+        // What stops a monster: everything solid, and doors.
+        public bool BlocksMonsters(int x, int y) => IsSolid(x, y) || this[x, y] == TileType.Door;
+
+        // A floor laid over bare floor (StoneFloor, BrickFloor, GlowFloor): walked on like floor, built on like floor.
+        public static bool IsPaving(TileType type) => type == TileType.StoneFloor || type == TileType.BrickFloor || type == TileType.GlowFloor;
+
+        // Bare floor or a laid floor: where things can be built.
+        public static bool IsGround(TileType type) => type == TileType.Floor || IsPaving(type);
 
         // Whether a tile of this type has its centre within reach of the position.
         public bool Near(Vec2 position, TileType type, float reach)

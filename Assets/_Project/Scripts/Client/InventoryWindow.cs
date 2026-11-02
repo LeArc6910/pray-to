@@ -85,7 +85,7 @@ namespace Game.Client
             _textWidth = inner - scrollbar - GUI.skin.label.margin.horizontal;
             // Room for two buttons and [퀵] beside each name.
             _nameWidth = Mathf.Clamp(_textWidth - IconRoom - 150 - QuickWidth, 60, 240);
-            _recipeWidth = _textWidth - IconRoom - 76;
+            _recipeWidth = _textWidth - IconRoom - 120;
             Controls.Block(area);
             Wheel(area);
             GUILayout.BeginArea(area, GUI.skin.box);
@@ -340,8 +340,8 @@ namespace Game.Client
             foreach (var pair in contents.Runes.ToList()) Stack(StackKind.Rune, pair.Key, Sprites.Icon(pair.Key), pair.Key.Name, pair.Value, "");
         }
 
-        // Every recipe, with what it takes against what the bag holds, and the station it needs when that is not in
-        // reach. [만들기] only works with everything at hand.
+        // Every recipe, with what it takes against what the bag and the chests nearby hold, and the station it needs
+        // when that is not in reach. [만들기] only works with everything at hand; [×N] makes it up to five times over.
         void DrawCrafting()
         {
             var recipes = _client.Recipes;
@@ -351,19 +351,25 @@ namespace Game.Client
             var enabled = GUI.enabled;
             foreach (var recipe in recipes)
             {
-                string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Bag.CountOf(i.Material)}/{i.Count}"));
+                string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Available(i.Material)}/{i.Count}"));
                 var station = _client.MissingStation(recipe);
                 if (station != null) needs += $" · {StationName(station.Value)} 필요";
                 string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
                 GUILayout.BeginHorizontal();
                 Icon(recipe.Item != null ? Sprites.Icon(recipe.Item) : recipe.Consumable != null ? Sprites.Icon(recipe.Consumable) : Sprites.Icon(recipe.Material));
                 GUILayout.Label(new GUIContent(Fit($"{name}\n{needs}", _recipeWidth), RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
-                GUI.enabled = enabled && _client.CanCraft(recipe);
+                int times = _client.CraftableTimes(recipe);
+                GUI.enabled = enabled && times > 0;
                 if (GUILayout.Button("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
+                GUI.enabled = enabled && times > 1;
+                int bulk = Mathf.Clamp(times, 2, BulkCraft);
+                if (GUILayout.Button($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), Sound.Craft);
                 GUI.enabled = enabled;
                 GUILayout.EndHorizontal();
             }
         }
+
+        const int BulkCraft = 5;
 
         static string StationName(TileType station) => station switch
         {

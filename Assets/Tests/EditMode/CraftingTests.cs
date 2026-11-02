@@ -347,5 +347,129 @@ namespace Game.Core.Tests
             var core = Gear.Data.FindMaterial("warden_core");
             Assert.AreEqual(1, arena.GroundLoot.Count(l => l.Material == core) + fighter.Inventory.CountOf(core));
         }
-    }
+            [Test]
+        public void LaidFloorsAreWalkedOnBuiltOnAndOnlyAPickaxeTakesThemUp()
+        {
+            var floor = Gear.Data.FindMaterial("stone_floor");
+            var world = Room(out var player, TileType.Floor, Gear.Wearing("copper_sword"));
+            player.Inventory.AddMaterial(floor, 2);
+            Assert.IsTrue(world.PlaceTile(player.Id, floor));
+            Assert.AreEqual(TileType.StoneFloor, world.Map[3, 2]);
+            Assert.IsFalse(world.Map.IsSolid(3, 2), "walked on like floor");
+            Assert.IsFalse(world.PlaceTile(player.Id, floor), "already laid");
+
+            // A sword swung at it leaves it be.
+            world.SetAttacking(player.Id, true);
+            Run(world, 40);
+            world.SetAttacking(player.Id, false);
+            Assert.AreEqual(TileType.StoneFloor, world.Map[3, 2]);
+
+            // Building on it gives the floor back.
+            var workbench = Gear.Data.FindMaterial("workbench");
+            player.Inventory.AddMaterial(workbench);
+            int before = player.Inventory.CountOf(floor);
+            Assert.IsTrue(world.PlaceTile(player.Id, workbench));
+            Assert.AreEqual(TileType.Workbench, world.Map[3, 2]);
+            Assert.AreEqual(before + 1, player.Inventory.CountOf(floor));
+
+            // No crops on a laid floor.
+            var spore = Gear.Data.FindMaterial("mushroom_spore");
+            world.MovePlayer(player.Id, TileMap.Center(2, 2), new Vec2(0, 1), 1);
+            Assert.IsTrue(world.PlaceTile(player.Id, floor));
+            player.Inventory.AddMaterial(spore);
+            Assert.IsFalse(world.Plant(player.Id, Tiles.Shipped.CropFrom(spore)));
+        }
+
+        [Test]
+        public void ALaidFloorComesUpToAPickaxe()
+        {
+            var world = Room(out var player, TileType.StoneFloor);
+            world.SetAttacking(player.Id, true);
+            Run(world, 60);
+            Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
+            Assert.AreEqual(1, player.Inventory.CountOf(Gear.Data.FindMaterial("stone_floor")));
+        }
+
+        [Test]
+        public void ADoorLetsPlayersThroughAndKeepsMonstersOut()
+        {
+            var map = Maps.FromRows(
+                "#########",
+                "#...#...#",
+                "#.......#",
+                "#...#...#",
+                "#########");
+            map[4, 2] = TileType.Door;
+            Assert.IsFalse(map.IsSolid(4, 2));
+            Assert.IsTrue(map.BlocksMonsters(4, 2));
+            var world = new World(map, TileMap.Center(2, 2), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null);
+            for (int i = 0; i < 60; i++) world.MovePlayer(player.Id, player.Position + new Vec2(0.15f, 0), new Vec2(1, 0), 1);
+            Assert.Greater(player.Position.X, 5.5f, "through the door");
+
+            var slime = world.SpawnEnemy(Monsters.Shipped.Find("slime"), TileMap.Center(2, 2));
+            for (int i = 0; i < World.Ticks(6); i++) world.Step();
+            Assert.Less(slime.Position.X, 4, "the slime stays on its side");
+
+            var field = new FlowField(map);
+            field.Build(new[] { TileMap.Center(6, 2) }, int.MaxValue - 1);
+            Assert.AreEqual(FlowField.Unreached, field.DistanceAt(2, 2), "no way round for monsters");
+        }
+
+        [Test]
+        public void CraftingTakesFromChestsNearbyAndMakesSeveralAtOnce()
+        {
+            var world = Room(out var player, TileType.Workbench);
+            var chest = Gear.Data.FindMaterial("chest");
+            world.MovePlayer(player.Id, player.Position, new Vec2(0, 1), 1);
+            player.Inventory.AddMaterial(chest);
+            Assert.IsTrue(world.PlaceTile(player.Id, chest));
+            var box = world.ChestAt(2, 3);
+            box.AddMaterial(Stone, 7);
+            player.Inventory.AddMaterial(Stone, 1);
+            Assert.AreEqual(7, world.StockNear(player.Position)[Stone]);
+
+            // Four stone floors take two stone: once from the bag and the chest, then three more from the chest.
+            var floors = RecipeFor("stone_floor");
+            int version = world.ChestVersion(2, 3);
+            Assert.AreEqual(4, world.CraftMany(player.Id, floors, 10), "eight stone, four times");
+            Assert.AreEqual(0, player.Inventory.CountOf(Stone));
+            Assert.AreEqual(0, box.CountOf(Stone));
+            Assert.AreEqual(16, player.Inventory.CountOf(Gear.Data.FindMaterial("stone_floor")));
+            Assert.Greater(world.ChestVersion(2, 3), version, "the chest's watchers hear of it");
+            Assert.IsFalse(world.Craft(player.Id, floors));
+        }
+
+        [Test]
+        public void TheClientCountsTheChestsNearby()
+        {
+            var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
+            var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped);
+            host.Receive(1, client.JoinMessage());
+            var player = host.World.Players.Single();
+            var chest = Gear.Data.FindMaterial("chest");
+            player.Inventory.AddMaterial(chest);
+            Assert.IsTrue(host.World.PlaceTile(player.Id, chest));
+            var (cx, cy) = World.TileAhead(player.Position, player.Facing);
+            host.World.ChestAt(cx, cy).AddMaterial(Stone, 6);
+            // And a workbench on the other side, which floors are made at.
+            var workbench = Gear.Data.FindMaterial("workbench");
+            player.Inventory.AddMaterial(workbench);
+            host.World.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
+            Assert.IsTrue(host.World.PlaceTile(player.Id, workbench));
+
+            for (int i = 0; i < 10; i++)
+            {
+                host.Tick();
+                foreach (var message in host.TakeOutgoing()) client.Receive(message.Data);
+            }
+            Assert.AreEqual(6, client.StockOf(Stone));
+            Assert.AreEqual(6 + client.Bag.CountOf(Stone), client.Available(Stone));
+            // Three times over from six stone (and whatever the bag holds).
+            Assert.GreaterOrEqual(client.CraftableTimes(RecipeFor("stone_floor")), 3);
+
+            host.Receive(1, client.CraftCommand(RecipeFor("stone_floor"), 3));
+            Assert.AreEqual(12, player.Inventory.CountOf(Gear.Data.FindMaterial("stone_floor")));
+        }
+}
 }

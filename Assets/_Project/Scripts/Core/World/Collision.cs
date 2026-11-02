@@ -9,27 +9,30 @@ namespace Game.Core
         const float MaxStep = 0.25f;
         const float Skin = 0.0005f;
 
-        public static Vec2 Move(TileMap map, Vec2 position, float radius, Vec2 delta)
+        // monster: a monster or boss moving, which doors stop as well (TileMap.BlocksMonsters).
+        public static Vec2 Move(TileMap map, Vec2 position, float radius, Vec2 delta, bool monster = false)
         {
             int steps = Math.Max(1, (int)MathF.Ceiling(delta.Length / MaxStep));
             var step = delta / steps;
-            for (int i = 0; i < steps; i++) position = Resolve(map, position + step, radius);
+            for (int i = 0; i < steps; i++) position = Resolve(map, position + step, radius, monster);
             return position;
         }
 
-        public static bool Overlaps(TileMap map, Vec2 position, float radius)
+        public static bool Overlaps(TileMap map, Vec2 position, float radius, bool monster = false)
         {
             for (int y = TileMap.Cell(position.Y - radius); y <= TileMap.Cell(position.Y + radius); y++)
             {
                 for (int x = TileMap.Cell(position.X - radius); x <= TileMap.Cell(position.X + radius); x++)
                 {
-                    if (map.IsSolid(x, y) && (position - Nearest(map, position, x, y)).LengthSquared < radius * radius) return true;
+                    if (Blocks(map, x, y, monster) && (position - Nearest(map, position, x, y, monster)).LengthSquared < radius * radius) return true;
                 }
             }
             return false;
         }
 
-        public static Vec2 Resolve(TileMap map, Vec2 position, float radius)
+        static bool Blocks(TileMap map, int x, int y, bool monster) => monster ? map.BlocksMonsters(x, y) : map.IsSolid(x, y);
+
+        public static Vec2 Resolve(TileMap map, Vec2 position, float radius, bool monster = false)
         {
             for (int pass = 0; pass < 3; pass++)
             {
@@ -38,8 +41,8 @@ namespace Game.Core
                 {
                     for (int x = TileMap.Cell(position.X - radius); x <= TileMap.Cell(position.X + radius); x++)
                     {
-                        if (!map.IsSolid(x, y)) continue;
-                        var away = position - Nearest(map, position, x, y);
+                        if (!Blocks(map, x, y, monster)) continue;
+                        var away = position - Nearest(map, position, x, y, monster);
                         float distanceSquared = away.LengthSquared;
                         if (distanceSquared >= radius * radius) continue;
 
@@ -64,10 +67,10 @@ namespace Game.Core
         // in a row and in a column. A straight run of walls then acts as one surface, so a circle sliding along it
         // is not nudged at the seams between tiles. Rows and columns are checked apart so an inside corner is not
         // mistaken for wall.
-        static Vec2 Nearest(TileMap map, Vec2 position, int x, int y)
+        static Vec2 Nearest(TileMap map, Vec2 position, int x, int y, bool monster)
         {
-            var row = Clamp(position, map.IsSolid(x - 1, y) ? x - 1 : x, map.IsSolid(x + 1, y) ? x + 2 : x + 1, y, y + 1);
-            var column = Clamp(position, x, x + 1, map.IsSolid(x, y - 1) ? y - 1 : y, map.IsSolid(x, y + 1) ? y + 2 : y + 1);
+            var row = Clamp(position, Blocks(map, x - 1, y, monster) ? x - 1 : x, Blocks(map, x + 1, y, monster) ? x + 2 : x + 1, y, y + 1);
+            var column = Clamp(position, x, x + 1, Blocks(map, x, y - 1, monster) ? y - 1 : y, Blocks(map, x, y + 1, monster) ? y + 2 : y + 1);
             return (position - row).LengthSquared <= (position - column).LengthSquared ? row : column;
         }
 

@@ -49,6 +49,8 @@ namespace Game.Core
             int x = TileMap.Cell(ahead.X);
             int y = TileMap.Cell(ahead.Y);
             if (Map.IsEdge(x, y) || Map[x, y] == TileType.Lava) return null;
+            // A laid floor or a door only comes up to a pickaxe, so swinging at monsters in a base never takes it up.
+            if ((TileMap.IsPaving(Map[x, y]) || Map[x, y] == TileType.Door) && !HoldsPickaxe(player)) return null;
             var tile = Tiles.Find(Map[x, y]);
             if (tile == null) return null;
             return (x, y, tile);
@@ -91,14 +93,17 @@ namespace Game.Core
         }
 
         // Puts the material's tile on the floor ahead of the player. False when it cannot be placed there: not a
-        // floor, someone or a crop in the way, inside a boss arena, or no such material in the bag.
+        // floor (bare or laid), someone or a crop in the way, inside a boss arena, or no such material in the bag.
+        // Building over a laid floor gives the floor back. A floor can be laid where a player stands.
         public bool PlaceTile(int playerId, MaterialDefinition material)
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || material?.Places == null || player.Inventory.CountOf(material) == 0) return false;
             var (x, y) = TileAhead(player.Position, player.Facing);
-            if (Map.IsEdge(x, y) || Map[x, y] != TileType.Floor || CropAt(x, y) != null) return false;
-            if (_players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, x, y))
+            var under = Map[x, y];
+            if (Map.IsEdge(x, y) || !TileMap.IsGround(under) || under == material.Places || CropAt(x, y) != null) return false;
+            bool paving = TileMap.IsPaving(material.Places.Value);
+            if ((!paving && _players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, x, y)))
                 || _enemies.Any(e => !e.IsDead && Touches(e.Position, e.Definition.Radius, x, y))
                 || _bosses.Any(b => Touches(b.Position, b.Definition.Radius, x, y) || Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1))
             {
@@ -106,6 +111,7 @@ namespace Game.Core
             }
 
             player.Inventory.TakeMaterial(material);
+            if (TileMap.IsPaving(under) && Tiles?.Find(under) is TileDefinition laid) player.Inventory.AddMaterial(laid.Material, laid.Count);
             player.InventoryVersion++;
             SetTile(x, y, material.Places.Value);
             var machine = MachineAt(x, y);
@@ -116,20 +122,41 @@ namespace Game.Core
 
         // Makes the recipe from the player's materials. False when something is missing, its crafting station is not
         // within StationReach, or the bag has no room for an item.
-        public bool Craft(int playerId, Recipe recipe)
+        // Ingredients come from the bag first, then from chests within CraftChestReach, nearest first. times makes it
+        // that many times over, or as many as the materials and the bag allow; returns how many were made.
+        public bool Craft(int playerId, Recipe recipe) => CraftMany(playerId, recipe, 1) > 0;
+
+        public int CraftMany(int playerId, Recipe recipe, int times)
         {
             var player = FindPlayer(playerId);
-            if (player == null || player.IsDead || recipe == null) return false;
-            if (recipe.Station != null && !Map.Near(player.Position, recipe.Station.Value, StationReach)) return false;
-            if (recipe.Ingredients.Any(i => player.Inventory.CountOf(i.Material) < i.Count)) return false;
-            if (recipe.Item != null && (player.Inventory.IsFull || _lootGenerator == null)) return false;
-
-            foreach (var (material, count) in recipe.Ingredients) player.Inventory.TakeMaterial(material, count);
-            if (recipe.Item != null) player.Inventory.TryAdd(Register(_lootGenerator.RollItem(recipe.Item, recipe.Item.Level, Rarity.Common, _random)));
-            if (recipe.Consumable != null) player.Inventory.AddConsumable(recipe.Consumable, recipe.Count);
-            if (recipe.Material != null) player.Inventory.AddMaterial(recipe.Material, recipe.Count);
-            player.InventoryVersion++;
-            return true;
+            if (player == null || player.IsDead || recipe == null) return 0;
+            if (recipe.Station != null && !Map.Near(player.Position, recipe.Station.Value, StationReach)) return 0;
+            var chests = ChestsNear(player.Position);
+            int made = 0;
+            for (; made < times; made++)
+            {
+                if (recipe.Ingredients.Any(i => player.Inventory.CountOf(i.Material) + chests.Sum(c => c.Chest.CountOf(i.Material)) < i.Count)) break;
+                if (recipe.Item != null && (player.Inventory.IsFull || _lootGenerator == null)) break;
+                foreach (var (material, count) in recipe.Ingredients)
+                {
+                    int fromBag = Math.Min(count, player.Inventory.CountOf(material));
+                    if (fromBag > 0) player.Inventory.TakeMaterial(material, fromBag);
+                    int left = count - fromBag;
+                    foreach (var (key, chest) in chests)
+                    {
+                        int take = Math.Min(left, chest.CountOf(material));
+                        if (take == 0) continue;
+                        chest.TakeMaterial(material, take);
+                        _chestVersions[key] = _chestVersions.GetValueOrDefault(key) + 1;
+                        left -= take;
+                    }
+                }
+                if (recipe.Item != null) player.Inventory.TryAdd(Register(_lootGenerator.RollItem(recipe.Item, recipe.Item.Level, Rarity.Common, _random)));
+                if (recipe.Consumable != null) player.Inventory.AddConsumable(recipe.Consumable, recipe.Count);
+                if (recipe.Material != null) player.Inventory.AddMaterial(recipe.Material, recipe.Count);
+            }
+            if (made > 0) player.InventoryVersion++;
+            return made;
         }
 
         // Puts back what a world save holds: changed tiles, crops planted the given number of ticks before now, and

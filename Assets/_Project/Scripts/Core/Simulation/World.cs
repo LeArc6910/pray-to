@@ -275,7 +275,7 @@ namespace Game.Core
             var definition = enemy.Definition;
             if (enemy.Knockback.LengthSquared > 0.01f)
             {
-                enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, enemy.Knockback * TickSeconds);
+                enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, enemy.Knockback * TickSeconds, monster: true);
                 enemy.Knockback *= KnockbackDecay;
             }
 
@@ -305,7 +305,7 @@ namespace Game.Core
                     if (definition.Behavior == MonsterBehavior.Ranged && gap < definition.KeepDistance)
                     {
                         var before = enemy.Position;
-                        enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, -toTarget.Normalized * (definition.Speed * TickSeconds));
+                        enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, -toTarget.Normalized * (definition.Speed * TickSeconds), monster: true);
                         enemy.Facing = toTarget.Normalized;
                         if (Vec2.Distance(before, enemy.Position) > definition.Speed * TickSeconds * 0.3f) break;
                     }
@@ -317,7 +317,7 @@ namespace Game.Core
                     var direction = gap < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);
                     if (direction.LengthSquared < 1e-6f) direction = toTarget.Normalized;
                     enemy.Facing = direction;
-                    enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, direction * (definition.Speed * TickSeconds));
+                    enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, direction * (definition.Speed * TickSeconds), monster: true);
                     break;
 
                 case EnemyState.Windup:
@@ -399,7 +399,7 @@ namespace Game.Core
             var definition = enemy.Definition;
             var before = enemy.Position;
             var step = enemy.ChargeDirection * (definition.ChargeSpeed * TickSeconds);
-            enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, step);
+            enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, step, monster: true);
             enemy.Facing = enemy.ChargeDirection;
             foreach (var player in _players)
             {
@@ -471,8 +471,8 @@ namespace Game.Core
                     if (distance >= minimum) continue;
 
                     var push = (distance > 1e-4f ? apart / distance : new Vec2(1, 0)) * ((minimum - distance) / 2);
-                    a.Position = Collision.Resolve(Map, a.Position - push, a.Definition.Radius);
-                    b.Position = Collision.Resolve(Map, b.Position + push, b.Definition.Radius);
+                    a.Position = Collision.Resolve(Map, a.Position - push, a.Definition.Radius, monster: true);
+                    b.Position = Collision.Resolve(Map, b.Position + push, b.Definition.Radius, monster: true);
                 }
             }
         }

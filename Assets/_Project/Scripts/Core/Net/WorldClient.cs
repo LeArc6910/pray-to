@@ -320,6 +320,13 @@ namespace Game.Core
                     case MessageType.Chest:
                         if (_loot != null) Chest = ChestMessage.Decode(data, _loot);
                         break;
+                    case MessageType.Stock:
+                        _stock.Clear();
+                        foreach (var (material, count) in StockMessage.Decode(data).Stock)
+                        {
+                            if (_loot != null && material < _loot.Materials.Count) _stock[_loot.Materials[material]] = count;
+                        }
+                        break;
                     case MessageType.Machines:
                         _machines = MachinesMessage.Decode(data).Machines;
                         _machinesTick = HostTick;
@@ -569,15 +576,34 @@ namespace Game.Core
         public byte[] PlantCommand(CropDefinition crop) =>
             new InventoryCommandMessage(InventoryCommand.Plant, 0, index: ItemCodec.Index(_tiles.Crops, crop)).Encode();
 
-        public byte[] CraftCommand(Recipe recipe) =>
-            new InventoryCommandMessage(InventoryCommand.Craft, 0, index: ItemCodec.Index(_loot.Recipes, recipe)).Encode();
+        // times over makes it that many times, as far as the materials go (WorldHost.MaxCraftAtOnce at most).
+        public byte[] CraftCommand(Recipe recipe, int times = 1) =>
+            new InventoryCommandMessage(InventoryCommand.Craft, times, index: ItemCodec.Index(_loot.Recipes, recipe)).Encode();
 
         public byte[] PlaceCommand(MaterialDefinition material) =>
             new InventoryCommandMessage(InventoryCommand.Place, 0, index: ItemCodec.Index(_loot.Materials, material)).Encode();
 
         // Whether the bag holds everything the recipe takes, and room for an item it makes.
-        public bool CanCraft(Recipe recipe) =>
-            recipe.Ingredients.All(i => Bag.CountOf(i.Material) >= i.Count) && (recipe.Item == null || !Bag.IsFull) && MissingStation(recipe) == null;
+        public bool CanCraft(Recipe recipe) => CraftableTimes(recipe) > 0;
+
+        // How many times over the recipe can be made here, from the bag and the chests nearby (StockNear), up to
+        // WorldHost.MaxCraftAtOnce: 0 when something is missing, the station is out of reach or an item has no room.
+        public int CraftableTimes(Recipe recipe)
+        {
+            if (MissingStation(recipe) != null) return 0;
+            int times = WorldHost.MaxCraftAtOnce;
+            foreach (var (material, count) in recipe.Ingredients) times = Math.Min(times, Available(material) / count);
+            if (recipe.Item != null) times = Math.Min(times, Inventory.Capacity - Bag.Items.Count);
+            return Math.Max(0, times);
+        }
+
+        // In the bag and in the chests nearby.
+        public int Available(MaterialDefinition material) => Bag.CountOf(material) + StockOf(material);
+
+        // In the chests nearby, as of the host's last word.
+        public int StockOf(MaterialDefinition material) => _stock.TryGetValue(material, out int count) ? count : 0;
+
+        readonly Dictionary<MaterialDefinition, int> _stock = new Dictionary<MaterialDefinition, int>();
 
         // Cells whose tile changed since the last call, for redrawing them.
         public List<TileChange> TakeChangedTiles()

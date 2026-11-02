@@ -33,7 +33,7 @@ namespace Game.Core
             {
                 int x = TileMap.Cell(target.X);
                 int y = TileMap.Cell(target.Y);
-                if (_map.IsSolid(x, y) || _distance[Index(x, y)] == 0) continue;
+                if (_map.BlocksMonsters(x, y) || _distance[Index(x, y)] == 0) continue;
                 _distance[Index(x, y)] = 0;
                 _queue.Enqueue((x, y));
             }
@@ -79,8 +79,9 @@ namespace Game.Core
 
         bool CanStep(int x, int y, int dx, int dy)
         {
-            if (_map.IsSolid(x + dx, y + dy)) return false;
-            return dx == 0 || dy == 0 || (!_map.IsSolid(x + dx, y) && !_map.IsSolid(x, y + dy));
+            // Monsters follow it, so doors are walls here.
+            if (_map.BlocksMonsters(x + dx, y + dy)) return false;
+            return dx == 0 || dy == 0 || (!_map.BlocksMonsters(x + dx, y) && !_map.BlocksMonsters(x, y + dy));
         }
 
         int Index(int x, int y) => y * _map.Width + x;

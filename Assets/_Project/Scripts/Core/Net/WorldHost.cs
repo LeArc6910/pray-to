@@ -65,7 +65,12 @@ namespace Game.Core
             public int SentChestVersion = -1;
             // Whether the last machines message had any, so an empty one is sent once when they go out of view.
             public bool SentMachines;
+            // The last stock message sent, to send again only when it changes.
+            public byte[] SentStock;
         }
+
+        // How many times over one craft command may make its recipe.
+        public const int MaxCraftAtOnce = 10;
 
         readonly Dictionary<ulong, Connection> _connections = new Dictionary<ulong, Connection>();
         readonly List<Outgoing> _outgoing = new List<Outgoing>();
@@ -175,7 +180,11 @@ namespace Game.Core
             foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendChest(pair.Key, pair.Value);
             if (World.Tick % _config.MachineInterval == 0)
             {
-                foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendMachines(pair.Key, pair.Value);
+                foreach (var pair in _connections.Where(pair => pair.Value.Player != null))
+                {
+                    SendMachines(pair.Key, pair.Value);
+                    SendStock(pair.Key, pair.Value);
+                }
             }
 
             if (World.Tick % _config.SnapshotInterval != 0) return;
@@ -311,7 +320,8 @@ namespace Game.Core
                     if (command.Index < _loot.Consumables.Count) World.UseConsumable(player.Id, _loot.Consumables[command.Index]);
                     break;
                 case InventoryCommand.Craft:
-                    if (command.Index < _loot.Recipes.Count) World.Craft(player.Id, _loot.Recipes[command.Index]);
+                    // Item says how many times over (0 for once, as before), up to MaxCraftAtOnce.
+                    if (command.Index < _loot.Recipes.Count) World.CraftMany(player.Id, _loot.Recipes[command.Index], Math.Clamp(command.Item, 1, MaxCraftAtOnce));
                     break;
                 case InventoryCommand.Place:
                     if (command.Index < _loot.Materials.Count) World.PlaceTile(player.Id, _loot.Materials[command.Index]);
@@ -435,6 +445,20 @@ namespace Game.Core
         (int X, int Y, int Crop, long PlantedTick, bool Watered) CropEntry(CropChange change) =>
             (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.PlantedTick ?? 0,
                 change.Crop?.Watered ?? false);
+
+        void SendStock(ulong connection, Connection sent)
+        {
+            if (_loot == null) return;
+            var stock = World.StockNear(sent.Player.Position)
+                .Select(pair => (IndexOf(_loot.Materials, pair.Key), pair.Value))
+                .Where(entry => entry.Item1 >= 0)
+                .OrderBy(entry => entry.Item1)
+                .ToList();
+            byte[] message = new StockMessage(stock).Encode();
+            if (sent.SentStock != null && sent.SentStock.AsSpan().SequenceEqual(message)) return;
+            sent.SentStock = message;
+            Send(connection, message, reliable: true);
+        }
 
         void SendMachines(ulong connection, Connection sent)
         {

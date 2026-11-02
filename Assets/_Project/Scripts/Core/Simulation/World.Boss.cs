@@ -261,7 +261,7 @@ namespace Game.Core
         // Bosses stay in their arena so a fight cannot be dragged off through the caves.
         void MoveBoss(Boss boss, Vec2 delta)
         {
-            var position = Collision.Move(Map, boss.Position, boss.Definition.Radius, delta);
+            var position = Collision.Move(Map, boss.Position, boss.Definition.Radius, delta, monster: true);
             var fromHome = position - boss.Home;
             float limit = Math.Max(0, boss.ArenaRadius - boss.Definition.Radius);
             if (fromHome.Length > limit) position = boss.Home + fromHome.Normalized * limit;

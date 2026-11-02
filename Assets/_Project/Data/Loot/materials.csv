@@ -34,3 +34,10 @@ harvester,수확기,Harvester,앞쪽 세 줄(3×3칸)에서 다 자란 작물을
 void_ore,공허석 원석,,공허의 심연의 보랏빛 광맥에서 캔다. 흑요석 곡괭이 이상이어야 캐진다
 void_bar,공허석 주괴,,화로에서 공허석 원석 둘을 녹여 만든다. 공허 장비의 재료
 void_essence,공허의 정수,,공허의 군주가 남긴 일렁이는 정수. 공허 장비를 만들 때 쓴다
+stone_floor,돌 바닥,StoneFloor,바닥에 까는 돌판. 위로 다닐 수 있고 그 위에 무엇이든 세울 수 있다. 곡괭이로만 걷어 낸다
+brick_floor,벽돌 바닥,BrickFloor,붉은 벽돌을 깐 바닥. 돌 바닥과 같다
+glow_floor,빛 타일,GlowFloor,빛 포자를 박은 바닥. 은은하게 둘레를 밝힌다
+door,문,Door,사람은 지나가고 몬스터는 못 지나간다. 곡괭이로만 뗀다
+stone_table,돌 탁자,Table,기지에 두는 탁자
+banner,깃발,Banner,기지에 세우는 깃발
+mushroom_pot,버섯 화분,Pot,동굴 버섯을 심은 화분
