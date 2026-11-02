@@ -14,6 +14,9 @@ namespace Game.Client
 
         public static string WorldKey(string name) => "world:" + name;
 
+        // The map a character has explored in the world of this seed (MapSave).
+        public static string MapKey(ulong seed, string character) => $"map:{seed}:{character}";
+
         public static bool Exists(string key)
         {
 #if UNITY_WEBGL && !UNITY_EDITOR

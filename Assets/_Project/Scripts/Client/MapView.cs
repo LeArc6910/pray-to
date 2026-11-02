@@ -8,8 +8,8 @@ namespace Game.Client
 {
     // The minimap in the top right corner and the full map it opens. Only tiles that have come within a few tiles of
     // the local player are drawn, so the map fills in as the caves are explored; the boss arena is always marked, as
-    // the HUD already points to it. What has been explored lives here, in this session only: it is a view, not game
-    // state, and is not saved or shared.
+    // the HUD already points to it. What has been explored is a view, not game state: it is not shared, and each
+    // player keeps their own on their device for each character and world (MapSave, GameRoot.MapKey).
     sealed class MapView : IDisposable
     {
         // Matches what the camera shows around the player.
@@ -45,20 +45,35 @@ namespace Game.Client
         int _revealedY = int.MinValue;
         bool _dirty;
 
-        public MapView(WorldClient client)
+        // saved is what an earlier session explored here (MapSave), or null to start with nothing.
+        public MapView(WorldClient client, byte[] saved = null)
         {
             _client = client;
             _map = client.Map;
             _pixels = new Color32[_map.Width * _map.Height];
-            _explored = new bool[_pixels.Length];
+            _explored = MapSave.Read(saved, _map.Width, _map.Height) ?? new bool[_pixels.Length];
             _texture = new Texture2D(_map.Width, _map.Height, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp,
             };
-            // Every pixel starts transparent: unexplored.
+            // Unexplored pixels stay transparent.
+            for (int i = 0; i < _explored.Length; i++)
+            {
+                if (_explored[i]) _pixels[i] = TileColor(i % _map.Width, i / _map.Width);
+            }
             _texture.SetPixels32(_pixels);
             _texture.Apply();
+        }
+
+        // Whether more has been explored since the last Save.
+        public bool Changed { get; private set; }
+
+        // What has been explored, to keep (MapSave).
+        public byte[] Save()
+        {
+            Changed = false;
+            return MapSave.Write(_explored, _map.Width, _map.Height);
         }
 
         // The full map is showing. Touches and attacks are held back meanwhile.
@@ -193,6 +208,7 @@ namespace Game.Client
                     _explored[index] = true;
                     _pixels[index] = TileColor(x, y);
                     _dirty = true;
+                    Changed = true;
                 }
             }
         }

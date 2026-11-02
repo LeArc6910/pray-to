@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -194,5 +195,35 @@ namespace Game.Core.Tests
             Assert.IsEmpty(host.World.Players);
             Assert.IsNull(client.SaveCharacter(), "nothing to overwrite the save with");
         }
-    }
+            [Test]
+        public void TheExploredMapComesBackAsItWas()
+        {
+            const int width = 40;
+            const int height = 30;
+            var seen = new bool[width * height];
+            var random = new GameRandom(5);
+            // Patches, as exploring leaves them, and the very first and last tiles.
+            for (int i = 0; i < 12; i++)
+            {
+                int cx = random.Next(width);
+                int cy = random.Next(height);
+                for (int y = Math.Max(0, cy - 3); y < Math.Min(height, cy + 4); y++)
+                {
+                    for (int x = Math.Max(0, cx - 3); x < Math.Min(width, cx + 4); x++) seen[y * width + x] = true;
+                }
+            }
+            seen[0] = true;
+            seen[seen.Length - 1] = true;
+
+            byte[] data = MapSave.Write(seen, width, height);
+            CollectionAssert.AreEqual(seen, MapSave.Read(data, width, height));
+            Assert.Less(data.Length, seen.Length / 8, "smaller than one bit a tile");
+            CollectionAssert.AreEqual(new bool[width * height], MapSave.Read(MapSave.Write(new bool[width * height], width, height), width, height));
+
+            Assert.IsNull(MapSave.Read(data, width + 1, height), "a map of another size starts empty");
+            Assert.IsNull(MapSave.Read(data.Take(data.Length - 1).ToArray(), width, height), "cut short");
+            Assert.IsNull(MapSave.Read(new byte[] { 1, 2, 3 }, width, height));
+            Assert.IsNull(MapSave.Read(null, width, height));
+        }
+}
 }

@@ -188,7 +188,7 @@ namespace Game.Client
             if (_client.Status != ClientStatus.Playing) return;
             SaveProgress(Time.deltaTime);
             _view ??= new WorldView(_client, _camera);
-            _map ??= new MapView(_client);
+            _map ??= new MapView(_client, SaveStore.Read(MapKey));
             _client.AdvanceRenderClock(Time.deltaTime);
             UpdateGuide(Time.deltaTime);
             UpdateBiome(Time.deltaTime);
@@ -621,12 +621,15 @@ namespace Game.Client
                 _savedInventoryVersion = _client.InventoryVersion;
                 Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
             }
-            if (_host == null) return;
             _worldSaveClock += deltaTime;
             if (_worldSaveClock < WorldSaveSeconds) return;
             _worldSaveClock = 0;
-            Save(_worldKey, _host.SaveWorld(Now()));
+            if (_map != null && _map.Changed) Save(MapKey, _map.Save());
+            if (_host != null) Save(_worldKey, _host.SaveWorld(Now()));
         }
+
+        // Where this character's map of this world is kept, by the world's seed so a joined world has one too.
+        string MapKey => SaveStore.MapKey(_client.Seed, CharacterName);
 
         static void Save(string key, byte[] data)
         {
@@ -660,6 +663,7 @@ namespace Game.Client
         {
             if (_client != null) Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
             if (_host != null) Save(_worldKey, _host.SaveWorld(Now()));
+            if (_map != null && _client != null && _client.Status == ClientStatus.Playing) Save(MapKey, _map.Save());
             _worldKey = null;
             _savedInventoryVersion = 0;
             _view?.Dispose();

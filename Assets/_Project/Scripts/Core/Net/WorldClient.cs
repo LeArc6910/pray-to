@@ -217,6 +217,8 @@ namespace Game.Core
         public string RefusedReason { get; private set; }
         public int PlayerId { get; private set; }
         public TileMap Map { get; private set; }
+        // The world's seed, from the host: what this client's own records of the world (its explored map) are kept under.
+        public ulong Seed { get; private set; }
         // What the tiles do (tiles.csv); null when the client was made without the sheet.
         public TileData Tiles => _tiles;
         // Where this player came into the world.
@@ -684,6 +686,7 @@ namespace Game.Core
         {
             ApplyKit(welcome.Classes, welcome.SkillOrder);
             PlayerId = welcome.PlayerId;
+            Seed = welcome.Seed;
             var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height);
             Map = generated.Map;
             Arena = generated.Arena;
