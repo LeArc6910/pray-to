@@ -148,7 +148,10 @@ async function playPc(browser, profile) {
   check(cast.mana < before.maxMana, `Q 키로 스킬을 쓰면 마나가 준다 (${before.mana} → ${cast.mana})`);
   await shot(game, profile, 'skill', 'Q 스킬(회전베기)');
 
-  await send(game, 'mana 5; potion mana_potion 1; drink mana_potion');
+  await send(game, 'mana 5');
+  await game.page.waitForTimeout(400);
+  await shot(game, profile, 'low-mana', '마나 5: 마나가 모자란 스킬 칸이 어둡다');
+  await send(game, 'potion mana_potion 1; drink mana_potion');
   const drunk = await state(game);
   check(drunk.mana >= 50, `마나 물약이 마나를 채운다 (5 → ${drunk.mana})`);
 
@@ -181,6 +184,10 @@ async function playPc(browser, profile) {
   check(/WaterWheel\+/.test(machines.machines), `물가의 물레방아가 돈다 (${machines.machines})`);
   await shot(game, profile, 'machines', '새 기계: 물레방아·태양광·전기로·번개 탑·포탑·거름망·수확기');
 
+  await send(game, 'clock 3 23');
+  await game.page.waitForTimeout(1500);
+  const night = await state(game);
+  check(/SolarPanel(?!\+)/.test(night.machines), `밤에는 태양광 판이 쉰다 (${night.machines})`);
   await send(game, 'scene skylight; clock 3 9');
   await game.page.waitForTimeout(1500);
   await shot(game, profile, 'morning', '아침 빛 구멍과 채광창');
