@@ -25,6 +25,7 @@ namespace Game.Core
         Kit = 19,
         Stock = 20,
         Production = 21,
+        Friendships = 22,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -36,7 +37,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.37.0";
+        public const string Version = "0.38.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -257,6 +258,35 @@ namespace Game.Core
     }
 
     // The machines near a player: which way each faces and what a conveyor carries how far along. Sent unreliably
+    // How well the player knows each person (World.Merchant.cs): the person's sheet index, the points and the days
+    // they last talked and gave a gift. Sent when it changes; the client keeps it in its character save.
+    public sealed class FriendshipsMessage
+    {
+        public FriendshipsMessage(IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay)> friendships) { Friendships = friendships; }
+
+        public IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay)> Friendships { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Friendships, w =>
+        {
+            w.Write((byte)Friendships.Count);
+            foreach (var (npc, points, talked, gifted) in Friendships)
+            {
+                w.Write((byte)npc);
+                w.Write((ushort)points);
+                w.Write(talked);
+                w.Write(gifted);
+            }
+        });
+
+        public static FriendshipsMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Friendships, r =>
+        {
+            int n = r.ReadByte();
+            var list = new List<(int, int, int, int)>(n);
+            for (int i = 0; i < n; i++) list.Add((r.ReadByte(), r.ReadUInt16(), r.ReadInt32(), r.ReadInt32()));
+            return new FriendshipsMessage(list);
+        });
+    }
+
     // What machines made in the last few minutes (World.Production), for everyone. Kind 0 is a material, 1 a
     // consumable; Index is its sheet index. Sent every few seconds when it changed.
     public sealed class ProductionMessage

@@ -433,6 +433,17 @@ namespace Game.Client
             "...dd...",
         };
 
+        // A round coin with a square hole and a glint.
+        static readonly string[] CoinRows =
+        {
+            "..LLLM..",
+            ".LwLMMm.",
+            "LLMddMmd",
+            "LMMddmmd",
+            ".MMmmmd.",
+            "..mmdd..",
+        };
+
         // A cog with a hole through it.
         static readonly string[] Cog =
         {
@@ -647,6 +658,7 @@ namespace Game.Client
                 case "essence": return Ramped(Gem, Ramp.Of("#C88CFF"));
                 case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
+                case "coin": return Ramped(CoinRows, Ramp.Of("#F2C440"));
                 case "copper_wire": return Ramped(Coil, Ramp.Of("#E08A4A"));
                 case "circuit": return Ramped(Board, Ramp.Of("#4CA85A"));
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);

@@ -331,7 +331,77 @@ namespace Game.Core
 
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
         // before the first one.
-        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id));
+        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
+            Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay)));
+
+        // The people, to name and trade with them (World.Merchant.cs).
+        public NpcData Npcs { get; set; }
+
+        // How well this character knows each person, by id: from its save, and as the host tells.
+        public Dictionary<string, (int Points, int TalkedDay, int GiftedDay)> Friendships => _friendships ??= ReadFriendships();
+
+        Dictionary<string, (int Points, int TalkedDay, int GiftedDay)> _friendships;
+
+        Dictionary<string, (int, int, int)> ReadFriendships()
+        {
+            var known = new Dictionary<string, (int, int, int)>();
+            if (Character == null || Character.Length == 0 || _loot == null) return known;
+            try
+            {
+                foreach (var (npc, points, talked, gifted) in CharacterSave.Read(Character, _loot).Friendships) known[npc] = (points, talked, gifted);
+            }
+            catch (System.IO.InvalidDataException)
+            {
+            }
+            return known;
+        }
+
+        public int Today => Calendar.Day(Clock);
+
+        public int HeartsWith(NpcDefinition npc) => Friendships.TryGetValue(npc.Id, out var f) ? World.HeartsOf(f.Points) : 0;
+
+        public int PointsWith(NpcDefinition npc) => Friendships.TryGetValue(npc.Id, out var f) ? f.Points : 0;
+
+        public bool TalkedToday(NpcDefinition npc) => Friendships.TryGetValue(npc.Id, out var f) && f.TalkedDay == Today;
+
+        public bool GiftedToday(NpcDefinition npc) => Friendships.TryGetValue(npc.Id, out var f) && f.GiftedDay == Today;
+
+        // What the merchant has on sale today (World.ShopFor).
+        public IReadOnlyList<ShopEntry> ShopToday => World.ShopFor(Npcs, Today);
+
+        // The person whose tile is within reach, and where it is, as World.NpcNear sees it.
+        public (NpcDefinition Npc, int X, int Y)? NpcNear()
+        {
+            if (Npcs == null || Map == null) return null;
+            int r = (int)MathF.Ceiling(World.StationReach) + 1;
+            int cx = TileMap.Cell(Position.X), cy = TileMap.Cell(Position.Y);
+            foreach (var npc in Npcs.Npcs)
+            {
+                for (int y = cy - r; y <= cy + r; y++)
+                {
+                    for (int x = cx - r; x <= cx + r; x++)
+                    {
+                        if (Map.InBounds(x, y) && Map[x, y] == npc.Tile && Vec2.Distance(Position, TileMap.Center(x, y)) <= World.StationReach) return (npc, x, y);
+                    }
+                }
+            }
+            return null;
+        }
+
+        public byte[] BuyCommand(ShopEntry entry, int count) =>
+            new InventoryCommandMessage(InventoryCommand.Buy, count, index: Npcs.Shop.ToList().IndexOf(entry)).Encode();
+
+        public byte[] SellCommand(object thing, int count) => thing is ConsumableDefinition consumable
+            ? new InventoryCommandMessage(InventoryCommand.Sell, (int)StackKind.Consumable + 4 * count, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode()
+            : new InventoryCommandMessage(InventoryCommand.Sell, (int)StackKind.Material + 4 * count, index: ItemCodec.Index(_loot.Materials, (MaterialDefinition)thing)).Encode();
+
+        public byte[] SellItemCommand(Item item) => new InventoryCommandMessage(InventoryCommand.SellItem, item.Id).Encode();
+
+        public byte[] GiftCommand(object thing) => thing is ConsumableDefinition consumable
+            ? new InventoryCommandMessage(InventoryCommand.Gift, (int)StackKind.Consumable, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode()
+            : new InventoryCommandMessage(InventoryCommand.Gift, (int)StackKind.Material, index: ItemCodec.Index(_loot.Materials, (MaterialDefinition)thing)).Encode();
+
+        public byte[] TalkCommand() => new InventoryCommandMessage(InventoryCommand.Talk, 0).Encode();
 
         // The guide, to name the goals whose rewards come back (GoalReward events carry their index).
         public GuideData Guide { get; set; }
@@ -402,6 +472,12 @@ namespace Game.Core
                         foreach (var (material, count) in StockMessage.Decode(data).Stock)
                         {
                             if (_loot != null && material < _loot.Materials.Count) _stock[_loot.Materials[material]] = count;
+                        }
+                        break;
+                    case MessageType.Friendships:
+                        foreach (var (npc, points, talked, gifted) in FriendshipsMessage.Decode(data).Friendships)
+                        {
+                            if (Npcs != null && npc < Npcs.Npcs.Count) Friendships[Npcs.Npcs[npc].Id] = (points, talked, gifted);
                         }
                         break;
                     case MessageType.Production:

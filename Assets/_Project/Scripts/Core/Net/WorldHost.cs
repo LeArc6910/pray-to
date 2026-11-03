@@ -69,6 +69,8 @@ namespace Game.Core
             public byte[] SentStock;
             // The last production message sent, likewise.
             public byte[] SentProduction;
+            // The last friendships message sent, likewise.
+            public byte[] SentFriendships;
         }
 
         // How many times over one craft command may make its recipe.
@@ -100,8 +102,10 @@ namespace Game.Core
             BossData bosses = null,
             ClassData classes = null,
             TileData tiles = null,
-            GuideData guide = null)
+            GuideData guide = null,
+            NpcData npcs = null)
         {
+            _npcs = npcs;
             _guide = guide;
             _seed = seed;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
@@ -118,7 +122,10 @@ namespace Game.Core
             {
                 World.PlaceBoss(bosses.Bosses[i], _generated.Arenas[i], _generated.ArenaRadius);
             }
+            if (npcs != null) World.SetNpcs(npcs);
         }
+
+        readonly NpcData _npcs;
 
         public World World { get; }
         public int PlayerCount => _connections.Values.Count(c => c.Player != null);
@@ -191,6 +198,7 @@ namespace Game.Core
                 {
                     SendMachines(pair.Key, pair.Value);
                     SendStock(pair.Key, pair.Value);
+                    SendFriendships(pair.Key, pair.Value);
                 }
             }
 
@@ -248,6 +256,7 @@ namespace Game.Core
             player.Experience = saved == null ? 0 : saved.Experience >= 0 ? saved.Experience : Leveling.TotalFor(Leveling.StartFor(saved.Equipment, saved.Bag));
             foreach (string goal in saved?.ClaimedGoals ?? new List<string>()) player.ClaimedGoals.Add(goal);
             if (saved != null) World.RestorePassives(player, _classes, saved.Passives);
+            if (saved != null) World.RestoreFriendships(player, saved.Friendships);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -311,6 +320,7 @@ namespace Game.Core
             World.RestoreClock(save.Clock);
             World.RestoreRiftTier(save.RiftTier);
             foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting, m.Recipe);
+            World.PlaceNpcs();
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -406,8 +416,31 @@ namespace Game.Core
                 case InventoryCommand.Discard:
                     World.DiscardItem(player.Id, command.Item);
                     break;
+                case InventoryCommand.Buy:
+                    if (_npcs != null && command.Index < _npcs.Shop.Count) World.Buy(player.Id, _npcs.Shop[command.Index], command.Item);
+                    break;
+                case InventoryCommand.Sell:
+                    World.Sell(player.Id, Stack((StackKind)(command.Item & 3), command.Index), command.Item >> 2);
+                    break;
+                case InventoryCommand.SellItem:
+                    World.SellItem(player.Id, command.Item);
+                    break;
+                case InventoryCommand.Gift:
+                    World.Gift(player.Id, Stack((StackKind)command.Item, command.Index));
+                    break;
+                case InventoryCommand.Talk:
+                    World.Talk(player.Id);
+                    break;
             }
         }
+
+        // A material or consumable by its kind and sheet index, or null.
+        object Stack(StackKind kind, int index) => kind switch
+        {
+            StackKind.Material when index < _loot.Materials.Count => _loot.Materials[index],
+            StackKind.Consumable when index < _loot.Consumables.Count => _loot.Consumables[index],
+            _ => null,
+        };
 
         void ApplyInput(Connection sender, InputMessage input)
         {
@@ -528,6 +561,20 @@ namespace Game.Core
                 pair.Value.SentProduction = message;
                 Send(pair.Key, message, reliable: true);
             }
+        }
+
+        void SendFriendships(ulong connection, Connection sent)
+        {
+            if (_npcs == null) return;
+            var known = sent.Player.Friendships
+                .Select(pair => (IndexOf(_npcs.Npcs, _npcs.Npcs.FirstOrDefault(n => n.Id == pair.Key)), pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay))
+                .Where(entry => entry.Item1 >= 0)
+                .OrderBy(entry => entry.Item1)
+                .ToList();
+            byte[] message = new FriendshipsMessage(known).Encode();
+            if (sent.SentFriendships != null && sent.SentFriendships.AsSpan().SequenceEqual(message)) return;
+            sent.SentFriendships = message;
+            Send(connection, message, reliable: true);
         }
 
         void SendStock(ulong connection, Connection sent)

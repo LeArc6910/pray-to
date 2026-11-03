@@ -271,6 +271,7 @@ namespace Game.Client
             DrawEntities(deltaTime);
             DrawCrops();
             DrawMachines();
+            DrawPeople();
             DrawMarks();
             DrawProjectiles();
 
@@ -336,6 +337,15 @@ namespace Game.Client
                 // A pole or generator nearby shows what its grid gives and draws.
                 else if (machine.Supply >= 0 && Vector3.Distance(at, _self.Position) < 4)
                     Label(at + new Vector3(0, 0.9f, 0), $"전력 {machine.Supply}/{machine.Demand}", machine.Supply >= machine.Demand ? PowerLabel : OffLabel);
+            }
+            // The merchant's name and how well this player knows her, close by.
+            if (_client.Npcs?.Merchant is NpcDefinition merchant)
+            {
+                foreach (var (x, y) in _stalls)
+                {
+                    var at = new Vector3(x + 0.5f, y + 1.5f, 0);
+                    if (Vector3.Distance(at, _self.Position) < 5) Label(at, $"{merchant.Name} (호감 {_client.HeartsWith(merchant)}/{World.MaxHearts}) · 가방에서 거래", PowerLabel);
+                }
             }
             foreach (var text in _floating)
             {
@@ -749,6 +759,55 @@ namespace Game.Client
             DrawWires();
         }
 
+        // The merchant behind each stall in view, breathing and blinking like a standing player, with the counter drawn
+        // again over her legs.
+        readonly Dictionary<int, (SpriteRenderer Figure, SpriteRenderer Counter)> _people = new Dictionary<int, (SpriteRenderer, SpriteRenderer)>();
+        readonly List<(int X, int Y)> _stalls = new List<(int X, int Y)>();
+        const int PeopleRange = 18;
+
+        void DrawPeople()
+        {
+            var map = _client.Map;
+            _seen.Clear();
+            _stalls.Clear();
+            int cx = Mathf.FloorToInt(_self.Position.x), cy = Mathf.FloorToInt(_self.Position.y);
+            for (int y = cy - PeopleRange; y <= cy + PeopleRange; y++)
+            {
+                for (int x = cx - PeopleRange; x <= cx + PeopleRange; x++)
+                {
+                    if (map.InBounds(x, y) && map[x, y] == TileType.MerchantStall) _stalls.Add((x, y));
+                }
+            }
+            int frame = Mathf.FloorToInt(Time.time * 1.5f) % CreatureArt.StandFrames;
+            var figure = Sprites.Standing($"npc/merchant/{frame}", () => CreatureArt.Player(Look.Down, frame, CreatureArt.MerchantTunic, Pose.Stand));
+            foreach (var (x, y) in _stalls)
+            {
+                int key = y * map.Width + x;
+                _seen.Add(key);
+                if (!_people.TryGetValue(key, out var person))
+                {
+                    person = (Renderer(_root.transform, "Merchant", null, Color.white),
+                        Renderer(_root.transform, "Counter", Sprites.Centered("npc/counter", () => TileArt.MerchantCounter), Color.white));
+                    _people[key] = person;
+                }
+                int order = 10000 - Mathf.RoundToInt((y + 0.3f) * 10);
+                person.Figure.sprite = figure;
+                person.Figure.transform.localPosition = new Vector3(x + 0.5f, y + 0.3f, 0);
+                person.Figure.sortingOrder = order;
+                person.Counter.transform.localPosition = new Vector3(x + 0.5f, y + 0.5f, 0);
+                person.Counter.sortingOrder = order + 2;
+            }
+            _gone.Clear();
+            foreach (var pair in _people)
+            {
+                if (_seen.Contains(pair.Key)) continue;
+                Object.Destroy(pair.Value.Figure.gameObject);
+                Object.Destroy(pair.Value.Counter.gameObject);
+                _gone.Add(pair.Key);
+            }
+            foreach (int key in _gone) _people.Remove(key);
+        }
+
         readonly List<SpriteRenderer> _wires = new List<SpriteRenderer>();
         readonly List<MachineView> _nodes = new List<MachineView>();
 
@@ -962,6 +1021,21 @@ namespace Game.Client
                     Sounds.Play(e.Amount == World.RiftOpened ? Sound.Roar : e.Amount == World.RiftCleared ? Sound.Victory : Sound.Down);
                     ShowBanner(e.Amount == World.RiftOpened ? "공허 균열이 열렸다!" : e.Amount == World.RiftCleared ? "균열을 닫았다! 제단에 보상이 떨어졌다" : "균열이 닫혀 버렸다");
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 3, RiftColor, FlashKind.Ring);
+                    break;
+                case SimEventType.Npc:
+                    // A gift taken well or badly, or a chat.
+                    var reaction = e.Amount switch
+                    {
+                        World.Loved => "정말 좋아한다!",
+                        World.Liked => "좋아한다",
+                        World.Disliked => "별로인 모양이다...",
+                        World.Talked => "즐겁게 이야기했다",
+                        _ => "고맙다고 한다",
+                    };
+                    var where = new Vector3(e.Position.X, e.Position.Y + 1.2f, 0);
+                    _floating.Add(new Floating { Position = where, Text = reaction, Color = e.Amount == World.Disliked ? OffLabel : PowerLabel });
+                    if (e.Amount >= World.Liked) AddFlash(where, 1, PowerLabel, FlashKind.Sparkles);
+                    if (e.Source == _client.PlayerId) Sounds.Play(e.Amount == World.Disliked ? Sound.Down : Sound.Pop);
                     break;
                 case SimEventType.Morning:
                     // Everyone slept: the next day's morning (GameRoot shows the banner, as for any morning).

@@ -45,6 +45,8 @@ namespace Game.Core
         public int Level => Leveling.LevelFor(Experience);
         // The points taken on the passive tree (World.Passives.cs), not counting the start.
         public List<PassiveNode> Passives { get; } = new List<PassiveNode>();
+        // How well they know each person, by id (World.Merchant.cs).
+        public Dictionary<string, Friendship> Friendships { get; } = new Dictionary<string, Friendship>();
         // One point for every level past the first.
         public int PassivePoints => Math.Max(0, Level - 1 - Passives.Count);
         // Goes up whenever the host puts the player somewhere the owning client did not: a refused move or a
@@ -305,6 +307,9 @@ namespace Game.Core
         Morning,
         // A void rift opened (Amount World.RiftOpened), was beaten (RiftCleared) or ran out (RiftFailed) at Position.
         Rift,
+        // Source, a player, gave a gift (Amount World.Disliked to World.Loved) or talked (World.Talked) to the person
+        // at Position; Target is the person's sheet index (World.Merchant.cs).
+        Npc,
     }
 
     public readonly struct SimEvent

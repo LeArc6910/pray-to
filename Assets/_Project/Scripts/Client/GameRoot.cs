@@ -63,6 +63,7 @@ namespace Game.Client
         ClassData _classes;
         TileData _tiles;
         GuideData _guide;
+        NpcData _npcs;
         // The guide for new players (Docs/Guide.md): how far this character has come, checked twice a second, and
         // when its current goal came up, for showing the hint a while.
         GuideProgress _guideProgress;
@@ -140,6 +141,7 @@ namespace Game.Client
             _classes = sheets.LoadClasses();
             _tiles = sheets.LoadTiles(_loot);
             _guide = sheets.LoadGuide(_loot);
+            _npcs = sheets.LoadNpcs(_loot);
             _chosenClasses.RemoveAll(id => !_classes.Classes.Any(c => c.Id == id));
             var errors = new List<string>(_loot.Errors);
             errors.AddRange(_monsters.Errors);
@@ -147,6 +149,7 @@ namespace Game.Client
             errors.AddRange(_classes.Errors);
             errors.AddRange(_tiles.Errors);
             errors.AddRange(_guide.Errors);
+            errors.AddRange(_npcs.Errors);
             if (errors.Count > 0) _status = "데이터 시트 오류:\n" + string.Join("\n", errors);
         }
 
@@ -596,7 +599,7 @@ namespace Game.Client
 
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
 
-            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide);
+            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs);
             if (world != null)
             {
                 _host.Restore(world);
@@ -609,6 +612,7 @@ namespace Game.Client
                 Character = character,
                 JoinSkillOrder = KeptSkillOrder(),
                 Guide = _guide,
+                Npcs = _npcs,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
@@ -658,6 +662,7 @@ namespace Game.Client
                 Character = character,
                 JoinSkillOrder = KeptSkillOrder(),
                 Guide = _guide,
+                Npcs = _npcs,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);

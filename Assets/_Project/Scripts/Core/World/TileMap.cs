@@ -74,6 +74,7 @@ namespace Game.Core
         PowerPole,
         FastConveyor,
         UndergroundBelt,
+        MerchantStall,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

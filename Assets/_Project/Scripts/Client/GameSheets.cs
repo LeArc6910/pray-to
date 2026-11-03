@@ -26,6 +26,8 @@ namespace Game.Client
         public TextAsset skills;
         public TextAsset passives;
         public TextAsset goals;
+        public TextAsset npcs;
+        public TextAsset shop;
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
@@ -42,6 +44,9 @@ namespace Game.Client
 
         // Without the sheet (an asset made before it existed) there are no goals.
         public GuideData LoadGuide(LootData loot) => GuideSheet.Parse(Text(goals), loot);
+
+        // Without the sheets (an asset made before they existed) there is no one.
+        public NpcData LoadNpcs(LootData loot) => NpcSheet.Parse(Text(npcs), Text(shop), loot);
 
         static string Text(TextAsset asset) => asset != null ? asset.text : "";
     }

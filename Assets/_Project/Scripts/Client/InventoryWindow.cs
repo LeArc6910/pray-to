@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using Game.Core;
 using UnityEngine;
@@ -18,6 +19,7 @@ namespace Game.Client
             Classes,
             Passives,
             Chest,
+            Merchant,
         }
 
         const float MaxWidth = 520;
@@ -29,7 +31,7 @@ namespace Game.Client
         const float WheelStep = 30;
 
         static GUIStyle _tooltipStyle;
-        static readonly string[] PageNames = { "장비", "재료·제작", "클래스", "특성", "상자" };
+        static readonly string[] PageNames = { "장비", "재료·제작", "클래스", "특성", "상자", "상인" };
         static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
         readonly WorldClient _client;
@@ -96,10 +98,15 @@ namespace Game.Client
             // Without room beside the window the hint goes in the title, so nothing sits over the list.
             string hint = besideWindow ? "" : Controls.UsingTouch ? " · 이름을 누르고 있으면 설명" : " · 이름에 마우스를 올리면 설명";
             GUILayout.Label(Fit($"가방 ({close}){hint}", inner));
-            // The chest tab is there only while a chest is in reach.
+            // The chest tab is there only while a chest is in reach, the merchant's while she is.
             bool chest = _client.Chest.IsOpen;
-            if (!chest && _page == Page.Chest) _page = Page.Gear;
-            _page = Tabs(_page, chest ? 5 : 4);
+            bool merchant = _client.NpcNear() != null;
+            if (!chest && _page == Page.Chest || !merchant && _page == Page.Merchant) _page = Page.Gear;
+            _pages.Clear();
+            _pages.AddRange(new[] { Page.Gear, Page.Materials, Page.Classes, Page.Passives });
+            if (chest) _pages.Add(Page.Chest);
+            if (merchant) _pages.Add(Page.Merchant);
+            _page = Tabs(_page, _pages);
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
@@ -108,6 +115,7 @@ namespace Game.Client
             else if (_page == Page.Materials) DrawMaterialsPage();
             else if (_page == Page.Classes) DrawClasses();
             else if (_page == Page.Passives) DrawPassives();
+            else if (_page == Page.Merchant) DrawMerchant();
             else DrawChest();
             GUILayout.EndScrollView();
             if (Event.current.type == EventType.Repaint)
@@ -121,8 +129,11 @@ namespace Game.Client
 
         // Tabs that switch as soon as they are pressed. IMGUI's toolbar switches on release, and in the browser its
         // first click after the bag opened was sometimes lost (LOCAL_TASKS.md, the 2026-10-31 UI check).
-        Page Tabs(Page page, int count)
+        readonly List<Page> _pages = new List<Page>();
+
+        Page Tabs(Page page, IReadOnlyList<Page> pages)
         {
+            int count = pages.Count;
             var row = GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true));
             const float gap = 4;
             float width = (row.width - gap * (count - 1)) / count;
@@ -132,16 +143,16 @@ namespace Game.Client
                 var tab = new Rect(row.x + i * (width + gap), row.y, width, row.height);
                 if (e.type == EventType.MouseDown && tab.Contains(e.mousePosition))
                 {
-                    if (page != (Page)i)
+                    if (page != pages[i])
                     {
-                        page = (Page)i;
+                        page = pages[i];
                         // A description from the old tab must not stay up over the new one.
                         GUI.tooltip = "";
                         Sounds.Play(Sound.Click);
                     }
                     e.Use();
                 }
-                if (e.type == EventType.Repaint) GUI.skin.button.Draw(tab, PageLabels[i], tab.Contains(e.mousePosition), false, page == (Page)i, false);
+                if (e.type == EventType.Repaint) GUI.skin.button.Draw(tab, PageLabels[(int)pages[i]], tab.Contains(e.mousePosition), false, page == pages[i], false);
             }
             return page;
         }
@@ -350,6 +361,120 @@ namespace Game.Client
 
         // Both sides of the chest: what it holds, each with [꺼내기], and what the bag holds, each with [넣기]. Stacks
         // move whole.
+        enum ShopMode
+        {
+            Buy,
+            Sell,
+            Gift,
+        }
+
+        ShopMode _shopMode;
+        static readonly string[] ShopModeNames = { "사기", "팔기", "선물" };
+
+        // The merchant (World.Merchant.cs): who she is and how well this player knows her, today's line, a chat once a
+        // day, and buying, selling and a gift once a day.
+        void DrawMerchant()
+        {
+            var near = _client.NpcNear();
+            if (near == null) return;
+            var npc = near.Value.Npc;
+            int hearts = _client.HeartsWith(npc);
+            var coin = _client.Bag.Materials.Keys.FirstOrDefault(m => m.Id == World.Coin);
+            int coins = coin == null ? 0 : _client.Bag.CountOf(coin);
+            GUILayout.Label(Fit($"{npc.Name} · 호감 {hearts}/{World.MaxHearts} ({_client.PointsWith(npc)}/{World.MaxHearts * World.PointsPerHeart}) · 금화 {coins}", _textWidth));
+            GUILayout.Label(Fit($"\"{npc.LineFor(_client.Today, hearts)}\"", _textWidth));
+            GUILayout.BeginHorizontal();
+            var enabled = GUI.enabled;
+            GUI.enabled = enabled && !_client.TalkedToday(npc);
+            if (GUILayout.Button(_client.TalkedToday(npc) ? "오늘은 이야기했다" : "말 걸기")) Send(_client.TalkCommand(), Sound.Click);
+            GUI.enabled = enabled;
+            GUILayout.EndHorizontal();
+            GUILayout.Label(Fit($"호감이 오를 때마다 사는 값은 {World.HeartPercent}% 싸지고 파는 값은 {World.HeartPercent}% 비싸진다.", _textWidth));
+            int mode = GUILayout.Toolbar((int)_shopMode, ShopModeNames);
+            if (mode != (int)_shopMode)
+            {
+                _shopMode = (ShopMode)mode;
+                Sounds.Play(Sound.Click);
+            }
+            GUILayout.Space(4);
+            if (_shopMode == ShopMode.Buy) DrawBuying(hearts, coins);
+            else if (_shopMode == ShopMode.Sell) DrawSelling(hearts);
+            else DrawGifts(npc);
+        }
+
+        void DrawBuying(int hearts, int coins)
+        {
+            var enabled = GUI.enabled;
+            foreach (var entry in _client.ShopToday)
+            {
+                GUILayout.BeginHorizontal();
+                Icon(entry.Material != null ? Sprites.Icon(entry.Material) : Sprites.Icon(entry.Consumable));
+                int price = World.BuyPrice(entry, hearts);
+                string note = entry.Daily ? " (오늘만)" : "";
+                bool open = hearts >= entry.Hearts;
+                string text = open ? $"{entry.Name}{note} · 금화 {price}" : $"{entry.Name} · 호감 {entry.Hearts}에 열린다";
+                GUILayout.Label(new GUIContent(Fit(text, _recipeWidth), entry.Material?.Description ?? entry.Consumable.Description), GUILayout.Width(_recipeWidth));
+                GUI.enabled = enabled && open && coins >= price;
+                if (GUILayout.Button("사기", GUILayout.Width(56))) Send(_client.BuyCommand(entry, 1), Sound.Craft);
+                GUI.enabled = enabled && open && coins >= price * 5;
+                if (GUILayout.Button("×5", GUILayout.Width(40))) Send(_client.BuyCommand(entry, 5), Sound.Craft);
+                GUI.enabled = enabled;
+                GUILayout.EndHorizontal();
+            }
+        }
+
+        void DrawSelling(int hearts)
+        {
+            bool any = false;
+            foreach (var entry in _client.Npcs.Shop.Where(e => e.Sell > 0))
+            {
+                int have = entry.Material != null ? _client.Bag.CountOf(entry.Material) : _client.Bag.CountOf(entry.Consumable);
+                if (have == 0) continue;
+                any = true;
+                GUILayout.BeginHorizontal();
+                Icon(entry.Material != null ? Sprites.Icon(entry.Material) : Sprites.Icon(entry.Consumable));
+                GUILayout.Label(Fit($"{entry.Name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts)}", _recipeWidth), GUILayout.Width(_recipeWidth));
+                if (GUILayout.Button("팔기", GUILayout.Width(56))) Send(_client.SellCommand(entry.Thing, 1), Sound.Pickup);
+                if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(entry.Thing, Math.Min(have, World.MaxTrade)), Sound.Pickup);
+                GUILayout.EndHorizontal();
+            }
+            foreach (var item in _client.Bag.Items.ToList())
+            {
+                any = true;
+                GUILayout.BeginHorizontal();
+                ItemLabel(item);
+                if (GUILayout.Button($"팔기 {World.ItemValue(item, hearts)}", GUILayout.Width(88))) Send(_client.SellItemCommand(item), Sound.Pickup);
+                GUILayout.EndHorizontal();
+            }
+            if (!any) GUILayout.Label(Fit("팔 것이 없다. 작물, 물고기, 요리, 주괴, 장비를 산다(입은 장비는 벗어야 판다).", _textWidth));
+        }
+
+        void DrawGifts(NpcDefinition npc)
+        {
+            if (_client.GiftedToday(npc))
+            {
+                GUILayout.Label(Fit("오늘은 선물을 주었다. 내일 또 줄 수 있다.", _textWidth));
+                return;
+            }
+            GUILayout.Label(Fit("하루에 하나. 좋아하는 것을 주면 호감이 크게 오른다.", _textWidth));
+            foreach (var pair in _client.Bag.Consumables.ToList())
+            {
+                GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(pair.Key));
+                GUILayout.Label(Fit($"{pair.Key.Name} ×{pair.Value}", _recipeWidth), GUILayout.Width(_recipeWidth));
+                if (GUILayout.Button("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
+                GUILayout.EndHorizontal();
+            }
+            foreach (var pair in _client.Bag.Materials.Where(p => p.Key.Id != World.Coin).ToList())
+            {
+                GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(pair.Key));
+                GUILayout.Label(Fit($"{pair.Key.Name} ×{pair.Value}", _recipeWidth), GUILayout.Width(_recipeWidth));
+                if (GUILayout.Button("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
+                GUILayout.EndHorizontal();
+            }
+        }
+
         void DrawChest()
         {
             var chest = _client.Chest.Contents;

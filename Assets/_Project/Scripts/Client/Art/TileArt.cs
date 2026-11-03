@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 using Game.Core;
 
 namespace Game.Client
@@ -386,6 +387,7 @@ namespace Game.Client
             TileType.RiftAltar => RiftAltarTile,
             TileType.Assembler => AssemblerTile,
             TileType.PowerPole => PowerPoleTile,
+            TileType.MerchantStall => MerchantStallTile,
             TileType.FastConveyor => ConveyorFrame,
             TileType.UndergroundBelt => ConveyorFrame,
             _ => null,
@@ -1344,6 +1346,42 @@ namespace Game.Client
             "..oaaaaaaaaaao..",
             "..oooooooooooo..",
             "..____________..");
+
+        // Static fields start in the order they are written, so this comes before the stall that uses it.
+        static readonly string[] Counter =
+        {
+            "oooooooooooooooo",
+            "oHHyHHHHHPHHyHHo",
+            "oWWWWWWWWWWWWWWo",
+            "owwwwwwwwwwwwwwo",
+            "owWwwwWwwwwWwwwo",
+            "oooooooooooooooo",
+            "________________",
+        };
+
+        // The merchant's stall: a striped awning on two posts over a wooden counter with wares on it. The merchant
+        // stands in the gap (WorldView draws them) and MerchantCounter goes over their legs.
+        static readonly PixelImage MerchantStallTile = PixelImage.FromRows(BasePalette,
+            "oooooooooooooooo",
+            "oRRccRRccRRccRRo",
+            "oRRccRRccRRccRRo",
+            "orrCCrrCCrrCCrro",
+            "oo.oo.oo.oo.oo.o",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            Counter[0],
+            Counter[1],
+            Counter[2],
+            Counter[3],
+            Counter[4],
+            Counter[5],
+            Counter[6]);
+
+        // The stall's counter alone, drawn over the merchant standing behind it.
+        public static readonly PixelImage MerchantCounter = PixelImage.FromRows(BasePalette,
+            Enumerable.Repeat("................", Size - Counter.Length).Concat(Counter).ToArray());
 
         // A wooden pole with a crossbar and two green glass insulators on it.
         static readonly PixelImage PowerPoleTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)

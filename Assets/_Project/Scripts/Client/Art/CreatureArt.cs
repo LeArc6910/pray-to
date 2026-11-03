@@ -140,6 +140,9 @@ namespace Game.Client
             ['o'] = Rgba.Hex("#5A3A24"),
         };
 
+        // The merchant at her stall wears purple (WorldView draws her as a standing player).
+        public static readonly Rgba MerchantTunic = Rgba.Hex("#9A5AC8");
+
         // A player in a tunic of the given colour (blue for you, other colours for the others), in a pose and its
         // frame (Pose).
         public static PixelImage Player(Look look, int frame, Rgba tunic, Pose pose = Pose.Walk)

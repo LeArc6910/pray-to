@@ -167,6 +167,14 @@ namespace Game.Core
         Salvage,
         Unsocket,
         Reroll,
+        // At the merchant (World.Merchant.cs). Buy: Index the shop row, Item how many. Sell: Index the sheet index,
+        // Item its StackKind + 4 × how many. SellItem: Item the item id. Gift: Item the StackKind, Index the sheet
+        // index. Talk: nothing.
+        Buy,
+        Sell,
+        SellItem,
+        Gift,
+        Talk,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
