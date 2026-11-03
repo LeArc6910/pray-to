@@ -83,6 +83,9 @@ ammo,ammo,10,iron_bar:1|copper_ore:2,Workbench
 bait,bait,4,slime_gel:1|mushroom_spore:1,Workbench
 steamed_crab,steamed_crab,1,cave_crab:1,Furnace
 fried_shrimp,fried_shrimp,1,cave_shrimp:3,Furnace
+barn,barn,1,stone:20|iron_bar:4|slime_gel:4,Workbench
+cheese,cheese,1,milk:2,PreservesJar
+warm_milk,warm_milk,1,milk:1,Furnace
 healing_potion,healing_potion,1,slime_gel:3,
 torch,torch,4,stone:1|slime_gel:1,
 roasted_mushroom,roasted_mushroom,1,mushroom:2,Furnace

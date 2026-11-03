@@ -393,6 +393,7 @@ namespace Game.Client
             TileType.Keg => KegTile,
             TileType.PreservesJar => JarTile,
             TileType.Coop => CoopTile,
+            TileType.Barn => BarnTile,
             TileType.WardStone => WardStoneTile,
             TileType.Turret => TurretBase,
             TileType.CrabPot => CrabPotTile,
@@ -1433,6 +1434,25 @@ namespace Game.Client
             "...owwwwwwwwo...",
             "....oooooooo....",
             "....________....",
+            "................");
+
+        // A red barn with a white-framed door.
+        static readonly PixelImage BarnTile = PixelImage.FromRows(BasePalette,
+            ".....oooooo.....",
+            "...ooRRRRRRoo...",
+            ".ooRRRRRRRRRRoo.",
+            "oRRRRRRRRRRRRRRo",
+            "orrrrrrrrrrrrrro",
+            ".oRRRRRRRRRRRRo.",
+            ".oRrRRoooooRRro.",
+            ".oRrRocSScocRro.",
+            ".oRrRoScSScoRro.",
+            ".oRrRocSScocRro.",
+            ".oRrRoScSScoRro.",
+            ".oRrRocSScocRro.",
+            ".orrroooooooorro",
+            ".oooooooooooooo.",
+            "..____________..",
             "................");
 
         // A pale blue crystal standing on a carved stone base.

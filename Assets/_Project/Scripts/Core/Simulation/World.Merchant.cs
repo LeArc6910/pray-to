@@ -51,7 +51,10 @@ namespace Game.Core
 
         public static int BuyPrice(ShopEntry entry, int hearts) => (entry.Buy * (100 - HeartPercent * hearts) + 99) / 100;
 
-        public static int SellPrice(ShopEntry entry, int hearts) => entry.Sell * (100 + HeartPercent * hearts) / 100;
+        // What a person pays for one: the row's price, more for silver or gold (MaterialDefinition.Quality), more with
+        // each heart.
+        public static int SellPrice(ShopEntry entry, int hearts, int quality = 0) =>
+            entry.Sell * MaterialDefinition.QualityPercent(quality) / 100 * (100 + HeartPercent * hearts) / 100;
 
         // What the merchant pays for a piece of gear: more for a higher level, a rarer one and an upgraded one.
         public static int ItemValue(Item item, int hearts)
@@ -201,7 +204,7 @@ namespace Game.Core
         }
 
         static int CountOf(Player player, object thing) =>
-            thing is MaterialDefinition material ? player.Inventory.CountOf(material) : player.Inventory.CountOf((ConsumableDefinition)thing);
+            thing is MaterialDefinition material ? player.Inventory.CountOfKind(material) : player.Inventory.CountOf((ConsumableDefinition)thing);
 
         // Brings the person within reach what they asked for today: takes it, gives what they promised and friendship.
         // False when there is no request, it was done today, or the player has not got everything.
@@ -214,7 +217,7 @@ namespace Game.Core
             if (request == null || friendship.RequestDay == Today || request.Need.Any(n => CountOf(player, n.Thing) < n.Count)) return false;
             foreach (var (thing, count) in request.Need)
             {
-                if (thing is MaterialDefinition material) player.Inventory.TakeMaterial(material, count);
+                if (thing is MaterialDefinition material) player.Inventory.TakeKind(material, count);
                 else for (int i = 0; i < count; i++) player.Inventory.TakeConsumable((ConsumableDefinition)thing);
             }
             foreach (var (thing, count) in request.Rewards) Give(player, thing, count);
@@ -264,18 +267,21 @@ namespace Game.Core
         {
             var at = AtMerchant(playerId);
             var coin = CoinMaterial;
-            var entry = at == null ? null : Npcs?.Shop.FirstOrDefault(e => e.Thing == thing && e.Sell > 0 && e.Npc == at.Value.Npc);
+            var kind = thing is MaterialDefinition m ? m.Kind : thing;
+            var entry = at == null ? null : Npcs?.Shop.FirstOrDefault(e => e.Thing == kind && e.Sell > 0 && e.Npc == at.Value.Npc);
             if (at == null || coin == null || entry == null) return false;
             var (player, _, friendship) = at.Value;
-            int have = entry.Material != null ? player.Inventory.CountOf(entry.Material) : player.Inventory.CountOf(entry.Consumable);
+            // A silver or gold one sells as itself, for more.
+            var sold = thing as MaterialDefinition ?? entry.Material;
+            int have = entry.Material != null ? player.Inventory.CountOf(sold) : player.Inventory.CountOf(entry.Consumable);
             count = Math.Min(Math.Clamp(count, 1, MaxTrade), have);
             if (count <= 0) return false;
-            if (entry.Material != null) player.Inventory.TakeMaterial(entry.Material, count);
+            if (entry.Material != null) player.Inventory.TakeMaterial(sold, count);
             else
             {
                 for (int i = 0; i < count; i++) player.Inventory.TakeConsumable(entry.Consumable);
             }
-            player.Inventory.AddMaterial(coin, SellPrice(entry, friendship.Hearts) * count);
+            player.Inventory.AddMaterial(coin, SellPrice(entry, friendship.Hearts, sold?.Quality ?? 0) * count);
             player.InventoryVersion++;
             return true;
         }
@@ -332,9 +338,12 @@ namespace Game.Core
                 default:
                     return -1;
             }
-            int reaction = npc.Loves.Contains(thing) ? Loved : npc.Likes.Contains(thing) ? Liked : npc.Dislikes.Contains(thing) ? Disliked : Neutral;
+            // A silver or gold one pleases as its plain kind does, and a little more.
+            var kind = thing is MaterialDefinition plain ? plain.Kind : thing;
+            int quality = (thing as MaterialDefinition)?.Quality ?? 0;
+            int reaction = npc.Loves.Contains(kind) ? Loved : npc.Likes.Contains(kind) ? Liked : npc.Dislikes.Contains(kind) ? Disliked : Neutral;
             friendship.GiftedDay = Today;
-            friendship.Points = Math.Clamp(friendship.Points + GiftPoints[reaction], 0, MaxHearts * PointsPerHeart);
+            friendship.Points = Math.Clamp(friendship.Points + GiftPoints[reaction] + (reaction > Disliked ? 10 * quality : 0), 0, MaxHearts * PointsPerHeart);
             player.InventoryVersion++;
             _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: reaction, position: TileMap.Center(near.Value.X, near.Value.Y)));
             return reaction;

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -85,6 +86,24 @@ namespace Game.Core
             if (count < 1 || have < count) return false;
             if (have == count) _materials.Remove(material);
             else _materials[material] = have - count;
+            return true;
+        }
+
+        // How many of the material there are in any quality (MaterialDefinition.Kind).
+        public int CountOfKind(MaterialDefinition material) => material.AllQualities.Sum(CountOf);
+
+        // Takes count of the material in any quality, the plainest first. False, and nothing taken, when there are
+        // not enough.
+        public bool TakeKind(MaterialDefinition material, int count)
+        {
+            if (count < 1 || CountOfKind(material) < count) return false;
+            foreach (var kind in material.AllQualities)
+            {
+                int take = Math.Min(count, CountOf(kind));
+                if (take > 0) TakeMaterial(kind, take);
+                count -= take;
+                if (count == 0) break;
+            }
             return true;
         }
 

@@ -770,7 +770,7 @@ namespace Game.Core
                 }
                 bool assembler = m.Kind == TileType.Assembler;
                 bool node = World.IsPowerNode(m.Kind);
-                bool coop = m.Kind == TileType.Coop;
+                bool coop = World.HouseOf(m.Kind) != null;
                 int supply = node && m.Setting >= 0 ? m.Setting / 256 : -1;
                 int demand = node && m.Setting >= 0 ? m.Setting % 256 : -1;
                 var setting = !assembler && !node && !coop && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
@@ -909,7 +909,8 @@ namespace Game.Core
         }
 
         // In the bag and in the chests nearby.
-        public int Available(MaterialDefinition material) => Bag.CountOf(material) + StockOf(material);
+        // Any quality of a crop counts (MaterialDefinition.Kind).
+        public int Available(MaterialDefinition material) => Bag.CountOfKind(material) + material.AllQualities.Sum(StockOf);
 
         // In the chests nearby, as of the host's last word.
         public int StockOf(MaterialDefinition material) => _stock.TryGetValue(material, out int count) ? count : 0;

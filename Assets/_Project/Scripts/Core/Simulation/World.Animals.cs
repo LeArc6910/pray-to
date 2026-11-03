@@ -4,45 +4,82 @@ using System.Linq;
 
 namespace Game.Core
 {
-    // The coop and the crab pot (Docs/Animals.md): machines that look after themselves once given what they eat.
+    // The coop, the barn and the crab pot (Docs/Animals.md): machines that look after themselves once given what they eat.
     public sealed partial class World
     {
         public const string Chicken = "chicken";
+        public const string Cow = "cow";
         public const string Feed = "feed";
         public const string Egg = "egg";
+        public const string Milk = "milk";
         public const string Bait = "bait";
         // How many chickens a coop holds, and how much feed.
         public const int CoopChickens = 4;
         public const int CoopFeed = 20;
 
-        public static int ChickensIn(Machine coop) => coop.Inputs.Where(p => p.Key.Id == Chicken).Sum(p => p.Value);
+        // A house for animals: which animal, how many fit, what they eat and how much for each thing they give.
+        public sealed class AnimalHouse
+        {
+            internal AnimalHouse(TileType tile, string animal, int most, string product, int feedEach)
+            {
+                Tile = tile;
+                Animal = animal;
+                Most = most;
+                Product = product;
+                FeedEach = feedEach;
+            }
 
-        // A coop takes chickens up to CoopChickens and feed up to CoopFeed; a crab pot takes bait up to its capacity.
+            public TileType Tile { get; }
+            public string Animal { get; }
+            public int Most { get; }
+            public string Product { get; }
+            public int FeedEach { get; }
+        }
+
+        public static readonly IReadOnlyList<AnimalHouse> AnimalHouses = new[]
+        {
+            new AnimalHouse(TileType.Coop, Chicken, CoopChickens, Egg, 1),
+            new AnimalHouse(TileType.Barn, Cow, 2, Milk, 2),
+        };
+
+        public static AnimalHouse HouseOf(TileType tile) => AnimalHouses.FirstOrDefault(h => h.Tile == tile);
+
+        // The animals in a coop or barn.
+        public static int AnimalsIn(Machine house) =>
+            HouseOf(house.Kind) is AnimalHouse kind ? house.Inputs.Where(p => p.Key.Id == kind.Animal).Sum(p => p.Value) : 0;
+
+        public static int ChickensIn(Machine coop) => AnimalsIn(coop);
+
+        // A coop or barn takes its animals up to how many fit and feed up to CoopFeed; a crab pot takes bait up to its
+        // capacity.
         static bool AnimalsTake(Machine machine, MaterialDefinition material)
         {
             int have = machine.Input.GetValueOrDefault(material);
             if (machine.Kind == TileType.CrabPot) return material.Id == Bait && have < machine.Definition.Capacity;
-            return material.Id == Chicken ? have < CoopChickens : material.Id == Feed && have < CoopFeed;
+            var house = HouseOf(machine.Kind);
+            if (house == null) return false;
+            return material.Id == house.Animal ? have < house.Most : material.Id == Feed && have < CoopFeed;
         }
 
-        // Once a day (the coop's seconds, real time) every chicken lays an egg, eating one feed for it. The day only
-        // runs while there are chickens and feed and room for the eggs. Eggs go out of the front like a smelter's bars.
-        void RunCoop(Machine coop)
+        // Once a day (the house's seconds, real time) every animal gives its product, eating its feed for it. The day
+        // only runs while there are animals, feed and room. What they give goes out of the front like a smelter's bars.
+        void RunAnimals(Machine house)
         {
-            var feed = coop.Input.Keys.FirstOrDefault(m => m.Id == Feed);
-            var egg = Loot?.Materials.FirstOrDefault(m => m.Id == Egg);
-            int chickens = ChickensIn(coop);
-            int laying = Math.Min(chickens, feed == null ? 0 : coop.Input[feed]);
-            // A hungry coop waits where its day was, rather than starting it over.
-            bool ready = egg != null && laying > 0 && Count(coop.Output) + laying <= coop.Definition.Capacity;
-            if (ready && ++coop.Timer >= coop.Definition.Ticks)
+            var kind = HouseOf(house.Kind);
+            var feed = house.Input.Keys.FirstOrDefault(m => m.Id == Feed);
+            var product = Loot?.Materials.FirstOrDefault(m => m.Id == kind.Product);
+            int fed = feed == null ? 0 : house.Input[feed] / kind.FeedEach;
+            int giving = Math.Min(AnimalsIn(house), fed);
+            // A hungry house waits where its day was, rather than starting it over.
+            bool ready = product != null && giving > 0 && Count(house.Output) + giving <= house.Definition.Capacity;
+            if (ready && ++house.Timer >= house.Definition.Ticks)
             {
-                coop.Timer = 0;
-                Add(coop.Input, feed, -laying);
-                Add(coop.Output, egg, laying);
-                CountMade(egg, laying);
+                house.Timer = 0;
+                Add(house.Input, feed, -giving * kind.FeedEach);
+                Add(house.Output, product, giving);
+                CountMade(product, giving);
             }
-            SendOut(coop, coop.Front);
+            SendOut(house, house.Front);
         }
 
         // Every so often a baited pot beside water catches one of what pots catch (materials.csv fish "pot"), eating a

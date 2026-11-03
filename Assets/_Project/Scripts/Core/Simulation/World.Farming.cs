@@ -211,16 +211,32 @@ namespace Game.Core
         {
             var definition = crop.Definition;
             bool again = definition.Regrows && crop.Grown >= definition.GrowTicks - definition.RegrowTicks;
+            bool fertile = Map[crop.X, crop.Y] == TileType.FertileSoil;
             int seeds = Reap(crop, out int count);
             // By hand: the farming skill may give one more, and grows by the days the crop took.
-            int bonus = LifeSkills.Bonus(LifeLevel(player, LifeSkill.Farming), LifeSkills.ExtraCropPercent);
+            int level = LifeLevel(player, LifeSkill.Farming);
+            int bonus = LifeSkills.Bonus(level, LifeSkills.ExtraCropPercent);
             if (bonus > 0 && _random.Chance(bonus / 100f)) count++;
+            var harvested = QualityOf(definition.HarvestMaterial, level, fertile);
             GainLifeExperience(player, LifeSkill.Farming, (int)Math.Round(6 * (again ? definition.RegrowDays : definition.GrowDays)));
-            if (definition.HarvestMaterial != null) player.Inventory.AddMaterial(definition.HarvestMaterial, count);
+            if (definition.HarvestMaterial != null) player.Inventory.AddMaterial(harvested, count);
             else player.Inventory.AddConsumable(definition.HarvestConsumable, count);
             player.Inventory.AddMaterial(definition.Seed, seeds);
             player.InventoryVersion++;
             _events.Add(new SimEvent(SimEventType.Harvested, player.Id, amount: definition.Count, position: TileMap.Center(crop.X, crop.Y)));
+        }
+
+        // The quality a harvest comes in (Docs/Farming.md, 품질): gold 1% + 2% a farming level above the first, silver 8%
+        // + 4% a level, both 10% more on fertile soil. A crop without quality, or a machine's harvest at level 1, as
+        // the sheet has it.
+        internal MaterialDefinition QualityOf(MaterialDefinition material, int farmingLevel, bool fertile)
+        {
+            if (material == null || material.Variants.Count < MaterialDefinition.MaxQuality) return material;
+            int soil = fertile ? 10 : 0;
+            int roll = _random.Next(100);
+            int gold = 1 + 2 * (farmingLevel - 1) + soil;
+            int silver = gold + 8 + 4 * (farmingLevel - 1) + soil;
+            return roll < gold ? material.Variants[1] : roll < silver ? material.Variants[0] : material;
         }
 
         // Takes the crop off its tile, or for one that regrows sets it back to ripen again in its regrow days with

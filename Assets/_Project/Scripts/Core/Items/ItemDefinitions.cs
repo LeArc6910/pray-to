@@ -256,6 +256,23 @@ namespace Game.Core
         public bool FishAtNight { get; }
         // What a crab pot catches (materials.csv fish "pot").
         public bool PotCatch { get; }
+
+        // Quality (Docs/Farming.md, 품질): a crop comes in plain, silver (1) or gold (2). The sheet marks which have it
+        // (materials.csv quality); the silver and gold kinds are made from them, with Base the plain one. Recipes,
+        // machines, requests and gifts take any quality as the plain one; shops pay more for the better.
+        public const int MaxQuality = 2;
+        internal static readonly string[] QualityIds = { "", "silver", "gold" };
+        public static readonly string[] QualityNames = { "", "은빛", "금빛" };
+        public static int QualityPercent(int quality) => 100 + 25 * quality;
+
+        public bool HasQuality { get; internal set; }
+        public int Quality { get; internal set; }
+        public MaterialDefinition Base { get; internal set; }
+        public IReadOnlyList<MaterialDefinition> Variants { get; internal set; } = Array.Empty<MaterialDefinition>();
+        // The plain kind: itself unless it is a silver or gold one.
+        public MaterialDefinition Kind => Base ?? this;
+        // It and its better kinds, plain first.
+        public IEnumerable<MaterialDefinition> AllQualities => new[] { Kind }.Concat(Kind.Variants);
         // Seconds a generator runs on one of it (materials.csv fuel), or 0 when it does not burn.
         public float Fuel { get; }
     }

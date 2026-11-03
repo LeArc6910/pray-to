@@ -296,6 +296,7 @@ namespace Game.Client
             "fried_egg" => RoastedMushroom,
             "steamed_crab" => MushroomSoup,
             "fried_shrimp" => SpicyFry,
+            "warm_milk" => MushroomSoup,
             _ => Potion,
         };
 
@@ -492,6 +493,39 @@ namespace Game.Client
             "...YY...",
         };
 
+        // A small black-and-white cow, side on, facing left; two frames, head up and grazing.
+        public static PixelImage Cow(int frame) => PixelImage.FromRows(CowColors, frame % 2 == 0 ? CowUp : CowGraze).Outlined(Outline);
+
+        static readonly Dictionary<char, Rgba> CowColors = new Dictionary<char, Rgba>(Common)
+        {
+            ['W'] = Rgba.Hex("#F6F2E8"),
+            ['K'] = Rgba.Hex("#2A2420"),
+            ['P'] = Rgba.Hex("#F0A0A0"),
+            ['G'] = Rgba.Hex("#C8C0B0"),
+        };
+
+        static readonly string[] CowUp =
+        {
+            "KK..........",
+            "WKW.........",
+            "WWWWWKKWWWW.",
+            "PWWWKKWWWKWW",
+            ".WWWWWWWWWWW",
+            ".WWKKWWWWKKW",
+            "..K.K....K.K",
+        };
+
+        static readonly string[] CowGraze =
+        {
+            "............",
+            "....WKKWWWW.",
+            "KK.WKKWWWKWW",
+            "WKWWWWWWWWWW",
+            "WWWWKWWWWKKW",
+            "PW.K.K...K.K",
+            "............",
+        };
+
         // A crab, front on.
         static readonly string[] Crab =
         {
@@ -665,6 +699,20 @@ namespace Game.Client
 
         static PixelImage MaterialIcon(MaterialDefinition material)
         {
+            // A silver or gold crop: the plain one with a star in its corner.
+            if (material.Base != null)
+            {
+                var plain = MaterialIcon(material.Base).Copy();
+                var star = Rgba.Hex(material.Quality >= 2 ? "#F2C440" : "#D4DCE6");
+                int right = plain.Width - 4, top = 0;
+                foreach (var (dx, dy) in new[] { (1, 0), (0, 1), (1, 1), (2, 1), (1, 2) }) plain[right + dx, top + dy] = star;
+                foreach (var (dx, dy) in new[] { (1, -1), (-1, 1), (3, 1), (1, 3), (0, 0), (2, 0), (0, 2), (2, 2) })
+                {
+                    int x = right + dx, y = top + dy;
+                    if (x >= 0 && y >= 0 && x < plain.Width && y < plain.Height && plain[x, y].A == 0) plain[x, y] = Outline;
+                }
+                return plain;
+            }
             var placed = material.Places is TileType places && places != TileType.Wall ? TileArt.Object(places) : null;
             if (placed != null && material.Places == TileType.Conveyor)
             {
@@ -774,6 +822,9 @@ namespace Game.Client
                 case "kimchi": return Ramped(Pickles, Ramp.Of("#D8603A"));
                 case "pickled_bean": return Ramped(Pickles, Ramp.Of("#6A44B8"));
                 case "chicken": return Chicken(0);
+                case "cow": return Cow(0);
+                case "milk": return Ramped(Bottle, Ramp.Of("#F6F2E8"));
+                case "cheese": return Ramped(Goo, Ramp.Of("#F2D060"));
                 case "ammo": return Ramped(Seeds, Ramp.Of("#D8B050"));
                 case "feed": return Ramped(Seeds, Ramp.Of("#D8B070"));
                 case "egg": return Ramped(Goo, Ramp.Of("#F6F0E0"));

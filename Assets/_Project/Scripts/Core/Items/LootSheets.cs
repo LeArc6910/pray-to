@@ -266,9 +266,33 @@ namespace Game.Core
                     bool atNight = fishing.Length == 2;
                     float fuel = row["fuel"].Length > 0 ? SheetValues.ParseDecimal(row["fuel"], "fuel") : 0;
                     if (fuel < 0) throw new FormatException("fuel은 0 이상이어야 합니다.");
+                    bool quality = row["quality"] switch
+                    {
+                        "" => false,
+                        "yes" => true,
+                        _ => throw new FormatException($"quality는 비우거나 yes입니다: '{row["quality"]}'"),
+                    };
                     materials.Add(new MaterialDefinition(NewId(row, materials.Select(m => m.Id)), Required(row, "name"), places, row["description"], fish, fuel,
-                        atNight, pot));
+                        atNight, pot) { HasQuality = quality });
                 });
+            }
+            // Silver and gold kinds of each that has quality, after all the sheet's, so the sheet's own keep their
+            // places (Docs/Farming.md, 품질).
+            foreach (var material in materials.Where(m => m.HasQuality).ToList())
+            {
+                var variants = new List<MaterialDefinition>();
+                for (int quality = 1; quality <= MaterialDefinition.MaxQuality; quality++)
+                {
+                    var variant = new MaterialDefinition($"{material.Id}_{MaterialDefinition.QualityIds[quality]}", $"{MaterialDefinition.QualityNames[quality]} {material.Name}",
+                        null, $"{material.Description} 품질이 좋아 {MaterialDefinition.QualityPercent(quality)}% 값에 팔린다.")
+                    {
+                        Quality = quality,
+                        Base = material,
+                    };
+                    variants.Add(variant);
+                    materials.Add(variant);
+                }
+                material.Variants = variants;
             }
             return materials;
         }

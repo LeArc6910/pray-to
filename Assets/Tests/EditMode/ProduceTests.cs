@@ -168,5 +168,58 @@ namespace Game.Core.Tests
             Assert.Greater(Sell("kimchi"), Sell("snow_cabbage"));
             Assert.Greater(Sell("star_wine"), Sell("star_melon"));
         }
+    
+        [Test]
+        public void CropsComeInSilverAndGoldAfterTheSheetsOwn()
+        {
+            var mushroom = Gear.Data.FindMaterial("mushroom");
+            Assert.AreEqual(MaterialDefinition.MaxQuality, mushroom.Variants.Count);
+            var gold = Gear.Data.FindMaterial("mushroom_gold");
+            Assert.AreSame(mushroom, gold.Base);
+            Assert.AreEqual(2, gold.Quality);
+            Assert.AreEqual("금빛 동굴 버섯", gold.Name);
+            Assert.Greater(Gear.Data.Materials.ToList().IndexOf(gold), Gear.Data.Materials.ToList().IndexOf(Gear.Data.FindMaterial("ward_stone")),
+                "made ones after every row of the sheet");
+            Assert.IsEmpty(Gear.Data.FindMaterial("stone").Variants, "only crops");
+        }
+
+        [Test]
+        public void BetterFarmersGrowBetterCrops()
+        {
+            var world = Room(out _);
+            var berry = Berry;
+            int Count(int level, int quality) => Enumerable.Range(0, 2000).Count(_ => world.QualityOf(berry, level, false).Quality == quality);
+            Assert.That(Count(1, 2), Is.InRange(5, 45), "gold about 1% at first");
+            Assert.That(Count(1, 1), Is.InRange(100, 240), "silver about 8%");
+            Assert.That(Count(10, 2), Is.InRange(300, 460), "gold about 19% at level 10");
+        }
+
+        [Test]
+        public void AnyQualityCooksAndSellsForMore()
+        {
+            var world = Room(out var player);
+            Place(world, player, Gear.Data.FindMaterial("furnace"), 8, 9, new Vec2(0, 1));
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("mushroom_gold"), 1);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("mushroom"), 1);
+            var roast = Gear.Data.Recipes.Single(r => r.Id == "roasted_mushroom");
+            Assert.IsTrue(world.Craft(player.Id, roast), "a gold one and a plain one make two");
+            Assert.AreEqual(0, player.Inventory.CountOfKind(Gear.Data.FindMaterial("mushroom")));
+
+            var entry = People.Shipped.Shop.Single(e => e.Npc == People.Shipped.Merchant && e.Material?.Id == "cave_berry");
+            Assert.AreEqual(entry.Sell * 150 / 100, World.SellPrice(entry, 0, 2));
+            Assert.AreEqual(entry.Sell * 125 / 100, World.SellPrice(entry, 0, 1));
+        }
+
+        [Test]
+        public void AKegTakesSilverFruit()
+        {
+            var world = Room(out var player);
+            Place(world, player, KegItem, 8, 9, new Vec2(0, 1));
+            var silver = Gear.Data.FindMaterial("cave_berry_silver");
+            player.Inventory.AddMaterial(silver, 2);
+            Assert.AreEqual(2, world.LoadMachine(player.Id, silver, 2));
+            Run(world, Keg.Seconds + 1);
+            Assert.AreEqual(1, world.MachineAt(8, 9).Outputs.GetValueOrDefault(Juice));
+        }
     }
 }

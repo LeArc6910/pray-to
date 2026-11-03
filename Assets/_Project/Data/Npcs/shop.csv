@@ -14,6 +14,7 @@ ember_corn_seed,35,,,,
 moon_grape_seed,45,,yes,,
 void_bean_seed,50,,,1,
 chicken,120,,,1,
+cow,300,,,2,
 feed,3,,,,
 bait,2,,,,
 ammo,3,,,,blacksmith
@@ -101,3 +102,6 @@ eel_skewer,,14,,,fisher
 abyss_feast,,14,,,fisher
 steamed_crab,,16,,,fisher
 fried_shrimp,,14,,,fisher
+milk,,12,,,
+cheese,,40,,,
+warm_milk,,20,,,

@@ -174,7 +174,8 @@ namespace Game.Core
                     RunAssembler(machine);
                     break;
                 case TileType.Coop:
-                    RunCoop(machine);
+                case TileType.Barn:
+                    RunAnimals(machine);
                     break;
                 case TileType.CrabPot:
                     RunCrabPot(machine);
@@ -197,7 +198,7 @@ namespace Game.Core
             var recipe = assembler.Recipe;
             var (fx, fy) = assembler.Front;
             bool room = recipe?.Material != null ? Count(assembler.Output) + recipe.Count <= assembler.Definition.Capacity : ChestAt(fx, fy) != null;
-            bool ready = recipe != null && room && recipe.Ingredients.All(i => assembler.Input.GetValueOrDefault(i.Material) >= i.Count);
+            bool ready = recipe != null && room && recipe.Ingredients.All(i => HeldKind(assembler.Input, i.Material) >= i.Count);
             if (!ready)
             {
                 assembler.Timer = 0;
@@ -205,7 +206,7 @@ namespace Game.Core
             else if (++assembler.Timer >= assembler.Definition.Ticks)
             {
                 assembler.Timer = 0;
-                foreach (var (material, count) in recipe.Ingredients) Add(assembler.Input, material, -count);
+                foreach (var (material, count) in recipe.Ingredients) UseKind(assembler.Input, material, count);
                 CountMade((object)recipe.Material ?? recipe.Consumable, recipe.Count);
                 if (recipe.Material != null)
                 {
@@ -225,8 +226,8 @@ namespace Game.Core
         // make needs, so one ingredient cannot fill it while another is missing.
         static bool AssemblerTakes(Machine assembler, MaterialDefinition material)
         {
-            var need = assembler.Recipe?.Ingredients.FirstOrDefault(i => i.Material == material);
-            return need?.Material != null && assembler.Input.GetValueOrDefault(material) < need.Value.Count * 2;
+            var need = assembler.Recipe?.Ingredients.FirstOrDefault(i => i.Material == material.Kind);
+            return need?.Material != null && HeldKind(assembler.Input, material) < need.Value.Count * 2;
         }
 
         // Sets the assembler ahead to make the recipe (null to stop). What it held that the new recipe does not use
@@ -240,7 +241,7 @@ namespace Game.Core
             assembler.Timer = 0;
             foreach (var pair in assembler.Input.ToList())
             {
-                if (recipe != null && recipe.Ingredients.Any(i => i.Material == pair.Key)) continue;
+                if (recipe != null && recipe.Ingredients.Any(i => i.Material == pair.Key.Kind)) continue;
                 player.Inventory.AddMaterial(pair.Key, pair.Value);
                 assembler.Input.Remove(pair.Key);
                 player.InventoryVersion++;
@@ -307,7 +308,7 @@ namespace Game.Core
         // Machines a player can fill by hand ([넣기]): what they make things from.
         public static bool LoadsByHand(TileType kind) =>
             kind == TileType.Smelter || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator
-            || kind == TileType.Coop || kind == TileType.CrabPot || kind == TileType.Turret;
+            || kind == TileType.Coop || kind == TileType.Barn || kind == TileType.CrabPot || kind == TileType.Turret;
 
         // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
         // a belt would. Returns how many went in.
@@ -420,6 +421,7 @@ namespace Game.Core
                     case TileType.Keg:
                     case TileType.PreservesJar:
                     case TileType.Coop:
+                    case TileType.Barn:
                     case TileType.CrabPot:
                         var made = source.Output.Keys.FirstOrDefault(Fits);
                         if (made != null) Add(source.Output, made, -1);
@@ -469,7 +471,7 @@ namespace Game.Core
         void RunProcessor(Machine smelter)
         {
             // The time only runs while there is something it can make and room for the result.
-            var recipe = ProcessesOf(smelter.Kind).FirstOrDefault(r => r.Ingredients.All(i => smelter.Input.GetValueOrDefault(i.Material) >= i.Count)
+            var recipe = ProcessesOf(smelter.Kind).FirstOrDefault(r => r.Ingredients.All(i => HeldKind(smelter.Input, i.Material) >= i.Count)
                 && Count(smelter.Output) + r.Count <= smelter.Definition.Capacity);
             if (recipe == null)
             {
@@ -478,7 +480,7 @@ namespace Game.Core
             else if (++smelter.Timer >= smelter.Definition.Ticks)
             {
                 smelter.Timer = 0;
-                foreach (var (material, count) in recipe.Ingredients) Add(smelter.Input, material, -count);
+                foreach (var (material, count) in recipe.Ingredients) UseKind(smelter.Input, material, count);
                 Add(smelter.Output, recipe.Material, recipe.Count);
                 CountMade(recipe.Material, recipe.Count);
             }
@@ -519,8 +521,10 @@ namespace Game.Core
                 if (crop != null)
                 {
                     var definition = crop.Definition;
+                    bool fertile = Map[crop.X, crop.Y] == TileType.FertileSoil;
                     int seeds = Reap(crop, out int count);
-                    Add(harvester.Output, definition.HarvestMaterial, count);
+                    // A machine harvests as a first-level farmer.
+                    Add(harvester.Output, QualityOf(definition.HarvestMaterial, 1, fertile), count);
                     CountMade(definition.HarvestMaterial, count);
                     // One that regrows is still there.
                     if (seeds > 0 && CropAt(crop.X, crop.Y) == null)
@@ -642,9 +646,9 @@ namespace Game.Core
                 TileType.Splitter => true,
                 TileType.Filter => true,
                 TileType.Generator => material.Fuel > 0,
-                TileType.Smelter or TileType.Keg or TileType.PreservesJar => ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)),
-                TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material),
-                TileType.Coop => material.Id == Chicken || material.Id == Feed,
+                TileType.Smelter or TileType.Keg or TileType.PreservesJar => ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
+                TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material.Kind),
+                TileType.Coop or TileType.Barn => material.Id == HouseOf(target.Kind).Animal || material.Id == Feed,
                 TileType.CrabPot => material.Id == Bait,
                 TileType.Turret => material.Id == Ammo,
                 _ => false,
@@ -683,7 +687,7 @@ namespace Game.Core
                     case TileType.Smelter:
                     case TileType.Keg:
                     case TileType.PreservesJar:
-                        if (!ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)) || Count(target.Input) >= target.Definition.Capacity) return false;
+                        if (!ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)) || Count(target.Input) >= target.Definition.Capacity) return false;
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Assembler:
@@ -695,6 +699,7 @@ namespace Game.Core
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Coop:
+                    case TileType.Barn:
                     case TileType.CrabPot:
                         if (!AnimalsTake(target, material)) return false;
                         Add(target.Input, material, 1);
@@ -712,6 +717,21 @@ namespace Game.Core
         }
 
         static int Count(Dictionary<MaterialDefinition, int> stacks) => stacks.Values.Sum();
+
+        // How much of the material a machine holds in any quality, and using some up, the plainest first.
+        static int HeldKind(Dictionary<MaterialDefinition, int> stacks, MaterialDefinition material) =>
+            material.AllQualities.Sum(kind => stacks.GetValueOrDefault(kind));
+
+        static void UseKind(Dictionary<MaterialDefinition, int> stacks, MaterialDefinition material, int count)
+        {
+            foreach (var kind in material.AllQualities)
+            {
+                int take = Math.Min(count, stacks.GetValueOrDefault(kind));
+                if (take > 0) Add(stacks, kind, -take);
+                count -= take;
+                if (count == 0) return;
+            }
+        }
 
         static void Add(Dictionary<MaterialDefinition, int> stacks, MaterialDefinition material, int count)
         {

@@ -137,18 +137,19 @@ namespace Game.Core
             int made = 0;
             for (; made < times; made++)
             {
-                if (recipe.Ingredients.Any(i => player.Inventory.CountOf(i.Material) + chests.Sum(c => c.Chest.CountOf(i.Material)) < i.Count)) break;
+                // Any quality of a crop will do (MaterialDefinition.Kind), the plainest first.
+                if (recipe.Ingredients.Any(i => player.Inventory.CountOfKind(i.Material) + chests.Sum(c => c.Chest.CountOfKind(i.Material)) < i.Count)) break;
                 if (recipe.Item != null && (player.Inventory.IsFull || _lootGenerator == null)) break;
                 foreach (var (material, count) in recipe.Ingredients)
                 {
-                    int fromBag = Math.Min(count, player.Inventory.CountOf(material));
-                    if (fromBag > 0) player.Inventory.TakeMaterial(material, fromBag);
+                    int fromBag = Math.Min(count, player.Inventory.CountOfKind(material));
+                    if (fromBag > 0) player.Inventory.TakeKind(material, fromBag);
                     int left = count - fromBag;
                     foreach (var (key, chest) in chests)
                     {
-                        int take = Math.Min(left, chest.CountOf(material));
+                        int take = Math.Min(left, chest.CountOfKind(material));
                         if (take == 0) continue;
-                        chest.TakeMaterial(material, take);
+                        chest.TakeKind(material, take);
                         _chestVersions[key] = _chestVersions.GetValueOrDefault(key) + 1;
                         left -= take;
                     }

@@ -211,5 +211,25 @@ namespace Game.Core.Tests
             Assert.IsTrue(world.Craft(player.Id, Gear.Data.Recipes.Single(r => r.Id == "healing_potion")));
             Assert.AreEqual(4, player.LifeExperience[(int)LifeSkill.Cooking], "a potion is no cooking");
         }
+    
+        [Test]
+        public void CowsGiveMilkForTwoFeedEach()
+        {
+            var world = Pond(out var player);
+            Place(world, player, Gear.Data.FindMaterial("barn"), 8, 10, new Vec2(0, 1));
+            var cow = Gear.Data.FindMaterial(World.Cow);
+            var milk = Gear.Data.FindMaterial(World.Milk);
+            player.Inventory.AddMaterial(cow, 3);
+            player.Inventory.AddMaterial(FeedItem, 5);
+            Assert.AreEqual(2, world.LoadMachine(player.Id, cow, 3), "two at most");
+            Assert.AreEqual(0, world.LoadMachine(player.Id, ChickenItem, 1), "no chickens in a barn");
+            Assert.AreEqual(5, world.LoadMachine(player.Id, FeedItem, 5));
+            var barn = Tiles.Shipped.Machine(TileType.Barn);
+            Run(world, barn.Seconds + 1);
+            Assert.AreEqual(2, world.MachineAt(8, 10).Outputs.GetValueOrDefault(milk));
+            Run(world, barn.Seconds + 1);
+            Assert.AreEqual(2, world.MachineAt(8, 10).Outputs.GetValueOrDefault(milk), "one feed left is not enough for a cow");
+            Assert.AreEqual(2, World.AnimalsIn(world.MachineAt(8, 10)));
+        }
     }
 }

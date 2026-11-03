@@ -81,6 +81,7 @@ namespace Game.Core
         PreservesJar,
         Coop,
         CrabPot,
+        Barn,
         WardStone,
         Turret,
     }

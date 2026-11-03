@@ -829,17 +829,21 @@ namespace Game.Client
             int used = 0;
             foreach (var machine in _client.Machines())
             {
-                if (machine.Kind != TileType.Coop) continue;
+                if (machine.Kind != TileType.Coop && machine.Kind != TileType.Barn) continue;
+                bool cows = machine.Kind == TileType.Barn;
                 for (int i = 0; i < machine.Animals; i++)
                 {
                     if (used == _chickens.Count) _chickens.Add(Renderer(_root.transform, "Chicken", null, Color.white));
                     var chicken = _chickens[used++];
                     chicken.enabled = true;
                     float t = Time.time * 0.45f + i * 1.7f + machine.X * 0.3f;
-                    var at = new Vector3(machine.X + 0.5f + Mathf.Sin(t) * 1.1f, machine.Y - 0.6f + Mathf.Sin(t * 1.9f + i) * 0.35f, 0);
+                    // Cows wander slower and wider.
+                    if (cows) t *= 0.6f;
+                    var at = new Vector3(machine.X + 0.5f + Mathf.Sin(t) * (cows ? 1.6f : 1.1f), machine.Y - (cows ? 0.9f : 0.6f) + Mathf.Sin(t * 1.9f + i) * 0.35f, 0);
                     bool pecking = Mathf.Sin(t * 3.1f) > 0.6f;
                     int frame = pecking ? 1 : 0;
-                    chicken.sprite = Sprites.Standing("animal/chicken/" + frame, () => ItemArt.Chicken(frame));
+                    chicken.sprite = cows ? Sprites.Standing("animal/cow/" + frame, () => ItemArt.Cow(frame))
+                        : Sprites.Standing("animal/chicken/" + frame, () => ItemArt.Chicken(frame));
                     // Facing the way it is going: left while sin falls.
                     chicken.flipX = Mathf.Cos(t) > 0;
                     chicken.transform.localPosition = at;

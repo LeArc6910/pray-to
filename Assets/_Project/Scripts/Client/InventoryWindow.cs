@@ -249,11 +249,11 @@ namespace Game.Client
         // Whether the machine makes anything from the material (World.Takes, as far as the client can tell).
         bool Takes(MachineView machine, MaterialDefinition material) => machine.Kind switch
         {
-            TileType.Assembler => machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material),
-            TileType.Coop => material.Id == World.Chicken || material.Id == World.Feed,
+            TileType.Assembler => machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material.Kind),
+            TileType.Coop or TileType.Barn => material.Id == World.HouseOf(machine.Kind).Animal || material.Id == World.Feed,
             TileType.CrabPot => material.Id == World.Bait,
             TileType.Turret => material.Id == World.Ammo,
-            _ => _client.ProcessesOf(machine.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)),
+            _ => _client.ProcessesOf(machine.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
         };
 
         bool _showProduction;
@@ -373,6 +373,8 @@ namespace Game.Client
                 GUILayout.EndHorizontal();
                 if (machine.Kind == TileType.Coop)
                     GUILayout.Label(Fit($"닭 {machine.Animals}/{World.CoopChickens}마리. 사료가 있으면 하루(20분)마다 닭마다 달걀 하나", _textWidth));
+                if (machine.Kind == TileType.Barn)
+                    GUILayout.Label(Fit($"소 {machine.Animals}/{World.HouseOf(TileType.Barn).Most}마리. 사료 둘이면 하루(20분)마다 소마다 우유 하나", _textWidth));
                 if (machine.Kind == TileType.CrabPot)
                     GUILayout.Label(Fit("바로 옆이 물이어야 한다. 미끼 하나로 15분에 하나씩 든다", _textWidth));
                 if (machine.Kind == TileType.Keg || machine.Kind == TileType.PreservesJar)
@@ -477,7 +479,7 @@ namespace Game.Client
                 GUILayout.Label(Fit("오늘 부탁은 들어주었다. 내일 또 다른 부탁이 있다.", _textWidth));
                 return;
             }
-            bool ready = request.Need.All(n => n.Thing is MaterialDefinition m ? _client.Bag.CountOf(m) >= n.Count : _client.Bag.CountOf((ConsumableDefinition)n.Thing) >= n.Count);
+            bool ready = request.Need.All(n => n.Thing is MaterialDefinition m ? _client.Bag.CountOfKind(m) >= n.Count : _client.Bag.CountOf((ConsumableDefinition)n.Thing) >= n.Count);
             var enabled = GUI.enabled;
             GUI.enabled = enabled && ready;
             if (GUILayout.Button(ready ? "건네기" : "아직 모자라다")) Send(_client.RequestCommand(), Sound.Craft);
@@ -510,15 +512,22 @@ namespace Game.Client
             bool any = false;
             foreach (var entry in _client.Npcs.Shop.Where(e => e.Sell > 0 && e.Npc == npc))
             {
-                int have = entry.Material != null ? _client.Bag.CountOf(entry.Material) : _client.Bag.CountOf(entry.Consumable);
-                if (have == 0) continue;
-                any = true;
-                GUILayout.BeginHorizontal();
-                Icon(entry.Material != null ? Sprites.Icon(entry.Material) : Sprites.Icon(entry.Consumable));
-                GUILayout.Label(Fit($"{entry.Name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts)}", _recipeWidth), GUILayout.Width(_recipeWidth));
-                if (GUILayout.Button("팔기", GUILayout.Width(56))) Send(_client.SellCommand(entry.Thing, 1), Sound.Pickup);
-                if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(entry.Thing, Math.Min(have, World.MaxTrade)), Sound.Pickup);
-                GUILayout.EndHorizontal();
+                // A crop in each quality the bag holds, the better ones dearer.
+                var kinds = entry.Material != null ? entry.Material.AllQualities.Cast<object>() : new object[] { entry.Consumable };
+                foreach (var thing in kinds)
+                {
+                    var material = thing as MaterialDefinition;
+                    int have = material != null ? _client.Bag.CountOf(material) : _client.Bag.CountOf(entry.Consumable);
+                    if (have == 0) continue;
+                    any = true;
+                    GUILayout.BeginHorizontal();
+                    Icon(material != null ? Sprites.Icon(material) : Sprites.Icon(entry.Consumable));
+                    string name = material?.Name ?? entry.Name;
+                    GUILayout.Label(Fit($"{name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts, material?.Quality ?? 0)}", _recipeWidth), GUILayout.Width(_recipeWidth));
+                    if (GUILayout.Button("팔기", GUILayout.Width(56))) Send(_client.SellCommand(thing, 1), Sound.Pickup);
+                    if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(thing, Math.Min(have, World.MaxTrade)), Sound.Pickup);
+                    GUILayout.EndHorizontal();
+                }
             }
             foreach (var item in npc.BuysGear ? _client.Bag.Items.ToList() : new List<Item>())
             {
