@@ -339,11 +339,19 @@ async function bag(browser) {
   }
   await game.shot('bag-rune', '룬을 끼운 뒤');
   // Throwing away and picking up again.
+  // A thrown-away item lands 1.2 tiles ahead and can be picked up again after 5 seconds, by walking onto it.
   const swords = items(await game.inventory(), 'copper_sword');
+  await game.send('face 1 0');
+  await game.wait(300);
   await game.press('버리기', '구리 검');
   check(items(await game.inventory(), 'copper_sword') === swords - 1, '[버리기]로 구리 검을 버린다');
-  await game.wait(6000);
-  check(items(await game.inventory(), 'copper_sword') === swords, '5초 뒤 발밑의 검을 다시 줍는다');
+  await game.wait(2000);
+  await game.send('goto 1 0');
+  await game.wait(1000);
+  check(items(await game.inventory(), 'copper_sword') === swords - 1, '버린 바로 뒤에는 밟아도 줍지 않는다');
+  await game.wait(3500);
+  check(items(await game.inventory(), 'copper_sword') === swords, '5초가 지나면 그 위에서 다시 줍는다');
+  await game.send('goto -1 0; face off');
   // A click inside the bag does not swing.
   const inBag = (await game.buttons()).find(b => b.shown && b.label === '버리기');
   await game.page.mouse.move(inBag.cx - 150, inBag.cy);
@@ -413,25 +421,28 @@ async function combat(browser) {
   await game.wait(800);
 
   // Bow and staff shoot.
+  // An arrow lives a fraction of a second, so the proof is a slime hit four tiles off, out of a sword's reach.
   for (const [weapon, name] of [['copper_bow', '활'], ['copper_staff', '지팡이']]) {
-    await game.send(`equip ${weapon}; spawn slime 4 0 5000; attack on 1 0`);
-    const shot = await game.until(s => s.projectiles > 0, 3000);
+    await game.send(`equip ${weapon}; spawn slime 4 0 5000; speed 0`);
+    await game.wait(300);
+    await game.send('speed 1; attack on 1 0');
+    const shot = await game.until(s => s.hurtMonsters > 0, 3000);
     await game.shot(`ranged-${weapon}`, `${name}로 쏘기`);
     await game.send('attack off; clear');
-    check(!!shot, `${name}를 들면 탄이 날아간다`);
+    check(!!shot, `${name}를 들면 4칸 떨어진 슬라임을 맞힌다`);
   }
   await game.send('equip copper_sword');
 
   // Four skills pressed at once all go.
-  await game.send('heal; spawn slime 2 0 5000; spawn slime -2 0 5000');
-  const before = await game.state();
+  // The four cost 10 + 15 + 5 + 15 = 45 mana: with exactly that much, all four leave almost none.
+  await game.send('heal; spawn slime 2 0 5000; spawn slime -2 0 5000; mana 45');
   for (const key of ['q', 'e', 'r', 'f']) await game.page.keyboard.down(key);
   await game.wait(150);
   for (const key of ['q', 'e', 'r', 'f']) await game.page.keyboard.up(key);
-  await game.wait(500);
-  await game.shot('skills', 'Q E R F를 함께 누른 뒤(칸이 모두 어둡다)');
+  await game.wait(150);
   const after = await game.state();
-  check(before.mana - after.mana >= 40, `Q E R F를 거의 함께 눌러도 모두 나간다 (마나 ${before.mana} → ${after.mana})`);
+  await game.shot('skills', 'Q E R F를 함께 누른 뒤(칸이 모두 어둡다)');
+  check(after.mana < 5, `Q E R F를 거의 함께 눌러도 넷 다 나간다 (마나 45 → ${after.mana})`);
   await game.wait(800);
   await game.shot('burning', '불붙은 슬라임(원소)');
   await game.send('clear');
@@ -523,7 +534,8 @@ async function world(browser) {
   await game.shot('lava', '용암 위');
   // A better pickaxe for obsidian.
   await game.send('heal; goto near ObsidianOre; equip copper_pickaxe');
-  await game.send('attack on 0 0');
+  // Facing the ore as "goto near" left it: "attack on" keeps that aim.
+  await game.send('attack on');
   const better = await game.until(r => (r.floating || []).some(f => has(f, '더 좋은 곡괭이')), 3000, game.texts);
   await game.send('attack off');
   check(!!better, '흑요석에 약한 곡괭이로는 "더 좋은 곡괭이가 필요하다"');
