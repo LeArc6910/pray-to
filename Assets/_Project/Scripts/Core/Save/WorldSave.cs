@@ -16,8 +16,8 @@ namespace Game.Core
         internal const string Magic = "PTWO";
         // 2 added chests, 3 machines, 4 whether each crop was watered, 5 beds and their owners.
         // 6: a filter's chosen material on each machine. 7: the world's clock (Calendar), and crops as how far they have
-        // grown and the water they have left (Docs/Time.md).
-        const int FormatVersion = 7;
+        // grown and the water they have left (Docs/Time.md). 8: the highest void rift tier it may open.
+        const int FormatVersion = 8;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -32,6 +32,7 @@ namespace Game.Core
             ulong seed,
             long savedAt,
             long clock,
+            int riftTier,
             int progressLevel,
             List<TileChange> tiles,
             List<(CropDefinition Crop, int X, int Y, long Grown, long WetLeft)> crops,
@@ -46,6 +47,7 @@ namespace Game.Core
             Seed = seed;
             SavedAt = savedAt;
             Clock = clock;
+            RiftTier = riftTier;
             ProgressLevel = progressLevel;
             Tiles = tiles;
             Crops = crops;
@@ -57,6 +59,8 @@ namespace Game.Core
         public long SavedAt { get; }
         // The world's clock (Calendar); 0, the first morning, for a save from before days.
         public long Clock { get; }
+        // 1 for a save from before rifts.
+        public int RiftTier { get; }
         public int ProgressLevel { get; }
         public IReadOnlyList<TileChange> Tiles { get; }
         // How many ticks each crop had grown, and the ticks of water it had left.
@@ -107,6 +111,7 @@ namespace Game.Core
                 w.Write(world.Map.Height);
                 w.Write(savedAt);
                 w.Write(world.Clock);
+                w.Write(world.RiftTier);
                 w.Write(world.ProgressLevel);
 
                 var tiles = world.ChangedTiles();
@@ -187,6 +192,7 @@ namespace Game.Core
                 int height = r.ReadInt32();
                 long savedAt = r.ReadInt64();
                 long clock = version >= 7 ? r.ReadInt64() : 0;
+                int riftTier = version >= 8 ? r.ReadInt32() : 1;
                 int progress = r.ReadInt32();
 
                 var names = new List<string>();
@@ -275,7 +281,7 @@ namespace Game.Core
                     int y = r.ReadUInt16();
                     beds.Add((x, y, r.ReadString()));
                 }
-                return new WorldSave(seed, savedAt, clock, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds);
+                return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds);
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

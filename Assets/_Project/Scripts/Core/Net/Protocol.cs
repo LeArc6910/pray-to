@@ -35,7 +35,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.34.0";
+        public const string Version = "0.35.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -535,6 +535,28 @@ namespace Game.Core
         Minion,
     }
 
+    // The world's void rifts (World.Rift.cs): the tier it may open, and the open rift if any (Tier 0 when none).
+    public readonly struct RiftState
+    {
+        public RiftState(int unlocked, int tier, int wave, int monstersLeft, int secondsLeft, RiftAffix affixes)
+        {
+            Unlocked = unlocked;
+            Tier = tier;
+            Wave = wave;
+            MonstersLeft = monstersLeft;
+            SecondsLeft = secondsLeft;
+            Affixes = affixes;
+        }
+
+        public int Unlocked { get; }
+        public int Tier { get; }
+        public int Wave { get; }
+        public int MonstersLeft { get; }
+        public int SecondsLeft { get; }
+        public RiftAffix Affixes { get; }
+        public bool Open => Tier > 0;
+    }
+
     // A player entity's phase (under its StatusBits).
     public static class PlayerPhase
     {
@@ -700,11 +722,13 @@ namespace Game.Core
             IReadOnlyList<HazardState> hazards,
             IReadOnlyList<SimEvent> events,
             long clock = 0,
-            int sleepers = 0)
+            int sleepers = 0,
+            RiftState rift = default)
         {
             Tick = tick;
             Clock = clock;
             Sleepers = sleepers;
+            Rift = rift;
             Self = self;
             Entities = entities;
             Projectiles = projectiles;
@@ -716,6 +740,7 @@ namespace Game.Core
         // The world's clock (Calendar) at Tick, and how many players are lying in their beds.
         public long Clock { get; }
         public int Sleepers { get; }
+        public RiftState Rift { get; }
         public SelfState Self { get; }
         public IReadOnlyList<EntityState> Entities { get; }
         public IReadOnlyList<ProjectileState> Projectiles { get; }
@@ -727,6 +752,12 @@ namespace Game.Core
             w.Write(Tick);
             w.Write(Clock);
             w.Write((byte)Math.Clamp(Sleepers, 0, 255));
+            w.Write((byte)Rift.Unlocked);
+            w.Write((byte)Rift.Tier);
+            w.Write((byte)Rift.Wave);
+            w.Write((byte)Math.Clamp(Rift.MonstersLeft, 0, 255));
+            w.Write((ushort)Math.Clamp(Rift.SecondsLeft, 0, ushort.MaxValue));
+            w.Write((byte)Rift.Affixes);
             w.Write(Self.Corrections);
             w.Write(Self.Position);
             w.Write(Self.Health);
@@ -804,6 +835,7 @@ namespace Game.Core
             long tick = r.ReadInt64();
             long clock = r.ReadInt64();
             int sleepers = r.ReadByte();
+            var rift = new RiftState(r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadUInt16(), (RiftAffix)r.ReadByte());
             int corrections = r.ReadInt32();
             var position = r.ReadVec2();
             float health = r.ReadSingle();
@@ -883,7 +915,7 @@ namespace Game.Core
                 bool critical = r.ReadBoolean();
                 events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), position: at));
             }
-            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers);
+            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift);
         });
     }
 }

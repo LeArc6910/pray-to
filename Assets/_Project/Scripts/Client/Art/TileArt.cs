@@ -383,6 +383,7 @@ namespace Game.Client
             TileType.Generator => GeneratorBody,
             TileType.Lever => LeverBase,
             TileType.Anvil => AnvilTile,
+            TileType.RiftAltar => RiftAltarTile,
             _ => null,
         };
 
@@ -1316,6 +1317,29 @@ namespace Game.Client
             "..oddo....oddo..",
             "..oooo....oooo..",
             "..____....____..");
+
+        // A dark altar with a violet crack hanging over it.
+        static readonly PixelImage RiftAltarTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['V'] = Rgba.Hex("#E2C8FF"), ['v'] = Rgba.Hex("#B48CFF"), ['u'] = Rgba.Hex("#6A44B8"), ['A'] = Rgba.Hex("#4A4058"),
+                ['a'] = Rgba.Hex("#332C3E"),
+            },
+            "......ooo.......",
+            ".....ouvuo......",
+            "....ouvVvuo.....",
+            ".....ovVvo......",
+            "......ovuo......",
+            ".....ouvo.......",
+            "......ouo.......",
+            "...oooooooooo...",
+            "..oAAAAAAAAAAo..",
+            "..oAaaAAAAaaAo..",
+            "...oAAAAAAAAo...",
+            "...oAaAvvAaAo...",
+            "...oAAAAAAAAo...",
+            "..oaaaaaaaaaao..",
+            "..oooooooooooo..",
+            "..____________..");
 
         // An iron anvil on a stump: the horn to the left, the face lit along its top.
         static readonly PixelImage AnvilTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)

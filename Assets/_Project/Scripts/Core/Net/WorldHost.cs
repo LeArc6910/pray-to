@@ -305,6 +305,7 @@ namespace Game.Core
             if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
             World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds);
             World.RestoreClock(save.Clock);
+            World.RestoreRiftTier(save.RiftTier);
             foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting);
         }
 
@@ -370,6 +371,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.ResetPassives:
                     World.ResetPassives(player.Id);
+                    break;
+                case InventoryCommand.OpenRift:
+                    World.OpenRift(player.Id);
                     break;
                 case InventoryCommand.Upgrade:
                     World.UpgradeItem(player.Id, command.Item);
@@ -446,8 +450,8 @@ namespace Game.Core
                 .OrderBy(e => Distance(e.Position))
                 .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
                 .Select(e => new EntityState(
-                    e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.Definition.Health, (byte)e.State,
-                    Protocol.WithStatus(0, e.Afflictions.Bits)));
+                    e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.MaxHealth, (byte)e.State,
+                    Protocol.WithStatus(e.Rift, e.Afflictions.Bits)));
             var drops = World.GroundLoot
                 .Where(l => InView(l.Position))
                 .OrderBy(l => Distance(l.Position))
@@ -485,11 +489,14 @@ namespace Game.Core
             // When there are too many, what changes the fight matters most and swings least.
             var shown = new HashSet<int>(entities.Select(e => e.Id));
             var events = _pendingEvents
-                .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning)
+                .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift)
                 .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)
                 .ToList();
-            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers);
+            var open = World.ActiveRift;
+            var rift = new RiftState(World.RiftTier, open?.Tier ?? 0, open?.Wave ?? 0, open?.MonstersLeft ?? 0,
+                (int)((open?.TicksLeft ?? 0) / World.TicksPerSecond), open?.Affixes ?? RiftAffix.None);
+            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift);
         }
 
         (int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil) CropEntry(CropChange change) =>

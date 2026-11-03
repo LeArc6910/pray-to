@@ -160,6 +160,7 @@ namespace Game.Core
             UpdateMachines();
             SeparateEnemies();
             UpdateClock();
+            UpdateRift();
 
             if (--_spawnTimer <= 0)
             {
@@ -308,9 +309,9 @@ namespace Game.Core
                     if (definition.Behavior == MonsterBehavior.Ranged && gap < definition.KeepDistance)
                     {
                         var before = enemy.Position;
-                        enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, -toTarget.Normalized * (definition.Speed * TickSeconds), monster: true);
+                        enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, -toTarget.Normalized * (enemy.Speed * TickSeconds), monster: true);
                         enemy.Facing = toTarget.Normalized;
-                        if (Vec2.Distance(before, enemy.Position) > definition.Speed * TickSeconds * 0.3f) break;
+                        if (Vec2.Distance(before, enemy.Position) > enemy.Speed * TickSeconds * 0.3f) break;
                     }
                     if (gap <= definition.Reach && CanStrike(enemy, target))
                     {
@@ -320,7 +321,7 @@ namespace Game.Core
                     var direction = gap < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);
                     if (direction.LengthSquared < 1e-6f) direction = toTarget.Normalized;
                     enemy.Facing = direction;
-                    enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, direction * (definition.Speed * TickSeconds), monster: true);
+                    enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, direction * (enemy.Speed * TickSeconds), monster: true);
                     break;
 
                 case EnemyState.Windup:
@@ -337,7 +338,7 @@ namespace Game.Core
                                 enemy.Position + enemy.Facing * definition.Radius,
                                 enemy.Facing * definition.ShotSpeed,
                                 MonsterShotRadius,
-                                definition.Damage,
+                                enemy.Damage,
                                 Ticks(definition.Reach * 1.5f / definition.ShotSpeed)));
                             break;
                         case MonsterBehavior.Charge:
@@ -350,7 +351,7 @@ namespace Game.Core
                             _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
                             if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack)
                             {
-                                AfflictPlayer(target, enemy.Id, HurtPlayer(target, enemy.Id, definition.Damage));
+                                AfflictPlayer(target, enemy.Id, HurtPlayer(target, enemy.Id, enemy.Damage));
                             }
                             break;
                     }
@@ -409,7 +410,7 @@ namespace Game.Core
                 if (player.IsDead || enemy.ChargeHits.Contains(player.Id)) continue;
                 if (Vec2.Distance(player.Position, enemy.Position) > definition.Radius + PlayerRadius) continue;
                 enemy.ChargeHits.Add(player.Id);
-                AfflictPlayer(player, enemy.Id, HurtPlayer(player, enemy.Id, definition.Damage));
+                AfflictPlayer(player, enemy.Id, HurtPlayer(player, enemy.Id, enemy.Damage));
             }
             bool blocked = Vec2.Distance(before, enemy.Position) < step.Length * 0.3f;
             if (--enemy.StateTicks > 0 && !blocked) return;

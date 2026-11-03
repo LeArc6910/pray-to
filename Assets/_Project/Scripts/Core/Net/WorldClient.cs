@@ -251,6 +251,15 @@ namespace Game.Core
         public bool Sleeping => (SelfStatus & StatusBits.Sleeping) != 0;
         // How many players are lying in their beds, and this player's bed (null without one).
         public int Sleepers { get; private set; }
+        // The world's void rifts as the host last said (World.Rift.cs).
+        public RiftState Rift { get; private set; }
+
+        // Beside an altar with a key and no rift open: may open one.
+        public bool CanOpenRift =>
+            !IsDead && !Rift.Open && Map != null && Map.Near(Position, TileType.RiftAltar, World.StationReach)
+            && _loot?.FindMaterial(World.RiftKey) is MaterialDefinition key && Bag.CountOf(key) > 0;
+
+        public byte[] OpenRiftCommand() => new InventoryCommandMessage(InventoryCommand.OpenRift, 0).Encode();
         public (int X, int Y)? Bed { get; private set; }
 
         // The world's clock (Calendar) now, as the host's last word plus the time since.
@@ -910,6 +919,7 @@ namespace Game.Core
             _clock = snapshot.Clock;
             _clockTick = snapshot.Tick;
             Sleepers = snapshot.Sleepers;
+            Rift = snapshot.Rift;
             if (self.Corrections != _seenCorrections)
             {
                 _seenCorrections = self.Corrections;

@@ -199,10 +199,19 @@ namespace Game.Core
             Definition = definition;
             Position = position;
             Health = definition.Health;
+            MaxHealth = definition.Health;
         }
 
         public int Id { get; }
         public MonsterDefinition Definition { get; }
+        // A rift makes its monsters tougher, harder-hitting or quicker than their sheet (World.Rift.cs).
+        public float MaxHealth { get; internal set; }
+        public float Power { get; internal set; } = 1;
+        public float SpeedScale { get; internal set; } = 1;
+        // 0 for an ordinary monster, RiftMonster or RiftGuardian for one a rift brought.
+        public int Rift { get; internal set; }
+        public float Damage => Definition.Damage * Power;
+        public float Speed => Definition.Speed * SpeedScale;
         public Vec2 Position { get; internal set; }
         public Vec2 Facing { get; internal set; } = new Vec2(0, -1);
         public float Health { get; internal set; }
@@ -294,6 +303,8 @@ namespace Game.Core
         GoalReward,
         // Everyone slept, and it is morning of day Amount (World.Sleep).
         Morning,
+        // A void rift opened (Amount World.RiftOpened), was beaten (RiftCleared) or ran out (RiftFailed) at Position.
+        Rift,
     }
 
     public readonly struct SimEvent
@@ -324,7 +335,7 @@ namespace Game.Core
 
         public static bool HasPosition(SimEventType type) =>
             type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
-            || type == SimEventType.Recall || type == SimEventType.Fishing;
+            || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift;
     }
 
     public enum BossState : byte

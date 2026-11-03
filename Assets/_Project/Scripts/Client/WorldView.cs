@@ -386,6 +386,10 @@ namespace Game.Client
                 }
                 if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) glow = Faded(ChargeColor, 0.45f);
                 (tint, glow) = StatusLook(view.Status, tint, glow);
+                // A rift's monsters glow violet; its guardian more, and has a name.
+                if (view.Kind == EntityKind.Monster && view.Phase >= World.RiftMonster && glow.a < 0.01f)
+                    glow = Faded(RiftColor, view.Phase == World.RiftGuardian ? 0.35f + 0.15f * Mathf.Sin(Time.time * 4) : 0.18f);
+                if (view.Kind == EntityKind.Monster && view.Phase == World.RiftGuardian) body.Name = "균열 수호자";
                 // A spirit flickers in its last two seconds (its health counts down the ticks it has left).
                 if (view.Kind == EntityKind.Minion && view.Health < World.TicksPerSecond * 2) tint = new Color(1, 1, 1, 0.35f + 0.65f * Mathf.Abs(Mathf.Sin(Time.time * 12)));
                 if (view.Kind == EntityKind.Boss)
@@ -758,6 +762,7 @@ namespace Game.Client
         static readonly Color LevelColor = new Color(1f, 0.85f, 0.35f);
         static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
         static readonly Color SleepLabel = new Color(0.75f, 0.85f, 1f);
+        static readonly Color RiftColor = new Color(0.7f, 0.45f, 1f);
 
         static Sprite[] _beltSprites;
 
@@ -887,6 +892,12 @@ namespace Game.Client
                     break;
                 case SimEventType.Fishing:
                     ShowFishing(e);
+                    break;
+                case SimEventType.Rift:
+                    // A rift opened, was beaten or ran out.
+                    Sounds.Play(e.Amount == World.RiftOpened ? Sound.Roar : e.Amount == World.RiftCleared ? Sound.Victory : Sound.Down);
+                    ShowBanner(e.Amount == World.RiftOpened ? "공허 균열이 열렸다!" : e.Amount == World.RiftCleared ? "균열을 닫았다! 제단에 보상이 떨어졌다" : "균열이 닫혀 버렸다");
+                    AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 3, RiftColor, FlashKind.Ring);
                     break;
                 case SimEventType.Morning:
                     // Everyone slept: the next day's morning (GameRoot shows the banner, as for any morning).

@@ -158,6 +158,8 @@ namespace Game.Core
         // Takes the passive tree point at Index (World.AllocatePassive), and gives every point back (World.ResetPassives).
         AllocatePassive,
         ResetPassives,
+        // Opens a void rift at the altar near (World.OpenRift).
+        OpenRift,
         // At an anvil, with the item's id in Item (World.Refining.cs).
         Upgrade,
         Salvage,

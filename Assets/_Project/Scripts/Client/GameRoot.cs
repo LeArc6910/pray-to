@@ -280,6 +280,33 @@ namespace Game.Client
         DayPhase? _dayPhase;
 
         // Lies down in the player's own bed, or gets up: the button over the bed, for a finger or the mouse.
+        // Opens a void rift: the button over the nearest altar while the player has a key and none is open.
+        void DrawRiftButton()
+        {
+            if (!_client.CanOpenRift) return;
+            (int X, int Y)? altar = null;
+            float best = float.MaxValue;
+            int cx = TileMap.Cell(_client.Position.X), cy = TileMap.Cell(_client.Position.Y);
+            for (int y = cy - 3; y <= cy + 3; y++)
+            {
+                for (int x = cx - 3; x <= cx + 3; x++)
+                {
+                    if (!_client.Map.InBounds(x, y) || _client.Map[x, y] != TileType.RiftAltar) continue;
+                    float d = Vec2.Distance(_client.Position, TileMap.Center(x, y));
+                    if (d < best) (altar, best) = ((x, y), d);
+                }
+            }
+            if (altar is not (int ax, int ay)) return;
+            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(ax + 0.5f, ay + 1.35f, 0));
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            var rect = new Rect(point.x - 70, point.y - 13, 140, 26);
+            Controls.Block(rect);
+            if (!GUI.Button(rect, $"균열 열기 ({_client.Rift.Unlocked}단계)")) return;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.OpenRiftCommand());
+        }
+
         void DrawBedButton()
         {
             if (_client.Bed is not (int x, int y) || !(_client.Sleeping || _client.CanSleep)) return;
@@ -797,6 +824,7 @@ namespace Game.Client
             {
                 DrawMachineSwitch();
                 DrawBedButton();
+                DrawRiftButton();
                 SkillBar.Draw(_client);
                 _hotbar?.Draw(_client.Skills.Count);
             }
@@ -1051,6 +1079,12 @@ namespace Game.Client
                 string players = _mode == Mode.Solo ? "" : $" · 접속 {_client.Names.Count}명";
                 long clock = _client.Clock;
                 lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%){(_client.PassivePoints > 0 ? $" · 특성 {_client.PassivePoints}" : "")} · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
+                if (_client.Rift.Open)
+                {
+                    var rift = _client.Rift;
+                    string wave = rift.Wave > World.RiftWaves ? "수호자" : $"{rift.Wave}/{World.RiftWaves} 물결";
+                    lines.Add($"공허 균열 {rift.Tier}단계 · {wave} · 남은 적 {rift.MonstersLeft} · {rift.SecondsLeft / 60}:{rift.SecondsLeft % 60:00} · {World.AffixNames(rift.Affixes)}");
+                }
                 if (_client.Sleeping)
                 {
                     int everyone = Math.Max(1, _client.Names.Count);
