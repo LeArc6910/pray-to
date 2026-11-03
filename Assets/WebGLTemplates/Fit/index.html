@@ -59,7 +59,9 @@
         autoSyncPersistentDataPath: true,
       }, function (progress) {
         loading.querySelector(".fill").style.width = Math.round(progress * 100) + "%";
-      }).then(function () {
+      }).then(function (instance) {
+        // The cloud's playtests drive the game through this (Docs/Playtest.md).
+        window.unityInstance = instance;
         loading.remove();
         canvas.focus();
       }).catch(function (message) {

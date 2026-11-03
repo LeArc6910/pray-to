@@ -6,3 +6,5 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Game.Core.Tests")]
 [assembly: InternalsVisibleTo("CoreSandbox")]
 [assembly: InternalsVisibleTo("Game.Client.Tests")]
+// The client's playtest remote control (Playtest.cs) sets a solo game's world up the same way.
+[assembly: InternalsVisibleTo("Game.Client")]

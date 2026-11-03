@@ -568,6 +568,13 @@ namespace Game.Client
 
         internal bool Playing => _client != null && _client.Status == ClientStatus.Playing;
 
+        internal bool IsSolo => _mode == Mode.Solo;
+
+        // The cloud's playtests of the web demo call this from the page: unityInstance.SendMessage("Game", "Playtest",
+        // "<commands>"). See Playtest.cs and Docs/Playtest.md.
+        [UnityEngine.Scripting.Preserve]
+        void Playtest(string commands) => Game.Client.Playtest.Run(this, commands);
+
         // For the play mode tests (Assets/Tests/PlayMode/FeatureTests.cs): the host's world in a solo or hosted game
         // and this player in it, the sheets, and the attack held down toward HeldAim as if the button were.
         internal World HostWorld => _host?.World;

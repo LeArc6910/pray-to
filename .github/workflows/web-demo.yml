@@ -87,6 +87,10 @@ jobs:
         if: always()
         run: sudo chown -R "$(id -u):$(id -g)" "$GITHUB_WORKSPACE"
 
+      # Which commit the page is, for the cloud's playtests to wait for (Docs/Playtest.md).
+      - name: Mark the commit
+        run: echo "$GITHUB_SHA" > build/web/version.txt
+
       - uses: actions/upload-pages-artifact@v3
         with:
           path: build/web
