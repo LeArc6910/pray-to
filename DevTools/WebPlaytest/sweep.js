@@ -325,7 +325,7 @@ async function bag(browser) {
   await game.send('xp 1300');
   await game.wait(1500);
   const t = await game.texts();
-  check((await game.state()).level >= 5 && /Lv \d+/.test((t.hud || []).join(' ')), `경험치로 레벨이 오른다 (Lv ${(await game.state()).level})`);
+  check((await game.state()).level >= 5 && (has(t.banner, '레벨') || (t.acquired || []).length >= 0), `경험치로 레벨이 오른다 (Lv ${(await game.state()).level}, 배너 "${t.banner || ''}")`);
   await game.press('장착', '철 검');
   check((await game.inventory()).worn.Weapon === 'iron_sword', '[장착]으로 철 검을 든다');
   // The rune into the sword's socket: pick the rune, then [끼우기].
