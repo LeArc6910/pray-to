@@ -45,7 +45,8 @@ namespace Game.Core.Tests
                 Read(LootSheets.RunewordsFile),
                 Read(LootSheets.ConsumablesFile),
                 Read(LootSheets.MaterialsFile),
-                Read(LootSheets.RecipesFile));
+                Read(LootSheets.RecipesFile),
+                Read(LootSheets.SetsFile));
         }
     }
 

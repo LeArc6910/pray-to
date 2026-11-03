@@ -1,0 +1,3 @@
+id,name,pieces,modifiers
+pilgrim,공허 순례자,2,Damage+15%;MaxHealth+40
+pilgrim,,3,CritChance+6;CritDamage+40;MoveSpeed+8%

@@ -53,6 +53,9 @@ namespace Game.Core
         public const int RiftFailed = 0;
         public const int RiftOpened = 1;
         public const int RiftCleared = 2;
+        // What the rift's legendaries name as the one that drops them, and how much likelier each tier makes them.
+        public const string RiftLegendaries = "rift";
+        public const int RiftLegendaryPerTier = 3;
         // A rift monster's health and hit against its sheet at tier 1, and how much more each tier adds.
         const float RiftHealth = 5f;
         const float RiftHealthPerTier = 1.5f;
@@ -189,6 +192,12 @@ namespace Game.Core
             for (int i = 0; essence != null && i < 3 * rift.Tier; i++) DropMaterial(essence, Scatter(rift.Center));
             var key = Loot.FindMaterial(RiftKey);
             if (key != null && _random.Chance(0.5f)) DropMaterial(key, Scatter(rift.Center));
+            // The rift's own legendaries (item_bases.csv legendary "rift"): each its chance and 3% a tier.
+            foreach (var legendary in _lootGenerator.LegendariesOf(RiftLegendaries).ToList())
+            {
+                if (_random.Next(100) < legendary.LegendaryChance + RiftLegendaryPerTier * rift.Tier)
+                    DropItem(_lootGenerator.RollLegendary(legendary, _random), Scatter(rift.Center));
+            }
         }
 
         // The tile of the type nearest the position within reach, or null.

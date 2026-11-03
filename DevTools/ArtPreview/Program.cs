@@ -575,7 +575,8 @@ namespace Game.Client
                 Read(LootSheets.RunewordsFile),
                 Read(LootSheets.ConsumablesFile),
                 Read(LootSheets.MaterialsFile),
-                Read(LootSheets.RecipesFile));
+                Read(LootSheets.RecipesFile),
+                Read(LootSheets.SetsFile));
         }
 
         static string FindFolder(string relativePath)

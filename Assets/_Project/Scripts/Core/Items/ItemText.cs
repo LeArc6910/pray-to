@@ -52,6 +52,11 @@ namespace Game.Core
                 lines.Add($"  · {StatText.Describe(affix.Modifier)}{tier}");
             }
 
+            if (item.Base.Set is GearSet set)
+            {
+                lines.Add($"  세트: {set.Name}");
+                lines.AddRange(set.AllBonuses.Select(b => $"  · {b.Pieces}개: {string.Join(", ", b.Modifiers.Select(StatText.Describe))}"));
+            }
             if (item.Sockets.Count == 0) return lines;
             lines.Add("  룬 소켓 " + string.Join(" ", item.Sockets.Select(rune => rune == null ? "[ ]" : $"[{rune.Name}]")));
             foreach (var rune in item.Sockets.Where(r => r != null))

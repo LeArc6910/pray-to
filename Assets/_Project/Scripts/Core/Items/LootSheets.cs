@@ -34,6 +34,8 @@ namespace Game.Core
         public IReadOnlyList<MaterialDefinition> Materials { get; }
         // In the order the crafting list shows them.
         public IReadOnlyList<Recipe> Recipes { get; }
+        // Gear sets and what wearing several of a set gives (sets.csv).
+        public IReadOnlyList<GearSet> Sets { get; internal set; } = Array.Empty<GearSet>();
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;
 
@@ -64,6 +66,7 @@ namespace Game.Core
         public const string ConsumablesFile = "consumables.csv";
         public const string MaterialsFile = "materials.csv";
         public const string RecipesFile = "recipes.csv";
+        public const string SetsFile = "sets.csv";
 
         const int MaxSockets = 6;
 
@@ -75,17 +78,52 @@ namespace Game.Core
             string runewordsCsv,
             string consumablesCsv = "",
             string materialsCsv = "",
-            string recipesCsv = "")
+            string recipesCsv = "",
+            string setsCsv = "")
         {
             var errors = new List<string>();
             var bases = ParseBases(basesCsv, errors);
+            var sets = ParseSets(setsCsv, errors);
+            // A base names its set (item_bases.csv set); one that names no known set is an error.
+            foreach (var itemBase in bases.Where(b => b.SetId.Length > 0))
+            {
+                itemBase.Set = sets.FirstOrDefault(s => s.Id == itemBase.SetId);
+                if (itemBase.Set == null) errors.Add($"{BasesFile}: '{itemBase.Id}'의 세트 '{itemBase.SetId}'가 {SetsFile}에 없습니다.");
+            }
             var affixes = ParseAffixes(affixesCsv, errors);
             var runes = ParseRunes(runesCsv, errors);
             var runewords = ParseRunewords(runewordsCsv, runes, bases, errors);
             var consumables = ParseConsumables(consumablesCsv, errors);
             var materials = ParseMaterials(materialsCsv, errors);
             var recipes = ParseRecipes(recipesCsv, bases, consumables, materials, errors);
-            return new LootData(bases, affixes, runes, runewords, consumables, materials, recipes, errors);
+            return new LootData(bases, affixes, runes, runewords, consumables, materials, recipes, errors) { Sets = sets };
+        }
+
+        // One row per threshold: the set's id, its name on the first row, how many pieces, and what they give.
+        static List<GearSet> ParseSets(string csv, List<string> errors)
+        {
+            var sets = new List<GearSet>();
+            if (string.IsNullOrWhiteSpace(csv)) return sets;
+            var table = Read(csv, SetsFile, errors, "id", "name", "pieces", "modifiers");
+            if (table == null) return sets;
+            foreach (var row in table.Rows)
+            {
+                TryRow(SetsFile, row, errors, () =>
+                {
+                    string id = row["id"];
+                    var set = sets.FirstOrDefault(s => s.Id == id);
+                    if (set == null)
+                    {
+                        if (!SheetValues.IsValidId(id)) throw new FormatException($"id '{id}'에는 영문, 숫자, _, -만 쓸 수 있습니다.");
+                        set = new GearSet(id, Required(row, "name"));
+                        sets.Add(set);
+                    }
+                    int pieces = SheetValues.ParseNumber(row["pieces"], "pieces");
+                    if (pieces < 2) throw new FormatException("pieces는 2 이상이어야 합니다.");
+                    set.Bonuses.Add((pieces, FixedModifiers(row["modifiers"])));
+                });
+            }
+            return sets;
         }
 
         static List<ItemBase> ParseBases(string csv, List<string> errors)
@@ -122,7 +160,7 @@ namespace Game.Core
                         tool,
                         legendary,
                         chance,
-                        require));
+                        require) { SetId = row["set"] });
                 });
             }
             return bases;

@@ -110,6 +110,8 @@ namespace Game.Core
             foreach (var point in passives ?? Enumerable.Empty<PassiveNode>()) sheet.Add(point.Modifiers);
             if (level > 1) sheet.Add(new Modifier(StatType.MaxHealth, ModifierKind.Flat, (level - 1) * Leveling.HealthPerLevel));
             foreach (var item in equipment.Items) sheet.Add(item.Modifiers());
+            // Sets: what so many pieces worn together give.
+            foreach (var worn in equipment.Items.Where(i => i.Base.Set != null).GroupBy(i => i.Base.Set)) sheet.Add(worn.Key.BonusFor(worn.Count()).ToList());
             if (food != null) sheet.Add(food.Buff);
             var picked = (classes ?? Enumerable.Empty<ClassDefinition>()).ToList();
             float share = ClassRules.PassiveShare(picked.Count);

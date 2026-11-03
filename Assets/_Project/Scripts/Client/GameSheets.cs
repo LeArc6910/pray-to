@@ -16,6 +16,7 @@ namespace Game.Client
         public TextAsset consumables;
         public TextAsset materials;
         public TextAsset recipes;
+        public TextAsset sets;
         public TextAsset tiles;
         public TextAsset crops;
         public TextAsset machines;
@@ -33,7 +34,7 @@ namespace Game.Client
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
         public LootData LoadLoot() =>
-            LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes));
+            LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes), Text(sets));
 
         public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines));
 

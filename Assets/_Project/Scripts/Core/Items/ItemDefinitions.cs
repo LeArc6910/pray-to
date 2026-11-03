@@ -97,6 +97,9 @@ namespace Game.Core
         // The boss that drops this as a legendary, or empty for an ordinary base; and the chance (%) each fighter
         // gets one when it falls.
         public string Legendary { get; }
+        // The gear set it belongs to (sets.csv), or none.
+        public string SetId { get; internal set; } = "";
+        public GearSet Set { get; internal set; }
         public int LegendaryChance { get; }
         public bool IsLegendary => Legendary.Length > 0;
         // The character level it takes to wear: five below the base's step (iron, step 10, from level 5), or a
@@ -227,6 +230,25 @@ namespace Game.Core
         // Whether it is any use at full health.
         public bool UsableAtFullHealth => IsFood || Effect.Length > 0;
         public int BuffTicks => World.Ticks(BuffSeconds);
+    }
+
+    // Pieces of gear that give more when several are worn together (sets.csv): each bonus once that many pieces are
+    // on.
+    public sealed class GearSet
+    {
+        internal GearSet(string id, string name)
+        {
+            Id = id;
+            Name = name;
+        }
+
+        public string Id { get; }
+        public string Name { get; }
+        internal List<(int Pieces, IReadOnlyList<Modifier> Modifiers)> Bonuses { get; } = new List<(int, IReadOnlyList<Modifier>)>();
+        public IReadOnlyList<(int Pieces, IReadOnlyList<Modifier> Modifiers)> AllBonuses => Bonuses;
+
+        // What wearing so many pieces gives.
+        public IEnumerable<Modifier> BonusFor(int worn) => Bonuses.Where(b => b.Pieces <= worn).SelectMany(b => b.Modifiers);
     }
 
     // Something gathered to make things with: from walls, monsters and bosses. Some can be placed as a tile.
