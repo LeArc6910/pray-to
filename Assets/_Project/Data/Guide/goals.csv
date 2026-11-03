@@ -4,19 +4,29 @@ workbench,작업대 세우기,가방(Tab)의 [재료·제작]에서 작업대를
 torch,횃불 세우기,가방의 횃불을 [놓기]로 세우면 둘레가 밝아진다. 돌 1과 슬라임 젤 1로 4개를 더 만든다,place:Torch,slime_gel:2
 floor,돌 바닥 깔기,작업대에서 돌 2로 돌 바닥 4장을 만들어 [놓기]로 깐다. 그 위에 무엇이든 세울 수 있다,place:StoneFloor,stone:6
 copper,구리 광석 6개 캐기,주황 덩어리가 박힌 벽이 구리 광맥이다,have:copper_ore:6,xp:20
+life_mining,채굴 기술 2레벨 되기,손으로 벽을 깰 때마다 채굴 기술이 오르고 레벨마다 더 빨리 캔다. 가방 [장비] 탭의 생활 기술에 보인다,life:mining:2,xp:20
 copper_gear,구리 장비 하나 만들기,작업대 옆에서 구리 투구·갑옷·장화·활·지팡이 가운데 하나를 만들어 [장착]한다,have:copper_helmet|have:copper_armor|have:copper_boots|have:copper_bow|have:copper_staff,healing_potion:2
 plant,버섯 심기,가방 재료의 버섯 포자를 [심기]로 흙 동굴 바닥에 심는다. 물뿌리개로 물을 준 날에만 자라고 다 자라면 그 위를 지나가며 거둔다,plant,mushroom_spore:2
 hoe,밭 갈기,작업대에서 호미를 만들고 [밭 갈기]로 바닥을 밭으로 만든다. 밭에 심으면 빨리 자란다,place:Soil,fertilizer:3
 fishing,물고기 낚기,작업대에서 낚싯대를 만들고 동굴 가장자리 물웅덩이를 바라보고 [낚시]. 입질(!)이 오면 바로 다시 누른다,have:cave_minnow|have:spore_catfish|have:ice_trout|have:crystal_eel|have:void_angler|have:firefly_catfish,xp:30
+merchant,상인에게 팔아 금화 10개 모으기,시작 지점 가까이 줄무늬 노점에 상인 도라가 있다. 곁에서 가방을 열면 [상인] 탭에서 물고기·작물·장비를 판다,have:coin:10,coin:15
 furnace,화로 세우기,작업대 옆에서 돌 15와 구리 광석 2로 만든다. 버섯을 굽고 철을 녹인다,place:Furnace,copper_ore:4
 boss,동굴 수호자 쓰러뜨리기,HUD에 보스 아레나 방향과 거리가 나온다. 바닥에 붉게 차오르는 예고를 피한다,have:warden_core,recall_scroll:2
 bed,침대 세우기,작업대에서 돌 6과 슬라임 젤 3으로 만든다. 쓰러지면 침대 옆에서 일어나고 귀환 두루마리로 돌아올 수 있다. 저녁부터 [잠자기]로 밤을 넘긴다,place:Bed,recall_scroll:2
 level5,레벨 5 되기,몬스터를 잡으면 경험치가 오른다. 철 장비는 레벨 5부터 입는다,level:5,healing_potion:3
+passive,특성 하나 배우기,레벨이 오를 때마다 특성 점수 1점. 가방 [특성] 탭에서 이어진 점을 눌러 [배우기],passive:1,xp:30
 iron_bar,철 주괴 만들기,시작 지점에서 30칸 넘게 가면 푸른 회색 철 광맥이 있다. 철 광석 2개를 화로에서 녹인다,have:iron_bar,iron_ore:4
+anvil,모루 세우기,작업대에서 철 주괴 5·돌 6으로 만든다. 곁에 서면 장비마다 [다듬기]가 생겨 강화·분해·룬 빼기·접사 다시 굴리기를 한다,place:Anvil,essence:3
 iron_gear,철 장비 하나 만들기,작업대 옆에서 철 주괴와 수호자의 핵으로 만든다,have:iron_sword|have:iron_bow|have:iron_staff|have:iron_helmet|have:iron_armor|have:iron_boots,xp:60
 drill,채굴기 세우기,광맥을 바라보고 [놓기]로 세우고 뒤에 상자를 두면 광석이 저절로 쌓인다,place:Drill,conveyor:4
+assembler,조립기 세우기,철 톱니·회로로 만든다. 바라보고 가방 제작 목록의 [조립기에]로 만들 것을 정하면 들어온 재료로 되풀이해 만든다,place:Assembler,iron_gear:4
 sprinkler,스프링클러 세우기,물뿌리개와 철 주괴로 만든다. 둘레 5×5칸 작물이 마르지 않게 저절로 물을 준다,place:Sprinkler,fertilizer:3
+keg,술통 세우기,철 주괴 2·돌 8. 과일(딸기·포도·서리 열매)을 [넣기]로 넣으면 몇 분 뒤 상인이 비싸게 사는 주스와 술이 된다,place:Keg,cave_berry_seed:2
+coop,닭장 세우기,돌 12·철 주괴 2·슬라임 젤 2. 상인의 닭과 사료를 [넣기]로 넣으면 하루마다 달걀을 낳는다,place:Coop,feed:8
+crab_pot,통발 놓기,구리 전선 4·돌 2. 바로 옆이 물인 바닥에 놓고 미끼를 넣으면 10분마다 게나 새우가 든다,place:CrabPot,bait:8
+friend,상인과 호감 2 되기,하루 한 번 [말 걸기]와 선물. 좋아하는 것을 주면 많이 오르고 호감이 오를수록 값이 좋아진다,friend:2,coin:30
 generator,발전기 돌리기,철 주괴 5·구리 광석 6·돌 6으로 만들고 슬라임 젤을 [연료]로 넣으면 둘레 기계가 두 배로 빨라진다,place:Generator,slime_gel:10
+power_pole,전신주로 힘 나르기,구리 전선 3·돌 2로 둘을 만든다. 8타일 안의 전신주·발전기끼리 이어지고 둘레 4타일 기계에 힘을 준다,place:PowerPole,copper_wire:4
 biome,빛 포자나 얼음 결정 얻기,흙 동굴 바깥 버섯 숲(빛 박쥐)이나 얼음 동굴(얼음 슬라임)의 몬스터가 떨어뜨린다. 들어서면 이름이 뜬다,have:glow_spore|have:ice_crystal,xp:40
 deep,깊은 곳 찾아가기,시작 지점에서 60칸 넘게 가면 빛나는 미스릴 광맥과 수정 박쥐·정령이 있는 깊은 곳이다. 횃불을 넉넉히 챙긴다,reach:60,torch:6
 mithril_ore,미스릴 광석 4개 캐기,깊은 곳 벽에 박힌 하늘색으로 빛나는 덩어리가 미스릴 광맥이다. 단단해서 여러 번 쳐야 한다,have:mithril_ore:4,xp:60
@@ -31,3 +41,5 @@ obsidian_pickaxe,흑요석 곡괭이 만들기,공허석은 흑요석 곡괭이 
 void_ore,공허석 원석 캐기,용암 아레나에서 굴을 따라가면 보랏빛 별이 박힌 공허의 심연이다,have:void_ore:3,xp:120
 void_lord,공허의 군주 쓰러뜨리기,HUD의 심연 아레나로 간다. 맞으면 느려지니 흑요석 장비와 음식을 챙긴다,have:void_essence,healing_potion:6
 void_gear,공허 장비 하나 만들기,화로에서 공허석 주괴를 녹이고 작업대에서 공허의 정수와 함께 만든다,have:void_sword|have:void_bow|have:void_staff|have:void_helmet|have:void_armor|have:void_boots,xp:300
+rift_altar,균열 제단 세우기,작업대에서 공허석 주괴 4·강화 정수 10으로 만든다. 열쇠는 모루에서 공허의 정수로 만든다,place:RiftAltar,rift_key:1
+rift,공허 균열 1단계 닫기,제단 곁에서 [균열 열기]. 5분 안에 물결 셋과 수호자를 잡으면 보상이 떨어지고 다음 단계가 열린다,rift:2,essence:10

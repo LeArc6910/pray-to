@@ -15,11 +15,12 @@ namespace Game.Core
             Tile = tile;
         }
 
-        // "have", "place", "plant", "reach" or "level".
+        // "have", "place", "plant", "reach", "level", "passive", "life", "rift" or "friend".
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
-        // How many to have, how many tiles from the spawn to reach, or the character level.
+        // How many to have, how many tiles from the spawn to reach, the character level, how many passive points, the
+        // life skill's level (Id is the skill), the rift tier the world has opened, or the hearts with anyone.
         public int Count { get; }
         // What to place.
         public TileType Tile { get; }
@@ -83,8 +84,13 @@ namespace Game.Core
     // What the guide checks goals against, read from what a client knows about its own player and the world.
     public sealed class GuideFacts
     {
-        public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1)
+        public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1,
+            int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0)
         {
+            Passives = passives;
+            LifeLevel = lifeLevel ?? (_ => 1);
+            RiftTier = riftTier;
+            Hearts = hearts;
             Level = level;
             CountOf = countOf;
             HasTile = hasTile;
@@ -99,6 +105,12 @@ namespace Game.Core
         public bool HasCrop { get; }
         public float DistanceFromSpawn { get; }
         public int Level { get; }
+        // Passive tree points taken, each life skill's level, the highest rift tier the world may open, and the most
+        // hearts the player has with anyone.
+        public int Passives { get; }
+        public Func<LifeSkill, int> LifeLevel { get; }
+        public int RiftTier { get; }
+        public int Hearts { get; }
 
         // The facts for a client's player: the bag and worn gear, the map, the crops and where the player stands.
         public static GuideFacts Of(WorldClient client)
@@ -126,7 +138,9 @@ namespace Game.Core
                 return false;
             }
 
-            return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level);
+            int hearts = client.Friendships.Values.Select(f => World.HeartsOf(f.Points)).DefaultIfEmpty(0).Max();
+            return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level,
+                client.Passives.Count, client.LifeLevel, Math.Max(1, client.Rift.Unlocked), hearts);
         }
 
         // The same facts as the host sees them, to check a claimed reward.
@@ -155,27 +169,48 @@ namespace Game.Core
                 return false;
             }
 
-            return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level);
+            int hearts = player.Friendships.Values.Select(f => f.Hearts).DefaultIfEmpty(0).Max();
+            return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level,
+                player.Passives.Count, skill => World.LifeLevel(player, skill), world.RiftTier, hearts);
         }
     }
 
-    // How far a player has come through the guide. Goals are done in order; every goal already met is passed at
-    // once, so a player who has done things before (a loaded character) skips ahead. Once passed, a goal stays done
-    // even if what it asked for is used up.
+    // How far a player has come through the guide: the goals passed, by id. The current goal is the first one in the
+    // sheet not yet passed, so goals added to the sheet later come up in their place even for someone further on.
+    // Every goal met now is passed at once, so a player who has done things before (a loaded character) skips ahead.
+    // Once passed, a goal stays done even if what it asked for is used up.
     public sealed class GuideProgress
     {
         readonly GuideData _data;
+        readonly HashSet<string> _passed;
 
-        public GuideProgress(GuideData data, int done)
+        public GuideProgress(GuideData data, IEnumerable<string> passed)
         {
             _data = data;
-            Done = Math.Max(0, Math.Min(done, data.Goals.Count));
+            _passed = new HashSet<string>(passed ?? Enumerable.Empty<string>());
         }
 
-        public int Done { get; private set; }
+        // The first `done` goals passed.
+        public GuideProgress(GuideData data, int done) : this(data, data.Goals.Take(Math.Max(0, done)).Select(g => g.Id))
+        {
+        }
+
+        // Goals added after progress was saved as a count (2026-11-03): a count from then is of the goals without them.
+        public static readonly IReadOnlyCollection<string> AddedAfterCounts = new[]
+        {
+            "life_mining", "merchant", "passive", "anvil", "assembler", "power_pole", "keg", "coop", "crab_pot", "friend", "rift_altar", "rift",
+        };
+
+        // The goals a count saved before AddedAfterCounts stood for.
+        public static IEnumerable<string> FromCount(GuideData data, int done) =>
+            data.Goals.Where(g => !AddedAfterCounts.Contains(g.Id)).Take(Math.Max(0, done)).Select(g => g.Id);
+
+        public IReadOnlyCollection<string> Passed => _passed;
+
+        public int Done => _data.Goals.Count(g => _passed.Contains(g.Id));
 
         // Null once every goal is done.
-        public Goal Current => Done < _data.Goals.Count ? _data.Goals[Done] : null;
+        public Goal Current => _data.Goals.FirstOrDefault(g => !_passed.Contains(g.Id));
 
         public int Total => _data.Goals.Count;
 
@@ -186,7 +221,7 @@ namespace Game.Core
             while (Current != null && Current.Conditions.Any(condition => IsMet(condition, facts)))
             {
                 passed.Add(Current);
-                Done++;
+                _passed.Add(Current.Id);
             }
             return passed;
         }
@@ -198,6 +233,10 @@ namespace Game.Core
             "plant" => facts.HasCrop,
             "reach" => facts.DistanceFromSpawn >= condition.Count,
             "level" => facts.Level >= condition.Count,
+            "passive" => facts.Passives >= condition.Count,
+            "life" => Enum.TryParse<LifeSkill>(condition.Id, true, out var skill) && facts.LifeLevel(skill) >= condition.Count,
+            "rift" => facts.RiftTier >= condition.Count,
+            "friend" => facts.Hearts >= condition.Count,
             _ => false,
         };
     }
@@ -271,8 +310,21 @@ namespace Game.Core
                     int level = SheetValues.ParseNumber(parts[1], "레벨");
                     if (level < 1 || level > Leveling.MaxLevel) throw new FormatException($"레벨은 1~{Leveling.MaxLevel}이어야 합니다.");
                     return new GoalCondition("level", null, level, default);
+                case "passive":
+                case "rift":
+                case "friend":
+                    if (parts.Length != 2) throw new FormatException($"'{text}'는 {parts[0]}:<수>로 적습니다.");
+                    int number = SheetValues.ParseNumber(parts[1], "수");
+                    if (number < 1) throw new FormatException("수는 1 이상이어야 합니다.");
+                    return new GoalCondition(parts[0], null, number, default);
+                case "life":
+                    if (parts.Length != 3 || !Enum.TryParse<LifeSkill>(parts[1], true, out _))
+                        throw new FormatException($"'{text}'는 life:<farming|fishing|mining>:<레벨>로 적습니다.");
+                    int lifeLevel = SheetValues.ParseNumber(parts[2], "레벨");
+                    if (lifeLevel < 1 || lifeLevel > LifeSkills.MaxLevel) throw new FormatException($"생활 기술 레벨은 1~{LifeSkills.MaxLevel}이어야 합니다.");
+                    return new GoalCondition("life", parts[1].ToLowerInvariant(), lifeLevel, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level, passive, life, rift, friend 중 하나)");
             }
         }
 

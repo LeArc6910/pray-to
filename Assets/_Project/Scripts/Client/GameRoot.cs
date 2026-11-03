@@ -398,12 +398,15 @@ namespace Game.Client
                 if (goal.Rewards.Count > 0 && !_client.ClaimedGoals.Contains(goal.Id)) SendToHost(_client.ClaimGoalCommand(IndexOfGoal(goal)));
             }
             _goalShownAt = Time.time;
-            Prefs.Set(GuideKey, _guideProgress.Done);
+            Prefs.Set(PassedKey, string.Join(",", _guideProgress.Passed));
             // Turned off in the menu, goals still count and bring their rewards, but nothing is said.
             if (!Settings.Guide) return;
             if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
             Sounds.Play(Sound.Craft);
         }
+
+        // The goals passed, by id; before 2026-11-03 how many (GuideKey).
+        string PassedKey => "guidepassed." + CharacterName;
 
         string GuideKey => "guide." + CharacterName;
 
@@ -421,7 +424,17 @@ namespace Game.Client
             _controlsUntil = Time.time + ControlsSeconds;
             _biomeHere = _biomeAnnounced = Biome.Cave;
             _biomeTime = 0;
-            _guideProgress = _guide != null && _guide.Goals.Count > 0 ? new GuideProgress(_guide, Prefs.Get(GuideKey, 0)) : null;
+            if (_guide == null || _guide.Goals.Count == 0)
+            {
+                _guideProgress = null;
+            }
+            else
+            {
+                string passed = Prefs.Get(PassedKey, null);
+                _guideProgress = passed != null
+                    ? new GuideProgress(_guide, passed.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    : new GuideProgress(_guide, GuideProgress.FromCount(_guide, Prefs.Get(GuideKey, 0)));
+            }
             _guideClock = GuideCheckSeconds;
             _goalShownAt = Time.time;
         }

@@ -82,6 +82,44 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void PassivesLifeSkillsRiftsAndFriendsAreChecked()
+        {
+            var data = GuideSheet.Parse(
+                "id,text,hint,done\n" +
+                "a,가,힌트,passive:2\n" +
+                "b,나,힌트,life:fishing:3\n" +
+                "c,다,힌트,rift:2\n" +
+                "d,라,힌트,friend:1\n",
+                Gear.Data);
+            Assert.IsTrue(data.Success, string.Join("\n", data.Errors));
+            var progress = new GuideProgress(data, 0);
+            GuideFacts With(int passives = 0, int fishing = 1, int rift = 1, int hearts = 0) =>
+                new GuideFacts(_ => 0, _ => false, false, 0, 1, passives, skill => skill == LifeSkill.Fishing ? fishing : 1, rift, hearts);
+
+            progress.Update(With(passives: 1));
+            Assert.AreEqual("a", progress.Current.Id);
+            progress.Update(With(passives: 2, fishing: 3));
+            Assert.AreEqual("c", progress.Current.Id);
+            progress.Update(With(passives: 2, fishing: 3, rift: 2, hearts: 1));
+            Assert.IsNull(progress.Current);
+
+            var bad = GuideSheet.Parse("id,text,hint,done\na,가,힌트,life:cooking:2\nb,나,힌트,friend:0\n", Gear.Data);
+            Assert.AreEqual(2, bad.Errors.Count, string.Join("\n", bad.Errors));
+        }
+
+        [Test]
+        public void ProgressIsKeptByIdSoNewGoalsComeUpInTheirPlace()
+        {
+            var data = Guide.Shipped;
+            // Someone who had passed the first seven goals before new ones went in among them.
+            var progress = new GuideProgress(data, GuideProgress.FromCount(data, 7));
+            Assert.AreEqual(7, progress.Passed.Count);
+            Assert.IsFalse(progress.Passed.Any(GuideProgress.AddedAfterCounts.Contains), "none of the new ones");
+            Assert.AreEqual("life_mining", progress.Current.Id, "the first new goal before where they were");
+            Assert.IsTrue(GuideProgress.AddedAfterCounts.All(id => data.Goals.Any(g => g.Id == id)), "every new goal is in the sheet");
+        }
+
+        [Test]
         public void SheetErrorsNameTheRow()
         {
             var data = GuideSheet.Parse(
