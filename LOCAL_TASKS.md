@@ -29,7 +29,7 @@ DevTools/Local/setup.sh --commit
 1. `git pull`, Git LFS 연결
 2. `ProjectSettings/ProjectVersion.txt`의 Unity(6000.6.3f1)를 Unity Hub 설치 위치에서 찾는다
 3. 배치 모드로 프로젝트를 열어 **Game > Set Up Project**를 실행한다. Active Input Handling(Input System Package), Product Name, 2D 모드, URP 2D 렌더러 에셋과 Graphics·Quality 지정, `Main` 씬, `GameSheets` 에셋을 만든다
-4. EditMode 테스트(Core 규칙)와 PlayMode 테스트(실제 클라이언트로 혼자 하기와 호스트를 5초씩 돌리고, 혼자 하기에서 스킬 넷을 모두 써 보며 에러가 없는지)를 돌린다
+4. EditMode 테스트(Core 규칙)와 PlayMode 테스트(실제 클라이언트로 혼자 하기와 호스트를 5초씩 돌리고, 혼자 하기에서 스킬 넷을 모두 써 보며 에러가 없는지. 2026-11-04부터 `FeatureTests`가 새 기능의 장면 여섯을 3초쯤씩 그린다: 연타와 타격, 새 기계, 기지 방어, 균열, 날씨·행사·채광창, 마나·세트)를 돌린다
 5. 결과를 이 파일의 "결과 보고"에 적고, 생성된 파일과 함께 커밋·푸시한다
 
 옵션: `-InstallEditor`(`--install-editor`)는 Unity가 없으면 Unity Hub로 설치한다(Web Build Support 포함). `-SkipTests`(`--skip-tests`), `-NoPull`(`--no-pull`). `-Commit`을 빼면 결과만 적고 커밋하지 않는다. Unity가 Hub 기본 위치가 아닌 곳에 있으면 환경 변수 `UNITY_EXE`에 실행 파일 경로를 넣는다. 로그는 `Logs/`에 남는다(커밋하지 않는다).
@@ -596,6 +596,10 @@ DevTools/Local/setup.sh --commit
   - (사람) 시작 지점 근처에 하늘빛이 드는 곳이 있고, 아침·낮·저녁·밤마다 빛의 색과 크기가 바뀌는지. 채광창을 기지에 깔면 그 위에도 빛이 드는지
   - (사람) 폭풍 날 빗줄기가 굵고 번개가 화면을 비추며 천둥이 우는지. 안개 날 안개가 흘러가는지. HUD에 날씨가 보이는지(휴대폰 세로에서도 줄이 넘치지 않는지)
   - (사람) 5일째(장날) 가게 값이 싸지는지, 7일째(수확제) 작물 파는 값이 오르는지, 8일째(보름달) 밤에 몬스터가 많은지. 아침 알림에 행사 이름이 나오는지
+
+- [ ] 72단계: PlayMode 장면 테스트(`Assets/Tests/PlayMode/FeatureTests.cs`)
+  - (로컬 세션) 명령 한 줄을 `-Commit`과 함께 돌린다. 새 파일 `FeatureTests.cs`의 `.meta`가 생기고 PlayMode 테스트가 6개 늘어난다. 실패하면 Console 로그와 실패한 장면 이름을 결과 보고에 붙인다(클라우드가 고친다)
+  - 장면은 자기 이름(`playmode-feature-test`)의 월드와 캐릭터를 쓰고 끝나면 지운다. 원래 저장본은 건드리지 않는다
 
 ## 결과 보고
 

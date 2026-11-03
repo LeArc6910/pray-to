@@ -538,6 +538,11 @@ namespace Game.Client
             var (move, aim, attack) = Controls.Read(_camera, _client.Position);
             // Clicking in the bag or on the map should not swing the sword.
             if (_inventory.Open || (_map != null && _map.FullOpen)) attack = false;
+            if (HoldAttack)
+            {
+                attack = true;
+                if (HeldAim.LengthSquared > 1e-6f) aim = HeldAim;
+            }
             byte[] input = _client.Step(move, aim, attack);
             if (input != null) SendToHost(input);
 
@@ -562,6 +567,15 @@ namespace Game.Client
         internal void StartHost() => StartHosting(Mode.Host);
 
         internal bool Playing => _client != null && _client.Status == ClientStatus.Playing;
+
+        // For the play mode tests (Assets/Tests/PlayMode/FeatureTests.cs): the host's world in a solo or hosted game
+        // and this player in it, the sheets, and the attack held down toward HeldAim as if the button were.
+        internal World HostWorld => _host?.World;
+        internal Player HostPlayer => _client == null ? null : _host?.World.FindPlayer(_client.PlayerId);
+        internal MonsterData MonsterSheet => _monsters;
+        internal LootData LootSheet => _loot;
+        internal bool HoldAttack { get; set; }
+        internal Vec2 HeldAim { get; set; }
 
         internal string Status => _status;
 
