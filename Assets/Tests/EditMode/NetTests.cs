@@ -258,7 +258,7 @@ namespace Game.Core.Tests
             var strict = new Session(new HostConfig { MaxClasses = 1 });
             var carol = strict.Join(1, "캐롤", Protocol.Version, "warrior", "fire_mage");
             CollectionAssert.AreEqual(new[] { "warrior" }, carol.Classes.Select(c => c.Id));
-            Assert.AreEqual(2, carol.Skills.Count);
+            Assert.AreEqual(3, carol.Skills.Count, "all three of one class fit the four slots");
         }
 
         [Test]
@@ -586,7 +586,8 @@ namespace Game.Core.Tests
 
             world.Map[TileMap.Cell(player.Position.X) + 1, TileMap.Cell(player.Position.Y)] = TileType.Workbench;
             var both = new[] { Classes.Shipped.Find("fire_mage"), Classes.Shipped.Find("warrior") };
-            session.Send(1, alice.ClassCommand(both, new[] { 3, 2, 1, 0 }));
+            // Indexes into every skill the two have: fireball, flame_brand, meteor, whirlwind, war_cry, ground_slam.
+            session.Send(1, alice.ClassCommand(both, new[] { 4, 3, 1, 0 }));
             session.Tick(4);
             CollectionAssert.AreEqual(new[] { "war_cry", "whirlwind", "flame_brand", "fireball" }, alice.Skills.Select(s => s.Id));
             CollectionAssert.AreEqual(player.Skills, alice.Skills);
@@ -595,7 +596,7 @@ namespace Game.Core.Tests
             // Coming back with the same classes and order keeps them.
             var bob = new WorldClient("key2", "밥", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, new[] { "fire_mage", "warrior" }, Tiles.Shipped)
             {
-                JoinSkillOrder = new[] { 3, 2, 1, 0 },
+                JoinSkillOrder = new[] { 4, 3, 1, 0 },
             };
             session.Host.Receive(2, bob.JoinMessage());
             session.Host.Tick();

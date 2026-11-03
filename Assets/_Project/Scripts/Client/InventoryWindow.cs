@@ -443,6 +443,9 @@ namespace Game.Client
 
         // The skills in their slots, each with buttons to move it up or down (anywhere, at once), and the classes,
         // which change beside a workbench (Docs/Classes.md, 게임 중에 바꾸기).
+        // The skill slot being filled from the unused skills, or -1.
+        int _swapSlot = -1;
+
         void DrawClasses()
         {
             if (_pickedForKit != _client.KitVersion)
@@ -452,8 +455,10 @@ namespace Game.Client
             }
             GUILayout.Label(Fit($"지금 클래스: {(_client.Classes.Count == 0 ? "없음" : string.Join(" + ", _client.Classes.Select(c => c.Name)))}", _textWidth));
             GUILayout.Space(4);
-            GUILayout.Label(Fit("스킬 칸 순서(어디서나 바꾼다)", _textWidth));
+            GUILayout.Label(Fit("스킬 칸(어디서나 바꾼다). [바꾸기]를 누르고 아래에서 그 칸에 넣을 스킬을 고른다", _textWidth));
             var order = _client.SkillOrder.ToList();
+            var all = ClassRules.AllSkillsFor(_client.Classes);
+            if (_swapSlot >= _client.Skills.Count) _swapSlot = -1;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
             {
                 GUILayout.BeginHorizontal();
@@ -463,8 +468,26 @@ namespace Game.Client
                 if (GUILayout.Button("▲", GUILayout.Width(40))) Swap(order, slot, slot - 1);
                 GUI.enabled = slot < _client.Skills.Count - 1;
                 if (GUILayout.Button("▼", GUILayout.Width(40))) Swap(order, slot, slot + 1);
+                GUI.enabled = all.Count > _client.Skills.Count;
+                if (GUILayout.Button(_swapSlot == slot ? "그만" : "바꾸기", GUILayout.Width(56))) _swapSlot = _swapSlot == slot ? -1 : slot;
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
+            }
+            // The class skills not in a slot; with a slot picked, each can go in it.
+            var unused = all.Where(s => !_client.Skills.Contains(s)).ToList();
+            if (unused.Count > 0)
+            {
+                GUILayout.Label(Fit($"칸에 없는 스킬: {string.Join(", ", unused.Select(s => s.Name))}", _textWidth));
+                if (_swapSlot >= 0)
+                {
+                    foreach (var skill in unused)
+                    {
+                        if (!GUILayout.Button(Ui.Wrap($"{_swapSlot + 1}번 칸에: {skill.Name} — {skill.Description}", GUI.skin.button, _textWidth))) continue;
+                        order[_swapSlot] = all.IndexOf(skill);
+                        _swapSlot = -1;
+                        Send(_client.ClassCommand(_client.Classes, order), Sound.Click);
+                    }
+                }
             }
 
             GUILayout.Space(8);

@@ -111,7 +111,13 @@ namespace Game.Core
             if (level > 1) sheet.Add(new Modifier(StatType.MaxHealth, ModifierKind.Flat, (level - 1) * Leveling.HealthPerLevel));
             foreach (var item in equipment.Items) sheet.Add(item.Modifiers());
             if (food != null) sheet.Add(food.Buff);
-            foreach (var chosen in classes ?? Enumerable.Empty<ClassDefinition>()) sheet.Add(chosen.Passive);
+            var picked = (classes ?? Enumerable.Empty<ClassDefinition>()).ToList();
+            float share = ClassRules.PassiveShare(picked.Count);
+            foreach (var chosen in picked)
+            {
+                sheet.Add(share >= 1 ? chosen.Passive
+                    : chosen.Passive.Select(m => new Modifier(m.Stat, m.Kind, (int)Math.Round(m.Value * share), m.Tags)).ToList());
+            }
             var granted = SkillTag.None;
             foreach (var buff in buffs ?? Enumerable.Empty<SkillDefinition>())
             {

@@ -335,7 +335,9 @@ namespace Game.Client
             Prefs.Set(SkillOrderKey, string.Join(",", _chosenClasses) + "|" + string.Join(",", _client.SkillOrder));
         }
 
-        string SkillOrderKey => "skillorder." + CharacterName;
+        // "skillorder2": since 2026-11-03 the order picks from every class skill, not just the first four, so the
+        // orders kept before mean other skills and are let go.
+        string SkillOrderKey => "skillorder2." + CharacterName;
 
         // The skill order kept for this character, if it is for the classes picked now.
         IReadOnlyList<int> KeptSkillOrder()

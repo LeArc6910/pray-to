@@ -300,7 +300,7 @@ namespace Game.Core
         {
             Classes = ClassesAt(classes);
             Skills = ClassRules.SkillsFor(Classes, order);
-            var natural = ClassRules.SkillsFor(Classes);
+            var natural = ClassRules.AllSkillsFor(Classes);
             SkillOrder = Skills.Select(s => natural.IndexOf(s)).ToList();
             _cooldowns = new int[Skills.Count];
             _buffs = new int[Skills.Count];

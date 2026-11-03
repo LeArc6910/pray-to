@@ -171,10 +171,15 @@ namespace Game.Core
     public static class ClassRules
     {
         // How many classes a player may mix unless the host says otherwise (HostConfig.MaxClasses).
-        public const int DefaultMaxClasses = 2;
+        public const int DefaultMaxClasses = 3;
         public const int SkillSlots = 4;
-        // So that DefaultMaxClasses classes always fit their skills into the slots.
-        public const int SkillsPerClass = SkillSlots / DefaultMaxClasses;
+        // Each class brings up to this many skills; the player picks which SkillSlots of them go in the slots.
+        public const int MaxSkillsPerClass = 3;
+        // Class passives are made for two classes; with more, each counts this share of two (2/3 for three), so
+        // mixing more classes widens a build without making it stronger.
+        public const int PassiveClasses = 2;
+
+        public static float PassiveShare(int classes) => classes > PassiveClasses ? (float)PassiveClasses / classes : 1;
 
         // The classes that count from a requested list: known ones, each once, at most max of them, in order.
         public static List<ClassDefinition> Choose(ClassData data, IEnumerable<string> ids, int max)
@@ -191,20 +196,33 @@ namespace Game.Core
             return chosen;
         }
 
-        // The skills in slot order: each class's skills, in the order the classes were chosen.
-        public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes) =>
-            classes.SelectMany(c => c.Skills).Take(SkillSlots).ToList();
+        // Every skill the chosen classes have, each class's in sheet order, the classes in the order chosen: what the
+        // slots are filled from.
+        public static List<SkillDefinition> AllSkillsFor(IEnumerable<ClassDefinition> classes) => classes.SelectMany(c => c.Skills).ToList();
 
-        // The skills in the order the player chose: order[i] is which of the classes' skills (in SkillsFor's order)
-        // goes in slot i. Anything but a full reordering of them leaves them as SkillsFor has them.
+        // The skills in the slots unless the player picks: each class's first skills, an equal share of the slots
+        // each (two each for two classes, as it always was; one each for three), class by class, then the next ones
+        // to fill what is left.
+        public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes)
+        {
+            var list = classes.ToList();
+            if (list.Count == 0) return new List<SkillDefinition>();
+            int share = Math.Max(1, SkillSlots / list.Count);
+            var skills = list.SelectMany(c => c.Skills.Take(share)).Take(SkillSlots).ToList();
+            skills.AddRange(AllSkillsFor(list).Where(s => !skills.Contains(s)).Take(SkillSlots - skills.Count));
+            return skills;
+        }
+
+        // The skills the player picked for the slots: order[i] is which of AllSkillsFor's goes in slot i. Anything but
+        // as many different ones as the slots hold leaves the defaults.
         public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes, IReadOnlyList<int> order)
         {
-            var skills = SkillsFor(classes);
-            return IsOrder(order, skills.Count) ? order.Select(i => skills[i]).ToList() : skills;
+            var all = AllSkillsFor(classes);
+            return IsOrder(order, all.Count) ? order.Select(i => all[i]).ToList() : SkillsFor(classes);
         }
 
         public static bool IsOrder(IReadOnlyList<int> order, int count) =>
-            order != null && order.Count == count && order.All(i => i >= 0 && i < count) && order.Distinct().Count() == count;
+            order != null && order.Count == Math.Min(SkillSlots, count) && order.All(i => i >= 0 && i < count) && order.Distinct().Count() == order.Count;
     }
 
     // Reads Assets/_Project/Data/Classes: classes.csv for the classes and skills.csv for their skills.
@@ -328,9 +346,9 @@ namespace Game.Core
                     if (skills.Any(s => s.Id == id)) throw new FormatException($"id '{id}'가 이미 있습니다.");
                     var owner = classes.FirstOrDefault(c => c.Id == row["class"])
                         ?? throw new FormatException($"클래스 '{row["class"]}'가 {ClassesFile}에 없습니다.");
-                    if (owner.Skills.Count >= ClassRules.SkillsPerClass)
+                    if (owner.Skills.Count >= ClassRules.MaxSkillsPerClass)
                         throw new FormatException(
-                            $"'{owner.Id}'의 스킬이 {ClassRules.SkillsPerClass}개를 넘습니다. 칸 {ClassRules.SkillSlots}개를 클래스 {ClassRules.DefaultMaxClasses}개가 나눠 씁니다.");
+                            $"'{owner.Id}'의 스킬이 {ClassRules.MaxSkillsPerClass}개를 넘습니다.");
 
                     var skill = new SkillDefinition(
                         id,

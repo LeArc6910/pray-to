@@ -72,7 +72,7 @@ namespace Game.Core
             }
             Classes = classes;
             Skills = skills;
-            var natural = ClassRules.SkillsFor(classes);
+            var natural = ClassRules.AllSkillsFor(classes);
             SkillOrder = skills.Select(s => natural.IndexOf(s)).ToList();
             _cooldowns = cooldowns;
             _buffTicks = buffs;

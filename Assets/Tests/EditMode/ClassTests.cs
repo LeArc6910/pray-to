@@ -39,10 +39,10 @@ namespace Game.Core.Tests
         public void ShippedSheetsLoad()
         {
             Assert.IsTrue(Classes.Shipped.Success, string.Join("\n", Classes.Shipped.Errors));
-            CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry" }, Warrior.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { "fireball", "flame_brand" }, FireMage.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { "volley", "eagle_eye" }, Archer.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { "spirits", "spirit_pact" }, Summoner.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "ground_slam" }, Warrior.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "meteor" }, FireMage.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "volley", "eagle_eye", "power_shot" }, Archer.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "spirits", "spirit_pact", "spirit_horde" }, Summoner.Skills.Select(s => s.Id));
         }
 
         [Test]
@@ -71,13 +71,14 @@ namespace Game.Core.Tests
                 "spark,불티,busy,nova,fire,50,2,1,,,,,,\n" +
                 "flare,불꽃,busy,nova,fire,50,2,1,,,,,,\n" +
                 "extra,하나 더,busy,nova,fire,50,2,1,,,,,,\n" +
+                "fourth,넷째,busy,nova,fire,50,2,1,,,,,,\n" +
                 "lost,길 잃은,nobody,nova,,50,2,1,,,,,,\n");
 
             AssertError(data, "classes.csv 3행", "범위로 적을 수 없습니다");
             AssertError(data, "skills.csv 2행", "projectile 스킬은 speed 칸을 채워야 합니다");
             AssertError(data, "skills.csv 3행", "modifiers나 grants");
-            AssertError(data, "skills.csv 6행", "'busy'의 스킬이 2개를 넘습니다");
-            AssertError(data, "skills.csv 7행", "클래스 'nobody'가 classes.csv에 없습니다");
+            AssertError(data, "skills.csv 7행", "'busy'의 스킬이 3개를 넘습니다");
+            AssertError(data, "skills.csv 8행", "클래스 'nobody'가 classes.csv에 없습니다");
             Assert.AreEqual(5, data.Errors.Count, string.Join("\n", data.Errors));
         }
 
@@ -405,6 +406,24 @@ namespace Game.Core.Tests
         }
     
         [Test]
+        public void ThreeClassesShareTwoClassesWorthOfPassives()
+        {
+            Assert.AreEqual(3, ClassRules.DefaultMaxClasses);
+            Assert.AreEqual(1f, ClassRules.PassiveShare(2));
+            Assert.AreEqual(2f / 3, ClassRules.PassiveShare(3), 1e-6f);
+
+            var world = Room();
+            var one = world.AddPlayer("a", null, Warrior);
+            var three = world.AddPlayer("b", null, Warrior, FireMage, Archer);
+            float bare = world.AddPlayer("c", null).Stats.MaxHealth;
+            Assert.AreEqual(bare * 1.2f, one.Stats.MaxHealth, 0.01f, "MaxHealth+20%");
+            Assert.AreEqual(bare * 1.13f, three.Stats.MaxHealth, 0.01f, "two thirds of it, rounded: 13%");
+            // One skill of each, then the first class's second, until a player picks.
+            CollectionAssert.AreEqual(new[] { "whirlwind", "fireball", "volley", "war_cry" }, three.Skills.Select(s => s.Id));
+            Assert.AreEqual(9, ClassRules.AllSkillsFor(three.Classes).Count, "nine to pick the four from");
+        }
+
+        [Test]
         public void SkillsCanBeReorderedAnywhereAndKeepTheirCooldowns()
         {
             var world = Room();
@@ -413,13 +432,20 @@ namespace Game.Core.Tests
             world.UseSkill(player.Id, Slot(player, "whirlwind"), Vec2.Zero);
             int cooling = player.CooldownTicks(0);
 
-            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 2, 0, 3, 1 }));
+            // Indexes into every skill the two have: whirlwind, war_cry, ground_slam, fireball, flame_brand, meteor.
+            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 3, 0, 4, 1 }));
             CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "flame_brand", "war_cry" }, player.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { 2, 0, 3, 1 }, player.SkillOrder);
+            CollectionAssert.AreEqual(new[] { 3, 0, 4, 1 }, player.SkillOrder);
             Assert.AreEqual(cooling, player.CooldownTicks(1), "whirlwind's cooldown went with it");
             Assert.AreEqual(0, player.CooldownTicks(0));
 
-            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 0, 0, 1, 2 }), "not a reordering: the classes' own order");
+            // A skill not in the slots can take one: meteor in place of war_cry.
+            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 3, 0, 4, 5 }));
+            CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "flame_brand", "meteor" }, player.Skills.Select(s => s.Id));
+            Assert.AreEqual(Slot(player, "meteor"), 3);
+            Assert.Greater(player.CooldownTicks(3), 0, "a skill new to the slots starts cooling down");
+
+            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 0, 0, 1, 2 }), "the same skill twice: the defaults");
             CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "fireball", "flame_brand" }, player.Skills.Select(s => s.Id));
         }
 

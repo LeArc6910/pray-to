@@ -179,7 +179,7 @@ namespace Game.Core.Tests
         [Test]
         public void TheStormCallerBringsBothElements()
         {
-            CollectionAssert.AreEqual(new[] { "chain_lightning", "frost_ring" }, StormCaller.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "chain_lightning", "frost_ring", "storm_mantle" }, StormCaller.Skills.Select(s => s.Id));
             Assert.IsTrue((Classes.Skill("chain_lightning").Tags & SkillTag.Lightning) != 0);
             Assert.IsTrue((Classes.Skill("frost_ring").Tags & SkillTag.Cold) != 0);
             foreach (string id in new[] { "frost_staff", "storm_bow" })
