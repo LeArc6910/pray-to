@@ -13,7 +13,15 @@ node DevTools/WebPlaytest/playtest.js --wait
 
 # 화면 하나만: pc, phone(휴대폰 세로 390×844), phone-wide(가로 844×390)
 node DevTools/WebPlaytest/playtest.js --profiles phone
+
+# 전체 점검: LOCAL_TASKS.md의 사람 확인을 차례로(30~40분)
+node DevTools/WebPlaytest/sweep.js --wait
+
+# 전체 점검의 일부만
+node DevTools/WebPlaytest/sweep.js --only menu,npc,touch
 ```
+
+전체 점검(`sweep.js`)의 부분: `menu`(메뉴 단추, 설정, 클래스, 키 바꾸기, 온라인), `basics`(첫 화면, 퀵슬롯, 지도, 캐기, 목표, 놓기, 제작, 상자, 횃불), `bag`(드랍, 레벨 제한, 장착, 룬, 버리기, 회복, 쓰러짐), `combat`(슬라임, 몬스터 열세 종류, 활·지팡이, 스킬 넷, 원소), `bosses`(보스 넷의 등장·페이즈·처치·드랍, 아레나를 떠나면 되돌아감), `world`(생물군계 다섯, 용암, 곡괭이 단계, 시간대의 빛), `farm`(심기, 물, 밭, 비료, 생물군계 작물, 스프링클러, 거두기), `life`(낚시 게이지, 술통, 닭장, 통발, 침대와 잠, 귀환), `npc`(상인의 사기·팔기·하루 한도·선물·부탁, 대장장이, 어부), `factory`(채굴기에서 상자까지, 전력, 기계 끄기, 거름망, 전기로, 조립기, 생산 통계), `gear`(모루, 특성, 클래스 바꾸기), `save`(나갔다 들어오기, 새로 고침, 내보내기와 다른 브라우저로 가져오기), `layout`(800×600, 375×812, 740×360의 메뉴·게임·가방·보스·지도), `touch`(휴대폰 세로·가로에서 탭으로 지도, 퀵슬롯, 물약, 가방, 기계 끄기, 스킬, 손가락으로 목록 끌기). 결과는 `DevTools/WebPlaytest/out/sweep/`.
 
 결과는 `DevTools/WebPlaytest/out/`에 사진(`<화면>-<장면>.png`)과 `report.md`(확인 항목마다 통과·실패, 브라우저가 본 에러)로 남는다(커밋하지 않는다). 클라우드는 사진을 열어 보고, 사람에게는 사진과 숫자로 알 수 없는 것만 맡긴다.
 
@@ -36,6 +44,16 @@ node DevTools/WebPlaytest/playtest.js --profiles phone
 | `spawn <몬스터> <dx> <dy> [생명력]` | 곁에 몬스터를 둔다 |
 | `attack on\|off [x y]`, `skill <칸>`, `touch on\|off`, `bag on\|off` | 조작 |
 | `report` | 상태 한 줄(JSON) |
+| `solo <이름> keep` | 저장본을 지우지 않고 이어서 시작한다 |
+| `probe on`, `buttons` | 마지막 프레임에 그린 단추마다 글자, 줄(앞에 쓴 이름), 화면 위치(점), 눌리는지, 목록에서 보이는지(JSON). 스킬 칸·물약·퀵슬롯도 `skill N`, `potion`, `quick N`으로 |
+| `texts` | HUD 줄, 왼쪽 아래 줄(획득·알림), 가운데 배너, 떠 있는 글, 메뉴의 알림 줄(JSON) |
+| `goto spawn\|<dx> <dy>\|boss <id>\|biome <이름>\|tile <칸>\|near <칸>` | 옮긴다. `near`는 그 칸 곁에 서서 바라본다 |
+| `build <칸> <dx> <dy> [방향]`, `fill <dx> <dy> <재료> <개수>`, `look <dx> <dy>` | 칸을 짓고, 기계·상자에 넣고, 칸·기계·상자·작물을 읽는다 |
+| `drop item <베이스> [등급] [소켓]\|rune\|potion <id>\|material <id>`, `inventory` | 발밑에 떨어뜨리고, 가방을 읽는다 |
+| `speed <틱>` | 혼자 하기 월드를 한 걸음에 그만큼 돌린다(0은 멈춤, 최대 60) |
+| `hurt <양>`, `boss <id> hurt <비율>`, `xp <양>`, `heal`, `clear`, `equip <베이스...>`, `face <x> <y>\|off` | 싸움과 같은 길로 다치고, 레벨을 올리고, 바라본다 |
+
+단추는 모두 `Ui.Button`·`Ui.LayoutButton`·`Ui.Toolbar`를 거친다(`Ui.cs`). 시험이 `probe on`을 켜 두면 그린 단추를 기억하고, 시험 도구(`lib.js`의 `press`)는 그 자리를 진짜 클릭이나 탭으로 누른다. 목록 밖으로 스크롤된 단추는 마우스 휠로 찾아간다. 새 단추를 만들 때도 이 셋을 쓴다.
 
 웹 페이지(`Assets/WebGLTemplates/Fit/index.html`)는 `window.unityInstance`를 열어 두고, 웹 데모 워크플로는 배포에 `version.txt`(커밋)를 넣어 `--wait`가 기다릴 수 있게 한다.
 
