@@ -30,11 +30,11 @@ namespace Game.Core.Tests
         public void LevelsTakeMoreExperienceEachTime()
         {
             Assert.AreEqual(0, LifeSkills.TotalFor(1));
-            Assert.AreEqual(50, LifeSkills.TotalFor(2));
-            Assert.AreEqual(150, LifeSkills.TotalFor(3));
-            Assert.AreEqual(2250, LifeSkills.TotalFor(10));
-            Assert.AreEqual(1, LifeSkills.LevelOf(49));
-            Assert.AreEqual(2, LifeSkills.LevelOf(50));
+            Assert.AreEqual(100, LifeSkills.TotalFor(2));
+            Assert.AreEqual(300, LifeSkills.TotalFor(3));
+            Assert.AreEqual(4500, LifeSkills.TotalFor(10));
+            Assert.AreEqual(1, LifeSkills.LevelOf(99));
+            Assert.AreEqual(2, LifeSkills.LevelOf(100));
             Assert.AreEqual(10, LifeSkills.LevelOf(999999));
             Assert.AreEqual(0, LifeSkills.Bonus(1, LifeSkills.DigPercent), "nothing at level 1");
             Assert.AreEqual(36, LifeSkills.Bonus(10, LifeSkills.DigPercent));
@@ -44,7 +44,6 @@ namespace Game.Core.Tests
         public void DiggingTeachesMiningAndMiningDigsFaster()
         {
             var world = Pond(out var player, Gear.Wearing("copper_pickaxe"));
-            var wall = Tiles.Shipped.Find(TileType.Wall);
             world.Map[8, 10] = TileType.Wall;
             Face(world, player, 8, 10, new Vec2(0, 1));
             for (int i = 0; i < 40 && world.Map[8, 10] == TileType.Wall; i++)
@@ -53,7 +52,7 @@ namespace Game.Core.Tests
                 Run(world, 0.6f);
             }
             Assert.AreEqual(TileType.Floor, world.Map[8, 10]);
-            Assert.AreEqual(wall.Hardness, player.LifeExperience[(int)LifeSkill.Mining]);
+            Assert.AreEqual(1, player.LifeExperience[(int)LifeSkill.Mining], "plain rock: a third of its hardness 3");
 
             float before = World.DigPowerOf(player);
             player.LifeExperience[(int)LifeSkill.Mining] = LifeSkills.TotalFor(10);
@@ -64,7 +63,7 @@ namespace Game.Core.Tests
         public void ReachingALevelIsAnEvent()
         {
             var world = Pond(out var player);
-            world.GainLifeExperience(player, LifeSkill.Farming, 49);
+            world.GainLifeExperience(player, LifeSkill.Farming, 99);
             Assert.IsFalse(world.TakeEvents().Any(e => e.Type == SimEventType.LifeLevel));
             world.GainLifeExperience(player, LifeSkill.Farming, 1);
             var level = world.TakeEvents().Single(e => e.Type == SimEventType.LifeLevel);
@@ -108,7 +107,7 @@ namespace Game.Core.Tests
             int difficulty = player.Fishing.Difficulty;
             Reels.Land(world, player);
             Assert.AreEqual(1, player.Inventory.Materials.Keys.Count(m => m.Fish != null));
-            Assert.AreEqual(10 + 5 * difficulty, player.LifeExperience[(int)LifeSkill.Fishing]);
+            Assert.AreEqual(3 + 2 * difficulty, player.LifeExperience[(int)LifeSkill.Fishing]);
         }
 
         [Test]
@@ -163,8 +162,8 @@ namespace Game.Core.Tests
         [Test]
         public void LifeSkillsAreKeptWithTheCharacterAndSentToThePlayer()
         {
-            var data = CharacterSave.Write(new Equipment(), new Inventory(), 0, null, null, null, new[] { 60, 0, 400 });
-            CollectionAssert.AreEqual(new[] { 60, 0, 400 }, CharacterSave.Read(data, Gear.Data).LifeExperience);
+            var data = CharacterSave.Write(new Equipment(), new Inventory(), 0, null, null, null, new[] { 120, 0, 400 });
+            CollectionAssert.AreEqual(new[] { 120, 0, 400 }, CharacterSave.Read(data, Gear.Data).LifeExperience);
 
             var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
             var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped) { Character = data };
@@ -176,7 +175,7 @@ namespace Game.Core.Tests
             }
             Assert.AreEqual(400, host.World.Players.Single().LifeExperience[(int)LifeSkill.Mining]);
             Assert.AreEqual(2, client.LifeLevel(LifeSkill.Farming));
-            CollectionAssert.AreEqual(new[] { 60, 0, 400 }, CharacterSave.Read(client.SaveCharacter(), Gear.Data).LifeExperience);
+            CollectionAssert.AreEqual(new[] { 120, 0, 400 }, CharacterSave.Read(client.SaveCharacter(), Gear.Data).LifeExperience);
         }
     }
 }

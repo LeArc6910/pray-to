@@ -23,8 +23,9 @@ namespace Game.Core
         public const int ZonePercent = 5;
         public const int DigPercent = 4;
 
-        // Experience to have reached the level: 0, 50, 150, 300 … 2250 for level 10.
-        public static int TotalFor(int level) => 25 * (Math.Clamp(level, 1, MaxLevel) - 1) * Math.Clamp(level, 1, MaxLevel);
+        // Experience to have reached the level: 0, 100, 300, 600 … 4500 for level 10. A few hours of one kind of work
+        // reach the top (DevTools/CoreSandbox --economy).
+        public static int TotalFor(int level) => 50 * (Math.Clamp(level, 1, MaxLevel) - 1) * Math.Clamp(level, 1, MaxLevel);
 
         public static int LevelOf(int experience)
         {

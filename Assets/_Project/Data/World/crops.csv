@@ -6,7 +6,7 @@ frost_berry,서리 열매,frost_berry_seed,4,ice,frost_berry,2,1,40,
 star_melon,별 수박,star_melon_seed,6,abyss,star_melon,1,1,30,
 cave_potato,동굴 감자,cave_potato_seed,3,cave,cave_potato,3,1,40,
 cave_berry,동굴 딸기,cave_berry_seed,4,cave|mushroom,cave_berry,3,0,0,2
-moon_grape,달빛 포도,moon_grape_seed,5,mushroom,moon_grape,4,0,0,2
+moon_grape,달빛 포도,moon_grape_seed,5,mushroom,moon_grape,3,0,0,2
 snow_cabbage,눈 배추,snow_cabbage_seed,5,ice,snow_cabbage,1,1,30,
 ember_corn,불씨 옥수수,ember_corn_seed,4,lava,ember_corn,2,0,0,2
 void_bean,공허 콩,void_bean_seed,4,abyss,void_bean,3,0,0,3

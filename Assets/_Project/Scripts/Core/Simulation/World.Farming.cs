@@ -214,7 +214,7 @@ namespace Game.Core
             // By hand: the farming skill may give one more, and grows by the days the crop took.
             int bonus = LifeSkills.Bonus(LifeLevel(player, LifeSkill.Farming), LifeSkills.ExtraCropPercent);
             if (bonus > 0 && _random.Chance(bonus / 100f)) count++;
-            GainLifeExperience(player, LifeSkill.Farming, (int)Math.Round(4 * (again ? definition.RegrowDays : definition.GrowDays)));
+            GainLifeExperience(player, LifeSkill.Farming, (int)Math.Round(6 * (again ? definition.RegrowDays : definition.GrowDays)));
             if (definition.HarvestMaterial != null) player.Inventory.AddMaterial(definition.HarvestMaterial, count);
             else player.Inventory.AddConsumable(definition.HarvestConsumable, count);
             player.Inventory.AddMaterial(definition.Seed, seeds);

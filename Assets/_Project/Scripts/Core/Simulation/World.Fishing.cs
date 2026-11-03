@@ -11,8 +11,10 @@ namespace Game.Core
     public sealed partial class World
     {
         public const string FishingRod = "fishing_rod";
-        public const float BiteMinSeconds = 2;
-        public const float BiteMaxSeconds = 5;
+        // How long a fish takes to bite (before the fishing skill), set against what fish fetch (DevTools/CoreSandbox
+        // --economy): a few hundred coins an hour in the plain cave.
+        public const float BiteMinSeconds = 8;
+        public const float BiteMaxSeconds = 20;
         public const float BiteSeconds = 4;
         // How far the player may move from where they cast before the line comes in.
         const float FishingLeash = 0.6f;
@@ -144,7 +146,7 @@ namespace Game.Core
             {
                 player.Inventory.AddMaterial(fish, _random.Chance(DoubleCatchChance) ? 2 : 1);
                 player.InventoryVersion++;
-                GainLifeExperience(player, LifeSkill.Fishing, 10 + 5 * fishing.Difficulty);
+                GainLifeExperience(player, LifeSkill.Fishing, 3 + 2 * fishing.Difficulty);
             }
             EndFishing(player, FishingCaught);
         }

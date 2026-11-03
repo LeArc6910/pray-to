@@ -87,7 +87,8 @@ namespace Game.Core
             var machine = MachineAt(x, y);
             if (machine != null) Empty(machine, player);
             SetTile(x, y, TileType.Floor);
-            GainLifeExperience(player, LifeSkill.Mining, tile.Hardness);
+            // A third of its hardness, at least one: plain rock 1, ore and harder rock more.
+            GainLifeExperience(player, LifeSkill.Mining, Math.Max(1, (tile.Hardness + 2) / 3));
             player.Inventory.AddMaterial(tile.Material, tile.Count);
             if (tile.Extra != null && tile.ExtraChance > 0 && _random.Chance(tile.ExtraChance / 100f)) player.Inventory.AddMaterial(tile.Extra);
             player.InventoryVersion++;

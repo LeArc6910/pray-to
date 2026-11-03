@@ -370,7 +370,7 @@ namespace Game.Client
                 if (machine.Kind == TileType.Coop)
                     GUILayout.Label(Fit($"닭 {machine.Animals}/{World.CoopChickens}마리. 사료가 있으면 하루(20분)마다 닭마다 달걀 하나", _textWidth));
                 if (machine.Kind == TileType.CrabPot)
-                    GUILayout.Label(Fit("바로 옆이 물이어야 한다. 미끼 하나로 10분에 하나씩 든다", _textWidth));
+                    GUILayout.Label(Fit("바로 옆이 물이어야 한다. 미끼 하나로 15분에 하나씩 든다", _textWidth));
                 if (machine.Kind == TileType.Keg || machine.Kind == TileType.PreservesJar)
                 {
                     string makes = string.Join(" · ", _client.ProcessesOf(machine.Kind)

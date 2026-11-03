@@ -16,6 +16,8 @@ namespace CoreSandbox
     // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
     // add --classes <class,class> to --fight or --boss to give the bots classes; they use every skill when it is ready
     // dotnet run -- --farm [minutes] [crop]          a plot of soil kept by a sprinkler and a harvester: harvest an hour
+    // dotnet run -- --rift [tiers] [seed]             bots open void rifts tier after tier (--players, --gear, --classes)
+    // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     static class Program
     {
         static void Main(string[] args)
@@ -87,6 +89,13 @@ namespace CoreSandbox
                 case "--farm":
                     FarmSim.Run(data, LoadTiles(data), LoadMonsters(), Number(1, 120), args.Length > 2 ? args[2] : "mushroom");
                     break;
+                case "--rift":
+                    var riftMonsters = LoadMonsters();
+                    RiftSim.Run(data, riftMonsters, LoadTiles(data), Number(1, 5), Seed(2), players, gear, LoadClasses(classIds), dodge);
+                    break;
+                case "--economy":
+                    EconomySim.Run(data, LoadTiles(data), LoadNpcs(data));
+                    break;
                 case "--boss":
                     var monsters = LoadMonsters();
                     BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge, bossId);
@@ -97,6 +106,8 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--classes warrior,fire_mage] [--no-dodge]");
                     Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--classes ...] [--no-dodge] [--boss-id crystal_queen]");
                     Console.WriteLine("       dotnet run -- --farm [minutes] [crop]");
+                    Console.WriteLine("       dotnet run -- --rift [tiers] [seed] [--players 2] [--gear ...] [--classes ...]");
+                    Console.WriteLine("       dotnet run -- --economy");
                     break;
             }
         }
@@ -220,6 +231,17 @@ namespace CoreSandbox
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "World"));
             string Read(string file) => File.ReadAllText(Path.Combine(folder, file));
             var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile));
+            if (data.Success) return data;
+
+            foreach (string error in data.Errors) Console.Error.WriteLine(error);
+            Environment.Exit(1);
+            return null;
+        }
+
+        static NpcData LoadNpcs(LootData loot)
+        {
+            string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Npcs"));
+            var data = NpcSheet.Parse(File.ReadAllText(Path.Combine(folder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(folder, NpcSheet.ShopFile)), loot);
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

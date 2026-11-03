@@ -53,6 +53,11 @@ namespace Game.Core
         public const int RiftFailed = 0;
         public const int RiftOpened = 1;
         public const int RiftCleared = 2;
+        // A rift monster's health and hit against its sheet at tier 1, and how much more each tier adds.
+        const float RiftHealth = 5f;
+        const float RiftHealthPerTier = 1.5f;
+        const float RiftPower = 2.2f;
+        const float RiftPowerPerTier = 0.35f;
         // How far from the altar its monsters appear.
         const float RiftInner = 3;
         const float RiftOuter = 7;
@@ -125,10 +130,14 @@ namespace Game.Core
             var rift = ActiveRift;
             rift.Wave++;
             rift.Monsters.Clear();
-            float health = (1 + 0.35f * (rift.Tier - 1)) * ((rift.Affixes & RiftAffix.Tough) != 0 ? 1.5f : 1);
-            float power = (1 + 0.15f * (rift.Tier - 1)) * ((rift.Affixes & RiftAffix.Fierce) != 0 ? 1.3f : 1);
+            // Set by DevTools/CoreSandbox --rift: two players in void gear close tier 1 in about two minutes, and the
+            // tiers after it ask for upgraded gear and the passive tree.
+            float health = (RiftHealth + RiftHealthPerTier * (rift.Tier - 1)) * ((rift.Affixes & RiftAffix.Tough) != 0 ? 1.5f : 1);
+            float power = (RiftPower + RiftPowerPerTier * (rift.Tier - 1)) * ((rift.Affixes & RiftAffix.Fierce) != 0 ? 1.3f : 1);
             float speed = (rift.Affixes & RiftAffix.Swift) != 0 ? 1.3f : 1;
-            var kinds = _monsters.Monsters.ToList();
+            // Only the deepest monsters come through: the rift opens after the last boss.
+            int deepest = _monsters.Monsters.Max(m => m.Level);
+            var kinds = _monsters.Monsters.Where(m => m.Level >= deepest - 1).ToList();
             if (rift.Wave > RiftWaves)
             {
                 var strongest = kinds.OrderByDescending(m => m.Health).First();

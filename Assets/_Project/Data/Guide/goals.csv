@@ -23,7 +23,7 @@ assembler,조립기 세우기,철 톱니·회로로 만든다. 바라보고 가�
 sprinkler,스프링클러 세우기,물뿌리개와 철 주괴로 만든다. 둘레 5×5칸 작물이 마르지 않게 저절로 물을 준다,place:Sprinkler,fertilizer:3
 keg,술통 세우기,철 주괴 2·돌 8. 과일(딸기·포도·서리 열매)을 [넣기]로 넣으면 몇 분 뒤 상인이 비싸게 사는 주스와 술이 된다,place:Keg,cave_berry_seed:2
 coop,닭장 세우기,돌 12·철 주괴 2·슬라임 젤 2. 상인의 닭과 사료를 [넣기]로 넣으면 하루마다 달걀을 낳는다,place:Coop,feed:8
-crab_pot,통발 놓기,구리 전선 4·돌 2. 바로 옆이 물인 바닥에 놓고 미끼를 넣으면 10분마다 게나 새우가 든다,place:CrabPot,bait:8
+crab_pot,통발 놓기,구리 전선 4·돌 2. 바로 옆이 물인 바닥에 놓고 미끼를 넣으면 15분마다 게나 새우가 든다,place:CrabPot,bait:8
 friend,상인과 호감 2 되기,하루 한 번 [말 걸기]와 선물. 좋아하는 것을 주면 많이 오르고 호감이 오를수록 값이 좋아진다,friend:2,coin:30
 generator,발전기 돌리기,철 주괴 5·구리 광석 6·돌 6으로 만들고 슬라임 젤을 [연료]로 넣으면 둘레 기계가 두 배로 빨라진다,place:Generator,slime_gel:10
 power_pole,전신주로 힘 나르기,구리 전선 3·돌 2로 둘을 만든다. 8타일 안의 전신주·발전기끼리 이어지고 둘레 4타일 기계에 힘을 준다,place:PowerPole,copper_wire:4

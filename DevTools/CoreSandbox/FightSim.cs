@@ -69,7 +69,7 @@ namespace CoreSandbox
 
         public static string ClassNames(ClassDefinition[] classes) => classes.Length == 0 ? "없음" : string.Join(" + ", classes.Select(c => c.Name));
 
-        static void Drive(World world, Player player, FlowField toEnemies, bool dodge)
+        internal static void Drive(World world, Player player, FlowField toEnemies, bool dodge)
         {
             if (player.IsDead) return;
             var target = world.Enemies.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
