@@ -306,7 +306,7 @@ namespace Game.Core
             World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds);
             World.RestoreClock(save.Clock);
             World.RestoreRiftTier(save.RiftTier);
-            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting);
+            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting, m.Recipe);
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -343,6 +343,10 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Fish:
                     World.Fish(player.Id);
+                    break;
+                case InventoryCommand.SetRecipe:
+                    // Index is the recipe's sheet index; Item 0 stops the assembler.
+                    World.SetRecipe(player.Id, command.Item == 0 || command.Index >= _loot.Recipes.Count ? null : _loot.Recipes[command.Index]);
                     break;
                 case InventoryCommand.SetFilter:
                     // Index is the material's sheet index; Item 0 clears the filter.
@@ -525,7 +529,8 @@ namespace Game.Core
                 .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
                 .Take(_config.MaxMachinesPerMessage)
                 .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled,
-                    m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting), World.IsPowered(m)))
+                    m.Kind == TileType.Assembler ? (m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe)) : m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting),
+                    World.IsPowered(m)))
                 .ToList();
             if (near.Count == 0 && !sent.SentMachines) return;
             sent.SentMachines = near.Count > 0;

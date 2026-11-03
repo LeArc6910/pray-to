@@ -384,6 +384,7 @@ namespace Game.Client
             TileType.Lever => LeverBase,
             TileType.Anvil => AnvilTile,
             TileType.RiftAltar => RiftAltarTile,
+            TileType.Assembler => AssemblerTile,
             _ => null,
         };
 
@@ -1338,6 +1339,29 @@ namespace Game.Client
             "...oAaAvvAaAo...",
             "...oAAAAAAAAo...",
             "..oaaaaaaaaaao..",
+            "..oooooooooooo..",
+            "..____________..");
+
+        // An iron box with a brass gear on its face and a green lamp: it makes the recipe it was given.
+        static readonly PixelImage AssemblerTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['I'] = Rgba.Hex("#9AA0AA"), ['i'] = Rgba.Hex("#747A86"), ['j'] = Rgba.Hex("#525762"), ['G'] = Rgba.Hex("#E2B04A"),
+                ['g'] = Rgba.Hex("#A87A2C"), ['e'] = Rgba.Hex("#7CE07C"),
+            },
+            "................",
+            "................",
+            "..oooooooooooo..",
+            ".oIIIIIIIIIIIIo.",
+            ".oIiiiiiiiiiijo.",
+            ".oIiioGoGoiiijo.",
+            ".oIioGGgGGoiijo.",
+            ".oIiGGgogGGiijo.",
+            ".oIioGgogGoiijo.",
+            ".oIiioGGGoieijo.",
+            ".oIiiiiiiiiiijo.",
+            ".oIjjjjjjjjjjjo.",
+            ".ooiiiiiiiiiioo.",
+            ".oojjjjjjjjjjoo.",
             "..oooooooooooo..",
             "..____________..");
 

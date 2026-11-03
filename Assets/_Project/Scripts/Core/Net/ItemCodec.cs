@@ -160,6 +160,8 @@ namespace Game.Core
         ResetPassives,
         // Opens a void rift at the altar near (World.OpenRift).
         OpenRift,
+        // Sets the assembler ahead to the recipe at Index, or stops it when Item is 0 (World.SetRecipe).
+        SetRecipe,
         // At an anvil, with the item's id in Item (World.Refining.cs).
         Upgrade,
         Salvage,

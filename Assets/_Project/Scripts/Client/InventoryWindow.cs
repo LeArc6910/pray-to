@@ -371,6 +371,15 @@ namespace Game.Client
             GUILayout.Space(6);
             GUILayout.Label("제작");
             var enabled = GUI.enabled;
+            // Facing an assembler, a recipe it can make gets [조립기에] (World.SetRecipe).
+            var assembler = _client.MachineAhead() is MachineView m && m.Kind == TileType.Assembler ? m : (MachineView?)null;
+            if (assembler != null)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Fit($"조립기: {assembler.Value.Recipe?.Name ?? "정하지 않음"} (조합법의 [조립기에]로 정한다)", _textWidth - 64));
+                if (assembler.Value.Recipe != null && GUILayout.Button("멈추기", GUILayout.Width(56))) Send(_client.SetRecipeCommand(null), Sound.Click);
+                GUILayout.EndHorizontal();
+            }
             foreach (var recipe in recipes)
             {
                 string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Available(i.Material)}/{i.Count}"));
@@ -387,6 +396,8 @@ namespace Game.Client
                 int bulk = Mathf.Clamp(times, 2, BulkCraft);
                 if (GUILayout.Button($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), Sound.Craft);
                 GUI.enabled = enabled;
+                if (assembler != null && World.Assembles(recipe) && GUILayout.Button("조립기에", GUILayout.Width(72)))
+                    Send(_client.SetRecipeCommand(recipe), Sound.Click);
                 GUILayout.EndHorizontal();
             }
         }
@@ -405,6 +416,7 @@ namespace Game.Client
         {
             TileType.Workbench => "작업대",
             TileType.Furnace => "화로",
+            TileType.Anvil => "모루",
             _ => station.ToString(),
         };
 

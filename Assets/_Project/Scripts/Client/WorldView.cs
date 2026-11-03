@@ -330,6 +330,9 @@ namespace Game.Client
             {
                 var at = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
                 if (!machine.On && Vector3.Distance(at, _self.Position) < 6) Label(at, "꺼짐", OffLabel);
+                // An assembler nearby shows what it makes.
+                else if (machine.Kind == TileType.Assembler && Vector3.Distance(at, _self.Position) < 4)
+                    Label(at + new Vector3(0, 0.7f, 0), machine.Recipe?.Name ?? "정하지 않음", Color.white);
             }
             foreach (var text in _floating)
             {

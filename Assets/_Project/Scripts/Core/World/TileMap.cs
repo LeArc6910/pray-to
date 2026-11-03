@@ -69,6 +69,8 @@ namespace Game.Core
         Anvil,
         // Where a rift key opens a void rift (World.Rift.cs).
         RiftAltar,
+        // A machine that makes a chosen recipe over and over from what comes in (Docs/Automation.md).
+        Assembler,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

@@ -35,7 +35,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.35.0";
+        public const string Version = "0.36.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -352,7 +352,7 @@ namespace Game.Core
         public float Progress { get; }
         // Switched on (World.ToggleMachine).
         public bool On { get; }
-        // A filter's chosen material as a sheet index, or -1.
+        // A filter's chosen material as a sheet index, an assembler's recipe as one, or -1.
         public int Setting { get; }
         // Working twice as fast beside a running generator.
         public bool Powered { get; }

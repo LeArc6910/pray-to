@@ -73,9 +73,10 @@ namespace Game.Core
         public sealed class SavedMachine
         {
             internal SavedMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
-                List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output, MaterialDefinition setting = null)
+                List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output, MaterialDefinition setting = null, Recipe recipe = null)
             {
                 Setting = setting;
+                Recipe = recipe;
                 X = x;
                 Y = y;
                 Direction = direction;
@@ -95,6 +96,8 @@ namespace Game.Core
             public IReadOnlyList<(MaterialDefinition Material, int Count)> Input { get; }
             // A filter's chosen material, or null.
             public MaterialDefinition Setting { get; }
+            // An assembler's recipe, or null.
+            public Recipe Recipe { get; }
             public IReadOnlyList<(MaterialDefinition Material, int Count)> Output { get; }
         }
         public IReadOnlyList<string> Warnings { get; }
@@ -163,7 +166,8 @@ namespace Game.Core
                     w.Write(machine.Progress);
                     SavedItems.WriteCounts(w, machine.Inputs.Select(p => (p.Key.Id, p.Value)));
                     SavedItems.WriteCounts(w, machine.Outputs.Select(p => (p.Key.Id, p.Value)));
-                    w.Write(machine.Setting?.Id ?? "");
+                    // A filter's material, or an assembler's recipe.
+                    w.Write(machine.Setting?.Id ?? machine.Recipe?.Id ?? "");
                 }
 
                 var beds = world.Beds.ToList();
@@ -272,7 +276,7 @@ namespace Game.Core
                         stacks.Select(s => (Find(s.Id), s.Count)).Where(s => s.Item1 != null).ToList();
                     string setting = version >= 6 ? r.ReadString() : "";
                     machines.Add(new SavedMachine(x, y, direction, timer, carried.Length > 0 ? Find(carried) : null, along, Resolve(input), Resolve(output),
-                        setting.Length > 0 ? Find(setting) : null));
+                        setting.Length > 0 ? Find(setting) : null, setting.Length > 0 ? loot?.Recipes.FirstOrDefault(rc => rc.Id == setting) : null));
                 }
                 var beds = new List<(int, int, string)>();
                 for (int count = version >= 5 ? r.ReadInt32() : 0; count > 0; count--)

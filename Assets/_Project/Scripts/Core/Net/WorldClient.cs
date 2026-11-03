@@ -119,9 +119,10 @@ namespace Game.Core
     public readonly struct MachineView
     {
         public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true,
-            MaterialDefinition setting = null, bool powered = false)
+            MaterialDefinition setting = null, bool powered = false, Recipe recipe = null)
         {
             Setting = setting;
+            Recipe = recipe;
             Powered = powered;
             X = x;
             Y = y;
@@ -142,6 +143,8 @@ namespace Game.Core
         public bool On { get; }
         // A filter's chosen material, or null.
         public MaterialDefinition Setting { get; }
+        // An assembler's recipe, or null.
+        public Recipe Recipe { get; }
         public bool Powered { get; }
     }
 
@@ -271,6 +274,10 @@ namespace Game.Core
             && (Calendar.Phase(Clock) == DayPhase.Evening || Calendar.Phase(Clock) == DayPhase.Night);
 
         public byte[] SleepCommand() => new InventoryCommandMessage(InventoryCommand.Sleep, 0).Encode();
+
+        // Sets the assembler ahead to the recipe, or stops it with null (World.SetRecipe).
+        public byte[] SetRecipeCommand(Recipe recipe) =>
+            new InventoryCommandMessage(InventoryCommand.SetRecipe, recipe == null ? 0 : 1, index: recipe == null ? 0 : ItemCodec.Index(_loot.Recipes, recipe)).Encode();
 
         // The sheets this client reads items by.
         public LootData Loot => _loot;
@@ -585,8 +592,10 @@ namespace Game.Core
                 {
                     progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks * (m.Powered ? 2 : 1)));
                 }
-                var setting = m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
-                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered));
+                bool assembler = m.Kind == TileType.Assembler;
+                var setting = !assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
+                var recipe = assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Recipes.Count ? _loot.Recipes[m.Setting] : null;
+                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe));
             }
             return views;
         }

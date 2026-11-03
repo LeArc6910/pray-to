@@ -28,6 +28,8 @@ namespace Game.Core
         public bool Enabled { get; internal set; } = true;
         // A filter's chosen material, sent straight on; null lets everything go aside.
         public MaterialDefinition Setting { get; internal set; }
+        // An assembler's chosen recipe, or null (World.SetRecipe).
+        public Recipe Recipe { get; internal set; }
         // A conveyor's, splitter's or arm's load and how far along the tile it has come (or the arm has swung), 0 to 1.
         public MaterialDefinition Carried { get; internal set; }
         public float Progress { get; internal set; }
@@ -140,7 +142,72 @@ namespace Game.Core
                 case TileType.Filter:
                     RunFilter(machine);
                     break;
+                case TileType.Assembler:
+                    RunAssembler(machine);
+                    break;
             }
+        }
+
+        // What an assembler may be set to: a workbench recipe (or one needing no station) that makes a material or a
+        // consumable. Gear is made by hand.
+        public static bool Assembles(Recipe recipe) =>
+            recipe != null && (recipe.Station == null || recipe.Station == TileType.Workbench) && (recipe.Material != null || recipe.Consumable != null);
+
+        // Makes its recipe whenever its input holds the ingredients, every so often. A material comes out of the front
+        // like a smelter's; a consumable only into a chest in front, and without one it waits.
+        void RunAssembler(Machine assembler)
+        {
+            var recipe = assembler.Recipe;
+            var (fx, fy) = assembler.Front;
+            bool room = recipe?.Material != null ? Count(assembler.Output) + recipe.Count <= assembler.Definition.Capacity : ChestAt(fx, fy) != null;
+            bool ready = recipe != null && room && recipe.Ingredients.All(i => assembler.Input.GetValueOrDefault(i.Material) >= i.Count);
+            if (!ready)
+            {
+                assembler.Timer = 0;
+            }
+            else if (++assembler.Timer >= assembler.Definition.Ticks)
+            {
+                assembler.Timer = 0;
+                foreach (var (material, count) in recipe.Ingredients) Add(assembler.Input, material, -count);
+                if (recipe.Material != null)
+                {
+                    Add(assembler.Output, recipe.Material, recipe.Count);
+                }
+                else
+                {
+                    ChestAt(fx, fy).AddConsumable(recipe.Consumable, recipe.Count);
+                    int key = fy * Map.Width + fx;
+                    _chestVersions[key] = _chestVersions.GetValueOrDefault(key) + 1;
+                }
+            }
+            SendOut(assembler, assembler.Front);
+        }
+
+        // Whether the assembler takes one more of the material: an ingredient of its recipe, up to twice what one
+        // make needs, so one ingredient cannot fill it while another is missing.
+        static bool AssemblerTakes(Machine assembler, MaterialDefinition material)
+        {
+            var need = assembler.Recipe?.Ingredients.FirstOrDefault(i => i.Material == material);
+            return need?.Material != null && assembler.Input.GetValueOrDefault(material) < need.Value.Count * 2;
+        }
+
+        // Sets the assembler ahead to make the recipe (null to stop). What it held that the new recipe does not use
+        // goes to the player. False when the machine ahead is no assembler or the recipe is not one it makes.
+        public bool SetRecipe(int playerId, Recipe recipe)
+        {
+            var player = FindPlayer(playerId);
+            var assembler = player == null || player.IsDead ? null : MachineFacing(player.Position, player.Facing);
+            if (assembler == null || assembler.Kind != TileType.Assembler || recipe != null && !Assembles(recipe)) return false;
+            assembler.Recipe = recipe;
+            assembler.Timer = 0;
+            foreach (var pair in assembler.Input.ToList())
+            {
+                if (recipe != null && recipe.Ingredients.Any(i => i.Material == pair.Key)) continue;
+                player.Inventory.AddMaterial(pair.Key, pair.Value);
+                assembler.Input.Remove(pair.Key);
+                player.InventoryVersion++;
+            }
+            return true;
         }
 
         // Burns one fuel when the last has burnt out; runs (Timer above 0) while it burns. Progress is how much of
@@ -271,6 +338,7 @@ namespace Game.Core
                     case TileType.Drill:
                     case TileType.Smelter:
                     case TileType.Harvester:
+                    case TileType.Assembler:
                         var made = source.Output.Keys.FirstOrDefault(Fits);
                         if (made != null) Add(source.Output, made, -1);
                         return made;
@@ -445,6 +513,7 @@ namespace Game.Core
                 TileType.Filter => true,
                 TileType.Generator => material.Fuel > 0,
                 TileType.Smelter => Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)),
+                TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material),
                 _ => false,
             };
         }
@@ -478,6 +547,10 @@ namespace Game.Core
                         if (!Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)) || Count(target.Input) >= target.Definition.Capacity) return false;
                         Add(target.Input, material, 1);
                         return true;
+                    case TileType.Assembler:
+                        if (!AssemblerTakes(target, material)) return false;
+                        Add(target.Input, material, 1);
+                        return true;
                     default:
                         return false;
                 }
@@ -502,13 +575,14 @@ namespace Game.Core
         // Puts back a machine as a world save held it.
         internal void RestoreMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
             IEnumerable<(MaterialDefinition Material, int Count)> input, IEnumerable<(MaterialDefinition Material, int Count)> output,
-            MaterialDefinition setting = null)
+            MaterialDefinition setting = null, Recipe recipe = null)
         {
             var machine = MachineAt(x, y);
             if (machine == null) return;
             machine.Direction = direction & 3;
             machine.Enabled = (direction & Machine.OffBit) == 0;
             machine.Setting = setting;
+            machine.Recipe = machine.Kind == TileType.Assembler && Assembles(recipe) ? recipe : null;
             machine.Timer = timer;
             machine.Carried = carried;
             machine.Progress = progress;

@@ -433,6 +433,46 @@ namespace Game.Client
             "...dd...",
         };
 
+        // A cog with a hole through it.
+        static readonly string[] Cog =
+        {
+            "...LM.LM...",
+            "...LMMMm...",
+            ".LMMLwMMmd.",
+            ".LMMm.MMmd.",
+            "LMMm...mMmd",
+            ".MMm...mmd.",
+            ".MMMmmmmmd.",
+            "..mMmmmmd..",
+            "...md.md...",
+        };
+
+        // A coil of wire with its end loose.
+        static readonly string[] Coil =
+        {
+            "...LLMM...",
+            "..LwMMmm..",
+            ".LMd..dmm.",
+            ".LM....mm.",
+            ".LMd..dmm.",
+            "..MMmmmd..",
+            "...Mmmd.MM",
+            "........Mm",
+        };
+
+        // A green board with copper tracks and a black chip.
+        static readonly string[] Board =
+        {
+            "MMMMMMMMMM",
+            "MyMMkkkMyM",
+            "MyyMkkkMYM",
+            "MMyMkkkyyM",
+            "MMyyyMMMMM",
+            "MLMMyMMLMM",
+            "MMMMyyyMMm",
+            "mmmmmmmmmm",
+        };
+
         static readonly string[] Spores =
         {
             "..LM......",
@@ -596,6 +636,9 @@ namespace Game.Client
                 case "firefly_catfish": return Ramped(FishRows, Ramp.Of("#E8D86A"));
                 case "essence": return Ramped(Gem, Ramp.Of("#C88CFF"));
                 case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
+                case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
+                case "copper_wire": return Ramped(Coil, Ramp.Of("#E08A4A"));
+                case "circuit": return Ramped(Board, Ramp.Of("#4CA85A"));
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);
             }
         }
