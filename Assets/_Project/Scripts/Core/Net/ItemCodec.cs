@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -15,7 +16,8 @@ namespace Game.Core
             writer.Write(item.Id);
             writer.Write((ushort)Index(data.Bases, item.Base));
             writer.Write((byte)item.Level);
-            writer.Write((byte)item.Rarity);
+            // The upgrade rides in the rarity byte's top half.
+            writer.Write((byte)((int)item.Rarity | item.Upgrade << 4));
 
             writer.Write((byte)item.Implicits.Count);
             foreach (var modifier in item.Implicits) writer.Write((short)modifier.Value);
@@ -37,7 +39,8 @@ namespace Game.Core
             int id = reader.ReadInt32();
             var itemBase = At(data.Bases, reader.ReadUInt16());
             int level = reader.ReadByte();
-            var rarity = (Rarity)reader.ReadByte();
+            int rarityByte = reader.ReadByte();
+            var rarity = (Rarity)(rarityByte & 0x0F);
 
             int implicitCount = reader.ReadByte();
             if (implicitCount != itemBase.Implicits.Count) throw new InvalidDataException("Implicit count does not match the base.");
@@ -56,7 +59,7 @@ namespace Game.Core
 
             int socketCount = reader.ReadByte();
             if (socketCount > itemBase.MaxSockets) throw new InvalidDataException("More sockets than the base allows.");
-            var item = new Item(itemBase, level, rarity, implicits, affixes, socketCount) { Id = id };
+            var item = new Item(itemBase, level, rarity, implicits, affixes, socketCount) { Id = id, Upgrade = Math.Min(Item.MaxUpgrade, rarityByte >> 4) };
             for (int socket = 0; socket < socketCount; socket++)
             {
                 byte rune = reader.ReadByte();
@@ -152,6 +155,11 @@ namespace Game.Core
         // Lies down in the player's bed, and gets up again (World.Sleep, World.Wake).
         Sleep,
         Wake,
+        // At an anvil, with the item's id in Item (World.Refining.cs).
+        Upgrade,
+        Salvage,
+        Unsocket,
+        Reroll,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

@@ -363,6 +363,18 @@ namespace Game.Core
                 case InventoryCommand.Wake:
                     World.Wake(player.Id);
                     break;
+                case InventoryCommand.Upgrade:
+                    World.UpgradeItem(player.Id, command.Item);
+                    break;
+                case InventoryCommand.Salvage:
+                    World.SalvageItem(player.Id, command.Item);
+                    break;
+                case InventoryCommand.Unsocket:
+                    World.UnsocketItem(player.Id, command.Item);
+                    break;
+                case InventoryCommand.Reroll:
+                    World.RerollItem(player.Id, command.Item);
+                    break;
                 case InventoryCommand.StoreItem:
                 case InventoryCommand.TakeItem:
                     World.MoveItem(player.Id, command.Item, command.Command == InventoryCommand.StoreItem);

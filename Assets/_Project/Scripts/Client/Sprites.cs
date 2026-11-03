@@ -25,6 +25,7 @@ namespace Game.Client
             TileType.Splitter, TileType.Arm, TileType.Lamp, TileType.Bed, TileType.Sprinkler, TileType.Harvester,
             TileType.StoneFloor, TileType.BrickFloor, TileType.GlowFloor, TileType.Door, TileType.Table, TileType.Banner, TileType.Pot, TileType.Soil, TileType.FertileSoil,
             TileType.Filter, TileType.Generator, TileType.Lever, TileType.MushroomSoil, TileType.FrostSoil, TileType.AshSoil, TileType.VoidSoil,
+            TileType.Anvil,
         };
 
         // A sprite made from the drawing the first time its key is asked for. The pivot is in the sprite's own

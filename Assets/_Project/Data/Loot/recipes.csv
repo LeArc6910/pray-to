@@ -61,6 +61,7 @@ hoe,hoe,1,copper_ore:2|stone:2,Workbench
 fertilizer,fertilizer,3,slime_gel:1|mushroom_spore:1,Workbench
 frost_berry_seed,frost_berry_seed,2,ice_crystal:1|mushroom_spore:1,Workbench
 mushroom_soil,mushroom_soil,2,glow_spore:2|stone:2,Workbench
+anvil,anvil,1,iron_bar:5|stone:6,Workbench
 frost_soil,frost_soil,2,ice_crystal:2|stone:2,Workbench
 ash_soil,ash_soil,2,obsidian_ore:1|stone:2,Workbench
 void_soil,void_soil,2,void_ore:1|stone:2,Workbench

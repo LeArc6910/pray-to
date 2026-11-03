@@ -382,6 +382,7 @@ namespace Game.Client
             TileType.Filter => FilterFrame,
             TileType.Generator => GeneratorBody,
             TileType.Lever => LeverBase,
+            TileType.Anvil => AnvilTile,
             _ => null,
         };
 
@@ -1315,6 +1316,29 @@ namespace Game.Client
             "..oddo....oddo..",
             "..oooo....oooo..",
             "..____....____..");
+
+        // An iron anvil on a stump: the horn to the left, the face lit along its top.
+        static readonly PixelImage AnvilTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['I'] = Rgba.Hex("#B8BCC4"), ['i'] = Rgba.Hex("#8A8E98"), ['j'] = Rgba.Hex("#5E626C"), ['b'] = Rgba.Hex("#7A5236"),
+                ['B'] = Rgba.Hex("#9A6A46"),
+            },
+            "................",
+            "................",
+            "................",
+            "................",
+            "..oooooooooooo..",
+            ".oIIIIIIIIIIIIo.",
+            "oIiiiiiiiiiiiijo",
+            ".oojiiiiiiijjoo.",
+            "...ojiiiiijjo...",
+            "....ojjjjjjo....",
+            "...ooooooooooo..",
+            "...oBBBBBBBBbo..",
+            "...oBbBBBBBBbo..",
+            "...obbbbbbbbbo..",
+            "...ooooooooooo..",
+            "...___________..");
 
         static readonly PixelImage BannerTile = PixelImage.FromRows(BasePalette,
             "....oo..........",

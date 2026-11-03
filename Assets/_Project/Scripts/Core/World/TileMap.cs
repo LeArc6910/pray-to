@@ -65,6 +65,8 @@ namespace Game.Core
         FrostSoil,
         AshSoil,
         VoidSoil,
+        // Where gear is upgraded, broken down and reworked (World.Refining.cs).
+        Anvil,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

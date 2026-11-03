@@ -263,6 +263,14 @@ namespace Game.Core
 
         public byte[] SleepCommand() => new InventoryCommandMessage(InventoryCommand.Sleep, 0).Encode();
 
+        // The sheets this client reads items by.
+        public LootData Loot => _loot;
+
+        // Standing by an anvil, so gear can be worked (World.Refining.cs).
+        public bool NearAnvil => Map != null && Map.Near(Position, TileType.Anvil, World.StationReach);
+
+        public byte[] RefineCommand(InventoryCommand how, int itemId) => new InventoryCommandMessage(how, itemId).Encode();
+
         public byte[] WakeCommand() => new InventoryCommandMessage(InventoryCommand.Wake, 0).Encode();
         public bool IsDead => Status == ClientStatus.Playing && _snapshots.Count > 0 && Health <= 0;
         public IReadOnlyDictionary<int, string> Names => _names;

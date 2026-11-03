@@ -37,6 +37,8 @@ namespace Game.Client
         readonly Vector2[] _scroll = new Vector2[PageNames.Length];
         Page _page;
         RuneDefinition _selectedRune;
+        // The item being worked at an anvil, by id, or 0 (World.Refining.cs).
+        int _refining;
         float _nameWidth;
         float _recipeWidth;
         // Width of a line of text in the scrolling list.
@@ -158,6 +160,7 @@ namespace Game.Client
 
         void DrawGear()
         {
+            DrawRefining();
             DrawStats();
             DrawConsumables();
 
@@ -176,6 +179,7 @@ namespace Game.Client
                 {
                     ItemLabel(item);
                     RuneButton(item);
+                    RefineButton(item);
                     if (GUILayout.Button("벗기", GUILayout.Width(56))) Send(_client.UnequipCommand(slot), Sound.Click);
                     QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
                 }
@@ -189,6 +193,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 ItemLabel(item);
                 RuneButton(item);
+                RefineButton(item);
                 // Too high a level to wear yet: the button says which level instead.
                 bool wearable = item.Base.RequiredLevel <= _client.Level;
                 GUI.enabled = wearable;
@@ -214,7 +219,7 @@ namespace Game.Client
                 GUI.color = previous;
             }
             GUILayout.EndHorizontal();
-            if (_selectedRune != null) GUILayout.Label(Fit($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 한 번 넣은 룬은 뺄 수 없습니다.", _textWidth));
+            if (_selectedRune != null) GUILayout.Label(Fit($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 넣은 룬은 모루에서 정수를 들여야 뺄 수 있습니다.", _textWidth));
         }
 
         void DrawMaterialsPage()
@@ -529,6 +534,61 @@ namespace Game.Client
         {
             var area = GUILayoutUtility.GetRect(IconSize, IconSize, GUILayout.Width(IconSize), GUILayout.Height(IconSize));
             if (Event.current.type == EventType.Repaint) Sprites.DrawInGui(area, sprite);
+        }
+
+        // Beside an anvil: picks the item to work on, or puts it back.
+        void RefineButton(Item item)
+        {
+            if (!_client.NearAnvil) return;
+            if (GUILayout.Button(_refining == item.Id ? "닫기" : "다듬기", GUILayout.Width(56))) _refining = _refining == item.Id ? 0 : item.Id;
+        }
+
+        // At the top of the gear page while an anvil is near: what can be done to the picked item and what it costs.
+        void DrawRefining()
+        {
+            if (!_client.NearAnvil)
+            {
+                _refining = 0;
+                return;
+            }
+            var loot = _client.Loot;
+            var essence = loot?.FindMaterial(World.Essence);
+            int have = essence == null ? 0 : _client.Bag.CountOf(essence);
+            var worn = _client.Equipment.Items.FirstOrDefault(i => i.Id == _refining);
+            var item = worn ?? _client.Bag.Find(_refining);
+            if (item == null)
+            {
+                _refining = 0;
+                GUILayout.Label(Fit($"모루: 장비의 [다듬기]를 누르면 강화, 분해, 룬 빼기, 접사 다시 굴리기를 한다. 강화 정수 {have}개", _textWidth));
+                GUILayout.Space(6);
+                return;
+            }
+            GUILayout.Label(Fit($"모루: {ItemText.Name(item)} · 강화 정수 {have}개", _textWidth));
+            GUILayout.BeginHorizontal();
+            if (World.UpgradeCost(item, loot) is var (cost, metal, metalCount))
+            {
+                bool can = have >= cost && (metal == null || _client.Bag.CountOf(metal) >= metalCount);
+                string needs = metal == null ? $"정수 {cost}" : $"정수 {cost}, {metal.Name} {metalCount}";
+                GUI.enabled = can;
+                if (GUILayout.Button($"강화 +{item.Upgrade + 1} ({needs})")) Send(_client.RefineCommand(InventoryCommand.Upgrade, item.Id), Sound.Craft);
+                GUI.enabled = true;
+            }
+            else
+            {
+                GUILayout.Label($"최대 강화(+{Item.MaxUpgrade})");
+            }
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (worn == null && GUILayout.Button($"분해 (정수 +{World.SalvageValue(item)})")) Send(_client.RefineCommand(InventoryCommand.Salvage, item.Id), Sound.Break);
+            GUI.enabled = have >= World.UnsocketEssence;
+            if (item.Sockets.Any(r => r != null) && GUILayout.Button($"룬 빼기 (정수 {World.UnsocketEssence})"))
+                Send(_client.RefineCommand(InventoryCommand.Unsocket, item.Id), Sound.Click);
+            int reroll = World.RerollCost(item);
+            GUI.enabled = have >= reroll;
+            if (reroll > 0 && GUILayout.Button($"접사 다시 (정수 {reroll})")) Send(_client.RefineCommand(InventoryCommand.Reroll, item.Id), Sound.Craft);
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
+            GUILayout.Space(6);
         }
 
         // Shown while a rune is picked and the item still has room for it.

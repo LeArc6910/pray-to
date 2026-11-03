@@ -75,6 +75,10 @@ namespace Game.Core
             return new Item(itemBase, level, rarity, implicits, affixes, sockets);
         }
 
+        // Fresh affixes for the item, as many and as good as its rarity and level allow (an anvil's reroll).
+        public List<ItemAffix> RerollAffixes(Item item, GameRandom random) =>
+            RollAffixes(item.Base.Slot, item.Level, _config.RuleFor(item.Rarity), random);
+
         public RuneDefinition RollRune(int level, GameRandom random)
         {
             var runes = _data.Runes.Where(r => r.Level <= level && r.Weight > 0).ToList();

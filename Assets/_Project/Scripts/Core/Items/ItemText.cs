@@ -28,7 +28,10 @@ namespace Game.Core
 
         // Uncommon items are named after their affixes ("신속의 날카로운 구리 검"). Rarer items have too many
         // affixes for that, so they keep the base name and list the affixes below it.
-        public static string Name(Item item)
+        // "+3 철 검" once an anvil has worked it.
+        public static string Name(Item item) => item.Upgrade > 0 ? $"+{item.Upgrade} {BaseName(item)}" : BaseName(item);
+
+        static string BaseName(Item item)
         {
             if (item.Runeword != null) return $"{item.Base.Name} 「{item.Runeword.Name}」";
             if (item.Rarity != Rarity.Uncommon) return item.Base.Name;

@@ -125,7 +125,8 @@ namespace Game.Core
         {
             w.Write(item.Base.Id);
             w.Write((short)item.Level);
-            w.Write((byte)item.Rarity);
+            // The anvil's upgrade in the top half of the rarity byte; saves from before it read as +0.
+            w.Write((byte)((int)item.Rarity | item.Upgrade << 4));
             w.Write((byte)item.Implicits.Count);
             foreach (var modifier in item.Implicits) w.Write(modifier.Value);
             w.Write((byte)item.Affixes.Count);
@@ -144,7 +145,8 @@ namespace Game.Core
         {
             string baseId = r.ReadString();
             int level = r.ReadInt16();
-            var rarity = (Rarity)r.ReadByte();
+            int rarityByte = r.ReadByte();
+            var rarity = (Rarity)(rarityByte & 0x0F);
             var implicitValues = new List<int>();
             for (int count = r.ReadByte(); count > 0; count--) implicitValues.Add(r.ReadInt32());
             var affixes = new List<(string Id, int Tier, int Value)>();
@@ -174,7 +176,10 @@ namespace Game.Core
                 var tier = affix.Tiers[Math.Clamp(tierNumber, 1, affix.Tiers.Count) - 1];
                 rolled.Add(new ItemAffix(tier, new Modifier(tier.Modifier.Stat, tier.Modifier.Kind, value, tier.Modifier.Tags)));
             }
-            var item = new Item(itemBase, level, rarity, implicits, rolled, Math.Min(runes.Count, itemBase.MaxSockets));
+            var item = new Item(itemBase, level, rarity, implicits, rolled, Math.Min(runes.Count, itemBase.MaxSockets))
+            {
+                Upgrade = Math.Min(Item.MaxUpgrade, rarityByte >> 4),
+            };
             for (int socket = 0; socket < item.Sockets.Count; socket++)
             {
                 if (runes[socket].Length == 0) continue;
