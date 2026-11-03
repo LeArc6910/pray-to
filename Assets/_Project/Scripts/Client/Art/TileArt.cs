@@ -391,6 +391,8 @@ namespace Game.Client
             TileType.Keg => KegTile,
             TileType.PreservesJar => JarTile,
             TileType.Coop => CoopTile,
+            TileType.WardStone => WardStoneTile,
+            TileType.Turret => TurretBase,
             TileType.CrabPot => CrabPotTile,
             TileType.FastConveyor => ConveyorFrame,
             TileType.UndergroundBelt => ConveyorFrame,
@@ -1403,6 +1405,47 @@ namespace Game.Client
             "...owwwwwwwwo...",
             "...owwwwwwwwo...",
             "....oooooooo....",
+            "....________....",
+            "................");
+
+        // A pale blue crystal standing on a carved stone base.
+        static readonly PixelImage WardStoneTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['B'] = Rgba.Hex("#E6F8FF"), ['b'] = Rgba.Hex("#8CE0FF"), ['n'] = Rgba.Hex("#3E8CC8"),
+            },
+            "......oo........",
+            ".....obBo.......",
+            ".....obBbo......",
+            "....onbBbo......",
+            "....onbbBbo.....",
+            "....onnbbbo.....",
+            "....onnbbbo.....",
+            ".....onnbo......",
+            "...oooooooooo...",
+            "..oLLLLLLLLLLo..",
+            "..oMMmMMMMmMMo..",
+            "..oMMMMMMMMMMo..",
+            "..ommmmmmmmmmo..",
+            "..oooooooooooo..",
+            "..____________..",
+            "................");
+
+        // A turret's round iron base; the barrel is drawn on top, turned toward its last shot.
+        static readonly PixelImage TurretBase = PixelImage.FromRows(MetalPalette,
+            "................",
+            "................",
+            "................",
+            ".....oooooo.....",
+            "...ooMMMMMMoo...",
+            "..oMMLLLLLLMMo..",
+            "..oMLLMMMMLLMo..",
+            "..oMLMkkkkMLMo..",
+            "..oMLMkkkkMLMo..",
+            "..oMLLMMMMLLMo..",
+            "..omMMMMMMMMmo..",
+            "...oommmmmmoo...",
+            "....dddddddd....",
+            ".....oooooo.....",
             "....________....",
             "................");
 

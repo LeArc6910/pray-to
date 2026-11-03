@@ -277,6 +277,16 @@ namespace Game.Core
             && _loot?.FindMaterial(World.RiftKey) is MaterialDefinition key && Bag.CountOf(key) > 0;
 
         public byte[] OpenRiftCommand() => new InventoryCommandMessage(InventoryCommand.OpenRift, 0).Encode();
+
+        // The world's base defense as of the last snapshot (World.Defense.cs).
+        public DefenseState Defense { get; private set; }
+
+        // Whether the button over a ward stone would start a defense: beside one, none (nor a rift) under way, not
+        // done today.
+        public bool CanStartDefense =>
+            !IsDead && !Defense.Active && !Rift.Open && !Defense.DoneToday && Map != null && Map.Near(Position, TileType.WardStone, World.StationReach);
+
+        public byte[] StartDefenseCommand() => new InventoryCommandMessage(InventoryCommand.StartDefense, 0).Encode();
         public (int X, int Y)? Bed { get; private set; }
 
         // The world's clock (Calendar) now, as the host's last word plus the time since.
@@ -1097,6 +1107,7 @@ namespace Game.Core
             _clockTick = snapshot.Tick;
             Sleepers = snapshot.Sleepers;
             Rift = snapshot.Rift;
+            Defense = snapshot.Defense;
             if (self.Corrections != _seenCorrections)
             {
                 _seenCorrections = self.Corrections;

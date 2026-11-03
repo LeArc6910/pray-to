@@ -439,6 +439,26 @@ namespace Game.Client
             "...dd...",
         };
 
+        // A turret's barrel pointing along +x from the middle, with a dark muzzle.
+        public static readonly PixelImage TurretBarrel = MakeBarrel();
+
+        static PixelImage MakeBarrel()
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            for (int x = 7; x < 15; x++)
+            {
+                image[x, 6] = Outline;
+                image[x, 7] = x == 14 ? Outline : SteelLight;
+                image[x, 8] = x == 14 ? Outline : Steel;
+                image[x, 9] = Outline;
+            }
+            for (int y = 5; y <= 10; y++)
+            {
+                for (int x = 5; x <= 9; x++) image[x, y] = y == 5 || y == 10 || x == 5 || x == 9 ? Outline : SteelDark;
+            }
+            return image;
+        }
+
         // A small white hen, side on, facing left; two frames, its head up and pecking.
         public static PixelImage Chicken(int frame) => PixelImage.FromRows(ChickenColors, frame % 2 == 0 ? ChickenUp : ChickenPeck).Outlined(Outline);
 
@@ -754,6 +774,7 @@ namespace Game.Client
                 case "kimchi": return Ramped(Pickles, Ramp.Of("#D8603A"));
                 case "pickled_bean": return Ramped(Pickles, Ramp.Of("#6A44B8"));
                 case "chicken": return Chicken(0);
+                case "ammo": return Ramped(Seeds, Ramp.Of("#D8B050"));
                 case "feed": return Ramped(Seeds, Ramp.Of("#D8B070"));
                 case "egg": return Ramped(Goo, Ramp.Of("#F6F0E0"));
                 case "bait": return Ramped(Goo, Ramp.Of("#C87850"));

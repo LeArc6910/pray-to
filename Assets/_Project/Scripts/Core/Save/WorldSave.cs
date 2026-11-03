@@ -16,8 +16,9 @@ namespace Game.Core
         internal const string Magic = "PTWO";
         // 2 added chests, 3 machines, 4 whether each crop was watered, 5 beds and their owners.
         // 6: a filter's chosen material on each machine. 7: the world's clock (Calendar), and crops as how far they have
-        // grown and the water they have left (Docs/Time.md). 8: the highest void rift tier it may open.
-        const int FormatVersion = 8;
+        // grown and the water they have left (Docs/Time.md). 8: the highest void rift tier it may open. 9: the base
+        // defense level and the day it was last defended (Docs/Defense.md).
+        const int FormatVersion = 9;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -39,8 +40,12 @@ namespace Game.Core
             List<(int X, int Y, Inventory Contents)> chests,
             List<SavedMachine> machines,
             List<string> warnings,
-            List<(int X, int Y, string Owner)> beds = null)
+            List<(int X, int Y, string Owner)> beds = null,
+            int defenseLevel = 1,
+            int defenseDay = 0)
         {
+            DefenseLevel = defenseLevel;
+            DefenseDay = defenseDay;
             Beds = beds ?? new List<(int, int, string)>();
             Chests = chests;
             Machines = machines;
@@ -61,6 +66,9 @@ namespace Game.Core
         public long Clock { get; }
         // 1 for a save from before rifts.
         public int RiftTier { get; }
+        // 1 and 0 (never) for a save from before base defense.
+        public int DefenseLevel { get; }
+        public int DefenseDay { get; }
         public int ProgressLevel { get; }
         public IReadOnlyList<TileChange> Tiles { get; }
         // How many ticks each crop had grown, and the ticks of water it had left.
@@ -115,6 +123,8 @@ namespace Game.Core
                 w.Write(savedAt);
                 w.Write(world.Clock);
                 w.Write(world.RiftTier);
+                w.Write(world.DefenseLevel);
+                w.Write(world.DefenseDay);
                 w.Write(world.ProgressLevel);
 
                 var tiles = world.ChangedTiles();
@@ -197,6 +207,8 @@ namespace Game.Core
                 long savedAt = r.ReadInt64();
                 long clock = version >= 7 ? r.ReadInt64() : 0;
                 int riftTier = version >= 8 ? r.ReadInt32() : 1;
+                int defenseLevel = version >= 9 ? r.ReadInt32() : 1;
+                int defenseDay = version >= 9 ? r.ReadInt32() : 0;
                 int progress = r.ReadInt32();
 
                 var names = new List<string>();
@@ -285,7 +297,8 @@ namespace Game.Core
                     int y = r.ReadUInt16();
                     beds.Add((x, y, r.ReadString()));
                 }
-                return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds);
+                return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds,
+                    defenseLevel, defenseDay);
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

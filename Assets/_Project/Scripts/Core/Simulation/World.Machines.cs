@@ -179,6 +179,9 @@ namespace Game.Core
                 case TileType.CrabPot:
                     RunCrabPot(machine);
                     break;
+                case TileType.Turret:
+                    RunTurret(machine);
+                    break;
             }
         }
 
@@ -304,7 +307,7 @@ namespace Game.Core
         // Machines a player can fill by hand ([넣기]): what they make things from.
         public static bool LoadsByHand(TileType kind) =>
             kind == TileType.Smelter || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator
-            || kind == TileType.Coop || kind == TileType.CrabPot;
+            || kind == TileType.Coop || kind == TileType.CrabPot || kind == TileType.Turret;
 
         // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
         // a belt would. Returns how many went in.
@@ -643,6 +646,7 @@ namespace Game.Core
                 TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material),
                 TileType.Coop => material.Id == Chicken || material.Id == Feed,
                 TileType.CrabPot => material.Id == Bait,
+                TileType.Turret => material.Id == Ammo,
                 _ => false,
             };
         }
@@ -684,6 +688,10 @@ namespace Game.Core
                         return true;
                     case TileType.Assembler:
                         if (!AssemblerTakes(target, material)) return false;
+                        Add(target.Input, material, 1);
+                        return true;
+                    case TileType.Turret:
+                        if (material.Id != Ammo || Count(target.Input) >= target.Definition.Capacity) return false;
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Coop:

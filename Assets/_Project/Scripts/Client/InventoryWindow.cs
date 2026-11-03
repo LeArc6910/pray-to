@@ -249,6 +249,7 @@ namespace Game.Client
             TileType.Assembler => machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material),
             TileType.Coop => material.Id == World.Chicken || material.Id == World.Feed,
             TileType.CrabPot => material.Id == World.Bait,
+            TileType.Turret => material.Id == World.Ammo,
             _ => _client.ProcessesOf(machine.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)),
         };
 

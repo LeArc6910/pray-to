@@ -38,7 +38,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.40.0";
+        public const string Version = "0.41.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -662,6 +662,29 @@ namespace Game.Core
         public bool Open => Tier > 0;
     }
 
+    // The world's base defense (World.Defense.cs): the level it defends at next, whether it was done today, and the
+    // defense under way if any (Level 0 when none), with the ward stone's health in percent.
+    public readonly struct DefenseState
+    {
+        public DefenseState(int unlocked, bool doneToday, int level, int wave, int monstersLeft, int stonePercent)
+        {
+            Unlocked = unlocked;
+            DoneToday = doneToday;
+            Level = level;
+            Wave = wave;
+            MonstersLeft = monstersLeft;
+            StonePercent = stonePercent;
+        }
+
+        public int Unlocked { get; }
+        public bool DoneToday { get; }
+        public int Level { get; }
+        public int Wave { get; }
+        public int MonstersLeft { get; }
+        public int StonePercent { get; }
+        public bool Active => Level > 0;
+    }
+
     // A player entity's phase (under its StatusBits).
     public static class PlayerPhase
     {
@@ -828,8 +851,10 @@ namespace Game.Core
             IReadOnlyList<SimEvent> events,
             long clock = 0,
             int sleepers = 0,
-            RiftState rift = default)
+            RiftState rift = default,
+            DefenseState defense = default)
         {
+            Defense = defense;
             Tick = tick;
             Clock = clock;
             Sleepers = sleepers;
@@ -846,6 +871,7 @@ namespace Game.Core
         public long Clock { get; }
         public int Sleepers { get; }
         public RiftState Rift { get; }
+        public DefenseState Defense { get; }
         public SelfState Self { get; }
         public IReadOnlyList<EntityState> Entities { get; }
         public IReadOnlyList<ProjectileState> Projectiles { get; }
@@ -863,6 +889,12 @@ namespace Game.Core
             w.Write((byte)Math.Clamp(Rift.MonstersLeft, 0, 255));
             w.Write((ushort)Math.Clamp(Rift.SecondsLeft, 0, ushort.MaxValue));
             w.Write((byte)Rift.Affixes);
+            w.Write((byte)Defense.Unlocked);
+            w.Write(Defense.DoneToday);
+            w.Write((byte)Defense.Level);
+            w.Write((byte)Defense.Wave);
+            w.Write((byte)Math.Clamp(Defense.MonstersLeft, 0, 255));
+            w.Write((byte)Math.Clamp(Defense.StonePercent, 0, 100));
             w.Write(Self.Corrections);
             w.Write(Self.Position);
             w.Write(Self.Health);
@@ -941,6 +973,7 @@ namespace Game.Core
             long clock = r.ReadInt64();
             int sleepers = r.ReadByte();
             var rift = new RiftState(r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadUInt16(), (RiftAffix)r.ReadByte());
+            var defense = new DefenseState(r.ReadByte(), r.ReadBoolean(), r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadByte());
             int corrections = r.ReadInt32();
             var position = r.ReadVec2();
             float health = r.ReadSingle();
@@ -1020,7 +1053,7 @@ namespace Game.Core
                 bool critical = r.ReadBoolean();
                 events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), position: at));
             }
-            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift);
+            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift, defense);
         });
     }
 }

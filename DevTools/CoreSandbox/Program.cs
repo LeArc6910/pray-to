@@ -17,6 +17,7 @@ namespace CoreSandbox
     // add --classes <class,class> to --fight or --boss to give the bots classes; they use every skill when it is ready
     // dotnet run -- --farm [minutes] [crop]          a plot of soil kept by a sprinkler and a harvester: harvest an hour
     // dotnet run -- --rift [tiers] [seed]             bots open void rifts tier after tier (--players, --gear, --classes)
+    // dotnet run -- --defense [levels] [seed]        bots hold a ward stone level after level (--turrets <n>, --players, --gear, --classes)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     static class Program
     {
@@ -92,6 +93,16 @@ namespace CoreSandbox
                 case "--rift":
                     var riftMonsters = LoadMonsters();
                     RiftSim.Run(data, riftMonsters, LoadTiles(data), Number(1, 5), Seed(2), players, gear, LoadClasses(classIds), dodge);
+                    break;
+                case "--defense":
+                    int turrets = 0;
+                    int turretsFlag = Array.IndexOf(args, "--turrets");
+                    if (turretsFlag >= 0)
+                    {
+                        turrets = int.Parse(args[turretsFlag + 1]);
+                        args = args.Where((_, i) => i != turretsFlag && i != turretsFlag + 1).ToArray();
+                    }
+                    DefenseSim.Run(data, LoadMonsters(), LoadTiles(data), Number(1, 5), Seed(2), players, gear, LoadClasses(classIds), dodge, turrets);
                     break;
                 case "--economy":
                     EconomySim.Run(data, LoadTiles(data), LoadNpcs(data));

@@ -278,6 +278,7 @@ namespace Game.Client
 
             foreach (var e in _client.TakeEvents()) Show(e);
             UpdateFlashes(deltaTime);
+            UpdateTracers(deltaTime);
             BobBobbers();
             UpdateBits(deltaTime);
             for (int i = _floating.Count - 1; i >= 0; i--)
@@ -406,7 +407,8 @@ namespace Game.Client
                 if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) glow = Faded(ChargeColor, 0.45f);
                 (tint, glow) = StatusLook(view.Status, tint, glow);
                 // A rift's monsters glow violet; its guardian more, and has a name.
-                if (view.Kind == EntityKind.Monster && view.Phase >= World.RiftMonster && glow.a < 0.01f)
+                if (view.Kind == EntityKind.Monster && view.Phase == World.DefenseMonster && glow.a < 0.01f) glow = Faded(DefenseColor, 0.2f);
+                else if (view.Kind == EntityKind.Monster && view.Phase >= World.RiftMonster && glow.a < 0.01f)
                     glow = Faded(RiftColor, view.Phase == World.RiftGuardian ? 0.35f + 0.15f * Mathf.Sin(Time.time * 4) : 0.18f);
                 if (view.Kind == EntityKind.Monster && view.Phase == World.RiftGuardian) body.Name = "균열 수호자";
                 // A spirit flickers in its last two seconds (its health counts down the ticks it has left).
@@ -704,6 +706,7 @@ namespace Game.Client
                     : machine.Kind == TileType.FastConveyor ? FastBeltSprites[machine.On ? fastFrame : 0]
                     : machine.Kind == TileType.UndergroundBelt ? UndergroundSprites[machine.On ? beltFrame : 0]
                     : machine.Kind == TileType.PowerPole ? null
+                    : machine.Kind == TileType.Turret ? TurretBarrelSprite
                     : machine.Kind == TileType.Splitter ? SplitterSprite
                     : machine.Kind == TileType.Arm ? ArmSprite
                     : machine.Kind == TileType.Sprinkler ? SprinklerSprite
@@ -723,6 +726,8 @@ namespace Game.Client
                     // A lever leans right when on, left when off, and is not turned by its direction.
                     : machine.Kind == TileType.Lever ? (machine.On ? -30 : 30)
                     : machine.Kind == TileType.Generator ? 0
+                    // A turret points where it last shot.
+                    : machine.Kind == TileType.Turret ? _turretAim.GetValueOrDefault(key, 90)
                     : machine.Direction * 90 + swing;
                 parts.Part.transform.localRotation = Quaternion.Euler(0, 0, turn);
                 parts.Part.sortingOrder = machine.Kind == TileType.Arm ? -13 : -15;
@@ -880,6 +885,40 @@ namespace Game.Client
             for (int i = used; i < _wires.Count; i++) _wires[i].enabled = false;
         }
 
+        static Sprite TurretBarrelSprite => Sprites.Centered("machine/turret", () => ItemArt.TurretBarrel);
+
+        readonly Dictionary<int, float> _turretAim = new Dictionary<int, float>();
+        readonly List<(SpriteRenderer Line, float Age)> _tracers = new List<(SpriteRenderer, float)>();
+        const float TracerSeconds = 0.12f;
+
+        void AddTracer(Vector3 from, Vector3 to)
+        {
+            var line = Renderer(_root.transform, "Tracer", Shapes.Square, TracerColor);
+            line.sortingOrder = 31;
+            var along = to - from;
+            line.transform.localPosition = (from + to) / 2;
+            line.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg);
+            line.transform.localScale = new Vector3(along.magnitude, 1 / 16f, 1);
+            _tracers.Add((line, 0));
+        }
+
+        void UpdateTracers(float deltaTime)
+        {
+            for (int i = _tracers.Count - 1; i >= 0; i--)
+            {
+                var (line, age) = _tracers[i];
+                age += deltaTime;
+                if (age >= TracerSeconds)
+                {
+                    Object.Destroy(line.gameObject);
+                    _tracers.RemoveAt(i);
+                    continue;
+                }
+                line.color = new Color(TracerColor.r, TracerColor.g, TracerColor.b, TracerColor.a * (1 - age / TracerSeconds));
+                _tracers[i] = (line, age);
+            }
+        }
+
         static Sprite DrillBitSprite => Sprites.Centered("machine/drill", () => ItemArt.DrillBit);
 
         static Sprite ChevronSprite => Sprites.Centered("machine/chevron", () => ItemArt.Chevron);
@@ -906,6 +945,9 @@ namespace Game.Client
         static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
         static readonly Color SleepLabel = new Color(0.75f, 0.85f, 1f);
         static readonly Color RiftColor = new Color(0.7f, 0.45f, 1f);
+        // Monsters come for the ward stone glow orange; turret shots are a brief yellow streak.
+        static readonly Color DefenseColor = new Color(1f, 0.55f, 0.2f);
+        static readonly Color TracerColor = new Color(1f, 0.9f, 0.45f, 0.9f);
         static readonly Color WireColor = new Color(0.78f, 0.45f, 0.2f, 0.85f);
         static readonly Color PowerLabel = new Color(1f, 0.85f, 0.45f);
 
@@ -1061,6 +1103,19 @@ namespace Game.Client
                     _floating.Add(new Floating { Position = grower, Text = $"{LifeSkills.Name(skill)} {e.Amount % 16}", Color = LevelColor });
                     AddFlash(grower, 1, LevelColor, FlashKind.Sparkles);
                     if (e.Source == _client.PlayerId) Sounds.Play(Sound.LevelUp);
+                    break;
+                case SimEventType.Defense:
+                    Sounds.Play(e.Amount == World.DefenseStarted ? Sound.Warning : e.Amount == World.DefenseWon ? Sound.Victory : Sound.Down);
+                    ShowBanner(e.Amount == World.DefenseStarted ? "몬스터가 수호석을 노린다!" : e.Amount == World.DefenseWon ? "기지를 지켰다! 수호석 곁에 보상이 떨어졌다" : "수호석이 무너졌다");
+                    AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 3, DefenseColor, FlashKind.Ring);
+                    break;
+                case SimEventType.TurretShot:
+                    // A streak from the turret along its shot, and the barrel turned that way.
+                    var muzzle = new Vector3(e.Position.X, e.Position.Y, 0);
+                    var along = new Vector3(e.Direction.X, e.Direction.Y, 0);
+                    AddTracer(muzzle + along * 0.4f, muzzle + along * (e.Amount / 10f));
+                    _turretAim[TileMap.Cell(e.Position.Y) * _client.Map.Width + TileMap.Cell(e.Position.X)] = Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg;
+                    Hear(Sound.Shoot, muzzle, 0.5f);
                     break;
                 case SimEventType.Npc:
                     // A gift taken well or badly, or a chat.

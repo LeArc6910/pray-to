@@ -77,6 +77,9 @@ feed_potato,feed,3,cave_potato:1,Workbench
 mayonnaise,mayonnaise,1,egg:2,PreservesJar
 fried_egg,fried_egg,1,egg:1,Furnace
 crab_pot,crab_pot,1,copper_wire:4|stone:2,Workbench
+ward_stone,ward_stone,1,stone:20|iron_bar:3|copper_wire:4,Workbench
+turret,turret,1,iron_gear:4|circuit:1|iron_bar:4,Workbench
+ammo,ammo,10,iron_bar:1|copper_ore:2,Workbench
 bait,bait,4,slime_gel:1|mushroom_spore:1,Workbench
 steamed_crab,steamed_crab,1,cave_crab:1,Furnace
 fried_shrimp,fried_shrimp,1,cave_shrimp:3,Furnace

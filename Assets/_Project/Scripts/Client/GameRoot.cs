@@ -310,6 +310,33 @@ namespace Game.Client
             SendToHost(_client.OpenRiftCommand());
         }
 
+        // Starts the day's base defense: the button over the nearest ward stone.
+        void DrawDefenseButton()
+        {
+            if (!_client.CanStartDefense) return;
+            (int X, int Y)? stone = null;
+            float best = float.MaxValue;
+            int cx = TileMap.Cell(_client.Position.X), cy = TileMap.Cell(_client.Position.Y);
+            for (int y = cy - 3; y <= cy + 3; y++)
+            {
+                for (int x = cx - 3; x <= cx + 3; x++)
+                {
+                    if (!_client.Map.InBounds(x, y) || _client.Map[x, y] != TileType.WardStone) continue;
+                    float d = Vec2.Distance(_client.Position, TileMap.Center(x, y));
+                    if (d < best) (stone, best) = ((x, y), d);
+                }
+            }
+            if (stone is not (int sx, int sy)) return;
+            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(sx + 0.5f, sy + 1.35f, 0));
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            var rect = new Rect(point.x - 80, point.y - 13, 160, 26);
+            Controls.Block(rect);
+            if (!GUI.Button(rect, $"기지 방어 시작 ({_client.Defense.Unlocked}단계)")) return;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.StartDefenseCommand());
+        }
+
         void DrawBedButton()
         {
             if (_client.Bed is not (int x, int y) || !(_client.Sleeping || _client.CanSleep)) return;
@@ -843,6 +870,7 @@ namespace Game.Client
                 DrawMachineSwitch();
                 DrawBedButton();
                 DrawRiftButton();
+                DrawDefenseButton();
                 SkillBar.Draw(_client);
                 _hotbar?.Draw(_client.Skills.Count);
             }
@@ -1102,6 +1130,11 @@ namespace Game.Client
                     var rift = _client.Rift;
                     string wave = rift.Wave > World.RiftWaves ? "수호자" : $"{rift.Wave}/{World.RiftWaves} 물결";
                     lines.Add($"공허 균열 {rift.Tier}단계 · {wave} · 남은 적 {rift.MonstersLeft} · {rift.SecondsLeft / 60}:{rift.SecondsLeft % 60:00} · {World.AffixNames(rift.Affixes)}");
+                }
+                if (_client.Defense.Active)
+                {
+                    var defense = _client.Defense;
+                    lines.Add($"기지 방어 {defense.Level}단계 · {defense.Wave}/{World.DefenseWaves} 물결 · 남은 적 {defense.MonstersLeft} · 수호석 {defense.StonePercent}%");
                 }
                 if (_client.Sleeping)
                 {

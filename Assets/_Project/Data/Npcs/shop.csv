@@ -16,6 +16,7 @@ void_bean_seed,50,,,1
 chicken,120,,,1
 feed,3,,,
 bait,2,,,
+ammo,3,,,
 glow_lamp,10,,yes,
 iron_gear,8,,yes,
 copper_wire,4,,yes,

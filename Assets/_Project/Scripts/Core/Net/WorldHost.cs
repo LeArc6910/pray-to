@@ -327,6 +327,7 @@ namespace Game.Core
             World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds);
             World.RestoreClock(save.Clock);
             World.RestoreRiftTier(save.RiftTier);
+            World.RestoreDefense(save.DefenseLevel, save.DefenseDay);
             foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting, m.Recipe);
             World.PlaceNpcs();
         }
@@ -400,6 +401,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.OpenRift:
                     World.OpenRift(player.Id);
+                    break;
+                case InventoryCommand.StartDefense:
+                    World.StartDefense(player.Id);
                     break;
                 case InventoryCommand.Upgrade:
                     World.UpgradeItem(player.Id, command.Item);
@@ -544,14 +548,18 @@ namespace Game.Core
             // When there are too many, what changes the fight matters most and swings least.
             var shown = new HashSet<int>(entities.Select(e => e.Id));
             var events = _pendingEvents
-                .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift)
+                .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift
+                    || e.Type == SimEventType.Defense || e.Type == SimEventType.TurretShot)
                 .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)
                 .ToList();
             var open = World.ActiveRift;
             var rift = new RiftState(World.RiftTier, open?.Tier ?? 0, open?.Wave ?? 0, open?.MonstersLeft ?? 0,
                 (int)((open?.TicksLeft ?? 0) / World.TicksPerSecond), open?.Affixes ?? RiftAffix.None);
-            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift);
+            var defending = World.ActiveDefense;
+            var defense = new DefenseState(World.DefenseLevel, World.DefendedToday, defending?.Level ?? 0, defending?.Wave ?? 0, defending?.MonstersLeft ?? 0,
+                defending == null ? 0 : (int)Math.Ceiling(defending.StoneHealth / defending.MaxStoneHealth * 100));
+            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift, defense);
         }
 
         (int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil) CropEntry(CropChange change) =>

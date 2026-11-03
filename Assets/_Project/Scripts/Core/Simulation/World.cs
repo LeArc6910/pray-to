@@ -70,6 +70,7 @@ namespace Game.Core
             Loot = loot;
             _lootGenerator = loot != null ? new LootGenerator(loot) : null;
             _flow = new FlowField(map);
+            _toStone = new FlowField(map);
             for (int i = 0; i < _config.EnemyTarget; i++) TrySpawnEnemy();
         }
 
@@ -161,6 +162,7 @@ namespace Game.Core
             SeparateEnemies();
             UpdateClock();
             UpdateRift();
+            UpdateDefense();
 
             if (--_spawnTimer <= 0)
             {
@@ -291,7 +293,12 @@ namespace Game.Core
                         .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= definition.Aggro)
                         .OrderBy(p => Vec2.Distance(p.Position, enemy.Position))
                         .FirstOrDefault();
-                    if (nearest == null) break;
+                    if (nearest == null)
+                    {
+                        // One that came for the ward stone goes on for it.
+                        MarchOnStone(enemy);
+                        break;
+                    }
                     enemy.TargetId = nearest.Id;
                     enemy.State = EnemyState.Chase;
                     break;

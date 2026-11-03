@@ -79,6 +79,8 @@ namespace Game.Core
         PreservesJar,
         Coop,
         CrabPot,
+        WardStone,
+        Turret,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

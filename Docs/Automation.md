@@ -110,7 +110,7 @@ M6에서 만든 규칙과 시트 작성법이다. 코드는 `Assets/_Project/Scr
 
 | 열 | 내용 |
 |---|---|
-| tile | 기계의 칸 종류: `Drill`, `Conveyor`, `Smelter`, `Splitter`, `Arm`, `Sprinkler`, `Harvester`, `Filter`, `Generator`, `Lever`, `Assembler`, `PowerPole`, `FastConveyor`, `UndergroundBelt`, `Keg`, `PreservesJar` |
+| tile | 기계의 칸 종류: `Drill`, `Conveyor`, `Smelter`, `Splitter`, `Arm`, `Sprinkler`, `Harvester`, `Filter`, `Generator`, `Lever`, `Assembler`, `PowerPole`, `FastConveyor`, `UndergroundBelt`, `Keg`, `PreservesJar`, `Coop`, `CrabPot`, `Turret` |
 | seconds | 채굴기는 광석 하나, 벨트는 한 칸, 제련기는 녹이기 한 번, 분배기는 하나를 내보내기까지, 로봇 팔은 하나를 옮기는 데 걸리는 시간. 스프링클러는 물 주기 사이, 수확기는 하나 거두기 사이, 조립기는 한 번 만드는 데 |
 | capacity | 안에 쌓아 두는 개수(1 이상. 스프링클러는 쓰지 않는다) |
 | power | 전력망에서 쓰는 힘(0이면 힘을 쓰지 않고 빨라지지도 않는다). 발전기는 탈 때 내는 힘. 비우면 0 |

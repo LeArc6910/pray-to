@@ -315,6 +315,11 @@ namespace Game.Core
         Npc,
         // Source, a player, reached a new level of a life skill: Amount is the skill × 16 + the level (World.Life.cs).
         LifeLevel,
+        // A base defense started (Amount World.DefenseStarted), was held (DefenseWon) or lost (DefenseLost) at the ward
+        // stone at Position (World.Defense.cs).
+        Defense,
+        // A turret at Position fired along Direction; Amount is how far in tenths of a tile (World.Turrets).
+        TurretShot,
     }
 
     public readonly struct SimEvent
@@ -346,7 +351,7 @@ namespace Game.Core
         public static bool HasPosition(SimEventType type) =>
             type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
             || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift || type == SimEventType.Npc
-            || type == SimEventType.LifeLevel;
+            || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot;
     }
 
     public enum BossState : byte
