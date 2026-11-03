@@ -26,6 +26,7 @@ namespace Game.Core
         Stock = 20,
         Production = 21,
         Friendships = 22,
+        Life = 23,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -37,7 +38,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.39.0";
+        public const string Version = "0.40.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -287,6 +288,28 @@ namespace Game.Core
         });
     }
 
+    // The player's experience in each life skill (World.Life.cs), in LifeSkill order. Sent when it changes; the
+    // client keeps it in its character save.
+    public sealed class LifeMessage
+    {
+        public LifeMessage(IReadOnlyList<int> experience) { Experience = experience; }
+
+        public IReadOnlyList<int> Experience { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Life, w =>
+        {
+            w.Write((byte)Experience.Count);
+            foreach (int experience in Experience) w.Write(experience);
+        });
+
+        public static LifeMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Life, r =>
+        {
+            var list = new List<int>();
+            for (int n = r.ReadByte(); n > 0; n--) list.Add(r.ReadInt32());
+            return new LifeMessage(list);
+        });
+    }
+
     // What machines made in the last few minutes (World.Production), for everyone. Kind 0 is a material, 1 a
     // consumable; Index is its sheet index. Sent every few seconds when it changed.
     public sealed class ProductionMessage
@@ -428,7 +451,7 @@ namespace Game.Core
         // Switched on (World.ToggleMachine).
         public bool On { get; }
         // A filter's chosen material as a sheet index, an assembler's recipe as one, a generator's or power pole's
-        // grid as supply × 256 + demand (MachineState.Grid), or -1.
+        // grid as supply × 256 + demand (MachineState.Grid), a coop's chickens, or -1.
         public int Setting { get; }
 
         // Packs a grid's supply and demand into a setting.

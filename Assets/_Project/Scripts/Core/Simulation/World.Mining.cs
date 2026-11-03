@@ -72,7 +72,7 @@ namespace Game.Core
             var chest = ChestAt(x, y);
             if (chest != null && !IsEmpty(chest)) return;
             int key = y * Map.Width + x;
-            float damage = _wallDamage.GetValueOrDefault(key) + (100 + player.Stats.MiningSpeed) / 100f;
+            float damage = _wallDamage.GetValueOrDefault(key) + DigPowerOf(player);
             bool broken = damage >= tile.Hardness - 1e-4f;
             // How far it is dug now, so clients can crack it that much: 1 to 99, or 100 when it gives way.
             int dug = broken ? DugThrough : Math.Clamp((int)MathF.Round(damage / tile.Hardness * 100), 1, DugThrough - 1);
@@ -87,6 +87,7 @@ namespace Game.Core
             var machine = MachineAt(x, y);
             if (machine != null) Empty(machine, player);
             SetTile(x, y, TileType.Floor);
+            GainLifeExperience(player, LifeSkill.Mining, tile.Hardness);
             player.Inventory.AddMaterial(tile.Material, tile.Count);
             if (tile.Extra != null && tile.ExtraChance > 0 && _random.Chance(tile.ExtraChance / 100f)) player.Inventory.AddMaterial(tile.Extra);
             player.InventoryVersion++;

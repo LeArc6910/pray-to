@@ -272,6 +272,7 @@ namespace Game.Client
             DrawCrops();
             DrawMachines();
             DrawPeople();
+            DrawChickens();
             DrawMarks();
             DrawProjectiles();
 
@@ -338,6 +339,8 @@ namespace Game.Client
                 else if (machine.Supply >= 0 && Vector3.Distance(at, _self.Position) < 4)
                     Label(at + new Vector3(0, 0.9f, 0), $"전력 {machine.Supply}/{machine.Demand}", machine.Supply >= machine.Demand ? PowerLabel : OffLabel);
             }
+            DrawReelGauge();
+
             // The merchant's name and how well this player knows her, close by.
             if (_client.Npcs?.Merchant is NpcDefinition merchant)
             {
@@ -808,6 +811,35 @@ namespace Game.Client
             foreach (int key in _gone) _people.Remove(key);
         }
 
+        readonly List<SpriteRenderer> _chickens = new List<SpriteRenderer>();
+
+        // A coop's chickens strut about in front of it, each on a slow loop of its own, now and then pecking. Only for
+        // the look: the coop keeps them (World.Animals.cs).
+        void DrawChickens()
+        {
+            int used = 0;
+            foreach (var machine in _client.Machines())
+            {
+                if (machine.Kind != TileType.Coop) continue;
+                for (int i = 0; i < machine.Animals; i++)
+                {
+                    if (used == _chickens.Count) _chickens.Add(Renderer(_root.transform, "Chicken", null, Color.white));
+                    var chicken = _chickens[used++];
+                    chicken.enabled = true;
+                    float t = Time.time * 0.45f + i * 1.7f + machine.X * 0.3f;
+                    var at = new Vector3(machine.X + 0.5f + Mathf.Sin(t) * 1.1f, machine.Y - 0.6f + Mathf.Sin(t * 1.9f + i) * 0.35f, 0);
+                    bool pecking = Mathf.Sin(t * 3.1f) > 0.6f;
+                    int frame = pecking ? 1 : 0;
+                    chicken.sprite = Sprites.Standing("animal/chicken/" + frame, () => ItemArt.Chicken(frame));
+                    // Facing the way it is going: left while sin falls.
+                    chicken.flipX = Mathf.Cos(t) > 0;
+                    chicken.transform.localPosition = at;
+                    chicken.sortingOrder = 10000 - Mathf.RoundToInt(at.y * 10);
+                }
+            }
+            for (int i = used; i < _chickens.Count; i++) _chickens[i].enabled = false;
+        }
+
         readonly List<SpriteRenderer> _wires = new List<SpriteRenderer>();
         readonly List<MachineView> _nodes = new List<MachineView>();
 
@@ -1022,6 +1054,14 @@ namespace Game.Client
                     ShowBanner(e.Amount == World.RiftOpened ? "공허 균열이 열렸다!" : e.Amount == World.RiftCleared ? "균열을 닫았다! 제단에 보상이 떨어졌다" : "균열이 닫혀 버렸다");
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 3, RiftColor, FlashKind.Ring);
                     break;
+                case SimEventType.LifeLevel:
+                    // A life skill grew a level.
+                    var skill = (LifeSkill)(e.Amount / 16);
+                    var grower = new Vector3(e.Position.X, e.Position.Y + 0.9f, 0);
+                    _floating.Add(new Floating { Position = grower, Text = $"{LifeSkills.Name(skill)} {e.Amount % 16}", Color = LevelColor });
+                    AddFlash(grower, 1, LevelColor, FlashKind.Sparkles);
+                    if (e.Source == _client.PlayerId) Sounds.Play(Sound.LevelUp);
+                    break;
                 case SimEventType.Npc:
                     // A gift taken well or badly, or a chat.
                     var reaction = e.Amount switch
@@ -1165,7 +1205,7 @@ namespace Game.Client
         {
             var spot = new Vector3(e.Position.X, e.Position.Y, 0);
             bool mine = e.Source == _client.PlayerId;
-            switch (e.Amount)
+            switch (World.FishingKind(e.Amount))
             {
                 case World.FishingCast:
                     if (!_bobbers.TryGetValue(e.Source, out var bobber))
@@ -1739,6 +1779,33 @@ namespace Game.Client
             if (screen.z < 0) return;
             Vector2 point = Ui.FromScreen(screen);
             Shadowed(new Rect(point.x - 80, point.y - 12, 160, 24), text, color, _labelStyle);
+        }
+
+        static readonly Color GaugeBack = new Color(0.08f, 0.1f, 0.14f, 0.85f);
+        static readonly Color GaugeZone = new Color(0.35f, 0.85f, 0.45f, 0.9f);
+
+        // While a fish bites: a bar over the player with the catch zone in its middle and a marker sliding to and fro
+        // (World.GaugeAt). Pressing the fishing button with the marker in the zone lands the fish.
+        void DrawReelGauge()
+        {
+            if (_client.Fishing != World.FishingBite) return;
+            Vector3 screen = _camera.WorldToScreenPoint(_self.Position + new Vector3(0, _self.Top + 1.1f, 0));
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            const float width = 140, height = 14;
+            var bar = new Rect(point.x - width / 2, point.y - height / 2, width, height);
+            int difficulty = _client.FishingDifficulty;
+            float half = World.CatchHalfWidth(difficulty, _client.LifeLevel(LifeSkill.Fishing));
+            float marker = World.GaugeAt(_client.BiteTicksSeen, difficulty);
+            var previous = GUI.color;
+            GUI.color = GaugeBack;
+            GUI.DrawTexture(new Rect(bar.x - 2, bar.y - 2, bar.width + 4, bar.height + 4), Texture2D.whiteTexture);
+            GUI.color = GaugeZone;
+            GUI.DrawTexture(new Rect(bar.x + bar.width * (0.5f - half), bar.y, bar.width * half * 2, bar.height), Texture2D.whiteTexture);
+            GUI.color = World.InCatchZone(marker, difficulty, _client.LifeLevel(LifeSkill.Fishing)) ? Color.white : new Color(1, 0.6f, 0.5f);
+            GUI.DrawTexture(new Rect(bar.x + bar.width * marker - 2, bar.y - 4, 4, bar.height + 8), Texture2D.whiteTexture);
+            GUI.color = previous;
+            Shadowed(new Rect(point.x - 120, bar.yMax + 4, 240, 20), "초록 칸에서 낚아채기!", Color.white, _labelStyle);
         }
 
         static void Shadowed(Rect rect, string text, Color color, GUIStyle style)

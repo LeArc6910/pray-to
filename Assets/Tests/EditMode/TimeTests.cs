@@ -191,9 +191,9 @@ namespace Game.Core.Tests
                 for (int i = 0; i < times; i++)
                 {
                     Assert.IsTrue(world.Fish(player.Id));
-                    for (int t = 0; t < World.Ticks(World.BiteMaxSeconds + 1) && !world.TakeEvents().Any(e => e.Amount == World.FishingBite); t++)
+                    for (int t = 0; t < World.Ticks(World.BiteMaxSeconds + 1) && !world.TakeEvents().Any(e => e.Type == SimEventType.Fishing && World.FishingKind(e.Amount) == World.FishingBite); t++)
                         world.Step();
-                    world.Fish(player.Id);
+                    if (player.Fishing != null) Reels.Land(world, player);
                 }
                 return player.Inventory.CountOf(firefly);
             }

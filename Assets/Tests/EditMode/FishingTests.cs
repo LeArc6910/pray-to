@@ -36,7 +36,7 @@ namespace Game.Core.Tests
             return events;
         }
 
-        static bool Has(List<SimEvent> events, int amount) => events.Any(e => e.Type == SimEventType.Fishing && e.Amount == amount);
+        static bool Has(List<SimEvent> events, int amount) => events.Any(e => e.Type == SimEventType.Fishing && World.FishingKind(e.Amount) == amount);
 
         [Test]
         public void CastWaitForTheBiteAndLandAFishOfTheBiome()
@@ -50,7 +50,7 @@ namespace Game.Core.Tests
 
             events = RunUntil(world, e => Has(e, World.FishingBite), World.BiteMaxSeconds + 0.5f);
             Assert.IsTrue(Has(events, World.FishingBite), "a bite within the time");
-            Assert.IsTrue(world.Fish(player.Id));
+            Reels.Land(world, player);
             Assert.IsTrue(Has(world.TakeEvents(), World.FishingCaught));
             Assert.That(player.Inventory.CountOf(Minnow), Is.InRange(1, 2), "the plain cave's fish");
             Assert.IsNull(player.Fishing);

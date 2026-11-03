@@ -293,6 +293,9 @@ namespace Game.Client
             "baked_potato" => RoastedMushroom,
             "grilled_corn" => SpicyFry,
             "kimchi_stew" => MushroomSoup,
+            "fried_egg" => RoastedMushroom,
+            "steamed_crab" => MushroomSoup,
+            "fried_shrimp" => SpicyFry,
             _ => Potion,
         };
 
@@ -434,6 +437,50 @@ namespace Game.Client
             ".MMMmmd.",
             "..Mmmd..",
             "...dd...",
+        };
+
+        // A small white hen, side on, facing left; two frames, its head up and pecking.
+        public static PixelImage Chicken(int frame) => PixelImage.FromRows(ChickenColors, frame % 2 == 0 ? ChickenUp : ChickenPeck).Outlined(Outline);
+
+        static readonly Dictionary<char, Rgba> ChickenColors = new Dictionary<char, Rgba>(Common)
+        {
+            ['W'] = Rgba.Hex("#F6F2E8"),
+            ['G'] = Rgba.Hex("#C8C0B0"),
+            ['R'] = Rgba.Hex("#E0402A"),
+            ['Y'] = Rgba.Hex("#F2B840"),
+        };
+
+        static readonly string[] ChickenUp =
+        {
+            ".R......",
+            "WW......",
+            "YWW...WW",
+            ".WWWWWW.",
+            ".WWWGGW.",
+            "..WWWW..",
+            "...YY...",
+        };
+
+        static readonly string[] ChickenPeck =
+        {
+            "........",
+            "......WW",
+            ".R..WWW.",
+            "WWWWWWW.",
+            "YWWWGGW.",
+            "..WWWW..",
+            "...YY...",
+        };
+
+        // A crab, front on.
+        static readonly string[] Crab =
+        {
+            "L......L",
+            "MM....MM",
+            ".M.ww.M.",
+            ".MMMMMM.",
+            "MMmMMmMM",
+            ".m.mm.m.",
         };
 
         // A bottle with a cork, for juices and wines.
@@ -706,6 +753,14 @@ namespace Game.Client
                 case "pickled_pepper": return Ramped(Pickles, Ramp.Of("#E0402A"));
                 case "kimchi": return Ramped(Pickles, Ramp.Of("#D8603A"));
                 case "pickled_bean": return Ramped(Pickles, Ramp.Of("#6A44B8"));
+                case "chicken": return Chicken(0);
+                case "feed": return Ramped(Seeds, Ramp.Of("#D8B070"));
+                case "egg": return Ramped(Goo, Ramp.Of("#F6F0E0"));
+                case "bait": return Ramped(Goo, Ramp.Of("#C87850"));
+                case "mayonnaise": return Ramped(Pickles, Ramp.Of("#F6F0D0"));
+                case "cave_crab": return Ramped(Crab, Ramp.Of("#E06040"));
+                case "cave_shrimp": return Ramped(FishRows, Ramp.Of("#F08870"));
+                case "cave_snail": return Ramped(CapMushroom, Ramp.Of("#A08870"));
                 case "copper_wire": return Ramped(Coil, Ramp.Of("#E08A4A"));
                 case "circuit": return Ramped(Board, Ramp.Of("#4CA85A"));
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);

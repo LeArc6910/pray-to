@@ -119,8 +119,10 @@ namespace Game.Core
     public readonly struct MachineView
     {
         public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true,
-            MaterialDefinition setting = null, bool powered = false, Recipe recipe = null, int supply = -1, int demand = -1, int holding = 0, int held = 0)
+            MaterialDefinition setting = null, bool powered = false, Recipe recipe = null, int supply = -1, int demand = -1, int holding = 0, int held = 0,
+            int animals = 0)
         {
+            Animals = animals;
             Holding = holding;
             Held = held;
             Supply = supply;
@@ -156,6 +158,8 @@ namespace Game.Core
         // How much it holds to work on, and how much it made that waits to go out.
         public int Holding { get; }
         public int Held { get; }
+        // A coop's chickens.
+        public int Animals { get; }
     }
 
     public readonly struct HazardView
@@ -337,7 +341,29 @@ namespace Game.Core
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
         // before the first one.
         public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
-            Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay)));
+            Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay)), LifeExperience);
+
+        // Experience in each life skill (LifeSkill order): from the save, and as the host tells.
+        public int[] LifeExperience => _life ??= ReadLife();
+
+        int[] _life;
+
+        int[] ReadLife()
+        {
+            var life = new int[LifeSkills.Count];
+            if (Character == null || Character.Length == 0 || _loot == null) return life;
+            try
+            {
+                var saved = CharacterSave.Read(Character, _loot).LifeExperience;
+                for (int i = 0; i < life.Length && i < saved.Count; i++) life[i] = saved[i];
+            }
+            catch (System.IO.InvalidDataException)
+            {
+            }
+            return life;
+        }
+
+        public int LifeLevel(LifeSkill skill) => LifeSkills.LevelOf(LifeExperience[(int)skill]);
 
         // The people, to name and trade with them (World.Merchant.cs).
         public NpcData Npcs { get; set; }
@@ -493,6 +519,10 @@ namespace Game.Core
                         {
                             if (_loot != null && material < _loot.Materials.Count) _stock[_loot.Materials[material]] = count;
                         }
+                        break;
+                    case MessageType.Life:
+                        var experience = LifeMessage.Decode(data).Experience;
+                        for (int i = 0; i < LifeExperience.Length && i < experience.Count; i++) LifeExperience[i] = experience[i];
                         break;
                     case MessageType.Friendships:
                         foreach (var (npc, points, talked, gifted) in FriendshipsMessage.Decode(data).Friendships)
@@ -710,11 +740,13 @@ namespace Game.Core
                 }
                 bool assembler = m.Kind == TileType.Assembler;
                 bool node = World.IsPowerNode(m.Kind);
+                bool coop = m.Kind == TileType.Coop;
                 int supply = node && m.Setting >= 0 ? m.Setting / 256 : -1;
                 int demand = node && m.Setting >= 0 ? m.Setting % 256 : -1;
-                var setting = !assembler && !node && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
+                var setting = !assembler && !node && !coop && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
                 var recipe = assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Recipes.Count ? _loot.Recipes[m.Setting] : null;
-                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe, supply, demand, m.Holding, m.Held));
+                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe, supply, demand, m.Holding, m.Held,
+                    coop ? Math.Max(0, m.Setting) : 0));
             }
             return views;
         }
@@ -747,10 +779,18 @@ namespace Game.Core
         public byte[] FertilizeCommand() => new InventoryCommandMessage(InventoryCommand.Fertilize, 0).Encode();
 
         // Casts, lands a biting fish or reels in (World.Fish).
-        public byte[] FishCommand() => new InventoryCommandMessage(InventoryCommand.Fish, 0).Encode();
+        // While a fish bites, it says how far the bite had gone on this screen when the player pressed.
+        public byte[] FishCommand() => new InventoryCommandMessage(InventoryCommand.Fish, Fishing == World.FishingBite ? BiteTicksSeen + 1 : 0).Encode();
 
         // Where this player's line is at: World.FishingCast while waiting, World.FishingBite while a fish bites, or -1.
         public int Fishing { get; private set; } = -1;
+
+        // While a fish bites: how hard it is, and when (in host ticks) this client heard of the bite.
+        public int FishingDifficulty { get; private set; } = 1;
+        public double BiteTick { get; private set; }
+
+        // Where the reel gauge's marker is now, as this client shows it (World.GaugeAt).
+        public int BiteTicksSeen => (int)Math.Max(0, HostTick - BiteTick);
 
         public byte[] ToggleMachineCommand() => new InventoryCommandMessage(InventoryCommand.ToggleMachine, 0).Encode();
 
@@ -1014,7 +1054,16 @@ namespace Game.Core
             _events.AddRange(snapshot.Events);
             foreach (var e in snapshot.Events)
             {
-                if (e.Type == SimEventType.Fishing && e.Source == PlayerId) Fishing = e.Amount == World.FishingCast || e.Amount == World.FishingBite ? e.Amount : -1;
+                if (e.Type == SimEventType.Fishing && e.Source == PlayerId)
+                {
+                    int kind = World.FishingKind(e.Amount);
+                    Fishing = kind == World.FishingCast || kind == World.FishingBite ? kind : -1;
+                    if (kind == World.FishingBite)
+                    {
+                        FishingDifficulty = World.FishingDifficultyOf(e.Amount);
+                        BiteTick = HostTick;
+                    }
+                }
                 if (e.Type == SimEventType.GoalReward && e.Source == PlayerId && Guide != null && e.Amount >= 0 && e.Amount < Guide.Goals.Count)
                 {
                     ClaimedGoals.Add(Guide.Goals[e.Amount].Id);

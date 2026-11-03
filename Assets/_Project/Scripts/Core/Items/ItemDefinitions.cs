@@ -234,8 +234,9 @@ namespace Game.Core
     public sealed class MaterialDefinition
     {
         internal MaterialDefinition(string id, string name, TileType? places, string description, Biome? fish = null, float fuel = 0,
-            bool fishAtNight = false)
+            bool fishAtNight = false, bool potCatch = false)
         {
+            PotCatch = potCatch;
             Id = id;
             Name = name;
             Places = places;
@@ -253,6 +254,8 @@ namespace Game.Core
         // A fish caught in the water of this biome (materials.csv fish), or null; only at night when FishAtNight.
         public Biome? Fish { get; }
         public bool FishAtNight { get; }
+        // What a crab pot catches (materials.csv fish "pot").
+        public bool PotCatch { get; }
         // Seconds a generator runs on one of it (materials.csv fuel), or 0 when it does not burn.
         public float Fuel { get; }
     }

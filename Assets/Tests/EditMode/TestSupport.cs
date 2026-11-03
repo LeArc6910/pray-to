@@ -220,6 +220,17 @@ namespace Game.Core.Tests
         }
     }
 
+    public static class Reels
+    {
+        // Lets the bite go on until the reel gauge's marker is in the middle, and presses: the fish is landed.
+        public static void Land(World world, Player player)
+        {
+            int ticks = World.CenterTicks(player.Fishing.Difficulty);
+            for (int i = 0; i < ticks; i++) world.Step();
+            Assert.IsTrue(world.Fish(player.Id, ticks));
+        }
+    }
+
     // Building things as a player would: standing beside a tile facing it and placing, then letting time pass.
     public static class Builds
     {

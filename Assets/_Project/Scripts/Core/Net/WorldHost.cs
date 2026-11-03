@@ -71,6 +71,8 @@ namespace Game.Core
             public byte[] SentProduction;
             // The last friendships message sent, likewise.
             public byte[] SentFriendships;
+            // The player's LifeVersion when their life skills were last sent.
+            public int SentLife = -1;
         }
 
         // How many times over one craft command may make its recipe.
@@ -199,6 +201,11 @@ namespace Game.Core
                     SendMachines(pair.Key, pair.Value);
                     SendStock(pair.Key, pair.Value);
                     SendFriendships(pair.Key, pair.Value);
+                    if (pair.Value.SentLife != pair.Value.Player.LifeVersion)
+                    {
+                        pair.Value.SentLife = pair.Value.Player.LifeVersion;
+                        Send(pair.Key, new LifeMessage(pair.Value.Player.LifeExperience).Encode(), reliable: true);
+                    }
                 }
             }
 
@@ -257,6 +264,7 @@ namespace Game.Core
             foreach (string goal in saved?.ClaimedGoals ?? new List<string>()) player.ClaimedGoals.Add(goal);
             if (saved != null) World.RestorePassives(player, _classes, saved.Passives);
             if (saved != null) World.RestoreFriendships(player, saved.Friendships);
+            if (saved != null) World.RestoreLifeExperience(player, saved.LifeExperience);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -356,7 +364,7 @@ namespace Game.Core
                     World.ToggleMachine(player.Id);
                     break;
                 case InventoryCommand.Fish:
-                    World.Fish(player.Id);
+                    World.Fish(player.Id, command.Item > 0 ? command.Item - 1 : (int?)null);
                     break;
                 case InventoryCommand.SetRecipe:
                     // Index is the recipe's sheet index; Item 0 stops the assembler.
@@ -611,6 +619,7 @@ namespace Game.Core
             int SettingOf(Machine m)
             {
                 if (m.Kind == TileType.Assembler) return m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe);
+                if (m.Kind == TileType.Coop) return World.ChickensIn(m);
                 if (World.IsPowerNode(m.Kind)) return World.GridOf(m) is PowerGrid grid ? MachineState.Grid(grid.Supply, grid.Demand) : -1;
                 return m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting);
             }

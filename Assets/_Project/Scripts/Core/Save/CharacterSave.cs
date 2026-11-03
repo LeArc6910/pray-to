@@ -13,12 +13,14 @@ namespace Game.Core
     {
         internal const string Magic = "PTCH";
         // 2: experience (character levels). 3: the guide goals whose rewards it has had. 4: the points taken on the
-        // passive tree, by id. 5: friendships (World.Merchant.cs), by person id.
-        const int FormatVersion = 5;
+        // passive tree, by id. 5: friendships (World.Merchant.cs), by person id. 6: life skill experience
+        // (World.Life.cs).
+        const int FormatVersion = 6;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
-            List<(string, int, int, int)> friendships = null)
+            List<(string, int, int, int)> friendships = null, List<int> life = null)
         {
+            LifeExperience = life ?? new List<int>();
             Friendships = friendships ?? new List<(string, int, int, int)>();
             ClaimedGoals = claimed ?? new List<string>();
             Passives = passives ?? new List<string>();
@@ -37,10 +39,13 @@ namespace Game.Core
         public IReadOnlyList<string> Passives { get; }
         // Each person it knows: their id, the friendship points and the days it last talked and gave them a gift.
         public IReadOnlyList<(string Npc, int Points, int TalkedDay, int GiftedDay)> Friendships { get; }
+        // Experience in each life skill, in LifeSkill order (empty for a save from before them).
+        public IReadOnlyList<int> LifeExperience { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
-            IEnumerable<string> passives = null, IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay)> friendships = null)
+            IEnumerable<string> passives = null, IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay)> friendships = null,
+            IEnumerable<int> life = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -71,6 +76,9 @@ namespace Game.Core
                     w.Write(talked);
                     w.Write(gifted);
                 }
+                var skills = (life ?? Enumerable.Empty<int>()).ToList();
+                w.Write((byte)skills.Count);
+                foreach (int points in skills) w.Write(points);
             }
             return stream.ToArray();
         }
@@ -125,7 +133,9 @@ namespace Game.Core
                 for (int count = version >= 4 ? r.ReadUInt16() : 0; count > 0; count--) passives.Add(r.ReadString());
                 var friendships = new List<(string, int, int, int)>();
                 for (int count = version >= 5 ? r.ReadUInt16() : 0; count > 0; count--) friendships.Add((r.ReadString(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32()));
-                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships);
+                var life = new List<int>();
+                for (int count = version >= 6 ? r.ReadByte() : 0; count > 0; count--) life.Add(r.ReadInt32());
+                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

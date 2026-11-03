@@ -175,6 +175,7 @@ namespace Game.Client
         {
             DrawRefining();
             DrawStats();
+            DrawLifeSkills();
             DrawConsumables();
 
             GUILayout.Space(6);
@@ -243,9 +244,13 @@ namespace Game.Client
         }
 
         // Whether the machine makes anything from the material (World.Takes, as far as the client can tell).
-        bool Takes(MachineView machine, MaterialDefinition material) => machine.Kind == TileType.Assembler
-            ? machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material)
-            : _client.ProcessesOf(machine.Kind).Any(r => r.Ingredients.Any(i => i.Material == material));
+        bool Takes(MachineView machine, MaterialDefinition material) => machine.Kind switch
+        {
+            TileType.Assembler => machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material),
+            TileType.Coop => material.Id == World.Chicken || material.Id == World.Feed,
+            TileType.CrabPot => material.Id == World.Bait,
+            _ => _client.ProcessesOf(machine.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)),
+        };
 
         bool _showProduction;
 
@@ -324,6 +329,20 @@ namespace Game.Client
             GUILayout.Label(Fit($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}", _textWidth));
         }
 
+        // Each life skill's level, how far to the next, and what it gives (World.Life.cs).
+        void DrawLifeSkills()
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("생활 기술");
+            foreach (LifeSkill skill in Enum.GetValues(typeof(LifeSkill)))
+            {
+                int experience = _client.LifeExperience[(int)skill];
+                int level = LifeSkills.LevelOf(experience);
+                string next = level >= LifeSkills.MaxLevel ? "최고" : $"{experience - LifeSkills.TotalFor(level)}/{LifeSkills.TotalFor(level + 1) - LifeSkills.TotalFor(level)}";
+                GUILayout.Label(Fit($"{LifeSkills.Name(skill)} {level} ({next}) · {LifeSkills.Perk(skill, level)}", _textWidth));
+            }
+        }
+
         // Materials, counted by kind. One that builds gets [놓기], a seed gets [심기] and the watering can [물 주기];
         // all act on the tile the player faces.
         void DrawMaterials()
@@ -348,6 +367,10 @@ namespace Game.Client
                 GUILayout.Label(Fit($"{_client.TileName(machine.Kind)}: 넣은 것 {machine.Holding} · 만든 것 {machine.Held}", _textWidth - 72));
                 if (machine.Held > 0 && GUILayout.Button("꺼내기", GUILayout.Width(64))) Send(_client.UnloadCommand(), Sound.Pickup);
                 GUILayout.EndHorizontal();
+                if (machine.Kind == TileType.Coop)
+                    GUILayout.Label(Fit($"닭 {machine.Animals}/{World.CoopChickens}마리. 사료가 있으면 하루(20분)마다 닭마다 달걀 하나", _textWidth));
+                if (machine.Kind == TileType.CrabPot)
+                    GUILayout.Label(Fit("바로 옆이 물이어야 한다. 미끼 하나로 10분에 하나씩 든다", _textWidth));
                 if (machine.Kind == TileType.Keg || machine.Kind == TileType.PreservesJar)
                 {
                     string makes = string.Join(" · ", _client.ProcessesOf(machine.Kind)

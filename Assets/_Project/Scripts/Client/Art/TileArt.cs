@@ -390,6 +390,8 @@ namespace Game.Client
             TileType.MerchantStall => MerchantStallTile,
             TileType.Keg => KegTile,
             TileType.PreservesJar => JarTile,
+            TileType.Coop => CoopTile,
+            TileType.CrabPot => CrabPotTile,
             TileType.FastConveyor => ConveyorFrame,
             TileType.UndergroundBelt => ConveyorFrame,
             _ => null,
@@ -1402,6 +1404,44 @@ namespace Game.Client
             "...owwwwwwwwo...",
             "....oooooooo....",
             "....________....",
+            "................");
+
+        // A little wooden hen house with a red roof and a dark doorway.
+        static readonly PixelImage CoopTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "......oooo......",
+            "....ooRRRRoo....",
+            "..ooRRRRRRRRoo..",
+            ".oRRRRRRRRRRRRo.",
+            "orrrrrrrrrrrrrro",
+            ".oWWWWWWWWWWWWo.",
+            ".oWwWWWWWWWWwWo.",
+            ".oWwWWWooWWWwWo.",
+            ".oWwWWokkoWWwWo.",
+            ".oWwWWokkoWWwWo.",
+            ".oWwWWokkoWWwWo.",
+            ".owwwwokkowwwwo.",
+            ".oooooooooooooo.",
+            "..____________..",
+            "................");
+
+        // A wicker pot with a rope, set down at the water's edge.
+        static readonly PixelImage CrabPotTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "..........cc....",
+            ".........c..c...",
+            "....oooooooc....",
+            "...oCSCSCSCSo...",
+            "..oSCoCoCoCSCo..",
+            "..oCSCSCSCSCSo..",
+            "..oSoCoCoCoCSo..",
+            "..oCSCSCSCSCSo..",
+            "..oSCoCoCoCSCo..",
+            "...oCSCSCSCSo...",
+            "....oooooooo....",
+            "....________....",
+            "................",
+            "................",
             "................");
 
         // A round clay jar with a cloth tied over its mouth.

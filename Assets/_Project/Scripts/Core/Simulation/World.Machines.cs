@@ -173,6 +173,12 @@ namespace Game.Core
                 case TileType.Assembler:
                     RunAssembler(machine);
                     break;
+                case TileType.Coop:
+                    RunCoop(machine);
+                    break;
+                case TileType.CrabPot:
+                    RunCrabPot(machine);
+                    break;
             }
         }
 
@@ -297,7 +303,8 @@ namespace Game.Core
 
         // Machines a player can fill by hand ([넣기]): what they make things from.
         public static bool LoadsByHand(TileType kind) =>
-            kind == TileType.Smelter || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator;
+            kind == TileType.Smelter || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator
+            || kind == TileType.Coop || kind == TileType.CrabPot;
 
         // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
         // a belt would. Returns how many went in.
@@ -409,6 +416,8 @@ namespace Game.Core
                     case TileType.Assembler:
                     case TileType.Keg:
                     case TileType.PreservesJar:
+                    case TileType.Coop:
+                    case TileType.CrabPot:
                         var made = source.Output.Keys.FirstOrDefault(Fits);
                         if (made != null) Add(source.Output, made, -1);
                         return made;
@@ -632,6 +641,8 @@ namespace Game.Core
                 TileType.Generator => material.Fuel > 0,
                 TileType.Smelter or TileType.Keg or TileType.PreservesJar => ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)),
                 TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material),
+                TileType.Coop => material.Id == Chicken || material.Id == Feed,
+                TileType.CrabPot => material.Id == Bait,
                 _ => false,
             };
         }
@@ -673,6 +684,11 @@ namespace Game.Core
                         return true;
                     case TileType.Assembler:
                         if (!AssemblerTakes(target, material)) return false;
+                        Add(target.Input, material, 1);
+                        return true;
+                    case TileType.Coop:
+                    case TileType.CrabPot:
+                        if (!AnimalsTake(target, material)) return false;
                         Add(target.Input, material, 1);
                         return true;
                     default:

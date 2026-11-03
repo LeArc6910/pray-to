@@ -77,6 +77,8 @@ namespace Game.Core
         MerchantStall,
         Keg,
         PreservesJar,
+        Coop,
+        CrabPot,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

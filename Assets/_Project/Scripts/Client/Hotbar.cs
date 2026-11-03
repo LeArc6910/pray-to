@@ -234,7 +234,7 @@ namespace Game.Client
                     string use = material.Places != null ? "앞에 놓는다"
                         : _client.CropFrom(material) != null ? "앞에 심는다"
                         : material.Id == World.WateringCan ? "앞 3×3칸에 물을 준다"
-                        : material.Id == World.FishingRod ? "앞의 물에 던지고, 입질(!)이 오면 다시 눌러 낚는다"
+                        : material.Id == World.FishingRod ? "앞의 물에 던지고, 입질(!)이 오면 게이지가 초록 칸에 왔을 때 다시 눌러 낚는다"
                         : material.Id == World.Hoe ? "앞 바닥을 밭으로 만든다(밭이면 바닥으로)"
                         : material.Id == World.Fertilizer ? "앞 3×3칸의 밭에 거름을 준다"
                         : "쓸 수 없다(재료)";

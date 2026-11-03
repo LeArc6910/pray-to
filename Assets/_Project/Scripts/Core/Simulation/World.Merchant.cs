@@ -230,7 +230,7 @@ namespace Game.Core
             friendship.TalkedDay = Today;
             friendship.Points = Math.Min(MaxHearts * PointsPerHeart, friendship.Points + TalkPoints);
             player.InventoryVersion++;
-            _events.Add(new SimEvent(SimEventType.Npc, player.Id, target: IndexOf(near.Value.Npc), amount: Talked, position: TileMap.Center(near.Value.X, near.Value.Y)));
+            _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: Talked, position: TileMap.Center(near.Value.X, near.Value.Y)));
             return true;
         }
 
@@ -259,10 +259,9 @@ namespace Game.Core
             friendship.GiftedDay = Today;
             friendship.Points = Math.Clamp(friendship.Points + GiftPoints[reaction], 0, MaxHearts * PointsPerHeart);
             player.InventoryVersion++;
-            _events.Add(new SimEvent(SimEventType.Npc, player.Id, target: IndexOf(npc), amount: reaction, position: TileMap.Center(near.Value.X, near.Value.Y)));
+            _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: reaction, position: TileMap.Center(near.Value.X, near.Value.Y)));
             return reaction;
         }
 
-        int IndexOf(NpcDefinition npc) => Npcs == null ? -1 : Npcs.Npcs.ToList().IndexOf(npc);
     }
 }

@@ -45,6 +45,9 @@ namespace Game.Core
         public int Level => Leveling.LevelFor(Experience);
         // The points taken on the passive tree (World.Passives.cs), not counting the start.
         public List<PassiveNode> Passives { get; } = new List<PassiveNode>();
+        // Experience in each life skill (LifeSkill order), and a count that goes up when any changes.
+        public int[] LifeExperience { get; } = new int[LifeSkills.Count];
+        public int LifeVersion { get; internal set; }
         // How well they know each person, by id (World.Merchant.cs).
         public Dictionary<string, Friendship> Friendships { get; } = new Dictionary<string, Friendship>();
         // One point for every level past the first.
@@ -308,8 +311,10 @@ namespace Game.Core
         // A void rift opened (Amount World.RiftOpened), was beaten (RiftCleared) or ran out (RiftFailed) at Position.
         Rift,
         // Source, a player, gave a gift (Amount World.Disliked to World.Loved) or talked (World.Talked) to the person
-        // at Position; Target is the person's sheet index (World.Merchant.cs).
+        // at Position (World.Merchant.cs).
         Npc,
+        // Source, a player, reached a new level of a life skill: Amount is the skill × 16 + the level (World.Life.cs).
+        LifeLevel,
     }
 
     public readonly struct SimEvent
@@ -340,7 +345,8 @@ namespace Game.Core
 
         public static bool HasPosition(SimEventType type) =>
             type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
-            || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift;
+            || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift || type == SimEventType.Npc
+            || type == SimEventType.LifeLevel;
     }
 
     public enum BossState : byte
