@@ -184,7 +184,8 @@ namespace Game.Core.Tests
 
             Assert.IsTrue(slime.IsDead);
             Assert.IsTrue(events.Any(e => e.Type == SimEventType.Hit && e.Source == alice.PlayerId && e.Target == slime.Id));
-            session.Tick(4);
+            // The client draws others WorldClient.InterpolationDelayTicks behind its latest snapshot, sent every other tick.
+            session.Tick(8);
             Assert.IsFalse(alice.Others().Any(e => e.Id == slime.Id), "gone from the client too");
         }
 

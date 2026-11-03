@@ -39,6 +39,9 @@ namespace Game.Client
         Cast,
         Bite,
         Splash,
+        // A combo's finisher: a heavier, lower whoosh, and the thump when it lands.
+        Heavy,
+        Thump,
     }
 
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
@@ -212,6 +215,17 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Sine, 0, 0.07f, 300, 700, 0.7f, decay: 3));
                     parts.Add(Tone(Wave.Sine, 0.1f, 0.07f, 300, 800, 0.7f, decay: 3));
                     level = 0.8f;
+                    break;
+                case Sound.Heavy:
+                    parts.Add(Noise(0, 0.22f, 1, 0.3f, attack: 0.05f, decay: 2.5f, seed: 21));
+                    parts.Add(Tone(Wave.Sine, 0, 0.2f, 220, 90, 0.4f, decay: 2.5f));
+                    level = 0.7f;
+                    break;
+                case Sound.Thump:
+                    parts.Add(Tone(Wave.Square, 0, 0.16f, 120, 40, 0.9f, decay: 4));
+                    parts.Add(Tone(Wave.Sine, 0, 0.2f, 90, 45, 0.7f, decay: 3));
+                    parts.Add(Noise(0, 0.08f, 0.5f, 0.6f, decay: 6, seed: 22));
+                    level = 0.95f;
                     break;
                 case Sound.Splash:
                     parts.Add(Noise(0, 0.3f, 1, 0.35f, attack: 0.005f, decay: 4, seed: 12));

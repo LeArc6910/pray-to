@@ -117,6 +117,39 @@ namespace Game.Client
             return image;
         }
 
+        // A blow landing: a white star of eight spikes, long and short in turn, that snaps out to its full reach and
+        // then comes away from the middle as it fades.
+        public static PixelImage Impact(int diameter, int frame)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float t = (frame + 1f) / Frames;
+            float centre = diameter / 2f;
+            float reach = (centre - 0.5f) * (t < 0.35f ? 0.6f + t / 0.35f * 0.4f : 1);
+            float gap = t < 0.5f ? 0 : reach * (t - 0.5f) / 0.5f * 0.8f;
+            for (int k = 0; k < 8; k++)
+            {
+                double angle = k * Math.PI / 4;
+                float length = k % 2 == 0 ? reach : reach * 0.55f;
+                for (float r = gap; r <= length; r += 0.5f)
+                {
+                    int x = (int)Math.Floor(centre + Math.Cos(angle) * r);
+                    int y = (int)Math.Floor(centre + Math.Sin(angle) * r);
+                    float along = r / Math.Max(1, length);
+                    var color = along < 0.35f ? Core : along < 0.7f ? Light : Mid;
+                    Plot(image, x, y, frame >= Frames - 2 ? Fade(color) : color);
+                }
+            }
+            if (t < 0.4f)
+            {
+                int c = (int)Math.Floor(centre);
+                Plot(image, c, c, Core);
+                Plot(image, c - 1, c, Core);
+                Plot(image, c, c - 1, Core);
+                Plot(image, c - 1, c - 1, Core);
+            }
+            return image;
+        }
+
         // A weapon's swing: a crescent pointing along +x, swept from its upper end (+SwingHalfAngle) down to its
         // lower, the way the weapon in hand turns. The newest part of the sweep is white and the trail behind it dims
         // and breaks up; in the last frames the trail catches up, leaving a thin tail.

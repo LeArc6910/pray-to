@@ -283,12 +283,12 @@ namespace Game.Core
         // where the hit came from, unless a spirit struck it (spirits strike often and would keep it from ever
         // reaching anyone) or lightning jumped to it. Then the elements do their part (World.Elements.cs).
         void HitEnemy(Player player, Enemy enemy, float damage, bool critical, Vec2 from, SkillTag tags, int cause = 0, bool knockback = true,
-            bool chained = false)
+            bool chained = false, float push = 1)
         {
             if (enemy.IsDead) return;
             int amount = Combat.Mitigate(damage * ElementFactor(enemy.Definition, tags), enemy.Definition.Armor);
             enemy.Health -= amount;
-            if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed;
+            if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed * push;
             _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
             if (enemy.IsDead)
             {

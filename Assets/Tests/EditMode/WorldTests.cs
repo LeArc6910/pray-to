@@ -44,6 +44,65 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void BasicAttacksGoThroughAComboOfThreeAndTheThirdHitsHarder()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"));
+            var dummy = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(1.1f, 0));
+            Face(world, player, new Vec2(1, 0));
+
+            world.SetAttacking(player.Id, true);
+            // The dummy is put back each tick, as the swings push it away.
+            var spot = dummy.Position;
+            var events = new List<SimEvent>();
+            for (int i = 0; i < World.TicksPerSecond * 4; i++)
+            {
+                events.AddRange(Run(world, 1));
+                dummy.Position = spot;
+                dummy.Knockback = Vec2.Zero;
+            }
+            var steps = events.Where(e => e.Type == SimEventType.Attack && e.Source == player.Id).Select(e => World.ComboStepOf(e.Amount)).ToList();
+            Assert.Greater(steps.Count, 6);
+            for (int i = 0; i < steps.Count; i++) Assert.AreEqual(i % World.ComboSteps, steps[i], $"attack {i}");
+            Assert.IsTrue(events.Where(e => e.Type == SimEventType.Attack).All(e => World.AttackKindOf(e.Amount) == BasicAttackKind.Swing));
+
+            // The hits in order go with the steps; a plain finisher hits half again as hard as a plain first strike.
+            var hits = events.Where(e => e.Type == SimEventType.Hit && e.Target == dummy.Id).ToList();
+            Assert.AreEqual(steps.Count, hits.Count);
+            var plain = hits.Select((h, i) => (Hit: h, Step: steps[i])).Where(p => !p.Hit.Critical).ToList();
+            int first = plain.First(p => p.Step == 0).Hit.Amount;
+            int finisher = plain.First(p => p.Step == World.ComboSteps - 1).Hit.Amount;
+            Assert.AreEqual(first * World.FinisherDamagePercent / 100f, finisher, 1.01f);
+
+            // Stopping for a while starts it again.
+            world.SetAttacking(player.Id, false);
+            Run(world, World.TicksPerSecond * 2);
+            world.SetAttacking(player.Id, true);
+            var again = Run(world, 2).First(e => e.Type == SimEventType.Attack && e.Source == player.Id);
+            Assert.AreEqual(0, World.ComboStepOf(again.Amount));
+        }
+
+        [Test]
+        public void DiggingIsNoCombo()
+        {
+            var world = new World(Maps.Room(14), TileMap.Center(7, 7), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", Gear.Wearing("copper_pickaxe"));
+            var (x, y) = (TileMap.Cell(player.Position.X) + 1, TileMap.Cell(player.Position.Y));
+            world.Map[x, y] = TileType.Wall;
+            Face(world, player, new Vec2(1, 0));
+            world.SetAttacking(player.Id, true);
+            var steps = new List<int>();
+            for (int i = 0; i < World.TicksPerSecond * 2; i++)
+            {
+                steps.AddRange(Run(world, 1).Where(e => e.Type == SimEventType.Attack).Select(e => World.ComboStepOf(e.Amount)));
+                // The wall is put back as it gives way, so every strike digs.
+                world.Map[x, y] = TileType.Wall;
+            }
+            Assert.IsNotEmpty(steps);
+            Assert.IsTrue(steps.All(step => step == 0));
+        }
+
+        [Test]
         public void HoldingAttackSwingsAtTheWeaponsRate()
         {
             var world = Room();
@@ -86,7 +145,7 @@ namespace Game.Core.Tests
             Assert.That(Monsters.Dummy.Health - first.Health, Is.EqualTo(3).Or.EqualTo(4));
             Assert.AreEqual(Monsters.Dummy.Health, behind.Health);
             Assert.AreEqual(friend.Stats.MaxHealth, friend.Health);
-            Assert.AreEqual((int)BasicAttackKind.Arrow, events.Single(e => e.Type == SimEventType.Attack).Amount);
+            Assert.AreEqual(BasicAttackKind.Arrow, World.AttackKindOf(events.Single(e => e.Type == SimEventType.Attack).Amount));
             Assert.IsEmpty(world.Projectiles);
         }
 

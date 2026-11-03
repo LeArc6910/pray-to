@@ -55,6 +55,15 @@ namespace Game.Client
             // A short lunge toward each attack: time left and which way.
             public float LungeTime;
             public Vector2 Lunge;
+            // How far the lunge goes, in lunges (a finisher goes twice as far).
+            public float LungeReach = 1;
+            // Knocked back by a blow: time left and which way, and how far (in lunges).
+            public float KnockTime;
+            public Vector2 Knock;
+            public float KnockReach = 1;
+            // The step of a player's basic attack combo (World.ComboStepOf) and how long its strike pose lasts.
+            public int Combo;
+            public float StrikeLength;
             // A player's poses (CreatureArt.Pose): time left in a strike, a cast and a flinch.
             public float StrikeTime;
             public float CastTime;
@@ -104,6 +113,8 @@ namespace Game.Client
             Ring,
             // Sparkles rising: healing, food, buffs.
             Sparkles,
+            // A star where a blow lands.
+            Impact,
         }
 
         // A bit flying off something that died, fading as it slows.
@@ -150,6 +161,14 @@ namespace Game.Client
         const float WindUpSeconds = 0.07f;
         const float CastSeconds = 0.3f;
         const float HurtSeconds = 0.25f;
+        // Hit feel: how long a struck body is knocked back, how long a heavy blow of one's own holds the picture still
+        // (hit-stop), and how long the screen's edges glow red when one is hurt.
+        const float KnockSeconds = 0.12f;
+        const float HitStopSeconds = 0.06f;
+        const float HurtGlowSeconds = 0.4f;
+        static readonly Color ImpactWhite = new Color(1, 1, 1, 0.95f);
+        static readonly Color ImpactGold = new Color(1f, 0.85f, 0.3f, 0.95f);
+        static readonly Color ImpactRed = new Color(1f, 0.35f, 0.3f, 0.95f);
         // A standing player breathes in every other BreathSeconds and blinks for BlinkSeconds every BlinkEvery.
         const float BreathSeconds = 0.8f;
         const float BlinkEvery = 3.4f;
@@ -221,6 +240,10 @@ namespace Game.Client
         readonly List<int> _gone = new List<int>();
         Vector3 _cameraTarget;
         float _shake;
+        float _hitStop;
+        float _hurtGlow;
+        float _hurtGlowStrength;
+        Texture2D _vignette;
         // How far the player has walked since their last footstep.
         float _stride;
         const float StepLength = 0.6f;
@@ -254,6 +277,17 @@ namespace Game.Client
 
         public void Render(float tickFraction, float deltaTime)
         {
+            _hurtGlow = Mathf.Max(0, _hurtGlow - deltaTime);
+            // A heavy blow of one's own holds the picture still for a moment (hit-stop); the world goes on underneath and
+            // the events wait. Off with screen shake.
+            if (_hitStop > 0 && Settings.ScreenShake)
+            {
+                _hitStop -= deltaTime;
+                _shake *= Mathf.Exp(-10 * deltaTime);
+                _camera.transform.position = _cameraTarget + (Vector3)(UnityEngine.Random.insideUnitCircle * _shake);
+                return;
+            }
+            _hitStop = 0;
             var selfPosition = Vec2.Lerp(_client.PreviousPosition, _client.Position, Mathf.Clamp01(tickFraction));
             var (selfTint, selfGlow) = StatusLook(_client.SelfStatus, Color.white, Color.clear);
             Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, selfTint, selfGlow, deltaTime,
@@ -297,9 +331,40 @@ namespace Game.Client
             UpdateDark(selfPosition);
         }
 
+        // Clear in the middle and thickening toward the edges and most in the corners, white, for GUI.color to tint.
+        static Texture2D MakeVignette()
+        {
+            const int size = 64;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = (x + 0.5f) / size * 2 - 1;
+                    float v = (y + 0.5f) / size * 2 - 1;
+                    float d = Mathf.Sqrt(u * u + v * v) / 1.4142f;
+                    float a = Mathf.Clamp01((d - 0.45f) / 0.55f);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(a * a * 255));
+                }
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            return texture;
+        }
+
         // Names, damage numbers and banners. Call from OnGUI.
         public void DrawGui()
         {
+            // Hurt: the screen's edges glow red for a moment, more for a harder blow.
+            if (_hurtGlow > 0 && Event.current.type == EventType.Repaint)
+            {
+                _vignette ??= MakeVignette();
+                var before = GUI.color;
+                GUI.color = new Color(0.9f, 0.1f, 0.08f, _hurtGlowStrength * _hurtGlow / HurtGlowSeconds);
+                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), _vignette);
+                GUI.color = before;
+            }
             // Centred on their spot and allowed past their box, so a tall font is never cut off at the bottom.
             _labelStyle ??= new GUIStyle(GUI.skin.label)
             {
@@ -1069,17 +1134,32 @@ namespace Game.Client
                 case SimEventType.Attack:
                     var attacker = Find(e.Source);
                     if (attacker == null) break;
+                    // Players' basic attacks come in a combo (World.ComboStepOf): a downward cut, a cut back up, and a
+                    // finisher that winds up, lunges twice as far and sweeps wider. Monsters and bosses only lunge.
+                    var kind = World.AttackKindOf(e.Amount);
+                    int step = attacker.Kind == BodyKind.Player ? World.ComboStepOf(e.Amount) : 0;
+                    bool finisher = step == World.ComboSteps - 1;
+                    attacker.Combo = step;
                     attacker.LungeTime = LungeSeconds;
+                    attacker.LungeReach = finisher ? 2 : 1;
                     attacker.Lunge = new Vector2(e.Direction.X, e.Direction.Y).normalized;
-                    attacker.StrikeTime = StrikeSeconds;
+                    attacker.StrikeLength = finisher ? StrikeSeconds * 1.4f : StrikeSeconds;
+                    attacker.StrikeTime = attacker.StrikeLength;
                     // A spirit just darts at what it strikes; the hit makes the sound.
                     if (attacker.Kind == BodyKind.Minion) break;
-                    var kind = (BasicAttackKind)e.Amount;
-                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : Sound.Swing, attacker.Position);
-                    // Shots show as their projectile, so only swings draw the arc.
-                    if (kind != BasicAttackKind.Swing) break;
+                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : finisher ? Sound.Heavy : Sound.Swing, attacker.Position);
+                    if (finisher && attacker == _self) _shake = Mathf.Max(_shake, 0.04f);
+                    // Shots show as their projectile (a finisher's is bigger), with a puff where it leaves; only swings
+                    // draw the arc.
+                    if (kind != BasicAttackKind.Swing)
+                    {
+                        if (finisher) AddFlash(attacker.Position + (Vector3)(attacker.Lunge * 0.45f), 0.35f, ImpactWhite, FlashKind.Ring);
+                        break;
+                    }
                     attacker.SwingTime = SwingSeconds;
                     attacker.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
+                    // The second cut comes back up: the crescent mirrored across the way it points. The finisher is bigger.
+                    attacker.Swing.transform.localScale = step == 1 ? new Vector3(1, -1, 1) : finisher ? Vector3.one * 1.4f : Vector3.one;
                     break;
                 case SimEventType.Hit:
                     var target = Find(e.Target);
@@ -1087,10 +1167,35 @@ namespace Game.Client
                     target.FlashTime = FlashSeconds;
                     target.HurtTime = HurtSeconds;
                     bool hurtsMe = e.Target == _client.PlayerId;
+                    var hitter = Find(e.Source);
+                    // A finisher's blow: the hitter is a player still in the strike of the combo's last step.
+                    bool heavy = hitter != null && hitter.Kind == BodyKind.Player && hitter.Combo == World.ComboSteps - 1 && hitter.StrikeTime > 0;
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
                     _floating.Add(new Floating { Position = target.Position, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
-                    if (hurtsMe) _shake = Mathf.Max(_shake, 0.12f);
-                    Hear(hurtsMe ? Sound.Hurt : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
+                    // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
+                    var away = hitter != null ? (Vector2)(target.Position - hitter.Position) : Vector2.zero;
+                    if (away.sqrMagnitude > 1e-4f)
+                    {
+                        target.Knock = away.normalized;
+                        target.KnockTime = KnockSeconds;
+                        target.KnockReach = heavy ? 2.5f : e.Critical ? 1.6f : 1;
+                    }
+                    var landed = target.Position - (Vector3)(away.normalized * target.Diameter * 0.3f) + new Vector3(0, target.Diameter * 0.2f, 0);
+                    AddFlash(landed, heavy || e.Critical ? 0.55f : 0.38f, hurtsMe ? ImpactRed : e.Critical ? ImpactGold : ImpactWhite, FlashKind.Impact);
+                    if (hurtsMe)
+                    {
+                        // The harder the blow for the health one has, the more the screen jolts and its edges glow red.
+                        float share = Mathf.Clamp01(e.Amount / Mathf.Max(1, _client.MaxHealth) * 4);
+                        _shake = Mathf.Max(_shake, 0.12f + 0.25f * share);
+                        _hurtGlow = HurtGlowSeconds;
+                        _hurtGlowStrength = 0.35f + 0.45f * share;
+                    }
+                    else if (e.Source == _client.PlayerId)
+                    {
+                        _shake = Mathf.Max(_shake, heavy ? 0.1f : e.Critical ? 0.07f : 0.025f);
+                        if (heavy || e.Critical) _hitStop = HitStopSeconds;
+                    }
+                    Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
                     break;
                 case SimEventType.Impact:
                     var source = Find(e.Source);
@@ -1291,9 +1396,12 @@ namespace Game.Client
                     AddFlash(caster.Position, caster.Diameter * (skill.Kind == SkillKind.Summon ? 2 : 1), color, skill.Kind == SkillKind.Summon ? FlashKind.Ring : FlashKind.Sparkles);
                     break;
                 case SkillKind.Projectile:
+                    caster.Combo = 0;
+                    caster.StrikeLength = StrikeSeconds;
                     caster.StrikeTime = StrikeSeconds;
                     caster.SwingTime = SwingSeconds;
                     caster.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
+                    caster.Swing.transform.localScale = Vector3.one;
                     break;
             }
         }
@@ -1442,6 +1550,7 @@ namespace Game.Client
         {
             FlashKind.Ring => Sprites.Centered($"fx/ring/{diameter}/{frame}", () => EffectArt.Ring(diameter, frame)),
             FlashKind.Sparkles => Sprites.Centered($"fx/sparkles/{diameter}/{frame}", () => EffectArt.Sparkles(diameter, frame)),
+            FlashKind.Impact => Sprites.Centered($"fx/impact/{diameter}/{frame}", () => EffectArt.Impact(diameter, frame)),
             _ => Sprites.Centered($"fx/burst/{diameter}/{frame}", () => EffectArt.Burst(diameter, frame)),
         };
 
@@ -1462,8 +1571,11 @@ namespace Game.Client
             float scale = 1 + pulse * Mathf.Sin(Time.time * 30);
             body.Shape.transform.localScale = new Vector3(1, scale, 1);
             // Leaning into an attack: out and back along its direction.
-            float lean = body.LungeTime > 0 ? Mathf.Sin(body.LungeTime / LungeSeconds * Mathf.PI) * LungeDistance : 0;
-            var offset = (Vector3)(body.Lunge * lean);
+            float lean = body.LungeTime > 0 ? Mathf.Sin(body.LungeTime / LungeSeconds * Mathf.PI) * LungeDistance * body.LungeReach : 0;
+            // Knocked back by a blow: out and back the other way.
+            float knock = body.KnockTime > 0 ? Mathf.Sin(body.KnockTime / KnockSeconds * Mathf.PI) * LungeDistance * body.KnockReach : 0;
+            var offset = (Vector3)(body.Lunge * lean + body.Knock * knock);
+            body.KnockTime = Mathf.Max(0, body.KnockTime - deltaTime);
             body.Shape.transform.localPosition = new Vector3(0, -body.Feet, 0) + offset;
             body.Glow.transform.localPosition = body.Shape.transform.localPosition;
             body.LungeTime = Mathf.Max(0, body.LungeTime - deltaTime);
@@ -1555,7 +1667,16 @@ namespace Game.Client
         {
             if (dead) return (Pose.Stand, 0);
             if (body.HurtTime > 0) return (Pose.Hurt, 0);
-            if (body.StrikeTime > 0) return (Pose.Strike, body.StrikeTime > StrikeSeconds - WindUpSeconds ? 0 : 1);
+            if (body.StrikeTime > 0)
+            {
+                // The combo's steps strike differently: the first winds up and follows through, the second the other
+                // way round (it comes back from where the first ended), and the finisher raises both arms first.
+                bool finisher = body.Combo == World.ComboSteps - 1;
+                float length = body.StrikeLength > 0 ? body.StrikeLength : StrikeSeconds;
+                bool early = body.StrikeTime > length - (finisher ? WindUpSeconds * 2 : WindUpSeconds);
+                if (finisher && early) return (Pose.Cast, 0);
+                return (Pose.Strike, body.Combo == 1 ? (early ? 1 : 0) : (early ? 0 : 1));
+            }
             if (body.CastTime > 0) return (Pose.Cast, 0);
             if (moving) return (Pose.Walk, Mathf.FloorToInt(body.Walked * 8) % CreatureArt.WalkFrames);
             float time = Time.time + body.Seed * 0.61f;
@@ -1579,7 +1700,12 @@ namespace Game.Client
             bool away = !side && facing.Y > 0;
             float x = away ? -0.22f : left ? -0.24f : 0.24f;
             body.Weapon.transform.localPosition = new Vector3(x, -body.Feet + 0.3f, 0) + offset;
-            float sweep = body.SwingTime > 0 ? Mathf.Lerp(-80, 40, body.SwingTime / SwingSeconds) : 0;
+            // Down for the first cut, back up for the second, a wider sweep for the finisher.
+            float through = body.SwingTime / SwingSeconds;
+            float sweep = body.SwingTime <= 0 ? 0
+                : body.Combo == 1 ? Mathf.Lerp(40, -80, through)
+                : body.Combo == World.ComboSteps - 1 ? Mathf.Lerp(-115, 70, through)
+                : Mathf.Lerp(-80, 40, through);
             body.Weapon.transform.localRotation = Quaternion.Euler(0, 0, left ? -sweep : sweep);
             body.Weapon.flipX = left;
             body.Weapon.sortingOrder = away ? order - 1 : order + 2;

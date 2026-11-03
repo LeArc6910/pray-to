@@ -104,6 +104,11 @@ namespace Game.Core
         public int FoodTicks { get; private set; }
 
         internal int AttackCooldown { get; set; }
+        // The basic attack combo (World.Attack): the step of the last attack, when it was, and how long it took to
+        // recover from.
+        public int ComboStep { get; internal set; }
+        internal long LastAttackTick { get; set; } = -1;
+        internal int AttackRecovery { get; set; }
         internal int RespawnTicks { get; set; }
         // Health still to come from a consumable: so much each tick, for so many ticks.
         internal float HealPerTick { get; set; }

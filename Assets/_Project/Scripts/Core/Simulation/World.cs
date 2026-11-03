@@ -32,6 +32,22 @@ namespace Game.Core
         // How far past the player's edge a swing reaches, and how wide it is.
         public const float MeleeReach = 1.1f;
         public const float MeleeArcDegrees = 120;
+        // Basic attacks come in a combo of three (Docs/Combat.md, 연타): each within ComboWindowSeconds after the last
+        // could be made goes on to the next step, and the third, the finisher, hits harder and wider, pushes further,
+        // and takes a little longer to recover from. The attack event's amount is the kind plus ComboStride × step.
+        public const int ComboSteps = 3;
+        public const int ComboStride = 4;
+        public const float ComboWindowSeconds = 0.6f;
+        public const int FinisherDamagePercent = 150;
+        public const int FinisherRecoveryPercent = 130;
+        const float FinisherReach = 0.3f;
+        const float FinisherArcDegrees = 170;
+        const float FinisherPush = 1.8f;
+        const float FinisherShotRadius = 1.6f;
+
+        // The attack kind and combo step an attack event carries.
+        public static BasicAttackKind AttackKindOf(int amount) => (BasicAttackKind)(amount % ComboStride);
+        public static int ComboStepOf(int amount) => amount / ComboStride;
         // Enemies chase until the player is this many times their aggro range away.
         const float LoseInterest = 1.5f;
         const float KnockbackSpeed = 7;
@@ -200,21 +216,33 @@ namespace Game.Core
         void Attack(Player player)
         {
             var stats = player.Stats;
-            player.AttackCooldown = Math.Max(1, (int)MathF.Round(TicksPerSecond / Math.Max(0.1f, stats.AttacksPerSecond)));
+            int interval = Math.Max(1, (int)MathF.Round(TicksPerSecond / Math.Max(0.1f, stats.AttacksPerSecond)));
             var target = DigTarget(player);
             bool rock = target != null && IsRock(target.Value.Tile);
             bool shoot = stats.Attack.Shoots && (target == null || rock);
             var kind = shoot ? stats.Attack.Kind : BasicAttackKind.Swing;
-            _events.Add(new SimEvent(SimEventType.Attack, player.Id, amount: (int)kind, direction: player.Facing));
-            if (shoot)
+            // The next step of the combo if the last attack was just now, else the first.
+            bool going = player.LastAttackTick >= 0 && Tick - player.LastAttackTick <= player.AttackRecovery + Ticks(ComboWindowSeconds);
+            int step = going ? (player.ComboStep + 1) % ComboSteps : 0;
+            bool finisher = step == ComboSteps - 1;
+            int at = _events.Count;
+            if (shoot) Shoot(player, finisher);
+            else if (stats.Attack.Shoots || !Swing(player, finisher))
             {
-                Shoot(player);
-                return;
+                if (target != null)
+                {
+                    // Digging is no combo: it starts again at the first step, at the usual pace.
+                    step = 0;
+                    finisher = false;
+                    if (!rock || HoldsPickaxe(player)) Dig(player);
+                    else _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: -1, position: TileMap.Center(target.Value.X, target.Value.Y)));
+                }
             }
-            if (!stats.Attack.Shoots && Swing(player)) return;
-            if (target == null) return;
-            if (!rock || HoldsPickaxe(player)) Dig(player);
-            else _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: -1, position: TileMap.Center(target.Value.X, target.Value.Y)));
+            player.ComboStep = step;
+            player.LastAttackTick = Tick;
+            player.AttackRecovery = finisher ? interval * FinisherRecoveryPercent / 100 : interval;
+            player.AttackCooldown = player.AttackRecovery;
+            _events.Insert(at, new SimEvent(SimEventType.Attack, player.Id, amount: (int)kind + ComboStride * step, direction: player.Facing));
         }
 
         public static bool HoldsPickaxe(Player player) => player.Equipment[ItemSlot.Weapon]?.Base.IsPickaxe == true;
@@ -222,13 +250,14 @@ namespace Game.Core
         // Walls and ore veins, which need a pickaxe; not the things players place.
         static bool IsRock(TileDefinition tile) => tile.Tile == TileType.Wall || tile.Drillable;
 
-        // An arrow or bolt toward where the player faces, its damage and crit rolled now (see FlyFriendly).
-        void Shoot(Player player)
+        // An arrow or bolt toward where the player faces, its damage and crit rolled now (see FlyFriendly). A finisher's
+        // is bigger and hits harder.
+        void Shoot(Player player, bool finisher = false)
         {
             var stats = player.Stats;
             var shot = stats.Attack;
             bool critical = _random.Chance(stats.CritChance / 100f);
-            float damage = stats.Damage * (critical ? stats.CritDamage / 100f : 1f);
+            float damage = stats.Damage * (critical ? stats.CritDamage / 100f : 1f) * (finisher ? FinisherDamagePercent / 100f : 1);
             var direction = player.Facing;
             _projectiles.Add(new Projectile(
                 _nextId++,
@@ -236,37 +265,41 @@ namespace Game.Core
                 -1,
                 player.Position + direction * PlayerRadius,
                 direction * shot.Speed,
-                shot.Radius,
+                shot.Radius * (finisher ? FinisherShotRadius : 1),
                 damage,
                 Ticks(shot.Range / shot.Speed),
                 friendly: true,
                 tags: stats.AttackTags));
         }
 
-        // Returns whether anything was hit.
-        bool Swing(Player player)
+        // Returns whether anything was hit. A finisher reaches further round and further out, hits harder and pushes
+        // further.
+        bool Swing(Player player, bool finisher = false)
         {
             var stats = player.Stats;
             bool hit = false;
+            float reach = MeleeReach + (finisher ? FinisherReach : 0);
+            float arc = finisher ? FinisherArcDegrees : MeleeArcDegrees;
+            float more = finisher ? FinisherDamagePercent / 100f : 1;
 
             foreach (var enemy in _enemies)
             {
                 if (enemy.IsDead) continue;
-                if (!Combat.InArc(player.Position, player.Facing, enemy.Position, enemy.Definition.Radius, MeleeReach, MeleeArcDegrees)) continue;
+                if (!Combat.InArc(player.Position, player.Facing, enemy.Position, enemy.Definition.Radius, reach, arc)) continue;
 
-                float damage = RollDamage(stats, out bool critical);
-                HitEnemy(player, enemy, damage, critical, player.Position, stats.AttackTags);
+                float damage = RollDamage(stats, out bool critical) * more;
+                HitEnemy(player, enemy, damage, critical, player.Position, stats.AttackTags, push: finisher ? FinisherPush : 1);
                 hit = true;
             }
 
             foreach (var boss in _bosses)
             {
                 if (boss.IsDead) continue;
-                if (!Combat.InArc(player.Position, player.Facing, boss.Position, boss.Definition.Radius, MeleeReach, MeleeArcDegrees)) continue;
+                if (!Combat.InArc(player.Position, player.Facing, boss.Position, boss.Definition.Radius, reach, arc)) continue;
                 hit = true;
                 if (boss.State == BossState.Dormant) Wake(boss);
                 if (boss.Invulnerable) continue;
-                HitBoss(player, boss, RollDamage(stats, out bool critical), critical, stats.AttackTags);
+                HitBoss(player, boss, RollDamage(stats, out bool critical) * more, critical, stats.AttackTags);
             }
             return hit;
         }
