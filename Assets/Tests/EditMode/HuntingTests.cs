@@ -1,12 +1,93 @@
 using System.Linq;
 using NUnit.Framework;
+using static Game.Core.Tests.Builds;
 
 namespace Game.Core.Tests
 {
     // The hunt's top end (Docs/Loot.md, 균열 전설과 세트): tier-5 affixes only past level 50, the rift's own
-    // legendaries, and gear sets.
+    // legendaries, and gear sets. And mana, which skills cost (Docs/Classes.md, 마나).
     public class HuntingTests
     {
+        static ClassDefinition Class(string id) => Classes.Shipped.Find(id);
+
+        static World Room() =>
+            new World(Maps.Room(20), TileMap.Center(10, 10), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, loot: Gear.Data);
+
+        [Test]
+        public void SkillsCostManaAndItComesBackBySecond()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null, Class("fire_mage"));
+            int fireball = player.Skills.ToList().FindIndex(s => s.Id == "fireball");
+            var skill = player.Skills[fireball];
+            Assert.Greater(skill.Mana, 0);
+            Assert.AreEqual(PlayerStats.BaseMana, player.Mana);
+
+            Assert.IsTrue(world.UseSkill(player.Id, fireball, Vec2.Zero));
+            Assert.AreEqual(PlayerStats.BaseMana - skill.Mana, player.Mana, 0.01f);
+
+            player.Mana = skill.Mana - 2;
+            Run(world, skill.Cooldown + 0.05f);
+            player.Mana = skill.Mana - 0.5f;
+            Assert.IsFalse(world.UseSkill(player.Id, fireball, Vec2.Zero), "not mana enough");
+            Assert.AreEqual(0, player.CooldownTicks(fireball), "a refused skill does not start its cooldown");
+            Run(world, 0.5f);
+            Assert.AreEqual(skill.Mana - 0.5f + PlayerStats.BaseManaRegen * 0.5f, player.Mana, 0.05f, "mana comes back at its rate");
+            Assert.IsTrue(world.UseSkill(player.Id, fireball, Vec2.Zero));
+        }
+
+        [Test]
+        public void AManaPotionFillsHalfTheManaAtOnce()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null, Class("fire_mage"));
+            var potion = Gear.Data.FindConsumable("mana_potion");
+            Assert.IsTrue(potion.RestoresMana);
+            player.Inventory.AddConsumable(potion, 2);
+
+            Assert.IsFalse(world.UseConsumable(player.Id, potion), "no use at full mana");
+            player.Mana = 10;
+            float health = player.Health;
+            Assert.IsTrue(world.UseConsumable(player.Id, potion));
+            Assert.AreEqual(10 + PlayerStats.BaseMana * potion.Heal / 100f, player.Mana, 0.01f);
+            Assert.AreEqual(health, player.Health, "it gives no health");
+            Assert.AreEqual(1, player.Inventory.CountOf(potion));
+        }
+
+        [Test]
+        public void GearAndPassivesAddMana()
+        {
+            var plain = PlayerStats.From(new Equipment());
+            Assert.AreEqual(PlayerStats.BaseMana, plain.MaxMana);
+            Assert.AreEqual(PlayerStats.BaseManaRegen, plain.ManaRegen);
+
+            var equipment = new Equipment();
+            equipment.Equip(Gear.Plain("copper_helmet", affixes: new[] { Gear.Affix("wise", 12), Gear.Affix("spring", 1) }));
+            var worn = PlayerStats.From(equipment);
+            Assert.AreEqual(PlayerStats.BaseMana + 12, worn.MaxMana);
+            Assert.AreEqual(PlayerStats.BaseManaRegen + 1, worn.ManaRegen);
+
+            var world = Room();
+            var player = world.AddPlayer("a", null, Class("fire_mage"));
+            player.Experience = Leveling.TotalFor(3);
+            Assert.IsTrue(world.AllocatePassive(player.Id, Classes.Shipped.FindPassive("int1")));
+            Assert.AreEqual(PlayerStats.BaseMana + 15, player.Stats.MaxMana);
+            Assert.AreEqual(player.Stats.MaxMana, player.Mana, 0.01f, "a bigger pool keeps the share that was full");
+        }
+
+        [Test]
+        public void TheSnapshotCarriesTheManaAndSkillsListTheirCost()
+        {
+            var snapshot = SnapshotMessage.Decode(new SnapshotMessage(
+                1,
+                new SelfState(0, new Vec2(1, 1), 50, 100, 5, mana: 37.5f, maxMana: 140),
+                new EntityState[0], new ProjectileState[0], new HazardState[0], new SimEvent[0]).Encode());
+            Assert.AreEqual(37.5f, snapshot.Self.Mana);
+            Assert.AreEqual(140, snapshot.Self.MaxMana);
+            Assert.IsTrue(SkillText.Numbers(Classes.Skill("meteor")).Contains("마나 30"));
+            Assert.IsTrue(Classes.Shipped.Skills.All(s => s.Mana > 0), "every skill has a cost");
+        }
+
         [Test]
         public void TheFifthTierOfAnAffixNeedsLevelFifty()
         {

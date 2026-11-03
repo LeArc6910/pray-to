@@ -255,7 +255,8 @@ namespace Game.Core
                     float buffSeconds = row["buff_seconds"].Length == 0 ? 0 : SheetValues.ParseDecimal(row["buff_seconds"], "buff_seconds");
                     if (buff.Count > 0 != buffSeconds > 0) throw new FormatException("buff와 buff_seconds는 함께 채우거나 함께 비웁니다.");
                     string effect = row["effect"];
-                    if (effect.Length > 0 && effect != ConsumableDefinition.Recall) throw new FormatException($"effect '{effect}'는 모릅니다(비우거나 recall).");
+                    if (effect.Length > 0 && effect != ConsumableDefinition.Recall && effect != ConsumableDefinition.ManaEffect)
+                        throw new FormatException($"effect '{effect}'는 모릅니다(비우거나 recall, mana).");
                     if (heal < (buff.Count > 0 || effect.Length > 0 ? 0 : 1) || heal > 100)
                         throw new FormatException("heal은 1~100(최대 생명력의 %)이어야 합니다. buff나 effect가 있으면 0도 됩니다.");
                     float cooldown = SheetValues.ParseDecimal(row["cooldown"], "cooldown");

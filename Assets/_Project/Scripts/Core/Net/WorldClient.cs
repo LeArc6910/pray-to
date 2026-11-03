@@ -262,6 +262,9 @@ namespace Game.Core
         public Vec2 Facing { get; private set; } = new Vec2(0, -1);
         public float Health { get; private set; }
         public float MaxHealth { get; private set; } = 1;
+        // Full until the first snapshot says otherwise, as a player joins with.
+        public float Mana { get; private set; } = PlayerStats.BaseMana;
+        public float MaxMana { get; private set; } = PlayerStats.BaseMana;
         public float MoveSpeed { get; private set; } = PlayerStats.BaseMoveSpeed;
         // The player's own burning and chilled marks (StatusBits).
         public byte SelfStatus { get; private set; }
@@ -653,6 +656,9 @@ namespace Game.Core
         // Seconds until the skill in the slot is ready, and until its buff runs out, counting down between snapshots.
         public float CooldownLeft(int slot) => SkillTimeLeft(_cooldowns, slot);
 
+        // Whether the mana the host last said is enough for the skill in the slot.
+        public bool HasManaFor(int slot) => slot >= 0 && slot < Skills.Count && Mana >= Skills[slot].Mana;
+
         public float BuffLeft(int slot) => SkillTimeLeft(_buffs, slot);
 
         float SkillTimeLeft(int[] ticks, int slot)
@@ -665,8 +671,9 @@ namespace Game.Core
         // starts on screen at once; the host decides and the next snapshot says what really happened.
         public byte[] SkillCommand(int slot, Vec2 aim)
         {
-            if (Status != ClientStatus.Playing || IsDead || slot < 0 || slot >= Skills.Count || CooldownLeft(slot) > 0) return null;
+            if (Status != ClientStatus.Playing || IsDead || slot < 0 || slot >= Skills.Count || CooldownLeft(slot) > 0 || !HasManaFor(slot)) return null;
             _cooldowns[slot] = Skills[slot].CooldownTicks + (int)Math.Ceiling(HostTick - _skillsTick);
+            Mana -= Skills[slot].Mana;
             return new SkillCommandMessage(slot, aim).Encode();
         }
 
@@ -739,6 +746,7 @@ namespace Game.Core
         {
             if (Status != ClientStatus.Playing || _snapshots.Count == 0 || IsDead || consumable == null || Bag.CountOf(consumable) == 0) return null;
             if (ConsumableCooldownLeft > 0 || (Health >= MaxHealth && !consumable.UsableAtFullHealth)) return null;
+            if (consumable.RestoresMana && Mana >= MaxMana) return null;
             _consumableCooldown = World.Ticks(consumable.Cooldown) + (int)Math.Ceiling(HostTick - _skillsTick);
             return new InventoryCommandMessage(InventoryCommand.UseConsumable, 0, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode();
         }
@@ -1121,6 +1129,8 @@ namespace Game.Core
             if (buffsChanged) RefreshStats();
             Health = self.Health;
             MaxHealth = self.MaxHealth;
+            Mana = self.Mana;
+            MaxMana = self.MaxMana;
             MoveSpeed = self.MoveSpeed;
             SelfStatus = self.Status;
             Bed = self.BedX >= 0 && self.BedY >= 0 ? (self.BedX, self.BedY) : ((int, int)?)null;

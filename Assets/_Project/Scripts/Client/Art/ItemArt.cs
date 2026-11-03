@@ -214,6 +214,21 @@ namespace Game.Client
             ".gRRRpg.",
             "..gppg..").Outlined(Outline);
 
+        // The same flask, filled blue.
+        static readonly PixelImage ManaPotion = PixelImage.FromRows(new Dictionary<char, Rgba>(PotionColors)
+            {
+                ['R'] = Rgba.Hex("#4A7CE8"),
+                ['p'] = Rgba.Hex("#2A3FA0"),
+            },
+            "...cc...",
+            "...gg...",
+            "...gg...",
+            "..gRRg..",
+            ".gRwRRg.",
+            ".gRRRRg.",
+            ".gRRRpg.",
+            "..gppg..").Outlined(Outline);
+
         static readonly Dictionary<char, Rgba> FoodColors = new Dictionary<char, Rgba>(Common)
         {
             ['L'] = Rgba.Hex("#E8A866"),
@@ -283,6 +298,7 @@ namespace Game.Client
             "spicy_fry" => SpicyFry,
             "mushroom_soup" => MushroomSoup,
             "recall_scroll" => RecallScroll,
+            "mana_potion" => ManaPotion,
             "grilled_fish" => Ramped(FishRows, Ramp.Of("#C4783E")),
             "fish_stew" => MushroomSoup,
             "eel_skewer" => SpicyFry,

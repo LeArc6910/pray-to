@@ -23,6 +23,7 @@ namespace Game.Core
             _buffTicks = new int[Skills.Count];
             Stats = PlayerStats.From(equipment, classes);
             Health = Stats.MaxHealth;
+            Mana = Stats.MaxMana;
         }
 
         public int Id { get; }
@@ -31,6 +32,8 @@ namespace Game.Core
         public Vec2 Facing { get; internal set; } = new Vec2(0, -1);
         public float Health { get; internal set; }
         public bool IsDead => Health <= 0;
+        // What is left for skills (SkillDefinition.Mana), up to Stats.MaxMana.
+        public float Mana { get; internal set; }
         public Equipment Equipment { get; }
         public Inventory Inventory { get; }
         // Goes up whenever the bag or the equipment changes, so the host knows when to send them again.
@@ -171,10 +174,11 @@ namespace Game.Core
             RefreshStats();
         }
 
-        // Works the numbers out again after the gear or buffs changed, keeping the same share of health.
+        // Works the numbers out again after the gear or buffs changed, keeping the same share of health and mana.
         internal void RefreshStats()
         {
             float healthShare = Health / Stats.MaxHealth;
+            float manaShare = Mana / Stats.MaxMana;
             var buffs = new List<SkillDefinition>();
             for (int slot = 0; slot < Skills.Count; slot++)
             {
@@ -182,6 +186,7 @@ namespace Game.Core
             }
             Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
+            Mana = manaShare * Stats.MaxMana;
         }
     }
 

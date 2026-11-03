@@ -88,7 +88,7 @@
 | cooldown | 마신 뒤 모든 소모품을 다시 쓸 수 있을 때까지(초) |
 | level, weight | 드랍 레벨이 level 이상일 때 나오고, 그중 weight 비율로 고른다 |
 | description | 가방 창에 보이는 설명 |
-| effect | (선택) 그 밖에 하는 일. 지금은 `recall`(침대나 시작 지점으로 귀환, `Docs/Crafting.md`)뿐이다. 있으면 heal이 0이어도 되고 생명력이 가득해도 쓴다 |
+| effect | (선택) 그 밖에 하는 일. `recall`(침대나 시작 지점으로 귀환, `Docs/Crafting.md`), `mana`(생명력 대신 마나를 heal%만큼 바로 채운다. 마나가 가득하면 쓰지 않는다). 있으면 heal이 0이어도 되고 생명력이 가득해도 쓴다 |
 | buff, buff_seconds | 음식이 거는 능력치(장비와 같은 문법, 범위는 안 됨)와 그 시간(초). 둘 다 채우거나 둘 다 비운다. 이 열이 없는 옛 시트도 읽는다 |
 
 ### runewords.csv
@@ -107,7 +107,7 @@
 | `Fire:Damage+20%` | 태그 | 화염 피해 20% 증가 |
 | `Melee&Fire:Damage+20%` | 태그 여러 개 (모두 있어야 적용) | 근접 화염 피해 20% 증가 |
 
-- 능력치: `MaxHealth` 최대 생명력, `HealthRegen` 생명력 재생, `Armor` 방어도, `MoveSpeed` 이동 속도, `Damage` 피해, `AttackSpeed` 공격 속도, `CritChance` 치명타 확률, `CritDamage` 치명타 피해, `MiningSpeed` 채굴 속도, `ItemRarity` 아이템 희귀도. `CritChance`와 `CritDamage`는 고정 수치 자체가 %다
+- 능력치: `MaxHealth` 최대 생명력, `HealthRegen` 생명력 재생, `Armor` 방어도, `MoveSpeed` 이동 속도, `Damage` 피해, `AttackSpeed` 공격 속도, `CritChance` 치명타 확률, `CritDamage` 치명타 피해, `MiningSpeed` 채굴 속도, `ItemRarity` 아이템 희귀도, `MaxMana` 최대 마나, `ManaRegen` 초당 마나 재생. `CritChance`와 `CritDamage`는 고정 수치 자체가 %다
 - 태그: `Melee` 근접, `Ranged` 원거리, `Magic` 마법, `Summon` 소환, `Fire` 화염, `Cold` 냉기, `Lightning` 번개
 
 ## 조정하는 법
@@ -173,6 +173,7 @@
   - 공허 순례자의 두건·옷·신(세트), 균열 칼날(근접 무기), 균열의 눈(목걸이)
 - **세트**: 새 시트 `sets.csv`와 `item_bases.csv`의 새 `set` 열. 같은 세트를 여럿 입으면 그 수만큼의 보너스가 붙는다(`PlayerStats.From`). 장비 설명에 "세트: 이름"과 개수별 보너스가 보인다
   - 공허 순례자: 2개 피해 15% · 생명력 +40, 3개 치명타 확률 +6 · 치명타 피해 +40 · 이동 속도 8%
+- **마나 접사**(`Docs/Classes.md`의 마나): 접두사 "지혜로운"(최대 마나 +10~15부터 5단계 +54~68), 접미사 "샘의"(마나 재생 +1부터 5단계 +6~7)
 
 ### sets.csv
 

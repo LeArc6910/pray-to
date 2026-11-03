@@ -200,8 +200,9 @@ namespace Game.Core
             return true;
         }
 
-        // Drinks or eats one from the bag: it heals over its seconds, and then every consumable waits its cooldown.
-        // False when the player cannot: dead, none left, still waiting, or already at full health.
+        // Drinks or eats one from the bag: it heals over its seconds (a mana potion fills mana at once instead), and then
+        // every consumable waits its cooldown. False when the player cannot: dead, none left, still waiting, or already
+        // full.
         public bool UseConsumable(int playerId, ConsumableDefinition consumable)
         {
             var player = FindPlayer(playerId);
@@ -209,6 +210,7 @@ namespace Game.Core
             // A potion is no use at full health; a food still gives its buff, a recall scroll still takes them home.
             if (player.Health >= player.Stats.MaxHealth && !consumable.UsableAtFullHealth) return false;
             if (consumable.Recalls && player.Recalling) return false;
+            if (consumable.RestoresMana && player.Mana >= player.Stats.MaxMana) return false;
             if (!player.Inventory.TakeConsumable(consumable)) return false;
             if (consumable.Recalls) StartRecall(player);
 
@@ -217,7 +219,11 @@ namespace Game.Core
                 player.Eat(consumable);
                 _events.Add(new SimEvent(SimEventType.Ate, player.Id, amount: Loot?.Consumables.ToList().IndexOf(consumable) ?? -1));
             }
-            if (consumable.Heal > 0)
+            if (consumable.RestoresMana)
+            {
+                player.Mana = Math.Min(player.Stats.MaxMana, player.Mana + player.Stats.MaxMana * consumable.Heal / 100f);
+            }
+            else if (consumable.Heal > 0)
             {
                 int ticks = Ticks(consumable.Seconds);
                 float amount = player.Stats.MaxHealth * consumable.Heal / 100f;

@@ -181,6 +181,7 @@ namespace Game.Core
                 if (--player.RespawnTicks > 0) return;
                 player.Position = HomeOf(player);
                 player.Health = player.Stats.MaxHealth;
+                player.Mana = player.Stats.MaxMana;
                 player.Corrections++;
                 return;
             }
@@ -427,9 +428,10 @@ namespace Game.Core
         }
 
         // Gear's regeneration always, resting once the player has gone unhurt for a while, and whatever a consumable
-        // still has to give. See Docs/Combat.md (healing).
+        // still has to give. See Docs/Combat.md (healing). Mana comes back at its own rate all the while.
         void Heal(Player player)
         {
+            player.Mana = Math.Min(player.Stats.MaxMana, player.Mana + player.Stats.ManaRegen * TickSeconds);
             float perSecond = player.Stats.HealthRegen;
             int restTicks = Ticks(RestDelaySeconds);
             if (player.RestingTicks < restTicks) player.RestingTicks++;

@@ -19,6 +19,8 @@ namespace Game.Core
             StatType.CritDamage => "치명타 피해",
             StatType.MiningSpeed => "채굴 속도",
             StatType.ItemRarity => "아이템 희귀도",
+            StatType.MaxMana => "최대 마나",
+            StatType.ManaRegen => "마나 재생",
             _ => stat.ToString(),
         };
 
@@ -97,6 +99,7 @@ namespace Game.Core
                     parts.Add($"{Number(skill.Range)}칸 안의 적");
                     break;
             }
+            if (skill.Mana > 0) parts.Add($"마나 {skill.Mana}");
             parts.Add($"재사용 {Number(skill.Cooldown)}초");
             return string.Join(" · ", parts);
         }

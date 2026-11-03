@@ -64,4 +64,4 @@ pilgrim_hood,공허 순례자의 두건,helmet,45,,Armor+40~50;MaxHealth+40~50;C
 pilgrim_robe,공허 순례자의 옷,chest,45,,Armor+70~85;MaxHealth+70~80;HealthRegen+3,3,0,,rift,4,,pilgrim
 pilgrim_treads,공허 순례자의 신,boots,45,,Armor+30~36;MoveSpeed+10%;MaxHealth+30~36,2,0,,rift,4,,pilgrim
 rift_edge,균열 칼날,weapon,45,melee,Damage+70~80;CritChance+6;CritDamage+40,3,0,,rift,4,,
-rift_eye,균열의 눈,amulet,45,,Damage+18%;MaxHealth+60~70;AttackSpeed+10%,1,0,,rift,4,,
+rift_eye,균열의 눈,amulet,45,,Damage+18%;MaxHealth+60~70;AttackSpeed+10%;MaxMana+40;ManaRegen+3,1,0,,rift,4,,

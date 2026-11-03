@@ -38,7 +38,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.43.0";
+        public const string Version = "0.44.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -802,8 +802,12 @@ namespace Game.Core
             byte status = 0,
             int experience = 0,
             int bedX = -1,
-            int bedY = -1)
+            int bedY = -1,
+            float mana = 0,
+            float maxMana = PlayerStats.BaseMana)
         {
+            Mana = mana;
+            MaxMana = maxMana;
             Status = status;
             Experience = experience;
             BedX = bedX;
@@ -825,6 +829,8 @@ namespace Game.Core
         public float Health { get; }
         public float MaxHealth { get; }
         public float MoveSpeed { get; }
+        public float Mana { get; }
+        public float MaxMana { get; }
         // Per skill slot: ticks until it is ready, and until the buff it put on runs out.
         public IReadOnlyList<int> Cooldowns { get; }
         public IReadOnlyList<int> Buffs { get; }
@@ -903,6 +909,8 @@ namespace Game.Core
             w.Write(Self.Health);
             w.Write(Self.MaxHealth);
             w.Write(Self.MoveSpeed);
+            w.Write(Self.Mana);
+            w.Write(Self.MaxMana);
             w.Write((byte)Self.Cooldowns.Count);
             for (int slot = 0; slot < Self.Cooldowns.Count; slot++)
             {
@@ -982,6 +990,8 @@ namespace Game.Core
             float health = r.ReadSingle();
             float maxHealth = r.ReadSingle();
             float moveSpeed = r.ReadSingle();
+            float mana = r.ReadSingle();
+            float maxMana = r.ReadSingle();
             var cooldowns = new List<int>();
             var buffs = new List<int>();
             for (int slots = r.ReadByte(); slots > 0; slots--)
@@ -997,7 +1007,7 @@ namespace Game.Core
             int bedX = r.ReadInt16();
             int bedY = r.ReadInt16();
             var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, consumableCooldown, food, foodTicks, status, experience,
-                bedX, bedY);
+                bedX, bedY, mana, maxMana);
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);

@@ -35,6 +35,11 @@ shocking,,,,10,560,Lightning:Damage+16~22%
 shocking,,,,20,320,Lightning:Damage+23~30%
 shocking,,,,30,160,Lightning:Damage+31~40%
 shocking,,,,50,80,Lightning:Damage+42~54%
+wise,prefix,지혜로운,helmet|ring|amulet,1,800,MaxMana+10~15
+wise,,,,10,560,MaxMana+18~24
+wise,,,,20,320,MaxMana+28~36
+wise,,,,30,160,MaxMana+40~50
+wise,,,,50,80,MaxMana+54~68
 # 접미사: 속도, 치명타, 생존, 채집
 swift,suffix,신속의,weapon|ring,1,1000,AttackSpeed+3~5%
 swift,,,,10,700,AttackSpeed+6~8%
@@ -61,6 +66,11 @@ regen,,,,10,700,HealthRegen+2
 regen,,,,20,400,HealthRegen+3~4
 regen,,,,30,200,HealthRegen+5~6
 regen,,,,50,100,HealthRegen+7~8
+spring,suffix,샘의,weapon|helmet|ring|amulet,1,800,ManaRegen+1
+spring,,,,10,560,ManaRegen+2
+spring,,,,20,320,ManaRegen+3
+spring,,,,30,160,ManaRegen+4~5
+spring,,,,50,80,ManaRegen+6~7
 guarding,suffix,수호의,armor,1,1000,Armor+8~12%
 guarding,,,,10,700,Armor+13~18%
 guarding,,,,20,400,Armor+19~25%

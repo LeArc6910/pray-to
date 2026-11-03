@@ -33,8 +33,10 @@ namespace Game.Core
             IReadOnlyList<Modifier> modifiers,
             SkillTag grants,
             string description,
-            int count = 1)
+            int count = 1,
+            int mana = 0)
         {
+            Mana = mana;
             Id = id;
             Name = name;
             Class = owner;
@@ -61,6 +63,8 @@ namespace Game.Core
         public int Damage { get; }
         // Seconds.
         public float Cooldown { get; }
+        // What using it costs (PlayerStats.MaxMana); 0 for nothing.
+        public int Mana { get; }
         // A nova's reach, or how wide a projectile bursts (0: only what it hits).
         public float Radius { get; }
         // A projectile's tiles per second and how far it flies. For a summon, how fast its spirits move and how far
@@ -365,7 +369,8 @@ namespace Game.Core
                         FixedModifiers(row["modifiers"]),
                         ParseTags(row["grants"]),
                         row["description"],
-                        row["count"].Length == 0 ? 1 : Whole(row, "count"));
+                        row["count"].Length == 0 ? 1 : Whole(row, "count"),
+                        Whole(row, "mana"));
                     Validate(skill);
                     owner.Add(skill);
                     skills.Add(skill);
@@ -385,6 +390,7 @@ namespace Game.Core
             }
 
             if (skill.Cooldown <= 0) throw new FormatException("cooldown은 0보다 커야 합니다.");
+            if (skill.Mana < 0 || skill.Mana > PlayerStats.BaseMana) throw new FormatException($"mana는 0에서 {PlayerStats.BaseMana} 사이여야 합니다.");
             if (skill.Count < 1 || skill.Count > MaxCount) throw new FormatException($"count는 1에서 {MaxCount} 사이여야 합니다.");
             switch (skill.Kind)
             {

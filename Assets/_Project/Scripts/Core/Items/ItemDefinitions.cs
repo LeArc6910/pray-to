@@ -223,10 +223,13 @@ namespace Game.Core
         public IReadOnlyList<Modifier> Buff { get; }
         public float BuffSeconds { get; }
         public bool IsFood => Buff.Count > 0;
-        // Something else it does (consumables.csv effect): "recall" takes its user home. Empty for none.
+        // Something else it does (consumables.csv effect): "recall" takes its user home; "mana" gives back mana
+        // instead of health, its Heal percent of the most at once. Empty for none.
         public string Effect { get; }
         public bool Recalls => Effect == Recall;
         public const string Recall = "recall";
+        public bool RestoresMana => Effect == ManaEffect;
+        public const string ManaEffect = "mana";
         // Whether it is any use at full health.
         public bool UsableAtFullHealth => IsFood || Effect.Length > 0;
         public int BuffTicks => World.Ticks(BuffSeconds);

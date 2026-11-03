@@ -39,6 +39,9 @@ namespace Game.Core
         public const float BaseAttacksPerSecond = 2;
         public const float BaseCritChance = 5;
         public const float BaseCritDamage = 150;
+        // Skills cost mana (SkillDefinition.Mana); it comes back by itself, so much a second.
+        public const float BaseMana = 100;
+        public const float BaseManaRegen = 5;
 
         readonly StatSheet _sheet;
         readonly bool _armed;
@@ -52,6 +55,8 @@ namespace Game.Core
             AttackTags = weaponTags | grantedTags;
             MaxHealth = (float)sheet.Get(StatType.MaxHealth, BaseHealth);
             HealthRegen = (float)sheet.Get(StatType.HealthRegen);
+            MaxMana = Math.Max(1, (float)sheet.Get(StatType.MaxMana, BaseMana));
+            ManaRegen = Math.Max(0, (float)sheet.Get(StatType.ManaRegen, BaseManaRegen));
             Armor = (float)sheet.Get(StatType.Armor);
             MoveSpeed = (float)sheet.Get(StatType.MoveSpeed, BaseMoveSpeed);
             Damage = DamageFor(AttackTags);
@@ -73,6 +78,9 @@ namespace Game.Core
         public float MaxHealth { get; }
         // Per second.
         public float HealthRegen { get; }
+        public float MaxMana { get; }
+        // Mana a second.
+        public float ManaRegen { get; }
         public float Armor { get; }
         // Tiles per second.
         public float MoveSpeed { get; }

@@ -48,13 +48,13 @@ namespace Game.Core.Tests
         [Test]
         public void SkillsDescribeTheirNumbers()
         {
-            Assert.AreEqual("피해 150% · 둘레 1.8칸 · 재사용 4초", SkillText.Numbers(Classes.Skill("whirlwind")));
-            Assert.AreEqual("피해 120% · 사거리 10칸 · 폭발 1.2칸 · 재사용 1.5초", SkillText.Numbers(Classes.Skill("fireball")));
-            Assert.AreEqual("6초 동안 근접 피해 30% 증가, 공격 속도 15% 증가 · 재사용 15초", SkillText.Numbers(Classes.Skill("war_cry")));
-            Assert.AreEqual("8초 동안 모든 공격에 화염 태그 · 재사용 16초", SkillText.Numbers(Classes.Skill("flame_brand")));
+            Assert.AreEqual("피해 150% · 둘레 1.8칸 · 마나 10 · 재사용 4초", SkillText.Numbers(Classes.Skill("whirlwind")));
+            Assert.AreEqual("피해 120% · 사거리 10칸 · 폭발 1.2칸 · 마나 5 · 재사용 1.5초", SkillText.Numbers(Classes.Skill("fireball")));
+            Assert.AreEqual("6초 동안 근접 피해 30% 증가, 공격 속도 15% 증가 · 마나 15 · 재사용 15초", SkillText.Numbers(Classes.Skill("war_cry")));
+            Assert.AreEqual("8초 동안 모든 공격에 화염 태그 · 마나 15 · 재사용 16초", SkillText.Numbers(Classes.Skill("flame_brand")));
             Assert.AreEqual("최대 생명력 20% 증가, 근접 피해 10% 증가", SkillText.Passive(Warrior));
-            Assert.AreEqual("피해 70% × 5발 · 사거리 9칸 · 재사용 4초", SkillText.Numbers(Classes.Skill("volley")));
-            Assert.AreEqual("2마리 · 15초 · 한 번에 피해 40% · 7칸 안의 적 · 재사용 18초", SkillText.Numbers(Classes.Skill("spirits")));
+            Assert.AreEqual("피해 70% × 5발 · 사거리 9칸 · 마나 12 · 재사용 4초", SkillText.Numbers(Classes.Skill("volley")));
+            Assert.AreEqual("2마리 · 15초 · 한 번에 피해 40% · 7칸 안의 적 · 마나 25 · 재사용 18초", SkillText.Numbers(Classes.Skill("spirits")));
         }
 
         [Test]

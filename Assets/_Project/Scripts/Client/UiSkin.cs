@@ -15,6 +15,7 @@ namespace Game.Client
         public const int PanelPadding = 12;
         static readonly Rgba HealthColor = Rgba.Hex("#D24A3C");
         static readonly Rgba BossColor = Rgba.Hex("#A8324A");
+        static readonly Rgba ManaColor = Rgba.Hex("#3C6ED2");
 
 #if UNITY_EDITOR
         // High-resolution backgrounds exist only in the editor; players have none to drop.
@@ -26,6 +27,7 @@ namespace Game.Client
         static GUIStyle _barText;
         static Texture2D _healthFill;
         static Texture2D _bossFill;
+        static Texture2D _manaFill;
 
         // Call inside OnGUI: Unity's default skin can only be read there.
         public static GUISkin Get()
@@ -71,12 +73,13 @@ namespace Game.Client
             _barWell.normal.background = inset;
             _healthFill = Texture(UiArt.BarFill(HealthColor));
             _bossFill = Texture(UiArt.BarFill(BossColor));
+            _manaFill = Texture(UiArt.BarFill(ManaColor));
             _skin = skin;
             return skin;
         }
 
         // A bar in a dark well: the fill stretched to the share it shows, and the text over it with a shadow.
-        public static void Bar(Rect area, float share, string text, bool boss = false)
+        public static void Bar(Rect area, float share, string text, bool boss = false, bool mana = false, int textSize = 13)
         {
             if (_barWell == null) return;
             _barText ??= new GUIStyle(GUI.skin.label)
@@ -85,11 +88,11 @@ namespace Game.Client
                 padding = new RectOffset(0, 0, 0, 0),
                 margin = new RectOffset(0, 0, 0, 0),
             };
-            Ui.Text(_barText, 13, bold: true);
+            Ui.Text(_barText, textSize, bold: true);
             GUI.Box(area, GUIContent.none, _barWell);
             float edge = UiArt.InsetBorder * UiArt.Scale;
             var inside = new Rect(area.x + edge, area.y + edge, area.width - edge * 2, area.height - edge * 2);
-            GUI.DrawTexture(new Rect(inside.x, inside.y, inside.width * Mathf.Clamp01(share), inside.height), boss ? _bossFill : _healthFill);
+            GUI.DrawTexture(new Rect(inside.x, inside.y, inside.width * Mathf.Clamp01(share), inside.height), boss ? _bossFill : mana ? _manaFill : _healthFill);
             if (string.IsNullOrEmpty(text)) return;
             var previous = GUI.color;
             GUI.color = new Color(0, 0, 0, 0.8f * previous.a);

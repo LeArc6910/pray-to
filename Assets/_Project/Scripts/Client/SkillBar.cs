@@ -91,7 +91,8 @@ namespace Game.Client
                 if (buff > 0) Outline(area, color, 3);
 
                 var previous = GUI.color;
-                GUI.color = cooldown > 0 || client.IsDead ? new Color(1, 1, 1, 0.45f) : Color.white;
+                // Dim while it waits, and also when there is not mana enough for it.
+                GUI.color = cooldown > 0 || client.IsDead || !client.HasManaFor(slot) ? new Color(1, 1, 1, 0.45f) : Color.white;
                 GUI.Label(NameArea(area), Ui.Wrap(skill.Name, _nameStyle, area.width - 6), _nameStyle);
                 GUI.color = previous;
                 if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.SkillKeyName(slot), _keyStyle);

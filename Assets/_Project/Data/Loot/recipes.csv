@@ -87,6 +87,7 @@ barn,barn,1,stone:20|iron_bar:4|slime_gel:4,Workbench
 cheese,cheese,1,milk:2,PreservesJar
 warm_milk,warm_milk,1,milk:1,Furnace
 healing_potion,healing_potion,1,slime_gel:3,
+mana_potion,mana_potion,1,slime_gel:2|glow_spore:1,
 torch,torch,4,stone:1|slime_gel:1,
 roasted_mushroom,roasted_mushroom,1,mushroom:2,Furnace
 watering_can,watering_can,1,copper_ore:4|stone:2,Workbench

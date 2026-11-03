@@ -14,6 +14,8 @@ namespace Game.Core
         CritDamage,
         MiningSpeed,
         ItemRarity,
+        MaxMana,
+        ManaRegen,
     }
 
     // Weapons and skills carry tags. Class combinations come from modifiers that only count for some tags.

@@ -30,6 +30,7 @@ namespace Game.Client
         const float ShortSideTiles = 14;
         // Its frame is 4 points thick at top and bottom, which leaves a 14-point well for a 12-point line of text.
         const float HealthBarHeight = 22;
+        const float ManaBarHeight = 16;
         const float GuideCheckSeconds = 0.5f;
         // A goal's hint shows this long after the goal comes up; then only the goal stays.
         const float GoalHintSeconds = 30;
@@ -1199,7 +1200,7 @@ namespace Game.Client
             float gap = Mathf.Max(label.margin.top, label.margin.bottom);
             float height = box.padding.vertical + (lines.Count > 0 ? label.margin.top + label.margin.bottom + gap * (lines.Count - 1) : 0);
             foreach (string line in lines) height += label.CalcHeight(new GUIContent(line), width);
-            if (playing) height += HealthBarHeight;
+            if (playing) height += HealthBarHeight + ManaBarHeight + 2;
             Ui.HudHeight = Mathf.Ceil(height) + 2;
 
             GUILayout.BeginArea(Ui.HudArea, box);
@@ -1208,6 +1209,10 @@ namespace Game.Client
                 var bar = GUILayoutUtility.GetRect(width, HealthBarHeight, GUILayout.ExpandWidth(true));
                 float share = _client.MaxHealth > 0 ? _client.Health / _client.MaxHealth : 0;
                 UiSkin.Bar(bar, share, $"생명력 {Mathf.CeilToInt(_client.Health)} / {Mathf.CeilToInt(_client.MaxHealth)}");
+                GUILayout.Space(2);
+                var manaBar = GUILayoutUtility.GetRect(width, ManaBarHeight, GUILayout.ExpandWidth(true));
+                float manaShare = _client.MaxMana > 0 ? _client.Mana / _client.MaxMana : 0;
+                UiSkin.Bar(manaBar, manaShare, $"마나 {Mathf.FloorToInt(_client.Mana)} / {Mathf.CeilToInt(_client.MaxMana)}", mana: true, textSize: 12);
             }
             foreach (string line in lines) GUILayout.Label(line, label);
             GUILayout.EndArea();

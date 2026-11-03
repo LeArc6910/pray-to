@@ -47,14 +47,16 @@ namespace Game.Core
         }
 
         // Uses the skill in the slot, toward aim or the way the player faces when aim is zero. False when the
-        // player cannot: dead, no such slot, or the skill is still cooling down.
+        // player cannot: dead, no such slot, the skill is still cooling down, or there is not mana enough for it.
         public bool UseSkill(int playerId, int slot, Vec2 aim)
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || slot < 0 || slot >= player.Skills.Count || player.CooldownTicks(slot) > 0) return false;
+            var skill = player.Skills[slot];
+            if (player.Mana < skill.Mana) return false;
             if (aim.IsFinite && aim.LengthSquared > 1e-6f) player.Facing = aim.Normalized;
 
-            var skill = player.Skills[slot];
+            player.Mana -= skill.Mana;
             player.StartCooldown(slot);
             _events.Add(new SimEvent(SimEventType.SkillUsed, player.Id, amount: slot, direction: player.Facing));
             switch (skill.Kind)

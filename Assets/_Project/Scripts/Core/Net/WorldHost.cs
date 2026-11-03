@@ -492,7 +492,9 @@ namespace Game.Core
                 (byte)(viewer.Afflictions.Bits | (viewer.Recalling ? StatusBits.Recalling : 0) | (viewer.Sleeping ? StatusBits.Sleeping : 0)),
                 viewer.Experience,
                 World.BedOf(viewer)?.X ?? -1,
-                World.BedOf(viewer)?.Y ?? -1);
+                World.BedOf(viewer)?.Y ?? -1,
+                viewer.Mana,
+                viewer.Stats.MaxMana);
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),
