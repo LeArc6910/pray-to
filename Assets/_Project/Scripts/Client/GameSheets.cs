@@ -24,6 +24,7 @@ namespace Game.Client
         public TextAsset bossAttacks;
         public TextAsset classes;
         public TextAsset skills;
+        public TextAsset passives;
         public TextAsset goals;
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
@@ -37,7 +38,7 @@ namespace Game.Client
 
         public BossData LoadBosses(MonsterData monsterData) => BossSheet.Parse(Text(bosses), Text(bossAttacks), monsterData);
 
-        public ClassData LoadClasses() => ClassSheet.Parse(Text(classes), Text(skills));
+        public ClassData LoadClasses() => ClassSheet.Parse(Text(classes), Text(skills), Text(passives));
 
         // Without the sheet (an asset made before it existed) there are no goals.
         public GuideData LoadGuide(LootData loot) => GuideSheet.Parse(Text(goals), loot);

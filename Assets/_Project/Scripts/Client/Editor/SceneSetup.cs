@@ -63,6 +63,7 @@ namespace Game.Client.Editor
             sheets.bossAttacks = Sheet(BossesFolder + BossSheet.AttacksFile);
             sheets.classes = Sheet(ClassesFolder + ClassSheet.ClassesFile);
             sheets.skills = Sheet(ClassesFolder + ClassSheet.SkillsFile);
+            sheets.passives = Sheet(ClassesFolder + ClassSheet.PassivesFile);
             sheets.goals = Sheet(GuideFolder + GuideSheet.File);
             EditorUtility.SetDirty(sheets);
             AssetDatabase.SaveAssets();

@@ -155,6 +155,9 @@ namespace Game.Core
         // Lies down in the player's bed, and gets up again (World.Sleep, World.Wake).
         Sleep,
         Wake,
+        // Takes the passive tree point at Index (World.AllocatePassive), and gives every point back (World.ResetPassives).
+        AllocatePassive,
+        ResetPassives,
         // At an anvil, with the item's id in Item (World.Refining.cs).
         Upgrade,
         Salvage,
@@ -196,14 +199,17 @@ namespace Game.Core
     // it changes.
     public sealed class InventoryMessage
     {
-        public InventoryMessage(Equipment equipment, Inventory bag)
+        public InventoryMessage(Equipment equipment, Inventory bag, IReadOnlyList<int> passives = null)
         {
             Equipment = equipment;
             Bag = bag;
+            Passives = passives ?? new List<int>();
         }
 
         public Equipment Equipment { get; }
         public Inventory Bag { get; }
+        // The passive tree points taken, as indexes into the passive sheet (ClassData.Passives).
+        public IReadOnlyList<int> Passives { get; }
 
         public byte[] Encode(LootData data) => Protocol.Build(MessageType.Inventory, w =>
         {
@@ -214,6 +220,8 @@ namespace Game.Core
                 if (item != null) ItemCodec.Write(w, item, data);
             }
             ItemCodec.WriteBag(w, Bag, data);
+            w.Write((ushort)Passives.Count);
+            foreach (int point in Passives) w.Write((ushort)point);
         });
 
         public static InventoryMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Inventory, r =>
@@ -226,7 +234,10 @@ namespace Game.Core
                 if (item.Base.Slot != slot) throw new InvalidDataException("Item in the wrong slot.");
                 equipment.Equip(item);
             }
-            return new InventoryMessage(equipment, ItemCodec.ReadBag(r, loot));
+            var bag = ItemCodec.ReadBag(r, loot);
+            var passives = new List<int>();
+            for (int count = r.ReadUInt16(); count > 0; count--) passives.Add(r.ReadUInt16());
+            return new InventoryMessage(equipment, bag, passives);
         });
     }
 

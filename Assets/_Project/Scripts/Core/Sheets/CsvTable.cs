@@ -140,6 +140,13 @@ namespace Game.Core
             throw new FormatException($"알 수 없는 {label} '{raw}' (가능한 값: {string.Join(", ", Enum.GetNames(typeof(T)))})");
         }
 
+        // A whole number that may be negative.
+        public static int ParseSigned(string raw, string label)
+        {
+            if (int.TryParse(raw, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out int number)) return number;
+            throw new FormatException($"{label} '{raw}'는 정수여야 합니다.");
+        }
+
         public static int ParseNumber(string raw, string label)
         {
             if (int.TryParse(raw, NumberStyles.None, CultureInfo.InvariantCulture, out int number)) return number;

@@ -12,12 +12,14 @@ namespace Game.Core
     public sealed class CharacterSave
     {
         internal const string Magic = "PTCH";
-        // 2: experience (character levels). 3: the guide goals whose rewards it has had.
-        const int FormatVersion = 3;
+        // 2: experience (character levels). 3: the guide goals whose rewards it has had. 4: the points taken on the
+        // passive tree, by id.
+        const int FormatVersion = 4;
 
-        CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null)
+        CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null)
         {
             ClaimedGoals = claimed ?? new List<string>();
+            Passives = passives ?? new List<string>();
             Equipment = equipment;
             Bag = bag;
             Experience = experience;
@@ -29,9 +31,12 @@ namespace Game.Core
         // -1 for a save from before levels (Leveling.StartFor decides then).
         public int Experience { get; }
         public IReadOnlyList<string> ClaimedGoals { get; }
+        // Ids of the passive tree points it took (World.RestorePassives puts back what still fits).
+        public IReadOnlyList<string> Passives { get; }
         public IReadOnlyList<string> Warnings { get; }
 
-        public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null)
+        public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
+            IEnumerable<string> passives = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -50,6 +55,9 @@ namespace Game.Core
                 var claimed = (claimedGoals ?? Enumerable.Empty<string>()).ToList();
                 w.Write((ushort)claimed.Count);
                 foreach (string goal in claimed) w.Write(goal);
+                var taken = (passives ?? Enumerable.Empty<string>()).ToList();
+                w.Write((ushort)taken.Count);
+                foreach (string point in taken) w.Write(point);
             }
             return stream.ToArray();
         }
@@ -100,7 +108,9 @@ namespace Game.Core
                 int experience = version >= 2 ? Math.Max(0, r.ReadInt32()) : -1;
                 var claimed = new List<string>();
                 for (int count = version >= 3 ? r.ReadUInt16() : 0; count > 0; count--) claimed.Add(r.ReadString());
-                return new CharacterSave(equipment, bag, experience, warnings, claimed);
+                var passives = new List<string>();
+                for (int count = version >= 4 ? r.ReadUInt16() : 0; count > 0; count--) passives.Add(r.ReadString());
+                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

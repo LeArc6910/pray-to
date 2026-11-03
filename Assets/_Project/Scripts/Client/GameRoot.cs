@@ -1048,7 +1048,7 @@ namespace Game.Client
                     : _mode == Mode.Join ? "참가 중" : "혼자 하기";
                 string players = _mode == Mode.Solo ? "" : $" · 접속 {_client.Names.Count}명";
                 long clock = _client.Clock;
-                lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
+                lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%){(_client.PassivePoints > 0 ? $" · 특성 {_client.PassivePoints}" : "")} · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
                 if (_client.Sleeping)
                 {
                     int everyone = Math.Max(1, _client.Names.Count);

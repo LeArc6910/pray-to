@@ -310,7 +310,7 @@ namespace Game.Core
 
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
         // before the first one.
-        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals);
+        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id));
 
         // The guide, to name the goals whose rewards come back (GoalReward events carry their index).
         public GuideData Guide { get; set; }
@@ -768,6 +768,8 @@ namespace Game.Core
             }
             Equipment = message.Equipment;
             Bag = message.Bag;
+            var passives = _classes?.Passives;
+            Passives = message.Passives.Where(i => passives != null && i < passives.Count).Select(i => passives[i]).ToList();
             RefreshStats();
             InventoryVersion++;
         }
@@ -782,8 +784,22 @@ namespace Game.Core
         void RefreshStats()
         {
             var buffs = Enumerable.Range(0, Math.Min(Skills.Count, _buffs.Length)).Where(slot => _buffs[slot] > 0).Select(slot => Skills[slot]);
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives);
         }
+
+        // The passive tree points taken, as the host last said (World.Passives.cs), and the tree itself.
+        public IReadOnlyList<PassiveNode> Passives { get; private set; } = new List<PassiveNode>();
+        public IReadOnlyList<PassiveNode> PassiveTree => _classes?.Passives ?? (IReadOnlyList<PassiveNode>)Array.Empty<PassiveNode>();
+        public int PassivePoints => Math.Max(0, Level - 1 - Passives.Count);
+
+        // Whether the point could be taken now: next to the start or a point taken, and a point to spend.
+        public bool CanAllocate(PassiveNode node) =>
+            node != null && !node.IsStart && PassivePoints > 0 && !Passives.Contains(node) && node.Links.Any(n => n.IsStart || Passives.Contains(n));
+
+        public byte[] AllocatePassiveCommand(PassiveNode node) =>
+            new InventoryCommandMessage(InventoryCommand.AllocatePassive, 0, index: ItemCodec.Index(_classes.Passives, node)).Encode();
+
+        public byte[] ResetPassivesCommand() => new InventoryCommandMessage(InventoryCommand.ResetPassives, 0).Encode();
 
         List<ClassDefinition> ClassesAt(IReadOnlyList<int> indexes)
         {

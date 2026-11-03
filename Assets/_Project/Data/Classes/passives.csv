@@ -1,0 +1,37 @@
+id,name,x,y,links,stats,kind
+start,시작,0,0,,,start
+str1,단련,-1,0,start,MaxHealth+5%,
+str2,근력,-2,0,str1,Melee:Damage+8%,
+str3,두꺼운 가죽,-3,0,str2,Armor+10%,
+str4,강철 피부,-4,0,str3,MaxHealth+10%;Armor+15%,notable
+str5,베기 연습,-3,-1,str2,Melee:Damage+8%,
+str6,빠른 손,-4,-1,str5,Melee:AttackSpeed+6%,
+str7,광전사,-5,-1,str6,Melee:Damage+15%;AttackSpeed+5%,notable
+str8,숨 고르기,-3,1,str2,HealthRegen+1,
+str9,질긴 몸,-4,1,str8,HealthRegen+1;MaxHealth+3%,
+str10,재생,-5,1,str9,HealthRegen+2;MaxHealth+5%,notable
+dex1,날렵함,1,0,start,AttackSpeed+4%,
+dex2,겨누기,2,0,dex1,Ranged:Damage+8%,
+dex3,눈썰미,3,0,dex2,CritChance+2,
+dex4,명사수,4,0,dex3,Ranged:Damage+15%;CritChance+2,notable
+dex5,가벼운 발,3,-1,dex2,MoveSpeed+3%,
+dex6,도약,4,-1,dex5,MoveSpeed+3%,
+dex7,바람 걸음,5,-1,dex6,MoveSpeed+6%;AttackSpeed+5%,notable
+dex8,급소 노리기,3,1,dex2,CritDamage+10,
+dex9,깊은 상처,4,1,dex8,CritDamage+10,
+dex10,급소,5,1,dex9,CritChance+3;CritDamage+20,notable
+int1,집중,0,-1,start,Magic:Damage+6%,
+int2,주문 연구,0,-2,int1,Magic:Damage+6%,
+int3,불씨,-1,-3,int2,Fire:Damage+10%,
+int4,업화,-1,-4,int3,Fire:Damage+20%,notable
+int5,서리,0,-3,int2,Cold:Damage+10%,
+int6,혹한,0,-4,int5,Cold:Damage+20%;Armor+5%,notable
+int7,전류,1,-3,int2,Lightning:Damage+10%,
+int8,벼락,1,-4,int7,Lightning:Damage+20%;AttackSpeed+3%,notable
+sum1,교감,0,1,start,Summon:Damage+8%,
+sum2,부름,0,2,sum1,Summon:Damage+8%,
+sum3,정령의 벗,0,3,sum2,Summon:Damage+15%;MaxHealth+5%,notable
+mine1,곡괭이질,1,2,sum1,MiningSpeed+15%,
+mine2,광부,2,2,mine1,MiningSpeed+25%;ItemRarity+5%,notable
+luck1,행운,-1,2,sum1,ItemRarity+5%,
+luck2,보물 사냥꾼,-2,2,luck1,ItemRarity+15%,notable

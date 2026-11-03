@@ -163,7 +163,7 @@ namespace Game.Core.Tests
     {
         static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Classes/" + file));
 
-        public static readonly ClassData Shipped = ClassSheet.Parse(Read(ClassSheet.ClassesFile), Read(ClassSheet.SkillsFile));
+        public static readonly ClassData Shipped = ClassSheet.Parse(Read(ClassSheet.ClassesFile), Read(ClassSheet.SkillsFile), Read(ClassSheet.PassivesFile));
 
         public const string ClassesHeader = "id,name,description,passive\n";
         public const string SkillsHeader = "id,name,class,kind,tags,damage,cooldown,radius,speed,range,duration,modifiers,grants,description\n";

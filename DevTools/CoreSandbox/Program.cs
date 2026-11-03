@@ -258,7 +258,8 @@ namespace CoreSandbox
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
             var data = ClassSheet.Parse(
                 File.ReadAllText(Path.Combine(folder, ClassSheet.ClassesFile)),
-                File.ReadAllText(Path.Combine(folder, ClassSheet.SkillsFile)));
+                File.ReadAllText(Path.Combine(folder, ClassSheet.SkillsFile)),
+                File.ReadAllText(Path.Combine(folder, ClassSheet.PassivesFile)));
             foreach (string error in data.Errors) Console.Error.WriteLine(error);
             if (!data.Success) Environment.Exit(1);
             var unknown = ids.Where(id => data.Classes.All(c => c.Id != id)).ToList();

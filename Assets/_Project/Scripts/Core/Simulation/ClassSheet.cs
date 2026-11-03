@@ -103,14 +103,59 @@ namespace Game.Core
         internal void Add(SkillDefinition skill) => _skills.Add(skill);
     }
 
+    // A point on the passive tree (Docs/Classes.md, 패시브 트리): what it gives, where it is drawn, and the points
+    // next to it. A point can be taken once one of the points it links to has been, starting from the start.
+    public sealed class PassiveNode
+    {
+        readonly List<PassiveNode> _links = new List<PassiveNode>();
+
+        internal PassiveNode(string id, string name, int x, int y, IReadOnlyList<Modifier> modifiers, bool notable, bool start)
+        {
+            Id = id;
+            Name = name;
+            X = x;
+            Y = y;
+            Modifiers = modifiers;
+            Notable = notable;
+            IsStart = start;
+        }
+
+        public string Id { get; }
+        public string Name { get; }
+        // Its place on the drawn tree, in steps; y grows downward like the screen.
+        public int X { get; }
+        public int Y { get; }
+        public IReadOnlyList<Modifier> Modifiers { get; }
+        // A bigger point, drawn larger.
+        public bool Notable { get; }
+        // Where everyone begins: always taken, worth nothing, costs nothing.
+        public bool IsStart { get; }
+        public IReadOnlyList<PassiveNode> Links => _links;
+
+        internal void Link(PassiveNode other)
+        {
+            if (other == this || _links.Contains(other)) return;
+            _links.Add(other);
+            other._links.Add(this);
+        }
+    }
+
     public sealed class ClassData
     {
-        internal ClassData(IReadOnlyList<ClassDefinition> classes, IReadOnlyList<SkillDefinition> skills, IReadOnlyList<string> errors)
+        internal ClassData(IReadOnlyList<ClassDefinition> classes, IReadOnlyList<SkillDefinition> skills, IReadOnlyList<string> errors,
+            IReadOnlyList<PassiveNode> passives = null)
         {
             Classes = classes;
             Skills = skills;
             Errors = errors;
+            Passives = passives ?? Array.Empty<PassiveNode>();
         }
+
+        // The passive tree in sheet order; the network names points by their index here. Empty without the sheet.
+        public IReadOnlyList<PassiveNode> Passives { get; }
+        public PassiveNode PassiveStart => Passives.FirstOrDefault(p => p.IsStart);
+
+        public PassiveNode FindPassive(string id) => Passives.FirstOrDefault(p => p.Id == id);
 
         public IReadOnlyList<ClassDefinition> Classes { get; }
         // Every skill in sheet order. The network names skills by their index here.
@@ -168,15 +213,74 @@ namespace Game.Core
     {
         public const string ClassesFile = "classes.csv";
         public const string SkillsFile = "skills.csv";
+        public const string PassivesFile = "passives.csv";
         // Most projectiles in one volley, or spirits in one summon.
         public const int MaxCount = 8;
 
-        public static ClassData Parse(string classesCsv, string skillsCsv)
+        // Without passivesCsv (an older asset) there is no passive tree.
+        public static ClassData Parse(string classesCsv, string skillsCsv, string passivesCsv = null)
         {
             var errors = new List<string>();
             var classes = ParseClasses(classesCsv, errors);
             var skills = ParseSkills(skillsCsv, classes, errors);
-            return new ClassData(classes, skills, errors);
+            var passives = string.IsNullOrWhiteSpace(passivesCsv) ? new List<PassiveNode>() : ParsePassives(passivesCsv, errors);
+            return new ClassData(classes, skills, errors, passives);
+        }
+
+        // passives.csv: id, name, x, y, links (ids of points next to it, | between), stats (as a class passive),
+        // kind (start, notable, or empty for a small point). Links go both ways; a link may name a later row.
+        static List<PassiveNode> ParsePassives(string csv, List<string> errors)
+        {
+            var nodes = new List<PassiveNode>();
+            var table = CsvTable.Read(csv);
+            var missing = table.MissingColumns("id", "name", "x", "y", "links", "stats", "kind");
+            if (missing.Count > 0)
+            {
+                errors.Add($"{PassivesFile}: 열이 없습니다: {string.Join(", ", missing)}");
+                return nodes;
+            }
+            var links = new List<(PassiveNode Node, string Links, int Line)>();
+            foreach (var row in table.Rows)
+            {
+                TryRow(PassivesFile, row, errors, () =>
+                {
+                    string id = row["id"];
+                    if (!SheetValues.IsValidId(id)) throw new FormatException($"id '{id}'에는 영문, 숫자, _, -만 쓸 수 있습니다.");
+                    if (nodes.Any(n => n.Id == id)) throw new FormatException($"id '{id}'가 이미 있습니다.");
+                    string kind = row["kind"];
+                    if (kind != "" && kind != "start" && kind != "notable") throw new FormatException($"kind '{kind}'는 start, notable이나 빈칸입니다.");
+                    int x = SheetValues.ParseSigned(row["x"], "x");
+                    int y = SheetValues.ParseSigned(row["y"], "y");
+                    if (nodes.Any(n => n.X == x && n.Y == y)) throw new FormatException($"({x}, {y})에 이미 다른 점이 있습니다.");
+                    var node = new PassiveNode(id, Required(row, "name"), x, y, FixedModifiers(row["stats"]), kind == "notable", kind == "start");
+                    nodes.Add(node);
+                    links.Add((node, row["links"], row.Line));
+                });
+            }
+            foreach (var (node, cell, line) in links)
+            {
+                foreach (string other in cell.Split('|').Select(p => p.Trim()).Where(p => p.Length > 0))
+                {
+                    var found = nodes.FirstOrDefault(n => n.Id == other);
+                    if (found == null) errors.Add($"{PassivesFile} {line}행: 이어진 점 '{other}'가 없습니다.");
+                    else node.Link(found);
+                }
+            }
+            int starts = nodes.Count(n => n.IsStart);
+            if (nodes.Count > 0 && starts != 1) errors.Add($"{PassivesFile}: 시작점(kind start)이 {starts}개입니다. 하나여야 합니다.");
+            // Every point must be reachable from the start.
+            var start = nodes.FirstOrDefault(n => n.IsStart);
+            if (start != null)
+            {
+                var reached = new HashSet<PassiveNode> { start };
+                var queue = new Queue<PassiveNode>(reached);
+                while (queue.Count > 0)
+                {
+                    foreach (var next in queue.Dequeue().Links.Where(reached.Add)) queue.Enqueue(next);
+                }
+                foreach (var lost in nodes.Where(n => !reached.Contains(n))) errors.Add($"{PassivesFile}: '{lost.Id}'는 시작점에서 이어지지 않습니다.");
+            }
+            return nodes;
         }
 
         static List<ClassDefinition> ParseClasses(string csv, List<string> errors)

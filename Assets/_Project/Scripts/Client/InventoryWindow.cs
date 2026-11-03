@@ -16,6 +16,7 @@ namespace Game.Client
             Gear,
             Materials,
             Classes,
+            Passives,
             Chest,
         }
 
@@ -28,7 +29,7 @@ namespace Game.Client
         const float WheelStep = 30;
 
         static GUIStyle _tooltipStyle;
-        static readonly string[] PageNames = { "장비", "재료·제작", "클래스", "상자" };
+        static readonly string[] PageNames = { "장비", "재료·제작", "클래스", "특성", "상자" };
         static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
         readonly WorldClient _client;
@@ -98,7 +99,7 @@ namespace Game.Client
             // The chest tab is there only while a chest is in reach.
             bool chest = _client.Chest.IsOpen;
             if (!chest && _page == Page.Chest) _page = Page.Gear;
-            _page = Tabs(_page, chest ? 4 : 3);
+            _page = Tabs(_page, chest ? 5 : 4);
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
@@ -106,6 +107,7 @@ namespace Game.Client
             if (_page == Page.Gear) DrawGear();
             else if (_page == Page.Materials) DrawMaterialsPage();
             else if (_page == Page.Classes) DrawClasses();
+            else if (_page == Page.Passives) DrawPassives();
             else DrawChest();
             GUILayout.EndScrollView();
             if (Event.current.type == EventType.Repaint)
@@ -534,6 +536,94 @@ namespace Game.Client
         {
             var area = GUILayoutUtility.GetRect(IconSize, IconSize, GUILayout.Width(IconSize), GUILayout.Height(IconSize));
             if (Event.current.type == EventType.Repaint) Sprites.DrawInGui(area, sprite);
+        }
+
+        // The passive tree (Docs/Classes.md, 패시브 트리): the points spent and left, the picked point with [배우기], the
+        // tree drawn as buttons joined by dotted lines, and the points that can be taken now as big buttons too, for
+        // fingers when the tree is drawn small.
+        PassiveNode _pickedPassive;
+
+        void DrawPassives()
+        {
+            var tree = _client.PassiveTree;
+            if (tree.Count == 0)
+            {
+                GUILayout.Label(Fit("특성 트리 시트가 없다. 명령 한 줄로 프로젝트를 다시 설정한다.", _textWidth));
+                return;
+            }
+            GUILayout.Label(Fit($"특성 포인트 {_client.PassivePoints}개 (레벨마다 1개). 시작점이나 배운 점과 이어진 점을 배운다.", _textWidth));
+            GUILayout.BeginHorizontal();
+            if (_client.Passives.Count > 0 && GUILayout.Button("모두 되돌리기", GUILayout.Width(110))) Send(_client.ResetPassivesCommand(), Sound.Click);
+            GUILayout.EndHorizontal();
+
+            if (_pickedPassive != null)
+            {
+                bool taken = _client.Passives.Contains(_pickedPassive);
+                string stats = _pickedPassive.Modifiers.Count == 0 ? "" : " · " + string.Join(", ", _pickedPassive.Modifiers.Select(StatText.Describe));
+                GUILayout.Label(Fit($"{_pickedPassive.Name}{(_pickedPassive.Notable ? " (큰 점)" : "")}{stats}", _textWidth));
+                GUILayout.BeginHorizontal();
+                GUI.enabled = _client.CanAllocate(_pickedPassive);
+                if (GUILayout.Button(taken ? "배움" : "배우기", GUILayout.Width(80))) Send(_client.AllocatePassiveCommand(_pickedPassive), Sound.LevelUp);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
+
+            DrawPassiveTree(tree);
+
+            var open = tree.Where(_client.CanAllocate).ToList();
+            if (open.Count == 0) return;
+            GUILayout.Label("지금 배울 수 있는 점");
+            foreach (var node in open)
+            {
+                string stats = string.Join(", ", node.Modifiers.Select(StatText.Describe));
+                if (GUILayout.Button(Ui.Wrap($"{node.Name}: {stats}", GUI.skin.button, _textWidth))) _pickedPassive = node;
+            }
+        }
+
+        void DrawPassiveTree(System.Collections.Generic.IReadOnlyList<PassiveNode> tree)
+        {
+            int minX = tree.Min(n => n.X), maxX = tree.Max(n => n.X), minY = tree.Min(n => n.Y), maxY = tree.Max(n => n.Y);
+            // Steps that fit the column, between small and roomy.
+            float step = Mathf.Clamp((_textWidth - 40) / Mathf.Max(1, maxX - minX), 26, 48);
+            float size = Mathf.Min(34, step - 6);
+            var canvas = GUILayoutUtility.GetRect((maxX - minX) * step + size + 8, (maxY - minY) * step + size + 8, GUILayout.ExpandWidth(false));
+            Vector2 At(PassiveNode n) => new Vector2(canvas.x + 4 + size / 2 + (n.X - minX) * step, canvas.y + 4 + size / 2 + (n.Y - minY) * step);
+            bool Taken(PassiveNode n) => n.IsStart || _client.Passives.Contains(n);
+
+            if (Event.current.type == EventType.Repaint)
+            {
+                foreach (var node in tree)
+                {
+                    foreach (var other in node.Links.Where(o => string.CompareOrdinal(o.Id, node.Id) > 0))
+                    {
+                        var color = Taken(node) && Taken(other) ? Palette.Worn : new Color(0.55f, 0.5f, 0.45f);
+                        Dots(At(node), At(other), color);
+                    }
+                }
+            }
+            foreach (var node in tree)
+            {
+                float s = node.Notable || node.IsStart ? size : size * 0.75f;
+                var center = At(node);
+                var rect = new Rect(center.x - s / 2, center.y - s / 2, s, s);
+                var previous = GUI.color;
+                GUI.color = node == _pickedPassive ? new Color(1f, 0.6f, 0.8f)
+                    : Taken(node) ? Palette.Worn
+                    : _client.CanAllocate(node) ? Color.white
+                    : new Color(0.55f, 0.55f, 0.55f);
+                if (GUI.Button(rect, node.IsStart ? "★" : node.Name.Substring(0, 1))) _pickedPassive = node.IsStart ? null : node;
+                GUI.color = previous;
+            }
+        }
+
+        // A dotted line: small squares every few points.
+        static void Dots(Vector2 from, Vector2 to, Color color)
+        {
+            var previous = GUI.color;
+            GUI.color = color;
+            float length = Vector2.Distance(from, to);
+            for (float d = 0; d <= length; d += 5) GUI.DrawTexture(new Rect(Vector2.Lerp(from, to, d / length) - Vector2.one, Vector2.one * 2), Texture2D.whiteTexture);
+            GUI.color = previous;
         }
 
         // Beside an anvil: picks the item to work on, or puts it back.

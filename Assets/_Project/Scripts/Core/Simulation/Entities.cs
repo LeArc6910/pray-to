@@ -43,6 +43,10 @@ namespace Game.Core
         // Experience gathered over the character's life; the level follows from it (Leveling).
         public int Experience { get; internal set; }
         public int Level => Leveling.LevelFor(Experience);
+        // The points taken on the passive tree (World.Passives.cs), not counting the start.
+        public List<PassiveNode> Passives { get; } = new List<PassiveNode>();
+        // One point for every level past the first.
+        public int PassivePoints => Math.Max(0, Level - 1 - Passives.Count);
         // Goes up whenever the host puts the player somewhere the owning client did not: a refused move or a
         // respawn. The client snaps to the host's position when it sees a new value.
         public int Corrections { get; internal set; }
@@ -171,7 +175,7 @@ namespace Game.Core
             {
                 if (HasBuff(slot)) buffs.Add(Skills[slot]);
             }
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
         }
     }

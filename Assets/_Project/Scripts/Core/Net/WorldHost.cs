@@ -179,7 +179,8 @@ namespace Game.Core
                 var player = pair.Value.Player;
                 if (player == null || pair.Value.SentInventory == player.InventoryVersion) continue;
                 pair.Value.SentInventory = player.InventoryVersion;
-                Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory).Encode(_loot), reliable: true);
+                var passives = player.Passives.Select(p => IndexOf(_classes?.Passives, p)).Where(i => i >= 0).ToList();
+                Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory, passives).Encode(_loot), reliable: true);
             }
             foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendChest(pair.Key, pair.Value);
             if (World.Tick % _config.MachineInterval == 0)
@@ -242,6 +243,7 @@ namespace Game.Core
             // A character from before levels starts at a level that lets it keep wearing what it has.
             player.Experience = saved == null ? 0 : saved.Experience >= 0 ? saved.Experience : Leveling.TotalFor(Leveling.StartFor(saved.Equipment, saved.Bag));
             foreach (string goal in saved?.ClaimedGoals ?? new List<string>()) player.ClaimedGoals.Add(goal);
+            if (saved != null) World.RestorePassives(player, _classes, saved.Passives);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -362,6 +364,12 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Wake:
                     World.Wake(player.Id);
+                    break;
+                case InventoryCommand.AllocatePassive:
+                    if (_classes != null && command.Index < _classes.Passives.Count) World.AllocatePassive(player.Id, _classes.Passives[command.Index]);
+                    break;
+                case InventoryCommand.ResetPassives:
+                    World.ResetPassives(player.Id);
                     break;
                 case InventoryCommand.Upgrade:
                     World.UpgradeItem(player.Id, command.Item);
