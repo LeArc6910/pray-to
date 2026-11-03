@@ -194,6 +194,13 @@ namespace Game.Core
             _newCropChanges.Clear();
         }
 
+        // Puts a tile straight on the map as if it were built: a scene for the play mode tests or the cloud's playtests
+        // (Client/Playtest.cs). The change goes out to the clients like any other, unlike Restore's.
+        internal void Build(int x, int y, TileType type)
+        {
+            if (Map.InBounds(x, y) && !Map.IsEdge(x, y)) SetTile(x, y, type);
+        }
+
         void SetTile(int x, int y, TileType type)
         {
             if (Map[x, y] == TileType.Chest || type == TileType.Chest) ChestTileChanged(x, y, type);

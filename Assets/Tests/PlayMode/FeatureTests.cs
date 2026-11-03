@@ -62,8 +62,11 @@ namespace Game.Client.Tests
         // The tile under the player, offset by so many tiles.
         (int X, int Y) Near(int dx, int dy) => (TileMap.Cell(Player.Position.X) + dx, TileMap.Cell(Player.Position.Y) + dy);
 
-        void Lay(params (int X, int Y, TileType Type)[] tiles) =>
-            World.Restore(tiles.Select(t => new TileChange(t.X, t.Y, t.Type)), System.Array.Empty<(CropDefinition, int, int, long, long)>(), 0);
+        // Built, so the change reaches the view as a player's building would (World.Build).
+        void Lay(params (int X, int Y, TileType Type)[] tiles)
+        {
+            foreach (var (x, y, type) in tiles) World.Build(x, y, type);
+        }
 
         MaterialDefinition Material(string id) => _root.LootSheet.FindMaterial(id);
 
@@ -174,10 +177,10 @@ namespace Game.Client.Tests
                 yield return new WaitForSecondsRealtime(1.5f);
                 yield return Screens.Take("weather-" + weather.ToString().ToLowerInvariant());
             }
-            // A full moon's evening and night, and a market day's noon.
-            foreach (var (day, hour) in new[] { (8, 13f), (8, 17f), (5, 6f) })
+            // A full moon's afternoon and night, and a market day's morning. A day starts at six.
+            foreach (var (day, hour) in new[] { (8, 13f), (8, 23f), (5, 9f) })
             {
-                World.RestoreClock((long)((day - 1 + hour / 24) * Calendar.TicksPerDay));
+                World.RestoreClock((long)((day - 1 + (hour - Calendar.MorningHour) / 24) * Calendar.TicksPerDay));
                 yield return new WaitForSecondsRealtime(1.5f);
                 yield return Screens.Take($"day{day}-{hour:00}h");
             }

@@ -167,6 +167,7 @@ async function playPc(browser, profile) {
   await game.page.mouse.up();
   const hit = await state(game);
   check(hit.hurtMonsters > 0, `마우스를 누르고 있으면 슬라임을 친다 (맞은 슬라임 ${hit.hurtMonsters})`);
+  await send(game, 'clear; heal');
 
   await game.page.keyboard.press('Tab');
   await game.page.waitForTimeout(600);
@@ -208,7 +209,8 @@ async function playPc(browser, profile) {
     await shot(game, profile, `weather-${weather}`, `날씨: ${weather}`);
   }
 
-  await send(game, 'scene defense');
+  // Gear that lasts, so the pictures are of the scene rather than of the player lying down.
+  await send(game, 'clear; equip void_sword void_helmet void_armor void_boots; heal; scene defense');
   await game.page.waitForTimeout(5000);
   const defense = await state(game);
   check(!!defense.defense, `기지 방어가 시작된다 (${defense.defense})`);
@@ -217,7 +219,7 @@ async function playPc(browser, profile) {
 
   game = await open(browser, profile);
   await startSolo(game);
-  await send(game, 'scene rift');
+  await send(game, 'equip void_sword void_helmet void_armor void_boots; heal; scene rift');
   await game.page.waitForTimeout(5000);
   const rift = await state(game);
   check(!!rift.rift, `균열이 열린다 (${rift.rift})`);
@@ -255,6 +257,7 @@ async function playPhone(browser, profile) {
   await send(game, 'spawn slime 1.2 0 5000; spawn slime -1.2 0 5000');
   await drag(game, width * 0.8, height * 0.4, -50, 0);
   await shot(game, profile, 'attack', '공격 스틱을 끌어 공격');
+  await send(game, 'clear; heal');
 
   // The bag button under the minimap.
   await game.page.touchscreen.tap(width - 10 - 120 + 27, 10 + 120 + 10 + 20);

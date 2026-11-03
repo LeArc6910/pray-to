@@ -17,7 +17,8 @@ namespace Game.Client
     //   solo                      start a solo game in a fresh world named "playtest"
     //   scene combo|machines|defense|rift|skylight|set
     //   clock <day> <hour>        weather clear|rain|storm|fog
-    //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>
+    //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal
+    //   equip <base> ...          clear (the monsters nearby fall)
     //   spawn <monster> <dx> <dy> [health]
     //   attack on|off [x y]       skill <slot>   touch on|off   bag on|off
     //   report                    one line of JSON: the player, the time, the monsters, the machines, the screen
@@ -76,7 +77,10 @@ namespace Game.Client
                     Scene(root, words[1]);
                     return null;
                 case "clock":
-                    world.RestoreClock((long)((Int(words[1]) - 1 + Float(words[2]) / 24) * Calendar.TicksPerDay));
+                    // A day starts at six in the morning; an hour before six is that day's night.
+                    float hour = Float(words[2]);
+                    float into = ((hour - Calendar.MorningHour) % 24 + 24) % 24;
+                    world.RestoreClock((long)((Int(words[1]) - 1 + into / 24) * Calendar.TicksPerDay));
                     return null;
                 case "weather":
                     var weather = (Weather)Enum.Parse(typeof(Weather), words[1], ignoreCase: true);
@@ -93,6 +97,22 @@ namespace Game.Client
                     return null;
                 case "mana":
                     player.Mana = Float(words[1]);
+                    return null;
+                case "heal":
+                    player.Health = player.Stats.MaxHealth;
+                    player.Mana = player.Stats.MaxMana;
+                    return null;
+                case "clear":
+                    foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
+                    return null;
+                case "equip":
+                    // Each base given at its best plain rolls, worn at once whatever its level.
+                    foreach (string id in words.Skip(1))
+                    {
+                        var itemBase = root.LootSheet.FindBase(id);
+                        var implicits = itemBase.Implicits.Select(r => new Modifier(r.Stat, r.Kind, r.Max, r.Tags)).ToList();
+                        player.Equip(new Item(itemBase, itemBase.Level, Rarity.Rare, implicits, Array.Empty<ItemAffix>(), 0));
+                    }
                     return null;
                 case "drink":
                     return world.UseConsumable(player.Id, root.LootSheet.Consumables.First(c => c.Id == words[1])) ? null : $"error drink {words[1]}: refused";
@@ -122,8 +142,10 @@ namespace Game.Client
             var loot = root.LootSheet;
             int px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
             (int X, int Y) Near(int dx, int dy) => (px + dx, py + dy);
-            void Lay(params (int X, int Y, TileType Type)[] tiles) =>
-                world.Restore(tiles.Select(t => new TileChange(t.X, t.Y, t.Type)), Array.Empty<(CropDefinition, int, int, long, long)>(), 0);
+            void Lay(params (int X, int Y, TileType Type)[] tiles)
+            {
+                foreach (var (x, y, type) in tiles) world.Build(x, y, type);
+            }
             var none = Array.Empty<(MaterialDefinition, int)>();
             Enemy Spawn(string monster, Vec2 at, float health)
             {
