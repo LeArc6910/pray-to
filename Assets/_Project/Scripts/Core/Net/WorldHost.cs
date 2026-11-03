@@ -599,7 +599,9 @@ namespace Game.Core
                 .Where(entry => entry.Item1 >= 0)
                 .OrderBy(entry => entry.Item1)
                 .ToList();
-            byte[] message = new FriendshipsMessage(known).Encode();
+            // Everyone sees the same day's sales: they are the people's, not the player's.
+            var sold = _npcs.Shop.Select((entry, index) => (index, World.SoldToday(entry))).Where(s => s.Item2 > 0).ToList();
+            byte[] message = new FriendshipsMessage(known, sold).Encode();
             if (sent.SentFriendships != null && sent.SentFriendships.AsSpan().SequenceEqual(message)) return;
             sent.SentFriendships = message;
             Send(connection, message, reliable: true);

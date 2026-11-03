@@ -38,7 +38,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.45.0";
+        public const string Version = "0.46.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -263,10 +263,16 @@ namespace Game.Core
     // they last talked and gave a gift. Sent when it changes; the client keeps it in its character save.
     public sealed class FriendshipsMessage
     {
-        public FriendshipsMessage(IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> friendships) =>
+        public FriendshipsMessage(IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> friendships,
+            IReadOnlyList<(int Entry, int Count)> sold = null)
+        {
             Friendships = friendships;
+            Sold = sold ?? Array.Empty<(int, int)>();
+        }
 
         public IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> Friendships { get; }
+        // How many of each shop row (by its index) its person bought today (World.SoldToday), the rows with any.
+        public IReadOnlyList<(int Entry, int Count)> Sold { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Friendships, w =>
         {
@@ -280,6 +286,12 @@ namespace Game.Core
                 w.Write(request);
                 w.Write((byte)heartGifts);
             }
+            w.Write((ushort)Sold.Count);
+            foreach (var (entry, count) in Sold)
+            {
+                w.Write((ushort)entry);
+                w.Write((byte)Math.Clamp(count, 0, 255));
+            }
         });
 
         public static FriendshipsMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Friendships, r =>
@@ -287,7 +299,9 @@ namespace Game.Core
             int n = r.ReadByte();
             var list = new List<(int, int, int, int, int, int)>(n);
             for (int i = 0; i < n; i++) list.Add((r.ReadByte(), r.ReadUInt16(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadByte()));
-            return new FriendshipsMessage(list);
+            var sold = new List<(int, int)>();
+            for (int k = r.ReadUInt16(); k > 0; k--) sold.Add((r.ReadUInt16(), r.ReadByte()));
+            return new FriendshipsMessage(list, sold);
         });
     }
 

@@ -39,6 +39,7 @@ dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --classes warrior,fir
 dotnet run --project DevTools/CoreSandbox -- --boss 400 1 --boss-id crystal_queen --gear iron_sword,iron_armor --reaction 0.5
 dotnet run --project DevTools/CoreSandbox -- --farm 120 mushroom
 dotnet run --project DevTools/CoreSandbox -- --economy
+dotnet run --project DevTools/CoreSandbox -- --factory 30
 dotnet run --project DevTools/CoreSandbox -- --defense 6 42 --gear iron_sword,iron_helmet,iron_armor,iron_boots --classes warrior --turrets 3
 dotnet run --project DevTools/CoreSandbox -- --rift 7 42 --players 2 --gear void_sword,void_helmet,void_armor,void_boots --classes warrior,fire_mage
 

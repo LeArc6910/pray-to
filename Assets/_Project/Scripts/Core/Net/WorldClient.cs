@@ -387,6 +387,11 @@ namespace Game.Core
         // How well this character knows each person, by id: from its save, and as the host tells.
         public Dictionary<string, (int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> Friendships => _friendships ??= ReadFriendships();
 
+        readonly Dictionary<ShopEntry, int> _sold = new Dictionary<ShopEntry, int>();
+
+        // How many more of the row's thing its person takes today, as the host last said (World.SellLeft).
+        public int SellLeft(ShopEntry entry) => Math.Max(0, World.DailySellLimit - _sold.GetValueOrDefault(entry));
+
         Dictionary<string, (int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> _friendships;
 
         Dictionary<string, (int, int, int, int, int)> ReadFriendships()
@@ -560,9 +565,15 @@ namespace Game.Core
                         for (int i = 0; i < LifeExperience.Length && i < experience.Count; i++) LifeExperience[i] = experience[i];
                         break;
                     case MessageType.Friendships:
-                        foreach (var (npc, points, talked, gifted, request, heartGifts) in FriendshipsMessage.Decode(data).Friendships)
+                        var friendships = FriendshipsMessage.Decode(data);
+                        foreach (var (npc, points, talked, gifted, request, heartGifts) in friendships.Friendships)
                         {
                             if (Npcs != null && npc < Npcs.Npcs.Count) Friendships[Npcs.Npcs[npc].Id] = (points, talked, gifted, request, heartGifts);
+                        }
+                        _sold.Clear();
+                        foreach (var (entry, count) in friendships.Sold)
+                        {
+                            if (Npcs != null && entry < Npcs.Shop.Count) _sold[Npcs.Shop[entry]] = count;
                         }
                         break;
                     case MessageType.Production:

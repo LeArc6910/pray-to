@@ -42,6 +42,25 @@ namespace Game.Core
         public const int HeartPercent = 4;
         // The most of one row bought or sold at once.
         public const int MaxTrade = 99;
+        // How many of one thing a person buys from everyone in a day; past that they have had enough until tomorrow,
+        // so machines that never stop do not make coins without end (Docs/Npcs.md, 하루에 사는 양).
+        public const int DailySellLimit = 20;
+
+        readonly Dictionary<ShopEntry, int> _soldToday = new Dictionary<ShopEntry, int>();
+        int _soldDay;
+
+        // How many of the row's thing its person has bought today, from anyone.
+        public int SoldToday(ShopEntry entry)
+        {
+            if (_soldDay != Today)
+            {
+                _soldDay = Today;
+                _soldToday.Clear();
+            }
+            return entry == null ? 0 : _soldToday.GetValueOrDefault(entry);
+        }
+
+        public int SellLeft(ShopEntry entry) => Math.Max(0, DailySellLimit - SoldToday(entry));
 
         public NpcData Npcs { get; private set; }
 
@@ -261,8 +280,8 @@ namespace Game.Core
             return true;
         }
 
-        // Sells up to count of a material or consumable the merchant buys. False when they do not buy it or the player
-        // has none.
+        // Sells up to count of a material or consumable the merchant buys, as many as they still take today. False when
+        // they do not buy it, have had enough of it today, or the player has none.
         public bool Sell(int playerId, object thing, int count)
         {
             var at = AtMerchant(playerId);
@@ -274,8 +293,9 @@ namespace Game.Core
             // A silver or gold one sells as itself, for more.
             var sold = thing as MaterialDefinition ?? entry.Material;
             int have = entry.Material != null ? player.Inventory.CountOf(sold) : player.Inventory.CountOf(entry.Consumable);
-            count = Math.Min(Math.Clamp(count, 1, MaxTrade), have);
+            count = Math.Min(Math.Min(Math.Clamp(count, 1, MaxTrade), have), SellLeft(entry));
             if (count <= 0) return false;
+            _soldToday[entry] = SoldToday(entry) + count;
             if (entry.Material != null) player.Inventory.TakeMaterial(sold, count);
             else
             {

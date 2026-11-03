@@ -519,6 +519,8 @@ namespace Game.Client
             bool any = false;
             foreach (var entry in _client.Npcs.Shop.Where(e => e.Sell > 0 && e.Npc == npc))
             {
+                // Each person takes only so many of a thing a day (World.DailySellLimit).
+                int left = _client.SellLeft(entry);
                 // A crop in each quality the bag holds, the better ones dearer.
                 var kinds = entry.Material != null ? entry.Material.AllQualities.Cast<object>() : new object[] { entry.Consumable };
                 foreach (var thing in kinds)
@@ -530,9 +532,12 @@ namespace Game.Client
                     GUILayout.BeginHorizontal();
                     Icon(material != null ? Sprites.Icon(material) : Sprites.Icon(entry.Consumable));
                     string name = material?.Name ?? entry.Name;
-                    GUILayout.Label(Fit($"{name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts, material?.Quality ?? 0)}", _recipeWidth), GUILayout.Width(_recipeWidth));
+                    string room = left > 0 ? $" · 오늘 {left}개 더" : " · 오늘은 그만 산다";
+                    GUILayout.Label(Fit($"{name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts, material?.Quality ?? 0)}{room}", _recipeWidth), GUILayout.Width(_recipeWidth));
+                    GUI.enabled = left > 0;
                     if (GUILayout.Button("팔기", GUILayout.Width(56))) Send(_client.SellCommand(thing, 1), Sound.Pickup);
-                    if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(thing, Math.Min(have, World.MaxTrade)), Sound.Pickup);
+                    if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(thing, Math.Min(Math.Min(have, left), World.MaxTrade)), Sound.Pickup);
+                    GUI.enabled = true;
                     GUILayout.EndHorizontal();
                 }
             }

@@ -57,6 +57,29 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void APersonTakesOnlySoManyOfAThingADay()
+        {
+            var world = Shop(out var player, out _);
+            var ore = Gear.Data.FindMaterial("iron_ore");
+            player.Inventory.AddMaterial(ore, World.DailySellLimit + 5);
+            int coins = player.Inventory.CountOf(Coin);
+            Assert.IsTrue(world.Sell(player.Id, ore, World.MaxTrade));
+            Assert.AreEqual(5, player.Inventory.CountOf(ore), "the rest stays in the bag");
+            Assert.AreEqual(coins + World.DailySellLimit * Row("iron_ore").Sell, player.Inventory.CountOf(Coin));
+            Assert.AreEqual(0, world.SellLeft(Row("iron_ore")));
+            Assert.IsFalse(world.Sell(player.Id, ore, 1), "enough for today");
+            player.Inventory.AddMaterial(Minnow, 1);
+            Assert.IsTrue(world.Sell(player.Id, Minnow, 1), "another thing is still wanted");
+
+            world.RestoreClock(world.Clock + Calendar.TicksPerDay);
+            Assert.AreEqual(World.DailySellLimit, world.SellLeft(Row("iron_ore")), "a new day");
+            Assert.IsTrue(world.Sell(player.Id, ore, 5));
+
+            var message = FriendshipsMessage.Decode(new FriendshipsMessage(new[] { (0, 10, 1, 1, 0, 0) }, new[] { (3, 7) }).Encode());
+            CollectionAssert.AreEqual(new[] { (3, 7) }, message.Sold);
+        }
+
+        [Test]
         public void BuyingCostsCoinsAndSellingPaysThem()
         {
             var world = Shop(out var player, out _);

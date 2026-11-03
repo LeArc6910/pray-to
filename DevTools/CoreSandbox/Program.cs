@@ -19,6 +19,7 @@ namespace CoreSandbox
     // dotnet run -- --rift [tiers] [seed]             bots open void rifts tier after tier (--players, --gear, --classes)
     // dotnet run -- --defense [levels] [seed]        bots hold a ward stone level after level (--turrets <n>, --players, --gear, --classes)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
+    // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
     static class Program
     {
         static void Main(string[] args)
@@ -107,6 +108,9 @@ namespace CoreSandbox
                 case "--economy":
                     EconomySim.Run(data, LoadTiles(data), LoadNpcs(data));
                     break;
+                case "--factory":
+                    FactorySim.Run(data, LoadMonsters(), LoadTiles(data), LoadNpcs(data), Number(1, 30));
+                    break;
                 case "--boss":
                     var monsters = LoadMonsters();
                     BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge, bossId);
@@ -119,6 +123,7 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --farm [minutes] [crop]");
                     Console.WriteLine("       dotnet run -- --rift [tiers] [seed] [--players 2] [--gear ...] [--classes ...]");
                     Console.WriteLine("       dotnet run -- --economy");
+                    Console.WriteLine("       dotnet run -- --factory [minutes]");
                     break;
             }
         }
