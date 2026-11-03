@@ -88,6 +88,8 @@ namespace Game.Core
         ArcFurnace,
         WaterWheel,
         SolarPanel,
+        // A tower that throws lightning at monsters, on power alone (Docs/Defense.md).
+        TeslaTower,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

@@ -768,7 +768,7 @@ namespace Game.Client
                     : machine.Kind == TileType.Conveyor ? BeltSprites[machine.On ? beltFrame : 0]
                     : machine.Kind == TileType.FastConveyor ? FastBeltSprites[machine.On ? fastFrame : 0]
                     : machine.Kind == TileType.UndergroundBelt ? UndergroundSprites[machine.On ? beltFrame : 0]
-                    : machine.Kind == TileType.PowerPole || machine.Kind == TileType.SolarPanel ? null
+                    : machine.Kind == TileType.PowerPole || machine.Kind == TileType.SolarPanel || machine.Kind == TileType.TeslaTower ? null
                     : machine.Kind == TileType.WaterWheel ? WheelSprite
                     : machine.Kind == TileType.Turret ? TurretBarrelSprite
                     : machine.Kind == TileType.Splitter ? SplitterSprite
@@ -1006,9 +1006,9 @@ namespace Game.Client
             }
         }
 
-        void AddTracer(Vector3 from, Vector3 to)
+        void AddTracer(Vector3 from, Vector3 to, Color? color = null)
         {
-            var line = Renderer(_root.transform, "Tracer", Shapes.Square, TracerColor);
+            var line = Renderer(_root.transform, "Tracer", Shapes.Square, color ?? TracerColor);
             line.sortingOrder = 31;
             var along = to - from;
             line.transform.localPosition = (from + to) / 2;
@@ -1029,7 +1029,8 @@ namespace Game.Client
                     _tracers.RemoveAt(i);
                     continue;
                 }
-                line.color = new Color(TracerColor.r, TracerColor.g, TracerColor.b, TracerColor.a * (1 - age / TracerSeconds));
+                var tint = line.color;
+                line.color = new Color(tint.r, tint.g, tint.b, TracerColor.a * (1 - age / TracerSeconds));
                 _tracers[i] = (line, age);
             }
         }
@@ -1065,6 +1066,9 @@ namespace Game.Client
         // Monsters come for the ward stone glow orange; turret shots are a brief yellow streak.
         static readonly Color DefenseColor = new Color(1f, 0.55f, 0.2f);
         static readonly Color TracerColor = new Color(1f, 0.9f, 0.45f, 0.9f);
+        static readonly Color FrostShot = new Color(0.55f, 0.85f, 1f, 0.9f);
+        static readonly Color FireShot = new Color(1f, 0.5f, 0.2f, 0.9f);
+        static readonly Color BoltShot = new Color(0.65f, 0.9f, 1f, 0.95f);
         static readonly Color WireColor = new Color(0.78f, 0.45f, 0.2f, 0.85f);
         static readonly Color PowerLabel = new Color(1f, 0.85f, 0.45f);
 
@@ -1270,10 +1274,28 @@ namespace Game.Client
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 3, DefenseColor, FlashKind.Ring);
                     break;
                 case SimEventType.TurretShot:
-                    // A streak from the turret along its shot, and the barrel turned that way.
+                    // A streak from the turret along its shot, coloured by what it fired, and the barrel turned that way.
+                    // A tesla tower's bolt is a jagged streak, and leaps on from monster to monster.
                     var muzzle = new Vector3(e.Position.X, e.Position.Y, 0);
                     var along = new Vector3(e.Direction.X, e.Direction.Y, 0);
-                    AddTracer(muzzle + along * 0.4f, muzzle + along * (e.Amount / 10f));
+                    int shotKind = e.Amount / World.TurretShotKind;
+                    float length = e.Amount % World.TurretShotKind / 10f;
+                    var shotColor = shotKind == 1 ? FrostShot : shotKind == 2 ? FireShot : shotKind == 3 ? BoltShot : TracerColor;
+                    if (shotKind == 3)
+                    {
+                        var side = new Vector3(-along.y, along.x, 0);
+                        var a = muzzle + along * 0.3f;
+                        var b = muzzle + along * (length * 0.4f) + side * 0.25f;
+                        var c = muzzle + along * (length * 0.7f) - side * 0.25f;
+                        var d = muzzle + along * length;
+                        AddTracer(a, b, shotColor);
+                        AddTracer(b, c, shotColor);
+                        AddTracer(c, d, shotColor);
+                        AddFlash(d, 0.35f, shotColor, FlashKind.Impact);
+                        Hear(Sound.Zap, muzzle, 0.6f);
+                        break;
+                    }
+                    AddTracer(muzzle + along * 0.4f, muzzle + along * length, shotColor);
                     _turretAim[TileMap.Cell(e.Position.Y) * _client.Map.Width + TileMap.Cell(e.Position.X)] = Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg;
                     Hear(Sound.Shoot, muzzle, 0.5f);
                     break;

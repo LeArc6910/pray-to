@@ -848,6 +848,8 @@ namespace Game.Client
                 case "milk": return Ramped(Bottle, Ramp.Of("#F6F2E8"));
                 case "cheese": return Ramped(Goo, Ramp.Of("#F2D060"));
                 case "ammo": return Ramped(Seeds, Ramp.Of("#D8B050"));
+                case "frost_ammo": return Ramped(Seeds, Ramp.Of("#8CD8FF"));
+                case "fire_ammo": return Ramped(Seeds, Ramp.Of("#FF7A3C"));
                 case "feed": return Ramped(Seeds, Ramp.Of("#D8B070"));
                 case "egg": return Ramped(Goo, Ramp.Of("#F6F0E0"));
                 case "bait": return Ramped(Goo, Ramp.Of("#C87850"));

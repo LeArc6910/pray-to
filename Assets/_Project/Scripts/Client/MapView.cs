@@ -238,7 +238,7 @@ namespace Game.Client
             if (TileMap.IsSoil(_map[x, y])) return new Color32(110, 80, 56, 255);
             if (_map[x, y] == TileType.Filter) return Palette.Splitter;
             if (_map[x, y] == TileType.MerchantStall || _map[x, y] == TileType.SmithStall || _map[x, y] == TileType.FisherHut) return new Color32(220, 90, 100, 255);
-            if (_map[x, y] == TileType.WardStone) return new Color32(140, 224, 255, 255);
+            if (_map[x, y] == TileType.WardStone || _map[x, y] == TileType.TeslaTower) return new Color32(140, 224, 255, 255);
             if (World.IsPowerNode(_map[x, y]) || _map[x, y] == TileType.Lever) return Palette.Drill;
             if (_map[x, y] == TileType.Bed) return new Color32(80, 130, 220, 255);
             if (_map[x, y] == TileType.Sprinkler) return new Color32(90, 150, 230, 255);

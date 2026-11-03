@@ -214,7 +214,7 @@ namespace Game.Core
             TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester,
             TileType.Filter, TileType.Generator, TileType.Lever, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt,
             TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot,
-            TileType.Turret, TileType.Barn, TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel,
+            TileType.Turret, TileType.Barn, TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower,
         };
 
         static List<MachineDefinition> ParseMachines(string csv, List<string> errors)

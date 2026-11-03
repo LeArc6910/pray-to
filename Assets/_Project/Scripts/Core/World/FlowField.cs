@@ -18,6 +18,12 @@ namespace Game.Core
         readonly int[] _distance;
         readonly Queue<(int X, int Y)> _queue = new Queue<(int X, int Y)>();
 
+        // Blocking tiles a monster would rather break through than give up on (a base's built walls during a defense,
+        // World.Defense.cs): counted open here. Null for none.
+        public Func<int, int, bool> Through { get; set; }
+
+        bool Blocks(int x, int y) => _map.BlocksMonsters(x, y) && (Through == null || !Through(x, y));
+
         public FlowField(TileMap map)
         {
             _map = map ?? throw new ArgumentNullException(nameof(map));
@@ -33,7 +39,7 @@ namespace Game.Core
             {
                 int x = TileMap.Cell(target.X);
                 int y = TileMap.Cell(target.Y);
-                if (_map.BlocksMonsters(x, y) || _distance[Index(x, y)] == 0) continue;
+                if (Blocks(x, y) || _distance[Index(x, y)] == 0) continue;
                 _distance[Index(x, y)] = 0;
                 _queue.Enqueue((x, y));
             }
@@ -80,8 +86,8 @@ namespace Game.Core
         bool CanStep(int x, int y, int dx, int dy)
         {
             // Monsters follow it, so doors are walls here.
-            if (_map.BlocksMonsters(x + dx, y + dy)) return false;
-            return dx == 0 || dy == 0 || (!_map.BlocksMonsters(x + dx, y) && !_map.BlocksMonsters(x, y + dy));
+            if (Blocks(x + dx, y + dy)) return false;
+            return dx == 0 || dy == 0 || (!Blocks(x + dx, y) && !Blocks(x, y + dy));
         }
 
         int Index(int x, int y) => y * _map.Width + x;

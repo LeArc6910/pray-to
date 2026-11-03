@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using static Game.Core.Tests.Builds;
@@ -127,6 +128,95 @@ namespace Game.Core.Tests
             Assert.IsTrue(events.Any(e => e.Type == SimEventType.Hit && e.Target == slime.Id && e.Source == 0));
             Assert.Less(slime.Health, before);
             Assert.AreEqual(2, world.MachineAt(20, 20).Inputs.Values.Sum());
+        }
+
+        [Test]
+        public void WalledInTheStoneTheMonstersBreakThroughWhatWasBuilt()
+        {
+            var world = Base(out var player);
+            Assert.IsTrue(world.StartDefense(player.Id));
+            // Off in a far corner, out of their sight, and a ring of built walls round the stone, two tiles out.
+            player.Position = TileMap.Center(2, 37);
+            var ring = new List<TileChange>();
+            for (int x = 18; x <= 22; x++)
+            {
+                for (int y = 18; y <= 22; y++)
+                {
+                    if (x == 18 || x == 22 || y == 18 || y == 22) ring.Add(new TileChange(x, y, TileType.Wall));
+                }
+            }
+            world.Restore(ring, System.Array.Empty<(CropDefinition, int, int, long, long)>(), 0);
+            Assert.IsTrue(world.BuiltBarrier(18, 20));
+            Assert.IsFalse(world.BuiltBarrier(0, 20), "the cave's own rock is no barrier");
+            world.TakeEvents();
+
+            bool broke = false;
+            float stone = world.ActiveDefense.StoneHealth;
+            for (int i = 0; i < World.TicksPerSecond * 120 && !broke; i++)
+            {
+                world.Step();
+                broke = ring.Any(t => world.Map[t.X, t.Y] == TileType.Floor);
+                Assert.AreEqual(stone, world.ActiveDefense?.StoneHealth ?? stone, "the stone is safe while the ring stands");
+            }
+            Assert.IsTrue(broke, "they broke in");
+            Assert.IsTrue(world.GroundLoot.Any(l => l.Material?.Id == "stone"), "the broken wall's stone lies there");
+        }
+
+        [Test]
+        public void FrostAndFireAmmoChillAndBurn()
+        {
+            var world = Base(out var player, stone: false);
+            Place(world, player, TurretItem, 20, 20, new Vec2(0, 1));
+            var slime = world.SpawnEnemy(Monsters.Shipped.Monsters.First(m => m.Id == "slime"), TileMap.Center(24, 20));
+            slime.MaxHealth = slime.Health = 10000;
+            var fire = Gear.Data.FindMaterial(World.FireAmmo);
+            var frost = Gear.Data.FindMaterial(World.FrostAmmo);
+            player.Inventory.AddMaterial(AmmoItem, 1);
+            player.Inventory.AddMaterial(frost, 1);
+            player.Inventory.AddMaterial(fire, 1);
+            Assert.AreEqual(1, world.LoadMachine(player.Id, AmmoItem, 1));
+            Assert.AreEqual(1, world.LoadMachine(player.Id, frost, 1));
+            Assert.AreEqual(1, world.LoadMachine(player.Id, fire, 1));
+            world.TakeEvents();
+
+            var kinds = new List<int>();
+            for (int i = 0; i < World.TicksPerSecond * 4 && kinds.Count < 3; i++)
+            {
+                world.Step();
+                kinds.AddRange(world.TakeEvents().Where(e => e.Type == SimEventType.TurretShot).Select(e => e.Amount / World.TurretShotKind));
+                if (kinds.Count == 1) Assert.IsTrue(slime.Afflictions.Burning, "fire first: it burns");
+                if (kinds.Count == 2) Assert.IsTrue(slime.Afflictions.Chilled, "then frost: it slows");
+            }
+            CollectionAssert.AreEqual(new[] { 2, 1, 0 }, kinds, "fire, frost, then plain");
+        }
+
+        [Test]
+        public void ATeslaTowerRunsOnPowerAndItsBoltLeaps()
+        {
+            var world = Base(out var player, stone: false);
+            Place(world, player, Gear.Data.FindMaterial("tesla_tower"), 20, 20, new Vec2(0, 1));
+            var slime = Monsters.Shipped.Monsters.First(m => m.Id == "slime");
+            var near = new[] { new Vec2(24, 20.5f), new Vec2(25.5f, 20.5f), new Vec2(26.5f, 21.5f), new Vec2(30, 30) }
+                .Select(at => world.SpawnEnemy(slime, at)).ToList();
+            foreach (var monster in near) monster.MaxHealth = monster.Health = 10000;
+            Run(world, 3);
+            Assert.IsTrue(near.All(m => m.Health == m.MaxHealth), "no power, no bolt");
+
+            var gel = Gear.Data.FindMaterial("slime_gel");
+            Place(world, player, Gear.Data.FindMaterial("generator"), 18, 18, new Vec2(0, 1));
+            player.Inventory.AddMaterial(gel, 5);
+            Assert.IsTrue(world.Refuel(player.Id, gel));
+            world.TakeEvents();
+            var shots = new List<SimEvent>();
+            for (int i = 0; i < World.TicksPerSecond * 3 && shots.Count == 0; i++)
+            {
+                world.Step();
+                shots.AddRange(world.TakeEvents().Where(e => e.Type == SimEventType.TurretShot));
+            }
+            Assert.AreEqual(1 + World.TeslaLeaps, shots.Count, "the bolt and its leaps");
+            Assert.IsTrue(shots.All(e => e.Amount / World.TurretShotKind == 3));
+            Assert.IsTrue(near.Take(3).All(m => m.Health < m.MaxHealth));
+            Assert.AreEqual(near[3].MaxHealth, near[3].Health, "too far to leap to");
         }
 
         [Test]

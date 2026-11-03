@@ -87,6 +87,7 @@ namespace Game.Core
             _lootGenerator = loot != null ? new LootGenerator(loot) : null;
             _flow = new FlowField(map);
             _toStone = new FlowField(map);
+            _toStoneThrough = new FlowField(map) { Through = BuiltBarrier };
             for (int i = 0; i < _config.EnemyTarget; i++) TrySpawnEnemy();
         }
 
@@ -324,7 +325,10 @@ namespace Game.Core
             switch (enemy.State)
             {
                 case EnemyState.Idle:
-                    var nearest = _players
+                    // One come for the ward stone goes after a player only if it can walk to them; walled out, it goes on
+                    // for the stone and breaks in.
+                    bool walledOut = enemy.Rift == DefenseMonster && _flow.DistanceAt(TileMap.Cell(enemy.Position.X), TileMap.Cell(enemy.Position.Y)) == FlowField.Unreached;
+                    var nearest = walledOut ? null : _players
                         .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= definition.Aggro)
                         .OrderBy(p => Vec2.Distance(p.Position, enemy.Position))
                         .FirstOrDefault();
@@ -358,6 +362,12 @@ namespace Game.Core
                     if (gap <= definition.Reach && CanStrike(enemy, target))
                     {
                         StartWindup(enemy, toTarget.Normalized);
+                        break;
+                    }
+                    if (enemy.Rift == DefenseMonster && gap >= 1.5f
+                        && _flow.DistanceAt(TileMap.Cell(enemy.Position.X), TileMap.Cell(enemy.Position.Y)) == FlowField.Unreached)
+                    {
+                        enemy.State = EnemyState.Idle;
                         break;
                     }
                     var direction = gap < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);

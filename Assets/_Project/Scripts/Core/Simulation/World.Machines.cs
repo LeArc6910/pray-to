@@ -195,6 +195,9 @@ namespace Game.Core
                 case TileType.Turret:
                     RunTurret(machine);
                     break;
+                case TileType.TeslaTower:
+                    RunTesla(machine);
+                    break;
             }
         }
 
@@ -706,7 +709,7 @@ namespace Game.Core
                 TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material.Kind),
                 TileType.Coop or TileType.Barn => material.Id == HouseOf(target.Kind).Animal || material.Id == Feed,
                 TileType.CrabPot => material.Id == Bait,
-                TileType.Turret => material.Id == Ammo,
+                TileType.Turret => IsAmmo(material),
                 _ => false,
             };
         }
@@ -756,7 +759,7 @@ namespace Game.Core
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Turret:
-                        if (material.Id != Ammo || Count(target.Input) >= target.Definition.Capacity) return false;
+                        if (!IsAmmo(material) || Count(target.Input) >= target.Definition.Capacity) return false;
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Coop:

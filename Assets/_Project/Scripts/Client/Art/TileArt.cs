@@ -402,6 +402,7 @@ namespace Game.Client
             TileType.ArcFurnace => ArcFurnaceTile,
             TileType.WaterWheel => WaterWheelStand,
             TileType.SolarPanel => SolarPanelTile,
+            TileType.TeslaTower => TeslaTowerTile,
             _ => null,
         };
 
@@ -1143,6 +1144,31 @@ namespace Game.Client
             ".oWWo......oWWo.",
             ".oooo......oooo.",
             ".____......____.");
+
+        // A tesla tower: a copper coil wound round a steel post on a broad base, a glowing ball on top.
+        static readonly PixelImage TeslaTowerTile = PixelImage.FromRows(new Dictionary<char, Rgba>(MetalPalette)
+            {
+                ['c'] = Rgba.Hex("#D6783F"),
+                ['C'] = Rgba.Hex("#9A4E22"),
+                ['e'] = Rgba.Hex("#9AE0FF"),
+                ['E'] = Rgba.Hex("#3A78C8"),
+            },
+            "......oooo......",
+            ".....oeeEEo.....",
+            ".....oeEEEo.....",
+            "......oooo......",
+            "......oMmo......",
+            ".....occCCo.....",
+            ".....oMMmmo.....",
+            ".....occCCo.....",
+            ".....oMMmmo.....",
+            ".....occCCo.....",
+            "....ooMMmmoo....",
+            "...oLLLLLLLLo...",
+            "..oLMMMMMMMMmo..",
+            "..oDDDDDDDDDDo..",
+            "...oooooooooo...",
+            "...__________...");
 
         // A solar panel: blue cells in a steel frame on a short post.
         static readonly PixelImage SolarPanelTile = PixelImage.FromRows(new Dictionary<char, Rgba>(MetalPalette)
