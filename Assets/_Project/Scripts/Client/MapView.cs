@@ -223,7 +223,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Chest) return Palette.Chest;
             if (_map[x, y] == TileType.Drill) return Palette.Drill;
             if (_map[x, y] == TileType.Smelter) return Palette.Smelter;
-            if (_map[x, y] == TileType.Conveyor) return Palette.Conveyor;
+            if (World.IsBelt(_map[x, y])) return Palette.Conveyor;
             if (_map[x, y] == TileType.Splitter) return Palette.Splitter;
             if (_map[x, y] == TileType.Arm) return Palette.Arm;
             if (_map[x, y] == TileType.Torch || _map[x, y] == TileType.Lamp) return Palette.Torch;
@@ -237,7 +237,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);
             if (TileMap.IsSoil(_map[x, y])) return new Color32(110, 80, 56, 255);
             if (_map[x, y] == TileType.Filter) return Palette.Splitter;
-            if (_map[x, y] == TileType.Generator || _map[x, y] == TileType.Lever) return Palette.Drill;
+            if (_map[x, y] == TileType.Generator || _map[x, y] == TileType.Lever || _map[x, y] == TileType.PowerPole) return Palette.Drill;
             if (_map[x, y] == TileType.Bed) return new Color32(80, 130, 220, 255);
             if (_map[x, y] == TileType.Sprinkler) return new Color32(90, 150, 230, 255);
             if (_map[x, y] == TileType.Harvester) return new Color32(110, 170, 80, 255);

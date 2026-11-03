@@ -227,7 +227,32 @@ namespace Game.Client
         void DrawMaterialsPage()
         {
             DrawMaterials();
+            DrawProduction();
             DrawCrafting();
+        }
+
+        bool _showProduction;
+
+        // What the machines made lately (World.Production), folded away until asked for. Only once anything was made.
+        void DrawProduction()
+        {
+            var made = _client.Production;
+            if (made.Count == 0) return;
+            GUILayout.Space(6);
+            int minutes = Mathf.Max(1, Mathf.RoundToInt(_client.ProductionMinutes));
+            if (GUILayout.Button(_showProduction ? $"공장 생산 접기 (최근 {minutes}분)" : $"공장 생산 보기 (최근 {minutes}분, {made.Count}가지)")) _showProduction = !_showProduction;
+            if (!_showProduction) return;
+            foreach (var (thing, count) in made)
+            {
+                GUILayout.BeginHorizontal();
+                var material = thing as MaterialDefinition;
+                var consumable = thing as ConsumableDefinition;
+                Icon(material != null ? Sprites.Icon(material) : Sprites.Icon(consumable));
+                string name = material?.Name ?? consumable?.Name;
+                float perMinute = count / Mathf.Max(1 / 60f, _client.ProductionMinutes);
+                GUILayout.Label(Fit($"{name} {count}개 · 분당 {perMinute:0.#}", _textWidth - IconRoom));
+                GUILayout.EndHorizontal();
+            }
         }
 
         // The hovered or held item's description, only while the pointer is over the list, so a description left over

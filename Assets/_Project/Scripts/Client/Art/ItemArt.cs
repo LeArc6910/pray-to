@@ -566,6 +566,16 @@ namespace Game.Client
                 placed = placed.Copy();
                 placed.Draw(Belt(0), 0, 0);
             }
+            else if (placed != null && material.Places == TileType.FastConveyor)
+            {
+                placed = placed.Copy();
+                placed.Draw(Belt(0, fast: true), 0, 0);
+            }
+            else if (placed != null && material.Places == TileType.UndergroundBelt)
+            {
+                placed = placed.Copy();
+                placed.Draw(Underground(0), 0, 0);
+            }
             else if (placed != null && material.Places == TileType.Splitter)
             {
                 placed = placed.Copy();
@@ -1013,26 +1023,47 @@ namespace Game.Client
             return image.Outlined(Outline);
         }
 
+        // An underground belt along +x: a belt going into a dark hooded mouth on its front half, where loads go down
+        // (or come up).
+        public static PixelImage Underground(int frame)
+        {
+            var image = Belt(frame);
+            var hood = Rgba.Hex("#5C6270");
+            var hoodLight = Rgba.Hex("#8A92A2");
+            var dark = Rgba.Hex("#121318");
+            for (int y = 1; y <= 14; y++)
+            {
+                for (int x = 8; x < TileArt.Size; x++)
+                {
+                    bool edge = y == 1 || y == 14 || x == 8;
+                    image[x, y] = edge ? Outline : y <= 3 || y >= 12 ? (x == 9 ? hoodLight : hood) : x <= 9 ? hoodLight : dark;
+                }
+            }
+            return image;
+        }
+
         // A belt running along +x, rails on both sides and chevrons that move a little each frame. It runs edge to
-        // edge, so belts in a line join up.
-        public static PixelImage Belt(int frame)
+        // edge, so belts in a line join up. A fast belt's rails are painted yellow.
+        public static PixelImage Belt(int frame, bool fast = false)
         {
             var image = new PixelImage(TileArt.Size, TileArt.Size);
             var rubber = Rgba.Hex("#2C2E36");
             var mark = Rgba.Hex("#4E525E");
+            var light = fast ? Rgba.Hex("#F2C440") : SteelLight;
+            var rail = fast ? Rgba.Hex("#C8962C") : Steel;
             int phase = (frame % BeltFrames) * 2;
             for (int x = 0; x < TileArt.Size; x++)
             {
                 image[x, 1] = Outline;
-                image[x, 2] = SteelLight;
-                image[x, 3] = x % 4 == 1 ? SteelDark : Steel;
+                image[x, 2] = light;
+                image[x, 3] = x % 4 == 1 ? SteelDark : rail;
                 for (int r = 0; r < 8; r++)
                 {
                     int offset = r < 4 ? r : 7 - r;
                     int along = ((x - phase - offset) % 8 + 8) % 8;
                     image[x, 4 + r] = along < 2 ? mark : rubber;
                 }
-                image[x, 12] = x % 4 == 1 ? SteelDark : Steel;
+                image[x, 12] = x % 4 == 1 ? SteelDark : rail;
                 image[x, 13] = SteelDark;
                 image[x, 14] = Outline;
             }

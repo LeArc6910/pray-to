@@ -385,6 +385,9 @@ namespace Game.Client
             TileType.Anvil => AnvilTile,
             TileType.RiftAltar => RiftAltarTile,
             TileType.Assembler => AssemblerTile,
+            TileType.PowerPole => PowerPoleTile,
+            TileType.FastConveyor => ConveyorFrame,
+            TileType.UndergroundBelt => ConveyorFrame,
             _ => null,
         };
 
@@ -1341,6 +1344,28 @@ namespace Game.Client
             "..oaaaaaaaaaao..",
             "..oooooooooooo..",
             "..____________..");
+
+        // A wooden pole with a crossbar and two green glass insulators on it.
+        static readonly PixelImage PowerPoleTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['g'] = Rgba.Hex("#8CE0A0"), ['G'] = Rgba.Hex("#4CA86A"),
+            },
+            "................",
+            "..og........go..",
+            ".oGgo......oGgo.",
+            "oWWWWWWWWWWWWWWo",
+            "owwwwwwSWwwwwwwo",
+            ".oooooowWooooo..",
+            "......owWo......",
+            "......owWo......",
+            "......owWo......",
+            "......owWo......",
+            "......owWo......",
+            "......owWo......",
+            ".....owwWWo.....",
+            ".....oooooo.....",
+            ".....______.....",
+            "................");
 
         // An iron box with a brass gear on its face and a green lamp: it makes the recipe it was given.
         static readonly PixelImage AssemblerTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)

@@ -24,6 +24,7 @@ namespace Game.Core
         Machines = 18,
         Kit = 19,
         Stock = 20,
+        Production = 21,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -35,7 +36,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.36.0";
+        public const string Version = "0.37.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -256,6 +257,42 @@ namespace Game.Core
     }
 
     // The machines near a player: which way each faces and what a conveyor carries how far along. Sent unreliably
+    // What machines made in the last few minutes (World.Production), for everyone. Kind 0 is a material, 1 a
+    // consumable; Index is its sheet index. Sent every few seconds when it changed.
+    public sealed class ProductionMessage
+    {
+        public ProductionMessage(float minutes, IReadOnlyList<(int Kind, int Index, int Count)> made)
+        {
+            Minutes = minutes;
+            Made = made;
+        }
+
+        // How many minutes the counts cover.
+        public float Minutes { get; }
+        public IReadOnlyList<(int Kind, int Index, int Count)> Made { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Production, w =>
+        {
+            w.Write(Minutes);
+            w.Write((ushort)Made.Count);
+            foreach (var (kind, index, count) in Made)
+            {
+                w.Write((byte)kind);
+                w.Write((ushort)index);
+                w.Write(count);
+            }
+        });
+
+        public static ProductionMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Production, r =>
+        {
+            float minutes = r.ReadSingle();
+            int n = r.ReadUInt16();
+            var made = new List<(int, int, int)>(n);
+            for (int i = 0; i < n; i++) made.Add((r.ReadByte(), r.ReadUInt16(), r.ReadInt32()));
+            return new ProductionMessage(minutes, made);
+        });
+    }
+
     // What the chests near the player hold, by material sheet index, so the crafting list can count them
     // (World.StockNear). Sent when it changes; each replaces the last.
     public sealed class StockMessage
@@ -352,8 +389,12 @@ namespace Game.Core
         public float Progress { get; }
         // Switched on (World.ToggleMachine).
         public bool On { get; }
-        // A filter's chosen material as a sheet index, an assembler's recipe as one, or -1.
+        // A filter's chosen material as a sheet index, an assembler's recipe as one, a generator's or power pole's
+        // grid as supply × 256 + demand (MachineState.Grid), or -1.
         public int Setting { get; }
+
+        // Packs a grid's supply and demand into a setting.
+        public static int Grid(int supply, int demand) => Math.Clamp(supply, 0, 254) * 256 + Math.Clamp(demand, 0, 255);
         // Working twice as fast beside a running generator.
         public bool Powered { get; }
     }

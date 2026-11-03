@@ -33,8 +33,11 @@ namespace Game.Core
         // A conveyor's, splitter's or arm's load and how far along the tile it has come (or the arm has swung), 0 to 1.
         public MaterialDefinition Carried { get; internal set; }
         public float Progress { get; internal set; }
-        // Ticks toward the next ore or bar; for a splitter, which of its ways out is next.
+        // Ticks toward the next ore or bar; for a splitter, which of its ways out is next; for an underground belt, 1
+        // while its load has come up from underground (it goes out of the front, not down again).
         internal int Timer { get; set; }
+        // Power owed toward the next powered step while its grid has less than it draws (World.PoweredStep).
+        internal int Charge { get; set; }
         // For a splitter: the side its load came in from (a direction), so it never sends it back, or -1.
         internal int CameFrom { get; set; } = -1;
         internal Dictionary<MaterialDefinition, int> Input { get; } = new Dictionary<MaterialDefinition, int>();
@@ -62,10 +65,15 @@ namespace Game.Core
     {
         // How far a sprinkler waters: the crops in the square this many tiles around it.
         public const int SprinklerReach = 2;
-        // A running generator powers the machines this far from it, which then work twice as fast; a lever switches
-        // the machines this far from it.
+        // A running generator powers the machines this far from it, which then work twice as fast (World.Power.cs); a
+        // lever switches the machines this far from it; an underground belt comes up at the next one facing its way
+        // this far ahead.
         public const float PowerReach = 6;
         public const float LeverReach = 5;
+        public const int UndergroundReach = 5;
+
+        // Tiles that carry a load along toward their front.
+        public static bool IsBelt(TileType type) => type == TileType.Conveyor || type == TileType.FastConveyor || type == TileType.UndergroundBelt;
 
         readonly SortedDictionary<int, Machine> _machines = new SortedDictionary<int, Machine>();
         List<Recipe> _smelts;
@@ -84,6 +92,7 @@ namespace Game.Core
             var definition = Tiles?.Machine(type);
             if (definition == null) _machines.Remove(key);
             else _machines[key] = new Machine(definition, x, y, 0);
+            _gridsStale = true;
         }
 
         // Whatever the machine held goes to whoever dug it up.
@@ -95,24 +104,18 @@ namespace Game.Core
 
         void UpdateMachines()
         {
-            var generators = _machines.Values.Where(m => m.Kind == TileType.Generator && m.Enabled).ToList();
-            foreach (var generator in generators) RunGenerator(generator);
-            var running = generators.Where(g => g.Timer > 0).ToList();
+            foreach (var generator in _machines.Values.Where(m => m.Kind == TileType.Generator && m.Enabled).ToList()) RunGenerator(generator);
+            CountPower();
             foreach (var machine in _machines.Values)
             {
                 if (!machine.Enabled || machine.Kind == TileType.Generator) continue;
-                // Powered: a second step every tick.
-                bool powered = running.Count > 0 && running.Any(g => Distance(g, machine) <= PowerReach);
                 Run(machine);
-                if (powered) Run(machine);
+                // Powered: a second step.
+                if (PoweredStep(machine)) Run(machine);
             }
         }
 
         static float Distance(Machine a, Machine b) => Vec2.Distance(TileMap.Center(a.X, a.Y), TileMap.Center(b.X, b.Y));
-
-        // Whether the machine is powered by a running generator nearby, for the view.
-        public bool IsPowered(Machine machine) =>
-            machine.Kind != TileType.Generator && _machines.Values.Any(g => g.Kind == TileType.Generator && g.Enabled && g.Timer > 0 && Distance(g, machine) <= PowerReach);
 
         void Run(Machine machine)
         {
@@ -125,7 +128,11 @@ namespace Game.Core
                     RunSmelter(machine);
                     break;
                 case TileType.Conveyor:
+                case TileType.FastConveyor:
                     RunConveyor(machine);
+                    break;
+                case TileType.UndergroundBelt:
+                    RunUnderground(machine);
                     break;
                 case TileType.Splitter:
                     RunSplitter(machine);
@@ -169,6 +176,7 @@ namespace Game.Core
             {
                 assembler.Timer = 0;
                 foreach (var (material, count) in recipe.Ingredients) Add(assembler.Input, material, -count);
+                CountMade((object)recipe.Material ?? recipe.Consumable, recipe.Count);
                 if (recipe.Material != null)
                 {
                     Add(assembler.Output, recipe.Material, recipe.Count);
@@ -343,10 +351,14 @@ namespace Game.Core
                         if (made != null) Add(source.Output, made, -1);
                         return made;
                     case TileType.Conveyor:
+                    case TileType.FastConveyor:
+                    case TileType.UndergroundBelt:
                     case TileType.Splitter:
                     case TileType.Filter:
                         var load = source.Carried;
-                        bool ready = source.Kind != TileType.Conveyor || (source.Progress >= 1 && source.Front == (arm.X, arm.Y));
+                        // From a belt, only at its end, facing the arm; never a load about to go underground.
+                        bool ready = !IsBelt(source.Kind) || (source.Progress >= 1 && source.Front == (arm.X, arm.Y)
+                            && (source.Kind != TileType.UndergroundBelt || source.Timer == 1 || UndergroundExit(source) == null));
                         if (load == null || !ready || !Fits(load)) return null;
                         source.Carried = null;
                         source.Progress = 0;
@@ -373,6 +385,7 @@ namespace Game.Core
             {
                 drill.Timer = 0;
                 Add(drill.Output, vein.Material, 1);
+                CountMade(vein.Material, 1);
             }
             SendOut(drill, drill.Back);
         }
@@ -392,6 +405,7 @@ namespace Game.Core
                 smelter.Timer = 0;
                 foreach (var (material, count) in recipe.Ingredients) Add(smelter.Input, material, -count);
                 Add(smelter.Output, recipe.Material, recipe.Count);
+                CountMade(recipe.Material, recipe.Count);
             }
             SendOut(smelter, smelter.Front);
         }
@@ -432,6 +446,7 @@ namespace Game.Core
                     var definition = crop.Definition;
                     int seeds = Reap(crop, out int count);
                     Add(harvester.Output, definition.HarvestMaterial, count);
+                    CountMade(definition.HarvestMaterial, count);
                     if (seeds > 0)
                     {
                         PlantCrop(definition, crop.X, crop.Y);
@@ -493,6 +508,45 @@ namespace Game.Core
             if (Push(belt, belt.Carried, fx, fy)) belt.Carried = null;
         }
 
+        // A load that came onto an underground belt from above goes down and comes up at the next underground belt
+        // facing the same way within World.UndergroundReach ahead, passing under whatever lies between. With none
+        // there, or once it has come up, it goes out of the front like any belt.
+        void RunUnderground(Machine belt)
+        {
+            if (belt.Carried == null) return;
+            belt.Progress = Math.Min(1, belt.Progress + 1f / belt.Definition.Ticks);
+            if (belt.Progress < 1) return;
+            var exit = belt.Timer == 1 ? null : UndergroundExit(belt);
+            if (exit != null)
+            {
+                if (exit.Carried != null) return;
+                exit.Carried = belt.Carried;
+                exit.Progress = 0;
+                exit.Timer = 1;
+                belt.Carried = null;
+                return;
+            }
+            var (fx, fy) = belt.Front;
+            if (!Push(belt, belt.Carried, fx, fy)) return;
+            belt.Carried = null;
+            belt.Timer = 0;
+        }
+
+        // Where an underground belt's loads come up: the nearest underground belt ahead facing the same way, within
+        // reach, or null.
+        public Machine UndergroundExit(Machine belt)
+        {
+            var (dx, dy) = Machine.Steps[belt.Direction];
+            for (int k = 1; k <= UndergroundReach; k++)
+            {
+                int x = belt.X + dx * k, y = belt.Y + dy * k;
+                if (!Map.InBounds(x, y)) return null;
+                var other = MachineAt(x, y);
+                if (other != null && other.Kind == TileType.UndergroundBelt && other.Direction == belt.Direction) return other;
+            }
+            return null;
+        }
+
         void SendOut(Machine machine, (int X, int Y) to)
         {
             var first = machine.Output.Keys.FirstOrDefault();
@@ -508,7 +562,7 @@ namespace Game.Core
             if (target == null) return ChestAt(x, y) != null;
             return target.Kind switch
             {
-                TileType.Conveyor => target.Front != (from.X, from.Y),
+                TileType.Conveyor or TileType.FastConveyor or TileType.UndergroundBelt => target.Front != (from.X, from.Y),
                 TileType.Splitter => true,
                 TileType.Filter => true,
                 TileType.Generator => material.Fuel > 0,
@@ -528,9 +582,13 @@ namespace Game.Core
                 switch (target.Kind)
                 {
                     case TileType.Conveyor:
+                    case TileType.FastConveyor:
+                    case TileType.UndergroundBelt:
                         if (target.Carried != null || target.Front == (from.X, from.Y)) return false;
                         target.Carried = material;
                         target.Progress = 0;
+                        // Onto an underground belt from above: it goes down.
+                        target.Timer = 0;
                         return true;
                     case TileType.Splitter:
                     case TileType.Filter:
@@ -581,6 +639,7 @@ namespace Game.Core
             if (machine == null) return;
             machine.Direction = direction & 3;
             machine.Enabled = (direction & Machine.OffBit) == 0;
+            _gridsStale = true;
             machine.Setting = setting;
             machine.Recipe = machine.Kind == TileType.Assembler && Assembles(recipe) ? recipe : null;
             machine.Timer = timer;

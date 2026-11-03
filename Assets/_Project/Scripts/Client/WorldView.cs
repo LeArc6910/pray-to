@@ -333,6 +333,9 @@ namespace Game.Client
                 // An assembler nearby shows what it makes.
                 else if (machine.Kind == TileType.Assembler && Vector3.Distance(at, _self.Position) < 4)
                     Label(at + new Vector3(0, 0.7f, 0), machine.Recipe?.Name ?? "정하지 않음", Color.white);
+                // A pole or generator nearby shows what its grid gives and draws.
+                else if (machine.Supply >= 0 && Vector3.Distance(at, _self.Position) < 4)
+                    Label(at + new Vector3(0, 0.9f, 0), $"전력 {machine.Supply}/{machine.Demand}", machine.Supply >= machine.Demand ? PowerLabel : OffLabel);
             }
             foreach (var text in _floating)
             {
@@ -660,6 +663,8 @@ namespace Game.Client
         {
             _seen.Clear();
             int beltFrame = Mathf.FloorToInt(Time.time * 16) % ItemArt.BeltFrames;
+            // A fast belt runs twice as fast, so its marks do too.
+            int fastFrame = Mathf.FloorToInt(Time.time * 32) % ItemArt.BeltFrames;
             foreach (var machine in _client.Machines())
             {
                 int key = machine.Y * _client.Map.Width + machine.X;
@@ -683,6 +688,9 @@ namespace Game.Client
                 var center = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
                 parts.Part.sprite = machine.Kind == TileType.Drill ? DrillBitSprite
                     : machine.Kind == TileType.Conveyor ? BeltSprites[machine.On ? beltFrame : 0]
+                    : machine.Kind == TileType.FastConveyor ? FastBeltSprites[machine.On ? fastFrame : 0]
+                    : machine.Kind == TileType.UndergroundBelt ? UndergroundSprites[machine.On ? beltFrame : 0]
+                    : machine.Kind == TileType.PowerPole ? null
                     : machine.Kind == TileType.Splitter ? SplitterSprite
                     : machine.Kind == TileType.Arm ? ArmSprite
                     : machine.Kind == TileType.Sprinkler ? SprinklerSprite
@@ -738,6 +746,47 @@ namespace Game.Client
                 _gone.Add(pair.Key);
             }
             foreach (int key in _gone) _machines.Remove(key);
+            DrawWires();
+        }
+
+        readonly List<SpriteRenderer> _wires = new List<SpriteRenderer>();
+        readonly List<MachineView> _nodes = new List<MachineView>();
+
+        // A thin copper line between each pair of generators and power poles that are wired together (World.Wired),
+        // sagging nowhere: it is seen from above.
+        void DrawWires()
+        {
+            _nodes.Clear();
+            foreach (var machine in _client.Machines())
+            {
+                if (World.IsPowerNode(machine.Kind)) _nodes.Add(machine);
+            }
+            int used = 0;
+            for (int i = 0; i < _nodes.Count; i++)
+            {
+                for (int j = i + 1; j < _nodes.Count; j++)
+                {
+                    var a = _nodes[i];
+                    var b = _nodes[j];
+                    if (!World.Wired(a.X, a.Y, b.X, b.Y)) continue;
+                    if (used == _wires.Count)
+                    {
+                        var wire = Renderer(_root.transform, "Wire", Shapes.Square, WireColor);
+                        wire.sortingOrder = 30;
+                        _wires.Add(wire);
+                    }
+                    var line = _wires[used++];
+                    line.enabled = true;
+                    // From the top of one pole to the other, where the insulators are.
+                    var from = new Vector3(a.X + 0.5f, a.Y + 0.85f, 0);
+                    var to = new Vector3(b.X + 0.5f, b.Y + 0.85f, 0);
+                    var along = to - from;
+                    line.transform.localPosition = (from + to) / 2;
+                    line.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg);
+                    line.transform.localScale = new Vector3(along.magnitude, 1 / 16f, 1);
+                }
+            }
+            for (int i = used; i < _wires.Count; i++) _wires[i].enabled = false;
         }
 
         static Sprite DrillBitSprite => Sprites.Centered("machine/drill", () => ItemArt.DrillBit);
@@ -766,6 +815,8 @@ namespace Game.Client
         static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
         static readonly Color SleepLabel = new Color(0.75f, 0.85f, 1f);
         static readonly Color RiftColor = new Color(0.7f, 0.45f, 1f);
+        static readonly Color WireColor = new Color(0.78f, 0.45f, 0.2f, 0.85f);
+        static readonly Color PowerLabel = new Color(1f, 0.85f, 0.45f);
 
         static Sprite[] _beltSprites;
 
@@ -776,6 +827,16 @@ namespace Game.Client
             Sprites.Centered("machine/belt2", () => ItemArt.Belt(2)),
             Sprites.Centered("machine/belt3", () => ItemArt.Belt(3)),
         };
+
+        static Sprite[] _fastBeltSprites;
+
+        static Sprite[] FastBeltSprites => _fastBeltSprites ??= Enumerable.Range(0, ItemArt.BeltFrames)
+            .Select(frame => Sprites.Centered("machine/fastbelt" + frame, () => ItemArt.Belt(frame, fast: true))).ToArray();
+
+        static Sprite[] _undergroundSprites;
+
+        static Sprite[] UndergroundSprites => _undergroundSprites ??= Enumerable.Range(0, ItemArt.BeltFrames)
+            .Select(frame => Sprites.Centered("machine/underground" + frame, () => ItemArt.Underground(frame))).ToArray();
 
         void DrawProjectiles()
         {

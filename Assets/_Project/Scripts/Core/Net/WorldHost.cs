@@ -67,6 +67,8 @@ namespace Game.Core
             public bool SentMachines;
             // The last stock message sent, to send again only when it changes.
             public byte[] SentStock;
+            // The last production message sent, likewise.
+            public byte[] SentProduction;
         }
 
         // How many times over one craft command may make its recipe.
@@ -191,6 +193,8 @@ namespace Game.Core
                     SendStock(pair.Key, pair.Value);
                 }
             }
+
+            if (World.Tick % ProductionInterval == 0) SendProduction();
 
             if (World.Tick % _config.SnapshotInterval != 0) return;
 
@@ -507,6 +511,25 @@ namespace Game.Core
             (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.Grown ?? 0,
                 change.Crop?.WetFrom ?? 0, change.Crop?.WetUntil ?? 0);
 
+        // How often the production list goes out.
+        static readonly int ProductionInterval = World.Ticks(5);
+
+        void SendProduction()
+        {
+            if (_loot == null) return;
+            var made = World.Production()
+                .Select(p => p.Made is ConsumableDefinition c ? (1, IndexOf(_loot.Consumables, c), p.Count) : (0, IndexOf(_loot.Materials, p.Made as MaterialDefinition), p.Count))
+                .Where(entry => entry.Item2 >= 0)
+                .ToList();
+            byte[] message = new ProductionMessage(World.ProductionSpan, made).Encode();
+            foreach (var pair in _connections.Where(pair => pair.Value.Player != null))
+            {
+                if (pair.Value.SentProduction != null && pair.Value.SentProduction.AsSpan().SequenceEqual(message)) continue;
+                pair.Value.SentProduction = message;
+                Send(pair.Key, message, reliable: true);
+            }
+        }
+
         void SendStock(ulong connection, Connection sent)
         {
             if (_loot == null) return;
@@ -529,10 +552,15 @@ namespace Game.Core
                 .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
                 .Take(_config.MaxMachinesPerMessage)
                 .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled,
-                    m.Kind == TileType.Assembler ? (m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe)) : m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting),
-                    World.IsPowered(m)))
+                    SettingOf(m), World.IsPowered(m)))
                 .ToList();
             if (near.Count == 0 && !sent.SentMachines) return;
+            int SettingOf(Machine m)
+            {
+                if (m.Kind == TileType.Assembler) return m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe);
+                if (World.IsPowerNode(m.Kind)) return World.GridOf(m) is PowerGrid grid ? MachineState.Grid(grid.Supply, grid.Demand) : -1;
+                return m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting);
+            }
             sent.SentMachines = near.Count > 0;
             Send(connection, new MachinesMessage(near).Encode(), reliable: false);
         }

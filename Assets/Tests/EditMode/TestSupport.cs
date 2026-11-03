@@ -212,4 +212,35 @@ namespace Game.Core.Tests
                 $"No error mentions {string.Join(" + ", parts)}. Errors:\n{string.Join("\n", data.Errors)}");
         }
     }
+
+    // Building things as a player would: standing beside a tile facing it and placing, then letting time pass.
+    public static class Builds
+    {
+        public static void Place(World world, Player player, MaterialDefinition material, int x, int y, Vec2 facing)
+        {
+            Face(world, player, x, y, facing);
+            player.Inventory.AddMaterial(material);
+            Assert.IsTrue(world.PlaceTile(player.Id, material), $"{material.Id} at ({x}, {y})");
+            Assert.AreEqual(material.Places, world.Map[x, y], $"{material.Id} landed somewhere else");
+        }
+
+        // Stands the player on the tile beside (x, y), facing it that way.
+        public static void Face(World world, Player player, int x, int y, Vec2 facing) => Walk(world, player, TileMap.Center(x, y) - facing, facing);
+
+        // Walks straight to the spot; what stands in the way stops them short.
+        public static void Walk(World world, Player player, Vec2 stand, Vec2 facing)
+        {
+            for (int i = 0; i < 20 && Vec2.Distance(player.Position, stand) > 0.01f; i++)
+            {
+                world.MovePlayer(player.Id, player.Position + (stand - player.Position).ClampLength(1.5f), facing, 10);
+            }
+            world.MovePlayer(player.Id, player.Position, facing, 1);
+        }
+
+        public static void Run(World world, float seconds)
+        {
+            for (int i = 0; i < World.Ticks(seconds); i++) world.Step();
+            world.TakeEvents();
+        }
+    }
 }

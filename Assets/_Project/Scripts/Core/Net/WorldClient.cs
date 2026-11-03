@@ -119,8 +119,10 @@ namespace Game.Core
     public readonly struct MachineView
     {
         public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true,
-            MaterialDefinition setting = null, bool powered = false, Recipe recipe = null)
+            MaterialDefinition setting = null, bool powered = false, Recipe recipe = null, int supply = -1, int demand = -1)
         {
+            Supply = supply;
+            Demand = demand;
             Setting = setting;
             Recipe = recipe;
             Powered = powered;
@@ -146,6 +148,9 @@ namespace Game.Core
         // An assembler's recipe, or null.
         public Recipe Recipe { get; }
         public bool Powered { get; }
+        // For a generator or power pole: what its grid gives and draws (World.PowerGrid), or -1.
+        public int Supply { get; }
+        public int Demand { get; }
     }
 
     public readonly struct HazardView
@@ -399,6 +404,16 @@ namespace Game.Core
                             if (_loot != null && material < _loot.Materials.Count) _stock[_loot.Materials[material]] = count;
                         }
                         break;
+                    case MessageType.Production:
+                        var production = ProductionMessage.Decode(data);
+                        ProductionMinutes = production.Minutes;
+                        Production = production.Made
+                            .Select(p => (p.Kind == 1
+                                ? (object)(_loot != null && p.Index < _loot.Consumables.Count ? _loot.Consumables[p.Index] : null)
+                                : _loot != null && p.Index < _loot.Materials.Count ? _loot.Materials[p.Index] : null, p.Count))
+                            .Where(p => p.Item1 != null)
+                            .ToList();
+                        break;
                     case MessageType.Machines:
                         _machines = MachinesMessage.Decode(data).Machines;
                         _machinesTick = HostTick;
@@ -576,6 +591,11 @@ namespace Game.Core
         public IReadOnlyList<Recipe> Recipes => _loot?.Recipes ?? (IReadOnlyList<Recipe>)Array.Empty<Recipe>();
 
         IReadOnlyList<MachineState> _machines = Array.Empty<MachineState>();
+
+        // What machines made lately (World.Production): a MaterialDefinition or ConsumableDefinition each, most first,
+        // over ProductionMinutes.
+        public IReadOnlyList<(object Made, int Count)> Production { get; private set; } = Array.Empty<(object, int)>();
+        public float ProductionMinutes { get; private set; }
         double _machinesTick;
 
         // The machines in view, with conveyor loads moved on to where they are now.
@@ -593,9 +613,12 @@ namespace Game.Core
                     progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks * (m.Powered ? 2 : 1)));
                 }
                 bool assembler = m.Kind == TileType.Assembler;
-                var setting = !assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
+                bool node = World.IsPowerNode(m.Kind);
+                int supply = node && m.Setting >= 0 ? m.Setting / 256 : -1;
+                int demand = node && m.Setting >= 0 ? m.Setting % 256 : -1;
+                var setting = !assembler && !node && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
                 var recipe = assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Recipes.Count ? _loot.Recipes[m.Setting] : null;
-                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe));
+                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe, supply, demand));
             }
             return views;
         }

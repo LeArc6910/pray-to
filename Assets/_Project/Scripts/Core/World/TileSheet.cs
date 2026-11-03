@@ -46,17 +46,21 @@ namespace Game.Core
     // A machine's numbers: seconds per ore, per tile moved or per smelt, and how much it holds. Docs/Automation.md.
     public sealed class MachineDefinition
     {
-        internal MachineDefinition(TileType tile, float seconds, int capacity)
+        internal MachineDefinition(TileType tile, float seconds, int capacity, int power = 0)
         {
             Tile = tile;
             Seconds = seconds;
             Capacity = capacity;
+            Power = power;
         }
 
         public TileType Tile { get; }
         public float Seconds { get; }
         public int Ticks => World.Ticks(Seconds);
         public int Capacity { get; }
+        // What it draws from a power grid to work twice as fast; for a generator, what it gives while it burns. 0 for
+        // a machine that power does not speed up (belts, splitters). See Docs/Automation.md, 전력망.
+        public int Power { get; }
     }
 
     // Something that grows from a seed on a floor tile of its biomes. See Docs/Farming.md and Docs/Time.md.
@@ -198,7 +202,7 @@ namespace Game.Core
         static readonly TileType[] MachineTiles =
         {
             TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester,
-            TileType.Filter, TileType.Generator, TileType.Lever, TileType.Assembler,
+            TileType.Filter, TileType.Generator, TileType.Lever, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt,
         };
 
         static List<MachineDefinition> ParseMachines(string csv, List<string> errors)
@@ -223,7 +227,9 @@ namespace Game.Core
                     if (seconds <= 0) throw new FormatException("seconds는 0보다 커야 합니다.");
                     int capacity = SheetValues.ParseNumber(row["capacity"], "capacity");
                     if (capacity < 1) throw new FormatException("capacity는 1 이상이어야 합니다.");
-                    machines.Add(new MachineDefinition(tile, seconds, capacity));
+                    int power = string.IsNullOrWhiteSpace(row["power"]) ? 0 : SheetValues.ParseNumber(row["power"], "power");
+                    if (power < 0) throw new FormatException("power는 0 이상이어야 합니다.");
+                    machines.Add(new MachineDefinition(tile, seconds, capacity, power));
                 }
                 catch (FormatException e)
                 {

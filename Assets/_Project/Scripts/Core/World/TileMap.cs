@@ -71,6 +71,9 @@ namespace Game.Core
         RiftAltar,
         // A machine that makes a chosen recipe over and over from what comes in (Docs/Automation.md).
         Assembler,
+        PowerPole,
+        FastConveyor,
+        UndergroundBelt,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -121,7 +124,7 @@ namespace Game.Core
         public bool IsSolid(int x, int y)
         {
             var type = this[x, y];
-            return type != TileType.Floor && type != TileType.Conveyor && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
+            return type != TileType.Floor && !World.IsBelt(type) && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
                 && type != TileType.Door && !IsSoil(type);
         }
 

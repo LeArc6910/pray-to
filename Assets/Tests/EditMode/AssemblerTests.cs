@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
+using static Game.Core.Tests.Builds;
 
 namespace Game.Core.Tests
 {
@@ -25,33 +26,6 @@ namespace Game.Core.Tests
             var world = new World(Maps.Room(16), TileMap.Center(8, 8), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
             player = world.AddPlayer("a", null);
             return world;
-        }
-
-        static void Place(World world, Player player, MaterialDefinition material, int x, int y, Vec2 facing)
-        {
-            Face(world, player, x, y, facing);
-            player.Inventory.AddMaterial(material);
-            Assert.IsTrue(world.PlaceTile(player.Id, material), $"{material.Id} at ({x}, {y})");
-        }
-
-        static void Face(World world, Player player, int x, int y, Vec2 facing)
-        {
-            Walk(world, player, TileMap.Center(x, y) - facing, facing);
-        }
-
-        static void Walk(World world, Player player, Vec2 stand, Vec2 facing)
-        {
-            for (int i = 0; i < 20 && Vec2.Distance(player.Position, stand) > 0.01f; i++)
-            {
-                world.MovePlayer(player.Id, player.Position + (stand - player.Position).ClampLength(1.5f), facing, 10);
-            }
-            world.MovePlayer(player.Id, player.Position, facing, 1);
-        }
-
-        static void Run(World world, float seconds)
-        {
-            for (int i = 0; i < World.Ticks(seconds); i++) world.Step();
-            world.TakeEvents();
         }
 
         // Chest (3, 8) → arm (4, 8) → assembler (5, 8) → chest (6, 8), and the player below the assembler facing it.

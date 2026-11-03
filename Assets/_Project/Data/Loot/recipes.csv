@@ -56,6 +56,9 @@ filter,filter,1,iron_gear:2|circuit:1,Workbench
 generator,generator,1,iron_gear:3|copper_wire:4|stone:6,Workbench
 lever,lever,1,copper_wire:2|iron_bar:1,Workbench
 assembler,assembler,1,iron_gear:4|circuit:2|iron_bar:3,Workbench
+power_pole,power_pole,2,copper_wire:3|stone:2,Workbench
+fast_conveyor,fast_conveyor,4,conveyor:4|iron_gear:2,Workbench
+underground_belt,underground_belt,2,conveyor:4|iron_bar:2,Workbench
 healing_potion,healing_potion,1,slime_gel:3,
 torch,torch,4,stone:1|slime_gel:1,
 roasted_mushroom,roasted_mushroom,1,mushroom:2,Furnace
