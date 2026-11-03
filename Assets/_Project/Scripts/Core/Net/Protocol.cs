@@ -38,7 +38,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.41.0";
+        public const string Version = "0.42.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -263,27 +263,30 @@ namespace Game.Core
     // they last talked and gave a gift. Sent when it changes; the client keeps it in its character save.
     public sealed class FriendshipsMessage
     {
-        public FriendshipsMessage(IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay)> friendships) { Friendships = friendships; }
+        public FriendshipsMessage(IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> friendships) =>
+            Friendships = friendships;
 
-        public IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay)> Friendships { get; }
+        public IReadOnlyList<(int Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> Friendships { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Friendships, w =>
         {
             w.Write((byte)Friendships.Count);
-            foreach (var (npc, points, talked, gifted) in Friendships)
+            foreach (var (npc, points, talked, gifted, request, heartGifts) in Friendships)
             {
                 w.Write((byte)npc);
                 w.Write((ushort)points);
                 w.Write(talked);
                 w.Write(gifted);
+                w.Write(request);
+                w.Write((byte)heartGifts);
             }
         });
 
         public static FriendshipsMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Friendships, r =>
         {
             int n = r.ReadByte();
-            var list = new List<(int, int, int, int)>(n);
-            for (int i = 0; i < n; i++) list.Add((r.ReadByte(), r.ReadUInt16(), r.ReadInt32(), r.ReadInt32()));
+            var list = new List<(int, int, int, int, int, int)>(n);
+            for (int i = 0; i < n; i++) list.Add((r.ReadByte(), r.ReadUInt16(), r.ReadInt32(), r.ReadInt32(), r.ReadInt32(), r.ReadByte()));
             return new FriendshipsMessage(list);
         });
     }

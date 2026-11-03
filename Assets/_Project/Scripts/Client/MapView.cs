@@ -237,7 +237,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);
             if (TileMap.IsSoil(_map[x, y])) return new Color32(110, 80, 56, 255);
             if (_map[x, y] == TileType.Filter) return Palette.Splitter;
-            if (_map[x, y] == TileType.MerchantStall) return new Color32(220, 90, 100, 255);
+            if (_map[x, y] == TileType.MerchantStall || _map[x, y] == TileType.SmithStall || _map[x, y] == TileType.FisherHut) return new Color32(220, 90, 100, 255);
             if (_map[x, y] == TileType.WardStone) return new Color32(140, 224, 255, 255);
             if (_map[x, y] == TileType.Generator || _map[x, y] == TileType.Lever || _map[x, y] == TileType.PowerPole) return Palette.Drill;
             if (_map[x, y] == TileType.Bed) return new Color32(80, 130, 220, 255);

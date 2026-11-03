@@ -181,6 +181,8 @@ namespace Game.Core
         Unload,
         // Starts the day's base defense at the ward stone near (World.StartDefense).
         StartDefense,
+        // Brings the person near what they asked for today (World.CompleteRequest).
+        Request,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

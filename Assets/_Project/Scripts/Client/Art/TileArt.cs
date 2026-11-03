@@ -388,6 +388,8 @@ namespace Game.Client
             TileType.Assembler => AssemblerTile,
             TileType.PowerPole => PowerPoleTile,
             TileType.MerchantStall => MerchantStallTile,
+            TileType.SmithStall => SmithStallTile,
+            TileType.FisherHut => FisherHutTile,
             TileType.Keg => KegTile,
             TileType.PreservesJar => JarTile,
             TileType.Coop => CoopTile,
@@ -1384,6 +1386,31 @@ namespace Game.Client
             Counter[4],
             Counter[5],
             Counter[6]);
+
+        // The blacksmith's: a soot-dark awning striped with ember orange; the fisher's: blue and white.
+        static readonly PixelImage SmithStallTile = Restriped(MerchantStallTile, "#4A4444", "#3A3434", "#E8783A", "#B8562A");
+        static readonly PixelImage FisherHutTile = Restriped(MerchantStallTile, "#3E7FD0", "#2E5FA0", "#F6F2E8", "#C8C0B0");
+
+        // The stall with its awning's stripes in other colours: the red and the cream, and their shades.
+        static PixelImage Restriped(PixelImage stall, string red, string redShade, string cream, string creamShade)
+        {
+            var swap = new Dictionary<Rgba, Rgba>
+            {
+                [BasePalette['R']] = Rgba.Hex(red),
+                [BasePalette['r']] = Rgba.Hex(redShade),
+                [BasePalette['c']] = Rgba.Hex(cream),
+                [BasePalette['C']] = Rgba.Hex(creamShade),
+            };
+            var image = stall.Copy();
+            for (int y = 0; y < 5; y++)
+            {
+                for (int x = 0; x < image.Width; x++)
+                {
+                    if (swap.TryGetValue(image[x, y], out var to)) image[x, y] = to;
+                }
+            }
+            return image;
+        }
 
         // The stall's counter alone, drawn over the merchant standing behind it.
         public static readonly PixelImage MerchantCounter = PixelImage.FromRows(BasePalette,

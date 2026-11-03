@@ -1,0 +1,16 @@
+id,npc,text,need,reward,hearts,points
+m_spores,merchant,버섯 포자 10개만 구해 줄래? 화분에 심으려고.,mushroom_spore:10,coin:40,,30
+m_fish,merchant,생선 구이 세 개가 필요해. 손님이 찾네.,grilled_fish:3,coin:50|healing_potion:2,,30
+m_berry,merchant,딸기 주스 두 병 부탁해.,berry_juice:2,coin:70,1,35
+m_wine,merchant,달빛 포도주 두 병이면 큰 거래를 할 수 있어.,moon_wine:2,coin:110|essence:3,2,40
+m_kimchi,merchant,눈 배추 김치가 먹고 싶어. 하나만!,kimchi:1,coin:120,3,45
+b_copper,blacksmith,구리 광석 20개. 전선을 뽑아야 해.,copper_ore:20,coin:40|copper_wire:6,,30
+b_iron,blacksmith,철 주괴 10개만 가져와. 주문이 밀렸어.,iron_bar:10,coin:80|essence:2,,30
+b_gear,blacksmith,철 톱니 12개. 조립기가 있으면 금방이지?,iron_gear:12,coin:90|ammo:20,1,35
+b_mithril,blacksmith,미스릴 주괴 다섯 개. 좋은 칼을 만들어 보고 싶어.,mithril_bar:5,coin:100|essence:6,2,40
+b_obsidian,blacksmith,흑요석 주괴 다섯 개. 용암 거인을 잡았다면 쉽겠지.,obsidian_bar:5,coin:150|essence:10,3,45
+f_minnow,fisher,송사리 다섯 마리. 미끼로 쓰려고.,cave_minnow:5,coin:30|bait:10,,30
+f_crab,fisher,동굴 게 두 마리만. 게찜이 먹고 싶네.,cave_crab:2,coin:40,,30
+f_trout,fisher,얼음 송어 두 마리 부탁해.,ice_trout:2,coin:50,1,35
+f_eel,fisher,수정 장어 두 마리. 꼬치를 굽자.,crystal_eel:2,coin:80|bait:15,2,40
+f_angler,fisher,심연의 아귀 한 마리. 평생 한 번 보고 싶었어.,void_angler:1,coin:120|essence:4,3,45

@@ -351,7 +351,8 @@ namespace Game.Core
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
         // before the first one.
         public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
-            Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay)), LifeExperience);
+            Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
+            LifeExperience);
 
         // Experience in each life skill (LifeSkill order): from the save, and as the host tells.
         public int[] LifeExperience => _life ??= ReadLife();
@@ -379,17 +380,18 @@ namespace Game.Core
         public NpcData Npcs { get; set; }
 
         // How well this character knows each person, by id: from its save, and as the host tells.
-        public Dictionary<string, (int Points, int TalkedDay, int GiftedDay)> Friendships => _friendships ??= ReadFriendships();
+        public Dictionary<string, (int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> Friendships => _friendships ??= ReadFriendships();
 
-        Dictionary<string, (int Points, int TalkedDay, int GiftedDay)> _friendships;
+        Dictionary<string, (int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> _friendships;
 
-        Dictionary<string, (int, int, int)> ReadFriendships()
+        Dictionary<string, (int, int, int, int, int)> ReadFriendships()
         {
-            var known = new Dictionary<string, (int, int, int)>();
+            var known = new Dictionary<string, (int, int, int, int, int)>();
             if (Character == null || Character.Length == 0 || _loot == null) return known;
             try
             {
-                foreach (var (npc, points, talked, gifted) in CharacterSave.Read(Character, _loot).Friendships) known[npc] = (points, talked, gifted);
+                foreach (var (npc, points, talked, gifted, request, heartGifts) in CharacterSave.Read(Character, _loot).Friendships)
+                    known[npc] = (points, talked, gifted, request, heartGifts);
             }
             catch (System.IO.InvalidDataException)
             {
@@ -407,26 +409,44 @@ namespace Game.Core
 
         public bool GiftedToday(NpcDefinition npc) => Friendships.TryGetValue(npc.Id, out var f) && f.GiftedDay == Today;
 
-        // What the merchant has on sale today (World.ShopFor).
+        public bool RequestDoneToday(NpcDefinition npc) => Friendships.TryGetValue(npc.Id, out var f) && f.RequestDay == Today;
+
+        // Whether the person has given the heart gift for this many hearts (and so told that story).
+        public bool HadHeartGift(NpcDefinition npc, int hearts) => Friendships.TryGetValue(npc.Id, out var f) && (f.HeartGifts & (1 << hearts)) != 0;
+
+        // What the merchant has on sale today (World.ShopFor), or another person.
         public IReadOnlyList<ShopEntry> ShopToday => World.ShopFor(Npcs, Today);
 
-        // The person whose tile is within reach, and where it is, as World.NpcNear sees it.
+        public IReadOnlyList<ShopEntry> ShopTodayOf(NpcDefinition npc) => World.ShopFor(Npcs, Today, npc);
+
+        // What the person asks of this player today (World.RequestFor).
+        public RequestDefinition RequestOf(NpcDefinition npc) => World.RequestFor(Npcs, npc, HeartsWith(npc), Today);
+
+        public byte[] RequestCommand() => new InventoryCommandMessage(InventoryCommand.Request, 0).Encode();
+
+        // The person whose tile is nearest within reach, and where it is, as World.NpcNear sees it.
         public (NpcDefinition Npc, int X, int Y)? NpcNear()
         {
             if (Npcs == null || Map == null) return null;
             int r = (int)MathF.Ceiling(World.StationReach) + 1;
             int cx = TileMap.Cell(Position.X), cy = TileMap.Cell(Position.Y);
+            (NpcDefinition, int, int)? best = null;
+            float bestDistance = float.MaxValue;
             foreach (var npc in Npcs.Npcs)
             {
                 for (int y = cy - r; y <= cy + r; y++)
                 {
                     for (int x = cx - r; x <= cx + r; x++)
                     {
-                        if (Map.InBounds(x, y) && Map[x, y] == npc.Tile && Vec2.Distance(Position, TileMap.Center(x, y)) <= World.StationReach) return (npc, x, y);
+                        if (!Map.InBounds(x, y) || Map[x, y] != npc.Tile) continue;
+                        float distance = Vec2.Distance(Position, TileMap.Center(x, y));
+                        if (distance > World.StationReach || distance >= bestDistance) continue;
+                        best = (npc, x, y);
+                        bestDistance = distance;
                     }
                 }
             }
-            return null;
+            return best;
         }
 
         public byte[] BuyCommand(ShopEntry entry, int count) =>
@@ -535,9 +555,9 @@ namespace Game.Core
                         for (int i = 0; i < LifeExperience.Length && i < experience.Count; i++) LifeExperience[i] = experience[i];
                         break;
                     case MessageType.Friendships:
-                        foreach (var (npc, points, talked, gifted) in FriendshipsMessage.Decode(data).Friendships)
+                        foreach (var (npc, points, talked, gifted, request, heartGifts) in FriendshipsMessage.Decode(data).Friendships)
                         {
-                            if (Npcs != null && npc < Npcs.Npcs.Count) Friendships[Npcs.Npcs[npc].Id] = (points, talked, gifted);
+                            if (Npcs != null && npc < Npcs.Npcs.Count) Friendships[Npcs.Npcs[npc].Id] = (points, talked, gifted, request, heartGifts);
                         }
                         break;
                     case MessageType.Production:

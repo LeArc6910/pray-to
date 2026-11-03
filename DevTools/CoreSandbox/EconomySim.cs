@@ -14,8 +14,9 @@ namespace CoreSandbox
 
         public static void Run(LootData loot, TileData tiles, NpcData npcs)
         {
-            int Sell(object thing) => npcs.Shop.FirstOrDefault(e => e.Thing == thing)?.Sell ?? 0;
-            int Buy(string id) => npcs.Shop.FirstOrDefault(e => (e.Material?.Id ?? e.Consumable?.Id) == id)?.Buy ?? 0;
+            // The best anyone pays, and the cheapest anyone asks.
+            int Sell(object thing) => npcs.Shop.Where(e => e.Thing == thing).Select(e => e.Sell).DefaultIfEmpty(0).Max();
+            int Buy(string id) => npcs.Shop.Where(e => (e.Material?.Id ?? e.Consumable?.Id) == id && e.Buy > 0).Select(e => e.Buy).DefaultIfEmpty(0).Min();
             // What one of a material fetches at best: as it is, or made into something by a keg, a jar or the furnace.
             (float Value, string How) Best(MaterialDefinition material)
             {
@@ -85,7 +86,7 @@ namespace CoreSandbox
             Console.WriteLine($"(딸기 밭 8칸을 술통으로: 시간당 {berryFarm:0}, 흙 동굴 낮 낚시: 시간당 {caveFishing:0})");
             foreach (var entry in npcs.Shop.Where(e => e.Buy >= 25).OrderBy(e => e.Buy))
             {
-                Console.WriteLine($"{Pad(entry.Name, 16)} {entry.Buy,4} 금화  딸기 밭 {entry.Buy / Math.Max(1, berryFarm),5:0.0}시간 · 낚시 {entry.Buy / Math.Max(1, caveFishing),5:0.0}시간{(entry.Hearts > 0 ? $" (호감 {entry.Hearts})" : "")}");
+                Console.WriteLine($"{Pad(entry.Name + " (" + entry.Npc.Role + ")", 24)} {entry.Buy,4} 금화  딸기 밭 {entry.Buy / Math.Max(1, berryFarm),5:0.0}시간 · 낚시 {entry.Buy / Math.Max(1, caveFishing),5:0.0}시간{(entry.Hearts > 0 ? $" (호감 {entry.Hearts})" : "")}");
             }
         }
 

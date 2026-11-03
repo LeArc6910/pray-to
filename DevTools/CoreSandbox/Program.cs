@@ -252,7 +252,8 @@ namespace CoreSandbox
         static NpcData LoadNpcs(LootData loot)
         {
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Npcs"));
-            var data = NpcSheet.Parse(File.ReadAllText(Path.Combine(folder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(folder, NpcSheet.ShopFile)), loot);
+            var data = NpcSheet.Parse(File.ReadAllText(Path.Combine(folder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(folder, NpcSheet.ShopFile)), loot,
+                File.ReadAllText(Path.Combine(folder, NpcSheet.RequestsFile)));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

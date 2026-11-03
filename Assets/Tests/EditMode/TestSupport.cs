@@ -158,7 +158,7 @@ namespace Game.Core.Tests
     {
         static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Npcs/" + file));
 
-        public static readonly NpcData Shipped = NpcSheet.Parse(Read(NpcSheet.NpcsFile), Read(NpcSheet.ShopFile), Gear.Data);
+        public static readonly NpcData Shipped = NpcSheet.Parse(Read(NpcSheet.NpcsFile), Read(NpcSheet.ShopFile), Gear.Data, Read(NpcSheet.RequestsFile));
     }
 
     public static class Guide

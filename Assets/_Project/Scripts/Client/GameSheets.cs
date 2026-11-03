@@ -28,6 +28,7 @@ namespace Game.Client
         public TextAsset goals;
         public TextAsset npcs;
         public TextAsset shop;
+        public TextAsset requests;
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
@@ -46,7 +47,7 @@ namespace Game.Client
         public GuideData LoadGuide(LootData loot) => GuideSheet.Parse(Text(goals), loot);
 
         // Without the sheets (an asset made before they existed) there is no one.
-        public NpcData LoadNpcs(LootData loot) => NpcSheet.Parse(Text(npcs), Text(shop), loot);
+        public NpcData LoadNpcs(LootData loot) => NpcSheet.Parse(Text(npcs), Text(shop), loot, Text(requests));
 
         static string Text(TextAsset asset) => asset != null ? asset.text : "";
     }

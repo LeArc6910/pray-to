@@ -100,7 +100,10 @@ namespace Game.Client
             GUILayout.Label(Fit($"가방 ({close}){hint}", inner));
             // The chest tab is there only while a chest is in reach, the merchant's while she is.
             bool chest = _client.Chest.IsOpen;
-            bool merchant = _client.NpcNear() != null;
+            var person = _client.NpcNear();
+            bool merchant = person != null;
+            // The tab is named for whoever is near: 상인, 대장장이, 어부.
+            if (merchant) PageLabels[(int)Page.Merchant].text = person.Value.Npc.Role;
             if (!chest && _page == Page.Chest || !merchant && _page == Page.Merchant) _page = Page.Gear;
             _pages.Clear();
             _pages.AddRange(new[] { Page.Gear, Page.Materials, Page.Classes, Page.Passives });
@@ -414,10 +417,11 @@ namespace Game.Client
             Buy,
             Sell,
             Gift,
+            Request,
         }
 
         ShopMode _shopMode;
-        static readonly string[] ShopModeNames = { "사기", "팔기", "선물" };
+        static readonly string[] ShopModeNames = { "사기", "팔기", "선물", "부탁" };
 
         // The merchant (World.Merchant.cs): who she is and how well this player knows her, today's line, a chat once a
         // day, and buying, selling and a gift once a day.
@@ -431,6 +435,11 @@ namespace Game.Client
             int coins = coin == null ? 0 : _client.Bag.CountOf(coin);
             GUILayout.Label(Fit($"{npc.Name} · 호감 {hearts}/{World.MaxHearts} ({_client.PointsWith(npc)}/{World.MaxHearts * World.PointsPerHeart}) · 금화 {coins}", _textWidth));
             GUILayout.Label(Fit($"\"{npc.LineFor(_client.Today, hearts)}\"", _textWidth));
+            // The stories told with each heart gift, once had.
+            foreach (var story in npc.Stories.OrderBy(p => p.Key))
+            {
+                if (_client.HadHeartGift(npc, story.Key)) GUILayout.Label(Fit($"(호감 {story.Key}) \"{story.Value}\"", _textWidth));
+            }
             GUILayout.BeginHorizontal();
             var enabled = GUI.enabled;
             GUI.enabled = enabled && !_client.TalkedToday(npc);
@@ -445,15 +454,40 @@ namespace Game.Client
                 Sounds.Play(Sound.Click);
             }
             GUILayout.Space(4);
-            if (_shopMode == ShopMode.Buy) DrawBuying(hearts, coins);
-            else if (_shopMode == ShopMode.Sell) DrawSelling(hearts);
-            else DrawGifts(npc);
+            if (_shopMode == ShopMode.Buy) DrawBuying(npc, hearts, coins);
+            else if (_shopMode == ShopMode.Sell) DrawSelling(npc, hearts);
+            else if (_shopMode == ShopMode.Gift) DrawGifts(npc);
+            else DrawRequest(npc);
         }
 
-        void DrawBuying(int hearts, int coins)
+        // What the person asks today, what they give for it, and [건네기] once the bag has it all.
+        void DrawRequest(NpcDefinition npc)
+        {
+            var request = _client.RequestOf(npc);
+            if (request == null)
+            {
+                GUILayout.Label(Fit("오늘은 부탁할 것이 없다고 한다.", _textWidth));
+                return;
+            }
+            GUILayout.Label(Fit($"\"{request.Text}\"", _textWidth));
+            GUILayout.Label(Fit($"필요한 것: {request.NeedText}", _textWidth));
+            GUILayout.Label(Fit($"보답: {request.RewardText} · 호감 +{request.Points}", _textWidth));
+            if (_client.RequestDoneToday(npc))
+            {
+                GUILayout.Label(Fit("오늘 부탁은 들어주었다. 내일 또 다른 부탁이 있다.", _textWidth));
+                return;
+            }
+            bool ready = request.Need.All(n => n.Thing is MaterialDefinition m ? _client.Bag.CountOf(m) >= n.Count : _client.Bag.CountOf((ConsumableDefinition)n.Thing) >= n.Count);
+            var enabled = GUI.enabled;
+            GUI.enabled = enabled && ready;
+            if (GUILayout.Button(ready ? "건네기" : "아직 모자라다")) Send(_client.RequestCommand(), Sound.Craft);
+            GUI.enabled = enabled;
+        }
+
+        void DrawBuying(NpcDefinition npc, int hearts, int coins)
         {
             var enabled = GUI.enabled;
-            foreach (var entry in _client.ShopToday)
+            foreach (var entry in _client.ShopTodayOf(npc))
             {
                 GUILayout.BeginHorizontal();
                 Icon(entry.Material != null ? Sprites.Icon(entry.Material) : Sprites.Icon(entry.Consumable));
@@ -471,10 +505,10 @@ namespace Game.Client
             }
         }
 
-        void DrawSelling(int hearts)
+        void DrawSelling(NpcDefinition npc, int hearts)
         {
             bool any = false;
-            foreach (var entry in _client.Npcs.Shop.Where(e => e.Sell > 0))
+            foreach (var entry in _client.Npcs.Shop.Where(e => e.Sell > 0 && e.Npc == npc))
             {
                 int have = entry.Material != null ? _client.Bag.CountOf(entry.Material) : _client.Bag.CountOf(entry.Consumable);
                 if (have == 0) continue;
@@ -486,7 +520,7 @@ namespace Game.Client
                 if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(entry.Thing, Math.Min(have, World.MaxTrade)), Sound.Pickup);
                 GUILayout.EndHorizontal();
             }
-            foreach (var item in _client.Bag.Items.ToList())
+            foreach (var item in npc.BuysGear ? _client.Bag.Items.ToList() : new List<Item>())
             {
                 any = true;
                 GUILayout.BeginHorizontal();
@@ -494,7 +528,7 @@ namespace Game.Client
                 if (GUILayout.Button($"팔기 {World.ItemValue(item, hearts)}", GUILayout.Width(88))) Send(_client.SellItemCommand(item), Sound.Pickup);
                 GUILayout.EndHorizontal();
             }
-            if (!any) GUILayout.Label(Fit("팔 것이 없다. 작물, 물고기, 요리, 주괴, 장비를 산다(입은 장비는 벗어야 판다).", _textWidth));
+            if (!any) GUILayout.Label(Fit(npc.BuysGear ? "팔 것이 없다. 입은 장비는 벗어야 판다." : "이 사람이 사는 것이 가방에 없다.", _textWidth));
         }
 
         void DrawGifts(NpcDefinition npc)

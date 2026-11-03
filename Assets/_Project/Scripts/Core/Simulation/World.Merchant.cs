@@ -4,14 +4,19 @@ using System.Linq;
 
 namespace Game.Core
 {
-    // How well a player knows someone: points (World.PointsPerHeart a heart) and the days they last talked and gave a
-    // gift, once a day each. Kept with the character (CharacterSave).
+    // How well a player knows someone: points (World.PointsPerHeart a heart), the days they last talked, gave a gift
+    // and did the day's request, once a day each, and which heart gifts they have had (a bit per heart). Kept with
+    // the character (CharacterSave).
     public sealed class Friendship
     {
         public int Points { get; internal set; }
         public int TalkedDay { get; internal set; }
         public int GiftedDay { get; internal set; }
+        public int RequestDay { get; internal set; }
+        public int HeartGifts { get; internal set; }
         public int Hearts => World.HeartsOf(Points);
+
+        public (int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts) Saved => (Points, TalkedDay, GiftedDay, RequestDay, HeartGifts);
     }
 
     // The merchant and other people (Docs/Npcs.md): buying and selling for coins, talking and gifts once a day, and
@@ -28,6 +33,9 @@ namespace Game.Core
         public const int Liked = 2;
         public const int Loved = 3;
         public const int Talked = 4;
+        // A request done; and HeartGift + hearts for a heart gift given on talking.
+        public const int RequestDone = 5;
+        public const int HeartGift = 16;
         static readonly int[] GiftPoints = { -20, 20, 45, 80 };
         // Daily shop rows on sale each day, and how much kinder the prices get with each heart (percent).
         public const int DailyShopItems = 2;
@@ -53,16 +61,27 @@ namespace Game.Core
             return value * (100 + HeartPercent * hearts) / 100;
         }
 
-        // What is on sale the day: every everyday row and DailyShopItems of the daily rows, picked by the day alone so
-        // every client works out the same.
-        public static IReadOnlyList<ShopEntry> ShopFor(NpcData npcs, int day)
+        // What a person has on sale the day: every everyday row of theirs and DailyShopItems of their daily rows,
+        // picked by the day alone so every client works out the same. Without a person, the merchant.
+        public static IReadOnlyList<ShopEntry> ShopFor(NpcData npcs, int day, NpcDefinition npc = null)
         {
             if (npcs == null) return Array.Empty<ShopEntry>();
-            var daily = npcs.Shop.Where(e => e.Daily && e.Buy > 0).ToList();
-            var random = new GameRandom((ulong)Math.Max(1, day), stream: 11);
+            npc ??= npcs.Merchant;
+            var own = npcs.Shop.Where(e => e.Npc == npc).ToList();
+            var daily = own.Where(e => e.Daily && e.Buy > 0).ToList();
+            var random = new GameRandom((ulong)Math.Max(1, day) * 31 + (ulong)Math.Max(0, npcs.IndexOf(npc)), stream: 11);
             var picked = new HashSet<ShopEntry>();
             while (picked.Count < Math.Min(DailyShopItems, daily.Count)) picked.Add(daily[random.Next(daily.Count)]);
-            return npcs.Shop.Where(e => e.Buy > 0 && (!e.Daily || picked.Contains(e))).ToList();
+            return own.Where(e => e.Buy > 0 && (!e.Daily || picked.Contains(e))).ToList();
+        }
+
+        // What a person asks of a player the day: one of their requests that the player is friendly enough for, a
+        // different one each day; null when they have none.
+        public static RequestDefinition RequestFor(NpcData npcs, NpcDefinition npc, int hearts, int day)
+        {
+            var open = npcs?.Requests.Where(r => r.Npc == npc && r.Hearts <= hearts).ToList();
+            if (open == null || open.Count == 0) return null;
+            return open[(Math.Max(0, day) * 7 + npcs.IndexOf(npc) * 3) % open.Count];
         }
 
         public int Today => Calendar.Day(Clock);
@@ -111,6 +130,8 @@ namespace Game.Core
                         if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r) continue;
                         int x = sx + dx, y = sy + dy;
                         if (!Map.InBounds(x, y - 1) || Map.IsEdge(x, y) || Map[x, y] != TileType.Floor || Map[x, y - 1] != TileType.Floor) continue;
+                        // Apart from the other people's places, so each has their own.
+                        if (Npcs.Npcs.Any(n => NearestTile(TileMap.Center(x, y), n.Tile, 4) != null)) continue;
                         return (x, y);
                     }
                 }
@@ -118,16 +139,22 @@ namespace Game.Core
             return null;
         }
 
-        // The person whose tile is within reach of the position, and where it is, or null.
+        // The person whose tile is nearest the position within reach, and where it is, or null.
         public (NpcDefinition Npc, int X, int Y)? NpcNear(Vec2 position)
         {
             if (Npcs == null) return null;
+            (NpcDefinition, int, int)? best = null;
+            float bestDistance = float.MaxValue;
             foreach (var npc in Npcs.Npcs)
             {
                 var at = NearestTile(position, npc.Tile, StationReach);
-                if (at != null) return (npc, at.Value.X, at.Value.Y);
+                if (at == null) continue;
+                float distance = Vec2.Distance(position, TileMap.Center(at.Value.X, at.Value.Y));
+                if (distance >= bestDistance) continue;
+                best = (npc, at.Value.X, at.Value.Y);
+                bestDistance = distance;
             }
-            return null;
+            return best;
         }
 
         public static Friendship FriendshipOf(Player player, NpcDefinition npc)
@@ -141,26 +168,75 @@ namespace Game.Core
         }
 
         // Puts back what a character save remembered, for the people this world has.
-        public static void RestoreFriendships(Player player, IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay)> saved)
+        public static void RestoreFriendships(Player player,
+            IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> saved)
         {
-            foreach (var (npc, points, talked, gifted) in saved)
+            foreach (var (npc, points, talked, gifted, request, heartGifts) in saved)
             {
                 player.Friendships[npc] = new Friendship
                 {
                     Points = Math.Clamp(points, 0, MaxHearts * PointsPerHeart),
                     TalkedDay = talked,
                     GiftedDay = gifted,
+                    RequestDay = request,
+                    HeartGifts = heartGifts,
                 };
             }
         }
 
-        // The merchant within reach of a living player, and how well they know them.
+        // The person within reach of a living player, and how well they know them.
         (Player Player, NpcDefinition Npc, Friendship Friendship)? AtMerchant(int playerId)
         {
             var player = FindPlayer(playerId);
             var near = player == null || player.IsDead ? null : NpcNear(player.Position);
-            if (near == null || near.Value.Npc.Tile != TileType.MerchantStall) return null;
+            if (near == null) return null;
             return (player, near.Value.Npc, FriendshipOf(player, near.Value.Npc));
+        }
+
+        // Gives the material or consumable to the player.
+        static void Give(Player player, object thing, int count)
+        {
+            if (thing is MaterialDefinition material) player.Inventory.AddMaterial(material, count);
+            else player.Inventory.AddConsumable((ConsumableDefinition)thing, count);
+        }
+
+        static int CountOf(Player player, object thing) =>
+            thing is MaterialDefinition material ? player.Inventory.CountOf(material) : player.Inventory.CountOf((ConsumableDefinition)thing);
+
+        // Brings the person within reach what they asked for today: takes it, gives what they promised and friendship.
+        // False when there is no request, it was done today, or the player has not got everything.
+        public bool CompleteRequest(int playerId)
+        {
+            var at = AtMerchant(playerId);
+            if (at == null) return false;
+            var (player, npc, friendship) = at.Value;
+            var request = RequestFor(Npcs, npc, friendship.Hearts, Today);
+            if (request == null || friendship.RequestDay == Today || request.Need.Any(n => CountOf(player, n.Thing) < n.Count)) return false;
+            foreach (var (thing, count) in request.Need)
+            {
+                if (thing is MaterialDefinition material) player.Inventory.TakeMaterial(material, count);
+                else for (int i = 0; i < count; i++) player.Inventory.TakeConsumable((ConsumableDefinition)thing);
+            }
+            foreach (var (thing, count) in request.Rewards) Give(player, thing, count);
+            friendship.RequestDay = Today;
+            friendship.Points = Math.Min(MaxHearts * PointsPerHeart, friendship.Points + request.Points);
+            player.InventoryVersion++;
+            var tile = NearestTile(player.Position, npc.Tile, StationReach) ?? (0, 0);
+            _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: RequestDone, position: TileMap.Center(tile.X, tile.Y)));
+            return true;
+        }
+
+        // On talking: the first heart gift the player has reached and not had yet.
+        void GiveHeartGift(Player player, NpcDefinition npc, Friendship friendship, Vec2 at)
+        {
+            foreach (var (hearts, thing, count) in npc.Gifts.OrderBy(g => g.Hearts))
+            {
+                if (hearts > friendship.Hearts || (friendship.HeartGifts & (1 << hearts)) != 0) continue;
+                friendship.HeartGifts |= 1 << hearts;
+                Give(player, thing, count);
+                _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: HeartGift + hearts, position: at));
+                return;
+            }
         }
 
         // Buys count of a row on sale today, for coins. False when it is not on sale, not open to them yet, or they
@@ -169,7 +245,7 @@ namespace Game.Core
         {
             var at = AtMerchant(playerId);
             var coin = CoinMaterial;
-            if (at == null || coin == null || entry == null || !ShopFor(Npcs, Today).Contains(entry)) return false;
+            if (at == null || coin == null || entry == null || entry.Npc != at.Value.Npc || !ShopFor(Npcs, Today, at.Value.Npc).Contains(entry)) return false;
             var (player, _, friendship) = at.Value;
             if (friendship.Hearts < entry.Hearts) return false;
             count = Math.Clamp(count, 1, MaxTrade);
@@ -188,7 +264,7 @@ namespace Game.Core
         {
             var at = AtMerchant(playerId);
             var coin = CoinMaterial;
-            var entry = Npcs?.Shop.FirstOrDefault(e => e.Thing == thing && e.Sell > 0);
+            var entry = at == null ? null : Npcs?.Shop.FirstOrDefault(e => e.Thing == thing && e.Sell > 0 && e.Npc == at.Value.Npc);
             if (at == null || coin == null || entry == null) return false;
             var (player, _, friendship) = at.Value;
             int have = entry.Material != null ? player.Inventory.CountOf(entry.Material) : player.Inventory.CountOf(entry.Consumable);
@@ -209,7 +285,7 @@ namespace Game.Core
         {
             var at = AtMerchant(playerId);
             var coin = CoinMaterial;
-            if (at == null || coin == null) return false;
+            if (at == null || coin == null || !at.Value.Npc.BuysGear) return false;
             var (player, _, friendship) = at.Value;
             var item = player.Inventory.Items.FirstOrDefault(i => i.Id == itemId);
             if (item == null) return false;
@@ -231,6 +307,7 @@ namespace Game.Core
             friendship.Points = Math.Min(MaxHearts * PointsPerHeart, friendship.Points + TalkPoints);
             player.InventoryVersion++;
             _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: Talked, position: TileMap.Center(near.Value.X, near.Value.Y)));
+            GiveHeartGift(player, near.Value.Npc, friendship, TileMap.Center(near.Value.X, near.Value.Y));
             return true;
         }
 

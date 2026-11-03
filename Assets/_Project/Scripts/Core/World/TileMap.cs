@@ -75,6 +75,8 @@ namespace Game.Core
         FastConveyor,
         UndergroundBelt,
         MerchantStall,
+        SmithStall,
+        FisherHut,
         Keg,
         PreservesJar,
         Coop,

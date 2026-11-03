@@ -342,14 +342,11 @@ namespace Game.Client
             }
             DrawReelGauge();
 
-            // The merchant's name and how well this player knows her, close by.
-            if (_client.Npcs?.Merchant is NpcDefinition merchant)
+            // Each person's name and how well this player knows them, close by.
+            foreach (var (x, y, npc) in _stalls)
             {
-                foreach (var (x, y) in _stalls)
-                {
-                    var at = new Vector3(x + 0.5f, y + 1.5f, 0);
-                    if (Vector3.Distance(at, _self.Position) < 5) Label(at, $"{merchant.Name} (호감 {_client.HeartsWith(merchant)}/{World.MaxHearts}) · 가방에서 거래", PowerLabel);
-                }
+                var at = new Vector3(x + 0.5f, y + 1.5f, 0);
+                if (Vector3.Distance(at, _self.Position) < 5) Label(at, $"{npc.Name} (호감 {_client.HeartsWith(npc)}/{World.MaxHearts}) · 가방에서", PowerLabel);
             }
             foreach (var text in _floating)
             {
@@ -770,7 +767,7 @@ namespace Game.Client
         // The merchant behind each stall in view, breathing and blinking like a standing player, with the counter drawn
         // again over her legs.
         readonly Dictionary<int, (SpriteRenderer Figure, SpriteRenderer Counter)> _people = new Dictionary<int, (SpriteRenderer, SpriteRenderer)>();
-        readonly List<(int X, int Y)> _stalls = new List<(int X, int Y)>();
+        readonly List<(int X, int Y, NpcDefinition Npc)> _stalls = new List<(int X, int Y, NpcDefinition Npc)>();
         const int PeopleRange = 18;
 
         void DrawPeople()
@@ -779,17 +776,23 @@ namespace Game.Client
             _seen.Clear();
             _stalls.Clear();
             int cx = Mathf.FloorToInt(_self.Position.x), cy = Mathf.FloorToInt(_self.Position.y);
-            for (int y = cy - PeopleRange; y <= cy + PeopleRange; y++)
+            var people = _client.Npcs?.Npcs;
+            for (int y = cy - PeopleRange; y <= cy + PeopleRange && people != null; y++)
             {
                 for (int x = cx - PeopleRange; x <= cx + PeopleRange; x++)
                 {
-                    if (map.InBounds(x, y) && map[x, y] == TileType.MerchantStall) _stalls.Add((x, y));
+                    if (!map.InBounds(x, y)) continue;
+                    foreach (var npc in people)
+                    {
+                        if (map[x, y] == npc.Tile) _stalls.Add((x, y, npc));
+                    }
                 }
             }
             int frame = Mathf.FloorToInt(Time.time * 1.5f) % CreatureArt.StandFrames;
-            var figure = Sprites.Standing($"npc/merchant/{frame}", () => CreatureArt.Player(Look.Down, frame, CreatureArt.MerchantTunic, Pose.Stand));
-            foreach (var (x, y) in _stalls)
+            foreach (var (x, y, npc) in _stalls)
             {
+                var tunic = Rgba.Hex(npc.Color);
+                var figure = Sprites.Standing($"npc/{npc.Id}/{frame}", () => CreatureArt.Player(Look.Down, frame, tunic, Pose.Stand));
                 int key = y * map.Width + x;
                 _seen.Add(key);
                 if (!_people.TryGetValue(key, out var person))
@@ -1119,8 +1122,9 @@ namespace Game.Client
                     break;
                 case SimEventType.Npc:
                     // A gift taken well or badly, or a chat.
-                    var reaction = e.Amount switch
+                    var reaction = e.Amount >= World.HeartGift ? $"호감 {e.Amount - World.HeartGift}: 선물을 받았다!" : e.Amount switch
                     {
+                        World.RequestDone => "부탁을 들어주었다!",
                         World.Loved => "정말 좋아한다!",
                         World.Liked => "좋아한다",
                         World.Disliked => "별로인 모양이다...",

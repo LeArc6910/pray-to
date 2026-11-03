@@ -443,6 +443,9 @@ namespace Game.Core
                 case InventoryCommand.Talk:
                     World.Talk(player.Id);
                     break;
+                case InventoryCommand.Request:
+                    World.CompleteRequest(player.Id);
+                    break;
                 case InventoryCommand.Load:
                     if (command.Index < _loot.Materials.Count) World.LoadMachine(player.Id, _loot.Materials[command.Index], Math.Clamp(command.Item, 1, World.MaxTrade));
                     break;
@@ -589,7 +592,8 @@ namespace Game.Core
         {
             if (_npcs == null) return;
             var known = sent.Player.Friendships
-                .Select(pair => (IndexOf(_npcs.Npcs, _npcs.Npcs.FirstOrDefault(n => n.Id == pair.Key)), pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay))
+                .Select(pair => (IndexOf(_npcs.Npcs, _npcs.Npcs.FirstOrDefault(n => n.Id == pair.Key)), pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay,
+                    pair.Value.RequestDay, pair.Value.HeartGifts))
                 .Where(entry => entry.Item1 >= 0)
                 .OrderBy(entry => entry.Item1)
                 .ToList();

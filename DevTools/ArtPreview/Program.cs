@@ -224,7 +224,7 @@ namespace Game.Client
                     TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester, TileType.StoneFloor, TileType.BrickFloor,
                     TileType.GlowFloor, TileType.Door, TileType.Table, TileType.Banner, TileType.Pot, TileType.Soil, TileType.FertileSoil,
                     TileType.Filter, TileType.Generator, TileType.Lever, TileType.MushroomSoil, TileType.FrostSoil, TileType.AshSoil, TileType.VoidSoil,
-                    TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot, TileType.WardStone, TileType.Turret,
+                    TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.SmithStall, TileType.FisherHut, TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot, TileType.WardStone, TileType.Turret,
                 }
                 .Select(TileArt.Object).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(f => ItemArt.Belt(f)))
                 .Concat(new[] { ItemArt.Belt(0, fast: true), ItemArt.Underground(0), TileArt.MerchantCounter, ItemArt.Chicken(0), ItemArt.Chicken(1), ItemArt.TurretBarrel })

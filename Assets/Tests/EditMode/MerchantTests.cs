@@ -14,7 +14,7 @@ namespace Game.Core.Tests
         static readonly MaterialDefinition StarMelon = Gear.Data.FindMaterial("star_melon");
         static readonly MaterialDefinition Stone = Gear.Data.FindMaterial("stone");
         static NpcDefinition Merchant => People.Shipped.Merchant;
-        static ShopEntry Row(string id) => People.Shipped.Shop.Single(e => (e.Material?.Id ?? e.Consumable.Id) == id);
+        static ShopEntry Row(string id) => People.Shipped.Shop.Single(e => e.Npc == Merchant && (e.Material?.Id ?? e.Consumable.Id) == id);
 
         // A room with the merchant's stall put down near the spawn, and a player in front of it.
         static World Shop(out Player player, out (int X, int Y) stall)
@@ -92,7 +92,7 @@ namespace Game.Core.Tests
         {
             var today = World.ShopFor(People.Shipped, 4);
             Assert.AreEqual(World.DailyShopItems, today.Count(e => e.Daily));
-            Assert.AreEqual(People.Shipped.Shop.Count(e => e.Buy > 0 && !e.Daily), today.Count(e => !e.Daily));
+            Assert.AreEqual(People.Shipped.Shop.Count(e => e.Npc == Merchant && e.Buy > 0 && !e.Daily), today.Count(e => !e.Daily));
             CollectionAssert.AreEqual(today, World.ShopFor(People.Shipped, 4), "the same each time");
 
             var world = Shop(out var player, out _);
@@ -154,9 +154,9 @@ namespace Game.Core.Tests
         [Test]
         public void FriendshipsAreKeptWithTheCharacter()
         {
-            var data = CharacterSave.Write(new Equipment(), new Inventory(), 0, null, null, new[] { ("merchant", 230, 4, 5) });
+            var data = CharacterSave.Write(new Equipment(), new Inventory(), 0, null, null, new[] { ("merchant", 230, 4, 5, 6, 4) });
             var save = CharacterSave.Read(data, Gear.Data);
-            Assert.AreEqual(("merchant", 230, 4, 5), save.Friendships.Single());
+            Assert.AreEqual(("merchant", 230, 4, 5, 6, 4), save.Friendships.Single());
         }
 
         [Test]

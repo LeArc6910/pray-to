@@ -68,6 +68,7 @@ namespace Game.Client.Editor
             sheets.goals = Sheet(GuideFolder + GuideSheet.File);
             sheets.npcs = Sheet(NpcsFolder + NpcSheet.NpcsFile);
             sheets.shop = Sheet(NpcsFolder + NpcSheet.ShopFile);
+            sheets.requests = Sheet(NpcsFolder + NpcSheet.RequestsFile);
             EditorUtility.SetDirty(sheets);
             AssetDatabase.SaveAssets();
         }
