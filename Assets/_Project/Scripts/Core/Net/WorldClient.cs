@@ -120,8 +120,9 @@ namespace Game.Core
     {
         public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true,
             MaterialDefinition setting = null, bool powered = false, Recipe recipe = null, int supply = -1, int demand = -1, int holding = 0, int held = 0,
-            int animals = 0)
+            int animals = 0, IReadOnlyList<MaterialDefinition> settings = null)
         {
+            Settings = settings ?? Array.Empty<MaterialDefinition>();
             Animals = animals;
             Holding = holding;
             Held = held;
@@ -147,8 +148,9 @@ namespace Game.Core
         public MaterialDefinition Carried { get; }
         public float Progress { get; }
         public bool On { get; }
-        // A filter's chosen material, or null.
+        // A filter's first chosen material, or null, and all of them.
         public MaterialDefinition Setting { get; }
+        public IReadOnlyList<MaterialDefinition> Settings { get; }
         // An assembler's recipe, or null.
         public Recipe Recipe { get; }
         public bool Powered { get; }
@@ -475,7 +477,7 @@ namespace Game.Core
 
         // Recipes a machine of the kind works through by itself (World.ProcessesOf), as the client knows them.
         public IEnumerable<Recipe> ProcessesOf(TileType kind) => Recipes.Where(r => r.Material != null
-            && (kind == TileType.Smelter ? r.Station == TileType.Furnace : (kind == TileType.Keg || kind == TileType.PreservesJar) && r.Station == kind));
+            && (kind == TileType.Smelter || kind == TileType.ArcFurnace ? r.Station == TileType.Furnace : (kind == TileType.Keg || kind == TileType.PreservesJar) && r.Station == kind));
 
         // Whether the recipe is made only by a machine, never by hand (World.MadeByMachine).
         public bool MadeByMachine(Recipe recipe) => recipe.Station is TileType station && _tiles?.Machine(station) != null;
@@ -772,7 +774,7 @@ namespace Game.Core
                 float progress = m.Progress;
                 var definition = _tiles?.Machine(m.Kind);
                 // Loads move on between messages (twice as fast with power); a generator's fuel does not.
-                if (carried != null && definition != null && m.On && m.Kind != TileType.Generator)
+                if (carried != null && definition != null && m.On && !World.IsGenerator(m.Kind))
                 {
                     progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks * (m.Powered ? 2 : 1)));
                 }
@@ -783,8 +785,9 @@ namespace Game.Core
                 int demand = node && m.Setting >= 0 ? m.Setting % 256 : -1;
                 var setting = !assembler && !node && !coop && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
                 var recipe = assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Recipes.Count ? _loot.Recipes[m.Setting] : null;
+                var picks = _loot == null ? new List<MaterialDefinition>() : m.Picks.Where(i => i >= 0 && i < _loot.Materials.Count).Select(i => _loot.Materials[i]).ToList();
                 views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe, supply, demand, m.Holding, m.Held,
-                    coop ? Math.Max(0, m.Setting) : 0));
+                    coop ? Math.Max(0, m.Setting) : 0, picks));
             }
             return views;
         }

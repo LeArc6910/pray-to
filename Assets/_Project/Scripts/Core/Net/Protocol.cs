@@ -38,7 +38,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.44.0";
+        public const string Version = "0.45.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -401,6 +401,8 @@ namespace Game.Core
                 w.Write((ushort)(m.Setting + 1));
                 w.Write((byte)Math.Clamp(m.Holding, 0, 255));
                 w.Write((byte)Math.Clamp(m.Held, 0, 255));
+                w.Write((byte)m.Picks.Count);
+                foreach (int pick in m.Picks) w.Write((ushort)pick);
             }
         });
 
@@ -419,8 +421,10 @@ namespace Game.Core
                 int setting = r.ReadUInt16() - 1;
                 int holding = r.ReadByte();
                 int held = r.ReadByte();
+                var picks = new int[r.ReadByte()];
+                for (int k = 0; k < picks.Length; k++) picks[k] = r.ReadUInt16();
                 machines.Add(new MachineState(x, y, kind, direction & 3, carried, progress, (direction & Machine.OffBit) == 0, setting, (direction & PoweredBit) != 0,
-                    holding, held));
+                    holding, held, picks));
             }
             return new MachinesMessage(machines);
         });
@@ -429,8 +433,9 @@ namespace Game.Core
     public readonly struct MachineState
     {
         public MachineState(int x, int y, TileType kind, int direction, int carried, float progress, bool on = true, int setting = -1, bool powered = false,
-            int holding = 0, int held = 0)
+            int holding = 0, int held = 0, IReadOnlyList<int> picks = null)
         {
+            Picks = picks ?? Array.Empty<int>();
             Holding = holding;
             Held = held;
             Setting = setting;
@@ -464,6 +469,8 @@ namespace Game.Core
         // How much it holds to work on, and how much it made that waits to go out (up to 255 each).
         public int Holding { get; }
         public int Held { get; }
+        // A filter's chosen materials, as sheet indexes.
+        public IReadOnlyList<int> Picks { get; }
     }
 
     // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.

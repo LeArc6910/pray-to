@@ -253,6 +253,7 @@ namespace Game.Client
             TileType.Coop or TileType.Barn => material.Id == World.HouseOf(machine.Kind).Animal || material.Id == World.Feed,
             TileType.CrabPot => material.Id == World.Bait,
             TileType.Turret => material.Id == World.Ammo,
+            TileType.Harvester => _client.CropFrom(material) != null,
             _ => _client.ProcessesOf(machine.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
         };
 
@@ -358,8 +359,9 @@ namespace Game.Client
             if (ahead?.Kind == TileType.Filter)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(Fit($"거름망 분배기: {ahead.Value.Setting?.Name ?? "정하지 않음"} (재료의 [거르기]로 정한다)", _textWidth - 64));
-                if (ahead.Value.Setting != null && GUILayout.Button("비우기", GUILayout.Width(56))) Send(_client.SetFilterCommand(null), Sound.Click);
+                string picks = ahead.Value.Settings.Count == 0 ? "정하지 않음" : string.Join(", ", ahead.Value.Settings.Select(m => m.Name));
+                GUILayout.Label(Fit($"거름망 분배기: {picks} (재료의 [거르기]로 {World.FilterPicks}개까지 더하고 [빼기]로 뺀다)", _textWidth - 64));
+                if (ahead.Value.Settings.Count > 0 && GUILayout.Button("비우기", GUILayout.Width(56))) Send(_client.SetFilterCommand(null), Sound.Click);
                 GUILayout.EndHorizontal();
             }
             // A machine that makes things: what it holds and has made, [꺼내기], and for a keg or a jar what it makes.
@@ -377,6 +379,10 @@ namespace Game.Client
                     GUILayout.Label(Fit($"소 {machine.Animals}/{World.HouseOf(TileType.Barn).Most}마리. 사료 둘이면 하루(20분)마다 소마다 우유 하나", _textWidth));
                 if (machine.Kind == TileType.CrabPot)
                     GUILayout.Label(Fit("바로 옆이 물이어야 한다. 미끼 하나로 15분에 하나씩 든다", _textWidth));
+                if (machine.Kind == TileType.ArcFurnace)
+                    GUILayout.Label(Fit(machine.Powered ? "전력으로 돈다. 광석 둘에 주괴 하나, 두 개마다 하나를 더 만든다" : "전력이 없어 멈춰 있다. 발전기·물레방아·태양광 판이 6타일 안에 있거나 전신주로 이어져야 한다", _textWidth));
+                if (machine.Kind == TileType.Harvester)
+                    GUILayout.Label(Fit("씨앗을 넣으면 앞쪽 3×3칸의 빈 밭에 심는다", _textWidth));
                 if (machine.Kind == TileType.Keg || machine.Kind == TileType.PreservesJar)
                 {
                     string makes = string.Join(" · ", _client.ProcessesOf(machine.Kind)
@@ -396,7 +402,8 @@ namespace Game.Client
                 if (pair.Key.Id == World.FishingRod && GUILayout.Button(FishingLabel(_client), GUILayout.Width(72))) Send(_client.FishCommand(), Sound.Cast);
                 if (pair.Key.Id == World.Hoe && GUILayout.Button("밭 갈기", GUILayout.Width(64))) Send(_client.TillCommand(), Sound.Dig);
                 // Facing a filter, any material can be what it picks out; facing a generator, fuel goes in.
-                if (ahead?.Kind == TileType.Filter && GUILayout.Button("거르기", GUILayout.Width(56))) Send(_client.SetFilterCommand(pair.Key), Sound.Click);
+                if (ahead?.Kind == TileType.Filter && GUILayout.Button(ahead.Value.Settings.Contains(pair.Key.Kind) ? "빼기" : "거르기", GUILayout.Width(56)))
+                    Send(_client.SetFilterCommand(pair.Key), Sound.Click);
                 if (ahead?.Kind == TileType.Generator && pair.Key.Fuel > 0 && GUILayout.Button("연료", GUILayout.Width(48))) Send(_client.RefuelCommand(pair.Key), Sound.Place);
                 // Facing a machine that makes things from this, it goes in (all of it, up to what the machine holds).
                 if (loads && Takes(ahead.Value, pair.Key) && GUILayout.Button("넣기", GUILayout.Width(48)))

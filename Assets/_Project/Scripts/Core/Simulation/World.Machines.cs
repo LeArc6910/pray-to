@@ -26,8 +26,11 @@ namespace Game.Core
         // A machine switched off does nothing by itself, but keeps what it holds, and others still put things in and
         // take them out.
         public bool Enabled { get; internal set; } = true;
-        // A filter's chosen material, sent straight on; null lets everything go aside.
-        public MaterialDefinition Setting { get; internal set; }
+        // A filter's chosen materials (World.FilterPicks at most), sent straight on; none lets everything go aside.
+        internal List<MaterialDefinition> Picks { get; } = new List<MaterialDefinition>();
+        public IReadOnlyList<MaterialDefinition> Settings => Picks;
+        // The first of them, or null.
+        public MaterialDefinition Setting => Picks.Count > 0 ? Picks[0] : null;
         // An assembler's chosen recipe, or null (World.SetRecipe).
         public Recipe Recipe { get; internal set; }
         // A conveyor's, splitter's or arm's load and how far along the tile it has come (or the arm has swung), 0 to 1.
@@ -38,6 +41,8 @@ namespace Game.Core
         internal int Timer { get; set; }
         // Power owed toward the next powered step while its grid has less than it draws (World.PoweredStep).
         internal int Charge { get; set; }
+        // An arc furnace's bars toward the next extra one (World.ArcFurnaceEvery).
+        internal int Bonus { get; set; }
         // For a splitter: the side its load came in from (a direction), so it never sends it back, or -1.
         internal int CameFrom { get; set; } = -1;
         internal Dictionary<MaterialDefinition, int> Input { get; } = new Dictionary<MaterialDefinition, int>();
@@ -71,6 +76,10 @@ namespace Game.Core
         public const float PowerReach = 6;
         public const float LeverReach = 5;
         public const int UndergroundReach = 5;
+        // How many materials a filter sends straight on.
+        public const int FilterPicks = 4;
+        // An arc furnace gives one bar more for every this many it makes.
+        public const int ArcFurnaceEvery = 2;
 
         // Tiles that carry a load along toward their front.
         public static bool IsBelt(TileType type) => type == TileType.Conveyor || type == TileType.FastConveyor || type == TileType.UndergroundBelt;
@@ -91,7 +100,7 @@ namespace Game.Core
         // and a preserves jar the recipes made at them (materials in, a material out). Empty for any other machine.
         public IReadOnlyList<Recipe> ProcessesOf(TileType kind)
         {
-            if (kind == TileType.Smelter) return Smelts;
+            if (kind == TileType.Smelter || kind == TileType.ArcFurnace) return Smelts;
             if (kind != TileType.Keg && kind != TileType.PreservesJar) return Array.Empty<Recipe>();
             if (!_processes.TryGetValue(kind, out var recipes))
             {
@@ -124,11 +133,13 @@ namespace Game.Core
         void UpdateMachines()
         {
             foreach (var generator in _machines.Values.Where(m => m.Kind == TileType.Generator && m.Enabled).ToList()) RunGenerator(generator);
+            foreach (var free in _machines.Values.Where(m => m.Kind == TileType.WaterWheel || m.Kind == TileType.SolarPanel)) free.Progress = Generating(free) ? 1 : 0;
             CountPower();
             foreach (var machine in _machines.Values)
             {
-                if (!machine.Enabled || machine.Kind == TileType.Generator) continue;
-                Run(machine);
+                if (!machine.Enabled || IsGenerator(machine.Kind)) continue;
+                // A power-only machine has just the powered step.
+                if (!machine.Definition.PowerOnly) Run(machine);
                 // Powered: a second step.
                 if (PoweredStep(machine)) Run(machine);
             }
@@ -144,6 +155,7 @@ namespace Game.Core
                     RunDrill(machine);
                     break;
                 case TileType.Smelter:
+                case TileType.ArcFurnace:
                 case TileType.Keg:
                 case TileType.PreservesJar:
                     RunProcessor(machine);
@@ -278,7 +290,7 @@ namespace Game.Core
             if (filter.Carried == null) return;
             filter.Progress = Math.Min(1, filter.Progress + 1f / filter.Definition.Ticks);
             if (filter.Progress < 1) return;
-            int[] turns = filter.Carried == filter.Setting ? new[] { 0 } : new[] { 1, 3 };
+            int[] turns = Picked(filter, filter.Carried) ? new[] { 0 } : new[] { 1, 3 };
             for (int k = 0; k < turns.Length; k++)
             {
                 int turn = turns[(filter.Timer + k) % turns.Length];
@@ -294,20 +306,27 @@ namespace Game.Core
             }
         }
 
-        // Sets the filter ahead of the player to pass this material straight on (null for none). False when the
-        // machine ahead is not a filter.
+        // Whether the filter sends the material straight on: one of its picks, in any quality.
+        static bool Picked(Machine filter, MaterialDefinition material) => filter.Picks.Any(p => p.Kind == material.Kind);
+
+        // Adds the material to what the filter ahead of the player passes straight on, or takes it off when it is there
+        // already; null takes them all off. False when the machine ahead is not a filter, or it has World.FilterPicks
+        // already.
         public bool SetFilter(int playerId, MaterialDefinition material)
         {
             var player = FindPlayer(playerId);
             var filter = player == null || player.IsDead ? null : MachineFacing(player.Position, player.Facing);
             if (filter == null || filter.Kind != TileType.Filter) return false;
-            filter.Setting = material;
+            if (material == null) filter.Picks.Clear();
+            else if (filter.Picks.Contains(material.Kind)) filter.Picks.Remove(material.Kind);
+            else if (filter.Picks.Count < FilterPicks) filter.Picks.Add(material.Kind);
+            else return false;
             return true;
         }
 
         // Machines a player can fill by hand ([넣기]): what they make things from.
         public static bool LoadsByHand(TileType kind) =>
-            kind == TileType.Smelter || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator
+            kind == TileType.Smelter || kind == TileType.ArcFurnace || kind == TileType.Harvester || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator
             || kind == TileType.Coop || kind == TileType.Barn || kind == TileType.CrabPot || kind == TileType.Turret;
 
         // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
@@ -416,6 +435,7 @@ namespace Game.Core
                 {
                     case TileType.Drill:
                     case TileType.Smelter:
+                    case TileType.ArcFurnace:
                     case TileType.Harvester:
                     case TileType.Assembler:
                     case TileType.Keg:
@@ -471,8 +491,9 @@ namespace Game.Core
         void RunProcessor(Machine smelter)
         {
             // The time only runs while there is something it can make and room for the result.
+            bool arc = smelter.Kind == TileType.ArcFurnace;
             var recipe = ProcessesOf(smelter.Kind).FirstOrDefault(r => r.Ingredients.All(i => HeldKind(smelter.Input, i.Material) >= i.Count)
-                && Count(smelter.Output) + r.Count <= smelter.Definition.Capacity);
+                && Count(smelter.Output) + r.Count + (arc ? 1 : 0) <= smelter.Definition.Capacity);
             if (recipe == null)
             {
                 smelter.Timer = 0;
@@ -481,8 +502,16 @@ namespace Game.Core
             {
                 smelter.Timer = 0;
                 foreach (var (material, count) in recipe.Ingredients) UseKind(smelter.Input, material, count);
-                Add(smelter.Output, recipe.Material, recipe.Count);
-                CountMade(recipe.Material, recipe.Count);
+                int made = recipe.Count;
+                // An arc furnace gets more out of the same ore.
+                if (arc)
+                {
+                    smelter.Bonus += recipe.Count;
+                    made += smelter.Bonus / ArcFurnaceEvery;
+                    smelter.Bonus %= ArcFurnaceEvery;
+                }
+                Add(smelter.Output, recipe.Material, made);
+                CountMade(recipe.Material, made);
             }
             SendOut(smelter, smelter.Front);
         }
@@ -509,7 +538,8 @@ namespace Game.Core
         // Every so often reaps one ripe crop in the three rows of three tiles ahead of it (nearest row first), plants
         // it again from one of the seeds, and keeps the harvest and the other seeds; it sends one out of the back each
         // tick it can, like a drill. It waits while what a crop gives would not fit, and passes over crops that give
-        // food rather than a material.
+        // food rather than a material. With nothing ripe, it plants a seed it was given (by belt, arm or hand) on an
+        // empty soil tile there where that crop grows.
         void RunHarvester(Machine harvester)
         {
             if (++harvester.Timer >= harvester.Definition.Ticks)
@@ -535,8 +565,32 @@ namespace Game.Core
                     Add(harvester.Output, definition.Seed, seeds);
                     _events.Add(new SimEvent(SimEventType.Harvested, 0, amount: definition.Count, position: TileMap.Center(crop.X, crop.Y)));
                 }
+                else
+                {
+                    PlantFrom(harvester);
+                }
             }
             SendOut(harvester, harvester.Back);
+        }
+
+        // Whether the material is the seed of some crop, so a harvester takes it.
+        bool IsSeed(MaterialDefinition material) => Tiles != null && Tiles.Crops.Any(c => c.Seed == material);
+
+        // One of the harvester's seeds goes into the first empty soil tile it reaps where that crop grows. Not inside a
+        // boss arena, as a player could not plant there either.
+        void PlantFrom(Machine harvester)
+        {
+            if (harvester.Input.Count == 0 || Tiles == null) return;
+            foreach (var (x, y) in HarvesterTiles(harvester))
+            {
+                if (Map.IsEdge(x, y) || !TileMap.IsSoil(Map[x, y]) || CropAt(x, y) != null) continue;
+                if (_bosses.Any(b => Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1)) continue;
+                var crop = Tiles.Crops.FirstOrDefault(c => harvester.Input.ContainsKey(c.Seed) && c.GrowsIn(FarmBiomeAt(x, y)));
+                if (crop == null) continue;
+                Add(harvester.Input, crop.Seed, -1);
+                PlantCrop(crop, x, y);
+                return;
+            }
         }
 
         // The nine tiles a harvester reaps, in the order it looks at them: three rows ahead of it, nearest first.
@@ -646,7 +700,9 @@ namespace Game.Core
                 TileType.Splitter => true,
                 TileType.Filter => true,
                 TileType.Generator => material.Fuel > 0,
-                TileType.Smelter or TileType.Keg or TileType.PreservesJar => ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
+                TileType.Smelter or TileType.ArcFurnace or TileType.Keg or TileType.PreservesJar =>
+                    ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
+                TileType.Harvester => IsSeed(material),
                 TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material.Kind),
                 TileType.Coop or TileType.Barn => material.Id == HouseOf(target.Kind).Animal || material.Id == Feed,
                 TileType.CrabPot => material.Id == Bait,
@@ -685,6 +741,7 @@ namespace Game.Core
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Smelter:
+                    case TileType.ArcFurnace:
                     case TileType.Keg:
                     case TileType.PreservesJar:
                         if (!ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)) || Count(target.Input) >= target.Definition.Capacity) return false;
@@ -692,6 +749,10 @@ namespace Game.Core
                         return true;
                     case TileType.Assembler:
                         if (!AssemblerTakes(target, material)) return false;
+                        Add(target.Input, material, 1);
+                        return true;
+                    case TileType.Harvester:
+                        if (!IsSeed(material) || Count(target.Input) >= target.Definition.Capacity) return false;
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Turret:
@@ -743,14 +804,15 @@ namespace Game.Core
         // Puts back a machine as a world save held it.
         internal void RestoreMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
             IEnumerable<(MaterialDefinition Material, int Count)> input, IEnumerable<(MaterialDefinition Material, int Count)> output,
-            MaterialDefinition setting = null, Recipe recipe = null)
+            IEnumerable<MaterialDefinition> settings = null, Recipe recipe = null)
         {
             var machine = MachineAt(x, y);
             if (machine == null) return;
             machine.Direction = direction & 3;
             machine.Enabled = (direction & Machine.OffBit) == 0;
             _gridsStale = true;
-            machine.Setting = setting;
+            machine.Picks.Clear();
+            if (machine.Kind == TileType.Filter && settings != null) machine.Picks.AddRange(settings.Where(m => m != null).Select(m => m.Kind).Distinct().Take(FilterPicks));
             machine.Recipe = machine.Kind == TileType.Assembler && Assembles(recipe) ? recipe : null;
             machine.Timer = timer;
             machine.Carried = carried;

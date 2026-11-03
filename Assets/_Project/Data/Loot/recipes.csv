@@ -57,6 +57,9 @@ generator,generator,1,iron_gear:3|copper_wire:4|stone:6,Workbench
 lever,lever,1,copper_wire:2|iron_bar:1,Workbench
 assembler,assembler,1,iron_gear:4|circuit:2|iron_bar:3,Workbench
 power_pole,power_pole,2,copper_wire:3|stone:2,Workbench
+water_wheel,water_wheel,1,iron_gear:3|iron_bar:2|stone:6,Workbench
+solar_panel,solar_panel,1,circuit:2|ice_crystal:3|copper_wire:2,Workbench
+arc_furnace,arc_furnace,1,circuit:3|mithril_bar:4|stone:10,Workbench
 fast_conveyor,fast_conveyor,4,conveyor:4|iron_gear:2,Workbench
 underground_belt,underground_belt,2,conveyor:4|iron_bar:2,Workbench
 keg,keg,1,iron_bar:2|stone:8,Workbench

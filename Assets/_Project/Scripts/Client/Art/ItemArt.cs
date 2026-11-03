@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using System.Collections.Generic;
 using Game.Core;
@@ -776,6 +777,11 @@ namespace Game.Client
                 placed = placed.Copy();
                 placed.Draw(Flame(0), 0, 0);
             }
+            else if (placed != null && material.Places == TileType.WaterWheel)
+            {
+                placed = placed.Copy();
+                placed.Draw(WaterWheel, 0, 0);
+            }
             else if (placed != null && material.Places == TileType.Lever)
             {
                 placed = placed.Copy();
@@ -1187,6 +1193,34 @@ namespace Game.Client
         // A harvester's reel: a toothed bar across the +x edge of the tile, on an axle from the middle. The view
         // turns it to face the field.
         public static readonly PixelImage HarvesterReel = MakeHarvesterReel();
+
+        // A water wheel: a wooden rim with eight paddles and spokes round an iron axle, drawn centred so it can turn.
+        public static readonly PixelImage WaterWheel = MakeWaterWheel();
+
+        static PixelImage MakeWaterWheel()
+        {
+            var image = new PixelImage(TileArt.Size, TileArt.Size);
+            var wood = Rgba.Hex("#9A6A3C");
+            var dark = Rgba.Hex("#6A4424");
+            var light = Rgba.Hex("#C08850");
+            for (int y = 0; y < TileArt.Size; y++)
+            {
+                for (int x = 0; x < TileArt.Size; x++)
+                {
+                    float dx = x - 7.5f, dy = y - 7.5f;
+                    float d = MathF.Sqrt(dx * dx + dy * dy);
+                    float angle = MathF.Atan2(dy, dx);
+                    // Which of the eight paddles or spokes it is nearest, and how far from that line.
+                    float sector = angle / (MathF.PI / 4);
+                    float off = MathF.Abs(sector - MathF.Round(sector)) * d * MathF.PI / 4;
+                    if (d < 1.6f) image[x, y] = d < 0.8f ? SteelDark : Steel;
+                    else if (d >= 4.6f && d < 6.0f) image[x, y] = ((int)MathF.Floor(sector + 8) & 1) == 0 ? wood : dark;
+                    else if (d >= 6.0f && d < 7.6f && off < 0.9f) image[x, y] = light;
+                    else if (d < 4.6f && off < 0.6f) image[x, y] = wood;
+                }
+            }
+            return image.Outlined(Outline);
+        }
 
         static PixelImage MakeHarvesterReel()
         {

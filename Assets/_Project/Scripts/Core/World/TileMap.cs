@@ -84,6 +84,10 @@ namespace Game.Core
         Barn,
         WardStone,
         Turret,
+        // Factory depth (Docs/Automation.md): a furnace that runs only on power, and generators that need no fuel.
+        ArcFurnace,
+        WaterWheel,
+        SolarPanel,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

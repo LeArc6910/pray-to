@@ -328,7 +328,7 @@ namespace Game.Core
             World.RestoreClock(save.Clock);
             World.RestoreRiftTier(save.RiftTier);
             World.RestoreDefense(save.DefenseLevel, save.DefenseDay);
-            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Setting, m.Recipe);
+            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Settings, m.Recipe);
             World.PlaceNpcs();
         }
 
@@ -627,7 +627,7 @@ namespace Game.Core
                 .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
                 .Take(_config.MaxMachinesPerMessage)
                 .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled,
-                    SettingOf(m), World.IsPowered(m), m.Inputs.Values.Sum(), m.Outputs.Values.Sum()))
+                    SettingOf(m), World.IsPowered(m), m.Inputs.Values.Sum(), m.Outputs.Values.Sum(), m.Settings.Select(s => IndexOf(_loot.Materials, s)).ToList()))
                 .ToList();
             if (near.Count == 0 && !sent.SentMachines) return;
             int SettingOf(Machine m)

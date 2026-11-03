@@ -25,13 +25,15 @@ keg,술통 세우기,철 주괴 2·돌 8. 과일(딸기·포도·서리 열매)�
 coop,닭장 세우기,돌 12·철 주괴 2·슬라임 젤 2. 상인의 닭과 사료를 [넣기]로 넣으면 하루마다 달걀을 낳는다,place:Coop,feed:8
 crab_pot,통발 놓기,구리 전선 4·돌 2. 바로 옆이 물인 바닥에 놓고 미끼를 넣으면 15분마다 게나 새우가 든다,place:CrabPot,bait:8
 friend,상인과 호감 2 되기,하루 한 번 [말 걸기]와 선물. 좋아하는 것을 주면 많이 오르고 호감이 오를수록 값이 좋아진다,friend:2,coin:30
-generator,발전기 돌리기,철 주괴 5·구리 광석 6·돌 6으로 만들고 슬라임 젤을 [연료]로 넣으면 둘레 기계가 두 배로 빨라진다,place:Generator,slime_gel:10
+generator,발전기 돌리기,철 톱니 3·구리 전선 4·돌 6으로 만들고 슬라임 젤을 [연료]로 넣으면 둘레 기계가 두 배로 빨라진다,place:Generator,slime_gel:10
 power_pole,전신주로 힘 나르기,구리 전선 3·돌 2로 둘을 만든다. 8타일 안의 전신주·발전기끼리 이어지고 둘레 4타일 기계에 힘을 준다,place:PowerPole,copper_wire:4
+free_power,연료 없이 힘 내기,물 바로 옆에 물레방아(철 톱니 3·철 주괴 2·돌 6)를 놓거나 태양광 판(회로 2·얼음 결정 3·구리 전선 2)을 놓는다. 태양광은 낮에만 돈다,place:WaterWheel|place:SolarPanel,iron_bar:4
 biome,빛 포자나 얼음 결정 얻기,흙 동굴 바깥 버섯 숲(빛 박쥐)이나 얼음 동굴(얼음 슬라임)의 몬스터가 떨어뜨린다. 들어서면 이름이 뜬다,have:glow_spore|have:ice_crystal,xp:40
 deep,깊은 곳 찾아가기,시작 지점에서 60칸 넘게 가면 빛나는 미스릴 광맥과 수정 박쥐·정령이 있는 깊은 곳이다. 횃불을 넉넉히 챙긴다,reach:60,torch:6
 mithril_ore,미스릴 광석 4개 캐기,깊은 곳 벽에 박힌 하늘색으로 빛나는 덩어리가 미스릴 광맥이다. 단단해서 여러 번 쳐야 한다,have:mithril_ore:4,xp:60
 queen,수정 거미 여왕 쓰러뜨리기,HUD의 깊은 아레나 방향으로 간다. 첫 보스보다 세니 철 장비와 물약을 갖춘다,have:queen_heart,healing_potion:4
 mithril_gear,미스릴 장비 하나 만들기,화로에서 미스릴 주괴를 녹이고 작업대에서 수정 심장과 함께 만든다,have:mithril_sword|have:mithril_bow|have:mithril_staff|have:mithril_helmet|have:mithril_armor|have:mithril_boots,xp:100
+arc_furnace,전기로 세우기,회로 3·미스릴 주괴 4·돌 10으로 만든다. 전력으로만 돌고 광석 두 개마다 주괴 하나를 더 만든다(제련기처럼 광석을 넣는다),place:ArcFurnace,mithril_ore:10
 level15,레벨 15 되기,보스를 잡을 때마다 몬스터가 주는 경험치가 늘어난다. 미스릴 장비는 레벨 15부터 입는다,level:15,healing_potion:4
 mithril_pickaxe,미스릴 곡괭이 만들기,용암 지대의 흑요석은 미스릴 곡괭이 이상이어야 캐진다. 작업대에서 미스릴 주괴 3개로 만든다,have:mithril_pickaxe,xp:60
 obsidian_ore,흑요석 원석 캐기,깊은 아레나 반대쪽 모퉁이가 용암 지대다. 붉게 빛나는 용암 웅덩이는 밟으면 불타니 피해 간다,have:obsidian_ore:3,xp:80

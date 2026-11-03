@@ -703,7 +703,8 @@ namespace Game.Client
                     : machine.Kind == TileType.Conveyor ? BeltSprites[machine.On ? beltFrame : 0]
                     : machine.Kind == TileType.FastConveyor ? FastBeltSprites[machine.On ? fastFrame : 0]
                     : machine.Kind == TileType.UndergroundBelt ? UndergroundSprites[machine.On ? beltFrame : 0]
-                    : machine.Kind == TileType.PowerPole ? null
+                    : machine.Kind == TileType.PowerPole || machine.Kind == TileType.SolarPanel ? null
+                    : machine.Kind == TileType.WaterWheel ? WheelSprite
                     : machine.Kind == TileType.Turret ? TurretBarrelSprite
                     : machine.Kind == TileType.Splitter ? SplitterSprite
                     : machine.Kind == TileType.Arm ? ArmSprite
@@ -724,6 +725,8 @@ namespace Game.Client
                     // A lever leans right when on, left when off, and is not turned by its direction.
                     : machine.Kind == TileType.Lever ? (machine.On ? -30 : 30)
                     : machine.Kind == TileType.Generator ? 0
+                    // A water wheel turns while there is water beside it.
+                    : machine.Kind == TileType.WaterWheel ? (machine.On && machine.Progress > 0 ? -Time.time * 90 % 360 : 0)
                     // A turret points where it last shot.
                     : machine.Kind == TileType.Turret ? _turretAim.GetValueOrDefault(key, 90)
                     : machine.Direction * 90 + swing;
@@ -732,10 +735,11 @@ namespace Game.Client
                 parts.Load.sortingOrder = machine.Kind == TileType.Arm ? -12 : -14;
                 // A filter shows the material it picks out while it carries nothing; a generator's fuel is not shown.
                 bool carrying = machine.Carried != null && machine.Kind != TileType.Generator;
-                bool picking = machine.Kind == TileType.Filter && !carrying && machine.Setting != null;
+                bool picking = machine.Kind == TileType.Filter && !carrying && machine.Settings.Count > 0;
                 parts.Load.enabled = carrying || picking;
                 if (carrying) parts.Load.sprite = Sprites.Icon(machine.Carried);
-                else if (picking) parts.Load.sprite = Sprites.Icon(machine.Setting);
+                // With several picks, it shows each in turn.
+                else if (picking) parts.Load.sprite = Sprites.Icon(machine.Settings[Mathf.FloorToInt(Time.time) % machine.Settings.Count]);
                 parts.Load.transform.localScale = Vector3.one * (picking ? 0.6f : 1);
                 if (machine.Kind == TileType.Arm)
                 {
@@ -976,6 +980,8 @@ namespace Game.Client
         static Sprite SprinklerSprite => Sprites.Centered("machine/sprinkler", () => ItemArt.SprinklerHead);
 
         static Sprite ReelSprite => Sprites.Centered("machine/reel", () => ItemArt.HarvesterReel);
+
+        static Sprite WheelSprite => Sprites.Centered("machine/wheel", () => ItemArt.WaterWheel);
 
         static Sprite LeverSprite => Sprites.Centered("machine/lever", () => ItemArt.LeverHandle);
 

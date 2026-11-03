@@ -140,6 +140,14 @@ namespace Game.Core
             throw new FormatException($"알 수 없는 {label} '{raw}' (가능한 값: {string.Join(", ", Enum.GetNames(typeof(T)))})");
         }
 
+        // A yes/no column: blank or "no" is no.
+        public static bool ParseBool(string raw, string label) => raw.ToLowerInvariant() switch
+        {
+            "" or "no" => false,
+            "yes" => true,
+            _ => throw new FormatException($"{label}는 yes나 no입니다: '{raw}'"),
+        };
+
         // A whole number that may be negative.
         public static int ParseSigned(string raw, string label)
         {

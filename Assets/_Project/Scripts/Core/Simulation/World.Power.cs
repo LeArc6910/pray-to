@@ -4,8 +4,9 @@ using System.Linq;
 
 namespace Game.Core
 {
-    // Generators and power poles joined within World.WireReach of each other, and the machines they reach. Burning
-    // generators give their power to the whole grid; machines in it share it (Docs/Automation.md, 전력망).
+    // Generators and power poles joined within World.WireReach of each other, and the machines they reach. Running
+    // generators give their power to the whole grid; machines in it share it (Docs/Automation.md, 전력망). A generator
+    // burns fuel; a water wheel turns beside water; a solar panel works by day.
     public sealed class PowerGrid
     {
         internal List<Machine> Nodes { get; } = new List<Machine>();
@@ -27,10 +28,21 @@ namespace Game.Core
         readonly Dictionary<Machine, PowerGrid> _gridOf = new Dictionary<Machine, PowerGrid>();
         bool _gridsStale = true;
 
-        public static bool IsPowerNode(TileType type) => type == TileType.Generator || type == TileType.PowerPole;
+        public static bool IsGenerator(TileType type) => type == TileType.Generator || type == TileType.WaterWheel || type == TileType.SolarPanel;
+
+        public static bool IsPowerNode(TileType type) => IsGenerator(type) || type == TileType.PowerPole;
 
         // How far a node gives power.
-        static float NodeReach(Machine node) => node.Kind == TileType.Generator ? PowerReach : PoleReach;
+        static float NodeReach(Machine node) => IsGenerator(node.Kind) ? PowerReach : PoleReach;
+
+        // Whether a generator gives its power now: switched on, and burning fuel, beside water, or in daylight.
+        public bool Generating(Machine node) => node.Enabled && node.Kind switch
+        {
+            TileType.Generator => node.Timer > 0,
+            TileType.WaterWheel => BesideWater(node.X, node.Y),
+            TileType.SolarPanel => !Calendar.IsNight(Clock),
+            _ => false,
+        };
 
         // The grid a node belongs to, or the one a machine draws from, or null.
         public PowerGrid GridOf(Machine machine)
@@ -85,7 +97,7 @@ namespace Game.Core
             if (_gridsStale) BuildGrids();
             foreach (var grid in _grids)
             {
-                grid.Supply = grid.Nodes.Where(n => n.Kind == TileType.Generator && n.Enabled && n.Timer > 0).Sum(n => n.Definition.Power);
+                grid.Supply = grid.Nodes.Where(Generating).Sum(n => n.Definition.Power);
                 grid.Demand = grid.Users.Where(m => m.Enabled).Sum(m => m.Definition.Power);
             }
         }
@@ -102,12 +114,14 @@ namespace Game.Core
             return true;
         }
 
-        // Whether the machine draws power from a grid with a burning generator, for the view.
+        // Whether the machine draws power from a grid with a running generator, for the view; for a generator, whether
+        // it runs.
         public bool IsPowered(Machine machine)
         {
+            if (IsGenerator(machine.Kind)) return Generating(machine);
             var grid = IsPowerNode(machine.Kind) ? null : GridOf(machine);
             if (grid == null) return false;
-            return grid.Nodes.Any(n => n.Kind == TileType.Generator && n.Enabled && n.Timer > 0);
+            return grid.Nodes.Any(Generating);
         }
     }
 }

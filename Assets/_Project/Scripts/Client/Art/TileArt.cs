@@ -399,6 +399,9 @@ namespace Game.Client
             TileType.CrabPot => CrabPotTile,
             TileType.FastConveyor => ConveyorFrame,
             TileType.UndergroundBelt => ConveyorFrame,
+            TileType.ArcFurnace => ArcFurnaceTile,
+            TileType.WaterWheel => WaterWheelStand,
+            TileType.SolarPanel => SolarPanelTile,
             _ => null,
         };
 
@@ -1092,6 +1095,77 @@ namespace Game.Client
             "..oooooooooooo..",
             "..____________..",
             "................");
+
+        // An arc furnace: a steel box with two electrodes on top and an arc crackling in its window.
+        static readonly PixelImage ArcFurnaceTile = PixelImage.FromRows(new Dictionary<char, Rgba>(MetalPalette)
+            {
+                ['f'] = Rgba.Hex("#F08A30"),
+                ['F'] = Rgba.Hex("#FFD860"),
+                ['e'] = Rgba.Hex("#9AE0FF"),
+                ['E'] = Rgba.Hex("#3A78C8"),
+            },
+            "................",
+            "..oo........oo..",
+            "..oe........eo..",
+            ".ooeooooooooeoo.",
+            ".oLLLLLLLLLLLLo.",
+            ".oLMMMMMMMMMMmo.",
+            ".oLMkkkkkkkkMmo.",
+            ".oLMkfFFFFfkMmo.",
+            ".oLMkFFeeFFkMmo.",
+            ".oLMkfFFFFfkMmo.",
+            ".oLMkkkkkkkkMmo.",
+            ".oLMMMMMMMMMMmo.",
+            ".oyEyEyEyEyEyEo.",
+            ".oDDDDDDDDDDDDo.",
+            "..oooooooooooo..",
+            "..____________..");
+
+        // A water wheel's two posts and axle block; the wheel is drawn on top, turning while it runs.
+        static readonly PixelImage WaterWheelStand = PixelImage.FromRows(new Dictionary<char, Rgba>(MetalPalette)
+            {
+                ['w'] = Rgba.Hex("#9A6A3C"),
+                ['W'] = Rgba.Hex("#6A4424"),
+            },
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "..ow........wo..",
+            "..ow........wo..",
+            "..oW........Wo..",
+            "..oW........Wo..",
+            ".oWWo......oWWo.",
+            ".oooo......oooo.",
+            ".____......____.");
+
+        // A solar panel: blue cells in a steel frame on a short post.
+        static readonly PixelImage SolarPanelTile = PixelImage.FromRows(new Dictionary<char, Rgba>(MetalPalette)
+            {
+                ['C'] = Rgba.Hex("#6A9CE8"),
+                ['c'] = Rgba.Hex("#2A4C9C"),
+            },
+            "................",
+            ".oooooooooooooo.",
+            ".oLLLLLLLLLLLLo.",
+            ".oLCccLCcLCccLo.",
+            ".oLcccLccLcccLo.",
+            ".oLcccLccLcccLo.",
+            ".oLLLLLLLLLLLLo.",
+            ".oLCccLCcLCccLo.",
+            ".oLcccLccLcccLo.",
+            ".oLcccLccLcccLo.",
+            ".oLLLLLLLLLLLLo.",
+            ".oooooooooooooo.",
+            "......oMMo......",
+            "......omMo......",
+            "....ooddddoo....",
+            "....__________..");
 
         // A lever's base; the handle is drawn on top, leaning one way when on and the other when off.
         static readonly PixelImage LeverBase = PixelImage.FromRows(MetalPalette,

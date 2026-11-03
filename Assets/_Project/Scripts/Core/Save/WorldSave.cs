@@ -81,9 +81,10 @@ namespace Game.Core
         public sealed class SavedMachine
         {
             internal SavedMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
-                List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output, MaterialDefinition setting = null, Recipe recipe = null)
+                List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output, IReadOnlyList<MaterialDefinition> settings = null,
+                Recipe recipe = null)
             {
-                Setting = setting;
+                Settings = settings ?? Array.Empty<MaterialDefinition>();
                 Recipe = recipe;
                 X = x;
                 Y = y;
@@ -103,7 +104,8 @@ namespace Game.Core
             public float Progress { get; }
             public IReadOnlyList<(MaterialDefinition Material, int Count)> Input { get; }
             // A filter's chosen material, or null.
-            public MaterialDefinition Setting { get; }
+            // A filter's materials.
+            public IReadOnlyList<MaterialDefinition> Settings { get; }
             // An assembler's recipe, or null.
             public Recipe Recipe { get; }
             public IReadOnlyList<(MaterialDefinition Material, int Count)> Output { get; }
@@ -176,8 +178,8 @@ namespace Game.Core
                     w.Write(machine.Progress);
                     SavedItems.WriteCounts(w, machine.Inputs.Select(p => (p.Key.Id, p.Value)));
                     SavedItems.WriteCounts(w, machine.Outputs.Select(p => (p.Key.Id, p.Value)));
-                    // A filter's material, or an assembler's recipe.
-                    w.Write(machine.Setting?.Id ?? machine.Recipe?.Id ?? "");
+                    // A filter's materials (ids joined by |, which no id has), or an assembler's recipe.
+                    w.Write(machine.Settings.Count > 0 ? string.Join("|", machine.Settings.Select(m => m.Id)) : machine.Recipe?.Id ?? "");
                 }
 
                 var beds = world.Beds.ToList();
@@ -287,8 +289,9 @@ namespace Game.Core
                     List<(MaterialDefinition, int)> Resolve(List<(string Id, int Count)> stacks) =>
                         stacks.Select(s => (Find(s.Id), s.Count)).Where(s => s.Item1 != null).ToList();
                     string setting = version >= 6 ? r.ReadString() : "";
+                    var picks = setting.Split('|').Where(id => id.Length > 0).Select(Find).Where(m => m != null).ToList();
                     machines.Add(new SavedMachine(x, y, direction, timer, carried.Length > 0 ? Find(carried) : null, along, Resolve(input), Resolve(output),
-                        setting.Length > 0 ? Find(setting) : null, setting.Length > 0 ? loot?.Recipes.FirstOrDefault(rc => rc.Id == setting) : null));
+                        picks, setting.Length > 0 ? loot?.Recipes.FirstOrDefault(rc => rc.Id == setting) : null));
                 }
                 var beds = new List<(int, int, string)>();
                 for (int count = version >= 5 ? r.ReadInt32() : 0; count > 0; count--)

@@ -46,8 +46,9 @@ namespace Game.Core
     // A machine's numbers: seconds per ore, per tile moved or per smelt, and how much it holds. Docs/Automation.md.
     public sealed class MachineDefinition
     {
-        internal MachineDefinition(TileType tile, float seconds, int capacity, int power = 0)
+        internal MachineDefinition(TileType tile, float seconds, int capacity, int power = 0, bool powerOnly = false)
         {
+            PowerOnly = powerOnly;
             Tile = tile;
             Seconds = seconds;
             Capacity = capacity;
@@ -61,6 +62,9 @@ namespace Game.Core
         // What it draws from a power grid to work twice as fast; for a generator, what it gives while it burns. 0 for
         // a machine that power does not speed up (belts, splitters). See Docs/Automation.md, 전력망.
         public int Power { get; }
+        // Works only with power, once a tick with the grid's whole draw met, instead of once by itself and once more
+        // with power (machines.csv power_only).
+        public bool PowerOnly { get; }
     }
 
     // Something that grows from a seed on a floor tile of its biomes. See Docs/Farming.md and Docs/Time.md.
@@ -210,7 +214,7 @@ namespace Game.Core
             TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester,
             TileType.Filter, TileType.Generator, TileType.Lever, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt,
             TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot,
-            TileType.Turret, TileType.Barn,
+            TileType.Turret, TileType.Barn, TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel,
         };
 
         static List<MachineDefinition> ParseMachines(string csv, List<string> errors)
@@ -237,7 +241,9 @@ namespace Game.Core
                     if (capacity < 1) throw new FormatException("capacity는 1 이상이어야 합니다.");
                     int power = string.IsNullOrWhiteSpace(row["power"]) ? 0 : SheetValues.ParseNumber(row["power"], "power");
                     if (power < 0) throw new FormatException("power는 0 이상이어야 합니다.");
-                    machines.Add(new MachineDefinition(tile, seconds, capacity, power));
+                    bool powerOnly = SheetValues.ParseBool(row["power_only"], "power_only");
+                    if (powerOnly && power == 0) throw new FormatException("power_only인 기계는 power가 있어야 합니다.");
+                    machines.Add(new MachineDefinition(tile, seconds, capacity, power, powerOnly));
                 }
                 catch (FormatException e)
                 {
