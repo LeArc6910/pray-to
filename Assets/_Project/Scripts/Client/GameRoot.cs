@@ -314,7 +314,7 @@ namespace Game.Client
             Vector2 point = Ui.FromScreen(screen);
             var rect = new Rect(point.x - 70, point.y - 13, 140, 26);
             Controls.Block(rect);
-            if (!GUI.Button(rect, $"균열 열기 ({_client.Rift.Unlocked}단계)")) return;
+            if (!Ui.Button(rect, $"균열 열기 ({_client.Rift.Unlocked}단계)")) return;
             Sounds.Play(Sound.Click);
             SendToHost(_client.OpenRiftCommand());
         }
@@ -341,7 +341,7 @@ namespace Game.Client
             Vector2 point = Ui.FromScreen(screen);
             var rect = new Rect(point.x - 80, point.y - 13, 160, 26);
             Controls.Block(rect);
-            if (!GUI.Button(rect, $"기지 방어 시작 ({_client.Defense.Unlocked}단계)")) return;
+            if (!Ui.Button(rect, $"기지 방어 시작 ({_client.Defense.Unlocked}단계)")) return;
             Sounds.Play(Sound.Click);
             SendToHost(_client.StartDefenseCommand());
         }
@@ -354,7 +354,7 @@ namespace Game.Client
             Vector2 point = Ui.FromScreen(screen);
             var rect = new Rect(point.x - 44, point.y - 13, 88, 26);
             Controls.Block(rect);
-            if (!GUI.Button(rect, _client.Sleeping ? "일어나기" : "잠자기")) return;
+            if (!Ui.Button(rect, _client.Sleeping ? "일어나기" : "잠자기")) return;
             Sounds.Play(Sound.Click);
             SendToHost(_client.Sleeping ? _client.WakeCommand() : _client.SleepCommand());
         }
@@ -511,7 +511,7 @@ namespace Game.Client
             if (!Controls.UsingTouch) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
             var rect = new Rect(point.x - 40, point.y - 13, 80, 26);
             Controls.Block(rect);
-            if (GUI.Button(rect, text)) ToggleMachine();
+            if (Ui.Button(rect, text)) ToggleMachine();
         }
 
         // Does what the quick slot holds: puts on the gear, uses the potion or food, places, plants or waters.
@@ -538,20 +538,22 @@ namespace Game.Client
             var (move, aim, attack) = Controls.Read(_camera, _client.Position);
             // Clicking in the bag or on the map should not swing the sword.
             if (_inventory.Open || (_map != null && _map.FullOpen)) attack = false;
-            if (HoldAttack)
-            {
-                attack = true;
-                if (HeldAim.LengthSquared > 1e-6f) aim = HeldAim;
-            }
+            if (HoldAttack) attack = true;
+            if ((HoldAttack || AimHeld) && HeldAim.LengthSquared > 1e-6f) aim = HeldAim;
             byte[] input = _client.Step(move, aim, attack);
             if (input != null) SendToHost(input);
 
             if (_host == null) return;
-            _host.Tick();
-            foreach (var message in _host.TakeOutgoing())
+            // Only a playtest runs a solo world faster than time (Playtest.cs, "speed").
+            int ticks = _mode == Mode.Solo ? Mathf.Clamp(HostTicksPerStep, 1, 60) : 1;
+            for (int i = 0; i < ticks; i++)
             {
-                if (message.Connection == LocalConnection) _client.Receive(message.Data);
-                else _net?.Send(message.Connection, message.Data, message.Reliable);
+                _host.Tick();
+                foreach (var message in _host.TakeOutgoing())
+                {
+                    if (message.Connection == LocalConnection) _client.Receive(message.Data);
+                    else _net?.Send(message.Connection, message.Data, message.Reliable);
+                }
             }
         }
 
@@ -583,6 +585,19 @@ namespace Game.Client
         internal LootData LootSheet => _loot;
         internal bool HoldAttack { get; set; }
         internal Vec2 HeldAim { get; set; }
+        // Facing HeldAim without attacking, as a mouse held to one side does (Playtest.cs, "face").
+        internal bool AimHeld { get; set; }
+        // Host ticks to each fixed step in a solo game: more runs the world faster (Playtest.cs, "speed").
+        internal int HostTicksPerStep { get; set; } = 1;
+
+        // What the screen says, for the playtests: the HUD's lines as last drawn, the "획득: …" lines and notices in
+        // the corner, and the banner in the middle while it shows.
+        internal IReadOnlyList<string> HudLines => _hudLines;
+        internal IEnumerable<string> AcquiredLines => _acquired.Select(a => a.Text);
+        internal string Banner => _view?.ShowingBanner;
+        internal bool MapOpen => _map != null && _map.FullOpen;
+        internal IEnumerable<string> FloatingTexts => _view?.FloatingTexts ?? Enumerable.Empty<string>();
+        string[] _hudLines = Array.Empty<string>();
 
         // The bag window open or shut, for the play mode tests' screenshots.
         internal bool BagOpen
@@ -952,9 +967,9 @@ namespace Game.Client
             var leave = Ui.TouchButtonArea(1, 2);
             Controls.Block(bag);
             Controls.Block(leave);
-            if (GUI.Button(bag, "가방")) _inventory.Open = !_inventory.Open;
+            if (Ui.Button(bag, "가방")) _inventory.Open = !_inventory.Open;
             // Ends on the next Update, after this OnGUI has finished with the session.
-            if (GUI.Button(leave, "나가기")) _endReason = "";
+            if (Ui.Button(leave, "나가기")) _endReason = "";
         }
 
         // Name and how to play on one side, classes on the other; one above the other on a narrow screen. Scrolls
@@ -982,7 +997,7 @@ namespace Game.Client
                 _scrollToSide = false;
             }
             GUILayout.BeginArea(area, GUI.skin.box);
-            _menuScroll = GUILayout.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
+            _menuScroll = Ui.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
             if (wide) GUILayout.BeginHorizontal();
 
             GUILayout.BeginVertical(GUILayout.Width(column));
@@ -999,19 +1014,19 @@ namespace Game.Client
             bool worldSaved = SaveStore.Exists(SaveStore.WorldKey(WorldName));
             GUILayout.BeginHorizontal();
             GUILayout.Label(worldSaved ? "저장된 월드를 이어한다" : "새 월드를 만든다");
-            if (worldSaved && GUILayout.Button(_confirmDelete ? "한 번 더 누르면 지운다" : "월드 지우기"))
+            if (worldSaved && Ui.LayoutButton(_confirmDelete ? "한 번 더 누르면 지운다" : "월드 지우기"))
             {
                 if (_confirmDelete) SaveStore.Delete(SaveStore.WorldKey(WorldName));
                 _confirmDelete = !_confirmDelete;
             }
             GUILayout.EndHorizontal();
             // The saves on this device: pick one, carry them off in a file, bring a file's in (SaveMenu).
-            if (GUILayout.Button(_side == MenuSide.Saves ? "저장본 닫기" : "저장본: 고르기·내보내기·가져오기")) OpenSide(MenuSide.Saves);
+            if (Ui.LayoutButton(_side == MenuSide.Saves ? "저장본 닫기" : "저장본: 고르기·내보내기·가져오기")) OpenSide(MenuSide.Saves);
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button($"어둠과 빛: {(Settings.Darkness ? "켜짐" : "꺼짐")}")) Settings.Darkness = !Settings.Darkness;
+            if (Ui.LayoutButton($"어둠과 빛: {(Settings.Darkness ? "켜짐" : "꺼짐")}")) Settings.Darkness = !Settings.Darkness;
             // Each press turns it up a quarter, and from full back to off.
-            if (GUILayout.Button($"효과음: {Settings.VolumeText}"))
+            if (Ui.LayoutButton($"효과음: {Settings.VolumeText}"))
             {
                 Settings.Volume = (Settings.Volume + 1) % (Settings.MaxVolume + 1);
                 Sounds.Play(Sound.Click);
@@ -1019,40 +1034,40 @@ namespace Game.Client
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             // The menu plays the cave's tune, so the change is heard at once.
-            if (GUILayout.Button($"음악: {Settings.MusicVolumeText}")) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
+            if (Ui.LayoutButton($"음악: {Settings.MusicVolumeText}")) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
             // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
-            if (GUILayout.Button($"개발 정보: {(Settings.DevInfo ? "켜짐" : "꺼짐")}")) Settings.DevInfo = !Settings.DevInfo;
+            if (Ui.LayoutButton($"개발 정보: {(Settings.DevInfo ? "켜짐" : "꺼짐")}")) Settings.DevInfo = !Settings.DevInfo;
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
-            if (GUILayout.Button($"글꼴: {(Settings.PixelFont ? "도트" : "매끈")}")) Settings.PixelFont = !Settings.PixelFont;
+            if (Ui.LayoutButton($"글꼴: {(Settings.PixelFont ? "도트" : "매끈")}")) Settings.PixelFont = !Settings.PixelFont;
             // The goals for new players in the HUD; met goals still count while it is off (Settings.Guide).
-            if (GUILayout.Button($"목표 안내: {(Settings.Guide ? "켜짐" : "꺼짐")}")) Settings.Guide = !Settings.Guide;
+            if (Ui.LayoutButton($"목표 안내: {(Settings.Guide ? "켜짐" : "꺼짐")}")) Settings.Guide = !Settings.Guide;
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button($"화면 흔들림: {(Settings.ScreenShake ? "켜짐" : "꺼짐")}")) Settings.ScreenShake = !Settings.ScreenShake;
+            if (Ui.LayoutButton($"화면 흔들림: {(Settings.ScreenShake ? "켜짐" : "꺼짐")}")) Settings.ScreenShake = !Settings.ScreenShake;
             // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
-            if (!Controls.UsingTouch && GUILayout.Button(_side == MenuSide.Keys ? "키 바꾸기 닫기" : "키 바꾸기")) OpenSide(MenuSide.Keys);
+            if (!Controls.UsingTouch && Ui.LayoutButton(_side == MenuSide.Keys ? "키 바꾸기 닫기" : "키 바꾸기")) OpenSide(MenuSide.Keys);
             GUILayout.EndHorizontal();
             GUILayout.Space(8);
 
             GUI.enabled = ready && !_connecting;
             // Online, through Unity Relay: the same on the web and on PC, so they play together.
             GUILayout.Label(Ui.Wrap("온라인 협동: 방을 만들면 코드가 나온다. 친구는 그 코드로 참가한다(웹과 PC가 함께)", GUI.skin.label, _menuColumn));
-            if (GUILayout.Button(_connecting ? "연결하는 중…" : "온라인 방 만들기")) StartOnlineHost();
+            if (Ui.LayoutButton(_connecting ? "연결하는 중…" : "온라인 방 만들기")) StartOnlineHost();
             GUILayout.BeginHorizontal();
             _codeInput = GUILayout.TextField(_codeInput, 12, GUILayout.MinWidth(80));
-            if (GUILayout.Button("코드로 참가", GUILayout.Width(110))) StartOnlineJoin();
+            if (Ui.LayoutButton("코드로 참가", GUILayout.Width(110))) StartOnlineJoin();
             GUILayout.EndHorizontal();
             // A browser cannot listen for connections, so the LAN way is only on PC.
             if (Application.platform != RuntimePlatform.WebGLPlayer)
             {
                 GUILayout.Space(8);
                 GUILayout.Label("같은 네트워크(LAN)");
-                if (GUILayout.Button($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
+                if (Ui.LayoutButton($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
                 GUILayout.Label("호스트 주소");
                 _address = GUILayout.TextField(_address, 64);
-                if (GUILayout.Button("참가")) StartJoining();
+                if (Ui.LayoutButton("참가")) StartJoining();
             }
             GUI.enabled = true;
             GUILayout.EndVertical();
@@ -1066,11 +1081,11 @@ namespace Game.Client
             GUILayout.EndVertical();
 
             if (wide) GUILayout.EndHorizontal();
-            GUILayout.EndScrollView();
+            Ui.EndScrollView();
 
             if (_status.Length > 0) GUILayout.Label(Ui.Wrap(_status, GUI.skin.label, inner - GUI.skin.label.margin.horizontal));
             GUI.enabled = ready;
-            if (GUILayout.Button("혼자 하기", GUILayout.Height(36))) StartSolo();
+            if (Ui.LayoutButton("혼자 하기", GUILayout.Height(36))) StartSolo();
             GUI.enabled = true;
             GUILayout.EndArea();
         }
@@ -1101,13 +1116,14 @@ namespace Game.Client
             foreach (var action in KeyBindings.Actions)
             {
                 GUILayout.BeginHorizontal();
+                Ui.Row(KeyBindings.ActionName(action));
                 GUILayout.Label(KeyBindings.ActionName(action), GUILayout.Width(Mathf.Min(90, _menuColumn * 0.4f)));
                 bool waiting = KeyBindings.Capturing == action;
-                if (GUILayout.Button(waiting ? "키를 누르세요…" : KeyBindings.Name(action))) KeyBindings.StartCapture(action);
+                if (Ui.LayoutButton(waiting ? "키를 누르세요…" : KeyBindings.Name(action))) KeyBindings.StartCapture(action);
                 GUILayout.EndHorizontal();
             }
             if (KeyBindings.Message.Length > 0) GUILayout.Label(Ui.Wrap(KeyBindings.Message, GUI.skin.label, _menuColumn));
-            if (GUILayout.Button("처음 키로")) KeyBindings.ResetAll();
+            if (Ui.LayoutButton("처음 키로")) KeyBindings.ResetAll();
             GUILayout.Label(Ui.Wrap("이동 WASD·화살표, 공격 스페이스·마우스, 메뉴 Esc는 바꿀 수 없다.", GUI.skin.label, _menuColumn));
         }
 
@@ -1123,7 +1139,7 @@ namespace Game.Client
                 bool full = order < 0 && _chosenClasses.Count >= max;
                 GUI.enabled = !full;
                 string mark = order >= 0 ? $"[{order + 1}] " : "[ ] ";
-                if (GUILayout.Button(mark + option.Name))
+                if (Ui.LayoutButton(mark + option.Name))
                 {
                     if (order >= 0) _chosenClasses.RemoveAt(order);
                     else _chosenClasses.Add(option.Id);
@@ -1236,6 +1252,7 @@ namespace Game.Client
             var label = _hudLine;
             float width = Ui.HudArea.width - box.padding.horizontal - label.margin.horizontal;
             for (int i = 0; i < lines.Count; i++) lines[i] = Ui.Wrap(lines[i], label, width);
+            if (Event.current.type == EventType.Repaint) _hudLines = lines.ToArray();
             float gap = Mathf.Max(label.margin.top, label.margin.bottom);
             float height = box.padding.vertical + (lines.Count > 0 ? label.margin.top + label.margin.bottom + gap * (lines.Count - 1) : 0);
             foreach (string line in lines) height += label.CalcHeight(new GUIContent(line), width);

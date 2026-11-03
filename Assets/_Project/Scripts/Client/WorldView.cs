@@ -659,6 +659,12 @@ namespace Game.Client
             _bossesSeen[view.Id] = (view.BossState, view.Phase, view.Boss.Name);
         }
 
+        // The banner while it shows, for the playtests (GameRoot.Banner).
+        internal string ShowingBanner => _bannerAge < BannerSeconds ? _banner : null;
+
+        // The words floating over the world (damage, "곡괭이가 필요하다", a level), for the playtests.
+        internal IEnumerable<string> FloatingTexts => _floating.Select(f => f.Text);
+
         public void ShowBanner(string text)
         {
             _banner = text;

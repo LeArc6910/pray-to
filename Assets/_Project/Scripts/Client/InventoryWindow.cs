@@ -113,14 +113,14 @@ namespace Game.Client
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
-            _scroll[page] = GUILayout.BeginScrollView(_scroll[page], GUILayout.ExpandHeight(true));
+            _scroll[page] = Ui.BeginScrollView(_scroll[page], GUILayout.ExpandHeight(true));
             if (_page == Page.Gear) DrawGear();
             else if (_page == Page.Materials) DrawMaterialsPage();
             else if (_page == Page.Classes) DrawClasses();
             else if (_page == Page.Passives) DrawPassives();
             else if (_page == Page.Merchant) DrawMerchant();
             else DrawChest();
-            GUILayout.EndScrollView();
+            Ui.EndScrollView();
             if (Event.current.type == EventType.Repaint)
             {
                 var rows = GUILayoutUtility.GetLastRect();
@@ -155,13 +155,19 @@ namespace Game.Client
                     }
                     e.Use();
                 }
+                Ui.Probe(PageLabels[(int)pages[i]].text, tab);
                 if (e.type == EventType.Repaint) GUI.skin.button.Draw(tab, PageLabels[(int)pages[i]], tab.Contains(e.mousePosition), false, page == pages[i], false);
             }
             return page;
         }
 
         // Text broken between words to fit the width (Ui.Wrap).
-        static string Fit(string text, float width) => Ui.Wrap(text, GUI.skin.label, width);
+        // The playtests learn which row a button is on from the text written before it (Ui.Row).
+        static string Fit(string text, float width)
+        {
+            Ui.Row(text);
+            return Ui.Wrap(text, GUI.skin.label, width);
+        }
 
         // Scrolls the open page by whole lines per notch while the pointer is over the window.
         void Wheel(Rect area)
@@ -197,7 +203,7 @@ namespace Game.Client
                     ItemLabel(item);
                     RuneButton(item);
                     RefineButton(item);
-                    if (GUILayout.Button("벗기", GUILayout.Width(56))) Send(_client.UnequipCommand(slot), Sound.Click);
+                    if (Ui.LayoutButton("벗기", GUILayout.Width(56))) Send(_client.UnequipCommand(slot), Sound.Click);
                     QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
                 }
                 GUILayout.EndHorizontal();
@@ -214,9 +220,9 @@ namespace Game.Client
                 // Too high a level to wear yet: the button says which level instead.
                 bool wearable = item.Base.RequiredLevel <= _client.Level;
                 GUI.enabled = wearable;
-                if (GUILayout.Button(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", GUILayout.Width(56))) Send(_client.EquipCommand(item.Id), Sound.Place);
+                if (Ui.LayoutButton(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", GUILayout.Width(56))) Send(_client.EquipCommand(item.Id), Sound.Place);
                 GUI.enabled = true;
-                if (GUILayout.Button("버리기", GUILayout.Width(56))) Send(_client.DiscardCommand(item.Id), Sound.Click);
+                if (Ui.LayoutButton("버리기", GUILayout.Width(56))) Send(_client.DiscardCommand(item.Id), Sound.Click);
                 QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
                 GUILayout.EndHorizontal();
             }
@@ -229,7 +235,7 @@ namespace Game.Client
                 GUI.color = pair.Key == _selectedRune ? Palette.Rune : previous;
                 var tooltip = string.Join("\n", new[] { SlotCategory.Weapon, SlotCategory.Armor, SlotCategory.Jewelry }
                     .Select(c => $"{CategoryName(c)}: {string.Join(", ", pair.Key.ModifiersFor(c).Select(StatText.Describe))}"));
-                if (GUILayout.Button(new GUIContent($"{pair.Key.Name} ×{pair.Value}", tooltip)))
+                if (Ui.LayoutButton(new GUIContent($"{pair.Key.Name} ×{pair.Value}", tooltip)))
                 {
                     _selectedRune = pair.Key == _selectedRune ? null : pair.Key;
                 }
@@ -266,7 +272,7 @@ namespace Game.Client
             if (made.Count == 0) return;
             GUILayout.Space(6);
             int minutes = Mathf.Max(1, Mathf.RoundToInt(_client.ProductionMinutes));
-            if (GUILayout.Button(_showProduction ? $"공장 생산 접기 (최근 {minutes}분)" : $"공장 생산 보기 (최근 {minutes}분, {made.Count}가지)")) _showProduction = !_showProduction;
+            if (Ui.LayoutButton(_showProduction ? $"공장 생산 접기 (최근 {minutes}분)" : $"공장 생산 보기 (최근 {minutes}분, {made.Count}가지)")) _showProduction = !_showProduction;
             if (!_showProduction) return;
             foreach (var (thing, count) in made)
             {
@@ -361,7 +367,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 string picks = ahead.Value.Settings.Count == 0 ? "정하지 않음" : string.Join(", ", ahead.Value.Settings.Select(m => m.Name));
                 GUILayout.Label(Fit($"거름망 분배기: {picks} (재료의 [거르기]로 {World.FilterPicks}개까지 더하고 [빼기]로 뺀다)", _textWidth - 64));
-                if (ahead.Value.Settings.Count > 0 && GUILayout.Button("비우기", GUILayout.Width(56))) Send(_client.SetFilterCommand(null), Sound.Click);
+                if (ahead.Value.Settings.Count > 0 && Ui.LayoutButton("비우기", GUILayout.Width(56))) Send(_client.SetFilterCommand(null), Sound.Click);
                 GUILayout.EndHorizontal();
             }
             // A machine that makes things: what it holds and has made, [꺼내기], and for a keg or a jar what it makes.
@@ -371,7 +377,7 @@ namespace Game.Client
                 var machine = ahead.Value;
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(Fit($"{_client.TileName(machine.Kind)}: 넣은 것 {machine.Holding} · 만든 것 {machine.Held}", _textWidth - 72));
-                if (machine.Held > 0 && GUILayout.Button("꺼내기", GUILayout.Width(64))) Send(_client.UnloadCommand(), Sound.Pickup);
+                if (machine.Held > 0 && Ui.LayoutButton("꺼내기", GUILayout.Width(64))) Send(_client.UnloadCommand(), Sound.Pickup);
                 GUILayout.EndHorizontal();
                 if (machine.Kind == TileType.Coop)
                     GUILayout.Label(Fit($"닭 {machine.Animals}/{World.CoopChickens}마리. 사료가 있으면 하루(20분)마다 닭마다 달걀 하나", _textWidth));
@@ -395,20 +401,20 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
-                if (pair.Key.Places != null && GUILayout.Button("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
+                if (pair.Key.Places != null && Ui.LayoutButton("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
                 var crop = _client.CropFrom(pair.Key);
-                if (crop != null && GUILayout.Button("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
-                if (pair.Key.Id == World.WateringCan && GUILayout.Button("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
-                if (pair.Key.Id == World.FishingRod && GUILayout.Button(FishingLabel(_client), GUILayout.Width(72))) Send(_client.FishCommand(), Sound.Cast);
-                if (pair.Key.Id == World.Hoe && GUILayout.Button("밭 갈기", GUILayout.Width(64))) Send(_client.TillCommand(), Sound.Dig);
+                if (crop != null && Ui.LayoutButton("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
+                if (pair.Key.Id == World.WateringCan && Ui.LayoutButton("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
+                if (pair.Key.Id == World.FishingRod && Ui.LayoutButton(FishingLabel(_client), GUILayout.Width(72))) Send(_client.FishCommand(), Sound.Cast);
+                if (pair.Key.Id == World.Hoe && Ui.LayoutButton("밭 갈기", GUILayout.Width(64))) Send(_client.TillCommand(), Sound.Dig);
                 // Facing a filter, any material can be what it picks out; facing a generator, fuel goes in.
-                if (ahead?.Kind == TileType.Filter && GUILayout.Button(ahead.Value.Settings.Contains(pair.Key.Kind) ? "빼기" : "거르기", GUILayout.Width(56)))
+                if (ahead?.Kind == TileType.Filter && Ui.LayoutButton(ahead.Value.Settings.Contains(pair.Key.Kind) ? "빼기" : "거르기", GUILayout.Width(56)))
                     Send(_client.SetFilterCommand(pair.Key), Sound.Click);
-                if (ahead?.Kind == TileType.Generator && pair.Key.Fuel > 0 && GUILayout.Button("연료", GUILayout.Width(48))) Send(_client.RefuelCommand(pair.Key), Sound.Place);
+                if (ahead?.Kind == TileType.Generator && pair.Key.Fuel > 0 && Ui.LayoutButton("연료", GUILayout.Width(48))) Send(_client.RefuelCommand(pair.Key), Sound.Place);
                 // Facing a machine that makes things from this, it goes in (all of it, up to what the machine holds).
-                if (loads && Takes(ahead.Value, pair.Key) && GUILayout.Button("넣기", GUILayout.Width(48)))
+                if (loads && Takes(ahead.Value, pair.Key) && Ui.LayoutButton("넣기", GUILayout.Width(48)))
                     Send(_client.LoadCommand(pair.Key, Math.Min(pair.Value, World.MaxTrade)), Sound.Place);
-                if (pair.Key.Id == World.Fertilizer && GUILayout.Button("거름 주기", GUILayout.Width(72))) Send(_client.FertilizeCommand(), Sound.Place);
+                if (pair.Key.Id == World.Fertilizer && Ui.LayoutButton("거름 주기", GUILayout.Width(72))) Send(_client.FertilizeCommand(), Sound.Place);
                 // Only what a quick slot can use: things that build, seeds and the tools.
                 if (pair.Key.Places != null || crop != null || IsTool(pair.Key))
                 {
@@ -452,11 +458,11 @@ namespace Game.Client
             GUILayout.BeginHorizontal();
             var enabled = GUI.enabled;
             GUI.enabled = enabled && !_client.TalkedToday(npc);
-            if (GUILayout.Button(_client.TalkedToday(npc) ? "오늘은 이야기했다" : "말 걸기")) Send(_client.TalkCommand(), Sound.Click);
+            if (Ui.LayoutButton(_client.TalkedToday(npc) ? "오늘은 이야기했다" : "말 걸기")) Send(_client.TalkCommand(), Sound.Click);
             GUI.enabled = enabled;
             GUILayout.EndHorizontal();
             GUILayout.Label(Fit($"호감이 오를 때마다 사는 값은 {World.HeartPercent}% 싸지고 파는 값은 {World.HeartPercent}% 비싸진다.", _textWidth));
-            int mode = GUILayout.Toolbar((int)_shopMode, ShopModeNames);
+            int mode = Ui.Toolbar((int)_shopMode, ShopModeNames);
             if (mode != (int)_shopMode)
             {
                 _shopMode = (ShopMode)mode;
@@ -489,7 +495,7 @@ namespace Game.Client
             bool ready = request.Need.All(n => n.Thing is MaterialDefinition m ? _client.Bag.CountOfKind(m) >= n.Count : _client.Bag.CountOf((ConsumableDefinition)n.Thing) >= n.Count);
             var enabled = GUI.enabled;
             GUI.enabled = enabled && ready;
-            if (GUILayout.Button(ready ? "건네기" : "아직 모자라다")) Send(_client.RequestCommand(), Sound.Craft);
+            if (Ui.LayoutButton(ready ? "건네기" : "아직 모자라다")) Send(_client.RequestCommand(), Sound.Craft);
             GUI.enabled = enabled;
         }
 
@@ -506,9 +512,9 @@ namespace Game.Client
                 string text = open ? $"{entry.Name}{note} · 금화 {price}" : $"{entry.Name} · 호감 {entry.Hearts}에 열린다";
                 GUILayout.Label(new GUIContent(Fit(text, _recipeWidth), entry.Material?.Description ?? entry.Consumable.Description), GUILayout.Width(_recipeWidth));
                 GUI.enabled = enabled && open && coins >= price;
-                if (GUILayout.Button("사기", GUILayout.Width(56))) Send(_client.BuyCommand(entry, 1), Sound.Craft);
+                if (Ui.LayoutButton("사기", GUILayout.Width(56))) Send(_client.BuyCommand(entry, 1), Sound.Craft);
                 GUI.enabled = enabled && open && coins >= price * 5;
-                if (GUILayout.Button("×5", GUILayout.Width(40))) Send(_client.BuyCommand(entry, 5), Sound.Craft);
+                if (Ui.LayoutButton("×5", GUILayout.Width(40))) Send(_client.BuyCommand(entry, 5), Sound.Craft);
                 GUI.enabled = enabled;
                 GUILayout.EndHorizontal();
             }
@@ -535,8 +541,8 @@ namespace Game.Client
                     string room = left > 0 ? $" · 오늘 {left}개 더" : " · 오늘은 그만 산다";
                     GUILayout.Label(Fit($"{name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts, material?.Quality ?? 0, Calendar.Day(_client.Clock))}{room}", _recipeWidth), GUILayout.Width(_recipeWidth));
                     GUI.enabled = left > 0;
-                    if (GUILayout.Button("팔기", GUILayout.Width(56))) Send(_client.SellCommand(thing, 1), Sound.Pickup);
-                    if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(thing, Math.Min(Math.Min(have, left), World.MaxTrade)), Sound.Pickup);
+                    if (Ui.LayoutButton("팔기", GUILayout.Width(56))) Send(_client.SellCommand(thing, 1), Sound.Pickup);
+                    if (Ui.LayoutButton("모두", GUILayout.Width(48))) Send(_client.SellCommand(thing, Math.Min(Math.Min(have, left), World.MaxTrade)), Sound.Pickup);
                     GUI.enabled = true;
                     GUILayout.EndHorizontal();
                 }
@@ -546,7 +552,7 @@ namespace Game.Client
                 any = true;
                 GUILayout.BeginHorizontal();
                 ItemLabel(item);
-                if (GUILayout.Button($"팔기 {World.ItemValue(item, hearts)}", GUILayout.Width(88))) Send(_client.SellItemCommand(item), Sound.Pickup);
+                if (Ui.LayoutButton($"팔기 {World.ItemValue(item, hearts)}", GUILayout.Width(88))) Send(_client.SellItemCommand(item), Sound.Pickup);
                 GUILayout.EndHorizontal();
             }
             if (!any) GUILayout.Label(Fit(npc.BuysGear ? "팔 것이 없다. 입은 장비는 벗어야 판다." : "이 사람이 사는 것이 가방에 없다.", _textWidth));
@@ -565,7 +571,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(Fit($"{pair.Key.Name} ×{pair.Value}", _recipeWidth), GUILayout.Width(_recipeWidth));
-                if (GUILayout.Button("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
+                if (Ui.LayoutButton("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
                 GUILayout.EndHorizontal();
             }
             foreach (var pair in _client.Bag.Materials.Where(p => p.Key.Id != World.Coin).ToList())
@@ -573,7 +579,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(Fit($"{pair.Key.Name} ×{pair.Value}", _recipeWidth), GUILayout.Width(_recipeWidth));
-                if (GUILayout.Button("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
+                if (Ui.LayoutButton("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
                 GUILayout.EndHorizontal();
             }
         }
@@ -599,7 +605,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 ItemLabel(item);
-                if (GUILayout.Button(action, GUILayout.Width(64))) Send(moveItem(item), Sound.Click);
+                if (Ui.LayoutButton(action, GUILayout.Width(64))) Send(moveItem(item), Sound.Click);
                 GUILayout.EndHorizontal();
             }
             void Stack(StackKind kind, object definition, Sprite icon, string name, int count, string description)
@@ -607,7 +613,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(icon);
                 GUILayout.Label(new GUIContent(Fit($"{name} ×{count}", _nameWidth), description), GUILayout.Width(_nameWidth));
-                if (GUILayout.Button(action, GUILayout.Width(64))) Send(moveStack(kind, definition), Sound.Click);
+                if (Ui.LayoutButton(action, GUILayout.Width(64))) Send(moveStack(kind, definition), Sound.Click);
                 GUILayout.EndHorizontal();
             }
             foreach (var pair in contents.Consumables.ToList()) Stack(StackKind.Consumable, pair.Key, Sprites.Icon(pair.Key), pair.Key.Name, pair.Value, pair.Key.Description);
@@ -630,7 +636,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Label(Fit($"조립기: {assembler.Value.Recipe?.Name ?? "정하지 않음"} (조합법의 [조립기에]로 정한다)", _textWidth - 64));
-                if (assembler.Value.Recipe != null && GUILayout.Button("멈추기", GUILayout.Width(56))) Send(_client.SetRecipeCommand(null), Sound.Click);
+                if (assembler.Value.Recipe != null && Ui.LayoutButton("멈추기", GUILayout.Width(56))) Send(_client.SetRecipeCommand(null), Sound.Click);
                 GUILayout.EndHorizontal();
             }
             foreach (var recipe in recipes)
@@ -646,12 +652,12 @@ namespace Game.Client
                 GUILayout.Label(new GUIContent(Fit($"{name}\n{needs}", _recipeWidth), RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
                 int times = _client.CraftableTimes(recipe);
                 GUI.enabled = enabled && times > 0;
-                if (GUILayout.Button("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
+                if (Ui.LayoutButton("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
                 GUI.enabled = enabled && times > 1;
                 int bulk = Mathf.Clamp(times, 2, BulkCraft);
-                if (GUILayout.Button($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), Sound.Craft);
+                if (Ui.LayoutButton($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), Sound.Craft);
                 GUI.enabled = enabled;
-                if (assembler != null && World.Assembles(recipe) && GUILayout.Button("조립기에", GUILayout.Width(72)))
+                if (assembler != null && World.Assembles(recipe) && Ui.LayoutButton("조립기에", GUILayout.Width(72)))
                     Send(_client.SetRecipeCommand(recipe), Sound.Click);
                 GUILayout.EndHorizontal();
             }
@@ -693,7 +699,7 @@ namespace Game.Client
                 Icon(Sprites.Icon(pair.Key));
                 GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
                 // A potion is drunk; a food is eaten, and still gives its buff at full health.
-                if (GUILayout.Button(pair.Key.IsFood ? "먹기" : pair.Key.Recalls ? "쓰기" : "마시기", GUILayout.Width(56)))
+                if (Ui.LayoutButton(pair.Key.IsFood ? "먹기" : pair.Key.Recalls ? "쓰기" : "마시기", GUILayout.Width(56)))
                 {
                     byte[] command = _client.UseConsumableCommand(pair.Key);
                     if (command != null) _send(command);
@@ -732,11 +738,11 @@ namespace Game.Client
                 string key = Controls.UsingTouch ? $"{slot + 1}" : Controls.SkillKeyName(slot);
                 GUILayout.Label(Fit($"{key}  {_client.Skills[slot].Name}", _nameWidth), GUILayout.Width(_nameWidth));
                 GUI.enabled = slot > 0;
-                if (GUILayout.Button("▲", GUILayout.Width(40))) Swap(order, slot, slot - 1);
+                if (Ui.LayoutButton("▲", GUILayout.Width(40))) Swap(order, slot, slot - 1);
                 GUI.enabled = slot < _client.Skills.Count - 1;
-                if (GUILayout.Button("▼", GUILayout.Width(40))) Swap(order, slot, slot + 1);
+                if (Ui.LayoutButton("▼", GUILayout.Width(40))) Swap(order, slot, slot + 1);
                 GUI.enabled = all.Count > _client.Skills.Count;
-                if (GUILayout.Button(_swapSlot == slot ? "그만" : "바꾸기", GUILayout.Width(56))) _swapSlot = _swapSlot == slot ? -1 : slot;
+                if (Ui.LayoutButton(_swapSlot == slot ? "그만" : "바꾸기", GUILayout.Width(56))) _swapSlot = _swapSlot == slot ? -1 : slot;
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
             }
@@ -749,7 +755,7 @@ namespace Game.Client
                 {
                     foreach (var skill in unused)
                     {
-                        if (!GUILayout.Button(Ui.Wrap($"{_swapSlot + 1}번 칸에: {skill.Name} — {skill.Description}", GUI.skin.button, _textWidth))) continue;
+                        if (!Ui.LayoutButton(Ui.Wrap($"{_swapSlot + 1}번 칸에: {skill.Name} — {skill.Description}", GUI.skin.button, _textWidth))) continue;
                         order[_swapSlot] = all.IndexOf(skill);
                         _swapSlot = -1;
                         Send(_client.ClassCommand(_client.Classes, order), Sound.Click);
@@ -769,7 +775,7 @@ namespace Game.Client
                 int picked = _pickedClasses.IndexOf(option.Id);
                 bool full = picked < 0 && _pickedClasses.Count >= ClassRules.DefaultMaxClasses;
                 GUI.enabled = near && !full;
-                if (GUILayout.Button(new GUIContent((picked >= 0 ? $"[{picked + 1}] " : "[ ] ") + option.Name, option.Description)))
+                if (Ui.LayoutButton(new GUIContent((picked >= 0 ? $"[{picked + 1}] " : "[ ] ") + option.Name, option.Description)))
                 {
                     if (picked >= 0) _pickedClasses.RemoveAt(picked);
                     else _pickedClasses.Add(option.Id);
@@ -778,7 +784,7 @@ namespace Game.Client
             }
             bool differs = !_pickedClasses.SequenceEqual(_client.Classes.Select(c => c.Id));
             GUI.enabled = near && differs;
-            if (GUILayout.Button("이대로 바꾸기"))
+            if (Ui.LayoutButton("이대로 바꾸기"))
             {
                 var classes = _pickedClasses.Select(id => _client.AllClasses.First(c => c.Id == id)).ToList();
                 Send(_client.ClassCommand(classes, null), Sound.Buff);
@@ -798,7 +804,7 @@ namespace Game.Client
         void QuickButton(int? slot, Action toggle)
         {
             if (slot == null) return;
-            if (!GUILayout.Button(slot < 0 ? "퀵" : $"퀵{slot + 1}", GUILayout.Width(QuickWidth))) return;
+            if (!Ui.LayoutButton(slot < 0 ? "퀵" : $"퀵{slot + 1}", GUILayout.Width(QuickWidth))) return;
             toggle();
             Sounds.Play(Sound.Click);
         }
@@ -843,7 +849,7 @@ namespace Game.Client
             }
             GUILayout.Label(Fit($"특성 포인트 {_client.PassivePoints}개 (레벨마다 1개). 시작점이나 배운 점과 이어진 점을 배운다.", _textWidth));
             GUILayout.BeginHorizontal();
-            if (_client.Passives.Count > 0 && GUILayout.Button("모두 되돌리기", GUILayout.Width(110))) Send(_client.ResetPassivesCommand(), Sound.Click);
+            if (_client.Passives.Count > 0 && Ui.LayoutButton("모두 되돌리기", GUILayout.Width(110))) Send(_client.ResetPassivesCommand(), Sound.Click);
             GUILayout.EndHorizontal();
 
             if (_pickedPassive != null)
@@ -853,7 +859,7 @@ namespace Game.Client
                 GUILayout.Label(Fit($"{_pickedPassive.Name}{(_pickedPassive.Notable ? " (큰 점)" : "")}{stats}", _textWidth));
                 GUILayout.BeginHorizontal();
                 GUI.enabled = _client.CanAllocate(_pickedPassive);
-                if (GUILayout.Button(taken ? "배움" : "배우기", GUILayout.Width(80))) Send(_client.AllocatePassiveCommand(_pickedPassive), Sound.LevelUp);
+                if (Ui.LayoutButton(taken ? "배움" : "배우기", GUILayout.Width(80))) Send(_client.AllocatePassiveCommand(_pickedPassive), Sound.LevelUp);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
             }
@@ -866,7 +872,7 @@ namespace Game.Client
             foreach (var node in open)
             {
                 string stats = string.Join(", ", node.Modifiers.Select(StatText.Describe));
-                if (GUILayout.Button(Ui.Wrap($"{node.Name}: {stats}", GUI.skin.button, _textWidth))) _pickedPassive = node;
+                if (Ui.LayoutButton(Ui.Wrap($"{node.Name}: {stats}", GUI.skin.button, _textWidth))) _pickedPassive = node;
             }
         }
 
@@ -901,7 +907,7 @@ namespace Game.Client
                     : Taken(node) ? Palette.Worn
                     : _client.CanAllocate(node) ? Color.white
                     : new Color(0.55f, 0.55f, 0.55f);
-                if (GUI.Button(rect, node.IsStart ? "★" : node.Name.Substring(0, 1))) _pickedPassive = node.IsStart ? null : node;
+                if (Ui.Button(rect, node.IsStart ? "★" : node.Name.Substring(0, 1))) _pickedPassive = node.IsStart ? null : node;
                 GUI.color = previous;
             }
         }
@@ -920,7 +926,7 @@ namespace Game.Client
         void RefineButton(Item item)
         {
             if (!_client.NearAnvil) return;
-            if (GUILayout.Button(_refining == item.Id ? "닫기" : "다듬기", GUILayout.Width(56))) _refining = _refining == item.Id ? 0 : item.Id;
+            if (Ui.LayoutButton(_refining == item.Id ? "닫기" : "다듬기", GUILayout.Width(56))) _refining = _refining == item.Id ? 0 : item.Id;
         }
 
         // At the top of the gear page while an anvil is near: what can be done to the picked item and what it costs.
@@ -950,7 +956,7 @@ namespace Game.Client
                 bool can = have >= cost && (metal == null || _client.Bag.CountOf(metal) >= metalCount);
                 string needs = metal == null ? $"정수 {cost}" : $"정수 {cost}, {metal.Name} {metalCount}";
                 GUI.enabled = can;
-                if (GUILayout.Button($"강화 +{item.Upgrade + 1} ({needs})")) Send(_client.RefineCommand(InventoryCommand.Upgrade, item.Id), Sound.Craft);
+                if (Ui.LayoutButton($"강화 +{item.Upgrade + 1} ({needs})")) Send(_client.RefineCommand(InventoryCommand.Upgrade, item.Id), Sound.Craft);
                 GUI.enabled = true;
             }
             else
@@ -959,13 +965,13 @@ namespace Game.Client
             }
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            if (worn == null && GUILayout.Button($"분해 (정수 +{World.SalvageValue(item)})")) Send(_client.RefineCommand(InventoryCommand.Salvage, item.Id), Sound.Break);
+            if (worn == null && Ui.LayoutButton($"분해 (정수 +{World.SalvageValue(item)})")) Send(_client.RefineCommand(InventoryCommand.Salvage, item.Id), Sound.Break);
             GUI.enabled = have >= World.UnsocketEssence;
-            if (item.Sockets.Any(r => r != null) && GUILayout.Button($"룬 빼기 (정수 {World.UnsocketEssence})"))
+            if (item.Sockets.Any(r => r != null) && Ui.LayoutButton($"룬 빼기 (정수 {World.UnsocketEssence})"))
                 Send(_client.RefineCommand(InventoryCommand.Unsocket, item.Id), Sound.Click);
             int reroll = World.RerollCost(item);
             GUI.enabled = have >= reroll;
-            if (reroll > 0 && GUILayout.Button($"접사 다시 (정수 {reroll})")) Send(_client.RefineCommand(InventoryCommand.Reroll, item.Id), Sound.Craft);
+            if (reroll > 0 && Ui.LayoutButton($"접사 다시 (정수 {reroll})")) Send(_client.RefineCommand(InventoryCommand.Reroll, item.Id), Sound.Craft);
             GUI.enabled = true;
             GUILayout.EndHorizontal();
             GUILayout.Space(6);
@@ -975,7 +981,7 @@ namespace Game.Client
         void RuneButton(Item item)
         {
             if (_selectedRune == null || !item.Sockets.Contains(null)) return;
-            if (GUILayout.Button("끼우기", GUILayout.Width(56))) Send(_client.InsertRuneCommand(item.Id, _selectedRune), Sound.Craft);
+            if (Ui.LayoutButton("끼우기", GUILayout.Width(56))) Send(_client.InsertRuneCommand(item.Id, _selectedRune), Sound.Craft);
         }
 
         static string CategoryName(SlotCategory category) => category switch

@@ -73,6 +73,7 @@ namespace Game.Client
             if (_font != null) GUI.skin.font = _font;
             Scale = PixelRatio();
             GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1));
+            StartProbe();
         }
 
         static void LoadFont(bool pixel)
@@ -176,6 +177,128 @@ namespace Game.Client
         {
             Measured.text = text;
             return style.CalcSize(Measured).x;
+        }
+
+        // The buttons the last frame drew, for the cloud's playtests (Playtest.cs): what each said, where it was on the
+        // screen in points, whether it could be pressed, and whether it showed (not scrolled out of its list). Every
+        // button goes through Button, LayoutButton or Toolbar so a playtest can press it with a real click or tap,
+        // as a person would. Kept only while a playtest asks (Probing), and only in repaints, when the rects are real.
+        internal readonly struct Drawn
+        {
+            public Drawn(string label, string row, Rect rect, bool enabled, bool shown)
+            {
+                Label = label;
+                Row = row;
+                Rect = rect;
+                Enabled = enabled;
+                Shown = shown;
+            }
+
+            public string Label { get; }
+            // The text written last before the button (Row): the name of the thing its row is about.
+            public string Row { get; }
+            public Rect Rect { get; }
+            public bool Enabled { get; }
+            public bool Shown { get; }
+        }
+
+        internal static bool Probing { get; set; }
+        internal static IReadOnlyList<Drawn> LastDrawn { get; private set; } = new List<Drawn>();
+        static readonly List<Drawn> Drawing = new List<Drawn>();
+        static readonly Stack<int> ScrollStarts = new Stack<int>();
+        static string _row = "";
+        // GUIUtility.GUIToScreenPoint's units per point (the GUI matrix may or may not be in it).
+        static float _screenPerPoint = 1;
+
+        // At the start of each OnGUI pass (Begin), the last repaint's buttons become the drawn ones.
+        static void StartProbe()
+        {
+            if (!Probing || Event.current.type != EventType.Repaint) return;
+            LastDrawn = Drawing.ToArray();
+            Drawing.Clear();
+            _row = "";
+            ScrollStarts.Clear();
+            _screenPerPoint = Mathf.Max(0.01f, GUIUtility.GUIToScreenPoint(new Vector2(1000, 0)).x / 1000f);
+        }
+
+        static Rect ToPoints(Rect rect)
+        {
+            var min = GUIUtility.GUIToScreenPoint(rect.min) / _screenPerPoint;
+            var max = GUIUtility.GUIToScreenPoint(rect.max) / _screenPerPoint;
+            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+        }
+
+        internal static void Probe(string label, Rect rect)
+        {
+            if (Probing && Event.current.type == EventType.Repaint) Drawing.Add(new Drawn(label, _row, ToPoints(rect), GUI.enabled, true));
+        }
+
+        // Notes the text a row starts with, for the buttons after it.
+        internal static void Row(string text)
+        {
+            if (Probing && Event.current.type == EventType.Repaint) _row = text ?? "";
+        }
+
+        public static bool Button(Rect rect, string text)
+        {
+            Probe(text, rect);
+            return GUI.Button(rect, text);
+        }
+
+        public static bool LayoutButton(string text, params GUILayoutOption[] options)
+        {
+            bool pressed = GUILayout.Button(text, options);
+            Probe(text, GUILayoutUtility.GetLastRect());
+            return pressed;
+        }
+
+        public static bool LayoutButton(string text, GUIStyle style, params GUILayoutOption[] options)
+        {
+            bool pressed = GUILayout.Button(text, style, options);
+            Probe(text, GUILayoutUtility.GetLastRect());
+            return pressed;
+        }
+
+        public static bool LayoutButton(GUIContent content, params GUILayoutOption[] options)
+        {
+            bool pressed = GUILayout.Button(content, options);
+            Probe(content.text, GUILayoutUtility.GetLastRect());
+            return pressed;
+        }
+
+        public static int Toolbar(int selected, string[] texts, params GUILayoutOption[] options)
+        {
+            int chosen = GUILayout.Toolbar(selected, texts, options);
+            var row = GUILayoutUtility.GetLastRect();
+            float width = row.width / Mathf.Max(1, texts.Length);
+            for (int i = 0; i < texts.Length; i++) Probe(texts[i], new Rect(row.x + i * width, row.y, width, row.height));
+            return chosen;
+        }
+
+        public static Vector2 BeginScrollView(Vector2 position, params GUILayoutOption[] options)
+        {
+            ScrollStarts.Push(Drawing.Count);
+            return GUILayout.BeginScrollView(position, options);
+        }
+
+        public static Vector2 BeginScrollView(Vector2 position, GUIStyle horizontal, GUIStyle vertical, params GUILayoutOption[] options)
+        {
+            ScrollStarts.Push(Drawing.Count);
+            return GUILayout.BeginScrollView(position, horizontal, vertical, options);
+        }
+
+        // Buttons scrolled out of the list's view do not show.
+        public static void EndScrollView()
+        {
+            GUILayout.EndScrollView();
+            int start = ScrollStarts.Count > 0 ? ScrollStarts.Pop() : Drawing.Count;
+            if (!Probing || Event.current.type != EventType.Repaint) return;
+            var view = ToPoints(GUILayoutUtility.GetLastRect());
+            for (int i = start; i < Drawing.Count; i++)
+            {
+                var drawn = Drawing[i];
+                if (!view.Contains(drawn.Rect.center)) Drawing[i] = new Drawn(drawn.Label, drawn.Row, drawn.Rect, drawn.Enabled, false);
+            }
         }
 
         // Screen pixels as cameras and touches give them (origin bottom left) to GUI points (origin top left).

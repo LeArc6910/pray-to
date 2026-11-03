@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
 using Calendar = Game.Core.Calendar;
 using System.Linq;
@@ -12,16 +13,28 @@ namespace Game.Client
     // calls unityInstance.SendMessage("Game", "Playtest", "<commands>") with commands split by ';', and each answers
     // with a "[playtest] ..." line in the browser console, which the harness reads. They set a solo game's world up
     // the way the play mode scenes do (Assets/Tests/PlayMode/FeatureTests.cs), so a picture of any feature can be
-    // taken without playing up to it. Only in a solo game: never in one other people are in.
+    // taken without playing up to it, and they read back what the screen shows (its buttons, the HUD's lines), so
+    // the harness can press the real buttons with real clicks and taps. Changing the world only in a solo game:
+    // never in one other people are in.
     //
-    //   solo                      start a solo game in a fresh world named "playtest"
+    // Anywhere:
+    //   solo [name] [keep]        start a solo game; a fresh world and character unless "keep"
+    //   probe on|off              keep the drawn buttons (Ui.LastDrawn) for "buttons"
+    //   buttons                   JSON: every button drawn last frame, with its rect in points; the skill and quick slots
+    //   texts                     JSON: the HUD's lines, the corner lines, the banner, the menu's status line
+    //   touch on|off              report (JSON: the player, the time, the monsters, the machines, the screen)
+    // In a solo game:
     //   scene combo|machines|defense|rift|skylight|set
-    //   clock <day> <hour>        weather clear|rain|storm|fog
-    //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal
-    //   equip <base> ...          clear (the monsters nearby fall)
-    //   spawn <monster> <dx> <dy> [health]
-    //   attack on|off [x y]       skill <slot>   touch on|off   bag on|off
-    //   report                    one line of JSON: the player, the time, the monsters, the machines, the screen
+    //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step, 0 pauses>
+    //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
+    //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>
+    //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health>
+    //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
+    //   goto spawn | <dx> <dy> | boss <id> | biome <name> | tile <type> | near <type>
+    //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
+    //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
+    //   inventory                 JSON: the bag
+    //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off
     static class Playtest
     {
         const string Name = "playtest";
@@ -51,26 +64,39 @@ namespace Game.Client
 
         static string Do(GameRoot root, string[] words)
         {
-            if (words[0] == "solo")
+            switch (words[0])
             {
-                if (root.Playing) return "error solo: already playing";
-                SaveStore.Delete(SaveStore.WorldKey(Name));
-                SaveStore.Delete(SaveStore.CharacterKey(Name));
-                root.PlayerName = Name;
-                root.WorldNameField = Name;
-                root.StartSolo();
-                return null;
+                case "solo":
+                    if (root.Playing) return "error solo: already playing";
+                    string name = words.Length > 1 ? words[1] : Name;
+                    if (!words.Contains("keep"))
+                    {
+                        SaveStore.Delete(SaveStore.WorldKey(name));
+                        SaveStore.Delete(SaveStore.CharacterKey(name));
+                    }
+                    root.PlayerName = name;
+                    root.WorldNameField = name;
+                    root.StartSolo();
+                    return null;
+                case "touch":
+                    Controls.ForceTouch(words[1] == "on");
+                    return null;
+                case "probe":
+                    Ui.Probing = words[1] == "on";
+                    return null;
+                case "buttons":
+                    return "buttons " + Buttons(root);
+                case "texts":
+                    return "texts " + Texts(root);
+                case "report":
+                    return "report " + Report(root);
             }
-            if (words[0] == "touch")
-            {
-                Controls.ForceTouch(words[1] == "on");
-                return null;
-            }
-            if (words[0] == "report") return "report " + Report(root);
             if (!root.Playing || !root.IsSolo || root.HostWorld == null) return $"error {words[0]}: not in a solo game";
 
             var world = root.HostWorld;
             var player = root.HostPlayer;
+            var loot = root.LootSheet;
+            int px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
             switch (words[0])
             {
                 case "scene":
@@ -87,12 +113,15 @@ namespace Game.Client
                     int day = Enumerable.Range(2, 400).First(d => World.WeatherOf(d) == weather);
                     world.RestoreClock((long)((day - 1 + 7 / 24f) * Calendar.TicksPerDay));
                     return $"ok weather {weather} on day {day}";
+                case "speed":
+                    root.HostTicksPerStep = Mathf.Clamp(Int(words[1]), 0, 60);
+                    return null;
                 case "give":
-                    player.Inventory.AddMaterial(root.LootSheet.FindMaterial(words[1]), Int(words[2]));
+                    player.Inventory.AddMaterial(loot.FindMaterial(words[1]) ?? throw new ArgumentException($"no material '{words[1]}'"), Int(words[2]));
                     player.InventoryVersion++;
                     return null;
                 case "potion":
-                    player.Inventory.AddConsumable(root.LootSheet.Consumables.First(c => c.Id == words[1]), Int(words[2]));
+                    player.Inventory.AddConsumable(Consumable(loot, words[1]), Int(words[2]));
                     player.InventoryVersion++;
                     return null;
                 case "mana":
@@ -102,27 +131,68 @@ namespace Game.Client
                     player.Health = player.Stats.MaxHealth;
                     player.Mana = player.Stats.MaxMana;
                     return null;
+                case "hurt":
+                    world.Hurt(player, Float(words[1]));
+                    return null;
+                case "xp":
+                    world.GainExperience(player, Int(words[1]));
+                    return null;
                 case "clear":
                     foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
                     return null;
                 case "equip":
                     // Each base given at its best plain rolls, worn at once whatever its level.
-                    foreach (string id in words.Skip(1))
-                    {
-                        var itemBase = root.LootSheet.FindBase(id);
-                        var implicits = itemBase.Implicits.Select(r => new Modifier(r.Stat, r.Kind, r.Max, r.Tags)).ToList();
-                        player.Equip(new Item(itemBase, itemBase.Level, Rarity.Rare, implicits, Array.Empty<ItemAffix>(), 0));
-                    }
+                    foreach (string id in words.Skip(1)) player.Equip(Plain(loot, id, Rarity.Rare, 0));
                     return null;
                 case "drink":
-                    return world.UseConsumable(player.Id, root.LootSheet.Consumables.First(c => c.Id == words[1])) ? null : $"error drink {words[1]}: refused";
+                    return world.UseConsumable(player.Id, Consumable(loot, words[1])) ? null : $"error drink {words[1]}: refused";
                 case "spawn":
-                    var enemy = world.SpawnEnemy(root.MonsterSheet.Find(words[1]), player.Position + new Vec2(Float(words[2]), Float(words[3])));
+                    var enemy = world.SpawnEnemy(root.MonsterSheet.Find(words[1]) ?? throw new ArgumentException($"no monster '{words[1]}'"),
+                        player.Position + new Vec2(Float(words[2]), Float(words[3])));
                     if (words.Length > 4) enemy.MaxHealth = enemy.Health = Float(words[4]);
                     return null;
+                case "boss":
+                    var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[1]) ?? throw new ArgumentException($"no boss '{words[1]}' standing");
+                    if (words[2] == "hurt") world.Hurt(boss, Math.Max(1, (int)(boss.MaxHealth * Float(words[3]))));
+                    return null;
+                case "drop":
+                    Drop(root, words);
+                    return null;
+                case "goto":
+                    return Goto(root, words);
+                case "build":
+                    var type = Tile(words[1]);
+                    int bx = px + Int(words[2]), by = py + Int(words[3]);
+                    world.Build(bx, by, type);
+                    if (words.Length > 4)
+                    {
+                        var machine = world.MachineAt(bx, by);
+                        if (machine != null) machine.Direction = Int(words[4]) & 3;
+                    }
+                    return null;
+                case "fill":
+                    int fx = px + Int(words[1]), fy = py + Int(words[2]);
+                    var material = loot.FindMaterial(words[3]) ?? throw new ArgumentException($"no material '{words[3]}'");
+                    int count = Int(words[4]);
+                    var chest = world.ChestAt(fx, fy);
+                    if (chest != null) chest.AddMaterial(material, count);
+                    else
+                    {
+                        var machine = world.MachineAt(fx, fy) ?? throw new ArgumentException($"nothing to fill at {fx},{fy}");
+                        machine.Input[material] = machine.Input.TryGetValue(material, out int had) ? had + count : count;
+                    }
+                    return null;
+                case "look":
+                    return "look " + Look(root, px + Int(words[1]), py + Int(words[2]));
+                case "inventory":
+                    return "inventory " + Inventory(player);
                 case "attack":
                     root.HoldAttack = words[1] == "on";
                     if (words.Length > 3) root.HeldAim = new Vec2(Float(words[2]), Float(words[3]));
+                    return null;
+                case "face":
+                    root.AimHeld = words[1] != "off";
+                    if (root.AimHeld) root.HeldAim = new Vec2(Float(words[1]), Float(words[2]));
                     return null;
                 case "skill":
                     return root.UseSkill(Int(words[1])) ? null : $"error skill {words[1]}: not ready";
@@ -132,6 +202,116 @@ namespace Game.Client
                 default:
                     return $"error {words[0]}: no such command";
             }
+        }
+
+        static TileType Tile(string name) => (TileType)Enum.Parse(typeof(TileType), name, ignoreCase: true);
+
+        static ConsumableDefinition Consumable(LootData loot, string id) =>
+            loot.Consumables.FirstOrDefault(c => c.Id == id) ?? throw new ArgumentException($"no consumable '{id}'");
+
+        static Item Plain(LootData loot, string id, Rarity rarity, int sockets)
+        {
+            var itemBase = loot.FindBase(id) ?? throw new ArgumentException($"no item base '{id}'");
+            var implicits = itemBase.Implicits.Select(r => new Modifier(r.Stat, r.Kind, r.Max, r.Tags)).ToList();
+            return new Item(itemBase, itemBase.Level, rarity, implicits, Array.Empty<ItemAffix>(), sockets);
+        }
+
+        // Things on the ground a step ahead of the player, to walk onto or be picked up.
+        static void Drop(GameRoot root, string[] words)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var loot = root.LootSheet;
+            var at = player.Position + new Vec2(0.6f, 0);
+            switch (words[1])
+            {
+                case "item":
+                    var rarity = words.Length > 3 ? (Rarity)Enum.Parse(typeof(Rarity), words[3], ignoreCase: true) : Rarity.Rare;
+                    world.DropItem(Plain(loot, words[2], rarity, words.Length > 4 ? Int(words[4]) : 0), at);
+                    break;
+                case "rune":
+                    world.DropRune(new LootGenerator(loot).RollRune(1, new GameRandom(5)), at);
+                    break;
+                case "potion":
+                    world.DropConsumable(Consumable(loot, words[2]), at);
+                    break;
+                case "material":
+                    world.DropMaterial(loot.FindMaterial(words[2]) ?? throw new ArgumentException($"no material '{words[2]}'"), at);
+                    break;
+                default:
+                    throw new ArgumentException($"no drop '{words[1]}'");
+            }
+        }
+
+        static bool Walkable(TileMap map, int x, int y) =>
+            map.InBounds(x, y) && !map.IsSolid(x, y) && map[x, y] != TileType.Water && map[x, y] != TileType.Lava;
+
+        // Moves the player, as recalling does. To a boss's arena (beside it, so it wakes), into a biome (the open
+        // floor in it nearest the spawn), onto the nearest tile of a type, or beside it facing it ("near").
+        static string Goto(GameRoot root, string[] words)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var map = world.Map;
+            int px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
+            Vec2 to;
+            switch (words[1])
+            {
+                case "spawn":
+                    to = world.Spawn;
+                    break;
+                case "boss":
+                    var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[2]) ?? throw new ArgumentException($"no boss '{words[2]}' standing");
+                    to = Nearest(map, TileMap.Cell(boss.Home.X), TileMap.Cell(boss.Home.Y) - 4, (x, y) => Walkable(map, x, y))
+                        ?? throw new InvalidOperationException("no floor in the arena");
+                    break;
+                case "biome":
+                    var biome = (Biome)Enum.Parse(typeof(Biome), words[2], ignoreCase: true);
+                    // Open floor with open floor all round, so the player can move and things can be built there.
+                    to = Nearest(map, TileMap.Cell(world.Spawn.X), TileMap.Cell(world.Spawn.Y),
+                        (x, y) => world.Biomes[x, y] == biome && Enumerable.Range(-1, 3).All(dx => Enumerable.Range(-1, 3).All(dy => Walkable(map, x + dx, y + dy))))
+                        ?? throw new InvalidOperationException($"no open floor in {biome}");
+                    break;
+                case "tile":
+                    var onto = Tile(words[2]);
+                    to = Nearest(map, px, py, (x, y) => map[x, y] == onto) ?? throw new InvalidOperationException($"no {onto} tile");
+                    break;
+                case "near":
+                    var type = Tile(words[2]);
+                    var target = Nearest(map, px, py, (x, y) => map[x, y] == type) ?? throw new InvalidOperationException($"no {type} tile");
+                    int tx = TileMap.Cell(target.X), ty = TileMap.Cell(target.Y);
+                    var beside = new[] { (0, -1), (1, 0), (-1, 0), (0, 1) }.Where(s => Walkable(map, tx + s.Item1, ty + s.Item2)).ToList();
+                    if (beside.Count == 0) throw new InvalidOperationException($"nowhere to stand beside {type}");
+                    to = TileMap.Center(tx + beside[0].Item1, ty + beside[0].Item2);
+                    root.AimHeld = true;
+                    root.HeldAim = new Vec2(-beside[0].Item1, -beside[0].Item2);
+                    break;
+                default:
+                    to = TileMap.Center(px + Int(words[1]), py + Int(words[2]));
+                    break;
+            }
+            player.Position = to;
+            player.Corrections++;
+            return $"ok goto {words[1]} at {TileMap.Cell(to.X)},{TileMap.Cell(to.Y)}";
+        }
+
+        // The tile nearest (x, y), by rings outward, that passes the test.
+        static Vec2? Nearest(TileMap map, int x, int y, Func<int, int, bool> test)
+        {
+            int reach = Math.Max(map.Width, map.Height);
+            for (int ring = 0; ring < reach; ring++)
+            {
+                for (int dx = -ring; dx <= ring; dx++)
+                {
+                    for (int dy = -ring; dy <= ring; dy++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != ring) continue;
+                        int cx = x + dx, cy = y + dy;
+                        if (map.InBounds(cx, cy) && test(cx, cy)) return TileMap.Center(cx, cy);
+                    }
+                }
+            }
+            return null;
         }
 
         // The play mode scenes (FeatureTests), laid around the player.
@@ -208,63 +388,226 @@ namespace Game.Client
             }
         }
 
+        // A small JSON writer for the answers.
+        sealed class Json
+        {
+            readonly StringBuilder _text = new StringBuilder();
+            bool _first = true;
+
+            public Json(char open)
+            {
+                _text.Append(open);
+            }
+
+            public static string Quote(string s) =>
+                "\"" + (s ?? "").Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "").Replace("\u00A0", " ") + "\"";
+
+            static string Value(object value) => value switch
+            {
+                null => "null",
+                bool b => b ? "true" : "false",
+                string s => Quote(s),
+                float f => f.ToString("0.##", CultureInfo.InvariantCulture),
+                double d => d.ToString("0.##", CultureInfo.InvariantCulture),
+                RawJson raw => raw.Text,
+                _ => Convert.ToString(value, CultureInfo.InvariantCulture),
+            };
+
+            public Json Field(string name, object value)
+            {
+                if (!_first) _text.Append(',');
+                _first = false;
+                _text.Append(Quote(name)).Append(':').Append(Value(value));
+                return this;
+            }
+
+            public Json Item(object value)
+            {
+                if (!_first) _text.Append(',');
+                _first = false;
+                _text.Append(Value(value));
+                return this;
+            }
+
+            public string Close(char close) => _text.Append(close).ToString();
+
+            public RawJson Raw(char close) => new RawJson(Close(close));
+        }
+
+        sealed class RawJson
+        {
+            public RawJson(string text)
+            {
+                Text = text;
+            }
+
+            public string Text { get; }
+        }
+
+        static RawJson Rect(Rect rect) =>
+            new Json('[').Item(rect.x).Item(rect.y).Item(rect.width).Item(rect.height).Raw(']');
+
+        static RawJson Strings(IEnumerable<string> lines)
+        {
+            var list = new Json('[');
+            foreach (string line in lines) list.Item(line);
+            return list.Raw(']');
+        }
+
+        static RawJson Counts<T>(IEnumerable<KeyValuePair<T, int>> pairs, Func<T, string> id)
+        {
+            var map = new Json('{');
+            foreach (var pair in pairs) map.Field(id(pair.Key), pair.Value);
+            return map.Raw('}');
+        }
+
+        // Every button the last frame drew: its label, its rect in points, whether it could be pressed and whether
+        // it showed. The skill and quick slots (drawn as panels, pressed through Controls) come as "skill N",
+        // "potion" and "quick N". The screen's size in points comes along, to turn points into the page's pixels.
+        static string Buttons(GameRoot root)
+        {
+            var list = new Json('[');
+            foreach (var drawn in Ui.LastDrawn)
+            {
+                list.Item(new Json('{').Field("label", drawn.Label).Field("row", drawn.Row.Replace('\n', ' ')).Field("rect", Rect(drawn.Rect)).Field("enabled", drawn.Enabled).Field("shown", drawn.Shown).Raw('}'));
+            }
+            if (root.Playing && !root.BagOpen && !root.MapOpen)
+            {
+                int skills = root.SkillCount;
+                for (int slot = 0; slot <= skills; slot++)
+                {
+                    string label = slot == skills ? "potion" : $"skill {slot}";
+                    list.Item(new Json('{').Field("label", label).Field("rect", Rect(SkillBar.Area(slot, skills))).Field("enabled", true).Field("shown", true).Raw('}'));
+                }
+                for (int slot = 0; slot < Hotbar.Slots; slot++)
+                {
+                    list.Item(new Json('{').Field("label", $"quick {slot}").Field("rect", Rect(Hotbar.Area(slot, skills))).Field("enabled", true).Field("shown", true).Raw('}'));
+                }
+            }
+            return new Json('{').Field("width", Ui.Width).Field("height", Ui.Height).Field("buttons", list.Raw(']')).Close('}');
+        }
+
+        static string Texts(GameRoot root) =>
+            new Json('{')
+                .Field("hud", Strings(root.HudLines.Select(l => l.Replace('\n', ' '))))
+                .Field("acquired", Strings(root.AcquiredLines))
+                .Field("banner", root.Banner)
+                .Field("floating", Strings(root.FloatingTexts))
+                .Field("status", root.Status)
+                .Close('}');
+
+        static string Inventory(Player player)
+        {
+            var items = new Json('[');
+            foreach (var item in player.Inventory.Items) items.Item(new Json('{').Field("id", item.Id).Field("base", item.Base.Id).Field("upgrade", item.Upgrade).Raw('}'));
+            var worn = new Json('{');
+            foreach (ItemSlot slot in Enum.GetValues(typeof(ItemSlot)))
+            {
+                var item = player.Equipment[slot];
+                if (item != null) worn.Field(slot.ToString(), item.Base.Id);
+            }
+            return new Json('{')
+                .Field("items", items.Raw(']'))
+                .Field("worn", worn.Raw('}'))
+                .Field("materials", Counts(player.Inventory.Materials, m => m.Id))
+                .Field("consumables", Counts(player.Inventory.Consumables, c => c.Id))
+                .Field("runes", player.Inventory.Runes.Values.Sum())
+                .Field("classes", string.Join(",", player.Classes.Select(c => c.Id)))
+                .Field("skills", string.Join(",", player.Skills.Select(s => s.Id)))
+                .Field("passives", player.Passives.Count)
+                .Field("friends", Counts(player.Friendships.Select(f => new KeyValuePair<string, int>(f.Key, f.Value.Points)), id => id))
+                .Field("life", string.Join(",", player.LifeExperience))
+                .Close('}');
+        }
+
+        static string Look(GameRoot root, int x, int y)
+        {
+            var world = root.HostWorld;
+            var json = new Json('{').Field("x", x).Field("y", y).Field("tile", world.Map[x, y].ToString()).Field("biome", world.Biomes[x, y].ToString());
+            var machine = world.MachineAt(x, y);
+            if (machine != null)
+            {
+                json.Field("machine", new Json('{')
+                    .Field("kind", machine.Kind.ToString())
+                    .Field("direction", machine.Direction)
+                    .Field("enabled", machine.Enabled)
+                    .Field("powered", world.IsPowered(machine))
+                    .Field("input", Counts(machine.Inputs, m => m.Id))
+                    .Field("output", Counts(machine.Outputs, m => m.Id))
+                    .Field("picks", string.Join(",", machine.Settings.Select(m => m.Id)))
+                    .Field("recipe", machine.Recipe?.Id)
+                    .Raw('}'));
+            }
+            var chest = world.ChestAt(x, y);
+            if (chest != null) json.Field("chest", Counts(chest.Materials, m => m.Id));
+            var crop = world.CropAt(x, y);
+            if (crop != null)
+            {
+                json.Field("crop", new Json('{')
+                    .Field("id", crop.Definition.Id)
+                    .Field("growth", crop.Growth(world.Tick))
+                    .Field("ripe", crop.IsRipe(world.Tick))
+                    .Field("wet", crop.IsWet(world.Tick))
+                    .Raw('}'));
+            }
+            return json.Close('}');
+        }
+
         // What a check needs to know, as one line of JSON.
         static string Report(GameRoot root)
         {
-            var json = new StringBuilder("{");
-            void Field(string name, object value)
-            {
-                if (json.Length > 1) json.Append(',');
-                json.Append('"').Append(name).Append("\":");
-                switch (value)
-                {
-                    case null:
-                        json.Append("null");
-                        break;
-                    case bool b:
-                        json.Append(b ? "true" : "false");
-                        break;
-                    case string s:
-                        json.Append('"').Append(s.Replace("\\", "\\\\").Replace("\"", "\\\"")).Append('"');
-                        break;
-                    case float f:
-                        json.Append(f.ToString("0.##", CultureInfo.InvariantCulture));
-                        break;
-                    default:
-                        json.Append(Convert.ToString(value, CultureInfo.InvariantCulture));
-                        break;
-                }
-            }
-            Field("playing", root.Playing);
-            Field("screen", $"{Ui.Width:0}x{Ui.Height:0}");
-            Field("touch", Controls.UsingTouch);
-            Field("bag", root.BagOpen);
+            var json = new Json('{');
+            json.Field("playing", root.Playing);
+            json.Field("screen", $"{Ui.Width:0}x{Ui.Height:0}");
+            json.Field("touch", Controls.UsingTouch);
+            json.Field("bag", root.BagOpen);
+            json.Field("map", root.MapOpen);
+            json.Field("speed", root.HostTicksPerStep);
             var world = root.HostWorld;
             var player = root.HostPlayer;
             if (world != null && player != null)
             {
-                Field("x", player.Position.X);
-                Field("y", player.Position.Y);
-                Field("health", player.Health);
-                Field("maxHealth", player.Stats.MaxHealth);
-                Field("mana", player.Mana);
-                Field("maxMana", player.Stats.MaxMana);
-                Field("level", player.Level);
-                Field("combo", player.ComboStep);
-                Field("weapon", player.Equipment[ItemSlot.Weapon]?.Base.Id);
-                Field("day", world.Today);
-                Field("clock", Calendar.Text(world.Clock));
-                Field("weather", world.WeatherToday.ToString());
-                Field("event", world.EventToday.ToString());
+                json.Field("x", player.Position.X);
+                json.Field("y", player.Position.Y);
+                json.Field("spawnX", world.Spawn.X);
+                json.Field("spawnY", world.Spawn.Y);
+                var (ax, ay) = World.TileAhead(player.Position, player.Facing);
+                json.Field("ahead", world.Map[ax, ay].ToString());
+                json.Field("biome", world.Biomes.At(player.Position).ToString());
+                json.Field("health", player.Health);
+                json.Field("maxHealth", player.Stats.MaxHealth);
+                json.Field("dead", player.IsDead);
+                json.Field("mana", player.Mana);
+                json.Field("maxMana", player.Stats.MaxMana);
+                json.Field("level", player.Level);
+                json.Field("experience", player.Experience);
+                json.Field("attacking", player.Attacking);
+                json.Field("combo", player.ComboStep);
+                json.Field("weapon", player.Equipment[ItemSlot.Weapon]?.Base.Id);
+                json.Field("day", world.Today);
+                json.Field("clock", Calendar.Text(world.Clock));
+                json.Field("weather", world.WeatherToday.ToString());
+                json.Field("event", world.EventToday.ToString());
+                var line = player.Fishing;
+                if (line != null)
+                {
+                    int fishing = LifeSkills.LevelOf(player.LifeExperience[(int)LifeSkill.Fishing]);
+                    float gauge = World.GaugeAt(line.BiteElapsed, line.Difficulty);
+                    json.Field("fishing", line.BiteTicks > 0 ? (World.InCatchZone(gauge, line.Difficulty, fishing) ? "bite in" : "bite out") : "wait");
+                }
                 var near = world.Enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) < 12).ToList();
-                Field("monsters", near.Count);
-                Field("hurtMonsters", near.Count(e => e.Health < e.MaxHealth));
+                json.Field("monsters", near.Count);
+                json.Field("monsterKinds", string.Join(",", near.Select(e => e.Definition.Id).Distinct()));
+                json.Field("hurtMonsters", near.Count(e => e.Health < e.MaxHealth));
+                json.Field("projectiles", world.Projectiles.Count(p => p.Source == player.Id));
+                json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
                 var machines = world.Machines.Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), player.Position) < 12).ToList();
-                Field("machines", string.Join(" ", machines.Select(m => $"{m.Kind}{(world.IsPowered(m) ? "+" : "")}")));
-                Field("defense", world.ActiveDefense == null ? null : $"wave {world.ActiveDefense.Wave} stone {world.ActiveDefense.StoneHealth:0}/{world.ActiveDefense.MaxStoneHealth:0}");
-                Field("rift", world.ActiveRift == null ? null : $"tier {world.ActiveRift.Tier} wave {world.ActiveRift.Wave}");
+                json.Field("machines", string.Join(" ", machines.Select(m => $"{m.Kind}{(world.IsPowered(m) ? "+" : "")}{(m.Enabled ? "" : "-off")}")));
+                json.Field("bosses", string.Join(" ", world.Bosses.Select(b => $"{b.Definition.Id}:{b.Health:0}/{b.MaxHealth:0}:p{b.Phase}:{b.State}")));
+                json.Field("defense", world.ActiveDefense == null ? null : $"wave {world.ActiveDefense.Wave} stone {world.ActiveDefense.StoneHealth:0}/{world.ActiveDefense.MaxStoneHealth:0}");
+                json.Field("rift", world.ActiveRift == null ? null : $"tier {world.ActiveRift.Tier} wave {world.ActiveRift.Wave}");
             }
-            return json.Append('}').ToString();
+            return json.Close('}');
         }
     }
 }

@@ -49,8 +49,8 @@ namespace Game.Client
                     ? "캐릭터와 월드를 파일로 내려받아 두거나 다른 기기로 옮긴다. 브라우저 데이터를 지우면 웹의 저장본도 사라지니 가끔 [전부 내보내기]로 남겨 둔다."
                     : "캐릭터와 월드를 파일로 내보내 두거나 다른 기기로 옮긴다.", label, width));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("전부 내보내기")) Act(() => Export(_keys, "전부 " + DateTime.Now.ToString("yyyy-MM-dd HHmm")));
-            if (GUILayout.Button(_folderOpen ? "가져오기 닫기" : "가져오기")) Act(Import);
+            if (Ui.LayoutButton("전부 내보내기")) Act(() => Export(_keys, "전부 " + DateTime.Now.ToString("yyyy-MM-dd HHmm")));
+            if (Ui.LayoutButton(_folderOpen ? "가져오기 닫기" : "가져오기")) Act(Import);
             GUILayout.EndHorizontal();
             if (_message.Length > 0) GUILayout.Label(Ui.Wrap(_message, label, width));
             if (_incoming != null) DrawClashes(width);
@@ -82,7 +82,7 @@ namespace Game.Client
             GUILayout.Label(Ui.Wrap(picked ? $"{name} (고름)" : name, GUI.skin.label, width));
             GUILayout.BeginHorizontal();
             GUI.enabled = !picked;
-            if (GUILayout.Button("고르기"))
+            if (Ui.LayoutButton("고르기"))
             {
                 Act(() =>
                 {
@@ -91,9 +91,9 @@ namespace Game.Client
                 });
             }
             GUI.enabled = true;
-            if (GUILayout.Button("내보내기")) Act(export);
+            if (Ui.LayoutButton("내보내기")) Act(export);
             bool confirming = _confirmDelete == key;
-            if (GUILayout.Button(confirming ? "정말 지우기" : "지우기"))
+            if (Ui.LayoutButton(confirming ? "정말 지우기" : "지우기"))
             {
                 Act(() =>
                 {
@@ -116,8 +116,8 @@ namespace Game.Client
         {
             GUILayout.Label(Ui.Wrap($"이미 있는 저장본을 바꾼다: {SaveTransfer.Describe(_clashes)}", GUI.skin.label, width));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("덮어쓰고 가져오기")) Act(Bring);
-            if (GUILayout.Button("그만두기"))
+            if (Ui.LayoutButton("덮어쓰고 가져오기")) Act(Bring);
+            if (Ui.LayoutButton("그만두기"))
             {
                 Act(() =>
                 {
@@ -134,13 +134,13 @@ namespace Game.Client
         {
             GUILayout.Label(Ui.Wrap($"이 폴더에 넣은 {SaveTransfer.Extension} 파일을 가져온다: {SaveTransfer.Folder}", GUI.skin.label, width));
             GUILayout.BeginHorizontal();
-            if (GUILayout.Button("폴더 열기")) SaveTransfer.OpenFolder();
-            if (GUILayout.Button("목록 새로")) Act(() => _folderFiles = SaveTransfer.FilesInFolder());
+            if (Ui.LayoutButton("폴더 열기")) SaveTransfer.OpenFolder();
+            if (Ui.LayoutButton("목록 새로")) Act(() => _folderFiles = SaveTransfer.FilesInFolder());
             GUILayout.EndHorizontal();
             if (_folderFiles.Count == 0) GUILayout.Label(Ui.Wrap("폴더에 저장 파일이 없다.", GUI.skin.label, width));
             foreach (string path in _folderFiles)
             {
-                if (GUILayout.Button(Ui.Wrap(Path.GetFileName(path), GUI.skin.button, width))) Act(() => ReadFile(path));
+                if (Ui.LayoutButton(Ui.Wrap(Path.GetFileName(path), GUI.skin.button, width))) Act(() => ReadFile(path));
             }
         }
 

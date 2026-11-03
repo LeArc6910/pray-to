@@ -130,6 +130,7 @@ namespace Game.Client
             float bottom = Mathf.Clamp(_client.Position.Y - half, 0, Mathf.Max(0, _map.Height - MinimapTiles));
             var window = new Rect(left, bottom, MinimapTiles, MinimapTiles);
             DrawTiles(area, window);
+            Ui.Probe("지도", area);
             if (GUI.Button(area, GUIContent.none, GUIStyle.none)) FullOpen = true;
         }
 
@@ -152,6 +153,7 @@ namespace Game.Client
             string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
             GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
             GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나");
+            Ui.Probe("지도 닫기", screen);
             if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
         }
 

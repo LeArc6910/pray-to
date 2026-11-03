@@ -489,6 +489,15 @@ namespace Game.Core
             player.Health = Math.Min(player.Stats.MaxHealth, player.Health + amount);
         }
 
+        // For the cloud's playtests (Client/Playtest.cs): a hit on a player past armor, or on a boss, as a fight would
+        // land it, so falling, a boss's phases and its drops happen the usual way.
+        internal int Hurt(Player player, float damage) => HurtPlayer(player, 0, damage, armor: false);
+
+        internal void Hurt(Boss boss, int amount)
+        {
+            if (!boss.IsDead) DamageBoss(boss, 0, amount, false);
+        }
+
         // Returns the damage dealt. A burn's damage is not lessened by armor.
         int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true)
         {
