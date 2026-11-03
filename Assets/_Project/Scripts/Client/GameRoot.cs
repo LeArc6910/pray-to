@@ -996,6 +996,7 @@ namespace Game.Client
                 _menuScroll.y = wide ? 0 : _sideTop;
                 _scrollToSide = false;
             }
+            Ui.TouchScroll(area, ref _menuScroll);
             GUILayout.BeginArea(area, GUI.skin.box);
             _menuScroll = Ui.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
             if (wide) GUILayout.BeginHorizontal();

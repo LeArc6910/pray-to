@@ -93,6 +93,7 @@ namespace Game.Client
             _recipeWidth = _textWidth - IconRoom - 120;
             Controls.Block(area);
             Wheel(area);
+            Ui.TouchScroll(area, ref _scroll[(int)_page]);
             GUILayout.BeginArea(area, GUI.skin.box);
             string close = Controls.UsingTouch ? "가방 버튼으로 닫기" : "Tab 또는 I로 닫기";
             // Without room beside the window the hint goes in the title, so nothing sits over the list.

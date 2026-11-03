@@ -207,8 +207,6 @@ namespace Game.Client
         static readonly List<Drawn> Drawing = new List<Drawn>();
         static readonly Stack<int> ScrollStarts = new Stack<int>();
         static string _row = "";
-        // GUIUtility.GUIToScreenPoint's units per point (the GUI matrix may or may not be in it).
-        static float _screenPerPoint = 1;
 
         // At the start of each OnGUI pass (Begin), the last repaint's buttons become the drawn ones.
         static void StartProbe()
@@ -218,14 +216,16 @@ namespace Game.Client
             Drawing.Clear();
             _row = "";
             ScrollStarts.Clear();
-            _screenPerPoint = Mathf.Max(0.01f, GUIUtility.GUIToScreenPoint(new Vector2(1000, 0)).x / 1000f);
         }
 
+        // A rect in the current group or list to points on the screen. GUIUtility.GUIToScreenPoint scales a point by
+        // the GUI matrix but adds the groups' and lists' offsets unscaled, so where the matrix is not 1 (a phone's
+        // pixel ratio) its answer is neither pixels nor points. The offset alone is in points: the point (0, 0) of
+        // the current group gives it.
         static Rect ToPoints(Rect rect)
         {
-            var min = GUIUtility.GUIToScreenPoint(rect.min) / _screenPerPoint;
-            var max = GUIUtility.GUIToScreenPoint(rect.max) / _screenPerPoint;
-            return Rect.MinMaxRect(min.x, min.y, max.x, max.y);
+            var offset = GUIUtility.GUIToScreenPoint(Vector2.zero);
+            return new Rect(rect.position + offset, rect.size);
         }
 
         internal static void Probe(string label, Rect rect)
@@ -298,6 +298,47 @@ namespace Game.Client
             {
                 var drawn = Drawing[i];
                 if (!view.Contains(drawn.Rect.center)) Drawing[i] = new Drawn(drawn.Label, drawn.Row, drawn.Rect, drawn.Enabled, false);
+            }
+        }
+
+        // A finger dragged over a list scrolls it, as on any phone: IMGUI itself scrolls only by its bar and the wheel.
+        // Call before drawing the list, with the area it is in. Once the finger has moved a few points it is a drag,
+        // not a press, so the button it started on is let go and does not fire when the finger lifts.
+        const float DragStart = 8;
+        static bool _dragArmed;
+        static bool _dragging;
+        static Vector2 _dragFrom;
+        static Vector2 _dragLast;
+
+        public static void TouchScroll(Rect area, ref Vector2 scroll)
+        {
+            if (!Controls.UsingTouch) return;
+            var e = Event.current;
+            switch (e.type)
+            {
+                case EventType.MouseDown:
+                    _dragArmed = area.Contains(e.mousePosition);
+                    _dragging = false;
+                    _dragFrom = _dragLast = e.mousePosition;
+                    break;
+                case EventType.MouseDrag:
+                    if (!_dragArmed) break;
+                    if (!_dragging && (e.mousePosition - _dragFrom).magnitude > DragStart)
+                    {
+                        _dragging = true;
+                        GUIUtility.hotControl = 0;
+                    }
+                    if (_dragging)
+                    {
+                        scroll.y = Mathf.Max(0, scroll.y - (e.mousePosition.y - _dragLast.y));
+                        e.Use();
+                    }
+                    _dragLast = e.mousePosition;
+                    break;
+                case EventType.MouseUp:
+                    if (_dragging) e.Use();
+                    _dragArmed = _dragging = false;
+                    break;
             }
         }
 

@@ -219,10 +219,10 @@ async function basics(browser) {
   await clearRoom(game, 3, 2);
   await game.send('build Wall 1 0; face 1 0');
   await game.send('attack on 1 0');
-  await game.wait(1500);
+  // The words float up for a moment, so they are looked for while the attack is held.
+  const needs = await game.until(r => (r.floating || []).some(f => has(f, '곡괭이가 필요하다')), 3000, game.texts);
   await game.send('attack off');
-  t = await game.texts();
-  check((t.floating || []).some(f => has(f, '곡괭이가 필요하다')), '검으로 벽을 치면 "곡괭이가 필요하다"');
+  check(!!needs, '검으로 벽을 치면 "곡괭이가 필요하다"');
   check((await game.look(1, 0)).tile === 'Wall', '검으로는 벽이 그대로');
   inv = await game.inventory();
   const stoneBefore = count(inv, 'stone');
@@ -524,9 +524,9 @@ async function world(browser) {
   // A better pickaxe for obsidian.
   await game.send('heal; goto near ObsidianOre; equip copper_pickaxe');
   await game.send('attack on 0 0');
-  await game.wait(1500);
+  const better = await game.until(r => (r.floating || []).some(f => has(f, '더 좋은 곡괭이')), 3000, game.texts);
   await game.send('attack off');
-  check((await game.texts()).floating.some(f => has(f, '더 좋은 곡괭이')), '흑요석에 약한 곡괭이로는 "더 좋은 곡괭이가 필요하다"');
+  check(!!better, '흑요석에 약한 곡괭이로는 "더 좋은 곡괭이가 필요하다"');
 
   // Light: a torch in the dark, the light wells over a day.
   await game.send('goto spawn; clear');

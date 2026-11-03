@@ -56,7 +56,15 @@ namespace Game.Client
             }
         }
 
-        static void Log(string text) => Debug.Log("[playtest] " + text);
+        // A browser's console cuts a line off at about 8 KB, so a long answer (a long recipe list's buttons) goes in
+        // pieces: the first on a "[playtest] " line, the rest each on a "[playtest]+" line that the harness joins on.
+        const int Piece = 1500;
+
+        static void Log(string text)
+        {
+            Debug.Log("[playtest] " + text.Substring(0, Math.Min(Piece, text.Length)));
+            for (int at = Piece; at < text.Length; at += Piece) Debug.Log("[playtest]+" + text.Substring(at, Math.Min(Piece, text.Length - at)));
+        }
 
         static int Int(string text) => int.Parse(text, CultureInfo.InvariantCulture);
 

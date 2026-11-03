@@ -7,7 +7,7 @@ const path = require('path');
 
 // The notes, checks and errors of one run, written to report.md at the end.
 function createRun(out) {
-  const run = { out, report: [], errors: [], passed: 0, failed: 0 };
+  const run = { out, report: [], errors: [], expected: new Set(), passed: 0, failed: 0 };
   run.note = line => {
     run.report.push(line);
     console.log(line);
@@ -22,6 +22,10 @@ function createRun(out) {
     return ok;
   };
   run.write = () => {
+    if (run.expected.size > 0) {
+      run.note(`\n## 예상된 에러\n`);
+      for (const line of run.expected) run.note(`- ${line}`);
+    }
     run.note(`\n## 에러\n`);
     if (run.errors.length === 0) run.note('- 없음');
     for (const error of [...new Set(run.errors)]) run.note(`- ${error}`);
@@ -49,7 +53,9 @@ async function open(browser, run, profile, url, context) {
     if (text.includes('memorysetup')) return;
     game.logs.push(text);
     if (m.type() === 'error' || /Exception|NullReference|IndexOutOfRange|KeyNotFound|ArgumentOutOfRange/.test(text)) {
-      run.errors.push(`${profile.name}: ${text.split('\n')[0]}`);
+      // Online play before the project is linked to Unity's cloud (LOCAL_TASKS.md, 온라인 협동) is expected to fail.
+      if (/UnityProjectNotLinkedException/.test(text)) run.expected.add('온라인 방: 프로젝트가 Unity 클라우드에 연결되지 않음(LOCAL_TASKS.md 온라인 협동)');
+      else run.errors.push(`${profile.name}: ${text.split('\n')[0]}`);
     }
   });
   page.on('pageerror', e => run.errors.push(`${profile.name}: page error ${e.message}`));
@@ -73,10 +79,19 @@ function helpers(game) {
     const mark = game.logs.length;
     const expected = commands.split(';').filter(c => c.trim()).length;
     await page.evaluate(text => window.unityInstance.SendMessage('Game', 'Playtest', text), commands);
-    const answered = () => game.logs.slice(mark).filter(l => l.startsWith('[playtest]'));
+    // An answer too long for one console line comes in pieces: "[playtest]+" lines join onto the one before.
+    const answered = () => {
+      const joined = [];
+      for (const l of game.logs.slice(mark)) {
+        if (l.startsWith('[playtest] ')) joined.push(l.slice(11));
+        else if (l.startsWith('[playtest]+') && joined.length > 0) joined[joined.length - 1] += l.slice(11);
+      }
+      return joined;
+    };
     const deadline = Date.now() + 3000;
     while (answered().length < expected && Date.now() < deadline) await page.waitForTimeout(15);
-    const lines = answered().map(l => l.slice(11));
+    await page.waitForTimeout(20);
+    const lines = answered();
     for (const line of lines) if (line.startsWith('error')) run.errors.push(`${profile.name}: playtest ${line}`);
     return lines;
   };
@@ -86,10 +101,21 @@ function helpers(game) {
     const word = command.split(' ')[0];
     const lines = await h.send(command);
     const line = lines.reverse().find(l => l.startsWith(word + ' '));
+    if (!line) return {};
+    const text = line.slice(word.length + 1);
     try {
-      return line ? JSON.parse(line.slice(word.length + 1)) : {};
+      return JSON.parse(text);
     } catch (e) {
-      run.errors.push(`${profile.name}: bad JSON from ${command}: ${line.slice(0, 200)}`);
+      // A build that sends a long answer in one line has it cut off: keep the whole entries before the cut.
+      const cut = text.lastIndexOf('},{');
+      if (cut > 0) {
+        try {
+          return JSON.parse(text.slice(0, cut + 1) + ']}');
+        } catch (e2) {
+          // fall through
+        }
+      }
+      run.errors.push(`${profile.name}: bad JSON from ${command}: ${text.slice(0, 200)}`);
       return {};
     }
   };
