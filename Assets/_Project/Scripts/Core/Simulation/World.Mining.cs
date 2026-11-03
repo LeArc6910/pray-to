@@ -154,7 +154,14 @@ namespace Game.Core
                     }
                 }
                 if (recipe.Item != null) player.Inventory.TryAdd(Register(_lootGenerator.RollItem(recipe.Item, recipe.Item.Level, Rarity.Common, _random)));
-                if (recipe.Consumable != null) player.Inventory.AddConsumable(recipe.Consumable, recipe.Count);
+                if (recipe.Consumable != null)
+                {
+                    // Cooking at a furnace teaches the skill, and the skill may make one more.
+                    int bonus = LifeSkills.Bonus(LifeLevel(player, LifeSkill.Cooking), LifeSkills.ExtraDishPercent);
+                    int extra = bonus > 0 && _random.Chance(bonus / 100f) ? 1 : 0;
+                    player.Inventory.AddConsumable(recipe.Consumable, recipe.Count + extra);
+                    if (recipe.Station == TileType.Furnace) GainLifeExperience(player, LifeSkill.Cooking, 2 + recipe.Ingredients.Sum(i => i.Count));
+                }
                 if (recipe.Material != null) player.Inventory.AddMaterial(recipe.Material, recipe.Count);
             }
             if (made > 0) player.InventoryVersion++;

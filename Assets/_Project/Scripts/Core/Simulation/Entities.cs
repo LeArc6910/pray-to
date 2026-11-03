@@ -320,6 +320,8 @@ namespace Game.Core
         Defense,
         // A turret at Position fired along Direction; Amount is how far in tenths of a tile (World.Turrets).
         TurretShot,
+        // A rainy day began and wet Amount crops (World.Weather.cs).
+        Rain,
     }
 
     public readonly struct SimEvent

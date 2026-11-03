@@ -162,8 +162,8 @@ namespace Game.Core.Tests
         [Test]
         public void LifeSkillsAreKeptWithTheCharacterAndSentToThePlayer()
         {
-            var data = CharacterSave.Write(new Equipment(), new Inventory(), 0, null, null, null, new[] { 120, 0, 400 });
-            CollectionAssert.AreEqual(new[] { 120, 0, 400 }, CharacterSave.Read(data, Gear.Data).LifeExperience);
+            var data = CharacterSave.Write(new Equipment(), new Inventory(), 0, null, null, null, new[] { 120, 0, 400, 30 });
+            CollectionAssert.AreEqual(new[] { 120, 0, 400, 30 }, CharacterSave.Read(data, Gear.Data).LifeExperience);
 
             var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
             var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped) { Character = data };
@@ -175,7 +175,41 @@ namespace Game.Core.Tests
             }
             Assert.AreEqual(400, host.World.Players.Single().LifeExperience[(int)LifeSkill.Mining]);
             Assert.AreEqual(2, client.LifeLevel(LifeSkill.Farming));
-            CollectionAssert.AreEqual(new[] { 120, 0, 400 }, CharacterSave.Read(client.SaveCharacter(), Gear.Data).LifeExperience);
+            CollectionAssert.AreEqual(new[] { 120, 0, 400, 30 }, CharacterSave.Read(client.SaveCharacter(), Gear.Data).LifeExperience);
+        }
+    
+        [Test]
+        public void SomeDaysRainAndWetEveryCrop()
+        {
+            var rainy = Enumerable.Range(1, 400).Count(World.IsRainy);
+            Assert.That(rainy, Is.InRange(60, 140), "about one day in four");
+            Assert.IsFalse(World.IsRainy(1), "never the first");
+
+            var world = Pond(out var player);
+            int day = Enumerable.Range(2, 100).First(World.IsRainy);
+            var crop = Tiles.Shipped.Crops.Single(c => c.Id == "mushroom");
+            Face(world, player, 8, 6, new Vec2(0, -1));
+            player.Inventory.AddMaterial(crop.Seed);
+            Assert.IsTrue(world.Plant(player.Id, crop));
+            Assert.IsFalse(world.CropAt(8, 6).IsWet(world.Tick), "a dry first day");
+            world.RestoreClock((day - 1) * Calendar.TicksPerDay);
+            world.Step();
+            Assert.IsTrue(world.CropAt(8, 6).IsWet(world.Tick), "the rain watered it");
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.Rain && e.Amount == 1));
+        }
+
+        [Test]
+        public void CookingAtAFurnaceTeachesCooking()
+        {
+            var world = Pond(out var player);
+            Place(world, player, Gear.Data.FindMaterial("furnace"), 8, 6, new Vec2(0, -1));
+            var roast = Gear.Data.Recipes.Single(r => r.Id == "roasted_mushroom");
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("mushroom"), 2);
+            Assert.IsTrue(world.Craft(player.Id, roast));
+            Assert.AreEqual(2 + 2, player.LifeExperience[(int)LifeSkill.Cooking]);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("slime_gel"), 3);
+            Assert.IsTrue(world.Craft(player.Id, Gear.Data.Recipes.Single(r => r.Id == "healing_potion")));
+            Assert.AreEqual(4, player.LifeExperience[(int)LifeSkill.Cooking], "a potion is no cooking");
         }
     }
 }

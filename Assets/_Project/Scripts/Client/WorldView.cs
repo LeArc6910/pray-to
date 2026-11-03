@@ -279,6 +279,7 @@ namespace Game.Client
             foreach (var e in _client.TakeEvents()) Show(e);
             UpdateFlashes(deltaTime);
             UpdateTracers(deltaTime);
+            UpdateRain(deltaTime);
             BobBobbers();
             UpdateBits(deltaTime);
             for (int i = _floating.Count - 1; i >= 0; i--)
@@ -894,6 +895,44 @@ namespace Game.Client
         readonly List<(SpriteRenderer Line, float Age)> _tracers = new List<(SpriteRenderer, float)>();
         const float TracerSeconds = 0.12f;
 
+        // On a rainy day thin drops fall through the view: rain from the land above seeping down (World.IsRainy).
+        readonly List<SpriteRenderer> _raindrops = new List<SpriteRenderer>();
+        static readonly Color RainColor = new Color(0.6f, 0.75f, 1f, 0.35f);
+        const int RainDrops = 40;
+
+        void UpdateRain(float deltaTime)
+        {
+            bool raining = World.IsRainy(Calendar.Day(_client.Clock));
+            if (!raining)
+            {
+                foreach (var drop in _raindrops) drop.enabled = false;
+                return;
+            }
+            var centre = _camera.transform.position;
+            float height = _camera.orthographicSize * 2 + 2;
+            float width = height * _camera.aspect + 2;
+            while (_raindrops.Count < RainDrops)
+            {
+                var drop = Renderer(_root.transform, "Rain", Shapes.Square, RainColor);
+                drop.sortingOrder = 29;
+                drop.transform.localScale = new Vector3(1 / 16f, 0.5f, 1);
+                drop.transform.localPosition = centre + new Vector3((UnityEngine.Random.value - 0.5f) * width, (UnityEngine.Random.value - 0.5f) * height, 0);
+                _raindrops.Add(drop);
+            }
+            foreach (var drop in _raindrops)
+            {
+                drop.enabled = true;
+                var at = drop.transform.localPosition + new Vector3(-0.2f, -1, 0) * (9 * deltaTime);
+                // Wrapped round the view as it moves.
+                if (at.y < centre.y - height / 2) at.y += height;
+                if (at.x < centre.x - width / 2) at.x += width;
+                if (at.x > centre.x + width / 2) at.x -= width;
+                if (at.y > centre.y + height / 2) at.y -= height;
+                at.z = 0;
+                drop.transform.localPosition = at;
+            }
+        }
+
         void AddTracer(Vector3 from, Vector3 to)
         {
             var line = Renderer(_root.transform, "Tracer", Shapes.Square, TracerColor);
@@ -1106,6 +1145,9 @@ namespace Game.Client
                     _floating.Add(new Floating { Position = grower, Text = $"{LifeSkills.Name(skill)} {e.Amount % 16}", Color = LevelColor });
                     AddFlash(grower, 1, LevelColor, FlashKind.Sparkles);
                     if (e.Source == _client.PlayerId) Sounds.Play(Sound.LevelUp);
+                    break;
+                case SimEventType.Rain:
+                    if (e.Amount > 0) ShowBanner("비가 스며 밭이 젖었다");
                     break;
                 case SimEventType.Defense:
                     Sounds.Play(e.Amount == World.DefenseStarted ? Sound.Warning : e.Amount == World.DefenseWon ? Sound.Victory : Sound.Down);

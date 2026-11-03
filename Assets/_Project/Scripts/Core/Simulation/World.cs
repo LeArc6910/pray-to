@@ -163,6 +163,7 @@ namespace Game.Core
             UpdateClock();
             UpdateRift();
             UpdateDefense();
+            UpdateWeather();
 
             if (--_spawnTimer <= 0)
             {

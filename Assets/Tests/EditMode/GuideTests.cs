@@ -103,7 +103,7 @@ namespace Game.Core.Tests
             progress.Update(With(passives: 2, fishing: 3, rift: 2, hearts: 1));
             Assert.IsNull(progress.Current);
 
-            var bad = GuideSheet.Parse("id,text,hint,done\na,가,힌트,life:cooking:2\nb,나,힌트,friend:0\n", Gear.Data);
+            var bad = GuideSheet.Parse("id,text,hint,done\na,가,힌트,life:dancing:2\nb,나,힌트,friend:0\n", Gear.Data);
             Assert.AreEqual(2, bad.Errors.Count, string.Join("\n", bad.Errors));
         }
 

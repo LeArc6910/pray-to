@@ -169,6 +169,9 @@ namespace Game.Core.Tests
         public void WaterLastsADayOfPlay()
         {
             var world = Room(out var player);
+            // Two dry days in a row, so no rain waters it (World.IsRainy).
+            int day = Enumerable.Range(1, 100).First(d => !World.IsRainy(d) && !World.IsRainy(d + 1));
+            world.RestoreClock((day - 1) * Calendar.TicksPerDay);
             player.Inventory.AddMaterial(Spore);
             world.Plant(player.Id, Mushroom);
             Water(world, player);

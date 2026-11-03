@@ -10,11 +10,12 @@ namespace Game.Core
         Farming,
         Fishing,
         Mining,
+        Cooking,
     }
 
     public static class LifeSkills
     {
-        public const int Count = 3;
+        public const int Count = 4;
         public const int MaxLevel = 10;
         // Per level above the first: the chance of one more crop from a hand harvest, how much sooner a fish bites and
         // how much wider the catch zone of the reel gauge is, and how much faster walls give way (percent).
@@ -22,6 +23,8 @@ namespace Game.Core
         public const int BitePercent = 4;
         public const int ZonePercent = 5;
         public const int DigPercent = 4;
+        // And the chance of one more of a dish cooked by hand.
+        public const int ExtraDishPercent = 5;
 
         // Experience to have reached the level: 0, 100, 300, 600 … 4500 for level 10. A few hours of one kind of work
         // reach the top (DevTools/CoreSandbox --economy).
@@ -38,6 +41,7 @@ namespace Game.Core
         {
             LifeSkill.Farming => "농사",
             LifeSkill.Fishing => "낚시",
+            LifeSkill.Cooking => "요리",
             _ => "채굴",
         };
 
@@ -49,6 +53,7 @@ namespace Game.Core
         {
             LifeSkill.Farming => $"직접 거둘 때 {Bonus(level, ExtraCropPercent)}% 확률로 하나 더",
             LifeSkill.Fishing => $"입질 {Bonus(level, BitePercent)}% 빨리 · 잡는 칸 {Bonus(level, ZonePercent)}% 넓게",
+            LifeSkill.Cooking => $"요리할 때 {Bonus(level, ExtraDishPercent)}% 확률로 하나 더",
             _ => $"캐는 속도 +{Bonus(level, DigPercent)}%",
         };
     }

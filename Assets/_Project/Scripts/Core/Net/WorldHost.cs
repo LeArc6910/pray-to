@@ -552,7 +552,7 @@ namespace Game.Core
             var shown = new HashSet<int>(entities.Select(e => e.Id));
             var events = _pendingEvents
                 .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift
-                    || e.Type == SimEventType.Defense || e.Type == SimEventType.TurretShot)
+                    || e.Type == SimEventType.Defense || e.Type == SimEventType.TurretShot || e.Type == SimEventType.Rain)
                 .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)
                 .ToList();

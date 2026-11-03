@@ -108,7 +108,8 @@ namespace Game.Core
         void PlantCrop(CropDefinition crop, int x, int y)
         {
             long head = TileMap.IsSoil(Map[x, y]) ? SoilHeadStart(crop) : 0;
-            var planted = new Crop(crop, x, y, head);
+            // On a rainy day the ground is wet already.
+            var planted = RainingToday && Tick > 0 ? new Crop(crop, x, y, head, Tick, Tick + WaterTicks) : new Crop(crop, x, y, head);
             _crops[y * Map.Width + x] = planted;
             _newCropChanges.Add(new CropChange(x, y, planted));
         }
