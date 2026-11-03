@@ -41,6 +41,13 @@ M6에서 만든 규칙과 시트 작성법이다. 코드는 `Assets/_Project/Scr
 - 벨트는 재료만 나른다(아이템, 룬, 소모품은 안 된다)
 - 순서가 늘 같도록 기계는 칸 번호 순서로 돌린다. 그래서 호스트가 바뀌어도(저장 후 불러오기) 같은 결과가 나온다
 
+## 술통, 절임 단지, 손으로 넣고 꺼내기 (2026-11-03)
+
+- **술통**(`Keg`, 240초)과 **절임 단지**(`PreservesJar`, 180초)는 제련기처럼 `recipes.csv`에서 `station`이 자기 칸 종류인 조합법을 혼자 만든다(`World.ProcessesOf`). 재료만 들어가고 재료가 나온다. 결과는 앞으로 내보내고, 힘은 1을 쓴다
+- **손으로 넣기**: 제련기, 술통, 절임 단지, 조립기를 바라보면 가방 재료 목록에서 그 기계가 받는 재료에 **[넣기]**가 생긴다. 누르면 그 기계가 받을 만큼 넣는다(벨트가 넣는 것과 같은 규칙, `World.LoadMachine`)
+- **손으로 꺼내기**: 기계를 바라보면 목록 위에 "넣은 것 N · 만든 것 M"이 보이고, 만든 것이 있으면 **[꺼내기]**로 모두 가방에 넣는다(`World.UnloadMachine`). 채굴기, 수확기에서도 된다
+- Machines 메시지에 기계마다 넣은 것과 만든 것의 개수(255까지)를 더했다(프로토콜 0.39.0)
+
 ## 전력망 (2026-11-03)
 
 - **전신주**(구리 전선 3·돌 2로 둘): 전신주와 발전기는 서로 **8타일**(`World.WireReach`) 안에 있으면 전선으로 이어져 한 전력망이 된다. 화면에 구리색 선으로 보인다
@@ -103,7 +110,7 @@ M6에서 만든 규칙과 시트 작성법이다. 코드는 `Assets/_Project/Scr
 
 | 열 | 내용 |
 |---|---|
-| tile | 기계의 칸 종류: `Drill`, `Conveyor`, `Smelter`, `Splitter`, `Arm`, `Sprinkler`, `Harvester`, `Filter`, `Generator`, `Lever`, `Assembler`, `PowerPole`, `FastConveyor`, `UndergroundBelt` |
+| tile | 기계의 칸 종류: `Drill`, `Conveyor`, `Smelter`, `Splitter`, `Arm`, `Sprinkler`, `Harvester`, `Filter`, `Generator`, `Lever`, `Assembler`, `PowerPole`, `FastConveyor`, `UndergroundBelt`, `Keg`, `PreservesJar` |
 | seconds | 채굴기는 광석 하나, 벨트는 한 칸, 제련기는 녹이기 한 번, 분배기는 하나를 내보내기까지, 로봇 팔은 하나를 옮기는 데 걸리는 시간. 스프링클러는 물 주기 사이, 수확기는 하나 거두기 사이, 조립기는 한 번 만드는 데 |
 | capacity | 안에 쌓아 두는 개수(1 이상. 스프링클러는 쓰지 않는다) |
 | power | 전력망에서 쓰는 힘(0이면 힘을 쓰지 않고 빨라지지도 않는다). 발전기는 탈 때 내는 힘. 비우면 0 |

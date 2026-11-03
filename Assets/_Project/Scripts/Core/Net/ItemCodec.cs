@@ -175,6 +175,10 @@ namespace Game.Core
         SellItem,
         Gift,
         Talk,
+        // Puts Item of the material at Index into the machine ahead (World.LoadMachine); takes out what it made
+        // (World.UnloadMachine).
+        Load,
+        Unload,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

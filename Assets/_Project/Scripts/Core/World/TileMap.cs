@@ -75,6 +75,8 @@ namespace Game.Core
         FastConveyor,
         UndergroundBelt,
         MerchantStall,
+        Keg,
+        PreservesJar,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

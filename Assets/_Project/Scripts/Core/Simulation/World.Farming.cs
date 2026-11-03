@@ -217,13 +217,23 @@ namespace Game.Core
             _events.Add(new SimEvent(SimEventType.Harvested, player.Id, amount: definition.Count, position: TileMap.Center(crop.X, crop.Y)));
         }
 
-        // Takes the crop off its tile; returns how many seeds it gave back, and how much of the harvest: one more on
+        // Takes the crop off its tile, or for one that regrows sets it back to ripen again in its regrow days with
+        // whatever water it had left; returns how many seeds it gave back, and how much of the harvest: one more on
         // fertile soil, which the harvest uses up.
         int Reap(Crop crop, out int count)
         {
-            _crops.Remove(crop.Y * Map.Width + crop.X);
-            _newCropChanges.Add(new CropChange(crop.X, crop.Y, null));
             var definition = crop.Definition;
+            if (definition.Regrows)
+            {
+                var again = new Crop(definition, crop.X, crop.Y, definition.GrowTicks - definition.RegrowTicks, Tick, Math.Max(Tick, crop.WetUntil));
+                _crops[crop.Y * Map.Width + crop.X] = again;
+                _newCropChanges.Add(new CropChange(crop.X, crop.Y, again));
+            }
+            else
+            {
+                _crops.Remove(crop.Y * Map.Width + crop.X);
+                _newCropChanges.Add(new CropChange(crop.X, crop.Y, null));
+            }
             count = definition.Count;
             if (Map[crop.X, crop.Y] == TileType.FertileSoil)
             {

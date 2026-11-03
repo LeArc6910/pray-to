@@ -13,3 +13,5 @@ Assembler,3,10,3
 PowerPole,1,1,0
 FastConveyor,0.25,1,0
 UndergroundBelt,0.5,1,0
+Keg,240,10,1
+PreservesJar,180,10,1

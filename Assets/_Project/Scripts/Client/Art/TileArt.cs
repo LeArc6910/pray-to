@@ -388,6 +388,8 @@ namespace Game.Client
             TileType.Assembler => AssemblerTile,
             TileType.PowerPole => PowerPoleTile,
             TileType.MerchantStall => MerchantStallTile,
+            TileType.Keg => KegTile,
+            TileType.PreservesJar => JarTile,
             TileType.FastConveyor => ConveyorFrame,
             TileType.UndergroundBelt => ConveyorFrame,
             _ => null,
@@ -1382,6 +1384,44 @@ namespace Game.Client
         // The stall's counter alone, drawn over the merchant standing behind it.
         public static readonly PixelImage MerchantCounter = PixelImage.FromRows(BasePalette,
             Enumerable.Repeat("................", Size - Counter.Length).Concat(Counter).ToArray());
+
+        // A wooden barrel on its end with two iron hoops and a tap.
+        static readonly PixelImage KegTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "................",
+            "....oooooooo....",
+            "...oSSSSSSSSo...",
+            "...oWWWWWWWWo...",
+            "..okkkkkkkkkko..",
+            "..oWWwWWWwWWWo..",
+            "..oWWwWWWwWWWoo.",
+            "..oWWwWWWwWWWoko",
+            "..oWWwWWWwWWWoo.",
+            "..okkkkkkkkkko..",
+            "...owwwwwwwwo...",
+            "...owwwwwwwwo...",
+            "....oooooooo....",
+            "....________....",
+            "................");
+
+        // A round clay jar with a cloth tied over its mouth.
+        static readonly PixelImage JarTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "................",
+            "................",
+            ".....oooooo.....",
+            "....occcccco....",
+            "....oCrrrrCo....",
+            ".....oPPPPo.....",
+            "....oPPPPPPo....",
+            "...oPPpPPPPPo...",
+            "...oPPpPPPPpo...",
+            "...oPPPPPPPpo...",
+            "....oPpppppo....",
+            ".....oooooo.....",
+            "....________....",
+            "................",
+            "................");
 
         // A wooden pole with a crossbar and two green glass insulators on it.
         static readonly PixelImage PowerPoleTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)

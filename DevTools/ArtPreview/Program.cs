@@ -224,7 +224,7 @@ namespace Game.Client
                     TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester, TileType.StoneFloor, TileType.BrickFloor,
                     TileType.GlowFloor, TileType.Door, TileType.Table, TileType.Banner, TileType.Pot, TileType.Soil, TileType.FertileSoil,
                     TileType.Filter, TileType.Generator, TileType.Lever, TileType.MushroomSoil, TileType.FrostSoil, TileType.AshSoil, TileType.VoidSoil,
-                    TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall,
+                    TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.Keg, TileType.PreservesJar,
                 }
                 .Select(TileArt.Object).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(f => ItemArt.Belt(f)))
                 .Concat(new[] { ItemArt.Belt(0, fast: true), ItemArt.Underground(0), TileArt.MerchantCounter })
@@ -285,7 +285,7 @@ namespace Game.Client
                 .Concat(loot.Runes.Take(1).Select(ItemArt.Rune))
                 .Concat(Enumerable.Range(0, 4).Select(ItemArt.Crop))
                 .Concat(Enumerable.Range(0, 4).Select(stage => ItemArt.Crop("fire_pepper", stage, watered: stage % 2 == 1)))
-                .Concat(new[] { "glow_cap", "frost_berry", "star_melon" }.SelectMany(id => Enumerable.Range(0, 4).Select(stage => ItemArt.Crop(id, stage))))
+                .Concat(new[] { "glow_cap", "frost_berry", "star_melon", "cave_potato", "cave_berry", "moon_grape", "snow_cabbage", "ember_corn", "void_bean" }.SelectMany(id => Enumerable.Range(0, 4).Select(stage => ItemArt.Crop(id, stage))))
                 .Concat(new[] { ItemArt.Arrow, ItemArt.Orb, ItemArt.Spore, CreatureArt.Shadow(12) }).ToList());
 
             const int gap = 4;

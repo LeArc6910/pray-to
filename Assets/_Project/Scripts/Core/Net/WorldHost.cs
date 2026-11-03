@@ -431,6 +431,12 @@ namespace Game.Core
                 case InventoryCommand.Talk:
                     World.Talk(player.Id);
                     break;
+                case InventoryCommand.Load:
+                    if (command.Index < _loot.Materials.Count) World.LoadMachine(player.Id, _loot.Materials[command.Index], Math.Clamp(command.Item, 1, World.MaxTrade));
+                    break;
+                case InventoryCommand.Unload:
+                    World.UnloadMachine(player.Id);
+                    break;
             }
         }
 
@@ -599,7 +605,7 @@ namespace Game.Core
                 .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
                 .Take(_config.MaxMachinesPerMessage)
                 .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled,
-                    SettingOf(m), World.IsPowered(m)))
+                    SettingOf(m), World.IsPowered(m), m.Inputs.Values.Sum(), m.Outputs.Values.Sum()))
                 .ToList();
             if (near.Count == 0 && !sent.SentMachines) return;
             int SettingOf(Machine m)

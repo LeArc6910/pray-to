@@ -68,8 +68,9 @@ namespace Game.Core
     {
         internal CropDefinition(
             string id, string name, MaterialDefinition seed, float growDays, MaterialDefinition material, ConsumableDefinition consumable, int count, int seeds,
-            float seedChance, IReadOnlyList<Biome> biomes = null)
+            float seedChance, IReadOnlyList<Biome> biomes = null, float regrowDays = 0)
         {
+            RegrowDays = regrowDays;
             Id = id;
             Name = name;
             Seed = seed;
@@ -87,6 +88,11 @@ namespace Game.Core
         public MaterialDefinition Seed { get; }
         // Days of play (Calendar.DaySeconds, real time) it must have water for to ripen.
         public float GrowDays { get; }
+        // For a crop that stays after harvest and ripens again: the days of water it needs to do so; 0 for one that is
+        // gone once harvested.
+        public float RegrowDays { get; }
+        public long RegrowTicks => RegrowDays <= 0 ? 0 : Math.Max(1, (long)Math.Round(RegrowDays * Calendar.TicksPerDay));
+        public bool Regrows => RegrowDays > 0;
         public long GrowTicks => Math.Max(1, (long)Math.Round(GrowDays * Calendar.TicksPerDay));
         // Where it can be planted; none means anywhere.
         public IReadOnlyList<Biome> Biomes { get; }
@@ -203,6 +209,7 @@ namespace Game.Core
         {
             TileType.Drill, TileType.Smelter, TileType.Conveyor, TileType.Splitter, TileType.Arm, TileType.Sprinkler, TileType.Harvester,
             TileType.Filter, TileType.Generator, TileType.Lever, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt,
+            TileType.Keg, TileType.PreservesJar,
         };
 
         static List<MachineDefinition> ParseMachines(string csv, List<string> errors)
@@ -272,9 +279,11 @@ namespace Game.Core
                     if (material == null && consumable == null) throw new FormatException($"harvest '{row["harvest"]}'가 재료나 소모품에 없습니다.");
                     int count = SheetValues.ParseNumber(row["count"], "count");
                     if (count < 1) throw new FormatException("count는 1 이상이어야 합니다.");
+                    float regrow = row["regrow_days"].Length == 0 ? 0 : SheetValues.ParseDecimal(row["regrow_days"], "regrow_days");
+                    if (regrow < 0 || regrow >= grow && regrow > 0) throw new FormatException("regrow_days는 비우거나 0보다 크고 grow_days보다 작아야 합니다.");
                     crops.Add(new CropDefinition(
                         id, name, seed, grow, material, consumable, count, SheetValues.ParseNumber(row["seeds"], "seeds"), Percent(row["seed_chance"], "seed_chance"),
-                        biomes));
+                        biomes, regrow));
                 }
                 catch (FormatException e)
                 {

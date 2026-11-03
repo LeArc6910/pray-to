@@ -148,7 +148,7 @@ M4c에서 만든 규칙과 시트 작성법이다. 놓는 물건(작업대, 화�
 
 - `result`는 아이템 베이스, 소모품, 재료 중 하나의 id다
 - `ingredients`는 `재료 id:개수`를 `|`로 나눠 적는다. 예: `copper_ore:6|stone:2`
-- `station`은 근처에 있어야 하는 칸 종류(`Workbench`, `Furnace`). 비우면 어디서나 만든다
+- `station`은 근처에 있어야 하는 칸 종류(`Workbench`, `Furnace`, `Anvil`). 비우면 어디서나 만든다. 기계 칸(`Keg`, `PreservesJar`)이면 그 기계만 시간을 들여 만들고 손으로는 만들 수 없다(`Docs/Farming.md`의 가공)
 - 적힌 순서대로 제작 목록에 나온다
 
 ## 통신

@@ -290,6 +290,9 @@ namespace Game.Client
             "glow_stirfry" => SpicyFry,
             "frost_sorbet" => MushroomSoup,
             "star_punch" => MushroomSoup,
+            "baked_potato" => RoastedMushroom,
+            "grilled_corn" => SpicyFry,
+            "kimchi_stew" => MushroomSoup,
             _ => Potion,
         };
 
@@ -431,6 +434,31 @@ namespace Game.Client
             ".MMMmmd.",
             "..Mmmd..",
             "...dd...",
+        };
+
+        // A bottle with a cork, for juices and wines.
+        static readonly string[] Bottle =
+        {
+            "...SS...",
+            "...hh...",
+            "...LM...",
+            "..LwMm..",
+            ".LwMMmd.",
+            ".LMMMmd.",
+            ".MMMmmd.",
+            "..mmdd..",
+        };
+
+        // A small jar with a cloth top, for pickles.
+        static readonly string[] Pickles =
+        {
+            ".hhhhhh.",
+            ".SSSSSS.",
+            "..LMMm..",
+            ".LwMMmd.",
+            ".LMMMmd.",
+            ".MMMmmd.",
+            "..mmdd..",
         };
 
         // A round coin with a square hole and a glint.
@@ -659,6 +687,25 @@ namespace Game.Client
                 case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
                 case "coin": return Ramped(CoinRows, Ramp.Of("#F2C440"));
+                case "cave_potato_seed": return Ramped(Seeds, Ramp.Of("#B08850"));
+                case "cave_berry_seed": return Ramped(Seeds, Ramp.Of("#E07080"));
+                case "moon_grape_seed": return Ramped(Seeds, Ramp.Of("#A88AE0"));
+                case "snow_cabbage_seed": return Ramped(Seeds, Ramp.Of("#C8F0C0"));
+                case "ember_corn_seed": return Ramped(Seeds, Ramp.Of("#F2C060"));
+                case "void_bean_seed": return Ramped(Seeds, Ramp.Of("#8A6AD0"));
+                case "cave_potato": return Ramped(Goo, Ramp.Of("#B08850"));
+                case "cave_berry": return Ramped(Gem, Ramp.Of("#E04060"));
+                case "moon_grape": return Ramped(Spores, Ramp.Of("#8A5AE0"));
+                case "snow_cabbage": return Ramped(CapMushroom, Ramp.Of("#C8F0C0"));
+                case "ember_corn": return Ramped(Gem, Ramp.Of("#F2A030"));
+                case "void_bean": return Ramped(Goo, Ramp.Of("#6A44B8"));
+                case "berry_juice": return Ramped(Bottle, Ramp.Of("#E04060"));
+                case "moon_wine": return Ramped(Bottle, Ramp.Of("#8A5AE0"));
+                case "frost_juice": return Ramped(Bottle, Ramp.Of("#8CD8FF"));
+                case "star_wine": return Ramped(Bottle, Ramp.Of("#F2C440"));
+                case "pickled_pepper": return Ramped(Pickles, Ramp.Of("#E0402A"));
+                case "kimchi": return Ramped(Pickles, Ramp.Of("#D8603A"));
+                case "pickled_bean": return Ramped(Pickles, Ramp.Of("#6A44B8"));
                 case "copper_wire": return Ramped(Coil, Ramp.Of("#E08A4A"));
                 case "circuit": return Ramped(Board, Ramp.Of("#4CA85A"));
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);
@@ -790,7 +837,7 @@ namespace Game.Client
         public static PixelImage Crop(string id, int stage, bool watered = false)
         {
             // The new crops are the mushroom's and the pepper's drawings in colours of their own.
-            var stages = id == "fire_pepper" || id == "frost_berry" || id == "star_melon" ? PepperStages : CropStages;
+            var stages = FruitCrops.Contains(id) ? PepperStages : CropStages;
             var rows = new List<string>(stages[System.Math.Clamp(stage, 0, stages.Length - 1)]);
             rows.AddRange(watered ? Soil.Select(row => row.Replace('t', 'u').Replace('T', 'U')) : Soil);
             var colors = CropColors;
@@ -802,8 +849,22 @@ namespace Game.Client
             return PixelImage.FromRows(colors, rows.ToArray()).Outlined(Outline.WithAlpha(200));
         }
 
+        // Crops drawn as a bush with fruit on it; the rest as the mushroom's head of leaves or cap.
+        static readonly HashSet<string> FruitCrops = new HashSet<string>
+        {
+            "fire_pepper", "frost_berry", "star_melon", "cave_berry", "moon_grape", "ember_corn", "void_bean",
+        };
+
         static readonly Dictionary<string, Dictionary<char, Rgba>> CropTints = new Dictionary<string, Dictionary<char, Rgba>>
         {
+            // Leafy potato tops, and a pale round cabbage.
+            ["cave_potato"] = new Dictionary<char, Rgba> { ['L'] = Rgba.Hex("#B8E08A"), ['M'] = Rgba.Hex("#7CB850"), ['m'] = Rgba.Hex("#4E8A30") },
+            ["snow_cabbage"] = new Dictionary<char, Rgba> { ['L'] = Rgba.Hex("#F0FFF0"), ['M'] = Rgba.Hex("#C8F0C0"), ['m'] = Rgba.Hex("#88C090") },
+            // Red berries, purple grapes, golden corn, dark beans.
+            ["cave_berry"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#E04060"), ['R'] = Rgba.Hex("#A02040"), ['o'] = Rgba.Hex("#FF9AB0") },
+            ["moon_grape"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#8A5AE0"), ['R'] = Rgba.Hex("#5A30A8"), ['o'] = Rgba.Hex("#C8A8FF") },
+            ["ember_corn"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#F2A030"), ['R'] = Rgba.Hex("#B86A10"), ['o'] = Rgba.Hex("#FFE08A") },
+            ["void_bean"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#6A44B8"), ['R'] = Rgba.Hex("#3A2470"), ['o'] = Rgba.Hex("#B48CFF") },
             // A glowing teal cap.
             ["glow_cap"] = new Dictionary<char, Rgba> { ['L'] = Rgba.Hex("#C8FFF0"), ['M'] = Rgba.Hex("#6FE8D0"), ['m'] = Rgba.Hex("#2EA890") },
             // Pale blue berries.

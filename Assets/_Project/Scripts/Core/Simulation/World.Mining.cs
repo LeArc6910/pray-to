@@ -129,7 +129,7 @@ namespace Game.Core
         public int CraftMany(int playerId, Recipe recipe, int times)
         {
             var player = FindPlayer(playerId);
-            if (player == null || player.IsDead || recipe == null) return 0;
+            if (player == null || player.IsDead || recipe == null || MadeByMachine(recipe)) return 0;
             if (recipe.Station != null && !Map.Near(player.Position, recipe.Station.Value, StationReach)) return 0;
             var chests = ChestsNear(player.Position);
             int made = 0;

@@ -119,8 +119,10 @@ namespace Game.Core
     public readonly struct MachineView
     {
         public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true,
-            MaterialDefinition setting = null, bool powered = false, Recipe recipe = null, int supply = -1, int demand = -1)
+            MaterialDefinition setting = null, bool powered = false, Recipe recipe = null, int supply = -1, int demand = -1, int holding = 0, int held = 0)
         {
+            Holding = holding;
+            Held = held;
             Supply = supply;
             Demand = demand;
             Setting = setting;
@@ -151,6 +153,9 @@ namespace Game.Core
         // For a generator or power pole: what its grid gives and draws (World.PowerGrid), or -1.
         public int Supply { get; }
         public int Demand { get; }
+        // How much it holds to work on, and how much it made that waits to go out.
+        public int Holding { get; }
+        public int Held { get; }
     }
 
     public readonly struct HazardView
@@ -400,6 +405,21 @@ namespace Game.Core
         public byte[] GiftCommand(object thing) => thing is ConsumableDefinition consumable
             ? new InventoryCommandMessage(InventoryCommand.Gift, (int)StackKind.Consumable, index: ItemCodec.Index(_loot.Consumables, consumable)).Encode()
             : new InventoryCommandMessage(InventoryCommand.Gift, (int)StackKind.Material, index: ItemCodec.Index(_loot.Materials, (MaterialDefinition)thing)).Encode();
+
+        public byte[] LoadCommand(MaterialDefinition material, int count) =>
+            new InventoryCommandMessage(InventoryCommand.Load, count, index: ItemCodec.Index(_loot.Materials, material)).Encode();
+
+        // A tile's name from the tile sheet (tiles.csv), or its type.
+        public string TileName(TileType type) => _tiles?.Find(type)?.Name ?? type.ToString();
+
+        public byte[] UnloadCommand() => new InventoryCommandMessage(InventoryCommand.Unload, 0).Encode();
+
+        // Recipes a machine of the kind works through by itself (World.ProcessesOf), as the client knows them.
+        public IEnumerable<Recipe> ProcessesOf(TileType kind) => Recipes.Where(r => r.Material != null
+            && (kind == TileType.Smelter ? r.Station == TileType.Furnace : (kind == TileType.Keg || kind == TileType.PreservesJar) && r.Station == kind));
+
+        // Whether the recipe is made only by a machine, never by hand (World.MadeByMachine).
+        public bool MadeByMachine(Recipe recipe) => recipe.Station is TileType station && _tiles?.Machine(station) != null;
 
         public byte[] TalkCommand() => new InventoryCommandMessage(InventoryCommand.Talk, 0).Encode();
 
@@ -694,7 +714,7 @@ namespace Game.Core
                 int demand = node && m.Setting >= 0 ? m.Setting % 256 : -1;
                 var setting = !assembler && !node && m.Setting >= 0 && _loot != null && m.Setting < _loot.Materials.Count ? _loot.Materials[m.Setting] : null;
                 var recipe = assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Recipes.Count ? _loot.Recipes[m.Setting] : null;
-                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe, supply, demand));
+                views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe, supply, demand, m.Holding, m.Held));
             }
             return views;
         }

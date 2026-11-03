@@ -85,6 +85,25 @@ namespace Game.Core
         // The furnace's melting recipes: materials in, a material out.
         IReadOnlyList<Recipe> Smelts => _smelts ??= Loot?.Recipes.Where(r => r.Station == TileType.Furnace && r.Material != null).ToList() ?? new List<Recipe>();
 
+        readonly Dictionary<TileType, IReadOnlyList<Recipe>> _processes = new Dictionary<TileType, IReadOnlyList<Recipe>>();
+
+        // What a machine that works through recipes on its own makes: a smelter the furnace's melting recipes, a keg
+        // and a preserves jar the recipes made at them (materials in, a material out). Empty for any other machine.
+        public IReadOnlyList<Recipe> ProcessesOf(TileType kind)
+        {
+            if (kind == TileType.Smelter) return Smelts;
+            if (kind != TileType.Keg && kind != TileType.PreservesJar) return Array.Empty<Recipe>();
+            if (!_processes.TryGetValue(kind, out var recipes))
+            {
+                recipes = Loot?.Recipes.Where(r => r.Station == kind && r.Material != null).ToList() ?? new List<Recipe>();
+                _processes[kind] = recipes;
+            }
+            return recipes;
+        }
+
+        // Whether a recipe is only ever made by a machine (a keg's, a jar's), never by hand.
+        public bool MadeByMachine(Recipe recipe) => recipe.Station is TileType station && Tiles?.Machine(station) != null;
+
         // A machine tile appeared or went: give it its state, or drop it.
         void MachineTileChanged(int x, int y, TileType type)
         {
@@ -125,7 +144,9 @@ namespace Game.Core
                     RunDrill(machine);
                     break;
                 case TileType.Smelter:
-                    RunSmelter(machine);
+                case TileType.Keg:
+                case TileType.PreservesJar:
+                    RunProcessor(machine);
                     break;
                 case TileType.Conveyor:
                 case TileType.FastConveyor:
@@ -274,6 +295,45 @@ namespace Game.Core
             return true;
         }
 
+        // Machines a player can fill by hand ([넣기]): what they make things from.
+        public static bool LoadsByHand(TileType kind) =>
+            kind == TileType.Smelter || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator;
+
+        // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
+        // a belt would. Returns how many went in.
+        public int LoadMachine(int playerId, MaterialDefinition material, int count)
+        {
+            var player = FindPlayer(playerId);
+            var machine = player == null || player.IsDead || material == null ? null : MachineFacing(player.Position, player.Facing);
+            if (machine == null || !LoadsByHand(machine.Kind)) return 0;
+            int moved = 0;
+            // Pushing from the machine to itself: none of these care where a load comes from.
+            while (moved < count && player.Inventory.CountOf(material) > 0 && Push(machine, material, machine.X, machine.Y))
+            {
+                player.Inventory.TakeMaterial(material);
+                moved++;
+            }
+            if (moved > 0) player.InventoryVersion++;
+            return moved;
+        }
+
+        // Takes everything the machine ahead has made into the player's bag ([꺼내기]). Returns how many.
+        public int UnloadMachine(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            var machine = player == null || player.IsDead ? null : MachineFacing(player.Position, player.Facing);
+            if (machine == null || machine.Output.Count == 0) return 0;
+            int moved = 0;
+            foreach (var pair in machine.Output.ToList())
+            {
+                player.Inventory.AddMaterial(pair.Key, pair.Value);
+                moved += pair.Value;
+            }
+            machine.Output.Clear();
+            player.InventoryVersion++;
+            return moved;
+        }
+
         // Puts the player's fuel of this kind into the generator ahead, as much as it holds. False when the machine
         // ahead is not a generator, the material does not burn, or there is no room.
         public bool Refuel(int playerId, MaterialDefinition fuel)
@@ -347,6 +407,8 @@ namespace Game.Core
                     case TileType.Smelter:
                     case TileType.Harvester:
                     case TileType.Assembler:
+                    case TileType.Keg:
+                    case TileType.PreservesJar:
                         var made = source.Output.Keys.FirstOrDefault(Fits);
                         if (made != null) Add(source.Output, made, -1);
                         return made;
@@ -390,11 +452,12 @@ namespace Game.Core
             SendOut(drill, drill.Back);
         }
 
-        // Melts whatever recipe its input allows every so often, and sends results out of the front.
-        void RunSmelter(Machine smelter)
+        // Makes whatever of its recipes its input allows every so often (a smelter melts, a keg brews, a jar pickles),
+        // and sends results out of the front.
+        void RunProcessor(Machine smelter)
         {
-            // The time only runs while there is something it can melt and room for the result.
-            var recipe = Smelts.FirstOrDefault(r => r.Ingredients.All(i => smelter.Input.GetValueOrDefault(i.Material) >= i.Count)
+            // The time only runs while there is something it can make and room for the result.
+            var recipe = ProcessesOf(smelter.Kind).FirstOrDefault(r => r.Ingredients.All(i => smelter.Input.GetValueOrDefault(i.Material) >= i.Count)
                 && Count(smelter.Output) + r.Count <= smelter.Definition.Capacity);
             if (recipe == null)
             {
@@ -447,7 +510,8 @@ namespace Game.Core
                     int seeds = Reap(crop, out int count);
                     Add(harvester.Output, definition.HarvestMaterial, count);
                     CountMade(definition.HarvestMaterial, count);
-                    if (seeds > 0)
+                    // One that regrows is still there.
+                    if (seeds > 0 && CropAt(crop.X, crop.Y) == null)
                     {
                         PlantCrop(definition, crop.X, crop.Y);
                         seeds--;
@@ -566,7 +630,7 @@ namespace Game.Core
                 TileType.Splitter => true,
                 TileType.Filter => true,
                 TileType.Generator => material.Fuel > 0,
-                TileType.Smelter => Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)),
+                TileType.Smelter or TileType.Keg or TileType.PreservesJar => ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)),
                 TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material),
                 _ => false,
             };
@@ -602,7 +666,9 @@ namespace Game.Core
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Smelter:
-                        if (!Smelts.Any(r => r.Ingredients.Any(i => i.Material == material)) || Count(target.Input) >= target.Definition.Capacity) return false;
+                    case TileType.Keg:
+                    case TileType.PreservesJar:
+                        if (!ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material)) || Count(target.Input) >= target.Definition.Capacity) return false;
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Assembler:

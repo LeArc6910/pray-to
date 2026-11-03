@@ -242,6 +242,11 @@ namespace Game.Client
             DrawCrafting();
         }
 
+        // Whether the machine makes anything from the material (World.Takes, as far as the client can tell).
+        bool Takes(MachineView machine, MaterialDefinition material) => machine.Kind == TileType.Assembler
+            ? machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material)
+            : _client.ProcessesOf(machine.Kind).Any(r => r.Ingredients.Any(i => i.Material == material));
+
         bool _showProduction;
 
         // What the machines made lately (World.Production), folded away until asked for. Only once anything was made.
@@ -334,6 +339,22 @@ namespace Game.Client
                 if (ahead.Value.Setting != null && GUILayout.Button("비우기", GUILayout.Width(56))) Send(_client.SetFilterCommand(null), Sound.Click);
                 GUILayout.EndHorizontal();
             }
+            // A machine that makes things: what it holds and has made, [꺼내기], and for a keg or a jar what it makes.
+            bool loads = ahead != null && World.LoadsByHand(ahead.Value.Kind) && ahead.Value.Kind != TileType.Generator;
+            if (ahead != null && (loads || ahead.Value.Held > 0))
+            {
+                var machine = ahead.Value;
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Fit($"{_client.TileName(machine.Kind)}: 넣은 것 {machine.Holding} · 만든 것 {machine.Held}", _textWidth - 72));
+                if (machine.Held > 0 && GUILayout.Button("꺼내기", GUILayout.Width(64))) Send(_client.UnloadCommand(), Sound.Pickup);
+                GUILayout.EndHorizontal();
+                if (machine.Kind == TileType.Keg || machine.Kind == TileType.PreservesJar)
+                {
+                    string makes = string.Join(" · ", _client.ProcessesOf(machine.Kind)
+                        .Select(r => $"{string.Join("+", r.Ingredients.Select(i => $"{i.Material.Name} {i.Count}"))} → {r.Name}"));
+                    GUILayout.Label(Fit($"만드는 것: {makes}", _textWidth));
+                }
+            }
             foreach (var pair in _client.Bag.Materials.ToList())
             {
                 GUILayout.BeginHorizontal();
@@ -348,6 +369,9 @@ namespace Game.Client
                 // Facing a filter, any material can be what it picks out; facing a generator, fuel goes in.
                 if (ahead?.Kind == TileType.Filter && GUILayout.Button("거르기", GUILayout.Width(56))) Send(_client.SetFilterCommand(pair.Key), Sound.Click);
                 if (ahead?.Kind == TileType.Generator && pair.Key.Fuel > 0 && GUILayout.Button("연료", GUILayout.Width(48))) Send(_client.RefuelCommand(pair.Key), Sound.Place);
+                // Facing a machine that makes things from this, it goes in (all of it, up to what the machine holds).
+                if (loads && Takes(ahead.Value, pair.Key) && GUILayout.Button("넣기", GUILayout.Width(48)))
+                    Send(_client.LoadCommand(pair.Key, Math.Min(pair.Value, World.MaxTrade)), Sound.Place);
                 if (pair.Key.Id == World.Fertilizer && GUILayout.Button("거름 주기", GUILayout.Width(72))) Send(_client.FertilizeCommand(), Sound.Place);
                 // Only what a quick slot can use: things that build, seeds and the tools.
                 if (pair.Key.Places != null || crop != null || IsTool(pair.Key))
@@ -532,6 +556,8 @@ namespace Game.Client
             }
             foreach (var recipe in recipes)
             {
+                // A keg's or a jar's: only that machine makes it (the materials page lists them by it).
+                if (_client.MadeByMachine(recipe)) continue;
                 string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Available(i.Material)}/{i.Count}"));
                 var station = _client.MissingStation(recipe);
                 if (station != null) needs += $" · {StationName(station.Value)} 필요";
