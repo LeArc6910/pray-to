@@ -58,9 +58,12 @@ namespace Game.Client
 
         public static float Scale { get; private set; } = 1;
 
-        // Screen size in points.
-        public static float Width => Screen.width / Scale;
-        public static float Height => Screen.height / Scale;
+        // Screen size in points: a test's stand-in size when there is one (SizeOverride), so the play mode tests can
+        // check the layout for a phone's screen on any machine.
+        public static float Width => SizeOverride?.x ?? Screen.width / Scale;
+        public static float Height => SizeOverride?.y ?? Screen.height / Scale;
+
+        internal static Vector2? SizeOverride { get; set; }
 
         // Call at the start of every OnGUI.
         public static void Begin()

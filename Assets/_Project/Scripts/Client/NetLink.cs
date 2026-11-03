@@ -42,11 +42,15 @@ namespace Game.Client
         public ulong LocalClientId => _manager.LocalClientId;
         public string DisconnectReason => _manager.DisconnectReason;
 
-        // Listens on every network interface so other machines on the LAN can join.
+        // Where a host listens: every network interface, so other machines on the LAN can join. The play mode tests
+        // listen on this machine only (127.0.0.1), which needs no firewall permission, so they run without anyone
+        // answering Windows' firewall prompt.
+        internal static string ListenAddress { get; set; } = "0.0.0.0";
+
         public static NetLink Host(ushort port)
         {
             var link = new NetLink();
-            link.Transport.SetConnectionData("127.0.0.1", port, "0.0.0.0");
+            link.Transport.SetConnectionData("127.0.0.1", port, ListenAddress);
             return link.Start(host: true) ? link : link.Fail();
         }
 

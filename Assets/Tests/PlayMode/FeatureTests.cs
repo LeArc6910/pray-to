@@ -77,7 +77,7 @@ namespace Game.Client.Tests
 
         // Holding the attack against a ring of slimes: the combo's three steps, hit stars, knockback, hit-stop, and
         // the slimes striking back (the red edge of the screen).
-        [UnityTest]
+        [UnityTest, Category(Screens.Category)]
         public IEnumerator TheComboAndHitsDraw()
         {
             yield return Start();
@@ -86,6 +86,12 @@ namespace Game.Client.Tests
             _root.HoldAttack = true;
             _root.HeldAim = new Vec2(1, 0);
             yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("combo");
+            // The same on a touch screen: the sticks and the skill buttons.
+            Controls.ForceTouch(true);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Screens.Take("combo-touch");
+            Controls.ForceTouch(false);
             _root.HoldAttack = false;
             Assert.IsTrue(_root.Playing);
             Assert.IsTrue(slimes.Any(s => s.Health < s.MaxHealth), "Holding the attack hit nothing.");
@@ -95,7 +101,7 @@ namespace Game.Client.Tests
         // Every machine this round of work added, running: a water wheel at a pool, a solar panel, an arc furnace with
         // ore, a tesla tower and a turret with fire ammo with a slime to shoot, a filter with two picks, a harvester
         // with seeds over soil.
-        [UnityTest]
+        [UnityTest, Category(Screens.Category)]
         public IEnumerator TheNewMachinesDraw()
         {
             yield return Start();
@@ -119,12 +125,13 @@ namespace Game.Client.Tests
             var slime = Spawn("slime", TileMap.Center(turret.X + 2, turret.Y));
             slime.MaxHealth = slime.Health = 5000;
             yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("machines");
             Assert.IsTrue(_root.Playing);
             Assert.IsTrue(World.IsPowered(World.MachineAt(wheel.X, wheel.Y)), "The water wheel did not turn beside water.");
         }
 
         // A defense under way at a stone beside the player, with built walls in the way to break.
-        [UnityTest]
+        [UnityTest, Category(Screens.Category)]
         public IEnumerator ADefenseDraws()
         {
             yield return Start();
@@ -134,11 +141,12 @@ namespace Game.Client.Tests
             World.RestoreDefense(1, 0);
             Assert.IsTrue(World.StartDefense(Player.Id), "The defense did not start beside the stone.");
             yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("defense");
             Assert.IsTrue(_root.Playing);
         }
 
         // A rift opened at an altar with a key.
-        [UnityTest]
+        [UnityTest, Category(Screens.Category)]
         public IEnumerator ARiftDraws()
         {
             yield return Start();
@@ -147,12 +155,13 @@ namespace Game.Client.Tests
             Give(World.RiftKey, 1);
             Assert.IsTrue(World.OpenRift(Player.Id), "The rift did not open at the altar.");
             yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("rift");
             Assert.IsTrue(_root.Playing);
         }
 
         // The weathers and the calendar's events, a skylight laid by the player, and the time of day passing over
         // the cave's light wells.
-        [UnityTest]
+        [UnityTest, Category(Screens.Category)]
         public IEnumerator WeatherEventsAndSkylightsDraw()
         {
             yield return Start();
@@ -163,18 +172,20 @@ namespace Game.Client.Tests
                 int day = Enumerable.Range(2, 400).First(d => World.WeatherOf(d) == weather);
                 World.RestoreClock((day - 1) * Calendar.TicksPerDay);
                 yield return new WaitForSecondsRealtime(1.5f);
+                yield return Screens.Take("weather-" + weather.ToString().ToLowerInvariant());
             }
             // A full moon's evening and night, and a market day's noon.
             foreach (var (day, hour) in new[] { (8, 13f), (8, 17f), (5, 6f) })
             {
                 World.RestoreClock((long)((day - 1 + hour / 24) * Calendar.TicksPerDay));
                 yield return new WaitForSecondsRealtime(1.5f);
+                yield return Screens.Take($"day{day}-{hour:00}h");
             }
             Assert.IsTrue(_root.Playing);
         }
 
         // Mana spent and drunk back, and the set and rift legendaries worn.
-        [UnityTest]
+        [UnityTest, Category(Screens.Category)]
         public IEnumerator ManaAndSetsDraw()
         {
             yield return Start();
@@ -192,6 +203,12 @@ namespace Game.Client.Tests
                 Player.Equip(generator.RollLegendary(piece, new GameRandom(3)));
             }
             yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("mana-set");
+            // The bag, with the set worn.
+            _root.BagOpen = true;
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("bag");
+            _root.BagOpen = false;
             Assert.IsTrue(_root.Playing);
             Assert.Greater(Player.Stats.MaxMana, 0);
         }

@@ -1,8 +1,29 @@
 # 로컬 작업 지시서
 
 클라우드 세션(코드·데이터·문서 담당)이 로컬(Unity 에디터가 있는 컴퓨터)에 넘기는 작업 목록이다.
-에디터 설정, 컴파일 확인, 테스트는 **명령 한 줄**로 끝난다. 그 밖에 사람이 직접 해야 하는 일은 아래에 따로 모아 둔다.
+에디터 설정, 컴파일 확인, 테스트, 화면 캡처는 **명령 한 줄**로 끝나고, **감시 스크립트**를 켜 두면 그것도 사람 손 없이 돈다. 그 밖에 사람이 직접 해야 하는 일은 아래에 따로 모아 둔다.
 로컬 세션(이 컴퓨터에서 도는 Claude)이 있다면 명령 한 줄과 결과 보고는 로컬 세션이 해도 된다.
+
+## 사람 손 없이 돌리기 (2026-11-04)
+
+한 번만 켜 두면, 클라우드가 main에 올릴 때마다 이 컴퓨터가 저절로 시험하고 결과를 올린다.
+
+```
+# Windows: 로그인할 때마다 켜지게 하고 지금도 켠다(최소화된 창). 끄려면 -Uninstall
+powershell -ExecutionPolicy Bypass -File DevTools\Local\watch.ps1 -Install
+
+# macOS, Linux: 10분마다 도는 cron 항목을 넣는다. 끄려면 --uninstall
+DevTools/Local/watch.sh --install
+```
+
+- 5분마다(cron은 10분마다) `origin/main`을 보고, 새 커밋이 있으면 명령 한 줄을 `-Commit`으로 돌린다: 받기, 프로젝트 설정, EditMode·PlayMode 테스트, 화면 캡처, 결과 보고와 푸시. 로컬 결과 커밋만 늘었으면 돌지 않는다
+- **화면 캡처**: `Screens` 분류의 PlayMode 장면(혼자 하기, 연타와 터치 화면, 새 기계, 기지 방어, 균열, 폭풍·안개·비, 보름달·장날, 마나와 세트, 가방 창)을 창이 보이는 Unity로 한 번 더 돌려 찍는다. Unity 창이 몇 분 열렸다 닫힌다(끝났는데 스스로 닫히지 않으면 30초 뒤에 닫고, 20분 안에 끝나지 않으면 끈다). 사진은 `local-screens` 브랜치에 올리고(매번 덮어써서 기록이 쌓이지 않는다), **클라우드가 그 사진으로 화면을 확인한다**. 그래서 아래 단계의 "(사람) ~가 보이는지"는 대부분 사진으로 대신한다
+- **화면 배치**: `LayoutTests`가 휴대폰 세로·가로, 작은 휴대폰, 태블릿, 작은 PC 창, PC 크기에서 스킬 단추·퀵슬롯·미니맵·HUD·터치 단추가 화면 안에 겹치지 않고 들어가는지 숫자로 본다
+- 테스트의 호스트는 이 컴퓨터 안(127.0.0.1)에서만 열어서 방화벽 창이 뜨지 않는다
+- 건너뛰는 때: Unity로 이 프로젝트를 열어 두었을 때, 커밋하지 않은 변경이 있을 때(사람이 작업 중일 수 있다). 다음 차례에 다시 본다
+- 푸시하려는 사이 클라우드가 먼저 올렸으면 그 위로 옮겨(rebase) 다시 푸시한다
+- 기록은 `Logs/watch.log`, 마지막으로 시험한 커밋은 `Logs/watch-tested.txt`
+- 사람이 꼭 해야 하는 것만 남는다: 실제 휴대폰으로 만져 보기(터치 감), 소리와 손맛(연타·타격감), 오래 해 보는 재미. 아래 단계에서 이런 것만 "(사람)"으로 남긴다
 
 ## 규칙
 
@@ -24,15 +45,16 @@ powershell -ExecutionPolicy Bypass -File DevTools\Local\setup.ps1 -Commit
 DevTools/Local/setup.sh --commit
 ```
 
-하는 일:
+하는 일(`watch`가 켜져 있으면 저절로 한다):
 
 1. `git pull`, Git LFS 연결
 2. `ProjectSettings/ProjectVersion.txt`의 Unity(6000.6.3f1)를 Unity Hub 설치 위치에서 찾는다
 3. 배치 모드로 프로젝트를 열어 **Game > Set Up Project**를 실행한다. Active Input Handling(Input System Package), Product Name, 2D 모드, URP 2D 렌더러 에셋과 Graphics·Quality 지정, `Main` 씬, `GameSheets` 에셋을 만든다
 4. EditMode 테스트(Core 규칙)와 PlayMode 테스트(실제 클라이언트로 혼자 하기와 호스트를 5초씩 돌리고, 혼자 하기에서 스킬 넷을 모두 써 보며 에러가 없는지. 2026-11-04부터 `FeatureTests`가 새 기능의 장면 여섯을 3초쯤씩 그린다: 연타와 타격, 새 기계, 기지 방어, 균열, 날씨·행사·채광창, 마나·세트)를 돌린다
-5. 결과를 이 파일의 "결과 보고"에 적고, 생성된 파일과 함께 커밋·푸시한다
+5. 화면 캡처: `Screens` 분류의 장면을 창이 보이는 Unity로 돌려 `Logs/screens/`에 찍고, `-Commit`이면 `local-screens` 브랜치에 올린다
+6. 결과를 이 파일의 "결과 보고"에 적고, 생성된 파일과 함께 커밋·푸시한다(거절되면 새 커밋 위로 옮겨 다시)
 
-옵션: `-InstallEditor`(`--install-editor`)는 Unity가 없으면 Unity Hub로 설치한다(Web Build Support 포함). `-SkipTests`(`--skip-tests`), `-NoPull`(`--no-pull`). `-Commit`을 빼면 결과만 적고 커밋하지 않는다. Unity가 Hub 기본 위치가 아닌 곳에 있으면 환경 변수 `UNITY_EXE`에 실행 파일 경로를 넣는다. 로그는 `Logs/`에 남는다(커밋하지 않는다).
+옵션: `-InstallEditor`(`--install-editor`)는 Unity가 없으면 Unity Hub로 설치한다(Web Build Support 포함). `-SkipTests`(`--skip-tests`), `-NoScreens`(`--no-screens`), `-NoPull`(`--no-pull`). `-Commit`을 빼면 결과만 적고 커밋하지 않는다. Unity가 Hub 기본 위치가 아닌 곳에 있으면 환경 변수 `UNITY_EXE`에 실행 파일 경로를 넣는다. 로그는 `Logs/`에 남는다(커밋하지 않는다).
 
 처음 실행은 패키지를 받고 임포트하느라 10분쯤 걸린다. 같은 메뉴는 에디터 안에서도 **Game > Set Up Project**로 실행할 수 있다.
 
@@ -45,7 +67,8 @@ DevTools/Local/setup.sh --commit
 - [x] **Unity Hub** 설치(https://unity.com/download), Unity 계정으로 로그인, Preferences > Licenses에서 **Personal 라이선스** 활성화. 명령 한 줄의 배치 모드도 이 라이선스로 돈다. Hub 로그인이 풀리면 배치 모드가 라이선스 에러(종료 코드 198)로 멈추니, 그때는 Hub에 다시 로그인한다
 - [x] **Unity 6000.6.3f1**과 **Web Build Support** 설치. Hub에서 직접 하거나, 명령 한 줄에 `-InstallEditor`를 붙인다
 - [x] **Git** 설치(Windows는 Git for Windows. Git LFS가 같이 들어 있다) 후 저장소 클론
-- [x] 명령 한 줄 실행. 처음에 Windows 방화벽 창이 뜨면 Unity Editor를 **허용**한다(PlayMode 테스트가 호스트를 열기 때문이고, 같은 네트워크의 친구가 참가할 때도 필요하다)
+- [x] 명령 한 줄 실행. 처음에 Windows 방화벽 창이 뜨면 Unity Editor를 **허용**한다(같은 네트워크의 친구가 참가할 때 필요하다. 2026-11-04부터 테스트는 이 컴퓨터 안에서만 열어서 창이 뜨지 않는다)
+- [ ] **감시 스크립트 켜기** (2026-11-04, 한 번만): 위 "사람 손 없이 돌리기"의 `watch.ps1 -Install`. 그 뒤로는 클라우드가 올릴 때마다 저절로 시험하고 결과와 화면을 올린다. Unity Hub 로그인이 풀리면(라이선스 에러, 종료 코드 198) 결과 보고에 적히니 그때만 Hub에 다시 로그인한다
 
 ### 웹 데모(모바일 브라우저 테스트)용
 
@@ -600,6 +623,11 @@ DevTools/Local/setup.sh --commit
 - [ ] 72단계: PlayMode 장면 테스트(`Assets/Tests/PlayMode/FeatureTests.cs`)
   - (로컬 세션) 명령 한 줄을 `-Commit`과 함께 돌린다. 새 파일 `FeatureTests.cs`의 `.meta`가 생기고 PlayMode 테스트가 6개 늘어난다. 실패하면 Console 로그와 실패한 장면 이름을 결과 보고에 붙인다(클라우드가 고친다)
   - 장면은 자기 이름(`playmode-feature-test`)의 월드와 캐릭터를 쓰고 끝나면 지운다. 원래 저장본은 건드리지 않는다
+
+- [ ] 73단계: 사람 손 없이 돌리기(위 "사람 손 없이 돌리기")
+  - (사람, 한 번) `watch.ps1 -Install`을 실행한다. 그 뒤로는 할 것이 없다
+  - (자동) 다음 클라우드 커밋에 감시가 명령 한 줄을 돌리고, 결과 보고에 "화면 캡처: 사진 N장"이 적히고, `local-screens` 브랜치가 생기는지. 새 파일 `Assets/Tests/PlayMode/Screens.cs`, `LayoutTests.cs`의 `.meta`도 이때 커밋된다
+  - 화면 캡처가 "결과 파일이 없습니다"나 시간 초과로 끝나면 Logs/screens.log에서 뽑은 줄이 보고에 붙는다(클라우드가 고친다)
 
 ## 결과 보고
 

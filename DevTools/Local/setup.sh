@@ -6,9 +6,12 @@
 #   3. 배치 모드로 프로젝트를 열어 Game > Set Up Project를 실행한다
 #      (Active Input Handling, Product Name, 2D 모드, URP 2D 렌더러, Main 씬, GameSheets 에셋)
 #   4. EditMode 테스트(Core 규칙)와 PlayMode 테스트(실제 클라이언트로 혼자 하기와 호스트를 몇 초씩)를 돌린다
-#   5. 결과를 LOCAL_TASKS.md의 "결과 보고"에 적는다. --commit이면 생성된 파일과 함께 커밋하고 푸시한다
+#   5. 화면 캡처: Screens 분류의 PlayMode 테스트를 창이 보이는 Unity로 한 번 더 돌려 장면마다 화면을 찍는다
+#      (배치 모드에서는 화면을 그리지 않는다). --commit이면 local-screens 브랜치에 올린다(클라우드가 본다)
+#   6. 결과를 LOCAL_TASKS.md의 "결과 보고"에 적는다. --commit이면 생성된 파일과 함께 커밋하고 푸시한다
 #
-# 사용법: DevTools/Local/setup.sh [--commit] [--install-editor] [--skip-tests] [--no-pull]
+# 사용법: DevTools/Local/setup.sh [--commit] [--install-editor] [--skip-tests] [--no-screens] [--no-pull]
+# 새 커밋마다 저절로 돌리려면 watch.sh를 쓴다.
 # Unity가 다른 곳에 있으면 환경 변수 UNITY_EXE에 실행 파일 경로를 넣는다. 로그와 테스트 결과는 Logs/에 남는다.
 # macOS의 bash 3.2는 set -u에서 빈 배열을 쓰면 멈추므로 -u는 켜지 않는다.
 set -o pipefail
@@ -16,12 +19,14 @@ set -o pipefail
 commit=0
 install_editor=0
 skip_tests=0
+screens=1
 pull=1
 for arg in "$@"; do
     case "$arg" in
         --commit) commit=1 ;;
         --install-editor) install_editor=1 ;;
         --skip-tests) skip_tests=1 ;;
+        --no-screens) screens=0 ;;
         --no-pull) pull=0 ;;
         *) echo "알 수 없는 옵션: $arg" >&2; exit 2 ;;
     esac
@@ -92,6 +97,72 @@ run_unity() {
     local name="$1"
     shift
     "$unity" -batchmode -projectPath "$root" -logFile "$logs/$name.log" "$@"
+}
+
+# 창이 보이는 Unity로 테스트를 돌린다(배치 모드가 아니어야 게임 화면과 OnGUI가 그려진다). 결과 파일($3)이
+# 생기면 테스트는 끝난 것이니, Unity가 스스로 닫히지 않아도 잠시(PRAY_TO_SCREENS_GRACE초, 기본 30) 뒤에 끄고 0을
+# 돌려준다. 결과 없이 $1초가 지나면 끄고 124.
+run_unity_window() {
+    local seconds="$1" name="$2" done_file="$3"
+    shift 3
+    "$unity" -projectPath "$root" -logFile "$logs/$name.log" "$@" &
+    local pid=$! waited=0 grace=0
+    while kill -0 "$pid" 2>/dev/null; do
+        if [ -f "$done_file" ]; then
+            if [ "$grace" -ge "${PRAY_TO_SCREENS_GRACE:-30}" ]; then
+                kill "$pid" 2>/dev/null
+                sleep 1
+                kill -9 "$pid" 2>/dev/null
+                wait "$pid" 2>/dev/null
+                return 0
+            fi
+            grace=$((grace + 1))
+            sleep 1
+            continue
+        fi
+        if [ "$waited" -ge "$seconds" ]; then
+            kill "$pid" 2>/dev/null
+            sleep 2
+            kill -9 "$pid" 2>/dev/null
+            wait "$pid" 2>/dev/null
+            return 124
+        fi
+        sleep 2
+        waited=$((waited + 2))
+    done
+    wait "$pid"
+}
+
+# 화면을 그릴 곳이 있는지: macOS는 늘, Linux는 디스플레이가 있을 때(PRAY_TO_SCREENS=1이면 늘)
+can_show_window() {
+    [ "${PRAY_TO_SCREENS:-}" = 1 ] && return 0
+    [ "$(uname -s)" = Darwin ] && return 0
+    [ -n "${DISPLAY:-}${WAYLAND_DISPLAY:-}" ]
+}
+
+# Logs/screens의 사진을 local-screens 브랜치 하나로 올린다. 이 브랜치는 매번 새로 덮어쓴다(기록을 쌓지 않는다).
+publish_screens() {
+    local folder="$logs/screens" work="$logs/screens-branch" remote
+    remote="$(git -C "$root" remote get-url origin)" || return 1
+    rm -rf "$work"
+    mkdir -p "$work"
+    cp "$folder"/*.jpg "$work/" || return 1
+    {
+        echo "# 로컬 화면 캡처"
+        echo
+        echo "$(date '+%Y-%m-%d %H:%M'), main $(git -C "$root" rev-parse --short HEAD). DevTools/Local/setup.sh가 만들었다."
+        echo
+        for shot in "$work"/*.jpg; do echo "- $(basename "$shot")"; done
+    } > "$work/README.md"
+    (
+        cd "$work" || exit 1
+        git init -q
+        git config user.name "$(git -C "$root" config user.name || echo local)"
+        git config user.email "$(git -C "$root" config user.email || echo local@localhost)"
+        git add -A
+        git commit -q -m "Screenshots from the local play mode tests"
+        git push -q --force "$remote" HEAD:refs/heads/local-screens
+    )
 }
 
 # 로그에서 원인이 될 만한 줄을 뽑는다
@@ -197,7 +268,23 @@ if [ "$setup_code" = 0 ] && [ "$skip_tests" = 0 ]; then
     done
 fi
 
-# --- 5. 결과 보고
+# --- 5. 화면 캡처
+# 이만큼(초) 지나도 끝나지 않으면 끈다. 시험용으로 PRAY_TO_SCREENS_SECONDS로 바꿀 수 있다.
+screens_seconds="${PRAY_TO_SCREENS_SECONDS:-1200}"
+screens_note=""
+screens_code=""
+if [ "$setup_code" = 0 ] && [ "$skip_tests" = 0 ] && [ "$screens" = 1 ]; then
+    if can_show_window; then
+        say "화면 캡처 중: Unity 창이 잠깐 열렸다 닫힌다 (Logs/screens.log)"
+        rm -rf "$logs/screens" "$logs/screens-results.xml"
+        run_unity_window "$screens_seconds" screens "$logs/screens-results.xml" -runTests -testPlatform PlayMode -testCategory Screens -testResults "$logs/screens-results.xml"
+        screens_code=$?
+    else
+        screens_note="화면을 그릴 디스플레이가 없어 건너뜀"
+    fi
+fi
+
+# --- 6. 결과 보고
 all_ok=1
 report="$logs/report.md"
 summary=""
@@ -246,6 +333,28 @@ for i in "${!platforms[@]}"; do
     [ "${inconclusive:-0}" = 0 ] || summary="$summary $inconclusive inconclusive."
 done
 [ "$skip_tests" = 1 ] && echo "- 테스트: 건너뜀" >> "$report"
+shots=0
+if [ -n "$screens_code" ]; then
+    shots="$(find "$logs/screens" -name '*.jpg' 2>/dev/null | wc -l | tr -d ' ')"
+    results="$logs/screens-results.xml"
+    if [ "$screens_code" = 124 ]; then
+        all_ok=0
+        echo "- 화면 캡처: **${screens_seconds}초 안에 끝나지 않아 껐다** (사진 ${shots}장). Logs/screens.log에서 뽑은 줄:" >> "$report"
+        log_errors screens | code_bullets >> "$report"
+    elif [ -f "$results" ]; then
+        failed="$(run_attribute "$results" failed)"
+        [ "${failed:-0}" = 0 ] || all_ok=0
+        echo "- 화면 캡처: 사진 ${shots}장, 장면 $(run_attribute "$results" total)개 중 $(run_attribute "$results" passed)개 통과" >> "$report"
+        failures "$results" | code_bullets >> "$report"
+    else
+        all_ok=0
+        echo "- 화면 캡처: **결과 파일이 없습니다** (종료 코드 $screens_code). Logs/screens.log에서 뽑은 줄:" >> "$report"
+        log_errors screens | code_bullets >> "$report"
+    fi
+    summary="$summary Screens: $shots."
+elif [ -n "$screens_note" ]; then
+    echo "- 화면 캡처: $screens_note" >> "$report"
+fi
 # 로컬은 스크립트를 고치지 않는다. Unity가 API 업데이트로 .cs를 바꿨다면 보고하고 커밋에서 뺀다.
 changed_scripts="$(git -C "$root" diff HEAD --name-only -- '*.cs' | paste -sd, - | sed 's/,/, /g')"
 if [ -n "$changed_scripts" ]; then
@@ -265,13 +374,27 @@ echo
 cat "$report"
 echo
 
-# --- 6. 커밋
+# --- 7. 커밋
 if [ "$commit" = 1 ]; then
+    if [ "${shots:-0}" -gt 0 ]; then
+        say "화면 ${shots}장을 local-screens 브랜치에 올린다"
+        publish_screens || { warn "화면을 올리지 못했습니다."; all_ok=0; }
+    fi
     git -C "$root" add -A
     git -C "$root" diff HEAD --name-only -- '*.cs' | while read -r script; do git -C "$root" reset -q -- "$script"; done
     if git -C "$root" commit -q -m "Record local Unity setup results" -m "$summary"; then
         say "git push"
-        git -C "$root" push || { warn "git push가 실패했습니다. 직접 푸시하세요."; all_ok=0; }
+        if ! git -C "$root" push -q; then
+            # 그사이 클라우드가 올렸다: 그 위로 옮겨 다시 푸시한다
+            warn "푸시가 거절되어 새 커밋 위로 옮긴다"
+            if git -C "$root" pull -q --rebase && git -C "$root" push -q; then
+                say "다시 푸시했다"
+            else
+                git -C "$root" rebase --abort 2>/dev/null
+                warn "git push가 실패했습니다. 직접 푸시하세요."
+                all_ok=0
+            fi
+        fi
     else
         say "커밋할 변경이 없습니다."
     fi

@@ -70,6 +70,9 @@ namespace Game.Client
         // A touch has been seen this run: the HUD shows touch buttons and hints.
         public static bool UsingTouch { get; private set; }
 
+        // For the play mode tests: lay the screen out as for a touch screen, or not, without a finger.
+        internal static void ForceTouch(bool touch) => UsingTouch = touch;
+
         // Once per frame, before Read: follows the fingers. Then drops last frame's UI areas; OnGUI marks them again.
         public static void UpdateTouches()
         {

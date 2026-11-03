@@ -8,9 +8,12 @@
     3. 배치 모드로 프로젝트를 열어 Game > Set Up Project를 실행한다
        (Active Input Handling, Product Name, 2D 모드, URP 2D 렌더러, Main 씬, GameSheets 에셋)
     4. EditMode 테스트(Core 규칙)와 PlayMode 테스트(실제 클라이언트로 혼자 하기와 호스트를 몇 초씩)를 돌린다
-    5. 결과를 LOCAL_TASKS.md의 "결과 보고"에 적는다. -Commit이면 생성된 파일과 함께 커밋하고 푸시한다
+    5. 화면 캡처: Screens 분류의 PlayMode 테스트를 창이 보이는 Unity로 한 번 더 돌려 장면마다 화면을 찍는다
+       (배치 모드에서는 화면을 그리지 않는다). -Commit이면 local-screens 브랜치에 올린다(클라우드가 본다)
+    6. 결과를 LOCAL_TASKS.md의 "결과 보고"에 적는다. -Commit이면 생성된 파일과 함께 커밋하고 푸시한다
 
     로그와 테스트 결과는 Logs/에 남는다(커밋하지 않는다). macOS와 Linux는 setup.sh를 쓴다.
+    새 커밋마다 저절로 돌리려면 watch.ps1을 쓴다.
 
 .EXAMPLE
     powershell -ExecutionPolicy Bypass -File DevTools\Local\setup.ps1 -Commit
@@ -23,6 +26,8 @@ param(
     [switch]$InstallEditor,
     # 테스트를 건너뛴다
     [switch]$SkipTests,
+    # 화면 캡처를 건너뛴다
+    [switch]$NoScreens,
     # 시작할 때 git pull을 하지 않는다
     [switch]$NoPull
 )
@@ -99,6 +104,74 @@ function Invoke-Unity([string]$name, [string[]]$extra) {
     $null = $process.Handle
     $process.WaitForExit()
     return $process.ExitCode
+}
+
+# 창이 보이는 Unity로 테스트를 돌린다(배치 모드가 아니어야 게임 화면과 OnGUI가 그려진다). 결과 파일($doneFile)이
+# 생기면 테스트는 끝난 것이니, Unity가 스스로 닫히지 않아도 잠시(PRAY_TO_SCREENS_GRACE초, 기본 30) 뒤에 끄고 0을
+# 돌려준다. 결과 없이 $seconds초가 지나면 끄고 124.
+function Invoke-UnityWindow([int]$seconds, [string]$name, [string]$doneFile, [string[]]$extra) {
+    $log = Join-Path $logs "$name.log"
+    $arguments = @('-projectPath', $root, '-logFile', $log) + $extra
+    $line = ($arguments | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
+    $process = Start-Process -FilePath $script:unity -ArgumentList $line -PassThru
+    $null = $process.Handle
+    $graceSeconds = if ($env:PRAY_TO_SCREENS_GRACE) { [int]$env:PRAY_TO_SCREENS_GRACE } else { 30 }
+    $waited = 0
+    $grace = 0
+    while (-not $process.WaitForExit(1000)) {
+        if (Test-Path $doneFile) {
+            $grace += 1
+            if ($grace -lt $graceSeconds) { continue }
+            try { $process.Kill() } catch { }
+            $process.WaitForExit()
+            return 0
+        }
+        $waited += 1
+        if ($waited -ge $seconds) {
+            try { $process.Kill() } catch { }
+            $process.WaitForExit()
+            return 124
+        }
+    }
+    return $process.ExitCode
+}
+
+# 화면을 그릴 곳이 있는지: Windows와 macOS는 늘, Linux는 디스플레이가 있을 때(PRAY_TO_SCREENS=1이면 늘)
+function Test-CanShowWindow {
+    if ($env:PRAY_TO_SCREENS -eq '1') { return $true }
+    if ($IsLinux) { return [bool]($env:DISPLAY -or $env:WAYLAND_DISPLAY) }
+    return $true
+}
+
+# Logs/screens의 사진을 local-screens 브랜치 하나로 올린다. 이 브랜치는 매번 새로 덮어쓴다(기록을 쌓지 않는다).
+function Publish-Screens {
+    $folder = Join-Path $logs 'screens'
+    $work = Join-Path $logs 'screens-branch'
+    $remote = (Invoke-Git remote get-url origin | Select-Object -First 1)
+    if ($script:GitExit -ne 0) { return $false }
+    $name = (Invoke-Git config user.name | Select-Object -First 1)
+    $email = (Invoke-Git config user.email | Select-Object -First 1)
+    if (-not $name) { $name = 'local' }
+    if (-not $email) { $email = 'local@localhost' }
+    $head = (Invoke-Git rev-parse --short HEAD | Select-Object -First 1)
+    if (Test-Path $work) { Remove-Item -Recurse -Force $work }
+    New-Item -ItemType Directory -Force -Path $work | Out-Null
+    Copy-Item (Join-Path $folder '*.jpg') $work
+    $readme = @('# 로컬 화면 캡처', '', "$(Get-Date -Format 'yyyy-MM-dd HH:mm'), main $head. DevTools/Local/setup.ps1이 만들었다.", '')
+    $readme += @(Get-ChildItem $work -Filter '*.jpg' | Sort-Object Name | ForEach-Object { "- $($_.Name)" })
+    [IO.File]::WriteAllText((Join-Path $work 'README.md'), ($readme -join "`n") + "`n", (New-Object System.Text.UTF8Encoding $false))
+    $previous = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    try {
+        & git -C $work init -q 2>&1 | Out-Null
+        & git -C $work config user.name $name 2>&1 | Out-Null
+        & git -C $work config user.email $email 2>&1 | Out-Null
+        & git -C $work add -A 2>&1 | Out-Null
+        & git -C $work commit -q -m 'Screenshots from the local play mode tests' 2>&1 | Out-Null
+        & git -C $work push -q --force $remote 'HEAD:refs/heads/local-screens' 2>&1 | ForEach-Object { Write-Host "  $_" }
+        return $LASTEXITCODE -eq 0
+    }
+    finally { $ErrorActionPreference = $previous }
 }
 
 # 로그에서 원인이 될 만한 줄을 뽑는다
@@ -202,7 +275,24 @@ if ($setupOk -and -not $SkipTests) {
     }
 }
 
-# --- 5. 결과 보고
+# --- 5. 화면 캡처
+# 이만큼(초) 지나도 끝나지 않으면 끈다. 시험용으로 PRAY_TO_SCREENS_SECONDS로 바꿀 수 있다.
+$screensSeconds = if ($env:PRAY_TO_SCREENS_SECONDS) { [int]$env:PRAY_TO_SCREENS_SECONDS } else { 1200 }
+$screensCode = $null
+$screensNote = ''
+if ($setupOk -and -not $SkipTests -and -not $NoScreens) {
+    if (Test-CanShowWindow) {
+        Say '화면 캡처 중: Unity 창이 잠깐 열렸다 닫힌다 (Logs/screens.log)'
+        $screensFolder = Join-Path $logs 'screens'
+        if (Test-Path $screensFolder) { Remove-Item -Recurse -Force $screensFolder }
+        $screensResults = Join-Path $logs 'screens-results.xml'
+        if (Test-Path $screensResults) { Remove-Item $screensResults }
+        $screensCode = Invoke-UnityWindow $screensSeconds 'screens' $screensResults @('-runTests', '-testPlatform', 'PlayMode', '-testCategory', 'Screens', '-testResults', $screensResults)
+    }
+    else { $screensNote = '화면을 그릴 디스플레이가 없어 건너뜀' }
+}
+
+# --- 6. 결과 보고
 $allOk = $setupOk
 $report = New-Object System.Collections.Generic.List[string]
 $summary = New-Object System.Collections.Generic.List[string]
@@ -242,6 +332,28 @@ foreach ($platform in $results.Keys) {
     if ($result.Inconclusive -gt 0) { $summary.Add("$($result.Inconclusive) inconclusive.") }
 }
 if ($SkipTests) { $report.Add('- 테스트: 건너뜀') }
+$shots = 0
+if ($null -ne $screensCode) {
+    $shots = @(Get-ChildItem (Join-Path $logs 'screens') -Filter '*.jpg' -ErrorAction SilentlyContinue).Count
+    $screensResult = Read-TestResults 'screens'
+    if ($screensCode -eq 124) {
+        $allOk = $false
+        $report.Add("- 화면 캡처: **${screensSeconds}초 안에 끝나지 않아 껐다** (사진 ${shots}장). Logs/screens.log에서 뽑은 줄:")
+        foreach ($line in (Get-LogErrors 'screens')) { $report.Add("  - ``$line``") }
+    }
+    elseif ($null -ne $screensResult) {
+        if ($screensResult.Failed -gt 0) { $allOk = $false }
+        $report.Add("- 화면 캡처: 사진 ${shots}장, 장면 $($screensResult.Total)개 중 $($screensResult.Passed)개 통과")
+        foreach ($failure in $screensResult.Failures) { $report.Add("  - ``$failure``") }
+    }
+    else {
+        $allOk = $false
+        $report.Add("- 화면 캡처: **결과 파일이 없습니다** (종료 코드 $screensCode). Logs/screens.log에서 뽑은 줄:")
+        foreach ($line in (Get-LogErrors 'screens')) { $report.Add("  - ``$line``") }
+    }
+    $summary.Add("Screens: $shots.")
+}
+elseif ($screensNote) { $report.Add("- 화면 캡처: $screensNote") }
 # 로컬은 스크립트를 고치지 않는다. Unity가 API 업데이트로 .cs를 바꿨다면 보고하고 커밋에서 뺀다.
 # '--'는 따옴표로 감싸야 PowerShell이 삼키지 않고 git에 넘긴다.
 $changedScripts = @(Invoke-Git diff HEAD --name-only '--' '*.cs')
@@ -263,15 +375,30 @@ Write-Host ''
 $report | ForEach-Object { Write-Host $_ }
 Write-Host ''
 
-# --- 6. 커밋
+# --- 7. 커밋
 if ($Commit) {
+    if ($shots -gt 0) {
+        Say "화면 ${shots}장을 local-screens 브랜치에 올린다"
+        if (-not (Publish-Screens)) { Warn '화면을 올리지 못했습니다.'; $allOk = $false }
+    }
     Invoke-Git add -A | Out-Null
     if ($changedScripts.Count -gt 0) { Invoke-Git reset -q '--' @changedScripts | Out-Null }
     Invoke-Git commit -q -m 'Record local Unity setup results' -m ($summary -join ' ') | Out-Null
     if ($script:GitExit -eq 0) {
         Say 'git push'
-        Invoke-Git push | ForEach-Object { Write-Host "  $_" }
-        if ($script:GitExit -ne 0) { Warn 'git push가 실패했습니다. 직접 푸시하세요.'; $allOk = $false }
+        Invoke-Git push -q | ForEach-Object { Write-Host "  $_" }
+        if ($script:GitExit -ne 0) {
+            # 그사이 클라우드가 올렸다: 그 위로 옮겨 다시 푸시한다
+            Warn '푸시가 거절되어 새 커밋 위로 옮긴다'
+            Invoke-Git pull -q --rebase | ForEach-Object { Write-Host "  $_" }
+            if ($script:GitExit -eq 0) { Invoke-Git push -q | ForEach-Object { Write-Host "  $_" } }
+            if ($script:GitExit -eq 0) { Say '다시 푸시했다' }
+            else {
+                Invoke-Git rebase --abort | Out-Null
+                Warn 'git push가 실패했습니다. 직접 푸시하세요.'
+                $allOk = $false
+            }
+        }
     }
     else { Say '커밋할 변경이 없습니다.' }
 }

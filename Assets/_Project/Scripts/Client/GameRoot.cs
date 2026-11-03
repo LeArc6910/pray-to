@@ -577,6 +577,13 @@ namespace Game.Client
         internal bool HoldAttack { get; set; }
         internal Vec2 HeldAim { get; set; }
 
+        // The bag window open or shut, for the play mode tests' screenshots.
+        internal bool BagOpen
+        {
+            get => _inventory.Open;
+            set => _inventory.Open = value;
+        }
+
         internal string Status => _status;
 
         internal int SkillCount => _client?.Skills.Count ?? 0;

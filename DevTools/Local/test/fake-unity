@@ -1,10 +1,13 @@
 #!/usr/bin/env bash
 # Stands in for the Unity editor in run.sh: reads the arguments the setup scripts pass and leaves behind what a real
-# run would (a log, an asset, packages-lock.json, NUnit results). FAKE_LICENSE_FAIL, FAKE_SETUP_FAIL, FAKE_PLAY_FAIL,
-# FAKE_EDIT_INCONCLUSIVE and FAKE_TOUCH_CS switch on the failures and doubtful results the scripts must report.
+# run would (a log, an asset, packages-lock.json, NUnit results, and for the Screens category screenshots in
+# Logs/screens). FAKE_LICENSE_FAIL, FAKE_SETUP_FAIL, FAKE_PLAY_FAIL, FAKE_EDIT_INCONCLUSIVE, FAKE_TOUCH_CS and
+# FAKE_SCREENS_HANG switch on the failures and doubtful results the scripts must report; FAKE_SCREENS_LINGER keeps the
+# windowed run open after its results are written, as an editor that does not close by itself would.
 log=""
 results=""
 platform=""
+category=""
 project=""
 mode=setup
 while [ $# -gt 0 ]; do
@@ -13,6 +16,7 @@ while [ $# -gt 0 ]; do
         -testResults) results="$2"; shift ;;
         -testPlatform) platform="$2"; shift ;;
         -projectPath) project="$2"; shift ;;
+        -testCategory) category="$2"; shift ;;
         -runTests) mode=tests ;;
     esac
     shift
@@ -76,6 +80,41 @@ if [ "$platform" = EditMode ] && [ -n "${FAKE_EDIT_INCONCLUSIVE:-}" ]; then
   </test-suite>
 </test-run>
 XML
+    exit 0
+fi
+
+# The cloud pushes to main while the tests run, so the results commit has to go on top of it.
+if [ -n "${FAKE_PUSH_RACE:-}" ] && [ "$platform" = PlayMode ] && [ -z "$category" ]; then
+    url="$(git -C "$project" remote get-url origin)"
+    race="$(mktemp -d)"
+    git clone -q --branch main "$url" "$race/clone"
+    (
+        cd "$race/clone" || exit 1
+        git config user.name cloud
+        git config user.email cloud@example.com
+        echo race > race.txt
+        git add race.txt
+        git commit -q -m "Cloud change meanwhile"
+        git push -q origin HEAD:main
+    )
+    rm -rf "$race"
+fi
+
+if [ "$category" = Screens ]; then
+    # The windowed screenshot run: never ends when asked to hang, else two pictures.
+    if [ -n "${FAKE_SCREENS_HANG:-}" ]; then
+        echo "NullReferenceException: Object reference not set to an instance of an object" >> "$log"
+        sleep 600
+    fi
+    mkdir -p "$project/Logs/screens"
+    printf 'jpg' > "$project/Logs/screens/solo.jpg"
+    printf 'jpg' > "$project/Logs/screens/combo.jpg"
+    cat > "$results" <<'XML'
+<?xml version="1.0" encoding="utf-8"?>
+<test-run id="2" testcasecount="7" result="Passed" total="7" passed="7" failed="0" inconclusive="0" skipped="0">
+</test-run>
+XML
+    if [ -n "${FAKE_SCREENS_LINGER:-}" ]; then sleep 600; fi
     exit 0
 fi
 

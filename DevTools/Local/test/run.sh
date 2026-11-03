@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Runs setup.sh and setup.ps1 against fake-unity in a throwaway clone with its own remote, so the scripts can be
-# checked without Unity. CI runs this; run it after changing either script. The PowerShell half needs pwsh.
+# Runs setup.sh and setup.ps1, and watch.sh and watch.ps1, against fake-unity in a throwaway clone with its own
+# remote, so the scripts can be checked without Unity. CI runs this; run it after changing any of them. The PowerShell
+# half needs pwsh.
 set -eo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -18,7 +19,7 @@ cd "$work/clone"
 git checkout -q -B main
 # Test the working copies, so uncommitted edits are covered too.
 mkdir -p DevTools/Local
-cp "$root/DevTools/Local/setup.sh" "$root/DevTools/Local/setup.ps1" DevTools/Local/
+cp "$root/DevTools/Local/setup.sh" "$root/DevTools/Local/setup.ps1" "$root/DevTools/Local/watch.sh" "$root/DevTools/Local/watch.ps1" DevTools/Local/
 cp "$root/LOCAL_TASKS.md" .
 git config user.name test
 git config user.email test@example.com
@@ -29,6 +30,8 @@ git push -q origin main
 git branch -q -u origin/main
 base="$(git rev-parse HEAD)"
 export UNITY_EXE="$here/fake-unity"
+# The fake draws screenshots without a display.
+export PRAY_TO_SCREENS=1
 
 failed=0
 expect() {
@@ -38,11 +41,29 @@ expect() {
     fi
 }
 
-# Puts the clone and its remote back to the test base before each case.
+# Puts the clone and its remote back to the test base before each case, without the logs, the watch's memory or
+# the screenshots branch.
 reset() {
     git reset -q --hard "$base"
     git clean -qfd
+    rm -rf Logs
     git push -q -f origin "$base:main"
+    git -C "$work/remote.git" branch -q -D local-screens 2> /dev/null || true
+}
+
+# The cloud pushes a commit to main, from a clone of its own.
+cloud_push() {
+    rm -rf "$work/cloud"
+    git clone -q --branch main "$work/remote.git" "$work/cloud"
+    (
+        cd "$work/cloud"
+        git config user.name cloud
+        git config user.email cloud@example.com
+        echo "$1" >> cloud.txt
+        git add cloud.txt
+        git commit -q -m "$1"
+        git push -q origin HEAD:main
+    )
 }
 
 # $1: label, $2: expected exit code, then the command
@@ -71,6 +92,26 @@ check_runner() {
     expect "$work/subject.txt" "Record local Unity setup results"
     git -C "$work/remote.git" show --stat --format= main > "$work/stat.txt"
     expect "$work/stat.txt" "Assets/_Project/Settings/URP-2D.asset"
+    expect LOCAL_TASKS.md "화면 캡처: 사진 2장, 장면 7개 중 7개 통과"
+    git -C "$work/remote.git" show --stat --format= local-screens > "$work/screens.txt" 2>&1
+    expect "$work/screens.txt" "solo.jpg"
+    expect "$work/screens.txt" "README.md"
+
+    reset
+    FAKE_SCREENS_HANG=1 PRAY_TO_SCREENS_SECONDS=4 case_run "$name: the screenshot run never ends" 1 "$@" "$commit"
+    expect LOCAL_TASKS.md "화면 캡처: **4초 안에 끝나지 않아 껐다**"
+    expect LOCAL_TASKS.md "NullReferenceException"
+
+    reset
+    FAKE_SCREENS_LINGER=1 PRAY_TO_SCREENS_GRACE=2 case_run "$name: the editor stays open after the screenshots" 0 "$@" "$commit"
+    expect LOCAL_TASKS.md "화면 캡처: 사진 2장, 장면 7개 중 7개 통과"
+
+    reset
+    FAKE_PUSH_RACE=1 case_run "$name: the cloud pushes while the tests run" 0 "$@" "$commit"
+    expect "$work/out.txt" "다시 푸시했다"
+    git -C "$work/remote.git" log --format=%s -2 main > "$work/log.txt"
+    expect "$work/log.txt" "Record local Unity setup results"
+    expect "$work/log.txt" "Cloud change meanwhile"
 
     reset
     FAKE_PLAY_FAIL=1 FAKE_TOUCH_CS=1 case_run "$name: a play mode test fails and Unity changes a script" 1 "$@" "$commit"
@@ -100,11 +141,39 @@ check_runner() {
     expect LOCAL_TASKS.md "error CS0246: The type or namespace name 'Foo' could not be found"
 }
 
+# $1: label, then the command that checks once
+check_watch() {
+    local name="$1"
+    shift
+    reset
+    case_run "$name: a new commit is tested and the results pushed" 0 "$@"
+    expect "$work/out.txt" "시험을 돌립니다"
+    git -C "$work/remote.git" log -1 --format=%s main > "$work/subject.txt"
+    expect "$work/subject.txt" "Record local Unity setup results"
+
+    case_run "$name: then nothing is new" 0 "$@"
+    expect "$work/out.txt" "새로 시험할 것이 없습니다."
+
+    cloud_push "Cloud work"
+    case_run "$name: the cloud's next commit is tested" 0 "$@"
+    expect "$work/out.txt" "시험을 돌립니다"
+    git -C "$work/remote.git" log --format=%s -3 main > "$work/log.txt"
+    expect "$work/log.txt" "Cloud work"
+
+    cloud_push "More cloud work"
+    echo "edited by hand" >> LOCAL_TASKS.md
+    case_run "$name: someone's uncommitted work is left alone" 0 "$@"
+    expect "$work/out.txt" "커밋하지 않은 변경이 있어"
+    git checkout -q -- LOCAL_TASKS.md
+}
+
 check_runner setup.sh --commit bash DevTools/Local/setup.sh --no-pull
+check_watch watch.sh bash DevTools/Local/watch.sh --once
 if command -v pwsh > /dev/null; then
     check_runner setup.ps1 -Commit pwsh -NoProfile -File DevTools/Local/setup.ps1 -NoPull
+    check_watch watch.ps1 pwsh -NoProfile -File DevTools/Local/watch.ps1 -Once
 else
-    echo "pwsh not found; skipped setup.ps1"
+    echo "pwsh not found; skipped setup.ps1 and watch.ps1"
 fi
 
 if [ "$failed" = 0 ]; then echo "All setup script checks passed"; fi

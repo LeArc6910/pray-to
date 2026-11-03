@@ -18,23 +18,27 @@ namespace Game.Client.Tests
         public void CreateRoot()
         {
             Assert.IsNotNull(GameSheets.Load(), "GameSheets asset is missing. Run Game > Set Up Project first.");
+            // A host on this machine only: no firewall prompt to answer (NetLink.ListenAddress).
+            NetLink.ListenAddress = "127.0.0.1";
             _root = new GameObject("Game").AddComponent<GameRoot>();
         }
 
         [UnityTearDown]
         public IEnumerator DestroyRoot()
         {
+            NetLink.ListenAddress = "0.0.0.0";
             Object.Destroy(_root.gameObject);
             // Let Netcode shut down before the next test starts a host on the same port.
             yield return null;
             yield return null;
         }
 
-        [UnityTest]
+        [UnityTest, Category(Screens.Category)]
         public IEnumerator SoloSessionRuns()
         {
             _root.StartSolo();
             yield return new WaitForSecondsRealtime(Seconds);
+            yield return Screens.Take("solo");
             Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
             Assert.Greater(Object.FindObjectsByType<SpriteRenderer>().Length, 0, "Nothing was drawn.");
         }
