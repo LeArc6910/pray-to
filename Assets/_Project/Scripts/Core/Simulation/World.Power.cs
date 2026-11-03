@@ -40,9 +40,14 @@ namespace Game.Core
         {
             TileType.Generator => node.Timer > 0,
             TileType.WaterWheel => BesideWater(node.X, node.Y),
-            TileType.SolarPanel => !Calendar.IsNight(Clock),
+            // A storm hides the sun.
+            TileType.SolarPanel => !Calendar.IsNight(Clock) && WeatherToday != Weather.Storm,
             _ => false,
         };
+
+        // What a generator gives now: its power while it runs, half again for a water wheel in a storm's swollen water.
+        public int PowerOf(Machine node) =>
+            !Generating(node) ? 0 : node.Kind == TileType.WaterWheel && WeatherToday == Weather.Storm ? node.Definition.Power * 3 / 2 : node.Definition.Power;
 
         // The grid a node belongs to, or the one a machine draws from, or null.
         public PowerGrid GridOf(Machine machine)
@@ -97,7 +102,7 @@ namespace Game.Core
             if (_gridsStale) BuildGrids();
             foreach (var grid in _grids)
             {
-                grid.Supply = grid.Nodes.Where(Generating).Sum(n => n.Definition.Power);
+                grid.Supply = grid.Nodes.Sum(PowerOf);
                 grid.Demand = grid.Users.Where(m => m.Enabled).Sum(m => m.Definition.Power);
             }
         }

@@ -179,6 +179,102 @@ namespace Game.Core.Tests
         }
     
         [Test]
+        public void TheWeatherComesInFourKinds()
+        {
+            var days = Enumerable.Range(1, 2000).Select(World.WeatherOf).ToList();
+            Assert.AreEqual(Weather.Clear, days[0], "never on the first day");
+            Assert.That(days.Count(w => w == Weather.Storm), Is.InRange(100, 230));
+            Assert.That(days.Count(w => w == Weather.Fog), Is.InRange(160, 330));
+            for (int day = 1; day <= 2000; day++)
+                Assert.AreEqual(World.WeatherOf(day) is Weather.Rain or Weather.Storm, World.IsRainy(day), $"day {day}: a storm wets the crops too");
+        }
+
+        [Test]
+        public void InFogMonstersNoticePlayersLater()
+        {
+            var slime = Monsters.Shipped.Find("slime");
+            bool Noticed(Weather weather)
+            {
+                var world = new World(Maps.Room(30), TileMap.Center(15, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+                int day = Enumerable.Range(2, 400).First(d => World.WeatherOf(d) == weather);
+                world.RestoreClock((day - 1) * Calendar.TicksPerDay);
+                var player = world.AddPlayer("a", null);
+                var monster = world.SpawnEnemy(slime, player.Position + new Vec2(slime.Aggro * 0.85f, 0));
+                world.Step();
+                world.Step();
+                return monster.State != EnemyState.Idle;
+            }
+            Assert.IsTrue(Noticed(Weather.Clear));
+            Assert.IsFalse(Noticed(Weather.Fog), $"fog: only {World.FogAggroPercent}% as far");
+        }
+
+        [Test]
+        public void AStormHidesTheSunAndSwellsTheWater()
+        {
+            var map = Maps.Room(16);
+            map[8, 10] = TileType.Water;
+            var world = new World(map, TileMap.Center(8, 4), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null);
+            Place(world, player, Gear.Data.FindMaterial("water_wheel"), 8, 9, new Vec2(0, 1));
+            Place(world, player, Gear.Data.FindMaterial("solar_panel"), 2, 2, new Vec2(0, 1));
+            int Supply(int x, int y) => world.GridOf(world.MachineAt(x, y)).Supply;
+
+            world.Step();
+            Assert.AreEqual(4, Supply(8, 9));
+            Assert.AreEqual(3, Supply(2, 2));
+            int stormy = Enumerable.Range(2, 400).First(d => World.WeatherOf(d) == Weather.Storm);
+            world.RestoreClock((stormy - 1) * Calendar.TicksPerDay);
+            world.Step();
+            Assert.AreEqual(6, Supply(8, 9), "half again in a storm");
+            Assert.AreEqual(0, Supply(2, 2), "no sun in a storm");
+        }
+
+        [Test]
+        public void TheCalendarHasMarketDaysFestivalsAndFullMoons()
+        {
+            Assert.AreEqual(DayEvent.None, World.EventOf(1));
+            Assert.AreEqual(DayEvent.Market, World.EventOf(5));
+            Assert.AreEqual(DayEvent.Harvest, World.EventOf(7));
+            Assert.AreEqual(DayEvent.FullMoon, World.EventOf(8));
+            Assert.AreEqual(DayEvent.Harvest, World.EventOf(35), "the rarer wins");
+            Assert.AreEqual(DayEvent.FullMoon, World.EventOf(40));
+
+            var seeds = People.Shipped.Shop.First(e => e.Buy >= 20 && e.Material != null);
+            Assert.AreEqual(World.BuyPrice(seeds, 0) * World.MarketPercent / 100f, World.BuyPrice(seeds, 0, 5), 1);
+            var crop = People.Shipped.Shop.First(e => e.Sell >= 10 && e.Material?.HasQuality == true);
+            var bar = People.Shipped.Shop.First(e => e.Sell > 0 && e.Material?.Id == "iron_bar");
+            Assert.AreEqual(World.SellPrice(crop, 0) * World.HarvestPercent / 100, World.SellPrice(crop, 0, 0, 7));
+            Assert.AreEqual(World.SellPrice(bar, 0), World.SellPrice(bar, 0, 0, 7), "only crops");
+
+            // A full moon's night: half again the experience for a kill.
+            int Experience(int day, float hour)
+            {
+                var world = new World(Maps.Room(20), TileMap.Center(10, 10), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+                world.RestoreClock((long)((day - 1 + hour / 24) * Calendar.TicksPerDay));
+                var player = world.AddPlayer("a", Gear.Wearing("copper_sword"));
+                var slime = world.SpawnEnemy(Monsters.Shipped.Find("slime"), player.Position + new Vec2(1, 0));
+                slime.Health = 1;
+                world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
+                world.SetAttacking(player.Id, true);
+                for (int i = 0; i < 10 && !slime.IsDead; i++) world.Step();
+                return player.Experience;
+            }
+            Assert.AreEqual(Experience(9, 18) * World.FullMoonExperiencePercent / 100, Experience(8, 18), 1, "the full moon's night (22:00 is 16 hours past six)");
+        }
+
+        [Test]
+        public void DaylightFallsThroughWellsNearTheSpawnAndHereAndThere()
+        {
+            var generated = WorldGenerator.Generate(7);
+            var wells = World.SkyWells(generated.Map, generated.Spawn, 7);
+            CollectionAssert.AreEqual(wells, World.SkyWells(generated.Map, generated.Spawn, 7), "the same from the seed");
+            Assert.Greater(wells.Count, 3);
+            Assert.IsTrue(wells.All(w => generated.Map[w.X, w.Y] == TileType.Floor));
+            Assert.LessOrEqual(Vec2.Distance(TileMap.Center(wells[0].X, wells[0].Y), generated.Spawn), 9, "one by the spawn");
+            Assert.IsTrue(TileMap.IsPaving(TileType.Skylight), "a skylight is laid like a floor");
+        }
+
+        [Test]
         public void SomeDaysRainAndWetEveryCrop()
         {
             var rainy = Enumerable.Range(1, 400).Count(World.IsRainy);

@@ -500,7 +500,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 Icon(entry.Material != null ? Sprites.Icon(entry.Material) : Sprites.Icon(entry.Consumable));
-                int price = World.BuyPrice(entry, hearts);
+                int price = World.BuyPrice(entry, hearts, Calendar.Day(_client.Clock));
                 string note = entry.Daily ? " (오늘만)" : "";
                 bool open = hearts >= entry.Hearts;
                 string text = open ? $"{entry.Name}{note} · 금화 {price}" : $"{entry.Name} · 호감 {entry.Hearts}에 열린다";
@@ -533,7 +533,7 @@ namespace Game.Client
                     Icon(material != null ? Sprites.Icon(material) : Sprites.Icon(entry.Consumable));
                     string name = material?.Name ?? entry.Name;
                     string room = left > 0 ? $" · 오늘 {left}개 더" : " · 오늘은 그만 산다";
-                    GUILayout.Label(Fit($"{name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts, material?.Quality ?? 0)}{room}", _recipeWidth), GUILayout.Width(_recipeWidth));
+                    GUILayout.Label(Fit($"{name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts, material?.Quality ?? 0, Calendar.Day(_client.Clock))}{room}", _recipeWidth), GUILayout.Width(_recipeWidth));
                     GUI.enabled = left > 0;
                     if (GUILayout.Button("팔기", GUILayout.Width(56))) Send(_client.SellCommand(thing, 1), Sound.Pickup);
                     if (GUILayout.Button("모두", GUILayout.Width(48))) Send(_client.SellCommand(thing, Math.Min(Math.Min(have, left), World.MaxTrade)), Sound.Pickup);

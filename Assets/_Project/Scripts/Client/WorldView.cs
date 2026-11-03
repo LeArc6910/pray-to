@@ -331,6 +331,63 @@ namespace Game.Client
             UpdateDark(selfPosition);
         }
 
+        Texture2D _fog;
+
+        void DrawWeather()
+        {
+            var weather = World.WeatherOf(Calendar.Day(_client.Clock));
+            var before = GUI.color;
+            if (weather == Weather.Fog)
+            {
+                _fog ??= MakeFog();
+                // Two layers of the same soft noise drifting slowly past each other.
+                float w = Ui.Width, h = Ui.Height, size = Mathf.Max(w, h) * 1.2f;
+                for (int layer = 0; layer < 2; layer++)
+                {
+                    float drift = Time.time * (layer == 0 ? 6 : -4);
+                    float x = Mathf.Repeat(drift, size) - size;
+                    GUI.color = new Color(0.78f, 0.8f, 0.84f, layer == 0 ? 0.32f : 0.22f);
+                    GUI.DrawTexture(new Rect(x, -size * 0.1f, size, size), _fog);
+                    GUI.DrawTexture(new Rect(x + size, -size * 0.1f, size, size), _fog);
+                }
+            }
+            if (_lightning > 0)
+            {
+                GUI.color = new Color(0.9f, 0.95f, 1f, Mathf.Clamp01(_lightning / 0.18f) * 0.45f);
+                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), Texture2D.whiteTexture);
+            }
+            GUI.color = before;
+        }
+
+        // Soft blotchy white, tiling, for fog: value noise smoothed over an 8-cell lattice that wraps.
+        static Texture2D MakeFog()
+        {
+            const int size = 64, cells = 8;
+            var lattice = new float[cells, cells];
+            var random = new System.Random(5);
+            for (int y = 0; y < cells; y++)
+            {
+                for (int x = 0; x < cells; x++) lattice[x, y] = (float)random.NextDouble();
+            }
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Repeat, filterMode = FilterMode.Bilinear };
+            var pixels = new Color32[size * size];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x * cells / (float)size, v = y * cells / (float)size;
+                    int x0 = (int)u, y0 = (int)v;
+                    float fu = Mathf.SmoothStep(0, 1, u - x0), fv = Mathf.SmoothStep(0, 1, v - y0);
+                    float a = Mathf.Lerp(lattice[x0 % cells, y0 % cells], lattice[(x0 + 1) % cells, y0 % cells], fu);
+                    float b = Mathf.Lerp(lattice[x0 % cells, (y0 + 1) % cells], lattice[(x0 + 1) % cells, (y0 + 1) % cells], fu);
+                    pixels[y * size + x] = new Color32(255, 255, 255, (byte)(Mathf.Lerp(a, b, fv) * 255));
+                }
+            }
+            texture.SetPixels32(pixels);
+            texture.Apply();
+            return texture;
+        }
+
         // Clear in the middle and thickening toward the edges and most in the corners, white, for GUI.color to tint.
         static Texture2D MakeVignette()
         {
@@ -356,6 +413,8 @@ namespace Game.Client
         // Names, damage numbers and banners. Call from OnGUI.
         public void DrawGui()
         {
+            // Fog drifts over the view, and a storm's lightning flashes white.
+            if (Event.current.type == EventType.Repaint) DrawWeather();
             // Hurt: the screen's edges glow red for a moment, more for a harder blow.
             if (_hurtGlow > 0 && Event.current.type == EventType.Repaint)
             {
@@ -968,6 +1027,21 @@ namespace Game.Client
         readonly List<(SpriteRenderer Line, float Age)> _tracers = new List<(SpriteRenderer, float)>();
         const float TracerSeconds = 0.12f;
 
+        // A storm: now and then lightning lights the whole cave for a moment through the cracks above, and thunder rolls.
+        float _lightning;
+        float _nextLightning = 4;
+
+        void UpdateStorm(bool storm, float deltaTime)
+        {
+            _lightning = Mathf.Max(0, _lightning - deltaTime);
+            if (!storm) return;
+            _nextLightning -= deltaTime;
+            if (_nextLightning > 0) return;
+            _nextLightning = 6 + UnityEngine.Random.value * 9;
+            _lightning = 0.18f;
+            Sounds.Play(Sound.Thunder, 0.8f);
+        }
+
         // On a rainy day thin drops fall through the view: rain from the land above seeping down (World.IsRainy).
         readonly List<SpriteRenderer> _raindrops = new List<SpriteRenderer>();
         static readonly Color RainColor = new Color(0.6f, 0.75f, 1f, 0.35f);
@@ -975,16 +1049,23 @@ namespace Game.Client
 
         void UpdateRain(float deltaTime)
         {
-            bool raining = World.IsRainy(Calendar.Day(_client.Clock));
+            var weather = World.WeatherOf(Calendar.Day(_client.Clock));
+            bool raining = weather is Weather.Rain or Weather.Storm;
+            UpdateStorm(weather == Weather.Storm, deltaTime);
             if (!raining)
             {
                 foreach (var drop in _raindrops) drop.enabled = false;
                 return;
             }
+            // A storm pours down harder and slants more.
+            bool storm = weather == Weather.Storm;
+            int wanted = storm ? RainDrops * 2 : RainDrops;
+            var fall = storm ? new Vector3(-0.45f, -1, 0) * 13 : new Vector3(-0.2f, -1, 0) * 9;
             var centre = _camera.transform.position;
             float height = _camera.orthographicSize * 2 + 2;
             float width = height * _camera.aspect + 2;
-            while (_raindrops.Count < RainDrops)
+            for (int i = 0; i < _raindrops.Count; i++) _raindrops[i].enabled = i < wanted;
+            while (_raindrops.Count < wanted)
             {
                 var drop = Renderer(_root.transform, "Rain", Shapes.Square, RainColor);
                 drop.sortingOrder = 29;
@@ -994,8 +1075,8 @@ namespace Game.Client
             }
             foreach (var drop in _raindrops)
             {
-                drop.enabled = true;
-                var at = drop.transform.localPosition + new Vector3(-0.2f, -1, 0) * (9 * deltaTime);
+                if (!drop.enabled) continue;
+                var at = drop.transform.localPosition + fall * deltaTime;
                 // Wrapped round the view as it moves.
                 if (at.y < centre.y - height / 2) at.y += height;
                 if (at.x < centre.x - width / 2) at.x += width;
@@ -1992,6 +2073,48 @@ namespace Game.Client
 
         // Every player carries a light, burning tiles (tiles.csv light) and glowing shots light their surroundings,
         // and the boss arena glows. Off in the menu, everything is lit.
+        // Daylight through the cave's cracks (World.SkyWells) and the skylights players lay: warm by morning, white by
+        // day, orange at evening, a little blue moonlight at night; dimmer under rain and fog.
+        List<(int X, int Y)> _skyWells;
+
+        void AddSkyLights(int left, int bottom, int size)
+        {
+            _skyWells ??= World.SkyWells(_client.Map, _client.Spawn, _client.Seed);
+            long clock = _client.Clock;
+            var (color, radius, intensity) = Calendar.Phase(clock) switch
+            {
+                DayPhase.Morning => (Rgba.Hex("#FFE6B0"), 4.5f, 0.9f),
+                DayPhase.Day => (Rgba.Hex("#FFF8E8"), 5f, 1f),
+                DayPhase.Evening => (Rgba.Hex("#FF9A5A"), 4f, 0.75f),
+                _ => (Rgba.Hex("#8AA8FF"), 2.5f, 0.45f),
+            };
+            var weather = World.WeatherOf(Calendar.Day(clock));
+            if (weather is Weather.Rain or Weather.Storm)
+            {
+                radius *= 0.8f;
+                intensity *= 0.7f;
+            }
+            else if (weather == Weather.Fog)
+            {
+                radius *= 0.85f;
+                intensity *= 0.8f;
+            }
+            const int margin = 6;
+            bool Near(int x, int y) => x >= left - margin && x < left + size + margin && y >= bottom - margin && y < bottom + size + margin;
+            foreach (var (x, y) in _skyWells)
+            {
+                if (Near(x, y)) _lights.Add(new LightSource(TileMap.Center(x, y), radius, intensity, color, tints: true));
+            }
+            var map = _client.Map;
+            for (int y = Mathf.Max(0, bottom - margin); y < Mathf.Min(map.Height, bottom + size + margin); y++)
+            {
+                for (int x = Mathf.Max(0, left - margin); x < Mathf.Min(map.Width, left + size + margin); x++)
+                {
+                    if (map[x, y] == TileType.Skylight) _lights.Add(new LightSource(TileMap.Center(x, y), radius * 0.8f, intensity, color, tints: true));
+                }
+            }
+        }
+
         void UpdateDark(Vec2 self)
         {
             _dark.enabled = Settings.Darkness;
@@ -2011,6 +2134,7 @@ namespace Game.Client
                 else if (body.Kind == BodyKind.Minion) _lights.Add(new LightSource(new Vec2(body.Position.x, body.Position.y), MinionLight, 0.7f, body.Color, tints: true));
             }
             _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time);
+            AddSkyLights(left, bottom, size);
             foreach (var shot in _projectiles.Values)
             {
                 if (shot.sprite == ArrowSprite) continue;

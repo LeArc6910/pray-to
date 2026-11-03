@@ -68,12 +68,20 @@ namespace Game.Core
 
         public static int HeartsOf(int points) => Math.Clamp(points / PointsPerHeart, 0, MaxHearts);
 
-        public static int BuyPrice(ShopEntry entry, int hearts) => (entry.Buy * (100 - HeartPercent * hearts) + 99) / 100;
+        public static int BuyPrice(ShopEntry entry, int hearts, int day = 0)
+        {
+            int price = (entry.Buy * (100 - HeartPercent * hearts) + 99) / 100;
+            // Market day: cheaper still.
+            return EventOf(day) == DayEvent.Market ? Math.Max(1, (price * MarketPercent + 99) / 100) : price;
+        }
 
         // What a person pays for one: the row's price, more for silver or gold (MaterialDefinition.Quality), more with
-        // each heart.
-        public static int SellPrice(ShopEntry entry, int hearts, int quality = 0) =>
-            entry.Sell * MaterialDefinition.QualityPercent(quality) / 100 * (100 + HeartPercent * hearts) / 100;
+        // each heart, and for a crop more on the day of the harvest festival.
+        public static int SellPrice(ShopEntry entry, int hearts, int quality = 0, int day = 0)
+        {
+            int price = entry.Sell * MaterialDefinition.QualityPercent(quality) / 100 * (100 + HeartPercent * hearts) / 100;
+            return EventOf(day) == DayEvent.Harvest && entry.Material?.HasQuality == true ? price * HarvestPercent / 100 : price;
+        }
 
         // What the merchant pays for a piece of gear: more for a higher level, a rarer one and an upgraded one.
         public static int ItemValue(Item item, int hearts)
@@ -271,7 +279,7 @@ namespace Game.Core
             var (player, _, friendship) = at.Value;
             if (friendship.Hearts < entry.Hearts) return false;
             count = Math.Clamp(count, 1, MaxTrade);
-            int price = BuyPrice(entry, friendship.Hearts) * count;
+            int price = BuyPrice(entry, friendship.Hearts, Today) * count;
             if (player.Inventory.CountOf(coin) < price) return false;
             player.Inventory.TakeMaterial(coin, price);
             if (entry.Material != null) player.Inventory.AddMaterial(entry.Material, count);
@@ -301,7 +309,7 @@ namespace Game.Core
             {
                 for (int i = 0; i < count; i++) player.Inventory.TakeConsumable(entry.Consumable);
             }
-            player.Inventory.AddMaterial(coin, SellPrice(entry, friendship.Hearts, sold?.Quality ?? 0) * count);
+            player.Inventory.AddMaterial(coin, SellPrice(entry, friendship.Hearts, sold?.Quality ?? 0, Today) * count);
             player.InventoryVersion++;
             return true;
         }

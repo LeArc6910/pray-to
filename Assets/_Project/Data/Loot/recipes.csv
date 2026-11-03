@@ -125,6 +125,7 @@ stone_floor,stone_floor,4,stone:2,Workbench
 brick_floor,brick_floor,4,stone:2|copper_ore:1,Workbench
 glow_floor,glow_floor,4,stone:2|glow_spore:1,Workbench
 door,door,1,stone:4|iron_bar:1,Workbench
+skylight,skylight,1,stone:8|slime_gel:1,Workbench
 stone_table,stone_table,1,stone:5,Workbench
 banner,banner,1,slime_gel:2|copper_ore:2,Workbench
 mushroom_pot,mushroom_pot,1,stone:2|mushroom:1,Workbench

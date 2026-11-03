@@ -48,6 +48,7 @@ namespace Game.Core
         void ExperienceFrom(Enemy enemy)
         {
             int amount = Leveling.ForMonster(Math.Max(enemy.Definition.Level, ProgressLevel));
+            if (FullMoonNight) amount = amount * FullMoonExperiencePercent / 100;
             foreach (var player in _players)
             {
                 if (!player.IsDead && Vec2.Distance(player.Position, enemy.Position) <= Leveling.ShareRange) GainExperience(player, amount);

@@ -90,6 +90,8 @@ namespace Game.Core
         SolarPanel,
         // A tower that throws lightning at monsters, on power alone (Docs/Defense.md).
         TeslaTower,
+        // A floor under a hole cut to the sky: daylight, sunset or moonlight falls on it (Docs/Time.md).
+        Skylight,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -163,7 +165,8 @@ namespace Game.Core
         public bool BlocksMonsters(int x, int y) => IsSolid(x, y) || this[x, y] == TileType.Door;
 
         // A floor laid over bare floor (StoneFloor, BrickFloor, GlowFloor): walked on like floor, built on like floor.
-        public static bool IsPaving(TileType type) => type == TileType.StoneFloor || type == TileType.BrickFloor || type == TileType.GlowFloor;
+        public static bool IsPaving(TileType type) =>
+            type == TileType.StoneFloor || type == TileType.BrickFloor || type == TileType.GlowFloor || type == TileType.Skylight;
 
         // Bare floor or a laid floor: where things can be built.
         public static bool IsGround(TileType type) => type == TileType.Floor || IsPaving(type);

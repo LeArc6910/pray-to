@@ -42,6 +42,8 @@ namespace Game.Client
         // A combo's finisher: a heavier, lower whoosh, and the thump when it lands.
         Heavy,
         Thump,
+        // A storm's thunder, rolling on.
+        Thunder,
     }
 
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
@@ -226,6 +228,12 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Sine, 0, 0.2f, 90, 45, 0.7f, decay: 3));
                     parts.Add(Noise(0, 0.08f, 0.5f, 0.6f, decay: 6, seed: 22));
                     level = 0.95f;
+                    break;
+                case Sound.Thunder:
+                    parts.Add(Noise(0, 1.4f, 1, 0.82f, attack: 0.02f, decay: 1.6f, seed: 31));
+                    parts.Add(Noise(0.15f, 1.0f, 0.7f, 0.9f, attack: 0.1f, decay: 2.2f, seed: 32));
+                    parts.Add(Tone(Wave.Sine, 0, 0.6f, 60, 35, 0.5f, decay: 2));
+                    level = 0.8f;
                     break;
                 case Sound.Splash:
                     parts.Add(Noise(0, 0.3f, 1, 0.35f, attack: 0.005f, decay: 4, seed: 12));

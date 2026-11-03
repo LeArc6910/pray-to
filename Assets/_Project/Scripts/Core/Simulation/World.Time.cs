@@ -77,7 +77,8 @@ namespace Game.Core
         public DayPhase Phase => Calendar.Phase(Clock);
 
         // How many monsters the caves keep now.
-        int EnemyTargetNow => Calendar.IsNight(Clock) ? _config.EnemyTarget * (100 + NightMonstersPercent) / 100 : _config.EnemyTarget;
+        // More at night, and more again under a full moon.
+        int EnemyTargetNow => Calendar.IsNight(Clock) ? _config.EnemyTarget * (100 + NightMonstersPercent * (FullMoonNight ? 2 : 1)) / 100 : _config.EnemyTarget;
 
         // A player beside their own bed lies down, from the evening on. Once everyone in the world is lying down the
         // clock moves on to the next morning. Moving, attacking or being hit gets them up again. False when they

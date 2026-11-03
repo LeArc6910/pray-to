@@ -278,7 +278,15 @@ namespace Game.Client
             _dayPhase = phase;
             if (first) return;
             if (phase == DayPhase.Night) _view?.ShowBanner("밤이 되었다");
-            else if (phase == DayPhase.Morning) _view?.ShowBanner($"{Calendar.Day(_client.Clock)}일째 아침");
+            else if (phase == DayPhase.Morning)
+            {
+                // The day's weather and what the calendar holds, when there is anything.
+                int day = Calendar.Day(_client.Clock);
+                var weather = World.WeatherOf(day);
+                var festival = World.EventOf(day);
+                string more = (weather != Weather.Clear ? " · " + World.WeatherName(weather) : "") + (festival != DayEvent.None ? " · " + World.EventName(festival) : "");
+                _view?.ShowBanner($"{day}일째 아침{more}");
+            }
         }
 
         DayPhase? _dayPhase;
@@ -1125,8 +1133,11 @@ namespace Game.Client
                     : _mode == Mode.Join ? "참가 중" : "혼자 하기";
                 string players = _mode == Mode.Solo ? "" : $" · 접속 {_client.Names.Count}명";
                 long clock = _client.Clock;
-                string rain = World.IsRainy(Calendar.Day(clock)) ? " · 비" : "";
+                int today = Calendar.Day(clock);
+                string rain = (World.WeatherOf(today) != Weather.Clear ? " · " + World.WeatherName(World.WeatherOf(today)) : "")
+                    + (World.EventOf(today) != DayEvent.None ? " · " + World.EventName(World.EventOf(today)) : "");
                 lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))}{rain} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%){(_client.PassivePoints > 0 ? $" · 특성 {_client.PassivePoints}" : "")} · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
+                if (World.EventOf(today) != DayEvent.None) lines.Add(World.EventText(World.EventOf(today)));
                 if (_client.Rift.Open)
                 {
                     var rift = _client.Rift;

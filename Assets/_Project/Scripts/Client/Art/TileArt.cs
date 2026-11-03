@@ -403,6 +403,7 @@ namespace Game.Client
             TileType.WaterWheel => WaterWheelStand,
             TileType.SolarPanel => SolarPanelTile,
             TileType.TeslaTower => TeslaTowerTile,
+            TileType.Skylight => SkylightTile,
             _ => null,
         };
 
@@ -1372,6 +1373,8 @@ namespace Game.Client
         static readonly PixelImage StoneFloorTile = Slabs("#7E7468", "#948A7C", "#6A6156", "#4E4740");
         static readonly PixelImage BrickFloorTile = Slabs("#A0563E", "#B86A50", "#8A4834", "#5A2E22");
         static readonly PixelImage GlowFloorTile = Slabs("#5E6A6E", "#727F84", "#4E585C", "#363E42", glow: true);
+        // Pale slabs worn smooth under a hole to the sky; the light that falls on them is the view's (WorldView, sky).
+        static readonly PixelImage SkylightTile = Slabs("#B8AE98", "#D2C8B0", "#9E9480", "#7A7262");
 
         static readonly Dictionary<char, Rgba> BasePalette = new Dictionary<char, Rgba>
         {
