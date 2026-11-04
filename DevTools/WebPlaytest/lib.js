@@ -166,8 +166,9 @@ function helpers(game) {
   // A real press where the button is drawn: a click on PC, a tap on a touch screen. A button scrolled out of its
   // list is first scrolled to with the mouse wheel (the game's own wheel step). False when there is none to press.
   h.press = async (label, row, { quiet } = {}) => {
+    // The bag scrolls about a row (30 points) a wheel step, so a row far down a long list takes many steps.
     let missing = 0;
-    for (let attempt = 0; attempt < 16; attempt++) {
+    for (let attempt = 0; attempt < 80; attempt++) {
       const all = await h.find(label, row);
       // Not drawn yet (a page just opened, a tab just changed): look again for a few seconds.
       if (all.length === 0 && missing++ < 8) {
@@ -187,7 +188,7 @@ function helpers(game) {
       const middle = box.top + box.height / 2;
       await page.mouse.move(hidden.cx, middle);
       await page.mouse.wheel(0, hidden.cy > middle ? 200 : -200);
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(150);
     }
     if (!quiet) run.errors.push(`${profile.name}: no button "${label}"${row ? ` in row "${row}"` : ''} to press`);
     return false;
