@@ -603,10 +603,13 @@ async function farm(browser) {
   await game.send('speed 1');
   check(!!grown, '버섯이 다 자란다');
   await game.shot('ripe', '다 자란 작물');
-  const before = count(await game.inventory(), 'mushroom');
+  // A harvest may come in silver or gold (another material id), so every mushroom of any quality counts.
+  const mushrooms = inv => Object.entries(inv.materials || {}).filter(([id]) => /^mushroom(?!_spore|_soup|_soil|_pot)/.test(id)).reduce((n, [, c]) => n + c, 0);
+  const before = mushrooms(await game.inventory());
   await game.send('goto 1 0');
   await game.wait(1500);
-  check(count(await game.inventory(), 'mushroom') > before, '다 자란 버섯 위를 걸으면 거둔다');
+  const after = await game.inventory();
+  check(mushrooms(after) > before, `다 자란 버섯 위를 걸으면 거둔다 (${Object.keys(after.materials).filter(id => /^mushroom/.test(id)).join(', ')})`);
   await game.context.close();
 }
 
