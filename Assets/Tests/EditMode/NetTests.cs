@@ -189,6 +189,29 @@ namespace Game.Core.Tests
             Assert.IsFalse(alice.Others().Any(e => e.Id == slime.Id), "gone from the client too");
         }
 
+        // A fallen boss leaves the snapshot's entities at once; its fall must still reach the players who saw it, or
+        // their screens never say "○○ 처치!".
+        [Test]
+        public void ABossFallReachesThePlayersNearby()
+        {
+            var session = new Session(bosses: Bosses.Shipped);
+            var alice = session.Join(1, "앨리스");
+            var boss = session.Host.World.PlaceBoss(Bosses.Shipped.Bosses[0], alice.Position + new Vec2(4, 0), 8);
+            session.Tick(4);
+            alice.TakeEvents();
+
+            session.Host.World.Hurt(boss, (int)boss.MaxHealth);
+            var events = new List<SimEvent>();
+            for (int i = 0; i < 4; i++)
+            {
+                session.Tick();
+                events.AddRange(alice.TakeEvents());
+            }
+
+            Assert.IsTrue(boss.IsDead);
+            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Died && e.Source == boss.Id), "the boss's fall reached the client");
+        }
+
         [Test]
         public void TheHostCorrectsMovesItRefuses()
         {

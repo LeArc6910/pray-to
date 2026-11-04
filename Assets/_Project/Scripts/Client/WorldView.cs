@@ -679,9 +679,30 @@ namespace Game.Client
         // The words floating over the world (damage, "곡괭이가 필요하다", a level), for the playtests.
         internal IEnumerable<string> FloatingTexts => _floating.Select(f => f.Text);
 
-        public void ShowBanner(string text)
+        // A banner shows at once, or after the one still fresh. One that comes first (a boss's fall) takes the screen
+        // now and the fresh one waits behind it. Levels gained together show only the last ("레벨 5!", not 2 to 5).
+        public void ShowBanner(string text, bool first = false)
         {
-            if (_bannerAge < BannerTurnSeconds && _banner.Length > 0)
+            bool fresh = _bannerAge < BannerTurnSeconds && _banner.Length > 0;
+            if (IsLevel(text))
+            {
+                var others = _bannerQueue.Where(b => !IsLevel(b)).ToList();
+                _bannerQueue.Clear();
+                foreach (string other in others) _bannerQueue.Enqueue(other);
+                if (fresh && IsLevel(_banner))
+                {
+                    _banner = text;
+                    return;
+                }
+            }
+            if (fresh && first && text != _banner)
+            {
+                var waiting = _bannerQueue.ToList();
+                _bannerQueue.Clear();
+                _bannerQueue.Enqueue(_banner);
+                foreach (string other in waiting) _bannerQueue.Enqueue(other);
+            }
+            else if (fresh)
             {
                 if (text != _banner && !_bannerQueue.Contains(text)) _bannerQueue.Enqueue(text);
                 return;
@@ -689,6 +710,8 @@ namespace Game.Client
             _banner = text;
             _bannerAge = 0;
         }
+
+        static bool IsLevel(string banner) => banner.StartsWith("레벨 ", StringComparison.Ordinal);
 
         // Telegraphs: a faint outline of the whole area, filled in as the moment it lands comes closer.
         void DrawMarks()
@@ -1495,7 +1518,7 @@ namespace Game.Client
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
                     {
                         Sounds.Play(Sound.Victory);
-                        ShowBanner($"{boss.Name} 처치!");
+                        ShowBanner($"{boss.Name} 처치!", first: true);
                         _bossesSeen.Remove(e.Source);
                     }
                     break;

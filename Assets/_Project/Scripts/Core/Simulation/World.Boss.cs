@@ -277,7 +277,9 @@ namespace Game.Core
             {
                 ClearAttacksFrom(boss);
                 DropFrom(boss);
-                _events.Add(new SimEvent(SimEventType.Died, boss.Id));
+                // Where it fell, for the host to send the fall to whoever could see it: the boss itself leaves the
+                // snapshots at once (WorldHost).
+                _events.Add(new SimEvent(SimEventType.Died, boss.Id, position: boss.Position));
                 _events.Add(new SimEvent(SimEventType.BossDefeated, boss.Id));
                 return;
             }

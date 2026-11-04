@@ -550,10 +550,12 @@ namespace Game.Core
                     (int)(h.ResolveTick - World.Tick), (int)(h.ResolveTick - h.StartTick), h.Damage > 0))
                 .ToList();
 
-            // When there are too many, what changes the fight matters most and swings least.
+            // When there are too many, what changes the fight matters most and swings least. A fallen boss is no longer
+            // among the entities, but its fall (which carries where) still reaches whoever could see it ("○○ 처치!").
             var shown = new HashSet<int>(entities.Select(e => e.Id));
             var events = _pendingEvents
                 .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift
+                    || e.Type == SimEventType.Died && e.Position.LengthSquared > 0 && InView(e.Position)
                     || e.Type == SimEventType.Defense || e.Type == SimEventType.TurretShot || e.Type == SimEventType.Rain)
                 .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)
