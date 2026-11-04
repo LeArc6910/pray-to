@@ -160,8 +160,14 @@ function helpers(game) {
   // A real press where the button is drawn: a click on PC, a tap on a touch screen. A button scrolled out of its
   // list is first scrolled to with the mouse wheel (the game's own wheel step). False when there is none to press.
   h.press = async (label, row, { quiet } = {}) => {
-    for (let attempt = 0; attempt < 12; attempt++) {
+    let missing = 0;
+    for (let attempt = 0; attempt < 16; attempt++) {
       const all = await h.find(label, row);
+      // Not drawn yet (a page just opened, a tab just changed): look again for a few seconds.
+      if (all.length === 0 && missing++ < 8) {
+        await page.waitForTimeout(400);
+        continue;
+      }
       const shown = all.find(b => b.shown && b.enabled);
       if (shown) {
         await h.tapAt(shown.cx, shown.cy);

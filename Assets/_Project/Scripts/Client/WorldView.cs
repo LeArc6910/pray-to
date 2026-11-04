@@ -581,8 +581,11 @@ namespace Game.Client
             {
                 if (_seen.Contains(pair.Key)) continue;
                 _departed[pair.Key] = new Departed(pair.Value.Position, BodyColor(pair.Value), pair.Value.Kind);
-                // A boss out of sight may go back to sleep (its arena empty) unseen; seen again, it is new.
-                if (pair.Value.Kind == BodyKind.Boss) _bossesSeen.Remove(pair.Key);
+                // A boss out of sight may go back to sleep (its arena empty) unseen, so it counts as asleep: seen awake
+                // again, it is announced again. Its name stays for the "처치!" banner, since a boss that falls leaves
+                // the view in the same update its death arrives.
+                if (pair.Value.Kind == BodyKind.Boss && _bossesSeen.TryGetValue(pair.Key, out var left))
+                    _bossesSeen[pair.Key] = (BossState.Dormant, 1, left.Name);
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
             }

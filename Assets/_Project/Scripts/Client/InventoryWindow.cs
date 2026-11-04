@@ -43,6 +43,8 @@ namespace Game.Client
         // The item being worked at an anvil, by id, or 0 (World.Refining.cs).
         int _refining;
         float _nameWidth;
+        // A 56-point button and the gap before it.
+        const float ExtraButton = 60;
         float _recipeWidth;
         // Width of a line of text in the scrolling list.
         float _textWidth;
@@ -88,8 +90,10 @@ namespace Game.Client
             float scrollbar = GUI.skin.verticalScrollbar.fixedWidth + 8;
             // A label in the list is that wide less its own margins.
             _textWidth = inner - scrollbar - GUI.skin.label.margin.horizontal;
-            // Room for two buttons and [퀵] beside each name.
-            _nameWidth = Mathf.Clamp(_textWidth - IconRoom - 150 - QuickWidth, 60, 240);
+            // Room for two buttons and [퀵] beside each name, and for [끼우기] while a rune is picked and [다듬기] by
+            // an anvil: without that room a row ran past the window, its [퀵] cut off.
+            float extra = (_selectedRune != null ? ExtraButton : 0) + (_client.NearAnvil ? ExtraButton : 0);
+            _nameWidth = Mathf.Clamp(_textWidth - IconRoom - 150 - QuickWidth - extra, 60, 240);
             _recipeWidth = _textWidth - IconRoom - 120;
             Controls.Block(area);
             Wheel(area);
@@ -908,7 +912,8 @@ namespace Game.Client
                     : Taken(node) ? Palette.Worn
                     : _client.CanAllocate(node) ? Color.white
                     : new Color(0.55f, 0.55f, 0.55f);
-                if (Ui.Button(rect, node.IsStart ? "★" : node.Name.Substring(0, 1))) _pickedPassive = node.IsStart ? null : node;
+                // The start as a dot: neither game font has "★" (Galmuri11, Noto Sans KR subsets), which drew as a box.
+                if (Ui.Button(rect, node.IsStart ? "●" : node.Name.Substring(0, 1))) _pickedPassive = node.IsStart ? null : node;
                 GUI.color = previous;
             }
         }

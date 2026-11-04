@@ -333,7 +333,8 @@ async function bag(browser) {
   if (runeButton) {
     await game.press(runeButton.label);
     const inserted = await game.press('끼우기', null, { quiet: true });
-    check(inserted && (await game.inventory()).runes === 0, '룬을 고르고 [끼우기]로 소켓에 넣는다');
+    const socketed = await game.until(i => i.runes === 0, 3000, game.inventory);
+    check(inserted && !!socketed, '룬을 고르고 [끼우기]로 소켓에 넣는다');
   } else {
     check(false, '가방에 룬 단추가 보인다');
   }
@@ -421,7 +422,10 @@ async function combat(browser) {
   await game.wait(800);
 
   // Bow and staff shoot.
-  // An arrow lives a fraction of a second, so the proof is a slime hit four tiles off, out of a sword's reach.
+  // An arrow lives a fraction of a second, so the proof is a slime hit four tiles off, out of a sword's reach. On
+  // fresh floor, away from where the gallery's monsters pushed the player about.
+  await game.send('heal; goto biome Cave');
+  await clearRoom(game, 5, 2);
   for (const [weapon, name] of [['copper_bow', '활'], ['copper_staff', '지팡이']]) {
     await game.send(`equip ${weapon}; spawn slime 4 0 5000; speed 0`);
     await game.wait(300);
@@ -533,9 +537,10 @@ async function world(browser) {
   check(burnt.health < burnt.maxHealth, `용암에 들어가면 화상 (${burnt.health}/${burnt.maxHealth})`);
   await game.shot('lava', '용암 위');
   // A better pickaxe for obsidian.
-  await game.send('heal; goto near ObsidianOre; equip copper_pickaxe');
-  // Facing the ore as "goto near" left it: "attack on" keeps that aim.
-  await game.send('attack on');
+  await game.send('heal; goto biome Lava');
+  await clearRoom(game, 2, 2);
+  await game.send('build ObsidianOre 1 0; face 1 0; equip copper_pickaxe');
+  await game.send('attack on 1 0');
   const better = await game.until(r => (r.floating || []).some(f => has(f, '더 좋은 곡괭이')), 3000, game.texts);
   await game.send('attack off');
   check(!!better, '흑요석에 약한 곡괭이로는 "더 좋은 곡괭이가 필요하다"');
@@ -724,7 +729,7 @@ async function npc(browser) {
   const game = await open(browser, run, Profiles.pc, url);
   await game.startSolo();
   await game.wait(1200);
-  await game.send('goto near MerchantStall; give coin 300; give stone 30; give star_melon 1');
+  await game.send('goto near MerchantStall; give coin 300; give copper_ore 30; give star_melon 1');
   await game.wait(800);
   await game.shot('merchant', '상인 노점');
   await bagTab(game);
@@ -737,11 +742,12 @@ async function npc(browser) {
   check((await game.inventory()).consumables.healing_potion === potions + 1, '금화로 회복 물약을 산다');
   await game.shot('shop-buy', '[사기]');
   await game.press('팔기');
+  // The merchant buys copper ore (not stone): 30 offered, 20 taken in a day.
   const coins = count(await game.inventory(), 'coin');
-  await game.press('모두', '돌 ×');
+  await game.press('모두', /^구리 광석 ×/);
   let inv = await game.inventory();
-  check(count(inv, 'stone') === 10 && count(inv, 'coin') > coins, `돌을 팔면 하루 20개까지만 사고 금화가 는다 (돌 ${count(inv, 'stone')}, 금화 ${coins} → ${count(inv, 'coin')})`);
-  const stopped = (await game.find('팔기', '돌 ×'))[0];
+  check(count(inv, 'copper_ore') === 10 && count(inv, 'coin') > coins, `구리 광석을 팔면 하루 20개까지만 사고 금화가 는다 (광석 ${count(inv, 'copper_ore')}, 금화 ${coins} → ${count(inv, 'coin')})`);
+  const stopped = (await game.find('팔기', /^구리 광석 ×/))[0];
   check(stopped && !stopped.enabled && has(stopped.row, '오늘은 그만 산다'), '20개를 판 뒤 "오늘은 그만 산다", [팔기]가 눌리지 않는다');
   await game.shot('shop-limit', '하루 한도에 닿은 [팔기]');
   await game.press('선물');
@@ -755,7 +761,7 @@ async function npc(browser) {
   await game.wait(1200);
   await bagTab(game, '상인');
   await game.press('팔기');
-  const again = (await game.find('팔기', '돌 ×'))[0];
+  const again = (await game.find('팔기', /^구리 광석 ×/))[0];
   check(again && again.enabled, '다음 날이 되면 다시 산다');
   await closeBag(game);
 
