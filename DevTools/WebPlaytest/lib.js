@@ -82,15 +82,21 @@ function helpers(game) {
     // An answer too long for one console line comes in pieces: "[playtest]+" lines join onto the one before.
     const answered = () => {
       const joined = [];
+      // A web build's Debug.Log ends each line with a newline, which would land inside the joined JSON.
       for (const l of game.logs.slice(mark)) {
-        if (l.startsWith('[playtest] ')) joined.push(l.slice(11));
-        else if (l.startsWith('[playtest]+') && joined.length > 0) joined[joined.length - 1] += l.slice(11);
+        const text = l.replace(/\r?\n$/, '');
+        if (text.startsWith('[playtest] ')) joined.push(text.slice(11));
+        else if (text.startsWith('[playtest]+') && joined.length > 0) joined[joined.length - 1] += text.slice(11);
       }
       return joined;
     };
     const deadline = Date.now() + 3000;
     while (answered().length < expected && Date.now() < deadline) await page.waitForTimeout(15);
-    await page.waitForTimeout(20);
+    // The pieces of a long answer come as separate console events: wait until no more come.
+    for (let count = -1; count !== game.logs.length && Date.now() < deadline; ) {
+      count = game.logs.length;
+      await page.waitForTimeout(40);
+    }
     const lines = answered();
     for (const line of lines) if (line.startsWith('error')) run.errors.push(`${profile.name}: playtest ${line}`);
     return lines;
