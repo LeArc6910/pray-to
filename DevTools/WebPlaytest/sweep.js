@@ -834,7 +834,7 @@ async function factory(browser) {
   await game.send('build Assembler 4 -1; goto 4 0; face 0 -1');
   await game.wait(400);
   await bagTab(game, '재료·제작');
-  await game.press('조립기에', '철 톱니');
+  await game.press('조립기에', /^철 톱니/);
   check(((await game.look(0, -1)).machine || {}).recipe, `조립기에 만들 것을 정한다 (${((await game.look(0, -1)).machine || {}).recipe})`);
   await game.shot('assembler', '조립기에 정한 뒤');
   await game.press(/^공장 생산 보기/);

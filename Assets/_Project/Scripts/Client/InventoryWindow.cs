@@ -654,7 +654,11 @@ namespace Game.Client
                 string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
                 GUILayout.BeginHorizontal();
                 Icon(recipe.Item != null ? Sprites.Icon(recipe.Item) : recipe.Consumable != null ? Sprites.Icon(recipe.Consumable) : Sprites.Icon(recipe.Material));
-                GUILayout.Label(new GUIContent(Fit($"{name}\n{needs}", _recipeWidth), RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
+                // Facing an assembler the row has [조립기에] too: the text gives it room, or the row ran past the window
+                // and the button was out of sight.
+                bool toAssembler = assembler != null && World.Assembles(recipe);
+                float width = toAssembler ? Mathf.Max(80, _recipeWidth - 76) : _recipeWidth;
+                GUILayout.Label(new GUIContent(Fit($"{name}\n{needs}", width), RecipeTooltip(recipe)), GUILayout.Width(width));
                 int times = _client.CraftableTimes(recipe);
                 GUI.enabled = enabled && times > 0;
                 if (Ui.LayoutButton("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
@@ -662,7 +666,7 @@ namespace Game.Client
                 int bulk = Mathf.Clamp(times, 2, BulkCraft);
                 if (Ui.LayoutButton($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), Sound.Craft);
                 GUI.enabled = enabled;
-                if (assembler != null && World.Assembles(recipe) && Ui.LayoutButton("조립기에", GUILayout.Width(72)))
+                if (toAssembler && Ui.LayoutButton("조립기에", GUILayout.Width(72)))
                     Send(_client.SetRecipeCommand(recipe), Sound.Click);
                 GUILayout.EndHorizontal();
             }
