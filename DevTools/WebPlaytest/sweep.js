@@ -1108,14 +1108,18 @@ async function touch(browser) {
     await game.send('give stone 5; give copper_ore 5; give iron_ore 5; give slime_gel 5; give iron_bar 5; give mushroom 5; give fire_pepper 5; give egg 5; give milk 5');
     await game.press('재료·제작');
     await game.wait(500);
-    const hiddenBefore = (await game.buttons()).filter(b => !b.shown).length;
+    // The first row showing, by its text and height: a drag that scrolls moves it.
+    const firstRow = async () => {
+      const shown = (await game.buttons()).filter(b => b.shown && (b.label === '만들기' || b.label === '놓기'));
+      return shown.length ? `${shown[0].row.slice(0, 10)}@${Math.round(shown[0].cy)}` : '';
+    };
+    const before = await firstRow();
     const box = await game.canvas();
-    const list = (await game.buttons()).filter(b => b.shown && b.label === '놓기');
-    if (list.length > 0) await game.drag(list[0].cx - 120, box.top + box.height * 0.75, 0, -box.height * 0.35, 200);
+    const list = (await game.buttons()).filter(b => b.shown && (b.label === '놓기' || b.label === '만들기'));
+    if (list.length > 0) await game.drag(list[0].cx - 120, box.top + box.height * 0.75, 0, -box.height * 0.3, 200);
     await game.wait(500);
-    const hiddenAfter = (await game.buttons()).filter(b => !b.shown);
-    const moved = JSON.stringify(hiddenAfter.map(b => b.label + b.row)) !== JSON.stringify((await game.buttons()).filter(b => !b.shown).map(b => b.label + b.row)) || hiddenAfter.length !== hiddenBefore;
-    check(hiddenAfter.length !== hiddenBefore, `가방 목록을 손가락으로 끌어 내릴 수 있다 (가려진 단추 ${hiddenBefore} → ${hiddenAfter.length})`);
+    const after = await firstRow();
+    check(before !== '' && after !== before, `가방 목록을 손가락으로 끌어 내릴 수 있다 (첫 줄 ${before} → ${after})`);
     await game.shot('bag-dragged', '목록을 끈 뒤');
     await game.press('가방');
 
