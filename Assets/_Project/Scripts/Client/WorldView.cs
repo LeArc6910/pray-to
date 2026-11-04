@@ -251,6 +251,10 @@ namespace Game.Client
         float _pickaxeHintAt;
         string _banner = "";
         float _bannerAge = BannerSeconds;
+        // Banners that came while another was still fresh: a boss's fall and the level it gave land in the same
+        // moment, and the second would hide the first at once. Each shows at least BannerTurnSeconds, then the next.
+        readonly Queue<string> _bannerQueue = new Queue<string>();
+        const float BannerTurnSeconds = 1.3f;
         GUIStyle _labelStyle;
         GUIStyle _bannerStyle;
 
@@ -322,6 +326,11 @@ namespace Game.Client
                 if (_floating[i].Age > FloatSeconds) _floating.RemoveAt(i);
             }
             _bannerAge += deltaTime;
+            if (_bannerQueue.Count > 0 && _bannerAge >= BannerTurnSeconds)
+            {
+                _banner = _bannerQueue.Dequeue();
+                _bannerAge = 0;
+            }
 
             _cameraTarget = Vector3.Lerp(_cameraTarget, new Vector3(selfPosition.X, selfPosition.Y, _cameraTarget.z), 1 - Mathf.Exp(-12 * deltaTime));
             // Off in the menu (Settings.ScreenShake), hits still flash and sound but the view holds still.
@@ -572,6 +581,8 @@ namespace Game.Client
             {
                 if (_seen.Contains(pair.Key)) continue;
                 _departed[pair.Key] = new Departed(pair.Value.Position, BodyColor(pair.Value), pair.Value.Kind);
+                // A boss out of sight may go back to sleep (its arena empty) unseen; seen again, it is new.
+                if (pair.Value.Kind == BodyKind.Boss) _bossesSeen.Remove(pair.Key);
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
             }
@@ -667,6 +678,11 @@ namespace Game.Client
 
         public void ShowBanner(string text)
         {
+            if (_bannerAge < BannerTurnSeconds && _banner.Length > 0)
+            {
+                if (text != _banner && !_bannerQueue.Contains(text)) _bannerQueue.Enqueue(text);
+                return;
+            }
             _banner = text;
             _bannerAge = 0;
         }

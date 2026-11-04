@@ -1181,7 +1181,8 @@ namespace Game.Client
                 int today = Calendar.Day(clock);
                 string rain = (World.WeatherOf(today) != Weather.Clear ? " · " + World.WeatherName(World.WeatherOf(today)) : "")
                     + (World.EventOf(today) != DayEvent.None ? " · " + World.EventName(World.EventOf(today)) : "");
-                lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))}{rain} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%){(_client.PassivePoints > 0 ? $" · 특성 {_client.PassivePoints}" : "")} · {BiomeMap.Name(_client.Biomes.At(_client.Position))} · {mode}{players}");
+                // Names of more than one word ("흙 동굴", "혼자 하기", "Lv 3 (40%)") stay on one line (Whole).
+                lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))}{rain} · {Whole($"Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%)")}{(_client.PassivePoints > 0 ? $" · {Whole($"특성 {_client.PassivePoints}")}" : "")} · {Whole(BiomeMap.Name(_client.Biomes.At(_client.Position)))} · {Whole(mode)}{players}");
                 if (World.EventOf(today) != DayEvent.None) lines.Add(World.EventText(World.EventOf(today)));
                 if (_client.Rift.Open)
                 {
@@ -1282,6 +1283,9 @@ namespace Game.Client
         // A key and what it does, joined by a space no line breaks at (Ui.Wrap breaks only at plain spaces), so the
         // line never ends between them ("· M / 지도"); the spaces inside the key ("Q E R F") hold too.
         static string Keyed(string key, string meaning) => (key + " " + meaning).Replace(' ', '\u00A0');
+
+        // Spaces no line breaks at, so a name is never split over two lines of the HUD.
+        static string Whole(string text) => text.Replace(' ', '\u00A0');
 
         // Between the HUD box and the minimap; under the HUD when the screen is too narrow for that.
         static void DrawBossBar(EntityView boss)
