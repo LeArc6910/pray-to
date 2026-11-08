@@ -443,6 +443,8 @@ namespace Game.Core
 
         public byte[] StoryCommand() => new InventoryCommandMessage(InventoryCommand.Story, 0).Encode();
 
+        public byte[] SortBagCommand() => new InventoryCommandMessage(InventoryCommand.SortBag, 0).Encode();
+
         // The person whose tile is nearest within reach, and where it is, as World.NpcNear sees it.
         public (NpcDefinition Npc, int X, int Y)? NpcNear()
         {

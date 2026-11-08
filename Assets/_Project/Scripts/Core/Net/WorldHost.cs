@@ -459,6 +459,10 @@ namespace Game.Core
                 case InventoryCommand.Request:
                     World.CompleteRequest(player.Id);
                     break;
+                case InventoryCommand.SortBag:
+                    player.Inventory.Sort();
+                    player.InventoryVersion++;
+                    break;
                 case InventoryCommand.Story:
                     World.CompleteStory(player.Id);
                     break;

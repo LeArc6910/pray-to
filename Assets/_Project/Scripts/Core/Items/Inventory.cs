@@ -30,6 +30,21 @@ namespace Game.Core
 
         public Item Find(int id) => _items.FirstOrDefault(item => item.Id == id);
 
+        // Gear in order: by slot (weapon first), then the higher level, rarity and upgrade first, then by name. A stable
+        // sort, so items alike keep their order.
+        public void Sort()
+        {
+            var sorted = _items
+                .OrderBy(item => item.Base.Slot)
+                .ThenByDescending(item => item.Level)
+                .ThenByDescending(item => item.Rarity)
+                .ThenByDescending(item => item.Upgrade)
+                .ThenBy(item => item.Base.Id, StringComparer.Ordinal)
+                .ToList();
+            _items.Clear();
+            _items.AddRange(sorted);
+        }
+
         public bool Remove(Item item) => _items.Remove(item);
 
         // Puts replacement where item was, so equipping something keeps the bag's order.

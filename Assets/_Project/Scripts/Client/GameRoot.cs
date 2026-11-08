@@ -972,6 +972,7 @@ namespace Game.Client
             Controls.Block(bag);
             Controls.Block(leave);
             if (Ui.Button(bag, "가방")) _inventory.Open = !_inventory.Open;
+            if (_client.SkillPoints > 0 || _client.PassivePoints > 0) InventoryWindow.Badge(bag);
             // Ends on the next Update, after this OnGUI has finished with the session.
             if (Ui.Button(leave, "나가기")) _endReason = "";
         }

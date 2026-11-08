@@ -100,5 +100,23 @@ namespace Game.Core.Tests
             Assert.AreEqual(7, sheet.Get(StatType.Damage, context: item.Base.Tags), 1e-9);
             Assert.AreEqual(5, sheet.Get(StatType.Damage, context: SkillTag.Melee), 1e-9);
         }
+
+        [Test]
+        public void SortingPutsGearInSlotOrderBestFirst()
+        {
+            var bag = new Inventory();
+            var generator = new LootGenerator(Gear.Data);
+            var random = new GameRandom(3);
+            Item Make(string id, int level, Rarity rarity) => generator.RollItem(Gear.Data.FindBase(id), level, rarity, random);
+            var ring = Make("iron_ring", 10, Rarity.Common);
+            var oldSword = Make("copper_sword", 1, Rarity.Common);
+            var newSword = Make("iron_sword", 10, Rarity.Rare);
+            var helmet = Make("iron_helmet", 10, Rarity.Uncommon);
+            foreach (var item in new[] { ring, oldSword, helmet, newSword }) bag.TryAdd(item);
+
+            bag.Sort();
+
+            CollectionAssert.AreEqual(new[] { newSword, oldSword, helmet, ring }, bag.Items);
+        }
     }
 }

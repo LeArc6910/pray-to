@@ -189,6 +189,8 @@ namespace Game.Core
         ResetSkills,
         // Brings the person in reach what the next step of their story asks (World.CompleteStory).
         Story,
+        // Puts the carried gear in order (Inventory.Sort).
+        SortBag,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

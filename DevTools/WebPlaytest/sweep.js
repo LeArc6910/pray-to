@@ -302,6 +302,13 @@ async function basics(browser) {
   await game.press('만들기', /^구리 검/);
   check(items(await game.inventory(), 'copper_sword') + ((await game.inventory()).worn.Weapon === 'copper_sword' ? 1 : 0) > swordsBefore, '작업대 곁에서 구리 검을 만든다');
   await game.shot('bag-crafted', '작업대 곁 제작 목록');
+  // [만들 수 있는 것만]: the list shrinks to what the bag and the stations near make now, and back.
+  const all = (await game.find('만들기')).length;
+  check(await game.press('만들 수 있는 것만'), '[만들 수 있는 것만]을 누른다');
+  const some = (await game.find('만들기')).length;
+  check(some > 0 && some < all, `만들 수 있는 것만 남는다 (${all} → ${some})`);
+  await game.shot('bag-craftable', '만들 수 있는 것만 본 제작 목록');
+  await game.press('모두 보기');
 
   // A chest beside it: the chest tab, put in and take out.
   await game.send('give chest 1; face -1 0');
@@ -363,6 +370,15 @@ async function bag(browser) {
   check((await game.state()).level >= 5 && (has(t.banner, '레벨') || (t.acquired || []).length >= 0), `경험치로 레벨이 오른다 (Lv ${(await game.state()).level}, 배너 "${t.banner || ''}")`);
   await game.press('장착', '철 검');
   check((await game.inventory()).worn.Weapon === 'iron_sword', '[장착]으로 철 검을 든다');
+  // [정렬]: gear in slot order (weapons first), the higher level first within a slot.
+  await game.send('drop item iron_helmet; drop item mithril_sword');
+  await game.wait(1500);
+  check(await game.press('정렬'), '[정렬]을 누른다');
+  await game.wait(500);
+  const order = (await game.inventory()).items.map(i => [i.slot, -i.level]);
+  const sorted = order.every((pair, i) => i === 0 || order[i - 1][0] < pair[0] || (order[i - 1][0] === pair[0] && order[i - 1][1] <= pair[1]));
+  check(sorted && order.length >= 3, `[정렬]하면 장비가 칸 종류, 높은 레벨 순 (${(await game.inventory()).items.map(i => i.base).join(', ')})`);
+  await game.shot('bag-sorted', '[정렬]한 가방');
   // The rune into the sword's socket: pick the rune's square, then the sword's, then [끼우기].
   const runeButton = (await game.buttons()).find(b => b.shown && / 룬 ×1$/.test(b.label));
   if (runeButton) {

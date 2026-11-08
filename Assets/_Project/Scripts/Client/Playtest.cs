@@ -528,7 +528,8 @@ namespace Game.Client
         static string Inventory(Player player)
         {
             var items = new Json('[');
-            foreach (var item in player.Inventory.Items) items.Item(new Json('{').Field("id", item.Id).Field("base", item.Base.Id).Field("upgrade", item.Upgrade).Raw('}'));
+            foreach (var item in player.Inventory.Items) items.Item(new Json('{').Field("id", item.Id).Field("base", item.Base.Id).Field("upgrade", item.Upgrade)
+                .Field("slot", (int)item.Base.Slot).Field("level", item.Level).Raw('}'));
             var worn = new Json('{');
             foreach (ItemSlot slot in Enum.GetValues(typeof(ItemSlot)))
             {
