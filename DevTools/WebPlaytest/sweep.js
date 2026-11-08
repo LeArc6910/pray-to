@@ -972,6 +972,15 @@ async function gear(browser) {
   const locked = await game.find('배우기', '칼날 폭풍');
   check(locked.length === 1 && !locked[0].enabled, '레벨이 모자란 스킬(칼날 폭풍, Lv 18)의 [배우기]는 눌리지 않는다');
   await game.shot('skills-learned', '전투 함성을 배워 올린 [스킬] 탭');
+  // Forgetting them for coins: ten a point spent, the points back.
+  await game.send('give coin 100');
+  await game.wait(500);
+  const spentBefore = await game.inventory();
+  check(await game.press(/^되돌리기 \(금화 20\)$/), '[되돌리기 (금화 20)]가 보이고 누른다');
+  const reset = await game.until(i => !/war_cry/.test(i.ranks), 3000, game.inventory);
+  check(!!reset && reset.skillPoints === spentBefore.skillPoints + 2 && count(reset, 'coin') === count(spentBefore, 'coin') - 20,
+    `되돌리면 포인트 둘이 돌아오고 금화 20을 낸다 (포인트 ${spentBefore.skillPoints} → ${reset && reset.skillPoints})`);
+  await game.press('배우기', '전투 함성');
   const skills = (await game.inventory()).skills;
   await game.press('▼');
   check((await game.inventory()).skills !== skills, `▼로 스킬 칸 순서를 바꾼다 (${skills} → ${(await game.inventory()).skills})`);
