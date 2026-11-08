@@ -201,7 +201,8 @@ namespace Game.Core
                 pair.Value.SentInventory = player.InventoryVersion;
                 var passives = player.Passives.Select(p => IndexOf(_classes?.Passives, p)).Where(i => i >= 0).ToList();
                 var skills = player.SkillRanks.Select(p => (p.Key.Index, p.Value)).OrderBy(p => p.Index).ToList();
-                Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory, passives, skills).Encode(_loot), reliable: true);
+                var stories = player.StorySteps.Select(p => (World.Npcs?.IndexOf(World.Npcs.Find(p.Key)) ?? -1, p.Value)).Where(p => p.Item1 >= 0).ToList();
+                Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory, passives, skills, stories).Encode(_loot), reliable: true);
             }
             foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendChest(pair.Key, pair.Value);
             if (World.Tick % _config.MachineInterval == 0)
@@ -276,6 +277,7 @@ namespace Game.Core
             if (saved != null) World.RestoreFriendships(player, saved.Friendships);
             if (saved != null) World.RestoreLifeExperience(player, saved.LifeExperience);
             if (saved != null) World.RestoreSkills(player, _classes, saved.SkillRanks);
+            if (saved != null) World.RestoreStories(player, saved.Stories);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -456,6 +458,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Request:
                     World.CompleteRequest(player.Id);
+                    break;
+                case InventoryCommand.Story:
+                    World.CompleteStory(player.Id);
                     break;
                 case InventoryCommand.ResetSkills:
                     World.ResetSkills(player.Id);

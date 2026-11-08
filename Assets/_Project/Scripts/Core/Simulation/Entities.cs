@@ -71,6 +71,9 @@ namespace Game.Core
         // known skill. They stay with the character when its classes change.
         public Dictionary<SkillDefinition, int> SkillRanks { get; } = new Dictionary<SkillDefinition, int>();
 
+        // How far through each person's story the player is: the last step done, by person id (World.CompleteStory).
+        public Dictionary<string, int> StorySteps { get; } = new Dictionary<string, int>();
+
         public int RankOf(SkillDefinition skill) => skill != null && SkillRanks.TryGetValue(skill, out int rank) ? rank : 0;
 
         // The rank the skill works at: learned and added by the stats (SkillRules.Power).

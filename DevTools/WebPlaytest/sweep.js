@@ -803,6 +803,20 @@ async function npc(browser) {
   // Met now, the merchant's request for today is in the goal list with how much of it the bag holds.
   const listed = (await game.texts()).hud.find(l => /^부탁: 상인/.test(l));
   check(!!listed && /\d+\/\d+/.test(listed), `만난 상인의 오늘 부탁이 목표 목록에 진행도와 함께 (${listed || '없음'})`);
+  // The merchant's story: its first step opens at a heart, shows in the goal list, and [건네기] hands it in.
+  await game.send('hearts merchant 1; give iron_bar 5; give stone 30');
+  await game.wait(800);
+  const story = (await game.texts()).hud.find(l => /^이야기: 상인 도라/.test(l));
+  check(!!story && /노점 손보기/.test(story), `호감 1이 되면 도라의 이야기가 목표 목록에 (${story || '없음'})`);
+  await bagTab(game, '상인');
+  await game.press('이야기');
+  await game.shot('shop-story', '[이야기] 첫 단계');
+  const coinsBefore = count(await game.inventory(), 'coin');
+  check(await game.press('건네기'), '[이야기]의 [건네기]를 누른다');
+  const told = await game.until(i => (i.stories || {}).merchant === 1, 3000, game.inventory);
+  check(!!told && count(told, 'coin') > coinsBefore, `이야기 1단계를 마치면 금화를 받고 다음 단계로 (${JSON.stringify((told || {}).stories)})`);
+  await game.shot('shop-story-done', '첫 단계를 마친 [이야기]');
+  await closeBag(game);
   await game.send('clock 2 7');
   await game.wait(1200);
   await bagTab(game, '상인');

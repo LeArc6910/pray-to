@@ -357,7 +357,7 @@ namespace Game.Core
         // before the first one.
         public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
-            LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)));
+            LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)));
 
         // Experience in each life skill (LifeSkill order): from the save, and as the host tells.
         public int[] LifeExperience => _life ??= ReadLife();
@@ -433,6 +433,15 @@ namespace Game.Core
         public RequestDefinition RequestOf(NpcDefinition npc) => World.RequestFor(Npcs, npc, HeartsWith(npc), Today);
 
         public byte[] RequestCommand() => new InventoryCommandMessage(InventoryCommand.Request, 0).Encode();
+
+        // How far through each person's story this player is, by person id, as the host last said; the next step
+        // with the person (null when the story is over), and the command that hands it in (World.CompleteStory).
+        public IReadOnlyDictionary<string, int> StorySteps => _storySteps;
+        readonly Dictionary<string, int> _storySteps = new Dictionary<string, int>();
+
+        public RequestDefinition StoryStepOf(NpcDefinition npc) => World.StoryStepFor(Npcs, npc, _storySteps.TryGetValue(npc.Id, out int done) ? done : 0);
+
+        public byte[] StoryCommand() => new InventoryCommandMessage(InventoryCommand.Story, 0).Encode();
 
         // The person whose tile is nearest within reach, and where it is, as World.NpcNear sees it.
         public (NpcDefinition Npc, int X, int Y)? NpcNear()
@@ -1037,6 +1046,11 @@ namespace Game.Core
             foreach (var (skill, rank) in message.Skills)
             {
                 if (_classes != null && skill < _classes.Skills.Count) _skillRanks[_classes.Skills[skill]] = rank;
+            }
+            _storySteps.Clear();
+            foreach (var (npc, step) in message.Stories)
+            {
+                if (Npcs != null && npc < Npcs.Npcs.Count) _storySteps[Npcs.Npcs[npc].Id] = step;
             }
             RefreshStats();
             InventoryVersion++;

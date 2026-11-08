@@ -33,8 +33,9 @@ namespace Game.Core
         public const int Liked = 2;
         public const int Loved = 3;
         public const int Talked = 4;
-        // A request done; and HeartGift + hearts for a heart gift given on talking.
+        // A request done; a story step done; and HeartGift + hearts for a heart gift given on talking.
         public const int RequestDone = 5;
+        public const int StoryDone = 6;
         public const int HeartGift = 16;
         static readonly int[] GiftPoints = { -20, 20, 45, 80 };
         // Daily shop rows on sale each day, and how much kinder the prices get with each heart (percent).
@@ -109,7 +110,7 @@ namespace Game.Core
         // different one each day; null when they have none.
         public static RequestDefinition RequestFor(NpcData npcs, NpcDefinition npc, int hearts, int day)
         {
-            var open = npcs?.Requests.Where(r => r.Npc == npc && r.Hearts <= hearts).ToList();
+            var open = npcs?.Requests.Where(r => r.Npc == npc && !r.IsStory && r.Hearts <= hearts).ToList();
             if (open == null || open.Count == 0) return null;
             return open[(Math.Max(0, day) * 7 + npcs.IndexOf(npc) * 3) % open.Count];
         }
@@ -224,10 +225,57 @@ namespace Game.Core
         }
 
         // Gives the material or consumable to the player.
-        static void Give(Player player, object thing, int count)
+        void Give(Player player, object thing, int count, Vec2 at = default)
         {
             if (thing is MaterialDefinition material) player.Inventory.AddMaterial(material, count);
+            else if (thing is ItemBase itemBase)
+            {
+                // Gear from a story: rare at its level, into the bag, or at the person's feet when it is full.
+                for (int i = 0; i < count && _lootGenerator != null; i++)
+                {
+                    var item = Register(_lootGenerator.RollItem(itemBase, itemBase.Level, Rarity.Rare, _random));
+                    if (!player.Inventory.TryAdd(item)) DropItem(item, at);
+                }
+            }
             else player.Inventory.AddConsumable((ConsumableDefinition)thing, count);
+        }
+
+        // The next step of the person's story for this player (how many they have done, plus one), or null when the
+        // story is over or they have none.
+        public static RequestDefinition StoryStepFor(NpcData npcs, NpcDefinition npc, int done) =>
+            npcs?.StoryOf(npc).FirstOrDefault(r => r.Step > done);
+
+        // Brings the person in reach what the next step of their story asks: takes it, gives the rewards (gear
+        // among them) and friendship, and moves the story on. False when the step is not open yet (too few hearts) or
+        // the bag lacks something.
+        public bool CompleteStory(int playerId)
+        {
+            var at = AtMerchant(playerId);
+            if (at == null) return false;
+            var (player, npc, friendship) = at.Value;
+            player.StorySteps.TryGetValue(npc.Id, out int done);
+            var step = StoryStepFor(Npcs, npc, done);
+            if (step == null || friendship.Hearts < step.Hearts || step.Need.Any(n => CountOf(player, n.Thing) < n.Count)) return false;
+            foreach (var (thing, count) in step.Need)
+            {
+                if (thing is MaterialDefinition material) player.Inventory.TakeKind(material, count);
+                else for (int i = 0; i < count; i++) player.Inventory.TakeConsumable((ConsumableDefinition)thing);
+            }
+            var tile = NearestTile(player.Position, npc.Tile, StationReach) ?? (0, 0);
+            var place = TileMap.Center(tile.X, tile.Y);
+            foreach (var (thing, count) in step.Rewards) Give(player, thing, count, player.Position);
+            player.StorySteps[npc.Id] = step.Step;
+            friendship.Points = Math.Min(MaxHearts * PointsPerHeart, friendship.Points + step.Points);
+            player.InventoryVersion++;
+            _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: StoryDone, position: place));
+            return true;
+        }
+
+        // Puts back the story steps a character save held (Docs/Npcs.md, 이야기).
+        public static void RestoreStories(Player player, IEnumerable<(string Npc, int Step)> saved)
+        {
+            player.StorySteps.Clear();
+            foreach (var (npc, step) in saved ?? Enumerable.Empty<(string, int)>()) if (step > 0) player.StorySteps[npc] = step;
         }
 
         static int CountOf(Player player, object thing) =>

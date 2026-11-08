@@ -1314,11 +1314,26 @@ namespace Game.Client
                 if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) text += $"\n{goal.Hint}";
                 entries.Add(($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}", text));
             }
-            // Today's requests from the people this player has met (Docs/Npcs.md), not yet done, with how much of each
-            // thing the bag holds. Two at most, one on a short screen.
+            // The next story step of each person met whose hearts allow it (Docs/Npcs.md, 이야기), then today's
+            // requests not yet done, with how much of each thing the bag holds. Two of these at most, one on a short
+            // screen.
+            int people = Ui.Short ? 1 : 2;
+            string Needs(RequestDefinition asked) => string.Join(" · ", asked.Need.Select(n =>
+            {
+                int have = n.Thing is MaterialDefinition m ? _client.Bag.CountOfKind(m) : _client.Bag.CountOf((ConsumableDefinition)n.Thing);
+                return $"{RequestDefinition.NameOf(n.Thing)} {Math.Min(have, n.Count)}/{n.Count}";
+            }));
             foreach (var npc in _client.Npcs?.Npcs ?? Enumerable.Empty<NpcDefinition>())
             {
-                if (entries.Count(e => e.Title.StartsWith("부탁")) >= (Ui.Short ? 1 : 2)) break;
+                if (entries.Count(e => e.Title.StartsWith("이야기") || e.Title.StartsWith("부탁")) >= people) break;
+                if (!_client.Friendships.ContainsKey(npc.Id)) continue;
+                var step = _client.StoryStepOf(npc);
+                if (step == null || _client.HeartsWith(npc) < step.Hearts) continue;
+                entries.Add(($"이야기: {npc.Name} — {step.Title}", Needs(step) + (Ui.Short ? "" : $"\n보답: {step.RewardText}")));
+            }
+            foreach (var npc in _client.Npcs?.Npcs ?? Enumerable.Empty<NpcDefinition>())
+            {
+                if (entries.Count(e => e.Title.StartsWith("이야기") || e.Title.StartsWith("부탁")) >= people) break;
                 if (!_client.Friendships.ContainsKey(npc.Id) || _client.RequestDoneToday(npc)) continue;
                 var request = _client.RequestOf(npc);
                 if (request == null) continue;

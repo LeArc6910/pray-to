@@ -1,4 +1,4 @@
-id,npc,text,need,reward,hearts,points
+id,npc,text,need,reward,hearts,points,step,title
 m_spores,merchant,버섯 포자 10개만 구해 줄래? 화분에 심으려고.,mushroom_spore:10,coin:40,,30
 m_fish,merchant,생선 구이 세 개가 필요해. 손님이 찾네.,grilled_fish:3,coin:50|healing_potion:2,,30
 m_berry,merchant,딸기 주스 두 병 부탁해.,berry_juice:2,coin:70,1,35
@@ -14,3 +14,12 @@ f_crab,fisher,동굴 게 두 마리만. 게찜이 먹고 싶네.,cave_crab:2,coi
 f_trout,fisher,얼음 송어 두 마리 부탁해.,ice_trout:2,coin:50,1,35
 f_eel,fisher,수정 장어 두 마리. 꼬치를 굽자.,crystal_eel:2,coin:80|bait:15,2,40
 f_angler,fisher,심연의 아귀 한 마리. 평생 한 번 보고 싶었어.,void_angler:1,coin:120|essence:4,3,45
+m_story1,merchant,비가 새서 노점이 엉망이야. 철 주괴 다섯이랑 돌 서른 개면 고칠 수 있을 텐데.,iron_bar:5|stone:30,coin:150|recall_scroll:2,1,40,1,노점 손보기
+m_story2,merchant,먼 데서 귀한 손님이 와. 별 수박 둘이랑 달빛 포도주 둘로 맞이하고 싶어.,star_melon:2|moon_wine:2,coin:300|essence:8,3,50,2,귀한 손님 맞기
+m_story3,merchant,언젠가 공허 너머까지 장사하러 가는 게 꿈이야. 공허의 정수와 수정 장어 둘을 구해 줄래? 보답은 아껴 둔 반지야.,void_essence:1|crystal_eel:2,coin:600|void_ring:1,5,60,3,도라의 꿈
+b_story1,blacksmith,망치 자루가 다 닳았어. 철 주괴 열과 구리선 열이면 새 연장을 만들지. 자네 몫도 하나 벼려 주마.,iron_bar:10|copper_wire:10,essence:5|iron_sword:1,1,40,1,강철의 연장
+b_story2,blacksmith,미스릴은 담금질이 까다로워. 미스릴 주괴 여덟 개로 연습하게 해 주면 갑옷 한 벌을 주지.,mithril_bar:8,essence:12|mithril_armor:1,3,50,2,미스릴 담금질
+b_story3,blacksmith,평생 공허석을 두드려 보는 게 소원이었네. 공허석 주괴와 흑요석 주괴 여섯씩이면 최고의 검을 만들 수 있어.,void_bar:6|obsidian_bar:6,essence:25|void_sword:1,5,60,3,공허를 두드리다
+f_story1,fisher,처음 낚시를 배울 때 동굴 송사리부터 잡았지. 열 마리만 모아 와 봐.,cave_minnow:10,bait:30|coin:80,1,40,1,하루의 첫 손님
+f_story2,fisher,얼음 동굴 아래엔 큰 송어가 산다더라. 얼음 송어 다섯과 수정 장어 하나를 보고 싶어.,ice_trout:5|crystal_eel:1,coin:200|mana_potion:3,3,50,2,얼음 아래의 송어
+f_story3,fisher,심연의 아귀를 한 번만 직접 보고 싶어. 두 마리면 아버지의 활을 줄게.,void_angler:2,coin:400|essence:10|void_bow:1,5,60,3,심연의 아귀

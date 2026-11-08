@@ -125,6 +125,47 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void TheMerchantsStoryGoesStepByStepWithHearts()
+        {
+            var world = Shop(out var player, out _);
+            var story = People.Shipped.StoryOf(Merchant);
+            Assert.AreEqual(3, story.Count);
+            CollectionAssert.AreEqual(new[] { 1, 2, 3 }, story.Select(s => s.Step));
+            Assert.IsFalse(People.Shipped.Requests.Where(r => r.IsStory).Any(r => World.RequestFor(People.Shipped, r.Npc, 5, 3) == r), "never the day's request");
+
+            var first = World.StoryStepFor(People.Shipped, Merchant, 0);
+            Assert.AreEqual("m_story1", first.Id);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("iron_bar"), 5);
+            player.Inventory.AddMaterial(Stone, 30);
+            Assert.IsFalse(world.CompleteStory(player.Id), "a heart first");
+
+            World.FriendshipOf(player, Merchant).Points = World.PointsPerHeart;
+            Assert.IsTrue(world.CompleteStory(player.Id));
+            Assert.AreEqual(1, player.StorySteps["merchant"]);
+            Assert.AreEqual(0, player.Inventory.CountOf(Stone));
+            Assert.AreEqual(150, player.Inventory.CountOf(Gear.Data.FindMaterial("coin")));
+            Assert.AreEqual(2, player.Inventory.CountOf(Gear.Data.Consumables.First(c => c.Id == "recall_scroll")));
+            Assert.Greater(World.FriendshipOf(player, Merchant).Points, World.PointsPerHeart);
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.Npc && e.Amount == World.StoryDone));
+            Assert.AreEqual("m_story2", World.StoryStepFor(People.Shipped, Merchant, 1).Id);
+            Assert.IsFalse(world.CompleteStory(player.Id), "the next step needs three hearts and its things");
+
+            // The last step gives gear: a rare void ring.
+            player.StorySteps["merchant"] = 2;
+            World.FriendshipOf(player, Merchant).Points = World.MaxHearts * World.PointsPerHeart;
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("void_essence"), 1);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("crystal_eel"), 2);
+            Assert.IsTrue(world.CompleteStory(player.Id));
+            var ring = player.Inventory.Items.Single(i => i.Base.Id == "void_ring");
+            Assert.AreEqual(Rarity.Rare, ring.Rarity);
+            Assert.IsNull(World.StoryStepFor(People.Shipped, Merchant, 3), "the story is over");
+            Assert.IsFalse(world.CompleteStory(player.Id));
+
+            var saved = CharacterSave.Read(CharacterSave.Write(player.Equipment, player.Inventory, stories: player.StorySteps.Select(p => (p.Key, p.Value))), Gear.Data);
+            CollectionAssert.Contains(saved.Stories, ("merchant", 3));
+        }
+
+        [Test]
         public void TalkingAndGiftsMakeFriendsOnceADay()
         {
             var world = Shop(out var player, out _);

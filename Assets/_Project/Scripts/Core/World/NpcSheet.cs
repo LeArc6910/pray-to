@@ -75,11 +75,15 @@ namespace Game.Core
     }
 
     // Something a person asks for (requests.csv): bring them these, and they give those and think better of you.
+    // A row with a step is part of their story (Docs/Npcs.md, 이야기): asked once each, in step order, never as the
+    // day's request; its rewards may name a piece of gear (rolled rare at its level).
     public sealed class RequestDefinition
     {
         internal RequestDefinition(string id, NpcDefinition npc, string text, IReadOnlyList<(object Thing, int Count)> need,
-            IReadOnlyList<(object Thing, int Count)> rewards, int hearts, int points)
+            IReadOnlyList<(object Thing, int Count)> rewards, int hearts, int points, int step = 0, string title = "")
         {
+            Step = step;
+            Title = title ?? "";
             Id = id;
             Npc = npc;
             Text = text;
@@ -98,8 +102,17 @@ namespace Game.Core
         // Asked only of players this friendly.
         public int Hearts { get; }
         public int Points { get; }
+        // Its place in the person's story (1 the first), or 0 for a daily request; and the story step's name.
+        public int Step { get; }
+        public string Title { get; }
+        public bool IsStory => Step > 0;
 
-        public static string NameOf(object thing) => thing is MaterialDefinition m ? m.Name : ((ConsumableDefinition)thing).Name;
+        public static string NameOf(object thing) => thing switch
+        {
+            MaterialDefinition m => m.Name,
+            ItemBase b => b.Name,
+            _ => ((ConsumableDefinition)thing).Name,
+        };
 
         public string NeedText => string.Join(" · ", Need.Select(n => $"{NameOf(n.Thing)} {n.Count}"));
         public string RewardText => string.Join(" · ", Rewards.Select(r => $"{NameOf(r.Thing)} {r.Count}"));
@@ -120,6 +133,9 @@ namespace Game.Core
         public IReadOnlyList<ShopEntry> Shop { get; }
         public IReadOnlyList<RequestDefinition> Requests { get; }
         public IReadOnlyList<string> Errors { get; }
+
+        // A person's story steps, first to last (Docs/Npcs.md, 이야기).
+        public IReadOnlyList<RequestDefinition> StoryOf(NpcDefinition npc) => Requests.Where(r => r.Npc == npc && r.IsStory).OrderBy(r => r.Step).ToList();
         public bool Success => Errors.Count == 0;
 
         // The merchant (the first person at a stall), or null.
@@ -167,13 +183,18 @@ namespace Game.Core
                     if (requests.Any(r => r.Id == id)) throw new FormatException($"id '{id}'가 이미 있습니다.");
                     var npc = npcs.FirstOrDefault(n => n.Id == row["npc"]) ?? throw new FormatException($"'{row["npc"]}'라는 사람이 {NpcsFile}에 없습니다.");
                     if (row["text"].Length == 0) throw new FormatException("'text' 칸이 비어 있습니다.");
+                    int step = row["step"].Length == 0 ? 0 : SheetValues.ParseNumber(row["step"], "step");
+                    if (step < 0) throw new FormatException("step은 0 이상입니다.");
+                    if (step > 0 && requests.Any(r => r.Npc == npc && r.Step == step)) throw new FormatException($"'{npc.Id}'의 이야기 {step}단계가 이미 있습니다.");
+                    if (step > 0 && row["title"].Length == 0) throw new FormatException("이야기(step)에는 title이 있어야 합니다.");
                     var need = Counts(row["need"], loot);
-                    var rewards = Counts(row["reward"], loot);
+                    // Only a story step may give gear.
+                    var rewards = Counts(row["reward"], loot, items: step > 0);
                     if (need.Count == 0 || rewards.Count == 0) throw new FormatException("need와 reward가 비어 있으면 안 됩니다.");
                     int hearts = row["hearts"].Length == 0 ? 0 : SheetValues.ParseNumber(row["hearts"], "hearts");
                     if (hearts > World.MaxHearts) throw new FormatException($"hearts는 {World.MaxHearts} 이하입니다.");
                     int points = row["points"].Length == 0 ? 30 : SheetValues.ParseNumber(row["points"], "points");
-                    requests.Add(new RequestDefinition(id, npc, row["text"], need, rewards, hearts, points));
+                    requests.Add(new RequestDefinition(id, npc, row["text"], need, rewards, hearts, points, step, row["title"]));
                 }
                 catch (FormatException e)
                 {
@@ -184,13 +205,14 @@ namespace Game.Core
         }
 
         // "copper_ore:20|coin:40".
-        static List<(object, int)> Counts(string text, LootData loot) => text.Split('|').Select(part => part.Trim()).Where(part => part.Length > 0).Select(part =>
+        static List<(object, int)> Counts(string text, LootData loot, bool items = false) => text.Split('|').Select(part => part.Trim()).Where(part => part.Length > 0).Select(part =>
         {
             string[] bits = part.Split(':');
             if (bits.Length != 2) throw new FormatException($"'{part}'는 <id>:<개수>로 적습니다.");
             int count = SheetValues.ParseNumber(bits[1], "개수");
             if (count < 1) throw new FormatException("개수는 1 이상이어야 합니다.");
-            return (Thing(bits[0], loot), count);
+            var itemBase = items ? loot.Bases.FirstOrDefault(b => b.Id == bits[0]) : null;
+            return (itemBase ?? Thing(bits[0], loot), count);
         }).ToList();
 
         static List<NpcDefinition> ParseNpcs(string csv, LootData loot, List<string> errors)

@@ -624,10 +624,11 @@ namespace Game.Client
             Sell,
             Gift,
             Request,
+            Story,
         }
 
         ShopMode _shopMode;
-        static readonly string[] ShopModeNames = { "사기", "팔기", "선물", "부탁" };
+        static readonly string[] ShopModeNames = { "사기", "팔기", "선물", "부탁", "이야기" };
 
         // The merchant (World.Merchant.cs): who she is and how well this player knows her, today's line, a chat once a
         // day, and buying, selling and a gift once a day.
@@ -663,7 +664,48 @@ namespace Game.Client
             if (_shopMode == ShopMode.Buy) DrawBuying(npc, hearts, coins);
             else if (_shopMode == ShopMode.Sell) DrawSelling(npc, hearts);
             else if (_shopMode == ShopMode.Gift) DrawGifts(npc);
-            else DrawRequest(npc);
+            else if (_shopMode == ShopMode.Request) DrawRequest(npc);
+            else DrawStory(npc, hearts);
+        }
+
+        // The person's story (Docs/Npcs.md, 이야기): the steps done, the next one with what it needs and gives, and
+        // [건네기] once the bag has it all; the step waits for its hearts.
+        void DrawStory(NpcDefinition npc, int hearts)
+        {
+            var story = _client.Npcs?.StoryOf(npc) ?? new List<RequestDefinition>();
+            if (story.Count == 0)
+            {
+                GUILayout.Label(Fit("들려줄 이야기가 없다고 한다.", _textWidth));
+                return;
+            }
+            var next = _client.StoryStepOf(npc);
+            foreach (var step in story.Where(s => next == null || s.Step < next.Step))
+            {
+                GUILayout.Label(Fit($"{step.Step}. {step.Title} (마침)", _textWidth));
+            }
+            if (next == null)
+            {
+                GUILayout.Label(Fit("이야기를 모두 들었다.", _textWidth));
+                return;
+            }
+            GUILayout.Space(4);
+            GUILayout.Label(Fit($"{next.Step}/{story.Count}. {next.Title}", _textWidth));
+            if (hearts < next.Hearts)
+            {
+                GUILayout.Label(Fit($"호감 {next.Hearts}이 되면 이야기를 꺼낸다(지금 {hearts}).", _textWidth));
+                return;
+            }
+            GUILayout.Label(Fit($"\"{next.Text}\"", _textWidth));
+            var needs = next.Need.Select(n => $"{RequestDefinition.NameOf(n.Thing)} {Math.Min(Have(n.Thing), n.Count)}/{n.Count}");
+            GUILayout.Label(Fit($"필요한 것: {string.Join(" · ", needs)}", _textWidth));
+            GUILayout.Label(Fit($"보답: {next.RewardText} · 호감 +{next.Points}", _textWidth));
+            bool ready = next.Need.All(n => Have(n.Thing) >= n.Count);
+            var enabled = GUI.enabled;
+            GUI.enabled = enabled && ready;
+            if (Ui.LayoutButton(ready ? "건네기" : "아직 모자라다")) Send(_client.StoryCommand(), Sound.Craft);
+            GUI.enabled = enabled;
+
+            int Have(object thing) => thing is MaterialDefinition m ? _client.Bag.CountOfKind(m) : _client.Bag.CountOf((ConsumableDefinition)thing);
         }
 
         // What the person asks today, what they give for it, and [건네기] once the bag has it all.

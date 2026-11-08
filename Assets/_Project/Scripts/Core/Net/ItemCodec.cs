@@ -187,6 +187,8 @@ namespace Game.Core
         LearnSkill,
         // Forgets the learned skills for coins and gives the points back (World.ResetSkills).
         ResetSkills,
+        // Brings the person in reach what the next step of their story asks (World.CompleteStory).
+        Story,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
@@ -224,8 +226,9 @@ namespace Game.Core
     public sealed class InventoryMessage
     {
         public InventoryMessage(Equipment equipment, Inventory bag, IReadOnlyList<int> passives = null,
-            IReadOnlyList<(int Skill, int Rank)> skills = null)
+            IReadOnlyList<(int Skill, int Rank)> skills = null, IReadOnlyList<(int Npc, int Step)> stories = null)
         {
+            Stories = stories ?? new List<(int, int)>();
             Equipment = equipment;
             Bag = bag;
             Passives = passives ?? new List<int>();
@@ -238,6 +241,8 @@ namespace Game.Core
         public IReadOnlyList<int> Passives { get; }
         // The skills learned and their ranks, as indexes into the skill sheet (ClassData.Skills).
         public IReadOnlyList<(int Skill, int Rank)> Skills { get; }
+        // The last story step done with each person, as indexes into the people sheet (NpcData.Npcs).
+        public IReadOnlyList<(int Npc, int Step)> Stories { get; }
 
         public byte[] Encode(LootData data) => Protocol.Build(MessageType.Inventory, w =>
         {
@@ -256,6 +261,12 @@ namespace Game.Core
                 w.Write((ushort)skill);
                 w.Write((byte)rank);
             }
+            w.Write((byte)Stories.Count);
+            foreach (var (npc, step) in Stories)
+            {
+                w.Write((byte)npc);
+                w.Write((byte)step);
+            }
         });
 
         public static InventoryMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Inventory, r =>
@@ -273,7 +284,9 @@ namespace Game.Core
             for (int count = r.ReadUInt16(); count > 0; count--) passives.Add(r.ReadUInt16());
             var skills = new List<(int, int)>();
             for (int count = r.ReadUInt16(); count > 0; count--) skills.Add((r.ReadUInt16(), r.ReadByte()));
-            return new InventoryMessage(equipment, bag, passives, skills);
+            var stories = new List<(int, int)>();
+            for (int count = r.ReadByte(); count > 0; count--) stories.Add((r.ReadByte(), r.ReadByte()));
+            return new InventoryMessage(equipment, bag, passives, skills, stories);
         });
     }
 

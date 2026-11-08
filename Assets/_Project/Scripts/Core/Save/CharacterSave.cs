@@ -15,12 +15,13 @@ namespace Game.Core
         // 2: experience (character levels). 3: the guide goals whose rewards it has had. 4: the points taken on the
         // passive tree, by id. 5: friendships (World.Merchant.cs), by person id. 6: life skill experience
         // (World.Life.cs). 7: each friendship's request day and heart gifts had. 8: the skills learned and their ranks
-        // (Docs/Classes.md, 스킬 포인트와 단계), by id.
-        const int FormatVersion = 8;
+        // (Docs/Classes.md, 스킬 포인트와 단계), by id. 9: how far through each person's story (Docs/Npcs.md, 이야기).
+        const int FormatVersion = 9;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
-            List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null)
+            List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null)
         {
+            Stories = stories ?? new List<(string, int)>();
             SkillRanks = skills ?? new List<(string, int)>();
             LifeExperience = life ?? new List<int>();
             Friendships = friendships ?? new List<(string, int, int, int, int, int)>();
@@ -46,11 +47,13 @@ namespace Game.Core
         public IReadOnlyList<int> LifeExperience { get; }
         // The skills it learned and their ranks, by id (World.RestoreSkills puts back what the sheet still has).
         public IReadOnlyList<(string Id, int Rank)> SkillRanks { get; }
+        // The last story step done with each person, by person id.
+        public IReadOnlyList<(string Npc, int Step)> Stories { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
             IEnumerable<string> passives = null, IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> friendships = null,
-            IEnumerable<int> life = null, IEnumerable<(string Id, int Rank)> skillRanks = null)
+            IEnumerable<int> life = null, IEnumerable<(string Id, int Rank)> skillRanks = null, IEnumerable<(string Npc, int Step)> stories = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -92,6 +95,13 @@ namespace Game.Core
                 {
                     w.Write(id);
                     w.Write((byte)rank);
+                }
+                var told = (stories ?? Enumerable.Empty<(string, int)>()).ToList();
+                w.Write((ushort)told.Count);
+                foreach (var (npc, step) in told)
+                {
+                    w.Write(npc);
+                    w.Write((byte)step);
                 }
             }
             return stream.ToArray();
@@ -158,7 +168,9 @@ namespace Game.Core
                 for (int count = version >= 6 ? r.ReadByte() : 0; count > 0; count--) life.Add(r.ReadInt32());
                 var ranks = new List<(string, int)>();
                 for (int count = version >= 8 ? r.ReadUInt16() : 0; count > 0; count--) ranks.Add((r.ReadString(), r.ReadByte()));
-                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks);
+                var stories = new List<(string, int)>();
+                for (int count = version >= 9 ? r.ReadUInt16() : 0; count > 0; count--) stories.Add((r.ReadString(), r.ReadByte()));
+                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

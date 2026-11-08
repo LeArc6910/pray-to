@@ -30,6 +30,7 @@ namespace Game.Client
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
     //   teach [rank]              every skill of the player's classes at the rank, no points needed
     //   classes <id,id> [order]   other classes at once, no workbench needed; order: which of their skills in each slot
+    //   hearts <person> <n>       that many hearts with the person (merchant, blacksmith, fisher)
     //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health>
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
     //   goto spawn | <dx> <dy> | boss <id> | biome <name> | tile <type> | near <type>
@@ -154,6 +155,11 @@ namespace Game.Client
                     var chosen = ClassRules.Choose(root.ClassSheet, words[1].Split(','), ClassRules.DefaultMaxClasses);
                     if (chosen.Count == 0) throw new ArgumentException($"no classes '{words[1]}'");
                     player.ChangeKit(chosen, words.Length > 2 ? words[2].Split(',').Select(Int).ToList() : null);
+                    player.InventoryVersion++;
+                    return null;
+                case "hearts":
+                    var person = world.Npcs?.Find(words[1]) ?? throw new ArgumentException($"no person '{words[1]}'");
+                    World.FriendshipOf(player, person).Points = Math.Clamp(Int(words[2]), 0, World.MaxHearts) * World.PointsPerHeart;
                     player.InventoryVersion++;
                     return null;
                 case "teach":
@@ -541,6 +547,7 @@ namespace Game.Client
                 .Field("skillPoints", player.SkillPoints)
                 .Field("passives", player.Passives.Count)
                 .Field("friends", Counts(player.Friendships.Select(f => new KeyValuePair<string, int>(f.Key, f.Value.Points)), id => id))
+                .Field("stories", Counts(player.StorySteps, id => id))
                 .Field("life", string.Join(",", player.LifeExperience))
                 .Close('}');
         }

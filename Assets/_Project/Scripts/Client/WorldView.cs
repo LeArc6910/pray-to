@@ -1457,6 +1457,7 @@ namespace Game.Client
                     var reaction = e.Amount >= World.HeartGift ? $"호감 {e.Amount - World.HeartGift}: 선물을 받았다!" : e.Amount switch
                     {
                         World.RequestDone => "부탁을 들어주었다!",
+                        World.StoryDone => "이야기를 하나 마쳤다!",
                         World.Loved => "정말 좋아한다!",
                         World.Liked => "좋아한다",
                         World.Disliked => "별로인 모양이다...",
