@@ -40,6 +40,12 @@ async function bagTab(game, tab) {
   if (tab) await game.press(tab);
 }
 
+// Picks a thing in the bag's [장비] grid by its square (the name, a RegExp for names that may carry more), so the
+// panel under the grid shows its buttons. Worn things are in the "착용" row, the rest under "소지품".
+async function pick(game, name, row = '소지품') {
+  return game.press(name instanceof RegExp ? name : new RegExp(`^${name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), row);
+}
+
 async function closeBag(game) {
   if ((await game.state()).bag) await game.send('bag off');
   await game.wait(300);
@@ -313,15 +319,16 @@ async function bag(browser) {
   check(inv.consumables.healing_potion === 4, '물약을 줍는다');
 
   await bagTab(game, '장비');
+  check(await pick(game, /철 검/), '가방 격자에서 철 검 칸을 고른다');
   const gated = await game.find(/^Lv\d+$/, '철 검');
   check(gated.length === 1, `레벨이 모자란 철 검에는 [장착] 대신 "${gated[0] && gated[0].label}"`);
-  await game.shot('bag-gear', '가방 [장비] 탭(레벨 제한)');
-  // A description under the pointer.
-  const row = gated[0];
-  if (row) {
-    await game.page.mouse.move(row.cx - 160, row.cy);
+  await game.shot('bag-gear', '가방 [장비] 격자와 고른 칸의 설명(레벨 제한)');
+  // A description under the pointer, over the sword's square.
+  const square = (await game.find(/철 검/, '소지품'))[0];
+  if (square) {
+    await game.page.mouse.move(square.cx, square.cy);
     await game.wait(700);
-    await game.shot('tooltip', '이름에 마우스를 올린 설명');
+    await game.shot('tooltip', '칸에 마우스를 올린 설명');
   }
   await game.send('xp 1300');
   await game.wait(1500);
@@ -329,10 +336,11 @@ async function bag(browser) {
   check((await game.state()).level >= 5 && (has(t.banner, '레벨') || (t.acquired || []).length >= 0), `경험치로 레벨이 오른다 (Lv ${(await game.state()).level}, 배너 "${t.banner || ''}")`);
   await game.press('장착', '철 검');
   check((await game.inventory()).worn.Weapon === 'iron_sword', '[장착]으로 철 검을 든다');
-  // The rune into the sword's socket: pick the rune, then [끼우기].
+  // The rune into the sword's socket: pick the rune's square, then the sword's, then [끼우기].
   const runeButton = (await game.buttons()).find(b => b.shown && / 룬 ×1$/.test(b.label));
   if (runeButton) {
     await game.press(runeButton.label);
+    await pick(game, /철 검/, '착용');
     const inserted = await game.press('끼우기', null, { quiet: true });
     const socketed = await game.until(i => i.runes === 0, 3000, game.inventory);
     check(inserted && !!socketed, '룬을 고르고 [끼우기]로 소켓에 넣는다');
@@ -345,6 +353,7 @@ async function bag(browser) {
   const swords = items(await game.inventory(), 'copper_sword');
   await game.send('face 1 0');
   await game.wait(300);
+  await pick(game, /구리 검/);
   await game.press('버리기', '구리 검');
   check(items(await game.inventory(), 'copper_sword') === swords - 1, '[버리기]로 구리 검을 버린다');
   await game.wait(2000);
@@ -710,6 +719,7 @@ async function life(browser) {
   check(!!slept, '혼자면 자고 나면 다음 날 아침');
   await game.send('goto 5 2; potion recall_scroll 1');
   await bagTab(game, '장비');
+  await pick(game, '귀환 두루마리');
   await game.press('쓰기', '귀환 두루마리');
   await closeBag(game);
   check((await game.texts()).hud.some(l => has(l, '귀환 중')), '귀환 두루마리를 쓰면 "귀환 중…"');
@@ -862,6 +872,7 @@ async function gear(browser) {
   const hud = (await game.texts()).hud.join(' ');
   check(/특성 포인트 \d+/.test(hud) && /스킬 포인트 \d+/.test(hud), `레벨이 오르면 HUD에 "스킬 포인트 N · 특성 포인트 N" (${(hud.match(/스킬 포인트[^|]*/) || [''])[0]})`);
   await bagTab(game, '장비');
+  await pick(game, /철 검/);
   await game.press('다듬기', '철 검');
   await game.shot('anvil', '모루 곁 [다듬기]');
   check(await game.press(/^강화 \+1/), '[강화 +1]이 보인다');
@@ -1112,6 +1123,7 @@ async function touch(browser) {
     await game.press('놓기', '횃불');
     check((await game.look(1, 0)).tile === 'Torch', '가방의 [놓기]를 탭해 횃불');
     await game.press('장비');
+    await pick(game, /철 검/);
     await game.press('장착', '철 검');
     check((await game.state()).weapon === 'iron_sword', '[장착]을 탭해 철 검');
     await game.shot('bag', '가방 [장비]');

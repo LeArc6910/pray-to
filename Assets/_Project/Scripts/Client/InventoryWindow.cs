@@ -194,69 +194,246 @@ namespace Game.Client
             e.Use();
         }
 
+        // The gear page as a grid, the way Terraria and Core Keeper show a bag: the six worn slots in a row, then
+        // every carried item, consumable and rune as a square with its icon, rarity edge and count. Pressing one picks
+        // it, and the panel under the grid tells what it is and holds its buttons ([장착], [버리기], [마시기], ...).
+        // With a rune picked, an item's panel offers [끼우기]. Stats and life skills fold away at the bottom.
         void DrawGear()
         {
             DrawRefining();
-            DrawStats();
-            DrawLifeSkills();
-            DrawConsumables();
 
-            GUILayout.Space(6);
-            GUILayout.Label("착용");
-            foreach (ItemSlot slot in Enum.GetValues(typeof(ItemSlot)))
+            float cell = Controls.UsingTouch ? 48 : 44;
+            GUILayout.Label(Fit("착용", _textWidth));
+            var slots = (ItemSlot[])Enum.GetValues(typeof(ItemSlot));
+            var worn = Grid(slots.Length, cell);
+            for (int i = 0; i < slots.Length; i++)
             {
-                var item = _client.Equipment[slot];
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(ItemText.SlotName(slot), GUILayout.Width(50));
+                var item = _client.Equipment[slots[i]];
+                var area = CellAt(worn, i, cell);
                 if (item == null)
                 {
-                    GUILayout.Label("-");
+                    EmptyCell(area, ItemText.SlotName(slots[i]));
+                    continue;
+                }
+                if (Cell(area, Sprites.Icon(item.Base), ItemText.Name(item), null, Palette.Of(item.Rarity), _picked == item.Id, ItemTooltip(item)))
+                {
+                    Pick(item.Id, null);
+                }
+            }
+
+            GUILayout.Space(4);
+            var items = _client.Bag.Items.ToList();
+            var consumables = _client.Bag.Consumables.ToList();
+            var runes = _client.Bag.Runes.ToList();
+            float wait = _client.ConsumableCooldownLeft;
+            GUILayout.Label(Fit($"소지품 {items.Count}/{Inventory.Capacity}" + (wait > 0 ? $" · 소모품은 {Mathf.CeilToInt(wait)}초 뒤에" : ""), _textWidth));
+            int count = Math.Max(items.Count + consumables.Count + runes.Count, 1);
+            var grid = Grid(count, cell);
+            int index = 0;
+            foreach (var item in items)
+            {
+                bool wearable = item.Base.RequiredLevel <= _client.Level;
+                if (Cell(CellAt(grid, index++, cell), Sprites.Icon(item.Base), ItemText.Name(item), wearable ? null : $"Lv{item.Base.RequiredLevel}",
+                    Palette.Of(item.Rarity), _picked == item.Id, ItemTooltip(item), dim: !wearable))
+                {
+                    Pick(item.Id, null);
+                }
+            }
+            foreach (var (consumable, number) in consumables)
+            {
+                if (Cell(CellAt(grid, index++, cell), Sprites.Icon(consumable), $"{consumable.Name} ×{number}", number.ToString(), Palette.Potion,
+                    _pickedConsumable == consumable, consumable.Description))
+                {
+                    Pick(0, consumable);
+                }
+            }
+            foreach (var (rune, number) in runes)
+            {
+                var tooltip = string.Join("\n", new[] { SlotCategory.Weapon, SlotCategory.Armor, SlotCategory.Jewelry }
+                    .Select(c => $"{CategoryName(c)}: {string.Join(", ", rune.ModifiersFor(c).Select(StatText.Describe))}"));
+                if (Cell(CellAt(grid, index++, cell), Sprites.Icon(rune), $"{rune.Name} ×{number}", number.ToString(), Palette.Rune,
+                    _selectedRune == rune, $"{rune.Name}\n{tooltip}"))
+                {
+                    _selectedRune = _selectedRune == rune ? null : rune;
+                    Sounds.Play(Sound.Click);
+                }
+            }
+            if (index == 0) GUILayout.Label(Fit("가방이 비었다", _textWidth));
+
+            DrawPicked();
+
+            GUILayout.Space(8);
+            if (Ui.LayoutButton(_showStats ? "능력치·생활 기술 접기" : "능력치·생활 기술 보기")) _showStats = !_showStats;
+            if (!_showStats) return;
+            DrawStats();
+            DrawLifeSkills();
+        }
+
+        bool _showStats;
+        // The item (by id) or consumable picked in the grid; nothing picked when both are empty.
+        int _picked;
+        ConsumableDefinition _pickedConsumable;
+
+        void Pick(int item, ConsumableDefinition consumable)
+        {
+            bool same = item != 0 ? _picked == item : _pickedConsumable == consumable;
+            _picked = same ? 0 : item;
+            _pickedConsumable = same ? null : consumable;
+            Sounds.Play(Sound.Click);
+        }
+
+        // What is picked, under the grid: its icon and name, what it is, and what can be done with it. A rune picked
+        // for socketing says so here too.
+        void DrawPicked()
+        {
+            if (_selectedRune != null)
+            {
+                GUILayout.Space(4);
+                GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(_selectedRune));
+                GUILayout.Label(Fit($"{_selectedRune.Name}: 끼울 아이템을 고르고 [끼우기]. 넣은 룬은 모루에서 정수를 들여야 뺄 수 있다", _textWidth - IconRoom - 64));
+                if (Ui.LayoutButton("그만", GUILayout.Width(56))) _selectedRune = null;
+                GUILayout.EndHorizontal();
+            }
+
+            var item = _picked == 0 ? null : _client.Equipment.Items.Concat(_client.Bag.Items).FirstOrDefault(i => i.Id == _picked);
+            if (item == null) _picked = 0;
+            if (_pickedConsumable != null && _client.Bag.CountOf(_pickedConsumable) == 0) _pickedConsumable = null;
+            if (item == null && _pickedConsumable == null)
+            {
+                if (_selectedRune == null) GUILayout.Label(Fit(Controls.UsingTouch ? "칸을 누르면 여기에 자세히 나온다" : "칸을 누르면 여기에 자세히 나온다(마우스를 올려도 설명)", _textWidth));
+                return;
+            }
+
+            GUILayout.Space(4);
+            GUILayout.BeginVertical(GUI.skin.box);
+            float width = _textWidth - GUI.skin.box.padding.horizontal;
+            if (item != null)
+            {
+                bool wearing = _client.Equipment[item.Base.Slot] == item;
+                GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(item.Base));
+                var previous = GUI.color;
+                GUI.color = Palette.Of(item.Rarity);
+                GUILayout.Label(Fit(ItemText.Name(item) + (wearing ? " (착용 중)" : ""), width - IconRoom));
+                GUI.color = previous;
+                GUILayout.EndHorizontal();
+                GUILayout.Label(Ui.Wrap(string.Join("\n", ItemText.Describe(item).Skip(1).Select(line => line.Trim())), GUI.skin.label, width));
+                GUILayout.BeginHorizontal();
+                if (wearing)
+                {
+                    if (Ui.LayoutButton("벗기", GUILayout.Width(64))) Send(_client.UnequipCommand(item.Base.Slot), Sound.Click);
                 }
                 else
                 {
-                    ItemLabel(item);
-                    RuneButton(item);
-                    RefineButton(item);
-                    if (Ui.LayoutButton("벗기", GUILayout.Width(56))) Send(_client.UnequipCommand(slot), Sound.Click);
-                    QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
+                    // Too high a level to wear yet: the button says which level instead.
+                    bool wearable = item.Base.RequiredLevel <= _client.Level;
+                    GUI.enabled = wearable;
+                    if (Ui.LayoutButton(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", GUILayout.Width(64))) Send(_client.EquipCommand(item.Id), Sound.Place);
+                    GUI.enabled = true;
+                    if (Ui.LayoutButton("버리기", GUILayout.Width(64))) Send(_client.DiscardCommand(item.Id), Sound.Click);
                 }
-                GUILayout.EndHorizontal();
-            }
-
-            GUILayout.Space(6);
-            GUILayout.Label($"소지품 {_client.Bag.Items.Count}/{Inventory.Capacity}");
-            foreach (var item in _client.Bag.Items.ToList())
-            {
-                GUILayout.BeginHorizontal();
-                ItemLabel(item);
                 RuneButton(item);
                 RefineButton(item);
-                // Too high a level to wear yet: the button says which level instead.
-                bool wearable = item.Base.RequiredLevel <= _client.Level;
-                GUI.enabled = wearable;
-                if (Ui.LayoutButton(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", GUILayout.Width(56))) Send(_client.EquipCommand(item.Id), Sound.Place);
-                GUI.enabled = true;
-                if (Ui.LayoutButton("버리기", GUILayout.Width(56))) Send(_client.DiscardCommand(item.Id), Sound.Click);
                 QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
+                GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
             }
-
-            GUILayout.Label("룬");
-            GUILayout.BeginHorizontal();
-            foreach (var pair in _client.Bag.Runes)
+            else
             {
-                var previous = GUI.color;
-                GUI.color = pair.Key == _selectedRune ? Palette.Rune : previous;
-                var tooltip = string.Join("\n", new[] { SlotCategory.Weapon, SlotCategory.Armor, SlotCategory.Jewelry }
-                    .Select(c => $"{CategoryName(c)}: {string.Join(", ", pair.Key.ModifiersFor(c).Select(StatText.Describe))}"));
-                if (Ui.LayoutButton(new GUIContent($"{pair.Key.Name} ×{pair.Value}", tooltip)))
+                var consumable = _pickedConsumable;
+                GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(consumable));
+                GUILayout.Label(Fit($"{consumable.Name} ×{_client.Bag.CountOf(consumable)}", width - IconRoom));
+                GUILayout.EndHorizontal();
+                GUILayout.Label(Ui.Wrap(consumable.Description, GUI.skin.label, width));
+                GUILayout.BeginHorizontal();
+                // A potion is drunk; a food is eaten, and still gives its buff at full health.
+                if (Ui.LayoutButton(consumable.IsFood ? "먹기" : consumable.Recalls ? "쓰기" : "마시기", GUILayout.Width(64)))
                 {
-                    _selectedRune = pair.Key == _selectedRune ? null : pair.Key;
+                    byte[] command = _client.UseConsumableCommand(consumable);
+                    if (command != null) _send(command);
                 }
-                GUI.color = previous;
+                QuickButton(_hotbar?.SlotOf(consumable), () => _hotbar.Toggle(consumable));
+                GUILayout.FlexibleSpace();
+                GUILayout.EndHorizontal();
             }
-            GUILayout.EndHorizontal();
-            if (_selectedRune != null) GUILayout.Label(Fit($"{_selectedRune.Name}: 넣을 아이템의 [끼우기]를 누르세요. 넣은 룬은 모루에서 정수를 들여야 뺄 수 있습니다.", _textWidth));
+            GUILayout.EndVertical();
+        }
+
+        // The item's description for the pointer's box, as the old rows had it.
+        static string ItemTooltip(Item item) => string.Join("\n", ItemText.Describe(item));
+
+        const float CellGap = 4;
+
+        // Room in the layout for so many cells, as many to a row as fit.
+        Rect Grid(int count, float cell)
+        {
+            int columns = Columns(cell);
+            int rows = (count + columns - 1) / columns;
+            return GUILayoutUtility.GetRect(_textWidth, rows * cell + (rows - 1) * CellGap, GUILayout.Width(_textWidth));
+        }
+
+        int Columns(float cell) => Math.Max(1, (int)((_textWidth + CellGap) / (cell + CellGap)));
+
+        Rect CellAt(Rect grid, int index, float cell)
+        {
+            int columns = Columns(cell);
+            return new Rect(grid.x + index % columns * (cell + CellGap), grid.y + index / columns * (cell + CellGap), cell, cell);
+        }
+
+        static GUIStyle _countStyle;
+        static GUIStyle _slotStyle;
+
+        // A square with the thing's icon, an edge in its colour (rarity, potion, rune), a count in the corner and a
+        // bright edge while picked. Its name is what the playtests press it by (Ui.Probe). True when pressed.
+        static bool Cell(Rect area, Sprite icon, string name, string corner, Color edge, bool picked, string tooltip, bool dim = false)
+        {
+            Ui.Probe(name, area);
+            bool pressed = GUI.Button(area, new GUIContent("", tooltip));
+            var previous = GUI.color;
+            GUI.color = new Color(edge.r, edge.g, edge.b, 0.8f);
+            Frame(area, 2);
+            if (picked)
+            {
+                GUI.color = Color.white;
+                Frame(new Rect(area.x - 2, area.y - 2, area.width + 4, area.height + 4), 2);
+            }
+            GUI.color = dim ? new Color(1, 1, 1, 0.5f) : Color.white;
+            float inset = Mathf.Round(area.width * 0.18f);
+            Sprites.DrawInGui(new Rect(area.x + inset, area.y + inset, area.width - inset * 2, area.height - inset * 2), icon);
+            GUI.color = previous;
+            if (!string.IsNullOrEmpty(corner))
+            {
+                _countStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerRight, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0) };
+                Ui.Text(_countStyle, 12, bold: true);
+                var box = new Rect(area.x + 2, area.y + 2, area.width - 5, area.height - 4);
+                GUI.color = new Color(0, 0, 0, 0.9f);
+                GUI.Label(new Rect(box.x + 1, box.y + 1, box.width, box.height), corner, _countStyle);
+                GUI.color = previous;
+                GUI.Label(box, corner, _countStyle);
+            }
+            return pressed;
+        }
+
+        // A worn slot with nothing in it: its name, faint.
+        static void EmptyCell(Rect area, string slot)
+        {
+            _slotStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), wordWrap = true };
+            Ui.Text(_slotStyle, 12);
+            var previous = GUI.color;
+            GUI.color = new Color(1, 1, 1, 0.35f);
+            GUI.Box(area, GUIContent.none);
+            GUI.Label(area, slot, _slotStyle);
+            GUI.color = previous;
+        }
+
+        static void Frame(Rect area, float width)
+        {
+            GUI.DrawTexture(new Rect(area.x, area.y, area.width, width), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(area.x, area.yMax - width, area.width, width), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(area.x, area.y, width, area.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(area.xMax - width, area.y, width, area.height), Texture2D.whiteTexture);
         }
 
         void DrawMaterialsPage()
@@ -350,7 +527,7 @@ namespace Game.Client
             if (_client.Classes.Count == 0) return;
             var hits = _client.Skills
                 .Where(skill => skill.Damage > 0)
-                .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f:0.#}");
+                .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f * SkillRules.DamageScale(_client.RankOf(skill)):0.#}");
             GUILayout.Label(Fit($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}", _textWidth));
         }
 
@@ -705,28 +882,6 @@ namespace Game.Client
             return recipe.Consumable?.Description ?? recipe.Material.Description;
         }
 
-        void DrawConsumables()
-        {
-            if (_client.Bag.Consumables.Count == 0) return;
-            GUILayout.Space(6);
-            float wait = _client.ConsumableCooldownLeft;
-            GUILayout.Label(wait > 0 ? $"소모품 (다시 쓰기까지 {Mathf.CeilToInt(wait)}초)" : "소모품");
-            foreach (var pair in _client.Bag.Consumables.ToList())
-            {
-                GUILayout.BeginHorizontal();
-                Icon(Sprites.Icon(pair.Key));
-                GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
-                // A potion is drunk; a food is eaten, and still gives its buff at full health.
-                if (Ui.LayoutButton(pair.Key.IsFood ? "먹기" : pair.Key.Recalls ? "쓰기" : "마시기", GUILayout.Width(56)))
-                {
-                    byte[] command = _client.UseConsumableCommand(pair.Key);
-                    if (command != null) _send(command);
-                }
-                var consumable = pair.Key;
-                QuickButton(_hotbar?.SlotOf(consumable), () => _hotbar.Toggle(consumable));
-                GUILayout.EndHorizontal();
-            }
-        }
 
         // The classes picked here but not yet taken, as ids; null shows the ones the player has.
         System.Collections.Generic.List<string> _pickedClasses;
