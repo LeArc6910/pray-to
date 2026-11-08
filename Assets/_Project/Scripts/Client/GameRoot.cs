@@ -1328,7 +1328,7 @@ namespace Game.Client
                     string name = n.Thing is MaterialDefinition material ? material.Name : ((ConsumableDefinition)n.Thing).Name;
                     return $"{name} {Math.Min(have, n.Count)}/{n.Count}";
                 });
-                entries.Add(($"부탁: {npc.Role} {npc.Name}", string.Join(" · ", needs) + (Ui.Short ? "" : $"\n보답: {request.RewardText}")));
+                entries.Add(($"부탁: {npc.Name}", string.Join(" · ", needs) + (Ui.Short ? "" : $"\n보답: {request.RewardText}")));
             }
             var shown = new List<string>();
             if (entries.Count == 0)
