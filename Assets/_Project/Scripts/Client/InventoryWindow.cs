@@ -74,16 +74,12 @@ namespace Game.Client
             Open = true;
         }
 
-        // The page drawn last, null while the bag is shut.
-        Page? _drawn;
-
         public void Draw()
         {
-            if (!Open)
-            {
-                _drawn = null;
-                return;
-            }
+            if (!Open) return;
+            // Only what the pointer is over in this frame: IMGUI keeps the last description it set, so one picked up
+            // on another page stayed beside this one (an iron sword's text beside the skills, in the web check).
+            GUI.tooltip = "";
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
             // Left of the minimap column, full height; on narrow screens under the column. The page scrolls when it
@@ -133,10 +129,6 @@ namespace Game.Client
             if (chest) _pages.Add(Page.Chest);
             if (merchant) _pages.Add(Page.Merchant);
             _page = Tabs(_page, _pages, inner);
-            // A description from another page, or from before the bag was shut, must not stay up over this one,
-            // however the page changed (a tab, a point badge on the HUD, the tests).
-            if (_drawn != _page) GUI.tooltip = "";
-            _drawn = _page;
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
