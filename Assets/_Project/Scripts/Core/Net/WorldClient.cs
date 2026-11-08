@@ -685,7 +685,7 @@ namespace Game.Core
         public byte[] SkillCommand(int slot, Vec2 aim)
         {
             if (Status != ClientStatus.Playing || IsDead || slot < 0 || slot >= Skills.Count || CooldownLeft(slot) > 0 || !HasManaFor(slot)) return null;
-            _cooldowns[slot] = SkillRules.CooldownTicks(Skills[slot], RankOf(Skills[slot])) + (int)Math.Ceiling(HostTick - _skillsTick);
+            _cooldowns[slot] = SkillRules.CooldownTicks(Skills[slot], PowerOf(Skills[slot]), Stats.CooldownRecoveryFor(Skills[slot].Tags)) + (int)Math.Ceiling(HostTick - _skillsTick);
             Mana -= Skills[slot].Mana;
             return new SkillCommandMessage(slot, aim).Encode();
         }
@@ -721,6 +721,14 @@ namespace Game.Core
         public int RankOf(SkillDefinition skill) => skill != null && _skillRanks.TryGetValue(skill, out int rank) ? rank : 0;
 
         public int SkillPoints => SkillRules.PointsLeft(Level, _skillRanks);
+
+        // The rank the skill works at, the learned one and what the passive tree and gear add (SkillRules.Power).
+        public int PowerOf(SkillDefinition skill) => SkillRules.Power(RankOf(skill), Stats, skill);
+
+        // What forgetting every skill costs now (World.ResetSkills), and the command.
+        public int SkillResetCost => SkillRules.SpentPoints(_skillRanks) * SkillRules.ResetCoinsPerPoint;
+
+        public byte[] ResetSkillsCommand() => new InventoryCommandMessage(InventoryCommand.ResetSkills, 0).Encode();
 
         public bool CanRaise(SkillDefinition skill) => SkillRules.CanRaise(skill, Classes, Level, SkillPoints, RankOf(skill));
 

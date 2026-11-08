@@ -66,6 +66,25 @@ namespace Game.Core
             return true;
         }
 
+        // Forgets every learned skill but the classes' first ones and gives the points back, for coins: so many a
+        // point spent (SkillRules.ResetCoinsPerPoint). False when nothing was learned or the coins are short.
+        public bool ResetSkills(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            var coin = CoinMaterial;
+            if (player == null) return false;
+            int spent = SkillRules.SpentPoints(player.SkillRanks);
+            int cost = spent * SkillRules.ResetCoinsPerPoint;
+            if (spent == 0 || coin == null || player.Inventory.CountOf(coin) < cost) return false;
+            player.Inventory.TakeMaterial(coin, cost);
+            player.SkillRanks.Clear();
+            player.LearnBasics(player.Classes);
+            player.ChangeKit(player.Classes, null);
+            player.InventoryVersion++;
+            _events.Add(new SimEvent(SimEventType.SkillLearned, player.Id, target: 0, amount: 0));
+            return true;
+        }
+
         // Puts back the ranks a character save held; unknown ids are dropped. A save from before skill points knows
         // only its classes' first skills and has every point of its level to spend.
         public static void RestoreSkills(Player player, ClassData classes, IEnumerable<(string Id, int Rank)> ranks)
@@ -125,7 +144,7 @@ namespace Game.Core
                     Dash(player, skill, slot);
                     break;
                 case SkillKind.Heal:
-                    float healed = Math.Min(player.Stats.MaxHealth - player.Health, player.Stats.MaxHealth * skill.Damage / 100f * SkillRules.DamageScale(player.RankOf(skill)));
+                    float healed = Math.Min(player.Stats.MaxHealth - player.Health, player.Stats.MaxHealth * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)));
                     player.Health += Math.Max(0, healed);
                     _events.Add(new SimEvent(SimEventType.Healed, player.Id, amount: (int)Math.Round(Math.Max(0, healed))));
                     break;
@@ -173,7 +192,7 @@ namespace Game.Core
             var stats = player.Stats;
             var context = stats.ContextFor(skill);
             critical = _random.Chance(stats.CritChanceFor(context) / 100f);
-            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.RankOf(skill))
+            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill))
                 * (critical ? stats.CritDamageFor(context) / 100f : 1f);
         }
 
@@ -218,7 +237,7 @@ namespace Game.Core
                 _minions.Add(new Minion(_nextId++, player.Id, slot, skill, i, position)
                 {
                     Facing = player.Facing,
-                    TicksLeft = SkillRules.DurationTicks(skill, player.RankOf(skill)),
+                    TicksLeft = player.DurationFor(skill),
                 });
             }
         }

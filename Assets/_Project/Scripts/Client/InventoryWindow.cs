@@ -527,7 +527,7 @@ namespace Game.Client
             if (_client.Classes.Count == 0) return;
             var hits = _client.Skills
                 .Where(skill => skill.Damage > 0)
-                .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f * SkillRules.DamageScale(_client.RankOf(skill)):0.#}");
+                .Select(skill => $"{skill.Name} {stats.DamageFor(stats.ContextFor(skill)) * skill.Damage / 100f * SkillRules.DamageScale(_client.PowerOf(skill)):0.#}");
             GUILayout.Label(Fit($"클래스 {string.Join(" + ", _client.Classes.Select(c => c.Name))} · 스킬 피해 {string.Join(" · ", hits)}", _textWidth));
         }
 
@@ -902,7 +902,15 @@ namespace Game.Client
                 _pickedForKit = _client.KitVersion;
             }
             int points = _client.SkillPoints;
-            GUILayout.Label(Fit($"스킬 포인트 {points} · Lv {_client.Level} (레벨이 오를 때마다 1)", _textWidth));
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(Fit($"스킬 포인트 {points} · Lv {_client.Level} (레벨이 오를 때마다 1)", _textWidth - 150), GUILayout.Width(_textWidth - 150));
+            // Every learned skill forgotten for coins, the points back to spend again (World.ResetSkills).
+            int cost = _client.SkillResetCost;
+            var coin = _client.Loot.FindMaterial(World.Coin);
+            GUI.enabled = cost > 0 && coin != null && _client.Bag.CountOf(coin) >= cost;
+            if (Ui.LayoutButton(cost > 0 ? $"되돌리기 (금화 {cost})" : "되돌리기", GUILayout.Width(146))) Send(_client.ResetSkillsCommand(), Sound.Click);
+            GUI.enabled = true;
+            GUILayout.EndHorizontal();
             GUILayout.Space(4);
             GUILayout.Label(Fit("스킬 칸(어디서나 바꾼다). [바꾸기]를 누르고 아래에서 그 칸에 넣을 배운 스킬을 고른다", _textWidth));
             var order = _client.SkillOrder.ToList();
@@ -916,7 +924,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(skill));
                 string key = Controls.UsingTouch ? $"{slot + 1}" : Controls.SkillKeyName(slot);
-                GUILayout.Label(new GUIContent(Fit($"{key}  {skill.Name} {_client.RankOf(skill)}단계", slotName), SkillTooltip(skill)), GUILayout.Width(slotName));
+                GUILayout.Label(new GUIContent(Fit($"{key}  {skill.Name} {RankText(skill)}", slotName), SkillTooltip(skill)), GUILayout.Width(slotName));
                 GUI.enabled = slot > 0;
                 if (Ui.LayoutButton("▲", GUILayout.Width(40))) Swap(order, slot, slot - 1);
                 GUI.enabled = slot < _client.Skills.Count - 1;
@@ -953,7 +961,7 @@ namespace Game.Client
                     var previous = GUI.color;
                     if (rank == 0) GUI.color = new Color(1, 1, 1, open ? 0.8f : 0.4f);
                     Icon(Sprites.Icon(skill));
-                    string state = rank > 0 ? $"{rank}/{SkillRules.MaxRank}단계" : open ? "배우지 않음" : $"Lv {skill.Level}부터";
+                    string state = rank > 0 ? $"{RankText(skill)}/{SkillRules.MaxRank}" : open ? "배우지 않음" : $"Lv {skill.Level}부터";
                     GUILayout.Label(new GUIContent(Fit($"{skill.Name} · {state}", rowName), SkillTooltip(skill)), GUILayout.Width(rowName));
                     GUI.color = previous;
                     bool can = _client.CanRaise(skill);
@@ -965,7 +973,7 @@ namespace Game.Client
                     // What it does at its rank now, or at the first for one not learned; and what the next adds.
                     var dim = GUI.color;
                     GUI.color = new Color(0.8f, 0.8f, 0.8f, rank > 0 ? 1 : 0.7f);
-                    GUILayout.Label(Ui.Wrap(SkillText.Numbers(skill, Math.Max(1, rank)), GUI.skin.label, _textWidth));
+                    GUILayout.Label(Ui.Wrap(SkillText.Numbers(skill, Math.Max(1, _client.PowerOf(skill))), GUI.skin.label, _textWidth));
                     GUI.color = dim;
                 }
             }
@@ -1005,13 +1013,22 @@ namespace Game.Client
             }
         }
 
-        // A skill's description and numbers at its rank, and what the next rank would make them.
+        // "2단계", or "2+1단계" when the passive tree or gear add a rank to it.
+        string RankText(SkillDefinition skill)
+        {
+            int rank = _client.RankOf(skill);
+            int bonus = _client.PowerOf(skill) - rank;
+            return bonus > 0 ? $"{rank}+{bonus}단계" : $"{rank}단계";
+        }
+
+        // A skill's description and numbers at the rank it works at, and what the next learned rank would make them.
         string SkillTooltip(SkillDefinition skill)
         {
             int rank = _client.RankOf(skill);
+            int power = Math.Max(1, _client.PowerOf(skill));
             string tags = skill.Tags == SkillTag.None ? "" : $" · {StatText.TagNames(skill.Tags)}";
-            string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, Math.Max(1, rank))}";
-            if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, rank + 1)}";
+            string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, power)}";
+            if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, power + 1)}";
             return text;
         }
 

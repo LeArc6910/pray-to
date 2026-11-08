@@ -21,6 +21,9 @@ namespace Game.Core
             StatType.ItemRarity => "아이템 희귀도",
             StatType.MaxMana => "최대 마나",
             StatType.ManaRegen => "마나 재생",
+            StatType.SkillRank => "스킬 단계",
+            StatType.CooldownRecovery => "스킬 재사용 속도",
+            StatType.SkillDuration => "스킬 지속 시간",
             _ => stat.ToString(),
         };
 

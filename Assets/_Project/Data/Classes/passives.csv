@@ -35,3 +35,12 @@ mine1,곡괭이질,1,2,sum1,MiningSpeed+15%,
 mine2,광부,2,2,mine1,MiningSpeed+25%;ItemRarity+5%,notable
 luck1,행운,-1,2,sum1,ItemRarity+5%,
 luck2,보물 사냥꾼,-2,2,luck1,ItemRarity+15%,notable
+str11,무기 숙련,-6,-1,str7,Melee:SkillRank+1,notable
+str12,끈기,-5,0,str4,SkillDuration+15%,
+dex11,연사,6,-1,dex7,Ranged:SkillRank+1,notable
+dex12,재빠른 손놀림,5,0,dex4,CooldownRecovery+8%,
+int9,화염 숙련,-1,-5,int4,Fire:SkillRank+1,notable
+int10,냉기 숙련,0,-5,int6,Cold:SkillRank+1,notable
+int11,번개 숙련,1,-5,int8,Lightning:SkillRank+1,notable
+int12,명상,-1,-2,int2,CooldownRecovery+10%,
+sum4,정령 군주,0,4,sum3,Summon:SkillRank+1;SkillDuration+10%,notable

@@ -14,6 +14,7 @@ furnace,화로 세우기,작업대 옆에서 돌 15와 구리 광석 2로 만든
 boss,동굴 수호자 쓰러뜨리기,HUD에 보스 아레나 방향과 거리가 나온다. 바닥에 붉게 차오르는 예고를 피한다,have:warden_core,recall_scroll:2
 bed,침대 세우기,작업대에서 돌 6과 슬라임 젤 3으로 만든다. 쓰러지면 침대 옆에서 일어나고 귀환 두루마리로 돌아올 수 있다. 저녁부터 [잠자기]로 밤을 넘긴다,place:Bed,recall_scroll:2
 level5,레벨 5 되기,몬스터를 잡으면 경험치가 오른다. 철 장비는 레벨 5부터 입는다,level:5,healing_potion:3
+skill,스킬 하나 배우기,레벨이 오를 때마다 스킬 포인트 1점. 가방 [스킬] 탭에서 [배우기]를 누르면 빈 스킬 칸에 들어간다,skills:1,healing_potion:2
 passive,특성 하나 배우기,레벨이 오를 때마다 특성 점수 1점. 가방 [특성] 탭에서 이어진 점을 눌러 [배우기],passive:1,xp:30
 iron_bar,철 주괴 만들기,시작 지점에서 30칸 넘게 가면 푸른 회색 철 광맥이 있다. 철 광석 2개를 화로에서 녹인다,have:iron_bar,iron_ore:4
 anvil,모루 세우기,작업대에서 철 주괴 5·돌 6으로 만든다. 곁에 서면 장비마다 [다듬기]가 생겨 강화·분해·룬 빼기·접사 다시 굴리기를 한다,place:Anvil,essence:3
@@ -35,6 +36,7 @@ queen,수정 거미 여왕 쓰러뜨리기,HUD의 깊은 아레나 방향으로 
 mithril_gear,미스릴 장비 하나 만들기,화로에서 미스릴 주괴를 녹이고 작업대에서 수정 심장과 함께 만든다,have:mithril_sword|have:mithril_bow|have:mithril_staff|have:mithril_helmet|have:mithril_armor|have:mithril_boots,xp:100
 arc_furnace,전기로 세우기,회로 3·미스릴 주괴 4·돌 10으로 만든다. 전력으로만 돌고 광석 두 개마다 주괴 하나를 더 만든다(제련기처럼 광석을 넣는다),place:ArcFurnace,mithril_ore:10
 level15,레벨 15 되기,보스를 잡을 때마다 몬스터가 주는 경험치가 늘어난다. 미스릴 장비는 레벨 15부터 입는다,level:15,healing_potion:4
+rank3,스킬을 3단계로 올리기,[스킬] 탭의 [올리기]로 자주 쓰는 스킬의 단계를 올리면 피해가 늘고 재사용 대기가 준다. 특성 트리 끝의 숙련은 단계를 하나 더 준다,rank:3,mana_potion:3
 mithril_pickaxe,미스릴 곡괭이 만들기,용암 지대의 흑요석은 미스릴 곡괭이 이상이어야 캐진다. 작업대에서 미스릴 주괴 3개로 만든다,have:mithril_pickaxe,xp:60
 obsidian_ore,흑요석 원석 캐기,깊은 아레나 반대쪽 모퉁이가 용암 지대다. 붉게 빛나는 용암 웅덩이는 밟으면 불타니 피해 간다,have:obsidian_ore:3,xp:80
 titan,용암 거인 쓰러뜨리기,HUD의 용암 아레나 방향으로 간다. 맞으면 불타니 미스릴 장비와 물약·버섯 수프를 챙긴다,have:titan_heart,healing_potion:5

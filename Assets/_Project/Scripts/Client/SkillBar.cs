@@ -95,8 +95,8 @@ namespace Game.Client
                 GUI.color = cooldown > 0 || client.IsDead || !client.HasManaFor(slot) ? new Color(1, 1, 1, 0.45f) : Color.white;
                 Sprites.DrawInGui(IconArea(area), Sprites.Icon(skill));
                 GUI.color = previous;
-                int rank = client.RankOf(skill);
-                if (rank > 1) GUI.Label(new Rect(area.xMax - Inner - 22, area.y + Inner, 20, 18), RankMark(rank), _keyStyle);
+                int rank = client.PowerOf(skill);
+                if (rank > 1) GUI.Label(new Rect(area.xMax - Inner - 26, area.y + Inner, 24, 18), RankMark(rank), _keyStyle);
                 if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.SkillKeyName(slot), _keyStyle);
 
                 Shade(area, cooldown, skill.Cooldown);
@@ -159,7 +159,7 @@ namespace Game.Client
         }
 
         // A rank past the first as Roman numerals, small in the top right corner.
-        public static string RankMark(int rank) => rank switch { 2 => "II", 3 => "III", 4 => "IV", 5 => "V", _ => "I" };
+        public static string RankMark(int rank) => rank switch { 2 => "II", 3 => "III", 4 => "IV", 5 => "V", 6 => "VI", 7 => "VII", 8 => "VIII", _ => "I" };
 
         // The key letter in the top left corner, inside the frame so its bevel does not hide the letter's top.
         static Rect KeyArea(Rect slot) => new Rect(slot.x + Inner + 2, slot.y + Inner, 24, 20);

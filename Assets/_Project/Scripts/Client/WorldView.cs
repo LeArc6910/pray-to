@@ -1347,6 +1347,12 @@ namespace Game.Client
                     // A point spent: the skill's name and rank over the player, and a chime for their own.
                     var learner = Find(e.Source);
                     var learnt = _client.SkillNamed(e.Target);
+                    if (learner != null && e.Target == 0)
+                    {
+                        _floating.Add(new Floating { Position = learner.Position + new Vector3(0, 0.6f, 0), Text = "스킬을 되돌렸다", Color = LevelColor });
+                        if (e.Source == _client.PlayerId) Sounds.Play(Sound.Click);
+                        break;
+                    }
                     if (learner == null || learnt == null) break;
                     _floating.Add(new Floating
                     {

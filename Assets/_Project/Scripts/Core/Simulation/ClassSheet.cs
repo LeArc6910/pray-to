@@ -186,20 +186,35 @@ namespace Game.Core
     // How chosen classes turn into a player's kit. See Docs/Classes.md.
     // What a skill's rank does (Docs/Classes.md, 스킬 포인트와 단계): each rank past the first adds 15% to its damage
     // (a spirit's every hit, a heal's amount), takes 5% off its cooldown and adds 10% to a buff's or spirits' time.
+    // A skill's power is its learned rank plus the ranks the passive tree and gear add for its tags (SkillRank), up to
+    // MaxPower; cooldowns and durations also take the player's CooldownRecovery and SkillDuration.
     public static class SkillRules
     {
         public const int MaxRank = 5;
+        // Learned ranks and added ones together.
+        public const int MaxPower = MaxRank + 3;
         const float DamagePerRank = 0.15f;
         const float CooldownPerRank = 0.05f;
         const float DurationPerRank = 0.1f;
 
-        static int Above(int rank) => Math.Clamp(rank, 1, MaxRank) - 1;
+        static int Above(int power) => Math.Clamp(power, 1, MaxPower) - 1;
 
-        public static float DamageScale(int rank) => 1 + DamagePerRank * Above(rank);
+        public static float DamageScale(int power) => 1 + DamagePerRank * Above(power);
 
-        public static int CooldownTicks(SkillDefinition skill, int rank) => Math.Max(1, (int)Math.Round(skill.CooldownTicks * (1 - CooldownPerRank * Above(rank))));
+        public static int CooldownTicks(SkillDefinition skill, int power, float recovery = 0) =>
+            Math.Max(1, (int)Math.Round(skill.CooldownTicks * (1 - CooldownPerRank * Above(power)) / (1 + Math.Max(0, recovery) / 100)));
 
-        public static int DurationTicks(SkillDefinition skill, int rank) => (int)Math.Round(skill.DurationTicks * (1 + DurationPerRank * Above(rank)));
+        public static int DurationTicks(SkillDefinition skill, int power, float bonus = 0) =>
+            (int)Math.Round(skill.DurationTicks * (1 + DurationPerRank * Above(power) + Math.Max(0, bonus) / 100));
+
+        // The rank a learned skill works at: its own and what the stats add for its tags; 0 for one not learned.
+        public static int Power(int rank, PlayerStats stats, SkillDefinition skill) =>
+            rank <= 0 ? 0 : Math.Min(MaxPower, rank + (stats?.SkillRankFor(skill.Tags) ?? 0));
+
+        // Coins to forget every learned skill and have the points back (World.ResetSkills): so many a point spent.
+        public const int ResetCoinsPerPoint = 10;
+
+        public static int SpentPoints(IEnumerable<KeyValuePair<SkillDefinition, int>> ranks) => ranks.Sum(pair => pair.Value - (pair.Key.IsBasic ? 1 : 0));
 
         // Whether a player could put a point in the skill now: one of their classes', their level high enough, a point
         // to spend, and not yet at the top rank.
@@ -211,8 +226,7 @@ namespace Game.Core
 
         // The skill points a character of the level has, one a level past the first, less those spent (a class's
         // first skill's first rank costs none).
-        public static int PointsLeft(int level, IEnumerable<KeyValuePair<SkillDefinition, int>> ranks) =>
-            Math.Max(0, level - 1 - ranks.Sum(pair => pair.Value - (pair.Key.IsBasic ? 1 : 0)));
+        public static int PointsLeft(int level, IEnumerable<KeyValuePair<SkillDefinition, int>> ranks) => Math.Max(0, level - 1 - SpentPoints(ranks));
     }
 
     public static class ClassRules

@@ -16,6 +16,12 @@ namespace Game.Core
         ItemRarity,
         MaxMana,
         ManaRegen,
+        // Ranks added to the skills with the modifier's tags (Docs/Classes.md, 스킬을 키우는 특성): "Fire:SkillRank+1".
+        SkillRank,
+        // Percent faster skill cooldowns, written like item rarity ("+10%" an increase on 100).
+        CooldownRecovery,
+        // Percent longer buffs and spirits, likewise.
+        SkillDuration,
     }
 
     // Weapons and skills carry tags. Class combinations come from modifiers that only count for some tags.

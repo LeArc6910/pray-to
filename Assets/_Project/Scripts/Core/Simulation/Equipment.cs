@@ -106,6 +106,14 @@ namespace Game.Core
 
         public float CritDamageFor(SkillTag context) => (float)_sheet.Get(StatType.CritDamage, BaseCritDamage, context);
 
+        // What the passive tree and gear add to a skill with these tags: ranks over the ones learned, percent faster
+        // cooldowns and percent longer buffs and spirits (SkillRules).
+        public int SkillRankFor(SkillTag tags) => (int)Math.Round(_sheet.Get(StatType.SkillRank, 0, tags));
+
+        public float CooldownRecoveryFor(SkillTag tags) => Math.Max(0, (float)_sheet.Get(StatType.CooldownRecovery, 100, tags) - 100);
+
+        public float SkillDurationFor(SkillTag tags) => Math.Max(0, (float)_sheet.Get(StatType.SkillDuration, 100, tags) - 100);
+
         public static PlayerStats From(
             Equipment equipment,
             IEnumerable<ClassDefinition> classes = null,

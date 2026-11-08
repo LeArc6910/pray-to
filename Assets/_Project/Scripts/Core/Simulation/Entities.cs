@@ -73,6 +73,13 @@ namespace Game.Core
 
         public int RankOf(SkillDefinition skill) => skill != null && SkillRanks.TryGetValue(skill, out int rank) ? rank : 0;
 
+        // The rank the skill works at: learned and added by the stats (SkillRules.Power).
+        public int PowerOf(SkillDefinition skill) => SkillRules.Power(RankOf(skill), Stats, skill);
+
+        internal int CooldownFor(SkillDefinition skill) => SkillRules.CooldownTicks(skill, PowerOf(skill), Stats.CooldownRecoveryFor(skill.Tags));
+
+        internal int DurationFor(SkillDefinition skill) => SkillRules.DurationTicks(skill, PowerOf(skill), Stats.SkillDurationFor(skill.Tags));
+
         public bool Knows(SkillDefinition skill) => RankOf(skill) > 0;
 
         // One a level past the first; a class's first skill's first rank is free.
@@ -99,7 +106,7 @@ namespace Game.Core
             for (int slot = 0; slot < skills.Count; slot++)
             {
                 int old = Skills.ToList().IndexOf(skills[slot]);
-                cooldowns[slot] = old >= 0 ? _cooldowns[old] : SkillRules.CooldownTicks(skills[slot], RankOf(skills[slot]));
+                cooldowns[slot] = old >= 0 ? _cooldowns[old] : CooldownFor(skills[slot]);
                 buffs[slot] = old >= 0 ? _buffTicks[old] : 0;
             }
             Classes = classes;
@@ -172,13 +179,13 @@ namespace Game.Core
             if (slot >= 0) _cooldowns[slot] = 0;
         }
 
-        internal void StartCooldown(int slot) => _cooldowns[slot] = SkillRules.CooldownTicks(Skills[slot], RankOf(Skills[slot]));
+        internal void StartCooldown(int slot) => _cooldowns[slot] = CooldownFor(Skills[slot]);
 
         // Using a buff again starts its time over.
         internal void StartBuff(int slot)
         {
             bool wasOn = HasBuff(slot);
-            _buffTicks[slot] = SkillRules.DurationTicks(Skills[slot], RankOf(Skills[slot]));
+            _buffTicks[slot] = DurationFor(Skills[slot]);
             if (!wasOn) RefreshStats();
         }
 
@@ -368,6 +375,7 @@ namespace Game.Core
         // A rainy day began and wet Amount crops (World.Weather.cs).
         Rain,
         // Source, a player, put a skill point into the skill Target - 1 (its index in the sheet); Amount is its rank now.
+        // Target 0: they forgot every skill for coins (World.ResetSkills).
         SkillLearned,
     }
 

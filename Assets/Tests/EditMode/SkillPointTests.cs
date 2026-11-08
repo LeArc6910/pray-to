@@ -221,6 +221,68 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void SkillsAreForgottenForCoinsAndThePointsComeBack()
+        {
+            var world = new World(Maps.Room(30), TileMap.Center(15, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null, Warrior);
+            AtLevel(player, 6);
+            world.LearnSkill(player.Id, Skill("war_cry"));
+            world.LearnSkill(player.Id, Skill("war_cry"));
+            world.LearnSkill(player.Id, Skill("charge"));
+            Assert.AreEqual(2, player.SkillPoints);
+            Assert.IsFalse(world.ResetSkills(player.Id), "no coins");
+
+            var coin = Gear.Data.FindMaterial("coin");
+            player.Inventory.AddMaterial(coin, 100);
+            Assert.IsTrue(world.ResetSkills(player.Id));
+            Assert.AreEqual(100 - 3 * SkillRules.ResetCoinsPerPoint, player.Inventory.CountOf(coin), "ten coins a point spent");
+            Assert.AreEqual(5, player.SkillPoints);
+            CollectionAssert.AreEqual(new[] { "whirlwind" }, player.Skills.Select(s => s.Id), "only the free basic skill is left");
+            Assert.AreEqual(1, player.RankOf(Skill("whirlwind")));
+            Assert.IsFalse(world.ResetSkills(player.Id), "nothing left to forget");
+        }
+
+        [Test]
+        public void PassivesAddRanksCooldownAndDuration()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null, FireMage);
+            var fireball = Skill("fireball");
+            Assert.AreEqual(1, player.PowerOf(fireball));
+            player.Passives.Add(Classes.Shipped.FindPassive("int9"));
+            player.Passives.Add(Classes.Shipped.FindPassive("int12"));
+            player.RefreshStats();
+
+            Assert.AreEqual(2, player.PowerOf(fireball), "화염 숙련: fire skills a rank higher");
+            Assert.AreEqual(0, player.PowerOf(Skill("flame_brand")), "but not one never learned");
+            Assert.AreEqual(1, player.RankOf(fireball), "the learned rank and the points stay as they were");
+            Assert.AreEqual(SkillRules.CooldownTicks(fireball, 2, 10), player.CooldownFor(fireball), "명상: cooldowns 10% faster");
+            Assert.Less(player.CooldownFor(fireball), SkillRules.CooldownTicks(fireball, 2));
+
+            var dummy = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(3, 0));
+            Assert.IsTrue(world.UseSkill(player.Id, 0, new Vec2(1, 0)));
+            Assert.AreEqual(SkillRules.CooldownTicks(fireball, 2, 10), player.CooldownTicks(0));
+            Assert.AreEqual(1 + SkillRules.MaxPower - SkillRules.MaxRank + 4, SkillRules.MaxPower - SkillRules.MaxRank + 5, "power reaches past the learned top rank");
+            Assert.AreEqual(1 + 0.15f * (SkillRules.MaxPower - 1), SkillRules.DamageScale(SkillRules.MaxPower + 3), 1e-5f, "and stops at MaxPower");
+            Assert.NotNull(dummy);
+        }
+
+        [Test]
+        public void TheGuideAsksToLearnAndRaiseASkill()
+        {
+            var goals = Guide.Shipped.Goals;
+            var learn = goals.Single(g => g.Id == "skill");
+            var raise = goals.Single(g => g.Id == "rank3");
+            GuideFacts Facts(int spent, int top) => new GuideFacts(_ => 0, _ => false, false, 0, skillsSpent: spent, topRank: top);
+            Assert.IsFalse(learn.Conditions.Any(c => GuideProgress.IsMet(c, Facts(0, 1))));
+            Assert.IsTrue(learn.Conditions.Any(c => GuideProgress.IsMet(c, Facts(1, 1))));
+            Assert.IsFalse(raise.Conditions.Any(c => GuideProgress.IsMet(c, Facts(4, 2))));
+            Assert.IsTrue(raise.Conditions.Any(c => GuideProgress.IsMet(c, Facts(4, 3))));
+            Assert.AreEqual("2/3", GuideProgress.Progress(raise, Facts(4, 2)));
+            Assert.Less(goals.ToList().IndexOf(learn), goals.ToList().FindIndex(g => g.Id == "passive"), "right after skill points first come");
+        }
+
+        [Test]
         public void EveryShippedSkillCanBeLearnedAndUsed()
         {
             foreach (var owner in Classes.Shipped.Classes)

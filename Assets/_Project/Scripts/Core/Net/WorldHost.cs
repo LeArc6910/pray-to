@@ -457,6 +457,9 @@ namespace Game.Core
                 case InventoryCommand.Request:
                     World.CompleteRequest(player.Id);
                     break;
+                case InventoryCommand.ResetSkills:
+                    World.ResetSkills(player.Id);
+                    break;
                 case InventoryCommand.LearnSkill:
                     if (_classes != null && command.Index < _classes.Skills.Count) World.LearnSkill(player.Id, _classes.Skills[command.Index]);
                     break;

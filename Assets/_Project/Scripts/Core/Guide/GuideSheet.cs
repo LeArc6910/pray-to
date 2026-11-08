@@ -15,12 +15,13 @@ namespace Game.Core
             Tile = tile;
         }
 
-        // "have", "place", "plant", "reach", "level", "passive", "life", "rift" or "friend".
+        // "have", "place", "plant", "reach", "level", "passive", "life", "rift", "friend", "skills" or "rank".
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
         // How many to have, how many tiles from the spawn to reach, the character level, how many passive points, the
-        // life skill's level (Id is the skill), the rift tier the world has opened, or the hearts with anyone.
+        // life skill's level (Id is the skill), the rift tier the world has opened, the hearts with anyone, the skill
+        // points spent or the rank of the best learned skill.
         public int Count { get; }
         // What to place.
         public TileType Tile { get; }
@@ -85,8 +86,10 @@ namespace Game.Core
     public sealed class GuideFacts
     {
         public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1,
-            int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0)
+            int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0, int skillsSpent = 0, int topRank = 0)
         {
+            SkillsSpent = skillsSpent;
+            TopRank = topRank;
             Passives = passives;
             LifeLevel = lifeLevel ?? (_ => 1);
             RiftTier = riftTier;
@@ -111,6 +114,9 @@ namespace Game.Core
         public Func<LifeSkill, int> LifeLevel { get; }
         public int RiftTier { get; }
         public int Hearts { get; }
+        // Skill points spent, and the highest rank of any learned skill (Docs/Classes.md, 스킬 포인트와 단계).
+        public int SkillsSpent { get; }
+        public int TopRank { get; }
 
         // The facts for a client's player: the bag and worn gear, the map, the crops and where the player stands.
         public static GuideFacts Of(WorldClient client)
@@ -140,7 +146,8 @@ namespace Game.Core
 
             int hearts = client.Friendships.Values.Select(f => World.HeartsOf(f.Points)).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level,
-                client.Passives.Count, client.LifeLevel, Math.Max(1, client.Rift.Unlocked), hearts);
+                client.Passives.Count, client.LifeLevel, Math.Max(1, client.Rift.Unlocked), hearts,
+                SkillRules.SpentPoints(client.SkillRanks), client.SkillRanks.Values.DefaultIfEmpty(0).Max());
         }
 
         // The same facts as the host sees them, to check a claimed reward.
@@ -171,7 +178,8 @@ namespace Game.Core
 
             int hearts = player.Friendships.Values.Select(f => f.Hearts).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level,
-                player.Passives.Count, skill => World.LifeLevel(player, skill), world.RiftTier, hearts);
+                player.Passives.Count, skill => World.LifeLevel(player, skill), world.RiftTier, hearts,
+                SkillRules.SpentPoints(player.SkillRanks), player.SkillRanks.Values.DefaultIfEmpty(0).Max());
         }
     }
 
@@ -199,7 +207,7 @@ namespace Game.Core
         public static readonly IReadOnlyCollection<string> AddedAfterCounts = new[]
         {
             "life_mining", "merchant", "passive", "anvil", "assembler", "power_pole", "keg", "coop", "crab_pot", "friend", "rift_altar", "rift",
-            "free_power", "arc_furnace",
+            "free_power", "arc_furnace", "skill", "rank3",
         };
 
         // The goals a count saved before AddedAfterCounts stood for.
@@ -242,6 +250,8 @@ namespace Game.Core
                     "life" => Enum.TryParse<LifeSkill>(condition.Id, true, out var skill) ? facts.LifeLevel(skill) : -1,
                     "rift" => facts.RiftTier,
                     "friend" => facts.Hearts,
+                    "skills" => facts.SkillsSpent,
+                    "rank" => facts.TopRank,
                     _ => -1,
                 };
                 if (have >= 0 && condition.Count > 1) return $"{Math.Min(have, condition.Count)}/{condition.Count}";
@@ -260,6 +270,8 @@ namespace Game.Core
             "life" => Enum.TryParse<LifeSkill>(condition.Id, true, out var skill) && facts.LifeLevel(skill) >= condition.Count,
             "rift" => facts.RiftTier >= condition.Count,
             "friend" => facts.Hearts >= condition.Count,
+            "skills" => facts.SkillsSpent >= condition.Count,
+            "rank" => facts.TopRank >= condition.Count,
             _ => false,
         };
     }
@@ -336,6 +348,8 @@ namespace Game.Core
                 case "passive":
                 case "rift":
                 case "friend":
+                case "skills":
+                case "rank":
                     if (parts.Length != 2) throw new FormatException($"'{text}'는 {parts[0]}:<수>로 적습니다.");
                     int number = SheetValues.ParseNumber(parts[1], "수");
                     if (number < 1) throw new FormatException("수는 1 이상이어야 합니다.");
@@ -347,7 +361,7 @@ namespace Game.Core
                     if (lifeLevel < 1 || lifeLevel > LifeSkills.MaxLevel) throw new FormatException($"생활 기술 레벨은 1~{LifeSkills.MaxLevel}이어야 합니다.");
                     return new GoalCondition("life", parts[1].ToLowerInvariant(), lifeLevel, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level, passive, life, rift, friend 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level, passive, life, rift, friend, skills, rank 중 하나)");
             }
         }
 

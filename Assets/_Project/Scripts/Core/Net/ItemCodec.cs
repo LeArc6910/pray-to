@@ -185,6 +185,8 @@ namespace Game.Core
         Request,
         // Learns a skill or raises it a rank with a skill point (World.LearnSkill): Index is the skill sheet index.
         LearnSkill,
+        // Forgets the learned skills for coins and gives the points back (World.ResetSkills).
+        ResetSkills,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
