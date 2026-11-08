@@ -1045,3 +1045,10 @@ DevTools/Local/setup.sh --commit
   - 800×600에서 HUD가 목표 안내까지 일곱 덩어리로 늘어 화면 왼쪽 위의 40% 넘게(세로 약 260점) 덮는다. 줄이 "· M / 지도"처럼 키 이름과 뜻 사이에서 바뀐다
 - 사람이 할 일: 위 "온라인 협동(Unity Relay)용" 두 가지(에디터 Project Settings > Services에서 클라우드 프로젝트 연결, cloud.unity.com에서 Relay 켜기). 연결하면 `ProjectSettings.asset`에 프로젝트 ID가 들어가니, 알려 주면 로컬 세션이 커밋·푸시한다. 그 전까지는 [온라인 방 만들기]가 "설정되지 않았습니다"를 보여 주는 것이 맞다
 - 사람 결정(11-02): 온라인 협동(Unity Relay) 설정은 나중에 한다. 그때까지 [온라인 방 만들기]는 "설정되지 않았습니다"가 맞다. 참고로 이 프로젝트는 Unity Hub 목록에 없었다(지금까지 배치 모드로만 열었다). 에디터에서 열려면 Hub의 Add project from disk로 `K:\게임 개발`을 추가한다
+
+### 2026-11-08 21:13 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 458개 중 458개 통과, 0개 실패
+- PlayMode 테스트: 17개 중 17개 통과, 0개 실패
