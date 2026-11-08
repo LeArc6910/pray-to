@@ -830,6 +830,7 @@ namespace Game.Client
                 case "support_cold": return Ramped(Gem, Ramp.Of("#B4ECFF"));
                 case "support_lightning": return Ramped(Gem, Ramp.Of("#FFF6A0"));
                 case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
+                case "rift_shard": return Ramped(Gem, Ramp.Of("#E86ED8"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
                 case "coin": return Ramped(CoinRows, Ramp.Of("#F2C440"));
                 case "cave_potato_seed": return Ramped(Seeds, Ramp.Of("#B08850"));

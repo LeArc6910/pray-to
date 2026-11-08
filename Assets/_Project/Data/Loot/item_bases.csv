@@ -65,3 +65,6 @@ pilgrim_robe,공허 순례자의 옷,chest,45,,Armor+70~85;MaxHealth+70~80;Healt
 pilgrim_treads,공허 순례자의 신,boots,45,,Armor+30~36;MoveSpeed+10%;MaxHealth+30~36,2,0,,rift,4,,pilgrim
 rift_edge,균열 칼날,weapon,45,melee,Damage+70~80;CritChance+6;CritDamage+40,3,0,,rift,4,,
 rift_eye,균열의 눈,amulet,45,,Damage+18%;MaxHealth+60~70;AttackSpeed+10%;MaxMana+40;ManaRegen+3,1,0,,rift,4,,
+# 균열 조각으로 모루에서 만든다(떨어지지 않는다, 2026-11-09)
+rift_band,균열 고리,ring,45,,SkillRank+1;MaxHealth+40~50,1,0,
+rift_charm,균열 부적,amulet,45,,CooldownRecovery+12~15%;Damage+10~12%,1,0,

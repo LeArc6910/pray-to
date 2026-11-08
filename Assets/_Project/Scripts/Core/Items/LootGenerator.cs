@@ -90,7 +90,8 @@ namespace Game.Core
         // The bases of the highest step the level reaches. Legendaries never drop at random.
         public IReadOnlyList<ItemBase> BasesAt(int level)
         {
-            var ordinary = _data.Bases.Where(b => !b.IsLegendary).ToList();
+            // Weight 0: made only, never dropped (the rift's band and charm), so no step of their own.
+            var ordinary = _data.Bases.Where(b => !b.IsLegendary && b.Weight > 0).ToList();
             var reached = ordinary.Where(b => b.Level <= level).ToList();
             int step = reached.Count > 0 ? reached.Max(b => b.Level) : ordinary.Min(b => b.Level);
             return ordinary.Where(b => b.Level == step).ToList();

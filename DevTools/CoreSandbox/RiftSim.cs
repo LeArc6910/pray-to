@@ -51,7 +51,7 @@ namespace CoreSandbox
             var toEnemies = new FlowField(world.Map);
             int deaths = 0, taken = 0, wave = 1;
             bool? cleared = null;
-            long ticks = World.Ticks(World.RiftSeconds + 2);
+            long ticks = World.Ticks(World.RiftSecondsFor(world.ActiveRift?.Tier ?? 1) + 2);
             long tick = 0;
             for (; tick < ticks && cleared == null; tick++)
             {

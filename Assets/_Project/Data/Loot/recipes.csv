@@ -137,3 +137,5 @@ support_power,support_power,1,essence:12|mithril_bar:2,Anvil
 support_fire,support_fire,1,essence:6|fire_pepper:3,Anvil
 support_cold,support_cold,1,essence:6|ice_crystal:3,Anvil
 support_lightning,support_lightning,1,essence:6|copper_wire:6,Anvil
+rift_band,rift_band,1,rift_shard:10|void_bar:4,Anvil
+rift_charm,rift_charm,1,rift_shard:15|void_essence:1,Anvil

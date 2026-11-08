@@ -118,5 +118,20 @@ namespace Game.Core.Tests
             again.Restore(save);
             Assert.AreEqual(4, again.World.RiftTier);
         }
+
+        [Test]
+        public void HighTiersGetMoreTimeAndTheirGearIsMadeNotDropped()
+        {
+            Assert.AreEqual(World.RiftSeconds, World.RiftSecondsFor(1));
+            Assert.AreEqual(World.RiftSeconds, World.RiftSecondsFor(5));
+            Assert.AreEqual(World.RiftSeconds + 5 * World.RiftSecondsPerTier, World.RiftSecondsFor(10));
+
+            var band = Gear.Data.FindBase("rift_band");
+            Assert.AreEqual(0, band.Weight, "made at the anvil from rift shards, never dropped");
+            Assert.IsTrue(band.Implicits.Any(i => i.Stat == StatType.SkillRank));
+            var generator = new LootGenerator(Gear.Data);
+            CollectionAssert.DoesNotContain(generator.BasesAt(60).Select(b => b.Id).ToList(), "rift_band");
+            Assert.IsTrue(Gear.Data.Recipes.Any(r => r.Item == band && r.Ingredients.Any(i => i.Material.Id == World.RiftShard)));
+        }
     }
 }

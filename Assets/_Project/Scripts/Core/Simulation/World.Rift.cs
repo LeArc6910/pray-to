@@ -45,6 +45,10 @@ namespace Game.Core
         public const string RiftKey = "rift_key";
         public const int RiftWaves = 3;
         public const float RiftSeconds = 300;
+        // Tiers past 5 get this much more time each (2026-11-09): their guardians take long to bring down.
+        public const float RiftSecondsPerTier = 20;
+
+        public static float RiftSecondsFor(int tier) => RiftSeconds + RiftSecondsPerTier * Math.Max(0, tier - 5);
         public const int MaxRiftTier = 10;
         // An Enemy's Rift: brought by a rift, or the rift's guardian. The snapshot carries it in the monster's phase.
         public const int RiftMonster = 1;
@@ -56,6 +60,8 @@ namespace Game.Core
         // What the rift's legendaries name as the one that drops them, and how much likelier each tier makes them.
         public const string RiftLegendaries = "rift";
         public const int RiftLegendaryPerTier = 3;
+        // What tiers 3 and up give for the rift band and charm (recipes.csv).
+        public const string RiftShard = "rift_shard";
         // A rift monster's health and hit against its sheet at tier 1, and how much more each tier adds.
         const float RiftHealth = 5f;
         const float RiftHealthPerTier = 1.5f;
@@ -103,7 +109,7 @@ namespace Game.Core
                 open.Remove(pick);
                 affixes |= pick;
             }
-            ActiveRift = new Rift(RiftTier, TileMap.Center(altar.Value.X, altar.Value.Y), affixes, Ticks(RiftSeconds));
+            ActiveRift = new Rift(RiftTier, TileMap.Center(altar.Value.X, altar.Value.Y), affixes, Ticks(RiftSecondsFor(RiftTier)));
             _events.Add(new SimEvent(SimEventType.Rift, player.Id, amount: RiftOpened, position: ActiveRift.Center));
             NextRiftWave();
             return true;
@@ -192,6 +198,12 @@ namespace Game.Core
             for (int i = 0; essence != null && i < 3 * rift.Tier; i++) DropMaterial(essence, Scatter(rift.Center));
             var key = Loot.FindMaterial(RiftKey);
             if (key != null && _random.Chance(0.5f)) DropMaterial(key, Scatter(rift.Center));
+            // From tier 3, shards for the rift's own gear (tier - 2 of them); from tier 2, half the time a support
+            // crystal (Docs/Classes.md, 스킬 변형).
+            var shard = Loot.FindMaterial(RiftShard);
+            for (int i = 0; shard != null && i < rift.Tier - 2; i++) DropMaterial(shard, Scatter(rift.Center));
+            var crystals = SkillSupports.Ids.Select(Loot.FindMaterial).Where(m => m != null).ToList();
+            if (rift.Tier >= 2 && crystals.Count > 0 && _random.Chance(0.5f)) DropMaterial(crystals[_random.Next(crystals.Count)], Scatter(rift.Center));
             // The rift's own legendaries (item_bases.csv legendary "rift"): each its chance and 3% a tier.
             foreach (var legendary in _lootGenerator.LegendariesOf(RiftLegendaries).ToList())
             {
