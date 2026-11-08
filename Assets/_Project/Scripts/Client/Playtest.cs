@@ -29,6 +29,7 @@ namespace Game.Client
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
     //   teach [rank]              every skill of the player's classes at the rank, no points needed
+    //   classes <id,id> [order]   other classes at once, no workbench needed; order: which of their skills in each slot
     //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health>
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
     //   goto spawn | <dx> <dy> | boss <id> | biome <name> | tile <type> | near <type>
@@ -149,6 +150,12 @@ namespace Game.Client
                 case "learn":
                     var skill = root.ClassSheet.Skills.FirstOrDefault(k => k.Id == words[1]) ?? throw new ArgumentException($"no skill '{words[1]}'");
                     return world.LearnSkill(player.Id, skill) ? $"ok learn {skill.Id} {player.RankOf(skill)}" : $"ok learn refused {skill.Id}";
+                case "classes":
+                    var chosen = ClassRules.Choose(root.ClassSheet, words[1].Split(','), ClassRules.DefaultMaxClasses);
+                    if (chosen.Count == 0) throw new ArgumentException($"no classes '{words[1]}'");
+                    player.ChangeKit(chosen, words.Length > 2 ? words[2].Split(',').Select(Int).ToList() : null);
+                    player.InventoryVersion++;
+                    return null;
                 case "teach":
                     World.TeachAll(player, words.Length > 1 ? Int(words[1]) : 1);
                     return null;

@@ -81,12 +81,13 @@ namespace Game.Core
             player.InventoryVersion++;
         }
 
-        // Every skill of the player's classes at the rank given, for the balance tools (CoreSandbox), whose bots have
-        // no levels to earn points with.
+        // Every skill of the player's classes at the rank given, for the balance tools (CoreSandbox), the tests and
+        // the playtests, whose players have no levels to earn points with.
         internal static void TeachAll(Player player, int rank)
         {
             foreach (var skill in ClassRules.AllSkillsFor(player.Classes)) player.SkillRanks[skill] = Math.Clamp(rank, 1, SkillRules.MaxRank);
-            player.ChangeKit(player.Classes, null);
+            // The slots stay as they are when they are full; otherwise the defaults fill them.
+            player.ChangeKit(player.Classes, player.SkillOrder);
             foreach (var skill in player.Skills) player.ClearCooldown(skill);
             player.InventoryVersion++;
         }

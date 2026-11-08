@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu basics bag combat bosses world farm life npc factory defense gear save layout touch
+// Sections: menu basics bag combat bosses world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -176,6 +176,27 @@ async function menu(browser) {
   await game.press('저장본: 고르기·내보내기·가져오기');
   await game.shot('menu-saves', '저장본 목록');
   await game.context.close();
+
+  // The first Tab after starting from the menu by a real click on [혼자 하기] (LOCAL_TASKS.md, 13: the first key
+  // once went unheard). Typing in the name field first, as a person would.
+  const fresh = await open(browser, run, Profiles.pc, url);
+  const solo = (await fresh.find('혼자 하기'))[0];
+  if (solo) {
+    // The name field sits above the buttons in the left column: a click there, a name typed, then [혼자 하기].
+    await fresh.tapAt(solo.cx, solo.cy - 120);
+    await fresh.page.keyboard.type('탭시험');
+    await fresh.press('혼자 하기');
+    const started = await fresh.until(s => s.playing, 25000);
+    check(!!started, '[혼자 하기]를 눌러 시작한다');
+    await fresh.wait(1500);
+    await fresh.page.keyboard.press('Tab');
+    const opened = await fresh.until(s => s.bag, 2000);
+    check(!!opened, '시작한 뒤 처음 누른 Tab으로 가방이 열린다');
+    await fresh.shot('first-tab', '첫 Tab으로 연 가방');
+  } else {
+    check(false, '메뉴에 [혼자 하기]');
+  }
+  await fresh.context.close();
 }
 
 // ---------------------------------------------------------------- 첫 화면, 이동, 캐기, 놓기, 제작, 목표 (2·3·4·9·18·26·27·28·45단계)
@@ -949,7 +970,8 @@ async function defense(browser) {
   await rift.wait(1200);
   await rift.send('goto biome Cave');
   await clearRoom(rift, 3, 3);
-  await rift.send('equip void_sword void_helmet void_armor void_boots; heal; give rift_key 1; build RiftAltar 0 1');
+  // As a player who reached the rift would be: level 40, skills learned.
+  await rift.send('xp 21300; teach 3; equip void_sword void_helmet void_armor void_boots; heal; give rift_key 1; build RiftAltar 0 1');
   await rift.wait(800);
   check(await rift.press(/^균열 열기/), '제단 곁에 [균열 열기] 단추');
   const opened = await rift.until(r => !!r.rift, 3000);
@@ -1163,7 +1185,115 @@ async function touch(browser) {
   }
 }
 
-const Sections = { menu, basics, bag, combat, bosses, world, farm, life, npc, factory, defense, gear, save, layout, touch };
+
+// ---------------------------------------------------------------- 궁수·소환사·폭풍술사 스킬, 스킬 아이콘 (74단계)
+async function skills(browser) {
+  note('\n## 궁수·소환사·폭풍술사의 스킬 여섯 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto biome Cave');
+  await clearRoom(game, 6, 4);
+  for (const [cls, name] of [['archer', '궁수'], ['summoner', '소환사'], ['storm_caller', '폭풍술사']]) {
+    await game.send(`classes ${cls}; xp 21300; teach 2; heal; clear`);
+    await game.wait(800);
+    let inv = await game.inventory();
+    check(inv.classes === cls && inv.skills.split(',').length === 4, `${name}: 배운 스킬 넷이 칸에 (${inv.skills})`);
+    // The first four slots, then the last two skills swapped in: every one of the six is used once.
+    let used = 0;
+    const names = [];
+    for (const order of [null, '4,5,0,1']) {
+      if (order) {
+        await game.send(`classes ${cls} ${order}; teach 2`);
+        await game.wait(600);
+        inv = await game.inventory();
+      }
+      const slots = order ? [0, 1] : [0, 1, 2, 3];
+      for (const slot of slots) {
+        await game.send('heal; clear; spawn slime 3 0 5000; spawn slime 2 2 5000; spawn slime -3 1 5000');
+        await game.wait(300);
+        const before = (await game.state()).mana;
+        await game.send(`face 1 0; skill ${slot}`);
+        await game.wait(700);
+        const id = inv.skills.split(',')[slot];
+        if ((await game.state()).mana < before) {
+          used++;
+          names.push(id);
+        }
+        await game.shot(`skill-${cls}-${id}`, `${name}: ${id}`);
+      }
+    }
+    check(used === 6, `${name}: 스킬 여섯이 모두 나간다 (${names.join(', ')})`);
+  }
+  await game.send('face off; bag 스킬');
+  await game.wait(800);
+  await game.shot('skills-icons', '[스킬] 탭의 스킬 아이콘');
+  await game.send('bag off');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 바닥, 문, 장식 (41단계)
+async function base(browser) {
+  note('\n## 바닥·문·장식 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto biome Cave');
+  await clearRoom(game, 6, 4);
+  // Three floors in a row, a wall across with a door in it, a table and a banner.
+  const commands = ['build StoneFloor -3 2', 'build BrickFloor -2 2', 'build GlowFloor -1 2', 'build Table -3 -2', 'build Banner -1 -2', 'build Door 2 0'];
+  for (let dy = -4; dy <= 4; dy++) if (dy !== 0) commands.push(`build Wall 2 ${dy}`);
+  await game.send(commands.join('; '));
+  await game.wait(1000);
+  const tiles = [];
+  for (const [dx, dy] of [[-3, 2], [-2, 2], [-1, 2], [-3, -2], [-1, -2], [2, 0]]) tiles.push((await game.look(dx, dy)).tile);
+  check(tiles.join(',') === 'StoneFloor,BrickFloor,GlowFloor,Table,Banner,Door', `바닥 셋, 탁자, 깃발, 문이 놓인다 (${tiles.join(', ')})`);
+  await game.shot('base', '돌·벽돌·빛 바닥, 문 달린 벽, 탁자와 깃발');
+  // A monster on the far side stays behind the door; the player walks through it.
+  await game.send('spawn slime 4 0 5000');
+  await game.wait(2500);
+  const start = await game.state();
+  await game.page.keyboard.down('d');
+  await game.wait(1400);
+  await game.page.keyboard.up('d');
+  const after = await game.state();
+  check(after.x > start.x + 2.2, `플레이어는 문을 지나간다 (x ${start.x.toFixed(1)} → ${after.x.toFixed(1)})`);
+  await game.shot('base-door', '문을 지나간 뒤');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 배포를 넘어 남는 웹 저장본 (49·50단계)
+// A browser profile kept between runs (out/profile-deploy): the first run leaves a character and its commit; a run on
+// a later deploy loads it and checks its level and bag are still there.
+async function deploysave() {
+  note('\n## 다음 배포 뒤에도 남는 저장본 (PC)\n');
+  const dir = path.join(__dirname, 'out', 'profile-deploy');
+  const marker = path.join(dir, 'left-by.json');
+  const context = await chromium.launchPersistentContext(dir, { ...Profiles.pc.context, args: LaunchArgs });
+  const game = await open(null, run, Profiles.pc, url, context);
+  const deployed = await deployedCommit(url);
+  const left = fs.existsSync(marker) ? JSON.parse(fs.readFileSync(marker, 'utf8')) : null;
+  await game.startSolo('배포시험', true);
+  await game.wait(1500);
+  const s = await game.state();
+  const inv = await game.inventory();
+  if (left && left.commit !== deployed) {
+    check(s.level === left.level && count(inv, 'stone') === left.stone, `배포(${left.commit.slice(0, 7)} → ${deployed.slice(0, 7)})를 넘어 캐릭터가 남는다 (Lv ${s.level}/${left.level}, 돌 ${count(inv, 'stone')}/${left.stone})`);
+  } else {
+    note(`- 처음이거나 같은 배포라 다음 배포 때 확인한다 (지금 ${deployed.slice(0, 7)})`);
+    await game.send('xp 300; give stone 23');
+    await game.wait(1500);
+  }
+  const now = await game.state();
+  const bag = await game.inventory();
+  await game.page.keyboard.press('Escape');
+  await game.until(st => !st.playing, 8000);
+  await game.wait(1000);
+  fs.writeFileSync(marker, JSON.stringify({ commit: deployed, level: now.level, stone: count(bag, 'stone') }));
+  await context.close();
+}
+
+const Sections = { menu, basics, bag, combat, bosses, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

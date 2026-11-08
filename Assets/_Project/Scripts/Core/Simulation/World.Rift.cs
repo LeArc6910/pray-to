@@ -59,8 +59,8 @@ namespace Game.Core
         // A rift monster's health and hit against its sheet at tier 1, and how much more each tier adds.
         const float RiftHealth = 5f;
         const float RiftHealthPerTier = 1.5f;
-        const float RiftPower = 2.2f;
-        const float RiftPowerPerTier = 0.35f;
+        const float RiftPower = 1.8f;
+        const float RiftPowerPerTier = 0.45f;
         // How far from the altar its monsters appear.
         const float RiftInner = 3;
         const float RiftOuter = 7;
