@@ -682,8 +682,11 @@ async function life(browser) {
   // The bag stays open on its materials page: the rod's button is [낚시], [걷기] while waiting and [낚아채기!] at a
   // bite, always in the same place, so it is pressed the moment the marker is in the green.
   await bagTab(game, '재료·제작');
-  const rod = (await game.find('낚시', '낚싯대'))[0];
   await game.press('낚시', '낚싯대');
+  // Where the rod's button is, read once the page is drawn (read right after the tab changed, it was not there yet
+  // and no strike was ever tried).
+  const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
+  check(!!rod, '낚싯대 줄의 단추가 보인다');
   check((await game.state()).fishing === 'wait', '[낚시]로 찌를 던진다');
   await game.shot('fishing', '찌를 던진 모습');
   let caught = false;
