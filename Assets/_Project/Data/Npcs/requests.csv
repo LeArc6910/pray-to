@@ -23,3 +23,10 @@ b_story3,blacksmith,평생 공허석을 두드려 보는 게 소원이었네. �
 f_story1,fisher,처음 낚시를 배울 때 동굴 송사리부터 잡았지. 열 마리만 모아 와 봐.,cave_minnow:10,bait:30|coin:80,1,40,1,하루의 첫 손님
 f_story2,fisher,얼음 동굴 아래엔 큰 송어가 산다더라. 얼음 송어 다섯과 수정 장어 하나를 보고 싶어.,ice_trout:5|crystal_eel:1,coin:200|mana_potion:3,3,50,2,얼음 아래의 송어
 f_story3,fisher,심연의 아귀를 한 번만 직접 보고 싶어. 두 마리면 아버지의 활을 줄게.,void_angler:2,coin:400|essence:10|void_bow:1,5,60,3,심연의 아귀
+a_slime,alchemist,슬라임 젤 열 개만 구해 줘. 연고를 만들려고.,slime_gel:10,coin:40,,30
+a_spore,alchemist,빛 포자 다섯 개. 등불 물약에 넣을 거야.,glow_spore:5,coin:60|mana_potion:1,1,30
+a_ice,alchemist,얼음 결정 다섯 개면 식힘 물약을 만들 수 있어.,ice_crystal:5,coin:80,2,35
+a_cap,alchemist,빛 버섯 세 개. 마나 물약의 핵심 재료야.,glow_cap:3,coin:100|essence:3,3,40
+a_story1,alchemist,빛 버섯으로 새 물약을 연구하고 있어. 빛 버섯 셋과 슬라임 젤 열이면 시작할 수 있겠어.,glow_cap:3|slime_gel:10,mana_potion:3|coin:100,1,40,1,빛 버섯 연구
+a_story2,alchemist,결정을 굳히는 법을 알아냈어! 얼음 결정 여덟과 서리 열매 셋이면 첫 결정을 만들 수 있어.,ice_crystal:8|frost_berry:3,support_haste:1|essence:6,3,50,2,얼음의 결정
+a_story3,alchemist,공허의 정수와 균열 조각을 섞으면 무엇이 될까? 다섯 조각과 정수 하나만 구해 줘. 성공하면 부적을 나눠 줄게.,void_essence:1|rift_shard:5,support_power:1|rift_charm:1,5,60,3,공허의 연금

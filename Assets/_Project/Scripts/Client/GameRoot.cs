@@ -474,6 +474,7 @@ namespace Game.Client
             }
             _guideClock = GuideCheckSeconds;
             _goalShownAt = Time.time;
+            if (_inventory != null) _inventory.Guide = _guideProgress;
         }
 
         // Skills go to the host as soon as they are pressed, not with the next tick's input.

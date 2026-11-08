@@ -218,6 +218,9 @@ namespace Game.Core
 
         public int Done => _data.Goals.Count(g => _passed.Contains(g.Id));
 
+        // The goals passed, in sheet order.
+        public IEnumerable<Goal> PassedGoals => _data.Goals.Where(g => _passed.Contains(g.Id));
+
         // Null once every goal is done.
         public Goal Current => _data.Goals.FirstOrDefault(g => !_passed.Contains(g.Id));
 

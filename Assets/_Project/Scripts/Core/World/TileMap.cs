@@ -92,6 +92,8 @@ namespace Game.Core
         TeslaTower,
         // A floor under a hole cut to the sky: daylight, sunset or moonlight falls on it (Docs/Time.md).
         Skylight,
+        // The alchemist's table, where she stands (Docs/Npcs.md, 2026-11-09).
+        AlchemyTable,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

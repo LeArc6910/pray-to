@@ -30,10 +30,11 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void ThreePeopleEachWithAStallAndAShop()
+        public void FourPeopleEachWithAStallAndAShop()
         {
             Assert.IsTrue(People.Shipped.Success, string.Join("\n", People.Shipped.Errors));
-            CollectionAssert.AreEqual(new[] { "merchant", "blacksmith", "fisher" }, People.Shipped.Npcs.Select(n => n.Id));
+            CollectionAssert.AreEqual(new[] { "merchant", "blacksmith", "fisher", "alchemist" }, People.Shipped.Npcs.Select(n => n.Id));
+            Assert.AreEqual(3, People.Shipped.StoryOf(Person("alchemist")).Count, "the alchemist has a story too");
             var world = Town("blacksmith", out _);
             foreach (var npc in People.Shipped.Npcs)
             {

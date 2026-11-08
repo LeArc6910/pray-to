@@ -20,6 +20,8 @@ namespace Game.Client
             Passives,
             Chest,
             Merchant,
+            Character,
+            Journal,
         }
 
         const float MaxWidth = 520;
@@ -31,7 +33,7 @@ namespace Game.Client
         const float WheelStep = 30;
 
         static GUIStyle _tooltipStyle;
-        static readonly string[] PageNames = { "장비", "재료·제작", "스킬", "특성", "상자", "상인" };
+        static readonly string[] PageNames = { "장비", "재료·제작", "스킬", "특성", "상자", "상인", "캐릭터", "일지" };
         static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
         readonly WorldClient _client;
@@ -120,7 +122,7 @@ namespace Game.Client
             if (merchant) PageLabels[(int)Page.Merchant].text = person.Value.Npc.Role;
             if (!chest && _page == Page.Chest || !merchant && _page == Page.Merchant) _page = Page.Gear;
             _pages.Clear();
-            _pages.AddRange(new[] { Page.Gear, Page.Materials, Page.Classes, Page.Passives });
+            _pages.AddRange(new[] { Page.Gear, Page.Materials, Page.Classes, Page.Passives, Page.Character, Page.Journal });
             if (chest) _pages.Add(Page.Chest);
             if (merchant) _pages.Add(Page.Merchant);
             _page = Tabs(_page, _pages);
@@ -133,6 +135,8 @@ namespace Game.Client
             else if (_page == Page.Classes) DrawClasses();
             else if (_page == Page.Passives) DrawPassives();
             else if (_page == Page.Merchant) DrawMerchant();
+            else if (_page == Page.Character) DrawCharacter();
+            else if (_page == Page.Journal) DrawJournal();
             else DrawChest();
             Ui.EndScrollView();
             if (Event.current.type == EventType.Repaint)
@@ -151,13 +155,18 @@ namespace Game.Client
         Page Tabs(Page page, IReadOnlyList<Page> pages)
         {
             int count = pages.Count;
-            var row = GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true));
             const float gap = 4;
-            float width = (row.width - gap * (count - 1)) / count;
+            // In two rows when one would make the tabs too narrow for their names (a phone held upright).
+            var probe = GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true));
+            int perRow = (probe.width - gap * (count - 1)) / count < 64 ? (count + 1) / 2 : count;
+            var second = perRow < count ? GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true)) : probe;
+            float width = (probe.width - gap * (perRow - 1)) / perRow;
             var e = Event.current;
             for (int i = 0; i < count; i++)
             {
-                var tab = new Rect(row.x + i * (width + gap), row.y, width, row.height);
+                var row = i < perRow ? probe : second;
+                int column = i < perRow ? i : i - perRow;
+                var tab = new Rect(row.x + column * (width + gap), row.y, width, row.height);
                 if (e.type == EventType.MouseDown && tab.Contains(e.mousePosition))
                 {
                     if (page != pages[i])
@@ -177,6 +186,113 @@ namespace Game.Client
             }
             return page;
         }
+
+        // The character (as Core Keeper shows one): the worn slots laid out round the body, the picked one's panel,
+        // then every stat, the classes and skills' hits, and the life skills.
+        void DrawCharacter()
+        {
+            GUILayout.Label(Fit($"{_client.Name} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · " +
+                (_client.Classes.Count == 0 ? "클래스 없음" : string.Join(" + ", _client.Classes.Select(c => c.Name))), _textWidth));
+            float cell = Controls.UsingTouch ? 52 : 48;
+            // Helmet and amulet on top, weapon, chest and ring across the middle, boots below.
+            var places = new (ItemSlot Slot, int Column, int Row)[]
+            {
+                (ItemSlot.Helmet, 1, 0), (ItemSlot.Amulet, 2, 0),
+                (ItemSlot.Weapon, 0, 1), (ItemSlot.Chest, 1, 1), (ItemSlot.Ring, 2, 1),
+                (ItemSlot.Boots, 1, 2),
+            };
+            var doll = GUILayoutUtility.GetRect(_textWidth, cell * 3 + CellGap * 2, GUILayout.Width(_textWidth));
+            float left = doll.x + (doll.width - (cell * 3 + CellGap * 2)) / 2;
+            Ui.Row("캐릭터");
+            foreach (var (slot, column, row) in places)
+            {
+                var area = new Rect(left + column * (cell + CellGap), doll.y + row * (cell + CellGap), cell, cell);
+                var item = _client.Equipment[slot];
+                if (item == null)
+                {
+                    EmptyCell(area, ItemText.SlotName(slot));
+                    continue;
+                }
+                if (Cell(area, Sprites.Icon(item.Base), ItemText.Name(item), item.Upgrade > 0 ? $"+{item.Upgrade}" : null, Palette.Of(item.Rarity), _picked == item.Id, ItemTooltip(item)))
+                {
+                    Pick(item.Id, null);
+                }
+            }
+            DrawPicked();
+            GUILayout.Space(6);
+            DrawStats();
+            GUILayout.Label(Fit($"스킬 포인트 {_client.SkillPoints} · 특성 포인트 {_client.PassivePoints} · 배운 특성 {_client.Passives.Count}", _textWidth));
+            DrawLifeSkills();
+        }
+
+        bool _showPassedGoals;
+
+        // What the player is doing and has done: the guide's goal and how far along, the goals passed, each person's
+        // story and today's requests, a rift or defense under way.
+        void DrawJournal()
+        {
+            if (_client.Rift.Open) GUILayout.Label(Fit($"공허 균열 {_client.Rift.Tier}단계 · 남은 적 {_client.Rift.MonstersLeft} · {_client.Rift.SecondsLeft / 60}:{_client.Rift.SecondsLeft % 60:00}", _textWidth));
+            if (_client.Defense.Active) GUILayout.Label(Fit($"기지 방어 {_client.Defense.Level}단계 · {_client.Defense.Wave}/{World.DefenseWaves} 물결 · 수호석 {_client.Defense.StonePercent}%", _textWidth));
+
+            var heading = new Color(1f, 0.85f, 0.4f);
+            void Heading(string text)
+            {
+                GUILayout.Space(6);
+                var previous = GUI.color;
+                GUI.color = heading;
+                GUILayout.Label(Fit(text, _textWidth));
+                GUI.color = previous;
+            }
+
+            var guide = Guide;
+            if (guide != null)
+            {
+                Heading($"목표 안내 {guide.Done}/{guide.Total}");
+                var goal = guide.Current;
+                if (goal == null) GUILayout.Label(Fit("안내한 목표를 모두 마쳤다", _textWidth));
+                else
+                {
+                    string progress = GuideProgress.Progress(goal, GuideFacts.Of(_client)) is string p ? $" ({p})" : "";
+                    GUILayout.Label(Fit($"지금: {goal.Text}{progress}", _textWidth));
+                    GUILayout.Label(Fit(goal.Hint, _textWidth));
+                    if (goal.Rewards.Count > 0) GUILayout.Label(Fit($"보상: {goal.RewardText}", _textWidth));
+                }
+                if (guide.Done > 0 && Ui.LayoutButton(_showPassedGoals ? "마친 목표 접기" : $"마친 목표 보기 ({guide.Done})")) _showPassedGoals = !_showPassedGoals;
+                if (_showPassedGoals)
+                {
+                    foreach (var passed in guide.PassedGoals) GUILayout.Label(Fit($"· {passed.Text}", _textWidth));
+                }
+            }
+
+            var people = _client.Npcs?.Npcs ?? (IReadOnlyList<NpcDefinition>)Array.Empty<NpcDefinition>();
+            Heading("이야기");
+            foreach (var npc in people)
+            {
+                var story = _client.Npcs.StoryOf(npc);
+                if (story.Count == 0) continue;
+                int done = _client.StorySteps.TryGetValue(npc.Id, out int d) ? d : 0;
+                var next = _client.StoryStepOf(npc);
+                string state = next == null ? "모두 들었다"
+                    : _client.HeartsWith(npc) < next.Hearts ? $"다음: {next.Title} (호감 {next.Hearts}에 열린다)"
+                    : $"다음: {next.Title}";
+                GUILayout.Label(Fit($"{npc.Name} {done}/{story.Count} · {state}", _textWidth));
+            }
+
+            Heading("오늘의 부탁");
+            bool any = false;
+            foreach (var npc in people)
+            {
+                if (!_client.Friendships.ContainsKey(npc.Id)) continue;
+                var request = _client.RequestOf(npc);
+                if (request == null) continue;
+                any = true;
+                GUILayout.Label(Fit($"{npc.Name}: {request.NeedText} → {request.RewardText}{(_client.RequestDoneToday(npc) ? " (마침)" : "")}", _textWidth));
+            }
+            if (!any) GUILayout.Label(Fit("만난 사람에게 말을 걸면 그날의 부탁을 알려 준다", _textWidth));
+        }
+
+        // The guide's progress for the journal (GameRoot hands it over when the guide starts).
+        public GuideProgress Guide { get; set; }
 
         // A small gold dot in a button's top right corner: something to do there (points to spend).
         internal static void Badge(Rect button)
@@ -283,13 +399,8 @@ namespace Game.Client
             DrawPicked();
 
             GUILayout.Space(8);
-            if (Ui.LayoutButton(_showStats ? "능력치·생활 기술 접기" : "능력치·생활 기술 보기")) _showStats = !_showStats;
-            if (!_showStats) return;
-            DrawStats();
-            DrawLifeSkills();
+            GUILayout.Label(Fit("능력치와 생활 기술은 [캐릭터] 탭에 있다", _textWidth));
         }
-
-        bool _showStats;
         // The item (by id) or consumable picked in the grid; nothing picked when both are empty.
         int _picked;
         ConsumableDefinition _pickedConsumable;

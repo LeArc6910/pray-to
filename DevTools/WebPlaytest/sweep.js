@@ -406,9 +406,10 @@ async function bag(browser) {
   await game.wait(3500);
   check(items(await game.inventory(), 'copper_sword') === swords, '5초가 지나면 그 위에서 다시 줍는다');
   await game.send('goto -1 0; face off');
-  // A click inside the bag does not swing: on the empty space under the stats button.
-  const inBag = (await game.buttons()).find(b => b.shown && /^능력치·생활 기술/.test(b.label));
-  await game.page.mouse.move(inBag.cx, inBag.cy + 80);
+  // A click inside the bag does not swing: on the empty space near the window's bottom, under the [장비] tab.
+  const inBag = (await game.buttons()).find(b => b.shown && b.label === '장비');
+  const bagBox = await game.canvas();
+  await game.page.mouse.move(inBag.cx, bagBox.top + bagBox.height * 0.9);
   await game.page.mouse.down();
   await game.wait(500);
   const clicking = await game.state();
@@ -835,6 +836,24 @@ async function npc(browser) {
   const told = await game.until(i => (i.stories || {}).merchant === 1, 3000, game.inventory);
   check(!!told && count(told, 'coin') > coinsBefore, `이야기 1단계를 마치면 금화를 받고 다음 단계로 (${JSON.stringify((told || {}).stories)})`);
   await game.shot('shop-story-done', '첫 단계를 마친 [이야기]');
+  // The journal: the merchant's story one step along, and today's request.
+  await game.press('일지');
+  const journal = (await game.buttons()).length >= 0;
+  await game.shot('journal', '[일지] 탭');
+  check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
+  const doll = await game.find(/구리 검/, '캐릭터');
+  check(doll.length === 1, `[캐릭터] 탭의 사람 모양 칸에 든 무기 (${doll.map(b => b.label).join(', ')})`);
+  await game.shot('character', '[캐릭터] 탭');
+  await closeBag(game);
+  // The alchemist at her table: her tab and her story.
+  await game.send('goto near AlchemyTable; hearts alchemist 1');
+  await game.wait(800);
+  await game.shot('alchemist', '연금술사의 탁자');
+  await bagTab(game);
+  check(await game.press('연금술사'), '연금술사 곁에서 가방에 [연금술사] 탭');
+  await game.press('이야기');
+  check((await game.find('아직 모자라다')).length === 1 || (await game.find('건네기')).length === 1, '연금술사의 [이야기] 첫 단계(빛 버섯 연구)가 보인다');
+  await game.shot('alchemist-story', '연금술사의 [이야기]');
   await closeBag(game);
   await game.send('clock 2 7');
   await game.wait(1200);
@@ -1146,7 +1165,7 @@ async function layout(browser) {
     const inside = (await game.buttons()).filter(b => /^(skill|potion|quick)/.test(b.label));
     const out = inside.filter(b => b.rect[0] < 0 || b.rect[1] < 0 || b.rect[0] + b.rect[2] > b.screen.width + 0.5 || b.rect[1] + b.rect[3] > b.screen.height + 0.5);
     check(out.length === 0, `스킬 칸·물약·퀵슬롯이 화면 안에 (${out.map(b => b.label).join(', ') || '모두'})`);
-    for (const tab of ['장비', '재료·제작', '스킬', '특성']) {
+    for (const tab of ['장비', '재료·제작', '스킬', '특성', '캐릭터', '일지']) {
       await bagTab(game, tab);
       await game.wait(300);
       const shown = (await game.buttons()).filter(b => b.shown);

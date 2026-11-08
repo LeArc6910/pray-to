@@ -106,3 +106,15 @@ fried_shrimp,,14,,,fisher
 milk,,12,,,
 cheese,,40,,,
 warm_milk,,20,,,
+healing_potion,22,5,,,alchemist
+mana_potion,24,6,,,alchemist
+support_cold,180,,yes,2,alchemist
+support_fire,180,,yes,2,alchemist
+support_lightning,180,,yes,2,alchemist
+support_haste,260,,yes,3,alchemist
+support_area,260,,yes,3,alchemist
+glow_cap,,9,,,alchemist
+frost_berry,,11,,,alchemist
+slime_gel,,2,,,alchemist
+glow_spore,,3,,,alchemist
+ice_crystal,,6,,,alchemist

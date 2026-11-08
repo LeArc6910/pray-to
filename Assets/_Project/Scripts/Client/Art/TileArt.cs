@@ -390,6 +390,7 @@ namespace Game.Client
             TileType.MerchantStall => MerchantStallTile,
             TileType.SmithStall => SmithStallTile,
             TileType.FisherHut => FisherHutTile,
+            TileType.AlchemyTable => AlchemyTableTile,
             TileType.Keg => KegTile,
             TileType.PreservesJar => JarTile,
             TileType.Coop => CoopTile,
@@ -1494,6 +1495,7 @@ namespace Game.Client
         // The blacksmith's: a soot-dark awning striped with ember orange; the fisher's: blue and white.
         static readonly PixelImage SmithStallTile = Restriped(MerchantStallTile, "#4A4444", "#3A3434", "#E8783A", "#B8562A");
         static readonly PixelImage FisherHutTile = Restriped(MerchantStallTile, "#3E7FD0", "#2E5FA0", "#F6F2E8", "#C8C0B0");
+        static readonly PixelImage AlchemyTableTile = Restriped(MerchantStallTile, "#9A5CD8", "#6E3CA8", "#E8F6E0", "#B8D0A8");
 
         // The stall with its awning's stripes in other colours: the red and the cream, and their shades.
         static PixelImage Restriped(PixelImage stall, string red, string redShade, string cream, string creamShade)
