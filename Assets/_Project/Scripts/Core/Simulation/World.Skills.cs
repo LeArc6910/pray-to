@@ -119,8 +119,9 @@ namespace Game.Core
             {
                 var skill = classes?.Skills.FirstOrDefault(s => s.Id == skillId);
                 var gem = loot?.Materials.FirstOrDefault(m => m.Id == gemId);
-                if (skill == null || gem == null || SkillSupports.KindOf(gem) == null) continue;
-                if (player.Knows(skill)) player.Supports[skill] = gem;
+                if (skill == null || gem == null || SkillSupports.KindOf(gem) is not SupportKind kind) continue;
+                // One the skill no longer takes (the rules changed after the save) goes back to the bag.
+                if (player.Knows(skill) && SkillSupports.Fits(skill, kind)) player.Supports[skill] = gem;
                 else player.Inventory.AddMaterial(gem, 1);
             }
         }
@@ -184,7 +185,8 @@ namespace Game.Core
                     Dash(player, skill, slot);
                     break;
                 case SkillKind.Heal:
-                    float healed = Math.Min(player.Stats.MaxHealth - player.Health, player.Stats.MaxHealth * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)));
+                    float healed = Math.Min(player.Stats.MaxHealth - player.Health,
+                        player.Stats.MaxHealth * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(skill, player.SupportOf(skill)));
                     player.Health += Math.Max(0, healed);
                     _events.Add(new SimEvent(SimEventType.Healed, player.Id, amount: (int)Math.Round(Math.Max(0, healed))));
                     break;
@@ -233,7 +235,7 @@ namespace Game.Core
             var stats = player.Stats;
             var context = player.ContextFor(skill);
             critical = _random.Chance(stats.CritChanceFor(context) / 100f);
-            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(player.SupportOf(skill))
+            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(skill, player.SupportOf(skill))
                 * (critical ? stats.CritDamageFor(context) / 100f : 1f);
         }
 

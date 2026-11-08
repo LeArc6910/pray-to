@@ -36,15 +36,70 @@ namespace CoreSandbox
                         SkillKind.Dash => "돌진",
                         _ => "회복",
                     };
-                    string Cell(float value) => skill.Kind == SkillKind.Buff ? "-" : skill.Kind == SkillKind.Heal ? $"{value:0.0}%" : $"{value:0.0}";
+                    string Cell(float value) => skill.Kind == SkillKind.Buff ? $"{value:0}%켬" : skill.Kind == SkillKind.Heal ? $"{value:0.0}%" : $"{value:0.0}";
                     Console.WriteLine($"{skill.Name,-10} {owner.Name,-7} {skill.Level,4} {kind,-6} {Cell(low.Single),12} {Cell(low.Pack),8} {Cell(high.Single),12} {Cell(high.Pack),8} {low.ManaPerSecond,7:0.0}");
                 }
             }
-            Console.WriteLine("회복은 최대 생명력의 초당 %(한 대상 칸). 버프는 피해를 주지 않는다");
+            Console.WriteLine("회복은 최대 생명력의 초당 %(한 대상 칸). 버프는 켜져 있는 시간의 비율(한 대상 칸)");
+        }
+
+        static readonly (SupportKind Kind, string Name)[] SupportNames =
+        {
+            (SupportKind.Area, "확산"), (SupportKind.Multi, "분열"), (SupportKind.Haste, "가속"), (SupportKind.Power, "증폭"),
+            (SupportKind.Fire, "화염"), (SupportKind.Cold, "냉기"), (SupportKind.Lightning, "번개"),
+        };
+
+        // Every skill with each crystal that fits it (Docs/Classes.md, 스킬 변형), against the skill bare at the same
+        // rank: how much the crystal multiplies its damage a second on the main dummy and on the whole pack (heal a
+        // second for heals, time on for buffs), and the mana it then costs a second. Cold only slows, which dummies
+        // that stand still do not show.
+        public static void RunSupports(LootData loot, ClassData classes, int seconds, string[] gear, int rank)
+        {
+            var dummy = MonsterSheet.Parse(Header + "dummy,허수아비,1,100000000,0,0,1,0.4,0,0.5,0.5,1,1\n").Find("dummy");
+            var monsters = MonsterSheet.Parse(Header + "dummy,허수아비,1,100000000,0,0,1,0.4,0,0.5,0.5,1,1\n");
+            var crystals = SkillSupports.Ids.Select(loot.FindMaterial).Where(m => m != null).ToDictionary(m => SkillSupports.KindOf(m).Value);
+            Console.WriteLine($"결정마다 {seconds}초, 스킬 {rank}단계, 장비 {string.Join(", ", gear)}. 칸: 한 대상 배율/무리 배율 (마나/초). 결정 없는 값에 대한 배율");
+            Console.WriteLine($"{"스킬",-10} {"종류",-4} {"결정 없음",16} " + string.Join(" ", SupportNames.Select(n => $"{n.Name,17}")));
+            float regen = PlayerStats.BaseManaRegen;
+            var flagged = new List<string>();
+            foreach (var owner in classes.Classes)
+            {
+                foreach (var skill in owner.Skills)
+                {
+                    var bare = Measure(loot, monsters, dummy, owner, skill, rank, seconds, gear);
+                    string kind = skill.Kind switch
+                    {
+                        SkillKind.Nova => "둘레", SkillKind.Projectile => "투사체", SkillKind.Buff => "버프",
+                        SkillKind.Summon => "소환", SkillKind.Dash => "돌진", _ => "회복",
+                    };
+                    var cells = new List<string>();
+                    foreach (var (support, name) in SupportNames)
+                    {
+                        if (!SkillSupports.Fits(skill, support) || !crystals.TryGetValue(support, out var crystal))
+                        {
+                            cells.Add($"{"-",17}");
+                            continue;
+                        }
+                        var with = Measure(loot, monsters, dummy, owner, skill, rank, seconds, gear, crystal);
+                        float single = bare.Single > 0 ? with.Single / bare.Single : 0;
+                        float pack = bare.Pack > 0 ? with.Pack / bare.Pack : single;
+                        cells.Add($"{$"x{single:0.00}/x{pack:0.00} ({with.ManaPerSecond:0.0})",17}");
+                        float best = Math.Max(single, pack);
+                        // A skill that deals nothing (a dash only for moving) has nothing to compare.
+                        if (bare.Single <= 0 && bare.Pack <= 0) continue;
+                        if (best >= 1.6f) flagged.Add($"{skill.Name}+{name}: x{best:0.00} (너무 셈)");
+                        else if (best <= 0.97f) flagged.Add($"{skill.Name}+{name}: x{best:0.00} (손해만)");
+                    }
+                    string Bare() => skill.Kind == SkillKind.Buff ? $"{bare.Single:0}%켬" : skill.Kind == SkillKind.Heal ? $"{bare.Single:0.0}%/초" : $"{bare.Single:0}/{bare.Pack:0}";
+                    Console.WriteLine($"{skill.Name,-10} {kind,-4} {$"{Bare()} ({bare.ManaPerSecond:0.0})",16} " + string.Join(" ", cells));
+                }
+            }
+            Console.WriteLine($"마나는 채워 두고 쟀다. 기본 마나 재생은 초당 {regen:0}");
+            Console.WriteLine(flagged.Count == 0 ? "눈에 띄는 것 없음" : "눈에 띄는 것(x1.6 이상, x0.97 이하):\n  " + string.Join("\n  ", flagged));
         }
 
         static (float Single, float Pack, float ManaPerSecond) Measure(LootData loot, MonsterData monsters, MonsterDefinition dummy, ClassDefinition owner,
-            SkillDefinition skill, int rank, int seconds, string[] gear)
+            SkillDefinition skill, int rank, int seconds, string[] gear, MaterialDefinition support = null)
         {
             var map = new TileMap(31, 31, TileType.Floor);
             for (int i = 0; i < 31; i++)
@@ -63,6 +118,7 @@ namespace CoreSandbox
             }
             var player = world.AddPlayer("bot", equipment, owner);
             foreach (var each in owner.Skills) player.SkillRanks[each] = rank;
+            if (support != null) player.Supports[skill] = support;
             var all = ClassRules.AllSkillsFor(player.Classes);
             var order = new List<int> { all.IndexOf(skill) };
             order.AddRange(Enumerable.Range(0, all.Count).Where(i => !order.Contains(i)).Take(ClassRules.SkillSlots - 1));
@@ -82,6 +138,7 @@ namespace CoreSandbox
 
             long single = 0, pack = 0;
             float mana = 0;
+            int buffed = 0;
             float maxHealth = player.Stats.MaxHealth;
             for (int tick = 0; tick < seconds * World.TicksPerSecond; tick++)
             {
@@ -91,14 +148,17 @@ namespace CoreSandbox
                 float before = player.Health;
                 if (player.CooldownTicks(0) == 0 && world.UseSkill(player.Id, 0, new Vec2(1, 0)))
                 {
-                    mana += skill.Mana;
+                    mana += player.ManaCost(skill);
                     if (skill.Kind == SkillKind.Heal) single += (long)Math.Round((player.Health - before) / maxHealth * 1000);
                 }
+                if (player.HasBuff(0)) buffed++;
                 player.Position = centre;
                 world.Step();
                 foreach (var e in world.TakeEvents())
                 {
-                    if (e.Type != SimEventType.Hit || e.Source != player.Id || e.Cause != 1) continue;
+                    // The skill's hits, its lightning's jumps, and burns (which carry no cause: nothing else here
+                    // hits for the player).
+                    if (e.Type != SimEventType.Hit || e.Source != player.Id || e.Cause != 1 && e.Cause != 0) continue;
                     pack += e.Amount;
                     if (e.Target == main.Id) single += e.Amount;
                 }
@@ -109,6 +169,8 @@ namespace CoreSandbox
                 }
             }
             if (skill.Kind == SkillKind.Heal) return (single / 10f / seconds, 0, mana / seconds);
+            // A buff's worth is the share of the time it is on.
+            if (skill.Kind == SkillKind.Buff) return (buffed * 100f / (seconds * World.TicksPerSecond), 0, mana / seconds);
             return (single / (float)seconds, pack / (float)seconds, mana / seconds);
         }
     }

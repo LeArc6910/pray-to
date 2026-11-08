@@ -1309,7 +1309,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Space(16);
-                GUILayout.Label(Fit($"{skill.Name}의 변형: {set.Name} ({SkillSupports.Describe(kind)})", width - 64), GUILayout.Width(width - 64));
+                GUILayout.Label(Fit($"{skill.Name}의 변형: {set.Name} ({SkillSupports.Describe(kind, skill)})", width - 64), GUILayout.Width(width - 64));
                 if (Ui.LayoutButton("빼기", GUILayout.Width(56))) Send(_client.SupportCommand(skill, null), Sound.Click);
                 GUILayout.EndHorizontal();
             }
@@ -1324,7 +1324,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 GUILayout.Space(16);
                 Icon(Sprites.Icon(gem));
-                if (Ui.LayoutButton(Ui.Wrap($"{gem.Name} 끼우기: {SkillSupports.Describe(SkillSupports.KindOf(gem).Value)}", GUI.skin.button, width - IconRoom), GUILayout.Width(width - IconRoom)))
+                if (Ui.LayoutButton(Ui.Wrap($"{gem.Name} 끼우기: {SkillSupports.Describe(SkillSupports.KindOf(gem).Value, skill)}", GUI.skin.button, width - IconRoom), GUILayout.Width(width - IconRoom)))
                     Send(_client.SupportCommand(skill, gem), Sound.Craft);
                 GUILayout.EndHorizontal();
             }
@@ -1346,7 +1346,7 @@ namespace Game.Client
             string tags = skill.Tags == SkillTag.None ? "" : $" · {StatText.TagNames(skill.Tags)}";
             string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, power, _client.Stats)}";
             if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, power + 1, _client.Stats)}";
-            if (_client.SupportOf(skill) is SupportKind kind) text += $"\n변형: {_client.Supports[skill].Name} ({SkillSupports.Describe(kind)})";
+            if (_client.SupportOf(skill) is SupportKind kind) text += $"\n변형: {_client.Supports[skill].Name} ({SkillSupports.Describe(kind, skill)})";
             return text;
         }
 

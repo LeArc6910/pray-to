@@ -20,6 +20,7 @@ namespace CoreSandbox
     // dotnet run -- --defense [levels] [seed]        bots hold a ward stone level after level (--turrets <n>, --players, --gear, --classes)
     // add --rank <1-5> for the bots' skill ranks, --level <n> for their level (and only the skills open by then)
     // dotnet run -- --skills [seconds]               every class skill alone against a pack of dummies, rank 1 and 5 (--gear)
+    // dotnet run -- --supports [seconds]             every skill with each support crystal that fits it, against it bare (--gear, --rank)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
     static class Program
@@ -121,6 +122,9 @@ namespace CoreSandbox
                     break;
                 case "--skills":
                     SkillSim.Run(data, LoadClassData(), Number(1, 60), gear);
+                    break;
+                case "--supports":
+                    SkillSim.RunSupports(data, LoadClassData(), Number(1, 60), gear, rankFlag >= 0 ? SkillBot.Rank : SkillRules.MaxRank);
                     break;
                 case "--economy":
                     EconomySim.Run(data, LoadTiles(data), LoadNpcs(data));

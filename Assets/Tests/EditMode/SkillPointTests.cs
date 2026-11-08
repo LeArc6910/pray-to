@@ -333,8 +333,75 @@ namespace Game.Core.Tests
             Assert.IsTrue(cold.SetSupport(mage.Id, fireball, Crystal("support_cold")));
             Assert.AreEqual(SkillTag.Magic | SkillTag.Fire | SkillTag.Cold, mage.ContextFor(fireball));
 
-            Assert.AreEqual(1.4f, SkillSupports.DamageFactor(SupportKind.Power));
+            Assert.AreEqual(1.4f, SkillSupports.DamageFactor(fireball, SupportKind.Power));
             Assert.AreEqual(Math.Round(fireball.CooldownTicks * 0.75f), SkillRules.CooldownTicks(fireball, 1) * SkillSupports.CooldownFactor(SupportKind.Haste), 1);
+        }
+
+        // The balance check of 2026-11-09 (CoreSandbox --supports): a split fireball is 40% more in all, not three
+        // fireballs; a volley that already has five keeps its arrows whole; lightning's jumps cost a share of the hit.
+        [Test]
+        public void SplitHitsShareWhatTheSkillDealt()
+        {
+            var fireball = Skill("fireball");
+            Assert.AreEqual(SkillSupports.MultiTotal, SkillSupports.Count(fireball, SupportKind.Multi) * SkillSupports.DamageFactor(fireball, SupportKind.Multi), 0.001f);
+            var volley = Skill("volley");
+            Assert.AreEqual(1f, SkillSupports.DamageFactor(volley, SupportKind.Multi));
+            Assert.AreEqual(7, SkillSupports.Count(volley, SupportKind.Multi));
+            var spirits = Skill("spirits");
+            Assert.AreEqual(SkillSupports.MultiTotal, SkillSupports.Count(spirits, SupportKind.Multi) * SkillSupports.DamageFactor(spirits, SupportKind.Multi) / spirits.Count, 0.001f);
+            Assert.Less(SkillSupports.DamageFactor(fireball, SupportKind.Lightning), 1f);
+            StringAssert.Contains("53% 덜", SkillSupports.Describe(SupportKind.Multi, fireball));
+        }
+
+        // Crystals that would only cost: power on a buff or on a dash that does not hit, haste on spirits, an element
+        // the skill has already.
+        [Test]
+        public void CrystalsAreOfferedOnlyWhereTheyHelp()
+        {
+            Assert.IsFalse(SkillSupports.Fits(Skill("war_cry"), SupportKind.Power));
+            Assert.IsTrue(SkillSupports.Fits(Skill("war_cry"), SupportKind.Haste));
+            Assert.IsFalse(SkillSupports.Fits(Skill("gale_step"), SupportKind.Power));
+            Assert.IsFalse(SkillSupports.Fits(Skill("spirits"), SupportKind.Haste));
+            Assert.IsTrue(SkillSupports.Fits(Skill("spirits"), SupportKind.Power));
+            Assert.IsFalse(SkillSupports.Fits(Skill("fireball"), SupportKind.Fire));
+            Assert.IsTrue(SkillSupports.Fits(Skill("fireball"), SupportKind.Lightning));
+            Assert.IsFalse(SkillSupports.Fits(Skill("life_spring"), SupportKind.Fire));
+            Assert.IsTrue(SkillSupports.Fits(Skill("life_spring"), SupportKind.Power));
+        }
+
+        [Test]
+        public void PowerHealsMore()
+        {
+            float Healed(string crystal)
+            {
+                var world = LootRoom();
+                var player = world.AddPlayer("a", null, Classes.Shipped.Find("summoner"));
+                var spring = Skill("life_spring");
+                World.TeachAll(player, 1);
+                player.ChangeKit(player.Classes, new[] { ClassRules.AllSkillsFor(player.Classes).IndexOf(spring) });
+                player.ClearCooldown(spring);
+                if (crystal != null)
+                {
+                    player.Inventory.AddMaterial(Crystal(crystal), 1);
+                    Assert.IsTrue(world.SetSupport(player.Id, spring, Crystal(crystal)));
+                }
+                player.Health = 1;
+                Assert.IsTrue(world.UseSkill(player.Id, player.Skills.ToList().IndexOf(spring), Vec2.Zero));
+                return player.Health - 1;
+            }
+            Assert.AreEqual(Healed(null) * 1.4f, Healed("support_power"), 0.5f);
+        }
+
+        // A save from before a crystal stopped fitting its skill gets the crystal back in the bag.
+        [Test]
+        public void ACrystalThatNoLongerFitsComesBack()
+        {
+            var player = LootRoom().AddPlayer("a", null, Warrior);
+            AtLevel(player, 4);
+            World.RestoreSkills(player, Classes.Shipped, new[] { ("whirlwind", 1), ("war_cry", 1) });
+            World.RestoreSupports(player, Classes.Shipped, Gear.Data, new[] { ("war_cry", "support_power") });
+            Assert.IsNull(player.SupportOf(Skill("war_cry")));
+            Assert.AreEqual(1, player.Inventory.CountOf(Crystal("support_power")));
         }
 
         [Test]
