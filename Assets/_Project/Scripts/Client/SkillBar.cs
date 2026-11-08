@@ -91,10 +91,12 @@ namespace Game.Client
                 if (buff > 0) Outline(area, color, 3);
 
                 var previous = GUI.color;
-                // Dim while it waits, and also when there is not mana enough for it.
+                // The skill's icon, dim while it waits, and also when there is not mana enough for it.
                 GUI.color = cooldown > 0 || client.IsDead || !client.HasManaFor(slot) ? new Color(1, 1, 1, 0.45f) : Color.white;
-                GUI.Label(NameArea(area), Ui.Wrap(skill.Name, _nameStyle, area.width - 6), _nameStyle);
+                Sprites.DrawInGui(IconArea(area), Sprites.Icon(skill));
                 GUI.color = previous;
+                int rank = client.RankOf(skill);
+                if (rank > 1) GUI.Label(new Rect(area.xMax - Inner - 22, area.y + Inner, 20, 18), RankMark(rank), _keyStyle);
                 if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.SkillKeyName(slot), _keyStyle);
 
                 Shade(area, cooldown, skill.Cooldown);
@@ -108,7 +110,7 @@ namespace Game.Client
                 if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
                 {
                     string tags = skill.Tags == SkillTag.None ? "" : " · " + StatText.TagNames(skill.Tags);
-                    DrawTooltip($"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill)}", area);
+                    DrawTooltip($"{skill.Name} {rank}단계 ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, rank)}", area);
                 }
             }
             DrawPotion(client, Area(count, count));
@@ -147,6 +149,17 @@ namespace Game.Client
                 DrawTooltip(potion != null ? $"{potion.Name} ×{count}\n{potion.Description}" : "물약이 없다. 몬스터와 보스가 떨어뜨린다", area);
             }
         }
+
+        // The icon fills the slot inside its frame, above the colour stripe.
+        static Rect IconArea(Rect slot)
+        {
+            float size = Mathf.Floor((slot.height - Inner * 2 - 8) / SkillArt.Size) * SkillArt.Size;
+            size = Mathf.Max(SkillArt.Size * 2, size);
+            return new Rect(slot.center.x - size / 2, slot.y + Inner + (slot.height - Inner * 2 - 6 - size) / 2, size, size);
+        }
+
+        // A rank past the first as Roman numerals, small in the top right corner.
+        public static string RankMark(int rank) => rank switch { 2 => "II", 3 => "III", 4 => "IV", 5 => "V", _ => "I" };
 
         // The key letter in the top left corner, inside the frame so its bevel does not hide the letter's top.
         static Rect KeyArea(Rect slot) => new Rect(slot.x + Inner + 2, slot.y + Inner, 24, 20);

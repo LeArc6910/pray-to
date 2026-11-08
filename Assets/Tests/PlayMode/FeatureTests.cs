@@ -187,6 +187,26 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Skill points (Docs/Classes.md, 스킬 포인트와 단계): a character of level 9 with some skills learned and
+        // raised, the bag's skills page with its icons, ranks and [배우기]/[올리기], then the skill keys with their
+        // icons and the lean HUD with its goal list, a dash and a heal used.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator SkillPointsDraw()
+        {
+            yield return Start();
+            World.GainExperience(Player, Leveling.TotalFor(9));
+            foreach (string id in new[] { "war_cry", "charge", "whirlwind", "flame_brand" }) World.LearnSkill(Player.Id, _root.ClassSheet.Skills.First(s => s.Id == id));
+            yield return new WaitForSecondsRealtime(1);
+            _root.ShowBag("스킬");
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("skills-page");
+            _root.BagOpen = false;
+            for (int slot = 0; slot < _root.SkillCount; slot++) _root.UseSkill(slot);
+            yield return new WaitForSecondsRealtime(1);
+            yield return Screens.Take("skill-keys");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Mana spent and drunk back, and the set and rift legendaries worn.
         [UnityTest, Category(Screens.Category)]
         public IEnumerator ManaAndSetsDraw()

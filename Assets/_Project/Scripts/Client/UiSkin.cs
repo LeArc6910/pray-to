@@ -28,6 +28,7 @@ namespace Game.Client
         static Texture2D _healthFill;
         static Texture2D _bossFill;
         static Texture2D _manaFill;
+        static Texture2D _experienceFill;
 
         // Call inside OnGUI: Unity's default skin can only be read there.
         public static GUISkin Get()
@@ -74,12 +75,13 @@ namespace Game.Client
             _healthFill = Texture(UiArt.BarFill(HealthColor));
             _bossFill = Texture(UiArt.BarFill(BossColor));
             _manaFill = Texture(UiArt.BarFill(ManaColor));
+            _experienceFill = Texture(UiArt.BarFill(Rgba.Hex("#E8C04A")));
             _skin = skin;
             return skin;
         }
 
         // A bar in a dark well: the fill stretched to the share it shows, and the text over it with a shadow.
-        public static void Bar(Rect area, float share, string text, bool boss = false, bool mana = false, int textSize = 13)
+        public static void Bar(Rect area, float share, string text, bool boss = false, bool mana = false, int textSize = 13, bool experience = false)
         {
             if (_barWell == null) return;
             _barText ??= new GUIStyle(GUI.skin.label)
@@ -92,7 +94,7 @@ namespace Game.Client
             GUI.Box(area, GUIContent.none, _barWell);
             float edge = UiArt.InsetBorder * UiArt.Scale;
             var inside = new Rect(area.x + edge, area.y + edge, area.width - edge * 2, area.height - edge * 2);
-            GUI.DrawTexture(new Rect(inside.x, inside.y, inside.width * Mathf.Clamp01(share), inside.height), boss ? _bossFill : mana ? _manaFill : _healthFill);
+            GUI.DrawTexture(new Rect(inside.x, inside.y, inside.width * Mathf.Clamp01(share), inside.height), boss ? _bossFill : mana ? _manaFill : experience ? _experienceFill : _healthFill);
             if (string.IsNullOrEmpty(text)) return;
             var previous = GUI.color;
             GUI.color = new Color(0, 0, 0, 0.8f * previous.a);

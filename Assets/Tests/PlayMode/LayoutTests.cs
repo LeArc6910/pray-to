@@ -6,8 +6,9 @@ using UnityEngine;
 namespace Game.Client.Tests
 {
     // The screen's fixed parts fit every screen the game means to run on (Docs/Design.md, 기술 원칙 7): on phones held
-    // either way, a small PC window and a tablet, with three or four skills, every skill button, quick slot, the
-    // minimap, the HUD box and the touch buttons lie inside the screen and clear of one another. The layout is worked
+    // either way, a small PC window and a tablet, with one to four skills, every skill button, quick slot, the
+    // minimap, the HUD box, the time and place lines and the touch buttons lie inside the screen and clear of one
+    // another. The layout is worked
     // out for a stand-in screen size (Ui.SizeOverride), so this runs anywhere, batch mode too.
     public class LayoutTests
     {
@@ -46,14 +47,15 @@ namespace Game.Client.Tests
             var problems = new List<string>();
             foreach (var (name, width, height, touch) in Sizes)
             {
-                foreach (int skills in new[] { 3, 4 })
+                foreach (int skills in new[] { 1, 2, 3, 4 })
                 {
                     Ui.SizeOverride = new Vector2(width, height);
                     Ui.HudHeight = 160;
                     Controls.ForceTouch(touch);
                     var keys = Enumerable.Range(0, skills + 1).Select(slot => ($"스킬 {slot}", SkillBar.Area(slot, skills))).ToList();
                     var quick = Enumerable.Range(0, Hotbar.Slots).Select(slot => ($"퀵슬롯 {slot}", Hotbar.Area(slot, skills))).ToList();
-                    var top = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea), ("HUD", Ui.HudArea) };
+                    // The time and place lines: up to four small lines (an online room's code the fourth).
+                    var top = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea), ("HUD", Ui.HudArea), ("시간·장소 줄", Ui.InfoArea(60)) };
                     if (touch) top.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
                     string where = $"{name} {width}×{height}, 스킬 {skills}";
 

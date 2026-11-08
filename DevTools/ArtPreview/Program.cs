@@ -45,12 +45,21 @@ namespace Game.Client
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
+            string classFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
+            var classes = ClassSheet.Parse(File.ReadAllText(Path.Combine(classFolder, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classFolder, ClassSheet.SkillsFile)));
+            if (!classes.Success)
+            {
+                foreach (string error in classes.Errors) Console.Error.WriteLine(error);
+                return 1;
+            }
+            Save(Skills(classes, out bool skillsFine), Path.Combine(output, "skills.png"), 6);
+            if (!skillsFine) return 1;
             var effects = Effects(out bool effectsFine);
             Save(effects, Path.Combine(output, "effects.png"), 3);
             if (!effectsFine) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
             if (!WriteMusic(Path.Combine(output, "music"))) return 1;
-            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png, effects.png, sounds/ and music/ to {output}");
+            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png, skills.png, effects.png, sounds/ and music/ to {output}");
             return 0;
         }
 
@@ -103,6 +112,43 @@ namespace Game.Client
         }
 
         static void Save(PixelImage image, string path, int scale) => Png.Save(Scaled(image, scale), path);
+
+        // ---- Skill icons ----
+
+        // Each class's skills in a row, in sheet order. Fails when a shipped skill has no picture of its own (it would
+        // show its kind's) or two skills look the same.
+        static PixelImage Skills(ClassData classes, out bool fine)
+        {
+            fine = true;
+            const int gap = 2;
+            int columns = classes.Classes.Max(c => c.Skills.Count);
+            var sheet = new PixelImage(gap + columns * (SkillArt.Size + gap), gap + classes.Classes.Count * (SkillArt.Size + gap));
+            sheet.Fill(0, 0, sheet.Width, sheet.Height, Backdrop);
+            var seen = new Dictionary<string, string>();
+            for (int row = 0; row < classes.Classes.Count; row++)
+            {
+                var skills = classes.Classes[row].Skills;
+                for (int column = 0; column < skills.Count; column++)
+                {
+                    var skill = skills[column];
+                    var icon = SkillArt.Icon(skill);
+                    if (!SkillArt.HasOwnPicture(skill))
+                    {
+                        Console.Error.WriteLine($"skill {skill.Id}: no picture of its own in SkillArt");
+                        fine = false;
+                    }
+                    string key = string.Concat(Enumerable.Range(0, icon.Width * icon.Height).Select(i => icon[i % icon.Width, i / icon.Width].R.ToString("X2")));
+                    if (seen.TryGetValue(key, out string same))
+                    {
+                        Console.Error.WriteLine($"skill {skill.Id}: looks the same as {same}");
+                        fine = false;
+                    }
+                    seen[key] = skill.Id;
+                    sheet.Draw(icon, gap + column * (SkillArt.Size + gap), gap + row * (SkillArt.Size + gap));
+                }
+            }
+            return sheet;
+        }
 
         // ---- Effects ----
 

@@ -74,33 +74,43 @@ namespace Game.Core
     public static class SkillText
     {
         // The skill's numbers in one line, e.g. "피해 150% · 둘레 1.8칸 · 재사용 4초".
-        public static string Numbers(SkillDefinition skill)
+        // At a rank (Docs/Classes.md, 스킬 포인트와 단계): its damage, cooldown and time as that rank has them.
+        public static string Numbers(SkillDefinition skill, int rank = 1)
         {
             var parts = new List<string>();
+            int damage = (int)Math.Round(skill.Damage * SkillRules.DamageScale(rank));
+            string duration = Number(SkillRules.DurationTicks(skill, rank) / (float)World.TicksPerSecond);
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
-                    parts.Add($"피해 {skill.Damage}%");
+                    parts.Add($"피해 {damage}%");
                     parts.Add($"둘레 {Number(skill.Radius)}칸");
                     break;
                 case SkillKind.Projectile:
-                    parts.Add(skill.Count > 1 ? $"피해 {skill.Damage}% × {skill.Count}발" : $"피해 {skill.Damage}%");
+                    parts.Add(skill.Count > 1 ? $"피해 {damage}% × {skill.Count}발" : $"피해 {damage}%");
                     parts.Add($"사거리 {Number(skill.Range)}칸");
                     if (skill.Radius > 0) parts.Add($"폭발 {Number(skill.Radius)}칸");
                     break;
                 case SkillKind.Buff:
                     var effects = skill.Modifiers.Select(StatText.Describe).ToList();
                     if (skill.Grants != SkillTag.None) effects.Add($"모든 공격에 {StatText.TagNames(skill.Grants)} 태그");
-                    parts.Add($"{Number(skill.Duration)}초 동안 {string.Join(", ", effects)}");
+                    parts.Add($"{duration}초 동안 {string.Join(", ", effects)}");
                     break;
                 case SkillKind.Summon:
-                    parts.Add($"{skill.Count}마리 · {Number(skill.Duration)}초");
-                    parts.Add($"한 번에 피해 {skill.Damage}%");
+                    parts.Add($"{skill.Count}마리 · {duration}초");
+                    parts.Add($"한 번에 피해 {damage}%");
                     parts.Add($"{Number(skill.Range)}칸 안의 적");
+                    break;
+                case SkillKind.Dash:
+                    parts.Add($"{Number(skill.Range)}칸 돌진");
+                    if (skill.Damage > 0) parts.Add($"지나는 적에게 피해 {damage}%");
+                    break;
+                case SkillKind.Heal:
+                    parts.Add($"최대 생명력의 {damage}% 회복");
                     break;
             }
             if (skill.Mana > 0) parts.Add($"마나 {skill.Mana}");
-            parts.Add($"재사용 {Number(skill.Cooldown)}초");
+            parts.Add($"재사용 {Number(SkillRules.CooldownTicks(skill, rank) / (float)World.TicksPerSecond)}초");
             return string.Join(" · ", parts);
         }
 

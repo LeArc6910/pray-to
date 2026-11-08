@@ -1339,6 +1339,20 @@ namespace Game.Client
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
                     break;
+                case SimEventType.SkillLearned:
+                    // A point spent: the skill's name and rank over the player, and a chime for their own.
+                    var learner = Find(e.Source);
+                    var learnt = _client.SkillNamed(e.Target);
+                    if (learner == null || learnt == null) break;
+                    _floating.Add(new Floating
+                    {
+                        Position = learner.Position + new Vector3(0, 0.6f, 0),
+                        Text = e.Amount > 1 ? $"{learnt.Name} {e.Amount}단계" : $"배움: {learnt.Name}",
+                        Color = Palette.Of(learnt.Tags | learnt.Grants),
+                    });
+                    AddFlash(learner.Position, learner.Diameter * 1.4f, Palette.Of(learnt.Tags | learnt.Grants), FlashKind.Sparkles);
+                    if (e.Source == _client.PlayerId) Sounds.Play(Sound.Buff);
+                    break;
                 case SimEventType.Dug:
                     // A puff of dust where the wall was struck, bigger when it gives way.
                     var struck = new Vector3(e.Position.X, e.Position.Y, 0);
@@ -1455,7 +1469,7 @@ namespace Game.Client
                     _floating.Add(new Floating { Position = climber.Position + new Vector3(0, 0.6f, 0), Text = $"Lv {e.Amount}", Color = LevelColor });
                     if (e.Source != _client.PlayerId) break;
                     Sounds.Play(Sound.LevelUp);
-                    ShowBanner($"레벨 {e.Amount}!");
+                    ShowBanner($"레벨 {e.Amount}! 스킬·특성 포인트 +1");
                     break;
                 case SimEventType.Recall:
                     var traveller = Find(e.Source);
@@ -1528,12 +1542,13 @@ namespace Game.Client
         // The skill's name over whoever used it, a ring for a nova and a pulse for a buff.
         void ShowSkill(SimEvent e)
         {
-            var skill = _client.SkillOf(e.Source, e.Amount);
+            // The event names the skill (its Target); the slot stands in for an older host's.
+            var skill = _client.SkillNamed(e.Target) ?? _client.SkillOf(e.Source, e.Amount);
             var caster = Find(e.Source);
             if (skill == null || caster == null) return;
             var color = Palette.Of(skill.Tags | skill.Grants | GrantedTags(e.Source));
             _floating.Add(new Floating { Position = caster.Position + new Vector3(0, 0.4f, 0), Text = skill.Name, Color = color });
-            Hear(skill.Kind == SkillKind.Nova ? Sound.Nova : skill.Kind == SkillKind.Buff ? Sound.Buff : Sound.Zap, caster.Position);
+            Hear(skill.Kind == SkillKind.Nova ? Sound.Nova : skill.Kind == SkillKind.Buff ? Sound.Buff : skill.Kind == SkillKind.Heal ? Sound.Heal : Sound.Zap, caster.Position);
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
@@ -1545,6 +1560,18 @@ namespace Game.Client
                 case SkillKind.Summon:
                     caster.CastTime = CastSeconds;
                     AddFlash(caster.Position, caster.Diameter * (skill.Kind == SkillKind.Summon ? 2 : 1), color, skill.Kind == SkillKind.Summon ? FlashKind.Ring : FlashKind.Sparkles);
+                    break;
+                case SkillKind.Dash:
+                    // A puff where the dash began; the player is already where it ended (the host moved them).
+                    caster.CastTime = CastSeconds;
+                    var from = caster.Position - new Vector3(e.Direction.X, e.Direction.Y, 0) * skill.Range;
+                    AddFlash(from, 0.8f, Palette.Dust, FlashKind.Burst);
+                    if (skill.Damage > 0) AddFlash(caster.Position, (skill.Radius + World.PlayerRadius) * 2, color, FlashKind.Ring);
+                    if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.05f);
+                    break;
+                case SkillKind.Heal:
+                    caster.CastTime = CastSeconds;
+                    AddFlash(caster.Position, caster.Diameter * 1.8f, Palette.Heal, FlashKind.Sparkles);
                     break;
                 case SkillKind.Projectile:
                     caster.Combo = 0;

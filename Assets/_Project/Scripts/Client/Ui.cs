@@ -40,6 +40,11 @@ namespace Game.Client
 
         public static float HudHeight { get; set; } = 160;
 
+        // Where the goal list under the status box ends (the box's own bottom when there is none), and where the time
+        // and place lines under the minimap column end, as last drawn.
+        public static float LeftColumnBottom { get; set; } = 170;
+        public static float InfoBottom { get; set; }
+
         public const float MinimapSize = 120;
         public const float TouchButtonHeight = 40;
         const float ColumnGap = 10;
@@ -53,6 +58,11 @@ namespace Game.Client
             var minimap = MinimapArea;
             return new Rect(minimap.x + index * (width + ColumnGap), minimap.yMax + ColumnGap, width, TouchButtonHeight);
         }
+
+        // The time and place lines under the minimap column (GameRoot.DrawInfo), as tall as they need.
+        public const float InfoWidth = 200;
+
+        public static Rect InfoArea(float height) => new Rect(MinimapArea.xMax - InfoWidth, RightColumnBottom + 4, InfoWidth, height);
 
         public static float RightColumnBottom => MinimapArea.yMax + (Controls.UsingTouch ? ColumnGap + TouchButtonHeight : 0);
 

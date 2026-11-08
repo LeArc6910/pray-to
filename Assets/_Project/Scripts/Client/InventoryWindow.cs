@@ -31,7 +31,7 @@ namespace Game.Client
         const float WheelStep = 30;
 
         static GUIStyle _tooltipStyle;
-        static readonly string[] PageNames = { "장비", "재료·제작", "클래스", "특성", "상자", "상인" };
+        static readonly string[] PageNames = { "장비", "재료·제작", "스킬", "특성", "상자", "상인" };
         static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
         readonly WorldClient _client;
@@ -62,6 +62,15 @@ namespace Game.Client
         }
 
         public bool Open { get; set; }
+
+        // Opens the bag on the page with that tab name (장비, 재료·제작, 스킬, 특성), for the tests' pictures.
+        internal void Show(string page)
+        {
+            int index = Array.IndexOf(PageNames, page);
+            if (index < 0) throw new ArgumentException($"no bag page '{page}'");
+            _page = (Page)index;
+            Open = true;
+        }
 
         public void Draw()
         {
@@ -728,6 +737,8 @@ namespace Game.Client
         // The skill slot being filled from the unused skills, or -1.
         int _swapSlot = -1;
 
+        // The skills page (Docs/Classes.md, 스킬 포인트와 단계): the points to spend, the four slots and their order,
+        // every skill of the chosen classes with [배우기] or [올리기], and changing classes beside a workbench.
         void DrawClasses()
         {
             if (_pickedForKit != _client.KitVersion)
@@ -735,47 +746,79 @@ namespace Game.Client
                 _pickedClasses = null;
                 _pickedForKit = _client.KitVersion;
             }
-            GUILayout.Label(Fit($"지금 클래스: {(_client.Classes.Count == 0 ? "없음" : string.Join(" + ", _client.Classes.Select(c => c.Name)))}", _textWidth));
+            int points = _client.SkillPoints;
+            GUILayout.Label(Fit($"스킬 포인트 {points} · Lv {_client.Level} (레벨이 오를 때마다 1)", _textWidth));
             GUILayout.Space(4);
-            GUILayout.Label(Fit("스킬 칸(어디서나 바꾼다). [바꾸기]를 누르고 아래에서 그 칸에 넣을 스킬을 고른다", _textWidth));
+            GUILayout.Label(Fit("스킬 칸(어디서나 바꾼다). [바꾸기]를 누르고 아래에서 그 칸에 넣을 배운 스킬을 고른다", _textWidth));
             var order = _client.SkillOrder.ToList();
             var all = ClassRules.AllSkillsFor(_client.Classes);
+            var learned = all.Where(s => _client.RankOf(s) > 0).ToList();
             if (_swapSlot >= _client.Skills.Count) _swapSlot = -1;
+            float slotName = _textWidth - IconRoom - 40 - 40 - 56 - 16;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
             {
+                var skill = _client.Skills[slot];
                 GUILayout.BeginHorizontal();
+                Icon(Sprites.Icon(skill));
                 string key = Controls.UsingTouch ? $"{slot + 1}" : Controls.SkillKeyName(slot);
-                GUILayout.Label(Fit($"{key}  {_client.Skills[slot].Name}", _nameWidth), GUILayout.Width(_nameWidth));
+                GUILayout.Label(new GUIContent(Fit($"{key}  {skill.Name} {_client.RankOf(skill)}단계", slotName), SkillTooltip(skill)), GUILayout.Width(slotName));
                 GUI.enabled = slot > 0;
                 if (Ui.LayoutButton("▲", GUILayout.Width(40))) Swap(order, slot, slot - 1);
                 GUI.enabled = slot < _client.Skills.Count - 1;
                 if (Ui.LayoutButton("▼", GUILayout.Width(40))) Swap(order, slot, slot + 1);
-                GUI.enabled = all.Count > _client.Skills.Count;
+                GUI.enabled = learned.Count > _client.Skills.Count;
                 if (Ui.LayoutButton(_swapSlot == slot ? "그만" : "바꾸기", GUILayout.Width(56))) _swapSlot = _swapSlot == slot ? -1 : slot;
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
             }
-            // The class skills not in a slot; with a slot picked, each can go in it.
-            var unused = all.Where(s => !_client.Skills.Contains(s)).ToList();
-            if (unused.Count > 0)
+            // The learned skills not in a slot; with a slot picked, each can go in it.
+            var unused = learned.Where(s => !_client.Skills.Contains(s)).ToList();
+            if (unused.Count > 0 && _swapSlot >= 0)
             {
-                GUILayout.Label(Fit($"칸에 없는 스킬: {string.Join(", ", unused.Select(s => s.Name))}", _textWidth));
-                if (_swapSlot >= 0)
+                foreach (var skill in unused)
                 {
-                    foreach (var skill in unused)
-                    {
-                        if (!Ui.LayoutButton(Ui.Wrap($"{_swapSlot + 1}번 칸에: {skill.Name} — {skill.Description}", GUI.skin.button, _textWidth))) continue;
-                        order[_swapSlot] = all.IndexOf(skill);
-                        _swapSlot = -1;
-                        Send(_client.ClassCommand(_client.Classes, order), Sound.Click);
-                    }
+                    if (!Ui.LayoutButton(Ui.Wrap($"{_swapSlot + 1}번 칸에: {skill.Name}", GUI.skin.button, _textWidth))) continue;
+                    order[_swapSlot] = all.IndexOf(skill);
+                    _swapSlot = -1;
+                    Send(_client.ClassCommand(_client.Classes, order), Sound.Click);
+                }
+            }
+
+            // Every skill of each class, in the order they open up.
+            float rowName = _textWidth - IconRoom - 64 - 8;
+            foreach (var owner in _client.Classes)
+            {
+                GUILayout.Space(8);
+                GUILayout.Label(Fit($"{owner.Name} 스킬", _textWidth));
+                foreach (var skill in owner.Skills)
+                {
+                    int rank = _client.RankOf(skill);
+                    bool open = _client.Level >= skill.Level;
+                    GUILayout.BeginHorizontal();
+                    var previous = GUI.color;
+                    if (rank == 0) GUI.color = new Color(1, 1, 1, open ? 0.8f : 0.4f);
+                    Icon(Sprites.Icon(skill));
+                    string state = rank > 0 ? $"{rank}/{SkillRules.MaxRank}단계" : open ? "배우지 않음" : $"Lv {skill.Level}부터";
+                    GUILayout.Label(new GUIContent(Fit($"{skill.Name} · {state}", rowName), SkillTooltip(skill)), GUILayout.Width(rowName));
+                    GUI.color = previous;
+                    bool can = _client.CanRaise(skill);
+                    GUI.enabled = can;
+                    string label = rank >= SkillRules.MaxRank ? "최고" : rank > 0 ? "올리기" : "배우기";
+                    if (Ui.LayoutButton(label, GUILayout.Width(64))) Send(_client.LearnSkillCommand(skill), Sound.Buff);
+                    GUI.enabled = true;
+                    GUILayout.EndHorizontal();
+                    // What it does at its rank now, or at the first for one not learned; and what the next adds.
+                    var dim = GUI.color;
+                    GUI.color = new Color(0.8f, 0.8f, 0.8f, rank > 0 ? 1 : 0.7f);
+                    GUILayout.Label(Ui.Wrap(SkillText.Numbers(skill, Math.Max(1, rank)), GUI.skin.label, _textWidth));
+                    GUI.color = dim;
                 }
             }
 
             GUILayout.Space(8);
             bool near = _client.Map != null && _client.Map.Near(_client.Position, TileType.Workbench, World.StationReach);
             GUILayout.Label(Fit(near
-                ? $"클래스 바꾸기(최대 {ClassRules.DefaultMaxClasses}개, 고른 순서대로 칸을 채운다. 새 스킬은 재사용 대기부터 시작한다)"
+                ? $"클래스 바꾸기(최대 {ClassRules.DefaultMaxClasses}개, 고른 순서대로 칸을 채운다. 배운 스킬은 클래스를 바꿔도 남는다)"
                 : "클래스는 작업대 곁에서 바꿀 수 있다", _textWidth));
             _pickedClasses ??= _client.Classes.Select(c => c.Id).ToList();
             GUI.enabled = near;
@@ -805,6 +848,16 @@ namespace Game.Client
                 (list[a], list[b]) = (list[b], list[a]);
                 Send(_client.ClassCommand(_client.Classes, list), Sound.Click);
             }
+        }
+
+        // A skill's description and numbers at its rank, and what the next rank would make them.
+        string SkillTooltip(SkillDefinition skill)
+        {
+            int rank = _client.RankOf(skill);
+            string tags = skill.Tags == SkillTag.None ? "" : $" · {StatText.TagNames(skill.Tags)}";
+            string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, Math.Max(1, rank))}";
+            if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, rank + 1)}";
+            return text;
         }
 
         const float QuickWidth = 50;

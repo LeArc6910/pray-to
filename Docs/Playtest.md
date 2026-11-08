@@ -42,11 +42,12 @@ node DevTools/WebPlaytest/sweep.js --only menu,npc,touch
 | `clock <날> <시>`, `weather clear\|rain\|storm\|fog` | 시계를 옮긴다 |
 | `give <재료> <개수>`, `potion <소모품> <개수>`, `drink <소모품>`, `mana <양>` | 가방과 마나 |
 | `spawn <몬스터> <dx> <dy> [생명력]` | 곁에 몬스터를 둔다 |
-| `attack on\|off [x y]`, `skill <칸>`, `touch on\|off`, `bag on\|off` | 조작 |
+| `attack on\|off [x y]`, `skill <칸>`, `touch on\|off`, `bag on\|off\|<탭 이름>` | 조작. `bag 스킬`처럼 탭 이름을 주면 그 탭으로 가방을 연다 |
+| `learn <스킬>`, `teach [단계]` | 포인트로 스킬 하나 배우기(단추와 같은 규칙), 클래스의 모든 스킬을 그 단계로 가르치기(포인트 없이) |
 | `report` | 상태 한 줄(JSON) |
 | `solo <이름> keep` | 저장본을 지우지 않고 이어서 시작한다 |
 | `probe on`, `buttons` | 마지막 프레임에 그린 단추마다 글자, 줄(앞에 쓴 이름), 화면 위치(점), 눌리는지, 목록에서 보이는지(JSON). 스킬 칸·물약·퀵슬롯도 `skill N`, `potion`, `quick N`으로 |
-| `texts` | HUD 줄, 왼쪽 아래 줄(획득·알림), 가운데 배너, 떠 있는 글, 메뉴의 알림 줄(JSON) |
+| `texts` | HUD 줄(경험치 막대 글자, 상태 상자의 줄, 미니맵 아래 글자, 목표 목록 "목표 1/44: 돌 10개 모으기 (0/10) 보상: …"), 왼쪽 아래 줄(획득·알림), 가운데 배너, 떠 있는 글, 메뉴의 알림 줄(JSON) |
 | `goto spawn\|<dx> <dy>\|boss <id>\|biome <이름>\|tile <칸>\|near <칸>` | 옮긴다. `near`는 그 칸 곁에 서서 바라본다 |
 | `build <칸> <dx> <dy> [방향]`, `fill <dx> <dy> <재료> <개수>`, `look <dx> <dy>` | 칸을 짓고, 기계·상자에 넣고, 칸·기계·상자·작물을 읽는다 |
 | `drop item <베이스> [등급] [소켓]\|rune\|potion <id>\|material <id>`, `inventory` | 발밑에 떨어뜨리고, 가방을 읽는다 |

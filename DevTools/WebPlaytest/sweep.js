@@ -180,10 +180,11 @@ async function basics(browser) {
   await game.wait(1500);
   let t = await game.texts();
   const hud = (t.hud || []).join(' | ');
-  check(/^1일째 06:\d\d/.test(t.hud[0] || ''), `HUD 첫 줄이 1일째 아침 (${(t.hud[0] || '').slice(0, 40)})`);
-  check(has(hud, 'Lv 1 (0%)'), 'HUD에 Lv 1 (0%)');
-  check(/목표 1\/\d+: 돌 10개 모으기/.test(hud), `HUD에 첫 목표 (${(hud.match(/목표[^|]*/) || [''])[0]})`);
-  check(has(hud, '(보상:'), '목표 옆에 보상');
+  check((t.hud || []).some(l => /^1일째 06:\d\d 아침/.test(l)), `미니맵 아래에 1일째 아침 (${(t.hud || []).find(l => /일째/.test(l)) || ''})`);
+  check(has(hud, 'Lv 1 (0%)'), '경험치 막대에 Lv 1 (0%)');
+  check(/목표 1\/\d+: 돌 10개 모으기 \(0\/10\)/.test(hud), `목표 목록에 첫 목표와 진행도 (${(hud.match(/목표[^|]*/) || [''])[0]})`);
+  check(has(hud, '보상:'), '목표 아래에 보상');
+  check(!/WASD|스틱|보스 아레나:/.test(hud), '조작법·아레나 방향 줄이 HUD에 없다');
   await game.shot('first', '새 캐릭터 첫 화면');
 
   let inv = await game.inventory();
@@ -437,9 +438,10 @@ async function combat(browser) {
   }
   await game.send('equip copper_sword');
 
-  // Four skills pressed at once all go.
-  // The four cost 10 + 15 + 5 + 15 = 45 mana: with exactly that much, all four leave almost none.
-  await game.send('heal; spawn slime 2 0 5000; spawn slime -2 0 5000; mana 45');
+  // Four skills pressed at once all go. A new character knows only each class's first skill: all are taught first.
+  // The four (whirlwind, war cry, fireball, flame brand) cost 10 + 15 + 5 + 15 = 45 mana: with exactly that much,
+  // all four leave almost none.
+  await game.send('teach; heal; spawn slime 2 0 5000; spawn slime -2 0 5000; mana 45');
   for (const key of ['q', 'e', 'r', 'f']) await game.page.keyboard.down(key);
   await game.wait(150);
   for (const key of ['q', 'e', 'r', 'f']) await game.page.keyboard.up(key);
@@ -468,8 +470,6 @@ async function bosses(browser) {
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   let s = await game.state();
   check(/cave_warden/.test(s.bosses) && /crystal_queen/.test(s.bosses) && /lava_titan/.test(s.bosses) && /void_lord/.test(s.bosses), `보스 넷이 월드에 있다 (${s.bosses})`);
-  const hud = (await game.texts()).hud.join(' ');
-  check(/보스 아레나: \S+쪽 \d+칸/.test(hud), `HUD가 보스 아레나 쪽을 가리킨다 (${(hud.match(/보스 아레나[^|]*/) || [''])[0]})`);
 
   // Leaving the arena puts the boss back as it was.
   await game.send('goto boss cave_warden');
@@ -706,7 +706,7 @@ async function life(browser) {
   await game.send('clock 1 21');
   await game.wait(1500);
   check(await game.press('잠자기'), '밤에 침대 곁에서 [잠자기]');
-  const slept = await game.until(t => /2일째 0[6-7]/.test((t.hud || [])[0] || ''), 8000, game.texts);
+  const slept = await game.until(t => (t.hud || []).some(l => /^2일째 0[6-7]/.test(l)), 8000, game.texts);
   check(!!slept, '혼자면 자고 나면 다음 날 아침');
   await game.send('goto 5 2; potion recall_scroll 1');
   await bagTab(game, '장비');
@@ -860,7 +860,7 @@ async function gear(browser) {
   await game.send('build Anvil 1 0; face 1 0; drop item iron_sword rare; give essence 60; give iron_bar 20; xp 3000');
   await game.wait(1500);
   const hud = (await game.texts()).hud.join(' ');
-  check(/특성 \d+/.test(hud), `레벨이 오르면 HUD에 "특성 N" (${(hud.match(/특성 \d+/) || [''])[0]})`);
+  check(/특성 포인트 \d+/.test(hud) && /스킬 포인트 \d+/.test(hud), `레벨이 오르면 HUD에 "스킬 포인트 N · 특성 포인트 N" (${(hud.match(/스킬 포인트[^|]*/) || [''])[0]})`);
   await bagTab(game, '장비');
   await game.press('다듬기', '철 검');
   await game.shot('anvil', '모루 곁 [다듬기]');
@@ -878,12 +878,23 @@ async function gear(browser) {
   await game.press('모두 되돌리기');
   check((await game.inventory()).passives === 0, '[모두 되돌리기]');
 
-  // Classes at a workbench.
+  // Skills learned with points (Docs/Classes.md, 스킬 포인트와 단계): [배우기] on a row, then [올리기].
   await closeBag(game);
   await game.send('build Workbench -1 0; face -1 0');
   await game.wait(500);
-  await bagTab(game, '클래스');
-  await game.shot('classes', '[클래스] 탭');
+  await bagTab(game, '스킬');
+  await game.shot('skills-page', '[스킬] 탭(포인트, 칸, 배우기)');
+  let before = await game.inventory();
+  check(before.skills === 'whirlwind,fireball' && before.skillPoints > 0, `새 캐릭터는 클래스마다 첫 스킬만 알고 포인트가 있다 (${before.skills}, 포인트 ${before.skillPoints})`);
+  check(await game.press('배우기', '전투 함성'), '[전투 함성]의 [배우기]를 누른다');
+  let after = await game.inventory();
+  check(/war_cry:1/.test(after.ranks) && after.skillPoints === before.skillPoints - 1, `포인트 하나로 전투 함성을 배운다 (${after.ranks}, 포인트 ${after.skillPoints})`);
+  check(/war_cry/.test(after.skills), `배운 스킬이 빈 칸에 들어간다 (${after.skills})`);
+  check(await game.press('올리기', '전투 함성'), '[올리기]를 누른다');
+  check(/war_cry:2/.test((await game.inventory()).ranks), `전투 함성이 2단계가 된다 (${(await game.inventory()).ranks})`);
+  const locked = await game.find('배우기', '칼날 폭풍');
+  check(locked.length === 1 && !locked[0].enabled, '레벨이 모자란 스킬(칼날 폭풍, Lv 18)의 [배우기]는 눌리지 않는다');
+  await game.shot('skills-learned', '전투 함성을 배워 올린 [스킬] 탭');
   const skills = (await game.inventory()).skills;
   await game.press('▼');
   check((await game.inventory()).skills !== skills, `▼로 스킬 칸 순서를 바꾼다 (${skills} → ${(await game.inventory()).skills})`);
@@ -917,7 +928,7 @@ async function defense(browser) {
   const started = await game.until(r => !!r.defense, 3000);
   check(!!started, `단추를 누르면 기지 방어가 시작된다 (${started && started.defense})`);
   const hud = (await game.texts()).hud.join(' ');
-  check(/기지 방어 1단계 · \d\/\d 물결/.test(hud), `HUD에 방어 단계·물결·수호석 (${(hud.match(/기지 방어[^|]*/) || [''])[0]})`);
+  check(/기지 방어 1단계: \d\/\d 물결/.test(hud), `목표 목록에 방어 단계·물결·수호석 (${(hud.match(/기지 방어[^|]*/) || [''])[0]})`);
   await game.wait(4000);
   await game.shot('defense-button', '단추로 시작한 기지 방어');
   await game.context.close();
@@ -933,7 +944,7 @@ async function defense(browser) {
   const opened = await rift.until(r => !!r.rift, 3000);
   check(!!opened, `단추를 누르면 균열이 열린다 (${opened && opened.rift})`);
   const line = (await rift.texts()).hud.join(' ');
-  check(/공허 균열 1단계/.test(line), `HUD에 균열 단계·물결·시간·접사 (${(line.match(/공허 균열[^|]*/) || [''])[0]})`);
+  check(/공허 균열 1단계: /.test(line), `목표 목록에 균열 단계·물결·시간·접사 (${(line.match(/공허 균열[^|]*/) || [''])[0]})`);
   await rift.wait(3000);
   await rift.shot('rift-button', '단추로 연 균열');
   await rift.context.close();
@@ -1037,7 +1048,7 @@ async function layout(browser) {
     const inside = (await game.buttons()).filter(b => /^(skill|potion|quick)/.test(b.label));
     const out = inside.filter(b => b.rect[0] < 0 || b.rect[1] < 0 || b.rect[0] + b.rect[2] > b.screen.width + 0.5 || b.rect[1] + b.rect[3] > b.screen.height + 0.5);
     check(out.length === 0, `스킬 칸·물약·퀵슬롯이 화면 안에 (${out.map(b => b.label).join(', ') || '모두'})`);
-    for (const tab of ['장비', '재료·제작', '클래스', '특성']) {
+    for (const tab of ['장비', '재료·제작', '스킬', '특성']) {
       await bagTab(game, tab);
       await game.wait(300);
       const shown = (await game.buttons()).filter(b => b.shown);
@@ -1130,8 +1141,8 @@ async function touch(browser) {
     check((await game.look(0, -1)).machine.enabled === false, '탭으로 기계가 꺼진다');
     await game.shot('switch', '기계 끄기 단추');
 
-    // Skills by the buttons.
-    await game.send('heal');
+    // Skills by the buttons (every skill taught, so there is a second one).
+    await game.send('teach; heal');
     const full = await game.state();
     await game.press('skill 1');
     await game.wait(500);

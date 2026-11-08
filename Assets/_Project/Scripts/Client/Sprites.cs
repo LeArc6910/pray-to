@@ -61,6 +61,8 @@ namespace Game.Client
 
         public static Sprite Icon(MaterialDefinition material) => Known(material) ?? MakeIcon(material);
 
+        public static Sprite Icon(SkillDefinition skill) => skill == null ? null : Known(skill) ?? MakeIcon(skill);
+
         // Kept apart from Icon, whose fast path would otherwise allocate the closures these need.
         static Sprite MakeIcon(ItemBase item) => Remember(item, Centered("gear/" + item.Id, () => ItemArt.Gear(item)));
 
@@ -71,6 +73,8 @@ namespace Game.Client
 
         static Sprite MakeIcon(MaterialDefinition material) =>
             Remember(material, Centered("material/" + material.Id, () => ItemArt.Material(material)));
+
+        static Sprite MakeIcon(SkillDefinition skill) => Remember(skill, Centered("skill/" + skill.Id, () => SkillArt.Icon(skill)));
 
         static Sprite Known(object definition) => Icons.TryGetValue(definition, out var sprite) && sprite != null ? sprite : null;
 

@@ -227,6 +227,28 @@ namespace Game.Core
             return passed;
         }
 
+        // How far along the goal is, for the screen's goal list: "3/10" for its first condition that counts toward
+        // more than one, or null (a thing to place, a crop to plant).
+        public static string Progress(Goal goal, GuideFacts facts)
+        {
+            foreach (var condition in goal.Conditions)
+            {
+                int have = condition.Kind switch
+                {
+                    "have" => facts.CountOf(condition.Id),
+                    "reach" => (int)facts.DistanceFromSpawn,
+                    "level" => facts.Level,
+                    "passive" => facts.Passives,
+                    "life" => Enum.TryParse<LifeSkill>(condition.Id, true, out var skill) ? facts.LifeLevel(skill) : -1,
+                    "rift" => facts.RiftTier,
+                    "friend" => facts.Hearts,
+                    _ => -1,
+                };
+                if (have >= 0 && condition.Count > 1) return $"{Math.Min(have, condition.Count)}/{condition.Count}";
+            }
+            return null;
+        }
+
         public static bool IsMet(GoalCondition condition, GuideFacts facts) => condition.Kind switch
         {
             "have" => facts.CountOf(condition.Id) >= condition.Count,

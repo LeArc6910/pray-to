@@ -31,11 +31,10 @@ namespace Game.Client
         // Its frame is 4 points thick at top and bottom, which leaves a 14-point well for a 12-point line of text.
         const float HealthBarHeight = 22;
         const float ManaBarHeight = 16;
+        const float ExperienceBarHeight = 12;
         const float GuideCheckSeconds = 0.5f;
         // A goal's hint shows this long after the goal comes up; then only the goal stays.
         const float GoalHintSeconds = 30;
-        // The how-to-play lines show this long after the game starts, and for a new character until its first goal.
-        const float ControlsSeconds = 60;
         // The host saves its world this often, and when the session ends. Characters save whenever the bag changes.
         const float WorldSaveSeconds = 30;
 
@@ -114,8 +113,6 @@ namespace Game.Client
         // Clears IMGUI's keyboard focus at the next OnGUI, so a name field left focused in the menu does not keep
         // taking keys once the game starts.
         bool _dropFocus;
-        // Until when the HUD shows the how-to-play lines (ControlsSeconds).
-        float _controlsUntil;
 
         void Awake()
         {
@@ -401,9 +398,9 @@ namespace Game.Client
             Prefs.Set(SkillOrderKey, string.Join(",", _chosenClasses) + "|" + string.Join(",", _client.SkillOrder));
         }
 
-        // "skillorder2": since 2026-11-03 the order picks from every class skill, not just the first four, so the
-        // orders kept before mean other skills and are let go.
-        string SkillOrderKey => "skillorder2." + CharacterName;
+        // "skillorder3": since 2026-11-08 each class has six skills (Docs/Classes.md, 스킬 포인트와 단계), so the
+        // indexes kept before mean other skills and are let go.
+        string SkillOrderKey => "skillorder3." + CharacterName;
 
         // The skill order kept for this character, if it is for the classes picked now.
         IReadOnlyList<int> KeptSkillOrder()
@@ -425,7 +422,9 @@ namespace Game.Client
             _guideClock += deltaTime;
             if (_guideClock < GuideCheckSeconds) return;
             _guideClock = 0;
-            var passed = _guideProgress.Update(GuideFacts.Of(_client));
+            var facts = GuideFacts.Of(_client);
+            var passed = _guideProgress.Update(facts);
+            _goalProgress = _guideProgress.Current != null ? GuideProgress.Progress(_guideProgress.Current, facts) : null;
             if (passed.Count == 0) return;
             foreach (var goal in passed)
             {
@@ -440,6 +439,9 @@ namespace Game.Client
             if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
             Sounds.Play(Sound.Craft);
         }
+
+        // How far along the current goal is ("3/10"), as of the last check, or null.
+        string _goalProgress;
 
         // The goals passed, by id; before 2026-11-03 how many (GuideKey).
         string PassedKey => "guidepassed." + CharacterName;
@@ -457,7 +459,6 @@ namespace Game.Client
 
         void StartGuide()
         {
-            _controlsUntil = Time.time + ControlsSeconds;
             _biomeHere = _biomeAnnounced = Biome.Cave;
             _biomeTime = 0;
             if (_guide == null || _guide.Goals.Count == 0)
@@ -583,6 +584,7 @@ namespace Game.Client
         internal Player HostPlayer => _client == null ? null : _host?.World.FindPlayer(_client.PlayerId);
         internal MonsterData MonsterSheet => _monsters;
         internal LootData LootSheet => _loot;
+        internal ClassData ClassSheet => _classes;
         internal bool HoldAttack { get; set; }
         internal Vec2 HeldAim { get; set; }
         // Facing HeldAim without attacking, as a mouse held to one side does (Playtest.cs, "face").
@@ -605,6 +607,8 @@ namespace Game.Client
             get => _inventory.Open;
             set => _inventory.Open = value;
         }
+
+        internal void ShowBag(string page) => _inventory.Show(page);
 
         internal string Status => _status;
 
@@ -1153,12 +1157,11 @@ namespace Game.Client
             if (_chosenClasses.Count == 0) GUILayout.Label(Ui.Wrap("고르지 않으면 기본 공격만 쓴다.", GUI.skin.label, _menuColumn));
         }
 
-        // The status box: a health bar, then lines that grow the box to fit, so a narrow window wraps them (between
-        // words) instead of cutting them off. Compact while the bag is open, so the bag can sit just under it: only the
-        // health bar, and the line saying so when the player is down. The how-to-play lines show only for a while
-        // (ControlsSeconds), and never on a short screen (a phone held sideways), so the HUD does not cover a big part
-        // of the screen (a fifth of an 800×600 window once they go; 2026-11-02 check). Lines sit close together, and a
-        // key stays on one line with what it does (Keyed).
+        // The status box in the top left corner (Core Keeper and Terraria keep theirs as lean): health, mana and the
+        // level's experience as bars, and only the lines that matter now under them: down, asleep, going home, a meal
+        // running, points to spend. The time, weather and place go under the minimap (DrawInfo) and the goals and
+        // missions in a list under this box (DrawTracker); how to play is on the start menu. While the bag is open
+        // only the bars show, so the bag can sit just under them. Lines that do not fit wrap between words.
         void DrawHud(bool compact)
         {
             var lines = new List<string>();
@@ -1167,81 +1170,27 @@ namespace Game.Client
             {
                 lines.Add(_status);
             }
-            else if (compact)
-            {
-                if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
-            }
             else
             {
                 if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
-                string mode = _mode == Mode.Host ? (_roomCode != null ? $"온라인 방 코드 {_roomCode}" : $"호스트 중 (포트 {NetLink.DefaultPort})")
-                    : _mode == Mode.Join ? "참가 중" : "혼자 하기";
-                string players = _mode == Mode.Solo ? "" : $" · 접속 {_client.Names.Count}명";
-                long clock = _client.Clock;
-                int today = Calendar.Day(clock);
-                string rain = (World.WeatherOf(today) != Weather.Clear ? " · " + World.WeatherName(World.WeatherOf(today)) : "")
-                    + (World.EventOf(today) != DayEvent.None ? " · " + World.EventName(World.EventOf(today)) : "");
-                // Names of more than one word ("흙 동굴", "혼자 하기", "Lv 3 (40%)") stay on one line (Whole).
-                lines.Add($"{Keyed(Calendar.Text(clock), Calendar.PhaseName(Calendar.Phase(clock)))}{rain} · {Whole($"Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%)")}{(_client.PassivePoints > 0 ? $" · {Whole($"특성 {_client.PassivePoints}")}" : "")} · {Whole(BiomeMap.Name(_client.Biomes.At(_client.Position)))} · {Whole(mode)}{players}");
-                if (World.EventOf(today) != DayEvent.None) lines.Add(World.EventText(World.EventOf(today)));
-                if (_client.Rift.Open)
+                if (!compact)
                 {
-                    var rift = _client.Rift;
-                    string wave = rift.Wave > World.RiftWaves ? "수호자" : $"{rift.Wave}/{World.RiftWaves} 물결";
-                    lines.Add($"공허 균열 {rift.Tier}단계 · {wave} · 남은 적 {rift.MonstersLeft} · {rift.SecondsLeft / 60}:{rift.SecondsLeft % 60:00} · {World.AffixNames(rift.Affixes)}");
+                    if (_client.Sleeping)
+                    {
+                        int everyone = Math.Max(1, _client.Names.Count);
+                        lines.Add(everyone > 1 ? $"자는 중… 모두 누우면 아침이 된다 ({_client.Sleepers}/{everyone}명)" : "자는 중…");
+                    }
+                    if ((_client.SelfStatus & StatusBits.Recalling) != 0) lines.Add("귀환 중… 맞으면 끊긴다");
+                    if (_client.Food != null)
+                    {
+                        int left = Mathf.CeilToInt(_client.FoodLeft);
+                        lines.Add($"{Whole(_client.Food.Name)} {left / 60}:{left % 60:00}");
+                    }
+                    var points = new List<string>();
+                    if (_client.SkillPoints > 0) points.Add(Whole($"스킬 포인트 {_client.SkillPoints}"));
+                    if (_client.PassivePoints > 0) points.Add(Whole($"특성 포인트 {_client.PassivePoints}"));
+                    if (points.Count > 0) lines.Add($"{string.Join(" · ", points)} (가방에서)");
                 }
-                if (_client.Defense.Active)
-                {
-                    var defense = _client.Defense;
-                    lines.Add($"기지 방어 {defense.Level}단계 · {defense.Wave}/{World.DefenseWaves} 물결 · 남은 적 {defense.MonstersLeft} · 수호석 {defense.StonePercent}%");
-                }
-                if (_client.Sleeping)
-                {
-                    int everyone = Math.Max(1, _client.Names.Count);
-                    lines.Add(everyone > 1 ? $"자는 중… 모두 누우면 아침이 된다 ({_client.Sleepers}/{everyone}명)" : "자는 중…");
-                }
-                // The nearest arena the player is not standing in: the first boss's from the spawn, the deep one's
-                // once there.
-                int next = -1;
-                for (int i = 0; i < _client.Arenas.Count; i++)
-                {
-                    float distance = Vec2.Distance(_client.Arenas[i], _client.Position);
-                    if (distance <= _client.ArenaRadius) continue;
-                    if (next < 0 || distance < Vec2.Distance(_client.Arenas[next], _client.Position)) next = i;
-                }
-                if (next >= 0)
-                {
-                    var toArena = _client.Arenas[next] - _client.Position;
-                    string arena = next == 0 ? "보스 아레나" : next == 1 ? "깊은 아레나" : next == 2 ? "용암 아레나" : "심연 아레나";
-                    lines.Add($"{arena}: {Compass(toArena)}쪽 {Mathf.RoundToInt(toArena.Length)}칸");
-                }
-                if ((_client.SelfStatus & StatusBits.Recalling) != 0) lines.Add("귀환 중… 맞으면 끊긴다");
-                if (_client.Food != null)
-                {
-                    int left = Mathf.CeilToInt(_client.FoodLeft);
-                    lines.Add($"음식: {_client.Food.Name} {left / 60}:{left % 60:00}");
-                }
-                var goal = Settings.Guide ? _guideProgress?.Current : null;
-                if (goal != null)
-                {
-                    string reward = goal.Rewards.Count > 0 ? $" (보상: {goal.RewardText})" : "";
-                    lines.Add($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}: {goal.Text}{reward}");
-                    if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) lines.Add(goal.Hint);
-                }
-            }
-            bool showControls = !compact && !Ui.Short && playing
-                && (Time.time < _controlsUntil || Settings.Guide && _guideProgress != null && _guideProgress.Done == 0);
-            if (showControls && Controls.UsingTouch)
-            {
-                lines.Add($"{Keyed("왼쪽 스틱", "이동")} · {Keyed("오른쪽 스틱", "공격")}(끄는 쪽으로, 곡괭이를 들면 벽을 캔다)");
-                lines.Add($"{Keyed("오른쪽 아래", "스킬·물약")} · 미니맵을 누르면 지도");
-            }
-            else if (showControls)
-            {
-                lines.Add($"{Keyed("WASD", "이동")} · {Keyed("마우스", "조준")} · {Keyed("클릭/스페이스", "공격")}(곡괭이를 들면 벽을 캔다)");
-                string skills = string.Join(" ", Enumerable.Range(0, 4).Select(Controls.SkillKeyName));
-                string quickKeys = $"{KeyBindings.Name(KeyAction.Hotbar1)}~{KeyBindings.Name(KeyAction.Hotbar6)}";
-                lines.Add($"{Keyed(skills, "스킬")} · {Keyed(Controls.PotionKeyName, "물약")} · {Keyed(quickKeys, "퀵슬롯")} · {Keyed(KeyBindings.Name(KeyAction.Bag), "가방")} · {Keyed(KeyBindings.Name(KeyAction.Map), "지도")} · {Keyed("Esc", "메뉴")}");
             }
 
             var box = GUI.skin.box;
@@ -1254,11 +1203,10 @@ namespace Game.Client
             var label = _hudLine;
             float width = Ui.HudArea.width - box.padding.horizontal - label.margin.horizontal;
             for (int i = 0; i < lines.Count; i++) lines[i] = Ui.Wrap(lines[i], label, width);
-            if (Event.current.type == EventType.Repaint) _hudLines = lines.ToArray();
             float gap = Mathf.Max(label.margin.top, label.margin.bottom);
             float height = box.padding.vertical + (lines.Count > 0 ? label.margin.top + label.margin.bottom + gap * (lines.Count - 1) : 0);
             foreach (string line in lines) height += label.CalcHeight(new GUIContent(line), width);
-            if (playing) height += HealthBarHeight + ManaBarHeight + 2;
+            if (playing) height += HealthBarHeight + ManaBarHeight + ExperienceBarHeight + 4;
             Ui.HudHeight = Mathf.Ceil(height) + 2;
 
             GUILayout.BeginArea(Ui.HudArea, box);
@@ -1271,18 +1219,147 @@ namespace Game.Client
                 var manaBar = GUILayoutUtility.GetRect(width, ManaBarHeight, GUILayout.ExpandWidth(true));
                 float manaShare = _client.MaxMana > 0 ? _client.Mana / _client.MaxMana : 0;
                 UiSkin.Bar(manaBar, manaShare, $"마나 {Mathf.FloorToInt(_client.Mana)} / {Mathf.CeilToInt(_client.MaxMana)}", mana: true, textSize: 12);
+                GUILayout.Space(2);
+                var experienceBar = GUILayoutUtility.GetRect(width, ExperienceBarHeight, GUILayout.ExpandWidth(true));
+                float progress = Leveling.Progress(_client.Experience);
+                UiSkin.Bar(experienceBar, progress, $"Lv {_client.Level} · {(int)(progress * 100)}%", textSize: 12, experience: true);
             }
             foreach (string line in lines) GUILayout.Label(line, label);
             GUILayout.EndArea();
 
+            var shown = new List<string>(lines);
+            if (playing) shown.Insert(0, $"Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%)");
+            if (playing && !compact) shown.AddRange(DrawInfo());
+            if (playing && !compact) shown.AddRange(DrawTracker());
+            else Ui.LeftColumnBottom = Ui.HudArea.yMax;
+            if (Event.current.type == EventType.Repaint) _hudLines = shown.ToArray();
+
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);
         }
 
-        GUIStyle _hudLine;
+        GUIStyle _smallLine;
 
-        // A key and what it does, joined by a space no line breaks at (Ui.Wrap breaks only at plain spaces), so the
-        // line never ends between them ("· M / 지도"); the spaces inside the key ("Q E R F") hold too.
-        static string Keyed(string key, string meaning) => (key + " " + meaning).Replace(' ', '\u00A0');
+        // Small lines that read over any ground: a dark shadow under each.
+        GUIStyle SmallLine()
+        {
+            _smallLine ??= new GUIStyle(GUI.skin.label) { padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0), wordWrap = false };
+            Ui.Text(_smallLine, 12);
+            return _smallLine;
+        }
+
+        void ShadowLabel(Rect area, string text, GUIStyle style, Color color)
+        {
+            var previous = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.85f);
+            GUI.Label(new Rect(area.x + 1, area.y + 1, area.width, area.height), text, style);
+            GUI.color = color;
+            GUI.Label(area, text, style);
+            GUI.color = previous;
+        }
+
+        // The day and hour, the weather and the day's event, where the player is, and an online room's code: small
+        // lines under the minimap (and the touch buttons), right-aligned to it.
+        List<string> DrawInfo()
+        {
+            long clock = _client.Clock;
+            int today = Calendar.Day(clock);
+            var lines = new List<string> { $"{Calendar.Text(clock)} {Calendar.PhaseName(Calendar.Phase(clock))}" };
+            var weather = World.WeatherOf(today);
+            string place = BiomeMap.Name(_client.Biomes.At(_client.Position));
+            lines.Add(weather != Weather.Clear ? $"{World.WeatherName(weather)} · {place}" : place);
+            if (World.EventOf(today) != DayEvent.None) lines.Add(World.EventName(World.EventOf(today)));
+            if (_mode != Mode.Solo)
+            {
+                string room = _mode == Mode.Host ? (_roomCode != null ? $"방 코드 {_roomCode}" : $"호스트 · 포트 {NetLink.DefaultPort}") : "참가 중";
+                lines.Add($"{room} · {_client.Names.Count}명");
+            }
+
+            var style = SmallLine();
+            style.alignment = TextAnchor.UpperRight;
+            var area = Ui.InfoArea(0);
+            float y = area.y;
+            foreach (string line in lines)
+            {
+                float height = style.CalcHeight(new GUIContent(line), area.width);
+                ShadowLabel(new Rect(area.x, y, area.width, height), line, style, new Color(0.92f, 0.9f, 0.85f));
+                y += height;
+            }
+            Ui.InfoBottom = y;
+            return lines;
+        }
+
+        // What the player is doing: a rift or a defense under way, and the guide's next goal with how far along it is
+        // and what it gives. Under the status box, in a box of its own, and gone while the bag is open.
+        List<string> DrawTracker()
+        {
+            var entries = new List<(string Title, string Text)>();
+            if (_client.Rift.Open)
+            {
+                var rift = _client.Rift;
+                string wave = rift.Wave > World.RiftWaves ? "수호자" : $"{rift.Wave}/{World.RiftWaves} 물결";
+                entries.Add(($"공허 균열 {rift.Tier}단계", $"{wave} · 남은 적 {rift.MonstersLeft} · {rift.SecondsLeft / 60}:{rift.SecondsLeft % 60:00}"
+                    + (Ui.Short ? "" : $"\n{World.AffixNames(rift.Affixes)}")));
+            }
+            if (_client.Defense.Active)
+            {
+                var defense = _client.Defense;
+                entries.Add(($"기지 방어 {defense.Level}단계", $"{defense.Wave}/{World.DefenseWaves} 물결 · 남은 적 {defense.MonstersLeft} · 수호석 {defense.StonePercent}%"));
+            }
+            var goal = Settings.Guide ? _guideProgress?.Current : null;
+            if (goal != null)
+            {
+                string progress = _goalProgress != null ? $" ({_goalProgress})" : "";
+                string text = goal.Text + progress;
+                if (goal.Rewards.Count > 0 && !Ui.Short) text += $"\n보상: {goal.RewardText}";
+                if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) text += $"\n{goal.Hint}";
+                entries.Add(($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}", text));
+            }
+            var shown = new List<string>();
+            if (entries.Count == 0)
+            {
+                Ui.LeftColumnBottom = Ui.HudArea.yMax;
+                return shown;
+            }
+
+            var box = GUI.skin.box;
+            var style = SmallLine();
+            style.alignment = TextAnchor.UpperLeft;
+            style.wordWrap = true;
+            _trackerTitle ??= new GUIStyle(GUI.skin.label) { padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0) };
+            Ui.Text(_trackerTitle, 12, bold: true);
+            var area = Ui.HudArea;
+            float width = area.width - box.padding.horizontal;
+            var laid = new List<(string Title, string Text, float TitleHeight, float TextHeight)>();
+            float height = box.padding.vertical;
+            foreach (var (title, raw) in entries)
+            {
+                string text = string.Join("\n", raw.Split('\n').Select(part => Ui.Wrap(part, style, width)));
+                float titleHeight = _trackerTitle.CalcHeight(new GUIContent(title), width);
+                float textHeight = style.CalcHeight(new GUIContent(text), width);
+                laid.Add((title, text, titleHeight, textHeight));
+                height += titleHeight + textHeight + 4;
+                shown.Add($"{title}: {raw.Replace('\n', ' ')}");
+            }
+            var frame = new Rect(area.x, area.yMax + 6, area.width, Mathf.Ceil(height));
+            var previous = GUI.color;
+            GUI.color = new Color(1, 1, 1, 0.85f);
+            GUI.Box(frame, GUIContent.none);
+            GUI.color = previous;
+            float y = frame.y + box.padding.top;
+            foreach (var (title, text, titleHeight, textHeight) in laid)
+            {
+                ShadowLabel(new Rect(frame.x + box.padding.left, y, width, titleHeight), title, _trackerTitle, new Color(1f, 0.85f, 0.4f));
+                y += titleHeight;
+                ShadowLabel(new Rect(frame.x + box.padding.left, y, width, textHeight), text, style, Color.white);
+                y += textHeight + 4;
+            }
+            Ui.LeftColumnBottom = frame.yMax;
+            return shown;
+        }
+
+        GUIStyle _trackerTitle;
+
+        GUIStyle _hudLine;
 
         // Spaces no line breaks at, so a name is never split over two lines of the HUD.
         static string Whole(string text) => text.Replace(' ', '\u00A0');
@@ -1296,7 +1373,7 @@ namespace Game.Client
             if (right - left < 240)
             {
                 left = 20;
-                top = Ui.HudArea.yMax + 10;
+                top = Ui.LeftColumnBottom + 10;
             }
             float width = Mathf.Min(600, right - left);
             float x = left + (right - left - width) / 2;
@@ -1306,14 +1383,6 @@ namespace Game.Client
             GUI.Label(new Rect(x, top, width, titleHeight), title);
             float share = boss.MaxHealth > 0 ? Mathf.Clamp01(boss.Health / boss.MaxHealth) : 0;
             UiSkin.Bar(new Rect(x, top + titleHeight, width, 18), share, "", boss: true);
-        }
-
-        // Which of the eight directions an offset points, as a Korean word. Up on screen is north.
-        static string Compass(Vec2 offset)
-        {
-            string[] names = { "동", "북동", "북", "북서", "서", "남서", "남", "남동" };
-            int sector = Mathf.RoundToInt(offset.Angle / (Mathf.PI / 4));
-            return names[(sector % 8 + 8) % 8];
         }
     }
 }

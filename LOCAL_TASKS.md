@@ -699,6 +699,12 @@ DevTools/Local/setup.sh --commit
   - (자동) 다음 클라우드 커밋에 감시가 명령 한 줄을 돌리고, 결과 보고에 "화면 캡처: 사진 N장"이 적히고, `local-screens` 브랜치가 생기는지. 새 파일 `Assets/Tests/PlayMode/Screens.cs`, `LayoutTests.cs`의 `.meta`도 이때 커밋된다
   - 화면 캡처가 "결과 파일이 없습니다"나 시간 초과로 끝나면 Logs/screens.log에서 뽑은 줄이 보고에 붙는다(클라우드가 고친다)
 
+- [ ] 74단계: 스킬 포인트와 단계, 스킬 아이콘, 새 HUD(`Docs/Classes.md` 스킬 포인트와 단계, `Docs/WebDemo.md` 화면 배치)
+  - (로컬 세션) 명령 한 줄을 `-Commit`과 함께 돌린다. 새 파일 `Scripts/Client/Art/SkillArt.cs`, `Tests/EditMode/SkillPointTests.cs`의 `.meta`가 생긴다. PlayMode에 `SkillPointsDraw` 장면(사진 `skills-page`, `skill-keys`)이 늘고, `SessionTests.EverySkillCanBeUsed`가 새 규칙(처음엔 클래스마다 첫 스킬만)으로 바뀌었다
+  - 클래스마다 스킬이 6개가 되었고 레벨마다 스킬 포인트 1개로 배우고 5단계까지 올린다. 처음 캐릭터는 클래스마다 첫 스킬만 안다. 예전 캐릭터는 레벨만큼의 포인트를 새로 쓴다
+  - 클라우드 확인은 배포 뒤 `sweep.js`로 한다(가방 [스킬] 탭의 [배우기]·[올리기], 레벨이 모자란 스킬, 새 HUD의 목표 목록과 진행도, 미니맵 아래 시간·날씨 줄)
+  - (사람) 새 HUD가 덜 복잡하게 느껴지는지, 목표 목록이 보기 좋은지. 스킬 아이콘이 알아보기 쉬운지. 돌진(전사 5레벨)·질풍 걸음(궁수 5레벨)의 손맛, 생명의 샘(소환사) 소리
+
 ## 결과 보고
 
 명령 한 줄이 실행할 때마다 아래에 결과를 덧붙인다. 플레이 확인 결과는 사람이(또는 로컬 세션이) 날짜와 함께 적는다.

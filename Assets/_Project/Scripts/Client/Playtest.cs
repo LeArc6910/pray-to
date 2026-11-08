@@ -27,14 +27,15 @@ namespace Game.Client
     //   scene combo|machines|defense|rift|skylight|set
     //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step, 0 pauses>
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
-    //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>
+    //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
+    //   teach [rank]              every skill of the player's classes at the rank, no points needed
     //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health>
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
     //   goto spawn | <dx> <dy> | boss <id> | biome <name> | tile <type> | near <type>
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
-    //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off
+    //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off|<tab name>
     static class Playtest
     {
         const string Name = "playtest";
@@ -145,6 +146,12 @@ namespace Game.Client
                 case "xp":
                     world.GainExperience(player, Int(words[1]));
                     return null;
+                case "learn":
+                    var skill = root.ClassSheet.Skills.FirstOrDefault(k => k.Id == words[1]) ?? throw new ArgumentException($"no skill '{words[1]}'");
+                    return world.LearnSkill(player.Id, skill) ? $"ok learn {skill.Id} {player.RankOf(skill)}" : $"ok learn refused {skill.Id}";
+                case "teach":
+                    World.TeachAll(player, words.Length > 1 ? Int(words[1]) : 1);
+                    return null;
                 case "clear":
                     foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
                     return null;
@@ -205,7 +212,8 @@ namespace Game.Client
                 case "skill":
                     return root.UseSkill(Int(words[1])) ? null : $"error skill {words[1]}: not ready";
                 case "bag":
-                    root.BagOpen = words[1] == "on";
+                    if (words[1] == "on" || words[1] == "off") root.BagOpen = words[1] == "on";
+                    else root.ShowBag(words[1]);
                     return null;
                 default:
                     return $"error {words[0]}: no such command";
@@ -522,6 +530,8 @@ namespace Game.Client
                 .Field("runes", player.Inventory.Runes.Values.Sum())
                 .Field("classes", string.Join(",", player.Classes.Select(c => c.Id)))
                 .Field("skills", string.Join(",", player.Skills.Select(s => s.Id)))
+                .Field("ranks", string.Join(",", player.SkillRanks.OrderBy(p => p.Key.Index).Select(p => $"{p.Key.Id}:{p.Value}")))
+                .Field("skillPoints", player.SkillPoints)
                 .Field("passives", player.Passives.Count)
                 .Field("friends", Counts(player.Friendships.Select(f => new KeyValuePair<string, int>(f.Key, f.Value.Points)), id => id))
                 .Field("life", string.Join(",", player.LifeExperience))

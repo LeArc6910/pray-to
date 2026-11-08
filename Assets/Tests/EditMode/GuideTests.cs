@@ -26,6 +26,16 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void TheGoalListShowsHowFarAlong()
+        {
+            var stone = Guide.Shipped.Goals[0];
+            var count = stone.Conditions[0].Count;
+            Assert.AreEqual($"3/{count}", GuideProgress.Progress(stone, Facts(new Dictionary<string, int> { [stone.Conditions[0].Id] = 3 })));
+            Assert.AreEqual($"{count}/{count}", GuideProgress.Progress(stone, Facts(new Dictionary<string, int> { [stone.Conditions[0].Id] = 99 })), "never past the count");
+            Assert.IsNull(GuideProgress.Progress(Guide.Shipped.Goals[1], Facts()), "a workbench to place has nothing to count");
+        }
+
+        [Test]
         public void GoalsPassInOrderAndSkipWhatIsAlreadyDone()
         {
             var progress = new GuideProgress(Guide.Shipped, 0);
