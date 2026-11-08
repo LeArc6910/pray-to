@@ -46,6 +46,51 @@ namespace Game.Core
             return true;
         }
 
+        // Puts a skill point into the skill: learns it at rank 1 or raises its rank (SkillRules.CanRaise). A newly
+        // learned skill goes into a free slot. False when it cannot.
+        public bool LearnSkill(int playerId, SkillDefinition skill)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || !SkillRules.CanRaise(player, skill)) return false;
+            bool learned = !player.Knows(skill);
+            player.SkillRanks[skill] = player.RankOf(skill) + 1;
+            if (learned && player.Skills.Count < ClassRules.SkillSlots)
+            {
+                var natural = ClassRules.AllSkillsFor(player.Classes);
+                var order = player.SkillOrder.Concat(new[] { natural.IndexOf(skill) }).ToList();
+                player.ChangeKit(player.Classes, order);
+                player.ClearCooldown(skill);
+            }
+            player.InventoryVersion++;
+            _events.Add(new SimEvent(SimEventType.SkillLearned, player.Id, target: skill.Index + 1, amount: player.RankOf(skill)));
+            return true;
+        }
+
+        // Puts back the ranks a character save held; unknown ids are dropped. A save from before skill points knows
+        // only its classes' first skills and has every point of its level to spend.
+        public static void RestoreSkills(Player player, ClassData classes, IEnumerable<(string Id, int Rank)> ranks)
+        {
+            player.SkillRanks.Clear();
+            foreach (var (id, rank) in ranks)
+            {
+                var skill = classes?.Skills.FirstOrDefault(s => s.Id == id);
+                if (skill != null && rank > 0) player.SkillRanks[skill] = Math.Min(rank, SkillRules.MaxRank);
+            }
+            player.LearnBasics(player.Classes);
+            player.ChangeKit(player.Classes, player.SkillOrder);
+            player.InventoryVersion++;
+        }
+
+        // Every skill of the player's classes at the rank given, for the balance tools (CoreSandbox), whose bots have
+        // no levels to earn points with.
+        internal static void TeachAll(Player player, int rank)
+        {
+            foreach (var skill in ClassRules.AllSkillsFor(player.Classes)) player.SkillRanks[skill] = Math.Clamp(rank, 1, SkillRules.MaxRank);
+            player.ChangeKit(player.Classes, null);
+            foreach (var skill in player.Skills) player.ClearCooldown(skill);
+            player.InventoryVersion++;
+        }
+
         // Uses the skill in the slot, toward aim or the way the player faces when aim is zero. False when the
         // player cannot: dead, no such slot, the skill is still cooling down, or there is not mana enough for it.
         public bool UseSkill(int playerId, int slot, Vec2 aim)
@@ -58,7 +103,8 @@ namespace Game.Core
 
             player.Mana -= skill.Mana;
             player.StartCooldown(slot);
-            _events.Add(new SimEvent(SimEventType.SkillUsed, player.Id, amount: slot, direction: player.Facing));
+            // The skill itself rides as the target (its index + 1), so others draw the right one.
+            _events.Add(new SimEvent(SimEventType.SkillUsed, player.Id, target: skill.Index + 1, amount: slot, direction: player.Facing));
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
@@ -74,8 +120,50 @@ namespace Game.Core
                 case SkillKind.Summon:
                     Summon(player, skill, slot);
                     break;
+                case SkillKind.Dash:
+                    Dash(player, skill, slot);
+                    break;
+                case SkillKind.Heal:
+                    float healed = Math.Min(player.Stats.MaxHealth - player.Health, player.Stats.MaxHealth * skill.Damage / 100f * SkillRules.DamageScale(player.RankOf(skill)));
+                    player.Health += Math.Max(0, healed);
+                    _events.Add(new SimEvent(SimEventType.Healed, player.Id, amount: (int)Math.Round(Math.Max(0, healed))));
+                    break;
             }
             return true;
+        }
+
+        const float DashStep = 0.25f;
+
+        // Rushes the player the skill's range the way they face, stopping at walls, and strikes once every enemy
+        // within its radius of the way it went. The client is told to put the player where the host has them.
+        void Dash(Player player, SkillDefinition skill, int slot)
+        {
+            var start = player.Position;
+            var hit = new HashSet<int>();
+            bool critical = false;
+            float damage = skill.Damage > 0 ? RollSkill(player, skill, out critical) : 0;
+            var tags = player.Stats.ContextFor(skill);
+            for (float gone = 0; gone < skill.Range; gone += DashStep)
+            {
+                var next = Collision.Move(Map, player.Position, PlayerRadius, player.Facing * Math.Min(DashStep, skill.Range - gone));
+                if (Vec2.Distance(next, player.Position) < 1e-4f) break;
+                player.Position = next;
+                if (damage <= 0) continue;
+                foreach (var enemy in _enemies.ToList())
+                {
+                    if (enemy.IsDead || hit.Contains(enemy.Id) || Vec2.Distance(enemy.Position, player.Position) > skill.Radius + enemy.Definition.Radius) continue;
+                    hit.Add(enemy.Id);
+                    HitEnemy(player, enemy, damage, critical, player.Position, tags, slot + 1);
+                }
+                foreach (var boss in _bosses)
+                {
+                    if (boss.IsDead || hit.Contains(boss.Id) || Vec2.Distance(boss.Position, player.Position) > skill.Radius + boss.Definition.Radius) continue;
+                    hit.Add(boss.Id);
+                    if (boss.State == BossState.Dormant) Wake(boss);
+                    HitBoss(player, boss, damage, critical, tags, slot + 1);
+                }
+            }
+            if (Vec2.Distance(start, player.Position) > 1e-4f) player.Corrections++;
         }
 
         // Damage before armor for the skill's tags and those buffs grant.
@@ -84,7 +172,8 @@ namespace Game.Core
             var stats = player.Stats;
             var context = stats.ContextFor(skill);
             critical = _random.Chance(stats.CritChanceFor(context) / 100f);
-            return stats.DamageFor(context) * skill.Damage / 100f * (critical ? stats.CritDamageFor(context) / 100f : 1f);
+            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.RankOf(skill))
+                * (critical ? stats.CritDamageFor(context) / 100f : 1f);
         }
 
         // One projectile where the player faces, or a volley fanned out around that.
@@ -125,7 +214,11 @@ namespace Game.Core
             for (int i = 0; i < skill.Count; i++)
             {
                 var position = player.Position + WaitOffset(i, skill.Count);
-                _minions.Add(new Minion(_nextId++, player.Id, slot, skill, i, position) { Facing = player.Facing });
+                _minions.Add(new Minion(_nextId++, player.Id, slot, skill, i, position)
+                {
+                    Facing = player.Facing,
+                    TicksLeft = SkillRules.DurationTicks(skill, player.RankOf(skill)),
+                });
             }
         }
 

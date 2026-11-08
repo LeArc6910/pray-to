@@ -13,9 +13,22 @@ namespace CoreSandbox
         readonly Dictionary<string, int> _dealt = new Dictionary<string, int>();
         readonly Dictionary<string, int> _uses = new Dictionary<string, int>();
 
+        // What the bots know (Docs/Classes.md, 스킬 포인트와 단계): every skill of their classes at Rank, or with a
+        // Level only those open by then (and the bots are that level). --rank and --level set them.
+        public static int Rank = 1;
+        public static int? Level;
+
         public SkillBot(Player player, LootData loot)
         {
             Player = player;
+            if (Level is int level) player.Experience = Leveling.TotalFor(level);
+            foreach (var skill in ClassRules.AllSkillsFor(player.Classes).Where(s => Level == null || s.Level <= Level))
+            {
+                player.SkillRanks[skill] = Math.Clamp(Rank, 1, SkillRules.MaxRank);
+            }
+            player.ChangeKit(player.Classes, null);
+            foreach (var skill in player.Skills) player.ClearCooldown(skill);
+            player.Health = player.Stats.MaxHealth;
             foreach (string id in new HostConfig().StarterConsumables)
             {
                 var consumable = loot.Consumables.FirstOrDefault(c => c.Id == id);

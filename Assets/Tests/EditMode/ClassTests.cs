@@ -30,6 +30,13 @@ namespace Game.Core.Tests
 
         static int Slot(Player player, string skillId) => player.Skills.ToList().FindIndex(s => s.Id == skillId);
 
+        // Every skill of the player's classes learned at rank 1, as a character that has spent its points would.
+        static Player Learned(Player player)
+        {
+            World.TeachAll(player, 1);
+            return player;
+        }
+
         static void AssertError(ClassData data, params string[] parts) =>
             Assert.IsTrue(
                 data.Errors.Any(error => parts.All(error.Contains)),
@@ -39,10 +46,17 @@ namespace Game.Core.Tests
         public void ShippedSheetsLoad()
         {
             Assert.IsTrue(Classes.Shipped.Success, string.Join("\n", Classes.Shipped.Errors));
-            CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "ground_slam" }, Warrior.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "meteor" }, FireMage.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { "volley", "eagle_eye", "power_shot" }, Archer.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { "spirits", "spirit_pact", "spirit_horde" }, Summoner.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "charge", "ground_slam", "iron_skin", "blade_storm" }, Warrior.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "fire_ring", "meteor", "flame_burst", "inferno" }, FireMage.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "volley", "eagle_eye", "gale_step", "power_shot", "explosive_arrow", "arrow_rain" }, Archer.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "spirits", "spirit_pact", "life_spring", "spirit_horde", "spirit_blast", "guardian" }, Summoner.Skills.Select(s => s.Id));
+            // Each class's skills open up at the same levels; the first is the free basic skill.
+            foreach (var owner in new[] { Warrior, FireMage, Archer, Summoner })
+            {
+                CollectionAssert.AreEqual(new[] { 1, 3, 5, 8, 12, 18 }, owner.Skills.Select(s => s.Level), owner.Id);
+                Assert.IsTrue(owner.Skills[0].IsBasic);
+                Assert.IsFalse(owner.Skills[1].IsBasic);
+            }
         }
 
         [Test]
@@ -72,13 +86,16 @@ namespace Game.Core.Tests
                 "flare,불꽃,busy,nova,fire,50,2,1,,,,,,\n" +
                 "extra,하나 더,busy,nova,fire,50,2,1,,,,,,\n" +
                 "fourth,넷째,busy,nova,fire,50,2,1,,,,,,\n" +
+                "fifth,다섯째,busy,nova,fire,50,2,1,,,,,,\n" +
+                "sixth,여섯째,busy,nova,fire,50,2,1,,,,,,\n" +
+                "seventh,일곱째,busy,nova,fire,50,2,1,,,,,,\n" +
                 "lost,길 잃은,nobody,nova,,50,2,1,,,,,,\n");
 
             AssertError(data, "classes.csv 3행", "범위로 적을 수 없습니다");
             AssertError(data, "skills.csv 2행", "projectile 스킬은 speed 칸을 채워야 합니다");
             AssertError(data, "skills.csv 3행", "modifiers나 grants");
-            AssertError(data, "skills.csv 7행", "'busy'의 스킬이 3개를 넘습니다");
-            AssertError(data, "skills.csv 8행", "클래스 'nobody'가 classes.csv에 없습니다");
+            AssertError(data, "skills.csv 10행", "'busy'의 스킬이 6개를 넘습니다");
+            AssertError(data, "skills.csv 11행", "클래스 'nobody'가 classes.csv에 없습니다");
             Assert.AreEqual(5, data.Errors.Count, string.Join("\n", data.Errors));
         }
 
@@ -97,9 +114,9 @@ namespace Game.Core.Tests
         {
             var world = Room();
 
-            var warriorFirst = world.AddPlayer("a", null, Warrior, FireMage);
-            var mageFirst = world.AddPlayer("b", null, FireMage, Warrior);
-            var classless = world.AddPlayer("c", null);
+            var warriorFirst = Learned(world.AddPlayer("a", null, Warrior, FireMage));
+            var mageFirst = Learned(world.AddPlayer("b", null, FireMage, Warrior));
+            var classless = Learned(world.AddPlayer("c", null));
 
             CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "fireball", "flame_brand" }, warriorFirst.Skills.Select(s => s.Id));
             CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "whirlwind", "war_cry" }, mageFirst.Skills.Select(s => s.Id));
@@ -139,7 +156,7 @@ namespace Game.Core.Tests
         public void WhirlwindHitsEveryoneAroundOnce()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"), Warrior);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("copper_sword"), Warrior));
             var near = new[] { new Vec2(1.2f, 0), new Vec2(-1.2f, 0), new Vec2(0, 1.5f) }
                 .Select(offset => world.SpawnEnemy(Slime, player.Position + offset))
                 .ToList();
@@ -162,7 +179,7 @@ namespace Game.Core.Tests
         public void SkillsCoolDownEachOnTheirOwn()
         {
             var world = Room();
-            var player = world.AddPlayer("a", null, Warrior);
+            var player = Learned(world.AddPlayer("a", null, Warrior));
             int whirlwind = Slot(player, "whirlwind");
             int warCry = Slot(player, "war_cry");
 
@@ -181,8 +198,8 @@ namespace Game.Core.Tests
         public void FireballFliesPastPlayersAndBurstsOnTheFirstEnemy()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("copper_staff"), FireMage);
-            var friend = world.AddPlayer("b", null);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("copper_staff"), FireMage));
+            var friend = Learned(world.AddPlayer("b", null));
             Assert.IsTrue(world.MovePlayer(friend.Id, friend.Position + new Vec2(2, 0), new Vec2(1, 0), 10));
             var aimedAt = player.Position + new Vec2(5, 0);
             var target = world.SpawnEnemy(Dummy, aimedAt);
@@ -209,7 +226,7 @@ namespace Game.Core.Tests
         public void FireballBurstsAtTheEndOfItsRangeOrOnAWall()
         {
             var world = Room(40);
-            var player = world.AddPlayer("a", null, FireMage);
+            var player = Learned(world.AddPlayer("a", null, FireMage));
             int fireball = Slot(player, "fireball");
 
             world.UseSkill(player.Id, fireball, new Vec2(1, 0));
@@ -228,7 +245,7 @@ namespace Game.Core.Tests
         public void WarCryLastsItsDuration()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"), Warrior);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("copper_sword"), Warrior));
             int slot = Slot(player, "war_cry");
 
             Assert.IsTrue(world.UseSkill(player.Id, slot, Vec2.Zero));
@@ -247,7 +264,7 @@ namespace Game.Core.Tests
         public void FallingEndsBuffs()
         {
             var world = Room(14, Monsters.Brute);
-            var player = world.AddPlayer("a", null, Warrior);
+            var player = Learned(world.AddPlayer("a", null, Warrior));
             int slot = Slot(player, "war_cry");
             world.UseSkill(player.Id, slot, Vec2.Zero);
             world.SpawnEnemy(Monsters.Brute.Monsters[0], player.Position + new Vec2(1, 0));
@@ -265,7 +282,7 @@ namespace Game.Core.Tests
         {
             var world = new World(Maps.Room(40), TileMap.Center(20, 16), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 });
             var boss = world.PlaceBoss(Bosses.Shipped.Bosses[0], TileMap.Center(20, 26), 8);
-            var player = world.AddPlayer("a", null, FireMage);
+            var player = Learned(world.AddPlayer("a", null, FireMage));
             Assert.AreEqual(BossState.Dormant, boss.State);
 
             world.UseSkill(player.Id, Slot(player, "fireball"), new Vec2(0, 1));
@@ -292,7 +309,7 @@ namespace Game.Core.Tests
         public void VolleyFansItsArrowsOutAroundTheAim()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("copper_bow"), Archer);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("copper_bow"), Archer));
             var ahead = world.SpawnEnemy(Dummy, player.Position + new Vec2(5, 0));
             // 24 degrees off the aim, where the outermost arrows go.
             var aside = world.SpawnEnemy(Dummy, player.Position + new Vec2(5 * 0.9135f, 5 * 0.4067f));
@@ -312,7 +329,7 @@ namespace Game.Core.Tests
         public void SpiritsGoAfterEnemiesNearTheirPlayerAndTheirHitsCountAsThePlayers()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"), Summoner);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("copper_sword"), Summoner));
             var near = world.SpawnEnemy(Dummy, player.Position + new Vec2(4, 0));
             var far = world.SpawnEnemy(Dummy, player.Position + new Vec2(-10, 0));
             int slot = Slot(player, "spirits");
@@ -337,7 +354,7 @@ namespace Game.Core.Tests
         public void SpiritsFollowTheirPlayerAndLeaveWhenTheirTimeIsUp()
         {
             var world = Room();
-            var player = world.AddPlayer("a", null, Summoner);
+            var player = Learned(world.AddPlayer("a", null, Summoner));
             int slot = Slot(player, "spirits");
             world.UseSkill(player.Id, slot, Vec2.Zero);
             var first = world.Minions.Select(m => m.Id).ToList();
@@ -365,7 +382,7 @@ namespace Game.Core.Tests
                 Classes.SkillsHeader.Replace("duration,", "duration,count,") + "call,부르기,caller,summon,summon,40,1,,5,6,10,3,,,\n");
             Assert.IsTrue(data.Success, string.Join("\n", data.Errors));
             var world = Room();
-            var player = world.AddPlayer("a", null, data.Find("caller"));
+            var player = Learned(world.AddPlayer("a", null, data.Find("caller")));
             world.UseSkill(player.Id, 0, Vec2.Zero);
             var first = world.Minions.Select(m => m.Id).ToList();
             Assert.AreEqual(3, first.Count);
@@ -383,7 +400,7 @@ namespace Game.Core.Tests
         {
             var world = new World(Maps.Room(40), TileMap.Center(20, 16), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 });
             var boss = world.PlaceBoss(Bosses.Shipped.Bosses[0], TileMap.Center(20, 20), 2);
-            var player = world.AddPlayer("a", null, Summoner);
+            var player = Learned(world.AddPlayer("a", null, Summoner));
             world.UseSkill(player.Id, Slot(player, "spirits"), Vec2.Zero);
 
             Run(world, World.TicksPerSecond * 2);
@@ -395,7 +412,7 @@ namespace Game.Core.Tests
         public void SpiritsLeaveWithTheirFallenPlayer()
         {
             var world = Room(14, Monsters.Brute);
-            var player = world.AddPlayer("a", null, Summoner);
+            var player = Learned(world.AddPlayer("a", null, Summoner));
             world.UseSkill(player.Id, Slot(player, "spirits"), Vec2.Zero);
             world.SpawnEnemy(Monsters.Brute.Monsters[0], player.Position + new Vec2(1, 0));
 
@@ -413,34 +430,35 @@ namespace Game.Core.Tests
             Assert.AreEqual(2f / 3, ClassRules.PassiveShare(3), 1e-6f);
 
             var world = Room();
-            var one = world.AddPlayer("a", null, Warrior);
-            var three = world.AddPlayer("b", null, Warrior, FireMage, Archer);
-            float bare = world.AddPlayer("c", null).Stats.MaxHealth;
+            var one = Learned(world.AddPlayer("a", null, Warrior));
+            var three = Learned(world.AddPlayer("b", null, Warrior, FireMage, Archer));
+            float bare = Learned(world.AddPlayer("c", null)).Stats.MaxHealth;
             Assert.AreEqual(bare * 1.2f, one.Stats.MaxHealth, 0.01f, "MaxHealth+20%");
             Assert.AreEqual(bare * 1.13f, three.Stats.MaxHealth, 0.01f, "two thirds of it, rounded: 13%");
             // One skill of each, then the first class's second, until a player picks.
             CollectionAssert.AreEqual(new[] { "whirlwind", "fireball", "volley", "war_cry" }, three.Skills.Select(s => s.Id));
-            Assert.AreEqual(9, ClassRules.AllSkillsFor(three.Classes).Count, "nine to pick the four from");
+            Assert.AreEqual(18, ClassRules.AllSkillsFor(three.Classes).Count, "eighteen to learn and pick the four from");
         }
 
         [Test]
         public void SkillsCanBeReorderedAnywhereAndKeepTheirCooldowns()
         {
             var world = Room();
-            var player = world.AddPlayer("a", null, Warrior, FireMage);
+            var player = Learned(world.AddPlayer("a", null, Warrior, FireMage));
             CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry", "fireball", "flame_brand" }, player.Skills.Select(s => s.Id));
             world.UseSkill(player.Id, Slot(player, "whirlwind"), Vec2.Zero);
             int cooling = player.CooldownTicks(0);
 
-            // Indexes into every skill the two have: whirlwind, war_cry, ground_slam, fireball, flame_brand, meteor.
-            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 3, 0, 4, 1 }));
+            // Indexes into every skill the two have: the warrior's six (whirlwind 0, war_cry 1, ...), then the fire
+            // mage's (fireball 6, flame_brand 7, fire_ring 8, meteor 9, ...).
+            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 6, 0, 7, 1 }));
             CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "flame_brand", "war_cry" }, player.Skills.Select(s => s.Id));
-            CollectionAssert.AreEqual(new[] { 3, 0, 4, 1 }, player.SkillOrder);
+            CollectionAssert.AreEqual(new[] { 6, 0, 7, 1 }, player.SkillOrder);
             Assert.AreEqual(cooling, player.CooldownTicks(1), "whirlwind's cooldown went with it");
             Assert.AreEqual(0, player.CooldownTicks(0));
 
             // A skill not in the slots can take one: meteor in place of war_cry.
-            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 3, 0, 4, 5 }));
+            Assert.IsTrue(world.ChangeClasses(player.Id, player.Classes, new[] { 6, 0, 7, 9 }));
             CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "flame_brand", "meteor" }, player.Skills.Select(s => s.Id));
             Assert.AreEqual(Slot(player, "meteor"), 3);
             Assert.Greater(player.CooldownTicks(3), 0, "a skill new to the slots starts cooling down");
@@ -453,7 +471,7 @@ namespace Game.Core.Tests
         public void OtherClassesOnlyBesideAWorkbenchAndTheirSkillsStartCoolingDown()
         {
             var world = Room();
-            var player = world.AddPlayer("a", null, Warrior);
+            var player = Learned(world.AddPlayer("a", null, Warrior));
             Assert.IsFalse(world.ChangeClasses(player.Id, new[] { FireMage }, null), "no workbench near");
             Assert.AreSame(Warrior, player.Classes.Single());
 
@@ -464,9 +482,10 @@ namespace Game.Core.Tests
             Assert.IsTrue(player.HasBuff(Slot(player, "war_cry")));
             Assert.IsTrue(world.ChangeClasses(player.Id, new[] { FireMage, Warrior }, null));
 
-            CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "whirlwind", "war_cry" }, player.Skills.Select(s => s.Id));
+            // Only learned skills take slots: of the fire mage's, the free fireball; the warrior's fill the rest.
+            CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "war_cry", "charge" }, player.Skills.Select(s => s.Id));
             Assert.AreEqual(Classes.Skill("fireball").CooldownTicks, player.CooldownTicks(0), "a new skill starts as if just used");
-            Assert.IsTrue(player.HasBuff(3), "war cry stayed, buff and all");
+            Assert.IsTrue(player.HasBuff(2), "war cry stayed, buff and all");
             CollectionAssert.AreEqual(new[] { FireMage, Warrior }, player.Classes);
         }
 }

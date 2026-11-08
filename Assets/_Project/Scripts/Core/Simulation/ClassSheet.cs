@@ -14,6 +14,10 @@ namespace Game.Core
         Buff,
         // Calls spirits that fight beside the player for a while (Minion).
         Summon,
+        // Rushes the player the way they face, striking what lies along the way (none when damage is 0).
+        Dash,
+        // Gives back that percent of the player's most health.
+        Heal,
     }
 
     public sealed class SkillDefinition
@@ -34,9 +38,11 @@ namespace Game.Core
             SkillTag grants,
             string description,
             int count = 1,
-            int mana = 0)
+            int mana = 0,
+            int level = 1)
         {
             Mana = mana;
+            Level = Math.Max(1, level);
             Id = id;
             Name = name;
             Class = owner;
@@ -55,6 +61,8 @@ namespace Game.Core
         }
 
         public string Id { get; }
+        // Its place in the sheet (ClassData.Skills), which the network uses to name it.
+        public int Index { get; internal set; }
         public string Name { get; }
         public ClassDefinition Class { get; }
         public SkillKind Kind { get; }
@@ -65,6 +73,10 @@ namespace Game.Core
         public float Cooldown { get; }
         // What using it costs (PlayerStats.MaxMana); 0 for nothing.
         public int Mana { get; }
+        // The character level it can be learned from (Docs/Classes.md, 스킬 포인트와 단계).
+        public int Level { get; }
+        // A class's first skill: known at rank 1 without a point while the class is chosen.
+        public bool IsBasic => Class != null && Class.Skills.Count > 0 && Class.Skills[0] == this;
         // A nova's reach, or how wide a projectile bursts (0: only what it hits).
         public float Radius { get; }
         // A projectile's tiles per second and how far it flies. For a summon, how fast its spirits move and how far
@@ -172,13 +184,45 @@ namespace Game.Core
     }
 
     // How chosen classes turn into a player's kit. See Docs/Classes.md.
+    // What a skill's rank does (Docs/Classes.md, 스킬 포인트와 단계): each rank past the first adds 15% to its damage
+    // (a spirit's every hit, a heal's amount), takes 5% off its cooldown and adds 10% to a buff's or spirits' time.
+    public static class SkillRules
+    {
+        public const int MaxRank = 5;
+        const float DamagePerRank = 0.15f;
+        const float CooldownPerRank = 0.05f;
+        const float DurationPerRank = 0.1f;
+
+        static int Above(int rank) => Math.Clamp(rank, 1, MaxRank) - 1;
+
+        public static float DamageScale(int rank) => 1 + DamagePerRank * Above(rank);
+
+        public static int CooldownTicks(SkillDefinition skill, int rank) => Math.Max(1, (int)Math.Round(skill.CooldownTicks * (1 - CooldownPerRank * Above(rank))));
+
+        public static int DurationTicks(SkillDefinition skill, int rank) => (int)Math.Round(skill.DurationTicks * (1 + DurationPerRank * Above(rank)));
+
+        // Whether a player could put a point in the skill now: one of their classes', their level high enough, a point
+        // to spend, and not yet at the top rank.
+        public static bool CanRaise(Player player, SkillDefinition skill) =>
+            CanRaise(skill, player.Classes, player.Level, player.SkillPoints, player.RankOf(skill));
+
+        public static bool CanRaise(SkillDefinition skill, IEnumerable<ClassDefinition> classes, int level, int points, int rank) =>
+            skill != null && classes.Contains(skill.Class) && level >= skill.Level && points > 0 && rank < MaxRank;
+
+        // The skill points a character of the level has, one a level past the first, less those spent (a class's
+        // first skill's first rank costs none).
+        public static int PointsLeft(int level, IEnumerable<KeyValuePair<SkillDefinition, int>> ranks) =>
+            Math.Max(0, level - 1 - ranks.Sum(pair => pair.Value - (pair.Key.IsBasic ? 1 : 0)));
+    }
+
     public static class ClassRules
     {
         // How many classes a player may mix unless the host says otherwise (HostConfig.MaxClasses).
         public const int DefaultMaxClasses = 3;
         public const int SkillSlots = 4;
-        // Each class brings up to this many skills; the player picks which SkillSlots of them go in the slots.
-        public const int MaxSkillsPerClass = 3;
+        // Each class brings up to this many skills; the player learns them with skill points and picks which
+        // SkillSlots of the learned ones go in the slots.
+        public const int MaxSkillsPerClass = 6;
         // Class passives are made for two classes; with more, each counts this share of two (2/3 for three), so
         // mixing more classes widens a build without making it stronger.
         public const int PassiveClasses = 2;
@@ -204,29 +248,43 @@ namespace Game.Core
         // slots are filled from.
         public static List<SkillDefinition> AllSkillsFor(IEnumerable<ClassDefinition> classes) => classes.SelectMany(c => c.Skills).ToList();
 
-        // The skills in the slots unless the player picks: each class's first skills, an equal share of the slots
-        // each (two each for two classes, as it always was; one each for three), class by class, then the next ones
-        // to fill what is left.
-        public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes)
+        // The skills in the slots unless the player picks: the known ones (all of them when known is null, as for
+        // another player's view), each class's first skills, an equal share of the slots each (two each for two
+        // classes; one each for three), class by class, then the next known ones to fill what is left.
+        public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes, Func<SkillDefinition, bool> known = null)
         {
             var list = classes.ToList();
             if (list.Count == 0) return new List<SkillDefinition>();
+            known ??= _ => true;
             int share = Math.Max(1, SkillSlots / list.Count);
-            var skills = list.SelectMany(c => c.Skills.Take(share)).Take(SkillSlots).ToList();
-            skills.AddRange(AllSkillsFor(list).Where(s => !skills.Contains(s)).Take(SkillSlots - skills.Count));
+            var skills = list.SelectMany(c => c.Skills.Where(known).Take(share)).Take(SkillSlots).ToList();
+            skills.AddRange(AllSkillsFor(list).Where(s => known(s) && !skills.Contains(s)).Take(SkillSlots - skills.Count));
             return skills;
         }
 
-        // The skills the player picked for the slots: order[i] is which of AllSkillsFor's goes in slot i. Anything but
-        // as many different ones as the slots hold leaves the defaults.
-        public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes, IReadOnlyList<int> order)
+        // The skills the player picked for the slots: order[i] is which of AllSkillsFor's goes in slot i. Only known
+        // skills may be slotted; anything but as many different known ones as the slots hold (or as are known)
+        // leaves the defaults.
+        public static List<SkillDefinition> SkillsFor(IEnumerable<ClassDefinition> classes, IReadOnlyList<int> order, Func<SkillDefinition, bool> known = null)
         {
             var all = AllSkillsFor(classes);
-            return IsOrder(order, all.Count) ? order.Select(i => all[i]).ToList() : SkillsFor(classes);
+            known ??= _ => true;
+            int knownCount = all.Count(known);
+            return IsOrder(order, all.Count) && order.Count == Math.Min(SkillSlots, knownCount) && order.All(i => known(all[i]))
+                ? order.Select(i => all[i]).ToList()
+                : SkillsFor(classes, known);
+        }
+
+        // Exactly the skills the order names (as the host has put them in the slots), or the defaults when it is no
+        // order: how a client reads the kit the host sends.
+        public static List<SkillDefinition> Slotted(IEnumerable<ClassDefinition> classes, IReadOnlyList<int> order)
+        {
+            var all = AllSkillsFor(classes);
+            return IsOrder(order, all.Count) && order.Count > 0 ? order.Select(i => all[i]).ToList() : SkillsFor(classes);
         }
 
         public static bool IsOrder(IReadOnlyList<int> order, int count) =>
-            order != null && order.Count == Math.Min(SkillSlots, count) && order.All(i => i >= 0 && i < count) && order.Distinct().Count() == order.Count;
+            order != null && order.Count <= SkillSlots && order.Count <= count && order.All(i => i >= 0 && i < count) && order.Distinct().Count() == order.Count;
     }
 
     // Reads Assets/_Project/Data/Classes: classes.csv for the classes and skills.csv for their skills.
@@ -370,8 +428,10 @@ namespace Game.Core
                         ParseTags(row["grants"]),
                         row["description"],
                         row["count"].Length == 0 ? 1 : Whole(row, "count"),
-                        Whole(row, "mana"));
+                        Whole(row, "mana"),
+                        row["level"].Length > 0 ? Whole(row, "level") : 1);
                     Validate(skill);
+                    skill.Index = skills.Count;
                     owner.Add(skill);
                     skills.Add(skill);
                 });
@@ -412,7 +472,15 @@ namespace Game.Core
                     Need(skill.Range > 0, "range");
                     Need(skill.Duration > 0, "duration");
                     break;
+                case SkillKind.Dash:
+                    Need(skill.Range > 0, "range");
+                    Need(skill.Damage == 0 || skill.Radius > 0, "damage가 있으면 radius");
+                    break;
+                case SkillKind.Heal:
+                    Need(skill.Damage > 0 && skill.Damage <= 100, "damage(1~100, 최대 생명력의 %)");
+                    break;
             }
+            if (skill.IsBasic && skill.Level > 1) throw new FormatException("클래스의 첫 스킬(기본 스킬)은 level이 1이어야 합니다.");
         }
 
         // Classes and skills always give the same amount, so their modifiers are written without a range.

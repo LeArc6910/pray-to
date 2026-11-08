@@ -183,6 +183,8 @@ namespace Game.Core
         StartDefense,
         // Brings the person near what they asked for today (World.CompleteRequest).
         Request,
+        // Learns a skill or raises it a rank with a skill point (World.LearnSkill): Index is the skill sheet index.
+        LearnSkill,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
@@ -219,17 +221,21 @@ namespace Game.Core
     // it changes.
     public sealed class InventoryMessage
     {
-        public InventoryMessage(Equipment equipment, Inventory bag, IReadOnlyList<int> passives = null)
+        public InventoryMessage(Equipment equipment, Inventory bag, IReadOnlyList<int> passives = null,
+            IReadOnlyList<(int Skill, int Rank)> skills = null)
         {
             Equipment = equipment;
             Bag = bag;
             Passives = passives ?? new List<int>();
+            Skills = skills ?? new List<(int, int)>();
         }
 
         public Equipment Equipment { get; }
         public Inventory Bag { get; }
         // The passive tree points taken, as indexes into the passive sheet (ClassData.Passives).
         public IReadOnlyList<int> Passives { get; }
+        // The skills learned and their ranks, as indexes into the skill sheet (ClassData.Skills).
+        public IReadOnlyList<(int Skill, int Rank)> Skills { get; }
 
         public byte[] Encode(LootData data) => Protocol.Build(MessageType.Inventory, w =>
         {
@@ -242,6 +248,12 @@ namespace Game.Core
             ItemCodec.WriteBag(w, Bag, data);
             w.Write((ushort)Passives.Count);
             foreach (int point in Passives) w.Write((ushort)point);
+            w.Write((ushort)Skills.Count);
+            foreach (var (skill, rank) in Skills)
+            {
+                w.Write((ushort)skill);
+                w.Write((byte)rank);
+            }
         });
 
         public static InventoryMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Inventory, r =>
@@ -257,7 +269,9 @@ namespace Game.Core
             var bag = ItemCodec.ReadBag(r, loot);
             var passives = new List<int>();
             for (int count = r.ReadUInt16(); count > 0; count--) passives.Add(r.ReadUInt16());
-            return new InventoryMessage(equipment, bag, passives);
+            var skills = new List<(int, int)>();
+            for (int count = r.ReadUInt16(); count > 0; count--) skills.Add((r.ReadUInt16(), r.ReadByte()));
+            return new InventoryMessage(equipment, bag, passives, skills);
         });
     }
 

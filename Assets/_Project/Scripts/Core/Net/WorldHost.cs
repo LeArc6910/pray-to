@@ -73,6 +73,8 @@ namespace Game.Core
             public byte[] SentFriendships;
             // The player's LifeVersion when their life skills were last sent.
             public int SentLife = -1;
+            // The player's KitVersion when their classes and slots were last sent (a learned skill fills a slot).
+            public int SentKit = -1;
         }
 
         // How many times over one craft command may make its recipe.
@@ -188,10 +190,18 @@ namespace Game.Core
             foreach (var pair in _connections)
             {
                 var player = pair.Value.Player;
+                if (player == null || pair.Value.SentKit == player.KitVersion) continue;
+                pair.Value.SentKit = player.KitVersion;
+                Send(pair.Key, new KitMessage(MessageType.Kit, ClassIndexes(player), player.SkillOrder).Encode(), reliable: true);
+            }
+            foreach (var pair in _connections)
+            {
+                var player = pair.Value.Player;
                 if (player == null || pair.Value.SentInventory == player.InventoryVersion) continue;
                 pair.Value.SentInventory = player.InventoryVersion;
                 var passives = player.Passives.Select(p => IndexOf(_classes?.Passives, p)).Where(i => i >= 0).ToList();
-                Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory, passives).Encode(_loot), reliable: true);
+                var skills = player.SkillRanks.Select(p => (p.Key.Index, p.Value)).OrderBy(p => p.Index).ToList();
+                Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory, passives, skills).Encode(_loot), reliable: true);
             }
             foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendChest(pair.Key, pair.Value);
             if (World.Tick % _config.MachineInterval == 0)
@@ -265,13 +275,14 @@ namespace Game.Core
             if (saved != null) World.RestorePassives(player, _classes, saved.Passives);
             if (saved != null) World.RestoreFriendships(player, saved.Friendships);
             if (saved != null) World.RestoreLifeExperience(player, saved.LifeExperience);
+            if (saved != null) World.RestoreSkills(player, _classes, saved.SkillRanks);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
             World.ChangeClasses(player.Id, player.Classes, join.SkillOrder);
             // Someone coming back to a world where they have a bed starts beside it (the client snaps there).
             World.SendHome(player);
-            _connections[connection] = new Connection { Player = player };
+            _connections[connection] = new Connection { Player = player, SentKit = player.KitVersion };
 
             var map = _generated.Map;
             Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, World.Spawn, ClassIndexes(player), player.SkillOrder).Encode(),
@@ -445,6 +456,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Request:
                     World.CompleteRequest(player.Id);
+                    break;
+                case InventoryCommand.LearnSkill:
+                    if (_classes != null && command.Index < _classes.Skills.Count) World.LearnSkill(player.Id, _classes.Skills[command.Index]);
                     break;
                 case InventoryCommand.Load:
                     if (command.Index < _loot.Materials.Count) World.LoadMachine(player.Id, _loot.Materials[command.Index], Math.Clamp(command.Item, 1, World.MaxTrade));
@@ -694,6 +708,7 @@ namespace Game.Core
             var classes = ClassRules.Choose(_classes, ids, _config.MaxClasses);
             bool changed = World.ChangeClasses(player.Id, classes, request.SkillOrder);
             Send(connection, new KitMessage(MessageType.Kit, ClassIndexes(player), player.SkillOrder).Encode(), reliable: true);
+            if (_connections.TryGetValue(connection, out var sent)) sent.SentKit = player.KitVersion;
             if (changed) BroadcastRoster();
         }
 

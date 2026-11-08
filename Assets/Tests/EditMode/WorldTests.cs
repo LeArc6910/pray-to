@@ -174,6 +174,7 @@ namespace Game.Core.Tests
         {
             var world = Room(size: 30);
             var player = world.AddPlayer("a", Gear.Wearing("copper_bow"), Classes.Shipped.Find("fire_mage"));
+            World.TeachAll(player, 1);
             world.UseSkill(player.Id, player.Skills.ToList().FindIndex(s => s.Id == "flame_brand"), Vec2.Zero);
 
             world.SetAttacking(player.Id, true);

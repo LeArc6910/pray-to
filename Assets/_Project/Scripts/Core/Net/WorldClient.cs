@@ -344,7 +344,7 @@ namespace Game.Core
         void ApplyKit(IReadOnlyList<int> classes, IReadOnlyList<int> order)
         {
             Classes = ClassesAt(classes);
-            Skills = ClassRules.SkillsFor(Classes, order);
+            Skills = ClassRules.Slotted(Classes, order);
             var natural = ClassRules.AllSkillsFor(Classes);
             SkillOrder = Skills.Select(s => natural.IndexOf(s)).ToList();
             _cooldowns = new int[Skills.Count];
@@ -357,7 +357,7 @@ namespace Game.Core
         // before the first one.
         public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
-            LifeExperience);
+            LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)));
 
         // Experience in each life skill (LifeSkill order): from the save, and as the host tells.
         public int[] LifeExperience => _life ??= ReadLife();
@@ -685,7 +685,7 @@ namespace Game.Core
         public byte[] SkillCommand(int slot, Vec2 aim)
         {
             if (Status != ClientStatus.Playing || IsDead || slot < 0 || slot >= Skills.Count || CooldownLeft(slot) > 0 || !HasManaFor(slot)) return null;
-            _cooldowns[slot] = Skills[slot].CooldownTicks + (int)Math.Ceiling(HostTick - _skillsTick);
+            _cooldowns[slot] = SkillRules.CooldownTicks(Skills[slot], RankOf(Skills[slot])) + (int)Math.Ceiling(HostTick - _skillsTick);
             Mana -= Skills[slot].Mana;
             return new SkillCommandMessage(slot, aim).Encode();
         }
@@ -696,11 +696,36 @@ namespace Game.Core
             : _rosterClasses.TryGetValue(playerId, out var classes) ? classes
             : (IReadOnlyList<ClassDefinition>)Array.Empty<ClassDefinition>();
 
+        // Another player's slots are learned from the skills they are seen using (SkillUsed names the skill); until
+        // then, their classes' first skills stand in.
         public SkillDefinition SkillOf(int playerId, int slot)
         {
+            if (playerId != PlayerId && _seenSlots.TryGetValue(playerId, out var seen) && seen.TryGetValue(slot, out var used)) return used;
             var skills = playerId == PlayerId ? Skills : ClassRules.SkillsFor(ClassesOf(playerId));
             return slot >= 0 && slot < skills.Count ? skills[slot] : null;
         }
+
+        readonly Dictionary<int, Dictionary<int, SkillDefinition>> _seenSlots = new Dictionary<int, Dictionary<int, SkillDefinition>>();
+
+        // The skill a SkillUsed or SkillLearned event names (its Target), or null.
+        public SkillDefinition SkillNamed(int target) =>
+            _classes != null && target > 0 && target <= _classes.Skills.Count ? _classes.Skills[target - 1] : null;
+
+        // Every skill of the chosen classes, in the order ClassRules.AllSkillsFor gives (the order SkillOrder counts in).
+        public IReadOnlyList<SkillDefinition> ClassSkills => ClassRules.AllSkillsFor(Classes);
+
+        // The ranks of the skills this player has learned, as the host last said (Docs/Classes.md, 스킬 포인트와 단계).
+        public IReadOnlyDictionary<SkillDefinition, int> SkillRanks => _skillRanks;
+        readonly Dictionary<SkillDefinition, int> _skillRanks = new Dictionary<SkillDefinition, int>();
+
+        public int RankOf(SkillDefinition skill) => skill != null && _skillRanks.TryGetValue(skill, out int rank) ? rank : 0;
+
+        public int SkillPoints => SkillRules.PointsLeft(Level, _skillRanks);
+
+        public bool CanRaise(SkillDefinition skill) => SkillRules.CanRaise(skill, Classes, Level, SkillPoints, RankOf(skill));
+
+        public byte[] LearnSkillCommand(SkillDefinition skill) =>
+            new InventoryCommandMessage(InventoryCommand.LearnSkill, 0, index: ItemCodec.Index(_classes.Skills, skill)).Encode();
 
         // The host's current tick as best this client can tell: the newest snapshot plus the time since it came.
         public double HostTick =>
@@ -1000,6 +1025,11 @@ namespace Game.Core
             Bag = message.Bag;
             var passives = _classes?.Passives;
             Passives = message.Passives.Where(i => passives != null && i < passives.Count).Select(i => passives[i]).ToList();
+            _skillRanks.Clear();
+            foreach (var (skill, rank) in message.Skills)
+            {
+                if (_classes != null && skill < _classes.Skills.Count) _skillRanks[_classes.Skills[skill]] = rank;
+            }
             RefreshStats();
             InventoryVersion++;
         }
@@ -1107,6 +1137,11 @@ namespace Game.Core
             _events.AddRange(snapshot.Events);
             foreach (var e in snapshot.Events)
             {
+                if (e.Type == SimEventType.SkillUsed && e.Source != PlayerId && SkillNamed(e.Target) is SkillDefinition used)
+                {
+                    if (!_seenSlots.TryGetValue(e.Source, out var slots)) _seenSlots[e.Source] = slots = new Dictionary<int, SkillDefinition>();
+                    slots[e.Amount] = used;
+                }
                 if (e.Type == SimEventType.Fishing && e.Source == PlayerId)
                 {
                     int kind = World.FishingKind(e.Amount);

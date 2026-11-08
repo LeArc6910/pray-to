@@ -26,6 +26,13 @@ namespace Game.Core.Tests
                 return client;
             }
 
+            // Every skill of the client's classes learned at rank 1 on the host, and the new slots sent back.
+            public void Teach(WorldClient client)
+            {
+                World.TeachAll(Host.World.FindPlayer(client.PlayerId), 1);
+                Tick();
+            }
+
             // Hands a command from a client to the host, as the transport would.
             public void Send(ulong connection, byte[] message)
             {
@@ -273,6 +280,9 @@ namespace Game.Core.Tests
             var bob = session.Join(2, "밥");
 
             CollectionAssert.AreEqual(new[] { "fire_mage", "warrior" }, alice.Classes.Select(c => c.Id));
+            CollectionAssert.AreEqual(new[] { "fireball", "whirlwind" }, alice.Skills.Select(s => s.Id), "a new character knows each class's first skill");
+            CollectionAssert.AreEqual(alice.Skills, session.Host.World.FindPlayer(alice.PlayerId).Skills);
+            session.Teach(alice);
             CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "whirlwind", "war_cry" }, alice.Skills.Select(s => s.Id));
             CollectionAssert.AreEqual(alice.Skills, session.Host.World.FindPlayer(alice.PlayerId).Skills);
             Assert.AreEqual(120, alice.Stats.MaxHealth, 0.001f, "the warrior passive counts on the client too");
@@ -282,7 +292,9 @@ namespace Game.Core.Tests
             var strict = new Session(new HostConfig { MaxClasses = 1 });
             var carol = strict.Join(1, "캐롤", Protocol.Version, "warrior", "fire_mage");
             CollectionAssert.AreEqual(new[] { "warrior" }, carol.Classes.Select(c => c.Id));
-            Assert.AreEqual(3, carol.Skills.Count, "all three of one class fit the four slots");
+            Assert.AreEqual(1, carol.Skills.Count, "only the basic skill until points are spent");
+            strict.Teach(carol);
+            Assert.AreEqual(4, carol.Skills.Count, "four of the six learned fill the slots");
         }
 
         [Test]
@@ -293,6 +305,7 @@ namespace Game.Core.Tests
             var bob = session.Join(2, "밥");
             var world = session.Host.World;
             var host = world.FindPlayer(alice.PlayerId);
+            session.Teach(alice);
             const int fireball = 0;
             const int flameBrand = 1;
 
@@ -610,22 +623,57 @@ namespace Game.Core.Tests
 
             world.Map[TileMap.Cell(player.Position.X) + 1, TileMap.Cell(player.Position.Y)] = TileType.Workbench;
             var both = new[] { Classes.Shipped.Find("fire_mage"), Classes.Shipped.Find("warrior") };
-            // Indexes into every skill the two have: fireball, flame_brand, meteor, whirlwind, war_cry, ground_slam.
-            session.Send(1, alice.ClassCommand(both, new[] { 4, 3, 1, 0 }));
+            foreach (var skill in both.SelectMany(c => c.Skills)) player.SkillRanks[skill] = 1;
+            player.InventoryVersion++;
+            // Indexes into every skill the two have: the fire mage's six (fireball 0, flame_brand 1, ...), then the
+            // warrior's (whirlwind 6, war_cry 7, ...).
+            session.Send(1, alice.ClassCommand(both, new[] { 7, 6, 1, 0 }));
             session.Tick(4);
             CollectionAssert.AreEqual(new[] { "war_cry", "whirlwind", "flame_brand", "fireball" }, alice.Skills.Select(s => s.Id));
             CollectionAssert.AreEqual(player.Skills, alice.Skills);
             CollectionAssert.AreEqual(new[] { "fire_mage", "warrior" }, alice.ClassesOf(alice.PlayerId).Select(c => c.Id), "the roster too");
 
-            // Coming back with the same classes and order keeps them.
+            // Coming back with the same character, classes and order keeps them.
             var bob = new WorldClient("key2", "밥", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, new[] { "fire_mage", "warrior" }, Tiles.Shipped)
             {
-                JoinSkillOrder = new[] { 4, 3, 1, 0 },
+                JoinSkillOrder = new[] { 7, 6, 1, 0 },
+                Character = alice.SaveCharacter(),
             };
             session.Host.Receive(2, bob.JoinMessage());
             session.Host.Tick();
             foreach (var message in session.Host.TakeOutgoing().Where(m => m.Connection == 2)) bob.Receive(message.Data);
             CollectionAssert.AreEqual(new[] { "war_cry", "whirlwind", "flame_brand", "fireball" }, bob.Skills.Select(s => s.Id));
+        }
+
+        [Test]
+        public void SkillsAreLearnedThroughTheHostAndSaved()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스", Protocol.Version, "warrior");
+            var bob = session.Join(2, "밥");
+            var player = session.Host.World.FindPlayer(alice.PlayerId);
+            session.Tick(2);
+            Assert.AreEqual(0, alice.SkillPoints);
+            Assert.AreEqual(1, alice.RankOf(Classes.Skill("whirlwind")));
+            Assert.IsFalse(alice.CanRaise(Classes.Skill("war_cry")));
+
+            player.Experience = Leveling.TotalFor(4);
+            session.Tick(2);
+            Assert.AreEqual(3, alice.SkillPoints);
+            Assert.IsTrue(alice.CanRaise(Classes.Skill("war_cry")));
+            Assert.IsFalse(alice.CanRaise(Classes.Skill("charge")), "level 5");
+            session.Send(1, alice.LearnSkillCommand(Classes.Skill("war_cry")));
+            session.Tick(2);
+
+            Assert.AreEqual(1, alice.RankOf(Classes.Skill("war_cry")));
+            Assert.AreEqual(2, alice.SkillPoints);
+            CollectionAssert.AreEqual(new[] { "whirlwind", "war_cry" }, alice.Skills.Select(s => s.Id), "the host's new slot reached the client");
+            session.Send(1, alice.SkillCommand(1, Vec2.Zero));
+            session.Tick(2);
+            Assert.AreEqual("war_cry", bob.SkillOf(alice.PlayerId, 1).Id, "others learn the slot from the skill used");
+
+            var saved = CharacterSave.Read(alice.SaveCharacter(), Gear.Data);
+            CollectionAssert.Contains(saved.SkillRanks, ("war_cry", 1));
         }
 
         [Test]

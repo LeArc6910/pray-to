@@ -18,6 +18,7 @@ namespace CoreSandbox
     // dotnet run -- --farm [minutes] [crop]          a plot of soil kept by a sprinkler and a harvester: harvest an hour
     // dotnet run -- --rift [tiers] [seed]             bots open void rifts tier after tier (--players, --gear, --classes)
     // dotnet run -- --defense [levels] [seed]        bots hold a ward stone level after level (--turrets <n>, --players, --gear, --classes)
+    // add --rank <1-5> for the bots' skill ranks, --level <n> for their level (and only the skills open by then)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
     static class Program
@@ -69,6 +70,18 @@ namespace CoreSandbox
             {
                 classIds = args[classesFlag + 1].Split(',');
                 args = args.Where((_, i) => i != classesFlag && i != classesFlag + 1).ToArray();
+            }
+            int rankFlag = Array.IndexOf(args, "--rank");
+            if (rankFlag >= 0)
+            {
+                SkillBot.Rank = int.Parse(args[rankFlag + 1]);
+                args = args.Where((_, i) => i != rankFlag && i != rankFlag + 1).ToArray();
+            }
+            int levelFlag = Array.IndexOf(args, "--level");
+            if (levelFlag >= 0)
+            {
+                SkillBot.Level = int.Parse(args[levelFlag + 1]);
+                args = args.Where((_, i) => i != levelFlag && i != levelFlag + 1).ToArray();
             }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();

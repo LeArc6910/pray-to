@@ -29,6 +29,13 @@ namespace Game.Core.Tests
 
         static int Slot(Player player, string skillId) => player.Skills.ToList().FindIndex(s => s.Id == skillId);
 
+        // Every skill of the player's classes learned at rank 1, as a character that has spent its points would.
+        static Player Learned(Player player)
+        {
+            World.TeachAll(player, 1);
+            return player;
+        }
+
         // One basic attack, then the button let go.
         static List<SimEvent> AttackOnce(World world, Player player)
         {
@@ -42,7 +49,7 @@ namespace Game.Core.Tests
         public void FireBurnsForAShareOfTheHitOverThreeSeconds()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("mithril_sword"), FireMage);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("mithril_sword"), FireMage));
             var dummy = world.SpawnEnemy(Dummy, player.Position + new Vec2(0, -1));
             world.UseSkill(player.Id, Slot(player, "flame_brand"), Vec2.Zero);
 
@@ -65,7 +72,7 @@ namespace Game.Core.Tests
         {
             var weak = MonsterSheet.Parse(Monsters.Header.Replace("weight\n", "weight,drop_chance\n") + "weak,약골,1,25,0,0,1,0.4,0,0.5,0.5,1,1,100\n");
             var world = Room(monsters: weak);
-            var player = world.AddPlayer("a", Gear.Wearing("mithril_sword"), FireMage);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("mithril_sword"), FireMage));
             var target = world.SpawnEnemy(weak.Monsters[0], player.Position + new Vec2(0, -1));
             world.UseSkill(player.Id, Slot(player, "flame_brand"), Vec2.Zero);
             // The sword's lowest 17, fire mage's 15% more: 20 of 25, and the burn's 30% of 20 finishes it.
@@ -83,8 +90,8 @@ namespace Game.Core.Tests
         {
             var world = Room(40);
             // Two lanes far apart: in each a player shoots a slime six tiles off once, with cold in one and not the other.
-            var frost = world.AddPlayer("frost", Gear.Wearing("frost_staff"));
-            var plain = world.AddPlayer("plain", Gear.Wearing("copper_staff"));
+            var frost = Learned(world.AddPlayer("frost", Gear.Wearing("frost_staff")));
+            var plain = Learned(world.AddPlayer("plain", Gear.Wearing("copper_staff")));
             Moves.Walk(world, frost, TileMap.Center(5, 10));
             Moves.Walk(world, plain, TileMap.Center(5, 30));
             world.MovePlayer(frost.Id, frost.Position, new Vec2(1, 0), 1);
@@ -111,7 +118,7 @@ namespace Game.Core.Tests
         public void LightningJumpsToTheTwoNearestForHalf()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("storm_bow"));
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("storm_bow")));
             world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
             var target = world.SpawnEnemy(Dummy, player.Position + new Vec2(4, 0));
             var near = world.SpawnEnemy(Dummy, target.Position + new Vec2(0, 1.5f));
@@ -147,7 +154,7 @@ namespace Game.Core.Tests
 
             // Ice slimes shrug off the chill too.
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"), StormCaller);
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("copper_sword"), StormCaller));
             var slime = world.SpawnEnemy(IceSlime, player.Position + new Vec2(1.5f, 0));
             world.UseSkill(player.Id, Slot(player, "frost_ring"), Vec2.Zero);
             Assert.Less(slime.Health, IceSlime.Health);
@@ -166,7 +173,7 @@ namespace Game.Core.Tests
         public void ColdMonstersChillThePlayersTheyHit()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"));
+            var player = Learned(world.AddPlayer("a", Gear.Wearing("copper_sword")));
             world.SpawnEnemy(IceSlime, player.Position + new Vec2(0.9f, 0));
             float speed = player.MoveSpeed;
 
@@ -179,7 +186,8 @@ namespace Game.Core.Tests
         [Test]
         public void TheStormCallerBringsBothElements()
         {
-            CollectionAssert.AreEqual(new[] { "chain_lightning", "frost_ring", "storm_mantle" }, StormCaller.Skills.Select(s => s.Id));
+            CollectionAssert.AreEqual(new[] { "chain_lightning", "frost_ring", "ice_lance", "storm_mantle", "thunderclap", "blizzard" },
+                StormCaller.Skills.Select(s => s.Id));
             Assert.IsTrue((Classes.Skill("chain_lightning").Tags & SkillTag.Lightning) != 0);
             Assert.IsTrue((Classes.Skill("frost_ring").Tags & SkillTag.Cold) != 0);
             foreach (string id in new[] { "frost_staff", "storm_bow" })

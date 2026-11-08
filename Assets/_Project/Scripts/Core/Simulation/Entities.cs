@@ -17,8 +17,10 @@ namespace Game.Core
             Equipment = equipment;
             Inventory = bag ?? new Inventory();
             Classes = classes;
-            Skills = ClassRules.SkillsFor(classes);
-            SkillOrder = Enumerable.Range(0, Skills.Count).ToList();
+            LearnBasics(classes);
+            Skills = ClassRules.SkillsFor(classes, Knows);
+            var natural = ClassRules.AllSkillsFor(classes);
+            SkillOrder = Skills.Select(s => natural.IndexOf(s)).ToList();
             _cooldowns = new int[Skills.Count];
             _buffTicks = new int[Skills.Count];
             Stats = PlayerStats.From(equipment, classes);
@@ -65,17 +67,39 @@ namespace Game.Core
         // Which of the classes' skills (ClassRules.SkillsFor) is in each slot.
         public IReadOnlyList<int> SkillOrder { get; private set; }
 
+        // Skill ranks bought with skill points (Docs/Classes.md, 스킬 포인트와 단계): 1 to SkillRules.MaxRank for a
+        // known skill. They stay with the character when its classes change.
+        public Dictionary<SkillDefinition, int> SkillRanks { get; } = new Dictionary<SkillDefinition, int>();
+
+        public int RankOf(SkillDefinition skill) => skill != null && SkillRanks.TryGetValue(skill, out int rank) ? rank : 0;
+
+        public bool Knows(SkillDefinition skill) => RankOf(skill) > 0;
+
+        // One a level past the first; a class's first skill's first rank is free.
+        public int SkillPoints => SkillRules.PointsLeft(Level, SkillRanks);
+
+        // Each chosen class's first skill is known from the start.
+        internal void LearnBasics(IEnumerable<ClassDefinition> classes)
+        {
+            foreach (var basic in classes.Where(c => c.Skills.Count > 0).Select(c => c.Skills[0]))
+            {
+                if (!Knows(basic)) SkillRanks[basic] = 1;
+            }
+        }
+
         // New classes, or the same in a new order (ClassRules.SkillsFor). A skill that stays keeps its cooldown and
-        // buff; a new one starts as if just used, so changing back and forth never skips a cooldown.
+        // buff; a new one starts as if just used, so changing back and forth never skips a cooldown. Only known
+        // skills go in the slots.
         internal void ChangeKit(IReadOnlyList<ClassDefinition> classes, IReadOnlyList<int> order)
         {
-            var skills = ClassRules.SkillsFor(classes, order);
+            LearnBasics(classes);
+            var skills = ClassRules.SkillsFor(classes, order, Knows);
             var cooldowns = new int[skills.Count];
             var buffs = new int[skills.Count];
             for (int slot = 0; slot < skills.Count; slot++)
             {
                 int old = Skills.ToList().IndexOf(skills[slot]);
-                cooldowns[slot] = old >= 0 ? _cooldowns[old] : skills[slot].CooldownTicks;
+                cooldowns[slot] = old >= 0 ? _cooldowns[old] : SkillRules.CooldownTicks(skills[slot], RankOf(skills[slot]));
                 buffs[slot] = old >= 0 ? _buffTicks[old] : 0;
             }
             Classes = classes;
@@ -84,8 +108,12 @@ namespace Game.Core
             SkillOrder = skills.Select(s => natural.IndexOf(s)).ToList();
             _cooldowns = cooldowns;
             _buffTicks = buffs;
+            KitVersion++;
             RefreshStats();
         }
+
+        // Goes up whenever the classes or the skills in the slots change, so the host can tell the player.
+        public int KitVersion { get; private set; }
 
         // Ticks until any consumable can be used again.
         public int ConsumableCooldown { get; internal set; }
@@ -137,13 +165,20 @@ namespace Game.Core
             return item;
         }
 
-        internal void StartCooldown(int slot) => _cooldowns[slot] = Skills[slot].CooldownTicks;
+        // A skill just learned (World.LearnSkill) is ready at once: it was never used, so nothing is skipped.
+        internal void ClearCooldown(SkillDefinition skill)
+        {
+            int slot = Skills.ToList().IndexOf(skill);
+            if (slot >= 0) _cooldowns[slot] = 0;
+        }
+
+        internal void StartCooldown(int slot) => _cooldowns[slot] = SkillRules.CooldownTicks(Skills[slot], RankOf(Skills[slot]));
 
         // Using a buff again starts its time over.
         internal void StartBuff(int slot)
         {
             bool wasOn = HasBuff(slot);
-            _buffTicks[slot] = Skills[slot].DurationTicks;
+            _buffTicks[slot] = SkillRules.DurationTicks(Skills[slot], RankOf(Skills[slot]));
             if (!wasOn) RefreshStats();
         }
 
@@ -332,6 +367,8 @@ namespace Game.Core
         TurretShot,
         // A rainy day began and wet Amount crops (World.Weather.cs).
         Rain,
+        // Source, a player, put a skill point into the skill Target - 1 (its index in the sheet); Amount is its rank now.
+        SkillLearned,
     }
 
     public readonly struct SimEvent
