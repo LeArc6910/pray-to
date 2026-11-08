@@ -274,11 +274,11 @@ namespace Game.Client
         int _picked;
         ConsumableDefinition _pickedConsumable;
 
+        // Pressing a square always picks it (pressing it again keeps it picked), so a press never hides the buttons.
         void Pick(int item, ConsumableDefinition consumable)
         {
-            bool same = item != 0 ? _picked == item : _pickedConsumable == consumable;
-            _picked = same ? 0 : item;
-            _pickedConsumable = same ? null : consumable;
+            _picked = item;
+            _pickedConsumable = consumable;
             Sounds.Play(Sound.Click);
         }
 

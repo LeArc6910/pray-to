@@ -180,7 +180,12 @@ async function menu(browser) {
   // The first Tab after starting from the menu by a real click on [혼자 하기] (LOCAL_TASKS.md, 13: the first key
   // once went unheard). Typing in the name field first, as a person would.
   const fresh = await open(browser, run, Profiles.pc, url);
-  const solo = (await fresh.find('혼자 하기'))[0];
+  // The menu may not be drawn yet with the probe on: look again for a few seconds.
+  let solo = null;
+  for (let i = 0; i < 20 && !solo; i++) {
+    solo = (await fresh.find('혼자 하기'))[0];
+    if (!solo) await fresh.wait(300);
+  }
   if (solo) {
     // The name field sits above the buttons in the left column: a click there, a name typed, then [혼자 하기].
     await fresh.tapAt(solo.cx, solo.cy - 120);
@@ -385,9 +390,9 @@ async function bag(browser) {
   await game.wait(3500);
   check(items(await game.inventory(), 'copper_sword') === swords, '5초가 지나면 그 위에서 다시 줍는다');
   await game.send('goto -1 0; face off');
-  // A click inside the bag does not swing.
-  const inBag = (await game.buttons()).find(b => b.shown && b.label === '버리기');
-  await game.page.mouse.move(inBag.cx - 150, inBag.cy);
+  // A click inside the bag does not swing: on the empty space under the stats button.
+  const inBag = (await game.buttons()).find(b => b.shown && /^능력치·생활 기술/.test(b.label));
+  await game.page.mouse.move(inBag.cx, inBag.cy + 80);
   await game.page.mouse.down();
   await game.wait(500);
   const clicking = await game.state();
@@ -469,10 +474,13 @@ async function combat(browser) {
   }
   await game.send('equip copper_sword');
 
-  // Four skills pressed at once all go. A new character knows only each class's first skill: all are taught first.
-  // The four (whirlwind, war cry, fireball, flame brand) cost 10 + 15 + 5 + 15 = 45 mana: with exactly that much,
-  // all four leave almost none.
-  await game.send('teach; heal; spawn slime 2 0 5000; spawn slime -2 0 5000; mana 45');
+  // Four skills pressed at once all go. A new character knows only each class's first skill: all are taught first,
+  // and the new slots reach the screen a moment later. The four (whirlwind, war cry, fireball, flame brand) cost
+  // 10 + 15 + 5 + 15 = 45 mana: with exactly that much, all four leave almost none.
+  await game.send('teach');
+  await game.until(inv => (inv.skills || '').split(',').length === 4, 3000, game.inventory);
+  await game.wait(800);
+  await game.send('heal; spawn slime 2 0 5000; spawn slime -2 0 5000; mana 45');
   for (const key of ['q', 'e', 'r', 'f']) await game.page.keyboard.down(key);
   await game.wait(150);
   for (const key of ['q', 'e', 'r', 'f']) await game.page.keyboard.up(key);
