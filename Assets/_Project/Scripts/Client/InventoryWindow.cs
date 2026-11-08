@@ -77,9 +77,10 @@ namespace Game.Client
         public void Draw()
         {
             if (!Open) return;
-            // Only what the pointer is over in this frame: IMGUI keeps the last description it set, so one picked up
-            // on another page stayed beside this one (an iron sword's text beside the skills, in the web check).
-            GUI.tooltip = "";
+            // Only what the pointer is over in this frame. IMGUI's own GUI.tooltip fell back to the last description
+            // the pointer had been over, even when set empty, so an iron sword's text picked up on [장비] stood beside
+            // the skills page (the 2026-11-09 web check). The window keeps its own.
+            if (Event.current.type == EventType.Repaint) _hover = "";
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
             // Left of the minimap column, full height; on narrow screens under the column. The page scrolls when it
@@ -551,10 +552,32 @@ namespace Game.Client
 
         // A square with the thing's icon, an edge in its colour (rarity, potion, rune), a count in the corner and a
         // bright edge while picked. Its name is what the playtests press it by (Ui.Probe). True when pressed.
+        // The description of whatever the pointer is over in this frame's drawing, for DrawTooltip.
+        static string _hover = "";
+
+        static void Hover(Rect area, string tooltip)
+        {
+            if (!string.IsNullOrEmpty(tooltip) && Event.current.type == EventType.Repaint && area.Contains(Event.current.mousePosition)) _hover = tooltip;
+        }
+
+        static void TipLabel(GUIContent content, params GUILayoutOption[] options)
+        {
+            GUILayout.Label(content, options);
+            Hover(GUILayoutUtility.GetLastRect(), content.tooltip);
+        }
+
+        static bool TipButton(GUIContent content, params GUILayoutOption[] options)
+        {
+            bool pressed = Ui.LayoutButton(content, options);
+            Hover(GUILayoutUtility.GetLastRect(), content.tooltip);
+            return pressed;
+        }
+
         static bool Cell(Rect area, Sprite icon, string name, string corner, Color edge, bool picked, string tooltip, bool dim = false)
         {
             Ui.Probe(name, area);
-            bool pressed = GUI.Button(area, new GUIContent("", tooltip));
+            bool pressed = GUI.Button(area, GUIContent.none);
+            Hover(area, tooltip);
             var previous = GUI.color;
             GUI.color = new Color(edge.r, edge.g, edge.b, 0.8f);
             Frame(area, 2);
@@ -649,10 +672,10 @@ namespace Game.Client
         void DrawTooltip(Rect window, bool besideWindow)
         {
             var pointer = Event.current.mousePosition;
-            bool hovering = !string.IsNullOrEmpty(GUI.tooltip) && _rows.Contains(pointer);
+            bool hovering = !string.IsNullOrEmpty(_hover) && _rows.Contains(pointer);
             if (!hovering && !besideWindow) return;
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
-            string text = hovering ? GUI.tooltip
+            string text = hovering ? _hover
                 : Controls.UsingTouch ? "이름이나 칸을 누르고 있으면 설명이 보입니다." : "이름이나 칸에 마우스를 올리면 설명이 보입니다.";
             float room = Mathf.Min(TooltipWidth, Ui.Width - 20);
             var content = new GUIContent(Ui.Wrap(text, _tooltipStyle, room));
@@ -765,7 +788,7 @@ namespace Game.Client
                 }
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
-                GUILayout.Label(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
+                TipLabel(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
                 if (pair.Key.Places != null && Ui.LayoutButton("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
                 var crop = _client.CropFrom(pair.Key);
                 if (crop != null && Ui.LayoutButton("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
@@ -937,7 +960,7 @@ namespace Game.Client
                 string note = entry.Daily ? " (오늘만)" : "";
                 bool open = hearts >= entry.Hearts;
                 string text = open ? $"{entry.Name}{note} · 금화 {price}" : $"{entry.Name} · 호감 {entry.Hearts}에 열린다";
-                GUILayout.Label(new GUIContent(Fit(text, _recipeWidth), entry.Material?.Description ?? entry.Consumable.Description), GUILayout.Width(_recipeWidth));
+                TipLabel(new GUIContent(Fit(text, _recipeWidth), entry.Material?.Description ?? entry.Consumable.Description), GUILayout.Width(_recipeWidth));
                 GUI.enabled = enabled && open && coins >= price;
                 if (Ui.LayoutButton("사기", GUILayout.Width(56))) Send(_client.BuyCommand(entry, 1), Sound.Craft);
                 GUI.enabled = enabled && open && coins >= price * 5;
@@ -1039,7 +1062,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 Icon(icon);
-                GUILayout.Label(new GUIContent(Fit($"{name} ×{count}", _nameWidth), description), GUILayout.Width(_nameWidth));
+                TipLabel(new GUIContent(Fit($"{name} ×{count}", _nameWidth), description), GUILayout.Width(_nameWidth));
                 if (Ui.LayoutButton(action, GUILayout.Width(64))) Send(moveStack(kind, definition), Sound.Click);
                 GUILayout.EndHorizontal();
             }
@@ -1098,7 +1121,7 @@ namespace Game.Client
                 // and the button was out of sight.
                 bool toAssembler = assembler != null && World.Assembles(recipe);
                 float width = toAssembler ? Mathf.Max(80, _recipeWidth - 76) : _recipeWidth;
-                GUILayout.Label(new GUIContent(Fit($"{name}\n{needs}", width), RecipeTooltip(recipe)), GUILayout.Width(width));
+                TipLabel(new GUIContent(Fit($"{name}\n{needs}", width), RecipeTooltip(recipe)), GUILayout.Width(width));
                 int times = _client.CraftableTimes(recipe);
                 GUI.enabled = enabled && times > 0;
                 if (Ui.LayoutButton("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
@@ -1182,7 +1205,7 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(skill));
                 string key = Controls.UsingTouch ? $"{slot + 1}" : Controls.SkillKeyName(slot);
-                GUILayout.Label(new GUIContent(Fit($"{key}  {skill.Name} {RankText(skill)}", slotName), SkillTooltip(skill)), GUILayout.Width(slotName));
+                TipLabel(new GUIContent(Fit($"{key}  {skill.Name} {RankText(skill)}", slotName), SkillTooltip(skill)), GUILayout.Width(slotName));
                 GUI.enabled = slot > 0;
                 if (Ui.LayoutButton("▲", GUILayout.Width(40))) Swap(order, slot, slot - 1);
                 GUI.enabled = slot < _client.Skills.Count - 1;
@@ -1222,7 +1245,7 @@ namespace Game.Client
                     Icon(Sprites.Icon(skill));
                     string state = rank > 0 ? $"{RankText(skill)}/{SkillRules.MaxRank}" : open ? "배우지 않음" : $"Lv {skill.Level}부터";
                     if (_client.Supports.TryGetValue(skill, out var set)) state += $" · {set.Name}";
-                    GUILayout.Label(new GUIContent(Fit($"{skill.Name} · {state}", rowName), SkillTooltip(skill)), GUILayout.Width(rowName));
+                    TipLabel(new GUIContent(Fit($"{skill.Name} · {state}", rowName), SkillTooltip(skill)), GUILayout.Width(rowName));
                     GUI.color = previous;
                     bool can = _client.CanRaise(skill);
                     GUI.enabled = can;
@@ -1253,7 +1276,7 @@ namespace Game.Client
                 int picked = _pickedClasses.IndexOf(option.Id);
                 bool full = picked < 0 && _pickedClasses.Count >= ClassRules.DefaultMaxClasses;
                 GUI.enabled = near && !full;
-                if (Ui.LayoutButton(new GUIContent((picked >= 0 ? $"[{picked + 1}] " : "[ ] ") + option.Name, option.Description)))
+                if (TipButton(new GUIContent((picked >= 0 ? $"[{picked + 1}] " : "[ ] ") + option.Name, option.Description)))
                 {
                     if (picked >= 0) _pickedClasses.RemoveAt(picked);
                     else _pickedClasses.Add(option.Id);
@@ -1344,7 +1367,7 @@ namespace Game.Client
             var previous = GUI.color;
             GUI.color = Palette.Of(item.Rarity);
             string sockets = item.Sockets.Count == 0 ? "" : " " + string.Concat(item.Sockets.Select(r => r == null ? "○" : "●"));
-            GUILayout.Label(new GUIContent(Fit(ItemText.Name(item) + sockets, _nameWidth), string.Join("\n", ItemText.Describe(item))), GUILayout.Width(_nameWidth));
+            TipLabel(new GUIContent(Fit(ItemText.Name(item) + sockets, _nameWidth), string.Join("\n", ItemText.Describe(item))), GUILayout.Width(_nameWidth));
             GUI.color = previous;
         }
 
