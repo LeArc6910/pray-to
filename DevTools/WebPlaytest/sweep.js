@@ -855,7 +855,8 @@ async function npc(browser) {
   check((await game.find('아직 모자라다')).length === 1 || (await game.find('건네기')).length === 1, '연금술사의 [이야기] 첫 단계(빛 버섯 연구)가 보인다');
   await game.shot('alchemist-story', '연금술사의 [이야기]');
   await closeBag(game);
-  await game.send('clock 2 7');
+  // Back at the merchant's stall: the alchemist's table is too far from it for her tab.
+  await game.send('goto near MerchantStall; clock 2 7');
   await game.wait(1200);
   await bagTab(game, '상인');
   await game.press('팔기');
