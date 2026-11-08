@@ -77,12 +77,52 @@ namespace Game.Core
             int cost = spent * SkillRules.ResetCoinsPerPoint;
             if (spent == 0 || coin == null || player.Inventory.CountOf(coin) < cost) return false;
             player.Inventory.TakeMaterial(coin, cost);
+            // The crystals come back to the bag with the points.
+            foreach (var gem in player.Supports.Values) player.Inventory.AddMaterial(gem, 1);
+            player.Supports.Clear();
             player.SkillRanks.Clear();
             player.LearnBasics(player.Classes);
             player.ChangeKit(player.Classes, null);
             player.InventoryVersion++;
             _events.Add(new SimEvent(SimEventType.SkillLearned, player.Id, target: 0, amount: 0));
             return true;
+        }
+
+        // Sets a support crystal into a learned skill, giving back the one it had; with no crystal, takes the one it
+        // has out. False when the skill is not learned, the crystal is not in the bag or does nothing for the skill.
+        public bool SetSupport(int playerId, SkillDefinition skill, MaterialDefinition gem)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || skill == null || !player.Knows(skill)) return false;
+            var kind = SkillSupports.KindOf(gem);
+            if (gem != null && (kind == null || player.Inventory.CountOf(gem) == 0 || !SkillSupports.Fits(skill, kind.Value))) return false;
+            if (gem == null && !player.Supports.ContainsKey(skill)) return false;
+            if (player.Supports.TryGetValue(skill, out var old))
+            {
+                player.Inventory.AddMaterial(old, 1);
+                player.Supports.Remove(skill);
+            }
+            if (gem != null)
+            {
+                player.Inventory.TakeMaterial(gem, 1);
+                player.Supports[skill] = gem;
+            }
+            player.InventoryVersion++;
+            return true;
+        }
+
+        // Puts back the crystals a character save had in its skills, for the skills it still knows.
+        public static void RestoreSupports(Player player, ClassData classes, LootData loot, IEnumerable<(string Skill, string Gem)> saved)
+        {
+            player.Supports.Clear();
+            foreach (var (skillId, gemId) in saved ?? Enumerable.Empty<(string, string)>())
+            {
+                var skill = classes?.Skills.FirstOrDefault(s => s.Id == skillId);
+                var gem = loot?.Materials.FirstOrDefault(m => m.Id == gemId);
+                if (skill == null || gem == null || SkillSupports.KindOf(gem) == null) continue;
+                if (player.Knows(skill)) player.Supports[skill] = gem;
+                else player.Inventory.AddMaterial(gem, 1);
+            }
         }
 
         // Puts back the ranks a character save held; unknown ids are dropped. A save from before skill points knows
@@ -118,10 +158,10 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || slot < 0 || slot >= player.Skills.Count || player.CooldownTicks(slot) > 0) return false;
             var skill = player.Skills[slot];
-            if (player.Mana < skill.Mana) return false;
+            if (player.Mana < player.ManaCost(skill)) return false;
             if (aim.IsFinite && aim.LengthSquared > 1e-6f) player.Facing = aim.Normalized;
 
-            player.Mana -= skill.Mana;
+            player.Mana -= player.ManaCost(skill);
             player.StartCooldown(slot);
             // The skill itself rides as the target (its index + 1), so others draw the right one.
             _events.Add(new SimEvent(SimEventType.SkillUsed, player.Id, target: skill.Index + 1, amount: slot, direction: player.Facing));
@@ -129,7 +169,7 @@ namespace Game.Core
             {
                 case SkillKind.Nova:
                     float damage = RollSkill(player, skill, out bool critical);
-                    HitArea(player, player.Position, skill.Radius, damage, critical, slot + 1, player.Stats.ContextFor(skill));
+                    HitArea(player, player.Position, SkillSupports.Radius(skill, player.SupportOf(skill)), damage, critical, slot + 1, player.ContextFor(skill));
                     break;
                 case SkillKind.Projectile:
                     Fire(player, skill, slot);
@@ -162,7 +202,8 @@ namespace Game.Core
             var hit = new HashSet<int>();
             bool critical = false;
             float damage = skill.Damage > 0 ? RollSkill(player, skill, out critical) : 0;
-            var tags = player.Stats.ContextFor(skill);
+            var tags = player.ContextFor(skill);
+            float reach = SkillSupports.Radius(skill, player.SupportOf(skill));
             for (float gone = 0; gone < skill.Range; gone += DashStep)
             {
                 var next = Collision.Move(Map, player.Position, PlayerRadius, player.Facing * Math.Min(DashStep, skill.Range - gone));
@@ -171,13 +212,13 @@ namespace Game.Core
                 if (damage <= 0) continue;
                 foreach (var enemy in _enemies.ToList())
                 {
-                    if (enemy.IsDead || hit.Contains(enemy.Id) || Vec2.Distance(enemy.Position, player.Position) > skill.Radius + enemy.Definition.Radius) continue;
+                    if (enemy.IsDead || hit.Contains(enemy.Id) || Vec2.Distance(enemy.Position, player.Position) > reach + enemy.Definition.Radius) continue;
                     hit.Add(enemy.Id);
                     HitEnemy(player, enemy, damage, critical, player.Position, tags, slot + 1);
                 }
                 foreach (var boss in _bosses)
                 {
-                    if (boss.IsDead || hit.Contains(boss.Id) || Vec2.Distance(boss.Position, player.Position) > skill.Radius + boss.Definition.Radius) continue;
+                    if (boss.IsDead || hit.Contains(boss.Id) || Vec2.Distance(boss.Position, player.Position) > reach + boss.Definition.Radius) continue;
                     hit.Add(boss.Id);
                     if (boss.State == BossState.Dormant) Wake(boss);
                     HitBoss(player, boss, damage, critical, tags, slot + 1);
@@ -190,9 +231,9 @@ namespace Game.Core
         float RollSkill(Player player, SkillDefinition skill, out bool critical)
         {
             var stats = player.Stats;
-            var context = stats.ContextFor(skill);
+            var context = player.ContextFor(skill);
             critical = _random.Chance(stats.CritChanceFor(context) / 100f);
-            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill))
+            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(player.SupportOf(skill))
                 * (critical ? stats.CritDamageFor(context) / 100f : 1f);
         }
 
@@ -200,9 +241,10 @@ namespace Game.Core
         void Fire(Player player, SkillDefinition skill, int slot)
         {
             float damage = RollSkill(player, skill, out bool critical);
-            for (int i = 0; i < skill.Count; i++)
+            int count = SkillSupports.Count(skill, player.SupportOf(skill));
+            for (int i = 0; i < count; i++)
             {
-                float degrees = (i - (skill.Count - 1) / 2f) * VolleySpread;
+                float degrees = (i - (count - 1) / 2f) * VolleySpread;
                 var direction = Rotate(player.Facing, degrees * MathF.PI / 180f);
                 _projectiles.Add(new Projectile(
                     _nextId++,
@@ -214,7 +256,7 @@ namespace Game.Core
                     damage,
                     Ticks(skill.Range / skill.Speed),
                     friendly: true,
-                    tags: player.Stats.ContextFor(skill),
+                    tags: player.ContextFor(skill),
                     skill: skill,
                     critical: critical));
             }
@@ -231,9 +273,10 @@ namespace Game.Core
         void Summon(Player player, SkillDefinition skill, int slot)
         {
             DismissMinions(m => m.OwnerId == player.Id && m.Slot == slot);
-            for (int i = 0; i < skill.Count; i++)
+            int count = SkillSupports.Count(skill, player.SupportOf(skill));
+            for (int i = 0; i < count; i++)
             {
-                var position = player.Position + WaitOffset(i, skill.Count);
+                var position = player.Position + WaitOffset(i, count);
                 _minions.Add(new Minion(_nextId++, player.Id, slot, skill, i, position)
                 {
                     Facing = player.Facing,
@@ -295,7 +338,7 @@ namespace Game.Core
                 }
 
                 minion.TargetId = 0;
-                var home = owner.Position + WaitOffset(minion.Index, skill.Count);
+                var home = owner.Position + WaitOffset(minion.Index, SkillSupports.Count(skill, owner.SupportOf(skill)));
                 var toHome = home - minion.Position;
                 float distance = toHome.Length;
                 if (distance < 0.05f) continue;
@@ -347,7 +390,7 @@ namespace Game.Core
             minion.AttackCooldown = Ticks(MinionAttackSeconds);
             _events.Add(new SimEvent(SimEventType.Attack, minion.Id, direction: minion.Facing));
             float damage = RollSkill(owner, minion.Skill, out bool critical);
-            var tags = owner.Stats.ContextFor(minion.Skill);
+            var tags = owner.ContextFor(minion.Skill);
             var enemy = FindEnemy(targetId);
             if (enemy != null)
             {
@@ -371,7 +414,8 @@ namespace Game.Core
             if (!touching && !ended) return false;
 
             if (projectile.Skill?.Radius > 0) _events.Add(new SimEvent(SimEventType.Burst, owner.Id, amount: projectile.Cause, position: at));
-            HitArea(owner, at, Math.Max(projectile.Skill?.Radius ?? 0, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1,
+            float burst = projectile.Skill == null ? 0 : SkillSupports.Radius(projectile.Skill, owner.SupportOf(projectile.Skill));
+            HitArea(owner, at, Math.Max(burst, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1,
                 projectile.Tags);
             return true;
         }

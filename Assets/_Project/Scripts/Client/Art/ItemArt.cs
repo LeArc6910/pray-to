@@ -821,6 +821,14 @@ namespace Game.Client
                 case "void_angler": return Ramped(FishRows, Ramp.Of("#7A5CC8"));
                 case "firefly_catfish": return Ramped(FishRows, Ramp.Of("#E8D86A"));
                 case "essence": return Ramped(Gem, Ramp.Of("#C88CFF"));
+                // Support crystals (Docs/Classes.md, 스킬 변형), each in the colour of what it does.
+                case "support_area": return Ramped(Gem, Ramp.Of("#7CE0C8"));
+                case "support_multi": return Ramped(Gem, Ramp.Of("#F2E25C"));
+                case "support_haste": return Ramped(Gem, Ramp.Of("#8CB4FF"));
+                case "support_power": return Ramped(Gem, Ramp.Of("#FF6E6E"));
+                case "support_fire": return Ramped(Gem, Ramp.Of("#FF9A3C"));
+                case "support_cold": return Ramped(Gem, Ramp.Of("#B4ECFF"));
+                case "support_lightning": return Ramped(Gem, Ramp.Of("#FFF6A0"));
                 case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
                 case "coin": return Ramped(CoinRows, Ramp.Of("#F2C440"));

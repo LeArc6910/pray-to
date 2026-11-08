@@ -357,7 +357,8 @@ namespace Game.Core
         // before the first one.
         public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
-            LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)));
+            LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
+            Supports.Select(pair => (pair.Key.Id, pair.Value.Id)));
 
         // Experience in each life skill (LifeSkill order): from the save, and as the host tells.
         public int[] LifeExperience => _life ??= ReadLife();
@@ -442,6 +443,18 @@ namespace Game.Core
         public RequestDefinition StoryStepOf(NpcDefinition npc) => World.StoryStepFor(Npcs, npc, _storySteps.TryGetValue(npc.Id, out int done) ? done : 0);
 
         public byte[] StoryCommand() => new InventoryCommandMessage(InventoryCommand.Story, 0).Encode();
+
+        // The crystal in each learned skill, as the host last said (Docs/Classes.md, 스킬 변형), and the command
+        // that sets one (or takes it out, with none).
+        public IReadOnlyDictionary<SkillDefinition, MaterialDefinition> Supports => _supports;
+        readonly Dictionary<SkillDefinition, MaterialDefinition> _supports = new Dictionary<SkillDefinition, MaterialDefinition>();
+
+        public SupportKind? SupportOf(SkillDefinition skill) => skill != null && _supports.TryGetValue(skill, out var gem) ? SkillSupports.KindOf(gem) : null;
+
+        public int ManaCost(SkillDefinition skill) => SkillSupports.ManaCost(skill, SupportOf(skill));
+
+        public byte[] SupportCommand(SkillDefinition skill, MaterialDefinition gem) =>
+            new InventoryCommandMessage(InventoryCommand.Support, gem == null ? 0 : ItemCodec.Index(_loot.Materials, gem) + 1, index: ItemCodec.Index(_classes.Skills, skill)).Encode();
 
         public byte[] SortBagCommand() => new InventoryCommandMessage(InventoryCommand.SortBag, 0).Encode();
 
@@ -681,7 +694,7 @@ namespace Game.Core
         public float CooldownLeft(int slot) => SkillTimeLeft(_cooldowns, slot);
 
         // Whether the mana the host last said is enough for the skill in the slot.
-        public bool HasManaFor(int slot) => slot >= 0 && slot < Skills.Count && Mana >= Skills[slot].Mana;
+        public bool HasManaFor(int slot) => slot >= 0 && slot < Skills.Count && Mana >= ManaCost(Skills[slot]);
 
         public float BuffLeft(int slot) => SkillTimeLeft(_buffs, slot);
 
@@ -696,8 +709,9 @@ namespace Game.Core
         public byte[] SkillCommand(int slot, Vec2 aim)
         {
             if (Status != ClientStatus.Playing || IsDead || slot < 0 || slot >= Skills.Count || CooldownLeft(slot) > 0 || !HasManaFor(slot)) return null;
-            _cooldowns[slot] = SkillRules.CooldownTicks(Skills[slot], PowerOf(Skills[slot]), Stats.CooldownRecoveryFor(Skills[slot].Tags)) + (int)Math.Ceiling(HostTick - _skillsTick);
-            Mana -= Skills[slot].Mana;
+            _cooldowns[slot] = (int)Math.Round(SkillRules.CooldownTicks(Skills[slot], PowerOf(Skills[slot]), Stats.CooldownRecoveryFor(Skills[slot].Tags))
+                * SkillSupports.CooldownFactor(SupportOf(Skills[slot]))) + (int)Math.Ceiling(HostTick - _skillsTick);
+            Mana -= ManaCost(Skills[slot]);
             return new SkillCommandMessage(slot, aim).Encode();
         }
 
@@ -1048,6 +1062,11 @@ namespace Game.Core
             foreach (var (skill, rank) in message.Skills)
             {
                 if (_classes != null && skill < _classes.Skills.Count) _skillRanks[_classes.Skills[skill]] = rank;
+            }
+            _supports.Clear();
+            foreach (var (skill, gem) in message.Supports)
+            {
+                if (_classes != null && skill < _classes.Skills.Count && gem < _loot.Materials.Count) _supports[_classes.Skills[skill]] = _loot.Materials[gem];
             }
             _storySteps.Clear();
             foreach (var (npc, step) in message.Stories)

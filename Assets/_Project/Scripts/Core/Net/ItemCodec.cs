@@ -191,6 +191,9 @@ namespace Game.Core
         Story,
         // Puts the carried gear in order (Inventory.Sort).
         SortBag,
+        // Sets a support crystal into a skill (World.SetSupport): Index the skill sheet index, Item the crystal's
+        // material index + 1, or 0 to take it out.
+        Support,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
@@ -228,8 +231,10 @@ namespace Game.Core
     public sealed class InventoryMessage
     {
         public InventoryMessage(Equipment equipment, Inventory bag, IReadOnlyList<int> passives = null,
-            IReadOnlyList<(int Skill, int Rank)> skills = null, IReadOnlyList<(int Npc, int Step)> stories = null)
+            IReadOnlyList<(int Skill, int Rank)> skills = null, IReadOnlyList<(int Npc, int Step)> stories = null,
+            IReadOnlyList<(int Skill, int Gem)> supports = null)
         {
+            Supports = supports ?? new List<(int, int)>();
             Stories = stories ?? new List<(int, int)>();
             Equipment = equipment;
             Bag = bag;
@@ -245,6 +250,8 @@ namespace Game.Core
         public IReadOnlyList<(int Skill, int Rank)> Skills { get; }
         // The last story step done with each person, as indexes into the people sheet (NpcData.Npcs).
         public IReadOnlyList<(int Npc, int Step)> Stories { get; }
+        // The crystal in each skill: skill sheet index and material index.
+        public IReadOnlyList<(int Skill, int Gem)> Supports { get; }
 
         public byte[] Encode(LootData data) => Protocol.Build(MessageType.Inventory, w =>
         {
@@ -269,6 +276,12 @@ namespace Game.Core
                 w.Write((byte)npc);
                 w.Write((byte)step);
             }
+            w.Write((byte)Supports.Count);
+            foreach (var (skill, gem) in Supports)
+            {
+                w.Write((ushort)skill);
+                w.Write((ushort)gem);
+            }
         });
 
         public static InventoryMessage Decode(byte[] data, LootData loot) => Protocol.Read(data, MessageType.Inventory, r =>
@@ -288,7 +301,9 @@ namespace Game.Core
             for (int count = r.ReadUInt16(); count > 0; count--) skills.Add((r.ReadUInt16(), r.ReadByte()));
             var stories = new List<(int, int)>();
             for (int count = r.ReadByte(); count > 0; count--) stories.Add((r.ReadByte(), r.ReadByte()));
-            return new InventoryMessage(equipment, bag, passives, skills, stories);
+            var supports = new List<(int, int)>();
+            for (int count = r.ReadByte(); count > 0; count--) supports.Add((r.ReadUInt16(), r.ReadUInt16()));
+            return new InventoryMessage(equipment, bag, passives, skills, stories, supports);
         });
     }
 

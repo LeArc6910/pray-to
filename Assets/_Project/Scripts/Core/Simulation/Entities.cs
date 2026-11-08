@@ -79,7 +79,18 @@ namespace Game.Core
         // The rank the skill works at: learned and added by the stats (SkillRules.Power).
         public int PowerOf(SkillDefinition skill) => SkillRules.Power(RankOf(skill), Stats, skill);
 
-        internal int CooldownFor(SkillDefinition skill) => SkillRules.CooldownTicks(skill, PowerOf(skill), Stats.CooldownRecoveryFor(skill.Tags));
+        internal int CooldownFor(SkillDefinition skill) =>
+            Math.Max(1, (int)Math.Round(SkillRules.CooldownTicks(skill, PowerOf(skill), Stats.CooldownRecoveryFor(skill.Tags)) * SkillSupports.CooldownFactor(SupportOf(skill))));
+
+        // The crystal set into each learned skill (Docs/Classes.md, 스킬 변형), and what it makes of the skill.
+        public Dictionary<SkillDefinition, MaterialDefinition> Supports { get; } = new Dictionary<SkillDefinition, MaterialDefinition>();
+
+        public SupportKind? SupportOf(SkillDefinition skill) => skill != null && Supports.TryGetValue(skill, out var gem) ? SkillSupports.KindOf(gem) : null;
+
+        // The tags a skill hits with: its own, what buffs grant and an element its support adds.
+        public SkillTag ContextFor(SkillDefinition skill) => Stats.ContextFor(skill) | SkillSupports.Tags(SupportOf(skill));
+
+        public int ManaCost(SkillDefinition skill) => SkillSupports.ManaCost(skill, SupportOf(skill));
 
         internal int DurationFor(SkillDefinition skill) => SkillRules.DurationTicks(skill, PowerOf(skill), Stats.SkillDurationFor(skill.Tags));
 

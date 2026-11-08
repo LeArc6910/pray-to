@@ -130,3 +130,10 @@ stone_table,stone_table,1,stone:5,Workbench
 banner,banner,1,slime_gel:2|copper_ore:2,Workbench
 mushroom_pot,mushroom_pot,1,stone:2|mushroom:1,Workbench
 recall_scroll,recall_scroll,2,slime_gel:2|stone:2,Workbench
+support_area,support_area,1,essence:8|warden_core:1,Anvil
+support_multi,support_multi,1,essence:8|glow_spore:4,Anvil
+support_haste,support_haste,1,essence:8|ice_crystal:4,Anvil
+support_power,support_power,1,essence:12|mithril_bar:2,Anvil
+support_fire,support_fire,1,essence:6|fire_pepper:3,Anvil
+support_cold,support_cold,1,essence:6|ice_crystal:3,Anvil
+support_lightning,support_lightning,1,essence:6|copper_wire:6,Anvil

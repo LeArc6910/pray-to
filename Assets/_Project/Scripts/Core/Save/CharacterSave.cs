@@ -16,11 +16,13 @@ namespace Game.Core
         // passive tree, by id. 5: friendships (World.Merchant.cs), by person id. 6: life skill experience
         // (World.Life.cs). 7: each friendship's request day and heart gifts had. 8: the skills learned and their ranks
         // (Docs/Classes.md, 스킬 포인트와 단계), by id. 9: how far through each person's story (Docs/Npcs.md, 이야기).
-        const int FormatVersion = 9;
+        // 10: the support crystal in each skill (Docs/Classes.md, 스킬 변형), by ids.
+        const int FormatVersion = 10;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
-            List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null)
+            List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null)
         {
+            Supports = supports ?? new List<(string, string)>();
             Stories = stories ?? new List<(string, int)>();
             SkillRanks = skills ?? new List<(string, int)>();
             LifeExperience = life ?? new List<int>();
@@ -49,11 +51,14 @@ namespace Game.Core
         public IReadOnlyList<(string Id, int Rank)> SkillRanks { get; }
         // The last story step done with each person, by person id.
         public IReadOnlyList<(string Npc, int Step)> Stories { get; }
+        // The crystal set in each skill: the skill's id and the crystal's (World.RestoreSupports).
+        public IReadOnlyList<(string Skill, string Gem)> Supports { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
             IEnumerable<string> passives = null, IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> friendships = null,
-            IEnumerable<int> life = null, IEnumerable<(string Id, int Rank)> skillRanks = null, IEnumerable<(string Npc, int Step)> stories = null)
+            IEnumerable<int> life = null, IEnumerable<(string Id, int Rank)> skillRanks = null, IEnumerable<(string Npc, int Step)> stories = null,
+            IEnumerable<(string Skill, string Gem)> supports = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -102,6 +107,13 @@ namespace Game.Core
                 {
                     w.Write(npc);
                     w.Write((byte)step);
+                }
+                var set = (supports ?? Enumerable.Empty<(string, string)>()).ToList();
+                w.Write((ushort)set.Count);
+                foreach (var (skill, gem) in set)
+                {
+                    w.Write(skill);
+                    w.Write(gem);
                 }
             }
             return stream.ToArray();
@@ -170,7 +182,9 @@ namespace Game.Core
                 for (int count = version >= 8 ? r.ReadUInt16() : 0; count > 0; count--) ranks.Add((r.ReadString(), r.ReadByte()));
                 var stories = new List<(string, int)>();
                 for (int count = version >= 9 ? r.ReadUInt16() : 0; count > 0; count--) stories.Add((r.ReadString(), r.ReadByte()));
-                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories);
+                var supports = new List<(string, string)>();
+                for (int count = version >= 10 ? r.ReadUInt16() : 0; count > 0; count--) supports.Add((r.ReadString(), r.ReadString()));
+                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

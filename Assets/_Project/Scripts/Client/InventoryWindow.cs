@@ -1090,8 +1090,9 @@ namespace Game.Client
                 }
             }
 
-            // Every skill of each class, in the order they open up.
-            float rowName = _textWidth - IconRoom - 64 - 8;
+            // Every skill of each class, in the order they open up; a learned one also takes a support crystal
+            // ([변형], Docs/Classes.md 스킬 변형).
+            float rowName = _textWidth - IconRoom - 64 - 60 - 8;
             foreach (var owner in _client.Classes)
             {
                 GUILayout.Space(8);
@@ -1105,14 +1106,18 @@ namespace Game.Client
                     if (rank == 0) GUI.color = new Color(1, 1, 1, open ? 0.8f : 0.4f);
                     Icon(Sprites.Icon(skill));
                     string state = rank > 0 ? $"{RankText(skill)}/{SkillRules.MaxRank}" : open ? "배우지 않음" : $"Lv {skill.Level}부터";
+                    if (_client.Supports.TryGetValue(skill, out var set)) state += $" · {set.Name}";
                     GUILayout.Label(new GUIContent(Fit($"{skill.Name} · {state}", rowName), SkillTooltip(skill)), GUILayout.Width(rowName));
                     GUI.color = previous;
                     bool can = _client.CanRaise(skill);
                     GUI.enabled = can;
                     string label = rank >= SkillRules.MaxRank ? "최고" : rank > 0 ? "올리기" : "배우기";
                     if (Ui.LayoutButton(label, GUILayout.Width(64))) Send(_client.LearnSkillCommand(skill), Sound.Click);
+                    GUI.enabled = rank > 0;
+                    if (Ui.LayoutButton(_supportFor == skill ? "닫기" : "변형", GUILayout.Width(56))) _supportFor = _supportFor == skill ? null : skill;
                     GUI.enabled = true;
                     GUILayout.EndHorizontal();
+                    if (_supportFor == skill && rank > 0) DrawSupports(skill);
                     // What it does at its rank now, or at the first for one not learned; and what the next adds.
                     var dim = GUI.color;
                     GUI.color = new Color(0.8f, 0.8f, 0.8f, rank > 0 ? 1 : 0.7f);
@@ -1156,6 +1161,37 @@ namespace Game.Client
             }
         }
 
+        SkillDefinition _supportFor;
+
+        // The crystal in the skill and the ones in the bag that would change it, each a button that sets it in.
+        void DrawSupports(SkillDefinition skill)
+        {
+            float width = _textWidth - 16;
+            if (_client.Supports.TryGetValue(skill, out var set) && SkillSupports.KindOf(set) is SupportKind kind)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(16);
+                GUILayout.Label(Fit($"{skill.Name}의 변형: {set.Name} ({SkillSupports.Describe(kind)})", width - 64), GUILayout.Width(width - 64));
+                if (Ui.LayoutButton("빼기", GUILayout.Width(56))) Send(_client.SupportCommand(skill, null), Sound.Click);
+                GUILayout.EndHorizontal();
+            }
+            var gems = _client.Bag.Materials.Keys.Where(m => SkillSupports.KindOf(m) is SupportKind k && SkillSupports.Fits(skill, k)).ToList();
+            if (gems.Count == 0)
+            {
+                GUILayout.Label(Fit("끼울 결정이 가방에 없다. 모루에서 강화 정수로 만든다(확산·분열·가속·증폭·화염·냉기·번개)", _textWidth));
+                return;
+            }
+            foreach (var gem in gems)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(16);
+                Icon(Sprites.Icon(gem));
+                if (Ui.LayoutButton(Ui.Wrap($"{gem.Name} 끼우기: {SkillSupports.Describe(SkillSupports.KindOf(gem).Value)}", GUI.skin.button, width - IconRoom), GUILayout.Width(width - IconRoom)))
+                    Send(_client.SupportCommand(skill, gem), Sound.Craft);
+                GUILayout.EndHorizontal();
+            }
+        }
+
         // "2단계", or "2+1단계" when the passive tree or gear add a rank to it.
         string RankText(SkillDefinition skill)
         {
@@ -1172,6 +1208,7 @@ namespace Game.Client
             string tags = skill.Tags == SkillTag.None ? "" : $" · {StatText.TagNames(skill.Tags)}";
             string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, power, _client.Stats)}";
             if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, power + 1, _client.Stats)}";
+            if (_client.SupportOf(skill) is SupportKind kind) text += $"\n변형: {_client.Supports[skill].Name} ({SkillSupports.Describe(kind)})";
             return text;
         }
 

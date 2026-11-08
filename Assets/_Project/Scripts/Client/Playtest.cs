@@ -546,6 +546,7 @@ namespace Game.Client
                 .Field("skills", string.Join(",", player.Skills.Select(s => s.Id)))
                 .Field("ranks", string.Join(",", player.SkillRanks.OrderBy(p => p.Key.Index).Select(p => $"{p.Key.Id}:{p.Value}")))
                 .Field("skillPoints", player.SkillPoints)
+                .Field("supports", string.Join(",", player.Supports.Select(p => $"{p.Key.Id}:{p.Value.Id}")))
                 .Field("passives", player.Passives.Count)
                 .Field("friends", Counts(player.Friendships.Select(f => new KeyValuePair<string, int>(f.Key, f.Value.Points)), id => id))
                 .Field("stories", Counts(player.StorySteps, id => id))

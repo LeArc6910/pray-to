@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
@@ -280,6 +281,83 @@ namespace Game.Core.Tests
             Assert.IsTrue(raise.Conditions.Any(c => GuideProgress.IsMet(c, Facts(4, 3))));
             Assert.AreEqual("2/3", GuideProgress.Progress(raise, Facts(4, 2)));
             Assert.Less(goals.ToList().IndexOf(learn), goals.ToList().FindIndex(g => g.Id == "passive"), "right after skill points first come");
+        }
+
+        static World LootRoom() =>
+            new World(Maps.Room(30), TileMap.Center(15, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+
+        static MaterialDefinition Crystal(string id) => Gear.Data.FindMaterial(id);
+
+        [Test]
+        public void SupportCrystalsGoIntoLearnedSkillsAndComeBackOut()
+        {
+            var world = LootRoom();
+            var player = world.AddPlayer("a", null, Warrior);
+            var whirlwind = Skill("whirlwind");
+            Assert.IsFalse(world.SetSupport(player.Id, whirlwind, Crystal("support_area")), "none in the bag");
+            player.Inventory.AddMaterial(Crystal("support_area"), 1);
+            player.Inventory.AddMaterial(Crystal("support_multi"), 1);
+            Assert.IsFalse(world.SetSupport(player.Id, whirlwind, Crystal("support_multi")), "more projectiles do nothing for a nova");
+            Assert.IsFalse(world.SetSupport(player.Id, Skill("war_cry"), Crystal("support_area")), "not learned");
+
+            Assert.IsTrue(world.SetSupport(player.Id, whirlwind, Crystal("support_area")));
+            Assert.AreEqual(SupportKind.Area, player.SupportOf(whirlwind));
+            Assert.AreEqual(0, player.Inventory.CountOf(Crystal("support_area")));
+            Assert.AreEqual(12, player.ManaCost(whirlwind), "20% more mana");
+
+            // A dummy just past the plain reach is hit only with the wider whirl.
+            var dummy = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(whirlwind.Radius + 0.4f + 0.3f, 0));
+            Assert.IsTrue(world.UseSkill(player.Id, 0, Vec2.Zero));
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.Hit && e.Target == dummy.Id));
+
+            Assert.IsTrue(world.SetSupport(player.Id, whirlwind, null));
+            Assert.IsNull(player.SupportOf(whirlwind));
+            Assert.AreEqual(1, player.Inventory.CountOf(Crystal("support_area")), "taken out, back in the bag");
+            Assert.IsFalse(world.SetSupport(player.Id, whirlwind, null), "nothing left to take out");
+        }
+
+        [Test]
+        public void SupportsChangeCountDamageAndTags()
+        {
+            var world = LootRoom();
+            var player = world.AddPlayer("a", null, FireMage);
+            var fireball = Skill("fireball");
+            player.Inventory.AddMaterial(Crystal("support_multi"), 1);
+            Assert.IsTrue(world.SetSupport(player.Id, fireball, Crystal("support_multi")));
+            Assert.IsTrue(world.UseSkill(player.Id, 0, new Vec2(1, 0)));
+            Assert.AreEqual(3, world.Projectiles.Count, "two more fireballs");
+
+            var cold = LootRoom();
+            var mage = cold.AddPlayer("b", null, FireMage);
+            mage.Inventory.AddMaterial(Crystal("support_cold"), 1);
+            Assert.IsTrue(cold.SetSupport(mage.Id, fireball, Crystal("support_cold")));
+            Assert.AreEqual(SkillTag.Magic | SkillTag.Fire | SkillTag.Cold, mage.ContextFor(fireball));
+
+            Assert.AreEqual(1.4f, SkillSupports.DamageFactor(SupportKind.Power));
+            Assert.AreEqual(Math.Round(fireball.CooldownTicks * 0.75f), SkillRules.CooldownTicks(fireball, 1) * SkillSupports.CooldownFactor(SupportKind.Haste), 1);
+        }
+
+        [Test]
+        public void SupportsAreSavedAndComeBackWithAReset()
+        {
+            var world = LootRoom();
+            var player = world.AddPlayer("a", null, Warrior);
+            AtLevel(player, 4);
+            world.LearnSkill(player.Id, Skill("war_cry"));
+            player.Inventory.AddMaterial(Crystal("support_haste"), 1);
+            Assert.IsTrue(world.SetSupport(player.Id, Skill("war_cry"), Crystal("support_haste")));
+
+            var saved = CharacterSave.Read(CharacterSave.Write(new Equipment(), new Inventory(), player.Experience,
+                skillRanks: player.SkillRanks.Select(p => (p.Key.Id, p.Value)), supports: player.Supports.Select(p => (p.Key.Id, p.Value.Id))), Gear.Data);
+            CollectionAssert.Contains(saved.Supports, ("war_cry", "support_haste"));
+            var again = LootRoom().AddPlayer("b", null, Warrior);
+            World.RestoreSkills(again, Classes.Shipped, saved.SkillRanks);
+            World.RestoreSupports(again, Classes.Shipped, Gear.Data, saved.Supports);
+            Assert.AreEqual(SupportKind.Haste, again.SupportOf(Skill("war_cry")));
+
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("coin"), 50);
+            Assert.IsTrue(world.ResetSkills(player.Id));
+            Assert.AreEqual(1, player.Inventory.CountOf(Crystal("support_haste")), "the crystal comes back with the points");
         }
 
         [Test]

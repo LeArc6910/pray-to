@@ -981,6 +981,17 @@ async function gear(browser) {
   check(!!reset && reset.skillPoints === spentBefore.skillPoints + 2 && count(reset, 'coin') === count(spentBefore, 'coin') - 20,
     `되돌리면 포인트 둘이 돌아오고 금화 20을 낸다 (포인트 ${spentBefore.skillPoints} → ${reset && reset.skillPoints})`);
   await game.press('배우기', '전투 함성');
+  // A support crystal into the whirlwind ([변형]), and back out.
+  await game.send('give support_area 1');
+  await game.wait(400);
+  check(await game.press('변형', '회전베기'), '회전베기의 [변형]을 누른다');
+  check(await game.press(/^확산의 결정 끼우기/), '[확산의 결정 끼우기]가 보이고 누른다');
+  const supported = await game.until(i => /whirlwind:support_area/.test(i.supports), 3000, game.inventory);
+  check(!!supported && count(supported, 'support_area') === 0, `확산의 결정이 회전베기에 들어간다 (${supported && supported.supports})`);
+  await game.shot('skills-support', '회전베기에 끼운 확산의 결정');
+  check(await game.press('빼기'), '[빼기]를 누른다');
+  const out = await game.until(i => !i.supports && count(i, 'support_area') === 1, 3000, game.inventory);
+  check(!!out, '빼면 결정이 가방으로 돌아온다');
   const skills = (await game.inventory()).skills;
   await game.press('▼');
   check((await game.inventory()).skills !== skills, `▼로 스킬 칸 순서를 바꾼다 (${skills} → ${(await game.inventory()).skills})`);
