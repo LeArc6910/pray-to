@@ -110,7 +110,7 @@ namespace Game.Client
                 if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
                 {
                     string tags = skill.Tags == SkillTag.None ? "" : " · " + StatText.TagNames(skill.Tags);
-                    DrawTooltip($"{skill.Name} {rank}단계 ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, rank)}", area);
+                    DrawTooltip($"{skill.Name} {rank}단계 ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, rank, client.Stats)}", area);
                 }
             }
             DrawPotion(client, Area(count, count));

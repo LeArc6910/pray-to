@@ -1110,13 +1110,13 @@ namespace Game.Client
                     bool can = _client.CanRaise(skill);
                     GUI.enabled = can;
                     string label = rank >= SkillRules.MaxRank ? "최고" : rank > 0 ? "올리기" : "배우기";
-                    if (Ui.LayoutButton(label, GUILayout.Width(64))) Send(_client.LearnSkillCommand(skill), Sound.Buff);
+                    if (Ui.LayoutButton(label, GUILayout.Width(64))) Send(_client.LearnSkillCommand(skill), Sound.Click);
                     GUI.enabled = true;
                     GUILayout.EndHorizontal();
                     // What it does at its rank now, or at the first for one not learned; and what the next adds.
                     var dim = GUI.color;
                     GUI.color = new Color(0.8f, 0.8f, 0.8f, rank > 0 ? 1 : 0.7f);
-                    GUILayout.Label(Ui.Wrap(SkillText.Numbers(skill, Math.Max(1, _client.PowerOf(skill))), GUI.skin.label, _textWidth));
+                    GUILayout.Label(Ui.Wrap(SkillText.Numbers(skill, Math.Max(1, _client.PowerOf(skill)), _client.Stats), GUI.skin.label, _textWidth));
                     GUI.color = dim;
                 }
             }
@@ -1170,8 +1170,8 @@ namespace Game.Client
             int rank = _client.RankOf(skill);
             int power = Math.Max(1, _client.PowerOf(skill));
             string tags = skill.Tags == SkillTag.None ? "" : $" · {StatText.TagNames(skill.Tags)}";
-            string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, power)}";
-            if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, power + 1)}";
+            string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, power, _client.Stats)}";
+            if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, power + 1, _client.Stats)}";
             return text;
         }
 
@@ -1256,9 +1256,10 @@ namespace Game.Client
         void DrawPassiveTree(System.Collections.Generic.IReadOnlyList<PassiveNode> tree)
         {
             int minX = tree.Min(n => n.X), maxX = tree.Max(n => n.X), minY = tree.Min(n => n.Y), maxY = tree.Max(n => n.Y);
-            // Steps that fit the column, between small and roomy.
-            float step = Mathf.Clamp((_textWidth - 40) / Mathf.Max(1, maxX - minX), 26, 48);
-            float size = Mathf.Min(34, step - 6);
+            // Steps that fit the column, between small and roomy: the whole tree always fits its width (a phone held
+            // upright gets small points; the open ones are also big buttons under the tree).
+            float step = Mathf.Clamp((_textWidth - 30) / Mathf.Max(1, maxX - minX), 16, 48);
+            float size = Mathf.Clamp(step - 4, 12, 34);
             var canvas = GUILayoutUtility.GetRect((maxX - minX) * step + size + 8, (maxY - minY) * step + size + 8, GUILayout.ExpandWidth(false));
             Vector2 At(PassiveNode n) => new Vector2(canvas.x + 4 + size / 2 + (n.X - minX) * step, canvas.y + 4 + size / 2 + (n.Y - minY) * step);
             bool Taken(PassiveNode n) => n.IsStart || _client.Passives.Contains(n);

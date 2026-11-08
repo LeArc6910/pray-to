@@ -115,6 +115,8 @@ namespace Game.Client
             Sparkles,
             // A star where a blow lands.
             Impact,
+            // Blades of light whirling round: spinning strikes and ice storms.
+            Vortex,
         }
 
         // A bit flying off something that died, fading as it slows.
@@ -1361,7 +1363,7 @@ namespace Game.Client
                         Color = Palette.Of(learnt.Tags | learnt.Grants),
                     });
                     AddFlash(learner.Position, learner.Diameter * 1.4f, Palette.Of(learnt.Tags | learnt.Grants), FlashKind.Sparkles);
-                    if (e.Source == _client.PlayerId) Sounds.Play(Sound.Buff);
+                    if (e.Source == _client.PlayerId) Sounds.Play(Sound.Learn);
                     break;
                 case SimEventType.Dug:
                     // A puff of dust where the wall was struck, bigger when it gives way.
@@ -1467,7 +1469,8 @@ namespace Game.Client
                     var where = new Vector3(e.Position.X, e.Position.Y + 1.2f, 0);
                     _floating.Add(new Floating { Position = where, Text = reaction, Color = e.Amount == World.Disliked ? OffLabel : PowerLabel });
                     if (e.Amount >= World.Liked) AddFlash(where, 1, PowerLabel, FlashKind.Sparkles);
-                    if (e.Source == _client.PlayerId) Sounds.Play(e.Amount == World.Disliked ? Sound.Down : Sound.Pop);
+                    if (e.Source == _client.PlayerId) Sounds.Play(e.Amount == World.Disliked ? Sound.Down : e.Amount == World.StoryDone ? Sound.Story : Sound.Pop);
+                    if (e.Amount == World.StoryDone) AddFlash(where, 1.6f, PowerLabel, FlashKind.Sparkles);
                     break;
                 case SimEventType.Morning:
                     // Everyone slept: the next day's morning (GameRoot shows the banner, as for any morning).
@@ -1559,12 +1562,28 @@ namespace Game.Client
             if (skill == null || caster == null) return;
             var color = Palette.Of(skill.Tags | skill.Grants | GrantedTags(e.Source));
             _floating.Add(new Floating { Position = caster.Position + new Vector3(0, 0.4f, 0), Text = skill.Name, Color = color });
-            Hear(skill.Kind == SkillKind.Nova ? Sound.Nova : skill.Kind == SkillKind.Buff ? Sound.Buff : skill.Kind == SkillKind.Heal ? Sound.Heal : Sound.Zap, caster.Position);
+            // Each kind its sound; cold skills ring like ice, and the big fiery or stormy ones land with a boom too.
+            var sound = skill.Kind switch
+            {
+                SkillKind.Buff => Sound.Buff,
+                SkillKind.Heal => Sound.Heal,
+                SkillKind.Dash => Sound.Dash,
+                _ when (skill.Tags & SkillTag.Cold) != 0 => Sound.Ice,
+                SkillKind.Nova => Sound.Nova,
+                _ => Sound.Zap,
+            };
+            Hear(sound, caster.Position);
+            if (skill.Kind == SkillKind.Nova && skill.Radius >= 3) Hear(Sound.Boom, caster.Position, 0.6f);
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
                     caster.CastTime = CastSeconds;
                     AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, FlashKind.Ring);
+                    // Spinning blades for the whirls, a fiery blast for the big fires, whirling ice for the cold.
+                    if ((skill.Tags & SkillTag.Melee) != 0 || (skill.Tags & SkillTag.Cold) != 0 && skill.Radius >= 3)
+                        AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, FlashKind.Vortex);
+                    else if ((skill.Tags & SkillTag.Fire) != 0 && skill.Radius >= 3)
+                        AddFlash(caster.Position, skill.Radius, color, FlashKind.Burst);
                     if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.06f);
                     break;
                 case SkillKind.Buff:
@@ -1738,6 +1757,7 @@ namespace Game.Client
         static Sprite EffectSprite(FlashKind kind, int diameter, int frame) => kind switch
         {
             FlashKind.Ring => Sprites.Centered($"fx/ring/{diameter}/{frame}", () => EffectArt.Ring(diameter, frame)),
+            FlashKind.Vortex => Sprites.Centered($"fx/vortex/{diameter}/{frame}", () => EffectArt.Vortex(diameter, frame)),
             FlashKind.Sparkles => Sprites.Centered($"fx/sparkles/{diameter}/{frame}", () => EffectArt.Sparkles(diameter, frame)),
             FlashKind.Impact => Sprites.Centered($"fx/impact/{diameter}/{frame}", () => EffectArt.Impact(diameter, frame)),
             _ => Sprites.Centered($"fx/burst/{diameter}/{frame}", () => EffectArt.Burst(diameter, frame)),

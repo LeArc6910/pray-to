@@ -44,6 +44,14 @@ namespace Game.Client
         Thump,
         // A storm's thunder, rolling on.
         Thunder,
+        // A dash: a rush of air rising.
+        Dash,
+        // A skill learned or raised: two bell notes.
+        Learn,
+        // A person's story step done: a short fanfare.
+        Story,
+        // Ice: a cold glassy shimmer, for frost skills.
+        Ice,
     }
 
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
@@ -228,6 +236,29 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Sine, 0, 0.2f, 90, 45, 0.7f, decay: 3));
                     parts.Add(Noise(0, 0.08f, 0.5f, 0.6f, decay: 6, seed: 22));
                     level = 0.95f;
+                    break;
+                case Sound.Dash:
+                    parts.Add(Noise(0, 0.28f, 0.7f, 0.35f, attack: 0.03f, decay: 2.5f, seed: 13));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.25f, 180, 620, 0.35f, decay: 2));
+                    level = 0.6f;
+                    break;
+                case Sound.Learn:
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 1047, 1047, 0.45f, decay: 2.5f));
+                    parts.Add(Tone(Wave.Sine, 0.12f, 0.6f, 1568, 1568, 0.35f, decay: 2.5f));
+                    parts.Add(Tone(Wave.Triangle, 0.12f, 0.6f, 784, 784, 0.15f, decay: 2.5f));
+                    level = 0.6f;
+                    break;
+                case Sound.Story:
+                    Arpeggio(parts, Wave.Pulse, 0.09f, 0.11f, 0.35f, 392, 523, 659);
+                    parts.Add(Tone(Wave.Pulse, 0.27f, 0.45f, 784, 784, 0.35f, decay: 1.5f, vibrato: 0.01f, vibratoRate: 6));
+                    parts.Add(Tone(Wave.Triangle, 0.27f, 0.45f, 392, 392, 0.25f, decay: 1.5f));
+                    level = 0.7f;
+                    break;
+                case Sound.Ice:
+                    parts.Add(Tone(Wave.Sine, 0, 0.45f, 1800, 2400, 0.3f, decay: 2, vibrato: 0.03f, vibratoRate: 22));
+                    parts.Add(Tone(Wave.Sine, 0.05f, 0.4f, 2700, 3200, 0.2f, decay: 2.5f));
+                    parts.Add(Noise(0, 0.4f, 0.3f, 0.85f, attack: 0.05f, decay: 2.5f, seed: 17));
+                    level = 0.5f;
                     break;
                 case Sound.Thunder:
                     parts.Add(Noise(0, 1.4f, 1, 0.82f, attack: 0.02f, decay: 1.6f, seed: 31));

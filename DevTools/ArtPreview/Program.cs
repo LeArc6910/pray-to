@@ -162,6 +162,7 @@ namespace Game.Client
                 ("burst (fire)", EffectArt.Diameter(2 * 1.6f), Rgba.Hex("#FF8A3C"), EffectArt.Frames, EffectArt.Burst),
                 ("burst (dust)", EffectArt.Diameter(2 * 0.35f), Rgba.Hex("#B8A890"), EffectArt.Frames, EffectArt.Burst),
                 ("ring (frost)", EffectArt.Diameter(2 * 2.8f), Rgba.Hex("#8CD8FF"), EffectArt.Frames, EffectArt.Ring),
+                ("vortex (blade storm)", EffectArt.Diameter(2 * 3.2f), Rgba.Hex("#E6E6F2"), EffectArt.Frames, EffectArt.Vortex),
                 ("sparkles (heal)", EffectArt.Diameter(2 * 0.8f), Rgba.Hex("#7CE07C"), EffectArt.Frames, EffectArt.Sparkles),
                 ("impact (crit)", EffectArt.Diameter(2 * 0.55f), Rgba.Hex("#FFD84C"), EffectArt.Frames, EffectArt.Impact),
                 ("aura (buff)", EffectArt.Diameter(0.8f * 1.7f), Rgba.Hex("#F2C440"), EffectArt.AuraFrames, EffectArt.Aura),

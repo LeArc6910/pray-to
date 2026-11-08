@@ -49,6 +49,35 @@ namespace Game.Client
             return image;
         }
 
+        // A whirl: three blades of light sweeping round the middle, turning further each frame and thinning out at the
+        // end, for spinning strikes (whirlwind, blade storm) and storms of ice (blizzard).
+        public static PixelImage Vortex(int diameter, int frame)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float t = (frame + 1f) / Frames;
+            float centre = diameter / 2f;
+            float outer = centre - 1;
+            double turn = t * Math.PI * 1.4;
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    float r = Distance(x, y, centre);
+                    if (r > outer || r < outer * 0.25f) continue;
+                    double angle = Math.Atan2(y + 0.5 - centre, x + 0.5 - centre) - turn - r / outer * 1.6;
+                    // Three arms: how near this pixel is to the middle of one, 0 at its middle and 1 between arms.
+                    double arm = Math.Abs(((angle / (2 * Math.PI / 3)) % 1 + 1) % 1 - 0.5) * 2;
+                    double width = 0.35 * (1 - t * 0.5);
+                    if (arm > width) continue;
+                    if (frame >= Frames - 2 && Hash(x, y, frame) % 3 == 0) continue;
+                    float edge = (float)(arm / width);
+                    var color = edge < 0.35f ? Core : edge < 0.7f ? Light : Mid;
+                    image[x, y] = frame >= Frames - 2 ? Fade(color) : color;
+                }
+            }
+            return image;
+        }
+
         // A blast: a disc that fills out with a white-hot middle, then hollows from the inside and breaks up, with
         // sparks thrown past its edge.
         public static PixelImage Burst(int diameter, int frame)
