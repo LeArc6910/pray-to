@@ -19,6 +19,7 @@ namespace CoreSandbox
     // dotnet run -- --rift [tiers] [seed]             bots open void rifts tier after tier (--players, --gear, --classes)
     // dotnet run -- --defense [levels] [seed]        bots hold a ward stone level after level (--turrets <n>, --players, --gear, --classes)
     // add --rank <1-5> for the bots' skill ranks, --level <n> for their level (and only the skills open by then)
+    // dotnet run -- --skills [seconds]               every class skill alone against a pack of dummies, rank 1 and 5 (--gear)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
     static class Program
@@ -117,6 +118,9 @@ namespace CoreSandbox
                         args = args.Where((_, i) => i != turretsFlag && i != turretsFlag + 1).ToArray();
                     }
                     DefenseSim.Run(data, LoadMonsters(), LoadTiles(data), Number(1, 5), Seed(2), players, gear, LoadClasses(classIds), dodge, turrets);
+                    break;
+                case "--skills":
+                    SkillSim.Run(data, LoadClassData(), Number(1, 60), gear);
                     break;
                 case "--economy":
                     EconomySim.Run(data, LoadTiles(data), LoadNpcs(data));
@@ -303,6 +307,18 @@ namespace CoreSandbox
             foreach (string error in data.Errors) Console.Error.WriteLine(error);
             Environment.Exit(1);
             return null;
+        }
+
+        static ClassData LoadClassData()
+        {
+            string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
+            var data = ClassSheet.Parse(
+                File.ReadAllText(Path.Combine(folder, ClassSheet.ClassesFile)),
+                File.ReadAllText(Path.Combine(folder, ClassSheet.SkillsFile)),
+                File.ReadAllText(Path.Combine(folder, ClassSheet.PassivesFile)));
+            foreach (string error in data.Errors) Console.Error.WriteLine(error);
+            if (!data.Success) Environment.Exit(1);
+            return data;
         }
 
         // The classes named on the command line, checked against the sheets.

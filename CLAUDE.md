@@ -44,6 +44,7 @@ dotnet run --project DevTools/CoreSandbox -- --economy
 dotnet run --project DevTools/CoreSandbox -- --factory 30
 dotnet run --project DevTools/CoreSandbox -- --defense 6 42 --gear iron_sword,iron_helmet,iron_armor,iron_boots --classes warrior --turrets 3
 dotnet run --project DevTools/CoreSandbox -- --rift 7 42 --players 2 --gear void_sword,void_helmet,void_armor,void_boots --classes warrior,fire_mage
+dotnet run --project DevTools/CoreSandbox -- --skills 60 --gear iron_sword
 
 # 도트 그림과 효과음·음악을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, cave.png, cave_unlit.png, arena.png, effects.png, sounds/, music/)
 dotnet run --project DevTools/ArtPreview
