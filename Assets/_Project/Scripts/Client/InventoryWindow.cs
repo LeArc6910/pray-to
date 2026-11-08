@@ -125,7 +125,7 @@ namespace Game.Client
             _pages.AddRange(new[] { Page.Gear, Page.Materials, Page.Classes, Page.Passives, Page.Character, Page.Journal });
             if (chest) _pages.Add(Page.Chest);
             if (merchant) _pages.Add(Page.Merchant);
-            _page = Tabs(_page, _pages);
+            _page = Tabs(_page, _pages, inner);
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
@@ -152,21 +152,24 @@ namespace Game.Client
         // first click after the bag opened was sometimes lost (LOCAL_TASKS.md, the 2026-10-31 UI check).
         readonly List<Page> _pages = new List<Page>();
 
-        Page Tabs(Page page, IReadOnlyList<Page> pages)
+        Page Tabs(Page page, IReadOnlyList<Page> pages, float width)
         {
             int count = pages.Count;
             const float gap = 4;
-            // In two rows when one would make the tabs too narrow for their names (a phone held upright).
+            // In two rows when one would make the tabs too narrow for their names (a phone held upright). Decided
+            // from the window's width, which is the same in every event: a rect from GetRect is a dummy while IMGUI
+            // lays out, so deciding from it asked for a second row there and not when drawing, and the mismatch
+            // threw and left every page blank.
+            int perRow = (width - gap * (count - 1)) / count < 64 ? (count + 1) / 2 : count;
             var probe = GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true));
-            int perRow = (probe.width - gap * (count - 1)) / count < 64 ? (count + 1) / 2 : count;
             var second = perRow < count ? GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true)) : probe;
-            float width = (probe.width - gap * (perRow - 1)) / perRow;
+            float tabWidth = (probe.width - gap * (perRow - 1)) / perRow;
             var e = Event.current;
             for (int i = 0; i < count; i++)
             {
                 var row = i < perRow ? probe : second;
                 int column = i < perRow ? i : i - perRow;
-                var tab = new Rect(row.x + column * (width + gap), row.y, width, row.height);
+                var tab = new Rect(row.x + column * (tabWidth + gap), row.y, tabWidth, row.height);
                 if (e.type == EventType.MouseDown && tab.Contains(e.mousePosition))
                 {
                     if (page != pages[i])
