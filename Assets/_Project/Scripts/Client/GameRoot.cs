@@ -1314,6 +1314,22 @@ namespace Game.Client
                 if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) text += $"\n{goal.Hint}";
                 entries.Add(($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}", text));
             }
+            // Today's requests from the people this player has met (Docs/Npcs.md), not yet done, with how much of each
+            // thing the bag holds. Two at most, one on a short screen.
+            foreach (var npc in _client.Npcs?.Npcs ?? Enumerable.Empty<NpcDefinition>())
+            {
+                if (entries.Count(e => e.Title.StartsWith("부탁")) >= (Ui.Short ? 1 : 2)) break;
+                if (!_client.Friendships.ContainsKey(npc.Id) || _client.RequestDoneToday(npc)) continue;
+                var request = _client.RequestOf(npc);
+                if (request == null) continue;
+                var needs = request.Need.Select(n =>
+                {
+                    int have = n.Thing is MaterialDefinition m ? _client.Bag.CountOfKind(m) : _client.Bag.CountOf((ConsumableDefinition)n.Thing);
+                    string name = n.Thing is MaterialDefinition material ? material.Name : ((ConsumableDefinition)n.Thing).Name;
+                    return $"{name} {Math.Min(have, n.Count)}/{n.Count}";
+                });
+                entries.Add(($"부탁: {npc.Role} {npc.Name}", string.Join(" · ", needs) + (Ui.Short ? "" : $"\n보답: {request.RewardText}")));
+            }
             var shown = new List<string>();
             if (entries.Count == 0)
             {

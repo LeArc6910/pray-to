@@ -792,6 +792,9 @@ async function npc(browser) {
   await game.press('부탁');
   await game.shot('shop-request', '[부탁]');
   await closeBag(game);
+  // Met now, the merchant's request for today is in the goal list with how much of it the bag holds.
+  const listed = (await game.texts()).hud.find(l => /^부탁: 상인/.test(l));
+  check(!!listed && /\d+\/\d+/.test(listed), `만난 상인의 오늘 부탁이 목표 목록에 진행도와 함께 (${listed || '없음'})`);
   await game.send('clock 2 7');
   await game.wait(1200);
   await bagTab(game, '상인');
