@@ -476,11 +476,15 @@ namespace Game.Client
             }
             DrawReelGauge();
 
-            // Each person's name and how well this player knows them, close by.
+            // Each person's name and how well this player knows them, close by; the one near enough to deal with also
+            // says where to (the bag's tab named for them).
+            var dealing = _client.NpcNear();
             foreach (var (x, y, npc) in _stalls)
             {
                 var at = new Vector3(x + 0.5f, y + 1.5f, 0);
-                if (Vector3.Distance(at, _self.Position) < 5) Label(at, $"{npc.Name} (호감 {_client.HeartsWith(npc)}/{World.MaxHearts}) · 가방에서", PowerLabel);
+                if (Vector3.Distance(at, _self.Position) >= 5) continue;
+                bool near = dealing != null && dealing.Value.Npc == npc;
+                Label(at, $"{npc.Name} 호감 {_client.HeartsWith(npc)}/{World.MaxHearts}" + (near ? " · 가방에서 거래" : ""), PowerLabel);
             }
             foreach (var text in _floating)
             {

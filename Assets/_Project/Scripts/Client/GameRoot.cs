@@ -31,7 +31,7 @@ namespace Game.Client
         // Its frame is 4 points thick at top and bottom, which leaves a 14-point well for a 12-point line of text.
         const float HealthBarHeight = 22;
         const float ManaBarHeight = 16;
-        const float ExperienceBarHeight = 12;
+        const float ExperienceBarHeight = 14;
         const float GuideCheckSeconds = 0.5f;
         // A goal's hint shows this long after the goal comes up; then only the goal stays.
         const float GoalHintSeconds = 30;

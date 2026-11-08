@@ -489,7 +489,7 @@ namespace Game.Client
             if (!hovering && !besideWindow) return;
             _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
             string text = hovering ? GUI.tooltip
-                : Controls.UsingTouch ? "아이템 이름을 누르고 있으면 설명이 보입니다." : "아이템 이름에 마우스를 올리면 설명이 보입니다.";
+                : Controls.UsingTouch ? "이름이나 칸을 누르고 있으면 설명이 보입니다." : "이름이나 칸에 마우스를 올리면 설명이 보입니다.";
             float room = Mathf.Min(TooltipWidth, Ui.Width - 20);
             var content = new GUIContent(Ui.Wrap(text, _tooltipStyle, room));
             // As wide as the longest line needs, so short descriptions get a small box.

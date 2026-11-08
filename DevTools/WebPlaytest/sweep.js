@@ -211,7 +211,8 @@ async function basics(browser) {
   check(has(hud, 'Lv 1 (0%)'), '경험치 막대에 Lv 1 (0%)');
   check(/목표 1\/\d+: 돌 10개 모으기 \(0\/10\)/.test(hud), `목표 목록에 첫 목표와 진행도 (${(hud.match(/목표[^|]*/) || [''])[0]})`);
   check(has(hud, '보상:'), '목표 아래에 보상');
-  check(!/WASD|스틱|보스 아레나:/.test(hud), '조작법·아레나 방향 줄이 HUD에 없다');
+  // The controls lines began "WASD 이동" (PC) or "왼쪽 스틱 이동" (touch); a goal's hint may still say "공격 스틱".
+  check(!/WASD|왼쪽\s스틱|보스 아레나:/.test(hud), '조작법·아레나 방향 줄이 HUD에 없다');
   await game.shot('first', '새 캐릭터 첫 화면');
 
   let inv = await game.inventory();
