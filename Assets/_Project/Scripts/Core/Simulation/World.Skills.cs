@@ -234,9 +234,10 @@ namespace Game.Core
             float damage = skill.Damage > 0 ? RollSkill(player, skill, out critical) : 0;
             var tags = player.ContextFor(skill);
             float reach = SkillSupports.Radius(skill, player.SupportsOf(skill));
+            var doors = DoorsFor(player);
             for (float gone = 0; gone < skill.Range; gone += DashStep)
             {
-                var next = Collision.Move(Map, player.Position, PlayerRadius, player.Facing * Math.Min(DashStep, skill.Range - gone));
+                var next = Collision.Move(Map, player.Position, PlayerRadius, player.Facing * Math.Min(DashStep, skill.Range - gone), passable: doors);
                 if (Vec2.Distance(next, player.Position) < 1e-4f) break;
                 player.Position = next;
                 if (damage <= 0) continue;

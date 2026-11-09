@@ -70,6 +70,79 @@ namespace Game.Core
             if (Map.InBounds(x, y) && Map[x, y] == TileType.Bed && owner.Length > 0) _beds[y * Map.Width + x] = owner;
         }
 
+        // Locked doors (Docs/Crafting.md, 문 잠그기, 2026-11-09). A player locks the door ahead and it is theirs, by
+        // name like a bed: they walk through it as through any door, and everyone else, monsters too, finds it a wall.
+        // Only its owner unlocks it or takes it up with a pickaxe. Each lock a door key (y × width + x) and its owner.
+        readonly Dictionary<int, string> _locks = new Dictionary<int, string>();
+
+        // Goes up when a lock is put on or comes off, so the host sends the locks again (WorldHost.SendLocks).
+        public int LockVersion { get; private set; }
+
+        // Every locked door: where it is and whose.
+        public IEnumerable<(int X, int Y, string Owner)> Locks =>
+            _locks.Select(pair => (pair.Key % Map.Width, pair.Key / Map.Width, pair.Value)).ToList();
+
+        // Who locked the door, or null.
+        public string LockOwner(int x, int y) => Map.InBounds(x, y) && _locks.TryGetValue(y * Map.Width + x, out var owner) ? owner : null;
+
+        // The doors the player walks through (Collision's passable): the ones they locked. Null when they locked none.
+        public ISet<int> DoorsFor(Player player)
+        {
+            HashSet<int> doors = null;
+            foreach (var pair in _locks)
+            {
+                if (pair.Value != player.Name) continue;
+                (doors ??= new HashSet<int>()).Add(pair.Key);
+            }
+            return doors;
+        }
+
+        // The door a player at this position facing this way locks or unlocks: the tile ahead where they build, or the
+        // one they would dig. The client asks the same to show its buttons.
+        public static (int X, int Y)? DoorAhead(TileMap map, Vec2 position, Vec2 facing)
+        {
+            foreach (var (x, y) in new[] { TileAhead(position, facing), DigAhead(position, facing) })
+            {
+                if (map.InBounds(x, y) && TileMap.IsDoor(map[x, y])) return (x, y);
+            }
+            return null;
+        }
+
+        // Locks the door ahead. False when it is not an open door, or someone stands in it.
+        public bool LockDoor(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || DoorAhead(Map, player.Position, player.Facing) is not (int x, int y)) return false;
+            if (Map[x, y] != TileType.Door) return false;
+            if (_players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, x, y))) return false;
+            SetTile(x, y, TileType.LockedDoor);
+            _locks[y * Map.Width + x] = player.Name;
+            LockVersion++;
+            return true;
+        }
+
+        // Takes the player's lock off the door ahead. False when it is not a door they locked.
+        public bool UnlockDoor(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || DoorAhead(Map, player.Position, player.Facing) is not (int x, int y)) return false;
+            if (LockOwner(x, y) != player.Name) return false;
+            SetTile(x, y, TileType.Door);
+            return true;
+        }
+
+        void LockTileChanged(int x, int y, TileType type)
+        {
+            if (type != TileType.LockedDoor && _locks.Remove(y * Map.Width + x)) LockVersion++;
+        }
+
+        internal void RestoreLock(int x, int y, string owner)
+        {
+            if (!Map.InBounds(x, y) || Map[x, y] != TileType.LockedDoor || owner.Length == 0) return;
+            _locks[y * Map.Width + x] = owner;
+            LockVersion++;
+        }
+
         // A recall scroll: home after RecallSeconds, unless a hit breaks it off first.
         void StartRecall(Player player)
         {

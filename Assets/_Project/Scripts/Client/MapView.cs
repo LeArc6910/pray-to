@@ -275,7 +275,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.ObsidianOre) return new Color32(110, 70, 150, 255);
             if (_map[x, y] == TileType.VoidOre) return new Color32(180, 140, 255, 255);
             if (TileMap.IsPaving(_map[x, y])) return new Color32(150, 138, 120, 255);
-            if (_map[x, y] == TileType.Door) return new Color32(170, 120, 70, 255);
+            if (TileMap.IsDoor(_map[x, y])) return new Color32(170, 120, 70, 255);
             if (_map[x, y] == TileType.Table || _map[x, y] == TileType.Banner || _map[x, y] == TileType.Pot) return new Color32(200, 160, 110, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);
             if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);

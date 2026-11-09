@@ -97,7 +97,7 @@ namespace Game.Core
             var tiles = edge.Select(e => map[e.Item1, e.Item2]).ToList();
             // Decor stands round the edge (it is solid); a rug lies on the floor inside.
             bool decorated = tiles.Any(t => Decor.Contains(t)) || floor.Any(f => Decor.Contains(map[f.Item1, f.Item2]));
-            return new Room(floor, edge.ToList(), closed, tiles.Contains(TileType.Door), tiles.Contains(TileType.Bed), decorated,
+            return new Room(floor, edge.ToList(), closed, tiles.Any(TileMap.IsDoor), tiles.Contains(TileType.Bed), decorated,
                 tiles.Where(t => people != null && people.Contains(t)).Distinct().ToList());
         }
 
@@ -155,7 +155,7 @@ namespace Game.Core
         {
             var floor = new HashSet<(int, int)>(room.Floor);
             bool NearDoor(int x, int y) =>
-                new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }.Any(d => map.InBounds(x + d.Item1, y + d.Item2) && map[x + d.Item1, y + d.Item2] == TileType.Door);
+                new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }.Any(d => map.InBounds(x + d.Item1, y + d.Item2) && TileMap.IsDoor(map[x + d.Item1, y + d.Item2]));
             var candidates = room.Floor
                 .Where(f => floor.Contains((f.X, f.Y - 1)) && !floor.Contains((f.X, f.Y + 1)) && !NearDoor(f.X, f.Y) && !NearDoor(f.X, f.Y - 1))
                 .OrderByDescending(f => f.Y).ThenBy(f => f.X);

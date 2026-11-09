@@ -132,7 +132,7 @@ namespace Game.Core
             bool valid = !player.IsDead
                 && reported.IsFinite
                 && Vec2.Distance(player.Position, reported) <= allowed
-                && !Collision.Overlaps(Map, reported, PlayerRadius - 0.01f);
+                && !Collision.Overlaps(Map, reported, PlayerRadius - 0.01f, passable: DoorsFor(player));
             if (valid)
             {
                 player.Position = reported;
@@ -603,9 +603,10 @@ namespace Game.Core
 
     public static class PlayerMotor
     {
-        // One tick of a player's own movement. Input is the stick or WASD direction; longer than 1 is clamped.
-        public static Vec2 Step(TileMap map, Vec2 position, Vec2 input, float moveSpeed) =>
-            Collision.Move(map, position, World.PlayerRadius, input.ClampLength(1) * (moveSpeed * World.TickSeconds));
+        // One tick of a player's own movement. Input is the stick or WASD direction; longer than 1 is clamped. doors are
+        // the locked doors they walk through (World.DoorsFor), the same on the host and in the client's prediction.
+        public static Vec2 Step(TileMap map, Vec2 position, Vec2 input, float moveSpeed, ISet<int> doors = null) =>
+            Collision.Move(map, position, World.PlayerRadius, input.ClampLength(1) * (moveSpeed * World.TickSeconds), passable: doors);
     }
 
     public static class Combat

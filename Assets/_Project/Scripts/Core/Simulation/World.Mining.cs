@@ -72,7 +72,9 @@ namespace Game.Core
             var (x, y) = DigAhead(player.Position, player.Facing);
             if (Map.IsEdge(x, y) || Map[x, y] == TileType.Lava) return null;
             // A laid floor or a door only comes up to a pickaxe, so swinging at monsters in a base never takes it up.
-            if ((TileMap.IsPaving(Map[x, y]) || Map[x, y] == TileType.Door) && !HoldsPickaxe(player)) return null;
+            if ((TileMap.IsPaving(Map[x, y]) || TileMap.IsDoor(Map[x, y])) && !HoldsPickaxe(player)) return null;
+            // A locked door comes up only to whoever locked it (World.LockDoor).
+            if (Map[x, y] == TileType.LockedDoor && LockOwner(x, y) is string owner && owner != player.Name) return null;
             // Striking a big machine's part strikes the machine.
             if (AnchorOf(Map, x, y) is (int ax, int ay)) (x, y) = (ax, ay);
             var tile = Tiles.Find(Map[x, y]);
@@ -308,7 +310,8 @@ namespace Game.Core
             IEnumerable<(CropDefinition Crop, int X, int Y, long Grown, long WetLeft)> crops,
             int progressLevel,
             IEnumerable<(int X, int Y, Inventory Contents)> chests = null,
-            IEnumerable<(int X, int Y, string Owner)> beds = null)
+            IEnumerable<(int X, int Y, string Owner)> beds = null,
+            IEnumerable<(int X, int Y, string Owner)> locks = null)
         {
             foreach (var tile in tiles)
             {
@@ -321,6 +324,9 @@ namespace Game.Core
                 _crops[y * Map.Width + x] = new Crop(crop, x, y, grown, Tick, Tick + Math.Clamp(wetLeft, 0, WaterTicks));
             }
             foreach (var (x, y, owner) in beds ?? Enumerable.Empty<(int, int, string)>()) RestoreBed(x, y, owner);
+            foreach (var (x, y, owner) in locks ?? Enumerable.Empty<(int, int, string)>()) RestoreLock(x, y, owner);
+            // A locked door whose owner the save lost would be a wall to everyone: it opens again.
+            foreach (var tile in ChangedTiles().Where(t => t.Type == TileType.LockedDoor && LockOwner(t.X, t.Y) == null)) SetTile(tile.X, tile.Y, TileType.Door);
             ProgressLevel = Math.Max(ProgressLevel, progressLevel);
             _newTileChanges.Clear();
             _newCropChanges.Clear();
@@ -337,6 +343,7 @@ namespace Game.Core
         {
             if (Map[x, y] == TileType.Chest || type == TileType.Chest) ChestTileChanged(x, y, type);
             if (Map[x, y] == TileType.Bed) BedTileChanged(x, y, type);
+            if (Map[x, y] == TileType.LockedDoor) LockTileChanged(x, y, type);
             if (Tiles?.Machine(Map[x, y]) != null || Tiles?.Machine(type) != null) MachineTileChanged(x, y, type);
             Map[x, y] = type;
             _changedTiles[y * Map.Width + x] = type;

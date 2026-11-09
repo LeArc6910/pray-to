@@ -449,6 +449,128 @@ namespace Game.Core.Tests
             Assert.AreEqual(FlowField.Unreached, field.DistanceAt(2, 2), "no way round for monsters");
         }
 
+        static World DoorRoom()
+        {
+            var map = Maps.FromRows(
+                "#########",
+                "#...#...#",
+                "#.......#",
+                "#...#...#",
+                "#########");
+            map[4, 2] = TileType.Door;
+            return new World(map, TileMap.Center(2, 2), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+        }
+
+        static void Walk(World world, Player player, Vec2 step, int steps)
+        {
+            for (int i = 0; i < steps; i++) world.MovePlayer(player.Id, player.Position + step, step, 1);
+        }
+
+        [Test]
+        public void ALockedDoorLetsOnlyItsOwnerThrough()
+        {
+            var world = DoorRoom();
+            var owner = world.AddPlayer("a", Gear.Wearing("copper_pickaxe"));
+            var other = world.AddPlayer("b", Gear.Wearing("copper_pickaxe"));
+            owner.Position = TileMap.Center(3, 2);
+            world.MovePlayer(owner.Id, owner.Position, new Vec2(1, 0), 1);
+
+            // Not while someone stands in the doorway.
+            other.Position = TileMap.Center(4, 2);
+            Assert.IsFalse(world.LockDoor(owner.Id), "someone is in the door");
+            other.Position = TileMap.Center(3, 1);
+            int version = world.LockVersion;
+            Assert.IsTrue(world.LockDoor(owner.Id));
+            Assert.AreEqual(TileType.LockedDoor, world.Map[4, 2]);
+            Assert.AreEqual("a", world.LockOwner(4, 2));
+            Assert.Greater(world.LockVersion, version, "the host sends the locks again");
+            Assert.IsTrue(world.Map.BlocksMonsters(4, 2));
+            Assert.IsTrue(Housing.RoomAt(world.Map, 2, 2, null).HasDoor, "a locked door is still a room's door");
+
+            // Its owner walks through, on the host and in their own client's prediction alike.
+            Walk(world, owner, new Vec2(0.15f, 0), 30);
+            Assert.Greater(owner.Position.X, 5.5f, "the owner goes through");
+            var predicted = TileMap.Center(3, 2);
+            for (int i = 0; i < 30; i++) predicted = PlayerMotor.Step(world.Map, predicted, new Vec2(1, 0), 4, world.DoorsFor(owner));
+            Assert.Greater(predicted.X, 5.5f, "the owner's client lets them through too");
+
+            // Anyone else finds a wall: they cannot walk, dig or unlock it.
+            other.Position = TileMap.Center(3, 2);
+            Walk(world, other, new Vec2(0.15f, 0), 30);
+            Assert.Less(other.Position.X, 4f, "someone else stops at it");
+            var blocked = TileMap.Center(3, 2);
+            for (int i = 0; i < 30; i++) blocked = PlayerMotor.Step(world.Map, blocked, new Vec2(1, 0), 4, world.DoorsFor(other));
+            Assert.Less(blocked.X, 4f);
+            world.MovePlayer(other.Id, other.Position, new Vec2(1, 0), 1);
+            Swing(world, other, 4);
+            Assert.AreEqual(TileType.LockedDoor, world.Map[4, 2], "only its owner takes it up");
+            Assert.IsFalse(world.UnlockDoor(other.Id));
+
+            // The owner, from the far side, takes the lock off; then it is a door for all.
+            owner.Position = TileMap.Center(5, 2);
+            world.MovePlayer(owner.Id, owner.Position, new Vec2(-1, 0), 1);
+            Assert.IsTrue(world.UnlockDoor(owner.Id));
+            Assert.AreEqual(TileType.Door, world.Map[4, 2]);
+            Assert.IsNull(world.LockOwner(4, 2));
+            Assert.IsEmpty(world.Locks);
+            Walk(world, other, new Vec2(0.15f, 0), 30);
+            Assert.Greater(other.Position.X, 5.5f);
+        }
+
+        [Test]
+        public void ALockOutlivesTheSaveAndALockedDoorWithNoOwnerOpens()
+        {
+            var world = DoorRoom();
+            var owner = world.AddPlayer("a", Gear.Wearing("copper_pickaxe"));
+            owner.Position = TileMap.Center(3, 2);
+            world.MovePlayer(owner.Id, owner.Position, new Vec2(1, 0), 1);
+            Assert.IsTrue(world.LockDoor(owner.Id));
+
+            var save = WorldSave.Read(WorldSave.Write(world, 1, 0), Tiles.Shipped, Gear.Data);
+            Assert.AreEqual(new[] { (4, 2, "a") }, save.Locks.Select(l => (l.X, l.Y, l.Owner)).ToArray());
+            var again = DoorRoom();
+            again.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds, save.Locks);
+            Assert.AreEqual(TileType.LockedDoor, again.Map[4, 2]);
+            Assert.AreEqual("a", again.LockOwner(4, 2));
+
+            // Without its owner a locked door would be a wall to all; it comes back open.
+            var lost = DoorRoom();
+            lost.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel);
+            Assert.AreEqual(TileType.Door, lost.Map[4, 2]);
+        }
+
+        [Test]
+        public void TheClientHearsWhichLockedDoorsAreItsOwn()
+        {
+            var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
+            var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped);
+            host.Receive(1, client.JoinMessage());
+            var player = host.World.Players.Single();
+            var (x, y) = World.TileAhead(player.Position, player.Facing);
+            host.World.Build(x, y, TileType.Door);
+            void Pump()
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    host.Tick();
+                    foreach (var message in host.TakeOutgoing()) client.Receive(message.Data);
+                }
+            }
+            Pump();
+            Assert.AreEqual((x, y), client.DoorAhead());
+
+            host.Receive(1, client.LockDoorCommand());
+            Pump();
+            Assert.AreEqual(TileType.LockedDoor, client.Map[x, y]);
+            Assert.IsTrue(client.IsMyDoor(x, y));
+            Assert.AreEqual("앨리스", client.LockOwner(x, y));
+
+            host.Receive(1, client.UnlockDoorCommand());
+            Pump();
+            Assert.AreEqual(TileType.Door, client.Map[x, y]);
+            Assert.IsFalse(client.IsMyDoor(x, y));
+        }
+
         [Test]
         public void CraftingTakesFromChestsNearbyAndMakesSeveralAtOnce()
         {

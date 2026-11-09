@@ -50,6 +50,7 @@ namespace Game.Client
             Save(TileArt.BigSmelter, Path.Combine(pieces, "big_smelter.png"), 6);
             Save(TileArt.BigAssembler, Path.Combine(pieces, "big_assembler.png"), 6);
             Save(TileArt.Object(TileType.Scarecrow), Path.Combine(pieces, "scarecrow.png"), 6);
+            Save(TileArt.Object(TileType.LockedDoor), Path.Combine(pieces, "locked_door.png"), 6);
             Save(Players(), Path.Combine(output, "player.png"), 6);
             Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
             Motions.Write(Path.Combine(output, "anim"), loot, monsters, npcs);
@@ -360,6 +361,7 @@ namespace Game.Client
                     TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.SmithStall, TileType.FisherHut, TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot, TileType.WardStone, TileType.Turret, TileType.Barn,
                     TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
                     TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow, TileType.Fence,
+                    TileType.LockedDoor,
                 }
                 .Select(TileArt.Object).Append(TileArt.OpenDoor).Append(TileArt.BigAssembler).Append(TileArt.BigSmelter).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(f => ItemArt.Belt(f)))
                 .Concat(new[] { ItemArt.Belt(0, fast: true), ItemArt.Underground(0), TileArt.MerchantCounter, ItemArt.Chicken(0), ItemArt.Chicken(1), ItemArt.Cow(0), ItemArt.Cow(1), ItemArt.Sheep(0), ItemArt.Sheep(1), ItemArt.TurretBarrel })

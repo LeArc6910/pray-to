@@ -259,5 +259,35 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
             Assert.Greater(Player.Stats.MaxMana, 0);
         }
+
+        // Locking a door (Docs/Crafting.md, 문 잠그기, 2026-11-09): a door across a wall, locked from the bag; the bag
+        // then offers [잠금 풀기], and the player who locked it walks through it.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ALockedDoorDraws()
+        {
+            yield return Start();
+            var door = Near(1, 0);
+            var tiles = new List<(int, int, TileType)> { (door.X, door.Y, TileType.Door) };
+            for (int dy = -2; dy <= 2; dy++)
+                if (dy != 0) tiles.Add((door.X, door.Y + dy, TileType.Wall));
+            for (int dx = -1; dx <= 2; dx++)
+                for (int dy = -1; dy <= 1; dy++)
+                    if (dx != 1) tiles.Add((door.X + dx, door.Y + dy, TileType.Floor));
+            Lay(tiles.ToArray());
+            Player.Position = TileMap.Center(door.X - 1, door.Y);
+            Player.Corrections++;
+            _root.AimHeld = true;
+            _root.HeldAim = new Vec2(1, 0);
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.IsTrue(World.LockDoor(Player.Id), "The door ahead did not lock.");
+            _root.ShowBag("재료·제작");
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("locked-door");
+            Assert.AreEqual(TileType.LockedDoor, World.Map[door.X, door.Y]);
+            Assert.IsTrue(_root.LocalClient.IsMyDoor(door.X, door.Y), "The client never heard the lock was its own.");
+            _root.BagOpen = false;
+            _root.AimHeld = false;
+            Assert.IsTrue(_root.Playing);
+        }
     }
 }

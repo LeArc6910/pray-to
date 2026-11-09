@@ -19,7 +19,8 @@ namespace Game.Core
         // grown and the water they have left (Docs/Time.md). 8: the highest void rift tier it may open. 9: the base
         // defense level and the day it was last defended (Docs/Defense.md).
         // 10 (2026-11-09): each machine ends with an animal house's affection and the day it was last petted.
-        const int FormatVersion = 10;
+        // 11 (2026-11-09): locked doors and their owners, after the beds.
+        const int FormatVersion = 11;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -43,8 +44,10 @@ namespace Game.Core
             List<string> warnings,
             List<(int X, int Y, string Owner)> beds = null,
             int defenseLevel = 1,
-            int defenseDay = 0)
+            int defenseDay = 0,
+            List<(int X, int Y, string Owner)> locks = null)
         {
+            Locks = locks ?? new List<(int, int, string)>();
             DefenseLevel = defenseLevel;
             DefenseDay = defenseDay;
             Beds = beds ?? new List<(int, int, string)>();
@@ -77,6 +80,8 @@ namespace Game.Core
         public IReadOnlyList<(int X, int Y, Inventory Contents)> Chests { get; }
         // Whose bed is where, by player name.
         public IReadOnlyList<(int X, int Y, string Owner)> Beds { get; }
+        // Whose lock is on which door (World.LockDoor), by player name.
+        public IReadOnlyList<(int X, int Y, string Owner)> Locks { get; }
         public IReadOnlyList<SavedMachine> Machines { get; }
 
         public sealed class SavedMachine
@@ -198,6 +203,15 @@ namespace Game.Core
                     w.Write((ushort)y);
                     w.Write(owner);
                 }
+
+                var locks = world.Locks.ToList();
+                w.Write(locks.Count);
+                foreach (var (x, y, owner) in locks)
+                {
+                    w.Write((ushort)x);
+                    w.Write((ushort)y);
+                    w.Write(owner);
+                }
             }
             return stream.ToArray();
         }
@@ -310,8 +324,15 @@ namespace Game.Core
                     int y = r.ReadUInt16();
                     beds.Add((x, y, r.ReadString()));
                 }
+                var locks = new List<(int, int, string)>();
+                for (int count = version >= 11 ? r.ReadInt32() : 0; count > 0; count--)
+                {
+                    int x = r.ReadUInt16();
+                    int y = r.ReadUInt16();
+                    locks.Add((x, y, r.ReadString()));
+                }
                 return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds,
-                    defenseLevel, defenseDay);
+                    defenseLevel, defenseDay, locks);
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

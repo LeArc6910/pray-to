@@ -536,6 +536,20 @@ namespace Game.Core
         public byte[] RepairCommand() => new InventoryCommandMessage(InventoryCommand.Repair, 0).Encode();
 
         public byte[] PetAnimalsCommand() => new InventoryCommandMessage(InventoryCommand.PetAnimals, 0).Encode();
+        public byte[] LockDoorCommand() => new InventoryCommandMessage(InventoryCommand.LockDoor, 0).Encode();
+        public byte[] UnlockDoorCommand() => new InventoryCommandMessage(InventoryCommand.UnlockDoor, 0).Encode();
+
+        // Locked doors as the host last told (World.Locks): who locked each, by its key (y × width + x), and the ones
+        // this player locked, which they walk through.
+        readonly Dictionary<int, string> _locks = new Dictionary<int, string>();
+        readonly HashSet<int> _myDoors = new HashSet<int>();
+
+        // Who locked the door at the tile, or null.
+        public string LockOwner(int x, int y) => Map != null && Map.InBounds(x, y) && _locks.TryGetValue(y * Map.Width + x, out var owner) ? owner : null;
+        public bool IsMyDoor(int x, int y) => Map != null && Map.InBounds(x, y) && _myDoors.Contains(y * Map.Width + x);
+
+        // The door ahead to lock or unlock (World.DoorAhead), or null.
+        public (int X, int Y)? DoorAhead() => Map == null ? null : World.DoorAhead(Map, Position, Facing);
 
         public byte[] StopCraftCommand() => new InventoryCommandMessage(InventoryCommand.StopCraft, 0).Encode();
 
@@ -814,6 +828,17 @@ namespace Game.Core
                         // The host sends what changed (2026-11-09): each one replaces what was heard of it before.
                         foreach (var machine in MachinesMessage.Decode(data).Machines) _machineStates[machine.Y * 65536 + machine.X] = (machine, HostTick);
                         break;
+                    case MessageType.Locks:
+                        _locks.Clear();
+                        _myDoors.Clear();
+                        if (Map == null) break;
+                        foreach (var (x, y, owner, mine) in LocksMessage.Decode(data).Locks)
+                        {
+                            if (!Map.InBounds(x, y)) continue;
+                            _locks[y * Map.Width + x] = owner;
+                            if (mine) _myDoors.Add(y * Map.Width + x);
+                        }
+                        break;
                     case MessageType.Snapshot:
                         if (Status == ClientStatus.Playing) Apply(SnapshotMessage.Decode(data));
                         break;
@@ -832,7 +857,7 @@ namespace Game.Core
             PreviousPosition = Position;
             if (!IsDead)
             {
-                Position = PlayerMotor.Step(Map, Position, move, MoveSpeed);
+                Position = PlayerMotor.Step(Map, Position, move, MoveSpeed, _myDoors);
                 if (aim.LengthSquared > 1e-6f) Facing = aim.Normalized;
             }
             _sequence++;

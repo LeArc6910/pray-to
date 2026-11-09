@@ -1654,6 +1654,29 @@ async function base(browser) {
   await game.send('goto 3 0');
   await game.wait(800);
   check((await game.state()).doorsOpen === 0, `멀어지면 문이 닫힌다 (${(await game.state()).doorsOpen})`);
+  // Locking it (2026-11-09): the bag's [문 잠그기] facing the door; whoever locked it still walks through.
+  await game.send('face -1 0');
+  await game.wait(400);
+  await bagTab(game, '재료·제작');
+  check(await game.press('문 잠그기'), '문을 마주 보면 가방 [재료·제작]에 [문 잠그기]');
+  await game.wait(900);
+  check((await game.look(-1, 0)).tile === 'LockedDoor', `[문 잠그기]로 문이 잠긴다 (${(await game.look(-1, 0)).tile})`);
+  check((await game.find('잠금 풀기')).length > 0, '내가 잠근 문 앞에서는 [잠금 풀기]');
+  await game.shot('locked-door', '잠근 문(자물쇠)과 [잠금 풀기]');
+  await closeBag(game);
+  const locked = await game.state();
+  await game.page.keyboard.down('a');
+  await game.wait(900);
+  await game.page.keyboard.up('a');
+  const past = await game.state();
+  check(past.x < locked.x - 1.8, `잠근 사람은 잠긴 문을 지나간다 (x ${locked.x.toFixed(1)} → ${past.x.toFixed(1)})`);
+  await game.send('goto 1 0; face 1 0');
+  await game.wait(500);
+  await bagTab(game, '재료·제작');
+  check(await game.press('잠금 풀기'), '안쪽에서도 [잠금 풀기]');
+  await game.wait(900);
+  check((await game.look(1, 0)).tile === 'Door', `[잠금 풀기]로 다시 문이 된다 (${(await game.look(1, 0)).tile})`);
+  await closeBag(game);
   await game.context.close();
 }
 

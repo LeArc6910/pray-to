@@ -28,6 +28,7 @@ namespace Game.Core
         Friendships = 22,
         Life = 23,
         Records = 24,
+        Locks = 25,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -39,7 +40,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.66.0";
+        public const string Version = "0.67.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -383,6 +384,34 @@ namespace Game.Core
             var pets = new List<(int, int)>();
             for (int n = r.ReadByte(); n > 0; n--) pets.Add((r.ReadByte(), r.ReadInt32()));
             return new RecordsMessage(records, achievements, pets);
+        });
+    }
+
+    // Every locked door (World.Locks, 2026-11-09): where it is, who locked it, and whether the player it goes to did,
+    // since those they walk through. Sent when a lock goes on or comes off, and to each player who joins.
+    public sealed class LocksMessage
+    {
+        public LocksMessage(IReadOnlyList<(int X, int Y, string Owner, bool Mine)> locks) => Locks = locks;
+
+        public IReadOnlyList<(int X, int Y, string Owner, bool Mine)> Locks { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Locks, w =>
+        {
+            w.Write((ushort)Locks.Count);
+            foreach (var (x, y, owner, mine) in Locks)
+            {
+                w.Write((ushort)x);
+                w.Write((ushort)y);
+                w.Write(owner ?? "");
+                w.Write(mine);
+            }
+        });
+
+        public static LocksMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Locks, r =>
+        {
+            var locks = new List<(int, int, string, bool)>();
+            for (int n = r.ReadUInt16(); n > 0; n--) locks.Add((r.ReadUInt16(), r.ReadUInt16(), r.ReadString(), r.ReadBoolean()));
+            return new LocksMessage(locks);
         });
     }
 

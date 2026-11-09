@@ -945,6 +945,27 @@ namespace Game.Client
                 if (Ui.LayoutButton($"고치기 ({cost})", GUILayout.Width(112))) Send(_client.RepairCommand(), Sound.Place);
                 GUILayout.EndHorizontal();
             }
+            // The door ahead (World.LockDoor, 2026-11-09): locked, only whoever locked it walks through.
+            if (_client.DoorAhead() is (int doorX, int doorY))
+            {
+                GUILayout.BeginHorizontal();
+                if (_client.Map[doorX, doorY] == TileType.Door)
+                {
+                    GUILayout.Label(Fit("앞의 문: 잠그면 나만 지나간다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+                    if (Ui.LayoutButton("문 잠그기", GUILayout.Width(96))) Send(_client.LockDoorCommand(), Sound.DoorShut);
+                }
+                else if (_client.IsMyDoor(doorX, doorY))
+                {
+                    GUILayout.Label(Fit("앞의 문: 내가 잠갔다. 나만 지나간다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+                    if (Ui.LayoutButton("잠금 풀기", GUILayout.Width(96))) Send(_client.UnlockDoorCommand(), Sound.Door);
+                }
+                else
+                {
+                    string owner = _client.LockOwner(doorX, doorY);
+                    GUILayout.Label(Fit(owner != null ? $"앞의 문: {owner}이(가) 잠가서 지나갈 수 없다" : "앞의 문: 잠겨 있다", _textWidth));
+                }
+                GUILayout.EndHorizontal();
+            }
             GUILayout.Label("재료");
             if (_client.Bag.Materials.Count == 0) GUILayout.Label(Fit("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.", _textWidth));
             // The machine the player faces, for the filter and generator buttons.

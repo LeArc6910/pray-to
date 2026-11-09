@@ -207,6 +207,9 @@ namespace Game.Core
         PetAnimals,
         // Stops what the player is making by hand (World.StopCrafting).
         StopCraft,
+        // Locks the door ahead, or takes the player's lock off it (World.LockDoor, World.UnlockDoor).
+        LockDoor,
+        UnlockDoor,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

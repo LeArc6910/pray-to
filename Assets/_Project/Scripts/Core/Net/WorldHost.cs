@@ -78,6 +78,8 @@ namespace Game.Core
             public int SentKit = -1;
             // The player's RecordsVersion when their bestiary was last sent.
             public int SentRecords = -1;
+            // The world's LockVersion when the locked doors were last sent.
+            public int SentLocks = -1;
         }
 
         // How many times over one craft command may make its recipe.
@@ -190,6 +192,15 @@ namespace Game.Core
                 foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) Send(pair.Key, message, reliable: true);
             }
 
+            // Locked doors before the snapshot too, so an owner's client lets them through as soon as the host does.
+            foreach (var pair in _connections)
+            {
+                var player = pair.Value.Player;
+                if (player == null || pair.Value.SentLocks == World.LockVersion) continue;
+                pair.Value.SentLocks = World.LockVersion;
+                var locks = World.Locks.Select(l => (l.X, l.Y, l.Owner, l.Owner == player.Name)).ToList();
+                Send(pair.Key, new LocksMessage(locks).Encode(), reliable: true);
+            }
             foreach (var pair in _connections)
             {
                 var player = pair.Value.Player;
@@ -372,7 +383,7 @@ namespace Game.Core
         public void Restore(WorldSave save)
         {
             if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
-            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds);
+            World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds, save.Locks);
             World.RestoreClock(save.Clock);
             World.RestoreRiftTier(save.RiftTier);
             World.RestoreDefense(save.DefenseLevel, save.DefenseDay);
@@ -538,6 +549,12 @@ namespace Game.Core
                     break;
                 case InventoryCommand.PetAnimals:
                     World.PetAnimals(player.Id);
+                    break;
+                case InventoryCommand.LockDoor:
+                    World.LockDoor(player.Id);
+                    break;
+                case InventoryCommand.UnlockDoor:
+                    World.UnlockDoor(player.Id);
                     break;
             }
         }

@@ -1351,6 +1351,8 @@ namespace Game.Client
         // Doors (2026-11-09): a door stands open while a player is in its doorway or right beside it, and swings shut
         // once they have gone, with a creak and a thud. Only the look: monsters are kept out either way (World rules).
         const float DoorReach = 1.05f;
+        // Less than a player stopped against the door stands from its middle (half a tile and their radius).
+        const float LockedDoorReach = 0.8f;
         readonly HashSet<int> _openDoors = new HashSet<int>();
         bool _trampleHintShown;
         // How many doors stand open now, for the playtest.
@@ -1372,8 +1374,10 @@ namespace Game.Client
                     for (int dy = -1; dy <= 1; dy++)
                     {
                         int x = cx + dx, y = cy + dy;
-                        if (!map.InBounds(x, y) || map[x, y] != TileType.Door) continue;
-                        if (Vector2.Distance(body.Position, new Vector2(x + 0.5f, y + 0.5f)) <= DoorReach) _doorsNear.Add(y * map.Width + x);
+                        if (!map.InBounds(x, y) || !TileMap.IsDoor(map[x, y])) continue;
+                        // A locked door opens only for whoever steps into it, its owner: anyone else stops short of it.
+                        float reach = map[x, y] == TileType.LockedDoor ? LockedDoorReach : DoorReach;
+                        if (Vector2.Distance(body.Position, new Vector2(x + 0.5f, y + 0.5f)) <= reach) _doorsNear.Add(y * map.Width + x);
                     }
                 }
             }
@@ -1391,8 +1395,8 @@ namespace Game.Client
             {
                 _openDoors.Remove(key);
                 var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
-                if (map[cell.x, cell.y] != TileType.Door) continue;
-                _objects.SetTile(cell, Sprites.Object(TileType.Door));
+                if (!TileMap.IsDoor(map[cell.x, cell.y])) continue;
+                _objects.SetTile(cell, Sprites.Object(map[cell.x, cell.y]));
                 Hear(Sound.DoorShut, cell + new Vector3(0.5f, 0.5f, 0));
             }
         }

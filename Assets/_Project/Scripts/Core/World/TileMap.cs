@@ -114,6 +114,8 @@ namespace Game.Core
         MachinePart,
         // A smelter two tiles each way (2026-11-09): on power, three times a smelter's pace.
         BigSmelter,
+        // A door its owner locked (World.Home.cs, 2026-11-09): solid to everyone else, monsters too.
+        LockedDoor,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -182,6 +184,9 @@ namespace Game.Core
 
         // Where crops are planted: bare floor or turned soil.
         public static bool IsFarmland(TileType type) => type == TileType.Floor || IsSoil(type);
+
+        // Either kind of door: an open one or one locked (World.LockDoor).
+        public static bool IsDoor(TileType type) => type == TileType.Door || type == TileType.LockedDoor;
 
         // What stops a monster: everything solid, and doors.
         public bool BlocksMonsters(int x, int y) => IsSolid(x, y) || this[x, y] == TileType.Door;
