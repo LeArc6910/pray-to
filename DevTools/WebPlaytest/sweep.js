@@ -1631,6 +1631,20 @@ async function firstRun(browser, profile, hourLong) {
     }
   };
   const inv = () => game.inventory();
+  // Presses [만들기] on the row of the thing (only what can be made shown) until the bag holds one more of it: a
+  // press during the list's redraw can land elsewhere. True when it was made.
+  const makeOne = async (name, id) => {
+    const before = count(await inv(), id);
+    for (let attempt = 0; attempt < 3; attempt++) {
+      await game.press('만들 수 있는 것만', undefined, { quiet: true });
+      await game.wait(400);
+      await game.press('만들기', new RegExp('^' + name), { quiet: true });
+      await game.wait(500);
+      if (count(await inv(), id) > before) break;
+    }
+    await game.press('모두 보기', undefined, { quiet: true });
+    return count(await inv(), id) > before;
+  };
   // What the screen and the map said when something did not happen, for the report.
   const why = async label => {
     const t = await game.texts();
@@ -1715,10 +1729,8 @@ async function firstRun(browser, profile, hourLong) {
   }
   await bagTab(game, '재료·제작');
   // The list is long by now; a person scrolls or shows only what can be made. The bot does the second.
-  await game.press('만들 수 있는 것만');
   const rows = await game.find('만들기', /^돌 바닥/);
-  const made = await game.press('만들기', /^돌 바닥/);
-  await game.press('모두 보기', undefined, { quiet: true });
+  const made = await makeOne('돌 바닥', 'stone_floor');
   await closeBag(game);
   check(made, '작업대 곁에서 돌 바닥 [만들기]');
   if (!made) {
@@ -1780,11 +1792,10 @@ async function firstRun(browser, profile, hourLong) {
       if (!moved.has(why)) note(`- ${why}: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)`);
       moved.add(why);
     };
+    const ids = { 호미: 'hoe', 낚싯대: 'fishing_rod', 화로: 'furnace', 침대: 'bed' };
     const craft = async name => {
       await bagTab(game, '재료·제작');
-      await game.press('만들 수 있는 것만');
-      const made = await game.press('만들기', new RegExp('^' + name), { quiet: true });
-      await game.press('모두 보기', undefined, { quiet: true });
+      const made = await makeOne(name, ids[name]);
       await closeBag(game);
       if (!made) await why(`${name} 만들기`);
       return made;
