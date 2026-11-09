@@ -1680,7 +1680,9 @@ async function firstRun(browser, profile, hourLong) {
     else await game.send(`face ${dx} ${dy}`);
   };
   const faceOpen = async (skip = []) => {
-    const around = (await near()).filter(a => a.tile === 'Floor' && !skip.includes(`${a.dx},${a.dy}`));
+    // Open floor with nothing growing on it (a person sees the sprouts).
+    const around = [];
+    for (const a of await near()) if (a.tile === 'Floor' && !skip.includes(`${a.dx},${a.dy}`) && !(await game.look(a.dx, a.dy)).crop) around.push(a);
     for (const a of around) {
       if ((await game.look(2 * a.dx, 2 * a.dy)).tile === 'Floor') {
         await turn(a.dx, a.dy);
@@ -1832,9 +1834,16 @@ async function firstRun(browser, profile, hourLong) {
         const foe = offset(s.foe);
         if (!foe) {
           await gather(3);
-          // None near: on along the tunnels.
-          await mine(async () => !!(await game.state()).foe, 15);
-          await slot(1);
+          // None near (monsters keep away from the spawn): out along the tunnels, away from it.
+          const away = [s.x - s.spawnX, s.y - s.spawnY];
+          const [ax, ay] = Math.hypot(away[0], away[1]) < 1 ? [1, 0] : toward(away[0], away[1]);
+          const ahead = (await game.look(ax, ay)).tile;
+          if (solid(ahead)) {
+            await slot(2);
+            await dig(ax, ay);
+            await slot(1);
+          }
+          await step(ax, ay, 400);
           continue;
         }
         const d = Math.hypot(foe[0], foe[1]);
@@ -1924,6 +1933,7 @@ async function firstRun(browser, profile, hourLong) {
     // 13. The cave warden, fought with what the bot has: up to three tries, back to the arena after a fall.
     const wardenAt = Date.now();
     let falls = 0;
+    let dodges = 0;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
     while (Date.now() - wardenAt < 300000 && (await goalNow()).n <= 13 && falls < 3) {
@@ -1936,6 +1946,14 @@ async function firstRun(browser, profile, hourLong) {
         continue;
       }
       if (s.health < s.maxHealth * 0.4) await drink();
+      // A warning on the floor underfoot: out of it first, as the goal's hint says.
+      const away = offset(s.danger);
+      if (away && (away[0] || away[1])) {
+        const [sx, sy] = toward(away[0], away[1]);
+        await step(sx, sy, 280);
+        dodges++;
+        continue;
+      }
       const boss = offset(s.bossAt);
       if (!boss) {
         await gather(5);
@@ -1953,7 +1971,7 @@ async function firstRun(browser, profile, hourLong) {
     }
     await gather(5);
     const fought = await game.state();
-    note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
+    note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
     await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
     await passed(13, '동굴 수호자 쓰러뜨리기');
 

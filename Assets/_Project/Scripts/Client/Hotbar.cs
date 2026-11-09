@@ -174,7 +174,7 @@ namespace Game.Client
 
             string tooltip = null;
             Rect tooltipSlot = default;
-            if (Event.current.type == EventType.Repaint) PointsAtGround = false;
+            if (Event.current.type == EventType.Repaint) PointsAtGround = PointsAtSoil = false;
             for (int slot = 0; slot < Slots; slot++)
             {
                 var area = Area(slot, skills);
@@ -204,7 +204,11 @@ namespace Game.Client
                 {
                     tooltip = _entries[slot].IsEmpty ? "빈 칸. 가방의 [퀵]으로 올린다" : $"{name}\n{does}";
                     tooltipSlot = area;
-                    if (Event.current.type == EventType.Repaint && ActsAhead(_entries[slot])) PointsAtGround = true;
+                    if (Event.current.type == EventType.Repaint && ActsAhead(_entries[slot]))
+                    {
+                        PointsAtGround = true;
+                        PointsAtSoil = WorksSoil(_entries[slot]);
+                    }
                 }
             }
             if (tooltip != null) DrawTooltip(tooltip, tooltipSlot);
@@ -213,6 +217,16 @@ namespace Game.Client
         // Whether the pointer is on a slot whose use builds, plants or works the tile ahead, for WorldView's frame on
         // that tile (2026-11-09).
         public bool PointsAtGround { get; private set; }
+        // And it works the ground right ahead (a seed, the can, the hoe, fertilizer, a floor): World.TileAhead, not
+        // World.PlaceAhead.
+        public bool PointsAtSoil { get; private set; }
+
+        bool WorksSoil(Entry entry)
+        {
+            var material = MaterialOf(entry);
+            return material != null && (material.Places is TileType tile && TileMap.IsPaving(tile) || _client.CropFrom(material) != null
+                || material.Id == World.WateringCan || material.Id == World.Hoe || material.Id == World.Fertilizer);
+        }
 
         bool ActsAhead(Entry entry)
         {

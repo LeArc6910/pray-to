@@ -295,6 +295,9 @@ namespace Game.Client
         public bool ShowTarget { get; set; }
 
         SpriteRenderer _target;
+        // The frame marks the tile ground work acts on rather than where a thing would be put (GameRoot sets it from
+        // what the pointer is over).
+        public bool TargetSoil { get; set; }
 
         void DrawTarget()
         {
@@ -305,7 +308,9 @@ namespace Game.Client
             }
             _target.enabled = ShowTarget && _client.Map != null && !_client.IsDead;
             if (!_target.enabled) return;
-            var (x, y) = World.PlaceAhead(_client.Position, _client.Facing);
+            // Where the action pointed at works: a thing put down goes on the first tile clear of the body, ground work
+            // (planting, watering, tilling, fertilizing, laying a floor) is on the tile right ahead.
+            var (x, y) = TargetSoil ? World.TileAhead(_client.Position, _client.Facing) : World.PlaceAhead(_client.Position, _client.Facing);
             var map = _client.Map;
             bool open = map.InBounds(x, y) && !map.IsEdge(x, y) && TileMap.IsGround(map[x, y]);
             var centre = TileMap.Center(x, y);

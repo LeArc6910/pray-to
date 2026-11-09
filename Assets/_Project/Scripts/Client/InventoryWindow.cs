@@ -64,6 +64,15 @@ namespace Game.Client
         }
 
         public bool Open { get; set; }
+        // The pointer is over a button that works the ground right ahead (plant, water, till, fertilize, lay a floor):
+        // the world's frame then marks World.TileAhead, not where a thing would be put (2026-11-09).
+        public bool PointsAtSoil { get; private set; }
+
+        // Marks the button just drawn as working the ground ahead, when the pointer is over it.
+        void Soil()
+        {
+            if (Event.current.type == EventType.Repaint && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition)) PointsAtSoil = true;
+        }
 
         // Opens the bag on the page with that tab name (장비, 재료·제작, 스킬, 특성), for the tests' pictures.
         internal void Show(string page)
@@ -80,7 +89,11 @@ namespace Game.Client
             // Only what the pointer is over in this frame. IMGUI's own GUI.tooltip fell back to the last description
             // the pointer had been over, even when set empty, so an iron sword's text picked up on [장비] stood beside
             // the skills page (the 2026-11-09 web check). The window keeps its own.
-            if (Event.current.type == EventType.Repaint) _hover = "";
+            if (Event.current.type == EventType.Repaint)
+            {
+                _hover = "";
+                PointsAtSoil = false;
+            }
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
             // Left of the minimap column, full height; on narrow screens under the column. The page scrolls when it
@@ -902,12 +915,28 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
                 TipLabel(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
-                if (pair.Key.Places != null && Ui.LayoutButton("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
+                if (pair.Key.Places != null)
+                {
+                    if (Ui.LayoutButton("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
+                    if (TileMap.IsPaving(pair.Key.Places.Value)) Soil();
+                }
                 var crop = _client.CropFrom(pair.Key);
-                if (crop != null && Ui.LayoutButton("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
-                if (pair.Key.Id == World.WateringCan && Ui.LayoutButton("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
+                if (crop != null)
+                {
+                    if (Ui.LayoutButton("심기", GUILayout.Width(56))) Send(_client.PlantCommand(crop), Sound.Place);
+                    Soil();
+                }
+                if (pair.Key.Id == World.WateringCan)
+                {
+                    if (Ui.LayoutButton("물 주기", GUILayout.Width(64))) Send(_client.WaterCommand(), Sound.Water);
+                    Soil();
+                }
                 if (pair.Key.Id == World.FishingRod && Ui.LayoutButton(FishingLabel(_client), GUILayout.Width(72))) Send(_client.FishCommand(), Sound.Cast);
-                if (pair.Key.Id == World.Hoe && Ui.LayoutButton("밭 갈기", GUILayout.Width(64))) Send(_client.TillCommand(), Sound.Dig);
+                if (pair.Key.Id == World.Hoe)
+                {
+                    if (Ui.LayoutButton("밭 갈기", GUILayout.Width(64))) Send(_client.TillCommand(), Sound.Dig);
+                    Soil();
+                }
                 // Facing a filter, any material can be what it picks out; facing a generator, fuel goes in.
                 if (ahead?.Kind == TileType.Filter && Ui.LayoutButton(ahead.Value.Settings.Contains(pair.Key.Kind) ? "빼기" : "거르기", GUILayout.Width(56)))
                     Send(_client.SetFilterCommand(pair.Key), Sound.Click);
@@ -915,7 +944,11 @@ namespace Game.Client
                 // Facing a machine that makes things from this, it goes in (all of it, up to what the machine holds).
                 if (loads && Takes(ahead.Value, pair.Key) && Ui.LayoutButton("넣기", GUILayout.Width(48)))
                     Send(_client.LoadCommand(pair.Key, Math.Min(pair.Value, World.MaxTrade)), Sound.Place);
-                if (pair.Key.Id == World.Fertilizer && Ui.LayoutButton("거름 주기", GUILayout.Width(72))) Send(_client.FertilizeCommand(), Sound.Place);
+                if (pair.Key.Id == World.Fertilizer)
+                {
+                    if (Ui.LayoutButton("거름 주기", GUILayout.Width(72))) Send(_client.FertilizeCommand(), Sound.Place);
+                    Soil();
+                }
                 // An egg hatches into the pet that follows the player (Pets.cs); the one they had goes back to its egg.
                 var hatches = Pets.ByEgg(pair.Key.Id);
                 if (hatches != null)

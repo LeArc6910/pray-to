@@ -652,6 +652,24 @@ namespace Game.Client
                 json.Field("foe", foe == null ? null : $"{foe.Position.X - player.Position.X:0.00},{foe.Position.Y - player.Position.Y:0.00}");
                 var awake = world.Bosses.Where(b => b.State != BossState.Dormant && !b.IsDead).OrderBy(b => Vec2.Distance(b.Position, player.Position)).FirstOrDefault();
                 json.Field("bossAt", awake == null ? null : $"{awake.Position.X - player.Position.X:0.00},{awake.Position.Y - player.Position.Y:0.00}");
+                // Standing in a warning on the floor: the nearest way out of every warning (a share marker is to stand
+                // in), or 0,0 when there is none; null when safe.
+                bool Danger(Vec2 at) => world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Contains(at, World.PlayerRadius));
+                if (Danger(player.Position))
+                {
+                    string way = "0,0";
+                    foreach (float reach in new[] { 1.5f, 2.5f, 3.5f, 5f })
+                    {
+                        for (int k = 0; k < 8 && way == "0,0"; k++)
+                        {
+                            var step = new Vec2(MathF.Cos(k * MathF.PI / 4), MathF.Sin(k * MathF.PI / 4)) * reach;
+                            var to = player.Position + step;
+                            if (!world.Map.IsSolid(TileMap.Cell(to.X), TileMap.Cell(to.Y)) && !Danger(to)) way = $"{step.X:0.00},{step.Y:0.00}";
+                        }
+                        if (way != "0,0") break;
+                    }
+                    json.Field("danger", way);
+                }
                 json.Field("projectiles", world.Projectiles.Count(p => p.Source == player.Id));
                 json.Field("hazards", world.Hazards.Count);
                 json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly));
