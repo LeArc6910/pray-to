@@ -1,0 +1,6 @@
+event,name,every,percent,text
+Market,장날,5,80,장날: 가게 물건이 {off}% 싸다
+FishingContest,낚시 대회,6,5,"낚시 대회: 낚은 물고기마다 상금(어려움 하나에 금화 {percent}), 낚시 경험치 두 배"
+Harvest,수확제,7,150,수확제: 작물을 {more}% 더 비싸게 산다
+FullMoon,보름달,8,150,보름달: 밤에 몬스터가 더 많고 경험치가 {more}% 더 나온다
+Festival,축제,11,0,축제: 상인이 평소에는 팔지 않는 스킬 결정을 싸게 판다

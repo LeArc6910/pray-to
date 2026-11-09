@@ -50,8 +50,10 @@ namespace Game.Core
     // is on sale only some days; one with hearts only to players that friendly.
     public sealed class ShopEntry
     {
-        internal ShopEntry(MaterialDefinition material, ConsumableDefinition consumable, int buy, int sell, bool daily, int hearts, NpcDefinition npc = null)
+        internal ShopEntry(MaterialDefinition material, ConsumableDefinition consumable, int buy, int sell, bool daily, int hearts, NpcDefinition npc = null,
+            DayEvent onlyOn = DayEvent.None)
         {
+            OnlyOn = onlyOn;
             Npc = npc;
             Material = material;
             Consumable = consumable;
@@ -63,6 +65,8 @@ namespace Game.Core
 
         public MaterialDefinition Material { get; }
         public ConsumableDefinition Consumable { get; }
+        // Sold only on that day (the festival's goods, 2026-11-09), or None for any day.
+        public DayEvent OnlyOn { get; }
         public object Thing => (object)Material ?? Consumable;
         public string Name => Material?.Name ?? Consumable.Name;
         // 0 when not sold, or not bought.
@@ -303,7 +307,8 @@ namespace Game.Core
                     };
                     int hearts = row["hearts"].Length == 0 ? 0 : SheetValues.ParseNumber(row["hearts"], "hearts");
                     if (hearts > World.MaxHearts) throw new FormatException($"hearts는 {World.MaxHearts} 이하입니다.");
-                    shop.Add(new ShopEntry(thing as MaterialDefinition, thing as ConsumableDefinition, buy, sell, daily, hearts, npc));
+                    var onlyOn = row["event"].Length == 0 ? DayEvent.None : SheetValues.ParseEnum<DayEvent>(row["event"], "event");
+                    shop.Add(new ShopEntry(thing as MaterialDefinition, thing as ConsumableDefinition, buy, sell, daily, hearts, npc, onlyOn));
                 }
                 catch (FormatException e)
                 {

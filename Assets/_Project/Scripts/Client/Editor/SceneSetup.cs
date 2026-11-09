@@ -70,6 +70,7 @@ namespace Game.Client.Editor
             sheets.npcs = Sheet(NpcsFolder + NpcSheet.NpcsFile);
             sheets.shop = Sheet(NpcsFolder + NpcSheet.ShopFile);
             sheets.requests = Sheet(NpcsFolder + NpcSheet.RequestsFile);
+            sheets.events = Sheet(WorldFolder + DayEventSheet.File);
             EditorUtility.SetDirty(sheets);
             AssetDatabase.SaveAssets();
         }

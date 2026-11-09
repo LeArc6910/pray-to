@@ -144,6 +144,9 @@ namespace Game.Client
             _tiles = sheets.LoadTiles(_loot);
             _guide = sheets.LoadGuide(_loot);
             _npcs = sheets.LoadNpcs(_loot);
+            // The days from their sheet; a build from before it (no sheet) keeps the ones in code.
+            var days = sheets.LoadEvents();
+            if (days.Events.Count > 0) World.DayEvents = days;
             _chosenClasses.RemoveAll(id => !_classes.Classes.Any(c => c.Id == id));
             var errors = new List<string>(_loot.Errors);
             errors.AddRange(_monsters.Errors);
@@ -152,6 +155,7 @@ namespace Game.Client
             errors.AddRange(_tiles.Errors);
             errors.AddRange(_guide.Errors);
             errors.AddRange(_npcs.Errors);
+            errors.AddRange(days.Errors);
             if (errors.Count > 0) _status = "데이터 시트 오류:\n" + string.Join("\n", errors);
         }
 

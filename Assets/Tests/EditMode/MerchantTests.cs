@@ -208,7 +208,7 @@ namespace Game.Core.Tests
         {
             var today = World.ShopFor(People.Shipped, 4);
             Assert.AreEqual(World.DailyShopItems, today.Count(e => e.Daily));
-            Assert.AreEqual(People.Shipped.Shop.Count(e => e.Npc == Merchant && e.Buy > 0 && !e.Daily), today.Count(e => !e.Daily));
+            Assert.AreEqual(People.Shipped.Shop.Count(e => e.Npc == Merchant && e.Buy > 0 && !e.Daily && e.OnlyOn == DayEvent.None), today.Count(e => !e.Daily));
             CollectionAssert.AreEqual(today, World.ShopFor(People.Shipped, 4), "the same each time");
 
             var world = Shop(out var player, out _);
@@ -356,6 +356,28 @@ namespace Game.Core.Tests
             Assert.IsTrue(client.GiftedToday(Merchant));
             var saved = CharacterSave.Read(client.SaveCharacter(), Gear.Data);
             Assert.AreEqual("merchant", saved.Friendships.Single().Npc);
+        }
+    
+        [Test]
+        public void TheFestivalSellsWhatTheMerchantNeverDoesOtherwise()
+        {
+            // 2026-11-09: the days come from events.csv, and on the festival (every 11th day) the merchant sells skill
+            // crystals; on any other day they are not on sale.
+            var events = DayEventSheet.Parse(System.IO.File.ReadAllText(RepoFile.Find("Assets/_Project/Data/World/" + DayEventSheet.File)));
+            Assert.IsTrue(events.Success, string.Join("\n", events.Errors));
+            Assert.AreEqual(5, events.Events.Count);
+            var festival = events.Find(DayEvent.Festival);
+            Assert.AreEqual(11, festival.Every);
+            Assert.AreEqual(DayEvent.Festival, World.EventOf(11));
+            Assert.AreEqual(DayEvent.Market, World.EventOf(10), "the rarer wins, and 10 is a market day");
+            var goods = People.Shipped.Shop.Where(e => e.OnlyOn == DayEvent.Festival).ToList();
+            Assert.Greater(goods.Count, 0);
+            foreach (var entry in goods)
+            {
+                CollectionAssert.Contains(World.ShopFor(People.Shipped, 11), entry);
+                CollectionAssert.DoesNotContain(World.ShopFor(People.Shipped, 10), entry);
+            }
+            Assert.AreEqual("장날: 가게 물건이 20% 싸다", events.Find(DayEvent.Market).Text, "the numbers go into the line");
         }
     }
 }

@@ -111,7 +111,9 @@ namespace Game.Core
         {
             if (npcs == null) return Array.Empty<ShopEntry>();
             npc ??= npcs.Merchant;
-            var own = npcs.Shop.Where(e => e.Npc == npc).ToList();
+            // An event's goods only on its day (the festival, 2026-11-09).
+            var today = EventOf(day);
+            var own = npcs.Shop.Where(e => e.Npc == npc && (e.OnlyOn == DayEvent.None || e.OnlyOn == today)).ToList();
             var daily = own.Where(e => e.Daily && e.Buy > 0).ToList();
             var random = new GameRandom((ulong)Math.Max(1, day) * 31 + (ulong)Math.Max(0, npcs.IndexOf(npc)), stream: 11);
             var picked = new HashSet<ShopEntry>();

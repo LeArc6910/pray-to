@@ -28,6 +28,8 @@ namespace Game.Core
         FullMoon,
         // The fishing contest (2026-11-09): a prize in coins for every fish landed, and twice the fishing experience.
         FishingContest,
+        // The festival (2026-11-09): the merchant sells what he never does otherwise (shop.csv rows with event Festival).
+        Festival,
     }
 
     public sealed partial class World
@@ -39,17 +41,17 @@ namespace Game.Core
         public const int FogPercent = 12;
         // How far a monster notices players in fog, as a share of its aggro range.
         public const int FogAggroPercent = 70;
-        // Market days come every MarketEvery days, the fishing contest every FishingContestEvery, the harvest festival
-        // every HarvestEvery, a full moon every FullMoonEvery; when two fall on one day the rarer wins.
-        public const int MarketEvery = 5;
-        public const int HarvestEvery = 7;
-        public const int FullMoonEvery = 8;
-        public const int FishingContestEvery = 6;
+        // The days (Docs/Time.md, 행사): read from events.csv by the game (2026-11-09), as in code before for a world that
+        // was given none. Each comes every so many days; when two fall on one day the rarer wins.
+        public static DayEventData DayEvents { get; set; } = DayEventSheet.Default;
+
+        static int PercentOf(DayEvent kind) => DayEvents.Find(kind)?.Percent ?? DayEventSheet.Default.Find(kind)?.Percent ?? 0;
+
         // A contest fish's prize: this many coins for each step of its difficulty.
-        public const int ContestPrizePerDifficulty = 5;
-        public const int MarketPercent = 80;
-        public const int HarvestPercent = 150;
-        public const int FullMoonExperiencePercent = 150;
+        public static int ContestPrizePerDifficulty => PercentOf(DayEvent.FishingContest);
+        public static int MarketPercent => PercentOf(DayEvent.Market);
+        public static int HarvestPercent => PercentOf(DayEvent.Harvest);
+        public static int FullMoonExperiencePercent => PercentOf(DayEvent.FullMoon);
 
         public static Weather WeatherOf(int day)
         {
@@ -72,31 +74,20 @@ namespace Game.Core
             _ => "맑음",
         };
 
-        public static DayEvent EventOf(int day) =>
-            day <= 1 ? DayEvent.None
-            : day % FullMoonEvery == 0 ? DayEvent.FullMoon
-            : day % HarvestEvery == 0 ? DayEvent.Harvest
-            : day % FishingContestEvery == 0 ? DayEvent.FishingContest
-            : day % MarketEvery == 0 ? DayEvent.Market
-            : DayEvent.None;
-
-        public static string EventName(DayEvent dayEvent) => dayEvent switch
+        public static DayEvent EventOf(int day)
         {
-            DayEvent.Market => "장날",
-            DayEvent.Harvest => "수확제",
-            DayEvent.FullMoon => "보름달",
-            DayEvent.FishingContest => "낚시 대회",
-            _ => "",
-        };
+            if (day <= 1) return DayEvent.None;
+            DayEventDefinition rarest = null;
+            foreach (var definition in DayEvents.Events)
+            {
+                if (day % definition.Every == 0 && (rarest == null || definition.Every > rarest.Every)) rarest = definition;
+            }
+            return rarest?.Kind ?? DayEvent.None;
+        }
 
-        public static string EventText(DayEvent dayEvent) => dayEvent switch
-        {
-            DayEvent.Market => $"장날: 가게 물건이 {100 - MarketPercent}% 싸다",
-            DayEvent.Harvest => $"수확제: 작물을 {HarvestPercent - 100}% 더 비싸게 산다",
-            DayEvent.FullMoon => $"보름달: 밤에 몬스터가 더 많고 경험치가 {FullMoonExperiencePercent - 100}% 더 나온다",
-            DayEvent.FishingContest => $"낚시 대회: 낚은 물고기마다 상금(어려움 하나에 금화 {ContestPrizePerDifficulty}), 낚시 경험치 두 배",
-            _ => "",
-        };
+        public static string EventName(DayEvent dayEvent) => DayEvents.Find(dayEvent)?.Name ?? "";
+
+        public static string EventText(DayEvent dayEvent) => DayEvents.Find(dayEvent)?.Text ?? "";
 
         public DayEvent EventToday => EventOf(Today);
 
