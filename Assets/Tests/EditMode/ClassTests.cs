@@ -496,7 +496,9 @@ namespace Game.Core.Tests
             Assert.IsFalse(world.ChangeClasses(player.Id, new[] { Warrior, FireMage }, null), "one slot at level 1");
 
             player.Experience = Leveling.TotalFor(10);
+            int version = player.InventoryVersion;
             Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Warrior, FireMage }, null), "a second at level 10, free");
+            Assert.Greater(player.InventoryVersion, version, "the new first skill's rank goes out with the bag though no coins changed hands");
             CollectionAssert.AreEqual(new[] { "whirlwind", "fireball" }, player.Skills.Select(s => s.Id));
             Assert.IsFalse(world.ChangeClasses(player.Id, new[] { Warrior, FireMage, Archer }, null), "a third waits for 20");
             player.Experience = Leveling.TotalFor(20);

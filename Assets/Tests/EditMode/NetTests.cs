@@ -288,6 +288,7 @@ namespace Game.Core.Tests
             session.Send(1, alice.ClassCommand(new[] { Classes.Shipped.Find("fire_mage"), Classes.Shipped.Find("warrior") }, null));
             session.Tick(4);
             CollectionAssert.AreEqual(new[] { "fire_mage", "warrior" }, alice.Classes.Select(c => c.Id));
+            Assert.AreEqual(1, alice.RankOf(Classes.Skill("whirlwind")), "the client hears the new class's first skill is learned, though no coins changed hands");
             CollectionAssert.AreEqual(new[] { "fireball", "whirlwind" }, alice.Skills.Select(s => s.Id), "a new character knows each class's first skill");
             CollectionAssert.AreEqual(alice.Skills, session.Host.World.FindPlayer(alice.PlayerId).Skills);
             session.Teach(alice);

@@ -59,6 +59,10 @@ namespace Game.Core
                 }
             }
             player.ChangeKit(classes, order);
+            // A class taken brings its first skill (Player.LearnBasics): the ranks go out with the bag, so it must be
+            // sent again even when no coins changed hands (2026-11-09: a second class picked free showed its first
+            // skill as not learned).
+            player.InventoryVersion++;
             return true;
         }
 

@@ -166,6 +166,9 @@ namespace Game.Client
                     var chosen = ClassRules.Choose(root.ClassSheet, words[1].Split(','), ClassRules.DefaultMaxClasses);
                     if (chosen.Count == 0) throw new ArgumentException($"no classes '{words[1]}'");
                     player.ChangeKit(chosen, words.Length > 2 ? words[2].Split(',').Select(Int).ToList() : null);
+                    // Ready at once, as for a character that joined with them (a change in the game starts new skills
+                    // cooling down; the checks give classes right after starting and use the skills straight away).
+                    foreach (var ready in player.Skills) player.ClearCooldown(ready);
                     player.InventoryVersion++;
                     return null;
                 case "hearts":

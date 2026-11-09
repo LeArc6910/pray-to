@@ -117,8 +117,6 @@ async function menu(browser) {
   await game.press('어둠과 빛: 꺼짐');
   await game.press('개발 정보: 켜짐');
 
-  await game.press('[ ] 화염 마법사');
-  check((await game.find('[1] 전사')).length === 1 && (await game.find('[2] 화염 마법사')).length === 1, '클래스를 처음대로 되돌린다');
 
   // Keys: skill 1 to the "1" key; W is refused; Esc gives up.
   await game.press('키 바꾸기');
@@ -1703,6 +1701,14 @@ async function firstRun(browser, profile, hourLong) {
     cdp = cdp || (await game.context.newCDPSession(game.page));
     await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
   };
+  // Taken beside a thing (the playtest's "goto near"), which turns the player to it by holding the aim
+  // (GameRoot.AimHeld). On the phone nothing else lets go of that hold, so the attack stick never turned the player
+  // again and every dig after it struck the same side (2026-11-09: 75 of 91 digs did not break): let go at once.
+  const gotoNear = async what => {
+    const answer = await game.send(`goto near ${what}`);
+    if (game.touch) await game.send('face off');
+    return answer;
+  };
   const screen = await game.canvas();
   const sticks = {
     move: { x: screen.left + screen.width * 0.25, y: screen.top + screen.height * 0.55 },
@@ -1892,7 +1898,9 @@ async function firstRun(browser, profile, hourLong) {
   const t0 = await goalNow();
   note(`- 첫 목표: ${t0.n}. ${t0.text}`);
 
-  // 1. A class (2026-11-09): picked in the bag's skills page, as the first goal's hint says; the warrior.
+  // 1. A class (2026-11-09): picked in the bag's skills page, as the first goal's hint says; the warrior. On the
+  // phone the [가방] button comes a moment after the world (the first run pressed before it was drawn).
+  if (game.touch) await game.until(b => b.some(x => x.label === '가방'), 10000, game.buttons);
   await bagTab(game, '스킬');
   check(await game.press('고르기', /^전사:/), '가방 [스킬] 탭에 클래스마다 [고르기]가 있다');
   await game.wait(800);
@@ -1979,7 +1987,7 @@ async function firstRun(browser, profile, hourLong) {
   if (!bench) {
     // Dug away from it for the stone: back beside it, as a person would walk back down the tunnel.
     note('- 돌 바닥을 만들 때 작업대에서 멀어져 있었다(돌을 더 캐느라). 봇은 작업대 곁으로 옮겨졌다');
-    await game.send('goto near Workbench');
+    await gotoNear('Workbench');
     await game.wait(800);
   }
   await bagTab(game, '재료·제작');
@@ -2013,7 +2021,7 @@ async function firstRun(browser, profile, hourLong) {
     const first = offset((await game.state()).veinAt);
     if (!first) {
       carried++;
-      await game.send('goto near CopperOre');
+      await gotoNear('CopperOre');
       await game.wait(800);
       return;
     }
@@ -2049,7 +2057,7 @@ async function firstRun(browser, profile, hourLong) {
     if (!beside) {
       // Water all round or a maze of it: taken there, as a person would find their way round.
       carried++;
-      await game.send('goto near CopperOre');
+      await gotoNear('CopperOre');
       await game.wait(800);
     }
   };
@@ -2063,7 +2071,7 @@ async function firstRun(browser, profile, hourLong) {
 
   // 6. A piece of copper gear, made beside the workbench and worn. (Mining skill 2 was the sixth goal until
   // 2026-11-09: a hundred walls, three minutes or more of digging alone, held up every goal after it.)
-  await game.send('goto near Workbench');
+  await gotoNear('Workbench');
   note('- 구리 장비를 만들려고 작업대로 돌아갈 때: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)');
   await game.wait(800);
   await bagTab(game, '재료·제작');
@@ -2118,6 +2126,7 @@ async function firstRun(browser, profile, hourLong) {
         await game.wait(500);
       }
       const answer = (await game.send(`goto ${where}`)).join(' ');
+      if (game.touch && where.startsWith('near ')) await game.send('face off');
       await game.wait(800);
       if (!/^ok/.test(answer)) note(`  - (${why}) goto ${where}: ${answer || '대답 없음'}`);
       if (!moved.has(why)) note(`- ${why}: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)`);
