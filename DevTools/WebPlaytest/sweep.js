@@ -74,9 +74,9 @@ async function menu(browser) {
   for (const word of ['어둠과 빛:', '효과음:', '음악:', '개발 정보:', '글꼴:', '목표 안내:', '화면 흔들림:', '키 바꾸기', '온라인 방 만들기', '코드로 참가', '저장본: 고르기·내보내기·가져오기']) {
     check(labels.some(l => l.startsWith(word)), `메뉴에 [${word}…] 단추`);
   }
-  const classes = labels.filter(l => /^\[[ \d]\] /.test(l));
-  check(classes.length === 5, `클래스 단추가 다섯 (${classes.join(', ')})`);
-  check(classes.includes('[1] 전사') && classes.includes('[2] 화염 마법사'), '처음 고른 클래스는 [1] 전사, [2] 화염 마법사');
+  // Classes are picked in the game (2026-11-09): the menu says so and has no class buttons.
+  check(labels.filter(l => /^\[[ \d]\] /.test(l)).length === 0, '메뉴에 클래스 단추가 없다');
+  check(/클래스는 게임 안에서 고른다/.test(await game.allText()), '메뉴가 "클래스는 게임 안에서 고른다: 가방의 [스킬] 탭에서…"라고 알린다');
 
   // The sound volume goes round off, 25, 50, 75, 100.
   const volumes = [];
@@ -117,17 +117,6 @@ async function menu(browser) {
   await game.press('어둠과 빛: 꺼짐');
   await game.press('개발 정보: 켜짐');
 
-  // Classes: a third one, then the first out; the numbers follow the order.
-  await game.press('[ ] 궁수');
-  check((await game.find('[3] 궁수')).length === 1, '[ ] 궁수를 누르면 [3] 궁수');
-  await game.press('[1] 전사');
-  buttons = (await game.buttons()).map(b => b.label);
-  check(buttons.includes('[1] 화염 마법사') && buttons.includes('[2] 궁수') && buttons.includes('[ ] 전사'), `전사를 빼면 번호가 당겨진다 (${buttons.filter(l => /^\[/.test(l)).join(', ')})`);
-  await game.shot('menu-classes', '클래스를 바꾼 메뉴');
-  // Back to 전사, 화염 마법사 without ever leaving none picked.
-  await game.press('[2] 궁수');
-  await game.press('[ ] 전사');
-  await game.press('[1] 화염 마법사');
   await game.press('[ ] 화염 마법사');
   check((await game.find('[1] 전사')).length === 1 && (await game.find('[2] 화염 마법사')).length === 1, '클래스를 처음대로 되돌린다');
 
@@ -1259,8 +1248,9 @@ async function gear(browser) {
   const skills = (await game.inventory()).skills;
   await game.press('▼');
   check((await game.inventory()).skills !== skills, `▼로 스킬 칸 순서를 바꾼다 (${skills} → ${(await game.inventory()).skills})`);
+  // Giving the fire mage up for the archer: a change, for coins by level (2026-11-09); two slots at this level.
+  await game.press('[2] 화염 마법사');
   await game.press('[ ] 궁수');
-  // Other classes cost coins by level (2026-11-09).
   await game.send('give coin 600');
   await game.wait(400);
   const goldBefore = count(await game.inventory(), 'coin');
@@ -1704,7 +1694,7 @@ async function hour(browser) {
 async function firstRun(browser, profile, hourLong) {
   note(`\n## ${hourLong ? '처음 한 시간' : '처음 10분'}: 목표 안내만 따라가기 (${profile.touch ? `휴대폰 터치 ${profile.context.viewport.width}×${profile.context.viewport.height}` : 'PC'})\n`);
   const game = await open(browser, run, profile, url);
-  check(await game.startSolo(hourLong ? 'firsthour' : profile.touch ? 'first10phone' : 'first10'), '새 캐릭터로 혼자 하기');
+  check(await game.startSolo(hourLong ? 'firsthour' : profile.touch ? 'first10phone' : 'first10', false, null), '새 캐릭터로 혼자 하기');
   await game.wait(1500);
   // A finger on the screen (phone): the move stick on the left half, the attack stick on the right, mid-height
   // where nothing is drawn over the world.
@@ -1902,11 +1892,22 @@ async function firstRun(browser, profile, hourLong) {
   const t0 = await goalNow();
   note(`- 첫 목표: ${t0.n}. ${t0.text}`);
 
-  // 1. Ten stones, with the pickaxe on 2.
+  // 1. A class (2026-11-09): picked in the bag's skills page, as the first goal's hint says; the warrior.
+  await bagTab(game, '스킬');
+  check(await game.press('고르기', /^전사:/), '가방 [스킬] 탭에 클래스마다 [고르기]가 있다');
+  await game.wait(800);
+  const picked = (await game.inventory()).classes;
+  check(picked === 'warrior', `전사를 고르면 클래스가 된다 (${picked})`);
+  check((await game.find('고르기')).length === 0, '레벨 1에는 하나만: 고른 뒤에는 [고르기]가 없다');
+  await game.shot('class-picked', '전사를 고른 [스킬] 탭');
+  await closeBag(game);
+  await passed(1, '클래스 고르기');
+
+  // 2. Ten stones, with the pickaxe on 2.
   await slot(2);
   await mine(async () => count(await inv(), 'stone') >= 10, 120);
   await game.wait(1200);
-  await passed(1, '돌 10개 모으기');
+  await passed(2, '돌 10개 모으기');
   await game.shot('first-stone', '돌을 캔 굴');
   // Room to put things: the walls on every side dug out, as a person clears a little room for a base (a workbench
   // set down in a tunnel one wide shuts the way back).
@@ -1967,10 +1968,10 @@ async function firstRun(browser, profile, hourLong) {
   await bagTab(game, '재료·제작');
   check(await game.press('만들기', /^작업대/), '[재료·제작]에 작업대 [만들기]가 있다');
   await closeBag(game);
-  await placeFor(2, '작업대 세우기', '작업대 ×');
+  await placeFor(3, '작업대 세우기', '작업대 ×');
 
   // 3. A torch from the bag, onto other open floor.
-  await placeFor(3, '횃불 세우기', /^횃불 ×/);
+  await placeFor(4, '횃불 세우기', /^횃불 ×/);
 
   // 4. Stone floor: made at the workbench (beside it), laid on open floor.
   await mine(async () => count(await inv(), 'stone') >= 4, 150);
@@ -1991,7 +1992,7 @@ async function firstRun(browser, profile, hourLong) {
     note(`  - 돌 바닥 줄: ${rows.map(b => `${b.enabled ? '눌림' : '안 눌림'}${b.shown ? '' : '(가려짐)'} "${b.row}"`).join(' / ') || '없음'}, 돌 ${count(await inv(), 'stone')}`);
     await why('돌 바닥');
   }
-  await placeFor(4, '돌 바닥 깔기', /^돌 바닥 ×/);
+  await placeFor(5, '돌 바닥 깔기', /^돌 바닥 ×/);
 
   // 5. Six copper ores. The hint says what a copper vein looks like but not where one is: the bot is taken to the
   // nearest (a person would walk the tunnels looking for orange).
@@ -2058,7 +2059,7 @@ async function firstRun(browser, profile, hourLong) {
   note(`- 구리 광맥: 미니맵이 가리키는 가장 가까운 광맥으로 ${veins}번 파 들어갔다${carried ? `(16칸 안에 없어 ${carried}번 옮겨졌다)` : ''}`);
   note(`  - 쓴 때: 광맥 찾아가기 ${Math.round(spent.vein)}초, 벽·광석 캐기 ${Math.round(spent.dig)}초(${spent.digs}번, 그 가운데 6초 안에 안 깨진 것 ${spent.stuck}번), 곁에 온 몬스터와 싸움 ${spent.fights}번`);
   await game.wait(1000);
-  await passed(5, '구리 광석 6개 캐기');
+  await passed(6, '구리 광석 6개 캐기');
 
   // 6. A piece of copper gear, made beside the workbench and worn. (Mining skill 2 was the sixth goal until
   // 2026-11-09: a hundred walls, three minutes or more of digging alone, held up every goal after it.)
@@ -2082,8 +2083,22 @@ async function firstRun(browser, profile, hourLong) {
   }
   await closeBag(game);
   await game.wait(1000);
-  await passed(6, '구리 장비 하나 만들기');
+  await passed(7, '구리 장비 하나 만들기');
   await game.shot('first-gear', '처음 10분 끝');
+  if (!hourLong) {
+    // A second class at level 10 (2026-11-09): the slot opens, the banner says so, and the skills page offers the
+    // other classes again, free.
+    await game.send('xp 1200');
+    const up = await game.until(t => /클래스를 하나 더 고를 수 있다/.test(t), 5000, game.allText);
+    check(!!up, '레벨 10이 되면 "클래스를 하나 더 고를 수 있다" 알림');
+    await bagTab(game, '스킬');
+    check(await game.press('고르기', /^화염 마법사:/), '레벨 10에는 [스킬] 탭에 다시 [고르기]가 있다');
+    const two = await game.until(i => i.classes === 'warrior,fire_mage', 4000, game.inventory);
+    check(!!two, `둘째 클래스를 금화 없이 고른다 (${(await game.inventory()).classes})`);
+    check(/레벨 20에 하나 더 고를 수 있다/.test(await game.allText()), '고른 뒤에는 "레벨 20에 하나 더 고를 수 있다"');
+    await game.shot('second-class', '둘째 클래스를 고른 [스킬] 탭');
+    await closeBag(game);
+  }
   if (hourLong) await onwards();
 
   note('\n목표마다 걸린 때:\n');
@@ -2175,7 +2190,7 @@ async function firstRun(browser, profile, hourLong) {
     await game.press('심기', '버섯 포자');
     await closeBag(game);
     await game.wait(800);
-    await passed(7, '버섯 심기');
+    await passed(8, '버섯 심기');
 
     // Copper and stone for the hoe, the rod and the furnace (copper 2 + 2 + 2, stone 2 + 1 + 15).
     await copperFor(6);
@@ -2186,7 +2201,7 @@ async function firstRun(browser, profile, hourLong) {
     const hoe = await craft('호미');
     note(`- 호미: ${hoe ? '만듦' : '못 만듦'} (구리 ${count(await inv(), 'copper_ore')}, 돌 ${count(await inv(), 'stone')}, 호미 ${count(await inv(), 'hoe')})`);
     const tilled = [];
-    for (let attempt = 0; attempt < 4 && (await goalNow()).n <= 8; attempt++) {
+    for (let attempt = 0; attempt < 4 && (await goalNow()).n <= 9; attempt++) {
       const at = await faceOpen(tilled);
       if (!at) break;
       tilled.push(`${at.dx},${at.dy}`);
@@ -2201,7 +2216,7 @@ async function firstRun(browser, profile, hourLong) {
         await why('밭 갈기');
       }
     }
-    await passed(8, '밭 갈기');
+    await passed(9, '밭 갈기');
 
     // 9. A rod (slime gel 2: the torch goal's reward), at the nearest water.
     await taken('near Workbench', '작업대로 돌아갈 때');
@@ -2213,7 +2228,7 @@ async function firstRun(browser, profile, hourLong) {
     const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
     let strikes = 0;
     const fishing = Date.now() + 150000;
-    while (rod && Date.now() < fishing && (await goalNow()).n <= 9) {
+    while (rod && Date.now() < fishing && (await goalNow()).n <= 10) {
       const f = (await game.state()).fishing;
       if (f === 'bite in') {
         await game.tapAt(rod.cx, rod.cy);
@@ -2226,7 +2241,7 @@ async function firstRun(browser, profile, hourLong) {
     }
     await closeBag(game);
     note(`- 낚시: 낚아채기 ${strikes}번`);
-    await passed(9, '물고기 낚기');
+    await passed(10, '물고기 낚기');
 
     // 10. Ten coins: what the merchant buys of the bag (fish, ore, mushrooms), at the stall near the spawn.
     await taken('near MerchantStall', '상인 노점으로 갈 때');
@@ -2242,20 +2257,20 @@ async function firstRun(browser, profile, hourLong) {
     note(`- 상인: 금화 ${count(await inv(), 'coin')}`);
     await closeBag(game);
     await game.wait(800);
-    await passed(10, '상인에게 팔아 금화 10개 모으기');
+    await passed(11, '상인에게 팔아 금화 10개 모으기');
 
     // 11. The furnace made at the workbench, set down.
-    await placeFor(11, '화로 세우기', /^화로 ×/);
+    await placeFor(12, '화로 세우기', /^화로 ×/);
 
     // 12. Mining skill 2, from all the walls dug so far and more.
-    await mine(async () => (await goalNow()).n > 12, 150);
-    await passed(12, '채굴 기술 2레벨 되기');
+    await mine(async () => (await goalNow()).n > 13, 150);
+    await passed(13, '채굴 기술 2레벨 되기');
 
     // 13. Level 3 by hunting, away from the spawn, as the goal's hint says.
     const early = await hunt(async () => (await game.state()).level >= 3, 300);
     note(`- 레벨 3까지 사냥: ${early}마리, 레벨 ${(await game.state()).level}`);
     await game.wait(800);
-    await passed(13, '레벨 3 되기');
+    await passed(14, '레벨 3 되기');
 
     // 14. The cave warden, fought with what the bot has: up to three tries, back to the arena after a fall.
     const wardenAt = Date.now();
@@ -2263,7 +2278,7 @@ async function firstRun(browser, profile, hourLong) {
     let dodges = 0;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
-    while (Date.now() - wardenAt < 300000 && (await goalNow()).n <= 14 && falls < 3) {
+    while (Date.now() - wardenAt < 300000 && (await goalNow()).n <= 15 && falls < 3) {
       const s = await game.state();
       if (s.dead) {
         falls++;
@@ -2284,7 +2299,7 @@ async function firstRun(browser, profile, hourLong) {
       const boss = offset(s.bossAt);
       if (!boss) {
         await gather(5);
-        if ((await goalNow()).n > 14) break;
+        if ((await goalNow()).n > 15) break;
         await game.wait(500);
         continue;
       }
@@ -2300,20 +2315,20 @@ async function firstRun(browser, profile, hourLong) {
     const fought = await game.state();
     note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
     await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
-    await passed(14, '동굴 수호자 쓰러뜨리기');
+    await passed(15, '동굴 수호자 쓰러뜨리기');
 
     // 15. A bed: stone 6 and slime gel 3, the gel from slimes.
     await hunt(async () => count(await inv(), 'slime_gel') >= 3, 180);
     await mine(async () => count(await inv(), 'stone') >= 6, 60);
     await taken('near Workbench', '작업대로 돌아갈 때');
     await craft('침대');
-    await placeFor(15, '침대 세우기', /^침대 ×/);
+    await placeFor(16, '침대 세우기', /^침대 ×/);
 
     // 16. Level 5 by hunting.
     const kills = await hunt(async () => (await game.state()).level >= 5, 300);
     note(`- 레벨 5까지 사냥: ${kills}마리, 레벨 ${(await game.state()).level}`);
     await game.wait(800);
-    await passed(16, '레벨 5 되기');
+    await passed(17, '레벨 5 되기');
     await game.shot('hour-end', '처음 한 시간 끝');
   }
 }

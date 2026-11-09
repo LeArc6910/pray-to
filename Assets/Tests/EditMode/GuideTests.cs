@@ -6,20 +6,25 @@ namespace Game.Core.Tests
 {
     public class GuideTests
     {
-        static GuideFacts Facts(Dictionary<string, int> counts = null, TileType[] tiles = null, bool crop = false, float distance = 0) =>
+        // A character with a class, as one is a minute in (the first goal, 2026-11-09).
+        static GuideFacts Facts(Dictionary<string, int> counts = null, TileType[] tiles = null, bool crop = false, float distance = 0, int classes = 1) =>
             new GuideFacts(
                 id => counts != null && counts.TryGetValue(id, out int count) ? count : 0,
                 type => tiles != null && tiles.Contains(type),
                 crop,
-                distance);
+                distance,
+                classes: classes);
+
+        static Goal Shipped(string id) => Guide.Shipped.Goals.Single(goal => goal.Id == id);
 
         [Test]
         public void ShippedGoalsStartWithDiggingAndBuilding()
         {
             var data = Guide.Shipped;
             Assert.IsTrue(data.Success, string.Join("\n", data.Errors));
-            Assert.AreEqual("stone", data.Goals[0].Id);
-            Assert.AreEqual("workbench", data.Goals[1].Id);
+            Assert.AreEqual("class", data.Goals[0].Id, "a class first, picked in the game (2026-11-09)");
+            Assert.AreEqual("stone", data.Goals[1].Id);
+            Assert.AreEqual("workbench", data.Goals[2].Id);
             Assert.IsTrue(data.Goals.All(goal => goal.Hint.Length > 0), "every goal says how");
             var copperGear = data.Goals.Single(goal => goal.Id == "copper_gear");
             Assert.Greater(copperGear.Conditions.Count, 1, "any of several items");
@@ -28,19 +33,21 @@ namespace Game.Core.Tests
         [Test]
         public void TheGoalListShowsHowFarAlong()
         {
-            var stone = Guide.Shipped.Goals[0];
+            var stone = Shipped("stone");
             var count = stone.Conditions[0].Count;
             Assert.AreEqual($"3/{count}", GuideProgress.Progress(stone, Facts(new Dictionary<string, int> { [stone.Conditions[0].Id] = 3 })));
             Assert.AreEqual($"{count}/{count}", GuideProgress.Progress(stone, Facts(new Dictionary<string, int> { [stone.Conditions[0].Id] = 99 })), "never past the count");
-            Assert.IsNull(GuideProgress.Progress(Guide.Shipped.Goals[1], Facts()), "a workbench to place has nothing to count");
+            Assert.IsNull(GuideProgress.Progress(Shipped("workbench"), Facts()), "a workbench to place has nothing to count");
         }
 
         [Test]
         public void GoalsPassInOrderAndSkipWhatIsAlreadyDone()
         {
             var progress = new GuideProgress(Guide.Shipped, 0);
+            Assert.AreEqual("class", progress.Current.Id);
+            Assert.IsEmpty(progress.Update(Facts(classes: 0)), "no class yet");
+            CollectionAssert.AreEqual(new[] { "class" }, progress.Update(Facts()).Select(goal => goal.Id));
             Assert.AreEqual("stone", progress.Current.Id);
-            Assert.IsEmpty(progress.Update(Facts()));
 
             var passed = progress.Update(Facts(new Dictionary<string, int> { ["stone"] = 12 }, new[] { TileType.Workbench, TileType.Torch }));
 
@@ -53,11 +60,11 @@ namespace Game.Core.Tests
         {
             var progress = new GuideProgress(Guide.Shipped, 0);
             progress.Update(Facts(new Dictionary<string, int> { ["stone"] = 10 }));
-            Assert.AreEqual(1, progress.Done);
+            Assert.AreEqual(2, progress.Done, "the class and the stones");
 
             progress.Update(Facts());
 
-            Assert.AreEqual(1, progress.Done, "the stones went into a workbench");
+            Assert.AreEqual(2, progress.Done, "the stones went into a workbench");
         }
 
         [Test]
@@ -125,7 +132,7 @@ namespace Game.Core.Tests
             var progress = new GuideProgress(data, GuideProgress.FromCount(data, 9));
             Assert.AreEqual(9, progress.Passed.Count);
             Assert.IsFalse(progress.Passed.Any(GuideProgress.AddedAfterCounts.Contains), "none of the new ones");
-            Assert.AreEqual("merchant", progress.Current.Id, "the first new goal before where they were");
+            Assert.AreEqual("class", progress.Current.Id, "the first new goal before where they were: picking a class, which a character from then has");
             Assert.IsTrue(GuideProgress.AddedAfterCounts.All(id => data.Goals.Any(g => g.Id == id)), "every new goal is in the sheet");
         }
 

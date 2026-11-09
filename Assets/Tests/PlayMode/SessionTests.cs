@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Linq;
 using Game.Core;
 using NUnit.Framework;
 using UnityEngine;
@@ -44,16 +45,19 @@ namespace Game.Client.Tests
             Assert.Greater(Object.FindObjectsByType<SpriteRenderer>().Length, 0, "Nothing was drawn.");
         }
 
-        // The menu starts with two classes picked, and a new character knows each one's first skill. Taught the
-        // rest (as points would), the slots hold four: a nova, a buff, a projectile and a buff that adds fire, which
-        // together draw every kind of skill effect.
+        // A new character has no class (picked in the game, 2026-11-09); given two, it knows each one's first skill.
+        // Taught the rest (as points would), the slots hold four: a nova, a buff, a projectile and a buff that adds
+        // fire, which together draw every kind of skill effect.
         [UnityTest]
         public IEnumerator EverySkillCanBeUsed()
         {
             _root.StartSolo();
             yield return new WaitForSecondsRealtime(1);
             Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
-            Assert.AreEqual(2, _root.SkillCount, "Expected the two starting classes' first skills.");
+            Assert.AreEqual(0, _root.SkillCount, "Expected a new character to start with no class.");
+            _root.HostPlayer.ChangeKit(new[] { "warrior", "fire_mage" }.Select(id => _root.ClassSheet.Classes.First(c => c.Id == id)).ToList(), null);
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.AreEqual(2, _root.SkillCount, "Expected the two classes' first skills.");
             World.TeachAll(_root.HostPlayer, 1);
             yield return new WaitForSecondsRealtime(0.5f);
             Assert.AreEqual(4, _root.SkillCount, "Expected four skills in the slots once taught.");

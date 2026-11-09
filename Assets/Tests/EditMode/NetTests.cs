@@ -279,13 +279,21 @@ namespace Game.Core.Tests
             var alice = session.Join(1, "앨리스", Protocol.Version, "fire_mage", "nobody", "fire_mage", "warrior");
             var bob = session.Join(2, "밥");
 
+            // A new character starts with one class at most (2026-11-09): the rest are picked in the game as the level
+            // opens slots.
+            CollectionAssert.AreEqual(new[] { "fire_mage" }, alice.Classes.Select(c => c.Id));
+            CollectionAssert.IsEmpty(bob.Classes, "none asked, none given");
+            var host = session.Host.World.FindPlayer(alice.PlayerId);
+            host.Experience = Leveling.TotalFor(10);
+            session.Send(1, alice.ClassCommand(new[] { Classes.Shipped.Find("fire_mage"), Classes.Shipped.Find("warrior") }, null));
+            session.Tick(4);
             CollectionAssert.AreEqual(new[] { "fire_mage", "warrior" }, alice.Classes.Select(c => c.Id));
             CollectionAssert.AreEqual(new[] { "fireball", "whirlwind" }, alice.Skills.Select(s => s.Id), "a new character knows each class's first skill");
             CollectionAssert.AreEqual(alice.Skills, session.Host.World.FindPlayer(alice.PlayerId).Skills);
             session.Teach(alice);
             CollectionAssert.AreEqual(new[] { "fireball", "flame_brand", "whirlwind", "war_cry" }, alice.Skills.Select(s => s.Id));
             CollectionAssert.AreEqual(alice.Skills, session.Host.World.FindPlayer(alice.PlayerId).Skills);
-            Assert.AreEqual(120, alice.Stats.MaxHealth, 0.001f, "the warrior passive counts on the client too");
+            Assert.AreEqual(host.Stats.MaxHealth, alice.Stats.MaxHealth, 0.001f, "the warrior passive counts on the client too");
             CollectionAssert.AreEqual(alice.Classes, bob.ClassesOf(alice.PlayerId));
             Assert.IsEmpty(bob.Skills);
 
@@ -618,9 +626,10 @@ namespace Game.Core.Tests
 
             session.Send(1, alice.ClassCommand(new[] { Classes.Shipped.Find("fire_mage") }, null));
             session.Tick(2);
-            Assert.AreEqual("warrior", alice.Classes.Single().Id, "away from a workbench nothing changes");
+            Assert.AreEqual("warrior", alice.Classes.Single().Id, "giving the warrior up away from a workbench changes nothing");
             Assert.Greater(alice.KitVersion, kits, "but the host answers");
 
+            player.Experience = Leveling.TotalFor(10);
             world.Map[TileMap.Cell(player.Position.X) + 1, TileMap.Cell(player.Position.Y)] = TileType.Workbench;
             player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.Coin), ClassRules.ChangeCoins(player.Level));
             var both = new[] { Classes.Shipped.Find("fire_mage"), Classes.Shipped.Find("warrior") };

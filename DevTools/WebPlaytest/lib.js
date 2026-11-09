@@ -223,9 +223,16 @@ function helpers(game) {
     return null;
   };
 
-  h.startSolo = async (name = 'playtest', keep = false) => {
+  // A new character has no class (picked in the game's skills page, 2026-11-09); the checks that are not about
+  // picking start it with a warrior and a fire mage, as the menu used to. Null leaves it with none.
+  h.startSolo = async (name = 'playtest', keep = false, classes = 'warrior,fire_mage') => {
     await h.send(`solo ${name}${keep ? ' keep' : ''}`);
-    return !!(await h.until(s => s.playing, 25000));
+    const playing = !!(await h.until(s => s.playing, 25000));
+    if (playing && !keep && classes) {
+      await h.send(`classes ${classes}`);
+      await page.waitForTimeout(400);
+    }
+    return playing;
   };
 
   // A finger on the screen at (x, y) moved by (dx, dy) over a second, through the DevTools protocol.

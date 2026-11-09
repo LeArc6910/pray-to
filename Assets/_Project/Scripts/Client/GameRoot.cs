@@ -73,7 +73,9 @@ namespace Game.Client
         float _goalShownAt;
         // Class ids in the order picked; the first one's skills take the first slots. Both to start with, so a new
         // player sees what mixing does.
-        readonly List<string> _chosenClasses = new List<string> { "warrior", "fire_mage" };
+        // The classes the character joins with: a saved character's own; none for a new one, who picks in the game
+        // (Docs/Classes.md, 클래스 고르기, 2026-11-09).
+        readonly List<string> _chosenClasses = new List<string>();
         // What the menu's second column shows: the classes, the keys to change, or the saves on this device.
         enum MenuSide
         {
@@ -435,12 +437,17 @@ namespace Game.Client
         List<string> _savedClasses;
         IReadOnlyList<int> _savedOrder;
 
+        // The playtest's "solo" starts a character afresh under a name the menu may have read already.
+        internal void ForgetCharacterClasses() => _classesFor = null;
+
         void SyncCharacterClasses()
         {
             if (_classesFor == CharacterName || _classes == null || _loot == null) return;
             _classesFor = CharacterName;
             _savedClasses = null;
             _savedOrder = null;
+            // Not the last character's classes: a new character starts with none.
+            _chosenClasses.Clear();
             var data = SaveStore.Read(SaveStore.CharacterKey(CharacterName));
             if (data == null) return;
             List<string> ids;
@@ -777,6 +784,7 @@ namespace Game.Client
             }
             _worldKey = SaveStore.WorldKey(WorldName);
             _worldSaveClock = 0;
+            SyncCharacterClasses();
             _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
             {
                 Character = character,
@@ -827,6 +835,7 @@ namespace Game.Client
                 _status = "접속을 시작하지 못했습니다. 주소를 확인하세요.";
                 return;
             }
+            SyncCharacterClasses();
             _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
             {
                 Character = character,
@@ -1163,7 +1172,7 @@ namespace Game.Client
             GUILayout.BeginVertical(GUILayout.Width(column));
             if (_side == MenuSide.Keys && !Controls.UsingTouch) DrawKeys();
             else if (_side == MenuSide.Saves) DrawSaves();
-            else if (_classes != null && _classes.Success) DrawClassPicker();
+            else if (_classes != null && _classes.Success) DrawClassNote();
             GUILayout.EndVertical();
 
             if (wide) GUILayout.EndHorizontal();
@@ -1213,38 +1222,24 @@ namespace Game.Client
             GUILayout.Label(Ui.Wrap("이동 WASD·화살표, 공격 스페이스·마우스, 메뉴 Esc는 바꿀 수 없다.", GUI.skin.label, _menuColumn));
         }
 
-        // A button per class; picking adds it after the ones already picked, picking again takes it out. The number
-        // on a picked class is its turn in the skill slots.
-        void DrawClassPicker()
+        // Classes are picked in the game, not here (2026-11-09, the owner's call): a saved character's are shown, and
+        // for a new one how it goes.
+        void DrawClassNote()
         {
             SyncCharacterClasses();
             if (_savedClasses != null)
             {
-                // A saved character keeps its classes; they change in the game.
                 var names = _savedClasses.Select(id => _classes.Classes.First(c => c.Id == id).Name);
                 GUILayout.Label(Ui.Wrap($"{CharacterName}의 클래스: {string.Join(" + ", names)}", GUI.skin.label, _menuColumn));
-                GUILayout.Label(Ui.Wrap($"저장된 캐릭터는 이 클래스로 시작한다. 바꾸려면 게임 안 작업대 곁에서 가방 [스킬] 탭의 [클래스 바꾸기](금화 {ClassRules.ChangeCoins(1)}부터, 레벨이 오를수록 더 든다).", GUI.skin.label, _menuColumn));
+                GUILayout.Label(Ui.Wrap($"저장된 캐릭터는 이 클래스로 시작한다. 빈 클래스 칸(레벨 {ClassRules.SlotLevels[1]}에 둘째, {ClassRules.SlotLevels[2]}에 셋째)은 게임 안 가방 [스킬] 탭에서 그냥 고르고, 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다(금화 {ClassRules.ChangeCoins(1)}부터, 레벨이 오를수록 더 든다).", GUI.skin.label, _menuColumn));
                 return;
             }
-            int max = ClassRules.DefaultMaxClasses;
-            GUILayout.Label(Ui.Wrap($"클래스 (최대 {max}개, 고른 순서대로 스킬 칸을 채운다)", GUI.skin.label, _menuColumn));
+            GUILayout.Label(Ui.Wrap($"클래스는 게임 안에서 고른다: 가방(PC는 Tab·휴대폰은 [가방])의 [스킬] 탭에서 처음에 하나, 레벨 {ClassRules.SlotLevels[1]}에 둘째, {ClassRules.SlotLevels[2]}에 셋째. 고르기 전에는 기본 공격만 쓴다.", GUI.skin.label, _menuColumn));
             foreach (var option in _classes.Classes)
             {
-                int order = _chosenClasses.IndexOf(option.Id);
-                bool full = order < 0 && _chosenClasses.Count >= max;
-                GUI.enabled = !full;
-                string mark = order >= 0 ? $"[{order + 1}] " : "[ ] ";
-                if (Ui.LayoutButton(mark + option.Name))
-                {
-                    if (order >= 0) _chosenClasses.RemoveAt(order);
-                    else _chosenClasses.Add(option.Id);
-                }
-                GUI.enabled = true;
-                GUILayout.Label(Ui.Wrap(
-                    $"{option.Description}\n패시브: {SkillText.Passive(option)}\n스킬: {string.Join(", ", option.Skills.Select(k => k.Name))}", GUI.skin.label, _menuColumn));
-                GUILayout.Space(4);
+                GUILayout.Label(Ui.Wrap($"{option.Name}: {option.Description}", GUI.skin.label, _menuColumn));
+                GUILayout.Space(2);
             }
-            if (_chosenClasses.Count == 0) GUILayout.Label(Ui.Wrap("고르지 않으면 기본 공격만 쓴다.", GUI.skin.label, _menuColumn));
         }
 
         // The status box in the top left corner (Core Keeper and Terraria keep theirs as lean): health, mana and the
@@ -1280,6 +1275,8 @@ namespace Game.Client
                         lines.Add($"{Whole(_client.Food.Name)} {left / 60}:{left % 60:00}");
                     }
                     var points = new List<string>();
+                    // An open class slot (Docs/Classes.md, 클래스 고르기): picked in the bag's skills page.
+                    if (_client.Classes.Count < ClassRules.SlotsAt(_client.Level)) points.Add(Whole(_client.Classes.Count == 0 ? "클래스 고르기" : "클래스 하나 더"));
                     if (_client.SkillPoints > 0) points.Add(Whole($"스킬 포인트 {_client.SkillPoints}"));
                     if (_client.PassivePoints > 0) points.Add(Whole($"특성 포인트 {_client.PassivePoints}"));
                     if (points.Count > 0) lines.Add($"{string.Join(" · ", points)} (가방에서)");

@@ -15,13 +15,13 @@ namespace Game.Core
             Tile = tile;
         }
 
-        // "have", "place", "plant", "reach", "level", "passive", "life", "rift", "friend", "skills" or "rank".
+        // "have", "place", "plant", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank" or "classes".
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
         // How many to have, how many tiles from the spawn to reach, the character level, how many passive points, the
         // life skill's level (Id is the skill), the rift tier the world has opened, the hearts with anyone, the skill
-        // points spent or the rank of the best learned skill.
+        // points spent, the rank of the best learned skill or how many classes the character has.
         public int Count { get; }
         // What to place.
         public TileType Tile { get; }
@@ -86,8 +86,10 @@ namespace Game.Core
     public sealed class GuideFacts
     {
         public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1,
-            int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0, int skillsSpent = 0, int topRank = 0)
+            int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0, int skillsSpent = 0, int topRank = 0,
+            int classes = 0)
         {
+            Classes = classes;
             SkillsSpent = skillsSpent;
             TopRank = topRank;
             Passives = passives;
@@ -117,6 +119,8 @@ namespace Game.Core
         // Skill points spent, and the highest rank of any learned skill (Docs/Classes.md, 스킬 포인트와 단계).
         public int SkillsSpent { get; }
         public int TopRank { get; }
+        // How many classes the character has taken (Docs/Classes.md, 클래스 고르기).
+        public int Classes { get; }
 
         // The facts for a client's player: the bag and worn gear, the map, the crops and where the player stands.
         public static GuideFacts Of(WorldClient client)
@@ -147,7 +151,7 @@ namespace Game.Core
             int hearts = client.Friendships.Values.Select(f => World.HeartsOf(f.Points)).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level,
                 client.Passives.Count, client.LifeLevel, Math.Max(1, client.Rift.Unlocked), hearts,
-                SkillRules.SpentPoints(client.SkillRanks), client.SkillRanks.Values.DefaultIfEmpty(0).Max());
+                SkillRules.SpentPoints(client.SkillRanks), client.SkillRanks.Values.DefaultIfEmpty(0).Max(), client.Classes.Count);
         }
 
         // The same facts as the host sees them, to check a claimed reward.
@@ -179,7 +183,7 @@ namespace Game.Core
             int hearts = player.Friendships.Values.Select(f => f.Hearts).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level,
                 player.Passives.Count, skill => World.LifeLevel(player, skill), world.RiftTier, hearts,
-                SkillRules.SpentPoints(player.SkillRanks), player.SkillRanks.Values.DefaultIfEmpty(0).Max());
+                SkillRules.SpentPoints(player.SkillRanks), player.SkillRanks.Values.DefaultIfEmpty(0).Max(), player.Classes.Count);
         }
     }
 
@@ -207,7 +211,7 @@ namespace Game.Core
         public static readonly IReadOnlyCollection<string> AddedAfterCounts = new[]
         {
             "life_mining", "merchant", "passive", "anvil", "assembler", "power_pole", "keg", "coop", "crab_pot", "friend", "rift_altar", "rift",
-            "free_power", "arc_furnace", "skill", "rank3", "serpent", "antlion", "level3",
+            "free_power", "arc_furnace", "skill", "rank3", "serpent", "antlion", "level3", "class", "second_class", "third_class",
         };
 
         // The goals a count saved before AddedAfterCounts stood for.
@@ -255,6 +259,7 @@ namespace Game.Core
                     "friend" => facts.Hearts,
                     "skills" => facts.SkillsSpent,
                     "rank" => facts.TopRank,
+                    "classes" => facts.Classes,
                     _ => -1,
                 };
                 if (have >= 0 && condition.Count > 1) return $"{Math.Min(have, condition.Count)}/{condition.Count}";
@@ -275,6 +280,7 @@ namespace Game.Core
             "friend" => facts.Hearts >= condition.Count,
             "skills" => facts.SkillsSpent >= condition.Count,
             "rank" => facts.TopRank >= condition.Count,
+            "classes" => facts.Classes >= condition.Count,
             _ => false,
         };
     }
@@ -353,9 +359,11 @@ namespace Game.Core
                 case "friend":
                 case "skills":
                 case "rank":
+                case "classes":
                     if (parts.Length != 2) throw new FormatException($"'{text}'는 {parts[0]}:<수>로 적습니다.");
                     int number = SheetValues.ParseNumber(parts[1], "수");
                     if (number < 1) throw new FormatException("수는 1 이상이어야 합니다.");
+                    if (parts[0] == "classes" && number > ClassRules.DefaultMaxClasses) throw new FormatException($"클래스는 {ClassRules.DefaultMaxClasses}개까지입니다.");
                     return new GoalCondition(parts[0], null, number, default);
                 case "life":
                     if (parts.Length != 3 || !Enum.TryParse<LifeSkill>(parts[1], true, out _))
@@ -364,7 +372,7 @@ namespace Game.Core
                     if (lifeLevel < 1 || lifeLevel > LifeSkills.MaxLevel) throw new FormatException($"생활 기술 레벨은 1~{LifeSkills.MaxLevel}이어야 합니다.");
                     return new GoalCondition("life", parts[1].ToLowerInvariant(), lifeLevel, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level, passive, life, rift, friend, skills, rank 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level, passive, life, rift, friend, skills, rank, classes 중 하나)");
             }
         }
 

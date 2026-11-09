@@ -48,12 +48,16 @@ namespace Game.Client.Tests
             Forget();
         }
 
+        // A solo game with a warrior and fire mage: a new character has no class (picked in the game, 2026-11-09), so
+        // the scenes give it the two whose skills they draw.
         IEnumerator Start()
         {
             _root.StartSolo();
             yield return new WaitForSecondsRealtime(1);
             Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
             Assert.IsNotNull(_root.HostWorld, "A solo game hosts its own world.");
+            Player.ChangeKit(new[] { "warrior", "fire_mage" }.Select(id => _root.ClassSheet.Classes.First(c => c.Id == id)).ToList(), null);
+            yield return new WaitForSecondsRealtime(0.3f);
         }
 
         World World => _root.HostWorld;
@@ -184,6 +188,26 @@ namespace Game.Client.Tests
                 yield return new WaitForSecondsRealtime(1.5f);
                 yield return Screens.Take($"day{day}-{hour:00}h");
             }
+            Assert.IsTrue(_root.Playing);
+        }
+
+        // Picking a class in the game (Docs/Classes.md, 클래스 고르기, 2026-11-09): a new character has none, and its
+        // skills page offers every class with [고르기]; picked, its first skill comes to the bar and no more is offered
+        // until level 10.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ClassPickDraws()
+        {
+            _root.StartSolo();
+            yield return new WaitForSecondsRealtime(1);
+            Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
+            Assert.AreEqual(0, _root.SkillCount, "A new character starts with no class.");
+            _root.ShowBag("스킬");
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("class-pick");
+            Assert.IsTrue(World.ChangeClasses(Player.Id, new[] { _root.ClassSheet.Classes.First(c => c.Id == "archer") }, null));
+            yield return new WaitForSecondsRealtime(1);
+            Assert.AreEqual(1, _root.SkillCount, "The archer's first skill.");
+            yield return Screens.Take("class-picked");
             Assert.IsTrue(_root.Playing);
         }
 

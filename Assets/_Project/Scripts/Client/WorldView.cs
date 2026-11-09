@@ -1962,7 +1962,10 @@ namespace Game.Client
                     _floating.Add(new Floating { Position = climber.Position + new Vector3(0, 0.6f, 0), Text = $"Lv {e.Amount}", Color = LevelColor });
                     if (e.Source != _client.PlayerId) break;
                     Sounds.Play(Sound.LevelUp);
-                    ShowBanner($"레벨 {e.Amount}! 스킬·특성 포인트 +1");
+                    // A class slot opens at levels 10 and 20 (Docs/Classes.md, 클래스 고르기).
+                    ShowBanner(ClassRules.SlotsAt(e.Amount) > ClassRules.SlotsAt(e.Amount - 1)
+                        ? $"레벨 {e.Amount}! 클래스를 하나 더 고를 수 있다(가방 [스킬] 탭)"
+                        : $"레벨 {e.Amount}! 스킬·특성 포인트 +1");
                     break;
                 case SimEventType.Recall:
                     var traveller = Find(e.Source);

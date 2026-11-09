@@ -243,8 +243,18 @@ namespace Game.Core
 
         public static float PassiveShare(int classes) => classes > PassiveClasses ? (float)PassiveClasses / classes : 1;
 
-        // Coins to take other classes in the game (World.ChangeClasses, 2026-11-09): more the further the character
-        // has come, 30 at level 1 and 520 at 50. Reordering the skills stays free.
+        // The level each class slot opens at (2026-11-09, the owner's call): a new character has no class and picks one
+        // in the game, a second at level 10 and a third at 20 (about the antlion and the tide serpent). Docs/Classes.md.
+        public static readonly int[] SlotLevels = { 1, 10, 20 };
+
+        // How many classes a character of the level may have.
+        public static int SlotsAt(int level, int max = DefaultMaxClasses) => Math.Min(max, SlotLevels.Count(l => level >= l));
+
+        // The level the next class slot opens at, or 0 when every one is open.
+        public static int NextSlotLevel(int level) => SlotLevels.FirstOrDefault(l => l > level);
+
+        // Coins to give a class up for another (World.ChangeClasses, 2026-11-09): more the further the character has
+        // come, 30 at level 1 and 520 at 50. Taking a class into an open slot and reordering stay free.
         public static int ChangeCoins(int level) => 20 + 10 * Math.Max(1, level);
 
         // Coins a point to take the whole passive tree back (World.ResetPassives), half what a skill point costs.

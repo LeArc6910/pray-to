@@ -1,4 +1,5 @@
 id,text,hint,done,reward
+class,클래스 고르기,가방(PC는 Tab·휴대폰은 [가방] 단추)의 [스킬] 탭에서 클래스 하나를 [고르기]로 고른다. 그 클래스의 첫 스킬을 바로 쓴다. 레벨 10에 둘째·20에 셋째 클래스를 더 고른다,classes:1,healing_potion:1
 stone,돌 10개 모으기,아래 퀵슬롯의 곡괭이(PC는 2)로 바꿔 들고 벽 쪽을 공격하면 캔다. PC는 클릭이나 스페이스·휴대폰은 공격 스틱을 벽 쪽으로,have:stone:10,healing_potion:1
 workbench,작업대 세우기,가방(PC는 Tab·휴대폰은 [가방] 단추)의 [재료·제작]에서 작업대를 만들고 재료 목록의 [놓기]로 세운다,place:Workbench,torch:4
 torch,횃불 세우기,가방의 횃불을 [놓기]로 세우면 둘레가 밝아진다. 돌 1과 슬라임 젤 1로 4개를 더 만든다,place:Torch,slime_gel:2
@@ -21,6 +22,7 @@ iron_bar,철 주괴 만들기,시작 지점에서 30칸 넘게 가면 푸른 회
 anvil,모루 세우기,작업대에서 철 주괴 5·돌 6으로 만든다. 곁에 서면 장비마다 [다듬기]가 생겨 강화·분해·룬 빼기·접사 다시 굴리기를 한다,place:Anvil,essence:3
 iron_gear,철 장비 하나 만들기,작업대 옆에서 철 주괴와 수호자의 핵으로 만든다,have:iron_sword|have:iron_bow|have:iron_staff|have:iron_helmet|have:iron_armor|have:iron_boots,xp:60
 antlion,개미귀신 쓰러뜨리기,동굴 수호자의 아레나에서 굴을 따라가면 모래 동굴이다. 개미귀신은 멀리 있는 사람 발밑에 개미지옥을 판다. 개미귀신 턱과 호박으로 모루에서 모래걸음 장화를 만든다,have:antlion_jaw,healing_potion:3
+second_class,둘째 클래스 고르기,레벨 10이 되면 가방 [스킬] 탭에서 클래스를 하나 더 고를 수 있다(무료). 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다,classes:2,healing_potion:2
 drill,채굴기 세우기,광맥을 바라보고 [놓기]로 세우고 뒤에 상자를 두면 광석이 저절로 쌓인다,place:Drill,conveyor:4
 assembler,조립기 세우기,철 톱니·회로로 만든다. 바라보고 가방 제작 목록의 [조립기에]로 만들 것을 정하면 들어온 재료로 되풀이해 만든다,place:Assembler,iron_gear:4
 sprinkler,스프링클러 세우기,물뿌리개와 철 주괴로 만든다. 둘레 5×5칸 작물이 마르지 않게 저절로 물을 준다,place:Sprinkler,fertilizer:3
@@ -40,6 +42,7 @@ arc_furnace,전기로 세우기,회로 3·미스릴 주괴 4·돌 10으로 만�
 level15,레벨 15 되기,보스를 잡을 때마다 몬스터가 주는 경험치가 늘어난다. 미스릴 장비는 레벨 15부터 입는다,level:15,healing_potion:4
 rank3,스킬을 3단계로 올리기,[스킬] 탭의 [올리기]로 자주 쓰는 스킬의 단계를 올리면 피해가 늘고 재사용 대기가 준다. 특성 트리 끝의 숙련은 단계를 하나 더 준다,rank:3,mana_potion:3
 serpent,물살 뱀 쓰러뜨리기,깊은 아레나에서 굴을 따라가면 지하 호수다. 물살 뱀은 맞으면 느려지니 미스릴 장비와 물약을 챙긴다. 뱀 비늘과 진주로 모루에서 물살의 목걸이를 만든다,have:serpent_scale,healing_potion:4
+third_class,셋째 클래스 고르기,레벨 20이 되면 가방 [스킬] 탭에서 마지막 셋째 클래스를 고른다(무료). 셋을 섞으면 클래스 특성은 저마다 3분의 2만 든다,classes:3,mana_potion:3
 mithril_pickaxe,미스릴 곡괭이 만들기,용암 지대의 흑요석은 미스릴 곡괭이 이상이어야 캐진다. 작업대에서 미스릴 주괴 3개로 만든다,have:mithril_pickaxe,xp:60
 obsidian_ore,흑요석 원석 캐기,깊은 아레나 반대쪽 모퉁이가 용암 지대다. 붉게 빛나는 용암 웅덩이는 밟으면 불타니 피해 간다,have:obsidian_ore:3,xp:80
 titan,용암 거인 쓰러뜨리기,HUD의 용암 아레나 방향으로 간다. 맞으면 불타니 미스릴 장비와 물약·버섯 수프를 챙긴다,have:titan_heart,healing_potion:5

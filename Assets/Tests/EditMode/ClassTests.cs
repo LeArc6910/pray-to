@@ -468,32 +468,75 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void OtherClassesOnlyBesideAWorkbenchAndTheirSkillsStartCoolingDown()
+        public void ClassSlotsOpenAtLevelsOneTenAndTwenty()
+        {
+            Assert.AreEqual(1, ClassRules.SlotsAt(1));
+            Assert.AreEqual(1, ClassRules.SlotsAt(9));
+            Assert.AreEqual(2, ClassRules.SlotsAt(10));
+            Assert.AreEqual(3, ClassRules.SlotsAt(20));
+            Assert.AreEqual(3, ClassRules.SlotsAt(50));
+            Assert.AreEqual(1, ClassRules.SlotsAt(30, max: 1), "a host may allow fewer");
+            Assert.AreEqual(10, ClassRules.NextSlotLevel(3));
+            Assert.AreEqual(20, ClassRules.NextSlotLevel(10));
+            Assert.AreEqual(0, ClassRules.NextSlotLevel(20), "all open");
+        }
+
+        [Test]
+        public void AClassIsPickedIntoAnOpenSlotFreeAndAnywhere()
+        {
+            // 2026-11-09, the owner's call: no class at the start; one picked in the game, more as the level opens slots.
+            var world = new World(Maps.Room(30), TileMap.Center(15, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data);
+            var player = world.AddPlayer("a", null);
+            CollectionAssert.IsEmpty(player.Classes);
+            CollectionAssert.IsEmpty(player.Skills, "no class, no skills: basic attacks only");
+
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Warrior }, null), "the first, with no workbench and no coins");
+            CollectionAssert.AreEqual(new[] { "whirlwind" }, player.Skills.Select(s => s.Id), "its first skill comes with it");
+            Assert.AreEqual(0, player.SkillPoints, "and costs no point");
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { Warrior, FireMage }, null), "one slot at level 1");
+
+            player.Experience = Leveling.TotalFor(10);
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Warrior, FireMage }, null), "a second at level 10, free");
+            CollectionAssert.AreEqual(new[] { "whirlwind", "fireball" }, player.Skills.Select(s => s.Id));
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { Warrior, FireMage, Archer }, null), "a third waits for 20");
+            player.Experience = Leveling.TotalFor(20);
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Warrior, FireMage, Archer }, null));
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { Warrior, FireMage, Archer, Summoner }, null), "three at most");
+            Assert.AreEqual(3, player.Classes.Count);
+        }
+
+        [Test]
+        public void GivingAClassUpTakesAWorkbenchAndCoinsAndTheSkillsThatStayKeepTheirState()
         {
             // With the loot sheets, so changing classes asks for coins.
             var world = new World(Maps.Room(30), TileMap.Center(15, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data);
             var player = Learned(world.AddPlayer("a", null, Warrior));
-            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { FireMage }, null), "no workbench near");
+            player.Experience = Leveling.TotalFor(10);
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { FireMage }, null), "giving the warrior up: no workbench near");
             Assert.AreSame(Warrior, player.Classes.Single());
 
-            int x = TileMap.Cell(player.Position.X) + 1;
-            int y = TileMap.Cell(player.Position.Y);
-            world.Map[x, y] = TileType.Workbench;
             world.UseSkill(player.Id, Slot(player, "war_cry"), Vec2.Zero);
             Assert.IsTrue(player.HasBuff(Slot(player, "war_cry")));
-            // Other classes cost coins (2026-11-09); the same classes in another order do not.
+            // Taking a class into the open second slot is free anywhere (2026-11-09).
             var coin = Gear.Data.FindMaterial(World.Coin);
-            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { FireMage, Warrior }, null), "no coins");
-            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Warrior }, null), "reordering is free");
-            player.Inventory.AddMaterial(coin, ClassRules.ChangeCoins(player.Level) + 3);
-            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { FireMage, Warrior }, null));
-            Assert.AreEqual(3, player.Inventory.CountOf(coin));
-
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { FireMage, Warrior }, null), "a second class, free, no workbench");
+            Assert.AreEqual(0, player.Inventory.CountOf(coin));
             // Only learned skills take slots: of the fire mage's, the free fireball; the warrior's fill the rest.
             CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "war_cry", "charge" }, player.Skills.Select(s => s.Id));
             Assert.AreEqual(Classes.Skill("fireball").CooldownTicks, player.CooldownTicks(0), "a new skill starts as if just used");
             Assert.IsTrue(player.HasBuff(2), "war cry stayed, buff and all");
-            CollectionAssert.AreEqual(new[] { FireMage, Warrior }, player.Classes);
+
+            // Giving one up for another is a change: beside a workbench, for coins (2026-11-09).
+            int x = TileMap.Cell(player.Position.X) + 1;
+            int y = TileMap.Cell(player.Position.Y);
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { Archer, Warrior }, null), "no workbench near");
+            world.Map[x, y] = TileType.Workbench;
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { Archer, Warrior }, null), "no coins");
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Warrior, FireMage }, null), "reordering is free");
+            player.Inventory.AddMaterial(coin, ClassRules.ChangeCoins(player.Level) + 3);
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Archer, Warrior }, null));
+            Assert.AreEqual(3, player.Inventory.CountOf(coin));
+            CollectionAssert.AreEqual(new[] { Archer, Warrior }, player.Classes);
         }
 }
 }

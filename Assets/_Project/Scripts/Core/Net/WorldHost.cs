@@ -275,7 +275,9 @@ namespace Game.Core
                 }
             }
             string name = string.IsNullOrWhiteSpace(join.Name) ? "플레이어" : join.Name.Trim();
-            var classes = ClassRules.Choose(_classes, join.Classes, _config.MaxClasses);
+            // A new character picks its classes in the game (Docs/Classes.md, 클래스 고르기): at most the first slot's
+            // worth from the menu, which no longer asks; a saved one comes back with the classes it had.
+            var classes = ClassRules.Choose(_classes, join.Classes, saved == null ? Math.Min(_config.MaxClasses, ClassRules.SlotsAt(1)) : _config.MaxClasses);
             var player = World.AddPlayer(name.Length > 16 ? name.Substring(0, 16) : name, saved?.Equipment ?? StarterGear(), saved?.Bag, classes.ToArray());
             if (saved == null) GiveStarterStacks(player);
             // A character from before levels starts at a level that lets it keep wearing what it has.

@@ -87,6 +87,7 @@ namespace Game.Client
                     }
                     root.PlayerName = name;
                     root.WorldNameField = name;
+                    root.ForgetCharacterClasses();
                     root.StartSolo();
                     return null;
                 case "touch":

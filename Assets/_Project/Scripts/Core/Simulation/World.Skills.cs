@@ -34,15 +34,18 @@ namespace Game.Core
             return player;
         }
 
-        // Reorders the player's skills, anywhere and free; or gives them other classes, only beside a workbench and for
-        // ClassRules.ChangeCoins. False when it cannot: dead, new classes away from a workbench, or the coins short. See
-        // Docs/Classes.md (게임 중에 바꾸기).
+        // Takes classes into the slots the level has opened (ClassRules.SlotsAt) and reorders skills, anywhere and free;
+        // giving a class up (for another, or for none) is a change, only beside a workbench and for
+        // ClassRules.ChangeCoins. False when it cannot: dead, more classes than the slots, a change away from a
+        // workbench, or the coins short. A character from before the slots keeps the classes it had. See
+        // Docs/Classes.md (클래스 고르기, 게임 중에 바꾸기).
         public bool ChangeClasses(int playerId, IReadOnlyList<ClassDefinition> classes, IReadOnlyList<int> order)
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || classes == null) return false;
-            bool same = classes.SequenceEqual(player.Classes);
-            if (!same)
+            if (classes.Count > Math.Max(ClassRules.SlotsAt(player.Level), player.Classes.Count)) return false;
+            bool givesUp = player.Classes.Any(c => !classes.Contains(c));
+            if (givesUp)
             {
                 if (!Map.Near(player.Position, TileType.Workbench, StationReach)) return false;
                 // A world without the loot sheets (some tests and sims) has no coins to ask for.

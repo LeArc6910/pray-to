@@ -94,11 +94,16 @@ async function shot(game, profile, name, caption) {
   note(`- ${caption}: \`${path.basename(file)}\``);
 }
 
+// A new character has no class (2026-11-09): given a warrior and a fire mage, so the skill keys have something.
 async function startSolo(game) {
   await send(game, 'solo');
   for (let i = 0; i < 40; i++) {
     await game.page.waitForTimeout(500);
-    if ((await state(game)).playing) return true;
+    if ((await state(game)).playing) {
+      await send(game, 'classes warrior,fire_mage');
+      await game.page.waitForTimeout(400);
+      return true;
+    }
   }
   return false;
 }

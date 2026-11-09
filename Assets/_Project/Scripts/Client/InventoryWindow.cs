@@ -1479,6 +1479,15 @@ namespace Game.Client
                 _pickedClasses = null;
                 _pickedForKit = _client.KitVersion;
             }
+            // Classes are picked here (2026-11-09, Docs/Classes.md 클래스 고르기): none at first, a slot open at level 1,
+            // a second at 10 and a third at 20; a pick into an open slot is free, anywhere.
+            int classSlots = ClassRules.SlotsAt(_client.Level);
+            int nextSlot = ClassRules.NextSlotLevel(_client.Level);
+            if (_client.Classes.Count < classSlots) DrawClassPick(classSlots);
+            else GUILayout.Label(Fit(nextSlot > 0
+                ? $"클래스 {_client.Classes.Count}/{ClassRules.DefaultMaxClasses} · 레벨 {nextSlot}에 하나 더 고를 수 있다"
+                : $"클래스 {_client.Classes.Count}/{ClassRules.DefaultMaxClasses}", _textWidth));
+            if (_client.Classes.Count == 0) return;
             int points = _client.SkillPoints;
             GUILayout.BeginHorizontal();
             GUILayout.Label(Fit($"스킬 포인트 {points} · Lv {_client.Level} (레벨이 오를 때마다 1)", _textWidth - 150), GUILayout.Width(_textWidth - 150));
@@ -1564,15 +1573,17 @@ namespace Game.Client
 
             GUILayout.Space(8);
             bool near = _client.Map != null && _client.Map.Near(_client.Position, TileType.Workbench, World.StationReach);
+            int changeCoins = ClassRules.ChangeCoins(_client.Level);
             GUILayout.Label(Fit(near
-                ? $"클래스 바꾸기(최대 {ClassRules.DefaultMaxClasses}개, 고른 순서대로 칸을 채운다. 배운 스킬은 클래스를 바꿔도 남는다)"
-                : "클래스는 작업대 곁에서 바꿀 수 있다", _textWidth));
+                ? $"클래스 바꾸기(고른 순서대로 칸을 채운다. 고른 클래스를 내주면 금화 {changeCoins}, 순서만 바꾸기는 무료. 배운 스킬은 남는다)"
+                : $"고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서(금화 {changeCoins}). 빈 칸에 더하기는 어디서나 무료", _textWidth));
             _pickedClasses ??= _client.Classes.Select(c => c.Id).ToList();
             GUI.enabled = near;
+            int most = Math.Max(classSlots, _client.Classes.Count);
             foreach (var option in _client.AllClasses)
             {
                 int picked = _pickedClasses.IndexOf(option.Id);
-                bool full = picked < 0 && _pickedClasses.Count >= ClassRules.DefaultMaxClasses;
+                bool full = picked < 0 && _pickedClasses.Count >= most;
                 GUI.enabled = near && !full;
                 if (TipButton(new GUIContent((picked >= 0 ? $"[{picked + 1}] " : "[ ] ") + option.Name, option.Description)))
                 {
@@ -1582,9 +1593,9 @@ namespace Game.Client
                 }
             }
             bool differs = !_pickedClasses.SequenceEqual(_client.Classes.Select(c => c.Id));
-            // Other classes cost coins (World.ChangeClasses); the same ones in another order are free.
-            bool sameSet = _pickedClasses.Count == _client.Classes.Count && _client.Classes.All(c => _pickedClasses.Contains(c.Id));
-            int changeCost = sameSet ? 0 : ClassRules.ChangeCoins(_client.Level);
+            // Giving a class up costs coins (World.ChangeClasses); the same ones in another order, or one more, do not.
+            bool givesUp = _client.Classes.Any(c => !_pickedClasses.Contains(c.Id));
+            int changeCost = givesUp ? changeCoins : 0;
             var gold = _client.Loot.FindMaterial(World.Coin);
             bool affordable = changeCost == 0 || gold != null && _client.Bag.CountOf(gold) >= changeCost;
             GUI.enabled = near && differs && affordable;
@@ -1603,6 +1614,27 @@ namespace Game.Client
         }
 
         SkillDefinition _supportFor;
+
+        // The classes not taken yet, each with its passive and first skill and [고르기] (free): the first at the start,
+        // more as the level opens slots.
+        void DrawClassPick(int slots)
+        {
+            GUILayout.Label(Fit(_client.Classes.Count == 0
+                ? $"클래스를 하나 고른다(무료). 그 클래스의 첫 스킬을 바로 쓴다. 레벨 {ClassRules.SlotLevels[1]}에 둘째, {ClassRules.SlotLevels[2]}에 셋째를 더 고른다. 고른 뒤 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다"
+                : $"클래스 칸이 열렸다({_client.Classes.Count}/{slots}): 하나 더 고른다(무료)", _textWidth));
+            float text = _textWidth - 80;
+            foreach (var option in _client.AllClasses.Where(c => !_client.Classes.Contains(c)))
+            {
+                GUILayout.BeginHorizontal();
+                string first = option.Skills.Count > 0 ? $" · 첫 스킬 {option.Skills[0].Name}" : "";
+                GUILayout.Label(Fit($"{option.Name}: {option.Description} 패시브 {SkillText.Passive(option)}{first}", text), GUILayout.Width(text));
+                if (Ui.LayoutButton("고르기", GUILayout.Width(72)))
+                    Send(_client.ClassCommand(_client.Classes.Concat(new[] { option }).ToList(), null), Sound.Buff);
+                GUILayout.EndHorizontal();
+                GUILayout.Space(4);
+            }
+            GUILayout.Space(8);
+        }
 
         // The skill's crystal slots (one, two from rank 3, three at rank 5): each crystal in it with [빼기], the
         // slots still shut, and while one is free, the crystals in the bag that would go in, each a button.
