@@ -1462,7 +1462,157 @@ async function deploysave() {
   await context.close();
 }
 
-const Sections = { menu, basics, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
+// ---------------------------------------------------------------- 처음 10분 (사람 요청 2026-11-09의 4번)
+// A new character follows only the goal list, with its own hands: keys, the bag's buttons, attacking toward a wall.
+// No give, build or goto, except one goto where the screen does not say where to go (noted in the report). Each
+// goal's time and what got in the way are written down.
+async function first(browser) {
+  note('\n## 처음 10분: 목표 안내만 따라가기 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  check(await game.startSolo('first10'), '새 캐릭터로 혼자 하기');
+  await game.wait(1500);
+  const began = Date.now();
+  const clock = () => `${Math.round((Date.now() - began) / 1000)}초`;
+  const goalNow = async () => {
+    const hud = ((await game.texts()).hud || []).join(' | ');
+    const m = hud.match(/목표 (\d+)\/\d+: ([^|]*)/);
+    return m ? { n: +m[1], text: m[2].trim() } : { n: 0, text: '' };
+  };
+  const steps = [];
+  const passed = async (n, what) => {
+    const now = await goalNow();
+    const ok = now.n > n;
+    steps.push(`${clock()} 목표 ${n} "${what}" ${ok ? '이룸' : '못 이룸'} → 지금 목표 ${now.n}: ${now.text}`);
+    check(ok, `목표 ${n} "${what}"를 안내만 보고 이룬다 (${clock()})`);
+    return ok;
+  };
+  const near = async () => {
+    const out = [];
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) out.push({ dx, dy, tile: (await game.look(dx, dy)).tile });
+    return out;
+  };
+  const solid = t => /Wall|Ore/.test(t);
+  // Digs the wall at (dx, dy) with what is in hand: attack toward it until it breaks (at most six seconds).
+  const dig = async (dx, dy) => {
+    await game.send(`face ${dx} ${dy}; attack on ${dx} ${dy}`);
+    let gone = false;
+    for (let i = 0; i < 20 && !gone; i++) {
+      await game.wait(300);
+      gone = !solid((await game.look(dx, dy)).tile);
+    }
+    await game.send('attack off');
+    return gone;
+  };
+  const key = { '1,0': 'd', '-1,0': 'a', '0,1': 'w', '0,-1': 's' };
+  const step = async (dx, dy, ms = 260) => {
+    await game.page.keyboard.down(key[`${dx},${dy}`]);
+    await game.wait(ms);
+    await game.page.keyboard.up(key[`${dx},${dy}`]);
+    await game.wait(150);
+  };
+  // Mines a tunnel: the nearest wall beside, else a step toward open floor, until `enough` says stop.
+  const mine = async (enough, seconds) => {
+    const until = Date.now() + seconds * 1000;
+    let way = [1, 0];
+    while (Date.now() < until && !(await enough())) {
+      const around = await near();
+      const wall = around.find(a => a.dx === way[0] && a.dy === way[1] && solid(a.tile)) || around.find(a => solid(a.tile));
+      if (wall) {
+        way = [wall.dx, wall.dy];
+        if (await dig(wall.dx, wall.dy)) await step(wall.dx, wall.dy);
+      } else {
+        await step(way[0], way[1], 400);
+      }
+    }
+  };
+  const inv = () => game.inventory();
+  const t0 = await goalNow();
+  note(`- 첫 목표: ${t0.n}. ${t0.text}`);
+
+  // 1. Ten stones, with the pickaxe on 2.
+  await game.page.keyboard.press('2');
+  await game.wait(400);
+  await mine(async () => count(await inv(), 'stone') >= 10, 120);
+  await game.wait(1200);
+  await passed(1, '돌 10개 모으기');
+  await game.shot('first-stone', '돌을 캔 굴');
+
+  // 2. A workbench: the bag's materials tab, [만들기], then [놓기] onto open floor ahead.
+  const faceOpen = async () => {
+    const open = (await near()).find(a => a.tile === 'Floor');
+    if (open) await game.send(`face ${open.dx} ${open.dy}`);
+    return open;
+  };
+  await faceOpen();
+  await bagTab(game, '재료·제작');
+  check(await game.press('만들기', /^작업대/), '[재료·제작]에 작업대 [만들기]가 있다');
+  check(await game.press('놓기', '작업대 ×'), '작업대 [놓기]');
+  await closeBag(game);
+  await game.wait(800);
+  await passed(2, '작업대 세우기');
+
+  // 3. A torch from the bag, onto other open floor.
+  await faceOpen();
+  await bagTab(game, '재료·제작');
+  check(await game.press('놓기', /^횃불 ×/), '횃불 [놓기]');
+  await closeBag(game);
+  await game.wait(800);
+  await passed(3, '횃불 세우기');
+
+  // 4. Stone floor: made at the workbench (beside it), laid on open floor.
+  await mine(async () => count(await inv(), 'stone') >= 4, 40);
+  const bench = (await near()).find(a => a.tile === 'Workbench');
+  note(`- 돌 바닥을 만들 때 작업대 곁인가: ${bench ? '예' : '아니오(굴을 파다 멀어졌다)'}`);
+  await faceOpen();
+  await bagTab(game, '재료·제작');
+  const made = await game.press('만들기', /^돌 바닥/);
+  check(made, '작업대 곁에서 돌 바닥 [만들기]');
+  if (made) await game.press('놓기', /^돌 바닥 ×/);
+  await closeBag(game);
+  await game.wait(800);
+  await passed(4, '돌 바닥 깔기');
+
+  // 5. Six copper ores. The hint says what a copper vein looks like but not where one is: the bot is taken to the
+  // nearest (a person would walk the tunnels looking for orange).
+  await game.send('goto near CopperOre');
+  note('- 구리 광맥: 안내는 모양만 알려 주고 자리는 알려 주지 않아서, 봇은 가장 가까운 광맥으로 옮겨졌다');
+  await game.wait(800);
+  await mine(async () => count(await inv(), 'copper_ore') >= 6, 120);
+  await game.wait(1000);
+  await passed(5, '구리 광석 6개 캐기');
+
+  // 6. Mining skill 2: more digging.
+  const life = async () => (await goalNow()).n > 6;
+  await mine(life, 150);
+  await game.wait(1000);
+  await passed(6, '채굴 기술 2레벨 되기');
+
+  // 7. A piece of copper gear, made beside the workbench and worn.
+  await game.send('goto near Workbench');
+  note('- 구리 장비를 만들려고 작업대로 돌아갈 때: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)');
+  await game.wait(800);
+  await bagTab(game, '재료·제작');
+  let gear = false;
+  for (const name of ['구리 투구', '구리 장화', '구리 갑옷']) {
+    if (!gear && (await game.find('만들기', new RegExp('^' + name))).some(b => b.enabled)) gear = await game.press('만들기', new RegExp('^' + name)) && name;
+  }
+  check(!!gear, `구리 장비 하나를 만든다 (${gear || '재료 부족'})`);
+  if (gear) {
+    await bagTab(game, '장비');
+    await pick(game, gear);
+    await game.press('장착');
+  }
+  await closeBag(game);
+  await game.wait(1000);
+  await passed(7, '구리 장비 하나 만들기');
+  await game.shot('first-gear', '처음 10분 끝');
+
+  note('\n목표마다 걸린 때:\n');
+  for (const line of steps) note(`- ${line}`);
+  await game.context.close();
+}
+
+const Sections = { menu, basics, first, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });
