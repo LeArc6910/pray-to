@@ -1312,6 +1312,7 @@ namespace Game.Client
         // once they have gone, with a creak and a thud. Only the look: monsters are kept out either way (World rules).
         const float DoorReach = 1.05f;
         readonly HashSet<int> _openDoors = new HashSet<int>();
+        bool _trampleHintShown;
         // How many doors stand open now, for the playtest.
         public int OpenDoors => _openDoors.Count;
         readonly HashSet<int> _doorsNear = new HashSet<int>();
@@ -1676,6 +1677,18 @@ namespace Game.Client
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
                     break;
+                case SimEventType.Trampled:
+                    // A monster trampled a crop at night: dust, a word, and once a session what to do about it.
+                    var trampled = new Vector3(e.Position.X, e.Position.Y, 0);
+                    AddFlash(trampled, 0.6f, Palette.Dust, FlashKind.Burst);
+                    Hear(Sound.Dig, trampled, 0.5f);
+                    _floating.Add(new Floating { Position = trampled + new Vector3(0, 0.5f, 0), Text = "짓밟혔다", Color = new Color(0.85f, 0.65f, 0.4f) });
+                    if (!_trampleHintShown && Vector3.Distance(trampled, _self.Position) < 12)
+                    {
+                        _trampleHintShown = true;
+                        ShowBanner($"밤에는 몬스터가 밭을 밟는다. 허수아비를 세우면 둘레 {World.ScarecrowReach}칸을 지킨다");
+                    }
+                    break;
                 case SimEventType.Crafted:
                     // Something made by hand that took time is done (Amount 1), or the work stopped (0).
                     if (e.Source != _client.PlayerId) break;
@@ -1725,7 +1738,7 @@ namespace Game.Client
                     break;
                 case SimEventType.MovedIn:
                     // A person moving into a room of the base: a sparkle at their new place and a banner for everyone.
-                    var mover = _client.Npcs != null && e.Target >= 0 && e.Target < _client.Npcs.Npcs.Count ? _client.Npcs.Npcs[e.Target] : null;
+                    var mover = _client.Npcs != null && e.Amount >= 0 && e.Amount < _client.Npcs.Npcs.Count ? _client.Npcs.Npcs[e.Amount] : null;
                     if (mover == null) break;
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 1.6f, LevelColor, FlashKind.Sparkles);
                     ShowBanner($"{mover.Name}이(가) 기지의 방으로 이사 왔다!");

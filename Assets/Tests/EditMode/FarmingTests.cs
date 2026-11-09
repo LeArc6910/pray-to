@@ -104,6 +104,50 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void MonstersTrampleCropsAtNightButNotNearAScarecrow()
+        {
+            var world = Room(out var player);
+            long half = Mushroom.GrowTicks / 2;
+            world.Restore(new TileChange[0], new[] { (Mushroom, 4, 3, half, 0L) }, 0);
+            var slime = world.SpawnEnemy(Monsters.Shipped.Find("slime"), TileMap.Center(4, 3));
+
+            // By day nothing happens.
+            Run(world, 1);
+            Assert.AreEqual(half, (long)world.CropAt(4, 3).GrownAt(world.Tick), 1);
+
+            // At night it sets the crop back a quarter of its growing, and not again for a while.
+            world.RestoreClock(Calendar.TicksPerDay * 17 / 24);
+            slime.Position = TileMap.Center(4, 3);
+            var events = Run(world, 1);
+            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Trampled), "trampled");
+            long after = (long)world.CropAt(4, 3).GrownAt(world.Tick);
+            Assert.AreEqual(half - (long)(Mushroom.GrowTicks * World.TrampleShare), after, 1);
+            slime.Position = TileMap.Center(4, 3);
+            Assert.IsFalse(Run(world, 2).Any(e => e.Type == SimEventType.Trampled), "once in a while for each tile");
+
+            // A scarecrow within four tiles keeps them off.
+            world.Restore(new[] { new TileChange(1, 1, TileType.Scarecrow) }, new[] { (Mushroom, 5, 3, half, 0L) }, 0);
+            Assert.IsTrue(world.Guarded(5, 3));
+            slime.Position = TileMap.Center(5, 3);
+            Assert.IsFalse(Run(world, 1).Any(e => e.Type == SimEventType.Trampled), "guarded");
+            Assert.AreEqual(half, (long)world.CropAt(5, 3).GrownAt(world.Tick), 1);
+
+            // Where it happened goes over the wire, as for petting and moving in.
+            var sent = SnapshotMessage.Decode(new SnapshotMessage(1, new SelfState(0, new Vec2(1, 1), 50, 100, 5), new EntityState[0], new ProjectileState[0],
+                new HazardState[0], new[]
+                {
+                    new SimEvent(SimEventType.Trampled, 3, position: new Vec2(4.5f, 3.5f)),
+                    new SimEvent(SimEventType.AnimalsPetted, 1, amount: 2, position: new Vec2(7.5f, 2.5f)),
+                    new SimEvent(SimEventType.MovedIn, 1, amount: 1, position: new Vec2(9.5f, 9.5f)),
+                }).Encode());
+            Assert.AreEqual(4.5f, sent.Events[0].Position.X, 0.05f);
+            Assert.AreEqual(7.5f, sent.Events[1].Position.X, 0.05f);
+            Assert.AreEqual(2, sent.Events[1].Amount);
+            Assert.AreEqual(9.5f, sent.Events[2].Position.Y, 0.05f);
+            Assert.AreEqual(1, sent.Events[2].Amount);
+        }
+
+        [Test]
         public void PlantingTakesASeedAndAFreeFloor()
         {
             var world = Room(out var player);

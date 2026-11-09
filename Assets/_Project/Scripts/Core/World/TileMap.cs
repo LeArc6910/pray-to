@@ -104,6 +104,8 @@ namespace Game.Core
         YellowCarpet,
         TapestryWall,
         ShieldWall,
+        // Keeps monsters from trampling the crops round it (World.Farming.cs, 2026-11-09).
+        Scarecrow,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

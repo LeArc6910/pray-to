@@ -205,6 +205,47 @@ namespace Game.Core
                 var crop = CropAt(TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y));
                 if (crop != null && crop.IsRipe(Tick)) Harvest(player, crop);
             }
+            if (Calendar.IsNight(Clock)) TrampleCrops();
+        }
+
+        // Monsters trample crops at night (2026-11-09, Docs/Farming.md 밭 지키기): one standing on a crop sets it back a
+        // quarter of its growing, a ripe one too, at most once every TrampleSeconds for each tile. Within
+        // ScarecrowReach of a scarecrow they leave crops alone.
+        public const float TrampleShare = 0.25f;
+        public const float TrampleSeconds = 10;
+        public const int ScarecrowReach = 4;
+        readonly Dictionary<int, long> _trampledAt = new Dictionary<int, long>();
+
+        void TrampleCrops()
+        {
+            foreach (var enemy in _enemies)
+            {
+                if (enemy.IsDead) continue;
+                int x = TileMap.Cell(enemy.Position.X), y = TileMap.Cell(enemy.Position.Y);
+                var crop = CropAt(x, y);
+                if (crop == null || Guarded(x, y)) continue;
+                int key = y * Map.Width + x;
+                if (_trampledAt.TryGetValue(key, out long at) && Tick - at < Ticks(TrampleSeconds)) continue;
+                _trampledAt[key] = Tick;
+                long grown = Math.Max(0, (long)crop.GrownAt(Tick) - (long)(crop.Definition.GrowTicks * TrampleShare));
+                var set = new Crop(crop.Definition, x, y, grown, Tick, Math.Max(Tick, crop.WetUntil));
+                _crops[key] = set;
+                _newCropChanges.Add(new CropChange(x, y, set));
+                _events.Add(new SimEvent(SimEventType.Trampled, enemy.Id, position: TileMap.Center(x, y)));
+            }
+        }
+
+        // Whether a scarecrow stands within ScarecrowReach of the tile (a square round it).
+        public bool Guarded(int x, int y)
+        {
+            for (int dy = -ScarecrowReach; dy <= ScarecrowReach; dy++)
+            {
+                for (int dx = -ScarecrowReach; dx <= ScarecrowReach; dx++)
+                {
+                    if (Map.InBounds(x + dx, y + dy) && Map[x + dx, y + dy] == TileType.Scarecrow) return true;
+                }
+            }
+            return false;
         }
 
         void Harvest(Player player, Crop crop)

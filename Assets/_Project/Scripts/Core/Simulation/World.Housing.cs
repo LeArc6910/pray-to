@@ -211,7 +211,7 @@ namespace Game.Core
             var from = PlaceOf(npc);
             if (from != null) SetTile(from.Value.X, from.Value.Y, TileType.Floor);
             SetTile(spot.Value.X, spot.Value.Y, npc.Tile);
-            _events.Add(new SimEvent(SimEventType.MovedIn, player.Id, target: Npcs.Npcs.ToList().IndexOf(npc), position: TileMap.Center(spot.Value.X, spot.Value.Y)));
+            _events.Add(new SimEvent(SimEventType.MovedIn, player.Id, amount: Npcs.Npcs.ToList().IndexOf(npc), position: TileMap.Center(spot.Value.X, spot.Value.Y)));
             return null;
         }
     }

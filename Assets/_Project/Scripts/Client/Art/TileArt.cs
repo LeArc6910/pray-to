@@ -423,6 +423,7 @@ namespace Game.Client
             TileType.YellowCarpet => YellowCarpetTile,
             TileType.TapestryWall => TapestryWallTile,
             TileType.ShieldWall => ShieldWallTile,
+            TileType.Scarecrow => ScarecrowTile,
             TileType.Table => TableTile,
             TileType.Banner => BannerTile,
             TileType.Pot => PotTile,
@@ -1551,6 +1552,29 @@ namespace Game.Client
             "oBBBBBBoBBBBBBBo",
             "obbbbbbobbbbbbbo",
             "oooooooooooooooo");
+
+        // A scarecrow (2026-11-09): a straw hat over a sack face, arms out on a crossbar, a patched coat, on a post.
+        static readonly PixelImage ScarecrowTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['T'] = Rgba.Hex("#E2C46A"), ['t'] = Rgba.Hex("#B8963E"), ['F'] = Rgba.Hex("#D8C8A0"), ['B'] = Rgba.Hex("#4A6E3A"),
+                ['b'] = Rgba.Hex("#34502A"), ['R'] = Rgba.Hex("#B83A44"),
+            },
+            "......oooo......",
+            "....ooTTTToo....",
+            "...otttttttto...",
+            "....oFFFFFFo....",
+            "....oFoFFoFo....",
+            "....oFFFFFFo....",
+            "..ooooBBBBoooo..",
+            ".oTWWWBRRBWWWTo.",
+            "..ooooBBBBoooo..",
+            ".....oBbbBo.....",
+            ".....oBBRBo.....",
+            ".....oTbbTo.....",
+            "......oWWo......",
+            "......oWWo......",
+            "......oWWo......",
+            "......____......");
 
         // An open door (2026-11-09, WorldView.SwingDoors): the frame, the floor's dark through it, and the slab swung
         // back against the left post, seen edge on.

@@ -435,6 +435,8 @@ namespace Game.Core
         // Source, a player, finished making one of what they make by hand (Amount 1), or stopped with it unfinished
         // (Amount 0): walked off, ran short, the bag full, or asked to (World.StartCrafting, 2026-11-09).
         Crafted,
+        // Source, a monster, trampled the crop at Position at night, setting it back (World.Farming.cs, 2026-11-09).
+        Trampled,
     }
 
     public readonly struct SimEvent
@@ -466,7 +468,8 @@ namespace Game.Core
         public static bool HasPosition(SimEventType type) =>
             type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
             || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift || type == SimEventType.Npc
-            || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot;
+            || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot
+            || type == SimEventType.AnimalsPetted || type == SimEventType.Trampled || type == SimEventType.MovedIn;
     }
 
     public enum BossState : byte

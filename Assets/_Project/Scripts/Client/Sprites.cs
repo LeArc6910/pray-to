@@ -27,7 +27,7 @@ namespace Game.Client
             TileType.Filter, TileType.Generator, TileType.Lever, TileType.MushroomSoil, TileType.FrostSoil, TileType.AshSoil, TileType.VoidSoil,
             TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.SmithStall, TileType.FisherHut, TileType.AlchemyTable, TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot, TileType.WardStone, TileType.Turret, TileType.Barn,
             TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
-            TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall,
+            TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow,
         };
 
         // A sprite made from the drawing the first time its key is asked for. The pivot is in the sprite's own
