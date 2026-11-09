@@ -934,6 +934,14 @@ async function npc(browser) {
   await game.press('사기', '회복 물약');
   check((await game.inventory()).consumables.healing_potion === potions + 1, '금화로 회복 물약을 산다');
   await game.shot('shop-buy', '[사기]');
+  // The festival (2026-11-09, every eleventh day): skill crystals on sale that day only.
+  check((await game.find('사기', /^확산의 결정/)).length === 0, '평소에는 상인이 확산의 결정을 팔지 않는다');
+  await game.send('clock 11 9');
+  await game.wait(1200);
+  check((await game.find('사기', /^확산의 결정/)).length > 0, '축제 날(11일)에는 상인이 확산의 결정을 판다');
+  await game.shot('festival-shop', '축제 날의 상점');
+  await game.send('clock 1 9');
+  await game.wait(800);
   await game.press('팔기');
   // The merchant buys copper ore (not stone): 30 offered, 20 taken in a day.
   const coins = count(await game.inventory(), 'coin');
@@ -1167,6 +1175,16 @@ async function factory(browser) {
   check(parts === 4, `대형 조립기는 [놓기]로 앞의 네 칸을 차지한다 (${parts}칸)`);
   await game.wait(800);
   await game.shot('big-assembler', '2×2 대형 조립기');
+  // The big smelter beside it (2026-11-09), from the bag, and the frame over its square while pointing at [놓기].
+  await game.send('goto -4 0; give big_smelter 1; face 1 0');
+  await game.wait(400);
+  await bagTab(game, '재료·제작');
+  await game.press('놓기', /^대형 제련로/);
+  await closeBag(game);
+  let smelterParts = 0;
+  for (let dx = 1; dx <= 3; dx++) for (let dy = -1; dy <= 1; dy++) if (((await game.look(dx, dy)).machine || {}).kind === 'BigSmelter') smelterParts++;
+  check(smelterParts === 4, `대형 제련로도 [놓기]로 네 칸을 차지한다 (${smelterParts}칸)`);
+  await game.shot('big-smelter', '2×2 대형 제련로');
   await game.context.close();
 }
 

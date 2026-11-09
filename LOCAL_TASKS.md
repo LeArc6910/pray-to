@@ -824,6 +824,11 @@ DevTools/Local/setup.sh --commit
   - 클라우드 확인은 배포 뒤 `--only menu,first,firstphone,gear,save`
   - (사람) 처음 들어가 클래스를 고르는 흐름이 자연스러운지, 휴대폰에서 [스킬] 탭의 [고르기]가 잘 눌리는지
 
+- [ ] 98단계: 벽 너머 공격 막기, 셋째 클래스 패시브, 대형 제련로와 2×2 놓기 틀, 생물군계 채집물, 행사 시트와 축제, 클래스 미리보기, 새 효과음·효과, 기계 통신(`Docs/Automation.md` 큰 기계·통신, `Docs/Biomes.md` 채집물, `Docs/Time.md` 날짜 행사, `Docs/Classes.md` 셋째 클래스·미리보기, `Docs/ArtPipeline.md`)
+  - (로컬 세션) 명령 한 줄을 다시 돌린다. 새 파일: `Scripts/Core/Simulation/World.Forage.cs`, `Scripts/Core/World/DayEventSheet.cs`, `Tests/EditMode/ForageTests.cs`, `Data/World/events.csv`(`.meta`는 Unity가 만든다). 새 시트 `events.csv`는 `Game > Set Up Main Scene`이 `GameSheets.events`에 넣는다(명령 한 줄이 한다). 프로토콜 0.66.0
+  - 클라우드 확인은 배포 뒤 `--only first,npc,factory,combat`
+  - (사람) 망치질·짓밟힘 소리가 거슬리지 않는지, 원소 불꽃과 허수아비 흔들림이 보기 좋은지, 날마다 깔리는 채집물이 너무 많거나 적지 않은지
+
 ## 결과 보고
 
 명령 한 줄이 실행할 때마다 아래에 결과를 덧붙인다. 플레이 확인 결과는 사람이(또는 로컬 세션이) 날짜와 함께 적는다.
