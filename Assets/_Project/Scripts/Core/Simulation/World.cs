@@ -254,7 +254,7 @@ namespace Game.Core
         public static bool HoldsPickaxe(Player player) => player.Equipment[ItemSlot.Weapon]?.Base.IsPickaxe == true;
 
         // Walls and ore veins, which need a pickaxe; not the things players place.
-        static bool IsRock(TileDefinition tile) => tile.Tile == TileType.Wall || tile.Drillable;
+        static bool IsRock(TileDefinition tile) => tile.Tile == TileType.Wall || tile.Tile == TileType.IronWall || tile.Drillable;
 
         // An arrow or bolt toward where the player faces, its damage and crit rolled now (see FlyFriendly). A finisher's
         // is bigger and hits harder.

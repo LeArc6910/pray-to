@@ -481,6 +481,8 @@ namespace Game.Core
             return perks;
         }
 
+        public byte[] RepairCommand() => new InventoryCommandMessage(InventoryCommand.Repair, 0).Encode();
+
         public byte[] ChoosePerkCommand(LifeSkill skill, int tier, int choice) =>
             new InventoryCommandMessage(InventoryCommand.ChoosePerk, choice, index: LifeSkills.PerkIndex(skill, tier)).Encode();
 

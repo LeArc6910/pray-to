@@ -38,6 +38,7 @@ stone_floor,돌 바닥,StoneFloor,바닥에 까는 돌판. 위로 다닐 수 있
 brick_floor,벽돌 바닥,BrickFloor,붉은 벽돌을 깐 바닥. 돌 바닥과 같다,,,
 glow_floor,빛 타일,GlowFloor,빛 포자를 박은 바닥. 은은하게 둘레를 밝힌다,,,
 door,문,Door,사람은 지나가고 몬스터는 못 지나간다. 곡괭이로만 뗀다,,,
+iron_wall,철벽,IronWall,몬스터가 돌벽보다 훨씬 오래 걸려 부순다. 금이 가면 철 주괴로 고친다. 곡괭이로만 뗀다,,,
 stone_table,돌 탁자,Table,기지에 두는 탁자,,,
 banner,깃발,Banner,기지에 세우는 깃발,,,
 mushroom_pot,버섯 화분,Pot,동굴 버섯을 심은 화분,,,

@@ -163,6 +163,44 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void ACrackedWallIsMendedFromTheBagAndIronHoldsLonger()
+        {
+            // Mid-defense (the monsters' way round the walls is rebuilt as they break), the waves left standing still.
+            var world = Base(out var player);
+            Assert.IsTrue(world.StartDefense(player.Id));
+            var slime = world.SpawnEnemy(Monsters.Shipped.Find("slime"), TileMap.Center(30, 30));
+            var stone = Gear.Data.FindMaterial("stone");
+            var iron = Gear.Data.FindMaterial("iron_bar");
+            Place(world, player, stone, 20, 16, new Vec2(0, -1));
+            Place(world, player, Gear.Data.FindMaterial("iron_wall"), 22, 16, new Vec2(0, -1));
+            Assert.IsTrue(world.BuiltBarrier(22, 16));
+
+            // Nothing to mend yet, then one blow cracks the stone wall.
+            Face(world, player, 20, 16, new Vec2(0, -1));
+            player.Inventory.AddMaterial(stone, 3);
+            Assert.IsFalse(world.Repair(player.Id), "a whole wall needs no mending");
+            world.DamageBarrier(slime, 20, 16);
+            world.TakeEvents();
+            Assert.IsTrue(world.Repair(player.Id));
+            Assert.AreEqual(2, player.Inventory.CountOf(stone), "one stone mends it");
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.Dug && e.Amount == World.Repaired));
+            Assert.IsFalse(world.Repair(player.Id), "and it is whole again");
+
+            // The iron wall takes iron, and stands far more blows than stone.
+            int stoneBlows = 0, ironBlows = 0;
+            while (world.Map[20, 16] == TileType.Wall) { world.DamageBarrier(slime, 20, 16); stoneBlows++; }
+            while (world.Map[22, 16] == TileType.IronWall) { world.DamageBarrier(slime, 22, 16); ironBlows++; }
+            Assert.GreaterOrEqual(ironBlows, stoneBlows * 2, $"iron {ironBlows} blows, stone {stoneBlows}");
+            world.Restore(new[] { new TileChange(22, 16, TileType.IronWall) }, System.Array.Empty<(CropDefinition, int, int, long, long)>(), 0);
+            world.DamageBarrier(slime, 22, 16);
+            Face(world, player, 22, 16, new Vec2(0, -1));
+            Assert.IsFalse(world.Repair(player.Id), "stone does not mend iron");
+            player.Inventory.AddMaterial(iron);
+            Assert.IsTrue(world.Repair(player.Id));
+            Assert.AreEqual(0, player.Inventory.CountOf(iron));
+        }
+
+        [Test]
         public void FrostAndFireAmmoChillAndBurn()
         {
             var world = Base(out var player, stone: false);

@@ -1702,6 +1702,20 @@ namespace Game.Client
                         _floating.Add(new Floating { Position = struck, Text = hint, Color = new Color(1f, 0.85f, 0.5f) });
                         break;
                     }
+                    if (e.Amount == World.Repaired)
+                    {
+                        // Mended: the cracks go, a little gleam.
+                        int mx = TileMap.Cell(e.Position.X), my = TileMap.Cell(e.Position.Y);
+                        int mended = my * _client.Map.Width + mx;
+                        if (_cracks.TryGetValue(mended, out var gone))
+                        {
+                            Object.Destroy(gone.gameObject);
+                            _cracks.Remove(mended);
+                        }
+                        AddFlash(struck, 0.6f, LevelColor, FlashKind.Sparkles);
+                        Hear(Sound.Place, struck);
+                        break;
+                    }
                     bool broke = e.Amount >= World.DugThrough;
                     AddFlash(struck, broke ? 0.7f : 0.35f, Palette.Dust, FlashKind.Burst);
                     Hear(broke ? Sound.Break : Sound.Dig, struck);
@@ -2581,6 +2595,17 @@ namespace Game.Client
         }
 
         static readonly (int X, int Y)[] Neighbourhood = { (0, 0), (1, 0), (-1, 0), (0, 1), (0, -1) };
+
+        // Whether the tile shows cracks (a monster or a pickaxe struck it and it still stands).
+        public bool Cracked(int x, int y) => _client.Map != null && _client.Map.InBounds(x, y) && _cracks.ContainsKey(y * _client.Map.Width + x);
+
+        // The cracked tile in front of the player, which the bag offers to mend (World.Repair), or none.
+        public TileType? CrackAhead()
+        {
+            if (_client.Map == null) return null;
+            var (x, y) = World.TileAhead(_client.Position, _client.Facing);
+            return Cracked(x, y) && _client.Map.BlocksMonsters(x, y) ? _client.Map[x, y] : null;
+        }
 
         // Cracks the rock at a tile as far as it is dug (percent): longer and more of them with each quarter.
         void Crack(int x, int y, int percent)

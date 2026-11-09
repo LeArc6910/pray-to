@@ -882,8 +882,20 @@ namespace Game.Client
 
         // Materials, counted by kind. One that builds gets [놓기], a seed gets [심기] and the watering can [물 주기];
         // all act on the tile the player faces.
+        // The cracked built tile ahead, when there is one (GameRoot sets it from the view): mended from the bag.
+        public TileType? CrackAhead { get; set; }
+
         void DrawMaterials()
         {
+            if (CrackAhead is TileType cracked)
+            {
+                string name = _client.TileName(cracked);
+                string cost = cracked == TileType.IronWall ? "철 주괴 1" : "돌 1";
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Fit($"앞의 {name}에 금이 갔다", _textWidth - 120), GUILayout.Width(_textWidth - 120));
+                if (Ui.LayoutButton($"고치기 ({cost})", GUILayout.Width(112))) Send(_client.RepairCommand(), Sound.Place);
+                GUILayout.EndHorizontal();
+            }
             GUILayout.Label("재료");
             if (_client.Bag.Materials.Count == 0) GUILayout.Label(Fit("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.", _textWidth));
             // The machine the player faces, for the filter and generator buttons.

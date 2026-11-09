@@ -94,6 +94,8 @@ namespace Game.Core
         Skylight,
         // The alchemist's table, where she stands (Docs/Npcs.md, 2026-11-09).
         AlchemyTable,
+        // A wall of iron plates (Docs/Defense.md, 2026-11-09): much harder for monsters to break than stone.
+        IronWall,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

@@ -223,6 +223,7 @@ namespace Game.Client
             _map.UpdateTiles(changedTiles);
             _view.ShowTarget = (_inventory != null && _inventory.Open) || (_hotbar != null && _hotbar.PointsAtGround);
             _view.TargetSoil = _inventory != null && _inventory.Open && _inventory.PointsAtSoil || _hotbar != null && _hotbar.PointsAtSoil;
+            if (_inventory != null) _inventory.CrackAhead = _inventory.Open ? _view.CrackAhead() : null;
             _view.Render(_tickClock / World.TickSeconds, Time.deltaTime);
             _map.Update();
 

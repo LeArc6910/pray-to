@@ -423,6 +423,9 @@ namespace Game.Core
                 case InventoryCommand.Refuel:
                     if (command.Index < _loot.Materials.Count) World.Refuel(player.Id, _loot.Materials[command.Index]);
                     break;
+                case InventoryCommand.Repair:
+                    World.Repair(player.Id);
+                    break;
                 case InventoryCommand.ChoosePerk:
                     // Index: LifeSkills.PerkIndex; item: the choice (1 or 2).
                     World.ChoosePerk(player.Id, (LifeSkill)(command.Index / LifeSkills.PerkTiers), command.Index % LifeSkills.PerkTiers, command.Item);

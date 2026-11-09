@@ -201,6 +201,8 @@ namespace Game.Core
         Invite,
         // Picks a life skill perk (World.ChoosePerk): Index is LifeSkills.PerkIndex, Item the choice.
         ChoosePerk,
+        // Mends the cracked built tile ahead (World.Repair).
+        Repair,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

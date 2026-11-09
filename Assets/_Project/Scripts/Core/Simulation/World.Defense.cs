@@ -105,9 +105,32 @@ namespace Game.Core
             Map.InBounds(x, y) && !Map.IsEdge(x, y) && Map.BlocksMonsters(x, y) && _changedTiles.TryGetValue(y * Map.Width + x, out var built) && built == Map[x, y]
             && Map[x, y] != TileType.WardStone && (ChestAt(x, y) is not Inventory chest || IsEmpty(chest));
 
+        // A Dug event's Amount when a crack was mended (2026-11-09).
+        public const int Repaired = 0;
+
+        // What mends a built tile: an iron bar for an iron wall, a stone for anything else.
+        public MaterialDefinition RepairMaterial(TileType tile) => Loot?.Materials.FirstOrDefault(m => m.Id == (tile == TileType.IronWall ? "iron_bar" : "stone"));
+
+        // Mends the cracks in the built tile ahead (a wall, a door, a machine monsters struck) with one stone, or an
+        // iron bar for an iron wall. False when there is nothing cracked ahead or nothing to mend it with.
+        public bool Repair(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead) return false;
+            var (x, y) = TileAhead(player.Position, player.Facing);
+            int key = y * Map.Width + x;
+            if (!Map.InBounds(x, y) || !_wallDamage.ContainsKey(key) || !BuiltBarrier(x, y)) return false;
+            var material = RepairMaterial(Map[x, y]);
+            if (material == null || !player.Inventory.TakeMaterial(material, 1)) return false;
+            player.InventoryVersion++;
+            _wallDamage.Remove(key);
+            _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: Repaired, position: TileMap.Center(x, y)));
+            return true;
+        }
+
         // A monster's blow on a built tile: it cracks like a wall being dug, and gives way at its hardness ×
         // BarrierHealthPerHardness. What it was drops there, and whatever a machine held.
-        void DamageBarrier(Enemy enemy, int x, int y)
+        internal void DamageBarrier(Enemy enemy, int x, int y)
         {
             var tile = Tiles?.Find(Map[x, y]);
             float hardness = Math.Max(1, tile?.Hardness ?? 1);

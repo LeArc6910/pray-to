@@ -416,6 +416,7 @@ namespace Game.Client
             TileType.BrickFloor => BrickFloorTile,
             TileType.GlowFloor => GlowFloorTile,
             TileType.Door => DoorTile,
+            TileType.IronWall => IronWallTile,
             TileType.Table => TableTile,
             TileType.Banner => BannerTile,
             TileType.Pot => PotTile,
@@ -1492,6 +1493,31 @@ namespace Game.Client
             ".oSwwwwwwwwwwSo.",
             ".oSSSSSSSSSSSSo.",
             "..____________..");
+
+        // An iron wall (2026-11-09): riveted steel plates in a dark frame, a lit top edge, filling the tile like rock.
+        static readonly PixelImage IronWallTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['A'] = Rgba.Hex("#C4CCD6"),
+                ['B'] = Rgba.Hex("#8E98A6"),
+                ['b'] = Rgba.Hex("#6C7684"),
+                ['v'] = Rgba.Hex("#E8EEF4"),
+            },
+            "oooooooooooooooo",
+            "oAAAAAAAAAAAAAAo",
+            "oBvBBBBBoBBBBvBo",
+            "oBBBBBBBoBBBBBBo",
+            "oBBBBBBBoBBBBBBo",
+            "obbbbbbbobbbbbbo",
+            "oooooooooooooooo",
+            "oBBBvBBBBBBvBBBo",
+            "oBBBBBBBBBBBBBBo",
+            "oBBBBBBBBBBBBBBo",
+            "obbbbbbbbbbbbbbo",
+            "oooooooooooooooo",
+            "oBvBBBBBoBBBBvBo",
+            "oBBBBBBBoBBBBBBo",
+            "obbbbbbbobbbbbbo",
+            "oooooooooooooooo");
 
         static readonly PixelImage TableTile = PixelImage.FromRows(BasePalette,
             "................",
