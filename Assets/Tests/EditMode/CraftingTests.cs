@@ -167,6 +167,23 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void AWallBesideIsDugFromTheFarSideOfTheTile()
+        {
+            // 2026-11-09, the guide bot on the web: standing at the left edge of its tile, a reach of 0.9 ended in
+            // the player's own tile, and a swing at the wall right beside did nothing.
+            var world = Room(out var player);
+            player.Position = new Vec2(2.02f, 2.5f);
+            world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
+            Assert.AreEqual((3, 2), World.DigAhead(player.Position, player.Facing));
+
+            Swing(world, player, 4);
+
+            Assert.AreEqual(TileType.Floor, world.Map[3, 2]);
+            Assert.AreEqual((3, 2), World.DigAhead(new Vec2(2.5f, 2.5f), new Vec2(1, 0)), "from the middle, the tile beside as before");
+            Assert.AreEqual((3, 2), World.DigAhead(new Vec2(2.09f, 2.5f), new Vec2(1, 0)), "never two tiles on");
+        }
+
+        [Test]
         public void MiningSpeedDigsFaster()
         {
             var pick = new Equipment();

@@ -41,6 +41,19 @@ namespace Game.Core
             return (TileMap.Cell(further.X), TileMap.Cell(further.Y));
         }
 
+        // The tile a swing digs (2026-11-09, found by the guide bot on the web: from the far side of their own tile, a
+        // player's reach ended inside it, so a swing at the wall right beside them did nothing, and a bot stood
+        // swinging at a vein for minutes): the tile DigReach ahead, or the next one that way while that is still
+        // the player's own.
+        public static (int X, int Y) DigAhead(Vec2 position, Vec2 facing)
+        {
+            var ahead = position + facing * DigReach;
+            int x = TileMap.Cell(ahead.X), y = TileMap.Cell(ahead.Y);
+            if (x != TileMap.Cell(position.X) || y != TileMap.Cell(position.Y)) return (x, y);
+            var further = position + facing * (DigReach + 0.5f);
+            return (TileMap.Cell(further.X), TileMap.Cell(further.Y));
+        }
+
         public List<TileChange> ChangedTiles() =>
             _changedTiles.Select(pair => new TileChange(pair.Key % Map.Width, pair.Key / Map.Width, pair.Value)).ToList();
 
@@ -56,9 +69,7 @@ namespace Game.Core
         (int X, int Y, TileDefinition Tile)? DigTarget(Player player)
         {
             if (Tiles == null) return null;
-            var ahead = player.Position + player.Facing * DigReach;
-            int x = TileMap.Cell(ahead.X);
-            int y = TileMap.Cell(ahead.Y);
+            var (x, y) = DigAhead(player.Position, player.Facing);
             if (Map.IsEdge(x, y) || Map[x, y] == TileType.Lava) return null;
             // A laid floor or a door only comes up to a pickaxe, so swinging at monsters in a base never takes it up.
             if ((TileMap.IsPaving(Map[x, y]) || Map[x, y] == TileType.Door) && !HoldsPickaxe(player)) return null;
