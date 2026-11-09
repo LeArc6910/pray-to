@@ -1737,6 +1737,7 @@ async function firstRun(browser, profile, hourLong) {
   };
   await nextVein();
   await mine(async () => count(await inv(), 'copper_ore') >= 6, 150, 'CopperOre', nextVein);
+  if (count(await inv(), 'copper_ore') < 6) await why(`구리 ${count(await inv(), 'copper_ore')}개에서 멈춤`);
   note(`- 구리 광맥: 안내는 모양만 알려 주고 자리는 알려 주지 않아서, 봇은 가장 가까운 광맥으로 옮겨졌다(${veins}번, 광맥 하나에 구리가 몇 개뿐이라)`);
   await game.wait(1000);
   await passed(5, '구리 광석 6개 캐기');
@@ -1873,13 +1874,25 @@ async function firstRun(browser, profile, hourLong) {
     await mine(async () => count(await inv(), 'stone') >= 20, 150);
     await taken('near Workbench', '작업대로 돌아갈 때');
 
-    // 8. A hoe, and [밭 갈기] on the floor ahead.
-    await craft('호미');
-    await faceOpen();
-    await bagTab(game, '재료·제작');
-    await game.press('밭 갈기', '호미');
-    await closeBag(game);
-    await game.wait(600);
+    // 8. A hoe, and [밭 갈기] on the floor ahead (other open sides when it does not take).
+    const hoe = await craft('호미');
+    note(`- 호미: ${hoe ? '만듦' : '못 만듦'} (구리 ${count(await inv(), 'copper_ore')}, 돌 ${count(await inv(), 'stone')}, 호미 ${count(await inv(), 'hoe')})`);
+    const tilled = [];
+    for (let attempt = 0; attempt < 4 && (await goalNow()).n <= 8; attempt++) {
+      const at = await faceOpen(tilled);
+      if (!at) break;
+      tilled.push(`${at.dx},${at.dy}`);
+      await bagTab(game, '재료·제작');
+      const pressed = await game.press('밭 갈기', '호미', { quiet: attempt > 0 });
+      await game.wait(500);
+      const s = await game.state();
+      await closeBag(game);
+      await game.wait(600);
+      if (s.ahead !== 'Soil') {
+        note(`  - (밭 갈기 ${attempt + 1}번째) 눌림 ${pressed}, 바라본 쪽 ${at.dx},${at.dy}, 앞 칸 ${s.ahead}, 그 칸 ${JSON.stringify(await game.look(at.dx, at.dy))}`);
+        await why('밭 갈기');
+      }
+    }
     await passed(8, '밭 갈기');
 
     // 9. A rod (slime gel 2: the torch goal's reward), at the nearest water.
