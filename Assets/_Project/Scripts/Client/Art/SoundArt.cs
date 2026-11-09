@@ -54,6 +54,28 @@ namespace Game.Client
         Ice,
     }
 
+    // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
+    enum CreatureVoice
+    {
+        Slime,
+        Mushroom,
+        Bug,
+        Bat,
+        Wisp,
+        Crab,
+        Worm,
+    }
+
+    enum Voice
+    {
+        // Noticing a player and coming for them.
+        Cry,
+        // Winding up an attack.
+        Attack,
+        // Struck.
+        Hurt,
+    }
+
     // The sound effects, made from code the way the pixel art is: square, triangle, saw and sine tones swept in
     // pitch, and filtered noise, each shaped by a quick attack and a decay, in the manner of 8-bit consoles. No audio
     // files, so they reach the web demo directly and the preview tool (DevTools/ArtPreview) writes them out as WAV.
@@ -508,6 +530,108 @@ namespace Game.Client
                     break;
                 default:
                     return null;
+            }
+            return Mix(parts, level);
+        }
+
+        // The monster id's kind of voice: slimes blub, mushrooms puff, bugs click, bats screech, wisps chime, crabs
+        // clack, worms rumble.
+        public static CreatureVoice VoiceOf(string monster) =>
+            monster.Contains("slime") ? CreatureVoice.Slime
+            : monster.Contains("spore") || monster.Contains("myconid") ? CreatureVoice.Mushroom
+            : monster.Contains("bat") ? CreatureVoice.Bat
+            : monster.Contains("wisp") ? CreatureVoice.Wisp
+            : monster.Contains("crab") ? CreatureVoice.Crab
+            : monster.Contains("worm") ? CreatureVoice.Worm
+            : monster.Contains("beetle") || monster.Contains("stalker") || monster.Contains("scorpion") ? CreatureVoice.Bug
+            : CreatureVoice.Slime;
+
+        public static float[] Creature(CreatureVoice creature, Voice voice)
+        {
+            var parts = new List<Part>();
+            float level = 0.45f;
+            switch (creature, voice)
+            {
+                case (CreatureVoice.Slime, Voice.Cry):
+                    parts.Add(Tone(Wave.Sine, 0, 0.18f, 180, 420, 0.6f, decay: 2, vibrato: 0.1f, vibratoRate: 14));
+                    break;
+                case (CreatureVoice.Slime, Voice.Attack):
+                    parts.Add(Tone(Wave.Sine, 0, 0.14f, 260, 120, 0.7f, decay: 3));
+                    parts.Add(Noise(0.02f, 0.08f, 0.4f, 0.25f, decay: 5, seed: 81));
+                    break;
+                case (CreatureVoice.Slime, Voice.Hurt):
+                    parts.Add(Tone(Wave.Sine, 0, 0.12f, 500, 220, 0.6f, decay: 4, vibrato: 0.15f, vibratoRate: 25));
+                    break;
+                case (CreatureVoice.Mushroom, Voice.Cry):
+                    parts.Add(Tone(Wave.Triangle, 0, 0.2f, 220, 300, 0.5f, decay: 2));
+                    parts.Add(Noise(0, 0.2f, 0.3f, 0.6f, attack: 0.05f, decay: 2, seed: 82));
+                    break;
+                case (CreatureVoice.Mushroom, Voice.Attack):
+                    parts.Add(Noise(0, 0.22f, 0.8f, 0.5f, attack: 0.03f, decay: 3, seed: 83));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.1f, 300, 180, 0.4f, decay: 3));
+                    break;
+                case (CreatureVoice.Mushroom, Voice.Hurt):
+                    parts.Add(Tone(Wave.Triangle, 0, 0.12f, 340, 200, 0.6f, decay: 3));
+                    parts.Add(Noise(0, 0.08f, 0.4f, 0.6f, decay: 5, seed: 84));
+                    break;
+                case (CreatureVoice.Bug, Voice.Cry):
+                    foreach (float at in new[] { 0f, 0.05f, 0.1f, 0.15f }) parts.Add(Noise(at, 0.025f, 0.8f, 0.9f, decay: 8, seed: 85 + (int)(at * 100)));
+                    break;
+                case (CreatureVoice.Bug, Voice.Attack):
+                    parts.Add(Noise(0, 0.18f, 0.7f, 0.85f, attack: 0.02f, decay: 2, seed: 86));
+                    parts.Add(Tone(Wave.Square, 0, 0.16f, 900, 1300, 0.12f, decay: 3, vibrato: 0.2f, vibratoRate: 60));
+                    break;
+                case (CreatureVoice.Bug, Voice.Hurt):
+                    parts.Add(Noise(0, 0.04f, 1, 0.9f, decay: 8, seed: 87));
+                    parts.Add(Tone(Wave.Square, 0.02f, 0.08f, 700, 400, 0.2f, decay: 4));
+                    break;
+                case (CreatureVoice.Bat, Voice.Cry):
+                    parts.Add(Tone(Wave.Sine, 0, 0.12f, 2400, 3200, 0.5f, decay: 2));
+                    parts.Add(Tone(Wave.Sine, 0.13f, 0.1f, 2600, 3400, 0.4f, decay: 2));
+                    break;
+                case (CreatureVoice.Bat, Voice.Attack):
+                    parts.Add(Tone(Wave.Saw, 0, 0.16f, 1800, 900, 0.35f, decay: 2, vibrato: 0.05f, vibratoRate: 40));
+                    parts.Add(Noise(0, 0.12f, 0.3f, 0.6f, decay: 3, seed: 88));
+                    break;
+                case (CreatureVoice.Bat, Voice.Hurt):
+                    parts.Add(Tone(Wave.Sine, 0, 0.1f, 3200, 1800, 0.5f, decay: 3));
+                    break;
+                case (CreatureVoice.Wisp, Voice.Cry):
+                    Bell(parts, 0, 0.5f, 880, 0.35f);
+                    Bell(parts, 0.08f, 0.45f, 1320, 0.25f);
+                    break;
+                case (CreatureVoice.Wisp, Voice.Attack):
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 600, 1400, 0.4f, attack: 0.05f, decay: 1.5f, vibrato: 0.04f, vibratoRate: 9));
+                    break;
+                case (CreatureVoice.Wisp, Voice.Hurt):
+                    Bell(parts, 0, 0.3f, 1760, 0.3f);
+                    parts.Add(Noise(0, 0.1f, 0.2f, 0.9f, decay: 4, seed: 89));
+                    break;
+                case (CreatureVoice.Crab, Voice.Cry):
+                    foreach (float at in new[] { 0f, 0.09f }) parts.Add(Noise(at, 0.03f, 1, 0.7f, decay: 8, seed: 90 + (int)(at * 100)));
+                    parts.Add(Tone(Wave.Sine, 0.05f, 0.1f, 400, 700, 0.25f, decay: 3));
+                    break;
+                case (CreatureVoice.Crab, Voice.Attack):
+                    parts.Add(Noise(0, 0.04f, 1, 0.75f, decay: 8, seed: 91));
+                    parts.Add(Noise(0.06f, 0.04f, 1, 0.75f, decay: 8, seed: 92));
+                    break;
+                case (CreatureVoice.Crab, Voice.Hurt):
+                    parts.Add(Noise(0, 0.05f, 0.9f, 0.7f, decay: 7, seed: 93));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.08f, 600, 300, 0.3f, decay: 4));
+                    break;
+                case (CreatureVoice.Worm, Voice.Cry):
+                    parts.Add(Noise(0, 0.35f, 0.8f, 0.12f, attack: 0.08f, decay: 2, seed: 94));
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 90, 70, 0.5f, attack: 0.05f, decay: 2));
+                    break;
+                case (CreatureVoice.Worm, Voice.Attack):
+                    parts.Add(Noise(0, 0.25f, 0.7f, 0.5f, attack: 0.02f, decay: 2.5f, seed: 95));
+                    parts.Add(Tone(Wave.Sine, 0, 0.2f, 140, 80, 0.4f, decay: 3));
+                    break;
+                default:
+                    // A worm struck.
+                    parts.Add(Tone(Wave.Sine, 0, 0.14f, 160, 90, 0.6f, decay: 3));
+                    parts.Add(Noise(0, 0.1f, 0.4f, 0.2f, decay: 4, seed: 96));
+                    break;
             }
             return Mix(parts, level);
         }

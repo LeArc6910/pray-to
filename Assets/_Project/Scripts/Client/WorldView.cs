@@ -77,6 +77,11 @@ namespace Game.Client
             // A boss's state as the snapshots say, for its pose; a monster's likewise.
             public BossState BossState;
             public EnemyState EnemyState;
+            // When a monster may cry out again on noticing someone, and where another player was last frame and how
+            // far they have walked since their last step (2026-11-09, sounds).
+            public float CryAt;
+            public Vector3 LastStep;
+            public float Stride;
             // A player lying in their bed (World.Sleep): "Zz" over them.
             public bool Sleeping;
             public float HurtTime;
@@ -684,7 +689,36 @@ namespace Game.Client
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
                 if (view.Kind == EntityKind.Boss) body.BossState = view.BossState;
-                if (view.Kind == EntityKind.Monster) body.EnemyState = view.EnemyState;
+                if (view.Kind == EntityKind.Monster)
+                {
+                    // Its voice: a cry on coming for someone (not more than every CrySeconds), a sound as it winds up.
+                    var was = body.EnemyState;
+                    body.EnemyState = view.EnemyState;
+                    var voiceAt = new Vector3(view.Position.X, view.Position.Y, 0);
+                    if (was != EnemyState.Windup && view.EnemyState == EnemyState.Windup)
+                        Sounds.PlayCreatureAt(view.Monster.Id, Voice.Attack, voiceAt, _self.Position);
+                    else if (was == EnemyState.Idle && view.EnemyState == EnemyState.Chase && Time.time >= body.CryAt)
+                    {
+                        body.CryAt = Time.time + CrySeconds;
+                        Sounds.PlayCreatureAt(view.Monster.Id, Voice.Cry, voiceAt, _self.Position, 0.5f);
+                    }
+                }
+                if (view.IsPlayer)
+                {
+                    // Other players' footsteps, quieter than one's own.
+                    var now = new Vector3(view.Position.X, view.Position.Y, 0);
+                    float moved = (now - body.LastStep).magnitude;
+                    body.LastStep = now;
+                    if (moved < 1)
+                    {
+                        body.Stride += moved;
+                        if (body.Stride >= StepLength)
+                        {
+                            body.Stride -= StepLength;
+                            Hear(Sound.Step, now, 0.22f);
+                        }
+                    }
+                }
                 body.Sleeping = view.IsPlayer && PlayerPhase.IsSleeping(view.Phase);
                 if (view.IsPlayer) DrawPet(view.Id, body, PlayerPhase.PetOf(view.Phase), deltaTime);
 
@@ -1531,6 +1565,7 @@ namespace Game.Client
                 case SimEventType.Hit:
                     var target = Find(e.Target);
                     if (target == null) break;
+                    if (target.Kind == BodyKind.Monster) Sounds.PlayCreatureAt(target.Id, Voice.Hurt, target.Position, _self.Position, 0.45f);
                     target.FlashTime = FlashSeconds;
                     target.HurtTime = HurtSeconds;
                     bool hurtsMe = e.Target == _client.PlayerId;
@@ -1920,6 +1955,9 @@ namespace Game.Client
                     break;
             }
         }
+
+        // Seconds before a monster that lost interest cries out again on noticing someone.
+        const float CrySeconds = 6;
 
         // A quiet step every StepLength the player walks. A jump of more than a tile in one frame is a snap or a
         // recall, not a walk.

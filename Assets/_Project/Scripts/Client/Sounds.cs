@@ -64,6 +64,36 @@ namespace Game.Client
             return true;
         }
 
+        // A monster's voice at a place (2026-11-09), quieter than the fight's own sounds; one voice and kind no more than
+        // every CreatureGap, so a crowd does not drown everything.
+        public static void PlayCreatureAt(string monster, Voice voice, Vector3 at, Vector3 listener, float volume = 0.6f)
+        {
+            if (!Settings.Sound) return;
+            float distance = Vector2.Distance(at, listener);
+            if (distance >= Hearing) return;
+            var creature = SoundArt.VoiceOf(monster);
+            var key = (creature, voice);
+            float now = Time.unscaledTime;
+            if (CreaturePlayed.TryGetValue(key, out float last) && now - last < CreatureGap) return;
+            CreaturePlayed[key] = now;
+            if (!CreatureClips.TryGetValue(key, out var clip))
+            {
+                var samples = SoundArt.Creature(creature, voice);
+                clip = AudioClip.Create($"creature_{creature}_{voice}", samples.Length, 1, SoundArt.SampleRate, false);
+                clip.SetData(samples, 0);
+                CreatureClips[key] = clip;
+            }
+            var source = NextSource();
+            source.clip = clip;
+            source.volume = Mathf.Clamp01(volume * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume;
+            source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter) * 2;
+            source.Play();
+        }
+
+        const float CreatureGap = 0.15f;
+        static readonly Dictionary<(CreatureVoice, Voice), AudioClip> CreatureClips = new Dictionary<(CreatureVoice, Voice), AudioClip>();
+        static readonly Dictionary<(CreatureVoice, Voice), float> CreaturePlayed = new Dictionary<(CreatureVoice, Voice), float>();
+
         static readonly Dictionary<string, AudioClip> SkillClips = new Dictionary<string, AudioClip>();
         static readonly Dictionary<string, float> SkillPlayed = new Dictionary<string, float>();
 

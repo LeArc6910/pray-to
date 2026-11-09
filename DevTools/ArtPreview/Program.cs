@@ -88,6 +88,24 @@ namespace Game.Client
                 }
                 Wav.Save(samples, SoundArt.SampleRate, Path.Combine(folder, sound.ToString().ToLowerInvariant() + ".wav"));
             }
+            // Each kind of monster voice (2026-11-09) to creatures/<kind>_<voice>.wav.
+            string creatures = Path.Combine(folder, "creatures");
+            Directory.CreateDirectory(creatures);
+            foreach (CreatureVoice creature in Enum.GetValues(typeof(CreatureVoice)))
+            {
+                foreach (Voice voice in Enum.GetValues(typeof(Voice)))
+                {
+                    var samples = SoundArt.Creature(creature, voice);
+                    float seconds = samples.Length / (float)SoundArt.SampleRate;
+                    float loudest = samples.Max(Math.Abs);
+                    if (samples.Length == 0 || seconds > 1 || loudest < 0.05f || loudest > 1 || samples.Any(float.IsNaN))
+                    {
+                        Console.Error.WriteLine($"{creature} {voice}: {seconds:0.00}s, peak {loudest:0.00}");
+                        fine = false;
+                    }
+                    Wav.Save(samples, SoundArt.SampleRate, Path.Combine(creatures, $"{creature}_{voice}".ToLowerInvariant() + ".wav"));
+                }
+            }
             return fine;
         }
 
