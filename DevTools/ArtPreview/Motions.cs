@@ -459,6 +459,45 @@ namespace Game.Client
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
             Animals(Path.Combine(folder, "animals.gif"), floor);
+            Decor(Path.Combine(folder, "decor.gif"), sword, floor);
+        }
+
+        // A room (2026-11-09): a back wall hung with tapestries and shields, the three rugs on the floor, and a door in
+        // the right wall that swings open as a player walks out through it and shuts behind them (WorldView.SwingDoors).
+        static void Decor(string path, ItemBase sword, PixelImage floor)
+        {
+            var walker = new Player { Weapon = sword, Facing = new Vec2(1, 0) };
+            var rock = TileArt.Ground(TileArt.Index(GroundKind.Rock, 0, 0));
+            var back = new[] { TileType.TapestryWall, TileType.ShieldWall, TileType.TapestryWall, TileType.ShieldWall, TileType.TapestryWall };
+            var rugs = new[] { TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet };
+            const float seconds = 6;
+            Play(path, 1, 1, 128, 80, 5, 0.5f, seconds, floor, (column, row, time, step) =>
+            {
+                var draws = new List<Draw>();
+                for (int i = 0; i < back.Length; i++) draws.Add(Sprite(TileArt.Object(back[i]), -2.5f + i, 1.5f, 0.5f, 0.5f, 0));
+                for (int x = 0; x < 5; x++)
+                {
+                    for (int y = 0; y < 2; y++) draws.Add(Sprite(TileArt.Object(rugs[(x + y) % 3]), -2.5f + x, 0.5f - y, 0.5f, 0.5f, -1));
+                }
+                // The right wall: rock above and below the door.
+                draws.Add(Sprite(rock, 2.5f, 1.5f, 0.5f, 0.5f, 0));
+                draws.Add(Sprite(rock, 2.5f, -0.5f, 0.5f, 0.5f, 0));
+                // Walking right along y = 0.5 from the left of the room and out through the door.
+                float t = time % seconds;
+                // Out of sight past the right edge for the last second, the door shut behind them.
+                float x0 = -3f + MathF.Min(t, 5) * 1.6f;
+                walker.Moving = true;
+                bool open = MathF.Abs(x0 - 2.5f) <= 1.05f;
+                draws.Add(Sprite(open ? TileArt.OpenDoor : TileArt.Object(TileType.Door), 2.5f, 0.5f, 0.5f, 0.5f, 0));
+                foreach (var d in walker.Frame(time, step))
+                {
+                    var moved = d;
+                    moved.X += x0;
+                    moved.Y += 0.5f;
+                    draws.Add(moved);
+                }
+                return draws;
+            });
         }
 
         // The coop, barn and fold with their animals wandering in front as WorldView.DrawChickens moves them, now and

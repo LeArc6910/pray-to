@@ -52,6 +52,9 @@ namespace Game.Client
         Story,
         // Ice: a cold glassy shimmer, for frost skills.
         Ice,
+        // A door swinging open on its hinge, and falling shut (2026-11-09).
+        Door,
+        DoorShut,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -275,6 +278,18 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Pulse, 0.27f, 0.45f, 784, 784, 0.35f, decay: 1.5f, vibrato: 0.01f, vibratoRate: 6));
                     parts.Add(Tone(Wave.Triangle, 0.27f, 0.45f, 392, 392, 0.25f, decay: 1.5f));
                     level = 0.7f;
+                    break;
+                case Sound.Door:
+                    // A short wooden creak, rising, and the latch.
+                    parts.Add(Tone(Wave.Saw, 0, 0.22f, 180, 260, 0.25f, attack: 0.02f, decay: 2, vibrato: 0.08f, vibratoRate: 30));
+                    parts.Add(Noise(0, 0.03f, 0.35f, 0.6f, decay: 6, seed: 41));
+                    level = 0.45f;
+                    break;
+                case Sound.DoorShut:
+                    // A soft wooden thud.
+                    parts.Add(Tone(Wave.Triangle, 0, 0.12f, 140, 70, 0.7f, decay: 6));
+                    parts.Add(Noise(0, 0.06f, 0.5f, 0.3f, decay: 6, seed: 42));
+                    level = 0.5f;
                     break;
                 case Sound.Ice:
                     parts.Add(Tone(Wave.Sine, 0, 0.45f, 1800, 2400, 0.3f, decay: 2, vibrato: 0.03f, vibratoRate: 22));

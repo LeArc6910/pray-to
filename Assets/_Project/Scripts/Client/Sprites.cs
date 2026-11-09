@@ -27,6 +27,7 @@ namespace Game.Client
             TileType.Filter, TileType.Generator, TileType.Lever, TileType.MushroomSoil, TileType.FrostSoil, TileType.AshSoil, TileType.VoidSoil,
             TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.SmithStall, TileType.FisherHut, TileType.AlchemyTable, TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot, TileType.WardStone, TileType.Turret, TileType.Barn,
             TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
+            TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall,
         };
 
         // A sprite made from the drawing the first time its key is asked for. The pivot is in the sprite's own
@@ -103,6 +104,18 @@ namespace Game.Client
             return _ground[index];
         }
 
+        // A door standing open (WorldView.SwingDoors): not a tile of its own in the world, only how a door looks.
+        public static TileBase OpenDoor
+        {
+            get
+            {
+                BuildAtlas();
+                return _openDoor;
+            }
+        }
+
+        static Tile _openDoor;
+
         // The tile for a placed thing, or null for tiles that are only ground.
         public static TileBase Object(TileType type)
         {
@@ -113,13 +126,15 @@ namespace Game.Client
         static void BuildAtlas()
         {
             if (_atlas != null) return;
-            int count = TileArt.GroundCount + ObjectTypes.Length;
+            // The ground, the placed things, and the open door last.
+            int count = TileArt.GroundCount + ObjectTypes.Length + 1;
             int columns = Mathf.CeilToInt(Mathf.Sqrt(count));
             int size = Mathf.NextPowerOfTwo(columns * Cell);
             var atlas = new PixelImage(size, size);
             var images = new PixelImage[count];
             for (int i = 0; i < TileArt.GroundCount; i++) images[i] = TileArt.Ground(i);
             for (int i = 0; i < ObjectTypes.Length; i++) images[TileArt.GroundCount + i] = TileArt.Object(ObjectTypes[i]);
+            images[count - 1] = TileArt.OpenDoor;
             for (int i = 0; i < count; i++) Extruded(atlas, images[i], i % columns * Cell, i / columns * Cell);
 
             _atlas = Texture(size, size);
@@ -140,6 +155,7 @@ namespace Game.Client
             _ground = new Tile[TileArt.GroundCount];
             for (int i = 0; i < TileArt.GroundCount; i++) _ground[i] = MakeTile(i);
             for (int i = 0; i < ObjectTypes.Length; i++) Objects[ObjectTypes[i]] = MakeTile(TileArt.GroundCount + i);
+            _openDoor = MakeTile(count - 1);
         }
 
         // Draws the image into the atlas with its edge pixels repeated one pixel outward.

@@ -418,6 +418,11 @@ namespace Game.Client
             TileType.Door => DoorTile,
             TileType.IronWall => IronWallTile,
             TileType.Fold => FoldTile,
+            TileType.RedCarpet => RedCarpetTile,
+            TileType.BlueCarpet => BlueCarpetTile,
+            TileType.YellowCarpet => YellowCarpetTile,
+            TileType.TapestryWall => TapestryWallTile,
+            TileType.ShieldWall => ShieldWallTile,
             TileType.Table => TableTile,
             TileType.Banner => BannerTile,
             TileType.Pot => PotTile,
@@ -1355,6 +1360,31 @@ namespace Game.Client
             // ---- Base building (Docs/Crafting.md, 기지 꾸미기) ----
 
         // Laid floors: slabs with grout lines, drawn edge to edge so a floor reads as one surface.
+        // A woven wool rug (2026-11-09): a dark border, a diamond in the light thread, a fringe top and bottom. Laid side by
+        // side they read as one patterned carpet.
+        static PixelImage Rug(string main, string light, string dark) => PixelImage.FromRows(
+            new Dictionary<char, Rgba> { ['M'] = Rgba.Hex(main), ['L'] = Rgba.Hex(light), ['d'] = Rgba.Hex(dark), ['f'] = Rgba.Hex("#E8DCC0") },
+            "f.f.f.f.f.f.f.f.",
+            "dddddddddddddddd",
+            "dMMMMMMMMMMMMMMd",
+            "dMLMMMMMMMMMMLMd",
+            "dMMMMMMLLMMMMMMd",
+            "dMMMMMLddLMMMMMd",
+            "dMMMMLdMMdLMMMMd",
+            "dMMMLdMLLMdLMMMd",
+            "dMMMLdMLLMdLMMMd",
+            "dMMMMLdMMdLMMMMd",
+            "dMMMMMLddLMMMMMd",
+            "dMMMMMMLLMMMMMMd",
+            "dMLMMMMMMMMMMLMd",
+            "dMMMMMMMMMMMMMMd",
+            "dddddddddddddddd",
+            ".f.f.f.f.f.f.f.f");
+
+        static readonly PixelImage RedCarpetTile = Rug("#B83A44", "#F0B060", "#5A1A22");
+        static readonly PixelImage BlueCarpetTile = Rug("#3A64B8", "#A8D8F0", "#1A2A5A");
+        static readonly PixelImage YellowCarpetTile = Rug("#D8A830", "#FFF0A0", "#6A4A14");
+
         static PixelImage Slabs(string main, string light, string shade, string grout, bool glow = false) => PixelImage.FromRows(
             new Dictionary<char, Rgba>
             {
@@ -1475,6 +1505,72 @@ namespace Game.Client
             ['p'] = Rgba.Hex("#8A4A34"),
             ['_'] = Shadow,
         };
+
+        // Stone bricks to hang things on, like the built stone wall.
+        static readonly Dictionary<char, Rgba> HungWallColors = new Dictionary<char, Rgba>(BasePalette)
+        {
+            ['B'] = Rgba.Hex("#8A8070"), ['b'] = Rgba.Hex("#6E6658"), ['v'] = Rgba.Hex("#A89E8C"),
+            ['R'] = Rgba.Hex("#B83A44"), ['r'] = Rgba.Hex("#7A222C"), ['y'] = Rgba.Hex("#F2C440"), ['n'] = Rgba.Hex("#3A64B8"),
+            ['s'] = Rgba.Hex("#C8CCD4"), ['k'] = Rgba.Hex("#5A4030"),
+        };
+
+        // A wall hung with a woven wool tapestry on a rod: red with a gold stripe and a blue diamond, tasselled.
+        static readonly PixelImage TapestryWallTile = PixelImage.FromRows(HungWallColors,
+            "oooooooooooooooo",
+            "ovvvvvvovvvvvvvo",
+            "obbbbkkkkkkkbbbo",
+            "oBBBRRRRRRRRBBBo",
+            "obbbRyyyyyyRbbbo",
+            "oBBBRRRnnRRRBBBo",
+            "oBBBRRnRRnRRBBbo",
+            "obbbRRRnnRRRbbbo",
+            "oBBBRyyyyyyRBBBo",
+            "oBBBRRRRRRRRBBBo",
+            "obbbRrRrRrRrbbbo",
+            "oBBBy.y.y.y.BBBo",
+            "ovvvvvvovvvvvvvo",
+            "oBBBBBBoBBBBBBBo",
+            "obbbbbbobbbbbbbo",
+            "oooooooooooooooo");
+
+        // A wall hung with a round red-and-gold shield over two crossed swords.
+        static readonly PixelImage ShieldWallTile = PixelImage.FromRows(HungWallColors,
+            "oooooooooooooooo",
+            "ovvvvvvovvvvvvvo",
+            "oBsBBBBoBBBBsBBo",
+            "obbsbbooobbsbbbo",
+            "oBBBsoRRRosBBBBo",
+            "oBBBoRyRyRoBBBBo",
+            "ovvvoRRyRRovvvvo",
+            "oBBBoRyRyRoBBBBo",
+            "obbbboRRRobbbbbo",
+            "oBBBsBoooBsBBBBo",
+            "oBBsBBBoBBBsBBBo",
+            "obkbbbbobbbbkbbo",
+            "ovvvvvvovvvvvvvo",
+            "oBBBBBBoBBBBBBBo",
+            "obbbbbbobbbbbbbo",
+            "oooooooooooooooo");
+
+        // An open door (2026-11-09, WorldView.SwingDoors): the frame, the floor's dark through it, and the slab swung
+        // back against the left post, seen edge on.
+        public static readonly PixelImage OpenDoor = PixelImage.FromRows(BasePalette,
+            "................",
+            "..oooooooooooo..",
+            ".oSSSSSSSSSSSSo.",
+            ".oSwo________So.",
+            ".oSwW________So.",
+            ".oSwk________So.",
+            ".oSwW________So.",
+            ".oSwW________So.",
+            ".oSwW________So.",
+            ".oSwW________So.",
+            ".oSwk________So.",
+            ".oSwW________So.",
+            ".oSwW________So.",
+            ".oSwo________So.",
+            ".oSSSSSSSSSSSSo.",
+            "..____________..");
 
         // A door: a stone frame and an iron-banded slab. Players walk through it; monsters cannot.
         static readonly PixelImage DoorTile = PixelImage.FromRows(BasePalette,

@@ -97,7 +97,7 @@ namespace Game.Core.Tests
             foreach (var (world, player, fault) in new[]
             {
                 (WithGuestRoom(out var a, door: false), a, "방에 문이 없다"),
-                (WithGuestRoom(out var b, decor: false), b, "방에 장식(탁자, 깃발, 화분, 등불, 횃불)이 없다"),
+                (WithGuestRoom(out var b, decor: false), b, "방에 장식(탁자, 깃발, 화분, 등불, 횃불, 벽 장식, 깔개)이 없다"),
                 (WithGuestRoom(out var c, closed: false), c, "방이 닫혀 있지 않다(벽과 문으로 둘러야 한다)"),
             })
             {
@@ -108,6 +108,17 @@ namespace Game.Core.Tests
             Assert.IsTrue(room.Closed);
             Assert.AreEqual(16, room.Floor.Count);
             Assert.AreEqual("방에 침대가 없다", room.Fault);
+            Assert.IsFalse(room.HasDecor);
+
+            // A rug on the floor or a hung wall in the edge makes it decorated (2026-11-09), and a rug is floor to walk.
+            var rugged = Maps.Room(6);
+            rugged[2, 2] = TileType.RedCarpet;
+            Assert.IsTrue(Housing.RoomAt(rugged, 3, 3, null).HasDecor);
+            Assert.AreEqual(16, Housing.RoomAt(rugged, 3, 3, null).Floor.Count, "the rug is floor of the room");
+            var hung = Maps.Room(6);
+            hung[0, 2] = TileType.TapestryWall;
+            var hall = Housing.RoomAt(hung, 3, 3, null);
+            Assert.IsTrue(hall.Closed && hall.HasDecor, "a tapestry wall closes the room and decorates it");
         }
 
         [Test]

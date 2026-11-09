@@ -38,7 +38,7 @@ namespace Game.Core
             : Floor.Count + People.Count < Housing.MinTiles ? $"방이 너무 좁다(바닥 {Housing.MinTiles}칸 이상)"
             : !HasBed ? "방에 침대가 없다"
             : !HasDoor ? "방에 문이 없다"
-            : !HasDecor ? "방에 장식(탁자, 깃발, 화분, 등불, 횃불)이 없다"
+            : !HasDecor ? "방에 장식(탁자, 깃발, 화분, 등불, 횃불, 벽 장식, 깔개)이 없다"
             : null;
 
         public bool Fit => Fault == null;
@@ -54,7 +54,11 @@ namespace Game.Core
         // A person living in a room of the base warms to the player faster: talks and gifts count this much more.
         public const float FriendshipBonus = 1.5f;
 
-        static readonly TileType[] Decor = { TileType.Table, TileType.Banner, TileType.Pot, TileType.Lamp, TileType.Torch };
+        static readonly TileType[] Decor =
+        {
+            TileType.Table, TileType.Banner, TileType.Pot, TileType.Lamp, TileType.Torch, TileType.TapestryWall, TileType.ShieldWall,
+            TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet,
+        };
 
         static bool Inside(TileMap map, int x, int y) => map.InBounds(x, y) && !map.IsSolid(x, y) && map[x, y] != TileType.Door;
 
@@ -91,7 +95,9 @@ namespace Game.Core
                 }
             }
             var tiles = edge.Select(e => map[e.Item1, e.Item2]).ToList();
-            return new Room(floor, edge.ToList(), closed, tiles.Contains(TileType.Door), tiles.Contains(TileType.Bed), tiles.Any(t => Decor.Contains(t)),
+            // Decor stands round the edge (it is solid); a rug lies on the floor inside.
+            bool decorated = tiles.Any(t => Decor.Contains(t)) || floor.Any(f => Decor.Contains(map[f.Item1, f.Item2]));
+            return new Room(floor, edge.ToList(), closed, tiles.Contains(TileType.Door), tiles.Contains(TileType.Bed), decorated,
                 tiles.Where(t => people != null && people.Contains(t)).Distinct().ToList());
         }
 

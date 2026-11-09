@@ -1503,24 +1503,42 @@ async function base(browser) {
   await game.send('goto biome Cave');
   await clearRoom(game, 6, 4);
   // Three floors in a row, a wall across with a door in it, a table and a banner.
-  const commands = ['build StoneFloor -3 2', 'build BrickFloor -2 2', 'build GlowFloor -1 2', 'build Table -3 -2', 'build Banner -1 -2', 'build Door 2 0'];
+  const commands = ['build StoneFloor -3 2', 'build BrickFloor -2 2', 'build GlowFloor -1 2', 'build Table -3 -2', 'build Banner -1 -2', 'build Door 2 0',
+    // Rugs and hung walls (2026-11-09).
+    'build RedCarpet -3 1', 'build BlueCarpet -2 1', 'build YellowCarpet -1 1', 'build TapestryWall -3 -3', 'build ShieldWall -2 -3'];
   for (let dy = -4; dy <= 4; dy++) if (dy !== 0) commands.push(`build Wall 2 ${dy}`);
   await game.send(commands.join('; '));
   await game.wait(1000);
   const tiles = [];
   for (const [dx, dy] of [[-3, 2], [-2, 2], [-1, 2], [-3, -2], [-1, -2], [2, 0]]) tiles.push((await game.look(dx, dy)).tile);
   check(tiles.join(',') === 'StoneFloor,BrickFloor,GlowFloor,Table,Banner,Door', `바닥 셋, 탁자, 깃발, 문이 놓인다 (${tiles.join(', ')})`);
+  const decor = [];
+  for (const [dx, dy] of [[-3, 1], [-2, 1], [-1, 1], [-3, -3], [-2, -3]]) decor.push((await game.look(dx, dy)).tile);
+  check(decor.join(',') === 'RedCarpet,BlueCarpet,YellowCarpet,TapestryWall,ShieldWall', `깔개 셋과 걸개 벽·방패 장식 벽이 놓인다 (${decor.join(', ')})`);
+  check((await game.state()).doorsOpen === 0, '아무도 곁에 없으면 문은 닫혀 있다');
   await game.shot('base', '돌·벽돌·빛 바닥, 문 달린 벽, 탁자와 깃발');
   // A monster on the far side stays behind the door; the player walks through it.
   await game.send('spawn slime 4 0 5000');
   await game.wait(2500);
   const start = await game.state();
   await game.page.keyboard.down('d');
-  await game.wait(1400);
+  let opened = false;
+  for (let i = 0; i < 7; i++) {
+    await game.wait(200);
+    if ((await game.state()).doorsOpen > 0 && !opened) {
+      opened = true;
+      await game.shot('door-open', '문을 지나는 중(열린 문)');
+    }
+  }
   await game.page.keyboard.up('d');
+  check(opened, '문 곁을 지날 때 문이 열린다');
   const after = await game.state();
   check(after.x > start.x + 2.2, `플레이어는 문을 지나간다 (x ${start.x.toFixed(1)} → ${after.x.toFixed(1)})`);
   await game.shot('base-door', '문을 지나간 뒤');
+  // Gone well away from it, the door swings shut.
+  await game.send('goto 3 0');
+  await game.wait(800);
+  check((await game.state()).doorsOpen === 0, `멀어지면 문이 닫힌다 (${(await game.state()).doorsOpen})`);
   await game.context.close();
 }
 

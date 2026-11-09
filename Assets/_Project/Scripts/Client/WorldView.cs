@@ -463,6 +463,7 @@ namespace Game.Client
             DrawMachines();
             DrawPeople();
             DrawChickens();
+            SwingDoors();
             DrawMarks();
             DrawProjectiles();
             DrawTarget();
@@ -1297,6 +1298,54 @@ namespace Game.Client
                 }
             }
             for (int i = used; i < _chickens.Count; i++) _chickens[i].enabled = false;
+        }
+
+        // Doors (2026-11-09): a door stands open while a player is in its doorway or right beside it, and swings shut
+        // once they have gone, with a creak and a thud. Only the look: monsters are kept out either way (World rules).
+        const float DoorReach = 1.05f;
+        readonly HashSet<int> _openDoors = new HashSet<int>();
+        // How many doors stand open now, for the playtest.
+        public int OpenDoors => _openDoors.Count;
+        readonly HashSet<int> _doorsNear = new HashSet<int>();
+        readonly List<int> _doorsShut = new List<int>();
+
+        void SwingDoors()
+        {
+            var map = _client.Map;
+            if (map == null || _objects == null || _self == null) return;
+            _doorsNear.Clear();
+            foreach (var body in _others.Values.Append(_self))
+            {
+                if (body == null) continue;
+                int cx = Mathf.FloorToInt(body.Position.x), cy = Mathf.FloorToInt(body.Position.y);
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        int x = cx + dx, y = cy + dy;
+                        if (!map.InBounds(x, y) || map[x, y] != TileType.Door) continue;
+                        if (Vector2.Distance(body.Position, new Vector2(x + 0.5f, y + 0.5f)) <= DoorReach) _doorsNear.Add(y * map.Width + x);
+                    }
+                }
+            }
+            foreach (int key in _doorsNear)
+            {
+                var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
+                bool opened = _openDoors.Add(key);
+                // Also after the tiles round it were redrawn closed.
+                if (_objects.GetTile(cell) != Sprites.OpenDoor) _objects.SetTile(cell, Sprites.OpenDoor);
+                if (opened) Hear(Sound.Door, cell + new Vector3(0.5f, 0.5f, 0));
+            }
+            _doorsShut.Clear();
+            foreach (int key in _openDoors) if (!_doorsNear.Contains(key)) _doorsShut.Add(key);
+            foreach (int key in _doorsShut)
+            {
+                _openDoors.Remove(key);
+                var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
+                if (map[cell.x, cell.y] != TileType.Door) continue;
+                _objects.SetTile(cell, Sprites.Object(TileType.Door));
+                Hear(Sound.DoorShut, cell + new Vector3(0.5f, 0.5f, 0));
+            }
         }
 
         readonly List<SpriteRenderer> _wires = new List<SpriteRenderer>();

@@ -98,6 +98,12 @@ namespace Game.Core
         IronWall,
         // A fold for sheep (World.Animals.cs, 2026-11-09).
         Fold,
+        // Woven wool rugs, laid like floors, and walls hung with something (Docs/Crafting.md, 2026-11-09).
+        RedCarpet,
+        BlueCarpet,
+        YellowCarpet,
+        TapestryWall,
+        ShieldWall,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -172,7 +178,8 @@ namespace Game.Core
 
         // A floor laid over bare floor (StoneFloor, BrickFloor, GlowFloor): walked on like floor, built on like floor.
         public static bool IsPaving(TileType type) =>
-            type == TileType.StoneFloor || type == TileType.BrickFloor || type == TileType.GlowFloor || type == TileType.Skylight;
+            type == TileType.StoneFloor || type == TileType.BrickFloor || type == TileType.GlowFloor || type == TileType.Skylight
+            || type == TileType.RedCarpet || type == TileType.BlueCarpet || type == TileType.YellowCarpet;
 
         // Bare floor or a laid floor: where things can be built.
         public static bool IsGround(TileType type) => type == TileType.Floor || IsPaving(type);

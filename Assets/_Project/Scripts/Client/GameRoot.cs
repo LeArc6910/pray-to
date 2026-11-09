@@ -624,6 +624,7 @@ namespace Game.Client
         internal IReadOnlyList<string> HudLines => _hudLines;
         internal IEnumerable<string> AcquiredLines => _acquired.Select(a => a.Text);
         internal string Banner => _view?.ShowingBanner;
+        internal int OpenDoors => _view?.OpenDoors ?? 0;
         internal bool MapOpen => _map != null && _map.FullOpen;
         internal IEnumerable<string> FloatingTexts => _view?.FloatingTexts ?? Enumerable.Empty<string>();
         string[] _hudLines = Array.Empty<string>();

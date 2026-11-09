@@ -91,6 +91,11 @@ steamed_crab,steamed_crab,1,cave_crab:1,Furnace
 fried_shrimp,fried_shrimp,1,cave_shrimp:3,Furnace
 barn,barn,1,stone:20|iron_bar:4|slime_gel:4,Workbench
 fold,fold,1,stone:16|iron_bar:3|slime_gel:3,Workbench
+red_carpet,red_carpet,2,wool:2|cave_berry:1,Workbench
+blue_carpet,blue_carpet,2,wool:2|frost_berry:1,Workbench
+yellow_carpet,yellow_carpet,2,wool:2|ember_corn:1,Workbench
+tapestry_wall,tapestry_wall,1,stone:2|wool:1,Workbench
+shield_wall,shield_wall,1,stone:2|iron_bar:1,Anvil
 cheese,cheese,1,milk:2,PreservesJar
 warm_milk,warm_milk,1,milk:1,Furnace
 healing_potion,healing_potion,1,slime_gel:3,
