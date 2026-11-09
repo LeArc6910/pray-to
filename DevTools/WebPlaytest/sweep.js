@@ -1693,7 +1693,7 @@ async function firstRun(browser, profile, hourLong) {
     if (game.touch) await step(dx, dy, 120);
     else await game.send(`face ${dx} ${dy}`);
   };
-  const faceOpen = async (skip = []) => {
+  const faceOpen = async (skip = [], depth = 0) => {
     // Open floor with nothing growing on it (a person sees the sprouts).
     const around = [];
     for (const a of await near()) if (a.tile === 'Floor' && !skip.includes(`${a.dx},${a.dy}`) && !(await game.look(a.dx, a.dy)).crop) around.push(a);
@@ -1707,8 +1707,15 @@ async function firstRun(browser, profile, hourLong) {
     if (open) {
       await step(-open.dx, -open.dy, 90).catch(() => {});
       await turn(open.dx, open.dy);
+      return open;
     }
-    return open;
+    // No open floor beside (things and sprouts all round): a step onto the floor or crop beside, and look again.
+    const walkable = (await near()).find(a => a.tile === 'Floor' || a.tile === 'StoneFloor' || a.tile === 'Soil');
+    if (walkable && depth < 3) {
+      await step(walkable.dx, walkable.dy, 400);
+      return faceOpen([], depth + 1);
+    }
+    return null;
   };
   await bagTab(game, '재료·제작');
   check(await game.press('만들기', /^작업대/), '[재료·제작]에 작업대 [만들기]가 있다');
