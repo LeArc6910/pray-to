@@ -1471,6 +1471,8 @@ async function touch(browser) {
     check(!!(await game.until(s => s.playing, 25000)), '탭으로 게임이 시작된다');
     await game.page.touchscreen.tap(width / 2, height / 3);
     await game.wait(800);
+    // A new character has no class (picked in the game, 2026-11-09): the two the skill buttons below are tried with.
+    await game.send('classes warrior,fire_mage');
     await game.send('goto biome Cave');
     await clearRoom(game, 3, 2);
 
@@ -1909,6 +1911,8 @@ async function firstRun(browser, profile, hourLong) {
     check(!!(await game.until(b => b.some(x => x.label === '가방'), 10000, game.buttons)), '휴대폰: 첫 터치 뒤 [가방] 단추가 보인다');
   }
   await bagTab(game, '스킬');
+  await game.wait(500);
+  await game.shot('class-pick', '클래스 고르기 목록(고르기 전)');
   check(await game.press('고르기', /^전사:/), '가방 [스킬] 탭에 클래스마다 [고르기]가 있다');
   await game.wait(800);
   const picked = (await game.inventory()).classes;

@@ -1627,7 +1627,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 string first = option.Skills.Count > 0 ? $" · 첫 스킬 {option.Skills[0].Name}" : "";
-                GUILayout.Label(Fit($"{option.Name}: {option.Description} 패시브 {SkillText.Passive(option)}{first}", text), GUILayout.Width(text));
+                GUILayout.Label(Fit($"{option.Name}: {option.Description} · 패시브: {SkillText.Passive(option)}{first}", text), GUILayout.Width(text));
                 if (Ui.LayoutButton("고르기", GUILayout.Width(72)))
                     Send(_client.ClassCommand(_client.Classes.Concat(new[] { option }).ToList(), null), Sound.Buff);
                 GUILayout.EndHorizontal();
