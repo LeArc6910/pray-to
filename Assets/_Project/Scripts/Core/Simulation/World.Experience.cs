@@ -64,6 +64,7 @@ namespace Game.Core
         public void GainExperience(Player player, int amount)
         {
             if (amount <= 0) return;
+            FeedPet(player, amount);
             int before = player.Level;
             player.Experience = Math.Min(player.Experience + amount, Leveling.TotalFor(Leveling.MaxLevel));
             if (player.Level == before) return;

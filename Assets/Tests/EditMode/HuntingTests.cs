@@ -1,3 +1,4 @@
+using System;
 using System.Linq;
 using NUnit.Framework;
 using static Game.Core.Tests.Builds;
@@ -52,6 +53,11 @@ namespace Game.Core.Tests
             Assert.AreEqual(10 + PlayerStats.BaseMana * potion.Heal / 100f, player.Mana, 0.01f);
             Assert.AreEqual(health, player.Health, "it gives no health");
             Assert.AreEqual(1, player.Inventory.CountOf(potion));
+            // The screen hears of it, to play the drink (2026-11-09).
+            var drank = world.TakeEvents().Single(e => e.Type == SimEventType.ManaRestored);
+            Assert.AreEqual(player.Id, drank.Source);
+            Assert.AreEqual(Gear.Data.Consumables.ToList().IndexOf(potion), drank.Target);
+            Assert.AreEqual((int)Math.Round(PlayerStats.BaseMana * potion.Heal / 100f), drank.Amount);
         }
 
         [Test]

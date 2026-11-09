@@ -226,9 +226,36 @@ namespace Game.Client
             DrawPicked();
             GUILayout.Space(6);
             DrawStats();
-            GUILayout.Label(Fit(_client.Pet == null ? "펫 없음 · 몬스터가 가끔 떨어뜨리는 알을 [재료·제작]의 [부화]로 깨운다" : $"펫 {_client.Pet.Name} · {_client.Pet.Bonus}", _textWidth));
+            DrawPet();
             GUILayout.Label(Fit($"스킬 포인트 {_client.SkillPoints} · 특성 포인트 {_client.PassivePoints} · 배운 특성 {_client.Passives.Count}", _textWidth));
             DrawLifeSkills();
+        }
+
+        // The pet (Docs/Animals.md 펫 키우기): its picture, level and how far to the next, and what it gives now.
+        void DrawPet()
+        {
+            var pet = _client.Pet;
+            if (pet == null)
+            {
+                GUILayout.Label(Fit("펫 없음 · 몬스터가 가끔 떨어뜨리는 알을 [재료·제작]의 [부화]로 깨운다", _textWidth));
+                return;
+            }
+            int level = _client.PetLevel;
+            _client.PetExperience.TryGetValue(pet.Id, out int had);
+            string next = level >= Pets.MaxLevel ? "최고 레벨" : $"경험 {had - Pets.TotalFor(level)}/{Pets.TotalFor(level + 1) - Pets.TotalFor(level)}";
+            string gives = string.Join(", ", Pets.ModifiersAt(pet, level).Select(StatText.Describe));
+            if (pet.Bites) gives += $", 곁의 몬스터를 {Pets.BiteSeconds:0}초마다 문다(피해의 {Pets.BiteShareAt(level) * 100:0}%)";
+            GUILayout.BeginHorizontal();
+            Icon(PetSprite(pet));
+            GUILayout.Label(Fit($"펫 {pet.Name} Lv {level} ({next}) · {gives}. 함께 싸우면 자란다", _textWidth - 40));
+            GUILayout.EndHorizontal();
+        }
+
+        Sprite PetSprite(PetDefinition pet)
+        {
+            var look = _client.MonsterKinds?.Monsters.FirstOrDefault(m => m.Id == pet.Look);
+            var color = look != null && ColorUtility.TryParseHtmlString(look.Color, out var parsed) ? Sprites.ToRgba(parsed) : Rgba.Hex("#8CD94D");
+            return Sprites.Centered($"PetIcon/{pet.Look}", () => CreatureArt.Monster(pet.Look, color, 0));
         }
 
         bool _showPassedGoals;

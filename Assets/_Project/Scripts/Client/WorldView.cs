@@ -287,6 +287,30 @@ namespace Game.Client
         // they show in the dark.
         const int DarkSize = 64;
         const int DarkOrder = 15000;
+
+        // The tile a [놓기] would build on (World.PlaceAhead), framed while ShowTarget (the bag open, or the pointer on
+        // a quick slot that builds or plants; 2026-11-09): white and breathing on open floor, red where it cannot
+        // go. Over the dark, so it shows in an unlit cave.
+        public bool ShowTarget { get; set; }
+
+        SpriteRenderer _target;
+
+        void DrawTarget()
+        {
+            if (_target == null)
+            {
+                _target = Renderer(_root.transform, "Target", Sprites.Centered("fx/target", EffectArt.TargetFrame), Color.white);
+                _target.sortingOrder = DarkOrder + 5;
+            }
+            _target.enabled = ShowTarget && _client.Map != null && !_client.IsDead;
+            if (!_target.enabled) return;
+            var (x, y) = World.PlaceAhead(_client.Position, _client.Facing);
+            var map = _client.Map;
+            bool open = map.InBounds(x, y) && !map.IsEdge(x, y) && TileMap.IsGround(map[x, y]);
+            var centre = TileMap.Center(x, y);
+            _target.transform.localPosition = new Vector3(centre.X, centre.Y, 0);
+            _target.color = open ? new Color(1, 1, 1, 0.6f + 0.25f * Mathf.Sin(Time.time * 4)) : new Color(1, 0.35f, 0.3f, 0.8f);
+        }
         // How far a glowing shot lights its way.
         const float ShotLight = 2.2f;
         // A summoned spirit glows a little in its colour.
@@ -300,6 +324,7 @@ namespace Game.Client
         static readonly Color DormantTint = new Color(0.6f, 0.6f, 0.62f);
         static readonly Color WindupColor = new Color(1f, 0.3f, 0.2f);
         static readonly Color ChargeColor = new Color(1f, 0.6f, 0.2f);
+        static readonly Color ManaColor = new Color(0.45f, 0.65f, 1f);
         static readonly Color DeadColor = new Color(0.5f, 0.5f, 0.5f, 0.45f);
         static readonly Color DangerColor = new Color(1f, 0.25f, 0.2f);
         static readonly Color PathColor = new Color(1f, 0.85f, 0.3f);
@@ -420,6 +445,7 @@ namespace Game.Client
             DrawChickens();
             DrawMarks();
             DrawProjectiles();
+            DrawTarget();
 
             foreach (var e in _client.TakeEvents()) Show(e);
             UpdateFlashes(deltaTime);
@@ -1520,6 +1546,33 @@ namespace Game.Client
                     break;
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
+                    break;
+                case SimEventType.PetLevelUp:
+                    // A pet grown: sparkles on it, and the news for its player.
+                    var keeperOfPet = Find(e.Source);
+                    var grownPet = Pets.ByIndex(e.Target);
+                    if (keeperOfPet == null || grownPet == null) break;
+                    var petAt = _pets.TryGetValue(e.Source, out var petBody) ? petBody.Position : keeperOfPet.Position;
+                    AddFlash(petAt, 1.1f, LevelColor, FlashKind.Sparkles);
+                    if (e.Source == _client.PlayerId)
+                    {
+                        ShowBanner($"펫 {grownPet.Name}이(가) Lv {e.Amount}이 되었다!");
+                        Sounds.Play(Sound.Learn);
+                    }
+                    break;
+                case SimEventType.ManaRestored:
+                    // A mana potion: the bottle to the mouth, like a healing one, and blue sparkles.
+                    var sipper = Find(e.Source);
+                    if (sipper == null) break;
+                    var drunk = _client.Loot != null && e.Target >= 0 && e.Target < _client.Loot.Consumables.Count ? _client.Loot.Consumables[e.Target] : null;
+                    if (sipper.Kind == BodyKind.Player && drunk != null)
+                    {
+                        Start(sipper, Motion.Drink, DrinkSeconds, Vec2.Zero);
+                        sipper.Holding = Sprites.Icon(drunk);
+                    }
+                    if (e.Amount > 0) _floating.Add(new Floating { Position = sipper.Position, Text = $"+{e.Amount} 마나", Color = ManaColor });
+                    Hear(Sound.Heal, sipper.Position);
+                    AddFlash(sipper.Position, sipper.Diameter, ManaColor, FlashKind.Sparkles);
                     break;
                 case SimEventType.MovedIn:
                     // A person moving into a room of the base: a sparkle at their new place and a banner for everyone.

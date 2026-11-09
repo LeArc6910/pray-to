@@ -25,6 +25,25 @@ namespace Game.Client
         // Sizes come in steps of four pixels, so a few drawings serve every radius.
         public static int Diameter(float tiles) => Math.Clamp((int)Math.Round(tiles * TileArt.Size / 4f) * 4, 8, 160);
 
+        // The frame round the tile a [놓기] would build on (WorldView, 2026-11-09): a tile and a pixel each side, its four
+        // corners bracketed in white with a dark edge, tinted by the screen (white open, red blocked).
+        public const int TargetSize = TileArt.Size + 2;
+
+        public static PixelImage TargetFrame()
+        {
+            var image = new PixelImage(TargetSize, TargetSize);
+            const int arm = 5;
+            for (int i = 0; i < arm; i++)
+            {
+                foreach (var (x, y) in new[] { (i, 0), (0, i), (TargetSize - 1 - i, 0), (TargetSize - 1, i), (i, TargetSize - 1), (0, TargetSize - 1 - i),
+                    (TargetSize - 1 - i, TargetSize - 1), (TargetSize - 1, TargetSize - 1 - i) })
+                {
+                    image[x, y] = Rgba.White;
+                }
+            }
+            return image.Outlined(new Rgba(20, 16, 24, 200));
+        }
+
         // A ring of light opening out: thick and bright at first, then thinner and dimmer, and broken into bits at
         // the end. For novas, summons and anything that spreads from a spot.
         public static PixelImage Ring(int diameter, int frame)

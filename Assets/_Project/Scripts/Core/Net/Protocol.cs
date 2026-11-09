@@ -39,7 +39,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.59.0";
+        public const string Version = "0.60.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -332,14 +332,18 @@ namespace Game.Core
     // boss, material or gear base) and how many; and the indices of the achievements had. Sent when it changes.
     public sealed class RecordsMessage
     {
-        public RecordsMessage(IReadOnlyList<(RecordKind Kind, int Index, int Count)> records, IReadOnlyList<int> achievements)
+        public RecordsMessage(IReadOnlyList<(RecordKind Kind, int Index, int Count)> records, IReadOnlyList<int> achievements,
+            IReadOnlyList<(int Pet, int Experience)> pets = null)
         {
             Records = records;
             Achievements = achievements;
+            Pets = pets ?? Array.Empty<(int, int)>();
         }
 
         public IReadOnlyList<(RecordKind Kind, int Index, int Count)> Records { get; }
         public IReadOnlyList<int> Achievements { get; }
+        // Each pet's experience by its number (Game.Core.Pets.IndexOf), 2026-11-09.
+        public IReadOnlyList<(int Pet, int Experience)> Pets { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Records, w =>
         {
@@ -352,6 +356,12 @@ namespace Game.Core
             }
             w.Write((byte)Achievements.Count);
             foreach (int index in Achievements) w.Write((byte)index);
+            w.Write((byte)Pets.Count);
+            foreach (var (pet, experience) in Pets)
+            {
+                w.Write((byte)pet);
+                w.Write(experience);
+            }
         });
 
         public static RecordsMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Records, r =>
@@ -360,7 +370,9 @@ namespace Game.Core
             for (int n = r.ReadUInt16(); n > 0; n--) records.Add(((RecordKind)r.ReadByte(), r.ReadUInt16(), r.ReadInt32()));
             var achievements = new List<int>();
             for (int n = r.ReadByte(); n > 0; n--) achievements.Add(r.ReadByte());
-            return new RecordsMessage(records, achievements);
+            var pets = new List<(int, int)>();
+            for (int n = r.ReadByte(); n > 0; n--) pets.Add((r.ReadByte(), r.ReadInt32()));
+            return new RecordsMessage(records, achievements, pets);
         });
     }
 

@@ -287,7 +287,8 @@ async function basics(browser) {
   // Placing a stone wall from the bag, then a workbench made and placed.
   await game.send('give stone 30; face 1 0');
   await bagTab(game, '재료·제작');
-  await game.shot('bag-materials', '가방 [재료·제작]');
+  check((await game.state()).target, '가방을 열면 놓일 칸에 틀이 그려진다');
+  await game.shot('bag-materials', '가방 [재료·제작]과 놓일 칸의 틀');
   await game.press('놓기', /^돌 ×/);
   check((await game.look(1, 0)).tile === 'Wall', '[놓기]로 바라보는 칸에 돌벽');
   await game.send('build Floor 1 0');
@@ -892,6 +893,11 @@ async function npc(browser) {
   await game.send('goto 3 0');
   await game.wait(1500);
   await game.shot('pet', '따라오는 펫 말랑이');
+  // Growing: the pet takes its player's experience (Docs/Animals.md 펫 키우기).
+  await game.send('experience 1300');
+  const grown = await game.until(i => i.petLevel >= 5, 3000, game.inventory);
+  check(!!grown, `경험치를 받으면 펫도 자란다 (Lv ${grown && grown.petLevel})`);
+  check((await game.allText()).includes('Lv 5이 되었다'), '"펫 말랑이이(가) Lv 5이 되었다!" 알림');
   await bagTab(game);
   check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
   const doll = await game.find(/구리 검/, '캐릭터');

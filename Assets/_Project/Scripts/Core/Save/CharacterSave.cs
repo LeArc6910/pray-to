@@ -18,14 +18,15 @@ namespace Game.Core
         // (Docs/Classes.md, 스킬 포인트와 단계), by id. 9: how far through each person's story (Docs/Npcs.md, 이야기).
         // 10: the support crystals in each skill (Docs/Classes.md, 스킬 변형), by ids, one pair a crystal (up to three a
         // skill since 2026-11-09, in slot order). 11: the records of the bestiary and the achievements had (Records.cs).
-        // 12: the pet that follows it (Pets.cs), by id.
-        const int FormatVersion = 12;
+        // 12: the pet that follows it (Pets.cs), by id. 13: each pet's experience (Pets.LevelOf), by pet id.
+        const int FormatVersion = 13;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
             List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null,
-            List<(string, string, int)> records = null, List<string> achievements = null, string pet = "")
+            List<(string, string, int)> records = null, List<string> achievements = null, string pet = "", List<(string, int)> petExperience = null)
         {
             Pet = pet ?? "";
+            PetExperience = petExperience ?? new List<(string, int)>();
             Records = records ?? new List<(string, string, int)>();
             Achievements = achievements ?? new List<string>();
             Supports = supports ?? new List<(string, string)>();
@@ -65,13 +66,15 @@ namespace Game.Core
         public IReadOnlyList<string> Achievements { get; }
         // The pet's id, or empty.
         public string Pet { get; }
+        // Each pet's experience, by pet id.
+        public IReadOnlyList<(string Pet, int Experience)> PetExperience { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
             IEnumerable<string> passives = null, IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> friendships = null,
             IEnumerable<int> life = null, IEnumerable<(string Id, int Rank)> skillRanks = null, IEnumerable<(string Npc, int Step)> stories = null,
             IEnumerable<(string Skill, string Gem)> supports = null, IEnumerable<(string Kind, string Id, int Count)> records = null,
-            IEnumerable<string> achievements = null, string pet = null)
+            IEnumerable<string> achievements = null, string pet = null, IEnumerable<(string Pet, int Experience)> petExperience = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -140,6 +143,13 @@ namespace Game.Core
                 w.Write((ushort)had.Count);
                 foreach (string id in had) w.Write(id);
                 w.Write(pet ?? "");
+                var grown = (petExperience ?? Enumerable.Empty<(string, int)>()).Where(p => p.Item2 > 0).ToList();
+                w.Write((byte)grown.Count);
+                foreach (var (id, amount) in grown)
+                {
+                    w.Write(id);
+                    w.Write(amount);
+                }
             }
             return stream.ToArray();
         }
@@ -214,7 +224,10 @@ namespace Game.Core
                 var achievements = new List<string>();
                 for (int count = version >= 11 ? r.ReadUInt16() : 0; count > 0; count--) achievements.Add(r.ReadString());
                 string pet = version >= 12 ? r.ReadString() : "";
-                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports, records, achievements, pet);
+                var grown = new List<(string, int)>();
+                for (int count = version >= 13 ? r.ReadByte() : 0; count > 0; count--) grown.Add((r.ReadString(), r.ReadInt32()));
+                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports, records, achievements, pet,
+                    grown);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

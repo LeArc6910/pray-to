@@ -61,6 +61,11 @@ namespace Game.Core
 
         // The pet following the player (Pets.cs), or null.
         public PetDefinition Pet { get; internal set; }
+
+        // Each pet's experience, by pet id, kept when it goes back in its egg (Pets.LevelOf).
+        public Dictionary<string, int> PetExperience { get; } = new Dictionary<string, int>();
+
+        public int PetLevel => Pet == null ? 0 : Pets.LevelOf(PetExperience.TryGetValue(Pet.Id, out int had) ? had : 0);
         public int RecordsVersion { get; internal set; }
         internal int RecordedInventory { get; set; } = -1;
         // How well they know each person, by id (World.Merchant.cs).
@@ -262,7 +267,7 @@ namespace Game.Core
             {
                 if (HasBuff(slot)) buffs.Add(Skills[slot]);
             }
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives, Pet?.Modifiers);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives, Pet == null ? null : Pets.ModifiersAt(Pet, PetLevel));
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
             Mana = manaShare * Stats.MaxMana;
         }
@@ -415,6 +420,11 @@ namespace Game.Core
         // Source, a player, asked the person Target (their row in npcs.csv) to move in, and they did: Position is
         // their new place (World.Invite).
         MovedIn,
+        // Source, a player, whose pet (Target, Pets.IndexOf) grew to level Amount (2026-11-09).
+        PetLevelUp,
+        // Source, a player, drank something that restores mana: Amount the mana it gave, Target the consumable's row
+        // in consumables.csv (2026-11-09, so the screen plays the drink).
+        ManaRestored,
     }
 
     public readonly struct SimEvent

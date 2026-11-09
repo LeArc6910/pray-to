@@ -174,6 +174,7 @@ namespace Game.Client
 
             string tooltip = null;
             Rect tooltipSlot = default;
+            if (Event.current.type == EventType.Repaint) PointsAtGround = false;
             for (int slot = 0; slot < Slots; slot++)
             {
                 var area = Area(slot, skills);
@@ -203,9 +204,22 @@ namespace Game.Client
                 {
                     tooltip = _entries[slot].IsEmpty ? "빈 칸. 가방의 [퀵]으로 올린다" : $"{name}\n{does}";
                     tooltipSlot = area;
+                    if (Event.current.type == EventType.Repaint && ActsAhead(_entries[slot])) PointsAtGround = true;
                 }
             }
             if (tooltip != null) DrawTooltip(tooltip, tooltipSlot);
+        }
+
+        // Whether the pointer is on a slot whose use builds, plants or works the tile ahead, for WorldView's frame on
+        // that tile (2026-11-09).
+        public bool PointsAtGround { get; private set; }
+
+        bool ActsAhead(Entry entry)
+        {
+            if (entry.Kind != Kind.Material) return false;
+            var material = MaterialOf(entry);
+            return material != null && (material.Places != null || _client.CropFrom(material) != null || material.Id == World.WateringCan
+                || material.Id == World.Hoe || material.Id == World.Fertilizer);
         }
 
         // The icon, the count (-1 for gear), whether it can be used now, whether it is the gear worn, its name and

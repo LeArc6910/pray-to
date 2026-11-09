@@ -360,10 +360,34 @@ namespace Game.Core
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
-            Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id);
+            Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
+            PetExperience.Select(pair => (pair.Key, pair.Value)));
 
         // The pet following this player, as the snapshots say (PlayerPhase.PetOf).
         public PetDefinition Pet { get; private set; }
+
+        // Each pet's experience by id (Pets.LevelOf): from the save until the host first tells, then as it tells.
+        public IReadOnlyDictionary<string, int> PetExperience
+        {
+            get
+            {
+                if (_petExperience != null) return _petExperience;
+                _petExperience = new Dictionary<string, int>();
+                if (Character == null || Character.Length == 0 || _loot == null) return _petExperience;
+                try
+                {
+                    foreach (var (pet, amount) in CharacterSave.Read(Character, _loot).PetExperience) _petExperience[pet] = amount;
+                }
+                catch (System.IO.InvalidDataException)
+                {
+                }
+                return _petExperience;
+            }
+        }
+
+        Dictionary<string, int> _petExperience;
+
+        public int PetLevel => Pet == null ? 0 : Pets.LevelOf(PetExperience.TryGetValue(Pet.Id, out int had) ? had : 0);
 
         public byte[] InviteCommand() => new InventoryCommandMessage(InventoryCommand.Invite, 0).Encode();
 
@@ -669,6 +693,13 @@ namespace Game.Core
                             if (index < Game.Core.Records.Achievements.Count) held.Item2.Add(Game.Core.Records.Achievements[index].Id);
                         }
                         _records = held;
+                        var grown = new Dictionary<string, int>();
+                        foreach (var (pet, amount) in told.Pets)
+                        {
+                            var known = Pets.ByIndex(pet);
+                            if (known != null) grown[known.Id] = amount;
+                        }
+                        _petExperience = grown;
                         break;
                     case MessageType.Life:
                         var experience = LifeMessage.Decode(data).Experience;

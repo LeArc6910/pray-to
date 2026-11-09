@@ -48,6 +48,29 @@ namespace Game.Core
                 new Modifier(StatType.Armor, ModifierKind.Flat, 8)),
         };
 
+        // Growing (2026-11-09, Docs/Animals.md 펫 키우기): a pet takes the experience its player takes and goes up
+        // to MaxLevel, its bonus GrowthPercent more of the first each level past the first (level 10: 2.35 times).
+        // Experience to reach level L: 60 × (L − 1) × L, so 120 for level 2, 1200 for 5 and 5400 for 10.
+        public const int MaxLevel = 10;
+        public const int GrowthPercent = 15;
+
+        public static int TotalFor(int level) => 60 * (Math.Clamp(level, 1, MaxLevel) - 1) * Math.Clamp(level, 1, MaxLevel);
+
+        public static int LevelOf(int experience)
+        {
+            int level = 1;
+            while (level < MaxLevel && experience >= TotalFor(level + 1)) level++;
+            return level;
+        }
+
+        static float Growth(int level) => (100 + GrowthPercent * (Math.Clamp(level, 1, MaxLevel) - 1)) / 100f;
+
+        // The pet's bonus at the level: each number grown, never less than at level 1.
+        public static IReadOnlyList<Modifier> ModifiersAt(PetDefinition pet, int level) =>
+            pet.Modifiers.Select(m => new Modifier(m.Stat, m.Kind, Math.Max(m.Value, (int)Math.Round(m.Value * Growth(level))), m.Tags)).ToList();
+
+        public static float BiteShareAt(int level) => BiteShare * Growth(level);
+
         // How often a monster that has an egg leaves it.
         public const float EggChance = 0.02f;
         // A biting pet: how often, how far from its player, and what share of its player's damage.
@@ -88,10 +111,30 @@ namespace Game.Core
             return true;
         }
 
-        public static void RestorePet(Player player, string id)
+        public static void RestorePet(Player player, string id, IEnumerable<(string Pet, int Experience)> experience = null)
         {
             player.Pet = string.IsNullOrEmpty(id) ? null : Pets.Find(id);
+            player.PetExperience.Clear();
+            foreach (var (pet, amount) in experience ?? Enumerable.Empty<(string, int)>())
+            {
+                if (Pets.Find(pet) != null && amount > 0) player.PetExperience[pet] = Math.Min(amount, Pets.TotalFor(Pets.MaxLevel));
+            }
             player.RefreshStats();
+        }
+
+        // The pet takes the experience its player takes; a level gained makes it stronger and says so.
+        void FeedPet(Player player, int amount)
+        {
+            if (player.Pet == null || amount <= 0) return;
+            int before = player.PetLevel;
+            player.PetExperience.TryGetValue(player.Pet.Id, out int had);
+            int now = Math.Min(had + amount, Pets.TotalFor(Pets.MaxLevel));
+            if (now == had) return;
+            player.PetExperience[player.Pet.Id] = now;
+            player.RecordsVersion++;
+            if (player.PetLevel == before) return;
+            player.RefreshStats();
+            _events.Add(new SimEvent(SimEventType.PetLevelUp, player.Id, target: Pets.IndexOf(player.Pet), amount: player.PetLevel));
         }
 
         // A monster with an egg sometimes leaves it where it fell.
@@ -110,7 +153,7 @@ namespace Game.Core
             var target = _enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) <= Pets.BiteReach + e.Definition.Radius)
                 .OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
             if (target == null) return;
-            HitEnemy(player, target, player.Stats.DamageFor(SkillTag.Melee) * Pets.BiteShare, false, player.Position, SkillTag.None, knockback: false);
+            HitEnemy(player, target, player.Stats.DamageFor(SkillTag.Melee) * Pets.BiteShareAt(player.PetLevel), false, player.Position, SkillTag.None, knockback: false);
         }
     }
 }

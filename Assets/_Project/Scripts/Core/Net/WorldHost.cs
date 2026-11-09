@@ -288,7 +288,7 @@ namespace Game.Core
             if (saved != null) World.RestoreStories(player, saved.Stories);
             if (saved != null) World.RestoreSupports(player, _classes, _loot, saved.Supports);
             if (saved != null) World.RestoreRecords(player, saved.Records, saved.Achievements);
-            if (saved != null) World.RestorePet(player, saved.Pet);
+            if (saved != null) World.RestorePet(player, saved.Pet, saved.PetExperience);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -322,7 +322,8 @@ namespace Game.Core
                 if (index >= 0) records.Add((pair.Key.Kind, index, pair.Value));
             }
             var had = Enumerable.Range(0, Records.Achievements.Count).Where(i => player.Achievements.Contains(Records.Achievements[i].Id)).ToList();
-            return new RecordsMessage(records, had);
+            var pets = player.PetExperience.Select(pair => (Pets.IndexOf(Pets.Find(pair.Key)), pair.Value)).Where(p => p.Item1 > 0).ToList();
+            return new RecordsMessage(records, had, pets);
         }
 
         Equipment StarterGear()

@@ -223,7 +223,10 @@ namespace Game.Core
             }
             if (consumable.RestoresMana)
             {
+                float before = player.Mana;
                 player.Mana = Math.Min(player.Stats.MaxMana, player.Mana + player.Stats.MaxMana * consumable.Heal / 100f);
+                _events.Add(new SimEvent(SimEventType.ManaRestored, player.Id, target: Loot?.Consumables.ToList().IndexOf(consumable) ?? -1,
+                    amount: (int)MathF.Round(player.Mana - before)));
             }
             else if (consumable.Heal > 0)
             {

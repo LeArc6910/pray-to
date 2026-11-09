@@ -118,6 +118,45 @@ namespace Game.Core.Tests
             Assert.IsTrue(PlayerPhase.IsSleeping(PlayerPhase.Sleeping | 3 << PlayerPhase.PetShift));
         }
 
+        // Growing (Docs/Animals.md 펫 키우기): the pet takes its player's experience, levels up, gives more; another
+        // pet starts afresh and the first keeps its experience in its egg; saved and sent.
+        [Test]
+        public void APetGrowsWithItsPlayer()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null);
+            var batEgg = Gear.Data.FindMaterial("bat_egg");
+            var wispEgg = Gear.Data.FindMaterial("wisp_egg");
+            player.Inventory.AddMaterial(batEgg, 1);
+            player.Inventory.AddMaterial(wispEgg, 1);
+            Assert.IsTrue(world.Hatch(player.Id, batEgg));
+            Assert.AreEqual(1, player.PetLevel);
+            float speed = player.Stats.MoveSpeed;
+            world.TakeEvents();
+
+            world.GainExperience(player, Pets.TotalFor(5));
+            Assert.AreEqual(5, player.PetLevel);
+            Assert.Greater(player.Stats.MoveSpeed, speed, "a grown bat makes its player quicker still");
+            Assert.AreEqual(8, Pets.ModifiersAt(Pets.Find("pet_bat"), 5)[0].Value, "5% grown by 15% a level for four levels");
+            var grew = world.TakeEvents().Where(e => e.Type == SimEventType.PetLevelUp).ToList();
+            Assert.AreEqual(1, grew.Count);
+            Assert.AreEqual(5, grew[0].Amount);
+
+            Assert.IsTrue(world.Hatch(player.Id, wispEgg));
+            Assert.AreEqual(1, player.PetLevel, "the wisp starts small");
+            Assert.AreEqual(Pets.TotalFor(5), player.PetExperience["pet_bat"], "the bat keeps what it had");
+
+            var saved = CharacterSave.Read(CharacterSave.Write(new Equipment(), new Inventory(), 0, pet: "pet_bat",
+                petExperience: player.PetExperience.Select(p => (p.Key, p.Value))), Gear.Data);
+            var again = Room().AddPlayer("b", null);
+            World.RestorePet(again, saved.Pet, saved.PetExperience);
+            Assert.AreEqual(5, again.PetLevel);
+
+            var message = RecordsMessage.Decode(new RecordsMessage(new (RecordKind, int, int)[0], new int[0], new[] { (2, 1300) }).Encode());
+            Assert.AreEqual((2, 1300), message.Pets[0]);
+            Assert.AreEqual(Pets.MaxLevel, Pets.LevelOf(Pets.TotalFor(Pets.MaxLevel) + 999));
+        }
+
         [Test]
         public void EveryPetHasAnEggAndMonstersThatDropIt()
         {

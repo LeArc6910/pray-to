@@ -221,6 +221,7 @@ namespace Game.Client
             var changedTiles = _client.TakeChangedTiles();
             _view.UpdateTiles(changedTiles);
             _map.UpdateTiles(changedTiles);
+            _view.ShowTarget = (_inventory != null && _inventory.Open) || (_hotbar != null && _hotbar.PointsAtGround);
             _view.Render(_tickClock / World.TickSeconds, Time.deltaTime);
             _map.Update();
 
@@ -611,6 +612,9 @@ namespace Game.Client
         }
 
         internal void ShowBag(string page) => _inventory.Show(page);
+
+        // Whether the frame on the tile a [놓기] would build on is drawn (WorldView.ShowTarget).
+        internal bool TargetShown => _view != null && _view.ShowTarget;
 
         internal string Status => _status;
 

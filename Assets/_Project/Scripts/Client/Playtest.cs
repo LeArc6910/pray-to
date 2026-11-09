@@ -127,6 +127,10 @@ namespace Game.Client
                 case "speed":
                     root.HostTicksPerStep = Mathf.Clamp(Int(words[1]), 0, 60);
                     return null;
+                case "experience":
+                    // Experience as if from monsters: the player's and, with a pet, the pet's (World.GainExperience).
+                    world.GainExperience(player, Int(words[1]));
+                    return null;
                 case "give":
                     player.Inventory.AddMaterial(loot.FindMaterial(words[1]) ?? throw new ArgumentException($"no material '{words[1]}'"), Int(words[2]));
                     player.InventoryVersion++;
@@ -553,6 +557,7 @@ namespace Game.Client
                 .Field("supports", string.Join(",", player.Supports.SelectMany(p => p.Value.Select(gem => $"{p.Key.Id}:{gem.Id}"))))
                 .Field("records", player.Records.Count)
                 .Field("pet", player.Pet?.Id ?? "")
+                .Field("petLevel", player.PetLevel)
                 .Field("achievements", string.Join(",", player.Achievements))
                 .Field("passives", player.Passives.Count)
                 .Field("friends", Counts(player.Friendships.Select(f => new KeyValuePair<string, int>(f.Key, f.Value.Points)), id => id))
@@ -602,6 +607,7 @@ namespace Game.Client
             json.Field("screen", $"{Ui.Width:0}x{Ui.Height:0}");
             json.Field("touch", Controls.UsingTouch);
             json.Field("bag", root.BagOpen);
+            json.Field("target", root.TargetShown);
             json.Field("map", root.MapOpen);
             json.Field("speed", root.HostTicksPerStep);
             var world = root.HostWorld;
