@@ -1165,6 +1165,24 @@ async function defense(browser) {
   await game.wait(1200);
   await game.send('goto biome Cave');
   await clearRoom(game, 6, 4);
+  // An iron wall (2026-11-09): one pickaxe blow cracks it, and the bag mends it with an iron bar.
+  await game.send('build IronWall 1 0; give iron_bar 2; equip copper_pickaxe');
+  await game.wait(600);
+  check((await game.look(1, 0)).tile === 'IronWall', '철벽이 세워진다');
+  await game.send('face 1 0; attack on 1 0');
+  await game.wait(500);
+  await game.send('attack off');
+  await game.wait(600);
+  check((await game.look(1, 0)).tile === 'IronWall', `곡괭이 한 번에는 철벽이 그대로 (${(await game.look(1, 0)).tile})`);
+  await game.shot('iron-wall', '금이 간 철벽');
+  const bars = count(await game.inventory(), 'iron_bar');
+  await bagTab(game, '재료·제작');
+  const mended = await game.press(/^고치기/);
+  check(mended, '금이 간 철벽을 마주 보면 가방 [재료·제작]에 [고치기 (철 주괴 1)]');
+  await game.wait(800);
+  check(count(await game.inventory(), 'iron_bar') === bars - 1, `고치면 철 주괴 하나가 든다 (${bars} → ${count(await game.inventory(), 'iron_bar')})`);
+  await closeBag(game);
+  await game.send('build Floor 1 0');
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   // A turret with ammo shoots a slime.
   await game.send('build Turret 3 2; fill 3 2 ammo 10; spawn slime 5 2 5000');
@@ -1786,14 +1804,38 @@ async function firstRun(browser, profile, hourLong) {
       return;
     }
     await slot(2);
-    for (let i = 0; i < 60; i++) {
+    let beside = false;
+    for (let i = 0; i < 60 && !beside; i++) {
       const v = offset((await game.state()).veinAt);
-      if (!v || Math.abs(v[0]) + Math.abs(v[1]) <= 1) break;
-      const [sx, sy] = toward(v[0], v[1]);
-      const ahead = (await game.look(sx, sy)).tile;
-      if (ahead === 'CopperOre') break;
+      if (!v || Math.abs(v[0]) + Math.abs(v[1]) <= 1) {
+        beside = !!v;
+        break;
+      }
+      let [sx, sy] = toward(v[0], v[1]);
+      let ahead = (await game.look(sx, sy)).tile;
+      // Water cannot be dug: round it the other way toward the vein, or aside (as a person walks the shore).
+      if (ahead === 'Water') {
+        const other = Math.abs(v[0]) > Math.abs(v[1]) ? [0, Math.sign(v[1]) || 1] : [Math.sign(v[0]) || 1, 0];
+        for (const [ax, ay] of [other, [-other[0], -other[1]], [-sx, -sy]]) {
+          const t = (await game.look(ax, ay)).tile;
+          if (t !== 'Water') {
+            [sx, sy, ahead] = [ax, ay, t];
+            break;
+          }
+        }
+      }
+      if (ahead === 'CopperOre') {
+        beside = true;
+        break;
+      }
       if (solid(ahead)) await dig(sx, sy);
       await step(sx, sy, 260);
+    }
+    if (!beside) {
+      // Water all round or a maze of it: taken there, as a person would find their way round.
+      carried++;
+      await game.send('goto near CopperOre');
+      await game.wait(800);
     }
   };
   await nextVein();
