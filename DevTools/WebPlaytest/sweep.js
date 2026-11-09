@@ -735,6 +735,37 @@ async function farm(browser) {
   await game.wait(1500);
   const after = await game.inventory();
   check(mushrooms(after) > before, `다 자란 버섯 위를 걸으면 거둔다 (${Object.keys(after.materials).filter(id => /^mushroom/.test(id)).join(', ')})`);
+
+  // At night a monster on a crop tramples it; a scarecrow guards four tiles round (2026-11-09, Docs/Farming.md).
+  await game.send('goto 0 9');
+  await clearRoom(game, 6, 3);
+  await game.send('clock 1 23; give mushroom_spore 2; give scarecrow 1; face 1 0');
+  await game.wait(600);
+  await bagTab(game, '재료·제작');
+  await game.press('심기', '버섯 포자');
+  await closeBag(game);
+  await game.send('spawn slime 1 0 99999');
+  const trampled = await game.until(t => /짓밟혔다/.test(t), 6000, game.allText);
+  check(!!trampled, `밤에 몬스터가 작물 위에 서면 "짓밟혔다" (${(await game.look(0, 0)).biome})`);
+  check(/허수아비/.test((await game.texts()).banner || ''), `처음 밟혔을 때 허수아비를 알려 준다 ("${(await game.texts()).banner || ''}")`);
+  await game.shot('trampled', '짓밟힌 밭과 허수아비 안내');
+  await game.send('clear');
+  await game.wait(2500);
+  // The scarecrow set down from the bag two tiles left; a crop beside it is left alone.
+  await game.send('goto -1 0; face -1 0');
+  await game.wait(400);
+  await bagTab(game, '재료·제작');
+  await game.press('놓기', /^허수아비/);
+  await game.send('face 0 1');
+  await game.wait(300);
+  await game.press('심기', '버섯 포자');
+  await closeBag(game);
+  check((await game.look(-1, 0)).tile === 'Scarecrow' && !!(await game.look(0, 1)).crop, '허수아비를 [놓기]로 세우고 곁에 버섯을 심는다');
+  await game.send('spawn slime 0 1 99999');
+  const guarded = await game.until(t => /짓밟혔다/.test(t), 5000, game.allText);
+  check(!guarded, '허수아비 곁의 작물은 몬스터가 서도 밟히지 않는다');
+  await game.shot('scarecrow', '허수아비가 지키는 밭');
+  await game.send('clear; clock 2 9');
   await game.context.close();
 }
 
@@ -873,6 +904,28 @@ async function life(browser) {
   check(perks[4] === 2, `날쌘 곡괭이를 고른다 (${perks.join(',')})`);
   await game.shot('life-perk', '고른 생활 기술 혜택');
   await closeBag(game);
+
+  // A pen (2026-11-09, Docs/Animals.md): fences round the tiles in front of a coop let the hen out to graze, and it
+  // lays without feed (the day half as long again). The coop at -3,0 faces east, so its front is -2,0; the fences
+  // close -2..1 by -1..1, twelve tiles for one hen.
+  await game.send('goto 0 9');
+  await clearRoom(game, 5, 3);
+  const fences = ['build Fence -3 1', 'build Fence -3 -1'];
+  for (let x = -3; x <= 2; x++) fences.push(`build Fence ${x} 2`, `build Fence ${x} -2`);
+  for (let y = -1; y <= 1; y++) fences.push(`build Fence 2 ${y}`);
+  await game.send(`build Coop -3 0; ${fences.join('; ')}; give chicken 1`);
+  await game.send('goto -2 0; face -1 0');
+  await game.wait(400);
+  await bagTab(game, '재료·제작');
+  await game.press('넣기', '닭 ×');
+  await closeBag(game);
+  check(Object.keys(((await game.look(-1, 0)).machine || {}).input || {}).length > 0, '울타리를 두른 닭장에 닭만 넣는다(사료 없이)');
+  await game.wait(2500);
+  await game.shot('pen', '울타리 안에서 풀을 뜯는 닭');
+  await game.send('speed 60');
+  const laid = await game.until(look => Object.keys((look.machine || {}).output || {}).some(id => /egg/.test(id)), 75000, () => game.look(-1, 0));
+  await game.send('speed 1');
+  check(!!laid, `방목하는 닭은 사료 없이도 알을 낳는다 (${JSON.stringify(((await game.look(-1, 0)).machine || {}).output)})`);
   await game.context.close();
 }
 
@@ -1112,6 +1165,21 @@ async function factory(browser) {
   await game.wait(4000);
   await game.send('speed 1');
   await game.shot('arm', '로봇 팔·분배기·레버');
+
+  // A machine two tiles each way (2026-11-09, Docs/Automation.md 큰 기계): the big assembler, set down from the bag,
+  // takes the square ahead, and each of its tiles is the machine.
+  await game.send('goto 0 9');
+  await clearRoom(game, 5, 3);
+  await game.send('give big_assembler 1; face 1 0');
+  await game.wait(400);
+  await bagTab(game, '재료·제작');
+  await game.press('놓기', /^대형 조립기/);
+  await closeBag(game);
+  let parts = 0;
+  for (let dx = 1; dx <= 3; dx++) for (let dy = -1; dy <= 1; dy++) if (((await game.look(dx, dy)).machine || {}).kind === 'BigAssembler') parts++;
+  check(parts === 4, `대형 조립기는 [놓기]로 앞의 네 칸을 차지한다 (${parts}칸)`);
+  await game.wait(800);
+  await game.shot('big-assembler', '2×2 대형 조립기');
   await game.context.close();
 }
 
