@@ -1285,6 +1285,8 @@ namespace Game.Client
                 bool cows = machine.Kind == TileType.Barn;
                 bool sheep = machine.Kind == TileType.Fold;
                 bool big = cows || sheep;
+                // Penned in (World.Grazes): they roam the pen's tiles instead, from one to another (2026-11-09).
+                var pen = PenFor(machine);
                 for (int i = 0; i < machine.Animals; i++)
                 {
                     if (used == _chickens.Count) _chickens.Add(Renderer(_root.transform, "Chicken", null, Color.white));
@@ -1294,7 +1296,20 @@ namespace Game.Client
                     // Cows wander slower and wider.
                     if (big) t *= 0.6f;
                     var at = new Vector3(machine.X + 0.5f + Mathf.Sin(t) * (big ? 1.6f : 1.1f), machine.Y - (big ? 0.9f : 0.6f) + Mathf.Sin(t * 1.9f + i) * 0.35f, 0);
-                    bool pecking = Mathf.Sin(t * 3.1f) > 0.6f;
+                    bool grazingNow = false;
+                    if (pen != null)
+                    {
+                        float leg = Time.time / (big ? 5f : 3.5f) + i * 0.37f + machine.X * 0.11f;
+                        int k = Mathf.FloorToInt(leg);
+                        float f = Mathf.SmoothStep(0, 1, Mathf.Clamp01((leg - k) * 1.6f));
+                        var from = pen[(i * 7 + k * 5) % pen.Count];
+                        var to = pen[(i * 7 + (k + 1) * 5) % pen.Count];
+                        at = new Vector3(Mathf.Lerp(from.X, to.X, f) + 0.5f, Mathf.Lerp(from.Y, to.Y, f) + 0.25f, 0);
+                        t = (to.X - from.X) >= 0 ? 0 : Mathf.PI;
+                        // Grazing when it has got there.
+                        grazingNow = leg - k > 0.65f;
+                    }
+                    bool pecking = pen != null ? grazingNow : Mathf.Sin(t * 3.1f) > 0.6f;
                     int frame = pecking ? 1 : 0;
                     chicken.sprite = cows ? Sprites.Standing("animal/cow/" + frame, () => ItemArt.Cow(frame))
                         : sheep ? Sprites.Standing("animal/sheep/" + frame, () => ItemArt.Sheep(frame))
@@ -1355,6 +1370,20 @@ namespace Game.Client
                 _objects.SetTile(cell, Sprites.Object(TileType.Door));
                 Hear(Sound.DoorShut, cell + new Vector3(0.5f, 0.5f, 0));
             }
+        }
+
+        // Each house's pen as last worked out, looked at again every two seconds.
+        readonly Dictionary<(int, int), (float At, List<(int X, int Y)> Pen)> _pens = new Dictionary<(int, int), (float, List<(int X, int Y)>)>();
+
+        List<(int X, int Y)> PenFor(MachineView house)
+        {
+            var key = (house.X, house.Y);
+            if (_pens.TryGetValue(key, out var known) && Time.time - known.At < 2) return known.Pen;
+            var step = Machine.Steps[house.Direction & 3];
+            int fx = house.X + step.X, fy = house.Y + step.Y;
+            var pen = World.Grazes(_client.Map, fx, fy, house.Animals) ? World.PenOf(_client.Map, fx, fy) : null;
+            _pens[key] = (Time.time, pen);
+            return pen;
         }
 
         readonly List<SpriteRenderer> _wires = new List<SpriteRenderer>();

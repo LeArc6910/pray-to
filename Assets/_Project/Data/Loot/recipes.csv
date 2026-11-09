@@ -99,6 +99,7 @@ blue_carpet,blue_carpet,2,wool:2|frost_berry:1,Workbench
 yellow_carpet,yellow_carpet,2,wool:2|ember_corn:1,Workbench
 tapestry_wall,tapestry_wall,1,stone:2|wool:1,Workbench
 scarecrow,scarecrow,1,stone:2|feed:3|slime_gel:1,Workbench
+fence,fence,4,stone:2|slime_gel:1,Workbench
 shield_wall,shield_wall,1,stone:2|iron_bar:1,Anvil
 cheese,cheese,1,milk:2,PreservesJar
 warm_milk,warm_milk,1,milk:1,Furnace

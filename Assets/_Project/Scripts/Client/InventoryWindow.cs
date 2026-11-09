@@ -971,6 +971,12 @@ namespace Game.Client
                     GUILayout.Label(Fit($"양 {machine.Animals}/{World.HouseOf(TileType.Fold).Most}마리. 사료가 있으면 이틀(40분)마다 양마다 양털 하나", _textWidth));
                 if (World.HouseOf(machine.Kind) != null && machine.Animals > 0)
                 {
+                    // Grazing (World.Grazes): a closed pen in front, four tiles an animal.
+                    var step = Machine.Steps[machine.Direction & 3];
+                    bool grazing = _client.Map != null && World.Grazes(_client.Map, machine.X + step.X, machine.Y + step.Y, machine.Animals);
+                    GUILayout.Label(Fit(grazing
+                        ? $"방목 중: 사료가 없어도 하루가 {World.GrazingSlowdown:0.#}배 걸려 준다. 사료가 넉넉하면 원래 속도"
+                        : $"앞을 울타리로 둘러 마리마다 {World.PenTilesPerAnimal}칸을 주면 방목한다(사료 없이도 준다)", _textWidth));
                     // Affection (World.PetAnimals): once a day, and fonder animals give silver and gold more often.
                     GUILayout.BeginHorizontal();
                     string hearts = new string('■', machine.Affection) + new string('□', World.AffectionMost - machine.Affection);

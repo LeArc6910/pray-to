@@ -24,6 +24,51 @@ namespace Game.Core
         public const int AffectionMost = 10;
         public const int AffectionPatience = 2;
 
+        // Grazing (2026-11-09, Docs/Animals.md 방목): a house whose front opens into a closed pen, fenced or walled with at
+        // least PenTilesPerAnimal open tiles an animal, lets its animals out to graze there. They then give without
+        // feed, the day taking GrazingSlowdown times as long; with feed for all, as fast as ever.
+        public const int PenTilesPerAnimal = 4;
+        public const int PenMostTiles = 64;
+        public const float GrazingSlowdown = 1.5f;
+        const int PenCheckTicks = 60;
+        readonly Dictionary<Machine, (long Tick, bool Grazes)> _grazing = new Dictionary<Machine, (long, bool)>();
+
+        // The open tiles of the pen in front of a house: from its front, through tiles that are neither solid nor doors,
+        // until walled in. Null when it is not closed within PenMostTiles or the front itself is shut.
+        public static List<(int X, int Y)> PenOf(TileMap map, int frontX, int frontY)
+        {
+            bool Open(int x, int y) => map.InBounds(x, y) && !map.IsSolid(x, y) && map[x, y] != TileType.Door;
+            if (!Open(frontX, frontY)) return null;
+            var pen = new List<(int, int)>();
+            var seen = new HashSet<(int, int)> { (frontX, frontY) };
+            var queue = new Queue<(int X, int Y)>();
+            queue.Enqueue((frontX, frontY));
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+                pen.Add((x, y));
+                if (pen.Count > PenMostTiles) return null;
+                foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                {
+                    if (Open(x + dx, y + dy) && seen.Add((x + dx, y + dy))) queue.Enqueue((x + dx, y + dy));
+                }
+            }
+            return pen;
+        }
+
+        // Whether a house's animals graze: a closed pen in front, big enough for them all.
+        public static bool Grazes(TileMap map, int frontX, int frontY, int animals) =>
+            animals > 0 && PenOf(map, frontX, frontY) is List<(int X, int Y)> pen && pen.Count >= PenTilesPerAnimal * animals;
+
+        bool Grazing(Machine house)
+        {
+            if (_grazing.TryGetValue(house, out var known) && Tick - known.Tick < PenCheckTicks) return known.Grazes;
+            var (fx, fy) = house.Front;
+            bool grazes = Grazes(Map, fx, fy, AnimalsIn(house));
+            _grazing[house] = (Tick, grazes);
+            return grazes;
+        }
+
         // A house for animals: which animal, how many fit, what they eat and how much for each thing they give.
         public sealed class AnimalHouse
         {
@@ -76,14 +121,19 @@ namespace Game.Core
             var kind = HouseOf(house.Kind);
             var feed = house.Input.Keys.FirstOrDefault(m => m.Id == Feed);
             var product = Loot?.Materials.FirstOrDefault(m => m.Id == kind.Product);
+            int animals = AnimalsIn(house);
             int fed = feed == null ? 0 : house.Input[feed] / kind.FeedEach;
-            int giving = Math.Min(AnimalsIn(house), fed);
+            // Grazing ones give without feed, more slowly unless there is feed for all of them.
+            bool grazing = Grazing(house);
+            int giving = grazing ? animals : Math.Min(animals, fed);
+            int eating = Math.Min(giving, fed);
+            int day = grazing && fed < animals ? (int)(house.Definition.Ticks * GrazingSlowdown) : house.Definition.Ticks;
             // A hungry house waits where its day was, rather than starting it over.
             bool ready = product != null && giving > 0 && Count(house.Output) + giving <= house.Definition.Capacity;
-            if (ready && ++house.Timer >= house.Definition.Ticks)
+            if (ready && ++house.Timer >= day)
             {
                 house.Timer = 0;
-                Add(house.Input, feed, -giving * kind.FeedEach);
+                if (eating > 0) Add(house.Input, feed, -eating * kind.FeedEach);
                 if (house.Affection > 0 && Today - house.PettedDay > AffectionPatience) house.Affection--;
                 for (int i = 0; i < giving; i++)
                 {

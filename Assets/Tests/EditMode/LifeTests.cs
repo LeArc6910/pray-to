@@ -348,6 +348,39 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void PennedAnimalsGrazeAndGiveWithoutFeedMoreSlowly()
+        {
+            var world = Pond(out var player);
+            Place(world, player, Gear.Data.FindMaterial("fold"), 6, 6, new Vec2(0, 1));
+            var fold = world.MachineAt(6, 6);
+            var (fx, fy) = fold.Front;
+            int dx = fx - 6, dy = fy - 6, px = dy, py = dx;
+            var sheep = Gear.Data.FindMaterial(World.Sheep);
+            var wool = Gear.Data.FindMaterial(World.Wool);
+            player.Position = TileMap.Center(11, 12);
+            fold.Input[sheep] = 2;
+            Assert.IsFalse(World.Grazes(world.Map, fx, fy, 2), "no pen: the room is too big to count");
+
+            // A 3×3 pen in front of the fold, fenced round.
+            var pen = new HashSet<(int, int)>();
+            for (int i = 0; i < 3; i++)
+                for (int j = -1; j <= 1; j++) pen.Add((6 + dx * (1 + i) + px * j, 6 + dy * (1 + i) + py * j));
+            foreach (var (x, y) in pen)
+                foreach (var (ox, oy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                    if (!pen.Contains((x + ox, y + oy)) && (x + ox, y + oy) != (6, 6)) world.Build(x + ox, y + oy, TileType.Fence);
+            Assert.AreEqual(9, World.PenOf(world.Map, fx, fy).Count);
+            Assert.IsTrue(World.Grazes(world.Map, fx, fy, 2), "four tiles a sheep");
+            Assert.IsFalse(World.Grazes(world.Map, fx, fy, 3), "too small for three");
+
+            // No feed: wool all the same, the day half as long again.
+            var seconds = Tiles.Shipped.Machine(TileType.Fold).Seconds;
+            Run(world, seconds + 1);
+            Assert.AreEqual(0, wool.AllQualities.Sum(w => fold.Outputs.GetValueOrDefault(w)), "slower without feed");
+            Run(world, seconds * (World.GrazingSlowdown - 1) + 1);
+            Assert.AreEqual(2, wool.AllQualities.Sum(w => fold.Outputs.GetValueOrDefault(w)));
+        }
+
+        [Test]
         public void SheepGiveWoolAndPettedAnimalsGiveBetterThings()
         {
             var world = Pond(out var player);

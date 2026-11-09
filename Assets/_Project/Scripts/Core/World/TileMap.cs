@@ -106,6 +106,8 @@ namespace Game.Core
         ShieldWall,
         // Keeps monsters from trampling the crops round it (World.Farming.cs, 2026-11-09).
         Scarecrow,
+        // A wooden fence to pen animals in (World.Animals.cs, 2026-11-09).
+        Fence,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

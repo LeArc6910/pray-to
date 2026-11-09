@@ -505,8 +505,31 @@ namespace Game.Client
         static void Animals(string path, PixelImage floor)
         {
             var houses = new[] { TileType.Coop, TileType.Barn, TileType.Fold };
-            Play(path, 4, 1, 64, 56, 4, 0.62f, 6f, floor, (column, row, time, step) =>
+            // The fifth: a fold opening into a fenced pen (World.Grazes), its sheep roaming the pen as WorldView does.
+            var pen = new List<(int X, int Y)>();
+            for (int y = 0; y >= -1; y--) for (int x = -1; x <= 1; x++) pen.Add((x, y));
+            Play(path, 5, 1, 64, 76, 4, 0.5f, 8f, floor, (column, row, time, step) =>
             {
+                if (column == 4)
+                {
+                    var penned = new List<Draw> { Sprite(TileArt.Object(TileType.Fold), 0, 1, 0.5f, 0.5f, 0) };
+                    foreach (int x in new[] { -2, -1, 1, 2 }) penned.Add(Sprite(TileArt.Object(TileType.Fence), x, 1, 0.5f, 0.5f, 0));
+                    for (int y = 0; y >= -1; y--) foreach (int x in new[] { -2, 2 }) penned.Add(Sprite(TileArt.Object(TileType.Fence), x, y, 0.5f, 0.5f, 0));
+                    for (int x = -2; x <= 2; x++) penned.Add(Sprite(TileArt.Object(TileType.Fence), x, -2, 0.5f, 0.5f, 20));
+                    for (int i = 0; i < 2; i++)
+                    {
+                        float leg = time / 5f + i * 0.37f;
+                        int k = (int)MathF.Floor(leg);
+                        float f = Math.Clamp((leg - k) * 1.6f, 0, 1);
+                        f = f * f * (3 - 2 * f);
+                        var from = pen[(i * 7 + k * 5) % pen.Count];
+                        var to = pen[(i * 7 + (k + 1) * 5) % pen.Count];
+                        float x = from.X + (to.X - from.X) * f, y = from.Y + (to.Y - from.Y) * f - 0.25f;
+                        int frame = leg - k > 0.65f ? 1 : 0;
+                        penned.Add(Sprite(ItemArt.Sheep(frame), x, y, 0.5f, 0, 10 - (int)(y * 10), flip: to.X >= from.X));
+                    }
+                    return penned;
+                }
                 if (column == 3)
                 {
                     return new List<Draw>

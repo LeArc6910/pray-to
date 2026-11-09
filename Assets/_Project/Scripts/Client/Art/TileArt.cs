@@ -424,6 +424,7 @@ namespace Game.Client
             TileType.TapestryWall => TapestryWallTile,
             TileType.ShieldWall => ShieldWallTile,
             TileType.Scarecrow => ScarecrowTile,
+            TileType.Fence => FenceTile,
             TileType.Table => TableTile,
             TileType.Banner => BannerTile,
             TileType.Pot => PotTile,
@@ -1575,6 +1576,25 @@ namespace Game.Client
             "......oWWo......",
             "......oWWo......",
             "......____......");
+
+        // A wooden fence (2026-11-09): three posts and two rails, low enough to see the pen over.
+        static readonly PixelImage FenceTile = PixelImage.FromRows(BasePalette,
+            "................",
+            "................",
+            "................",
+            "................",
+            ".oo.....oo....oo",
+            "oWWo...oWWo..oWW",
+            "oWWoooooWWooooWW",
+            "oSSSSSSSSSSSSSSS",
+            "oWWwwwwwWWwwwwWW",
+            "oWWo...oWWo..oWW",
+            "oWWoooooWWooooWW",
+            "oSSSSSSSSSSSSSSS",
+            "oWWwwwwwWWwwwwWW",
+            "owwo...owwo..oww",
+            "_oo_..._oo_.._oo",
+            "................");
 
         // An open door (2026-11-09, WorldView.SwingDoors): the frame, the floor's dark through it, and the slab swung
         // back against the left post, seen edge on.
