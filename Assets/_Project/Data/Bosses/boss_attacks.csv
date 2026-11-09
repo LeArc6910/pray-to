@@ -50,3 +50,12 @@ tide_serpent,whirlpool,소용돌이,2|3,ring,self,1.2,24,2.4,6.5,,,,,,1.0,18,
 tide_serpent,deep_share,수압,2|3,share,random,1.3,46,1.8,,,,,,,1.0,14,
 tide_serpent,bubble_spiral,물방울 나선,3,spiral,self,0.7,13,0.3,,22,5,6,,7,1.3,15,
 tide_serpent,call_crabs,게 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,lake_crab
+antlion,bite,물어뜯기,,cone,nearest,0.8,20,,3.2,90,,,,,0.8,25,
+antlion,sand_jet,모래 분사,,line,nearest,0.9,20,,10,,1.4,,,,1.0,20,
+antlion,pit,개미지옥,,circle,farthest,1.1,22,2.2,,,,1,,,1.0,20,
+antlion,sand_trail,모래 물결,,trail,nearest,0.8,18,1.1,8,,,5,,8,0.9,18,
+antlion,burrow,파고들기,2|3,charge,farthest,1.0,26,,10,,2.4,,,16,1.2,20,
+antlion,quicksand,모래늪,2|3,ring,self,1.2,20,2.4,6,,,,,,1.0,18,
+antlion,sandstorm,모래 폭풍,2|3,share,random,1.3,40,1.8,,,,,,,1.0,12,
+antlion,sand_spiral,모래 나선,3,spiral,self,0.7,11,0.3,,22,5,6,,7,1.3,14,
+antlion,call_scorpions,전갈 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,sand_scorpion

@@ -228,6 +228,7 @@ namespace Game.Client
             Biome.Lava => 0.14f,
             Biome.Abyss => 0.06f,
             Biome.Lake => 0.05f,
+            Biome.Sand => 0.04f,
             Biome.Ice => 0.06f,
             Biome.Crystal => 0.06f,
             _ => 0,

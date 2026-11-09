@@ -6,7 +6,8 @@ namespace Game.Core
     public sealed class GeneratedWorld
     {
         public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius, int deepArenaX, int deepArenaY,
-            BiomeMap biomes = null, (int X, int Y)? lavaArena = null, (int X, int Y)? abyssArena = null, (int X, int Y)? lakeArena = null)
+            BiomeMap biomes = null, (int X, int Y)? lavaArena = null, (int X, int Y)? abyssArena = null, (int X, int Y)? lakeArena = null,
+            (int X, int Y)? sandArena = null)
         {
             Biomes = biomes ?? BiomeMap.Plain(map.Width, map.Height);
             Map = map;
@@ -19,6 +20,7 @@ namespace Game.Core
             if (lavaArena is (int lx, int ly)) arenas.Add(TileMap.Center(lx, ly));
             if (abyssArena is (int ax, int ay)) arenas.Add(TileMap.Center(ax, ay));
             if (lakeArena is (int kx, int ky)) arenas.Add(TileMap.Center(kx, ky));
+            if (sandArena is (int sx, int sy)) arenas.Add(TileMap.Center(sx, sy));
             Arenas = arenas;
         }
 
@@ -90,6 +92,11 @@ namespace Game.Core
         // The underground lake (Docs/Biomes.md, 2026-11-09), last of all on its own stream: the fifth arena at the far
         // end of the side corner the abyss did not take, reached by a tunnel from the deep arena, and many more pools.
         const ulong LakeStream = 11;
+        // The sand caves (Docs/Biomes.md, 2026-11-09), after the lake: the sixth arena in the crystal quarter's near band,
+        // on the flank further from the first arena, about SandArenaDistance from the spawn, reached by a tunnel from
+        // the first arena.
+        const ulong SandStream = 12;
+        static readonly (int Along, int Across) SandArenaOffset = (44, 12);
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -143,8 +150,19 @@ namespace Game.Core
             var (abyssCornerX, abyssCornerY) = abyss.Next(2) == 0 ? (cornerX, -cornerY) : (-cornerX, cornerY);
             // The lake: the other of those two corners.
             var (lakeCornerX, lakeCornerY) = abyssCornerX == cornerX ? (-cornerX, cornerY) : (cornerX, -cornerY);
+            // The sand arena (carved last): of the two flanks of the crystal quarter, the one further from the first arena.
+            var sand = new GameRandom(seed, SandStream);
+            var flanks = new[]
+            {
+                (spawnX + cornerX * SandArenaOffset.Along, spawnY + cornerY * SandArenaOffset.Across),
+                (spawnX + cornerX * SandArenaOffset.Across, spawnY + cornerY * SandArenaOffset.Along),
+            };
+            int Far((int X, int Y) f) => (f.X - arenaX) * (f.X - arenaX) + (f.Y - arenaY) * (f.Y - arenaY);
+            var (sandX, sandY) = Far(flanks[0]) == Far(flanks[1]) ? flanks[sand.Next(2)] : Far(flanks[0]) > Far(flanks[1]) ? flanks[0] : flanks[1];
+            sandX = Clamp(sandX, ArenaRadius + 2, width - ArenaRadius - 3);
+            sandY = Clamp(sandY, ArenaRadius + 2, height - ArenaRadius - 3);
             var biomes = BiomeMap.Make(seed, width, height, spawnX, spawnY, (cornerX, cornerY), mushroomFirst, (abyssCornerX, abyssCornerY),
-                (lakeCornerX, lakeCornerY));
+                (lakeCornerX, lakeCornerY), (sandX, sandY));
 
             var lava = new GameRandom(seed, LavaStream);
             int lavaX = Clamp(spawnX - cornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
@@ -197,7 +215,27 @@ namespace Game.Core
             // Twice over: a lake is mostly water at its edges.
             PlaceWater(map, lake, LakeShore);
             PlaceWater(map, lake, LakeShore);
-            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY), (abyssX, abyssY), (lakeX, lakeY));
+
+            CarveTunnel(map, arenaX, arenaY, sandX, sandY);
+            ClearDisc(map, sandX, sandY, ArenaRadius);
+            for (int y = sandY - ArenaRadius - 3; y <= sandY + ArenaRadius + 3; y++)
+            {
+                for (int x = sandX - ArenaRadius - 3; x <= sandX + ArenaRadius + 3; x++)
+                {
+                    if (IsInside(map, x, y) && map[x, y] == TileType.Water && (x - sandX) * (x - sandX) + (y - sandY) * (y - sandY) <= (ArenaRadius + 3) * (ArenaRadius + 3))
+                        map[x, y] = TileType.Wall;
+                }
+            }
+            // The sand caves are dry: pools laid in them earlier are rock again.
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    if (map[x, y] == TileType.Water && biomes[x, y] == Biome.Sand) map[x, y] = TileType.Wall;
+                }
+            }
+            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY), (abyssX, abyssY), (lakeX, lakeY),
+                (sandX, sandY));
         }
 
         static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;

@@ -14,6 +14,7 @@ namespace Game.Client
         Boss,
         Abyss,
         Lake,
+        Sand,
     }
 
     // Sound that loops under the music: the cave's wind and drips, the lava's rumble and bubbles, and the hum of a
@@ -111,6 +112,12 @@ namespace Game.Client
             {
                 Bpm = 72, Root = 48, Scale = Dorian, Chords = new[] { 0, 4, 3, 0 }, Lead = Wave.Sine, LeadOctave = 1, LeadVolume = 0.26f,
                 Arp = Wave.Triangle, ArpRate = 3, ArpOctave = 2, ArpVolume = 0.12f, BassNotes = 2, Rest = 0.5f, Echo = 0.45f, Seed = 8,
+            },
+            // Dry and swaying: a hijaz-like harmonic scale over a plucked bass and a soft beat, short echoes.
+            Tune.Sand => new Style
+            {
+                Bpm = 96, Root = 45, Scale = Harmonic, Chords = new[] { 0, 1, 0, 6 }, Lead = Wave.Pulse, LeadOctave = 1, LeadVolume = 0.2f,
+                Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 4, Rest = 0.45f, Drums = true, Echo = 0.2f, Seed = 9,
             },
             Tune.Boss => new Style
             {

@@ -555,8 +555,8 @@ namespace Game.Client
         // up-left: idle, a wind-up of a second, the strike, idle, a charge, idle, a roar, idle.
         static void Bosses(string path, PixelImage arena)
         {
-            string[] ids = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent" };
-            float[] radii = { 1.2f, 1.3f, 1.4f, 1.4f, 1.3f };
+            string[] ids = { "cave_warden", "antlion", "crystal_queen", "lava_titan", "void_lord", "tide_serpent" };
+            float[] radii = { 1.2f, 1.3f, 1.3f, 1.4f, 1.4f, 1.3f };
             var bosses = new Boss[3, ids.Length];
             for (int row = 0; row < ids.Length; row++)
             {

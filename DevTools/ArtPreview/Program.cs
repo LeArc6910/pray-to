@@ -326,6 +326,8 @@ namespace Game.Client
             creatures.Add(CreatureArt.Boss("void_lord", BossColor, 1));
             creatures.Add(CreatureArt.Boss("tide_serpent", BossColor, 0));
             creatures.Add(CreatureArt.Boss("tide_serpent", BossColor, 1));
+            creatures.Add(CreatureArt.Boss("antlion", BossColor, 0));
+            creatures.Add(CreatureArt.Boss("antlion", BossColor, 1));
             rows.Add(creatures);
 
             rows.Add(new[]
@@ -401,7 +403,7 @@ namespace Game.Client
         static PixelImage Bosses()
         {
             var rows = new List<IList<PixelImage>>();
-            foreach (string id in new[] { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent" })
+            foreach (string id in new[] { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion" })
             {
                 foreach (var view in (BossView[])Enum.GetValues(typeof(BossView)))
                 {

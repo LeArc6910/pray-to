@@ -526,7 +526,7 @@ async function bosses(browser) {
   await game.wait(1200);
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   let s = await game.state();
-  check(/cave_warden/.test(s.bosses) && /crystal_queen/.test(s.bosses) && /lava_titan/.test(s.bosses) && /void_lord/.test(s.bosses) && /tide_serpent/.test(s.bosses), `보스 다섯이 월드에 있다 (${s.bosses})`);
+  check(/cave_warden/.test(s.bosses) && /crystal_queen/.test(s.bosses) && /lava_titan/.test(s.bosses) && /void_lord/.test(s.bosses) && /tide_serpent/.test(s.bosses) && /antlion/.test(s.bosses), `보스 여섯이 월드에 있다 (${s.bosses})`);
 
   // Leaving the arena puts the boss back as it was.
   await game.send('goto boss cave_warden');
@@ -538,7 +538,7 @@ async function bosses(browser) {
   const warden = (s.bosses.match(/cave_warden:(\d+)\/(\d+):p(\d):(\w+)/) || []);
   check(warden[1] === warden[2], `아레나를 떠나 5초가 지나면 보스가 처음 상태로 (${warden.slice(1).join(' ')})`);
 
-  for (const [id, name] of [['cave_warden', '동굴 수호자'], ['crystal_queen', '수정 거미 여왕'], ['lava_titan', '용암 거인'], ['void_lord', '공허의 군주'], ['tide_serpent', '물살 뱀']]) {
+  for (const [id, name] of [['cave_warden', '동굴 수호자'], ['crystal_queen', '수정 거미 여왕'], ['lava_titan', '용암 거인'], ['void_lord', '공허의 군주'], ['tide_serpent', '물살 뱀'], ['antlion', '개미귀신']]) {
     await game.send(`heal; goto boss ${id}`);
     const woke = await game.until(t => has(t.banner, '등장'), 6000, game.texts);
     check(!!woke, `${name}: "${name} 등장!" 배너`);
@@ -576,6 +576,7 @@ async function patterns(browser) {
     ['crystal_queen', 'crystal_cross', '수정 십자'], ['crystal_queen', 'venom_share', '독 거미줄(나눠 맞기, 금색)'], ['crystal_queen', 'crystal_spiral', '수정 나선'],
     ['void_lord', 'void_cross', '공허 십자(대각선)'], ['void_lord', 'event_horizon', '사건의 지평선(고리)'],
     ['tide_serpent', 'whirlpool', '물살 뱀의 소용돌이(고리)'], ['tide_serpent', 'tidal_trail', '물살 뱀의 밀물(연쇄 폭발)'],
+    ['antlion', 'pit', '개미귀신의 개미지옥(멀리 있는 사람 발밑)'], ['antlion', 'quicksand', '개미귀신의 모래늪(고리)'],
   ];
   let woken = '';
   for (const [id, attack, name] of uses) {
@@ -606,7 +607,7 @@ async function world(browser) {
   await game.send('goto biome Cave');
   await game.wait(1000);
   await game.shot('cave-dark', '흙 동굴의 어둠');
-  for (const [biome, name] of [['Mushroom', '버섯 숲'], ['Ice', '얼음 동굴'], ['Crystal', '수정 동굴'], ['Lava', '용암 지대'], ['Abyss', '공허의 심연'], ['Lake', '지하 호수']]) {
+  for (const [biome, name] of [['Mushroom', '버섯 숲'], ['Ice', '얼음 동굴'], ['Crystal', '수정 동굴'], ['Lava', '용암 지대'], ['Abyss', '공허의 심연'], ['Lake', '지하 호수'], ['Sand', '모래 동굴']]) {
     await game.send(`heal; goto biome ${biome}`);
     const banner = await game.until(t => has(t.banner, name), 4000, game.texts);
     check(!!banner, `${name}에 들어서면 "${name}" 배너`);

@@ -16,6 +16,9 @@ namespace Game.Core
         Abyss,
         // The far end of the other of those corners: an underground lake of many pools (2026-11-09).
         Lake,
+        // The near band of the crystal caverns' quarter, between the plain cave and the crystal: sandstone and drifts
+        // (2026-11-09, the level 15 zone between the first boss and the second).
+        Sand,
     }
 
     // Which biome every tile is in, worked out from the seed with integer math only, so the host and every client
@@ -26,6 +29,10 @@ namespace Game.Core
         public const int CaveRadius = 32;
         // The abyss takes its corner this far from the spawn, along either axis.
         public const int AbyssDistance = 40;
+        // The sand caves are the crystal quarter's tiles nearer the spawn than this (give or take its own wobble).
+        public const int SandRadius = 52;
+        // And all of it this near the sand arena (WorldGenerator), so the arena is always in it.
+        const int SandArenaReach = 15;
         const int Wobble = 8;
         const int Cell = 16;
 
@@ -64,7 +71,7 @@ namespace Game.Core
         // opposite; mushroomFirst picks which of the other two corners gets the mushroom forest.
         // abyss is the corner whose far end is the abyss, lake the one whose far end is the lake; null for none.
         public static BiomeMap Make(ulong seed, int width, int height, int spawnX, int spawnY, (int X, int Y) corner, bool mushroomFirst,
-            (int X, int Y)? abyss = null, (int X, int Y)? lake = null)
+            (int X, int Y)? abyss = null, (int X, int Y)? lake = null, (int X, int Y)? sandArena = null)
         {
             var tiles = new Biome[width * height];
             for (int y = 0; y < height; y++)
@@ -73,11 +80,21 @@ namespace Game.Core
                 {
                     int dx = x - spawnX + Noise(seed, x, y, 1);
                     int dy = y - spawnY + Noise(seed, x, y, 2);
+                    // Round the sand arena it is sand whatever the wobble says.
+                    if (sandArena is (int ax0, int ay0) && (x - ax0) * (x - ax0) + (y - ay0) * (y - ay0) <= SandArenaReach * SandArenaReach)
+                    {
+                        tiles[y * width + x] = Biome.Sand;
+                        continue;
+                    }
                     if (dx * dx + dy * dy < CaveRadius * CaveRadius) continue;
                     int sx = dx >= 0 ? 1 : -1;
                     int sy = dy >= 0 ? 1 : -1;
                     Biome biome;
-                    if (sx == corner.X && sy == corner.Y) biome = Biome.Crystal;
+                    if (sx == corner.X && sy == corner.Y)
+                    {
+                        int sandX = dx + Noise(seed, x, y, 5), sandY = dy + Noise(seed, x, y, 6);
+                        biome = sandX * sandX + sandY * sandY < SandRadius * SandRadius ? Biome.Sand : Biome.Crystal;
+                    }
                     else if (sx == -corner.X && sy == -corner.Y) biome = Biome.Lava;
                     else biome = (sx == corner.X) == mushroomFirst ? Biome.Mushroom : Biome.Ice;
                     // The square at the far end of the abyss corner, with a wobbly edge of its own.
@@ -133,6 +150,7 @@ namespace Game.Core
             Biome.Lava => "용암 지대",
             Biome.Abyss => "공허의 심연",
             Biome.Lake => "지하 호수",
+            Biome.Sand => "모래 동굴",
             _ => "흙 동굴",
         };
     }

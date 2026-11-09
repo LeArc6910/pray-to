@@ -29,6 +29,7 @@ namespace Game.Client
             Biome.Lava => new Color32(96, 64, 56, 255),
             Biome.Abyss => new Color32(48, 38, 72, 255),
             Biome.Lake => new Color32(40, 78, 84, 255),
+            Biome.Sand => new Color32(118, 92, 56, 255),
             _ => Floor,
         };
         static readonly Color32 Wall = new Color32(158, 140, 118, 255);

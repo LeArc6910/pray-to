@@ -250,6 +250,7 @@ namespace Game.Client
             Biome.Lava => LavaFloor,
             Biome.Abyss => AbyssFloor,
             Biome.Lake => LakeFloor,
+            Biome.Sand => SandFloor,
             _ => CaveFloor,
         };
 
@@ -261,6 +262,7 @@ namespace Game.Client
             Biome.Lava => LavaRock,
             Biome.Abyss => AbyssRock,
             Biome.Lake => LakeRock,
+            Biome.Sand => SandRock,
             _ => RockColors,
         };
 
@@ -298,6 +300,21 @@ namespace Game.Client
             Top = Rgba.Hex("#2A2238"), TopDark = Rgba.Hex("#241D30"), TopLight = Rgba.Hex("#342A46"), Rim = Rgba.Hex("#6A54A0"),
             FaceTop = Rgba.Hex("#46386A"), FaceBottom = Rgba.Hex("#30264A"), Strata = Rgba.Hex("#5A3CA0"), FaceSpeck = Rgba.Hex("#C8B4FF"),
             Contact = Rgba.Hex("#0E0B14"), Outline = Rgba.Hex("#08060C"),
+        };
+
+        // The sand caves (2026-11-09): tan drifts with wind ripples and the odd bleached bone, sandstone in warm layers.
+        static readonly FloorPalette SandFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#6A5236"), Dark = Rgba.Hex("#5C462E"), Light = Rgba.Hex("#7A6040"),
+            Pebble = Rgba.Hex("#8A6E4A"), PebbleLight = Rgba.Hex("#A2845A"), PebbleShadow = Rgba.Hex("#3A2C1C"),
+            Decor = Rgba.Hex("#9C7E52"), DecorLight = Rgba.Hex("#E8DCC0"),
+        };
+
+        static readonly RockPalette SandRock = new RockPalette
+        {
+            Top = Rgba.Hex("#7A5E3E"), TopDark = Rgba.Hex("#6A5034"), TopLight = Rgba.Hex("#8A6C48"), Rim = Rgba.Hex("#C8A46C"),
+            FaceTop = Rgba.Hex("#A07C50"), FaceBottom = Rgba.Hex("#7E5E3A"), Strata = Rgba.Hex("#C49656"), FaceSpeck = Rgba.Hex("#F0D49A"),
+            Contact = Rgba.Hex("#2A1E12"), Outline = Rgba.Hex("#1C140C"),
         };
 
         // The underground lake: wet grey-green stone, glistening, with pale shells and weed at the water's edge.
@@ -368,6 +385,12 @@ namespace Game.Client
                 case Biome.Lake:
                     // Water running down the face in a thin bright line.
                     for (int i = 0; i < 3; i++) rock[x + 1, y + i] = i == 0 ? floor.DecorLight : floor.DecorLight.Scale(0.75f);
+                    break;
+                case Biome.Sand:
+                    // Sand trickling from a crack: a light grain over a short fall.
+                    rock[x + 1, y] = floor.Pebble;
+                    rock[x + 1, y + 1] = floor.Decor;
+                    rock[x + 1, y + 3] = floor.Decor.Scale(0.85f);
                     break;
             }
             return rock;
@@ -509,6 +532,21 @@ namespace Game.Client
                     image[x, y] = variant % 2 == 0 ? colors.DecorLight : colors.Decor;
                     image[x - 3, y + 2] = colors.Decor.Scale(0.6f);
                     if (variant == 3) image[x + 3, y - 2] = colors.Decor.Scale(0.8f);
+                    break;
+                case Biome.Sand:
+                    // A wind ripple across the drift, or a small bleached bone.
+                    if (variant % 2 == 0)
+                    {
+                        for (int i = -2; i <= 2; i++) image[x + i, y + (i == 0 ? -1 : 0)] = colors.Decor;
+                        for (int i = -1; i <= 1; i++) image[x + i + 1, y + 2] = colors.Decor.Scale(0.85f);
+                    }
+                    else
+                    {
+                        image[x - 1, y] = colors.DecorLight;
+                        image[x, y] = colors.DecorLight.Scale(0.85f);
+                        image[x + 1, y] = colors.DecorLight.Scale(0.85f);
+                        image[x + 2, y] = colors.DecorLight;
+                    }
                     break;
                 case Biome.Lake:
                     // A pale shell, or a wisp of weed.

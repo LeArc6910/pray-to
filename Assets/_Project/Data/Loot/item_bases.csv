@@ -69,3 +69,4 @@ rift_eye,균열의 눈,amulet,45,,Damage+18%;MaxHealth+60~70;AttackSpeed+10%;Max
 rift_band,균열 고리,ring,45,,SkillRank+1;MaxHealth+40~50,1,0,
 rift_charm,균열 부적,amulet,45,,CooldownRecovery+12~15%;Damage+10~12%,1,0,
 tide_amulet,물살의 목걸이,amulet,25,,MaxMana+30~40;ManaRegen+3~4,1,0,
+sandstride_boots,모래걸음 장화,boots,15,,Armor+7~9;MoveSpeed+6~8%,2,0,
