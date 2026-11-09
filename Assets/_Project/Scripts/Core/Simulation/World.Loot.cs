@@ -173,9 +173,10 @@ namespace Game.Core
             return Collision.Resolve(Map, origin + offset, 0.2f);
         }
 
-        GroundLoot Place(Item item, RuneDefinition rune, Vec2 position, long readyTick, ConsumableDefinition consumable = null, MaterialDefinition material = null)
+        GroundLoot Place(Item item, RuneDefinition rune, Vec2 position, long readyTick, ConsumableDefinition consumable = null, MaterialDefinition material = null,
+            long expireTick = -1)
         {
-            var loot = new GroundLoot(_nextId++, position, item, rune, readyTick, Tick + Ticks(LootSeconds), consumable, material);
+            var loot = new GroundLoot(_nextId++, position, item, rune, readyTick, expireTick >= 0 ? expireTick : Tick + Ticks(LootSeconds), consumable, material);
             _groundLoot.Add(loot);
             // The oldest goes first when the floor fills up.
             if (_groundLoot.Count > MaxGroundLoot) _groundLoot.RemoveAt(0);

@@ -777,7 +777,8 @@ namespace Game.Client
 
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
 
-            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs);
+            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
+                worldConfig: new WorldConfig { Forage = true });
             if (world != null)
             {
                 _host.Restore(world);

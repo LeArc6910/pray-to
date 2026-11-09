@@ -16,6 +16,9 @@ namespace Game.Core
         public float ZoneRing { get; set; } = 30;
         // A defeated boss returns to its arena after this long.
         public float BossRespawnSeconds { get; set; } = 120;
+        // Lays each biome's forage on the floor every day (World.Forage.cs). Off unless asked: the game's host turns it
+        // on; tests and sims count what lies on the floor without it.
+        public bool Forage { get; set; }
     }
 
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
@@ -83,6 +86,7 @@ namespace Game.Core
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _config = config ?? new WorldConfig();
             _random = new GameRandom(seed, stream: 2);
+            _forageSeed = seed;
             Loot = loot;
             _lootGenerator = loot != null ? new LootGenerator(loot) : null;
             _flow = new FlowField(map);
@@ -178,6 +182,7 @@ namespace Game.Core
             UpdateAfflictions();
             UpdateHazards();
             UpdateProjectiles();
+            UpdateForage();
             UpdateLoot();
             UpdateCrops();
             UpdateMachines();
