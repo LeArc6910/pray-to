@@ -1136,8 +1136,13 @@ async function gear(browser) {
     await game.press('배우기');
   }
   check((await game.inventory()).passives === 1, '점을 골라 [배우기]');
-  await game.press('모두 되돌리기');
-  check((await game.inventory()).passives === 0, '[모두 되돌리기]');
+  // Taking the tree back costs coins a point (2026-11-09).
+  await game.send('give coin 20');
+  await game.wait(400);
+  const coinsBefore = count(await game.inventory(), 'coin');
+  check(await game.press(/^모두 되돌리기 \(금화 5\)$/), '[모두 되돌리기 (금화 5)]가 보이고 누른다');
+  const resetTree = await game.until(i => i.passives === 0, 3000, game.inventory);
+  check(!!resetTree && count(resetTree, 'coin') === coinsBefore - 5, `되돌리면 점이 돌아오고 금화 5를 낸다 (${coinsBefore} → ${resetTree && count(resetTree, 'coin')})`);
 
   // Skills learned with points (Docs/Classes.md, 스킬 포인트와 단계): [배우기] on a row, then [올리기].
   await closeBag(game);
@@ -1182,8 +1187,16 @@ async function gear(browser) {
   await game.press('▼');
   check((await game.inventory()).skills !== skills, `▼로 스킬 칸 순서를 바꾼다 (${skills} → ${(await game.inventory()).skills})`);
   await game.press('[ ] 궁수');
-  await game.press('이대로 바꾸기');
-  check(/archer/.test((await game.inventory()).classes), `작업대 곁에서 클래스를 바꾼다 (${(await game.inventory()).classes})`);
+  // Other classes cost coins by level (2026-11-09).
+  await game.send('give coin 600');
+  await game.wait(400);
+  const goldBefore = count(await game.inventory(), 'coin');
+  const changeButton = (await game.find(/^이대로 바꾸기 \(금화 \d+\)$/))[0];
+  check(!!changeButton, `[이대로 바꾸기]에 금화가 보인다 (${changeButton && changeButton.label})`);
+  await game.press(/^이대로 바꾸기/);
+  const changed = await game.until(i => /archer/.test(i.classes), 3000, game.inventory);
+  const price = changeButton ? Number(changeButton.label.match(/금화 (\d+)/)[1]) : 0;
+  check(!!changed && count(changed, 'coin') === goldBefore - price, `작업대 곁에서 금화를 내고 클래스를 바꾼다 (${changed && changed.classes}, 금화 ${goldBefore} → ${changed && count(changed, 'coin')})`);
   await closeBag(game);
   await game.shot('archer', '궁수가 된 스킬 칸');
   await game.context.close();
@@ -1269,6 +1282,10 @@ async function save(browser) {
   await game.page.keyboard.press('Escape');
   await game.until(s => !s.playing, 8000);
   await game.shot('menu-saved', '나간 뒤 메뉴(이어하기)');
+  // The menu remembers the character's classes (2026-11-09) instead of asking again.
+  const menuText = await game.allText();
+  check(/savetest의 클래스: 전사 \+ 화염 마법사/.test(menuText), '메뉴가 저장된 캐릭터의 클래스를 보인다(savetest의 클래스: 전사 + 화염 마법사)');
+  check((await game.find(/^\[[ \d]\] /)).length === 0, '저장된 캐릭터는 메뉴에서 클래스 단추가 없다(게임 안에서 바꾼다)');
   await game.startSolo('savetest', true);
   await game.wait(1500);
   let inv = await game.inventory();

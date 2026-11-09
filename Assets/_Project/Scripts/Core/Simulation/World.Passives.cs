@@ -3,7 +3,7 @@ using System.Linq;
 namespace Game.Core
 {
     // The passive tree (Docs/Classes.md, 패시브 트리): a point for every level past the first, spent on points of the
-    // tree next to ones already taken, starting from its start. Taking them all back is free.
+    // tree next to ones already taken, starting from its start. Taking them all back costs coins (2026-11-09).
     public sealed partial class World
     {
         // Takes the point for the player. False when it cannot: no point to spend, already taken, the start, or not
@@ -18,11 +18,20 @@ namespace Game.Core
             return true;
         }
 
-        // Gives every point back. False when there were none.
+        // Gives every point back for ClassRules.PassiveResetCoinsPerPoint coins a point. False when there were none or
+        // the coins are short.
         public bool ResetPassives(int playerId)
         {
             var player = FindPlayer(playerId);
             if (player == null || player.Passives.Count == 0) return false;
+            var coin = CoinMaterial;
+            int cost = player.Passives.Count * ClassRules.PassiveResetCoinsPerPoint;
+            if (coin != null)
+            {
+                if (player.Inventory.CountOf(coin) < cost) return false;
+                player.Inventory.TakeMaterial(coin, cost);
+            }
+            player.InventoryVersion++;
             player.Passives.Clear();
             PassivesChanged(player);
             return true;

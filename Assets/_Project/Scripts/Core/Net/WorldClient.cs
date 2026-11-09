@@ -366,7 +366,8 @@ namespace Game.Core
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
             Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
-            PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)));
+            PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)),
+            Classes.Select(c => c.Id), SkillOrder);
 
         // The names this player gave their pets (Pets.CleanName), by pet id: kept in the character save only, so other
         // players see the kind's name.

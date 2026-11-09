@@ -131,6 +131,7 @@ namespace Game.Core.Tests
             world.LearnSkill(player.Id, Skill("war_cry"));
             int x = TileMap.Cell(player.Position.X) + 1, y = TileMap.Cell(player.Position.Y);
             world.Map[x, y] = TileType.Workbench;
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.Coin), 2 * ClassRules.ChangeCoins(player.Level));
 
             Assert.IsTrue(world.ChangeClasses(player.Id, new[] { FireMage }, null));
             CollectionAssert.AreEqual(new[] { "fireball" }, player.Skills.Select(s => s.Id));

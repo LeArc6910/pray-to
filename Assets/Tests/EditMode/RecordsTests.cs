@@ -161,6 +161,16 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void TheCharacterSaveKeepsItsClassesAndSkillOrder()
+        {
+            var saved = CharacterSave.Read(CharacterSave.Write(new Equipment(), new Inventory(), 0, classes: new[] { "fire_mage", "warrior" },
+                skillOrder: new[] { 7, 6, 1, 0 }), Gear.Data);
+            CollectionAssert.AreEqual(new[] { "fire_mage", "warrior" }, saved.Classes);
+            CollectionAssert.AreEqual(new[] { 7, 6, 1, 0 }, saved.SkillOrder);
+            Assert.IsEmpty(CharacterSave.Read(CharacterSave.Write(new Equipment(), new Inventory()), Gear.Data).Classes);
+        }
+
+        [Test]
         public void APetsNameIsCleanedAndKeptInTheSave()
         {
             Assert.AreEqual("", Pets.CleanName("   "));

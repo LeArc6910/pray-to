@@ -1553,8 +1553,13 @@ namespace Game.Client
                 }
             }
             bool differs = !_pickedClasses.SequenceEqual(_client.Classes.Select(c => c.Id));
-            GUI.enabled = near && differs;
-            if (Ui.LayoutButton("이대로 바꾸기"))
+            // Other classes cost coins (World.ChangeClasses); the same ones in another order are free.
+            bool sameSet = _pickedClasses.Count == _client.Classes.Count && _client.Classes.All(c => _pickedClasses.Contains(c.Id));
+            int changeCost = sameSet ? 0 : ClassRules.ChangeCoins(_client.Level);
+            var gold = _client.Loot.FindMaterial(World.Coin);
+            bool affordable = changeCost == 0 || gold != null && _client.Bag.CountOf(gold) >= changeCost;
+            GUI.enabled = near && differs && affordable;
+            if (Ui.LayoutButton(changeCost > 0 ? $"이대로 바꾸기 (금화 {changeCost})" : "이대로 바꾸기"))
             {
                 var classes = _pickedClasses.Select(id => _client.AllClasses.First(c => c.Id == id)).ToList();
                 Send(_client.ClassCommand(classes, null), Sound.Buff);
@@ -1692,7 +1697,15 @@ namespace Game.Client
             }
             GUILayout.Label(Fit($"특성 포인트 {_client.PassivePoints}개 (레벨마다 1개). 시작점이나 배운 점과 이어진 점을 배운다.", _textWidth));
             GUILayout.BeginHorizontal();
-            if (_client.Passives.Count > 0 && Ui.LayoutButton("모두 되돌리기", GUILayout.Width(110))) Send(_client.ResetPassivesCommand(), Sound.Click);
+            if (_client.Passives.Count > 0)
+            {
+                // A few coins a point (World.ResetPassives).
+                int resetCost = _client.Passives.Count * ClassRules.PassiveResetCoinsPerPoint;
+                var gold = _client.Loot.FindMaterial(World.Coin);
+                GUI.enabled = gold != null && _client.Bag.CountOf(gold) >= resetCost;
+                if (Ui.LayoutButton($"모두 되돌리기 (금화 {resetCost})", GUILayout.Width(180))) Send(_client.ResetPassivesCommand(), Sound.Click);
+                GUI.enabled = true;
+            }
             GUILayout.EndHorizontal();
 
             if (_pickedPassive != null)

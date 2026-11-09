@@ -20,14 +20,17 @@ namespace Game.Core
         // skill since 2026-11-09, in slot order). 11: the records of the bestiary and the achievements had (Records.cs).
         // 12: the pet that follows it (Pets.cs), by id. 13: each pet's experience (Pets.LevelOf), by pet id. 14: the
         // life skill perks picked (LifeSkills.PerkIndex order, 0 none). 15: the names given to pets (Pets.CleanName), by
-        // pet id.
-        const int FormatVersion = 15;
+        // pet id. 16: its classes, by id in the order picked, and its skill order (Player.SkillOrder), so the menu
+        // starts it with them (2026-11-09).
+        const int FormatVersion = 16;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
             List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null,
             List<(string, string, int)> records = null, List<string> achievements = null, string pet = "", List<(string, int)> petExperience = null,
-            List<int> lifePerks = null, List<(string, string)> petNames = null)
+            List<int> lifePerks = null, List<(string, string)> petNames = null, List<string> classes = null, List<int> skillOrder = null)
         {
+            Classes = classes ?? new List<string>();
+            SkillOrder = skillOrder ?? new List<int>();
             PetNames = petNames ?? new List<(string, string)>();
             LifePerks = lifePerks ?? new List<int>();
             Pet = pet ?? "";
@@ -76,6 +79,10 @@ namespace Game.Core
         public IReadOnlyList<int> LifePerks { get; }
         // The names the player gave their pets, by pet id.
         public IReadOnlyList<(string Pet, string Name)> PetNames { get; }
+        // The classes it plays, by id in the order picked (empty for saves from before format 16), and its skills'
+        // order among them.
+        public IReadOnlyList<string> Classes { get; }
+        public IReadOnlyList<int> SkillOrder { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
@@ -83,7 +90,8 @@ namespace Game.Core
             IEnumerable<int> life = null, IEnumerable<(string Id, int Rank)> skillRanks = null, IEnumerable<(string Npc, int Step)> stories = null,
             IEnumerable<(string Skill, string Gem)> supports = null, IEnumerable<(string Kind, string Id, int Count)> records = null,
             IEnumerable<string> achievements = null, string pet = null, IEnumerable<(string Pet, int Experience)> petExperience = null,
-            IEnumerable<int> lifePerks = null, IEnumerable<(string Pet, string Name)> petNames = null)
+            IEnumerable<int> lifePerks = null, IEnumerable<(string Pet, string Name)> petNames = null, IEnumerable<string> classes = null,
+            IEnumerable<int> skillOrder = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -169,6 +177,12 @@ namespace Game.Core
                     w.Write(id);
                     w.Write(name);
                 }
+                var kit = (classes ?? Enumerable.Empty<string>()).ToList();
+                w.Write((byte)kit.Count);
+                foreach (string id in kit) w.Write(id);
+                var order = (skillOrder ?? Enumerable.Empty<int>()).ToList();
+                w.Write((byte)order.Count);
+                foreach (int index in order) w.Write((byte)index);
             }
             return stream.ToArray();
         }
@@ -249,8 +263,12 @@ namespace Game.Core
                 for (int count = version >= 14 ? r.ReadByte() : 0; count > 0; count--) perks.Add(r.ReadByte());
                 var names = new List<(string, string)>();
                 for (int count = version >= 15 ? r.ReadByte() : 0; count > 0; count--) names.Add((r.ReadString(), Pets.CleanName(r.ReadString())));
+                var kit = new List<string>();
+                for (int count = version >= 16 ? r.ReadByte() : 0; count > 0; count--) kit.Add(r.ReadString());
+                var order = new List<int>();
+                for (int count = version >= 16 ? r.ReadByte() : 0; count > 0; count--) order.Add(r.ReadByte());
                 return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports, records, achievements, pet,
-                    grown, perks, names);
+                    grown, perks, names, kit, order);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

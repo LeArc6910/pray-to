@@ -63,8 +63,13 @@ namespace Game.Core.Tests
             Assert.AreEqual(0, player.PassivePoints);
             Assert.IsFalse(world.AllocatePassive(player.Id, Point("dex1")), "no points left");
 
+            // Taking them back costs coins a point (2026-11-09).
+            var coin = Gear.Data.FindMaterial(World.Coin);
+            Assert.IsFalse(world.ResetPassives(player.Id), "no coins");
+            player.Inventory.AddMaterial(coin, 2 * ClassRules.PassiveResetCoinsPerPoint);
             int version = player.InventoryVersion;
             Assert.IsTrue(world.ResetPassives(player.Id));
+            Assert.AreEqual(0, player.Inventory.CountOf(coin));
             Assert.AreEqual(2, player.PassivePoints);
             Assert.AreEqual(health, player.Stats.MaxHealth, 0.01f);
             Assert.Greater(player.InventoryVersion, version, "so the client hears of it and the character is saved");

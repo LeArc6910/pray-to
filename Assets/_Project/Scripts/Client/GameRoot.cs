@@ -47,6 +47,7 @@ namespace Game.Client
         int _savedInventoryVersion;
         int _savedExperience;
         int _savedPetNames;
+        int _savedKit;
         // [월드 지우기] asks once more before it deletes.
         bool _confirmDelete;
         string _address = "127.0.0.1";
@@ -427,9 +428,49 @@ namespace Game.Client
         // indexes kept before mean other skills and are let go.
         string SkillOrderKey => "skillorder3." + CharacterName;
 
+        // The classes a saved character plays (character save format 16, or before it the classes the skill order was
+        // kept for on this device), read once each time the name in the menu changes. A saved character starts with
+        // them; changing them is done in the game, beside a workbench, for coins (Docs/Classes.md, 게임 중에 바꾸기).
+        string _classesFor;
+        List<string> _savedClasses;
+        IReadOnlyList<int> _savedOrder;
+
+        void SyncCharacterClasses()
+        {
+            if (_classesFor == CharacterName || _classes == null || _loot == null) return;
+            _classesFor = CharacterName;
+            _savedClasses = null;
+            _savedOrder = null;
+            var data = SaveStore.Read(SaveStore.CharacterKey(CharacterName));
+            if (data == null) return;
+            List<string> ids;
+            try
+            {
+                var save = CharacterSave.Read(data, _loot);
+                ids = save.Classes.ToList();
+                if (ids.Count > 0) _savedOrder = save.SkillOrder;
+            }
+            catch (System.IO.InvalidDataException)
+            {
+                return;
+            }
+            // An older save: the classes this device last kept a skill order for.
+            if (ids.Count == 0)
+            {
+                string kept = Prefs.Get(SkillOrderKey, "").Split('|')[0];
+                ids = kept.Split(',').Where(id => id.Length > 0).ToList();
+            }
+            ids = ids.Where(id => _classes.Classes.Any(c => c.Id == id)).Take(ClassRules.DefaultMaxClasses).ToList();
+            if (ids.Count == 0) return;
+            _savedClasses = ids;
+            _chosenClasses.Clear();
+            _chosenClasses.AddRange(ids);
+        }
+
         // The skill order kept for this character, if it is for the classes picked now.
         IReadOnlyList<int> KeptSkillOrder()
         {
+            if (_savedOrder != null && _savedOrder.Count > 0 && _savedClasses != null && _savedClasses.SequenceEqual(_chosenClasses)) return _savedOrder;
             string[] parts = Prefs.Get(SkillOrderKey, "").Split('|');
             if (parts.Length != 2 || parts[0] != string.Join(",", _chosenClasses)) return null;
             var order = new List<int>();
@@ -852,8 +893,10 @@ namespace Game.Client
         {
             // The character is kept when its gear or bag changes, and when it gains experience.
             if (_client.InventoryVersion != _savedInventoryVersion || (_client.Experience != _savedExperience && _client.InventoryVersion > 0)
-                || (_client.PetNamesVersion != _savedPetNames && _client.InventoryVersion > 0))
+                || (_client.PetNamesVersion != _savedPetNames && _client.InventoryVersion > 0)
+                || (_client.KitVersion != _savedKit && _client.InventoryVersion > 0))
             {
+                _savedKit = _client.KitVersion;
                 _savedInventoryVersion = _client.InventoryVersion;
                 _savedExperience = _client.Experience;
                 _savedPetNames = _client.PetNamesVersion;
@@ -904,6 +947,8 @@ namespace Game.Client
             if (_map != null && _client != null && _client.Status == ClientStatus.Playing) Save(MapKey, _map.Save());
             _worldKey = null;
             _savedInventoryVersion = 0;
+            // The menu reads the character's classes again (they may have changed in the game).
+            _classesFor = null;
             _savedExperience = 0;
             _view?.Dispose();
             _map?.Dispose();
@@ -1172,6 +1217,15 @@ namespace Game.Client
         // on a picked class is its turn in the skill slots.
         void DrawClassPicker()
         {
+            SyncCharacterClasses();
+            if (_savedClasses != null)
+            {
+                // A saved character keeps its classes; they change in the game.
+                var names = _savedClasses.Select(id => _classes.Classes.First(c => c.Id == id).Name);
+                GUILayout.Label(Ui.Wrap($"{CharacterName}의 클래스: {string.Join(" + ", names)}", GUI.skin.label, _menuColumn));
+                GUILayout.Label(Ui.Wrap($"저장된 캐릭터는 이 클래스로 시작한다. 바꾸려면 게임 안 작업대 곁에서 가방 [스킬] 탭의 [클래스 바꾸기](금화 {ClassRules.ChangeCoins(1)}부터, 레벨이 오를수록 더 든다).", GUI.skin.label, _menuColumn));
+                return;
+            }
             int max = ClassRules.DefaultMaxClasses;
             GUILayout.Label(Ui.Wrap($"클래스 (최대 {max}개, 고른 순서대로 스킬 칸을 채운다)", GUI.skin.label, _menuColumn));
             foreach (var option in _classes.Classes)

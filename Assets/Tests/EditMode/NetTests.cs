@@ -622,6 +622,7 @@ namespace Game.Core.Tests
             Assert.Greater(alice.KitVersion, kits, "but the host answers");
 
             world.Map[TileMap.Cell(player.Position.X) + 1, TileMap.Cell(player.Position.Y)] = TileType.Workbench;
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial(World.Coin), ClassRules.ChangeCoins(player.Level));
             var both = new[] { Classes.Shipped.Find("fire_mage"), Classes.Shipped.Find("warrior") };
             foreach (var skill in both.SelectMany(c => c.Skills)) player.SkillRanks[skill] = 1;
             player.InventoryVersion++;

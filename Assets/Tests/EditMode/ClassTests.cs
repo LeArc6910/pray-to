@@ -470,7 +470,8 @@ namespace Game.Core.Tests
         [Test]
         public void OtherClassesOnlyBesideAWorkbenchAndTheirSkillsStartCoolingDown()
         {
-            var world = Room();
+            // With the loot sheets, so changing classes asks for coins.
+            var world = new World(Maps.Room(30), TileMap.Center(15, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data);
             var player = Learned(world.AddPlayer("a", null, Warrior));
             Assert.IsFalse(world.ChangeClasses(player.Id, new[] { FireMage }, null), "no workbench near");
             Assert.AreSame(Warrior, player.Classes.Single());
@@ -480,7 +481,13 @@ namespace Game.Core.Tests
             world.Map[x, y] = TileType.Workbench;
             world.UseSkill(player.Id, Slot(player, "war_cry"), Vec2.Zero);
             Assert.IsTrue(player.HasBuff(Slot(player, "war_cry")));
+            // Other classes cost coins (2026-11-09); the same classes in another order do not.
+            var coin = Gear.Data.FindMaterial(World.Coin);
+            Assert.IsFalse(world.ChangeClasses(player.Id, new[] { FireMage, Warrior }, null), "no coins");
+            Assert.IsTrue(world.ChangeClasses(player.Id, new[] { Warrior }, null), "reordering is free");
+            player.Inventory.AddMaterial(coin, ClassRules.ChangeCoins(player.Level) + 3);
             Assert.IsTrue(world.ChangeClasses(player.Id, new[] { FireMage, Warrior }, null));
+            Assert.AreEqual(3, player.Inventory.CountOf(coin));
 
             // Only learned skills take slots: of the fire mage's, the free fireball; the warrior's fill the rest.
             CollectionAssert.AreEqual(new[] { "fireball", "whirlwind", "war_cry", "charge" }, player.Skills.Select(s => s.Id));

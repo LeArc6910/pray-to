@@ -243,6 +243,13 @@ namespace Game.Core
 
         public static float PassiveShare(int classes) => classes > PassiveClasses ? (float)PassiveClasses / classes : 1;
 
+        // Coins to take other classes in the game (World.ChangeClasses, 2026-11-09): more the further the character
+        // has come, 30 at level 1 and 520 at 50. Reordering the skills stays free.
+        public static int ChangeCoins(int level) => 20 + 10 * Math.Max(1, level);
+
+        // Coins a point to take the whole passive tree back (World.ResetPassives), half what a skill point costs.
+        public const int PassiveResetCoinsPerPoint = 5;
+
         // The classes that count from a requested list: known ones, each once, at most max of them, in order.
         public static List<ClassDefinition> Choose(ClassData data, IEnumerable<string> ids, int max)
         {
