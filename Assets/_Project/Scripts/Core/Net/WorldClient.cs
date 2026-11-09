@@ -1057,8 +1057,18 @@ namespace Game.Core
         public byte[] CraftCommand(Recipe recipe, int times = 1) =>
             new InventoryCommandMessage(InventoryCommand.Craft, times, index: ItemCodec.Index(_loot.Recipes, recipe)).Encode();
 
-        public byte[] PlaceCommand(MaterialDefinition material) =>
-            new InventoryCommandMessage(InventoryCommand.Place, 0, index: ItemCodec.Index(_loot.Materials, material)).Encode();
+        // With a notice when the tile it would go on is not open floor, so a refused [놓기] is not silent (the host
+        // decides, World.PlaceTile).
+        public byte[] PlaceCommand(MaterialDefinition material)
+        {
+            if (Map != null && material?.Places != null)
+            {
+                var (x, y) = TileMap.IsPaving(material.Places.Value) ? World.TileAhead(Position, Facing) : World.PlaceAhead(Position, Facing);
+                if (!Map.InBounds(x, y) || Map.IsEdge(x, y) || !TileMap.IsGround(Map[x, y]) || Map[x, y] == material.Places)
+                    _notices.Add($"{material.Name}: 앞이 막혀 있다. 빈 바닥을 바라보고 놓는다");
+            }
+            return new InventoryCommandMessage(InventoryCommand.Place, 0, index: ItemCodec.Index(_loot.Materials, material)).Encode();
+        }
 
         // Whether the bag holds everything the recipe takes, and room for an item it makes.
         public bool CanCraft(Recipe recipe) => CraftableTimes(recipe) > 0;

@@ -87,6 +87,24 @@ namespace Game.Core.Tests
             Assert.AreEqual(0, data.Find(TileType.Chest).Light, "an empty light column is no light");
         }
 
+        // Standing at the front of a tile (so close to the next that the body is in it), [놓기] puts the thing on the
+        // tile after, rather than refusing without a word (found by the first-ten-minutes playtest, 2026-11-09).
+        [Test]
+        public void PlacingFromTheFrontOfATileGoesOnTheNextClearTile()
+        {
+            var world = Room(out var player);
+            player.Inventory.AddMaterial(TorchItem, 2);
+            player.Position = new Vec2(5.85f, 5.5f);
+            Assert.AreEqual((6, 5), World.TileAhead(player.Position, player.Facing), "the tile a step ahead is the one the body is in");
+            Assert.AreEqual((7, 5), World.PlaceAhead(player.Position, player.Facing));
+            Assert.IsTrue(world.PlaceTile(player.Id, TorchItem));
+            Assert.AreEqual(TileType.Torch, world.Map[7, 5]);
+            Assert.AreEqual(TileType.Floor, world.Map[6, 5]);
+
+            player.Position = new Vec2(5.5f, 5.5f);
+            Assert.AreEqual((6, 5), World.PlaceAhead(player.Position, player.Facing), "from the middle of a tile, the next one");
+        }
+
         [Test]
         public void CraftingNeedsItsStationWithinReach()
         {

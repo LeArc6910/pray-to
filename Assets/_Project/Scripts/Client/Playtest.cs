@@ -308,7 +308,10 @@ namespace Game.Client
                     break;
                 case "near":
                     var type = Tile(words[2]);
-                    var target = Nearest(map, px, py, (x, y) => map[x, y] == type) ?? throw new InvalidOperationException($"no {type} tile");
+                    // The nearest one there is room to stand beside (an ore vein can be shut in rock).
+                    var target = Nearest(map, px, py, (x, y) => map[x, y] == type
+                            && new[] { (0, -1), (1, 0), (-1, 0), (0, 1) }.Any(s => Walkable(map, x + s.Item1, y + s.Item2)))
+                        ?? throw new InvalidOperationException($"no {type} tile with room beside it");
                     int tx = TileMap.Cell(target.X), ty = TileMap.Cell(target.Y);
                     var beside = new[] { (0, -1), (1, 0), (-1, 0), (0, 1) }.Where(s => Walkable(map, tx + s.Item1, ty + s.Item2)).ToList();
                     if (beside.Count == 0) throw new InvalidOperationException($"nowhere to stand beside {type}");

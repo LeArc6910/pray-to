@@ -30,6 +30,17 @@ namespace Game.Core
             return (TileMap.Cell(ahead.X), TileMap.Cell(ahead.Y));
         }
 
+        // Where a placed thing goes (2026-11-09, found by the first-ten-minutes playtest): the tile ahead, or the one
+        // after it when the player stands so far into that tile that their own body would be in the way, which
+        // otherwise refused [놓기] silently at a third of the places a player can stand.
+        public static (int X, int Y) PlaceAhead(Vec2 position, Vec2 facing)
+        {
+            var (x, y) = TileAhead(position, facing);
+            if (!Touches(position, PlayerRadius, x, y)) return (x, y);
+            var further = position + facing * (BuildReach + 1);
+            return (TileMap.Cell(further.X), TileMap.Cell(further.Y));
+        }
+
         public List<TileChange> ChangedTiles() =>
             _changedTiles.Select(pair => new TileChange(pair.Key % Map.Width, pair.Key / Map.Width, pair.Value)).ToList();
 
@@ -101,10 +112,11 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || material?.Places == null || player.Inventory.CountOf(material) == 0) return false;
-            var (x, y) = TileAhead(player.Position, player.Facing);
+            // A floor is laid even under its player; anything else goes on the first tile ahead clear of them.
+            bool paving = TileMap.IsPaving(material.Places.Value);
+            var (x, y) = paving ? TileAhead(player.Position, player.Facing) : PlaceAhead(player.Position, player.Facing);
             var under = Map[x, y];
             if (Map.IsEdge(x, y) || !TileMap.IsGround(under) || under == material.Places || CropAt(x, y) != null) return false;
-            bool paving = TileMap.IsPaving(material.Places.Value);
             if ((!paving && _players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, x, y)))
                 || _enemies.Any(e => !e.IsDead && Touches(e.Position, e.Definition.Radius, x, y))
                 || _bosses.Any(b => Touches(b.Position, b.Definition.Radius, x, y) || Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1))

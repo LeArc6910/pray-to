@@ -1562,7 +1562,12 @@ async function first(browser) {
   // 4. Stone floor: made at the workbench (beside it), laid on open floor.
   await mine(async () => count(await inv(), 'stone') >= 4, 40);
   const bench = (await near()).find(a => a.tile === 'Workbench');
-  note(`- 돌 바닥을 만들 때 작업대 곁인가: ${bench ? '예' : '아니오(굴을 파다 멀어졌다)'}`);
+  if (!bench) {
+    // Dug away from it for the stone: back beside it, as a person would walk back down the tunnel.
+    note('- 돌 바닥을 만들 때 작업대에서 멀어져 있었다(돌을 더 캐느라). 봇은 작업대 곁으로 옮겨졌다');
+    await game.send('goto near Workbench');
+    await game.wait(800);
+  }
   await faceOpen();
   await bagTab(game, '재료·제작');
   const made = await game.press('만들기', /^돌 바닥/);
