@@ -149,6 +149,7 @@ namespace Game.Client
         // drawn every frame.
         public static string Wrap(string text, GUIStyle style, float width)
         {
+            if (Probing && !string.IsNullOrEmpty(text) && Event.current != null && Event.current.type == EventType.Repaint) Writing.Add(text);
             if (string.IsNullOrEmpty(text) || width <= 0) return text;
             var key = (text, Mathf.RoundToInt(width), style.fontSize, style.fontStyle);
             if (Wrapped.TryGetValue(key, out string wrapped)) return wrapped;
@@ -228,6 +229,10 @@ namespace Game.Client
         internal static bool Probing { get; set; }
         internal static IReadOnlyList<Drawn> LastDrawn { get; private set; } = new List<Drawn>();
         static readonly List<Drawn> Drawing = new List<Drawn>();
+        // The texts laid out with Wrap in the last repaint (most labels: menus, the bag's lines), for the playtest's
+        // "texts" (a check can read a label as a person reads it, not only buttons).
+        internal static IReadOnlyList<string> LastWritten { get; private set; } = new List<string>();
+        static readonly List<string> Writing = new List<string>();
         static readonly Stack<int> ScrollStarts = new Stack<int>();
         static string _row = "";
 
@@ -237,6 +242,8 @@ namespace Game.Client
             if (!Probing || Event.current.type != EventType.Repaint) return;
             LastDrawn = Drawing.ToArray();
             Drawing.Clear();
+            LastWritten = Writing.ToArray();
+            Writing.Clear();
             _row = "";
             ScrollStarts.Clear();
         }

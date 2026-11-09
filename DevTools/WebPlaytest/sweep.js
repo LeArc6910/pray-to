@@ -1758,7 +1758,7 @@ async function firstRun(browser, profile, hourLong) {
   // Digs the wall at (dx, dy) with what is in hand: attack toward it until it breaks (at most six seconds). On the
   // phone the attack stick is held pulled toward it.
   // Where the time goes (seconds walking to veins, seconds digging, digs that did not break), for the report.
-  const spent = { vein: 0, dig: 0, digs: 0, stuck: 0 };
+  const spent = { vein: 0, dig: 0, digs: 0, stuck: 0, fights: 0 };
   const dig = async (dx, dy) => {
     const started = Date.now();
     spent.digs++;
@@ -1772,7 +1772,15 @@ async function firstRun(browser, profile, hourLong) {
     if (game.touch) await lift();
     else await game.send('attack off');
     spent.dig += (Date.now() - started) / 1000;
-    if (!gone) spent.stuck++;
+    if (!gone) {
+      spent.stuck++;
+      // The first few that did not break, with where the bot stood in its tile and what was near, for the report.
+      if (spent.stuck <= 3) {
+        const s = await game.state();
+        const t = await game.texts();
+        note(`  - (안 깨진 벽 ${spent.stuck}) 방향 ${dx},${dy}, 벽 ${(await game.look(dx, dy)).tile}, 선 곳 ${s.x},${s.y}, 바라본 칸 ${s.ahead}, 손 ${s.weapon}, 가까운 몬스터 ${s.foe || '없음'}(${s.monsters}마리), 체력 ${s.health}, 떠 있는 글 ${(t.floating || []).join('/') || '없음'}`);
+      }
+    }
     return gone;
   };
   const key = { '1,0': 'd', '-1,0': 'a', '0,1': 'w', '0,-1': 's' };
@@ -1790,12 +1798,51 @@ async function firstRun(browser, profile, hourLong) {
   };
   // Mines a tunnel: the nearest wall beside, else a step toward open floor, until `enough` says stop.
   // With `prefer` (a tile type) it digs that first, and with none beside it goes to the next one (`onNone`).
+  const drink = async () => {
+    if (game.touch) await game.press('potion', undefined, { quiet: true });
+    else await game.page.keyboard.press('c');
+  };
+  // Attacks toward (dx, dy) for a moment: the attack stick pulled that way on the phone, the aim on PC.
+  const strike = async (dx, dy, ms) => {
+    const d = Math.hypot(dx, dy) || 1;
+    if (game.touch) {
+      await hold('aim', dx / d, dy / d);
+      await game.wait(ms);
+      await lift();
+    } else {
+      await game.send(`attack on ${(dx / d).toFixed(2)} ${(dy / d).toFixed(2)}`);
+      await game.wait(ms);
+      await game.send('attack off');
+    }
+  };
+  // A monster at hand while digging or walking to a vein (2026-11-09: the phone bot fell to slimes at its
+  // workbench in its first two minutes, never striking back): the sword on 1 at it until it falls or keeps off, a
+  // potion below 40% health, then the pickaxe again. As a person would.
+  const defend = async () => {
+    let fought = false;
+    for (let i = 0; i < 25; i++) {
+      const s = await game.state();
+      if (s.dead) break;
+      if (s.health < s.maxHealth * 0.4) await drink();
+      const foe = offset(s.foe);
+      if (!foe || Math.hypot(foe[0], foe[1]) > 2.2) break;
+      if (!fought) {
+        await slot(1);
+        fought = true;
+        spent.fights++;
+      }
+      await strike(foe[0], foe[1], 450);
+    }
+    if (fought) await slot(2);
+    return fought;
+  };
   const mine = async (enough, seconds, prefer = null, onNone = null) => {
     // The pickaxe in hand (quick slot 2), as the first goal's hint says.
     await slot(2);
     const until = Date.now() + seconds * 1000;
     let way = [1, 0];
     while (Date.now() < until && !(await enough())) {
+      if (await defend()) continue;
       const around = await near();
       const wanted = prefer && around.find(a => a.tile === prefer);
       if (prefer && !wanted && onNone) {
@@ -1977,6 +2024,7 @@ async function firstRun(browser, profile, hourLong) {
         beside = !!v;
         break;
       }
+      if (await defend()) continue;
       let [sx, sy] = toward(v[0], v[1]);
       let ahead = (await game.look(sx, sy)).tile;
       // Water cannot be dug: round it the other way toward the vein, or aside (as a person walks the shore).
@@ -2008,7 +2056,7 @@ async function firstRun(browser, profile, hourLong) {
   await mine(async () => count(await inv(), 'copper_ore') >= 6, 150, 'CopperOre', nextVein);
   if (count(await inv(), 'copper_ore') < 6) await why(`구리 ${count(await inv(), 'copper_ore')}개에서 멈춤`);
   note(`- 구리 광맥: 미니맵이 가리키는 가장 가까운 광맥으로 ${veins}번 파 들어갔다${carried ? `(16칸 안에 없어 ${carried}번 옮겨졌다)` : ''}`);
-  note(`  - 쓴 때: 광맥 찾아가기 ${Math.round(spent.vein)}초, 벽·광석 캐기 ${Math.round(spent.dig)}초(${spent.digs}번, 그 가운데 6초 안에 안 깨진 것 ${spent.stuck}번)`);
+  note(`  - 쓴 때: 광맥 찾아가기 ${Math.round(spent.vein)}초, 벽·광석 캐기 ${Math.round(spent.dig)}초(${spent.digs}번, 그 가운데 6초 안에 안 깨진 것 ${spent.stuck}번), 곁에 온 몬스터와 싸움 ${spent.fights}번`);
   await game.wait(1000);
   await passed(5, '구리 광석 6개 캐기');
 
@@ -2072,23 +2120,6 @@ async function firstRun(browser, profile, hourLong) {
       if (count(await inv(), 'copper_ore') >= n) return;
       await nextVein();
       await mine(async () => count(await inv(), 'copper_ore') >= n, 150, 'CopperOre', nextVein);
-    };
-    const drink = async () => {
-      if (game.touch) await game.press('potion', undefined, { quiet: true });
-      else await game.page.keyboard.press('c');
-    };
-    // Attacks toward (dx, dy) for a moment: the attack stick pulled that way on the phone, the aim on PC.
-    const strike = async (dx, dy, ms) => {
-      const d = Math.hypot(dx, dy) || 1;
-      if (game.touch) {
-        await hold('aim', dx / d, dy / d);
-        await game.wait(ms);
-        await lift();
-      } else {
-        await game.send(`attack on ${(dx / d).toFixed(2)} ${(dy / d).toFixed(2)}`);
-        await game.wait(ms);
-        await game.send('attack off');
-      }
     };
     // Walks onto the drops lying near.
     const gather = async seconds => {

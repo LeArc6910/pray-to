@@ -21,7 +21,7 @@ namespace Game.Client
     //   solo [name] [keep]        start a solo game; a fresh world and character unless "keep"
     //   probe on|off              keep the drawn buttons (Ui.LastDrawn) for "buttons"
     //   buttons                   JSON: every button drawn last frame, with its rect in points; the skill and quick slots
-    //   texts                     JSON: the HUD's lines, the corner lines, the banner, the menu's status line
+    //   texts                     JSON: the HUD's lines, the corner lines, the banner, the menu's status line, the labels laid out with Ui.Wrap
     //   touch on|off              report (JSON: the player, the time, the monsters, the machines, the screen)
     // In a solo game:
     //   scene combo|machines|defense|rift|skylight|set
@@ -537,6 +537,7 @@ namespace Game.Client
                 .Field("banner", root.Banner)
                 .Field("floating", Strings(root.FloatingTexts))
                 .Field("status", root.Status)
+                .Field("written", Strings(Ui.LastWritten))
                 .Close('}');
 
         static string Inventory(Player player, WorldClient client)

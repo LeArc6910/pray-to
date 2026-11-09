@@ -133,7 +133,7 @@ function helpers(game) {
   // Every line the screen shows, for looking a word up.
   h.allText = async () => {
     const t = await h.texts();
-    return [...(t.hud || []), ...(t.acquired || []), ...(t.floating || []), t.banner || '', t.status || ''].join(' | ');
+    return [...(t.hud || []), ...(t.acquired || []), ...(t.floating || []), t.banner || '', t.status || '', ...(t.written || [])].join(' | ');
   };
 
   h.canvas = () =>
