@@ -963,5 +963,40 @@ namespace Game.Core.Tests
                 session.Tick(2);
             });
         }
+    
+        [Test]
+        public void MachinesGoOnlyWhenTheyChangeAndManyMoreThanTheCapReachTheClient()
+        {
+            // 2026-11-09, Docs/Automation.md 통신: a still base costs nothing, and a big one is not cut off at the cap.
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var world = session.Host.World;
+            var player = world.FindPlayer(alice.PlayerId);
+            int px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
+            int built = 0;
+            for (int dy = -6; dy <= 6 && built < 100; dy++)
+            {
+                for (int dx = -6; dx <= 6 && built < 100; dx++)
+                {
+                    if (Math.Abs(dx) <= 1 && Math.Abs(dy) <= 1) continue;
+                    world.Build(px + dx, py + dy, TileType.Conveyor);
+                    built++;
+                }
+            }
+            session.Tick(8);
+            Assert.AreEqual(100, alice.Machines().Count, "all hundred, past the sixty a message holds");
+
+            // Still: the next round (machines go every MachineInterval ticks) sends no machine message, until the refresh.
+            var later = new List<Outgoing>();
+            for (int i = 0; i < 6; i++)
+            {
+                session.Host.Tick();
+                later.AddRange(session.Host.TakeOutgoing());
+            }
+            Assert.IsFalse(later.Any(m => Protocol.TypeOf(m.Data) == MessageType.Machines), "nothing changed, nothing sent");
+            foreach (var message in later) alice.Receive(message.Data);
+            session.Tick((int)(1.1f * World.TicksPerSecond));
+            Assert.AreEqual(100, alice.Machines().Count, "the refresh keeps them all in view");
+        }
     }
 }

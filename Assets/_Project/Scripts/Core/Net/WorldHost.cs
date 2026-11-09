@@ -64,7 +64,8 @@ namespace Game.Core
             public int SentChest = -1;
             public int SentChestVersion = -1;
             // Whether the last machines message had any, so an empty one is sent once when they go out of view.
-            public bool SentMachines;
+            // Each machine in view as last sent and when (2026-11-09: only what changed goes, and each again now and then).
+            public readonly Dictionary<int, (MachineState State, long Tick)> SentMachineStates = new Dictionary<int, (MachineState State, long Tick)>();
             // The last stock message sent, to send again only when it changes.
             public byte[] SentStock;
             // The last production message sent, likewise.
@@ -712,17 +713,40 @@ namespace Game.Core
             Send(connection, message, reliable: true);
         }
 
+        // Machines in view, a message of at most MaxMachinesPerMessage at a time (2026-11-09, Docs/Automation.md 통신):
+        // only the ones that changed since they were last sent, and each again every MachineRefreshSeconds in case a
+        // message was lost, so a still base costs next to nothing and a big one is not cut off at the cap. Past
+        // MachineMessagesPerTick messages the rest wait a tick, nearest first.
         void SendMachines(ulong connection, Connection sent)
         {
             var viewer = sent.Player.Position;
-            var near = World.Machines
+            long now = World.Tick;
+            long refresh = (long)(MachineRefreshSeconds * World.TicksPerSecond);
+            var inView = World.Machines
                 .Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer) <= _config.ViewRange)
                 .OrderBy(m => Vec2.Distance(TileMap.Center(m.X, m.Y), viewer))
-                .Take(_config.MaxMachinesPerMessage)
-                .Select(m => new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled,
-                    SettingOf(m), World.IsPowered(m), m.Inputs.Values.Sum(), m.Outputs.Values.Sum(), m.Settings.Select(s => IndexOf(_loot.Materials, s)).ToList()))
                 .ToList();
-            if (near.Count == 0 && !sent.SentMachines) return;
+            var keys = new HashSet<int>();
+            var due = new List<(int Key, MachineState State)>();
+            foreach (var m in inView)
+            {
+                int key = m.Y * World.Map.Width + m.X;
+                keys.Add(key);
+                var state = new MachineState(m.X, m.Y, m.Kind, m.Direction, m.Carried == null ? -1 : IndexOf(_loot.Materials, m.Carried), m.Progress, m.Enabled,
+                    SettingOf(m), World.IsPowered(m), m.Inputs.Values.Sum(), m.Outputs.Values.Sum(), m.Settings.Select(s => IndexOf(_loot.Materials, s)).ToList());
+                if (sent.SentMachineStates.TryGetValue(key, out var last) && last.State.SameAs(state) && now - last.Tick < refresh) continue;
+                due.Add((key, state));
+            }
+            // Out of view: forgotten, so coming back sends them at once.
+            foreach (int gone in sent.SentMachineStates.Keys.Where(k => !keys.Contains(k)).ToList()) sent.SentMachineStates.Remove(gone);
+            int most = _config.MaxMachinesPerMessage;
+            for (int start = 0; start < due.Count && start < most * MachineMessagesPerTick; start += most)
+            {
+                var part = due.Skip(start).Take(most).ToList();
+                foreach (var (key, state) in part) sent.SentMachineStates[key] = (state, now);
+                Send(connection, new MachinesMessage(part.Select(p => p.State).ToList()).Encode(), reliable: false);
+            }
+
             int SettingOf(Machine m)
             {
                 if (World.IsAssembler(m.Kind)) return m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe);
@@ -730,9 +754,10 @@ namespace Game.Core
                 if (World.IsPowerNode(m.Kind)) return World.GridOf(m) is PowerGrid grid ? MachineState.Grid(grid.Supply, grid.Demand) : -1;
                 return m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting);
             }
-            sent.SentMachines = near.Count > 0;
-            Send(connection, new MachinesMessage(near).Encode(), reliable: false);
         }
+
+        const float MachineRefreshSeconds = 1;
+        const int MachineMessagesPerTick = 3;
 
         // The chest the player stands by, when it is a different one or it changed; a closed message when they left it.
         void SendChest(ulong connection, Connection sent)

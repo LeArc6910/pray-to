@@ -39,7 +39,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.65.0";
+        public const string Version = "0.66.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -544,6 +544,12 @@ namespace Game.Core
         public int Held { get; }
         // A filter's chosen materials, as sheet indexes.
         public IReadOnlyList<int> Picks { get; }
+
+        // Whether a client would see no difference (progress as it goes over the wire, a 255th at a time).
+        public bool SameAs(MachineState other) =>
+            X == other.X && Y == other.Y && Kind == other.Kind && Direction == other.Direction && Carried == other.Carried && On == other.On
+            && Setting == other.Setting && Powered == other.Powered && Holding == other.Holding && Held == other.Held
+            && (int)MathF.Round(Progress * 255) == (int)MathF.Round(other.Progress * 255) && Picks.SequenceEqual(other.Picks);
     }
 
     // Uses the skill in a slot, aimed where the player points. Sent reliably: a press must not get lost.

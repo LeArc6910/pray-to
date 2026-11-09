@@ -811,8 +811,8 @@ namespace Game.Core
                             .ToList();
                         break;
                     case MessageType.Machines:
-                        _machines = MachinesMessage.Decode(data).Machines;
-                        _machinesTick = HostTick;
+                        // The host sends what changed (2026-11-09): each one replaces what was heard of it before.
+                        foreach (var machine in MachinesMessage.Decode(data).Machines) _machineStates[machine.Y * 65536 + machine.X] = (machine, HostTick);
                         break;
                     case MessageType.Snapshot:
                         if (Status == ClientStatus.Playing) Apply(SnapshotMessage.Decode(data));
@@ -1025,27 +1025,35 @@ namespace Game.Core
         // In the order the crafting list shows them.
         public IReadOnlyList<Recipe> Recipes => _loot?.Recipes ?? (IReadOnlyList<Recipe>)Array.Empty<Recipe>();
 
-        IReadOnlyList<MachineState> _machines = Array.Empty<MachineState>();
+        // Each machine as last heard of and when. One the host has not mentioned for MachineStaleSeconds is out of view
+        // or gone; one whose tile is no longer that machine went with it.
+        readonly Dictionary<int, (MachineState State, double Tick)> _machineStates = new Dictionary<int, (MachineState State, double Tick)>();
+        const double MachineStaleSeconds = 2.5;
 
         // What machines made lately (World.Production): a MaterialDefinition or ConsumableDefinition each, most first,
         // over ProductionMinutes.
         public IReadOnlyList<(object Made, int Count)> Production { get; private set; } = Array.Empty<(object, int)>();
         public float ProductionMinutes { get; private set; }
-        double _machinesTick;
 
         // The machines in view, with conveyor loads moved on to where they are now.
         public List<MachineView> Machines()
         {
-            var views = new List<MachineView>(_machines.Count);
-            foreach (var m in _machines)
+            var views = new List<MachineView>(_machineStates.Count);
+            foreach (var key in _machineStates.Keys.ToList())
             {
+                var (m, heard) = _machineStates[key];
+                if (HostTick - heard > MachineStaleSeconds * World.TicksPerSecond || Map != null && Map.InBounds(m.X, m.Y) && Map[m.X, m.Y] != m.Kind)
+                {
+                    _machineStates.Remove(key);
+                    continue;
+                }
                 var carried = m.Carried >= 0 && _loot != null && m.Carried < _loot.Materials.Count ? _loot.Materials[m.Carried] : null;
                 float progress = m.Progress;
                 var definition = _tiles?.Machine(m.Kind);
                 // Loads move on between messages (twice as fast with power); a generator's fuel does not.
                 if (carried != null && definition != null && m.On && !World.IsGenerator(m.Kind))
                 {
-                    progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks * (m.Powered ? 2 : 1)));
+                    progress = Math.Min(1, progress + (float)((HostTick - heard) / definition.Ticks * (m.Powered ? 2 : 1)));
                 }
                 bool assembler = World.IsAssembler(m.Kind);
                 bool node = World.IsPowerNode(m.Kind);
