@@ -74,8 +74,9 @@ namespace Game.Client
             public float MotionLength;
             public int SpinFrom;
             public Sprite Holding;
-            // A boss's state as the snapshots say, for its pose.
+            // A boss's state as the snapshots say, for its pose; a monster's likewise.
             public BossState BossState;
+            public EnemyState EnemyState;
             // A player lying in their bed (World.Sleep): "Zz" over them.
             public bool Sleeping;
             public float HurtTime;
@@ -663,6 +664,7 @@ namespace Game.Client
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
                 if (view.Kind == EntityKind.Boss) body.BossState = view.BossState;
+                if (view.Kind == EntityKind.Monster) body.EnemyState = view.EnemyState;
                 body.Sleeping = view.IsPlayer && PlayerPhase.IsSleeping(view.Phase);
                 if (view.IsPlayer) DrawPet(view.Id, body, PlayerPhase.PetOf(view.Phase), deltaTime);
 
@@ -1146,8 +1148,8 @@ namespace Game.Client
             DrawWires();
         }
 
-        // The merchant behind each stall in view, breathing and blinking like a standing player, with the counter drawn
-        // again over her legs.
+        // The person behind each stall in view, drawn as themselves and busy with their trade (PeopleArt), with the
+        // counter drawn again over their legs.
         readonly Dictionary<int, (SpriteRenderer Figure, SpriteRenderer Counter)> _people = new Dictionary<int, (SpriteRenderer, SpriteRenderer)>();
         readonly List<(int X, int Y, NpcDefinition Npc)> _stalls = new List<(int X, int Y, NpcDefinition Npc)>();
         const int PeopleRange = 18;
@@ -1170,11 +1172,14 @@ namespace Game.Client
                     }
                 }
             }
-            int frame = Mathf.FloorToInt(Time.time * 1.5f) % CreatureArt.StandFrames;
+            // Each person loops their own little motion (PeopleArt), started at a different time by where they stand.
             foreach (var (x, y, npc) in _stalls)
             {
                 var tunic = Rgba.Hex(npc.Color);
-                var figure = Sprites.Standing($"npc/{npc.Id}/{frame}", () => CreatureArt.Player(Look.Down, frame, tunic, Pose.Stand));
+                int frame = Mathf.FloorToInt(Time.time * PeopleArt.FramesPerSecond + x * 7 + y * 3) % PeopleArt.Frames;
+                int stand = frame % CreatureArt.StandFrames;
+                var figure = Sprites.Standing($"npc/{npc.Id}/{frame}",
+                    () => PeopleArt.Person(npc.Id, tunic, frame) ?? CreatureArt.Player(Look.Down, stand, tunic, Pose.Stand));
                 int key = y * map.Width + x;
                 _seen.Add(key);
                 if (!_people.TryGetValue(key, out var person))
@@ -2151,6 +2156,30 @@ namespace Game.Client
                 body.Glow.sprite = Sprites.Standing(bossKey + "/white", () => drawBoss().Silhouette());
                 body.Shape.flipX = turned;
                 body.Glow.flipX = turned;
+                body.Top = -body.Feet + body.Shape.sprite.rect.height / Sprites.PixelsPerUnit;
+                return;
+            }
+
+            if (body.Kind == BodyKind.Monster)
+            {
+                // Eight ways as two looks flipped: from the side, or from behind going away (up, or up and aside);
+                // and a pose: hit, striking, winding up (2026-11-09).
+                int sector = SectorOf(facing);
+                var monsterView = !dead && (sector == 1 || sector == 2 || sector == 3) ? MonsterView.Back : MonsterView.Side;
+                var monsterPose = dead ? MonsterPose.Idle
+                    : body.HurtTime > 0 ? MonsterPose.Hurt
+                    : body.StrikeTime > 0 ? MonsterPose.Strike
+                    : body.EnemyState == EnemyState.Windup ? MonsterPose.Windup
+                    : MonsterPose.Idle;
+                int monsterCode = 200000 + (((int)monsterPose * 4 + (int)monsterView) * 16 + frame) * 2 + (left ? 1 : 0);
+                if (monsterCode == body.Frame) return;
+                body.Frame = monsterCode;
+                string monsterKey = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{monsterView}/{monsterPose}/{frame}";
+                Func<PixelImage> drawMonster = () => CreatureArt.Monster(body.Id, body.Color, frame, monsterView, monsterPose);
+                body.Shape.sprite = Sprites.Standing(monsterKey, drawMonster);
+                body.Glow.sprite = Sprites.Standing(monsterKey + "/white", () => drawMonster().Silhouette());
+                body.Shape.flipX = left;
+                body.Glow.flipX = left;
                 body.Top = -body.Feet + body.Shape.sprite.rect.height / Sprites.PixelsPerUnit;
                 return;
             }

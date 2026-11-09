@@ -442,7 +442,7 @@ namespace Game.Client
 
         // ---- The pictures ----
 
-        public static void Write(string folder, LootData loot)
+        public static void Write(string folder, LootData loot, MonsterData monsters, NpcData npcs)
         {
             Directory.CreateDirectory(folder);
             var sword = loot.Bases.First(b => b.Id == "iron_sword");
@@ -456,6 +456,110 @@ namespace Game.Client
             PlayerTurn(Path.Combine(folder, "player_turn.gif"), sword, floor);
             PlayerMotions(Path.Combine(folder, "player_motions.gif"), sword, bow, staff, potion, food, floor);
             Bosses(Path.Combine(folder, "bosses.gif"), arena);
+            Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
+            People(Path.Combine(folder, "people.gif"), npcs, floor);
+        }
+
+        // Each person at their stall as WorldView draws them (2026-11-09): the stall, the person standing in it and the
+        // counter over their legs; two loops.
+        static void People(string path, NpcData npcs, PixelImage floor)
+        {
+            var list = npcs.Npcs.ToList();
+            var counter = TileArt.MerchantCounter;
+            Play(path, list.Count, 1, 26, 30, 5, 0.6f, 2 * PeopleArt.Frames / PeopleArt.FramesPerSecond, floor, (column, row, time, step) =>
+            {
+                var npc = list[column];
+                int frame = (int)MathF.Floor(time * PeopleArt.FramesPerSecond) % PeopleArt.Frames;
+                var person = PeopleArt.Person(npc.Id, Rgba.Hex(npc.Color), frame) ?? CreatureArt.Player(Look.Down, 0, Rgba.Hex(npc.Color), Pose.Stand);
+                return new List<Draw>
+                {
+                    Sprite(TileArt.Object(npc.Tile), 0, 0, 0.5f, 0.5f, 0),
+                    Sprite(person, 0, -0.2f, 0.5f, 0, 10),
+                    Sprite(counter, 0, 0, 0.5f, 0.5f, 12),
+                };
+            });
+        }
+
+        // ---- A monster (2026-11-09), as WorldView draws one: two looks flipped for eight ways, and a pose ----
+
+        sealed class Critter
+        {
+            public string Id;
+            public Rgba Color;
+            public float Radius;
+            public int Seed;
+            public Vec2 Facing = new Vec2(1, 0);
+            public bool Moving;
+            public EnemyState State;
+            public float StrikeTime, LungeTime, HurtTime, FlashTime, KnockTime;
+            public Vec2 Lunge, Knock;
+
+            public void Attack()
+            {
+                LungeTime = LungeSeconds;
+                Lunge = Facing;
+                StrikeTime = StrikeSeconds;
+            }
+
+            public void Hit()
+            {
+                FlashTime = FlashSeconds;
+                HurtTime = HurtSeconds;
+                Knock = new Vec2(-Facing.X, -Facing.Y);
+                KnockTime = KnockSeconds;
+            }
+
+            public List<Draw> Frame(float time, float deltaTime)
+            {
+                float feet = Radius * 0.8f;
+                var draws = new List<Draw>();
+                int frame = (int)MathF.Floor(time * (Moving ? 6 : 3) + Seed * 0.37f) % CreatureArt.IdleFrames;
+                int sector = SectorOf(Facing);
+                var view = sector == 1 || sector == 2 || sector == 3 ? MonsterView.Back : MonsterView.Side;
+                bool left = Facing.X < 0;
+                var pose = HurtTime > 0 ? MonsterPose.Hurt : StrikeTime > 0 ? MonsterPose.Strike : State == EnemyState.Windup ? MonsterPose.Windup : MonsterPose.Idle;
+                var body = CreatureArt.Monster(Id, Color, frame, view, pose);
+                float lean = LungeTime > 0 ? MathF.Sin(LungeTime / LungeSeconds * MathF.PI) * LungeDistance : 0;
+                float knock = KnockTime > 0 ? MathF.Sin(KnockTime / KnockSeconds * MathF.PI) * LungeDistance : 0;
+                float x = Lunge.X * lean + Knock.X * knock, y = -feet + Lunge.Y * lean + Knock.Y * knock;
+                float scaleY = State == EnemyState.Windup ? 1 + 0.06f * MathF.Sin(time * 30) : 1;
+                int shadowWidth = Math.Max(6, (int)MathF.Round(Radius * 2 * Ppu * 0.9f));
+                draws.Add(Sprite(CreatureArt.Shadow(shadowWidth), 0, -feet + 1f / Ppu, 0.5f, 0.5f, -30));
+                draws.Add(Sprite(body, x, y, 0.5f, 0, 10000, left, scaleY: scaleY));
+                // The red glow of a wind-up, and the white flash of a hit.
+                if (State == EnemyState.Windup)
+                    draws.Add(Sprite(body.Silhouette(), x, y, 0.5f, 0, 10001, left, scaleY: scaleY, tint: new Rgba(255, 77, 51, (int)(255 * (0.35f + 0.25f * MathF.Sin(time * 30))))));
+                if (FlashTime > 0) draws.Add(Sprite(body.Silhouette(), x, y, 0.5f, 0, 10002, left, tint: new Rgba(255, 255, 255, 217)));
+                LungeTime = MathF.Max(0, LungeTime - deltaTime);
+                StrikeTime = MathF.Max(0, StrikeTime - deltaTime);
+                HurtTime = MathF.Max(0, HurtTime - deltaTime);
+                FlashTime = MathF.Max(0, FlashTime - deltaTime);
+                KnockTime = MathF.Max(0, KnockTime - deltaTime);
+                return draws;
+            }
+        }
+
+        // Every monster, seven a row: a second walking right, a second walking away (its back), half a second walking
+        // left, a wind-up of 0.6 seconds and the strike, then a hit; 4.8 seconds a loop.
+        static void Critters(string path, MonsterData monsters, PixelImage floor)
+        {
+            var list = monsters.Monsters.ToList();
+            const int columns = 7;
+            int rows = (list.Count + columns - 1) / columns;
+            var critters = list.Select((m, i) => new Critter { Id = m.Id, Color = Rgba.Hex(m.Color), Radius = m.Radius, Seed = i }).ToList();
+            Play(path, columns, rows, 26, 22, 4, 0.7f, 4.8f, floor, (column, row, time, step) =>
+            {
+                int index = row * columns + column;
+                if (index >= critters.Count) return null;
+                var c = critters[index];
+                int tick = Ticks(time);
+                c.Moving = time < 2.6f;
+                c.Facing = time < 1.0f ? new Vec2(1, 0) : time < 2.0f ? new Vec2(0, 1) : new Vec2(-1, 0);
+                c.State = time >= 2.6f && time < 3.2f ? EnemyState.Windup : EnemyState.Chase;
+                if (tick == Ticks(3.2f)) c.Attack();
+                if (tick == Ticks(3.8f)) c.Hit();
+                return c.Frame(time, step);
+            });
         }
 
         // Plays cells side by side for so long, each cell's actor stepping every frame.

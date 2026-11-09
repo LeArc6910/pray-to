@@ -30,9 +30,12 @@ namespace Game.Client
                 loot,
                 File.ReadAllText(Path.Combine(world, TileSheet.CropsFile)),
                 File.ReadAllText(Path.Combine(world, TileSheet.MachinesFile)));
-            if (!loot.Success || !monsters.Success || !tiles.Success)
+            string npcFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Npcs"));
+            var npcs = NpcSheet.Parse(File.ReadAllText(Path.Combine(npcFolder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(npcFolder, NpcSheet.ShopFile)), loot,
+                File.ReadAllText(Path.Combine(npcFolder, NpcSheet.RequestsFile)));
+            if (!loot.Success || !monsters.Success || !tiles.Success || !npcs.Success)
             {
-                foreach (string error in loot.Errors.Concat(monsters.Errors).Concat(tiles.Errors)) Console.Error.WriteLine(error);
+                foreach (string error in loot.Errors.Concat(monsters.Errors).Concat(tiles.Errors).Concat(npcs.Errors)) Console.Error.WriteLine(error);
                 return 1;
             }
 
@@ -41,10 +44,10 @@ namespace Game.Client
             var clock = System.Diagnostics.Stopwatch.StartNew();
             for (int i = 0; i < TileArt.GroundCount; i++) TileArt.Ground(i);
             Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
-            Save(Sheet(loot, monsters), Path.Combine(output, "sheet.png"), 4);
+            Save(Sheet(loot, monsters, npcs), Path.Combine(output, "sheet.png"), 4);
             Save(Players(), Path.Combine(output, "player.png"), 6);
             Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
-            Motions.Write(Path.Combine(output, "anim"), loot);
+            Motions.Write(Path.Combine(output, "anim"), loot, monsters, npcs);
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
@@ -243,7 +246,7 @@ namespace Game.Client
 
         // ---- Every sprite ----
 
-        static PixelImage Sheet(LootData loot, MonsterData monsters)
+        static PixelImage Sheet(LootData loot, MonsterData monsters, NpcData npcs)
         {
             var rows = new List<List<PixelImage>>();
             var tiles = new List<PixelImage>();
@@ -291,10 +294,16 @@ namespace Game.Client
             }
             players.Add(CreatureArt.Player(Look.Down, 0, Rgba.Hex("#4DB06A")));
             players.Add(CreatureArt.Player(Look.Down, 0, Rgba.Hex("#E08A3C")));
-            // The merchant, and her stall.
-            players.Add(CreatureArt.Player(Look.Down, 0, CreatureArt.MerchantTunic, Pose.Stand));
-            players.Add(TileArt.Object(TileType.MerchantStall));
             rows.Add(players);
+
+            // The people, each beside their stall.
+            var people = new List<PixelImage>();
+            foreach (var npc in npcs.Npcs)
+            {
+                people.Add(PeopleArt.Person(npc.Id, Rgba.Hex(npc.Color), 0) ?? CreatureArt.Player(Look.Down, 0, Rgba.Hex(npc.Color), Pose.Stand));
+                people.Add(TileArt.Object(npc.Tile));
+            }
+            rows.Add(people);
 
             // Every pose but walking, in each direction: standing (still, breathing in, blinking), the strike's two
             // frames, casting, flinching.

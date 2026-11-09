@@ -44,6 +44,24 @@ namespace Game.Client
         Back,
     }
 
+    // Which way a monster is seen (2026-11-09): from the side (or the front: most face the viewer), or from behind,
+    // going away, its eyes hidden. WorldView flips the side for the left.
+    enum MonsterView
+    {
+        Side,
+        Back,
+    }
+
+    // What a monster is doing (2026-11-09): crouched and red-eyed winding up an attack, stretched out striking,
+    // squashed with its eyes shut when hit.
+    enum MonsterPose
+    {
+        Idle,
+        Windup,
+        Strike,
+        Hurt,
+    }
+
     // What a boss is doing (WorldView picks it from its state and its last attack).
     enum BossPose
     {
@@ -224,8 +242,6 @@ namespace Game.Client
             ['o'] = Rgba.Hex("#5A3A24"),
         };
 
-        // The merchant at her stall wears purple (WorldView draws her as a standing player).
-        public static readonly Rgba MerchantTunic = Rgba.Hex("#9A5AC8");
 
         // A player in a tunic of the given colour (blue for you, other colours for the others), in a pose and its
         // frame (Pose).
@@ -1179,8 +1195,9 @@ namespace Game.Client
             },
         };
 
-        // Monsters face right; the view flips them to face left.
-        public static PixelImage Monster(string id, Rgba color, int frame)
+        // Monsters face right; the view flips them to face left. Seen from behind their eyes are hidden; a pose reshapes
+        // them about their middle, standing on the same feet (Reshaped).
+        public static PixelImage Monster(string id, Rgba color, int frame, MonsterView view = MonsterView.Side, MonsterPose pose = MonsterPose.Idle)
         {
             var ramp = Ramp.Of(color);
             var colors = RampColors(ramp);
@@ -1188,6 +1205,9 @@ namespace Game.Client
             {
                 foreach (var pair in extra) colors[pair.Key] = pair.Value;
             }
+            if (view == MonsterView.Back) colors['e'] = ramp.Main;
+            else if (pose == MonsterPose.Windup) colors['e'] = AngryEye;
+            else if (pose == MonsterPose.Hurt) colors['e'] = ramp.Dark;
             var frames = id switch
             {
                 "ice_slime" => IceCube,
@@ -1208,7 +1228,38 @@ namespace Game.Client
                 "sand_worm" => SandWorm,
                 _ => Slime,
             };
-            return PixelImage.FromRows(colors, frames[frame % frames.Length]).Outlined(ramp.Outline);
+            var image = PixelImage.FromRows(colors, frames[frame % frames.Length]);
+            image = pose switch
+            {
+                // Crouched: two rows shorter and two wider (one each for the small ones). Striking: a row taller, a
+                // column narrower. Hit: squashed by one.
+                MonsterPose.Windup => image.Height >= 14 ? Reshaped(image, -2, 2) : Reshaped(image, -1, 1),
+                MonsterPose.Strike => Reshaped(image, 1, -1),
+                MonsterPose.Hurt => Reshaped(image, -1, 1),
+                _ => image,
+            };
+            return image.Outlined(ramp.Outline);
+        }
+
+        static readonly Rgba AngryEye = Rgba.Hex("#FF4A3A");
+
+        // The picture with rows added (or taken away, negative) through its middle and columns likewise, so the
+        // outline stays crisp and it stands on the same feet.
+        static PixelImage Reshaped(PixelImage image, int rows, int columns)
+        {
+            int width = System.Math.Max(1, image.Width + columns);
+            int height = System.Math.Max(1, image.Height + rows);
+            int midX = image.Width / 2;
+            int midY = image.Height / 2;
+            int Source(int at, int middle, int added) => added >= 0
+                ? at < middle ? at : at < middle + added ? middle : at - added
+                : at < middle ? at : at - added;
+            var result = new PixelImage(width, height);
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++) result[x, y] = image[Source(x, midX, columns), Source(y, midY, rows)];
+            }
+            return result;
         }
 
         // ---- The boss ----
