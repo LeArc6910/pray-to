@@ -346,5 +346,45 @@ namespace Game.Core.Tests
             Assert.AreEqual(2, world.MachineAt(8, 10).Outputs.GetValueOrDefault(milk), "one feed left is not enough for a cow");
             Assert.AreEqual(2, World.AnimalsIn(world.MachineAt(8, 10)));
         }
+
+        [Test]
+        public void SheepGiveWoolAndPettedAnimalsGiveBetterThings()
+        {
+            var world = Pond(out var player);
+            Place(world, player, Gear.Data.FindMaterial("fold"), 8, 10, new Vec2(0, 1));
+            var sheep = Gear.Data.FindMaterial(World.Sheep);
+            var wool = Gear.Data.FindMaterial(World.Wool);
+            var fold = world.MachineAt(8, 10);
+            Assert.IsFalse(world.PetAnimals(player.Id), "an empty fold has no one to pet");
+            player.Inventory.AddMaterial(sheep, 4);
+            player.Inventory.AddMaterial(FeedItem, 10);
+            Assert.AreEqual(3, world.LoadMachine(player.Id, sheep, 4), "three at most");
+            Assert.AreEqual(10, world.LoadMachine(player.Id, FeedItem, 10));
+
+            // Once a day.
+            Assert.IsTrue(world.PetAnimals(player.Id));
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.AnimalsPetted && e.Amount == 1));
+            Assert.IsFalse(world.PetAnimals(player.Id), "already petted today");
+            Assert.AreEqual(1, fold.Affection);
+
+            // Two days for three wool, one feed each.
+            Run(world, Tiles.Shipped.Machine(TileType.Fold).Seconds + 1);
+            Assert.AreEqual(3, wool.AllQualities.Sum(w => fold.Outputs.GetValueOrDefault(w)));
+            Assert.AreEqual(7, fold.Inputs.GetValueOrDefault(FeedItem));
+            Assert.IsTrue(world.PetAnimals(player.Id), "a new day");
+            Assert.AreEqual(2, fold.Affection);
+
+            // Fond animals give silver and gold more often; none at all, only plain.
+            var egg = Gear.Data.FindMaterial(World.Egg);
+            int fine = Enumerable.Range(0, 1000).Count(_ => world.AnimalQuality(egg, World.AffectionMost) != egg);
+            Assert.That(fine, Is.InRange(600, 760), "about 68% silver or gold at the most");
+            Assert.IsTrue(Enumerable.Range(0, 200).All(_ => world.AnimalQuality(egg, 0) == egg));
+
+            // Left alone too long, they cool by one each time they give.
+            fold.Affection = 5;
+            fold.PettedDay = world.Today - World.AffectionPatience - 1;
+            Run(world, Tiles.Shipped.Machine(TileType.Fold).Seconds + 1);
+            Assert.AreEqual(4, fold.Affection);
+        }
     }
 }

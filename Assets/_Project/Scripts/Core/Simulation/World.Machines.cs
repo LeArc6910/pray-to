@@ -39,6 +39,10 @@ namespace Game.Core
         // Ticks toward the next ore or bar; for a splitter, which of its ways out is next; for an underground belt, 1
         // while its load has come up from underground (it goes out of the front, not down again).
         internal int Timer { get; set; }
+        // A coop's, barn's or fold's: how fond its animals are of their keepers (0 to World.AffectionMost), and the day
+        // they were last petted, or -1 (World.PetAnimals).
+        public int Affection { get; internal set; }
+        public int PettedDay { get; internal set; } = -1;
         // Power owed toward the next powered step while its grid has less than it draws (World.PoweredStep).
         internal int Charge { get; set; }
         // An arc furnace's bars toward the next extra one (World.ArcFurnaceEvery).
@@ -187,6 +191,7 @@ namespace Game.Core
                     break;
                 case TileType.Coop:
                 case TileType.Barn:
+                case TileType.Fold:
                     RunAnimals(machine);
                     break;
                 case TileType.CrabPot:
@@ -330,7 +335,7 @@ namespace Game.Core
         // Machines a player can fill by hand ([넣기]): what they make things from.
         public static bool LoadsByHand(TileType kind) =>
             kind == TileType.Smelter || kind == TileType.ArcFurnace || kind == TileType.Harvester || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator
-            || kind == TileType.Coop || kind == TileType.Barn || kind == TileType.CrabPot || kind == TileType.Turret;
+            || kind == TileType.Coop || kind == TileType.Barn || kind == TileType.Fold || kind == TileType.CrabPot || kind == TileType.Turret;
 
         // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
         // a belt would. Returns how many went in.
@@ -445,6 +450,7 @@ namespace Game.Core
                     case TileType.PreservesJar:
                     case TileType.Coop:
                     case TileType.Barn:
+                    case TileType.Fold:
                     case TileType.CrabPot:
                         var made = source.Output.Keys.FirstOrDefault(Fits);
                         if (made != null) Add(source.Output, made, -1);
@@ -707,7 +713,7 @@ namespace Game.Core
                     ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
                 TileType.Harvester => IsSeed(material),
                 TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material.Kind),
-                TileType.Coop or TileType.Barn => material.Id == HouseOf(target.Kind).Animal || material.Id == Feed,
+                TileType.Coop or TileType.Barn or TileType.Fold => material.Id == HouseOf(target.Kind).Animal || material.Id == Feed,
                 TileType.CrabPot => material.Id == Bait,
                 TileType.Turret => IsAmmo(material),
                 _ => false,
@@ -764,6 +770,7 @@ namespace Game.Core
                         return true;
                     case TileType.Coop:
                     case TileType.Barn:
+                    case TileType.Fold:
                     case TileType.CrabPot:
                         if (!AnimalsTake(target, material)) return false;
                         Add(target.Input, material, 1);
@@ -807,10 +814,12 @@ namespace Game.Core
         // Puts back a machine as a world save held it.
         internal void RestoreMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
             IEnumerable<(MaterialDefinition Material, int Count)> input, IEnumerable<(MaterialDefinition Material, int Count)> output,
-            IEnumerable<MaterialDefinition> settings = null, Recipe recipe = null)
+            IEnumerable<MaterialDefinition> settings = null, Recipe recipe = null, int affection = 0, int pettedDay = -1)
         {
             var machine = MachineAt(x, y);
             if (machine == null) return;
+            machine.Affection = HouseOf(machine.Kind) != null ? Math.Clamp(affection, 0, AffectionMost) : 0;
+            machine.PettedDay = pettedDay;
             machine.Direction = direction & 3;
             machine.Enabled = (direction & Machine.OffBit) == 0;
             _gridsStale = true;

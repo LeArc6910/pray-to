@@ -513,6 +513,51 @@ namespace Game.Client
         // A small black-and-white cow, side on, facing left; two frames, head up and grazing.
         public static PixelImage Cow(int frame) => PixelImage.FromRows(CowColors, frame % 2 == 0 ? CowUp : CowGraze).Outlined(Outline);
 
+        // A sheep (2026-11-09): a cream fleece in puffs, a dark face and legs; head up, then down grazing.
+        public static PixelImage Sheep(int frame) => PixelImage.FromRows(SheepColors, frame % 2 == 0 ? SheepUp : SheepGraze).Outlined(Outline);
+
+        static readonly Dictionary<char, Rgba> SheepColors = new Dictionary<char, Rgba>(Common)
+        {
+            ['W'] = Rgba.Hex("#F4F0E6"),
+            ['w'] = Rgba.Hex("#D6CCBA"),
+            ['K'] = Rgba.Hex("#3A322C"),
+            ['e'] = Rgba.Hex("#F2E6C8"),
+        };
+
+        static readonly string[] SheepUp =
+        {
+            "....w.w.w...",
+            ".KK.wWwWwWw.",
+            "KeKwWWWWWWWw",
+            "KKKWWWwWWWWW",
+            ".KwWWWWWWwWW",
+            "..wWWWWWWWWw",
+            "...wwwwwwww.",
+            "...K.K..K.K.",
+        };
+
+        static readonly string[] SheepGraze =
+        {
+            "............",
+            "....w.w.w...",
+            "...wWwWwWwW.",
+            "..wWWWWWWWWw",
+            ".KWWWwWWWWWW",
+            "KeKWWWWWWwWW",
+            "KKKwwwwwwww.",
+            "...K.K..K.K.",
+        };
+
+        static readonly string[] Fleece =
+        {
+            "..L.L.L...",
+            ".LMLMLML..",
+            "LMMMLMMMm.",
+            "MMLMMMLMm.",
+            ".MMMMMMm..",
+            "..mmdmm...",
+        };
+
         static readonly Dictionary<char, Rgba> CowColors = new Dictionary<char, Rgba>(Common)
         {
             ['W'] = Rgba.Hex("#F6F2E8"),
@@ -862,6 +907,8 @@ namespace Game.Client
                 case "pickled_bean": return Ramped(Pickles, Ramp.Of("#6A44B8"));
                 case "chicken": return Chicken(0);
                 case "cow": return Cow(0);
+                case "sheep": return Sheep(0);
+                case "wool": return Ramped(Fleece, Ramp.Of("#F4F0E6"));
                 case "milk": return Ramped(Bottle, Ramp.Of("#F6F2E8"));
                 case "cheese": return Ramped(Goo, Ramp.Of("#F2D060"));
                 case "ammo": return Ramped(Seeds, Ramp.Of("#D8B050"));

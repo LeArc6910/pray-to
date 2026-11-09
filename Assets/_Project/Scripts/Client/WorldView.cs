@@ -1271,8 +1271,11 @@ namespace Game.Client
             int used = 0;
             foreach (var machine in _client.Machines())
             {
-                if (machine.Kind != TileType.Coop && machine.Kind != TileType.Barn) continue;
+                if (World.HouseOf(machine.Kind) == null) continue;
+                // Cows and sheep wander slower and wider than chickens.
                 bool cows = machine.Kind == TileType.Barn;
+                bool sheep = machine.Kind == TileType.Fold;
+                bool big = cows || sheep;
                 for (int i = 0; i < machine.Animals; i++)
                 {
                     if (used == _chickens.Count) _chickens.Add(Renderer(_root.transform, "Chicken", null, Color.white));
@@ -1280,11 +1283,12 @@ namespace Game.Client
                     chicken.enabled = true;
                     float t = Time.time * 0.45f + i * 1.7f + machine.X * 0.3f;
                     // Cows wander slower and wider.
-                    if (cows) t *= 0.6f;
-                    var at = new Vector3(machine.X + 0.5f + Mathf.Sin(t) * (cows ? 1.6f : 1.1f), machine.Y - (cows ? 0.9f : 0.6f) + Mathf.Sin(t * 1.9f + i) * 0.35f, 0);
+                    if (big) t *= 0.6f;
+                    var at = new Vector3(machine.X + 0.5f + Mathf.Sin(t) * (big ? 1.6f : 1.1f), machine.Y - (big ? 0.9f : 0.6f) + Mathf.Sin(t * 1.9f + i) * 0.35f, 0);
                     bool pecking = Mathf.Sin(t * 3.1f) > 0.6f;
                     int frame = pecking ? 1 : 0;
                     chicken.sprite = cows ? Sprites.Standing("animal/cow/" + frame, () => ItemArt.Cow(frame))
+                        : sheep ? Sprites.Standing("animal/sheep/" + frame, () => ItemArt.Sheep(frame))
                         : Sprites.Standing("animal/chicken/" + frame, () => ItemArt.Chicken(frame));
                     // Facing the way it is going: left while sin falls.
                     chicken.flipX = Mathf.Cos(t) > 0;
@@ -1455,6 +1459,7 @@ namespace Game.Client
 
         static readonly Color OffTint = new Color(0.5f, 0.5f, 0.56f);
         static readonly Color LevelColor = new Color(1f, 0.85f, 0.35f);
+        static readonly Color FondColor = new Color(1f, 0.55f, 0.7f);
         static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
         static readonly Color SleepLabel = new Color(0.75f, 0.85f, 1f);
         static readonly Color RiftColor = new Color(0.7f, 0.45f, 1f);
@@ -1611,6 +1616,13 @@ namespace Game.Client
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
                     break;
+                case SimEventType.AnimalsPetted:
+                    // Pink sparkles over the house, and how fond they are now.
+                    var petted = new Vector3(e.Position.X, e.Position.Y - 0.6f, 0);
+                    AddFlash(petted, 1.3f, FondColor, FlashKind.Sparkles);
+                    Hear(Sound.Harvest, petted);
+                    _floating.Add(new Floating { Position = petted + new Vector3(0, 0.8f, 0), Text = $"애정 {e.Amount}/{World.AffectionMost}", Color = FondColor });
+                    break;
                 case SimEventType.PetLevelUp:
                     // A pet grown: sparkles on it, and the news for its player.
                     var keeperOfPet = Find(e.Source);
@@ -1620,7 +1632,7 @@ namespace Game.Client
                     AddFlash(petAt, 1.1f, LevelColor, FlashKind.Sparkles);
                     if (e.Source == _client.PlayerId)
                     {
-                        ShowBanner($"펫 {grownPet.Name}이(가) Lv {e.Amount}이 되었다!");
+                        ShowBanner($"펫 {_client.PetName(grownPet)}이(가) Lv {e.Amount}이 되었다!");
                         Sounds.Play(Sound.Learn);
                     }
                     break;

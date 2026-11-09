@@ -458,6 +458,41 @@ namespace Game.Client
             Bosses(Path.Combine(folder, "bosses.gif"), arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
+            Animals(Path.Combine(folder, "animals.gif"), floor);
+        }
+
+        // The coop, barn and fold with their animals wandering in front as WorldView.DrawChickens moves them, now and
+        // then pecking or grazing (2026-11-09), and the iron wall beside a stone one.
+        static void Animals(string path, PixelImage floor)
+        {
+            var houses = new[] { TileType.Coop, TileType.Barn, TileType.Fold };
+            Play(path, 4, 1, 64, 56, 4, 0.62f, 6f, floor, (column, row, time, step) =>
+            {
+                if (column == 3)
+                {
+                    return new List<Draw>
+                    {
+                        Sprite(TileArt.Object(TileType.IronWall), -0.55f, 0.3f, 0.5f, 0.5f, 0),
+                        Sprite(TileArt.Ground(TileArt.Index(GroundKind.Rock, 0, 0)), 0.55f, 0.3f, 0.5f, 0.5f, 0),
+                        Sprite(TileArt.Cracks(2), -0.55f, 0.3f, 0.5f, 0.5f, 1),
+                    };
+                }
+                var kind = houses[column];
+                bool big = kind != TileType.Coop;
+                int animals = kind == TileType.Coop ? 4 : kind == TileType.Barn ? 2 : 3;
+                var draws = new List<Draw> { Sprite(TileArt.Object(kind), 0, 0.9f, 0.5f, 0.5f, 0) };
+                for (int i = 0; i < animals; i++)
+                {
+                    float t = time * 0.45f + i * 1.7f + column * 0.3f;
+                    if (big) t *= 0.6f;
+                    float x = MathF.Sin(t) * (big ? 1.4f : 1.1f);
+                    float y = -0.4f + MathF.Sin(t * 1.9f + i) * 0.3f;
+                    int frame = MathF.Sin(t * 3.1f) > 0.6f ? 1 : 0;
+                    var image = kind == TileType.Barn ? ItemArt.Cow(frame) : kind == TileType.Fold ? ItemArt.Sheep(frame) : ItemArt.Chicken(frame);
+                    draws.Add(Sprite(image, x, y, 0.5f, 0, 10 - (int)(y * 10), flip: MathF.Cos(t) > 0));
+                }
+                return draws;
+            });
         }
 
         // Each person at their stall as WorldView draws them (2026-11-09): the stall, the person standing in it and the

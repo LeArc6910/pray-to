@@ -161,6 +161,17 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void APetsNameIsCleanedAndKeptInTheSave()
+        {
+            Assert.AreEqual("", Pets.CleanName("   "));
+            Assert.AreEqual("콩이", Pets.CleanName("  콩이\n "));
+            Assert.AreEqual(Pets.NameMost, Pets.CleanName("아주아주아주아주긴이름").Length);
+            var saved = CharacterSave.Read(CharacterSave.Write(new Equipment(), new Inventory(), 0, pet: "pet_bat",
+                petNames: new[] { ("pet_bat", "보리"), ("pet_slime", "") }), Gear.Data);
+            CollectionAssert.AreEqual(new[] { ("pet_bat", "보리") }, saved.PetNames.ToArray(), "an empty name is not kept");
+        }
+
+        [Test]
         public void EveryPetHasAnEggAndMonstersThatDropIt()
         {
             foreach (var pet in Pets.All)

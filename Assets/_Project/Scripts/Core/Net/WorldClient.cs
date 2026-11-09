@@ -120,8 +120,10 @@ namespace Game.Core
     {
         public MachineView(int x, int y, TileType kind, int direction, MaterialDefinition carried, float progress, bool on = true,
             MaterialDefinition setting = null, bool powered = false, Recipe recipe = null, int supply = -1, int demand = -1, int holding = 0, int held = 0,
-            int animals = 0, IReadOnlyList<MaterialDefinition> settings = null)
+            int animals = 0, IReadOnlyList<MaterialDefinition> settings = null, int affection = 0, bool petted = false)
         {
+            Affection = affection;
+            Petted = petted;
             Settings = settings ?? Array.Empty<MaterialDefinition>();
             Animals = animals;
             Holding = holding;
@@ -160,8 +162,11 @@ namespace Game.Core
         // How much it holds to work on, and how much it made that waits to go out.
         public int Holding { get; }
         public int Held { get; }
-        // A coop's chickens.
+        // A coop's chickens, a barn's cows or a fold's sheep; how fond they are (0 to World.AffectionMost), and whether
+        // someone petted them today.
         public int Animals { get; }
+        public int Affection { get; }
+        public bool Petted { get; }
     }
 
     public readonly struct HazardView
@@ -361,7 +366,45 @@ namespace Game.Core
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
             Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
-            PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks);
+            PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)));
+
+        // The names this player gave their pets (Pets.CleanName), by pet id: kept in the character save only, so other
+        // players see the kind's name.
+        public IReadOnlyDictionary<string, string> PetNames
+        {
+            get
+            {
+                if (_petNames != null) return _petNames;
+                _petNames = new Dictionary<string, string>();
+                if (Character == null || Character.Length == 0 || _loot == null) return _petNames;
+                try
+                {
+                    foreach (var (pet, name) in CharacterSave.Read(Character, _loot).PetNames) _petNames[pet] = name;
+                }
+                catch (System.IO.InvalidDataException)
+                {
+                }
+                return _petNames;
+            }
+        }
+
+        Dictionary<string, string> _petNames;
+
+        // Bumped whenever a name changes, so the screen knows to save the character.
+        public int PetNamesVersion { get; private set; }
+
+        public void NamePet(PetDefinition pet, string name)
+        {
+            if (pet == null) return;
+            _ = PetNames;
+            string clean = Pets.CleanName(name);
+            if (clean.Length == 0 || clean == pet.Name) _petNames.Remove(pet.Id);
+            else _petNames[pet.Id] = clean;
+            PetNamesVersion++;
+        }
+
+        // What the pet is called: the name given, or its kind's.
+        public string PetName(PetDefinition pet) => pet == null ? "" : PetNames.TryGetValue(pet.Id, out var name) ? name : pet.Name;
 
         // The pet following this player, as the snapshots say (PlayerPhase.PetOf).
         public PetDefinition Pet { get; private set; }
@@ -482,6 +525,8 @@ namespace Game.Core
         }
 
         public byte[] RepairCommand() => new InventoryCommandMessage(InventoryCommand.Repair, 0).Encode();
+
+        public byte[] PetAnimalsCommand() => new InventoryCommandMessage(InventoryCommand.PetAnimals, 0).Encode();
 
         public byte[] ChoosePerkCommand(LifeSkill skill, int tier, int choice) =>
             new InventoryCommandMessage(InventoryCommand.ChoosePerk, choice, index: LifeSkills.PerkIndex(skill, tier)).Encode();
@@ -1000,7 +1045,7 @@ namespace Game.Core
                 var recipe = assembler && m.Setting >= 0 && _loot != null && m.Setting < _loot.Recipes.Count ? _loot.Recipes[m.Setting] : null;
                 var picks = _loot == null ? new List<MaterialDefinition>() : m.Picks.Where(i => i >= 0 && i < _loot.Materials.Count).Select(i => _loot.Materials[i]).ToList();
                 views.Add(new MachineView(m.X, m.Y, m.Kind, m.Direction, carried, progress, m.On, setting, m.Powered, recipe, supply, demand, m.Holding, m.Held,
-                    coop ? Math.Max(0, m.Setting) : 0, picks));
+                    coop ? World.AnimalsOf(m.Setting) : 0, picks, coop ? World.AffectionOf(m.Setting) : 0, coop && World.PettedOf(m.Setting)));
             }
             return views;
         }

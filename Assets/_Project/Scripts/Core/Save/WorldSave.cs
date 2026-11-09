@@ -18,7 +18,8 @@ namespace Game.Core
         // 6: a filter's chosen material on each machine. 7: the world's clock (Calendar), and crops as how far they have
         // grown and the water they have left (Docs/Time.md). 8: the highest void rift tier it may open. 9: the base
         // defense level and the day it was last defended (Docs/Defense.md).
-        const int FormatVersion = 9;
+        // 10 (2026-11-09): each machine ends with an animal house's affection and the day it was last petted.
+        const int FormatVersion = 10;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -82,8 +83,10 @@ namespace Game.Core
         {
             internal SavedMachine(int x, int y, int direction, int timer, MaterialDefinition carried, float progress,
                 List<(MaterialDefinition, int)> input, List<(MaterialDefinition, int)> output, IReadOnlyList<MaterialDefinition> settings = null,
-                Recipe recipe = null)
+                Recipe recipe = null, int affection = 0, int pettedDay = -1)
             {
+                Affection = affection;
+                PettedDay = pettedDay;
                 Settings = settings ?? Array.Empty<MaterialDefinition>();
                 Recipe = recipe;
                 X = x;
@@ -109,6 +112,9 @@ namespace Game.Core
             // An assembler's recipe, or null.
             public Recipe Recipe { get; }
             public IReadOnlyList<(MaterialDefinition Material, int Count)> Output { get; }
+            // A coop's, barn's or fold's (World.PetAnimals); 0 and -1 for the rest.
+            public int Affection { get; }
+            public int PettedDay { get; }
         }
         public IReadOnlyList<string> Warnings { get; }
 
@@ -180,6 +186,8 @@ namespace Game.Core
                     SavedItems.WriteCounts(w, machine.Outputs.Select(p => (p.Key.Id, p.Value)));
                     // A filter's materials (ids joined by |, which no id has), or an assembler's recipe.
                     w.Write(machine.Settings.Count > 0 ? string.Join("|", machine.Settings.Select(m => m.Id)) : machine.Recipe?.Id ?? "");
+                    w.Write((byte)machine.Affection);
+                    w.Write(machine.PettedDay);
                 }
 
                 var beds = world.Beds.ToList();
@@ -290,8 +298,10 @@ namespace Game.Core
                         stacks.Select(s => (Find(s.Id), s.Count)).Where(s => s.Item1 != null).ToList();
                     string setting = version >= 6 ? r.ReadString() : "";
                     var picks = setting.Split('|').Where(id => id.Length > 0).Select(Find).Where(m => m != null).ToList();
+                    int affection = version >= 10 ? r.ReadByte() : 0;
+                    int pettedDay = version >= 10 ? r.ReadInt32() : -1;
                     machines.Add(new SavedMachine(x, y, direction, timer, carried.Length > 0 ? Find(carried) : null, along, Resolve(input), Resolve(output),
-                        picks, setting.Length > 0 ? loot?.Recipes.FirstOrDefault(rc => rc.Id == setting) : null));
+                        picks, setting.Length > 0 ? loot?.Recipes.FirstOrDefault(rc => rc.Id == setting) : null, affection, pettedDay));
                 }
                 var beds = new List<(int, int, string)>();
                 for (int count = version >= 5 ? r.ReadInt32() : 0; count > 0; count--)

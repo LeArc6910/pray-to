@@ -224,7 +224,7 @@ namespace Game.Client
                 case "look":
                     return "look " + Look(root, px + Int(words[1]), py + Int(words[2]));
                 case "inventory":
-                    return "inventory " + Inventory(player);
+                    return "inventory " + Inventory(player, root.LocalClient);
                 case "attack":
                     root.HoldAttack = words[1] == "on";
                     if (words.Length > 3) root.HeldAim = new Vec2(Float(words[2]), Float(words[3]));
@@ -539,7 +539,7 @@ namespace Game.Client
                 .Field("status", root.Status)
                 .Close('}');
 
-        static string Inventory(Player player)
+        static string Inventory(Player player, WorldClient client)
         {
             var items = new Json('[');
             foreach (var item in player.Inventory.Items) items.Item(new Json('{').Field("id", item.Id).Field("base", item.Base.Id).Field("upgrade", item.Upgrade)
@@ -564,6 +564,7 @@ namespace Game.Client
                 .Field("records", player.Records.Count)
                 .Field("pet", player.Pet?.Id ?? "")
                 .Field("petLevel", player.PetLevel)
+                .Field("petName", client?.PetName(player.Pet) ?? "")
                 .Field("achievements", string.Join(",", player.Achievements))
                 .Field("passives", player.Passives.Count)
                 .Field("friends", Counts(player.Friendships.Select(f => new KeyValuePair<string, int>(f.Key, f.Value.Points)), id => id))
@@ -589,6 +590,7 @@ namespace Game.Client
                     .Field("output", Counts(machine.Outputs, m => m.Id))
                     .Field("picks", string.Join(",", machine.Settings.Select(m => m.Id)))
                     .Field("recipe", machine.Recipe?.Id)
+                    .Field("affection", machine.Affection)
                     .Raw('}'));
             }
             var chest = world.ChestAt(x, y);

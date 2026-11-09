@@ -199,9 +199,13 @@ namespace Game.Client
             return mouse != null ? Toward(camera, mouse.position.ReadValue(), player) : Vec2.Zero;
         }
 
+        // While a text field in the game has the keyboard (a pet's name), keys write letters: no walking, attacking or
+        // hotkeys. The screen sets it every frame.
+        public static bool Typing { get; set; }
+
         public static (Vec2 Move, Vec2 Aim, bool Attack) Read(Camera camera, Vec2 player)
         {
-            var keyboard = Keyboard.current;
+            var keyboard = Typing ? null : Keyboard.current;
             var mouse = Time.unscaledTime - _lastTouch < MouseQuietSeconds ? null : Mouse.current;
 
             float x = 0;
@@ -257,12 +261,12 @@ namespace Game.Client
         static bool _hearingWithoutFocus;
 #endif
 
-        public static bool LeavePressed() => Keyboard.current != null && Keyboard.current[Key.Escape].wasPressedThisFrame;
+        public static bool LeavePressed() => !Typing && Keyboard.current != null && Keyboard.current[Key.Escape].wasPressedThisFrame;
 
         // The bag's key, or I as well while no other action has it.
         public static bool BagPressed() =>
             KeyBindings.Pressed(KeyAction.Bag)
-            || (KeyBindings.Capturing == null && !KeyBindings.IsBound(Key.I) && Keyboard.current != null && Keyboard.current[Key.I].wasPressedThisFrame);
+            || (KeyBindings.Capturing == null && !Typing && !KeyBindings.IsBound(Key.I) && Keyboard.current != null && Keyboard.current[Key.I].wasPressedThisFrame);
 
         public static bool MapPressed() => KeyBindings.Pressed(KeyAction.Map);
 

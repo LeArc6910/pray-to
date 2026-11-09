@@ -203,6 +203,8 @@ namespace Game.Core
         ChoosePerk,
         // Mends the cracked built tile ahead (World.Repair).
         Repair,
+        // Pets the animals of the coop, barn or fold ahead (World.PetAnimals).
+        PetAnimals,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

@@ -36,6 +36,22 @@ namespace Game.Core
 
     public static class Pets
     {
+        // A name a player gives their pet (2026-11-09): trimmed, no control characters, at most NameMost letters. Empty
+        // means the pet goes by its kind's name.
+        public const int NameMost = 8;
+
+        public static string CleanName(string name)
+        {
+            if (string.IsNullOrWhiteSpace(name)) return "";
+            var kept = new string(name.Where(c => !char.IsControl(c) && !char.IsSurrogate(c)).ToArray()).Trim();
+            return kept.Length <= NameMost ? kept : kept.Substring(0, NameMost).Trim();
+        }
+
+        // Names to suggest for a pet, for those without a keyboard at hand.
+        public static readonly IReadOnlyList<string> SuggestedNames = new[]
+        {
+            "콩이", "보리", "모찌", "구름이", "별이", "두부", "호떡", "단추", "젤리", "초코", "토리", "망고",
+        };
         public static readonly IReadOnlyList<PetDefinition> All = new[]
         {
             new PetDefinition("pet_slime", "말랑이", "slime_egg", new[] { "slime", "ice_slime", "magma_slime" }, "slime", "생명력 재생 +1", false,

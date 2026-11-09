@@ -427,6 +427,9 @@ namespace Game.Core
         // Source, a player, drank something that restores mana: Amount the mana it gave, Target the consumable's row
         // in consumables.csv (2026-11-09, so the screen plays the drink).
         ManaRestored,
+        // Source, a player, petted the animals of the house at Position; Amount is the house's affection now
+        // (World.PetAnimals, 2026-11-09).
+        AnimalsPetted,
     }
 
     public readonly struct SimEvent

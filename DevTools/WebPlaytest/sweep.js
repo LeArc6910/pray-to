@@ -792,6 +792,13 @@ async function life(browser) {
   await game.press('넣기', '닭 ×');
   await game.press('넣기', '사료');
   check(Object.keys(((await game.look(-1, 0)).machine || {}).input || {}).length > 0, '닭장에 [넣기]로 닭과 사료를 넣는다');
+  // Petting (2026-11-09): once a day, the house grows fonder.
+  await game.wait(600);
+  check(await game.press('쓰다듬기'), '닭이 든 닭장 앞에서 가방 [재료·제작]에 [쓰다듬기]');
+  await game.wait(600);
+  check(((await game.look(-1, 0)).machine || {}).affection === 1, `쓰다듬으면 애정이 1 (${((await game.look(-1, 0)).machine || {}).affection})`);
+  check((await game.find('쓰다듬기')).length === 0, '하루에 한 번: 쓰다듬은 뒤에는 단추 대신 "오늘 쓰다듬음"');
+  await game.shot('petted', '쓰다듬은 닭장의 애정 줄');
   await closeBag(game);
   await game.send('goto 5 1; face 0 -1'); // O+3,1 facing the crab pot
   await game.wait(400);
@@ -944,6 +951,24 @@ async function npc(browser) {
   check((await game.allText()).includes('Lv 5이 되었다'), '"펫 말랑이이(가) Lv 5이 되었다!" 알림');
   await bagTab(game);
   check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
+  // A name for the pet (2026-11-09): typed into the field, then [이름 짓기]. Keys typed must not walk the player.
+  const before = await game.state();
+  const shown = await game.buttons();
+  const nameButton = shown.find(b => /^이름 짓기/.test(b.label));
+  const suggest = shown.find(b => b.label === '추천');
+  if (nameButton && suggest) {
+    // The field is just left of [이름 짓기] (140 points wide); the two buttons give the screen's scale.
+    const scale = (suggest.cx - nameButton.cx) / ((nameButton.rect[2] + suggest.rect[2]) / 2 + 4);
+    await game.page.mouse.click(nameButton.cx - (nameButton.rect[2] / 2 + 74) * scale, nameButton.cy);
+    await game.page.keyboard.type('dw', { delay: 80 });
+    await game.wait(400);
+    const after = await game.state();
+    check(Math.abs(after.x - before.x) + Math.abs(after.y - before.y) < 0.2, '이름 칸에 글자를 치는 동안 W·D로 걷지 않는다');
+  }
+  check(await game.press('추천'), '[캐릭터] 탭의 펫 줄에 [추천]');
+  check(await game.press('이름 짓기'), '[이름 짓기]를 누른다');
+  const named = await game.until(i => i.petName && i.petName !== '말랑이', 2000, game.inventory);
+  check(!!named, `펫에 이름이 붙는다 (${named && named.petName})`);
   const doll = await game.find(/구리 검/, '캐릭터');
   check(doll.length === 1, `[캐릭터] 탭의 사람 모양 칸에 든 무기 (${doll.map(b => b.label).join(', ')})`);
   await game.shot('character', '[캐릭터] 탭');

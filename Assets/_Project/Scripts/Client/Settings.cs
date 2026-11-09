@@ -168,7 +168,7 @@ namespace Game.Client
         {
             var keyboard = Keyboard.current;
             var key = KeyFor(action);
-            return keyboard != null && Capturing == null && key != Key.None && keyboard[key].wasPressedThisFrame;
+            return keyboard != null && Capturing == null && !Controls.Typing && key != Key.None && keyboard[key].wasPressedThisFrame;
         }
 
         public static string ActionName(KeyAction action) => action switch

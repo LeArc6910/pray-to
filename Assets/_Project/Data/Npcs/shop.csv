@@ -16,6 +16,7 @@ moon_grape_seed,45,,yes,,
 void_bean_seed,50,,,1,
 chicken,120,,,1,
 cow,300,,,2,
+sheep,220,,,2,
 feed,3,,,,
 bait,2,,,,
 ammo,3,,,,blacksmith
@@ -106,6 +107,7 @@ fried_shrimp,,14,,,fisher
 milk,,12,,,
 cheese,,40,,,
 warm_milk,,20,,,
+wool,,18,,,
 healing_potion,22,5,,,alchemist
 mana_potion,24,6,,,alchemist
 support_cold,180,,yes,2,alchemist

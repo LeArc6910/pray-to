@@ -46,6 +46,7 @@ namespace Game.Client
         float _worldSaveClock;
         int _savedInventoryVersion;
         int _savedExperience;
+        int _savedPetNames;
         // [월드 지우기] asks once more before it deletes.
         bool _confirmDelete;
         string _address = "127.0.0.1";
@@ -224,6 +225,10 @@ namespace Game.Client
             _view.ShowTarget = (_inventory != null && _inventory.Open) || (_hotbar != null && _hotbar.PointsAtGround);
             _view.TargetSoil = _inventory != null && _inventory.Open && _inventory.PointsAtSoil || _hotbar != null && _hotbar.PointsAtSoil;
             if (_inventory != null) _inventory.CrackAhead = _inventory.Open ? _view.CrackAhead() : null;
+            // Typing a pet's name keeps the keys from the game; the bag closing lets go of the field.
+            bool typing = _inventory != null && _inventory.Typing;
+            if (Controls.Typing && !typing && _inventory != null && !_inventory.Open) GUIUtility.keyboardControl = 0;
+            Controls.Typing = typing;
             _view.Render(_tickClock / World.TickSeconds, Time.deltaTime);
             _map.Update();
 
@@ -602,6 +607,7 @@ namespace Game.Client
         // For the play mode tests (Assets/Tests/PlayMode/FeatureTests.cs): the host's world in a solo or hosted game
         // and this player in it, the sheets, and the attack held down toward HeldAim as if the button were.
         internal World HostWorld => _host?.World;
+        internal WorldClient LocalClient => _client;
         internal Player HostPlayer => _client == null ? null : _host?.World.FindPlayer(_client.PlayerId);
         internal MonsterData MonsterSheet => _monsters;
         internal LootData LootSheet => _loot;
@@ -844,10 +850,12 @@ namespace Game.Client
         void SaveProgress(float deltaTime)
         {
             // The character is kept when its gear or bag changes, and when it gains experience.
-            if (_client.InventoryVersion != _savedInventoryVersion || (_client.Experience != _savedExperience && _client.InventoryVersion > 0))
+            if (_client.InventoryVersion != _savedInventoryVersion || (_client.Experience != _savedExperience && _client.InventoryVersion > 0)
+                || (_client.PetNamesVersion != _savedPetNames && _client.InventoryVersion > 0))
             {
                 _savedInventoryVersion = _client.InventoryVersion;
                 _savedExperience = _client.Experience;
+                _savedPetNames = _client.PetNamesVersion;
                 Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
             }
             _worldSaveClock += deltaTime;

@@ -19,6 +19,7 @@ Coop,1200,12,0
 CrabPot,900,10,0
 Turret,1,20,2
 Barn,1200,6,0
+Fold,2400,6,0
 ArcFurnace,2,20,6,yes
 WaterWheel,1,1,4
 SolarPanel,1,1,3

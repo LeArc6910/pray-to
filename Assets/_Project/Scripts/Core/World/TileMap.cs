@@ -96,6 +96,8 @@ namespace Game.Core
         AlchemyTable,
         // A wall of iron plates (Docs/Defense.md, 2026-11-09): much harder for monsters to break than stone.
         IronWall,
+        // A fold for sheep (World.Animals.cs, 2026-11-09).
+        Fold,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

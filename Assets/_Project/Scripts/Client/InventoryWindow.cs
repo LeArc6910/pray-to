@@ -86,6 +86,7 @@ namespace Game.Client
         public void Draw()
         {
             if (!Open) return;
+            _typing = GUI.GetNameOfFocusedControl() == PetNameControl;
             // Only what the pointer is over in this frame. IMGUI's own GUI.tooltip fell back to the last description
             // the pointer had been over, even when set empty, so an iron sword's text picked up on [장비] stood beside
             // the skills page (the 2026-11-09 web check). The window keeps its own.
@@ -258,11 +259,46 @@ namespace Game.Client
             string next = level >= Pets.MaxLevel ? "최고 레벨" : $"경험 {had - Pets.TotalFor(level)}/{Pets.TotalFor(level + 1) - Pets.TotalFor(level)}";
             string gives = string.Join(", ", Pets.ModifiersAt(pet, level).Select(StatText.Describe));
             if (pet.Bites) gives += $", 곁의 몬스터를 {Pets.BiteSeconds:0}초마다 문다(피해의 {Pets.BiteShareAt(level) * 100:0}%)";
+            string called = _client.PetName(pet);
+            string kind = called == pet.Name ? "" : $"({pet.Name}) ";
             GUILayout.BeginHorizontal();
             Icon(PetSprite(pet));
-            GUILayout.Label(Fit($"펫 {pet.Name} Lv {level} ({next}) · {gives}. 함께 싸우면 자란다", _textWidth - 40));
+            GUILayout.Label(Fit($"펫 {called} {kind}Lv {level} ({next}) · {gives}. 함께 싸우면 자란다", _textWidth - 40));
+            GUILayout.EndHorizontal();
+            // Its name (2026-11-09): typed, or one suggested (a phone may have no keyboard up).
+            if (_petNameFor != pet.Id)
+            {
+                _petNameFor = pet.Id;
+                _petName = _client.PetNames.TryGetValue(pet.Id, out var given) ? given : "";
+            }
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("이름", GUILayout.Width(40));
+            GUI.SetNextControlName(PetNameControl);
+            _petName = GUILayout.TextField(_petName ?? "", Pets.NameMost, GUILayout.Width(Mathf.Min(140, _textWidth - 220)));
+            bool typing = GUI.GetNameOfFocusedControl() == PetNameControl;
+            bool enter = typing && Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter);
+            if (Ui.LayoutButton("이름 짓기", GUILayout.Width(88)) || enter)
+            {
+                _client.NamePet(pet, _petName);
+                _petName = _client.PetNames.TryGetValue(pet.Id, out var kept) ? kept : "";
+                GUIUtility.keyboardControl = 0;
+                Sounds.Play(Sound.Learn);
+            }
+            if (Ui.LayoutButton("추천", GUILayout.Width(56)))
+            {
+                var names = Pets.SuggestedNames;
+                _petName = names[(Array.IndexOf(names.ToArray(), _petName) + 1 + UnityEngine.Random.Range(0, names.Count - 1)) % names.Count];
+            }
             GUILayout.EndHorizontal();
         }
+
+        const string PetNameControl = "PetName";
+        string _petNameFor;
+        string _petName;
+
+        // Whether the pet's name field has the keyboard, so walking and hotkeys keep still while typing.
+        public bool Typing => Open && _typing;
+        bool _typing;
 
         Sprite PetSprite(PetDefinition pet)
         {
@@ -760,7 +796,7 @@ namespace Game.Client
         bool Takes(MachineView machine, MaterialDefinition material) => machine.Kind switch
         {
             TileType.Assembler => machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material.Kind),
-            TileType.Coop or TileType.Barn => material.Id == World.HouseOf(machine.Kind).Animal || material.Id == World.Feed,
+            TileType.Coop or TileType.Barn or TileType.Fold => material.Id == World.HouseOf(machine.Kind).Animal || material.Id == World.Feed,
             TileType.CrabPot => material.Id == World.Bait,
             TileType.Turret => World.IsAmmo(material),
             TileType.Harvester => _client.CropFrom(material) != null,
@@ -921,6 +957,18 @@ namespace Game.Client
                     GUILayout.Label(Fit($"닭 {machine.Animals}/{World.CoopChickens}마리. 사료가 있으면 하루(20분)마다 닭마다 달걀 하나", _textWidth));
                 if (machine.Kind == TileType.Barn)
                     GUILayout.Label(Fit($"소 {machine.Animals}/{World.HouseOf(TileType.Barn).Most}마리. 사료 둘이면 하루(20분)마다 소마다 우유 하나", _textWidth));
+                if (machine.Kind == TileType.Fold)
+                    GUILayout.Label(Fit($"양 {machine.Animals}/{World.HouseOf(TileType.Fold).Most}마리. 사료가 있으면 이틀(40분)마다 양마다 양털 하나", _textWidth));
+                if (World.HouseOf(machine.Kind) != null && machine.Animals > 0)
+                {
+                    // Affection (World.PetAnimals): once a day, and fonder animals give silver and gold more often.
+                    GUILayout.BeginHorizontal();
+                    string hearts = new string('■', machine.Affection) + new string('□', World.AffectionMost - machine.Affection);
+                    GUILayout.Label(Fit($"애정 {hearts} {machine.Affection}/{World.AffectionMost} · 높을수록 은빛·금빛이 잘 나온다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+                    if (machine.Petted) GUILayout.Label("오늘 쓰다듬음", GUILayout.Width(96));
+                    else if (Ui.LayoutButton("쓰다듬기", GUILayout.Width(96))) Send(_client.PetAnimalsCommand(), Sound.Harvest);
+                    GUILayout.EndHorizontal();
+                }
                 if (machine.Kind == TileType.CrabPot)
                     GUILayout.Label(Fit("바로 옆이 물이어야 한다. 미끼 하나로 15분에 하나씩 든다", _textWidth));
                 if (machine.Kind == TileType.ArcFurnace)

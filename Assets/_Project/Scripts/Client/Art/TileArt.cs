@@ -417,6 +417,7 @@ namespace Game.Client
             TileType.GlowFloor => GlowFloorTile,
             TileType.Door => DoorTile,
             TileType.IronWall => IronWallTile,
+            TileType.Fold => FoldTile,
             TileType.Table => TableTile,
             TileType.Banner => BannerTile,
             TileType.Pot => PotTile,
@@ -1658,6 +1659,30 @@ namespace Game.Client
             ".orrroooooooorro",
             ".oooooooooooooo.",
             "..____________..",
+            "................");
+
+        // A sheep fold (2026-11-09): a straw-roofed lean-to over a hay bed, a low wooden fence round the front.
+        static readonly PixelImage FoldTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['T'] = Rgba.Hex("#E2C46A"),
+                ['t'] = Rgba.Hex("#B8963E"),
+                ['g'] = Rgba.Hex("#D8C070"),
+            },
+            "................",
+            "....oooooooo....",
+            "..ooTTTTTTTToo..",
+            ".oTTtTTtTTtTTTo.",
+            "otttttttttttttto",
+            ".oWoggggggggoWo.",
+            ".oWogtggtggtoWo.",
+            ".oWoggggggggoWo.",
+            "oooooooooooooooo",
+            "oWWWWWWWWWWWWWWo",
+            "owoowoowoowoowoo",
+            "oWWWWWWWWWWWWWWo",
+            "owoowoowoowoowoo",
+            "oooooooooooooooo",
+            ".______________.",
             "................");
 
         // A pale blue crystal standing on a carved stone base.

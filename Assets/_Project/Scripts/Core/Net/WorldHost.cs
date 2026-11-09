@@ -373,7 +373,8 @@ namespace Game.Core
             World.RestoreClock(save.Clock);
             World.RestoreRiftTier(save.RiftTier);
             World.RestoreDefense(save.DefenseLevel, save.DefenseDay);
-            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Settings, m.Recipe);
+            foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Settings, m.Recipe,
+                m.Affection, m.PettedDay);
             World.PlaceNpcs();
         }
 
@@ -527,6 +528,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Unload:
                     World.UnloadMachine(player.Id);
+                    break;
+                case InventoryCommand.PetAnimals:
+                    World.PetAnimals(player.Id);
                     break;
             }
         }
@@ -713,7 +717,7 @@ namespace Game.Core
             int SettingOf(Machine m)
             {
                 if (m.Kind == TileType.Assembler) return m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe);
-                if (World.HouseOf(m.Kind) != null) return World.AnimalsIn(m);
+                if (World.HouseOf(m.Kind) != null) return World.HouseSetting(World.AnimalsIn(m), m.Affection, m.PettedDay == World.Today);
                 if (World.IsPowerNode(m.Kind)) return World.GridOf(m) is PowerGrid grid ? MachineState.Grid(grid.Supply, grid.Demand) : -1;
                 return m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting);
             }
