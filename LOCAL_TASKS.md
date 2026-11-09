@@ -1154,3 +1154,11 @@ DevTools/Local/setup.sh --commit
   - 첫 입력: 메뉴의 이름 칸 글자가 선택된 채로 [혼자 하기]를 누르고 5초 뒤 Tab을 보냈더니 첫 Tab은 듣지 않고 두 번째 Tab에 가방이 열렸다(자동 입력, 한 번)
   - HUD가 60초 뒤 줄어드는지는 보지 못했다(그동안 Claude 앱 브라우저 창 크기가 바뀌어 확인을 줄였다)
 - 사람 결정(11-08): 감시 스크립트(`watch.ps1 -Install`)는 켜지 않는다. 로컬 확인은 사람이 요청할 때만 로컬 세션이 하고, 명령 한 줄은 늘 `-Commit -NoScreens`로 돌린다(창이 보이는 Unity를 띄우지 않고, `local-screens` 브랜치도 올리지 않는다). 그래서 화면 사진이 필요한 확인은 클라우드의 웹 플레이 시험이나 로컬 세션의 웹 데모 확인으로 한다
+
+### 2026-11-09 17:19 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 502개 중 502개 통과, 0개 실패
+- PlayMode 테스트: 18개 중 17개 통과, 1개 실패
+  - `Game.Client.Tests.LayoutTests.TheFixedPartsFitEveryScreen: 작은 휴대폰 가로 667×375, 스킬 3: 시간·장소 줄와(과) 스킬 0이(가) 겹침`
