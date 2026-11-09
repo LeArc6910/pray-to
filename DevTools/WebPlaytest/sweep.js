@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu basics bag combat bosses patterns world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu basics first firstphone hour bag combat bosses patterns world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1491,10 +1491,52 @@ async function deploysave() {
 // No give, build or goto, except one goto where the screen does not say where to go (noted in the report). Each
 // goal's time and what got in the way are written down.
 async function first(browser) {
-  note('\n## 처음 10분: 목표 안내만 따라가기 (PC)\n');
-  const game = await open(browser, run, Profiles.pc, url);
-  check(await game.startSolo('first10'), '새 캐릭터로 혼자 하기');
+  await firstRun(browser, Profiles.pc, false);
+}
+
+// The same on a phone (2026-11-09): every step by finger, the move stick on the left half, the attack stick on the
+// right, quick slots and buttons tapped.
+async function firstphone(browser) {
+  await firstRun(browser, Profiles.phone, false);
+}
+
+// The first hour (2026-11-09): the first ten minutes and on through goals 7 to 15 (plant, till, fish, sell, furnace,
+// mining skill, the cave warden, a bed, level 5).
+async function hour(browser) {
+  await firstRun(browser, Profiles.pc, true);
+}
+
+async function firstRun(browser, profile, hourLong) {
+  note(`\n## ${hourLong ? '처음 한 시간' : '처음 10분'}: 목표 안내만 따라가기 (${profile.touch ? `휴대폰 터치 ${profile.context.viewport.width}×${profile.context.viewport.height}` : 'PC'})\n`);
+  const game = await open(browser, run, profile, url);
+  check(await game.startSolo(hourLong ? 'firsthour' : profile.touch ? 'first10phone' : 'first10'), '새 캐릭터로 혼자 하기');
   await game.wait(1500);
+  // A finger on the screen (phone): the move stick on the left half, the attack stick on the right, mid-height
+  // where nothing is drawn over the world.
+  let cdp = null;
+  const finger = async (type, points) => {
+    cdp = cdp || (await game.context.newCDPSession(game.page));
+    await cdp.send('Input.dispatchTouchEvent', { type, touchPoints: points });
+  };
+  const screen = await game.canvas();
+  const sticks = {
+    move: { x: screen.left + screen.width * 0.25, y: screen.top + screen.height * 0.55 },
+    aim: { x: screen.left + screen.width * 0.75, y: screen.top + screen.height * 0.55 },
+  };
+  const Pull = 45;
+  const hold = async (stick, dx, dy) => {
+    const at = sticks[stick];
+    await finger('touchStart', [{ x: at.x, y: at.y }]);
+    await game.wait(40);
+    await finger('touchMove', [{ x: at.x + dx * Pull, y: at.y - dy * Pull }]);
+  };
+  const lift = async () => finger('touchEnd', []);
+  // Quick slot n (1 = the first): its key on PC, a tap on the phone.
+  const slot = async n => {
+    if (game.touch) await game.press(`quick ${n - 1}`);
+    else await game.page.keyboard.press(String(n));
+    await game.wait(300);
+  };
   const began = Date.now();
   const clock = () => `${Math.round((Date.now() - began) / 1000)}초`;
   const goalNow = async () => {
@@ -1516,30 +1558,38 @@ async function first(browser) {
     return out;
   };
   const solid = t => /Wall|Ore/.test(t);
-  // Digs the wall at (dx, dy) with what is in hand: attack toward it until it breaks (at most six seconds).
+  // Digs the wall at (dx, dy) with what is in hand: attack toward it until it breaks (at most six seconds). On the
+  // phone the attack stick is held pulled toward it.
   const dig = async (dx, dy) => {
-    await game.send(`face ${dx} ${dy}; attack on ${dx} ${dy}`);
+    if (game.touch) await hold('aim', dx, dy);
+    else await game.send(`face ${dx} ${dy}; attack on ${dx} ${dy}`);
     let gone = false;
     for (let i = 0; i < 20 && !gone; i++) {
       await game.wait(300);
       gone = !solid((await game.look(dx, dy)).tile);
     }
-    await game.send('attack off');
+    if (game.touch) await lift();
+    else await game.send('attack off');
     return gone;
   };
   const key = { '1,0': 'd', '-1,0': 'a', '0,1': 'w', '0,-1': 's' };
   const step = async (dx, dy, ms = 260) => {
-    await game.page.keyboard.down(key[`${dx},${dy}`]);
-    await game.wait(ms);
-    await game.page.keyboard.up(key[`${dx},${dy}`]);
+    if (game.touch) {
+      await hold('move', dx, dy);
+      await game.wait(ms);
+      await lift();
+    } else {
+      await game.page.keyboard.down(key[`${dx},${dy}`]);
+      await game.wait(ms);
+      await game.page.keyboard.up(key[`${dx},${dy}`]);
+    }
     await game.wait(150);
   };
   // Mines a tunnel: the nearest wall beside, else a step toward open floor, until `enough` says stop.
   // With `prefer` (a tile type) it digs that first, and with none beside it goes to the next one (`onNone`).
   const mine = async (enough, seconds, prefer = null, onNone = null) => {
     // The pickaxe in hand (quick slot 2), as the first goal's hint says.
-    await game.page.keyboard.press('2');
-    await game.wait(300);
+    await slot(2);
     const until = Date.now() + seconds * 1000;
     let way = [1, 0];
     while (Date.now() < until && !(await enough())) {
@@ -1587,8 +1637,7 @@ async function first(browser) {
   note(`- 첫 목표: ${t0.n}. ${t0.text}`);
 
   // 1. Ten stones, with the pickaxe on 2.
-  await game.page.keyboard.press('2');
-  await game.wait(400);
+  await slot(2);
   await mine(async () => count(await inv(), 'stone') >= 10, 120);
   await game.wait(1200);
   await passed(1, '돌 10개 모으기');
@@ -1701,13 +1750,219 @@ async function first(browser) {
   await game.wait(1000);
   await passed(6, '구리 장비 하나 만들기');
   await game.shot('first-gear', '처음 10분 끝');
+  if (hourLong) await onwards();
 
   note('\n목표마다 걸린 때:\n');
   for (const line of steps) note(`- ${line}`);
   await game.context.close();
+
+  // ---- Goals 7 to 15, the rest of the first hour ----
+  async function onwards() {
+    const moved = new Set();
+    // Where the bot is taken instead of walking back down its tunnels (once a reason, for the report).
+    const taken = async (where, why) => {
+      await game.send(`goto ${where}`);
+      await game.wait(800);
+      if (!moved.has(why)) note(`- ${why}: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)`);
+      moved.add(why);
+    };
+    const craft = async name => {
+      await bagTab(game, '재료·제작');
+      await game.press('만들 수 있는 것만');
+      const made = await game.press('만들기', new RegExp('^' + name), { quiet: true });
+      await game.press('모두 보기', undefined, { quiet: true });
+      await closeBag(game);
+      if (!made) await why(`${name} 만들기`);
+      return made;
+    };
+    const copperFor = async n => {
+      if (count(await inv(), 'copper_ore') >= n) return;
+      await nextVein();
+      await mine(async () => count(await inv(), 'copper_ore') >= n, 150, 'CopperOre', nextVein);
+    };
+    const toward = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
+    const offset = text => (text ? text.split(',').map(Number) : null);
+    const drink = async () => {
+      if (game.touch) await game.press('potion', undefined, { quiet: true });
+      else await game.page.keyboard.press('c');
+    };
+    // Attacks toward (dx, dy) for a moment: the attack stick pulled that way on the phone, the aim on PC.
+    const strike = async (dx, dy, ms) => {
+      const d = Math.hypot(dx, dy) || 1;
+      if (game.touch) {
+        await hold('aim', dx / d, dy / d);
+        await game.wait(ms);
+        await lift();
+      } else {
+        await game.send(`attack on ${(dx / d).toFixed(2)} ${(dy / d).toFixed(2)}`);
+        await game.wait(ms);
+        await game.send('attack off');
+      }
+    };
+    // Walks onto the drops lying near.
+    const gather = async seconds => {
+      const until = Date.now() + seconds * 1000;
+      while (Date.now() < until) {
+        const at = offset((await game.state()).lootAt);
+        if (!at) break;
+        const [sx, sy] = toward(at[0], at[1]);
+        await step(sx, sy, 200);
+      }
+    };
+    // Fights the nearest monsters with the weapon on quick slot 1 until `enough` (or the time runs out): walks at
+    // the nearest, strikes when close, drinks below 40% health, picks up what falls.
+    const hunt = async (enough, seconds) => {
+      await slot(1);
+      const until = Date.now() + seconds * 1000;
+      let kills = 0;
+      while (Date.now() < until && !(await enough())) {
+        const s = await game.state();
+        if (s.health < s.maxHealth * 0.4) await drink();
+        const foe = offset(s.foe);
+        if (!foe) {
+          await gather(3);
+          // None near: on along the tunnels.
+          await mine(async () => !!(await game.state()).foe, 15);
+          await slot(1);
+          continue;
+        }
+        const d = Math.hypot(foe[0], foe[1]);
+        if (d > 1.4) {
+          const [sx, sy] = toward(foe[0], foe[1]);
+          await step(sx, sy, 220);
+        } else {
+          const before = s.monsters;
+          await strike(foe[0], foe[1], 450);
+          if ((await game.state()).monsters < before) kills++;
+        }
+      }
+      await gather(4);
+      return kills;
+    };
+
+    // 7. The two spores a new character has, planted on the cave floor ahead.
+    await faceOpen();
+    await bagTab(game, '재료·제작');
+    await game.press('심기', '버섯 포자');
+    await closeBag(game);
+    await game.wait(800);
+    await passed(7, '버섯 심기');
+
+    // Copper and stone for the hoe, the rod and the furnace (copper 2 + 2 + 2, stone 2 + 1 + 15).
+    await copperFor(6);
+    await mine(async () => count(await inv(), 'stone') >= 20, 150);
+    await taken('near Workbench', '작업대로 돌아갈 때');
+
+    // 8. A hoe, and [밭 갈기] on the floor ahead.
+    await craft('호미');
+    await faceOpen();
+    await bagTab(game, '재료·제작');
+    await game.press('밭 갈기', '호미');
+    await closeBag(game);
+    await game.wait(600);
+    await passed(8, '밭 갈기');
+
+    // 9. A rod (slime gel 2: the torch goal's reward), at the nearest water.
+    await taken('near Workbench', '작업대로 돌아갈 때');
+    await craft('낚싯대');
+    await craft('화로');
+    await taken('near Water', '물웅덩이를 찾을 때(안내는 "동굴 가장자리 물웅덩이"라고만 한다)');
+    await bagTab(game, '재료·제작');
+    await game.press('낚시', '낚싯대');
+    const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
+    let strikes = 0;
+    const fishing = Date.now() + 150000;
+    while (rod && Date.now() < fishing && (await goalNow()).n <= 9) {
+      const f = (await game.state()).fishing;
+      if (f === 'bite in') {
+        await game.tapAt(rod.cx, rod.cy);
+        strikes++;
+        await game.wait(700);
+      } else if (!f) {
+        await game.tapAt(rod.cx, rod.cy);
+        await game.wait(400);
+      }
+    }
+    await closeBag(game);
+    note(`- 낚시: 낚아채기 ${strikes}번`);
+    await passed(9, '물고기 낚기');
+
+    // 10. Ten coins: what the merchant buys of the bag (fish, ore, mushrooms), at the stall near the spawn.
+    await taken('near MerchantStall', '상인 노점으로 갈 때');
+    await bagTab(game);
+    await game.press('상인');
+    await game.press('팔기');
+    for (let i = 0; i < 40 && count(await inv(), 'coin') < 10; i++) {
+      const sell = (await game.find('팔기')).find(b => b.enabled && b.shown && /광석|송사리|메기|송어|게 ×|새우|버섯|젤/.test(b.row || ''));
+      if (!sell) break;
+      await game.tapAt(sell.cx, sell.cy);
+      await game.wait(350);
+    }
+    note(`- 상인: 금화 ${count(await inv(), 'coin')}`);
+    await closeBag(game);
+    await game.wait(800);
+    await passed(10, '상인에게 팔아 금화 10개 모으기');
+
+    // 11. The furnace made at the workbench, set down.
+    await placeFor(11, '화로 세우기', /^화로 ×/);
+
+    // 12. Mining skill 2, from all the walls dug so far and more.
+    await mine(async () => (await goalNow()).n > 12, 150);
+    await passed(12, '채굴 기술 2레벨 되기');
+
+    // 13. The cave warden, fought with what the bot has: up to three tries, back to the arena after a fall.
+    const wardenAt = Date.now();
+    let falls = 0;
+    await slot(1);
+    await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
+    while (Date.now() - wardenAt < 300000 && (await goalNow()).n <= 13 && falls < 3) {
+      const s = await game.state();
+      if (s.dead) {
+        falls++;
+        await game.until(t => !t.dead, 15000);
+        await game.send('goto boss cave_warden');
+        await game.wait(1200);
+        continue;
+      }
+      if (s.health < s.maxHealth * 0.4) await drink();
+      const boss = offset(s.bossAt);
+      if (!boss) {
+        await gather(5);
+        if ((await goalNow()).n > 13) break;
+        await game.wait(500);
+        continue;
+      }
+      const d = Math.hypot(boss[0], boss[1]);
+      if (d > 2.2) {
+        const [sx, sy] = toward(boss[0], boss[1]);
+        await step(sx, sy, 220);
+      } else {
+        await strike(boss[0], boss[1], 500);
+      }
+    }
+    await gather(5);
+    const fought = await game.state();
+    note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
+    await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
+    await passed(13, '동굴 수호자 쓰러뜨리기');
+
+    // 14. A bed: stone 6 and slime gel 3, the gel from slimes.
+    await hunt(async () => count(await inv(), 'slime_gel') >= 3, 180);
+    await mine(async () => count(await inv(), 'stone') >= 6, 60);
+    await taken('near Workbench', '작업대로 돌아갈 때');
+    await craft('침대');
+    await placeFor(14, '침대 세우기', /^침대 ×/);
+
+    // 15. Level 5 by hunting.
+    const kills = await hunt(async () => (await game.state()).level >= 5, 300);
+    note(`- 레벨 5까지 사냥: ${kills}마리, 레벨 ${(await game.state()).level}`);
+    await game.wait(800);
+    await passed(15, '레벨 5 되기');
+    await game.shot('hour-end', '처음 한 시간 끝');
+  }
 }
 
-const Sections = { menu, basics, first, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
+const Sections = { menu, basics, first, firstphone, hour, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

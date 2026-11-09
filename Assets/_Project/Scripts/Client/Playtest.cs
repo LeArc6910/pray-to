@@ -647,10 +647,17 @@ namespace Game.Client
                 json.Field("monsters", near.Count);
                 json.Field("monsterKinds", string.Join(",", near.Select(e => e.Definition.Id).Distinct()));
                 json.Field("hurtMonsters", near.Count(e => e.Health < e.MaxHealth));
+                // Where the nearest monster and the nearest awake boss are from the player, for a bot to aim at.
+                var foe = near.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
+                json.Field("foe", foe == null ? null : $"{foe.Position.X - player.Position.X:0.00},{foe.Position.Y - player.Position.Y:0.00}");
+                var awake = world.Bosses.Where(b => b.State != BossState.Dormant && !b.IsDead).OrderBy(b => Vec2.Distance(b.Position, player.Position)).FirstOrDefault();
+                json.Field("bossAt", awake == null ? null : $"{awake.Position.X - player.Position.X:0.00},{awake.Position.Y - player.Position.Y:0.00}");
                 json.Field("projectiles", world.Projectiles.Count(p => p.Source == player.Id));
                 json.Field("hazards", world.Hazards.Count);
                 json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly));
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
+                var drop = world.GroundLoot.Where(l => Vec2.Distance(l.Position, player.Position) < 10).OrderBy(l => Vec2.Distance(l.Position, player.Position)).FirstOrDefault();
+                json.Field("lootAt", drop == null ? null : $"{drop.Position.X - player.Position.X:0.00},{drop.Position.Y - player.Position.Y:0.00}");
                 var machines = world.Machines.Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), player.Position) < 12).ToList();
                 json.Field("machines", string.Join(" ", machines.Select(m => $"{m.Kind}{(world.IsPowered(m) ? "+" : "")}{(m.Enabled ? "" : "-off")}")));
                 json.Field("bosses", string.Join(" ", world.Bosses.Select(b => $"{b.Definition.Id}:{b.Health:0}/{b.MaxHealth:0}:p{b.Phase}:{b.State}")));
