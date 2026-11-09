@@ -1063,9 +1063,14 @@ namespace Game.Core
         {
             if (Map != null && material?.Places != null)
             {
-                var (x, y) = TileMap.IsPaving(material.Places.Value) ? World.TileAhead(Position, Facing) : World.PlaceAhead(Position, Facing);
+                var (fx, fy) = World.TileAhead(Position, Facing);
+                var (x, y) = TileMap.IsPaving(material.Places.Value) ? (fx, fy) : World.PlaceAhead(Position, Facing);
                 if (!Map.InBounds(x, y) || Map.IsEdge(x, y) || !TileMap.IsGround(Map[x, y]) || Map[x, y] == material.Places)
-                    _notices.Add($"{material.Name}: 앞이 막혀 있다. 빈 바닥을 바라보고 놓는다");
+                {
+                    // The tile right ahead is open but the body is in it, and the one after is not: step back.
+                    bool tooClose = (x, y) != (fx, fy) && Map.InBounds(fx, fy) && TileMap.IsGround(Map[fx, fy]);
+                    _notices.Add(tooClose ? $"{material.Name}: 너무 붙어 섰다. 한 걸음 물러서서 놓는다" : $"{material.Name}: 앞이 막혀 있다. 빈 바닥을 바라보고 놓는다");
+                }
             }
             return new InventoryCommandMessage(InventoryCommand.Place, 0, index: ItemCodec.Index(_loot.Materials, material)).Encode();
         }

@@ -1463,7 +1463,8 @@ async function deploysave() {
 }
 
 // ---------------------------------------------------------------- 처음 10분 (사람 요청 2026-11-09의 4번)
-// A new character follows only the goal list, with its own hands: keys, the bag's buttons, attacking toward a wall.
+// A new character follows only the goal list (its first six goals), with its own hands: keys, the bag's buttons,
+// attacking toward a wall.
 // No give, build or goto, except one goto where the screen does not say where to go (noted in the report). Each
 // goal's time and what got in the way are written down.
 async function first(browser) {
@@ -1511,21 +1512,51 @@ async function first(browser) {
     await game.wait(150);
   };
   // Mines a tunnel: the nearest wall beside, else a step toward open floor, until `enough` says stop.
-  const mine = async (enough, seconds) => {
+  // With `prefer` (a tile type) it digs that first, and with none beside it goes to the next one (`onNone`).
+  const mine = async (enough, seconds, prefer = null, onNone = null) => {
     const until = Date.now() + seconds * 1000;
     let way = [1, 0];
     while (Date.now() < until && !(await enough())) {
       const around = await near();
-      const wall = around.find(a => a.dx === way[0] && a.dy === way[1] && solid(a.tile)) || around.find(a => solid(a.tile));
+      const wanted = prefer && around.find(a => a.tile === prefer);
+      if (prefer && !wanted && onNone) {
+        await onNone();
+        continue;
+      }
+      const wall = wanted || around.find(a => a.dx === way[0] && a.dy === way[1] && solid(a.tile)) || around.find(a => solid(a.tile));
       if (wall) {
         way = [wall.dx, wall.dy];
         if (await dig(wall.dx, wall.dy)) await step(wall.dx, wall.dy);
       } else {
+        // No wall beside: toward the nearest wall in sight along the four ways (a person sees the walls on the
+        // screen), else on over open floor, turning when something placed stands in the way.
+        let seen = null;
+        for (let d = 2; d <= 8 && !seen; d++) {
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            if (!seen && solid((await game.look(dx * d, dy * d)).tile)) seen = [dx, dy];
+          }
+        }
+        const open = around.filter(a => a.tile === 'Floor');
+        if (seen) way = seen;
+        else if (!open.some(a => a.dx === way[0] && a.dy === way[1]) && open.length > 0) {
+          const pick = open[Math.floor(Math.random() * open.length)];
+          way = [pick.dx, pick.dy];
+        }
+        const before = await game.look(0, 0);
         await step(way[0], way[1], 400);
+        const after = await game.look(0, 0);
+        if (before.x === after.x && before.y === after.y) way = [-way[1], way[0]];
       }
     }
   };
   const inv = () => game.inventory();
+  // What the screen and the map said when something did not happen, for the report.
+  const why = async label => {
+    const t = await game.texts();
+    const here = await game.look(0, 0);
+    const around = (await near()).map(a => `${a.dx},${a.dy}=${a.tile}`).join(' ');
+    note(`  - (${label}) 칸 ${here.x},${here.y}, 곁: ${around}; 떠 있는 글: ${(t.floating || []).join(' / ') || '없음'}; 알림: ${(t.acquired || []).slice(-3).join(' / ') || '없음'}`);
+  };
   const t0 = await goalNow();
   note(`- 첫 목표: ${t0.n}. ${t0.text}`);
 
@@ -1536,28 +1567,54 @@ async function first(browser) {
   await game.wait(1200);
   await passed(1, '돌 10개 모으기');
   await game.shot('first-stone', '돌을 캔 굴');
+  // Room to put things: the walls on every side dug out, as a person clears a little room for a base (a workbench
+  // set down in a tunnel one wide shuts the way back).
+  for (const a of await near()) if (solid(a.tile)) await dig(a.dx, a.dy);
+
+  // Puts the thing from the bag's materials tab, facing each open side in turn until the goal moves on.
+  const placeFor = async (n, what, row) => {
+    const tried = [];
+    for (let attempt = 0; attempt < 4; attempt++) {
+      const at = await faceOpen(tried);
+      if (!at) break;
+      tried.push(`${at.dx},${at.dy}`);
+      await bagTab(game, '재료·제작');
+      const pressed = await game.press('놓기', row, { quiet: attempt > 0 });
+      await game.wait(400);
+      await closeBag(game);
+      await game.wait(600);
+      if ((await goalNow()).n > n) break;
+      if (!pressed) break;
+      await why(`${what} ${attempt + 1}번째`);
+    }
+    return passed(n, what);
+  };
 
   // 2. A workbench: the bag's materials tab, [만들기], then [놓기] onto open floor ahead.
-  const faceOpen = async () => {
-    const open = (await near()).find(a => a.tile === 'Floor');
-    if (open) await game.send(`face ${open.dx} ${open.dy}`);
+  // Faces open floor, two tiles of it if there are (a thing goes on the tile after when the body is in the first);
+  // with only one, takes a short step back from it first. Sides already tried are skipped.
+  const faceOpen = async (skip = []) => {
+    const around = (await near()).filter(a => a.tile === 'Floor' && !skip.includes(`${a.dx},${a.dy}`));
+    for (const a of around) {
+      if ((await game.look(2 * a.dx, 2 * a.dy)).tile === 'Floor') {
+        await game.send(`face ${a.dx} ${a.dy}`);
+        return a;
+      }
+    }
+    const open = around[0];
+    if (open) {
+      await step(-open.dx, -open.dy, 90).catch(() => {});
+      await game.send(`face ${open.dx} ${open.dy}`);
+    }
     return open;
   };
-  await faceOpen();
   await bagTab(game, '재료·제작');
   check(await game.press('만들기', /^작업대/), '[재료·제작]에 작업대 [만들기]가 있다');
-  check(await game.press('놓기', '작업대 ×'), '작업대 [놓기]');
   await closeBag(game);
-  await game.wait(800);
-  await passed(2, '작업대 세우기');
+  await placeFor(2, '작업대 세우기', '작업대 ×');
 
   // 3. A torch from the bag, onto other open floor.
-  await faceOpen();
-  await bagTab(game, '재료·제작');
-  check(await game.press('놓기', /^횃불 ×/), '횃불 [놓기]');
-  await closeBag(game);
-  await game.wait(800);
-  await passed(3, '횃불 세우기');
+  await placeFor(3, '횃불 세우기', /^횃불 ×/);
 
   // 4. Stone floor: made at the workbench (beside it), laid on open floor.
   await mine(async () => count(await inv(), 'stone') >= 4, 40);
@@ -1568,39 +1625,46 @@ async function first(browser) {
     await game.send('goto near Workbench');
     await game.wait(800);
   }
-  await faceOpen();
   await bagTab(game, '재료·제작');
+  // The list is long by now; a person scrolls or shows only what can be made. The bot does the second.
+  await game.press('만들 수 있는 것만');
+  const rows = await game.find('만들기', /^돌 바닥/);
   const made = await game.press('만들기', /^돌 바닥/);
-  check(made, '작업대 곁에서 돌 바닥 [만들기]');
-  if (made) await game.press('놓기', /^돌 바닥 ×/);
+  await game.press('모두 보기', undefined, { quiet: true });
   await closeBag(game);
-  await game.wait(800);
-  await passed(4, '돌 바닥 깔기');
+  check(made, '작업대 곁에서 돌 바닥 [만들기]');
+  if (!made) {
+    note(`  - 돌 바닥 줄: ${rows.map(b => `${b.enabled ? '눌림' : '안 눌림'}${b.shown ? '' : '(가려짐)'} "${b.row}"`).join(' / ') || '없음'}, 돌 ${count(await inv(), 'stone')}`);
+    await why('돌 바닥');
+  }
+  await placeFor(4, '돌 바닥 깔기', /^돌 바닥 ×/);
 
   // 5. Six copper ores. The hint says what a copper vein looks like but not where one is: the bot is taken to the
   // nearest (a person would walk the tunnels looking for orange).
-  await game.send('goto near CopperOre');
-  note('- 구리 광맥: 안내는 모양만 알려 주고 자리는 알려 주지 않아서, 봇은 가장 가까운 광맥으로 옮겨졌다');
-  await game.wait(800);
-  await mine(async () => count(await inv(), 'copper_ore') >= 6, 120);
+  let veins = 0;
+  const nextVein = async () => {
+    veins++;
+    await game.send('goto near CopperOre');
+    await game.wait(800);
+  };
+  await nextVein();
+  await mine(async () => count(await inv(), 'copper_ore') >= 6, 150, 'CopperOre', nextVein);
+  note(`- 구리 광맥: 안내는 모양만 알려 주고 자리는 알려 주지 않아서, 봇은 가장 가까운 광맥으로 옮겨졌다(${veins}번, 광맥 하나에 구리가 몇 개뿐이라)`);
   await game.wait(1000);
   await passed(5, '구리 광석 6개 캐기');
 
-  // 6. Mining skill 2: more digging.
-  const life = async () => (await goalNow()).n > 6;
-  await mine(life, 150);
-  await game.wait(1000);
-  await passed(6, '채굴 기술 2레벨 되기');
-
-  // 7. A piece of copper gear, made beside the workbench and worn.
+  // 6. A piece of copper gear, made beside the workbench and worn. (Mining skill 2 was the sixth goal until
+  // 2026-11-09: a hundred walls, three minutes or more of digging alone, held up every goal after it.)
   await game.send('goto near Workbench');
   note('- 구리 장비를 만들려고 작업대로 돌아갈 때: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)');
   await game.wait(800);
   await bagTab(game, '재료·제작');
   let gear = false;
+  await game.press('만들 수 있는 것만');
   for (const name of ['구리 투구', '구리 장화', '구리 갑옷']) {
     if (!gear && (await game.find('만들기', new RegExp('^' + name))).some(b => b.enabled)) gear = await game.press('만들기', new RegExp('^' + name)) && name;
   }
+  await game.press('모두 보기', undefined, { quiet: true });
   check(!!gear, `구리 장비 하나를 만든다 (${gear || '재료 부족'})`);
   if (gear) {
     await bagTab(game, '장비');
@@ -1609,7 +1673,7 @@ async function first(browser) {
   }
   await closeBag(game);
   await game.wait(1000);
-  await passed(7, '구리 장비 하나 만들기');
+  await passed(6, '구리 장비 하나 만들기');
   await game.shot('first-gear', '처음 10분 끝');
 
   note('\n목표마다 걸린 때:\n');

@@ -121,11 +121,11 @@ namespace Game.Core.Tests
         public void ProgressIsKeptByIdSoNewGoalsComeUpInTheirPlace()
         {
             var data = Guide.Shipped;
-            // Someone who had passed the first seven goals before new ones went in among them.
-            var progress = new GuideProgress(data, GuideProgress.FromCount(data, 7));
-            Assert.AreEqual(7, progress.Passed.Count);
+            // Someone who had passed the first nine goals before new ones went in among them.
+            var progress = new GuideProgress(data, GuideProgress.FromCount(data, 9));
+            Assert.AreEqual(9, progress.Passed.Count);
             Assert.IsFalse(progress.Passed.Any(GuideProgress.AddedAfterCounts.Contains), "none of the new ones");
-            Assert.AreEqual("life_mining", progress.Current.Id, "the first new goal before where they were");
+            Assert.AreEqual("merchant", progress.Current.Id, "the first new goal before where they were");
             Assert.IsTrue(GuideProgress.AddedAfterCounts.All(id => data.Goals.Any(g => g.Id == id)), "every new goal is in the sheet");
         }
 
