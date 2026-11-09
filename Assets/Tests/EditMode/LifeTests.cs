@@ -60,6 +60,25 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void APerkIsPickedOnceAtItsLevelAndKeptInTheSave()
+        {
+            var world = Pond(out var player);
+            Assert.IsFalse(world.ChoosePerk(player.Id, LifeSkill.Mining, 0, 2), "not before level 5");
+            player.LifeExperience[(int)LifeSkill.Mining] = LifeSkills.TotalFor(5);
+            float before = World.DigPowerOf(player);
+            Assert.IsTrue(world.ChoosePerk(player.Id, LifeSkill.Mining, 0, 2));
+            Assert.Greater(World.DigPowerOf(player), before, "the quick pickaxe digs faster");
+            Assert.IsFalse(world.ChoosePerk(player.Id, LifeSkill.Mining, 0, 1), "kept for good");
+            Assert.IsFalse(world.ChoosePerk(player.Id, LifeSkill.Mining, 1, 1), "level 10's not yet");
+
+            var saved = CharacterSave.Read(CharacterSave.Write(new Equipment(), new Inventory(), 0, lifePerks: player.LifePerks), Gear.Data);
+            Assert.AreEqual(2, saved.LifePerks[LifeSkills.PerkIndex(LifeSkill.Mining, 0)]);
+            var other = Pond(out var again);
+            World.RestoreLifePerks(again, saved.LifePerks);
+            Assert.IsTrue(World.HasPerk(again, LifeSkill.Mining, 0, 2));
+        }
+
+        [Test]
         public void ReachingALevelIsAnEvent()
         {
             var world = Pond(out var player);

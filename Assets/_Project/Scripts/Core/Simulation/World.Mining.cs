@@ -101,6 +101,14 @@ namespace Game.Core
             // A third of its hardness, at least one: plain rock 1, ore and harder rock more.
             GainLifeExperience(player, LifeSkill.Mining, Math.Max(1, (tile.Hardness + 2) / 3));
             player.Inventory.AddMaterial(tile.Material, tile.Count);
+            // The mining perks (World.Life.cs): more from a vein, now and then a rune in it.
+            if (tile.Tile.ToString().EndsWith("Ore"))
+            {
+                int extra = (HasPerk(player, LifeSkill.Mining, 0, 1) && _random.Chance(0.25f) ? 1 : 0) + (HasPerk(player, LifeSkill.Mining, 1, 2) && _random.Chance(0.5f) ? 1 : 0);
+                if (extra > 0) player.Inventory.AddMaterial(tile.Material, extra);
+                if (HasPerk(player, LifeSkill.Mining, 1, 1) && _random.Chance(0.03f) && _lootGenerator?.RollRune(Math.Max(1, player.Level), _random) is RuneDefinition rune)
+                    player.Inventory.AddRune(rune);
+            }
             if (tile.Extra != null && tile.ExtraChance > 0 && _random.Chance(tile.ExtraChance / 100f)) player.Inventory.AddMaterial(tile.Extra);
             player.InventoryVersion++;
         }
@@ -170,7 +178,8 @@ namespace Game.Core
                 if (recipe.Consumable != null)
                 {
                     // Cooking at a furnace teaches the skill, and the skill may make one more.
-                    int bonus = LifeSkills.Bonus(LifeLevel(player, LifeSkill.Cooking), LifeSkills.ExtraDishPercent);
+                    int bonus = LifeSkills.Bonus(LifeLevel(player, LifeSkill.Cooking), LifeSkills.ExtraDishPercent)
+                        + (HasPerk(player, LifeSkill.Cooking, 0, 1) ? 15 : 0) + (HasPerk(player, LifeSkill.Cooking, 1, 1) ? 25 : 0);
                     int extra = bonus > 0 && _random.Chance(bonus / 100f) ? 1 : 0;
                     player.Inventory.AddConsumable(recipe.Consumable, recipe.Count + extra);
                     if (recipe.Station == TileType.Furnace) GainLifeExperience(player, LifeSkill.Cooking, 2 + recipe.Ingredients.Sum(i => i.Count));

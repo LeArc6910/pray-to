@@ -74,7 +74,8 @@ namespace Game.Core
             var bait = player.Inventory.Materials.Keys.FirstOrDefault(m => m.Id == Bait);
             if (bait != null)
             {
-                player.Inventory.TakeMaterial(bait, 1);
+                // The bait master's bait stays on the hook half the time.
+                if (!(HasPerk(player, LifeSkill.Fishing, 1, 2) && _random.Chance(0.5f))) player.Inventory.TakeMaterial(bait, 1);
                 player.InventoryVersion++;
                 wait = Math.Max(1, wait * BaitWaitPercent / 100);
             }
@@ -98,7 +99,7 @@ namespace Game.Core
                 // The fish is chosen as it bites, so the gauge can go at its speed.
                 fishing.Catch = PickFish(fishing.X, fishing.Y);
                 fishing.Difficulty = Difficulty(fishing.Catch);
-                fishing.BiteTicks = Ticks(BiteSeconds);
+                fishing.BiteTicks = Ticks(BiteSeconds + (HasPerk(player, LifeSkill.Fishing, 0, 1) ? 1 : 0));
                 fishing.BiteElapsed = 0;
                 _events.Add(new SimEvent(SimEventType.Fishing, player.Id, amount: FishingBite + 16 * fishing.Difficulty, position: fishing.Spot));
                 return;
@@ -164,14 +165,15 @@ namespace Game.Core
             bool contest = EventToday == DayEvent.FishingContest;
             if (fish != null)
             {
-                player.Inventory.AddMaterial(fish, _random.Chance(DoubleCatchChance) ? 2 : 1);
+                float twice = DoubleCatchChance + (HasPerk(player, LifeSkill.Fishing, 1, 1) ? 0.2f : 0);
+                player.Inventory.AddMaterial(fish, _random.Chance(twice) ? 2 : 1);
                 player.InventoryVersion++;
                 GainLifeExperience(player, LifeSkill.Fishing, (3 + 2 * fishing.Difficulty) * (contest ? 2 : 1));
             }
             EndFishing(player, FishingCaught);
             if (fish == null) return;
             // Treasure: a rune of about the player's level, or a little chest of coins.
-            int chance = (TreasurePercent + fishing.Difficulty) * (fishing.Baited ? 2 : 1);
+            int chance = (TreasurePercent + fishing.Difficulty) * (fishing.Baited ? 2 : 1) * (HasPerk(player, LifeSkill.Fishing, 0, 2) ? 2 : 1);
             if (_random.Next(100) < chance)
             {
                 var runes = Loot?.Runes.Where(r => r.Level <= player.Level + 5).ToList();

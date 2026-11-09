@@ -218,7 +218,7 @@ namespace Game.Core
                     if (pair.Value.SentLife != pair.Value.Player.LifeVersion)
                     {
                         pair.Value.SentLife = pair.Value.Player.LifeVersion;
-                        Send(pair.Key, new LifeMessage(pair.Value.Player.LifeExperience).Encode(), reliable: true);
+                        Send(pair.Key, new LifeMessage(pair.Value.Player.LifeExperience, pair.Value.Player.LifePerks).Encode(), reliable: true);
                     }
                     if (pair.Value.SentRecords != pair.Value.Player.RecordsVersion)
                     {
@@ -284,6 +284,7 @@ namespace Game.Core
             if (saved != null) World.RestorePassives(player, _classes, saved.Passives);
             if (saved != null) World.RestoreFriendships(player, saved.Friendships);
             if (saved != null) World.RestoreLifeExperience(player, saved.LifeExperience);
+            if (saved != null) World.RestoreLifePerks(player, saved.LifePerks);
             if (saved != null) World.RestoreSkills(player, _classes, saved.SkillRanks);
             if (saved != null) World.RestoreStories(player, saved.Stories);
             if (saved != null) World.RestoreSupports(player, _classes, _loot, saved.Supports);
@@ -421,6 +422,10 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Refuel:
                     if (command.Index < _loot.Materials.Count) World.Refuel(player.Id, _loot.Materials[command.Index]);
+                    break;
+                case InventoryCommand.ChoosePerk:
+                    // Index: LifeSkills.PerkIndex; item: the choice (1 or 2).
+                    World.ChoosePerk(player.Id, (LifeSkill)(command.Index / LifeSkills.PerkTiers), command.Index % LifeSkills.PerkTiers, command.Item);
                     break;
                 case InventoryCommand.ClaimGoal:
                     if (_guide != null && command.Index < _guide.Goals.Count) World.ClaimGoal(player.Id, _guide.Goals[command.Index], command.Index);

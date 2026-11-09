@@ -855,6 +855,28 @@ namespace Game.Client
                 int level = LifeSkills.LevelOf(experience);
                 string next = level >= LifeSkills.MaxLevel ? "최고" : $"{experience - LifeSkills.TotalFor(level)}/{LifeSkills.TotalFor(level + 1) - LifeSkills.TotalFor(level)}";
                 GUILayout.Label(Fit($"{LifeSkills.Name(skill)} {level} ({next}) · {LifeSkills.Perk(skill, level)}", _textWidth));
+                // The special perks (2026-11-09): picked, or two to pick from once the level is reached.
+                for (int tier = 0; tier < LifeSkills.PerkTiers; tier++)
+                {
+                    int picked = _client.LifePerks[LifeSkills.PerkIndex(skill, tier)];
+                    int at = LifeSkills.PerkLevels[tier];
+                    if (picked != 0)
+                    {
+                        var (name, text) = LifeSkills.PerkOf(skill, tier, picked);
+                        GUILayout.Label(Fit($"  {at}레벨 혜택: {name} - {text}", _textWidth));
+                        continue;
+                    }
+                    if (level < at) continue;
+                    GUILayout.Label(Fit($"  {at}레벨 혜택을 하나 고른다(바꿀 수 없다)", _textWidth));
+                    for (int choice = 1; choice <= 2; choice++)
+                    {
+                        var (name, text) = LifeSkills.PerkOf(skill, tier, choice);
+                        GUILayout.BeginHorizontal();
+                        GUILayout.Label(Fit($"  {name}: {text}", _textWidth - 72), GUILayout.Width(_textWidth - 72));
+                        if (Ui.LayoutButton("고르기", GUILayout.Width(64))) Send(_client.ChoosePerkCommand(skill, tier, choice), Sound.Learn);
+                        GUILayout.EndHorizontal();
+                    }
+                }
             }
         }
 

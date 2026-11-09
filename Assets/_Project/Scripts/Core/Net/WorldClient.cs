@@ -361,7 +361,7 @@ namespace Game.Core
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
             Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
-            PetExperience.Select(pair => (pair.Key, pair.Value)));
+            PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks);
 
         // The pet following this player, as the snapshots say (PlayerPhase.PetOf).
         public PetDefinition Pet { get; private set; }
@@ -460,6 +460,29 @@ namespace Game.Core
         }
 
         public int LifeLevel(LifeSkill skill) => LifeSkills.LevelOf(LifeExperience[(int)skill]);
+
+        // The life skill perks picked (LifeSkills.PerkIndex order): from the save, and as the host tells.
+        public int[] LifePerks => _perks ??= ReadPerks();
+
+        int[] _perks;
+
+        int[] ReadPerks()
+        {
+            var perks = new int[LifeSkills.Count * LifeSkills.PerkTiers];
+            if (Character == null || Character.Length == 0 || _loot == null) return perks;
+            try
+            {
+                var saved = CharacterSave.Read(Character, _loot).LifePerks;
+                for (int i = 0; i < perks.Length && i < saved.Count; i++) perks[i] = saved[i];
+            }
+            catch (System.IO.InvalidDataException)
+            {
+            }
+            return perks;
+        }
+
+        public byte[] ChoosePerkCommand(LifeSkill skill, int tier, int choice) =>
+            new InventoryCommandMessage(InventoryCommand.ChoosePerk, choice, index: LifeSkills.PerkIndex(skill, tier)).Encode();
 
         // The people, to name and trade with them (World.Merchant.cs).
         public NpcData Npcs { get; set; }
@@ -702,8 +725,10 @@ namespace Game.Core
                         _petExperience = grown;
                         break;
                     case MessageType.Life:
-                        var experience = LifeMessage.Decode(data).Experience;
+                        var lifeMessage = LifeMessage.Decode(data);
+                        var experience = lifeMessage.Experience;
                         for (int i = 0; i < LifeExperience.Length && i < experience.Count; i++) LifeExperience[i] = experience[i];
+                        for (int i = 0; i < LifePerks.Length && i < lifeMessage.Perks.Count; i++) LifePerks[i] = lifeMessage.Perks[i];
                         break;
                     case MessageType.Friendships:
                         var friendships = FriendshipsMessage.Decode(data);

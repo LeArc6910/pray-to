@@ -199,6 +199,8 @@ namespace Game.Core
         Hatch,
         // Asks the person within reach to move into a free room (World.Invite).
         Invite,
+        // Picks a life skill perk (World.ChoosePerk): Index is LifeSkills.PerkIndex, Item the choice.
+        ChoosePerk,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

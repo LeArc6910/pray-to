@@ -847,6 +847,19 @@ async function life(browser) {
   check(!!up && near(up, bedSide), '쓰러지면 침대 곁에서 일어난다');
   const inv = await game.inventory();
   note(`  - 생활 기술 경험치(농사, 낚시, 채굴, 요리): ${inv.life}`);
+
+  // A special perk at mining level 5 (2026-11-09), picked in the character tab.
+  await game.send('lifexp mining 1000');
+  await game.wait(800);
+  await bagTab(game, '캐릭터');
+  const pickPerk = (await game.find('고르기', '날쌘 곡괭이'))[0];
+  check(!!pickPerk, '채굴 5레벨이면 [캐릭터]에 특별 혜택 [고르기]가 보인다');
+  if (pickPerk) await game.press('고르기', '날쌘 곡괭이');
+  await game.wait(800);
+  const perks = ((await game.inventory()).perks || '').split(',').map(Number);
+  check(perks[4] === 2, `날쌘 곡괭이를 고른다 (${perks.join(',')})`);
+  await game.shot('life-perk', '고른 생활 기술 혜택');
+  await closeBag(game);
   await game.context.close();
 }
 

@@ -215,8 +215,10 @@ namespace Game.Core
             int seeds = Reap(crop, out int count);
             // By hand: the farming skill may give one more, and grows by the days the crop took.
             int level = LifeLevel(player, LifeSkill.Farming);
-            int bonus = LifeSkills.Bonus(level, LifeSkills.ExtraCropPercent);
-            if (bonus > 0 && _random.Chance(bonus / 100f)) count++;
+            int bonus = LifeSkills.Bonus(level, LifeSkills.ExtraCropPercent)
+                + (HasPerk(player, LifeSkill.Farming, 0, 1) ? 15 : 0) + (HasPerk(player, LifeSkill.Farming, 1, 2) ? 25 : 0);
+            if (bonus > 0 && _random.Chance(Math.Min(100, bonus) / 100f)) count++;
+            if (HasPerk(player, LifeSkill.Farming, 1, 1) && definition.Seed != null && _random.Chance(0.25f)) seeds++;
             var harvested = QualityOf(definition.HarvestMaterial, level, fertile);
             GainLifeExperience(player, LifeSkill.Farming, (int)Math.Round(6 * (again ? definition.RegrowDays : definition.GrowDays)));
             if (definition.HarvestMaterial != null) player.Inventory.AddMaterial(harvested, count);

@@ -39,7 +39,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.61.0";
+        public const string Version = "0.62.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -310,21 +310,31 @@ namespace Game.Core
     // client keeps it in its character save.
     public sealed class LifeMessage
     {
-        public LifeMessage(IReadOnlyList<int> experience) { Experience = experience; }
+        public LifeMessage(IReadOnlyList<int> experience, IReadOnlyList<int> perks = null)
+        {
+            Experience = experience;
+            Perks = perks ?? Array.Empty<int>();
+        }
 
         public IReadOnlyList<int> Experience { get; }
+        // The life skill perks picked (LifeSkills.PerkIndex order, 2026-11-09).
+        public IReadOnlyList<int> Perks { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Life, w =>
         {
             w.Write((byte)Experience.Count);
             foreach (int experience in Experience) w.Write(experience);
+            w.Write((byte)Perks.Count);
+            foreach (int perk in Perks) w.Write((byte)perk);
         });
 
         public static LifeMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Life, r =>
         {
             var list = new List<int>();
             for (int n = r.ReadByte(); n > 0; n--) list.Add(r.ReadInt32());
-            return new LifeMessage(list);
+            var perks = new List<int>();
+            for (int n = r.ReadByte(); n > 0; n--) perks.Add(r.ReadByte());
+            return new LifeMessage(list, perks);
         });
     }
 

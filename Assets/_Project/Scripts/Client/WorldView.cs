@@ -1747,6 +1747,9 @@ namespace Game.Client
                     _floating.Add(new Floating { Position = grower, Text = $"{LifeSkills.Name(skill)} {e.Amount % 16}", Color = LevelColor });
                     AddFlash(grower, 1, LevelColor, FlashKind.Sparkles);
                     if (e.Source == _client.PlayerId) Sounds.Play(Sound.LevelUp);
+                    // A level that opens a special perk: say where to pick it.
+                    if (e.Source == _client.PlayerId && Array.IndexOf(LifeSkills.PerkLevels, e.Amount % 16) >= 0)
+                        ShowBanner($"{LifeSkills.Name(skill)} {e.Amount % 16}레벨! 가방 [캐릭터]에서 특별 혜택을 고른다");
                     break;
                 case SimEventType.Rain:
                     if (e.Amount > 0) ShowBanner("비가 스며 밭이 젖었다");

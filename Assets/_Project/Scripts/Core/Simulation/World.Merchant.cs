@@ -78,6 +78,19 @@ namespace Game.Core
 
         // What a person pays for one: the row's price, more for silver or gold (MaterialDefinition.Quality), more with
         // each heart, and for a crop more on the day of the harvest festival.
+        // What the life skill perks add to a sale (World.Life.cs): crops for the farmer who took "좋은 값", dishes for the
+        // cook who took "요리 상인" or "별미" (percent of the price).
+        int PerkPricePercent(Player player, ShopEntry entry)
+        {
+            if (entry.Material != null && HasPerk(player, LifeSkill.Farming, 0, 2) && Tiles?.Crops.Any(c => c.HarvestMaterial?.Id == entry.Material.Id) == true) return 120;
+            if (entry.Consumable != null && Loot?.Recipes.Any(r => r.Consumable == entry.Consumable && r.Station == TileType.Furnace) == true)
+            {
+                if (HasPerk(player, LifeSkill.Cooking, 1, 2)) return 150;
+                if (HasPerk(player, LifeSkill.Cooking, 0, 2)) return 125;
+            }
+            return 100;
+        }
+
         public static int SellPrice(ShopEntry entry, int hearts, int quality = 0, int day = 0)
         {
             int price = entry.Sell * MaterialDefinition.QualityPercent(quality) / 100 * (100 + HeartPercent * hearts) / 100;
@@ -357,7 +370,7 @@ namespace Game.Core
             {
                 for (int i = 0; i < count; i++) player.Inventory.TakeConsumable(entry.Consumable);
             }
-            player.Inventory.AddMaterial(coin, SellPrice(entry, friendship.Hearts, sold?.Quality ?? 0, Today) * count);
+            player.Inventory.AddMaterial(coin, SellPrice(entry, friendship.Hearts, sold?.Quality ?? 0, Today) * PerkPricePercent(player, entry) / 100 * count);
             player.InventoryVersion++;
             return true;
         }

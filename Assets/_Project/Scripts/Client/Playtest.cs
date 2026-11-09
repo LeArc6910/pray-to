@@ -127,6 +127,12 @@ namespace Game.Client
                 case "speed":
                     root.HostTicksPerStep = Mathf.Clamp(Int(words[1]), 0, 60);
                     return null;
+                case "lifexp":
+                    // lifexp <farming|fishing|mining|cooking> <experience>: sets a life skill's experience.
+                    var lifeSkill = (LifeSkill)Enum.Parse(typeof(LifeSkill), words[1], ignoreCase: true);
+                    player.LifeExperience[(int)lifeSkill] = Int(words[2]);
+                    player.LifeVersion++;
+                    return null;
                 case "experience":
                     // Experience as if from monsters: the player's and, with a pet, the pet's (World.GainExperience).
                     world.GainExperience(player, Int(words[1]));
@@ -563,6 +569,7 @@ namespace Game.Client
                 .Field("friends", Counts(player.Friendships.Select(f => new KeyValuePair<string, int>(f.Key, f.Value.Points)), id => id))
                 .Field("stories", Counts(player.StorySteps, id => id))
                 .Field("life", string.Join(",", player.LifeExperience))
+                .Field("perks", string.Join(",", player.LifePerks))
                 .Close('}');
         }
 

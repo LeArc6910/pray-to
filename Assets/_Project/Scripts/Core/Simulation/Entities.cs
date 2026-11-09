@@ -52,6 +52,8 @@ namespace Game.Core
         public List<PassiveNode> Passives { get; } = new List<PassiveNode>();
         // Experience in each life skill (LifeSkill order), and a count that goes up when any changes.
         public int[] LifeExperience { get; } = new int[LifeSkills.Count];
+        // Each skill's perk picked at each tier (LifeSkills.PerkIndex): 0 none, 1 or 2.
+        public int[] LifePerks { get; } = new int[LifeSkills.Count * LifeSkills.PerkTiers];
         public int LifeVersion { get; internal set; }
 
         // The bestiary (Records.cs): how many of each kind of thing felled or held, the achievements had, and a
