@@ -208,6 +208,22 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void ASwingDoesNotReachThroughAWall()
+        {
+            // 2026-11-09: a swing reached a monster behind the one-tile wall the player stood against, and the wall
+            // was never dug while it was there.
+            var world = Room(out var player);
+            player.Position = new Vec2(2.64f, 2.5f);
+            world.MovePlayer(player.Id, player.Position, new Vec2(1, 0), 1);
+            var behind = world.SpawnEnemy(Monsters.Dummy, new Vec2(4.45f, 2.5f));
+
+            var events = Swing(world, player, 1);
+
+            Assert.IsFalse(events.Any(e => e.Type == SimEventType.Hit && e.Target == behind.Id), "the wall is between them");
+            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Dug), "the swing digs the wall instead");
+        }
+
+        [Test]
         public void OnlyAPickaxeDigsRock()
         {
             var world = Room(out var player, gear: Gear.Wearing("copper_sword"));

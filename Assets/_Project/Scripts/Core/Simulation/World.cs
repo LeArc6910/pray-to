@@ -295,6 +295,9 @@ namespace Game.Core
             {
                 if (enemy.IsDead) continue;
                 if (!Combat.InArc(player.Position, player.Facing, enemy.Position, enemy.Definition.Radius, reach, arc)) continue;
+                // Not through rock (2026-11-09): a monster behind a wall the player stands against is out of reach, and
+                // the swing goes to the wall instead.
+                if (!ClearLine(player.Position, enemy.Position, ThinLine)) continue;
 
                 float damage = RollDamage(stats, out bool critical) * more;
                 HitEnemy(player, enemy, damage, critical, player.Position, stats.AttackTags, push: finisher ? FinisherPush : 1);
@@ -306,6 +309,7 @@ namespace Game.Core
             {
                 if (boss.IsDead) continue;
                 if (!Combat.InArc(player.Position, player.Facing, boss.Position, boss.Definition.Radius, reach, arc)) continue;
+                if (!ClearLine(player.Position, boss.Position, ThinLine)) continue;
                 hit = true;
                 if (boss.State == BossState.Dormant) Wake(boss);
                 if (boss.Invulnerable) continue;
@@ -411,7 +415,7 @@ namespace Game.Core
                             return;
                         default:
                             _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
-                            if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack)
+                            if (target != null && !target.IsDead && Gap(enemy, target) <= definition.Reach + StrikeSlack && ClearLine(enemy.Position, target.Position, ThinLine))
                             {
                                 AfflictPlayer(target, enemy.Id, HurtPlayer(target, enemy.Id, enemy.Damage));
                             }
@@ -448,6 +452,9 @@ namespace Game.Core
         bool CanStrike(Enemy enemy, Player target) =>
             enemy.Definition.Behavior == MonsterBehavior.Melee
             || ClearLine(enemy.Position, target.Position, enemy.Definition.Behavior == MonsterBehavior.Ranged ? MonsterShotRadius : enemy.Definition.Radius);
+
+        // A blow's line between two bodies (a swing, a monster's bite): only rock in the way stops it.
+        const float ThinLine = 0.1f;
 
         bool ClearLine(Vec2 from, Vec2 to, float radius)
         {
