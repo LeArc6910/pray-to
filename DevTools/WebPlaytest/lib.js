@@ -157,7 +157,7 @@ function helpers(game) {
 
   function matches(b, label, row) {
     const labelOk = label instanceof RegExp ? label.test(b.label) : b.label === label;
-    const rowOk = !row || (row instanceof RegExp ? row.test(b.row) : b.row.includes(row));
+    const rowOk = !row || (row instanceof RegExp ? row.test(b.row || '') : (b.row || '').includes(row));
     return labelOk && rowOk;
   }
 

@@ -67,6 +67,15 @@ namespace Game.Client
             // A player's poses (CreatureArt.Pose): time left in a strike, a cast and a flinch.
             public float StrikeTime;
             public float CastTime;
+            // A motion of the player's own (2026-11-09): drawing a bow, a staff's zap, drinking, a skill thrown forward
+            // or round; its time left and length, the sector it began facing (for a spin), and what is in hand.
+            public Motion Motion;
+            public float MotionTime;
+            public float MotionLength;
+            public int SpinFrom;
+            public Sprite Holding;
+            // A boss's state as the snapshots say, for its pose.
+            public BossState BossState;
             // A player lying in their bed (World.Sleep): "Zz" over them.
             public bool Sleeping;
             public float HurtTime;
@@ -213,6 +222,47 @@ namespace Game.Client
         const float StrikeSeconds = 0.24f;
         const float WindUpSeconds = 0.07f;
         const float CastSeconds = 0.3f;
+        const float ShootSeconds = 0.3f;
+        const float DrinkSeconds = 0.6f;
+        const float ThrustSeconds = 0.32f;
+        const float SpinSeconds = 0.36f;
+
+        enum Motion
+        {
+            None,
+            Shoot,
+            Zap,
+            Drink,
+            Thrust,
+            Spin,
+        }
+
+        // The eight ways a player looks, from facing right and turning counterclockwise: right, up-right, up, up-left,
+        // left, down-left, down, down-right. Left-facing ones are right-facing pictures flipped.
+        static readonly (Look Look, bool Left)[] Sectors =
+        {
+            (Look.Side, false), (Look.UpSide, false), (Look.Up, false), (Look.UpSide, true),
+            (Look.Side, true), (Look.DownSide, true), (Look.Down, false), (Look.DownSide, false),
+        };
+
+        // A boss's views for the same eight ways (CreatureArt.BossView).
+        static readonly (BossView View, bool Left)[] BossSectors =
+        {
+            (BossView.Side, false), (BossView.BackSide, false), (BossView.Back, false), (BossView.BackSide, true),
+            (BossView.Side, true), (BossView.FrontSide, true), (BossView.Front, false), (BossView.FrontSide, false),
+        };
+
+        static int SectorOf(Vec2 facing) =>
+            facing.LengthSquared < 1e-6f ? 6 : (Mathf.RoundToInt(Mathf.Atan2(facing.Y, facing.X) / (Mathf.PI / 4)) % 8 + 8) % 8;
+
+        static void Start(Body body, Motion motion, float seconds, Vec2 facing)
+        {
+            body.Motion = motion;
+            body.MotionTime = seconds;
+            body.MotionLength = seconds;
+            body.SpinFrom = SectorOf(facing);
+            body.StrikeTime = 0;
+        }
         const float HurtSeconds = 0.25f;
         // Hit feel: how long a struck body is knocked back, how long a heavy blow of one's own holds the picture still
         // (hit-stop), and how long the screen's edges glow red when one is hurt.
@@ -586,6 +636,7 @@ namespace Game.Client
                     _others[view.Id] = body;
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
+                if (view.Kind == EntityKind.Boss) body.BossState = view.BossState;
                 body.Sleeping = view.IsPlayer && PlayerPhase.IsSleeping(view.Phase);
                 if (view.IsPlayer) DrawPet(view.Id, body, PlayerPhase.PetOf(view.Phase), deltaTime);
 
@@ -1411,7 +1462,9 @@ namespace Game.Client
                     Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : finisher ? Sound.Heavy : Sound.Swing, attacker.Position);
                     if (finisher && attacker == _self) _shake = Mathf.Max(_shake, 0.04f);
                     // Shots show as their projectile (a finisher's is bigger), with a puff where it leaves; only swings
-                    // draw the arc.
+                    // draw the arc. A bow is drawn and let go, a staff raised and pointed.
+                    if (kind != BasicAttackKind.Swing && attacker.Kind == BodyKind.Player)
+                        Start(attacker, kind == BasicAttackKind.Arrow ? Motion.Shoot : Motion.Zap, ShootSeconds, e.Direction);
                     if (kind != BasicAttackKind.Swing)
                     {
                         if (finisher) AddFlash(attacker.Position + (Vector3)(attacker.Lunge * 0.45f), 0.35f, ImpactWhite, FlashKind.Ring);
@@ -1545,6 +1598,11 @@ namespace Game.Client
                     var food = _client.ConsumableAt(e.Amount);
                     if (eater == null || food == null) break;
                     _floating.Add(new Floating { Position = eater.Position + new Vector3(0, 0.4f, 0), Text = food.Name, Color = Palette.Food });
+                    if (eater.Kind == BodyKind.Player)
+                    {
+                        Start(eater, Motion.Drink, DrinkSeconds, Vec2.Zero);
+                        eater.Holding = Sprites.Icon(food);
+                    }
                     Hear(Sound.Eat, eater.Position);
                     AddFlash(eater.Position, eater.Diameter, Palette.Food, FlashKind.Sparkles);
                     break;
@@ -1661,6 +1719,14 @@ namespace Game.Client
                     var drinker = Find(e.Source);
                     if (drinker == null) break;
                     _floating.Add(new Floating { Position = drinker.Position, Text = "+" + e.Amount, Color = Palette.Heal });
+                    // A potion (not a healing skill, which casts): the bottle to the mouth. Food that heals has
+                    // its own motion from Ate just before.
+                    if (drinker.Kind == BodyKind.Player && drinker.CastTime <= 0 && !(drinker.Motion == Motion.Drink && drinker.MotionTime > 0))
+                    {
+                        Start(drinker, Motion.Drink, DrinkSeconds, Vec2.Zero);
+                        var potion = _client.Loot?.Consumables.FirstOrDefault(c => c.Id == "healing_potion");
+                        drinker.Holding = potion == null ? null : Sprites.Icon(potion);
+                    }
                     Hear(Sound.Heal, drinker.Position);
                     AddFlash(drinker.Position, drinker.Diameter, Palette.Heal, FlashKind.Sparkles);
                     break;
@@ -1722,7 +1788,8 @@ namespace Game.Client
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
-                    caster.CastTime = CastSeconds;
+                    // Arms flung wide and a full turn on the spot.
+                    Start(caster, Motion.Spin, SpinSeconds, e.Direction);
                     AddFlash(caster.Position, skill.Radius + World.PlayerRadius, color, FlashKind.Ring);
                     // Spinning blades for the whirls, a fiery blast for the big fires, whirling ice for the cold.
                     if ((skill.Tags & SkillTag.Melee) != 0 || (skill.Tags & SkillTag.Cold) != 0 && skill.Radius >= 3)
@@ -1738,7 +1805,7 @@ namespace Game.Client
                     break;
                 case SkillKind.Dash:
                     // A puff where the dash began; the player is already where it ended (the host moved them).
-                    caster.CastTime = CastSeconds;
+                    Start(caster, Motion.Thrust, ThrustSeconds, e.Direction);
                     var from = caster.Position - new Vector3(e.Direction.X, e.Direction.Y, 0) * skill.Range;
                     AddFlash(from, 0.8f, Palette.Dust, FlashKind.Burst);
                     if (skill.Damage > 0) AddFlash(caster.Position, (skill.Radius + World.PlayerRadius) * 2, color, FlashKind.Ring);
@@ -1749,9 +1816,10 @@ namespace Game.Client
                     AddFlash(caster.Position, caster.Diameter * 1.8f, Palette.Heal, FlashKind.Sparkles);
                     break;
                 case SkillKind.Projectile:
+                    // Both hands sent forward after it. A sword still cuts the arc; a bow or staff is aimed instead.
+                    Start(caster, Motion.Thrust, ThrustSeconds, e.Direction);
+                    if (caster.Held != null && !IsMelee(caster.Held)) break;
                     caster.Combo = 0;
-                    caster.StrikeLength = StrikeSeconds;
-                    caster.StrikeTime = StrikeSeconds;
                     caster.SwingTime = SwingSeconds;
                     caster.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     caster.Swing.transform.localScale = Vector3.one;
@@ -1968,6 +2036,8 @@ namespace Game.Client
             body.StrikeTime = Mathf.Max(0, body.StrikeTime - deltaTime);
             body.CastTime = Mathf.Max(0, body.CastTime - deltaTime);
             body.HurtTime = Mathf.Max(0, body.HurtTime - deltaTime);
+            body.MotionTime = Mathf.Max(0, body.MotionTime - deltaTime);
+            if (body.MotionTime <= 0) body.Motion = Motion.None;
         }
 
         // Players look three ways (left is right flipped) and strike, cast, flinch, walk or stand (CreatureArt.Pose);
@@ -1984,20 +2054,47 @@ namespace Game.Client
             switch (body.Kind)
             {
                 case BodyKind.Player:
-                    look = Mathf.Abs(facing.X) >= Mathf.Abs(facing.Y) ? Look.Side : facing.Y > 0 ? Look.Up : Look.Down;
+                    // Eight ways; a spin turns through all eight once over its time.
+                    int sector = SectorOf(facing);
+                    if (body.Motion == Motion.Spin && body.MotionTime > 0)
+                        sector = (body.SpinFrom + Mathf.FloorToInt((1 - body.MotionTime / body.MotionLength) * 8)) % 8;
+                    (look, left) = Sectors[sector];
                     (pose, frame) = PlayerPose(body, moving, dead);
-                    left &= look == Look.Side;
                     break;
                 case BodyKind.Monster:
                 case BodyKind.Minion:
                     frame = Mathf.FloorToInt(Time.time * (moving ? 6 : 3) + body.Seed * 0.37f) % CreatureArt.IdleFrames;
                     break;
                 default:
-                    frame = Mathf.FloorToInt(Time.time * 1.5f) % CreatureArt.IdleFrames;
+                    frame = Mathf.FloorToInt(Time.time * (moving ? 4 : 1.5f)) % CreatureArt.IdleFrames;
                     break;
             }
 
-            int code = (((int)pose * 3 + (int)look) * 16 + frame) * 2 + (left ? 1 : 0);
+            if (body.Kind == BodyKind.Boss)
+            {
+                // Eight ways, and a pose from what it is doing: winding up while its telegraph shows, the strike just
+                // after an attack lands, leaning into a charge, roaring.
+                var (view, turned) = BossSectors[SectorOf(facing)];
+                var bossPose = dead ? BossPose.Idle
+                    : body.StrikeTime > 0 ? BossPose.Strike
+                    : body.BossState == BossState.Telegraph ? BossPose.Windup
+                    : body.BossState == BossState.Charge ? BossPose.Charge
+                    : body.BossState == BossState.Roar ? BossPose.Roar
+                    : BossPose.Idle;
+                int bossCode = 100000 + (((int)bossPose * 8 + (int)view) * 16 + frame) * 2 + (turned ? 1 : 0);
+                if (bossCode == body.Frame) return;
+                body.Frame = bossCode;
+                string bossKey = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{view}/{bossPose}/{frame}";
+                Func<PixelImage> drawBoss = () => CreatureArt.Boss(body.Id, body.Color, frame, view, bossPose);
+                body.Shape.sprite = Sprites.Standing(bossKey, drawBoss);
+                body.Glow.sprite = Sprites.Standing(bossKey + "/white", () => drawBoss().Silhouette());
+                body.Shape.flipX = turned;
+                body.Glow.flipX = turned;
+                body.Top = -body.Feet + body.Shape.sprite.rect.height / Sprites.PixelsPerUnit;
+                return;
+            }
+
+            int code = (((int)pose * 8 + (int)look) * 16 + frame) * 2 + (left ? 1 : 0);
             if (code == body.Frame) return;
             body.Frame = code;
             string key = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{look}/{pose}/{frame}";
@@ -2021,6 +2118,19 @@ namespace Game.Client
         {
             if (dead) return (Pose.Stand, 0);
             if (body.HurtTime > 0) return (Pose.Hurt, 0);
+            if (body.Motion != Motion.None && body.MotionTime > 0)
+            {
+                // Two frames over the motion: the first part held back (drawn, raised, lifted), then let go.
+                int second = body.MotionTime < body.MotionLength * 0.45f ? 1 : 0;
+                return body.Motion switch
+                {
+                    Motion.Shoot => (Pose.Shoot, second),
+                    Motion.Zap => (Pose.Zap, second),
+                    Motion.Drink => (Pose.Drink, body.MotionTime < body.MotionLength * 0.6f ? 1 : 0),
+                    Motion.Spin => (Pose.Spread, 0),
+                    _ => (Pose.Thrust, 0),
+                };
+            }
             if (body.StrikeTime > 0)
             {
                 // The combo's steps strike differently: the first winds up and follows through, the second the other
@@ -2047,13 +2157,65 @@ namespace Game.Client
                 body.Held = weapon;
                 body.Weapon.sprite = weapon == null ? null : HeldSprite(weapon);
             }
+            var (look, left) = Sectors[SectorOf(facing)];
+            bool away = look == Look.Up || look == Look.UpSide;
+            // Drinking or eating, the bottle or food is in the hand at the mouth instead, tipping back: beside the
+            // mouth facing the viewer, behind the head beside it facing away.
+            if (body.Motion == Motion.Drink && body.MotionTime > 0 && body.Holding != null && !dead)
+            {
+                body.Weapon.enabled = true;
+                body.Weapon.sprite = body.Holding;
+                body.Held = null;
+                float tip = Mathf.Lerp(20, 120, 1 - body.MotionTime / body.MotionLength);
+                bool mirrored = facing.X < 0;
+                float side = away ? 0.22f : 0.2f;
+                body.Weapon.transform.localPosition = new Vector3(mirrored ? -side : side, -body.Feet + (away ? 0.6f : 0.52f), 0) + offset;
+                body.Weapon.transform.localRotation = Quaternion.Euler(0, 0, mirrored ? -tip : tip);
+                body.Weapon.transform.localScale = Vector3.one * HeldScale;
+                body.Weapon.flipX = mirrored;
+                body.Weapon.sortingOrder = away ? order - 1 : order + 2;
+                return;
+            }
+            body.Weapon.transform.localScale = Vector3.one;
             body.Weapon.enabled = weapon != null && !dead;
             if (!body.Weapon.enabled) return;
-            bool side = Mathf.Abs(facing.X) >= Mathf.Abs(facing.Y);
-            bool left = side && facing.X < 0;
-            bool away = !side && facing.Y > 0;
-            float x = away ? -0.22f : left ? -0.24f : 0.24f;
+            // Eight ways: beside on the side faced, behind when facing away (wholly or turned away), in front when
+            // facing the viewer.
+            float x = look == Look.Up ? -0.22f : look == Look.Down ? 0.24f : left ? -0.24f : 0.24f;
+            if (look == Look.UpSide) x = left ? -0.2f : 0.2f;
+            if (look == Look.DownSide) x = left ? -0.26f : 0.26f;
             body.Weapon.transform.localPosition = new Vector3(x, -body.Feet + 0.3f, 0) + offset;
+            // Aimed: a bow drawn, a staff raised then pointed, either sending a skill forward. A sword is swung.
+            bool aimed = body.MotionTime > 0 && (body.Motion == Motion.Shoot || body.Motion == Motion.Zap || body.Motion == Motion.Thrust && !IsMelee(weapon));
+            if (aimed)
+            {
+                float angle = Mathf.Atan2(facing.Y, facing.X) * Mathf.Rad2Deg;
+                bool raised = body.Motion == Motion.Zap && body.MotionTime >= body.MotionLength * 0.45f;
+                var way = new Vector3(facing.X, facing.Y, 0).normalized;
+                if (raised)
+                {
+                    body.Weapon.transform.localPosition = new Vector3(x, -body.Feet + 0.5f, 0) + offset;
+                    body.Weapon.transform.localRotation = Quaternion.identity;
+                }
+                else if ((weapon.Tags & SkillTag.Ranged) != 0)
+                {
+                    // The bow's icon stands upright, bowed to the left: turned so it bows toward the target, its
+                    // string to the player, held out round the chest the way they aim, clear of the body.
+                    body.Weapon.transform.localPosition = new Vector3(way.x * 0.42f, -body.Feet + 0.5f + way.y * 0.38f, 0) + offset;
+                    body.Weapon.transform.localRotation = Quaternion.Euler(0, 0, angle + 180);
+                }
+                else
+                {
+                    // A staff's icon lies corner to corner, grip at the bottom left: turned so it points where the
+                    // player looks, from the hand.
+                    var ahead = new Vector3(way.x, way.y * 0.6f, 0).normalized * 0.28f;
+                    body.Weapon.transform.localPosition = new Vector3(ahead.x, -body.Feet + 0.42f + ahead.y * 0.5f, 0) + offset;
+                    body.Weapon.transform.localRotation = Quaternion.Euler(0, 0, angle - 45);
+                }
+                body.Weapon.flipX = false;
+                body.Weapon.sortingOrder = away ? order - 1 : order + 2;
+                return;
+            }
             // Down for the first cut, back up for the second, a wider sweep for the finisher.
             float through = body.SwingTime / SwingSeconds;
             float sweep = body.SwingTime <= 0 ? 0
@@ -2064,6 +2226,11 @@ namespace Game.Client
             body.Weapon.flipX = left;
             body.Weapon.sortingOrder = away ? order - 1 : order + 2;
         }
+
+        // A bottle or food in the hand is drawn smaller than its icon, so it does not hide the face.
+        const float HeldScale = 0.55f;
+
+        static bool IsMelee(ItemBase weapon) => (weapon.Tags & (SkillTag.Ranged | SkillTag.Magic)) == 0;
 
         // The weapon's icon held by its grip: the bottom left of a sword or staff, the middle of a bow.
         static Sprite HeldSprite(ItemBase weapon)

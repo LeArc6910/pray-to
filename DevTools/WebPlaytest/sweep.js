@@ -892,6 +892,7 @@ async function npc(browser) {
   await game.send('goto 3 0');
   await game.wait(1500);
   await game.shot('pet', '따라오는 펫 말랑이');
+  await bagTab(game);
   check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
   const doll = await game.find(/구리 검/, '캐릭터');
   check(doll.length === 1, `[캐릭터] 탭의 사람 모양 칸에 든 무기 (${doll.map(b => b.label).join(', ')})`);

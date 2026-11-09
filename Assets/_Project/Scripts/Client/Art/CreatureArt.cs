@@ -2,17 +2,23 @@ using System.Collections.Generic;
 
 namespace Game.Client
 {
-    // Which way a player sprite looks. Left is Side flipped.
+    // Which way a player sprite looks, of eight (2026-11-09): down, up, side, and the two three-quarter views between,
+    // down-side (toward the viewer and right) and up-side (away and right). The left ones are these flipped.
     enum Look
     {
         Down,
         Up,
         Side,
+        DownSide,
+        UpSide,
     }
 
     // What a player is doing, which decides the frame drawn (WorldView picks it). The frames of each:
     // Stand: 0 still, 1 breathing in (a pixel taller), 2 blinking. Walk: the WalkFrames of a step cycle.
     // Strike: 0 the weapon raised, 1 brought through. Cast: arms raised. Hurt: flinching, eyes shut.
+    // Shoot (a bow): 0 the string drawn back, 1 let go. Zap (a staff): 0 raised, 1 pointed. Drink: 0 the bottle lifted,
+    // 1 tipped back. Thrust (a skill sent forward, a dash): both hands out ahead. Spread (a skill all round): arms
+    // flung wide.
     enum Pose
     {
         Stand,
@@ -20,6 +26,32 @@ namespace Game.Client
         Strike,
         Cast,
         Hurt,
+        Shoot,
+        Zap,
+        Drink,
+        Thrust,
+        Spread,
+    }
+
+    // Which way a boss is drawn (2026-11-09): toward the viewer, three-quarters, side on, three-quarters away, away.
+    // The left ones are flipped.
+    enum BossView
+    {
+        Front,
+        FrontSide,
+        Side,
+        BackSide,
+        Back,
+    }
+
+    // What a boss is doing (WorldView picks it from its state and its last attack).
+    enum BossPose
+    {
+        Idle,
+        Windup,
+        Strike,
+        Charge,
+        Roar,
     }
 
     // Players, monsters and the boss, at the tiles' 16 pixels a tile. Each comes in a few frames: players walk in
@@ -62,6 +94,30 @@ namespace Game.Client
             "..SssssS..",
         };
 
+        // Three-quarter views: the face turned toward the viewer and right, both eyes showing; and turned away and
+        // right, the hair and a sliver of cheek.
+        static readonly string[] HeadDownSide =
+        {
+            "..hhhhhh..",
+            ".hHHHHHhh.",
+            "hHHhhhhhh.",
+            "hhhssssss.",
+            "hhhsesses.",
+            ".hhsesseS.",
+            "..hssssS..",
+        };
+
+        static readonly string[] HeadUpSide =
+        {
+            "..hhhhhh..",
+            ".hHHHHHhh.",
+            "hHHHhhHhh.",
+            "hhHhhhhhs.",
+            "hhhhhhhhs.",
+            ".hhhhhhhS.",
+            "..SsssS...",
+        };
+
         static readonly string[] HeadSide =
         {
             "..hhhhh...",
@@ -101,6 +157,24 @@ namespace Game.Client
             "..tTTTTt..",
         };
 
+        static readonly string[] BodyDownSide =
+        {
+            "..tTTUUTt.",
+            ".tTTTUUTTt",
+            ".tTTTTTTTt",
+            "..bbbBBbb.",
+            "..tTTTTTt.",
+        };
+
+        static readonly string[] BodyUpSide =
+        {
+            "..tTTTTTt.",
+            ".tTTTTTTTt",
+            ".tTTTTTTTt",
+            "..bbbbbbb.",
+            "..tTTTTTt.",
+        };
+
         // The head's row with the upper half of the eyes; a blink or a flinch leaves only the lower half.
         const int EyeRow = 4;
 
@@ -121,9 +195,19 @@ namespace Game.Client
             new[] { "...PpP....", "..oo.oo..." },
         };
 
+        // Three-quarter on, the legs sit a little to the near side, closer together.
+        static readonly string[][] LegsSlant =
+        {
+            new[] { "...pP.Pp..", "...oo.oo.." },
+            new[] { "...pP.oo..", "...oo....." },
+            new[] { "...pP.Pp..", "...oo.oo.." },
+            new[] { "...oo.Pp..", "......oo.." },
+        };
+
         // Feet planted apart for a strike, and drawn together in a flinch (facing down or up; side on, a strike
         // takes a stride and a flinch stands).
         static readonly string[] LegsWide = { ".pP....Pp.", ".oo....oo." };
+        static readonly string[] LegsSlantWide = { "..pP...Pp.", "..oo...oo." };
         static readonly string[] LegsTogether = { "...pPPp...", "...oooo..." };
 
         static readonly Dictionary<char, Rgba> PlayerColors = new Dictionary<char, Rgba>
@@ -154,8 +238,8 @@ namespace Game.Client
                 ['t'] = ramp.Shade,
                 ['U'] = ramp.Light,
             };
-            var head = look == Look.Down ? HeadDown : look == Look.Up ? HeadUp : HeadSide;
-            var body = look == Look.Down ? BodyDown : look == Look.Up ? BodyUp : BodySide;
+            var head = look switch { Look.Down => HeadDown, Look.Up => HeadUp, Look.DownSide => HeadDownSide, Look.UpSide => HeadUpSide, _ => HeadSide };
+            var body = look switch { Look.Down => BodyDown, Look.Up => BodyUp, Look.DownSide => BodyDownSide, Look.UpSide => BodyUpSide, _ => BodySide };
             var legs = Legs(look, pose, frame);
             // An empty row on top, so a step can lift the head and body a pixel without clipping the hair.
             var rows = new List<char[]> { new string('.', head[0].Length).ToCharArray() };
@@ -173,20 +257,26 @@ namespace Game.Client
             var grid = new string[rows.Count];
             for (int y = 0; y < rows.Count; y++) grid[y] = new string(rows[y]);
             var image = PixelImage.FromRows(colors, grid);
-            // A step's bob, and breathing in: the head and body a pixel up over the same legs.
-            if (pose == Pose.Walk && frame % 2 == 1 || pose == Pose.Stand && frame == Breath) image = Lift(image, bodyTop + body.Length);
+            // A step's bob, breathing in, tipping a bottle back and a cast's stretch: the head and body a pixel up over
+            // the same legs.
+            if (pose == Pose.Walk && frame % 2 == 1 || pose == Pose.Stand && frame == Breath || pose == Pose.Drink && frame == 1
+                || pose == Pose.Cast || pose == Pose.Zap && frame == 0)
+                image = Lift(image, bodyTop + body.Length);
             return image.Outlined(Rgba.Hex("#140E10"));
         }
 
         static string[] Legs(Look look, Pose pose, int frame)
         {
             bool side = look == Look.Side;
+            bool slant = look == Look.DownSide || look == Look.UpSide;
+            var walk = side ? LegsSide : slant ? LegsSlant : LegsFront;
             return pose switch
             {
-                Pose.Walk => (side ? LegsSide : LegsFront)[frame % WalkFrames],
-                Pose.Strike => side ? LegsSide[1] : LegsWide,
+                Pose.Walk => walk[frame % WalkFrames],
+                // A stance for striking, shooting and casting out or round: a stride side on, feet apart otherwise.
+                Pose.Strike or Pose.Shoot or Pose.Thrust or Pose.Spread => side ? LegsSide[1] : slant ? LegsSlantWide : LegsWide,
                 Pose.Hurt => side ? LegsSide[0] : LegsTogether,
-                _ => (side ? LegsSide : LegsFront)[0],
+                _ => walk[0],
             };
         }
 
@@ -197,10 +287,50 @@ namespace Game.Client
         // side on, only the near hand shows.
         static IEnumerable<(int X, int Y, char C)> Hands(Look look, Pose pose, int frame)
         {
-            if (look == Look.Side)
+            if (look == Look.DownSide || look == Look.UpSide) return SlantHands(look, pose, frame);
+            return look == Look.Side ? SideHands(pose, frame) : FrontHands(look, pose, frame);
+        }
+
+        // Side on: only the near hand shows (and the far one when flung back or out).
+        static IEnumerable<(int X, int Y, char C)> SideHands(Pose pose, int frame)
+        {
             {
                 switch (pose)
                 {
+                    case Pose.Shoot when frame == 0:
+                        // Bow arm out ahead, the string hand drawn back to the chin.
+                        yield return (9, 1, 's');
+                        yield return (8, 1, 't');
+                        yield return (5, 0, 's');
+                        break;
+                    case Pose.Shoot:
+                        yield return (9, 1, 's');
+                        yield return (8, 1, 't');
+                        yield return (1, 1, 's');
+                        break;
+                    case Pose.Zap when frame == 0:
+                        yield return (7, -1, 's');
+                        yield return (7, 0, 't');
+                        break;
+                    case Pose.Zap:
+                        yield return (9, 1, 's');
+                        yield return (8, 1, 't');
+                        break;
+                    case Pose.Drink:
+                        yield return (8, frame == 0 ? -1 : -2, 's');
+                        yield return (7, 0, 't');
+                        break;
+                    case Pose.Thrust:
+                        yield return (9, 1, 's');
+                        yield return (8, 1, 't');
+                        yield return (9, 2, 's');
+                        break;
+                    case Pose.Spread:
+                        yield return (9, 1, 's');
+                        yield return (8, 1, 't');
+                        yield return (0, 1, 's');
+                        yield return (1, 1, 't');
+                        break;
                     case Pose.Walk:
                         yield return (frame == 1 ? 7 : frame == 3 ? 2 : 5, 2, 's');
                         break;
@@ -221,9 +351,93 @@ namespace Game.Client
                         yield return (5, 2, 's');
                         break;
                 }
-                yield break;
             }
+        }
 
+        // Three-quarter on: the near (weapon) hand on the right edge, the far one at the left, a shade darker.
+        static IEnumerable<(int X, int Y, char C)> SlantHands(Look look, Pose pose, int frame)
+        {
+            bool toward = look == Look.DownSide;
+            switch (pose)
+            {
+                case Pose.Walk when frame % 2 == 1:
+                    bool nearBack = frame == 1;
+                    yield return (9, nearBack ? 1 : 3, 's');
+                    if (nearBack) yield return (9, 2, '.');
+                    yield return (1, nearBack ? 3 : 1, 'S');
+                    if (!nearBack) yield return (1, 2, '.');
+                    break;
+                case Pose.Strike:
+                    yield return (1, 2, 'S');
+                    if (frame == 0)
+                    {
+                        yield return (9, -1, 's');
+                        yield return (9, 0, 't');
+                        yield return (9, 2, '.');
+                    }
+                    else yield return (9, 3, 's');
+                    break;
+                case Pose.Cast:
+                    foreach (int x in new[] { 1, 9 })
+                    {
+                        yield return (x, -1, x == 1 ? 'S' : 's');
+                        yield return (x, 0, 't');
+                        yield return (x, 2, '.');
+                    }
+                    break;
+                case Pose.Hurt:
+                    yield return (1, 1, 'S');
+                    yield return (1, 2, '.');
+                    yield return (9, 1, 's');
+                    yield return (9, 2, '.');
+                    break;
+                case Pose.Shoot:
+                    // Facing toward the viewer the bow is held out low in front; facing away, out to the side.
+                    yield return (9, toward ? 3 : 1, 's');
+                    yield return (9, 2, toward ? 't' : '.');
+                    yield return (1, 2, '.');
+                    yield return (frame == 0 ? 6 : 0, frame == 0 ? (toward ? 2 : 1) : 1, frame == 0 ? 's' : 'S');
+                    break;
+                case Pose.Zap:
+                    yield return (1, 2, 'S');
+                    if (frame == 0)
+                    {
+                        yield return (9, -1, 's');
+                        yield return (9, 0, 't');
+                        yield return (9, 2, '.');
+                    }
+                    else yield return (9, toward ? 3 : 1, 's');
+                    break;
+                case Pose.Drink:
+                    // The near hand up at the mouth, a shade darker so it shows against the face, the arm across.
+                    yield return (1, 2, 'S');
+                    yield return (9, 2, '.');
+                    yield return (toward ? 8 : 9, frame == 0 ? -1 : -2, toward ? 'S' : 's');
+                    yield return (8, 1, 't');
+                    yield return (toward ? 8 : 9, 0, 't');
+                    break;
+                case Pose.Thrust:
+                    yield return (9, toward ? 3 : 1, 's');
+                    yield return (8, toward ? 3 : 1, 's');
+                    yield return (9, 2, toward ? 't' : '.');
+                    yield return (1, 2, '.');
+                    break;
+                case Pose.Spread:
+                    yield return (9, 1, 's');
+                    yield return (9, 2, '.');
+                    yield return (0, 1, 'S');
+                    yield return (1, 2, '.');
+                    break;
+                default:
+                    yield return (9, 2, 's');
+                    yield return (1, 2, 'S');
+                    break;
+            }
+        }
+
+        // Facing down or up: both hands at the sides.
+        static IEnumerable<(int X, int Y, char C)> FrontHands(Look look, Pose pose, int frame)
+        {
             int weapon = look == Look.Down ? 9 : 0;
             int other = 9 - weapon;
             switch (pose)
@@ -263,6 +477,56 @@ namespace Game.Client
                     yield return (7, 1, 's');
                     break;
                 case Pose.Hurt:
+                    yield return (0, 1, 's');
+                    yield return (0, 2, '.');
+                    yield return (9, 1, 's');
+                    yield return (9, 2, '.');
+                    break;
+                case Pose.Shoot when look == Look.Down:
+                    // Both hands in front aiming down; letting go, the string hand flies back out.
+                    yield return (0, 2, '.');
+                    yield return (9, 2, '.');
+                    yield return (4, 3, 's');
+                    yield return (frame == 0 ? 5 : 9, frame == 0 ? 3 : 1, 's');
+                    break;
+                case Pose.Shoot:
+                case Pose.Thrust when look == Look.Up:
+                    // Facing away, the elbows show out at the sides with the hands ahead.
+                    yield return (0, 1, 's');
+                    yield return (0, 2, '.');
+                    yield return (9, frame == 1 && pose == Pose.Shoot ? 2 : 1, 's');
+                    if (!(frame == 1 && pose == Pose.Shoot)) yield return (9, 2, '.');
+                    break;
+                case Pose.Zap when frame == 0:
+                    yield return (other, 2, 's');
+                    yield return (weapon, -1, 's');
+                    yield return (weapon, 0, 't');
+                    yield return (weapon, 2, '.');
+                    break;
+                case Pose.Zap:
+                    yield return (other, 2, 's');
+                    yield return (weapon, 2, '.');
+                    yield return (look == Look.Down ? 8 : 1, look == Look.Down ? 3 : 1, 's');
+                    break;
+                case Pose.Drink:
+                    yield return (other, 2, 's');
+                    yield return (weapon, 2, '.');
+                    if (look == Look.Down)
+                    {
+                        // The hand at the mouth a shade darker than the face, the arm drawn across the chest.
+                        yield return (frame == 0 ? 6 : 5, -1, 'S');
+                        yield return (7, 0, 't');
+                        yield return (8, 1, 't');
+                    }
+                    else yield return (weapon, 0, 's');
+                    break;
+                case Pose.Thrust:
+                    yield return (0, 2, '.');
+                    yield return (9, 2, '.');
+                    yield return (3, 3, 's');
+                    yield return (6, 3, 's');
+                    break;
+                case Pose.Spread:
                     yield return (0, 1, 's');
                     yield return (0, 2, '.');
                     yield return (9, 1, 's');
@@ -899,79 +1163,116 @@ namespace Game.Client
 
         // ---- The boss ----
 
-        // The cave warden, a golem of stacked stone blocks with a glowing core. Drawn from blocks rather than a
-        // grid because it is big; the second frame breathes, raising the upper body a pixel.
-        public static PixelImage Boss(string id, Rgba color, int frame) => id switch
+        // The bosses (2026-11-09: eight ways and moving with their attacks). Each is drawn from parts for the view
+        // (BossView: front, front three-quarter, side, back three-quarter, back; WorldView flips them for the left)
+        // and the pose (BossPose): idle breathing, winding up while a telegraph shows, the strike as it lands, a
+        // charge's lean and a roar. The canvases have room round the body for raised or flung-out limbs.
+        public static PixelImage Boss(string id, Rgba color, int frame, BossView view = BossView.Front, BossPose pose = BossPose.Idle) => id switch
         {
-            "crystal_queen" => Queen(frame),
+            "crystal_queen" => Queen(frame, view, pose),
             // The lava titan: the warden's build in black basalt, its seams and core burning.
-            "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, molten: true),
-            "void_lord" => VoidLord(frame),
-            "tide_serpent" => Serpent(frame),
-            _ => Warden(color, frame),
+            "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, view, pose, molten: true),
+            "void_lord" => VoidLord(frame, view, pose),
+            "tide_serpent" => Serpent(frame, view, pose),
+            _ => Warden(color, frame, view, pose),
         };
 
+        static bool Behind(BossView view) => view == BossView.Back || view == BossView.BackSide;
+
+        // How far a view turns the face toward the right, in steps (0 front or back, 1 three-quarter, 2 side).
+        static int Turn(BossView view) => view == BossView.Side ? 2 : view == BossView.FrontSide || view == BossView.BackSide ? 1 : 0;
+
         // The tide serpent: a long teal body in three coils, a pale belly, its head reared up on a curving neck with a
-        // fin crest, gold eyes and fangs. The second frame sways the neck and lifts the head a pixel.
-        static PixelImage Serpent(int frame)
+        // fin crest, gold eyes and fangs. Its head turns with the view; it rears back to wind up, lunges to strike and
+        // opens its jaws to roar.
+        static PixelImage Serpent(int frame, BossView view, BossPose pose)
         {
-            const int width = 40;
-            const int height = 38;
+            const int width = 44;
+            const int height = 42;
             var image = new PixelImage(width, height);
             var skin = Ramp.Of("#2E8C9A");
             var belly = Ramp.Of("#BFE8DC");
             var fin = Ramp.Of("#5AD2E6");
             var eye = Rgba.Hex("#FFE85A");
             int sway = frame % 2 == 1 ? 1 : 0;
+            bool behind = Behind(view);
+            int turn = Turn(view);
             void Set(int x, int y, Rgba c)
             {
                 if (image.Inside(x, y)) image[x, y] = c;
             }
 
-            // The coils, widest at the bottom, each a flattened ring with a light top and a dark underside.
+            // The coils, widest at the bottom, each a flattened ring with a light top and a dark underside; from behind
+            // no pale belly shows.
             for (int ring = 0; ring < 3; ring++)
             {
-                int cy = 33 - ring * 5;
+                int cy = 37 - ring * 5;
                 int rx = 16 - ring * 4;
                 const int ry = 4;
                 for (int y = cy - ry; y <= cy + ry; y++)
                 {
-                    for (int x = 20 - rx; x <= 20 + rx; x++)
+                    for (int x = 22 - rx; x <= 22 + rx; x++)
                     {
-                        float dx = (x - 20) / (float)rx;
+                        float dx = (x - 22) / (float)rx;
                         float dy = (y - cy) / (float)ry;
                         float d = dx * dx + dy * dy;
                         if (d > 1) continue;
                         var c = dy < -0.45f ? skin.Light : dy > 0.55f ? skin.Dark : (x * 3 + y) % 7 == 0 ? skin.Shade : skin.Main;
-                        // Scales: a pale belly band along the front of each coil.
-                        if (dy > 0.1f && dy < 0.45f && d < 0.8f) c = (x % 2 == 0) ? belly.Main : belly.Shade;
+                        if (!behind && dy > 0.1f && dy < 0.45f && d < 0.8f) c = x % 2 == 0 ? belly.Main : belly.Shade;
                         Set(x, y, c);
                     }
                 }
             }
-            // The neck curving up out of the top coil.
-            for (int i = 0; i < 13; i++)
+            // Where the head goes: reared back and high to wind up, lunging forward and low to strike, up for a roar.
+            int reachX = pose switch { BossPose.Windup => -3, BossPose.Strike => 5, BossPose.Charge => 4, _ => 0 } + (turn == 0 ? 0 : sway);
+            int reachY = pose switch { BossPose.Windup => -3, BossPose.Strike => 6, BossPose.Charge => 4, BossPose.Roar => -2, _ => 0 } - (turn == 0 ? sway : 0);
+            // The neck curving up out of the top coil to the head, bending toward the side it faces.
+            int hx = 22 + turn * 2 + reachX;
+            int hy = 10 + reachY;
+            for (int i = 0; i <= 14; i++)
             {
-                int nx = 20 + (int)System.Math.Round(System.Math.Sin(i / 12.0 * System.Math.PI) * (3 + sway));
-                int ny = 22 - i;
+                float t = i / 14f;
+                int nx = (int)System.Math.Round(22 + (hx - 22) * t + System.Math.Sin(t * System.Math.PI) * (turn == 0 ? 2 : 4));
+                int ny = (int)System.Math.Round(26 + (hy + 3 - 26) * t);
                 for (int w = -2; w <= 2; w++)
                 {
-                    Set(nx + w, ny, w == -2 ? skin.Light : w == 2 ? skin.Dark : w == 0 ? belly.Main : skin.Main);
+                    var c = w == -2 ? skin.Light : w == 2 ? skin.Dark : w == 0 && !behind ? belly.Main : skin.Main;
+                    Set(nx + w, ny, c);
                 }
-                // A fin down the back of the neck.
                 if (i % 2 == 0) Set(nx - 3, ny, fin.Main);
             }
-            // The head: a wedge pointing right, the crest behind it.
-            int hx = 20 + sway;
-            int hy = 6 - sway;
+            bool open = pose == BossPose.Roar || pose == BossPose.Strike;
+            if (turn == 0)
+            {
+                // Head on: a round head, the crest fanned behind it; facing the viewer, two eyes and fangs.
+                for (int y = -3; y <= 3; y++)
+                {
+                    for (int x = -4; x <= 4; x++)
+                    {
+                        if (x * x + y * y * 2 > 22) continue;
+                        Set(hx + x, hy + y, y <= -2 ? skin.Light : y >= 2 ? skin.Dark : skin.Main);
+                    }
+                }
+                for (int i = -5; i <= 5; i += 2) Set(hx + i, hy - 4 - (5 - System.Math.Abs(i)) / 2, fin.Light);
+                if (!behind)
+                {
+                    Set(hx - 2, hy - 1, eye);
+                    Set(hx + 2, hy - 1, eye);
+                    Set(hx - 1, hy + 2 + (open ? 1 : 0), Rgba.White);
+                    Set(hx + 1, hy + 2 + (open ? 1 : 0), Rgba.White);
+                    if (open) Set(hx, hy + 2, Rgba.Hex("#7A1E2E"));
+                }
+                return image.Outlined(Rgba.Hex("#0A1A1E"));
+            }
+            // Turned: a wedge pointing right, the crest behind it.
             for (int y = -3; y <= 3; y++)
             {
-                int reach = 5 - System.Math.Abs(y) / 2;
+                int reach = 5 - System.Math.Abs(y) / 2 + (turn == 2 ? 1 : 0);
                 for (int x = -4; x <= reach + 2; x++)
                 {
                     var c = y <= -2 ? skin.Light : y >= 2 ? skin.Dark : skin.Main;
-                    if (y == 2 && x > 0) c = belly.Main;
-                    Set(hx + x, hy + y, c);
+                    if (!behind && y == 2 && x > 0) c = belly.Main;
+                    Set(hx + x, hy + y + (open && y >= 2 && x > 2 ? 1 : 0), c);
                 }
             }
             for (int i = 0; i < 4; i++)
@@ -979,200 +1280,353 @@ namespace Game.Client
                 Set(hx - 5 - i, hy - 3 + i, fin.Light);
                 Set(hx - 4 - i, hy - 4 + i, fin.Main);
             }
-            Set(hx + 3, hy - 1, eye);
-            Set(hx + 4, hy - 1, eye.Scale(0.8f));
-            Set(hx + 6, hy + 2, Rgba.White);
-            Set(hx + 4, hy + 3, Rgba.White);
+            if (!behind)
+            {
+                Set(hx + 3, hy - 1, eye);
+                if (turn == 1) Set(hx, hy - 1, eye);
+                Set(hx + 6, hy + 2 + (open ? 1 : 0), Rgba.White);
+                Set(hx + 4, hy + 3 + (open ? 1 : 0), Rgba.White);
+                if (open) Set(hx + 5, hy + 2, Rgba.Hex("#7A1E2E"));
+            }
             return image.Outlined(Rgba.Hex("#0A1A1E"));
         }
 
         // The void lord: a hooded shape in a long cloak that floats over the ground, two cold eyes in the dark of the
-        // hood, an orb of the void held before it and stars turning round its head. The second frame rises a pixel
-        // and turns the stars.
-        static PixelImage VoidLord(int frame)
+        // hood, an orb of the void held before it and stars turning round its head. It lifts the orb overhead to wind
+        // up, thrusts it out to strike and flares its cloak to roar; side on, the cloak narrows and the orb is held
+        // out in front; from behind, the hood is closed and the orb hidden.
+        static PixelImage VoidLord(int frame, BossView view, BossPose pose)
         {
-            const int width = 40;
-            const int height = 40;
+            const int width = 46;
+            const int height = 46;
             var image = new PixelImage(width, height);
             var cloak = Ramp.Of("#3A2C5C");
             var trim = Ramp.Of("#9A7CFF");
             var orb = Ramp.Of("#C8A8FF");
             var eye = Rgba.Hex("#BFF4FF");
-            int bob = frame % 2 == 1 ? -1 : 0;
-            const int cx = 20;
-
-            // The cloak: wider towards the hem, frayed at the bottom, with a lit edge down each side.
-            for (int y = 10; y < 36; y++)
+            int bob = (frame % 2 == 1 ? -1 : 0) + (pose == BossPose.Windup ? -2 : pose == BossPose.Strike ? 1 : 0);
+            bool behind = Behind(view);
+            int turn = Turn(view);
+            const int cx = 23;
+            int face = cx + turn * 2;
+            int flare = pose == BossPose.Roar ? 4 : pose == BossPose.Strike ? 2 : 0;
+            float narrow = turn == 2 ? 0.65f : turn == 1 ? 0.85f : 1;
+            void Set(int x, int y, Rgba c)
             {
-                int half = 5 + (y - 10) * 9 / 26;
-                bool frayed = y >= 33;
+                if (image.Inside(x, y)) image[x, y] = c;
+            }
+
+            // The cloak: wider toward the hem, frayed at the bottom, with a lit edge down each side; a charge drags it
+            // back away from the way it rushes.
+            for (int y = 13; y < 40; y++)
+            {
+                int half = (int)System.Math.Round((5 + (y - 13) * (9 + flare) / 27f) * narrow);
+                int drag = pose == BossPose.Charge ? -(y - 13) / 6 : 0;
+                bool frayed = y >= 37;
                 for (int x = cx - half; x <= cx + half; x++)
                 {
                     if (frayed && (x + y) % 3 == 0) continue;
                     var color = x <= cx - half + 1 ? cloak.Light : x >= cx + half - 1 ? cloak.Dark : (x + y) % 7 == 0 ? cloak.Shade : cloak.Main;
-                    image[x, y + bob] = color;
+                    Set(x + drag, y + bob, color);
                 }
                 if (!frayed)
                 {
-                    image[cx - half, y + bob] = trim.Main;
-                    image[cx + half, y + bob] = trim.Shade;
+                    Set(cx - half + drag, y + bob, trim.Main);
+                    Set(cx + half + drag, y + bob, trim.Shade);
                 }
             }
-            // The hood, dark inside, and the eyes.
-            for (int y = 3; y < 13; y++)
+            // The hood: dark inside facing the viewer, closed cloth from behind.
+            for (int y = 6; y < 16; y++)
             {
-                int half = y < 6 ? y - 1 : 6;
-                for (int x = cx - half; x <= cx + half; x++) image[x, y + bob] = cloak.Main;
+                int half = y < 9 ? y - 4 : 6;
+                for (int x = face - half; x <= face + half; x++) Set(x, y + bob, cloak.Main);
             }
-            for (int y = 6; y < 12; y++)
+            if (!behind)
             {
-                for (int x = cx - 3; x <= cx + 3; x++) image[x, y + bob] = Rgba.Hex("#08060C");
-            }
-            image[cx - 2, 8 + bob] = eye;
-            image[cx + 2, 8 + bob] = eye;
-            image[cx - 2, 9 + bob] = trim.Main;
-            image[cx + 2, 9 + bob] = trim.Main;
-            // The orb in front, with sleeves reaching to it.
-            for (int dy = -3; dy <= 3; dy++)
-            {
-                for (int dx = -3; dx <= 3; dx++)
+                int left = face - 3 + turn;
+                for (int y = 9; y < 15; y++)
                 {
-                    int d = dx * dx + dy * dy;
-                    if (d > 10) continue;
-                    image[cx + dx, 21 + dy + bob] = d <= 1 ? Rgba.White : d <= 4 ? orb.Light : d <= 7 ? orb.Main : orb.Shade;
+                    for (int x = left; x <= face + 3; x++) Set(x, y + bob, Rgba.Hex("#08060C"));
+                }
+                var bright = pose == BossPose.Roar || pose == BossPose.Windup ? Rgba.White : eye;
+                if (turn < 2) Set(face - 2 + turn, 11 + bob, bright);
+                Set(face + 2, 11 + bob, bright);
+                if (turn < 2) Set(face - 2 + turn, 12 + bob, trim.Main);
+                Set(face + 2, 12 + bob, trim.Main);
+            }
+            else
+            {
+                for (int y = 8; y < 15; y++) Set(face, y + bob, cloak.Shade);
+            }
+            // The orb with sleeves reaching to it: before the chest, overhead to wind up, thrust out and down to strike;
+            // side on it is held out ahead. From behind only the sleeves show.
+            int ox = cx + turn * 4 + (pose == BossPose.Strike ? turn * 2 : 0);
+            int oy = pose == BossPose.Windup ? 3 : pose == BossPose.Strike ? 27 : 24;
+            if (!behind)
+            {
+                int glow = pose == BossPose.Strike || pose == BossPose.Windup ? 14 : 10;
+                for (int dy = -4; dy <= 4; dy++)
+                {
+                    for (int dx = -4; dx <= 4; dx++)
+                    {
+                        int d = dx * dx + dy * dy;
+                        if (d > glow) continue;
+                        Set(ox + dx, oy + dy + bob, d <= 1 ? Rgba.White : d <= 4 ? orb.Light : d <= 8 ? orb.Main : orb.Shade);
+                    }
                 }
             }
+            int sleeveY = pose == BossPose.Windup ? 8 : 21;
             for (int i = 0; i < 5; i++)
             {
-                image[cx - 9 + i, 18 + i / 2 + bob] = cloak.Light;
-                image[cx + 9 - i, 18 + i / 2 + bob] = cloak.Shade;
+                int toward = pose == BossPose.Windup ? -i : i / 2;
+                Set(cx - (int)(9 * narrow) + i, sleeveY + toward + bob, cloak.Light);
+                Set(cx + (int)(9 * narrow) - i, sleeveY + toward + bob, cloak.Shade);
             }
-            // Stars turning round the head.
+            // Stars turning round the head, faster in a roar.
             for (int i = 0; i < 6; i++)
             {
-                double angle = (i + frame * 0.5) / 6 * System.Math.PI * 2;
-                int sx = cx + (int)System.Math.Round(System.Math.Cos(angle) * 13);
-                int sy = 8 + (int)System.Math.Round(System.Math.Sin(angle) * 4) + bob;
-                if (!image.Inside(sx, sy)) continue;
-                image[sx, sy] = i % 2 == 0 ? Rgba.White : trim.Light;
+                double angle = (i + frame * (pose == BossPose.Roar ? 1.5 : 0.5)) / 6 * System.Math.PI * 2;
+                int sx = face + (int)System.Math.Round(System.Math.Cos(angle) * 13);
+                int sy = 11 + (int)System.Math.Round(System.Math.Sin(angle) * 4) + bob;
+                Set(sx, sy, i % 2 == 0 ? Rgba.White : trim.Light);
             }
             return image.Outlined(Rgba.Hex("#08060C"));
         }
 
-        static PixelImage Warden(Rgba color, int frame, bool molten = false)
+        // The cave warden (and in basalt the lava titan): a golem of stacked stone blocks with a glowing core. Its
+        // arms go up over its head to wind up, smash down in front to strike, swing back in a charge and fling wide
+        // to roar. Side on it narrows to one arm in front of the other; from behind, a back of stones, no face or core.
+        static PixelImage Warden(Rgba color, int frame, BossView view, BossPose pose, bool molten = false)
         {
-            const int width = 36;
-            const int height = 34;
+            const int width = 44;
+            const int height = 42;
+            const int ox = 4;
+            const int oy = 6;
             var image = new PixelImage(width, height);
             var stone = Ramp.Of(color);
             var darkStone = Ramp.Of(color.Scale(0.8f));
+            var farStone = Ramp.Of(color.Scale(0.65f));
             var glow = Ramp.Of(Rgba.Hex("#FFB040"));
-            var moss = Rgba.Hex("#5E8A3C");
-            int bob = frame % 2 == 1 ? -1 : 0;
-
-            Block(image, 9, 25, 7, 9, darkStone, 1);
-            Block(image, 20, 25, 7, 9, darkStone, 2);
-            Block(image, 5, 10 + bob, 26, 17, stone, 3);
-            Block(image, 0, 16 + bob, 8, 12, darkStone, 4);
-            Block(image, 28, 16 + bob, 8, 12, darkStone, 5);
-            Block(image, 0, 7 + bob, 10, 10, stone, 6);
-            Block(image, 26, 7 + bob, 10, 10, stone, 7);
-            Block(image, 12, 1 + bob, 12, 10, stone, 8);
-
-            // Brow and eyes.
-            for (int x = 13; x < 23; x++) image[x, 5 + bob] = stone.Dark;
-            foreach (int x in new[] { 15, 16, 19, 20 })
+            var moss = molten ? Rgba.Hex("#FF7A1E") : Rgba.Hex("#5E8A3C");
+            bool behind = Behind(view);
+            int turn = Turn(view);
+            int bob = (frame % 2 == 1 ? -1 : 0) + (pose == BossPose.Windup ? -1 : pose == BossPose.Strike ? 1 : 0);
+            // The arms: how far up, and how far in toward the body (out when negative), by the pose.
+            var (shoulderUp, armUp, armIn) = pose switch
             {
-                image[x, 6 + bob] = glow.Light;
-                image[x, 7 + bob] = glow.Main;
+                BossPose.Windup => (3, 19, 1),
+                BossPose.Strike => (-2, -4, 3),
+                BossPose.Charge => (0, 2, -1),
+                BossPose.Roar => (2, 6, -3),
+                _ => (0, 0, 0),
+            };
+            void Put(int x, int y, Rgba c)
+            {
+                if (image.Inside(x + ox, y + oy)) image[x + ox, y + oy] = c;
             }
-
-            // The core: a gem in the chest with a ring of light around it.
-            int cx = 18;
-            int cy = 17 + bob;
-            for (int dy = -3; dy <= 3; dy++)
+            void Stone(int x, int y, int w, int h, Ramp ramp, int salt)
             {
-                for (int dx = -3; dx <= 3; dx++)
+                var part = new PixelImage(w, h);
+                Block(part, 0, 0, w, h, ramp, salt);
+                for (int j = 0; j < h; j++)
                 {
-                    int d = System.Math.Abs(dx) + System.Math.Abs(dy);
-                    if (d == 3) image[cx + dx, cy + dy] = stone.Dark;
-                    else if (d == 2) image[cx + dx, cy + dy] = glow.Shade;
-                    else if (d == 1) image[cx + dx, cy + dy] = glow.Main;
-                    else if (d == 0) image[cx + dx, cy + dy] = glow.Light;
+                    for (int i = 0; i < w; i++)
+                    {
+                        if (part[i, j].A > 0) Put(x + i, y + j, part[i, j]);
+                    }
                 }
             }
-            image[cx - 1, cy - 1] = Rgba.White;
 
-            // Cracks and moss.
-            Line(image, 8, 14 + bob, new[] { (1, 1), (1, 0), (1, 1), (0, 1), (1, 1) }, stone.Dark);
-            Line(image, 26, 20 + bob, new[] { (-1, 1), (0, 1), (-1, 1), (-1, 0) }, stone.Dark);
-            if (molten) moss = Rgba.Hex("#FF7A1E");
-            foreach (var (x, y) in new[] { (2, 8), (3, 8), (4, 8), (3, 9), (29, 8), (30, 8), (13, 2), (14, 2), (15, 2), (14, 3), (22, 11), (23, 11) })
+            // Side on the body is narrower and moves toward the way it faces; turned three-quarters, a little.
+            int torsoX = turn == 2 ? 9 : 5 + turn;
+            int torsoW = turn == 2 ? 18 : 26 - turn * 2;
+            int headX = 12 + turn * 3;
+            int lean = pose == BossPose.Charge ? turn * 2 : 0;
+            // The far arm first (darker, partly behind the body), then legs, body, head and the near arm over them.
+            int nearArmX = 26 + (turn == 2 ? -4 : 0) - armIn;
+            int farArmX = turn == 2 ? 6 + armIn : 0 + armIn;
+            if (turn > 0)
             {
-                image[x, y + bob] = moss;
+                Stone(farArmX, 16 + bob - armUp, 8, 12, farStone, 4);
+                Stone(farArmX, 7 + bob - shoulderUp, 10, 10, farStone, 6);
             }
+            if (turn == 2)
+            {
+                Stone(12, 25, 7, 9, farStone, 1);
+                Stone(17, 25, 7, 9, darkStone, 2);
+            }
+            else
+            {
+                Stone(9 + turn, 25, 7, 9, darkStone, 1);
+                Stone(20 + turn, 25, 7, 9, darkStone, 2);
+            }
+            Stone(torsoX + lean, 10 + bob, torsoW, 17, stone, 3);
+            if (turn == 0)
+            {
+                Stone(0 + armIn, 16 + bob - armUp, 8, 12, darkStone, 4);
+                Stone(0 + armIn, 7 + bob - shoulderUp, 10, 10, stone, 6);
+            }
+            Stone(headX + lean, 1 + bob - (pose == BossPose.Roar ? 1 : 0), 12, 10, stone, 8);
+            Stone(nearArmX + 2 + lean, 16 + bob - armUp, 8, 12, darkStone, 5);
+            Stone(nearArmX + lean, 7 + bob - shoulderUp, 10, 10, stone, 7);
+
+            int hy = 1 + bob - (pose == BossPose.Roar ? 1 : 0);
+            int cx = 18 + turn * 3 + lean;
+            int cy = 17 + bob;
+            if (!behind)
+            {
+                // Brow and eyes: both facing the viewer, the near one side on.
+                for (int x = headX + 1 + lean; x < headX + 11 + lean; x++) Put(x, hy + 4, stone.Dark);
+                var eyes = turn == 2 ? new[] { 20, 21 } : new[] { 15, 16, 19, 20 };
+                foreach (int x in eyes)
+                {
+                    int ex = x + (turn == 2 ? 3 : turn * 3) + lean;
+                    Put(ex, hy + 5, pose == BossPose.Windup || pose == BossPose.Roar ? Rgba.White : glow.Light);
+                    Put(ex, hy + 6, glow.Main);
+                }
+                // The core: a gem in the chest with a ring of light, brighter as it winds up; side on, its edge.
+                int reach = pose == BossPose.Windup || pose == BossPose.Strike ? 4 : 3;
+                for (int dy = -reach; dy <= reach; dy++)
+                {
+                    for (int dx = -reach; dx <= reach; dx++)
+                    {
+                        if (turn == 2 && dx > 1) continue;
+                        int d = System.Math.Abs(dx) + System.Math.Abs(dy);
+                        if (d == reach) Put(cx + dx, cy + dy, stone.Dark);
+                        else if (d == reach - 1) Put(cx + dx, cy + dy, glow.Shade);
+                        else if (d >= 1) Put(cx + dx, cy + dy, glow.Main);
+                        else Put(cx + dx, cy + dy, glow.Light);
+                    }
+                }
+                Put(cx - 1, cy - 1, Rgba.White);
+            }
+            else
+            {
+                // From behind: a spine of darker stones down the back.
+                for (int y = 12; y < 25; y += 3)
+                {
+                    for (int x = cx - 2; x <= cx + 1; x++) Put(x, y + bob, stone.Shade);
+                    Put(cx - 2, y + bob + 1, stone.Dark);
+                }
+            }
+
+            // Cracks and moss, riding on their parts.
+            Line(image, torsoX + 3 + ox + lean, 14 + bob + oy, new[] { (1, 1), (1, 0), (1, 1), (0, 1), (1, 1) }, stone.Dark);
+            foreach (var (x, y) in new[] { (2, 8), (3, 8), (4, 8), (3, 9) }) if (turn == 0) Put(x + armIn, y + bob - shoulderUp, moss);
+            foreach (var (x, y) in new[] { (3, 1), (4, 1), (2, 1), (3, 2) }) Put(nearArmX + x, 7 + y + bob - shoulderUp, moss);
+            foreach (var (x, y) in new[] { (1, 1), (2, 1), (3, 1), (2, 2) }) Put(headX + x + lean, hy + y, moss);
             if (molten)
             {
-                // Glowing seams down the body and arms.
-                Line(image, 10, 12 + bob, new[] { (1, 1), (0, 1), (1, 1), (1, 0), (0, 1) }, Rgba.Hex("#FFB040"));
-                Line(image, 24, 12 + bob, new[] { (1, 1), (0, 1), (-1, 1), (0, 1), (1, 1) }, Rgba.Hex("#FFB040"));
-                Line(image, 3, 18 + bob, new[] { (1, 1), (0, 1), (1, 1) }, Rgba.Hex("#FF7A1E"));
-                Line(image, 31, 18 + bob, new[] { (-1, 1), (0, 1), (-1, 1) }, Rgba.Hex("#FF7A1E"));
+                // Glowing seams down the body and the near arm.
+                Line(image, torsoX + 5 + ox + lean, 12 + bob + oy, new[] { (1, 1), (0, 1), (1, 1), (1, 0), (0, 1) }, Rgba.Hex("#FFB040"));
+                if (turn < 2) Line(image, torsoX + torsoW - 7 + ox + lean, 12 + bob + oy, new[] { (1, 1), (0, 1), (-1, 1), (0, 1), (1, 1) }, Rgba.Hex("#FFB040"));
+                Line(image, nearArmX + 5 + ox + lean, 18 + bob - armUp + oy, new[] { (-1, 1), (0, 1), (-1, 1) }, Rgba.Hex("#FF7A1E"));
             }
             return image.Outlined(stone.Outline);
         }
 
         // The crystal spider queen: a dark round body grown over with crystals, a head with a row of pink eyes, and
-        // eight jointed legs. In the second frame her legs shift, pair by pair.
-        static PixelImage Queen(int frame)
+        // eight jointed legs. In the second frame her legs shift, pair by pair. She rears her front legs to wind up,
+        // lunges head first to strike or charge, and lifts every leg to roar. The head is toward the way she faces:
+        // below her body facing the viewer, hidden above it from behind, out to the side side on.
+        static PixelImage Queen(int frame, BossView view, BossPose pose)
         {
-            const int width = 42;
-            const int height = 36;
+            const int width = 46;
+            const int height = 42;
+            const int ox = 2;
+            const int oy = 4;
             var image = new PixelImage(width, height);
             var body = Ramp.Of("#4E4062");
             var leg = Ramp.Of("#6E5C88");
             var crystal = Ramp.Of("#7CD2E2");
             var eye = Rgba.Hex("#FF5C8A");
             int shift = frame % 2;
+            bool behind = Behind(view);
+            int turn = Turn(view);
+            int lunge = pose == BossPose.Strike || pose == BossPose.Charge ? 3 : pose == BossPose.Windup ? -2 : 0;
+            // The body's centre and the head's, by the view.
+            int bx = 21 - turn * 2;
+            int by = behind ? 17 : 13;
+            int hx = 21 + turn * 5 + (turn > 0 ? lunge : 0);
+            int hy = (behind ? 7 : 25 - turn * 3) + (turn == 0 ? (behind ? -lunge : lunge) : 0);
+            void Leg(int x0, int y0, int x1, int y1, Rgba color, Rgba light)
+            {
+                Thick(image, x0 + ox, y0 + oy, x1 + ox, y1 + oy, color, light);
+            }
 
-            // Legs first, under the body: from the body's sides out to a knee and down to a foot.
+            // Legs first, under the body: from the body's sides out to a knee and down to a foot. The front pair rears
+            // up to wind up; a roar lifts them all.
             for (int i = 0; i < 4; i++)
             {
                 int lift = (i + shift) % 2 == 0 ? -1 : 1;
-                int startY = 17 + i * 3;
-                int kneeY = 8 + i * 5 + lift;
-                int footY = 15 + i * 5 + lift;
+                if (pose == BossPose.Roar) lift -= 3;
+                if (pose == BossPose.Windup && i == 0) lift -= 6;
+                int startY = by + 4 + i * 3;
+                int kneeY = by - 5 + i * 5 + lift;
+                int footY = by + 2 + i * 5 + lift + (pose == BossPose.Windup && i == 0 ? -4 : 0);
                 foreach (int side in new[] { -1, 1 })
                 {
-                    int startX = 21 + side * 6;
-                    int kneeX = 21 + side * (14 + i);
-                    int footX = 21 + side * (19 + i / 2);
-                    Thick(image, startX, startY, kneeX, kneeY, leg.Main, leg.Light);
-                    Thick(image, kneeX, kneeY, footX, footY, leg.Shade, leg.Main);
+                    // Side on, the far legs are shorter and darker.
+                    bool far = turn == 2 && side < 0;
+                    int spread = far ? 10 : 14;
+                    int startX = bx + side * 6;
+                    int kneeX = bx + side * (spread + i);
+                    int footX = bx + side * (spread + 5 + i / 2) + (pose == BossPose.Strike ? side * 2 : 0);
+                    Leg(startX, startY, kneeX, kneeY, far ? leg.Shade : leg.Main, far ? leg.Main : leg.Light);
+                    Leg(kneeX, kneeY, footX, footY, far ? leg.Dark : leg.Shade, far ? leg.Shade : leg.Main);
                 }
             }
 
-            Ellipse(image, 21, 13, 11, 9, body);
-            Ellipse(image, 21, 25, 7, 5, Ramp.Of("#5C4C72"));
+            void Oval(int cx, int cy, int rx, int ry, Ramp ramp)
+            {
+                var part = new PixelImage(width, height);
+                Ellipse(part, cx + ox, cy + oy, rx, ry, ramp);
+                for (int y = 0; y < height; y++)
+                {
+                    for (int x = 0; x < width; x++)
+                    {
+                        if (part[x, y].A > 0) image[x, y] = part[x, y];
+                    }
+                }
+            }
+
+            // From behind the head is hidden past the body, so it goes first; otherwise after.
+            if (behind) Oval(hx, hy, 6, 4, Ramp.Of("#5C4C72"));
+            Oval(bx, by, turn == 2 ? 10 : 11, 9, body);
+            if (!behind) Oval(hx, hy, turn == 2 ? 6 : 7, 5, Ramp.Of("#5C4C72"));
 
             // Crystals on her back.
-            foreach (var (x, y, h) in new[] { (15, 9, 5), (20, 6, 7), (26, 9, 5), (18, 14, 4), (24, 14, 4) })
+            foreach (var (x, y, h) in new[] { (-6, -4, 5), (-1, -7, 7), (5, -4, 5), (-3, 1, 4), (3, 1, 4) })
             {
+                int cx = bx + x + ox;
+                int cy = by + y + oy;
                 for (int j = 0; j < h; j++)
                 {
                     int half = (h - j) / 3;
-                    for (int dx = -half; dx <= half; dx++) image[x + dx, y - j + h / 2] = dx < 0 ? crystal.Light : dx > 0 ? crystal.Shade : crystal.Main;
+                    for (int dx = -half; dx <= half; dx++) image[cx + dx, cy - j + h / 2] = dx < 0 ? crystal.Light : dx > 0 ? crystal.Shade : crystal.Main;
                 }
-                image[x, y - h / 2] = Rgba.White;
+                image[cx, cy - h / 2] = Rgba.White;
             }
 
-            foreach (int x in new[] { 17, 19, 23, 25 }) image[x, 24] = eye;
-            image[20, 23] = eye;
-            image[22, 23] = eye;
-            image[19, 29] = Rgba.Hex("#E8E0D0");
-            image[23, 29] = Rgba.Hex("#E8E0D0");
-            image[19, 30] = Rgba.Hex("#E8E0D0");
-            image[23, 30] = Rgba.Hex("#E8E0D0");
+            if (!behind)
+            {
+                // Her eyes, a row of four and two above, and fangs below that part to strike or roar.
+                var bright = pose == BossPose.Windup || pose == BossPose.Roar ? Rgba.White : eye;
+                foreach (int x in turn == 2 ? new[] { 1, 3, 5 } : new[] { -4, -2, 2, 4 }) image[hx + x + ox, hy - 1 + oy] = bright;
+                if (turn < 2)
+                {
+                    image[hx - 1 + ox, hy - 2 + oy] = eye;
+                    image[hx + 1 + ox, hy - 2 + oy] = eye;
+                }
+                int part = pose == BossPose.Strike || pose == BossPose.Roar ? 1 : 0;
+                var fang = Rgba.Hex("#E8E0D0");
+                int fx = hx + (turn == 2 ? 4 : 0);
+                for (int dy = 0; dy < 2; dy++)
+                {
+                    image[fx - 2 - part + ox, hy + 4 + dy + oy] = fang;
+                    image[fx + 2 + part + ox, hy + 4 + dy + oy] = fang;
+                }
+            }
             return image.Outlined(body.Outline);
         }
 

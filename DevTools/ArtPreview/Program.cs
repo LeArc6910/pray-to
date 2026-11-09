@@ -42,6 +42,9 @@ namespace Game.Client
             for (int i = 0; i < TileArt.GroundCount; i++) TileArt.Ground(i);
             Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
             Save(Sheet(loot, monsters), Path.Combine(output, "sheet.png"), 4);
+            Save(Players(), Path.Combine(output, "player.png"), 6);
+            Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
+            Motions.Write(Path.Combine(output, "anim"), loot);
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
@@ -59,7 +62,7 @@ namespace Game.Client
             if (!effectsFine) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
             if (!WriteMusic(Path.Combine(output, "music"))) return 1;
-            Console.WriteLine($"Wrote sheet.png, cave.png, cave_unlit.png, arena.png, skills.png, effects.png, sounds/ and music/ to {output}");
+            Console.WriteLine($"Wrote sheet.png, player.png, bosses.png, anim/, cave.png, cave_unlit.png, arena.png, skills.png, effects.png, sounds/ and music/ to {output}");
             return 0;
         }
 
@@ -282,7 +285,7 @@ namespace Game.Client
                 .Concat(Enumerable.Range(1, TileArt.CrackStages).Select(TileArt.Cracks)).ToList());
 
             var players = new List<PixelImage>();
-            foreach (var look in new[] { Look.Down, Look.Side, Look.Up })
+            foreach (var look in new[] { Look.Down, Look.DownSide, Look.Side, Look.UpSide, Look.Up })
             {
                 for (int frame = 0; frame < CreatureArt.WalkFrames; frame++) players.Add(CreatureArt.Player(look, frame, Rgba.Hex("#3F7FD8")));
             }
@@ -339,6 +342,12 @@ namespace Game.Client
                 .Concat(new[] { "glow_cap", "frost_berry", "star_melon", "cave_potato", "cave_berry", "moon_grape", "snow_cabbage", "ember_corn", "void_bean" }.SelectMany(id => Enumerable.Range(0, 4).Select(stage => ItemArt.Crop(id, stage))))
                 .Concat(new[] { ItemArt.Arrow, ItemArt.Orb, ItemArt.Spore, CreatureArt.Shadow(12) }).ToList());
 
+            return Rows(rows);
+        }
+
+        static PixelImage Rows(IEnumerable<IList<PixelImage>> lines)
+        {
+            var rows = lines.ToList();
             const int gap = 4;
             int width = rows.Max(row => row.Sum(image => image.Width + gap)) + gap;
             int height = rows.Sum(row => row.Max(image => image.Height) + gap) + gap;
@@ -356,6 +365,55 @@ namespace Game.Client
                 y += row.Max(image => image.Height) + gap;
             }
             return sheet;
+        }
+
+        // Every look of the player (eight ways: the five drawn and three of them flipped) in every pose and frame, a row
+        // a look, for checking the motions side by side (2026-11-09): walk 0-3, stand 0-2, strike 0-1, cast, hurt,
+        // shoot 0-1, zap 0-1, drink 0-1, thrust, spread.
+        static PixelImage Players()
+        {
+            var tunic = Rgba.Hex("#3F7FD8");
+            var rows = new List<IList<PixelImage>>();
+            var poses = new List<(Pose Pose, int Frames)>
+            {
+                (Pose.Walk, CreatureArt.WalkFrames), (Pose.Stand, CreatureArt.StandFrames), (Pose.Strike, CreatureArt.StrikeFrames), (Pose.Cast, 1),
+                (Pose.Hurt, 1), (Pose.Shoot, 2), (Pose.Zap, 2), (Pose.Drink, 2), (Pose.Thrust, 1), (Pose.Spread, 1),
+            };
+            foreach (var (look, flip) in new[] { (Look.Down, false), (Look.DownSide, false), (Look.Side, false), (Look.UpSide, false), (Look.Up, false),
+                (Look.UpSide, true), (Look.Side, true), (Look.DownSide, true) })
+            {
+                var row = new List<PixelImage>();
+                foreach (var (pose, frames) in poses)
+                {
+                    for (int frame = 0; frame < frames; frame++)
+                    {
+                        var image = CreatureArt.Player(look, frame, tunic, pose);
+                        row.Add(flip ? image.FlippedX() : image);
+                    }
+                }
+                rows.Add(row);
+            }
+            return Rows(rows);
+        }
+
+        // Every boss in every view (front, front three-quarter, side, back three-quarter, back) and pose (idle in both
+        // frames, wind-up, strike, charge, roar), a row a boss and view (2026-11-09).
+        static PixelImage Bosses()
+        {
+            var rows = new List<IList<PixelImage>>();
+            foreach (string id in new[] { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent" })
+            {
+                foreach (var view in (BossView[])Enum.GetValues(typeof(BossView)))
+                {
+                    var row = new List<PixelImage>
+                    {
+                        CreatureArt.Boss(id, BossColor, 0, view), CreatureArt.Boss(id, BossColor, 1, view),
+                    };
+                    foreach (var pose in new[] { BossPose.Windup, BossPose.Strike, BossPose.Charge, BossPose.Roar }) row.Add(CreatureArt.Boss(id, BossColor, 0, view, pose));
+                    rows.Add(row);
+                }
+            }
+            return Rows(rows);
         }
 
         static readonly Rgba BossColor = new Rgba(158, 143, 128);
