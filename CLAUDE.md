@@ -39,6 +39,8 @@ dotnet run --project DevTools/CoreSandbox -- --fight 120 42
 dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --players 2
 dotnet run --project DevTools/CoreSandbox -- --boss 300 42 --classes warrior,fire_mage
 dotnet run --project DevTools/CoreSandbox -- --boss 400 1 --boss-id crystal_queen --gear iron_sword,iron_armor --reaction 0.5
+# 그 레벨의 캐릭터처럼: 스킬 포인트, 숙련 특성, 결정을 다 쓴 봇 (Docs/Bosses.md 성장 곡선)
+dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --gear obsidian_sword,obsidian_armor,obsidian_helmet,obsidian_boots,obsidian_ring,obsidian_amulet --classes warrior,fire_mage --level 34 --build
 dotnet run --project DevTools/CoreSandbox -- --farm 120 mushroom
 dotnet run --project DevTools/CoreSandbox -- --economy
 dotnet run --project DevTools/CoreSandbox -- --factory 30

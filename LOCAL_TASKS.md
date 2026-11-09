@@ -747,6 +747,11 @@ DevTools/Local/setup.sh --commit
   - 클라우드 확인은 배포 뒤 바꾼 구역만(`--only npc`) 돌린다
   - (사람) 돌벽과 문으로 방을 지어 침대와 장식을 두고 상인을 이사시켜 보기. 까닭 문구가 알아듣기 쉬운지, 방 안의 노점 자리가 어색하지 않은지
 
+- [ ] 83단계: 보스 체력(성장 곡선)과 웹 로딩 설정(`Docs/Bosses.md` 성장 곡선 다시 재기, `Docs/WebDemo.md` 로딩)
+  - (로컬 세션) 명령 한 줄을 `-Commit`과 함께 돌린다. 시작 화면 끄기와 IL2CPP 설정이 `ProjectSettings/ProjectSettings.asset`에, 후처리 빼기가 `Assets/UniversalRenderPipelineGlobalSettings.asset`에 들어간다. 새 `.cs`는 없다
+  - 클라우드 확인은 배포 뒤 로딩 시간과 받는 양을 다시 재고, 바꾼 구역만(`--only menu,bosses`) 돌린다
+  - (사람) PC와 휴대폰에서 첫 로딩이 빨라졌는지. 수정 거미 여왕부터 공허의 군주까지 보스가 너무 오래 걸리거나 지루하지 않은지
+
 ## 결과 보고
 
 명령 한 줄이 실행할 때마다 아래에 결과를 덧붙인다. 플레이 확인 결과는 사람이(또는 로컬 세션이) 날짜와 함께 적는다.

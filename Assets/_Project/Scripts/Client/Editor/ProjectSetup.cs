@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using UnityEditor;
+using UnityEditor.Build;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
@@ -69,6 +70,38 @@ namespace Game.Client.Editor
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.dataCaching = true;
             PlayerSettings.WebGL.template = WebTemplate;
+            // Lighter and quicker to start (2026-11-09, Docs/WebDemo.md 로딩): no Unity splash before the menu (Unity 6
+            // lets every plan turn it off; its logo was 2.7 MB and it held the menu back about 2.5 seconds), and
+            // IL2CPP code made for size rather than speed, which the game does not need.
+            PlayerSettings.SplashScreen.show = false;
+            PlayerSettings.SplashScreen.showUnityLogo = false;
+            PlayerSettings.SetIl2CppCodeGeneration(NamedBuildTarget.WebGL, Il2CppCodeGeneration.OptimizeSize);
+            StripUnusedPostProcessing();
+        }
+
+        // Unity 6's URP puts its ten film grain textures (2.5 MB) and the post-processing shader variants in every
+        // build unless told to leave out what no volume uses, and the game has no post-processing. The switch is in
+        // the URP global settings asset (URPShaderStrippingSetting); it is set by its serialized name, so nothing
+        // hangs on a C# name that changes between URP versions, and nothing happens if it is not there.
+        const string GlobalSettingsPath = "Assets/UniversalRenderPipelineGlobalSettings.asset";
+
+        static void StripUnusedPostProcessing()
+        {
+            var settings = AssetDatabase.LoadMainAssetAtPath(GlobalSettingsPath);
+            if (settings == null) return;
+            var serialized = new SerializedObject(settings);
+            bool changed = false;
+            var property = serialized.GetIterator();
+            while (property.Next(true))
+            {
+                if (property.propertyType != SerializedPropertyType.Boolean || property.boolValue) continue;
+                if (property.name != "m_StripUnusedPostProcessingVariantsAndResources" && property.name != "m_StripUnusedPostProcessingVariants") continue;
+                property.boolValue = true;
+                changed = true;
+            }
+            if (!changed) return;
+            serialized.ApplyModifiedPropertiesWithoutUndo();
+            EditorUtility.SetDirty(settings);
         }
 
         // The pixel font's import settings (Ui): its 12-pixel design size and no smoothing, so each of its pixels is a

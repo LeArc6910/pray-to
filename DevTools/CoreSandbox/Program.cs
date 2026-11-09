@@ -19,6 +19,7 @@ namespace CoreSandbox
     // dotnet run -- --rift [tiers] [seed]             bots open void rifts tier after tier (--players, --gear, --classes)
     // dotnet run -- --defense [levels] [seed]        bots hold a ward stone level after level (--turrets <n>, --players, --gear, --classes)
     // add --rank <1-5> for the bots' skill ranks, --level <n> for their level (and only the skills open by then)
+    // and --build (with --level) to spend the level's skill and passive points and set crystals as a player would
     // dotnet run -- --skills [seconds]               every class skill alone against a pack of dummies, rank 1 and 5 (--gear)
     // dotnet run -- --supports [seconds]             every skill with each support crystal that fits it, against it bare (--gear, --rank)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
@@ -84,6 +85,11 @@ namespace CoreSandbox
             {
                 SkillBot.Level = int.Parse(args[levelFlag + 1]);
                 args = args.Where((_, i) => i != levelFlag && i != levelFlag + 1).ToArray();
+            }
+            if (args.Contains("--build"))
+            {
+                SkillBot.Build = LoadClassData();
+                args = args.Where(a => a != "--build").ToArray();
             }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();

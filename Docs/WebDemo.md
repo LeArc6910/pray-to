@@ -19,6 +19,23 @@
 
 로컬에서 빌드만 해 보려면 에디터 메뉴 **Game > Build Web Demo**(결과는 `Builds/Web`, 커밋하지 않는다). 아무 정적 서버로 그 폴더를 띄우면 된다. 예: `python -m http.server 8000 --directory Builds/Web` 후 같은 Wi-Fi의 휴대폰에서 `http://<PC 주소>:8000`. 빌드하면 Unity가 URP 에셋 몇 개(`URP-2D.asset`의 셰이더 프리필터 설정, `UniversalRenderPipelineGlobalSettings.asset`, `DefaultVolumeProfile.asset`)를 고쳐 쓰는데, 게임에는 영향이 없으니 되돌려도 된다. Burst가 저장소 루트에 만드는 `Data/`는 무시된다.
 
+## 로딩 (2026-11-09)
+
+사람이 고른 다음 작업 후보 5번. 첫 접속에 받는 양과 메뉴가 뜨기까지의 시간을 쟀다(헤드리스 Chromium, 캐시 없이 두 번).
+
+- **고치기 전**(`b2c6eed`): 20.9 MB를 받는다(wasm 13.4 MB, 데이터 6.9 MB, 모두 gzip). 엔진이 뜨는 데 2.3~3.9초, 메뉴가 보이는 데 5.2~6.6초다. 그 사이 2.5~3초는 유니티 시작 화면이었다
+- **데이터가 큰 까닭**(웹 빌드 로그의 Build Report):
+  - 유니티 로고 시작 화면: 2.7 MB
+  - URP 필름 그레인 텍스처 열 장: 2.5 MB(후처리를 쓰지 않는데도 Unity 6 URP가 넣는다)
+  - 글꼴: Noto Sans KR 0.5 MB, Galmuri 0.3 MB
+  - 셰이더: 0.5 MB
+- **고친 것**(`ProjectSetup.UseWebSettings`, 웹 빌드가 부를 때마다 다시 맞춘다):
+  - 시작 화면을 끈다(Unity 6은 Personal도 끌 수 있다)
+  - URP 전역 설정의 "쓰지 않는 후처리 변형과 자원 빼기"를 켠다. 이름으로 찾아 켜므로 URP 버전이 이름을 바꾸면 아무 일도 하지 않는다
+  - IL2CPP 코드를 속도 대신 크기에 맞춰 만든다
+- **하지 않은 것**: 코드 줄이기(managed stripping) 단계를 올리면 wasm이 더 줄지만, Relay·인증이 쓰는 Newtonsoft JSON의 리플렉션이 깨질 수 있어 두었다. Brotli는 GitHub Pages가 압축 헤더를 붙이지 않아 로더가 자바스크립트로 풀어야 해서, 휴대폰에서는 오히려 느릴 수 있다
+- **고친 뒤**: 배포 뒤에 다시 잰다
+
 ## 웹에서 달라지는 것
 
 - **협동은 온라인 방으로.** 브라우저는 연결을 받을 수 없어 LAN 호스트는 숨기고, Unity Relay를 거치는 [온라인 방 만들기]와 [코드로 참가]만 둔다. PC 버전과도 한 방에서 논다(`Docs/Multiplayer.md`의 "온라인", 2026-11-02). 프로젝트를 Unity Cloud에 연결하고 Relay를 켜기 전에는 오류 문장만 나온다
