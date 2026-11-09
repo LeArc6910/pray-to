@@ -872,6 +872,14 @@ async function npc(browser) {
   await game.press('일지');
   const journal = (await game.buttons()).length >= 0;
   await game.shot('journal', '[일지] 탭');
+  // The bestiary and the achievements, two more pages of the journal (Docs/Guide.md 도감과 업적).
+  check(await game.press('도감'), '[일지]의 [도감]을 누른다');
+  await game.shot('journal-bestiary', '[일지] 도감');
+  check(await game.press('업적'), '[일지]의 [업적]을 누른다');
+  await game.shot('journal-achievements', '[일지] 업적');
+  const seen = await game.inventory();
+  check(seen.records > 0, `가진 재료와 장비가 도감에 든다 (${seen.records})`);
+  await game.press('목표·이야기');
   check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
   const doll = await game.find(/구리 검/, '캐릭터');
   check(doll.length === 1, `[캐릭터] 탭의 사람 모양 칸에 든 무기 (${doll.map(b => b.label).join(', ')})`);

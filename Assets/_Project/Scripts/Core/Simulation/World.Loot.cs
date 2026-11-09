@@ -55,6 +55,7 @@ namespace Game.Core
         void DropFrom(Enemy enemy, Player killer)
         {
             ExperienceFrom(enemy);
+            Record(killer, RecordKind.Kill, enemy.Definition.Id);
             if (_lootGenerator == null) return;
             var definition = enemy.Definition;
             int level = Math.Max(definition.Level, ProgressLevel);

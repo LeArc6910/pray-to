@@ -17,12 +17,15 @@ namespace Game.Core
         // (World.Life.cs). 7: each friendship's request day and heart gifts had. 8: the skills learned and their ranks
         // (Docs/Classes.md, 스킬 포인트와 단계), by id. 9: how far through each person's story (Docs/Npcs.md, 이야기).
         // 10: the support crystals in each skill (Docs/Classes.md, 스킬 변형), by ids, one pair a crystal (up to three a
-        // skill since 2026-11-09, in slot order).
-        const int FormatVersion = 10;
+        // skill since 2026-11-09, in slot order). 11: the records of the bestiary and the achievements had (Records.cs).
+        const int FormatVersion = 11;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
-            List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null)
+            List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null,
+            List<(string, string, int)> records = null, List<string> achievements = null)
         {
+            Records = records ?? new List<(string, string, int)>();
+            Achievements = achievements ?? new List<string>();
             Supports = supports ?? new List<(string, string)>();
             Stories = stories ?? new List<(string, int)>();
             SkillRanks = skills ?? new List<(string, int)>();
@@ -54,12 +57,17 @@ namespace Game.Core
         public IReadOnlyList<(string Npc, int Step)> Stories { get; }
         // The crystals set in the skills, one pair each: the skill's id and the crystal's (World.RestoreSupports).
         public IReadOnlyList<(string Skill, string Gem)> Supports { get; }
+        // The bestiary: what kind of record (RecordKind's name), whose id, how many (World.RestoreRecords).
+        public IReadOnlyList<(string Kind, string Id, int Count)> Records { get; }
+        // The ids of the achievements had.
+        public IReadOnlyList<string> Achievements { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
             IEnumerable<string> passives = null, IEnumerable<(string Npc, int Points, int TalkedDay, int GiftedDay, int RequestDay, int HeartGifts)> friendships = null,
             IEnumerable<int> life = null, IEnumerable<(string Id, int Rank)> skillRanks = null, IEnumerable<(string Npc, int Step)> stories = null,
-            IEnumerable<(string Skill, string Gem)> supports = null)
+            IEnumerable<(string Skill, string Gem)> supports = null, IEnumerable<(string Kind, string Id, int Count)> records = null,
+            IEnumerable<string> achievements = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -116,6 +124,17 @@ namespace Game.Core
                     w.Write(skill);
                     w.Write(gem);
                 }
+                var seen = (records ?? Enumerable.Empty<(string, string, int)>()).ToList();
+                w.Write((ushort)seen.Count);
+                foreach (var (kind, id, count) in seen)
+                {
+                    w.Write(kind);
+                    w.Write(id);
+                    w.Write(count);
+                }
+                var had = (achievements ?? Enumerable.Empty<string>()).ToList();
+                w.Write((ushort)had.Count);
+                foreach (string id in had) w.Write(id);
             }
             return stream.ToArray();
         }
@@ -185,7 +204,11 @@ namespace Game.Core
                 for (int count = version >= 9 ? r.ReadUInt16() : 0; count > 0; count--) stories.Add((r.ReadString(), r.ReadByte()));
                 var supports = new List<(string, string)>();
                 for (int count = version >= 10 ? r.ReadUInt16() : 0; count > 0; count--) supports.Add((r.ReadString(), r.ReadString()));
-                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports);
+                var records = new List<(string, string, int)>();
+                for (int count = version >= 11 ? r.ReadUInt16() : 0; count > 0; count--) records.Add((r.ReadString(), r.ReadString(), r.ReadInt32()));
+                var achievements = new List<string>();
+                for (int count = version >= 11 ? r.ReadUInt16() : 0; count > 0; count--) achievements.Add(r.ReadString());
+                return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports, records, achievements);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

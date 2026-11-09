@@ -1419,6 +1419,15 @@ namespace Game.Client
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
                     break;
+                case SimEventType.Achievement:
+                    // One of ours: its name in a banner, a chime and sparkles (Records.cs).
+                    if (e.Source == _client.PlayerId && e.Target >= 1 && e.Target <= Records.Achievements.Count)
+                    {
+                        ShowBanner($"업적: {Records.Achievements[e.Target - 1].Name}!");
+                        Sounds.Play(Sound.Story);
+                        AddFlash(_self.Position, _self.Diameter * 1.6f, LevelColor, FlashKind.Sparkles);
+                    }
+                    break;
                 case SimEventType.SkillLearned:
                     // A point spent: the skill's name and rank over the player, and a chime for their own.
                     var learner = Find(e.Source);

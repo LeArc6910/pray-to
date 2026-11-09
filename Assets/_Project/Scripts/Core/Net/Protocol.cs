@@ -27,6 +27,7 @@ namespace Game.Core
         Production = 21,
         Friendships = 22,
         Life = 23,
+        Records = 24,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -38,7 +39,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.56.0";
+        public const string Version = "0.57.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -324,6 +325,42 @@ namespace Game.Core
             var list = new List<int>();
             for (int n = r.ReadByte(); n > 0; n--) list.Add(r.ReadInt32());
             return new LifeMessage(list);
+        });
+    }
+
+    // The player's bestiary (Records.cs): each record as its kind, the sheet index of what it counts (monster,
+    // boss, material or gear base) and how many; and the indices of the achievements had. Sent when it changes.
+    public sealed class RecordsMessage
+    {
+        public RecordsMessage(IReadOnlyList<(RecordKind Kind, int Index, int Count)> records, IReadOnlyList<int> achievements)
+        {
+            Records = records;
+            Achievements = achievements;
+        }
+
+        public IReadOnlyList<(RecordKind Kind, int Index, int Count)> Records { get; }
+        public IReadOnlyList<int> Achievements { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Records, w =>
+        {
+            w.Write((ushort)Records.Count);
+            foreach (var (kind, index, count) in Records)
+            {
+                w.Write((byte)kind);
+                w.Write((ushort)index);
+                w.Write(count);
+            }
+            w.Write((byte)Achievements.Count);
+            foreach (int index in Achievements) w.Write((byte)index);
+        });
+
+        public static RecordsMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Records, r =>
+        {
+            var records = new List<(RecordKind, int, int)>();
+            for (int n = r.ReadUInt16(); n > 0; n--) records.Add(((RecordKind)r.ReadByte(), r.ReadUInt16(), r.ReadInt32()));
+            var achievements = new List<int>();
+            for (int n = r.ReadByte(); n > 0; n--) achievements.Add(r.ReadByte());
+            return new RecordsMessage(records, achievements);
         });
     }
 

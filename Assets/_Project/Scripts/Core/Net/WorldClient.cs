@@ -358,7 +358,39 @@ namespace Game.Core
         public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
-            Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))));
+            Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
+            Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements);
+
+        // The bestiary (Records.cs) and the achievements had: from the save until the host first tells, then as it
+        // tells.
+        public IReadOnlyDictionary<(RecordKind Kind, string Id), int> Records => RecordsHeld().Records;
+        public IReadOnlyCollection<string> Achievements => RecordsHeld().Achievements;
+
+        (Dictionary<(RecordKind Kind, string Id), int> Records, HashSet<string> Achievements) _records;
+
+        (Dictionary<(RecordKind Kind, string Id), int> Records, HashSet<string> Achievements) RecordsHeld()
+        {
+            if (_records.Records != null) return _records;
+            _records = (new Dictionary<(RecordKind, string), int>(), new HashSet<string>());
+            if (Character == null || Character.Length == 0 || _loot == null) return _records;
+            try
+            {
+                var saved = CharacterSave.Read(Character, _loot);
+                foreach (var (kind, id, count) in saved.Records)
+                {
+                    if (Enum.TryParse<RecordKind>(kind, out var parsed)) _records.Records[(parsed, id)] = count;
+                }
+                foreach (string id in saved.Achievements) _records.Achievements.Add(id);
+            }
+            catch (System.IO.InvalidDataException)
+            {
+            }
+            return _records;
+        }
+
+        // What there is to find in a group, as the sheets have it here.
+        public IReadOnlyList<(RecordKind Kind, string Id, string Name)> RecordEntries(RecordGroup group) =>
+            Game.Core.Records.Entries(group, _monsters, _bosses?.Bosses, _loot, Tiles);
 
         // Experience in each life skill (LifeSkill order): from the save, and as the host tells.
         public int[] LifeExperience => _life ??= ReadLife();
@@ -594,6 +626,26 @@ namespace Game.Core
                         {
                             if (_loot != null && material < _loot.Materials.Count) _stock[_loot.Materials[material]] = count;
                         }
+                        break;
+                    case MessageType.Records:
+                        var told = RecordsMessage.Decode(data);
+                        var held = (new Dictionary<(RecordKind, string), int>(), new HashSet<string>());
+                        foreach (var (kind, index, count) in told.Records)
+                        {
+                            string id = kind switch
+                            {
+                                RecordKind.Kill => index < _monsters.Monsters.Count ? _monsters.Monsters[index].Id : null,
+                                RecordKind.Boss => _bosses != null && index < _bosses.Bosses.Count ? _bosses.Bosses[index].Id : null,
+                                RecordKind.Found => _loot != null && index < _loot.Materials.Count ? _loot.Materials[index].Id : null,
+                                _ => _loot != null && index < _loot.Bases.Count ? _loot.Bases[index].Id : null,
+                            };
+                            if (id != null) held.Item1[(kind, id)] = count;
+                        }
+                        foreach (int index in told.Achievements)
+                        {
+                            if (index < Game.Core.Records.Achievements.Count) held.Item2.Add(Game.Core.Records.Achievements[index].Id);
+                        }
+                        _records = held;
                         break;
                     case MessageType.Life:
                         var experience = LifeMessage.Decode(data).Experience;

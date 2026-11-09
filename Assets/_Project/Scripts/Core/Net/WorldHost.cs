@@ -75,6 +75,8 @@ namespace Game.Core
             public int SentLife = -1;
             // The player's KitVersion when their classes and slots were last sent (a learned skill fills a slot).
             public int SentKit = -1;
+            // The player's RecordsVersion when their bestiary was last sent.
+            public int SentRecords = -1;
         }
 
         // How many times over one craft command may make its recipe.
@@ -218,6 +220,11 @@ namespace Game.Core
                         pair.Value.SentLife = pair.Value.Player.LifeVersion;
                         Send(pair.Key, new LifeMessage(pair.Value.Player.LifeExperience).Encode(), reliable: true);
                     }
+                    if (pair.Value.SentRecords != pair.Value.Player.RecordsVersion)
+                    {
+                        pair.Value.SentRecords = pair.Value.Player.RecordsVersion;
+                        Send(pair.Key, RecordsFor(pair.Value.Player).Encode(), reliable: true);
+                    }
                 }
             }
 
@@ -280,6 +287,7 @@ namespace Game.Core
             if (saved != null) World.RestoreSkills(player, _classes, saved.SkillRanks);
             if (saved != null) World.RestoreStories(player, saved.Stories);
             if (saved != null) World.RestoreSupports(player, _classes, _loot, saved.Supports);
+            if (saved != null) World.RestoreRecords(player, saved.Records, saved.Achievements);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -295,6 +303,25 @@ namespace Game.Core
             var crops = World.Crops.Select(c => CropEntry(new CropChange(c.X, c.Y, c))).ToList();
             foreach (byte[] message in CropChangesMessage.EncodeAll(crops)) Send(connection, message, reliable: true);
             BroadcastRoster();
+        }
+
+        // The player's records by sheet index; records whose sheet row is gone stay in the save but are not sent.
+        RecordsMessage RecordsFor(Player player)
+        {
+            var records = new List<(RecordKind, int, int)>();
+            foreach (var pair in player.Records)
+            {
+                int index = pair.Key.Kind switch
+                {
+                    RecordKind.Kill => IndexOf(_monsters.Monsters, _monsters.Monsters.FirstOrDefault(m => m.Id == pair.Key.Id)),
+                    RecordKind.Boss => IndexOf(_bosses?.Bosses, _bosses?.Bosses.FirstOrDefault(b => b.Id == pair.Key.Id)),
+                    RecordKind.Found => IndexOf(_loot?.Materials, _loot?.Materials.FirstOrDefault(m => m.Id == pair.Key.Id)),
+                    _ => IndexOf(_loot?.Bases, _loot?.Bases.FirstOrDefault(b => b.Id == pair.Key.Id)),
+                };
+                if (index >= 0) records.Add((pair.Key.Kind, index, pair.Value));
+            }
+            var had = Enumerable.Range(0, Records.Achievements.Count).Where(i => player.Achievements.Contains(Records.Achievements[i].Id)).ToList();
+            return new RecordsMessage(records, had);
         }
 
         Equipment StarterGear()

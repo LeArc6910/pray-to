@@ -155,7 +155,11 @@ namespace Game.Core
         public void Step()
         {
             Tick++;
-            foreach (var player in _players) UpdatePlayer(player);
+            foreach (var player in _players)
+            {
+                UpdatePlayer(player);
+                RecordHoldings(player);
+            }
             foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id);
             _enemies.RemoveAll(e => e.IsDead);
             RemoveDefeatedBosses();
@@ -492,6 +496,9 @@ namespace Game.Core
         // For the cloud's playtests (Client/Playtest.cs): a hit on a player past armor, or on a boss, as a fight would
         // land it, so falling, a boss's phases and its drops happen the usual way.
         internal int Hurt(Player player, float damage) => HurtPlayer(player, 0, damage, armor: false);
+
+        // For the playtests and tests: the player's hit on the monster, as a blow of theirs would land.
+        internal void Hurt(Enemy enemy, Player by, float damage) => HitEnemy(by, enemy, damage, false, by.Position, SkillTag.None);
 
         internal void Hurt(Boss boss, int amount)
         {

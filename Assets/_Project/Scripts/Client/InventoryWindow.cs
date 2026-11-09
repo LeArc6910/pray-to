@@ -232,10 +232,95 @@ namespace Game.Client
 
         bool _showPassedGoals;
 
+        static readonly RecordGroup[] BestiaryGroups = { RecordGroup.Monsters, RecordGroup.Bosses, RecordGroup.Fish, RecordGroup.Crops, RecordGroup.Gear };
+
+        // Each group: how many of all there are found, the names of those found (with how many felled, for monsters
+        // and bosses), and how many are still unknown.
+        void DrawBestiary()
+        {
+            var records = _client.Records;
+            int felled = Records.Progress(RecordGroup.Felled, records, System.Array.Empty<(RecordKind, string, string)>());
+            JournalHeading($"잡은 몬스터 모두 {felled}마리");
+            foreach (var group in BestiaryGroups)
+            {
+                var entries = _client.RecordEntries(group);
+                if (entries.Count == 0) continue;
+                int found = Records.Progress(group, records, entries);
+                JournalHeading($"{Records.GroupName(group)} {found}/{entries.Count}");
+                bool counted = group == RecordGroup.Monsters || group == RecordGroup.Bosses;
+                var known = entries.Where(e => records.TryGetValue((e.Kind, e.Id), out int count) && count > 0)
+                    .Select(e => counted ? $"{e.Name} {records[(e.Kind, e.Id)]}" : e.Name).ToList();
+                GUILayout.Label(Ui.Wrap(known.Count == 0 ? "아직 없다" : string.Join(" · ", known), GUI.skin.label, _textWidth));
+                if (found < entries.Count)
+                {
+                    var faint = GUI.color;
+                    GUI.color = new Color(1, 1, 1, 0.5f);
+                    GUILayout.Label(Fit($"모르는 것 {entries.Count - found}", _textWidth));
+                    GUI.color = faint;
+                }
+            }
+        }
+
+        // Every achievement: done or how far along, and its reward (handed out the moment it is reached).
+        void DrawAchievements()
+        {
+            int done = Records.Achievements.Count(a => _client.Achievements.Contains(a.Id));
+            JournalHeading($"업적 {done}/{Records.Achievements.Count} · 이루면 보상을 바로 받는다");
+            foreach (var achievement in Records.Achievements)
+            {
+                var entries = _client.RecordEntries(achievement.Group);
+                int need = Records.Needed(achievement, entries);
+                int have = Math.Min(need, Records.Progress(achievement.Group, _client.Records, entries));
+                bool had = _client.Achievements.Contains(achievement.Id);
+                var previous = GUI.color;
+                if (had) GUI.color = new Color(0.75f, 1f, 0.75f);
+                GUILayout.Label(Ui.Wrap($"{(had ? "[완료] " : "")}{achievement.Name} ({have}/{need}) · 보상 {Records.RewardText(achievement, _client.Loot)}",
+                    GUI.skin.label, _textWidth));
+                GUI.color = previous;
+            }
+        }
+
         // What the player is doing and has done: the guide's goal and how far along, the goals passed, each person's
         // story and today's requests, a rift or defense under way.
+        // The journal's three pages: goals and stories, the bestiary, the achievements (Docs/Guide.md 도감과 업적).
+        int _journalPage;
+        static readonly string[] JournalPages = { "목표·이야기", "도감", "업적" };
+
+        void JournalHeading(string text)
+        {
+            GUILayout.Space(6);
+            var previous = GUI.color;
+            GUI.color = new Color(1f, 0.85f, 0.4f);
+            GUILayout.Label(Fit(text, _textWidth));
+            GUI.color = previous;
+        }
+
         void DrawJournal()
         {
+            GUILayout.BeginHorizontal();
+            float pageWidth = (_textWidth - 8) / JournalPages.Length;
+            for (int i = 0; i < JournalPages.Length; i++)
+            {
+                var previous = GUI.color;
+                if (i == _journalPage) GUI.color = new Color(1f, 0.9f, 0.55f);
+                if (Ui.LayoutButton(JournalPages[i], GUILayout.Width(pageWidth)) && _journalPage != i)
+                {
+                    _journalPage = i;
+                    Sounds.Play(Sound.Click);
+                }
+                GUI.color = previous;
+            }
+            GUILayout.EndHorizontal();
+            if (_journalPage == 1)
+            {
+                DrawBestiary();
+                return;
+            }
+            if (_journalPage == 2)
+            {
+                DrawAchievements();
+                return;
+            }
             if (_client.Rift.Open) GUILayout.Label(Fit($"공허 균열 {_client.Rift.Tier}단계 · 남은 적 {_client.Rift.MonstersLeft} · {_client.Rift.SecondsLeft / 60}:{_client.Rift.SecondsLeft % 60:00}", _textWidth));
             if (_client.Defense.Active) GUILayout.Label(Fit($"기지 방어 {_client.Defense.Level}단계 · {_client.Defense.Wave}/{World.DefenseWaves} 물결 · 수호석 {_client.Defense.StonePercent}%", _textWidth));
 

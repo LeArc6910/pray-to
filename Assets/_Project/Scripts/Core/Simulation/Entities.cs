@@ -53,6 +53,13 @@ namespace Game.Core
         // Experience in each life skill (LifeSkill order), and a count that goes up when any changes.
         public int[] LifeExperience { get; } = new int[LifeSkills.Count];
         public int LifeVersion { get; internal set; }
+
+        // The bestiary (Records.cs): how many of each kind of thing felled or held, the achievements had, and a
+        // counter that moves whenever either changes. RecordedInventory is the inventory version last looked through.
+        public Dictionary<(RecordKind Kind, string Id), int> Records { get; } = new Dictionary<(RecordKind, string), int>();
+        public HashSet<string> Achievements { get; } = new HashSet<string>();
+        public int RecordsVersion { get; internal set; }
+        internal int RecordedInventory { get; set; } = -1;
         // How well they know each person, by id (World.Merchant.cs).
         public Dictionary<string, Friendship> Friendships { get; } = new Dictionary<string, Friendship>();
         // One point for every level past the first.
@@ -398,6 +405,8 @@ namespace Game.Core
         // Source, a player, put a skill point into the skill Target - 1 (its index in the sheet); Amount is its rank now.
         // Target 0: they forgot every skill for coins (World.ResetSkills).
         SkillLearned,
+        // Source, a player, reached the achievement Target - 1 (its index in Records.Achievements) and had its reward.
+        Achievement,
     }
 
     public readonly struct SimEvent

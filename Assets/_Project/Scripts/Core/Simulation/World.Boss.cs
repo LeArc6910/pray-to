@@ -346,6 +346,8 @@ namespace Game.Core
             if (boss.IsDead)
             {
                 ClearAttacksFrom(boss);
+                // Everyone in the fight has it in their bestiary.
+                foreach (var fighter in Fighters(boss)) Record(fighter, RecordKind.Boss, boss.Definition.Id);
                 DropFrom(boss);
                 // Where it fell, for the host to send the fall to whoever could see it: the boss itself leaves the
                 // snapshots at once (WorldHost).
