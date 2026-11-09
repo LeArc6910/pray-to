@@ -39,5 +39,20 @@ namespace Game.Core
             }
             return (baseValue + flat) * Math.Max(0, 1 + increased / 100.0) * more;
         }
+
+        // What the increases and multipliers to the stat come to in this context, leaving out its flat additions:
+        // (1 + increased%) × each (1 + more%).
+        public double Scale(StatType stat, SkillTag context = SkillTag.None)
+        {
+            int increased = 0;
+            double more = 1;
+            foreach (var modifier in _modifiers)
+            {
+                if (modifier.Stat != stat || !modifier.AppliesTo(context)) continue;
+                if (modifier.Kind == ModifierKind.Increased) increased += modifier.Value;
+                else if (modifier.Kind == ModifierKind.More) more *= 1 + modifier.Value / 100.0;
+            }
+            return Math.Max(0, 1 + increased / 100.0) * more;
+        }
     }
 }

@@ -24,6 +24,9 @@ namespace Game.Core
             StatType.SkillRank => "스킬 단계",
             StatType.CooldownRecovery => "스킬 재사용 속도",
             StatType.SkillDuration => "스킬 지속 시간",
+            StatType.FireDamage => "화염 추가 피해",
+            StatType.ColdDamage => "냉기 추가 피해",
+            StatType.LightningDamage => "번개 추가 피해",
             _ => stat.ToString(),
         };
 

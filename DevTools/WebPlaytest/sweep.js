@@ -1199,6 +1199,16 @@ async function gear(browser) {
   check(!!changed && count(changed, 'coin') === goldBefore - price, `작업대 곁에서 금화를 내고 클래스를 바꾼다 (${changed && changed.classes}, 금화 ${goldBefore} → ${changed && count(changed, 'coin')})`);
   await closeBag(game);
   await game.shot('archer', '궁수가 된 스킬 칸');
+  // An elemental weapon (2026-11-09): the character tab shows the fire it adds, and a blow is followed by a fire hit.
+  await game.send('equip flame_blade; clear');
+  await game.wait(600);
+  await bagTab(game, '캐릭터');
+  check(/피해 [\d.]+ \+ 화염 [\d.]+/.test(await game.allText()), '불꽃 칼을 들면 [캐릭터]의 능력치에 "피해 N + 화염 M"');
+  await closeBag(game);
+  await game.send('spawn slime 1 0 400; face 1 0; attack on 1 0');
+  await game.wait(700);
+  await game.shot('flame-blade', '불꽃 칼로 친 슬라임(주황 숫자와 화상)');
+  await game.send('attack off');
   await game.context.close();
 }
 

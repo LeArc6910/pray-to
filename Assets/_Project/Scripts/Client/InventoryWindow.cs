@@ -874,10 +874,14 @@ namespace Game.Client
         // gear or starting a buff shows its effect on every skill.
         void DrawStats()
         {
+            // A weapon's added elements after the blow's own damage: " + 화염 6.2".
+            static string Added(PlayerStats stats) => string.Concat(World.ElementOrder
+                .Where(e => stats.AddedFor(e) > 0)
+                .Select(e => $" + {StatText.TagName(e)} {stats.AddedFor(e):0.#}"));
             var stats = _client.Stats;
             GUILayout.Label(Fit(
                 $"생명력 {stats.MaxHealth:0} · 재생 {stats.HealthRegen:0.#}/초 · 마나 {stats.MaxMana:0} · 재생 {stats.ManaRegen:0.#}/초 · 방어도 {stats.Armor:0} · 이동 {stats.MoveSpeed:0.#}\n" +
-                $"{stats.Attack.Name} 피해 {stats.Damage:0.#} · 초당 공격 {stats.AttacksPerSecond:0.##} · 치명타 {stats.CritChance:0.#}% (×{stats.CritDamage:0}%) · 아이템 희귀도 +{stats.ItemRarity:0}%",
+                $"{stats.Attack.Name} 피해 {stats.Damage:0.#}{Added(stats)} · 초당 공격 {stats.AttacksPerSecond:0.##} · 치명타 {stats.CritChance:0.#}% (×{stats.CritDamage:0}%) · 아이템 희귀도 +{stats.ItemRarity:0}%",
                 _textWidth));
             if (_client.Classes.Count == 0) return;
             var hits = _client.Skills

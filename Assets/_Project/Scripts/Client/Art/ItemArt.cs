@@ -162,6 +162,17 @@ namespace Game.Client
                 ['g'] = item.IsLegendary ? Rgba.Hex("#FF8A3C") : item.Slot == ItemSlot.Weapon ? Rgba.Hex("#C88CFF") : Rgba.Hex("#E8485A"),
                 ['G'] = item.IsLegendary ? Rgba.Hex("#B83A10") : item.Slot == ItemSlot.Weapon ? Rgba.Hex("#7E46D0") : Rgba.Hex("#9A2234"),
             };
+            // A weapon that adds an element's damage (2026-11-09) wears that element's stone: ember, frost or spark.
+            var adds = item.Implicits.Select(m => m.Stat).FirstOrDefault(s => s == StatType.FireDamage || s == StatType.ColdDamage || s == StatType.LightningDamage);
+            if (!item.IsLegendary && adds != default)
+            {
+                (colors['g'], colors['G']) = adds switch
+                {
+                    StatType.FireDamage => (Rgba.Hex("#FF9A3C"), Rgba.Hex("#C8401A")),
+                    StatType.ColdDamage => (Rgba.Hex("#A8E8FF"), Rgba.Hex("#3E8CC8")),
+                    _ => (Rgba.Hex("#FFF06A"), Rgba.Hex("#C8A020")),
+                };
+            }
             string[] rows = item.Slot switch
             {
                 ItemSlot.Weapon => item.IsPickaxe ? PickaxeRows : (item.Tags & SkillTag.Ranged) != 0 ? Bow : (item.Tags & SkillTag.Magic) != 0 ? Staff : Sword,

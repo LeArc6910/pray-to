@@ -439,7 +439,8 @@ namespace Game.Core
             // One that goes through hits what it touches and flies on, softer, while it has monsters left to pass.
             if (touching && !ended && projectile.PiercesLeft > 0)
             {
-                HitArea(owner, at, projectile.Radius, projectile.Damage, projectile.Critical, projectile.Cause + 1, projectile.Tags, pierced);
+                HitArea(owner, at, projectile.Radius, projectile.Damage, projectile.Critical, projectile.Cause + 1, projectile.Tags, pierced,
+                    projectile.Skill == null ? projectile.More : 0);
                 projectile.PiercesLeft--;
                 projectile.Damage *= SkillSupports.PierceFalloff;
                 return false;
@@ -448,18 +449,21 @@ namespace Game.Core
             if (projectile.Skill?.Radius > 0) _events.Add(new SimEvent(SimEventType.Burst, owner.Id, amount: projectile.Cause, position: at));
             float burst = projectile.Skill == null ? 0 : SkillSupports.Radius(projectile.Skill, owner.SupportsOf(projectile.Skill));
             HitArea(owner, at, Math.Max(burst, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1,
-                projectile.Tags, pierced.Count > 0 ? pierced : null);
+                projectile.Tags, pierced.Count > 0 ? pierced : null, projectile.Skill == null ? projectile.More : 0);
             return true;
         }
 
         // Every enemy and boss touching the circle takes the hit, but those in skip; hit ones join skip.
-        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical, int cause, SkillTag tags, HashSet<int> skip = null)
+        // A basic attack's arrow or bolt (elements > 0, its finisher's more) also strikes with the weapon's elements.
+        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical, int cause, SkillTag tags, HashSet<int> skip = null,
+            float elements = 0)
         {
             foreach (var enemy in _enemies.ToList())
             {
                 if (enemy.IsDead || Vec2.Distance(enemy.Position, centre) > radius + enemy.Definition.Radius) continue;
                 if (skip != null && !skip.Add(enemy.Id)) continue;
                 HitEnemy(player, enemy, damage, critical, centre, tags, cause);
+                if (elements > 0) AddElements(player, enemy, null, critical, elements);
             }
             foreach (var boss in _bosses)
             {
@@ -467,6 +471,7 @@ namespace Game.Core
                 if (skip != null && !skip.Add(boss.Id)) continue;
                 if (boss.State == BossState.Dormant) Wake(boss);
                 HitBoss(player, boss, damage, critical, tags, cause);
+                if (elements > 0) AddElements(player, null, boss, critical, elements);
             }
         }
 

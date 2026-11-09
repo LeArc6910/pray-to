@@ -67,7 +67,30 @@ namespace Game.Core
             // back as the bonus over that: two +50% affixes make +100%.
             ItemRarity = (float)sheet.Get(StatType.ItemRarity, 100) - 100;
             MiningSpeed = (float)sheet.Get(StatType.MiningSpeed, 100) - 100;
+            FireAdded = Added(StatType.FireDamage, SkillTag.Fire);
+            ColdAdded = Added(StatType.ColdDamage, SkillTag.Cold);
+            LightningAdded = Added(StatType.LightningDamage, SkillTag.Lightning);
+
+            // The flat damage of the element, grown by whatever grows the basic attack and that element's attacks.
+            float Added(StatType stat, SkillTag element)
+            {
+                double flat = sheet.Get(stat, 0, AttackTags | element);
+                return flat <= 0 ? 0 : (float)(flat * sheet.Scale(StatType.Damage, AttackTags | element));
+            }
         }
+
+        // The elemental damage each basic attack adds (StatType.FireDamage and the others), before a crit.
+        public float FireAdded { get; }
+        public float ColdAdded { get; }
+        public float LightningAdded { get; }
+
+        public float AddedFor(SkillTag element) => element switch
+        {
+            SkillTag.Fire => FireAdded,
+            SkillTag.Cold => ColdAdded,
+            SkillTag.Lightning => LightningAdded,
+            _ => 0,
+        };
 
         // What the basic attack does: swing, arrow or bolt, from the weapon's own tags.
         public BasicAttack Attack { get; }

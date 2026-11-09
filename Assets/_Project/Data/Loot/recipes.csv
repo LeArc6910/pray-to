@@ -24,6 +24,9 @@ mithril_sword,mithril_sword,1,mithril_bar:4|queen_heart:1,Workbench
 mithril_pickaxe,mithril_pickaxe,1,mithril_bar:3,Workbench
 mithril_bow,mithril_bow,1,mithril_bar:4|queen_heart:1,Workbench
 mithril_staff,mithril_staff,1,mithril_bar:4|queen_heart:1,Workbench
+flame_blade,flame_blade,1,mithril_bar:4|queen_heart:1|fire_pepper:6,Anvil
+frost_bow,frost_bow,1,mithril_bar:4|queen_heart:1|ice_crystal:8,Anvil
+thunder_staff,thunder_staff,1,mithril_bar:4|queen_heart:1|glow_spore:8,Anvil
 mithril_helmet,mithril_helmet,1,mithril_bar:3|queen_heart:1,Workbench
 mithril_armor,mithril_armor,1,mithril_bar:5|queen_heart:1,Workbench
 mithril_boots,mithril_boots,1,mithril_bar:3|queen_heart:1,Workbench

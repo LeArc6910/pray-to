@@ -647,8 +647,10 @@ namespace Game.Core
             bool friendly = false,
             SkillTag tags = SkillTag.None,
             SkillDefinition skill = null,
-            bool critical = false)
+            bool critical = false,
+            float more = 1)
         {
+            More = more;
             Id = id;
             Source = source;
             Cause = cause;
@@ -684,6 +686,8 @@ namespace Game.Core
         // The skill that fired it, or null for a basic attack or a boss's.
         public SkillDefinition Skill { get; }
         public bool Critical { get; }
+        // A basic attack's: how much harder than a plain one it hits (a finisher's), for the elements it adds.
+        public float More { get; }
         internal int RemainingTicks { get; set; }
     }
 }

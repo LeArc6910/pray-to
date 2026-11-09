@@ -44,3 +44,9 @@ int10,냉기 숙련,0,-5,int6,Cold:SkillRank+1,notable
 int11,번개 숙련,1,-5,int8,Lightning:SkillRank+1,notable
 int12,명상,-1,-2,int2,CooldownRecovery+10%,
 sum4,정령 군주,0,4,sum3,Summon:SkillRank+1;SkillDuration+10%,notable
+wfire1,불꽃 깃든 무기,-2,-2,int12,FireDamage+3,
+wfire2,타오르는 무기,-3,-2,wfire1,FireDamage+5;Fire:Damage+10%,notable
+wcold1,서리 깃든 무기,1,-2,int2,ColdDamage+3,
+wcold2,얼어붙은 무기,2,-2,wcold1,ColdDamage+5;Cold:Damage+10%,notable
+wbolt1,번개 깃든 무기,2,1,dex2,LightningDamage+3,
+wbolt2,벼락 무기,1,1,wbolt1,LightningDamage+5;Lightning:Damage+10%,notable

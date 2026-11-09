@@ -275,7 +275,9 @@ namespace Game.Core
                 damage,
                 Ticks(shot.Range / shot.Speed),
                 friendly: true,
-                tags: stats.AttackTags));
+                tags: stats.AttackTags,
+                critical: critical,
+                more: finisher ? FinisherDamagePercent / 100f : 1));
         }
 
         // Returns whether anything was hit. A finisher reaches further round and further out, hits harder and pushes
@@ -295,6 +297,7 @@ namespace Game.Core
 
                 float damage = RollDamage(stats, out bool critical) * more;
                 HitEnemy(player, enemy, damage, critical, player.Position, stats.AttackTags, push: finisher ? FinisherPush : 1);
+                AddElements(player, enemy, null, critical, more);
                 hit = true;
             }
 
@@ -306,6 +309,7 @@ namespace Game.Core
                 if (boss.State == BossState.Dormant) Wake(boss);
                 if (boss.Invulnerable) continue;
                 HitBoss(player, boss, RollDamage(stats, out bool critical) * more, critical, stats.AttackTags);
+                AddElements(player, null, boss, critical, more);
             }
             return hit;
         }

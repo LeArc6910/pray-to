@@ -1634,8 +1634,11 @@ namespace Game.Client
                     var hitter = Find(e.Source);
                     // A finisher's blow: the hitter is a player still in the strike of the combo's last step.
                     bool heavy = hitter != null && hitter.Kind == BodyKind.Player && hitter.Combo == World.ComboSteps - 1 && hitter.StrikeTime > 0;
-                    var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
-                    _floating.Add(new Floating { Position = target.Position, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
+                    // A weapon's elemental hit (World.AddElements) in its element's colour, a little aside of the blow's own number.
+                    var element = World.ElementOfCause(e.Cause);
+                    var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : element != SkillTag.None ? Palette.Of(element) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
+                    var numberAt = element == SkillTag.None ? target.Position : target.Position + new Vector3(0.35f, 0.2f, 0);
+                    _floating.Add(new Floating { Position = numberAt, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
                     // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
                     var away = hitter != null ? (Vector2)(target.Position - hitter.Position) : Vector2.zero;
                     if (away.sqrMagnitude > 1e-4f)

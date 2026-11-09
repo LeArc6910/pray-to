@@ -39,7 +39,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.63.0";
+        public const string Version = "0.64.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -1059,7 +1059,9 @@ namespace Game.Core
                 if (SimEvent.HasPosition(e.Type)) w.WriteCompact(e.Position);
                 else w.Write(e.Target);
                 w.Write((short)Math.Clamp(e.Amount, short.MinValue, short.MaxValue));
-                w.Write(e.Critical);
+                // A crit in the low bit; for a weapon's elemental hit (World.ElementalCause) the element's place + 1 above it.
+                int element = e.Type == SimEventType.Hit && World.ElementOfCause(e.Cause) != SkillTag.None ? e.Cause - World.ElementalCause + 1 : 0;
+                w.Write((byte)((e.Critical ? 1 : 0) | element << 1));
                 w.Write(Protocol.PackDirection(e.Direction));
             }
         });
@@ -1149,8 +1151,10 @@ namespace Game.Core
                 var at = located ? r.ReadCompact() : Vec2.Zero;
                 int target = located ? 0 : r.ReadInt32();
                 int amount = r.ReadInt16();
-                bool critical = r.ReadBoolean();
-                events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), position: at));
+                int flags = r.ReadByte();
+                bool critical = (flags & 1) != 0;
+                int cause = flags >> 1 > 0 ? World.ElementalCause + (flags >> 1) - 1 : 0;
+                events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), cause, position: at));
             }
             return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift, defense);
         });

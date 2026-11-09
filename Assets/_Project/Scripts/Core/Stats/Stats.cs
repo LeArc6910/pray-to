@@ -22,6 +22,11 @@ namespace Game.Core
         CooldownRecovery,
         // Percent longer buffs and spirits, likewise.
         SkillDuration,
+        // Damage of an element a weapon adds to each basic attack (2026-11-09, Docs/Classes.md 원소 피해): it strikes
+        // as that element alone just after the attack's own hit, grown by the attack's increases and that element's.
+        FireDamage,
+        ColdDamage,
+        LightningDamage,
     }
 
     // Weapons and skills carry tags. Class combinations come from modifiers that only count for some tags.

@@ -184,6 +184,46 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void AFlameBladeAddsAFireHitThatBurnsAndThatFireResistanceCuts()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", Gear.Wearing("flame_blade"));
+            Assert.That(player.Stats.FireAdded, Is.InRange(5f, 7f), "the blade's own 5 to 7");
+            Assert.AreEqual(0, player.Stats.ColdAdded);
+            var dummy = world.SpawnEnemy(Dummy, player.Position + new Vec2(0, -1));
+
+            var events = AttackOnce(world, player);
+            var hits = events.Where(e => e.Type == SimEventType.Hit && e.Target == dummy.Id).ToList();
+            Assert.AreEqual(2, hits.Count, "the blow, then the fire");
+            Assert.AreEqual(0, hits[0].Cause);
+            Assert.AreEqual(SkillTag.Fire, World.ElementOfCause(hits[1].Cause));
+            Assert.IsTrue(dummy.Afflictions.Burning, "the fire burns though the sword itself is not fire");
+            Assert.AreEqual(hits[1].Amount * World.BurnShare, dummy.Afflictions.BurnPerTick * dummy.Afflictions.BurnTicks, 1, "burning from the fire's share only");
+
+            // The element goes over the wire in the crit byte.
+            var sent = SnapshotMessage.Decode(new SnapshotMessage(1, new SelfState(0, new Vec2(1, 1), 50, 100, 5), new EntityState[0], new ProjectileState[0],
+                new HazardState[0], hits).Encode());
+            Assert.AreEqual(hits[1].Cause, sent.Events[1].Cause);
+            Assert.AreEqual(0, sent.Events[0].Cause);
+            Assert.AreEqual(hits[1].Critical, sent.Events[1].Critical);
+        }
+
+        [Test]
+        public void ElementalWeaponsAreMadeAndTheirAffixesAndTreeGrowTheFire()
+        {
+            foreach (string id in new[] { "flame_blade", "frost_bow", "thunder_staff" })
+                Assert.IsTrue(Gear.Data.Recipes.Any(r => r.Item?.Id == id && r.Station == TileType.Anvil), id);
+            Assert.IsTrue(Gear.Data.Affixes.Any(a => a.Id == "embered"), "an affix adds fire to weapons");
+            // The tree's weapon-fire points add to it, and "Fire:Damage" grows it.
+            var sheet = new StatSheet();
+            sheet.Add(new Modifier(StatType.FireDamage, ModifierKind.Flat, 10));
+            sheet.Add(new Modifier(StatType.Damage, ModifierKind.Increased, 20, SkillTag.Fire));
+            sheet.Add(new Modifier(StatType.Damage, ModifierKind.Increased, 30, SkillTag.Cold));
+            Assert.AreEqual(1.2, sheet.Scale(StatType.Damage, SkillTag.Melee | SkillTag.Fire), 1e-6, "cold's increase is not fire's");
+            Assert.That(Classes.Shipped.Passives.Count(n => !n.IsStart), Is.GreaterThanOrEqualTo(Leveling.MaxLevel - 1), "a point for every level has somewhere to go");
+        }
+
+        [Test]
         public void TheStormCallerBringsBothElements()
         {
             CollectionAssert.AreEqual(new[] { "chain_lightning", "frost_ring", "ice_lance", "storm_mantle", "thunderclap", "blizzard" },

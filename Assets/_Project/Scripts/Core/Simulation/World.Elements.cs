@@ -94,6 +94,30 @@ namespace Game.Core
             return factor;
         }
 
+        // A weapon's added elemental damage (PlayerStats.FireAdded and the others, 2026-11-09): after a basic attack's
+        // own hit, each element it adds strikes the same target again as that element alone, so the target's
+        // resistance, burning, slowing and chaining follow that element's rules. It does not knock back. Its hit carries
+        // ElementalCause + the element's place in Elements, so the screen shows its number in the element's colour.
+        public const int ElementalCause = 100;
+        public static readonly SkillTag[] ElementOrder = { SkillTag.Fire, SkillTag.Cold, SkillTag.Lightning };
+
+        public static SkillTag ElementOfCause(int cause) =>
+            cause >= ElementalCause && cause < ElementalCause + ElementOrder.Length ? ElementOrder[cause - ElementalCause] : SkillTag.None;
+
+        void AddElements(Player player, Enemy enemy, Boss boss, bool critical, float more = 1)
+        {
+            var stats = player.Stats;
+            for (int i = 0; i < ElementOrder.Length; i++)
+            {
+                float added = stats.AddedFor(ElementOrder[i]) * more * (critical ? stats.CritDamage / 100f : 1f);
+                if (added <= 0) continue;
+                if (enemy != null && !enemy.IsDead)
+                    HitEnemy(player, enemy, added, critical, enemy.Position, ElementOrder[i], ElementalCause + i, knockback: false);
+                else if (boss != null && !boss.IsDead && !boss.Invulnerable)
+                    HitBoss(player, boss, added, critical, ElementOrder[i], ElementalCause + i);
+            }
+        }
+
         // What the hit leaves behind on a monster, and lightning's jump to others. dealt is the damage it took.
         void Afflict(Player player, Enemy enemy, SkillTag tags, int dealt, float damage, bool critical, int cause, bool chained)
         {
