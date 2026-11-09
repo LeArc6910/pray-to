@@ -1619,6 +1619,24 @@ namespace Game.Client
         }
 
         SkillDefinition _supportFor;
+        // The class whose skills are shown before it is picked.
+        ClassDefinition _previewClass;
+
+        // A class's six skills as they would come: each with its icon, the level it opens at and what it does at the
+        // first rank with the stats the player has now.
+        void DrawClassPreview(ClassDefinition option)
+        {
+            float width = _textWidth - IconRoom - 16;
+            foreach (var skill in option.Skills)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Space(16);
+                Icon(Sprites.Icon(skill));
+                string opens = skill == option.Skills[0] ? "고르면 바로" : $"Lv {skill.Level}부터";
+                GUILayout.Label(Fit($"{skill.Name} · {opens}\n{SkillText.Numbers(skill, 1, _client.Stats, Array.Empty<SupportKind>())}", width), GUILayout.Width(width));
+                GUILayout.EndHorizontal();
+            }
+        }
 
         // The classes not taken yet, each with its passive and first skill and [고르기] (free): the first at the start,
         // more as the level opens slots.
@@ -1633,9 +1651,18 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 string first = option.Skills.Count > 0 ? $" · 첫 스킬 {option.Skills[0].Name}" : "";
                 GUILayout.Label(Fit($"{option.Name}: {option.Description} · 패시브: {SkillText.Passive(option)}{first}", text), GUILayout.Width(text));
+                GUILayout.BeginVertical(GUILayout.Width(72));
                 if (Ui.LayoutButton("고르기", GUILayout.Width(72)))
                     Send(_client.ClassCommand(_client.Classes.Concat(new[] { option }).ToList(), null), Sound.Buff);
+                // Every skill of the class before picking it (2026-11-09, 사람이 고른 다음 작업 후보 6번).
+                if (Ui.LayoutButton(_previewClass == option ? "닫기" : "미리보기", GUILayout.Width(72)))
+                {
+                    _previewClass = _previewClass == option ? null : option;
+                    Sounds.Play(Sound.Click);
+                }
+                GUILayout.EndVertical();
                 GUILayout.EndHorizontal();
+                if (_previewClass == option) DrawClassPreview(option);
                 GUILayout.Space(4);
             }
             GUILayout.Space(8);

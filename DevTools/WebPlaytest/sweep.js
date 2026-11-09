@@ -1913,6 +1913,11 @@ async function firstRun(browser, profile, hourLong) {
   await bagTab(game, '스킬');
   await game.wait(500);
   await game.shot('class-pick', '클래스 고르기 목록(고르기 전)');
+  // Its six skills before picking (2026-11-09).
+  check(await game.press('미리보기', /^전사:/), '클래스마다 [미리보기]가 있다');
+  await game.wait(500);
+  check(/전투 함성 · Lv 3부터/.test(await game.allText()), '미리보기에 그 클래스의 스킬과 열리는 레벨이 나온다(전투 함성 · Lv 3부터)');
+  await game.shot('class-preview', '전사 미리보기');
   check(await game.press('고르기', /^전사:/), '가방 [스킬] 탭에 클래스마다 [고르기]가 있다');
   await game.wait(800);
   const picked = (await game.inventory()).classes;
