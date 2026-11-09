@@ -16,6 +16,9 @@ namespace Unity.Services.Authentication
         bool IsSignedIn { get; }
         string PlayerId { get; }
         Task SignInAnonymouslyAsync(SignInOptions options = default(SignInOptions));
+        Task SignInWithUsernamePasswordAsync(string username, string password);
+        Task SignUpWithUsernamePasswordAsync(string username, string password);
+        void SignOut(bool clearCredentials = false);
     }
 
     public sealed class SignInOptions

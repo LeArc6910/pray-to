@@ -11,7 +11,8 @@
         "Unity.RenderPipelines.Universal.2D.Runtime",
         "Unity.Services.Core",
         "Unity.Services.Authentication",
-        "Unity.Services.Multiplayer"
+        "Unity.Services.Multiplayer",
+        "Unity.Services.CloudSave"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

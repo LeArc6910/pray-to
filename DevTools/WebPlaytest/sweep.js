@@ -1404,6 +1404,11 @@ async function save(browser) {
   await game.press('저장본: 고르기·내보내기·가져오기');
   const [download] = await Promise.all([game.page.waitForEvent('download', { timeout: 15000 }).catch(() => null), game.press('전부 내보내기')]);
   check(!!download, '[전부 내보내기]가 파일을 내려받는다');
+  // Cloud saves (2026-11-09): the account is checked by Unity's rules before anything goes out.
+  check(await game.press('올리기'), '저장본 칸에 클라우드 저장 [올리기]·[받기]·[계정 만들기]');
+  await game.wait(600);
+  check((await game.allText()).includes('아이디는 3~20자'), '아이디 없이 [올리기]를 누르면 아이디 규칙을 알려 준다');
+  await game.shot('cloud-save', '저장본 칸의 클라우드 저장');
   if (!download) return game.context.close();
   const file = path.join(out, 'saves.bundle');
   await download.saveAs(file);

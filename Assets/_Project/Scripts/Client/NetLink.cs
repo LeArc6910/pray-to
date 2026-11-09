@@ -127,11 +127,7 @@ namespace Game.Client
         {
             try
             {
-                if (UnityServices.State == ServicesInitializationState.Uninitialized)
-                {
-                    var options = new InitializationOptions().SetProfile("p" + Guid.NewGuid().ToString("N").Substring(0, 12));
-                    await UnityServices.InitializeAsync(options);
-                }
+                await StartServices();
                 if (!AuthenticationService.Instance.IsSignedIn) await AuthenticationService.Instance.SignInAnonymouslyAsync();
                 return null;
             }
@@ -139,6 +135,14 @@ namespace Game.Client
             {
                 return Explain(e);
             }
+        }
+
+        // Starts Unity Gaming Services for this run, under a profile of its own (online play and CloudSaves alike).
+        internal static async Task StartServices()
+        {
+            if (UnityServices.State != ServicesInitializationState.Uninitialized) return;
+            var options = new InitializationOptions().SetProfile("p" + Guid.NewGuid().ToString("N").Substring(0, 12));
+            await UnityServices.InitializeAsync(options);
         }
 
         // A reason a player can act on, with the service's own message for the rest.

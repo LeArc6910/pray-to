@@ -43,6 +43,7 @@
     "com.unity.multiplayer.playmode": "3.0.0",
     "com.unity.netcode.gameobjects": "2.13.3",
     "com.unity.render-pipelines.universal": "17.6.0",
+    "com.unity.services.cloudsave": "3.4.2",
     "com.unity.services.multiplayer": "2.3.3",
     "com.unity.ugui": "2.6.0"
   }

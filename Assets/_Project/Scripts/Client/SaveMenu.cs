@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading.Tasks;
 using Game.Core;
 using UnityEngine;
 
@@ -30,6 +31,11 @@ namespace Game.Client
         // Off the web: whether the files in the folder are shown, and which they are.
         bool _folderOpen;
         List<string> _folderFiles = new List<string>();
+        // Cloud saves (CloudSaves, 2026-11-09): the account as typed, and an upload or a download under way.
+        string _cloudName = "";
+        string _cloudPassword = "";
+        Task<string> _uploading;
+        Task<(byte[] Bundle, string Message)> _downloading;
 
         public SaveMenu(Action<string> pickCharacter, Action<string> pickWorld)
         {
@@ -52,6 +58,7 @@ namespace Game.Client
             if (Ui.LayoutButton("전부 내보내기")) Act(() => Export(_keys, "전부 " + DateTime.Now.ToString("yyyy-MM-dd HHmm")));
             if (Ui.LayoutButton(_folderOpen ? "가져오기 닫기" : "가져오기")) Act(Import);
             GUILayout.EndHorizontal();
+            DrawCloud(width);
             if (_message.Length > 0) GUILayout.Label(Ui.Wrap(_message, label, width));
             if (_incoming != null) DrawClashes(width);
             if (_folderOpen) DrawFolder(width);
@@ -110,6 +117,64 @@ namespace Game.Client
                 });
             }
             GUILayout.EndHorizontal();
+        }
+
+        // A name and a password, and [올리기], [받기] and [계정 만들기]. What comes down goes in as a file's saves do,
+        // asking before it replaces any.
+        void DrawCloud(float width)
+        {
+            GUILayout.Space(6);
+            GUILayout.Label("클라우드 저장");
+            GUILayout.Label(Ui.Wrap("아이디와 비밀번호로 이 기기의 저장본을 클라우드에 올려 두고 다른 기기(웹·PC·휴대폰)에서 받는다. 받을 때 이미 있는 저장본을 바꾸게 되면 먼저 묻는다.", GUI.skin.label, width));
+            bool busy = _uploading != null || _downloading != null;
+            GUI.enabled = !busy;
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("아이디", GUILayout.Width(76));
+            _cloudName = GUILayout.TextField(_cloudName, CloudAccount.NameMost);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            GUILayout.Label("비밀번호", GUILayout.Width(76));
+            _cloudPassword = GUILayout.PasswordField(_cloudPassword, '*', CloudAccount.PasswordMost);
+            GUILayout.EndHorizontal();
+            GUILayout.BeginHorizontal();
+            if (Ui.LayoutButton("올리기")) Act(() => StartUpload(false));
+            if (Ui.LayoutButton("받기")) Act(StartDownload);
+            if (Ui.LayoutButton("계정 만들기")) Act(() => StartUpload(true));
+            GUILayout.EndHorizontal();
+            GUI.enabled = true;
+            if (busy) GUILayout.Label("클라우드와 주고받는 중…");
+        }
+
+        void StartUpload(bool create)
+        {
+            _message = CloudAccount.Check(_cloudName, _cloudPassword) ?? "";
+            if (_message.Length == 0) _uploading = CloudSaves.Upload(_cloudName.Trim(), _cloudPassword, create);
+        }
+
+        void StartDownload()
+        {
+            _incoming = null;
+            _clashes = null;
+            _message = CloudAccount.Check(_cloudName, _cloudPassword) ?? "";
+            if (_message.Length == 0) _downloading = CloudSaves.Download(_cloudName.Trim(), _cloudPassword);
+        }
+
+        // An upload or a download that has finished, from Update like a picked file.
+        void PollCloud()
+        {
+            if (_uploading != null && _uploading.IsCompleted)
+            {
+                _message = _uploading.Status == TaskStatus.RanToCompletion ? _uploading.Result : "올리지 못했습니다.";
+                _uploading = null;
+                Relist();
+            }
+            if (_downloading != null && _downloading.IsCompleted)
+            {
+                var (bundle, message) = _downloading.Status == TaskStatus.RanToCompletion ? _downloading.Result : (null, "받지 못했습니다.");
+                _downloading = null;
+                if (bundle != null) Receive(bundle);
+                else _message = message;
+            }
         }
 
         void DrawClashes(float width)
@@ -204,6 +269,7 @@ namespace Game.Client
         // draw what it laid out.
         public void Poll()
         {
+            PollCloud();
             switch (SaveTransfer.PollPick(out byte[] file))
             {
                 case SaveTransfer.Pick.Ready:

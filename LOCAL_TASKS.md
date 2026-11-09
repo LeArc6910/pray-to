@@ -89,6 +89,14 @@ DevTools/Local/setup.sh --commit
 - [ ] https://cloud.unity.com 에서 그 프로젝트를 열고 **Multiplayer > Relay**를 켠다(환경은 production). 무료 한도가 있다. 결제 수단을 요구하면 진행하기 전에 정한다(결과 보고에 적어 주면 클라우드가 다른 방법을 찾는다)
 - [ ] 결과 보고에는 연결했는지, Relay를 켰는지만 적는다. 프로젝트 ID는 비밀이 아니지만 적지 않아도 된다
 
+### 클라우드 저장용 (2026-11-09)
+
+저장본 칸의 "클라우드 저장"(아이디·비밀번호로 올리고 받기, `Docs/Saving.md` 클라우드 저장)이 쓰는 Unity 서비스를 켠다. 위 Relay와 같은 Unity 프로젝트다(먼저 프로젝트를 연결해야 한다).
+
+- [ ] https://cloud.unity.com 에서 그 프로젝트를 열고 **Player Authentication > Identity providers**에서 **Username & Password**를 추가해 켠다(환경은 production)
+- [ ] 같은 곳에서 **Cloud Save**를 쓸 수 있는지 본다(처음 쓰는 거라 켜라고 하면 켠다). 무료 한도가 있다. 결제 수단을 요구하면 진행하기 전에 정한다
+- [ ] 결과 보고에는 켰는지만 적는다. 계정의 아이디·비밀번호는 적지 않는다
+
 ### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
 
 이 컴퓨터에서 Claude Code를 켜 두면 휴대폰 Claude 앱에서 그 세션에 일을 시킬 수 있다. 명령 한 줄 실행과 결과 확인을 밖에서 할 수 있다. Pro, Max, Team, Enterprise 플랜이 필요하다.
@@ -828,6 +836,13 @@ DevTools/Local/setup.sh --commit
   - (로컬 세션) 명령 한 줄을 다시 돌린다. 새 파일: `Scripts/Core/Simulation/World.Forage.cs`, `Scripts/Core/World/DayEventSheet.cs`, `Tests/EditMode/ForageTests.cs`, `Data/World/events.csv`(`.meta`는 Unity가 만든다). 새 시트 `events.csv`는 `Game > Set Up Main Scene`이 `GameSheets.events`에 넣는다(명령 한 줄이 한다). 프로토콜 0.66.0
   - 클라우드 확인은 배포 뒤 `--only first,npc,factory,combat`
   - (사람) 망치질·짓밟힘 소리가 거슬리지 않는지, 원소 불꽃과 허수아비 흔들림이 보기 좋은지, 날마다 깔리는 채집물이 너무 많거나 적지 않은지
+  - (클라우드 2026-11-10 웹 확인, 1c71e33) `--only first,npc,factory,combat` 통과 75, 실패 0. 축제 날 상점, 대형 제련로 네 칸, 클래스 미리보기, 원소 불꽃 사진을 봤다
+
+- [ ] 99단계: 문 잠그기, 클라우드 저장(`Docs/Crafting.md` 문 잠그기, `Docs/Saving.md` 클라우드 저장)
+  - (로컬 세션) 명령 한 줄을 다시 돌린다. 새 파일: `Scripts/Client/CloudSaves.cs`(`.meta`는 Unity가 만든다). `Packages/manifest.json`에 `com.unity.services.cloudsave` 3.4.2를 더했으니 Unity가 받으며 바꾼 `Packages/packages-lock.json`을 커밋한다. 월드 저장 형식 11, 프로토콜 0.67.0. PlayMode에 장면 `ALockedDoorDraws`(사진 `locked-door`)가 더해졌다
+  - (사람, 위 "클라우드 저장용"을 한 뒤) 웹과 PC에서 같은 아이디로 [계정 만들기]·[올리기] 후 다른 쪽에서 [받기]로 캐릭터가 넘어오는지
+  - 클라우드 확인은 배포 뒤 `--only base,save`
+  - (사람) 잠긴 문 그림(자물쇠)이 잘 보이는지, 휴대폰에서 아이디·비밀번호 칸에 글자가 잘 들어가는지
 
 ## 결과 보고
 

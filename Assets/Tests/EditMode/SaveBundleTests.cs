@@ -61,6 +61,35 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void UploadingLaysThisDevicesSavesOverTheCloudsAndKeepsTheRest()
+        {
+            var cloud = Saves();
+            var newer = Character();
+            newer[newer.Length - 1] ^= 1;
+            var device = new List<(string, byte[])> { (SaveKeys.Character("모험가"), newer), (SaveKeys.World("새 월드"), World()) };
+
+            var merged = SaveBundle.Read(SaveBundle.Write(SaveBundle.Over(cloud, device)));
+
+            CollectionAssert.AreEquivalent(new[] { SaveKeys.Character("모험가"), SaveKeys.World("새 월드"), SaveKeys.Map(5, "모험가"), SaveKeys.World("내 월드") },
+                merged.Select(s => s.Key));
+            CollectionAssert.AreEqual(newer, merged.First(s => s.Key == SaveKeys.Character("모험가")).Data, "this device's character wins");
+            Assert.AreEqual(4, SaveBundle.Over(new (string, byte[])[0], merged).Count);
+        }
+
+        [Test]
+        public void ACloudAccountFollowsUnitysRules()
+        {
+            Assert.IsNull(CloudAccount.Check("pray.to-1", "Abcdef1!"));
+            Assert.IsNotNull(CloudAccount.Check("ab", "Abcdef1!"), "too short a name");
+            Assert.IsNotNull(CloudAccount.Check("모험가1", "Abcdef1!"), "Korean in the name");
+            Assert.IsNotNull(CloudAccount.Check("player", "Abcde1!"), "seven characters");
+            Assert.IsNotNull(CloudAccount.Check("player", "abcdef1!"), "no capital");
+            Assert.IsNotNull(CloudAccount.Check("player", "Abcdefg!"), "no digit");
+            Assert.IsNotNull(CloudAccount.Check("player", "Abcdefg1"), "no symbol");
+            Assert.IsNotNull(CloudAccount.Check(null, null));
+        }
+
+        [Test]
         public void OnlySavesGoIn()
         {
             Assert.Throws<ArgumentException>(() => SaveBundle.Write(new[] { ("settings.txt", new byte[] { 1 }) }));

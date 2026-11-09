@@ -86,6 +86,21 @@ namespace Game.Core
             return saves;
         }
 
+        // The saves of under with those of over laid on top (Docs/Saving.md, 클라우드 저장): over's every save, then the
+        // ones of under whose key over does not have. Uploading a device's saves over the cloud's bundle so keeps what
+        // another device put there.
+        public static List<(string Key, byte[] Data)> Over(IEnumerable<(string Key, byte[] Data)> under, IEnumerable<(string Key, byte[] Data)> over)
+        {
+            var saves = new List<(string Key, byte[] Data)>(over);
+            var keys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var save in saves) keys.Add(save.Key);
+            foreach (var save in under)
+            {
+                if (keys.Add(save.Key)) saves.Add(save);
+            }
+            return saves;
+        }
+
         // "캐릭터 '이름'", "월드 '이름'" or "'이름'의 지도", for messages.
         public static string Describe(string key)
         {
@@ -96,6 +111,41 @@ namespace Game.Core
                 SaveKind.World => $"월드 '{name}'",
                 _ => $"'{name}'의 지도",
             };
+        }
+    }
+
+    // A cloud save account (Docs/Saving.md, 클라우드 저장): a name and a password, by the rules of Unity
+    // Authentication's username and password sign-in, checked before asking it.
+    public static class CloudAccount
+    {
+        public const int NameMin = 3;
+        public const int NameMost = 20;
+        public const int PasswordMin = 8;
+        public const int PasswordMost = 30;
+
+        // Null when the name and password could be an account, else what to change, for the screen.
+        public static string Check(string name, string password)
+        {
+            name ??= "";
+            password ??= "";
+            if (name.Length < NameMin || name.Length > NameMost) return $"아이디는 {NameMin}~{NameMost}자로 쓴다.";
+            foreach (char c in name)
+            {
+                bool plain = c < 128 && (char.IsLetterOrDigit(c) || c == '.' || c == '-' || c == '@' || c == '_');
+                if (!plain) return "아이디에는 영문, 숫자와 . - @ _ 만 쓴다.";
+            }
+            if (password.Length < PasswordMin || password.Length > PasswordMost) return $"비밀번호는 {PasswordMin}~{PasswordMost}자로 쓴다.";
+            bool upper = false, lower = false, digit = false, symbol = false;
+            foreach (char c in password)
+            {
+                if (c >= 'A' && c <= 'Z') upper = true;
+                else if (c >= 'a' && c <= 'z') lower = true;
+                else if (c >= '0' && c <= '9') digit = true;
+                else if (c > ' ' && c < 127) symbol = true;
+                else return "비밀번호에는 영문, 숫자, 기호만 쓴다.";
+            }
+            if (!(upper && lower && digit && symbol)) return "비밀번호에는 영문 대문자, 소문자, 숫자, 기호가 하나씩은 있어야 한다.";
+            return null;
         }
     }
 }
