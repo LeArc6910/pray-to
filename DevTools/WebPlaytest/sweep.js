@@ -815,7 +815,8 @@ async function life(browser) {
   const keg = (await game.look(0, 1)).machine || {};
   check(Object.keys(keg.output || {}).length > 0, `술통이 주스를 만든다 (${JSON.stringify(keg.output)})`);
   const coop = (await game.look(-3, 0)).machine || {};
-  check((coop.output || {}).egg > 0, `닭장에 하루 뒤 달걀 (${JSON.stringify(coop.output)})`);
+  // Petted once, an egg may come out silver (egg_silver and the like).
+  check(Object.keys(coop.output || {}).some(id => /egg/.test(id)), `닭장에 하루 뒤 달걀 (${JSON.stringify(coop.output)})`);
   const pot = (await game.look(3, 0)).machine || {};
   check(Object.keys(pot.output || {}).length > 0, `통발에 잡힌 것 (${JSON.stringify(pot.output)})`);
   await game.shot('animals', '술통·닭장·통발');

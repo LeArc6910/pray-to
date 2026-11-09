@@ -274,8 +274,14 @@ namespace Game.Client
             GUILayout.BeginHorizontal();
             GUILayout.Label("이름", GUILayout.Width(40));
             GUI.SetNextControlName(PetNameControl);
-            _petName = GUILayout.TextField(_petName ?? "", Pets.NameMost, GUILayout.Width(Mathf.Min(140, _textWidth - 220)));
+            _petName = GUILayout.TextField(_petName ?? "", Pets.NameMost, GUILayout.Width(Mathf.Clamp(_textWidth - 220, 60, 140)));
             bool typing = GUI.GetNameOfFocusedControl() == PetNameControl;
+            // Esc lets go of the field (the game's own Esc waits while typing).
+            if (typing && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
+            {
+                GUIUtility.keyboardControl = 0;
+                Event.current.Use();
+            }
             bool enter = typing && Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter);
             if (Ui.LayoutButton("이름 짓기", GUILayout.Width(88)) || enter)
             {
