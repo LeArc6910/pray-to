@@ -1840,6 +1840,26 @@ async function firstRun(browser, profile, hourLong) {
     }
     await game.wait(150);
   };
+  // Moves (dx, dy) tiles in any direction (2026-11-10: the warden bot stepped one axis at a time out of a warning that
+  // wanted a diagonal, and stayed in the rock trail): both keys of a diagonal held on PC, the stick on the phone, for
+  // about as long as the distance takes at a walk.
+  const move = async (dx, dy) => {
+    const d = Math.hypot(dx, dy);
+    if (d < 0.05) return;
+    const ms = Math.min(900, Math.round(d * 230 + 60));
+    if (game.touch) {
+      await hold('move', dx / d, dy / d);
+      await game.wait(ms);
+      await lift();
+      return;
+    }
+    const keys = [];
+    if (Math.abs(dx) > d * 0.38) keys.push(key[`${Math.sign(dx)},0`]);
+    if (Math.abs(dy) > d * 0.38) keys.push(key[`0,${Math.sign(dy)}`]);
+    for (const k of keys) await game.page.keyboard.down(k);
+    await game.wait(ms);
+    for (const k of keys) await game.page.keyboard.up(k);
+  };
   // Mines a tunnel: the nearest wall beside, else a step toward open floor, until `enough` says stop.
   // With `prefer` (a tile type) it digs that first, and with none beside it goes to the next one (`onNone`).
   const drink = async () => {
@@ -2239,6 +2259,13 @@ async function firstRun(browser, profile, hourLong) {
             await slot(1);
           }
           await step(ax, ay, 400);
+          // Stopped by something that is not rock (a workbench, water, a machine): round it, to one side and on.
+          const moved = await game.state();
+          if (Math.hypot(moved.x - s.x, moved.y - s.y) < 0.2) {
+            const side = Math.random() < 0.5 ? 1 : -1;
+            await step(ay * side, ax * side, 700);
+            await step(ax, ay, 500);
+          }
           continue;
         }
         const d = Math.hypot(foe[0], foe[1]);
@@ -2343,13 +2370,13 @@ async function firstRun(browser, profile, hourLong) {
     await game.wait(800);
     await passed(14, '레벨 3 되기');
 
-    // 14. The cave warden, fought with what the bot has: up to three tries, back to the arena after a fall.
+    // 14. The cave warden, fought with what the bot has: up to five tries in eight minutes, back to the arena after a fall.
     const wardenAt = Date.now();
     let falls = 0;
     let dodges = 0;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
-    while (Date.now() - wardenAt < 300000 && (await goalNow()).n <= 15 && falls < 3) {
+    while (Date.now() - wardenAt < 480000 && (await goalNow()).n <= 15 && falls < 5) {
       const s = await game.state();
       if (s.dead) {
         falls++;
@@ -2358,12 +2385,12 @@ async function firstRun(browser, profile, hourLong) {
         await game.wait(1200);
         continue;
       }
-      if (s.health < s.maxHealth * 0.4) await drink();
-      // A warning on the floor underfoot: out of it first, as the goal's hint says.
+      if (s.health < s.maxHealth * 0.45) await drink();
+      // A warning on the floor underfoot: out of it first, as the goal's hint says, the way the screen shows clear
+      // (the nearest safe spot, diagonals too).
       const away = offset(s.danger);
       if (away && (away[0] || away[1])) {
-        const [sx, sy] = toward(away[0], away[1]);
-        await step(sx, sy, 280);
+        await move(away[0], away[1]);
         dodges++;
         continue;
       }
@@ -2375,11 +2402,23 @@ async function firstRun(browser, profile, hourLong) {
         continue;
       }
       const d = Math.hypot(boss[0], boss[1]);
+      // A monster at the bot's side (the arena's sand scorpions) first, or it wears the bot down.
+      const add = offset(s.foe);
+      if (add && Math.hypot(add[0], add[1]) < 1.6 && d > 2.4) {
+        await strike(add[0], add[1], 400);
+        continue;
+      }
       if (d > 2.2) {
-        const [sx, sy] = toward(boss[0], boss[1]);
-        await step(sx, sy, 220);
+        await move(boss[0] * (d - 1.8) / d, boss[1] * (d - 1.8) / d);
       } else {
-        await strike(boss[0], boss[1], 500);
+        // The class's skills too, as a player would (Q, E), aimed at it.
+        if (!game.touch) {
+          await game.send(`face ${(boss[0] / d).toFixed(2)} ${(boss[1] / d).toFixed(2)}`);
+          await game.page.keyboard.press('q');
+          await game.page.keyboard.press('e');
+          await game.send('face off');
+        }
+        await strike(boss[0], boss[1], 450);
       }
     }
     await gather(5);
