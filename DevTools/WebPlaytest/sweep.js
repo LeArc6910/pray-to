@@ -1668,18 +1668,24 @@ async function firstRun(browser, profile, hourLong) {
   // 2. A workbench: the bag's materials tab, [만들기], then [놓기] onto open floor ahead.
   // Faces open floor, two tiles of it if there are (a thing goes on the tile after when the body is in the first);
   // with only one, takes a short step back from it first. Sides already tried are skipped.
+  // On a phone a person turns by a nudge of the move stick, so the bot does the same (the attack stick's last pull
+  // would otherwise still decide which way it faces).
+  const turn = async (dx, dy) => {
+    if (game.touch) await step(dx, dy, 50);
+    else await game.send(`face ${dx} ${dy}`);
+  };
   const faceOpen = async (skip = []) => {
     const around = (await near()).filter(a => a.tile === 'Floor' && !skip.includes(`${a.dx},${a.dy}`));
     for (const a of around) {
       if ((await game.look(2 * a.dx, 2 * a.dy)).tile === 'Floor') {
-        await game.send(`face ${a.dx} ${a.dy}`);
+        await turn(a.dx, a.dy);
         return a;
       }
     }
     const open = around[0];
     if (open) {
       await step(-open.dx, -open.dy, 90).catch(() => {});
-      await game.send(`face ${open.dx} ${open.dy}`);
+      await turn(open.dx, open.dy);
     }
     return open;
   };
