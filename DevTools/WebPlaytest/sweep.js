@@ -1689,7 +1689,11 @@ async function firstRun(browser, profile, hourLong) {
   const offset = text => (text ? text.split(',').map(Number) : null);
   // Digs the wall at (dx, dy) with what is in hand: attack toward it until it breaks (at most six seconds). On the
   // phone the attack stick is held pulled toward it.
+  // Where the time goes (seconds walking to veins, seconds digging, digs that did not break), for the report.
+  const spent = { vein: 0, dig: 0, digs: 0, stuck: 0 };
   const dig = async (dx, dy) => {
+    const started = Date.now();
+    spent.digs++;
     if (game.touch) await hold('aim', dx, dy);
     else await game.send(`face ${dx} ${dy}; attack on ${dx} ${dy}`);
     let gone = false;
@@ -1699,6 +1703,8 @@ async function firstRun(browser, profile, hourLong) {
     }
     if (game.touch) await lift();
     else await game.send('attack off');
+    spent.dig += (Date.now() - started) / 1000;
+    if (!gone) spent.stuck++;
     return gone;
   };
   const key = { '1,0': 'd', '-1,0': 'a', '0,1': 'w', '0,-1': 's' };
@@ -1774,8 +1780,9 @@ async function firstRun(browser, profile, hourLong) {
   const why = async label => {
     const t = await game.texts();
     const here = await game.look(0, 0);
+    const s = await game.state();
     const around = (await near()).map(a => `${a.dx},${a.dy}=${a.tile}`).join(' ');
-    note(`  - (${label}) 칸 ${here.x},${here.y}, 곁: ${around}; 떠 있는 글: ${(t.floating || []).join(' / ') || '없음'}; 알림: ${(t.acquired || []).slice(-3).join(' / ') || '없음'}`);
+    note(`  - (${label}) 칸 ${here.x},${here.y}, 체력 ${s.health}/${s.maxHealth}${s.dead ? ' 쓰러짐' : ''}, 곁: ${around}; 떠 있는 글: ${(t.floating || []).join(' / ') || '없음'}; 알림: ${(t.acquired || []).slice(-3).join(' / ') || '없음'}`);
   };
   const t0 = await goalNow();
   note(`- 첫 목표: ${t0.n}. ${t0.text}`);
@@ -1878,6 +1885,14 @@ async function firstRun(browser, profile, hourLong) {
   // To the next copper vein as the minimap marks it (2026-11-09): toward it, digging through what is in the way,
   // until it is beside. Taken there only when none is marked within reach.
   const nextVein = async () => {
+    const started = Date.now();
+    try {
+      await walkToVein();
+    } finally {
+      spent.vein += (Date.now() - started) / 1000;
+    }
+  };
+  const walkToVein = async () => {
     veins++;
     const first = offset((await game.state()).veinAt);
     if (!first) {
@@ -1925,6 +1940,7 @@ async function firstRun(browser, profile, hourLong) {
   await mine(async () => count(await inv(), 'copper_ore') >= 6, 150, 'CopperOre', nextVein);
   if (count(await inv(), 'copper_ore') < 6) await why(`구리 ${count(await inv(), 'copper_ore')}개에서 멈춤`);
   note(`- 구리 광맥: 미니맵이 가리키는 가장 가까운 광맥으로 ${veins}번 파 들어갔다${carried ? `(16칸 안에 없어 ${carried}번 옮겨졌다)` : ''}`);
+  note(`  - 쓴 때: 광맥 찾아가기 ${Math.round(spent.vein)}초, 벽·광석 캐기 ${Math.round(spent.dig)}초(${spent.digs}번, 그 가운데 6초 안에 안 깨진 것 ${spent.stuck}번)`);
   await game.wait(1000);
   await passed(5, '구리 광석 6개 캐기');
 
@@ -1963,8 +1979,16 @@ async function firstRun(browser, profile, hourLong) {
     const moved = new Set();
     // Where the bot is taken instead of walking back down its tunnels (once a reason, for the report).
     const taken = async (where, why) => {
-      await game.send(`goto ${where}`);
+      // A bot that fell gets up at the spawn (or its bed) a few seconds later: moved before that, it would be put
+      // back there (the first-hour run of 2026-11-09 stood at the spawn when it went to make the rod).
+      if ((await game.state()).dead) {
+        note(`  - (${why}) 봇이 쓰러져 있었다: 일어날 때까지 기다린다`);
+        await game.until(s => !s.dead, 15000);
+        await game.wait(500);
+      }
+      const answer = (await game.send(`goto ${where}`)).join(' ');
       await game.wait(800);
+      if (!/^ok/.test(answer)) note(`  - (${why}) goto ${where}: ${answer || '대답 없음'}`);
       if (!moved.has(why)) note(`- ${why}: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)`);
       moved.add(why);
     };
