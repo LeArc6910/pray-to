@@ -321,6 +321,8 @@ namespace Game.Client
             creatures.Add(CreatureArt.Boss("lava_titan", BossColor, 1));
             creatures.Add(CreatureArt.Boss("void_lord", BossColor, 0));
             creatures.Add(CreatureArt.Boss("void_lord", BossColor, 1));
+            creatures.Add(CreatureArt.Boss("tide_serpent", BossColor, 0));
+            creatures.Add(CreatureArt.Boss("tide_serpent", BossColor, 1));
             rows.Add(creatures);
 
             rows.Add(new[]

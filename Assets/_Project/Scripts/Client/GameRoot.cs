@@ -374,6 +374,7 @@ namespace Game.Client
                 Biome.Crystal => Tune.Crystal,
                 Biome.Lava => Tune.Lava,
                 Biome.Abyss => Tune.Abyss,
+                Biome.Lake => Tune.Lake,
                 _ => Tune.Cave,
             };
             float nearest = float.MaxValue;

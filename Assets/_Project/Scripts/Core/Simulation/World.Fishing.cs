@@ -102,6 +102,7 @@ namespace Game.Core
                 Biome.Crystal => 3,
                 Biome.Lava => 4,
                 Biome.Abyss => 5,
+                Biome.Lake => 4,
                 _ => 1,
             };
             return Math.Min(MaxDifficulty, depth + (fish.FishAtNight ? 1 : 0));

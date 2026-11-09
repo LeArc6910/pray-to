@@ -502,6 +502,68 @@ namespace Game.Client
             },
         };
 
+        // A lake crab: a wide low shell on six legs, two big claws raised, tipped red. The claws open and close.
+        static readonly string[][] Crab =
+        {
+            new[]
+            {
+                "..KK........KK..",
+                ".KrrK......KrrK.",
+                ".KrK........KrK.",
+                "..K.LLLLLLLL.K..",
+                "...LMMwMMwMMML..",
+                "..LMMMMMMMMMMMm.",
+                "..mMMMMMMMMMMmm.",
+                "...mmmmmmmmmmm..",
+                "..K.K.K..K.K.K..",
+                ".K.K.K....K.K.K.",
+            },
+            new[]
+            {
+                ".KK..........KK.",
+                "KrrK........KrrK",
+                ".KrK........KrK.",
+                "..K.LLLLLLLL.K..",
+                "...LMMwMMwMMML..",
+                "..LMMMMMMMMMMMm.",
+                "..mMMMMMMMMMMmm.",
+                "...mmmmmmmmmmm..",
+                "...K.K.K.K.K.K..",
+                "..K.K.K..K.K.K..",
+            },
+        };
+
+        // A water wisp: a pale bell like a jellyfish, two dark eyes, trailing threads that sway.
+        static readonly string[][] Jelly =
+        {
+            new[]
+            {
+                "....LLLLLL......",
+                "..LLMMMMMMLL....",
+                ".LMMwMMMMwMML...",
+                ".LMMMMMMMMMML...",
+                "..mMMMMMMMMm....",
+                "...mmmmmmmm.....",
+                "...h.h..h.h.....",
+                "..h..h..h..h....",
+                "...h..h..h..h...",
+                "..h..h....h.....",
+            },
+            new[]
+            {
+                "....LLLLLL......",
+                "..LLMMMMMMLL....",
+                ".LMMwMMMMwMML...",
+                ".LMMMMMMMMMML...",
+                "..mMMMMMMMMm....",
+                "...mmmmmmmm.....",
+                "....h.h..h.h....",
+                "...h..h..h..h...",
+                "..h..h..h..h....",
+                "...h....h..h....",
+            },
+        };
+
         // An abyss stalker: a low shell on many legs, claws out front and a glowing sting curled over its back.
         static readonly string[][] Scorpion =
         {
@@ -758,6 +820,16 @@ namespace Game.Client
                 ['c'] = Rgba.Hex("#ECDCC4"),
                 ['C'] = Rgba.Hex("#BFA88C"),
             },
+            ["lake_crab"] = new Dictionary<char, Rgba>
+            {
+                ['K'] = Rgba.Hex("#1E3A44"),
+                ['r'] = Rgba.Hex("#E86E5A"),
+            },
+            ["tide_wisp"] = new Dictionary<char, Rgba>
+            {
+                ['w'] = Rgba.Hex("#103038"),
+                ['h'] = Rgba.Hex("#BFF4EC"),
+            },
             ["cave_beetle"] = new Dictionary<char, Rgba>
             {
                 ['K'] = Rgba.Hex("#58422E"),
@@ -818,6 +890,8 @@ namespace Game.Client
                 "crystal_wisp" => Gem,
                 "frost_wisp" => FrostWisp,
                 "void_wisp" => EyeWisp,
+                "lake_crab" => Crab,
+                "tide_wisp" => Jelly,
                 _ => Slime,
             };
             return PixelImage.FromRows(colors, frames[frame % frames.Length]).Outlined(ramp.Outline);
@@ -833,8 +907,84 @@ namespace Game.Client
             // The lava titan: the warden's build in black basalt, its seams and core burning.
             "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, molten: true),
             "void_lord" => VoidLord(frame),
+            "tide_serpent" => Serpent(frame),
             _ => Warden(color, frame),
         };
+
+        // The tide serpent: a long teal body in three coils, a pale belly, its head reared up on a curving neck with a
+        // fin crest, gold eyes and fangs. The second frame sways the neck and lifts the head a pixel.
+        static PixelImage Serpent(int frame)
+        {
+            const int width = 40;
+            const int height = 38;
+            var image = new PixelImage(width, height);
+            var skin = Ramp.Of("#2E8C9A");
+            var belly = Ramp.Of("#BFE8DC");
+            var fin = Ramp.Of("#5AD2E6");
+            var eye = Rgba.Hex("#FFE85A");
+            int sway = frame % 2 == 1 ? 1 : 0;
+            void Set(int x, int y, Rgba c)
+            {
+                if (image.Inside(x, y)) image[x, y] = c;
+            }
+
+            // The coils, widest at the bottom, each a flattened ring with a light top and a dark underside.
+            for (int ring = 0; ring < 3; ring++)
+            {
+                int cy = 33 - ring * 5;
+                int rx = 16 - ring * 4;
+                const int ry = 4;
+                for (int y = cy - ry; y <= cy + ry; y++)
+                {
+                    for (int x = 20 - rx; x <= 20 + rx; x++)
+                    {
+                        float dx = (x - 20) / (float)rx;
+                        float dy = (y - cy) / (float)ry;
+                        float d = dx * dx + dy * dy;
+                        if (d > 1) continue;
+                        var c = dy < -0.45f ? skin.Light : dy > 0.55f ? skin.Dark : (x * 3 + y) % 7 == 0 ? skin.Shade : skin.Main;
+                        // Scales: a pale belly band along the front of each coil.
+                        if (dy > 0.1f && dy < 0.45f && d < 0.8f) c = (x % 2 == 0) ? belly.Main : belly.Shade;
+                        Set(x, y, c);
+                    }
+                }
+            }
+            // The neck curving up out of the top coil.
+            for (int i = 0; i < 13; i++)
+            {
+                int nx = 20 + (int)System.Math.Round(System.Math.Sin(i / 12.0 * System.Math.PI) * (3 + sway));
+                int ny = 22 - i;
+                for (int w = -2; w <= 2; w++)
+                {
+                    Set(nx + w, ny, w == -2 ? skin.Light : w == 2 ? skin.Dark : w == 0 ? belly.Main : skin.Main);
+                }
+                // A fin down the back of the neck.
+                if (i % 2 == 0) Set(nx - 3, ny, fin.Main);
+            }
+            // The head: a wedge pointing right, the crest behind it.
+            int hx = 20 + sway;
+            int hy = 6 - sway;
+            for (int y = -3; y <= 3; y++)
+            {
+                int reach = 5 - System.Math.Abs(y) / 2;
+                for (int x = -4; x <= reach + 2; x++)
+                {
+                    var c = y <= -2 ? skin.Light : y >= 2 ? skin.Dark : skin.Main;
+                    if (y == 2 && x > 0) c = belly.Main;
+                    Set(hx + x, hy + y, c);
+                }
+            }
+            for (int i = 0; i < 4; i++)
+            {
+                Set(hx - 5 - i, hy - 3 + i, fin.Light);
+                Set(hx - 4 - i, hy - 4 + i, fin.Main);
+            }
+            Set(hx + 3, hy - 1, eye);
+            Set(hx + 4, hy - 1, eye.Scale(0.8f));
+            Set(hx + 6, hy + 2, Rgba.White);
+            Set(hx + 4, hy + 3, Rgba.White);
+            return image.Outlined(Rgba.Hex("#0A1A1E"));
+        }
 
         // The void lord: a hooded shape in a long cloak that floats over the ground, two cold eyes in the dark of the
         // hood, an orb of the void held before it and stars turning round its head. The second frame rises a pixel

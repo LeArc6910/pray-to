@@ -68,3 +68,4 @@ rift_eye,균열의 눈,amulet,45,,Damage+18%;MaxHealth+60~70;AttackSpeed+10%;Max
 # 균열 조각으로 모루에서 만든다(떨어지지 않는다, 2026-11-09)
 rift_band,균열 고리,ring,45,,SkillRank+1;MaxHealth+40~50,1,0,
 rift_charm,균열 부적,amulet,45,,CooldownRecovery+12~15%;Damage+10~12%,1,0,
+tide_amulet,물살의 목걸이,amulet,25,,MaxMana+30~40;ManaRegen+3~4,1,0,

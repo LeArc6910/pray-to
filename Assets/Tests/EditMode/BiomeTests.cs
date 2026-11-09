@@ -37,11 +37,14 @@ namespace Game.Core.Tests
             var abyss = world.Arenas[3] - world.Spawn;
             Assert.AreEqual(0, Vec2.Distance(abyss, new Vec2(deep.X, -deep.Y)) * Vec2.Distance(abyss, new Vec2(-deep.X, deep.Y)), 0.01f,
                 "in one of the corners beside the lava fields");
+            // The far end of the other one is the underground lake, with the fifth arena.
+            Assert.AreEqual(Biome.Lake, biomes.At(world.Arenas[4]));
+            Assert.AreEqual(-1, Vec2.Dot(world.Arenas[4] - world.Spawn, abyss) / (abyss.Length * abyss.Length), 0.01f, "the corner across from the abyss");
 
             var counts = Count(biomes);
             foreach (Biome biome in System.Enum.GetValues(typeof(Biome)))
             {
-                Assert.Greater(counts.GetValueOrDefault(biome), biome == Biome.Abyss ? 300 : 1000, biome.ToString());
+                Assert.Greater(counts.GetValueOrDefault(biome), biome == Biome.Abyss || biome == Biome.Lake ? 300 : 1000, biome.ToString());
             }
         }
 
@@ -73,15 +76,21 @@ namespace Game.Core.Tests
             // Biomes only say what kind of cave a tile is in. The lava fields carved their arena, a tunnel from the
             // spawn and pools of lava, all in the plain cave and the lava fields; the abyss its arena, veins and a
             // tunnel from the lava arena. The caves of the other three biomes, away from that tunnel, are what they were.
+            // The lake (2026-11-09) took the far end of a side corner, carved its arena and a tunnel from the deep
+            // arena and set pools into rock: its biome counts with the others, away from its arena and tunnel.
             var world = WorldGenerator.Generate(7);
             var tunnel = NearLine(world, world.Arenas[2], world.Arenas[3], 2);
+            var lakeTunnel = NearLine(world, world.Arenas[1], world.Arenas[4], 2);
+            var lake = world.Arenas[4];
             int floors = 0;
             for (int y = 0; y < world.Map.Height; y++)
             {
                 for (int x = 0; x < world.Map.Width; x++)
                 {
                     var biome = world.Biomes[x, y];
-                    bool elsewhere = (biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Crystal) && !tunnel[y * world.Map.Width + x];
+                    bool carved = tunnel[y * world.Map.Width + x] || lakeTunnel[y * world.Map.Width + x]
+                        || Vec2.Distance(TileMap.Center(x, y), lake) <= world.ArenaRadius + 1;
+                    bool elsewhere = (biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Crystal || biome == Biome.Lake) && !carved;
                     if (elsewhere && world.Map[x, y] == TileType.Floor) floors++;
                 }
             }
@@ -90,8 +99,10 @@ namespace Game.Core.Tests
 
         // Floor tiles of seed 7 in the mushroom forest, ice caves and crystal caverns away from the abyss tunnel,
         // counted on these tiles with the code from before the abyss (5367; before the lava fields the same biomes
-        // held 6073), so a change to those caves shows up here.
-        const int FloorsElsewhereOfSeedSeven = 5367;
+        // held 6073), so a change to those caves shows up here. Since the lake (2026-11-09) the count leaves out its
+        // arena and tunnel too, whose floors were in the 5367 before; the lake itself only carved those and set pools
+        // into rock, so the rest of these caves are the same tiles.
+        const int FloorsElsewhereOfSeedSeven = 4855;
 
         // Tiles within reach of the straight line between two points, drawn the way tunnels are.
         static bool[] NearLine(GeneratedWorld world, Vec2 from, Vec2 to, int reach)

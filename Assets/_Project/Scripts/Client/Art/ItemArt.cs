@@ -834,6 +834,9 @@ namespace Game.Client
                 case "support_leech": return Ramped(Gem, Ramp.Of("#C83C5A"));
                 case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
                 case "rift_shard": return Ramped(Gem, Ramp.Of("#E86ED8"));
+                case "pearl": return Ramped(Gem, Ramp.Of("#EDE6DA"));
+                case "serpent_scale": return Ramped(Gem, Ramp.Of("#2E8C9A"));
+                case "lake_pike": return Ramped(FishRows, Ramp.Of("#5AA89A"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
                 case "coin": return Ramped(CoinRows, Ramp.Of("#F2C440"));
                 case "cave_potato_seed": return Ramped(Seeds, Ramp.Of("#B08850"));

@@ -13,6 +13,7 @@ namespace Game.Client
         Lava,
         Boss,
         Abyss,
+        Lake,
     }
 
     // Sound that loops under the music: the cave's wind and drips, the lava's rumble and bubbles, and the hum of a
@@ -104,6 +105,12 @@ namespace Game.Client
             {
                 Bpm = 60, Root = 47, Scale = Phrygian, Chords = new[] { 0, 1, 5, 6 }, Lead = Wave.Sine, LeadOctave = 2, LeadVolume = 0.24f,
                 Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 1, Rest = 0.55f, Echo = 0.5f, Seed = 7,
+            },
+            // Gently rocking: a dorian melody over a slow bass, arpeggios like ripples, long echoes.
+            Tune.Lake => new Style
+            {
+                Bpm = 72, Root = 48, Scale = Dorian, Chords = new[] { 0, 4, 3, 0 }, Lead = Wave.Sine, LeadOctave = 1, LeadVolume = 0.26f,
+                Arp = Wave.Triangle, ArpRate = 3, ArpOctave = 2, ArpVolume = 0.12f, BassNotes = 2, Rest = 0.5f, Echo = 0.45f, Seed = 8,
             },
             Tune.Boss => new Style
             {

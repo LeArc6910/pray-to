@@ -142,3 +142,5 @@ support_duration,support_duration,1,essence:8|glow_cap:3,Anvil
 support_leech,support_leech,1,essence:10|slime_gel:12,Anvil
 rift_band,rift_band,1,rift_shard:10|void_bar:4,Anvil
 rift_charm,rift_charm,1,rift_shard:15|void_essence:1,Anvil
+tide_amulet,tide_amulet,1,serpent_scale:1|pearl:6|mithril_bar:3,Anvil
+grilled_pike,grilled_fish,2,lake_pike:1,Furnace

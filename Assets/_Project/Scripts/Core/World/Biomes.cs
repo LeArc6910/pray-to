@@ -14,6 +14,8 @@ namespace Game.Core
         Lava,
         // The far end of one of the corners beside the lava fields, past AbyssDistance (Docs/Biomes.md).
         Abyss,
+        // The far end of the other of those corners: an underground lake of many pools (2026-11-09).
+        Lake,
     }
 
     // Which biome every tile is in, worked out from the seed with integer math only, so the host and every client
@@ -60,9 +62,9 @@ namespace Game.Core
 
         // corner is the deep arena's corner as signs (±1, ±1): the crystal caverns lie there, the lava fields
         // opposite; mushroomFirst picks which of the other two corners gets the mushroom forest.
-        // abyss is the corner whose far end is the abyss, or null for none.
+        // abyss is the corner whose far end is the abyss, lake the one whose far end is the lake; null for none.
         public static BiomeMap Make(ulong seed, int width, int height, int spawnX, int spawnY, (int X, int Y) corner, bool mushroomFirst,
-            (int X, int Y)? abyss = null)
+            (int X, int Y)? abyss = null, (int X, int Y)? lake = null)
         {
             var tiles = new Biome[width * height];
             for (int y = 0; y < height; y++)
@@ -84,6 +86,13 @@ namespace Game.Core
                         && Math.Max(Math.Abs(dx), Math.Abs(dy)) >= AbyssDistance)
                     {
                         biome = Biome.Abyss;
+                    }
+                    // The lake takes the far end of the other side corner the same way, on its own wobble.
+                    if (lake is (int lx, int ly) && sx == lx && sy == ly
+                        && Math.Min(Math.Abs(dx), Math.Abs(dy)) + Noise(seed, x, y, 4) / 2 >= AbyssDistance - 8
+                        && Math.Max(Math.Abs(dx), Math.Abs(dy)) >= AbyssDistance)
+                    {
+                        biome = Biome.Lake;
                     }
                     tiles[y * width + x] = biome;
                 }
@@ -123,6 +132,7 @@ namespace Game.Core
             Biome.Crystal => "수정 동굴",
             Biome.Lava => "용암 지대",
             Biome.Abyss => "공허의 심연",
+            Biome.Lake => "지하 호수",
             _ => "흙 동굴",
         };
     }

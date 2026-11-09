@@ -129,6 +129,7 @@ namespace Game.Client
                 Biome.Mushroom => ("#1E4E5A", "#2E7A84", "#7CC8C0"),
                 Biome.Crystal => ("#22386E", "#3A5CA8", "#9AC0F0"),
                 Biome.Abyss => ("#1A1438", "#2E2460", "#8A74D8"),
+                Biome.Lake => ("#0E4A56", "#1E7A84", "#8AE8E0"),
                 _ => ("#1C3A5C", "#2C5C8C", "#7CA8D8"),
             };
             var deepColor = Rgba.Hex(deep);
@@ -248,6 +249,7 @@ namespace Game.Client
             Biome.Crystal => CrystalFloor,
             Biome.Lava => LavaFloor,
             Biome.Abyss => AbyssFloor,
+            Biome.Lake => LakeFloor,
             _ => CaveFloor,
         };
 
@@ -258,6 +260,7 @@ namespace Game.Client
             Biome.Crystal => CrystalRock,
             Biome.Lava => LavaRock,
             Biome.Abyss => AbyssRock,
+            Biome.Lake => LakeRock,
             _ => RockColors,
         };
 
@@ -295,6 +298,21 @@ namespace Game.Client
             Top = Rgba.Hex("#2A2238"), TopDark = Rgba.Hex("#241D30"), TopLight = Rgba.Hex("#342A46"), Rim = Rgba.Hex("#6A54A0"),
             FaceTop = Rgba.Hex("#46386A"), FaceBottom = Rgba.Hex("#30264A"), Strata = Rgba.Hex("#5A3CA0"), FaceSpeck = Rgba.Hex("#C8B4FF"),
             Contact = Rgba.Hex("#0E0B14"), Outline = Rgba.Hex("#08060C"),
+        };
+
+        // The underground lake: wet grey-green stone, glistening, with pale shells and weed at the water's edge.
+        static readonly FloorPalette LakeFloor = new FloorPalette
+        {
+            Base = Rgba.Hex("#22343A"), Dark = Rgba.Hex("#1C2C31"), Light = Rgba.Hex("#2A3F46"),
+            Pebble = Rgba.Hex("#34505A"), PebbleLight = Rgba.Hex("#46666E"), PebbleShadow = Rgba.Hex("#121C20"),
+            Decor = Rgba.Hex("#E8E0D0"), DecorLight = Rgba.Hex("#5AD2B4"),
+        };
+
+        static readonly RockPalette LakeRock = new RockPalette
+        {
+            Top = Rgba.Hex("#33494E"), TopDark = Rgba.Hex("#2C4045"), TopLight = Rgba.Hex("#3D5559"), Rim = Rgba.Hex("#6AA8A8"),
+            FaceTop = Rgba.Hex("#486A6E"), FaceBottom = Rgba.Hex("#344F54"), Strata = Rgba.Hex("#2E7A84"), FaceSpeck = Rgba.Hex("#BFF4EC"),
+            Contact = Rgba.Hex("#101A1C"), Outline = Rgba.Hex("#0A1214"),
         };
 
         static readonly RockPalette LavaRock = new RockPalette
@@ -346,6 +364,10 @@ namespace Game.Client
                     rock[x + 2, y] = floor.Decor.Scale(0.7f);
                     rock[x + 1, y - 1] = floor.Decor.Scale(0.7f);
                     rock[x + 1, y + 1] = floor.Decor.Scale(0.7f);
+                    break;
+                case Biome.Lake:
+                    // Water running down the face in a thin bright line.
+                    for (int i = 0; i < 3; i++) rock[x + 1, y + i] = i == 0 ? floor.DecorLight : floor.DecorLight.Scale(0.75f);
                     break;
             }
             return rock;
@@ -487,6 +509,20 @@ namespace Game.Client
                     image[x, y] = variant % 2 == 0 ? colors.DecorLight : colors.Decor;
                     image[x - 3, y + 2] = colors.Decor.Scale(0.6f);
                     if (variant == 3) image[x + 3, y - 2] = colors.Decor.Scale(0.8f);
+                    break;
+                case Biome.Lake:
+                    // A pale shell, or a wisp of weed.
+                    if (variant % 2 == 0)
+                    {
+                        image[x, y] = colors.Decor;
+                        image[x + 1, y] = colors.Decor.Scale(0.8f);
+                    }
+                    else
+                    {
+                        image[x, y] = colors.DecorLight;
+                        image[x, y - 1] = colors.DecorLight.Scale(0.8f);
+                        image[x + 1, y - 2] = colors.DecorLight.Scale(0.6f);
+                    }
                     break;
             }
         }
