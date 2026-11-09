@@ -970,7 +970,7 @@ namespace Game.Client
                     // Affection (World.PetAnimals): once a day, and fonder animals give silver and gold more often.
                     GUILayout.BeginHorizontal();
                     string hearts = new string('■', machine.Affection) + new string('□', World.AffectionMost - machine.Affection);
-                    GUILayout.Label(Fit($"애정 {hearts} {machine.Affection}/{World.AffectionMost} · 높을수록 은빛·금빛이 잘 나온다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+                    GUILayout.Label(Fit($"애정 {hearts} {machine.Affection}/{World.AffectionMost} (높으면 은빛·금빛)", _textWidth - 104), GUILayout.Width(_textWidth - 104));
                     if (machine.Petted) GUILayout.Label("오늘 쓰다듬음", GUILayout.Width(96));
                     else if (Ui.LayoutButton("쓰다듬기", GUILayout.Width(96))) Send(_client.PetAnimalsCommand(), Sound.Harvest);
                     GUILayout.EndHorizontal();
