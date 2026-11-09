@@ -197,6 +197,8 @@ namespace Game.Core
         Support,
         // Hatches the egg (World.Hatch): Item the egg's material index.
         Hatch,
+        // Asks the person within reach to move into a free room (World.Invite).
+        Invite,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

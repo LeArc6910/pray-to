@@ -1521,6 +1521,14 @@ namespace Game.Client
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
                     break;
+                case SimEventType.MovedIn:
+                    // A person moving into a room of the base: a sparkle at their new place and a banner for everyone.
+                    var mover = _client.Npcs != null && e.Target >= 0 && e.Target < _client.Npcs.Npcs.Count ? _client.Npcs.Npcs[e.Target] : null;
+                    if (mover == null) break;
+                    AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 1.6f, LevelColor, FlashKind.Sparkles);
+                    ShowBanner($"{mover.Name}이(가) 기지의 방으로 이사 왔다!");
+                    Sounds.Play(Sound.Learn);
+                    break;
                 case SimEventType.Hatched:
                     var keeper = Find(e.Source);
                     var hatched = Pets.ByIndex(e.Target);

@@ -926,6 +926,35 @@ async function npc(browser) {
     await game.shot(`npc-${tile}`, `${role}의 탭`);
     await closeBag(game);
   }
+
+  // Moving in (Docs/Npcs.md 이사): a room walled round, away from the people, with a door, a bed and a banner; the
+  // merchant at two hearts moves into it from her stall.
+  await game.send('goto spawn; goto 22 0');
+  await clearRoom(game, 5, 3);
+  const room = [];
+  for (let x = 1; x <= 7; x++) room.push(`build Wall ${x} -1`, `build Wall ${x} 4`);
+  for (let y = 0; y <= 3; y++) room.push(`build Wall 1 ${y}`, `build Wall 7 ${y}`);
+  await game.send('build Floor 0 0; ' + room.join('; ') + '; build Door 4 -1; build Bed 2 3; build Banner 6 0');
+  await game.send('goto near MerchantStall; hearts merchant 1');
+  await game.wait(800);
+  await bagTab(game, '상인');
+  const early = (await game.find('이사 권하기'))[0];
+  check(early && !early.enabled, `호감 1에서는 [이사 권하기]가 눌리지 않는다`);
+  await game.send('hearts merchant 2');
+  await game.wait(500);
+  await game.shot('invite', '[이사 권하기]');
+  check(await game.press('이사 권하기'), '호감 2에서 [이사 권하기]를 누른다');
+  await game.wait(800);
+  check((await game.allText()).includes('이사 왔다'), '"상인 도라이(가) 기지의 방으로 이사 왔다!" 알림');
+  await closeBag(game);
+  await game.send('goto near MerchantStall');
+  await game.wait(1200);
+  await game.shot('moved-in', '방으로 이사 온 상인');
+  await bagTab(game, '상인');
+  check((await game.find('이사 권하기')).length === 0 && (await game.find('말 걸기')).length + (await game.find('오늘은 이야기했다')).length === 1,
+    '방에서도 [상인] 탭이 열리고 [이사 권하기]는 없다');
+  await game.shot('moved-in-tab', '방에 사는 상인의 탭');
+  await closeBag(game);
   await game.context.close();
 }
 

@@ -497,6 +497,9 @@ namespace Game.Core
                 case InventoryCommand.Hatch:
                     if (_loot != null && command.Item >= 0 && command.Item < _loot.Materials.Count) World.Hatch(player.Id, _loot.Materials[command.Item]);
                     break;
+                case InventoryCommand.Invite:
+                    World.Invite(player.Id);
+                    break;
                 case InventoryCommand.SortBag:
                     player.Inventory.Sort();
                     player.InventoryVersion++;

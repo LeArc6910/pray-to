@@ -28,6 +28,88 @@ namespace Game.Core.Tests
             return world;
         }
 
+        // Moving in (World.Housing.cs, Docs/Npcs.md 이사): a guest room walled round with x 20..26, y 3..8, its
+        // inside 5 by 4, with a door in the bottom wall, a bed and a banner against the walls inside.
+        static World WithGuestRoom(out Player player, bool door = true, bool decor = true, bool closed = true)
+        {
+            var world = new World(Maps.Room(30), TileMap.Center(10, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            world.SetNpcs(People.Shipped);
+            for (int x = 20; x <= 26; x++)
+            {
+                world.Map[x, 3] = TileType.Wall;
+                world.Map[x, 8] = TileType.Wall;
+            }
+            for (int y = 3; y <= 8; y++)
+            {
+                world.Map[20, y] = TileType.Wall;
+                world.Map[26, y] = closed || y != 6 ? TileType.Wall : TileType.Floor;
+            }
+            if (door) world.Map[23, 3] = TileType.Door;
+            world.Map[21, 7] = TileType.Bed;
+            if (decor) world.Map[25, 4] = TileType.Banner;
+            player = world.AddPlayer("a", null);
+            var stall = Enumerable.Range(0, 30).SelectMany(y => Enumerable.Range(0, 30).Select(x => (x, y))).Single(t => world.Map[t.x, t.y] == TileType.MerchantStall);
+            Walk(world, player, TileMap.Center(stall.x, stall.y - 1), new Vec2(0, 1));
+            return world;
+        }
+
+        static (int X, int Y) StallOf(World world, TileType tile) =>
+            Enumerable.Range(0, world.Map.Height).SelectMany(y => Enumerable.Range(0, world.Map.Width).Select(x => (x, y))).Single(t => world.Map[t.x, t.y] == tile);
+
+        [Test]
+        public void APersonWhoLikesThePlayerMovesIntoAFitRoomAndWarmsFaster()
+        {
+            var world = WithGuestRoom(out var player);
+            var old = StallOf(world, TileType.MerchantStall);
+            Assert.AreEqual($"호감 {Housing.InviteHearts}부터 이사를 권할 수 있다", world.Invite(player.Id));
+            World.FriendshipOf(player, Merchant).Points = Housing.InviteHearts * World.PointsPerHeart;
+            Assert.IsFalse(world.LivesHere(Merchant));
+
+            Assert.IsNull(world.Invite(player.Id));
+            var now = StallOf(world, TileType.MerchantStall);
+            Assert.AreEqual(TileType.Floor, world.Map[old.X, old.Y], "the old place is floor again");
+            Assert.IsTrue(now.X > 20 && now.X < 26 && now.Y > 3 && now.Y < 8, $"in the room: {now}");
+            Assert.AreEqual(7, now.Y, "against the top wall");
+            Assert.IsTrue(world.LivesHere(Merchant));
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.MovedIn && e.Source == player.Id));
+            Assert.AreEqual("곁에 아무도 없다", world.Invite(player.Id), "she has gone from beside the player");
+
+            // Talking in her new room (in through the door): half as much again.
+            player.Position = TileMap.Center(now.X, now.Y - 1);
+            Assert.AreEqual("이미 방에 산다", world.Invite(player.Id));
+            int before = World.FriendshipOf(player, Merchant).Points;
+            Assert.IsTrue(world.Talk(player.Id));
+            Assert.AreEqual(before + 15, World.FriendshipOf(player, Merchant).Points);
+
+            // The room is one person's: the smith finds none free.
+            player.Position = TileMap.Center(StallOf(world, TileType.SmithStall).X, StallOf(world, TileType.SmithStall).Y - 1);
+            World.FriendshipOf(player, People.Shipped.Npcs.Single(n => n.Id == "blacksmith")).Points = 5 * World.PointsPerHeart;
+            Assert.AreEqual("빈 방이 없다(한 방에 한 사람)", world.Invite(player.Id));
+
+            // Taking the door out: she stays, but the room is no longer a home.
+            world.Map[23, 3] = TileType.Wall;
+            Assert.IsFalse(world.LivesHere(Merchant));
+        }
+
+        [Test]
+        public void ARoomNeedsADoorSomethingNiceAndWalls()
+        {
+            foreach (var (world, player, fault) in new[]
+            {
+                (WithGuestRoom(out var a, door: false), a, "방에 문이 없다"),
+                (WithGuestRoom(out var b, decor: false), b, "방에 장식(탁자, 깃발, 화분, 등불, 횃불)이 없다"),
+                (WithGuestRoom(out var c, closed: false), c, "방이 닫혀 있지 않다(벽과 문으로 둘러야 한다)"),
+            })
+            {
+                World.FriendshipOf(player, Merchant).Points = 5 * World.PointsPerHeart;
+                Assert.AreEqual(fault, world.Invite(player.Id));
+            }
+            var room = Housing.RoomAt(Maps.Room(6), 2, 2, new[] { TileType.MerchantStall });
+            Assert.IsTrue(room.Closed);
+            Assert.AreEqual(16, room.Floor.Count);
+            Assert.AreEqual("방에 침대가 없다", room.Fault);
+        }
+
         [Test]
         public void TheSheetsReadCleanly()
         {

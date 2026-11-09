@@ -962,8 +962,17 @@ namespace Game.Client
             var enabled = GUI.enabled;
             GUI.enabled = enabled && !_client.TalkedToday(npc);
             if (Ui.LayoutButton(_client.TalkedToday(npc) ? "오늘은 이야기했다" : "말 걸기")) Send(_client.TalkCommand(), Sound.Click);
+            // Moving in (Docs/Npcs.md, 이사): [이사 권하기] once they like the player enough and a room is free.
+            var (home, fault) = HousingOf(npc, near.Value.X, near.Value.Y);
+            if (!home)
+            {
+                GUI.enabled = enabled && fault == null;
+                if (Ui.LayoutButton("이사 권하기")) Send(_client.InviteCommand(), Sound.Click);
+            }
             GUI.enabled = enabled;
             GUILayout.EndHorizontal();
+            if (home) GUILayout.Label(Fit($"기지의 방에 산다: 말 걸기와 선물로 오르는 호감이 {Housing.FriendshipBonus}배다.", _textWidth));
+            else if (fault != null) GUILayout.Label(Fit($"이사: {fault}", _textWidth));
             GUILayout.Label(Fit($"호감이 오를 때마다 사는 값은 {World.HeartPercent}% 싸지고 파는 값은 {World.HeartPercent}% 비싸진다.", _textWidth));
             int mode = Ui.Toolbar((int)_shopMode, ShopModeNames);
             if (mode != (int)_shopMode)
@@ -978,6 +987,23 @@ namespace Game.Client
             else if (_shopMode == ShopMode.Request) DrawRequest(npc);
             else DrawStory(npc, hearts);
         }
+
+        // Whether the person lives in a room and why they could not move in, worked out from the map once a frame
+        // (IMGUI draws the window several times a frame).
+        (bool Home, string Fault) HousingOf(NpcDefinition npc, int x, int y)
+        {
+            if (_housingFrame != Time.frameCount || _housingNpc != npc)
+            {
+                _housingFrame = Time.frameCount;
+                _housingNpc = npc;
+                _housing = _client.LivesHere(npc, x, y) ? (true, null) : (false, _client.InviteFault(npc, x, y));
+            }
+            return _housing;
+        }
+
+        int _housingFrame = -1;
+        NpcDefinition _housingNpc;
+        (bool Home, string Fault) _housing;
 
         // The person's story (Docs/Npcs.md, 이야기): the steps done, the next one with what it needs and gives, and
         // [건네기] once the bag has it all; the step waits for its hearts.

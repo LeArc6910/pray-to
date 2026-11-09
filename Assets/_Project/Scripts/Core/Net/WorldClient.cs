@@ -365,6 +365,23 @@ namespace Game.Core
         // The pet following this player, as the snapshots say (PlayerPhase.PetOf).
         public PetDefinition Pet { get; private set; }
 
+        public byte[] InviteCommand() => new InventoryCommandMessage(InventoryCommand.Invite, 0).Encode();
+
+        // Moving in (World.Housing.cs), from this client's map: whether the person at (x, y) lives in a fit room, and
+        // why they could not move in now (null when they could).
+        public bool LivesHere(NpcDefinition npc, int x, int y) => Npcs != null && Map != null && Housing.HomeAt(Map, x, y, PersonTiles) != null;
+
+        public string InviteFault(NpcDefinition npc, int x, int y)
+        {
+            if (Npcs == null || Map == null) return "곁에 아무도 없다";
+            if (HeartsWith(npc) < Housing.InviteHearts) return $"호감 {Housing.InviteHearts}부터 이사를 권할 수 있다";
+            if (LivesHere(npc, x, y)) return "이미 방에 산다";
+            var near = Bed is (int bx, int by) ? TileMap.Center(bx, by) : Spawn;
+            return Housing.FreeRoom(Map, PersonTiles, near) == null ? Housing.NoRoom(Map, PersonTiles, near) : null;
+        }
+
+        ICollection<TileType> PersonTiles => Npcs.Npcs.Select(n => n.Tile).ToList();
+
         public byte[] HatchCommand(MaterialDefinition egg) => new InventoryCommandMessage(InventoryCommand.Hatch, ItemCodec.Index(_loot.Materials, egg)).Encode();
 
         // The bestiary (Records.cs) and the achievements had: from the save until the host first tells, then as it

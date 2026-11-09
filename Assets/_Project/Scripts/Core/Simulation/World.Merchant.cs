@@ -386,7 +386,7 @@ namespace Game.Core
             var friendship = FriendshipOf(player, near.Value.Npc);
             if (friendship.TalkedDay == Today) return false;
             friendship.TalkedDay = Today;
-            friendship.Points = Math.Min(MaxHearts * PointsPerHeart, friendship.Points + TalkPoints);
+            friendship.Points = Math.Min(MaxHearts * PointsPerHeart, friendship.Points + Warmed(near.Value.Npc, TalkPoints));
             player.InventoryVersion++;
             _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: Talked, position: TileMap.Center(near.Value.X, near.Value.Y)));
             GiveHeartGift(player, near.Value.Npc, friendship, TileMap.Center(near.Value.X, near.Value.Y));
@@ -419,7 +419,7 @@ namespace Game.Core
             int quality = (thing as MaterialDefinition)?.Quality ?? 0;
             int reaction = npc.Loves.Contains(kind) ? Loved : npc.Likes.Contains(kind) ? Liked : npc.Dislikes.Contains(kind) ? Disliked : Neutral;
             friendship.GiftedDay = Today;
-            friendship.Points = Math.Clamp(friendship.Points + GiftPoints[reaction] + (reaction > Disliked ? 10 * quality : 0), 0, MaxHearts * PointsPerHeart);
+            friendship.Points = Math.Clamp(friendship.Points + Warmed(npc, GiftPoints[reaction] + (reaction > Disliked ? 10 * quality : 0)), 0, MaxHearts * PointsPerHeart);
             player.InventoryVersion++;
             _events.Add(new SimEvent(SimEventType.Npc, player.Id, amount: reaction, position: TileMap.Center(near.Value.X, near.Value.Y)));
             return reaction;

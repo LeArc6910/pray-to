@@ -412,6 +412,9 @@ namespace Game.Core
         Achievement,
         // Source, a player, hatched an egg: Target is the pet's number (Pets.IndexOf).
         Hatched,
+        // Source, a player, asked the person Target (their row in npcs.csv) to move in, and they did: Position is
+        // their new place (World.Invite).
+        MovedIn,
     }
 
     public readonly struct SimEvent
