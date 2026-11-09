@@ -288,6 +288,7 @@ namespace Game.Core
             if (saved != null) World.RestoreStories(player, saved.Stories);
             if (saved != null) World.RestoreSupports(player, _classes, _loot, saved.Supports);
             if (saved != null) World.RestoreRecords(player, saved.Records, saved.Achievements);
+            if (saved != null) World.RestorePet(player, saved.Pet);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -493,6 +494,9 @@ namespace Game.Core
                     if (command.Item > 0 && command.Item <= _loot.Materials.Count) World.AddSupport(player.Id, _classes.Skills[command.Index], _loot.Materials[command.Item - 1]);
                     else if (command.Item <= 0) World.RemoveSupport(player.Id, _classes.Skills[command.Index], -command.Item);
                     break;
+                case InventoryCommand.Hatch:
+                    if (_loot != null && command.Item >= 0 && command.Item < _loot.Materials.Count) World.Hatch(player.Id, _loot.Materials[command.Item]);
+                    break;
                 case InventoryCommand.SortBag:
                     player.Inventory.Sort();
                     player.InventoryVersion++;
@@ -558,7 +562,7 @@ namespace Game.Core
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),
-                Protocol.WithStatus(p.Sleeping ? PlayerPhase.Sleeping : 0, p.Afflictions.Bits)));
+                Protocol.WithStatus((p.Sleeping ? PlayerPhase.Sleeping : 0) | Pets.IndexOf(p.Pet) << PlayerPhase.PetShift, p.Afflictions.Bits)));
             var bosses = World.Bosses
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(

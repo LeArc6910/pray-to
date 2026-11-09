@@ -79,6 +79,7 @@ namespace Game.Core
                 var material = Loot.Materials.FirstOrDefault(m => m.Id == definition.MaterialId);
                 if (material != null) DropMaterial(material, Scatter(enemy.Position));
             }
+            DropEgg(enemy, killer);
         }
 
         // One of the consumables that drop at this level, by weight; null when there are none.

@@ -120,9 +120,11 @@ namespace Game.Core
             IEnumerable<SkillDefinition> buffs = null,
             ConsumableDefinition food = null,
             int level = 1,
-            IEnumerable<PassiveNode> passives = null)
+            IEnumerable<PassiveNode> passives = null,
+            IEnumerable<Modifier> pet = null)
         {
             var sheet = new StatSheet();
+            if (pet != null) sheet.Add(pet.ToList());
             foreach (var point in passives ?? Enumerable.Empty<PassiveNode>()) sheet.Add(point.Modifiers);
             if (level > 1) sheet.Add(new Modifier(StatType.MaxHealth, ModifierKind.Flat, (level - 1) * Leveling.HealthPerLevel));
             foreach (var item in equipment.Items) sheet.Add(item.Modifiers());

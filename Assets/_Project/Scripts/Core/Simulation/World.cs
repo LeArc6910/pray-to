@@ -159,6 +159,7 @@ namespace Game.Core
             {
                 UpdatePlayer(player);
                 RecordHoldings(player);
+                PetBites(player);
             }
             foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id);
             _enemies.RemoveAll(e => e.IsDead);

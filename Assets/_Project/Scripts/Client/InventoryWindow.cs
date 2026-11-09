@@ -226,6 +226,7 @@ namespace Game.Client
             DrawPicked();
             GUILayout.Space(6);
             DrawStats();
+            GUILayout.Label(Fit(_client.Pet == null ? "펫 없음 · 몬스터가 가끔 떨어뜨리는 알을 [재료·제작]의 [부화]로 깨운다" : $"펫 {_client.Pet.Name} · {_client.Pet.Bonus}", _textWidth));
             GUILayout.Label(Fit($"스킬 포인트 {_client.SkillPoints} · 특성 포인트 {_client.PassivePoints} · 배운 특성 {_client.Passives.Count}", _textWidth));
             DrawLifeSkills();
         }
@@ -864,7 +865,7 @@ namespace Game.Client
             var plain = new List<KeyValuePair<MaterialDefinition, int>>();
             foreach (var pair in _client.Bag.Materials.ToList())
             {
-                bool acts = pair.Key.Places != null || _client.CropFrom(pair.Key) != null || IsTool(pair.Key) || ahead?.Kind == TileType.Filter
+                bool acts = pair.Key.Places != null || _client.CropFrom(pair.Key) != null || IsTool(pair.Key) || Pets.ByEgg(pair.Key.Id) != null || ahead?.Kind == TileType.Filter
                     || ahead?.Kind == TileType.Generator && pair.Key.Fuel > 0 || loads && Takes(ahead.Value, pair.Key);
                 if (!acts)
                 {
@@ -888,6 +889,14 @@ namespace Game.Client
                 if (loads && Takes(ahead.Value, pair.Key) && Ui.LayoutButton("넣기", GUILayout.Width(48)))
                     Send(_client.LoadCommand(pair.Key, Math.Min(pair.Value, World.MaxTrade)), Sound.Place);
                 if (pair.Key.Id == World.Fertilizer && Ui.LayoutButton("거름 주기", GUILayout.Width(72))) Send(_client.FertilizeCommand(), Sound.Place);
+                // An egg hatches into the pet that follows the player (Pets.cs); the one they had goes back to its egg.
+                var hatches = Pets.ByEgg(pair.Key.Id);
+                if (hatches != null)
+                {
+                    GUI.enabled = _client.Pet != hatches;
+                    if (Ui.LayoutButton("부화", GUILayout.Width(56))) Send(_client.HatchCommand(pair.Key), Sound.Learn);
+                    GUI.enabled = true;
+                }
                 // Only what a quick slot can use: things that build, seeds and the tools.
                 if (pair.Key.Places != null || crop != null || IsTool(pair.Key))
                 {

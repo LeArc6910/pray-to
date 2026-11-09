@@ -39,7 +39,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.57.0";
+        public const string Version = "0.58.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -750,6 +750,12 @@ namespace Game.Core
     public static class PlayerPhase
     {
         public const int Sleeping = 1;
+        // Above the sleeping bit, the pet's number (Pets.IndexOf), so everyone draws it.
+        public const int PetShift = 1;
+
+        public static bool IsSleeping(int phase) => (phase & Sleeping) != 0;
+
+        public static PetDefinition PetOf(int phase) => Pets.ByIndex((phase & Protocol.PhaseMask) >> PetShift);
     }
 
     public static class DropState

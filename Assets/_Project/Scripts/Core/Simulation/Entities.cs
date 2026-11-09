@@ -58,6 +58,9 @@ namespace Game.Core
         // counter that moves whenever either changes. RecordedInventory is the inventory version last looked through.
         public Dictionary<(RecordKind Kind, string Id), int> Records { get; } = new Dictionary<(RecordKind, string), int>();
         public HashSet<string> Achievements { get; } = new HashSet<string>();
+
+        // The pet following the player (Pets.cs), or null.
+        public PetDefinition Pet { get; internal set; }
         public int RecordsVersion { get; internal set; }
         internal int RecordedInventory { get; set; } = -1;
         // How well they know each person, by id (World.Merchant.cs).
@@ -259,7 +262,7 @@ namespace Game.Core
             {
                 if (HasBuff(slot)) buffs.Add(Skills[slot]);
             }
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives, Pet?.Modifiers);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
             Mana = manaShare * Stats.MaxMana;
         }
@@ -407,6 +410,8 @@ namespace Game.Core
         SkillLearned,
         // Source, a player, reached the achievement Target - 1 (its index in Records.Achievements) and had its reward.
         Achievement,
+        // Source, a player, hatched an egg: Target is the pet's number (Pets.IndexOf).
+        Hatched,
     }
 
     public readonly struct SimEvent

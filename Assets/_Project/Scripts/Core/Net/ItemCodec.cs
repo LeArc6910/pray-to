@@ -195,6 +195,8 @@ namespace Game.Core
         // crystal's material index + 1; or takes the one in slot k out (World.RemoveSupport) with Item -k (0 for the
         // first).
         Support,
+        // Hatches the egg (World.Hatch): Item the egg's material index.
+        Hatch,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

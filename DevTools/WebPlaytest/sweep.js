@@ -880,6 +880,18 @@ async function npc(browser) {
   const seen = await game.inventory();
   check(seen.records > 0, `가진 재료와 장비가 도감에 든다 (${seen.records})`);
   await game.press('목표·이야기');
+  // A pet (Docs/Animals.md 펫): an egg hatched from the materials tab follows the player.
+  await closeBag(game);
+  await game.send('give slime_egg 1');
+  await game.wait(400);
+  await bagTab(game, '재료·제작');
+  check(await game.press('부화', '말랑한 알'), '말랑한 알의 [부화]를 누른다');
+  const hatched = await game.until(i => i.pet === 'pet_slime', 3000, game.inventory);
+  check(!!hatched, `알에서 펫 말랑이가 나온다 (${hatched && hatched.pet})`);
+  await closeBag(game);
+  await game.send('goto 3 0');
+  await game.wait(1500);
+  await game.shot('pet', '따라오는 펫 말랑이');
   check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
   const doll = await game.find(/구리 검/, '캐릭터');
   check(doll.length === 1, `[캐릭터] 탭의 사람 모양 칸에 든 무기 (${doll.map(b => b.label).join(', ')})`);

@@ -248,6 +248,7 @@ namespace Game.Core
         public ulong Seed { get; private set; }
         // What the tiles do (tiles.csv); null when the client was made without the sheet.
         public TileData Tiles => _tiles;
+        public MonsterData MonsterKinds => _monsters;
         // Where this player came into the world.
         public Vec2 Spawn { get; private set; }
         // Where the boss's arena is, known from the seed like the rest of the map.
@@ -359,7 +360,12 @@ namespace Game.Core
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
-            Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements);
+            Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id);
+
+        // The pet following this player, as the snapshots say (PlayerPhase.PetOf).
+        public PetDefinition Pet { get; private set; }
+
+        public byte[] HatchCommand(MaterialDefinition egg) => new InventoryCommandMessage(InventoryCommand.Hatch, ItemCodec.Index(_loot.Materials, egg)).Encode();
 
         // The bestiary (Records.cs) and the achievements had: from the save until the host first tells, then as it
         // tells.
@@ -1153,7 +1159,7 @@ namespace Game.Core
         void RefreshStats()
         {
             var buffs = Enumerable.Range(0, Math.Min(Skills.Count, _buffs.Length)).Where(slot => _buffs[slot] > 0).Select(slot => Skills[slot]);
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives);
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives, Pet?.Modifiers);
         }
 
         // The passive tree points taken, as the host last said (World.Passives.cs), and the tree itself.
@@ -1283,6 +1289,10 @@ namespace Game.Core
             _foodTicks = self.FoodTicks;
             _skillsTick = snapshot.Tick;
             buffsChanged |= Leveling.LevelFor(self.Experience) != Level;
+            var me = snapshot.Entities.FirstOrDefault(e => e.Id == PlayerId);
+            var pet = me.Id == PlayerId ? PlayerPhase.PetOf(me.Phase) : Pet;
+            buffsChanged |= pet != Pet;
+            Pet = pet;
             Experience = self.Experience;
             if (buffsChanged) RefreshStats();
             Health = self.Health;

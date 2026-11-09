@@ -867,6 +867,11 @@ namespace Game.Client
                 case "fire_ammo": return Ramped(Seeds, Ramp.Of("#FF7A3C"));
                 case "feed": return Ramped(Seeds, Ramp.Of("#D8B070"));
                 case "egg": return Ramped(Goo, Ramp.Of("#F6F0E0"));
+                // Pet eggs (Pets.cs), each in its creature's colour.
+                case "slime_egg": return Ramped(Goo, Ramp.Of("#7CD06A"));
+                case "bat_egg": return Ramped(Goo, Ramp.Of("#9A84C8"));
+                case "wisp_egg": return Ramped(Goo, Ramp.Of("#9AE8F0"));
+                case "crab_egg": return Ramped(Goo, Ramp.Of("#4AA0B4"));
                 case "bait": return Ramped(Goo, Ramp.Of("#C87850"));
                 case "mayonnaise": return Ramped(Pickles, Ramp.Of("#F6F0D0"));
                 case "cave_crab": return Ramped(Crab, Ramp.Of("#E06040"));

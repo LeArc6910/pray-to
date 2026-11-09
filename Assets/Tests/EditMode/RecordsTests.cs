@@ -83,6 +83,53 @@ namespace Game.Core.Tests
             CollectionAssert.AreEqual(new[] { 0, 5 }, message.Achievements);
         }
 
+        // Pets (Pets.cs, Docs/Animals.md 펫): an egg hatches into a pet that gives its bonus; another egg swaps it, the
+        // old one back in its egg; the crab nips monsters beside its player; the pet is saved and rides in snapshots.
+        [Test]
+        public void AnEggHatchesAPetThatHelps()
+        {
+            var world = Room();
+            var player = world.AddPlayer("a", null);
+            var slimeEgg = Gear.Data.FindMaterial("slime_egg");
+            var crabEgg = Gear.Data.FindMaterial("crab_egg");
+            float regen = player.Stats.HealthRegen;
+            float armor = player.Stats.Armor;
+            Assert.IsFalse(world.Hatch(player.Id, slimeEgg), "no egg in the bag");
+            player.Inventory.AddMaterial(slimeEgg, 1);
+            player.Inventory.AddMaterial(crabEgg, 1);
+            Assert.IsTrue(world.Hatch(player.Id, slimeEgg));
+            Assert.AreEqual("pet_slime", player.Pet.Id);
+            Assert.AreEqual(regen + 1, player.Stats.HealthRegen, 0.001f);
+            Assert.IsTrue(world.TakeEvents().Any(e => e.Type == SimEventType.Hatched && e.Source == player.Id));
+
+            Assert.IsTrue(world.Hatch(player.Id, crabEgg));
+            Assert.AreEqual(1, player.Inventory.CountOf(slimeEgg), "the slime back in its egg");
+            Assert.AreEqual(armor + 8, player.Stats.Armor, 0.001f);
+
+            var dummy = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(1.5f, 0));
+            for (int tick = 0; tick < World.Ticks(Pets.BiteSeconds) + 1; tick++) world.Step();
+            Assert.Less(dummy.Health, dummy.MaxHealth, "the crab nipped it");
+
+            var saved = CharacterSave.Read(CharacterSave.Write(new Equipment(), new Inventory(), 0, pet: player.Pet.Id), Gear.Data);
+            var again = Room().AddPlayer("b", null);
+            World.RestorePet(again, saved.Pet);
+            Assert.AreEqual("pet_crab", again.Pet.Id);
+            Assert.AreEqual(Pets.Find("pet_crab"), PlayerPhase.PetOf(PlayerPhase.Sleeping | Pets.IndexOf(again.Pet) << PlayerPhase.PetShift));
+            Assert.IsTrue(PlayerPhase.IsSleeping(PlayerPhase.Sleeping | 3 << PlayerPhase.PetShift));
+        }
+
+        [Test]
+        public void EveryPetHasAnEggAndMonstersThatDropIt()
+        {
+            foreach (var pet in Pets.All)
+            {
+                Assert.IsNotNull(Gear.Data.Materials.FirstOrDefault(m => m.Id == pet.EggId), pet.EggId);
+                Assert.IsTrue(pet.Sources.All(id => Monsters.Shipped.Monsters.Any(m => m.Id == id)), pet.Id);
+                Assert.IsNotNull(Monsters.Shipped.Monsters.FirstOrDefault(m => m.Id == pet.Look), pet.Look);
+            }
+            Assert.LessOrEqual(Pets.All.Count, 31, "the pet number fits in a player's phase");
+        }
+
         [Test]
         public void EveryAchievementCanBeReached()
         {

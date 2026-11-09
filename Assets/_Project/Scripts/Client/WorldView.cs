@@ -94,6 +94,53 @@ namespace Game.Client
             public HazardState State;
         }
 
+        // A player's pet (Pets.cs): its monster drawn small, trotting after them a little behind, hopping or bobbing.
+        sealed class PetBody
+        {
+            public SpriteRenderer Renderer;
+            public PetDefinition Pet;
+            public Vector3 Position;
+            public bool Left;
+        }
+
+        readonly Dictionary<int, PetBody> _pets = new Dictionary<int, PetBody>();
+        const float PetScale = 0.6f;
+
+        void DrawPet(int owner, Body body, PetDefinition pet, float deltaTime)
+        {
+            _pets.TryGetValue(owner, out var shown);
+            if (pet == null || body == null)
+            {
+                if (shown != null) Object.Destroy(shown.Renderer.gameObject);
+                _pets.Remove(owner);
+                return;
+            }
+            if (shown == null || shown.Pet != pet)
+            {
+                if (shown != null) Object.Destroy(shown.Renderer.gameObject);
+                shown = new PetBody { Renderer = Renderer(_root.transform, "Pet", null, Color.white), Pet = pet, Position = body.Position };
+                shown.Renderer.transform.localScale = Vector3.one * PetScale;
+                _pets[owner] = shown;
+            }
+            // Behind and beside its player, catching up smoothly; it faces the way it is going.
+            var target = body.Position + new Vector3(shown.Left ? 0.75f : -0.75f, -0.15f, 0);
+            var before = shown.Position;
+            shown.Position = Vector3.Lerp(shown.Position, target, 1 - Mathf.Exp(-5 * deltaTime));
+            float moved = shown.Position.x - before.x;
+            if (Mathf.Abs(moved) > 0.002f) shown.Left = moved < 0;
+            bool moving = (shown.Position - before).sqrMagnitude > 0.00001f;
+            bool flies = pet.Look.Contains("bat") || pet.Look.Contains("wisp");
+            float lift = flies ? 0.35f + 0.06f * Mathf.Sin(Time.time * 5 + owner) : moving ? Mathf.Abs(Mathf.Sin(Time.time * 12)) * 0.08f : 0;
+            int frame = Mathf.FloorToInt(Time.time * (moving ? 6 : 3)) % CreatureArt.IdleFrames;
+            var look = _client.MonsterKinds?.Monsters.FirstOrDefault(m => m.Id == pet.Look);
+            var color = look != null && ColorUtility.TryParseHtmlString(look.Color, out var parsed) ? Sprites.ToRgba(parsed) : SlimeColor;
+            string key = $"Pet/{pet.Look}/{frame}";
+            shown.Renderer.sprite = Sprites.Standing(key, () => CreatureArt.Monster(pet.Look, color, frame));
+            shown.Renderer.flipX = shown.Left;
+            shown.Renderer.transform.localPosition = shown.Position + new Vector3(0, lift, 0);
+            shown.Renderer.sortingOrder = 10000 - Mathf.RoundToInt(shown.Position.y * 10);
+        }
+
         // Telegraphs just gone, by id, for the blast drawn when the boss's Impact for them comes (HazardLanded).
         readonly Dictionary<int, (HazardState State, float Time)> _landed = new Dictionary<int, (HazardState, float)>();
 
@@ -307,6 +354,7 @@ namespace Game.Client
                 weapon: _client.Equipment[ItemSlot.Weapon]?.Base);
             _self.Name = _client.Name;
             _self.Sleeping = _client.Sleeping;
+            DrawPet(_client.PlayerId, _self, _client.Pet, deltaTime);
             Footsteps(_self.Position - _self.LastPosition);
             int selfBuffs = 0;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
@@ -538,7 +586,8 @@ namespace Game.Client
                     _others[view.Id] = body;
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
-                body.Sleeping = view.IsPlayer && view.Phase == PlayerPhase.Sleeping;
+                body.Sleeping = view.IsPlayer && PlayerPhase.IsSleeping(view.Phase);
+                if (view.IsPlayer) DrawPet(view.Id, body, PlayerPhase.PetOf(view.Phase), deltaTime);
 
                 var tint = Color.white;
                 var glow = Color.clear;
@@ -1418,6 +1467,19 @@ namespace Game.Client
                     break;
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
+                    break;
+                case SimEventType.Hatched:
+                    var keeper = Find(e.Source);
+                    var hatched = Pets.ByIndex(e.Target);
+                    if (keeper != null && hatched != null)
+                    {
+                        AddFlash(keeper.Position, keeper.Diameter * 1.4f, LevelColor, FlashKind.Sparkles);
+                        if (e.Source == _client.PlayerId)
+                        {
+                            ShowBanner($"펫: {hatched.Name}이(가) 따라온다!");
+                            Sounds.Play(Sound.Learn);
+                        }
+                    }
                     break;
                 case SimEventType.Achievement:
                     // One of ours: its name in a banner, a chime and sparkles (Records.cs).
