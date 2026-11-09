@@ -57,6 +57,37 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void BaitIsUsedOnACastAndTheFishBitesSooner()
+        {
+            var bait = Gear.Data.FindMaterial(World.Bait);
+            var world = Pond(out var player);
+            player.Inventory.AddMaterial(bait, 2);
+            Assert.IsTrue(world.Fish(player.Id));
+            Assert.AreEqual(1, player.Inventory.CountOf(bait), "one bait on the hook");
+            // 70% of the longest wait is enough with bait.
+            var events = RunUntil(world, e => Has(e, World.FishingBite), World.BiteMaxSeconds * 0.7f + 0.5f);
+            Assert.IsTrue(Has(events, World.FishingBite));
+        }
+
+        [Test]
+        public void TheFishingContestPaysAPrizeForEachFish()
+        {
+            Assert.AreEqual(DayEvent.FishingContest, World.EventOf(6));
+            Assert.AreEqual(DayEvent.Market, World.EventOf(5));
+            Assert.AreEqual(DayEvent.FishingContest, World.EventOf(30), "rarer than market day");
+            var coin = Gear.Data.FindMaterial(World.Coin);
+            var world = Pond(out var player);
+            world.RestoreClock(5 * Calendar.TicksPerDay + Calendar.TicksPerDay / 6);
+            Assert.AreEqual(DayEvent.FishingContest, world.EventToday);
+            Assert.IsTrue(world.Fish(player.Id));
+            RunUntil(world, e => Has(e, World.FishingBite), World.BiteMaxSeconds + 0.5f);
+            Reels.Land(world, player);
+            var events = world.TakeEvents();
+            Assert.IsTrue(Has(events, World.FishingPrize));
+            Assert.GreaterOrEqual(player.Inventory.CountOf(coin), World.ContestPrizePerDifficulty);
+        }
+
+        [Test]
         public void TooLateTheFishGetsAway()
         {
             var world = Pond(out var player);

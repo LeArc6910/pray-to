@@ -27,6 +27,17 @@ namespace Game.Core
         public const int FishingCaught = 2;
         public const int FishingEscaped = 3;
         public const int FishingReeled = 4;
+        // After a catch: something else came up with the fish (Amount), or a contest prize was won (its coins in Amount
+        // above 16, FishingPrize + 16 × coins).
+        public const int FishingTreasure = 5;
+        public const int FishingPrize = 6;
+
+        // Bait on the hook (2026-11-09): one is used on each cast while the bag has any; the fish bites in 70% of the
+        // time (no more: fishing already pays well, Docs/Fishing.md) and treasure comes up twice as often.
+        const int BaitWaitPercent = 70;
+        // The chance in percent that a catch brings up treasure as well: this much, one more for each step of the
+        // fish's difficulty, twice with bait.
+        const int TreasurePercent = 4;
 
         // A bite's Amount also carries the fish's difficulty, for the view's gauge: FishingBite + 16 × difficulty.
         public static int FishingKind(int amount) => amount & 15;
@@ -60,7 +71,14 @@ namespace Game.Core
             if (!Map.InBounds(x, y) || Map[x, y] != TileType.Water) return false;
             int wait = Ticks(BiteMinSeconds) + _random.Next(Ticks(BiteMaxSeconds - BiteMinSeconds) + 1);
             wait = Math.Max(1, wait * (100 - LifeSkills.Bonus(LifeLevel(player, LifeSkill.Fishing), LifeSkills.BitePercent)) / 100);
-            player.Fishing = new FishingLine(x, y, player.Position, wait);
+            var bait = player.Inventory.Materials.Keys.FirstOrDefault(m => m.Id == Bait);
+            if (bait != null)
+            {
+                player.Inventory.TakeMaterial(bait, 1);
+                player.InventoryVersion++;
+                wait = Math.Max(1, wait * BaitWaitPercent / 100);
+            }
+            player.Fishing = new FishingLine(x, y, player.Position, wait) { Baited = bait != null };
             _events.Add(new SimEvent(SimEventType.Fishing, player.Id, amount: FishingCast, position: TileMap.Center(x, y)));
             return true;
         }
@@ -143,13 +161,39 @@ namespace Game.Core
         {
             var fishing = player.Fishing;
             var fish = fishing.Catch;
+            bool contest = EventToday == DayEvent.FishingContest;
             if (fish != null)
             {
                 player.Inventory.AddMaterial(fish, _random.Chance(DoubleCatchChance) ? 2 : 1);
                 player.InventoryVersion++;
-                GainLifeExperience(player, LifeSkill.Fishing, 3 + 2 * fishing.Difficulty);
+                GainLifeExperience(player, LifeSkill.Fishing, (3 + 2 * fishing.Difficulty) * (contest ? 2 : 1));
             }
             EndFishing(player, FishingCaught);
+            if (fish == null) return;
+            // Treasure: a rune of about the player's level, or a little chest of coins.
+            int chance = (TreasurePercent + fishing.Difficulty) * (fishing.Baited ? 2 : 1);
+            if (_random.Next(100) < chance)
+            {
+                var runes = Loot?.Runes.Where(r => r.Level <= player.Level + 5).ToList();
+                if (runes != null && runes.Count > 0 && _random.Chance(0.5f))
+                {
+                    player.Inventory.AddRune(_random.PickWeighted(runes, r => Math.Max(1, r.Weight)));
+                }
+                else if (Loot?.Materials.FirstOrDefault(m => m.Id == Coin) is MaterialDefinition coins)
+                {
+                    player.Inventory.AddMaterial(coins, (10 + _random.Next(21)) * fishing.Difficulty);
+                }
+                player.InventoryVersion++;
+                _events.Add(new SimEvent(SimEventType.Fishing, player.Id, amount: FishingTreasure, position: fishing.Spot));
+            }
+            // The contest's prize.
+            if (contest && Loot?.Materials.FirstOrDefault(m => m.Id == Coin) is MaterialDefinition prize)
+            {
+                int won = ContestPrizePerDifficulty * fishing.Difficulty;
+                player.Inventory.AddMaterial(prize, won);
+                player.InventoryVersion++;
+                _events.Add(new SimEvent(SimEventType.Fishing, player.Id, amount: FishingPrize + 16 * won, position: fishing.Spot));
+            }
         }
 
         void EndFishing(Player player, int how)
@@ -182,5 +226,7 @@ namespace Game.Core
         internal int BiteElapsed { get; set; }
         internal MaterialDefinition Catch { get; set; }
         public int Difficulty { get; internal set; } = 1;
+        // Cast with bait (World.Bait).
+        internal bool Baited { get; set; }
     }
 }

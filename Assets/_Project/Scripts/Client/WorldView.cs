@@ -2011,6 +2011,18 @@ namespace Game.Client
                         AddFlash(spot, 0.4f, Palette.Water, FlashKind.Ring);
                         if (mine) _floating.Add(new Floating { Position = spot + new Vector3(0, 0.3f, 0), Text = "놓쳤다", Color = Color.gray });
                     }
+                    else if (e.Amount == World.FishingTreasure)
+                    {
+                        // Something else came up with the fish: a rune or a chest of coins (World.Fishing.cs).
+                        AddFlash(spot, 1.2f, LevelColor, FlashKind.Sparkles);
+                        _floating.Add(new Floating { Position = spot + new Vector3(0, 0.6f, 0), Text = "보물!", Color = LevelColor });
+                        if (mine) Sounds.Play(Sound.Story);
+                    }
+                    else if (World.FishingKind(e.Amount) == World.FishingPrize)
+                    {
+                        _floating.Add(new Floating { Position = spot + new Vector3(0, 0.9f, 0), Text = $"대회 상금 +{e.Amount >> 4}", Color = LevelColor });
+                        if (mine) Sounds.Play(Sound.Pickup);
+                    }
                     break;
             }
         }
