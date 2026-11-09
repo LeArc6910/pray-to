@@ -824,7 +824,8 @@ namespace Game.Client
             bool known = _bossesSeen.TryGetValue(view.Id, out var before);
             if (view.BossState != BossState.Dormant && (!known || before.State == BossState.Dormant))
             {
-                ShowBanner($"{view.Boss.Name} 등장!");
+                // Under the level it is made for, a word of warning with it (bosses.csv level).
+                ShowBanner(view.Boss.Level > _client.Level ? $"{view.Boss.Name} 등장! (권장 레벨 {view.Boss.Level})" : $"{view.Boss.Name} 등장!");
                 Sounds.Play(Sound.Wake);
             }
             else if (known && view.Phase > before.Phase)

@@ -197,6 +197,9 @@ namespace Game.Core
         // A material from materials.csv, and how many for each player in the fight.
         public string MaterialId { get; }
         public int MaterialCount { get; }
+        // The character level the fight is made for (bosses.csv level, 2026-11-09; 0 when not given), shown on the
+        // boss bar.
+        public int Level { get; internal set; }
         // The element of every attack (bosses.csv element): fire burns whoever it hits, cold slows them.
         public SkillTag Element { get; }
         public IReadOnlyList<BossAttack> Attacks => _attacks;
@@ -286,7 +289,7 @@ namespace Game.Core
                         Whole(row, "potion_count"),
                         row["material"],
                         Whole(row, "material_count"),
-                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])));
+                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level") });
                 });
             }
             return bosses;

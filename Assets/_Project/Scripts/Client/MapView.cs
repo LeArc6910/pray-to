@@ -38,6 +38,37 @@ namespace Game.Client
         static readonly Color OtherPlayer = new Color(0.45f, 0.7f, 1f);
         static readonly Color ArenaMark = new Color(1f, 0.35f, 0.3f);
 
+        // The nearest vein of each early ore within SenseTiles, explored or not (2026-11-09): a prospector's feel for
+        // where the copper is, so finding the next vein is not a blind dig. Looked for again every SenseSeconds.
+        const int SenseTiles = 16;
+        const float SenseSeconds = 0.5f;
+        static readonly (TileType Ore, Color Color)[] SensedOres = { (TileType.CopperOre, Palette.CopperOre), (TileType.IronOre, Palette.IronOre) };
+        readonly List<(Vec2 At, Color Color)> _veins = new List<(Vec2, Color)>();
+        float _sensedAt = -1;
+
+        void Sense()
+        {
+            _veins.Clear();
+            int cx = TileMap.Cell(_client.Position.X), cy = TileMap.Cell(_client.Position.Y);
+            foreach (var (ore, color) in SensedOres)
+            {
+                float best = float.MaxValue;
+                Vec2? at = null;
+                for (int y = cy - SenseTiles; y <= cy + SenseTiles; y++)
+                {
+                    for (int x = cx - SenseTiles; x <= cx + SenseTiles; x++)
+                    {
+                        if (!_map.InBounds(x, y) || _map[x, y] != ore) continue;
+                        float d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+                        if (d > SenseTiles * SenseTiles || d >= best) continue;
+                        best = d;
+                        at = TileMap.Center(x, y);
+                    }
+                }
+                if (at.HasValue) _veins.Add((at.Value, color));
+            }
+        }
+
         readonly WorldClient _client;
         readonly TileMap _map;
         readonly Texture2D _texture;
@@ -114,6 +145,12 @@ namespace Game.Client
                 _dirty = false;
             }
 
+            if (Time.unscaledTime - _sensedAt >= SenseSeconds)
+            {
+                _sensedAt = Time.unscaledTime;
+                Sense();
+            }
+
             _others.Clear();
             foreach (var entity in _client.Others())
             {
@@ -154,7 +191,7 @@ namespace Game.Client
 
             string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
             GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
-            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나");
+            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥");
             Ui.Probe("지도 닫기", screen);
             if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
         }
@@ -166,6 +203,9 @@ namespace Game.Client
             GUI.DrawTextureWithTexCoords(area, _texture, uv);
 
             foreach (var arena in _client.Arenas) Marker(area, window, arena, Shapes.Ring, ArenaMark, MarkerSize * 2.2f);
+            // The nearest veins, breathing so they catch the eye.
+            float breath = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 4);
+            foreach (var (at, color) in _veins) Marker(area, window, at, Shapes.Ring, new Color(color.r, color.g, color.b, breath), MarkerSize * 1.6f);
             foreach (var position in _others) Marker(area, window, position, Shapes.Circle, OtherPlayer, MarkerSize);
             Marker(area, window, _client.Position, Shapes.Circle, Color.white, MarkerSize);
         }

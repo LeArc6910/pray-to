@@ -207,7 +207,7 @@ namespace Game.Core
         public static readonly IReadOnlyCollection<string> AddedAfterCounts = new[]
         {
             "life_mining", "merchant", "passive", "anvil", "assembler", "power_pole", "keg", "coop", "crab_pot", "friend", "rift_altar", "rift",
-            "free_power", "arc_furnace", "skill", "rank3", "serpent", "antlion",
+            "free_power", "arc_furnace", "skill", "rank3", "serpent", "antlion", "level3",
         };
 
         // The goals a count saved before AddedAfterCounts stood for.

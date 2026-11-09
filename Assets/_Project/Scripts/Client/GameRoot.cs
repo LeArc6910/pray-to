@@ -1262,7 +1262,7 @@ namespace Game.Client
 
             // A boss in sight, still asleep: its first phase made ahead for when it wakes.
             if (_view?.BossInSight is string sleeper) Music.Prepare(Song.Of(sleeper, 1));
-            if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);
+            if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss, _client.Level);
         }
 
         GUIStyle _smallLine;
@@ -1424,7 +1424,7 @@ namespace Game.Client
         static string Whole(string text) => text.Replace(' ', '\u00A0');
 
         // Between the HUD box and the minimap; under the HUD when the screen is too narrow for that.
-        static void DrawBossBar(EntityView boss)
+        static void DrawBossBar(EntityView boss, int level)
         {
             float left = Ui.HudArea.xMax + 10;
             float right = Ui.MinimapArea.x - 10;
@@ -1437,7 +1437,8 @@ namespace Game.Client
             float width = Mathf.Min(600, right - left);
             float x = left + (right - left - width) / 2;
             // The name line as tall as the font needs, so it is not cut off, and the bar under it.
-            var title = new GUIContent($"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈");
+            string advice = boss.Boss.Level > level ? $" · 권장 Lv {boss.Boss.Level}" : "";
+            var title = new GUIContent($"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈{advice}");
             float titleHeight = GUI.skin.label.CalcHeight(title, width);
             GUI.Label(new Rect(x, top, width, titleHeight), title);
             float share = boss.MaxHealth > 0 ? Mathf.Clamp01(boss.Health / boss.MaxHealth) : 0;

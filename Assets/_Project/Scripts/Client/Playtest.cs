@@ -674,6 +674,23 @@ namespace Game.Client
                 json.Field("hazards", world.Hazards.Count);
                 json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly));
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
+                // The nearest copper vein within 16 tiles, as the minimap marks it (MapView.Sense).
+                (int X, int Y)? vein = null;
+                int px0 = TileMap.Cell(player.Position.X), py0 = TileMap.Cell(player.Position.Y), veinDistance = int.MaxValue;
+                for (int vy = py0 - 16; vy <= py0 + 16; vy++)
+                {
+                    for (int vx = px0 - 16; vx <= px0 + 16; vx++)
+                    {
+                        if (!world.Map.InBounds(vx, vy) || world.Map[vx, vy] != TileType.CopperOre) continue;
+                        int d = (vx - px0) * (vx - px0) + (vy - py0) * (vy - py0);
+                        if (d <= 256 && d < veinDistance)
+                        {
+                            veinDistance = d;
+                            vein = (vx, vy);
+                        }
+                    }
+                }
+                json.Field("veinAt", vein is (int ox, int oy) ? $"{ox - px0},{oy - py0}" : null);
                 var drop = world.GroundLoot.Where(l => Vec2.Distance(l.Position, player.Position) < 10).OrderBy(l => Vec2.Distance(l.Position, player.Position)).FirstOrDefault();
                 json.Field("lootAt", drop == null ? null : $"{drop.Position.X - player.Position.X:0.00},{drop.Position.Y - player.Position.Y:0.00}");
                 var machines = world.Machines.Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), player.Position) < 12).ToList();

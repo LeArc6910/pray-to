@@ -1514,8 +1514,8 @@ async function firstphone(browser) {
   await firstRun(browser, Profiles.phone, false);
 }
 
-// The first hour (2026-11-09): the first ten minutes and on through goals 7 to 15 (plant, till, fish, sell, furnace,
-// mining skill, the cave warden, a bed, level 5).
+// The first hour (2026-11-09): the first ten minutes and on through goals 7 to 16 (plant, till, fish, sell, furnace,
+// mining skill, level 3, the cave warden, a bed, level 5).
 async function hour(browser) {
   await firstRun(browser, Profiles.pc, true);
 }
@@ -1572,6 +1572,8 @@ async function firstRun(browser, profile, hourLong) {
     return out;
   };
   const solid = t => /Wall|Ore/.test(t);
+  const toward = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
+  const offset = text => (text ? text.split(',').map(Number) : null);
   // Digs the wall at (dx, dy) with what is in hand: attack toward it until it breaks (at most six seconds). On the
   // phone the attack stick is held pulled toward it.
   const dig = async (dx, dy) => {
@@ -1758,15 +1760,33 @@ async function firstRun(browser, profile, hourLong) {
   // 5. Six copper ores. The hint says what a copper vein looks like but not where one is: the bot is taken to the
   // nearest (a person would walk the tunnels looking for orange).
   let veins = 0;
+  let carried = 0;
+  // To the next copper vein as the minimap marks it (2026-11-09): toward it, digging through what is in the way,
+  // until it is beside. Taken there only when none is marked within reach.
   const nextVein = async () => {
     veins++;
-    await game.send('goto near CopperOre');
-    await game.wait(800);
+    const first = offset((await game.state()).veinAt);
+    if (!first) {
+      carried++;
+      await game.send('goto near CopperOre');
+      await game.wait(800);
+      return;
+    }
+    await slot(2);
+    for (let i = 0; i < 60; i++) {
+      const v = offset((await game.state()).veinAt);
+      if (!v || Math.abs(v[0]) + Math.abs(v[1]) <= 1) break;
+      const [sx, sy] = toward(v[0], v[1]);
+      const ahead = (await game.look(sx, sy)).tile;
+      if (ahead === 'CopperOre') break;
+      if (solid(ahead)) await dig(sx, sy);
+      await step(sx, sy, 260);
+    }
   };
   await nextVein();
   await mine(async () => count(await inv(), 'copper_ore') >= 6, 150, 'CopperOre', nextVein);
   if (count(await inv(), 'copper_ore') < 6) await why(`구리 ${count(await inv(), 'copper_ore')}개에서 멈춤`);
-  note(`- 구리 광맥: 안내는 모양만 알려 주고 자리는 알려 주지 않아서, 봇은 가장 가까운 광맥으로 옮겨졌다(${veins}번, 광맥 하나에 구리가 몇 개뿐이라)`);
+  note(`- 구리 광맥: 미니맵이 가리키는 가장 가까운 광맥으로 ${veins}번 파 들어갔다${carried ? `(16칸 안에 없어 ${carried}번 옮겨졌다)` : ''}`);
   await game.wait(1000);
   await passed(5, '구리 광석 6개 캐기');
 
@@ -1821,8 +1841,6 @@ async function firstRun(browser, profile, hourLong) {
       await nextVein();
       await mine(async () => count(await inv(), 'copper_ore') >= n, 150, 'CopperOre', nextVein);
     };
-    const toward = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
-    const offset = text => (text ? text.split(',').map(Number) : null);
     const drink = async () => {
       if (game.touch) await game.press('potion', undefined, { quiet: true });
       else await game.page.keyboard.press('c');
@@ -1970,13 +1988,19 @@ async function firstRun(browser, profile, hourLong) {
     await mine(async () => (await goalNow()).n > 12, 150);
     await passed(12, '채굴 기술 2레벨 되기');
 
-    // 13. The cave warden, fought with what the bot has: up to three tries, back to the arena after a fall.
+    // 13. Level 3 by hunting, away from the spawn, as the goal's hint says.
+    const early = await hunt(async () => (await game.state()).level >= 3, 300);
+    note(`- 레벨 3까지 사냥: ${early}마리, 레벨 ${(await game.state()).level}`);
+    await game.wait(800);
+    await passed(13, '레벨 3 되기');
+
+    // 14. The cave warden, fought with what the bot has: up to three tries, back to the arena after a fall.
     const wardenAt = Date.now();
     let falls = 0;
     let dodges = 0;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
-    while (Date.now() - wardenAt < 300000 && (await goalNow()).n <= 13 && falls < 3) {
+    while (Date.now() - wardenAt < 300000 && (await goalNow()).n <= 14 && falls < 3) {
       const s = await game.state();
       if (s.dead) {
         falls++;
@@ -1997,7 +2021,7 @@ async function firstRun(browser, profile, hourLong) {
       const boss = offset(s.bossAt);
       if (!boss) {
         await gather(5);
-        if ((await goalNow()).n > 13) break;
+        if ((await goalNow()).n > 14) break;
         await game.wait(500);
         continue;
       }
@@ -2013,20 +2037,20 @@ async function firstRun(browser, profile, hourLong) {
     const fought = await game.state();
     note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
     await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
-    await passed(13, '동굴 수호자 쓰러뜨리기');
+    await passed(14, '동굴 수호자 쓰러뜨리기');
 
-    // 14. A bed: stone 6 and slime gel 3, the gel from slimes.
+    // 15. A bed: stone 6 and slime gel 3, the gel from slimes.
     await hunt(async () => count(await inv(), 'slime_gel') >= 3, 180);
     await mine(async () => count(await inv(), 'stone') >= 6, 60);
     await taken('near Workbench', '작업대로 돌아갈 때');
     await craft('침대');
-    await placeFor(14, '침대 세우기', /^침대 ×/);
+    await placeFor(15, '침대 세우기', /^침대 ×/);
 
-    // 15. Level 5 by hunting.
+    // 16. Level 5 by hunting.
     const kills = await hunt(async () => (await game.state()).level >= 5, 300);
     note(`- 레벨 5까지 사냥: ${kills}마리, 레벨 ${(await game.state()).level}`);
     await game.wait(800);
-    await passed(15, '레벨 5 되기');
+    await passed(16, '레벨 5 되기');
     await game.shot('hour-end', '처음 한 시간 끝');
   }
 }
