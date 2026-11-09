@@ -237,6 +237,26 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void EachFighterGetsTheirOwnBossDropsThatOthersCannotTake()
+        {
+            var world = new World(Maps.Room(40), Spawn, Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var boss = world.PlaceBoss(Bosses.Shipped.Find("cave_warden"), Home, ArenaRadius);
+            var a = world.AddPlayer("a", null);
+            var b = world.AddPlayer("b", null);
+            Walk(world, a, Home + new Vec2(0, -3));
+            Walk(world, b, Home + new Vec2(2, -3));
+            Run(world, 0.5f);
+            world.Hurt(boss, (int)boss.MaxHealth + 1);
+            var drops = world.GroundLoot.ToList();
+            Assert.IsTrue(drops.Any(l => l.Owner == a.Id) && drops.Any(l => l.Owner == b.Id), "a share for each");
+            Assert.IsTrue(drops.All(l => l.Owner == a.Id || l.Owner == b.Id));
+            var mine = drops.First(l => l.Owner == a.Id);
+            Assert.IsTrue(mine.For(a.Id, world.Tick));
+            Assert.IsFalse(mine.For(b.Id, world.Tick), "b neither sees nor takes it");
+            Assert.IsTrue(drops.Any(l => l.Material?.Id == World.Coin && l.Count > 1), "a heap of coins in each share");
+        }
+
+        [Test]
         public void TheBossResetsWhenEveryoneLeaves()
         {
             var world = Arena(out var boss, Bosses.With(Attack("circle", radius: "2", count: "1")));

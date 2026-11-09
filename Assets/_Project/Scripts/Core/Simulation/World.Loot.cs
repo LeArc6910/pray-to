@@ -52,7 +52,42 @@ namespace Game.Core
             return item;
         }
 
+        // A monster's drops are its killer's alone for this long, then anyone's (2026-11-09).
+        const float KillerLootSeconds = 30;
+        // The chance a monster drops coins, and how many: one, and one more for every CoinLevels of its level, and up
+        // to as many again.
+        const float CoinChance = 0.35f;
+        const int CoinLevels = 4;
+        // A boss's coins for each fighter: this many for each level of its drops.
+        const int BossCoinsPerLevel = 5;
+
+        // Marks what dropped since the floor held `before` things as the player's, until the tick given.
+        void Own(int before, Player owner, long until)
+        {
+            if (owner == null) return;
+            for (int i = Math.Min(before, _groundLoot.Count); i < _groundLoot.Count; i++)
+            {
+                _groundLoot[i].Owner = owner.Id;
+                _groundLoot[i].OwnedUntil = until;
+            }
+        }
+
+        // A heap of coins on the floor.
+        void DropCoins(int count, Vec2 position)
+        {
+            var coin = Loot?.Materials.FirstOrDefault(m => m.Id == Coin);
+            if (coin == null || count <= 0) return;
+            DropMaterial(coin, position).Count = count;
+        }
+
         void DropFrom(Enemy enemy, Player killer)
+        {
+            int before = _groundLoot.Count;
+            DropFromMonster(enemy, killer);
+            Own(before, killer, Tick + Ticks(KillerLootSeconds));
+        }
+
+        void DropFromMonster(Enemy enemy, Player killer)
         {
             ExperienceFrom(enemy);
             Record(killer, RecordKind.Kill, enemy.Definition.Id);
@@ -80,6 +115,7 @@ namespace Game.Core
                 if (material != null) DropMaterial(material, Scatter(enemy.Position));
             }
             DropEgg(enemy, killer);
+            if (_random.Chance(CoinChance)) DropCoins(1 + level / CoinLevels + _random.Next(level / CoinLevels + 1), Scatter(enemy.Position));
         }
 
         // One of the consumables that drop at this level, by weight; null when there are none.
@@ -97,33 +133,37 @@ namespace Game.Core
             ExperienceFrom(boss, everyone);
             if (_lootGenerator == null) return;
 
-            int fighters = Math.Max(1, everyone.Count);
-            for (int i = 0; i < definition.DropCount * fighters; i++)
-            {
-                DropItem(_lootGenerator.RollItem(definition.DropLevel, _random, 0, definition.DropRarity), Scatter(boss.Position, 2));
-            }
-            for (int i = 0; i < definition.RuneCount * fighters; i++)
-            {
-                var rune = _lootGenerator.RollRune(definition.DropLevel, _random);
-                if (rune != null) DropRune(rune, Scatter(boss.Position, 2));
-            }
-            for (int i = 0; i < definition.PotionCount * fighters; i++)
-            {
-                var consumable = RollConsumable(definition.DropLevel);
-                if (consumable != null) DropConsumable(consumable, Scatter(boss.Position, 2));
-            }
+            // Each fighter's share is rolled for them and lies there for them alone (others do not see it).
+            var owners = everyone.Count > 0 ? everyone : new List<Player> { null };
             var bossMaterial = Loot.Materials.FirstOrDefault(m => m.Id == definition.MaterialId);
-            for (int i = 0; bossMaterial != null && i < definition.MaterialCount * fighters; i++)
+            foreach (var owner in owners)
             {
-                DropMaterial(bossMaterial, Scatter(boss.Position, 2));
-            }
-            // Its legendaries, each with its own chance for every fighter.
-            foreach (var legendary in _lootGenerator.LegendariesOf(definition.Id).ToList())
-            {
-                for (int i = 0; i < fighters; i++)
+                int before = _groundLoot.Count;
+                for (int i = 0; i < definition.DropCount; i++)
+                {
+                    DropItem(_lootGenerator.RollItem(definition.DropLevel, _random, 0, definition.DropRarity), Scatter(boss.Position, 2));
+                }
+                for (int i = 0; i < definition.RuneCount; i++)
+                {
+                    var rune = _lootGenerator.RollRune(definition.DropLevel, _random);
+                    if (rune != null) DropRune(rune, Scatter(boss.Position, 2));
+                }
+                for (int i = 0; i < definition.PotionCount; i++)
+                {
+                    var consumable = RollConsumable(definition.DropLevel);
+                    if (consumable != null) DropConsumable(consumable, Scatter(boss.Position, 2));
+                }
+                for (int i = 0; bossMaterial != null && i < definition.MaterialCount; i++)
+                {
+                    DropMaterial(bossMaterial, Scatter(boss.Position, 2));
+                }
+                // Its legendaries, each with its own chance.
+                foreach (var legendary in _lootGenerator.LegendariesOf(definition.Id).ToList())
                 {
                     if (_random.Next(100) < legendary.LegendaryChance) DropItem(_lootGenerator.RollLegendary(legendary, _random), Scatter(boss.Position, 2));
                 }
+                DropCoins(definition.DropLevel * BossCoinsPerLevel, Scatter(boss.Position, 2));
+                Own(before, owner, long.MaxValue);
             }
         }
 
@@ -152,11 +192,11 @@ namespace Game.Core
                 for (int i = 0; i < _groundLoot.Count; i++)
                 {
                     var loot = _groundLoot[i];
-                    if (Tick < loot.ReadyTick || Vec2.Distance(loot.Position, player.Position) > PickupRadius + PlayerRadius) continue;
+                    if (Tick < loot.ReadyTick || !loot.For(player.Id, Tick) || Vec2.Distance(loot.Position, player.Position) > PickupRadius + PlayerRadius) continue;
                     if (loot.Item != null && !player.Inventory.TryAdd(loot.Item)) continue;
                     if (loot.Rune != null) player.Inventory.AddRune(loot.Rune);
                     if (loot.Consumable != null) player.Inventory.AddConsumable(loot.Consumable);
-                    if (loot.Material != null) player.Inventory.AddMaterial(loot.Material);
+                    if (loot.Material != null) player.Inventory.AddMaterial(loot.Material, loot.Count);
                     _groundLoot.RemoveAt(i--);
                     player.InventoryVersion++;
                     _events.Add(new SimEvent(SimEventType.Pickup, player.Id, loot.Id));

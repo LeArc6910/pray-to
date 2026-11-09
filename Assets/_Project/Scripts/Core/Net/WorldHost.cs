@@ -585,7 +585,7 @@ namespace Game.Core
                     e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.MaxHealth, (byte)e.State,
                     Protocol.WithStatus(e.Rift, e.Afflictions.Bits)));
             var drops = World.GroundLoot
-                .Where(l => InView(l.Position))
+                .Where(l => InView(l.Position) && l.For(viewer.Id, World.Tick))
                 .OrderBy(l => Distance(l.Position))
                 .Take(_config.MaxDropsPerSnapshot)
                 .Select(l => new EntityState(

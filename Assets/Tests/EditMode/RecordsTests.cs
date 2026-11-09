@@ -54,14 +54,17 @@ namespace Game.Core.Tests
             var kinds = world.RecordEntries(RecordGroup.Monsters).Take(5).Select(e => Monsters.Shipped.Find(e.Id)).ToList();
             foreach (var monster in kinds.Take(4)) Fell(world, player, monster);
             Assert.IsFalse(player.Achievements.Contains("hunter_5"));
-            Assert.AreEqual(0, player.Inventory.CountOf(coin));
+            // Monsters drop a few coins of their own (2026-11-09); the achievement's hundred come on top, once.
+            int before = player.Inventory.CountOf(coin);
+            Assert.Less(before, 100);
 
             world.TakeEvents();
             Fell(world, player, kinds[4]);
             Assert.IsTrue(player.Achievements.Contains("hunter_5"));
-            Assert.AreEqual(100, player.Inventory.CountOf(coin));
+            int paid = player.Inventory.CountOf(coin);
+            Assert.GreaterOrEqual(paid - before, 100);
             Fell(world, player, kinds[4]);
-            Assert.AreEqual(100, player.Inventory.CountOf(coin), "only once");
+            Assert.Less(player.Inventory.CountOf(coin) - paid, 100, "only once");
         }
 
         [Test]

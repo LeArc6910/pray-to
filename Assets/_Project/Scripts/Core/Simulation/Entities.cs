@@ -616,6 +616,14 @@ namespace Game.Core
         public MaterialDefinition Material { get; }
         public long ReadyTick { get; }
         public long ExpireTick { get; }
+        // Whose it is (2026-11-09, 0 for anyone's) and until when: a boss's drops are each fighter's own for good, a
+        // monster's are its killer's for a while. Only the owner sees and picks it up till then.
+        internal int Owner { get; set; }
+        internal long OwnedUntil { get; set; }
+        // How many of the material lie there (coins come in heaps).
+        internal int Count { get; set; } = 1;
+
+        public bool For(int playerId, long tick) => Owner == 0 || Owner == playerId || tick >= OwnedUntil;
     }
 
     // A boss's projectile hurts players. A player's (Friendly) flies through players and stops at the first enemy;
