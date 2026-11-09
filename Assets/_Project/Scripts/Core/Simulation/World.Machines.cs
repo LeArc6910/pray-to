@@ -55,8 +55,12 @@ namespace Game.Core
         public IReadOnlyDictionary<MaterialDefinition, int> Inputs => Input;
         public IReadOnlyDictionary<MaterialDefinition, int> Outputs => Output;
 
-        public (int X, int Y) Front => (X + Steps[Direction].X, Y + Steps[Direction].Y);
-        public (int X, int Y) Back => (X - Steps[Direction].X, Y - Steps[Direction].Y);
+        // How many tiles it takes each way (World.SizeOf): the tile in front is past its far side.
+        public int Size => World.SizeOf(Kind);
+        public (int X, int Y) Front => Size == 1 ? (X + Steps[Direction].X, Y + Steps[Direction].Y)
+            : (X + (Steps[Direction].X > 0 ? Size : Steps[Direction].X), Y + (Steps[Direction].Y > 0 ? Size : Steps[Direction].Y));
+        public (int X, int Y) Back => Size == 1 ? (X - Steps[Direction].X, Y - Steps[Direction].Y)
+            : (X + (Steps[Direction].X < 0 ? Size : -Steps[Direction].X), Y + (Steps[Direction].Y < 0 ? Size : -Steps[Direction].Y));
 
         public static readonly (int X, int Y)[] Steps = { (1, 0), (0, 1), (-1, 0), (0, -1) };
 
@@ -93,7 +97,38 @@ namespace Game.Core
 
         public IEnumerable<Machine> Machines => _machines.Values;
 
-        public Machine MachineAt(int x, int y) => _machines.TryGetValue(y * Map.Width + x, out var machine) ? machine : null;
+        // The machine on the tile, a big machine's too when the tile is one of its parts.
+        public Machine MachineAt(int x, int y)
+        {
+            if (_machines.TryGetValue(y * Map.Width + x, out var machine)) return machine;
+            return AnchorOf(Map, x, y) is (int ax, int ay) && _machines.TryGetValue(ay * Map.Width + ax, out var big) ? big : null;
+        }
+
+        // Machines that take more than a tile (2026-11-09, Docs/Automation.md 큰 기계): so many tiles each way.
+        public static int SizeOf(TileType kind) => kind == TileType.BigAssembler ? 2 : 1;
+
+        // The tiles a machine of that size takes with its own at (x, y), the lower left.
+        public static IEnumerable<(int X, int Y)> Footprint(int x, int y, int size)
+        {
+            for (int dy = 0; dy < size; dy++)
+                for (int dx = 0; dx < size; dx++) yield return (x + dx, y + dy);
+        }
+
+        // The big machine a MachinePart tile belongs to: its own tile, which is left of it, below it or both. Any big
+        // machine there must be the owner, since its footprint takes this tile.
+        public static (int X, int Y)? AnchorOf(TileMap map, int x, int y)
+        {
+            if (!map.InBounds(x, y) || map[x, y] != TileType.MachinePart) return null;
+            foreach (var (dx, dy) in new[] { (-1, 0), (0, -1), (-1, -1) })
+            {
+                int ax = x + dx, ay = y + dy;
+                if (map.InBounds(ax, ay) && SizeOf(map[ax, ay]) > 1) return (ax, ay);
+            }
+            return null;
+        }
+
+        public static bool IsAssembler(TileType kind) => kind == TileType.Assembler || kind == TileType.BigAssembler;
+        public const int BigAssemblerSpeed = 3;
 
         // The furnace's melting recipes: materials in, a material out.
         IReadOnlyList<Recipe> Smelts => _smelts ??= Loot?.Recipes.Where(r => r.Station == TileType.Furnace && r.Material != null).ToList() ?? new List<Recipe>();
@@ -187,6 +222,7 @@ namespace Game.Core
                     RunFilter(machine);
                     break;
                 case TileType.Assembler:
+                case TileType.BigAssembler:
                     RunAssembler(machine);
                     break;
                 case TileType.Coop:
@@ -226,6 +262,8 @@ namespace Game.Core
                 : chest != null;
             bool ready = recipe != null && room && recipe.Ingredients.All(i => HeldKind(assembler.Input, i.Material) >= i.Count);
             int takes = recipe == null ? assembler.Definition.Ticks : Math.Max(assembler.Definition.Ticks, Ticks(CraftRules.Seconds(recipe, Tiles)));
+            // The big assembler works three times as fast.
+            if (assembler.Kind == TileType.BigAssembler) takes = Math.Max(1, takes / BigAssemblerSpeed);
             if (!ready)
             {
                 assembler.Timer = 0;
@@ -269,7 +307,7 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             var assembler = player == null || player.IsDead ? null : MachineFacing(player.Position, player.Facing);
-            if (assembler == null || assembler.Kind != TileType.Assembler || recipe != null && !Assembles(recipe)) return false;
+            if (assembler == null || !IsAssembler(assembler.Kind) || recipe != null && !Assembles(recipe)) return false;
             assembler.Recipe = recipe;
             assembler.Timer = 0;
             foreach (var pair in assembler.Input.ToList())
@@ -347,7 +385,7 @@ namespace Game.Core
 
         // Machines a player can fill by hand ([넣기]): what they make things from.
         public static bool LoadsByHand(TileType kind) =>
-            kind == TileType.Smelter || kind == TileType.ArcFurnace || kind == TileType.Harvester || kind == TileType.Keg || kind == TileType.PreservesJar || kind == TileType.Assembler || kind == TileType.Generator
+            kind == TileType.Smelter || kind == TileType.ArcFurnace || kind == TileType.Harvester || kind == TileType.Keg || kind == TileType.PreservesJar || IsAssembler(kind) || kind == TileType.Generator
             || kind == TileType.Coop || kind == TileType.Barn || kind == TileType.Fold || kind == TileType.CrabPot || kind == TileType.Turret;
 
         // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
@@ -459,6 +497,7 @@ namespace Game.Core
                     case TileType.ArcFurnace:
                     case TileType.Harvester:
                     case TileType.Assembler:
+                    case TileType.BigAssembler:
                     case TileType.Keg:
                     case TileType.PreservesJar:
                     case TileType.Coop:
@@ -725,7 +764,7 @@ namespace Game.Core
                 TileType.Smelter or TileType.ArcFurnace or TileType.Keg or TileType.PreservesJar =>
                     ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
                 TileType.Harvester => IsSeed(material),
-                TileType.Assembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material.Kind),
+                TileType.Assembler or TileType.BigAssembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material.Kind),
                 TileType.Coop or TileType.Barn or TileType.Fold => material.Id == HouseOf(target.Kind).Animal || material.Id == Feed,
                 TileType.CrabPot => material.Id == Bait,
                 TileType.Turret => IsAmmo(material),
@@ -770,6 +809,7 @@ namespace Game.Core
                         Add(target.Input, material, 1);
                         return true;
                     case TileType.Assembler:
+                    case TileType.BigAssembler:
                         if (!AssemblerTakes(target, material)) return false;
                         Add(target.Input, material, 1);
                         return true;
@@ -838,7 +878,7 @@ namespace Game.Core
             _gridsStale = true;
             machine.Picks.Clear();
             if (machine.Kind == TileType.Filter && settings != null) machine.Picks.AddRange(settings.Where(m => m != null).Select(m => m.Kind).Distinct().Take(FilterPicks));
-            machine.Recipe = machine.Kind == TileType.Assembler && Assembles(recipe) ? recipe : null;
+            machine.Recipe = IsAssembler(machine.Kind) && Assembles(recipe) ? recipe : null;
             machine.Timer = timer;
             machine.Carried = carried;
             machine.Progress = progress;

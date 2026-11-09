@@ -801,7 +801,7 @@ namespace Game.Client
         // Whether the machine makes anything from the material (World.Takes, as far as the client can tell).
         bool Takes(MachineView machine, MaterialDefinition material) => machine.Kind switch
         {
-            TileType.Assembler => machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material.Kind),
+            TileType.Assembler or TileType.BigAssembler => machine.Recipe != null && machine.Recipe.Ingredients.Any(i => i.Material == material.Kind),
             TileType.Coop or TileType.Barn or TileType.Fold => material.Id == World.HouseOf(machine.Kind).Animal || material.Id == World.Feed,
             TileType.CrabPot => material.Id == World.Bait,
             TileType.Turret => World.IsAmmo(material),
@@ -1376,7 +1376,7 @@ namespace Game.Client
                 GUILayout.Space(4);
             }
             // Facing an assembler, a recipe it can make gets [조립기에] (World.SetRecipe).
-            var assembler = _client.MachineAhead() is MachineView m && m.Kind == TileType.Assembler ? m : (MachineView?)null;
+            var assembler = _client.MachineAhead() is MachineView m && World.IsAssembler(m.Kind) ? m : (MachineView?)null;
             if (assembler != null)
             {
                 GUILayout.BeginHorizontal();

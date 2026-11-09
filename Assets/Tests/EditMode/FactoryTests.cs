@@ -103,6 +103,52 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void ABigAssemblerTakesFourTilesRunsOnPowerAndComesUpWhole()
+        {
+            var world = Room(out var player);
+            var bigItem = Gear.Data.FindMaterial("big_assembler");
+            var gear = Gear.Data.FindMaterial("iron_gear");
+            // Facing up from below: its own tile at (8, 10), the square on up and to the right.
+            Place(world, player, bigItem, 8, 10, new Vec2(0, 1));
+            var big = world.MachineAt(8, 10);
+            Assert.AreEqual(TileType.BigAssembler, big.Kind);
+            foreach (var (x, y) in new[] { (9, 10), (8, 11), (9, 11) })
+            {
+                Assert.AreEqual(TileType.MachinePart, world.Map[x, y]);
+                Assert.AreSame(big, world.MachineAt(x, y), "a part is the machine");
+            }
+            Assert.AreEqual((8, 12), big.Front, "the tile in front is past its far side");
+
+            // Set and loaded from beside a part (stood there: walking straight over would bump into it).
+            player.Position = TileMap.Center(10, 11);
+            world.MovePlayer(player.Id, player.Position, new Vec2(-1, 0), 10);
+            Assert.IsTrue(world.SetRecipe(player.Id, Gear.Data.Recipes.Single(r => r.Id == "iron_gear")));
+            player.Inventory.AddMaterial(IronBar, 4);
+            Assert.AreEqual(2, world.LoadMachine(player.Id, IronBar, 4), "twice what one make needs");
+            Run(world, 3);
+            Assert.AreEqual(0, big.Outputs.Values.Sum(), "nothing without power");
+
+            world.Build(6, 10, TileType.Generator);
+            player.Position = TileMap.Center(6, 9);
+            world.MovePlayer(player.Id, player.Position, new Vec2(0, 1), 10);
+            player.Inventory.AddMaterial(Gel, 4);
+            Assert.IsTrue(world.Refuel(player.Id, Gel));
+            Run(world, 2.5f);
+            Assert.AreEqual(4, big.Outputs.GetValueOrDefault(gear), "two makes of two gears in a couple of seconds");
+
+            // Struck on a part, the whole of it comes up and back to the bag.
+            player.Position = TileMap.Center(10, 11);
+            world.MovePlayer(player.Id, player.Position, new Vec2(-1, 0), 10);
+            int had = player.Inventory.CountOf(bigItem);
+            world.SetAttacking(player.Id, true);
+            for (int i = 0; i < World.Ticks(6) && world.Map[8, 10] == TileType.BigAssembler; i++) world.Step();
+            world.SetAttacking(player.Id, false);
+            foreach (var (x, y) in World.Footprint(8, 10, 2)) Assert.AreEqual(TileType.Floor, world.Map[x, y]);
+            Assert.AreEqual(had + 1, player.Inventory.CountOf(bigItem));
+            Assert.IsNull(world.MachineAt(9, 11));
+        }
+
+        [Test]
         public void AHarvesterPlantsTheSeedsItIsGiven()
         {
             var world = Room(out var player);

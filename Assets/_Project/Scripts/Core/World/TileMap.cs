@@ -108,6 +108,10 @@ namespace Game.Core
         Scarecrow,
         // A wooden fence to pen animals in (World.Animals.cs, 2026-11-09).
         Fence,
+        // A machine two tiles each way (World.Machines.cs, 2026-11-09): its own tile is the lower left, and the other
+        // three are MachinePart tiles that belong to it.
+        BigAssembler,
+        MachinePart,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

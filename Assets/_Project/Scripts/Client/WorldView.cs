@@ -622,7 +622,7 @@ namespace Game.Client
                 var at = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
                 if (!machine.On && Vector3.Distance(at, _self.Position) < 6) Label(at, "꺼짐", OffLabel);
                 // An assembler nearby shows what it makes.
-                else if (machine.Kind == TileType.Assembler && Vector3.Distance(at, _self.Position) < 4)
+                else if (World.IsAssembler(machine.Kind) && Vector3.Distance(at, _self.Position) < 4)
                     Label(at + new Vector3(0, 0.7f, 0), machine.Recipe?.Name ?? "정하지 않음", Color.white);
                 // A pole or generator nearby shows what its grid gives and draws.
                 else if (machine.Supply >= 0 && Vector3.Distance(at, _self.Position) < 4)
@@ -1151,7 +1151,11 @@ namespace Game.Client
                     // A generator's flame only while it burns.
                     : machine.Kind == TileType.Generator ? (machine.On && machine.Progress > 0 ? FlameSprites[Mathf.FloorToInt(Time.time * 8) % ItemArt.FlameFrames] : null)
                     : machine.Kind == TileType.Lever ? LeverSprite
+                    // A big machine's whole body, over its four tiles (the map draws none of them).
+                    : machine.Kind == TileType.BigAssembler ? BigAssemblerSprite
                     : ChevronSprite;
+                int size = World.SizeOf(machine.Kind);
+                if (size > 1) center = new Vector3(machine.X + size / 2f, machine.Y + size / 2f, 0);
                 parts.Part.transform.localPosition = center;
                 // Switched off, the moving part stands still and greys out; powered by a generator, it glows a little.
                 parts.Part.color = !machine.On ? OffTint : machine.Powered ? PoweredTint : Color.white;
@@ -1166,6 +1170,7 @@ namespace Game.Client
                     : machine.Kind == TileType.WaterWheel ? (machine.On && machine.Progress > 0 ? -Time.time * 90 % 360 : 0)
                     // A turret points where it last shot.
                     : machine.Kind == TileType.Turret ? _turretAim.GetValueOrDefault(key, 90)
+                    : size > 1 ? 0
                     : machine.Direction * 90 + swing;
                 parts.Part.transform.localRotation = Quaternion.Euler(0, 0, turn);
                 parts.Part.sortingOrder = machine.Kind == TileType.Arm ? -13 : -15;
@@ -1536,6 +1541,8 @@ namespace Game.Client
         static Sprite WheelSprite => Sprites.Centered("machine/wheel", () => ItemArt.WaterWheel);
 
         static Sprite LeverSprite => Sprites.Centered("machine/lever", () => ItemArt.LeverHandle);
+
+        static Sprite BigAssemblerSprite => Sprites.Centered("machine/big_assembler", () => TileArt.BigAssembler);
 
         static Sprite[] _flameSprites;
 

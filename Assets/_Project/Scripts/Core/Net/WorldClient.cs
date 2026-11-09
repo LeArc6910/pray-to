@@ -1047,7 +1047,7 @@ namespace Game.Core
                 {
                     progress = Math.Min(1, progress + (float)((HostTick - _machinesTick) / definition.Ticks * (m.Powered ? 2 : 1)));
                 }
-                bool assembler = m.Kind == TileType.Assembler;
+                bool assembler = World.IsAssembler(m.Kind);
                 bool node = World.IsPowerNode(m.Kind);
                 bool coop = World.HouseOf(m.Kind) != null;
                 int supply = node && m.Setting >= 0 ? m.Setting / 256 : -1;
@@ -1066,6 +1066,8 @@ namespace Game.Core
         {
             if (Map == null) return null;
             var (x, y) = World.TileAhead(Position, Facing);
+            // A big machine's part stands for the machine.
+            if (World.AnchorOf(Map, x, y) is (int ax, int ay)) (x, y) = (ax, ay);
             int ux = TileMap.Cell(Position.X);
             int uy = TileMap.Cell(Position.Y);
             MachineView? under = null;

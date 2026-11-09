@@ -118,6 +118,7 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead) return false;
             var (x, y) = TileAhead(player.Position, player.Facing);
+            if (AnchorOf(Map, x, y) is (int ax, int ay)) (x, y) = (ax, ay);
             int key = y * Map.Width + x;
             if (!Map.InBounds(x, y) || !_wallDamage.ContainsKey(key) || !BuiltBarrier(x, y)) return false;
             var material = RepairMaterial(Map[x, y]);
@@ -132,6 +133,8 @@ namespace Game.Core
         // BarrierHealthPerHardness. What it was drops there, and whatever a machine held.
         internal void DamageBarrier(Enemy enemy, int x, int y)
         {
+            // A blow on a big machine's part is a blow on the machine.
+            if (AnchorOf(Map, x, y) is (int ax, int ay)) (x, y) = (ax, ay);
             var tile = Tiles?.Find(Map[x, y]);
             float hardness = Math.Max(1, tile?.Hardness ?? 1);
             int key = y * Map.Width + x;
@@ -155,7 +158,7 @@ namespace Game.Core
                 }
                 if (machine.Carried != null) DropMaterial(machine.Carried, Scatter(at));
             }
-            SetTile(x, y, TileType.Floor);
+            ClearTile(x, y);
             for (int i = 0; tile?.Material != null && i < tile.Count; i++) DropMaterial(tile.Material, Scatter(at));
             BuildDefenseFlow();
         }

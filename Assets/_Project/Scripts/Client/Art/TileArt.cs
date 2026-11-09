@@ -440,6 +440,8 @@ namespace Game.Client
             TileType.Anvil => AnvilTile,
             TileType.RiftAltar => RiftAltarTile,
             TileType.Assembler => AssemblerTile,
+            // The bag's icon for a big assembler; on the map it is drawn whole over its four tiles (BigAssembler).
+            TileType.BigAssembler => AssemblerTile,
             TileType.PowerPole => PowerPoleTile,
             TileType.MerchantStall => MerchantStallTile,
             TileType.SmithStall => SmithStallTile,
@@ -2002,6 +2004,46 @@ namespace Game.Client
             ".oojjjjjjjjjjoo.",
             "..oooooooooooo..",
             "..____________..");
+
+        // A big assembler (2026-11-09, World.SizeOf), 32 pixels each way for its 2×2 tiles: a steel housing round a dark
+        // panel with two gold gears turning against each other, lamps, and a chute at the bottom.
+        public static readonly PixelImage BigAssembler = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)
+            {
+                ['I'] = Rgba.Hex("#9AA0AA"), ['i'] = Rgba.Hex("#747A86"), ['j'] = Rgba.Hex("#525762"), ['G'] = Rgba.Hex("#E2B04A"),
+                ['g'] = Rgba.Hex("#A87A2C"), ['e'] = Rgba.Hex("#7CE07C"),
+            },
+            "................................",
+            "................................",
+            ".oooooooooooooooooooooooooooooo.",
+            ".oIIIIIIIIIIIIIIIIIIIIIIIIIIIIo.",
+            ".oIiiiiiiiiiiiiiiiiiiiiiiiiiijo.",
+            ".oIiooooooooooooooooooooooooijo.",
+            ".oIiokkkjkkkkkkjkkkkkkjkkkkoijo.",
+            ".oIiokkjkGGGGGjkkkkkkjkkkkkoijo.",
+            ".oIiokjkkGgggGkkkkkGGGGGkkkoijo.",
+            ".oIiojkkgggggggkkkkjgggkkkjoijo.",
+            ".oIiokkgggggggggkkgggggggjkoijo.",
+            ".oIioGGgggGGGgggGGgggggggkGoijo.",
+            ".oIioGgggGGoGGggGgggGoGgggGoijo.",
+            ".oIioGgggGoooGggGgggooogggGoijo.",
+            ".oIioGgggGGoGGggGgggGoGgggGoijo.",
+            ".oIioGGgggGGGgggGGgggggggkGoijo.",
+            ".oIiojkgggggggggkkgggggggkjoijo.",
+            ".oIiokkkgggggggkkkjkgggkkjkoijo.",
+            ".oIiokkkkGgggGkkkjkGGGGGjkkoijo.",
+            ".oIiokGkkGGGGGkkjkkkkkkjeekoijo.",
+            ".oIiokkkjkkkkkkjkkkkkkjkkkkoijo.",
+            ".oIiooooooooooooooooooooooooijo.",
+            ".oIiiiiiiiiiokkkkkkoiiiiiiiiijo.",
+            ".oIiiiiiiiiiokkkkkkoiiiiiiiiijo.",
+            ".oIiiiiiiiiiokkkkkkoiiiiiiiiijo.",
+            ".oIiiiiiiiiiooooooooiiiiiiiiijo.",
+            ".oIjjjjjjjjjjjjjjjjjjjjjjjjjjjo.",
+            ".oooooooooooooooooooooooooooooo.",
+            "...oooooooooooooooooooooooooo...",
+            "..____________________________..",
+            "................................",
+            "................................");
 
         // An iron anvil on a stump: the horn to the left, the face lit along its top.
         static readonly PixelImage AnvilTile = PixelImage.FromRows(new Dictionary<char, Rgba>(BasePalette)

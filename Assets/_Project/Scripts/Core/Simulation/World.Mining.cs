@@ -62,6 +62,8 @@ namespace Game.Core
             if (Map.IsEdge(x, y) || Map[x, y] == TileType.Lava) return null;
             // A laid floor or a door only comes up to a pickaxe, so swinging at monsters in a base never takes it up.
             if ((TileMap.IsPaving(Map[x, y]) || Map[x, y] == TileType.Door) && !HoldsPickaxe(player)) return null;
+            // Striking a big machine's part strikes the machine.
+            if (AnchorOf(Map, x, y) is (int ax, int ay)) (x, y) = (ax, ay);
             var tile = Tiles.Find(Map[x, y]);
             if (tile == null) return null;
             return (x, y, tile);
@@ -97,7 +99,7 @@ namespace Game.Core
             _wallDamage.Remove(key);
             var machine = MachineAt(x, y);
             if (machine != null) Empty(machine, player);
-            SetTile(x, y, TileType.Floor);
+            ClearTile(x, y);
             // A third of its hardness, at least one: plain rock 1, ore and harder rock more.
             GainLifeExperience(player, LifeSkill.Mining, Math.Max(1, (tile.Hardness + 2) / 3));
             player.Inventory.AddMaterial(tile.Material, tile.Count);
@@ -123,6 +125,7 @@ namespace Game.Core
             // A floor is laid even under its player; anything else goes on the first tile ahead clear of them.
             bool paving = TileMap.IsPaving(material.Places.Value);
             var (x, y) = paving ? TileAhead(player.Position, player.Facing) : PlaceAhead(player.Position, player.Facing);
+            if (SizeOf(material.Places.Value) > 1) return PlaceBig(player, material, x, y);
             var under = Map[x, y];
             if (Map.IsEdge(x, y) || !TileMap.IsGround(under) || under == material.Places || CropAt(x, y) != null) return false;
             if ((!paving && _players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, x, y)))
@@ -140,6 +143,45 @@ namespace Game.Core
             if (machine != null) machine.Direction = Machine.DirectionOf(player.Facing);
             if (material.Places == TileType.Bed) ClaimBed(player, x, y);
             return true;
+        }
+
+        // A big machine (SizeOf > 1) goes on the square ahead: from the tile ahead, on away from the player and upward.
+        // Every tile of it must be bare or laid floor, clear of bodies and crops and outside an arena.
+        bool PlaceBig(Player player, MaterialDefinition material, int x, int y)
+        {
+            var kind = material.Places.Value;
+            int size = SizeOf(kind);
+            int direction = Machine.DirectionOf(player.Facing);
+            int ox = Machine.Steps[direction].X < 0 ? x - (size - 1) : x;
+            int oy = Machine.Steps[direction].Y < 0 ? y - (size - 1) : y;
+            var tiles = Footprint(ox, oy, size).ToList();
+            foreach (var (tx, ty) in tiles)
+            {
+                if (!Map.InBounds(tx, ty) || Map.IsEdge(tx, ty) || !TileMap.IsGround(Map[tx, ty]) || CropAt(tx, ty) != null) return false;
+                if (_players.Any(p => !p.IsDead && Touches(p.Position, PlayerRadius, tx, ty))
+                    || _enemies.Any(e => !e.IsDead && Touches(e.Position, e.Definition.Radius, tx, ty))
+                    || _bosses.Any(b => Touches(b.Position, b.Definition.Radius, tx, ty) || Vec2.Distance(TileMap.Center(tx, ty), b.Home) <= b.ArenaRadius + 1))
+                    return false;
+            }
+            player.Inventory.TakeMaterial(material);
+            foreach (var (tx, ty) in tiles)
+            {
+                if (TileMap.IsPaving(Map[tx, ty]) && Tiles?.Find(Map[tx, ty]) is TileDefinition laid) player.Inventory.AddMaterial(laid.Material, laid.Count);
+                SetTile(tx, ty, tx == ox && ty == oy ? kind : TileType.MachinePart);
+            }
+            player.InventoryVersion++;
+            var machine = MachineAt(ox, oy);
+            if (machine != null) machine.Direction = direction;
+            return true;
+        }
+
+        // Clears a broken tile to floor; a big machine's every tile goes with it.
+        void ClearTile(int x, int y)
+        {
+            int size = SizeOf(Map[x, y]);
+            if (size > 1)
+                foreach (var (tx, ty) in Footprint(x, y, size).ToList()) SetTile(tx, ty, TileType.Floor);
+            else SetTile(x, y, TileType.Floor);
         }
 
         // Makes the recipe from the player's materials. False when something is missing, its crafting station is not

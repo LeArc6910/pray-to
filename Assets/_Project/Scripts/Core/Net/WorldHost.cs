@@ -723,7 +723,7 @@ namespace Game.Core
             if (near.Count == 0 && !sent.SentMachines) return;
             int SettingOf(Machine m)
             {
-                if (m.Kind == TileType.Assembler) return m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe);
+                if (World.IsAssembler(m.Kind)) return m.Recipe == null ? -1 : IndexOf(_loot.Recipes, m.Recipe);
                 if (World.HouseOf(m.Kind) != null) return World.HouseSetting(World.AnimalsIn(m), m.Affection, m.PettedDay == World.Today);
                 if (World.IsPowerNode(m.Kind)) return World.GridOf(m) is PowerGrid grid ? MachineState.Grid(grid.Supply, grid.Demand) : -1;
                 return m.Setting == null ? -1 : IndexOf(_loot.Materials, m.Setting);
