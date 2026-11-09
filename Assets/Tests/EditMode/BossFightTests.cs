@@ -246,6 +246,89 @@ namespace Game.Core.Tests
             Assert.AreEqual(Home, again.Position);
         }
 
+        // Ring: safe close to the boss, hurt out to its edge, safe again beyond it.
+        [Test]
+        public void RingsSpareWhoeverHugsTheBoss()
+        {
+            var world = Arena(out var boss, Bosses.With(Attack("ring", target: "self", radius: "2", length: "6")));
+            var near = world.AddPlayer("a", null);
+            var mid = world.AddPlayer("b", null);
+            Walk(world, near, Home + new Vec2(0, -1));
+            Walk(world, mid, Home + new Vec2(4, 0));
+            Run(world, 0.1f);
+            var ring = world.Hazards.Single();
+            Assert.AreEqual(HazardShape.Ring, ring.Shape);
+            Assert.AreEqual(6, ring.Size);
+            Assert.AreEqual(2, ring.Width);
+            Run(world, 1.1f);
+            Assert.AreEqual(PlayerStats.BaseHealth, near.Health, "inside the safe middle");
+            Assert.Less(mid.Health, PlayerStats.BaseHealth);
+        }
+
+        [Test]
+        public void CrossesLayTwoBeamsOnTheTarget()
+        {
+            var world = Arena(out _, Bosses.With(Attack("cross", length: "5", width: "1", angle: "45")));
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -5));
+            Run(world, 0.1f);
+            var beams = world.Hazards.ToList();
+            Assert.AreEqual(2, beams.Count);
+            Assert.IsTrue(beams.All(b => b.Shape == HazardShape.Line && b.Size == 10));
+            Assert.IsTrue(beams.All(b => b.Contains(player.Position, 0)), "both cross where the player stood");
+            Assert.AreEqual(0, Vec2.Dot(beams[0].Direction, beams[1].Direction), 0.001f);
+        }
+
+        // Trail: circles walking out from the boss, each later than the one before.
+        [Test]
+        public void TrailsLandOneAfterAnother()
+        {
+            var world = Arena(out var boss, Bosses.With(Attack("trail", radius: "1", length: "8", count: "4", speed: "8")));
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -6));
+            Run(world, 0.1f);
+            var blasts = world.Hazards.OrderBy(h => h.ResolveTick).ToList();
+            Assert.AreEqual(4, blasts.Count);
+            for (int i = 1; i < blasts.Count; i++)
+            {
+                Assert.Greater(blasts[i].ResolveTick, blasts[i - 1].ResolveTick);
+                Assert.Greater(Vec2.Distance(blasts[i].Position, boss.Position), Vec2.Distance(blasts[i - 1].Position, boss.Position));
+            }
+        }
+
+        [Test]
+        public void SpiralsFireSeveralTurningVolleys()
+        {
+            var world = Arena(out var boss, Bosses.With(Attack("spiral", target: "self", telegraph: 0.2f, radius: "0.3", count: "4", width: "3", angle: "30", speed: "1", cooldown: 2)));
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(7, 0));
+            var events = Run(world, 1.2f);
+            Assert.AreEqual(12, world.Projectiles.Count(p => !p.Friendly), "three volleys of four");
+            Assert.AreEqual(3, events.Count(e => e.Type == SimEventType.Attack && e.Source == boss.Id));
+        }
+
+        // Share: the circle's damage is split among the players standing in it.
+        [Test]
+        public void SharedCirclesSplitTheirDamage()
+        {
+            var world = Arena(out _, Bosses.With(Attack("share", damage: 40, radius: "2")));
+            var alice = world.AddPlayer("a", null);
+            var bob = world.AddPlayer("b", null);
+            Walk(world, alice, Home + new Vec2(0, -5));
+            Walk(world, bob, Home + new Vec2(0.5f, -5));
+            Run(world, 0.1f);
+            Assert.AreEqual(HazardShape.Share, world.Hazards.Single().Shape);
+            Run(world, 1);
+            Assert.AreEqual(PlayerStats.BaseHealth - 20, alice.Health, 0.01f);
+            Assert.AreEqual(PlayerStats.BaseHealth - 20, bob.Health, 0.01f);
+
+            var lone = Arena(out _, Bosses.With(Attack("share", damage: 40, radius: "2")));
+            var carol = lone.AddPlayer("c", null);
+            Walk(lone, carol, Home + new Vec2(0, -5));
+            Run(lone, 1.1f);
+            Assert.AreEqual(PlayerStats.BaseHealth - 40, carol.Health, 0.01f, "alone, one takes it all");
+        }
+
         [Test]
         public void HazardShapesCoverTheRightGround()
         {
@@ -262,6 +345,11 @@ namespace Game.Core.Tests
             Assert.IsTrue(line.Contains(new Vec2(1.2f, 5), 0.35f));
             Assert.IsFalse(line.Contains(new Vec2(1.5f, 5), 0.35f));
             Assert.IsFalse(line.Contains(new Vec2(0, 7), 0.35f));
+
+            var ring = new Hazard(4, 0, 0, HazardShape.Ring, new Vec2(0, 0), new Vec2(1, 0), 6, 2, 1, 0, 1);
+            Assert.IsFalse(ring.Contains(new Vec2(1, 0), 0.35f));
+            Assert.IsTrue(ring.Contains(new Vec2(4, 0), 0.35f));
+            Assert.IsFalse(ring.Contains(new Vec2(7, 0), 0.35f));
         }
     }
 }

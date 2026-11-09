@@ -18,6 +18,16 @@ namespace Game.Core
         Burst,
         // Monsters appearing around the boss.
         Summon,
+        // A ring on the ground, from radius out to length: safe close to its centre (the boss, or a player).
+        Ring,
+        // Two beams crossing on the target (or the boss), each length out from the centre, turned by angle.
+        Cross,
+        // Circles from the boss toward the target, one after another, the blasts walking out at speed.
+        Trail,
+        // Volleys of projectiles all the way round, each turned by angle from the last: width volleys.
+        Spiral,
+        // A circle on the target whose damage is shared among everyone standing in it: co-op players stack up.
+        Share,
     }
 
     public enum AttackTarget : byte
@@ -108,6 +118,9 @@ namespace Game.Core
             AttackShape.Line => Length * 0.9f,
             AttackShape.Charge => Length,
             AttackShape.Circle => 14,
+            AttackShape.Share => 14,
+            AttackShape.Trail => Length,
+            AttackShape.Cross => 14,
             _ => float.PositiveInfinity,
         };
     }
@@ -358,6 +371,21 @@ namespace Game.Core
                     break;
                 case AttackShape.Summon:
                     Need(attack.Count > 0 && attack.Summon != null, "count, summon");
+                    break;
+                case AttackShape.Ring:
+                    Need(attack.Radius > 0 && attack.Length > attack.Radius && attack.Damage > 0, "radius(안쪽), radius보다 큰 length(바깥), damage");
+                    break;
+                case AttackShape.Cross:
+                    Need(attack.Length > 0 && attack.Width > 0 && attack.Damage > 0, "length, width, damage");
+                    break;
+                case AttackShape.Trail:
+                    Need(attack.Count > 0 && attack.Radius > 0 && attack.Length > 0 && attack.Speed > 0 && attack.Damage > 0, "count, radius, length, speed, damage");
+                    break;
+                case AttackShape.Spiral:
+                    Need(attack.Count > 0 && attack.Radius > 0 && attack.Speed > 0 && attack.Width >= 1 && attack.Damage > 0, "count, radius, speed, width(몇 번), damage");
+                    break;
+                case AttackShape.Share:
+                    Need(attack.Radius > 0 && attack.Damage > 0, "radius, damage");
                     break;
             }
         }

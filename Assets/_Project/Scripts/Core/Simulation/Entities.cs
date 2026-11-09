@@ -480,6 +480,10 @@ namespace Game.Core
 
         internal Vec2 ChargeDirection { get; set; }
         internal HashSet<int> ChargeHits { get; } = new HashSet<int>();
+        // A spiral's volleys still to fire, the ticks to the next and the turn it has reached (radians).
+        internal int VolleysLeft { get; set; }
+        internal int VolleyTicks { get; set; }
+        internal float VolleyAngle { get; set; }
         // Ticks with nobody left to fight; the boss resets after a while.
         internal int EmptyTicks { get; set; }
     }
@@ -489,6 +493,10 @@ namespace Game.Core
         Circle,
         Cone,
         Line,
+        // From Width (the safe middle) out to Size.
+        Ring,
+        // A circle whose damage is shared among the players in it.
+        Share,
     }
 
     // A marked area that hurts every player inside it when ResolveTick comes. Zero damage marks a charge's path.
@@ -516,9 +524,9 @@ namespace Game.Core
         // Centre of a circle, or where a cone or line starts.
         public Vec2 Position { get; }
         public Vec2 Direction { get; }
-        // Circle radius, or cone and line length.
+        // Circle radius, a ring's outer radius, or cone and line length.
         public float Size { get; }
-        // Cone angle in degrees, or line width.
+        // Cone angle in degrees, line width, or a ring's inner (safe) radius.
         public float Width { get; }
         public int Damage { get; }
         public long StartTick { get; }
@@ -532,7 +540,10 @@ namespace Game.Core
             switch (Shape)
             {
                 case HazardShape.Circle:
+                case HazardShape.Share:
                     return distance <= Size + radius;
+                case HazardShape.Ring:
+                    return distance <= Size + radius && distance >= Width - radius;
                 case HazardShape.Cone:
                     if (distance > Size + radius) return false;
                     return distance < 1e-4f || Vec2.Dot(offset / distance, Direction) >= MathF.Cos(Width * 0.5f * MathF.PI / 180f);

@@ -91,7 +91,11 @@ namespace Game.Client
             public Transform Root;
             public SpriteRenderer Edge;
             public SpriteRenderer Fill;
+            public HazardState State;
         }
+
+        // Telegraphs just gone, by id, for the blast drawn when the boss's Impact for them comes (HazardLanded).
+        readonly Dictionary<int, (HazardState State, float Time)> _landed = new Dictionary<int, (HazardState, float)>();
 
         // A skill's ring or burst, growing and fading out where it happened.
         sealed class Flash
@@ -202,6 +206,9 @@ namespace Game.Client
         static readonly Color DeadColor = new Color(0.5f, 0.5f, 0.5f, 0.45f);
         static readonly Color DangerColor = new Color(1f, 0.25f, 0.2f);
         static readonly Color PathColor = new Color(1f, 0.85f, 0.3f);
+        // A shared circle: gold, to say "stand in it together".
+        static readonly Color ShareColor = new Color(1f, 0.8f, 0.2f);
+        static readonly Color BlastColor = new Color(1f, 0.45f, 0.25f, 0.95f);
         static readonly Color ProjectileColor = new Color(1f, 0.6f, 0.25f);
         static readonly Color HitFlash = new Color(1, 1, 1, 0.85f);
 
@@ -675,6 +682,15 @@ namespace Game.Client
             {
                 ShowBanner($"{view.Phase}페이즈!");
                 Sounds.Play(Sound.Roar);
+                // The boss flares up: a ring bursting out and blades of light whirling round it, and the ground shakes.
+                var boss = Find(view.Id);
+                if (boss != null)
+                {
+                    AddFlash(boss.Position, boss.Diameter * 2.2f, WindupColor, FlashKind.Ring);
+                    AddFlash(boss.Position, boss.Diameter * 1.4f, ImpactGold, FlashKind.Vortex);
+                    AddFlash(boss.Position, boss.Diameter, WindupColor, FlashKind.Burst);
+                    _shake = Mathf.Max(_shake, 0.35f);
+                }
             }
             _bossesSeen[view.Id] = (view.BossState, view.Phase, view.Boss.Name);
         }
@@ -734,13 +750,21 @@ namespace Game.Client
                     Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
                 }
 
-                var color = hazard.Harmful ? DangerColor : PathColor;
-                mark.Edge.color = new Color(color.r, color.g, color.b, 0.22f);
+                var color = hazard.Shape == HazardShape.Share ? ShareColor : hazard.Harmful ? DangerColor : PathColor;
+                // A shared circle's edge pulses, so it reads as a place to gather rather than to flee.
+                float edge = hazard.Shape == HazardShape.Share ? 0.35f + 0.25f * Mathf.Sin(Time.time * 8) : 0.22f;
+                mark.Edge.color = new Color(color.r, color.g, color.b, edge);
                 mark.Fill.color = new Color(color.r, color.g, color.b, 0.25f + 0.3f * view.Progress);
                 switch (hazard.Shape)
                 {
                     case HazardShape.Circle:
+                    case HazardShape.Share:
                         mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2 * view.Progress);
+                        break;
+                    case HazardShape.Ring:
+                        // The whole ring darkens; its hole stays clear.
+                        mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2);
+                        mark.Fill.color = new Color(color.r, color.g, color.b, 0.1f + 0.4f * view.Progress);
                         break;
                     case HazardShape.Cone:
                         mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2 * view.Progress);
@@ -758,8 +782,51 @@ namespace Game.Client
                 if (_seen.Contains(pair.Key)) continue;
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
+                _landed[pair.Key] = (pair.Value.State, Time.time);
             }
             foreach (int id in _gone) _marks.Remove(id);
+            if (_landed.Count > 32)
+            {
+                foreach (int old in _landed.Where(p => Time.time - p.Value.Time > 2).Select(p => p.Key).ToList()) _landed.Remove(old);
+            }
+        }
+
+        // A telegraph landing: a blast that fills its shape, so the hit reads where it fell.
+        void HazardLanded(int id)
+        {
+            HazardState hazard;
+            if (_marks.TryGetValue(id, out var mark)) hazard = mark.State;
+            else if (_landed.TryGetValue(id, out var gone)) hazard = gone.State;
+            else return;
+            if (!hazard.Harmful) return;
+            var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
+            var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
+            switch (hazard.Shape)
+            {
+                case HazardShape.Circle:
+                    AddFlash(at, hazard.Size, BlastColor, FlashKind.Burst);
+                    break;
+                case HazardShape.Share:
+                    AddFlash(at, hazard.Size, ShareColor, FlashKind.Burst);
+                    AddFlash(at, hazard.Size * 1.2f, ShareColor, FlashKind.Ring);
+                    break;
+                case HazardShape.Ring:
+                    // A shockwave out to the edge, and blasts round the band itself.
+                    AddFlash(at, hazard.Size, BlastColor, FlashKind.Ring);
+                    float band = (hazard.Size + hazard.Width) / 2;
+                    for (int i = 0; i < 8; i++)
+                    {
+                        float angle = i * Mathf.PI / 4;
+                        AddFlash(at + new Vector3(Mathf.Cos(angle), Mathf.Sin(angle), 0) * band, Mathf.Max(0.5f, (hazard.Size - hazard.Width) / 2), BlastColor, FlashKind.Burst);
+                    }
+                    break;
+                case HazardShape.Line:
+                    for (float d = 0.6f; d < hazard.Size; d += 1.4f) AddFlash(at + along * d, Mathf.Max(0.45f, hazard.Width / 2 + 0.2f), BlastColor, FlashKind.Burst);
+                    break;
+                case HazardShape.Cone:
+                    AddFlash(at + along * (hazard.Size * 0.55f), hazard.Size * 0.5f, BlastColor, FlashKind.Burst);
+                    break;
+            }
         }
 
         Mark MakeMark(HazardState hazard)
@@ -774,8 +841,13 @@ namespace Game.Client
             switch (hazard.Shape)
             {
                 case HazardShape.Circle:
+                case HazardShape.Share:
                     edge = Shapes.Circle;
                     fill = Shapes.Circle;
+                    break;
+                case HazardShape.Ring:
+                    edge = Shapes.Donut(hazard.Size > 0 ? hazard.Width / hazard.Size : 0);
+                    fill = edge;
                     break;
                 case HazardShape.Cone:
                     edge = Shapes.Wedge(hazard.Width);
@@ -792,6 +864,7 @@ namespace Game.Client
                 Root = root,
                 Edge = Renderer(root, "Edge", edge, Color.clear),
                 Fill = Renderer(root, "Fill", fill, Color.clear),
+                State = hazard,
             };
             mark.Edge.sortingOrder = DarkOrder + 10;
             mark.Fill.sortingOrder = DarkOrder + 11;
@@ -1337,6 +1410,7 @@ namespace Game.Client
                     Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
                     break;
                 case SimEventType.Impact:
+                    if (e.Target != 0) HazardLanded(e.Target);
                     var source = Find(e.Source);
                     if (source == null || Vector3.Distance(source.Position, _self.Position) > ShakeRange) break;
                     _shake = Mathf.Max(_shake, Mathf.Min(0.45f, e.Amount * 0.07f));

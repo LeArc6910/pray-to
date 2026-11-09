@@ -115,6 +115,15 @@ namespace Game.Core
 
                 case BossState.Recover:
                 case BossState.Roar:
+                    // A spiral fires its later volleys while the boss rests, each turned on from the last.
+                    if (boss.State == BossState.Recover && boss.VolleysLeft > 0 && --boss.VolleyTicks <= 0 && boss.Attack?.Shape == AttackShape.Spiral)
+                    {
+                        boss.VolleysLeft--;
+                        boss.VolleyTicks = Ticks(SpiralSeconds);
+                        boss.VolleyAngle += boss.Attack.Angle * MathF.PI / 180f;
+                        Volley(boss, boss.Attack, boss.VolleyAngle);
+                        _events.Add(new SimEvent(SimEventType.Attack, boss.Id, direction: Vec2.FromAngle(boss.VolleyAngle)));
+                    }
                     if (--boss.StateTicks <= 0) ChooseAttack(boss, fighters);
                     break;
             }
@@ -125,9 +134,24 @@ namespace Game.Core
             if (fighters.Count == 0) return;
             var choices = boss.Definition.Attacks.Where(a => a.InPhase(boss.Phase) && a.Weight > 0).ToList();
             boss.Attack = _random.PickWeighted(choices, a => a.Weight);
+            boss.VolleysLeft = 0;
             boss.TargetId = PickTarget(boss, boss.Attack.Target, fighters).Id;
             boss.State = BossState.Approach;
             boss.StateTicks = Ticks(ApproachSeconds);
+        }
+
+        // For the playtests: the awake boss lays down that attack's telegraph at once, on the target its rule picks.
+        internal bool ForceAttack(Boss boss, string attackId)
+        {
+            var attack = boss.Definition.Attacks.FirstOrDefault(a => a.Id == attackId);
+            var fighters = Fighters(boss);
+            if (attack == null || fighters.Count == 0 || boss.State == BossState.Dormant || boss.IsDead) return false;
+            boss.Attack = attack;
+            boss.VolleysLeft = 0;
+            var target = PickTarget(boss, attack.Target, fighters);
+            boss.TargetId = target.Id;
+            StartTelegraph(boss, target, fighters);
+            return true;
         }
 
         Player PickTarget(Boss boss, AttackTarget mode, List<Player> fighters)
@@ -182,6 +206,31 @@ namespace Game.Core
                     AddHazard(boss, cause, HazardShape.Line, boss.Position, boss.Facing, attack.Length, attack.Width, 0, resolve);
                     boss.ChargeDirection = boss.Facing;
                     break;
+                case AttackShape.Ring:
+                    var middle = attack.Target == AttackTarget.Self ? boss.Position : target.Position;
+                    AddHazard(boss, cause, HazardShape.Ring, middle, boss.Facing, attack.Length, attack.Radius, attack.Damage, resolve);
+                    break;
+                case AttackShape.Cross:
+                    var crossing = attack.Target == AttackTarget.Self ? boss.Position : target.Position;
+                    float turn = attack.Angle * MathF.PI / 180f;
+                    for (int arm = 0; arm < 2; arm++)
+                    {
+                        var along = Vec2.FromAngle(turn + arm * MathF.PI / 2);
+                        AddHazard(boss, cause, HazardShape.Line, crossing - along * attack.Length, along, attack.Length * 2, attack.Width, attack.Damage, resolve);
+                    }
+                    break;
+                case AttackShape.Trail:
+                    // The blasts walk out from the boss toward where the target stood, one after another.
+                    float gap = attack.Length / attack.Count;
+                    for (int i = 0; i < attack.Count; i++)
+                    {
+                        long at = resolve + Ticks(gap * i / attack.Speed);
+                        AddHazard(boss, cause, HazardShape.Circle, boss.Position + boss.Facing * (gap * (i + 1)), boss.Facing, attack.Radius, 0, attack.Damage, at);
+                    }
+                    break;
+                case AttackShape.Share:
+                    AddHazard(boss, cause, HazardShape.Share, target.Position, boss.Facing, attack.Radius, 0, attack.Damage, resolve);
+                    break;
             }
         }
 
@@ -200,6 +249,13 @@ namespace Game.Core
                 case AttackShape.Burst:
                     Burst(boss, attack);
                     break;
+                case AttackShape.Spiral:
+                    // The first volley now; the rest while the boss rests (UpdateBoss).
+                    boss.VolleyAngle = _random.NextFloat() * 2 * MathF.PI;
+                    boss.VolleysLeft = Math.Max(1, (int)attack.Width) - 1;
+                    boss.VolleyTicks = Ticks(SpiralSeconds);
+                    Volley(boss, attack, boss.VolleyAngle);
+                    break;
                 case AttackShape.Summon:
                     for (int i = 0; i < attack.Count; i++)
                     {
@@ -211,6 +267,20 @@ namespace Game.Core
             }
             boss.State = BossState.Recover;
             boss.StateTicks = Ticks(attack.Cooldown);
+        }
+
+        // Seconds between a spiral's volleys.
+        const float SpiralSeconds = 0.3f;
+
+        // One ring of a spiral: projectiles evenly all the way round from the angle given.
+        void Volley(Boss boss, BossAttack attack, float start)
+        {
+            for (int i = 0; i < attack.Count; i++)
+            {
+                var direction = Vec2.FromAngle(start + 2 * MathF.PI * i / attack.Count);
+                _projectiles.Add(new Projectile(_nextId++, boss.Id, Cause(boss, attack), boss.Position + direction * boss.Definition.Radius,
+                    direction * attack.Speed, attack.Radius, attack.Damage, Ticks(ProjectileSeconds)));
+            }
         }
 
         // Evenly spaced projectiles: all the way round from a random start, or fanned out toward the target.
@@ -353,13 +423,10 @@ namespace Game.Core
                 if (Tick < hazard.ResolveTick) continue;
                 _hazards.RemoveAt(i);
                 if (hazard.Damage <= 0) continue;
-                foreach (var player in _players)
-                {
-                    if (!player.IsDead && hazard.Contains(player.Position, PlayerRadius))
-                    {
-                        AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, hazard.Damage, hazard.Cause));
-                    }
-                }
+                var hit = _players.Where(p => !p.IsDead && hazard.Contains(p.Position, PlayerRadius)).ToList();
+                // A shared circle splits its damage among everyone in it; alone, one takes it all.
+                int damage = hazard.Shape == HazardShape.Share ? (int)MathF.Ceiling(hazard.Damage / (float)Math.Max(1, hit.Count)) : hazard.Damage;
+                foreach (var player in hit) AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
                 _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size)));
             }
         }

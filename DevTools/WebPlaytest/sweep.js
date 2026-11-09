@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu basics bag combat bosses world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu basics bag combat bosses patterns world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -559,6 +559,37 @@ async function bosses(browser) {
     const after = await game.state();
     check(after.loot > 0, `${name}: 잡으면 떨어뜨린다 (바닥 ${after.loot}개)`);
     await game.shot(`boss-${id}-drops`, `${name}의 드랍`);
+  }
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 보스의 새 패턴(2026-11-09): 고리, 십자, 연쇄 폭발, 나선, 나눠 맞기
+async function patterns(browser) {
+  note('\n## 보스 패턴 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  const uses = [
+    ['cave_warden', 'shockwave', '충격파(고리: 보스 곁은 안전)'], ['cave_warden', 'rock_trail', '바위 줄기(차례로 터지는 원)'],
+    ['crystal_queen', 'crystal_cross', '수정 십자'], ['crystal_queen', 'venom_share', '독 거미줄(나눠 맞기, 금색)'], ['crystal_queen', 'crystal_spiral', '수정 나선'],
+    ['void_lord', 'void_cross', '공허 십자(대각선)'], ['void_lord', 'event_horizon', '사건의 지평선(고리)'],
+  ];
+  let woken = '';
+  for (const [id, attack, name] of uses) {
+    if (woken !== id) {
+      await game.send(`heal; goto boss ${id}`);
+      await game.until(t => has(t.banner, '등장'), 6000, game.texts);
+      woken = id;
+    }
+    await game.wait(1500);
+    await game.send(`heal; boss ${id} use ${attack}`);
+    await game.wait(attack.endsWith('spiral') ? 1200 : 450);
+    const s = await game.state();
+    check(attack.endsWith('spiral') ? s.bossShots > 0 : s.hazards > 0, `${name}: 예고가 깔린다 (장판 ${s.hazards}, 탄 ${s.bossShots})`);
+    await game.shot(`pattern-${attack}`, name);
+    await game.wait(1200);
+    await game.shot(`pattern-${attack}-land`, `${name}이 떨어진 자리`);
   }
   await game.context.close();
 }
@@ -1380,7 +1411,7 @@ async function deploysave() {
   await context.close();
 }
 
-const Sections = { menu, basics, bag, combat, bosses, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
+const Sections = { menu, basics, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

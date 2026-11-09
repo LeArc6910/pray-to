@@ -162,6 +162,18 @@ namespace CoreSandbox
                     var side = new Vec2(-hazard.Direction.Y, hazard.Direction.X);
                     away += side * (Vec2.Dot(offset, side) >= 0 ? 1 : -1);
                 }
+                else if (hazard.Shape == HazardShape.Ring)
+                {
+                    // Into the safe middle when nearer it than the outer edge, else out past the edge.
+                    float distance = offset.Length;
+                    var outward = distance > 1e-4f ? offset / distance : new Vec2(1, 0);
+                    away += distance - hazard.Width < hazard.Size - distance ? outward * -1 : outward;
+                }
+                else if (hazard.Shape == HazardShape.Share)
+                {
+                    // Taken together: the bots stay in and share it (alone, the one in it takes it all).
+                    continue;
+                }
                 else
                 {
                     away += offset.LengthSquared > 1e-4f ? offset.Normalized : new Vec2(1, 0);

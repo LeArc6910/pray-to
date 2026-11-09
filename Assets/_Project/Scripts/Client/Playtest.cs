@@ -31,7 +31,7 @@ namespace Game.Client
     //   teach [rank]              every skill of the player's classes at the rank, no points needed
     //   classes <id,id> [order]   other classes at once, no workbench needed; order: which of their skills in each slot
     //   hearts <person> <n>       that many hearts with the person (merchant, blacksmith, fisher)
-    //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health>
+    //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health> | use <attack>
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
     //   goto spawn | <dx> <dy> | boss <id> | biome <name> | tile <type> | near <type>
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
@@ -182,6 +182,7 @@ namespace Game.Client
                 case "boss":
                     var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[1]) ?? throw new ArgumentException($"no boss '{words[1]}' standing");
                     if (words[2] == "hurt") world.Hurt(boss, Math.Max(1, (int)(boss.MaxHealth * Float(words[3]))));
+                    else if (words[2] == "use" && !world.ForceAttack(boss, words[3])) throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (awake, someone in the arena?)");
                     return null;
                 case "drop":
                     Drop(root, words);
@@ -634,6 +635,8 @@ namespace Game.Client
                 json.Field("monsterKinds", string.Join(",", near.Select(e => e.Definition.Id).Distinct()));
                 json.Field("hurtMonsters", near.Count(e => e.Health < e.MaxHealth));
                 json.Field("projectiles", world.Projectiles.Count(p => p.Source == player.Id));
+                json.Field("hazards", world.Hazards.Count);
+                json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly));
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
                 var machines = world.Machines.Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), player.Position) < 12).ToList();
                 json.Field("machines", string.Join(" ", machines.Select(m => $"{m.Kind}{(world.IsPowered(m) ? "+" : "")}{(m.Enabled ? "" : "-off")}")));

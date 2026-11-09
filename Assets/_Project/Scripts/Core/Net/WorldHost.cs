@@ -20,7 +20,7 @@ namespace Game.Core
         public int MaxEntitiesPerSnapshot { get; set; } = 20;
         public int MaxDropsPerSnapshot { get; set; } = 8;
         public int MaxProjectilesPerSnapshot { get; set; } = 20;
-        public int MaxHazardsPerSnapshot { get; set; } = 10;
+        public int MaxHazardsPerSnapshot { get; set; } = 16;
         public int MaxEventsPerSnapshot { get; set; } = 14;
         public string[] StarterGear { get; set; } = { "copper_sword" };
         // Put in the bag of a new character, and of a saved one that has no pickaxe (from before rock needed one).

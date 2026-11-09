@@ -21,6 +21,19 @@ namespace Game.Client
 
         public static Sprite Square => _square ??= Make((u, v) => 1);
 
+        static readonly System.Collections.Generic.Dictionary<int, Sprite> Donuts = new System.Collections.Generic.Dictionary<int, Sprite>();
+
+        // A ring whose hole is inner (0 to 1) of its radius across, for a boss's ring telegraphs (safe in the hole).
+        public static Sprite Donut(float inner)
+        {
+            int key = Mathf.Clamp(Mathf.RoundToInt(inner * 100), 0, 99);
+            if (Donuts.TryGetValue(key, out var sprite)) return sprite;
+            float hole = key / 100f;
+            sprite = Make((u, v) => Mathf.Min(Edge(1 - Radius(u, v)), Edge(Radius(u, v) - hole)));
+            Donuts[key] = sprite;
+            return sprite;
+        }
+
         // A slice of a disc pointing along +x with its tip at the centre, for cone telegraphs.
         public static Sprite Wedge(float degrees)
         {
