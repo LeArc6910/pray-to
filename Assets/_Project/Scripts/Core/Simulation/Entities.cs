@@ -80,19 +80,26 @@ namespace Game.Core
         public int PowerOf(SkillDefinition skill) => SkillRules.Power(RankOf(skill), Stats, skill);
 
         internal int CooldownFor(SkillDefinition skill) =>
-            Math.Max(1, (int)Math.Round(SkillRules.CooldownTicks(skill, PowerOf(skill), Stats.CooldownRecoveryFor(skill.Tags)) * SkillSupports.CooldownFactor(SupportOf(skill))));
+            Math.Max(1, (int)Math.Round(SkillRules.CooldownTicks(skill, PowerOf(skill), Stats.CooldownRecoveryFor(skill.Tags)) * SkillSupports.CooldownFactor(SupportsOf(skill))));
 
-        // The crystal set into each learned skill (Docs/Classes.md, 스킬 변형), and what it makes of the skill.
-        public Dictionary<SkillDefinition, MaterialDefinition> Supports { get; } = new Dictionary<SkillDefinition, MaterialDefinition>();
+        // The crystals set into each learned skill, in the order they went in (Docs/Classes.md, 스킬 변형), and what
+        // they make of the skill.
+        public Dictionary<SkillDefinition, List<MaterialDefinition>> Supports { get; } = new Dictionary<SkillDefinition, List<MaterialDefinition>>();
 
-        public SupportKind? SupportOf(SkillDefinition skill) => skill != null && Supports.TryGetValue(skill, out var gem) ? SkillSupports.KindOf(gem) : null;
+        static readonly SupportKind[] NoSupports = new SupportKind[0];
 
-        // The tags a skill hits with: its own, what buffs grant and an element its support adds.
-        public SkillTag ContextFor(SkillDefinition skill) => Stats.ContextFor(skill) | SkillSupports.Tags(SupportOf(skill));
+        public IReadOnlyList<SupportKind> SupportsOf(SkillDefinition skill) =>
+            skill != null && Supports.TryGetValue(skill, out var gems) && gems.Count > 0
+                ? gems.Select(SkillSupports.KindOf).Where(k => k != null).Select(k => k.Value).ToArray()
+                : NoSupports;
 
-        public int ManaCost(SkillDefinition skill) => SkillSupports.ManaCost(skill, SupportOf(skill));
+        // The tags a skill hits with: its own, what buffs grant and the elements its supports add.
+        public SkillTag ContextFor(SkillDefinition skill) => Stats.ContextFor(skill) | SkillSupports.Tags(SupportsOf(skill));
 
-        internal int DurationFor(SkillDefinition skill) => SkillRules.DurationTicks(skill, PowerOf(skill), Stats.SkillDurationFor(skill.Tags));
+        public int ManaCost(SkillDefinition skill) => SkillSupports.ManaCost(skill, SupportsOf(skill));
+
+        internal int DurationFor(SkillDefinition skill) =>
+            (int)Math.Round(SkillRules.DurationTicks(skill, PowerOf(skill), Stats.SkillDurationFor(skill.Tags)) * SkillSupports.DurationFactor(SupportsOf(skill)));
 
         public bool Knows(SkillDefinition skill) => RankOf(skill) > 0;
 
@@ -612,8 +619,12 @@ namespace Game.Core
         // Tiles per second.
         public Vec2 Velocity { get; }
         public float Radius { get; }
-        // Before armor. A player's projectile rolls its damage and crit when it is fired.
-        public float Damage { get; }
+        // Before armor. A player's projectile rolls its damage and crit when it is fired; one that goes through
+        // monsters (SkillSupports.Pierces) is softer after each.
+        public float Damage { get; internal set; }
+        // How many more monsters it goes on through, and those it has gone through.
+        internal int PiercesLeft { get; set; }
+        internal HashSet<int> Pierced { get; } = new HashSet<int>();
         public bool Friendly { get; }
         // A player's: the tags it hits with, buffs included.
         public SkillTag Tags { get; }

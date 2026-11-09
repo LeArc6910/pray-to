@@ -1,3 +1,4 @@
+using System.Linq;
 using Game.Core;
 using UnityEngine;
 
@@ -110,8 +111,9 @@ namespace Game.Client
                 if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
                 {
                     string tags = skill.Tags == SkillTag.None ? "" : " · " + StatText.TagNames(skill.Tags);
-                    DrawTooltip($"{skill.Name} {rank}단계 ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, rank, client.Stats)}"
-                        + (client.SupportOf(skill) is SupportKind kind ? $"\n변형: {client.Supports[skill].Name} ({SkillSupports.Describe(kind, skill)})" : ""), area);
+                    var gems = client.GemsIn(skill);
+                    DrawTooltip($"{skill.Name} {rank}단계 ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, rank, client.Stats, client.SupportsOf(skill))}"
+                        + (gems.Count > 0 ? $"\n변형: {string.Join(", ", gems.Select(g => g.Name))}" : ""), area);
                 }
             }
             DrawPotion(client, Area(count, count));

@@ -113,6 +113,8 @@ support_fire,180,,yes,2,alchemist
 support_lightning,180,,yes,2,alchemist
 support_haste,260,,yes,3,alchemist
 support_area,260,,yes,3,alchemist
+support_duration,220,,yes,2,alchemist
+support_leech,260,,yes,3,alchemist
 glow_cap,,9,,,alchemist
 frost_berry,,11,,,alchemist
 slime_gel,,2,,,alchemist

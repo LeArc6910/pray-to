@@ -202,7 +202,7 @@ namespace Game.Core
                 var passives = player.Passives.Select(p => IndexOf(_classes?.Passives, p)).Where(i => i >= 0).ToList();
                 var skills = player.SkillRanks.Select(p => (p.Key.Index, p.Value)).OrderBy(p => p.Index).ToList();
                 var stories = player.StorySteps.Select(p => (World.Npcs?.IndexOf(World.Npcs.Find(p.Key)) ?? -1, p.Value)).Where(p => p.Item1 >= 0).ToList();
-                var supports = player.Supports.Select(p => (p.Key.Index, IndexOf(_loot.Materials, p.Value))).Where(p => p.Item2 >= 0).ToList();
+                var supports = player.Supports.SelectMany(p => p.Value.Select(gem => (p.Key.Index, IndexOf(_loot.Materials, gem)))).Where(p => p.Item2 >= 0).ToList();
                 Send(pair.Key, new InventoryMessage(player.Equipment, player.Inventory, passives, skills, stories, supports).Encode(_loot), reliable: true);
             }
             foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) SendChest(pair.Key, pair.Value);
@@ -462,8 +462,9 @@ namespace Game.Core
                     World.CompleteRequest(player.Id);
                     break;
                 case InventoryCommand.Support:
-                    if (_classes != null && command.Index < _classes.Skills.Count && command.Item >= 0 && command.Item <= _loot.Materials.Count)
-                        World.SetSupport(player.Id, _classes.Skills[command.Index], command.Item == 0 ? null : _loot.Materials[command.Item - 1]);
+                    if (_classes == null || command.Index >= _classes.Skills.Count) break;
+                    if (command.Item > 0 && command.Item <= _loot.Materials.Count) World.AddSupport(player.Id, _classes.Skills[command.Index], _loot.Materials[command.Item - 1]);
+                    else if (command.Item <= 0) World.RemoveSupport(player.Id, _classes.Skills[command.Index], -command.Item);
                     break;
                 case InventoryCommand.SortBag:
                     player.Inventory.Sort();

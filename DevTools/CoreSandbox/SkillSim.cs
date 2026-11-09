@@ -47,6 +47,7 @@ namespace CoreSandbox
         {
             (SupportKind.Area, "확산"), (SupportKind.Multi, "분열"), (SupportKind.Haste, "가속"), (SupportKind.Power, "증폭"),
             (SupportKind.Fire, "화염"), (SupportKind.Cold, "냉기"), (SupportKind.Lightning, "번개"),
+            (SupportKind.Pierce, "관통"), (SupportKind.Duration, "지속"), (SupportKind.Leech, "흡혈"),
         };
 
         // Every skill with each crystal that fits it (Docs/Classes.md, 스킬 변형), against the skill bare at the same
@@ -80,7 +81,7 @@ namespace CoreSandbox
                             cells.Add($"{"-",17}");
                             continue;
                         }
-                        var with = Measure(loot, monsters, dummy, owner, skill, rank, seconds, gear, crystal);
+                        var with = Measure(loot, monsters, dummy, owner, skill, rank, seconds, gear, new[] { crystal });
                         float single = bare.Single > 0 ? with.Single / bare.Single : 0;
                         float pack = bare.Pack > 0 ? with.Pack / bare.Pack : single;
                         cells.Add($"{$"x{single:0.00}/x{pack:0.00} ({with.ManaPerSecond:0.0})",17}");
@@ -88,7 +89,8 @@ namespace CoreSandbox
                         // A skill that deals nothing (a dash only for moving) has nothing to compare.
                         if (bare.Single <= 0 && bare.Pack <= 0) continue;
                         if (best >= 1.6f) flagged.Add($"{skill.Name}+{name}: x{best:0.00} (너무 셈)");
-                        else if (best <= 0.97f) flagged.Add($"{skill.Name}+{name}: x{best:0.00} (손해만)");
+                        // Cold slows and drinking heals: what they give does not show in damage.
+                        else if (best <= 0.97f && support != SupportKind.Cold && support != SupportKind.Leech) flagged.Add($"{skill.Name}+{name}: x{best:0.00} (손해만)");
                     }
                     string Bare() => skill.Kind == SkillKind.Buff ? $"{bare.Single:0}%켬" : skill.Kind == SkillKind.Heal ? $"{bare.Single:0.0}%/초" : $"{bare.Single:0}/{bare.Pack:0}";
                     Console.WriteLine($"{skill.Name,-10} {kind,-4} {$"{Bare()} ({bare.ManaPerSecond:0.0})",16} " + string.Join(" ", cells));
@@ -96,10 +98,43 @@ namespace CoreSandbox
             }
             Console.WriteLine($"마나는 채워 두고 쟀다. 기본 마나 재생은 초당 {regen:0}");
             Console.WriteLine(flagged.Count == 0 ? "눈에 띄는 것 없음" : "눈에 띄는 것(x1.6 이상, x0.97 이하):\n  " + string.Join("\n  ", flagged));
+            if (rank >= 5) Best(loot, classes, monsters, dummy, crystals, seconds, gear, rank);
+        }
+
+        // At rank 5 a skill holds three crystals: for each skill, the three that make it strongest on the pack and on
+        // one target, against the skill bare, and the mana that costs.
+        static void Best(LootData loot, ClassData classes, MonsterData monsters, MonsterDefinition dummy, Dictionary<SupportKind, MaterialDefinition> crystals,
+            int seconds, string[] gear, int rank)
+        {
+            Console.WriteLine($"\n결정 셋(스킬 {rank}단계): 무리에 가장 센 셋과 한 대상에 가장 센 셋. 배율은 결정 없을 때에 대한 것");
+            foreach (var owner in classes.Classes)
+            {
+                foreach (var skill in owner.Skills)
+                {
+                    var bare = Measure(loot, monsters, dummy, owner, skill, rank, seconds, gear);
+                    if (bare.Single <= 0 && bare.Pack <= 0) continue;
+                    var fits = SupportNames.Where(n => SkillSupports.Fits(skill, n.Kind) && crystals.ContainsKey(n.Kind)).ToList();
+                    if (fits.Count < 3) continue;
+                    (string Names, float Single, float Pack, float Mana) bestPack = default, bestSingle = default;
+                    for (int a = 0; a < fits.Count; a++)
+                    for (int b = a + 1; b < fits.Count; b++)
+                    for (int c = b + 1; c < fits.Count; c++)
+                    {
+                        var set = new[] { fits[a], fits[b], fits[c] };
+                        var with = Measure(loot, monsters, dummy, owner, skill, rank, seconds, gear, set.Select(n => crystals[n.Kind]));
+                        float single = bare.Single > 0 ? with.Single / bare.Single : 0;
+                        float pack = bare.Pack > 0 ? with.Pack / bare.Pack : single;
+                        string names = string.Join("+", set.Select(n => n.Name));
+                        if (pack > bestPack.Pack) bestPack = (names, single, pack, with.ManaPerSecond);
+                        if (single > bestSingle.Single) bestSingle = (names, single, pack, with.ManaPerSecond);
+                    }
+                    Console.WriteLine($"{skill.Name,-10} 무리 {bestPack.Names,-12} x{bestPack.Pack:0.00} (마나 {bestPack.Mana:0.0}/초)  한 대상 {bestSingle.Names,-12} x{bestSingle.Single:0.00} (마나 {bestSingle.Mana:0.0}/초)");
+                }
+            }
         }
 
         static (float Single, float Pack, float ManaPerSecond) Measure(LootData loot, MonsterData monsters, MonsterDefinition dummy, ClassDefinition owner,
-            SkillDefinition skill, int rank, int seconds, string[] gear, MaterialDefinition support = null)
+            SkillDefinition skill, int rank, int seconds, string[] gear, IEnumerable<MaterialDefinition> supports = null)
         {
             var map = new TileMap(31, 31, TileType.Floor);
             for (int i = 0; i < 31; i++)
@@ -118,7 +153,7 @@ namespace CoreSandbox
             }
             var player = world.AddPlayer("bot", equipment, owner);
             foreach (var each in owner.Skills) player.SkillRanks[each] = rank;
-            if (support != null) player.Supports[skill] = support;
+            if (supports != null) player.Supports[skill] = supports.ToList();
             var all = ClassRules.AllSkillsFor(player.Classes);
             var order = new List<int> { all.IndexOf(skill) };
             order.AddRange(Enumerable.Range(0, all.Count).Where(i => !order.Contains(i)).Take(ClassRules.SkillSlots - 1));

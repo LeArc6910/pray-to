@@ -358,7 +358,7 @@ namespace Game.Core
         public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
-            Supports.Select(pair => (pair.Key.Id, pair.Value.Id)));
+            Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))));
 
         // Experience in each life skill (LifeSkill order): from the save, and as the host tells.
         public int[] LifeExperience => _life ??= ReadLife();
@@ -444,17 +444,28 @@ namespace Game.Core
 
         public byte[] StoryCommand() => new InventoryCommandMessage(InventoryCommand.Story, 0).Encode();
 
-        // The crystal in each learned skill, as the host last said (Docs/Classes.md, 스킬 변형), and the command
-        // that sets one (or takes it out, with none).
-        public IReadOnlyDictionary<SkillDefinition, MaterialDefinition> Supports => _supports;
-        readonly Dictionary<SkillDefinition, MaterialDefinition> _supports = new Dictionary<SkillDefinition, MaterialDefinition>();
+        // The crystals in each learned skill, in their slots, as the host last said (Docs/Classes.md, 스킬 변형),
+        // and the commands that set one into a free slot or take the one in a slot out.
+        public IReadOnlyDictionary<SkillDefinition, List<MaterialDefinition>> Supports => _supports;
+        readonly Dictionary<SkillDefinition, List<MaterialDefinition>> _supports = new Dictionary<SkillDefinition, List<MaterialDefinition>>();
 
-        public SupportKind? SupportOf(SkillDefinition skill) => skill != null && _supports.TryGetValue(skill, out var gem) ? SkillSupports.KindOf(gem) : null;
+        static readonly SupportKind[] NoSupports = new SupportKind[0];
 
-        public int ManaCost(SkillDefinition skill) => SkillSupports.ManaCost(skill, SupportOf(skill));
+        public IReadOnlyList<SupportKind> SupportsOf(SkillDefinition skill) =>
+            skill != null && _supports.TryGetValue(skill, out var gems) && gems.Count > 0
+                ? gems.Select(SkillSupports.KindOf).Where(k => k != null).Select(k => k.Value).ToArray()
+                : NoSupports;
+
+        public IReadOnlyList<MaterialDefinition> GemsIn(SkillDefinition skill) =>
+            skill != null && _supports.TryGetValue(skill, out var gems) ? gems : (IReadOnlyList<MaterialDefinition>)Array.Empty<MaterialDefinition>();
+
+        public int ManaCost(SkillDefinition skill) => SkillSupports.ManaCost(skill, SupportsOf(skill));
 
         public byte[] SupportCommand(SkillDefinition skill, MaterialDefinition gem) =>
-            new InventoryCommandMessage(InventoryCommand.Support, gem == null ? 0 : ItemCodec.Index(_loot.Materials, gem) + 1, index: ItemCodec.Index(_classes.Skills, skill)).Encode();
+            new InventoryCommandMessage(InventoryCommand.Support, ItemCodec.Index(_loot.Materials, gem) + 1, index: ItemCodec.Index(_classes.Skills, skill)).Encode();
+
+        public byte[] RemoveSupportCommand(SkillDefinition skill, int slot) =>
+            new InventoryCommandMessage(InventoryCommand.Support, -slot, index: ItemCodec.Index(_classes.Skills, skill)).Encode();
 
         public byte[] SortBagCommand() => new InventoryCommandMessage(InventoryCommand.SortBag, 0).Encode();
 
@@ -710,7 +721,7 @@ namespace Game.Core
         {
             if (Status != ClientStatus.Playing || IsDead || slot < 0 || slot >= Skills.Count || CooldownLeft(slot) > 0 || !HasManaFor(slot)) return null;
             _cooldowns[slot] = (int)Math.Round(SkillRules.CooldownTicks(Skills[slot], PowerOf(Skills[slot]), Stats.CooldownRecoveryFor(Skills[slot].Tags))
-                * SkillSupports.CooldownFactor(SupportOf(Skills[slot]))) + (int)Math.Ceiling(HostTick - _skillsTick);
+                * SkillSupports.CooldownFactor(SupportsOf(Skills[slot]))) + (int)Math.Ceiling(HostTick - _skillsTick);
             Mana -= ManaCost(Skills[slot]);
             return new SkillCommandMessage(slot, aim).Encode();
         }
@@ -1066,7 +1077,10 @@ namespace Game.Core
             _supports.Clear();
             foreach (var (skill, gem) in message.Supports)
             {
-                if (_classes != null && skill < _classes.Skills.Count && gem < _loot.Materials.Count) _supports[_classes.Skills[skill]] = _loot.Materials[gem];
+                if (_classes == null || skill >= _classes.Skills.Count || gem >= _loot.Materials.Count) continue;
+                var key = _classes.Skills[skill];
+                if (!_supports.TryGetValue(key, out var gems)) _supports[key] = gems = new List<MaterialDefinition>();
+                gems.Add(_loot.Materials[gem]);
             }
             _storySteps.Clear();
             foreach (var (npc, step) in message.Stories)

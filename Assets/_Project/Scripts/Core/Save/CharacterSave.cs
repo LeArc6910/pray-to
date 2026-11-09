@@ -16,7 +16,8 @@ namespace Game.Core
         // passive tree, by id. 5: friendships (World.Merchant.cs), by person id. 6: life skill experience
         // (World.Life.cs). 7: each friendship's request day and heart gifts had. 8: the skills learned and their ranks
         // (Docs/Classes.md, 스킬 포인트와 단계), by id. 9: how far through each person's story (Docs/Npcs.md, 이야기).
-        // 10: the support crystal in each skill (Docs/Classes.md, 스킬 변형), by ids.
+        // 10: the support crystals in each skill (Docs/Classes.md, 스킬 변형), by ids, one pair a crystal (up to three a
+        // skill since 2026-11-09, in slot order).
         const int FormatVersion = 10;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
@@ -51,7 +52,7 @@ namespace Game.Core
         public IReadOnlyList<(string Id, int Rank)> SkillRanks { get; }
         // The last story step done with each person, by person id.
         public IReadOnlyList<(string Npc, int Step)> Stories { get; }
-        // The crystal set in each skill: the skill's id and the crystal's (World.RestoreSupports).
+        // The crystals set in the skills, one pair each: the skill's id and the crystal's (World.RestoreSupports).
         public IReadOnlyList<(string Skill, string Gem)> Supports { get; }
         public IReadOnlyList<string> Warnings { get; }
 

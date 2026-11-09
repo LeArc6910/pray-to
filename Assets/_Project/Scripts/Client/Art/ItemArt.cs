@@ -829,6 +829,9 @@ namespace Game.Client
                 case "support_fire": return Ramped(Gem, Ramp.Of("#FF9A3C"));
                 case "support_cold": return Ramped(Gem, Ramp.Of("#B4ECFF"));
                 case "support_lightning": return Ramped(Gem, Ramp.Of("#FFF6A0"));
+                case "support_pierce": return Ramped(Gem, Ramp.Of("#C8C8D8"));
+                case "support_duration": return Ramped(Gem, Ramp.Of("#B48CFF"));
+                case "support_leech": return Ramped(Gem, Ramp.Of("#C83C5A"));
                 case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
                 case "rift_shard": return Ramped(Gem, Ramp.Of("#E86ED8"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));

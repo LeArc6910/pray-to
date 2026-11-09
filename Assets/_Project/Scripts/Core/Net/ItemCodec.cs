@@ -191,8 +191,9 @@ namespace Game.Core
         Story,
         // Puts the carried gear in order (Inventory.Sort).
         SortBag,
-        // Sets a support crystal into a skill (World.SetSupport): Index the skill sheet index, Item the crystal's
-        // material index + 1, or 0 to take it out.
+        // Sets a support crystal into a free slot of a skill (World.AddSupport): Index the skill sheet index, Item the
+        // crystal's material index + 1; or takes the one in slot k out (World.RemoveSupport) with Item -k (0 for the
+        // first).
         Support,
     }
 

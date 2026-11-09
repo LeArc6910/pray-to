@@ -1244,7 +1244,8 @@ namespace Game.Client
                     if (rank == 0) GUI.color = new Color(1, 1, 1, open ? 0.8f : 0.4f);
                     Icon(Sprites.Icon(skill));
                     string state = rank > 0 ? $"{RankText(skill)}/{SkillRules.MaxRank}" : open ? "배우지 않음" : $"Lv {skill.Level}부터";
-                    if (_client.Supports.TryGetValue(skill, out var set)) state += $" · {set.Name}";
+                    var held = _client.GemsIn(skill);
+                    if (held.Count > 0) state += $" · 결정 {held.Count}/{SkillSupports.SlotsFor(rank)}";
                     TipLabel(new GUIContent(Fit($"{skill.Name} · {state}", rowName), SkillTooltip(skill)), GUILayout.Width(rowName));
                     GUI.color = previous;
                     bool can = _client.CanRaise(skill);
@@ -1259,7 +1260,7 @@ namespace Game.Client
                     // What it does at its rank now, or at the first for one not learned; and what the next adds.
                     var dim = GUI.color;
                     GUI.color = new Color(0.8f, 0.8f, 0.8f, rank > 0 ? 1 : 0.7f);
-                    GUILayout.Label(Ui.Wrap(SkillText.Numbers(skill, Math.Max(1, _client.PowerOf(skill)), _client.Stats), GUI.skin.label, _textWidth));
+                    GUILayout.Label(Ui.Wrap(SkillText.Numbers(skill, Math.Max(1, _client.PowerOf(skill)), _client.Stats, _client.SupportsOf(skill)), GUI.skin.label, _textWidth));
                     GUI.color = dim;
                 }
             }
@@ -1301,22 +1302,42 @@ namespace Game.Client
 
         SkillDefinition _supportFor;
 
-        // The crystal in the skill and the ones in the bag that would change it, each a button that sets it in.
+        // The skill's crystal slots (one, two from rank 3, three at rank 5): each crystal in it with [빼기], the
+        // slots still shut, and while one is free, the crystals in the bag that would go in, each a button.
         void DrawSupports(SkillDefinition skill)
         {
             float width = _textWidth - 16;
-            if (_client.Supports.TryGetValue(skill, out var set) && SkillSupports.KindOf(set) is SupportKind kind)
+            int rank = _client.RankOf(skill);
+            int slots = SkillSupports.SlotsFor(rank);
+            var held = _client.GemsIn(skill);
+            Ui.Row($"{skill.Name}의 변형");
+            for (int slot = 0; slot < SkillSupports.MaxSlots; slot++)
             {
                 GUILayout.BeginHorizontal();
                 GUILayout.Space(16);
-                GUILayout.Label(Fit($"{skill.Name}의 변형: {set.Name} ({SkillSupports.Describe(kind, skill)})", width - 64), GUILayout.Width(width - 64));
-                if (Ui.LayoutButton("빼기", GUILayout.Width(56))) Send(_client.SupportCommand(skill, null), Sound.Click);
+                if (slot < held.Count && SkillSupports.KindOf(held[slot]) is SupportKind kind)
+                {
+                    Icon(Sprites.Icon(held[slot]));
+                    GUILayout.Label(Ui.Wrap($"{slot + 1}칸 {held[slot].Name}: {SkillSupports.Describe(kind, skill)}", GUI.skin.label, width - IconRoom - 64),
+                        GUILayout.Width(width - IconRoom - 64));
+                    if (Ui.LayoutButton("빼기", GUILayout.Width(56))) Send(_client.RemoveSupportCommand(skill, slot), Sound.Click);
+                }
+                else if (slot < slots) GUILayout.Label(Fit($"{slot + 1}칸 비어 있다", width));
+                else
+                {
+                    var faint = GUI.color;
+                    GUI.color = new Color(1, 1, 1, 0.5f);
+                    GUILayout.Label(Fit($"{slot + 1}칸은 스킬 {SkillSupports.RankForSlot(slot)}단계부터", width));
+                    GUI.color = faint;
+                }
                 GUILayout.EndHorizontal();
             }
-            var gems = _client.Bag.Materials.Keys.Where(m => SkillSupports.KindOf(m) is SupportKind k && SkillSupports.Fits(skill, k)).ToList();
+            if (held.Count >= slots) return;
+            var kinds = _client.SupportsOf(skill);
+            var gems = _client.Bag.Materials.Keys.Where(m => SkillSupports.KindOf(m) is SupportKind k && SkillSupports.CanAdd(skill, rank, kinds, k)).ToList();
             if (gems.Count == 0)
             {
-                GUILayout.Label(Fit("끼울 결정이 가방에 없다. 모루에서 강화 정수로 만든다(확산·분열·가속·증폭·화염·냉기·번개)", _textWidth));
+                GUILayout.Label(Fit("끼울 결정이 가방에 없다. 모루에서 강화 정수로 만든다(확산·분열·가속·증폭·화염·냉기·번개·관통·지속·흡혈)", _textWidth));
                 return;
             }
             foreach (var gem in gems)
@@ -1344,9 +1365,11 @@ namespace Game.Client
             int rank = _client.RankOf(skill);
             int power = Math.Max(1, _client.PowerOf(skill));
             string tags = skill.Tags == SkillTag.None ? "" : $" · {StatText.TagNames(skill.Tags)}";
-            string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, power, _client.Stats)}";
-            if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, power + 1, _client.Stats)}";
-            if (_client.SupportOf(skill) is SupportKind kind) text += $"\n변형: {_client.Supports[skill].Name} ({SkillSupports.Describe(kind, skill)})";
+            var supports = _client.SupportsOf(skill);
+            string text = $"{skill.Name} ({skill.Class.Name}){tags}\n{skill.Description}\n{SkillText.Numbers(skill, power, _client.Stats, supports)}";
+            if (rank > 0 && rank < SkillRules.MaxRank) text += $"\n다음 단계: {SkillText.Numbers(skill, power + 1, _client.Stats, supports)}";
+            var gems = _client.GemsIn(skill);
+            if (gems.Count > 0) text += $"\n변형: {string.Join(", ", gems.Select(g => g.Name))}";
             return text;
         }
 

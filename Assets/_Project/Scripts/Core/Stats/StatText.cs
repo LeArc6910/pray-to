@@ -79,23 +79,26 @@ namespace Game.Core
         // The skill's numbers in one line, e.g. "피해 150% · 둘레 1.8칸 · 재사용 4초".
         // At a rank (Docs/Classes.md, 스킬 포인트와 단계): its damage, cooldown and time as that rank has them. With the
         // player's stats, the damage also in points ("피해 31 (150%)"), a heal in health, and the cooldown and time
-        // with what the passive tree and gear add.
-        public static string Numbers(SkillDefinition skill, int rank = 1, PlayerStats stats = null)
+        // with what the passive tree and gear add. With the crystals set in it (스킬 변형), as they make it: the
+        // hit, reach, count, time, mana and cooldown, and what they add besides.
+        public static string Numbers(SkillDefinition skill, int rank = 1, PlayerStats stats = null, IReadOnlyCollection<SupportKind> supports = null)
         {
             var parts = new List<string>();
-            int damage = (int)Math.Round(skill.Damage * SkillRules.DamageScale(rank));
-            string Hit(string percent) => stats == null ? percent : $"{Points(stats.DamageFor(stats.ContextFor(skill)) * damage / 100f)} ({percent})";
-            string duration = Number(SkillRules.DurationTicks(skill, rank, stats?.SkillDurationFor(skill.Tags) ?? 0) / (float)World.TicksPerSecond);
+            int damage = (int)Math.Round(skill.Damage * SkillRules.DamageScale(rank) * SkillSupports.DamageFactor(skill, supports));
+            string Hit(string percent) => stats == null ? percent : $"{Points(stats.DamageFor(stats.ContextFor(skill) | SkillSupports.Tags(supports)) * damage / 100f)} ({percent})";
+            string duration = Number(SkillRules.DurationTicks(skill, rank, stats?.SkillDurationFor(skill.Tags) ?? 0) * SkillSupports.DurationFactor(supports) / World.TicksPerSecond);
+            float radius = SkillSupports.Radius(skill, supports);
+            int count = SkillSupports.Count(skill, supports);
             switch (skill.Kind)
             {
                 case SkillKind.Nova:
                     parts.Add($"피해 {Hit($"{damage}%")}");
-                    parts.Add($"둘레 {Number(skill.Radius)}칸");
+                    parts.Add($"둘레 {Number(radius)}칸");
                     break;
                 case SkillKind.Projectile:
-                    parts.Add(skill.Count > 1 ? $"피해 {Hit($"{damage}%")} × {skill.Count}발" : $"피해 {Hit($"{damage}%")}");
+                    parts.Add(count > 1 ? $"피해 {Hit($"{damage}%")} × {count}발" : $"피해 {Hit($"{damage}%")}");
                     parts.Add($"사거리 {Number(skill.Range)}칸");
-                    if (skill.Radius > 0) parts.Add($"폭발 {Number(skill.Radius)}칸");
+                    if (radius > 0) parts.Add($"폭발 {Number(radius)}칸");
                     break;
                 case SkillKind.Buff:
                     var effects = skill.Modifiers.Select(StatText.Describe).ToList();
@@ -103,7 +106,7 @@ namespace Game.Core
                     parts.Add($"{duration}초 동안 {string.Join(", ", effects)}");
                     break;
                 case SkillKind.Summon:
-                    parts.Add($"{skill.Count}마리 · {duration}초");
+                    parts.Add($"{count}마리 · {duration}초");
                     parts.Add($"한 번에 피해 {Hit($"{damage}%")}");
                     parts.Add($"{Number(skill.Range)}칸 안의 적");
                     break;
@@ -115,8 +118,13 @@ namespace Game.Core
                     parts.Add(stats == null ? $"최대 생명력의 {damage}% 회복" : $"생명력 {Points(stats.MaxHealth * damage / 100f)} 회복 (최대의 {damage}%)");
                     break;
             }
-            if (skill.Mana > 0) parts.Add($"마나 {skill.Mana}");
-            parts.Add($"재사용 {Number(SkillRules.CooldownTicks(skill, rank, stats?.CooldownRecoveryFor(skill.Tags) ?? 0) / (float)World.TicksPerSecond)}초");
+            if (SkillSupports.Pierces(supports) > 0) parts.Add($"적 {SkillSupports.Pierces(supports)}을 더 뚫는다");
+            if (SkillSupports.Leech(supports) > 0) parts.Add($"준 피해의 {Math.Round(SkillSupports.Leech(supports) * 100)}% 회복");
+            var added = SkillSupports.Tags(supports);
+            if (added != SkillTag.None) parts.Add($"{StatText.TagNames(added)} 태그");
+            int mana = SkillSupports.ManaCost(skill, supports);
+            if (mana > 0) parts.Add($"마나 {mana}");
+            parts.Add($"재사용 {Number(SkillRules.CooldownTicks(skill, rank, stats?.CooldownRecoveryFor(skill.Tags) ?? 0) * SkillSupports.CooldownFactor(supports) / World.TicksPerSecond)}초");
             return string.Join(" · ", parts);
         }
 

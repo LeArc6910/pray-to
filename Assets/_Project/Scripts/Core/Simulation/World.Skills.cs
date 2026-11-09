@@ -78,7 +78,7 @@ namespace Game.Core
             if (spent == 0 || coin == null || player.Inventory.CountOf(coin) < cost) return false;
             player.Inventory.TakeMaterial(coin, cost);
             // The crystals come back to the bag with the points.
-            foreach (var gem in player.Supports.Values) player.Inventory.AddMaterial(gem, 1);
+            foreach (var gem in player.Supports.Values.SelectMany(g => g)) player.Inventory.AddMaterial(gem, 1);
             player.Supports.Clear();
             player.SkillRanks.Clear();
             player.LearnBasics(player.Classes);
@@ -88,30 +88,35 @@ namespace Game.Core
             return true;
         }
 
-        // Sets a support crystal into a learned skill, giving back the one it had; with no crystal, takes the one it
-        // has out. False when the skill is not learned, the crystal is not in the bag or does nothing for the skill.
-        public bool SetSupport(int playerId, SkillDefinition skill, MaterialDefinition gem)
+        // Sets a support crystal into a free slot of a learned skill. False when the skill is not learned, the
+        // crystal is not in the bag, does nothing for the skill, the skill holds one of its kind already or has no
+        // slot free at its rank (SkillSupports.SlotsFor).
+        public bool AddSupport(int playerId, SkillDefinition skill, MaterialDefinition gem)
         {
             var player = FindPlayer(playerId);
-            if (player == null || skill == null || !player.Knows(skill)) return false;
-            var kind = SkillSupports.KindOf(gem);
-            if (gem != null && (kind == null || player.Inventory.CountOf(gem) == 0 || !SkillSupports.Fits(skill, kind.Value))) return false;
-            if (gem == null && !player.Supports.ContainsKey(skill)) return false;
-            if (player.Supports.TryGetValue(skill, out var old))
-            {
-                player.Inventory.AddMaterial(old, 1);
-                player.Supports.Remove(skill);
-            }
-            if (gem != null)
-            {
-                player.Inventory.TakeMaterial(gem, 1);
-                player.Supports[skill] = gem;
-            }
+            if (player == null || skill == null || !player.Knows(skill) || gem == null || player.Inventory.CountOf(gem) == 0) return false;
+            if (SkillSupports.KindOf(gem) is not SupportKind kind || !SkillSupports.CanAdd(skill, player.RankOf(skill), player.SupportsOf(skill).ToList(), kind)) return false;
+            player.Inventory.TakeMaterial(gem, 1);
+            if (!player.Supports.TryGetValue(skill, out var gems)) player.Supports[skill] = gems = new List<MaterialDefinition>();
+            gems.Add(gem);
             player.InventoryVersion++;
             return true;
         }
 
-        // Puts back the crystals a character save had in its skills, for the skills it still knows.
+        // Takes the crystal in that slot (0, 1, 2) out of the skill, back to the bag.
+        public bool RemoveSupport(int playerId, SkillDefinition skill, int slot)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || skill == null || !player.Supports.TryGetValue(skill, out var gems) || slot < 0 || slot >= gems.Count) return false;
+            player.Inventory.AddMaterial(gems[slot], 1);
+            gems.RemoveAt(slot);
+            if (gems.Count == 0) player.Supports.Remove(skill);
+            player.InventoryVersion++;
+            return true;
+        }
+
+        // Puts back the crystals a character save had in its skills, for the skills it still knows. One the skill no
+        // longer takes (the rules changed after the save, or its slots are full) goes back to the bag.
         public static void RestoreSupports(Player player, ClassData classes, LootData loot, IEnumerable<(string Skill, string Gem)> saved)
         {
             player.Supports.Clear();
@@ -120,8 +125,11 @@ namespace Game.Core
                 var skill = classes?.Skills.FirstOrDefault(s => s.Id == skillId);
                 var gem = loot?.Materials.FirstOrDefault(m => m.Id == gemId);
                 if (skill == null || gem == null || SkillSupports.KindOf(gem) is not SupportKind kind) continue;
-                // One the skill no longer takes (the rules changed after the save) goes back to the bag.
-                if (player.Knows(skill) && SkillSupports.Fits(skill, kind)) player.Supports[skill] = gem;
+                if (player.Knows(skill) && SkillSupports.CanAdd(skill, player.RankOf(skill), player.SupportsOf(skill).ToList(), kind))
+                {
+                    if (!player.Supports.TryGetValue(skill, out var gems)) player.Supports[skill] = gems = new List<MaterialDefinition>();
+                    gems.Add(gem);
+                }
                 else player.Inventory.AddMaterial(gem, 1);
             }
         }
@@ -170,7 +178,7 @@ namespace Game.Core
             {
                 case SkillKind.Nova:
                     float damage = RollSkill(player, skill, out bool critical);
-                    HitArea(player, player.Position, SkillSupports.Radius(skill, player.SupportOf(skill)), damage, critical, slot + 1, player.ContextFor(skill));
+                    HitArea(player, player.Position, SkillSupports.Radius(skill, player.SupportsOf(skill)), damage, critical, slot + 1, player.ContextFor(skill));
                     break;
                 case SkillKind.Projectile:
                     Fire(player, skill, slot);
@@ -186,7 +194,7 @@ namespace Game.Core
                     break;
                 case SkillKind.Heal:
                     float healed = Math.Min(player.Stats.MaxHealth - player.Health,
-                        player.Stats.MaxHealth * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(skill, player.SupportOf(skill)));
+                        player.Stats.MaxHealth * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(skill, player.SupportsOf(skill)));
                     player.Health += Math.Max(0, healed);
                     _events.Add(new SimEvent(SimEventType.Healed, player.Id, amount: (int)Math.Round(Math.Max(0, healed))));
                     break;
@@ -205,7 +213,7 @@ namespace Game.Core
             bool critical = false;
             float damage = skill.Damage > 0 ? RollSkill(player, skill, out critical) : 0;
             var tags = player.ContextFor(skill);
-            float reach = SkillSupports.Radius(skill, player.SupportOf(skill));
+            float reach = SkillSupports.Radius(skill, player.SupportsOf(skill));
             for (float gone = 0; gone < skill.Range; gone += DashStep)
             {
                 var next = Collision.Move(Map, player.Position, PlayerRadius, player.Facing * Math.Min(DashStep, skill.Range - gone));
@@ -235,7 +243,7 @@ namespace Game.Core
             var stats = player.Stats;
             var context = player.ContextFor(skill);
             critical = _random.Chance(stats.CritChanceFor(context) / 100f);
-            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(skill, player.SupportOf(skill))
+            return stats.DamageFor(context) * skill.Damage / 100f * SkillRules.DamageScale(player.PowerOf(skill)) * SkillSupports.DamageFactor(skill, player.SupportsOf(skill))
                 * (critical ? stats.CritDamageFor(context) / 100f : 1f);
         }
 
@@ -243,7 +251,7 @@ namespace Game.Core
         void Fire(Player player, SkillDefinition skill, int slot)
         {
             float damage = RollSkill(player, skill, out bool critical);
-            int count = SkillSupports.Count(skill, player.SupportOf(skill));
+            int count = SkillSupports.Count(skill, player.SupportsOf(skill));
             for (int i = 0; i < count; i++)
             {
                 float degrees = (i - (count - 1) / 2f) * VolleySpread;
@@ -260,7 +268,7 @@ namespace Game.Core
                     friendly: true,
                     tags: player.ContextFor(skill),
                     skill: skill,
-                    critical: critical));
+                    critical: critical) { PiercesLeft = SkillSupports.Pierces(player.SupportsOf(skill)) });
             }
         }
 
@@ -275,7 +283,7 @@ namespace Game.Core
         void Summon(Player player, SkillDefinition skill, int slot)
         {
             DismissMinions(m => m.OwnerId == player.Id && m.Slot == slot);
-            int count = SkillSupports.Count(skill, player.SupportOf(skill));
+            int count = SkillSupports.Count(skill, player.SupportsOf(skill));
             for (int i = 0; i < count; i++)
             {
                 var position = player.Position + WaitOffset(i, count);
@@ -340,7 +348,7 @@ namespace Game.Core
                 }
 
                 minion.TargetId = 0;
-                var home = owner.Position + WaitOffset(minion.Index, SkillSupports.Count(skill, owner.SupportOf(skill)));
+                var home = owner.Position + WaitOffset(minion.Index, SkillSupports.Count(skill, owner.SupportsOf(skill)));
                 var toHome = home - minion.Position;
                 float distance = toHome.Length;
                 if (distance < 0.05f) continue;
@@ -411,28 +419,39 @@ namespace Game.Core
             var owner = FindPlayer(projectile.Source);
             if (owner == null) return true;
             var at = projectile.Position;
-            bool touching = _enemies.Any(e => !e.IsDead && Vec2.Distance(e.Position, at) <= projectile.Radius + e.Definition.Radius)
-                || _bosses.Any(b => !b.IsDead && Vec2.Distance(b.Position, at) <= projectile.Radius + b.Definition.Radius);
+            var pierced = projectile.Pierced;
+            bool touching = _enemies.Any(e => !e.IsDead && !pierced.Contains(e.Id) && Vec2.Distance(e.Position, at) <= projectile.Radius + e.Definition.Radius)
+                || _bosses.Any(b => !b.IsDead && !pierced.Contains(b.Id) && Vec2.Distance(b.Position, at) <= projectile.Radius + b.Definition.Radius);
             if (!touching && !ended) return false;
+            // One that goes through hits what it touches and flies on, softer, while it has monsters left to pass.
+            if (touching && !ended && projectile.PiercesLeft > 0)
+            {
+                HitArea(owner, at, projectile.Radius, projectile.Damage, projectile.Critical, projectile.Cause + 1, projectile.Tags, pierced);
+                projectile.PiercesLeft--;
+                projectile.Damage *= SkillSupports.PierceFalloff;
+                return false;
+            }
 
             if (projectile.Skill?.Radius > 0) _events.Add(new SimEvent(SimEventType.Burst, owner.Id, amount: projectile.Cause, position: at));
-            float burst = projectile.Skill == null ? 0 : SkillSupports.Radius(projectile.Skill, owner.SupportOf(projectile.Skill));
+            float burst = projectile.Skill == null ? 0 : SkillSupports.Radius(projectile.Skill, owner.SupportsOf(projectile.Skill));
             HitArea(owner, at, Math.Max(burst, projectile.Radius), projectile.Damage, projectile.Critical, projectile.Cause + 1,
-                projectile.Tags);
+                projectile.Tags, pierced.Count > 0 ? pierced : null);
             return true;
         }
 
-        // Every enemy and boss touching the circle takes the hit.
-        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical, int cause, SkillTag tags)
+        // Every enemy and boss touching the circle takes the hit, but those in skip; hit ones join skip.
+        void HitArea(Player player, Vec2 centre, float radius, float damage, bool critical, int cause, SkillTag tags, HashSet<int> skip = null)
         {
             foreach (var enemy in _enemies.ToList())
             {
                 if (enemy.IsDead || Vec2.Distance(enemy.Position, centre) > radius + enemy.Definition.Radius) continue;
+                if (skip != null && !skip.Add(enemy.Id)) continue;
                 HitEnemy(player, enemy, damage, critical, centre, tags, cause);
             }
             foreach (var boss in _bosses)
             {
                 if (boss.IsDead || Vec2.Distance(boss.Position, centre) > radius + boss.Definition.Radius) continue;
+                if (skip != null && !skip.Add(boss.Id)) continue;
                 if (boss.State == BossState.Dormant) Wake(boss);
                 HitBoss(player, boss, damage, critical, tags, cause);
             }
@@ -449,6 +468,7 @@ namespace Game.Core
             enemy.Health -= amount;
             if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed * push;
             _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
+            Leech(player, cause, amount);
             if (enemy.IsDead)
             {
                 _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
@@ -464,7 +484,16 @@ namespace Game.Core
             if (boss.IsDead || boss.Invulnerable) return;
             int amount = Combat.Mitigate(damage, boss.Definition.Armor);
             DamageBoss(boss, player.Id, amount, critical, cause);
+            Leech(player, cause, amount);
             AfflictBoss(player, boss, tags, amount, damage, critical, cause);
+        }
+
+        // A skill with the drinking crystal heals its player a share of what it dealt (cause is its slot + 1).
+        static void Leech(Player player, int cause, int amount)
+        {
+            if (cause < 1 || cause > player.Skills.Count || amount <= 0 || player.IsDead) return;
+            float share = SkillSupports.Leech(player.SupportsOf(player.Skills[cause - 1]));
+            if (share > 0) player.Health = Math.Min(player.Stats.MaxHealth, player.Health + amount * share);
         }
     }
 }
