@@ -1669,14 +1669,15 @@ namespace Game.Client
             "________________",
         };
 
-        // The merchant's stall: a striped awning on two posts over a wooden counter with wares on it. The merchant
-        // stands in the gap (WorldView draws them) and MerchantCounter goes over their legs.
+        // A person's stall, two tiles tall (2026-11-09): its own tile has a wooden counter with wares on it and two posts
+        // going up; the striped awning on the posts is on the tile above (Awning), drawn over the person standing in
+        // the gap (WorldView draws them) so they stand under it. MerchantCounter goes over their legs.
         static readonly PixelImage MerchantStallTile = PixelImage.FromRows(BasePalette,
-            "oooooooooooooooo",
-            "oRRccRRccRRccRRo",
-            "oRRccRRccRRccRRo",
-            "orrCCrrCCrrCCrro",
-            "oo.oo.oo.oo.oo.o",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.",
             ".ow..........wo.",
             ".ow..........wo.",
             ".ow..........wo.",
@@ -1689,12 +1690,46 @@ namespace Game.Client
             Counter[5],
             Counter[6]);
 
-        // The blacksmith's: a soot-dark awning striped with ember orange; the fisher's: blue and white.
-        static readonly PixelImage SmithStallTile = Restriped(MerchantStallTile, "#4A4444", "#3A3434", "#E8783A", "#B8562A");
-        static readonly PixelImage FisherHutTile = Restriped(MerchantStallTile, "#3E7FD0", "#2E5FA0", "#F6F2E8", "#C8C0B0");
-        static readonly PixelImage AlchemyTableTile = Restriped(MerchantStallTile, "#9A5CD8", "#6E3CA8", "#E8F6E0", "#B8D0A8");
+        static readonly PixelImage SmithStallTile = MerchantStallTile;
+        static readonly PixelImage FisherHutTile = MerchantStallTile;
+        static readonly PixelImage AlchemyTableTile = MerchantStallTile;
 
-        // The stall with its awning's stripes in other colours: the red and the cream, and their shades.
+        // The awning over a stall, for the tile above it: a scalloped striped canopy on the tops of the posts. Its edge
+        // comes a pixel or two over the person's head. The merchant's is red and cream; the blacksmith's soot-dark with
+        // ember orange; the fisher's blue and white; the alchemist's violet and pale green.
+        static readonly PixelImage MerchantAwning = PixelImage.FromRows(BasePalette,
+            "................",
+            "................",
+            "................",
+            "................",
+            "................",
+            "oooooooooooooooo",
+            "oRRccRRccRRccRRo",
+            "oRRccRRccRRccRRo",
+            "orrCCrrCCrrCCrro",
+            "oRRccRRccRRccRRo",
+            "oo.oo.oo.oo.oo.o",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.",
+            ".ow..........wo.");
+
+        static readonly PixelImage SmithAwning = Restriped(MerchantAwning, "#4A4444", "#3A3434", "#E8783A", "#B8562A");
+        static readonly PixelImage FisherAwning = Restriped(MerchantAwning, "#3E7FD0", "#2E5FA0", "#F6F2E8", "#C8C0B0");
+        static readonly PixelImage AlchemyAwning = Restriped(MerchantAwning, "#9A5CD8", "#6E3CA8", "#E8F6E0", "#B8D0A8");
+
+        // The awning for a person's stall, or null for any other tile.
+        public static PixelImage Awning(TileType stall) => stall switch
+        {
+            TileType.MerchantStall => MerchantAwning,
+            TileType.SmithStall => SmithAwning,
+            TileType.FisherHut => FisherAwning,
+            TileType.AlchemyTable => AlchemyAwning,
+            _ => null,
+        };
+
+        // The awning with its stripes in other colours: the red and the cream, and their shades.
         static PixelImage Restriped(PixelImage stall, string red, string redShade, string cream, string creamShade)
         {
             var swap = new Dictionary<Rgba, Rgba>
@@ -1705,7 +1740,7 @@ namespace Game.Client
                 [BasePalette['C']] = Rgba.Hex(creamShade),
             };
             var image = stall.Copy();
-            for (int y = 0; y < 5; y++)
+            for (int y = 0; y < image.Height; y++)
             {
                 for (int x = 0; x < image.Width; x++)
                 {

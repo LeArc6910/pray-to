@@ -534,13 +534,13 @@ namespace Game.Client
             });
         }
 
-        // Each person at their stall as WorldView draws them (2026-11-09): the stall, the person standing in it and the
-        // counter over their legs; two loops.
+        // Each person at their stall as WorldView draws them (2026-11-09): the stall, the person standing in it, the
+        // counter over their legs and the awning on the tile above over their head; two loops.
         static void People(string path, NpcData npcs, PixelImage floor)
         {
             var list = npcs.Npcs.ToList();
             var counter = TileArt.MerchantCounter;
-            Play(path, list.Count, 1, 26, 30, 5, 0.6f, 2 * PeopleArt.Frames / PeopleArt.FramesPerSecond, floor, (column, row, time, step) =>
+            Play(path, list.Count, 1, 26, 44, 5, 0.72f, 2 * PeopleArt.Frames / PeopleArt.FramesPerSecond, floor, (column, row, time, step) =>
             {
                 var npc = list[column];
                 int frame = (int)MathF.Floor(time * PeopleArt.FramesPerSecond) % PeopleArt.Frames;
@@ -550,6 +550,7 @@ namespace Game.Client
                     Sprite(TileArt.Object(npc.Tile), 0, 0, 0.5f, 0.5f, 0),
                     Sprite(person, 0, -0.2f, 0.5f, 0, 10),
                     Sprite(counter, 0, 0, 0.5f, 0.5f, 12),
+                    Sprite(TileArt.Awning(npc.Tile), 0, 1, 0.5f, 0.5f, 13),
                 };
             });
         }

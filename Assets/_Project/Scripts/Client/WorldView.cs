@@ -1207,7 +1207,8 @@ namespace Game.Client
 
         // The person behind each stall in view, drawn as themselves and busy with their trade (PeopleArt), with the
         // counter drawn again over their legs.
-        readonly Dictionary<int, (SpriteRenderer Figure, SpriteRenderer Counter)> _people = new Dictionary<int, (SpriteRenderer, SpriteRenderer)>();
+        readonly Dictionary<int, (SpriteRenderer Figure, SpriteRenderer Counter, SpriteRenderer Awning)> _people =
+            new Dictionary<int, (SpriteRenderer, SpriteRenderer, SpriteRenderer)>();
         readonly List<(int X, int Y, NpcDefinition Npc)> _stalls = new List<(int X, int Y, NpcDefinition Npc)>();
         const int PeopleRange = 18;
 
@@ -1241,8 +1242,10 @@ namespace Game.Client
                 _seen.Add(key);
                 if (!_people.TryGetValue(key, out var person))
                 {
+                    var tile = npc.Tile;
                     person = (Renderer(_root.transform, "Merchant", null, Color.white),
-                        Renderer(_root.transform, "Counter", Sprites.Centered("npc/counter", () => TileArt.MerchantCounter), Color.white));
+                        Renderer(_root.transform, "Counter", Sprites.Centered("npc/counter", () => TileArt.MerchantCounter), Color.white),
+                        Renderer(_root.transform, "Awning", Sprites.Centered($"npc/awning/{tile}", () => TileArt.Awning(tile)), Color.white));
                     _people[key] = person;
                 }
                 int order = 10000 - Mathf.RoundToInt((y + 0.3f) * 10);
@@ -1251,6 +1254,9 @@ namespace Game.Client
                 person.Figure.sortingOrder = order;
                 person.Counter.transform.localPosition = new Vector3(x + 0.5f, y + 0.5f, 0);
                 person.Counter.sortingOrder = order + 2;
+                // The awning on the tile above, over the person's head (and over anyone walking behind the stall).
+                person.Awning.transform.localPosition = new Vector3(x + 0.5f, y + 1.5f, 0);
+                person.Awning.sortingOrder = order + 3;
             }
             _gone.Clear();
             foreach (var pair in _people)
@@ -1258,6 +1264,7 @@ namespace Game.Client
                 if (_seen.Contains(pair.Key)) continue;
                 Object.Destroy(pair.Value.Figure.gameObject);
                 Object.Destroy(pair.Value.Counter.gameObject);
+                Object.Destroy(pair.Value.Awning.gameObject);
                 _gone.Add(pair.Key);
             }
             foreach (int key in _gone) _people.Remove(key);
