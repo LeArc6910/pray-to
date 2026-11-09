@@ -529,6 +529,11 @@ async function combat(browser) {
   await game.context.close();
 }
 
+// Each boss attack's first phase, from the sheet ("boss/attack" → 1, 2 or 3).
+const BossFirstPhase = Object.fromEntries(fs.readFileSync(path.join(__dirname, '..', '..', 'Assets', '_Project', 'Data', 'Bosses', 'boss_attacks.csv'), 'utf8')
+  .split('\n').slice(1).filter(l => l.trim()).map(l => l.split(','))
+  .map(c => [`${c[0]}/${c[1]}`, c[3] ? Math.min(...c[3].split('|').map(Number)) : 1]));
+
 // ---------------------------------------------------------------- 보스 넷 (M3, 19·31·40단계)
 async function bosses(browser) {
   note('\n## 보스 (PC)\n');
@@ -560,6 +565,10 @@ async function bosses(browser) {
     await game.send(`heal; boss ${id} hurt 0.36`);
     const two = await game.until(t => has(t.banner, '2페이즈'), 3000, game.texts);
     check(!!two, `${name}: 체력 66% 아래에서 "2페이즈!"`);
+    // Past the roar, the first attack is one phase 2 brought (2026-11-09).
+    const opener = await game.until(t => new RegExp(`${id}:\\d+/\\d+:p2:(?!Roar)\\w+:(?!-)`).test(t.bosses || ''), 5000);
+    const opened = ((opener || {}).bosses || '').match(new RegExp(`${id}:\\d+/\\d+:p2:\\w+:(\\w+)`));
+    check(!!opened && BossFirstPhase[`${id}/${opened[1]}`] === 2, `${name}: 2페이즈는 새 공격으로 연다 (${opened ? opened[1] : '없음'})`);
     const second = await game.until(t => t.music === `boss_${id}_2`, 3000);
     check(!!second, `${name}: 2페이즈에 곡도 바뀐다 (${(second || await game.state()).music})`);
     await game.wait(2500);

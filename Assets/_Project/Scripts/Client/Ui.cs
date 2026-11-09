@@ -62,7 +62,20 @@ namespace Game.Client
         // The time and place lines under the minimap column (GameRoot.DrawInfo), as tall as they need.
         public const float InfoWidth = 200;
 
-        public static Rect InfoArea(float height) => new Rect(MinimapArea.xMax - InfoWidth, RightColumnBottom + 4, InfoWidth, height);
+        // Room kept for them: four small lines.
+        const float InfoReserve = 60;
+
+        // Under the column; but on a low touch screen (a phone held sideways) lines there would run into the skill
+        // buttons in the corner below (667×375, the 2026-11-09 layout test), so there they stand to the left of the
+        // column, their bottom level with its bottom: clear of the HUD, of a boss bar along the top and of the skill
+        // buttons. Under the column again when the HUD leaves no room beside it.
+        public static Rect InfoArea(float height)
+        {
+            var under = new Rect(MinimapArea.xMax - InfoWidth, RightColumnBottom + 4, InfoWidth, height);
+            if (!Controls.UsingTouch || under.y + InfoReserve <= SkillBar.Bounds(SkillBar.MostSkills).yMin) return under;
+            var beside = new Rect(MinimapArea.x - 8 - InfoWidth, RightColumnBottom - InfoReserve, InfoWidth, height);
+            return beside.x >= HudArea.xMax + 6 ? beside : under;
+        }
 
         public static float RightColumnBottom => MinimapArea.yMax + (Controls.UsingTouch ? ColumnGap + TouchButtonHeight : 0);
 

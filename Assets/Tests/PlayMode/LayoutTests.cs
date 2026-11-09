@@ -61,14 +61,14 @@ namespace Game.Client.Tests
 
                     foreach (var (part, rect) in keys.Concat(quick).Concat(top))
                     {
-                        if (!Inside(rect, width, height)) problems.Add($"{where}: {part}이(가) 화면 밖 {rect}");
+                        if (!Inside(rect, width, height)) problems.Add($"{where}: 화면 밖 - {part} {rect}");
                     }
                     var bottom = keys.Concat(quick).ToList();
                     for (int i = 0; i < bottom.Count; i++)
                     {
                         for (int j = i + 1; j < bottom.Count; j++)
                         {
-                            if (Overlap(bottom[i].Item2, bottom[j].Item2)) problems.Add($"{where}: {bottom[i].Item1}와(과) {bottom[j].Item1}이(가) 겹침");
+                            if (Overlap(bottom[i].Item2, bottom[j].Item2)) problems.Add($"{where}: 겹침 - {bottom[i].Item1} / {bottom[j].Item1}");
                         }
                     }
                     // The top parts with one another, and each with everything along the bottom.
@@ -77,7 +77,7 @@ namespace Game.Client.Tests
                         var others = top.Skip(i + 1).Concat(bottom);
                         foreach (var (other, otherRect) in others)
                         {
-                            if (Overlap(top[i].Item2, otherRect)) problems.Add($"{where}: {top[i].Item1}와(과) {other}이(가) 겹침");
+                            if (Overlap(top[i].Item2, otherRect)) problems.Add($"{where}: 겹침 - {top[i].Item1} / {other}");
                         }
                     }
                 }

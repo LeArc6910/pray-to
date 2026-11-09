@@ -129,11 +129,46 @@ namespace Game.Core
             }
         }
 
+        // ---- Phases (2026-11-09): each phase is felt, not only its health bar. The attacks a phase brings come
+        // first after its roar and come up most often in it; the ones from before fade; the boss rests less between
+        // attacks; and from phase 2 it sometimes lays a second area attack at once on someone else, from phase 3
+        // often. ----
+
+        // How much shorter the rest after an attack is in each phase.
+        static float Tempo(int phase) => phase >= 3 ? 0.7f : phase == 2 ? 0.85f : 1f;
+
+        // The chance a phase lays a second area attack with the one chosen.
+        static float DoubleChance(int phase) => phase >= 3 ? 0.5f : phase == 2 ? 0.25f : 0f;
+
+        static int FirstPhase(BossAttack attack) => attack.Phases.Count == 0 ? 1 : attack.Phases.Min();
+
+        // An attack's weight in a phase (in tenths of the sheet's): two and a half times for one the phase brought,
+        // less for each phase since an older one came.
+        internal static int PhaseWeight(BossAttack attack, int phase)
+        {
+            int first = FirstPhase(attack);
+            float factor = phase > 1 && first == phase ? 2.5f : 1 / (1 + 0.5f * Math.Max(0, phase - first));
+            return Math.Max(1, (int)MathF.Round(attack.Weight * 10 * factor));
+        }
+
+        // The attacks that can be laid alongside another: marked areas only (no charge, spray, spiral or summons).
+        static bool LaysAreas(BossAttack attack) => attack.Shape switch
+        {
+            AttackShape.Circle or AttackShape.Cone or AttackShape.Line or AttackShape.Ring or AttackShape.Cross or AttackShape.Trail => true,
+            _ => false,
+        };
+
         void ChooseAttack(Boss boss, List<Player> fighters)
         {
             if (fighters.Count == 0) return;
             var choices = boss.Definition.Attacks.Where(a => a.InPhase(boss.Phase) && a.Weight > 0).ToList();
-            boss.Attack = _random.PickWeighted(choices, a => a.Weight);
+            if (boss.OpensPhase)
+            {
+                boss.OpensPhase = false;
+                var fresh = choices.Where(a => FirstPhase(a) == boss.Phase).ToList();
+                if (fresh.Count > 0) choices = fresh;
+            }
+            boss.Attack = _random.PickWeighted(choices, a => PhaseWeight(a, boss.Phase));
             boss.VolleysLeft = 0;
             boss.TargetId = PickTarget(boss, boss.Attack.Target, fighters).Id;
             boss.State = BossState.Approach;
@@ -178,6 +213,32 @@ namespace Game.Core
             long resolve = Tick + boss.StateTicks;
             int cause = Cause(boss, attack);
 
+            LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
+            if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;
+
+            // A later phase sometimes lays another area attack of this phase at once, on someone (else, when there is
+            // anyone else), resolving a moment after.
+            if (LaysAreas(attack) && _random.NextFloat() < DoubleChance(boss.Phase))
+            {
+                var others = boss.Definition.Attacks.Where(a => a != attack && a.InPhase(boss.Phase) && a.Weight > 0 && LaysAreas(a)).ToList();
+                if (others.Count > 0)
+                {
+                    var second = _random.PickWeighted(others, a => PhaseWeight(a, boss.Phase));
+                    var victim = fighters.Count > 1 ? fighters.Where(p => p != target).ElementAt(_random.Next(fighters.Count - 1)) : target;
+                    var toward = victim.Position - boss.Position;
+                    var facing = toward.LengthSquared > 1e-6f ? toward.Normalized : boss.Facing;
+                    LayHazards(boss, second, victim, fighters, facing, resolve + Ticks(SecondDelay), Cause(boss, second));
+                }
+            }
+        }
+
+        // Seconds after the first that a second attack laid with it lands.
+        const float SecondDelay = 0.4f;
+
+        // The marked areas of an attack, aimed along facing (cones, lines, trails) at the target, resolving at tick
+        // resolve. A charge's path is marked without harm: the charge itself hurts.
+        void LayHazards(Boss boss, BossAttack attack, Player target, List<Player> fighters, Vec2 facing, long resolve, int cause)
+        {
             switch (attack.Shape)
             {
                 case AttackShape.Circle:
@@ -191,24 +252,22 @@ namespace Game.Core
                             var offset = attack.Spread > 0
                                 ? Vec2.FromAngle(_random.NextFloat() * 2 * MathF.PI) * (MathF.Sqrt(_random.NextFloat()) * attack.Spread)
                                 : Vec2.Zero;
-                            AddHazard(boss, cause, HazardShape.Circle, centre + offset, boss.Facing, attack.Radius, 0, attack.Damage, resolve);
+                            AddHazard(boss, cause, HazardShape.Circle, centre + offset, facing, attack.Radius, 0, attack.Damage, resolve);
                         }
                     }
                     break;
                 case AttackShape.Cone:
-                    AddHazard(boss, cause, HazardShape.Cone, boss.Position, boss.Facing, attack.Length, attack.Angle, attack.Damage, resolve);
+                    AddHazard(boss, cause, HazardShape.Cone, boss.Position, facing, attack.Length, attack.Angle, attack.Damage, resolve);
                     break;
                 case AttackShape.Line:
-                    AddHazard(boss, cause, HazardShape.Line, boss.Position, boss.Facing, attack.Length, attack.Width, attack.Damage, resolve);
+                    AddHazard(boss, cause, HazardShape.Line, boss.Position, facing, attack.Length, attack.Width, attack.Damage, resolve);
                     break;
                 case AttackShape.Charge:
-                    // Only marks the path; the charge itself does the hurting.
-                    AddHazard(boss, cause, HazardShape.Line, boss.Position, boss.Facing, attack.Length, attack.Width, 0, resolve);
-                    boss.ChargeDirection = boss.Facing;
+                    AddHazard(boss, cause, HazardShape.Line, boss.Position, facing, attack.Length, attack.Width, 0, resolve);
                     break;
                 case AttackShape.Ring:
                     var middle = attack.Target == AttackTarget.Self ? boss.Position : target.Position;
-                    AddHazard(boss, cause, HazardShape.Ring, middle, boss.Facing, attack.Length, attack.Radius, attack.Damage, resolve);
+                    AddHazard(boss, cause, HazardShape.Ring, middle, facing, attack.Length, attack.Radius, attack.Damage, resolve);
                     break;
                 case AttackShape.Cross:
                     var crossing = attack.Target == AttackTarget.Self ? boss.Position : target.Position;
@@ -225,11 +284,11 @@ namespace Game.Core
                     for (int i = 0; i < attack.Count; i++)
                     {
                         long at = resolve + Ticks(gap * i / attack.Speed);
-                        AddHazard(boss, cause, HazardShape.Circle, boss.Position + boss.Facing * (gap * (i + 1)), boss.Facing, attack.Radius, 0, attack.Damage, at);
+                        AddHazard(boss, cause, HazardShape.Circle, boss.Position + facing * (gap * (i + 1)), facing, attack.Radius, 0, attack.Damage, at);
                     }
                     break;
                 case AttackShape.Share:
-                    AddHazard(boss, cause, HazardShape.Share, target.Position, boss.Facing, attack.Radius, 0, attack.Damage, resolve);
+                    AddHazard(boss, cause, HazardShape.Share, target.Position, facing, attack.Radius, 0, attack.Damage, resolve);
                     break;
             }
         }
@@ -266,7 +325,8 @@ namespace Game.Core
                     break;
             }
             boss.State = BossState.Recover;
-            boss.StateTicks = Ticks(attack.Cooldown);
+            // A quicker phase rests less, but never so little that a spiral's later volleys go unfired.
+            boss.StateTicks = Math.Max(Ticks(attack.Cooldown * Tempo(boss.Phase)), boss.VolleysLeft * Ticks(SpiralSeconds) + 1);
         }
 
         // Seconds between a spiral's volleys.
@@ -325,7 +385,7 @@ namespace Game.Core
             if (--boss.StateTicks > 0 && !blocked) return;
             _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: 6));
             boss.State = BossState.Recover;
-            boss.StateTicks = Ticks(attack.Cooldown);
+            boss.StateTicks = Ticks(attack.Cooldown * Tempo(boss.Phase));
         }
 
         // Bosses stay in their arena so a fight cannot be dragged off through the caves.
@@ -368,6 +428,7 @@ namespace Game.Core
             var definition = boss.Definition;
             boss.Phase = phase;
             boss.Attack = null;
+            boss.OpensPhase = true;
             boss.State = BossState.Roar;
             boss.StateTicks = Ticks(definition.Roar);
             _events.Add(new SimEvent(SimEventType.PhaseChanged, boss.Id, amount: phase));
@@ -387,6 +448,7 @@ namespace Game.Core
             boss.Attack = null;
             boss.State = BossState.Dormant;
             boss.EmptyTicks = 0;
+            boss.OpensPhase = false;
         }
 
         void RemoveDefeatedBosses()

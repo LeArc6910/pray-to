@@ -678,7 +678,7 @@ namespace Game.Client
                 json.Field("lootAt", drop == null ? null : $"{drop.Position.X - player.Position.X:0.00},{drop.Position.Y - player.Position.Y:0.00}");
                 var machines = world.Machines.Where(m => Vec2.Distance(TileMap.Center(m.X, m.Y), player.Position) < 12).ToList();
                 json.Field("machines", string.Join(" ", machines.Select(m => $"{m.Kind}{(world.IsPowered(m) ? "+" : "")}{(m.Enabled ? "" : "-off")}")));
-                json.Field("bosses", string.Join(" ", world.Bosses.Select(b => $"{b.Definition.Id}:{b.Health:0}/{b.MaxHealth:0}:p{b.Phase}:{b.State}")));
+                json.Field("bosses", string.Join(" ", world.Bosses.Select(b => $"{b.Definition.Id}:{b.Health:0}/{b.MaxHealth:0}:p{b.Phase}:{b.State}:{b.Attack?.Id ?? "-"}")));
                 json.Field("defense", world.ActiveDefense == null ? null : $"wave {world.ActiveDefense.Wave} stone {world.ActiveDefense.StoneHealth:0}/{world.ActiveDefense.MaxStoneHealth:0}");
                 json.Field("rift", world.ActiveRift == null ? null : $"tier {world.ActiveRift.Tier} wave {world.ActiveRift.Wave}");
             }

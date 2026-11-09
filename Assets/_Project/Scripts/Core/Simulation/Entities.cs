@@ -513,6 +513,8 @@ namespace Game.Core
         internal float VolleyAngle { get; set; }
         // Ticks with nobody left to fight; the boss resets after a while.
         internal int EmptyTicks { get; set; }
+        // Just past a roar: the next attack is one the new phase brought (World.Boss.cs, phases).
+        internal bool OpensPhase { get; set; }
     }
 
     public enum HazardShape : byte

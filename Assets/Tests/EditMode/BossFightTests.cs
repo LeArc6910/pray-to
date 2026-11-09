@@ -209,6 +209,34 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void APhaseOpensWithAnAttackItBroughtAndFavoursIt()
+        {
+            // "a" in every phase, "b" from phase 2.
+            string rows = Attack("circle", damage: 1, radius: "1", count: "1") + "dummy,b,새 공격,2,ring,self,1,1,2,5,,,,,,1,1,\n";
+            var definition = Bosses.With(rows, phases: "50", health: 100);
+            var world = Arena(out var boss, definition);
+            var player = world.AddPlayer("a", Gear.Wearing("iron_sword"));
+            Walk(world, player, Home + new Vec2(0, -2), facing: new Vec2(0, 1));
+
+            world.SetAttacking(player.Id, true);
+            for (int i = 0; i < 600 && boss.Phase == 1; i++)
+            {
+                world.MovePlayer(player.Id, player.Position, boss.Position - player.Position, 1);
+                world.Step();
+            }
+            world.SetAttacking(player.Id, false);
+            Assert.AreEqual(2, boss.Phase);
+            // Past the roar, the first attack chosen is the one phase 2 brought.
+            for (int i = 0; i < 600 && boss.State == BossState.Roar; i++) world.Step();
+            Assert.AreEqual("b", boss.Attack?.Id);
+
+            var a = definition.Attacks.Single(x => x.Id == "a");
+            var b = definition.Attacks.Single(x => x.Id == "b");
+            Assert.Greater(World.PhaseWeight(b, 2), World.PhaseWeight(a, 2) * 3, "the new attack comes up far more often than the old");
+            Assert.AreEqual(World.PhaseWeight(a, 1), a.Weight * 10, "phase 1 as the sheet says");
+        }
+
+        [Test]
         public void TheBossResetsWhenEveryoneLeaves()
         {
             var world = Arena(out var boss, Bosses.With(Attack("circle", radius: "2", count: "1")));

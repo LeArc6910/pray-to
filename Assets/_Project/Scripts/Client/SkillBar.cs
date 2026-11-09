@@ -12,6 +12,8 @@ namespace Game.Client
     static class SkillBar
     {
         const float KeySize = 64;
+        // The most skill slots a player can have, for keeping room for all of them.
+        public const int MostSkills = ClassRules.SkillSlots;
         const float ButtonSize = 62;
         const float Gap = 6;
         const float Margin = 12;

@@ -64,6 +64,13 @@
         window.unityInstance = instance;
         loading.remove();
         canvas.focus();
+        // Saves live in the site's storage, which a browser may clear for a site not opened in a while (phones
+        // most of all). Asking once to keep it makes that much less likely (2026-11-09; the browser may say no).
+        if (navigator.storage && navigator.storage.persist) {
+          navigator.storage.persisted().then(function (kept) {
+            if (!kept) navigator.storage.persist();
+          }).catch(function () {});
+        }
       }).catch(function (message) {
         loading.textContent = "불러오지 못했습니다: " + message;
       });
