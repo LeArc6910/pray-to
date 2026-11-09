@@ -1899,8 +1899,15 @@ async function firstRun(browser, profile, hourLong) {
   note(`- 첫 목표: ${t0.n}. ${t0.text}`);
 
   // 1. A class (2026-11-09): picked in the bag's skills page, as the first goal's hint says; the warrior. On the
-  // phone the [가방] button comes a moment after the world (the first run pressed before it was drawn).
-  if (game.touch) await game.until(b => b.some(x => x.label === '가방'), 10000, game.buttons);
+  // phone the touch buttons ([가방]) come with the first touch: the test browser is a desktop one in a phone's size, so
+  // the game does not know it for a phone until touched (a phone's browser starts touch-first, Controls.UsingTouch),
+  // so a person's first touch on the world first.
+  if (game.touch) {
+    await hold('move', 0, 0);
+    await game.wait(200);
+    await lift();
+    check(!!(await game.until(b => b.some(x => x.label === '가방'), 10000, game.buttons)), '휴대폰: 첫 터치 뒤 [가방] 단추가 보인다');
+  }
   await bagTab(game, '스킬');
   check(await game.press('고르기', /^전사:/), '가방 [스킬] 탭에 클래스마다 [고르기]가 있다');
   await game.wait(800);

@@ -67,8 +67,10 @@ namespace Game.Client
         static readonly Color AimColor = new Color(1f, 0.6f, 0.55f);
         static float _lastTouch = float.NegativeInfinity;
 
-        // A touch has been seen this run: the HUD shows touch buttons and hints.
-        public static bool UsingTouch { get; private set; }
+        // A touch has been seen this run, or the game runs on a phone or tablet (a mobile browser, 2026-11-09: until the
+        // first touch a phone showed the PC screen, with no [가방] button to open the bag the first goal points to):
+        // the HUD shows touch buttons and hints.
+        public static bool UsingTouch { get; private set; } = Application.isMobilePlatform;
 
         // For the play mode tests: lay the screen out as for a touch screen, or not, without a finger.
         internal static void ForceTouch(bool touch) => UsingTouch = touch;
