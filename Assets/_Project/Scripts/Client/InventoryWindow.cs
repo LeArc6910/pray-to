@@ -1355,6 +1355,20 @@ namespace Game.Client
             if (Ui.LayoutButton(_craftableOnly ? "모두 보기" : "만들 수 있는 것만", GUILayout.Width(156))) _craftableOnly = !_craftableOnly;
             GUILayout.EndHorizontal();
             var enabled = GUI.enabled;
+            // What is being made by hand (World.StartCrafting, 2026-11-09): a bar, how many more, and [그만].
+            if (_client.Crafting != null)
+            {
+                GUILayout.BeginHorizontal();
+                string more = _client.CraftLeft > 1 ? $" · 남은 {_client.CraftLeft}개" : "";
+                GUILayout.Label(Fit($"만드는 중: {_client.Crafting.Name}{more} (작업대 곁을 떠나면 멈춘다)", _textWidth - 64), GUILayout.Width(_textWidth - 64));
+                if (Ui.LayoutButton("그만", GUILayout.Width(56))) Send(_client.StopCraftCommand(), Sound.Click);
+                GUILayout.EndHorizontal();
+                var bar = GUILayoutUtility.GetRect(_textWidth, 8);
+                GUI.DrawTexture(bar, Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0, new Color(0.2f, 0.2f, 0.2f, 0.8f), 0, 0);
+                GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * _client.CraftProgress, bar.height), Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0,
+                    new Color(1f, 0.8f, 0.35f), 0, 0);
+                GUILayout.Space(4);
+            }
             // Facing an assembler, a recipe it can make gets [조립기에] (World.SetRecipe).
             var assembler = _client.MachineAhead() is MachineView m && m.Kind == TileType.Assembler ? m : (MachineView?)null;
             if (assembler != null)
@@ -1384,6 +1398,9 @@ namespace Game.Client
                     GUI.color = heading;
                 }
                 string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Available(i.Material)}/{i.Count}"));
+                // A thing that takes time by hand says how long (CraftRules.Seconds); an assembler makes it unattended.
+                float seconds = _client.CraftSeconds(recipe);
+                if (seconds > 0) needs += $" · {seconds:0.#}초";
                 var station = _client.MissingStation(recipe);
                 if (station != null) needs += $" · {StationName(station.Value)} 필요";
                 string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
@@ -1396,10 +1413,12 @@ namespace Game.Client
                 TipLabel(new GUIContent(Fit($"{name}\n{needs}", width), RecipeTooltip(recipe)), GUILayout.Width(width));
                 int times = _client.CraftableTimes(recipe);
                 GUI.enabled = enabled && times > 0;
-                if (Ui.LayoutButton("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), Sound.Craft);
+                // One that takes time sounds when it is done (SimEventType.Crafted), not when pressed.
+                var pressed = seconds > 0 ? Sound.Click : Sound.Craft;
+                if (Ui.LayoutButton("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), pressed);
                 GUI.enabled = enabled && times > 1;
                 int bulk = Mathf.Clamp(times, 2, BulkCraft);
-                if (Ui.LayoutButton($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), Sound.Craft);
+                if (Ui.LayoutButton($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), pressed);
                 GUI.enabled = enabled;
                 if (toAssembler && Ui.LayoutButton("조립기에", GUILayout.Width(72)))
                     Send(_client.SetRecipeCommand(recipe), Sound.Click);

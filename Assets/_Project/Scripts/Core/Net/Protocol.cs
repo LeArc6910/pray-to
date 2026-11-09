@@ -890,8 +890,14 @@ namespace Game.Core
             int bedX = -1,
             int bedY = -1,
             float mana = 0,
-            float maxMana = PlayerStats.BaseMana)
+            float maxMana = PlayerStats.BaseMana,
+            int craftRecipe = -1,
+            float craftProgress = 0,
+            int craftLeft = 0)
         {
+            CraftRecipe = craftRecipe;
+            CraftProgress = craftProgress;
+            CraftLeft = craftLeft;
             Mana = mana;
             MaxMana = maxMana;
             Status = status;
@@ -932,6 +938,11 @@ namespace Game.Core
         // The tile of the player's bed, or -1 (World.BedOf), so the client can offer to sleep beside it.
         public int BedX { get; }
         public int BedY { get; }
+        // What the player is making by hand (World.StartCrafting, 2026-11-09): the recipe's sheet index or -1, how far
+        // through this one (0 to 1), and how many more after it.
+        public int CraftRecipe { get; }
+        public float CraftProgress { get; }
+        public int CraftLeft { get; }
         public bool IsDead => Health <= 0;
     }
 
@@ -1010,6 +1021,9 @@ namespace Game.Core
             w.Write(Self.Experience);
             w.Write((short)Math.Clamp(Self.BedX, -1, short.MaxValue));
             w.Write((short)Math.Clamp(Self.BedY, -1, short.MaxValue));
+            w.Write((ushort)(Self.CraftRecipe + 1));
+            w.Write((byte)Math.Clamp((int)Math.Round(Self.CraftProgress * 255), 0, 255));
+            w.Write((byte)Math.Clamp(Self.CraftLeft, 0, 255));
 
             w.Write((ushort)Entities.Count);
             foreach (var entity in Entities)
@@ -1094,8 +1108,11 @@ namespace Game.Core
             int experience = r.ReadInt32();
             int bedX = r.ReadInt16();
             int bedY = r.ReadInt16();
+            int craftRecipe = r.ReadUInt16() - 1;
+            float craftProgress = r.ReadByte() / 255f;
+            int craftLeft = r.ReadByte();
             var self = new SelfState(corrections, position, health, maxHealth, moveSpeed, cooldowns, buffs, consumableCooldown, food, foodTicks, status, experience,
-                bedX, bedY, mana, maxMana);
+                bedX, bedY, mana, maxMana, craftRecipe, craftProgress, craftLeft);
 
             int entityCount = r.ReadUInt16();
             var entities = new List<EntityState>(entityCount);

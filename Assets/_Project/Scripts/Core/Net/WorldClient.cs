@@ -300,6 +300,14 @@ namespace Game.Core
         public byte[] StartDefenseCommand() => new InventoryCommandMessage(InventoryCommand.StartDefense, 0).Encode();
         public (int X, int Y)? Bed { get; private set; }
 
+        // What this player is making by hand, how far through the one now (0 to 1) and how many more after it.
+        public Recipe Crafting { get; private set; }
+        public float CraftProgress { get; private set; }
+        public int CraftLeft { get; private set; }
+
+        // Seconds a recipe takes by hand (CraftRules.Seconds).
+        public float CraftSeconds(Recipe recipe) => CraftRules.Seconds(recipe, _tiles);
+
         // The world's clock (Calendar) now, as the host's last word plus the time since.
         public long Clock => _clock + (long)Math.Max(0, HostTick - _clockTick);
 
@@ -528,6 +536,8 @@ namespace Game.Core
         public byte[] RepairCommand() => new InventoryCommandMessage(InventoryCommand.Repair, 0).Encode();
 
         public byte[] PetAnimalsCommand() => new InventoryCommandMessage(InventoryCommand.PetAnimals, 0).Encode();
+
+        public byte[] StopCraftCommand() => new InventoryCommandMessage(InventoryCommand.StopCraft, 0).Encode();
 
         public byte[] ChoosePerkCommand(LifeSkill skill, int tier, int choice) =>
             new InventoryCommandMessage(InventoryCommand.ChoosePerk, choice, index: LifeSkills.PerkIndex(skill, tier)).Encode();
@@ -1438,6 +1448,9 @@ namespace Game.Core
             MoveSpeed = self.MoveSpeed;
             SelfStatus = self.Status;
             Bed = self.BedX >= 0 && self.BedY >= 0 ? (self.BedX, self.BedY) : ((int, int)?)null;
+            Crafting = self.CraftRecipe >= 0 && _loot != null && self.CraftRecipe < _loot.Recipes.Count ? _loot.Recipes[self.CraftRecipe] : null;
+            CraftProgress = self.CraftProgress;
+            CraftLeft = self.CraftLeft;
             _clock = snapshot.Clock;
             _clockTick = snapshot.Tick;
             Sleepers = snapshot.Sleepers;

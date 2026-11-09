@@ -148,6 +148,57 @@ namespace Game.Core
         // that many times over, or as many as the materials and the bag allow; returns how many were made.
         public bool Craft(int playerId, Recipe recipe) => CraftMany(playerId, recipe, 1) > 0;
 
+        // How a player makes something (InventoryCommand.Craft): at once when it takes no time (CraftRules.Seconds),
+        // else one after another while they stay by the station, each taking its seconds; nothing is used until each is
+        // done. Returns how many were made at once, or for a timed one how many it set about making.
+        public int StartCrafting(int playerId, Recipe recipe, int times)
+        {
+            float seconds = CraftRules.Seconds(recipe, Tiles);
+            if (seconds <= 0) return CraftMany(playerId, recipe, times);
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || recipe == null || MadeByMachine(recipe) || !CanMake(player, recipe)) return 0;
+            player.Crafting = new CraftJob(recipe, Math.Max(1, times), Ticks(seconds));
+            return player.Crafting.Left;
+        }
+
+        public bool StopCrafting(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player?.Crafting == null) return false;
+            player.Crafting = null;
+            _events.Add(new SimEvent(SimEventType.Crafted, player.Id, amount: 0));
+            return true;
+        }
+
+        // Whether the player could make one now: by the station, the ingredients in the bag and the chests near, room
+        // for an item.
+        bool CanMake(Player player, Recipe recipe)
+        {
+            if (recipe.Station != null && !Map.Near(player.Position, recipe.Station.Value, StationReach)) return false;
+            if (recipe.Item != null && (player.Inventory.IsFull || _lootGenerator == null)) return false;
+            var chests = ChestsNear(player.Position);
+            return recipe.Ingredients.All(i => player.Inventory.CountOfKind(i.Material) + chests.Sum(c => c.Chest.CountOfKind(i.Material)) >= i.Count);
+        }
+
+        // A tick of the hand work: done, it is made and the next begins; walked off, dead or short, it stops.
+        void RunCrafting(Player player)
+        {
+            var job = player.Crafting;
+            if (job == null) return;
+            if (player.IsDead || !CanMake(player, job.Recipe))
+            {
+                player.Crafting = null;
+                _events.Add(new SimEvent(SimEventType.Crafted, player.Id, amount: 0));
+                return;
+            }
+            if (++job.Done < job.Ticks) return;
+            int made = CraftMany(player.Id, job.Recipe, 1);
+            _events.Add(new SimEvent(SimEventType.Crafted, player.Id, amount: made, target: (Loot?.Recipes.ToList().IndexOf(job.Recipe) ?? -1) + 1));
+            job.Left--;
+            job.Done = 0;
+            if (made == 0 || job.Left <= 0) player.Crafting = null;
+        }
+
         public int CraftMany(int playerId, Recipe recipe, int times)
         {
             var player = FindPlayer(playerId);

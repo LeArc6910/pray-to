@@ -301,7 +301,12 @@ async function basics(browser) {
   await game.wait(300);
   const swordsBefore = items(await game.inventory(), 'copper_sword');
   await game.press('만들기', /^구리 검/);
-  check(items(await game.inventory(), 'copper_sword') + ((await game.inventory()).worn.Weapon === 'copper_sword' ? 1 : 0) > swordsBefore, '작업대 곁에서 구리 검을 만든다');
+  // Gear takes time by hand (2026-11-09): a bar fills for 3 seconds while the player stays by the workbench.
+  await game.wait(800);
+  check(/만드는 중: 구리 검/.test(await game.allText()), '구리 검은 바로 나오지 않고 "만드는 중: 구리 검"과 막대가 보인다');
+  await game.shot('bag-crafting', '만드는 중의 막대와 [그만]');
+  const swordDone = await game.until(i => items(i, 'copper_sword') + (i.worn.Weapon === 'copper_sword' ? 1 : 0) > swordsBefore, 5000, game.inventory);
+  check(!!swordDone, '작업대 곁에서 3초 뒤 구리 검이 나온다');
   await game.shot('bag-crafted', '작업대 곁 제작 목록');
   // [만들 수 있는 것만]: the list shrinks to what the bag and the stations near make now, and back.
   const all = (await game.find('만들기')).length;
@@ -1758,7 +1763,8 @@ async function firstRun(browser, profile, hourLong) {
       await game.press('만들 수 있는 것만', undefined, { quiet: true });
       await game.wait(400);
       await game.press('만들기', new RegExp('^' + name), { quiet: true });
-      await game.wait(500);
+      // Some things take a few seconds by hand (Docs/Crafting.md 제작 시간).
+      for (let i = 0; i < 10 && count(await inv(), id) <= before; i++) await game.wait(500);
       if (count(await inv(), id) > before) break;
     }
     await game.press('모두 보기', undefined, { quiet: true });
@@ -1933,6 +1939,8 @@ async function firstRun(browser, profile, hourLong) {
   for (const name of ['구리 투구', '구리 장화', '구리 갑옷']) {
     if (!gear && (await game.find('만들기', new RegExp('^' + name))).some(b => b.enabled)) gear = await game.press('만들기', new RegExp('^' + name)) && name;
   }
+  // Gear takes 3 seconds by hand: the bot stays by the workbench meanwhile, as a person would watch the bar.
+  if (gear) await game.wait(3800);
   await game.press('모두 보기', undefined, { quiet: true });
   check(!!gear, `구리 장비 하나를 만든다 (${gear || '재료 부족'})`);
   if (gear) {

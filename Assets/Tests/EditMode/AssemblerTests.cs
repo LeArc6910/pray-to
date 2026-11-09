@@ -56,12 +56,14 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void ItMakesOnlyMaterialsAndConsumablesFromTheWorkbenchOrHand()
+        public void ItMakesWhatTheHandWorkbenchAndAnvilMake()
         {
             Assert.IsTrue(World.Assembles(RecipeFor("iron_gear")));
             Assert.IsTrue(World.Assembles(RecipeFor("healing_potion")), "a recipe needing no station");
             Assert.IsFalse(World.Assembles(RecipeFor("iron_bar")), "the furnace's, which the smelter does");
-            Assert.IsFalse(World.Assembles(RecipeFor("copper_sword")), "gear is made by hand");
+            // Since 2026-11-09 gear too, so what takes long by hand can be left to it (Docs/Automation.md).
+            Assert.IsTrue(World.Assembles(RecipeFor("copper_sword")), "gear from the workbench");
+            Assert.IsTrue(World.Assembles(RecipeFor("flame_blade")), "and from the anvil");
         }
 
         [Test]
@@ -80,6 +82,47 @@ namespace Game.Core.Tests
             Assert.AreEqual(0, world.ChestAt(3, 8).CountOf(IronBar));
             Assert.AreEqual(4, world.ChestAt(3, 8).CountOf(Stone), "nothing the recipe does not use");
             Assert.AreEqual(6, world.ChestAt(6, 8).CountOf(IronGear));
+        }
+
+        [Test]
+        public void GearTakesTimeByHandAndTheAssemblerMakesItUnattended()
+        {
+            // By hand: a copper sword takes 3 seconds at a workbench, the ore used only when it is done.
+            var world = Room(out var player);
+            var sword = RecipeFor("copper_sword");
+            Assert.AreEqual(3f, CraftRules.Seconds(sword, Tiles.Shipped));
+            Assert.AreEqual(0f, CraftRules.Seconds(RecipeFor("healing_potion"), Tiles.Shipped), "a potion is at once");
+            Assert.AreEqual(CraftRules.MachineSeconds, CraftRules.Seconds(RecipeFor("assembler"), Tiles.Shipped));
+            int x = TileMap.Cell(player.Position.X) + 1, y = TileMap.Cell(player.Position.Y);
+            world.Map[x, y] = TileType.Workbench;
+            player.Inventory.AddMaterial(CopperOre, 12);
+            player.Inventory.AddMaterial(Stone, 4);
+            int items = player.Inventory.Items.Count;
+            Assert.AreEqual(2, world.StartCrafting(player.Id, sword, 2));
+            Run(world, 1);
+            Assert.AreEqual(items, player.Inventory.Items.Count, "not yet");
+            Assert.AreEqual(12, player.Inventory.CountOf(CopperOre), "nothing used yet");
+            Run(world, 2.2f);
+            Assert.AreEqual(items + 1, player.Inventory.Items.Count, "one done");
+            Assert.AreEqual(6, player.Inventory.CountOf(CopperOre));
+            Assert.IsNotNull(player.Crafting, "the second under way");
+            Assert.IsTrue(world.StopCrafting(player.Id));
+            Assert.IsNull(player.Crafting);
+            Assert.AreEqual(6, player.Inventory.CountOf(CopperOre), "stopping costs nothing");
+            // Walking off stops it too.
+            world.StartCrafting(player.Id, sword, 1);
+            player.Position = TileMap.Center(x - 8, y);
+            Run(world, 3.5f);
+            Assert.IsNull(player.Crafting);
+            Assert.AreEqual(items + 1, player.Inventory.Items.Count);
+
+            // The assembler: the same sword, into the chest in front, while no one waits.
+            var line = Line(out var keeper);
+            Assert.IsTrue(line.SetRecipe(keeper.Id, sword));
+            line.ChestAt(3, 8).AddMaterial(CopperOre, 6);
+            line.ChestAt(3, 8).AddMaterial(Stone, 2);
+            Run(line, 12);
+            Assert.AreEqual(1, line.ChestAt(6, 8).Items.Count(i => i.Base.Id == "copper_sword"), "a sword in the chest in front");
         }
 
         [Test]
@@ -135,10 +178,9 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void ItRefusesGearAndOtherStationsRecipesAndOtherMachines()
+        public void ItRefusesOtherStationsRecipesAndOtherMachines()
         {
             var world = Line(out var player);
-            Assert.IsFalse(world.SetRecipe(player.Id, RecipeFor("copper_sword")));
             Assert.IsFalse(world.SetRecipe(player.Id, RecipeFor("iron_bar")));
             Assert.IsNull(world.MachineAt(5, 8).Recipe);
 

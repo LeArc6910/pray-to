@@ -377,7 +377,9 @@ namespace Game.Core
                         station = SheetValues.ParseEnum<TileType>(row["station"], "제작대");
                         if (station == TileType.Floor) throw new FormatException("station에는 작업대 같은 칸 종류를 적습니다.");
                     }
-                    recipes.Add(new Recipe(id, item, consumable, material, count, ingredients, station));
+                    var recipe = new Recipe(id, item, consumable, material, count, ingredients, station);
+                    if (row["seconds"].Length > 0) recipe.Seconds = Math.Max(0, (float)SheetValues.ParseDecimal(row["seconds"], "seconds"));
+                    recipes.Add(recipe);
                 });
             }
             return recipes;

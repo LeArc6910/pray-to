@@ -197,6 +197,7 @@ namespace Game.Core
         void UpdatePlayer(Player player)
         {
             player.TickSkills();
+            RunCrafting(player);
             if (player.ConsumableCooldown > 0) player.ConsumableCooldown--;
             if (player.IsDead)
             {

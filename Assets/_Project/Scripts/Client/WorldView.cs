@@ -1676,6 +1676,19 @@ namespace Game.Client
                 case SimEventType.SkillUsed:
                     ShowSkill(e);
                     break;
+                case SimEventType.Crafted:
+                    // Something made by hand that took time is done (Amount 1), or the work stopped (0).
+                    if (e.Source != _client.PlayerId) break;
+                    if (e.Amount > 0)
+                    {
+                        Sounds.Play(Sound.Craft);
+                        AddFlash(_self.Position + new Vector3(0, 0.6f, 0), 0.8f, LevelColor, FlashKind.Sparkles);
+                    }
+                    else
+                    {
+                        _floating.Add(new Floating { Position = _self.Position + new Vector3(0, 0.9f, 0), Text = "만들기를 멈췄다", Color = new Color(1f, 0.85f, 0.5f) });
+                    }
+                    break;
                 case SimEventType.AnimalsPetted:
                     // Pink sparkles over the house, and how fond they are now.
                     var petted = new Vector3(e.Position.X, e.Position.Y - 0.6f, 0);

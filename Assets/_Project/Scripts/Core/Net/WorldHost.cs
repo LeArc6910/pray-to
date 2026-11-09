@@ -396,7 +396,11 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Craft:
                     // Item says how many times over (0 for once, as before), up to MaxCraftAtOnce.
-                    if (command.Index < _loot.Recipes.Count) World.CraftMany(player.Id, _loot.Recipes[command.Index], Math.Clamp(command.Item, 1, MaxCraftAtOnce));
+                    // Things that take time are made one after another while the player stays (World.StartCrafting).
+                    if (command.Index < _loot.Recipes.Count) World.StartCrafting(player.Id, _loot.Recipes[command.Index], Math.Clamp(command.Item, 1, MaxCraftAtOnce));
+                    break;
+                case InventoryCommand.StopCraft:
+                    World.StopCrafting(player.Id);
                     break;
                 case InventoryCommand.Place:
                     if (command.Index < _loot.Materials.Count) World.PlaceTile(player.Id, _loot.Materials[command.Index]);
@@ -574,7 +578,10 @@ namespace Game.Core
                 World.BedOf(viewer)?.X ?? -1,
                 World.BedOf(viewer)?.Y ?? -1,
                 viewer.Mana,
-                viewer.Stats.MaxMana);
+                viewer.Stats.MaxMana,
+                viewer.Crafting == null ? -1 : IndexOf(_loot?.Recipes, viewer.Crafting.Recipe),
+                viewer.Crafting?.Progress ?? 0,
+                viewer.Crafting?.Left ?? 0);
             // A player's type is the weapon in their hands (its base's index plus one), so others can draw it.
             var players = World.Players.Select(p => new EntityState(
                 p.Id, EntityKind.Player, HeldWeapon(p), p.Position, p.Facing, p.Health, p.Stats.MaxHealth, BuffBits(p),

@@ -332,6 +332,25 @@ namespace Game.Core
         // The crafting station that must be nearby (World.StationReach), or null for anywhere.
         public TileType? Station { get; }
         public string Name => Item?.Name ?? Consumable?.Name ?? Material.Name;
+        // Seconds the sheet sets for making it by hand (recipes.csv seconds), or -1 to go by CraftRules.Seconds.
+        public float Seconds { get; internal set; } = -1;
+    }
+
+    // How long making a thing by hand takes (2026-11-09, Docs/Crafting.md 제작 시간): gear 3 seconds and half a second
+    // every five levels (copper 3, iron 4, mithril 5, void 7), a machine 2, the rest none; the sheet may say otherwise.
+    // An assembler makes the same in the same time without anyone waiting, twice as fast on power.
+    public static class CraftRules
+    {
+        public const float MachineSeconds = 2;
+
+        public static float Seconds(Recipe recipe, TileData tiles)
+        {
+            if (recipe == null) return 0;
+            if (recipe.Seconds >= 0) return recipe.Seconds;
+            if (recipe.Item != null) return 3 + (float)Math.Round(recipe.Item.Level / 5f) / 2;
+            if (recipe.Material?.Places is TileType placed && tiles?.Machine(placed) != null) return MachineSeconds;
+            return 0;
+        }
     }
 
     // Filling every socket of a Common item with exactly these runes, in this order, adds the runeword's bonus on

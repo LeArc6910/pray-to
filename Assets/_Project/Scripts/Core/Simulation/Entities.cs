@@ -54,6 +54,8 @@ namespace Game.Core
         public int[] LifeExperience { get; } = new int[LifeSkills.Count];
         // Each skill's perk picked at each tier (LifeSkills.PerkIndex): 0 none, 1 or 2.
         public int[] LifePerks { get; } = new int[LifeSkills.Count * LifeSkills.PerkTiers];
+        // What the player is making by hand that takes time (World.StartCrafting), or null.
+        public CraftJob Crafting { get; internal set; }
         public int LifeVersion { get; internal set; }
 
         // The bestiary (Records.cs): how many of each kind of thing felled or held, the achievements had, and a
@@ -430,6 +432,9 @@ namespace Game.Core
         // Source, a player, petted the animals of the house at Position; Amount is the house's affection now
         // (World.PetAnimals, 2026-11-09).
         AnimalsPetted,
+        // Source, a player, finished making one of what they make by hand (Amount 1), or stopped with it unfinished
+        // (Amount 0): walked off, ran short, the bag full, or asked to (World.StartCrafting, 2026-11-09).
+        Crafted,
     }
 
     public readonly struct SimEvent
@@ -633,6 +638,24 @@ namespace Game.Core
 
     // A boss's projectile hurts players. A player's (Friendly) flies through players and stops at the first enemy;
     // a skill's bursts there.
+    // A thing being made by hand (World.StartCrafting): the recipe, how many more after this one, and the ticks done
+    // of this one out of how many it takes.
+    public sealed class CraftJob
+    {
+        internal CraftJob(Recipe recipe, int left, int ticks)
+        {
+            Recipe = recipe;
+            Left = left;
+            Ticks = Math.Max(1, ticks);
+        }
+
+        public Recipe Recipe { get; }
+        public int Left { get; internal set; }
+        public int Done { get; internal set; }
+        public int Ticks { get; }
+        public float Progress => (float)Done / Ticks;
+    }
+
     public sealed class Projectile
     {
         internal Projectile(

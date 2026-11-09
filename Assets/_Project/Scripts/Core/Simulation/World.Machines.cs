@@ -208,22 +208,29 @@ namespace Game.Core
 
         // What an assembler may be set to: a workbench recipe (or one needing no station) that makes a material or a
         // consumable. Gear is made by hand.
+        // What an assembler makes: anything made by hand or at a workbench or an anvil, gear too (2026-11-09) so the
+        // things that take long by hand can be left to it (Docs/Automation.md 조립기).
         public static bool Assembles(Recipe recipe) =>
-            recipe != null && (recipe.Station == null || recipe.Station == TileType.Workbench) && (recipe.Material != null || recipe.Consumable != null);
+            recipe != null && (recipe.Station == null || recipe.Station == TileType.Workbench || recipe.Station == TileType.Anvil);
 
-        // Makes its recipe whenever its input holds the ingredients, every so often. A material comes out of the front
-        // like a smelter's; a consumable only into a chest in front, and without one it waits.
+        // Makes its recipe whenever its input holds the ingredients, in the time it takes by hand (CraftRules.Seconds)
+        // or its own if that is longer; on power, twice as fast. A material comes out of the front like a smelter's; a
+        // consumable or a piece of gear only into a chest in front, and without one, or with it full, it waits.
         void RunAssembler(Machine assembler)
         {
             var recipe = assembler.Recipe;
             var (fx, fy) = assembler.Front;
-            bool room = recipe?.Material != null ? Count(assembler.Output) + recipe.Count <= assembler.Definition.Capacity : ChestAt(fx, fy) != null;
+            var chest = ChestAt(fx, fy);
+            bool room = recipe?.Material != null ? Count(assembler.Output) + recipe.Count <= assembler.Definition.Capacity
+                : recipe?.Item != null ? chest != null && !chest.IsFull && _lootGenerator != null
+                : chest != null;
             bool ready = recipe != null && room && recipe.Ingredients.All(i => HeldKind(assembler.Input, i.Material) >= i.Count);
+            int takes = recipe == null ? assembler.Definition.Ticks : Math.Max(assembler.Definition.Ticks, Ticks(CraftRules.Seconds(recipe, Tiles)));
             if (!ready)
             {
                 assembler.Timer = 0;
             }
-            else if (++assembler.Timer >= assembler.Definition.Ticks)
+            else if (++assembler.Timer >= takes)
             {
                 assembler.Timer = 0;
                 foreach (var (material, count) in recipe.Ingredients) UseKind(assembler.Input, material, count);
@@ -231,6 +238,12 @@ namespace Game.Core
                 if (recipe.Material != null)
                 {
                     Add(assembler.Output, recipe.Material, recipe.Count);
+                }
+                else if (recipe.Item != null)
+                {
+                    chest.TryAdd(Register(_lootGenerator.RollItem(recipe.Item, recipe.Item.Level, Rarity.Common, _random)));
+                    int key = fy * Map.Width + fx;
+                    _chestVersions[key] = _chestVersions.GetValueOrDefault(key) + 1;
                 }
                 else
                 {

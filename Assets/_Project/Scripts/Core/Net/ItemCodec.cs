@@ -205,6 +205,8 @@ namespace Game.Core
         Repair,
         // Pets the animals of the coop, barn or fold ahead (World.PetAnimals).
         PetAnimals,
+        // Stops what the player is making by hand (World.StopCrafting).
+        StopCraft,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

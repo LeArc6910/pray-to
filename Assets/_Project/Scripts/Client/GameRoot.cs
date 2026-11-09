@@ -1271,6 +1271,9 @@ namespace Game.Client
                         lines.Add(everyone > 1 ? $"자는 중… 모두 누우면 아침이 된다 ({_client.Sleepers}/{everyone}명)" : "자는 중…");
                     }
                     if ((_client.SelfStatus & StatusBits.Recalling) != 0) lines.Add("귀환 중… 맞으면 끊긴다");
+                    // Making something by hand (World.StartCrafting): what, how far, how many more.
+                    if (_client.Crafting != null)
+                        lines.Add($"만드는 중: {Whole(_client.Crafting.Name)} {_client.CraftProgress * 100:0}%" + (_client.CraftLeft > 1 ? $" (남은 {_client.CraftLeft}개)" : ""));
                     if (_client.Food != null)
                     {
                         int left = Mathf.CeilToInt(_client.FoodLeft);
