@@ -55,6 +55,10 @@ namespace Game.Client
         // A door swinging open on its hinge, and falling shut (2026-11-09).
         Door,
         DoorShut,
+        // A hammer's tap on the workbench while something is being made (2026-11-09).
+        Hammer,
+        // A monster tramping through a crop at night: leaves crushed and a dull thud (2026-11-09).
+        Trample,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -153,6 +157,17 @@ namespace Game.Client
                 case Sound.Click:
                     parts.Add(Tone(Wave.Pulse, 0, 0.04f, 1200, 1100, 0.3f, decay: 6));
                     level = 0.4f;
+                    break;
+                case Sound.Hammer:
+                    parts.Add(Tone(Wave.Pulse, 0, 0.05f, 1700, 1550, 0.45f, decay: 9));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.09f, 420, 300, 0.5f, decay: 6));
+                    parts.Add(Noise(0, 0.025f, 0.3f, 0.8f, decay: 9));
+                    level = 0.45f;
+                    break;
+                case Sound.Trample:
+                    parts.Add(Noise(0, 0.2f, 0.55f, 0.35f, decay: 3, seed: 7));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.13f, 170, 85, 0.5f, decay: 5));
+                    level = 0.55f;
                     break;
                 case Sound.Shoot:
                     parts.Add(Tone(Wave.Triangle, 0, 0.14f, 720, 250, 0.7f, decay: 4));

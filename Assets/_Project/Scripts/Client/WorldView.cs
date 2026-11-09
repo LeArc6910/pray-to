@@ -326,6 +326,20 @@ namespace Game.Client
             _target.transform.localScale = new Vector3(size, size, 1);
             _target.color = open ? new Color(1, 1, 1, 0.6f + 0.25f * Mathf.Sin(Time.time * 4)) : new Color(1, 0.35f, 0.3f, 0.8f);
         }
+        // Scarecrows sway in a draught (2026-11-09): a few degrees each way about their foot, each a little out of step.
+        readonly HashSet<Vector3Int> _scarecrows = new HashSet<Vector3Int>();
+
+        void SwayScarecrows()
+        {
+            foreach (var cell in _scarecrows)
+            {
+                float degrees = Mathf.Sin(Time.time * 1.7f + cell.x * 0.9f + cell.y * 0.4f) * 6;
+                var sway = Matrix4x4.Translate(new Vector3(0, -0.45f, 0)) * Matrix4x4.Rotate(Quaternion.Euler(0, 0, degrees)) * Matrix4x4.Translate(new Vector3(0, 0.45f, 0));
+                _objects.SetTileFlags(cell, TileFlags.None);
+                _objects.SetTransformMatrix(cell, sway);
+            }
+        }
+
         // How far a glowing shot lights its way.
         const float ShotLight = 2.2f;
         // A summoned spirit glows a little in its colour.
@@ -471,6 +485,7 @@ namespace Game.Client
             DrawMarks();
             DrawProjectiles();
             DrawTarget();
+            SwayScarecrows();
 
             foreach (var e in _client.TakeEvents()) Show(e);
             UpdateFlashes(deltaTime);
@@ -1682,6 +1697,8 @@ namespace Game.Client
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : element != SkillTag.None ? Palette.Of(element) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
                     var numberAt = element == SkillTag.None ? target.Position : target.Position + new Vector3(0.35f, 0.2f, 0);
                     _floating.Add(new Floating { Position = numberAt, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
+                    // And a burst of the element where it struck, for everyone to see (2026-11-09).
+                    if (element != SkillTag.None) AddFlash(target.Position + new Vector3(0, target.Diameter * 0.15f, 0), 0.5f, Palette.Of(element), FlashKind.Burst);
                     // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
                     var away = hitter != null ? (Vector2)(target.Position - hitter.Position) : Vector2.zero;
                     if (away.sqrMagnitude > 1e-4f)
@@ -1723,7 +1740,7 @@ namespace Game.Client
                     // A monster trampled a crop at night: dust, a word, and once a session what to do about it.
                     var trampled = new Vector3(e.Position.X, e.Position.Y, 0);
                     AddFlash(trampled, 0.6f, Palette.Dust, FlashKind.Burst);
-                    Hear(Sound.Dig, trampled, 0.5f);
+                    Hear(Sound.Trample, trampled, 0.6f);
                     _floating.Add(new Floating { Position = trampled + new Vector3(0, 0.5f, 0), Text = "짓밟혔다", Color = new Color(0.85f, 0.65f, 0.4f) });
                     if (!_trampleHintShown && Vector3.Distance(trampled, _self.Position) < 12)
                     {
@@ -2705,6 +2722,7 @@ namespace Game.Client
                 {
                     ground[y * map.Width + x] = GroundAt(x, y);
                     objects[y * map.Width + x] = Sprites.Object(map[x, y]);
+                    if (map[x, y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(x, y, 0));
                 }
             }
             var bounds = new BoundsInt(0, 0, 0, map.Width, map.Height, 1);
@@ -2787,6 +2805,8 @@ namespace Game.Client
                     _cracks.Remove(key);
                 }
                 _objects.SetTile(new Vector3Int(change.X, change.Y, 0), Sprites.Object(map[change.X, change.Y]));
+                if (map[change.X, change.Y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(change.X, change.Y, 0));
+                else _scarecrows.Remove(new Vector3Int(change.X, change.Y, 0));
                 foreach (var (dx, dy) in Neighbourhood)
                 {
                     int x = change.X + dx;

@@ -231,6 +231,12 @@ namespace Game.Client
             _map.UpdateTiles(changedTiles);
             _view.ShowTarget = (_inventory != null && _inventory.Open) || (_hotbar != null && _hotbar.PointsAtGround);
             _view.TargetSoil = _inventory != null && _inventory.Open && _inventory.PointsAtSoil || _hotbar != null && _hotbar.PointsAtSoil;
+            // A hammer's tap now and then while something is being made by hand (2026-11-09).
+            if (_client.Crafting != null && Time.time >= _hammerAt)
+            {
+                Sounds.Play(Sound.Hammer, 0.5f);
+                _hammerAt = Time.time + 0.6f;
+            }
             _view.TargetSize = Math.Max(_inventory != null && _inventory.Open ? _inventory.PointsAtSize : 1, _hotbar != null ? _hotbar.PointsAtSize : 1);
             if (_inventory != null) _inventory.CrackAhead = _inventory.Open ? _view.CrackAhead() : null;
             // Typing a pet's name keeps the keys from the game; the bag closing lets go of the field.
@@ -444,6 +450,8 @@ namespace Game.Client
 
         // The playtest's "solo" starts a character afresh under a name the menu may have read already.
         internal void ForgetCharacterClasses() => _classesFor = null;
+
+        float _hammerAt;
 
         void SyncCharacterClasses()
         {

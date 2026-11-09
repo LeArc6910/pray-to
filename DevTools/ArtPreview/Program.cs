@@ -45,6 +45,11 @@ namespace Game.Client
             for (int i = 0; i < TileArt.GroundCount; i++) TileArt.Ground(i);
             Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
             Save(Sheet(loot, monsters, npcs), Path.Combine(output, "sheet.png"), 4);
+            // The newest pieces one by one, for a closer look (2026-11-09).
+            var pieces = Directory.CreateDirectory(Path.Combine(output, "pieces")).FullName;
+            Save(TileArt.BigSmelter, Path.Combine(pieces, "big_smelter.png"), 6);
+            Save(TileArt.BigAssembler, Path.Combine(pieces, "big_assembler.png"), 6);
+            Save(TileArt.Object(TileType.Scarecrow), Path.Combine(pieces, "scarecrow.png"), 6);
             Save(Players(), Path.Combine(output, "player.png"), 6);
             Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
             Motions.Write(Path.Combine(output, "anim"), loot, monsters, npcs);
