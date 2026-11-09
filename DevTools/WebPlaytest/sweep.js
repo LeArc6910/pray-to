@@ -569,12 +569,17 @@ async function bosses(browser) {
     await game.shot(`boss-${id}-3`, `${name} 3페이즈`);
     if (id === 'cave_warden' || id === 'crystal_queen') check(!!three, `${name}: 체력 33% 아래에서 "3페이즈!"`);
     if (three) check((await game.state()).music === `boss_${id}_3`, `${name}: 3페이즈 곡`);
+    // What the bag holds before the kill: a boss falling beside the player can drop its loot where the player stands,
+    // and it is picked up at once.
+    const held = inv => (inv.items || []).length + Object.values(inv.materials || {}).reduce((a, b) => a + b, 0) + Object.values(inv.consumables || {}).reduce((a, b) => a + b, 0);
+    const before = held(await game.inventory());
     await game.send(`heal; boss ${id} hurt 1`);
     const dead = await game.until(t => has(t.banner, '처치'), 4000, game.texts);
     check(!!dead, `${name}: "${name} 처치!" 배너`);
     await game.wait(1200);
     const after = await game.state();
-    check(after.loot > 0, `${name}: 잡으면 떨어뜨린다 (바닥 ${after.loot}개)`);
+    const gained = held(await game.inventory()) - before;
+    check(after.loot > 0 || gained > 0, `${name}: 잡으면 떨어뜨린다 (바닥 ${after.loot}개, 가방에 든 것 +${gained})`);
     await game.shot(`boss-${id}-drops`, `${name}의 드랍`);
   }
   await game.context.close();
