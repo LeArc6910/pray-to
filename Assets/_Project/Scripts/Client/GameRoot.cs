@@ -357,8 +357,9 @@ namespace Game.Client
             SendToHost(_client.Sleeping ? _client.WakeCommand() : _client.SleepCommand());
         }
 
-        // The boss tune while a boss is awake on screen, else the biome's; the menu has the cave's. Under it the cave's
-        // drips or the lava's bubbles, and the hum of the nearest running machine in view.
+        // The boss's theme at its phase while a boss is awake on screen, else the biome's tune, urgent in a fight
+        // (WorldView.InCombat); the menu has the cave's. Under it the cave's drips or the lava's bubbles, and the hum of
+        // the nearest running machine in view. The songs likely next are made ahead (Music.Prepare).
         void UpdateMusic(float deltaTime)
         {
             if (_client == null || _client.Status != ClientStatus.Playing || _client.Map == null)
@@ -368,7 +369,7 @@ namespace Game.Client
             }
             // The biome the player has settled in (UpdateBiome), so walking along a border does not keep switching.
             var biome = _biomeAnnounced;
-            var tune = _view?.ActiveBoss != null ? Tune.Boss : biome switch
+            var tune = biome switch
             {
                 Biome.Mushroom => Tune.Mushroom,
                 Biome.Ice => Tune.Ice,
@@ -379,12 +380,26 @@ namespace Game.Client
                 Biome.Sand => Tune.Sand,
                 _ => Tune.Cave,
             };
+            bool fight = _view != null && _view.InCombat;
+            Song song;
+            // A boss in sight, still asleep: its first phase made ahead for when it wakes.
+            if (_view?.BossInSight is string sleeper) Music.Prepare(Song.Of(sleeper, 1));
+            if (_view?.ActiveBoss is EntityView boss)
+            {
+                song = Song.Of(boss.Boss.Id, boss.Phase);
+                for (int phase = song.Phase + 1; phase <= MusicArt.BossPhases; phase++) Music.Prepare(Song.Of(boss.Boss.Id, phase));
+            }
+            else
+            {
+                song = Song.Field(tune, fight);
+                Music.Prepare(Song.Field(tune, !fight));
+            }
             float nearest = float.MaxValue;
             foreach (var machine in _client.Machines())
             {
                 if (machine.On) nearest = Mathf.Min(nearest, Vec2.Distance(_client.Position, TileMap.Center(machine.X, machine.Y)));
             }
-            Music.Update(tune, biome == Biome.Lava ? Ambience.Lava : Ambience.Cave, 1 - nearest / MachineHearing, deltaTime);
+            Music.Update(song, biome == Biome.Lava ? Ambience.Lava : Ambience.Cave, 1 - nearest / MachineHearing, deltaTime);
         }
 
         // How far off a running machine can be heard.
@@ -616,6 +631,8 @@ namespace Game.Client
 
         // Whether the frame on the tile a [놓기] would build on is drawn (WorldView.ShowTarget).
         internal bool TargetShown => _view != null && _view.ShowTarget;
+        // The song playing (MusicArt Song.Key), for the playtest.
+        internal string MusicPlaying => Music.Playing;
 
         internal string Status => _status;
 
@@ -1242,6 +1259,8 @@ namespace Game.Client
             else Ui.LeftColumnBottom = Ui.HudArea.yMax;
             if (Event.current.type == EventType.Repaint) _hudLines = shown.ToArray();
 
+            // A boss in sight, still asleep: its first phase made ahead for when it wakes.
+            if (_view?.BossInSight is string sleeper) Music.Prepare(Song.Of(sleeper, 1));
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss);
         }
 

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -43,6 +44,41 @@ namespace Game.Client
             float distance = Vector2.Distance(at, listener);
             if (distance >= Hearing) return;
             Play(sound, volume * (1 - distance / Hearing));
+        }
+
+        // A skill's own sound (SoundArt.Skill) at a place in the world; false when the skill has none.
+        public static bool PlaySkillAt(string id, Vector3 at, Vector3 listener, float volume = 1)
+        {
+            var clip = SkillClip(id);
+            if (clip == null) return false;
+            float distance = Vector2.Distance(at, listener);
+            if (!Settings.Sound || distance >= Hearing) return true;
+            float now = Time.unscaledTime;
+            if (SkillPlayed.TryGetValue(id, out float last) && now - last < MinGap) return true;
+            SkillPlayed[id] = now;
+            var source = NextSource();
+            source.clip = clip;
+            source.volume = Mathf.Clamp01(volume * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume;
+            source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter) * 0.5f;
+            source.Play();
+            return true;
+        }
+
+        static readonly Dictionary<string, AudioClip> SkillClips = new Dictionary<string, AudioClip>();
+        static readonly Dictionary<string, float> SkillPlayed = new Dictionary<string, float>();
+
+        static AudioClip SkillClip(string id)
+        {
+            if (id == null) return null;
+            if (SkillClips.TryGetValue(id, out var clip)) return clip;
+            var samples = SoundArt.Skill(id);
+            if (samples != null)
+            {
+                clip = AudioClip.Create("skill_" + id, samples.Length, 1, SoundArt.SampleRate, false);
+                clip.SetData(samples, 0);
+            }
+            SkillClips[id] = clip;
+            return clip;
         }
 
         static AudioSource NextSource()

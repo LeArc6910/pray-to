@@ -281,6 +281,261 @@ namespace Game.Client
             return Mix(parts, level);
         }
 
+        // Each skill's own sound as it is used (2026-11-09), by its id in skills.csv; null for a skill without one,
+        // which sounds as its kind does (WorldView).
+        public static float[] Skill(string id)
+        {
+            var parts = new List<Part>();
+            float level;
+            switch (id)
+            {
+                // ---- Warrior: steel and weight ----
+                case "whirlwind":
+                    // Two blades whooshing round and the ring of steel.
+                    parts.Add(Noise(0, 0.18f, 1, 0.25f, attack: 0.05f, decay: 2.5f, seed: 41));
+                    parts.Add(Noise(0.16f, 0.18f, 1, 0.3f, attack: 0.05f, decay: 2.5f, seed: 42));
+                    parts.Add(Tone(Wave.Sine, 0, 0.32f, 320, 150, 0.3f, decay: 2));
+                    parts.Add(Tone(Wave.Triangle, 0.05f, 0.3f, 1500, 1400, 0.12f, decay: 3));
+                    level = 0.7f;
+                    break;
+                case "war_cry":
+                    // A rough shout over a drum.
+                    parts.Add(Tone(Wave.Saw, 0, 0.5f, 180, 230, 0.6f, attack: 0.04f, decay: 1.5f, vibrato: 0.05f, vibratoRate: 7));
+                    parts.Add(Tone(Wave.Square, 0, 0.5f, 90, 115, 0.3f, attack: 0.04f, decay: 1.5f));
+                    parts.Add(Tone(Wave.Sine, 0, 0.25f, 120, 45, 0.8f, decay: 4));
+                    parts.Add(Noise(0, 0.4f, 0.4f, 0.15f, attack: 0.03f, decay: 2, seed: 43));
+                    level = 0.85f;
+                    break;
+                case "charge":
+                    // A rush of air and the stamp of landing.
+                    parts.Add(Noise(0, 0.35f, 0.8f, 0.4f, attack: 0.02f, decay: 2, seed: 44));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.3f, 150, 500, 0.4f, decay: 2));
+                    parts.Add(Tone(Wave.Sine, 0.3f, 0.2f, 110, 40, 0.8f, decay: 4));
+                    parts.Add(Noise(0.3f, 0.08f, 0.6f, 0.5f, decay: 6, seed: 45));
+                    level = 0.8f;
+                    break;
+                case "ground_slam":
+                    // A deep thud, the ground rumbling and stones cracking.
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 80, 30, 1, decay: 3));
+                    parts.Add(Noise(0, 0.6f, 1, 0.08f, decay: 3, seed: 50));
+                    Crackle(parts, 0.05f, 0.3f, 4, 0.5f, 51);
+                    level = 1;
+                    break;
+                case "iron_skin":
+                    // A clang, and the iron ringing on.
+                    parts.Add(Noise(0, 0.03f, 0.5f, 0.8f, decay: 6, seed: 46));
+                    Bell(parts, 0, 0.9f, 520, 0.5f);
+                    Bell(parts, 0.08f, 0.8f, 780, 0.35f);
+                    level = 0.7f;
+                    break;
+                case "blade_storm":
+                    // Five whooshes, quicker and quicker, and a long ring.
+                    foreach (float at in new[] { 0f, 0.13f, 0.24f, 0.33f, 0.41f })
+                        parts.Add(Noise(at, 0.16f, 1, 0.3f, attack: 0.04f, decay: 2.5f, seed: 47 + (int)(at * 100)));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.7f, 1800, 1600, 0.12f, decay: 2, vibrato: 0.02f, vibratoRate: 30));
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 260, 120, 0.25f, decay: 2));
+                    level = 0.8f;
+                    break;
+
+                // ---- Fire mage: whooshes, hisses and crackles ----
+                case "fireball":
+                    parts.Add(Noise(0, 0.4f, 1, 0.3f, attack: 0.06f, decay: 2, seed: 52));
+                    parts.Add(Tone(Wave.Sine, 0, 0.35f, 200, 520, 0.4f, decay: 2));
+                    Crackle(parts, 0.08f, 0.3f, 3, 0.3f, 53);
+                    level = 0.75f;
+                    break;
+                case "flame_brand":
+                    // A match struck: a hiss, a warm rise and a glint.
+                    parts.Add(Noise(0, 0.5f, 0.6f, 0.7f, attack: 0.1f, decay: 2.5f, seed: 54));
+                    parts.Add(Tone(Wave.Triangle, 0.05f, 0.45f, 330, 660, 0.35f, decay: 2));
+                    Bell(parts, 0.2f, 0.4f, 880, 0.2f);
+                    level = 0.65f;
+                    break;
+                case "fire_ring":
+                    // A roar of flame swelling out round the caster.
+                    parts.Add(Noise(0, 0.7f, 1, 0.2f, attack: 0.15f, decay: 2, seed: 55));
+                    parts.Add(Tone(Wave.Saw, 0, 0.6f, 110, 70, 0.3f, attack: 0.1f, decay: 2, vibrato: 0.05f, vibratoRate: 6));
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 220, 440, 0.25f, decay: 2));
+                    level = 0.85f;
+                    break;
+                case "meteor":
+                    // A whistle falling from the sky, then the crash.
+                    parts.Add(Tone(Wave.Sine, 0, 0.6f, 1800, 400, 0.35f, attack: 0.1f, decay: 0.8f));
+                    parts.Add(Noise(0.55f, 0.6f, 1, 0.1f, decay: 3, seed: 56));
+                    parts.Add(Tone(Wave.Sine, 0.55f, 0.5f, 90, 30, 1, decay: 3));
+                    Crackle(parts, 0.6f, 0.4f, 4, 0.35f, 57);
+                    level = 1;
+                    break;
+                case "flame_burst":
+                    // Three quick puffs of fire.
+                    foreach (float at in new[] { 0f, 0.1f, 0.2f })
+                    {
+                        parts.Add(Noise(at, 0.15f, 1, 0.35f, attack: 0.02f, decay: 3, seed: 58 + (int)(at * 10)));
+                        parts.Add(Tone(Wave.Sine, at, 0.12f, 300, 600, 0.25f, decay: 3));
+                    }
+                    level = 0.7f;
+                    break;
+                case "inferno":
+                    // A long roar of fire, crackling, over a deep rumble.
+                    parts.Add(Noise(0, 1.2f, 1, 0.15f, attack: 0.2f, decay: 1.5f, seed: 60));
+                    parts.Add(Tone(Wave.Saw, 0, 1.1f, 70, 55, 0.4f, attack: 0.15f, decay: 1.5f, vibrato: 0.08f, vibratoRate: 5));
+                    parts.Add(Tone(Wave.Sine, 0, 0.4f, 120, 40, 0.6f, decay: 3));
+                    Crackle(parts, 0.1f, 1, 7, 0.35f, 61);
+                    level = 1;
+                    break;
+
+                // ---- Archer: the bow and the air ----
+                case "volley":
+                    foreach (float at in new[] { 0f, 0.09f, 0.18f }) Twang(parts, at, 0.6f, 62 + (int)(at * 100));
+                    level = 0.65f;
+                    break;
+                case "eagle_eye":
+                    // A hawk's cry and a glint.
+                    parts.Add(Tone(Wave.Sine, 0, 0.35f, 1800, 2600, 0.4f, attack: 0.03f, decay: 1.5f, vibrato: 0.03f, vibratoRate: 25));
+                    parts.Add(Tone(Wave.Sine, 0.3f, 0.3f, 2600, 1500, 0.35f, decay: 2, vibrato: 0.03f, vibratoRate: 25));
+                    Bell(parts, 0.05f, 0.5f, 1320, 0.2f);
+                    level = 0.6f;
+                    break;
+                case "gale_step":
+                    // A gust rising.
+                    parts.Add(Noise(0, 0.45f, 0.8f, 0.55f, attack: 0.08f, decay: 2, seed: 63));
+                    parts.Add(Tone(Wave.Sine, 0, 0.4f, 400, 1200, 0.25f, decay: 2, vibrato: 0.05f, vibratoRate: 9));
+                    level = 0.6f;
+                    break;
+                case "power_shot":
+                    // The bow creaking as it bends, then a deep twang and the arrow tearing away.
+                    parts.Add(Tone(Wave.Saw, 0, 0.25f, 90, 140, 0.25f, attack: 0.05f, decay: 0.5f, vibrato: 0.2f, vibratoRate: 30));
+                    parts.Add(Tone(Wave.Triangle, 0.25f, 0.25f, 500, 120, 0.9f, decay: 4));
+                    parts.Add(Noise(0.25f, 0.25f, 0.6f, 0.5f, attack: 0.01f, decay: 3, seed: 64));
+                    level = 0.85f;
+                    break;
+                case "explosive_arrow":
+                    // A twang and a sizzling fuse.
+                    Twang(parts, 0, 0.6f, 65);
+                    parts.Add(Noise(0.05f, 0.45f, 0.4f, 0.9f, attack: 0.02f, decay: 1, seed: 66));
+                    parts.Add(Tone(Wave.Square, 0.1f, 0.4f, 1200, 1300, 0.06f, decay: 1, vibrato: 0.1f, vibratoRate: 40));
+                    level = 0.65f;
+                    break;
+                case "arrow_rain":
+                    // A shot up, and arrows whistling down.
+                    parts.Add(Tone(Wave.Triangle, 0, 0.12f, 500, 900, 0.5f, decay: 3));
+                    for (int k = 0; k < 5; k++) parts.Add(Tone(Wave.Sine, 0.15f + 0.08f * k, 0.3f, 2200 - 100 * k, 900, 0.18f, decay: 2));
+                    level = 0.6f;
+                    break;
+
+                // ---- Summoner: bells, breath and voices ----
+                case "spirits":
+                    Arpeggio(parts, Wave.Sine, 0.07f, 0.4f, 0.3f, 784, 988, 1175, 1568);
+                    parts.Add(Noise(0, 0.6f, 0.25f, 0.9f, attack: 0.2f, decay: 2, seed: 67));
+                    level = 0.6f;
+                    break;
+                case "spirit_pact":
+                    // Two bells a fifth apart and a slow pulse binding them.
+                    Bell(parts, 0, 0.8f, 440, 0.4f);
+                    Bell(parts, 0, 0.8f, 660, 0.3f);
+                    parts.Add(Tone(Wave.Sine, 0, 0.8f, 220, 220, 0.25f, attack: 0.1f, decay: 1.5f, vibrato: 0.03f, vibratoRate: 4));
+                    level = 0.6f;
+                    break;
+                case "life_spring":
+                    // Water welling up and a harp running up.
+                    foreach (float at in new[] { 0f, 0.07f, 0.15f, 0.22f }) parts.Add(Tone(Wave.Sine, at, 0.07f, 500 + at * 800, 1100 + at * 800, 0.3f, decay: 5));
+                    Arpeggio(parts, Wave.Triangle, 0.08f, 0.3f, 0.3f, 523, 659, 784, 1047, 1319);
+                    level = 0.6f;
+                    break;
+                case "spirit_horde":
+                    // Many little bells scattered.
+                    var notes = new[] { 1047f, 1319, 1568, 1175, 1760, 1397, 2093 };
+                    for (int k = 0; k < notes.Length; k++) Bell(parts, k * 0.065f, 0.4f, notes[k], 0.25f);
+                    parts.Add(Noise(0, 0.6f, 0.2f, 0.9f, attack: 0.2f, decay: 2, seed: 68));
+                    level = 0.6f;
+                    break;
+                case "spirit_blast":
+                    // A ghostly rise bursting.
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 300, 900, 0.4f, attack: 0.05f, decay: 1, vibrato: 0.08f, vibratoRate: 12));
+                    parts.Add(Noise(0.22f, 0.4f, 0.8f, 0.3f, decay: 3, seed: 69));
+                    parts.Add(Tone(Wave.Sine, 0.25f, 0.3f, 200, 60, 0.6f, decay: 3));
+                    level = 0.85f;
+                    break;
+                case "guardian":
+                    // A low choir and a bell: something great answering.
+                    foreach (var (pitch, volume) in new[] { (220f, 0.3f), (277f, 0.25f), (330f, 0.22f) })
+                        parts.Add(Tone(Wave.Sine, 0, 1, pitch, pitch, volume, attack: 0.15f, decay: 1, vibrato: 0.015f, vibratoRate: 5));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.6f, 110, 110, 0.3f, attack: 0.1f, decay: 1.5f));
+                    Bell(parts, 0.1f, 0.8f, 880, 0.25f);
+                    level = 0.75f;
+                    break;
+
+                // ---- Storm caller: lightning, ice and wind ----
+                case "chain_lightning":
+                    Crackle(parts, 0, 0.25f, 5, 0.9f, 70);
+                    parts.Add(Tone(Wave.Square, 0, 0.3f, 2000, 300, 0.2f, decay: 2, vibrato: 0.3f, vibratoRate: 60));
+                    level = 0.7f;
+                    break;
+                case "frost_ring":
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 1600, 2200, 0.3f, decay: 2, vibrato: 0.03f, vibratoRate: 20));
+                    parts.Add(Noise(0, 0.5f, 0.4f, 0.85f, attack: 0.05f, decay: 2, seed: 71));
+                    parts.Add(Noise(0.02f, 0.04f, 0.8f, 0.6f, decay: 8, seed: 72));
+                    Bell(parts, 0.05f, 0.4f, 2637, 0.15f);
+                    level = 0.6f;
+                    break;
+                case "ice_lance":
+                    // A glassy whistle and a crack.
+                    parts.Add(Tone(Wave.Sine, 0, 0.25f, 2400, 3000, 0.35f, decay: 1.5f));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.2f, 1200, 1500, 0.2f, decay: 2));
+                    parts.Add(Noise(0.2f, 0.06f, 1, 0.6f, decay: 7, seed: 73));
+                    Bell(parts, 0.2f, 0.3f, 3136, 0.15f);
+                    level = 0.6f;
+                    break;
+                case "storm_mantle":
+                    // Wind gathering, an electric hum and a spark.
+                    parts.Add(Noise(0, 0.8f, 0.6f, 0.3f, attack: 0.2f, decay: 1.5f, seed: 74));
+                    parts.Add(Tone(Wave.Saw, 0, 0.8f, 110, 110, 0.2f, attack: 0.1f, decay: 1.5f, vibrato: 0.02f, vibratoRate: 50));
+                    parts.Add(Tone(Wave.Square, 0.1f, 0.15f, 800, 2400, 0.15f, decay: 3));
+                    level = 0.6f;
+                    break;
+                case "thunderclap":
+                    parts.Add(Noise(0, 0.08f, 1, 0.95f, attack: 0.001f, decay: 6, seed: 75));
+                    parts.Add(Noise(0.04f, 0.9f, 0.9f, 0.06f, attack: 0.03f, decay: 2, seed: 76));
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 70, 35, 0.7f, decay: 3));
+                    level = 1;
+                    break;
+                case "blizzard":
+                    // A howling wind with ice glittering in it.
+                    parts.Add(Noise(0, 1.4f, 0.8f, 0.25f, attack: 0.3f, decay: 1, seed: 77));
+                    parts.Add(Tone(Wave.Sine, 0, 1.3f, 700, 900, 0.15f, attack: 0.2f, decay: 1, vibrato: 0.1f, vibratoRate: 3));
+                    parts.Add(Tone(Wave.Sine, 0.1f, 1, 2400, 2800, 0.15f, decay: 2, vibrato: 0.03f, vibratoRate: 20));
+                    level = 0.8f;
+                    break;
+                default:
+                    return null;
+            }
+            return Mix(parts, level);
+        }
+
+        // A struck bell: the note and a fainter partial 2.76 times as high that dies sooner.
+        static void Bell(List<Part> parts, float start, float seconds, float pitch, float volume)
+        {
+            parts.Add(Tone(Wave.Sine, start, seconds, pitch, pitch, volume, decay: 3));
+            parts.Add(Tone(Wave.Sine, start, seconds * 0.6f, pitch * 2.76f, pitch * 2.76f, volume * 0.35f, decay: 4));
+        }
+
+        // A bowstring let go: a falling twang and a breath of air.
+        static void Twang(List<Part> parts, float start, float volume, int seed)
+        {
+            parts.Add(Tone(Wave.Triangle, start, 0.12f, 720, 250, volume, decay: 4));
+            parts.Add(Noise(start, 0.06f, volume * 0.5f, 0.7f, decay: 6, seed: seed));
+        }
+
+        // Short sharp bursts of noise spread over a time: crackling fire, cracking stone, lightning.
+        static void Crackle(List<Part> parts, float start, float seconds, int count, float volume, int seed)
+        {
+            for (int k = 0; k < count; k++)
+            {
+                float at = start + seconds * k / count + (seed * 7 + k * 13) % 5 * 0.01f;
+                parts.Add(Noise(at, 0.05f, volume * (1 - 0.1f * k), 0.75f, decay: 8, seed: seed * 10 + k));
+            }
+        }
+
         // A tone or noise burst placed in time; Render adds it into the buffer.
         sealed class Part
         {

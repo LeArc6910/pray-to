@@ -64,10 +64,13 @@ namespace Game.Client
             Save(effects, Path.Combine(output, "effects.png"), 3);
             if (!effectsFine) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
+            if (!WriteSkillSounds(Path.Combine(output, "sounds", "skills"), classes)) return 1;
             if (!WriteMusic(Path.Combine(output, "music"))) return 1;
             Console.WriteLine($"Wrote sheet.png, player.png, bosses.png, anim/, cave.png, cave_unlit.png, arena.png, skills.png, effects.png, sounds/ and music/ to {output}");
             return 0;
         }
+
+        static readonly string[] BossIds = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion" };
 
         static bool WriteSounds(string folder)
         {
@@ -88,6 +91,41 @@ namespace Game.Client
             return fine;
         }
 
+        // Every skill's own sound to sounds/skills/<id>.wav (2026-11-09). Each shipped skill must have one, in range,
+        // and no two may be the same.
+        static bool WriteSkillSounds(string folder, ClassData classes)
+        {
+            Directory.CreateDirectory(folder);
+            bool fine = true;
+            var seen = new Dictionary<string, string>();
+            foreach (var skill in classes.Classes.SelectMany(c => c.Skills))
+            {
+                var samples = SoundArt.Skill(skill.Id);
+                if (samples == null)
+                {
+                    Console.Error.WriteLine($"skill {skill.Id}: no sound of its own");
+                    fine = false;
+                    continue;
+                }
+                float seconds = samples.Length / (float)SoundArt.SampleRate;
+                float loudest = samples.Max(Math.Abs);
+                if (seconds > 2 || loudest < 0.05f || loudest > 1 || samples.Any(float.IsNaN))
+                {
+                    Console.Error.WriteLine($"skill {skill.Id}: {seconds:0.00}s, peak {loudest:0.00}");
+                    fine = false;
+                }
+                string print = $"{samples.Length}:{samples.Sum(Math.Abs):0.000}";
+                if (seen.TryGetValue(print, out string twin))
+                {
+                    Console.Error.WriteLine($"skill {skill.Id} sounds the same as {twin}");
+                    fine = false;
+                }
+                seen[print] = skill.Id;
+                Wav.Save(samples, SoundArt.SampleRate, Path.Combine(folder, skill.Id + ".wav"));
+            }
+            return fine;
+        }
+
         // Every tune and ambience loop to music/<name>.wav. Each must be a real loop (a few seconds at least), in
         // range, and must run on from its end into its start without a jump.
         static bool WriteMusic(string folder)
@@ -95,9 +133,27 @@ namespace Game.Client
             Directory.CreateDirectory(folder);
             bool fine = true;
             var clock = System.Diagnostics.Stopwatch.StartNew();
-            var loops = ((Tune[])Enum.GetValues(typeof(Tune))).Select(t => ("tune_" + t, MusicArt.Make(t)))
+            // Every field's tune calm and in a fight, every boss's theme at each phase, and the ambience.
+            var songs = ((Tune[])Enum.GetValues(typeof(Tune))).Where(t => t != Tune.Boss)
+                .SelectMany(t => new[] { Song.Field(t), Song.Field(t, battle: true) })
+                .Concat(BossIds.SelectMany(id => Enumerable.Range(1, MusicArt.BossPhases).Select(phase => Song.Of(id, phase))))
+                .ToList();
+            var loops = songs.Select(song => (song.Key, MusicArt.Make(song)))
                 .Concat(((Ambience[])Enum.GetValues(typeof(Ambience))).Select(a => ("ambience_" + a, MusicArt.Make(a))))
                 .ToList();
+            // A field's two versions, and a boss's first two phases, must line up sample for sample (Music plays one
+            // on from the other's place).
+            foreach (var a in songs)
+            {
+                foreach (var b in songs)
+                {
+                    if (string.CompareOrdinal(a.Key, b.Key) >= 0 || !a.InStepWith(b)) continue;
+                    int left = loops.First(l => l.Item1 == a.Key).Item2.Length, right = loops.First(l => l.Item1 == b.Key).Item2.Length;
+                    if (left == right) continue;
+                    Console.Error.WriteLine($"{a.Key} and {b.Key} do not line up: {left} and {right} samples");
+                    fine = false;
+                }
+            }
             Console.WriteLine($"{loops.Count} music and ambience loops in {clock.ElapsedMilliseconds} ms");
             foreach (var (name, samples) in loops)
             {
@@ -412,7 +468,7 @@ namespace Game.Client
         static PixelImage Bosses()
         {
             var rows = new List<IList<PixelImage>>();
-            foreach (string id in new[] { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion" })
+            foreach (string id in BossIds)
             {
                 foreach (var view in (BossView[])Enum.GetValues(typeof(BossView)))
                 {

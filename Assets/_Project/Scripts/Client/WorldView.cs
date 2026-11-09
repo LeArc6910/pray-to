@@ -411,6 +411,15 @@ namespace Game.Client
         // The awake boss on screen, for the health bar at the top.
         public EntityView? ActiveBoss { get; private set; }
 
+        // A fight is on (for the music, 2026-11-09): a monster within CombatReach chasing, winding up, striking or
+        // charging, or the player just hurt or hitting something; it stays on CombatHold seconds after the last of that.
+        public bool InCombat => Time.time < _combatUntil;
+        // The id of a boss on screen, awake or not.
+        public string BossInSight { get; private set; }
+        const float CombatReach = 10;
+        const float CombatHold = 5;
+        float _combatUntil = -1;
+
         public void Render(float tickFraction, float deltaTime)
         {
             _hurtGlow = Mathf.Max(0, _hurtGlow - deltaTime);
@@ -645,10 +654,16 @@ namespace Game.Client
         void DrawEntities(float deltaTime)
         {
             ActiveBoss = null;
+            BossInSight = null;
             _seen.Clear();
             foreach (var view in _client.Others())
             {
                 _seen.Add(view.Id);
+                if (view.Kind == EntityKind.Monster && view.EnemyState != EnemyState.Idle
+                    && Vector2.Distance(new Vector2(view.Position.X, view.Position.Y), _self.Position) < CombatReach)
+                {
+                    _combatUntil = Time.time + CombatHold;
+                }
                 if (view.Kind == EntityKind.Drop)
                 {
                     DrawDrop(view);
@@ -705,6 +720,7 @@ namespace Game.Client
                             break;
                     }
                     if (view.BossState != BossState.Dormant) ActiveBoss = view;
+                    BossInSight = view.Boss.Id;
                 }
                 Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, tint, glow, deltaTime, pulse,
                     showHealth: view.Kind != EntityKind.Boss && view.Kind != EntityKind.Minion,
@@ -1533,12 +1549,14 @@ namespace Game.Client
                         float share = Mathf.Clamp01(e.Amount / Mathf.Max(1, _client.MaxHealth) * 4);
                         _shake = Mathf.Max(_shake, 0.12f + 0.25f * share);
                         _hurtGlow = HurtGlowSeconds;
+                        _combatUntil = Time.time + CombatHold;
                         _hurtGlowStrength = 0.35f + 0.45f * share;
                     }
                     else if (e.Source == _client.PlayerId)
                     {
                         _shake = Mathf.Max(_shake, heavy ? 0.1f : e.Critical ? 0.07f : 0.025f);
                         if (heavy || e.Critical) _hitStop = HitStopSeconds;
+                        _combatUntil = Time.time + CombatHold;
                     }
                     Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
                     break;
@@ -1839,18 +1857,22 @@ namespace Game.Client
             if (skill == null || caster == null) return;
             var color = Palette.Of(skill.Tags | skill.Grants | GrantedTags(e.Source));
             _floating.Add(new Floating { Position = caster.Position + new Vector3(0, 0.4f, 0), Text = skill.Name, Color = color });
-            // Each kind its sound; cold skills ring like ice, and the big fiery or stormy ones land with a boom too.
-            var sound = skill.Kind switch
+            // Each skill its own sound (SoundArt.Skill). One without: its kind's, cold skills ringing like ice, and the
+            // big novas landing with a boom too.
+            if (!Sounds.PlaySkillAt(skill.Id, caster.Position, _self.Position))
             {
-                SkillKind.Buff => Sound.Buff,
-                SkillKind.Heal => Sound.Heal,
-                SkillKind.Dash => Sound.Dash,
-                _ when (skill.Tags & SkillTag.Cold) != 0 => Sound.Ice,
-                SkillKind.Nova => Sound.Nova,
-                _ => Sound.Zap,
-            };
-            Hear(sound, caster.Position);
-            if (skill.Kind == SkillKind.Nova && skill.Radius >= 3) Hear(Sound.Boom, caster.Position, 0.6f);
+                var sound = skill.Kind switch
+                {
+                    SkillKind.Buff => Sound.Buff,
+                    SkillKind.Heal => Sound.Heal,
+                    SkillKind.Dash => Sound.Dash,
+                    _ when (skill.Tags & SkillTag.Cold) != 0 => Sound.Ice,
+                    SkillKind.Nova => Sound.Nova,
+                    _ => Sound.Zap,
+                };
+                Hear(sound, caster.Position);
+                if (skill.Kind == SkillKind.Nova && skill.Radius >= 3) Hear(Sound.Boom, caster.Position, 0.6f);
+            }
             switch (skill.Kind)
             {
                 case SkillKind.Nova:

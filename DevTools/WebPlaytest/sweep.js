@@ -492,6 +492,17 @@ async function combat(browser) {
   }
   await game.send('equip copper_sword');
 
+  // The music turns urgent in a fight and calms down after (2026-11-09): the field's tune and its fight version.
+  await game.send('heal; clear');
+  await game.until(t => /^tune_[a-z]+$/.test(t.music || ''), 9000);
+  let tune = (await game.state()).music;
+  await game.send('spawn slime 3 0 5000');
+  const urgent = await game.until(t => t.music === `${tune}_battle`, 4000);
+  check(!!urgent, `싸움이 붙으면 그 지역 곡이 전투판으로 (${tune} → ${(urgent || await game.state()).music})`);
+  await game.send('clear');
+  const calm = await game.until(t => t.music === tune, 12000);
+  check(!!calm, `싸움이 끝나고 몇 초 뒤 평소 곡으로 (${(calm || await game.state()).music})`);
+
   // Four skills pressed at once all go. A new character knows only each class's first skill: all are taught first,
   // and the new slots reach the screen a moment later. The four (whirlwind, war cry, fireball, flame brand) cost
   // 10 + 15 + 5 + 15 = 45 mana: with exactly that much, all four leave almost none.
@@ -542,17 +553,22 @@ async function bosses(browser) {
     await game.send(`heal; goto boss ${id}`);
     const woke = await game.until(t => has(t.banner, '등장'), 6000, game.texts);
     check(!!woke, `${name}: "${name} 등장!" 배너`);
+    const theme = await game.until(t => t.music === `boss_${id}_1`, 4000);
+    check(!!theme, `${name}: 보스 곡 1페이즈 (${(theme || await game.state()).music})`);
     await game.wait(2500);
     await game.shot(`boss-${id}`, `${name} 싸움(예고 장판, 체력 막대)`);
     await game.send(`heal; boss ${id} hurt 0.36`);
     const two = await game.until(t => has(t.banner, '2페이즈'), 3000, game.texts);
     check(!!two, `${name}: 체력 66% 아래에서 "2페이즈!"`);
+    const second = await game.until(t => t.music === `boss_${id}_2`, 3000);
+    check(!!second, `${name}: 2페이즈에 곡도 바뀐다 (${(second || await game.state()).music})`);
     await game.wait(2500);
     await game.send(`heal; boss ${id} hurt 0.34`);
     const three = await game.until(t => has(t.banner, '3페이즈'), 3000, game.texts);
     await game.wait(2500);
     await game.shot(`boss-${id}-3`, `${name} 3페이즈`);
     if (id === 'cave_warden' || id === 'crystal_queen') check(!!three, `${name}: 체력 33% 아래에서 "3페이즈!"`);
+    if (three) check((await game.state()).music === `boss_${id}_3`, `${name}: 3페이즈 곡`);
     await game.send(`heal; boss ${id} hurt 1`);
     const dead = await game.until(t => has(t.banner, '처치'), 4000, game.texts);
     check(!!dead, `${name}: "${name} 처치!" 배너`);

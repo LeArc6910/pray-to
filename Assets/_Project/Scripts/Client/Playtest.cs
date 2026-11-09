@@ -608,6 +608,7 @@ namespace Game.Client
             json.Field("touch", Controls.UsingTouch);
             json.Field("bag", root.BagOpen);
             json.Field("target", root.TargetShown);
+            json.Field("music", root.MusicPlaying);
             json.Field("map", root.MapOpen);
             json.Field("speed", root.HostTicksPerStep);
             var world = root.HostWorld;

@@ -26,15 +26,58 @@ namespace Game.Client
         Hum,
     }
 
-    // Background music and ambience, made from code like the sound effects (SoundArt): bass, a quiet arpeggio and a
-    // melody on chiptune waves over a chord progression, with drums for the lava fields and the boss. The melody is
-    // written by a fixed scramble from the tune, so a tune always comes out the same. Everything wraps round the end
-    // of its loop, so the loop has no seam. Mono, at SoundArt.SampleRate. See Docs/ArtPipeline.md.
+    // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
+    readonly struct Song : IEquatable<Song>
+    {
+        Song(Tune tune, bool battle, string boss, int phase)
+        {
+            Tune = tune;
+            Battle = battle;
+            Boss = boss;
+            Phase = phase;
+        }
+
+        public Tune Tune { get; }
+        public bool Battle { get; }
+        // The boss's id in bosses.csv, or null for a field's tune.
+        public string Boss { get; }
+        public int Phase { get; }
+
+        public static Song Field(Tune tune, bool battle = false) => new Song(tune, battle, null, 0);
+
+        // Phases past the last theme play the last.
+        public static Song Of(string boss, int phase) => new Song(Tune.Boss, false, boss, Math.Clamp(phase, 1, MusicArt.BossPhases));
+
+        public string Key => Boss != null ? $"boss_{Boss}_{Phase}" : Battle ? $"tune_{Tune}_battle" : $"tune_{Tune}";
+
+        // Two songs that are one loop in two arrangements, the same length, tempo and melody: a field's calm and
+        // fight, or a boss's first two phases. One can take over from the other at the same place (Music).
+        public bool InStepWith(Song other) =>
+            Boss == null ? other.Boss == null && Tune == other.Tune
+            : Boss == other.Boss && Math.Max(Phase, other.Phase) <= 2;
+
+        public bool Equals(Song other) => Tune == other.Tune && Battle == other.Battle && Boss == other.Boss && Phase == other.Phase;
+        public override bool Equals(object obj) => obj is Song other && Equals(other);
+        public override int GetHashCode() => Key.GetHashCode();
+        public override string ToString() => Key;
+    }
+
+    // Background music and ambience, made from code like the sound effects (SoundArt): bass, an arpeggio, a melody
+    // and sometimes a held pad on chiptune waves and bells over a chord progression, with drums played from 16-step
+    // patterns. The melody is written by a fixed scramble from the tune, so a tune always comes out the same.
+    // Each field has a calm tune and a fight version of it: the same length, tempo, chords and melody with a driving
+    // bass, quick arpeggios and full drums, so the music can turn urgent mid-bar (Music). Each boss has a theme in
+    // three phases: the second adds those layers the same way; the third is a semitone higher and faster with the
+    // melody doubled an octave up. Everything wraps round the end of its loop, so the loop has no seam. Mono, at
+    // SoundArt.SampleRate. See Docs/ArtPipeline.md.
     static class MusicArt
     {
         public const int SampleRate = SoundArt.SampleRate;
-        // Loops are normalised to this peak, below the sound effects, which play over them.
-        const float Peak = 0.5f;
+        public const int BossPhases = 3;
+        // Songs are brought to this loudness and kept under this peak (ambience is normalised to its peak), below the
+        // sound effects, which play over them.
+        const float Loudness = 0.11f;
+        const float Peak = 0.55f;
 
         enum Wave
         {
@@ -43,9 +86,12 @@ namespace Game.Client
             Triangle,
             Saw,
             Sine,
+            // A struck bell: a sine with a fainter partial 2.76 times as high.
+            Bell,
         }
 
-        // How a tune goes: its speed, key, scale, chords and instruments.
+        // How a tune goes: its speed, key, scale, chords and instruments. Drum patterns are 16 steps a bar, x a hit,
+        // X a loud one, . a rest.
         sealed class Style
         {
             public float Bpm;
@@ -56,8 +102,9 @@ namespace Game.Client
             public int BarsPerChord = 2;
             public int Bars = 8;
             public Wave Bass = Wave.Triangle;
-            // Bass notes a bar: 1 or 2 held, 8 driving.
+            // Bass notes a bar: 1 or 2 held, 4 bouncing, 8 driving with the octave on the off-beats.
             public int BassNotes = 2;
+            public float BassVolume = 0.32f;
             public Wave Arp = Wave.Pulse;
             // Arpeggio notes a beat, and how loud.
             public int ArpRate = 2;
@@ -66,11 +113,24 @@ namespace Game.Client
             public Wave Lead = Wave.Square;
             public int LeadOctave = 1;
             public float LeadVolume = 0.22f;
+            // The melody again an octave up, this loud (0 for none).
+            public float LeadDouble;
             // The share of melody eighths left silent.
             public float Rest = 0.4f;
-            public bool Drums;
+            // The chord held under everything, swelling in (0 for none).
+            public Wave Pad = Wave.Triangle;
+            public float PadVolume;
+            public string Kick;
+            public string Snare;
+            public string Hat;
+            // Low drums: a tom, or the deep "doum" of a hand drum.
+            public string Tom;
+            // The hand drum's sharp "tek".
+            public string Tek;
             public float Echo = 0.3f;
             public int Seed;
+
+            public Style Copy() => (Style)MemberwiseClone();
         }
 
         static readonly int[] Minor = { 0, 2, 3, 5, 7, 8, 10 };
@@ -78,63 +138,185 @@ namespace Game.Client
         static readonly int[] Lydian = { 0, 2, 4, 6, 7, 9, 11 };
         static readonly int[] Phrygian = { 0, 1, 3, 5, 7, 8, 10 };
         static readonly int[] Harmonic = { 0, 2, 3, 5, 7, 8, 11 };
+        // Phrygian with a major third, the "hijaz" of desert tunes.
+        static readonly int[] Hijaz = { 0, 1, 4, 5, 7, 8, 10 };
 
         static Style StyleOf(Tune tune) => tune switch
         {
+            // Whimsical and bouncing: a dorian melody on a soft triangle over a hopping bass and a woodblock tick.
             Tune.Mushroom => new Style
             {
                 Bpm = 84, Root = 50, Scale = Dorian, Chords = new[] { 0, 3, 0, 6 }, Lead = Wave.Triangle, LeadVolume = 0.3f,
-                Arp = Wave.Pulse, Rest = 0.35f, Seed = 2,
+                Arp = Wave.Pulse, BassNotes = 4, BassVolume = 0.26f, Rest = 0.35f, Hat = "x...x...x...x.x.", Seed = 2,
             },
+            // A music box: lydian bells high over a held bass, a glassy pad, wide echoes.
             Tune.Ice => new Style
             {
-                Bpm = 66, Root = 52, Scale = Lydian, Chords = new[] { 0, 1, 0, 4 }, Lead = Wave.Sine, LeadOctave = 2, LeadVolume = 0.25f,
-                Arp = Wave.Sine, ArpRate = 4, ArpOctave = 2, ArpVolume = 0.1f, BassNotes = 1, Rest = 0.5f, Echo = 0.45f, Seed = 3,
+                Bpm = 66, Root = 52, Scale = Lydian, Chords = new[] { 0, 1, 0, 4 }, Lead = Wave.Bell, LeadOctave = 2, LeadVolume = 0.25f,
+                Arp = Wave.Sine, ArpRate = 4, ArpOctave = 2, ArpVolume = 0.08f, BassNotes = 1, Rest = 0.5f, Pad = Wave.Sine, PadVolume = 0.07f,
+                Echo = 0.45f, Seed = 3,
             },
+            // Glittering: harmonic minor bells running in sixteenths, a pulse melody, a faint shimmer of hats.
             Tune.Crystal => new Style
             {
                 Bpm = 76, Root = 49, Scale = Harmonic, Chords = new[] { 0, 3, 5, 4 }, Lead = Wave.Pulse, LeadVolume = 0.2f,
-                Arp = Wave.Triangle, ArpRate = 4, ArpOctave = 2, ArpVolume = 0.14f, Rest = 0.45f, Echo = 0.4f, Seed = 4,
+                Arp = Wave.Bell, ArpRate = 4, ArpOctave = 2, ArpVolume = 0.12f, Rest = 0.45f, Hat = "..x...x...x...x.", Echo = 0.4f, Seed = 4,
             },
+            // Heavy and hot: phrygian over a driving saw bass, toms rolling under the beat.
             Tune.Lava => new Style
             {
                 Bpm = 92, Root = 40, Scale = Phrygian, Chords = new[] { 0, 1, 0, 6 }, Bass = Wave.Saw, BassNotes = 8, Lead = Wave.Square,
-                LeadVolume = 0.2f, Arp = Wave.Pulse, ArpVolume = 0.08f, Rest = 0.45f, Drums = true, Echo = 0.2f, Seed = 5,
+                LeadVolume = 0.2f, Arp = Wave.Pulse, ArpVolume = 0.08f, Rest = 0.45f, Kick = "x.....x...x.....", Snare = "....x.......x...",
+                Tom = "..........x...x.", Hat = "x.x.x.x.x.x.x.x.", Echo = 0.2f, Seed = 5,
             },
-            // Slow and cold: a sine melody high over a held bass, wide echoes.
+            // Slow and cold: a sine melody high over a held bass and a dark drone, wide echoes.
             Tune.Abyss => new Style
             {
                 Bpm = 60, Root = 47, Scale = Phrygian, Chords = new[] { 0, 1, 5, 6 }, Lead = Wave.Sine, LeadOctave = 2, LeadVolume = 0.24f,
-                Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 1, Rest = 0.55f, Echo = 0.5f, Seed = 7,
+                Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 1, Rest = 0.55f, Pad = Wave.Saw, PadVolume = 0.05f,
+                Echo = 0.5f, Seed = 7,
             },
             // Gently rocking: a dorian melody over a slow bass, arpeggios like ripples, long echoes.
             Tune.Lake => new Style
             {
                 Bpm = 72, Root = 48, Scale = Dorian, Chords = new[] { 0, 4, 3, 0 }, Lead = Wave.Sine, LeadOctave = 1, LeadVolume = 0.26f,
-                Arp = Wave.Triangle, ArpRate = 3, ArpOctave = 2, ArpVolume = 0.12f, BassNotes = 2, Rest = 0.5f, Echo = 0.45f, Seed = 8,
+                Arp = Wave.Triangle, ArpRate = 3, ArpOctave = 2, ArpVolume = 0.12f, BassNotes = 2, Rest = 0.5f, Pad = Wave.Sine, PadVolume = 0.05f,
+                Echo = 0.45f, Seed = 8,
             },
-            // Dry and swaying: a hijaz-like harmonic scale over a plucked bass and a soft beat, short echoes.
+            // Dry and swaying: a hijaz melody over a plucked bass and a hand drum's doum and tek, short echoes.
             Tune.Sand => new Style
             {
-                Bpm = 96, Root = 45, Scale = Harmonic, Chords = new[] { 0, 1, 0, 6 }, Lead = Wave.Pulse, LeadOctave = 1, LeadVolume = 0.2f,
-                Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 4, Rest = 0.45f, Drums = true, Echo = 0.2f, Seed = 9,
+                Bpm = 96, Root = 45, Scale = Hijaz, Chords = new[] { 0, 1, 0, 6 }, Lead = Wave.Pulse, LeadOctave = 1, LeadVolume = 0.2f,
+                Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 4, Rest = 0.45f,
+                Tom = "x.....x...x.....", Tek = "...x.x.x...x.x.x", Echo = 0.2f, Seed = 9,
             },
-            Tune.Boss => new Style
-            {
-                Bpm = 140, Root = 45, Scale = Harmonic, Chords = new[] { 0, 5, 3, 4 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw,
-                BassNotes = 8, Lead = Wave.Square, LeadVolume = 0.22f, Arp = Wave.Pulse, ArpRate = 4, ArpVolume = 0.1f, Rest = 0.25f,
-                Drums = true, Echo = 0.15f, Seed = 6,
-            },
+            Tune.Boss => BossStyle(null),
+            // The home caves: a slow minor melody with echoes over a held bass and a soft pad.
             _ => new Style
             {
                 Bpm = 70, Root = 45, Scale = Minor, Chords = new[] { 0, 5, 2, 6 }, Lead = Wave.Triangle, LeadVolume = 0.3f,
-                Arp = Wave.Pulse, ArpVolume = 0.1f, BassNotes = 1, Rest = 0.5f, Echo = 0.4f, Seed = 1,
+                Arp = Wave.Pulse, ArpVolume = 0.1f, BassNotes = 1, Rest = 0.5f, Pad = Wave.Triangle, PadVolume = 0.05f, Echo = 0.4f, Seed = 1,
             },
         };
 
-        public static float[] Make(Tune tune)
+        // A field's tune in a fight: the same loop driven hard. The melody (seed, scale, rest, octave), chords, tempo
+        // and length stay, so the two line up beat for beat.
+        static Style Battle(Style calm)
         {
-            var style = StyleOf(tune);
+            var style = calm.Copy();
+            style.Bass = Wave.Saw;
+            style.BassNotes = 8;
+            style.BassVolume = 0.3f;
+            style.ArpRate = 4;
+            style.ArpVolume = Math.Max(calm.ArpVolume, 0.11f);
+            if (style.Lead == Wave.Sine || style.Lead == Wave.Triangle) style.Lead = Wave.Square;
+            style.LeadVolume = Math.Min(0.24f, calm.LeadVolume);
+            style.PadVolume = 0;
+            style.Echo = Math.Min(calm.Echo, 0.18f);
+            // Slow tunes get the drums in double time so the fight still runs.
+            bool slow = calm.Bpm < 85;
+            style.Kick = slow ? "x..x..x.x..x..x." : "x...x...x...x.x.";
+            style.Snare = slow ? "....X..x....X..x" : "....X.......X...";
+            style.Hat = slow ? "xxxxxxxxxxxxxxxx" : "x.xxx.xxx.xxx.xx";
+            style.Tom = calm.Tek != null ? "x..x..x...x..x.." : "..............xx";
+            if (calm.Tek != null) style.Tek = "x.xx.xx.x.xx.xxx";
+            return style;
+        }
+
+        // A boss's theme, in the spirit of its place and of itself; null for a boss without one of its own.
+        static Style BossStyle(string boss) => boss switch
+        {
+            // The stone golem of the home caves: minor, stomping toms and a heavy kick.
+            "cave_warden" => new Style
+            {
+                Bpm = 120, Root = 45, Scale = Minor, Chords = new[] { 0, 5, 3, 4 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw, BassNotes = 4,
+                Lead = Wave.Square, LeadVolume = 0.22f, Arp = Wave.Pulse, ArpRate = 2, ArpVolume = 0.1f, Rest = 0.3f,
+                Kick = "x.....x.x.......", Snare = "....x.......x...", Tom = "........x...x.x.", Echo = 0.15f, Seed = 21,
+            },
+            // The crystal spider: harmonic minor, bells skittering in sixteenths like legs, a ticking hat.
+            "crystal_queen" => new Style
+            {
+                Bpm = 132, Root = 49, Scale = Harmonic, Chords = new[] { 0, 5, 1, 4 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Triangle,
+                BassNotes = 4, Lead = Wave.Pulse, LeadVolume = 0.2f, Arp = Wave.Bell, ArpRate = 4, ArpOctave = 2, ArpVolume = 0.12f, Rest = 0.3f,
+                Kick = "x...x...x...x...", Snare = "....x.......x...", Hat = "xxx.xxx.xxx.xxx.", Echo = 0.2f, Seed = 22,
+            },
+            // The lava titan: low phrygian, a saw melody over a grinding bass and pounding drums.
+            "lava_titan" => new Style
+            {
+                Bpm = 108, Root = 40, Scale = Phrygian, Chords = new[] { 0, 1, 0, 6 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw, BassNotes = 8,
+                Lead = Wave.Saw, LeadVolume = 0.18f, Arp = Wave.Pulse, ArpRate = 2, ArpVolume = 0.08f, Rest = 0.3f,
+                Kick = "x.x...x.x.x...x.", Snare = "....X.......X...", Tom = "......x.......xx", Echo = 0.12f, Seed = 23,
+            },
+            // The lord of the void: slow and vast, a cold sine melody over a dark choir of a pad.
+            "void_lord" => new Style
+            {
+                Bpm = 100, Root = 47, Scale = Phrygian, Chords = new[] { 0, 1, 5, 4 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw, BassNotes = 2,
+                Lead = Wave.Sine, LeadOctave = 2, LeadVolume = 0.24f, Arp = Wave.Triangle, ArpRate = 2, ArpVolume = 0.1f, Rest = 0.35f,
+                Pad = Wave.Saw, PadVolume = 0.06f, Kick = "x.......x.......", Snare = "........X.......", Tom = "............x.x.",
+                Echo = 0.35f, Seed = 24,
+            },
+            // The tide serpent: dorian, rolling arpeggios in threes like waves.
+            "tide_serpent" => new Style
+            {
+                Bpm = 126, Root = 48, Scale = Dorian, Chords = new[] { 0, 4, 3, 6 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Triangle,
+                BassNotes = 4, Lead = Wave.Triangle, LeadVolume = 0.26f, Arp = Wave.Triangle, ArpRate = 3, ArpOctave = 2, ArpVolume = 0.12f,
+                Rest = 0.3f, Kick = "x..x..x...x..x..", Snare = "....x.......x...", Echo = 0.25f, Seed = 25,
+            },
+            // The antlion in the sand: hijaz over hand drums.
+            "antlion" => new Style
+            {
+                Bpm = 138, Root = 45, Scale = Hijaz, Chords = new[] { 0, 1, 6, 0 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw, BassNotes = 4,
+                Lead = Wave.Pulse, LeadVolume = 0.2f, Arp = Wave.Triangle, ArpRate = 2, ArpVolume = 0.1f, Rest = 0.3f,
+                Kick = "x.......x.......", Tom = "x.....x...x.....", Tek = "...x.x.x...x.x.x", Echo = 0.15f, Seed = 26,
+            },
+            // Any other boss: fast harmonic minor with driving drums.
+            _ => new Style
+            {
+                Bpm = 140, Root = 45, Scale = Harmonic, Chords = new[] { 0, 5, 3, 4 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw,
+                BassNotes = 8, Lead = Wave.Square, LeadVolume = 0.22f, Arp = Wave.Pulse, ArpRate = 4, ArpVolume = 0.1f, Rest = 0.25f,
+                Kick = "x...x...x...x...", Snare = "....x.......x...", Hat = "x.xxx.xxx.xxx.xx", Echo = 0.15f, Seed = 6,
+            },
+        };
+
+        // The boss's theme at a phase: the first as written; the second with the bass driving, sixteenth arpeggios
+        // and hats added (the same loop); the third a semitone up and an eighth faster with the melody doubled.
+        static Style BossPhase(string boss, int phase)
+        {
+            var style = BossStyle(boss);
+            if (phase < 2) return style;
+            style.BassNotes = 8;
+            style.ArpRate = 4;
+            style.ArpVolume = Math.Max(style.ArpVolume, 0.11f);
+            style.Hat ??= "x.xxx.xxx.xxx.xx";
+            if (style.Snare != null) style.Snare = style.Snare.Substring(0, 15) + "x";
+            if (phase < 3) return style;
+            style.Root += 1;
+            style.Bpm *= 1.12f;
+            style.LeadDouble = 0.1f;
+            style.Hat = "xxxxxxxxxxxxxxxx";
+            if (style.Kick != null) style.Kick = "x...x...x...x.x.";
+            return style;
+        }
+
+        public static float[] Make(Tune tune) => Make(Song.Field(tune));
+
+        public static float[] Make(Song song)
+        {
+            var steps = Making(song);
+            while (steps.MoveNext())
+            {
+                if (steps.Current != null) return steps.Current;
+            }
+            throw new InvalidOperationException(song.Key);
+        }
+
+        // The song made a little at a time, so it can be made ahead over several frames without a stall (Music): a
+        // step per part of a bar and per phrase, null until the last, which is the finished loop.
+        public static IEnumerator<float[]> Making(Song song)
+        {
+            var style = song.Boss != null ? BossPhase(song.Boss, song.Phase)
+                : song.Battle ? Battle(StyleOf(song.Tune))
+                : StyleOf(song.Tune);
             float beat = 60 / style.Bpm;
             float bar = beat * 4;
             var buffer = new float[Samples(bar * style.Bars)];
@@ -147,13 +329,16 @@ namespace Game.Client
                 var chord = new[] { Pitch(style, degree, 0), Pitch(style, degree + 2, 0), Pitch(style, degree + 4, 0) };
                 float start = b * bar;
 
-                // Bass: the chord's root, held or driving in eighths with the octave on the off-beats.
+                // Bass: the chord's root, held, bouncing or driving in eighths with the octave on the off-beats.
                 float bassLength = bar / style.BassNotes;
                 for (int i = 0; i < style.BassNotes; i++)
                 {
                     int note = chord[0] - 12 + (style.BassNotes == 8 && i % 2 == 1 ? 12 : 0);
-                    Note(buffer, style.Bass, start + i * bassLength, bassLength * 0.9f, note, 0.32f, decay: style.BassNotes == 8 ? 4 : 1.2f);
+                    Note(buffer, style.Bass, start + i * bassLength, bassLength * (style.BassNotes == 4 ? 0.6f : 0.9f), note, style.BassVolume,
+                        decay: style.BassNotes >= 4 ? 4 : 1.2f);
                 }
+
+                yield return null;
 
                 // Arpeggio: up and down the chord.
                 int steps = style.ArpRate * 4;
@@ -165,7 +350,18 @@ namespace Game.Client
                     Note(buffer, style.Arp, start + i * arpLength, arpLength * 0.8f, note, style.ArpVolume, decay: 3);
                 }
 
-                if (style.Drums) Drums(buffer, start, beat, tune == Tune.Boss);
+                yield return null;
+
+                // The pad: the chord held through its bars, swelling in and out.
+                if (style.PadVolume > 0 && b % style.BarsPerChord == 0)
+                {
+                    float length = bar * style.BarsPerChord;
+                    foreach (int note in chord) Note(buffer, style.Pad, start, length, note, style.PadVolume, decay: 0.6f, attack: length * 0.3f, vibrato: 0.004f);
+                }
+
+                yield return null;
+                Drums(buffer, style, start, beat);
+                yield return null;
             }
 
             // The melody: two-bar phrases A B A C, where C is A ending on the root. Bars past eight repeat them.
@@ -186,9 +382,12 @@ namespace Game.Client
                 {
                     int degree = style.Chords[(p * 2 + slot / 8) / style.BarsPerChord % style.Chords.Length];
                     int fitted = Fit(style, note, degree, slot % 8 == 0);
-                    Note(lead, style.Lead, p * 2 * bar + slot * eighth, length * eighth * 0.85f, fitted, style.LeadVolume, decay: 1.5f,
-                        vibrato: style.Lead == Wave.Sine || style.Lead == Wave.Triangle ? 0.006f : 0);
+                    float at = p * 2 * bar + slot * eighth;
+                    float vibrato = style.Lead == Wave.Sine || style.Lead == Wave.Triangle ? 0.006f : 0;
+                    Note(lead, style.Lead, at, length * eighth * 0.85f, fitted, style.LeadVolume, decay: 1.5f, vibrato: vibrato);
+                    if (style.LeadDouble > 0) Note(lead, Wave.Pulse, at, length * eighth * 0.7f, fitted + 12, style.LeadDouble, decay: 2);
                 }
+                yield return null;
             }
             // A dotted-eighth echo on the melody, wrapping round like everything else.
             int delay = Samples(eighth * 1.5f);
@@ -198,7 +397,20 @@ namespace Game.Client
                 buffer[(i + delay) % buffer.Length] += lead[i] * style.Echo;
                 buffer[(i + delay * 2) % buffer.Length] += lead[i] * style.Echo * style.Echo;
             }
-            return Normalised(buffer, Peak);
+            yield return Levelled(buffer);
+        }
+
+        // A song brought to an even loudness (Loudness, the root mean square) whatever its drums, so a fight or a
+        // later phase is not quieter than the calm tune; peaks over Peak are rounded off softly instead of clipping.
+        static float[] Levelled(float[] buffer)
+        {
+            double sum = 0;
+            foreach (float sample in buffer) sum += sample * sample;
+            float rms = (float)Math.Sqrt(sum / Math.Max(1, buffer.Length));
+            if (rms <= 0) return buffer;
+            float scale = Loudness / rms;
+            for (int i = 0; i < buffer.Length; i++) buffer[i] = Peak * (float)Math.Tanh(buffer[i] * scale / Peak);
+            return buffer;
         }
 
         public static float[] Make(Ambience ambience)
@@ -314,7 +526,8 @@ namespace Game.Client
         static double Frequency(int note) => 440 * Math.Pow(2, (note - 69) / 12.0);
 
         // A note added into the loop, wrapping past its end: a quick attack, then a decay over its length.
-        static void Note(float[] buffer, Wave wave, float start, float seconds, int note, float volume, float decay = 2, float vibrato = 0)
+        static void Note(float[] buffer, Wave wave, float start, float seconds, int note, float volume, float decay = 2, float vibrato = 0,
+            float attack = 0.006f)
         {
             double frequency = Frequency(note);
             int first = Samples(start);
@@ -328,7 +541,7 @@ namespace Game.Client
             {
                 float t = i / (float)SampleRate;
                 phase += (vibrato > 0 ? frequency * (1 + vibrato * Math.Sin(2 * Math.PI * 5.5 * t)) : frequency) / SampleRate;
-                float envelope = Math.Min(1, t / 0.006f) * fall * Math.Min(1, (seconds - t) / 0.01f);
+                float envelope = Math.Min(1, t / attack) * fall * Math.Min(1, (seconds - t) / Math.Max(0.01f, attack * 0.5f));
                 fall *= fallStep;
                 buffer[(first + i) % buffer.Length] += Value(wave, phase) * volume * Math.Max(0, envelope);
             }
@@ -358,21 +571,34 @@ namespace Game.Client
                 Wave.Pulse => p < 0.25 ? 0.5f : -0.5f,
                 Wave.Triangle => (float)(p < 0.5 ? 4 * p - 1 : 3 - 4 * p),
                 Wave.Saw => (float)(2 * p - 1) * 0.6f,
+                Wave.Bell => (float)(Math.Sin(2 * Math.PI * p) * 0.75 + Math.Sin(2 * Math.PI * 2.76 * phase) * 0.25),
                 _ => (float)Math.Sin(2 * Math.PI * p),
             };
         }
 
-        // Kick on the beats (all four in a boss fight, one and three otherwise), a snare on two and four, hats on
-        // the eighths.
-        static void Drums(float[] buffer, float start, float beat, bool driving)
+        // The style's drums for a bar, from their 16-step patterns: a kick (a sine falling fast), a snare, hats, a tom
+        // or a hand drum's doum (lower sines falling) and its tek (a sharp tick).
+        static void Drums(float[] buffer, Style style, float start, float beat)
         {
-            for (int i = 0; i < 4; i++)
+            float step = beat / 4;
+            for (int i = 0; i < 16; i++)
             {
-                float at = start + i * beat;
-                if (driving || i % 2 == 0) Sweep(buffer, Wave.Sine, at, 0.16f, 130, 42, 0.55f);
-                if (i % 2 == 1) Click(buffer, at, 0.12f, 0.3f, seed: 3 + i);
-                Click(buffer, at, 0.03f, 0.1f, seed: 9 + i, hiss: true);
-                Click(buffer, at + beat / 2, 0.03f, driving ? 0.12f : 0.07f, seed: 17 + i, hiss: true);
+                float at = start + i * step;
+                float Loud(string pattern, float volume) => pattern == null || i >= pattern.Length || pattern[i] == '.' ? 0 : pattern[i] == 'X' ? volume * 1.35f : volume;
+                float kick = Loud(style.Kick, 0.55f);
+                if (kick > 0) Sweep(buffer, Wave.Sine, at, 0.16f, 130, 42, kick);
+                float snare = Loud(style.Snare, 0.3f);
+                if (snare > 0) Click(buffer, at, 0.12f, snare, seed: 3 + i);
+                float hat = Loud(style.Hat, i % 4 == 0 ? 0.1f : 0.07f);
+                if (hat > 0) Click(buffer, at, 0.03f, hat, seed: 9 + i, hiss: true);
+                float tom = Loud(style.Tom, 0.42f);
+                if (tom > 0) Sweep(buffer, Wave.Sine, at, 0.22f, style.Tek != null ? 120 : 190, style.Tek != null ? 70 : 90, tom);
+                float tek = Loud(style.Tek, 0.2f);
+                if (tek > 0)
+                {
+                    Click(buffer, at, 0.05f, tek, seed: 40 + i, hiss: true);
+                    Sweep(buffer, Wave.Triangle, at, 0.04f, 900, 600, tek * 0.6f);
+                }
             }
         }
 
