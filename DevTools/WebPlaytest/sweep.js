@@ -1514,6 +1514,9 @@ async function first(browser) {
   // Mines a tunnel: the nearest wall beside, else a step toward open floor, until `enough` says stop.
   // With `prefer` (a tile type) it digs that first, and with none beside it goes to the next one (`onNone`).
   const mine = async (enough, seconds, prefer = null, onNone = null) => {
+    // The pickaxe in hand (quick slot 2), as the first goal's hint says.
+    await game.page.keyboard.press('2');
+    await game.wait(300);
     const until = Date.now() + seconds * 1000;
     let way = [1, 0];
     while (Date.now() < until && !(await enough())) {
@@ -1617,7 +1620,7 @@ async function first(browser) {
   await placeFor(3, '횃불 세우기', /^횃불 ×/);
 
   // 4. Stone floor: made at the workbench (beside it), laid on open floor.
-  await mine(async () => count(await inv(), 'stone') >= 4, 40);
+  await mine(async () => count(await inv(), 'stone') >= 4, 60);
   const bench = (await near()).find(a => a.tile === 'Workbench');
   if (!bench) {
     // Dug away from it for the stone: back beside it, as a person would walk back down the tunnel.
@@ -1668,7 +1671,7 @@ async function first(browser) {
   check(!!gear, `구리 장비 하나를 만든다 (${gear || '재료 부족'})`);
   if (gear) {
     await bagTab(game, '장비');
-    await pick(game, gear);
+    await pick(game, new RegExp(gear));
     await game.press('장착');
   }
   await closeBag(game);
