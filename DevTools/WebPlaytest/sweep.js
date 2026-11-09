@@ -1690,7 +1690,7 @@ async function firstRun(browser, profile, hourLong) {
   // On a phone a person turns by a nudge of the move stick, so the bot does the same (the attack stick's last pull
   // would otherwise still decide which way it faces).
   const turn = async (dx, dy) => {
-    if (game.touch) await step(dx, dy, 50);
+    if (game.touch) await step(dx, dy, 120);
     else await game.send(`face ${dx} ${dy}`);
   };
   const faceOpen = async (skip = []) => {
@@ -1719,7 +1719,7 @@ async function firstRun(browser, profile, hourLong) {
   await placeFor(3, '횃불 세우기', /^횃불 ×/);
 
   // 4. Stone floor: made at the workbench (beside it), laid on open floor.
-  await mine(async () => count(await inv(), 'stone') >= 4, 60);
+  await mine(async () => count(await inv(), 'stone') >= 4, 150);
   const bench = (await near()).find(a => a.tile === 'Workbench');
   if (!bench) {
     // Dug away from it for the stone: back beside it, as a person would walk back down the tunnel.
