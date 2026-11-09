@@ -635,7 +635,8 @@ namespace Game.Client
             var dealing = _client.NpcNear();
             foreach (var (x, y, npc) in _stalls)
             {
-                var at = new Vector3(x + 0.5f, y + 1.5f, 0);
+                // Above the awning on the tile over the stall (2026-11-09), not across it.
+                var at = new Vector3(x + 0.5f, y + 2.05f, 0);
                 if (Vector3.Distance(at, _self.Position) >= 5) continue;
                 bool near = dealing != null && dealing.Value.Npc == npc;
                 Label(at, $"{npc.Name} 호감 {_client.HeartsWith(npc)}/{World.MaxHearts}" + (near ? " · 가방에서 거래" : ""), PowerLabel);

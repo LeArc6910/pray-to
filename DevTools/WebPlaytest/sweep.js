@@ -953,7 +953,9 @@ async function npc(browser) {
   await bagTab(game);
   check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
   // A name for the pet (2026-11-09): typed into the field, then [이름 짓기]. Keys typed must not walk the player.
-  const before = await game.state();
+  // No monsters about, so nothing knocks them aside meanwhile.
+  await game.send('clear');
+  await game.wait(600);
   const shown = await game.buttons();
   const nameButton = shown.find(b => /^이름 짓기/.test(b.label));
   const suggest = shown.find(b => b.label === '추천');
@@ -961,10 +963,14 @@ async function npc(browser) {
     // The field is just left of [이름 짓기] (140 points wide); the two buttons give the screen's scale.
     const scale = (suggest.cx - nameButton.cx) / ((nameButton.rect[2] + suggest.rect[2]) / 2 + 4);
     await game.page.mouse.click(nameButton.cx - (nameButton.rect[2] / 2 + 74) * scale, nameButton.cy);
+    await game.wait(400);
+    const before = await game.state();
+    check(before.typing === true, '이름 칸을 누르면 글자를 칠 수 있다(게임 키가 멈춘다)');
     await game.page.keyboard.type('dw', { delay: 80 });
     await game.wait(400);
     const after = await game.state();
-    check(Math.abs(after.x - before.x) + Math.abs(after.y - before.y) < 0.2, '이름 칸에 글자를 치는 동안 W·D로 걷지 않는다');
+    const moved = Math.abs(after.x - before.x) + Math.abs(after.y - before.y);
+    check(moved < 0.2, `이름 칸에 글자를 치는 동안 W·D로 걷지 않는다 (${moved.toFixed(2)}칸)`);
   }
   check(await game.press('추천'), '[캐릭터] 탭의 펫 줄에 [추천]');
   check(await game.press('이름 짓기'), '[이름 짓기]를 누른다');

@@ -619,6 +619,7 @@ namespace Game.Client
             json.Field("target", root.TargetShown);
             json.Field("music", root.MusicPlaying);
             json.Field("doorsOpen", root.OpenDoors);
+            json.Field("typing", Controls.Typing);
             json.Field("map", root.MapOpen);
             json.Field("speed", root.HostTicksPerStep);
             var world = root.HostWorld;
