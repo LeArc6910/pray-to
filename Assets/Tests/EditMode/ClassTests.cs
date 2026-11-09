@@ -423,18 +423,19 @@ namespace Game.Core.Tests
         }
     
         [Test]
-        public void ThreeClassesShareTwoClassesWorthOfPassives()
+        public void ThreeClassesEachKeepTheirWholePassive()
         {
+            // 2026-11-09: a third class, a reward at level 20, no longer takes a third off every passive.
             Assert.AreEqual(3, ClassRules.DefaultMaxClasses);
             Assert.AreEqual(1f, ClassRules.PassiveShare(2));
-            Assert.AreEqual(2f / 3, ClassRules.PassiveShare(3), 1e-6f);
+            Assert.AreEqual(1f, ClassRules.PassiveShare(3));
 
             var world = Room();
             var one = Learned(world.AddPlayer("a", null, Warrior));
             var three = Learned(world.AddPlayer("b", null, Warrior, FireMage, Archer));
             float bare = Learned(world.AddPlayer("c", null)).Stats.MaxHealth;
             Assert.AreEqual(bare * 1.2f, one.Stats.MaxHealth, 0.01f, "MaxHealth+20%");
-            Assert.AreEqual(bare * 1.13f, three.Stats.MaxHealth, 0.01f, "two thirds of it, rounded: 13%");
+            Assert.AreEqual(bare * 1.2f, three.Stats.MaxHealth, 0.01f, "the warrior's whole 20% with two more classes");
             // One skill of each, then the first class's second, until a player picks.
             CollectionAssert.AreEqual(new[] { "whirlwind", "fireball", "volley", "war_cry" }, three.Skills.Select(s => s.Id));
             Assert.AreEqual(18, ClassRules.AllSkillsFor(three.Classes).Count, "eighteen to learn and pick the four from");

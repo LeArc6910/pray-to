@@ -237,9 +237,10 @@ namespace Game.Core
         // Each class brings up to this many skills; the player learns them with skill points and picks which
         // SkillSlots of the learned ones go in the slots.
         public const int MaxSkillsPerClass = 6;
-        // Class passives are made for two classes; with more, each counts this share of two (2/3 for three), so
-        // mixing more classes widens a build without making it stronger.
-        public const int PassiveClasses = 2;
+        // Up to this many classes each passive counts in full; past it, each counts this share. Three since
+        // 2026-11-09: with three counting as two (2/3 each) the third class, a reward at level 20, took a third off
+        // the passives a player had and left them weaker. Now it adds its own.
+        public const int PassiveClasses = 3;
 
         public static float PassiveShare(int classes) => classes > PassiveClasses ? (float)PassiveClasses / classes : 1;
 
