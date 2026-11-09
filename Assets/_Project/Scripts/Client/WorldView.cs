@@ -303,6 +303,8 @@ namespace Game.Client
         // The frame marks the tile ground work acts on rather than where a thing would be put (GameRoot sets it from
         // what the pointer is over).
         public bool TargetSoil { get; set; }
+        // How many tiles each way the thing pointed at takes (a big machine 2, 2026-11-09): the frame covers them all.
+        public int TargetSize { get; set; } = 1;
 
         void DrawTarget()
         {
@@ -317,9 +319,11 @@ namespace Game.Client
             // (planting, watering, tilling, fertilizing, laying a floor) is on the tile right ahead.
             var (x, y) = TargetSoil ? World.TileAhead(_client.Position, _client.Facing) : World.PlaceAhead(_client.Position, _client.Facing);
             var map = _client.Map;
-            bool open = map.InBounds(x, y) && !map.IsEdge(x, y) && TileMap.IsGround(map[x, y]);
-            var centre = TileMap.Center(x, y);
-            _target.transform.localPosition = new Vector3(centre.X, centre.Y, 0);
+            int size = TargetSoil ? 1 : Mathf.Max(1, TargetSize);
+            if (size > 1) (x, y) = World.BigOrigin(x, y, _client.Facing, size);
+            bool open = World.Footprint(x, y, size).All(t => map.InBounds(t.X, t.Y) && !map.IsEdge(t.X, t.Y) && TileMap.IsGround(map[t.X, t.Y]));
+            _target.transform.localPosition = new Vector3(x + size / 2f, y + size / 2f, 0);
+            _target.transform.localScale = new Vector3(size, size, 1);
             _target.color = open ? new Color(1, 1, 1, 0.6f + 0.25f * Mathf.Sin(Time.time * 4)) : new Color(1, 0.35f, 0.3f, 0.8f);
         }
         // How far a glowing shot lights its way.
@@ -1153,6 +1157,7 @@ namespace Game.Client
                     : machine.Kind == TileType.Lever ? LeverSprite
                     // A big machine's whole body, over its four tiles (the map draws none of them).
                     : machine.Kind == TileType.BigAssembler ? BigAssemblerSprite
+                    : machine.Kind == TileType.BigSmelter ? BigSmelterSprite
                     : ChevronSprite;
                 int size = World.SizeOf(machine.Kind);
                 if (size > 1) center = new Vector3(machine.X + size / 2f, machine.Y + size / 2f, 0);
@@ -1543,6 +1548,7 @@ namespace Game.Client
         static Sprite LeverSprite => Sprites.Centered("machine/lever", () => ItemArt.LeverHandle);
 
         static Sprite BigAssemblerSprite => Sprites.Centered("machine/big_assembler", () => TileArt.BigAssembler);
+        static Sprite BigSmelterSprite => Sprites.Centered("machine/big_smelter", () => TileArt.BigSmelter);
 
         static Sprite[] _flameSprites;
 

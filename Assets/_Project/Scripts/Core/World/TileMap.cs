@@ -112,6 +112,8 @@ namespace Game.Core
         // three are MachinePart tiles that belong to it.
         BigAssembler,
         MachinePart,
+        // A smelter two tiles each way (2026-11-09): on power, three times a smelter's pace.
+        BigSmelter,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

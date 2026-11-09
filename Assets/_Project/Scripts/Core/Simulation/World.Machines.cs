@@ -105,7 +105,7 @@ namespace Game.Core
         }
 
         // Machines that take more than a tile (2026-11-09, Docs/Automation.md 큰 기계): so many tiles each way.
-        public static int SizeOf(TileType kind) => kind == TileType.BigAssembler ? 2 : 1;
+        public static int SizeOf(TileType kind) => kind == TileType.BigAssembler || kind == TileType.BigSmelter ? 2 : 1;
 
         // The tiles a machine of that size takes with its own at (x, y), the lower left.
         public static IEnumerable<(int X, int Y)> Footprint(int x, int y, int size)
@@ -128,6 +128,9 @@ namespace Game.Core
         }
 
         public static bool IsAssembler(TileType kind) => kind == TileType.Assembler || kind == TileType.BigAssembler;
+
+        // What melts ore into bars: the smelter, the arc furnace and the big smelter (2026-11-09).
+        public static bool IsSmelter(TileType kind) => kind == TileType.Smelter || kind == TileType.ArcFurnace || kind == TileType.BigSmelter;
         public const int BigAssemblerSpeed = 3;
 
         // The furnace's melting recipes: materials in, a material out.
@@ -139,7 +142,7 @@ namespace Game.Core
         // and a preserves jar the recipes made at them (materials in, a material out). Empty for any other machine.
         public IReadOnlyList<Recipe> ProcessesOf(TileType kind)
         {
-            if (kind == TileType.Smelter || kind == TileType.ArcFurnace) return Smelts;
+            if (IsSmelter(kind)) return Smelts;
             if (kind != TileType.Keg && kind != TileType.PreservesJar) return Array.Empty<Recipe>();
             if (!_processes.TryGetValue(kind, out var recipes))
             {
@@ -195,6 +198,7 @@ namespace Game.Core
                     break;
                 case TileType.Smelter:
                 case TileType.ArcFurnace:
+                case TileType.BigSmelter:
                 case TileType.Keg:
                 case TileType.PreservesJar:
                     RunProcessor(machine);
@@ -385,7 +389,7 @@ namespace Game.Core
 
         // Machines a player can fill by hand ([넣기]): what they make things from.
         public static bool LoadsByHand(TileType kind) =>
-            kind == TileType.Smelter || kind == TileType.ArcFurnace || kind == TileType.Harvester || kind == TileType.Keg || kind == TileType.PreservesJar || IsAssembler(kind) || kind == TileType.Generator
+            IsSmelter(kind) || kind == TileType.Harvester || kind == TileType.Keg || kind == TileType.PreservesJar || IsAssembler(kind) || kind == TileType.Generator
             || kind == TileType.Coop || kind == TileType.Barn || kind == TileType.Fold || kind == TileType.CrabPot || kind == TileType.Turret;
 
         // Puts up to count of the player's material into the machine ahead, as much of it as the machine takes, the way
@@ -495,6 +499,7 @@ namespace Game.Core
                     case TileType.Drill:
                     case TileType.Smelter:
                     case TileType.ArcFurnace:
+                    case TileType.BigSmelter:
                     case TileType.Harvester:
                     case TileType.Assembler:
                     case TileType.BigAssembler:
@@ -761,7 +766,7 @@ namespace Game.Core
                 TileType.Splitter => true,
                 TileType.Filter => true,
                 TileType.Generator => material.Fuel > 0,
-                TileType.Smelter or TileType.ArcFurnace or TileType.Keg or TileType.PreservesJar =>
+                TileType.Smelter or TileType.ArcFurnace or TileType.BigSmelter or TileType.Keg or TileType.PreservesJar =>
                     ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)),
                 TileType.Harvester => IsSeed(material),
                 TileType.Assembler or TileType.BigAssembler => target.Recipe != null && target.Recipe.Ingredients.Any(i => i.Material == material.Kind),
@@ -803,6 +808,7 @@ namespace Game.Core
                         return true;
                     case TileType.Smelter:
                     case TileType.ArcFurnace:
+                    case TileType.BigSmelter:
                     case TileType.Keg:
                     case TileType.PreservesJar:
                         if (!ProcessesOf(target.Kind).Any(r => r.Ingredients.Any(i => i.Material == material.Kind)) || Count(target.Input) >= target.Definition.Capacity) return false;

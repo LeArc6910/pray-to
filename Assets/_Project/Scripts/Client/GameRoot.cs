@@ -227,6 +227,7 @@ namespace Game.Client
             _map.UpdateTiles(changedTiles);
             _view.ShowTarget = (_inventory != null && _inventory.Open) || (_hotbar != null && _hotbar.PointsAtGround);
             _view.TargetSoil = _inventory != null && _inventory.Open && _inventory.PointsAtSoil || _hotbar != null && _hotbar.PointsAtSoil;
+            _view.TargetSize = Math.Max(_inventory != null && _inventory.Open ? _inventory.PointsAtSize : 1, _hotbar != null ? _hotbar.PointsAtSize : 1);
             if (_inventory != null) _inventory.CrackAhead = _inventory.Open ? _view.CrackAhead() : null;
             // Typing a pet's name keeps the keys from the game; the bag closing lets go of the field.
             bool typing = _inventory != null && _inventory.Typing;

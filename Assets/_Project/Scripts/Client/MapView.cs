@@ -266,7 +266,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Furnace) return Palette.Furnace;
             if (_map[x, y] == TileType.Chest) return Palette.Chest;
             if (_map[x, y] == TileType.Drill) return Palette.Drill;
-            if (_map[x, y] == TileType.Smelter || _map[x, y] == TileType.ArcFurnace) return Palette.Smelter;
+            if (World.IsSmelter(_map[x, y])) return Palette.Smelter;
             if (World.IsBelt(_map[x, y])) return Palette.Conveyor;
             if (_map[x, y] == TileType.Splitter) return Palette.Splitter;
             if (_map[x, y] == TileType.Arm) return Palette.Arm;

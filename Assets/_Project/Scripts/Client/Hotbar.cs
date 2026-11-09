@@ -174,7 +174,11 @@ namespace Game.Client
 
             string tooltip = null;
             Rect tooltipSlot = default;
-            if (Event.current.type == EventType.Repaint) PointsAtGround = PointsAtSoil = false;
+            if (Event.current.type == EventType.Repaint)
+            {
+                PointsAtGround = PointsAtSoil = false;
+                PointsAtSize = 1;
+            }
             for (int slot = 0; slot < Slots; slot++)
             {
                 var area = Area(slot, skills);
@@ -208,6 +212,7 @@ namespace Game.Client
                     {
                         PointsAtGround = true;
                         PointsAtSoil = WorksSoil(_entries[slot]);
+                        PointsAtSize = MaterialOf(_entries[slot])?.Places is TileType places ? World.SizeOf(places) : 1;
                     }
                 }
             }
@@ -220,6 +225,8 @@ namespace Game.Client
         // And it works the ground right ahead (a seed, the can, the hoe, fertilizer, a floor): World.TileAhead, not
         // World.PlaceAhead.
         public bool PointsAtSoil { get; private set; }
+        // How many tiles each way the slot's thing takes when put down (a big machine 2).
+        public int PointsAtSize { get; private set; } = 1;
 
         bool WorksSoil(Entry entry)
         {

@@ -103,6 +103,36 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void ABigSmelterTakesFourTilesAndSmeltsThriceASmeltersPaceOnPower()
+        {
+            // 2026-11-09: the second big machine.
+            var world = Room(out var player);
+            var item = Gear.Data.FindMaterial("big_smelter");
+            Assert.AreEqual((8, 9), World.BigOrigin(8, 10, new Vec2(0, -1), 2), "facing down, the square reaches down from the tile ahead");
+            Place(world, player, item, 8, 10, new Vec2(0, 1));
+            var big = world.MachineAt(8, 10);
+            Assert.AreEqual(TileType.BigSmelter, big.Kind);
+            foreach (var (x, y) in new[] { (9, 10), (8, 11), (9, 11) }) Assert.AreSame(big, world.MachineAt(x, y), "a part is the machine");
+
+            // Ore in from beside a part; nothing without power.
+            player.Position = TileMap.Center(10, 11);
+            world.MovePlayer(player.Id, player.Position, new Vec2(-1, 0), 10);
+            player.Inventory.AddMaterial(IronOre, 12);
+            Assert.Greater(world.LoadMachine(player.Id, IronOre, 12), 0);
+            Run(world, 3);
+            Assert.AreEqual(0, big.Outputs.Values.Sum(), "nothing without power");
+
+            world.Build(6, 10, TileType.Generator);
+            player.Position = TileMap.Center(6, 9);
+            world.MovePlayer(player.Id, player.Position, new Vec2(0, 1), 10);
+            player.Inventory.AddMaterial(Gel, 4);
+            Assert.IsTrue(world.Refuel(player.Id, Gel));
+            Run(world, 4.2f);
+            int bars = big.Outputs.GetValueOrDefault(IronBar);
+            Assert.GreaterOrEqual(bars, 3, $"three smelts in 4.2 seconds, where a smelter takes 4 each ({bars})");
+        }
+
+        [Test]
         public void ABigAssemblerTakesFourTilesRunsOnPowerAndComesUpWhole()
         {
             var world = Room(out var player);

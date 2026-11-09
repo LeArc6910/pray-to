@@ -156,15 +156,22 @@ namespace Game.Core
             return true;
         }
 
-        // A big machine (SizeOf > 1) goes on the square ahead: from the tile ahead, on away from the player and upward.
-        // Every tile of it must be bare or laid floor, clear of bodies and crops and outside an arena.
+        // Where a big machine of the size goes (its lower left tile) for a player facing that way with the tile ahead at
+        // (x, y): the square from it, on away from the player and upward. The screen's frame shows the same square.
+        public static (int X, int Y) BigOrigin(int x, int y, Vec2 facing, int size)
+        {
+            int direction = Machine.DirectionOf(facing);
+            return (Machine.Steps[direction].X < 0 ? x - (size - 1) : x, Machine.Steps[direction].Y < 0 ? y - (size - 1) : y);
+        }
+
+        // A big machine (SizeOf > 1) goes on the square ahead (BigOrigin). Every tile of it must be bare or laid floor,
+        // clear of bodies and crops and outside an arena.
         bool PlaceBig(Player player, MaterialDefinition material, int x, int y)
         {
             var kind = material.Places.Value;
             int size = SizeOf(kind);
             int direction = Machine.DirectionOf(player.Facing);
-            int ox = Machine.Steps[direction].X < 0 ? x - (size - 1) : x;
-            int oy = Machine.Steps[direction].Y < 0 ? y - (size - 1) : y;
+            var (ox, oy) = BigOrigin(x, y, player.Facing, size);
             var tiles = Footprint(ox, oy, size).ToList();
             foreach (var (tx, ty) in tiles)
             {

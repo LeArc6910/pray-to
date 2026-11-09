@@ -67,6 +67,8 @@ namespace Game.Client
         // The pointer is over a button that works the ground right ahead (plant, water, till, fertilize, lay a floor):
         // the world's frame then marks World.TileAhead, not where a thing would be put (2026-11-09).
         public bool PointsAtSoil { get; private set; }
+        // And the size of what it would put down (a big machine 2), for the frame (2026-11-09).
+        public int PointsAtSize { get; private set; } = 1;
 
         // Marks the button just drawn as working the ground ahead, when the pointer is over it.
         void Soil()
@@ -94,6 +96,7 @@ namespace Game.Client
             {
                 _hover = "";
                 PointsAtSoil = false;
+                PointsAtSize = 1;
             }
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
@@ -1016,6 +1019,8 @@ namespace Game.Client
                 if (pair.Key.Places != null)
                 {
                     if (Ui.LayoutButton("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
+                    if (Event.current.type == EventType.Repaint && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition))
+                        PointsAtSize = World.SizeOf(pair.Key.Places.Value);
                     if (TileMap.IsPaving(pair.Key.Places.Value)) Soil();
                 }
                 var crop = _client.CropFrom(pair.Key);
