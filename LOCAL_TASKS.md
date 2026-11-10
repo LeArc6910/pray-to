@@ -866,6 +866,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 102단계: 새 장소 모양(항구·폐허 신전·광산 마을)과 곁 장소 셋, 장소의 상인 셋, 마족 둥지의 몬스터와 보스(`Docs/Story.md` 장소 꾸밈·지금 이야기, `Docs/Npcs.md` 장소의 상인, `Docs/Bosses.md` 미쳐 버린 장군 모르그, `Docs/Combat.md` place 열)
   - (로컬 세션) 명령 한 줄을 다시 돌린다. 새 `.cs` 파일은 없다. 시트에 열이 늘었다(`npcs.csv`·`monsters.csv`·`bosses.csv`의 `place`). 프로토콜 0.73.0
   - 클라우드 확인은 배포 뒤 `--only story,first,npc`
+  - (클라우드 2026-11-10 웹 확인, 2d9c6fc) `--only story,first,npc` 통과 71, 실패 0. 왕도 사진에 왕실 상인 엘라의 노점(빨강·금 차양), 지도에 장소 일곱과 둥지 곁 아레나가 보인다
   - (사람) 항구의 배와 등대, 신전 제단, 갱도 입구 그림이 마음에 드는지, 장군 보스의 손맛과 음악, 마족 몬스터 소리
 
 - [ ] 103단계: 이야기 갈래(고르기)와 바닥 위에 선 기지 물건(`Docs/Story.md` 고르기·지금 이야기, `Docs/ArtPipeline.md` 기지 물건도 세운다)
