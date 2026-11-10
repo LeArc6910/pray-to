@@ -248,6 +248,169 @@ namespace Game.Client
         // The rows with the marks over them, in the person's colours (T, t and U their clothes), blinking at frame 10
         // (eyeRow is the upper row of the eyes) and breathing in at frames 7 and 8 (the rows over the legs a pixel up); outlined, and then the loose marks,
         // things in the air or glowing, drawn over the outline without one of their own.
+
+        // ---- The people of the story (Docs/Story.md, 2026-11-10): one drawing a look in characters.csv, clothes in
+        // their colour, breathing and blinking like the rest. A look not drawn here is a villager. ----
+
+        public static readonly string[] Looks = { "queen", "hero", "elder", "girl", "demon", "guard", "villager" };
+        static readonly string[] QueenLook =
+        {
+            "..............",
+            "....Y.YY.Y....",
+            "....YYrYYY....",
+            "...HHHHHHHH...",
+            "..HHssssssHH..",
+            "..HHsesseSHH..",
+            "..HHssssSSHH..",
+            "..HHHssssHHH..",
+            "..HtTTYYTTtH..",
+            "..tTTTYYTTTt..",
+            "..tTTTYYTTTt..",
+            "..sTTTTTTTTs..",
+            "..tTTTTTTTTt..",
+            ".tTTTTTTTTTTt.",
+            ".tTTTTTTTTTTt.",
+            ".tYYYYYYYYYYt.",
+            "..............",
+        };
+        static readonly string[] HeroLook =
+        {
+            "..............",
+            "....hhhhhh....",
+            "...hhHHHHhh...",
+            "...hssssssh...",
+            "...sesssess...",
+            "...ssssssSs...",
+            "....sSSSSs....",
+            "..TTIIIIIITT..",
+            ".TTiIIIIIIiTT.",
+            ".TtsIIBBIIstT.",
+            ".Tt.IibbiI.tT.",
+            ".Tt.IIIIII.tT.",
+            ".T..pppppp..T.",
+            "....pp..pp....",
+            "....pp..pp....",
+            "....oo..oo....",
+            "..............",
+        };
+        static readonly string[] ElderLook =
+        {
+            "..............",
+            "....ssssss....",
+            "...sssssssS...",
+            "..nssssssssn..",
+            "..nsesssessn..",
+            "..nnssssssnn..",
+            "...nnnnnnnn...",
+            "..TTnnnnnnTT..",
+            ".wTTTnnnnTTT..",
+            ".wtTTTnnTTTt..",
+            ".wsTTTTTTTTs..",
+            ".wtTTTTTTTTt..",
+            ".w.tTTTTTTt...",
+            ".w.tTTTTTTt...",
+            ".w.tTTTTTTt...",
+            ".w..oo..oo....",
+            "..............",
+        };
+        static readonly string[] GirlLook =
+        {
+            "..............",
+            "..............",
+            "..............",
+            "....PPPPPP....",
+            "...PPPPPPPP...",
+            "..PPssssssPP..",
+            "..PPssssssPP..",
+            "..PPsesseSPP..",
+            "..PPssssSSPP..",
+            "..PP.sSSs.PP..",
+            "...tTTTTTTt...",
+            "..sTTTUUTTTs..",
+            "...tTTTTTTt...",
+            "..tTTTTTTTTt..",
+            "..tTTTTTTTTt..",
+            "....ss..ss....",
+            "....oo..oo....",
+        };
+        static readonly string[] DemonLook =
+        {
+            "..............",
+            "..N........N..",
+            "..cN......Nc..",
+            "...cNTTTTNc...",
+            "...TTTTTTTT...",
+            "...TRRTTRRT...",
+            "...TTTTTTtT...",
+            "....TttttT....",
+            "..pPPPPPPPPp..",
+            ".pPPPPYYPPPPp.",
+            ".pTPPPPPPPPTp.",
+            ".p.PPPPPPPP.p.",
+            "...PPPPPPPP...",
+            "...PPPPPPPP...",
+            "...PP....PP...",
+            "...oo....oo...",
+            "..............",
+        };
+        static readonly string[] GuardLook =
+        {
+            "............I.",
+            "...iiiiii..IIw",
+            "..iIIIIIIi..w.",
+            "..issssssi..w.",
+            "...sesssess.w.",
+            "...ssssssSs.w.",
+            "....sSSSSs..w.",
+            "..IITTTTTTIIw.",
+            ".IiTTTYYTTTiw.",
+            ".IsTTTYYTTTsw.",
+            ".Ii.TTTTTT..w.",
+            "....TTTTTT..w.",
+            "....pppppp..w.",
+            "....pp..pp..w.",
+            "....pp..pp..w.",
+            "....oo..oo....",
+            "..............",
+        };
+        static readonly string[] VillagerLook =
+        {
+            "..............",
+            "....hhhhhh....",
+            "...hhhhhhhh...",
+            "...hssssssh...",
+            "...sesssess...",
+            "...ssssssSs...",
+            "....sSSSSs....",
+            "...tTTTTTTt...",
+            "..tTTccccTTt..",
+            "..sTTccccTTs..",
+            "..tTTccccTTt..",
+            "...TTccccTT...",
+            "...TTTTTTTT...",
+            "....pp..pp....",
+            "....pp..pp....",
+            "....oo..oo....",
+            "..............",
+        };
+
+        // The person of the story in their look and colour, at a frame of the loop.
+        public static PixelImage Look(string look, Rgba color, int frame)
+        {
+            frame = (frame % Frames + Frames) % Frames;
+            var (rows, eyeRow) = look switch
+            {
+                "queen" => (QueenLook, 5),
+                "hero" => (HeroLook, 4),
+                "elder" => (ElderLook, 4),
+                "girl" => (GirlLook, 7),
+                "demon" => (DemonLook, 5),
+                "guard" => (GuardLook, 4),
+                _ => (VillagerLook, 4),
+            };
+            return Paint(rows, color, frame, System.Array.Empty<(int, int, char)>(), System.Array.Empty<(int, int, char)>(), eyeRow, legs: 16, breathes: true);
+        }
+
         static PixelImage Paint(string[] rows, Rgba color, int frame, IEnumerable<(int X, int Y, char C)> marks, IEnumerable<(int X, int Y, char C)> loose,
             int eyeRow, int legs, bool breathes)
         {

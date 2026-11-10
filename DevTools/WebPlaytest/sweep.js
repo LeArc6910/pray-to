@@ -1700,6 +1700,66 @@ async function base(browser) {
   await game.context.close();
 }
 
+// ---------------------------------------------------------------- 이야기와 장소 (100단계, 2026-11-10)
+// The story (Docs/Story.md): the village round the spawn, talking to its chief through the talk at the bottom of the
+// screen, the step in the goal list with its way, reaching the royal city along the road, its waypoint, and going back
+// by waypoint.
+async function story(browser) {
+  note('\n## 이야기와 장소 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1500);
+  let s = await game.state();
+  check(s.places >= 4, `장소가 동굴에 깎여 있다 (${s.places}곳)`);
+  check(s.place === 'dawn_village', `처음 서는 곳은 새벽 마을 (${s.place})`);
+  check(s.journey === 1 && !s.journeyTaken, `이야기는 1단계에서 시작한다 (${s.journey})`);
+  check(/dawn_village/.test(s.waypoints), `마을 웨이포인트는 처음부터 열린다 (${s.waypoints})`);
+  check((await game.allText()).includes('촌장 바르도에게 말 걸기'), '목표 목록 맨 위에 "촌장 바르도에게 말 걸기"');
+  await game.shot('village', '새벽 마을과 촌장(이름 앞 !)');
+  await game.send('goto person chief');
+  await game.wait(800);
+  check(await game.press(/촌장 바르도와 말하기/), '촌장 곁에서 [! 촌장 바르도와 말하기]');
+  await game.wait(500);
+  await game.shot('story-talk', '이야기 대화 창');
+  let pages = 0;
+  while (pages < 12 && (await game.press('다음', undefined, { quiet: true }))) {
+    pages++;
+    await game.wait(250);
+  }
+  check(pages >= 3, `대화를 [다음]으로 넘긴다 (${pages}번)`);
+  check(await game.press('알겠다'), '마지막 줄에서 [알겠다]');
+  await game.wait(1000);
+  s = await game.state();
+  check(s.journeyTaken, '[알겠다]로 이야기 단계를 받는다');
+  const tracker = await game.allText();
+  check(/왕도 루미나에 가기/.test(tracker) && /칸/.test(tracker), `목표 목록에 "왕도 루미나에 가기"와 방향·거리 (${(tracker.match(/왕도 루미나[^|]*/) || [''])[0]})`);
+  await game.shot('story-taken', '받은 단계와 목표 목록');
+  // The map: every place's name and the gold ring where the story leads.
+  await game.page.keyboard.press('m');
+  await game.wait(700);
+  await game.shot('story-map', '지도의 장소와 이야기 목적지');
+  await game.page.keyboard.press('m');
+  // The royal city: arriving finishes the step, and its waypoint opens when stood on.
+  await game.send('goto place royal_city');
+  await game.wait(1500);
+  s = await game.state();
+  check(s.place === 'royal_city', `왕도에 닿는다 (${s.place})`);
+  check(s.journey === 2, `왕도에 닿으면 1단계가 끝난다 (단계 ${s.journey})`);
+  await game.send('goto 0 2');
+  await game.wait(1200);
+  s = await game.state();
+  check(/royal_city/.test(s.waypoints), `웨이포인트를 밟으면 열린다 (${s.waypoints})`);
+  await game.shot('royal-city', '왕도 루미나와 여왕');
+  check(await game.press('웨이포인트'), '웨이포인트 위에서 [웨이포인트]');
+  await game.wait(500);
+  await game.shot('waypoints', '웨이포인트 목록');
+  check(await game.press('새벽 마을'), '목록에서 [새벽 마을]');
+  await game.wait(1200);
+  s = await game.state();
+  check(s.place === 'dawn_village', `웨이포인트로 마을에 돌아간다 (${s.place})`);
+  await game.context.close();
+}
+
 // ---------------------------------------------------------------- 배포를 넘어 남는 웹 저장본 (49·50단계)
 // A browser profile kept between runs (out/profile-deploy): the first run leaves a character and its commit; a run on
 // a later deploy loads it and checks its level and bag are still there.
@@ -2535,7 +2595,7 @@ async function firstRun(browser, profile, hourLong) {
   }
 }
 
-const Sections = { menu, basics, first, firstphone, hour, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, deploysave, layout, touch };
+const Sections = { menu, basics, first, firstphone, hour, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

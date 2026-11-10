@@ -162,6 +162,13 @@ namespace Game.Core.Tests
         public static readonly NpcData Shipped = NpcSheet.Parse(Read(NpcSheet.NpcsFile), Read(NpcSheet.ShopFile), Gear.Data, Read(NpcSheet.RequestsFile));
     }
 
+    public static class Tales
+    {
+        static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Story/" + file));
+
+        public static readonly StoryData Shipped = StorySheet.Parse(Read(StorySheet.PlacesFile), Read(StorySheet.CharactersFile), Read(StorySheet.StoryFile), Gear.Data, Bosses.Shipped);
+    }
+
     public static class Guide
     {
         public static readonly GuideData Shipped = GuideSheet.Parse(File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Guide/" + GuideSheet.File)), Gear.Data);

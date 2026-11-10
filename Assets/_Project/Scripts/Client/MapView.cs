@@ -191,7 +191,18 @@ namespace Game.Client
 
             string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
             GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
-            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥");
+            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소");
+            // Each place's name beside its dot.
+            var window = new Rect(0, 0, _map.Width, _map.Height);
+            foreach (var site in _client.Places)
+            {
+                float u = site.Center.X / window.width, v = site.Center.Y / window.height;
+                var at = new Vector2(area.x + u * area.width, area.yMax - v * area.height);
+                var previous = GUI.color;
+                GUI.color = _client.Waypoints.Contains(site.Definition.Index) ? WaypointOpen : Color.white;
+                GUI.Label(new Rect(at.x + MarkerSize, at.y - lineHeight / 2, 200, lineHeight), site.Definition.Name);
+                GUI.color = previous;
+            }
             Ui.Probe("지도 닫기", screen);
             if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
         }
@@ -206,9 +217,18 @@ namespace Game.Client
             // The nearest veins, breathing so they catch the eye.
             float breath = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 4);
             foreach (var (at, color) in _veins) Marker(area, window, at, Shapes.Ring, new Color(color.r, color.g, color.b, breath), MarkerSize * 1.6f);
+            // The places of the story (Docs/Story.md, 2026-11-10): blue where the waypoint is open, grey elsewhere,
+            // and the place the story leads to now ringed in gold.
+            foreach (var site in _client.Places)
+                Marker(area, window, site.Center, Shapes.Circle, _client.Waypoints.Contains(site.Definition.Index) ? WaypointOpen : PlaceMark, MarkerSize * 1.5f);
+            var leads = _client.SiteOf(_client.CurrentStep?.Target);
+            if (leads != null) Marker(area, window, leads.Center, Shapes.Ring, new Color(1f, 0.85f, 0.35f, breath), MarkerSize * 2.8f);
             foreach (var position in _others) Marker(area, window, position, Shapes.Circle, OtherPlayer, MarkerSize);
             Marker(area, window, _client.Position, Shapes.Circle, Color.white, MarkerSize);
         }
+
+        static readonly Color WaypointOpen = new Color(0.5f, 0.78f, 1f);
+        static readonly Color PlaceMark = new Color(0.7f, 0.7f, 0.7f);
 
         static void Marker(Rect area, Rect window, Vec2 world, Sprite sprite, Color color, float size)
         {
@@ -276,6 +296,8 @@ namespace Game.Client
             if (_map[x, y] == TileType.VoidOre) return new Color32(180, 140, 255, 255);
             if (TileMap.IsPaving(_map[x, y])) return new Color32(150, 138, 120, 255);
             if (TileMap.IsDoor(_map[x, y])) return new Color32(170, 120, 70, 255);
+            if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);
+            if (_map[x, y] == TileType.Waypoint) return new Color32(110, 170, 255, 255);
             if (_map[x, y] == TileType.Table || _map[x, y] == TileType.Banner || _map[x, y] == TileType.Pot) return new Color32(200, 160, 110, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);
             if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);

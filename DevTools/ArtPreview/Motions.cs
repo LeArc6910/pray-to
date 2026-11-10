@@ -458,6 +458,7 @@ namespace Game.Client
             Bosses(Path.Combine(folder, "bosses.gif"), arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
+            StoryPeople(Path.Combine(folder, "story_people.gif"), floor);
             Animals(Path.Combine(folder, "animals.gif"), floor);
             Decor(Path.Combine(folder, "decor.gif"), sword, floor);
         }
@@ -554,6 +555,17 @@ namespace Game.Client
                     draws.Add(Sprite(image, x, y, 0.5f, 0, 10 - (int)(y * 10), flip: MathF.Cos(t) > 0));
                 }
                 return draws;
+            });
+        }
+
+        // The people of the story in each look (Docs/Story.md, 2026-11-10), breathing and blinking; two loops.
+        static void StoryPeople(string path, PixelImage floor)
+        {
+            var colors = new[] { "#E8C860", "#4A7AD8", "#8A6A4A", "#B84AC8", "#6A3A8A", "#5A7AB8", "#C85A6A" };
+            Play(path, PeopleArt.Looks.Length, 1, 22, 26, 5, 0.72f, 2 * PeopleArt.Frames / PeopleArt.FramesPerSecond, floor, (column, row, time, step) =>
+            {
+                int frame = (int)MathF.Floor(time * PeopleArt.FramesPerSecond) % PeopleArt.Frames;
+                return new List<Draw> { Sprite(PeopleArt.Look(PeopleArt.Looks[column], Rgba.Hex(colors[column]), frame), 0, -0.2f, 0.5f, 0, 10) };
             });
         }
 

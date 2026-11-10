@@ -39,6 +39,29 @@ namespace Game.Core
         public IReadOnlyList<Vec2> Arenas { get; }
         // Which kind of cave each tile is in (Docs/Biomes.md).
         public BiomeMap Biomes { get; }
+        // The places of the story (Docs/Story.md), in sheet order; none when made without the sheets.
+        public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
+    }
+
+    // Where a place was carved: its middle (the waypoint), its plaza's radius, and where its people stand.
+    public sealed class PlaceSite
+    {
+        internal PlaceSite(PlaceDefinition definition, int x, int y, IReadOnlyList<(CharacterDefinition Character, Vec2 At)> people)
+        {
+            Definition = definition;
+            X = x;
+            Y = y;
+            People = people;
+        }
+
+        public PlaceDefinition Definition { get; }
+        public int X { get; }
+        public int Y { get; }
+        public int Radius => Definition.Radius;
+        public Vec2 Center => TileMap.Center(X, Y);
+        public IReadOnlyList<(CharacterDefinition Character, Vec2 At)> People { get; }
+
+        public bool Contains(Vec2 position) => Vec2.Distance(position, Center) <= Radius + 0.5f;
     }
 
     // Caves from a seed: random fill, a few smoothing passes, a clearing around the spawn, a boss arena some way
@@ -104,7 +127,156 @@ namespace Game.Core
             (38, 0), (27, 27), (0, 38), (-27, 27), (-38, 0), (-27, -27), (0, -38), (27, -27),
         };
 
-        public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize)
+        // The places of the story (Docs/Story.md, 2026-11-10), carved last of all on their own stream, so a world made
+        // without the story sheets (the tests, the sims) is the caves it always was.
+        const ulong PlaceStream = 13;
+        // Sixteen ways round, as thousandths (integers only, so every machine carves the same places).
+        static readonly (int X, int Y)[] Ways =
+        {
+            (1000, 0), (924, 383), (707, 707), (383, 924), (0, 1000), (-383, 924), (-707, 707), (-924, 383),
+            (-1000, 0), (-924, -383), (-707, -707), (-383, -924), (0, -1000), (383, -924), (707, -707), (924, -383),
+        };
+
+        public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null)
+        {
+            var world = GenerateCaves(seed, width, height);
+            if (story != null && story.Places.Count > 0) world.Places = CarvePlaces(world, seed, story);
+            return world;
+        }
+
+        // Each place round its plaza, in sheet order: at its distance from the spawn, of the sixteen ways the one
+        // nearest the place its road comes from that keeps clear of the arenas and the other places; lamps round the
+        // edge, a waypoint in the middle, its people on a ring inside. Then the roads, three wide and paved, bent once
+        // to keep out of the arenas, never laid over a plaza.
+        static List<PlaceSite> CarvePlaces(GeneratedWorld world, ulong seed, StoryData story)
+        {
+            var map = world.Map;
+            var random = new GameRandom(seed, PlaceStream);
+            var arenas = world.Arenas.Select(a => (X: TileMap.Cell(a.X), Y: TileMap.Cell(a.Y))).ToList();
+            var sites = new List<PlaceSite>();
+            int Square(int dx, int dy) => dx * dx + dy * dy;
+            foreach (var place in story.Places)
+            {
+                int r = place.Radius;
+                int cx = world.SpawnX, cy = world.SpawnY;
+                if (place.Distance > 0)
+                {
+                    var from = sites.FirstOrDefault(s => s.Definition.Id == place.Road);
+                    int fromX = from?.X ?? world.SpawnX, fromY = from?.Y ?? world.SpawnY;
+                    int start = random.Next(Ways.Length);
+                    (int X, int Y)? best = null;
+                    int bestScore = int.MaxValue;
+                    for (int i = 0; i < Ways.Length; i++)
+                    {
+                        var way = Ways[(start + i) % Ways.Length];
+                        int x = Clamp(world.SpawnX + way.X * place.Distance / 1000, r + 3, map.Width - r - 4);
+                        int y = Clamp(world.SpawnY + way.Y * place.Distance / 1000, r + 3, map.Height - r - 4);
+                        bool clear = arenas.All(a => Square(x - a.X, y - a.Y) >= (ArenaRadius + r + 3) * (ArenaRadius + r + 3))
+                            && sites.All(s => Square(x - s.X, y - s.Y) >= (s.Radius + r + 4) * (s.Radius + r + 4));
+                        // Clear ways first, the one nearest where its road comes from; crowded ones only when no way is clear.
+                        int score = Square(x - fromX, y - fromY) + (clear ? 0 : 1 << 24);
+                        if (score < bestScore)
+                        {
+                            bestScore = score;
+                            best = (x, y);
+                        }
+                    }
+                    (cx, cy) = best.Value;
+                }
+                for (int y = cy - r; y <= cy + r; y++)
+                {
+                    for (int x = cx - r; x <= cx + r; x++)
+                    {
+                        if (IsInside(map, x, y) && Square(x - cx, y - cy) <= r * r) map[x, y] = place.Floor;
+                    }
+                }
+                // Lamps on the four diagonals near the edge, so a place is lit from afar.
+                foreach (int w in new[] { 2, 6, 10, 14 })
+                {
+                    int lx = cx + Ways[w].X * (r - 1) / 1000, ly = cy + Ways[w].Y * (r - 1) / 1000;
+                    if (IsInside(map, lx, ly)) map[lx, ly] = TileType.Lamp;
+                }
+                if (place.Waypoint) map[cx, cy] = TileType.Waypoint;
+                var people = new List<(CharacterDefinition, Vec2)>();
+                var living = story.Characters.Where(c => c.Place == place).ToList();
+                int ring = System.Math.Max(2, r - 3);
+                for (int i = 0; i < living.Count; i++)
+                {
+                    // From the top of the plaza round, evenly; a second lap a little further in when there are many.
+                    int lap = i / 8;
+                    var way = Ways[(4 + (i % 8) * 2 + lap) % Ways.Length];
+                    int dist = System.Math.Max(2, ring - lap);
+                    int px = cx + way.X * dist / 1000, py = cy + way.Y * dist / 1000;
+                    if (map[px, py] != place.Floor) (px, py) = (cx + (i % 2 == 0 ? 1 : -1), cy + 1 + i / 2);
+                    people.Add((living[i], TileMap.Center(px, py)));
+                }
+                sites.Add(new PlaceSite(place, cx, cy, people));
+            }
+
+            bool InPlaza(int x, int y) => sites.Any(s => Square(x - s.X, y - s.Y) <= s.Radius * s.Radius);
+            int ArenaTiles(List<(int X, int Y)> line) => line.Count(p => arenas.Any(a => Square(p.X - a.X, p.Y - a.Y) <= (ArenaRadius + 2) * (ArenaRadius + 2)));
+            foreach (var site in sites)
+            {
+                var from = sites.FirstOrDefault(s => s.Definition.Id == site.Definition.Road);
+                if (from == null || from == site) continue;
+                List<(int X, int Y)> path = null;
+                int fewest = int.MaxValue;
+                foreach (int bend in new[] { 0, 250, -250, 450, -450 })
+                {
+                    int midX = (from.X + site.X) / 2 - (site.Y - from.Y) * bend / 1000;
+                    int midY = (from.Y + site.Y) / 2 + (site.X - from.X) * bend / 1000;
+                    midX = Clamp(midX, 2, map.Width - 3);
+                    midY = Clamp(midY, 2, map.Height - 3);
+                    var line = Line(from.X, from.Y, midX, midY).Concat(Line(midX, midY, site.X, site.Y)).ToList();
+                    int crossed = ArenaTiles(line);
+                    if (crossed < fewest)
+                    {
+                        fewest = crossed;
+                        path = line;
+                    }
+                }
+                foreach (var (x, y) in path)
+                {
+                    for (int ty = y - TunnelHalfWidth; ty <= y + TunnelHalfWidth; ty++)
+                    {
+                        for (int tx = x - TunnelHalfWidth; tx <= x + TunnelHalfWidth; tx++)
+                        {
+                            if (IsInside(map, tx, ty) && !InPlaza(tx, ty)) map[tx, ty] = TileType.Road;
+                        }
+                    }
+                }
+            }
+            return sites;
+        }
+
+        // The tiles of a straight line, both ends in (Bresenham's).
+        static IEnumerable<(int X, int Y)> Line(int fromX, int fromY, int toX, int toY)
+        {
+            int dx = System.Math.Abs(toX - fromX);
+            int dy = -System.Math.Abs(toY - fromY);
+            int stepX = fromX < toX ? 1 : -1;
+            int stepY = fromY < toY ? 1 : -1;
+            int error = dx + dy;
+            int x = fromX, y = fromY;
+            while (true)
+            {
+                yield return (x, y);
+                if (x == toX && y == toY) yield break;
+                int twice = 2 * error;
+                if (twice >= dy)
+                {
+                    error += dy;
+                    x += stepX;
+                }
+                if (twice <= dx)
+                {
+                    error += dx;
+                    y += stepY;
+                }
+            }
+        }
+
+        static GeneratedWorld GenerateCaves(ulong seed, int width, int height)
         {
             var random = new GameRandom(seed, Stream);
             var map = new TileMap(width, height);

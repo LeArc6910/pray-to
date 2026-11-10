@@ -33,9 +33,12 @@ namespace Game.Client
             string npcFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Npcs"));
             var npcs = NpcSheet.Parse(File.ReadAllText(Path.Combine(npcFolder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(npcFolder, NpcSheet.ShopFile)), loot,
                 File.ReadAllText(Path.Combine(npcFolder, NpcSheet.RequestsFile)));
-            if (!loot.Success || !monsters.Success || !tiles.Success || !npcs.Success)
+            string storyFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Story"));
+            var story = StorySheet.Parse(File.ReadAllText(Path.Combine(storyFolder, StorySheet.PlacesFile)), File.ReadAllText(Path.Combine(storyFolder, StorySheet.CharactersFile)),
+                File.ReadAllText(Path.Combine(storyFolder, StorySheet.StoryFile)), loot);
+            if (!loot.Success || !monsters.Success || !tiles.Success || !npcs.Success || !story.Success)
             {
-                foreach (string error in loot.Errors.Concat(monsters.Errors).Concat(tiles.Errors).Concat(npcs.Errors)) Console.Error.WriteLine(error);
+                foreach (string error in loot.Errors.Concat(monsters.Errors).Concat(tiles.Errors).Concat(npcs.Errors).Concat(story.Errors)) Console.Error.WriteLine(error);
                 return 1;
             }
 
@@ -51,6 +54,13 @@ namespace Game.Client
             Save(TileArt.BigAssembler, Path.Combine(pieces, "big_assembler.png"), 6);
             Save(TileArt.Object(TileType.Scarecrow), Path.Combine(pieces, "scarecrow.png"), 6);
             Save(TileArt.Object(TileType.LockedDoor), Path.Combine(pieces, "locked_door.png"), 6);
+            // The story (2026-11-10): its people in their looks, the road and the waypoint, and each place as the game
+            // lays it out and lights it.
+            var looks = PeopleArt.Looks.Select(look => PeopleArt.Look(look, Rgba.Hex(story.Characters.FirstOrDefault(c => c.Look == look)?.Color ?? "#8A7A6A"), 0)).ToList();
+            Save(Row(looks), Path.Combine(pieces, "story_people.png"), 6);
+            Save(Row(new[] { TileArt.Object(TileType.Road), TileArt.Object(TileType.Waypoint) }.ToList()), Path.Combine(pieces, "road_waypoint.png"), 6);
+            var storyWorld = WorldGenerator.Generate(7, story: story);
+            foreach (var site in storyWorld.Places) Save(Place(storyWorld, site, lights), Path.Combine(pieces, $"place_{site.Definition.Id}.png"), 3);
             Save(Players(), Path.Combine(output, "player.png"), 6);
             Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
             Motions.Write(Path.Combine(output, "anim"), loot, monsters, npcs);
@@ -569,6 +579,33 @@ namespace Game.Client
             scene.Icon(sx + 2.2f, sy - 1.2f, ItemArt.Material(loot.FindMaterial("slime_gel")));
             scene.Shot(sx + 3.4f, sy + 0.2f, ItemArt.Arrow);
             return scene.Image;
+        }
+
+        // A place of the story as the game lays it out (Docs/Story.md): its plaza, lamps, waypoint, roads and people, lit.
+        static PixelImage Place(GeneratedWorld world, PlaceSite site, WorldLights lights)
+        {
+            int half = site.Radius + 5;
+            var scene = new Scene(world.Map, site.X - half, site.Y - half, half * 2, half * 2, _ => false);
+            scene.Lit(lights, null);
+            foreach (var (character, at) in site.People)
+                scene.Player(at.X, at.Y - 0.3f, PeopleArt.Look(character.Look, Rgba.Hex(character.Color), 0));
+            scene.Player(site.X + 0.5f, site.Y - 1.5f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
+            return scene.Image;
+        }
+
+        // Images side by side with a gap, on a dark ground.
+        static PixelImage Row(List<PixelImage> images)
+        {
+            int width = images.Sum(i => i.Width + 2) + 2, height = images.Max(i => i.Height) + 4;
+            var row = new PixelImage(width, height);
+            row.Fill(0, 0, width, height, Rgba.Hex("#2A2420"));
+            int x = 2;
+            foreach (var image in images)
+            {
+                row.Draw(image, x, 2);
+                x += image.Width + 2;
+            }
+            return row;
         }
 
         // The boss in its arena, awake, with two players in front of it.

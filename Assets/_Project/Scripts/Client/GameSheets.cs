@@ -32,6 +32,10 @@ namespace Game.Client
         public TextAsset requests;
         // The days (events.csv, 2026-11-09).
         public TextAsset events;
+        // The story: its places, people and steps (Docs/Story.md, 2026-11-10).
+        public TextAsset places;
+        public TextAsset characters;
+        public TextAsset story;
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
@@ -51,6 +55,7 @@ namespace Game.Client
 
         // Without the sheets (an asset made before they existed) there is no one.
         public DayEventData LoadEvents() => DayEventSheet.Parse(Text(events));
+        public StoryData LoadStory(LootData loot, BossData bosses) => StorySheet.Parse(Text(places), Text(characters), Text(story), loot, bosses);
 
         public NpcData LoadNpcs(LootData loot) => NpcSheet.Parse(Text(npcs), Text(shop), loot, Text(requests));
 

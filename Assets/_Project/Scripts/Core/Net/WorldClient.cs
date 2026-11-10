@@ -375,7 +375,7 @@ namespace Game.Core
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
             Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
             PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)),
-            Classes.Select(c => c.Id), SkillOrder);
+            Classes.Select(c => c.Id), SkillOrder, JourneyStep, JourneyTaken, Waypoints.Select(i => Story?.Places[i].Id).Where(id => id != null));
 
         // The names this player gave their pets (Pets.CleanName), by pet id: kept in the character save only, so other
         // players see the kind's name.
@@ -536,6 +536,25 @@ namespace Game.Core
         public byte[] RepairCommand() => new InventoryCommandMessage(InventoryCommand.Repair, 0).Encode();
 
         public byte[] PetAnimalsCommand() => new InventoryCommandMessage(InventoryCommand.PetAnimals, 0).Encode();
+        // The story (World.Story.cs, 2026-11-10): its sheets, set before joining, as the host's (the places are carved
+        // from them); where the places are; and this player's step, whether it is taken, and the open waypoints.
+        public StoryData Story { get; set; }
+        public IReadOnlyList<PlaceSite> Places { get; private set; } = Array.Empty<PlaceSite>();
+        public int JourneyStep { get; private set; }
+        public bool JourneyTaken { get; private set; }
+        public HashSet<int> Waypoints { get; } = new HashSet<int>();
+        // Goes up whenever the host tells the player's place in the story, for the screen to notice.
+        public int JourneyVersion { get; private set; }
+
+        public StoryStep CurrentStep => Story?.Step(JourneyStep);
+        public string BossName(string id) => _bosses?.Bosses.FirstOrDefault(b => b.Id == id)?.Name ?? id;
+        public PlaceSite SiteOf(PlaceDefinition place) => place == null ? null : Places.FirstOrDefault(p => p.Definition == place);
+        public (CharacterDefinition Character, Vec2 At)? CharacterNear() => World.CharacterNear(Places, Position);
+        public PlaceSite WaypointNear() => World.WaypointNear(Places, Position);
+        public PlaceSite PlaceHere() => Places.FirstOrDefault(p => p.Contains(Position));
+        public byte[] TalkStoryCommand() => new InventoryCommandMessage(InventoryCommand.TalkStory, 0).Encode();
+        public byte[] TeleportCommand(PlaceDefinition place) => new InventoryCommandMessage(InventoryCommand.Teleport, 0, index: place.Index).Encode();
+
         public byte[] LockDoorCommand() => new InventoryCommandMessage(InventoryCommand.LockDoor, 0).Encode();
         public byte[] UnlockDoorCommand() => new InventoryCommandMessage(InventoryCommand.UnlockDoor, 0).Encode();
 
@@ -827,6 +846,14 @@ namespace Game.Core
                     case MessageType.Machines:
                         // The host sends what changed (2026-11-09): each one replaces what was heard of it before.
                         foreach (var machine in MachinesMessage.Decode(data).Machines) _machineStates[machine.Y * 65536 + machine.X] = (machine, HostTick);
+                        break;
+                    case MessageType.Journey:
+                        var journey = JourneyMessage.Decode(data);
+                        JourneyStep = journey.Step;
+                        JourneyTaken = journey.Taken;
+                        Waypoints.Clear();
+                        foreach (int index in journey.Waypoints) Waypoints.Add(index);
+                        JourneyVersion++;
                         break;
                     case MessageType.Locks:
                         _locks.Clear();
@@ -1395,8 +1422,9 @@ namespace Game.Core
             ApplyKit(welcome.Classes, welcome.SkillOrder);
             PlayerId = welcome.PlayerId;
             Seed = welcome.Seed;
-            var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height);
+            var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story);
             Map = generated.Map;
+            Places = generated.Places;
             Arena = generated.Arena;
             Arenas = generated.Arenas;
             Biomes = generated.Biomes;

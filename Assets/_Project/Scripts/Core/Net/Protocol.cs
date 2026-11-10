@@ -29,6 +29,7 @@ namespace Game.Core
         Life = 23,
         Records = 24,
         Locks = 25,
+        Journey = 26,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -40,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.67.0";
+        public const string Version = "0.68.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -384,6 +385,39 @@ namespace Game.Core
             var pets = new List<(int, int)>();
             for (int n = r.ReadByte(); n > 0; n--) pets.Add((r.ReadByte(), r.ReadInt32()));
             return new RecordsMessage(records, achievements, pets);
+        });
+    }
+
+    // The player's place in the story (World.Story.cs, 2026-11-10): the step, whether its giver was talked to, and the
+    // waypoints open to them by place index. Sent when any of these changes and when they join.
+    public sealed class JourneyMessage
+    {
+        public JourneyMessage(int step, bool taken, IReadOnlyList<int> waypoints)
+        {
+            Step = step;
+            Taken = taken;
+            Waypoints = waypoints;
+        }
+
+        public int Step { get; }
+        public bool Taken { get; }
+        public IReadOnlyList<int> Waypoints { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Journey, w =>
+        {
+            w.Write((ushort)Step);
+            w.Write(Taken);
+            w.Write((byte)Waypoints.Count);
+            foreach (int index in Waypoints) w.Write((byte)index);
+        });
+
+        public static JourneyMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Journey, r =>
+        {
+            int step = r.ReadUInt16();
+            bool taken = r.ReadBoolean();
+            var waypoints = new List<int>();
+            for (int n = r.ReadByte(); n > 0; n--) waypoints.Add(r.ReadByte());
+            return new JourneyMessage(step, taken, waypoints);
         });
     }
 

@@ -21,14 +21,19 @@ namespace Game.Core
         // 12: the pet that follows it (Pets.cs), by id. 13: each pet's experience (Pets.LevelOf), by pet id. 14: the
         // life skill perks picked (LifeSkills.PerkIndex order, 0 none). 15: the names given to pets (Pets.CleanName), by
         // pet id. 16: its classes, by id in the order picked, and its skill order (Player.SkillOrder), so the menu
-        // starts it with them (2026-11-09).
-        const int FormatVersion = 16;
+        // starts it with them (2026-11-09). 17: the main story's step, whether it was taken, and the waypoints open
+        // to it by place id (Docs/Story.md, 2026-11-10).
+        const int FormatVersion = 17;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
             List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null,
             List<(string, string, int)> records = null, List<string> achievements = null, string pet = "", List<(string, int)> petExperience = null,
-            List<int> lifePerks = null, List<(string, string)> petNames = null, List<string> classes = null, List<int> skillOrder = null)
+            List<int> lifePerks = null, List<(string, string)> petNames = null, List<string> classes = null, List<int> skillOrder = null,
+            int journeyStep = 0, bool journeyTaken = false, List<string> waypoints = null)
         {
+            JourneyStep = journeyStep;
+            JourneyTaken = journeyTaken;
+            Waypoints = waypoints ?? new List<string>();
             Classes = classes ?? new List<string>();
             SkillOrder = skillOrder ?? new List<int>();
             PetNames = petNames ?? new List<(string, string)>();
@@ -83,6 +88,10 @@ namespace Game.Core
         // order among them.
         public IReadOnlyList<string> Classes { get; }
         public IReadOnlyList<int> SkillOrder { get; }
+        // Where it is in the main story (Player.JourneyStep) and the waypoints open to it, by place id.
+        public int JourneyStep { get; }
+        public bool JourneyTaken { get; }
+        public IReadOnlyList<string> Waypoints { get; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
@@ -91,7 +100,7 @@ namespace Game.Core
             IEnumerable<(string Skill, string Gem)> supports = null, IEnumerable<(string Kind, string Id, int Count)> records = null,
             IEnumerable<string> achievements = null, string pet = null, IEnumerable<(string Pet, int Experience)> petExperience = null,
             IEnumerable<int> lifePerks = null, IEnumerable<(string Pet, string Name)> petNames = null, IEnumerable<string> classes = null,
-            IEnumerable<int> skillOrder = null)
+            IEnumerable<int> skillOrder = null, int journeyStep = 0, bool journeyTaken = false, IEnumerable<string> waypoints = null)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -183,6 +192,11 @@ namespace Game.Core
                 var order = (skillOrder ?? Enumerable.Empty<int>()).ToList();
                 w.Write((byte)order.Count);
                 foreach (int index in order) w.Write((byte)index);
+                w.Write((ushort)journeyStep);
+                w.Write(journeyTaken);
+                var open = (waypoints ?? Enumerable.Empty<string>()).ToList();
+                w.Write((byte)open.Count);
+                foreach (string id in open) w.Write(id);
             }
             return stream.ToArray();
         }
@@ -267,8 +281,12 @@ namespace Game.Core
                 for (int count = version >= 16 ? r.ReadByte() : 0; count > 0; count--) kit.Add(r.ReadString());
                 var order = new List<int>();
                 for (int count = version >= 16 ? r.ReadByte() : 0; count > 0; count--) order.Add(r.ReadByte());
+                int journeyStep = version >= 17 ? r.ReadUInt16() : 0;
+                bool journeyTaken = version >= 17 && r.ReadBoolean();
+                var waypoints = new List<string>();
+                for (int count = version >= 17 ? r.ReadByte() : 0; count > 0; count--) waypoints.Add(r.ReadString());
                 return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports, records, achievements, pet,
-                    grown, perks, names, kit, order);
+                    grown, perks, names, kit, order, journeyStep, journeyTaken, waypoints);
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {

@@ -183,6 +183,7 @@ namespace Game.Core
             UpdateHazards();
             UpdateProjectiles();
             UpdateForage();
+            UpdateStory();
             UpdateLoot();
             UpdateCrops();
             UpdateMachines();
@@ -586,6 +587,8 @@ namespace Game.Core
                 var position = TileMap.Center(x, y);
                 if (Map.IsSolid(x, y)
                     || Map[x, y] == TileType.Lava
+                    // Not on the roads or in the places of the story (World.Story.cs).
+                    || Map[x, y] == TileType.Road || Map[x, y] == TileType.Waypoint || Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + 2)
                     || Vec2.Distance(position, Spawn) < _config.SpawnDistance
                     || _players.Any(p => Vec2.Distance(p.Position, position) < _config.SpawnDistance))
                 {

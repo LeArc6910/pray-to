@@ -66,6 +66,9 @@ namespace Game.Client
         TileData _tiles;
         GuideData _guide;
         NpcData _npcs;
+        // The story, its places and people (Docs/Story.md, 2026-11-10); empty in a build from before its sheets.
+        StoryData _story;
+        StoryScreen _storyScreen;
         // The guide for new players (Docs/Guide.md): how far this character has come, checked twice a second, and
         // when its current goal came up, for showing the hint a while.
         GuideProgress _guideProgress;
@@ -144,6 +147,7 @@ namespace Game.Client
             _tiles = sheets.LoadTiles(_loot);
             _guide = sheets.LoadGuide(_loot);
             _npcs = sheets.LoadNpcs(_loot);
+            _story = sheets.LoadStory(_loot, _bosses);
             // The days from their sheet; a build from before it (no sheet) keeps the ones in code.
             var days = sheets.LoadEvents();
             if (days.Events.Count > 0) World.DayEvents = days;
@@ -156,6 +160,7 @@ namespace Game.Client
             errors.AddRange(_guide.Errors);
             errors.AddRange(_npcs.Errors);
             errors.AddRange(days.Errors);
+            errors.AddRange(_story.Errors);
             if (errors.Count > 0) _status = "데이터 시트 오류:\n" + string.Join("\n", errors);
         }
 
@@ -790,7 +795,7 @@ namespace Game.Client
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
 
             _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
-                worldConfig: new WorldConfig { Forage = true });
+                worldConfig: new WorldConfig { Forage = true }, story: _story);
             if (world != null)
             {
                 _host.Restore(world);
@@ -805,10 +810,12 @@ namespace Game.Client
                 JoinSkillOrder = KeptSkillOrder(),
                 Guide = _guide,
                 Npcs = _npcs,
+                Story = _story,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
+            _storyScreen = new StoryScreen(_client, SendToHost);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
             _status = "";
@@ -856,10 +863,12 @@ namespace Game.Client
                 JoinSkillOrder = KeptSkillOrder(),
                 Guide = _guide,
                 Npcs = _npcs,
+                Story = _story,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
+            _storyScreen = new StoryScreen(_client, SendToHost);
             _joinSent = false;
             _net.Connected += id =>
             {
@@ -1029,11 +1038,14 @@ namespace Game.Client
                 DrawMachineSwitch();
                 DrawBedButton();
                 DrawRiftButton();
+                _storyScreen?.DrawWorldButtons(_camera);
                 DrawDefenseButton();
                 SkillBar.Draw(_client);
                 _hotbar?.Draw(_client.Skills.Count);
             }
             _inventory?.Draw();
+            // The story's talk and the waypoint list, over the rest (Docs/Story.md).
+            if (_client.Status == ClientStatus.Playing && !_inventory.Open) _storyScreen?.DrawPanels();
             DrawAcquired();
             _map?.DrawMinimap(Ui.MinimapArea);
             if (Controls.UsingTouch)
@@ -1411,6 +1423,8 @@ namespace Game.Client
                 var defense = _client.Defense;
                 entries.Add(($"기지 방어 {defense.Level}단계", $"{defense.Wave}/{World.DefenseWaves} 물결 · 남은 적 {defense.MonstersLeft} · 수호석 {defense.StonePercent}%"));
             }
+            // The main story first (Docs/Story.md): where it leads and which way.
+            if (_storyScreen?.TrackerEntry() is (string storyTitle, string storyText)) entries.Add((storyTitle, storyText));
             var goal = Settings.Guide ? _guideProgress?.Current : null;
             if (goal != null)
             {

@@ -210,6 +210,10 @@ namespace Game.Core
         // Locks the door ahead, or takes the player's lock off it (World.LockDoor, World.UnlockDoor).
         LockDoor,
         UnlockDoor,
+        // Talks to the person of the story in reach (World.TalkInStory, 2026-11-10).
+        TalkStory,
+        // From beside an open waypoint to the one of place Index (World.Teleport).
+        Teleport,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

@@ -171,6 +171,10 @@ namespace Game.Client
                     foreach (var ready in player.Skills) player.ClearCooldown(ready);
                     player.InventoryVersion++;
                     return null;
+                // The main story (Docs/Story.md): jump to a step (from 1), its giver not yet talked to.
+                case "journey":
+                    world.RestoreJourney(player, Int(words[1]) - 1, false, null);
+                    return null;
                 case "hearts":
                     var person = world.Npcs?.Find(words[1]) ?? throw new ArgumentException($"no person '{words[1]}'");
                     World.FriendshipOf(player, person).Points = Math.Clamp(Int(words[2]), 0, World.MaxHearts) * World.PointsPerHeart;
@@ -303,6 +307,16 @@ namespace Game.Client
             {
                 case "spawn":
                     to = world.Spawn;
+                    break;
+                // A place of the story (Docs/Story.md), just below its waypoint; or beside one of its people.
+                case "place":
+                    var site = world.Places.FirstOrDefault(p => p.Definition.Id == words[2]) ?? throw new ArgumentException($"no place '{words[2]}'");
+                    to = TileMap.Center(site.X, site.Y - 2);
+                    break;
+                case "person":
+                    var standing = world.Places.SelectMany(p => p.People).FirstOrDefault(p => p.Character.Id == words[2]);
+                    if (standing.Character == null) throw new ArgumentException($"no person '{words[2]}' in the story");
+                    to = standing.At + new Vec2(0, -1);
                     break;
                 case "boss":
                     var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[2]) ?? throw new ArgumentException($"no boss '{words[2]}' standing");
@@ -633,6 +647,12 @@ namespace Game.Client
             {
                 json.Field("x", player.Position.X);
                 json.Field("y", player.Position.Y);
+                // The main story (Docs/Story.md): the step (from 1), whether taken, the open waypoints, where the player is.
+                json.Field("journey", player.JourneyStep + 1);
+                json.Field("journeyTaken", player.JourneyTaken);
+                json.Field("waypoints", string.Join(",", player.Waypoints.OrderBy(w => w)));
+                json.Field("place", world.PlaceAt(player.Position)?.Definition.Id ?? "");
+                json.Field("places", world.Places.Count);
                 json.Field("spawnX", world.Spawn.X);
                 json.Field("spawnY", world.Spawn.Y);
                 var (ax, ay) = World.TileAhead(player.Position, player.Facing);

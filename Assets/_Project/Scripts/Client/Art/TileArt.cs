@@ -417,6 +417,8 @@ namespace Game.Client
             TileType.GlowFloor => GlowFloorTile,
             TileType.Door => DoorTile,
             TileType.LockedDoor => LockedDoorTile,
+            TileType.Road => RoadTile,
+            TileType.Waypoint => WaypointTile,
             TileType.IronWall => IronWallTile,
             TileType.Fold => FoldTile,
             TileType.RedCarpet => RedCarpetTile,
@@ -1638,6 +1640,62 @@ namespace Game.Client
             ".oSwwwwwwwwwwSo.",
             ".oSSSSSSSSSSSSo.",
             "..____________..");
+
+        // A road between the places of the story (Docs/Story.md, 2026-11-10): packed earth with flat stones set in it,
+        // lighter than the cave floor so the way reads from afar.
+        static readonly PixelImage RoadTile = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['w'] = Rgba.Hex("#8A7258"),
+                ['W'] = Rgba.Hex("#76604A"),
+                ['H'] = Rgba.Hex("#9A9488"),
+                ['L'] = Rgba.Hex("#C2BCAE"),
+                ['M'] = Rgba.Hex("#8C867A"),
+            },
+            "wWwwWwwwwWwwwWww",
+            "WwwwwwWwwwwwwwwW",
+            "wwHHHwwwwwMMMwww",
+            "wwHLLHwwwwMLLMww",
+            "wwHHHwwwHHwMMwww",
+            "wwwwwwwHLLHwwwWw",
+            "WwwMMMwwHHwwwwww",
+            "wwMLLLMwwwwwwHHw",
+            "wwwMMMwwwwwwHLLH",
+            "wwwwwwwHHHwwwHHw",
+            "wWwwwwHLLLHwwwww",
+            "wwwHHwwHHHwwMMww",
+            "wwHLLHwwwwwMLLMw",
+            "wwwHHwwwwWwwMMww",
+            "WwwwwwwwwwwwwwwW",
+            "wwWwwwwWwwwwWwww");
+
+        // A place's waypoint (Docs/Story.md): a ring of carved stone round a pool of blue light.
+        static readonly PixelImage WaypointTile = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['o'] = Rgba.Hex("#1A1410"),
+                ['S'] = Rgba.Hex("#8A8478"),
+                ['M'] = Rgba.Hex("#6A645A"),
+                ['B'] = Rgba.Hex("#2A4A8A"),
+                ['b'] = Rgba.Hex("#3A6ACA"),
+                ['c'] = Rgba.Hex("#5A9AF0"),
+                ['C'] = Rgba.Hex("#8AC8FF"),
+                ['D'] = Rgba.Hex("#E0F4FF"),
+            },
+            "................",
+            ".....oooooo.....",
+            "...ooSSSSSSoo...",
+            "..oSSMMMMMMSSo..",
+            "..oSMBbbbbBMSo..",
+            ".oSMBbcccccbBMSo",
+            ".oSMbcCCCCCcbMSo",
+            ".oSMbcCDDDCcbMSo",
+            ".oSMbcCDDDCcbMSo",
+            ".oSMbcCCCCCcbMSo",
+            ".oSMBbcccccbBMSo",
+            "..oSMBbbbbBMSo..",
+            "..oSSMMMMMMSSo..",
+            "...ooSSSSSSoo...",
+            ".....oooooo.....",
+            "................");
 
         // A locked door (2026-11-09, World.LockDoor): the same door with a brass padlock on its middle band in place of
         // the handle. Only its owner walks through.

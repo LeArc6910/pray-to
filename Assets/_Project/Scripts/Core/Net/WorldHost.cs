@@ -80,6 +80,8 @@ namespace Game.Core
             public int SentRecords = -1;
             // The world's LockVersion when the locked doors were last sent.
             public int SentLocks = -1;
+            // The player's JourneyVersion when their place in the story was last sent.
+            public int SentJourney = -1;
         }
 
         // How many times over one craft command may make its recipe.
@@ -112,7 +114,8 @@ namespace Game.Core
             ClassData classes = null,
             TileData tiles = null,
             GuideData guide = null,
-            NpcData npcs = null)
+            NpcData npcs = null,
+            StoryData story = null)
         {
             _npcs = npcs;
             _guide = guide;
@@ -124,7 +127,7 @@ namespace Game.Core
             _loot = loot ?? throw new ArgumentNullException(nameof(loot));
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
-            _generated = WorldGenerator.Generate(seed);
+            _generated = WorldGenerator.Generate(seed, story: story);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles, _generated.Biomes);
             // Each boss in its own arena, in sheet order: the first near the spawn, the next in the deep zone.
             for (int i = 0; bosses != null && i < bosses.Bosses.Count && i < _generated.Arenas.Count; i++)
@@ -132,6 +135,7 @@ namespace Game.Core
                 World.PlaceBoss(bosses.Bosses[i], _generated.Arenas[i], _generated.ArenaRadius);
             }
             if (npcs != null) World.SetNpcs(npcs);
+            if (story != null) World.SetStory(story, _generated.Places);
         }
 
         readonly NpcData _npcs;
@@ -192,6 +196,15 @@ namespace Game.Core
                 foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) Send(pair.Key, message, reliable: true);
             }
 
+            // Where each player is in the story.
+            foreach (var pair in _connections)
+            {
+                var player = pair.Value.Player;
+                if (player == null || pair.Value.SentJourney == player.JourneyVersion) continue;
+                pair.Value.SentJourney = player.JourneyVersion;
+                var open = World.Story?.Places.Where(p => player.Waypoints.Contains(p.Id)).Select(p => p.Index).ToList() ?? new List<int>();
+                Send(pair.Key, new JourneyMessage(player.JourneyStep, player.JourneyTaken, open).Encode(), reliable: true);
+            }
             // Locked doors before the snapshot too, so an owner's client lets them through as soon as the host does.
             foreach (var pair in _connections)
             {
@@ -304,6 +317,7 @@ namespace Game.Core
             if (saved != null) World.RestoreSupports(player, _classes, _loot, saved.Supports);
             if (saved != null) World.RestoreRecords(player, saved.Records, saved.Achievements);
             if (saved != null) World.RestorePet(player, saved.Pet, saved.PetExperience);
+            if (saved != null) World.RestoreJourney(player, saved.JourneyStep, saved.JourneyTaken, saved.Waypoints);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -555,6 +569,12 @@ namespace Game.Core
                     break;
                 case InventoryCommand.UnlockDoor:
                     World.UnlockDoor(player.Id);
+                    break;
+                case InventoryCommand.TalkStory:
+                    World.TalkInStory(player.Id);
+                    break;
+                case InventoryCommand.Teleport:
+                    World.Teleport(player.Id, command.Index);
                     break;
             }
         }

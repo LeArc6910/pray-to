@@ -20,6 +20,7 @@ namespace Game.Client.Editor
         const string WorldFolder = ProjectFolder + "/Data/World/";
         const string GuideFolder = ProjectFolder + "/Data/Guide/";
         const string NpcsFolder = ProjectFolder + "/Data/Npcs/";
+        const string StoryFolder = ProjectFolder + "/Data/Story/";
 
         [MenuItem("Game/Set Up Main Scene")]
         public static void SetUp()
@@ -71,6 +72,9 @@ namespace Game.Client.Editor
             sheets.shop = Sheet(NpcsFolder + NpcSheet.ShopFile);
             sheets.requests = Sheet(NpcsFolder + NpcSheet.RequestsFile);
             sheets.events = Sheet(WorldFolder + DayEventSheet.File);
+            sheets.places = Sheet(StoryFolder + StorySheet.PlacesFile);
+            sheets.characters = Sheet(StoryFolder + StorySheet.CharactersFile);
+            sheets.story = Sheet(StoryFolder + StorySheet.StoryFile);
             EditorUtility.SetDirty(sheets);
             AssetDatabase.SaveAssets();
         }

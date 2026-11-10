@@ -93,6 +93,14 @@ namespace Game.Core
         // How far through each person's story the player is: the last step done, by person id (World.CompleteStory).
         public Dictionary<string, int> StorySteps { get; } = new Dictionary<string, int>();
 
+        // The main story (World.Story.cs, Docs/Story.md): the step they are on (story.csv order, from 0; the count of
+        // steps once done), whether they have talked to its giver, the waypoints open to them by place id, and a
+        // counter that moves when any of these changes.
+        public int JourneyStep { get; internal set; }
+        public bool JourneyTaken { get; internal set; }
+        public HashSet<string> Waypoints { get; } = new HashSet<string>();
+        public int JourneyVersion { get; internal set; }
+
         public int RankOf(SkillDefinition skill) => skill != null && SkillRanks.TryGetValue(skill, out int rank) ? rank : 0;
 
         // The rank the skill works at: learned and added by the stats (SkillRules.Power).
@@ -437,6 +445,12 @@ namespace Game.Core
         Crafted,
         // Source, a monster, trampled the crop at Position at night, setting it back (World.Farming.cs, 2026-11-09).
         Trampled,
+        // Source, a player, took story step Target (Amount World.StoryTaken) or finished it (Amount the step after,
+        // from 1) (World.Story.cs, 2026-11-10).
+        Story,
+        // Source, a player, opened the waypoint of place Target (Amount World.WaypointOpened) or went to it
+        // (World.WaypointUsed).
+        Waypoint,
     }
 
     public readonly struct SimEvent

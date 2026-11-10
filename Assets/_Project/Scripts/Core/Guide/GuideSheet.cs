@@ -377,7 +377,7 @@ namespace Game.Core
         }
 
         // "copper_ore:6", "healing_potion:2" or "xp:50".
-        static GoalReward Reward(string text, LootData loot)
+        internal static GoalReward Reward(string text, LootData loot)
         {
             string[] parts = text.Split(':');
             if (parts.Length != 2) throw new FormatException($"보상 '{text}'는 <id>:<개수> 또는 xp:<경험치>로 적습니다.");

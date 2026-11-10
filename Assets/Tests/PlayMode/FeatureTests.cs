@@ -289,5 +289,20 @@ namespace Game.Client.Tests
             _root.AimHeld = false;
             Assert.IsTrue(_root.Playing);
         }
+
+        // The story (Docs/Story.md, 2026-11-10): the solo world has its places carved (the sheets were read), and the
+        // royal city shows its plaza, lamps, waypoint and people.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheStoryDraws()
+        {
+            yield return Start();
+            Assert.GreaterOrEqual(World.Places.Count, 2, "No places in the world: the story sheets were not read (Game > Set Up Main Scene).");
+            var city = World.Places[1];
+            Player.Position = TileMap.Center(city.X, city.Y - 2);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("story-city");
+            Assert.IsTrue(_root.Playing);
+        }
     }
 }

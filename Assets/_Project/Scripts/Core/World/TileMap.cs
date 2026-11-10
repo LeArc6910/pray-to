@@ -116,6 +116,11 @@ namespace Game.Core
         BigSmelter,
         // A door its owner locked (World.Home.cs, 2026-11-09): solid to everyone else, monsters too.
         LockedDoor,
+        // A paved road between the places of the story (Docs/Story.md, 2026-11-10): walked on, never dug or built
+        // over, and monsters do not come into being on it.
+        Road,
+        // A place's waypoint (Docs/Story.md): stood on, it opens; from any open one, a player goes to any other.
+        Waypoint,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -167,7 +172,7 @@ namespace Game.Core
         {
             var type = this[x, y];
             return type != TileType.Floor && !World.IsBelt(type) && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
-                && type != TileType.Door && !IsSoil(type);
+                && type != TileType.Door && !IsSoil(type) && type != TileType.Road && type != TileType.Waypoint;
         }
 
         public static bool IsSoil(TileType type) => type == TileType.Soil || type == TileType.FertileSoil || SoilBiome(type) != null;

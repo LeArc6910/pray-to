@@ -480,6 +480,8 @@ namespace Game.Client
             DrawCrops();
             DrawMachines();
             DrawPeople();
+            DrawStoryPeople();
+            AnnouncePlace();
             DrawChickens();
             SwingDoors();
             DrawMarks();
@@ -648,6 +650,14 @@ namespace Game.Client
                     Label(at + new Vector3(0, 0.9f, 0), $"전력 {machine.Supply}/{machine.Demand}", machine.Supply >= machine.Demand ? PowerLabel : OffLabel);
             }
             DrawReelGauge();
+            // The people of the story: their names, gold for whoever the story waits on now.
+            var waiting = _client.CurrentStep?.Who;
+            foreach (var (character, at) in _storyInView)
+            {
+                var head = new Vector3(at.X, at.Y + 0.95f, 0);
+                if (Vector3.Distance(head, _self.Position) >= 7) continue;
+                Label(head, character == waiting ? $"! {character.Name}" : character.Name, character == waiting ? StoryLabel : Color.white);
+            }
 
             // Each person's name and how well this player knows them, close by; the one near enough to deal with also
             // says where to (the bag's tab named for them).
@@ -1296,6 +1306,60 @@ namespace Game.Client
             foreach (int key in _gone) _people.Remove(key);
         }
 
+        // The people of the story at their places (Docs/Story.md, 2026-11-10), each in their look (PeopleArt.Look),
+        // breathing and blinking; their names are drawn in DrawGui.
+        readonly Dictionary<string, SpriteRenderer> _storyPeople = new Dictionary<string, SpriteRenderer>();
+        readonly HashSet<string> _storySeen = new HashSet<string>();
+        readonly List<string> _storyGone = new List<string>();
+        readonly List<(CharacterDefinition Character, Vec2 At)> _storyInView = new List<(CharacterDefinition, Vec2)>();
+
+        void DrawStoryPeople()
+        {
+            _storySeen.Clear();
+            _storyInView.Clear();
+            var self = new Vec2(_self.Position.x, _self.Position.y);
+            foreach (var site in _client.Places)
+            {
+                if (Vec2.Distance(self, site.Center) > PeopleRange + site.Radius) continue;
+                foreach (var (character, at) in site.People)
+                {
+                    if (Vec2.Distance(self, at) > PeopleRange) continue;
+                    _storyInView.Add((character, at));
+                    var color = Rgba.Hex(string.IsNullOrEmpty(character.Color) ? "#8A7A6A" : character.Color);
+                    int frame = Mathf.FloorToInt(Time.time * PeopleArt.FramesPerSecond + at.X * 7 + at.Y * 3) % PeopleArt.Frames;
+                    var figure = Sprites.Standing($"story/{character.Id}/{frame}", () => PeopleArt.Look(character.Look, color, frame));
+                    _storySeen.Add(character.Id);
+                    if (!_storyPeople.TryGetValue(character.Id, out var renderer))
+                    {
+                        renderer = Renderer(_root.transform, "Story " + character.Id, null, Color.white);
+                        _storyPeople[character.Id] = renderer;
+                    }
+                    renderer.sprite = figure;
+                    renderer.transform.localPosition = new Vector3(at.X, at.Y - 0.3f, 0);
+                    renderer.sortingOrder = 10000 - Mathf.RoundToInt((at.Y - 0.3f) * 10);
+                }
+            }
+            _storyGone.Clear();
+            foreach (var pair in _storyPeople)
+            {
+                if (_storySeen.Contains(pair.Key)) continue;
+                Object.Destroy(pair.Value.gameObject);
+                _storyGone.Add(pair.Key);
+            }
+            foreach (string id in _storyGone) _storyPeople.Remove(id);
+        }
+
+        // The place the player stands in, last announced: entering another shows its name and line (Docs/Story.md).
+        PlaceDefinition _placeAnnounced;
+
+        void AnnouncePlace()
+        {
+            var here = _client.PlaceHere()?.Definition;
+            if (here == _placeAnnounced) return;
+            _placeAnnounced = here;
+            if (here != null) ShowBanner(here.Name);
+        }
+
         readonly List<SpriteRenderer> _chickens = new List<SpriteRenderer>();
 
         // A coop's chickens strut about in front of it, each on a slow loop of its own, now and then pecking. Only for
@@ -1764,6 +1828,31 @@ namespace Game.Client
                     {
                         _floating.Add(new Floating { Position = _self.Position + new Vector3(0, 0.9f, 0), Text = "만들기를 멈췄다", Color = new Color(1f, 0.85f, 0.5f) });
                     }
+                    break;
+                case SimEventType.Story:
+                    // A step of the story taken or done (Docs/Story.md).
+                    if (e.Source != _client.PlayerId) break;
+                    var storyStep = _client.Story?.Step(e.Target);
+                    if (storyStep == null) break;
+                    if (e.Amount == World.StoryTaken)
+                    {
+                        Sounds.Play(Sound.Learn);
+                        ShowBanner($"이야기: {storyStep.Title}");
+                    }
+                    else
+                    {
+                        Sounds.Play(Sound.LevelUp);
+                        AddFlash(_self.Position + new Vector3(0, 0.6f, 0), 1.2f, StoryLabel, FlashKind.Sparkles);
+                        ShowBanner($"이야기 완료: {storyStep.Title}");
+                    }
+                    break;
+                case SimEventType.Waypoint:
+                    if (e.Source != _client.PlayerId || _client.Story == null || e.Target >= _client.Story.Places.Count) break;
+                    var waypointPlace = _client.Story.Places[e.Target];
+                    var waypointAt = new Vector3(e.Position.X, e.Position.Y, 0);
+                    AddFlash(waypointAt, 1.4f, WaypointGlow, FlashKind.Sparkles);
+                    Sounds.Play(Sound.Learn);
+                    if (e.Amount == World.WaypointOpened) ShowBanner($"웨이포인트 열림: {waypointPlace.Name}");
                     break;
                 case SimEventType.AnimalsPetted:
                     // Pink sparkles over the house, and how fond they are now.
@@ -2944,6 +3033,9 @@ namespace Game.Client
             Vector2 point = Ui.FromScreen(screen);
             Shadowed(new Rect(point.x - 80, point.y - 12, 160, 24), text, color, _labelStyle);
         }
+
+        static readonly Color StoryLabel = new Color(1f, 0.85f, 0.35f);
+        static readonly Color WaypointGlow = new Color(0.55f, 0.8f, 1f);
 
         static readonly Color GaugeBack = new Color(0.08f, 0.1f, 0.14f, 0.85f);
         static readonly Color GaugeZone = new Color(0.35f, 0.85f, 0.45f, 0.9f);
