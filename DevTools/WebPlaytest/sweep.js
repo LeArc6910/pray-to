@@ -2266,6 +2266,9 @@ async function firstRun(browser, profile, hourLong) {
       await slot(1);
       const until = Date.now() + seconds * 1000;
       let kills = 0;
+      let lastSeen = Date.now();
+      let lastWay = null;
+      let wandered = false;
       while (Date.now() < until && !(await enough())) {
         const s = await game.state();
         if (s.dead) {
@@ -2277,25 +2280,42 @@ async function firstRun(browser, profile, hourLong) {
         const foe = offset(s.foe);
         if (!foe) {
           await gather(3);
-          // None near (monsters keep away from the spawn): out along the tunnels, away from it.
+          // None near: monsters come into being twelve tiles or more from the spawn and from players, and come down
+          // open tunnels (2026-11-10: digging straight through rock away from the spawn, the bot met none in four
+          // minutes). Along the most open way, away from the spawn, not straight back.
+          if (Date.now() - lastSeen > 60000 && !wandered) {
+            await taken('biome Mushroom', '사냥할 몬스터가 1분 동안 보이지 않을 때');
+            wandered = true;
+            lastSeen = Date.now();
+            continue;
+          }
           const away = [s.x - s.spawnX, s.y - s.spawnY];
-          const [ax, ay] = Math.hypot(away[0], away[1]) < 1 ? [1, 0] : toward(away[0], away[1]);
-          const ahead = (await game.look(ax, ay)).tile;
-          if (solid(ahead)) {
+          const far = Math.hypot(away[0], away[1]) || 1;
+          let best = null;
+          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            let open = 0;
+            for (let k = 1; k <= 3; k++) {
+              if (!/Floor|Soil|Carpet/.test((await game.look(dx * k, dy * k)).tile || '')) break;
+              open++;
+            }
+            const back = lastWay && dx === -lastWay[0] && dy === -lastWay[1] ? 3 : 0;
+            const score = open * 2 + (dx * away[0] + dy * away[1]) / far - back + Math.random();
+            if (open > 0 && (!best || score > best.score)) best = { dx, dy, score };
+          }
+          if (best) {
+            lastWay = [best.dx, best.dy];
+            await step(best.dx, best.dy, 600);
+          } else {
+            // Shut in: dig out away from the spawn.
+            const [ax, ay] = far < 1.5 ? [1, 0] : toward(away[0], away[1]);
             await slot(2);
             await dig(ax, ay);
             await slot(1);
-          }
-          await step(ax, ay, 400);
-          // Stopped by something that is not rock (a workbench, water, a machine): round it, to one side and on.
-          const moved = await game.state();
-          if (Math.hypot(moved.x - s.x, moved.y - s.y) < 0.2) {
-            const side = Math.random() < 0.5 ? 1 : -1;
-            await step(ay * side, ax * side, 700);
-            await step(ax, ay, 500);
+            await step(ax, ay, 400);
           }
           continue;
         }
+        lastSeen = Date.now();
         const d = Math.hypot(foe[0], foe[1]);
         if (d > 1.4) {
           const [sx, sy] = toward(foe[0], foe[1]);
@@ -2389,7 +2409,8 @@ async function firstRun(browser, profile, hourLong) {
     await placeFor(12, '화로 세우기', /^화로 ×/);
 
     // 12. Mining skill 2, from all the walls dug so far and more.
-    await mine(async () => (await goalNow()).n > 13, 300);
+    // Level 2 is 100 mining experience, a wall each (ore two), so it can take some minutes after the copper.
+    await mine(async () => (await goalNow()).n > 13, 600);
     await passed(13, '채굴 기술 2레벨 되기');
 
     // 13. Level 3 by hunting, away from the spawn, as the goal's hint says.
