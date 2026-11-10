@@ -274,17 +274,31 @@ namespace Game.Core
                 int x = cx + dx, y = cy + dy;
                 if (IsInside(map, x, y) && dx * dx + dy * dy <= r * r && map[x, y] == place.Floor && !(dx == 0 && dy == 0)) map[x, y] = floor;
             }
-            // Where Open will cut a gate (2026-11-10): from each road that comes up to the plaza, a way three wide
-            // straight to the middle. The royal city sets its towers and fountains clear of these rather than lose
-            // them to the gate.
+            // Where Open will cut a gate through a wall round the plaza (2026-11-10): from the first tile, in its
+            // order, of each road that comes up to the plaza, a way three wide straight to the middle (the rest of
+            // that road is then reached through it). The royal city sets its towers, fountains and lamp posts clear
+            // of these rather than lose them to the gate.
             var gates = new HashSet<(int X, int Y)>();
             int reach = r + 2;
+            bool Approach(int x, int y)
+            {
+                int d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+                return IsInside(map, x, y) && map[x, y] == TileType.Road && d > r * r && d <= reach * reach;
+            }
+            var seen = new HashSet<(int X, int Y)>();
             for (int y = cy - reach; y <= cy + reach; y++)
             {
                 for (int x = cx - reach; x <= cx + reach; x++)
                 {
-                    int d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
-                    if (!IsInside(map, x, y) || map[x, y] != TileType.Road || d <= r * r || d > reach * reach) continue;
+                    if (!Approach(x, y) || !seen.Add((x, y))) continue;
+                    var road = new Queue<(int X, int Y)>();
+                    road.Enqueue((x, y));
+                    while (road.Count > 0)
+                    {
+                        var (rx, ry) = road.Dequeue();
+                        foreach (var (nx, ny) in new[] { (rx + 1, ry), (rx - 1, ry), (rx, ry + 1), (rx, ry - 1) })
+                            if (Approach(nx, ny) && seen.Add((nx, ny))) road.Enqueue((nx, ny));
+                    }
                     foreach (var (lx, ly) in Line(x, y, cx, cy))
                         for (int ty = ly - TunnelHalfWidth; ty <= ly + TunnelHalfWidth; ty++)
                             for (int tx = lx - TunnelHalfWidth; tx <= lx + TunnelHalfWidth; tx++)
@@ -293,24 +307,43 @@ namespace Game.Core
             }
             // At the first of the spots where all of the structure fits clear of the gates (and, when inner, inside
             // the castle wall's ring).
-            void PutClear(TileType type, bool inner, params (int X, int Y)[] spots)
+            bool Clear(TileType type, bool inner, int dx, int dy)
             {
                 var (w, h) = Structures.Footprint(type);
+                for (int j = 0; j < h; j++)
+                {
+                    for (int i = 0; i < w; i++)
+                    {
+                        int x = dx + i, y = dy + j;
+                        if (!Free(x, y) || gates.Contains((x, y)) || inner && x * x + y * y > (r - 2) * (r - 2)) return false;
+                    }
+                }
+                return true;
+            }
+            void PutClear(TileType type, bool inner, params (int X, int Y)[] spots)
+            {
                 foreach (var (dx, dy) in spots)
                 {
-                    bool fits = true;
-                    for (int j = 0; j < h && fits; j++)
-                    {
-                        for (int i = 0; i < w && fits; i++)
-                        {
-                            int x = dx + i, y = dy + j;
-                            fits = Free(x, y) && !gates.Contains((x, y)) && (!inner || x * x + y * y <= (r - 2) * (r - 2));
-                        }
-                    }
-                    if (!fits) continue;
+                    if (!Clear(type, inner, dx, dy)) continue;
                     Put(dx, dy, type);
                     return;
                 }
+            }
+            // A pair mirrored across the middle at the first of the spots (given on the right) where both stand clear,
+            // so a gate on one side moves both alike (2026-11-10); where no spot holds both, each takes its own.
+            void PutPair(TileType type, bool inner, params (int X, int Y)[] spots)
+            {
+                int w = Structures.Footprint(type).W;
+                var mirrored = spots.Select(s => (-s.X - w + 1, s.Y)).ToArray();
+                for (int k = 0; k < spots.Length; k++)
+                {
+                    if (!Clear(type, inner, spots[k].X, spots[k].Y) || !Clear(type, inner, mirrored[k].Item1, mirrored[k].Item2)) continue;
+                    Put(spots[k].X, spots[k].Y, type);
+                    Put(mirrored[k].Item1, mirrored[k].Item2, type);
+                    return;
+                }
+                PutClear(type, inner, spots);
+                PutClear(type, inner, mirrored);
             }
             void Lamps(TileType lamp)
             {
@@ -345,13 +378,14 @@ namespace Game.Core
                     break;
                 case "kingdom":
                     // Towers on the four corners of a castle wall round the edge (gates are opened where the roads
-                    // come in, by Open), a red carpet up the middle to the throne, statues at the gate, pillars, two
-                    // great fountains, hedges, flowerbeds, royal banners and lamp posts. A tower whose corner a gate
-                    // comes through stands further along the wall, and a fountain in a gate's way moves to another
-                    // spot inside, so the gate takes neither away.
+                    // come in, by Open), a red carpet up the middle to the throne, statues by its south end, pillars,
+                    // two great fountains, hedges, flowerbeds, royal banners and lamp posts. Gates take away what
+                    // small things are in their way, but not the towers, fountains or lamp posts (2026-11-10): a pair
+                    // of them one of which is in a gate's way moves both alike, the towers along the wall and the
+                    // fountains and lamps to another spot inside, so they stay mirrored.
                     var corner = new[] { (6, 6), (7, 4), (4, 7), (8, 2), (2, 8) };
-                    foreach (var (sx, sy) in new[] { (1, 1), (-1, 1), (1, -1), (-1, -1) })
-                        PutClear(TileType.Tower, false, corner.Select(c => (sx > 0 ? c.Item1 : -c.Item1 - 1, sy > 0 ? c.Item2 : -c.Item2 - 1)).ToArray());
+                    PutPair(TileType.Tower, false, corner);
+                    PutPair(TileType.Tower, false, corner.Select(c => (c.Item1, -c.Item2 - 1)).ToArray());
                     for (int dy = -r; dy <= r; dy++)
                         for (int dx = -r; dx <= r; dx++)
                         {
@@ -364,14 +398,21 @@ namespace Game.Core
                     Put(0, r - 3, TileType.Throne);
                     Both(2, r - 3, TileType.Pillar);
                     foreach (int dy in new[] { -5, -2, 2 }) Both(3, dy, TileType.Pillar);
-                    Both(2, -r + 2, TileType.Statue);
-                    var basin = new[] { (5, -3), (5, -5), (5, 1), (4, 5) };
-                    PutClear(TileType.BigFountain, true, basin);
-                    PutClear(TileType.BigFountain, true, basin.Select(b => (-b.Item1 - 1, b.Item2)).ToArray());
+                    // Just inside the wall: on its ring they never stood (the wall is laid first).
+                    Both(2, -r + 3, TileType.Statue);
+                    var basins = new[] { (5, -3), (5, -5), (5, 1), (4, 5) };
+                    PutPair(TileType.BigFountain, true, basins);
                     foreach (int dx in new[] { 6, 7 }) Both(dx, 1, TileType.Hedge);
                     Both(5, 4, TileType.RoyalBanner);
                     Both(5, -6, TileType.Flowerbed);
-                    Both(5, 0, TileType.LampPost);
+                    // Lamp posts beside the fountains, a pair like them: on the carpet side, or the other side where a
+                    // gate is in the way.
+                    foreach (var (fx, fy) in basins)
+                    {
+                        if (map[cx + fx, cy + fy] != TileType.BigFountain) continue;
+                        PutPair(TileType.LampPost, true, (fx - 1, fy), (fx + 2, fy), (fx - 1, fy + 1), (fx + 2, fy + 1));
+                        break;
+                    }
                     wanted.Add((cx, cy + r - 4));
                     wanted.Add((cx - 2, cy + r - 5));
                     break;

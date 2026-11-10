@@ -139,21 +139,33 @@ namespace Game.Core.Tests
         }
 
         // The royal city's gates are cut where the roads come in, and its towers and great fountains are set clear of
-        // them rather than cut away with the wall (2026-11-10): all four towers and both fountains, on every seed.
+        // them rather than cut away with the wall (2026-11-10): all four towers, and both fountains and lamp posts mirrored,
+        // on every seed.
         [Test]
         public void TheRoyalCityKeepsItsTowersAndFountainsClearOfTheGates([Range(1, 24)] int seed)
         {
             var world = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
             var city = world.Places.Single(p => p.Definition.Style == "kingdom");
-            int towers = 0, fountains = 0;
+            int towers = 0;
+            var fountains = new List<(int X, int Y)>();
             for (int y = city.Y - city.Radius; y <= city.Y + city.Radius; y++)
                 for (int x = city.X - city.Radius; x <= city.X + city.Radius; x++)
                 {
                     if (world.Map[x, y] == TileType.Tower) towers++;
-                    if (world.Map[x, y] == TileType.BigFountain) fountains++;
+                    if (world.Map[x, y] == TileType.BigFountain) fountains.Add((x - city.X, y - city.Y));
                 }
             Assert.AreEqual(4, towers, $"seed {seed}: towers");
-            Assert.AreEqual(2, fountains, $"seed {seed}: great fountains");
+            Assert.AreEqual(2, fountains.Count, $"seed {seed}: great fountains");
+            // Mirrored across the middle, at the same height (a fountain is two tiles wide).
+            Assert.AreEqual(fountains[0].Y, fountains[1].Y, $"seed {seed}: fountains at different heights");
+            Assert.AreEqual(-1, fountains[0].X + fountains[1].X, $"seed {seed}: fountains not mirrored");
+            // The lamp posts beside them too.
+            var lamps = new List<(int X, int Y)>();
+            for (int y = city.Y - city.Radius; y <= city.Y + city.Radius; y++)
+                for (int x = city.X - city.Radius; x <= city.X + city.Radius; x++)
+                    if (world.Map[x, y] == TileType.LampPost) lamps.Add((x - city.X, y - city.Y));
+            Assert.AreEqual(2, lamps.Count, $"seed {seed}: lamp posts");
+            Assert.AreEqual((0, lamps[0].Y), (lamps[0].X + lamps[1].X, lamps[1].Y), $"seed {seed}: lamp posts not mirrored");
         }
 
         // The open tiles walked to from (x, y) within reach of it.
