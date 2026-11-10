@@ -146,9 +146,36 @@ namespace Game.Core
             foreach (var npc in Npcs.Npcs)
             {
                 if (HasTile(npc.Tile)) continue;
-                var spot = NpcSpot();
+                // One who keeps shop in a place of the story stands there, or nowhere when the world has no such place.
+                var spot = npc.Place != null ? PlaceSpot(Places.FirstOrDefault(p => p.Definition.Id == npc.Place)) : NpcSpot();
                 if (spot != null) SetTile(spot.Value.X, spot.Value.Y, npc.Tile);
             }
+        }
+
+        // A tile of the place's own floor with its floor in front (below) of it, a ring or more out from the waypoint,
+        // apart from its people of the story and from the other stalls: the nearest such to the waypoint, below it
+        // first.
+        (int X, int Y)? PlaceSpot(PlaceSite site)
+        {
+            if (site == null) return null;
+            var floor = site.Definition.Floor;
+            for (int r = 3; r < site.Radius; r++)
+            {
+                for (int dy = -r; dy <= r; dy++)
+                {
+                    for (int dx = -r; dx <= r; dx++)
+                    {
+                        if (Math.Max(Math.Abs(dx), Math.Abs(dy)) != r || dx * dx + dy * dy > (site.Radius - 1) * (site.Radius - 1)) continue;
+                        int x = site.X + dx, y = site.Y + dy;
+                        if (!Map.InBounds(x, y - 2) || Map[x, y] != floor || Map[x, y - 1] != floor || Map[x, y + 1] != floor) continue;
+                        var at = TileMap.Center(x, y);
+                        if (site.People.Any(p => Vec2.Distance(p.At, at) < 2.5f)) continue;
+                        if (Npcs.Npcs.Any(n => NearestTile(at, n.Tile, 4) != null)) continue;
+                        return (x, y);
+                    }
+                }
+            }
+            return null;
         }
 
         bool HasTile(TileType type)

@@ -32,6 +32,8 @@ namespace Game.Core
         public const int TicksPerSecond = 30;
         public const float TickSeconds = 1f / TicksPerSecond;
         public const float PlayerRadius = 0.35f;
+        // How far out from a place's plaza the monsters that keep to it come (monsters.csv place, 2026-11-10).
+        public const float HauntReach = 16;
         // How far past the player's edge a swing reaches, and how wide it is.
         public const float MeleeReach = 1.1f;
         public const float MeleeArcDegrees = 120;
@@ -588,7 +590,7 @@ namespace Game.Core
                 if (Map.IsSolid(x, y)
                     || Map[x, y] == TileType.Lava
                     // Not on the roads or in the places of the story (World.Story.cs).
-                    || Map[x, y] == TileType.Road || Map[x, y] == TileType.Waypoint || Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + 2)
+                    || Structures.IsWay(Map[x, y]) || Map[x, y] == TileType.Waypoint || Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + 2)
                     || Vec2.Distance(position, Spawn) < _config.SpawnDistance
                     || _players.Any(p => Vec2.Distance(p.Position, position) < _config.SpawnDistance))
                 {
@@ -596,7 +598,12 @@ namespace Game.Core
                 }
                 int zone = ZoneLevelAt(position);
                 var biome = biomes[x, y];
-                var choices = _monsters.Monsters.Where(m => m.Level <= zone && m.Weight > 0 && (m.Biome == null || m.Biome == biome)).ToList();
+                // Round a place some monsters keep to (monsters.csv place), only those come; elsewhere never them.
+                var haunt = Places.FirstOrDefault(p => Vec2.Distance(position, p.Center) <= p.Radius + HauntReach
+                    && _monsters.Monsters.Any(m => m.Place == p.Definition.Id && m.Weight > 0));
+                var choices = haunt != null
+                    ? _monsters.Monsters.Where(m => m.Place == haunt.Definition.Id && m.Weight > 0).ToList()
+                    : _monsters.Monsters.Where(m => m.Place == null && m.Level <= zone && m.Weight > 0 && (m.Biome == null || m.Biome == biome)).ToList();
                 if (choices.Count == 0) continue;
                 SpawnEnemy(_random.PickWeighted(choices, m => m.Weight), position);
                 return;

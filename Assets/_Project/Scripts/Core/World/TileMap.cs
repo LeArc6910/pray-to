@@ -158,6 +158,28 @@ namespace Game.Core
         RoyalBanner,
         DemonBanner,
         Flowerbed,
+        // Walked on like the road (2026-11-10, Docs/Story.md 장소 꾸밈): a harbour's planks over the water, a mine's rails.
+        Dock,
+        Rail,
+        // More dressing: the harbour, the ruined temple and the mining village.
+        Boat,
+        Lighthouse,
+        NetRack,
+        Bollard,
+        Anchor,
+        BrokenPillar,
+        FallenColumn,
+        Rubble,
+        RuneStone,
+        Altar,
+        MineEntrance,
+        MineCart,
+        OrePile,
+        Lantern,
+        // The stalls of the people who keep shop in the places of the story (2026-11-10, Docs/Npcs.md 장소의 상인).
+        RoyalStall,
+        DemonStall,
+        OreStall,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -165,17 +187,26 @@ namespace Game.Core
     {
         public const TileType First = TileType.TimberWall;
         public const TileType Last = TileType.Flowerbed;
+        // The second run, after the dock and rail floors.
+        public const TileType FirstMore = TileType.Boat;
+        public const TileType LastMore = TileType.Lantern;
 
         // Laid by the generator round a place, never dug (no row in tiles.csv), drawn standing on the floor.
-        public static bool IsDecor(TileType type) => type >= First && type <= Last;
+        public static bool IsDecor(TileType type) => type >= First && type <= Last || type >= FirstMore && type <= LastMore;
 
         // How many tiles across and up a structure stands on, from the tile its type is on (its lower left).
         public static (int W, int H) Footprint(TileType type) => type switch
         {
             TileType.Cottage or TileType.Cabin => (4, 3),
-            TileType.Tower or TileType.BigFountain or TileType.BigTent => (2, 2),
+            TileType.Boat or TileType.MineEntrance => (3, 2),
+            TileType.Tower or TileType.BigFountain or TileType.BigTent or TileType.Lighthouse => (2, 2),
+            TileType.Altar => (3, 1),
+            TileType.FallenColumn => (2, 1),
             _ => (1, 1),
         };
+
+        // Floors the places lay that are walked like the road: never built on or dug.
+        public static bool IsWay(TileType type) => type == TileType.Road || type == TileType.Dock || type == TileType.Rail;
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.
@@ -227,7 +258,7 @@ namespace Game.Core
         {
             var type = this[x, y];
             return type != TileType.Floor && !World.IsBelt(type) && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
-                && type != TileType.Door && !IsSoil(type) && type != TileType.Road && type != TileType.Waypoint;
+                && type != TileType.Door && !IsSoil(type) && !Structures.IsWay(type) && type != TileType.Waypoint;
         }
 
         public static bool IsSoil(TileType type) => type == TileType.Soil || type == TileType.FertileSoil || SoilBiome(type) != null;

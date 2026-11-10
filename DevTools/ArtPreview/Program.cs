@@ -89,7 +89,7 @@ namespace Game.Client
             return 0;
         }
 
-        static readonly string[] BossIds = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion" };
+        static readonly string[] BossIds = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion", "mad_general" };
 
         static bool WriteSounds(string folder)
         {

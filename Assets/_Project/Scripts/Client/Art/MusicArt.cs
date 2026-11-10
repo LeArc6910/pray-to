@@ -269,6 +269,13 @@ namespace Game.Client
                 Lead = Wave.Pulse, LeadVolume = 0.2f, Arp = Wave.Triangle, ArpRate = 2, ArpVolume = 0.1f, Rest = 0.3f,
                 Kick = "x.......x.......", Tom = "x.....x...x.....", Tek = "...x.x.x...x.x.x", Echo = 0.15f, Seed = 26,
             },
+            // The mad general of the demon nest (2026-11-10): low phrygian war drums under a burning saw lead.
+            "mad_general" => new Style
+            {
+                Bpm = 116, Root = 43, Scale = Phrygian, Chords = new[] { 0, 1, 6, 5 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw, BassNotes = 8,
+                Lead = Wave.Saw, LeadVolume = 0.2f, Arp = Wave.Square, ArpRate = 2, ArpVolume = 0.08f, Rest = 0.3f,
+                Kick = "x...x.x.x...x.x.", Snare = "....X.......X...", Tom = "..x.....x.x...x.", Echo = 0.15f, Seed = 27,
+            },
             // Any other boss: fast harmonic minor with driving drums.
             _ => new Style
             {

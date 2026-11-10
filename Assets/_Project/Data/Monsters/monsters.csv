@@ -1,18 +1,20 @@
-id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight,drop_chance,rune_chance,potion_chance,material,material_chance,behavior,shot_speed,keep_distance,charge_speed,color,biome,resist,element
-slime,슬라임,1,30,9,0,2.4,0.4,8,0.5,0.5,1.0,100,20,6,8,slime_gel,30,melee,,,,#8CD94D,,,
-spore_shooter,가시 버섯,2,24,8,0,1.6,0.35,9,6,0.8,2.0,60,20,6,8,mushroom_spore,25,ranged,7,4,,#B07CE0,,fire:-25,
-cave_beetle,동굴 딱정벌레,2,60,14,15,2.2,0.42,8,4,0.7,2.2,50,25,8,8,copper_ore,40,charge,,,10,#A0703C,,,
-crystal_bat,수정 박쥐,3,75,17,10,3.6,0.3,9,0.5,0.35,0.9,60,25,8,10,mithril_ore,30,melee,,,,#7CD2E2,crystal,,
-crystal_wisp,수정 정령,3,60,18,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,mithril_ore,25,ranged,9,4.5,,#C8F4FF,crystal,lightning:50,
-myconid,버섯 병정,2,55,12,5,1.8,0.4,8,0.5,0.6,1.4,70,22,7,8,glow_spore,35,melee,,,,#C86ED8,mushroom,fire:-25,
-glow_bat,빛 박쥐,3,70,16,5,3.8,0.3,9,0.5,0.35,0.9,60,25,8,10,glow_spore,30,melee,,,,#5FE0C8,mushroom,,
-ice_slime,얼음 슬라임,2,70,12,10,1.8,0.42,8,0.5,0.6,1.2,70,22,7,8,ice_crystal,25,melee,,,,#8CC8F0,ice,cold:75|fire:-25,cold
-frost_wisp,서리 정령,3,60,17,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,ice_crystal,30,ranged,9,4.5,,#BFE8FF,ice,cold:75|fire:-25,cold
-magma_slime,용암 슬라임,3,95,18,15,2.0,0.42,8,0.5,0.55,1.1,60,25,8,10,obsidian_ore,30,melee,,,,#E0541E,lava,fire:75|cold:-25,fire
-fire_bat,불 박쥐,3,70,17,5,3.8,0.3,9,0.5,0.35,0.9,50,25,8,10,obsidian_ore,20,melee,,,,#FF8A3A,lava,fire:75,fire
-void_wisp,공허 정령,4,120,24,10,2.2,0.33,10,7,0.7,1.5,45,30,12,12,void_ore,25,ranged,10,4.5,,#A07CFF,abyss,lightning:50|cold:25,cold
-abyss_stalker,심연 추적자,4,170,30,25,3.0,0.45,10,0.6,0.5,1.0,55,30,12,12,void_ore,25,charge,,,14,#5E3E96,abyss,cold:50,
-lake_crab,호수 게,3,140,18,25,2.0,0.42,8,0.55,0.5,1.0,55,25,8,10,pearl,30,melee,,,,#4AA0B4,lake,cold:50|fire:-25,
-tide_wisp,물살 정령,3,80,16,5,2.4,0.32,10,7,0.6,1.4,45,25,8,10,pearl,25,ranged,9,4.5,,#5AD2E6,lake,cold:50|lightning:-25,cold
-sand_scorpion,모래 전갈,2,110,16,20,2.3,0.42,8,0.6,0.55,1.1,55,25,8,10,amber,30,melee,,,,#D2A050,sand,,
-sand_worm,모래 지렁이,2,70,14,5,1.6,0.38,10,7,0.7,1.6,45,25,8,10,amber,25,ranged,8,4.5,,#C8965A,sand,,
+id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight,drop_chance,rune_chance,potion_chance,material,material_chance,behavior,shot_speed,keep_distance,charge_speed,color,biome,resist,element,place
+slime,슬라임,1,30,9,0,2.4,0.4,8,0.5,0.5,1.0,100,20,6,8,slime_gel,30,melee,,,,#8CD94D,,,,
+spore_shooter,가시 버섯,2,24,8,0,1.6,0.35,9,6,0.8,2.0,60,20,6,8,mushroom_spore,25,ranged,7,4,,#B07CE0,,fire:-25,,
+cave_beetle,동굴 딱정벌레,2,60,14,15,2.2,0.42,8,4,0.7,2.2,50,25,8,8,copper_ore,40,charge,,,10,#A0703C,,,,
+crystal_bat,수정 박쥐,3,75,17,10,3.6,0.3,9,0.5,0.35,0.9,60,25,8,10,mithril_ore,30,melee,,,,#7CD2E2,crystal,,,
+crystal_wisp,수정 정령,3,60,18,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,mithril_ore,25,ranged,9,4.5,,#C8F4FF,crystal,lightning:50,,
+myconid,버섯 병정,2,55,12,5,1.8,0.4,8,0.5,0.6,1.4,70,22,7,8,glow_spore,35,melee,,,,#C86ED8,mushroom,fire:-25,,
+glow_bat,빛 박쥐,3,70,16,5,3.8,0.3,9,0.5,0.35,0.9,60,25,8,10,glow_spore,30,melee,,,,#5FE0C8,mushroom,,,
+ice_slime,얼음 슬라임,2,70,12,10,1.8,0.42,8,0.5,0.6,1.2,70,22,7,8,ice_crystal,25,melee,,,,#8CC8F0,ice,cold:75|fire:-25,cold,
+frost_wisp,서리 정령,3,60,17,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,ice_crystal,30,ranged,9,4.5,,#BFE8FF,ice,cold:75|fire:-25,cold,
+magma_slime,용암 슬라임,3,95,18,15,2.0,0.42,8,0.5,0.55,1.1,60,25,8,10,obsidian_ore,30,melee,,,,#E0541E,lava,fire:75|cold:-25,fire,
+fire_bat,불 박쥐,3,70,17,5,3.8,0.3,9,0.5,0.35,0.9,50,25,8,10,obsidian_ore,20,melee,,,,#FF8A3A,lava,fire:75,fire,
+void_wisp,공허 정령,4,120,24,10,2.2,0.33,10,7,0.7,1.5,45,30,12,12,void_ore,25,ranged,10,4.5,,#A07CFF,abyss,lightning:50|cold:25,cold,
+abyss_stalker,심연 추적자,4,170,30,25,3.0,0.45,10,0.6,0.5,1.0,55,30,12,12,void_ore,25,charge,,,14,#5E3E96,abyss,cold:50,,
+lake_crab,호수 게,3,140,18,25,2.0,0.42,8,0.55,0.5,1.0,55,25,8,10,pearl,30,melee,,,,#4AA0B4,lake,cold:50|fire:-25,,
+tide_wisp,물살 정령,3,80,16,5,2.4,0.32,10,7,0.6,1.4,45,25,8,10,pearl,25,ranged,9,4.5,,#5AD2E6,lake,cold:50|lightning:-25,cold,
+sand_scorpion,모래 전갈,2,110,16,20,2.3,0.42,8,0.6,0.55,1.1,55,25,8,10,amber,30,melee,,,,#D2A050,sand,,,
+sand_worm,모래 지렁이,2,70,14,5,1.6,0.38,10,7,0.7,1.6,45,25,8,10,amber,25,ranged,8,4.5,,#C8965A,sand,,,
+demon_soldier,마족 병사,4,95,16,12,2.6,0.42,8,0.6,0.5,1.0,100,25,8,8,void_ore,20,melee,,,,#8A2A3A,,fire:25|cold:-15,,demon_nest
+demon_caster,마족 주술사,4,60,13,4,2.0,0.38,10,7,0.8,2.2,60,25,10,10,void_essence,8,ranged,7,5,,#6A3A9A,,cold:-20,fire,demon_nest

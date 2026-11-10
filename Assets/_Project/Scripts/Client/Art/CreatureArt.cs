@@ -751,6 +751,85 @@ namespace Game.Client
             },
         };
 
+        // A demon soldier of the nest (2026-11-10): horns, a dark iron cuirass over crimson skin, a curved blade.
+        static readonly string[][] DemonSoldier =
+        {
+            new[]
+            {
+                "..h.....h.....",
+                "..hh...hh.....",
+                "...hMMMh......",
+                "...MLLMMm.....",
+                "...MeMMem.....",
+                "....MMMm......",
+                "..kKKKKKKk...b",
+                ".kKkKKKKKKk.bB",
+                ".MkKKKKKKKMbB.",
+                ".M.KKKKKK.MB..",
+                "...KKdKKK.....",
+                "...Km..mK.....",
+                "...mm..mm.....",
+                "..dd....dd....",
+            },
+            new[]
+            {
+                "..h.....h.....",
+                "..hh...hh.....",
+                "...hMMMh......",
+                "...MLLMMm.....",
+                "...MeMMem.....",
+                "....MMMm......",
+                "..kKKKKKKk...b",
+                ".kKkKKKKKKk.bB",
+                ".MkKKKKKKKMbB.",
+                ".M.KKKKKK.MB..",
+                "...KKdKKK.....",
+                "....Km.mK.....",
+                "....mmmm......",
+                "...dd.dd......",
+            },
+        };
+
+        // A demon caster: a hooded robe with horns through the hood, eyes in its shadow, a staff of dark wood crowned
+        // with a flame that flickers.
+        static readonly string[][] DemonCaster =
+        {
+            new[]
+            {
+                "...........F..",
+                "..h....h..fFf.",
+                "..hh..hh...f..",
+                "...LLMMM...K..",
+                "..LMMMMMm..K..",
+                "..MdeddeM..K..",
+                "..MddddddM.K..",
+                "...MMMMMMmmK..",
+                "..LMMMMMMMmK..",
+                ".LMMMMMMMMmK..",
+                ".LMMMMMMMMMm..",
+                ".MMMMMMMMMMm..",
+                "..mmmmmmmmm...",
+                "..dd.....dd...",
+            },
+            new[]
+            {
+                "..........fF..",
+                "..h....h...Ff.",
+                "..hh..hh..ff..",
+                "...LLMMM...K..",
+                "..LMMMMMm..K..",
+                "..MdeddeM..K..",
+                "..MddddddM.K..",
+                "...MMMMMMmmK..",
+                "..LMMMMMMMmK..",
+                ".LMMMMMMMMmK..",
+                ".LMMMMMMMMMm..",
+                ".MMMMMMMMMMm..",
+                "..mmmmmmmmm...",
+                "...dd...dd....",
+            },
+        };
+
         // A cave beetle: a round shell, a horned head and six legs that step between the frames.
         static readonly string[][] Beetle =
         {
@@ -1171,6 +1250,22 @@ namespace Game.Client
                 ['r'] = Rgba.Hex("#BFF4FF"),
                 ['h'] = Rgba.Hex("#C8B4FF"),
             },
+            // The demons of the nest: bone horns, dark iron, a steel blade; the caster's staff and flame.
+            ["demon_soldier"] = new Dictionary<char, Rgba>
+            {
+                ['h'] = Rgba.Hex("#E2DCCA"),
+                ['K'] = Rgba.Hex("#3A3440"),
+                ['k'] = Rgba.Hex("#6A6470"),
+                ['b'] = Rgba.Hex("#E0E4EE"),
+                ['B'] = Rgba.Hex("#9AA0B0"),
+            },
+            ["demon_caster"] = new Dictionary<char, Rgba>
+            {
+                ['h'] = Rgba.Hex("#E2DCCA"),
+                ['K'] = Rgba.Hex("#4A3422"),
+                ['f'] = Rgba.Hex("#FF9A3A"),
+                ['F'] = Rgba.Hex("#FFE07A"),
+            },
             // The spear: a wooden shaft and an iron head.
             ["myconid"] = new Dictionary<char, Rgba>
             {
@@ -1226,6 +1321,8 @@ namespace Game.Client
                 "tide_wisp" => Jelly,
                 "sand_scorpion" => Scorpion,
                 "sand_worm" => SandWorm,
+                "demon_soldier" => DemonSoldier,
+                "demon_caster" => DemonCaster,
                 _ => Slime,
             };
             var image = PixelImage.FromRows(colors, frames[frame % frames.Length]);
@@ -1274,6 +1371,9 @@ namespace Game.Client
             // The lava titan: the warden's build in black basalt, its seams and core burning.
             "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, view, pose, molten: true),
             "void_lord" => VoidLord(frame, view, pose),
+            // The mad general of the demon nest (2026-11-10): the void lord's robed build in crimson and ember, a ball
+            // of fire for the orb, horns through the hood.
+            "mad_general" => VoidLord(frame, view, pose, "#5A1A24", "#E86A3A", "#FF9A4A", "#FFD27A", horns: true),
             "tide_serpent" => Serpent(frame, view, pose),
             "antlion" => Antlion(frame, view, pose),
             _ => Warden(color, frame, view, pose),
@@ -1397,15 +1497,16 @@ namespace Game.Client
         // hood, an orb of the void held before it and stars turning round its head. It lifts the orb overhead to wind
         // up, thrusts it out to strike and flares its cloak to roar; side on, the cloak narrows and the orb is held
         // out in front; from behind, the hood is closed and the orb hidden.
-        static PixelImage VoidLord(int frame, BossView view, BossPose pose)
+        static PixelImage VoidLord(int frame, BossView view, BossPose pose, string cloakColor = "#3A2C5C", string trimColor = "#9A7CFF",
+            string orbColor = "#C8A8FF", string eyeColor = "#BFF4FF", bool horns = false)
         {
             const int width = 46;
             const int height = 46;
             var image = new PixelImage(width, height);
-            var cloak = Ramp.Of("#3A2C5C");
-            var trim = Ramp.Of("#9A7CFF");
-            var orb = Ramp.Of("#C8A8FF");
-            var eye = Rgba.Hex("#BFF4FF");
+            var cloak = Ramp.Of(cloakColor);
+            var trim = Ramp.Of(trimColor);
+            var orb = Ramp.Of(orbColor);
+            var eye = Rgba.Hex(eyeColor);
             int bob = (frame % 2 == 1 ? -1 : 0) + (pose == BossPose.Windup ? -2 : pose == BossPose.Strike ? 1 : 0);
             bool behind = Behind(view);
             int turn = Turn(view);
@@ -1459,6 +1560,18 @@ namespace Game.Client
             else
             {
                 for (int y = 8; y < 15; y++) Set(face, y + bob, cloak.Shade);
+            }
+            // Horns of bone curving up out of the hood.
+            if (horns)
+            {
+                var bone = Ramp.Of("#E2DCCA");
+                for (int i = 0; i < 6; i++)
+                {
+                    Set(face - 5 - i / 2, 7 - i + bob, i < 3 ? bone.Main : bone.Light);
+                    Set(face - 4 - i / 2, 7 - i + bob, bone.Shade);
+                    Set(face + 5 + i / 2, 7 - i + bob, i < 3 ? bone.Shade : bone.Main);
+                    Set(face + 4 + i / 2, 7 - i + bob, bone.Dark);
+                }
             }
             // The orb with sleeves reaching to it: before the chest, overhead to wind up, thrust out and down to strike;
             // side on it is held out ahead. From behind only the sleeves show.

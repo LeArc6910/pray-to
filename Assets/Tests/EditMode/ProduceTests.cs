@@ -163,7 +163,7 @@ namespace Game.Core.Tests
         [Test]
         public void TheMerchantPaysMoreForWhatWasMadeThanForTheCrop()
         {
-            int Sell(string id) => People.Shipped.Shop.Single(e => e.Material?.Id == id).Sell;
+            int Sell(string id) => People.Shipped.Shop.Single(e => e.Material?.Id == id && e.Npc == People.Shipped.Merchant).Sell;
             Assert.Greater(Sell("berry_juice"), Sell("cave_berry") * 2);
             Assert.Greater(Sell("kimchi"), Sell("snow_cabbage"));
             Assert.Greater(Sell("star_wine"), Sell("star_melon"));

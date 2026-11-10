@@ -565,14 +565,14 @@ namespace Game.Client
         }
 
         // The monster id's kind of voice: slimes blub, mushrooms puff, bugs click, bats screech, wisps chime, crabs
-        // clack, worms rumble.
+        // clack, worms (and the nest's demons) rumble.
         public static CreatureVoice VoiceOf(string monster) =>
             monster.Contains("slime") ? CreatureVoice.Slime
             : monster.Contains("spore") || monster.Contains("myconid") ? CreatureVoice.Mushroom
             : monster.Contains("bat") ? CreatureVoice.Bat
             : monster.Contains("wisp") ? CreatureVoice.Wisp
             : monster.Contains("crab") ? CreatureVoice.Crab
-            : monster.Contains("worm") ? CreatureVoice.Worm
+            : monster.Contains("worm") || monster.Contains("demon") ? CreatureVoice.Worm
             : monster.Contains("beetle") || monster.Contains("stalker") || monster.Contains("scorpion") ? CreatureVoice.Bug
             : CreatureVoice.Slime;
 

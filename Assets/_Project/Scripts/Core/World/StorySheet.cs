@@ -154,7 +154,7 @@ namespace Game.Core
         public const string CharactersFile = "characters.csv";
         public const string StoryFile = "story.csv";
         public const int MaxRadius = 12;
-        public static readonly string[] Styles = { "village", "kingdom", "hut", "nest" };
+        public static readonly string[] Styles = { "village", "kingdom", "hut", "nest", "harbor", "ruins", "mine" };
 
         public static StoryData Parse(string placesCsv, string charactersCsv, string storyCsv, LootData loot, BossData bosses = null)
         {

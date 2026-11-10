@@ -127,6 +127,10 @@ namespace Game.Core
 
     public sealed class BossDefinition
     {
+        // The place of the story (places.csv id) whose arena the boss waits in, or null for the caves' own arenas in
+        // sheet order (2026-11-10).
+        public string Place { get; internal set; }
+
         readonly List<BossAttack> _attacks = new List<BossAttack>();
 
         internal BossDefinition(
@@ -289,7 +293,7 @@ namespace Game.Core
                         Whole(row, "potion_count"),
                         row["material"],
                         Whole(row, "material_count"),
-                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level") });
+                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"] });
                 });
             }
             return bosses;

@@ -21,7 +21,18 @@ namespace Game.Core
             if (abyssArena is (int ax, int ay)) arenas.Add(TileMap.Center(ax, ay));
             if (lakeArena is (int kx, int ky)) arenas.Add(TileMap.Center(kx, ky));
             if (sandArena is (int sx, int sy)) arenas.Add(TileMap.Center(sx, sy));
-            Arenas = arenas;
+            _arenas = arenas;
+            CaveArenas = arenas.Count;
+        }
+
+        readonly List<Vec2> _arenas;
+        readonly Dictionary<string, Vec2> _placeArenas = new Dictionary<string, Vec2>();
+
+        // A boss arena carved beside a place of the story (2026-11-10, the demon nest's): after the caves' own.
+        internal void AddPlaceArena(string place, Vec2 center)
+        {
+            _arenas.Add(center);
+            _placeArenas[place] = center;
         }
 
         public TileMap Map { get; }
@@ -35,8 +46,12 @@ namespace Game.Core
         public Vec2 Arena => TileMap.Center(ArenaX, ArenaY);
         // Every boss arena in the order the bosses go in (bosses.csv): the first one's, then the deep one far out,
         // reached by a tunnel from the first, then the lava one in the opposite corner, reached from the spawn. All
-        // have ArenaRadius.
-        public IReadOnlyList<Vec2> Arenas { get; }
+        // have ArenaRadius. After the caves' own come those beside places of the story (PlaceArenas).
+        public IReadOnlyList<Vec2> Arenas => _arenas;
+        // How many of Arenas are the caves' own, for the bosses with no place, in sheet order.
+        public int CaveArenas { get; }
+        // The arena beside each place of the story that has one, by place id (bosses.csv place).
+        public IReadOnlyDictionary<string, Vec2> PlaceArenas => _placeArenas;
         // Which kind of cave each tile is in (Docs/Biomes.md).
         public BiomeMap Biomes { get; }
         // The places of the story (Docs/Story.md), in sheet order; none when made without the sheets.
@@ -229,6 +244,44 @@ namespace Game.Core
                 }
             }
 
+            // Beside the demon nest, its lord's arena (2026-11-10, bosses.csv place): on the side away from the road
+            // that comes in, clear of the other places and arenas, reached from the nest by a short road.
+            foreach (var (place, cx, cy) in spots.Where(s => s.Place.Style == "nest").ToList())
+            {
+                int r = place.Radius;
+                var from = spots.FirstOrDefault(s => s.Place.Id == place.Road);
+                int fromX = from.Place != null ? from.X : world.SpawnX, fromY = from.Place != null ? from.Y : world.SpawnY;
+                // Nearest the nest first, then furthest from where the road comes from.
+                (int X, int Y)? best = null;
+                int bestScore = int.MinValue;
+                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 16 && best == null; reach += 2)
+                {
+                    foreach (var way in Ways)
+                    {
+                        int ax = cx + way.X * reach / 1000, ay = cy + way.Y * reach / 1000;
+                        if (ax < ArenaRadius + 1 || ay < ArenaRadius + 1 || ax > map.Width - ArenaRadius - 2 || ay > map.Height - ArenaRadius - 2) continue;
+                        if (spots.Any(s => s.Place != place && Square(ax - s.X, ay - s.Y) < (s.Place.Radius + ArenaRadius + 3) * (s.Place.Radius + ArenaRadius + 3))) continue;
+                        if (arenas.Any(a => Square(ax - a.X, ay - a.Y) < (2 * ArenaRadius + 2) * (2 * ArenaRadius + 2))) continue;
+                        int score = Square(ax - fromX, ay - fromY);
+                        if (score > bestScore)
+                        {
+                            bestScore = score;
+                            best = (ax, ay);
+                        }
+                    }
+                }
+                if (best is not (int bx, int by)) continue;
+                ClearDisc(map, bx, by, ArenaRadius);
+                foreach (var (x, y) in Line(cx, cy, bx, by))
+                {
+                    for (int ty = y - TunnelHalfWidth; ty <= y + TunnelHalfWidth; ty++)
+                        for (int tx = x - TunnelHalfWidth; tx <= x + TunnelHalfWidth; tx++)
+                            if (IsInside(map, tx, ty) && !InPlaza(tx, ty) && Square(tx - bx, ty - by) > ArenaRadius * ArenaRadius) map[tx, ty] = TileType.Road;
+                }
+                world.AddPlaceArena(place.Id, TileMap.Center(bx, by));
+                arenas.Add((bx, by));
+            }
+
             var sites = new List<PlaceSite>();
             foreach (var (place, cx, cy) in spots)
             {
@@ -268,6 +321,20 @@ namespace Game.Core
             {
                 Put(dx, dy, type);
                 Put(-dx - Structures.Footprint(type).W + 1, dy, type);
+            }
+            // A structure out on the plaza's water (the harbour's boats), all of it on water.
+            void Afloat(int dx, int dy, TileType type)
+            {
+                var (w, h) = Structures.Footprint(type);
+                for (int j = 0; j < h; j++)
+                    for (int i = 0; i < w; i++)
+                    {
+                        int x = cx + dx + i, y = cy + dy + j;
+                        if (!IsInside(map, x, y) || (dx + i) * (dx + i) + (dy + j) * (dy + j) > r * r || map[x, y] != TileType.Water) return;
+                    }
+                for (int j = 0; j < h; j++)
+                    for (int i = 0; i < w; i++)
+                        map[cx + dx + i, cy + dy + j] = i == 0 && j == 0 ? type : TileType.StructurePart;
             }
             void Lay(int dx, int dy, TileType floor)
             {
@@ -487,6 +554,62 @@ namespace Game.Core
                     foreach (var (dx, dy) in new[] { (-2, -4), (3, -3), (-5, 0), (6, 0), (-1, -6), (2, -6), (-3, 3), (4, 5) }) Put(dx, dy, TileType.Bones);
                     wanted.Add((cx, cy + 3));
                     wanted.Add((cx - 2, cy + 2));
+                    break;
+                case "harbor":
+                    // An underground harbour (2026-11-10): the south of the plaza is the lake, with a quay along its
+                    // shore, a plank pier out over the water and boats moored either side; bollards on the quay, a
+                    // lighthouse, a fisher's cottage, nets drying, an anchor, crates and barrels, lamp posts.
+                    for (int dy = -3; dy >= -r; dy--)
+                        for (int dx = -1; dx <= 1; dx++)
+                            if (dy >= -r + 2) Lay(dx, dy, TileType.Dock);
+                    for (int dy = -3; dy >= -r; dy--)
+                        for (int dx = -r; dx <= r; dx++)
+                            Lay(dx, dy, TileType.Water);
+                    Afloat(-5, -6, TileType.Boat);
+                    Afloat(3, -7, TileType.Boat);
+                    foreach (int dx in new[] { 2, 6 }) Both(dx, -2, TileType.Bollard);
+                    Both(4, -2, TileType.LampPost);
+                    Put(5, 3, TileType.Lighthouse);
+                    Put(-7, 2, TileType.Cottage);
+                    foreach (int dx in new[] { -3, -2 }) Put(dx, 2, TileType.NetRack);
+                    Put(3, 1, TileType.Anchor);
+                    Put(2, -1, TileType.Crates);
+                    Put(3, -1, TileType.Barrel);
+                    Put(-3, -1, TileType.Barrel);
+                    Put(-7, -1, TileType.Crates);
+                    wanted.Add((cx + 1, cy + 3));
+                    wanted.Add((cx, cy - 6));
+                    break;
+                case "ruins":
+                    // A ruined temple (2026-11-10): an altar of glowing runes at the north, rune stones beside it, a
+                    // broken ring of pillars (some still standing), fallen columns, rubble everywhere and giant
+                    // mushrooms grown up through the floor.
+                    Put(-1, 4, TileType.Altar);
+                    Both(3, 4, TileType.RuneStone);
+                    foreach (int w in new[] { 0, 2, 4, 6, 8, 10, 12, 14 })
+                        Put(Ways[w].X * (r - 2) / 1000, Ways[w].Y * (r - 2) / 1000, w % 4 == 0 ? TileType.Pillar : TileType.BrokenPillar);
+                    Put(-5, -3, TileType.FallenColumn);
+                    Put(3, -5, TileType.FallenColumn);
+                    foreach (var (dx, dy) in new[] { (-2, 2), (4, 1), (-4, -1), (2, -3), (-1, -5), (5, -2), (-6, 2), (1, 6), (-3, -6) }) Put(dx, dy, TileType.Rubble);
+                    foreach (var (dx, dy) in new[] { (-6, -5), (6, 4) }) Put(dx, dy, TileType.MushroomTree);
+                    wanted.Add((cx, cy + 2));
+                    wanted.Add((cx + 2, cy - 2));
+                    break;
+                case "mine":
+                    // A mining village (2026-11-10): a timbered mine entrance in the north, rails running out of it
+                    // past the waypoint, a cart and heaps of ore, lanterns, a miner's cabin, woodpile, crates and
+                    // barrels.
+                    Put(2, 5, TileType.MineEntrance);
+                    foreach (var (dx, dy) in new[] { (1, 5), (5, 5), (-2, -3), (6, -2) }) Put(dx, dy, TileType.Lantern);
+                    Put(4, -3, TileType.MineCart);
+                    foreach (var (dx, dy) in new[] { (5, 3), (1, 3), (5, -5) }) Put(dx, dy, TileType.OrePile);
+                    for (int dy = 4; dy >= -r + 1; dy--) Lay(3, dy, TileType.Rail);
+                    Put(-7, 1, TileType.Cabin);
+                    Put(-3, 1, TileType.Woodpile);
+                    foreach (var (dx, dy) in new[] { (-6, -3), (-5, -3) }) Put(dx, dy, TileType.Crates);
+                    Put(-4, -4, TileType.Barrel);
+                    wanted.Add((cx - 2, cy + 3));
+                    wanted.Add((cx + 1, cy - 3));
                     break;
                 default:
                     Lamps(TileType.LampPost);

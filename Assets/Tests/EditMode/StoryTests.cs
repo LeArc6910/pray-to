@@ -23,7 +23,7 @@ namespace Game.Core.Tests
         public void TheShippedStoryReads()
         {
             Assert.IsEmpty(Tales.Shipped.Errors, string.Join("\n", Tales.Shipped.Errors));
-            Assert.AreEqual(4, Tales.Shipped.Places.Count);
+            Assert.AreEqual(7, Tales.Shipped.Places.Count);
             Assert.GreaterOrEqual(Tales.Shipped.Steps.Count, 9);
             var first = Tales.Shipped.Steps[0];
             Assert.AreEqual("chief", first.Who.Id);
@@ -54,7 +54,7 @@ namespace Game.Core.Tests
         {
             var world = WorldGenerator.Generate(11, story: Tales.Shipped);
             var again = WorldGenerator.Generate(11, story: Tales.Shipped);
-            Assert.AreEqual(4, world.Places.Count);
+            Assert.AreEqual(Tales.Shipped.Places.Count, world.Places.Count);
             for (int y = 0; y < world.Map.Height; y++)
                 for (int x = 0; x < world.Map.Width; x++)
                     Assert.AreEqual(world.Map[x, y], again.Map[x, y], $"({x}, {y})");
@@ -136,6 +136,68 @@ namespace Game.Core.Tests
                     Assert.IsTrue(walked.Contains((tile.Item1, tile.Item2 - 1)), $"seed {seed}: nowhere to talk to {character.Id} from");
                 }
             }
+        }
+
+        // Each style dresses its place with what marks it (2026-11-10): the harbour's lake, pier and boats, the temple's
+        // altar and rune stones, the mine's entrance, rails and cart.
+        [Test]
+        public void TheHarbourTempleAndMineAreDressed([Range(1, 12)] int seed)
+        {
+            var world = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
+            int Count(string style, TileType type)
+            {
+                var site = world.Places.Single(p => p.Definition.Style == style);
+                int n = 0;
+                for (int y = site.Y - site.Radius; y <= site.Y + site.Radius; y++)
+                    for (int x = site.X - site.Radius; x <= site.X + site.Radius; x++)
+                        if (world.Map[x, y] == type) n++;
+                return n;
+            }
+            Assert.Greater(Count("harbor", TileType.Water), 20, $"seed {seed}: the harbour's lake");
+            Assert.Greater(Count("harbor", TileType.Dock), 6, $"seed {seed}: the pier");
+            Assert.GreaterOrEqual(Count("harbor", TileType.Boat), 1, $"seed {seed}: boats");
+            Assert.AreEqual(1, Count("ruins", TileType.Altar), $"seed {seed}: the altar");
+            Assert.GreaterOrEqual(Count("ruins", TileType.RuneStone), 1, $"seed {seed}: rune stones");
+            Assert.AreEqual(1, Count("mine", TileType.MineEntrance), $"seed {seed}: the mine entrance");
+            Assert.Greater(Count("mine", TileType.Rail), 6, $"seed {seed}: rails");
+        }
+
+        // The demon nest's lord waits in an arena of its own beside the nest (2026-11-10, bosses.csv place), clear of
+        // the other places, on the far side from the road in, walked to from the nest's waypoint.
+        [Test]
+        public void TheNestsLordHasAnArenaBesideIt([Range(1, 24)] int seed)
+        {
+            var generated = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
+            Assert.IsTrue(generated.PlaceArenas.TryGetValue("demon_nest", out var arena), $"seed {seed}: no arena");
+            Assert.AreEqual(generated.CaveArenas + 1, generated.Arenas.Count);
+            var nest = generated.Places.Single(p => p.Definition.Id == "demon_nest");
+            foreach (var other in generated.Places.Where(p => p != nest))
+                Assert.Greater(Vec2.Distance(other.Center, arena), other.Radius + WorldGenerator.ArenaRadius, $"seed {seed}: on {other.Definition.Id}");
+            var field = new FlowField(generated.Map);
+            field.Build(new[] { nest.Center }, int.MaxValue - 1);
+            Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(TileMap.Cell(arena.X), TileMap.Cell(arena.Y)), $"seed {seed}: cannot be walked to");
+        }
+
+        [Test]
+        public void TheMadGeneralWaitsInTheNestsArenaAndDemonsKeepToTheNest()
+        {
+            var config = new WorldConfig { EnemyTarget = 0 };
+            var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, config, Bosses.Shipped, Classes.Shipped, Tiles.Shipped, story: Tales.Shipped);
+            var world = host.World;
+            var nest = world.Places.Single(p => p.Definition.Id == "demon_nest");
+            var general = world.Bosses.Single(b => b.Definition.Id == "mad_general");
+            Assert.Less(Vec2.Distance(general.Home, nest.Center), nest.Radius + WorldGenerator.ArenaRadius + 8, "beside the nest");
+            Assert.AreEqual(Bosses.Shipped.Bosses.Count, world.Bosses.Count, "every boss has its arena");
+
+            // Monsters come over the whole map; round the nest only demons, and demons nowhere else.
+            config.EnemyTarget = 400;
+            Run(world, 3000);
+            var demons = world.Enemies.Where(e => e.Definition.Place == "demon_nest").ToList();
+            Assert.IsNotEmpty(demons, "some demons came");
+            foreach (var demon in demons)
+                Assert.LessOrEqual(Vec2.Distance(demon.Position, nest.Center), nest.Radius + World.HauntReach + 6, "a demon wandered far");
+            foreach (var enemy in world.Enemies.Where(e => Vec2.Distance(e.Position, nest.Center) < nest.Radius + World.HauntReach - 6))
+                Assert.AreEqual("demon_nest", enemy.Definition.Place, $"{enemy.Definition.Id} by the nest");
         }
 
         // The royal city's gates are cut where the roads come in, and its towers and great fountains are set clear of
@@ -314,7 +376,7 @@ namespace Game.Core.Tests
             Assert.IsTrue(client.JourneyTaken);
             Assert.AreEqual("hero", client.CurrentStep.Who.Id);
             CollectionAssert.IsSupersetOf(client.Waypoints, new[] { 0, 1 });
-            Assert.AreEqual(4, client.Places.Count, "the client carves the same places from the seed");
+            Assert.AreEqual(host.World.Places.Count, client.Places.Count, "the client carves the same places from the seed");
             Assert.AreEqual(host.World.Places[2].Center, client.Places[2].Center);
 
             var back = CharacterSave.Read(client.SaveCharacter(), Gear.Data);

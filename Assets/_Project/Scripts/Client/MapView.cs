@@ -297,6 +297,8 @@ namespace Game.Client
             if (TileMap.IsPaving(_map[x, y])) return new Color32(150, 138, 120, 255);
             if (TileMap.IsDoor(_map[x, y])) return new Color32(170, 120, 70, 255);
             if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);
+            if (_map[x, y] == TileType.Dock) return new Color32(168, 116, 68, 255);
+            if (_map[x, y] == TileType.Rail) return new Color32(120, 110, 100, 255);
             if (_map[x, y] == TileType.Waypoint) return new Color32(110, 170, 255, 255);
             // The dressing of the story's places (Docs/Story.md): walls by what they are made of, the rest warm.
             if (_map[x, y] == TileType.TimberWall) return new Color32(150, 104, 58, 255);
@@ -312,7 +314,8 @@ namespace Game.Client
             if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);
             if (TileMap.IsSoil(_map[x, y])) return new Color32(110, 80, 56, 255);
             if (_map[x, y] == TileType.Filter) return Palette.Splitter;
-            if (_map[x, y] == TileType.MerchantStall || _map[x, y] == TileType.SmithStall || _map[x, y] == TileType.FisherHut || _map[x, y] == TileType.AlchemyTable)
+            if (_map[x, y] == TileType.MerchantStall || _map[x, y] == TileType.SmithStall || _map[x, y] == TileType.FisherHut || _map[x, y] == TileType.AlchemyTable
+                || _map[x, y] == TileType.RoyalStall || _map[x, y] == TileType.DemonStall || _map[x, y] == TileType.OreStall)
                 return new Color32(220, 90, 100, 255);
             if (_map[x, y] == TileType.WardStone || _map[x, y] == TileType.TeslaTower) return new Color32(140, 224, 255, 255);
             if (World.IsPowerNode(_map[x, y]) || _map[x, y] == TileType.Lever) return Palette.Drill;

@@ -9,8 +9,9 @@ namespace Game.Core
     {
         internal NpcDefinition(string id, string name, TileType tile, IReadOnlyCollection<object> loves, IReadOnlyCollection<object> likes,
             IReadOnlyCollection<object> dislikes, IReadOnlyList<string> lines, string role = "", string color = "#9A5AC8", bool buysGear = false,
-            IReadOnlyList<(int Hearts, object Thing, int Count)> gifts = null, IReadOnlyDictionary<int, string> stories = null)
+            IReadOnlyList<(int Hearts, object Thing, int Count)> gifts = null, IReadOnlyDictionary<int, string> stories = null, string place = null)
         {
+            Place = string.IsNullOrEmpty(place) ? null : place;
             Role = role.Length > 0 ? role : name;
             Color = color;
             BuysGear = buysGear;
@@ -29,6 +30,8 @@ namespace Game.Core
         public string Name { get; }
         // The tile they stand at (a merchant's stall); players beside it can trade and talk.
         public TileType Tile { get; }
+        // The place of the story (places.csv id) their stall stands in, or null for near the spawn (2026-11-10).
+        public string Place { get; }
         // Materials and consumables.
         public IReadOnlyCollection<object> Loves { get; }
         public IReadOnlyCollection<object> Likes { get; }
@@ -265,7 +268,7 @@ namespace Game.Core
                     };
                     string color = row["color"].Length > 0 ? row["color"] : "#9A5AC8";
                     npcs.Add(new NpcDefinition(id, name, tile, Things(row["loves"], loot), Things(row["likes"], loot), Things(row["dislikes"], loot), lines,
-                        row["role"], color, buysGear, gifts, stories));
+                        row["role"], color, buysGear, gifts, stories, row["place"]));
                 }
                 catch (FormatException e)
                 {

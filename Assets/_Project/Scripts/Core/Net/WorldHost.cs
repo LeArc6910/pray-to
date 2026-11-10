@@ -130,12 +130,19 @@ namespace Game.Core
             _generated = WorldGenerator.Generate(seed, story: story);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles, _generated.Biomes);
             // Each boss in its own arena, in sheet order: the first near the spawn, the next in the deep zone.
-            for (int i = 0; bosses != null && i < bosses.Bosses.Count && i < _generated.Arenas.Count; i++)
+            // A boss with a place (bosses.csv place, 2026-11-10) waits in the arena beside it, when the world has it.
+            var caveBosses = bosses?.Bosses.Where(b => b.Place == null).ToList() ?? new List<BossDefinition>();
+            for (int i = 0; i < caveBosses.Count && i < _generated.CaveArenas; i++)
             {
-                World.PlaceBoss(bosses.Bosses[i], _generated.Arenas[i], _generated.ArenaRadius);
+                World.PlaceBoss(caveBosses[i], _generated.Arenas[i], _generated.ArenaRadius);
             }
-            if (npcs != null) World.SetNpcs(npcs);
+            foreach (var boss in bosses?.Bosses.Where(b => b.Place != null) ?? Enumerable.Empty<BossDefinition>())
+            {
+                if (_generated.PlaceArenas.TryGetValue(boss.Place, out var arena)) World.PlaceBoss(boss, arena, _generated.ArenaRadius);
+            }
+            // The places first: some people keep shop in them.
             if (story != null) World.SetStory(story, _generated.Places);
+            if (npcs != null) World.SetNpcs(npcs);
         }
 
         readonly NpcData _npcs;

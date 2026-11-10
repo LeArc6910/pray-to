@@ -35,6 +35,10 @@ namespace Game.Client
         static readonly Ramp Cream = new Ramp(Rgba.Hex("#FFF6E2"), Rgba.Hex("#E8DCC0"), Rgba.Hex("#BCAA8A"), Rgba.Hex("#8A7A60"));
         static readonly Ramp Straw = new Ramp(Rgba.Hex("#F2DC8A"), Rgba.Hex("#D2B45A"), Rgba.Hex("#A2843A"), Rgba.Hex("#6E5624"));
         static readonly Ramp Bone = new Ramp(Rgba.Hex("#FFFCF0"), Rgba.Hex("#E2DCCA"), Rgba.Hex("#B4AC96"), Rgba.Hex("#7E7664"));
+        static readonly Ramp Copper = new Ramp(Rgba.Hex("#F6B070"), Rgba.Hex("#D07A3E"), Rgba.Hex("#985028"), Rgba.Hex("#603018"));
+        static readonly Ramp Paint = new Ramp(Rgba.Hex("#7AB8E0"), Rgba.Hex("#4A86B8"), Rgba.Hex("#305E88"), Rgba.Hex("#1E3C5A"));
+        static readonly Rgba Rune = Rgba.Hex("#8AF0FF");
+        static readonly Rgba RuneCore = Rgba.Hex("#E8FFFF");
         static readonly Rgba WindowLight = Rgba.Hex("#FFD27A");
         static readonly Rgba WindowCore = Rgba.Hex("#FFF2C2");
         static readonly Rgba Flame = Rgba.Hex("#FF9A3C");
@@ -181,6 +185,20 @@ namespace Game.Client
             TileType.Totem => Totem(),
             TileType.Cage => Cage(),
             TileType.Brazier => Brazier(),
+            TileType.Boat => Boat(),
+            TileType.Lighthouse => Lighthouse(),
+            TileType.NetRack => NetRack(),
+            TileType.Bollard => Bollard(),
+            TileType.Anchor => Anchor(),
+            TileType.BrokenPillar => BrokenPillar(),
+            TileType.FallenColumn => FallenColumn(),
+            TileType.Rubble => Rubble(),
+            TileType.RuneStone => RuneStone(),
+            TileType.Altar => Altar(),
+            TileType.MineEntrance => MineEntrance(),
+            TileType.MineCart => MineCart(),
+            TileType.OrePile => OrePile(),
+            TileType.Lantern => Lantern(),
             _ => null,
         };
 
@@ -192,6 +210,8 @@ namespace Game.Client
             TileType.Crates, TileType.Barrel, TileType.Signpost, TileType.Bench, TileType.Hedge, TileType.Flowerbed, TileType.Woodpile,
             TileType.TrainingDummy, TileType.WeaponRack, TileType.Campfire, TileType.Bones, TileType.Spire, TileType.Totem, TileType.Cage,
             TileType.Brazier, TileType.Fountain, TileType.Tent,
+            TileType.Boat, TileType.Lighthouse, TileType.NetRack, TileType.Bollard, TileType.Anchor, TileType.BrokenPillar, TileType.FallenColumn,
+            TileType.Rubble, TileType.RuneStone, TileType.Altar, TileType.MineEntrance, TileType.MineCart, TileType.OrePile, TileType.Lantern,
         };
 
         // A wall block: its top face over its tile (shifted up by its height, so a wall in front hides this one's foot)
@@ -826,6 +846,259 @@ namespace Game.Client
             return Finish(body, ShadowLayer(T, 30, 9, 28, 5, 1.5f));
         }
 
+        // ---- The harbour, the ruined temple and the mining village (2026-11-10) ----
+
+        // A rowing boat moored on the lake, three tiles by two: a painted hull seen from above and in front, its
+        // planked inside, a mast with the sail furled, ripples at the waterline.
+        static PixelImage Boat()
+        {
+            const int w = 48, h = 44;
+            var body = new PixelImage(w, h);
+            // The hull's side: a lens narrowing to the keel and to its two ends.
+            for (int y = 26; y < 39; y++)
+            {
+                float half = 21 - Math.Max(0, y - 30) * 0.7f;
+                for (int x = (int)(24 - half); x <= (int)(24 + half); x++)
+                {
+                    float t = (x - (24 - half)) / (half * 2);
+                    var color = t < 0.2f ? Wood.Light : t < 0.75f ? Wood.Main : Wood.Shade;
+                    if (y == 31 || y == 32) color = t < 0.75f ? Paint.Main : Paint.Shade;
+                    if (y >= 36) color = color.Scale(0.8f);
+                    body[x, y] = color;
+                }
+            }
+            // The gunwale and the planked inside.
+            LitOval(body, 24, 26, 21, 5, Wood);
+            Oval(body, 24, 26.5f, 18, 3.5f, DarkWood.Main);
+            for (int x = 10; x < 40; x += 5) Rect(body, x, 24, 1, 5, DarkWood.Dark);
+            Rect(body, 12, 25, 24, 1, DarkWood.Shade);
+            // The mast and the furled sail.
+            Column(body, 22, 3, 2, 24, DarkWood);
+            for (int y = 6; y < 20; y++)
+                for (int x = 24; x < 24 + (20 - y) / 2 + 2; x++) body[x, y] = x < 26 ? Cream.Light : Cream.Main;
+            Rect(body, 18, 8, 10, 1, DarkWood.Main);
+            Rect(body, 23, 1, 4, 2, Royal.Main);
+            // Ripples where the hull meets the water.
+            for (int x = 4; x < 44; x++)
+                if ((x / 3) % 2 == 0) body[x, 39 + (x / 7) % 2] = Water.Light;
+            return Finish(body);
+        }
+
+        // A lighthouse on the shore, two tiles by two: a tapering tower in red and white bands, a lamp room with its
+        // great light, an iron cap.
+        static PixelImage Lighthouse()
+        {
+            const int w = 32, h = 80;
+            var body = new PixelImage(w, h);
+            for (int y = 20; y < 74; y++)
+            {
+                float half = 7 + (y - 20) * 0.11f;
+                for (int x = (int)(16 - half); x <= (int)(16 + half); x++)
+                {
+                    float t = (x - (16 - half)) / (half * 2);
+                    var ramp = (y - 20) / 9 % 2 == 0 ? Plaster : Royal;
+                    body[x, y] = t < 0.25f ? ramp.Light : t < 0.68f ? ramp.Main : ramp.Shade;
+                }
+            }
+            Rect(body, 14, 62, 4, 11, DarkWood.Main);
+            Rect(body, 15, 40, 2, 4, Ink);
+            Box(body, 7, 17, 18, 2, 3, Iron);
+            Rect(body, 9, 8, 14, 9, WindowLight);
+            Rect(body, 11, 9, 6, 6, WindowCore);
+            foreach (int x in new[] { 9, 15, 22 }) Rect(body, x, 8, 1, 9, Iron.Dark);
+            for (int y = 1; y < 8; y++)
+            {
+                float half = y * 1.2f;
+                for (int x = (int)(16 - half); x <= (int)(16 + half); x++) body[x, y] = x < 15 ? Iron.Light : x < 18 ? Iron.Main : Iron.Shade;
+            }
+            Box(body, 4, 72, 24, 2, 5, Stone);
+            return Finish(body, ShadowLayer(w, h, 17, h - 3, 14, 3));
+        }
+
+        // Nets drying on a frame of two posts.
+        static PixelImage NetRack()
+        {
+            var body = new PixelImage(T, 30);
+            Column(body, 1, 4, 2, 24, DarkWood);
+            Column(body, 13, 4, 2, 24, DarkWood);
+            Rect(body, 1, 4, 14, 2, Wood.Main);
+            for (int y = 6; y < 22; y++)
+                for (int x = 3; x < 13; x++)
+                    if ((x + y) % 3 == 0 || (x - y + 30) % 3 == 0) body[x, y] = y > 19 ? Straw.Shade : Straw.Main;
+            body[6, 12] = Royal.Main; body[10, 16] = Royal.Main;
+            return Finish(body, ShadowLayer(T, 30, 9, 28, 7, 2));
+        }
+
+        // An iron mooring post with a rope wound round it.
+        static PixelImage Bollard()
+        {
+            var body = new PixelImage(T, 16);
+            Column(body, 5, 5, 6, 8, Iron);
+            LitOval(body, 8, 5, 4, 2, Iron);
+            foreach (int y in new[] { 8, 10 }) Rect(body, 5, y, 6, 1, Straw.Main);
+            body[11, 9] = Straw.Shade; body[12, 10] = Straw.Shade;
+            return Finish(body, ShadowLayer(T, 16, 9, 14, 5, 1.5f));
+        }
+
+        // A ship's anchor stood on its crown.
+        static PixelImage Anchor()
+        {
+            var body = new PixelImage(T, 24);
+            Oval(body, 8, 3, 2.5f, 2.5f, Iron.Main);
+            Oval(body, 8, 3, 1.2f, 1.2f, new Rgba(0, 0, 0, 0));
+            Rect(body, 3, 7, 10, 2, Iron.Light);
+            Column(body, 7, 5, 2, 15, Iron);
+            for (int i = 0; i < 5; i++)
+            {
+                body[7 - i, 19 - i / 2] = Iron.Main;
+                body[8 + i, 19 - i / 2] = Iron.Shade;
+            }
+            Rect(body, 2, 15, 2, 2, Iron.Light);
+            Rect(body, 12, 15, 2, 2, Iron.Shade);
+            return Finish(body, ShadowLayer(T, 24, 9, 22, 6, 1.5f));
+        }
+
+        // A temple pillar broken off part way up, moss on its stones.
+        static PixelImage BrokenPillar()
+        {
+            var body = new PixelImage(T, 30);
+            Column(body, 4, 9, 8, 16, Stone);
+            for (int x = 4; x < 12; x++)
+            {
+                int top = 9 - (int)(PixelNoise.Value(x, 3, 41) * 5);
+                Rect(body, x, top, 1, 9 - top, x < 6 ? Stone.Light : x < 10 ? Stone.Main : Stone.Shade);
+            }
+            Box(body, 2, 24, 12, 2, 4, Stone);
+            foreach (var (x, y) in new[] { (5, 14), (6, 15), (10, 19), (4, 22), (11, 11) }) body[x, y] = Leaf.Shade;
+            return Finish(body, ShadowLayer(T, 30, 9, 28, 7, 2));
+        }
+
+        // A column fallen on its side, two tiles long, cracked through.
+        static PixelImage FallenColumn()
+        {
+            const int w = 32, h = 18;
+            var body = new PixelImage(w, h);
+            for (int y = 4; y < 14; y++)
+            {
+                var color = y < 6 ? Stone.Light : y < 10 ? Stone.Main : y < 12 ? Stone.Shade : Stone.Dark;
+                Rect(body, 4, y, 25, 1, color);
+            }
+            LitOval(body, 4, 9, 3, 5, Stone);
+            Oval(body, 4, 9, 1.5f, 3, Stone.Shade);
+            for (int x = 6; x < 28; x += 4) Rect(body, x, 5, 1, 8, Stone.Main.Scale(0.88f));
+            for (int y = 4; y < 14; y++) body[17 + (y % 3) - 1, y] = Ink;
+            foreach (var (x, y) in new[] { (9, 4), (10, 4), (22, 5), (25, 4) }) body[x, y] = Leaf.Main;
+            return Finish(body, ShadowLayer(w, h, 17, 15, 14, 2.5f));
+        }
+
+        // Broken stones lying about.
+        static PixelImage Rubble()
+        {
+            var body = new PixelImage(T, 12);
+            LitOval(body, 5, 7, 3, 2.5f, Stone);
+            LitOval(body, 10, 8, 2.5f, 2, DarkStone);
+            LitOval(body, 8, 5, 2, 1.6f, Stone);
+            return Finish(body, ShadowLayer(T, 12, 8, 10, 6, 1.5f));
+        }
+
+        // A standing stone carved with a rune that still glows.
+        static PixelImage RuneStone()
+        {
+            var body = new PixelImage(T, 36);
+            for (int y = 3; y < 32; y++)
+            {
+                float half = Math.Min(5, 3 + (y - 3) * 0.12f);
+                for (int x = (int)(8 - half); x <= (int)(8 + half); x++)
+                {
+                    float t = (x - (8 - half)) / (half * 2);
+                    body[x, y] = t < 0.3f ? DarkStone.Light : t < 0.7f ? DarkStone.Main : DarkStone.Shade;
+                }
+            }
+            foreach (var (x, y) in new[] { (8, 10), (8, 11), (8, 12), (8, 13), (8, 14), (8, 15), (7, 11), (6, 12), (9, 13), (10, 14), (7, 17), (8, 18), (9, 19) })
+                body[x, y] = y < 15 ? RuneCore : Rune;
+            Box(body, 2, 30, 12, 1, 3, DarkStone);
+            return Finish(body, ShadowLayer(T, 36, 9, 34, 7, 2));
+        }
+
+        // The temple's altar, three tiles across: a stone block carved with glowing runes, cracked on top, an orb of
+        // light resting on it.
+        static PixelImage Altar()
+        {
+            const int w = 48, h = 32;
+            var body = new PixelImage(w, h);
+            Box(body, 3, 12, 42, 6, 12, Stone);
+            Rect(body, 6, 20, 36, 1, Stone.Dark);
+            for (int x = 8; x < 40; x += 6)
+            {
+                body[x, 23] = Rune; body[x + 1, 24] = Rune; body[x + 2, 23] = Rune; body[x + 1, 22] = RuneCore;
+            }
+            for (int i = 0; i < 6; i++) body[28 + i, 13 + i / 2] = Stone.Dark;
+            LitOval(body, 24, 9, 4, 4, Violet);
+            Oval(body, 23, 8, 1.5f, 1.5f, RuneCore);
+            Rect(body, 22, 12, 5, 1, Stone.Shade);
+            return Finish(body, ShadowLayer(w, h, 25, h - 3, 21, 3));
+        }
+
+        // The mouth of the mine, three tiles by two: rock heaped round a timber frame, the dark tunnel inside, the
+        // rails running in, a lantern hung from the lintel.
+        static PixelImage MineEntrance()
+        {
+            const int w = 48, h = 52;
+            var body = new PixelImage(w, h);
+            LitOval(body, 24, 24, 23, 20, DarkStone);
+            for (int y = 8; y < 44; y += 3)
+                for (int x = 2; x < 46; x++)
+                    if (PixelNoise.Value(x, y, 51) > 0.82f && body[x, y].A > 0) body[x, y] = DarkStone.Dark;
+            Rect(body, 13, 18, 22, 30, new Rgba(12, 8, 10, 255));
+            for (int y = 18; y < 48; y++)
+                for (int x = 13; x < 35; x++)
+                    if (y > 38) body[x, y] = new Rgba(30, 22, 20, 255);
+            Column(body, 10, 16, 4, 32, Wood);
+            Column(body, 34, 16, 4, 32, Wood);
+            Box(body, 7, 12, 34, 2, 4, Wood);
+            foreach (int x in new[] { 20, 27 }) Rect(body, x, 40, 1, 8, Iron.Light);
+            for (int y = 41; y < 48; y += 3) Rect(body, 18, y, 12, 1, DarkWood.Main);
+            Rect(body, 31, 18, 1, 3, Iron.Dark);
+            Rect(body, 29, 21, 5, 5, WindowLight);
+            Rect(body, 30, 22, 2, 2, WindowCore);
+            return Finish(body, ShadowLayer(w, h, 25, h - 3, 22, 3));
+        }
+
+        // A mine cart of iron heaped with ore.
+        static PixelImage MineCart()
+        {
+            var body = new PixelImage(T, 20);
+            Box(body, 2, 7, 12, 3, 7, Iron);
+            foreach (var (x, y, ramp) in new[] { (5, 6, Copper), (9, 5, Copper), (11, 7, Iron), (7, 4, Copper) }) LitOval(body, x, y, 2, 1.6f, ramp);
+            foreach (int x in new[] { 4, 11 }) Oval(body, x, 17, 1.8f, 1.8f, Ink);
+            return Finish(body, ShadowLayer(T, 20, 9, 18, 7, 1.5f));
+        }
+
+        // A heap of ore dug out of the mine.
+        static PixelImage OrePile()
+        {
+            var body = new PixelImage(T, 16);
+            LitOval(body, 8, 10, 7, 4.5f, DarkStone);
+            foreach (var (x, y) in new[] { (5, 8), (9, 7), (11, 10), (7, 11), (4, 11) }) body[x, y] = Copper.Light;
+            foreach (var (x, y) in new[] { (8, 9), (12, 9), (6, 10) }) body[x, y] = Copper.Main;
+            return Finish(body, ShadowLayer(T, 16, 9, 14, 7, 1.5f));
+        }
+
+        // A miner's lantern hung from the arm of a timber post.
+        static PixelImage Lantern()
+        {
+            var body = new PixelImage(T, 36);
+            Column(body, 4, 6, 3, 28, Wood);
+            Rect(body, 4, 6, 9, 2, Wood.Main);
+            Rect(body, 11, 8, 1, 2, Iron.Dark);
+            Rect(body, 9, 10, 5, 6, WindowLight);
+            Rect(body, 10, 11, 2, 2, WindowCore);
+            Rect(body, 9, 10, 5, 1, Iron.Dark);
+            Rect(body, 9, 15, 5, 1, Iron.Dark);
+            Box(body, 2, 32, 7, 1, 2, DarkWood);
+            return Finish(body, ShadowLayer(T, 36, 7, 34, 5, 1.5f));
+        }
+
         // ---- The floor under things ----
 
         // What floor runs under the thing at (x, y), or null for none: in a place of the story, its own floor; else
@@ -833,7 +1106,8 @@ namespace Game.Client
         public static TileType? Underlay(TileMap map, IReadOnlyList<PlaceSite> places, int x, int y)
         {
             var here = map[x, y];
-            if (here == TileType.Floor || here == TileType.Road || TileMap.IsPaving(here) || TileMap.IsSoil(here) || here == TileType.Wall
+            if (here == TileType.Boat || here == TileType.StructurePart && AnchorOf(map, x, y) == TileType.Boat) return TileType.Water;
+            if (here == TileType.Floor || Structures.IsWay(here) || TileMap.IsPaving(here) || TileMap.IsSoil(here) || here == TileType.Wall
                 || here == TileType.Water || here == TileType.Lava || here.ToString().EndsWith("Ore"))
                 return null;
             if (places != null)
@@ -861,6 +1135,22 @@ namespace Game.Client
             return best;
         }
 
+        // The type of the structure a StructurePart tile belongs to, from its lower-left tile.
+        public static TileType? AnchorOf(TileMap map, int x, int y)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                for (int i = 0; i < 4; i++)
+                {
+                    var t = map[x - i, y - j];
+                    if (t == TileType.StructurePart) continue;
+                    var (w, h) = Structures.Footprint(t);
+                    if (i < w && j < h && (w > 1 || h > 1)) return t;
+                }
+            }
+            return null;
+        }
+
         // Which of a wall's four sides meet the same wall: north 1, east 2, south 4, west 8.
         public static int Sides(TileMap map, int x, int y)
         {
@@ -881,6 +1171,11 @@ namespace Game.Client
             (TileType.Brazier, 5, "#C08AFF"),
             (TileType.Cottage, 3.5f, "#FFC27A"),
             (TileType.Cabin, 3.5f, "#FFC27A"),
+            (TileType.Lighthouse, 7, "#FFE0A0"),
+            (TileType.RuneStone, 3.5f, "#8AF0FF"),
+            (TileType.Altar, 4.5f, "#B08AFF"),
+            (TileType.Lantern, 5, "#FFC27A"),
+            (TileType.MineEntrance, 3, "#FFC27A"),
         };
     }
 }

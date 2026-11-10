@@ -112,6 +112,7 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
 | resist | (선택) 원소 저항. `fire:75\|cold:-25`처럼 원소:퍼센트, 음수는 약점, 100까지 |
 | element | (선택) 공격의 원소: `fire`(화상), `cold`(느려짐), `lightning`. 비우면 없음 |
 | biome | (선택) 이 생물군계에서만 나온다: `cave`, `mushroom`, `ice`, `crystal`, `lava`. 비우면 어디서나(`Docs/Biomes.md`) |
+| place | (선택, 2026-11-10) 이야기 장소의 id(`places.csv`). 그 장소 광장 둘레 16칸 안에서만 나오고, 지역 레벨과 생물군계를 따지지 않는다. 그 둘레에서는 이런 몬스터만 나온다. 마족 둥지의 마족 병사·주술사(`Docs/Story.md`) |
 | weight | 같은 구역에서 나올 비율 |
 | drop_chance, rune_chance | 죽을 때 아이템, 룬을 떨어뜨릴 확률(%). 비우면 0. 자세한 건 `Docs/Loot.md`의 드랍 절 |
 | potion_chance | 죽을 때 소모품(물약)을 떨어뜨릴 확률(%). 비우면 0 |

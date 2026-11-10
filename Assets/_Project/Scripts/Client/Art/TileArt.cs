@@ -418,6 +418,10 @@ namespace Game.Client
             TileType.Door => DoorTile,
             TileType.LockedDoor => LockedDoorTile,
             TileType.Road => RoadTile,
+            TileType.Dock => DockTile,
+            TileType.Rail => RailTile,
+            // Under the harbour's boats (PropArt.Underlay): open water with no shore.
+            TileType.Water => Ground(Index(GroundKind.Water, 0, 0)),
             TileType.Waypoint => WaypointTile,
             TileType.IronWall => IronWallTile,
             TileType.Fold => FoldTile,
@@ -450,6 +454,7 @@ namespace Game.Client
             TileType.MerchantStall => MerchantStallTile,
             TileType.SmithStall => SmithStallTile,
             TileType.FisherHut => FisherHutTile,
+            TileType.RoyalStall or TileType.DemonStall or TileType.OreStall => MerchantStallTile,
             TileType.AlchemyTable => AlchemyTableTile,
             TileType.Keg => KegTile,
             TileType.PreservesJar => JarTile,
@@ -1668,6 +1673,60 @@ namespace Game.Client
             "WwwwwwwwwwwwwwwW",
             "wwWwwwwWwwwwWwww");
 
+        // The harbour's planks over the water (Docs/Story.md, 2026-11-10): boards laid across, dark gaps between,
+        // nail heads.
+        static readonly PixelImage DockTile = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['l'] = Rgba.Hex("#C8965E"),
+                ['p'] = Rgba.Hex("#A87444"),
+                ['P'] = Rgba.Hex("#8A5C34"),
+                ['g'] = Rgba.Hex("#3A2618"),
+                ['n'] = Rgba.Hex("#5A4A40"),
+            },
+            "llllllllllllllll",
+            "pnpppppppppppnpp",
+            "pppppppPpppppppp",
+            "PPPPPPPPPPPPPPPP",
+            "gggggggggggggggg",
+            "llllllllllllllll",
+            "ppppnpppppppppnp",
+            "pppppPpppppppppp",
+            "PPPPPPPPPPPPPPPP",
+            "gggggggggggggggg",
+            "llllllllllllllll",
+            "pnppppppppnppppp",
+            "pppppppppppPpppp",
+            "PPPPPPPPPPPPPPPP",
+            "gggggggggggggggg",
+            "llllllllllllllll");
+
+        // A mine's rails (2026-11-10): two iron rails running north and south on wooden sleepers over packed earth.
+        static readonly PixelImage RailTile = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['e'] = Rgba.Hex("#6E5C4A"),
+                ['E'] = Rgba.Hex("#5E4E40"),
+                ['s'] = Rgba.Hex("#8A6440"),
+                ['S'] = Rgba.Hex("#64462C"),
+                ['r'] = Rgba.Hex("#C4CAD4"),
+                ['R'] = Rgba.Hex("#727886"),
+            },
+            "eeerReeeeeerReee",
+            "eEerReeeeEerReee",
+            "ssSrRsssssSrRsSs",
+            "SSSrRSSSSSSrRSSS",
+            "eeerReeeeeerReEe",
+            "eeerReeEeeerReee",
+            "eEerReeeeeerReee",
+            "ssSrRsssssSrRsSs",
+            "SSSrRSSSSSSrRSSS",
+            "eeerReeeeEerReee",
+            "eeerReeeeeerReee",
+            "EeerReeeeeerReeE",
+            "ssSrRsssssSrRsSs",
+            "SSSrRSSSSSSrRSSS",
+            "eeerReeEeeerReee",
+            "eeerReeeeeerReee");
+
         // A place's waypoint (Docs/Story.md): a ring of carved stone round a pool of blue light.
         static readonly PixelImage WaypointTile = PixelImage.FromRows(new Dictionary<char, Rgba>
             {
@@ -1845,6 +1904,11 @@ namespace Game.Client
         static readonly PixelImage SmithAwning = Restriped(MerchantAwning, "#4A4444", "#3A3434", "#E8783A", "#B8562A");
         static readonly PixelImage FisherAwning = Restriped(MerchantAwning, "#3E7FD0", "#2E5FA0", "#F6F2E8", "#C8C0B0");
         static readonly PixelImage AlchemyAwning = Restriped(MerchantAwning, "#9A5CD8", "#6E3CA8", "#E8F6E0", "#B8D0A8");
+        // The shops in the places of the story (2026-11-10): royal red and gold, demon purple and bone, the ore seller's
+        // rust and grey.
+        static readonly PixelImage RoyalAwning = Restriped(MerchantAwning, "#C8323A", "#8A1E2A", "#F0BE40", "#B8862A");
+        static readonly PixelImage DemonAwning = Restriped(MerchantAwning, "#581A34", "#380E22", "#E2DCCA", "#B4AC96");
+        static readonly PixelImage OreAwning = Restriped(MerchantAwning, "#985028", "#603018", "#9A9488", "#6E6A62");
 
         // The awning for a person's stall, or null for any other tile.
         public static PixelImage Awning(TileType stall) => stall switch
@@ -1853,6 +1917,9 @@ namespace Game.Client
             TileType.SmithStall => SmithAwning,
             TileType.FisherHut => FisherAwning,
             TileType.AlchemyTable => AlchemyAwning,
+            TileType.RoyalStall => RoyalAwning,
+            TileType.DemonStall => DemonAwning,
+            TileType.OreStall => OreAwning,
             _ => null,
         };
 

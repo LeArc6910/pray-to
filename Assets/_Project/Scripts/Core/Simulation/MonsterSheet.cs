@@ -16,6 +16,10 @@ namespace Game.Core
 
     public sealed class MonsterDefinition
     {
+        // The place of the story (places.csv id) this monster keeps to (2026-11-10): it comes only round that place,
+        // whatever the zone's level or the biome, and only such monsters come there. Null for the caves at large.
+        public string Place { get; internal set; }
+
         internal MonsterDefinition(
             string id,
             string name,
@@ -205,7 +209,7 @@ namespace Game.Core
                         color,
                         biome,
                         resists,
-                        element));
+                        element) { Place = row["place"].Length == 0 ? null : row["place"] });
                 }
                 catch (FormatException e)
                 {

@@ -57,6 +57,10 @@ namespace Game.Client
                 "blacksmith" => Blacksmith(color, frame),
                 "fisher" => Fisher(color, frame),
                 "alchemist" => Alchemist(color, frame),
+                // The people who keep shop in the places of the story stand in a look of the story's people.
+                "royal_trader" => Look("villager", color, frame),
+                "demon_trader" => Look("demon", color, frame),
+                "ore_trader" => Look("elder", color, frame),
                 _ => null,
             };
         }

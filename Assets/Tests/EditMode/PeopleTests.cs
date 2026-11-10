@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 using static Game.Core.Tests.Builds;
@@ -33,15 +34,45 @@ namespace Game.Core.Tests
         public void FourPeopleEachWithAStallAndAShop()
         {
             Assert.IsTrue(People.Shipped.Success, string.Join("\n", People.Shipped.Errors));
-            CollectionAssert.AreEqual(new[] { "merchant", "blacksmith", "fisher", "alchemist" }, People.Shipped.Npcs.Select(n => n.Id));
+            CollectionAssert.AreEqual(new[] { "merchant", "blacksmith", "fisher", "alchemist", "royal_trader", "demon_trader", "ore_trader" },
+                People.Shipped.Npcs.Select(n => n.Id));
             Assert.AreEqual(3, People.Shipped.StoryOf(Person("alchemist")).Count, "the alchemist has a story too");
             var world = Town("blacksmith", out _);
             foreach (var npc in People.Shipped.Npcs)
             {
-                Assert.AreEqual(1, Enumerable.Range(0, 24).Sum(y => Enumerable.Range(0, 24).Count(x => world.Map[x, y] == npc.Tile)), npc.Id);
+                // The four by the spawn stand there; those who keep shop in a place of the story stand nowhere in a world
+                // without the story's places.
+                Assert.AreEqual(npc.Place == null ? 1 : 0, Enumerable.Range(0, 24).Sum(y => Enumerable.Range(0, 24).Count(x => world.Map[x, y] == npc.Tile)), npc.Id);
                 Assert.IsNotEmpty(World.ShopFor(People.Shipped, 3, npc), $"{npc.Id} sells something");
             }
             Assert.IsTrue(World.ShopFor(People.Shipped, 3, Person("blacksmith")).All(e => e.Npc == Person("blacksmith")));
+        }
+
+        // The people who keep shop in the places of the story (2026-11-10): each stall in its own place, with the
+        // tile in front of it walked to from the waypoint, on every seed.
+        [Test]
+        public void TheTradersOfThePlacesStandInTheirPlaces([Range(1, 12)] int seed)
+        {
+            var host = new WorldHost((ulong)seed, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped,
+                Tiles.Shipped, npcs: People.Shipped, story: Tales.Shipped);
+            var world = host.World;
+            foreach (var npc in People.Shipped.Npcs.Where(n => n.Place != null))
+            {
+                var site = world.Places.Single(p => p.Definition.Id == npc.Place);
+                var stalls = new List<(int X, int Y)>();
+                for (int y = 0; y < world.Map.Height; y++)
+                    for (int x = 0; x < world.Map.Width; x++)
+                        if (world.Map[x, y] == npc.Tile) stalls.Add((x, y));
+                Assert.AreEqual(1, stalls.Count, $"seed {seed}: {npc.Id}");
+                var (sx, sy) = stalls[0];
+                Assert.IsTrue(site.Contains(TileMap.Center(sx, sy)), $"seed {seed}: {npc.Id} outside {npc.Place}");
+                var field = new FlowField(world.Map);
+                field.Build(new[] { site.Center }, int.MaxValue - 1);
+                Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(sx, sy - 1), $"seed {seed}: nowhere to trade with {npc.Id} from");
+                var player = world.AddPlayer("a", null);
+                player.Position = TileMap.Center(sx, sy - 1);
+                Assert.AreSame(npc, world.NpcNear(player.Position)?.Npc, $"seed {seed}: in front of {npc.Id}");
+            }
         }
 
         [Test]
