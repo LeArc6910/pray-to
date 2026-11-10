@@ -461,6 +461,63 @@ namespace Game.Client
             StoryPeople(Path.Combine(folder, "story_people.gif"), floor);
             Animals(Path.Combine(folder, "animals.gif"), floor);
             Decor(Path.Combine(folder, "decor.gif"), sword, floor);
+            Standing(Path.Combine(folder, "structures.gif"), sword);
+        }
+
+        // Structures standing on the floor (2026-11-10, PropArt): a player walks round a cottage, in front of it and
+        // then behind it, where the roof hides them. Props sort as WorldView.DrawProps does (10000 - y*10 from the
+        // bottom edge of the anchor tile) and people as WorldView.Place (10000 - y*10 from their centre).
+        static void Standing(string path, ItemBase sword)
+        {
+            var walker = new Player { Weapon = sword, Facing = new Vec2(1, 0) };
+            var props = new (TileType Type, int X, int Y)[]
+            {
+                (TileType.Cottage, -2, 0), (TileType.LampPost, -4, 1), (TileType.Barrel, 3, 0), (TileType.Crates, 3, 1),
+                (TileType.Flowerbed, -4, -1), (TileType.Bench, 3, 3), (TileType.MushroomTree, -5, 3),
+            };
+            // The way round: along the front, up the right side, along the back, down the left side.
+            var corners = new[] { new Vec2(-2.6f, -0.9f), new Vec2(2.6f, -0.9f), new Vec2(2.6f, 3.6f), new Vec2(-2.6f, 3.6f) };
+            float perimeter = 0;
+            for (int i = 0; i < 4; i++) perimeter += (corners[(i + 1) % 4] - corners[i]).Length;
+            const float seconds = 8;
+            Play(path, 1, 1, 160, 112, 3, 5f / 7, seconds, TileArt.Object(TileType.StoneFloor), (column, row, time, step) =>
+            {
+                var draws = new List<Draw>();
+                foreach (var (type, x, y) in props)
+                {
+                    int w = Structures.Footprint(type).W;
+                    draws.Add(Sprite(PropArt.Prop(type), x + w / 2f, y, 0.5f, 0, 10000 - y * 10));
+                }
+                float along = time / seconds * perimeter;
+                var at = corners[0];
+                var facing = new Vec2(1, 0);
+                for (int i = 0; i < 4; i++)
+                {
+                    var from = corners[i];
+                    var to = corners[(i + 1) % 4];
+                    float length = (to - from).Length;
+                    if (along <= length)
+                    {
+                        facing = (to - from) * (1 / length);
+                        at = from + facing * along;
+                        break;
+                    }
+                    along -= length;
+                }
+                walker.Facing = facing;
+                walker.Moving = true;
+                int lift = -(int)MathF.Round(at.Y * 10);
+                foreach (var d in walker.Frame(time, step))
+                {
+                    var moved = d;
+                    moved.X += at.X;
+                    moved.Y += at.Y;
+                    // The foot shadow stays under everything; the body and what it holds sort by where they stand.
+                    if (moved.Order > 0) moved.Order += lift;
+                    draws.Add(moved);
+                }
+                return draws;
+            });
         }
 
         // A room (2026-11-09): a back wall hung with tapestries and shields, the three rugs on the floor, and a door in
