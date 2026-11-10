@@ -138,6 +138,24 @@ namespace Game.Core.Tests
             }
         }
 
+        // The royal city's gates are cut where the roads come in, and its towers and great fountains are set clear of
+        // them rather than cut away with the wall (2026-11-10): all four towers and both fountains, on every seed.
+        [Test]
+        public void TheRoyalCityKeepsItsTowersAndFountainsClearOfTheGates([Range(1, 24)] int seed)
+        {
+            var world = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
+            var city = world.Places.Single(p => p.Definition.Style == "kingdom");
+            int towers = 0, fountains = 0;
+            for (int y = city.Y - city.Radius; y <= city.Y + city.Radius; y++)
+                for (int x = city.X - city.Radius; x <= city.X + city.Radius; x++)
+                {
+                    if (world.Map[x, y] == TileType.Tower) towers++;
+                    if (world.Map[x, y] == TileType.BigFountain) fountains++;
+                }
+            Assert.AreEqual(4, towers, $"seed {seed}: towers");
+            Assert.AreEqual(2, fountains, $"seed {seed}: great fountains");
+        }
+
         // The open tiles walked to from (x, y) within reach of it.
         static HashSet<(int, int)> Walked(TileMap map, int cx, int cy, int reach)
         {

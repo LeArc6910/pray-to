@@ -274,6 +274,44 @@ namespace Game.Core
                 int x = cx + dx, y = cy + dy;
                 if (IsInside(map, x, y) && dx * dx + dy * dy <= r * r && map[x, y] == place.Floor && !(dx == 0 && dy == 0)) map[x, y] = floor;
             }
+            // Where Open will cut a gate (2026-11-10): from each road that comes up to the plaza, a way three wide
+            // straight to the middle. The royal city sets its towers and fountains clear of these rather than lose
+            // them to the gate.
+            var gates = new HashSet<(int X, int Y)>();
+            int reach = r + 2;
+            for (int y = cy - reach; y <= cy + reach; y++)
+            {
+                for (int x = cx - reach; x <= cx + reach; x++)
+                {
+                    int d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+                    if (!IsInside(map, x, y) || map[x, y] != TileType.Road || d <= r * r || d > reach * reach) continue;
+                    foreach (var (lx, ly) in Line(x, y, cx, cy))
+                        for (int ty = ly - TunnelHalfWidth; ty <= ly + TunnelHalfWidth; ty++)
+                            for (int tx = lx - TunnelHalfWidth; tx <= lx + TunnelHalfWidth; tx++)
+                                gates.Add((tx - cx, ty - cy));
+                }
+            }
+            // At the first of the spots where all of the structure fits clear of the gates (and, when inner, inside
+            // the castle wall's ring).
+            void PutClear(TileType type, bool inner, params (int X, int Y)[] spots)
+            {
+                var (w, h) = Structures.Footprint(type);
+                foreach (var (dx, dy) in spots)
+                {
+                    bool fits = true;
+                    for (int j = 0; j < h && fits; j++)
+                    {
+                        for (int i = 0; i < w && fits; i++)
+                        {
+                            int x = dx + i, y = dy + j;
+                            fits = Free(x, y) && !gates.Contains((x, y)) && (!inner || x * x + y * y <= (r - 2) * (r - 2));
+                        }
+                    }
+                    if (!fits) continue;
+                    Put(dx, dy, type);
+                    return;
+                }
+            }
             void Lamps(TileType lamp)
             {
                 foreach (int w in new[] { 2, 6, 10, 14 }) Put(Ways[w].X * (r - 1) / 1000, Ways[w].Y * (r - 1) / 1000, lamp);
@@ -308,11 +346,12 @@ namespace Game.Core
                 case "kingdom":
                     // Towers on the four corners of a castle wall round the edge (gates are opened where the roads
                     // come in, by Open), a red carpet up the middle to the throne, statues at the gate, pillars, two
-                    // great fountains, hedges, flowerbeds, royal banners and lamp posts.
-                    Put(6, 6, TileType.Tower);
-                    Put(-7, 6, TileType.Tower);
-                    Put(6, -7, TileType.Tower);
-                    Put(-7, -7, TileType.Tower);
+                    // great fountains, hedges, flowerbeds, royal banners and lamp posts. A tower whose corner a gate
+                    // comes through stands further along the wall, and a fountain in a gate's way moves to another
+                    // spot inside, so the gate takes neither away.
+                    var corner = new[] { (6, 6), (7, 4), (4, 7), (8, 2), (2, 8) };
+                    foreach (var (sx, sy) in new[] { (1, 1), (-1, 1), (1, -1), (-1, -1) })
+                        PutClear(TileType.Tower, false, corner.Select(c => (sx > 0 ? c.Item1 : -c.Item1 - 1, sy > 0 ? c.Item2 : -c.Item2 - 1)).ToArray());
                     for (int dy = -r; dy <= r; dy++)
                         for (int dx = -r; dx <= r; dx++)
                         {
@@ -326,7 +365,9 @@ namespace Game.Core
                     Both(2, r - 3, TileType.Pillar);
                     foreach (int dy in new[] { -5, -2, 2 }) Both(3, dy, TileType.Pillar);
                     Both(2, -r + 2, TileType.Statue);
-                    Both(5, -3, TileType.BigFountain);
+                    var basin = new[] { (5, -3), (5, -5), (5, 1), (4, 5) };
+                    PutClear(TileType.BigFountain, true, basin);
+                    PutClear(TileType.BigFountain, true, basin.Select(b => (-b.Item1 - 1, b.Item2)).ToArray());
                     foreach (int dx in new[] { 6, 7 }) Both(dx, 1, TileType.Hedge);
                     Both(5, 4, TileType.RoyalBanner);
                     Both(5, -6, TileType.Flowerbed);
