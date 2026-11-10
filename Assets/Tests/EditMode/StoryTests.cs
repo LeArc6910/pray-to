@@ -166,6 +166,26 @@ namespace Game.Core.Tests
                     if (world.Map[x, y] == TileType.LampPost) lamps.Add((x - city.X, y - city.Y));
             Assert.AreEqual(2, lamps.Count, $"seed {seed}: lamp posts");
             Assert.AreEqual((0, lamps[0].Y), (lamps[0].X + lamps[1].X, lamps[1].Y), $"seed {seed}: lamp posts not mirrored");
+            // And the small things: each has its mirror (2026-11-10), moved rather than left out where a spot holds
+            // both, so at least two pairs of pillars and four pairs of the rest still stand.
+            for (int y = city.Y - city.Radius; y <= city.Y + city.Radius; y++)
+                for (int x = city.X - city.Radius; x <= city.X + city.Radius; x++)
+                {
+                    var type = world.Map[x, y];
+                    if (!Structures.IsDecor(type) || type == TileType.StructurePart || type == TileType.CastleWall || type == TileType.Tower) continue;
+                    int mirror = city.X - (x - city.X) - Structures.Footprint(type).W + 1;
+                    Assert.AreEqual(type, world.Map[mirror, y], $"seed {seed}: {type} at {x - city.X},{y - city.Y} has no mirror");
+                }
+            int pillars = 0, small = 0;
+            for (int y = city.Y - city.Radius; y <= city.Y + city.Radius; y++)
+                for (int x = city.X - city.Radius; x <= city.X + city.Radius; x++)
+                {
+                    var type = world.Map[x, y];
+                    if (type == TileType.Pillar) pillars++;
+                    if (type == TileType.Statue || type == TileType.Hedge || type == TileType.RoyalBanner || type == TileType.Flowerbed) small++;
+                }
+            Assert.GreaterOrEqual(pillars, 4, $"seed {seed}: pillars");
+            Assert.GreaterOrEqual(small, 8, $"seed {seed}: statues, hedges, banners and flowerbeds");
         }
 
         // The open tiles walked to from (x, y) within reach of it.

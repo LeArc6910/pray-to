@@ -331,17 +331,56 @@ namespace Game.Core
             }
             // A pair mirrored across the middle at the first of the spots (given on the right) where both stand clear,
             // so a gate on one side moves both alike (2026-11-10); where no spot holds both, each takes its own.
-            void PutPair(TileType type, bool inner, params (int X, int Y)[] spots)
+            void PutPair(TileType type, bool inner, params (int X, int Y)[] spots) => PutMirrored(type, inner, true, spots);
+            // The same for small things, which rather than stand alone are left out, so the place stays mirrored.
+            void PutSmall(TileType type, params (int X, int Y)[] spots) => PutMirrored(type, true, false, spots);
+            // A row of small things of one type, moved whole with its mirror to the first of the shifts where all
+            // of both stand clear.
+            void PutRow(TileType type, (int X, int Y)[] row, params (int X, int Y)[] shifts)
+            {
+                foreach (var (sx, sy) in shifts)
+                {
+                    bool clear = row.All(t => Clear(type, true, t.X + sx, t.Y + sy) && Clear(type, true, -(t.X + sx), t.Y + sy));
+                    if (!clear) continue;
+                    foreach (var (tx, ty) in row)
+                    {
+                        Put(tx + sx, ty + sy, type);
+                        Put(-(tx + sx), ty + sy, type);
+                    }
+                    return;
+                }
+            }
+            // Just behind a tower or a house, whose picture stands two tiles above its footprint and would hide it.
+            bool Behind(int dx, int dy)
+            {
+                int x = cx + dx, y = cy + dy;
+                for (int ay = y - 5; ay < y; ay++)
+                {
+                    for (int ax = x - 3; ax <= x; ax++)
+                    {
+                        if (!IsInside(map, ax, ay)) continue;
+                        var t = map[ax, ay];
+                        if (t != TileType.Tower && t != TileType.Cottage && t != TileType.Cabin) continue;
+                        var (w, h) = Structures.Footprint(t);
+                        if (x < ax + w && y >= ay + h && y < ay + h + 2) return true;
+                    }
+                }
+                return false;
+            }
+            void PutMirrored(TileType type, bool inner, bool alone, (int X, int Y)[] spots)
             {
                 int w = Structures.Footprint(type).W;
                 var mirrored = spots.Select(s => (-s.X - w + 1, s.Y)).ToArray();
                 for (int k = 0; k < spots.Length; k++)
                 {
                     if (!Clear(type, inner, spots[k].X, spots[k].Y) || !Clear(type, inner, mirrored[k].Item1, mirrored[k].Item2)) continue;
+                    // A small thing would be lost behind a big one.
+                    if (!alone && (Behind(spots[k].X, spots[k].Y) || Behind(mirrored[k].Item1, mirrored[k].Item2))) continue;
                     Put(spots[k].X, spots[k].Y, type);
                     Put(mirrored[k].Item1, mirrored[k].Item2, type);
                     return;
                 }
+                if (!alone) return;
                 PutClear(type, inner, spots);
                 PutClear(type, inner, mirrored);
             }
@@ -379,10 +418,10 @@ namespace Game.Core
                 case "kingdom":
                     // Towers on the four corners of a castle wall round the edge (gates are opened where the roads
                     // come in, by Open), a red carpet up the middle to the throne, statues by its south end, pillars,
-                    // two great fountains, hedges, flowerbeds, royal banners and lamp posts. Gates take away what
-                    // small things are in their way, but not the towers, fountains or lamp posts (2026-11-10): a pair
-                    // of them one of which is in a gate's way moves both alike, the towers along the wall and the
-                    // fountains and lamps to another spot inside, so they stay mirrored.
+                    // two great fountains, hedges, flowerbeds, royal banners and lamp posts. All of it is mirrored left
+                    // and right (2026-11-10): a pair one of which is in a gate's way moves both alike to the next spot
+                    // where both stand clear, the towers along the wall and the rest inside it. Towers and fountains
+                    // always stand, alone if no spot holds both; a small pair with no spot for both is left out.
                     var corner = new[] { (6, 6), (7, 4), (4, 7), (8, 2), (2, 8) };
                     PutPair(TileType.Tower, false, corner);
                     PutPair(TileType.Tower, false, corner.Select(c => (c.Item1, -c.Item2 - 1)).ToArray());
@@ -396,21 +435,22 @@ namespace Game.Core
                         for (int dx = -1; dx <= 1; dx++)
                             Lay(dx, dy, TileType.RedCarpet);
                     Put(0, r - 3, TileType.Throne);
-                    Both(2, r - 3, TileType.Pillar);
-                    foreach (int dy in new[] { -5, -2, 2 }) Both(3, dy, TileType.Pillar);
-                    // Just inside the wall: on its ring they never stood (the wall is laid first).
-                    Both(2, -r + 3, TileType.Statue);
+                    PutSmall(TileType.Pillar, (2, r - 3), (3, r - 3), (3, r - 4));
+                    // The row of pillars along the carpet, each a step along or out if a gate is in its way. Statues
+                    // stand just inside the wall (on its ring they never stood: the wall is laid first).
+                    foreach (int dy in new[] { -5, -2, 2 })
+                        PutSmall(TileType.Pillar, (3, dy), (3, dy + 1), (3, dy - 1), (4, dy), (2, dy), (4, dy + 1), (4, dy - 1), (2, dy + 1), (2, dy - 1));
+                    PutSmall(TileType.Statue, (2, -r + 3), (3, -r + 3), (2, -r + 4), (3, -r + 4), (4, -r + 4), (4, -r + 5), (5, -r + 5));
                     var basins = new[] { (5, -3), (5, -5), (5, 1), (4, 5) };
                     PutPair(TileType.BigFountain, true, basins);
-                    foreach (int dx in new[] { 6, 7 }) Both(dx, 1, TileType.Hedge);
-                    Both(5, 4, TileType.RoyalBanner);
-                    Both(5, -6, TileType.Flowerbed);
-                    // Lamp posts beside the fountains, a pair like them: on the carpet side, or the other side where a
-                    // gate is in the way.
+                    PutRow(TileType.Hedge, new[] { (6, 1), (7, 1) }, (0, 0), (0, 1), (0, -1), (0, 2), (0, -2), (-1, 3));
+                    PutSmall(TileType.RoyalBanner, (5, 4), (4, 4), (6, 4), (5, 5), (5, 3));
+                    PutSmall(TileType.Flowerbed, (5, -6), (4, -6), (6, -5), (4, -5), (6, -4), (2, -4), (2, -3), (6, -1));
+                    // Lamp posts beside the fountains: on the carpet side, or the other side where a gate is in the way.
                     foreach (var (fx, fy) in basins)
                     {
                         if (map[cx + fx, cy + fy] != TileType.BigFountain) continue;
-                        PutPair(TileType.LampPost, true, (fx - 1, fy), (fx + 2, fy), (fx - 1, fy + 1), (fx + 2, fy + 1));
+                        PutSmall(TileType.LampPost, (fx - 1, fy), (fx + 2, fy), (fx - 1, fy + 1), (fx + 2, fy + 1));
                         break;
                     }
                     wanted.Add((cx, cy + r - 4));
