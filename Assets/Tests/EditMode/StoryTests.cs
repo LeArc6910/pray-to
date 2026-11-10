@@ -351,6 +351,79 @@ namespace Game.Core.Tests
             Assert.Greater(player.Corrections, corrections, "the client snaps there");
         }
 
+        // Choices (2026-11-10, story.csv choices and next): the queen asks at step 9; talking takes the step but does not
+        // finish it, an answer finishes it and leads to step 10 or 11, and each branch ends the story so far.
+        [Test]
+        public void TheQueensQuestionBranchesTheStory([Values(0, 1)] int answer)
+        {
+            var asks = Tales.Shipped.Steps[8];
+            Assert.AreEqual(2, asks.Choices.Count);
+            Assert.AreEqual(9, asks.Choices[0].Step);
+            Assert.AreEqual(10, asks.Choices[1].Step);
+            Assert.AreEqual(Tales.Shipped.Steps.Count, Tales.Shipped.Steps[9].Next, "the first branch ends, not into the second");
+
+            var host = Host();
+            var world = host.World;
+            var player = world.AddPlayer("a", null);
+            var queen = world.Places.SelectMany(p => p.People).Single(p => p.Character.Id == "queen");
+            world.RestoreJourney(player, 8, false, null);
+            player.Position = Beside(queen.At);
+            int coins = player.Inventory.CountOf(Gear.Data.FindMaterial("coin"));
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.AreEqual(8, player.JourneyStep, "talking does not answer");
+            Assert.IsTrue(player.JourneyTaken);
+            Assert.IsFalse(world.ChooseInStory(player.Id, 2), "no third answer");
+            Assert.IsTrue(world.ChooseInStory(player.Id, answer));
+            Assert.AreEqual(9 + answer, player.JourneyStep);
+            Assert.AreEqual(answer, player.StoryChoices[8]);
+            Assert.AreEqual(coins + 150, player.Inventory.CountOf(Gear.Data.FindMaterial("coin")), "the step's reward");
+
+            // The queen answers in turn, and that is the end of the story so far.
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.AreEqual(Tales.Shipped.Steps.Count, player.JourneyStep);
+            Assert.IsNull(world.StepOf(player));
+        }
+
+        [Test]
+        public void ChoicesAreRememberedInTheSaveAndSentToTheClient()
+        {
+            var bytes = CharacterSave.Write(new Equipment(), new Inventory(), 10, journeyStep: 10, waypoints: new[] { "dawn_village" },
+                storyChoices: new[] { (8, 1) });
+            var saved = CharacterSave.Read(bytes, Gear.Data);
+            CollectionAssert.AreEqual(new[] { (8, 1) }, saved.StoryChoices);
+
+            var host = Host();
+            var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped)
+            {
+                Story = Tales.Shipped,
+                Character = bytes,
+            };
+            host.Receive(1, client.JoinMessage());
+            for (int i = 0; i < 4; i++)
+            {
+                host.Tick();
+                foreach (var message in host.TakeOutgoing()) client.Receive(message.Data);
+            }
+            Assert.AreEqual(1, client.StoryChoices[8]);
+            var back = CharacterSave.Read(client.SaveCharacter(), Gear.Data);
+            CollectionAssert.AreEqual(new[] { (8, 1) }, back.StoryChoices);
+        }
+
+        [Test]
+        public void ChoicesOnlyWhereNothingIsAskedAndToStepsThatAre()
+        {
+            var data = StorySheet.Parse(
+                "id,name,distance,radius,road\na,가,0,7,\n",
+                "id,name,place\np,사람,a\n",
+                "step,title,who,lines,goal,choices,next\n1,하나,p,안녕,,예>9|아니오>1,\n2,둘,p,안녕,,하나뿐>1,\n3,셋,p,안녕,,,7\n4,넷,p,안녕,reach:a,예>2|아니오>1,\n",
+                Gear.Data, Bosses.Shipped);
+            string all = string.Join("\n", data.Errors);
+            StringAssert.Contains("choices는 goal이 빈 단계", all);
+            StringAssert.Contains("choices의 step '9'", all);
+            StringAssert.Contains("choices는 둘 이상", all);
+            StringAssert.Contains("next '7'", all);
+        }
+
         [Test]
         public void TheStoryOutlivesTheCharacterSaveAndReachesTheClient()
         {

@@ -199,8 +199,28 @@ namespace Game.Client
             TileType.MineCart => MineCart(),
             TileType.OrePile => OrePile(),
             TileType.Lantern => Lantern(),
+            // The things players build, standing too (2026-11-10, Stands).
+            TileType.Workbench => Workbench(),
+            TileType.Furnace => Furnace(),
+            TileType.Chest => Chest(),
+            TileType.Anvil => Anvil(),
+            TileType.Bed => Bed(),
+            TileType.Table => StoneTable(),
+            TileType.Torch => Torch(),
+            TileType.Lamp => GlowLamp(),
+            TileType.Pot => MushroomPot(),
+            TileType.Banner => Banner(Paint, Gold, demon: false),
+            TileType.WardStone => WardStone(),
+            TileType.RiftAltar => RiftAltar(),
             _ => null,
         };
+
+        // The things players build that stand on the floor like the structures (2026-11-10, 사람이 고른 다음 작업 1번):
+        // the crafting stations, the chest, the bed and the furniture. Machines with moving parts drawn over them stay
+        // tiles, so their parts are not hidden.
+        public static bool Stands(TileType type) => type == TileType.Workbench || type == TileType.Furnace || type == TileType.Chest
+            || type == TileType.Anvil || type == TileType.Bed || type == TileType.Table || type == TileType.Torch || type == TileType.Lamp
+            || type == TileType.Pot || type == TileType.Banner || type == TileType.WardStone || type == TileType.RiftAltar;
 
         // Every structure, for the preview tool.
         public static readonly TileType[] All =
@@ -212,6 +232,8 @@ namespace Game.Client
             TileType.Brazier, TileType.Fountain, TileType.Tent,
             TileType.Boat, TileType.Lighthouse, TileType.NetRack, TileType.Bollard, TileType.Anchor, TileType.BrokenPillar, TileType.FallenColumn,
             TileType.Rubble, TileType.RuneStone, TileType.Altar, TileType.MineEntrance, TileType.MineCart, TileType.OrePile, TileType.Lantern,
+            TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Anvil, TileType.Bed, TileType.Table, TileType.Torch, TileType.Lamp,
+            TileType.Pot, TileType.Banner, TileType.WardStone, TileType.RiftAltar,
         };
 
         // A wall block: its top face over its tile (shifted up by its height, so a wall in front hides this one's foot)
@@ -1097,6 +1119,162 @@ namespace Game.Client
             Rect(body, 9, 15, 5, 1, Iron.Dark);
             Box(body, 2, 32, 7, 1, 2, DarkWood);
             return Finish(body, ShadowLayer(T, 36, 7, 34, 5, 1.5f));
+        }
+
+        // ---- The things players build (2026-11-10) ----
+
+        // A workbench: a plank top with a saw and a hammer on it, a vise at one end, stout legs and a shelf.
+        static PixelImage Workbench()
+        {
+            var body = new PixelImage(T, 22);
+            Box(body, 1, 6, 14, 4, 4, Wood);
+            foreach (int x in new[] { 2, 12 }) Column(body, x, 14, 2, 6, DarkWood);
+            Rect(body, 3, 17, 10, 1, DarkWood.Main);
+            Rect(body, 3, 7, 6, 1, Iron.Light);
+            for (int i = 0; i < 3; i++) body[4 + i * 2, 8] = Iron.Shade;
+            Rect(body, 10, 5, 1, 4, DarkWood.Main);
+            Rect(body, 9, 5, 3, 1, Iron.Main);
+            Box(body, 12, 3, 3, 2, 2, Iron);
+            return Finish(body, ShadowLayer(T, 22, 9, 20, 7, 2));
+        }
+
+        // A furnace of stone: a block with the fire glowing in its arched mouth, a chimney at the back.
+        static PixelImage Furnace()
+        {
+            var body = new PixelImage(T, 26);
+            Column(body, 10, 1, 4, 8, DarkStone);
+            Box(body, 1, 6, 14, 3, 16, Stone);
+            for (int y = 11; y < 21; y += 3)
+                for (int x = 2; x < 14; x++)
+                    if ((x + y) % 5 == 0) body[x, y] = Stone.Shade;
+            Rect(body, 5, 13, 6, 7, Ink);
+            Rect(body, 6, 12, 4, 1, Ink);
+            Rect(body, 6, 15, 4, 5, Flame);
+            Rect(body, 7, 16, 2, 3, FlameCore);
+            return Finish(body, ShadowLayer(T, 26, 9, 24, 7, 2));
+        }
+
+        // A wooden chest bound in iron with a gold lock.
+        static PixelImage Chest()
+        {
+            var body = new PixelImage(T, 18);
+            Box(body, 1, 3, 14, 4, 9, Wood);
+            Rect(body, 1, 7, 14, 1, Wood.Dark);
+            foreach (int x in new[] { 3, 12 }) Rect(body, x, 3, 1, 13, Iron.Main);
+            Rect(body, 7, 7, 2, 3, Gold.Main);
+            body[7, 7] = Gold.Light;
+            return Finish(body, ShadowLayer(T, 18, 9, 16, 7, 2));
+        }
+
+        // An anvil on a stump: the face and horn of iron, the waist narrowing to the foot.
+        static PixelImage Anvil()
+        {
+            var body = new PixelImage(T, 20);
+            Column(body, 4, 11, 8, 7, Wood);
+            LitOval(body, 8, 11, 4, 1.5f, Wood);
+            Rect(body, 6, 7, 4, 4, Iron.Shade);
+            Box(body, 3, 3, 10, 2, 3, Iron);
+            for (int i = 0; i < 3; i++) Rect(body, 0 + i, 4, 3 - i, 1, Iron.Main);
+            body[1, 4] = Iron.Light;
+            return Finish(body, ShadowLayer(T, 20, 9, 18, 6, 2));
+        }
+
+        // A bed: the headboard at the back, a pillow, a blanket over the mattress, the frame's foot in front.
+        static PixelImage Bed()
+        {
+            var body = new PixelImage(T, 24);
+            Box(body, 1, 1, 14, 2, 6, Wood);
+            Box(body, 2, 7, 12, 12, 2, Cream);
+            LitOval(body, 8, 9, 4, 1.8f, Cream);
+            Rect(body, 2, 12, 12, 7, Paint.Main);
+            Rect(body, 2, 12, 12, 1, Paint.Light);
+            Rect(body, 12, 12, 2, 7, Paint.Shade);
+            Box(body, 1, 18, 14, 1, 3, Wood);
+            return Finish(body, ShadowLayer(T, 24, 9, 22, 7, 2));
+        }
+
+        // A stone table: a slab on two thick legs.
+        static PixelImage StoneTable()
+        {
+            var body = new PixelImage(T, 18);
+            Box(body, 1, 4, 14, 4, 3, Stone);
+            foreach (int x in new[] { 3, 10 }) Column(body, x, 11, 3, 5, Stone);
+            return Finish(body, ShadowLayer(T, 18, 9, 16, 7, 2));
+        }
+
+        // A torch on a short post, its flame burning.
+        static PixelImage Torch()
+        {
+            var body = new PixelImage(T, 24);
+            Column(body, 7, 9, 2, 13, Wood);
+            Rect(body, 6, 8, 4, 2, Iron.Main);
+            for (int y = 1; y < 8; y++)
+            {
+                int half = y < 3 ? 0 : y < 6 ? 1 : 2;
+                for (int x = 8 - half; x <= 7 + half; x++) body[x, y] = Math.Abs(x - 7.5f) < half * 0.6f || y < 4 ? FlameCore : Flame;
+            }
+            return Finish(body, ShadowLayer(T, 24, 9, 22, 4, 1.5f));
+        }
+
+        // A lamp of glowing mushrooms: a pale stem and a bright cyan cap.
+        static PixelImage GlowLamp()
+        {
+            var body = new PixelImage(T, 22);
+            Column(body, 7, 9, 3, 11, Cream);
+            var glow = new Ramp(Rgba.Hex("#E2FFF8"), Rgba.Hex("#6FE8D0"), Rgba.Hex("#3AA898"), Rgba.Hex("#1E6A60"));
+            LitOval(body, 8, 7, 6, 4, glow);
+            foreach (var (x, y) in new[] { (5, 6), (9, 5), (11, 8) }) body[x, y] = Rgba.White;
+            Box(body, 4, 19, 8, 1, 2, DarkStone);
+            return Finish(body, ShadowLayer(T, 22, 9, 20, 6, 2));
+        }
+
+        // A clay pot of cave mushrooms.
+        static PixelImage MushroomPot()
+        {
+            var body = new PixelImage(T, 20);
+            Column(body, 3, 11, 10, 7, Copper);
+            LitOval(body, 8, 11, 5, 1.8f, Copper);
+            Oval(body, 8, 11, 4, 1.2f, DarkWood.Dark);
+            foreach (var (x, top) in new[] { (5, 5), (9, 3), (11, 7) })
+            {
+                Rect(body, x, top + 3, 1, 10 - top - 2, Cream.Main);
+                LitOval(body, x + 0.5f, top + 2, 2.5f, 1.6f, Mushroom);
+            }
+            return Finish(body, ShadowLayer(T, 20, 9, 18, 6, 2));
+        }
+
+        // A ward stone: a standing stone with a cyan rune that wards the base.
+        static PixelImage WardStone()
+        {
+            var body = new PixelImage(T, 30);
+            for (int y = 3; y < 26; y++)
+            {
+                float half = Math.Min(5, 3 + (y - 3) * 0.15f);
+                for (int x = (int)(8 - half); x <= (int)(8 + half); x++)
+                {
+                    float t = (x - (8 - half)) / (half * 2);
+                    body[x, y] = t < 0.3f ? Stone.Light : t < 0.7f ? Stone.Main : Stone.Shade;
+                }
+            }
+            var ward = Rgba.Hex("#8CE0FF");
+            foreach (var (x, y) in new[] { (8, 8), (7, 9), (9, 9), (6, 10), (10, 10), (8, 11), (8, 12), (8, 13), (7, 14), (9, 14), (8, 16) }) body[x, y] = y < 12 ? RuneCore : ward;
+            Box(body, 2, 24, 12, 1, 3, Stone);
+            return Finish(body, ShadowLayer(T, 30, 9, 28, 7, 2));
+        }
+
+        // The rift altar: a dark stone altar with a shard of the void floating over it.
+        static PixelImage RiftAltar()
+        {
+            var body = new PixelImage(T, 26);
+            Box(body, 1, 13, 14, 3, 8, DarkStone);
+            Rect(body, 3, 18, 10, 1, Violet.Shade);
+            for (int y = 2; y < 10; y++)
+            {
+                int half = y < 6 ? (y - 2) / 2 : (10 - y) / 2;
+                for (int x = 8 - half; x <= 8 + half; x++) body[x, y] = x < 8 ? Violet.Light : Violet.Main;
+            }
+            body[7, 4] = Rgba.White;
+            return Finish(body, ShadowLayer(T, 26, 9, 24, 7, 2));
         }
 
         // ---- The floor under things ----

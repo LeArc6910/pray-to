@@ -1757,6 +1757,35 @@ async function story(browser) {
   await game.wait(1200);
   s = await game.state();
   check(s.place === 'dawn_village', `웨이포인트로 마을에 돌아간다 (${s.place})`);
+  // A choice (2026-11-10, story.csv choices): the queen asks at step 9; the answer picked leads to step 11, whose words
+  // follow on by themselves, and that is the end of the story so far.
+  await game.send('journey 9; goto person queen');
+  await game.wait(1200);
+  check(await game.press(/여왕 세라핀과 말하기/), '여왕 곁에서 [! 여왕 세라핀과 말하기]');
+  await game.wait(500);
+  pages = 0;
+  while (pages < 12 && (await game.press('다음', undefined, { quiet: true }))) {
+    pages++;
+    await game.wait(250);
+  }
+  const asked = await game.allText();
+  check(/루가 마왕이라고 말한다/.test(asked) && /아무것도 없었다고 한다/.test(asked), '마지막 줄에 고를 말 둘');
+  await game.shot('story-choice', '이야기 고르기');
+  check(await game.press('아무것도 없었다고 한다'), '[아무것도 없었다고 한다]를 고른다');
+  await game.wait(1500);
+  s = await game.state();
+  check(s.journey === 11, `고른 쪽 단계로 간다 (단계 ${s.journey})`);
+  check(/아무것도 없었다라/.test(await game.allText()), '여왕의 다음 말이 바로 이어진다');
+  await game.shot('story-answer', '고른 뒤 이어지는 말');
+  pages = 0;
+  while (pages < 12 && (await game.press('다음', undefined, { quiet: true }))) {
+    pages++;
+    await game.wait(250);
+  }
+  check(await game.press('알겠다'), '이어진 말의 끝에서 [알겠다]');
+  await game.wait(1200);
+  s = await game.state();
+  check(s.journey === 12, `그 갈래로 이야기가 끝난다 (단계 ${s.journey})`);
   await game.context.close();
 }
 
@@ -2015,6 +2044,21 @@ async function firstRun(browser, profile, hourLong) {
         // between it and the rock it saw, two minutes long).
         const open = around.filter(a => /Floor|Road|Carpet|Soil|Dock|Rail/.test(a.tile || ''));
         const blocked = d => !open.some(a => a.dx === d[0] && a.dy === d[1]);
+        // In the village round the spawn with no rock in sight (2026-11-10: the hour bot struck no wall in its fifteen
+        // minutes for the mining skill, wandering the dressed plaza): out away from its middle, where the cave walls
+        // are, as a person heads for the rock they see past the houses.
+        if (!seen) {
+          const me = await game.state();
+          if (me.place) {
+            const ax = me.x - me.spawnX, ay = me.y - me.spawnY;
+            const out = Math.abs(ax) >= Math.abs(ay) ? [Math.sign(ax) || 1, 0] : [0, Math.sign(ay) || 1];
+            if (!blocked(out)) seen = out;
+            else {
+              const side = Math.abs(ax) >= Math.abs(ay) ? [0, Math.sign(ay) || 1] : [Math.sign(ax) || 1, 0];
+              if (!blocked(side)) seen = side;
+            }
+          }
+        }
         if (seen && !blocked(seen)) way = seen;
         else if (blocked(way) && open.length > 0) {
           const pick = open[Math.floor(Math.random() * open.length)];

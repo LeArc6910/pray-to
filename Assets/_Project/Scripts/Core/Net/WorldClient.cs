@@ -375,7 +375,8 @@ namespace Game.Core
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
             Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
             PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)),
-            Classes.Select(c => c.Id), SkillOrder, JourneyStep, JourneyTaken, Waypoints.Select(i => Story?.Places[i].Id).Where(id => id != null));
+            Classes.Select(c => c.Id), SkillOrder, JourneyStep, JourneyTaken, Waypoints.Select(i => Story?.Places[i].Id).Where(id => id != null),
+            StoryChoices.Select(pair => (pair.Key, pair.Value)));
 
         // The names this player gave their pets (Pets.CleanName), by pet id: kept in the character save only, so other
         // players see the kind's name.
@@ -543,6 +544,8 @@ namespace Game.Core
         public int JourneyStep { get; private set; }
         public bool JourneyTaken { get; private set; }
         public HashSet<int> Waypoints { get; } = new HashSet<int>();
+        // The answers this player gave where the story asked, by step index (JourneyMessage).
+        public Dictionary<int, int> StoryChoices { get; } = new Dictionary<int, int>();
         // Goes up whenever the host tells the player's place in the story, for the screen to notice.
         public int JourneyVersion { get; private set; }
 
@@ -553,6 +556,9 @@ namespace Game.Core
         public PlaceSite WaypointNear() => World.WaypointNear(Places, Position);
         public PlaceSite PlaceHere() => Places.FirstOrDefault(p => p.Contains(Position));
         public byte[] TalkStoryCommand() => new InventoryCommandMessage(InventoryCommand.TalkStory, 0).Encode();
+
+        // Answers what the person of the story asked (World.ChooseInStory, 2026-11-10).
+        public byte[] ChooseStoryCommand(int choice) => new InventoryCommandMessage(InventoryCommand.ChooseStory, 0, index: choice).Encode();
         public byte[] TeleportCommand(PlaceDefinition place) => new InventoryCommandMessage(InventoryCommand.Teleport, 0, index: place.Index).Encode();
 
         public byte[] LockDoorCommand() => new InventoryCommandMessage(InventoryCommand.LockDoor, 0).Encode();
@@ -853,6 +859,8 @@ namespace Game.Core
                         JourneyTaken = journey.Taken;
                         Waypoints.Clear();
                         foreach (int index in journey.Waypoints) Waypoints.Add(index);
+                        StoryChoices.Clear();
+                        foreach (var (at, choice) in journey.Choices) StoryChoices[at] = choice;
                         JourneyVersion++;
                         break;
                     case MessageType.Locks:

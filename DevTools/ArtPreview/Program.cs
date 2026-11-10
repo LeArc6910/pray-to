@@ -542,6 +542,15 @@ namespace Game.Client
             Put(-4, 3, TileType.Workbench);
             Put(-3, 3, TileType.Furnace);
             Put(-2, 3, TileType.Chest);
+            // The rest of what stands on the floor (PropArt.Stands, 2026-11-10).
+            Put(-1, 3, TileType.Anvil);
+            Put(1, 3, TileType.Bed);
+            Put(2, 3, TileType.Table);
+            Put(3, 3, TileType.Pot);
+            Put(4, 3, TileType.Lamp);
+            Put(5, 3, TileType.Banner);
+            Put(6, 3, TileType.WardStone);
+            Put(7, 3, TileType.RiftAltar);
             for (int dx = 1; dx <= 9; dx++) Put(dx, -4, TileType.Floor);
             Put(1, -4, TileType.CopperOre);
             Put(1, -3, TileType.Wall);
@@ -553,6 +562,7 @@ namespace Game.Client
             Put(7, -4, TileType.Chest);
             Put(-6, 3, TileType.Torch);
             Put(9, -3, TileType.Torch);
+            scene.Places(null);
             scene.Machine(sx + 2, sy - 4, 2, ItemArt.DrillBit);
             scene.Machine(sx + 3, sy - 4, 0, ItemArt.Belt(0));
             scene.Machine(sx + 4, sy - 4, 0, ItemArt.Belt(0));
@@ -692,7 +702,8 @@ namespace Game.Client
                             // The floor that runs under things (PropArt.Underlay), as WorldView's underlay layer draws it.
                             var under = PropArt.Underlay(_map, _places, x, y);
                             if (under != null) image.Draw(TileArt.Object(under.Value), px, py);
-                            var placed = TileArt.Object(_map[x, y]);
+                            // Things that stand (PropArt.Stands) are drawn with the bodies, as WorldView.DrawProps does.
+                            var placed = PropArt.Stands(_map[x, y]) ? null : TileArt.Object(_map[x, y]);
                             if (placed != null) image.Draw(placed, px, py);
                         }
                     }

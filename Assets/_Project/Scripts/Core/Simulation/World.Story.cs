@@ -91,11 +91,27 @@ namespace Game.Core
                 player.JourneyVersion++;
                 _events.Add(new SimEvent(SimEventType.Story, player.Id, target: step.Index, amount: StoryTaken, position: near.Value.At));
             }
-            if (step.Goal == StoryGoal.None || GoalMet(player, step)) CompleteStep(player, step);
+            // A step that asks waits for the answer (ChooseInStory).
+            if (step.Choices.Count == 0 && (step.Goal == StoryGoal.None || GoalMet(player, step))) CompleteStep(player, step);
             return true;
         }
 
-        void CompleteStep(Player player, StoryStep step)
+        // The player answers what the step's giver in reach asked (story.csv choices, 2026-11-10): the answer is
+        // remembered, the step done, and the story goes on at the step the answer leads to. False when there is no
+        // such question or answer.
+        public bool ChooseInStory(int playerId, int choice)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || Story == null) return false;
+            var near = CharacterNear(Places, player.Position);
+            var step = StepOf(player);
+            if (near == null || step == null || near.Value.Character != step.Who || choice < 0 || choice >= step.Choices.Count) return false;
+            player.StoryChoices[step.Index] = choice;
+            CompleteStep(player, step, step.Choices[choice].Step);
+            return true;
+        }
+
+        void CompleteStep(Player player, StoryStep step, int? next = null)
         {
             if (step.Goal == StoryGoal.Have)
             {
@@ -109,7 +125,7 @@ namespace Game.Core
                 else player.Inventory.AddConsumable(reward.Consumable, reward.Count);
             }
             player.InventoryVersion++;
-            player.JourneyStep = step.Index + 1;
+            player.JourneyStep = next ?? step.Next;
             player.JourneyTaken = false;
             player.JourneyVersion++;
             _events.Add(new SimEvent(SimEventType.Story, player.Id, target: step.Index, amount: step.Index + 1, position: player.Position));
@@ -152,12 +168,13 @@ namespace Game.Core
         }
 
         // Puts back what a character save remembered: the step (no further than the story goes), whether it was taken,
-        // and the open waypoints that are still places.
-        public void RestoreJourney(Player player, int step, bool taken, IEnumerable<string> waypoints)
+        // the open waypoints that are still places and the answers given.
+        public void RestoreJourney(Player player, int step, bool taken, IEnumerable<string> waypoints, IEnumerable<(int Step, int Choice)> choices = null)
         {
             int last = Story?.Steps.Count ?? int.MaxValue;
             player.JourneyStep = Math.Clamp(step, 0, last);
             player.JourneyTaken = taken && player.JourneyStep < last;
+            foreach (var (at, choice) in choices ?? Enumerable.Empty<(int, int)>()) player.StoryChoices[at] = choice;
             foreach (string id in waypoints ?? Enumerable.Empty<string>())
             {
                 if (Story == null || Story.Place(id) != null) player.Waypoints.Add(id);

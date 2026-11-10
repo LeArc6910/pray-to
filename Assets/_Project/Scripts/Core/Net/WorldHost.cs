@@ -210,7 +210,8 @@ namespace Game.Core
                 if (player == null || pair.Value.SentJourney == player.JourneyVersion) continue;
                 pair.Value.SentJourney = player.JourneyVersion;
                 var open = World.Story?.Places.Where(p => player.Waypoints.Contains(p.Id)).Select(p => p.Index).ToList() ?? new List<int>();
-                Send(pair.Key, new JourneyMessage(player.JourneyStep, player.JourneyTaken, open).Encode(), reliable: true);
+                var answers = player.StoryChoices.Select(c => (c.Key, c.Value)).ToList();
+                Send(pair.Key, new JourneyMessage(player.JourneyStep, player.JourneyTaken, open, answers).Encode(), reliable: true);
             }
             // Locked doors before the snapshot too, so an owner's client lets them through as soon as the host does.
             foreach (var pair in _connections)
@@ -324,7 +325,7 @@ namespace Game.Core
             if (saved != null) World.RestoreSupports(player, _classes, _loot, saved.Supports);
             if (saved != null) World.RestoreRecords(player, saved.Records, saved.Achievements);
             if (saved != null) World.RestorePet(player, saved.Pet, saved.PetExperience);
-            if (saved != null) World.RestoreJourney(player, saved.JourneyStep, saved.JourneyTaken, saved.Waypoints);
+            if (saved != null) World.RestoreJourney(player, saved.JourneyStep, saved.JourneyTaken, saved.Waypoints, saved.StoryChoices);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.
@@ -582,6 +583,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.Teleport:
                     World.Teleport(player.Id, command.Index);
+                    break;
+                case InventoryCommand.ChooseStory:
+                    World.ChooseInStory(player.Id, command.Index);
                     break;
             }
         }

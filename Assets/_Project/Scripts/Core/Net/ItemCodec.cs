@@ -214,6 +214,8 @@ namespace Game.Core
         TalkStory,
         // From beside an open waypoint to the one of place Index (World.Teleport).
         Teleport,
+        // Answers what the person of the story asked with choice Index (World.ChooseInStory, 2026-11-10).
+        ChooseStory,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

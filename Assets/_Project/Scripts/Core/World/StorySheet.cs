@@ -118,6 +118,12 @@ namespace Game.Core
         public int Count { get; }
         public IReadOnlyList<GoalReward> Rewards { get; }
         public string Hint { get; }
+        // What the player may answer at the end of the talk (story.csv choices, 2026-11-10), each with the step it
+        // leads to (index); none for a step that only talks or asks for something.
+        public IReadOnlyList<(string Text, int Step)> Choices { get; internal set; } = Array.Empty<(string, int)>();
+        // The step that follows this one when done (story.csv next): the next row unless the sheet says another, or
+        // the end (Steps.Count).
+        public int Next { get; internal set; }
 
         public string RewardText => string.Join(" · ", Rewards.Select(r => r.Text));
 
@@ -232,6 +238,7 @@ namespace Game.Core
             else
             {
                 int line = 1;
+                var links = new List<(StoryStep Step, string Choices, string Next, int Line)>();
                 foreach (var row in storyTable.Rows)
                 {
                     line++;
@@ -259,11 +266,41 @@ namespace Game.Core
                         var rewards = row["reward"].Length == 0 || loot == null
                             ? new List<GoalReward>()
                             : row["reward"].Split('|').Select(part => GuideSheet.Reward(part.Trim(), loot)).ToList();
+                        if (row["choices"].Length > 0 && goal != StoryGoal.None) throw new FormatException("choices는 goal이 빈 단계(말만 하는 단계)에만 적습니다.");
                         steps.Add(new StoryStep(steps.Count, row["chapter"], row["title"], who, lines, goal, place, boss, material, consumable, count, rewards, row["hint"]));
+                        links.Add((steps[steps.Count - 1], row["choices"], row["next"], line));
                     }
                     catch (FormatException e)
                     {
                         errors.Add($"{StoryFile} {line}줄: {e.Message}");
+                    }
+                }
+                // Where each step leads, once every step is read (a choice or next may point at a later row).
+                int StepNumber(string text, string what)
+                {
+                    if (text == "end") return steps.Count;
+                    int number = SheetValues.ParseNumber(text, what);
+                    if (number < 1 || number > steps.Count) throw new FormatException($"{what} '{text}'은 1~{steps.Count}의 step이거나 end여야 합니다.");
+                    return number - 1;
+                }
+                foreach (var (step, choices, next, at) in links)
+                {
+                    try
+                    {
+                        step.Next = next.Length == 0 ? step.Index + 1 : StepNumber(next, "next");
+                        var answers = new List<(string, int)>();
+                        foreach (string part in choices.Split('|').Select(c => c.Trim()).Where(c => c.Length > 0))
+                        {
+                            int arrow = part.LastIndexOf('>');
+                            if (arrow < 1) throw new FormatException($"choices '{part}'는 <고를 말>><step>로 적습니다. 예: 말한다>10");
+                            answers.Add((part.Substring(0, arrow).Trim(), StepNumber(part.Substring(arrow + 1).Trim(), "choices의 step")));
+                        }
+                        if (answers.Count == 1) throw new FormatException("choices는 둘 이상 적습니다.");
+                        step.Choices = answers;
+                    }
+                    catch (FormatException e)
+                    {
+                        errors.Add($"{StoryFile} {at}줄: {e.Message}");
                     }
                 }
             }

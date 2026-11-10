@@ -99,6 +99,8 @@ namespace Game.Core
         public int JourneyStep { get; internal set; }
         public bool JourneyTaken { get; internal set; }
         public HashSet<string> Waypoints { get; } = new HashSet<string>();
+        // What the player answered where the story asked (story.csv choices, 2026-11-10): the choice by step index.
+        public Dictionary<int, int> StoryChoices { get; } = new Dictionary<int, int>();
         public int JourneyVersion { get; internal set; }
 
         public int RankOf(SkillDefinition skill) => skill != null && SkillRanks.TryGetValue(skill, out int rank) ? rank : 0;

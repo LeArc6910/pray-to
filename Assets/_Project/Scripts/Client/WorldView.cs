@@ -1371,7 +1371,8 @@ namespace Game.Client
                 {
                     if (!map.InBounds(x, y)) continue;
                     var type = map[x, y];
-                    if (!Structures.IsDecor(type) || type == TileType.StructurePart) continue;
+                    // The places' structures and the things players build that stand (PropArt.Stands, 2026-11-10).
+                    if (!(Structures.IsDecor(type) || PropArt.Stands(type)) || type == TileType.StructurePart) continue;
                     int sides = PropArt.IsWall(type) ? PropArt.Sides(map, x, y) : 0;
                     var sprite = Sprites.Standing($"prop/{type}/{sides}", () => PropArt.Prop(type, sides));
                     int key = y * map.Width + x;
@@ -2865,7 +2866,7 @@ namespace Game.Client
                 {
                     ground[y * map.Width + x] = GroundAt(x, y);
                     underlay[y * map.Width + x] = UnderlayAt(x, y);
-                    objects[y * map.Width + x] = Sprites.Object(map[x, y]);
+                    objects[y * map.Width + x] = ObjectTile(map[x, y]);
                     if (map[x, y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(x, y, 0));
                 }
             }
@@ -2876,6 +2877,9 @@ namespace Game.Client
         }
 
         TileBase UnderlayAt(int x, int y) => PropArt.Underlay(_client.Map, _client.Places, x, y) is TileType floor ? Sprites.Object(floor) : null;
+
+        // The flat tile of a placed thing, or none for one that stands on the floor (PropArt.Stands, DrawProps).
+        static TileBase ObjectTile(TileType type) => PropArt.Stands(type) ? null : Sprites.Object(type);
 
         static Tilemap AddTilemap(Transform grid, string name, int order)
         {
@@ -2951,7 +2955,7 @@ namespace Game.Client
                     Object.Destroy(crack.gameObject);
                     _cracks.Remove(key);
                 }
-                _objects.SetTile(new Vector3Int(change.X, change.Y, 0), Sprites.Object(map[change.X, change.Y]));
+                _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTile(map[change.X, change.Y]));
                 if (map[change.X, change.Y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(change.X, change.Y, 0));
                 else _scarecrows.Remove(new Vector3Int(change.X, change.Y, 0));
                 foreach (var (dx, dy) in Neighbourhood)
