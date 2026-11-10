@@ -138,6 +138,47 @@ namespace Game.Core.Tests
             }
         }
 
+        // Along the roads (2026-11-11): lamp posts set into the rock at the edge, a signpost where each road leaves a
+        // place, and a rest spot with a campfire and a bench; none of it on the road, and none of it shutting off the
+        // floor beside it.
+        [Test]
+        public void RoadsHaveLampsSignpostsAndARestSpot([Range(1, 12)] int seed)
+        {
+            var world = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
+            var map = world.Map;
+            bool InPlace(int x, int y) => world.Places.Any(p => (x - p.X) * (x - p.X) + (y - p.Y) * (y - p.Y) <= p.Radius * p.Radius);
+            int lamps = 0, signs = 0, rests = 0;
+            var dressed = new List<(int X, int Y)>();
+            for (int y = 0; y < map.Height; y++)
+                for (int x = 0; x < map.Width; x++)
+                {
+                    if (InPlace(x, y)) continue;
+                    var here = map[x, y];
+                    if (here != TileType.LampPost && here != TileType.Signpost && here != TileType.Campfire) continue;
+                    bool byRoad = new[] { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1) }.Any(d => map[x + d.Item1, y + d.Item2] == TileType.Road);
+                    Assert.IsTrue(byRoad, $"seed {seed}: {here} at {x},{y} is not beside a road");
+                    dressed.Add((x, y));
+                    if (here == TileType.LampPost) lamps++;
+                    if (here == TileType.Signpost) signs++;
+                    bool bench = false;
+                    for (int dy = -3; dy <= 3; dy++)
+                        for (int dx = -3; dx <= 3; dx++) bench |= map.InBounds(x + dx, y + dy) && map[x + dx, y + dy] == TileType.Bench;
+                    if (here == TileType.Campfire && bench) rests++;
+                }
+            int roads = Tales.Shipped.Places.Count(p => p.Road.Length > 0);
+            Assert.GreaterOrEqual(lamps, roads, $"seed {seed}: lamps along the roads");
+            Assert.GreaterOrEqual(signs, roads, $"seed {seed}: signposts where the roads leave the places");
+            Assert.GreaterOrEqual(rests, 1, $"seed {seed}: a rest spot");
+
+            // Nothing set beside a road shuts off the floor round it.
+            var field = new FlowField(map);
+            field.Build(new[] { world.Spawn }, int.MaxValue - 1);
+            foreach (var (x, y) in dressed)
+                foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                    if (!map.IsSolid(nx, ny) && map[nx, ny] != TileType.Water && map[nx, ny] != TileType.Lava)
+                        Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(nx, ny), $"seed {seed}: the floor at {nx},{ny} beside {map[x, y]} is shut off");
+        }
+
         // Each style dresses its place with what marks it (2026-11-10): the harbour's lake, pier and boats, the temple's
         // altar and rune stones, the mine's entrance, rails and cart.
         [Test]

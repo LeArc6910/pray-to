@@ -93,6 +93,8 @@ namespace Game.Core
         public const int ArenaRadius = 10;
         const int ArenaDistance = 38;
         const int TunnelHalfWidth = 1;
+        // How many tiles of road between its lamp posts (2026-11-11; the roads between places are 10 to 30 long).
+        const int RoadLampEvery = 5;
         // Ore gets its own random stream, so adding it left the caves exactly as they were.
         const ulong OreStream = 4;
         const int CopperVeins = 60;
@@ -212,6 +214,7 @@ namespace Game.Core
 
             bool InPlaza(int x, int y) => spots.Any(s => Square(x - s.X, y - s.Y) <= s.Place.Radius * s.Place.Radius);
             int ArenaTiles(List<(int X, int Y)> line) => line.Count(p => arenas.Any(a => Square(p.X - a.X, p.Y - a.Y) <= (ArenaRadius + 2) * (ArenaRadius + 2)));
+            var roads = new List<(List<(int X, int Y)> Path, (PlaceDefinition Place, int X, int Y) From, (PlaceDefinition Place, int X, int Y) To)>();
             foreach (var spot in spots)
             {
                 var from = spots.FirstOrDefault(s => s.Place.Id == spot.Place.Road);
@@ -242,6 +245,7 @@ namespace Game.Core
                         }
                     }
                 }
+                roads.Add((path, from, spot));
             }
 
             // Beside the demon nest, its lord's arena (2026-11-10, bosses.csv place): on the side away from the road
@@ -280,6 +284,136 @@ namespace Game.Core
                 }
                 world.AddPlaceArena(place.Id, TileMap.Center(bx, by));
                 arenas.Add((bx, by));
+            }
+
+            // Along each road (2026-11-11, Docs/Story.md 길가): a lamp post just past its edge every RoadLampEvery
+            // tiles, on alternate sides; a signpost where it leaves each place; and about halfway a rest spot beside
+            // it, paved, with a campfire and a bench. They go on bare floor or plain rock only, never where they would
+            // shut a bit of floor off from the road, and the road itself stays clear.
+            // Outside the square round each plaza too, so the plaza's own dressing is all that stands near it.
+            bool Free(int x, int y) => IsInside(map, x, y) && (map[x, y] == TileType.Wall || map[x, y] == TileType.Floor)
+                && spots.All(p => System.Math.Abs(x - p.X) > p.Place.Radius + 1 || System.Math.Abs(y - p.Y) > p.Place.Radius + 1)
+                && arenas.All(a => Square(x - a.X, y - a.Y) > (ArenaRadius + 2) * (ArenaRadius + 2));
+            // Whether something solid at x, y would leave open floor beside it with no way to a road nearby.
+            bool Shuts(int x, int y)
+            {
+                var was = map[x, y];
+                map[x, y] = TileType.Wall;
+                bool shut = false;
+                foreach (var (sx, sy) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                {
+                    if (!IsInside(map, sx, sy) || map.IsSolid(sx, sy)) continue;
+                    var seen = new HashSet<(int, int)> { (sx, sy) };
+                    var open = new Queue<(int X, int Y, int D)>();
+                    open.Enqueue((sx, sy, 0));
+                    bool road = false;
+                    while (open.Count > 0 && !road)
+                    {
+                        var (cx, cy, d) = open.Dequeue();
+                        if (Structures.IsWay(map[cx, cy]) || map[cx, cy] == TileType.Waypoint) road = true;
+                        else if (d < 10)
+                        {
+                            foreach (var (nx, ny) in new[] { (cx + 1, cy), (cx - 1, cy), (cx, cy + 1), (cx, cy - 1) })
+                                if (IsInside(map, nx, ny) && !map.IsSolid(nx, ny) && seen.Add((nx, ny))) open.Enqueue((nx, ny, d + 1));
+                        }
+                    }
+                    if (!road) shut = true;
+                }
+                map[x, y] = was;
+                return shut;
+            }
+            bool Set(int x, int y, TileType type)
+            {
+                if (map[x, y] != TileType.Wall && Shuts(x, y)) return false;
+                map[x, y] = type;
+                return true;
+            }
+            foreach (var (path, from, to) in roads)
+            {
+                bool Clear(int i, (PlaceDefinition Place, int X, int Y) end, int margin) =>
+                    Square(path[i].X - end.X, path[i].Y - end.Y) > (end.Place.Radius + margin) * (end.Place.Radius + margin);
+                bool Away(int i, int margin) => Clear(i, from, margin) && Clear(i, to, margin);
+                // Which way the road runs at path[i], and across it (to its left).
+                (int X, int Y) Along(int i)
+                {
+                    var (bx, by) = path[System.Math.Max(0, i - 1)];
+                    var (ax, ay) = path[System.Math.Min(path.Count - 1, i + 1)];
+                    return (System.Math.Sign(ax - bx), System.Math.Sign(ay - by));
+                }
+                // Sets the tile into the rock just past the road's edge beside path[i], on that side or else the other.
+                bool Edge(int i, int side, TileType type)
+                {
+                    var (dx, dy) = Along(i);
+                    if (dx == 0 && dy == 0) return false;
+                    foreach (int s in new[] { side, -side })
+                    {
+                        int px = -dy * s, py = dx * s;
+                        int x = path[i].X + px * (TunnelHalfWidth + 1), y = path[i].Y + py * (TunnelHalfWidth + 1);
+                        int ex = path[i].X + px * TunnelHalfWidth, ey = path[i].Y + py * TunnelHalfWidth;
+                        if (!Free(x, y) || !IsInside(map, ex, ey) || map[ex, ey] != TileType.Road) continue;
+                        if (Set(x, y, type)) return true;
+                    }
+                    return false;
+                }
+                // A signpost where it leaves each end's plaza.
+                for (int i = 0; i < path.Count; i++)
+                {
+                    if (Clear(i, from, 2) && Edge(i, 1, TileType.Signpost)) break;
+                }
+                for (int i = path.Count - 1; i >= 0; i--)
+                {
+                    if (Clear(i, to, 2) && Edge(i, -1, TileType.Signpost)) break;
+                }
+                // The rest spot: nearest halfway, three tiles along and two deep of bare floor or rock just past the
+                // road's edge on one side (the edge found column by column, so a sloping road gets a stepped alcove).
+                bool rested = false;
+                for (int k = 0; k <= path.Count / 2 && !rested; k++)
+                {
+                    foreach (int i in new[] { path.Count / 2 + k, path.Count / 2 - k })
+                    {
+                        if (rested || i < 1 || i >= path.Count - 1 || !Away(i, 4)) continue;
+                        var (ax, ay) = path[System.Math.Max(0, i - 3)];
+                        var (bx, by) = path[System.Math.Min(path.Count - 1, i + 3)];
+                        bool eastWest = System.Math.Abs(bx - ax) >= System.Math.Abs(by - ay);
+                        int ux = eastWest ? 1 : 0, uy = eastWest ? 0 : 1, vx = 1 - ux, vy = 1 - uy;
+                        foreach (int s in new[] { 1, -1 })
+                        {
+                            var front = new List<(int X, int Y)>();
+                            var back = new List<(int X, int Y)>();
+                            for (int a = -1; a <= 1; a++)
+                            {
+                                int x = path[i].X + ux * a, y = path[i].Y + uy * a, steps = 0;
+                                while (steps < TunnelHalfWidth + 3 && IsInside(map, x, y) && map[x, y] == TileType.Road)
+                                {
+                                    x += vx * s;
+                                    y += vy * s;
+                                    steps++;
+                                }
+                                if (steps == 0 || !Free(x, y) || !Free(x + vx * s, y + vy * s)) break;
+                                front.Add((x, y));
+                                back.Add((x + vx * s, y + vy * s));
+                            }
+                            if (front.Count < 3) continue;
+                            foreach (var (x, y) in front.Concat(back)) map[x, y] = TileType.Road;
+                            Set(back[0].X, back[0].Y, TileType.Campfire);
+                            Set(back[2].X, back[2].Y, TileType.Bench);
+                            rested = true;
+                            break;
+                        }
+                    }
+                }
+                // The lamps, from just outside the places (they have their own), the first as soon as there is room.
+                int since = RoadLampEvery - 1, lampSide = 1;
+                for (int i = 0; i < path.Count; i++)
+                {
+                    if (!Away(i, 2)) continue;
+                    if (++since < RoadLampEvery) continue;
+                    if (Edge(i, lampSide, TileType.LampPost))
+                    {
+                        since = 0;
+                        lampSide = -lampSide;
+                    }
+                }
             }
 
             var sites = new List<PlaceSite>();

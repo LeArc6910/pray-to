@@ -64,6 +64,8 @@ namespace Game.Client
             Save(Row(new[] { 0, 2 | 8, 1 | 4, 1 | 2, 15 }.Select(sides => PropArt.Prop(TileType.CastleWall, sides)).ToList()), Path.Combine(pieces, "castle_walls.png"), 6);
             var storyWorld = WorldGenerator.Generate(7, story: story);
             foreach (var site in storyWorld.Places) Save(Place(storyWorld, site, lights), Path.Combine(pieces, $"place_{site.Definition.Id}.png"), 3);
+            // A road between places with its lamps, signposts and rest spot (2026-11-11).
+            Save(RoadView(storyWorld, lights), Path.Combine(pieces, "road.png"), 3);
             Save(Players(), Path.Combine(output, "player.png"), 6);
             Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
             Motions.Write(Path.Combine(output, "anim"), loot, monsters, npcs);
@@ -604,6 +606,26 @@ namespace Game.Client
             foreach (var (character, at) in site.People)
                 scene.Player(at.X, at.Y - 0.3f, PeopleArt.Look(character.Look, Rgba.Hex(character.Color), 0));
             scene.Player(site.X + 0.5f, site.Y - 1.5f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
+            return scene.Image;
+        }
+
+        // The stretch of road round its first rest spot (a campfire outside every place), lit, with a player on the road.
+        static PixelImage RoadView(GeneratedWorld world, WorldLights lights)
+        {
+            var map = world.Map;
+            int fx = map.Width / 2, fy = map.Height / 2;
+            for (int y = 0; y < map.Height && fx == map.Width / 2; y++)
+                for (int x = 0; x < map.Width; x++)
+                {
+                    if (map[x, y] != TileType.Campfire || world.Places.Any(p => (x - p.X) * (x - p.X) + (y - p.Y) * (y - p.Y) <= p.Radius * p.Radius)) continue;
+                    fx = x;
+                    fy = y;
+                    break;
+                }
+            const int half = 14;
+            var scene = new Scene(map, fx - half, fy - half / 2 - 2, half * 2, half + 4, _ => false);
+            scene.Lit(lights, null);
+            scene.Places(world.Places);
             return scene.Image;
         }
 
