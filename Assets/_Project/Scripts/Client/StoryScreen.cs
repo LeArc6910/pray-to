@@ -19,6 +19,9 @@ namespace Game.Client
         bool _tellsHost;
         bool _waypoints;
 
+        // How far up from the bottom of the screen the talk sits, clear of the quick slots and skill keys.
+        const float TalkLift = 140;
+
         public StoryScreen(WorldClient client, Action<byte[]> send)
         {
             _client = client;
@@ -116,7 +119,8 @@ namespace Game.Client
             string wrapped = Ui.Wrap(text, label, width - 32);
             float textHeight = label.CalcHeight(new GUIContent(wrapped), width - 32);
             float height = textHeight + 96;
-            var panel = new Rect((Ui.Width - width) / 2, Ui.Height - height - 12, width, height);
+            // Above the quick slots and skill keys (2026-11-10: at the very bottom it covered them), as low as fits.
+            var panel = new Rect((Ui.Width - width) / 2, Mathf.Max(8, Ui.Height - height - TalkLift), width, height);
             Controls.Block(panel);
             GUI.Box(panel, GUIContent.none);
             var previous = GUI.color;

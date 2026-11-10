@@ -847,6 +847,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 100단계: 이야기와 장소(`Docs/Story.md`). 새벽 마을·왕도 루미나·용사의 오두막·마족 둥지가 길로 이어져 동굴에 깎이고, 장소마다 웨이포인트, 인물에게 [말하기]로 이야기 단계를 받는다
   - (로컬 세션) 명령 한 줄을 다시 돌린다. 새 파일: `Scripts/Core/World/StorySheet.cs`, `Scripts/Core/Simulation/World.Story.cs`, `Scripts/Client/StoryScreen.cs`, `Tests/EditMode/StoryTests.cs`, `Data/Story/places.csv`·`characters.csv`·`story.csv`(`.meta`는 Unity가 만든다). 새 시트 셋은 `Game > Set Up Main Scene`이 `GameSheets`의 `places`·`characters`·`story`에 넣는다(명령 한 줄이 한다). 캐릭터 저장 형식 17, 프로토콜 0.68.0. PlayMode에 장면 `TheStoryDraws`(사진 `story-city`): 장소가 하나도 없으면 시트가 씬에 안 들어간 것이다
   - 클라우드 확인은 배포 뒤 `--only story`
+  - (클라우드 2026-11-10 웹 확인, af36027) `--only story` 통과 16, 실패 0. 대화 창, 목표 목록의 방향·거리, 지도의 장소 이름과 목적지 고리, 웨이포인트 목록 사진을 봤다
   - (사람) 이야기 대사와 흐름이 마음에 드는지(고치거나 더할 것은 세 시트에), 인물 그림, 길을 따라 걷는 맛, 휴대폰에서 대화 창과 [다음]이 잘 눌리는지
 
 ## 결과 보고
