@@ -567,7 +567,7 @@ namespace Game.Core
             who == null ? null : Story?.GivenBy(who, JourneyStep, JourneyTaken, SideSteps, SideTaken);
         public string BossName(string id) => _bosses?.Bosses.FirstOrDefault(b => b.Id == id)?.Name ?? id;
         public PlaceSite SiteOf(PlaceDefinition place) => place == null ? null : Places.FirstOrDefault(p => p.Definition == place);
-        public (CharacterDefinition Character, Vec2 At)? CharacterNear() => World.CharacterNear(Places, Position);
+        public (CharacterDefinition Character, Vec2 At)? CharacterNear() => World.CharacterNear(Places, Position, Clock);
         public PlaceSite WaypointNear() => World.WaypointNear(Places, Position);
         public PlaceSite PlaceHere() => Places.FirstOrDefault(p => p.Contains(Position));
         public byte[] TalkStoryCommand() => new InventoryCommandMessage(InventoryCommand.TalkStory, 0).Encode();

@@ -170,6 +170,8 @@ namespace Game.Core
                         if (!Map.InBounds(x, y - 2) || Map[x, y] != floor || Map[x, y - 1] != floor || Map[x, y + 1] != floor) continue;
                         var at = TileMap.Center(x, y);
                         if (site.People.Any(p => Vec2.Distance(p.At, at) < 2.5f)) continue;
+                        // Nor where people walk by day (PlaceSite.Rounds).
+                        if (site.Rounds.Values.Any(spots => spots.Any(s => Vec2.Distance(s, at) < 1.5f))) continue;
                         if (Npcs.Npcs.Any(n => NearestTile(at, n.Tile, 4) != null)) continue;
                         return (x, y);
                     }

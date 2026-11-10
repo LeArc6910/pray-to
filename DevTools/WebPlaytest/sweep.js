@@ -1714,6 +1714,14 @@ async function story(browser) {
   check(s.place === 'dawn_village', `처음 서는 곳은 새벽 마을 (${s.place})`);
   check(s.journey === 1 && !s.journeyTaken, `이야기는 1단계에서 시작한다 (${s.journey})`);
   check(/dawn_village/.test(s.waypoints), `마을 웨이포인트는 처음부터 열린다 (${s.waypoints})`);
+  // The people go about their plaza by day (2026-11-11): over twenty seconds someone in the village has moved. Then
+  // they are held at home so the talks below can walk up to them.
+  const before = s.people;
+  await game.wait(20000);
+  const after = (await game.state()).people;
+  check(before && after && before !== after, `마을 사람들이 낮에 광장을 돌아다닌다 (${before} → ${after})`);
+  await game.shot('people-walk', '돌아다니는 마을 사람들');
+  await game.send('still');
   check((await game.allText()).includes('촌장 바르도에게 말 걸기'), '목표 목록 맨 위에 "촌장 바르도에게 말 걸기"');
   await game.shot('village', '새벽 마을과 촌장(이름 앞 !)');
   await game.send('goto person chief');
@@ -1786,7 +1794,8 @@ async function story(browser) {
   check(await game.press('알겠다'), '이어진 말의 끝에서 [알겠다]');
   await game.wait(1200);
   s = await game.state();
-  check(s.journey === s.storyEnd, `그 갈래로 이야기가 끝난다 (단계 ${s.journey}, 끝 ${s.storyEnd})`);
+  check(s.journey === 22, `그 갈래 뒤로 4장(단계 22)이 이어진다 (단계 ${s.journey})`);
+  check(/4장 · 가라앉은 왕관/.test(await game.allText()), '목표 목록에 4장 · 가라앉은 왕관');
   // A side story (2026-11-11, story.csv chain): the fisher at the harbour gives one apart from the main story; it shows
   // in the goal list, and the minnows brought finish its first step. The harbour master's words then follow the answer
   // given to the queen (?9=2: kept the secret).

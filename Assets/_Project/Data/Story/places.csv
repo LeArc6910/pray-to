@@ -1,8 +1,8 @@
-id,name,kind,distance,radius,road,waypoint,floor,text,style
-dawn_village,새벽 마을,마을,0,9,,yes,,전쟁이 끝난 뒤 피난민들이 동굴에 세운 마을,village
-royal_city,왕도 루미나,왕국,30,10,dawn_village,yes,BrickFloor,여왕 세라핀이 다스리는 지하 왕도. 승전의 깃발이 아직 걸려 있다,kingdom
-hero_hut,용사의 오두막,오두막,42,6,royal_city,yes,StoneFloor,버섯 숲 너머 용사 카일이 홀로 산다는 오두막,hut
-demon_nest,마족 둥지,둥지,54,8,hero_hut,yes,GlowFloor,전쟁에서 진 마족들이 숨어 사는 둥지. 누군가를 기다리고 있다,nest
-mist_harbor,물안개 항구,항구,24,9,dawn_village,yes,StoneFloor,지하 호수에 배를 띄우는 어부들의 항구. 물안개가 걷히는 날이 드물다,harbor
-iron_valley,철곡 광산촌,광산 마을,38,9,dawn_village,yes,,왕도에 철을 대는 광부들의 마을. 갱도 깊은 곳에서 이상한 소리가 난다,mine
-old_temple,잊힌 신전,신전,50,8,mist_harbor,yes,StoneFloor,전쟁보다 오래된 신전. 아무도 섬기지 않는 제단의 룬이 아직 빛난다,ruins
+id,name,kind,distance,radius,road,waypoint,floor,text,style,arena
+dawn_village,새벽 마을,마을,0,9,,yes,,전쟁이 끝난 뒤 피난민들이 동굴에 세운 마을,village,
+royal_city,왕도 루미나,왕국,30,10,dawn_village,yes,BrickFloor,여왕 세라핀이 다스리는 지하 왕도. 승전의 깃발이 아직 걸려 있다,kingdom,
+hero_hut,용사의 오두막,오두막,42,6,royal_city,yes,StoneFloor,버섯 숲 너머 용사 카일이 홀로 산다는 오두막,hut,
+demon_nest,마족 둥지,둥지,54,8,hero_hut,yes,GlowFloor,전쟁에서 진 마족들이 숨어 사는 둥지. 누군가를 기다리고 있다,nest,yes
+mist_harbor,물안개 항구,항구,24,9,dawn_village,yes,StoneFloor,지하 호수에 배를 띄우는 어부들의 항구. 물안개가 걷히는 날이 드물다,harbor,yes
+iron_valley,철곡 광산촌,광산 마을,38,9,dawn_village,yes,,왕도에 철을 대는 광부들의 마을. 갱도 깊은 곳에서 이상한 소리가 난다,mine,
+old_temple,잊힌 신전,신전,50,8,mist_harbor,yes,StoneFloor,전쟁보다 오래된 신전. 아무도 섬기지 않는 제단의 룬이 아직 빛난다,ruins,

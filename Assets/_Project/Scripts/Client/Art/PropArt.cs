@@ -212,8 +212,15 @@ namespace Game.Client
             TileType.Banner => Banner(Paint, Gold, demon: false),
             TileType.WardStone => WardStone(),
             TileType.RiftAltar => RiftAltar(),
-            // Machines (2026-11-11, 사람이 고른 다음 작업 4번): their tile as the top of a block (Raised).
-            _ when RaisedMachines.Contains(type) => Raised(TileArt.Object(type), LiftOf(type)),
+            // Machines (2026-11-11): the busiest drawn on their own (DrillBody and the rest), the others their tile as the
+            // top of a block (Raised).
+            TileType.Drill => DrillBody(),
+            TileType.Smelter => SmelterBody(),
+            TileType.Generator => GeneratorBody(),
+            TileType.Turret => TurretBody(),
+            TileType.Assembler => AssemblerBody(),
+            TileType.ArcFurnace => ArcFurnaceBody(),
+            _ when RaisedMachines.Contains(type) => Raised(TileArt.Object(type), RaiseOf(type)),
             _ => null,
         };
 
@@ -226,9 +233,159 @@ namespace Game.Client
             TileType.ArcFurnace, TileType.Coop, TileType.Barn, TileType.AlchemyTable, TileType.TeslaTower,
         };
 
+        // The houses whose windows light up in the evening (2026-11-11, WorldView.DrawProps and AddNightLights).
+        public static bool LitAtNight(TileType type) => type == TileType.Cottage || type == TileType.Cabin || type == TileType.Tower;
+
+        // The drawing by day: its lit windows as dark glass with a sky glint.
+        public static PixelImage Daylit(PixelImage lit)
+        {
+            var day = lit.Copy();
+            var glass = Rgba.Hex("#4E6274");
+            var glint = Rgba.Hex("#8EA6B8");
+            for (int y = 0; y < day.Height; y++)
+            {
+                for (int x = 0; x < day.Width; x++)
+                {
+                    var c = day[x, y];
+                    if (Same(c, WindowLight)) day[x, y] = glass;
+                    else if (Same(c, WindowCore)) day[x, y] = glint;
+                }
+            }
+            return day;
+        }
+
+        static bool Same(Rgba a, Rgba b) => a.R == b.R && a.G == b.G && a.B == b.B && a.A == b.A;
+
         // How many pixels a raised machine's top stands above the floor (a big machine's, BigLift).
-        public static int LiftOf(TileType type) => type == TileType.Turret || type == TileType.Keg || type == TileType.PreservesJar ? 4 : 5;
+        static int RaiseOf(TileType type) => type == TileType.Keg || type == TileType.PreservesJar ? 4 : 5;
         public const int BigLift = 7;
+
+        // How many pixels above the tile's middle a machine's moving part and load sit: the middle of its top.
+        public static float LiftOf(TileType type) => type switch
+        {
+            TileType.Drill => 4,
+            TileType.Smelter => 6,
+            TileType.Generator => 4,
+            TileType.Turret => 2.5f,
+            TileType.Assembler => 4,
+            TileType.ArcFurnace => 6,
+            _ => RaiseOf(type),
+        };
+
+        // ---- Machines drawn on their own (2026-11-11, 사람이 고른 다음 작업 5번) ----
+
+        static readonly Rgba Hazard = Rgba.Hex("#F0C030");
+        static readonly Rgba LampGreen = Rgba.Hex("#7CF08A");
+        static readonly Rgba LampRed = Rgba.Hex("#F05A4A");
+
+        // A drill: a steel housing with a motor block behind, hazard stripes and lamps on its front; the bit turns on
+        // its top (WorldView.DrawMachines).
+        static PixelImage DrillBody()
+        {
+            var body = new PixelImage(T, 22);
+            Box(body, 3, 3, 10, 3, 5, DarkStone);
+            for (int x = 4; x < 12; x += 2) body[x, 4] = DarkStone.Dark;
+            Box(body, 1, 8, 14, 5, 7, Iron);
+            for (int x = 1; x < 15; x++)
+            {
+                bool stripe = (x + 0) / 2 % 2 == 0;
+                body[x, 16] = stripe ? Hazard : Ink;
+                body[x, 17] = (x + 1) / 2 % 2 == 0 ? Hazard : Ink;
+            }
+            body[3, 14] = LampGreen;
+            body[5, 14] = LampRed;
+            Rect(body, 9, 14, 4, 1, Iron.Dark);
+            Foot(body, 1, 19, 14, 1);
+            return Finish(body, ShadowLayer(T, 22, 8, 20, 7, 2));
+        }
+
+        // A smelter: a stone block with a copper hopper on its top, a chimney behind and the fire in its mouth.
+        static PixelImage SmelterBody()
+        {
+            var body = new PixelImage(T, 23);
+            Column(body, 10, 1, 4, 8, DarkStone);
+            Rect(body, 10, 1, 4, 1, Ink);
+            Box(body, 1, 7, 14, 4, 10, Stone);
+            for (int y = 12; y < 20; y += 3)
+                for (int x = 2; x < 14; x++)
+                    if ((x + y) % 5 == 0) body[x, y] = Stone.Shade;
+            Rect(body, 3, 7, 5, 3, Copper.Main);
+            Rect(body, 3, 7, 5, 1, Copper.Light);
+            Rect(body, 4, 8, 3, 1, Copper.Dark);
+            Rect(body, 5, 13, 6, 6, Ink);
+            Rect(body, 6, 12, 4, 1, Ink);
+            Rect(body, 6, 15, 4, 4, Flame);
+            Rect(body, 7, 16, 2, 2, FlameCore);
+            Foot(body, 1, 20, 14, 1);
+            return Finish(body, ShadowLayer(T, 23, 8, 21, 7, 2));
+        }
+
+        // A generator: an iron block with a grate on top where its flame burns, copper coils at the sides and a dial.
+        static PixelImage GeneratorBody()
+        {
+            var body = new PixelImage(T, 22);
+            Box(body, 1, 8, 14, 5, 7, Iron);
+            Rect(body, 5, 9, 6, 3, Ink);
+            for (int x = 5; x < 11; x += 2) Rect(body, x, 9, 1, 3, Iron.Shade);
+            foreach (int x in new[] { 1, 13 })
+            {
+                Rect(body, x, 13, 2, 6, Copper.Main);
+                for (int y = 13; y < 19; y += 2) Rect(body, x, y, 2, 1, Copper.Light);
+            }
+            LitOval(body, 8, 16, 2.5f, 2.5f, Cream);
+            body[8, 16] = Ink;
+            body[9, 15] = Ink;
+            Foot(body, 1, 19, 14, 1);
+            return Finish(body, ShadowLayer(T, 22, 8, 20, 7, 2));
+        }
+
+        // A turret: a squat round stone base banded with iron; its barrel turns on top.
+        static PixelImage TurretBody()
+        {
+            var body = new PixelImage(T, 20);
+            Column(body, 2, 10, 12, 7, DarkStone);
+            Rect(body, 2, 13, 12, 1, Iron.Main);
+            Rect(body, 2, 14, 12, 1, Iron.Shade);
+            LitOval(body, 8, 17, 6, 1.5f, DarkStone);
+            LitOval(body, 8, 10, 6, 2.5f, Iron);
+            LitOval(body, 8, 9.6f, 3, 1.3f, Iron);
+            return Finish(body, ShadowLayer(T, 20, 8, 18, 7, 2));
+        }
+
+        // An assembler: a blue-painted cabinet with a lit work window on top, vents and a little green screen in front.
+        static PixelImage AssemblerBody()
+        {
+            var body = new PixelImage(T, 22);
+            Box(body, 1, 8, 14, 5, 7, Paint);
+            Rect(body, 4, 9, 8, 3, Ink);
+            Rect(body, 5, 10, 6, 1, Gold.Light);
+            for (int y = 14; y < 19; y += 2) Rect(body, 3, y, 5, 1, Paint.Dark);
+            Rect(body, 9, 14, 4, 3, Ink);
+            Rect(body, 10, 15, 2, 1, LampGreen);
+            Foot(body, 1, 19, 14, 1);
+            return Finish(body, ShadowLayer(T, 22, 8, 20, 7, 2));
+        }
+
+        // An arc furnace: a dark iron block with a chimney, copper coils down its sides and a blue arc in its mouth.
+        static PixelImage ArcFurnaceBody()
+        {
+            var body = new PixelImage(T, 24);
+            Column(body, 2, 2, 3, 7, DarkStone);
+            Box(body, 1, 8, 14, 5, 9, Iron);
+            Rect(body, 1, 8, 14, 5, DarkStone.Light);
+            foreach (int x in new[] { 1, 13 })
+            {
+                Rect(body, x, 13, 2, 8, Copper.Main);
+                for (int y = 13; y < 21; y += 2) Rect(body, x, y, 2, 1, Copper.Light);
+            }
+            Rect(body, 5, 14, 6, 6, Ink);
+            Rect(body, 6, 15, 4, 4, Paint.Main);
+            Rect(body, 7, 15, 1, 4, Rune);
+            body[8, 16] = RuneCore;
+            body[6, 17] = Rune;
+            Foot(body, 1, 21, 14, 1);
+            return Finish(body, ShadowLayer(T, 24, 8, 22, 7, 2));
+        }
 
         // A flat top-down drawing stood up as a block: under each column's lowest drawn pixel, that colour darkened
         // for lift pixels (darker toward the floor, lighter at the left edge), the top over it, and a shadow under it.

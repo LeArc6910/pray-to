@@ -13,6 +13,9 @@ namespace Game.Core
     {
         // How near a person a player talks to them, and how near a waypoint it opens and can be used.
         public const float TalkReach = 1.8f;
+        // The host lets a talk through a little further (2026-11-11): the person may have walked on a step since the
+        // player's screen showed them in reach.
+        public const float TalkSlack = 1.2f;
         public const float WaypointReach = 1.6f;
         // A Story event's Amount for a step taken (talked to its giver, its goal still to do), and Waypoint's for one
         // newly open and for one gone to.
@@ -35,15 +38,16 @@ namespace Game.Core
 
         public PlaceSite SiteOf(PlaceDefinition place) => place == null ? null : Places.FirstOrDefault(p => p.Definition == place);
 
-        // The person of the story nearest the position within TalkReach, and where they stand, or null.
-        public static (CharacterDefinition Character, Vec2 At)? CharacterNear(IReadOnlyList<PlaceSite> places, Vec2 position)
+        // The person of the story nearest the position within reach (TalkReach unless said), where they are at that
+        // time (PlaceSite.PersonAt), or null.
+        public static (CharacterDefinition Character, Vec2 At)? CharacterNear(IReadOnlyList<PlaceSite> places, Vec2 position, long clock, float reach = TalkReach)
         {
             (CharacterDefinition, Vec2)? best = null;
-            float nearest = TalkReach;
+            float nearest = reach;
             foreach (var site in places)
             {
-                if (Vec2.Distance(position, site.Center) > site.Radius + TalkReach + 1) continue;
-                foreach (var (character, at) in site.People)
+                if (Vec2.Distance(position, site.Center) > site.Radius + reach + 1) continue;
+                foreach (var (character, at) in site.PeopleAt(clock))
                 {
                     float distance = Vec2.Distance(position, at);
                     if (distance > nearest) continue;
@@ -90,7 +94,7 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || Story == null) return false;
-            var near = CharacterNear(Places, player.Position);
+            var near = CharacterNear(Places, player.Position, Clock, TalkReach + TalkSlack);
             if (near == null || !(GivenBy(player, near.Value.Character) is (StoryStep step, bool taken))) return false;
             if (!taken)
             {
@@ -111,7 +115,7 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || Story == null) return false;
-            var near = CharacterNear(Places, player.Position);
+            var near = CharacterNear(Places, player.Position, Clock, TalkReach + TalkSlack);
             if (near == null || !(GivenBy(player, near.Value.Character) is (StoryStep step, _)) || choice < 0 || choice >= step.Choices.Count) return false;
             player.StoryChoices[step.Index] = choice;
             CompleteStep(player, step, step.Choices[choice].Step);

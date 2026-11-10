@@ -171,6 +171,10 @@ namespace Game.Client
                     foreach (var ready in player.Skills) player.ClearCooldown(ready);
                     player.InventoryVersion++;
                     return null;
+                // The people of the story hold still at home (on) or go about their day again (off), PlaceSite.Still.
+                case "still":
+                    PlaceSite.Still = words.Length < 2 || words[1] != "off";
+                    return null;
                 // The main story (Docs/Story.md): jump to a step (from 1), its giver not yet talked to.
                 case "journey":
                     world.RestoreJourney(player, Int(words[1]) - 1, false, null);
@@ -322,7 +326,7 @@ namespace Game.Client
                     to = TileMap.Center(signX + road.Item1, signY + road.Item2);
                     break;
                 case "person":
-                    var standing = world.Places.SelectMany(p => p.People).FirstOrDefault(p => p.Character.Id == words[2]);
+                    var standing = world.Places.SelectMany(p => p.PeopleAt(world.Clock)).FirstOrDefault(p => p.Character.Id == words[2]);
                     if (standing.Character == null) throw new ArgumentException($"no person '{words[2]}' in the story");
                     to = standing.At + new Vec2(0, -1);
                     break;
@@ -673,6 +677,9 @@ namespace Game.Client
                     .Concat(player.SideTaken.Where(chain => !player.SideSteps.ContainsKey(chain)).Select(chain => $"{chain}:{(world.Story?.Chain(chain)?.First.Index ?? 0) + 1}*"))));
                 json.Field("place", world.PlaceAt(player.Position)?.Definition.Id ?? "");
                 json.Field("places", world.Places.Count);
+                // Where the first place's people are now: "chief:12.5,30.5;mina:...".
+                json.Field("people", world.Places.Count == 0 ? "" : string.Join(";", world.Places[0].PeopleAt(world.Clock)
+                    .Select(p => $"{p.Character.Id}:{p.At.X:0.0},{p.At.Y:0.0}")));
                 json.Field("spawnX", world.Spawn.X);
                 json.Field("spawnY", world.Spawn.Y);
                 var (ax, ay) = World.TileAhead(player.Position, player.Facing);

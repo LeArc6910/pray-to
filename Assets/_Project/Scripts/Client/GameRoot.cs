@@ -419,8 +419,10 @@ namespace Game.Client
             }
             else
             {
-                song = Song.Field(tune, fight);
-                Music.Prepare(Song.Field(tune, !fight));
+                // A place's tune softens at night (2026-11-11, MusicArt.Night); a fight still wakes it.
+                bool night = place != null && PlaceTune(place.Definition.Style) == tune && Calendar.IsNight(_client.Clock);
+                song = Song.Field(tune, fight, night);
+                Music.Prepare(Song.Field(tune, !fight, night));
             }
             float nearest = float.MaxValue;
             foreach (var machine in _client.Machines())

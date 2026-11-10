@@ -665,11 +665,13 @@ namespace Game.Client
             // A signpost close by says where its road goes and which way (2026-11-11).
             foreach (var (sx, sy, toward) in _client.Signposts)
             {
-                var post = new Vector3(sx + 0.5f, sy + 1.6f, 0);
-                if (Vector3.Distance(post, _self.Position) >= 3) continue;
+                var post = new Vector3(sx + 0.5f, sy + 2.2f, 0);
+                if (Vector3.Distance(post, _self.Position) >= 3.5f) continue;
                 var there = _client.SiteOf(toward);
                 if (there == null) continue;
-                Label(post, $"{toward.Name} · {Compass(there.Center.X - (sx + 0.5f), there.Center.Y - (sy + 0.5f))}쪽", Color.white);
+                // Through Ui.Wrap, so the playtests read it as a person does.
+                string way = Ui.Wrap($"{toward.Name} · {Compass(there.Center.X - (sx + 0.5f), there.Center.Y - (sy + 0.5f))}쪽", _labelStyle, 600);
+                Label(post, way, new Color(1f, 0.95f, 0.75f));
             }
 
             // Each person's name and how well this player knows them, close by; the one near enough to deal with also
@@ -1340,15 +1342,21 @@ namespace Game.Client
             _storySeen.Clear();
             _storyInView.Clear();
             var self = new Vec2(_self.Position.x, _self.Position.y);
+            long clock = _client.Clock;
             foreach (var site in _client.Places)
             {
                 if (Vec2.Distance(self, site.Center) > PeopleRange + site.Radius) continue;
-                foreach (var (character, at) in site.People)
+                foreach (var (character, home) in site.People)
                 {
+                    // Where they are now on their day's round (PlaceSite.PersonAt), and a moment ago, to face the way
+                    // they walk and bob as they go.
+                    var at = site.PersonAt(character, home, clock);
+                    var before = site.PersonAt(character, home, clock - 6);
                     if (Vec2.Distance(self, at) > PeopleRange) continue;
                     _storyInView.Add((character, at));
                     var color = Rgba.Hex(string.IsNullOrEmpty(character.Color) ? "#8A7A6A" : character.Color);
-                    int frame = Mathf.FloorToInt(Time.time * PeopleArt.FramesPerSecond + at.X * 7 + at.Y * 3) % PeopleArt.Frames;
+                    int frame = Mathf.FloorToInt(Time.time * PeopleArt.FramesPerSecond + home.X * 7 + home.Y * 3) % PeopleArt.Frames;
+                    bool walking = Vec2.Distance(at, before) > 0.01f;
                     var figure = Sprites.Standing($"story/{character.Id}/{frame}", () => PeopleArt.Look(character.Look, color, frame));
                     _storySeen.Add(character.Id);
                     if (!_storyPeople.TryGetValue(character.Id, out var renderer))
@@ -1357,7 +1365,9 @@ namespace Game.Client
                         _storyPeople[character.Id] = renderer;
                     }
                     renderer.sprite = figure;
-                    renderer.transform.localPosition = new Vector3(at.X, at.Y - 0.3f, 0);
+                    if (walking) renderer.flipX = at.X < before.X - 0.005f;
+                    float bob = walking ? Mathf.Abs(Mathf.Sin(Time.time * (character.Walk == "run" ? 16 : 10))) * 0.07f : 0;
+                    renderer.transform.localPosition = new Vector3(at.X, at.Y - 0.3f + bob, 0);
                     renderer.sortingOrder = 10000 - Mathf.RoundToInt((at.Y - 0.3f) * 10);
                 }
             }
@@ -1379,9 +1389,13 @@ namespace Game.Client
         readonly List<int> _propsGone = new List<int>();
         const int PropRange = 20;
 
+        bool _windowsLit;
+
         void DrawProps()
         {
             var map = _client.Map;
+            var phase = Calendar.Phase(_client.Clock);
+            _windowsLit = phase == DayPhase.Evening || phase == DayPhase.Night;
             _propsSeen.Clear();
             int cx = Mathf.FloorToInt(_self.Position.x), cy = Mathf.FloorToInt(_self.Position.y);
             for (int y = cy - PropRange; y <= cy + PropRange; y++)
@@ -1393,7 +1407,11 @@ namespace Game.Client
                     // The places' structures and the things players build that stand (PropArt.Stands, 2026-11-10).
                     if (!(Structures.IsDecor(type) || PropArt.Stands(type)) || type == TileType.StructurePart) continue;
                     int sides = PropArt.IsWall(type) ? PropArt.Sides(map, x, y) : 0;
-                    var sprite = Sprites.Standing($"prop/{type}/{sides}", () => PropArt.Prop(type, sides));
+                    // Houses show their windows lit from the evening (2026-11-11), dark glass by day.
+                    bool lit = PropArt.LitAtNight(type) && _windowsLit;
+                    var sprite = PropArt.LitAtNight(type)
+                        ? Sprites.Standing($"prop/{type}/{(lit ? "lit" : "day")}", () => lit ? PropArt.Prop(type) : PropArt.Daylit(PropArt.Prop(type)))
+                        : Sprites.Standing($"prop/{type}/{sides}", () => PropArt.Prop(type, sides));
                     int key = y * map.Width + x;
                     _propsSeen.Add(key);
                     if (!_props.TryGetValue(key, out var renderer))
@@ -3079,6 +3097,32 @@ namespace Game.Client
             }
         }
 
+        // In the evening and at night (2026-11-11), the windows of the places' houses glow warm out onto the plaza,
+        // and the lamps along the roads and in the places throw their light further.
+        void AddNightLights(int left, int bottom, int size)
+        {
+            var phase = Calendar.Phase(_client.Clock);
+            if (phase != DayPhase.Evening && phase != DayPhase.Night || _client.Places.Count == 0) return;
+            float strength = phase == DayPhase.Night ? 1 : 0.6f;
+            var warm = Rgba.Hex("#FFC870");
+            var map = _client.Map;
+            const int margin = 6;
+            for (int y = Mathf.Max(0, bottom - margin); y < Mathf.Min(map.Height, bottom + size + margin); y++)
+            {
+                for (int x = Mathf.Max(0, left - margin); x < Mathf.Min(map.Width, left + size + margin); x++)
+                {
+                    var type = map[x, y];
+                    if (PropArt.LitAtNight(type))
+                    {
+                        var (w, _) = Structures.Footprint(type);
+                        _lights.Add(new LightSource(new Vec2(x + w / 2f, y + 0.6f), 3.2f, 0.7f * strength, warm, tints: true));
+                    }
+                    else if (type == TileType.LampPost || type == TileType.Lantern || type == TileType.Brazier || type == TileType.Campfire)
+                        _lights.Add(new LightSource(TileMap.Center(x, y), 4.5f, 0.45f * strength, warm, tints: true));
+                }
+            }
+        }
+
         void UpdateDark(Vec2 self)
         {
             _dark.enabled = Settings.Darkness;
@@ -3099,6 +3143,7 @@ namespace Game.Client
             }
             _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time);
             AddSkyLights(left, bottom, size);
+            AddNightLights(left, bottom, size);
             foreach (var shot in _projectiles.Values)
             {
                 if (shot.sprite == ArrowSprite) continue;

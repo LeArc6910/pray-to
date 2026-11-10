@@ -9,8 +9,9 @@ namespace Game.Core
     public sealed class PlaceDefinition
     {
         internal PlaceDefinition(int index, string id, string name, string kind, int distance, int radius, string road, bool waypoint, TileType floor, string text,
-            string style = "")
+            string style = "", bool arena = false)
         {
+            Arena = arena;
             Style = style;
             Index = index;
             Id = id;
@@ -41,14 +42,18 @@ namespace Game.Core
         public string Text { get; }
         // How it is dressed (WorldGenerator.Decorate): village, kingdom, hut, nest, or "" for a bare plaza with lamps.
         public string Style { get; }
+        // Whether a boss arena is carved beside it (places.csv arena, 2026-11-11), for a boss with this place.
+        public bool Arena { get; }
     }
 
     // Someone in the story (Docs/Story.md, 인물): where they live, how they look, and what they say when it is not
     // their turn in the story.
     public sealed class CharacterDefinition
     {
-        internal CharacterDefinition(int index, string id, string name, PlaceDefinition place, string look, string color, IReadOnlyList<(string Text, StoryWhen When)> lines)
+        internal CharacterDefinition(int index, string id, string name, PlaceDefinition place, string look, string color, IReadOnlyList<(string Text, StoryWhen When)> lines,
+            string walk = "wander")
         {
+            Walk = walk;
             Index = index;
             Id = id;
             Name = name;
@@ -65,6 +70,9 @@ namespace Game.Core
         // Which drawing (queen, hero, elder, girl, demon, guard, villager); any other is a villager.
         public string Look { get; }
         public string Color { get; }
+        // How they spend the day (characters.csv walk, 2026-11-11): "wander" round the plaza, "run" round it quicker
+        // (children), or "stay" where they stand (PlaceSite.PersonAt).
+        public string Walk { get; }
         // What they say when it is not their turn, each line maybe only after an answer (StoryWhen).
         public IReadOnlyList<(string Text, StoryWhen When)> Lines { get; }
 
@@ -297,7 +305,8 @@ namespace Game.Core
                         bool waypoint = row["waypoint"].Length == 0 || row["waypoint"] == "yes";
                         string style = row["style"];
                         if (style.Length > 0 && !Styles.Contains(style)) throw new FormatException($"style은 비우거나 {string.Join(", ", Styles)} 가운데 하나여야 합니다.");
-                        places.Add(new PlaceDefinition(places.Count, id, row["name"], row["kind"], distance, radius, road, waypoint, floor, row["text"], style));
+                        bool arena = row["arena"] == "yes";
+                        places.Add(new PlaceDefinition(places.Count, id, row["name"], row["kind"], distance, radius, road, waypoint, floor, row["text"], style, arena));
                     }
                     catch (FormatException e)
                     {
@@ -322,7 +331,9 @@ namespace Game.Core
                         if (characters.Any(c => c.Id == id)) throw new FormatException($"'{id}'가 두 번 있습니다.");
                         var place = places.FirstOrDefault(p => p.Id == row["place"]) ?? throw new FormatException($"place '{row["place"]}'가 {PlacesFile}에 없습니다.");
                         var lines = row["lines"].Split('|').Select(l => l.Trim()).Where(l => l.Length > 0).Select(When).ToList();
-                        characters.Add(new CharacterDefinition(characters.Count, id, row["name"], place, row["look"], row["color"], lines));
+                        string walk = row["walk"].Length == 0 ? "wander" : row["walk"];
+                        if (walk != "wander" && walk != "run" && walk != "stay") throw new FormatException($"walk '{walk}'는 비우거나 wander, run, stay 가운데 하나여야 합니다.");
+                        characters.Add(new CharacterDefinition(characters.Count, id, row["name"], place, row["look"], row["color"], lines, walk));
                     }
                     catch (FormatException e)
                     {

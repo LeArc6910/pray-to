@@ -208,15 +208,19 @@ namespace Game.Core.Tests
         [Test]
         public void TheNestsLordHasAnArenaBesideIt([Range(1, 24)] int seed)
         {
+            // The nest's and (2026-11-11) the harbour's: places.csv arena.
             var generated = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
-            Assert.IsTrue(generated.PlaceArenas.TryGetValue("demon_nest", out var arena), $"seed {seed}: no arena");
-            Assert.AreEqual(generated.CaveArenas + 1, generated.Arenas.Count);
-            var nest = generated.Places.Single(p => p.Definition.Id == "demon_nest");
-            foreach (var other in generated.Places.Where(p => p != nest))
-                Assert.Greater(Vec2.Distance(other.Center, arena), other.Radius + WorldGenerator.ArenaRadius, $"seed {seed}: on {other.Definition.Id}");
-            var field = new FlowField(generated.Map);
-            field.Build(new[] { nest.Center }, int.MaxValue - 1);
-            Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(TileMap.Cell(arena.X), TileMap.Cell(arena.Y)), $"seed {seed}: cannot be walked to");
+            Assert.AreEqual(generated.CaveArenas + 2, generated.Arenas.Count);
+            foreach (string id in new[] { "demon_nest", "mist_harbor" })
+            {
+                Assert.IsTrue(generated.PlaceArenas.TryGetValue(id, out var arena), $"seed {seed}: no arena by {id}");
+                var place = generated.Places.Single(p => p.Definition.Id == id);
+                foreach (var other in generated.Places.Where(p => p != place))
+                    Assert.Greater(Vec2.Distance(other.Center, arena), other.Radius + WorldGenerator.ArenaRadius, $"seed {seed}: {id}'s arena on {other.Definition.Id}");
+                var field = new FlowField(generated.Map);
+                field.Build(new[] { place.Center }, int.MaxValue - 1);
+                Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(TileMap.Cell(arena.X), TileMap.Cell(arena.Y)), $"seed {seed}: {id}'s arena cannot be walked to");
+            }
         }
 
         [Test]
@@ -229,6 +233,13 @@ namespace Game.Core.Tests
             var general = world.Bosses.Single(b => b.Definition.Id == "mad_general");
             Assert.Less(Vec2.Distance(general.Home, nest.Center), nest.Radius + WorldGenerator.ArenaRadius + 8, "beside the nest");
             Assert.AreEqual(Bosses.Shipped.Bosses.Count, world.Bosses.Count, "every boss has its arena");
+            // Chapter 4's crown wraith (2026-11-11) waits beside the harbour, dropping the sunken crown and its two
+            // legendaries.
+            var harbor = world.Places.Single(p => p.Definition.Id == "mist_harbor");
+            var wraith = world.Bosses.Single(b => b.Definition.Id == "crown_wraith");
+            Assert.Less(Vec2.Distance(wraith.Home, harbor.Center), harbor.Radius + WorldGenerator.ArenaRadius + 32, "beside the harbour");
+            Assert.AreEqual("sunken_crown", wraith.Definition.MaterialId);
+            CollectionAssert.AreEquivalent(new[] { "wraith_circlet", "drowned_mantle" }, Gear.Data.Bases.Where(b => b.Legendary == "crown_wraith").Select(b => b.Id));
 
             // Monsters come over the whole map; round the nest only demons, and demons nowhere else.
             config.EnemyTarget = 400;
@@ -316,10 +327,10 @@ namespace Game.Core.Tests
             var host = Host();
             var world = host.World;
             var player = world.AddPlayer("a", null);
-            var chief = world.Places[0].People.First(p => p.Character.Id == "chief").At;
+            var chief = world.Places[0].PeopleAt(world.Clock).First(p => p.Character.Id == "chief").At;
             Assert.AreEqual(0, player.JourneyStep);
 
-            player.Position = Beside(world.Places[0].People.First(p => p.Character.Id == "mina").At);
+            player.Position = Beside(world.Places[0].PeopleAt(world.Clock).First(p => p.Character.Id == "mina").At);
             Assert.IsFalse(world.TalkInStory(player.Id), "mina does not give the first step");
             player.Position = Beside(chief);
             Assert.IsTrue(world.TalkInStory(player.Id));
@@ -340,7 +351,7 @@ namespace Game.Core.Tests
             var host = Host();
             var world = host.World;
             var player = world.AddPlayer("a", null);
-            var queen = world.Places[1].People.First(p => p.Character.Id == "queen").At;
+            var queen = world.Places[1].PeopleAt(world.Clock).First(p => p.Character.Id == "queen").At;
             world.RestoreJourney(player, 1, false, null);
 
             player.Position = Beside(queen);
@@ -352,7 +363,7 @@ namespace Game.Core.Tests
 
             // Step 4 asks for five roasted mushrooms, taken when the player talks to the hero again holding them.
             world.RestoreJourney(player, 3, false, null);
-            var hero = world.Places[2].People.First(p => p.Character.Id == "hero").At;
+            var hero = world.Places[2].PeopleAt(world.Clock).First(p => p.Character.Id == "hero").At;
             player.Position = Beside(hero);
             Assert.IsTrue(world.TalkInStory(player.Id));
             Assert.AreEqual(3, player.JourneyStep);
@@ -401,12 +412,12 @@ namespace Game.Core.Tests
             Assert.AreEqual(2, asks.Choices.Count);
             Assert.AreEqual(9, asks.Choices[0].Step);
             Assert.AreEqual(10, asks.Choices[1].Step);
-            Assert.AreEqual(Tales.Shipped.Steps.Count, Tales.Shipped.Steps[9].Next, "the first branch ends, not into the second");
+            Assert.AreEqual(21, Tales.Shipped.Steps[9].Next, "the first branch goes on to chapter 4, not into the second");
 
             var host = Host();
             var world = host.World;
             var player = world.AddPlayer("a", null);
-            var queen = world.Places.SelectMany(p => p.People).Single(p => p.Character.Id == "queen");
+            var queen = world.Places.SelectMany(p => p.PeopleAt(world.Clock)).Single(p => p.Character.Id == "queen");
             world.RestoreJourney(player, 8, false, null);
             player.Position = Beside(queen.At);
             int coins = player.Inventory.CountOf(Gear.Data.FindMaterial("coin"));
@@ -419,10 +430,10 @@ namespace Game.Core.Tests
             Assert.AreEqual(answer, player.StoryChoices[8]);
             Assert.AreEqual(coins + 150, player.Inventory.CountOf(Gear.Data.FindMaterial("coin")), "the step's reward");
 
-            // The queen answers in turn, and that is the end of the story so far.
+            // The queen answers in turn, and chapter 4 begins with the hero.
             Assert.IsTrue(world.TalkInStory(player.Id));
-            Assert.AreEqual(Tales.Shipped.Steps.Count, player.JourneyStep);
-            Assert.IsNull(world.StepOf(player));
+            Assert.AreEqual(21, player.JourneyStep);
+            Assert.AreEqual("hero", world.StepOf(player).Who.Id);
         }
 
         [Test]
@@ -465,6 +476,33 @@ namespace Game.Core.Tests
             StringAssert.Contains("next '7'", all);
         }
 
+        // The people go about their plaza by day and are home at night (2026-11-11): wanderers move, those who stay do
+        // not, and wherever they are is open floor of their own place.
+        [Test]
+        public void PeopleWalkTheirRoundsByDayAndAreHomeAtNight([Range(1, 6)] int seed)
+        {
+            var world = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
+            int moving = 0;
+            foreach (var site in world.Places)
+            {
+                foreach (var (character, home) in site.People)
+                {
+                    var seen = new HashSet<(int, int)>();
+                    for (long clock = 0; clock < Calendar.TicksPerDay; clock += World.TicksPerSecond * 3)
+                    {
+                        var at = site.PersonAt(character, home, clock);
+                        Assert.IsFalse(world.Map.IsSolid(TileMap.Cell(at.X), TileMap.Cell(at.Y)), $"seed {seed}: {character.Id} in something solid");
+                        Assert.LessOrEqual(Vec2.Distance(at, site.Center), site.Radius, $"seed {seed}: {character.Id} out of {site.Definition.Id}");
+                        if (Calendar.IsNight(clock)) Assert.AreEqual(home, at, $"seed {seed}: {character.Id} is home at night");
+                        seen.Add(((int)(at.X * 2), (int)(at.Y * 2)));
+                    }
+                    if (character.Walk == "stay") Assert.AreEqual(1, seen.Count, $"{character.Id} stays put");
+                    else if (seen.Count > 1) moving++;
+                }
+            }
+            Assert.GreaterOrEqual(moving, 6, $"seed {seed}: most people go about");
+        }
+
         // The places are safe (2026-11-11): a monster knocked or wandering into one is set back outside its edge, and
         // none goes after a player standing inside one.
         [Test]
@@ -505,7 +543,8 @@ namespace Game.Core.Tests
                 Assert.AreEqual(story.Steps.Count, rows.Last().Next, $"{chain.Id} ends, not into another story");
                 for (int i = 0; i + 1 < rows.Count; i++) Assert.AreEqual(rows[i + 1].Index, rows[i].Next, $"{chain.Id} goes row by row");
             }
-            Assert.AreEqual(story.Steps.Count, story.Steps[10].Next, "the main story's last row ends rather than running into a side story");
+            Assert.AreEqual(21, story.Steps[10].Next, "both branches go on to chapter 4, past the side stories' rows");
+            foreach (int ending in new[] { 25, 26, 27 }) Assert.AreEqual(story.Steps.Count, story.Steps[ending].Next, "each ending ends the story");
 
             var host = Host();
             var world = host.World;
@@ -548,17 +587,19 @@ namespace Game.Core.Tests
         public void TheStorySoFarFollowsTheAnswers()
         {
             var story = Tales.Shipped;
-            var kept = story.Passed(0, story.Steps.Count, new Dictionary<int, int> { [8] = 1 });
+            var kept = story.Passed(0, 21, new Dictionary<int, int> { [8] = 1 });
             CollectionAssert.AreEqual(Enumerable.Range(0, 9).Append(10), kept.Select(s => s.Index), "through the queen's question to the branch kept");
-            var told = story.Passed(0, story.Steps.Count, new Dictionary<int, int> { [8] = 0 });
+            var told = story.Passed(0, 21, new Dictionary<int, int> { [8] = 0 });
             CollectionAssert.AreEqual(Enumerable.Range(0, 10), told.Select(s => s.Index));
+            var crowned = story.Passed(0, story.Steps.Count, new Dictionary<int, int> { [8] = 1, [24] = 2 });
+            CollectionAssert.AreEqual(new[] { 21, 22, 23, 24, 27 }, crowned.Skip(10).Select(s => s.Index), "chapter 4 to the queen's ending");
             Assert.AreEqual(3, story.Passed(0, 3, null).Count, "up to the step on now");
             int harbor = Index("harbor");
             Assert.AreEqual(2, story.Passed(harbor, Index("harbor", 2), null).Count);
         }
 
         static void PersonAt(World world, string id, Player player) =>
-            player.Position = Beside(world.Places.SelectMany(p => p.People).Single(p => p.Character.Id == id).At);
+            player.Position = Beside(world.Places.SelectMany(p => p.PeopleAt(world.Clock)).Single(p => p.Character.Id == id).At);
 
         [Test]
         public void TheNestsSideStorySendsThemAfterTheGeneral()

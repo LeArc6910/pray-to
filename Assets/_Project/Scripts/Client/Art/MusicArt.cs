@@ -39,8 +39,9 @@ namespace Game.Client
     // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
     readonly struct Song : IEquatable<Song>
     {
-        Song(Tune tune, bool battle, string boss, int phase)
+        Song(Tune tune, bool battle, string boss, int phase, bool night = false)
         {
+            Night = night;
             Tune = tune;
             Battle = battle;
             Boss = boss;
@@ -49,24 +50,26 @@ namespace Game.Client
 
         public Tune Tune { get; }
         public bool Battle { get; }
+        // A place's tune at night (2026-11-11): quieter, slower, no drums.
+        public bool Night { get; }
         // The boss's id in bosses.csv, or null for a field's tune.
         public string Boss { get; }
         public int Phase { get; }
 
-        public static Song Field(Tune tune, bool battle = false) => new Song(tune, battle, null, 0);
+        public static Song Field(Tune tune, bool battle = false, bool night = false) => new Song(tune, battle, null, 0, night && !battle);
 
         // Phases past the last theme play the last.
         public static Song Of(string boss, int phase) => new Song(Tune.Boss, false, boss, Math.Clamp(phase, 1, MusicArt.BossPhases));
 
-        public string Key => Boss != null ? $"boss_{Boss}_{Phase}" : Battle ? $"tune_{Tune}_battle" : $"tune_{Tune}";
+        public string Key => Boss != null ? $"boss_{Boss}_{Phase}" : Battle ? $"tune_{Tune}_battle" : Night ? $"tune_{Tune}_night" : $"tune_{Tune}";
 
         // Two songs that are one loop in two arrangements, the same length, tempo and melody: a field's calm and
         // fight, or a boss's first two phases. One can take over from the other at the same place (Music).
         public bool InStepWith(Song other) =>
-            Boss == null ? other.Boss == null && Tune == other.Tune
+            Boss == null ? other.Boss == null && Tune == other.Tune && !Night && !other.Night
             : Boss == other.Boss && Math.Max(Phase, other.Phase) <= 2;
 
-        public bool Equals(Song other) => Tune == other.Tune && Battle == other.Battle && Boss == other.Boss && Phase == other.Phase;
+        public bool Equals(Song other) => Tune == other.Tune && Battle == other.Battle && Boss == other.Boss && Phase == other.Phase && Night == other.Night;
         public override bool Equals(object obj) => obj is Song other && Equals(other);
         public override int GetHashCode() => Key.GetHashCode();
         public override string ToString() => Key;
@@ -285,6 +288,32 @@ namespace Game.Client
             return style;
         }
 
+        // The tunes of the story's places, which have a night arrangement too.
+        public static readonly Tune[] PlaceTunes = { Tune.Village, Tune.Kingdom, Tune.Hut, Tune.Nest, Tune.Harbor, Tune.Ruins, Tune.Mine };
+
+        // A place's tune at night (2026-11-11): the same melody slower and softer, the drums gone, the arpeggio
+        // slowed to one note a beat, a held pad under it and longer echoes, as if heard from outside a lit window.
+        static Style Night(Style day)
+        {
+            var style = day.Copy();
+            style.Bpm = day.Bpm * 0.85f;
+            style.Kick = null;
+            style.Snare = null;
+            style.Hat = null;
+            style.Tom = null;
+            style.Tek = null;
+            style.BassNotes = 1;
+            style.ArpRate = 1;
+            style.ArpVolume = day.ArpVolume * 0.7f;
+            style.LeadVolume = day.LeadVolume * 0.85f;
+            if (style.Lead == Wave.Square || style.Lead == Wave.Saw) style.Lead = Wave.Triangle;
+            if (day.PadVolume <= 0) style.Pad = Wave.Sine;
+            style.PadVolume = Math.Max(day.PadVolume, 0.06f);
+            style.Echo = Math.Max(day.Echo, 0.45f);
+            style.Rest = Math.Min(0.7f, day.Rest + 0.1f);
+            return style;
+        }
+
         // A boss's theme, in the spirit of its place and of itself; null for a boss without one of its own.
         static Style BossStyle(string boss) => boss switch
         {
@@ -338,6 +367,15 @@ namespace Game.Client
                 Lead = Wave.Saw, LeadVolume = 0.2f, Arp = Wave.Square, ArpRate = 2, ArpVolume = 0.08f, Rest = 0.3f,
                 Kick = "x...x.x.x...x.x.", Snare = "....X.......X...", Tom = "..x.....x.x...x.", Echo = 0.15f, Seed = 27,
             },
+            // The crown wraith under the lake (2026-11-11): a drowned waltz, bells over rolling arpeggios in threes and a
+            // cold pad, the drums slow and far off.
+            "crown_wraith" => new Style
+            {
+                Bpm = 112, Root = 47, Scale = Harmonic, Chords = new[] { 0, 5, 3, 4 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Triangle,
+                BassNotes = 2, Lead = Wave.Bell, LeadOctave = 1, LeadVolume = 0.24f, Arp = Wave.Triangle, ArpRate = 3, ArpOctave = 1,
+                ArpVolume = 0.12f, Rest = 0.3f, Pad = Wave.Sine, PadVolume = 0.06f, Kick = "x...........x...", Tom = "......x.......x.",
+                Echo = 0.4f, Seed = 28,
+            },
             // Any other boss: fast harmonic minor with driving drums.
             _ => new Style
             {
@@ -385,6 +423,7 @@ namespace Game.Client
         {
             var style = song.Boss != null ? BossPhase(song.Boss, song.Phase)
                 : song.Battle ? Battle(StyleOf(song.Tune))
+                : song.Night ? Night(StyleOf(song.Tune))
                 : StyleOf(song.Tune);
             float beat = 60 / style.Bpm;
             float bar = beat * 4;

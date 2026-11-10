@@ -1375,6 +1375,9 @@ namespace Game.Client
             // of fire for the orb, horns through the hood.
             "mad_general" => VoidLord(frame, view, pose, "#5A1A24", "#E86A3A", "#FF9A4A", "#FFD27A", horns: true),
             "tide_serpent" => Serpent(frame, view, pose),
+            // The crown wraith under the harbour's lake (2026-11-11): the robed build drowned, sea-green and pale, a cold
+            // orb, the sunken crown on its hood.
+            "crown_wraith" => VoidLord(frame, view, pose, "#1E4A4E", "#7AD8C8", "#A8F0FF", "#E8FFFF", crown: true),
             "antlion" => Antlion(frame, view, pose),
             _ => Warden(color, frame, view, pose),
         };
@@ -1498,7 +1501,7 @@ namespace Game.Client
         // up, thrusts it out to strike and flares its cloak to roar; side on, the cloak narrows and the orb is held
         // out in front; from behind, the hood is closed and the orb hidden.
         static PixelImage VoidLord(int frame, BossView view, BossPose pose, string cloakColor = "#3A2C5C", string trimColor = "#9A7CFF",
-            string orbColor = "#C8A8FF", string eyeColor = "#BFF4FF", bool horns = false)
+            string orbColor = "#C8A8FF", string eyeColor = "#BFF4FF", bool horns = false, bool crown = false)
         {
             const int width = 46;
             const int height = 46;
@@ -1572,6 +1575,24 @@ namespace Game.Client
                     Set(face + 5 + i / 2, 7 - i + bob, i < 3 ? bone.Shade : bone.Main);
                     Set(face + 4 + i / 2, 7 - i + bob, bone.Dark);
                 }
+            }
+            // A sunken king's crown over the hood (2026-11-11, the crown wraith): a gold band with three points, green
+            // with the lake's tarnish in places.
+            if (crown)
+            {
+                var gold = Ramp.Of("#F0BE40");
+                var tarnish = Rgba.Hex("#5AA88A");
+                for (int x = face - 5; x <= face + 5; x++)
+                {
+                    Set(x, 6 + bob, (x - face) % 4 == 0 ? tarnish : gold.Main);
+                    Set(x, 7 + bob, gold.Shade);
+                }
+                foreach (int px in new[] { face - 4, face, face + 4 })
+                {
+                    Set(px, 5 + bob, gold.Light);
+                    Set(px, 4 + bob, gold.Main);
+                }
+                Set(face, 3 + bob, gold.Light);
             }
             // The orb with sleeves reaching to it: before the chest, overhead to wind up, thrust out and down to strike;
             // side on it is held out ahead. From behind only the sleeves show.

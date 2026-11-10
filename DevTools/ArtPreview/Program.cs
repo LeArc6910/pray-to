@@ -91,7 +91,7 @@ namespace Game.Client
             return 0;
         }
 
-        static readonly string[] BossIds = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion", "mad_general" };
+        static readonly string[] BossIds = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion", "mad_general", "crown_wraith" };
 
         static bool WriteSounds(string folder)
         {
@@ -175,6 +175,7 @@ namespace Game.Client
             // Every field's tune calm and in a fight, every boss's theme at each phase, and the ambience.
             var songs = ((Tune[])Enum.GetValues(typeof(Tune))).Where(t => t != Tune.Boss)
                 .SelectMany(t => new[] { Song.Field(t), Song.Field(t, battle: true) })
+                .Concat(MusicArt.PlaceTunes.Select(t => Song.Field(t, night: true)))
                 .Concat(BossIds.SelectMany(id => Enumerable.Range(1, MusicArt.BossPhases).Select(phase => Song.Of(id, phase))))
                 .ToList();
             var loops = songs.Select(song => (song.Key, MusicArt.Make(song)))

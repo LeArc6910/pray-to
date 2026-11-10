@@ -62,15 +62,64 @@ namespace Game.Core
         internal void AddSignpost(int x, int y, PlaceDefinition toward) => _signposts.Add((x, y, toward));
     }
 
-    // Where a place was carved: its middle (the waypoint), its plaza's radius, and where its people stand.
+    // Where a place was carved: its middle (the waypoint), its plaza's radius, where its people stand at home, and the
+    // spots each walks between by day.
     public sealed class PlaceSite
     {
-        internal PlaceSite(PlaceDefinition definition, int x, int y, IReadOnlyList<(CharacterDefinition Character, Vec2 At)> people)
+        internal PlaceSite(PlaceDefinition definition, int x, int y, IReadOnlyList<(CharacterDefinition Character, Vec2 At)> people,
+            IReadOnlyDictionary<string, IReadOnlyList<Vec2>> rounds = null)
         {
             Definition = definition;
             X = x;
             Y = y;
             People = people;
+            Rounds = rounds ?? new Dictionary<string, IReadOnlyList<Vec2>>();
+        }
+
+        // The people of the story go about the plaza by day (2026-11-11, characters.csv walk): from home to two other
+        // spots and back, lingering at each, on a loop of about RoundSeconds (half that for those who run), each person
+        // at their own point in it; at night everyone is home. Where they are is worked out from the world's clock
+        // alone, so the host and every client see them in the same place without a word between them.
+        public const float WalkSpeed = 1.1f;
+        public const float RunSpeed = 2.4f;
+        public const float RoundSeconds = 70;
+        // Playtests hold everyone at home so they can be walked up to (Playtest "still").
+        public static bool Still;
+
+        // Each wanderer's spots by character id, home first.
+        public IReadOnlyDictionary<string, IReadOnlyList<Vec2>> Rounds { get; }
+
+        public Vec2 PersonAt(CharacterDefinition character, Vec2 home, long clock)
+        {
+            if (Still || !Rounds.TryGetValue(character.Id, out var spots) || spots.Count < 2 || Calendar.IsNight(clock)) return home;
+            bool runs = character.Walk == "run";
+            float speed = runs ? RunSpeed : WalkSpeed;
+            int n = spots.Count;
+            var walks = new float[n];
+            float walking = 0;
+            for (int i = 0; i < n; i++)
+            {
+                walks[i] = Vec2.Distance(spots[i], spots[(i + 1) % n]) / speed;
+                walking += walks[i];
+            }
+            float round = runs ? RoundSeconds / 2 : RoundSeconds;
+            float dwell = System.Math.Max(2, (round - walking) / n);
+            double period = walking + dwell * n;
+            double t = (clock / (double)World.TicksPerSecond + character.Index * 13.7) % period;
+            for (int i = 0; i < n; i++)
+            {
+                if (t < dwell) return spots[i];
+                t -= dwell;
+                if (t < walks[i]) return Vec2.Lerp(spots[i], spots[(i + 1) % n], (float)(t / walks[i]));
+                t -= walks[i];
+            }
+            return home;
+        }
+
+        // Everyone here and where they are at that time.
+        public IEnumerable<(CharacterDefinition Character, Vec2 At)> PeopleAt(long clock)
+        {
+            foreach (var (character, home) in People) yield return (character, PersonAt(character, home, clock));
         }
 
         public PlaceDefinition Definition { get; }
@@ -254,7 +303,7 @@ namespace Game.Core
 
             // Beside the demon nest, its lord's arena (2026-11-10, bosses.csv place): on the side away from the road
             // that comes in, clear of the other places and arenas, reached from the nest by a short road.
-            foreach (var (place, cx, cy) in spots.Where(s => s.Place.Style == "nest").ToList())
+            foreach (var (place, cx, cy) in spots.Where(s => s.Place.Arena).ToList())
             {
                 int r = place.Radius;
                 var from = spots.FirstOrDefault(s => s.Place.Id == place.Road);
@@ -262,7 +311,7 @@ namespace Game.Core
                 // Nearest the nest first, then furthest from where the road comes from.
                 (int X, int Y)? best = null;
                 int bestScore = int.MinValue;
-                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 16 && best == null; reach += 2)
+                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 30 && best == null; reach += 2)
                 {
                     foreach (var way in Ways)
                     {
@@ -429,7 +478,7 @@ namespace Game.Core
                 var people = Stand(map, cx, cy, place, story.Characters.Where(c => c.Place == place).ToList(), wanted);
                 Open(map, cx, cy, place, people.Select(p => (TileMap.Cell(p.Item2.X), TileMap.Cell(p.Item2.Y))));
                 Tidy(map, cx, cy, place);
-                sites.Add(new PlaceSite(place, cx, cy, people));
+                sites.Add(new PlaceSite(place, cx, cy, people, Rounds(map, cx, cy, place, people)));
             }
             return sites;
         }
@@ -830,6 +879,49 @@ namespace Game.Core
                 people.Add((living[i], TileMap.Center(px, py)));
             }
             return people;
+        }
+
+        // Where each person who goes about walks by day (PlaceSite.PersonAt): from home to a spot two and a half to six
+        // tiles off, on to another as far, and home, each leg a straight line over open floor, away from the other
+        // people's homes. Spots are tried in an order fixed by the person and the tile, so it is the same every time.
+        static Dictionary<string, IReadOnlyList<Vec2>> Rounds(TileMap map, int cx, int cy, PlaceDefinition place,
+            List<(CharacterDefinition Character, Vec2 At)> people)
+        {
+            var rounds = new Dictionary<string, IReadOnlyList<Vec2>>();
+            int r = place.Radius;
+            bool Walkable(Vec2 p) => !map.IsSolid(TileMap.Cell(p.X), TileMap.Cell(p.Y)) && map[TileMap.Cell(p.X), TileMap.Cell(p.Y)] != TileType.Water;
+            bool Clear(Vec2 a, Vec2 b)
+            {
+                float length = Vec2.Distance(a, b);
+                for (float along = 0; along <= length; along += 0.25f)
+                {
+                    var p = Vec2.Lerp(a, b, length < 1e-3f ? 0 : along / length);
+                    if (!Walkable(p) || !Walkable(p + new Vec2(0.3f, 0)) || !Walkable(p + new Vec2(-0.3f, 0))) return false;
+                }
+                return true;
+            }
+            var floor = new List<Vec2>();
+            for (int y = cy - r; y <= cy + r; y++)
+                for (int x = cx - r; x <= cx + r; x++)
+                {
+                    if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > (r - 1) * (r - 1) || !IsInside(map, x, y)) continue;
+                    if (map.IsSolid(x, y) || map[x, y] == TileType.Waypoint || map[x, y] == TileType.Water || map.IsSolid(x, y - 1)) continue;
+                    floor.Add(TileMap.Center(x, y));
+                }
+            foreach (var (character, home) in people)
+            {
+                if (character.Walk == "stay") continue;
+                int seed = character.Index * 7919 + 17;
+                var order = floor.OrderBy(p => ((int)p.X * 73856093 ^ (int)p.Y * 19349663 ^ seed) & 0x7fffffff).ToList();
+                bool AwayFromOthers(Vec2 p) => people.All(o => o.Character == character || Vec2.Distance(o.At, p) >= 1.5f);
+                Vec2? first = order.Cast<Vec2?>().FirstOrDefault(p => Vec2.Distance(p.Value, home) is float d && d >= 2.5f && d <= 6
+                    && AwayFromOthers(p.Value) && Clear(home, p.Value));
+                if (first is not Vec2 a) continue;
+                Vec2? second = order.Cast<Vec2?>().FirstOrDefault(p => Vec2.Distance(p.Value, a) is float d && d >= 2.5f && d <= 6
+                    && Vec2.Distance(p.Value, home) >= 2 && AwayFromOthers(p.Value) && Clear(a, p.Value) && Clear(p.Value, home));
+                rounds[character.Id] = second is Vec2 b ? new[] { home, a, b } : new[] { home, a };
+            }
+            return rounds;
         }
 
         // Whatever the dressing shut off is opened again: each person (and the tile below them) and each road that
