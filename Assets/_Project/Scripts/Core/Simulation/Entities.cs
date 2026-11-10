@@ -101,6 +101,10 @@ namespace Game.Core
         public HashSet<string> Waypoints { get; } = new HashSet<string>();
         // What the player answered where the story asked (story.csv choices, 2026-11-10): the choice by step index.
         public Dictionary<int, int> StoryChoices { get; } = new Dictionary<int, int>();
+        // Where the player is in each side story (story.csv chain, 2026-11-11): the step (index; the step count once
+        // done), absent for one not begun, and the side stories whose step they have taken.
+        public Dictionary<string, int> SideSteps { get; } = new Dictionary<string, int>();
+        public HashSet<string> SideTaken { get; } = new HashSet<string>();
         public int JourneyVersion { get; internal set; }
 
         public int RankOf(SkillDefinition skill) => skill != null && SkillRanks.TryGetValue(skill, out int rank) ? rank : 0;

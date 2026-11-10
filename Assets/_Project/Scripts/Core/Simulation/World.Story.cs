@@ -58,8 +58,16 @@ namespace Game.Core
         public static PlaceSite WaypointNear(IReadOnlyList<PlaceSite> places, Vec2 position) =>
             places.FirstOrDefault(p => p.Definition.Waypoint && Vec2.Distance(position, p.Center) <= WaypointReach);
 
-        // The step the player is on, or null once the story so far is done.
-        public StoryStep StepOf(Player player) => Story?.Step(player.JourneyStep);
+        // The step the player is on in the main story, or null once the story so far is done.
+        public StoryStep StepOf(Player player) => Story?.Step(player.JourneyStep) is StoryStep step && step.Chain.Length == 0 ? step : null;
+
+        // The steps the player has now, main and side (StoryData.Current), and whether each is taken.
+        public List<(StoryStep Step, bool Taken)> StepsOf(Player player) =>
+            Story?.Current(player.JourneyStep, player.JourneyTaken, player.SideSteps, player.SideTaken) ?? new List<(StoryStep, bool)>();
+
+        // The step the person gives the player now, or null.
+        (StoryStep Step, bool Taken)? GivenBy(Player player, CharacterDefinition who) =>
+            Story?.GivenBy(who, player.JourneyStep, player.JourneyTaken, player.SideSteps, player.SideTaken);
 
         // Whether the step's goal is met for the player now.
         public bool GoalMet(Player player, StoryStep step)
@@ -83,11 +91,11 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || Story == null) return false;
             var near = CharacterNear(Places, player.Position);
-            var step = StepOf(player);
-            if (near == null || step == null || near.Value.Character != step.Who) return false;
-            if (!player.JourneyTaken)
+            if (near == null || !(GivenBy(player, near.Value.Character) is (StoryStep step, bool taken))) return false;
+            if (!taken)
             {
-                player.JourneyTaken = true;
+                if (step.Chain.Length == 0) player.JourneyTaken = true;
+                else player.SideTaken.Add(step.Chain);
                 player.JourneyVersion++;
                 _events.Add(new SimEvent(SimEventType.Story, player.Id, target: step.Index, amount: StoryTaken, position: near.Value.At));
             }
@@ -104,8 +112,7 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || Story == null) return false;
             var near = CharacterNear(Places, player.Position);
-            var step = StepOf(player);
-            if (near == null || step == null || near.Value.Character != step.Who || choice < 0 || choice >= step.Choices.Count) return false;
+            if (near == null || !(GivenBy(player, near.Value.Character) is (StoryStep step, _)) || choice < 0 || choice >= step.Choices.Count) return false;
             player.StoryChoices[step.Index] = choice;
             CompleteStep(player, step, step.Choices[choice].Step);
             return true;
@@ -125,8 +132,16 @@ namespace Game.Core
                 else player.Inventory.AddConsumable(reward.Consumable, reward.Count);
             }
             player.InventoryVersion++;
-            player.JourneyStep = next ?? step.Next;
-            player.JourneyTaken = false;
+            if (step.Chain.Length == 0)
+            {
+                player.JourneyStep = next ?? step.Next;
+                player.JourneyTaken = false;
+            }
+            else
+            {
+                player.SideSteps[step.Chain] = next ?? step.Next;
+                player.SideTaken.Remove(step.Chain);
+            }
             player.JourneyVersion++;
             _events.Add(new SimEvent(SimEventType.Story, player.Id, target: step.Index, amount: step.Index + 1, position: player.Position));
         }
@@ -145,9 +160,10 @@ namespace Game.Core
                     player.JourneyVersion++;
                     _events.Add(new SimEvent(SimEventType.Waypoint, player.Id, target: waypoint.Definition.Index, amount: WaypointOpened, position: waypoint.Center));
                 }
-                var step = StepOf(player);
-                if (step != null && player.JourneyTaken && (step.Goal == StoryGoal.Reach || step.Goal == StoryGoal.Boss) && GoalMet(player, step))
-                    CompleteStep(player, step);
+                foreach (var (step, taken) in StepsOf(player))
+                {
+                    if (taken && (step.Goal == StoryGoal.Reach || step.Goal == StoryGoal.Boss) && GoalMet(player, step)) CompleteStep(player, step);
+                }
             }
         }
 
@@ -168,12 +184,24 @@ namespace Game.Core
         }
 
         // Puts back what a character save remembered: the step (no further than the story goes), whether it was taken,
-        // the open waypoints that are still places and the answers given.
-        public void RestoreJourney(Player player, int step, bool taken, IEnumerable<string> waypoints, IEnumerable<(int Step, int Choice)> choices = null)
+        // the open waypoints that are still places, the answers given and where each side story that is still in the
+        // sheet stood (a step no longer in that story starts it again).
+        public void RestoreJourney(Player player, int step, bool taken, IEnumerable<string> waypoints, IEnumerable<(int Step, int Choice)> choices = null,
+            IEnumerable<(string Chain, int Step, bool Taken)> sides = null)
         {
             int last = Story?.Steps.Count ?? int.MaxValue;
             player.JourneyStep = Math.Clamp(step, 0, last);
+            if (Story?.Step(player.JourneyStep) is StoryStep side && side.Chain.Length > 0) player.JourneyStep = 0;
             player.JourneyTaken = taken && player.JourneyStep < last;
+            foreach (var (chain, at, open) in sides ?? Enumerable.Empty<(string, int, bool)>())
+            {
+                if (Story != null && Story.Chain(chain) == null) continue;
+                bool done = at == last;
+                bool inChain = Story == null || done || Story.Step(at)?.Chain == chain;
+                if (!inChain) continue;
+                player.SideSteps[chain] = at;
+                if (open && !done) player.SideTaken.Add(chain);
+            }
             foreach (var (at, choice) in choices ?? Enumerable.Empty<(int, int)>()) player.StoryChoices[at] = choice;
             foreach (string id in waypoints ?? Enumerable.Empty<string>())
             {

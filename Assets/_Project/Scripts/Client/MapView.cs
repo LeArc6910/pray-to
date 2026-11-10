@@ -223,6 +223,12 @@ namespace Game.Client
                 Marker(area, window, site.Center, Shapes.Circle, _client.Waypoints.Contains(site.Definition.Index) ? WaypointOpen : PlaceMark, MarkerSize * 1.5f);
             var leads = _client.SiteOf(_client.CurrentStep?.Target);
             if (leads != null) Marker(area, window, leads.Center, Shapes.Ring, new Color(1f, 0.85f, 0.35f, breath), MarkerSize * 2.8f);
+            // A side story taken leads too, in a paler, smaller ring (2026-11-11).
+            foreach (var (step, taken) in _client.CurrentSteps)
+            {
+                if (step.Chain.Length == 0 || !taken || !(_client.SiteOf(step.Target) is PlaceSite side) || side == leads) continue;
+                Marker(area, window, side.Center, Shapes.Ring, new Color(1f, 0.95f, 0.75f, breath * 0.8f), MarkerSize * 2.2f);
+            }
             foreach (var position in _others) Marker(area, window, position, Shapes.Circle, OtherPlayer, MarkerSize);
             Marker(area, window, _client.Position, Shapes.Circle, Color.white, MarkerSize);
         }

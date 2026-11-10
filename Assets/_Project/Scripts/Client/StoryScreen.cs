@@ -51,7 +51,7 @@ namespace Game.Client
             var near = _client.CharacterNear();
             if (near is var (character, at))
             {
-                bool turn = _client.CurrentStep?.Who == character;
+                bool turn = _client.StepGivenBy(character) != null;
                 string talk = $"{character.Name}{(Final(character.Name) ? "과" : "와")} 말하기";
                 if (WorldButton(camera, new Vector3(at.X, at.Y + 1.35f, 0), turn ? "! " + talk : talk)) Talk(character);
                 return;
@@ -83,27 +83,26 @@ namespace Game.Client
             return Ui.Button(rect, text);
         }
 
-        // What talking to them says: the step's lines from its giver, a reminder of the step once taken, or else a line
-        // of their own.
+        // What talking to them says: the lines of the step they give (main story first, then a side story), a reminder
+        // of it once taken, or else a line of their own. Lines that wait on an earlier answer show only after it.
         void Talk(CharacterDefinition character)
         {
             Sounds.Play(Sound.Click);
-            var step = _client.CurrentStep;
             _line = 0;
             _tellsHost = false;
             _choices = null;
-            if (step != null && step.Who == character && step.Choices.Count > 0)
+            if (_client.StepGivenBy(character) is (StoryStep step, bool taken))
             {
-                // A question: its words (just the last once heard), then the answers to pick from.
-                _lines = (_client.JourneyTaken ? step.Lines.Skip(step.Lines.Count - 1) : step.Lines).Select(l => (l.Speaker.Name, l.Text)).ToList();
-                _choices = step.Choices;
-                return;
-            }
-            if (step != null && step.Who == character)
-            {
-                if (!_client.JourneyTaken)
+                var said = step.LinesFor(_client.StoryChoices);
+                if (step.Choices.Count > 0)
                 {
-                    _lines = step.Lines.Select(l => (l.Speaker.Name, l.Text)).ToList();
+                    // A question: its words (just the last once heard), then the answers to pick from.
+                    _lines = (taken ? said.Skip(said.Count - 1) : said).Select(l => (l.Speaker.Name, l.Text)).ToList();
+                    _choices = step.Choices;
+                }
+                else if (!taken)
+                {
+                    _lines = said.Select(l => (l.Speaker.Name, l.Text)).ToList();
                     _tellsHost = true;
                 }
                 else if (step.Goal == StoryGoal.Have && Held(step) >= step.Count)
@@ -111,10 +110,10 @@ namespace Game.Client
                     _lines = new List<(string, string)> { (character.Name, "가져왔군. 고맙다.") };
                     _tellsHost = true;
                 }
-                else _lines = new List<(string, string)> { (character.Name, step.Lines[step.Lines.Count - 1].Text), ("", Doing(step)) };
+                else _lines = new List<(string, string)> { (character.Name, said[said.Count - 1].Text), ("", Doing(step)) };
                 return;
             }
-            _lines = new List<(string, string)> { (character.Name, character.LineFor(_client.Today)) };
+            _lines = new List<(string, string)> { (character.Name, character.LineFor(_client.Today, _client.StoryChoices)) };
         }
 
         int Held(StoryStep step) => step.Material != null ? _client.Bag.CountOf(step.Material) : _client.Bag.CountOf(step.Consumable);
@@ -123,11 +122,11 @@ namespace Game.Client
         public void DrawPanels()
         {
             // Once the host has taken the answer, the one who asked says what follows.
-            if (_answered != null && _client.JourneyStep != _answeredAt)
+            if (_answered != null && _client.StepGivenBy(_answered)?.Step.Index != _answeredAt)
             {
                 var asked = _answered;
                 _answered = null;
-                if (_client.CurrentStep?.Who == asked) Talk(asked);
+                if (_client.StepGivenBy(asked) != null) Talk(asked);
             }
             if (_lines != null) DrawTalk();
             else if (_waypoints) DrawWaypoints();
@@ -162,8 +161,9 @@ namespace Game.Client
                     {
                         Sounds.Play(Sound.Click);
                         _send(_client.ChooseStoryCommand(i));
-                        _answered = _client.CurrentStep?.Who;
-                        _answeredAt = _client.JourneyStep;
+                        var asker = _client.CurrentSteps.FirstOrDefault(s => s.Step.Choices == _choices).Step;
+                        _answered = asker?.Who;
+                        _answeredAt = asker?.Index ?? -1;
                         _lines = null;
                         _choices = null;
                         return;
@@ -218,18 +218,26 @@ namespace Game.Client
             if (here == null) _waypoints = false;
         }
 
-        // The goal list's line for the story: its chapter and title, then what to do and which way.
-        public (string Title, string Text)? TrackerEntry()
+        // The goal list's lines for the story: the main story's, then each side story taken (one on a short screen),
+        // each its chapter and title, then what to do and which way.
+        public List<(string Title, string Text)> TrackerEntries()
         {
-            var step = _client.CurrentStep;
-            if (step == null) return null;
-            string title = string.IsNullOrEmpty(step.Chapter) ? $"이야기: {step.Title}" : $"{step.Chapter}: {step.Title}";
-            string text = _client.JourneyTaken ? Doing(step) : $"{step.Who.Name}에게 말 걸기";
-            var site = _client.SiteOf(_client.JourneyTaken ? step.Target : step.Who.Place);
-            if (site != null && (step.Goal == StoryGoal.Reach || !_client.JourneyTaken || step.Goal == StoryGoal.Have))
-                text += " · " + Way(site);
-            if (!Ui.Short && !string.IsNullOrEmpty(step.Hint) && _client.JourneyTaken) text += "\n" + step.Hint;
-            return (title, text);
+            var entries = new List<(string, string)>();
+            int sides = 0;
+            foreach (var (step, taken) in _client.CurrentSteps)
+            {
+                bool side = step.Chain.Length > 0;
+                if (side && (!taken || sides >= (Ui.Short ? 1 : 2))) continue;
+                if (side) sides++;
+                string title = string.IsNullOrEmpty(step.Chapter) ? $"이야기: {step.Title}" : $"{step.Chapter}: {step.Title}";
+                string text = taken ? Doing(step) : $"{step.Who.Name}에게 말 걸기";
+                var site = _client.SiteOf(taken ? step.Target : step.Who.Place);
+                if (site != null && (step.Goal == StoryGoal.Reach || !taken || step.Goal == StoryGoal.Have))
+                    text += " · " + Way(site);
+                if (!Ui.Short && !side && !string.IsNullOrEmpty(step.Hint) && taken) text += "\n" + step.Hint;
+                entries.Add((title, text));
+            }
+            return entries;
         }
 
         // What the taken step asks now.

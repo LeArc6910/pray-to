@@ -424,6 +424,178 @@ namespace Game.Core.Tests
             StringAssert.Contains("next '7'", all);
         }
 
+        static int Index(string chain, int nth = 0) => Tales.Shipped.Steps.Where(s => s.Chain == chain).ElementAt(nth).Index;
+
+        [Test]
+        public void SideStoriesOpenAfterTheirMainStepAndGoApartFromIt()
+        {
+            var story = Tales.Shipped;
+            CollectionAssert.AreEqual(new[] { "harbor", "mine", "temple", "nest" }, story.Chains.Select(c => c.Id));
+            Assert.AreEqual(6, story.Chain("nest").After, "the general waits until the crystal queen sleeps");
+            foreach (var chain in story.Chains)
+            {
+                var rows = story.Steps.Where(s => s.Chain == chain.Id).ToList();
+                Assert.AreEqual(rows[0], chain.First);
+                Assert.AreEqual(story.Steps.Count, rows.Last().Next, $"{chain.Id} ends, not into another story");
+                for (int i = 0; i + 1 < rows.Count; i++) Assert.AreEqual(rows[i + 1].Index, rows[i].Next, $"{chain.Id} goes row by row");
+            }
+            Assert.AreEqual(story.Steps.Count, story.Steps[10].Next, "the main story's last row ends rather than running into a side story");
+
+            var host = Host();
+            var world = host.World;
+            var player = world.AddPlayer("a", null);
+            CollectionAssert.AreEqual(new[] { "" }, world.StepsOf(player).Select(s => s.Step.Chain), "only the main story at first");
+            world.RestoreJourney(player, 1, false, null);
+            CollectionAssert.AreEqual(new[] { "", "harbor", "mine" }, world.StepsOf(player).Select(s => s.Step.Chain), "the temple waits for step 3");
+
+            // The fisher asks for minnows; the main story is not taken by it.
+            PersonAt(world, "fisher_ida", player);
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.IsTrue(player.SideTaken.Contains("harbor"));
+            Assert.IsFalse(player.JourneyTaken);
+            Assert.AreEqual(1, player.JourneyStep);
+            player.Inventory.AddMaterial(Gear.Data.FindMaterial("cave_minnow"), 3);
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.AreEqual(Index("harbor", 1), player.SideSteps["harbor"]);
+            Assert.IsFalse(player.SideTaken.Contains("harbor"));
+            Assert.AreEqual(0, player.Inventory.CountOf(Gear.Data.FindMaterial("cave_minnow")), "the minnows are taken");
+
+            // The harbour master sends them to the temple, done on arriving.
+            PersonAt(world, "harbor_master", player);
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            player.Position = world.SiteOf(story.Place("old_temple")).Center + new Vec2(1, 0);
+            Run(world, World.TicksPerSecond);
+            Assert.AreEqual(Index("harbor", 2), player.SideSteps["harbor"]);
+
+            // The temple keeper finishes it; their own story is not open yet, so the harbour's is what they give.
+            PersonAt(world, "temple_keeper", player);
+            int experience = player.Experience;
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.AreEqual(story.Steps.Count, player.SideSteps["harbor"]);
+            Assert.AreEqual(experience + 80, player.Experience);
+            CollectionAssert.AreEqual(new[] { "", "mine" }, world.StepsOf(player).Select(s => s.Step.Chain), "the harbour's story is done");
+            Assert.AreEqual(1, player.JourneyStep, "and the main story never moved");
+        }
+
+        static void PersonAt(World world, string id, Player player) =>
+            player.Position = Beside(world.Places.SelectMany(p => p.People).Single(p => p.Character.Id == id).At);
+
+        [Test]
+        public void TheNestsSideStorySendsThemAfterTheGeneral()
+        {
+            var host = Host();
+            var world = host.World;
+            var player = world.AddPlayer("a", null);
+            world.RestoreJourney(player, 5, false, null);
+            Assert.IsFalse(world.StepsOf(player).Any(s => s.Step.Chain == "nest"), "not before the crystal queen");
+            world.RestoreJourney(player, 6, false, null);
+            var nest = world.StepsOf(player).Single(s => s.Step.Chain == "nest").Step;
+            Assert.AreEqual("demon_watch", nest.Who.Id);
+            Assert.AreEqual("mad_general", nest.Boss);
+
+            PersonAt(world, "demon_watch", player);
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.AreEqual(nest.Index, world.StepsOf(player).Single(s => s.Step.Chain == "nest").Step.Index, "the general is still up");
+            player.Records[(RecordKind.Boss, "mad_general")] = 1;
+            Run(world, World.TicksPerSecond);
+            Assert.AreEqual(Index("nest", 1), player.SideSteps["nest"], "done once the general has fallen");
+
+            // The elder gives the main step first, then the nest's.
+            PersonAt(world, "demon_elder", player);
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.IsTrue(player.JourneyTaken, "the main story's step 7 came first");
+            Assert.AreEqual(Index("nest", 1), player.SideSteps["nest"]);
+            world.RestoreJourney(player, Tales.Shipped.Steps.Count, false, null);
+            Assert.IsTrue(world.TalkInStory(player.Id));
+            Assert.AreEqual(Tales.Shipped.Steps.Count, player.SideSteps["nest"]);
+
+            // The general drops his crest and his two legendaries, and the guide asks for the crest.
+            var general = Bosses.Shipped.Bosses.Single(b => b.Id == "mad_general");
+            Assert.AreEqual("general_crest", general.MaterialId);
+            CollectionAssert.AreEquivalent(new[] { "general_blade", "legion_mantle" }, Gear.Data.Bases.Where(b => b.Legendary == "mad_general").Select(b => b.Id));
+            Assert.IsTrue(Guide.Shipped.Goals.Any(g => g.Conditions.Any(c => c.Kind == "have" && c.Id == "general_crest")));
+        }
+
+        [Test]
+        public void LinesFollowTheAnswerGivenEarlier()
+        {
+            var story = Tales.Shipped;
+            var master = story.Steps[Index("harbor", 1)];
+            var none = master.LinesFor(new Dictionary<int, int>());
+            var told = master.LinesFor(new Dictionary<int, int> { [8] = 0 });
+            var kept = master.LinesFor(new Dictionary<int, int> { [8] = 1 });
+            Assert.IsTrue(none.All(l => l.When == null), "no answer yet: only the lines for everyone");
+            Assert.IsTrue(told.Any(l => l.Text.Contains("근위대")) && !told.Any(l => l.Text.Contains("우리끼리")));
+            Assert.IsTrue(kept.Any(l => l.Text.Contains("우리끼리")) && !kept.Any(l => l.Text.Contains("근위대")));
+            Assert.AreEqual(none.Count + 1, told.Count);
+
+            var hero = story.Character("hero");
+            var said = Enumerable.Range(0, 12).Select(day => hero.LineFor(day)).ToList();
+            var thanked = Enumerable.Range(0, 12).Select(day => hero.LineFor(day, new Dictionary<int, int> { [8] = 1 })).ToList();
+            Assert.IsFalse(said.Any(l => l.Contains("고맙다")), "only after keeping the secret");
+            Assert.IsTrue(thanked.Any(l => l.Contains("고맙다")));
+            Assert.IsFalse(thanked.Any(l => l.Contains("여왕이 알았다지")));
+        }
+
+        [Test]
+        public void SideStoryAndConditionErrorsSayWhatIsWrong()
+        {
+            var data = StorySheet.Parse(
+                "id,name,distance,radius,road\na,가,0,7,\n",
+                "id,name,place,lines\np,사람,a,안녕|?9=1 그래\nq,사람,a,?1=x 음\n",
+                "step,title,who,lines,goal,choices,next,chain,after\n" +
+                "1,하나,p,안녕,,,,,\n" +
+                "2,둘,p,안녕|?1=1 어,,,,side,1\n" +
+                "3,셋,p,안녕,,,,side,2\n" +
+                "4,넷,p,안녕,,,1,side,\n" +
+                "5,다섯,p,?1=0 어,,,,,\n",
+                Gear.Data, Bosses.Shipped);
+            string all = string.Join("\n", data.Errors);
+            StringAssert.Contains("조건 '?1=1'의 step은 choices가 있는 step", all);
+            StringAssert.Contains("next '1'은 같은 이야기", all);
+            StringAssert.Contains("after는 곁이야기(chain)의 첫 줄에만", all);
+            StringAssert.Contains("조건(?step=n) 없는 말", all);
+            StringAssert.Contains("조건의 답 번호", all);
+            StringAssert.Contains("characters.csv 'p'", all);
+
+            var first = StorySheet.Parse("id,name,distance,radius,road\na,가,0,7,\n", "id,name,place\np,사람,a\n",
+                "step,title,who,lines,chain\n1,하나,p,안녕,side\n", Gear.Data, Bosses.Shipped);
+            StringAssert.Contains("step 1은 큰 이야기", string.Join("\n", first.Errors));
+        }
+
+        [Test]
+        public void SideStoriesAreKeptInTheSaveAndSentToTheClient()
+        {
+            int harbor = Index("harbor", 1);
+            var bytes = CharacterSave.Write(new Equipment(), new Inventory(), 10, journeyStep: 3, waypoints: new[] { "dawn_village" },
+                sideStories: new[] { ("harbor", harbor, true), ("mine", Tales.Shipped.Steps.Count, false), ("gone", 3, false) });
+            var saved = CharacterSave.Read(bytes, Gear.Data);
+            CollectionAssert.AreEqual(new[] { ("harbor", harbor, true), ("mine", Tales.Shipped.Steps.Count, false), ("gone", 3, false) }, saved.SideStories);
+
+            var host = Host();
+            var client = new WorldClient("key", "앨리스", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped)
+            {
+                Story = Tales.Shipped,
+                Character = bytes,
+            };
+            host.Receive(1, client.JoinMessage());
+            for (int i = 0; i < 4; i++)
+            {
+                host.Tick();
+                foreach (var message in host.TakeOutgoing()) client.Receive(message.Data);
+            }
+            Assert.AreEqual(harbor, client.SideSteps["harbor"]);
+            Assert.IsTrue(client.SideTaken.Contains("harbor"));
+            Assert.IsFalse(client.SideSteps.ContainsKey("gone"), "a side story no longer in the sheet is dropped");
+            CollectionAssert.AreEqual(new[] { "", "harbor", "temple" }, client.CurrentSteps.Select(s => s.Step.Chain), "the mine's is done");
+            var master = Tales.Shipped.Character("harbor_master");
+            Assert.AreEqual(harbor, client.StepGivenBy(master)?.Step.Index);
+            Assert.IsTrue(client.StepGivenBy(master)?.Taken);
+
+            var back = CharacterSave.Read(client.SaveCharacter(), Gear.Data);
+            CollectionAssert.AreEquivalent(new[] { ("harbor", harbor, true), ("mine", Tales.Shipped.Steps.Count, false) }, back.SideStories);
+        }
+
         [Test]
         public void TheStoryOutlivesTheCharacterSaveAndReachesTheClient()
         {

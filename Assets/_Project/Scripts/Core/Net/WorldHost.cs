@@ -211,7 +211,10 @@ namespace Game.Core
                 pair.Value.SentJourney = player.JourneyVersion;
                 var open = World.Story?.Places.Where(p => player.Waypoints.Contains(p.Id)).Select(p => p.Index).ToList() ?? new List<int>();
                 var answers = player.StoryChoices.Select(c => (c.Key, c.Value)).ToList();
-                Send(pair.Key, new JourneyMessage(player.JourneyStep, player.JourneyTaken, open, answers).Encode(), reliable: true);
+                var sides = player.SideSteps.Select(side => (side.Key, side.Value, player.SideTaken.Contains(side.Key)))
+                    .Concat(player.SideTaken.Where(chain => !player.SideSteps.ContainsKey(chain)).Select(chain => (chain, World.Story?.Chain(chain)?.First.Index ?? 0, true)))
+                    .ToList();
+                Send(pair.Key, new JourneyMessage(player.JourneyStep, player.JourneyTaken, open, answers, sides).Encode(), reliable: true);
             }
             // Locked doors before the snapshot too, so an owner's client lets them through as soon as the host does.
             foreach (var pair in _connections)
@@ -325,7 +328,7 @@ namespace Game.Core
             if (saved != null) World.RestoreSupports(player, _classes, _loot, saved.Supports);
             if (saved != null) World.RestoreRecords(player, saved.Records, saved.Achievements);
             if (saved != null) World.RestorePet(player, saved.Pet, saved.PetExperience);
-            if (saved != null) World.RestoreJourney(player, saved.JourneyStep, saved.JourneyTaken, saved.Waypoints, saved.StoryChoices);
+            if (saved != null) World.RestoreJourney(player, saved.JourneyStep, saved.JourneyTaken, saved.Waypoints, saved.StoryChoices, saved.SideStories);
             player.RefreshStats();
             GivePickaxe(player);
             // The skills in the order the player keeps them in.

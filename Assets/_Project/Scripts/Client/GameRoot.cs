@@ -1423,8 +1423,8 @@ namespace Game.Client
                 var defense = _client.Defense;
                 entries.Add(($"기지 방어 {defense.Level}단계", $"{defense.Wave}/{World.DefenseWaves} 물결 · 남은 적 {defense.MonstersLeft} · 수호석 {defense.StonePercent}%"));
             }
-            // The main story first (Docs/Story.md): where it leads and which way.
-            if (_storyScreen?.TrackerEntry() is (string storyTitle, string storyText)) entries.Add((storyTitle, storyText));
+            // The story first (Docs/Story.md): where it leads and which way, then the side stories taken.
+            if (_storyScreen != null) entries.AddRange(_storyScreen.TrackerEntries());
             var goal = Settings.Guide ? _guideProgress?.Current : null;
             if (goal != null)
             {

@@ -1786,7 +1786,46 @@ async function story(browser) {
   check(await game.press('알겠다'), '이어진 말의 끝에서 [알겠다]');
   await game.wait(1200);
   s = await game.state();
-  check(s.journey === 12, `그 갈래로 이야기가 끝난다 (단계 ${s.journey})`);
+  check(s.journey === s.storyEnd, `그 갈래로 이야기가 끝난다 (단계 ${s.journey}, 끝 ${s.storyEnd})`);
+  // A side story (2026-11-11, story.csv chain): the fisher at the harbour gives one apart from the main story; it shows
+  // in the goal list, and the minnows brought finish its first step. The harbour master's words then follow the answer
+  // given to the queen (?9=2: kept the secret).
+  await game.send('goto person fisher_ida');
+  await game.wait(1200);
+  check(await game.press(/어부 이다와 말하기/), '항구의 어부 곁에서 [! 어부 이다와 말하기]');
+  await game.wait(500);
+  pages = 0;
+  while (pages < 12 && (await game.press('다음', undefined, { quiet: true }))) {
+    pages++;
+    await game.wait(250);
+  }
+  check(await game.press('알겠다'), '곁이야기 대화 끝에서 [알겠다]');
+  await game.wait(1200);
+  s = await game.state();
+  check(/harbor:\d+\*/.test(s.sides), `곁이야기 단계를 받는다 (${s.sides})`);
+  const side = await game.allText();
+  check(/곁이야기 · 물안개 항구/.test(side) && /동굴 송사리 0\/3/.test(side), `목표 목록에 곁이야기와 "동굴 송사리 0/3" (${(side.match(/곁이야기[^|]*/) || [''])[0]})`);
+  await game.shot('side-story', '곁이야기를 받은 목표 목록');
+  await game.send('give cave_minnow 3');
+  await game.wait(800);
+  check(await game.press(/어부 이다와 말하기/), '송사리를 들고 다시 [어부 이다와 말하기]');
+  await game.wait(500);
+  check(await game.press('알겠다'), '"가져왔군"에 [알겠다]');
+  await game.wait(1200);
+  s = await game.state();
+  check(/harbor:13(,|$)/.test(s.sides), `송사리를 건네면 다음 단계로 (${s.sides})`);
+  await game.send('goto person harbor_master');
+  await game.wait(1200);
+  check(await game.press(/항구지기 마렌과 말하기/), '항구지기 곁에서 [! 항구지기 마렌과 말하기]');
+  await game.wait(500);
+  let heard = '';
+  pages = 0;
+  do {
+    heard += ' ' + (await game.allText());
+    pages++;
+  } while (pages < 12 && (await game.press('다음', undefined, { quiet: true })) && (await game.wait(250), true));
+  check(/우리끼리만/.test(heard) && !/근위대가 와서/.test(heard), '여왕에게 숨긴 갈래의 말만 나온다');
+  await game.shot('side-story-branch', '고른 말에 따라 바뀌는 대사');
   await game.context.close();
 }
 

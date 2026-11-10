@@ -62,6 +62,8 @@ titan_cinder,거인의 불씨,weapon,30,magic|fire,Damage+30~36;Magic:Damage+50%
 titan_plate,용암 거인의 갑주,chest,30,,Armor+50~60;MaxHealth+45~55;HealthRegen+3,3,0,,lava_titan,25,,
 lord_scepter,공허 군주의 홀,weapon,40,magic|lightning,Damage+55~62;Magic:Damage+60%;Lightning:Damage+30%;AttackSpeed-15%,3,0,,void_lord,25,,
 void_band,공허의 고리,ring,40,,MaxHealth+50~60;Damage+12%;CritChance+5;AttackSpeed+8%,1,0,,void_lord,25,,
+general_blade,모르그의 불꽃 대검,weapon,15,melee,Damage+16~19;FireDamage+6~8;CritDamage+20;AttackSpeed-10%,2,0,,mad_general,25,,
+legion_mantle,군단장의 망토,chest,15,,Armor+20~24;MaxHealth+25~30;MoveSpeed+5%,2,0,,mad_general,25,,
 # 균열 전설(2026-11-04): 균열을 깨면 떨어진다(chance% + 단계마다 3%). 셋은 공허 순례자 세트(sets.csv)
 pilgrim_hood,공허 순례자의 두건,helmet,45,,Armor+40~50;MaxHealth+40~50;CritChance+3,2,0,,rift,4,,pilgrim
 pilgrim_robe,공허 순례자의 옷,chest,45,,Armor+70~85;MaxHealth+70~80;HealthRegen+3,3,0,,rift,4,,pilgrim

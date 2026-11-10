@@ -376,7 +376,12 @@ namespace Game.Core
             Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
             PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)),
             Classes.Select(c => c.Id), SkillOrder, JourneyStep, JourneyTaken, Waypoints.Select(i => Story?.Places[i].Id).Where(id => id != null),
-            StoryChoices.Select(pair => (pair.Key, pair.Value)));
+            StoryChoices.Select(pair => (pair.Key, pair.Value)), SideStories());
+
+        // Where each begun side story stands, as the save and the host keep it.
+        IEnumerable<(string, int, bool)> SideStories() =>
+            SideSteps.Select(pair => (pair.Key, pair.Value, SideTaken.Contains(pair.Key)))
+                .Concat(SideTaken.Where(chain => !SideSteps.ContainsKey(chain)).Select(chain => (chain, Story?.Chain(chain)?.First.Index ?? 0, true)));
 
         // The names this player gave their pets (Pets.CleanName), by pet id: kept in the character save only, so other
         // players see the kind's name.
@@ -546,10 +551,18 @@ namespace Game.Core
         public HashSet<int> Waypoints { get; } = new HashSet<int>();
         // The answers this player gave where the story asked, by step index (JourneyMessage).
         public Dictionary<int, int> StoryChoices { get; } = new Dictionary<int, int>();
+        // Where this player is in each begun side story, and the side stories whose step is taken (JourneyMessage).
+        public Dictionary<string, int> SideSteps { get; } = new Dictionary<string, int>();
+        public HashSet<string> SideTaken { get; } = new HashSet<string>();
         // Goes up whenever the host tells the player's place in the story, for the screen to notice.
         public int JourneyVersion { get; private set; }
 
-        public StoryStep CurrentStep => Story?.Step(JourneyStep);
+        public StoryStep CurrentStep => Story?.Step(JourneyStep) is StoryStep step && step.Chain.Length == 0 ? step : null;
+        // The steps this player has now, main then side, and whether each is taken (StoryData.Current).
+        public List<(StoryStep Step, bool Taken)> CurrentSteps => Story?.Current(JourneyStep, JourneyTaken, SideSteps, SideTaken) ?? new List<(StoryStep, bool)>();
+        // The step the person gives this player now, if any.
+        public (StoryStep Step, bool Taken)? StepGivenBy(CharacterDefinition who) =>
+            who == null ? null : Story?.GivenBy(who, JourneyStep, JourneyTaken, SideSteps, SideTaken);
         public string BossName(string id) => _bosses?.Bosses.FirstOrDefault(b => b.Id == id)?.Name ?? id;
         public PlaceSite SiteOf(PlaceDefinition place) => place == null ? null : Places.FirstOrDefault(p => p.Definition == place);
         public (CharacterDefinition Character, Vec2 At)? CharacterNear() => World.CharacterNear(Places, Position);
@@ -861,6 +874,13 @@ namespace Game.Core
                         foreach (int index in journey.Waypoints) Waypoints.Add(index);
                         StoryChoices.Clear();
                         foreach (var (at, choice) in journey.Choices) StoryChoices[at] = choice;
+                        SideSteps.Clear();
+                        SideTaken.Clear();
+                        foreach (var (chain, at, taken) in journey.Sides)
+                        {
+                            SideSteps[chain] = at;
+                            if (taken) SideTaken.Add(chain);
+                        }
                         JourneyVersion++;
                         break;
                     case MessageType.Locks:

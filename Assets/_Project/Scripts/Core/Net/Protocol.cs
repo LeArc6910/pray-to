@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.74.0";
+        public const string Version = "0.75.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -392,8 +392,10 @@ namespace Game.Core
     // waypoints open to them by place index. Sent when any of these changes and when they join.
     public sealed class JourneyMessage
     {
-        public JourneyMessage(int step, bool taken, IReadOnlyList<int> waypoints, IReadOnlyList<(int Step, int Choice)> choices = null)
+        public JourneyMessage(int step, bool taken, IReadOnlyList<int> waypoints, IReadOnlyList<(int Step, int Choice)> choices = null,
+            IReadOnlyList<(string Chain, int Step, bool Taken)> sides = null)
         {
+            Sides = sides ?? new List<(string, int, bool)>();
             Step = step;
             Taken = taken;
             Waypoints = waypoints;
@@ -405,6 +407,8 @@ namespace Game.Core
         public IReadOnlyList<int> Waypoints { get; }
         // The answers given where the story asked (2026-11-10), by step index.
         public IReadOnlyList<(int Step, int Choice)> Choices { get; }
+        // Where each begun side story stands (2026-11-11): chain id, step index, taken.
+        public IReadOnlyList<(string Chain, int Step, bool Taken)> Sides { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Journey, w =>
         {
@@ -418,6 +422,13 @@ namespace Game.Core
                 w.Write((ushort)at);
                 w.Write((byte)choice);
             }
+            w.Write((byte)Sides.Count);
+            foreach (var (chain, at, taken) in Sides)
+            {
+                w.Write(chain);
+                w.Write((ushort)at);
+                w.Write(taken);
+            }
         });
 
         public static JourneyMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Journey, r =>
@@ -428,7 +439,9 @@ namespace Game.Core
             for (int n = r.ReadByte(); n > 0; n--) waypoints.Add(r.ReadByte());
             var choices = new List<(int, int)>();
             for (int n = r.ReadUInt16(); n > 0; n--) choices.Add((r.ReadUInt16(), r.ReadByte()));
-            return new JourneyMessage(step, taken, waypoints, choices);
+            var sides = new List<(string, int, bool)>();
+            for (int n = r.ReadByte(); n > 0; n--) sides.Add((r.ReadString(), r.ReadUInt16(), r.ReadBoolean()));
+            return new JourneyMessage(step, taken, waypoints, choices, sides);
         });
     }
 

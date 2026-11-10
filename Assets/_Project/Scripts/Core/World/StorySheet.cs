@@ -47,7 +47,7 @@ namespace Game.Core
     // their turn in the story.
     public sealed class CharacterDefinition
     {
-        internal CharacterDefinition(int index, string id, string name, PlaceDefinition place, string look, string color, IReadOnlyList<string> lines)
+        internal CharacterDefinition(int index, string id, string name, PlaceDefinition place, string look, string color, IReadOnlyList<(string Text, StoryWhen When)> lines)
         {
             Index = index;
             Id = id;
@@ -65,9 +65,55 @@ namespace Game.Core
         // Which drawing (queen, hero, elder, girl, demon, guard, villager); any other is a villager.
         public string Look { get; }
         public string Color { get; }
-        public IReadOnlyList<string> Lines { get; }
+        // What they say when it is not their turn, each line maybe only after an answer (StoryWhen).
+        public IReadOnlyList<(string Text, StoryWhen When)> Lines { get; }
 
-        public string LineFor(int day) => Lines.Count == 0 ? "" : Lines[Math.Max(0, day) % Lines.Count];
+        // The day's line among those that hold for the answers given (none given: the lines without a condition).
+        public string LineFor(int day, IReadOnlyDictionary<int, int> choices = null)
+        {
+            var lines = Lines.Where(l => l.When == null || l.When.Holds(choices)).ToList();
+            return lines.Count == 0 ? "" : lines[Math.Max(0, day) % lines.Count].Text;
+        }
+    }
+
+    // A condition on a line (story.csv and characters.csv lines, 2026-11-11): "?9=1 ..." is said only to one who gave
+    // the first answer where step 9 asked, "?9=0 ..." only to one who has not answered there yet.
+    public sealed class StoryWhen
+    {
+        internal StoryWhen(int step, int choice, string text)
+        {
+            Step = step;
+            Choice = choice;
+            Text = text;
+        }
+
+        // The step that asked (index) and the answer (index), or -1 for not answered yet.
+        public int Step { get; }
+        public int Choice { get; }
+        // As written, for errors.
+        public string Text { get; }
+
+        public bool Holds(IReadOnlyDictionary<int, int> choices) =>
+            choices != null && choices.TryGetValue(Step, out int given) ? given == Choice : Choice < 0;
+    }
+
+    // A side story (story.csv chain, 2026-11-11): rows with the same chain id, gone through apart from the main story
+    // and from each other. It opens once the main story is past After steps.
+    public sealed class StoryChain
+    {
+        internal StoryChain(int index, string id, StoryStep first, int after)
+        {
+            Index = index;
+            Id = id;
+            First = first;
+            After = after;
+        }
+
+        public int Index { get; }
+        public string Id { get; }
+        public StoryStep First { get; }
+        // How many main steps come first (story.csv after on the chain's first row): open while JourneyStep >= After.
+        public int After { get; }
     }
 
     public enum StoryGoal
@@ -85,10 +131,11 @@ namespace Game.Core
     // One step of the story (Docs/Story.md, 이야기 단계): who gives it and what they say, then what to do.
     public sealed class StoryStep
     {
-        internal StoryStep(int index, string chapter, string title, CharacterDefinition who, IReadOnlyList<(CharacterDefinition Speaker, string Text)> lines,
+        internal StoryStep(int index, string chapter, string title, CharacterDefinition who, IReadOnlyList<(CharacterDefinition Speaker, string Text, StoryWhen When)> lines,
             StoryGoal goal, PlaceDefinition place, string boss, MaterialDefinition material, ConsumableDefinition consumable, int count,
-            IReadOnlyList<GoalReward> rewards, string hint)
+            IReadOnlyList<GoalReward> rewards, string hint, string chain = "")
         {
+            Chain = chain;
             Index = index;
             Chapter = chapter;
             Title = title;
@@ -108,8 +155,11 @@ namespace Game.Core
         public string Chapter { get; }
         public string Title { get; }
         public CharacterDefinition Who { get; }
-        // What is said on talking to Who: each line by Who, or by another character when it began with @id.
-        public IReadOnlyList<(CharacterDefinition Speaker, string Text)> Lines { get; }
+        // What is said on talking to Who: each line by Who, or by another character when it began with @id, and maybe
+        // only after an answer (?step=n before it).
+        public IReadOnlyList<(CharacterDefinition Speaker, string Text, StoryWhen When)> Lines { get; }
+        // The side story it belongs to (story.csv chain), or "" for the main story.
+        public string Chain { get; }
         public StoryGoal Goal { get; }
         public PlaceDefinition Place { get; }
         public string Boss { get; }
@@ -127,14 +177,20 @@ namespace Game.Core
 
         public string RewardText => string.Join(" · ", Rewards.Select(r => r.Text));
 
+        // The lines said to one who gave these answers (StoryWhen); at least the ones without a condition.
+        public IReadOnlyList<(CharacterDefinition Speaker, string Text, StoryWhen When)> LinesFor(IReadOnlyDictionary<int, int> choices) =>
+            Lines.Where(l => l.When == null || l.When.Holds(choices)).ToList();
+
         // Where the step leads: the place to reach, or else the giver's.
         public PlaceDefinition Target => Goal == StoryGoal.Reach ? Place : Who.Place;
     }
 
     public sealed class StoryData
     {
-        public StoryData(IReadOnlyList<PlaceDefinition> places, IReadOnlyList<CharacterDefinition> characters, IReadOnlyList<StoryStep> steps, IReadOnlyList<string> errors)
+        public StoryData(IReadOnlyList<PlaceDefinition> places, IReadOnlyList<CharacterDefinition> characters, IReadOnlyList<StoryStep> steps, IReadOnlyList<string> errors,
+            IReadOnlyList<StoryChain> chains = null)
         {
+            Chains = chains ?? Array.Empty<StoryChain>();
             Places = places;
             Characters = characters;
             Steps = steps;
@@ -144,12 +200,42 @@ namespace Game.Core
         public IReadOnlyList<PlaceDefinition> Places { get; }
         public IReadOnlyList<CharacterDefinition> Characters { get; }
         public IReadOnlyList<StoryStep> Steps { get; }
+        // The side stories, in the order of their first rows.
+        public IReadOnlyList<StoryChain> Chains { get; }
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;
 
         public PlaceDefinition Place(string id) => Places.FirstOrDefault(p => p.Id == id);
         public CharacterDefinition Character(string id) => Characters.FirstOrDefault(c => c.Id == id);
         public StoryStep Step(int index) => index >= 0 && index < Steps.Count ? Steps[index] : null;
+        public StoryChain Chain(string id) => Chains.FirstOrDefault(c => c.Id == id);
+
+        // The steps a player has now and whether each is taken: the main story's, then each open side story's that is
+        // not done, in sheet order. The same on host (Player) and client (WorldClient).
+        public List<(StoryStep Step, bool Taken)> Current(int journeyStep, bool journeyTaken, Dictionary<string, int> sideSteps, HashSet<string> sideTaken)
+        {
+            var steps = new List<(StoryStep, bool)>();
+            var main = Step(journeyStep);
+            if (main != null && main.Chain.Length == 0) steps.Add((main, journeyTaken));
+            foreach (var chain in Chains)
+            {
+                if (journeyStep < chain.After) continue;
+                int at = sideSteps != null && sideSteps.TryGetValue(chain.Id, out int saved) ? saved : chain.First.Index;
+                var step = Step(at);
+                if (step != null && step.Chain == chain.Id) steps.Add((step, sideTaken != null && sideTaken.Contains(chain.Id)));
+            }
+            return steps;
+        }
+
+        // The step the character gives now, if any (main story first), and whether it is taken.
+        public (StoryStep Step, bool Taken)? GivenBy(CharacterDefinition who, int journeyStep, bool journeyTaken, Dictionary<string, int> sideSteps, HashSet<string> sideTaken)
+        {
+            foreach (var current in Current(journeyStep, journeyTaken, sideSteps, sideTaken))
+            {
+                if (current.Step.Who == who) return current;
+            }
+            return null;
+        }
     }
 
     // Reads Assets/_Project/Data/Story/places.csv, characters.csv and story.csv (Docs/Story.md). A row that does not
@@ -168,6 +254,7 @@ namespace Game.Core
             var places = new List<PlaceDefinition>();
             var characters = new List<CharacterDefinition>();
             var steps = new List<StoryStep>();
+            var chains = new List<StoryChain>();
 
             var placeTable = CsvTable.Read(placesCsv ?? "");
             var missing = placeTable.MissingColumns("id", "name", "distance", "radius");
@@ -218,7 +305,7 @@ namespace Game.Core
                         if (id.Length == 0 || row["name"].Length == 0) throw new FormatException("id와 name을 적어야 합니다.");
                         if (characters.Any(c => c.Id == id)) throw new FormatException($"'{id}'가 두 번 있습니다.");
                         var place = places.FirstOrDefault(p => p.Id == row["place"]) ?? throw new FormatException($"place '{row["place"]}'가 {PlacesFile}에 없습니다.");
-                        var lines = row["lines"].Split('|').Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+                        var lines = row["lines"].Split('|').Select(l => l.Trim()).Where(l => l.Length > 0).Select(When).ToList();
                         characters.Add(new CharacterDefinition(characters.Count, id, row["name"], place, row["look"], row["color"], lines));
                     }
                     catch (FormatException e)
@@ -238,7 +325,7 @@ namespace Game.Core
             else
             {
                 int line = 1;
-                var links = new List<(StoryStep Step, string Choices, string Next, int Line)>();
+                var links = new List<(StoryStep Step, string Choices, string Next, string After, int Line)>();
                 foreach (var row in storyTable.Rows)
                 {
                     line++;
@@ -247,9 +334,10 @@ namespace Game.Core
                         int number = SheetValues.ParseNumber(row["step"], "step");
                         if (number != steps.Count + 1) throw new FormatException($"step은 1부터 차례로 적습니다(여기는 {steps.Count + 1}).");
                         var who = characters.FirstOrDefault(c => c.Id == row["who"]) ?? throw new FormatException($"who '{row["who"]}'가 {CharactersFile}에 없습니다.");
-                        var lines = new List<(CharacterDefinition, string)>();
-                        foreach (string part in row["lines"].Split('|').Select(l => l.Trim()).Where(l => l.Length > 0))
+                        var lines = new List<(CharacterDefinition, string, StoryWhen)>();
+                        foreach (string written in row["lines"].Split('|').Select(l => l.Trim()).Where(l => l.Length > 0))
                         {
+                            var (part, when) = When(written);
                             if (part.StartsWith("@"))
                             {
                                 int space = part.IndexOf(' ');
@@ -257,18 +345,22 @@ namespace Game.Core
                                 var speaker = characters.FirstOrDefault(c => c.Id == speakerId) ?? throw new FormatException($"말하는 사람 '@{speakerId}'가 {CharactersFile}에 없습니다.");
                                 string text = space < 0 ? "" : part.Substring(space + 1).Trim();
                                 if (text.Length == 0) throw new FormatException($"'@{speakerId}' 뒤에 할 말을 적어야 합니다.");
-                                lines.Add((speaker, text));
+                                lines.Add((speaker, text, when));
                             }
-                            else lines.Add((who, part));
+                            else lines.Add((who, part, when));
                         }
                         if (lines.Count == 0) throw new FormatException("lines에 할 말을 하나 이상 적어야 합니다.");
+                        if (lines.All(l => l.Item3 != null)) throw new FormatException("lines에 조건(?step=n) 없는 말을 하나 이상 적어야 합니다.");
+                        string chain = row["chain"];
+                        if (chain.Length > 0 && !chain.All(c => char.IsLetterOrDigit(c) || c == '_')) throw new FormatException($"chain '{chain}'은 영문·숫자·_로 적습니다.");
+                        if (chain.Length > 0 && steps.Count == 0) throw new FormatException("step 1은 큰 이야기여야 합니다(chain을 비운다).");
                         var (goal, place, boss, material, consumable, count) = Goal(row["goal"], places, loot, bosses);
                         var rewards = row["reward"].Length == 0 || loot == null
                             ? new List<GoalReward>()
                             : row["reward"].Split('|').Select(part => GuideSheet.Reward(part.Trim(), loot)).ToList();
                         if (row["choices"].Length > 0 && goal != StoryGoal.None) throw new FormatException("choices는 goal이 빈 단계(말만 하는 단계)에만 적습니다.");
-                        steps.Add(new StoryStep(steps.Count, row["chapter"], row["title"], who, lines, goal, place, boss, material, consumable, count, rewards, row["hint"]));
-                        links.Add((steps[steps.Count - 1], row["choices"], row["next"], line));
+                        steps.Add(new StoryStep(steps.Count, row["chapter"], row["title"], who, lines, goal, place, boss, material, consumable, count, rewards, row["hint"], chain));
+                        links.Add((steps[steps.Count - 1], row["choices"], row["next"], row["after"], line));
                     }
                     catch (FormatException e)
                     {
@@ -276,24 +368,36 @@ namespace Game.Core
                     }
                 }
                 // Where each step leads, once every step is read (a choice or next may point at a later row).
-                int StepNumber(string text, string what)
+                int StepNumber(string text, string what, string chain)
                 {
                     if (text == "end") return steps.Count;
                     int number = SheetValues.ParseNumber(text, what);
                     if (number < 1 || number > steps.Count) throw new FormatException($"{what} '{text}'은 1~{steps.Count}의 step이거나 end여야 합니다.");
+                    if (steps[number - 1].Chain != chain) throw new FormatException($"{what} '{text}'은 같은 이야기(chain '{chain}')의 step이어야 합니다.");
                     return number - 1;
                 }
-                foreach (var (step, choices, next, at) in links)
+                foreach (var (step, choices, next, after, at) in links)
                 {
                     try
                     {
-                        step.Next = next.Length == 0 ? step.Index + 1 : StepNumber(next, "next");
+                        // Unless the sheet says, the next row of the same story, or its end.
+                        var following = steps.Skip(step.Index + 1).FirstOrDefault(s => s.Chain == step.Chain);
+                        step.Next = next.Length == 0 ? following?.Index ?? steps.Count : StepNumber(next, "next", step.Chain);
+                        bool first = steps.First(s => s.Chain == step.Chain) == step;
+                        if (after.Length > 0 && (step.Chain.Length == 0 || !first)) throw new FormatException("after는 곁이야기(chain)의 첫 줄에만 적습니다.");
+                        if (step.Chain.Length > 0 && first)
+                        {
+                            int opens = after.Length == 0 ? 0 : SheetValues.ParseNumber(after, "after");
+                            if (opens < 0 || opens > steps.Count) throw new FormatException($"after는 0~{steps.Count}의 step이어야 합니다.");
+                            if (opens > 0 && steps[opens - 1].Chain.Length > 0) throw new FormatException($"after '{after}'는 큰 이야기의 step이어야 합니다.");
+                            chains.Add(new StoryChain(chains.Count, step.Chain, step, opens));
+                        }
                         var answers = new List<(string, int)>();
                         foreach (string part in choices.Split('|').Select(c => c.Trim()).Where(c => c.Length > 0))
                         {
                             int arrow = part.LastIndexOf('>');
                             if (arrow < 1) throw new FormatException($"choices '{part}'는 <고를 말>><step>로 적습니다. 예: 말한다>10");
-                            answers.Add((part.Substring(0, arrow).Trim(), StepNumber(part.Substring(arrow + 1).Trim(), "choices의 step")));
+                            answers.Add((part.Substring(0, arrow).Trim(), StepNumber(part.Substring(arrow + 1).Trim(), "choices의 step", step.Chain)));
                         }
                         if (answers.Count == 1) throw new FormatException("choices는 둘 이상 적습니다.");
                         step.Choices = answers;
@@ -303,8 +407,47 @@ namespace Game.Core
                         errors.Add($"{StoryFile} {at}줄: {e.Message}");
                     }
                 }
+                // A condition must name a step that asks, and one of its answers.
+                string Wrong(StoryWhen when)
+                {
+                    if (when == null) return null;
+                    var asked = when.Step >= 0 && when.Step < steps.Count ? steps[when.Step] : null;
+                    if (asked == null || asked.Choices.Count == 0) return $"조건 '{when.Text}'의 step은 choices가 있는 step이어야 합니다.";
+                    if (when.Choice >= asked.Choices.Count) return $"조건 '{when.Text}'의 답은 0~{asked.Choices.Count}이어야 합니다.";
+                    return null;
+                }
+                foreach (var (step, _, _, _, at) in links)
+                {
+                    foreach (var said in step.Lines)
+                    {
+                        if (Wrong(said.When) is string error) errors.Add($"{StoryFile} {at}줄: {error}");
+                    }
+                }
+                foreach (var character in characters)
+                {
+                    foreach (var said in character.Lines)
+                    {
+                        if (Wrong(said.When) is string error) errors.Add($"{CharactersFile} '{character.Id}': {error}");
+                    }
+                }
             }
-            return new StoryData(places, characters, steps, errors);
+            return new StoryData(places, characters, steps, errors, chains);
+        }
+
+        // "?9=1 말" → the words and the condition (answer 1 at step 9), or the line as it is.
+        static (string Text, StoryWhen When) When(string line)
+        {
+            if (!line.StartsWith("?")) return (line, null);
+            int space = line.IndexOf(' ');
+            string condition = space < 0 ? line.Substring(1) : line.Substring(1, space - 1);
+            string[] parts = condition.Split('=');
+            if (parts.Length != 2) throw new FormatException($"조건 '?{condition}'은 ?<step>=<답 번호>로 적습니다. 예: ?9=1 (0은 아직 답하지 않음)");
+            int step = SheetValues.ParseNumber(parts[0], "조건의 step");
+            int answer = SheetValues.ParseNumber(parts[1], "조건의 답 번호");
+            if (step < 1 || answer < 0) throw new FormatException($"조건 '?{condition}'의 step은 1 이상, 답 번호는 0 이상이어야 합니다.");
+            string text = space < 0 ? "" : line.Substring(space + 1).Trim();
+            if (text.Length == 0) throw new FormatException($"조건 '?{condition}' 뒤에 할 말을 적어야 합니다.");
+            return (text, new StoryWhen(step - 1, answer - 1, "?" + condition));
         }
 
         // "" (done on talking), "reach:<place>", "boss:<boss id>" or "have:<material or consumable>:<count>".

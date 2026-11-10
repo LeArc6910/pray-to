@@ -659,6 +659,10 @@ namespace Game.Client
                 json.Field("journey", player.JourneyStep + 1);
                 json.Field("journeyTaken", player.JourneyTaken);
                 json.Field("waypoints", string.Join(",", player.Waypoints.OrderBy(w => w)));
+                // The step past the story's last (the end), and each side story begun: "harbor:13*" (step from 1, * taken).
+                json.Field("storyEnd", (world.Story?.Steps.Count ?? 0) + 1);
+                json.Field("sides", string.Join(",", player.SideSteps.Select(side => $"{side.Key}:{side.Value + 1}{(player.SideTaken.Contains(side.Key) ? "*" : "")}")
+                    .Concat(player.SideTaken.Where(chain => !player.SideSteps.ContainsKey(chain)).Select(chain => $"{chain}:{(world.Story?.Chain(chain)?.First.Index ?? 0) + 1}*"))));
                 json.Field("place", world.PlaceAt(player.Position)?.Definition.Id ?? "");
                 json.Field("places", world.Places.Count);
                 json.Field("spawnX", world.Spawn.X);

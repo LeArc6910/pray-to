@@ -653,13 +653,14 @@ namespace Game.Client
                     Label(at + new Vector3(0, 0.9f, 0), $"전력 {machine.Supply}/{machine.Demand}", machine.Supply >= machine.Demand ? PowerLabel : OffLabel);
             }
             DrawReelGauge();
-            // The people of the story: their names, gold for whoever the story waits on now.
-            var waiting = _client.CurrentStep?.Who;
+            // The people of the story: their names, gold for whoever a story (main or side) waits on now.
+            var waiting = _client.CurrentSteps.Select(s => s.Step.Who).ToList();
             foreach (var (character, at) in _storyInView)
             {
                 var head = new Vector3(at.X, at.Y + 0.95f, 0);
                 if (Vector3.Distance(head, _self.Position) >= 7) continue;
-                Label(head, character == waiting ? $"! {character.Name}" : character.Name, character == waiting ? StoryLabel : Color.white);
+                bool turn = waiting.Contains(character);
+                Label(head, turn ? $"! {character.Name}" : character.Name, turn ? StoryLabel : Color.white);
             }
 
             // Each person's name and how well this player knows them, close by; the one near enough to deal with also
