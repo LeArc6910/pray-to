@@ -2638,8 +2638,14 @@ async function firstRun(browser, profile, hourLong) {
     await passed(15, '동굴 수호자 쓰러뜨리기');
 
     // 15. A bed: stone 6 and slime gel 3, the gel from slimes.
-    await hunt(async () => count(await inv(), 'slime_gel') >= 3, 180);
-    await mine(async () => count(await inv(), 'stone') >= 6, 60);
+    // Until both are in the bag (2026-11-10: three minutes of hunting left it short of gel, and the bed unmade).
+    for (let round = 0; round < 3; round++) {
+      const bag = await inv();
+      if (count(bag, 'slime_gel') >= 3 && count(bag, 'stone') >= 6) break;
+      await hunt(async () => count(await inv(), 'slime_gel') >= 3, 240);
+      await mine(async () => count(await inv(), 'stone') >= 6, 90);
+    }
+    note(`- 침대 재료: 슬라임 젤 ${count(await inv(), 'slime_gel')}, 돌 ${count(await inv(), 'stone')}`);
     await taken('near Workbench', '작업대로 돌아갈 때');
     await craft('침대');
     await placeFor(16, '침대 세우기', /^침대 ×/);
