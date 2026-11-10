@@ -2414,7 +2414,7 @@ async function firstRun(browser, profile, hourLong) {
     const stoneBefore = count(await inv(), 'stone');
     const digsBefore = spent.digs;
     const stuckBefore = spent.stuck;
-    await mine(async () => (await goalNow()).n > 13, 600);
+    await mine(async () => (await goalNow()).n > 13, 900);
     // What the ten minutes went on (2026-11-10: three runs ended this step at level 1).
     note(`- 채굴 기술 단계: 생활 경험치(농사,낚시,요리,채굴) ${lifeBefore} → ${(await inv()).life}, 돌 ${stoneBefore} → ${count(await inv(), 'stone')}, 친 벽 ${spent.digs - digsBefore}번, 6초 안에 안 깨진 것 ${spent.stuck - stuckBefore}번`);
     await passed(13, '채굴 기술 2레벨 되기');
@@ -2431,6 +2431,30 @@ async function firstRun(browser, profile, hourLong) {
       const more = await hunt(async () => (await game.state()).level >= 4, 240);
       note(`- 수호자 앞 사냥: ${more}마리, 레벨 ${(await game.state()).level}`);
     }
+    // The points a player spends before a boss (the HUD keeps saying 스킬 포인트·특성 포인트): every [배우기] and
+    // [올리기] on the skills page, then the passive tree's open nodes (2026-11-10: the bot fought the warden with them
+    // all unspent).
+    await bagTab(game, '스킬');
+    let raised = 0;
+    for (let i = 0; i < 8; i++) {
+      const b = (await game.buttons()).find(x => x.shown && x.enabled && /^(배우기|올리기)$/.test(x.label));
+      if (!b) break;
+      await game.tapAt(b.cx, b.cy);
+      await game.wait(500);
+      raised++;
+    }
+    await game.press('특성');
+    for (let i = 0; i < 6; i++) {
+      const nodes = (await game.buttons()).filter(b => b.shown && b.enabled && /: /.test(b.label) && b.label.length > 4);
+      const node = nodes[i % Math.max(1, nodes.length)];
+      if (!node) break;
+      await game.tapAt(node.cx, node.cy);
+      await game.wait(300);
+      await game.press('배우기', undefined, { quiet: true });
+      await game.wait(400);
+    }
+    await closeBag(game);
+    note(`- 수호자 앞에서 포인트를 썼다: 스킬 ${raised}번, 특성 ${(await inv()).passives}점`);
     const wardenAt = Date.now();
     let falls = 0;
     let dodges = 0;
