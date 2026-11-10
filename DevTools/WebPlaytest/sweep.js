@@ -2010,9 +2010,13 @@ async function firstRun(browser, profile, hourLong) {
             if (!seen && solid((await game.look(dx * d, dy * d)).tile)) seen = [dx, dy];
           }
         }
-        const open = around.filter(a => a.tile === 'Floor');
-        if (seen) way = seen;
-        else if (!open.some(a => a.dx === way[0] && a.dy === way[1]) && open.length > 0) {
+        // Anything walked on is open: bare floor, laid floors, soil, and the roads and paths of the story's places
+        // (2026-11-10: in the village round the spawn the bot saw only road beside it and walked into a giant mushroom
+        // between it and the rock it saw, two minutes long).
+        const open = around.filter(a => /Floor|Road|Carpet|Soil/.test(a.tile || ''));
+        const blocked = d => !open.some(a => a.dx === d[0] && a.dy === d[1]);
+        if (seen && !blocked(seen)) way = seen;
+        else if (blocked(way) && open.length > 0) {
           const pick = open[Math.floor(Math.random() * open.length)];
           way = [pick.dx, pick.dy];
         }
