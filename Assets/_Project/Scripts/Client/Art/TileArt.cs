@@ -417,7 +417,7 @@ namespace Game.Client
             TileType.GlowFloor => GlowFloorTile,
             TileType.Door => DoorTile,
             TileType.LockedDoor => LockedDoorTile,
-            TileType.Road => RoadTile,
+            TileType.Road => Road(15),
             TileType.Dock => DockTile,
             TileType.Rail => RailTile,
             // Under the harbour's boats (PropArt.Underlay): open water with no shore.
@@ -1646,32 +1646,124 @@ namespace Game.Client
             ".oSSSSSSSSSSSSo.",
             "..____________..");
 
-        // A road between the places of the story (Docs/Story.md, 2026-11-10): packed earth with flat stones set in it,
-        // lighter than the cave floor so the way reads from afar.
-        static readonly PixelImage RoadTile = PixelImage.FromRows(new Dictionary<char, Rgba>
+        // A road between the places of the story (Docs/Story.md; redrawn 2026-11-11, "길 같지가 않아"): rounded cobbles
+        // laid in courses, each course shifted so the joints do not line up, in warm greys lighter than the cave floor,
+        // and a kerb of long stones wherever the road meets something that is not road (RoadVariant), so its edges
+        // read as a way. Two layings, chosen by the tile's place, keep a long road from looking stamped.
+        public const int RoadVariants = 32;
+        static readonly PixelImage[] RoadTiles = new PixelImage[RoadVariants];
+
+        // The road with these sides joined to more road or paving (N 1, E 2, S 4, W 8), laid the first or second way
+        // (+16).
+        public static PixelImage Road(int variant)
+        {
+            variant = System.Math.Clamp(variant, 0, RoadVariants - 1);
+            return RoadTiles[variant] ??= DrawRoad(variant & 15, variant >> 4);
+        }
+
+        // Which road tile goes at x, y: its sides that meet road, a waypoint, the harbour's planks, the mine's rails or
+        // a laid floor, and a laying by a hash of where it is.
+        public static int RoadVariant(TileMap map, int x, int y)
+        {
+            bool Joins(int nx, int ny)
             {
-                ['w'] = Rgba.Hex("#8A7258"),
-                ['W'] = Rgba.Hex("#76604A"),
-                ['H'] = Rgba.Hex("#9A9488"),
-                ['L'] = Rgba.Hex("#C2BCAE"),
-                ['M'] = Rgba.Hex("#8C867A"),
-            },
-            "wWwwWwwwwWwwwWww",
-            "WwwwwwWwwwwwwwwW",
-            "wwHHHwwwwwMMMwww",
-            "wwHLLHwwwwMLLMww",
-            "wwHHHwwwHHwMMwww",
-            "wwwwwwwHLLHwwwWw",
-            "WwwMMMwwHHwwwwww",
-            "wwMLLLMwwwwwwHHw",
-            "wwwMMMwwwwwwHLLH",
-            "wwwwwwwHHHwwwHHw",
-            "wWwwwwHLLLHwwwww",
-            "wwwHHwwHHHwwMMww",
-            "wwHLLHwwwwwMLLMw",
-            "wwwHHwwwwWwwMMww",
-            "WwwwwwwwwwwwwwwW",
-            "wwWwwwwWwwwwWwww");
+                if (!map.InBounds(nx, ny)) return true;
+                var type = map[nx, ny];
+                return Structures.IsWay(type) || type == TileType.Waypoint || TileMap.IsPaving(type);
+            }
+            int sides = (Joins(x, y + 1) ? 1 : 0) | (Joins(x + 1, y) ? 2 : 0) | (Joins(x, y - 1) ? 4 : 0) | (Joins(x - 1, y) ? 8 : 0);
+            int laying = ((x * 73 + y * 151) >> 2 ^ x ^ y) & 1;
+            return sides | laying << 4;
+        }
+
+        static PixelImage DrawRoad(int sides, int laying)
+        {
+            var mortar = Rgba.Hex("#5E564C");
+            var grit = Rgba.Hex("#4E473F");
+            var tints = new[]
+            {
+                (Light: Rgba.Hex("#C4BAA8"), Main: Rgba.Hex("#A89E8C"), Shade: Rgba.Hex("#8A8070")),
+                (Light: Rgba.Hex("#B8B0A0"), Main: Rgba.Hex("#9C9484"), Shade: Rgba.Hex("#80786A")),
+                (Light: Rgba.Hex("#CAC0AC"), Main: Rgba.Hex("#B0A48E"), Shade: Rgba.Hex("#928670")),
+            };
+            var image = new PixelImage(Size, Size);
+            image.Fill(0, 0, Size, Size, mortar);
+            // Four courses of three stones (5, 6 and 5 wide), each course shifted along; the joints wrap round the tile so
+            // tiles meet without a seam.
+            int[] widths = { 5, 6, 5 };
+            int[] shifts = laying == 0 ? new[] { 0, 3, 7, 2 } : new[] { 2, 6, 1, 4 };
+            for (int course = 0; course < 4; course++)
+            {
+                int top = course * 4;
+                int at = shifts[course];
+                for (int stone = 0; stone < 3; stone++)
+                {
+                    var tint = tints[(course * 2 + stone + laying * 2) % tints.Length];
+                    int w = widths[(stone + course + laying) % 3];
+                    // The stone fills its width less a joint on its right and its height less the course's bottom joint.
+                    for (int dy = 0; dy < 3; dy++)
+                    {
+                        for (int dx = 0; dx < w - 1; dx++)
+                        {
+                            bool corner = (dx == 0 || dx == w - 2) && (dy == 0 || dy == 2);
+                            if (corner) continue;
+                            var color = dy == 0 ? tint.Light : dy == 2 || dx == w - 2 ? tint.Shade : tint.Main;
+                            image[(at + dx) % Size, top + dy] = color;
+                        }
+                    }
+                    at += w;
+                }
+            }
+            // A few grains of grit in the joints.
+            foreach (var (gx, gy) in laying == 0 ? new[] { (4, 3), (11, 7), (6, 11), (14, 15) } : new[] { (1, 7), (9, 3), (13, 11), (5, 15) })
+                image[gx, gy] = grit;
+
+            // The kerb along each side that does not join more road: long stones with a dark line outside them; the
+            // south kerb (the front, as the view looks) shows its face below.
+            var kerb = (Light: Rgba.Hex("#D2CAB8"), Main: Rgba.Hex("#B4AA96"), Shade: Rgba.Hex("#8C826F"));
+            var edge = Rgba.Hex("#332E28");
+            bool north = (sides & 1) == 0, east = (sides & 2) == 0, south = (sides & 4) == 0, west = (sides & 8) == 0;
+            if (north)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    image[x, 0] = edge;
+                    image[x, 1] = x % 8 == 7 ? kerb.Shade : kerb.Light;
+                    image[x, 2] = x % 8 == 7 ? kerb.Shade : kerb.Main;
+                }
+            }
+            if (south)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    image[x, 12] = x % 8 == 3 ? kerb.Shade : kerb.Light;
+                    image[x, 13] = x % 8 == 3 ? kerb.Shade : kerb.Main;
+                    image[x, 14] = kerb.Shade;
+                    image[x, 15] = edge;
+                }
+            }
+            if (west)
+            {
+                for (int y = 0; y < Size; y++)
+                {
+                    if (north && y < 1 || south && y > 14) continue;
+                    image[0, y] = edge;
+                    image[1, y] = y % 8 == 5 ? kerb.Shade : kerb.Light;
+                    image[2, y] = y % 8 == 5 ? kerb.Shade : kerb.Main;
+                }
+            }
+            if (east)
+            {
+                for (int y = 0; y < Size; y++)
+                {
+                    if (north && y < 1 || south && y > 14) continue;
+                    image[13, y] = y % 8 == 1 ? kerb.Shade : kerb.Main;
+                    image[14, y] = kerb.Shade;
+                    image[15, y] = edge;
+                }
+            }
+            return image;
+        }
 
         // The harbour's planks over the water (Docs/Story.md, 2026-11-10): boards laid across, dark gaps between,
         // nail heads.

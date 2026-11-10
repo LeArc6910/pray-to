@@ -2877,7 +2877,7 @@ namespace Game.Client
                 {
                     ground[y * map.Width + x] = GroundAt(x, y);
                     underlay[y * map.Width + x] = UnderlayAt(x, y);
-                    objects[y * map.Width + x] = ObjectTile(map[x, y]);
+                    objects[y * map.Width + x] = ObjectTileAt(map, x, y);
                     if (map[x, y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(x, y, 0));
                 }
             }
@@ -2891,6 +2891,10 @@ namespace Game.Client
 
         // The flat tile of a placed thing, or none for one that stands on the floor (PropArt.Stands, DrawProps).
         static TileBase ObjectTile(TileType type) => PropArt.Stands(type) ? null : Sprites.Object(type);
+
+        // The tile at x, y, a road matched to its neighbours (TileArt.RoadVariant).
+        static TileBase ObjectTileAt(TileMap map, int x, int y) =>
+            map[x, y] == TileType.Road ? Sprites.Road(TileArt.RoadVariant(map, x, y)) : ObjectTile(map[x, y]);
 
         static Tilemap AddTilemap(Transform grid, string name, int order)
         {
@@ -2966,7 +2970,7 @@ namespace Game.Client
                     Object.Destroy(crack.gameObject);
                     _cracks.Remove(key);
                 }
-                _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTile(map[change.X, change.Y]));
+                _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTileAt(map, change.X, change.Y));
                 if (map[change.X, change.Y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(change.X, change.Y, 0));
                 else _scarecrows.Remove(new Vector3Int(change.X, change.Y, 0));
                 foreach (var (dx, dy) in Neighbourhood)
@@ -2976,6 +2980,8 @@ namespace Game.Client
                     if (!map.InBounds(x, y)) continue;
                     _ground.SetTile(new Vector3Int(x, y, 0), GroundAt(x, y));
                     _underlay.SetTile(new Vector3Int(x, y, 0), UnderlayAt(x, y));
+                    // A road beside it may gain or lose a kerb.
+                    if (map[x, y] == TileType.Road) _objects.SetTile(new Vector3Int(x, y, 0), ObjectTileAt(map, x, y));
                 }
             }
         }

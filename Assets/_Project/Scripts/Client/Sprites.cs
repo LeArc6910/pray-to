@@ -116,6 +116,14 @@ namespace Game.Client
         }
 
         static Tile _openDoor;
+        static Tile[] _roads;
+
+        // The road tile for a variant from TileArt.RoadVariant (2026-11-11: its kerbs follow its neighbours).
+        public static TileBase Road(int variant)
+        {
+            BuildAtlas();
+            return _roads[System.Math.Clamp(variant, 0, TileArt.RoadVariants - 1)];
+        }
 
         // The tile for a placed thing, or null for tiles that are only ground.
         public static TileBase Object(TileType type)
@@ -127,15 +135,17 @@ namespace Game.Client
         static void BuildAtlas()
         {
             if (_atlas != null) return;
-            // The ground, the placed things, and the open door last.
-            int count = TileArt.GroundCount + ObjectTypes.Length + 1;
+            // The ground, the placed things, the open door, and the roads last.
+            int roads = TileArt.GroundCount + ObjectTypes.Length + 1;
+            int count = roads + TileArt.RoadVariants;
             int columns = Mathf.CeilToInt(Mathf.Sqrt(count));
             int size = Mathf.NextPowerOfTwo(columns * Cell);
             var atlas = new PixelImage(size, size);
             var images = new PixelImage[count];
             for (int i = 0; i < TileArt.GroundCount; i++) images[i] = TileArt.Ground(i);
             for (int i = 0; i < ObjectTypes.Length; i++) images[TileArt.GroundCount + i] = TileArt.Object(ObjectTypes[i]);
-            images[count - 1] = TileArt.OpenDoor;
+            images[roads - 1] = TileArt.OpenDoor;
+            for (int i = 0; i < TileArt.RoadVariants; i++) images[roads + i] = TileArt.Road(i);
             for (int i = 0; i < count; i++) Extruded(atlas, images[i], i % columns * Cell, i / columns * Cell);
 
             _atlas = Texture(size, size);
@@ -156,7 +166,9 @@ namespace Game.Client
             _ground = new Tile[TileArt.GroundCount];
             for (int i = 0; i < TileArt.GroundCount; i++) _ground[i] = MakeTile(i);
             for (int i = 0; i < ObjectTypes.Length; i++) Objects[ObjectTypes[i]] = MakeTile(TileArt.GroundCount + i);
-            _openDoor = MakeTile(count - 1);
+            _openDoor = MakeTile(roads - 1);
+            _roads = new Tile[TileArt.RoadVariants];
+            for (int i = 0; i < TileArt.RoadVariants; i++) _roads[i] = MakeTile(roads + i);
         }
 
         // Draws the image into the atlas with its edge pixels repeated one pixel outward.

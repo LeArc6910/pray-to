@@ -725,7 +725,8 @@ namespace Game.Client
                             var under = PropArt.Underlay(_map, _places, x, y);
                             if (under != null) image.Draw(TileArt.Object(under.Value), px, py);
                             // Things that stand (PropArt.Stands) are drawn with the bodies, as WorldView.DrawProps does.
-                            var placed = PropArt.Stands(_map[x, y]) ? null : TileArt.Object(_map[x, y]);
+                            var placed = PropArt.Stands(_map[x, y]) ? null
+                                : _map[x, y] == TileType.Road ? TileArt.Road(TileArt.RoadVariant(_map, x, y)) : TileArt.Object(_map[x, y]);
                             if (placed != null) image.Draw(placed, px, py);
                         }
                     }
