@@ -2400,8 +2400,10 @@ async function firstRun(browser, profile, hourLong) {
           // minutes). Along the most open way, away from the spawn, not straight back.
           // Again each minute with none seen, up to three times (the places and roads near the spawn keep monsters
           // off a wide round, 2026-11-10).
-          if (Date.now() - lastSeen > 60000 && wandered < 3) {
-            await taken(['biome Mushroom', 'biome Ice', 'biome Crystal'][wandered], '사냥할 몬스터가 1분 동안 보이지 않을 때');
+          // Then beside the nearest monster (2026-11-10: there are few near the spawn, and in the biomes too the bot
+          // met none; a person would see one on the screen or go looking further than the bot can).
+          if (Date.now() - lastSeen > 40000) {
+            await taken('monster', '사냥할 몬스터가 40초 동안 보이지 않을 때(가장 가까운 몬스터 곁으로)');
             wandered++;
             lastSeen = Date.now();
             continue;
@@ -2553,9 +2555,10 @@ async function firstRun(browser, profile, hourLong) {
     await passed(14, '레벨 3 되기');
 
     // 14. The cave warden, fought with what the bot has: up to eight tries in ten minutes, back to the arena after a
-    // fall. A level more first (the bot dodges slower than a person; at level 3 it fell five times, 2026-11-10).
-    if ((await game.state()).level < 4) {
-      const more = await hunt(async () => (await game.state()).level >= 4, 240);
+    // fall. Two levels more first (the bot dodges slower than a person; at level 3 it fell five times and at level 4
+    // eight, at level 6 none, 2026-11-10).
+    if ((await game.state()).level < 5) {
+      const more = await hunt(async () => (await game.state()).level >= 5, 300);
       note(`- 수호자 앞 사냥: ${more}마리, 레벨 ${(await game.state()).level}`);
     }
     // The points a player spends before a boss (the HUD keeps saying 스킬 포인트·특성 포인트): every [배우기] and

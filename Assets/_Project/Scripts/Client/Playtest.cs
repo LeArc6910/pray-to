@@ -334,6 +334,14 @@ namespace Game.Client
                     var onto = Tile(words[2]);
                     to = Nearest(map, px, py, (x, y) => map[x, y] == onto) ?? throw new InvalidOperationException($"no {onto} tile");
                     break;
+                // The nearest monster (2026-11-10, the first-hour checks' hunts: near the spawn there are few, and the bot
+                // cannot see further than the screen): open floor three or four tiles from it.
+                case "monster":
+                    var foe = world.Enemies.Where(e => e.Health > 0).OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault()
+                        ?? throw new InvalidOperationException("no monster");
+                    int fx = TileMap.Cell(foe.Position.X), fy = TileMap.Cell(foe.Position.Y);
+                    to = Nearest(map, fx, fy, (x, y) => Walkable(map, x, y) && Math.Abs(x - fx) + Math.Abs(y - fy) >= 3) ?? foe.Position;
+                    break;
                 case "near":
                     var type = Tile(words[2]);
                     // The nearest one there is room to stand beside (an ore vein can be shut in rock).
