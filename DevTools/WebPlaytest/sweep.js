@@ -2140,6 +2140,11 @@ async function firstRun(browser, profile, hourLong) {
   const placeFor = async (n, what, row) => {
     const tried = [];
     for (let attempt = 0; attempt < 4; attempt++) {
+      // Up again first if a monster felled it (2026-11-10: the bot tried to set its torch down lying on the floor).
+      if ((await game.state()).dead) {
+        await game.until(st => !st.dead, 15000);
+        await game.wait(800);
+      }
       const at = await faceOpen(tried);
       if (!at) break;
       tried.push(`${at.dx},${at.dy}`);
@@ -2378,7 +2383,7 @@ async function firstRun(browser, profile, hourLong) {
       let kills = 0;
       let lastSeen = Date.now();
       let lastWay = null;
-      let wandered = false;
+      let wandered = 0;
       while (Date.now() < until && !(await enough())) {
         const s = await game.state();
         if (s.dead) {
@@ -2393,9 +2398,11 @@ async function firstRun(browser, profile, hourLong) {
           // None near: monsters come into being twelve tiles or more from the spawn and from players, and come down
           // open tunnels (2026-11-10: digging straight through rock away from the spawn, the bot met none in four
           // minutes). Along the most open way, away from the spawn, not straight back.
-          if (Date.now() - lastSeen > 60000 && !wandered) {
-            await taken('biome Mushroom', '사냥할 몬스터가 1분 동안 보이지 않을 때');
-            wandered = true;
+          // Again each minute with none seen, up to three times (the places and roads near the spawn keep monsters
+          // off a wide round, 2026-11-10).
+          if (Date.now() - lastSeen > 60000 && wandered < 3) {
+            await taken(['biome Mushroom', 'biome Ice', 'biome Crystal'][wandered], '사냥할 몬스터가 1분 동안 보이지 않을 때');
+            wandered++;
             lastSeen = Date.now();
             continue;
           }
@@ -2405,7 +2412,9 @@ async function firstRun(browser, profile, hourLong) {
           for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             let open = 0;
             for (let k = 1; k <= 3; k++) {
-              if (!/Floor|Soil|Carpet/.test((await game.look(dx * k, dy * k)).tile || '')) break;
+              // The roads and paths of the story's places are walked too (2026-11-10: in the village the hunt saw only
+              // road round it and stood still).
+              if (!/Floor|Soil|Carpet|Road|Dock|Rail/.test((await game.look(dx * k, dy * k)).tile || '')) break;
               open++;
             }
             const back = lastWay && dx === -lastWay[0] && dy === -lastWay[1] ? 3 : 0;
