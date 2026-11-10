@@ -2389,7 +2389,7 @@ async function firstRun(browser, profile, hourLong) {
     await placeFor(12, '화로 세우기', /^화로 ×/);
 
     // 12. Mining skill 2, from all the walls dug so far and more.
-    await mine(async () => (await goalNow()).n > 13, 150);
+    await mine(async () => (await goalNow()).n > 13, 300);
     await passed(13, '채굴 기술 2레벨 되기');
 
     // 13. Level 3 by hunting, away from the spawn, as the goal's hint says.
@@ -2398,7 +2398,12 @@ async function firstRun(browser, profile, hourLong) {
     await game.wait(800);
     await passed(14, '레벨 3 되기');
 
-    // 14. The cave warden, fought with what the bot has: up to five tries in eight minutes, back to the arena after a fall.
+    // 14. The cave warden, fought with what the bot has: up to eight tries in ten minutes, back to the arena after a
+    // fall. A level more first (the bot dodges slower than a person; at level 3 it fell five times, 2026-11-10).
+    if ((await game.state()).level < 4) {
+      const more = await hunt(async () => (await game.state()).level >= 4, 240);
+      note(`- 수호자 앞 사냥: ${more}마리, 레벨 ${(await game.state()).level}`);
+    }
     const wardenAt = Date.now();
     let falls = 0;
     let dodges = 0;
@@ -2407,7 +2412,7 @@ async function firstRun(browser, profile, hourLong) {
     let lowest = Infinity;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
-    while (Date.now() - wardenAt < 480000 && (await goalNow()).n <= 15 && falls < 5) {
+    while (Date.now() - wardenAt < 600000 && (await goalNow()).n <= 15 && falls < 8) {
       const s = await game.state();
       if (s.dead) {
         falls++;
@@ -2416,7 +2421,7 @@ async function firstRun(browser, profile, hourLong) {
         await game.wait(1200);
         continue;
       }
-      if (s.health < s.maxHealth * 0.45) await drink();
+      if (s.health < s.maxHealth * 0.5) await drink();
       // A warning on the floor underfoot: out of it first, as the goal's hint says, the way the screen shows clear
       // (the nearest safe spot, diagonals too).
       const away = offset(s.danger);
