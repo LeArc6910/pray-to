@@ -4,12 +4,13 @@
 
 ## 작업 분담
 
-- **클라우드 세션**: 코드(`.cs`, `.asmdef`), 데이터, 테스트, 문서. Unity 에디터 없이 `dotnet`으로 컴파일·테스트한다. 푸시할 때마다 `CLOUD_LOG.md` 맨 위에 항목을 같은 커밋으로 추가한다(무엇을 왜 바꿨는지, 로컬에서 할 일, 비어 있는 로컬 확인 칸).
+- **클라우드 세션**: 코드(`.cs`, `.asmdef`), 데이터, 테스트, 문서. Unity 에디터 없이 `dotnet`으로 컴파일·테스트한다. 푸시할 때마다 `CLOUD_LOG.md` 맨 위에 항목을 같은 커밋으로 추가한다(무엇을 왜 바꿨는지, 요청 대조, 로컬에서 할 일, 비어 있는 로컬 확인 칸). 요청 대조는 사람이 요청한 항목마다 코드·저장·안내 목표·Playtest 장면·문서까지 됐는지 적고, 빠진 것은 빠졌다고 적는다(AI가 말없이 빠뜨리는 것을 잡는다, `Docs/Research2026-11.md` 후보 5).
 - **로컬 세션**: Unity 에디터가 필요한 일. 씬, 프리팹, `.asset`, `.meta`, `Packages/packages-lock.json`, `ProjectSettings/`, 아트·사운드를 맡는다. 시작할 때 `git pull` 후 `CLOUD_LOG.md`에서 로컬 확인이 비어 있는 항목을 읽고 체크한다. `LOCAL_TASKS.md`를 위에서부터 처리하고 결과를 같은 파일에 적는다. 에디터 설정과 Unity 안의 테스트는 명령 한 줄(`DevTools/Local/setup.ps1`, `setup.sh`)이 하고 결과도 직접 적는다. 사람이 직접 해야 하는 일은 `LOCAL_TASKS.md`에 따로 모아 둔다.
 - **사람 손 없이**: 로컬 컴퓨터에서 감시 스크립트(`DevTools/Local/watch.ps1 -Install`, `watch.sh --install`)를 켜 두면 클라우드가 main에 올릴 때마다 명령 한 줄이 저절로 돌고 결과 커밋을 푸시한다. 화면 캡처(PlayMode `Screens` 분류)는 `local-screens` 브랜치에 덮어써 올라온다. 클라우드는 `git fetch origin local-screens` 후 `git show origin/local-screens:<이름>.jpg`로 사진을 꺼내 화면을 확인하고, 사람에게는 사진으로 볼 수 없는 것(손맛, 소리, 실제 휴대폰 터치)만 맡긴다.
 - **클라우드가 대신 해 보기**: 사람이 "테스트해 줘"라고 하면, 사람이 로컬에서 직접 보던 확인을 클라우드가 먼저 한다. 웹 데모 배포를 기다려 `node DevTools/WebPlaytest/playtest.js --wait`로 헤드리스 Chromium에서 PC(키보드·마우스)와 휴대폰(터치) 화면으로 플레이하고, 사진과 `report.md`를 열어 본 뒤 결과를 알린다(`Docs/Playtest.md`). 새 기능을 만들면 `Client/Playtest.cs`의 장면과 `playtest.js`·`sweep.js`의 확인도 더한다. 단추는 `Ui.Button`·`Ui.LayoutButton`으로 그려야 시험이 진짜 클릭·탭으로 누를 수 있다. 사람에게는 사진으로 알 수 없는 것(손맛, 소리, 실제 휴대폰 감각)만 묻는다. 전체 점검(`sweep.js`를 구역 없이)은 사람이 요청할 때만 돌린다. 평소 배포 뒤에는 새로 넣거나 바꾼 기능의 구역만(`--only`) 돌리고 그 사진만 본다(토큰을 아끼려고, 사용자 결정, 2026-11-09).
 - 로컬은 `.cs` 파일을 고치지 않는다. 컴파일 에러나 버그는 Console 로그를 결과 보고에 붙이고, 클라우드가 고친다.
 - 클라우드는 에디터 작업이 필요하면 `LOCAL_TASKS.md`에 할 일을 추가한다. 가능하면 손 작업 대신 에디터 스크립트로 만들고 `ProjectSetup.SetUp`에서 불러서, 로컬은 명령 한 줄만 다시 실행하게 한다.
+- 클라우드 세션은 씬·프리팹·`.asset`·`.meta`·`ProjectSettings/`·`Packages/packages-lock.json`을 Edit/Write로 고치지 못한다(`.claude/hooks/guard-unity-files.sh`가 막는다. 로컬 세션은 막지 않는다).
 - 클라우드는 `.meta`를 만들지 않는다. 새 파일의 `.meta`는 로컬이 Unity를 열 때 생기고 로컬이 커밋한다. 단, 클라우드가 파일을 지우거나 옮길 때는 짝이 되는 `.meta`도 같이 지우거나 옮긴다.
 
 ## 코드 구조
