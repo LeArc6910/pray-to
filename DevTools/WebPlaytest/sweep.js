@@ -2410,7 +2410,13 @@ async function firstRun(browser, profile, hourLong) {
 
     // 12. Mining skill 2, from all the walls dug so far and more.
     // Level 2 is 100 mining experience, a wall each (ore two), so it can take some minutes after the copper.
+    const lifeBefore = (await inv()).life;
+    const stoneBefore = count(await inv(), 'stone');
+    const digsBefore = spent.digs;
+    const stuckBefore = spent.stuck;
     await mine(async () => (await goalNow()).n > 13, 600);
+    // What the ten minutes went on (2026-11-10: three runs ended this step at level 1).
+    note(`- 채굴 기술 단계: 생활 경험치(농사,낚시,요리,채굴) ${lifeBefore} → ${(await inv()).life}, 돌 ${stoneBefore} → ${count(await inv(), 'stone')}, 친 벽 ${spent.digs - digsBefore}번, 6초 안에 안 깨진 것 ${spent.stuck - stuckBefore}번`);
     await passed(13, '채굴 기술 2레벨 되기');
 
     // 13. Level 3 by hunting, away from the spawn, as the goal's hint says.
