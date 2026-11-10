@@ -1922,6 +1922,14 @@ async function firstRun(browser, profile, hourLong) {
     let way = [1, 0];
     while (Date.now() < until && !(await enough())) {
       if (await defend()) continue;
+      // Back on its feet after a fall, or the sword still in hand from a fight: the pickaxe again (2026-11-10: the
+      // hour bot swung its sword at the rock for two minutes after a slime felled it).
+      const held = await game.state();
+      if (held.dead) {
+        await game.until(t => !t.dead, 15000);
+        continue;
+      }
+      if (!/pickaxe/.test(held.weapon || '')) await slot(2);
       const around = await near();
       const wanted = prefer && around.find(a => a.tile === prefer);
       if (prefer && !wanted && onNone) {
@@ -2260,6 +2268,11 @@ async function firstRun(browser, profile, hourLong) {
       let kills = 0;
       while (Date.now() < until && !(await enough())) {
         const s = await game.state();
+        if (s.dead) {
+          await game.until(t => !t.dead, 15000);
+          continue;
+        }
+        if (/pickaxe/.test(s.weapon || '')) await slot(1);
         if (s.health < s.maxHealth * 0.4) await drink();
         const foe = offset(s.foe);
         if (!foe) {
@@ -2389,6 +2402,9 @@ async function firstRun(browser, profile, hourLong) {
     const wardenAt = Date.now();
     let falls = 0;
     let dodges = 0;
+    let swings = 0;
+    let closest = Infinity;
+    let lowest = Infinity;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
     while (Date.now() - wardenAt < 480000 && (await goalNow()).n <= 15 && falls < 5) {
@@ -2417,6 +2433,10 @@ async function firstRun(browser, profile, hourLong) {
         continue;
       }
       const d = Math.hypot(boss[0], boss[1]);
+      closest = Math.min(closest, d);
+      const hp = (s.bosses || '').match(/cave_warden:(\d+)\//);
+      if (hp) lowest = Math.min(lowest, Number(hp[1]));
+      if (/pickaxe/.test(s.weapon || '')) await slot(1);
       // A monster at the bot's side (the arena's sand scorpions) first, or it wears the bot down.
       const add = offset(s.foe);
       if (add && Math.hypot(add[0], add[1]) < 1.6 && d > 2.4) {
@@ -2434,11 +2454,12 @@ async function firstRun(browser, profile, hourLong) {
           await game.send('face off');
         }
         await strike(boss[0], boss[1], 450);
+        swings++;
       }
     }
     await gather(5);
     const fought = await game.state();
-    note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
+    note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 휘두름 ${swings}번, 가장 가까이 ${closest.toFixed(1)}칸, 가장 낮은 체력 ${lowest}, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
     await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
     await passed(15, '동굴 수호자 쓰러뜨리기');
 
