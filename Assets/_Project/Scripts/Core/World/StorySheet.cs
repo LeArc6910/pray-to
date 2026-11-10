@@ -8,8 +8,10 @@ namespace Game.Core
     // plaza of its floor, joined to an earlier place by a road, with a waypoint in the middle.
     public sealed class PlaceDefinition
     {
-        internal PlaceDefinition(int index, string id, string name, string kind, int distance, int radius, string road, bool waypoint, TileType floor, string text)
+        internal PlaceDefinition(int index, string id, string name, string kind, int distance, int radius, string road, bool waypoint, TileType floor, string text,
+            string style = "")
         {
+            Style = style;
             Index = index;
             Id = id;
             Name = name;
@@ -37,6 +39,8 @@ namespace Game.Core
         public TileType Floor { get; }
         // A line about it: under its name on arriving, and in the waypoint list.
         public string Text { get; }
+        // How it is dressed (WorldGenerator.Decorate): village, kingdom, hut, nest, or "" for a bare plaza with lamps.
+        public string Style { get; }
     }
 
     // Someone in the story (Docs/Story.md, 인물): where they live, how they look, and what they say when it is not
@@ -150,6 +154,7 @@ namespace Game.Core
         public const string CharactersFile = "characters.csv";
         public const string StoryFile = "story.csv";
         public const int MaxRadius = 12;
+        public static readonly string[] Styles = { "village", "kingdom", "hut", "nest" };
 
         public static StoryData Parse(string placesCsv, string charactersCsv, string storyCsv, LootData loot, BossData bosses = null)
         {
@@ -181,7 +186,9 @@ namespace Game.Core
                         var floor = row["floor"].Length == 0 ? TileType.Floor : SheetValues.ParseEnum<TileType>(row["floor"], "floor");
                         if (floor != TileType.Floor && !TileMap.IsPaving(floor)) throw new FormatException("floor는 비우거나(맨바닥) 깔 수 있는 바닥이어야 합니다.");
                         bool waypoint = row["waypoint"].Length == 0 || row["waypoint"] == "yes";
-                        places.Add(new PlaceDefinition(places.Count, id, row["name"], row["kind"], distance, radius, road, waypoint, floor, row["text"]));
+                        string style = row["style"];
+                        if (style.Length > 0 && !Styles.Contains(style)) throw new FormatException($"style은 비우거나 {string.Join(", ", Styles)} 가운데 하나여야 합니다.");
+                        places.Add(new PlaceDefinition(places.Count, id, row["name"], row["kind"], distance, radius, road, waypoint, floor, row["text"], style));
                     }
                     catch (FormatException e)
                     {

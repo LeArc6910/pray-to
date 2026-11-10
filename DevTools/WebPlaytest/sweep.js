@@ -1871,7 +1871,8 @@ async function firstRun(browser, profile, hourLong) {
     for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) out.push({ dx, dy, tile: (await game.look(dx, dy)).tile });
     return out;
   };
-  const solid = t => /Wall|Ore/.test(t);
+  // Rock and ore only: the walls of the story's places (TimberWall, CastleWall) are not dug (2026-11-10).
+  const solid = t => t === 'Wall' || /Ore$/.test(t || '');
   const toward = (dx, dy) => (Math.abs(dx) > Math.abs(dy) ? [Math.sign(dx), 0] : [0, Math.sign(dy)]);
   const offset = text => (text ? text.split(',').map(Number) : null);
   // Digs the wall at (dx, dy) with what is in hand: attack toward it until it breaks (at most six seconds). On the
@@ -2131,7 +2132,7 @@ async function firstRun(browser, profile, hourLong) {
       return open;
     }
     // No open floor beside (things and sprouts all round): a step onto the floor or crop beside, and look again.
-    const walkable = (await near()).find(a => a.tile === 'Floor' || a.tile === 'StoneFloor' || a.tile === 'Soil');
+    const walkable = (await near()).find(a => a.tile === 'Floor' || a.tile === 'StoneFloor' || a.tile === 'Soil' || a.tile === 'Road');
     if (walkable && depth < 3) {
       await step(walkable.dx, walkable.dy, 400);
       return faceOpen([], depth + 1);

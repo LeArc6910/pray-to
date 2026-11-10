@@ -121,6 +121,20 @@ namespace Game.Core
         Road,
         // A place's waypoint (Docs/Story.md): stood on, it opens; from any open one, a player goes to any other.
         Waypoint,
+        // What the places of the story are dressed with (Docs/Story.md, 장소 꾸밈, 2026-11-10): laid by the generator,
+        // solid, and never dug (they have no row in tiles.csv).
+        TimberWall,
+        CastleWall,
+        Well,
+        Barrel,
+        MushroomTree,
+        Throne,
+        Pillar,
+        Fountain,
+        Campfire,
+        Bones,
+        Spire,
+        Tent,
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

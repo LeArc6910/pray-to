@@ -298,6 +298,12 @@ namespace Game.Client
             if (TileMap.IsDoor(_map[x, y])) return new Color32(170, 120, 70, 255);
             if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);
             if (_map[x, y] == TileType.Waypoint) return new Color32(110, 170, 255, 255);
+            // The dressing of the story's places (Docs/Story.md): walls by what they are made of, the rest warm.
+            if (_map[x, y] == TileType.TimberWall) return new Color32(150, 104, 58, 255);
+            if (_map[x, y] == TileType.CastleWall || _map[x, y] == TileType.Pillar) return new Color32(190, 186, 176, 255);
+            if (_map[x, y] == TileType.Spire) return new Color32(170, 120, 240, 255);
+            if (_map[x, y] == TileType.Campfire) return Palette.Torch;
+            if (_map[x, y] >= TileType.Well && _map[x, y] <= TileType.Tent) return new Color32(140, 120, 100, 255);
             if (_map[x, y] == TileType.Table || _map[x, y] == TileType.Banner || _map[x, y] == TileType.Pot) return new Color32(200, 160, 110, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);
             if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);

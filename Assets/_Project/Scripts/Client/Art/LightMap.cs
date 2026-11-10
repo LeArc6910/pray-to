@@ -200,7 +200,23 @@ namespace Game.Client
                 _color[index] = tile.LightColor.Length > 0 ? Rgba.Hex(tile.LightColor) : Flame;
                 _reach = Math.Max(_reach, _radius[index]);
             }
+            // The dressing of the story's places that gives light (Docs/Story.md): not in tiles.csv, as no one digs it.
+            foreach (var (type, radius, color) in DecorLights)
+            {
+                int index = (int)type;
+                if (index >= kinds || _radius[index] > 0) continue;
+                _radius[index] = radius;
+                _color[index] = Rgba.Hex(color);
+                _reach = Math.Max(_reach, radius);
+            }
         }
+
+        static readonly (TileType Type, float Radius, string Color)[] DecorLights =
+        {
+            (TileType.Campfire, 6, "#FF9A3C"),
+            (TileType.Spire, 4.5f, "#B07AFF"),
+            (TileType.Fountain, 2.5f, "#8AC8FF"),
+        };
 
         public static LightSource Carried(Vec2 position) => new LightSource(position, CarriedRadius, CarriedIntensity, Rgba.White, tints: false);
 

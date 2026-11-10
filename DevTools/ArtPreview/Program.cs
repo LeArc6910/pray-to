@@ -371,7 +371,8 @@ namespace Game.Client
                     TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.SmithStall, TileType.FisherHut, TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot, TileType.WardStone, TileType.Turret, TileType.Barn,
                     TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
                     TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow, TileType.Fence,
-                    TileType.LockedDoor,
+                    TileType.LockedDoor, TileType.Road, TileType.Waypoint,
+                    TileType.TimberWall, TileType.CastleWall, TileType.Well, TileType.Barrel, TileType.MushroomTree, TileType.Throne, TileType.Pillar, TileType.Fountain, TileType.Campfire, TileType.Bones, TileType.Spire, TileType.Tent,
                 }
                 .Select(TileArt.Object).Append(TileArt.OpenDoor).Append(TileArt.BigAssembler).Append(TileArt.BigSmelter).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(f => ItemArt.Belt(f)))
                 .Concat(new[] { ItemArt.Belt(0, fast: true), ItemArt.Underground(0), TileArt.MerchantCounter, ItemArt.Chicken(0), ItemArt.Chicken(1), ItemArt.Cow(0), ItemArt.Cow(1), ItemArt.Sheep(0), ItemArt.Sheep(1), ItemArt.TurretBarrel })

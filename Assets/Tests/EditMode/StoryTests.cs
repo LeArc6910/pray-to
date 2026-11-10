@@ -101,7 +101,40 @@ namespace Game.Core.Tests
                     Assert.Greater(Vec2.Distance(site.Center, arena), WorldGenerator.ArenaRadius + site.Radius, $"seed {seed}: {site.Definition.Id} on an arena");
                 foreach (var other in world.Places.Where(o => o != site))
                     Assert.Greater(Vec2.Distance(site.Center, other.Center), site.Radius + other.Radius, $"seed {seed}: {site.Definition.Id} on {other.Definition.Id}");
+                // Dressed (Docs/Story.md, 장소 꾸밈), and every person still walked to from the waypoint, with room
+                // below them to talk from.
+                int decor = 0;
+                for (int y = site.Y - site.Radius; y <= site.Y + site.Radius; y++)
+                    for (int x = site.X - site.Radius; x <= site.X + site.Radius; x++)
+                        if (world.Map[x, y] >= TileType.TimberWall && world.Map[x, y] <= TileType.Tent) decor++;
+                Assert.GreaterOrEqual(decor, 6, $"seed {seed}: {site.Definition.Id} is bare");
+                var walked = Walked(world.Map, site.X, site.Y, site.Radius + 2);
+                foreach (var (character, at) in site.People)
+                {
+                    var tile = (TileMap.Cell(at.X), TileMap.Cell(at.Y));
+                    Assert.IsTrue(walked.Contains(tile), $"seed {seed}: {character.Id} shut in at {site.Definition.Id}");
+                    Assert.IsTrue(walked.Contains((tile.Item1, tile.Item2 - 1)), $"seed {seed}: nowhere to talk to {character.Id} from");
+                }
             }
+        }
+
+        // The open tiles walked to from (x, y) within reach of it.
+        static HashSet<(int, int)> Walked(TileMap map, int cx, int cy, int reach)
+        {
+            var seen = new HashSet<(int, int)> { (cx, cy) };
+            var queue = new Queue<(int X, int Y)>();
+            queue.Enqueue((cx, cy));
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+                foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if ((nx - cx) * (nx - cx) + (ny - cy) * (ny - cy) > reach * reach || map.IsSolid(nx, ny) || !seen.Add((nx, ny))) continue;
+                    queue.Enqueue((nx, ny));
+                }
+            }
+            return seen;
         }
 
         [Test]

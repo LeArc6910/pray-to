@@ -145,15 +145,16 @@ namespace Game.Core
         }
 
         // Each place round its plaza, in sheet order: at its distance from the spawn, of the sixteen ways the one
-        // nearest the place its road comes from that keeps clear of the arenas and the other places; lamps round the
-        // edge, a waypoint in the middle, its people on a ring inside. Then the roads, three wide and paved, bent once
-        // to keep out of the arenas, never laid over a plaza.
+        // nearest the place its road comes from that keeps clear of the arenas and the other places, with its waypoint
+        // in the middle. Then the roads, three wide and paved, bent once to keep out of the arenas, never laid over a
+        // plaza. Then each plaza is dressed in its style (Decorate), its people stood on open floor, and any person or
+        // road the dressing shut off from the waypoint opened again.
         static List<PlaceSite> CarvePlaces(GeneratedWorld world, ulong seed, StoryData story)
         {
             var map = world.Map;
             var random = new GameRandom(seed, PlaceStream);
             var arenas = world.Arenas.Select(a => (X: TileMap.Cell(a.X), Y: TileMap.Cell(a.Y))).ToList();
-            var sites = new List<PlaceSite>();
+            var spots = new List<(PlaceDefinition Place, int X, int Y)>();
             int Square(int dx, int dy) => dx * dx + dy * dy;
             foreach (var place in story.Places)
             {
@@ -161,8 +162,8 @@ namespace Game.Core
                 int cx = world.SpawnX, cy = world.SpawnY;
                 if (place.Distance > 0)
                 {
-                    var from = sites.FirstOrDefault(s => s.Definition.Id == place.Road);
-                    int fromX = from?.X ?? world.SpawnX, fromY = from?.Y ?? world.SpawnY;
+                    var from = spots.FirstOrDefault(s => s.Place.Id == place.Road);
+                    int fromX = from.Place != null ? from.X : world.SpawnX, fromY = from.Place != null ? from.Y : world.SpawnY;
                     int start = random.Next(Ways.Length);
                     (int X, int Y)? best = null;
                     int bestScore = int.MaxValue;
@@ -172,7 +173,7 @@ namespace Game.Core
                         int x = Clamp(world.SpawnX + way.X * place.Distance / 1000, r + 3, map.Width - r - 4);
                         int y = Clamp(world.SpawnY + way.Y * place.Distance / 1000, r + 3, map.Height - r - 4);
                         bool clear = arenas.All(a => Square(x - a.X, y - a.Y) >= (ArenaRadius + r + 3) * (ArenaRadius + r + 3))
-                            && sites.All(s => Square(x - s.X, y - s.Y) >= (s.Radius + r + 4) * (s.Radius + r + 4));
+                            && spots.All(s => Square(x - s.X, y - s.Y) >= (s.Place.Radius + r + 4) * (s.Place.Radius + r + 4));
                         // Clear ways first, the one nearest where its road comes from; crowded ones only when no way is clear.
                         int score = Square(x - fromX, y - fromY) + (clear ? 0 : 1 << 24);
                         if (score < bestScore)
@@ -190,44 +191,25 @@ namespace Game.Core
                         if (IsInside(map, x, y) && Square(x - cx, y - cy) <= r * r) map[x, y] = place.Floor;
                     }
                 }
-                // Lamps on the four diagonals near the edge, so a place is lit from afar.
-                foreach (int w in new[] { 2, 6, 10, 14 })
-                {
-                    int lx = cx + Ways[w].X * (r - 1) / 1000, ly = cy + Ways[w].Y * (r - 1) / 1000;
-                    if (IsInside(map, lx, ly)) map[lx, ly] = TileType.Lamp;
-                }
                 if (place.Waypoint) map[cx, cy] = TileType.Waypoint;
-                var people = new List<(CharacterDefinition, Vec2)>();
-                var living = story.Characters.Where(c => c.Place == place).ToList();
-                int ring = System.Math.Max(2, r - 3);
-                for (int i = 0; i < living.Count; i++)
-                {
-                    // From the top of the plaza round, evenly; a second lap a little further in when there are many.
-                    int lap = i / 8;
-                    var way = Ways[(4 + (i % 8) * 2 + lap) % Ways.Length];
-                    int dist = System.Math.Max(2, ring - lap);
-                    int px = cx + way.X * dist / 1000, py = cy + way.Y * dist / 1000;
-                    if (map[px, py] != place.Floor) (px, py) = (cx + (i % 2 == 0 ? 1 : -1), cy + 1 + i / 2);
-                    people.Add((living[i], TileMap.Center(px, py)));
-                }
-                sites.Add(new PlaceSite(place, cx, cy, people));
+                spots.Add((place, cx, cy));
             }
 
-            bool InPlaza(int x, int y) => sites.Any(s => Square(x - s.X, y - s.Y) <= s.Radius * s.Radius);
+            bool InPlaza(int x, int y) => spots.Any(s => Square(x - s.X, y - s.Y) <= s.Place.Radius * s.Place.Radius);
             int ArenaTiles(List<(int X, int Y)> line) => line.Count(p => arenas.Any(a => Square(p.X - a.X, p.Y - a.Y) <= (ArenaRadius + 2) * (ArenaRadius + 2)));
-            foreach (var site in sites)
+            foreach (var spot in spots)
             {
-                var from = sites.FirstOrDefault(s => s.Definition.Id == site.Definition.Road);
-                if (from == null || from == site) continue;
+                var from = spots.FirstOrDefault(s => s.Place.Id == spot.Place.Road);
+                if (from.Place == null || from.Place == spot.Place) continue;
                 List<(int X, int Y)> path = null;
                 int fewest = int.MaxValue;
                 foreach (int bend in new[] { 0, 250, -250, 450, -450 })
                 {
-                    int midX = (from.X + site.X) / 2 - (site.Y - from.Y) * bend / 1000;
-                    int midY = (from.Y + site.Y) / 2 + (site.X - from.X) * bend / 1000;
+                    int midX = (from.X + spot.X) / 2 - (spot.Y - from.Y) * bend / 1000;
+                    int midY = (from.Y + spot.Y) / 2 + (spot.X - from.X) * bend / 1000;
                     midX = Clamp(midX, 2, map.Width - 3);
                     midY = Clamp(midY, 2, map.Height - 3);
-                    var line = Line(from.X, from.Y, midX, midY).Concat(Line(midX, midY, site.X, site.Y)).ToList();
+                    var line = Line(from.X, from.Y, midX, midY).Concat(Line(midX, midY, spot.X, spot.Y)).ToList();
                     int crossed = ArenaTiles(line);
                     if (crossed < fewest)
                     {
@@ -246,7 +228,235 @@ namespace Game.Core
                     }
                 }
             }
+
+            var sites = new List<PlaceSite>();
+            foreach (var (place, cx, cy) in spots)
+            {
+                var wanted = Decorate(map, cx, cy, place);
+                var people = Stand(map, cx, cy, place, story.Characters.Where(c => c.Place == place).ToList(), wanted);
+                Open(map, cx, cy, place, people.Select(p => (TileMap.Cell(p.Item2.X), TileMap.Cell(p.Item2.Y))));
+                sites.Add(new PlaceSite(place, cx, cy, people));
+            }
             return sites;
+        }
+
+        // Dresses a plaza in its style (Docs/Story.md, 장소 꾸밈) and gives where its people would stand, in
+        // characters.csv order (more people than that stand round a ring). Nothing goes on the waypoint or right
+        // beside it, off the plaza, or on anything but the plaza's own floor.
+        static List<(int X, int Y)> Decorate(TileMap map, int cx, int cy, PlaceDefinition place)
+        {
+            int r = place.Radius;
+            void Put(int dx, int dy, TileType type)
+            {
+                int x = cx + dx, y = cy + dy;
+                if (!IsInside(map, x, y) || dx * dx + dy * dy > r * r || map[x, y] != place.Floor) return;
+                if (System.Math.Abs(dx) <= 1 && System.Math.Abs(dy) <= 1) return;
+                map[x, y] = type;
+            }
+            void Lamps()
+            {
+                foreach (int w in new[] { 2, 6, 10, 14 }) Put(Ways[w].X * (r - 1) / 1000, Ways[w].Y * (r - 1) / 1000, TileType.Lamp);
+            }
+            // A small house of timber: walls round, a door in the middle of its front (bottom), things inside.
+            void House(int left, int bottom, int width, int height, params TileType[] inside)
+            {
+                for (int dy = 0; dy < height; dy++)
+                {
+                    for (int dx = 0; dx < width; dx++)
+                    {
+                        bool edge = dx == 0 || dy == 0 || dx == width - 1 || dy == height - 1;
+                        if (edge) Put(left + dx, bottom + dy, dy == 0 && dx == width / 2 ? TileType.Door : TileType.TimberWall);
+                    }
+                }
+                for (int i = 0; i < inside.Length && i < width - 2; i++) Put(left + 1 + i, bottom + height - 2, inside[i]);
+            }
+            var wanted = new List<(int X, int Y)>();
+            switch (place.Style)
+            {
+                case "village":
+                    // Paths of road crossing at the waypoint (road, so nothing is built on them and no paving comes up
+                    // free), then two houses, a well, barrels, giant mushrooms.
+                    for (int a = -r; a <= r; a++)
+                    {
+                        for (int b = -1; b <= 1; b++)
+                        {
+                            foreach (var (x, y) in new[] { (cx + a, cy + b), (cx + b, cy + a) })
+                            {
+                                if (IsInside(map, x, y) && map[x, y] == place.Floor && (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r) map[x, y] = TileType.Road;
+                            }
+                        }
+                    }
+                    House(-7, 2, 5, 4, TileType.Table, TileType.Barrel, TileType.Pot);
+                    House(3, 2, 5, 4, TileType.Pot, TileType.Table, TileType.Barrel);
+                    Put(-4, -4, TileType.Well);
+                    foreach (var (dx, dy) in new[] { (4, -4), (5, -4), (4, -5) }) Put(dx, dy, TileType.Barrel);
+                    foreach (var (dx, dy) in new[] { (-8, -2), (8, -2), (-3, -8), (3, -8), (-6, -6) }) Put(dx, dy, TileType.MushroomTree);
+                    foreach (var (dx, dy) in new[] { (-6, 1), (6, 1) }) Put(dx, dy, TileType.Pot);
+                    Put(-8, 1, TileType.Banner);
+                    Put(8, 1, TileType.Banner);
+                    Lamps();
+                    wanted.Add((cx, cy + 3));
+                    wanted.Add((cx - 2, cy - 3));
+                    break;
+                case "kingdom":
+                    // A castle wall round the edge (gates are opened where the roads come in, by Open), a red carpet
+                    // up the middle to the throne, pillars either side, fountains and banners.
+                    for (int dy = -r; dy <= r; dy++)
+                    {
+                        for (int dx = -r; dx <= r; dx++)
+                        {
+                            int d = dx * dx + dy * dy;
+                            if (d <= r * r && d > (r - 1) * (r - 1)) Put(dx, dy, TileType.CastleWall);
+                        }
+                    }
+                    for (int dy = -r + 1; dy <= r - 4; dy++)
+                    {
+                        for (int dx = -1; dx <= 1; dx++)
+                        {
+                            int x = cx + dx, y = cy + dy;
+                            if (IsInside(map, x, y) && map[x, y] == place.Floor && !(dx == 0 && dy == 0)) map[x, y] = TileType.RedCarpet;
+                        }
+                    }
+                    Put(0, r - 3, TileType.Throne);
+                    foreach (int side in new[] { -1, 1 })
+                    {
+                        foreach (int dy in new[] { -6, -3, 3 }) Put(side * 3, dy, TileType.Pillar);
+                        Put(side * 2, r - 3, TileType.Pillar);
+                        Put(side * 6, -3, TileType.Fountain);
+                        Put(side * 5, 4, TileType.Banner);
+                        Put(side * 6, 1, TileType.Pot);
+                    }
+                    Lamps();
+                    wanted.Add((cx, cy + r - 4));
+                    wanted.Add((cx - 2, cy + r - 5));
+                    break;
+                case "hut":
+                    House(-3, 2, 5, 4, TileType.Table, TileType.Barrel, TileType.Pot);
+                    Put(3, -2, TileType.Campfire);
+                    foreach (int dx in new[] { 2, 3, 4 }) Put(dx, 4, TileType.Fence);
+                    Put(4, 3, TileType.Fence);
+                    Put(4, 2, TileType.Fence);
+                    foreach (var (dx, dy) in new[] { (2, 3), (3, 3), (2, 2), (3, 2) }) Put(dx, dy, TileType.Soil);
+                    foreach (var (dx, dy) in new[] { (-5, -2), (-4, -4), (4, -4), (-5, 1) }) Put(dx, dy, TileType.MushroomTree);
+                    Put(-2, -4, TileType.Barrel);
+                    Lamps();
+                    wanted.Add((cx + 1, cy - 2));
+                    wanted.Add((cx - 2, cy - 2));
+                    break;
+                case "nest":
+                    // Dark crystal spires round the edge for light, demon tents, bones strewn about.
+                    foreach (int w in new[] { 1, 4, 7, 9, 12, 15 }) Put(Ways[w].X * (r - 1) / 1000, Ways[w].Y * (r - 1) / 1000, TileType.Spire);
+                    foreach (var (dx, dy) in new[] { (-4, 3), (4, 3), (-5, -1), (5, -1) }) Put(dx, dy, TileType.Tent);
+                    foreach (var (dx, dy) in new[] { (-2, -4), (3, -4), (0, 5), (-5, -4), (6, 2), (-3, 5) }) Put(dx, dy, TileType.Bones);
+                    Put(0, 4, TileType.Spire);
+                    wanted.Add((cx, cy + 2));
+                    wanted.Add((cx - 2, cy + 1));
+                    break;
+                default:
+                    Lamps();
+                    break;
+            }
+            return wanted;
+        }
+
+        // Each person on the open tile nearest where they would stand (their style's spot, else a ring round the
+        // waypoint), with open floor below them to talk from, one to a tile.
+        static List<(CharacterDefinition Character, Vec2 At)> Stand(TileMap map, int cx, int cy, PlaceDefinition place, List<CharacterDefinition> living,
+            List<(int X, int Y)> wanted)
+        {
+            int r = place.Radius;
+            var taken = new HashSet<(int, int)>();
+            var people = new List<(CharacterDefinition, Vec2)>();
+            bool Open(int x, int y) => IsInside(map, x, y) && !map.IsSolid(x, y) && map[x, y] != TileType.Waypoint && map[x, y] != TileType.Door;
+            for (int i = 0; i < living.Count; i++)
+            {
+                (int X, int Y) aim;
+                if (i < wanted.Count) aim = wanted[i];
+                else
+                {
+                    int lap = i / 8;
+                    var way = Ways[(4 + (i % 8) * 2 + lap) % Ways.Length];
+                    int dist = System.Math.Max(2, r - 3 - lap);
+                    aim = (cx + way.X * dist / 1000, cy + way.Y * dist / 1000);
+                }
+                (int X, int Y)? found = null;
+                for (int ring = 0; ring <= r && found == null; ring++)
+                {
+                    for (int dy = -ring; dy <= ring && found == null; dy++)
+                    {
+                        for (int dx = -ring; dx <= ring && found == null; dx++)
+                        {
+                            if (System.Math.Max(System.Math.Abs(dx), System.Math.Abs(dy)) != ring) continue;
+                            int x = aim.X + dx, y = aim.Y + dy;
+                            if ((x - cx) * (x - cx) + (y - cy) * (y - cy) > (r - 1) * (r - 1)) continue;
+                            if (taken.Contains((x, y)) || (x == cx && y == cy) || !Open(x, y) || !Open(x, y - 1)) continue;
+                            found = (x, y);
+                        }
+                    }
+                }
+                var (px, py) = found ?? (cx + (i % 2 == 0 ? 1 : -1), cy + 1 + i / 2);
+                taken.Add((px, py));
+                people.Add((living[i], TileMap.Center(px, py)));
+            }
+            return people;
+        }
+
+        // Whatever the dressing shut off is opened again: each person (and the tile below them) and each road that
+        // comes up to the plaza, walked to from the waypoint over open tiles (doors too); one that cannot be gets a way
+        // three wide straight to the middle, the dressing in it taken away.
+        static void Open(TileMap map, int cx, int cy, PlaceDefinition place, IEnumerable<(int X, int Y)> people)
+        {
+            int r = place.Radius;
+            int reach = r + 2;
+            bool Near(int x, int y) => (x - cx) * (x - cx) + (y - cy) * (y - cy) <= reach * reach;
+            var targets = new List<(int X, int Y)>();
+            foreach (var (x, y) in people)
+            {
+                targets.Add((x, y));
+                targets.Add((x, y - 1));
+            }
+            for (int y = cy - reach; y <= cy + reach; y++)
+            {
+                for (int x = cx - reach; x <= cx + reach; x++)
+                {
+                    int d = (x - cx) * (x - cx) + (y - cy) * (y - cy);
+                    if (IsInside(map, x, y) && map[x, y] == TileType.Road && d > r * r && Near(x, y)) targets.Add((x, y));
+                }
+            }
+            foreach (var target in targets)
+            {
+                if (Reached(map, cx, cy, Near).Contains(target)) continue;
+                foreach (var (x, y) in Line(target.X, target.Y, cx, cy))
+                {
+                    for (int ty = y - TunnelHalfWidth; ty <= y + TunnelHalfWidth; ty++)
+                    {
+                        for (int tx = x - TunnelHalfWidth; tx <= x + TunnelHalfWidth; tx++)
+                        {
+                            if (!IsInside(map, tx, ty) || map[tx, ty] == TileType.Waypoint) continue;
+                            if ((tx - cx) * (tx - cx) + (ty - cy) * (ty - cy) <= r * r && map.IsSolid(tx, ty)) map[tx, ty] = place.Floor;
+                        }
+                    }
+                }
+            }
+        }
+
+        // The open tiles (doors too) walked to from the middle without leaving the area.
+        static HashSet<(int X, int Y)> Reached(TileMap map, int cx, int cy, System.Func<int, int, bool> within)
+        {
+            var seen = new HashSet<(int X, int Y)> { (cx, cy) };
+            var queue = new Queue<(int X, int Y)>();
+            queue.Enqueue((cx, cy));
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+                foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if (!IsInside(map, nx, ny) || !within(nx, ny) || map.IsSolid(nx, ny) || !seen.Add((nx, ny))) continue;
+                    queue.Enqueue((nx, ny));
+                }
+            }
+            return seen;
         }
 
         // The tiles of a straight line, both ends in (Bresenham's).
