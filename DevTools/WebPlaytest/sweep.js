@@ -1768,7 +1768,8 @@ async function story(browser) {
     pages++;
     await game.wait(250);
   }
-  const asked = await game.allText();
+  // The answers are buttons, not text on the screen.
+  const asked = (await game.buttons()).map(b => b.label).join(' | ');
   check(/루가 마왕이라고 말한다/.test(asked) && /아무것도 없었다고 한다/.test(asked), '마지막 줄에 고를 말 둘');
   await game.shot('story-choice', '이야기 고르기');
   check(await game.press('아무것도 없었다고 한다'), '[아무것도 없었다고 한다]를 고른다');
@@ -2476,6 +2477,14 @@ async function firstRun(browser, profile, hourLong) {
     // 9. A rod (slime gel 2: the torch goal's reward), at the nearest water.
     await taken('near Workbench', '작업대로 돌아갈 때');
     await craft('낚싯대');
+    // The furnace's stone (2026-11-10: the stone run before the hoe ended at its time with too little, so the furnace
+    // was never made and every goal after it stood still): more first if short, as a person would on seeing the cost.
+    if (count(await inv(), 'stone') < 15 || count(await inv(), 'copper_ore') < 2) {
+      await copperFor(2);
+      await mine(async () => count(await inv(), 'stone') >= 15, 300);
+      note(`- 화로 재료를 더 모았다: 돌 ${count(await inv(), 'stone')}, 구리 ${count(await inv(), 'copper_ore')}`);
+      await taken('near Workbench', '작업대로 돌아갈 때');
+    }
     await craft('화로');
     await taken('near Water', '물웅덩이를 찾을 때(안내는 "동굴 가장자리 물웅덩이"라고만 한다)');
     await bagTab(game, '재료·제작');
