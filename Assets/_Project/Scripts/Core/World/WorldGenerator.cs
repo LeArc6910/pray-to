@@ -56,6 +56,10 @@ namespace Game.Core
         public BiomeMap Biomes { get; }
         // The places of the story (Docs/Story.md), in sheet order; none when made without the sheets.
         public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
+        // The signposts by the roads (2026-11-11) and the place each points to along its road, for the screen.
+        public IReadOnlyList<(int X, int Y, PlaceDefinition Toward)> Signposts => _signposts;
+        readonly List<(int X, int Y, PlaceDefinition Toward)> _signposts = new List<(int, int, PlaceDefinition)>();
+        internal void AddSignpost(int x, int y, PlaceDefinition toward) => _signposts.Add((x, y, toward));
     }
 
     // Where a place was carved: its middle (the waypoint), its plaza's radius, and where its people stand.
@@ -341,7 +345,7 @@ namespace Game.Core
                     return (System.Math.Sign(ax - bx), System.Math.Sign(ay - by));
                 }
                 // Sets the tile into the rock just past the road's edge beside path[i], on that side or else the other.
-                bool Edge(int i, int side, TileType type)
+                bool Edge(int i, int side, TileType type, PlaceDefinition toward = null)
                 {
                     var (dx, dy) = Along(i);
                     if (dx == 0 && dy == 0) return false;
@@ -351,18 +355,20 @@ namespace Game.Core
                         int x = path[i].X + px * (TunnelHalfWidth + 1), y = path[i].Y + py * (TunnelHalfWidth + 1);
                         int ex = path[i].X + px * TunnelHalfWidth, ey = path[i].Y + py * TunnelHalfWidth;
                         if (!Free(x, y) || !IsInside(map, ex, ey) || map[ex, ey] != TileType.Road) continue;
-                        if (Set(x, y, type)) return true;
+                        if (!Set(x, y, type)) continue;
+                        if (toward != null) world.AddSignpost(x, y, toward);
+                        return true;
                     }
                     return false;
                 }
-                // A signpost where it leaves each end's plaza.
+                // A signpost where it leaves each end's plaza, pointing on along the road to the other end.
                 for (int i = 0; i < path.Count; i++)
                 {
-                    if (Clear(i, from, 2) && Edge(i, 1, TileType.Signpost)) break;
+                    if (Clear(i, from, 2) && Edge(i, 1, TileType.Signpost, to.Place)) break;
                 }
                 for (int i = path.Count - 1; i >= 0; i--)
                 {
-                    if (Clear(i, to, 2) && Edge(i, -1, TileType.Signpost)) break;
+                    if (Clear(i, to, 2) && Edge(i, -1, TileType.Signpost, from.Place)) break;
                 }
                 // The rest spot: nearest halfway, three tiles along and two deep of bare floor or rock just past the
                 // road's edge on one side (the edge found column by column, so a sloping road gets a stepped alcove).

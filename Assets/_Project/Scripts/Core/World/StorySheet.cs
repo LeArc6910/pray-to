@@ -227,6 +227,22 @@ namespace Game.Core
             return steps;
         }
 
+        // The steps passed on the way from first to the step reached (the main story from 0, a side story from its
+        // first row), following the answers given where it asked; for the journal (2026-11-11).
+        public List<StoryStep> Passed(int first, int reached, IReadOnlyDictionary<int, int> choices)
+        {
+            var passed = new List<StoryStep>();
+            int at = first;
+            for (int guard = 0; guard < Steps.Count && at != reached && Step(at) is StoryStep step; guard++)
+            {
+                passed.Add(step);
+                at = step.Choices.Count > 0 && choices != null && choices.TryGetValue(step.Index, out int answer) && answer < step.Choices.Count
+                    ? step.Choices[answer].Step
+                    : step.Next;
+            }
+            return passed;
+        }
+
         // The step the character gives now, if any (main story first), and whether it is taken.
         public (StoryStep Step, bool Taken)? GivenBy(CharacterDefinition who, int journeyStep, bool journeyTaken, Dictionary<string, int> sideSteps, HashSet<string> sideTaken)
         {

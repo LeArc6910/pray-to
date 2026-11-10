@@ -440,8 +440,10 @@ namespace Game.Client
                 }
             }
 
+            DrawStoryLog(Heading);
+
             var people = _client.Npcs?.Npcs ?? (IReadOnlyList<NpcDefinition>)Array.Empty<NpcDefinition>();
-            Heading("이야기");
+            Heading("사람들의 이야기");
             foreach (var npc in people)
             {
                 var story = _client.Npcs.StoryOf(npc);
@@ -465,6 +467,65 @@ namespace Game.Client
                 GUILayout.Label(Fit($"{npc.Name}: {request.NeedText} → {request.RewardText}{(_client.RequestDoneToday(npc) ? " (마침)" : "")}", _textWidth));
             }
             if (!any) GUILayout.Label(Fit("만난 사람에게 말을 걸면 그날의 부탁을 알려 준다", _textWidth));
+        }
+
+        // The story so far (Docs/Story.md, 2026-11-11): each chapter's steps passed, with the answers given, then the
+        // step on now; and each side story, how far along, or when it opens.
+        void DrawStoryLog(Action<string> heading)
+        {
+            var story = _client.Story;
+            if (story == null || story.Steps.Count == 0) return;
+            heading("큰 이야기");
+            string chapter = null;
+            foreach (var step in story.Passed(0, _client.JourneyStep, _client.StoryChoices))
+            {
+                if (step.Chapter != chapter && !string.IsNullOrEmpty(step.Chapter))
+                {
+                    chapter = step.Chapter;
+                    GUILayout.Label(Fit(chapter, _textWidth));
+                }
+                GUILayout.Label(Fit($"  · {step.Title}", _textWidth));
+                if (step.Choices.Count > 0 && _client.StoryChoices.TryGetValue(step.Index, out int answer) && answer < step.Choices.Count)
+                    GUILayout.Label(Fit($"     고른 말: \"{step.Choices[answer].Text}\"", _textWidth));
+            }
+            var now = _client.CurrentStep;
+            GUILayout.Label(Fit(now == null ? "이야기는 여기까지다. 다음 이야기가 곧 이어진다" : $"지금: {now.Title} · {StoryGoal(now, _client.JourneyTaken)}", _textWidth));
+
+            if (story.Chains.Count == 0) return;
+            heading("곁이야기");
+            foreach (var chain in story.Chains)
+            {
+                var rows = story.Steps.Where(s => s.Chain == chain.Id).ToList();
+                string name = string.IsNullOrEmpty(chain.First.Chapter) ? chain.First.Title : chain.First.Chapter;
+                if (_client.JourneyStep < chain.After)
+                {
+                    GUILayout.Label(Fit($"{name} · 큰 이야기 {chain.After}단계를 마치면 열린다", _textWidth));
+                    continue;
+                }
+                int at = _client.SideSteps.TryGetValue(chain.Id, out int saved) ? saved : chain.First.Index;
+                int done = story.Passed(chain.First.Index, at, _client.StoryChoices).Count;
+                var step = story.Step(at);
+                if (step == null || step.Chain != chain.Id)
+                {
+                    GUILayout.Label(Fit($"{name} {rows.Count}/{rows.Count} · 마쳤다", _textWidth));
+                    continue;
+                }
+                bool taken = _client.SideTaken.Contains(chain.Id);
+                GUILayout.Label(Fit($"{name} {done}/{rows.Count} · {step.Title}: {StoryGoal(step, taken)}", _textWidth));
+            }
+        }
+
+        // What a step asks, in a few words.
+        string StoryGoal(StoryStep step, bool taken)
+        {
+            if (!taken) return $"{step.Who.Name}에게 말 걸기 ({step.Who.Place.Name})";
+            return step.Goal switch
+            {
+                Game.Core.StoryGoal.Reach => $"{step.Place.Name}에 가기",
+                Game.Core.StoryGoal.Boss => $"{_client.BossName(step.Boss)} 쓰러뜨리기",
+                Game.Core.StoryGoal.Have => $"{step.Material?.Name ?? step.Consumable?.Name} {step.Count}개를 {step.Who.Name}에게",
+                _ => $"{step.Who.Name}에게 말 걸기",
+            };
         }
 
         // The guide's progress for the journal (GameRoot hands it over when the guide starts).

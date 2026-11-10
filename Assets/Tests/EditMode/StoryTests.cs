@@ -465,6 +465,31 @@ namespace Game.Core.Tests
             StringAssert.Contains("next '7'", all);
         }
 
+        // The places are safe (2026-11-11): a monster knocked or wandering into one is set back outside its edge, and
+        // none goes after a player standing inside one.
+        [Test]
+        public void MonstersKeepOutOfThePlaces()
+        {
+            var host = Host();
+            var world = host.World;
+            var village = world.Places[0];
+            var player = world.AddPlayer("a", null);
+            player.Position = village.Center + new Vec2(2, 0);
+            var slime = Monsters.Shipped.Monsters.First(m => m.Id == "slime");
+            var inside = world.SpawnEnemy(slime, village.Center + new Vec2(-2, 0));
+            var outside = world.SpawnEnemy(slime, village.Center + new Vec2(village.Radius + 3, 0));
+            Run(world, World.TicksPerSecond * 3);
+            foreach (var enemy in new[] { inside, outside })
+                Assert.Greater(Vec2.Distance(enemy.Position, village.Center), village.Radius + World.SafeMargin, "kept outside the village");
+            Assert.AreEqual(player.Stats.MaxHealth, player.Health, 0.01f, "nothing reached the player inside");
+            Assert.IsTrue(world.InSafePlace(player.Position));
+
+            // Out of the village, the slime comes for them again.
+            player.Position = outside.Position + new Vec2(2.5f, 0);
+            Run(world, World.TicksPerSecond);
+            Assert.AreNotEqual(EnemyState.Idle, outside.State, "a player outside is fair game");
+        }
+
         static int Index(string chain, int nth = 0) => Tales.Shipped.Steps.Where(s => s.Chain == chain).ElementAt(nth).Index;
 
         [Test]
@@ -516,6 +541,20 @@ namespace Game.Core.Tests
             Assert.AreEqual(experience + 80, player.Experience);
             CollectionAssert.AreEqual(new[] { "", "mine" }, world.StepsOf(player).Select(s => s.Step.Chain), "the harbour's story is done");
             Assert.AreEqual(1, player.JourneyStep, "and the main story never moved");
+        }
+
+        // The journal's story so far (2026-11-11): the steps passed follow the answer given, and stop at the step on.
+        [Test]
+        public void TheStorySoFarFollowsTheAnswers()
+        {
+            var story = Tales.Shipped;
+            var kept = story.Passed(0, story.Steps.Count, new Dictionary<int, int> { [8] = 1 });
+            CollectionAssert.AreEqual(Enumerable.Range(0, 9).Append(10), kept.Select(s => s.Index), "through the queen's question to the branch kept");
+            var told = story.Passed(0, story.Steps.Count, new Dictionary<int, int> { [8] = 0 });
+            CollectionAssert.AreEqual(Enumerable.Range(0, 10), told.Select(s => s.Index));
+            Assert.AreEqual(3, story.Passed(0, 3, null).Count, "up to the step on now");
+            int harbor = Index("harbor");
+            Assert.AreEqual(2, story.Passed(harbor, Index("harbor", 2), null).Count);
         }
 
         static void PersonAt(World world, string id, Player player) =>

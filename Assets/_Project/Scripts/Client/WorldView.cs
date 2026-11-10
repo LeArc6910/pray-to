@@ -662,6 +662,15 @@ namespace Game.Client
                 bool turn = waiting.Contains(character);
                 Label(head, turn ? $"! {character.Name}" : character.Name, turn ? StoryLabel : Color.white);
             }
+            // A signpost close by says where its road goes and which way (2026-11-11).
+            foreach (var (sx, sy, toward) in _client.Signposts)
+            {
+                var post = new Vector3(sx + 0.5f, sy + 1.6f, 0);
+                if (Vector3.Distance(post, _self.Position) >= 3) continue;
+                var there = _client.SiteOf(toward);
+                if (there == null) continue;
+                Label(post, $"{toward.Name} · {Compass(there.Center.X - (sx + 0.5f), there.Center.Y - (sy + 0.5f))}쪽", Color.white);
+            }
 
             // Each person's name and how well this player knows them, close by; the one near enough to deal with also
             // says where to (the bag's tab named for them).
@@ -1406,6 +1415,14 @@ namespace Game.Client
                 _propsGone.Add(pair.Key);
             }
             foreach (int key in _propsGone) _props.Remove(key);
+        }
+
+        // Which of eight ways (y up is north).
+        static string Compass(float dx, float dy)
+        {
+            string[] names = { "동", "북동", "북", "북서", "서", "남서", "남", "남동" };
+            float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
+            return names[Mathf.RoundToInt((angle + 360) % 360 / 45f) % 8];
         }
 
         // The place the player stands in, last announced: entering another shows its name and line (Docs/Story.md).

@@ -313,6 +313,14 @@ namespace Game.Client
                     var site = world.Places.FirstOrDefault(p => p.Definition.Id == words[2]) ?? throw new ArgumentException($"no place '{words[2]}'");
                     to = TileMap.Center(site.X, site.Y - 2);
                     break;
+                // Beside the first signpost of the roads (GeneratedWorld.Signposts), on the road side.
+                case "signpost":
+                    var signs = root.LocalClient?.Signposts;
+                    if (signs == null || signs.Count == 0) throw new InvalidOperationException("no road signposts");
+                    var (signX, signY, _) = signs[0];
+                    var road = new[] { (0, -1), (1, 0), (-1, 0), (0, 1) }.FirstOrDefault(s => map.InBounds(signX + s.Item1, signY + s.Item2) && Structures.IsWay(map[signX + s.Item1, signY + s.Item2]));
+                    to = TileMap.Center(signX + road.Item1, signY + road.Item2);
+                    break;
                 case "person":
                     var standing = world.Places.SelectMany(p => p.People).FirstOrDefault(p => p.Character.Id == words[2]);
                     if (standing.Character == null) throw new ArgumentException($"no person '{words[2]}' in the story");

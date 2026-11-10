@@ -177,7 +177,9 @@ namespace Game.Core
             }
             foreach (var enemy in _enemies)
             {
-                if (!SkipsTick(enemy)) UpdateEnemy(enemy);
+                if (SkipsTick(enemy)) continue;
+                UpdateEnemy(enemy);
+                KeepOutOfPlaces(enemy);
             }
             UpdateBosses();
             UpdateMinions();
@@ -351,7 +353,7 @@ namespace Game.Core
                     // for the stone and breaks in.
                     bool walledOut = enemy.Rift == DefenseMonster && _flow.DistanceAt(TileMap.Cell(enemy.Position.X), TileMap.Cell(enemy.Position.Y)) == FlowField.Unreached;
                     var nearest = walledOut ? null : _players
-                        .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= definition.Aggro * AggroScale)
+                        .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= definition.Aggro * AggroScale && !InSafePlace(p.Position))
                         .OrderBy(p => Vec2.Distance(p.Position, enemy.Position))
                         .FirstOrDefault();
                     if (nearest == null)
@@ -365,7 +367,9 @@ namespace Game.Core
                     break;
 
                 case EnemyState.Chase:
-                    if (target == null || target.IsDead || Vec2.Distance(target.Position, enemy.Position) > definition.Aggro * LoseInterest)
+                    // A player in a place of the story is out of reach: the monster gives up.
+                    if (target == null || target.IsDead || Vec2.Distance(target.Position, enemy.Position) > definition.Aggro * LoseInterest
+                        || InSafePlace(target.Position))
                     {
                         enemy.State = EnemyState.Idle;
                         break;
@@ -570,6 +574,28 @@ namespace Game.Core
                     a.Position = Collision.Resolve(Map, a.Position - push, a.Definition.Radius, monster: true);
                     b.Position = Collision.Resolve(Map, b.Position + push, b.Definition.Radius, monster: true);
                 }
+            }
+        }
+
+        // The places of the story are safe (2026-11-11, "괴물이 마을 안까지 들어와"): no monster comes into being in
+        // one (TrySpawnEnemy), none goes after a player inside one, and one that wanders or is knocked in is set back
+        // just outside its edge. The ward stone's raiders and the bosses keep to their own ground and are not stopped.
+        public const float SafeMargin = 1;
+
+        public bool InSafePlace(Vec2 position) => Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + SafeMargin);
+
+        void KeepOutOfPlaces(Enemy enemy)
+        {
+            if (enemy.Rift == DefenseMonster || Places.Count == 0) return;
+            foreach (var place in Places)
+            {
+                float edge = place.Radius + SafeMargin + enemy.Definition.Radius;
+                var away = enemy.Position - place.Center;
+                float distance = away.Length;
+                if (distance >= edge) continue;
+                var outward = distance > 1e-3f ? away / distance : new Vec2(0, -1);
+                enemy.Position = Collision.Resolve(Map, place.Center + outward * edge, enemy.Definition.Radius, monster: true);
+                if (enemy.State == EnemyState.Chase) enemy.State = EnemyState.Idle;
             }
         }
 

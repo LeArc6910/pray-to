@@ -1826,6 +1826,22 @@ async function story(browser) {
   } while (pages < 12 && (await game.press('다음', undefined, { quiet: true })) && (await game.wait(250), true));
   check(/우리끼리만/.test(heard) && !/근위대가 와서/.test(heard), '여왕에게 숨긴 갈래의 말만 나온다');
   await game.shot('side-story-branch', '고른 말에 따라 바뀌는 대사');
+  await game.press('알겠다', undefined, { quiet: true });
+  await game.press('닫기', undefined, { quiet: true });
+  // The journal's story so far (2026-11-11): the chapters passed, the answer given, and the side stories.
+  await bagTab(game, '일지');
+  await game.wait(400);
+  const log = await game.allText();
+  check(/큰 이야기/.test(log) && /고른 말/.test(log) && /아무것도 없었다고 한다/.test(log), '[일지]에 지나온 큰 이야기와 고른 말');
+  check(/곁이야기/.test(log) && /물안개 항구/.test(log), '[일지]에 곁이야기의 진행');
+  await game.shot('journal-story', '[일지]의 이야기 기록');
+  await closeBag(game);
+  // A road signpost says where its road goes (2026-11-11).
+  await game.send('goto signpost');
+  await game.wait(900);
+  const sign = await game.allText();
+  check(/(새벽 마을|왕도 루미나|용사의 오두막|마족 둥지|물안개 항구|철곡 광산촌|잊힌 신전) · (동|북동|북|북서|서|남서|남|남동)쪽/.test(sign), `이정표 곁에서 갈 곳과 방향 (${(sign.match(/[가-힣 ]+ · [가-힣]+쪽/) || [''])[0]})`);
+  await game.shot('signpost', '길 이정표와 갈 곳');
   await game.context.close();
 }
 

@@ -546,6 +546,8 @@ namespace Game.Core
         // from them); where the places are; and this player's step, whether it is taken, and the open waypoints.
         public StoryData Story { get; set; }
         public IReadOnlyList<PlaceSite> Places { get; private set; } = Array.Empty<PlaceSite>();
+        // The road signposts and the place each points to (GeneratedWorld.Signposts).
+        public IReadOnlyList<(int X, int Y, PlaceDefinition Toward)> Signposts { get; private set; } = Array.Empty<(int, int, PlaceDefinition)>();
         public int JourneyStep { get; private set; }
         public bool JourneyTaken { get; private set; }
         public HashSet<int> Waypoints { get; } = new HashSet<int>();
@@ -1452,6 +1454,7 @@ namespace Game.Core
             Seed = welcome.Seed;
             var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story);
             Map = generated.Map;
+            Signposts = generated.Signposts;
             Places = generated.Places;
             Arena = generated.Arena;
             Arenas = generated.Arenas;

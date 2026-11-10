@@ -1650,15 +1650,17 @@ namespace Game.Client
         // laid in courses, each course shifted so the joints do not line up, in warm greys lighter than the cave floor,
         // and a kerb of long stones wherever the road meets something that is not road (RoadVariant), so its edges
         // read as a way. Two layings, chosen by the tile's place, keep a long road from looking stamped.
-        public const int RoadVariants = 32;
+        // Sides (4 bits), inner corners (4 bits) and laying (1 bit).
+        public const int RoadVariants = 512;
         static readonly PixelImage[] RoadTiles = new PixelImage[RoadVariants];
 
-        // The road with these sides joined to more road or paving (N 1, E 2, S 4, W 8), laid the first or second way
-        // (+16).
+        // The road with these sides joined to more road or paving (N 1, E 2, S 4, W 8), these inner corners kerbed
+        // (NE 16, SE 32, SW 64, NW 128: both sides beside the corner join but the tile across it does not), laid the
+        // first or second way (+256).
         public static PixelImage Road(int variant)
         {
             variant = System.Math.Clamp(variant, 0, RoadVariants - 1);
-            return RoadTiles[variant] ??= DrawRoad(variant & 15, variant >> 4);
+            return RoadTiles[variant] ??= DrawRoad(variant & 15, variant >> 4 & 15, variant >> 8);
         }
 
         // Which road tile goes at x, y: its sides that meet road, a waypoint, the harbour's planks, the mine's rails or
@@ -1672,11 +1674,17 @@ namespace Game.Client
                 return Structures.IsWay(type) || type == TileType.Waypoint || TileMap.IsPaving(type);
             }
             int sides = (Joins(x, y + 1) ? 1 : 0) | (Joins(x + 1, y) ? 2 : 0) | (Joins(x, y - 1) ? 4 : 0) | (Joins(x - 1, y) ? 8 : 0);
+            // An inner corner: the two sides beside it join, the tile across it does not (where a sloping road steps).
+            int corners = 0;
+            if ((sides & 3) == 3 && !Joins(x + 1, y + 1)) corners |= 1;
+            if ((sides & 6) == 6 && !Joins(x + 1, y - 1)) corners |= 2;
+            if ((sides & 12) == 12 && !Joins(x - 1, y - 1)) corners |= 4;
+            if ((sides & 9) == 9 && !Joins(x - 1, y + 1)) corners |= 8;
             int laying = ((x * 73 + y * 151) >> 2 ^ x ^ y) & 1;
-            return sides | laying << 4;
+            return sides | corners << 4 | laying << 8;
         }
 
-        static PixelImage DrawRoad(int sides, int laying)
+        static PixelImage DrawRoad(int sides, int corners, int laying)
         {
             var mortar = Rgba.Hex("#5E564C");
             var grit = Rgba.Hex("#4E473F");
@@ -1762,6 +1770,22 @@ namespace Game.Client
                     image[15, y] = edge;
                 }
             }
+            // The inner corners: a short bend of kerb, so the kerbs of a stepping road run on round the step.
+            void Corner(bool right, bool top)
+            {
+                int Fx(int i) => right ? Size - 1 - i : i;
+                int Fy(int j) => top ? j : Size - 1 - j;
+                image[Fx(0), Fy(0)] = edge;
+                image[Fx(1), Fy(0)] = top ? kerb.Light : kerb.Shade;
+                image[Fx(0), Fy(1)] = right ? kerb.Shade : kerb.Light;
+                image[Fx(1), Fy(1)] = kerb.Main;
+                image[Fx(2), Fy(0)] = top ? kerb.Main : kerb.Shade;
+                image[Fx(0), Fy(2)] = kerb.Main;
+            }
+            if ((corners & 1) != 0) Corner(right: true, top: true);
+            if ((corners & 2) != 0) Corner(right: true, top: false);
+            if ((corners & 4) != 0) Corner(right: false, top: false);
+            if ((corners & 8) != 0) Corner(right: false, top: true);
             return image;
         }
 
