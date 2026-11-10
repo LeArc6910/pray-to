@@ -135,6 +135,47 @@ namespace Game.Core
         Bones,
         Spire,
         Tent,
+        // Structures of the story's places that stand taller than a tile (2026-11-10, Docs/Story.md, 장소 꾸밈): a
+        // structure bigger than a tile is its type on its lower left tile and StructurePart on the rest.
+        StructurePart,
+        Cottage,
+        Cabin,
+        Tower,
+        BigFountain,
+        Statue,
+        LampPost,
+        Crates,
+        Signpost,
+        Bench,
+        Hedge,
+        Woodpile,
+        TrainingDummy,
+        WeaponRack,
+        BigTent,
+        Totem,
+        Cage,
+        Brazier,
+        RoyalBanner,
+        DemonBanner,
+        Flowerbed,
+    }
+
+    // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
+    public static class Structures
+    {
+        public const TileType First = TileType.TimberWall;
+        public const TileType Last = TileType.Flowerbed;
+
+        // Laid by the generator round a place, never dug (no row in tiles.csv), drawn standing on the floor.
+        public static bool IsDecor(TileType type) => type >= First && type <= Last;
+
+        // How many tiles across and up a structure stands on, from the tile its type is on (its lower left).
+        public static (int W, int H) Footprint(TileType type) => type switch
+        {
+            TileType.Cottage or TileType.Cabin => (4, 3),
+            TileType.Tower or TileType.BigFountain or TileType.BigTent => (2, 2),
+            _ => (1, 1),
+        };
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

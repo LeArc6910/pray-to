@@ -303,7 +303,10 @@ namespace Game.Client
             if (_map[x, y] == TileType.CastleWall || _map[x, y] == TileType.Pillar) return new Color32(190, 186, 176, 255);
             if (_map[x, y] == TileType.Spire) return new Color32(170, 120, 240, 255);
             if (_map[x, y] == TileType.Campfire) return Palette.Torch;
-            if (_map[x, y] >= TileType.Well && _map[x, y] <= TileType.Tent) return new Color32(140, 120, 100, 255);
+            if (_map[x, y] == TileType.Cottage || _map[x, y] == TileType.Cabin) return new Color32(176, 72, 58, 255);
+            if (_map[x, y] == TileType.Tower) return new Color32(74, 108, 192, 255);
+            if (_map[x, y] == TileType.BigTent || _map[x, y] == TileType.Totem || _map[x, y] == TileType.Brazier) return new Color32(128, 40, 74, 255);
+            if (Structures.IsDecor(_map[x, y])) return new Color32(140, 120, 100, 255);
             if (_map[x, y] == TileType.Table || _map[x, y] == TileType.Banner || _map[x, y] == TileType.Pot) return new Color32(200, 160, 110, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);
             if (_map[x, y] == TileType.Water) return new Color32(50, 100, 170, 255);

@@ -59,6 +59,9 @@ namespace Game.Client
             var looks = PeopleArt.Looks.Select(look => PeopleArt.Look(look, Rgba.Hex(story.Characters.FirstOrDefault(c => c.Look == look)?.Color ?? "#8A7A6A"), 0)).ToList();
             Save(Row(looks), Path.Combine(pieces, "story_people.png"), 6);
             Save(Row(new[] { TileArt.Object(TileType.Road), TileArt.Object(TileType.Waypoint) }.ToList()), Path.Combine(pieces, "road_waypoint.png"), 6);
+            // Every structure of the places, standing on its feet, and castle wall blocks joined as on a wall.
+            Save(Row(PropArt.All.Select(type => PropArt.Prop(type)).ToList()), Path.Combine(pieces, "structures.png"), 4);
+            Save(Row(new[] { 0, 2 | 8, 1 | 4, 1 | 2, 15 }.Select(sides => PropArt.Prop(TileType.CastleWall, sides)).ToList()), Path.Combine(pieces, "castle_walls.png"), 6);
             var storyWorld = WorldGenerator.Generate(7, story: story);
             foreach (var site in storyWorld.Places) Save(Place(storyWorld, site, lights), Path.Combine(pieces, $"place_{site.Definition.Id}.png"), 3);
             Save(Players(), Path.Combine(output, "player.png"), 6);
@@ -372,7 +375,6 @@ namespace Game.Client
                     TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
                     TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow, TileType.Fence,
                     TileType.LockedDoor, TileType.Road, TileType.Waypoint,
-                    TileType.TimberWall, TileType.CastleWall, TileType.Well, TileType.Barrel, TileType.MushroomTree, TileType.Throne, TileType.Pillar, TileType.Fountain, TileType.Campfire, TileType.Bones, TileType.Spire, TileType.Tent,
                 }
                 .Select(TileArt.Object).Append(TileArt.OpenDoor).Append(TileArt.BigAssembler).Append(TileArt.BigSmelter).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(f => ItemArt.Belt(f)))
                 .Concat(new[] { ItemArt.Belt(0, fast: true), ItemArt.Underground(0), TileArt.MerchantCounter, ItemArt.Chicken(0), ItemArt.Chicken(1), ItemArt.Cow(0), ItemArt.Cow(1), ItemArt.Sheep(0), ItemArt.Sheep(1), ItemArt.TurretBarrel })
@@ -588,6 +590,7 @@ namespace Game.Client
             int half = site.Radius + 5;
             var scene = new Scene(world.Map, site.X - half, site.Y - half, half * 2, half * 2, _ => false);
             scene.Lit(lights, null);
+            scene.Places(world.Places);
             foreach (var (character, at) in site.People)
                 scene.Player(at.X, at.Y - 0.3f, PeopleArt.Look(character.Look, Rgba.Hex(character.Color), 0));
             scene.Player(site.X + 0.5f, site.Y - 1.5f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
@@ -636,6 +639,26 @@ namespace Game.Client
             readonly int _height;
             readonly Func<Vec2, bool> _inArena;
             readonly List<(float Y, Action<PixelImage> Draw)> _bodies = new List<(float, Action<PixelImage>)>();
+            IReadOnlyList<PlaceSite> _places;
+
+            // The places of the story: their floors under things, and their structures standing (as WorldView.DrawProps).
+            public void Places(IReadOnlyList<PlaceSite> places)
+            {
+                _places = places;
+                for (int y = _bottom - 3; y < _bottom + _height + 1; y++)
+                {
+                    for (int x = _left - 3; x < _left + _width + 1; x++)
+                    {
+                        if (!_map.InBounds(x, y)) continue;
+                        var type = _map[x, y];
+                        var image = PropArt.Prop(type, PropArt.IsWall(type) ? PropArt.Sides(_map, x, y) : 0);
+                        if (image == null) continue;
+                        var (w, _) = Structures.Footprint(type);
+                        var (px, py) = Corner(x + w / 2f, y);
+                        _bodies.Add((y, canvas => canvas.Draw(image, px - image.Width / 2, py - image.Height)));
+                    }
+                }
+            }
             readonly List<Action<PixelImage>> _overlays = new List<Action<PixelImage>>();
             readonly List<Action<PixelImage>> _icons = new List<Action<PixelImage>>();
             readonly List<Action<PixelImage>> _shots = new List<Action<PixelImage>>();
@@ -666,6 +689,9 @@ namespace Game.Client
                         {
                             var (px, py) = Corner(x, y + 1);
                             image.Draw(TileArt.Ground(TileArt.GroundAt(_map, x, y, _inArena(TileMap.Center(x, y)))), px, py);
+                            // The floor that runs under things (PropArt.Underlay), as WorldView's underlay layer draws it.
+                            var under = PropArt.Underlay(_map, _places, x, y);
+                            if (under != null) image.Draw(TileArt.Object(under.Value), px, py);
                             var placed = TileArt.Object(_map[x, y]);
                             if (placed != null) image.Draw(placed, px, py);
                         }

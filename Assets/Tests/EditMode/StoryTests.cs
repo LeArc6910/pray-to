@@ -106,8 +106,28 @@ namespace Game.Core.Tests
                 int decor = 0;
                 for (int y = site.Y - site.Radius; y <= site.Y + site.Radius; y++)
                     for (int x = site.X - site.Radius; x <= site.X + site.Radius; x++)
-                        if (world.Map[x, y] >= TileType.TimberWall && world.Map[x, y] <= TileType.Tent) decor++;
+                        if (Structures.IsDecor(world.Map[x, y])) decor++;
                 Assert.GreaterOrEqual(decor, 6, $"seed {seed}: {site.Definition.Id} is bare");
+                // No structure is left with a tile missing, nor a tile of one standing on its own.
+                for (int y = site.Y - site.Radius; y <= site.Y + site.Radius; y++)
+                    for (int x = site.X - site.Radius; x <= site.X + site.Radius; x++)
+                    {
+                        var (w, h) = Structures.Footprint(world.Map[x, y]);
+                        for (int j = 0; j < h; j++)
+                            for (int i = 0; i < w; i++)
+                                if (i > 0 || j > 0) Assert.AreEqual(TileType.StructurePart, world.Map[x + i, y + j], $"seed {seed}: {world.Map[x, y]} at {x},{y} is missing a part");
+                        if (world.Map[x, y] == TileType.StructurePart)
+                        {
+                            bool owned = false;
+                            for (int j = 0; j < 3 && !owned; j++)
+                                for (int i = 0; i < 4 && !owned; i++)
+                                {
+                                    var (ow, oh) = Structures.Footprint(world.Map[x - i, y - j]);
+                                    owned = world.Map[x - i, y - j] != TileType.StructurePart && i < ow && j < oh && (ow > 1 || oh > 1);
+                                }
+                            Assert.IsTrue(owned, $"seed {seed}: a structure part at {x},{y} belongs to nothing");
+                        }
+                    }
                 var walked = Walked(world.Map, site.X, site.Y, site.Radius + 2);
                 foreach (var (character, at) in site.People)
                 {

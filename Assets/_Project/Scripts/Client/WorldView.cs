@@ -388,6 +388,8 @@ namespace Game.Client
         readonly Dictionary<int, (TileType Kind, SpriteRenderer Part, SpriteRenderer Load)> _machines =
             new Dictionary<int, (TileType, SpriteRenderer, SpriteRenderer)>();
         Tilemap _ground;
+        // The floor under things (PropArt.Underlay): a place's floor, or paving round it, between ground and objects.
+        Tilemap _underlay;
         Tilemap _objects;
         LightMap _lightMap;
         readonly List<LightSource> _lights = new List<LightSource>();
@@ -481,6 +483,7 @@ namespace Game.Client
             DrawMachines();
             DrawPeople();
             DrawStoryPeople();
+            DrawProps();
             AnnouncePlace();
             DrawChickens();
             SwingDoors();
@@ -1347,6 +1350,51 @@ namespace Game.Client
                 _storyGone.Add(pair.Key);
             }
             foreach (string id in _storyGone) _storyPeople.Remove(id);
+        }
+
+        // The structures of the story's places (PropArt, Docs/Story.md 장소 꾸밈) in view: each standing on its
+        // footprint's bottom edge, rising above its tiles, in front of or behind people by where its foot is. Walls
+        // join their neighbours (PropArt.Sides).
+        readonly Dictionary<int, SpriteRenderer> _props = new Dictionary<int, SpriteRenderer>();
+        readonly HashSet<int> _propsSeen = new HashSet<int>();
+        readonly List<int> _propsGone = new List<int>();
+        const int PropRange = 20;
+
+        void DrawProps()
+        {
+            var map = _client.Map;
+            _propsSeen.Clear();
+            int cx = Mathf.FloorToInt(_self.Position.x), cy = Mathf.FloorToInt(_self.Position.y);
+            for (int y = cy - PropRange; y <= cy + PropRange; y++)
+            {
+                for (int x = cx - PropRange - 3; x <= cx + PropRange; x++)
+                {
+                    if (!map.InBounds(x, y)) continue;
+                    var type = map[x, y];
+                    if (!Structures.IsDecor(type) || type == TileType.StructurePart) continue;
+                    int sides = PropArt.IsWall(type) ? PropArt.Sides(map, x, y) : 0;
+                    var sprite = Sprites.Standing($"prop/{type}/{sides}", () => PropArt.Prop(type, sides));
+                    int key = y * map.Width + x;
+                    _propsSeen.Add(key);
+                    if (!_props.TryGetValue(key, out var renderer))
+                    {
+                        renderer = Renderer(_root.transform, "Prop", null, Color.white);
+                        _props[key] = renderer;
+                    }
+                    var (w, _) = Structures.Footprint(type);
+                    renderer.sprite = sprite;
+                    renderer.transform.localPosition = new Vector3(x + w / 2f, y, 0);
+                    renderer.sortingOrder = 10000 - Mathf.RoundToInt(y * 10);
+                }
+            }
+            _propsGone.Clear();
+            foreach (var pair in _props)
+            {
+                if (_propsSeen.Contains(pair.Key)) continue;
+                Object.Destroy(pair.Value.gameObject);
+                _propsGone.Add(pair.Key);
+            }
+            foreach (int key in _propsGone) _props.Remove(key);
         }
 
         // The place the player stands in, last announced: entering another shows its name and line (Docs/Story.md).
@@ -2805,23 +2853,29 @@ namespace Game.Client
             var grid = new GameObject("Grid", typeof(Grid));
             grid.transform.SetParent(_root.transform, false);
             _ground = AddTilemap(grid.transform, "Ground", -100);
+            _underlay = AddTilemap(grid.transform, "Underlay", -95);
             _objects = AddTilemap(grid.transform, "Objects", -90);
 
             var ground = new TileBase[map.Width * map.Height];
+            var underlay = new TileBase[map.Width * map.Height];
             var objects = new TileBase[map.Width * map.Height];
             for (int y = 0; y < map.Height; y++)
             {
                 for (int x = 0; x < map.Width; x++)
                 {
                     ground[y * map.Width + x] = GroundAt(x, y);
+                    underlay[y * map.Width + x] = UnderlayAt(x, y);
                     objects[y * map.Width + x] = Sprites.Object(map[x, y]);
                     if (map[x, y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(x, y, 0));
                 }
             }
             var bounds = new BoundsInt(0, 0, 0, map.Width, map.Height, 1);
             _ground.SetTilesBlock(bounds, ground);
+            _underlay.SetTilesBlock(bounds, underlay);
             _objects.SetTilesBlock(bounds, objects);
         }
+
+        TileBase UnderlayAt(int x, int y) => PropArt.Underlay(_client.Map, _client.Places, x, y) is TileType floor ? Sprites.Object(floor) : null;
 
         static Tilemap AddTilemap(Transform grid, string name, int order)
         {
@@ -2904,7 +2958,9 @@ namespace Game.Client
                 {
                     int x = change.X + dx;
                     int y = change.Y + dy;
-                    if (map.InBounds(x, y)) _ground.SetTile(new Vector3Int(x, y, 0), GroundAt(x, y));
+                    if (!map.InBounds(x, y)) continue;
+                    _ground.SetTile(new Vector3Int(x, y, 0), GroundAt(x, y));
+                    _underlay.SetTile(new Vector3Int(x, y, 0), UnderlayAt(x, y));
                 }
             }
         }

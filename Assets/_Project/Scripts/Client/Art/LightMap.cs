@@ -201,7 +201,7 @@ namespace Game.Client
                 _reach = Math.Max(_reach, _radius[index]);
             }
             // The dressing of the story's places that gives light (Docs/Story.md): not in tiles.csv, as no one digs it.
-            foreach (var (type, radius, color) in DecorLights)
+            foreach (var (type, radius, color) in PropArt.Lights)
             {
                 int index = (int)type;
                 if (index >= kinds || _radius[index] > 0) continue;
@@ -211,12 +211,7 @@ namespace Game.Client
             }
         }
 
-        static readonly (TileType Type, float Radius, string Color)[] DecorLights =
-        {
-            (TileType.Campfire, 6, "#FF9A3C"),
-            (TileType.Spire, 4.5f, "#B07AFF"),
-            (TileType.Fountain, 2.5f, "#8AC8FF"),
-        };
+
 
         public static LightSource Carried(Vec2 position) => new LightSource(position, CarriedRadius, CarriedIntensity, Rgba.White, tints: false);
 

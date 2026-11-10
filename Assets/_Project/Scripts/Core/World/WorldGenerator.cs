@@ -235,6 +235,7 @@ namespace Game.Core
                 var wanted = Decorate(map, cx, cy, place);
                 var people = Stand(map, cx, cy, place, story.Characters.Where(c => c.Place == place).ToList(), wanted);
                 Open(map, cx, cy, place, people.Select(p => (TileMap.Cell(p.Item2.X), TileMap.Cell(p.Item2.Y))));
+                Tidy(map, cx, cy, place);
                 sites.Add(new PlaceSite(place, cx, cy, people));
             }
             return sites;
@@ -242,121 +243,166 @@ namespace Game.Core
 
         // Dresses a plaza in its style (Docs/Story.md, 장소 꾸밈) and gives where its people would stand, in
         // characters.csv order (more people than that stand round a ring). Nothing goes on the waypoint or right
-        // beside it, off the plaza, or on anything but the plaza's own floor.
+        // beside it, off the plaza, or on anything but the plaza's own floor; a structure of more than one tile goes
+        // only where all of it fits.
         static List<(int X, int Y)> Decorate(TileMap map, int cx, int cy, PlaceDefinition place)
         {
             int r = place.Radius;
-            void Put(int dx, int dy, TileType type)
+            bool Free(int dx, int dy)
             {
                 int x = cx + dx, y = cy + dy;
-                if (!IsInside(map, x, y) || dx * dx + dy * dy > r * r || map[x, y] != place.Floor) return;
-                if (System.Math.Abs(dx) <= 1 && System.Math.Abs(dy) <= 1) return;
-                map[x, y] = type;
+                return IsInside(map, x, y) && dx * dx + dy * dy <= r * r && map[x, y] == place.Floor
+                    && !(System.Math.Abs(dx) <= 1 && System.Math.Abs(dy) <= 1);
             }
-            void Lamps()
+            void Put(int dx, int dy, TileType type)
             {
-                foreach (int w in new[] { 2, 6, 10, 14 }) Put(Ways[w].X * (r - 1) / 1000, Ways[w].Y * (r - 1) / 1000, TileType.Lamp);
+                var (w, h) = Structures.Footprint(type);
+                for (int j = 0; j < h; j++)
+                    for (int i = 0; i < w; i++)
+                        if (!Free(dx + i, dy + j)) return;
+                for (int j = 0; j < h; j++)
+                    for (int i = 0; i < w; i++)
+                        map[cx + dx + i, cy + dy + j] = i == 0 && j == 0 ? type : TileType.StructurePart;
             }
-            // A small house of timber: walls round, a door in the middle of its front (bottom), things inside.
-            void House(int left, int bottom, int width, int height, params TileType[] inside)
+            void Both(int dx, int dy, TileType type)
             {
-                for (int dy = 0; dy < height; dy++)
-                {
-                    for (int dx = 0; dx < width; dx++)
-                    {
-                        bool edge = dx == 0 || dy == 0 || dx == width - 1 || dy == height - 1;
-                        if (edge) Put(left + dx, bottom + dy, dy == 0 && dx == width / 2 ? TileType.Door : TileType.TimberWall);
-                    }
-                }
-                for (int i = 0; i < inside.Length && i < width - 2; i++) Put(left + 1 + i, bottom + height - 2, inside[i]);
+                Put(dx, dy, type);
+                Put(-dx - Structures.Footprint(type).W + 1, dy, type);
+            }
+            void Lay(int dx, int dy, TileType floor)
+            {
+                int x = cx + dx, y = cy + dy;
+                if (IsInside(map, x, y) && dx * dx + dy * dy <= r * r && map[x, y] == place.Floor && !(dx == 0 && dy == 0)) map[x, y] = floor;
+            }
+            void Lamps(TileType lamp)
+            {
+                foreach (int w in new[] { 2, 6, 10, 14 }) Put(Ways[w].X * (r - 1) / 1000, Ways[w].Y * (r - 1) / 1000, lamp);
             }
             var wanted = new List<(int X, int Y)>();
             switch (place.Style)
             {
                 case "village":
-                    // Paths of road crossing at the waypoint (road, so nothing is built on them and no paving comes up
-                    // free), then two houses, a well, barrels, giant mushrooms.
+                    // Road paths crossing at the waypoint (road, so nothing is built on them and no paving comes up
+                    // free), two cottages, a well, lamp posts along the paths, a signpost at the crossing, crates and
+                    // barrels, benches, flowerbeds and giant mushrooms.
                     for (int a = -r; a <= r; a++)
-                    {
                         for (int b = -1; b <= 1; b++)
                         {
-                            foreach (var (x, y) in new[] { (cx + a, cy + b), (cx + b, cy + a) })
-                            {
-                                if (IsInside(map, x, y) && map[x, y] == place.Floor && (x - cx) * (x - cx) + (y - cy) * (y - cy) <= r * r) map[x, y] = TileType.Road;
-                            }
+                            Lay(a, b, TileType.Road);
+                            Lay(b, a, TileType.Road);
                         }
-                    }
-                    House(-7, 2, 5, 4, TileType.Table, TileType.Barrel, TileType.Pot);
-                    House(3, 2, 5, 4, TileType.Pot, TileType.Table, TileType.Barrel);
+                    Put(-7, 2, TileType.Cottage);
+                    Put(4, 2, TileType.Cottage);
+                    Both(-3, 2, TileType.Flowerbed);
                     Put(-4, -4, TileType.Well);
-                    foreach (var (dx, dy) in new[] { (4, -4), (5, -4), (4, -5) }) Put(dx, dy, TileType.Barrel);
-                    foreach (var (dx, dy) in new[] { (-8, -2), (8, -2), (-3, -8), (3, -8), (-6, -6) }) Put(dx, dy, TileType.MushroomTree);
-                    foreach (var (dx, dy) in new[] { (-6, 1), (6, 1) }) Put(dx, dy, TileType.Pot);
-                    Put(-8, 1, TileType.Banner);
-                    Put(8, 1, TileType.Banner);
-                    Lamps();
+                    foreach (var (dx, dy) in new[] { (-2, 5), (2, 5), (-2, -5), (2, -5) }) Put(dx, dy, TileType.LampPost);
+                    Put(2, -2, TileType.Signpost);
+                    foreach (var (dx, dy) in new[] { (4, -4), (5, -4) }) Put(dx, dy, TileType.Crates);
+                    Put(4, -5, TileType.Barrel);
+                    Put(6, -4, TileType.Barrel);
+                    Both(-6, -2, TileType.Bench);
+                    foreach (var (dx, dy) in new[] { (-8, -3), (8, -3), (-3, -8), (3, -8), (-6, -6), (6, -6) }) Put(dx, dy, TileType.MushroomTree);
                     wanted.Add((cx, cy + 3));
                     wanted.Add((cx - 2, cy - 3));
                     break;
                 case "kingdom":
-                    // A castle wall round the edge (gates are opened where the roads come in, by Open), a red carpet
-                    // up the middle to the throne, pillars either side, fountains and banners.
+                    // Towers on the four corners of a castle wall round the edge (gates are opened where the roads
+                    // come in, by Open), a red carpet up the middle to the throne, statues at the gate, pillars, two
+                    // great fountains, hedges, flowerbeds, royal banners and lamp posts.
+                    Put(6, 6, TileType.Tower);
+                    Put(-7, 6, TileType.Tower);
+                    Put(6, -7, TileType.Tower);
+                    Put(-7, -7, TileType.Tower);
                     for (int dy = -r; dy <= r; dy++)
-                    {
                         for (int dx = -r; dx <= r; dx++)
                         {
                             int d = dx * dx + dy * dy;
-                            if (d <= r * r && d > (r - 1) * (r - 1)) Put(dx, dy, TileType.CastleWall);
+                            if (d <= r * r && d > (r - 2) * (r - 2)) Put(dx, dy, TileType.CastleWall);
                         }
-                    }
                     for (int dy = -r + 1; dy <= r - 4; dy++)
-                    {
                         for (int dx = -1; dx <= 1; dx++)
-                        {
-                            int x = cx + dx, y = cy + dy;
-                            if (IsInside(map, x, y) && map[x, y] == place.Floor && !(dx == 0 && dy == 0)) map[x, y] = TileType.RedCarpet;
-                        }
-                    }
+                            Lay(dx, dy, TileType.RedCarpet);
                     Put(0, r - 3, TileType.Throne);
-                    foreach (int side in new[] { -1, 1 })
-                    {
-                        foreach (int dy in new[] { -6, -3, 3 }) Put(side * 3, dy, TileType.Pillar);
-                        Put(side * 2, r - 3, TileType.Pillar);
-                        Put(side * 6, -3, TileType.Fountain);
-                        Put(side * 5, 4, TileType.Banner);
-                        Put(side * 6, 1, TileType.Pot);
-                    }
-                    Lamps();
+                    Both(2, r - 3, TileType.Pillar);
+                    foreach (int dy in new[] { -5, -2, 2 }) Both(3, dy, TileType.Pillar);
+                    Both(2, -r + 2, TileType.Statue);
+                    Both(5, -3, TileType.BigFountain);
+                    foreach (int dx in new[] { 6, 7 }) Both(dx, 1, TileType.Hedge);
+                    Both(5, 4, TileType.RoyalBanner);
+                    Both(5, -6, TileType.Flowerbed);
+                    Both(5, 0, TileType.LampPost);
                     wanted.Add((cx, cy + r - 4));
                     wanted.Add((cx - 2, cy + r - 5));
                     break;
                 case "hut":
-                    House(-3, 2, 5, 4, TileType.Table, TileType.Barrel, TileType.Pot);
+                    // A log cabin, a fenced garden with a scarecrow, a woodpile, a training dummy and a weapon rack
+                    // (the hero keeps his hand in), a campfire with a bench, a barrel, a lamp post and giant mushrooms.
+                    Put(-3, 2, TileType.Cabin);
+                    foreach (var (dx, dy) in new[] { (2, 3), (3, 3), (2, 4), (3, 4) }) Lay(dx, dy, TileType.Soil);
+                    foreach (var (dx, dy) in new[] { (4, 2), (4, 3), (4, 4), (2, 5), (3, 5) }) Put(dx, dy, TileType.Fence);
+                    Put(2, 2, TileType.Scarecrow);
+                    Put(1, 2, TileType.Woodpile);
+                    Put(-4, -2, TileType.TrainingDummy);
+                    Put(-4, 0, TileType.WeaponRack);
                     Put(3, -2, TileType.Campfire);
-                    foreach (int dx in new[] { 2, 3, 4 }) Put(dx, 4, TileType.Fence);
-                    Put(4, 3, TileType.Fence);
-                    Put(4, 2, TileType.Fence);
-                    foreach (var (dx, dy) in new[] { (2, 3), (3, 3), (2, 2), (3, 2) }) Put(dx, dy, TileType.Soil);
-                    foreach (var (dx, dy) in new[] { (-5, -2), (-4, -4), (4, -4), (-5, 1) }) Put(dx, dy, TileType.MushroomTree);
+                    Put(4, -3, TileType.Bench);
                     Put(-2, -4, TileType.Barrel);
-                    Lamps();
+                    Put(0, -5, TileType.LampPost);
+                    foreach (var (dx, dy) in new[] { (-5, -3), (5, -1), (3, -5), (-5, 1) }) Put(dx, dy, TileType.MushroomTree);
                     wanted.Add((cx + 1, cy - 2));
                     wanted.Add((cx - 2, cy - 2));
                     break;
                 case "nest":
-                    // Dark crystal spires round the edge for light, demon tents, bones strewn about.
+                    // Great demon tents, a horned totem between two braziers of violet fire, demon banners, cages,
+                    // crystal spires round the edge for light, bones strewn about.
+                    Both(4, 2, TileType.BigTent);
+                    Both(4, -4, TileType.BigTent);
+                    Put(0, 5, TileType.Totem);
+                    Both(2, 5, TileType.Brazier);
+                    Both(3, 6, TileType.DemonBanner);
+                    Both(3, -6, TileType.Cage);
                     foreach (int w in new[] { 1, 4, 7, 9, 12, 15 }) Put(Ways[w].X * (r - 1) / 1000, Ways[w].Y * (r - 1) / 1000, TileType.Spire);
-                    foreach (var (dx, dy) in new[] { (-4, 3), (4, 3), (-5, -1), (5, -1) }) Put(dx, dy, TileType.Tent);
-                    foreach (var (dx, dy) in new[] { (-2, -4), (3, -4), (0, 5), (-5, -4), (6, 2), (-3, 5) }) Put(dx, dy, TileType.Bones);
-                    Put(0, 4, TileType.Spire);
-                    wanted.Add((cx, cy + 2));
-                    wanted.Add((cx - 2, cy + 1));
+                    foreach (var (dx, dy) in new[] { (-2, -4), (3, -3), (-5, 0), (6, 0), (-1, -6), (2, -6), (-3, 3), (4, 5) }) Put(dx, dy, TileType.Bones);
+                    wanted.Add((cx, cy + 3));
+                    wanted.Add((cx - 2, cy + 2));
                     break;
                 default:
-                    Lamps();
+                    Lamps(TileType.LampPost);
                     break;
             }
+            if (place.Style == "village" || place.Style == "hut") Lamps(TileType.Lamp);
             return wanted;
+        }
+
+        // After Open: a structure Open cut into is taken away whole, so none is left with tiles missing, nor tiles
+        // standing for one no longer there.
+        static void Tidy(TileMap map, int cx, int cy, PlaceDefinition place)
+        {
+            int r = place.Radius;
+            var covered = new HashSet<(int, int)>();
+            for (int y = cy - r; y <= cy + r; y++)
+            {
+                for (int x = cx - r; x <= cx + r; x++)
+                {
+                    if (!IsInside(map, x, y)) continue;
+                    var (w, h) = Structures.Footprint(map[x, y]);
+                    if (map[x, y] == TileType.StructurePart || (w == 1 && h == 1)) continue;
+                    bool whole = true;
+                    for (int j = 0; j < h; j++)
+                        for (int i = 0; i < w; i++)
+                            if ((i > 0 || j > 0) && (!IsInside(map, x + i, y + j) || map[x + i, y + j] != TileType.StructurePart)) whole = false;
+                    for (int j = 0; j < h; j++)
+                        for (int i = 0; i < w; i++)
+                        {
+                            if (!IsInside(map, x + i, y + j)) continue;
+                            if (whole) covered.Add((x + i, y + j));
+                            else if (i > 0 || j > 0 ? map[x + i, y + j] == TileType.StructurePart : true) map[x + i, y + j] = place.Floor;
+                        }
+                }
+            }
+            for (int y = cy - r; y <= cy + r; y++)
+                for (int x = cx - r; x <= cx + r; x++)
+                    if (IsInside(map, x, y) && map[x, y] == TileType.StructurePart && !covered.Contains((x, y))) map[x, y] = place.Floor;
         }
 
         // Each person on the open tile nearest where they would stand (their style's spot, else a ring round the
