@@ -393,9 +393,11 @@ namespace Game.Client
                 Music.Update(Tune.Cave, null, 0, deltaTime);
                 return;
             }
-            // The biome the player has settled in (UpdateBiome), so walking along a border does not keep switching.
+            // The biome the player has settled in (UpdateBiome), so walking along a border does not keep switching; inside
+            // a place of the story (2026-11-11), the place's own tune instead.
             var biome = _biomeAnnounced;
-            var tune = biome switch
+            var place = MusicPlace();
+            var tune = place != null && PlaceTune(place.Definition.Style) is Tune own ? own : biome switch
             {
                 Biome.Mushroom => Tune.Mushroom,
                 Biome.Ice => Tune.Ice,
@@ -425,8 +427,49 @@ namespace Game.Client
             {
                 if (machine.On) nearest = Mathf.Min(nearest, Vec2.Distance(_client.Position, TileMap.Center(machine.X, machine.Y)));
             }
-            Music.Update(song, biome == Biome.Lava ? Ambience.Lava : Ambience.Cave, 1 - nearest / MachineHearing, deltaTime);
+            // The places close by get their tunes made ahead, so arriving does not wait on them.
+            foreach (var site in _client.Places)
+            {
+                if (site != place && PlaceTune(site.Definition.Style) is Tune next && Vec2.Distance(_client.Position, site.Center) <= site.Radius + PlaceHearing)
+                    Music.Prepare(Song.Field(next));
+            }
+            var ambience = place != null ? PlaceAmbience(place.Definition.Style) : biome == Biome.Lava ? Ambience.Lava : Ambience.Cave;
+            Music.Update(song, ambience, 1 - nearest / MachineHearing, deltaTime);
         }
+
+        // How far outside a place its tune is made ready.
+        const float PlaceHearing = 14;
+        PlaceSite _musicPlace;
+
+        // The place whose music plays: entered on stepping into its plaza, left a few tiles past its edge.
+        PlaceSite MusicPlace()
+        {
+            var at = _client.Position;
+            if (_musicPlace != null && (!_client.Places.Contains(_musicPlace) || Vec2.Distance(at, _musicPlace.Center) > _musicPlace.Radius + 4)) _musicPlace = null;
+            if (_musicPlace == null) _musicPlace = _client.Places.FirstOrDefault(p => Vec2.Distance(at, p.Center) <= p.Radius);
+            return _musicPlace;
+        }
+
+        // Each style of place's tune (MusicArt), or null for a bare plaza, which keeps the cave's.
+        static Tune? PlaceTune(string style) => style switch
+        {
+            "village" => Tune.Village,
+            "kingdom" => Tune.Kingdom,
+            "hut" => Tune.Hut,
+            "nest" => Tune.Nest,
+            "harbor" => Tune.Harbor,
+            "ruins" => Tune.Ruins,
+            "mine" => Tune.Mine,
+            _ => null,
+        };
+
+        // Under it: water at the harbour, a hearth where people keep house, the cave's drips at the nest and temple.
+        static Ambience PlaceAmbience(string style) => style switch
+        {
+            "harbor" => Ambience.Waves,
+            "village" or "kingdom" or "hut" or "mine" => Ambience.Hearth,
+            _ => Ambience.Cave,
+        };
 
         // How far off a running machine can be heard.
         const float MachineHearing = 7;

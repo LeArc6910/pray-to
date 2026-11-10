@@ -1189,8 +1189,13 @@ namespace Game.Client
                     : machine.Kind == TileType.BigSmelter ? BigSmelterSprite
                     : ChevronSprite;
                 int size = World.SizeOf(machine.Kind);
+                // A machine standing as a block (2026-11-11, PropArt.Raises): its parts on its top, that much higher.
+                float lift = PropArt.Raises(machine.Kind) ? PropArt.LiftOf(machine.Kind) / (float)TileArt.Size
+                    : size > 1 ? PropArt.BigLift / (float)TileArt.Size : 0;
+                // A big machine's body stands from its foot; what it carries shows on its top.
                 if (size > 1) center = new Vector3(machine.X + size / 2f, machine.Y + size / 2f, 0);
-                parts.Part.transform.localPosition = center;
+                parts.Part.transform.localPosition = size > 1 ? new Vector3(center.x, machine.Y, 0) : center + new Vector3(0, lift, 0);
+                center += new Vector3(0, lift, 0);
                 // Switched off, the moving part stands still and greys out; powered by a generator, it glows a little.
                 parts.Part.color = !machine.On ? OffTint : machine.Powered ? PoweredTint : Color.white;
                 // A robot arm waits pointing back at where it picks up, and swings over to the front as it carries.
@@ -1207,8 +1212,12 @@ namespace Game.Client
                     : size > 1 ? 0
                     : machine.Direction * 90 + swing;
                 parts.Part.transform.localRotation = Quaternion.Euler(0, 0, turn);
-                parts.Part.sortingOrder = machine.Kind == TileType.Arm ? -13 : -15;
-                parts.Load.sortingOrder = machine.Kind == TileType.Arm ? -12 : -14;
+                // On a raised body or a big machine (a block itself), sorted by its foot just in front of the body, so people
+                // pass in front of and behind it; on a flat one, on the floor.
+                int body = 10000 - Mathf.RoundToInt(machine.Y * 10);
+                bool standing = lift > 0 || size > 1;
+                parts.Part.sortingOrder = standing ? body + 1 : machine.Kind == TileType.Arm ? -13 : -15;
+                parts.Load.sortingOrder = standing ? body + 2 : machine.Kind == TileType.Arm ? -12 : -14;
                 // A filter shows the material it picks out while it carries nothing; a generator's fuel is not shown.
                 bool carrying = machine.Carried != null && machine.Kind != TileType.Generator;
                 bool picking = machine.Kind == TileType.Filter && !carrying && machine.Settings.Count > 0;
@@ -1680,8 +1689,9 @@ namespace Game.Client
 
         static Sprite LeverSprite => Sprites.Centered("machine/lever", () => ItemArt.LeverHandle);
 
-        static Sprite BigAssemblerSprite => Sprites.Centered("machine/big_assembler", () => TileArt.BigAssembler);
-        static Sprite BigSmelterSprite => Sprites.Centered("machine/big_smelter", () => TileArt.BigSmelter);
+        // The big machines stand as blocks over their four tiles, from their foot (2026-11-11).
+        static Sprite BigAssemblerSprite => Sprites.Standing("machine/big_assembler", () => PropArt.Raised(TileArt.BigAssembler, PropArt.BigLift));
+        static Sprite BigSmelterSprite => Sprites.Standing("machine/big_smelter", () => PropArt.Raised(TileArt.BigSmelter, PropArt.BigLift));
 
         static Sprite[] _flameSprites;
 

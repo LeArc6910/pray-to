@@ -462,6 +462,67 @@ namespace Game.Client
             Animals(Path.Combine(folder, "animals.gif"), floor);
             Decor(Path.Combine(folder, "decor.gif"), sword, floor);
             Standing(Path.Combine(folder, "structures.gif"), sword);
+            Machines(Path.Combine(folder, "machines.gif"), sword);
+        }
+
+        // Machines standing as blocks (2026-11-11, PropArt.Raised): a drill turning its bit, a turret sweeping, a
+        // generator burning and the others, their parts on their tops as WorldView.DrawMachines places them, and a
+        // player walking round them, in front and behind.
+        static void Machines(string path, ItemBase sword)
+        {
+            var walker = new Player { Weapon = sword, Facing = new Vec2(1, 0) };
+            var row = new (TileType Type, int X, int Y)[]
+            {
+                (TileType.Drill, -3, -1), (TileType.Smelter, -2, -1), (TileType.Generator, -1, -1), (TileType.Turret, 0, -1), (TileType.ArcFurnace, 1, -1),
+                (TileType.Assembler, 2, -1), (TileType.Keg, -3, 1), (TileType.PreservesJar, -2, 1), (TileType.Coop, -1, 1), (TileType.Barn, 0, 1),
+                (TileType.AlchemyTable, 1, 1), (TileType.TeslaTower, 2, 1),
+            };
+            var corners = new[] { new Vec2(-3.9f, -1.6f), new Vec2(3.4f, -1.6f), new Vec2(3.4f, 0.5f), new Vec2(-3.9f, 0.5f) };
+            float perimeter = 0;
+            for (int i = 0; i < 4; i++) perimeter += (corners[(i + 1) % 4] - corners[i]).Length;
+            const float seconds = 9;
+            Play(path, 1, 1, 160, 112, 3, 0.5f, seconds, TileArt.Object(TileType.StoneFloor), (column, r, time, step) =>
+            {
+                var draws = new List<Draw>();
+                foreach (var (type, x, y) in row)
+                {
+                    int body = 10000 - y * 10;
+                    draws.Add(Sprite(PropArt.Prop(type), x + 0.5f, y, 0.5f, 0, body));
+                    float top = y + 0.5f + PropArt.LiftOf(type) / (float)TileArt.Size;
+                    if (type == TileType.Drill) draws.Add(Sprite(ItemArt.DrillBit, x + 0.5f, top, 0.5f, 0.5f, body + 1, angle: time * 360 % 360));
+                    if (type == TileType.Turret) draws.Add(Sprite(ItemArt.TurretBarrel, x + 0.5f, top, 0.5f, 0.5f, body + 1, angle: 90 + 60 * MathF.Sin(time * 2)));
+                    if (type == TileType.Generator)
+                        draws.Add(Sprite(ItemArt.Flame((int)(time * 8) % ItemArt.FlameFrames), x + 0.5f, top, 0.5f, 0.5f, body + 1));
+                }
+                float along = time / seconds * perimeter;
+                var at = corners[0];
+                var facing = new Vec2(1, 0);
+                for (int i = 0; i < 4; i++)
+                {
+                    var from = corners[i];
+                    var to = corners[(i + 1) % 4];
+                    float length = (to - from).Length;
+                    if (along <= length)
+                    {
+                        facing = (to - from) * (1 / length);
+                        at = from + facing * along;
+                        break;
+                    }
+                    along -= length;
+                }
+                walker.Facing = facing;
+                walker.Moving = true;
+                int lift = -(int)MathF.Round(at.Y * 10);
+                foreach (var d in walker.Frame(time, step))
+                {
+                    var moved = d;
+                    moved.X += at.X;
+                    moved.Y += at.Y;
+                    if (moved.Order > 0) moved.Order += lift;
+                    draws.Add(moved);
+                }
+                return draws;
+            });
         }
 
         // Structures standing on the floor (2026-11-10, PropArt): a player walks round a cottage, in front of it and

@@ -212,15 +212,70 @@ namespace Game.Client
             TileType.Banner => Banner(Paint, Gold, demon: false),
             TileType.WardStone => WardStone(),
             TileType.RiftAltar => RiftAltar(),
+            // Machines (2026-11-11, 사람이 고른 다음 작업 4번): their tile as the top of a block (Raised).
+            _ when RaisedMachines.Contains(type) => Raised(TileArt.Object(type), LiftOf(type)),
             _ => null,
         };
+
+        // The machines that stand on the floor as blocks (2026-11-11): bodies their moving parts sit on top of
+        // (WorldView.DrawMachines draws those parts LiftOf higher and just in front). Belts, splitters, filters, arms,
+        // levers, poles, sprinklers, harvesters, water wheels and solar panels stay flat on the floor.
+        static readonly HashSet<TileType> RaisedMachines = new HashSet<TileType>
+        {
+            TileType.Drill, TileType.Smelter, TileType.Generator, TileType.Turret, TileType.Keg, TileType.PreservesJar, TileType.Assembler,
+            TileType.ArcFurnace, TileType.Coop, TileType.Barn, TileType.AlchemyTable, TileType.TeslaTower,
+        };
+
+        // How many pixels a raised machine's top stands above the floor (a big machine's, BigLift).
+        public static int LiftOf(TileType type) => type == TileType.Turret || type == TileType.Keg || type == TileType.PreservesJar ? 4 : 5;
+        public const int BigLift = 7;
+
+        // A flat top-down drawing stood up as a block: under each column's lowest drawn pixel, that colour darkened
+        // for lift pixels (darker toward the floor, lighter at the left edge), the top over it, and a shadow under it.
+        public static PixelImage Raised(PixelImage top, int lift)
+        {
+            int w = top.Width, h = top.Height + lift;
+            var body = new PixelImage(w, h);
+            int left = w, right = -1;
+            for (int x = 0; x < w; x++)
+            {
+                int bottom = -1;
+                for (int y = top.Height - 1; y >= 0 && bottom < 0; y--) if (top[x, y].A >= 200) bottom = y;
+                if (bottom < 0) continue;
+                left = Math.Min(left, x);
+                right = Math.Max(right, x);
+                // The face takes the colour just inside the top's edge (the edge itself is mostly outline).
+                var face = top[x, Math.Max(0, bottom - 2)];
+                if (face.A < 200) face = top[x, bottom];
+                for (int j = 1; j <= lift; j++)
+                {
+                    body[x, bottom + j] = face;
+                    body.Shade(x, bottom + j, j == lift ? 0.4f : 0.72f - 0.04f * j);
+                }
+            }
+            body.Draw(top, 0, 0);
+            // The face's corners: a highlight down its left side, a shade down its right.
+            for (int y = 0; y < h; y++)
+            {
+                if (left < w && body[left, y].A >= 200 && top[left, Math.Min(y, top.Height - 1)].A < 200) body.Shade(left, y, 1.25f);
+                if (right >= 0 && body[right, y].A >= 200 && (y >= top.Height || top[right, y].A < 200)) body.Shade(right, y, 0.8f);
+            }
+            if (right < 0) return body;
+            var floor = ShadowLayer(w, h, (left + right) / 2f, h - 1.5f, (right - left) / 2f + 1, 2);
+            floor.Draw(body, 0, 0);
+            return floor;
+        }
 
         // The things players build that stand on the floor like the structures (2026-11-10, 사람이 고른 다음 작업 1번):
         // the crafting stations, the chest, the bed and the furniture. Machines with moving parts drawn over them stay
         // tiles, so their parts are not hidden.
         public static bool Stands(TileType type) => type == TileType.Workbench || type == TileType.Furnace || type == TileType.Chest
             || type == TileType.Anvil || type == TileType.Bed || type == TileType.Table || type == TileType.Torch || type == TileType.Lamp
-            || type == TileType.Pot || type == TileType.Banner || type == TileType.WardStone || type == TileType.RiftAltar;
+            || type == TileType.Pot || type == TileType.Banner || type == TileType.WardStone || type == TileType.RiftAltar
+            || RaisedMachines.Contains(type);
+
+        // Whether a machine's body stands raised (its parts drawn LiftOf higher).
+        public static bool Raises(TileType type) => RaisedMachines.Contains(type);
 
         // Every structure, for the preview tool.
         public static readonly TileType[] All =
@@ -234,6 +289,8 @@ namespace Game.Client
             TileType.Rubble, TileType.RuneStone, TileType.Altar, TileType.MineEntrance, TileType.MineCart, TileType.OrePile, TileType.Lantern,
             TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Anvil, TileType.Bed, TileType.Table, TileType.Torch, TileType.Lamp,
             TileType.Pot, TileType.Banner, TileType.WardStone, TileType.RiftAltar,
+            TileType.Drill, TileType.Smelter, TileType.Generator, TileType.Turret, TileType.Keg, TileType.PreservesJar, TileType.Assembler,
+            TileType.ArcFurnace, TileType.Coop, TileType.Barn, TileType.AlchemyTable, TileType.TeslaTower,
         };
 
         // A wall block: its top face over its tile (shifted up by its height, so a wall in front hides this one's foot)

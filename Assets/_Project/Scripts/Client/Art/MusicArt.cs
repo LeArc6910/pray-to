@@ -3,7 +3,8 @@ using System.Collections.Generic;
 
 namespace Game.Client
 {
-    // A tune that loops while the player is somewhere: one for each biome, and one for a boss fight.
+    // A tune that loops while the player is somewhere: one for each biome, one for a boss fight, and one for each
+    // style of the story's places (2026-11-11), played inside them.
     enum Tune
     {
         Cave,
@@ -15,15 +16,24 @@ namespace Game.Client
         Abyss,
         Lake,
         Sand,
+        Village,
+        Kingdom,
+        Hut,
+        Nest,
+        Harbor,
+        Ruins,
+        Mine,
     }
 
-    // Sound that loops under the music: the cave's wind and drips, the lava's rumble and bubbles, and the hum of a
-    // running machine.
+    // Sound that loops under the music: the cave's wind and drips, the lava's rumble and bubbles, the hum of a
+    // running machine, and in the story's places (2026-11-11) a hearth's crackle or water lapping at a pier.
     enum Ambience
     {
         Cave,
         Lava,
         Hum,
+        Hearth,
+        Waves,
     }
 
     // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
@@ -140,6 +150,8 @@ namespace Game.Client
         static readonly int[] Harmonic = { 0, 2, 3, 5, 7, 8, 11 };
         // Phrygian with a major third, the "hijaz" of desert tunes.
         static readonly int[] Hijaz = { 0, 1, 4, 5, 7, 8, 10 };
+        static readonly int[] Major = { 0, 2, 4, 5, 7, 9, 11 };
+        static readonly int[] Mixolydian = { 0, 2, 4, 5, 7, 9, 10 };
 
         static Style StyleOf(Tune tune) => tune switch
         {
@@ -189,6 +201,56 @@ namespace Game.Client
                 Bpm = 96, Root = 45, Scale = Hijaz, Chords = new[] { 0, 1, 0, 6 }, Lead = Wave.Pulse, LeadOctave = 1, LeadVolume = 0.2f,
                 Arp = Wave.Triangle, ArpRate = 2, ArpOctave = 1, ArpVolume = 0.1f, BassNotes = 4, Rest = 0.45f,
                 Tom = "x.....x...x.....", Tek = "...x.x.x...x.x.x", Echo = 0.2f, Seed = 9,
+            },
+            // The story's places (2026-11-11, Docs/ArtPipeline.md 장소의 음악). The dawn village: a warm folk tune, a
+            // triangle melody in major over a plucked bass and a light shaker, like a hearth after the war.
+            Tune.Village => new Style
+            {
+                Bpm = 88, Root = 48, Scale = Major, Chords = new[] { 0, 3, 4, 0 }, Lead = Wave.Triangle, LeadVolume = 0.28f,
+                Arp = Wave.Pulse, ArpRate = 2, ArpVolume = 0.09f, BassNotes = 2, BassVolume = 0.24f, Rest = 0.4f, Hat = "..x...x...x...x.",
+                Echo = 0.25f, Seed = 31,
+            },
+            // The royal city: stately, a square fanfare in major over a marching snare and a full pad.
+            Tune.Kingdom => new Style
+            {
+                Bpm = 96, Root = 50, Scale = Major, Chords = new[] { 0, 4, 5, 3 }, Lead = Wave.Square, LeadVolume = 0.22f,
+                Arp = Wave.Pulse, ArpRate = 2, ArpVolume = 0.1f, BassNotes = 4, Rest = 0.35f, Pad = Wave.Triangle, PadVolume = 0.06f,
+                Kick = "x.......x.......", Snare = "....x.......x.xx", Echo = 0.2f, Seed = 32,
+            },
+            // The hero's hut: quiet and alone, a sine melody over a held bass, a soft pad and long echoes.
+            Tune.Hut => new Style
+            {
+                Bpm = 64, Root = 45, Scale = Dorian, Chords = new[] { 0, 3, 0, 4 }, Lead = Wave.Sine, LeadOctave = 1, LeadVolume = 0.26f,
+                Arp = Wave.Triangle, ArpRate = 1, ArpVolume = 0.08f, BassNotes = 1, Rest = 0.55f, Pad = Wave.Triangle, PadVolume = 0.06f,
+                Echo = 0.45f, Seed = 33,
+            },
+            // The demon nest: low and uneasy, harmonic minor over a dark saw drone and a slow hand drum.
+            Tune.Nest => new Style
+            {
+                Bpm = 70, Root = 42, Scale = Harmonic, Chords = new[] { 0, 5, 1, 4 }, Lead = Wave.Pulse, LeadVolume = 0.2f,
+                Arp = Wave.Triangle, ArpRate = 2, ArpVolume = 0.08f, BassNotes = 1, Rest = 0.5f, Pad = Wave.Saw, PadVolume = 0.05f,
+                Tom = "x.......x..x....", Echo = 0.35f, Seed = 34,
+            },
+            // The misty harbour: lilting mixolydian, arpeggios in threes like water, a slow rocking bass.
+            Tune.Harbor => new Style
+            {
+                Bpm = 80, Root = 47, Scale = Mixolydian, Chords = new[] { 0, 6, 3, 0 }, Lead = Wave.Triangle, LeadOctave = 1, LeadVolume = 0.25f,
+                Arp = Wave.Triangle, ArpRate = 3, ArpOctave = 1, ArpVolume = 0.11f, BassNotes = 2, Rest = 0.45f, Pad = Wave.Sine,
+                PadVolume = 0.05f, Echo = 0.4f, Seed = 35,
+            },
+            // The forgotten temple: lydian bells, very slow, over a held sine and the widest echoes.
+            Tune.Ruins => new Style
+            {
+                Bpm = 58, Root = 50, Scale = Lydian, Chords = new[] { 0, 1, 4, 0 }, Lead = Wave.Bell, LeadOctave = 1, LeadVolume = 0.24f,
+                Arp = Wave.Sine, ArpRate = 2, ArpOctave = 2, ArpVolume = 0.07f, BassNotes = 1, Rest = 0.6f, Pad = Wave.Sine, PadVolume = 0.07f,
+                Echo = 0.55f, Seed = 36,
+            },
+            // The mining village: a work song, dorian on a pulse over a walking bass and a hammer's tek on the beat.
+            Tune.Mine => new Style
+            {
+                Bpm = 100, Root = 43, Scale = Dorian, Chords = new[] { 0, 3, 6, 4 }, Lead = Wave.Pulse, LeadVolume = 0.22f,
+                Arp = Wave.Triangle, ArpRate = 2, ArpVolume = 0.08f, BassNotes = 4, BassVolume = 0.26f, Rest = 0.4f,
+                Kick = "x.......x.......", Tek = "x...x...x...x...", Echo = 0.15f, Seed = 37,
             },
             Tune.Boss => BossStyle(null),
             // The home caves: a slow minor melody with echoes over a held bass and a soft pad.
@@ -436,6 +498,32 @@ namespace Game.Client
                         Sweep(buffer, Wave.Sine, t, 0.09f, from, from * 2.6f, 0.35f + random.Next() * 0.25f);
                     }
                     return Normalised(buffer, 0.45f);
+                }
+                case Ambience.Hearth:
+                {
+                    // A fire crackling: a low warm rush with pops and snaps.
+                    float seconds = 16;
+                    var buffer = Wind(seconds, smoothing: 0.04f, volume: 0.35f, swell: 0.3f, seed: 15);
+                    var random = new Scramble(16);
+                    for (float t = 0.1f; t < seconds; t += 0.05f + random.Next() * 0.45f)
+                    {
+                        Click(buffer, t, 0.012f + random.Next() * 0.02f, 0.4f + random.Next() * 0.6f, seed: 100 + (int)(t * 50), hiss: random.Next() < 0.5f);
+                    }
+                    return Normalised(LowPass(buffer, 0.5f), 0.4f);
+                }
+                case Ambience.Waves:
+                {
+                    // Water lapping at a pier: slow swells of soft noise, a wave's wash every few seconds, a creak now
+                    // and then.
+                    float seconds = 24;
+                    var buffer = Wind(seconds, smoothing: 0.012f, volume: 0.5f, swell: 0.8f, seed: 17);
+                    var random = new Scramble(18);
+                    for (float t = 0.5f; t < seconds; t += 2.2f + random.Next() * 1.8f)
+                    {
+                        Click(buffer, t, 0.9f + random.Next() * 0.5f, 0.25f + random.Next() * 0.15f, seed: 200 + (int)(t * 10));
+                        if (random.Next() < 0.3f) Sweep(buffer, Wave.Triangle, t + 0.6f, 0.25f, 180, 140, 0.12f);
+                    }
+                    return Normalised(LowPass(buffer, 0.3f), 0.4f);
                 }
                 case Ambience.Hum:
                 {
