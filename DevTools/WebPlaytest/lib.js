@@ -252,6 +252,15 @@ function helpers(game) {
 }
 
 // Waits (up to 45 minutes) until the page says it is the given commit (version.txt).
+function contains(later, sha) {
+  try {
+    require('child_process').execSync(`git merge-base --is-ancestor ${sha} ${later}`, { cwd: require('path').join(__dirname, '..', '..'), stdio: 'ignore' });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
 async function waitForCommit(url, sha) {
   const deadline = Date.now() + 45 * 60 * 1000;
   for (;;) {
@@ -262,6 +271,9 @@ async function waitForCommit(url, sha) {
       deployed = '';
     }
     if (deployed === sha) return deployed;
+    // A later deploy carries it too (a push of docs or tools after it deploys again): the page's commit has it as an
+    // ancestor in this clone.
+    if (/^[0-9a-f]{40}$/.test(deployed) && contains(deployed, sha)) return deployed;
     if (Date.now() > deadline) throw new Error(`the page is still ${deployed || 'unknown'}, not ${sha}`);
     console.log(`waiting for ${sha.slice(0, 7)} (the page is ${deployed.slice(0, 7) || 'unknown'})`);
     await new Promise(r => setTimeout(r, 30000));
