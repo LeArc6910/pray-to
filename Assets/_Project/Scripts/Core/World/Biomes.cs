@@ -74,6 +74,11 @@ namespace Game.Core
             (int X, int Y)? abyss = null, (int X, int Y)? lake = null, (int X, int Y)? sandArena = null)
         {
             var tiles = new Biome[width * height];
+            // Every distance and the borders' wobble grow with the map (2026-11-11: the game's map is four times as wide
+            // as the 128 tiles these were set for, WorldGenerator.ScaleOf).
+            int k = WorldGenerator.ScaleOf(width, height);
+            int caveRadius = CaveRadius * k, sandRadius = SandRadius * k, abyssDistance = AbyssDistance * k, sandArenaReach = SandArenaReach * k;
+            int Noise(ulong noiseSeed, int nx, int ny, int salt) => NoiseAt(noiseSeed, nx, ny, salt, Cell * k, Wobble * k);
             for (int y = 0; y < height; y++)
             {
                 for (int x = 0; x < width; x++)
@@ -81,33 +86,33 @@ namespace Game.Core
                     int dx = x - spawnX + Noise(seed, x, y, 1);
                     int dy = y - spawnY + Noise(seed, x, y, 2);
                     // Round the sand arena it is sand whatever the wobble says.
-                    if (sandArena is (int ax0, int ay0) && (x - ax0) * (x - ax0) + (y - ay0) * (y - ay0) <= SandArenaReach * SandArenaReach)
+                    if (sandArena is (int ax0, int ay0) && (x - ax0) * (x - ax0) + (y - ay0) * (y - ay0) <= sandArenaReach * sandArenaReach)
                     {
                         tiles[y * width + x] = Biome.Sand;
                         continue;
                     }
-                    if (dx * dx + dy * dy < CaveRadius * CaveRadius) continue;
+                    if (dx * dx + dy * dy < caveRadius * caveRadius) continue;
                     int sx = dx >= 0 ? 1 : -1;
                     int sy = dy >= 0 ? 1 : -1;
                     Biome biome;
                     if (sx == corner.X && sy == corner.Y)
                     {
                         int sandX = dx + Noise(seed, x, y, 5), sandY = dy + Noise(seed, x, y, 6);
-                        biome = sandX * sandX + sandY * sandY < SandRadius * SandRadius ? Biome.Sand : Biome.Crystal;
+                        biome = sandX * sandX + sandY * sandY < sandRadius * sandRadius ? Biome.Sand : Biome.Crystal;
                     }
                     else if (sx == -corner.X && sy == -corner.Y) biome = Biome.Lava;
                     else biome = (sx == corner.X) == mushroomFirst ? Biome.Mushroom : Biome.Ice;
                     // The square at the far end of the abyss corner, with a wobbly edge of its own.
                     if (abyss is (int ax, int ay) && sx == ax && sy == ay
-                        && Math.Min(Math.Abs(dx), Math.Abs(dy)) + Noise(seed, x, y, 3) / 2 >= AbyssDistance - 8
-                        && Math.Max(Math.Abs(dx), Math.Abs(dy)) >= AbyssDistance)
+                        && Math.Min(Math.Abs(dx), Math.Abs(dy)) + Noise(seed, x, y, 3) / 2 >= abyssDistance - Wobble * k
+                        && Math.Max(Math.Abs(dx), Math.Abs(dy)) >= abyssDistance)
                     {
                         biome = Biome.Abyss;
                     }
                     // The lake takes the far end of the other side corner the same way, on its own wobble.
                     if (lake is (int lx, int ly) && sx == lx && sy == ly
-                        && Math.Min(Math.Abs(dx), Math.Abs(dy)) + Noise(seed, x, y, 4) / 2 >= AbyssDistance - 8
-                        && Math.Max(Math.Abs(dx), Math.Abs(dy)) >= AbyssDistance)
+                        && Math.Min(Math.Abs(dx), Math.Abs(dy)) + Noise(seed, x, y, 4) / 2 >= abyssDistance - Wobble * k
+                        && Math.Max(Math.Abs(dx), Math.Abs(dy)) >= abyssDistance)
                     {
                         biome = Biome.Lake;
                     }
@@ -117,17 +122,18 @@ namespace Game.Core
             return new BiomeMap(width, height, tiles);
         }
 
-        // A smooth value from -Wobble to Wobble: random values on a lattice every Cell tiles, blended between them.
-        static int Noise(ulong seed, int x, int y, int salt)
+        // A smooth value from -wobble to wobble: random values on a lattice every cell tiles, blended between them.
+        static int NoiseAt(ulong seed, int x, int y, int salt, int cell, int wobble)
         {
-            int cx = Math.DivRem(x, Cell, out int fx);
-            int cy = Math.DivRem(y, Cell, out int fy);
+            int cx = Math.DivRem(x, cell, out int fx);
+            int cy = Math.DivRem(y, cell, out int fy);
             int v00 = Lattice(seed, cx, cy, salt);
             int v10 = Lattice(seed, cx + 1, cy, salt);
             int v01 = Lattice(seed, cx, cy + 1, salt);
             int v11 = Lattice(seed, cx + 1, cy + 1, salt);
-            int sum = v00 * (Cell - fx) * (Cell - fy) + v10 * fx * (Cell - fy) + v01 * (Cell - fx) * fy + v11 * fx * fy;
-            return sum / (Cell * Cell);
+            int sum = v00 * (cell - fx) * (cell - fy) + v10 * fx * (cell - fy) + v01 * (cell - fx) * fy + v11 * fx * fy;
+            // The lattice gives -Wobble to Wobble; a bigger wobble is the same shape stretched.
+            return sum * (wobble / Wobble) / (cell * cell);
         }
 
         static int Lattice(ulong seed, int x, int y, int salt)

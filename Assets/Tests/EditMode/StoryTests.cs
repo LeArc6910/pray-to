@@ -88,6 +88,22 @@ namespace Game.Core.Tests
             Assert.AreEqual(0, Enumerable.Range(0, plain.Map.Width * plain.Map.Height).Count(i => plain.Map[i % plain.Map.Width, i / plain.Map.Width] == TileType.Road));
         }
 
+        // The game's map (2026-11-11, the owner: "the waypoints at least 200 tiles apart"): every waypoint 200 tiles
+        // or more from every other, and all walked to from the spawn.
+        [Test]
+        public void OnTheGameMapTheWaypointsStandTwoHundredTilesApart([Values(1, 2, 3, 4)] int seed)
+        {
+            var world = WorldGenerator.Generate((ulong)seed, WorldGenerator.GameSize, WorldGenerator.GameSize, Tales.Shipped);
+            var ways = world.Places.Where(p => p.Definition.Waypoint).ToList();
+            Assert.AreEqual(Tales.Shipped.Places.Count(p => p.Waypoint), ways.Count);
+            foreach (var a in ways)
+                foreach (var b in ways.Where(b => b != a))
+                    Assert.GreaterOrEqual(Vec2.Distance(a.Center, b.Center), 200f, $"seed {seed}: {a.Definition.Id} to {b.Definition.Id}");
+            var field = new FlowField(world.Map);
+            field.Build(new[] { world.Spawn }, int.MaxValue - 1);
+            foreach (var site in world.Places) Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(site.X, site.Y), $"seed {seed}: {site.Definition.Id}");
+        }
+
         [Test]
         public void EverySeedGivesPlacesClearOfTheArenasAndWithinReach([Range(1, 24)] int seed)
         {

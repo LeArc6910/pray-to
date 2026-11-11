@@ -14,6 +14,9 @@ namespace Game.Core
         public int SnapshotInterval { get; set; } = 2;
         // Entities further than this from a player are left out of that player's snapshots.
         public float ViewRange { get; set; } = 22;
+        // How many tiles across the generated map is (WorldGenerator.DefaultSize for tests and sims; the game asks for
+        // WorldGenerator.GameSize, or a saved world's own size).
+        public int MapSize { get; set; } = WorldGenerator.DefaultSize;
         // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). With 43 bytes for
         // the header and the player's own state, 17 an entity or drop, 14 a projectile, 19 a hazard and 13 an event,
         // the maximum comes to about 1.19 KB.
@@ -127,7 +130,7 @@ namespace Game.Core
             _loot = loot ?? throw new ArgumentNullException(nameof(loot));
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
-            _generated = WorldGenerator.Generate(seed, story: story);
+            _generated = WorldGenerator.Generate(seed, _config.MapSize, _config.MapSize, story);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles, _generated.Biomes);
             // Each boss in its own arena, in sheet order: the first near the spawn, the next in the deep zone.
             // A boss with a place (bosses.csv place, 2026-11-10) waits in the arena beside it, when the world has it.

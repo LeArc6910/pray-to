@@ -65,6 +65,44 @@ namespace Game.Core.Tests
             Assert.IsTrue(world.Enemies.Any(e => e.Definition == Slime && Vec2.Distance(e.Position, world.Spawn) < 30));
         }
 
+        // On a big map (2026-11-11) monsters come round the players and go when no one is near, the zones are as many
+        // but wider, and a field monster further out is tougher (the content audit's 4th point).
+        [Test]
+        public void OnABigMapMonstersComeRoundThePlayersAndToughenFarOut()
+        {
+            var world = new World(Maps.Room(300), TileMap.Center(150, 150), Monsters.Shipped, 3, new WorldConfig { EnemyTarget = 40, SpawnDistance = 5 });
+            Assert.AreEqual(2, world.MapScale);
+            Assert.AreEqual(1, world.ZoneLevelAt(world.Spawn + new Vec2(59, 0)));
+            Assert.AreEqual(2, world.ZoneLevelAt(world.Spawn + new Vec2(61, 0)));
+
+            var player = world.AddPlayer("a", null);
+            player.Position = world.Spawn + new Vec2(100, 0);
+            void Live(int seconds)
+            {
+                for (int i = 0; i < seconds; i++)
+                {
+                    Run(world, 1);
+                    player.Health = player.Stats.MaxHealth;
+                }
+            }
+            Live(60);
+            Assert.IsNotEmpty(world.Enemies);
+            foreach (var enemy in world.Enemies.Where(e => e.Rift == 0))
+            {
+                Assert.LessOrEqual(Vec2.Distance(enemy.Position, player.Position), World.DespawnReach + 20, "came round the player");
+                int extra = world.ZoneLevelAt(enemy.Position) - 1;
+                Assert.AreEqual(extra, enemy.ZoneLevels);
+                Assert.AreEqual(enemy.Definition.Health * (1 + World.ZoneHealthStep * extra), enemy.MaxHealth, 0.01f);
+            }
+            Assert.IsTrue(world.Enemies.Any(e => e.ZoneLevels > 0), "some are out past the first zone");
+
+            // Gone from there once the player is far away.
+            var left = world.Enemies.Select(e => e.Id).ToList();
+            player.Position = world.Spawn - new Vec2(100, 0);
+            Live(10);
+            Assert.IsFalse(world.Enemies.Any(e => left.Contains(e.Id)), "the ones left behind went");
+        }
+
         [Test]
         public void ShootersKeepTheirDistanceAndShoot()
         {

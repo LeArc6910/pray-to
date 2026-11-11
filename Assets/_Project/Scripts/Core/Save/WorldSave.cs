@@ -64,6 +64,9 @@ namespace Game.Core
         }
 
         public ulong Seed { get; }
+        // The map's size when it was made: a world saved before the bigger map (2026-11-11) goes on at its own size.
+        public int Width { get; private set; } = WorldGenerator.DefaultSize;
+        public int Height { get; private set; } = WorldGenerator.DefaultSize;
         // Seconds since 1970 when it was saved, as the caller counted them. Nothing grows by it: a closed world waits.
         public long SavedAt { get; }
         // The world's clock (Calendar); 0, the first morning, for a save from before days.
@@ -332,7 +335,7 @@ namespace Game.Core
                     locks.Add((x, y, r.ReadString()));
                 }
                 return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds,
-                    defenseLevel, defenseDay, locks);
+                    defenseLevel, defenseDay, locks) { Width = width, Height = height };
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

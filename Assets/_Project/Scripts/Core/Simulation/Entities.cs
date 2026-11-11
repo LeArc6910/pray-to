@@ -322,6 +322,8 @@ namespace Game.Core
         // A rift makes its monsters tougher, harder-hitting or quicker than their sheet (World.Rift.cs).
         public float MaxHealth { get; internal set; }
         public float Power { get; internal set; } = 1;
+        // Zones past the first where a field monster came (World.ToughenForZone): its experience is that many levels up.
+        public int ZoneLevels { get; internal set; }
         public float SpeedScale { get; internal set; } = 1;
         // 0 for an ordinary monster, RiftMonster or RiftGuardian for one a rift brought.
         public int Rift { get; internal set; }

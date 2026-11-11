@@ -21,7 +21,7 @@ namespace CoreSandbox
             Console.WriteLine("|---|---|---|---|" + string.Concat(places.Select(_ => "---|")) + "---|");
             foreach (ulong seed in seeds)
             {
-                var world = WorldGenerator.Generate(seed, story: story);
+                var world = WorldGenerator.Generate(seed, WorldGenerator.GameSize, WorldGenerator.GameSize, story);
                 var steps = Walk(world.Map, world.SpawnX, world.SpawnY);
                 int Near(Func<int, int, bool> what)
                 {

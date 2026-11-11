@@ -47,7 +47,7 @@ namespace Game.Core
         // Everyone alive near where the monster fell gets its experience.
         void ExperienceFrom(Enemy enemy)
         {
-            int amount = Leveling.ForMonster(Math.Max(enemy.Definition.Level, ProgressLevel));
+            int amount = Leveling.ForMonster(Math.Max(enemy.Definition.Level, ProgressLevel) + enemy.ZoneLevels);
             if (FullMoonNight) amount = amount * FullMoonExperiencePercent / 100;
             foreach (var player in _players)
             {

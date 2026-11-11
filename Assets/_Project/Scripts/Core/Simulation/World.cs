@@ -203,6 +203,7 @@ namespace Game.Core
             if (--_spawnTimer <= 0)
             {
                 _spawnTimer = Ticks(_config.SpawnIntervalSeconds);
+                if (SpawnsNearPlayers) ClearFarMonsters();
                 if (_enemies.Count < EnemyTargetNow) TrySpawnEnemy();
             }
         }
@@ -607,8 +608,39 @@ namespace Game.Core
         }
 
         // The zone level at a place: ZoneLevel at the spawn, one more every ZoneRing tiles out.
+        // The ring grows with the map (WorldGenerator.ScaleOf, 2026-11-11), so a big map has the same zones, wider.
         public int ZoneLevelAt(Vec2 position) =>
-            _config.ZoneLevel + (_config.ZoneRing > 0 ? (int)(Vec2.Distance(position, Spawn) / _config.ZoneRing) : 0);
+            _config.ZoneLevel + (_config.ZoneRing > 0 ? (int)(Vec2.Distance(position, Spawn) / (_config.ZoneRing * MapScale)) : 0);
+
+        // How many times WorldGenerator.DefaultSize the map is across.
+        public int MapScale => WorldGenerator.ScaleOf(Map.Width, Map.Height);
+
+        // On a big map (2026-11-11) monsters come round the players, not anywhere on the map: between SpawnDistance and
+        // SpawnReach from one of them, and the ones of the field go when no one is within DespawnReach.
+        public bool SpawnsNearPlayers => MapScale >= 2;
+        public const float SpawnReach = 40;
+        public const float DespawnReach = 64;
+
+        // A field monster further out is tougher (2026-11-11, the owner's decision on the content audit's 4th point):
+        // each zone past the first adds half its health, a third of its hits and the experience of a level.
+        public const float ZoneHealthStep = 0.5f;
+        public const float ZonePowerStep = 0.35f;
+
+        void ToughenForZone(Enemy enemy, int zone)
+        {
+            int extra = Math.Max(0, zone - 1);
+            if (extra == 0) return;
+            enemy.MaxHealth = enemy.Health = enemy.Definition.Health * (1 + ZoneHealthStep * extra);
+            enemy.Power = 1 + ZonePowerStep * extra;
+            enemy.ZoneLevels = extra;
+        }
+
+        void ClearFarMonsters()
+        {
+            var alive = _players.Where(p => !p.IsDead).ToList();
+            if (alive.Count == 0) return;
+            _enemies.RemoveAll(e => e.Rift == 0 && alive.All(p => Vec2.Distance(p.Position, e.Position) > DespawnReach));
+        }
 
         // Whether a monster comes at a tile of this zone level and biome. A biome's own monsters come one zone early
         // (2026-11-11, the content audit): the biomes lie out past the plain cave already (BiomeMap.CaveRadius), and on
@@ -620,11 +652,25 @@ namespace Game.Core
         {
             if (!_monsters.Monsters.Any(m => m.Level <= _config.ZoneLevel && m.Weight > 0)) return;
             var biomes = Biomes;
+            var round = SpawnsNearPlayers ? _players.Where(p => !p.IsDead).ToList() : null;
+            if (round != null && round.Count == 0) return;
 
             for (int attempt = 0; attempt < 30; attempt++)
             {
-                int x = _random.Next(Map.Width);
-                int y = _random.Next(Map.Height);
+                int x, y;
+                if (round != null)
+                {
+                    var near = round[_random.Next(round.Count)];
+                    int reach = (int)SpawnReach;
+                    x = TileMap.Cell(near.Position.X) + _random.Next(2 * reach + 1) - reach;
+                    y = TileMap.Cell(near.Position.Y) + _random.Next(2 * reach + 1) - reach;
+                    if (!Map.InBounds(x, y) || Vec2.Distance(TileMap.Center(x, y), near.Position) > SpawnReach) continue;
+                }
+                else
+                {
+                    x = _random.Next(Map.Width);
+                    y = _random.Next(Map.Height);
+                }
                 var position = TileMap.Center(x, y);
                 if (Map.IsSolid(x, y)
                     || Map[x, y] == TileType.Lava
@@ -644,7 +690,7 @@ namespace Game.Core
                     ? _monsters.Monsters.Where(m => m.Place == haunt.Definition.Id && m.Weight > 0).ToList()
                     : _monsters.Monsters.Where(m => m.Place == null && m.Weight > 0 && Comes(m, zone, biome)).ToList();
                 if (choices.Count == 0) continue;
-                SpawnEnemy(_random.PickWeighted(choices, m => m.Weight), position);
+                ToughenForZone(SpawnEnemy(_random.PickWeighted(choices, m => m.Weight), position), zone);
                 return;
             }
         }

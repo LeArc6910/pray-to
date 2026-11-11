@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 
@@ -141,6 +142,13 @@ namespace Game.Core
     public static class WorldGenerator
     {
         public const int DefaultSize = 128;
+        // The map the game makes (2026-11-11, the owner: "the map is too small; the waypoints at least 200 tiles
+        // apart"). Tests and most sims keep DefaultSize; every distance and count below was set for it and grows with
+        // ScaleOf.
+        public const int GameSize = 512;
+
+        // How many times DefaultSize the map is across (1 for it or smaller).
+        public static int ScaleOf(int width, int height) => Math.Max(1, Math.Min(width, height) / DefaultSize);
         const ulong Stream = 1;
         const int WallPercent = 45;
         const int SmoothingPasses = 5;
@@ -202,11 +210,13 @@ namespace Game.Core
         // The places of the story (Docs/Story.md, 2026-11-10), carved last of all on their own stream, so a world made
         // without the story sheets (the tests, the sims) is the caves it always was.
         const ulong PlaceStream = 13;
-        // Sixteen ways round, as thousandths (integers only, so every machine carves the same places).
+        // Twenty-four ways round, every 15 degrees, as thousandths (integers only, so every machine carves the same
+        // places; 2026-11-11, from sixteen, so six places can stand 60 degrees apart).
         static readonly (int X, int Y)[] Ways =
         {
-            (1000, 0), (924, 383), (707, 707), (383, 924), (0, 1000), (-383, 924), (-707, 707), (-924, 383),
-            (-1000, 0), (-924, -383), (-707, -707), (-383, -924), (0, -1000), (383, -924), (707, -707), (924, -383),
+            (1000, 0), (966, 259), (866, 500), (707, 707), (500, 866), (259, 966), (0, 1000), (-259, 966),
+            (-500, 866), (-707, 707), (-866, 500), (-966, 259), (-1000, 0), (-966, -259), (-866, -500), (-707, -707),
+            (-500, -866), (-259, -966), (0, -1000), (259, -966), (500, -866), (707, -707), (866, -500), (966, -259),
         };
 
         public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null)
@@ -228,33 +238,71 @@ namespace Game.Core
             var arenas = world.Arenas.Select(a => (X: TileMap.Cell(a.X), Y: TileMap.Cell(a.Y))).ToList();
             var spots = new List<(PlaceDefinition Place, int X, int Y)>();
             int Square(int dx, int dy) => dx * dx + dy * dy;
+            // The places away from the spawn stand on evenly spaced slots round it (2026-11-11, the owner: waypoints at
+            // least 200 tiles apart): with six of them at 240 tiles on a 512 map, each is 240 from the spawn and from
+            // the slots beside it. Distances in places.csv are for GameSize and shrink with smaller maps.
+            int size = System.Math.Min(map.Width, map.Height);
+            var ringPlaces = story.Places.Count(p => p.Distance > 0);
+            int step = System.Math.Max(1, Ways.Length / System.Math.Max(1, ringPlaces));
+            // A place's distance, never so far that the plaza would run off the map.
+            int DistanceOf(PlaceDefinition place) => System.Math.Min(place.Distance * size / GameSize, size / 2 - place.Radius - 6);
+            (int X, int Y) SlotAt(int slot, PlaceDefinition place) => (
+                Clamp(world.SpawnX + Ways[slot].X * DistanceOf(place) / 1000, place.Radius + 3, map.Width - place.Radius - 4),
+                Clamp(world.SpawnY + Ways[slot].Y * DistanceOf(place) / 1000, place.Radius + 3, map.Height - place.Radius - 4));
+            bool ClearOfArenas((int X, int Y) at, int radius) =>
+                arenas.All(a => Square(at.X - a.X, at.Y - a.Y) >= (ArenaRadius + radius + 3) * (ArenaRadius + radius + 3));
+            // The ring turned whichever way leaves the fewest slots on an arena (a random one among the best).
+            var ring = story.Places.Where(p => p.Distance > 0).ToList();
+            int Crowded(int turn) => Enumerable.Range(0, ringPlaces).Count(i => ring.Count > 0 && !ClearOfArenas(SlotAt((turn + i * step) % Ways.Length, ring[0]), ring.Max(p => p.Radius)));
+            int leastCrowded = Enumerable.Range(0, step).Min(Crowded);
+            var turns = Enumerable.Range(0, step).Where(t => Crowded(t) == leastCrowded).ToList();
+            int rotation = turns[random.Next(turns.Count)];
+            var freeSlots = Enumerable.Range(0, ringPlaces).Select(i => (rotation + i * step) % Ways.Length).ToList();
             foreach (var place in story.Places)
             {
                 int r = place.Radius;
                 int cx = world.SpawnX, cy = world.SpawnY;
-                if (place.Distance > 0)
+                if (place.Distance > 0 && freeSlots.Count > 0)
                 {
                     var from = spots.FirstOrDefault(s => s.Place.Id == place.Road);
                     int fromX = from.Place != null ? from.X : world.SpawnX, fromY = from.Place != null ? from.Y : world.SpawnY;
-                    int start = random.Next(Ways.Length);
-                    (int X, int Y)? best = null;
-                    int bestScore = int.MaxValue;
-                    for (int i = 0; i < Ways.Length; i++)
+                    // The free slot nearest where its road comes from, as far out as it is clear of the arenas and the
+                    // places before it (pulled in at most a sixth, so the ring stays wide); if no slot is clear, any way
+                    // round at any distance clear of them, as on the small maps of the tests.
+                    int full = DistanceOf(place);
+                    bool Clear(int x, int y) => ClearOfArenas((x, y), r)
+                        && spots.All(s => Square(x - s.X, y - s.Y) >= (s.Place.Radius + r + 4) * (s.Place.Radius + r + 4));
+                    (int X, int Y) At(int way, int distance) => (
+                        Clamp(world.SpawnX + Ways[way].X * distance / 1000, r + 3, map.Width - r - 4),
+                        Clamp(world.SpawnY + Ways[way].Y * distance / 1000, r + 3, map.Height - r - 4));
+                    int bestSlot = -1;
+                    long bestScore = long.MaxValue;
+                    (int X, int Y) best = SlotAt(freeSlots[0], place);
+                    void Try(IEnumerable<int> ways, int nearest, bool slot)
                     {
-                        var way = Ways[(start + i) % Ways.Length];
-                        int x = Clamp(world.SpawnX + way.X * place.Distance / 1000, r + 3, map.Width - r - 4);
-                        int y = Clamp(world.SpawnY + way.Y * place.Distance / 1000, r + 3, map.Height - r - 4);
-                        bool clear = arenas.All(a => Square(x - a.X, y - a.Y) >= (ArenaRadius + r + 3) * (ArenaRadius + r + 3))
-                            && spots.All(s => Square(x - s.X, y - s.Y) >= (s.Place.Radius + r + 4) * (s.Place.Radius + r + 4));
-                        // Clear ways first, the one nearest where its road comes from; crowded ones only when no way is clear.
-                        int score = Square(x - fromX, y - fromY) + (clear ? 0 : 1 << 24);
-                        if (score < bestScore)
-                        {
-                            bestScore = score;
-                            best = (x, y);
-                        }
+                        foreach (int way in ways)
+                            for (int distance = full; distance >= nearest; distance -= 2)
+                            {
+                                var (x, y) = At(way, distance);
+                                if (!Clear(x, y)) continue;
+                                long score = (long)Square(x - fromX, y - fromY) + (long)(full - distance) * 4096;
+                                if (score < bestScore)
+                                {
+                                    bestScore = score;
+                                    bestSlot = slot ? way : -1;
+                                    best = (x, y);
+                                }
+                                break;
+                            }
                     }
-                    (cx, cy) = best.Value;
+                    Try(freeSlots, full - full / 6, true);
+                    if (bestScore == long.MaxValue)
+                    {
+                        int start = random.Next(Ways.Length);
+                        Try(Enumerable.Range(0, Ways.Length).Select(w => (start + w) % Ways.Length), System.Math.Min(full, r + 25), false);
+                    }
+                    freeSlots.Remove(bestSlot >= 0 ? bestSlot : freeSlots.OrderBy(f => Square(SlotAt(f, place).X - best.X, SlotAt(f, place).Y - best.Y)).First());
+                    (cx, cy) = best;
                 }
                 for (int y = cy - r; y <= cy + r; y++)
                 {
@@ -460,11 +508,12 @@ namespace Game.Core
                     }
                 }
                 // The lamps, from just outside the places (they have their own), the first as soon as there is room.
-                int since = RoadLampEvery - 1, lampSide = 1;
+                int lampEvery = RoadLampEvery * ScaleOf(map.Width, map.Height);
+                int since = lampEvery - 1, lampSide = 1;
                 for (int i = 0; i < path.Count; i++)
                 {
                     if (!Away(i, 2)) continue;
-                    if (++since < RoadLampEvery) continue;
+                    if (++since < lampEvery) continue;
                     if (Edge(i, lampSide, TileType.LampPost))
                     {
                         since = 0;
@@ -704,11 +753,16 @@ namespace Game.Core
                     PutRow(TileType.Hedge, new[] { (6, 1), (7, 1) }, (0, 0), (0, 1), (0, -1), (0, 2), (0, -2), (-1, 3));
                     PutSmall(TileType.RoyalBanner, (5, 4), (4, 4), (6, 4), (5, 5), (5, 3));
                     PutSmall(TileType.Flowerbed, (5, -6), (4, -6), (6, -5), (4, -5), (6, -4), (2, -4), (2, -3), (6, -1));
-                    // Lamp posts beside the fountains: on the carpet side, or the other side where a gate is in the way.
+                    // Lamp posts beside the fountains: on the carpet side, or the other side, or the nearest spot round it where a
+                    // gate or a tower is in the way.
                     foreach (var (fx, fy) in basins)
                     {
                         if (map[cx + fx, cy + fy] != TileType.BigFountain) continue;
-                        PutSmall(TileType.LampPost, (fx - 1, fy), (fx + 2, fy), (fx - 1, fy + 1), (fx + 2, fy + 1));
+                        PutSmall(TileType.LampPost, new[] { (fx - 1, fy), (fx + 2, fy), (fx - 1, fy + 1), (fx + 2, fy + 1) }
+                            .Concat(from dy in Enumerable.Range(fy - 2, 5) from dx in Enumerable.Range(fx - 3, 8)
+                                    where dx < fx || dx > fx + 1 || dy < fy || dy > fy + 1
+                                    orderby System.Math.Abs(2 * dx - 2 * fx - 1) + 2 * System.Math.Abs(dy - fy), dy, dx
+                                    select (dx, dy)).ToArray());
                         break;
                     }
                     wanted.Add((cx, cy + r - 4));
@@ -1028,8 +1082,12 @@ namespace Game.Core
             int spawnX = width / 2;
             int spawnY = height / 2;
             ClearDisc(map, spawnX, spawnY, SpawnClearing);
+            // Distances grow with the map's width, counts with its area.
+            int k = ScaleOf(width, height), area = k * k;
 
             var (offsetX, offsetY) = ArenaOffsets[random.Next(ArenaOffsets.Length)];
+            offsetX *= k;
+            offsetY *= k;
             int arenaX = Clamp(spawnX + offsetX, ArenaRadius + 2, width - ArenaRadius - 3);
             int arenaY = Clamp(spawnY + offsetY, ArenaRadius + 2, height - ArenaRadius - 3);
             ClearDisc(map, arenaX, arenaY, ArenaRadius);
@@ -1037,8 +1095,8 @@ namespace Game.Core
 
             FillUnreachable(map, spawnX, spawnY);
             var ore = new GameRandom(seed, OreStream);
-            PlaceVeins(map, ore, TileType.CopperOre, CopperVeins, spawnX, spawnY, 0);
-            PlaceVeins(map, ore, TileType.IronOre, IronVeins, spawnX, spawnY, IronDistance);
+            PlaceVeins(map, ore, TileType.CopperOre, CopperVeins * area, spawnX, spawnY, 0);
+            PlaceVeins(map, ore, TileType.IronOre, IronVeins * area, spawnX, spawnY, IronDistance * k);
 
             // The deep arena: a far corner on the first arena's side, so the way there runs through the first.
             var deep = new GameRandom(seed, DeepStream);
@@ -1046,11 +1104,11 @@ namespace Game.Core
                 .Where(c => c.Item1 * offsetX + c.Item2 * offsetY > 0)
                 .ToArray();
             var (cornerX, cornerY) = corners[deep.Next(corners.Length)];
-            int deepX = Clamp(spawnX + cornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
-            int deepY = Clamp(spawnY + cornerY * DeepArenaOffset, ArenaRadius + 2, height - ArenaRadius - 3);
+            int deepX = Clamp(spawnX + cornerX * DeepArenaOffset * k, ArenaRadius + 2, width - ArenaRadius - 3);
+            int deepY = Clamp(spawnY + cornerY * DeepArenaOffset * k, ArenaRadius + 2, height - ArenaRadius - 3);
             CarveTunnel(map, arenaX, arenaY, deepX, deepY);
             ClearDisc(map, deepX, deepY, ArenaRadius);
-            PlaceVeins(map, new GameRandom(seed, MithrilStream), TileType.MithrilOre, MithrilVeins, spawnX, spawnY, MithrilDistance);
+            PlaceVeins(map, new GameRandom(seed, MithrilStream), TileType.MithrilOre, MithrilVeins * area, spawnX, spawnY, MithrilDistance * k);
             bool mushroomFirst = new GameRandom(seed, BiomeStream).Next(2) == 0;
             var abyss = new GameRandom(seed, AbyssStream);
             // One of the two corners beside both the crystal caverns and the lava fields.
@@ -1061,8 +1119,8 @@ namespace Game.Core
             var sand = new GameRandom(seed, SandStream);
             var flanks = new[]
             {
-                (spawnX + cornerX * SandArenaOffset.Along, spawnY + cornerY * SandArenaOffset.Across),
-                (spawnX + cornerX * SandArenaOffset.Across, spawnY + cornerY * SandArenaOffset.Along),
+                (spawnX + cornerX * SandArenaOffset.Along * k, spawnY + cornerY * SandArenaOffset.Across * k),
+                (spawnX + cornerX * SandArenaOffset.Across * k, spawnY + cornerY * SandArenaOffset.Along * k),
             };
             int Far((int X, int Y) f) => (f.X - arenaX) * (f.X - arenaX) + (f.Y - arenaY) * (f.Y - arenaY);
             var (sandX, sandY) = Far(flanks[0]) == Far(flanks[1]) ? flanks[sand.Next(2)] : Far(flanks[0]) > Far(flanks[1]) ? flanks[0] : flanks[1];
@@ -1072,8 +1130,8 @@ namespace Game.Core
                 (lakeCornerX, lakeCornerY), (sandX, sandY));
 
             var lava = new GameRandom(seed, LavaStream);
-            int lavaX = Clamp(spawnX - cornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
-            int lavaY = Clamp(spawnY - cornerY * DeepArenaOffset, ArenaRadius + 2, height - ArenaRadius - 3);
+            int lavaX = Clamp(spawnX - cornerX * DeepArenaOffset * k, ArenaRadius + 2, width - ArenaRadius - 3);
+            int lavaY = Clamp(spawnY - cornerY * DeepArenaOffset * k, ArenaRadius + 2, height - ArenaRadius - 3);
             CarveTunnel(map, spawnX, spawnY, lavaX, lavaY);
             ClearDisc(map, lavaX, lavaY, ArenaRadius);
             bool InLava(int x, int y, int distance)
@@ -1085,27 +1143,27 @@ namespace Game.Core
             bool NearArena(int x, int y) =>
                 new[] { (arenaX, arenaY), (deepX, deepY), (lavaX, lavaY) }
                     .Any(a => (x - a.Item1) * (x - a.Item1) + (y - a.Item2) * (y - a.Item2) <= (ArenaRadius + 2) * (ArenaRadius + 2));
-            PlaceVeins(map, lava, TileType.ObsidianOre, ObsidianVeins, (x, y) => map[x, y] == TileType.Wall && InLava(x, y, ObsidianDistance));
-            PlaceLava(map, lava, (x, y) => map[x, y] == TileType.Floor && InLava(x, y, LavaPoolDistance) && !NearArena(x, y));
+            PlaceVeins(map, lava, TileType.ObsidianOre, ObsidianVeins * area, (x, y) => map[x, y] == TileType.Wall && InLava(x, y, ObsidianDistance * k));
+            PlaceLava(map, lava, LavaPools * area, (x, y) => map[x, y] == TileType.Floor && InLava(x, y, LavaPoolDistance * k) && !NearArena(x, y));
 
-            int abyssX = Clamp(spawnX + abyssCornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
-            int abyssY = Clamp(spawnY + abyssCornerY * DeepArenaOffset, ArenaRadius + 2, height - ArenaRadius - 3);
+            int abyssX = Clamp(spawnX + abyssCornerX * DeepArenaOffset * k, ArenaRadius + 2, width - ArenaRadius - 3);
+            int abyssY = Clamp(spawnY + abyssCornerY * DeepArenaOffset * k, ArenaRadius + 2, height - ArenaRadius - 3);
             CarveTunnel(map, lavaX, lavaY, abyssX, abyssY);
             ClearDisc(map, abyssX, abyssY, ArenaRadius);
-            PlaceVeins(map, abyss, TileType.VoidOre, VoidVeins, (x, y) => map[x, y] == TileType.Wall && biomes[x, y] == Biome.Abyss
+            PlaceVeins(map, abyss, TileType.VoidOre, VoidVeins * area, (x, y) => map[x, y] == TileType.Wall && biomes[x, y] == Biome.Abyss
                 && (x - abyssX) * (x - abyssX) + (y - abyssY) * (y - abyssY) > (ArenaRadius + 2) * (ArenaRadius + 2));
             var arenas = new[] { (arenaX, arenaY), (deepX, deepY), (lavaX, lavaY), (abyssX, abyssY) };
             bool Shore(int x, int y)
             {
                 if (map[x, y] != TileType.Wall || biomes[x, y] == Biome.Lava) return false;
-                if ((x - spawnX) * (x - spawnX) + (y - spawnY) * (y - spawnY) < WaterDistance * WaterDistance) return false;
+                if ((x - spawnX) * (x - spawnX) + (y - spawnY) * (y - spawnY) < WaterDistance * k * WaterDistance * k) return false;
                 return !arenas.Any(a => (x - a.Item1) * (x - a.Item1) + (y - a.Item2) * (y - a.Item2) <= (ArenaRadius + 3) * (ArenaRadius + 3));
             }
-            PlaceWater(map, new GameRandom(seed, WaterStream), Shore);
+            PlaceWater(map, new GameRandom(seed, WaterStream), WaterPools * area, Shore);
 
             var lake = new GameRandom(seed, LakeStream);
-            int lakeX = Clamp(spawnX + lakeCornerX * DeepArenaOffset, ArenaRadius + 2, width - ArenaRadius - 3);
-            int lakeY = Clamp(spawnY + lakeCornerY * DeepArenaOffset, ArenaRadius + 2, height - ArenaRadius - 3);
+            int lakeX = Clamp(spawnX + lakeCornerX * DeepArenaOffset * k, ArenaRadius + 2, width - ArenaRadius - 3);
+            int lakeY = Clamp(spawnY + lakeCornerY * DeepArenaOffset * k, ArenaRadius + 2, height - ArenaRadius - 3);
             CarveTunnel(map, deepX, deepY, lakeX, lakeY);
             ClearDisc(map, lakeX, lakeY, ArenaRadius);
             // Pools laid before the arena was there keep their distance from it, as all pools do from arenas.
@@ -1120,8 +1178,8 @@ namespace Game.Core
             bool LakeShore(int x, int y) => map[x, y] == TileType.Wall && biomes[x, y] == Biome.Lake
                 && (x - lakeX) * (x - lakeX) + (y - lakeY) * (y - lakeY) > (ArenaRadius + 3) * (ArenaRadius + 3);
             // Twice over: a lake is mostly water at its edges.
-            PlaceWater(map, lake, LakeShore);
-            PlaceWater(map, lake, LakeShore);
+            PlaceWater(map, lake, WaterPools * area, LakeShore);
+            PlaceWater(map, lake, WaterPools * area, LakeShore);
 
             CarveTunnel(map, arenaX, arenaY, sandX, sandY);
             ClearDisc(map, sandX, sandY, ArenaRadius);
@@ -1197,9 +1255,9 @@ namespace Game.Core
 
         // Pools of lava on open floor: a centre and some of the floor around it, two rings out.
         // Each pool starts in rock right beside a floor tile and spreads a little into the rock around it.
-        static void PlaceWater(TileMap map, GameRandom random, System.Func<int, int, bool> allowed)
+        static void PlaceWater(TileMap map, GameRandom random, int pools, System.Func<int, int, bool> allowed)
         {
-            for (int pool = 0; pool < WaterPools; pool++)
+            for (int pool = 0; pool < pools; pool++)
             {
                 for (int attempt = 0; attempt < 200; attempt++)
                 {
@@ -1221,9 +1279,9 @@ namespace Game.Core
             }
         }
 
-        static void PlaceLava(TileMap map, GameRandom random, System.Func<int, int, bool> allowed)
+        static void PlaceLava(TileMap map, GameRandom random, int pools, System.Func<int, int, bool> allowed)
         {
-            for (int pool = 0; pool < LavaPools; pool++)
+            for (int pool = 0; pool < pools; pool++)
             {
                 for (int attempt = 0; attempt < 80; attempt++)
                 {

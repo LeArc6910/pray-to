@@ -24,7 +24,7 @@ namespace CoreSandbox
     // dotnet run -- --supports [seconds]             every skill with each support crystal that fits it, against it bare (--gear, --rank)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
-    // dotnet run -- --hour [minutes] [seed,seed,...]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
+    // dotnet run -- --hour [minutes] [seed,seed,...] [map size, 512]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
     // dotnet run -- --supply                          which system supplies which, from the sheets (Docs/Systems.md)
     // dotnet run -- --flow [seeds]                    steps from the spawn to the first veins, arena and places (Docs/WorldFlow.md)
     static class Program
@@ -158,7 +158,7 @@ namespace CoreSandbox
                     FactorySim.Run(data, LoadMonsters(), LoadTiles(data), LoadNpcs(data), Number(1, 30));
                     break;
                 case "--hour":
-                    HourSim.Run(LoadSheets(data), Number(1, 60), args.Length > 2 ? args[2] : "1,2,3");
+                    HourSim.Run(LoadSheets(data), Number(1, 60), args.Length > 2 ? args[2] : "1,2,3", args.Length > 3 ? int.Parse(args[3]) : WorldGenerator.GameSize);
                     break;
                 case "--boss":
                     var monsters = LoadMonsters();
@@ -173,7 +173,7 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --rift [tiers] [seed] [--players 2] [--gear ...] [--classes ...]");
                     Console.WriteLine("       dotnet run -- --economy");
                     Console.WriteLine("       dotnet run -- --factory [minutes]");
-                    Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...]");
+                    Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...] [map size]");
                     break;
             }
         }

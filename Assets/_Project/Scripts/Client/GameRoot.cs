@@ -946,7 +946,9 @@ namespace Game.Client
 
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
 
-            _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
+            // A new world is the game's big map; a saved one keeps the size it was made at (2026-11-11).
+            _host = new WorldHost(seed, _monsters, _loot, new HostConfig { MapSize = world?.Width ?? WorldGenerator.GameSize },
+                bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
                 worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes }, story: _story);
             if (world != null)
             {
