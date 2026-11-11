@@ -70,3 +70,38 @@ ComfyUI에서 쓸 무료 모델:
 
 - Steam: 플레이어가 보는 그림·소리·글에 생성형 AI 결과를 쓰면 스토어 설문에서 공개해야 한다(2026-01 개정으로 개발 도구로만 쓴 것은 공개하지 않아도 된다는 보도, Steamworks 원문은 확인 못 함).
 - 확인 못 한 것: PixelLab 월 생성 횟수 공식 수치, Scenario의 RD 모델 단가, Replicate·Poe의 무료 몫과 상업 조건, Leonardo·Civitai·Tensor.art·SeaArt의 공식 조건, Retro Diffusion 확장 라이선스 원문.
+
+## 그림·효과음·음악·3D를 한 곳에서: 결제할 곳 고르기 (2026-11-11)
+
+사람 요청 "pixellab, retro diffusion 포함해서 효과음, bgm까지 한번에 해결할 수 있는 ai api 사이트, 차후 2d 이미지나 3d 모델링까지 고려해서 결제할 만한 곳". 웹 조사만 했다. 가격은 공식 페이지 기준이고 자주 바뀐다.
+
+### 결론
+
+- **Retro Diffusion과 PixelLab을 둘 다 주는 곳은 없다.** PixelLab은 직접 API·MCP뿐이다.
+- 모음 사이트의 Retro Diffusion은 4종(Fast·Plus·Tile·Animation)뿐이라 **8방향 회전·고급 동작·RD Pro는 Retro Diffusion 직접 API에만 있다**(8방향 회전 $0.25, 업로드한 스프라이트 8방향 돌리기 $0.10, 동작 $0.14).
+- 도트(RD)+효과음+음악+2D+3D를 한 결제로 덮는 곳은 **Scenario**(구독, 공식 MCP)와 **Replicate**(충전식, 효과음은 Stable Audio로 대신)다. Ludo.ai도 다섯 분야를 덮지만 도트는 자체 모델이고 소리 모델 이름을 밝히지 않는다.
+
+### 사이트별 요점
+
+| 곳 | 도트 | 효과음 | 음악 | 3D | 결제 |
+|---|---|---|---|---|---|
+| Scenario | RD Plus·Tile·Animation(4방향) | ElevenLabs SFX 2 | ElevenLabs·MiniMax·Lyria | Tripo·Rodin·Meshy·Trellis | 구독 $15/월(1,500CU)부터, CU 매달 소멸, 무료 출력은 비상업 |
+| Replicate | RD 4종(16~32px 한 장 $0.017~0.025, 애니 $0.07) | Stable Audio 2.5($0.20/파일) | ElevenLabs Music·MiniMax·Lyria·ACE-Step | Rodin $0.40, TRELLIS2 | 충전식 쓴 만큼 |
+| fal.ai | RD·PixelLab 없음(변환 도구만) | ElevenLabs SFX(2초 $0.004) | MiniMax $0.03/곡, Lyria 3 Pro $0.08, ElevenLabs $0.60/분 | Tripo $0.20~0.40, Rodin $0.40, Meshy $0.80 | 충전식, 크레딧 1년 만료 |
+| Retro Diffusion 직접 | Fast $0.03, Plus $0.06, Pro $0.18, 8방향 회전, 동작 애니, 타일셋 | 없음 | 없음 | 도트 텍스처 로우폴리 | 충전 $5부터, 만료 없음, 공식 MCP |
+| PixelLab 직접 | 8방향 캐릭터(64px 약 $0.017), 스켈레톤 애니, 타일셋 | 없음 | 없음 | 없음 | 구독 약 $12/월 |
+| Ludo.ai | 자체 도트, 8방향 스프라이트 | 있음(모델 비공개) | 있음(모델 비공개) | 있음, 리깅 | 구독 $15/월(연간)부터, 상업 이용 됨 |
+| Layer.ai | 변환만 | ElevenLabs SFX | ElevenLabs·MiniMax·Lyria 등 | Tripo·Trellis·Meshy·Rodin | 구독 $10/월부터 |
+| ElevenLabs 직접 | 없음 | SFX $0.12/분 | Music $0.15/분 | 없음 | 구독 $6/월부터 |
+| Higgsfield | 없음 | — | — | — | 영상·광고 중심 |
+
+### 추천 조합
+
+1. **한 곳으로: Scenario Starter $15/월**(모자라면 CU 추가, 대략 월 $15~45). RD·ElevenLabs 효과음·음악·2D·3D를 MCP 하나로. 캐릭터는 4방향 48px까지. 구독이 싫으면 Replicate(충전식, 비슷한 사용량에 월 $25~40쯤).
+2. **이 게임에 더 맞는 조합: Retro Diffusion 직접 + fal.ai**(합해 월 $15~40쯤). RD 직접으로 16px 아이콘·타일·8방향 회전·동작 애니, fal로 효과음(ElevenLabs SFX)·음악(MiniMax·Lyria)·2D·3D(Tripo·Rodin). 둘 다 충전식이라 쓴 만큼만 낸다. 8방향 캐릭터를 비교하고 싶으면 PixelLab(약 $12/월)을 더한다.
+
+### 라이선스 주의
+
+- 쓰지 말 것: **MMAudio·MusicGen**(가중치가 비상업 CC BY-NC인데 일부 사이트는 상업 가능으로 표시), **Hunyuan3D**(한국 제외), **Suno·Udio**(공식 공개 API가 없고, 다른 사이트의 Suno는 비공식 우회).
+- 조건이 있는 것: **ElevenLabs Music**(게임 누적 매출 $50만·회사 게임 매출 연 $100만 미만이면 인디로 상업 이용, 넘으면 플랜 변경), **Stable Audio**(연매출 $100만 미만만 무료 상업 이용), **Lyria**(워터마크), **TRELLIS.2**(의존 라이브러리가 비상업이라는 지적).
+- Steam: 플레이어가 보고 듣는 AI 생성물(그림·소리·음악)은 스토어 설문에서 공개해야 한다.
