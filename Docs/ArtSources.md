@@ -106,3 +106,41 @@ ComfyUI에서 쓸 무료 모델:
 - 쓰지 말 것: **MMAudio·MusicGen**(가중치가 비상업 CC BY-NC인데 일부 사이트는 상업 가능으로 표시), **Hunyuan3D**(한국 제외), **Suno·Udio**(공식 공개 API가 없고, 다른 사이트의 Suno는 비공식 우회).
 - 조건이 있는 것: **ElevenLabs Music**(게임 누적 매출 $50만·회사 게임 매출 연 $100만 미만이면 인디로 상업 이용, 넘으면 플랜 변경), **Stable Audio**(연매출 $100만 미만만 무료 상업 이용), **Lyria**(워터마크), **TRELLIS.2**(의존 라이브러리가 비상업이라는 지적).
 - Steam: 플레이어가 보고 듣는 AI 생성물(그림·소리·음악)은 스토어 설문에서 공개해야 한다.
+
+## fal.ai·Scenario·Replicate 자세히 (2026-11-12)
+
+사람 요청 "fal.ai에서 각 분야에 어떤 모델을 쓰는지와 상업 가능 유무, 샘플", "scenario, replicate도 자세히". 웹 조사만 했다(가입·결제·생성 없음). 상업 이용은 **플랫폼 표시와 원래 모델 약관 둘 다** 봤고, 둘이 어긋나면 쓰지 않는다. 가격은 2026-11 공식 페이지 기준.
+
+### 분야별 추천 모델
+
+| 분야 | 1순위 (곳, 단가) | 상업 이용 | 대안 | 쓰지 말 것 |
+|---|---|---|---|---|
+| 도트 정지·타일 | Retro Diffusion: Replicate `rd-plus`(16px $0.024)·`rd-tile`(타일 하나 $0.024, 타일셋 $0.10)·`rd-fast`($0.017) | RD "출력물은 당신 것" | RD 직접(Fast $0.03, Plus $0.06) | — |
+| 도트 8방향·동작 | RD 직접 API: rotate $0.10, 8방향 회전 $0.25, 고급 애니메이션 $0.14 | 같음 | Replicate `rd-animation` 4방향 48px $0.07 | — |
+| 도트 후처리 | fal `fal-ai/image2pixel`(격자·팔레트 고정·투명) | fal 상업 표시 | 우리 `DevTools/ArtImport/to_rows.py` | — |
+| 효과음 | fal `elevenlabs/sound-effects/v3`: 초당 $0.002, 0.5~30초, **반복(loop) 옵션** | ElevenLabs 유료 조건으로 상업 가능(fal 경유 적용 조건은 미확인) | fal `stable-audio-3/small/sfx`($0.02/개, 연매출 $100만 미만 무료 상업, 출력물 소유) | MMAudio(가중치 비상업) |
+| 음악·BGM | fal `stable-audio-3/medium`: 곡당 약 $0.04, 최대 6분20초 | Stability Community License: 연매출 $100만 미만 무료, 출력물 소유, 워터마크 없음 | ElevenLabs Music(fal $0.6/분, Replicate 약 $0.5/분, 게임 누적 매출 $50만 미만 인디 조건), Lyria 3.5(곡당 $0.08~0.10, SynthID 워터마크), ACE-Step(Apache-2.0, 아주 쌈, 품질 미확인) | MusicGen(비상업), Lyria 2(Scenario가 비상업 표시) |
+| 2D(컨셉·UI·아이콘) | fal Ideogram v3 투명 배경($0.03~0.09) 또는 GPT Image(투명·SVG, 장당 단가 미확인) | 상업 표시 | Z-Image(Apache-2.0, 아주 쌈, 이음새 없는 타일 `/tiling`), Recraft(벡터) | — |
+| 3D | fal `meshy/t2.5/image-to-3d`: 텍스처 포함 $0.60, 3만 삼각형 이하, 리깅 +$0.20 | 상업 표시(Meshy 원래 조건은 미확인) | Rodin($0.40), Tripo($0.20~0.40) | Hunyuan3D(라이선스가 한국 제외), TRELLIS(의존 라이브러리 비상업) |
+
+- 반복 재생되는 BGM을 바로 만드는 음악 모델은 없다(효과음은 ElevenLabs loop 옵션이 있다). BGM은 이음매를 손봐야 한다.
+- 받아 둔 예시 파일(신뢰할 수 없는 데이터로 다루고 열지 않았다, 저장소 밖): fal 27개, Replicate·Scenario 24개.
+
+### 세 곳 비교
+
+| | fal.ai | Replicate | Scenario |
+|---|---|---|---|
+| 결제 | 선불 충전, 365일 만료, 환불 불가, 무료 크레딧은 API에서 못 씀 | 선불 충전, 1년 만료, 자동 충전 최소 $15 | 구독 $15/$45/$75, 월 CU 이월 없음, 추가 CU 12개월 |
+| Retro Diffusion | 없음 | 있음(가장 쌈, 8방향 없음) | 있음(장당 약 $0.11~0.15, 8방향 없음) |
+| 효과음 | ElevenLabs SFX(가장 좋음, 쌈) | ElevenLabs SFX 없음, Stable Audio 2.5 $0.20/개 | ElevenLabs SFX 2 |
+| 음악 | Stable Audio 3, ElevenLabs, Lyria, ACE-Step | ElevenLabs, Lyria, MiniMax, ACE-Step | 같은 계열, 단가 비공개(dryRun으로 확인) |
+| 3D | Meshy·Tripo·Rodin | Rodin·Hunyuan 3.1 | 가장 많음 + 리깅·리토폴로지 |
+| 자기 스타일 학습 | Z-Image LoRA 1000스텝 $0.85 | FLUX LoRA 약 $1.5/회 | Pro 이상, 5~15장(짧은 변 700px 이상) |
+| 그 밖 | 출력물 소유를 넘겨주는 조항이 약관에 없음(모델별 약관), 결과 URL 기본 공개 | 출력 권리를 넘겨줌, 모델별 약관 책임은 사용자, API 기록 1시간 뒤 삭제 | 출력물 소유, **셀프서비스 콘텐츠를 학습에 쓸 수 있고 옵트아웃 없음**, Unity 플러그인(MIT)·MCP |
+
+### 추천 (이 게임)
+
+- **Replicate**(도트 정지·타일·4방향) + **RD 직접**(8방향·고급 동작) + **fal**(효과음 ElevenLabs·음악 Stable Audio 3·3D Meshy). 셋 다 충전식이라 쓴 만큼만 낸다.
+- 아이콘·타일 300, 애니 30, 효과음 60, 음악 10, 3D 5를 한 달에 만든다면 대략: Replicate 약 $13, RD 직접 약 $5~10, fal 약 $5(효과음 2초×60 $0.24 + 음악 10곡 $0.4 + 3D 5개 $3) → **월 $25 안팎**. 후보를 세 배 뽑아도 $60~80쯤.
+- 하나만 고른다면: 구독이 괜찮으면 Scenario Max($75/월, 같은 양에 맞는 플랜). 아니면 Replicate 하나(효과음은 Stable Audio로, 월 $40쯤).
+- Scenario는 자기 그림으로 스타일을 학습시키고 싶을 때 한 달만 Pro($45)로.
