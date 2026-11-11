@@ -2,8 +2,8 @@ using System.Collections.Generic;
 
 namespace Game.Client
 {
-    // Frames for the menus and windows, in the colours of the caves: dark stone panels with a lit bevel, raised wooden
-    // buttons that sink when pressed, and dark insets for text fields, scroll tracks and bars. Each is drawn small and
+    // Frames for the menus and windows, in the colours of the caves: dark stone panels in a thin gold rim, dark
+    // buttons with a gold-brown rim that sink when pressed, and dark insets for text fields, scroll tracks and bars. Each is drawn small and
     // stretched by its middle (nine-slice), so its edge pixels keep their size; Border says how many pixels at each
     // edge to keep. UiSkin turns them into the IMGUI skin.
     static class UiArt
@@ -11,65 +11,79 @@ namespace Game.Client
         // Every frame is drawn at twice its pixel size, so its edges read on a desktop screen too.
         public const int Scale = 2;
 
+        // Dark stone with a thin rim of old gold and a bright stud at each corner (2026-11-11, the owner: the UI looked
+        // crude; after the framed dark panels of Core Keeper and Buch's Golden UI, CC0, in our own colours).
         static readonly Dictionary<char, Rgba> PanelColors = new Dictionary<char, Rgba>
         {
-            ['o'] = Rgba.Hex("#0E0A08"),
-            ['L'] = Rgba.Hex("#7A6450"),
-            ['M'] = Rgba.Hex("#52402F"),
-            ['d'] = Rgba.Hex("#33281F"),
-            ['f'] = Rgba.Hex("#1C1612"),
+            ['o'] = Rgba.Hex("#0B0807"),
+            ['W'] = Rgba.Hex("#F4DE9C"),
+            ['G'] = Rgba.Hex("#C49A55"),
+            ['s'] = Rgba.Hex("#6B5230"),
+            ['k'] = Rgba.Hex("#100C0A"),
+            ['F'] = Rgba.Hex("#2A211B"),
+            ['f'] = Rgba.Hex("#1D1713"),
+            ['d'] = Rgba.Hex("#16110E"),
         };
 
-        public const int PanelBorder = 3;
+        public const int PanelBorder = 4;
 
         public static readonly PixelImage Panel = PixelImage.FromRows(PanelColors,
-            ".oooooooo.",
-            "oLLLLLLLMo",
-            "oLMMMMMMdo",
-            "oLMffffMdo",
-            "oLMffffMdo",
-            "oLMffffMdo",
-            "oLMffffMdo",
-            "oMMMMMMMdo",
-            "oMdddddddo",
-            ".oooooooo.");
+            ".oooooooooo.",
+            "oWGGGGGGGGWo",
+            "oGkkkkkkkkso",
+            "oGkFFFFFFkso",
+            "oGkFffffFkso",
+            "oGkFffffFkso",
+            "oGkFffffFkso",
+            "oGkFffffFkso",
+            "oGkddddddkso",
+            "oGkkkkkkkkso",
+            "oWssssssssWo",
+            ".oooooooooo.");
 
-        public const int ButtonBorder = 2;
+        public const int ButtonBorder = 3;
 
         static readonly string[] Raised =
         {
-            ".oooooo.",
-            "oLLLLLLo",
-            "oLMMMMdo",
-            "oLMMMMdo",
-            "oLMMMMdo",
-            "oLMMMMdo",
-            "oddddddo",
-            ".oooooo.",
+            ".oooooooo.",
+            "orrrrrrrro",
+            "orLLLLLLro",
+            "orMMMMMMro",
+            "orMMMMMMro",
+            "orMMMMMMro",
+            "orMMMMMMro",
+            "orddddddro",
+            "oqqqqqqqqo",
+            ".oooooooo.",
         };
 
         static readonly string[] Sunk =
         {
-            ".oooooo.",
-            "oddddddo",
-            "odMMMMLo",
-            "odMMMMLo",
-            "odMMMMLo",
-            "odMMMMLo",
-            "oLLLLLLo",
-            ".oooooo.",
+            ".oooooooo.",
+            "oqqqqqqqqo",
+            "orddddddro",
+            "orMMMMMMro",
+            "orMMMMMMro",
+            "orMMMMMMro",
+            "orMMMMMMro",
+            "orLLLLLLro",
+            "orrrrrrrro",
+            ".oooooooo.",
         };
 
-        // Wood for a button, a little lighter under the pointer, gold when it is the chosen tab.
+        // Dark leather-brown with a gold-brown rim; under the pointer the rim lights up, and the chosen tab is gold.
         public static PixelImage Button(bool hover = false, bool pressed = false, bool chosen = false)
         {
-            var wood = chosen ? Ramp.Of("#9A7436") : hover ? Ramp.Of("#7E6046") : Ramp.Of("#6A503A");
+            var fill = chosen ? Ramp.Of("#8C6A34") : hover ? Ramp.Of("#4A3A2C") : Ramp.Of("#3A2D23");
+            var rim = chosen ? Rgba.Hex("#F0D490") : hover ? Rgba.Hex("#D8B06A") : Rgba.Hex("#8C6C40");
             var colors = new Dictionary<char, Rgba>
             {
-                ['o'] = Rgba.Hex("#0E0A08"),
-                ['L'] = wood.Light,
-                ['M'] = wood.Main,
-                ['d'] = wood.Dark,
+                ['o'] = Rgba.Hex("#0B0807"),
+                ['r'] = rim,
+                ['q'] = rim.Mix(Rgba.Hex("#0B0807"), 0.45f),
+                ['L'] = fill.Light,
+                ['M'] = fill.Main,
+                ['d'] = fill.Dark,
             };
             return PixelImage.FromRows(colors, pressed ? Sunk : Raised);
         }

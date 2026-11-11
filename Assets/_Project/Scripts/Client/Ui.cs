@@ -275,6 +275,12 @@ namespace Game.Client
             return GUI.Button(rect, text);
         }
 
+        public static bool Button(Rect rect, string text, GUIStyle style)
+        {
+            Probe(text, rect);
+            return GUI.Button(rect, text, style);
+        }
+
         public static bool LayoutButton(string text, params GUILayoutOption[] options)
         {
             bool pressed = GUILayout.Button(text, options);

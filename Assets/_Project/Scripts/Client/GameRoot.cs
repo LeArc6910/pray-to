@@ -79,23 +79,6 @@ namespace Game.Client
         // The classes the character joins with: a saved character's own; none for a new one, who picks in the game
         // (Docs/Classes.md, 클래스 고르기, 2026-11-09).
         readonly List<string> _chosenClasses = new List<string>();
-        // What the menu's second column shows: the classes, the keys to change, or the saves on this device.
-        enum MenuSide
-        {
-            Classes,
-            Keys,
-            Saves,
-        }
-
-        MenuSide _side;
-        SaveMenu _saveMenu;
-        Vector2 _menuScroll;
-        // On a narrow screen the second column is under the first: where it starts, and whether to scroll there once
-        // (after a button opened the keys or the saves).
-        float _sideTop;
-        bool _scrollToSide;
-        // Width of a line of text in a menu column this frame.
-        float _menuColumn;
         WorldHost _host;
         WorldClient _client;
         NetLink _net;
@@ -1256,40 +1239,194 @@ namespace Game.Client
         // Name and how to play on one side, classes on the other; one above the other on a narrow screen. Scrolls
         // when the screen is too short for it, but [혼자 하기] (and what went wrong last) stays at the bottom, in view
         // however short the screen is.
+        // The start screen as other games have it (2026-11-11, the owner: "the start screen is messy; tidy the menu like
+        // other games, 게임 시작, 설정 and so on"): the name of the game over a column of a few big buttons, each opening a
+        // page of its own with [뒤로] back. Esc goes back too.
         void DrawMenu()
         {
-            // Two columns side by side wherever they fit, a phone held sideways included.
-            bool wide = Ui.Width >= 700;
-            float width = wide ? Mathf.Min(740, Ui.Width - 20) : Mathf.Min(380, Ui.Width - 20);
-            float height = Mathf.Min(wide ? 460 : 760, Ui.Height - 20);
-            // Both columns get a set width that leaves room for the scroll bar, so a long line wraps instead of
-            // widening its column, and the menu never scrolls sideways.
-            float inner = width - GUI.skin.box.padding.horizontal;
-            float list = inner - GUI.skin.verticalScrollbar.fixedWidth - 8;
-            float column = wide ? (list - 16) / 2 : list;
-            // Text in a column is that wide less a label's margins.
-            _menuColumn = column - GUI.skin.label.margin.horizontal;
             bool ready = _loot != null && _loot.Success && _monsters != null && _monsters.Success && _bosses != null && _bosses.Success
                 && _classes != null && _classes.Success && _tiles != null && _tiles.Success;
-            var area = new Rect((Ui.Width - width) / 2, (Ui.Height - height) / 2, width, height);
-            if (_scrollToSide && Event.current.type == EventType.Layout)
+            if (_page != MenuPage.Main && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape
+                && KeyBindings.Capturing == null)
             {
-                _menuScroll.y = wide ? 0 : _sideTop;
-                _scrollToSide = false;
+                Back();
+                Event.current.Use();
             }
+            UiSkin.Backdrop(new Rect(0, 0, Ui.Width, Ui.Height));
+            if (_page == MenuPage.Main) DrawMainMenu(ready);
+            else DrawMenuPage(ready);
+        }
+
+        enum MenuPage
+        {
+            Main,
+            Play,
+            Together,
+            Saves,
+            Settings,
+            Keys,
+        }
+
+        MenuPage _page;
+        SaveMenu _saveMenu;
+        Vector2 _menuScroll;
+        // Width of a line of text on a menu page this frame.
+        float _menuColumn;
+
+        void Open(MenuPage page)
+        {
+            _page = page;
+            _menuScroll = Vector2.zero;
+            _confirmDelete = false;
+            Sounds.Play(Sound.Click);
+            // The pass ends here, so the new page is laid out before it is drawn (IMGUI cannot draw what it did not lay out).
+            GUIUtility.ExitGUI();
+        }
+
+        void Back() => _page = _page == MenuPage.Keys ? MenuPage.Settings : MenuPage.Main;
+
+        GUIStyle _logo, _logoShadow, _tagline, _bigButton, _pageTitle, _small;
+
+        void DrawMainMenu(bool ready)
+        {
+            _logo ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _logoShadow ??= new GUIStyle(_logo);
+            _tagline ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter };
+            _bigButton ??= new GUIStyle(GUI.skin.button);
+            _small ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerCenter };
+            Ui.Text(_logo, Ui.Short ? 36 : 48, bold: true);
+            Ui.Text(_logoShadow, Ui.Short ? 36 : 48, bold: true);
+            Ui.Text(_tagline, 15);
+            Ui.Text(_bigButton, 18);
+            Ui.Text(_small, 12);
+            _logo.normal.textColor = UiSkin.Gold;
+            _logoShadow.normal.textColor = new Color(0, 0, 0, 0.8f);
+            _tagline.normal.textColor = UiSkin.Muted;
+            _small.normal.textColor = UiSkin.Muted;
+
+            // The buttons and how tall the column is: the logo above it, the whole in the middle of the screen.
+            var buttons = new List<(string Label, Action Press, bool Enabled)>
+            {
+                (Strings.T("menu.start", "게임 시작"), () => Open(MenuPage.Play), true),
+                (Strings.T("menu.together", "함께 하기"), () => Open(MenuPage.Together), true),
+                (Strings.T("menu.saves", "저장본"), () => Open(MenuPage.Saves), true),
+                (Strings.T("menu.settings", "설정"), () => Open(MenuPage.Settings), true),
+                (Strings.T("menu.feedback", "의견 보내기"), () => Application.OpenURL(Feedback.FormUrl()), true),
+            };
+            if (Application.platform != RuntimePlatform.WebGLPlayer && !Application.isEditor)
+                buttons.Add((Strings.T("menu.quit", "끝내기"), Application.Quit, true));
+            float logoHeight = Ui.Short ? 46 : 64, tagHeight = 24;
+            float buttonHeight = Ui.Short ? 34 : 42, gap = Ui.Short ? 6 : 10;
+            float width = Mathf.Min(300, Ui.Width - 40);
+            float column = logoHeight + tagHeight + (Ui.Short ? 12 : 28) + buttons.Count * (buttonHeight + gap);
+            float top = Mathf.Max(8, (Ui.Height - column) / 2 - (Ui.Short ? 0 : 20));
+            float left = (Ui.Width - width) / 2;
+
+            var logo = new Rect(0, top, Ui.Width, logoHeight);
+            GUI.Label(new Rect(logo.x + 3, logo.y + 3, logo.width, logo.height), "pray-to", _logoShadow);
+            GUI.Label(logo, "pray-to", _logo);
+            GUI.Label(new Rect(0, logo.yMax, Ui.Width, tagHeight), Strings.T("menu.tagline", "동굴 아래, 무너진 왕국의 이야기"), _tagline);
+            float y = logo.yMax + tagHeight + (Ui.Short ? 12 : 28);
+            GUI.enabled = ready;
+            foreach (var (label, press, enabled) in buttons)
+            {
+                GUI.enabled = ready && enabled;
+                if (Ui.Button(new Rect(left, y, width, buttonHeight), label, _bigButton)) press();
+                y += buttonHeight + gap;
+            }
+            GUI.enabled = true;
+
+            // Under the column: the export reminder (web and phone saves live only in the browser or the app) and why
+            // the game cannot start, when it cannot.
+            float noteWidth = Mathf.Min(420, Ui.Width - 32);
+            if (SaveMenu.ExportDue)
+            {
+                var was = GUI.color;
+                GUI.color = new Color(1f, 0.82f, 0.4f);
+                string note = Ui.Wrap(SaveMenu.ExportReminder, GUI.skin.label, noteWidth);
+                float h = GUI.skin.label.CalcHeight(new GUIContent(note), noteWidth);
+                GUI.Label(new Rect((Ui.Width - noteWidth) / 2, y, noteWidth, h), note);
+                y += h;
+                GUI.color = was;
+            }
+            if (_status.Length > 0)
+            {
+                string status = Ui.Wrap(_status, GUI.skin.label, noteWidth);
+                GUI.Label(new Rect((Ui.Width - noteWidth) / 2, y, noteWidth, GUI.skin.label.CalcHeight(new GUIContent(status), noteWidth)), status);
+            }
+            GUI.Label(new Rect(0, Ui.Height - 22, Ui.Width - 8, 20), string.Format(Strings.T("menu.version", "버전 {0}"), Protocol.Version), _small);
+        }
+
+        // A page: its name and [뒤로] on a bar at the top, what it holds in a column under it (scrolled when long), and on
+        // the play page the start button kept at the bottom.
+        void DrawMenuPage(bool ready)
+        {
+            float width = Mathf.Min(460, Ui.Width - 20);
+            float height = Mathf.Min(_page == MenuPage.Saves || _page == MenuPage.Keys ? 640 : 520, Ui.Height - 20);
+            var area = new Rect((Ui.Width - width) / 2, (Ui.Height - height) / 2, width, height);
+            float inner = width - GUI.skin.box.padding.horizontal;
+            _menuColumn = inner - GUI.skin.verticalScrollbar.fixedWidth - 8 - GUI.skin.label.margin.horizontal;
+            _pageTitle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleLeft };
+            Ui.Text(_pageTitle, 20, bold: true);
+            _pageTitle.normal.textColor = UiSkin.Gold;
+
             Ui.TouchScroll(area, ref _menuScroll);
             GUILayout.BeginArea(area, GUI.skin.box);
-            _menuScroll = Ui.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
-            if (wide) GUILayout.BeginHorizontal();
-
-            GUILayout.BeginVertical(GUILayout.Width(column));
-            GUILayout.Label(string.Format(Strings.T("menu.title", "pray-to 프로토타입 (버전 {0})"), Protocol.Version));
+            GUILayout.BeginHorizontal();
+            if (Ui.LayoutButton(Strings.T("menu.back", "뒤로"), GUILayout.Width(72), GUILayout.Height(30))) Back();
             GUILayout.Space(8);
-            GUILayout.Label(Strings.T("menu.name", "이름 (캐릭터)"));
-            _playerName = GUILayout.TextField(_playerName, 16);
-            GUILayout.Label(SaveStore.Exists(SaveStore.CharacterKey(CharacterName)) ? Strings.T("menu.character_saved", "저장된 캐릭터로 이어한다") : Strings.T("menu.character_new", "새 캐릭터로 시작한다"));
-            GUILayout.Space(4);
-            GUILayout.Label(Strings.T("menu.world", "월드 (혼자 하기·호스트)"));
+            GUILayout.Label(PageName(_page), _pageTitle, GUILayout.Height(30));
+            GUILayout.EndHorizontal();
+            UiSkin.Divider(GUILayoutUtility.GetRect(inner, 6));
+            _menuScroll = Ui.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
+            GUILayout.BeginVertical(GUILayout.Width(_menuColumn + GUI.skin.label.margin.horizontal));
+            switch (_page)
+            {
+                case MenuPage.Play: DrawPlayPage(); break;
+                case MenuPage.Together: DrawTogetherPage(ready); break;
+                case MenuPage.Saves: DrawSaves(); break;
+                case MenuPage.Settings: DrawSettingsPage(); break;
+                case MenuPage.Keys: DrawKeys(); break;
+            }
+            GUILayout.EndVertical();
+            Ui.EndScrollView();
+            if (_status.Length > 0) GUILayout.Label(Ui.Wrap(_status, GUI.skin.label, inner - GUI.skin.label.margin.horizontal));
+            if (_page == MenuPage.Play)
+            {
+                _bigButton ??= new GUIStyle(GUI.skin.button);
+                Ui.Text(_bigButton, 18);
+                GUI.enabled = ready;
+                if (Ui.LayoutButton(Strings.T("menu.solo", "혼자 하기"), _bigButton, GUILayout.Height(42))) StartSolo();
+                GUI.enabled = true;
+            }
+            GUILayout.EndArea();
+        }
+
+        static string PageName(MenuPage page) => page switch
+        {
+            MenuPage.Play => Strings.T("menu.start", "게임 시작"),
+            MenuPage.Together => Strings.T("menu.together", "함께 하기"),
+            MenuPage.Saves => Strings.T("menu.saves", "저장본"),
+            MenuPage.Settings => Strings.T("menu.settings", "설정"),
+            MenuPage.Keys => Strings.T("menu.keys", "키 바꾸기"),
+            _ => "",
+        };
+
+        // A small heading over a group on a page.
+        void Heading(string text)
+        {
+            GUILayout.Space(6);
+            var was = GUI.color;
+            GUI.color = UiSkin.Gold;
+            GUILayout.Label(text);
+            GUI.color = was;
+        }
+
+        // The character and the world to play, how long a day is, and how classes go.
+        void DrawPlayPage()
+        {
+            DrawCharacterField();
+            Heading(Strings.T("menu.world", "월드"));
             string worldName = GUILayout.TextField(_worldName, 24);
             if (worldName != _worldName) _confirmDelete = false;
             _worldName = worldName;
@@ -1304,96 +1441,82 @@ namespace Game.Client
             GUILayout.EndHorizontal();
             // How long a day takes in the worlds this player opens or hosts; joiners go by the host's (Docs/Time.md).
             if (Ui.LayoutButton(string.Format(Strings.T("menu.daylength", "하루 길이: {0}분"), Settings.DayMinutes))) Settings.DayMinutes = Settings.NextDayMinutes();
-            // The words' language, when the string sheet has another (Strings, Docs/Strings.md).
-            if (Strings.HasOthers && Ui.LayoutButton($"{Strings.T("menu.language", "언어")}: {Strings.NameOf(Settings.Language)}")) Settings.Language = Strings.NextLanguage();
-            // The saves on this device: pick one, carry them off in a file, bring a file's in (SaveMenu).
-            if (Ui.LayoutButton(_side == MenuSide.Saves ? Strings.T("menu.saves_close", "저장본 닫기") : Strings.T("menu.saves", "저장본: 고르기·내보내기·가져오기"))) OpenSide(MenuSide.Saves);
-            // A GitHub issue form with the version, the device and how far the player has got (Feedback); nothing is
-            // sent until the player sends it there.
-            if (Ui.LayoutButton(Strings.T("menu.feedback", "의견 보내기"))) Application.OpenURL(Feedback.FormUrl());
-            // Web and phone saves live in the browser or the app only: a reminder when nothing was exported for a week.
-            if (SaveMenu.ExportDue)
-            {
-                var was = GUI.color;
-                GUI.color = new Color(1f, 0.82f, 0.4f);
-                GUILayout.Label(Ui.Wrap(SaveMenu.ExportReminder, GUI.skin.label, _menuColumn));
-                GUI.color = was;
-            }
-            GUILayout.Space(4);
-            GUILayout.BeginHorizontal();
-            if (Ui.LayoutButton($"{Strings.T("menu.darkness", "어둠과 빛")}: {Strings.OnOff(Settings.Darkness)}")) Settings.Darkness = !Settings.Darkness;
-            // Each press turns it up a quarter, and from full back to off.
-            if (Ui.LayoutButton($"{Strings.T("menu.sound", "효과음")}: {Settings.VolumeText}"))
-            {
-                Settings.Volume = (Settings.Volume + 1) % (Settings.MaxVolume + 1);
-                Sounds.Play(Sound.Click);
-            }
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            // The menu plays the cave's tune, so the change is heard at once.
-            if (Ui.LayoutButton($"{Strings.T("menu.music", "음악")}: {Settings.MusicVolumeText}")) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
-            // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
-            if (Ui.LayoutButton($"{Strings.T("menu.devinfo", "개발 정보")}: {Strings.OnOff(Settings.DevInfo)}")) Settings.DevInfo = !Settings.DevInfo;
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
-            if (Ui.LayoutButton($"{Strings.T("menu.font", "글꼴")}: {(Settings.PixelFont ? Strings.T("menu.font_pixel", "도트") : Strings.T("menu.font_smooth", "매끈"))}")) Settings.PixelFont = !Settings.PixelFont;
-            // The goals for new players in the HUD; met goals still count while it is off (Settings.Guide).
-            if (Ui.LayoutButton($"{Strings.T("menu.guide", "목표 안내")}: {Strings.OnOff(Settings.Guide)}")) Settings.Guide = !Settings.Guide;
-            GUILayout.EndHorizontal();
-            GUILayout.BeginHorizontal();
-            if (Ui.LayoutButton($"{Strings.T("menu.shake", "화면 흔들림")}: {Strings.OnOff(Settings.ScreenShake)}")) Settings.ScreenShake = !Settings.ScreenShake;
-            // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
-            if (!Controls.UsingTouch && Ui.LayoutButton(_side == MenuSide.Keys ? Strings.T("menu.keys_close", "키 바꾸기 닫기") : Strings.T("menu.keys", "키 바꾸기"))) OpenSide(MenuSide.Keys);
-            GUILayout.EndHorizontal();
-            GUILayout.Space(8);
+            Heading(Strings.T("menu.classes", "클래스"));
+            if (_classes != null && _classes.Success) DrawClassNote();
+        }
 
+        void DrawCharacterField()
+        {
+            Heading(Strings.T("menu.name", "캐릭터 이름"));
+            _playerName = GUILayout.TextField(_playerName, 16);
+            GUILayout.Label(SaveStore.Exists(SaveStore.CharacterKey(CharacterName)) ? Strings.T("menu.character_saved", "저장된 캐릭터로 이어한다") : Strings.T("menu.character_new", "새 캐릭터로 시작한다"));
+        }
+
+        // Online through Unity Relay (the same on the web and on PC, so they play together), and on PC the LAN too.
+        void DrawTogetherPage(bool ready)
+        {
+            DrawCharacterField();
             GUI.enabled = ready && !_connecting;
-            // Online, through Unity Relay: the same on the web and on PC, so they play together.
+            Heading(Strings.T("menu.online", "온라인"));
             GUILayout.Label(Ui.Wrap(Strings.T("menu.online_note", "온라인 협동: 방을 만들면 코드가 나온다. 친구는 그 코드로 참가한다(웹과 PC가 함께)"), GUI.skin.label, _menuColumn));
-            if (Ui.LayoutButton(_connecting ? Strings.T("menu.connecting", "연결하는 중…") : Strings.T("menu.host_online", "온라인 방 만들기"))) StartOnlineHost();
+            GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.host_world", "방을 만들면 [게임 시작]의 월드({0})가 열린다"), WorldName), GUI.skin.label, _menuColumn));
+            if (Ui.LayoutButton(_connecting ? Strings.T("menu.connecting", "연결하는 중…") : Strings.T("menu.host_online", "온라인 방 만들기"), GUILayout.Height(34))) StartOnlineHost();
             GUILayout.BeginHorizontal();
             _codeInput = GUILayout.TextField(_codeInput, 12, GUILayout.MinWidth(80));
-            if (Ui.LayoutButton(Strings.T("menu.join_code", "코드로 참가"), GUILayout.Width(110))) StartOnlineJoin();
+            if (Ui.LayoutButton(Strings.T("menu.join_code", "코드로 참가"), GUILayout.Width(120))) StartOnlineJoin();
             GUILayout.EndHorizontal();
             // A browser cannot listen for connections, so the LAN way is only on PC.
             if (Application.platform != RuntimePlatform.WebGLPlayer)
             {
-                GUILayout.Space(8);
-                GUILayout.Label(Strings.T("menu.lan", "같은 네트워크(LAN)"));
+                Heading(Strings.T("menu.lan", "같은 네트워크(LAN)"));
                 if (Ui.LayoutButton(string.Format(Strings.T("menu.host_lan", "호스트 (포트 {0})"), NetLink.DefaultPort))) StartHost();
                 GUILayout.Label(Strings.T("menu.host_address", "호스트 주소"));
                 _address = GUILayout.TextField(_address, 64);
                 if (Ui.LayoutButton(Strings.T("menu.join", "참가"))) StartJoining();
             }
             GUI.enabled = true;
-            GUILayout.EndVertical();
-            if (!wide && Event.current.type == EventType.Repaint) _sideTop = GUILayoutUtility.GetLastRect().yMax;
-
-            if (wide) GUILayout.Space(16);
-            GUILayout.BeginVertical(GUILayout.Width(column));
-            if (_side == MenuSide.Keys && !Controls.UsingTouch) DrawKeys();
-            else if (_side == MenuSide.Saves) DrawSaves();
-            else if (_classes != null && _classes.Success) DrawClassNote();
-            GUILayout.EndVertical();
-
-            if (wide) GUILayout.EndHorizontal();
-            Ui.EndScrollView();
-
-            if (_status.Length > 0) GUILayout.Label(Ui.Wrap(_status, GUI.skin.label, inner - GUI.skin.label.margin.horizontal));
-            GUI.enabled = ready;
-            if (Ui.LayoutButton(Strings.T("menu.solo", "혼자 하기"), GUILayout.Height(36))) StartSolo();
-            GUI.enabled = true;
-            GUILayout.EndArea();
         }
 
-        // Opens that in the second column, or the classes again when it is already open. The GUI pass ends here, so
-        // the column is laid out anew before it is drawn (IMGUI cannot draw controls it did not lay out).
-        void OpenSide(MenuSide side)
+        // Sound, the screen and play, a row each: what it is on the left, its button on the right.
+        void DrawSettingsPage()
         {
-            _side = _side == side ? MenuSide.Classes : side;
-            _scrollToSide = _side != MenuSide.Classes;
-            GUIUtility.ExitGUI();
+            float button = Mathf.Min(150, _menuColumn * 0.45f);
+            bool Setting(string name, string value)
+            {
+                GUILayout.BeginHorizontal();
+                Ui.Row(name);
+                GUILayout.Label(name, GUILayout.Width(_menuColumn - button - 8));
+                bool pressed = Ui.LayoutButton($"{name}: {value}", GUILayout.Width(button));
+                GUILayout.EndHorizontal();
+                return pressed;
+            }
+            Heading(Strings.T("menu.sound_group", "소리"));
+            // Each press turns it up a quarter, and from full back to off. The menu plays the cave's tune, so the
+            // change is heard at once.
+            if (Setting(Strings.T("menu.sound", "효과음"), Settings.VolumeText))
+            {
+                Settings.Volume = (Settings.Volume + 1) % (Settings.MaxVolume + 1);
+                Sounds.Play(Sound.Click);
+            }
+            if (Setting(Strings.T("menu.music", "음악"), Settings.MusicVolumeText)) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
+            Heading(Strings.T("menu.screen_group", "화면"));
+            if (Setting(Strings.T("menu.darkness", "어둠과 빛"), Strings.OnOff(Settings.Darkness))) Settings.Darkness = !Settings.Darkness;
+            // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
+            if (Setting(Strings.T("menu.font", "글꼴"), Settings.PixelFont ? Strings.T("menu.font_pixel", "도트") : Strings.T("menu.font_smooth", "매끈"))) Settings.PixelFont = !Settings.PixelFont;
+            if (Setting(Strings.T("menu.shake", "화면 흔들림"), Strings.OnOff(Settings.ScreenShake))) Settings.ScreenShake = !Settings.ScreenShake;
+            // The words' language, when the string sheet has another (Strings, Docs/Strings.md).
+            if (Strings.HasOthers && Setting(Strings.T("menu.language", "언어"), Strings.NameOf(Settings.Language))) Settings.Language = Strings.NextLanguage();
+            Heading(Strings.T("menu.play_group", "플레이"));
+            // The goals for new players in the HUD; met goals still count while it is off (Settings.Guide).
+            if (Setting(Strings.T("menu.guide", "목표 안내"), Strings.OnOff(Settings.Guide))) Settings.Guide = !Settings.Guide;
+            // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
+            if (Setting(Strings.T("menu.devinfo", "개발 정보"), Strings.OnOff(Settings.DevInfo))) Settings.DevInfo = !Settings.DevInfo;
+            // Keys only matter with a keyboard.
+            if (!Controls.UsingTouch)
+            {
+                GUILayout.Space(6);
+                if (Ui.LayoutButton(Strings.T("menu.keys", "키 바꾸기"))) Open(MenuPage.Keys);
+            }
         }
 
         void DrawSaves()

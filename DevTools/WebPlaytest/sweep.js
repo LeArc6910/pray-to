@@ -64,20 +64,42 @@ async function clearRoom(game, w = 6, h = 4) {
 const count = (inv, id) => (inv.materials || {})[id] || 0;
 const items = (inv, base) => (inv.items || []).filter(i => i.base === base).length;
 
-// ---------------------------------------------------------------- 메뉴와 설정 (6·14·17·21·24·36·37·46·50단계)
+// The start screen's pages (2026-11-11): back to the first screen, then the page of that name (none: stay there).
+async function menuPage(game, page) {
+  for (let i = 0; i < 4 && (await game.find('게임 시작')).length === 0; i++) {
+    if (!(await game.press('뒤로', null, { quiet: true }))) await game.wait(400);
+  }
+  if (page) await game.press(page);
+}
+
+// ---------------------------------------------------------------- 메뉴와 설정 (6·14·17·21·24·36·37·46·50·131단계)
 async function menu(browser) {
   note('\n## 메뉴와 설정 (PC 1280×720)\n');
   const game = await open(browser, run, Profiles.pc, url);
-  await game.shot('menu', '메뉴');
-  let buttons = await game.buttons();
-  const labels = buttons.map(b => b.label);
-  check(labels.includes('혼자 하기'), '메뉴에 [혼자 하기]');
-  for (const word of ['어둠과 빛:', '효과음:', '음악:', '개발 정보:', '글꼴:', '목표 안내:', '화면 흔들림:', '키 바꾸기', '온라인 방 만들기', '코드로 참가', '저장본: 고르기·내보내기·가져오기', '의견 보내기', '하루 길이:']) {
-    check(labels.some(l => l.startsWith(word)), `메뉴에 [${word}…] 단추`);
+  await game.shot('menu', '시작 화면');
+  // The first screen: the game's name over a few big buttons, as other games have it (2026-11-11).
+  let labels = (await game.buttons()).map(b => b.label);
+  for (const word of ['게임 시작', '함께 하기', '저장본', '설정', '의견 보내기']) check(labels.includes(word), `시작 화면에 [${word}]`);
+  check(labels.length <= 6, `시작 화면의 단추가 적다 (${labels.join(', ')})`);
+  check(!labels.includes('혼자 하기'), '시작 화면에는 [혼자 하기]가 없다(게임 시작 안에)');
+
+  await menuPage(game, '게임 시작');
+  labels = (await game.buttons()).map(b => b.label);
+  check(labels.includes('혼자 하기') && labels.includes('뒤로') && labels.some(l => l.startsWith('하루 길이:')), `[게임 시작]에 [혼자 하기]·[뒤로]·[하루 길이] (${labels.join(', ')})`);
+  // Classes are picked in the game (2026-11-09): the page says so and has no class buttons.
+  check(labels.filter(l => /^\[[ \d]\] /.test(l)).length === 0, '클래스 단추가 없다');
+  check(/클래스는 게임 안에서 고른다/.test(await game.allText()), '"클래스는 게임 안에서 고른다: 가방의 [스킬] 탭에서…"라고 알린다');
+  await game.shot('menu-play', '게임 시작 화면');
+  await game.page.keyboard.press('Escape');
+  await game.wait(400);
+  check((await game.find('게임 시작')).length === 1, 'Esc로 시작 화면에 돌아온다');
+
+  await menuPage(game, '설정');
+  labels = (await game.buttons()).map(b => b.label);
+  for (const word of ['어둠과 빛:', '효과음:', '음악:', '개발 정보:', '글꼴:', '목표 안내:', '화면 흔들림:', '키 바꾸기']) {
+    check(labels.some(l => l.startsWith(word)), `[설정]에 [${word}…] 단추`);
   }
-  // Classes are picked in the game (2026-11-09): the menu says so and has no class buttons.
-  check(labels.filter(l => /^\[[ \d]\] /.test(l)).length === 0, '메뉴에 클래스 단추가 없다');
-  check(/클래스는 게임 안에서 고른다/.test(await game.allText()), '메뉴가 "클래스는 게임 안에서 고른다: 가방의 [스킬] 탭에서…"라고 알린다');
+  await game.shot('menu-settings', '설정 화면');
 
   // The sound volume goes round off, 25, 50, 75, 100.
   const volumes = [];
@@ -100,7 +122,7 @@ async function menu(browser) {
   check((await game.find('어둠과 빛: 꺼짐')).length === 1, '[어둠과 빛: 켜짐]을 누르면 꺼짐');
   await game.press('글꼴: 도트');
   check((await game.find('글꼴: 매끈')).length === 1, '[글꼴: 도트]를 누르면 매끈');
-  await game.shot('menu-smooth', '매끈한 글꼴의 메뉴');
+  await game.shot('menu-smooth', '매끈한 글꼴의 설정');
   await game.press('글꼴: 매끈');
   await game.press('개발 정보: 꺼짐');
   await game.page.reload();
@@ -108,6 +130,7 @@ async function menu(browser) {
   await game.wait(2500);
   await game.send('probe on');
   await game.wait(300);
+  await menuPage(game, '설정');
   check((await game.find('어둠과 빛: 꺼짐')).length === 1, '새로 고쳐도 [어둠과 빛: 꺼짐]이 남는다');
   check((await game.find('개발 정보: 켜짐')).length === 1, '새로 고쳐도 [개발 정보: 켜짐]이 남는다');
   await game.startSolo();
@@ -115,30 +138,32 @@ async function menu(browser) {
   await game.shot('no-darkness-devinfo', '어둠 없이, 개발 정보 창(왼쪽 아래)');
   await game.page.keyboard.press('Escape');
   await game.until(s => !s.playing, 8000);
+  await menuPage(game, '설정');
   await game.press('어둠과 빛: 꺼짐');
   await game.press('개발 정보: 켜짐');
 
   // The string table (Docs/Strings.md, 2026-11-11): [언어] turns the menu into English and back.
   const language = (await game.find(/^언어: /))[0];
-  check(!!language, `메뉴에 [언어: 한국어] 단추 (${language && language.label})`);
+  check(!!language, `[설정]에 [언어: 한국어] 단추 (${language && language.label})`);
   if (language) {
     await game.press(language.label);
+    await game.press('Back');
     const english = (await game.buttons()).map(b => b.label);
-    check(english.includes('Play solo') && english.some(l => l.startsWith('Sound:')), `[언어]를 누르면 메뉴가 영어 (${english.slice(0, 6).join(', ')})`);
+    check(english.includes('Start game') && english.includes('Settings'), `[언어]를 누르면 시작 화면이 영어 (${english.slice(0, 6).join(', ')})`);
     const korean = english.filter(l => /[가-힣]/.test(l));
-    check(korean.length === 0, `영어 메뉴에 한글 단추가 없다 (${korean.join(', ') || '없음'})`);
-    const lines = (await game.allText()).split('\n').filter(l => /[가-힣]/.test(l) && !/playtest|탭시험/.test(l));
-    note(`- 영어 메뉴에 남은 한글 줄: ${lines.length ? lines.slice(0, 6).join(' / ') : '없음'}`);
-    await game.shot('menu-english', '영어 메뉴');
-    for (let i = 0; i < 4 && (await game.find('혼자 하기')).length === 0; i++) {
+    check(korean.length === 0, `영어 시작 화면에 한글 단추가 없다 (${korean.join(', ') || '없음'})`);
+    await game.shot('menu-english', '영어 시작 화면');
+    await game.press('Settings');
+    for (let i = 0; i < 4 && (await game.find('뒤로')).length === 0; i++) {
       const next = (await game.find(/^Language: /))[0];
       if (!next) break;
       await game.press(next.label);
     }
-    check((await game.find('혼자 하기')).length === 1, '[언어]를 다시 누르면 한국어로 돌아온다');
+    check((await game.find('뒤로')).length === 1, '[언어]를 다시 누르면 한국어로 돌아온다');
   }
 
   // Keys: skill 1 to the "1" key; W is refused; Esc gives up.
+  await menuPage(game, '설정');
   await game.press('키 바꾸기');
   await game.shot('menu-keys', '키 바꾸기 목록');
   const skillKey = (await game.find(/.+/, '스킬 1'))[0];
@@ -156,7 +181,7 @@ async function menu(browser) {
     check(afterW && afterW.label !== 'W', `W는 받지 않는다 (${afterW && afterW.label})`);
     await game.page.keyboard.press('Escape');
     await game.wait(400);
-    check((await game.find('1', '스킬 1')).length === 1, 'Esc는 그만두기(1 그대로)');
+    check((await game.find('1', '스킬 1')).length === 1, 'Esc는 그만두기(1 그대로, 키 바꾸기 화면에 남는다)');
     await game.startSolo();
     await game.wait(1200);
     const before = await game.state();
@@ -167,20 +192,25 @@ async function menu(browser) {
     await game.shot('key-1', '스킬 칸 글자가 1');
     await game.page.keyboard.press('Escape');
     await game.until(s => !s.playing, 8000);
-    if ((await game.find('처음 키로')).length === 0) await game.press('키 바꾸기');
+    if ((await game.find('처음 키로')).length === 0) {
+      await menuPage(game, '설정');
+      await game.press('키 바꾸기');
+    }
     await game.press('처음 키로');
     check((await game.find('Q', '스킬 1')).length === 1, '[처음 키로]로 Q로 돌아온다');
-    await game.press('키 바꾸기 닫기', null, { quiet: true });
   }
 
   // Online without a cloud project: a plain message.
+  await menuPage(game, '함께 하기');
+  labels = (await game.buttons()).map(b => b.label);
+  check(labels.includes('온라인 방 만들기') && labels.includes('코드로 참가'), '[함께 하기]에 [온라인 방 만들기]·[코드로 참가]');
   await game.press('온라인 방 만들기');
   await game.wait(6000);
   const said = (await game.texts()).status || '';
   check(said.length > 0, `[온라인 방 만들기]가 알림을 띄운다 ("${said.slice(0, 80)}")`);
   await game.shot('online', '온라인 방 만들기 뒤');
 
-  await game.press('저장본: 고르기·내보내기·가져오기');
+  await menuPage(game, '저장본');
   await game.shot('menu-saves', '저장본 목록');
   await game.context.close();
 
@@ -190,12 +220,15 @@ async function menu(browser) {
   // The menu may not be drawn yet with the probe on: look again for a few seconds.
   let solo = null;
   for (let i = 0; i < 20 && !solo; i++) {
+    if ((await fresh.find('게임 시작')).length) await fresh.press('게임 시작');
     solo = (await fresh.find('혼자 하기'))[0];
     if (!solo) await fresh.wait(300);
   }
   if (solo) {
-    // The name field sits above the buttons in the left column: a click there, a name typed, then [혼자 하기].
-    await fresh.tapAt(solo.cx, solo.cy - 120);
+    // The name field is the first thing on the page, just under its title bar.
+    const box = await fresh.canvas();
+    const back = (await fresh.find('뒤로'))[0];
+    await fresh.tapAt(box.left + box.width / 2, back.cy + 64);
     await fresh.page.keyboard.type('탭시험');
     await fresh.press('혼자 하기');
     const started = await fresh.until(s => s.playing, 25000);
@@ -206,7 +239,7 @@ async function menu(browser) {
     check(!!opened, '시작한 뒤 처음 누른 Tab으로 가방이 열린다');
     await fresh.shot('first-tab', '첫 Tab으로 연 가방');
   } else {
-    check(false, '메뉴에 [혼자 하기]');
+    check(false, '[게임 시작]에 [혼자 하기]');
   }
   await fresh.context.close();
 }
@@ -1476,7 +1509,7 @@ async function save(browser) {
   await game.until(r => !r.playing, 8000);
 
   // Every save out as a file, into a fresh browser.
-  await game.press('저장본: 고르기·내보내기·가져오기');
+  await menuPage(game, '저장본');
   const [download] = await Promise.all([game.page.waitForEvent('download', { timeout: 15000 }).catch(() => null), game.press('전부 내보내기')]);
   check(!!download, '[전부 내보내기]가 파일을 내려받는다');
   // Cloud saves (2026-11-09): the account is checked by Unity's rules before anything goes out.
@@ -1491,7 +1524,7 @@ async function save(browser) {
   await game.context.close();
 
   const other = await open(browser, run, Profiles.pc, url);
-  await other.press('저장본: 고르기·내보내기·가져오기');
+  await menuPage(other, '저장본');
   await other.press('가져오기');
   await other.wait(800);
   const input = await other.page.$('input[type=file]');
@@ -1517,10 +1550,18 @@ async function layout(browser) {
     const { width, height } = profile.context.viewport;
     note(`\n## 화면 배치 ${name} ${width}×${height}\n`);
     const game = await open(browser, run, profile, url);
-    await game.shot('menu', '메뉴');
-    const menuButtons = await game.buttons();
-    const solo = menuButtons.find(b => b.label === '혼자 하기');
-    check(solo && solo.shown && solo.rect[1] + solo.rect[3] <= solo.screen.height, '[혼자 하기]가 처음부터 화면 안에 보인다');
+    await game.shot('menu', '시작 화면');
+    const first = (await game.buttons()).filter(b => !b.shown || b.rect[1] < 0 || b.rect[1] + b.rect[3] > b.screen.height + 0.5);
+    check(first.length === 0, `시작 화면의 단추가 모두 화면 안에 (${first.map(b => b.label).join(', ') || '모두'})`);
+    await menuPage(game, '게임 시작');
+    await game.shot('menu-play', '게임 시작 화면');
+    const solo = (await game.buttons()).find(b => b.label === '혼자 하기');
+    check(solo && solo.shown && solo.rect[1] + solo.rect[3] <= solo.screen.height, '[게임 시작]의 [혼자 하기]가 처음부터 화면 안에 보인다');
+    await menuPage(game, '설정');
+    await game.shot('menu-settings', '설정 화면');
+    const wide = (await game.buttons()).filter(b => b.shown && (b.rect[0] < -0.5 || b.rect[0] + b.rect[2] > b.screen.width + 0.5));
+    check(wide.length === 0, `설정 단추가 옆으로 넘치지 않는다 (${wide.map(b => b.label).join(', ') || '모두 안'})`);
+    await menuPage(game, '게임 시작');
     if (game.touch) {
       await game.press('혼자 하기');
       await game.until(s => s.playing, 25000);
@@ -1565,6 +1606,7 @@ async function touch(browser) {
     const { width, height } = profile.context.viewport;
     note(`\n## 휴대폰 터치 ${name} ${width}×${height}\n`);
     const game = await open(browser, run, profile, url);
+    check(await game.press('게임 시작'), '[게임 시작]을 탭한다');
     check(await game.press('혼자 하기'), '[혼자 하기]를 탭한다');
     check(!!(await game.until(s => s.playing, 25000)), '탭으로 게임이 시작된다');
     await game.page.touchscreen.tap(width / 2, height / 3);
@@ -2701,6 +2743,7 @@ async function firstRun(browser, profile, hourLong) {
 async function time(browser) {
   note('\n## 하루 길이 (PC)\n');
   const game = await open(browser, run, Profiles.pc, url);
+  await menuPage(game, '게임 시작');
   const lengths = [];
   for (let i = 0; i < 4; i++) {
     const b = (await game.find(/^하루 길이:/))[0];

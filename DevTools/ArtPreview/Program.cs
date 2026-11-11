@@ -48,6 +48,7 @@ namespace Game.Client
             for (int i = 0; i < TileArt.GroundCount; i++) TileArt.Ground(i);
             Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
             Save(Sheet(loot, monsters, npcs), Path.Combine(output, "sheet.png"), 4);
+            Save(UiMock(), Path.Combine(output, "ui_mock.png"), 3);
             // The newest pieces one by one, for a closer look (2026-11-09).
             var pieces = Directory.CreateDirectory(Path.Combine(output, "pieces")).FullName;
             Save(TileArt.BigSmelter, Path.Combine(pieces, "big_smelter.png"), 6);
@@ -218,6 +219,37 @@ namespace Game.Client
         }
 
         static void Save(PixelImage image, string path, int scale) => Png.Save(Scaled(image, scale), path);
+
+        // The UI frames as the game stretches them (nine-slice, UiSkin): a menu page with a title bar, buttons and a
+        // text field, to look at the frames together (ui_mock.png).
+        static PixelImage UiMock()
+        {
+            var mock = new PixelImage(240, 170);
+            for (int y = 0; y < mock.Height; y++)
+                for (int x = 0; x < mock.Width; x++) mock[x, y] = Rgba.Hex("#0A0807");
+            void Slice(PixelImage frame, int border, int left, int top, int width, int height)
+            {
+                for (int y = 0; y < height; y++)
+                {
+                    int sy = y < border ? y : y >= height - border ? frame.Height - (height - y) : border + (y - border) % (frame.Height - 2 * border);
+                    for (int x = 0; x < width; x++)
+                    {
+                        int sx = x < border ? x : x >= width - border ? frame.Width - (width - x) : border + (x - border) % (frame.Width - 2 * border);
+                        var c = frame[sx, sy];
+                        if (c.A > 0) mock[left + x, top + y] = c;
+                    }
+                }
+            }
+            Slice(UiArt.Panel, UiArt.PanelBorder, 8, 8, 224, 154);
+            Slice(UiArt.Button(), UiArt.ButtonBorder, 18, 18, 40, 16);
+            Slice(UiArt.Inset, UiArt.InsetBorder, 18, 44, 204, 14);
+            Slice(UiArt.Button(), UiArt.ButtonBorder, 18, 66, 204, 18);
+            Slice(UiArt.Button(hover: true), UiArt.ButtonBorder, 18, 88, 204, 18);
+            Slice(UiArt.Button(pressed: true), UiArt.ButtonBorder, 18, 110, 204, 18);
+            Slice(UiArt.Button(chosen: true), UiArt.ButtonBorder, 18, 132, 100, 18);
+            Slice(UiArt.Button(), UiArt.ButtonBorder, 122, 132, 100, 18);
+            return mock;
+        }
 
         // ---- Skill icons ----
 

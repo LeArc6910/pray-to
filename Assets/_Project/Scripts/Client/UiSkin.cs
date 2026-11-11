@@ -80,6 +80,56 @@ namespace Game.Client
             return skin;
         }
 
+        // Headings and the game's name; small notes.
+        public static readonly Color Gold = new Color(0.95f, 0.78f, 0.42f);
+        public static readonly Color Muted = new Color(0.72f, 0.66f, 0.58f);
+
+        static Texture2D _backdrop, _divider;
+
+        // Behind the start screen: deep cave dark, a warm glow low in the middle as of a fire far off, darker at the
+        // edges (2026-11-11, the owner: a tidier start screen).
+        public static void Backdrop(Rect area)
+        {
+            if (_backdrop == null)
+            {
+                const int w = 64, h = 64;
+                _backdrop = new Texture2D(w, h, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                var top = new Color(0.035f, 0.028f, 0.03f);
+                var glow = new Color(0.22f, 0.12f, 0.06f);
+                for (int y = 0; y < h; y++)
+                {
+                    for (int x = 0; x < w; x++)
+                    {
+                        float dx = (x + 0.5f) / w - 0.5f, dy = (y + 0.5f) / h - 0.32f;
+                        float light = Mathf.Clamp01(1 - Mathf.Sqrt(dx * dx * 2.2f + dy * dy * 3.2f) * 1.6f);
+                        float edge = Mathf.Clamp01(1 - (dx * dx + (y / (float)h - 0.5f) * (y / (float)h - 0.5f)) * 1.2f);
+                        var c = Color.Lerp(top, glow, light * light) * (0.55f + 0.45f * edge);
+                        c.a = 1;
+                        _backdrop.SetPixel(x, y, c);
+                    }
+                }
+                _backdrop.Apply();
+            }
+            GUI.DrawTexture(area, _backdrop, ScaleMode.StretchToFill);
+        }
+
+        // A thin gold rule that fades out at both ends, under a page's title.
+        public static void Divider(Rect area)
+        {
+            if (_divider == null)
+            {
+                const int w = 64;
+                _divider = new Texture2D(w, 1, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                for (int x = 0; x < w; x++)
+                {
+                    float t = Mathf.Sin(Mathf.PI * (x + 0.5f) / w);
+                    _divider.SetPixel(x, 0, new Color(Gold.r, Gold.g, Gold.b, 0.75f * t));
+                }
+                _divider.Apply();
+            }
+            GUI.DrawTexture(new Rect(area.x, area.y + area.height / 2 - 1, area.width, 2), _divider, ScaleMode.StretchToFill);
+        }
+
         // A bar in a dark well: the fill stretched to the share it shows, and the text over it with a shadow.
         public static void Bar(Rect area, float share, string text, bool boss = false, bool mana = false, int textSize = 13, bool experience = false)
         {
