@@ -125,6 +125,10 @@ async function menu(browser) {
     await game.press(language.label);
     const english = (await game.buttons()).map(b => b.label);
     check(english.includes('Play solo') && english.some(l => l.startsWith('Sound:')), `[언어]를 누르면 메뉴가 영어 (${english.slice(0, 6).join(', ')})`);
+    const korean = english.filter(l => /[가-힣]/.test(l));
+    check(korean.length === 0, `영어 메뉴에 한글 단추가 없다 (${korean.join(', ') || '없음'})`);
+    const lines = (await game.allText()).split('\n').filter(l => /[가-힣]/.test(l) && !/playtest|탭시험/.test(l));
+    note(`- 영어 메뉴에 남은 한글 줄: ${lines.length ? lines.slice(0, 6).join(' / ') : '없음'}`);
     await game.shot('menu-english', '영어 메뉴');
     for (let i = 0; i < 4 && (await game.find('혼자 하기')).length === 0; i++) {
       const next = (await game.find(/^Language: /))[0];

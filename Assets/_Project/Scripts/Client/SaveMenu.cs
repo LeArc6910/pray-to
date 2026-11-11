@@ -247,8 +247,8 @@ namespace Game.Client
 
         public static string ExportReminder =>
             Prefs.Get(ExportedKey, "").Length == 0
-                ? "저장본은 이 브라우저(앱)에만 있습니다. 브라우저 데이터를 지우면 사라지니 [저장본]에서 [전부 내보내기]로 파일을 남겨 두세요."
-                : $"마지막으로 내보낸 지 {ExportDays}일이 넘었습니다. [저장본]에서 [전부 내보내기]로 파일을 새로 남겨 두세요.";
+                ? Strings.T("menu.export_first", "저장본은 이 브라우저(앱)에만 있습니다. 브라우저 데이터를 지우면 사라지니 [저장본]에서 [전부 내보내기]로 파일을 남겨 두세요.")
+                : string.Format(Strings.T("menu.export_again", "마지막으로 내보낸 지 {0}일이 넘었습니다. [저장본]에서 [전부 내보내기]로 파일을 새로 남겨 두세요."), ExportDays);
 
         void Export(IEnumerable<string> keys, string what)
         {

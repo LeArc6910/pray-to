@@ -22,3 +22,26 @@ menu.lan,같은 네트워크(LAN),Same network (LAN)
 menu.host_address,호스트 주소,Host address
 menu.join,참가,Join
 menu.solo,혼자 하기,Play solo
+menu.title,pray-to 프로토타입 (버전 {0}),pray-to prototype (version {0})
+menu.character_saved,저장된 캐릭터로 이어한다,Continues the saved character
+menu.character_new,새 캐릭터로 시작한다,Starts a new character
+menu.world_saved,저장된 월드를 이어한다,Continues the saved world
+menu.world_new,새 월드를 만든다,Makes a new world
+menu.world_delete,월드 지우기,Delete world
+menu.world_delete_again,한 번 더 누르면 지운다,Press again to delete
+menu.font,글꼴,Font
+menu.font_pixel,도트,Pixel
+menu.font_smooth,매끈,Smooth
+menu.keys,키 바꾸기,Change keys
+menu.keys_close,키 바꾸기 닫기,Close keys
+menu.keys_note,키 바꾸기: 단추를 누른 뒤 쓸 키를 누른다. 다른 일에 쓰던 키면 서로 바뀐다. Esc는 그만두기,"Change keys: press a button, then the key to use. A key used for something else swaps. Esc cancels"
+menu.press_key,키를 누르세요…,Press a key…
+menu.keys_reset,처음 키로,Default keys
+menu.keys_fixed,"이동 WASD·화살표, 공격 스페이스·마우스, 메뉴 Esc는 바꿀 수 없다.","Move (WASD, arrows), attack (Space, mouse) and menu (Esc) cannot be changed."
+menu.online_note,온라인 협동: 방을 만들면 코드가 나온다. 친구는 그 코드로 참가한다(웹과 PC가 함께),"Online co-op: host a room to get a code, and friends join with it (web and PC together)"
+menu.host_lan,호스트 (포트 {0}),Host (port {0})
+menu.classes_of,{0}의 클래스: {1},{0}'s classes: {1}
+menu.classes_saved,"저장된 캐릭터는 이 클래스로 시작한다. 빈 클래스 칸(레벨 {0}에 둘째, {1}에 셋째)은 게임 안 가방 [스킬] 탭에서 그냥 고르고, 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다(금화 {2}부터, 레벨이 오를수록 더 든다).","A saved character starts with these classes. Empty class slots (the second at level {0}, the third at {1}) are picked freely in the [Skills] tab of the bag in the game; changing a picked class costs coins at a workbench (from {2} coins, more as the level rises)."
+menu.classes_new,"클래스는 게임 안에서 고른다: 가방(PC는 Tab·휴대폰은 [가방])의 [스킬] 탭에서 처음에 하나, 레벨 {0}에 둘째, {1}에 셋째. 고르기 전에는 기본 공격만 쓴다.","Classes are picked in the game, in the [Skills] tab of the bag (Tab on PC, [Bag] on a phone): one at the start, a second at level {0}, a third at {1}. Until then only the basic attack."
+menu.export_first,저장본은 이 브라우저(앱)에만 있습니다. 브라우저 데이터를 지우면 사라지니 [저장본]에서 [전부 내보내기]로 파일을 남겨 두세요.,Saves live only in this browser (app). Clearing browser data loses them: keep a file with [Export all] under [Saves].
+menu.export_again,마지막으로 내보낸 지 {0}일이 넘었습니다. [저장본]에서 [전부 내보내기]로 파일을 새로 남겨 두세요.,It has been over {0} days since the last export. Keep a fresh file with [Export all] under [Saves].

@@ -1264,11 +1264,11 @@ namespace Game.Client
             if (wide) GUILayout.BeginHorizontal();
 
             GUILayout.BeginVertical(GUILayout.Width(column));
-            GUILayout.Label($"pray-to 프로토타입 (버전 {Protocol.Version})");
+            GUILayout.Label(string.Format(Strings.T("menu.title", "pray-to 프로토타입 (버전 {0})"), Protocol.Version));
             GUILayout.Space(8);
             GUILayout.Label(Strings.T("menu.name", "이름 (캐릭터)"));
             _playerName = GUILayout.TextField(_playerName, 16);
-            GUILayout.Label(SaveStore.Exists(SaveStore.CharacterKey(CharacterName)) ? "저장된 캐릭터로 이어한다" : "새 캐릭터로 시작한다");
+            GUILayout.Label(SaveStore.Exists(SaveStore.CharacterKey(CharacterName)) ? Strings.T("menu.character_saved", "저장된 캐릭터로 이어한다") : Strings.T("menu.character_new", "새 캐릭터로 시작한다"));
             GUILayout.Space(4);
             GUILayout.Label(Strings.T("menu.world", "월드 (혼자 하기·호스트)"));
             string worldName = GUILayout.TextField(_worldName, 24);
@@ -1276,8 +1276,8 @@ namespace Game.Client
             _worldName = worldName;
             bool worldSaved = SaveStore.Exists(SaveStore.WorldKey(WorldName));
             GUILayout.BeginHorizontal();
-            GUILayout.Label(worldSaved ? "저장된 월드를 이어한다" : "새 월드를 만든다");
-            if (worldSaved && Ui.LayoutButton(_confirmDelete ? "한 번 더 누르면 지운다" : "월드 지우기"))
+            GUILayout.Label(worldSaved ? Strings.T("menu.world_saved", "저장된 월드를 이어한다") : Strings.T("menu.world_new", "새 월드를 만든다"));
+            if (worldSaved && Ui.LayoutButton(_confirmDelete ? Strings.T("menu.world_delete_again", "한 번 더 누르면 지운다") : Strings.T("menu.world_delete", "월드 지우기")))
             {
                 if (_confirmDelete) SaveStore.Delete(SaveStore.WorldKey(WorldName));
                 _confirmDelete = !_confirmDelete;
@@ -1318,20 +1318,20 @@ namespace Game.Client
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
-            if (Ui.LayoutButton($"글꼴: {(Settings.PixelFont ? "도트" : "매끈")}")) Settings.PixelFont = !Settings.PixelFont;
+            if (Ui.LayoutButton($"{Strings.T("menu.font", "글꼴")}: {(Settings.PixelFont ? Strings.T("menu.font_pixel", "도트") : Strings.T("menu.font_smooth", "매끈"))}")) Settings.PixelFont = !Settings.PixelFont;
             // The goals for new players in the HUD; met goals still count while it is off (Settings.Guide).
             if (Ui.LayoutButton($"{Strings.T("menu.guide", "목표 안내")}: {Strings.OnOff(Settings.Guide)}")) Settings.Guide = !Settings.Guide;
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (Ui.LayoutButton($"{Strings.T("menu.shake", "화면 흔들림")}: {Strings.OnOff(Settings.ScreenShake)}")) Settings.ScreenShake = !Settings.ScreenShake;
             // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
-            if (!Controls.UsingTouch && Ui.LayoutButton(_side == MenuSide.Keys ? "키 바꾸기 닫기" : "키 바꾸기")) OpenSide(MenuSide.Keys);
+            if (!Controls.UsingTouch && Ui.LayoutButton(_side == MenuSide.Keys ? Strings.T("menu.keys_close", "키 바꾸기 닫기") : Strings.T("menu.keys", "키 바꾸기"))) OpenSide(MenuSide.Keys);
             GUILayout.EndHorizontal();
             GUILayout.Space(8);
 
             GUI.enabled = ready && !_connecting;
             // Online, through Unity Relay: the same on the web and on PC, so they play together.
-            GUILayout.Label(Ui.Wrap("온라인 협동: 방을 만들면 코드가 나온다. 친구는 그 코드로 참가한다(웹과 PC가 함께)", GUI.skin.label, _menuColumn));
+            GUILayout.Label(Ui.Wrap(Strings.T("menu.online_note", "온라인 협동: 방을 만들면 코드가 나온다. 친구는 그 코드로 참가한다(웹과 PC가 함께)"), GUI.skin.label, _menuColumn));
             if (Ui.LayoutButton(_connecting ? Strings.T("menu.connecting", "연결하는 중…") : Strings.T("menu.host_online", "온라인 방 만들기"))) StartOnlineHost();
             GUILayout.BeginHorizontal();
             _codeInput = GUILayout.TextField(_codeInput, 12, GUILayout.MinWidth(80));
@@ -1342,7 +1342,7 @@ namespace Game.Client
             {
                 GUILayout.Space(8);
                 GUILayout.Label(Strings.T("menu.lan", "같은 네트워크(LAN)"));
-                if (Ui.LayoutButton($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
+                if (Ui.LayoutButton(string.Format(Strings.T("menu.host_lan", "호스트 (포트 {0})"), NetLink.DefaultPort))) StartHost();
                 GUILayout.Label(Strings.T("menu.host_address", "호스트 주소"));
                 _address = GUILayout.TextField(_address, 64);
                 if (Ui.LayoutButton(Strings.T("menu.join", "참가"))) StartJoining();
@@ -1390,19 +1390,19 @@ namespace Game.Client
         // A row per changeable key: what it does and its key. Pressing the key's button waits for the next key pressed.
         void DrawKeys()
         {
-            GUILayout.Label(Ui.Wrap("키 바꾸기: 단추를 누른 뒤 쓸 키를 누른다. 다른 일에 쓰던 키면 서로 바뀐다. Esc는 그만두기", GUI.skin.label, _menuColumn));
+            GUILayout.Label(Ui.Wrap(Strings.T("menu.keys_note", "키 바꾸기: 단추를 누른 뒤 쓸 키를 누른다. 다른 일에 쓰던 키면 서로 바뀐다. Esc는 그만두기"), GUI.skin.label, _menuColumn));
             foreach (var action in KeyBindings.Actions)
             {
                 GUILayout.BeginHorizontal();
                 Ui.Row(KeyBindings.ActionName(action));
                 GUILayout.Label(KeyBindings.ActionName(action), GUILayout.Width(Mathf.Min(90, _menuColumn * 0.4f)));
                 bool waiting = KeyBindings.Capturing == action;
-                if (Ui.LayoutButton(waiting ? "키를 누르세요…" : KeyBindings.Name(action))) KeyBindings.StartCapture(action);
+                if (Ui.LayoutButton(waiting ? Strings.T("menu.press_key", "키를 누르세요…") : KeyBindings.Name(action))) KeyBindings.StartCapture(action);
                 GUILayout.EndHorizontal();
             }
             if (KeyBindings.Message.Length > 0) GUILayout.Label(Ui.Wrap(KeyBindings.Message, GUI.skin.label, _menuColumn));
-            if (Ui.LayoutButton("처음 키로")) KeyBindings.ResetAll();
-            GUILayout.Label(Ui.Wrap("이동 WASD·화살표, 공격 스페이스·마우스, 메뉴 Esc는 바꿀 수 없다.", GUI.skin.label, _menuColumn));
+            if (Ui.LayoutButton(Strings.T("menu.keys_reset", "처음 키로"))) KeyBindings.ResetAll();
+            GUILayout.Label(Ui.Wrap(Strings.T("menu.keys_fixed", "이동 WASD·화살표, 공격 스페이스·마우스, 메뉴 Esc는 바꿀 수 없다."), GUI.skin.label, _menuColumn));
         }
 
         // Classes are picked in the game, not here (2026-11-09, the owner's call): a saved character's are shown, and
@@ -1413,11 +1413,11 @@ namespace Game.Client
             if (_savedClasses != null)
             {
                 var names = _savedClasses.Select(id => _classes.Classes.First(c => c.Id == id).Name);
-                GUILayout.Label(Ui.Wrap($"{CharacterName}의 클래스: {string.Join(" + ", names)}", GUI.skin.label, _menuColumn));
-                GUILayout.Label(Ui.Wrap($"저장된 캐릭터는 이 클래스로 시작한다. 빈 클래스 칸(레벨 {ClassRules.SlotLevels[1]}에 둘째, {ClassRules.SlotLevels[2]}에 셋째)은 게임 안 가방 [스킬] 탭에서 그냥 고르고, 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다(금화 {ClassRules.ChangeCoins(1)}부터, 레벨이 오를수록 더 든다).", GUI.skin.label, _menuColumn));
+                GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_of", "{0}의 클래스: {1}"), CharacterName, string.Join(" + ", names)), GUI.skin.label, _menuColumn));
+                GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_saved", "저장된 캐릭터는 이 클래스로 시작한다. 빈 클래스 칸(레벨 {0}에 둘째, {1}에 셋째)은 게임 안 가방 [스킬] 탭에서 그냥 고르고, 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다(금화 {2}부터, 레벨이 오를수록 더 든다)."), ClassRules.SlotLevels[1], ClassRules.SlotLevels[2], ClassRules.ChangeCoins(1)), GUI.skin.label, _menuColumn));
                 return;
             }
-            GUILayout.Label(Ui.Wrap($"클래스는 게임 안에서 고른다: 가방(PC는 Tab·휴대폰은 [가방])의 [스킬] 탭에서 처음에 하나, 레벨 {ClassRules.SlotLevels[1]}에 둘째, {ClassRules.SlotLevels[2]}에 셋째. 고르기 전에는 기본 공격만 쓴다.", GUI.skin.label, _menuColumn));
+            GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_new", "클래스는 게임 안에서 고른다: 가방(PC는 Tab·휴대폰은 [가방])의 [스킬] 탭에서 처음에 하나, 레벨 {0}에 둘째, {1}에 셋째. 고르기 전에는 기본 공격만 쓴다."), ClassRules.SlotLevels[1], ClassRules.SlotLevels[2]), GUI.skin.label, _menuColumn));
             foreach (var option in _classes.Classes)
             {
                 GUILayout.Label(Ui.Wrap($"{option.Name}: {option.Description}", GUI.skin.label, _menuColumn));
