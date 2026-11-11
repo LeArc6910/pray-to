@@ -7,7 +7,7 @@ floor,돌 바닥 깔기,작업대에서 돌 2로 돌 바닥 4장을 만들어 [�
 copper,구리 광석 6개 캐기,주황 덩어리가 박힌 벽이 구리 광맥이다. 미니맵에 깜박이는 주황 고리가 가장 가까운 광맥이다. 한 광맥에 몇 개뿐이라 둘셋을 찾아 캔다,have:copper_ore:6,xp:20
 copper_gear,구리 장비 하나 만들기,작업대 옆에서 구리 투구·갑옷·장화·활·지팡이 가운데 하나를 만들어 [장착]한다,have:copper_helmet|have:copper_armor|have:copper_boots|have:copper_bow|have:copper_staff,healing_potion:2
 furnace,화로 세우기,작업대 옆에서 돌 15와 구리 광석 2로 만든다. 버섯을 굽고 철을 녹인다,place:Furnace,copper_ore:4
-level3,레벨 3 되기,몬스터를 잡으면 경험치가 오른다. 시작 지점 둘레에는 몬스터가 나오지 않으니 굴을 따라 조금 나가서 잡는다. 동굴 수호자는 레벨 3쯤부터 해 볼 만하다,level:3,healing_potion:2
+level3,레벨 3 되기,몬스터를 잡으면 경험치가 오른다. 시작 지점 둘레에는 몬스터가 나오지 않으니 굴을 따라 조금 나가서 잡는다. 동굴 수호자는 레벨 3쯤부터 해 볼 만하다,level:3,healing_potion:4
 boss,동굴 수호자 쓰러뜨리기,여왕이 부탁한 일이다. 지도(M)에 고리로 보이는 곳이 보스 아레나다. 회복 물약을 챙겨 가고 바닥에 붉게 차오르는 예고를 피한다. 권장 레벨보다 낮으면 등장 알림에 나온다,have:warden_core,recall_scroll:2
 bed,침대 세우기,작업대에서 돌 6과 슬라임 젤 3으로 만든다. 쓰러지면 침대 옆에서 일어나고 귀환 두루마리로 돌아올 수 있다. 저녁부터 [잠자기]로 밤을 넘긴다,place:Bed,recall_scroll:2
 plant,버섯 심기,가방 재료의 버섯 포자를 [심기]로 흙 동굴 바닥에 심는다. 물뿌리개로 물을 준 날에만 자라고 다 자라면 그 위를 지나가며 거둔다,plant,mushroom_spore:2
