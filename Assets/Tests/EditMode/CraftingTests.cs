@@ -595,6 +595,37 @@ namespace Game.Core.Tests
             Assert.IsFalse(world.Craft(player.Id, floors));
         }
 
+        // [상자에 넣기] (Docs/Crafting.md 근처 상자에 넣기, 2026-11-11): a whole stack goes into a chest nearby that holds
+        // its kind already, and nothing goes where there is none of it.
+        [Test]
+        public void StashingPutsMaterialsWhereTheyAlreadyGo()
+        {
+            var world = Room(out var player, TileType.Workbench);
+            var chest = Gear.Data.FindMaterial("chest");
+            var copper = Gear.Data.FindMaterial("copper_ore");
+            world.MovePlayer(player.Id, player.Position, new Vec2(0, 1), 1);
+            player.Inventory.AddMaterial(chest);
+            Assert.IsTrue(world.PlaceTile(player.Id, chest));
+            var box = world.ChestAt(2, 3);
+            box.AddMaterial(Stone, 2);
+            player.Inventory.AddMaterial(Stone, 5);
+            player.Inventory.AddMaterial(copper, 3);
+            int version = world.ChestVersion(2, 3);
+
+            Assert.AreEqual(5, world.StashMaterial(player.Id, Stone));
+            Assert.AreEqual(7, box.CountOf(Stone));
+            Assert.AreEqual(0, player.Inventory.CountOf(Stone));
+            Assert.Greater(world.ChestVersion(2, 3), version);
+            Assert.AreEqual(0, world.StashMaterial(player.Id, copper), "no chest holds copper ore");
+            Assert.AreEqual(3, player.Inventory.CountOf(copper));
+            Assert.AreEqual(0, world.StashMaterial(player.Id, Stone), "none left");
+
+            // Out of reach, nothing goes.
+            player.Inventory.AddMaterial(Stone, 4);
+            player.Position = new Vec2(player.Position.X + World.CraftChestReach + 2, player.Position.Y);
+            Assert.AreEqual(0, world.StashMaterial(player.Id, Stone));
+        }
+
         [Test]
         public void TheClientCountsTheChestsNearby()
         {
@@ -625,6 +656,15 @@ namespace Game.Core.Tests
 
             host.Receive(1, client.CraftCommand(RecipeFor("stone_floor"), 3));
             Assert.AreEqual(12, player.Inventory.CountOf(Gear.Data.FindMaterial("stone_floor")));
+
+            // [상자에 넣기] goes over the wire too.
+            host.World.ChestAt(cx, cy).AddMaterial(Stone, 1);
+            player.Inventory.AddMaterial(Stone, 4);
+            int stone = player.Inventory.CountOf(Stone);
+            host.Receive(1, client.StashCommand(Stone));
+            Assert.AreEqual(0, player.Inventory.CountOf(Stone));
+            Assert.GreaterOrEqual(host.World.ChestAt(cx, cy).CountOf(Stone), stone);
+            Assert.IsEmpty(client.NeededMaterials(), "no goals asking for anything");
         }
 }
 }

@@ -314,6 +314,27 @@ async function basics(browser) {
   await game.shot('bag-chest', '[상자] 탭');
   await game.press('꺼내기', /^돌 ×/);
   check(!((await game.look(-1, 0)).chest || {}).stone, '[꺼내기]로 다시 가방에');
+  // [상자에 넣기] (2026-11-11, Docs/Research2026-11.md 후보 8): what a chest nearby holds already goes in whole;
+  // what none holds, and what the player locked, stay in the bag.
+  await game.send('fill -1 0 stone 1; fill -1 0 slime_gel 1; give slime_gel 4; give copper_ore 3');
+  await game.wait(800);
+  await bagTab(game, '재료·제작');
+  check(await game.press(/^슬라임 젤 ×/), '재료 칸에서 슬라임 젤을 고른다');
+  check(await game.press('잠그기'), '고른 재료의 [잠그기]를 누른다');
+  check((await game.find('잠금 풀기')).length === 1, '잠그면 [잠금 풀기]로 바뀐다');
+  await game.shot('bag-lock', '잠근 슬라임 젤');
+  await bagTab(game, '상자');
+  check(await game.press('상자에 넣기'), '[상자] 탭에 [상자에 넣기]가 있다');
+  await game.wait(800);
+  let stashed = await game.inventory();
+  const inChest = (await game.look(-1, 0)).chest || {};
+  check(count(stashed, 'stone') === 0 && inChest.stone > 1, `상자에 이미 있는 돌은 모두 상자로 (가방 ${count(stashed, 'stone')}, 상자 ${inChest.stone})`);
+  check(count(stashed, 'slime_gel') >= 4, `잠근 슬라임 젤은 가방에 남는다 (${count(stashed, 'slime_gel')})`);
+  check(count(stashed, 'copper_ore') >= 3, `상자에 없는 구리 광석은 남는다 (${count(stashed, 'copper_ore')})`);
+  await game.shot('bag-stash', '[상자에 넣기] 뒤');
+  await bagTab(game, '재료·제작');
+  await game.press(/^슬라임 젤 ×/);
+  await game.press('잠금 풀기');
   await closeBag(game);
 
   // A torch from the quick slot in front.

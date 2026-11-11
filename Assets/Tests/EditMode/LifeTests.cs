@@ -413,11 +413,14 @@ namespace Game.Core.Tests
             Assert.That(fine, Is.InRange(600, 760), "about 68% silver or gold at the most");
             Assert.IsTrue(Enumerable.Range(0, 200).All(_ => world.AnimalQuality(egg, 0) == egg));
 
-            // Left alone too long, they cool by one each time they give.
-            fold.Affection = 5;
+            // Left alone too long, they cool by one each time they give, but keep half their fondness.
+            fold.Affection = 7;
             fold.PettedDay = world.Today - World.AffectionPatience - 1;
             Run(world, Tiles.Shipped.Machine(TileType.Fold).Seconds + 1);
-            Assert.AreEqual(4, fold.Affection);
+            Assert.AreEqual(6, fold.Affection);
+            fold.Affection = World.AffectionFloor;
+            Run(world, Tiles.Shipped.Machine(TileType.Fold).Seconds + 1);
+            Assert.AreEqual(World.AffectionFloor, fold.Affection, "not below half");
         }
     }
 }

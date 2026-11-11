@@ -467,6 +467,9 @@ namespace Game.Core
                 case InventoryCommand.Refuel:
                     if (command.Index < _loot.Materials.Count) World.Refuel(player.Id, _loot.Materials[command.Index]);
                     break;
+                case InventoryCommand.Stash:
+                    if (command.Index < _loot.Materials.Count) World.StashMaterial(player.Id, _loot.Materials[command.Index]);
+                    break;
                 case InventoryCommand.Repair:
                     World.Repair(player.Id);
                     break;

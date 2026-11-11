@@ -66,6 +66,27 @@ namespace Game.Core
             return stock;
         }
 
+        // Puts all of a material from the bag into the nearest chest within CraftChestReach that already holds some of
+        // its kind (Docs/Crafting.md 근처 상자에 넣기, 2026-11-11). Only materials, and only where they already go, so
+        // nothing ends up somewhere the player did not choose; the client leaves out what the player keeps (tools,
+        // quick slots, locked, needed for a goal). How many went in: 0 when no chest near holds that kind.
+        public int StashMaterial(int playerId, MaterialDefinition material)
+        {
+            var player = FindPlayer(playerId);
+            if (player == null || player.IsDead || material == null) return 0;
+            int count = player.Inventory.CountOf(material);
+            if (count == 0) return 0;
+            foreach (var (key, chest) in ChestsNear(player.Position))
+            {
+                if (chest.CountOfKind(material) == 0) continue;
+                if (!player.Inventory.TakeMaterial(material, count)) return 0;
+                chest.AddMaterial(material, count);
+                Changed(player, key);
+                return count;
+            }
+            return 0;
+        }
+
         // Goes up whenever the chest's contents change.
         public int ChestVersion(int x, int y) => _chestVersions.TryGetValue(y * Map.Width + x, out int version) ? version : 0;
 

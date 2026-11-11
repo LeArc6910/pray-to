@@ -995,6 +995,45 @@ namespace Game.Client
         // The cracked built tile ahead, when there is one (GameRoot sets it from the view): mended from the bag.
         public TileType? CrackAhead { get; set; }
 
+        // What the player's goals still ask for (WorldClient.NeededMaterials), worked out once a frame.
+        Dictionary<MaterialDefinition, (string For, int Count)> _needed = new Dictionary<MaterialDefinition, (string For, int Count)>();
+        int _neededFrame = -1;
+
+        Dictionary<MaterialDefinition, (string For, int Count)> Needed()
+        {
+            if (_neededFrame != Time.frameCount)
+            {
+                _neededFrame = Time.frameCount;
+                _needed = _client.NeededMaterials();
+            }
+            return _needed;
+        }
+
+        // "아직 필요: 상인 도라 3/5" for a material a goal asks for, or null.
+        string NeededText(MaterialDefinition material) =>
+            Needed().TryGetValue(material.Kind, out var need) ? $"아직 필요: {need.For} {Math.Min(_client.Bag.CountOfKind(material), need.Count)}/{need.Count}" : null;
+
+        // Whether [상자에 넣기] takes it: a material a chest nearby already holds, unless it is a tool, in a quick slot,
+        // locked, or wanted for a goal (Docs/Crafting.md 근처 상자에 넣기, 2026-11-11).
+        bool Stashable(MaterialDefinition material) =>
+            !IsTool(material) && !(_hotbar?.Keeps(material) ?? false) && !Needed().ContainsKey(material.Kind)
+            && material.AllQualities.Sum(_client.StockOf) > 0;
+
+        // One press puts every such material into the chests nearby that hold it already (World.StashMaterial).
+        void DrawStash()
+        {
+            var stash = _client.Bag.Materials.Keys.Where(Stashable).ToList();
+            if (stash.Count == 0) return;
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(Fit($"근처 상자에 있는 재료 {stash.Count}가지 (잠근 것·퀵슬롯·도구·목표에 필요한 것은 남는다)", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+            if (Ui.LayoutButton("상자에 넣기", GUILayout.Width(96)))
+            {
+                Sounds.Play(Sound.Place);
+                foreach (var material in stash) _send(_client.StashCommand(material));
+            }
+            GUILayout.EndHorizontal();
+        }
+
         void DrawMaterials()
         {
             if (CrackAhead is TileType cracked)
@@ -1029,6 +1068,7 @@ namespace Game.Client
             }
             GUILayout.Label("재료");
             if (_client.Bag.Materials.Count == 0) GUILayout.Label(Fit("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.", _textWidth));
+            DrawStash();
             // The machine the player faces, for the filter and generator buttons.
             var ahead = _client.MachineAhead();
             if (ahead?.Kind == TileType.Filter)
@@ -1049,18 +1089,18 @@ namespace Game.Client
                 if (machine.Held > 0 && Ui.LayoutButton("꺼내기", GUILayout.Width(64))) Send(_client.UnloadCommand(), Sound.Pickup);
                 GUILayout.EndHorizontal();
                 if (machine.Kind == TileType.Coop)
-                    GUILayout.Label(Fit($"닭 {machine.Animals}/{World.CoopChickens}마리. 사료가 있으면 하루(20분)마다 닭마다 달걀 하나", _textWidth));
+                    GUILayout.Label(Fit($"닭 {machine.Animals}/{World.CoopChickens}마리. 사료가 있으면 20분마다 닭마다 달걀 하나", _textWidth));
                 if (machine.Kind == TileType.Barn)
-                    GUILayout.Label(Fit($"소 {machine.Animals}/{World.HouseOf(TileType.Barn).Most}마리. 사료 둘이면 하루(20분)마다 소마다 우유 하나", _textWidth));
+                    GUILayout.Label(Fit($"소 {machine.Animals}/{World.HouseOf(TileType.Barn).Most}마리. 사료 둘이면 20분마다 소마다 우유 하나", _textWidth));
                 if (machine.Kind == TileType.Fold)
-                    GUILayout.Label(Fit($"양 {machine.Animals}/{World.HouseOf(TileType.Fold).Most}마리. 사료가 있으면 이틀(40분)마다 양마다 양털 하나", _textWidth));
+                    GUILayout.Label(Fit($"양 {machine.Animals}/{World.HouseOf(TileType.Fold).Most}마리. 사료가 있으면 40분마다 양마다 양털 하나", _textWidth));
                 if (World.HouseOf(machine.Kind) != null && machine.Animals > 0)
                 {
                     // Grazing (World.Grazes): a closed pen in front, four tiles an animal.
                     var step = Machine.Steps[machine.Direction & 3];
                     bool grazing = _client.Map != null && World.Grazes(_client.Map, machine.X + step.X, machine.Y + step.Y, machine.Animals);
                     GUILayout.Label(Fit(grazing
-                        ? $"방목 중: 사료가 없어도 하루가 {World.GrazingSlowdown:0.#}배 걸려 준다. 사료가 넉넉하면 원래 속도"
+                        ? $"방목 중: 사료가 없어도 {World.GrazingSlowdown:0.#}배 걸려 준다. 사료가 넉넉하면 원래 속도"
                         : $"앞을 울타리로 둘러 마리마다 {World.PenTilesPerAnimal}칸을 주면 방목한다(사료 없이도 준다)", _textWidth));
                     // Affection (World.PetAnimals): once a day, and fonder animals give silver and gold more often.
                     GUILayout.BeginHorizontal();
@@ -1097,7 +1137,9 @@ namespace Game.Client
                 }
                 GUILayout.BeginHorizontal();
                 Icon(Sprites.Icon(pair.Key));
-                TipLabel(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}", _nameWidth), pair.Key.Description), GUILayout.Width(_nameWidth));
+                string wanted = NeededText(pair.Key);
+                TipLabel(new GUIContent(Fit($"{pair.Key.Name} ×{pair.Value}{(wanted != null ? " · 필요" : "")}", _nameWidth), wanted != null ? $"{pair.Key.Description}\n{wanted}" : pair.Key.Description),
+                    GUILayout.Width(_nameWidth));
                 if (pair.Key.Places != null)
                 {
                     if (Ui.LayoutButton("놓기", GUILayout.Width(56))) Send(_client.PlaceCommand(pair.Key), Sound.Place);
@@ -1157,16 +1199,35 @@ namespace Game.Client
             for (int i = 0; i < plain.Count; i++)
             {
                 var (material, count) = (plain[i].Key, plain[i].Value);
-                if (Cell(CellAt(grid, i, cell), Sprites.Icon(material), $"{material.Name} ×{count}", count.ToString(), Palette.Material, _pickedMaterial == material,
-                    $"{material.Name} ×{count}\n{material.Description}"))
+                string wanted = NeededText(material);
+                bool locked = _hotbar?.IsLocked(material) ?? false;
+                var area = CellAt(grid, i, cell);
+                // A goal's material carries the badge (as a tab with points to spend does); a locked one says so.
+                if (Cell(area, Sprites.Icon(material), $"{material.Name} ×{count}{(wanted != null ? " · 필요" : "")}{(locked ? " · 잠금" : "")}",
+                    locked ? $"잠{count}" : count.ToString(), Palette.Material, _pickedMaterial == material,
+                    $"{material.Name} ×{count}\n{material.Description}{(wanted != null ? "\n" + wanted : "")}{(locked ? "\n잠금: [상자에 넣기]가 두고 간다" : "")}"))
                 {
                     _pickedMaterial = material;
                     Sounds.Play(Sound.Click);
                 }
+                if (wanted != null && Event.current.type == EventType.Repaint) Badge(area);
             }
             if (_pickedMaterial != null && plain.Any(p => p.Key == _pickedMaterial))
             {
-                GUILayout.Label(Fit($"{_pickedMaterial.Name} ×{_client.Bag.CountOf(_pickedMaterial)}: {_pickedMaterial.Description}", _textWidth));
+                string wanted = NeededText(_pickedMaterial);
+                GUILayout.Label(Fit($"{_pickedMaterial.Name} ×{_client.Bag.CountOf(_pickedMaterial)}: {_pickedMaterial.Description}" + (wanted != null ? $" ({wanted})" : ""), _textWidth));
+                if (_hotbar != null)
+                {
+                    GUILayout.BeginHorizontal();
+                    bool locked = _hotbar.IsLocked(_pickedMaterial);
+                    GUILayout.Label(Fit(locked ? "잠금: [상자에 넣기]가 가방에 남긴다" : "잠그면 [상자에 넣기]가 가방에 남긴다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+                    if (Ui.LayoutButton(locked ? "잠금 풀기" : "잠그기", GUILayout.Width(96)))
+                    {
+                        _hotbar.ToggleLock(_pickedMaterial);
+                        Sounds.Play(Sound.Click);
+                    }
+                    GUILayout.EndHorizontal();
+                }
             }
         }
 
@@ -1405,6 +1466,7 @@ namespace Game.Client
             GUILayout.Label($"상자 ({chest.Items.Count}/{Inventory.Capacity})");
             DrawContents(chest, "꺼내기", item => _client.TakeItemCommand(item.Id), (kind, definition) => _client.TakeStackCommand(kind, definition));
             GUILayout.Space(8);
+            DrawStash();
             GUILayout.Label($"가방 ({_client.Bag.Items.Count}/{Inventory.Capacity})");
             DrawContents(_client.Bag, "넣기", item => _client.StoreItemCommand(item.Id), (kind, definition) => _client.StoreStackCommand(kind, definition));
         }

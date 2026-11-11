@@ -216,6 +216,8 @@ namespace Game.Core
         Teleport,
         // Answers what the person of the story asked with choice Index (World.ChooseInStory, 2026-11-10).
         ChooseStory,
+        // Puts all of material Index into a chest nearby that holds that kind already (World.StashMaterial, 2026-11-11).
+        Stash,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

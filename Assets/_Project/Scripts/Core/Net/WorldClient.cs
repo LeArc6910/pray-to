@@ -660,6 +660,39 @@ namespace Game.Core
 
         public RequestDefinition StoryStepOf(NpcDefinition npc) => World.StoryStepFor(Npcs, npc, _storySteps.TryGetValue(npc.Id, out int done) ? done : 0);
 
+        // The materials something the player is doing still asks for (Docs/Crafting.md 아직 필요, 2026-11-11): the story's
+        // step taken that asks to bring something, the next step of each person met whose hearts allow it, and today's
+        // requests not yet done; each kind (MaterialDefinition.Kind) with who asks for it (the first) and how many in
+        // all. The bag marks these, and putting things into chests nearby leaves them in the bag.
+        public Dictionary<MaterialDefinition, (string For, int Count)> NeededMaterials()
+        {
+            var needed = new Dictionary<MaterialDefinition, (string For, int Count)>();
+            void Add(object thing, int count, string asker)
+            {
+                if (thing is not MaterialDefinition material || count <= 0) return;
+                var kind = material.Kind;
+                needed[kind] = needed.TryGetValue(kind, out var was) ? (was.For, was.Count + count) : (asker, count);
+            }
+            foreach (var (step, taken) in CurrentSteps)
+            {
+                if (taken && step.Goal == StoryGoal.Have) Add(step.Material, step.Count, step.Who.Name);
+            }
+            foreach (var npc in Npcs?.Npcs ?? Enumerable.Empty<NpcDefinition>())
+            {
+                if (!Friendships.ContainsKey(npc.Id)) continue;
+                var story = StoryStepOf(npc);
+                if (story != null && HeartsWith(npc) >= story.Hearts)
+                {
+                    foreach (var (thing, count) in story.Need) Add(thing, count, npc.Name);
+                }
+                if (RequestDoneToday(npc)) continue;
+                var request = RequestOf(npc);
+                if (request == null) continue;
+                foreach (var (thing, count) in request.Need) Add(thing, count, npc.Name);
+            }
+            return needed;
+        }
+
         public byte[] StoryCommand() => new InventoryCommandMessage(InventoryCommand.Story, 0).Encode();
 
         // The crystals in each learned skill, in their slots, as the host last said (Docs/Classes.md, 스킬 변형),
@@ -1179,6 +1212,10 @@ namespace Game.Core
 
         public byte[] RefuelCommand(MaterialDefinition fuel) =>
             new InventoryCommandMessage(InventoryCommand.Refuel, 0, index: ItemCodec.Index(_loot.Materials, fuel)).Encode();
+
+        // Puts all of that material into a chest nearby that holds its kind already (World.StashMaterial).
+        public byte[] StashCommand(MaterialDefinition material) =>
+            new InventoryCommandMessage(InventoryCommand.Stash, 0, index: ItemCodec.Index(_loot.Materials, material)).Encode();
 
         public byte[] TillCommand() => new InventoryCommandMessage(InventoryCommand.Till, 0).Encode();
 

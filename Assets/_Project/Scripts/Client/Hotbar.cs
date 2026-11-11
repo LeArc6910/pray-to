@@ -76,10 +76,28 @@ namespace Game.Client
             _client = client;
             _loot = loot;
             _key = "hotbar." + character;
+            _lockKey = "locks." + character;
+            foreach (string id in Prefs.Get(_lockKey, "").Split('\n')) if (id.Length > 0) _locked.Add(id);
             if (!Prefs.Has(_key)) return;
             string[] lines = Prefs.Get(_key, "").Split('\n');
             for (int slot = 0; slot < Slots && slot < lines.Length; slot++) _entries[slot] = Entry.Parse(lines[slot]);
             _ready = true;
+        }
+
+        // Materials the player has locked (Docs/Crafting.md 근처 상자에 넣기, 2026-11-11), by kind: [상자에 넣기] leaves
+        // them in the bag, as it does whatever is in a quick slot. Kept per character on this device, like the slots.
+        readonly HashSet<string> _locked = new HashSet<string>();
+        readonly string _lockKey;
+
+        public bool IsLocked(MaterialDefinition material) => _locked.Contains(material.Kind.Id);
+
+        // Locked, or in a quick slot (in any quality).
+        public bool Keeps(MaterialDefinition material) => IsLocked(material) || material.AllQualities.Any(m => SlotOf(m) >= 0);
+
+        public void ToggleLock(MaterialDefinition material)
+        {
+            if (!_locked.Remove(material.Kind.Id)) _locked.Add(material.Kind.Id);
+            Prefs.Set(_lockKey, string.Join("\n", _locked));
         }
 
         // What the last [퀵] press did when it could not, for the bag to show a moment.

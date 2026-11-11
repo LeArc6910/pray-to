@@ -20,9 +20,11 @@ namespace Game.Core
         public const int CoopFeed = 20;
         // Affection (2026-11-09, Docs/Animals.md): petting a house's animals once a day raises it by one up to
         // AffectionMost; a day's products come out silver or gold more often the fonder they are. Left unpetted more
-        // than AffectionPatience days, it falls by one each time they give.
+        // than AffectionPatience days, it falls by one each time they give, but not below AffectionFloor
+        // (2026-11-11, Docs/Time.md 시간 압박 점검): away for a while, the animals keep half their fondness.
         public const int AffectionMost = 10;
         public const int AffectionPatience = 2;
+        public const int AffectionFloor = AffectionMost / 2;
 
         // Grazing (2026-11-09, Docs/Animals.md 방목): a house whose front opens into a closed pen, fenced or walled with at
         // least PenTilesPerAnimal open tiles an animal, lets its animals out to graze there. They then give without
@@ -134,7 +136,7 @@ namespace Game.Core
             {
                 house.Timer = 0;
                 if (eating > 0) Add(house.Input, feed, -eating * kind.FeedEach);
-                if (house.Affection > 0 && Today - house.PettedDay > AffectionPatience) house.Affection--;
+                if (house.Affection > AffectionFloor && Today - house.PettedDay > AffectionPatience) house.Affection--;
                 for (int i = 0; i < giving; i++)
                 {
                     var made = AnimalQuality(product, house.Affection);
