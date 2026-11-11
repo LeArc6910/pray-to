@@ -22,8 +22,14 @@ namespace Game.Client.Tests
             Assert.IsNotNull(GameSheets.Load(), "GameSheets asset is missing. Run Game > Set Up Project first.");
             // A host on this machine only: no firewall prompt to answer (NetLink.ListenAddress).
             NetLink.ListenAddress = "127.0.0.1";
+            TestSaves.Forget(Name);
             _root = new GameObject("Game").AddComponent<GameRoot>();
+            // Never the player's own default character or world (TestSaves).
+            _root.PlayerName = Name;
+            _root.WorldNameField = Name;
         }
+
+        const string Name = "playmode-session-test";
 
         [UnityTearDown]
         public IEnumerator DestroyRoot()
@@ -33,6 +39,7 @@ namespace Game.Client.Tests
             // Let Netcode shut down before the next test starts a host on the same port.
             yield return null;
             yield return null;
+            TestSaves.Forget(Name);
         }
 
         [UnityTest, Category(Screens.Category)]

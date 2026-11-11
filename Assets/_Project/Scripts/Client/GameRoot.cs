@@ -129,7 +129,14 @@ namespace Game.Client
             Application.runInBackground = true;
             Controls.HearKeysWithoutFocus();
             _camera = Camera.main;
-            if (_camera == null) _camera = new GameObject("Main Camera", typeof(Camera)).GetComponent<Camera>();
+            if (_camera == null)
+            {
+                // Made here, so tagged as the main one and taken away with this root (2026-11-11: untagged, each play
+                // mode test made another camera and listener, up to fifteen "audio listeners in the scene").
+                _camera = new GameObject("Main Camera", typeof(Camera)).GetComponent<Camera>();
+                _camera.tag = "MainCamera";
+                _ownCamera = true;
+            }
             _camera.orthographic = true;
             _camera.orthographicSize = ViewHalfHeight(Screen.width, Screen.height);
             _camera.clearFlags = CameraClearFlags.SolidColor;
@@ -1145,7 +1152,13 @@ namespace Game.Client
             _endReason = null;
         }
 
-        void OnDestroy() => EndSession("");
+        bool _ownCamera;
+
+        void OnDestroy()
+        {
+            EndSession("");
+            if (_ownCamera && _camera != null) Destroy(_camera.gameObject);
+        }
 
         void OnGUI()
         {

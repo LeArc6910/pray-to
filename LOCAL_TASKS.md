@@ -967,6 +967,11 @@ DevTools/Local/setup.sh --commit
     - 2026-11-11 check70(a0f3a5e): 150개 통과, 실패 0. 장군·망령도 등장·전조·페이즈·처치·드랍까지 통과(사진 `pc-boss-mad_general*.png`, `pc-boss-crown_wraith*.png`)
   - (사람) 공허의 심연에 공허 정령·심연 추적자가 나오는지, 버섯 숲·얼음 동굴에 빛 박쥐·서리 정령이 전보다 자주 나와 벅차지 않은지. 가방에서 흑요석 주괴·용암 심장·얼음 결정이 돌과 다르게 보이는지, 요리마다 색이 다른지
   - (사람, 결정) `Docs/ContentAudit.md`의 "사람이 정할 것" 다섯 가지
+- [ ] 127단계: 로컬이 알려 온 PlayMode 실패 고침
+  - (로컬 세션) 명령 한 줄을 다시 돌린다. 새 파일 `Assets/Tests/PlayMode/TestSaves.cs`의 `.meta`는 Unity가 만들면 커밋한다. PlayMode가 21/21 통과해야 한다. 저장 폴더를 옮기지 않고 그대로 두고 두 번 돌려도 같아야 한다
+  - `SessionTests`는 이제 `playmode-session-test` 캐릭터·월드로 돌고, 시험 앞뒤로 그 이름의 저장본(월드, 캐릭터, 탐험 지도, 퀵슬롯, 스킬 순서)을 지운다(`TestSaves.Forget`). `FeatureTests`도 같은 정리를 쓴다. 지난 실행이 남긴 "플레이어" 저장본은 이번에 지우지 않으니, 사람이 그 이름으로 놀지 않았다면 로컬이 지워도 된다(`pray-to.bak-20261111`도)
+  - `ALockedDoorDraws`: 시험이 문 칸에 바닥을 덮어 깔았다(`dx != 1` → `dx != 0`). 게임 쪽 문제는 아니었다
+  - 소리 리스너가 쌓이던 것: `GameRoot`가 카메라를 만들 때 `MainCamera` 태그를 붙이지 않아, 시험마다 카메라와 리스너가 하나씩 더 생겼다. 태그를 붙이고, 직접 만든 카메라는 끝날 때 지운다. `Logs/playmode.log`의 "There are N audio listeners" 경고가 없어져야 한다
 
 ## 결과 보고
 

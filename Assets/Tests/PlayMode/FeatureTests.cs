@@ -21,12 +21,7 @@ namespace Game.Client.Tests
         // A world and character of their own, so the scenes never touch the player's saves.
         const string Name = "playmode-feature-test";
 
-        static void Forget()
-        {
-            SaveStore.Delete(SaveStore.WorldKey(Name));
-            SaveStore.Delete(SaveStore.CharacterKey(Name));
-            Prefs.Delete("hotbar." + Name);
-        }
+        static void Forget() => TestSaves.Forget(Name);
 
         [SetUp]
         public void CreateRoot()
@@ -270,9 +265,10 @@ namespace Game.Client.Tests
             var tiles = new List<(int, int, TileType)> { (door.X, door.Y, TileType.Door) };
             for (int dy = -2; dy <= 2; dy++)
                 if (dy != 0) tiles.Add((door.X, door.Y + dy, TileType.Wall));
+            // Floor round the door, not on it (2026-11-11: dx != 1 laid floor over the door itself).
             for (int dx = -1; dx <= 2; dx++)
                 for (int dy = -1; dy <= 1; dy++)
-                    if (dx != 1) tiles.Add((door.X + dx, door.Y + dy, TileType.Floor));
+                    if (dx != 0) tiles.Add((door.X + dx, door.Y + dy, TileType.Floor));
             Lay(tiles.ToArray());
             Player.Position = TileMap.Center(door.X - 1, door.Y);
             Player.Corrections++;
