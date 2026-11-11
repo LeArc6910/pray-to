@@ -142,6 +142,9 @@ namespace Game.Core
                     case "plant":
                         Plant(goal);
                         return;
+                    case "request":
+                        Request(goal);
+                        return;
                     case "place" when condition.Tile == TileType.Soil:
                         Till(goal);
                         return;
@@ -181,6 +184,13 @@ namespace Game.Core
                 Sell(condition.Count);
                 return true;
             }
+            return Obtain(goal, id);
+        }
+
+        // Works at getting one more of a material, consumable or item: fished, dug, hunted, or gathered for and made.
+        // False when the bot does not know how.
+        bool Obtain(Goal goal, string id)
+        {
             var material = _loot.Materials.FirstOrDefault(m => m.Id == id);
             if (material?.Fish != null)
             {
@@ -217,6 +227,13 @@ namespace Game.Core
             foreach (var (material, count) in recipe.Ingredients)
             {
                 if (_player.Inventory.CountOfKind(material) >= count) continue;
+                // A fish (grilled fish takes two minnows, 2026-11-11): caught.
+                if (material.Fish != null)
+                {
+                    Doing = $"{recipe.Name} 재료: {material.Name} 낚기";
+                    Fish(Current);
+                    return false;
+                }
                 var source = Source(material);
                 if (source == null)
                 {
@@ -514,6 +531,41 @@ namespace Game.Core
         int _fishFor;
 
         int FishCount() => _player.Inventory.Materials.Where(m => m.Key.Fish != null).Sum(m => m.Value);
+
+        // The merchant's request of the day (World.RequestFor, the bag's [건네기]): what it needs gathered or made, then
+        // handed over at the stall (World.CompleteRequest).
+        void Request(Goal goal)
+        {
+            var npcs = _world.Npcs;
+            var npc = npcs?.Npcs.FirstOrDefault(n => n.Tile == TileType.MerchantStall);
+            var request = npc == null ? null : World.RequestFor(npcs, npc, World.FriendshipOf(_player, npc).Hearts, _world.Today);
+            if (request == null)
+            {
+                Skip(goal, "오늘 상인의 부탁이 없음");
+                return;
+            }
+            foreach (var (thing, count) in request.Need)
+            {
+                string id = thing is MaterialDefinition m ? m.Id : ((ConsumableDefinition)thing).Id;
+                int have = thing is MaterialDefinition material ? _player.Inventory.CountOfKind(material) : _player.Inventory.CountOf((ConsumableDefinition)thing);
+                if (have >= count) continue;
+                Doing = $"부탁 \"{request.Text}\": {id} {have}/{count}";
+                if (!Obtain(goal, id)) Skip(goal, $"부탁의 {id}을(를) 구할 줄 모름");
+                return;
+            }
+            var intent = Pilot.Next(BotTarget.Beside(TileType.MerchantStall));
+            if (intent.Do != BotDo.Arrived)
+            {
+                Doing = "부탁을 건네러 상인에게";
+                Execute(intent);
+                return;
+            }
+            _world.SetAttacking(_player.Id, false);
+            Doing = "부탁 건네기";
+            if (_world.CompleteRequest(_player.Id)) Memory.Refresh();
+            else if (++_tries > 10) Skip(goal, "상인이 부탁을 받지 않음");
+            _waitUntil = _world.Tick + 30;
+        }
 
         // Monsters till the level: the nearest within reach of the player's level, picking up what falls.
         void Hunt()
