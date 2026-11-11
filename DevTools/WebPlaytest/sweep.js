@@ -2769,9 +2769,10 @@ async function time(browser) {
     await game.press(b.label);
   }
   check(lengths.join(',') === '20분,30분,40분,60분', `메뉴의 [하루 길이]가 20→30→40→60분으로 돈다 (${lengths.join(' → ')})`);
+  // Back at 20 after going round: two presses make it 40.
   await game.press('하루 길이: 20분');
   await game.press('하루 길이: 30분');
-  await game.press('하루 길이: 40분');
+  check((await game.find('하루 길이: 40분')).length === 1, '[하루 길이: 40분]으로 맞춘다');
   await game.startSolo('daylength');
   await game.wait(1200);
   let s = await game.state();
