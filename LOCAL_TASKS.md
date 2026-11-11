@@ -1385,3 +1385,11 @@ DevTools/Local/setup.sh --commit
 - PlayMode 테스트: 21개 중 19개 통과, 2개 실패
   - `Game.Client.Tests.FeatureTests.ALockedDoorDraws: The door ahead did not lock.`
   - `Game.Client.Tests.SessionTests.EverySkillCanBeUsed: Expected a new character to start with no class.`
+
+### 2026-11-11 18:39 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 684개 중 684개 통과, 0개 실패
+- PlayMode 테스트: 21개 중 20개 통과, 1개 실패
+  - `Game.Client.Tests.FeatureTests.ALockedDoorDraws: The door ahead did not lock.`
