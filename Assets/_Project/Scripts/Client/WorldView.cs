@@ -455,7 +455,7 @@ namespace Game.Client
             _hurtGlow = Mathf.Max(0, _hurtGlow - deltaTime);
             // A heavy blow of one's own holds the picture still for a moment (hit-stop); the world goes on underneath and
             // the events wait. Off with screen shake.
-            if (_hitStop > 0 && Settings.ScreenShake)
+            if (_hitStop > 0 && Settings.ScreenShake && Feel.HitStop)
             {
                 _hitStop -= deltaTime;
                 _shake *= Mathf.Exp(-10 * deltaTime);
@@ -512,7 +512,7 @@ namespace Game.Client
 
             _cameraTarget = Vector3.Lerp(_cameraTarget, new Vector3(selfPosition.X, selfPosition.Y, _cameraTarget.z), 1 - Mathf.Exp(-12 * deltaTime));
             // Off in the menu (Settings.ScreenShake), hits still flash and sound but the view holds still.
-            _shake = Settings.ScreenShake ? _shake * Mathf.Exp(-10 * deltaTime) : 0;
+            _shake = Settings.ScreenShake && Feel.Shake ? _shake * Mathf.Exp(-10 * deltaTime) : 0;
             var jolt = (Vector3)(UnityEngine.Random.insideUnitCircle * _shake);
             _camera.transform.position = _cameraTarget + jolt;
             UpdateDark(selfPosition);
@@ -603,7 +603,7 @@ namespace Game.Client
             // Fog drifts over the view, and a storm's lightning flashes white.
             if (Event.current.type == EventType.Repaint) DrawWeather();
             // Hurt: the screen's edges glow red for a moment, more for a harder blow.
-            if (_hurtGlow > 0 && Event.current.type == EventType.Repaint)
+            if (_hurtGlow > 0 && Feel.HurtGlow && Event.current.type == EventType.Repaint)
             {
                 _vignette ??= MakeVignette();
                 var before = GUI.color;
@@ -1859,7 +1859,7 @@ namespace Game.Client
                     var element = World.ElementOfCause(e.Cause);
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : element != SkillTag.None ? Palette.Of(element) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
                     var numberAt = element == SkillTag.None ? target.Position : target.Position + new Vector3(0.35f, 0.2f, 0);
-                    _floating.Add(new Floating { Position = numberAt, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
+                    if (Feel.Numbers) _floating.Add(new Floating { Position = numberAt, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
                     // And a burst of the element where it struck, for everyone to see (2026-11-09).
                     if (element != SkillTag.None) AddFlash(target.Position + new Vector3(0, target.Diameter * 0.15f, 0), 0.5f, Palette.Of(element), FlashKind.Burst);
                     // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
@@ -2445,6 +2445,7 @@ namespace Game.Client
 
         void AddFlash(Vector3 position, float radius, Color color, FlashKind kind)
         {
+            if (kind == FlashKind.Impact && !Feel.Impact) return;
             int diameter = EffectArt.Diameter(radius * 2);
             var renderer = Renderer(_root.transform, "Flash", EffectSprite(kind, diameter, 0), color);
             renderer.transform.localPosition = position;
@@ -2502,6 +2503,10 @@ namespace Game.Client
             float scale = 1 + pulse * Mathf.Sin(Time.time * 30);
             body.Shape.transform.localScale = new Vector3(1, scale, 1);
             // Leaning into an attack: out and back along its direction.
+            if (!Feel.Lunge) body.LungeTime = 0;
+            if (!Feel.Knock) body.KnockTime = 0;
+            if (!Feel.Flash) body.FlashTime = 0;
+            if (!Feel.Swing) body.SwingTime = 0;
             float lean = body.LungeTime > 0 ? Mathf.Sin(body.LungeTime / LungeSeconds * Mathf.PI) * LungeDistance * body.LungeReach : 0;
             // Knocked back by a blow: out and back the other way.
             float knock = body.KnockTime > 0 ? Mathf.Sin(body.KnockTime / KnockSeconds * Mathf.PI) * LungeDistance * body.KnockReach : 0;
@@ -2809,6 +2814,7 @@ namespace Game.Client
         // Bits flying out of something that died, in its colour, more for something bigger.
         void Burst(Vector3 at, Color color, float size)
         {
+            if (!Feel.Bits) return;
             int count = Mathf.RoundToInt(BitsPerDeath * Mathf.Clamp(size, 0.6f, 2.5f));
             for (int i = 0; i < count; i++)
             {

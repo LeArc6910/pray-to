@@ -120,6 +120,10 @@ namespace Game.Client
                     float into = ((hour - Calendar.MorningHour) % 24 + 24) % 24;
                     world.RestoreClock((long)((Int(words[1]) - 1 + into / 24) * Calendar.TicksPerDay));
                     return null;
+                case "feel":
+                    // feel <piece|all> <on|off>: one piece of a blow's feedback (Feel, Docs/Feel.md).
+                    if (!Feel.Set(words[1], words.Length < 3 || words[2] != "off")) return $"no feel '{words[1]}' (all, {string.Join(", ", Feel.Names)})";
+                    return $"ok feel off: {Feel.Off}";
                 case "daylength":
                     // daylength <minutes>: how long a day of this world takes (Calendar.DayLengths).
                     world.SetDayMinutes(Int(words[1]));
@@ -704,6 +708,7 @@ namespace Game.Client
                 json.Field("clockTicks", world.Clock);
                 json.Field("tick", world.Tick);
                 json.Field("dayMinutes", world.DayMinutes);
+                json.Field("feelOff", Feel.Off);
                 json.Field("weather", world.WeatherToday.ToString());
                 json.Field("event", world.EventToday.ToString());
                 var line = player.Fishing;
