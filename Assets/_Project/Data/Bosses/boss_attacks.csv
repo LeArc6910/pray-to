@@ -80,10 +80,10 @@ mad_general,ember_spiral,불씨 나선,3,spiral,self,0.7,13,0.3,,20,4,6,,7,1.1,1
 mad_general,call_soldiers,병사 부르기,3,summon,self,0.8,,,,,,2,3,,1.0,10,demon_soldier
 mad_general,meteors,불운석,3,circle,each,1.3,26,1.4,,,,3,2.6,,1.1,16,
 crown_wraith,grasp,망령의 손길,,cone,nearest,0.8,28,,3.4,110,,,,,0.8,28,
-crown_wraith,drown,가라앉히기,,circle,random,1.2,24,1.5,,,,4,4,,1.0,22,
-crown_wraith,undertow,역류,,trail,farthest,0.9,22,1.2,9,,,5,,9,0.9,18,
-crown_wraith,crown_ring,왕관의 고리,2|3,ring,self,1.2,22,2.4,6.5,,,,,,1.0,18,
-crown_wraith,crown_cross,물의 십자,2|3,cross,self,1.2,26,,9,45,1.5,,,,1.0,16,
-crown_wraith,deep_share,깊은 수압,2|3,share,random,1.3,44,1.8,,,,,,,1.0,14,
-crown_wraith,cold_spiral,찬 물방울 나선,3,spiral,self,0.7,12,0.3,,22,5,6,,7,1.2,15,
-crown_wraith,call_crabs,게 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,lake_crab
+crown_wraith,lightning_fall,벼락,,circle,random,1.2,24,1.5,,,,4,4,,1.0,22,
+crown_wraith,soul_lance,넋의 창,,line,nearest,0.9,30,,11,,1.2,,,,1.0,18,
+crown_wraith,phantom_rush,유령 돌진,2|3,charge,farthest,1.0,32,,11,,2.2,,,18,1.1,20,
+crown_wraith,crown_ring,왕관의 고리,2|3,ring,self,1.2,22,2.4,6.5,,,,,,1.0,16,
+crown_wraith,storm_brand,번개 낙인,2|3,circle,each,1.3,26,1.4,,,,2,2.2,,1.1,16,
+crown_wraith,deep_share,깊은 수압,3,share,random,1.3,44,1.8,,,,,,,1.0,14,
+crown_wraith,call_wisps,도깨비불 부르기,3,summon,self,0.8,,,,,,3,3,,1.0,10,tide_wisp

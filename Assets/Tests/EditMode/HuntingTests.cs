@@ -111,8 +111,10 @@ namespace Game.Core.Tests
         {
             var generator = new LootGenerator(Gear.Data);
             var own = generator.LegendariesOf(World.RiftLegendaries).ToList();
-            Assert.AreEqual(5, own.Count);
-            Assert.IsTrue(own.All(b => b.Level == 45 && b.RequiredLevel == 45));
+            Assert.AreEqual(7, own.Count);
+            Assert.IsTrue(own.All(b => (b.Level == 45 || b.Level == 48) && b.RequiredLevel == b.Level));
+            // Two at 48 for the levels past the void gear (2026-11-11, the content audit: nothing new from 46 to 50).
+            CollectionAssert.AreEquivalent(new[] { "rift_scepter", "rift_loop" }, own.Where(b => b.Level == 48).Select(b => b.Id));
             var edge = generator.RollLegendary(own.Single(b => b.Id == "rift_edge"), new GameRandom(1));
             Assert.AreEqual(Rarity.Legendary, edge.Rarity);
         }

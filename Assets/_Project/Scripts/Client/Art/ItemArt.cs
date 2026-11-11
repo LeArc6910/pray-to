@@ -152,16 +152,18 @@ namespace Game.Client
         public static PixelImage Gear(ItemBase item)
         {
             // A legendary is gold, with fiery stones.
-            var metal = item.IsLegendary ? Ramp.Of("#E8B23A") : Metal(item.Level);
+            // Tinged with its boss's colour, so legendaries of one slot differ (LegendaryStones).
+            var metal = item.IsLegendary ? Ramp.Of(Rgba.Hex("#E8B23A").Mix(LegendaryStones(item.Legendary).Light, 0.3f)) : Metal(item.Level);
             var colors = new Dictionary<char, Rgba>(Common)
             {
                 ['L'] = metal.Light,
                 ['M'] = metal.Main,
                 ['m'] = metal.Shade,
                 ['d'] = metal.Dark,
-                ['g'] = item.IsLegendary ? Rgba.Hex("#FF8A3C") : item.Slot == ItemSlot.Weapon ? Rgba.Hex("#C88CFF") : Rgba.Hex("#E8485A"),
-                ['G'] = item.IsLegendary ? Rgba.Hex("#B83A10") : item.Slot == ItemSlot.Weapon ? Rgba.Hex("#7E46D0") : Rgba.Hex("#9A2234"),
+                ['g'] = item.Slot == ItemSlot.Weapon ? Rgba.Hex("#C88CFF") : Rgba.Hex("#E8485A"),
+                ['G'] = item.Slot == ItemSlot.Weapon ? Rgba.Hex("#7E46D0") : Rgba.Hex("#9A2234"),
             };
+            if (item.IsLegendary) (colors['g'], colors['G']) = LegendaryStones(item.Legendary);
             // A weapon that adds an element's damage (2026-11-09) wears that element's stone: ember, frost or spark.
             var adds = item.Implicits.Select(m => m.Stat).FirstOrDefault(s => s == StatType.FireDamage || s == StatType.ColdDamage || s == StatType.LightningDamage);
             if (!item.IsLegendary && adds != default)
@@ -184,6 +186,22 @@ namespace Game.Client
             };
             return PixelImage.FromRows(colors, rows).Outlined(Outline);
         }
+
+        // A legendary's stones are its boss's colour (2026-11-11, the content audit: the legendaries of one slot were
+        // drawn alike whichever boss they came from).
+        static (Rgba Light, Rgba Dark) LegendaryStones(string owner) => owner switch
+        {
+            "cave_warden" => (Rgba.Hex("#FFA83A"), Rgba.Hex("#B8601A")),
+            "crystal_queen" => (Rgba.Hex("#FF6E9C"), Rgba.Hex("#B02A58")),
+            "lava_titan" => (Rgba.Hex("#FF5A2A"), Rgba.Hex("#A82010")),
+            "void_lord" => (Rgba.Hex("#C8A8FF"), Rgba.Hex("#6A44B8")),
+            "mad_general" => (Rgba.Hex("#E83A3A"), Rgba.Hex("#7A1420")),
+            "crown_wraith" => (Rgba.Hex("#A8F0FF"), Rgba.Hex("#2E8CA8")),
+            "antlion" => (Rgba.Hex("#E8C060"), Rgba.Hex("#9A7020")),
+            "tide_serpent" => (Rgba.Hex("#5AD2E6"), Rgba.Hex("#1E6A8A")),
+            "rift" => (Rgba.Hex("#F0E8FF"), Rgba.Hex("#8C6CE0")),
+            _ => (Rgba.Hex("#FF8A3C"), Rgba.Hex("#B83A10")),
+        };
 
         // ---- Runes and consumables ----
 

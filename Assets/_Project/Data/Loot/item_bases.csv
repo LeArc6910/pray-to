@@ -64,7 +64,7 @@ lord_scepter,공허 군주의 홀,weapon,40,magic|lightning,Damage+55~62;Magic:D
 void_band,공허의 고리,ring,40,,MaxHealth+50~60;Damage+12%;CritChance+5;AttackSpeed+8%,1,0,,void_lord,25,,
 general_blade,모르그의 불꽃 대검,weapon,15,melee,Damage+16~19;FireDamage+6~8;CritDamage+20;AttackSpeed-10%,2,0,,mad_general,25,,
 legion_mantle,군단장의 망토,chest,15,,Armor+20~24;MaxHealth+25~30;MoveSpeed+5%,2,0,,mad_general,25,,
-wraith_circlet,망령의 관,helmet,22,,Armor+18~22;MaxMana+30~36;Cold:Damage+20%,2,0,,crown_wraith,25,,
+wraith_circlet,망령의 관,helmet,22,,Armor+18~22;MaxMana+30~36;Lightning:Damage+20%,2,0,,crown_wraith,25,,
 drowned_mantle,물에 젖은 왕의 망토,chest,22,,Armor+30~36;MaxHealth+30~36;HealthRegen+2,2,0,,crown_wraith,25,,
 # 균열 전설(2026-11-04): 균열을 깨면 떨어진다(chance% + 단계마다 3%). 셋은 공허 순례자 세트(sets.csv)
 pilgrim_hood,공허 순례자의 두건,helmet,45,,Armor+40~50;MaxHealth+40~50;CritChance+3,2,0,,rift,4,,pilgrim
@@ -77,3 +77,9 @@ rift_band,균열 고리,ring,45,,SkillRank+1;MaxHealth+40~50,1,0,
 rift_charm,균열 부적,amulet,45,,CooldownRecovery+12~15%;Damage+10~12%,1,0,
 tide_amulet,물살의 목걸이,amulet,25,,MaxMana+30~40;ManaRegen+3~4,1,0,
 sandstride_boots,모래걸음 장화,boots,15,,Armor+7~9;MoveSpeed+6~8%,2,0,
+antlion_mandible,개미귀신의 턱칼,weapon,12,melee,Damage+13~15;CritChance+5;AttackSpeed+10%,2,0,,antlion,25,,
+sandwhirl_boots,모래 회오리 장화,boots,12,,Armor+7~9;MaxHealth+15~18;MoveSpeed+8%,2,0,,antlion,25,,
+abyssal_harpoon,심해의 작살,weapon,20,ranged,Damage+20~24;ColdDamage+5~7;CritChance+3,2,0,,tide_serpent,25,,
+scale_mail,뱀비늘 갑옷,chest,20,,Armor+28~33;MaxHealth+25~30;HealthRegen+2,2,0,,tide_serpent,25,,
+rift_scepter,끝없는 균열의 홀,weapon,48,magic,Damage+66~74;Magic:Damage+50%;CritChance+5,3,0,,rift,1,,
+rift_loop,끝없는 고리,ring,48,,Damage+12~15%;MaxHealth+50~60;CooldownRecovery+8~10%,1,0,,rift,1,,

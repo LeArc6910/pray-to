@@ -1,4 +1,4 @@
 strays 0
 colours 1
 wobble 6
-twins 19
+twins 10

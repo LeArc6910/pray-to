@@ -544,7 +544,10 @@ namespace Game.Core.Tests
                 for (int i = 0; i + 1 < rows.Count; i++) Assert.AreEqual(rows[i + 1].Index, rows[i].Next, $"{chain.Id} goes row by row");
             }
             Assert.AreEqual(21, story.Steps[10].Next, "both branches go on to chapter 4, past the side stories' rows");
-            foreach (int ending in new[] { 25, 26, 27 }) Assert.AreEqual(story.Steps.Count, story.Steps[ending].Next, "each ending ends the story");
+            // Chapter 4's three endings go on to chapter 5 (2026-11-11), which ends the story.
+            foreach (int ending in new[] { 25, 26, 27 }) Assert.AreEqual(28, story.Steps[ending].Next, "each ending goes on to chapter 5");
+            Assert.AreEqual(story.Steps.Count, story.Steps[32].Next, "chapter 5 ends the story");
+            Assert.AreEqual("void_lord", story.Steps[31].Boss);
 
             var host = Host();
             var world = host.World;
@@ -592,7 +595,7 @@ namespace Game.Core.Tests
             var told = story.Passed(0, 21, new Dictionary<int, int> { [8] = 0 });
             CollectionAssert.AreEqual(Enumerable.Range(0, 10), told.Select(s => s.Index));
             var crowned = story.Passed(0, story.Steps.Count, new Dictionary<int, int> { [8] = 1, [24] = 2 });
-            CollectionAssert.AreEqual(new[] { 21, 22, 23, 24, 27 }, crowned.Skip(10).Select(s => s.Index), "chapter 4 to the queen's ending");
+            CollectionAssert.AreEqual(new[] { 21, 22, 23, 24, 27, 28, 29, 30, 31, 32 }, crowned.Skip(10).Select(s => s.Index), "chapter 4 to the queen's ending, then chapter 5");
             Assert.AreEqual(3, story.Passed(0, 3, null).Count, "up to the step on now");
             int harbor = Index("harbor");
             Assert.AreEqual(2, story.Passed(harbor, Index("harbor", 2), null).Count);
