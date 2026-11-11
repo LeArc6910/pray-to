@@ -2,7 +2,7 @@
 
 클라우드 세션(코드·데이터·문서 담당)이 로컬(Unity 에디터가 있는 컴퓨터)에 넘기는 작업 목록이다.
 에디터 설정, 컴파일 확인, 테스트, 화면 캡처는 **명령 한 줄**로 끝나고, **감시 스크립트**를 켜 두면 그것도 사람 손 없이 돈다. 그 밖에 사람이 직접 해야 하는 일은 아래에 따로 모아 둔다.
-로컬 세션(이 컴퓨터에서 도는 Claude)이 있다면 명령 한 줄과 결과 보고는 로컬 세션이 해도 된다.
+로컬 세션(이 컴퓨터에서 도는 AI 세션)이 있다면 명령 한 줄과 결과 보고는 로컬 세션이 해도 된다.
 
 ## 사람 손 없이 돌리기 (2026-11-04)
 
@@ -60,7 +60,7 @@ DevTools/Local/setup.sh --commit
 
 ## 사람이 직접 해야 하는 일
 
-계정, 라이선스, 저장소 설정, 그리고 직접 해 보는 느낌은 Claude가 대신할 수 없다.
+계정, 라이선스, 저장소 설정, 그리고 직접 해 보는 느낌은 AI 세션이 대신할 수 없다.
 
 ### 처음 한 번
 
@@ -74,7 +74,7 @@ DevTools/Local/setup.sh --commit
 
 배포처는 공개 저장소 + GitHub Pages로 정했다(2026-10-28). 빌드·배포 워크플로(`web-demo.yml`)는 클라우드가 붙였고, 아래 셋을 하면 푸시마다 https://learc6910.github.io/pray-to/ 가 갱신된다. 자세한 건 `Docs/WebDemo.md`.
 
-- [x] (2026-10-28 로컬 세션, 사용자 승인) **저장소를 public으로.** GitHub 저장소 Settings > General 맨 아래 Danger Zone > Change repository visibility > Make public. 클라우드 세션에는 이 권한이 없다. 로컬 세션에 맡긴다면 사람이 허락한 뒤 `gh repo edit LeArc6910/pray-to --visibility public --accept-visibility-change-consequences`. 공개 전에 기록을 확인했다: 커밋 이메일은 GitHub·Anthropic의 noreply 주소이고, 라이선스 파일·키·비밀번호는 없다
+- [x] (2026-10-28 로컬 세션, 사용자 승인) **저장소를 public으로.** GitHub 저장소 Settings > General 맨 아래 Danger Zone > Change repository visibility > Make public. 클라우드 세션에는 이 권한이 없다. 로컬 세션에 맡긴다면 사람이 허락한 뒤 `gh repo edit LeArc6910/pray-to --visibility public --accept-visibility-change-consequences`. 공개 전에 기록을 확인했다: 커밋 이메일은 noreply 주소뿐이고, 라이선스 파일·키·비밀번호는 없다
 - [x] (2026-10-28 로컬 세션, `gh api`로 build_type=workflow) Settings > Pages > Build and deployment > Source를 **GitHub Actions**로 (public이 된 뒤에 고를 수 있다)
 - [x] ~~라이선스 파일 찾기~~ 필요 없어졌다(2026-10-28). Unity 6 Personal에는 ULF 파일이 없고, 웹 데모 빌드는 이제 이메일·비밀번호로 Personal을 활성화한다
 - [x] (2026-10-28 01:38 사람이 넣음. 값은 확인하지 않음) Settings > Secrets and variables > Actions에 시크릿 추가: `UNITY_EMAIL`, `UNITY_PASSWORD`(Unity 계정. 소셜 로그인이나 2단계 인증 없이 https://id.unity.com 에 이메일·비밀번호로 들어가지는 계정). **이 값들은 이 파일이나 커밋, 채팅에 절대 적지 않는다.** 공개 저장소여도 시크릿은 보이지 않는다. 처음에 넣었던 `UNITY_LICENSE`는 이제 쓰지 않으니 지워도 된다
@@ -96,17 +96,6 @@ DevTools/Local/setup.sh --commit
 - [ ] https://cloud.unity.com 에서 그 프로젝트를 열고 **Player Authentication > Identity providers**에서 **Username & Password**를 추가해 켠다(환경은 production)
 - [ ] 같은 곳에서 **Cloud Save**를 쓸 수 있는지 본다(처음 쓰는 거라 켜라고 하면 켠다). 무료 한도가 있다. 결제 수단을 요구하면 진행하기 전에 정한다
 - [ ] 결과 보고에는 켰는지만 적는다. 계정의 아이디·비밀번호는 적지 않는다
-
-### (선택) 휴대폰에서 로컬 작업 시키기: Remote Control
-
-이 컴퓨터에서 Claude Code를 켜 두면 휴대폰 Claude 앱에서 그 세션에 일을 시킬 수 있다. 명령 한 줄 실행과 결과 확인을 밖에서 할 수 있다. Pro, Max, Team, Enterprise 플랜이 필요하다.
-
-- [ ] Claude Code 설치. Windows PowerShell에서 `irm https://claude.ai/install.ps1 | iex` (macOS·Linux는 https://code.claude.com/docs/en/setup 참고)
-- [ ] 저장소 폴더에서 `claude`를 한 번 실행해 claude.ai 계정으로 로그인
-- [ ] 같은 폴더에서 `claude remote-control --name pray-to`. 처음에 `Enable Remote Control? (y/n)`에 y
-- [ ] 휴대폰 Claude 앱 > Code에서 초록 점이 붙은 컴퓨터 아이콘의 `pray-to` 세션을 연다
-- 컴퓨터가 켜져 있고 터미널이 열려 있는 동안만 쓸 수 있다. 끝내려면 터미널에서 Ctrl+C
-- 파일 수정이나 명령 실행 허락을 묻는 창이 휴대폰으로 온다. Windows에서는 명령이 샌드박스 없이 돌기 때문에 무엇을 하려는지 보고 허락한다
 
 ### 매번: 직접 플레이하고 느낌 적기
 
@@ -949,13 +938,12 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(코드만 바뀌었다) → 2026-11-11 했다(`d048dd0`, `dfe311d`, -NoScreens)
   - (클라우드) 배포 뒤 `feel.js`로 `no-squash.gif`를 만들어 보낸다
   - (사람) 맞을 때 한 픽셀 낮고 넓게, 내밀 때 높고 좁게 바뀌는 것이 손맛을 더하는지, 떨림처럼 보이지 않는지
-- [ ] 121단계: 의견 단추, CI 자동 수정 켜기, 출시 계획 결정(`Docs/Release.md`)
+- [ ] 121단계: 의견 단추, 출시 계획 결정(`Docs/Release.md`)
   - 명령 한 줄을 다시 돌린다(코드가 바뀌었다) → 2026-11-11 했다(`d048dd0`, `dfe311d`, -NoScreens)
   - (클라우드 웹 점검) 메뉴의 [의견 보내기]와 기기 안 단계 기록(로드·첫 채굴)을 `sweep.js --only menu,basics`가 본다. 결과는 배포 뒤 여기에 적는다
     - 2026-11-11 check67(250ac12): 통과. 메뉴에 [의견 보내기], 단계 기록 "로드 0:00 · 첫 채굴 0:13". menu·basics·touch 108개 통과, 실패 0
   - (사람) 메뉴의 [의견 보내기]를 눌러 GitHub 이슈 쓰기 화면에 버전·기기·플레이 시간·단계가 채워져 열리는지(보내지 않아도 된다)
-  - (사람, 켜고 싶으면) CI 자동 수정: 저장소 Settings → Secrets and variables → Actions에 `ANTHROPIC_API_KEY`를 넣는다. 넣지 않으면 알림만 남기고 건너뛴다. API 사용료는 키 주인 계정에 든다
-  - (사람, 결정) `Docs/Release.md`의 한 줄 훅 후보 가운데 하나 고르기, Steam 페이지를 만들지와 시기, AI 사용 공개 문구, 외부 분석 서비스를 붙일지
+  - (사람, 결정) `Docs/Release.md`의 한 줄 훅 후보 가운데 하나 고르기, Steam 페이지를 만들지와 시기, 외부 분석 서비스를 붙일지
 - [ ] 122단계: 곡을 마디 경계에서 바꾸기(`Docs/ArtPipeline.md` 음악 층)
   - 명령 한 줄을 다시 돌린다(코드만 바뀌었다) → 2026-11-11 했다(`d048dd0`, `dfe311d`, -NoScreens)
   - (사람, 헤드폰) 장소에 들어서고 나갈 때, 보스 3페이즈가 될 때 곡이 박자 가운데서 끊기지 않고 마디에서 바뀌는지, 기다림(최대 2.5초)이 늦게 느껴지지 않는지
@@ -1425,3 +1413,5 @@ DevTools/Local/setup.sh --commit
   - 같은 규칙에 걸리는 나머지(도구 이름, 회사 이름, 대화 앱 주소): `Docs/HumanChecklist.md` 5줄의 체크 페이지 주소, `Docs/PixelArtMcp.md`의 커넥터·설치 안내, `Docs/ArtPipeline.md` 160줄, `Docs/Research2026-11.md`(11곳), `Assets/_Project/Scripts/Core/Bot/BotMemory.cs` 302줄 주석, 이 파일의 5·63·77줄과 "(선택) 휴대폰에서 로컬 작업 시키기" 절, `CLOUD_LOG.md`의 도구 이름 몇 곳. 지울지 바꿔 쓸지는 클라우드가 정한다(체크 페이지는 주소를 빼도 그대로 쓸 수 있다)
   - 다시 들어오지 않게 `CLAUDE.md`의 규칙 절에 이 결정을 한 줄 적어 주세요
 - 로컬 세션이 쓴 지난 기록의 도구 이름(브라우저를 가리킨 6곳)은 이번에 로컬이 "앱 내장 브라우저"로 고쳤다
+- 2026-11-11 클라우드 처리: CI 자동 수정 워크플로를 지우고 `Docs/Release.md`의 그 절과 AI 사용 공개 문구, 121단계의 키 항목을 뺐다. 체크 페이지 주소, 그림 문서의 커넥터·설치 안내, 조사 문서(출처 링크는 사이트 이름만 남김), 봇 주석, 이 파일의 5·63·77줄과 휴대폰 원격 작업 절, `CLOUD_LOG.md`의 도구 이름을 지우거나 일반 말로 바꿨다. `CLAUDE.md` 규칙 절에 결정 한 줄을 더했다
+  - 남은 것: `.claude/` 폴더 삭제. 클라우드 세션 자신의 동작 설정이라 클라우드에서 지우는 명령이 권한 판단에서 막혔다. 사람이 클라우드 채팅에서 지워도 된다고 하거나 로컬 세션이 지운다. 지운 뒤 `CLAUDE.md` 13줄의 "(… 훅이 막는다 …)"를 "규칙으로 지킨다"로 고친다

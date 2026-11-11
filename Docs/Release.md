@@ -1,6 +1,6 @@
 # 출시 계획 초안
 
-조사 보고서 후보 18·19·13(`Docs/Research2026-11.md`, 2026-11-11). 계정을 만들고 돈을 내고 공개하는 일은 사람이 정하고 한다. 이 문서는 그 결정을 돕는 초안이고, 클라우드가 미리 해 둘 수 있는 것(문구 초안, 의견 단추, CI 자동 수정)은 해 두었다.
+조사 보고서 후보 18·13(`Docs/Research2026-11.md`, 2026-11-11). 계정을 만들고 돈을 내고 공개하는 일은 사람이 정하고 한다. 이 문서는 그 결정을 돕는 초안이고, 클라우드가 미리 해 둘 수 있는 것(문구 초안, 의견 단추, CI 자동 수정)은 해 두었다.
 
 ## 순서
 
@@ -35,14 +35,6 @@
 - 농사·낚시·동물·요리, 자동화 공장, 기지 방어, 공허의 균열
 - 하루 길이를 고르는 느긋한 생활(20~60분), 놓쳐도 잃지 않는 날
 
-## AI 사용 공개 문구 초안
-
-Steam은 2026년 1월부터 **플레이어가 보거나 듣는 AI 생성물**을 중심으로 공개를 받는다. pray-to의 그림과 소리는 사람이 정한 규칙을 코드로 그리고 합성한 것이다(`Docs/ArtPipeline.md`). 다만 그 코드와 글의 많은 부분을 AI 코딩 도구가 썼으므로 숨기지 않고 쓰는 편이 낫다.
-
-> 이 게임의 코드와 글 일부는 AI 코딩 도구(Claude Code)의 도움을 받아 썼습니다. 그림과 효과음·음악은 생성형 이미지·음악 모델을 쓰지 않고, 도트와 소리를 코드로 그리고 합성했습니다. 모든 내용은 개발자가 정하고 검토했습니다.
-
-> Parts of this game's code and text were written with the help of an AI coding tool (Claude Code). The art, sound effects and music use no generative image or music model: the pixels and sounds are drawn and synthesized by code. The developer decided and reviewed everything.
-
 ## 의견 단추와 단계 기록(후보 13)
 
 외부 분석 서비스를 고르는 것은 사람의 결정(개인정보 고지, 비용)이라 서비스는 붙이지 않았다. 대신 서비스 없이 되는 만큼 넣었다(`Client/Feedback.cs`).
@@ -51,9 +43,3 @@ Steam은 2026년 1월부터 **플레이어가 보거나 듣는 AI 생성물**을
 - **[의견 보내기]**(메뉴): 버전, 기기(웹·PC·휴대폰), 플레이 시간, 위 단계 기록을 채운 GitHub 이슈 쓰기 화면을 연다. 사람이 읽고 직접 [Submit]을 눌러야 보내진다(GitHub 계정 필요)
 - 나중에 서비스를 고르면(예: PostHog, Plausible, 직접 만든 작은 수집 서버) 단계 기록을 그쪽으로도 보내게 할 수 있다. 그때는 메뉴에 고지와 끄기 단추를 함께 둔다
 
-## CI 자동 수정(후보 19)
-
-`.github/workflows/ci-autofix.yml`: main에서 Core 테스트 워크플로가 실패하면 Claude가 실패 로그를 읽고 고친 브랜치(`claude/autofix-<커밋>`)로 풀 리퀘스트를 연다. main에 직접 올리지 않고, 같은 커밋에는 한 번만, 자기가 만든 브랜치의 실패에는 돌지 않는다. 확실한 원인을 못 찾으면 이슈를 연다. 테스트를 끄거나 약하게 하지 말라고 지시해 두었다.
-
-- **켜려면**(사람): 저장소 Settings → Secrets and variables → Actions에 `ANTHROPIC_API_KEY`를 넣는다. 없으면 알림만 남기고 건너뛴다(`LOCAL_TASKS.md` 121단계)
-- 쓰는 액션: `anthropics/claude-code-action@v1`. API 사용료는 키 주인의 계정에 든다

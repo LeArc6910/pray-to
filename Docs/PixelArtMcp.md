@@ -35,7 +35,7 @@
 
 ## 클라우드 세션에 연결하는 법
 
-클라우드 세션은 매번 새 컨테이너에서 시작하므로, 내 컴퓨터에서 `claude mcp add`로 넣은 설정은 넘어오지 않는다. 방법은 둘이다.
+클라우드 세션은 매번 새 컨테이너에서 시작하므로, 내 컴퓨터에서 명령으로 넣은 MCP 설정은 넘어오지 않는다. 방법은 둘이다.
 
 ### 1. 저장소의 `.mcp.json`과 환경에 넣은 키 (추천)
 
@@ -64,16 +64,16 @@
 - 키를 넣은 다음 **새 세션**부터 MCP 도구가 보인다. 처음 쓸 때 저장소의 MCP 서버를 믿을지 묻는 확인이 나올 수 있다.
 - 로컬에서 쓰려면 같은 이름의 환경 변수를 그 컴퓨터에도 둔다.
 
-### 2. claude.ai 커넥터
+### 2. 대화 앱의 커넥터
 
-[claude.ai 커넥터 설정](https://claude.ai/customize/connectors)에서 원격 MCP 주소로 사용자 지정 커넥터를 더하는 방법도 있다. 연결한 커넥터는 새로 시작하는 세션에서 읽힌다.
+대화 앱의 커넥터 설정에서 원격 MCP 주소로 사용자 지정 커넥터를 더하는 방법도 있다. 연결한 커넥터는 새로 시작하는 세션에서 읽힌다.
 
-다만 두 서비스는 API 키를 `Authorization` 헤더로 받는다. claude.ai 커넥터가 이런 고정 키를 받을 수 있는지, 두 서비스가 OAuth 로그인을 지원하는지는 확인하지 못했다. 안 되면 1번으로 한다.
+다만 두 서비스는 API 키를 `Authorization` 헤더로 받는다. 커넥터가 이런 고정 키를 받을 수 있는지, 두 서비스가 OAuth 로그인을 지원하는지는 확인하지 못했다. 안 되면 1번으로 한다.
 
 ### 네트워크
 
 - 2026-11-02에 이 클라우드 환경에서 두 주소 모두 MCP 연결 요청(initialize)에 HTTP 200으로 답했다. 지금 네트워크 정책으로 닿는다.
-- 나중에 막히면 환경 설정의 Network access에서 `mcp.retrodiffusion.ai`, `api.pixellab.ai`를 Allowed domains에 더한다([안내](https://code.claude.com/docs/en/cloud-environments#network-access)). 그때 "Allow package managers"는 켜 둔다.
+- 나중에 막히면 환경 설정의 Network access에서 `mcp.retrodiffusion.ai`, `api.pixellab.ai`를 Allowed domains에 더한다(클라우드 환경 설정 안내 참고). 그때 "Allow package managers"는 켜 둔다.
 
 ## 쓰기로 하면
 

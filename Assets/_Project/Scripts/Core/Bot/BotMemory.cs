@@ -299,7 +299,7 @@ namespace Game.Core
         }
     }
 
-    // Where and why a bot gave up on something (BotPilot): a report a person (or Claude) can read.
+    // Where and why a bot gave up on something (BotPilot): a report a person (or an AI session) can read.
     public sealed class BotStuck
     {
         public long Tick { get; set; }
