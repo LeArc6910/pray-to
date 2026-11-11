@@ -1987,9 +1987,15 @@ async function firstRun(browser, profile, hourLong) {
   const clock = () => `${Math.round((Date.now() - began) / 1000)}초`;
   const goalNow = async () => {
     const hud = ((await game.texts()).hud || []).join(' | ');
-    const m = hud.match(/목표 (\d+)\/\d+: ([^|]*)/);
+    // "목표 3/55: …", or merged with the story's step "깨어난 수호자 · 목표 10/55" (2026-11-11).
+    const m = hud.match(/목표 (\d+)\/\d+:? ?([^|]*)/);
     return m ? { n: +m[1], text: m[2].trim() } : { n: 0, text: '' };
   };
+  // Each goal's place in the guide (goals.csv, 1 = the first), so the checks follow the sheet when the order changes
+  // (2026-11-11: the furnace, level 3, the warden and the bed came before planting, tilling, fishing and selling).
+  const order = fs.readFileSync(path.join(__dirname, '..', '..', 'Assets', '_Project', 'Data', 'Guide', 'goals.csv'), 'utf8')
+    .split('\n').slice(1).filter(l => l.trim()).map(l => l.split(',')[0]);
+  const at = id => order.indexOf(id) + 1;
   const steps = [];
   const passed = async (n, what) => {
     const now = await goalNow();
@@ -2177,13 +2183,13 @@ async function firstRun(browser, profile, hourLong) {
   check((await game.find('고르기')).length === 0, '레벨 1에는 하나만: 고른 뒤에는 [고르기]가 없다');
   await game.shot('class-picked', '전사를 고른 [스킬] 탭');
   await closeBag(game);
-  await passed(1, '클래스 고르기');
+  await passed(at('class'), '클래스 고르기');
 
   // 2. Ten stones, with the pickaxe on 2.
   await slot(2);
   await mine(async () => count(await inv(), 'stone') >= 10, 120);
   await game.wait(1200);
-  await passed(2, '돌 10개 모으기');
+  await passed(at('stone'), '돌 10개 모으기');
   await game.shot('first-stone', '돌을 캔 굴');
   // Room to put things: the walls on every side dug out, as a person clears a little room for a base (a workbench
   // set down in a tunnel one wide shuts the way back).
@@ -2249,10 +2255,10 @@ async function firstRun(browser, profile, hourLong) {
   await bagTab(game, '재료·제작');
   check(await game.press('만들기', /^작업대/), '[재료·제작]에 작업대 [만들기]가 있다');
   await closeBag(game);
-  await placeFor(3, '작업대 세우기', '작업대 ×');
+  await placeFor(at('workbench'), '작업대 세우기', '작업대 ×');
 
   // 3. A torch from the bag, onto other open floor.
-  await placeFor(4, '횃불 세우기', /^횃불 ×/);
+  await placeFor(at('torch'), '횃불 세우기', /^횃불 ×/);
 
   // 4. Stone floor: made at the workbench (beside it), laid on open floor.
   await mine(async () => count(await inv(), 'stone') >= 4, 150);
@@ -2271,7 +2277,7 @@ async function firstRun(browser, profile, hourLong) {
     note(`  - 돌 바닥 줄: ${rows.map(b => `${b.enabled ? '눌림' : '안 눌림'}${b.shown ? '' : '(가려짐)'} "${b.row}"`).join(' / ') || '없음'}, 돌 ${count(await inv(), 'stone')}`);
     await why('돌 바닥');
   }
-  await placeFor(5, '돌 바닥 깔기', /^돌 바닥 ×/);
+  await placeFor(at('floor'), '돌 바닥 깔기', /^돌 바닥 ×/);
 
   // 5. Six copper ores: the nearest veins by the way there (the minimap rings the nearest; the bot knows them all within
   // a screen and a half, and goes on past the edge of what it has seen when there are none).
@@ -2279,7 +2285,7 @@ async function firstRun(browser, profile, hourLong) {
   if (count(await inv(), 'copper_ore') < 6) await why(`구리 ${count(await inv(), 'copper_ore')}개에서 멈춤`);
   note(`- 구리까지: 길잡이 ${pilot.counts.navs}번 물음, 걸음 ${pilot.counts.moves}번, 캐기 ${pilot.counts.digs}번(그 가운데 6초 안에 안 깨진 것 ${spent.stuck}번), 싸움 ${pilot.counts.fights}번, 멈춤 ${pilot.counts.stalls}번`);
   await game.wait(1000);
-  await passed(6, '구리 광석 6개 캐기');
+  await passed(at('copper'), '구리 광석 6개 캐기');
 
   // 6. A piece of copper gear, made beside the workbench and worn. (Mining skill 2 was the sixth goal until
   // 2026-11-09: a hundred walls, three minutes or more of digging alone, held up every goal after it.)
@@ -2301,7 +2307,7 @@ async function firstRun(browser, profile, hourLong) {
   }
   await closeBag(game);
   await game.wait(1000);
-  await passed(7, '구리 장비 하나 만들기');
+  await passed(at('copper_gear'), '구리 장비 하나 만들기');
   await game.shot('first-gear', '처음 10분 끝');
   if (!hourLong) {
     // A second class at level 10 (2026-11-09): the slot opens, the banner says so, and the skills page offers the
@@ -2405,110 +2411,26 @@ async function firstRun(browser, profile, hourLong) {
       return (await felled()) - before;
     };
 
-    // 7. The two spores a new character has, planted on the cave floor ahead.
-    await faceOpen();
-    await bagTab(game, '재료·제작');
-    await game.press('심기', '버섯 포자');
-    await closeBag(game);
-    await game.wait(800);
-    await passed(8, '버섯 심기');
-
-    // Copper and stone for the hoe, the rod and the furnace (copper 2 + 2 + 2, stone 2 + 1 + 15).
-    await copperFor(6);
-    await mine(async () => count(await inv(), 'stone') >= 20, 150);
-    await taken('near Workbench', '작업대로 돌아갈 때');
-
-    // 8. A hoe, and [밭 갈기] on the floor ahead (other open sides when it does not take).
-    const hoe = await craft('호미');
-    note(`- 호미: ${hoe ? '만듦' : '못 만듦'} (구리 ${count(await inv(), 'copper_ore')}, 돌 ${count(await inv(), 'stone')}, 호미 ${count(await inv(), 'hoe')})`);
-    const tilled = [];
-    for (let attempt = 0; attempt < 4 && (await goalNow()).n <= 9; attempt++) {
-      const at = await faceOpen(tilled);
-      if (!at) break;
-      tilled.push(`${at.dx},${at.dy}`);
-      await bagTab(game, '재료·제작');
-      const pressed = await game.press('밭 갈기', '호미', { quiet: attempt > 0 });
-      await game.wait(500);
-      const s = await game.state();
-      await closeBag(game);
-      await game.wait(600);
-      if (s.ahead !== 'Soil') {
-        note(`  - (밭 갈기 ${attempt + 1}번째) 눌림 ${pressed}, 바라본 쪽 ${at.dx},${at.dy}, 앞 칸 ${s.ahead}, 그 칸 ${JSON.stringify(await game.look(at.dx, at.dy))}`);
-        await why('밭 갈기');
-      }
-    }
-    await passed(9, '밭 갈기');
-
-    // 9. A rod (slime gel 2: the torch goal's reward), at the nearest water.
-    await taken('near Workbench', '작업대로 돌아갈 때');
-    await craft('낚싯대');
-    // The furnace's stone (2026-11-10: the stone run before the hoe ended at its time with too little, so the furnace
-    // was never made and every goal after it stood still): more first if short, as a person would on seeing the cost.
+    // In the guide's order (goals.csv, 2026-11-11): the furnace, level 3, the warden and the bed, then planting,
+    // tilling, fishing, selling, the mining skill and level 5.
+    // The furnace: stone 15 and copper 2 at the workbench (2026-11-10: a stone run that ended short left it unmade and
+    // every goal after it standing), set down.
     if (count(await inv(), 'stone') < 15 || count(await inv(), 'copper_ore') < 2) {
       await copperFor(2);
       await mine(async () => count(await inv(), 'stone') >= 15, 300);
-      note(`- 화로 재료를 더 모았다: 돌 ${count(await inv(), 'stone')}, 구리 ${count(await inv(), 'copper_ore')}`);
-      await taken('near Workbench', '작업대로 돌아갈 때');
+      note(`- 화로 재료를 모았다: 돌 ${count(await inv(), 'stone')}, 구리 ${count(await inv(), 'copper_ore')}`);
     }
+    await taken('near Workbench', '작업대로 돌아갈 때');
     await craft('화로');
-    await taken('near Water', '물웅덩이를 찾을 때(안내는 "동굴 가장자리 물웅덩이"라고만 한다)');
-    await bagTab(game, '재료·제작');
-    await game.press('낚시', '낚싯대');
-    const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
-    let strikes = 0;
-    const fishing = Date.now() + 150000;
-    while (rod && Date.now() < fishing && (await goalNow()).n <= 10) {
-      const f = (await game.state()).fishing;
-      if (f === 'bite in') {
-        await game.tapAt(rod.cx, rod.cy);
-        strikes++;
-        await game.wait(700);
-      } else if (!f) {
-        await game.tapAt(rod.cx, rod.cy);
-        await game.wait(400);
-      }
-    }
-    await closeBag(game);
-    note(`- 낚시: 낚아채기 ${strikes}번`);
-    await passed(10, '물고기 낚기');
+    await placeFor(at('furnace'), '화로 세우기', /^화로 ×/);
 
-    // 10. Ten coins: what the merchant buys of the bag (fish, ore, mushrooms), at the stall near the spawn.
-    await taken('near MerchantStall', '상인 노점으로 갈 때');
-    await bagTab(game);
-    await game.press('상인');
-    await game.press('팔기');
-    for (let i = 0; i < 40 && count(await inv(), 'coin') < 10; i++) {
-      const sell = (await game.find('팔기')).find(b => b.enabled && b.shown && /광석|송사리|메기|송어|게 ×|새우|버섯|젤/.test(b.row || ''));
-      if (!sell) break;
-      await game.tapAt(sell.cx, sell.cy);
-      await game.wait(350);
-    }
-    note(`- 상인: 금화 ${count(await inv(), 'coin')}`);
-    await closeBag(game);
-    await game.wait(800);
-    await passed(11, '상인에게 팔아 금화 10개 모으기');
-
-    // 11. The furnace made at the workbench, set down.
-    await placeFor(12, '화로 세우기', /^화로 ×/);
-
-    // 12. Mining skill 2, from all the walls dug so far and more.
-    // Level 2 is 100 mining experience, a wall each (ore two), so it can take some minutes after the copper.
-    const lifeBefore = (await inv()).life;
-    const stoneBefore = count(await inv(), 'stone');
-    const digsBefore = spent.digs;
-    const stuckBefore = spent.stuck;
-    await mine(async () => (await goalNow()).n > 13, 900);
-    // What the ten minutes went on (2026-11-10: three runs ended this step at level 1).
-    note(`- 채굴 기술 단계: 생활 경험치(농사,낚시,요리,채굴) ${lifeBefore} → ${(await inv()).life}, 돌 ${stoneBefore} → ${count(await inv(), 'stone')}, 친 벽 ${spent.digs - digsBefore}번, 6초 안에 안 깨진 것 ${spent.stuck - stuckBefore}번`);
-    await passed(13, '채굴 기술 2레벨 되기');
-
-    // 13. Level 3 by hunting, away from the spawn, as the goal's hint says.
+    // Level 3 by hunting, away from the spawn, as the goal's hint says.
     const early = await hunt(async () => (await game.state()).level >= 3, 300);
     note(`- 레벨 3까지 사냥: ${early}마리, 레벨 ${(await game.state()).level}`);
     await game.wait(800);
-    await passed(14, '레벨 3 되기');
+    await passed(at('level3'), '레벨 3 되기');
 
-    // 14. The cave warden, fought with what the bot has: up to eight tries in ten minutes, back to the arena after a
+    // The cave warden, fought with what the bot has: up to eight tries in ten minutes, back to the arena after a
     // fall. Two levels more first (the bot dodges slower than a person; at level 3 it fell five times and at level 4
     // eight, at level 6 none, 2026-11-10).
     if ((await game.state()).level < 5) {
@@ -2547,7 +2469,7 @@ async function firstRun(browser, profile, hourLong) {
     let lowest = Infinity;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
-    while (Date.now() - wardenAt < 600000 && (await goalNow()).n <= 15 && falls < 8) {
+    while (Date.now() - wardenAt < 600000 && (await goalNow()).n <= at('boss') && falls < 8) {
       const s = await game.state();
       if (s.dead) {
         falls++;
@@ -2568,7 +2490,7 @@ async function firstRun(browser, profile, hourLong) {
       if (!boss) {
         // Asleep in its arena, or felled: to it by the way there (it wakes as the bot comes near), or the drops.
         await gather(5);
-        if ((await goalNow()).n > 15) break;
+        if ((await goalNow()).n > at('boss')) break;
         await pilot.go('fight cave_warden', { seconds: 4 });
         continue;
       }
@@ -2604,26 +2526,112 @@ async function firstRun(browser, profile, hourLong) {
     const fought = await game.state();
     note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 휘두름 ${swings}번, 가장 가까이 ${closest.toFixed(1)}칸, 가장 낮은 체력 ${lowest}, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
     await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
-    await passed(15, '동굴 수호자 쓰러뜨리기');
+    await passed(at('boss'), '동굴 수호자 쓰러뜨리기');
 
-    // 15. A bed: stone 6 and slime gel 3, the gel from slimes.
+    // A bed: stone 6 and slime gel 3, the gel from slimes; and two more for the rod after it (the guide's order since
+    // 2026-11-11 makes the bed before the rod, so the torch goal's two gel go into the bed).
     // Until both are in the bag (2026-11-10: three minutes of hunting left it short of gel, and the bed unmade).
     for (let round = 0; round < 3; round++) {
       const bag = await inv();
-      if (count(bag, 'slime_gel') >= 3 && count(bag, 'stone') >= 6) break;
-      await hunt(async () => count(await inv(), 'slime_gel') >= 3, 240, 'slime');
+      if (count(bag, 'slime_gel') >= 5 && count(bag, 'stone') >= 6) break;
+      await hunt(async () => count(await inv(), 'slime_gel') >= 5, 240, 'slime');
       await mine(async () => count(await inv(), 'stone') >= 6, 90);
     }
     note(`- 침대 재료: 슬라임 젤 ${count(await inv(), 'slime_gel')}, 돌 ${count(await inv(), 'stone')}`);
     await taken('near Workbench', '작업대로 돌아갈 때');
     await craft('침대');
-    await placeFor(16, '침대 세우기', /^침대 ×/);
+    await placeFor(at('bed'), '침대 세우기', /^침대 ×/);
 
-    // 16. Level 5 by hunting.
+    // The two spores a new character has, planted on the cave floor ahead.
+    await faceOpen();
+    await bagTab(game, '재료·제작');
+    await game.press('심기', '버섯 포자');
+    await closeBag(game);
+    await game.wait(800);
+    await passed(at('plant'), '버섯 심기');
+
+    // Copper and stone for the hoe and the rod (copper 2 + 2, stone 2 + 1).
+    await copperFor(4);
+    await mine(async () => count(await inv(), 'stone') >= 5, 150);
+    await taken('near Workbench', '작업대로 돌아갈 때');
+
+    // A hoe, and [밭 갈기] on the floor ahead (other open sides when it does not take).
+    const hoe = await craft('호미');
+    note(`- 호미: ${hoe ? '만듦' : '못 만듦'} (구리 ${count(await inv(), 'copper_ore')}, 돌 ${count(await inv(), 'stone')}, 호미 ${count(await inv(), 'hoe')})`);
+    const tilled = [];
+    for (let attempt = 0; attempt < 4 && (await goalNow()).n <= at('hoe'); attempt++) {
+      const at = await faceOpen(tilled);
+      if (!at) break;
+      tilled.push(`${at.dx},${at.dy}`);
+      await bagTab(game, '재료·제작');
+      const pressed = await game.press('밭 갈기', '호미', { quiet: attempt > 0 });
+      await game.wait(500);
+      const s = await game.state();
+      await closeBag(game);
+      await game.wait(600);
+      if (s.ahead !== 'Soil') {
+        note(`  - (밭 갈기 ${attempt + 1}번째) 눌림 ${pressed}, 바라본 쪽 ${at.dx},${at.dy}, 앞 칸 ${s.ahead}, 그 칸 ${JSON.stringify(await game.look(at.dx, at.dy))}`);
+        await why('밭 갈기');
+      }
+    }
+    await passed(at('hoe'), '밭 갈기');
+
+    // A rod (slime gel 2, from the slimes before the bed), at the nearest water.
+    await taken('near Workbench', '작업대로 돌아갈 때');
+    await craft('낚싯대');
+    await taken('near Water', '물웅덩이를 찾을 때(안내는 "동굴 가장자리 물웅덩이"라고만 한다)');
+    await bagTab(game, '재료·제작');
+    await game.press('낚시', '낚싯대');
+    const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
+    let strikes = 0;
+    const fishing = Date.now() + 150000;
+    while (rod && Date.now() < fishing && (await goalNow()).n <= at('fishing')) {
+      const f = (await game.state()).fishing;
+      if (f === 'bite in') {
+        await game.tapAt(rod.cx, rod.cy);
+        strikes++;
+        await game.wait(700);
+      } else if (!f) {
+        await game.tapAt(rod.cx, rod.cy);
+        await game.wait(400);
+      }
+    }
+    await closeBag(game);
+    note(`- 낚시: 낚아채기 ${strikes}번`);
+    await passed(at('fishing'), '물고기 낚기');
+
+    // Ten coins: what the merchant buys of the bag (fish, ore, mushrooms), at the stall near the spawn.
+    await taken('near MerchantStall', '상인 노점으로 갈 때');
+    await bagTab(game);
+    await game.press('상인');
+    await game.press('팔기');
+    for (let i = 0; i < 40 && count(await inv(), 'coin') < 10; i++) {
+      const sell = (await game.find('팔기')).find(b => b.enabled && b.shown && /광석|송사리|메기|송어|게 ×|새우|버섯|젤/.test(b.row || ''));
+      if (!sell) break;
+      await game.tapAt(sell.cx, sell.cy);
+      await game.wait(350);
+    }
+    note(`- 상인: 금화 ${count(await inv(), 'coin')}`);
+    await closeBag(game);
+    await game.wait(800);
+    await passed(at('merchant'), '상인에게 팔아 금화 10개 모으기');
+
+    // Mining skill 2, from all the walls dug so far and more.
+    // Level 2 is 100 mining experience, a wall each (ore two), so it can take some minutes after the copper.
+    const lifeBefore = (await inv()).life;
+    const stoneBefore = count(await inv(), 'stone');
+    const digsBefore = spent.digs;
+    const stuckBefore = spent.stuck;
+    await mine(async () => (await goalNow()).n > at('life_mining'), 900);
+    // What the ten minutes went on (2026-11-10: three runs ended this step at level 1).
+    note(`- 채굴 기술 단계: 생활 경험치(농사,낚시,요리,채굴) ${lifeBefore} → ${(await inv()).life}, 돌 ${stoneBefore} → ${count(await inv(), 'stone')}, 친 벽 ${spent.digs - digsBefore}번, 6초 안에 안 깨진 것 ${spent.stuck - stuckBefore}번`);
+    await passed(at('life_mining'), '채굴 기술 2레벨 되기');
+
+    // Level 5 by hunting.
     const kills = await hunt(async () => (await game.state()).level >= 5, 300);
     note(`- 레벨 5까지 사냥: ${kills}마리, 레벨 ${(await game.state()).level}`);
     await game.wait(800);
-    await passed(17, '레벨 5 되기');
+    await passed(at('level5'), '레벨 5 되기');
     await game.shot('hour-end', '처음 한 시간 끝');
   }
 }
