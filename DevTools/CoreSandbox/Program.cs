@@ -25,6 +25,7 @@ namespace CoreSandbox
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
     // dotnet run -- --hour [minutes] [seed,seed,...]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
+    // dotnet run -- --supply                          which system supplies which, from the sheets (Docs/Systems.md)
     static class Program
     {
         static void Main(string[] args)
@@ -135,6 +136,14 @@ namespace CoreSandbox
                     break;
                 case "--economy":
                     EconomySim.Run(data, LoadTiles(data), LoadNpcs(data));
+                    break;
+                case "--supply":
+                    var supplyMonsters = LoadMonsters();
+                    var supplyBosses = LoadBosses(supplyMonsters);
+                    string storyFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Story"));
+                    string StoryFile(string file) => File.ReadAllText(Path.Combine(storyFolder, file));
+                    var story = StorySheet.Parse(StoryFile(StorySheet.PlacesFile), StoryFile(StorySheet.CharactersFile), StoryFile(StorySheet.StoryFile), data, supplyBosses);
+                    SupplySim.Run(data, LoadTiles(data), LoadNpcs(data), supplyMonsters, supplyBosses, story);
                     break;
                 case "--factory":
                     FactorySim.Run(data, LoadMonsters(), LoadTiles(data), LoadNpcs(data), Number(1, 30));

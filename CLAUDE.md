@@ -45,6 +45,8 @@ dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --
 dotnet run --project DevTools/CoreSandbox -- --farm 120 mushroom
 dotnet run --project DevTools/CoreSandbox -- --economy
 dotnet run --project DevTools/CoreSandbox -- --factory 30
+# 어느 시스템이 어느 시스템에 재료를 주는지, 고립된 재료(Docs/Systems.md)
+dotnet run --project DevTools/CoreSandbox -- --supply
 dotnet run --project DevTools/CoreSandbox -- --defense 6 42 --gear iron_sword,iron_helmet,iron_armor,iron_boots --classes warrior --turrets 3
 dotnet run --project DevTools/CoreSandbox -- --rift 7 42 --players 2 --gear void_sword,void_helmet,void_armor,void_boots --classes warrior,fire_mage
 dotnet run --project DevTools/CoreSandbox -- --skills 60 --gear iron_sword
