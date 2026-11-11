@@ -53,6 +53,9 @@ namespace Game.Core
 
         public long StartTick { get; }
         public long LastProgressTick { get; private set; }
+
+        // Waiting on something that is going on (a line in the water, a thing being made) counts as getting on.
+        public void Busy() => LastProgressTick = _world.Tick;
         public int SeenTiles { get; private set; }
         // Seen tiles in the round about the spawn over all its tiles (0 to 1).
         public float Explored => _roundTiles == 0 ? 0 : (float)_seenInRound / _roundTiles;

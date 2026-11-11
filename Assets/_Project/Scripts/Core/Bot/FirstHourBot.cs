@@ -231,7 +231,7 @@ namespace Game.Core
                 if (material.Fish != null)
                 {
                     Doing = $"{recipe.Name} 재료: {material.Name} 낚기";
-                    Fish(Current);
+                    Fish(Current, material.Fish);
                     return false;
                 }
                 var source = Source(material);
@@ -266,7 +266,11 @@ namespace Game.Core
             }
             _world.SetAttacking(_player.Id, false);
             // Still at it (World.RunCrafting): asking again would start it over.
-            if (_player.Crafting != null) return false;
+            if (_player.Crafting != null)
+            {
+                Memory.Busy();
+                return false;
+            }
             int before = Count(recipe);
             if (_world.StartCrafting(_player.Id, recipe, 1) <= 0)
             {
@@ -457,7 +461,8 @@ namespace Game.Core
                 && _world.Till(_player.Id))) Wander();
         }
 
-        void Fish(Goal goal)
+        // With a biome, at its water (a recipe's or a request's fish lives there: grilled fish takes cave minnows).
+        void Fish(Goal goal, Biome? biome = null)
         {
             var rod = _loot.Materials.FirstOrDefault(m => m.Id == World.FishingRod);
             if (rod == null)
@@ -471,15 +476,28 @@ namespace Game.Core
                 if (recipe != null && Gather(recipe)) Make(recipe);
                 return;
             }
+            // A monster near (2026-11-11: a spore shooter six tiles off broke every line it hit, and the bot stood
+            // casting for eight minutes): it first, as a person would.
+            if (_world.Enemies.Any(e => !e.IsDead && Vec2.Distance(e.Position, _player.Position) < 8 && e.Definition.Level <= _player.Level + 2))
+            {
+                var fight = Pilot.Next(BotTarget.Monster());
+                if (fight.Do != BotDo.NoWay)
+                {
+                    Doing = "낚시 전에 가까운 몬스터";
+                    Execute(fight);
+                    return;
+                }
+            }
             var line = _player.Fishing;
             if (line != null)
             {
                 Doing = "낚시";
+                Memory.Busy();
                 int level = World.LifeLevel(_player, LifeSkill.Fishing);
                 if (line.BiteTicks > 0 && World.InCatchZone(World.GaugeAt(line.BiteElapsed, line.Difficulty), line.Difficulty, level) && _world.Fish(_player.Id)) Memory.Refresh();
                 return;
             }
-            var intent = Pilot.Next(BotTarget.Beside(TileType.Water));
+            var intent = Pilot.Next(BotTarget.Beside(TileType.Water, biome));
             if (intent.Do == BotDo.Arrived && intent.Tile != null)
             {
                 Face(intent.Direction);

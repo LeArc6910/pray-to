@@ -110,7 +110,8 @@ namespace Game.Core
                 int cost = _cost[at];
                 if (priority - (heuristic?.Invoke(ax, ay) ?? 0) > cost) continue;
                 if (goal(ax, ay)) return Trace(at);
-                if (++Searched > Budget) return null;
+                // Toward one goal (A*) the search stays near the straight way, so it may look further (a 512-tile world).
+                if (++Searched > (heuristic != null ? Budget * 8 : Budget)) return null;
                 foreach (var (dx, dy) in Ways)
                 {
                     int nx = ax + dx, ny = ay + dy;

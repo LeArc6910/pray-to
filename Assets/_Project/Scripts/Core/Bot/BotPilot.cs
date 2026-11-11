@@ -35,12 +35,14 @@ namespace Game.Core
         public string Id { get; private set; }
         public int X { get; private set; }
         public int Y { get; private set; }
+        // With Beside: only tiles in this biome (the water a fish lives in).
+        public Biome? Biome { get; private set; }
 
         public static BotTarget Wall => new BotTarget { Aim = BotAim.Wall };
         public static BotTarget Explore => new BotTarget { Aim = BotAim.Explore };
         public static BotTarget Loot => new BotTarget { Aim = BotAim.Loot };
         public static BotTarget Dig(TileType tile) => new BotTarget { Aim = BotAim.Tile, Tile = tile };
-        public static BotTarget Beside(TileType tile) => new BotTarget { Aim = BotAim.Beside, Tile = tile };
+        public static BotTarget Beside(TileType tile, Biome? biome = null) => new BotTarget { Aim = BotAim.Beside, Tile = tile, Biome = biome };
         public static BotTarget Monster(string id = null) => new BotTarget { Aim = BotAim.Monster, Id = id };
         public static BotTarget Boss(string id) => new BotTarget { Aim = BotAim.Boss, Id = id };
         public static BotTarget Fight(string id) => new BotTarget { Aim = BotAim.BossFight, Id = id };
@@ -56,7 +58,7 @@ namespace Game.Core
             {
                 case "wall": return Wall;
                 case "tile": return Dig(Type(1));
-                case "near": return Beside(Type(1));
+                case "near": return Beside(Type(1), words.Count > 2 ? (Biome)Enum.Parse(typeof(Biome), words[2], ignoreCase: true) : (Biome?)null);
                 case "monster": return Monster(words.Count > 1 ? words[1] : null);
                 case "boss": return Boss(Word(1));
                 case "fight": return Fight(Word(1));
@@ -71,7 +73,7 @@ namespace Game.Core
         {
             BotAim.Wall => "wall",
             BotAim.Tile => "tile " + Tile,
-            BotAim.Beside => "near " + Tile,
+            BotAim.Beside => "near " + Tile + (Biome is Biome b ? " " + b : ""),
             BotAim.Monster => Id == null ? "monster" : "monster " + Id,
             BotAim.Boss => "boss " + Id,
             BotAim.BossFight => "fight " + Id,
@@ -315,8 +317,12 @@ namespace Game.Core
                 }
                 case BotAim.Beside:
                 {
-                    if (BesideOf(target.Tile) is (int bx, int by)) return (null, "", Arrive((bx, by)));
-                    var path = Nav.Find(hx, hy, (x, y) => map[x, y] == target.Tile && !Memory.IsBlocked(x, y), enter: false);
+                    bool In(int x, int y) => target.Biome == null || _world.Biomes[x, y] == target.Biome;
+                    if (BesideOf(target.Tile) is (int bx, int by) && In(bx, by)) return (null, "", Arrive((bx, by)));
+                    var path = Nav.Find(hx, hy, (x, y) => map[x, y] == target.Tile && In(x, y) && !Memory.IsBlocked(x, y), enter: false);
+                    // Further than the search round (the merchant's stall from the far caves of a 512-tile world): the
+                    // nearest such tile as the crow flies, by A* toward it.
+                    if (path == null && NearestTile(target.Tile, In) is (int fx, int fy)) path = Nav.To(hx, hy, fx, fy, enter: false);
                     return (path, path == null ? target.Tile + "에 갈 길 없음" : "", null);
                 }
                 case BotAim.Monster:
@@ -395,6 +401,27 @@ namespace Game.Core
             var (hx, hy) = Here;
             var path = Nav.Find(hx, hy, (x, y) => (x != hx || y != hy) && Memory.IsFrontier(x, y) && !Memory.IsBlocked(x, y));
             return (path, path == null ? why + " (갈 곳 없음)" : why, null);
+        }
+
+        // The nearest tile of the type anywhere (not given up on), as the crow flies.
+        (int X, int Y)? NearestTile(TileType type, Func<int, int, bool> also)
+        {
+            var map = _world.Map;
+            var (hx, hy) = Here;
+            (int, int)? best = null;
+            long bestDistance = long.MaxValue;
+            for (int y = 0; y < map.Height; y++)
+            {
+                for (int x = 0; x < map.Width; x++)
+                {
+                    if (map[x, y] != type || !also(x, y) || Memory.IsBlocked(x, y)) continue;
+                    long d = (long)(x - hx) * (x - hx) + (long)(y - hy) * (y - hy);
+                    if (d >= bestDistance) continue;
+                    bestDistance = d;
+                    best = (x, y);
+                }
+            }
+            return best;
         }
 
         bool Near(int x, int y, float reach) => Vec2.Distance(TileMap.Center(x, y), _player.Position) <= reach;
