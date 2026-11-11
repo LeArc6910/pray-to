@@ -19,6 +19,7 @@
   - 곡괭이(등급 금속 색)와 주괴(재료 색)를 Ninja Adventure 모양으로 바꿨다. 색은 우리 색 띠라 등급마다 다르게 칠해진다. `ArtPreview`의 `imported.png`
   - `DevTools/ArtImport/to_rows.py`: PNG를 코드 그림 격자로 바꾸는 도구(재료 색을 등급 색 글자로 받는 `--ramp`)
   - 무료 생성형 AI: Pollinations·AI Horde·Hugging Face Space를 직접 불러 봤지만 16px 게임 그림이 나오지 않았다. 제대로 되는 곳(Retro Diffusion, PixelLab)은 가입·키가 필요하고 무료 몫이 몇 장뿐이라 붙이지 않았다
+- **웹 점검(8490593, 지도 512칸과 새 시작 화면)**: `sweep.js --only menu,time,first,world,story,layout,touch` 179 통과, 0 실패. 시작 화면·설정·게임 시작 페이지(PC·작은 휴대폰), 새 창 틀의 HUD·웨이포인트 창 사진을 열어 봤다. 설정 단추에 이름이 한 번 더 적혀 있어 값만 보이게 고쳤다(이번 푸시)
 - **요청 대조**: 무료 공개 그림 활용: 견주기·곡괭이·주괴·도구·문서 됨, 나머지 아이콘은 사람이 고르면 같은 길로. 무료 생성형 AI: 해 봤으나 쓸 만한 무료 길이 없어 붙이지 않음(키를 주면 시험 가능)
 - **로컬에서 할 일**: `LOCAL_TASKS.md` 134단계
 - **로컬 확인**: [ ]

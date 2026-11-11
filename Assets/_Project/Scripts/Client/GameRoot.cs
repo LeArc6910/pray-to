@@ -1486,7 +1486,10 @@ namespace Game.Client
                 GUILayout.BeginHorizontal();
                 Ui.Row(name);
                 GUILayout.Label(name, GUILayout.Width(_menuColumn - button - 8));
-                bool pressed = Ui.LayoutButton($"{name}: {value}", GUILayout.Width(button));
+                // Only the value on the button (its name is beside it); the probe still reads "name: value".
+                var rect = GUILayoutUtility.GetRect(new GUIContent(value), GUI.skin.button, GUILayout.Width(button));
+                bool pressed = GUI.Button(rect, value);
+                Ui.Probe($"{name}: {value}", rect);
                 GUILayout.EndHorizontal();
                 return pressed;
             }
