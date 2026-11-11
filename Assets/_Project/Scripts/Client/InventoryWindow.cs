@@ -2059,6 +2059,17 @@ namespace Game.Client
                 GUILayout.Label($"최대 강화(+{Item.MaxUpgrade})");
             }
             GUILayout.EndHorizontal();
+            // Older gear of the same slot upgraded further: its steps can move onto this one (World.TransferUpgrade).
+            var source = World.UpgradeSource(item, _client.Equipment.Items.Concat(_client.Bag.Items));
+            if (source != null)
+            {
+                GUILayout.BeginHorizontal();
+                GUI.enabled = have >= World.TransferEssence;
+                if (Ui.LayoutButton($"강화 옮기기: {ItemText.Name(source)}의 +{source.Upgrade}를 여기로 (정수 {World.TransferEssence})"))
+                    Send(_client.RefineCommand(InventoryCommand.TransferUpgrade, item.Id), Sound.Craft);
+                GUI.enabled = true;
+                GUILayout.EndHorizontal();
+            }
             GUILayout.BeginHorizontal();
             if (worn == null && Ui.LayoutButton($"분해 (정수 +{World.SalvageValue(item)})")) Send(_client.RefineCommand(InventoryCommand.Salvage, item.Id), Sound.Break);
             GUI.enabled = have >= World.UnsocketEssence;

@@ -75,6 +75,33 @@ namespace Game.Core.Tests
             Assert.Greater(player.Stats.Damage, before);
         }
 
+        // 강화 옮기기 (Docs/Loot.md, 2026-11-11, the research report's candidate 11): the steps put into older gear move
+        // onto a newer piece of the same slot, so the new tier is worth having at once.
+        [Test]
+        public void AnUpgradeMovesOntoNewerGearOfTheSameSlot()
+        {
+            var world = Forge(out var player);
+            var copper = Carry(world, player, Gear.Plain("copper_sword"));
+            copper.Upgrade = 4;
+            var helmet = Carry(world, player, Gear.Plain("iron_helmet"));
+            player.Equip(Gear.Plain("iron_sword"));
+            var iron = player.Equipment[ItemSlot.Weapon];
+            float before = player.Stats.Damage;
+
+            Assert.AreSame(copper, World.UpgradeSource(iron, player.Equipment.Items.Concat(player.Inventory.Items)));
+            Assert.IsNull(World.UpgradeSource(helmet, player.Equipment.Items.Concat(player.Inventory.Items)), "another slot");
+            Assert.IsNull(World.UpgradeSource(copper, player.Equipment.Items.Concat(player.Inventory.Items)), "only onto a later tier");
+            Assert.IsFalse(world.TransferUpgrade(player.Id, iron.Id), "no essence");
+
+            player.Inventory.AddMaterial(Essence, 5);
+            Assert.IsTrue(world.TransferUpgrade(player.Id, iron.Id));
+            Assert.AreEqual(4, iron.Upgrade);
+            Assert.AreEqual(0, copper.Upgrade);
+            Assert.AreEqual(5 - World.TransferEssence, player.Inventory.CountOf(Essence));
+            Assert.Greater(player.Stats.Damage, before, "the worn sword's stats follow");
+            Assert.IsFalse(world.TransferUpgrade(player.Id, iron.Id), "nothing more to move");
+        }
+
         [Test]
         public void NothingHappensAwayFromAnAnvil()
         {

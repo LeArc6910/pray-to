@@ -15,6 +15,8 @@ namespace Game.Core
         static readonly int[] RerollEssence = { 0, 3, 5, 8, 0 };
         // Essence for taking the runes out.
         public const int UnsocketEssence = 1;
+        // Essence for moving an upgrade onto newer gear (TransferUpgrade).
+        public const int TransferEssence = 2;
 
         MaterialDefinition EssenceMaterial => Loot?.FindMaterial(Essence);
 
@@ -87,6 +89,30 @@ namespace Game.Core
             player.Inventory.TakeMaterial(EssenceMaterial, cost);
             item.SetAffixes(_lootGenerator.RerollAffixes(item, _random));
             Refined(player, worn);
+            return true;
+        }
+
+        // The item whose upgrade TransferUpgrade would move onto this one (Docs/Loot.md 강화 옮기기, 2026-11-11): worn or
+        // carried, for the same slot, of an earlier tier (a lower base level), and upgraded further than this one; the
+        // most upgraded of those. Null when there is none.
+        public static Item UpgradeSource(Item target, System.Collections.Generic.IEnumerable<Item> owned) =>
+            target == null ? null : owned
+                .Where(i => i != target && i.Base.Slot == target.Base.Slot && i.Base.Level < target.Base.Level && i.Upgrade > target.Upgrade)
+                .OrderByDescending(i => i.Upgrade).ThenBy(i => i.Id).FirstOrDefault();
+
+        // Moves the upgrade of older gear onto this newer piece for TransferEssence, so what went into the old one is
+        // not lost and a new tier is worth looking forward to (the research report's candidate 11): the new piece takes
+        // the old one's steps, and the old one goes back to +0, keeping its affixes and runes.
+        public bool TransferUpgrade(int playerId, int itemId)
+        {
+            var (player, item, _) = Refinable(playerId, itemId);
+            if (item == null) return false;
+            var source = UpgradeSource(item, player.Equipment.Items.Concat(player.Inventory.Items));
+            if (source == null || player.Inventory.CountOf(EssenceMaterial) < TransferEssence) return false;
+            player.Inventory.TakeMaterial(EssenceMaterial, TransferEssence);
+            item.Upgrade = source.Upgrade;
+            source.Upgrade = 0;
+            Refined(player, true);
             return true;
         }
 

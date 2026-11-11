@@ -218,6 +218,8 @@ namespace Game.Core
         ChooseStory,
         // Puts all of material Index into a chest nearby that holds that kind already (World.StashMaterial, 2026-11-11).
         Stash,
+        // Moves the upgrade of older gear of the same slot onto item Item (World.TransferUpgrade, 2026-11-11).
+        TransferUpgrade,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

@@ -516,6 +516,9 @@ namespace Game.Core
                 case InventoryCommand.Reroll:
                     World.RerollItem(player.Id, command.Item);
                     break;
+                case InventoryCommand.TransferUpgrade:
+                    World.TransferUpgrade(player.Id, command.Item);
+                    break;
                 case InventoryCommand.StoreItem:
                 case InventoryCommand.TakeItem:
                     World.MoveItem(player.Id, command.Item, command.Command == InventoryCommand.StoreItem);
