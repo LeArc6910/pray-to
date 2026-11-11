@@ -2635,7 +2635,13 @@ async function firstRun(browser, profile, hourLong) {
     const fought = await game.state();
     note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 휘두름 ${swings}번, 가장 가까이 ${closest.toFixed(1)}칸, 가장 낮은 체력 ${lowest}, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
     await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
-    await passed(at('boss'), '동굴 수호자 쓰러뜨리기');
+    if (!(await passed(at('boss'), '동굴 수호자 쓰러뜨리기'))) {
+      // The guide waits at the warden; the later goals could not be told apart from it. Recorded as failed above,
+      // then the guide is moved on to the bed (playtest "guide") so the rest is still checked (2026-11-11).
+      await game.send('guide bed');
+      await game.wait(800);
+      note('  - 수호자를 못 잡아 안내를 침대 목표로 넘기고 뒤 목표를 이어서 본다(guide bed)');
+    }
 
     // A bed: stone 6 and slime gel 3, the gel from slimes; and two more for the rod after it (the guide's order since
     // 2026-11-11 makes the bed before the rod, so the torch goal's two gel go into the bed).
@@ -2695,8 +2701,24 @@ async function firstRun(browser, profile, hourLong) {
       await game.press('낚시', '낚싯대');
       const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
       const end = Date.now() + seconds * 1000;
+      const seen = { wait: 0, bites: 0, fights: 0 };
       while (rod && Date.now() < end && !(await enough())) {
-        const f = (await game.state()).fishing;
+        const st = await game.state();
+        // A monster near first (2026-11-11: a spore shooter's shots broke every line in the sim): the bag shut, the
+        // monster fought by the game's path finding, then back to the water and the rod.
+        const foe = offset(st.foe);
+        if (foe && Math.hypot(foe[0], foe[1]) < 6) {
+          seen.fights++;
+          await closeBag(game);
+          await pilot.go('monster', { until: async () => { const t = offset((await game.state()).foe); return !t || Math.hypot(t[0], t[1]) >= 6; }, seconds: 30 });
+          await taken(waterAt, '낚시하다 몬스터를 잡은 뒤 물가로');
+          await bagTab(game, '재료·제작');
+          await game.press('낚시', '낚싯대');
+          continue;
+        }
+        const f = st.fishing;
+        if (f === 'wait') seen.wait++;
+        if (f && f.startsWith('bite')) seen.bites++;
         if (f === 'bite in') {
           await game.tapAt(rod.cx, rod.cy);
           strikes++;
@@ -2707,7 +2729,9 @@ async function firstRun(browser, profile, hourLong) {
         }
       }
       await closeBag(game);
+      note(`  - (낚시) 기다림 ${seen.wait}번 봄, 입질 ${seen.bites}번 봄, 몬스터 먼저 ${seen.fights}번${rod ? '' : ', 낚싯대 단추 없음'}`);
     };
+    let waterAt = 'near Water Cave';
     // At the dirt cave's water (2026-11-11: the cooking goal after it wants two cave minnows, which live there
     // alone; the playtest's "nav near Water Cave"), until the goal and the two minnows.
     await taken('near Water Cave', '흙 동굴 물웅덩이를 찾을 때(안내는 "동굴 가장자리 물웅덩이"라고만 한다)');
