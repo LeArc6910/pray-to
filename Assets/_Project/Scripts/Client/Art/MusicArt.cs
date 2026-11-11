@@ -405,6 +405,16 @@ namespace Game.Client
             return style;
         }
 
+        // Samples in one bar of the song, for changing songs on a bar line (Music, 2026-11-11).
+        public static int BarSamples(Song song)
+        {
+            var style = song.Boss != null ? BossPhase(song.Boss, song.Phase)
+                : song.Battle ? Battle(StyleOf(song.Tune))
+                : song.Night ? Night(StyleOf(song.Tune))
+                : StyleOf(song.Tune);
+            return Math.Max(1, Samples(60 / style.Bpm * 4));
+        }
+
         public static float[] Make(Tune tune) => Make(Song.Field(tune));
 
         public static float[] Make(Song song)

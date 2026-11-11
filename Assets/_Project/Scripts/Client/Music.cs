@@ -86,8 +86,13 @@ namespace Game.Client
         public static void Update(Song? song, Ambience? ambience, float hum, float deltaTime)
         {
             Make();
-            if (!Nullable.Equals(song, _song))
+            if (!Nullable.Equals(song, _song) && !OnBarLine(song, deltaTime))
             {
+                // Waiting for the playing song's next bar line (OnBarLine); the volumes below go on as they were.
+            }
+            else if (!Nullable.Equals(song, _song))
+            {
+                _barWait = 0;
                 var before = _song;
                 var playing = _tunes[_current];
                 _song = song;
@@ -130,6 +135,26 @@ namespace Game.Client
             Loop(_ambience, effects * AmbienceLevel);
             if (hum > 0 && _hum.clip == null) _hum.clip = Clip(Ambience.Hum);
             Loop(_hum, Mathf.Clamp01(hum) * effects * HumLevel);
+        }
+
+        // A change to another song that cannot cross in step (a place's tune, a boss's later phase) waits for the
+        // playing song's next bar line, so the music turns on the beat rather than mid-phrase (Docs/ArtPipeline.md
+        // 음악 층, 2026-11-11, the research report's candidate 25), but never longer than MostBarWait. Changes in step (the
+        // calm and fight versions of one tune, crossfaded at the same place: the vertical layers) and to or from
+        // silence go at once.
+        const float MostBarWait = 2.5f;
+        static float _barWait;
+
+        static bool OnBarLine(Song? song, float deltaTime)
+        {
+            var playing = _tunes[_current];
+            if (song == null || _song is not Song now || !playing.isPlaying || playing.clip == null) return true;
+            if (now.InStepWith(song.Value)) return true;
+            _barWait += deltaTime;
+            if (_barWait >= MostBarWait) return true;
+            int bar = MusicArt.BarSamples(now);
+            int frame = Mathf.CeilToInt(Mathf.Max(deltaTime, 1 / 30f) * playing.clip.frequency);
+            return playing.timeSamples % bar < frame;
         }
 
         // Plays a loop at this volume, or stops it at none.
