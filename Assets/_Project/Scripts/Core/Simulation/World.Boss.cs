@@ -54,10 +54,15 @@ namespace Game.Core
         List<Player> Fighters(Boss boss) =>
             _players.Where(p => !p.IsDead && Vec2.Distance(p.Position, boss.Home) <= boss.ArenaRadius + ArenaMargin).ToList();
 
+        // How far beyond the arena's edge a player still counts toward the boss's health when it wakes.
+        public const float NearArena = 8;
+
         void Wake(Boss boss)
         {
             var definition = boss.Definition;
-            int players = Math.Max(1, _players.Count(p => !p.IsDead));
+            // Tougher for each player at hand (in the arena or about to come in), not for everyone in the world: a
+            // friend at the base does not make the boss harder (2026-11-11, the research report's candidate 14).
+            int players = Math.Max(1, _players.Count(p => !p.IsDead && Vec2.Distance(p.Position, boss.Home) <= boss.ArenaRadius + ArenaMargin + NearArena));
             boss.MaxHealth = definition.Health * (1 + definition.HealthPerPlayer / 100f * (players - 1));
             boss.Health = boss.MaxHealth;
             boss.Phase = 1;

@@ -214,6 +214,7 @@ namespace Game.Core
             if (player.ConsumableCooldown > 0) player.ConsumableCooldown--;
             if (player.IsDead)
             {
+                if (Revive(player)) return;
                 if (--player.RespawnTicks > 0) return;
                 player.Position = HomeOf(player);
                 player.Health = player.Stats.MaxHealth;
@@ -551,7 +552,9 @@ namespace Game.Core
             player.HealTicks = 0;
             player.ClearBuffs();
             player.Afflictions.Clear();
-            player.RespawnTicks = Ticks(_config.RespawnSeconds);
+            // With others in the world there is time for one of them to come (DownSeconds, World.Revive).
+            player.RespawnTicks = Ticks(_players.Count > 1 ? Math.Max(DownSeconds, _config.RespawnSeconds) : _config.RespawnSeconds);
+            player.ReviveTicks = 0;
             _events.Add(new SimEvent(SimEventType.Died, player.Id));
             return amount;
         }

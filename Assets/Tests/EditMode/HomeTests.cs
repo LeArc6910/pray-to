@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using System.Linq;
 using NUnit.Framework;
 
@@ -138,6 +139,48 @@ namespace Game.Core.Tests
             var back = again.World.Players.Single();
             Assert.AreEqual(bed, again.World.BedOf(back));
             Assert.AreEqual(again.World.HomeOf(back), back.Position, "starts beside the bed");
+        }
+
+        // 동료 살리기 (Docs/Multiplayer.md, 2026-11-11, the research report's candidate 14): with others in the world a
+        // fallen player waits for an ally, who gets them up where they fell by standing beside them; or they get up at
+        // home at once. Alone, nothing changes.
+        [Test]
+        public void AnAllyGetsAFallenPlayerUpWhereTheyFell()
+        {
+            var world = new World(Maps.Room(20), TileMap.Center(10, 10), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var alone = new World(Maps.Room(20), TileMap.Center(10, 10), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var solo = alone.AddPlayer("solo", null);
+            alone.Hurt(solo, 100000);
+            for (int i = 0; i < World.Ticks(5) + 1; i++) alone.Step();
+            Assert.IsFalse(solo.IsDead, "alone, up at home after five seconds as before");
+
+            var a = world.AddPlayer("a", null);
+            var b = world.AddPlayer("b", null);
+            a.Position = TileMap.Center(4, 4);
+            b.Position = TileMap.Center(14, 14);
+            world.Hurt(a, 100000);
+            Assert.IsTrue(a.IsDead);
+            for (int i = 0; i < World.Ticks(6); i++) world.Step();
+            Assert.IsTrue(a.IsDead, "with an ally in the world, still down after five seconds");
+
+            b.Position = a.Position + new Vec2(1, 0);
+            var events = new List<SimEvent>();
+            for (int i = 0; i < World.Ticks(World.ReviveSeconds) + 2; i++)
+            {
+                world.Step();
+                events.AddRange(world.TakeEvents());
+            }
+            Assert.IsFalse(a.IsDead, "got up");
+            Assert.AreEqual(TileMap.Center(4, 4).X, a.Position.X, 0.01f, "where they fell");
+            Assert.AreEqual(a.Stats.MaxHealth * World.ReviveShare, a.Health, 1);
+            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Revived && e.Source == b.Id && e.Target == a.Id));
+
+            // Or up at home at once.
+            b.Position = TileMap.Center(14, 14);
+            world.Hurt(a, 100000);
+            world.GetUp(a.Id);
+            world.Step();
+            Assert.IsFalse(a.IsDead);
         }
     }
 }

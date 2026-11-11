@@ -65,7 +65,7 @@ const Crop = { width: 480, height: 300 };
     const game = await open(browser, run, Profiles.pc, url, context);
     await game.startSolo('feel');
     await game.wait(1500);
-    await game.send('goto biome Cave; equip copper_sword; heal');
+    await game.send('goto wild; equip copper_sword; heal');
     await game.wait(800);
     for (const [name, label, off] of Variants) {
       await game.send('feel all on' + off.map(piece => `; feel ${piece} off`).join(''));

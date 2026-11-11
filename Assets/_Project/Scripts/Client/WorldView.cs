@@ -1910,6 +1910,14 @@ namespace Game.Client
                     }
                     Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
                     break;
+                case SimEventType.Revived:
+                    // An ally got someone up where they fell (World.Revive): a burst of light on them.
+                    var raised = Find(e.Target);
+                    if (raised == null) break;
+                    AddFlash(raised.Position, raised.Diameter * 1.6f, LevelColor, FlashKind.Sparkles);
+                    _floating.Add(new Floating { Position = raised.Position + new Vector3(0, 0.7f, 0), Text = "일어났다!", Color = LevelColor });
+                    Hear(Sound.Learn, raised.Position);
+                    break;
                 case SimEventType.Impact:
                     if (e.Target != 0) HazardLanded(e.Target);
                     var source = Find(e.Source);

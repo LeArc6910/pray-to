@@ -220,6 +220,8 @@ namespace Game.Core
         Stash,
         // Moves the upgrade of older gear of the same slot onto item Item (World.TransferUpgrade, 2026-11-11).
         TransferUpgrade,
+        // A fallen player gets up at home now rather than wait for an ally (World.GetUp, 2026-11-11).
+        GetUp,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

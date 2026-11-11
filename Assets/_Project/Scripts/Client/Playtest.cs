@@ -353,6 +353,12 @@ namespace Game.Client
                         (x, y) => world.Biomes[x, y] == biome && Enumerable.Range(-1, 3).All(dx => Enumerable.Range(-1, 3).All(dy => Walkable(map, x + dx, y + dy))))
                         ?? throw new InvalidOperationException($"no open floor in {biome}");
                     break;
+                // Open floor outside the story's places, where monsters may come (World.InSafePlace keeps them out).
+                case "wild":
+                    to = Nearest(map, px, py, (x, y) => !world.InSafePlace(TileMap.Center(x, y))
+                            && Enumerable.Range(-2, 5).All(dx => Enumerable.Range(-2, 5).All(dy => Walkable(map, x + dx, y + dy))))
+                        ?? throw new InvalidOperationException("no open floor outside the places");
+                    break;
                 case "tile":
                     var onto = Tile(words[2]);
                     to = Nearest(map, px, py, (x, y) => map[x, y] == onto) ?? throw new InvalidOperationException($"no {onto} tile");

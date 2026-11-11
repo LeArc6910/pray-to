@@ -199,6 +199,8 @@ namespace Game.Core
         internal long LastAttackTick { get; set; } = -1;
         internal int AttackRecovery { get; set; }
         internal int RespawnTicks { get; set; }
+        // While fallen in co-op: how long an ally has stood beside them (World.Revive).
+        internal int ReviveTicks { get; set; }
         // Health still to come from a consumable: so much each tick, for so many ticks.
         internal float HealPerTick { get; set; }
         internal int HealTicks { get; set; }
@@ -457,6 +459,8 @@ namespace Game.Core
         // Source, a player, opened the waypoint of place Target (Amount World.WaypointOpened) or went to it
         // (World.WaypointUsed).
         Waypoint,
+        // Source, a player, got Target, a fallen player, back up where they fell (World.Revive, 2026-11-11).
+        Revived,
     }
 
     public readonly struct SimEvent

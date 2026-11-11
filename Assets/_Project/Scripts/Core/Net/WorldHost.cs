@@ -519,6 +519,9 @@ namespace Game.Core
                 case InventoryCommand.TransferUpgrade:
                     World.TransferUpgrade(player.Id, command.Item);
                     break;
+                case InventoryCommand.GetUp:
+                    World.GetUp(player.Id);
+                    break;
                 case InventoryCommand.StoreItem:
                 case InventoryCommand.TakeItem:
                     World.MoveItem(player.Id, command.Item, command.Command == InventoryCommand.StoreItem);

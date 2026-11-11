@@ -322,6 +322,8 @@ namespace Game.Core
             !IsDead && Bed is (int x, int y) && Vec2.Distance(Position, TileMap.Center(x, y)) <= World.BedReach
             && (Calendar.Phase(Clock) == DayPhase.Evening || Calendar.Phase(Clock) == DayPhase.Night);
 
+        public byte[] GetUpCommand() => new InventoryCommandMessage(InventoryCommand.GetUp, 0).Encode();
+
         public byte[] SleepCommand() => new InventoryCommandMessage(InventoryCommand.Sleep, 0).Encode();
 
         // Sets the assembler ahead to the recipe, or stops it with null (World.SetRecipe).

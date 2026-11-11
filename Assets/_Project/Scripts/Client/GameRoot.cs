@@ -370,6 +370,26 @@ namespace Game.Client
             SendToHost(_client.StartDefenseCommand());
         }
 
+        // When the player fell; for the time left before getting up at home in co-op.
+        float _downSince;
+        bool _wasDown;
+
+        // In co-op, over the fallen player: get up at home now rather than wait for an ally (World.GetUp).
+        void DrawGetUpButton()
+        {
+            if (_client.IsDead && !_wasDown) _downSince = Time.time;
+            _wasDown = _client.IsDead;
+            if (!_client.IsDead || _client.Names.Count <= 1) return;
+            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(_client.Position.X, _client.Position.Y + 1.3f, 0));
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            var rect = new Rect(point.x - 70, point.y - 13, 140, 26);
+            Controls.Block(rect);
+            if (!Ui.Button(rect, "집에서 일어나기")) return;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.GetUpCommand());
+        }
+
         void DrawBedButton()
         {
             if (_client.Bed is not (int x, int y) || !(_client.Sleeping || _client.CanSleep)) return;
@@ -1084,6 +1104,7 @@ namespace Game.Client
             {
                 DrawMachineSwitch();
                 DrawBedButton();
+                DrawGetUpButton();
                 DrawRiftButton();
                 _storyScreen?.DrawWorldButtons(_camera);
                 DrawDefenseButton();
@@ -1332,7 +1353,19 @@ namespace Game.Client
             }
             else
             {
-                if (_client.IsDead) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
+                // In co-op a fallen player waits for an ally (World.Revive), and allies are told who is down.
+                bool together = _client.Names.Count > 1;
+                if (_client.IsDead && !together) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
+                if (_client.IsDead && together)
+                    lines.Add($"쓰러졌다. 동료가 곁에 {World.ReviveSeconds:0}초 서 있으면 이 자리에서 일어난다 ({Mathf.Max(0, Mathf.CeilToInt(World.DownSeconds - (Time.time - _downSince)))}초 뒤 집에서)");
+                if (!_client.IsDead)
+                {
+                    foreach (var other in _client.Others())
+                    {
+                        if (other.Kind == EntityKind.Player && other.Health <= 0 && _client.Names.TryGetValue(other.Id, out var fallen))
+                            lines.Add($"{fallen}이(가) 쓰러졌다: 곁에 {World.ReviveSeconds:0}초 서 있으면 일으킨다");
+                    }
+                }
                 if (!compact)
                 {
                     if (_client.Sleeping)

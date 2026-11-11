@@ -9,6 +9,52 @@ namespace Game.Core
     // they fall and when they join, and a recall scroll takes them there; without a bed, home is the spawn.
     public sealed partial class World
     {
+        // Getting a fallen friend up (Docs/Multiplayer.md 동료 살리기, 2026-11-11, the research report's candidate 14).
+        // With others in the world a fallen player stays down DownSeconds before getting up at home, and an ally who
+        // stands within ReviveReach of them, alive and not attacking, for ReviveSeconds gets them up where they fell
+        // with ReviveShare of their health. They may also get up at home at once (GetUp). Alone, nothing changes: up at
+        // home after the world's RespawnSeconds.
+        public const float DownSeconds = 20;
+        public const float ReviveSeconds = 3;
+        public const float ReviveReach = 1.5f;
+        public const float ReviveShare = 0.4f;
+
+        // The ally getting the fallen player up now, or null.
+        public Player ReviverOf(Player fallen) =>
+            fallen == null || !fallen.IsDead ? null : _players.FirstOrDefault(p => p != fallen && !p.IsDead && !p.Attacking
+                && Vec2.Distance(p.Position, fallen.Position) <= ReviveReach);
+
+        // Counts an ally's time beside the fallen player; true once they are up.
+        bool Revive(Player fallen)
+        {
+            var reviver = ReviverOf(fallen);
+            if (reviver == null)
+            {
+                fallen.ReviveTicks = 0;
+                return false;
+            }
+            if (++fallen.ReviveTicks < Ticks(ReviveSeconds)) return false;
+            fallen.ReviveTicks = 0;
+            fallen.RespawnTicks = 0;
+            fallen.Health = Math.Max(1, fallen.Stats.MaxHealth * ReviveShare);
+            fallen.Mana = fallen.Stats.MaxMana / 2;
+            _events.Add(new SimEvent(SimEventType.Revived, reviver.Id, fallen.Id));
+            return true;
+        }
+
+        // A fallen player gets up at home now instead of waiting.
+        public void GetUp(int playerId)
+        {
+            var player = FindPlayer(playerId);
+            if (player != null && player.IsDead) player.RespawnTicks = 1;
+        }
+
+        // How far through being got up the fallen player is (0 to 1), for their screen.
+        public float ReviveProgress(Player player) => player == null || !player.IsDead ? 0 : Math.Min(1, player.ReviveTicks / (float)Ticks(ReviveSeconds));
+
+        // Seconds until the fallen player gets up at home.
+        public float SecondsDown(Player player) => player == null || !player.IsDead ? 0 : player.RespawnTicks / (float)TicksPerSecond;
+
         public const float RecallSeconds = 2;
         // A Recall event's Amount: started, arrived, broken off by a hit.
         public const int RecallStarted = 1;

@@ -202,7 +202,8 @@ async function basics(browser) {
   const hud = (t.hud || []).join(' | ');
   check((t.hud || []).some(l => /^1일째 06:\d\d 아침/.test(l)), `미니맵 아래에 1일째 아침 (${(t.hud || []).find(l => /일째/.test(l)) || ''})`);
   check(has(hud, 'Lv 1 (0%)'), '경험치 막대에 Lv 1 (0%)');
-  check(/목표 1\/\d+: 돌 10개 모으기 \(0\/10\)/.test(hud), `목표 목록에 첫 목표와 진행도 (${(hud.match(/목표[^|]*/) || [''])[0]})`);
+  // The first goal is picking a class (2026-11-09), which startSolo does, so stones are the second.
+  check(/목표 2\/\d+: 돌 10개 모으기 \(0\/10\)/.test(hud), `목표 목록에 클래스 다음 목표와 진행도 (${(hud.match(/목표[^|]*/) || [''])[0]})`);
   check(has(hud, '보상:'), '목표 아래에 보상');
   // The controls lines began "WASD 이동" (PC) or "왼쪽 스틱 이동" (touch); a goal's hint may still say "공격 스틱".
   check(!/WASD|왼쪽\s스틱|보스 아레나:/.test(hud), '조작법·아레나 방향 줄이 HUD에 없다');
@@ -211,7 +212,8 @@ async function basics(browser) {
   let inv = await game.inventory();
   check(inv.worn.Weapon === 'copper_sword', `처음 무기는 구리 검 (${inv.worn.Weapon})`);
   check(items(inv, 'copper_pickaxe') === 1, '가방에 구리 곡괭이');
-  check((inv.consumables || {}).healing_potion === 3, `회복 물약 3개 (${(inv.consumables || {}).healing_potion})`);
+  // Three to start with and one for the class goal.
+  check((inv.consumables || {}).healing_potion === 4, `회복 물약 3개와 클래스 목표 보상 하나 (${(inv.consumables || {}).healing_potion})`);
   check(count(inv, 'torch') === 6 && count(inv, 'mushroom_spore') === 2, `횃불 6, 버섯 포자 2 (${count(inv, 'torch')}, ${count(inv, 'mushroom_spore')})`);
 
   // Quick slots: 2 is the pickaxe; a click on slot 1 is the sword again and does not swing.
@@ -269,7 +271,7 @@ async function basics(browser) {
   await game.wait(1500);
   t = await game.texts();
   check((t.acquired || []).some(l => has(l, '목표 달성: 돌 10개 모으기')), '"목표 달성: 돌 10개 모으기"');
-  check(/목표 2\//.test((t.hud || []).join(' ')), '다음 목표로 넘어간다');
+  check(/목표 3\//.test((t.hud || []).join(' ')), '다음 목표로 넘어간다');
   await game.shot('goal', '첫 목표를 이룬 뒤');
 
   // Placing a stone wall from the bag, then a workbench made and placed.
