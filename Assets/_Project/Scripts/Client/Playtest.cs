@@ -728,6 +728,12 @@ namespace Game.Client
                 json.Field("dayMinutes", world.DayMinutes);
                 // The CC0 recordings loaded, and what the ground underfoot sounds like (Recordings, 2026-11-11).
                 json.Field("recordedSets", Recordings.SetCount);
+                // Timber walls round the player (a shop's, 2026-11-11, WorldGenerator.CarveShops).
+                int timber = 0, px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
+                for (int ty = py - 4; ty <= py + 4; ty++)
+                    for (int tx = px - 4; tx <= px + 4; tx++)
+                        if (world.Map[tx, ty] == TileType.TimberWall) timber++;
+                json.Field("timberNear", timber);
                 json.Field("ground", Recordings.GroundAt(world.Map, world.Biomes, TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)).ToString());
                 json.Field("feelOff", Feel.Off);
                 json.Field("weather", world.WeatherToday.ToString());

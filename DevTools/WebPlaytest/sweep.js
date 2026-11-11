@@ -1018,7 +1018,10 @@ async function npc(browser) {
   await game.wait(1200);
   await game.send('goto near MerchantStall; give coin 300; give copper_ore 30; give star_melon 1');
   await game.wait(800);
-  await game.shot('merchant', '상인 노점');
+  // Each merchant keeps shop in a timber room of their own (2026-11-11, Docs/Npcs.md 상점 건물).
+  const shop = await game.state();
+  check(shop.timberNear >= 12, `상인이 나무 벽 상점 안에 있다 (둘레 나무 벽 ${shop.timberNear}칸)`);
+  await game.shot('merchant', '상점 안의 상인');
   await bagTab(game);
   check(await game.press('상인'), '노점 곁에서 가방에 [상인] 탭');
   await game.press('말 걸기');
