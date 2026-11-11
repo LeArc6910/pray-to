@@ -2371,7 +2371,9 @@ async function firstRun(browser, profile, hourLong) {
     // nearest within a screen and a half, not much above its level, and on past the edge of what it has seen when
     // there is none (2026-11-10: looking only at the screen, the hunts met no monster in five runs). Drinks below 40%
     // health on the way; picks up what falls.
-    const hunt = async (enough, seconds) => {
+    // With a kind, only that one (the bed's gel comes from slimes alone, 2026-11-11: the web run hunted 49 of seven
+    // kinds and had two gel).
+    const hunt = async (enough, seconds, kind = null) => {
       const before = await felled();
       const end = Date.now() + seconds * 1000;
       let result = 'time';
@@ -2386,8 +2388,9 @@ async function firstRun(browser, profile, hourLong) {
           const t = await game.state();
           return t.health < t.maxHealth * 0.4;
         };
-        result = await pilot.go('monster', { until: async () => (await enough()) || (await low()), seconds: Math.max(5, (end - Date.now()) / 1000) });
+        result = await pilot.go(kind ? `monster ${kind}` : 'monster', { until: async () => (await enough()) || (await low()), seconds: Math.max(5, (end - Date.now()) / 1000) });
         if (result === 'done' && (await enough())) break;
+        if (result === 'done') await gather(3);
         if (result === 'stuck' || result === 'noway') break;
       }
       await gather(4);
@@ -2601,7 +2604,7 @@ async function firstRun(browser, profile, hourLong) {
     for (let round = 0; round < 3; round++) {
       const bag = await inv();
       if (count(bag, 'slime_gel') >= 3 && count(bag, 'stone') >= 6) break;
-      await hunt(async () => count(await inv(), 'slime_gel') >= 3, 240);
+      await hunt(async () => count(await inv(), 'slime_gel') >= 3, 240, 'slime');
       await mine(async () => count(await inv(), 'stone') >= 6, 90);
     }
     note(`- 침대 재료: 슬라임 젤 ${count(await inv(), 'slime_gel')}, 돌 ${count(await inv(), 'stone')}`);
