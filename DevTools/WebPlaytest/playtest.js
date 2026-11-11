@@ -18,6 +18,7 @@ const fs = require('fs');
 const path = require('path');
 const { execSync } = require('child_process');
 const { chromium } = require('playwright');
+const { makePilot } = require('./bot');
 
 const args = process.argv.slice(2);
 function option(name, fallback) {
@@ -174,6 +175,10 @@ async function playPc(browser, profile) {
   check(hit.hurtMonsters > 0, `마우스를 누르고 있으면 슬라임을 친다 (맞은 슬라임 ${hit.hurtMonsters})`);
   await send(game, 'clear; heal');
 
+  // The bot by the game's state (bot.js, Client/PlaytestBot.cs, 2026-11-11): the game's path finding says where to go
+  // next, and the real keys walk there; the nearest monster, wherever it is, and then rock dug for stone.
+  await huntAndDig(game, profile);
+
   await game.page.keyboard.press('Tab');
   await game.page.waitForTimeout(600);
   check((await state(game)).bag, 'Tab 키로 가방이 열린다');
@@ -230,6 +235,68 @@ async function playPc(browser, profile) {
   check(!!rift.rift, `균열이 열린다 (${rift.rift})`);
   await shot(game, profile, 'rift', '공허 균열');
   await game.context.close();
+}
+
+// The playtest's JSON answer to a command.
+async function ask(game, command) {
+  const word = command.split(' ')[0];
+  const line = (await send(game, command)).reverse().find(l => l.startsWith(word + ' '));
+  try {
+    return line ? JSON.parse(line.slice(word.length + 1)) : {};
+  } catch (e) {
+    return {};
+  }
+}
+
+async function huntAndDig(game, profile) {
+  const keys = { '1,0': 'd', '-1,0': 'a', '0,1': 'w', '0,-1': 's' };
+  const wait = ms => game.page.waitForTimeout(ms);
+  const pilot = makePilot({
+    ask: command => ask(game, command),
+    wait,
+    // Both keys of a diagonal, about as long as the way takes at a walk.
+    move: async (dx, dy) => {
+      const d = Math.hypot(dx, dy);
+      if (d < 0.05) return;
+      const held = [];
+      if (Math.abs(dx) > d * 0.38) held.push(keys[`${Math.sign(dx)},0`]);
+      if (Math.abs(dy) > d * 0.38) held.push(keys[`0,${Math.sign(dy)}`]);
+      for (const k of held) await game.page.keyboard.down(k);
+      await wait(Math.min(900, Math.round(d * 230 + 60)));
+      for (const k of held) await game.page.keyboard.up(k);
+    },
+    dig: async (dx, dy) => {
+      await send(game, `face ${dx} ${dy}; attack on ${dx} ${dy}`);
+      await wait(1500);
+      await send(game, 'attack off; face off');
+    },
+    strike: async (dx, dy, ms) => {
+      const d = Math.hypot(dx, dy) || 1;
+      await send(game, `attack on ${(dx / d).toFixed(2)} ${(dy / d).toFixed(2)}`);
+      await wait(ms);
+      await send(game, 'attack off');
+    },
+    hold: async what => {
+      await game.page.keyboard.press(what === 'pickaxe' ? '2' : '1');
+      await wait(200);
+    },
+    note,
+    shot: (name, caption) => shot(game, profile, name, caption),
+  });
+  await send(game, 'probe on; botreset');
+  const started = Date.now();
+  const kills = async () => (await ask(game, 'sense')).kills || '';
+  const hunted = await pilot.go('monster', { until: async () => (await kills()) !== '', seconds: 120 });
+  const s = await ask(game, 'sense');
+  check(hunted === 'done', `길잡이(nav)로 가장 가까운 몬스터에게 걸어가 잡는다 (${hunted}, ${Math.round((Date.now() - started) / 1000)}초, 잡은 것 ${s.kills || '없음'}, 걸음 ${pilot.counts.moves}, 캔 벽 ${pilot.counts.digs})`);
+  await shot(game, profile, 'nav-hunt', '길잡이로 사냥한 뒤');
+  const stone = async () => ((await ask(game, 'inventory')).materials || {}).stone || 0;
+  const before = await stone();
+  const dug = await pilot.go('wall', { until: async () => (await stone()) >= before + 3, seconds: 60 });
+  check(dug === 'done', `길잡이로 벽을 캐서 돌 3개를 모은다 (${dug})`);
+  const numbers = await ask(game, 'botreport 웹 PC 짧은 점검');
+  if (typeof numbers === 'string') note('\n' + numbers);
+  await send(game, 'clear; heal');
 }
 
 async function playPhone(browser, profile) {

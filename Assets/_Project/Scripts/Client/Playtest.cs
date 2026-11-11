@@ -38,7 +38,8 @@ namespace Game.Client
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
     //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off|<tab name>
-    static class Playtest
+    //   nav <target>   sense   botreport [name]   botreset      the bot by the Core's state (PlaytestBot.cs), with probe on
+    static partial class Playtest
     {
         const string Name = "playtest";
 
@@ -104,6 +105,8 @@ namespace Game.Client
                     return "report " + Report(root);
             }
             if (!root.Playing || !root.IsSolo || root.HostWorld == null) return $"error {words[0]}: not in a solo game";
+
+            if (words[0] == "nav" || words[0] == "sense" || words[0] == "botreport" || words[0] == "botreset") return Bot(root, words);
 
             var world = root.HostWorld;
             var player = root.HostPlayer;

@@ -24,6 +24,7 @@ namespace CoreSandbox
     // dotnet run -- --supports [seconds]             every skill with each support crystal that fits it, against it bare (--gear, --rank)
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
+    // dotnet run -- --hour [minutes] [seed,seed,...]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
     static class Program
     {
         static void Main(string[] args)
@@ -138,6 +139,9 @@ namespace CoreSandbox
                 case "--factory":
                     FactorySim.Run(data, LoadMonsters(), LoadTiles(data), LoadNpcs(data), Number(1, 30));
                     break;
+                case "--hour":
+                    HourSim.Run(LoadSheets(data), Number(1, 60), args.Length > 2 ? args[2] : "1,2,3");
+                    break;
                 case "--boss":
                     var monsters = LoadMonsters();
                     BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge, bossId);
@@ -151,6 +155,7 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --rift [tiers] [seed] [--players 2] [--gear ...] [--classes ...]");
                     Console.WriteLine("       dotnet run -- --economy");
                     Console.WriteLine("       dotnet run -- --factory [minutes]");
+                    Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...]");
                     break;
             }
         }
@@ -268,6 +273,25 @@ namespace CoreSandbox
             foreach (string error in data.Errors) Console.Error.WriteLine(error);
             Environment.Exit(1);
             return null;
+        }
+
+        // Every sheet a world of the game is made from, as GameRoot loads them.
+        static BotSheets LoadSheets(LootData loot)
+        {
+            var monsters = LoadMonsters();
+            var bosses = LoadBosses(monsters);
+            string guideFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Guide"));
+            string storyFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Story"));
+            string Story(string file) => File.ReadAllText(Path.Combine(storyFolder, file));
+            var guide = GuideSheet.Parse(File.ReadAllText(Path.Combine(guideFolder, GuideSheet.File)), loot);
+            var story = StorySheet.Parse(Story(StorySheet.PlacesFile), Story(StorySheet.CharactersFile), Story(StorySheet.StoryFile), loot, bosses);
+            foreach (string error in guide.Errors.Concat(story.Errors)) Console.Error.WriteLine(error);
+            if (!guide.Success || !story.Success) Environment.Exit(1);
+            return new BotSheets
+            {
+                Monsters = monsters, Loot = loot, Bosses = bosses, Classes = LoadClassData(), Tiles = LoadTiles(loot), Guide = guide,
+                Npcs = LoadNpcs(loot), Story = story,
+            };
         }
 
         static TileData LoadTiles(LootData loot)

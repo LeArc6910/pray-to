@@ -723,6 +723,8 @@ namespace Game.Client
         internal MonsterData MonsterSheet => _monsters;
         internal LootData LootSheet => _loot;
         internal ClassData ClassSheet => _classes;
+        // The guide's goals, for the playtest bot's numbers (PlaytestBot.cs).
+        internal GuideData GuideSheet => _guide;
         internal bool HoldAttack { get; set; }
         internal Vec2 HeldAim { get; set; }
         // Facing HeldAim without attacking, as a mouse held to one side does (Playtest.cs, "face").

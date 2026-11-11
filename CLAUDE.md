@@ -49,6 +49,8 @@ dotnet run --project DevTools/CoreSandbox -- --defense 6 42 --gear iron_sword,ir
 dotnet run --project DevTools/CoreSandbox -- --rift 7 42 --players 2 --gear void_sword,void_helmet,void_armor,void_boots --classes warrior,fire_mage
 dotnet run --project DevTools/CoreSandbox -- --skills 60 --gear iron_sword
 dotnet run --project DevTools/CoreSandbox -- --supports 60 --gear iron_sword
+# 새 캐릭터의 첫 한 시간을 안내대로(상태와 길찾기로 움직이는 봇, Docs/Playtest.md). 시드마다 지표 표와 막힘 보고서
+dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 
 # 도트 그림과 효과음·음악을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, player.png, bosses.png, anim/*.gif, cave.png, cave_unlit.png, arena.png, effects.png, sounds/, music/)
 dotnet run --project DevTools/ArtPreview

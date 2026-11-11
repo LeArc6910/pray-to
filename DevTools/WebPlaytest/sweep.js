@@ -13,6 +13,7 @@ const path = require('path');
 const { execSync } = require('child_process');
 const { chromium } = require('playwright');
 const { createRun, Profiles, open, waitForCommit, deployedCommit, LaunchArgs } = require('./lib');
+const { makePilot } = require('./bot');
 
 const args = process.argv.slice(2);
 function option(name, fallback) {
@@ -1960,10 +1961,12 @@ async function firstRun(browser, profile, hourLong) {
     await finger('touchMove', [{ x: at.x + dx * Pull, y: at.y - dy * Pull }]);
   };
   const lift = async () => finger('touchEnd', []);
-  // Quick slot n (1 = the first): its key on PC, a tap on the phone.
+  // Quick slot n (1 = the first): its key on PC, a tap on the phone. What it put in hand is kept for the pilot.
+  let holding = null;
   const slot = async n => {
     if (game.touch) await game.press(`quick ${n - 1}`);
     else await game.page.keyboard.press(String(n));
+    holding = n === 2 ? 'pickaxe' : n === 1 ? 'weapon' : null;
     await game.wait(300);
   };
   const began = Date.now();
@@ -2070,92 +2073,43 @@ async function firstRun(browser, profile, hourLong) {
       await game.send('attack off');
     }
   };
-  // A monster at hand while digging or walking to a vein (2026-11-09: the phone bot fell to slimes at its
-  // workbench in its first two minutes, never striking back): the sword on 1 at it until it falls or keeps off, a
-  // potion below 40% health, then the pickaxe again. As a person would.
-  const defend = async () => {
-    let fought = false;
-    for (let i = 0; i < 25; i++) {
-      const s = await game.state();
-      if (s.dead) break;
-      if (s.health < s.maxHealth * 0.4) await drink();
-      const foe = offset(s.foe);
-      if (!foe || Math.hypot(foe[0], foe[1]) > 2.2) break;
-      if (!fought) {
-        await slot(1);
-        fought = true;
-        spent.fights++;
-      }
-      await strike(foe[0], foe[1], 450);
-    }
-    if (fought) await slot(2);
-    return fought;
+  // The bot by the game's state (bot.js, Client/PlaytestBot.cs, 2026-11-11): the game's own path finding says where
+  // to go next (round water, digging through rock, at the nearest monster or vein even off the screen), and the bot
+  // does it with the keys and touches above. It replaced looking round the screen tile by tile, which met no monster
+  // in the hunts and stood in the village plaza with no rock in sight (2026-11-10).
+  const pilot = makePilot({
+    ask: command => game.ask(command),
+    wait: ms => game.wait(ms),
+    move: (dx, dy) => move(dx, dy),
+    dig: (dx, dy) => dig(dx, dy),
+    strike: (dx, dy, ms) => strike(dx, dy, ms),
+    hold: async what => {
+      if (holding !== what) await slot(what === 'pickaxe' ? 2 : 1);
+    },
+    note,
+    shot: (name, caption) => game.shot(name, caption),
+  });
+  await game.send('botreset');
+  // Digs rock (or the tile type given, an ore vein) until `enough` says stop: the nearest by the way there, through
+  // what is in the way; monsters that come near are fought on the way.
+  const mine = async (enough, seconds, prefer = null) => {
+    const result = await pilot.go(prefer ? `tile ${prefer}` : 'wall', { until: enough, seconds });
+    if (result !== 'done') note(`  - (캐기 ${prefer || '벽'}: ${result}) ${seconds}초 안에 다 못 캠`);
+    return result;
   };
-  const mine = async (enough, seconds, prefer = null, onNone = null) => {
-    // The pickaxe in hand (quick slot 2), as the first goal's hint says.
-    await slot(2);
-    const until = Date.now() + seconds * 1000;
-    let way = [1, 0];
-    while (Date.now() < until && !(await enough())) {
-      if (await defend()) continue;
-      // Back on its feet after a fall, or the sword still in hand from a fight: the pickaxe again (2026-11-10: the
-      // hour bot swung its sword at the rock for two minutes after a slime felled it).
-      const held = await game.state();
-      if (held.dead) {
-        await game.until(t => !t.dead, 15000);
-        continue;
-      }
-      if (!/pickaxe/.test(held.weapon || '')) await slot(2);
-      const around = await near();
-      const wanted = prefer && around.find(a => a.tile === prefer);
-      if (prefer && !wanted && onNone) {
-        await onNone();
-        continue;
-      }
-      const wall = wanted || around.find(a => a.dx === way[0] && a.dy === way[1] && solid(a.tile)) || around.find(a => solid(a.tile));
-      if (wall) {
-        way = [wall.dx, wall.dy];
-        if (await dig(wall.dx, wall.dy)) await step(wall.dx, wall.dy);
-      } else {
-        // No wall beside: toward the nearest wall in sight along the four ways (a person sees the walls on the
-        // screen), else on over open floor, turning when something placed stands in the way.
-        let seen = null;
-        for (let d = 2; d <= 8 && !seen; d++) {
-          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            if (!seen && solid((await game.look(dx * d, dy * d)).tile)) seen = [dx, dy];
-          }
-        }
-        // Anything walked on is open: bare floor, laid floors, soil, and the roads and paths of the story's places
-        // (2026-11-10: in the village round the spawn the bot saw only road beside it and walked into a giant mushroom
-        // between it and the rock it saw, two minutes long).
-        const open = around.filter(a => /Floor|Road|Carpet|Soil|Dock|Rail/.test(a.tile || ''));
-        const blocked = d => !open.some(a => a.dx === d[0] && a.dy === d[1]);
-        // In the village round the spawn with no rock in sight (2026-11-10: the hour bot struck no wall in its fifteen
-        // minutes for the mining skill, wandering the dressed plaza): out away from its middle, where the cave walls
-        // are, as a person heads for the rock they see past the houses.
-        if (!seen) {
-          const me = await game.state();
-          if (me.place) {
-            const ax = me.x - me.spawnX, ay = me.y - me.spawnY;
-            const out = Math.abs(ax) >= Math.abs(ay) ? [Math.sign(ax) || 1, 0] : [0, Math.sign(ay) || 1];
-            if (!blocked(out)) seen = out;
-            else {
-              const side = Math.abs(ax) >= Math.abs(ay) ? [0, Math.sign(ay) || 1] : [Math.sign(ax) || 1, 0];
-              if (!blocked(side)) seen = side;
-            }
-          }
-        }
-        if (seen && !blocked(seen)) way = seen;
-        else if (blocked(way) && open.length > 0) {
-          const pick = open[Math.floor(Math.random() * open.length)];
-          way = [pick.dx, pick.dy];
-        }
-        const before = await game.look(0, 0);
-        await step(way[0], way[1], 400);
-        const after = await game.look(0, 0);
-        if (before.x === after.x && before.y === after.y) way = [-way[1], way[0]];
-      }
+  // Walks to stand beside the nearest tile of the type, facing it (2026-11-11: no more taken there by the playtest's
+  // "goto near"); taken there only if the way cannot be found, which the report says.
+  const walkTo = async (what, why) => {
+    const result = await pilot.go(`near ${what}`, { seconds: 120 });
+    if (result === 'arrived') {
+      const at = pilot.last;
+      if (at.x || at.y) await turn(Math.sign(Math.round(at.x)), Math.sign(Math.round(at.y)));
+      return true;
     }
+    note(`  - (${why}) 걸어서 못 감(${result}): 옮겨졌다`);
+    await gotoNear(what);
+    await game.wait(800);
+    return false;
   };
   const inv = () => game.inventory();
   // Presses [만들기] on the row of the thing (only what can be made shown) until the bag holds one more of it: a
@@ -2291,9 +2245,7 @@ async function firstRun(browser, profile, hourLong) {
   const bench = (await near()).find(a => a.tile === 'Workbench');
   if (!bench) {
     // Dug away from it for the stone: back beside it, as a person would walk back down the tunnel.
-    note('- 돌 바닥을 만들 때 작업대에서 멀어져 있었다(돌을 더 캐느라). 봇은 작업대 곁으로 옮겨졌다');
-    await gotoNear('Workbench');
-    await game.wait(800);
+    await walkTo('Workbench', '돌 바닥을 만들려고 작업대로');
   }
   await bagTab(game, '재료·제작');
   // The list is long by now; a person scrolls or shows only what can be made. The bot does the second.
@@ -2307,78 +2259,17 @@ async function firstRun(browser, profile, hourLong) {
   }
   await placeFor(5, '돌 바닥 깔기', /^돌 바닥 ×/);
 
-  // 5. Six copper ores. The hint says what a copper vein looks like but not where one is: the bot is taken to the
-  // nearest (a person would walk the tunnels looking for orange).
-  let veins = 0;
-  let carried = 0;
-  // To the next copper vein as the minimap marks it (2026-11-09): toward it, digging through what is in the way,
-  // until it is beside. Taken there only when none is marked within reach.
-  const nextVein = async () => {
-    const started = Date.now();
-    try {
-      await walkToVein();
-    } finally {
-      spent.vein += (Date.now() - started) / 1000;
-    }
-  };
-  const walkToVein = async () => {
-    veins++;
-    const first = offset((await game.state()).veinAt);
-    if (!first) {
-      carried++;
-      await gotoNear('CopperOre');
-      await game.wait(800);
-      return;
-    }
-    await slot(2);
-    let beside = false;
-    for (let i = 0; i < 60 && !beside; i++) {
-      const v = offset((await game.state()).veinAt);
-      if (!v || Math.abs(v[0]) + Math.abs(v[1]) <= 1) {
-        beside = !!v;
-        break;
-      }
-      if (await defend()) continue;
-      let [sx, sy] = toward(v[0], v[1]);
-      let ahead = (await game.look(sx, sy)).tile;
-      // Water cannot be dug: round it the other way toward the vein, or aside (as a person walks the shore).
-      if (ahead === 'Water') {
-        const other = Math.abs(v[0]) > Math.abs(v[1]) ? [0, Math.sign(v[1]) || 1] : [Math.sign(v[0]) || 1, 0];
-        for (const [ax, ay] of [other, [-other[0], -other[1]], [-sx, -sy]]) {
-          const t = (await game.look(ax, ay)).tile;
-          if (t !== 'Water') {
-            [sx, sy, ahead] = [ax, ay, t];
-            break;
-          }
-        }
-      }
-      if (ahead === 'CopperOre') {
-        beside = true;
-        break;
-      }
-      if (solid(ahead)) await dig(sx, sy);
-      await step(sx, sy, 260);
-    }
-    if (!beside) {
-      // Water all round or a maze of it: taken there, as a person would find their way round.
-      carried++;
-      await gotoNear('CopperOre');
-      await game.wait(800);
-    }
-  };
-  await nextVein();
-  await mine(async () => count(await inv(), 'copper_ore') >= 6, 150, 'CopperOre', nextVein);
+  // 5. Six copper ores: the nearest veins by the way there (the minimap rings the nearest; the bot knows them all within
+  // a screen and a half, and goes on past the edge of what it has seen when there are none).
+  await mine(async () => count(await inv(), 'copper_ore') >= 6, 150, 'CopperOre');
   if (count(await inv(), 'copper_ore') < 6) await why(`구리 ${count(await inv(), 'copper_ore')}개에서 멈춤`);
-  note(`- 구리 광맥: 미니맵이 가리키는 가장 가까운 광맥으로 ${veins}번 파 들어갔다${carried ? `(16칸 안에 없어 ${carried}번 옮겨졌다)` : ''}`);
-  note(`  - 쓴 때: 광맥 찾아가기 ${Math.round(spent.vein)}초, 벽·광석 캐기 ${Math.round(spent.dig)}초(${spent.digs}번, 그 가운데 6초 안에 안 깨진 것 ${spent.stuck}번), 곁에 온 몬스터와 싸움 ${spent.fights}번`);
+  note(`- 구리까지: 길잡이 ${pilot.counts.navs}번 물음, 걸음 ${pilot.counts.moves}번, 캐기 ${pilot.counts.digs}번(그 가운데 6초 안에 안 깨진 것 ${spent.stuck}번), 싸움 ${pilot.counts.fights}번, 멈춤 ${pilot.counts.stalls}번`);
   await game.wait(1000);
   await passed(6, '구리 광석 6개 캐기');
 
   // 6. A piece of copper gear, made beside the workbench and worn. (Mining skill 2 was the sixth goal until
   // 2026-11-09: a hundred walls, three minutes or more of digging alone, held up every goal after it.)
-  await gotoNear('Workbench');
-  note('- 구리 장비를 만들려고 작업대로 돌아갈 때: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)');
-  await game.wait(800);
+  await walkTo('Workbench', '구리 장비를 만들려고 작업대로');
   await bagTab(game, '재료·제작');
   let gear = false;
   await game.press('만들 수 있는 것만');
@@ -2416,6 +2307,10 @@ async function firstRun(browser, profile, hourLong) {
 
   note('\n목표마다 걸린 때:\n');
   for (const line of steps) note(`- ${line}`);
+  // The run's numbers by the game's state (BotReport, the same tables as the sim's CoreSandbox --hour).
+  const numbers = await game.ask(`botreport 웹 ${game.touch ? '휴대폰' : 'PC'}`);
+  if (typeof numbers === 'string') note('\n### 숫자 지표\n\n' + numbers);
+  note(`\n- 길잡이: ${pilot.counts.navs}번 물음, 걸음 ${pilot.counts.moves}, 캐기 ${pilot.counts.digs}, 싸움 ${pilot.counts.fights}, 멈춤 ${pilot.counts.stalls}, 막힘 ${pilot.counts.stuck}`);
   await game.context.close();
 
   // ---- Goals 7 to 15, the rest of the first hour ----
@@ -2430,11 +2325,21 @@ async function firstRun(browser, profile, hourLong) {
         await game.until(s => !s.dead, 15000);
         await game.wait(500);
       }
+      // Walked there by the game's path finding (2026-11-11); taken there only when the way cannot be found.
+      if (where.startsWith('near ') || where.startsWith('boss ')) {
+        const result = await pilot.go(where, { seconds: 150 });
+        if (result === 'arrived') {
+          const at = pilot.last;
+          if (where.startsWith('near ') && (at.x || at.y)) await turn(Math.sign(Math.round(at.x)), Math.sign(Math.round(at.y)));
+          return;
+        }
+        note(`  - (${why}) 걸어서 못 감(${result})`);
+      }
       const answer = (await game.send(`goto ${where}`)).join(' ');
       if (game.touch && where.startsWith('near ')) await game.send('face off');
       await game.wait(800);
       if (!/^ok/.test(answer)) note(`  - (${why}) goto ${where}: ${answer || '대답 없음'}`);
-      if (!moved.has(why)) note(`- ${why}: 봇은 옮겨졌다(굴을 되짚어 걷기 대신)`);
+      if (!moved.has(why)) note(`- ${why}: 봇은 옮겨졌다(걸어서 못 가서)`);
       moved.add(why);
     };
     const ids = { 호미: 'hoe', 낚싯대: 'fishing_rod', 화로: 'furnace', 침대: 'bed' };
@@ -2447,93 +2352,40 @@ async function firstRun(browser, profile, hourLong) {
     };
     const copperFor = async n => {
       if (count(await inv(), 'copper_ore') >= n) return;
-      await nextVein();
-      await mine(async () => count(await inv(), 'copper_ore') >= n, 150, 'CopperOre', nextVein);
+      await mine(async () => count(await inv(), 'copper_ore') >= n, 150, 'CopperOre');
     };
     // Walks onto the drops lying near.
     const gather = async seconds => {
-      const until = Date.now() + seconds * 1000;
-      while (Date.now() < until) {
-        const at = offset((await game.state()).lootAt);
-        if (!at) break;
-        const [sx, sy] = toward(at[0], at[1]);
-        await step(sx, sy, 200);
-      }
+      await pilot.go('loot', { seconds });
     };
-    // Fights the nearest monsters with the weapon on quick slot 1 until `enough` (or the time runs out): walks at
-    // the nearest, strikes when close, drinks below 40% health, picks up what falls.
+    // Monsters felled on the run so far (the game's bestiary, by kind).
+    const felled = async () => ((await game.ask('sense')).kills || '').split(',').filter(Boolean).reduce((n, k) => n + Number(k.split(':')[1]), 0);
+    // Fights the nearest monsters until `enough` (or the time runs out): the game's path finding takes the bot to the
+    // nearest within a screen and a half, not much above its level, and on past the edge of what it has seen when
+    // there is none (2026-11-10: looking only at the screen, the hunts met no monster in five runs). Drinks below 40%
+    // health on the way; picks up what falls.
     const hunt = async (enough, seconds) => {
-      await slot(1);
-      const until = Date.now() + seconds * 1000;
-      let kills = 0;
-      let lastSeen = Date.now();
-      let lastWay = null;
-      let wandered = 0;
-      while (Date.now() < until && !(await enough())) {
+      const before = await felled();
+      const end = Date.now() + seconds * 1000;
+      let result = 'time';
+      while (Date.now() < end) {
         const s = await game.state();
         if (s.dead) {
           await game.until(t => !t.dead, 15000);
           continue;
         }
-        if (/pickaxe/.test(s.weapon || '')) await slot(1);
         if (s.health < s.maxHealth * 0.4) await drink();
-        const foe = offset(s.foe);
-        if (!foe) {
-          await gather(3);
-          // None near: monsters come into being twelve tiles or more from the spawn and from players, and come down
-          // open tunnels (2026-11-10: digging straight through rock away from the spawn, the bot met none in four
-          // minutes). Along the most open way, away from the spawn, not straight back.
-          // Again each minute with none seen, up to three times (the places and roads near the spawn keep monsters
-          // off a wide round, 2026-11-10).
-          // Then beside the nearest monster (2026-11-10: there are few near the spawn, and in the biomes too the bot
-          // met none; a person would see one on the screen or go looking further than the bot can).
-          if (Date.now() - lastSeen > 40000) {
-            await taken('monster', '사냥할 몬스터가 40초 동안 보이지 않을 때(가장 가까운 몬스터 곁으로)');
-            wandered++;
-            lastSeen = Date.now();
-            continue;
-          }
-          const away = [s.x - s.spawnX, s.y - s.spawnY];
-          const far = Math.hypot(away[0], away[1]) || 1;
-          let best = null;
-          for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
-            let open = 0;
-            for (let k = 1; k <= 3; k++) {
-              // The roads and paths of the story's places are walked too (2026-11-10: in the village the hunt saw only
-              // road round it and stood still).
-              if (!/Floor|Soil|Carpet|Road|Dock|Rail/.test((await game.look(dx * k, dy * k)).tile || '')) break;
-              open++;
-            }
-            const back = lastWay && dx === -lastWay[0] && dy === -lastWay[1] ? 3 : 0;
-            const score = open * 2 + (dx * away[0] + dy * away[1]) / far - back + Math.random();
-            if (open > 0 && (!best || score > best.score)) best = { dx, dy, score };
-          }
-          if (best) {
-            lastWay = [best.dx, best.dy];
-            await step(best.dx, best.dy, 600);
-          } else {
-            // Shut in: dig out away from the spawn.
-            const [ax, ay] = far < 1.5 ? [1, 0] : toward(away[0], away[1]);
-            await slot(2);
-            await dig(ax, ay);
-            await slot(1);
-            await step(ax, ay, 400);
-          }
-          continue;
-        }
-        lastSeen = Date.now();
-        const d = Math.hypot(foe[0], foe[1]);
-        if (d > 1.4) {
-          const [sx, sy] = toward(foe[0], foe[1]);
-          await step(sx, sy, 220);
-        } else {
-          const before = s.monsters;
-          await strike(foe[0], foe[1], 450);
-          if ((await game.state()).monsters < before) kills++;
-        }
+        const low = async () => {
+          const t = await game.state();
+          return t.health < t.maxHealth * 0.4;
+        };
+        result = await pilot.go('monster', { until: async () => (await enough()) || (await low()), seconds: Math.max(5, (end - Date.now()) / 1000) });
+        if (result === 'done' && (await enough())) break;
+        if (result === 'stuck' || result === 'noway') break;
       }
       await gather(4);
-      return kills;
+      if (!(await enough())) note(`  - (사냥: ${result}) ${seconds}초 안에 다 못 이룸`);
+      return (await felled()) - before;
     };
 
     // 7. The two spores a new character has, planted on the cave floor ahead.
@@ -2683,8 +2535,7 @@ async function firstRun(browser, profile, hourLong) {
       if (s.dead) {
         falls++;
         await game.until(t => !t.dead, 15000);
-        await game.send('goto boss cave_warden');
-        await game.wait(1200);
+        await taken('boss cave_warden', '쓰러진 뒤 동굴 수호자에게 다시 갈 때');
         continue;
       }
       if (s.health < s.maxHealth * 0.5) await drink();
@@ -2698,9 +2549,10 @@ async function firstRun(browser, profile, hourLong) {
       }
       const boss = offset(s.bossAt);
       if (!boss) {
+        // Asleep in its arena, or felled: to it by the way there (it wakes as the bot comes near), or the drops.
         await gather(5);
         if ((await goalNow()).n > 15) break;
-        await game.wait(500);
+        await pilot.go('fight cave_warden', { seconds: 4 });
         continue;
       }
       const d = Math.hypot(boss[0], boss[1]);
@@ -2715,7 +2567,10 @@ async function firstRun(browser, profile, hourLong) {
         continue;
       }
       if (d > 2.2) {
-        await move(boss[0] * (d - 1.8) / d, boss[1] * (d - 1.8) / d);
+        // Round what is in the way by the game's path finding (a person sees the way on the screen).
+        const step = await game.ask('nav fight cave_warden');
+        if (step.do === 'move') await move(step.x, step.y);
+        else await move(boss[0] * (d - 1.8) / d, boss[1] * (d - 1.8) / d);
       } else {
         // The class's skills too, as a player would (Q, E), aimed at it.
         if (!game.touch) {
