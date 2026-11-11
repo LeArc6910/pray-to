@@ -316,6 +316,7 @@ namespace Game.Client
             "..w...w...",
             "...w...w..",
             ".LLmLLLmL.",
+            "bMMMmMMMmb",
             "bbbbbbbbbb",
             ".bBBBBBBb.",
             "..bBBBBb..",
@@ -334,7 +335,7 @@ namespace Game.Client
         static PixelImage Soup(string hex)
         {
             var ramp = Ramp.Of(hex);
-            return Dish(BowlColors, SoupRows, new Dictionary<char, Rgba> { ['L'] = ramp.Light, ['m'] = ramp.Shade });
+            return Dish(BowlColors, SoupRows, new Dictionary<char, Rgba> { ['L'] = ramp.Light, ['M'] = ramp.Main, ['m'] = ramp.Shade });
         }
 
         static PixelImage Fry(string hex, string side)
@@ -357,7 +358,7 @@ namespace Game.Client
             "recall_scroll" => RecallScroll,
             "mana_potion" => ManaPotion,
             "grilled_fish" => Ramped(FishRows, Ramp.Of("#C4783E")),
-            "fish_stew" => Soup("#E8D8B0"),
+            "fish_stew" => Soup("#C88A4A"),
             "eel_skewer" => Fry("#7A6A4A", "#E0B050"),
             "abyss_feast" => Soup("#8A6AD0"),
             "glow_stirfry" => Fry("#5FE0C8", "#8AD05A"),
@@ -515,7 +516,7 @@ namespace Game.Client
             ".mmddddmd.",
         };
 
-        // A heart with a bright core (the lava titan's heart, 2026-11-11: it shared the stone's picture).
+        // A heart with a bright core (the lava titan's heart, 2026-11-11: it drew as the stone).
         static readonly string[] Heart =
         {
             ".LL...LL..",
@@ -927,8 +928,7 @@ namespace Game.Client
                 // These five drew as plain stone until 2026-11-11 (the content audit).
                 case "obsidian_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#6A5484")), OreChunk).Outlined(Outline);
                 case "obsidian_bar": return Bar(Ramp.Of("#4E4266"));
-                case "lava_heart": return Ramped(Heart, Ramp.Of("#FF6A2A"));
-                case "titan_heart": return Ramped(Heart, Ramp.Of("#FFB43A"));
+                case "titan_heart": return Ramped(Heart, Ramp.Of("#FF6A2A"));
                 case "glow_spore": return Ramped(Spores, Ramp.Of("#5FE0C8"));
                 case "ice_crystal": return Ramped(Shard, Ramp.Of("#9CDCFF"));
                 case "void_bar": return Bar(Ramp.Of("#9A74F0"));
