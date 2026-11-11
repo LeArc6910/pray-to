@@ -2782,32 +2782,43 @@ async function firstRun(browser, profile, hourLong) {
       const i = hud.findIndex(l => /^부탁: 상인 도라/.test(l));
       return i < 0 ? '' : /\d+\/\d+/.test(hud[i]) ? hud[i] : `${hud[i]} · ${hud[i + 1] || ''}`;
     };
-    const want = (line, name) => {
-      const m = line.match(new RegExp(name + ' (\\d+)/(\\d+)'));
-      return m ? Math.max(0, +m[2] - +m[1]) : 0;
-    };
-    const asked = await requestLine();
-    note(`- 부탁: ${asked || '목표 목록에 없음'}`);
-    const fish = want(asked, '생선 구이');
+    // What the request needs, from her [부탁] page ("필요한 것: 버섯 포자 10"; 2026-11-11: the goal list did not always
+    // show the request), against the bag.
+    const things = { '버섯 포자': 'mushroom_spore', '생선 구이': 'grilled_fish' };
+    await taken('near MerchantStall', '부탁을 보러 상인에게');
+    await bagTab(game, '상인');
+    await game.press('부탁');
+    await game.wait(400);
+    const page = (await game.allText()).replace(/\s*\n\s*/g, ' ');
+    await closeBag(game);
+    const needLine = ((page.match(/필요한 것: ([^|"]+)/) || [])[1] || '').trim();
+    note(`- 부탁: ${needLine || '읽지 못함'} (목표 목록: ${(await requestLine()) || '없음'})`);
+    const short = {};
+    for (const m of needLine.matchAll(/([^\d·,]+?) (\d+)/g)) {
+      const name = m[1].trim();
+      short[name] = Math.max(0, +m[2] - (things[name] ? count(await inv(), things[name]) : 0));
+      if (!things[name]) note(`  - 봇이 모을 줄 모르는 부탁이다: ${name}`);
+    }
+    const fish = short['생선 구이'] || 0;
     if (fish > 0) {
       await taken('near Water Cave', '부탁의 생선을 낚으러 갈 때');
       await fishUntil(async () => count(await inv(), 'cave_minnow') >= fish * 2, 300);
       await taken('near Furnace', '부탁의 생선을 구우러 화로로');
       for (let i = 0; i < fish && count(await inv(), 'cave_minnow') >= 2; i++) await craft('생선 구이');
     }
-    const spores = want(asked, '버섯 포자');
+    const spores = short['버섯 포자'] || 0;
     if (spores > 0) {
       await taken('near MerchantStall', '버섯 포자를 사러 상인에게');
       await bagTab(game, '상인');
       await game.press('사기');
-      for (let i = 0; i < 20 && want(await requestLine(), '버섯 포자') > 0; i++) {
+      const goal = count(await inv(), 'mushroom_spore') + spores;
+      for (let i = 0; i < 20 && count(await inv(), 'mushroom_spore') < goal; i++) {
         if (!(await game.press('사기', '버섯 포자', { quiet: i > 0 }))) break;
         await game.wait(350);
       }
+      note(`  - 버섯 포자를 샀다: ${count(await inv(), 'mushroom_spore')}`);
       await closeBag(game);
     }
-    const short = [...asked.matchAll(/(\d+)\/(\d+)/g)].some(m => +m[1] < +m[2]);
-    if (asked && fish === 0 && spores === 0 && short) note('  - 봇이 모을 줄 모르는 부탁이다');
     await taken('near MerchantStall', '부탁을 건네러 상인에게');
     await bagTab(game, '상인');
     await game.press('부탁');
