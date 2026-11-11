@@ -2045,7 +2045,7 @@ async function firstRun(browser, profile, hourLong) {
   const clock = () => `${Math.round((Date.now() - began) / 1000)}초`;
   const goalNow = async () => {
     const hud = ((await game.texts()).hud || []).join(' | ');
-    // "목표 3/55: …", or merged with the story's step "깨어난 수호자 · 목표 10/55" (2026-11-11).
+    // "목표 3/65: …", or merged with the story's step "깨어난 수호자 · 목표 10/65" (2026-11-11).
     const m = hud.match(/목표 (\d+)\/\d+:? ?([^|]*)/);
     return m ? { n: +m[1], text: m[2].trim() } : { n: 0, text: '' };
   };

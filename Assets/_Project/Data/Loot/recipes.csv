@@ -159,3 +159,12 @@ rift_charm,rift_charm,1,rift_shard:15|void_essence:1,Anvil
 tide_amulet,tide_amulet,1,serpent_scale:1|pearl:6|mithril_bar:3,Anvil
 grilled_pike,grilled_fish,2,lake_pike:1,Furnace
 sandstride_boots,sandstride_boots,1,antlion_jaw:1|amber:6|iron_bar:4,Anvil
+grilled_glow_tetra,grilled_fish,2,glow_tetra:1,Furnace
+grilled_frost_char,grilled_fish,2,frost_char:1,Furnace
+grilled_prism_carp,grilled_fish,2,prism_carp:1,Furnace
+grilled_lake_perch,grilled_fish,2,lake_perch:1,Furnace
+grilled_silver_eel,grilled_fish,2,silver_eel:1,Furnace
+grilled_shadow_eel,grilled_fish,2,shadow_eel:1,Furnace
+crystal_pickle,crystal_pickle,1,crystal_radish:2,PreservesJar
+lotus_tea,lotus_tea,1,lotus_root:2,Keg
+cactus_juice,cactus_juice,1,cactus_fruit:2,Keg

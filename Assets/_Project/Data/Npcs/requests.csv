@@ -30,3 +30,24 @@ a_cap,alchemist,빛 버섯 세 개. 마나 물약의 핵심 재료야.,glow_cap:
 a_story1,alchemist,빛 버섯으로 새 물약을 연구하고 있어. 빛 버섯 셋과 슬라임 젤 열이면 시작할 수 있겠어.,glow_cap:3|slime_gel:10,mana_potion:3|coin:100,1,40,1,빛 버섯 연구
 a_story2,alchemist,결정을 굳히는 법을 알아냈어! 얼음 결정 여덟과 서리 열매 셋이면 첫 결정을 만들 수 있어.,ice_crystal:8|frost_berry:3,support_haste:1|essence:6,3,50,2,얼음의 결정
 a_story3,alchemist,공허의 정수와 균열 조각을 섞으면 무엇이 될까? 다섯 조각과 정수 하나만 구해 줘. 성공하면 부적을 나눠 줄게.,void_essence:1|rift_shard:5,support_power:1|rift_charm:1,5,60,3,공허의 연금
+r_wine,royal_trader,폐하의 연회에 별 수박 술 두 병이 필요해요. 품질은 제가 볼게요.,star_wine:2,coin:120|essence:2,,30
+r_eel,royal_trader,수정 장어 세 마리. 왕실 요리사가 꼬치를 굽겠대요.,crystal_eel:3,coin:90|mana_potion:2,1,35
+r_pearl,royal_trader,진주 다섯 알이면 왕관 장식을 손볼 수 있어요.,pearl:5,coin:150|essence:4,2,40
+r_crest,royal_trader,장군의 문장을 왕실 보물고에 두고 싶어요. 정중히 사겠습니다.,general_crest:1,coin:300|support_power:1,3,45
+r_story1,royal_trader,왕도 곳간이 비었어요. 눈 배추 열 포기와 동굴 감자 열 개면 겨울을 나요.,snow_cabbage:10|cave_potato:10,coin:150|recall_scroll:3,1,40,1,왕도의 곳간
+r_story2,royal_trader,폐하께 드릴 선물로 달빛 포도주 셋과 치즈 셋을 모아 주세요.,moon_wine:3|cheese:3,coin:300|essence:8,3,50,2,여왕의 만찬
+r_story3,royal_trader,가라앉은 왕관을 되찾으셨다지요. 그 왕관을 왕실에 돌려주시면 크게 보답할게요.,sunken_crown:1,coin:600|essence:20|rift_key:1,5,60,3,돌아온 왕관
+d_ore,demon_trader,공허석 원석 다섯. 우리 대장간 불이 꺼져 간다.,void_ore:5,coin:120|void_bean_seed:2,,30
+d_food,demon_trader,인간의 동굴 버섯이 그렇게 맛있다던데. 열 개 가져와 봐.,mushroom:10,coin:70|pickled_bean:2,1,35
+d_obsidian,demon_trader,흑요석 주괴 넷. 둥지의 문을 다시 달아야 해.,obsidian_bar:4,coin:180|essence:6,2,40
+d_angler,demon_trader,심연의 아귀 한 마리. 아이들이 고향 맛을 그리워한다.,void_angler:1,coin:200|support_multi:1,3,45
+d_story1,demon_trader,인간과 거래하려면 믿음이 필요하지. 슬라임 젤 스물과 버섯 포자 스물을 가져와 봐라.,slime_gel:20|mushroom_spore:20,coin:120|abyss_feast:2,1,40,1,첫 거래
+d_story2,demon_trader,둥지의 미친 장군 때문에 우리도 쫓겨났다. 장군의 문장을 가져오면 네 편이 되지.,general_crest:1,coin:300|support_leech:1,3,50,2,쫓겨난 마족
+d_story3,demon_trader,공허의 군주가 쓰러졌다는 소문이 있다. 정말이라면 공허석 주괴 다섯과 공허의 정수 셋으로 증명해라.,void_bar:5|void_essence:3,coin:800|essence:25|rift_key:1,5,60,3,군주 없는 공허
+o_iron,ore_trader,철광석 스무 개. 왕도에 댈 물량이 모자라.,iron_ore:20,coin:70|copper_wire:6,,30
+o_amber,ore_trader,호박 다섯 알. 모래 동굴에서 나온다던데.,amber:5,coin:90|essence:2,1,35
+o_mithril,ore_trader,미스릴 광석 열. 갱도 깊은 곳이 무너져서 못 캐고 있어.,mithril_ore:10,coin:140|essence:4,2,40
+o_obsidian,ore_trader,흑요석 원석 열. 용암 지대에 갈 배짱이 있다면.,obsidian_ore:10,coin:200|essence:6,3,45
+o_story1,ore_trader,갱도 버팀목이 썩었어. 돌 쉰 개와 철 주괴 열 개면 다시 받칠 수 있지.,stone:50|iron_bar:10,coin:150|iron_gear:6,1,40,1,무너진 갱도
+o_story2,ore_trader,갱도 깊은 곳에서 이상한 소리가 난다고 했지? 개미귀신의 턱을 가져오면 사람들이 안심할 거야.,antlion_jaw:1,coin:250|essence:8,3,50,2,갱도의 소리
+o_story3,ore_trader,평생 공허석을 다뤄 보고 싶었어. 공허석 원석 열과 흑요석 주괴 다섯이면 내 곡괭이를 주지.,void_ore:10|obsidian_bar:5,coin:500|essence:20|obsidian_pickaxe:1,5,60,3,공허석의 맛

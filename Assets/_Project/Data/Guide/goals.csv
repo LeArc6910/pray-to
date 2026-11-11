@@ -13,7 +13,9 @@ bed,침대 세우기,작업대에서 돌 6과 슬라임 젤 3으로 만든다. �
 plant,버섯 심기,가방 재료의 버섯 포자를 [심기]로 흙 동굴 바닥에 심는다. 물뿌리개로 물을 준 날에만 자라고 다 자라면 그 위를 지나가며 거둔다,plant,mushroom_spore:2
 hoe,밭 갈기,작업대에서 호미를 만들고 [밭 갈기]로 바닥을 밭으로 만든다. 밭에 심으면 빨리 자란다,place:Soil,fertilizer:3
 fishing,물고기 낚기,작업대에서 낚싯대를 만들고 동굴 가장자리 물웅덩이를 바라보고 [낚시]. 입질(!)이 오면 바로 다시 누른다,have:cave_minnow|have:spore_catfish|have:ice_trout|have:crystal_eel|have:void_angler|have:firefly_catfish,xp:30
+cook,요리 하나 만들기,화로 곁에서 동굴 송사리 2로 생선 구이를 만든다. 요리를 먹으면 한동안 능력치가 오른다. 밭에서 거둔 버섯·작물로 만드는 요리도 화로에서 만든다,have:grilled_fish|have:roasted_mushroom|have:mushroom_soup|have:spicy_fry,mushroom_spore:3
 merchant,상인에게 팔아 금화 10개 모으기,시작 지점 가까이 줄무늬 노점에 상인 도라가 있다. 곁에서 가방을 열면 [상인] 탭에서 물고기·작물·장비를 판다,have:coin:10,coin:15
+request,부탁 하나 들어주기,사람 곁에서 가방을 열면 그 사람 탭에 오늘의 부탁이 보인다. 필요한 것을 모아 [건네기]를 누르면 보답과 호감을 준다. 부탁은 하루에 하나씩 바뀐다,request,coin:20
 life_mining,채굴 기술 2레벨 되기,손으로 벽을 깰 때마다 채굴 기술이 오르고 레벨마다 더 빨리 캔다. 가방 [장비] 탭의 생활 기술에 보인다,life:mining:2,xp:20
 level5,레벨 5 되기,몬스터를 잡으면 경험치가 오른다. 철 장비는 레벨 5부터 입는다,level:5,healing_potion:3
 skill,스킬 하나 배우기,레벨이 오를 때마다 스킬 포인트 1점. 가방 [스킬] 탭에서 [배우기]를 누르면 빈 스킬 칸에 들어간다,skills:1,healing_potion:2
@@ -22,18 +24,25 @@ iron_bar,철 주괴 만들기,시작 지점에서 30칸 넘게 가면 푸른 회
 anvil,모루 세우기,작업대에서 철 주괴 5·돌 6으로 만든다. 곁에 서면 장비마다 [다듬기]가 생겨 강화·분해·룬 빼기·접사 다시 굴리기를 한다,place:Anvil,essence:3
 iron_gear,철 장비 하나 만들기,작업대 옆에서 철 주괴와 수호자의 핵으로 만든다,have:iron_sword|have:iron_bow|have:iron_staff|have:iron_helmet|have:iron_armor|have:iron_boots,xp:60
 antlion,개미귀신 쓰러뜨리기,동굴 수호자의 아레나에서 굴을 따라가면 모래 동굴이다. 개미귀신은 멀리 있는 사람 발밑에 개미지옥을 판다. 개미귀신 턱과 호박으로 모루에서 모래걸음 장화를 만든다,have:antlion_jaw,healing_potion:3
+rune,장비에 룬 끼우기,몬스터와 보스가 룬을 떨어뜨린다. 소켓이 있는 장비를 고르고 룬 줄의 [끼우기]를 누른다. 일반 등급 장비에 소켓 수만큼 룬을 정해진 순서로 끼우면 룬워드가 된다,rune,essence:4
 second_class,둘째 클래스 고르기,레벨 10이 되면 가방 [스킬] 탭에서 클래스를 하나 더 고를 수 있다(무료). 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다,classes:2,healing_potion:2
 drill,채굴기 세우기,광맥을 바라보고 [놓기]로 세우고 뒤에 상자를 두면 광석이 저절로 쌓인다,place:Drill,conveyor:4
+belt,벨트로 나르기,작업대에서 철 주괴 1·돌 2로 벨트 4개를 만든다. 채굴기 앞에 깔면 캔 것을 상자까지 나른다. 로봇 팔은 상자와 기계 사이를 옮긴다,place:Conveyor|place:Arm,iron_gear:2
 assembler,조립기 세우기,철 톱니·회로로 만든다. 바라보고 가방 제작 목록의 [조립기에]로 만들 것을 정하면 들어온 재료로 되풀이해 만든다,place:Assembler,iron_gear:4
 sprinkler,스프링클러 세우기,물뿌리개와 철 주괴로 만든다. 둘레 5×5칸 작물이 마르지 않게 저절로 물을 준다,place:Sprinkler,fertilizer:3
+harvester,수확기 세우기,밭 곁에 세우면 다 자란 작물을 거둬 곁의 상자에 넣는다. 씨앗이 있으면 다시 심는다,place:Harvester,fertilizer:4
 keg,술통 세우기,철 주괴 2·돌 8. 과일(딸기·포도·서리 열매)을 [넣기]로 넣으면 몇 분 뒤 상인이 비싸게 사는 주스와 술이 된다,place:Keg,cave_berry_seed:2
 coop,닭장 세우기,돌 12·철 주괴 2·슬라임 젤 2. 상인의 닭과 사료를 [넣기]로 넣으면 하루마다 달걀을 낳는다,place:Coop,feed:8
+pen,양이나 소 들이기,작업대에서 양 우리나 외양간을 만들어 세우고 상인에게 산 양이나 소를 들인다. 양털과 우유가 나온다,place:Fold|place:Barn,feed:8
 crab_pot,통발 놓기,구리 전선 4·돌 2. 바로 옆이 물인 바닥에 놓고 미끼를 넣으면 15분마다 게나 새우가 든다,place:CrabPot,bait:8
 friend,상인과 호감 2 되기,하루 한 번 [말 걸기]와 선물. 좋아하는 것을 주면 많이 오르고 호감이 오를수록 값이 좋아진다,friend:2,coin:30
 generator,발전기 돌리기,철 톱니 3·구리 전선 4·돌 6으로 만들고 슬라임 젤을 [연료]로 넣으면 둘레 기계가 두 배로 빨라진다,place:Generator,slime_gel:10
 power_pole,전신주로 힘 나르기,구리 전선 3·돌 2로 둘을 만든다. 8타일 안의 전신주·발전기끼리 이어지고 둘레 4타일 기계에 힘을 준다,place:PowerPole,copper_wire:4
+ward,수호석 세우기,작업대에서 돌 20·철 주괴 3·구리 전선 4로 만든다. 곁에 서서 [기지 방어 시작]을 누르면 몬스터 물결이 몰려온다. 지키면 금화와 장비를 준다. 하루에 한 번이다,place:WardStone,healing_potion:3
+turret,포탑 세우기,수호석 곁에 포탑을 세우고 탄환을 넣으면 가까운 몬스터를 쏜다. 탄환은 철 주괴 1·구리 광석 2로 열 발이다,place:Turret,iron_bar:4
 free_power,연료 없이 힘 내기,물 바로 옆에 물레방아(철 톱니 3·철 주괴 2·돌 6)를 놓거나 태양광 판(회로 2·얼음 결정 3·구리 전선 2)을 놓는다. 태양광은 낮에만 돈다,place:WaterWheel|place:SolarPanel,iron_bar:4
 biome,빛 포자나 얼음 결정 얻기,흙 동굴 바깥 버섯 숲(빛 박쥐)이나 얼음 동굴(얼음 슬라임)의 몬스터가 떨어뜨린다. 들어서면 이름이 뜬다,have:glow_spore|have:ice_crystal,xp:40
+pet,펫 데리고 다니기,몬스터가 아주 가끔 알을 떨어뜨린다. 가방 [재료·제작]의 알 줄에서 [부화]를 누르면 펫이 따라오며 능력치를 보탠다,pet,xp:40
 deep,깊은 곳 찾아가기,시작 지점에서 60칸 넘게 가면 빛나는 미스릴 광맥과 수정 박쥐·정령이 있는 깊은 곳이다. 횃불을 넉넉히 챙긴다,reach:60,torch:6
 mithril_ore,미스릴 광석 4개 캐기,깊은 곳 벽에 박힌 하늘색으로 빛나는 덩어리가 미스릴 광맥이다. 단단해서 여러 번 쳐야 한다,have:mithril_ore:4,xp:60
 queen,수정 거미 여왕 쓰러뜨리기,HUD의 깊은 아레나 방향으로 간다. 첫 보스보다 세니 철 장비와 물약을 갖춘다,have:queen_heart,healing_potion:4
@@ -43,6 +52,7 @@ level15,레벨 15 되기,보스를 잡을 때마다 몬스터가 주는 경험�
 rank3,스킬을 3단계로 올리기,[스킬] 탭의 [올리기]로 자주 쓰는 스킬의 단계를 올리면 피해가 늘고 재사용 대기가 준다. 특성 트리 끝의 숙련은 단계를 하나 더 준다,rank:3,mana_potion:3
 mad_general,미쳐 버린 장군 쓰러뜨리기,이야기에서 마족 둥지에 가면 둥지 곁 붉은 고리에 장군 모르그가 있다. 맞으면 불타니 철 장비와 물약을 챙긴다. 이기면 장군의 문장이 떨어진다,have:general_crest,healing_potion:4
 serpent,물살 뱀 쓰러뜨리기,깊은 아레나에서 굴을 따라가면 지하 호수다. 물살 뱀은 맞으면 느려지니 미스릴 장비와 물약을 챙긴다. 뱀 비늘과 진주로 모루에서 물살의 목걸이를 만든다,have:serpent_scale,healing_potion:4
+wraith,왕관의 망령 쓰러뜨리기,4장 이야기의 끝에 물안개 항구의 아레나에서 만난다. 냉기에 맞서는 장비와 회복 물약을 챙긴다,boss:crown_wraith,healing_potion:4
 third_class,셋째 클래스 고르기,레벨 20이 되면 가방 [스킬] 탭에서 마지막 셋째 클래스를 고른다(무료). 셋째 클래스의 패시브가 그대로 더해진다,classes:3,mana_potion:3
 mithril_pickaxe,미스릴 곡괭이 만들기,용암 지대의 흑요석은 미스릴 곡괭이 이상이어야 캐진다. 작업대에서 미스릴 주괴 3개로 만든다,have:mithril_pickaxe,xp:60
 obsidian_ore,흑요석 원석 캐기,깊은 아레나 반대쪽 모퉁이가 용암 지대다. 붉게 빛나는 용암 웅덩이는 밟으면 불타니 피해 간다,have:obsidian_ore:3,xp:80

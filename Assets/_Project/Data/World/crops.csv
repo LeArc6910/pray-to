@@ -10,3 +10,6 @@ moon_grape,달빛 포도,moon_grape_seed,5,mushroom,moon_grape,3,0,0,2
 snow_cabbage,눈 배추,snow_cabbage_seed,5,ice,snow_cabbage,1,1,30,
 ember_corn,불씨 옥수수,ember_corn_seed,4,lava,ember_corn,2,0,0,2
 void_bean,공허 콩,void_bean_seed,4,abyss,void_bean,3,0,0,3
+crystal_radish,수정 무,crystal_radish_seed,4,crystal,crystal_radish,2,1,40,
+lotus_root,호수 연근,lotus_seed,5,lake,lotus_root,2,1,40,
+cactus_fruit,선인장 열매,cactus_seed,4,sand,cactus_fruit,2,0,0,3

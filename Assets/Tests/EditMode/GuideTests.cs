@@ -77,6 +77,33 @@ namespace Game.Core.Tests
             Assert.AreEqual(1, GuideSheet.Parse("id,text,hint,done\na,가,힌트,boss:\n", Gear.Data).Errors.Count);
         }
 
+        // Goals for systems the guide never named (2026-11-11, the content audit): a pet, a rune, a request, defense,
+        // belts, pens, cooking, the wraith; pet, rune and request are conditions of their own.
+        [Test]
+        public void TheGuideNamesPetsRunesRequestsAndDefense()
+        {
+            var ids = Guide.Shipped.Goals.Select(g => g.Id).ToList();
+            foreach (string id in new[] { "cook", "request", "rune", "belt", "harvester", "pen", "ward", "turret", "pet", "wraith" })
+                Assert.Contains(id, ids);
+            Assert.Less(ids.IndexOf("request"), ids.IndexOf("friend"), "a request before two hearts");
+            Assert.Less(ids.IndexOf("ward"), ids.IndexOf("turret"));
+            GuideFacts With(bool pet = false, bool rune = false, bool request = false) =>
+                new GuideFacts(_ => 0, _ => false, false, 0, hasPet: pet, hasRune: rune, didRequest: request);
+            Assert.IsFalse(GuideProgress.IsMet(Shipped("pet").Conditions.Single(), With()));
+            Assert.IsTrue(GuideProgress.IsMet(Shipped("pet").Conditions.Single(), With(pet: true)));
+            Assert.IsTrue(GuideProgress.IsMet(Shipped("rune").Conditions.Single(), With(rune: true)));
+            Assert.IsTrue(GuideProgress.IsMet(Shipped("request").Conditions.Single(), With(request: true)));
+            Assert.AreEqual(1, GuideSheet.Parse("id,text,hint,done\na,가,힌트,pet:2\n", Gear.Data).Errors.Count, "pet takes no value");
+
+            // The host's facts: a hatched pet, a socketed rune, a request done.
+            var world = new World(Maps.Room(12), TileMap.Center(6, 6), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null);
+            var facts = GuideFacts.Of(world, player);
+            Assert.IsFalse(facts.HasPet || facts.HasRune || facts.DidRequest);
+            player.Friendships["merchant"] = new Friendship { RequestDay = 1 };
+            Assert.IsTrue(GuideFacts.Of(world, player).DidRequest);
+        }
+
         [Test]
         public void ShippedGoalsStartWithDiggingAndBuilding()
         {

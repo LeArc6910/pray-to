@@ -975,6 +975,23 @@ namespace Game.Client
                 case "general_crest": return Ramped(Gem, Ramp.Of("#C8402A"));
                 case "sunken_crown": return Ramped(Gem, Ramp.Of("#E8C060"));
                 case "lake_pike": return Ramped(FishRows, Ramp.Of("#5AA89A"));
+                // Fish, crops and goods added 2026-11-11 (the content audit: a fish or two per biome, crops for the crystal,
+                // lake and sand caves).
+                case "glow_tetra": return Ramped(FishRows, Ramp.Of("#5FE0C8"));
+                case "frost_char": return Ramped(FishRows, Ramp.Of("#BFE8FF"));
+                case "prism_carp": return Ramped(FishRows, Ramp.Of("#E8B8FF"));
+                case "lake_perch": return Ramped(FishRows, Ramp.Of("#8AA858"));
+                case "silver_eel": return Ramped(FishRows, Ramp.Of("#D8E0F0"));
+                case "shadow_eel": return Ramped(FishRows, Ramp.Of("#4A3A70"));
+                case "crystal_radish_seed": return Ramped(Seeds, Ramp.Of("#8C7CE0"));
+                case "crystal_radish": return Ramped(Goo, Ramp.Of("#C8B8FF"));
+                case "crystal_pickle": return Ramped(Pickles, Ramp.Of("#C8B8FF"));
+                case "lotus_seed": return Ramped(Seeds, Ramp.Of("#5AA870"));
+                case "lotus_root": return Ramped(Goo, Ramp.Of("#E8C8A8"));
+                case "lotus_tea": return Ramped(Bottle, Ramp.Of("#E8C8A8"));
+                case "cactus_seed": return Ramped(Seeds, Ramp.Of("#7CC85A"));
+                case "cactus_fruit": return Ramped(Goo, Ramp.Of("#E05A8A"));
+                case "cactus_juice": return Ramped(Bottle, Ramp.Of("#E05A8A"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
                 case "coin": return Ramped(CoinRows, Ramp.Of("#F2C440"));
                 case "cave_potato_seed": return Ramped(Seeds, Ramp.Of("#B08850"));
@@ -1164,6 +1181,7 @@ namespace Game.Client
         static readonly HashSet<string> FruitCrops = new HashSet<string>
         {
             "fire_pepper", "frost_berry", "star_melon", "cave_berry", "moon_grape", "ember_corn", "void_bean",
+            "cactus_fruit",
         };
 
         static readonly Dictionary<string, Dictionary<char, Rgba>> CropTints = new Dictionary<string, Dictionary<char, Rgba>>
@@ -1180,6 +1198,10 @@ namespace Game.Client
             ["glow_cap"] = new Dictionary<char, Rgba> { ['L'] = Rgba.Hex("#C8FFF0"), ['M'] = Rgba.Hex("#6FE8D0"), ['m'] = Rgba.Hex("#2EA890") },
             // Pale blue berries.
             ["frost_berry"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#8CD8FF"), ['R'] = Rgba.Hex("#4A8CC8"), ['o'] = Rgba.Hex("#E0F6FF") },
+            // A pale violet radish top, a lotus pad, a green cactus with pink fruit (2026-11-11).
+            ["crystal_radish"] = new Dictionary<char, Rgba> { ['L'] = Rgba.Hex("#E8E0FF"), ['M'] = Rgba.Hex("#B8A8F0"), ['m'] = Rgba.Hex("#7C6CC8") },
+            ["lotus_root"] = new Dictionary<char, Rgba> { ['L'] = Rgba.Hex("#A8E0B8"), ['M'] = Rgba.Hex("#5AA870"), ['m'] = Rgba.Hex("#2E7848") },
+            ["cactus_fruit"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#E05A8A"), ['R'] = Rgba.Hex("#A02858"), ['o'] = Rgba.Hex("#FFB0C8") },
             // Round yellow melons with a pale star.
             ["star_melon"] = new Dictionary<char, Rgba> { ['r'] = Rgba.Hex("#F2C440"), ['R'] = Rgba.Hex("#B88A20"), ['o'] = Rgba.Hex("#FFF4C0") },
         };

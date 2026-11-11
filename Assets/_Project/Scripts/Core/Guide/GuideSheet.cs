@@ -15,7 +15,7 @@ namespace Game.Core
             Tile = tile;
         }
 
-        // "have", "place", "plant", "boss", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank" or "classes".
+        // "have", "place", "plant", "boss", "pet", "rune", "request", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank" or "classes".
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
@@ -87,8 +87,11 @@ namespace Game.Core
     {
         public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1,
             int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0, int skillsSpent = 0, int topRank = 0,
-            int classes = 0, Func<string, int> bossesFelled = null)
+            int classes = 0, Func<string, int> bossesFelled = null, bool hasPet = false, bool hasRune = false, bool didRequest = false)
         {
+            HasPet = hasPet;
+            HasRune = hasRune;
+            DidRequest = didRequest;
             BossesFelled = bossesFelled ?? (_ => 0);
             Classes = classes;
             SkillsSpent = skillsSpent;
@@ -108,6 +111,10 @@ namespace Game.Core
         public Func<string, int> CountOf { get; }
         // How many times the player has felled the boss with this id (the bestiary's records).
         public Func<string, int> BossesFelled { get; }
+        // A pet hatched and following, a rune set in worn gear, a person's request done once (2026-11-11).
+        public bool HasPet { get; }
+        public bool HasRune { get; }
+        public bool DidRequest { get; }
         // Whether a tile of the type stands anywhere in the world.
         public Func<TileType, bool> HasTile { get; }
         public bool HasCrop { get; }
@@ -145,7 +152,9 @@ namespace Game.Core
             return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level,
                 client.Passives.Count, client.LifeLevel, Math.Max(1, client.Rift.Unlocked), hearts,
                 SkillRules.SpentPoints(client.SkillRanks), client.SkillRanks.Values.DefaultIfEmpty(0).Max(), client.Classes.Count,
-                id => client.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0);
+                id => client.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0,
+                client.Pet != null, client.Equipment.Items.Any(i => i.Sockets.Any(r => r != null)),
+                client.Friendships.Values.Any(f => f.RequestDay > 0));
         }
 
         // The same facts as the host sees them, to check a claimed reward.
@@ -167,7 +176,9 @@ namespace Game.Core
             return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level,
                 player.Passives.Count, skill => World.LifeLevel(player, skill), world.RiftTier, hearts,
                 SkillRules.SpentPoints(player.SkillRanks), player.SkillRanks.Values.DefaultIfEmpty(0).Max(), player.Classes.Count,
-                id => player.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0);
+                id => player.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0,
+                player.Pet != null, player.Equipment.Items.Any(i => i.Sockets.Any(r => r != null)),
+                player.Friendships.Values.Any(f => f.RequestDay > 0));
         }
     }
 
@@ -266,6 +277,9 @@ namespace Game.Core
             "place" => facts.HasTile(condition.Tile),
             "plant" => facts.HasCrop,
             "boss" => facts.BossesFelled(condition.Id) >= 1,
+            "pet" => facts.HasPet,
+            "rune" => facts.HasRune,
+            "request" => facts.DidRequest,
             "reach" => facts.DistanceFromSpawn >= condition.Count,
             "level" => facts.Level >= condition.Count,
             "passive" => facts.Passives >= condition.Count,
@@ -343,6 +357,12 @@ namespace Game.Core
                 case "plant":
                     if (parts.Length != 1) throw new FormatException("plant에는 덧붙이는 값이 없습니다.");
                     return new GoalCondition("plant", null, 0, default);
+                // pet: a pet follows; rune: a rune is set in worn gear; request: a person's request done (2026-11-11).
+                case "pet":
+                case "rune":
+                case "request":
+                    if (parts.Length != 1) throw new FormatException($"{parts[0]}에는 덧붙이는 값이 없습니다.");
+                    return new GoalCondition(parts[0], null, 0, default);
                 case "reach":
                     if (parts.Length != 2) throw new FormatException($"'{text}'는 reach:<타일 수>로 적습니다.");
                     int tiles = SheetValues.ParseNumber(parts[1], "타일 수");
@@ -371,7 +391,7 @@ namespace Game.Core
                     if (lifeLevel < 1 || lifeLevel > LifeSkills.MaxLevel) throw new FormatException($"생활 기술 레벨은 1~{LifeSkills.MaxLevel}이어야 합니다.");
                     return new GoalCondition("life", parts[1].ToLowerInvariant(), lifeLevel, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, boss, reach, level, passive, life, rift, friend, skills, rank, classes 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, boss, pet, rune, request, reach, level, passive, life, rift, friend, skills, rank, classes 중 하나)");
             }
         }
 
