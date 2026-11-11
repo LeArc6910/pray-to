@@ -17,6 +17,22 @@ namespace Game.Core.Tests
 
         static Goal Shipped(string id) => Guide.Shipped.Goals.Single(goal => goal.Id == id);
 
+        // The first half hour is one line: dig, make, the first boss (Docs/Guide.md 첫 30분, 2026-11-11, the research
+        // report's candidate 4). Farming, fishing and selling wait until after it; a count saved long ago still means
+        // the goals it meant then.
+        [Test]
+        public void FarmingAndFishingWaitUntilAfterTheFirstBoss()
+        {
+            var ids = Guide.Shipped.Goals.Select(g => g.Id).ToList();
+            int boss = ids.IndexOf("boss");
+            foreach (string later in new[] { "plant", "hoe", "fishing", "merchant", "life_mining" })
+                Assert.Greater(ids.IndexOf(later), boss, later);
+            foreach (string sooner in new[] { "stone", "workbench", "copper", "copper_gear", "furnace", "level3" })
+                Assert.Less(ids.IndexOf(sooner), boss, sooner);
+            CollectionAssert.AreEqual(new[] { "stone", "workbench", "torch", "floor", "copper", "copper_gear", "plant", "hoe", "fishing", "furnace" },
+                GuideProgress.FromCount(Guide.Shipped, 10).ToArray(), "a count from before 2026-11-03 keeps its old order");
+        }
+
         [Test]
         public void ShippedGoalsStartWithDiggingAndBuilding()
         {

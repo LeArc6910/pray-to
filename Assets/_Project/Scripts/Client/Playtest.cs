@@ -188,7 +188,12 @@ namespace Game.Client
                     return null;
                 // The main story (Docs/Story.md): jump to a step (from 1), its giver not yet talked to.
                 case "journey":
-                    world.RestoreJourney(player, Int(words[1]) - 1, false, null);
+                    // journey <step> [taken]: at that step of the main story, taken or not yet.
+                    world.RestoreJourney(player, Int(words[1]) - 1, words.Length > 2 && words[2] == "taken", null);
+                    return null;
+                case "guide":
+                    // guide <goal id>: every guide goal before it passed (GameRoot.GuideUpTo).
+                    root.GuideUpTo(words[1]);
                     return null;
                 case "hearts":
                     var person = world.Npcs?.Find(words[1]) ?? throw new ArgumentException($"no person '{words[1]}'");

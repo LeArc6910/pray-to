@@ -370,6 +370,18 @@ namespace Game.Client
             SendToHost(_client.StartDefenseCommand());
         }
 
+        // Whether the guide's goal is the boss the main story's taken step asks for (its drop is the goal's).
+        bool SameAsStory(Goal goal)
+        {
+            foreach (var (step, taken) in _client.CurrentSteps)
+            {
+                if (!taken || step.Chain.Length > 0 || step.Goal != StoryGoal.Boss) continue;
+                string drop = _bosses?.Find(step.Boss)?.MaterialId;
+                if (!string.IsNullOrEmpty(drop) && goal.Conditions.Any(c => c.Kind == "have" && c.Id == drop)) return true;
+            }
+            return false;
+        }
+
         // When the player fell; for the time left before getting up at home in co-op.
         float _downSince;
         bool _wasDown;
@@ -630,6 +642,15 @@ namespace Game.Client
             }
             _guideClock = GuideCheckSeconds;
             _goalShownAt = Time.time;
+            if (_inventory != null) _inventory.Guide = _guideProgress;
+        }
+
+        // Playtests: every goal before that one passed, so it is the one now (Playtest "guide").
+        internal void GuideUpTo(string id)
+        {
+            if (_guide == null) return;
+            _guideProgress = new GuideProgress(_guide, _guide.Goals.TakeWhile(g => g.Id != id).Select(g => g.Id));
+            _guideClock = GuideCheckSeconds;
             if (_inventory != null) _inventory.Guide = _guideProgress;
         }
 
@@ -1506,8 +1527,20 @@ namespace Game.Client
                 entries.Add(($"기지 방어 {defense.Level}단계", $"{defense.Wave}/{World.DefenseWaves} 물결 · 남은 적 {defense.MonstersLeft} · 수호석 {defense.StonePercent}%"));
             }
             // The story first (Docs/Story.md): where it leads and which way, then the side stories taken.
+            int storyAt = entries.Count;
             if (_storyScreen != null) entries.AddRange(_storyScreen.TrackerEntries());
             var goal = Settings.Guide ? _guideProgress?.Current : null;
+            // One next thing, not two (Docs/Guide.md 하나의 다음 목표, 2026-11-11, the research report's candidate 4): when
+            // the guide's goal is the boss the story's step asks for, the story's entry says it and carries the guide's
+            // count and reward, and the guide's own entry goes.
+            if (goal != null && entries.Count > storyAt && SameAsStory(goal))
+            {
+                var (title, text) = entries[storyAt];
+                string progress = _goalProgress != null ? $" ({_goalProgress})" : "";
+                entries[storyAt] = ($"{title} · 목표 {_guideProgress.Done + 1}/{_guideProgress.Total}",
+                    text + progress + (goal.Rewards.Count > 0 && !Ui.Short ? $"\n보상: {goal.RewardText}" : ""));
+                goal = null;
+            }
             if (goal != null)
             {
                 string progress = _goalProgress != null ? $" ({_goalProgress})" : "";

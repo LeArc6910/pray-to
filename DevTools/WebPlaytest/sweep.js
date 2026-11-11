@@ -1794,6 +1794,13 @@ async function story(browser) {
   await game.wait(1200);
   s = await game.state();
   check(s.place === 'dawn_village', `웨이포인트로 마을에 돌아간다 (${s.place})`);
+  // One next thing (2026-11-11, Docs/Guide.md 첫 30분): with the queen's request for the warden taken and the guide's
+  // goal the warden too, the goal list shows one entry, the story's, carrying the guide's count.
+  await game.send('journey 2 taken; guide boss');
+  const merged = await game.until(t => (t.hud || []).some(l => /깨어난 수호자 · 목표 \d+\/\d+/.test(l)), 6000, game.texts);
+  const hudNow = ((merged || await game.texts()).hud || []);
+  check(!!merged && !hudNow.some(l => /^목표 \d+\/\d+/.test(l)), `여왕의 수호자 부탁과 안내 목표가 한 항목으로 (${hudNow.filter(l => /수호자|목표/.test(l)).join(' / ')})`);
+  await game.shot('one-goal', '이야기와 안내가 합쳐진 목표 목록');
   // A choice (2026-11-10, story.csv choices): the queen asks at step 9; the answer picked leads to step 11, whose words
   // follow on by themselves, and that is the end of the story so far.
   await game.send('journey 9; goto person queen');

@@ -214,9 +214,18 @@ namespace Game.Core
             "free_power", "arc_furnace", "skill", "rank3", "serpent", "antlion", "level3", "class", "second_class", "third_class", "mad_general",
         };
 
-        // The goals a count saved before AddedAfterCounts stood for.
-        public static IEnumerable<string> FromCount(GuideData data, int done) =>
-            data.Goals.Where(g => !AddedAfterCounts.Contains(g.Id)).Take(Math.Max(0, done)).Select(g => g.Id);
+        // Goals moved after the first boss (2026-11-11, the research report's candidate 4: the first half hour is
+        // digging, making and the first boss); a count from before 2026-11-03 had these three right after copper_gear.
+        static readonly string[] MovedAfterBoss = { "plant", "hoe", "fishing" };
+
+        // The goals a count saved before AddedAfterCounts stood for, in the order the sheet had then.
+        public static IEnumerable<string> FromCount(GuideData data, int done)
+        {
+            var then = data.Goals.Where(g => !AddedAfterCounts.Contains(g.Id) && !MovedAfterBoss.Contains(g.Id)).Select(g => g.Id).ToList();
+            int at = then.IndexOf("copper_gear") + 1;
+            then.InsertRange(at > 0 ? at : then.Count, MovedAfterBoss.Where(id => data.Goals.Any(g => g.Id == id)));
+            return then.Take(Math.Max(0, done));
+        }
 
         public IReadOnlyCollection<string> Passed => _passed;
 
