@@ -49,6 +49,9 @@ namespace Game.Client
             Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
             Save(Sheet(loot, monsters, npcs), Path.Combine(output, "sheet.png"), 4);
             Save(UiMock(), Path.Combine(output, "ui_mock.png"), 3);
+            // The shapes taken from CC0 packs (Docs/ArtSources.md), in each tier's colours: picks and ingots.
+            Save(Row(loot.Bases.Where(b => b.IsPickaxe).Select(ItemArt.Gear)
+                .Concat(loot.Materials.Where(m => m.Id.EndsWith("_bar")).Select(ItemArt.Material)).ToList()), Path.Combine(output, "imported.png"), 6);
             // The newest pieces one by one, for a closer look (2026-11-09).
             var pieces = Directory.CreateDirectory(Path.Combine(output, "pieces")).FullName;
             Save(TileArt.BigSmelter, Path.Combine(pieces, "big_smelter.png"), 6);

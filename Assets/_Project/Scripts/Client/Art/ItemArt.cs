@@ -59,6 +59,28 @@ namespace Game.Client
             ".....Ls...",
         };
 
+        // A pick from Ninja Adventure (pixel-boy and AAA, CC0, 2026-11-11, Docs/ArtSources.md), its own outline kept:
+        // the head in the tier's metal (L M m), the haft in wood (h H).
+        static readonly string[] Pick16 =
+        {
+            "...oooo.........",
+            "...oLLLoo..oo...",
+            "...oLLLLMoohho..",
+            "...oooLLMLHhho..",
+            "......ooMLLHo...",
+            "........oMLLo...",
+            ".......oHmMMMo..",
+            "......ohHHoLLo..",
+            ".....ohHho.oLLo.",
+            "....ohhho..oLLo.",
+            "...ohhho....oLo.",
+            "..ohhho.....oLo.",
+            ".ohHho.......o..",
+            "ohHho...........",
+            "oHho............",
+            ".oo.............",
+        };
+
         // A pick head across the top, its handle running down to the bottom left where it is held.
         static readonly string[] PickaxeRows =
         {
@@ -174,6 +196,11 @@ namespace Game.Client
                     StatType.ColdDamage => (Rgba.Hex("#A8E8FF"), Rgba.Hex("#3E8CC8")),
                     _ => (Rgba.Hex("#FFF06A"), Rgba.Hex("#C8A020")),
                 };
+            }
+            if (item.Slot == ItemSlot.Weapon && item.IsPickaxe)
+            {
+                colors['o'] = Outline;
+                return PixelImage.FromRows(colors, Pick16);
             }
             string[] rows = item.Slot switch
             {
@@ -491,23 +518,32 @@ namespace Game.Client
             ['d'] = Rgba.Hex("#525C6C"),
         };
 
-        static readonly PixelImage IronBar = PixelImage.FromRows(BarColors,
-            "...LLLLL..",
-            "..LMMMMMm.",
-            ".LMMMMMmd.",
-            "LMMMMMMmd.",
-            "mmmmmmmd..").Outlined(Outline);
+        static readonly PixelImage IronBar = BarOf(BarColors);
 
-        // An ingot in the ramp's colours, like the iron bar.
-        static PixelImage Bar(Ramp ramp)
+        // An ingot in the ramp's colours: the bar of Ninja Adventure (pixel-boy and AAA, CC0, 2026-11-11,
+        // Docs/ArtSources.md) seen from a corner, its own outline kept.
+        static PixelImage Bar(Ramp ramp) =>
+            BarOf(new Dictionary<char, Rgba> { ['L'] = ramp.Light, ['M'] = ramp.Main, ['m'] = ramp.Shade, ['d'] = ramp.Dark });
+
+        static PixelImage BarOf(Dictionary<char, Rgba> metal)
         {
-            var colors = new Dictionary<char, Rgba> { ['L'] = ramp.Light, ['M'] = ramp.Main, ['m'] = ramp.Shade, ['d'] = ramp.Dark };
+            var colors = new Dictionary<char, Rgba>(metal) { ['o'] = Rgba.Hex("#15100E") };
             return PixelImage.FromRows(colors,
-                "...LLLLL..",
-                "..LMMMMMm.",
-                ".LMMMMMmd.",
-                "LMMMMMMmd.",
-                "mmmmmmmd..").Outlined(Outline);
+                "..........oo....",
+                "........ooLLoo..",
+                "......ooLLLLLLo.",
+                "....ooLLLLLLLmo.",
+                "..ooLLLLLLLMmmmo",
+                ".oMLLLLLLMMMmmmo",
+                "oMMMMLLmmMMMmdo.",
+                "oMMMMMmmmMMddmo.",
+                ".odMMMmmmddmmmmo",
+                ".omddMmddmmmmmmo",
+                "ommmmddmmmmmmoo.",
+                "ommmmmmmmmmoo...",
+                ".oommmmmmoo.....",
+                "...oommoo.......",
+                ".....oo.........");
         }
 
         static readonly string[] Goo =
