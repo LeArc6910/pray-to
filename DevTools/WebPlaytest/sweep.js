@@ -1592,6 +1592,14 @@ async function touch(browser) {
     await game.press('skill 1');
     await game.wait(500);
     check((await game.state()).mana < full.mana, '둘째 스킬 단추를 탭한다');
+    // A skill button alone aims at the nearest foe (2026-11-11, Docs/WebDemo.md 터치): a slime above, the stick untouched.
+    await game.send('face off; heal; clear; spawn slime 0 3 5000');
+    await game.wait(1500);
+    await game.press('skill 0');
+    await game.wait(600);
+    const facing = ((await game.state()).facing || '0,0').split(',').map(Number);
+    check(facing[1] > 0.6, `스틱 없이 스킬 단추만 탭해도 가장 가까운 적(위쪽)을 향한다 (바라보는 쪽 ${facing.join(',')})`);
+    await game.shot('touch-autoaim', '스틱 없이 쓴 스킬');
     await game.context.close();
   }
 }

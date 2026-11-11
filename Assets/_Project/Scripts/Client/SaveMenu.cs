@@ -231,6 +231,25 @@ namespace Game.Client
                 .OrderBy(name => name, StringComparer.Ordinal)
                 .ToList();
 
+        const string ExportedKey = "saves.exported";
+        const int ExportDays = 7;
+
+        // Saves are kept, it is a web or touch device, and none were exported in the last ExportDays (or ever).
+        public static bool ExportDue
+        {
+            get
+            {
+                if (!(Application.platform == RuntimePlatform.WebGLPlayer || Controls.UsingTouch) || SaveStore.List().Count == 0) return false;
+                string when = Prefs.Get(ExportedKey, "");
+                return !DateTime.TryParse(when, null, System.Globalization.DateTimeStyles.RoundtripKind, out var at) || (DateTime.UtcNow - at).TotalDays >= ExportDays;
+            }
+        }
+
+        public static string ExportReminder =>
+            Prefs.Get(ExportedKey, "").Length == 0
+                ? "저장본은 이 브라우저(앱)에만 있습니다. 브라우저 데이터를 지우면 사라지니 [저장본]에서 [전부 내보내기]로 파일을 남겨 두세요."
+                : $"마지막으로 내보낸 지 {ExportDays}일이 넘었습니다. [저장본]에서 [전부 내보내기]로 파일을 새로 남겨 두세요.";
+
         void Export(IEnumerable<string> keys, string what)
         {
             var list = keys.ToList();
@@ -242,6 +261,7 @@ namespace Game.Client
             try
             {
                 _message = SaveTransfer.Deliver(SaveTransfer.FileName(what), SaveTransfer.Pack(list));
+                Prefs.Set(ExportedKey, DateTime.UtcNow.ToString("o"));
             }
             catch (Exception e) when (e is IOException || e is UnauthorizedAccessException)
             {

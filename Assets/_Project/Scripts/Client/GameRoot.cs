@@ -370,6 +370,26 @@ namespace Game.Client
             SendToHost(_client.StartDefenseCommand());
         }
 
+        // How far a touch player's skills and taps reach for a foe on their own.
+        const float AutoAimReach = 8;
+
+        // The way to the nearest living monster or boss within AutoAimReach, or zero when there is none.
+        Vec2 NearestFoeDirection()
+        {
+            Vec2 best = Vec2.Zero;
+            float nearest = AutoAimReach;
+            foreach (var other in _client.Others())
+            {
+                if ((other.Kind != EntityKind.Monster && other.Kind != EntityKind.Boss) || other.Health <= 0) continue;
+                var to = other.Position - _client.Position;
+                float distance = to.Length;
+                if (distance >= nearest || distance < 1e-3f) continue;
+                nearest = distance;
+                best = to / distance;
+            }
+            return best;
+        }
+
         // Whether the guide's goal is the boss the main story's taken step asks for (its drop is the goal's).
         bool SameAsStory(Goal goal)
         {
@@ -663,6 +683,8 @@ namespace Game.Client
             bool machine = Controls.MachinePressed();
             if (_inventory.Open || (_map != null && _map.FullOpen)) return;
             var aim = Controls.SkillAim(_camera, _client.Position);
+            // On touch a skill button alone aims at the nearest foe, so it needs no second thumb on the stick.
+            if (Controls.UsingTouch && aim.LengthSquared < 0.01f) aim = NearestFoeDirection();
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
             foreach (int slot in quick) UseQuickSlot(slot);
@@ -718,6 +740,13 @@ namespace Game.Client
             // Clicking in the bag or on the map should not swing the sword.
             if (_inventory.Open || (_map != null && _map.FullOpen)) attack = false;
             if (HoldAttack) attack = true;
+            // A tap on the attack stick without pulling it swings at the nearest foe rather than where one walks
+            // (Docs/WebDemo.md 터치, 2026-11-11, the research report's candidate 16).
+            if (Controls.UsingTouch && attack && !Controls.AimPulled)
+            {
+                var foe = NearestFoeDirection();
+                if (foe.LengthSquared > 0.01f) aim = foe;
+            }
             if ((HoldAttack || AimHeld) && HeldAim.LengthSquared > 1e-6f) aim = HeldAim;
             byte[] input = _client.Step(move, aim, attack);
             if (input != null) SendToHost(input);
@@ -1234,6 +1263,14 @@ namespace Game.Client
             if (Ui.LayoutButton($"하루 길이: {Settings.DayMinutes}분")) Settings.DayMinutes = Settings.NextDayMinutes();
             // The saves on this device: pick one, carry them off in a file, bring a file's in (SaveMenu).
             if (Ui.LayoutButton(_side == MenuSide.Saves ? "저장본 닫기" : "저장본: 고르기·내보내기·가져오기")) OpenSide(MenuSide.Saves);
+            // Web and phone saves live in the browser or the app only: a reminder when nothing was exported for a week.
+            if (SaveMenu.ExportDue)
+            {
+                var was = GUI.color;
+                GUI.color = new Color(1f, 0.82f, 0.4f);
+                GUILayout.Label(Ui.Wrap(SaveMenu.ExportReminder, GUI.skin.label, _menuColumn));
+                GUI.color = was;
+            }
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
             if (Ui.LayoutButton($"어둠과 빛: {(Settings.Darkness ? "켜짐" : "꺼짐")}")) Settings.Darkness = !Settings.Darkness;

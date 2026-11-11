@@ -192,6 +192,9 @@ namespace Game.Client
             return slots;
         }
 
+        // The attack stick is held and pulled some way (not just touched), so it says where to aim.
+        public static bool AimPulled => _aim.Held && _aim.Direction.LengthSquared > 0.01f;
+
         // Where a skill goes: where the attack stick is pulled, else at the mouse. Zero leaves it to the way the
         // player faces.
         public static Vec2 SkillAim(Camera camera, Vec2 player)
