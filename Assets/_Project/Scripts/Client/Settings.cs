@@ -15,6 +15,8 @@ namespace Game.Client
         static int? _volume;
         const string MusicKey = "settings.music";
         static int? _music;
+        const string DayKey = "settings.daylength";
+        static int? _dayMinutes;
         static readonly Choice DevInfoChoice = new Choice("settings.devinfo", false);
         static readonly Choice PixelFontChoice = new Choice("settings.pixelfont", true);
         static readonly Choice GuideChoice = new Choice("settings.guide", true);
@@ -53,6 +55,26 @@ namespace Game.Client
                 _music = value;
                 Prefs.Set(MusicKey, value);
             }
+        }
+
+        // Minutes of play a day takes in the worlds this player hosts (Calendar.DayLengths, Docs/Time.md 하루 길이).
+        public static int DayMinutes
+        {
+            get => _dayMinutes ??= Game.Core.Calendar.DayMinutesOf(Prefs.Get(DayKey, Game.Core.Calendar.BaseDayMinutes));
+            set
+            {
+                value = Game.Core.Calendar.DayMinutesOf(value);
+                if (_dayMinutes == value) return;
+                _dayMinutes = value;
+                Prefs.Set(DayKey, value);
+            }
+        }
+
+        // The next of Calendar.DayLengths, and from the longest back to the shortest.
+        public static int NextDayMinutes()
+        {
+            var lengths = Game.Core.Calendar.DayLengths;
+            return lengths[(System.Array.IndexOf(lengths, DayMinutes) + 1) % lengths.Length];
         }
 
         public static string MusicVolumeText => MusicVolume == 0 ? "끔" : $"{MusicVolume * 100 / MaxVolume}%";

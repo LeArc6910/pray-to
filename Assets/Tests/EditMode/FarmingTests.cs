@@ -125,6 +125,12 @@ namespace Game.Core.Tests
             slime.Position = TileMap.Center(4, 3);
             Assert.IsFalse(Run(world, 2).Any(e => e.Type == SimEventType.Trampled), "once in a while for each tile");
 
+            // A ripe crop waits for its grower: no one loses a harvest for being away when it ripened.
+            world.Restore(new TileChange[0], new[] { (Mushroom, 3, 3, Mushroom.GrowTicks, 0L) }, 0);
+            slime.Position = TileMap.Center(3, 3);
+            Assert.IsFalse(Run(world, 1).Any(e => e.Type == SimEventType.Trampled), "ripe");
+            Assert.IsTrue(world.CropAt(3, 3).IsRipe(world.Tick));
+
             // A scarecrow within four tiles keeps them off.
             world.Restore(new[] { new TileChange(1, 1, TileType.Scarecrow) }, new[] { (Mushroom, 5, 3, half, 0L) }, 0);
             Assert.IsTrue(world.Guarded(5, 3));

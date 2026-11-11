@@ -707,7 +707,7 @@ namespace Game.Core
             var defending = World.ActiveDefense;
             var defense = new DefenseState(World.DefenseLevel, World.DefendedToday, defending?.Level ?? 0, defending?.Wave ?? 0, defending?.MonstersLeft ?? 0,
                 defending == null ? 0 : (int)Math.Ceiling(defending.StoneHealth / defending.MaxStoneHealth * 100));
-            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift, defense);
+            return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift, defense, World.DayMinutes);
         }
 
         (int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil) CropEntry(CropChange change) =>

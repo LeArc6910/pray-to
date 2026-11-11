@@ -1350,8 +1350,8 @@ namespace Game.Client
                 {
                     // Where they are now on their day's round (PlaceSite.PersonAt), and a moment ago, to face the way
                     // they walk and bob as they go.
-                    var at = site.PersonAt(character, home, clock);
-                    var before = site.PersonAt(character, home, clock - 6);
+                    var at = site.PersonAt(character, home, clock, _client.DayMinutes);
+                    var before = site.PersonAt(character, home, clock - 6, _client.DayMinutes);
                     if (Vec2.Distance(self, at) > PeopleRange) continue;
                     _storyInView.Add((character, at));
                     var color = Rgba.Hex(string.IsNullOrEmpty(character.Color) ? "#8A7A6A" : character.Color);

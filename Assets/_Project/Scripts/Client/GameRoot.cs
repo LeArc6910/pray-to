@@ -840,7 +840,7 @@ namespace Game.Client
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
 
             _host = new WorldHost(seed, _monsters, _loot, bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
-                worldConfig: new WorldConfig { Forage = true }, story: _story);
+                worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes }, story: _story);
             if (world != null)
             {
                 _host.Restore(world);
@@ -1186,6 +1186,8 @@ namespace Game.Client
                 _confirmDelete = !_confirmDelete;
             }
             GUILayout.EndHorizontal();
+            // How long a day takes in the worlds this player opens or hosts; joiners go by the host's (Docs/Time.md).
+            if (Ui.LayoutButton($"하루 길이: {Settings.DayMinutes}분")) Settings.DayMinutes = Settings.NextDayMinutes();
             // The saves on this device: pick one, carry them off in a file, bring a file's in (SaveMenu).
             if (Ui.LayoutButton(_side == MenuSide.Saves ? "저장본 닫기" : "저장본: 고르기·내보내기·가져오기")) OpenSide(MenuSide.Saves);
             GUILayout.Space(4);

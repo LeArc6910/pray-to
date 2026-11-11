@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.77.0";
+        public const string Version = "0.78.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -1051,8 +1051,10 @@ namespace Game.Core
             long clock = 0,
             int sleepers = 0,
             RiftState rift = default,
-            DefenseState defense = default)
+            DefenseState defense = default,
+            int dayMinutes = Calendar.BaseDayMinutes)
         {
+            DayMinutes = Calendar.DayMinutesOf(dayMinutes);
             Defense = defense;
             Tick = tick;
             Clock = clock;
@@ -1069,6 +1071,8 @@ namespace Game.Core
         // The world's clock (Calendar) at Tick, and how many players are lying in their beds.
         public long Clock { get; }
         public int Sleepers { get; }
+        // Minutes of play a day takes, so a client runs the clock on at the host's pace (Calendar.ClockFor).
+        public int DayMinutes { get; }
         public RiftState Rift { get; }
         public DefenseState Defense { get; }
         public SelfState Self { get; }
@@ -1081,6 +1085,7 @@ namespace Game.Core
         {
             w.Write(Tick);
             w.Write(Clock);
+            w.Write((byte)DayMinutes);
             w.Write((byte)Math.Clamp(Sleepers, 0, 255));
             w.Write((byte)Rift.Unlocked);
             w.Write((byte)Rift.Tier);
@@ -1177,6 +1182,7 @@ namespace Game.Core
         {
             long tick = r.ReadInt64();
             long clock = r.ReadInt64();
+            int dayMinutes = r.ReadByte();
             int sleepers = r.ReadByte();
             var rift = new RiftState(r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadUInt16(), (RiftAffix)r.ReadByte());
             var defense = new DefenseState(r.ReadByte(), r.ReadBoolean(), r.ReadByte(), r.ReadByte(), r.ReadByte(), r.ReadByte());
@@ -1266,7 +1272,7 @@ namespace Game.Core
                 int cause = flags >> 1 > 0 ? World.ElementalCause + (flags >> 1) - 1 : 0;
                 events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), cause, position: at));
             }
-            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift, defense);
+            return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift, defense, dayMinutes);
         });
     }
 }

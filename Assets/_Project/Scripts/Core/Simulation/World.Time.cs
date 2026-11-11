@@ -14,10 +14,22 @@ namespace Game.Core
     // The days of a world (Docs/Time.md). A clock in ticks from the first morning: a day is DaySeconds of play, from
     // six in the morning to six the next, so a game hour is 50 seconds. It runs only while the world is open, and
     // sleeping moves it on to the next morning. Crops do not follow it: they grow by the ticks that really pass.
+    // The host may make the days longer (DayLengths, 2026-11-11): the clock then runs slower than the ticks, so a
+    // day still holds TicksPerDay of the clock but takes more of play.
     public static class Calendar
     {
         public const float DaySeconds = 1200;
         public const long TicksPerDay = (long)(DaySeconds * World.TicksPerSecond);
+        // Minutes of play a day takes unless the host chooses longer.
+        public const int BaseDayMinutes = 20;
+        // The lengths the host may choose (Settings.DayMinutes), shortest first.
+        public static readonly int[] DayLengths = { 20, 30, 40, 60 };
+
+        // One of DayLengths: the base for anything else.
+        public static int DayMinutesOf(int minutes) => Array.IndexOf(DayLengths, minutes) >= 0 ? minutes : BaseDayMinutes;
+
+        // How far the clock goes in that many ticks of play when a day takes those minutes.
+        public static long ClockFor(long ticks, int dayMinutes) => ticks * BaseDayMinutes / DayMinutesOf(dayMinutes);
         // The hour the clock starts each day at.
         public const int MorningHour = 6;
         const int MinutesPerDay = 24 * 60;
@@ -74,6 +86,13 @@ namespace Game.Core
         // Ticks since the first morning (Calendar). Sleeping moves it on; a world save keeps it.
         public long Clock { get; private set; }
 
+        // Minutes of play a day takes in this world (WorldConfig.DayMinutes, one of Calendar.DayLengths).
+        public int DayMinutes { get; private set; } = Calendar.BaseDayMinutes;
+        // The ticks' share of a clock tick not yet counted when the days are longer than the base.
+        int _clockShare;
+
+        public void SetDayMinutes(int minutes) => DayMinutes = Calendar.DayMinutesOf(minutes);
+
         public DayPhase Phase => Calendar.Phase(Clock);
 
         // How many monsters the caves keep now.
@@ -111,7 +130,13 @@ namespace Game.Core
         // is still lying down, it is morning.
         void UpdateClock()
         {
-            Clock++;
+            // Longer days: the clock goes BaseDayMinutes for every DayMinutes ticks (two in three for 30 minutes).
+            _clockShare += Calendar.BaseDayMinutes;
+            while (_clockShare >= DayMinutes)
+            {
+                Clock++;
+                _clockShare -= DayMinutes;
+            }
             foreach (var player in _players)
             {
                 if (!player.Sleeping) continue;

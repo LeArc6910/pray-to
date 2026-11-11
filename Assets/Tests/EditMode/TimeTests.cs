@@ -60,6 +60,34 @@ namespace Game.Core.Tests
             Assert.AreEqual(DayPhase.Morning, world.Phase);
         }
 
+        // The host may make the days longer (Docs/Time.md 하루 길이): the clock runs slower than play, a day still
+        // ends at six the next morning, and water lasts the longer day so crops want it once a day as before.
+        [Test]
+        public void LongerDaysRunTheClockSlower()
+        {
+            var world = new World(Maps.Room(30), TileMap.Center(15, 15), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0, DayMinutes = 30 },
+                Gear.Data, Tiles.Shipped);
+            Assert.AreEqual(30, world.DayMinutes);
+            Run(world, 90);
+            Assert.AreEqual(60, world.Clock, "two clock ticks in three");
+            Assert.AreEqual(Calendar.TicksPerDay * 3 / 2, world.WaterTicks, "water lasts the day");
+
+            world.SetDayMinutes(40);
+            Run(world, 90);
+            Assert.AreEqual(105, world.Clock, "one in two");
+            world.SetDayMinutes(25);
+            Assert.AreEqual(Calendar.BaseDayMinutes, world.DayMinutes, "only the lengths on offer");
+            Assert.AreEqual(Calendar.TicksPerDay, world.WaterTicks);
+            Assert.AreEqual(60, Calendar.ClockFor(120, 40));
+            Assert.AreEqual(120, Calendar.ClockFor(120, 7), "an unknown length is the base");
+
+            // The snapshot carries it, so a client runs the clock on at the host's pace between snapshots.
+            var sent = SnapshotMessage.Decode(new SnapshotMessage(1, new SelfState(0, new Vec2(1, 1), 50, 100, 5), new EntityState[0], new ProjectileState[0],
+                new HazardState[0], new SimEvent[0], clock: 500, dayMinutes: 60).Encode());
+            Assert.AreEqual(60, sent.DayMinutes);
+            Assert.AreEqual(500, sent.Clock);
+        }
+
         [Test]
         public void WhenEveryoneIsInBedItIsMorning()
         {

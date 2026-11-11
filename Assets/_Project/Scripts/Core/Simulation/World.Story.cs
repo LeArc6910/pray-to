@@ -40,14 +40,15 @@ namespace Game.Core
 
         // The person of the story nearest the position within reach (TalkReach unless said), where they are at that
         // time (PlaceSite.PersonAt), or null.
-        public static (CharacterDefinition Character, Vec2 At)? CharacterNear(IReadOnlyList<PlaceSite> places, Vec2 position, long clock, float reach = TalkReach)
+        public static (CharacterDefinition Character, Vec2 At)? CharacterNear(IReadOnlyList<PlaceSite> places, Vec2 position, long clock, float reach = TalkReach,
+            int dayMinutes = Calendar.BaseDayMinutes)
         {
             (CharacterDefinition, Vec2)? best = null;
             float nearest = reach;
             foreach (var site in places)
             {
                 if (Vec2.Distance(position, site.Center) > site.Radius + reach + 1) continue;
-                foreach (var (character, at) in site.PeopleAt(clock))
+                foreach (var (character, at) in site.PeopleAt(clock, dayMinutes))
                 {
                     float distance = Vec2.Distance(position, at);
                     if (distance > nearest) continue;
@@ -94,7 +95,7 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || Story == null) return false;
-            var near = CharacterNear(Places, player.Position, Clock, TalkReach + TalkSlack);
+            var near = CharacterNear(Places, player.Position, Clock, TalkReach + TalkSlack, DayMinutes);
             if (near == null || !(GivenBy(player, near.Value.Character) is (StoryStep step, bool taken))) return false;
             if (!taken)
             {
@@ -115,7 +116,7 @@ namespace Game.Core
         {
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || Story == null) return false;
-            var near = CharacterNear(Places, player.Position, Clock, TalkReach + TalkSlack);
+            var near = CharacterNear(Places, player.Position, Clock, TalkReach + TalkSlack, DayMinutes);
             if (near == null || !(GivenBy(player, near.Value.Character) is (StoryStep step, _)) || choice < 0 || choice >= step.Choices.Count) return false;
             player.StoryChoices[step.Index] = choice;
             CompleteStep(player, step, step.Choices[choice].Step);

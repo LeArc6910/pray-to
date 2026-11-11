@@ -65,8 +65,9 @@ namespace Game.Core
         // The tool that turns floor into soil and back, and what is worked into soil to make it fertile.
         public const string Hoe = "hoe";
         public const string Fertilizer = "fertilizer";
-        // Water keeps a crop growing for a day of play (Calendar.DaySeconds), real ticks, whatever the clock does.
-        public const long WaterTicks = Calendar.TicksPerDay;
+        // Water keeps a crop growing for a day of play, real ticks, whatever the clock does: twenty minutes, or as long
+        // as the host's longer days (DayMinutes), so a crop wants water once a day however long the days are.
+        public long WaterTicks => Calendar.TicksPerDay * DayMinutes / Calendar.BaseDayMinutes;
 
         readonly Dictionary<int, Crop> _crops = new Dictionary<int, Crop>();
         readonly List<CropChange> _newCropChanges = new List<CropChange>();
@@ -209,8 +210,9 @@ namespace Game.Core
         }
 
         // Monsters trample crops at night (2026-11-09, Docs/Farming.md 밭 지키기): one standing on a crop sets it back a
-        // quarter of its growing, a ripe one too, at most once every TrampleSeconds for each tile. Within
-        // ScarecrowReach of a scarecrow they leave crops alone.
+        // quarter of its growing, at most once every TrampleSeconds for each tile. Within ScarecrowReach of a scarecrow
+        // they leave crops alone. A ripe crop waits for its grower (2026-11-11, Docs/Time.md 시간 압박 점검): being
+        // away when it ripened costs nothing.
         public const float TrampleShare = 0.25f;
         public const float TrampleSeconds = 10;
         public const int ScarecrowReach = 4;
@@ -223,7 +225,7 @@ namespace Game.Core
                 if (enemy.IsDead) continue;
                 int x = TileMap.Cell(enemy.Position.X), y = TileMap.Cell(enemy.Position.Y);
                 var crop = CropAt(x, y);
-                if (crop == null || Guarded(x, y)) continue;
+                if (crop == null || crop.IsRipe(Tick) || Guarded(x, y)) continue;
                 int key = y * Map.Width + x;
                 if (_trampledAt.TryGetValue(key, out long at) && Tick - at < Ticks(TrampleSeconds)) continue;
                 _trampledAt[key] = Tick;

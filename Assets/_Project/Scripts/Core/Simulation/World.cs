@@ -19,6 +19,8 @@ namespace Game.Core
         // Lays each biome's forage on the floor every day (World.Forage.cs). Off unless asked: the game's host turns it
         // on; tests and sims count what lies on the floor without it.
         public bool Forage { get; set; }
+        // Minutes of play a day takes (Calendar.DayLengths); the host's choice (Docs/Time.md 하루 길이).
+        public int DayMinutes { get; set; } = Calendar.BaseDayMinutes;
     }
 
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
@@ -87,6 +89,7 @@ namespace Game.Core
             Spawn = spawn;
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _config = config ?? new WorldConfig();
+            DayMinutes = Calendar.DayMinutesOf(_config.DayMinutes);
             _random = new GameRandom(seed, stream: 2);
             _forageSeed = seed;
             Loot = loot;

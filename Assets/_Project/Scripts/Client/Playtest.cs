@@ -120,6 +120,10 @@ namespace Game.Client
                     float into = ((hour - Calendar.MorningHour) % 24 + 24) % 24;
                     world.RestoreClock((long)((Int(words[1]) - 1 + into / 24) * Calendar.TicksPerDay));
                     return null;
+                case "daylength":
+                    // daylength <minutes>: how long a day of this world takes (Calendar.DayLengths).
+                    world.SetDayMinutes(Int(words[1]));
+                    return $"ok daylength {world.DayMinutes}";
                 case "weather":
                     var weather = (Weather)Enum.Parse(typeof(Weather), words[1], ignoreCase: true);
                     int day = Enumerable.Range(2, 400).First(d => World.WeatherOf(d) == weather);
@@ -326,7 +330,7 @@ namespace Game.Client
                     to = TileMap.Center(signX + road.Item1, signY + road.Item2);
                     break;
                 case "person":
-                    var standing = world.Places.SelectMany(p => p.PeopleAt(world.Clock)).FirstOrDefault(p => p.Character.Id == words[2]);
+                    var standing = world.Places.SelectMany(p => p.PeopleAt(world.Clock, world.DayMinutes)).FirstOrDefault(p => p.Character.Id == words[2]);
                     if (standing.Character == null) throw new ArgumentException($"no person '{words[2]}' in the story");
                     to = standing.At + new Vec2(0, -1);
                     break;
@@ -678,7 +682,7 @@ namespace Game.Client
                 json.Field("place", world.PlaceAt(player.Position)?.Definition.Id ?? "");
                 json.Field("places", world.Places.Count);
                 // Where the first place's people are now: "chief:12.5,30.5;mina:...".
-                json.Field("people", world.Places.Count == 0 ? "" : string.Join(";", world.Places[0].PeopleAt(world.Clock)
+                json.Field("people", world.Places.Count == 0 ? "" : string.Join(";", world.Places[0].PeopleAt(world.Clock, world.DayMinutes)
                     .Select(p => $"{p.Character.Id}:{p.At.X:0.0},{p.At.Y:0.0}")));
                 json.Field("spawnX", world.Spawn.X);
                 json.Field("spawnY", world.Spawn.Y);
@@ -697,6 +701,9 @@ namespace Game.Client
                 json.Field("weapon", player.Equipment[ItemSlot.Weapon]?.Base.Id);
                 json.Field("day", world.Today);
                 json.Field("clock", Calendar.Text(world.Clock));
+                json.Field("clockTicks", world.Clock);
+                json.Field("tick", world.Tick);
+                json.Field("dayMinutes", world.DayMinutes);
                 json.Field("weather", world.WeatherToday.ToString());
                 json.Field("event", world.EventToday.ToString());
                 var line = player.Fishing;

@@ -2735,7 +2735,42 @@ async function firstRun(browser, profile, hourLong) {
   }
 }
 
-const Sections = { menu, basics, first, firstphone, hour, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+// Candidate 15 of Docs/Research2026-11.md (2026-11-11): the host may make the days longer. The menu's button goes
+// round the lengths; a longer day runs the clock slower than play, and the client's clock keeps the host's pace.
+async function time(browser) {
+  note('\n## 하루 길이 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  const lengths = [];
+  for (let i = 0; i < 4; i++) {
+    const b = (await game.find(/^하루 길이:/))[0];
+    if (!b) break;
+    lengths.push(b.label.replace('하루 길이: ', ''));
+    await game.press(b.label);
+  }
+  check(lengths.join(',') === '20분,30분,40분,60분', `메뉴의 [하루 길이]가 20→30→40→60분으로 돈다 (${lengths.join(' → ')})`);
+  await game.press('하루 길이: 20분');
+  await game.press('하루 길이: 30분');
+  await game.press('하루 길이: 40분');
+  await game.startSolo('daylength');
+  await game.wait(1200);
+  let s = await game.state();
+  check(s.dayMinutes === 40, `고른 하루 길이로 월드가 열린다 (${s.dayMinutes}분)`);
+  const before = await game.state();
+  await game.wait(3000);
+  const after = await game.state();
+  const ratio = (after.clockTicks - before.clockTicks) / Math.max(1, after.tick - before.tick);
+  check(Math.abs(ratio - 0.5) < 0.05, `40분이면 시계가 플레이의 절반 빠르기로 간다 (${ratio.toFixed(2)})`);
+  await game.shot('daylength-hud', '하루 40분 월드의 HUD');
+  await game.send('daylength 20');
+  const b2 = await game.state();
+  await game.wait(2000);
+  const a2 = await game.state();
+  const ratio2 = (a2.clockTicks - b2.clockTicks) / Math.max(1, a2.tick - b2.tick);
+  check(Math.abs(ratio2 - 1) < 0.05, `20분으로 돌리면 시계가 플레이와 같이 간다 (${ratio2.toFixed(2)})`);
+  await game.context.close();
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

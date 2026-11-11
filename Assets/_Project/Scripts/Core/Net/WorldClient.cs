@@ -309,7 +309,11 @@ namespace Game.Core
         public float CraftSeconds(Recipe recipe) => CraftRules.Seconds(recipe, _tiles);
 
         // The world's clock (Calendar) now, as the host's last word plus the time since.
-        public long Clock => _clock + (long)Math.Max(0, HostTick - _clockTick);
+        // The host's days may be longer than the base, so the clock runs on at its pace (Calendar.ClockFor).
+        public long Clock => _clock + Calendar.ClockFor((long)Math.Max(0, HostTick - _clockTick), DayMinutes);
+
+        // Minutes of play a day takes in this world (the host's choice).
+        public int DayMinutes { get; private set; } = Calendar.BaseDayMinutes;
 
         // Beside their own bed in the evening or at night, so they may lie down (World.Sleep says the same).
         public bool CanSleep =>
@@ -567,7 +571,7 @@ namespace Game.Core
             who == null ? null : Story?.GivenBy(who, JourneyStep, JourneyTaken, SideSteps, SideTaken);
         public string BossName(string id) => _bosses?.Bosses.FirstOrDefault(b => b.Id == id)?.Name ?? id;
         public PlaceSite SiteOf(PlaceDefinition place) => place == null ? null : Places.FirstOrDefault(p => p.Definition == place);
-        public (CharacterDefinition Character, Vec2 At)? CharacterNear() => World.CharacterNear(Places, Position, Clock);
+        public (CharacterDefinition Character, Vec2 At)? CharacterNear() => World.CharacterNear(Places, Position, Clock, dayMinutes: DayMinutes);
         public PlaceSite WaypointNear() => World.WaypointNear(Places, Position);
         public PlaceSite PlaceHere() => Places.FirstOrDefault(p => p.Contains(Position));
         public byte[] TalkStoryCommand() => new InventoryCommandMessage(InventoryCommand.TalkStory, 0).Encode();
@@ -1547,6 +1551,7 @@ namespace Game.Core
             CraftLeft = self.CraftLeft;
             _clock = snapshot.Clock;
             _clockTick = snapshot.Tick;
+            DayMinutes = snapshot.DayMinutes;
             Sleepers = snapshot.Sleepers;
             Rift = snapshot.Rift;
             Defense = snapshot.Defense;

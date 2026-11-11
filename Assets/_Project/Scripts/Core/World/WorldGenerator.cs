@@ -89,7 +89,8 @@ namespace Game.Core
         // Each wanderer's spots by character id, home first.
         public IReadOnlyDictionary<string, IReadOnlyList<Vec2>> Rounds { get; }
 
-        public Vec2 PersonAt(CharacterDefinition character, Vec2 home, long clock)
+        // Longer days slow the clock, not the walking: dayMinutes turns the clock back into seconds of play.
+        public Vec2 PersonAt(CharacterDefinition character, Vec2 home, long clock, int dayMinutes = Calendar.BaseDayMinutes)
         {
             if (Still || !Rounds.TryGetValue(character.Id, out var spots) || spots.Count < 2 || Calendar.IsNight(clock)) return home;
             bool runs = character.Walk == "run";
@@ -105,7 +106,8 @@ namespace Game.Core
             float round = runs ? RoundSeconds / 2 : RoundSeconds;
             float dwell = System.Math.Max(2, (round - walking) / n);
             double period = walking + dwell * n;
-            double t = (clock / (double)World.TicksPerSecond + character.Index * 13.7) % period;
+            double played = clock * (double)Calendar.DayMinutesOf(dayMinutes) / Calendar.BaseDayMinutes;
+            double t = (played / World.TicksPerSecond + character.Index * 13.7) % period;
             for (int i = 0; i < n; i++)
             {
                 if (t < dwell) return spots[i];
@@ -117,9 +119,9 @@ namespace Game.Core
         }
 
         // Everyone here and where they are at that time.
-        public IEnumerable<(CharacterDefinition Character, Vec2 At)> PeopleAt(long clock)
+        public IEnumerable<(CharacterDefinition Character, Vec2 At)> PeopleAt(long clock, int dayMinutes = Calendar.BaseDayMinutes)
         {
-            foreach (var (character, home) in People) yield return (character, PersonAt(character, home, clock));
+            foreach (var (character, home) in People) yield return (character, PersonAt(character, home, clock, dayMinutes));
         }
 
         public PlaceDefinition Definition { get; }
