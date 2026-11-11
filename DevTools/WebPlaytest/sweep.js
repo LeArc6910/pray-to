@@ -2442,7 +2442,9 @@ async function firstRun(browser, profile, hourLong) {
     // fall. Two levels more first (the bot dodges slower than a person; at level 3 it fell five times and at level 4
     // eight, at level 6 none, 2026-11-10).
     if ((await game.state()).level < 5) {
-      const more = await hunt(async () => (await game.state()).level >= 5, 300);
+      // Up to eight minutes (2026-11-11: five ended at level 4 on the web, and the warden then felled the bot seven
+      // times in ten minutes).
+      const more = await hunt(async () => (await game.state()).level >= 5, 480);
       note(`- 수호자 앞 사냥: ${more}마리, 레벨 ${(await game.state()).level}`);
     }
     // The points a player spends before a boss (the HUD keeps saying 스킬 포인트·특성 포인트): every [배우기] and

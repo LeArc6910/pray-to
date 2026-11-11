@@ -555,6 +555,7 @@ namespace Game.Core
             // With others in the world there is time for one of them to come (DownSeconds, World.Revive).
             player.RespawnTicks = Ticks(_players.Count > 1 ? Math.Max(DownSeconds, _config.RespawnSeconds) : _config.RespawnSeconds);
             player.ReviveTicks = 0;
+            player.Falls++;
             _events.Add(new SimEvent(SimEventType.Died, player.Id));
             return amount;
         }

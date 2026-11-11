@@ -29,7 +29,7 @@ namespace Game.Core
         long _nextGoalCheck;
         int _seenInRound;
         int _roundTiles;
-        bool _wasDead;
+        readonly int _startFalls;
 
         public BotMemory(World world, Player player, GuideData guide = null)
         {
@@ -38,6 +38,7 @@ namespace Game.Core
             _guide = guide;
             _seen = new bool[world.Map.Width * world.Map.Height];
             StartTick = world.Tick;
+            _startFalls = player.Falls;
             LastProgressTick = world.Tick;
             _startRecords = new Dictionary<(RecordKind, string), int>(player.Records);
             int sx = TileMap.Cell(world.Spawn.X), sy = TileMap.Cell(world.Spawn.Y);
@@ -67,7 +68,8 @@ namespace Game.Core
         public int GoalHorizon { get; set; } = int.MaxValue;
         // Named moments (BotReport.Moments): the first kill, the first boss's arena, its first warning, ...
         public Dictionary<string, long> Moments { get; } = new Dictionary<string, long>();
-        public int Deaths { get; private set; }
+        // Falls since the run began, from the player's own count (a web bot does not look while it lies fallen).
+        public int Deaths => _player.Falls - _startFalls;
         // Recent stretches of no progress the bot noticed, and where it gave up (BotPilot).
         public int Stalls { get; internal set; }
         public List<BotStuck> Stuck { get; } = new List<BotStuck>();
@@ -104,8 +106,6 @@ namespace Game.Core
             var map = _world.Map;
             int px = TileMap.Cell(_player.Position.X), py = TileMap.Cell(_player.Position.Y);
             bool progress = false;
-            if (_player.IsDead && !_wasDead) Deaths++;
-            _wasDead = _player.IsDead;
 
             // Seen: a flood through open floor, Sight tiles round, and the solid tiles that bound it.
             int before = SeenTiles;

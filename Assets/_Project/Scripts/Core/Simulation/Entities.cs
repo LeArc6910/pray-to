@@ -199,6 +199,8 @@ namespace Game.Core
         internal long LastAttackTick { get; set; } = -1;
         internal int AttackRecovery { get; set; }
         internal int RespawnTicks { get; set; }
+        // How many times the player has fallen since joining (the playtest bot's numbers, BotMemory.Deaths).
+        public int Falls { get; internal set; }
         // While fallen in co-op: how long an ally has stood beside them (World.Revive).
         internal int ReviveTicks { get; set; }
         // Health still to come from a consumable: so much each tick, for so many ticks.
