@@ -379,8 +379,46 @@ namespace Game.Core
             }
             Doing = crop.Name + " 심기";
             _world.SetAttacking(_player.Id, false);
-            if (!FaceEach(() => _world.Plant(_player.Id, crop))) Wander();
+            if (FaceEach(() => _world.Plant(_player.Id, crop))) return;
+            // Not here (2026-11-11: with the bed before it, the bot came to planting far out in the ice or the abyss,
+            // where a mushroom does not grow, and wandered on): to the nearest floor where the crop grows, beside it.
+            int hx = TileMap.Cell(_player.Position.X), hy = TileMap.Cell(_player.Position.Y);
+            if (_plantAt is (int px, int py) && (!Plantable(crop, px, py) || Memory.IsBlocked(px, py))) _plantAt = null;
+            if (_plantAt == null)
+            {
+                var path = Pilot.Nav.Find(hx, hy, (x, y) => Plantable(crop, x, y) && !Memory.IsBlocked(x, y), enter: false);
+                if (path == null || path.Count == 0)
+                {
+                    Skip(goal, $"{crop.Name}이(가) 자라는 바닥을 못 찾음");
+                    return;
+                }
+                _plantAt = path[path.Count - 1];
+                _plantFrom = path.Count >= 2 ? path[path.Count - 2] : (hx, hy);
+            }
+            var (sx, sy) = _plantFrom;
+            if (hx == sx && hy == sy)
+            {
+                var (tx, ty) = _plantAt.Value;
+                Face(new Vec2(tx - hx, ty - hy));
+                if (_world.Plant(_player.Id, crop)) Memory.Refresh();
+                else
+                {
+                    Memory.Block((tx, ty), 120 * World.TicksPerSecond);
+                    _plantAt = null;
+                }
+                return;
+            }
+            Go(BotTarget.At(sx, sy));
         }
+
+        (int X, int Y)? _plantAt;
+        (int X, int Y) _plantFrom;
+
+        // Where World.Plant would take the crop: farmland of one of its biomes, nothing growing, not by a boss's arena.
+        bool Plantable(CropDefinition crop, int x, int y) =>
+            !_world.Map.IsEdge(x, y) && TileMap.IsFarmland(_world.Map[x, y]) && _world.CropAt(x, y) == null
+            && crop.GrowsIn(_world.FarmBiomeAt(x, y))
+            && !_world.Bosses.Any(b => Vec2.Distance(TileMap.Center(x, y), b.Home) <= b.ArenaRadius + 1);
 
         void Till(Goal goal)
         {
