@@ -2305,14 +2305,26 @@ async function firstRun(browser, profile, hourLong) {
   // Puts the thing from the bag's materials tab, facing each open side in turn until the goal moves on.
   const placeFor = async (n, what, row) => {
     const tried = [];
+    let walked = false;
     for (let attempt = 0; attempt < 4; attempt++) {
       // Up again first if a monster felled it (2026-11-10: the bot tried to set its torch down lying on the floor).
       if ((await game.state()).dead) {
         await game.until(st => !st.dead, 15000);
         await game.wait(800);
       }
-      const at = await faceOpen(tried);
-      if (!at) break;
+      let at = await faceOpen(tried);
+      // No bare floor beside (2026-11-11: on the 512-tile map the workbench went up among the village's roads, and
+      // the stone floor had nowhere to go): to the nearest bare floor by the game's path finding, and again.
+      if (!at && !walked) {
+        walked = true;
+        const result = await pilot.go('near Floor', { seconds: 40 });
+        note(`  - (${what}) 곁에 맨바닥이 없어 가까운 맨바닥으로 걸어감(${result})`);
+        at = await faceOpen(tried);
+      }
+      if (!at) {
+        await why(`${what}: 놓을 맨바닥 없음`);
+        break;
+      }
       tried.push(`${at.dx},${at.dy}`);
       await bagTab(game, '재료·제작');
       const pressed = await game.press('놓기', row, { quiet: attempt > 0 });
@@ -2764,7 +2776,12 @@ async function firstRun(browser, profile, hourLong) {
     // The merchant's request of the day (2026-11-11): what it needs is in the goal list once she has been met
     // ("부탁: 상인 도라 · 생선 구이 0/3"). Grilled fish: minnows from the dirt cave's water, made at the furnace;
     // mushroom spores: bought from her. Then [건네기] in her [부탁].
-    const requestLine = async () => ((await game.texts()).hud || []).find(l => /^부탁: 상인 도라/.test(l)) || '';
+    // The entry's title and what it needs may come as separate lines: the title's line and the one after it.
+    const requestLine = async () => {
+      const hud = (await game.texts()).hud || [];
+      const i = hud.findIndex(l => /^부탁: 상인 도라/.test(l));
+      return i < 0 ? '' : /\d+\/\d+/.test(hud[i]) ? hud[i] : `${hud[i]} · ${hud[i + 1] || ''}`;
+    };
     const want = (line, name) => {
       const m = line.match(new RegExp(name + ' (\\d+)/(\\d+)'));
       return m ? Math.max(0, +m[2] - +m[1]) : 0;
