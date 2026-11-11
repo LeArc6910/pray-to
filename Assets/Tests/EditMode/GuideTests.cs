@@ -33,6 +33,33 @@ namespace Game.Core.Tests
                 GuideProgress.FromCount(Guide.Shipped, 10).ToArray(), "a count from before 2026-11-03 keeps its old order");
         }
 
+        // The places lay stone floor and soil from the start (2026-11-11, the first-hour bot): "lay a floor" and "till a
+        // field" count only tiles changed since the map was made, wherever they stand.
+        [Test]
+        public void FloorsAndFieldsLaidByThePlacesDoNotMeetTheGoals()
+        {
+            var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped,
+                story: Tales.Shipped);
+            var world = host.World;
+            var player = world.AddPlayer("a", null);
+            Assert.IsTrue(world.Places.Count > 0);
+            bool laid = false;
+            for (int y = 0; y < world.Map.Height && !laid; y++)
+                for (int x = 0; x < world.Map.Width && !laid; x++)
+                    laid = world.Map[x, y] == TileType.StoneFloor;
+            Assert.IsTrue(laid, "a place lays stone floor");
+
+            var facts = GuideFacts.Of(world, player);
+            Assert.IsFalse(facts.HasTile(TileType.StoneFloor), "the places' floors are not the player's");
+
+            // One laid in the village at the spawn counts, though the village is a place.
+            var spawn = world.Spawn;
+            Assert.IsNotNull(world.PlaceAt(spawn), "the village stands at the spawn");
+            world.Build(TileMap.Cell(spawn.X) + 2, TileMap.Cell(spawn.Y), TileType.StoneFloor);
+            Assert.IsTrue(GuideFacts.Of(world, player).HasTile(TileType.StoneFloor), "one the player laid is");
+            Assert.IsFalse(GuideFacts.Of(world, player).HasTile(TileType.Soil), "the hut's garden is still not theirs");
+        }
+
         [Test]
         public void ShippedGoalsStartWithDiggingAndBuilding()
         {

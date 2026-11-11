@@ -391,6 +391,7 @@ namespace Game.Client
         readonly Dictionary<int, (TileType Kind, SpriteRenderer Part, SpriteRenderer Load)> _machines =
             new Dictionary<int, (TileType, SpriteRenderer, SpriteRenderer)>();
         Tilemap _ground;
+        Tilemap _corners;
         // The floor under things (PropArt.Underlay): a place's floor, or paving round it, between ground and objects.
         Tilemap _underlay;
         Tilemap _objects;
@@ -2946,10 +2947,12 @@ namespace Game.Client
             var grid = new GameObject("Grid", typeof(Grid));
             grid.transform.SetParent(_root.transform, false);
             _ground = AddTilemap(grid.transform, "Ground", -100);
+            _corners = AddTilemap(grid.transform, "Corners", -99);
             _underlay = AddTilemap(grid.transform, "Underlay", -95);
             _objects = AddTilemap(grid.transform, "Objects", -90);
 
             var ground = new TileBase[map.Width * map.Height];
+            var corners = new TileBase[map.Width * map.Height];
             var underlay = new TileBase[map.Width * map.Height];
             var objects = new TileBase[map.Width * map.Height];
             for (int y = 0; y < map.Height; y++)
@@ -2957,6 +2960,7 @@ namespace Game.Client
                 for (int x = 0; x < map.Width; x++)
                 {
                     ground[y * map.Width + x] = GroundAt(x, y);
+                    corners[y * map.Width + x] = CornersAt(x, y);
                     underlay[y * map.Width + x] = UnderlayAt(x, y);
                     objects[y * map.Width + x] = ObjectTileAt(map, x, y);
                     if (map[x, y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(x, y, 0));
@@ -2964,6 +2968,7 @@ namespace Game.Client
             }
             var bounds = new BoundsInt(0, 0, 0, map.Width, map.Height, 1);
             _ground.SetTilesBlock(bounds, ground);
+            _corners.SetTilesBlock(bounds, corners);
             _underlay.SetTilesBlock(bounds, underlay);
             _objects.SetTilesBlock(bounds, objects);
         }
@@ -2985,10 +2990,22 @@ namespace Game.Client
             return tilesObject.GetComponent<Tilemap>();
         }
 
-        TileBase GroundAt(int x, int y)
+        TileBase GroundAt(int x, int y) => Sprites.Ground(GroundIndex(x, y));
+
+        int GroundIndex(int x, int y) => TileArt.GroundAt(_client.Map, x, y, InArena(_client, x, y), _client.Biomes[x, y]);
+
+        // The rounded corners over the tile at x, y (TileArt.Rounds), each from the ground tile beside it.
+        readonly int[] _cornerSources = new int[4];
+
+        TileBase CornersAt(int x, int y)
         {
-            bool inArena = InArena(_client, x, y);
-            return Sprites.Ground(TileArt.GroundAt(_client.Map, x, y, inArena, _client.Biomes[x, y]));
+            var map = _client.Map;
+            for (int c = 0; c < TileArt.CornerWays.Length; c++)
+            {
+                var (sx, sy) = TileArt.CornerWays[c];
+                _cornerSources[c] = map.InBounds(x + sx, y) && TileArt.Rounds(map, x, y, sx, sy) ? GroundIndex(x + sx, y) : -1;
+            }
+            return Sprites.Corners(_cornerSources);
         }
 
         // Whether the tile is in any boss's arena.
@@ -3054,6 +3071,15 @@ namespace Game.Client
                 _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTileAt(map, change.X, change.Y));
                 if (map[change.X, change.Y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(change.X, change.Y, 0));
                 else _scarecrows.Remove(new Vector3Int(change.X, change.Y, 0));
+                // The corners round by the neighbours and take the ground beside, which itself depends on its neighbours.
+                for (int dy = -2; dy <= 2; dy++)
+                {
+                    for (int dx = -2; dx <= 2; dx++)
+                    {
+                        if (map.InBounds(change.X + dx, change.Y + dy))
+                            _corners.SetTile(new Vector3Int(change.X + dx, change.Y + dy, 0), CornersAt(change.X + dx, change.Y + dy));
+                    }
+                }
                 foreach (var (dx, dy) in Neighbourhood)
                 {
                     int x = change.X + dx;

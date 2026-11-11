@@ -57,6 +57,10 @@ namespace Game.Core
         public List<TileChange> ChangedTiles() =>
             _changedTiles.Select(pair => new TileChange(pair.Key % Map.Width, pair.Key / Map.Width, pair.Value)).ToList();
 
+        // Whether a tile of the type stands where the map was changed since it was made: something built, not laid by
+        // the world (the guide's "place:" goals, Docs/Guide.md).
+        public bool Built(TileType type) => _changedTiles.ContainsValue(type);
+
         // Tiles changed since the last call.
         public List<TileChange> TakeTileChanges()
         {

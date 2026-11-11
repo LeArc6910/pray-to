@@ -99,6 +99,31 @@ namespace Game.Client
         }
 
         // The ground tile for an index from TileArt.GroundAt.
+        // The rounded-corner layer over a ground tile (TileArt.CornerOverlay), made the first time each mix of corners
+        // is seen. Sources are ground indexes per corner, -1 for none; null when no corner rounds.
+        static readonly Dictionary<long, Tile> CornerTiles = new Dictionary<long, Tile>();
+
+        public static TileBase Corners(int[] sources)
+        {
+            long key = 0;
+            bool any = false;
+            foreach (int source in sources)
+            {
+                key = key * (TileArt.GroundCount + 1) + source + 1;
+                any |= source >= 0;
+            }
+            if (!any) return null;
+            if (CornerTiles.TryGetValue(key, out var tile)) return tile;
+            var texture = Texture(TileArt.Size, TileArt.Size);
+            texture.SetPixels32(Pixels(TileArt.CornerOverlay(sources)));
+            texture.Apply(false, true);
+            tile = ScriptableObject.CreateInstance<Tile>();
+            tile.sprite = Sprite.Create(texture, new Rect(0, 0, TileArt.Size, TileArt.Size), new Vector2(0.5f, 0.5f), PixelsPerUnit, 0, SpriteMeshType.FullRect);
+            tile.colliderType = Tile.ColliderType.None;
+            CornerTiles[key] = tile;
+            return tile;
+        }
+
         public static TileBase Ground(int index)
         {
             BuildAtlas();

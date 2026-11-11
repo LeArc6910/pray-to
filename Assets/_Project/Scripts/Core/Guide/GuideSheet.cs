@@ -134,19 +134,9 @@ namespace Game.Core
                 return client.Bag.Items.Concat(client.Equipment.Items).Count(item => item.Base.Id == id);
             }
 
-            bool HasTile(TileType type)
-            {
-                var map = client.Map;
-                if (map == null) return false;
-                for (int y = 0; y < map.Height; y++)
-                {
-                    for (int x = 0; x < map.Width; x++)
-                    {
-                        if (map[x, y] == type) return true;
-                    }
-                }
-                return false;
-            }
+            // Only tiles someone has changed count (2026-11-11): the places lay stone floor and soil from the start
+            // (places.csv), which would meet "lay a floor" and "till a field" before the player had done anything.
+            bool HasTile(TileType type) => client.Built(type);
 
             int hearts = client.Friendships.Values.Select(f => World.HeartsOf(f.Points)).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level,
@@ -167,18 +157,7 @@ namespace Game.Core
                 return bag.Items.Concat(player.Equipment.Items).Count(item => item.Base.Id == id);
             }
 
-            bool HasTile(TileType type)
-            {
-                var map = world.Map;
-                for (int y = 0; y < map.Height; y++)
-                {
-                    for (int x = 0; x < map.Width; x++)
-                    {
-                        if (map[x, y] == type) return true;
-                    }
-                }
-                return false;
-            }
+            bool HasTile(TileType type) => world.Built(type);
 
             int hearts = player.Friendships.Values.Select(f => f.Hearts).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level,

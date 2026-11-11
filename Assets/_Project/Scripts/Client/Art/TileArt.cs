@@ -54,6 +54,47 @@ namespace Game.Client
             type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre
             || type == TileType.ObsidianOre || type == TileType.VoidOre;
 
+        // Rounded cave corners (Docs/ArtPipeline.md 둥근 모서리, 2026-11-11): a square corner is cut or filled by a
+        // three-pixel step. Where rock sticks out into open floor (its two sides and the diagonal open) the corner is
+        // cut back to the floor beside it; where floor goes into rock (rock on both sides of a corner) it is filled with
+        // the rock beside it. Drawn as a layer over the ground, from the ground tile beside, so the step carries that
+        // tile's colours and texture.
+        public const int CornerStep = 3;
+        // The four corners as (way across, way up): top-left, top-right, bottom-left, bottom-right.
+        public static readonly (int X, int Y)[] CornerWays = { (-1, 1), (1, 1), (-1, -1), (1, -1) };
+
+        // Whether the corner of the tile at (x, y) that lies (sx, sy) of it rounds. Outside the map reads as rock.
+        public static bool Rounds(TileMap map, int x, int y, int sx, int sy)
+        {
+            bool rock = IsRock(map[x, y]);
+            bool side = IsRock(map[x + sx, y]), upDown = IsRock(map[x, y + sy]), diagonal = IsRock(map[x + sx, y + sy]);
+            return rock ? !side && !upDown && !diagonal : side && upDown;
+        }
+
+        // A tile-sized layer with, for each corner given a ground tile (by index, -1 for none), the step taken from
+        // that tile as it shows across the corner's side edge.
+        public static PixelImage CornerOverlay(int[] sources)
+        {
+            var image = new PixelImage(Size, Size);
+            for (int c = 0; c < CornerWays.Length; c++)
+            {
+                if (sources[c] < 0) continue;
+                var from = Ground(sources[c]);
+                var (sx, sy) = CornerWays[c];
+                for (int i = 0; i < CornerStep; i++)
+                {
+                    for (int j = 0; j < CornerStep - i; j++)
+                    {
+                        // Image rows run from the top.
+                        int px = sx < 0 ? i : Size - 1 - i;
+                        int py = sy > 0 ? j : Size - 1 - j;
+                        image[px, py] = from[px, py];
+                    }
+                }
+            }
+            return image;
+        }
+
         // Which ground tile goes at (x, y), in the colours of its biome. Outside the map reads as wall.
         public static int GroundAt(TileMap map, int x, int y, bool inArena, Biome biome = Biome.Cave)
         {

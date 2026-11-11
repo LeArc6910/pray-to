@@ -207,6 +207,8 @@ namespace Game.Core
         readonly List<SimEvent> _events = new List<SimEvent>();
         readonly Dictionary<int, string> _names = new Dictionary<int, string>();
         readonly List<TileChange> _changedTiles = new List<TileChange>();
+        // Every cell changed since the map was made, with what stands there now (World.Built).
+        readonly Dictionary<int, TileType> _builtTiles = new Dictionary<int, TileType>();
         readonly Dictionary<int, List<ClassDefinition>> _rosterClasses = new Dictionary<int, List<ClassDefinition>>();
         int[] _cooldowns = Array.Empty<int>();
         int[] _buffs = Array.Empty<int>();
@@ -1350,6 +1352,9 @@ namespace Game.Core
         readonly Dictionary<MaterialDefinition, int> _stock = new Dictionary<MaterialDefinition, int>();
 
         // Cells whose tile changed since the last call, for redrawing them.
+        // Whether a tile of the type stands where the map was changed since it was made (World.Built).
+        public bool Built(TileType type) => _builtTiles.ContainsValue(type);
+
         public List<TileChange> TakeChangedTiles()
         {
             var changes = new List<TileChange>(_changedTiles);
@@ -1473,6 +1478,7 @@ namespace Game.Core
                 if (!Map.InBounds(change.X, change.Y)) throw new InvalidDataException("Tile change outside the map.");
                 Map[change.X, change.Y] = change.Type;
                 _changedTiles.Add(change);
+                _builtTiles[change.Y * Map.Width + change.X] = change.Type;
             }
         }
 
@@ -1499,6 +1505,7 @@ namespace Game.Core
             Seed = welcome.Seed;
             var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story);
             Map = generated.Map;
+            _builtTiles.Clear();
             Signposts = generated.Signposts;
             Places = generated.Places;
             Arena = generated.Arena;

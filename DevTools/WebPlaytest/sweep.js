@@ -1257,6 +1257,23 @@ async function gear(browser) {
   check(await game.press(/^강화 \+1/), '[강화 +1]이 보인다');
   const upgraded = (await game.inventory()).items.find(i => i.base === 'iron_sword');
   check(upgraded && upgraded.upgrade === 1, '강화하면 +1');
+  // Moving an older piece's upgrade onto the newer one (Docs/Loot.md 강화 옮기기, 2026-11-11): a copper sword to +2,
+  // then [강화 옮기기] on the iron sword takes its +2 and leaves it +0.
+  await game.send('drop item copper_sword rare; give copper_ore 10');
+  await game.wait(1200);
+  await pick(game, /구리 검/);
+  await game.press('다듬기', '구리 검');
+  await game.press(/^강화 \+1/);
+  await game.press(/^강화 \+2/);
+  const copper = await game.until(i => i.items.some(x => x.base === 'copper_sword' && x.upgrade === 2), 3000, game.inventory);
+  check(!!copper, '구리 검을 +2로 강화한다');
+  await pick(game, /철 검/);
+  await game.press('다듬기', '철 검');
+  await game.shot('anvil-transfer', '철 검의 모루: [강화 옮기기]');
+  check(await game.press(/^강화 옮기기: 구리 검의 \+2/), '철 검의 모루에 [강화 옮기기: 구리 검의 +2를 여기로]가 보이고 누른다');
+  const moved = await game.until(i => i.items.some(x => x.base === 'iron_sword' && x.upgrade === 2), 3000, game.inventory);
+  const old = moved && moved.items.find(x => x.base === 'copper_sword');
+  check(!!moved && old && old.upgrade === 0, `철 검이 +2, 구리 검은 +0이 된다 (구리 검 +${old && old.upgrade})`);
   await game.press('특성');
   await game.shot('passives', '[특성] 탭');
   const node = (await game.buttons()).find(b => b.shown && /: /.test(b.label) && b.label.length > 4);

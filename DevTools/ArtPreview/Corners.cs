@@ -11,7 +11,6 @@ namespace Game.Client
     static class Corners
     {
         const int Px = TileArt.Size;
-        const int Step = 3;
 
         public static PixelImage Compare(int seed = 7, int width = 24, int height = 14)
         {
@@ -21,7 +20,7 @@ namespace Game.Client
             int left = world.SpawnX + 18 - width / 2, bottom = world.SpawnY + 14 - height / 2;
             var plain = Draw(map, world, left, bottom, width, height);
             var rounded = Draw(map, world, left, bottom, width, height);
-            Round(rounded, map, left, bottom, width, height);
+            Round(rounded, world, left, bottom, width, height);
             var both = new PixelImage(width * Px * 2 + 8, height * Px);
             both.Draw(plain, 0, 0);
             both.Draw(rounded, width * Px + 8, 0);
@@ -40,41 +39,25 @@ namespace Game.Client
             return image;
         }
 
-        static bool Rock(TileMap map, int x, int y) => !map.InBounds(x, y) || TileArt.IsRock(map[x, y]);
-
-        static void Round(PixelImage image, TileMap map, int left, int bottom, int width, int height)
+        // The game's own corner layer (TileArt.Rounds, TileArt.CornerOverlay) over each tile.
+        static void Round(PixelImage image, GeneratedWorld world, int left, int bottom, int width, int height)
         {
-            // The four corners as (way across, way up): top-left, top-right, bottom-left, bottom-right.
-            var corners = new[] { (-1, 1), (1, 1), (-1, -1), (1, -1) };
-            var copy = new PixelImage(image.Width, image.Height);
-            copy.Draw(image, 0, 0);
+            var map = world.Map;
+            var sources = new int[4];
             for (int ty = 0; ty < height; ty++)
             {
                 for (int tx = 0; tx < width; tx++)
                 {
                     int x = left + tx, y = bottom + ty;
-                    bool rock = Rock(map, x, y);
-                    foreach (var (sx, sy) in corners)
+                    bool any = false;
+                    for (int c = 0; c < TileArt.CornerWays.Length; c++)
                     {
-                        bool side = Rock(map, x + sx, y), upDown = Rock(map, x, y + sy), diagonal = Rock(map, x + sx, y + sy);
-                        // A rock corner sticking out into open floor, or a floor corner pressed in by rock on both sides.
-                        bool cut = rock && !side && !upDown && !diagonal;
-                        bool fill = !rock && side && upDown;
-                        if (!cut && !fill) continue;
-                        int ox = tx * Px, oy = (height - 1 - ty) * Px;
-                        for (int i = 0; i < Step; i++)
-                        {
-                            for (int j = 0; j < Step - i; j++)
-                            {
-                                int px = sx < 0 ? i : Px - 1 - i;
-                                int py = sy > 0 ? j : Px - 1 - j;
-                                // Taken from the tile beside, across the corner's side edge.
-                                int fromX = ox + px + (sx < 0 ? -Px : Px), fromY = oy + py;
-                                if (fromX < 0 || fromX >= copy.Width) continue;
-                                image[ox + px, oy + py] = copy[fromX, fromY];
-                            }
-                        }
+                        var (sx, sy) = TileArt.CornerWays[c];
+                        bool rounds = map.InBounds(x + sx, y) && TileArt.Rounds(map, x, y, sx, sy);
+                        sources[c] = rounds ? TileArt.GroundAt(map, x + sx, y, false, world.Biomes[x + sx, y]) : -1;
+                        any |= rounds;
                     }
+                    if (any) image.Draw(TileArt.CornerOverlay(sources), tx * Px, (height - 1 - ty) * Px);
                 }
             }
         }
