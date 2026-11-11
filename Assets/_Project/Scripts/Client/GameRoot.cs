@@ -181,6 +181,7 @@ namespace Game.Client
                 _saveMenu?.Poll();
                 return;
             }
+            NoteSteps(Time.unscaledDeltaTime);
             if (_map != null && Controls.MapPressed())
             {
                 _map.FullOpen = !_map.FullOpen;
@@ -400,6 +401,24 @@ namespace Game.Client
                 if (!string.IsNullOrEmpty(drop) && goal.Conditions.Any(c => c.Kind == "have" && c.Id == drop)) return true;
             }
             return false;
+        }
+
+        // Where this device's player has got to, for the feedback form (Feedback, Docs/Release.md 의견 단추).
+        Vec2? _firstPosition;
+
+        void NoteSteps(float deltaTime)
+        {
+            if (_client.Status != ClientStatus.Playing) return;
+            Feedback.Tick(deltaTime);
+            Feedback.Reach("load");
+            _firstPosition ??= _client.Position;
+            if (!Feedback.Has("move") && Vec2.Distance(_firstPosition.Value, _client.Position) > 2) Feedback.Reach("move");
+            var passed = _guideProgress?.Passed;
+            if (passed != null && passed.Contains("stone")) Feedback.Reach("dig");
+            if (passed != null && passed.Contains("workbench")) Feedback.Reach("craft");
+            if (_client.Experience > 0 || _client.Level > 1) Feedback.Reach("kill");
+            if (_view?.ActiveBoss is EntityView boss && boss.BossState == BossState.Telegraph) Feedback.Reach("boss_warning");
+            if (passed != null && passed.Contains("boss")) Feedback.Reach("boss");
         }
 
         // When the player fell; for the time left before getting up at home in co-op.
@@ -1263,6 +1282,9 @@ namespace Game.Client
             if (Ui.LayoutButton($"하루 길이: {Settings.DayMinutes}분")) Settings.DayMinutes = Settings.NextDayMinutes();
             // The saves on this device: pick one, carry them off in a file, bring a file's in (SaveMenu).
             if (Ui.LayoutButton(_side == MenuSide.Saves ? "저장본 닫기" : "저장본: 고르기·내보내기·가져오기")) OpenSide(MenuSide.Saves);
+            // A GitHub issue form with the version, the device and how far the player has got (Feedback); nothing is
+            // sent until the player sends it there.
+            if (Ui.LayoutButton("의견 보내기")) Application.OpenURL(Feedback.FormUrl());
             // Web and phone saves live in the browser or the app only: a reminder when nothing was exported for a week.
             if (SaveMenu.ExportDue)
             {

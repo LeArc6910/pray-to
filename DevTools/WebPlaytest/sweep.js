@@ -72,7 +72,7 @@ async function menu(browser) {
   let buttons = await game.buttons();
   const labels = buttons.map(b => b.label);
   check(labels.includes('혼자 하기'), '메뉴에 [혼자 하기]');
-  for (const word of ['어둠과 빛:', '효과음:', '음악:', '개발 정보:', '글꼴:', '목표 안내:', '화면 흔들림:', '키 바꾸기', '온라인 방 만들기', '코드로 참가', '저장본: 고르기·내보내기·가져오기']) {
+  for (const word of ['어둠과 빛:', '효과음:', '음악:', '개발 정보:', '글꼴:', '목표 안내:', '화면 흔들림:', '키 바꾸기', '온라인 방 만들기', '코드로 참가', '저장본: 고르기·내보내기·가져오기', '의견 보내기', '하루 길이:']) {
     check(labels.some(l => l.startsWith(word)), `메뉴에 [${word}…] 단추`);
   }
   // Classes are picked in the game (2026-11-09): the menu says so and has no class buttons.
@@ -272,6 +272,9 @@ async function basics(browser) {
   t = await game.texts();
   check((t.acquired || []).some(l => has(l, '목표 달성: 돌 10개 모으기')), '"목표 달성: 돌 10개 모으기"');
   check(/목표 3\//.test((t.hud || []).join(' ')), '다음 목표로 넘어간다');
+  // Where this player has got to, kept on the device for the feedback form (Feedback, Docs/Release.md 의견 단추).
+  const steps = (await game.state()).steps || '';
+  check(/로드/.test(steps) && /첫 채굴/.test(steps), `기기 안 단계 기록에 로드와 첫 채굴 (${steps})`);
   await game.shot('goal', '첫 목표를 이룬 뒤');
 
   // Placing a stone wall from the bag, then a workbench made and placed.

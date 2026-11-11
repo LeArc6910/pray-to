@@ -722,6 +722,7 @@ namespace Game.Client
                 json.Field("clockTicks", world.Clock);
                 json.Field("tick", world.Tick);
                 json.Field("facing", $"{player.Facing.X:0.00},{player.Facing.Y:0.00}");
+                json.Field("steps", Feedback.Summary);
                 json.Field("dayMinutes", world.DayMinutes);
                 json.Field("feelOff", Feel.Off);
                 json.Field("weather", world.WeatherToday.ToString());
