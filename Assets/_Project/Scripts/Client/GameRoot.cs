@@ -1499,6 +1499,12 @@ namespace Game.Client
                 Sounds.Play(Sound.Click);
             }
             if (Setting(Strings.T("menu.music", "음악"), Settings.MusicVolumeText)) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
+            // CC0 recordings (Recordings, 2026-11-11) or the sounds made in code, to compare.
+            if (Setting(Strings.T("menu.sound_kind", "소리 종류"), Settings.RecordedSounds ? Strings.T("menu.sound_recorded", "녹음") : Strings.T("menu.sound_made", "합성")))
+            {
+                Settings.RecordedSounds = !Settings.RecordedSounds;
+                Sounds.Play(Sound.Click);
+            }
             Heading(Strings.T("menu.screen_group", "화면"));
             if (Setting(Strings.T("menu.darkness", "어둠과 빛"), Strings.OnOff(Settings.Darkness))) Settings.Darkness = !Settings.Darkness;
             // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).

@@ -23,6 +23,7 @@ namespace Game.Client
         static readonly Choice PixelFontChoice = new Choice("settings.pixelfont", true);
         static readonly Choice GuideChoice = new Choice("settings.guide", true);
         static readonly Choice ScreenShakeChoice = new Choice("settings.shake", true);
+        static readonly Choice RecordedChoice = new Choice("settings.recorded", true);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -123,6 +124,14 @@ namespace Game.Client
         {
             get => ScreenShakeChoice.Value;
             set => ScreenShakeChoice.Value = value;
+        }
+
+        // Recorded sounds (CC0 recordings in Resources/Sfx, 2026-11-11) where there are some, or the ones made in code
+        // (Art/SoundArt.cs) everywhere, to compare.
+        public static bool RecordedSounds
+        {
+            get => RecordedChoice.Value;
+            set => RecordedChoice.Value = value;
         }
 
         // One on-or-off choice, saved under its key when it changes.

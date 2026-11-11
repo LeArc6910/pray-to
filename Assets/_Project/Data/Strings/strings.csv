@@ -55,3 +55,6 @@ menu.host_world,방을 만들면 [게임 시작]의 월드({0})가 열린다,"Ho
 menu.sound_group,소리,Sound
 menu.screen_group,화면,Screen
 menu.play_group,플레이,Play
+menu.sound_kind,소리 종류,Sound kind
+menu.sound_recorded,녹음,Recorded
+menu.sound_made,합성,Synth

@@ -412,7 +412,8 @@ namespace Game.Client
         Texture2D _vignette;
         // How far the player has walked since their last footstep.
         float _stride;
-        const float StepLength = 0.6f;
+        // About two steps a second at a walk (2026-11-11: at 0.6 the steps came eight a second, a rattle).
+        const float StepLength = 1.15f;
         // When the "곡괭이가 필요하다" reminder may show again.
         float _pickaxeHintAt;
         string _banner = "";
@@ -765,7 +766,7 @@ namespace Game.Client
                         if (body.Stride >= StepLength)
                         {
                             body.Stride -= StepLength;
-                            Hear(Sound.Step, now, 0.22f);
+                            if (_self != null) Sounds.StepAt(GroundUnder(now), now, _self.Position, 0.2f);
                         }
                     }
                 }
@@ -2359,6 +2360,8 @@ namespace Game.Client
 
         // A quiet step every StepLength the player walks. A jump of more than a tile in one frame is a snap or a
         // recall, not a walk.
+        Ground GroundUnder(Vector3 at) => Recordings.GroundAt(_client.Map, _client.Biomes, Mathf.FloorToInt(at.x), Mathf.FloorToInt(at.y));
+
         void Footsteps(Vector3 moved)
         {
             float distance = moved.magnitude;
@@ -2366,7 +2369,7 @@ namespace Game.Client
             _stride += distance;
             if (_stride < StepLength) return;
             _stride -= StepLength;
-            Sounds.Play(Sound.Step, 0.35f);
+            Sounds.Step(GroundUnder(_self.Position), 0.3f);
         }
 
         // A float where a line goes in; a splash and a "!" when a fish bites; a splash when one is landed; the float

@@ -32,10 +32,38 @@ namespace Game.Client
             if (now - LastPlayed[index] < MinGap && LastPlayed[index] > 0) return;
             LastPlayed[index] = now;
             var source = NextSource();
-            source.clip = Clip(sound);
-            source.volume = Mathf.Clamp01(volume) * Settings.Volume / Settings.MaxVolume;
+            var recorded = Settings.RecordedSounds ? Recordings.Pick(Recordings.NameOf(sound)) : null;
+            source.clip = recorded ?? Clip(sound);
+            source.volume = Mathf.Clamp01(volume * (recorded != null ? Recordings.GainOf(sound) : 1)) * Settings.Volume / Settings.MaxVolume;
             source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter);
             source.Play();
+        }
+
+        // A footstep on that ground (2026-11-11, the owner: steps were loud and did not sound like walking; each floor
+        // its own): a recording of that ground, never the same one twice running, a little higher or lower and louder
+        // or softer each time; the made-in-code step when recordings are off or there are none.
+        public static void Step(Ground ground, float volume)
+        {
+            if (!Settings.Sound || volume <= 0) return;
+            var clip = Settings.RecordedSounds ? Recordings.Pick(Recordings.StepName(ground)) : null;
+            if (clip == null)
+            {
+                Play(Sound.Step, volume);
+                return;
+            }
+            var source = NextSource();
+            source.clip = clip;
+            float gain = Recordings.StepGain(ground) * UnityEngine.Random.Range(0.8f, 1f);
+            source.volume = Mathf.Clamp01(volume * gain) * Settings.Volume / Settings.MaxVolume;
+            source.pitch = 1 + UnityEngine.Random.Range(-0.05f, 0.05f) + (ground == Ground.Ice ? 0.15f : 0);
+            source.Play();
+        }
+
+        public static void StepAt(Ground ground, Vector3 at, Vector3 listener, float volume)
+        {
+            float distance = Vector2.Distance(at, listener);
+            if (distance >= Hearing) return;
+            Step(ground, volume * (1 - distance / Hearing));
         }
 
         // A sound at a place in the world, heard from the listener's place.

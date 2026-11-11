@@ -726,6 +726,9 @@ namespace Game.Client
                 json.Field("skillAim", $"{root.LastSkillAim.X:0.00},{root.LastSkillAim.Y:0.00}");
                 json.Field("corners", root.CornersNear);
                 json.Field("dayMinutes", world.DayMinutes);
+                // The CC0 recordings loaded, and what the ground underfoot sounds like (Recordings, 2026-11-11).
+                json.Field("recordedSets", Recordings.SetCount);
+                json.Field("ground", Recordings.GroundAt(world.Map, world.Biomes, TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)).ToString());
                 json.Field("feelOff", Feel.Off);
                 json.Field("weather", world.WeatherToday.ToString());
                 json.Field("event", world.EventToday.ToString());

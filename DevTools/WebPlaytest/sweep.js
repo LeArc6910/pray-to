@@ -96,7 +96,7 @@ async function menu(browser) {
 
   await menuPage(game, '설정');
   labels = (await game.buttons()).map(b => b.label);
-  for (const word of ['어둠과 빛:', '효과음:', '음악:', '개발 정보:', '글꼴:', '목표 안내:', '화면 흔들림:', '키 바꾸기']) {
+  for (const word of ['어둠과 빛:', '효과음:', '음악:', '소리 종류:', '개발 정보:', '글꼴:', '목표 안내:', '화면 흔들림:', '키 바꾸기']) {
     check(labels.some(l => l.startsWith(word)), `[설정]에 [${word}…] 단추`);
   }
   await game.shot('menu-settings', '설정 화면');
@@ -135,6 +135,9 @@ async function menu(browser) {
   check((await game.find('개발 정보: 켜짐')).length === 1, '새로 고쳐도 [개발 정보: 켜짐]이 남는다');
   await game.startSolo();
   await game.wait(1500);
+  // The CC0 recordings (2026-11-11, Docs/SoundCredits.md): in the build, and the ground under the spawn named.
+  const heard = await game.state();
+  check(heard.recordedSets >= 15, `녹음 효과음 세트가 빌드에 들어 있다 (${heard.recordedSets}세트, 발밑 ${heard.ground})`);
   await game.shot('no-darkness-devinfo', '어둠 없이, 개발 정보 창(왼쪽 아래)');
   await game.page.keyboard.press('Escape');
   await game.until(s => !s.playing, 8000);
