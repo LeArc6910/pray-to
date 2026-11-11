@@ -270,6 +270,9 @@ namespace Game.Client
             body.StrikeTime = 0;
         }
         const float HurtSeconds = 0.25f;
+        // How long a struck body stays squashed, and what one pixel of a 16-pixel body is as a share of it.
+        const float SquashSeconds = 0.1f;
+        const float OnePixel = 1f / 16;
         // Hit feel: how long a struck body is knocked back, how long a heavy blow of one's own holds the picture still
         // (hit-stop), and how long the screen's edges glow red when one is hurt.
         const float KnockSeconds = 0.12f;
@@ -2530,7 +2533,15 @@ namespace Game.Client
             bool dead = health <= 0;
             Animate(body, facing, deltaTime, dead);
             float scale = 1 + pulse * Mathf.Sin(Time.time * 30);
-            body.Shape.transform.localScale = new Vector3(1, scale, 1);
+            // One pixel of squash and stretch (Docs/Feel.md, 2026-11-11, the research report's candidate 22): squat and
+            // wide for a moment when struck, tall and narrow while leaning into a blow. A pixel of a 16-pixel body.
+            float squashX = 1, squashY = 1;
+            if (Feel.Squash && !dead)
+            {
+                if (body.HurtTime > HurtSeconds - SquashSeconds) (squashX, squashY) = (1 + OnePixel, 1 - OnePixel);
+                else if (body.LungeTime > 0) (squashX, squashY) = (1 - OnePixel, 1 + OnePixel);
+            }
+            body.Shape.transform.localScale = new Vector3(squashX, scale * squashY, 1);
             // Leaning into an attack: out and back along its direction.
             if (!Feel.Lunge) body.LungeTime = 0;
             if (!Feel.Knock) body.KnockTime = 0;

@@ -30,6 +30,8 @@ namespace Game.Client
         public static bool HurtGlow = true;
         // Bits fly out of what dies.
         public static bool Bits = true;
+        // A pixel of squash when struck, of stretch while lunging (2026-11-11).
+        public static bool Squash = true;
 
         static readonly Dictionary<string, Action<bool>> Switches = new Dictionary<string, Action<bool>>
         {
@@ -43,6 +45,7 @@ namespace Game.Client
             ["hitstop"] = on => HitStop = on,
             ["hurtglow"] = on => HurtGlow = on,
             ["bits"] = on => Bits = on,
+            ["squash"] = on => Squash = on,
         };
 
         public static IEnumerable<string> Names => Switches.Keys;
@@ -64,7 +67,7 @@ namespace Game.Client
         public static string Off => string.Join(" ", new (string Name, bool On)[]
         {
             ("lunge", Lunge), ("swing", Swing), ("flash", Flash), ("knock", Knock), ("impact", Impact), ("numbers", Numbers),
-            ("shake", Shake), ("hitstop", HitStop), ("hurtglow", HurtGlow), ("bits", Bits),
+            ("shake", Shake), ("hitstop", HitStop), ("hurtglow", HurtGlow), ("bits", Bits), ("squash", Squash),
         }.Where(p => !p.On).Select(p => p.Name));
     }
 }

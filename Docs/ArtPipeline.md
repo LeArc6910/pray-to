@@ -185,3 +185,13 @@ AI 생성 도구로 아트와 사운드를 만드는 방안을 조사한 결과�
 - Stability: https://docs.stability.ai/pricing
 - Suno: https://www.digitalmusicnews.com/2026/07/03/suno-is-opening-an-api-partner-program/
 - Steam: https://partner.steamgames.com/doc/gettingstarted/contentsurvey, https://videogameschronicle.com/news/valve-has-significantly-rewritten-steams-rules-for-how-developers-much-disclose-ai-use
+
+## 그림 검사 (2026-11-11)
+
+조사 보고서 후보 21. `dotnet run --project DevTools/ArtPreview`가 그림을 그린 뒤 코드로 그릴 때 생기기 쉬운 실수를 센다(`DevTools/ArtPreview/ArtLint.cs`). 결과는 `out/lint.md`.
+
+- **외딴 픽셀**: 둘레 여덟 칸에 아무것도 없는 픽셀. 16px에서는 잡티로 보인다
+- **색이 너무 많은 그림**: 한 그림에 16색 넘게. 램프 몇 개로 충분해야 한다
+- **흔들리는 실루엣**: 반복 움직임(플레이어 걷기, 몬스터 숨쉬기)에서 한 프레임과 다음 프레임의 모양이 40% 넘게 다르다. 움직임이 아니라 떨림으로 보인다
+- 처음 잰 값(2026-11-11): 외딴 픽셀 0, 16색 넘는 그림 1(수확기 재료 그림 17색), 흔들리는 움직임 6(박쥐 셋의 날갯짓, 일부러 크게 움직인다). `DevTools/ArtPreview/lint-baseline.txt`에 적었고, **수가 늘면 실패한다**(그래서 CI의 `art-preview`도 실패한다). 줄였으면 그 파일의 수를 낮춘다
+- 램프 밖 색(색조를 옮긴 램프에서 벗어난 색)은 아직 세지 않는다. 색 수 검사로 대신한다

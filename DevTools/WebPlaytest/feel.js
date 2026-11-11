@@ -35,6 +35,7 @@ const Variants = [
   ['no-knock', '밀림·내밀기 끔', ['knock', 'lunge']],
   ['no-numbers', '숫자 끔', ['numbers']],
   ['no-swing', '휘두름 호 끔', ['swing']],
+  ['no-squash', '찌그러짐 끔', ['squash']],
   ['all-off', '모두 끔', ['all']],
 ];
 const StrikeSeconds = 3.2;

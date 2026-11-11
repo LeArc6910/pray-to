@@ -84,6 +84,8 @@ namespace Game.Client
             var effects = Effects(out bool effectsFine);
             Save(effects, Path.Combine(output, "effects.png"), 3);
             if (!effectsFine) return 1;
+            // The pixel slips the eye misses at sheet size (ArtLint): fails only when a count goes up.
+            if (!ArtLint.Run(loot, monsters, FindFolder(Path.Combine("DevTools", "ArtPreview")), output)) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
             if (!WriteSkillSounds(Path.Combine(output, "sounds", "skills"), classes)) return 1;
             if (!WriteMusic(Path.Combine(output, "music"))) return 1;
