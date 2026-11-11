@@ -336,6 +336,7 @@ namespace Game.Client
         {
             foreach (var cell in _scarecrows)
             {
+                if (!Shown(cell.x, cell.y)) continue;
                 float degrees = Mathf.Sin(Time.time * 1.7f + cell.x * 0.9f + cell.y * 0.4f) * 6;
                 var sway = Matrix4x4.Translate(new Vector3(0, -0.45f, 0)) * Matrix4x4.Rotate(Quaternion.Euler(0, 0, degrees)) * Matrix4x4.Translate(new Vector3(0, 0.45f, 0));
                 _objects.SetTileFlags(cell, TileFlags.None);
@@ -476,6 +477,7 @@ namespace Game.Client
             _self.Sleeping = _client.Sleeping;
             DrawPet(_client.PlayerId, _self, _client.Pet, deltaTime);
             Footsteps(_self.Position - _self.LastPosition);
+            StreamChunks(_self.Position);
             int selfBuffs = 0;
             for (int slot = 0; slot < _client.Skills.Count; slot++)
             {
@@ -1579,7 +1581,7 @@ namespace Game.Client
             {
                 _openDoors.Remove(key);
                 var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
-                if (!TileMap.IsDoor(map[cell.x, cell.y])) continue;
+                if (!TileMap.IsDoor(map[cell.x, cell.y]) || !Shown(cell.x, cell.y)) continue;
                 _objects.SetTile(cell, Sprites.Object(map[cell.x, cell.y]));
                 Hear(Sound.DoorShut, cell + new Vector3(0.5f, 0.5f, 0));
             }
@@ -2954,22 +2956,65 @@ namespace Game.Client
             _underlay = AddTilemap(grid.transform, "Underlay", -95);
             _objects = AddTilemap(grid.transform, "Objects", -90);
 
-            var ground = new TileBase[map.Width * map.Height];
-            var corners = new TileBase[map.Width * map.Height];
-            var underlay = new TileBase[map.Width * map.Height];
-            var objects = new TileBase[map.Width * map.Height];
             for (int y = 0; y < map.Height; y++)
-            {
                 for (int x = 0; x < map.Width; x++)
-                {
-                    ground[y * map.Width + x] = GroundAt(x, y);
-                    corners[y * map.Width + x] = CornersAt(x, y);
-                    underlay[y * map.Width + x] = UnderlayAt(x, y);
-                    objects[y * map.Width + x] = ObjectTileAt(map, x, y);
                     if (map[x, y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(x, y, 0));
+            StreamChunks(new Vector2(client.Position.X, client.Position.Y));
+        }
+
+        // The tilemaps hold only the chunks round the player (2026-11-12: the game's map is 1024 tiles across, a
+        // million tiles a layer, too many for a browser to hold at once): those within ChunkReach chunks are laid, and
+        // those that fall more than a chunk further away are cleared. A chunk is laid from the map as it is then, so a
+        // tile that changed while its chunk was away is drawn right when it comes back.
+        const int ChunkSize = 32, ChunkReach = 2;
+        readonly HashSet<(int X, int Y)> _chunks = new HashSet<(int X, int Y)>();
+        readonly List<(int X, int Y)> _chunksGone = new List<(int X, int Y)>();
+
+        bool Shown(int x, int y) => _chunks.Contains((x / ChunkSize, y / ChunkSize));
+
+        void StreamChunks(Vector2 at)
+        {
+            var map = _client.Map;
+            int cx = Mathf.FloorToInt(at.x) / ChunkSize, cy = Mathf.FloorToInt(at.y) / ChunkSize;
+            int across = (map.Width + ChunkSize - 1) / ChunkSize, up = (map.Height + ChunkSize - 1) / ChunkSize;
+            for (int y = cy - ChunkReach; y <= cy + ChunkReach; y++)
+                for (int x = cx - ChunkReach; x <= cx + ChunkReach; x++)
+                    if (x >= 0 && y >= 0 && x < across && y < up && _chunks.Add((x, y))) LayChunk(x, y, true);
+            _chunksGone.Clear();
+            foreach (var chunk in _chunks)
+                if (Mathf.Abs(chunk.X - cx) > ChunkReach + 1 || Mathf.Abs(chunk.Y - cy) > ChunkReach + 1) _chunksGone.Add(chunk);
+            foreach (var chunk in _chunksGone)
+            {
+                _chunks.Remove(chunk);
+                LayChunk(chunk.X, chunk.Y, false);
+            }
+        }
+
+        // Lays a chunk's tiles on all four tilemaps, or clears them.
+        void LayChunk(int chunkX, int chunkY, bool lay)
+        {
+            var map = _client.Map;
+            int x0 = chunkX * ChunkSize, y0 = chunkY * ChunkSize;
+            int w = Mathf.Min(ChunkSize, map.Width - x0), h = Mathf.Min(ChunkSize, map.Height - y0);
+            var ground = new TileBase[w * h];
+            var corners = new TileBase[w * h];
+            var underlay = new TileBase[w * h];
+            var objects = new TileBase[w * h];
+            if (lay)
+            {
+                for (int y = 0; y < h; y++)
+                {
+                    for (int x = 0; x < w; x++)
+                    {
+                        int i = y * w + x;
+                        ground[i] = GroundAt(x0 + x, y0 + y);
+                        corners[i] = CornersAt(x0 + x, y0 + y);
+                        underlay[i] = UnderlayAt(x0 + x, y0 + y);
+                        objects[i] = ObjectTileAt(map, x0 + x, y0 + y);
+                    }
                 }
             }
-            var bounds = new BoundsInt(0, 0, 0, map.Width, map.Height, 1);
+            var bounds = new BoundsInt(x0, y0, 0, w, h, 1);
             _ground.SetTilesBlock(bounds, ground);
             _corners.SetTilesBlock(bounds, corners);
             _underlay.SetTilesBlock(bounds, underlay);
@@ -3082,7 +3127,7 @@ namespace Game.Client
                     Object.Destroy(crack.gameObject);
                     _cracks.Remove(key);
                 }
-                _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTileAt(map, change.X, change.Y));
+                if (Shown(change.X, change.Y)) _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTileAt(map, change.X, change.Y));
                 if (map[change.X, change.Y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(change.X, change.Y, 0));
                 else _scarecrows.Remove(new Vector3Int(change.X, change.Y, 0));
                 // The corners round by the neighbours and take the ground beside, which itself depends on its neighbours.
@@ -3090,7 +3135,7 @@ namespace Game.Client
                 {
                     for (int dx = -2; dx <= 2; dx++)
                     {
-                        if (map.InBounds(change.X + dx, change.Y + dy))
+                        if (map.InBounds(change.X + dx, change.Y + dy) && Shown(change.X + dx, change.Y + dy))
                             _corners.SetTile(new Vector3Int(change.X + dx, change.Y + dy, 0), CornersAt(change.X + dx, change.Y + dy));
                     }
                 }
@@ -3098,7 +3143,7 @@ namespace Game.Client
                 {
                     int x = change.X + dx;
                     int y = change.Y + dy;
-                    if (!map.InBounds(x, y)) continue;
+                    if (!map.InBounds(x, y) || !Shown(x, y)) continue;
                     _ground.SetTile(new Vector3Int(x, y, 0), GroundAt(x, y));
                     _underlay.SetTile(new Vector3Int(x, y, 0), UnderlayAt(x, y));
                     // A road beside it may gain or lose a kerb.

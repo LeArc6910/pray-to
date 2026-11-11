@@ -102,6 +102,18 @@ namespace Game.Core.Tests
             var field = new FlowField(world.Map);
             field.Build(new[] { world.Spawn }, int.MaxValue - 1);
             foreach (var site in world.Places) Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(site.X, site.Y), $"seed {seed}: {site.Definition.Id}");
+            // Small places along the roads between them (2026-11-12, CarveLandmarks), each walked into from the spawn.
+            Assert.GreaterOrEqual(world.Landmarks.Count, 8, $"seed {seed}: landmarks");
+            int r = WorldGenerator.LandmarkRadius;
+            foreach (var landmark in world.Landmarks)
+            {
+                bool reached = false;
+                for (int y = landmark.Y - r; y <= landmark.Y + r && !reached; y++)
+                    for (int x = landmark.X - r; x <= landmark.X + r && !reached; x++)
+                        reached = !world.Map.IsSolid(x, y) && field.DistanceAt(x, y) != FlowField.Unreached;
+                Assert.IsTrue(reached, $"seed {seed}: the {landmark.Style} at {landmark.X},{landmark.Y} cannot be walked to");
+                Assert.IsTrue(world.Places.All(p => Vec2.Distance(p.Center, landmark.Center) > p.Radius + r), $"seed {seed}: the {landmark.Style} is in a place");
+            }
         }
 
         // Shops (2026-11-11, the owner: the merchants each in a shop of their own, not in the street): on the game's
@@ -199,7 +211,9 @@ namespace Game.Core.Tests
         {
             var world = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
             var map = world.Map;
-            bool InPlace(int x, int y) => world.Places.Any(p => (x - p.X) * (x - p.X) + (y - p.Y) * (y - p.Y) <= p.Radius * p.Radius);
+            // The small places by the roads (2026-11-12, CarveLandmarks) have their own campfires and are not road dressing.
+            bool InPlace(int x, int y) => world.Places.Any(p => (x - p.X) * (x - p.X) + (y - p.Y) * (y - p.Y) <= p.Radius * p.Radius)
+                || world.Landmarks.Any(l => (x - l.X) * (x - l.X) + (y - l.Y) * (y - l.Y) <= (WorldGenerator.LandmarkRadius + 1) * (WorldGenerator.LandmarkRadius + 1));
             int lamps = 0, signs = 0, rests = 0;
             var dressed = new List<(int X, int Y)>();
             for (int y = 0; y < map.Height; y++)

@@ -57,6 +57,8 @@ namespace Game.Core
         public BiomeMap Biomes { get; }
         // The places of the story (Docs/Story.md), in sheet order; none when made without the sheets.
         public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
+        // The small places along the roads (CarveLandmarks); none without the story sheets.
+        public IReadOnlyList<Landmark> Landmarks { get; internal set; } = new List<Landmark>();
         // The signposts by the roads (2026-11-11) and the place each points to along its road, for the screen.
         public IReadOnlyList<(int X, int Y, PlaceDefinition Toward)> Signposts => _signposts;
         readonly List<(int X, int Y, PlaceDefinition Toward)> _signposts = new List<(int, int, PlaceDefinition)>();
@@ -65,6 +67,22 @@ namespace Game.Core
 
     // Where a place was carved: its middle (the waypoint), its plaza's radius, where its people stand at home, and the
     // spots each walks between by day.
+    // A small place by a road (WorldGenerator.CarveLandmarks): a camp, ruins, a shrine, a hamlet or an outpost.
+    public sealed class Landmark
+    {
+        public Landmark(int x, int y, string style)
+        {
+            X = x;
+            Y = y;
+            Style = style;
+        }
+
+        public int X { get; }
+        public int Y { get; }
+        public string Style { get; }
+        public Vec2 Center => TileMap.Center(X, Y);
+    }
+
     public sealed class PlaceSite
     {
         internal PlaceSite(PlaceDefinition definition, int x, int y, IReadOnlyList<(CharacterDefinition Character, Vec2 At)> people,
@@ -148,7 +166,7 @@ namespace Game.Core
         // The map the game makes (2026-11-11, the owner: "the map is too small; the waypoints at least 200 tiles
         // apart"). Tests and most sims keep DefaultSize; every distance and count below was set for it and grows with
         // ScaleOf.
-        public const int GameSize = 512;
+        public const int GameSize = 1024;
 
         // How many times DefaultSize the map is across (1 for it or smaller).
         public static int ScaleOf(int width, int height) => Math.Max(1, Math.Min(width, height) / DefaultSize);
@@ -222,6 +240,23 @@ namespace Game.Core
             (-500, -866), (-259, -966), (0, -1000), (259, -966), (500, -866), (707, -707), (866, -500), (966, -259),
         };
 
+        // Seventy-two ways round, every 5 degrees, as thousandths (integers only, so every machine carves the same).
+        static readonly (int X, int Y)[] Ways72 =
+        {
+            (1000, 0), (996, 87), (985, 174), (966, 259), (940, 342), (906, 423), (866, 500), (819, 574), (766, 643),
+            (707, 707), (643, 766), (574, 819), (500, 866), (423, 906), (342, 940), (259, 966), (174, 985), (87, 996), (0,
+            1000), (-87, 996), (-174, 985), (-259, 966), (-342, 940), (-423, 906), (-500, 866), (-574, 819), (-643, 766),
+            (-707, 707), (-766, 643), (-819, 574), (-866, 500), (-906, 423), (-940, 342), (-966, 259), (-985, 174), (-996,
+            87), (-1000, 0), (-996, -87), (-985, -174), (-966, -259), (-940, -342), (-906, -423), (-866, -500), (-819,
+            -574), (-766, -643), (-707, -707), (-643, -766), (-574, -819), (-500, -866), (-423, -906), (-342, -940),
+            (-259, -966), (-174, -985), (-87, -996), (0, -1000), (87, -996), (174, -985), (259, -966), (342, -940), (423,
+            -906), (500, -866), (574, -819), (643, -766), (707, -707), (766, -643), (819, -574), (866, -500), (906, -423),
+            (940, -342), (966, -259), (985, -174), (996, -87)
+        };
+
+        // How far apart the places of the story stand at least, on the game's map (scaled for smaller maps).
+        public const int MinPlaceGap = 200;
+
         public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null)
         {
             var world = GenerateCaves(seed, width, height);
@@ -241,71 +276,75 @@ namespace Game.Core
             var arenas = world.Arenas.Select(a => (X: TileMap.Cell(a.X), Y: TileMap.Cell(a.Y))).ToList();
             var spots = new List<(PlaceDefinition Place, int X, int Y)>();
             int Square(int dx, int dy) => dx * dx + dy * dy;
-            // The places away from the spawn stand on evenly spaced slots round it (2026-11-11, the owner: waypoints at
-            // least 200 tiles apart): with six of them at 240 tiles on a 512 map, each is 240 from the spawn and from
-            // the slots beside it. Distances in places.csv are for GameSize and shrink with smaller maps.
+            // The places branch out from the spawn along the roads (2026-11-12, the owner: "a vast map like Diablo; the
+            // places far apart along big roads, small places between, not near and even"): each stands its places.csv
+            // distance from the place its road comes from, heading on outward the way that road was going (the village's
+            // own roads spread round it), turned and pulled in as little as it must to keep clear of the map's edge, the
+            // arenas and the other places (MinPlaceGap apart). Distances are for GameSize and shrink with smaller maps.
             int size = System.Math.Min(map.Width, map.Height);
-            var ringPlaces = story.Places.Count(p => p.Distance > 0);
-            int step = System.Math.Max(1, Ways.Length / System.Math.Max(1, ringPlaces));
-            // A place's distance, never so far that the plaza would run off the map.
-            int DistanceOf(PlaceDefinition place) => System.Math.Min(place.Distance * size / GameSize, size / 2 - place.Radius - 6);
-            (int X, int Y) SlotAt(int slot, PlaceDefinition place) => (
-                Clamp(world.SpawnX + Ways[slot].X * DistanceOf(place) / 1000, place.Radius + 3, map.Width - place.Radius - 4),
-                Clamp(world.SpawnY + Ways[slot].Y * DistanceOf(place) / 1000, place.Radius + 3, map.Height - place.Radius - 4));
+            int gap = MinPlaceGap * size / GameSize;
             bool ClearOfArenas((int X, int Y) at, int radius) =>
                 arenas.All(a => Square(at.X - a.X, at.Y - a.Y) >= (ArenaRadius + radius + 3) * (ArenaRadius + radius + 3));
-            // The ring turned whichever way leaves the fewest slots on an arena (a random one among the best).
-            var ring = story.Places.Where(p => p.Distance > 0).ToList();
-            int Crowded(int turn) => Enumerable.Range(0, ringPlaces).Count(i => ring.Count > 0 && !ClearOfArenas(SlotAt((turn + i * step) % Ways.Length, ring[0]), ring.Max(p => p.Radius)));
-            int leastCrowded = Enumerable.Range(0, step).Min(Crowded);
-            var turns = Enumerable.Range(0, step).Where(t => Crowded(t) == leastCrowded).ToList();
-            int rotation = turns[random.Next(turns.Count)];
-            var freeSlots = Enumerable.Range(0, ringPlaces).Select(i => (rotation + i * step) % Ways.Length).ToList();
+            int Heading(int dx, int dy)
+            {
+                int bestWay = 0;
+                long bestDot = long.MinValue;
+                for (int w = 0; w < Ways72.Length; w++)
+                {
+                    long dot = (long)Ways72[w].X * dx + (long)Ways72[w].Y * dy;
+                    if (dot > bestDot)
+                    {
+                        bestDot = dot;
+                        bestWay = w;
+                    }
+                }
+                return bestWay;
+            }
+            var rootPlaces = story.Places.Where(p => p.Distance > 0 && (p.Road.Length == 0 || story.Places.Any(q => q.Id == p.Road && q.Distance == 0))).ToList();
+            int rootTurn = random.Next(Ways72.Length);
+            var children = new Dictionary<string, int>();
             foreach (var place in story.Places)
             {
                 int r = place.Radius;
                 int cx = world.SpawnX, cy = world.SpawnY;
-                if (place.Distance > 0 && freeSlots.Count > 0)
+                if (place.Distance > 0)
                 {
                     var from = spots.FirstOrDefault(s => s.Place.Id == place.Road);
-                    int fromX = from.Place != null ? from.X : world.SpawnX, fromY = from.Place != null ? from.Y : world.SpawnY;
-                    // The free slot nearest where its road comes from, as far out as it is clear of the arenas and the
-                    // places before it (pulled in at most a sixth, so the ring stays wide); if no slot is clear, any way
-                    // round at any distance clear of them, as on the small maps of the tests.
-                    int full = DistanceOf(place);
-                    bool Clear(int x, int y) => ClearOfArenas((x, y), r)
-                        && spots.All(s => Square(x - s.X, y - s.Y) >= (s.Place.Radius + r + 4) * (s.Place.Radius + r + 4));
-                    (int X, int Y) At(int way, int distance) => (
-                        Clamp(world.SpawnX + Ways[way].X * distance / 1000, r + 3, map.Width - r - 4),
-                        Clamp(world.SpawnY + Ways[way].Y * distance / 1000, r + 3, map.Height - r - 4));
-                    int bestSlot = -1;
-                    long bestScore = long.MaxValue;
-                    (int X, int Y) best = SlotAt(freeSlots[0], place);
-                    void Try(IEnumerable<int> ways, int nearest, bool slot)
-                    {
-                        foreach (int way in ways)
-                            for (int distance = full; distance >= nearest; distance -= 2)
+                    bool root = from.Place == null || from.Place.Distance == 0;
+                    int fromX = root ? world.SpawnX : from.X, fromY = root ? world.SpawnY : from.Y;
+                    int sibling = children.TryGetValue(place.Road, out int n) ? n : 0;
+                    children[place.Road] = sibling + 1;
+                    int heading = root
+                        ? (rootTurn + rootPlaces.IndexOf(place) * Ways72.Length / System.Math.Max(1, rootPlaces.Count) + random.Next(5) - 2 + Ways72.Length) % Ways72.Length
+                        : (Heading(fromX - world.SpawnX, fromY - world.SpawnY) + (sibling % 2 == 0 ? 1 : -1) * (2 + random.Next(5)) + Ways72.Length) % Ways72.Length;
+                    int full = System.Math.Max(r + 25, place.Distance * size / GameSize);
+                    // Clear of the map's edge by a twentieth of it, so a far place does not hug the rim.
+                    int rim = r + 3 + size / 20;
+                    bool Fits(int x, int y) => x >= rim && y >= rim && x < map.Width - rim && y < map.Height - rim;
+                    bool Clear(int x, int y, int apart) => Fits(x, y) && ClearOfArenas((x, y), r)
+                        && spots.All(s => Square(x - s.X, y - s.Y) >= System.Math.Max(apart, s.Place.Radius + r + 4) * System.Math.Max(apart, s.Place.Radius + r + 4));
+                    (int X, int Y)? found = null;
+                    // Turned up to all the way round and pulled in up to three fifths, nearest the heading first.
+                    for (int pull = 0; pull <= 6 && found == null; pull++)
+                        for (int turn = 0; turn <= 36 && found == null; turn++)
+                            foreach (int side in turn == 0 ? new[] { 0 } : new[] { 1, -1 })
                             {
-                                var (x, y) = At(way, distance);
-                                if (!Clear(x, y)) continue;
-                                long score = (long)Square(x - fromX, y - fromY) + (long)(full - distance) * 4096;
-                                if (score < bestScore)
-                                {
-                                    bestScore = score;
-                                    bestSlot = slot ? way : -1;
-                                    best = (x, y);
-                                }
+                                int way = (heading + side * turn + Ways72.Length) % Ways72.Length;
+                                int distance = full * (10 - pull) / 10;
+                                int x = fromX + Ways72[way].X * distance / 1000, y = fromY + Ways72[way].Y * distance / 1000;
+                                if (!Clear(x, y, gap)) continue;
+                                found = (x, y);
                                 break;
                             }
-                    }
-                    Try(freeSlots, full - full / 6, true);
-                    if (bestScore == long.MaxValue)
-                    {
-                        int start = random.Next(Ways.Length);
-                        Try(Enumerable.Range(0, Ways.Length).Select(w => (start + w) % Ways.Length), System.Math.Min(full, r + 25), false);
-                    }
-                    freeSlots.Remove(bestSlot >= 0 ? bestSlot : freeSlots.OrderBy(f => Square(SlotAt(f, place).X - best.X, SlotAt(f, place).Y - best.Y)).First());
-                    (cx, cy) = best;
+                    // Failing that (the small maps of the tests), any way round the spawn clear of the rest.
+                    for (int distance = full; distance >= r + 12 && found == null; distance -= 2)
+                        for (int way = 0; way < Ways72.Length && found == null; way++)
+                        {
+                            int x = world.SpawnX + Ways72[(way + rootTurn) % Ways72.Length].X * distance / 1000;
+                            int y = world.SpawnY + Ways72[(way + rootTurn) % Ways72.Length].Y * distance / 1000;
+                            if (Clear(x, y, 0)) found = (x, y);
+                        }
+                    (cx, cy) = found ?? (Clamp(fromX + Ways72[heading].X * full / 1000, r + 3, map.Width - r - 4), Clamp(fromY + Ways72[heading].Y * full / 1000, r + 3, map.Height - r - 4));
                 }
                 for (int y = cy - r; y <= cy + r; y++)
                 {
@@ -325,15 +364,28 @@ namespace Game.Core
             {
                 var from = spots.FirstOrDefault(s => s.Place.Id == spot.Place.Road);
                 if (from.Place == null || from.Place == spot.Place) continue;
+                // A road that wanders (2026-11-12): through a bend every 60 tiles or so, each pushed off the straight
+                // line by up to a seventh of the road's length; of six such, the one over the fewest arena tiles.
                 List<(int X, int Y)> path = null;
                 int fewest = int.MaxValue;
-                foreach (int bend in new[] { 0, 250, -250, 450, -450 })
+                int length = (int)System.Math.Sqrt(Square(spot.X - from.X, spot.Y - from.Y));
+                int bends = System.Math.Max(1, length / 60);
+                for (int attempt = 0; attempt < 6; attempt++)
                 {
-                    int midX = (from.X + spot.X) / 2 - (spot.Y - from.Y) * bend / 1000;
-                    int midY = (from.Y + spot.Y) / 2 + (spot.X - from.X) * bend / 1000;
-                    midX = Clamp(midX, 2, map.Width - 3);
-                    midY = Clamp(midY, 2, map.Height - 3);
-                    var line = Line(from.X, from.Y, midX, midY).Concat(Line(midX, midY, spot.X, spot.Y)).ToList();
+                    var line = new List<(int X, int Y)>();
+                    int lastX = from.X, lastY = from.Y;
+                    for (int k = 1; k <= bends + 1; k++)
+                    {
+                        int px = from.X + (spot.X - from.X) * k / (bends + 1), py = from.Y + (spot.Y - from.Y) * k / (bends + 1);
+                        if (k <= bends)
+                        {
+                            int push = length > 0 ? (random.Next(2 * length / 7 + 1) - length / 7) : 0;
+                            px = Clamp(px - (spot.Y - from.Y) * push / System.Math.Max(1, length), 2, map.Width - 3);
+                            py = Clamp(py + (spot.X - from.X) * push / System.Math.Max(1, length), 2, map.Height - 3);
+                        }
+                        line.AddRange(Line(lastX, lastY, px, py));
+                        (lastX, lastY) = (px, py);
+                    }
                     int crossed = ArenaTiles(line);
                     if (crossed < fewest)
                     {
@@ -364,7 +416,7 @@ namespace Game.Core
                 // Nearest the nest first, then furthest from where the road comes from.
                 (int X, int Y)? best = null;
                 int bestScore = int.MinValue;
-                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 30 && best == null; reach += 2)
+                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 60 && best == null; reach += 2)
                 {
                     foreach (var way in Ways)
                     {
@@ -525,6 +577,8 @@ namespace Game.Core
                 }
             }
 
+            world.Landmarks = CarveLandmarks(map, roads.Select(rd => rd.Path).ToList(), spots.Select(sp => (sp.X, sp.Y, sp.Place.Radius)).ToList(), arenas, new GameRandom(seed, LandmarkStream), size);
+
             var sites = new List<PlaceSite>();
             foreach (var (place, cx, cy) in spots)
             {
@@ -537,6 +591,124 @@ namespace Game.Core
             foreach (var site in sites.Where(s => s.Definition.Shops > 0))
                 site.Shops = CarveShops(map, site, spots.Select(p => (p.X, p.Y, p.Place.Radius)).ToList(), arenas);
             return sites;
+        }
+
+        // The small places along the roads between the places of the story (2026-11-12, the owner: "the big places far
+        // along big roads, and small places in between", as in Diablo): every LandmarkEvery tiles of road (scaled with
+        // the map), on one side of it or the other, a little clearing of radius LandmarkRadius joined to the road,
+        // dressed as one of the styles. Only where all of it and a tile round it is plain rock or floor clear of the
+        // places, the arenas and the other landmarks; where not, that one is skipped.
+        public const int LandmarkEvery = 110, LandmarkRadius = 4;
+        public static readonly string[] LandmarkStyles = { "camp", "ruins", "shrine", "hamlet", "outpost" };
+        const ulong LandmarkStream = 17;
+
+        static List<Landmark> CarveLandmarks(TileMap map, List<List<(int X, int Y)>> roads, List<(int X, int Y, int Radius)> places,
+            List<(int X, int Y)> arenas, GameRandom random, int size)
+        {
+            var landmarks = new List<Landmark>();
+            int every = System.Math.Max(40, LandmarkEvery * size / GameSize), r = LandmarkRadius;
+            int Square(int dx, int dy) => dx * dx + dy * dy;
+            bool Rock(TileType t) => t == TileType.Wall || t == TileType.Floor || t == TileType.CopperOre || t == TileType.IronOre
+                || t == TileType.MithrilOre || t == TileType.ObsidianOre || t == TileType.VoidOre;
+            bool Room(int cx, int cy)
+            {
+                if (places.Any(p => Square(cx - p.X, cy - p.Y) < (p.Radius + r + 10) * (p.Radius + r + 10))) return false;
+                if (arenas.Any(a => Square(cx - a.X, cy - a.Y) < (ArenaRadius + r + 4) * (ArenaRadius + r + 4))) return false;
+                if (landmarks.Any(l => Square(cx - l.X, cy - l.Y) < every * every / 4)) return false;
+                for (int y = cy - r - 1; y <= cy + r + 1; y++)
+                    for (int x = cx - r - 1; x <= cx + r + 1; x++)
+                        if (Square(x - cx, y - cy) <= (r + 1) * (r + 1) && (!IsInside(map, x, y) || !Rock(map[x, y]))) return false;
+                return true;
+            }
+            foreach (var path in roads)
+            {
+                int side = random.Next(2) == 0 ? 1 : -1;
+                for (int i = every / 2; i < path.Count - every / 3; i += every)
+                {
+                    var (px, py) = path[i];
+                    var (ax, ay) = path[System.Math.Max(0, i - 4)];
+                    var (bx, by) = path[System.Math.Min(path.Count - 1, i + 4)];
+                    int dx = bx - ax, dy = by - ay;
+                    int length = System.Math.Max(1, (int)System.Math.Sqrt(Square(dx, dy)));
+                    (int X, int Y)? at = null;
+                    foreach (int s in new[] { side, -side })
+                        foreach (int off in new[] { r + 4, r + 6, r + 8 })
+                        {
+                            if (at != null) break;
+                            int cx = px - s * dy * off / length, cy = py + s * dx * off / length;
+                            if (Room(cx, cy)) at = (cx, cy);
+                        }
+                    side = -side;
+                    if (at is not (int lx, int ly)) continue;
+                    string style = LandmarkStyles[random.Next(LandmarkStyles.Length)];
+                    var floor = style == "shrine" || style == "outpost" ? TileType.StoneFloor : TileType.Floor;
+                    for (int y = ly - r; y <= ly + r; y++)
+                        for (int x = lx - r; x <= lx + r; x++)
+                            if (Square(x - lx, y - ly) <= r * r) map[x, y] = floor;
+                    // A path to the road: from the clearing's edge straight to the road.
+                    foreach (var (tx, ty) in Line(lx, ly, px, py))
+                    {
+                        if (Structures.IsWay(map[tx, ty])) break;
+                        if (Square(tx - lx, ty - ly) > (r - 1) * (r - 1) && (Rock(map[tx, ty]) || map[tx, ty] == floor)) map[tx, ty] = TileType.Road;
+                    }
+                    bool Put(int dx2, int dy2, TileType type)
+                    {
+                        var (w, h) = Structures.Footprint(type);
+                        for (int j = 0; j < h; j++)
+                            for (int k = 0; k < w; k++)
+                            {
+                                int x = lx + dx2 + k, y = ly + dy2 + j;
+                                if (map[x, y] != floor || Square(x - lx, y - ly) > (r - 1) * (r - 1) + 1) return false;
+                            }
+                        for (int j = 0; j < h; j++)
+                            for (int k = 0; k < w; k++)
+                                map[lx + dx2 + k, ly + dy2 + j] = j == 0 && k == 0 ? type : TileType.StructurePart;
+                        return true;
+                    }
+                    switch (style)
+                    {
+                        case "camp":
+                            Put(0, 0, TileType.Campfire);
+                            Put(-2, 1, TileType.Tent);
+                            Put(2, 0, TileType.Bench);
+                            Put(1, 2, TileType.Woodpile);
+                            Put(-2, -2, TileType.Crates);
+                            Put(2, -2, TileType.Barrel);
+                            break;
+                        case "ruins":
+                            Put(-2, 2, TileType.BrokenPillar);
+                            Put(2, 2, TileType.BrokenPillar);
+                            Put(-2, -2, TileType.BrokenPillar);
+                            Put(2, -1, TileType.Rubble);
+                            Put(0, 2, TileType.Rubble);
+                            Put(-1, -3, TileType.FallenColumn);
+                            break;
+                        case "shrine":
+                            Put(0, 1, TileType.RuneStone);
+                            Put(-2, 1, TileType.Brazier);
+                            Put(2, 1, TileType.Brazier);
+                            Put(-1, -2, TileType.Flowerbed);
+                            Put(1, -2, TileType.Flowerbed);
+                            break;
+                        case "hamlet":
+                            Put(-3, 0, TileType.Cottage);
+                            Put(2, -1, TileType.Well);
+                            Put(2, 1, TileType.Barrel);
+                            Put(-2, -2, TileType.Woodpile);
+                            Put(0, -3, TileType.Hedge);
+                            break;
+                        default:
+                            Put(-2, 1, TileType.Lantern);
+                            Put(2, 1, TileType.Lantern);
+                            Put(-1, 2, TileType.Crates);
+                            Put(1, 2, TileType.Barrel);
+                            Put(0, -2, TileType.Totem);
+                            break;
+                    }
+                    landmarks.Add(new Landmark(lx, ly, style));
+                }
+            }
+            return landmarks;
         }
 
         // A shop: a timber room ShopWidth by ShopHeight outside (walls round a floor of the place's own paving, or
@@ -555,8 +727,9 @@ namespace Game.Core
             int Square(int dx, int dy) => dx * dx + dy * dy;
             bool Rock(TileType t) => t == TileType.Wall || t == TileType.Floor || t == TileType.CopperOre || t == TileType.IronOre
                 || t == TileType.MithrilOre || t == TileType.ObsidianOre || t == TileType.VoidOre;
+            // Outside the square round each plaza (its dressing is checked over that square).
             bool Bare(int x, int y, bool margin) => IsInside(map, x, y) && (Rock(map[x, y]) || margin && Structures.IsWay(map[x, y]))
-                && plazas.All(p => Square(x - p.X, y - p.Y) > (p.Radius + 1) * (p.Radius + 1))
+                && plazas.All(p => System.Math.Max(System.Math.Abs(x - p.X), System.Math.Abs(y - p.Y)) > p.Radius + 1)
                 && arenas.All(a => Square(x - a.X, y - a.Y) > (ArenaRadius + 2) * (ArenaRadius + 2));
             bool InThisPlaza(int x, int y) => Square(x - cx, y - cy) <= r * r;
             var floor = TileMap.IsPaving(site.Definition.Floor) ? site.Definition.Floor : TileType.StoneFloor;
@@ -828,7 +1001,7 @@ namespace Game.Core
                     foreach (int dy in new[] { -5, -2, 2 })
                         PutSmall(TileType.Pillar, (3, dy), (3, dy + 1), (3, dy - 1), (4, dy), (2, dy), (4, dy + 1), (4, dy - 1), (2, dy + 1), (2, dy - 1));
                     PutSmall(TileType.Statue, (2, -r + 3), (3, -r + 3), (2, -r + 4), (3, -r + 4), (4, -r + 4), (4, -r + 5), (5, -r + 5));
-                    var basins = new[] { (5, -3), (5, -5), (5, 1), (4, 5) };
+                    var basins = new[] { (5, -3), (5, -5), (5, 1), (4, 5), (6, -1), (4, -1), (4, 3), (3, -6), (6, 2) };
                     PutPair(TileType.BigFountain, true, basins);
                     PutRow(TileType.Hedge, new[] { (6, 1), (7, 1) }, (0, 0), (0, 1), (0, -1), (0, 2), (0, -2), (-1, 3));
                     PutSmall(TileType.RoyalBanner, (5, 4), (4, 4), (6, 4), (5, 5), (5, 3));
