@@ -66,6 +66,8 @@ namespace Game.Client
             foreach (var site in storyWorld.Places) Save(Place(storyWorld, site, lights), Path.Combine(pieces, $"place_{site.Definition.Id}.png"), 3);
             // A road between places with its lamps, signposts and rest spot (2026-11-11).
             Save(RoadView(storyWorld, lights), Path.Combine(pieces, "road.png"), 3);
+            // Square cave corners beside rounded ones, for a person to judge (Corners, 2026-11-11).
+            Save(Corners.Compare(), Path.Combine(pieces, "corners_compare.png"), 3);
             Save(Players(), Path.Combine(output, "player.png"), 6);
             Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
             Motions.Write(Path.Combine(output, "anim"), loot, monsters, npcs);

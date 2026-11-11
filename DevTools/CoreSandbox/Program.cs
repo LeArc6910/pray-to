@@ -26,6 +26,7 @@ namespace CoreSandbox
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
     // dotnet run -- --hour [minutes] [seed,seed,...]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
     // dotnet run -- --supply                          which system supplies which, from the sheets (Docs/Systems.md)
+    // dotnet run -- --flow [seeds]                    steps from the spawn to the first veins, arena and places (Docs/WorldFlow.md)
     static class Program
     {
         static void Main(string[] args)
@@ -136,6 +137,14 @@ namespace CoreSandbox
                     break;
                 case "--economy":
                     EconomySim.Run(data, LoadTiles(data), LoadNpcs(data));
+                    break;
+                case "--flow":
+                    string flowFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Story"));
+                    string FlowFile(string file) => File.ReadAllText(Path.Combine(flowFolder, file));
+                    var flowMonsters = LoadMonsters();
+                    var flowStory = StorySheet.Parse(FlowFile(StorySheet.PlacesFile), FlowFile(StorySheet.CharactersFile), FlowFile(StorySheet.StoryFile), data, LoadBosses(flowMonsters));
+                    var seedList = args.Length > 1 && !args[1].StartsWith("--") ? args[1].Split(',').Select(ulong.Parse) : Enumerable.Range(1, 12).Select(i => (ulong)i);
+                    FlowSim.Run(flowStory, seedList);
                     break;
                 case "--supply":
                     var supplyMonsters = LoadMonsters();

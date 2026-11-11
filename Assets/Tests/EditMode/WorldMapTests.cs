@@ -41,6 +41,49 @@ namespace Game.Core.Tests
             Assert.That(floor / (double)(map.Width * map.Height), Is.InRange(0.25, 0.75));
         }
 
+        // The way a new world leads (Docs/WorldFlow.md, 2026-11-11, the research report's candidate 24): from the
+        // spawn, on foot and without digging, a copper vein close by, the first boss's arena not far, and every place
+        // of the story reachable, whatever the seed. CoreSandbox --flow prints the same steps.
+        [Test]
+        public void EverySeedLeadsFromCopperToTheArenaAndEveryPlace()
+        {
+            for (ulong seed = 1; seed <= 8; seed++)
+            {
+                var world = WorldGenerator.Generate(seed, story: Tales.Shipped);
+                var map = world.Map;
+                var steps = new int[map.Width * map.Height];
+                for (int i = 0; i < steps.Length; i++) steps[i] = -1;
+                var queue = new System.Collections.Generic.Queue<(int X, int Y)>();
+                steps[world.SpawnY * map.Width + world.SpawnX] = 0;
+                queue.Enqueue((world.SpawnX, world.SpawnY));
+                var ways = new[] { (1, 0), (-1, 0), (0, 1), (0, -1) };
+                while (queue.Count > 0)
+                {
+                    var (x, y) = queue.Dequeue();
+                    foreach (var (dx, dy) in ways)
+                    {
+                        int nx = x + dx, ny = y + dy;
+                        if (!map.InBounds(nx, ny) || steps[ny * map.Width + nx] >= 0 || map.IsSolid(nx, ny)
+                            || map[nx, ny] == TileType.Water || map[nx, ny] == TileType.Lava) continue;
+                        steps[ny * map.Width + nx] = steps[y * map.Width + x] + 1;
+                        queue.Enqueue((nx, ny));
+                    }
+                }
+                int At(int x, int y) => map.InBounds(x, y) ? steps[y * map.Width + x] : -1;
+                int copper = int.MaxValue;
+                for (int y = 0; y < map.Height; y++)
+                    for (int x = 0; x < map.Width; x++)
+                        if (map[x, y] == TileType.CopperOre)
+                            foreach (var (dx, dy) in ways)
+                                if (At(x + dx, y + dy) >= 0) copper = System.Math.Min(copper, At(x + dx, y + dy));
+                Assert.LessOrEqual(copper, 35, $"seed {seed}: a copper vein within a short walk");
+                int arena = At(world.ArenaX, world.ArenaY);
+                Assert.That(arena, Is.InRange(0, 60), $"seed {seed}: the first arena on foot");
+                foreach (var site in world.Places)
+                    Assert.GreaterOrEqual(At(site.X, site.Y - 2), 0, $"seed {seed}: {site.Definition.Id} on foot");
+            }
+        }
+
         [TestCase(1UL)]
         [TestCase(2UL)]
         [TestCase(3UL)]
