@@ -261,30 +261,38 @@ namespace Game.Client
             ['p'] = Rgba.Hex("#A8243A"),
         };
 
-        static readonly PixelImage Potion = PixelImage.FromRows(PotionColors,
-            "...cc...",
-            "...gg...",
-            "...gg...",
-            "..gRRg..",
-            ".gRwRRg.",
-            ".gRRRRg.",
-            ".gRRRpg.",
-            "..gppg..").Outlined(Outline);
+        // A stoppered jar with a heart on it (Ninja Adventure's life pot, CC0, 2026-11-11, Docs/ArtSources.md).
+        static readonly string[] HeartJar =
+        {
+            "..ooooo..",
+            ".occccco.",
+            "ogRRRRRgo",
+            "ogggggggo",
+            ".og...go.",
+            "ogRR.RRgo",
+            "ogRRRRRgo",
+            "og.RRR.go",
+            "og..R..go",
+            "ogggggggo",
+            ".ooooooo.",
+        };
 
-        // The same flask, filled blue.
+        static readonly PixelImage Potion = PixelImage.FromRows(new Dictionary<char, Rgba>(PotionColors)
+            {
+                ['o'] = Rgba.Hex("#15100E"),
+                ['c'] = Rgba.Hex("#FFAD5D"),
+                ['g'] = Rgba.Hex("#F2EAF1"),
+                ['R'] = Rgba.Hex("#E8485A"),
+            }, HeartJar);
+
+        // The same jar with a blue heart.
         static readonly PixelImage ManaPotion = PixelImage.FromRows(new Dictionary<char, Rgba>(PotionColors)
             {
+                ['o'] = Rgba.Hex("#15100E"),
+                ['c'] = Rgba.Hex("#FFAD5D"),
+                ['g'] = Rgba.Hex("#F2EAF1"),
                 ['R'] = Rgba.Hex("#4A7CE8"),
-                ['p'] = Rgba.Hex("#2A3FA0"),
-            },
-            "...cc...",
-            "...gg...",
-            "...gg...",
-            "..gRRg..",
-            ".gRwRRg.",
-            ".gRRRRg.",
-            ".gRRRpg.",
-            "..gppg..").Outlined(Outline);
+            }, HeartJar);
 
         static readonly Dictionary<char, Rgba> FoodColors = new Dictionary<char, Rgba>(Common)
         {
@@ -339,17 +347,30 @@ namespace Game.Client
             "...bbbb...",
         };
 
-        // A rolled scroll tied with a blue ribbon.
-        static readonly PixelImage RecallScroll = PixelImage.FromRows(BowlColors,
-            "..bbbbbb..",
-            ".bLLLLLLb.",
-            ".bLMmMMLb.",
-            ".bLLLLLLb.",
-            ".bLMMmMLb.",
-            "..bbwwbb..",
-            ".bLLLLLLb.",
-            ".bLMmMMLb.",
-            "..bbbbbb..").Outlined(Outline);
+        // A rolled scroll (Ninja Adventure, pixel-boy and AAA, CC0, 2026-11-11, Docs/ArtSources.md).
+        static readonly PixelImage RecallScroll = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['o'] = Rgba.Hex("#15100E"),
+                ['a'] = Rgba.Hex("#F2EAF1"),
+                ['b'] = Rgba.Hex("#EECF9B"),
+                ['c'] = Rgba.Hex("#FFAD5D"),
+                ['e'] = Rgba.Hex("#D2B37D"),
+                ['f'] = Rgba.Hex("#E66A3A"),
+            },
+            "........o.oo..",
+            ".......oaocco.",
+            "......oaaafcco",
+            ".....obeaaafco",
+            "....obbbeaabo.",
+            "...obbbbbebbbo",
+            "..obbbbbbeebo.",
+            ".oaebbbbeeeo..",
+            "oaaaebbeeeo...",
+            ".oaaaeeeeo....",
+            "ocfaabeeo.....",
+            "occfbbbo......",
+            ".occobo.......",
+            "..oo.o........");
 
         // A bowl of creamy soup with bits of mushroom.
         // Made on first use: the rows below are set after this line in the type's start-up.
@@ -402,7 +423,7 @@ namespace Game.Client
             "mushroom_soup" => MushroomSoup,
             "recall_scroll" => RecallScroll,
             "mana_potion" => ManaPotion,
-            "grilled_fish" => Ramped(FishRows, Ramp.Of("#C4783E")),
+            "grilled_fish" => RampedOwn(Fish16, Ramp.Of("#C4783E")),
             "fish_stew" => Soup("#C88A4A"),
             "eel_skewer" => Fry("#7A6A4A", "#E0B050"),
             "abyss_feast" => Soup("#8A6AD0"),
@@ -419,33 +440,31 @@ namespace Game.Client
             _ => Potion,
         };
 
-        // A fish, facing left, in its colour.
-        static readonly string[] FishRows =
-        {
-            "...LL.....",
-            ".LLMMLL.L.",
-            "LwMMMMMLL.",
-            "MMMMMMmmM.",
-            ".mmmmmm.m.",
-            "...mm.....",
-        };
 
-        // A hoe: a wooden handle and a copper blade.
-        static readonly PixelImage HoeIcon = PixelImage.FromRows(new Dictionary<char, Rgba>(Common)
+        // A hoe (Ninja Adventure, pixel-boy and AAA, CC0, 2026-11-11, Docs/ArtSources.md).
+        static readonly PixelImage HoeIcon = PixelImage.FromRows(new Dictionary<char, Rgba>
             {
-                ['h'] = Rgba.Hex("#9A7452"),
-                ['H'] = Rgba.Hex("#6A4A32"),
-                ['c'] = Rgba.Hex("#D6783F"),
-                ['C'] = Rgba.Hex("#9A4E22"),
+                ['o'] = Rgba.Hex("#15100E"),
+                ['a'] = Rgba.Hex("#FFAD5D"),
+                ['b'] = Rgba.Hex("#ABC2BC"),
+                ['c'] = Rgba.Hex("#8D977F"),
+                ['e'] = Rgba.Hex("#E66A3A"),
             },
-            "......cccc",
-            "......hCC.",
-            ".....h....",
-            "....h.....",
-            "...h......",
-            "..h.......",
-            ".H........",
-            "H.........").Outlined(Outline);
+            "...........oo...",
+            ".........ooaao..",
+            "........obeaao..",
+            ".......obbbeo...",
+            ".......obbbbo...",
+            ".......ocbbcco..",
+            "......oaeccbbo..",
+            ".....oaeaoobcco.",
+            "....oaaao.obcco.",
+            "...oaaao..obcco.",
+            "..oaaao..obccco.",
+            ".oaeao...obccco.",
+            "oaeao....ooooo..",
+            "oeao............",
+            ".oo.............");
 
         // A rod with its line and float.
         static readonly PixelImage FishingRodIcon = PixelImage.FromRows(new Dictionary<char, Rgba>(Common)
@@ -583,16 +602,6 @@ namespace Game.Client
             "....dd....",
         };
 
-        static readonly string[] Gem =
-        {
-            "...LL...",
-            "..LwLM..",
-            ".LwLMMm.",
-            "LLMMMMmd",
-            ".MMMmmd.",
-            "..Mmmd..",
-            "...dd...",
-        };
 
         // A turret's barrel pointing along +x from the middle, with a dark muzzle.
         public static readonly PixelImage TurretBarrel = MakeBarrel();
@@ -736,18 +745,6 @@ namespace Game.Client
             ".m.mm.m.",
         };
 
-        // A bottle with a cork, for juices and wines.
-        static readonly string[] Bottle =
-        {
-            "...SS...",
-            "...hh...",
-            "...LM...",
-            "..LwMm..",
-            ".LwMMmd.",
-            ".LMMMmd.",
-            ".MMMmmd.",
-            "..mmdd..",
-        };
 
         // A small jar with a cloth top, for pickles.
         static readonly string[] Pickles =
@@ -867,24 +864,31 @@ namespace Game.Client
             "...mmd....",
             "....d.....").Outlined(Outline);
 
-        static readonly Dictionary<char, Rgba> CanColors = new Dictionary<char, Rgba>(Common)
-        {
-            ['L'] = Rgba.Hex("#9CD6EC"),
-            ['M'] = Rgba.Hex("#5AA0C8"),
-            ['m'] = Rgba.Hex("#3A6E9C"),
-            ['d'] = Rgba.Hex("#24466E"),
-        };
 
-        // A watering can, spout to the right.
-        static readonly PixelImage WateringCanIcon = PixelImage.FromRows(CanColors,
-            "...mmmm.....",
-            "..m....m....",
-            ".LLLLLLL...L",
-            ".LwMMMMM..Lm",
-            ".LMMMMMMLMm.",
-            ".MMMMMMMMm..",
-            ".MMMMMMMm...",
-            ".mmmmmmmd...").Outlined(Outline);
+        // A watering can (Ninja Adventure, pixel-boy and AAA, CC0, 2026-11-11, Docs/ArtSources.md).
+        static readonly PixelImage WateringCanIcon = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['o'] = Rgba.Hex("#15100E"),
+                ['a'] = Rgba.Hex("#ABC2BC"),
+                ['b'] = Rgba.Hex("#8D977F"),
+                ['c'] = Rgba.Hex("#5F7160"),
+            },
+            "....oooo........",
+            "..ooaaaao.......",
+            ".oaaaooaao..oo..",
+            "oaaoo..oao.oaao.",
+            "oao...ooao.obaao",
+            "oao.ooaabboccbao",
+            "oaoocccaaacbbco.",
+            "oaacccccaaacbo..",
+            ".oaaccccaabcbo..",
+            ".obbaaaabbaco...",
+            ".oaabbbbaaaco...",
+            ".oaaaaaaaaao....",
+            ".oaaaaaaaaao....",
+            ".oaaaaaaaao.....",
+            "..oaaaaaoo......",
+            "...ooooo........");
 
         static readonly Dictionary<string, PixelImage> MaterialIcons = new Dictionary<string, PixelImage>();
 
@@ -977,7 +981,7 @@ namespace Game.Client
                 case "iron_bar": return IronBar;
                 case "mithril_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#8FE6F2")), OreChunk).Outlined(Outline);
                 case "mithril_bar": return Bar(Ramp.Of("#7CD2E2"));
-                case "queen_heart": return Ramped(Gem, Ramp.Of("#FF6E9C"));
+                case "queen_heart": return RampedOwn(Gem15, Ramp.Of("#FF6E9C"));
                 case "void_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#B48CFF")), OreChunk).Outlined(Outline);
                 // These five drew as plain stone until 2026-11-11 (the content audit).
                 case "obsidian_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#6A5484")), OreChunk).Outlined(Outline);
@@ -986,9 +990,9 @@ namespace Game.Client
                 case "glow_spore": return Ramped(Spores, Ramp.Of("#5FE0C8"));
                 case "ice_crystal": return Ramped(Shard, Ramp.Of("#9CDCFF"));
                 case "void_bar": return Bar(Ramp.Of("#9A74F0"));
-                case "void_essence": return Ramped(Gem, Ramp.Of("#C8A8FF"));
+                case "void_essence": return RampedOwn(Gem15, Ramp.Of("#C8A8FF"));
                 case "slime_gel": return Ramped(Goo, Ramp.Of("#8CD94D"));
-                case "warden_core": return Ramped(Gem, Ramp.Of("#FFA83A"));
+                case "warden_core": return RampedOwn(Gem15, Ramp.Of("#FFA83A"));
                 case "mushroom_spore": return Ramped(Spores, Ramp.Of("#B07CE0"));
                 case "mushroom": return Ramped(CapMushroom, Ramp.Of("#E8A866"));
                 case "fire_pepper_seed": return Ramped(Seeds, Ramp.Of("#E8D27C"));
@@ -999,53 +1003,53 @@ namespace Game.Client
                 case "fertilizer": return Ramped(Goo, Ramp.Of("#8A6A3A"));
                 case "glow_cap": return Ramped(CapMushroom, Ramp.Of("#6FE8D0"));
                 case "frost_berry_seed": return Ramped(Seeds, Ramp.Of("#A8D8F0"));
-                case "frost_berry": return Ramped(Gem, Ramp.Of("#8CD8FF"));
+                case "frost_berry": return RampedOwn(Gem15, Ramp.Of("#8CD8FF"));
                 case "star_melon_seed": return Ramped(Seeds, Ramp.Of("#F2E08C"));
                 case "star_melon": return Ramped(Goo, Ramp.Of("#F2C440"));
-                case "cave_minnow": return Ramped(FishRows, Ramp.Of("#A8B4C0"));
-                case "spore_catfish": return Ramped(FishRows, Ramp.Of("#9A7CB8"));
-                case "ice_trout": return Ramped(FishRows, Ramp.Of("#8CD8FF"));
-                case "crystal_eel": return Ramped(FishRows, Ramp.Of("#7CD2E2"));
-                case "void_angler": return Ramped(FishRows, Ramp.Of("#7A5CC8"));
-                case "firefly_catfish": return Ramped(FishRows, Ramp.Of("#E8D86A"));
-                case "essence": return Ramped(Gem, Ramp.Of("#C88CFF"));
+                case "cave_minnow": return RampedOwn(Fish16, Ramp.Of("#A8B4C0"));
+                case "spore_catfish": return RampedOwn(Fish16, Ramp.Of("#9A7CB8"));
+                case "ice_trout": return RampedOwn(Fish16, Ramp.Of("#8CD8FF"));
+                case "crystal_eel": return RampedOwn(Fish16, Ramp.Of("#7CD2E2"));
+                case "void_angler": return RampedOwn(Fish16, Ramp.Of("#7A5CC8"));
+                case "firefly_catfish": return RampedOwn(Fish16, Ramp.Of("#E8D86A"));
+                case "essence": return RampedOwn(Gem15, Ramp.Of("#C88CFF"));
                 // Support crystals (Docs/Classes.md, 스킬 변형), each in the colour of what it does.
-                case "support_area": return Ramped(Gem, Ramp.Of("#7CE0C8"));
-                case "support_multi": return Ramped(Gem, Ramp.Of("#F2E25C"));
-                case "support_haste": return Ramped(Gem, Ramp.Of("#8CB4FF"));
-                case "support_power": return Ramped(Gem, Ramp.Of("#FF6E6E"));
-                case "support_fire": return Ramped(Gem, Ramp.Of("#FF9A3C"));
-                case "support_cold": return Ramped(Gem, Ramp.Of("#B4ECFF"));
-                case "support_lightning": return Ramped(Gem, Ramp.Of("#FFF6A0"));
-                case "support_pierce": return Ramped(Gem, Ramp.Of("#C8C8D8"));
-                case "support_duration": return Ramped(Gem, Ramp.Of("#B48CFF"));
-                case "support_leech": return Ramped(Gem, Ramp.Of("#C83C5A"));
-                case "rift_key": return Ramped(Gem, Ramp.Of("#7A44E8"));
-                case "rift_shard": return Ramped(Gem, Ramp.Of("#E86ED8"));
-                case "pearl": return Ramped(Gem, Ramp.Of("#EDE6DA"));
-                case "serpent_scale": return Ramped(Gem, Ramp.Of("#2E8C9A"));
-                case "amber": return Ramped(Gem, Ramp.Of("#E8A030"));
-                case "antlion_jaw": return Ramped(Gem, Ramp.Of("#E2D2A8"));
-                case "general_crest": return Ramped(Gem, Ramp.Of("#C8402A"));
-                case "sunken_crown": return Ramped(Gem, Ramp.Of("#E8C060"));
-                case "lake_pike": return Ramped(FishRows, Ramp.Of("#5AA89A"));
+                case "support_area": return RampedOwn(Gem15, Ramp.Of("#7CE0C8"));
+                case "support_multi": return RampedOwn(Gem15, Ramp.Of("#F2E25C"));
+                case "support_haste": return RampedOwn(Gem15, Ramp.Of("#8CB4FF"));
+                case "support_power": return RampedOwn(Gem15, Ramp.Of("#FF6E6E"));
+                case "support_fire": return RampedOwn(Gem15, Ramp.Of("#FF9A3C"));
+                case "support_cold": return RampedOwn(Gem15, Ramp.Of("#B4ECFF"));
+                case "support_lightning": return RampedOwn(Gem15, Ramp.Of("#FFF6A0"));
+                case "support_pierce": return RampedOwn(Gem15, Ramp.Of("#C8C8D8"));
+                case "support_duration": return RampedOwn(Gem15, Ramp.Of("#B48CFF"));
+                case "support_leech": return RampedOwn(Gem15, Ramp.Of("#C83C5A"));
+                case "rift_key": return RampedOwn(Gem15, Ramp.Of("#7A44E8"));
+                case "rift_shard": return RampedOwn(Gem15, Ramp.Of("#E86ED8"));
+                case "pearl": return RampedOwn(Gem15, Ramp.Of("#EDE6DA"));
+                case "serpent_scale": return RampedOwn(Gem15, Ramp.Of("#2E8C9A"));
+                case "amber": return RampedOwn(Gem15, Ramp.Of("#E8A030"));
+                case "antlion_jaw": return RampedOwn(Gem15, Ramp.Of("#E2D2A8"));
+                case "general_crest": return RampedOwn(Gem15, Ramp.Of("#C8402A"));
+                case "sunken_crown": return RampedOwn(Gem15, Ramp.Of("#E8C060"));
+                case "lake_pike": return RampedOwn(Fish16, Ramp.Of("#5AA89A"));
                 // Fish, crops and goods added 2026-11-11 (the content audit: a fish or two per biome, crops for the crystal,
                 // lake and sand caves).
-                case "glow_tetra": return Ramped(FishRows, Ramp.Of("#5FE0C8"));
-                case "frost_char": return Ramped(FishRows, Ramp.Of("#BFE8FF"));
-                case "prism_carp": return Ramped(FishRows, Ramp.Of("#E8B8FF"));
-                case "lake_perch": return Ramped(FishRows, Ramp.Of("#8AA858"));
-                case "silver_eel": return Ramped(FishRows, Ramp.Of("#D8E0F0"));
-                case "shadow_eel": return Ramped(FishRows, Ramp.Of("#4A3A70"));
+                case "glow_tetra": return RampedOwn(Fish16, Ramp.Of("#5FE0C8"));
+                case "frost_char": return RampedOwn(Fish16, Ramp.Of("#BFE8FF"));
+                case "prism_carp": return RampedOwn(Fish16, Ramp.Of("#E8B8FF"));
+                case "lake_perch": return RampedOwn(Fish16, Ramp.Of("#8AA858"));
+                case "silver_eel": return RampedOwn(Fish16, Ramp.Of("#D8E0F0"));
+                case "shadow_eel": return RampedOwn(Fish16, Ramp.Of("#4A3A70"));
                 case "crystal_radish_seed": return Ramped(Seeds, Ramp.Of("#8C7CE0"));
                 case "crystal_radish": return Ramped(Goo, Ramp.Of("#C8B8FF"));
                 case "crystal_pickle": return Ramped(Pickles, Ramp.Of("#C8B8FF"));
                 case "lotus_seed": return Ramped(Seeds, Ramp.Of("#5AA870"));
                 case "lotus_root": return Ramped(Goo, Ramp.Of("#E8C8A8"));
-                case "lotus_tea": return Ramped(Bottle, Ramp.Of("#E8C8A8"));
+                case "lotus_tea": return RampedOwn(Jar, Ramp.Of("#E8C8A8"));
                 case "cactus_seed": return Ramped(Seeds, Ramp.Of("#7CC85A"));
                 case "cactus_fruit": return Ramped(Goo, Ramp.Of("#E05A8A"));
-                case "cactus_juice": return Ramped(Bottle, Ramp.Of("#E05A8A"));
+                case "cactus_juice": return RampedOwn(Jar, Ramp.Of("#E05A8A"));
                 case "iron_gear": return Ramped(Cog, Ramp.Of("#B8BCC4"));
                 case "coin": return Ramped(CoinRows, Ramp.Of("#F2C440"));
                 case "cave_potato_seed": return Ramped(Seeds, Ramp.Of("#B08850"));
@@ -1055,15 +1059,15 @@ namespace Game.Client
                 case "ember_corn_seed": return Ramped(Seeds, Ramp.Of("#F2C060"));
                 case "void_bean_seed": return Ramped(Seeds, Ramp.Of("#8A6AD0"));
                 case "cave_potato": return Ramped(Goo, Ramp.Of("#B08850"));
-                case "cave_berry": return Ramped(Gem, Ramp.Of("#E04060"));
+                case "cave_berry": return RampedOwn(Gem15, Ramp.Of("#E04060"));
                 case "moon_grape": return Ramped(Spores, Ramp.Of("#8A5AE0"));
                 case "snow_cabbage": return Ramped(CapMushroom, Ramp.Of("#C8F0C0"));
-                case "ember_corn": return Ramped(Gem, Ramp.Of("#F2A030"));
+                case "ember_corn": return RampedOwn(Gem15, Ramp.Of("#F2A030"));
                 case "void_bean": return Ramped(Goo, Ramp.Of("#6A44B8"));
-                case "berry_juice": return Ramped(Bottle, Ramp.Of("#E04060"));
-                case "moon_wine": return Ramped(Bottle, Ramp.Of("#8A5AE0"));
-                case "frost_juice": return Ramped(Bottle, Ramp.Of("#8CD8FF"));
-                case "star_wine": return Ramped(Bottle, Ramp.Of("#F2C440"));
+                case "berry_juice": return RampedOwn(Jar, Ramp.Of("#E04060"));
+                case "moon_wine": return RampedOwn(Jar, Ramp.Of("#8A5AE0"));
+                case "frost_juice": return RampedOwn(Jar, Ramp.Of("#8CD8FF"));
+                case "star_wine": return RampedOwn(Jar, Ramp.Of("#F2C440"));
                 case "pickled_pepper": return Ramped(Pickles, Ramp.Of("#E0402A"));
                 case "kimchi": return Ramped(Pickles, Ramp.Of("#D8603A"));
                 case "pickled_bean": return Ramped(Pickles, Ramp.Of("#6A44B8"));
@@ -1071,7 +1075,7 @@ namespace Game.Client
                 case "cow": return Cow(0);
                 case "sheep": return Sheep(0);
                 case "wool": return Ramped(Fleece, Ramp.Of("#F4F0E6"));
-                case "milk": return Ramped(Bottle, Ramp.Of("#F6F2E8"));
+                case "milk": return RampedOwn(Jar, Ramp.Of("#F6F2E8"));
                 case "cheese": return Ramped(Goo, Ramp.Of("#F2D060"));
                 case "ammo": return Ramped(Seeds, Ramp.Of("#D8B050"));
                 case "frost_ammo": return Ramped(Seeds, Ramp.Of("#8CD8FF"));
@@ -1086,13 +1090,86 @@ namespace Game.Client
                 case "bait": return Ramped(Goo, Ramp.Of("#C87850"));
                 case "mayonnaise": return Ramped(Pickles, Ramp.Of("#F6F0D0"));
                 case "cave_crab": return Ramped(Crab, Ramp.Of("#E06040"));
-                case "cave_shrimp": return Ramped(FishRows, Ramp.Of("#F08870"));
+                case "cave_shrimp": return RampedOwn(Fish16, Ramp.Of("#F08870"));
                 case "cave_snail": return Ramped(CapMushroom, Ramp.Of("#A08870"));
                 case "copper_wire": return Ramped(Coil, Ramp.Of("#E08A4A"));
                 case "circuit": return Ramped(Board, Ramp.Of("#4CA85A"));
                 default: return PixelImage.FromRows(RockAnd(Ramp.Of("#7C7068")), Stone).Outlined(Outline);
             }
         }
+
+        // Shapes from Ninja Adventure (pixel-boy and AAA, CC0, 2026-11-11, Docs/ArtSources.md), painted in the ramp
+        // like the others; they bring their own outline ('o').
+        static PixelImage RampedOwn(string[] rows, Ramp ramp)
+        {
+            var colors = new Dictionary<char, Rgba>(Common)
+            {
+                ['L'] = ramp.Light,
+                ['M'] = ramp.Main,
+                ['m'] = ramp.Shade,
+                ['d'] = ramp.Dark,
+                ['S'] = Rgba.Hex("#C8B496"),
+                ['o'] = Outline,
+            };
+            return PixelImage.FromRows(colors, rows);
+        }
+
+        // A fish on its side, a white gleam on its back (Ninja Adventure's fish).
+        static readonly string[] Fish16 =
+        {
+            "................",
+            ".........oo.....",
+            ".........oLo....",
+            ".......oooLMo...",
+            ".....oowwLMMMo..",
+            "....oLLLLMLLMMo.",
+            "...oLwLMMMMLooo.",
+            "..owLLLMwLMo....",
+            "..owLoMMMLMo....",
+            "..owoooMMMMo....",
+            "..ommoMMLLMo....",
+            "..ommmmMMLo.....",
+            ".oodmmmmMo......",
+            ".owwmmmoo.......",
+            "..ooooo.........",
+            "................",
+        };
+
+        // A cut stone, lit facets to the upper left (Ninja Adventure's gem).
+        static readonly string[] Gem15 =
+        {
+            "..oooooo.......",
+            ".oLLLLLLoo.....",
+            "oLLLLMMMLLoo...",
+            "oLLLLMLLMMMMo..",
+            "oLLLLMLLLMmmMo.",
+            "oLLLLMLLMMMMmMo",
+            "oLLLLMLMMMMMmMo",
+            "oLLMMLMmMMMMmMo",
+            "oMMMMMLLmmMMmMo",
+            "omMMMMMMMMmmmMo",
+            "oMmMMmmmMMMMMMo",
+            "oMMmddmmmmMMMMo",
+            "oMMMmmddmmmmmmo",
+            "oMMmmmmmddmmmo.",
+            ".oooooooooooo..",
+        };
+
+        // A stoppered jar, the drink in the ramp's colours (Ninja Adventure's water pot).
+        static readonly string[] Jar =
+        {
+            "..ooooo..",
+            ".oSSSSSo.",
+            "osHHHHHso",
+            "ossssssso",
+            ".os...so.",
+            "os.....so",
+            "osLLLLLso",
+            "osMMMMMso",
+            "osMMMMMso",
+            "ossssssso",
+            ".ooooooo.",
+        };
 
         static PixelImage Ramped(string[] rows, Ramp ramp)
         {

@@ -50,8 +50,12 @@ namespace Game.Client
             Save(Sheet(loot, monsters, npcs), Path.Combine(output, "sheet.png"), 4);
             Save(UiMock(), Path.Combine(output, "ui_mock.png"), 3);
             // The shapes taken from CC0 packs (Docs/ArtSources.md), in each tier's colours: picks and ingots.
+            var imported = new[] { "_bar", "cave_minnow", "ice_trout", "crystal_eel", "void_angler", "warden_core", "queen_heart", "void_essence", "frost_berry",
+                "berry_juice", "moon_wine", "milk", "lotus_tea", "hoe", "watering_can" };
             Save(Row(loot.Bases.Where(b => b.IsPickaxe).Select(ItemArt.Gear)
-                .Concat(loot.Materials.Where(m => m.Id.EndsWith("_bar")).Select(ItemArt.Material)).ToList()), Path.Combine(output, "imported.png"), 6);
+                .Concat(loot.Materials.Where(m => imported.Any(id => m.Id == id || id.StartsWith("_") && m.Id.EndsWith(id))).Select(ItemArt.Material))
+                .Concat(loot.Consumables.Where(c => c.Id == "healing_potion" || c.Id == "mana_potion" || c.Id == "recall_scroll" || c.Id == "grilled_fish").Select(ItemArt.Consumable))
+                .ToList()), Path.Combine(output, "imported.png"), 5);
             // The newest pieces one by one, for a closer look (2026-11-09).
             var pieces = Directory.CreateDirectory(Path.Combine(output, "pieces")).FullName;
             Save(TileArt.BigSmelter, Path.Combine(pieces, "big_smelter.png"), 6);
