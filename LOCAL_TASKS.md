@@ -965,6 +965,7 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 시트 폴더 `Assets/_Project/Data/Strings/`를 `SceneSetup`이 `GameSheets`에 넣는다. 새 파일(`strings.csv`, `StringSheet.cs`, `Strings.cs`, `DevTools/Strings/`)의 `.meta`는 Unity가 만들면 커밋한다
   - (클라우드 웹 점검) 메뉴가 표를 거쳐도 전과 같은 말로 보이는지, [언어] 단추로 영어 메뉴가 되는지 `sweep.js --only menu`가 본다. 결과는 배포 뒤 여기에 적는다
     - 2026-11-11 check67(250ac12): 통과. [언어]로 영어 메뉴, 다시 눌러 한국어. 사진에 남은 한글 줄(이어하기 안내, 월드 지우기, 내보내기 안내, 클래스 안내)이 보여 그것들도 표로 옮겼다. 다시 점검은 다음 배포 뒤
+    - 2026-11-11 check68(aabe3d6): 통과 36, 실패 0. 영어 메뉴에 한글 단추·한글 줄 없음, 사진 `pc-menu-english.png`
   - (사람) 메뉴의 [언어]를 눌러 English로 바꿔 보고 글자가 깨지거나 칸을 넘치지 않는지(아직 메뉴만 영어다)
 
 ## 결과 보고
