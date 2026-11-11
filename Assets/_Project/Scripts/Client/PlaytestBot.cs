@@ -22,6 +22,8 @@ namespace Game.Client
         static Player _botPlayer;
         static BotPilot _pilot;
         static long _botStart;
+        // The first boss (the caves' nearest, the warden), chosen at the run's start: a felled one leaves World.Bosses.
+        static string _firstBoss;
 
         static BotPilot Pilot(GameRoot root, bool fresh = false)
         {
@@ -33,6 +35,7 @@ namespace Game.Client
                 _botPlayer = player;
                 _pilot = new BotPilot(world, player, new BotMemory(world, player, root.GuideSheet));
                 _botStart = world.Tick;
+                _firstBoss = world.Bosses.Where(b => b.Definition.Place == null).OrderBy(b => Vec2.Distance(b.Home, world.Spawn)).FirstOrDefault()?.Definition.Id ?? "cave_warden";
             }
             return _pilot;
         }
@@ -54,7 +57,6 @@ namespace Game.Client
                 default:
                     var pilot = Pilot(root);
                     pilot.Memory.Observe();
-                    var first = root.HostWorld.Bosses.Where(b => b.Definition.Place == null).OrderBy(b => Vec2.Distance(b.Home, root.HostWorld.Spawn)).FirstOrDefault();
                     var run = new[]
                     {
                         new BotRunResult
@@ -63,7 +65,7 @@ namespace Game.Client
                             Memory = pilot.Memory,
                             Ticks = root.HostWorld.Tick - _botStart,
                             Level = player.Level,
-                            FirstBoss = first?.Definition.Id ?? "cave_warden",
+                            FirstBoss = _firstBoss,
                             Goals = root.GuideSheet?.Goals.Take(17).ToList() ?? new System.Collections.Generic.List<Goal>(),
                         },
                     };
