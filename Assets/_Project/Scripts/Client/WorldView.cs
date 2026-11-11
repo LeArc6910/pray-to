@@ -2994,6 +2994,17 @@ namespace Game.Client
 
         int GroundIndex(int x, int y) => TileArt.GroundAt(_client.Map, x, y, InArena(_client, x, y), _client.Biomes[x, y]);
 
+        // How many tiles round the given cell have a rounded-corner layer on them, read back from the tilemap (Playtest).
+        internal int CornersNear(int cx, int cy, int reach)
+        {
+            if (_corners == null) return -1;
+            int count = 0;
+            for (int y = cy - reach; y <= cy + reach; y++)
+                for (int x = cx - reach; x <= cx + reach; x++)
+                    if (_corners.GetTile(new Vector3Int(x, y, 0)) != null) count++;
+            return count;
+        }
+
         // The rounded corners over the tile at x, y (TileArt.Rounds), each from the ground tile beside it.
         readonly int[] _cornerSources = new int[4];
 

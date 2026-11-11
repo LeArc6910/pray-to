@@ -15,7 +15,7 @@ namespace Game.Core
             Tile = tile;
         }
 
-        // "have", "place", "plant", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank" or "classes".
+        // "have", "place", "plant", "boss", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank" or "classes".
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
@@ -87,8 +87,9 @@ namespace Game.Core
     {
         public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1,
             int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0, int skillsSpent = 0, int topRank = 0,
-            int classes = 0)
+            int classes = 0, Func<string, int> bossesFelled = null)
         {
+            BossesFelled = bossesFelled ?? (_ => 0);
             Classes = classes;
             SkillsSpent = skillsSpent;
             TopRank = topRank;
@@ -105,6 +106,8 @@ namespace Game.Core
 
         // How many of a material, consumable or item base (carried or worn) the player has.
         public Func<string, int> CountOf { get; }
+        // How many times the player has felled the boss with this id (the bestiary's records).
+        public Func<string, int> BossesFelled { get; }
         // Whether a tile of the type stands anywhere in the world.
         public Func<TileType, bool> HasTile { get; }
         public bool HasCrop { get; }
@@ -141,7 +144,8 @@ namespace Game.Core
             int hearts = client.Friendships.Values.Select(f => World.HeartsOf(f.Points)).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level,
                 client.Passives.Count, client.LifeLevel, Math.Max(1, client.Rift.Unlocked), hearts,
-                SkillRules.SpentPoints(client.SkillRanks), client.SkillRanks.Values.DefaultIfEmpty(0).Max(), client.Classes.Count);
+                SkillRules.SpentPoints(client.SkillRanks), client.SkillRanks.Values.DefaultIfEmpty(0).Max(), client.Classes.Count,
+                id => client.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0);
         }
 
         // The same facts as the host sees them, to check a claimed reward.
@@ -162,7 +166,8 @@ namespace Game.Core
             int hearts = player.Friendships.Values.Select(f => f.Hearts).DefaultIfEmpty(0).Max();
             return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level,
                 player.Passives.Count, skill => World.LifeLevel(player, skill), world.RiftTier, hearts,
-                SkillRules.SpentPoints(player.SkillRanks), player.SkillRanks.Values.DefaultIfEmpty(0).Max(), player.Classes.Count);
+                SkillRules.SpentPoints(player.SkillRanks), player.SkillRanks.Values.DefaultIfEmpty(0).Max(), player.Classes.Count,
+                id => player.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0);
         }
     }
 
@@ -260,6 +265,7 @@ namespace Game.Core
             "have" => facts.CountOf(condition.Id) >= condition.Count,
             "place" => facts.HasTile(condition.Tile),
             "plant" => facts.HasCrop,
+            "boss" => facts.BossesFelled(condition.Id) >= 1,
             "reach" => facts.DistanceFromSpawn >= condition.Count,
             "level" => facts.Level >= condition.Count,
             "passive" => facts.Passives >= condition.Count,
@@ -329,6 +335,11 @@ namespace Game.Core
                 case "place":
                     if (parts.Length != 2) throw new FormatException($"'{text}'는 place:<칸 종류>로 적습니다.");
                     return new GoalCondition("place", null, 0, SheetValues.ParseEnum<TileType>(parts[1], "칸 종류"));
+                // boss:<id>: the player has felled that boss (2026-11-11, the content audit: the void lord's essence is
+                // also sold, so having it did not mean the fight).
+                case "boss":
+                    if (parts.Length != 2 || parts[1].Length == 0) throw new FormatException($"'{text}'는 boss:<보스 id>로 적습니다.");
+                    return new GoalCondition("boss", parts[1], 1, default);
                 case "plant":
                     if (parts.Length != 1) throw new FormatException("plant에는 덧붙이는 값이 없습니다.");
                     return new GoalCondition("plant", null, 0, default);
@@ -360,7 +371,7 @@ namespace Game.Core
                     if (lifeLevel < 1 || lifeLevel > LifeSkills.MaxLevel) throw new FormatException($"생활 기술 레벨은 1~{LifeSkills.MaxLevel}이어야 합니다.");
                     return new GoalCondition("life", parts[1].ToLowerInvariant(), lifeLevel, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, reach, level, passive, life, rift, friend, skills, rank, classes 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, boss, reach, level, passive, life, rift, friend, skills, rank, classes 중 하나)");
             }
         }
 

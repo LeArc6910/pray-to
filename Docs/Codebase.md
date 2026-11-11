@@ -17,3 +17,4 @@
 - `Assets/_Project/Scripts/Client` (`Game.Client`): 화면, 입력, 네트워크 전송만 맡는다. 게임 규칙을 두지 않는다. 그림은 `Art/`에 코드로 그린 16px 도트이고 `Sprites`가 Unity 스프라이트로 바꾼다. 효과음도 `Art/SoundArt.cs`가 합성하고 `Sounds`가 튼다. 배경 음악과 환경음은 `Art/MusicArt.cs`가 합성하고 `Music`이 튼다(`Docs/ArtPipeline.md`). UI는 IMGUI이고 크기는 `Ui`의 점 단위로 잡는다(`Screen.width` 대신 `Ui.Width`). 줄이 바뀔 수 있는 한글은 `Ui.Wrap`으로 띄어쓰기에서 바꾼다(Unity는 낱말 가운데서도 바꾼다). 입력은 `Controls`가 키보드·마우스와 터치를 함께 읽는다. `Editor/`에는 프로젝트 설정과 씬·에셋을 코드로 만드는 메뉴(`Game > Set Up Project`, `Game > Set Up Main Scene`)와 웹 빌드(`Game > Build Web Demo`)가 있다.
 - 웹 데모: `.github/workflows/web-demo.yml`이 GameCI로 빌드해 GitHub Pages에 올린다. 협동은 Unity Relay의 방 코드로 하고(웹과 PC가 함께, `Docs/Multiplayer.md`), 글꼴은 `Resources/Fonts`의 도트 글꼴 Galmuri11 Bold 부분집합(`DevTools/Fonts/make-pixel-font.py`)이 기본이고, 메뉴에서 Noto Sans KR 부분집합(`make-korean-font.py`)으로 바꿀 수 있다. 글자 크기는 `Ui.Text`로 정한다(도트 글꼴은 12px의 정수배). `Docs/WebDemo.md`.
 
+전체 콘텐츠 점검(시스템마다 개수, 고립·도달 불가, 같은 그림, 문서 어긋남)은 `Docs/ContentAudit.md`.

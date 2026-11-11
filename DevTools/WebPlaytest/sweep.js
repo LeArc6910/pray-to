@@ -267,6 +267,10 @@ async function basics(browser) {
   await game.send('attack off');
   check(!!needs, '검으로 벽을 치면 "곡괭이가 필요하다"');
   check((await game.look(1, 0)).tile === 'Wall', '검으로는 벽이 그대로');
+  // Rounded corners (Docs/ArtPipeline.md 둥근 모서리, 2026-11-11): a lone wall rounds all four corners, so the corner
+  // layer has tiles round the player.
+  const corners = (await game.state()).corners;
+  check(corners > 0, `벽 둘레에 둥근 모서리 칸이 있다 (${corners}칸)`);
   inv = await game.inventory();
   const stoneBefore = count(inv, 'stone');
   await game.page.keyboard.press('2');
@@ -572,7 +576,7 @@ const BossFirstPhase = Object.fromEntries(fs.readFileSync(path.join(__dirname, '
   .split('\n').slice(1).filter(l => l.trim()).map(l => l.split(','))
   .map(c => [`${c[0]}/${c[1]}`, c[3] ? Math.min(...c[3].split('|').map(Number)) : 1]));
 
-// ---------------------------------------------------------------- 보스 넷 (M3, 19·31·40단계)
+// ---------------------------------------------------------------- 보스 여덟 (M3, 19·31·40단계)
 async function bosses(browser) {
   note('\n## 보스 (PC)\n');
   const game = await open(browser, run, Profiles.pc, url);
@@ -580,7 +584,8 @@ async function bosses(browser) {
   await game.wait(1200);
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   let s = await game.state();
-  check(/cave_warden/.test(s.bosses) && /crystal_queen/.test(s.bosses) && /lava_titan/.test(s.bosses) && /void_lord/.test(s.bosses) && /tide_serpent/.test(s.bosses) && /antlion/.test(s.bosses), `보스 여섯이 월드에 있다 (${s.bosses})`);
+  check(/cave_warden/.test(s.bosses) && /crystal_queen/.test(s.bosses) && /lava_titan/.test(s.bosses) && /void_lord/.test(s.bosses) && /tide_serpent/.test(s.bosses) && /antlion/.test(s.bosses)
+    && /mad_general/.test(s.bosses) && /crown_wraith/.test(s.bosses), `보스 여덟이 월드에 있다 (${s.bosses})`);
 
   // Leaving the arena puts the boss back as it was.
   await game.send('goto boss cave_warden');
@@ -592,7 +597,9 @@ async function bosses(browser) {
   const warden = (s.bosses.match(/cave_warden:(\d+)\/(\d+):p(\d):(\w+)/) || []);
   check(warden[1] === warden[2], `아레나를 떠나 5초가 지나면 보스가 처음 상태로 (${warden.slice(1).join(' ')})`);
 
-  for (const [id, name] of [['cave_warden', '동굴 수호자'], ['crystal_queen', '수정 거미 여왕'], ['lava_titan', '용암 거인'], ['void_lord', '공허의 군주'], ['tide_serpent', '물살 뱀'], ['antlion', '개미귀신']]) {
+  for (const [id, name] of [['cave_warden', '동굴 수호자'], ['crystal_queen', '수정 거미 여왕'], ['lava_titan', '용암 거인'], ['void_lord', '공허의 군주'], ['tide_serpent', '물살 뱀'], ['antlion', '개미귀신'],
+    // The two bosses of the places (2026-11-11, the content audit: they were not yet checked).
+    ['mad_general', '미쳐 버린 장군 모르그'], ['crown_wraith', '왕관의 망령']]) {
     await game.send(`heal; goto boss ${id}`);
     const woke = await game.until(t => has(t.banner, '등장'), 6000, game.texts);
     check(!!woke, `${name}: "${name} 등장!" 배너`);
@@ -1270,7 +1277,7 @@ async function gear(browser) {
   await pick(game, /철 검/);
   await game.press('다듬기', '철 검');
   await game.shot('anvil-transfer', '철 검의 모루: [강화 옮기기]');
-  check(await game.press(/^강화 옮기기: 구리 검의 \+2/), '철 검의 모루에 [강화 옮기기: 구리 검의 +2를 여기로]가 보이고 누른다');
+  check(await game.press(/^강화 옮기기: (\+2 )?구리 검의 \+2/), '철 검의 모루에 [강화 옮기기: 구리 검의 +2를 여기로]가 보이고 누른다');
   const moved = await game.until(i => i.items.some(x => x.base === 'iron_sword' && x.upgrade === 2), 3000, game.inventory);
   const old = moved && moved.items.find(x => x.base === 'copper_sword');
   check(!!moved && old && old.upgrade === 0, `철 검이 +2, 구리 검은 +0이 된다 (구리 검 +${old && old.upgrade})`);

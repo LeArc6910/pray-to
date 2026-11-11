@@ -8,7 +8,7 @@ copper,구리 광석 6개 캐기,주황 덩어리가 박힌 벽이 구리 광맥
 copper_gear,구리 장비 하나 만들기,작업대 옆에서 구리 투구·갑옷·장화·활·지팡이 가운데 하나를 만들어 [장착]한다,have:copper_helmet|have:copper_armor|have:copper_boots|have:copper_bow|have:copper_staff,healing_potion:2
 furnace,화로 세우기,작업대 옆에서 돌 15와 구리 광석 2로 만든다. 버섯을 굽고 철을 녹인다,place:Furnace,copper_ore:4
 level3,레벨 3 되기,몬스터를 잡으면 경험치가 오른다. 시작 지점 둘레에는 몬스터가 나오지 않으니 굴을 따라 조금 나가서 잡는다. 동굴 수호자는 레벨 3쯤부터 해 볼 만하다,level:3,healing_potion:4
-boss,동굴 수호자 쓰러뜨리기,여왕이 부탁한 일이다. 지도(M)에 고리로 보이는 곳이 보스 아레나다. 회복 물약을 챙겨 가고 바닥에 붉게 차오르는 예고를 피한다. 권장 레벨보다 낮으면 등장 알림에 나온다,have:warden_core,recall_scroll:2
+boss,동굴 수호자 쓰러뜨리기,왕도의 여왕 세라핀도 바라는 일이다. 지도(M)에 고리로 보이는 곳이 보스 아레나다. 회복 물약을 챙겨 가고 바닥에 붉게 차오르는 예고를 피한다. 권장 레벨보다 낮으면 등장 알림에 나온다,have:warden_core,recall_scroll:2
 bed,침대 세우기,작업대에서 돌 6과 슬라임 젤 3으로 만든다. 쓰러지면 침대 옆에서 일어나고 귀환 두루마리로 돌아올 수 있다. 저녁부터 [잠자기]로 밤을 넘긴다,place:Bed,recall_scroll:2
 plant,버섯 심기,가방 재료의 버섯 포자를 [심기]로 흙 동굴 바닥에 심는다. 물뿌리개로 물을 준 날에만 자라고 다 자라면 그 위를 지나가며 거둔다,plant,mushroom_spore:2
 hoe,밭 갈기,작업대에서 호미를 만들고 [밭 갈기]로 바닥을 밭으로 만든다. 밭에 심으면 빨리 자란다,place:Soil,fertilizer:3
@@ -50,7 +50,7 @@ titan,용암 거인 쓰러뜨리기,HUD의 용암 아레나 방향으로 간다.
 obsidian_gear,흑요석 장비 하나 만들기,화로에서 흑요석 주괴를 녹이고 작업대에서 용암 심장과 함께 만든다,have:obsidian_sword|have:obsidian_bow|have:obsidian_staff|have:obsidian_helmet|have:obsidian_armor|have:obsidian_boots,xp:150
 obsidian_pickaxe,흑요석 곡괭이 만들기,공허석은 흑요석 곡괭이 이상이어야 캐진다. 작업대에서 흑요석 주괴 3과 용암 심장 1로 만든다,have:obsidian_pickaxe,xp:80
 void_ore,공허석 원석 캐기,용암 아레나에서 굴을 따라가면 보랏빛 별이 박힌 공허의 심연이다,have:void_ore:3,xp:120
-void_lord,공허의 군주 쓰러뜨리기,HUD의 심연 아레나로 간다. 맞으면 느려지니 흑요석 장비와 음식을 챙긴다,have:void_essence,healing_potion:6
+void_lord,공허의 군주 쓰러뜨리기,HUD의 심연 아레나로 간다. 맞으면 느려지니 흑요석 장비와 음식을 챙긴다,boss:void_lord,healing_potion:6
 void_gear,공허 장비 하나 만들기,화로에서 공허석 주괴를 녹이고 작업대에서 공허의 정수와 함께 만든다,have:void_sword|have:void_bow|have:void_staff|have:void_helmet|have:void_armor|have:void_boots,xp:300
 rift_altar,균열 제단 세우기,작업대에서 공허석 주괴 4·강화 정수 10으로 만든다. 열쇠는 모루에서 공허의 정수로 만든다,place:RiftAltar,rift_key:1
 rift,공허 균열 1단계 닫기,제단 곁에서 [균열 열기]. 5분 안에 물결 셋과 수호자를 잡으면 보상이 떨어지고 다음 단계가 열린다,rift:2,essence:10

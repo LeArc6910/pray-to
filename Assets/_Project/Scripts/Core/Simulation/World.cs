@@ -610,6 +610,12 @@ namespace Game.Core
         public int ZoneLevelAt(Vec2 position) =>
             _config.ZoneLevel + (_config.ZoneRing > 0 ? (int)(Vec2.Distance(position, Spawn) / _config.ZoneRing) : 0);
 
+        // Whether a monster comes at a tile of this zone level and biome. A biome's own monsters come one zone early
+        // (2026-11-11, the content audit): the biomes lie out past the plain cave already (BiomeMap.CaveRadius), and on
+        // a 128-tile map no floor is four zones out, so the abyss's level 4 monsters never came at all.
+        public static bool Comes(MonsterDefinition monster, int zone, Biome biome) =>
+            monster.Biome == null ? monster.Level <= zone : monster.Biome == biome && monster.Level <= zone + 1;
+
         void TrySpawnEnemy()
         {
             if (!_monsters.Monsters.Any(m => m.Level <= _config.ZoneLevel && m.Weight > 0)) return;
@@ -636,7 +642,7 @@ namespace Game.Core
                     && _monsters.Monsters.Any(m => m.Place == p.Definition.Id && m.Weight > 0));
                 var choices = haunt != null
                     ? _monsters.Monsters.Where(m => m.Place == haunt.Definition.Id && m.Weight > 0).ToList()
-                    : _monsters.Monsters.Where(m => m.Place == null && m.Level <= zone && m.Weight > 0 && (m.Biome == null || m.Biome == biome)).ToList();
+                    : _monsters.Monsters.Where(m => m.Place == null && m.Weight > 0 && Comes(m, zone, biome)).ToList();
                 if (choices.Count == 0) continue;
                 SpawnEnemy(_random.PickWeighted(choices, m => m.Weight), position);
                 return;

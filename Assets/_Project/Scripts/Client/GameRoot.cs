@@ -100,6 +100,9 @@ namespace Game.Client
         WorldClient _client;
         NetLink _net;
         WorldView _view;
+        // Rounded-corner tiles within ten cells of the player (WorldView.CornersNear), for the playtests.
+        internal int CornersNear => _view == null || _client?.Map == null ? -1
+            : _view.CornersNear(TileMap.Cell(_client.Position.X), TileMap.Cell(_client.Position.Y), 10);
         InventoryWindow _inventory;
         // The biome the player is in, how long they have been there, and the last one announced (UpdateBiome).
         Biome _biomeHere;
@@ -402,6 +405,7 @@ namespace Game.Client
             {
                 if (!taken || step.Chain.Length > 0 || step.Goal != StoryGoal.Boss) continue;
                 string drop = _bosses?.Find(step.Boss)?.MaterialId;
+                if (goal.Conditions.Any(c => c.Kind == "boss" && c.Id == step.Boss)) return true;
                 if (!string.IsNullOrEmpty(drop) && goal.Conditions.Any(c => c.Kind == "have" && c.Id == drop)) return true;
             }
             return false;

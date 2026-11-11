@@ -248,7 +248,12 @@ namespace Game.Client
             ['m'] = Rgba.Hex("#8E4E24"),
         };
 
-        static readonly PixelImage RoastedMushroom = PixelImage.FromRows(FoodColors,
+        // Made on first use: the rows below are set after this line in the type's start-up.
+        static PixelImage _roastedMushroom;
+        static PixelImage RoastedMushroom => _roastedMushroom ??= PixelImage.FromRows(FoodColors, SkewerRows).Outlined(Outline);
+
+        static readonly string[] SkewerRows =
+        {
             "........h.",
             "..LLL..h..",
             ".LMwMm.h..",
@@ -258,7 +263,8 @@ namespace Game.Client
             ".LMhMMm...",
             ".MhMMMm...",
             "..hmmm....",
-            ".h........").Outlined(Outline);
+            ".h........",
+        };
 
         static readonly Dictionary<char, Rgba> BowlColors = new Dictionary<char, Rgba>(Common)
         {
@@ -273,14 +279,20 @@ namespace Game.Client
         };
 
         // Peppers and mushroom fried in a bowl.
-        static readonly PixelImage SpicyFry = PixelImage.FromRows(BowlColors,
+        // Made on first use: the rows below are set after this line in the type's start-up.
+        static PixelImage _spicyFry;
+        static PixelImage SpicyFry => _spicyFry ??= PixelImage.FromRows(BowlColors, FryRows).Outlined(Outline);
+
+        static readonly string[] FryRows =
+        {
             "...w..w...",
             "..oR.gR...",
             ".RoMgRoMg.",
             "bbbbbbbbbb",
             ".bBBBBBBb.",
             "..bBBBBb..",
-            "...bbbb...").Outlined(Outline);
+            "...bbbb...",
+        };
 
         // A rolled scroll tied with a blue ribbon.
         static readonly PixelImage RecallScroll = PixelImage.FromRows(BowlColors,
@@ -295,14 +307,47 @@ namespace Game.Client
             "..bbbbbb..").Outlined(Outline);
 
         // A bowl of creamy soup with bits of mushroom.
-        static readonly PixelImage MushroomSoup = PixelImage.FromRows(BowlColors,
+        // Made on first use: the rows below are set after this line in the type's start-up.
+        static PixelImage _mushroomSoup;
+        static PixelImage MushroomSoup => _mushroomSoup ??= PixelImage.FromRows(BowlColors, SoupRows).Outlined(Outline);
+
+        static readonly string[] SoupRows =
+        {
             "..w...w...",
             "...w...w..",
             ".LLmLLLmL.",
             "bbbbbbbbbb",
             ".bBBBBBBb.",
             "..bBBBBb..",
-            "...bbbb...").Outlined(Outline);
+            "...bbbb...",
+        };
+
+        // The same three dishes in each food's own colours (2026-11-11, the content audit: sixteen dishes shared three
+        // pictures, so foods with different buffs could not be told apart).
+        static PixelImage Dish(Dictionary<char, Rgba> basis, string[] rows, Dictionary<char, Rgba> colors)
+        {
+            var merged = new Dictionary<char, Rgba>(basis);
+            foreach (var (key, color) in colors) merged[key] = color;
+            return PixelImage.FromRows(merged, rows).Outlined(Outline);
+        }
+
+        static PixelImage Soup(string hex)
+        {
+            var ramp = Ramp.Of(hex);
+            return Dish(BowlColors, SoupRows, new Dictionary<char, Rgba> { ['L'] = ramp.Light, ['m'] = ramp.Shade });
+        }
+
+        static PixelImage Fry(string hex, string side)
+        {
+            var ramp = Ramp.Of(hex);
+            return Dish(BowlColors, FryRows, new Dictionary<char, Rgba> { ['o'] = ramp.Light, ['R'] = ramp.Main, ['M'] = ramp.Shade, ['g'] = Rgba.Hex(side) });
+        }
+
+        static PixelImage Skewer(string hex)
+        {
+            var ramp = Ramp.Of(hex);
+            return Dish(FoodColors, SkewerRows, new Dictionary<char, Rgba> { ['L'] = ramp.Light, ['M'] = ramp.Main, ['m'] = ramp.Shade });
+        }
 
         public static PixelImage Consumable(ConsumableDefinition consumable) => consumable.Id switch
         {
@@ -312,19 +357,19 @@ namespace Game.Client
             "recall_scroll" => RecallScroll,
             "mana_potion" => ManaPotion,
             "grilled_fish" => Ramped(FishRows, Ramp.Of("#C4783E")),
-            "fish_stew" => MushroomSoup,
-            "eel_skewer" => SpicyFry,
-            "abyss_feast" => MushroomSoup,
-            "glow_stirfry" => SpicyFry,
-            "frost_sorbet" => MushroomSoup,
-            "star_punch" => MushroomSoup,
-            "baked_potato" => RoastedMushroom,
-            "grilled_corn" => SpicyFry,
-            "kimchi_stew" => MushroomSoup,
-            "fried_egg" => RoastedMushroom,
-            "steamed_crab" => MushroomSoup,
-            "fried_shrimp" => SpicyFry,
-            "warm_milk" => MushroomSoup,
+            "fish_stew" => Soup("#E8D8B0"),
+            "eel_skewer" => Fry("#7A6A4A", "#E0B050"),
+            "abyss_feast" => Soup("#8A6AD0"),
+            "glow_stirfry" => Fry("#5FE0C8", "#8AD05A"),
+            "frost_sorbet" => Soup("#BFE8FF"),
+            "star_punch" => Soup("#FF9AB8"),
+            "baked_potato" => Skewer("#C8A060"),
+            "grilled_corn" => Fry("#F2D04A", "#8AD05A"),
+            "kimchi_stew" => Soup("#E0482A"),
+            "fried_egg" => Skewer("#F6E6A0"),
+            "steamed_crab" => Soup("#F07850"),
+            "fried_shrimp" => Fry("#F08870", "#F2D04A"),
+            "warm_milk" => Soup("#F6F2E8"),
             _ => Potion,
         };
 
@@ -455,6 +500,32 @@ namespace Game.Client
             ".MwMMMm...",
             ".MMMMmm...",
             "..mmmd....",
+        };
+
+        // A cluster of three upright crystals (ice crystal, 2026-11-11: it shared the stone's picture).
+        static readonly string[] Shard =
+        {
+            "....L.....",
+            "...LwM....",
+            "...LwM.L..",
+            ".L.LMm.LM.",
+            "LwMLMmLwMm",
+            "LMmLMmLMmd",
+            "MMmMMmMmmd",
+            ".mmddddmd.",
+        };
+
+        // A heart with a bright core (the lava titan's heart, 2026-11-11: it shared the stone's picture).
+        static readonly string[] Heart =
+        {
+            ".LL...LL..",
+            "LwML.LwMm.",
+            "LwMMMMMMmd",
+            "MMMwwMMMmd",
+            ".MMwMMMmd.",
+            "..MMMMmd..",
+            "...Mmmd...",
+            "....dd....",
         };
 
         static readonly string[] Gem =
@@ -853,6 +924,13 @@ namespace Game.Client
                 case "mithril_bar": return Bar(Ramp.Of("#7CD2E2"));
                 case "queen_heart": return Ramped(Gem, Ramp.Of("#FF6E9C"));
                 case "void_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#B48CFF")), OreChunk).Outlined(Outline);
+                // These five drew as plain stone until 2026-11-11 (the content audit).
+                case "obsidian_ore": return PixelImage.FromRows(RockAnd(Ramp.Of("#6A5484")), OreChunk).Outlined(Outline);
+                case "obsidian_bar": return Bar(Ramp.Of("#4E4266"));
+                case "lava_heart": return Ramped(Heart, Ramp.Of("#FF6A2A"));
+                case "titan_heart": return Ramped(Heart, Ramp.Of("#FFB43A"));
+                case "glow_spore": return Ramped(Spores, Ramp.Of("#5FE0C8"));
+                case "ice_crystal": return Ramped(Shard, Ramp.Of("#9CDCFF"));
                 case "void_bar": return Bar(Ramp.Of("#9A74F0"));
                 case "void_essence": return Ramped(Gem, Ramp.Of("#C8A8FF"));
                 case "slime_gel": return Ramped(Goo, Ramp.Of("#8CD94D"));

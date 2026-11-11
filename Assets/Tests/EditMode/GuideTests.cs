@@ -60,6 +60,23 @@ namespace Game.Core.Tests
             Assert.IsFalse(GuideFacts.Of(world, player).HasTile(TileType.Soil), "the hut's garden is still not theirs");
         }
 
+        // boss:<id> asks for the fight itself (2026-11-11, the content audit): the void lord's essence is also sold.
+        [Test]
+        public void ABossGoalIsMetByFellingTheBossNotByHavingItsDrop()
+        {
+            var lord = Guide.Shipped.Goals.Single(g => g.Id == "void_lord");
+            Assert.AreEqual("boss", lord.Conditions.Single().Kind);
+            foreach (var goal in Guide.Shipped.Goals)
+                foreach (var condition in goal.Conditions.Where(c => c.Kind == "boss"))
+                    Assert.IsNotNull(Bosses.Shipped.Find(condition.Id), $"{goal.Id}: {condition.Id}");
+
+            GuideFacts With(int essence, int felled) => new GuideFacts(id => id == "void_essence" ? essence : 0, _ => false, false, 0,
+                bossesFelled: id => id == "void_lord" ? felled : 0);
+            Assert.IsFalse(GuideProgress.IsMet(lord.Conditions.Single(), With(5, 0)), "bought essence is not the fight");
+            Assert.IsTrue(GuideProgress.IsMet(lord.Conditions.Single(), With(0, 1)));
+            Assert.AreEqual(1, GuideSheet.Parse("id,text,hint,done\na,가,힌트,boss:\n", Gear.Data).Errors.Count);
+        }
+
         [Test]
         public void ShippedGoalsStartWithDiggingAndBuilding()
         {

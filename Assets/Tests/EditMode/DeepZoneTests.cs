@@ -87,7 +87,9 @@ namespace Game.Core.Tests
             Assert.AreEqual(3, world.ZoneLevelAt(world.Spawn + new Vec2(61, 0)));
             var deep = world.Enemies.Where(e => e.Definition.Level >= 3).ToList();
             Assert.IsNotEmpty(deep);
-            Assert.IsTrue(deep.All(e => Vec2.Distance(e.Position, world.Spawn) >= 60));
+            // A biome's own monsters come one zone early (World.Comes, 2026-11-11), only in their biome.
+            Assert.IsTrue(deep.All(e => Vec2.Distance(e.Position, world.Spawn) >= 30 * (e.Definition.Level - 2)));
+            Assert.IsTrue(deep.All(e => e.Definition.Biome == biomes[TileMap.Cell(e.Position.X), TileMap.Cell(e.Position.Y)]));
         }
     }
 }

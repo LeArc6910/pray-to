@@ -66,7 +66,12 @@ namespace Game.Client
                 }
             }
 
-            var counts = new Dictionary<string, int> { ["strays"] = strays.Count, ["colours"] = colourful.Count, ["wobble"] = wobbly.Count };
+            // Different things drawn the very same (2026-11-11, the content audit: five materials fell through to the stone's
+            // picture). Every id past the first in a group of identical pictures counts; a placed thing and its item are meant to match.
+            var twins = stills.Where(s => !s.Name.StartsWith("칸 ")).GroupBy(s => Key(s.Image)).Where(g => g.Count() > 1).Select(g => g.Select(s => s.Name).ToList()).ToList();
+            int twinCount = twins.Sum(g => g.Count - 1);
+
+            var counts = new Dictionary<string, int> { ["strays"] = strays.Count, ["colours"] = colourful.Count, ["wobble"] = wobbly.Count, ["twins"] = twinCount };
             var report = new List<string>
             {
                 "# 그림 검사",
@@ -80,6 +85,8 @@ namespace Game.Client
             report.AddRange(colourful.Select(s => "- " + s));
             report.AddRange(new[] { "", $"## 프레임 사이 실루엣이 {MostWobble:P0} 넘게 바뀌는 움직임 ({wobbly.Count})", "" });
             report.AddRange(wobbly.Select(s => "- " + s));
+            report.AddRange(new[] { "", $"## 다른 것인데 픽셀까지 같은 그림 ({twinCount})", "" });
+            report.AddRange(twins.Select(g => "- " + string.Join(" = ", g)));
             File.WriteAllLines(Path.Combine(output, "lint.md"), report);
 
             string baselinePath = Path.Combine(folder, BaselineFile);
@@ -98,6 +105,18 @@ namespace Game.Client
                 }
             }
             return fine;
+        }
+
+        static string Key(PixelImage image)
+        {
+            var key = new System.Text.StringBuilder($"{image.Width}x{image.Height}:");
+            for (int y = 0; y < image.Height; y++)
+                for (int x = 0; x < image.Width; x++)
+                {
+                    var c = image[x, y];
+                    key.Append(c.A == 0 ? "." : $"{c.R:x2}{c.G:x2}{c.B:x2}{c.A:x2}");
+                }
+            return key.ToString();
         }
 
         static bool Drawn(PixelImage image, int x, int y) => x >= 0 && y >= 0 && x < image.Width && y < image.Height && image[x, y].A > 0;

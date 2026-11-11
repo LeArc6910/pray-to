@@ -139,5 +139,30 @@ namespace Game.Core.Tests
             foreach (string id in new[] { "void_wisp", "abyss_stalker" }) Assert.AreEqual(Biome.Abyss, Monsters.Shipped.Find(id).Biome, id);
             Assert.AreEqual("공허의 심연", BiomeMap.Name(Biome.Abyss));
         }
+
+        // Every biome's monsters can come somewhere in it (2026-11-11, the content audit): the abyss's level 4 monsters
+        // once had no floor four zones out on any seed.
+        [Test]
+        public void EveryBiomeMonsterHasGroundToComeOn()
+        {
+            var config = new WorldConfig();
+            foreach (ulong seed in new ulong[] { 1, 2, 3, 4, 5, 6, 7, 8 })
+            {
+                var generated = WorldGenerator.Generate(seed);
+                var world = new World(generated.Map, generated.Spawn, Monsters.Shipped, seed, config, Gear.Data, Tiles.Shipped, generated.Biomes);
+                foreach (var monster in Monsters.Shipped.Monsters.Where(m => m.Biome != null && m.Place == null))
+                {
+                    int tiles = 0;
+                    for (int y = 0; y < generated.Map.Height; y++)
+                        for (int x = 0; x < generated.Map.Width; x++)
+                            if (!generated.Map.IsSolid(x, y) && World.Comes(monster, world.ZoneLevelAt(TileMap.Center(x, y)), generated.Biomes[x, y])) tiles++;
+                    Assert.Greater(tiles, 100, $"{monster.Id} on seed {seed}");
+                }
+            }
+            var slime = Monsters.Shipped.Find("slime");
+            Assert.IsTrue(World.Comes(slime, 1, Biome.Cave));
+            Assert.IsFalse(World.Comes(Monsters.Shipped.Find("void_wisp"), 3, Biome.Lava), "only in its own biome");
+            Assert.IsFalse(World.Comes(Monsters.Shipped.Find("void_wisp"), 2, Biome.Abyss), "nor near the spawn");
+        }
 }
 }

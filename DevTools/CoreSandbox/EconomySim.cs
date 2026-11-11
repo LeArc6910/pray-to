@@ -52,7 +52,10 @@ namespace CoreSandbox
                     float seconds = wait + (float)fish.Average(m => World.CenterTicks(World.Difficulty(m))) / World.TicksPerSecond + 0.5f;
                     float perHour = 3600 / seconds * 1.12f;
                     float price = (float)fish.Average(m => Best(m).Value);
-                    Console.WriteLine($"{Pad(BiomeMap.Name(group.Key) + (night ? " 밤" : " 낮"), 14)} 한 마리 {seconds,4:0.0}초, 시간당 {perHour,4:0}마리 × 평균 {price,5:0.0} = {perHour * price,6:0} 금화");
+                    // A person buys at most DailySellLimit of each kind a day (2026-11-11, the content audit: the table
+                    // once left this out): at the base day length that is so many an hour of each kind caught here.
+                    float sellable = Math.Min(perHour, fish.Count * World.DailySellLimit * 60f / Calendar.BaseDayMinutes);
+                    Console.WriteLine($"{Pad(BiomeMap.Name(group.Key) + (night ? " 밤" : " 낮"), 14)} 한 마리 {seconds,4:0.0}초, 시간당 {perHour,4:0}마리, 팔 수 있는 것 {sellable,4:0}마리 × 평균 {price,5:0.0} = {sellable * price,6:0} 금화");
                 }
             }
 

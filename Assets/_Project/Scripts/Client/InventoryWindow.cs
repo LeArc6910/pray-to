@@ -2065,7 +2065,7 @@ namespace Game.Client
             {
                 GUILayout.BeginHorizontal();
                 GUI.enabled = have >= World.TransferEssence;
-                if (Ui.LayoutButton($"강화 옮기기: {ItemText.Name(source)}의 +{source.Upgrade}를 여기로 (정수 {World.TransferEssence})"))
+                if (Ui.LayoutButton($"강화 옮기기: {source.Base.Name}의 +{source.Upgrade}를 여기로 (정수 {World.TransferEssence})"))
                     Send(_client.RefineCommand(InventoryCommand.TransferUpgrade, item.Id), Sound.Craft);
                 GUI.enabled = true;
                 GUILayout.EndHorizontal();
