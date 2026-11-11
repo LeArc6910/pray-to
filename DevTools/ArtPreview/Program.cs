@@ -636,7 +636,10 @@ namespace Game.Client
         // A place of the story as the game lays it out (Docs/Story.md): its plaza, lamps, waypoint, roads and people, lit.
         static PixelImage Place(GeneratedWorld world, PlaceSite site, WorldLights lights)
         {
-            int half = site.Radius + 5;
+            // Wide enough for its shops (2026-11-11), each with a stall at its counter as the game puts one.
+            int half = site.Radius + (site.Shops.Count > 0 ? 15 : 5);
+            var stalls = new[] { TileType.MerchantStall, TileType.SmithStall, TileType.FisherHut, TileType.AlchemyTable };
+            for (int i = 0; i < site.Shops.Count; i++) world.Map[site.Shops[i].X, site.Shops[i].Y] = stalls[i % stalls.Length];
             var scene = new Scene(world.Map, site.X - half, site.Y - half, half * 2, half * 2, _ => false);
             scene.Lit(lights, null);
             scene.Places(world.Places);

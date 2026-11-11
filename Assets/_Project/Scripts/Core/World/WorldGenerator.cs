@@ -87,6 +87,9 @@ namespace Game.Core
         // Playtests hold everyone at home so they can be walked up to (Playtest "still").
         public static bool Still;
 
+        // Where the stalls of its shops stand (WorldGenerator.CarveShops), in order; empty when it has none.
+        public IReadOnlyList<(int X, int Y)> Shops { get; internal set; } = new List<(int X, int Y)>();
+
         // Each wanderer's spots by character id, home first.
         public IReadOnlyDictionary<string, IReadOnlyList<Vec2>> Rounds { get; }
 
@@ -531,7 +534,84 @@ namespace Game.Core
                 Tidy(map, cx, cy, place);
                 sites.Add(new PlaceSite(place, cx, cy, people, Rounds(map, cx, cy, place, people)));
             }
+            foreach (var site in sites.Where(s => s.Definition.Shops > 0))
+                site.Shops = CarveShops(map, site, spots.Select(p => (p.X, p.Y, p.Place.Radius)).ToList(), arenas);
             return sites;
+        }
+
+        // A shop: a timber room ShopWidth by ShopHeight outside (walls round a floor of the place's own paving, or
+        // stone), its door in the middle of the front (lower) wall, the stall against the back wall facing it, and a
+        // lantern in a back corner. A short road leads from the door to the plaza.
+        public const int ShopWidth = 7, ShopHeight = 6;
+
+        // Round the plaza, outside it (2026-11-11, the owner: "the merchants should not stand in the street but each
+        // in a shop of their own"): up to the place's number of shops, each where all of it and a tile round it is
+        // bare floor or rock clear of the other places, the arenas, the roads and their dressing, with a clear way
+        // from its door to the plaza. Above the plaza first, so the doors face it; the counter spots, in order.
+        static List<(int X, int Y)> CarveShops(TileMap map, PlaceSite site, List<(int X, int Y, int Radius)> plazas, List<(int X, int Y)> arenas)
+        {
+            var counters = new List<(int X, int Y)>();
+            int r = site.Radius, cx = site.X, cy = site.Y;
+            int Square(int dx, int dy) => dx * dx + dy * dy;
+            bool Rock(TileType t) => t == TileType.Wall || t == TileType.Floor || t == TileType.CopperOre || t == TileType.IronOre
+                || t == TileType.MithrilOre || t == TileType.ObsidianOre || t == TileType.VoidOre;
+            bool Bare(int x, int y, bool margin) => IsInside(map, x, y) && (Rock(map[x, y]) || margin && Structures.IsWay(map[x, y]))
+                && plazas.All(p => Square(x - p.X, y - p.Y) > (p.Radius + 1) * (p.Radius + 1))
+                && arenas.All(a => Square(x - a.X, y - a.Y) > (ArenaRadius + 2) * (ArenaRadius + 2));
+            bool InThisPlaza(int x, int y) => Square(x - cx, y - cy) <= r * r;
+            var floor = TileMap.IsPaving(site.Definition.Floor) ? site.Definition.Floor : TileType.StoneFloor;
+            // The ways round, above the plaza first (sideways next, below last).
+            var ways = Enumerable.Range(0, Ways.Length).OrderByDescending(w => Ways[w].Y).ThenBy(w => System.Math.Abs(Ways[w].X)).ToList();
+            foreach (int way in ways)
+            {
+                if (counters.Count >= site.Definition.Shops) break;
+                for (int reach = r + ShopHeight / 2 + 2; reach <= r + ShopHeight + 14; reach++)
+                {
+                    // The lower left corner of the walls.
+                    int left = cx + Ways[way].X * reach / 1000 - ShopWidth / 2;
+                    int bottom = cy + Ways[way].Y * reach / 1000 - ShopHeight / 2;
+                    bool clear = true;
+                    for (int y = bottom - 1; y <= bottom + ShopHeight && clear; y++)
+                        for (int x = left - 1; x <= left + ShopWidth && clear; x++)
+                            clear = Bare(x, y, x < left || x >= left + ShopWidth || y < bottom || y >= bottom + ShopHeight);
+                    if (!clear) continue;
+                    // From just below the door toward the waypoint, until the plaza: over bare floor or rock only.
+                    int doorX = left + ShopWidth / 2, doorY = bottom;
+                    var path = new List<(int X, int Y)>();
+                    bool reached = false;
+                    foreach (var (px, py) in Line(doorX, doorY - 1, cx, cy))
+                    {
+                        if (InThisPlaza(px, py))
+                        {
+                            reached = true;
+                            break;
+                        }
+                        bool ownWall = px >= left && px < left + ShopWidth && py >= bottom && py < bottom + ShopHeight;
+                        if (ownWall || !(Rock(map[px, py]) || Structures.IsWay(map[px, py]))) break;
+                        path.Add((px, py));
+                    }
+                    if (!reached) continue;
+                    for (int y = bottom - 1; y <= bottom + ShopHeight; y++)
+                        for (int x = left - 1; x <= left + ShopWidth; x++)
+                        {
+                            bool wall = x == left || x == left + ShopWidth - 1 || y == bottom || y == bottom + ShopHeight - 1;
+                            bool outside = x < left || x >= left + ShopWidth || y < bottom || y >= bottom + ShopHeight;
+                            if (outside && Structures.IsWay(map[x, y])) continue;
+                            map[x, y] = outside ? TileType.Floor : wall ? TileType.TimberWall : floor;
+                        }
+                    map[doorX, doorY] = TileType.Door;
+                    foreach (var (px, py) in path)
+                        if (!Structures.IsWay(map[px, py])) map[px, py] = TileType.Road;
+                    var counter = (doorX, bottom + ShopHeight - 2);
+                    map[left + 1, bottom + ShopHeight - 2] = TileType.Lantern;
+                    map[left + ShopWidth - 2, bottom + ShopHeight - 2] = TileType.Crates;
+                    counters.Add(counter);
+                    // The tiles round it are taken now.
+                    plazas.Add((doorX, bottom + ShopHeight / 2, ShopWidth / 2 + 1));
+                    break;
+                }
+            }
+            return counters;
         }
 
         // Dresses a plaza in its style (Docs/Story.md, 장소 꾸밈) and gives where its people would stand, in

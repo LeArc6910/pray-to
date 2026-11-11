@@ -65,10 +65,13 @@ namespace Game.Core.Tests
                         if (world.Map[x, y] == npc.Tile) stalls.Add((x, y));
                 Assert.AreEqual(1, stalls.Count, $"seed {seed}: {npc.Id}");
                 var (sx, sy) = stalls[0];
-                Assert.IsTrue(site.Contains(TileMap.Center(sx, sy)), $"seed {seed}: {npc.Id} outside {npc.Place}");
+                // In the place, or behind the counter of one of its shops (2026-11-11, walked into through its door:
+                // OnTheGameMapTheMerchantsStandInShopsOfTheirOwn).
+                bool shop = site.Shops.Contains((sx, sy));
+                Assert.IsTrue(shop || site.Contains(TileMap.Center(sx, sy)), $"seed {seed}: {npc.Id} outside {npc.Place}");
                 var field = new FlowField(world.Map);
                 field.Build(new[] { site.Center }, int.MaxValue - 1);
-                Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(sx, sy - 1), $"seed {seed}: nowhere to trade with {npc.Id} from");
+                if (!shop) Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(sx, sy - 1), $"seed {seed}: nowhere to trade with {npc.Id} from");
                 var player = world.AddPlayer("a", null);
                 player.Position = TileMap.Center(sx, sy - 1);
                 Assert.AreSame(npc, world.NpcNear(player.Position)?.Npc, $"seed {seed}: in front of {npc.Id}");

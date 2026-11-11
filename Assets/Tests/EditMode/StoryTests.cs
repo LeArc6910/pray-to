@@ -104,6 +104,43 @@ namespace Game.Core.Tests
             foreach (var site in world.Places) Assert.AreNotEqual(FlowField.Unreached, field.DistanceAt(site.X, site.Y), $"seed {seed}: {site.Definition.Id}");
         }
 
+        // Shops (2026-11-11, the owner: the merchants each in a shop of their own, not in the street): on the game's
+        // map the people who keep shop stand behind the counter of a timber room with a door, walked into from the
+        // spawn, the village's four round it and the story's traders round their place.
+        [Test]
+        public void OnTheGameMapTheMerchantsStandInShopsOfTheirOwn([Values(1, 2)] int seed)
+        {
+            var host = new WorldHost((ulong)seed, Monsters.Shipped, Gear.Data, config: new HostConfig { MapSize = WorldGenerator.GameSize },
+                bosses: Bosses.Shipped, classes: Classes.Shipped, tiles: Tiles.Shipped, npcs: People.Shipped, story: Tales.Shipped);
+            var world = host.World;
+            var map = world.Map;
+            var reached = new HashSet<(int, int)>();
+            var open = new Queue<(int X, int Y)>();
+            open.Enqueue((TileMap.Cell(world.Spawn.X), TileMap.Cell(world.Spawn.Y)));
+            reached.Add(open.Peek());
+            while (open.Count > 0)
+            {
+                var (x, y) = open.Dequeue();
+                foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                    if (map.InBounds(nx, ny) && !map.IsSolid(nx, ny) && reached.Add((nx, ny))) open.Enqueue((nx, ny));
+            }
+            int inShops = 0;
+            foreach (var npc in People.Shipped.Npcs)
+            {
+                var site = npc.Place != null ? world.Places.Single(p => p.Definition.Id == npc.Place) : world.Places.Single(p => p.Definition.Distance == 0);
+                var counter = site.Shops.FirstOrDefault(c => map[c.X, c.Y] == npc.Tile);
+                if (site.Shops.Count == 0 || counter == default) continue;
+                inShops++;
+                // Behind the counter the back wall, timber both sides of the room, and a door in its front wall.
+                Assert.AreEqual(TileType.TimberWall, map[counter.X, counter.Y + 1], $"seed {seed}: {npc.Id} back wall");
+                Assert.AreEqual(TileType.TimberWall, map[counter.X - 3, counter.Y], $"seed {seed}: {npc.Id} side wall");
+                Assert.AreEqual(TileType.TimberWall, map[counter.X + 3, counter.Y], $"seed {seed}: {npc.Id} side wall");
+                Assert.AreEqual(TileType.Door, map[counter.X, counter.Y - WorldGenerator.ShopHeight + 2], $"seed {seed}: {npc.Id} door");
+                Assert.IsTrue(reached.Contains((counter.X, counter.Y - 1)), $"seed {seed}: {npc.Id}'s counter is walked up to from the spawn");
+            }
+            Assert.GreaterOrEqual(inShops, People.Shipped.Npcs.Count - 1, $"seed {seed}: the merchants are in shops");
+        }
+
         [Test]
         public void EverySeedGivesPlacesClearOfTheArenasAndWithinReach([Range(1, 24)] int seed)
         {

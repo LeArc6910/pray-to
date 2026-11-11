@@ -146,10 +146,33 @@ namespace Game.Core
             foreach (var npc in Npcs.Npcs)
             {
                 if (HasTile(npc.Tile)) continue;
+                // Behind the counter of a free shop of their place (2026-11-11, WorldGenerator.CarveShops): the one
+                // of the story's place they keep shop in, or for the others the village round the spawn.
+                var home = npc.Place != null ? Places.FirstOrDefault(p => p.Definition.Id == npc.Place) : Places.FirstOrDefault(p => p.Definition.Distance == 0);
+                var shop = ShopSpot(home);
+                if (shop != null)
+                {
+                    SetTile(shop.Value.X, shop.Value.Y, npc.Tile);
+                    continue;
+                }
                 // One who keeps shop in a place of the story stands there, or nowhere when the world has no such place.
                 var spot = npc.Place != null ? PlaceSpot(Places.FirstOrDefault(p => p.Definition.Id == npc.Place)) : NpcSpot();
                 if (spot != null) SetTile(spot.Value.X, spot.Value.Y, npc.Tile);
             }
+        }
+
+        // The first of the place's shop counters with nobody's stall on it and still the shop's floor round it.
+        (int X, int Y)? ShopSpot(PlaceSite site)
+        {
+            if (site == null) return null;
+            var people = PersonTiles;
+            foreach (var (x, y) in site.Shops)
+            {
+                if (people.Contains(Map[x, y])) continue;
+                if (Map[x, y] != Map[x, y - 1] || Map.IsSolid(x, y - 1)) continue;
+                return (x, y);
+            }
+            return null;
         }
 
         // A tile of the place's own floor with its floor in front (below) of it, a ring or more out from the waypoint,
