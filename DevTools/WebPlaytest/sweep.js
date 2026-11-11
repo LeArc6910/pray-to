@@ -61,7 +61,8 @@ async function clearRoom(game, w = 6, h = 4) {
   await game.wait(400);
 }
 
-const count = (inv, id) => (inv.materials || {})[id] || 0;
+// A material or consumable in the bag (grilled fish is a consumable, 2026-11-11).
+const count = (inv, id) => (inv.materials || {})[id] || (inv.consumables || {})[id] || 0;
 const items = (inv, base) => (inv.items || []).filter(i => i.base === base).length;
 
 // The start screen's pages (2026-11-11): back to the first screen, then the page of that name (none: stay there).
@@ -2468,7 +2469,7 @@ async function firstRun(browser, profile, hourLong) {
       if (!moved.has(why)) note(`- ${why}: 봇은 옮겨졌다(걸어서 못 가서)`);
       moved.add(why);
     };
-    const ids = { 호미: 'hoe', 낚싯대: 'fishing_rod', 화로: 'furnace', 침대: 'bed' };
+    const ids = { 호미: 'hoe', 낚싯대: 'fishing_rod', 화로: 'furnace', 침대: 'bed', '생선 구이': 'grilled_fish' };
     const craft = async name => {
       await bagTab(game, '재료·제작');
       const made = await makeOne(name, ids[name]);
@@ -2687,26 +2688,38 @@ async function firstRun(browser, profile, hourLong) {
     // A rod (slime gel 2, from the slimes before the bed), at the nearest water.
     await taken('near Workbench', '작업대로 돌아갈 때');
     await craft('낚싯대');
-    await taken('near Water', '물웅덩이를 찾을 때(안내는 "동굴 가장자리 물웅덩이"라고만 한다)');
-    await bagTab(game, '재료·제작');
-    await game.press('낚시', '낚싯대');
-    const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
+    // Fishes at the water in front, pressing the rod's button as the bite comes, until `enough` (or the time runs out).
     let strikes = 0;
-    const fishing = Date.now() + 150000;
-    while (rod && Date.now() < fishing && (await goalNow()).n <= at('fishing')) {
-      const f = (await game.state()).fishing;
-      if (f === 'bite in') {
-        await game.tapAt(rod.cx, rod.cy);
-        strikes++;
-        await game.wait(700);
-      } else if (!f) {
-        await game.tapAt(rod.cx, rod.cy);
-        await game.wait(400);
+    const fishUntil = async (enough, seconds) => {
+      await bagTab(game, '재료·제작');
+      await game.press('낚시', '낚싯대');
+      const rod = (await game.find(/^(낚시|걷기|낚아채기!)$/, '낚싯대'))[0];
+      const end = Date.now() + seconds * 1000;
+      while (rod && Date.now() < end && !(await enough())) {
+        const f = (await game.state()).fishing;
+        if (f === 'bite in') {
+          await game.tapAt(rod.cx, rod.cy);
+          strikes++;
+          await game.wait(700);
+        } else if (!f) {
+          await game.tapAt(rod.cx, rod.cy);
+          await game.wait(400);
+        }
       }
-    }
-    await closeBag(game);
-    note(`- 낚시: 낚아채기 ${strikes}번`);
+      await closeBag(game);
+    };
+    // At the dirt cave's water (2026-11-11: the cooking goal after it wants two cave minnows, which live there
+    // alone; the playtest's "nav near Water Cave"), until the goal and the two minnows.
+    await taken('near Water Cave', '흙 동굴 물웅덩이를 찾을 때(안내는 "동굴 가장자리 물웅덩이"라고만 한다)');
+    await fishUntil(async () => (await goalNow()).n > at('fishing') && count(await inv(), 'cave_minnow') >= 2, 240);
+    note(`- 낚시: 낚아채기 ${strikes}번, 송사리 ${count(await inv(), 'cave_minnow')}`);
     await passed(at('fishing'), '물고기 낚기');
+
+    // Cooking (2026-11-11): grilled fish from two minnows, made beside the furnace as the goal's hint says.
+    await taken('near Furnace', '화로로 갈 때');
+    const cooked = await craft('생선 구이');
+    note(`- 요리: 생선 구이 ${cooked ? '만듦' : '못 만듦'} (송사리 ${count(await inv(), 'cave_minnow')}, 생선 구이 ${count(await inv(), 'grilled_fish')})`);
+    await passed(at('cook'), '요리 하나 만들기');
 
     // Ten coins: what the merchant buys of the bag (fish, ore, mushrooms), at the stall near the spawn.
     await taken('near MerchantStall', '상인 노점으로 갈 때');
@@ -2723,6 +2736,46 @@ async function firstRun(browser, profile, hourLong) {
     await closeBag(game);
     await game.wait(800);
     await passed(at('merchant'), '상인에게 팔아 금화 10개 모으기');
+
+    // The merchant's request of the day (2026-11-11): what it needs is in the goal list once she has been met
+    // ("부탁: 상인 도라 · 생선 구이 0/3"). Grilled fish: minnows from the dirt cave's water, made at the furnace;
+    // mushroom spores: bought from her. Then [건네기] in her [부탁].
+    const requestLine = async () => ((await game.texts()).hud || []).find(l => /^부탁: 상인 도라/.test(l)) || '';
+    const want = (line, name) => {
+      const m = line.match(new RegExp(name + ' (\\d+)/(\\d+)'));
+      return m ? Math.max(0, +m[2] - +m[1]) : 0;
+    };
+    const asked = await requestLine();
+    note(`- 부탁: ${asked || '목표 목록에 없음'}`);
+    const fish = want(asked, '생선 구이');
+    if (fish > 0) {
+      await taken('near Water Cave', '부탁의 생선을 낚으러 갈 때');
+      await fishUntil(async () => count(await inv(), 'cave_minnow') >= fish * 2, 300);
+      await taken('near Furnace', '부탁의 생선을 구우러 화로로');
+      for (let i = 0; i < fish && count(await inv(), 'cave_minnow') >= 2; i++) await craft('생선 구이');
+    }
+    const spores = want(asked, '버섯 포자');
+    if (spores > 0) {
+      await taken('near MerchantStall', '버섯 포자를 사러 상인에게');
+      await bagTab(game, '상인');
+      await game.press('사기');
+      for (let i = 0; i < 20 && want(await requestLine(), '버섯 포자') > 0; i++) {
+        if (!(await game.press('사기', '버섯 포자', { quiet: i > 0 }))) break;
+        await game.wait(350);
+      }
+      await closeBag(game);
+    }
+    const short = [...asked.matchAll(/(\d+)\/(\d+)/g)].some(m => +m[1] < +m[2]);
+    if (asked && fish === 0 && spores === 0 && short) note('  - 봇이 모을 줄 모르는 부탁이다');
+    await taken('near MerchantStall', '부탁을 건네러 상인에게');
+    await bagTab(game, '상인');
+    await game.press('부탁');
+    const handed = await game.press('건네기', undefined, { quiet: true });
+    await game.wait(800);
+    if (!handed) await game.shot('hour-request', '건네지 못한 [부탁]');
+    await closeBag(game);
+    note(`- 부탁 건네기: ${handed ? '누름' : '못 누름'} (지금: ${(await requestLine()) || '목표 목록에서 사라짐'})`);
+    await passed(at('request'), '부탁 하나 들어주기');
 
     // Mining skill 2, from all the walls dug so far and more.
     // Level 2 is 100 mining experience, a wall each (ore two), so it can take some minutes after the copper.
