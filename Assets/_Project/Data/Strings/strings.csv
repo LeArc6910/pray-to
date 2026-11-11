@@ -1,0 +1,24 @@
+id,ko,en
+# The menu (Docs/Strings.md, 2026-11-11): the first screen read through the table. ko is what the code keeps too.
+common.on,켜짐,On
+common.off,꺼짐,Off
+menu.name,이름 (캐릭터),Name (character)
+menu.world,월드 (혼자 하기·호스트),World (solo or host)
+menu.daylength,하루 길이: {0}분,Day length: {0} min
+menu.language,언어,Language
+menu.saves,저장본: 고르기·내보내기·가져오기,"Saves: pick, export, import"
+menu.saves_close,저장본 닫기,Close saves
+menu.feedback,의견 보내기,Send feedback
+menu.darkness,어둠과 빛,Darkness and light
+menu.sound,효과음,Sound
+menu.music,음악,Music
+menu.devinfo,개발 정보,Dev info
+menu.guide,목표 안내,Goal guide
+menu.shake,화면 흔들림,Screen shake
+menu.host_online,온라인 방 만들기,Host an online room
+menu.connecting,연결하는 중…,Connecting…
+menu.join_code,코드로 참가,Join by code
+menu.lan,같은 네트워크(LAN),Same network (LAN)
+menu.host_address,호스트 주소,Host address
+menu.join,참가,Join
+menu.solo,혼자 하기,Play solo

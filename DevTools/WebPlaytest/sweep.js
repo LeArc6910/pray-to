@@ -118,6 +118,21 @@ async function menu(browser) {
   await game.press('어둠과 빛: 꺼짐');
   await game.press('개발 정보: 켜짐');
 
+  // The string table (Docs/Strings.md, 2026-11-11): [언어] turns the menu into English and back.
+  const language = (await game.find(/^언어: /))[0];
+  check(!!language, `메뉴에 [언어: 한국어] 단추 (${language && language.label})`);
+  if (language) {
+    await game.press(language.label);
+    const english = (await game.buttons()).map(b => b.label);
+    check(english.includes('Play solo') && english.some(l => l.startsWith('Sound:')), `[언어]를 누르면 메뉴가 영어 (${english.slice(0, 6).join(', ')})`);
+    await game.shot('menu-english', '영어 메뉴');
+    for (let i = 0; i < 4 && (await game.find('혼자 하기')).length === 0; i++) {
+      const next = (await game.find(/^Language: /))[0];
+      if (!next) break;
+      await game.press(next.label);
+    }
+    check((await game.find('혼자 하기')).length === 1, '[언어]를 다시 누르면 한국어로 돌아온다');
+  }
 
   // Keys: skill 1 to the "1" key; W is refused; Esc gives up.
   await game.press('키 바꾸기');
@@ -1596,12 +1611,16 @@ async function touch(browser) {
     await game.wait(500);
     check((await game.state()).mana < full.mana, '둘째 스킬 단추를 탭한다');
     // A skill button alone aims at the nearest foe (2026-11-11, Docs/WebDemo.md 터치): a slime above, the stick untouched.
-    await game.send('face off; heal; clear; spawn slime 0 3 5000');
+    // Outside the places (monsters are kept out of them), with the second skill (an aimed one, not a buff).
+    // The skill was just used above: its cooldown (about 12 seconds) runs out first.
+    await game.wait(12000);
+    await game.send('goto wild; face off; heal; mana 100; clear; spawn slime 0 3 5000');
     await game.wait(1500);
-    await game.press('skill 0');
+    await game.press('skill 1');
     await game.wait(600);
-    const facing = ((await game.state()).facing || '0,0').split(',').map(Number);
-    check(facing[1] > 0.6, `스틱 없이 스킬 단추만 탭해도 가장 가까운 적(위쪽)을 향한다 (바라보는 쪽 ${facing.join(',')})`);
+    // The aim the press sent (the host's facing is the client's again by the next input).
+    const aimed = ((await game.state()).skillAim || '0,0').split(',').map(Number);
+    check(aimed[1] > 0.6, `스틱 없이 스킬 단추만 탭해도 가장 가까운 적(위쪽)으로 쓴다 (조준 ${aimed.join(',')})`);
     await game.shot('touch-autoaim', '스틱 없이 쓴 스킬');
     await game.context.close();
   }

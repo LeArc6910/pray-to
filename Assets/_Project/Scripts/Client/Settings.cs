@@ -16,6 +16,8 @@ namespace Game.Client
         const string MusicKey = "settings.music";
         static int? _music;
         const string DayKey = "settings.daylength";
+        const string LanguageKey = "settings.language";
+        static string _language;
         static int? _dayMinutes;
         static readonly Choice DevInfoChoice = new Choice("settings.devinfo", false);
         static readonly Choice PixelFontChoice = new Choice("settings.pixelfont", true);
@@ -67,6 +69,18 @@ namespace Game.Client
                 if (_dayMinutes == value) return;
                 _dayMinutes = value;
                 Prefs.Set(DayKey, value);
+            }
+        }
+
+        // The language of the words on screen (Strings, Docs/Strings.md): "ko" unless chosen.
+        public static string Language
+        {
+            get => _language ??= Prefs.Get(LanguageKey, "ko");
+            set
+            {
+                if (_language == value) return;
+                _language = value;
+                Prefs.Set(LanguageKey, value);
             }
         }
 

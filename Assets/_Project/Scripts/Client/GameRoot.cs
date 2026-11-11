@@ -148,6 +148,7 @@ namespace Game.Client
             _guide = sheets.LoadGuide(_loot);
             _npcs = sheets.LoadNpcs(_loot);
             _story = sheets.LoadStory(_loot, _bosses);
+            Strings.Use(sheets.LoadStrings());
             // The days from their sheet; a build from before it (no sheet) keeps the ones in code.
             var days = sheets.LoadEvents();
             if (days.Events.Count > 0) World.DayEvents = days;
@@ -370,6 +371,9 @@ namespace Game.Client
             Sounds.Play(Sound.Click);
             SendToHost(_client.StartDefenseCommand());
         }
+
+        // Where the last skill press aimed, for the playtests (Playtest "skillAim").
+        internal Vec2 LastSkillAim { get; private set; }
 
         // How far a touch player's skills and taps reach for a foe on their own.
         const float AutoAimReach = 8;
@@ -704,6 +708,7 @@ namespace Game.Client
             var aim = Controls.SkillAim(_camera, _client.Position);
             // On touch a skill button alone aims at the nearest foe, so it needs no second thumb on the stick.
             if (Controls.UsingTouch && aim.LengthSquared < 0.01f) aim = NearestFoeDirection();
+            if (slots.Count > 0) LastSkillAim = aim;
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
             foreach (int slot in quick) UseQuickSlot(slot);
@@ -1261,11 +1266,11 @@ namespace Game.Client
             GUILayout.BeginVertical(GUILayout.Width(column));
             GUILayout.Label($"pray-to 프로토타입 (버전 {Protocol.Version})");
             GUILayout.Space(8);
-            GUILayout.Label("이름 (캐릭터)");
+            GUILayout.Label(Strings.T("menu.name", "이름 (캐릭터)"));
             _playerName = GUILayout.TextField(_playerName, 16);
             GUILayout.Label(SaveStore.Exists(SaveStore.CharacterKey(CharacterName)) ? "저장된 캐릭터로 이어한다" : "새 캐릭터로 시작한다");
             GUILayout.Space(4);
-            GUILayout.Label("월드 (혼자 하기·호스트)");
+            GUILayout.Label(Strings.T("menu.world", "월드 (혼자 하기·호스트)"));
             string worldName = GUILayout.TextField(_worldName, 24);
             if (worldName != _worldName) _confirmDelete = false;
             _worldName = worldName;
@@ -1279,12 +1284,14 @@ namespace Game.Client
             }
             GUILayout.EndHorizontal();
             // How long a day takes in the worlds this player opens or hosts; joiners go by the host's (Docs/Time.md).
-            if (Ui.LayoutButton($"하루 길이: {Settings.DayMinutes}분")) Settings.DayMinutes = Settings.NextDayMinutes();
+            if (Ui.LayoutButton(string.Format(Strings.T("menu.daylength", "하루 길이: {0}분"), Settings.DayMinutes))) Settings.DayMinutes = Settings.NextDayMinutes();
+            // The words' language, when the string sheet has another (Strings, Docs/Strings.md).
+            if (Strings.HasOthers && Ui.LayoutButton($"{Strings.T("menu.language", "언어")}: {Strings.NameOf(Settings.Language)}")) Settings.Language = Strings.NextLanguage();
             // The saves on this device: pick one, carry them off in a file, bring a file's in (SaveMenu).
-            if (Ui.LayoutButton(_side == MenuSide.Saves ? "저장본 닫기" : "저장본: 고르기·내보내기·가져오기")) OpenSide(MenuSide.Saves);
+            if (Ui.LayoutButton(_side == MenuSide.Saves ? Strings.T("menu.saves_close", "저장본 닫기") : Strings.T("menu.saves", "저장본: 고르기·내보내기·가져오기"))) OpenSide(MenuSide.Saves);
             // A GitHub issue form with the version, the device and how far the player has got (Feedback); nothing is
             // sent until the player sends it there.
-            if (Ui.LayoutButton("의견 보내기")) Application.OpenURL(Feedback.FormUrl());
+            if (Ui.LayoutButton(Strings.T("menu.feedback", "의견 보내기"))) Application.OpenURL(Feedback.FormUrl());
             // Web and phone saves live in the browser or the app only: a reminder when nothing was exported for a week.
             if (SaveMenu.ExportDue)
             {
@@ -1295,9 +1302,9 @@ namespace Game.Client
             }
             GUILayout.Space(4);
             GUILayout.BeginHorizontal();
-            if (Ui.LayoutButton($"어둠과 빛: {(Settings.Darkness ? "켜짐" : "꺼짐")}")) Settings.Darkness = !Settings.Darkness;
+            if (Ui.LayoutButton($"{Strings.T("menu.darkness", "어둠과 빛")}: {Strings.OnOff(Settings.Darkness)}")) Settings.Darkness = !Settings.Darkness;
             // Each press turns it up a quarter, and from full back to off.
-            if (Ui.LayoutButton($"효과음: {Settings.VolumeText}"))
+            if (Ui.LayoutButton($"{Strings.T("menu.sound", "효과음")}: {Settings.VolumeText}"))
             {
                 Settings.Volume = (Settings.Volume + 1) % (Settings.MaxVolume + 1);
                 Sounds.Play(Sound.Click);
@@ -1305,18 +1312,18 @@ namespace Game.Client
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             // The menu plays the cave's tune, so the change is heard at once.
-            if (Ui.LayoutButton($"음악: {Settings.MusicVolumeText}")) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
+            if (Ui.LayoutButton($"{Strings.T("menu.music", "음악")}: {Settings.MusicVolumeText}")) Settings.MusicVolume = (Settings.MusicVolume + 1) % (Settings.MaxVolume + 1);
             // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
-            if (Ui.LayoutButton($"개발 정보: {(Settings.DevInfo ? "켜짐" : "꺼짐")}")) Settings.DevInfo = !Settings.DevInfo;
+            if (Ui.LayoutButton($"{Strings.T("menu.devinfo", "개발 정보")}: {Strings.OnOff(Settings.DevInfo)}")) Settings.DevInfo = !Settings.DevInfo;
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
             if (Ui.LayoutButton($"글꼴: {(Settings.PixelFont ? "도트" : "매끈")}")) Settings.PixelFont = !Settings.PixelFont;
             // The goals for new players in the HUD; met goals still count while it is off (Settings.Guide).
-            if (Ui.LayoutButton($"목표 안내: {(Settings.Guide ? "켜짐" : "꺼짐")}")) Settings.Guide = !Settings.Guide;
+            if (Ui.LayoutButton($"{Strings.T("menu.guide", "목표 안내")}: {Strings.OnOff(Settings.Guide)}")) Settings.Guide = !Settings.Guide;
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
-            if (Ui.LayoutButton($"화면 흔들림: {(Settings.ScreenShake ? "켜짐" : "꺼짐")}")) Settings.ScreenShake = !Settings.ScreenShake;
+            if (Ui.LayoutButton($"{Strings.T("menu.shake", "화면 흔들림")}: {Strings.OnOff(Settings.ScreenShake)}")) Settings.ScreenShake = !Settings.ScreenShake;
             // Keys only matter with a keyboard; the list opens in the other column, in place of the classes.
             if (!Controls.UsingTouch && Ui.LayoutButton(_side == MenuSide.Keys ? "키 바꾸기 닫기" : "키 바꾸기")) OpenSide(MenuSide.Keys);
             GUILayout.EndHorizontal();
@@ -1325,20 +1332,20 @@ namespace Game.Client
             GUI.enabled = ready && !_connecting;
             // Online, through Unity Relay: the same on the web and on PC, so they play together.
             GUILayout.Label(Ui.Wrap("온라인 협동: 방을 만들면 코드가 나온다. 친구는 그 코드로 참가한다(웹과 PC가 함께)", GUI.skin.label, _menuColumn));
-            if (Ui.LayoutButton(_connecting ? "연결하는 중…" : "온라인 방 만들기")) StartOnlineHost();
+            if (Ui.LayoutButton(_connecting ? Strings.T("menu.connecting", "연결하는 중…") : Strings.T("menu.host_online", "온라인 방 만들기"))) StartOnlineHost();
             GUILayout.BeginHorizontal();
             _codeInput = GUILayout.TextField(_codeInput, 12, GUILayout.MinWidth(80));
-            if (Ui.LayoutButton("코드로 참가", GUILayout.Width(110))) StartOnlineJoin();
+            if (Ui.LayoutButton(Strings.T("menu.join_code", "코드로 참가"), GUILayout.Width(110))) StartOnlineJoin();
             GUILayout.EndHorizontal();
             // A browser cannot listen for connections, so the LAN way is only on PC.
             if (Application.platform != RuntimePlatform.WebGLPlayer)
             {
                 GUILayout.Space(8);
-                GUILayout.Label("같은 네트워크(LAN)");
+                GUILayout.Label(Strings.T("menu.lan", "같은 네트워크(LAN)"));
                 if (Ui.LayoutButton($"호스트 (포트 {NetLink.DefaultPort})")) StartHost();
-                GUILayout.Label("호스트 주소");
+                GUILayout.Label(Strings.T("menu.host_address", "호스트 주소"));
                 _address = GUILayout.TextField(_address, 64);
-                if (Ui.LayoutButton("참가")) StartJoining();
+                if (Ui.LayoutButton(Strings.T("menu.join", "참가"))) StartJoining();
             }
             GUI.enabled = true;
             GUILayout.EndVertical();
@@ -1356,7 +1363,7 @@ namespace Game.Client
 
             if (_status.Length > 0) GUILayout.Label(Ui.Wrap(_status, GUI.skin.label, inner - GUI.skin.label.margin.horizontal));
             GUI.enabled = ready;
-            if (Ui.LayoutButton("혼자 하기", GUILayout.Height(36))) StartSolo();
+            if (Ui.LayoutButton(Strings.T("menu.solo", "혼자 하기"), GUILayout.Height(36))) StartSolo();
             GUI.enabled = true;
             GUILayout.EndArea();
         }

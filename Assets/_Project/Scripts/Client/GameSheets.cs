@@ -36,6 +36,8 @@ namespace Game.Client
         public TextAsset places;
         public TextAsset characters;
         public TextAsset story;
+        // The words on screen in each language (Docs/Strings.md, 2026-11-11).
+        public TextAsset strings;
 
         public static GameSheets Load() => Resources.Load<GameSheets>(ResourcePath);
 
@@ -56,6 +58,9 @@ namespace Game.Client
         // Without the sheets (an asset made before they existed) there is no one.
         public DayEventData LoadEvents() => DayEventSheet.Parse(Text(events));
         public StoryData LoadStory(LootData loot, BossData bosses) => StorySheet.Parse(Text(places), Text(characters), Text(story), loot, bosses);
+
+        // Without the sheet every line shows the Korean the code keeps beside it.
+        public StringData LoadStrings() => StringSheet.Parse(Text(strings));
 
         public NpcData LoadNpcs(LootData loot) => NpcSheet.Parse(Text(npcs), Text(shop), loot, Text(requests));
 

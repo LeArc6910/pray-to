@@ -959,6 +959,10 @@ DevTools/Local/setup.sh --commit
   - (사람, 헤드폰) 장소에 들어서고 나갈 때, 보스 3페이즈가 될 때 곡이 박자 가운데서 끊기지 않고 마디에서 바뀌는지, 기다림(최대 2.5초)이 늦게 느껴지지 않는지
 - [ ] 123단계: 둥근 모서리 비교 그림 판정(`Docs/ArtPipeline.md` 둥근 모서리 시험)
   - (사람) 클라우드가 보낸 `corners_compare.png`(왼쪽 지금, 오른쪽 모서리를 3픽셀 깎고 메운 것)를 보고 게임에 넣을지 정한다. 넣으면 클라우드가 바닥 위 모서리 한 겹으로 만든다
+- [ ] 124단계: 문자열 표 시험(`Docs/Strings.md`)
+  - 명령 한 줄을 다시 돌린다. 새 시트 폴더 `Assets/_Project/Data/Strings/`를 `SceneSetup`이 `GameSheets`에 넣는다. 새 파일(`strings.csv`, `StringSheet.cs`, `Strings.cs`, `DevTools/Strings/`)의 `.meta`는 Unity가 만들면 커밋한다
+  - (클라우드 웹 점검) 메뉴가 표를 거쳐도 전과 같은 말로 보이는지, [언어] 단추로 영어 메뉴가 되는지 `sweep.js --only menu`가 본다. 결과는 배포 뒤 여기에 적는다
+  - (사람) 메뉴의 [언어]를 눌러 English로 바꿔 보고 글자가 깨지거나 칸을 넘치지 않는지(아직 메뉴만 영어다)
 
 ## 결과 보고
 

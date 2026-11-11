@@ -222,5 +222,34 @@ namespace Game.Core.Tests
             Assert.IsTrue(broken.Errors.Any(e => e.Contains("nothing")), string.Join("\n", broken.Errors));
             Assert.IsTrue(broken.Errors.Any(e => e.Contains("레벨")), string.Join("\n", broken.Errors));
         }
-}
+
+    
+        // The string table (Docs/Strings.md, 2026-11-11): read as a sheet; a line it lacks shows the Korean given; and
+        // every line the code reads through it keeps the same Korean in the code and in the sheet's ko column.
+        [Test]
+        public void TheStringSheetGivesEachLanguageAndKeepsTheCodesKorean()
+        {
+            var data = StringSheet.Parse("id,ko,en\na,가,A\nb,나,\na,다,C\n,라,D\n");
+            Assert.AreEqual(2, data.Errors.Count, "a repeated id and a missing one");
+            Assert.AreEqual("A", data.Get("a", "en", "가"));
+            Assert.AreEqual("나", data.Get("b", "en", "나"), "no English: the Korean");
+            Assert.AreEqual("없음", data.Get("missing", "en", "없음"));
+            CollectionAssert.AreEqual(new[] { "ko", "en" }, data.Languages);
+
+            var shipped = StringSheet.Parse(System.IO.File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Strings/" + StringSheet.File)));
+            Assert.IsTrue(shipped.Success, string.Join("\n", shipped.Errors));
+            var calls = new System.Text.RegularExpressions.Regex("Strings\\.T\\(\"([a-z_.]+)\", \"([^\"]*)\"\\)");
+            var root = System.IO.Path.GetDirectoryName(RepoFile.Find("Assets/_Project/Scripts/Client/Strings.cs"));
+            int seen = 0;
+            foreach (string file in System.IO.Directory.GetFiles(root, "*.cs", System.IO.SearchOption.AllDirectories))
+            {
+                foreach (System.Text.RegularExpressions.Match call in calls.Matches(System.IO.File.ReadAllText(file)))
+                {
+                    seen++;
+                    Assert.AreEqual(call.Groups[2].Value, shipped.Get(call.Groups[1].Value, "ko", "(시트에 없음)"), $"{call.Groups[1].Value} in {System.IO.Path.GetFileName(file)}");
+                }
+            }
+            Assert.Greater(seen, 10, "the menu reads through the table");
+        }
+    }
 }

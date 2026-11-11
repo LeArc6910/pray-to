@@ -21,6 +21,8 @@ namespace Game.Client.Editor
         const string GuideFolder = ProjectFolder + "/Data/Guide/";
         const string NpcsFolder = ProjectFolder + "/Data/Npcs/";
         const string StoryFolder = ProjectFolder + "/Data/Story/";
+        // The words on screen in each language (Docs/Strings.md, 2026-11-11).
+        const string StringsFolder = ProjectFolder + "/Data/Strings/";
 
         [MenuItem("Game/Set Up Main Scene")]
         public static void SetUp()
@@ -75,6 +77,7 @@ namespace Game.Client.Editor
             sheets.places = Sheet(StoryFolder + StorySheet.PlacesFile);
             sheets.characters = Sheet(StoryFolder + StorySheet.CharactersFile);
             sheets.story = Sheet(StoryFolder + StorySheet.StoryFile);
+            sheets.strings = Sheet(StringsFolder + StringSheet.File);
             EditorUtility.SetDirty(sheets);
             AssetDatabase.SaveAssets();
         }
