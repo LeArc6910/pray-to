@@ -132,6 +132,31 @@ namespace Game.Core.Tests
             Assert.IsTrue(events.Any(e => e.Type == SimEventType.Impact && e.Source == boss.Id));
         }
 
+        // Every attack shape gives one of five warnings, the same on every boss, and a winding-up boss sends it with its
+        // state (Docs/Bosses.md 전조 말, 2026-11-11).
+        [Test]
+        public void EachAttackGivesItsKindOfWarning()
+        {
+            foreach (AttackShape shape in System.Enum.GetValues(typeof(AttackShape))) Assert.AreNotEqual(Tell.None, World.TellOf(shape), shape.ToString());
+            Assert.AreEqual(Tell.Area, World.TellOf(AttackShape.Circle));
+            Assert.AreEqual(Tell.Area, World.TellOf(AttackShape.Trail));
+            Assert.AreEqual(Tell.Dash, World.TellOf(AttackShape.Charge));
+            Assert.AreEqual(Tell.Gather, World.TellOf(AttackShape.Share));
+            Assert.AreEqual(Tell.Barrage, World.TellOf(AttackShape.Spiral));
+            Assert.AreEqual(Tell.Call, World.TellOf(AttackShape.Summon));
+
+            var world = Arena(out var boss, Bosses.With(Attack("burst", target: "self", radius: "0.3", count: "8", speed: "6", cooldown: 20)));
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -4));
+            for (int i = 0; i < World.Ticks(3) && boss.State != BossState.Telegraph; i++) world.Step();
+            Assert.AreEqual(BossState.Telegraph, boss.State);
+            byte sent = World.BossStateByte(boss);
+            Assert.AreEqual(BossState.Telegraph, (BossState)(sent & 0x0F));
+            Assert.AreEqual(Tell.Barrage, (Tell)(sent >> 4));
+            Run(world, 1.1f);
+            Assert.AreEqual((byte)boss.State, World.BossStateByte(boss), "no warning once it has struck");
+        }
+
         [Test]
         public void BurstsSendProjectilesThatStopAtPlayersAndWalls()
         {

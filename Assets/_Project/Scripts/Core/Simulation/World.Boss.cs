@@ -10,6 +10,20 @@ namespace Game.Core
     // leaves or falls, the boss resets.
     public sealed partial class World
     {
+        // The kind of warning each attack shape gives (Tell, Docs/Bosses.md 전조 말).
+        public static Tell TellOf(AttackShape shape) => shape switch
+        {
+            AttackShape.Charge => Tell.Dash,
+            AttackShape.Share => Tell.Gather,
+            AttackShape.Burst or AttackShape.Spiral => Tell.Barrage,
+            AttackShape.Summon => Tell.Call,
+            _ => Tell.Area,
+        };
+
+        // A boss's state for the wire: its BossState in the low four bits, and while it winds up, its Tell above them.
+        public static byte BossStateByte(Boss boss) =>
+            (byte)((byte)boss.State | (boss.State == BossState.Telegraph && boss.Attack != null ? (int)TellOf(boss.Attack.Shape) << 4 : 0));
+
         // How far outside the arena players still count as fighting it.
         const float ArenaMargin = 6;
         const float ResetSeconds = 5;

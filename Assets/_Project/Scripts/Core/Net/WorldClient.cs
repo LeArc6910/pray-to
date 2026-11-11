@@ -67,7 +67,9 @@ namespace Game.Core
         public float MaxHealth { get; }
         public byte State { get; }
         public EnemyState EnemyState => (EnemyState)State;
-        public BossState BossState => (BossState)State;
+        public BossState BossState => (BossState)(State & 0x0F);
+        // While a boss winds up, the kind of warning its attack gives (World.BossStateByte).
+        public Tell Tell => (Tell)(State >> 4);
         public int Phase { get; }
         // Burning, chilled (StatusBits).
         public byte Status { get; }

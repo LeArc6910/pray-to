@@ -794,7 +794,8 @@ namespace Game.Client
                             tint = DormantTint;
                             break;
                         case BossState.Telegraph:
-                            glow = Faded(Color.white, 0.25f + 0.2f * Mathf.Sin(Time.time * 20));
+                            // The same glow for the same kind of attack on every boss (World.TellOf, Docs/Bosses.md 전조 말).
+                            glow = TellGlow(view.Tell);
                             break;
                         case BossState.Charge:
                             glow = Faded(ChargeColor, 0.5f);
@@ -922,8 +923,28 @@ namespace Game.Client
                     _shake = Mathf.Max(_shake, 0.35f);
                 }
             }
+            // Shots and summons leave nothing on the ground, so their warning starts with a ring off the boss in their
+            // colour as well as the glow.
+            else if (known && view.BossState == BossState.Telegraph && before.State != BossState.Telegraph && (view.Tell == Tell.Barrage || view.Tell == Tell.Call))
+            {
+                var boss = Find(view.Id);
+                if (boss != null) AddFlash(boss.Position, boss.Diameter * 1.3f, view.Tell == Tell.Call ? CallColor : Color.white, FlashKind.Ring);
+            }
             _bossesSeen[view.Id] = (view.BossState, view.Phase, view.Boss.Name);
         }
+
+        static readonly Color CallColor = new Color(0.75f, 0.45f, 1f);
+
+        // A winding-up boss's glow for each kind of warning: red for marks on the ground, yellow for a charge, gold to
+        // gather, a quick white flicker for shots, violet for monsters called.
+        static Color TellGlow(Tell tell) => tell switch
+        {
+            Tell.Dash => Faded(PathColor, 0.45f + 0.15f * Mathf.Sin(Time.time * 20)),
+            Tell.Gather => Faded(ShareColor, 0.4f + 0.2f * Mathf.Sin(Time.time * 8)),
+            Tell.Barrage => Faded(Color.white, Mathf.Sin(Time.time * 40) > 0 ? 0.55f : 0.15f),
+            Tell.Call => Faded(CallColor, 0.45f + 0.15f * Mathf.Sin(Time.time * 6)),
+            _ => Faded(DangerColor, 0.3f + 0.2f * Mathf.Sin(Time.time * 20)),
+        };
 
         // The banner while it shows, for the playtests (GameRoot.Banner).
         internal string ShowingBanner => _bannerAge < BannerSeconds ? _banner : null;

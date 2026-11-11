@@ -576,6 +576,11 @@ async function bosses(browser) {
     check(!!theme, `${name}: 보스 곡 1페이즈 (${(theme || await game.state()).music})`);
     await game.wait(2500);
     await game.shot(`boss-${id}`, `${name} 싸움(예고 장판, 체력 막대)`);
+    // Winding up, it gives one of the five warnings (World.TellOf, Docs/Bosses.md 전조 말, 2026-11-11).
+    const telling = await game.until(t => new RegExp(`${id}:\\d+/\\d+:p\\d:Telegraph:\\w+:(Area|Dash|Gather|Barrage|Call)`).test(t.bosses || ''), 8000);
+    const tell = ((telling || {}).bosses || '').match(new RegExp(`${id}:\\d+/\\d+:p\\d:Telegraph:(\\w+):(\\w+)`));
+    check(!!tell, `${name}: 예고하는 동안 전조 종류가 정해져 있다 (${tell ? `${tell[1]} → ${tell[2]}` : '없음'})`);
+    if (tell) await game.shot(`boss-${id}-tell`, `${name} 예고: ${tell[1]}(${tell[2]})`);
     await game.send(`heal; boss ${id} hurt 0.36`);
     const two = await game.until(t => has(t.banner, '2페이즈'), 3000, game.texts);
     check(!!two, `${name}: 체력 66% 아래에서 "2페이즈!"`);

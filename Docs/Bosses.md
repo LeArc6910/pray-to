@@ -33,6 +33,22 @@ M3에서 만든 보스전 규칙과 시트 작성법이다. 코드는 `Assets/_P
 
 대상(`target`)은 `nearest`(가장 가까운 사람), `farthest`(가장 먼 사람), `random`, `each`(싸우는 사람마다 하나씩), `self`(보스 자신 중심) 중 하나다. `farthest`와 `each`는 협동할 때 의미가 생긴다. 멀리서 활 쏘는 사람도 안전하지 않고, 모두가 각자 피해야 한다.
 
+## 전조 말 (2026-11-11)
+
+조사 보고서 후보 9(`Docs/Research2026-11.md`). 한 보스전에 비슷한 전조가 여러 가지 섞이면 읽을 수 없게 된다(Hades II가 받은 비판). 그래서 공격 모양 열한 가지를 **전조 다섯 가지**로 묶고, 모든 보스가 같은 말로 예고한다(`Tell`, `World.TellOf`). 예고하는 동안 보스가 그 종류의 빛으로 빛나고, 바닥 표시는 지금처럼 그 색이다.
+
+| 전조 | 공격 모양 | 바닥 | 보스의 빛 | 플레이어가 할 일 |
+|---|---|---|---|---|
+| 범위(`Area`) | circle, cone, line, ring, cross, trail | 붉은 표시가 차오른다 | 붉게 깜박임 | 붉은 곳 밖으로 |
+| 돌진(`Dash`) | charge | 노란 길 | 노랗게 | 길 옆으로 |
+| 모이기(`Gather`) | share | 금색 원이 맥박 친다 | 금색 | 함께 원 안으로(혼자면 각오) |
+| 탄막(`Barrage`) | burst, spiral | 없음 | 하얗게 빠르게 번쩍임, 시작할 때 하얀 고리 | 계속 움직이며 틈으로 |
+| 부르기(`Call`) | summon | 없음 | 보랏빛, 시작할 때 보랏빛 고리 | 부하를 먼저 |
+
+- 새 공격 모양을 더하면 `World.TellOf`에 다섯 가운데 하나로 넣는다. 여섯째 전조를 만들지 않는다(시험 `EachAttackGivesItsKindOfWarning`이 모든 모양이 다섯 중 하나인지 본다)
+- 통신(`Protocol.Version` 0.80.0): 보스 엔티티의 상태 바이트 아래 네 비트가 `BossState`, 예고하는 동안 위 네 비트가 전조 종류다(`World.BossStateByte`, `EntityView.Tell`)
+- 시험 보고의 `bosses`에 예고 중인 전조 종류가 붙는다(`cave_warden:…:Telegraph:slam:Area`)
+
 ## bosses.csv
 
 | 열 | 내용 |

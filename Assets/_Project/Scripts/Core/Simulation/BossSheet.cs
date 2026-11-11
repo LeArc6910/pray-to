@@ -30,6 +30,21 @@ namespace Game.Core
         Share,
     }
 
+    // How a boss shows what is coming while it winds up (Docs/Bosses.md 전조 말, 2026-11-11, the research report's
+    // candidate 9). Five kinds, each always drawn the same way for every boss, so a player who has learnt one fight
+    // reads the next: Area, red marks filling in on the ground; Dash, a yellow path and the boss glowing yellow;
+    // Gather, a gold circle pulsing to stand in together; Barrage, the boss flickering white with nothing on the
+    // ground (shots are coming: keep moving); Call, the boss glowing violet (monsters are coming).
+    public enum Tell : byte
+    {
+        None,
+        Area,
+        Dash,
+        Gather,
+        Barrage,
+        Call,
+    }
+
     public enum AttackTarget : byte
     {
         Nearest,

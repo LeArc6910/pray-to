@@ -646,7 +646,7 @@ namespace Game.Core
             var bosses = World.Bosses
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
-                    b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, (byte)b.State,
+                    b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, World.BossStateByte(b),
                     Protocol.WithStatus(b.Phase, b.Afflictions.Bits)));
             var minions = World.Minions
                 .Where(m => InView(m.Position))
