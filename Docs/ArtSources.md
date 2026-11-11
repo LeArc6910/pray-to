@@ -31,7 +31,8 @@
 
 ### 먼저 결론
 
-- **16px 캐릭터의 8방향 걷기를 바로 쓸 수 있게 만드는 도구는 로컬에도 유료에도 없다.** 캐릭터 애니메이션은 유료도 32~48px부터다(Retro Diffusion 걷기 48px·32px, PixelLab 8방향 32~64px). 16px로 바로 잘 나오는 것은 타일과 아이콘이다.
+- **16px 캐릭터의 8방향 걷기를 바로 쓸 수 있게 만드는 도구는 로컬에도 유료에도 없다.** 캐릭터 애니메이션은 유료도 32px부터다(PixelLab 8방향 32~64px, Retro Diffusion 32~256px). 16px로 바로 잘 나오는 것은 타일과 아이콘이다.
+  - **바로잡음(2026-11-12)**: 처음에 "Retro Diffusion 걷기는 4방향 48px·32px뿐"이라고 적었는데, 모음 사이트(Replicate)에 올라온 모델만 본 것이었다. Retro Diffusion 직접 API(공식 예제 https://github.com/Retro-Diffusion/api-examples)에는 **8방향 보기 만들기**(`rd_advanced_animation__rotate` $0.10: 올린 스프라이트의 나머지 7방향, `rd_animation__8_dir_rotation` $0.25)와 **올린 그림을 움직이는 고급 애니메이션**(`walking`·`idle`·`attack` 등 $0.14, 32~256px, 4~16프레임)이 있다. 그래서 "8방향 보기를 만들고 → 방향마다 걷기를 만드는" 식으로 8방향 걷기를 만들 수 있다. 다만 한 번에 8방향 걷기 시트를 주는 기능은 아니고, 크기는 32px부터라 우리 캐릭터(16px대)와는 여전히 안 맞는다
 - 현실적인 길은 "크게 그리기 → 격자 찾아 진짜 해상도로 줄이기 → 우리 팔레트로 맞추기 → 손질". 8방향과 걷기 프레임은 각도 바꾸기 모델과 영상 모델로 밑그림을 만들고 다듬는다.
 - 상업 게임에는 Apache·MIT 라이선스 모델(Z-Image, FLUX.2 klein 4B, Qwen-Image-Edit, Wan2.2, TRELLIS.2)이 안전하다. FLUX.1-dev·FLUX.2 klein 9B(비상업), Hunyuan3D(라이선스가 한국을 적용 지역에서 뺀다), LPC 기반 LoRA는 피한다.
 
