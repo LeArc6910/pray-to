@@ -1376,3 +1376,12 @@ DevTools/Local/setup.sh --commit
 - 사람이 직접 웹 데모(0.61.0)를 열어 보고 "저장은 정상적으로 잘 되는 것 같아"라고 알려 왔다. 사람의 브라우저에서는 배포를 넘어서도 저장이 이어진다
 - 그러니 위 17:30에 적은 "웹 저장이 남지 않았다"는 Claude 앱 내장 브라우저에서만 본 일이다. 게임 쪽 문제일 가능성은 낮고, 그 브라우저가 사이트 저장소를 비운 쪽으로 본다. 다음 확인 때 남겨 둔 표식(`pray-to-storage-probe`)으로 한 번 더 가린다
 - `navigator.storage.persist()` 제안은 급하지 않다. 휴대폰 브라우저가 오래 안 연 사이트 저장소를 비우는 일을 막는 보험으로만 남긴다
+
+### 2026-11-11 18:36 setup.ps1 (Unity 6000.6.3f1)
+
+- 프로젝트 설정: 성공
+- 패키지: com.unity.netcode.gameobjects 2.13.3, com.unity.transport 6.6.0, com.unity.render-pipelines.universal 17.6.0, com.unity.inputsystem 1.20.0, com.unity.multiplayer.playmode 3.0.0, com.unity.test-framework 1.8.0
+- EditMode 테스트: 684개 중 684개 통과, 0개 실패
+- PlayMode 테스트: 21개 중 19개 통과, 2개 실패
+  - `Game.Client.Tests.FeatureTests.ALockedDoorDraws: The door ahead did not lock.`
+  - `Game.Client.Tests.SessionTests.EverySkillCanBeUsed: Expected a new character to start with no class.`

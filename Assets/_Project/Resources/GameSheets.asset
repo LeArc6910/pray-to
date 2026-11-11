@@ -33,3 +33,8 @@ MonoBehaviour:
   npcs: {fileID: 4900000, guid: d33b075d22df4b742b22ed6dbe28d741, type: 3}
   shop: {fileID: 4900000, guid: 33b1b5d23e88ae040a87d5094761bffd, type: 3}
   requests: {fileID: 4900000, guid: beed157e8a514a046bd66bb8d8a8d9f6, type: 3}
+  events: {fileID: 4900000, guid: 183b394d6f81281498b4f8582888f6e6, type: 3}
+  places: {fileID: 4900000, guid: 2de580b02d646624da5e2453d4451bc2, type: 3}
+  characters: {fileID: 4900000, guid: 079b4ae6946c879409caae1333fb6cad, type: 3}
+  story: {fileID: 4900000, guid: f424a9a82e6ed594aa5014b1e239617d, type: 3}
+  strings: {fileID: 4900000, guid: 23694ddcbbf31ef45bfa3e991ed218f9, type: 3}
