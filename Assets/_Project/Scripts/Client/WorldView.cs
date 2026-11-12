@@ -88,6 +88,8 @@ namespace Game.Client
             // The samurai dashing, and where the dash began (WorldView.Bosses.cs).
             public bool Dashing;
             public Vector3 DashFrom;
+            // Its blade has clicked home after the last cut.
+            public bool Clicked;
             public EnemyState EnemyState;
             // When a monster may cry out again on noticing someone, and where another player was last frame and how
             // far they have walked since their last step (2026-11-09, sounds).

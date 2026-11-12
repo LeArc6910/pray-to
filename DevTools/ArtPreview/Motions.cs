@@ -951,15 +951,18 @@ namespace Game.Client
         {
             (SamuraiPose, int, float)[] Run(SamuraiPose pose, int frames, float seconds) =>
                 Enumerable.Range(0, frames).Select(f => (pose, f, seconds)).ToArray();
-            (SamuraiPose, int, float)[] Sheathe() => new[] { (SamuraiPose.Chiburi, 0, 0.14f) }.Concat(Run(SamuraiPose.Noto, 3, 0.18f)).ToArray();
+            // As WorldView times them (AnimateSamurai): a slow pull from the scabbard, the cut in a fifth of a second, the
+            // blade flicked and home in a tenth.
+            (SamuraiPose, int, float)[] Sheathe() => new[] { (SamuraiPose.Chiburi, 0, 0.06f) }.Concat(Run(SamuraiPose.Noto, 3, 0.04f)).Concat(new[] { (SamuraiPose.Idle, 0, 0.4f) }).ToArray();
+            (SamuraiPose, int, float)[] Cut(SamuraiPose pose) => new[] { (pose, 0, 0.02f), (pose, 1, 0.08f), (pose, 2, 0.08f) };
             var rows = new[]
             {
                 Run(SamuraiPose.Walk, 4, 0.14f).Concat(Run(SamuraiPose.Walk, 4, 0.14f)).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.15f)).Concat(new[] { (SamuraiPose.Draw, 0, 0.04f), (SamuraiPose.Draw, 1, 0.1f), (SamuraiPose.Draw, 2, 0.12f) })
+                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.1f)).Concat(Run(SamuraiPose.Pull, 4, 0.12f)).Concat(Cut(SamuraiPose.Draw))
                     .Concat(Sheathe()).ToArray(),
                 new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.1f)).Concat(Run(SamuraiPose.Dash, 4, 0.05f))
-                    .Concat(new[] { (SamuraiPose.Draw, 1, 0.1f), (SamuraiPose.Draw, 2, 0.12f) }).Concat(Sheathe()).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Jodan, 6, 0.15f)).Concat(new[] { (SamuraiPose.Kiri, 0, 0.04f), (SamuraiPose.Kiri, 1, 0.1f), (SamuraiPose.Kiri, 2, 0.12f) })
+                    .Concat(Cut(SamuraiPose.Draw)).Concat(Sheathe()).ToArray(),
+                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Pull, 4, 0.1f)).Concat(Run(SamuraiPose.Jodan, 6, 0.12f)).Concat(Cut(SamuraiPose.Kiri))
                     .Concat(Sheathe()).ToArray(),
                 new[] { (SamuraiPose.Idle, 0, 0.3f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f) },
             };
@@ -969,7 +972,7 @@ namespace Game.Client
             int width = cellWidth * 2;
             int height = cellHeight * rows.Length;
             var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
-            for (float time = 0; time < 3.4f; time += 0.04f)
+            for (float time = 0; time < 3.4f; time += 0.02f)
             {
                 var pixels = new Rgba[width * height];
                 for (int row = 0; row < rows.Length; row++)
@@ -989,6 +992,7 @@ namespace Game.Client
                         int twist = step.Item1 switch
                         {
                             SamuraiPose.Stance => step.Item2 >= 2 ? -1 : 0,
+                            SamuraiPose.Pull => -1,
                             SamuraiPose.Jodan => step.Item2 >= 3 ? -1 : 0,
                             SamuraiPose.Draw or SamuraiPose.Kiri => step.Item2 == 0 ? 0 : 1,
                             SamuraiPose.Chiburi => 1,
@@ -1008,7 +1012,7 @@ namespace Game.Client
                         }
                     }
                 }
-                frames.Add((pixels, 4));
+                frames.Add((pixels, 2));
             }
             Gif.Save(path, width, height, frames);
         }

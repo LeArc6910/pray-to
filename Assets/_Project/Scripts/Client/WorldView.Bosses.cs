@@ -433,7 +433,9 @@ namespace Game.Client
         // Faster than this (tiles a second) it is darting, not walking.
         const float DartSpeed = 6;
         // The sheathing ends this long after the cut.
-        const float NotoDone = 0.95f;
+        const float NotoDone = 0.36f;
+        // How far through a draw's telegraph the blade starts easing out of the scabbard.
+        const float PullFrom = 0.6f;
 
         // Cuts across (a cross, a crescent wave, the petals) come down from overhead; everything else is drawn from the
         // scabbard.
@@ -488,19 +490,28 @@ namespace Game.Client
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
                 float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
-                frame = Mathf.Min(5, Mathf.FloorToInt(progress * 6));
-                pose = FromAbove(attack) ? SamuraiPose.Jodan : SamuraiPose.Stance;
+                // The draw starts slow: held still in the stance, then the blade eased out of the scabbard over the last
+                // part of the telegraph (a cut from above eases it out first, then raises it).
+                if (FromAbove(attack))
+                {
+                    if (progress < 0.35f) (pose, frame) = (SamuraiPose.Pull, Mathf.Min(3, Mathf.FloorToInt(progress / 0.35f * 4)));
+                    else (pose, frame) = (SamuraiPose.Jodan, Mathf.Min(5, Mathf.FloorToInt((progress - 0.35f) / 0.65f * 6)));
+                }
+                else if (progress < PullFrom) (pose, frame) = (SamuraiPose.Stance, Mathf.Min(5, Mathf.FloorToInt(progress / PullFrom * 6)));
+                else (pose, frame) = (SamuraiPose.Pull, Mathf.Min(3, Mathf.FloorToInt((progress - PullFrom) / (1 - PullFrom) * 4)));
             }
             else if (body.BossState == BossState.Recover && attack != null && since < NotoDone)
             {
                 // The cut in three quick frames (from the scabbard, or down from overhead), the blood flicked off, then
                 // the blade slid home slowly.
+                // Then all at once: out and through in a fifth of a second, the blood flicked off and the blade home
+                // almost before it is seen.
                 var cut = FromAbove(attack) ? SamuraiPose.Kiri : SamuraiPose.Draw;
-                if (since < 0.04f) (pose, frame) = (cut, 0);
-                else if (since < 0.14f) (pose, frame) = (cut, 1);
-                else if (since < 0.26f) (pose, frame) = (cut, 2);
-                else if (since < 0.4f) (pose, frame) = (SamuraiPose.Chiburi, 0);
-                else (pose, frame) = (SamuraiPose.Noto, Mathf.Min(2, Mathf.FloorToInt((since - 0.4f) / ((NotoDone - 0.4f) / 3))));
+                if (since < 0.02f) (pose, frame) = (cut, 0);
+                else if (since < 0.1f) (pose, frame) = (cut, 1);
+                else if (since < 0.18f) (pose, frame) = (cut, 2);
+                else if (since < 0.24f) (pose, frame) = (SamuraiPose.Chiburi, 0);
+                else (pose, frame) = (SamuraiPose.Noto, Mathf.Min(2, Mathf.FloorToInt((since - 0.24f) / ((NotoDone - 0.24f) / 3))));
             }
 
             // The body turns with the cut: wound away from the viewer while it gathers (the shoulder turned in, the
@@ -508,6 +519,7 @@ namespace Game.Client
             int twist = pose switch
             {
                 SamuraiPose.Stance => frame >= 2 ? -1 : 0,
+                SamuraiPose.Pull => -1,
                 SamuraiPose.Jodan => frame >= 3 ? -1 : 0,
                 SamuraiPose.Draw or SamuraiPose.Kiri => frame == 0 ? 0 : 1,
                 SamuraiPose.Chiburi => 1,
@@ -550,6 +562,15 @@ namespace Game.Client
                 // A flash step: gone just before it lands behind its target.
                 if (attack.GoesAway && progress > 0.6f) body.Shape.color = new Color(1, 1, 1, Mathf.Max(0.08f, 1 - (progress - 0.6f) * 4));
             }
+            // The blade home: the guard clicks against the scabbard's mouth.
+            if (view.BossState == BossState.Recover && attack != null && since >= NotoDone && !body.Clicked)
+            {
+                body.Clicked = true;
+                var hip = feet + new Vector3(body.Shape.flipX ? 0.25f : -0.25f, 0.9f, 0);
+                AddFlash(hip, 0.35f, Color.white, FlashKind.Impact);
+                Hear(Sound.Click, hip, 1);
+            }
+            if (view.BossState != BossState.Recover) body.Clicked = false;
             // Darting in, or dashing: streaks behind it.
             var moved = body.Position - body.LastPosition;
             bool darting = moved.magnitude / Mathf.Max(1e-3f, Time.deltaTime) > DartSpeed;

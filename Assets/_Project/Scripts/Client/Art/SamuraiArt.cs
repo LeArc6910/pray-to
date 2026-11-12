@@ -19,6 +19,7 @@ namespace Game.Client
         Kiri,
         Chiburi,
         Noto,
+        Pull,
     }
 
     // The samurai of the forgotten shrine (2026-11-12): a ronin in crimson lacquered armour and a straw hat, a katana
@@ -351,6 +352,11 @@ namespace Game.Client
             float back = scabbard;
             switch (pose)
             {
+                case SamuraiPose.Pull:
+                    // The slow start of the draw (2026-11-12, the person: "slow at first, then out in an instant"): the hand
+                    // eases the hilt forward along the scabbard and the blade shows a little more each frame, still
+                    // pointing back into the scabbard's mouth.
+                    return new Hold(1 + 1.6f * f, 0.5f, back, 0.1f + 0.08f * f);
                 case SamuraiPose.Draw:
                     // Nukitsuke: the hand pulls the hilt forward out of the scabbard, the blade leaving it level and cutting
                     // across at full reach, then sweeping on and up.
@@ -407,6 +413,8 @@ namespace Game.Client
                 case SamuraiPose.Stance:
                     // Feet set wide, the front foot forward, sinking lower.
                     return (3 + 2 * t, 0, -2 - t, 0);
+                case SamuraiPose.Pull:
+                    return (5, 0, -3, 0);
                 case SamuraiPose.Draw:
                 case SamuraiPose.Kiri:
                     // A long lunge on the front foot.
@@ -532,6 +540,10 @@ namespace Game.Client
                     lean = 3 + 2 * t;
                     stretch = -0.08f - 0.1f * t;
                     break;
+                case SamuraiPose.Pull:
+                    lean = 5;
+                    stretch = -0.18f;
+                    break;
                 case SamuraiPose.Draw:
                 case SamuraiPose.Kiri:
                     lean = new[] { 6, 8, 5 }[System.Math.Min(frame, 2)];
@@ -563,7 +575,7 @@ namespace Game.Client
             int c2 = System.Math.Min(frame, 2);
             int shove = pose switch
             {
-                SamuraiPose.Stance => -1,
+                SamuraiPose.Stance or SamuraiPose.Pull => -1,
                 SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 4, 9, 8 }[c2],
                 SamuraiPose.Chiburi => 6,
                 SamuraiPose.Noto => new[] { 4, 2, 0 }[c2],
@@ -573,6 +585,7 @@ namespace Game.Client
             int drop = pose switch
             {
                 SamuraiPose.Stance => frame >= 3 ? 1 : 0,
+                SamuraiPose.Pull => 1,
                 SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 1, 3, 2 }[c2],
                 SamuraiPose.Chiburi => 2,
                 SamuraiPose.Noto => new[] { 1, 1, 0 }[c2],
