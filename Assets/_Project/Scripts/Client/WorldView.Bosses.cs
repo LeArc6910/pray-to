@@ -70,6 +70,7 @@ namespace Game.Client
             if (body.Id == "vein_eater") VeinEaterExtras(body, view);
             else if (body.Mound != null) body.Mound.enabled = false;
             if (body.Id == "shrine_samurai") SamuraiExtras(body, view);
+            if (body.Id == "black_knight") KnightExtras(body, view);
         }
 
         void ShowWarningSign(Body body, bool on)
@@ -330,7 +331,8 @@ namespace Game.Client
         void FallingRock(Mark mark, HazardState hazard, float progress)
         {
             var attack = AttackOf(hazard);
-            if (attack == null || attack.Shape != AttackShape.Circle || _bossInView.Id != "vein_eater")
+            // The black knight's falling roof too (2026-11-12).
+            if (attack == null || attack.Shape != AttackShape.Circle || !(_bossInView.Id == "vein_eater" || _bossInView.Id == "black_knight" && attack.Target == AttackTarget.Each))
             {
                 if (mark.Rock != null) mark.Rock.enabled = false;
                 return;

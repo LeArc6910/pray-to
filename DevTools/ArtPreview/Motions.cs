@@ -458,6 +458,7 @@ namespace Game.Client
             Bosses(Path.Combine(folder, "bosses.gif"), arena);
             VeinEater(Path.Combine(folder, "vein_eater.gif"), arena);
             Samurai(Path.Combine(folder, "samurai.gif"), arena);
+            Knight(Path.Combine(folder, "knight.gif"), arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
             StoryPeople(Path.Combine(folder, "story_people.gif"), floor);
@@ -947,6 +948,95 @@ namespace Game.Client
 
         // The shrine samurai's walk and iaido (2026-11-12, SamuraiArt), a row each, facing right and facing down: walk,
         // stance and draw and sheathing, a dash, the blade raised overhead and brought down, a shout.
+        // The black knight's walk and its heavy blows (2026-11-12, KnightArt), a row each, facing right and facing down: walk
+        // dragging the hammer; overhead smash; sweep; shoulder charge; pound at its feet; leap; roar. Timed as WorldView
+        // times them (AnimateKnight): a long, slow wind-up, the blow in a blur, held in the floor, slowly hauled out.
+        static void Knight(string path, PixelImage arena)
+        {
+            (KnightPose, int, float)[] Run(KnightPose pose, int frames, float seconds) =>
+                Enumerable.Range(0, frames).Select(f => (pose, f, seconds)).ToArray();
+            (KnightPose, int, float)[] Blow(KnightPose pose) => new[] { (pose, 0, 0.05f), (pose, 1, 0.12f), (pose, 2, 0.35f), (pose, 3, 0.3f), (KnightPose.Idle, 0, 0.4f) };
+            var rows = new[]
+            {
+                Run(KnightPose.Walk, 4, 0.2f).Concat(Run(KnightPose.Walk, 4, 0.2f)).ToArray(),
+                new[] { (KnightPose.Idle, 0, 0.3f) }.Concat(Run(KnightPose.Raise, 6, 0.25f)).Concat(Blow(KnightPose.Smash)).ToArray(),
+                new[] { (KnightPose.Idle, 0, 0.3f) }.Concat(Run(KnightPose.Wind, 6, 0.23f)).Concat(Blow(KnightPose.Sweep)).ToArray(),
+                new[] { (KnightPose.Idle, 0, 0.3f) }.Concat(Run(KnightPose.Brace, 6, 0.26f)).Concat(Run(KnightPose.Charge, 4, 0.08f)).Concat(Run(KnightPose.Charge, 4, 0.08f)).ToArray(),
+                new[] { (KnightPose.Idle, 0, 0.3f) }.Concat(Run(KnightPose.Raise, 6, 0.3f)).Concat(Blow(KnightPose.Pound)).ToArray(),
+                new[] { (KnightPose.Idle, 0, 0.3f) }.Concat(Run(KnightPose.Crouch, 6, 0.2f)).Concat(Run(KnightPose.Leap, 4, 0.06f)).Concat(new[] { (KnightPose.Leap, 3, 0.4f) }).Concat(Blow(KnightPose.Pound)).ToArray(),
+                new[] { (KnightPose.Idle, 0, 0.3f), (KnightPose.Roar, 0, 0.2f), (KnightPose.Roar, 1, 0.2f), (KnightPose.Roar, 0, 0.2f), (KnightPose.Roar, 1, 0.2f) },
+            };
+            const int scale = 2;
+            int cellWidth = KnightArt.Width * scale;
+            int cellHeight = KnightArt.Height * scale;
+            int width = cellWidth * 2;
+            int height = cellHeight * rows.Length;
+            var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
+            for (float time = 0; time < 4.2f; time += 0.04f)
+            {
+                var pixels = new Rgba[width * height];
+                for (int row = 0; row < rows.Length; row++)
+                {
+                    float at = time % rows[row].Sum(f => f.Item3);
+                    var step = rows[row][0];
+                    foreach (var f in rows[row])
+                    {
+                        step = f;
+                        if (at < f.Item3) break;
+                        at -= f.Item3;
+                    }
+                    for (int column = 0; column < 2; column++)
+                    {
+                        // The body turns with the blow as WorldView turns it: away while it winds up, back through the blow.
+                        int twist = step.Item1 switch
+                        {
+                            KnightPose.Raise or KnightPose.Wind => step.Item2 >= 2 ? -1 : 0,
+                            KnightPose.Sweep => step.Item2 <= 1 ? 1 : 0,
+                            _ => 0,
+                        };
+                        var sideView = twist < 0 ? BossView.BackSide : twist > 0 ? BossView.FrontSide : BossView.Side;
+                        var image = KnightArt.Draw(column == 0 ? sideView : BossView.Front, step.Item1, step.Item2, 1);
+                        for (int y = 0; y < cellHeight; y++)
+                        {
+                            for (int x = 0; x < cellWidth; x++)
+                            {
+                                var floor = arena[x / scale % arena.Width, y / scale % arena.Height];
+                                var c = image[x / scale, y / scale];
+                                pixels[(row * cellHeight + y) * width + column * cellWidth + x] = c.A > 0 ? c : floor;
+                            }
+                        }
+                    }
+                }
+                frames.Add((pixels, 4));
+            }
+            Gif.Save(path, width, height, frames);
+            // The key frames by view, a column each (side, three-quarter front, front, three-quarter back, back), for a
+            // person to look the poses over one by one (knight_poses.png).
+            var keys = new[]
+            {
+                (KnightPose.Idle, 0), (KnightPose.Walk, 0), (KnightPose.Walk, 2), (KnightPose.Raise, 1), (KnightPose.Raise, 5),
+                (KnightPose.Smash, 0), (KnightPose.Smash, 1), (KnightPose.Smash, 3), (KnightPose.Wind, 5), (KnightPose.Sweep, 0),
+                (KnightPose.Sweep, 1), (KnightPose.Brace, 5), (KnightPose.Charge, 0), (KnightPose.Crouch, 5), (KnightPose.Leap, 0),
+                (KnightPose.Pound, 1), (KnightPose.Roar, 0),
+            };
+            var views = new[] { BossView.Side, BossView.FrontSide, BossView.Front, BossView.BackSide, BossView.Back };
+            var sheet = new PixelImage(views.Length * KnightArt.Width, keys.Length * KnightArt.Height);
+            for (int k = 0; k < keys.Length; k++)
+            {
+                for (int v = 0; v < views.Length; v++)
+                {
+                    var image = KnightArt.Draw(views[v], keys[k].Item1, keys[k].Item2, k == keys.Length - 1 ? 3 : 1);
+                    for (int y = 0; y < KnightArt.Height; y++)
+                        for (int x = 0; x < KnightArt.Width; x++)
+                        {
+                            var c = image[x, y];
+                            sheet[v * KnightArt.Width + x, k * KnightArt.Height + y] = c.A > 0 ? c : arena[x % arena.Width, y % arena.Height];
+                        }
+                }
+            }
+            Png.Save(sheet, Path.Combine(Path.GetDirectoryName(path), "knight_poses.png"));
+        }
+
         static void Samurai(string path, PixelImage arena)
         {
             (SamuraiPose, int, float)[] Run(SamuraiPose pose, int frames, float seconds) =>

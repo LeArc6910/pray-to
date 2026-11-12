@@ -275,11 +275,11 @@ namespace Game.Core.Tests
         [Test]
         public void TheNestsLordHasAnArenaBesideIt([Range(1, 24)] int seed)
         {
-            // The nest's, (2026-11-11) the harbour's and (2026-11-12) the mining village's and the forgotten shrine's:
-            // places.csv arena.
+            // The nest's, (2026-11-11) the harbour's and (2026-11-12) the mining village's, the forgotten shrine's and
+            // the hero's hut's: places.csv arena.
             var generated = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
-            Assert.AreEqual(generated.CaveArenas + 4, generated.Arenas.Count);
-            foreach (string id in new[] { "demon_nest", "mist_harbor", "iron_valley", "old_temple" })
+            Assert.AreEqual(generated.CaveArenas + 5, generated.Arenas.Count);
+            foreach (string id in new[] { "demon_nest", "mist_harbor", "iron_valley", "old_temple", "hero_hut" })
             {
                 Assert.IsTrue(generated.PlaceArenas.TryGetValue(id, out var arena), $"seed {seed}: no arena by {id}");
                 var place = generated.Places.Single(p => p.Definition.Id == id);

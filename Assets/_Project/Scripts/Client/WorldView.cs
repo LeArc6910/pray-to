@@ -95,6 +95,8 @@ namespace Game.Client
             public float EchoAt;
             public int Echoes;
             public bool Vanished;
+            // The black knight's last walking frame, for a thud as each foot comes down (WorldView.Knight.cs).
+            public int KnightStep = -1;
             public EnemyState EnemyState;
             // When a monster may cry out again on noticing someone, and where another player was last frame and how
             // far they have walked since their last step (2026-11-09, sounds).
@@ -1107,7 +1109,7 @@ namespace Game.Client
             else if (_landed.TryGetValue(id, out var gone)) hazard = gone.State;
             else return;
             if (!hazard.Harmful) return;
-            if (VeinEaterLanded(hazard)) return;
+            if (VeinEaterLanded(hazard) || KnightLanded(hazard)) return;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             switch (hazard.Shape)
@@ -2703,6 +2705,11 @@ namespace Game.Client
             if (body.Kind == BodyKind.Boss && body.Id == "shrine_samurai")
             {
                 AnimateSamurai(body, facing, dead, moving, speed);
+                return;
+            }
+            if (body.Kind == BodyKind.Boss && body.Id == "black_knight")
+            {
+                AnimateKnight(body, facing, dead, moving);
                 return;
             }
 

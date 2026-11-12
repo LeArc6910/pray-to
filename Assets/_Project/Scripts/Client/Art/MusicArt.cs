@@ -392,6 +392,14 @@ namespace Game.Client
                 Lead = Wave.Bell, LeadOctave = 1, LeadVolume = 0.26f, Arp = Wave.Pulse, ArpRate = 2, ArpVolume = 0.07f, Rest = 0.45f,
                 Pad = Wave.Sine, PadVolume = 0.05f, Kick = "x.........x.....", Tom = "x.....x...x.x...", Echo = 0.35f, Seed = 30,
             },
+            // The black knight (2026-11-12): a slow, heavy march in natural minor, an organ-like pad and a low saw bass,
+            // the toms and kick falling like the hammer, with long rests between.
+            "black_knight" => new Style
+            {
+                Bpm = 84, Root = 38, Scale = Minor, Chords = new[] { 0, 5, 3, 4 }, BarsPerChord = 2, Bars = 16, Bass = Wave.Saw, BassNotes = 2,
+                Lead = Wave.Square, LeadOctave = 0, LeadVolume = 0.18f, Arp = Wave.Triangle, ArpRate = 1, ArpVolume = 0.08f, Rest = 0.4f,
+                Pad = Wave.Saw, PadVolume = 0.07f, Kick = "x.......x.......", Snare = "........X.......", Tom = "x.....x.x.......", Echo = 0.3f, Seed = 31,
+            },
             // Any other boss: fast harmonic minor with driving drums.
             _ => new Style
             {

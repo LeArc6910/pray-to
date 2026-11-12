@@ -276,6 +276,15 @@ namespace Game.Core
             var arenas = world.Arenas.Select(a => (X: TileMap.Cell(a.X), Y: TileMap.Cell(a.Y))).ToList();
             var spots = new List<(PlaceDefinition Place, int X, int Y)>();
             int Square(int dx, int dy) => dx * dx + dy * dy;
+            // How far (tiles) the point (px, py) lies from the segment (ax, ay)-(bx, by).
+            float SegmentDistance(int ax, int ay, int bx, int by, int px, int py)
+            {
+                float dx = bx - ax, dy = by - ay;
+                float length = dx * dx + dy * dy;
+                float t = length == 0 ? 0 : System.Math.Max(0, System.Math.Min(1, ((px - ax) * dx + (py - ay) * dy) / length));
+                float ex = ax + t * dx - px, ey = ay + t * dy - py;
+                return (float)System.Math.Sqrt(ex * ex + ey * ey);
+            }
             // The places branch out from the spawn along the roads (2026-11-12, the owner: "a vast map like Diablo; the
             // places far apart along big roads, small places between, not near and even"): each stands its places.csv
             // distance from the place its road comes from, heading on outward the way that road was going (the village's
@@ -416,6 +425,9 @@ namespace Game.Core
                 // Nearest the nest first, then furthest from where the road comes from.
                 (int X, int Y)? best = null;
                 int bestScore = int.MinValue;
+                // Where it can, its road keeps clear of the other places (2026-11-12: the hut's arena beyond the royal
+                // city cut through the city's wall); only where nothing else will do does it pass one.
+                for (int pass = 0; pass < 2 && best == null; pass++)
                 for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 60 && best == null; reach += 2)
                 {
                     foreach (var way in Ways)
@@ -424,6 +436,7 @@ namespace Game.Core
                         if (ax < ArenaRadius + 1 || ay < ArenaRadius + 1 || ax > map.Width - ArenaRadius - 2 || ay > map.Height - ArenaRadius - 2) continue;
                         if (spots.Any(s => s.Place != place && Square(ax - s.X, ay - s.Y) < (s.Place.Radius + ArenaRadius + 3) * (s.Place.Radius + ArenaRadius + 3))) continue;
                         if (arenas.Any(a => Square(ax - a.X, ay - a.Y) < (2 * ArenaRadius + 2) * (2 * ArenaRadius + 2))) continue;
+                        if (pass == 0 && spots.Any(s => s.Place != place && SegmentDistance(cx, cy, ax, ay, s.X, s.Y) < s.Place.Radius + TunnelHalfWidth + 2)) continue;
                         int score = Square(ax - fromX, ay - fromY);
                         if (score > bestScore)
                         {
@@ -434,11 +447,33 @@ namespace Game.Core
                 }
                 if (best is not (int bx, int by)) continue;
                 ClearDisc(map, bx, by, ArenaRadius);
-                foreach (var (x, y) in Line(cx, cy, bx, by))
+                // A road that would cut through another place bends once round it instead.
+                bool Crosses(int x0, int y0, int x1, int y1) => spots.Any(s => s.Place != place && SegmentDistance(x0, y0, x1, y1, s.X, s.Y) < s.Place.Radius + TunnelHalfWidth + 2);
+                var bends = new List<(int X, int Y)> { (cx, cy) };
+                var blocking = spots.FirstOrDefault(s => s.Place != place && SegmentDistance(cx, cy, bx, by, s.X, s.Y) < s.Place.Radius + TunnelHalfWidth + 2);
+                if (blocking.Place != null)
                 {
-                    for (int ty = y - TunnelHalfWidth; ty <= y + TunnelHalfWidth; ty++)
-                        for (int tx = x - TunnelHalfWidth; tx <= x + TunnelHalfWidth; tx++)
-                            if (IsInside(map, tx, ty) && !InPlaza(tx, ty) && Square(tx - bx, ty - by) > ArenaRadius * ArenaRadius) map[tx, ty] = TileType.Road;
+                    float dx = bx - cx, dy = by - cy, length = (float)System.Math.Sqrt(dx * dx + dy * dy);
+                    for (int off = blocking.Place.Radius + TunnelHalfWidth + 4; off <= blocking.Place.Radius + 30 && bends.Count == 1; off += 2)
+                    {
+                        foreach (int side in new[] { 1, -1 })
+                        {
+                            int wx = blocking.X + (int)System.Math.Round(-dy / length * off * side), wy = blocking.Y + (int)System.Math.Round(dx / length * off * side);
+                            if (wx < 2 || wy < 2 || wx > map.Width - 3 || wy > map.Height - 3 || Crosses(cx, cy, wx, wy) || Crosses(wx, wy, bx, by)) continue;
+                            bends.Add((wx, wy));
+                            break;
+                        }
+                    }
+                }
+                bends.Add((bx, by));
+                for (int leg = 0; leg + 1 < bends.Count; leg++)
+                {
+                    foreach (var (x, y) in Line(bends[leg].X, bends[leg].Y, bends[leg + 1].X, bends[leg + 1].Y))
+                    {
+                        for (int ty = y - TunnelHalfWidth; ty <= y + TunnelHalfWidth; ty++)
+                            for (int tx = x - TunnelHalfWidth; tx <= x + TunnelHalfWidth; tx++)
+                                if (IsInside(map, tx, ty) && !InPlaza(tx, ty) && Square(tx - bx, ty - by) > ArenaRadius * ArenaRadius) map[tx, ty] = TileType.Road;
+                    }
                 }
                 world.AddPlaceArena(place.Id, TileMap.Center(bx, by));
                 arenas.Add((bx, by));

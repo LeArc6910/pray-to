@@ -58,7 +58,7 @@ namespace Game.Core.Tests
             for (int phase = 2; phase <= eater.PhaseCount; phase++)
                 Assert.IsTrue(eater.Attacks.Any(a => a.Phases.Count > 0 && a.Phases.Min() == phase), $"phase {phase} brings something new");
             // The bosses from before are announced as they always were.
-            foreach (var boss in Bosses.Shipped.Bosses.Where(b => b.Id != "vein_eater" && b.Id != "shrine_samurai"))
+            foreach (var boss in Bosses.Shipped.Bosses.Where(b => b.Id != "vein_eater" && b.Id != "shrine_samurai" && b.Id != "black_knight"))
                 Assert.IsTrue(boss.Attacks.All(a => a.Warning == AttackWarning.Marked), boss.Id);
             var wrong = Bosses.Parse(Bosses.BossesHeader + "dummy,허수아비,1000,50,0,2,1,,1,3,10\n", Header + "dummy,a,공격,,circle,nearest,1,30,2,,,,1,,,1,1,,loud\n");
             Assert.IsFalse(wrong.Success);
@@ -160,6 +160,26 @@ namespace Game.Core.Tests
                 Assert.Less(dash.Length / dash.Speed, 0.3f, $"{dash.Id} is over in a blink");
                 Assert.GreaterOrEqual(dash.Telegraph, 0.9f, $"{dash.Id} gives a stance long enough to read");
             }
+        }
+
+        // The black knight (2026-11-12): the samurai's opposite. Every blow is marked through a long wind-up and hits far
+        // harder than the samurai's; only its leap and its judgement carry the warning sign; each phase brings blows of
+        // its own; it walks slowly; and it waits by the hero's hut.
+        [Test]
+        public void TheKnightIsSlowToStrikeAndStrikesHard()
+        {
+            var knight = Bosses.Shipped.Find("black_knight");
+            var samurai = Bosses.Shipped.Find("shrine_samurai");
+            Assert.AreEqual("hero_hut", knight.Place);
+            CollectionAssert.AreEquivalent(new[] { "leap", "judgement" }, knight.Attacks.Where(a => a.Warning == AttackWarning.Strong).Select(a => a.Id));
+            Assert.IsTrue(knight.Attacks.All(a => a.Warning != AttackWarning.Hidden), "every blow is marked");
+            for (int phase = 2; phase <= knight.PhaseCount; phase++)
+                Assert.IsTrue(knight.Attacks.Any(a => a.Phases.Count > 0 && a.Phases.Min() == phase), $"phase {phase} brings something new");
+            Assert.Greater(knight.Attacks.Min(a => a.Telegraph), 1.35f, "every wind-up is long");
+            Assert.Greater(knight.Attacks.Min(a => a.Telegraph), samurai.Attacks.Average(a => a.Telegraph), "slower than the samurai's on the whole");
+            Assert.Greater(knight.Attacks.Average(a => a.Damage), 2 * samurai.Attacks.Average(a => a.Damage), "each blow hits far harder");
+            Assert.Less(knight.Speed, samurai.Speed);
+            Assert.IsFalse(knight.Bursts, "it walks");
         }
 
         // A bursting gait (2026-11-12): it rushes in a sudden dart and then all but stops, a little faster than a walk on

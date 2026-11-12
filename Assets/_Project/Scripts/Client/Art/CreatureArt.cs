@@ -1399,6 +1399,16 @@ namespace Game.Client
                 BossPose.Roar => SamuraiPose.Kiai,
                 _ => SamuraiPose.Idle,
             }, frame, 1),
+            // The black knight of the hero's hut (2026-11-12): likewise, its war hammer drawn in code (KnightPose in
+            // WorldView).
+            "black_knight" => KnightArt.Draw(view, pose switch
+            {
+                BossPose.Windup => KnightPose.Raise,
+                BossPose.Strike => KnightPose.Smash,
+                BossPose.Charge => KnightPose.Charge,
+                BossPose.Roar => KnightPose.Roar,
+                _ => KnightPose.Idle,
+            }, frame, 1),
             _ => Warden(color, frame, view, pose),
         };
 

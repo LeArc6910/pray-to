@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -807,6 +807,51 @@ async function samurai(browser) {
   await game.send('heal; clear; boss shrine_samurai hurt 0.36');
   await game.wait(600);
   await game.shot('samurai-phase2', '2페이즈 기합');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 흑철 기사 발두인 (2026-11-12, Docs/Bosses.md)
+// Slow, heavy blows: every attack is marked on the ground through a long wind-up (the hammer hauled up or drawn back),
+// the leap and the judgement show a warning sign too. A picture mid wind-up and one just after the blow lands (cracks,
+// dust, the hammer in the floor).
+async function knight(browser) {
+  note('\n## 흑철 기사 발두인 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss black_knight');
+  const woke = await game.until(t => has(t.banner, '발두인'), 8000, game.texts);
+  check(!!woke, `용사의 오두막 곁 아레나에서 깨면 "흑철 기사 발두인 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  await game.wait(1500);
+  await game.shot('knight-awake', '깨어난 발두인');
+  // [attack, name, telegraph seconds, strong]
+  const uses = [
+    ['smash', '망치 내려찍기(머리 위로 들어 올림)', 1.5, false],
+    ['sweep', '휩쓸어 치기(뒤로 크게 젖힘)', 1.4, false],
+    ['bash', '어깨 돌진(어깨를 낮춤)', 1.6, false],
+    ['quake', '대지 강타(둘레 원)', 1.8, false],
+    ['shockwave', '충격파(앞으로 터져 나감)', 1.6, false],
+    ['leap', '도약 내려찍기(경고)', 1.9, true],
+    ['fissure', '십자 균열', 1.7, false],
+    ['rubble', '무너지는 천장(사람마다)', 1.4, false],
+    ['judgement', '심판의 일격(넓은 원, 경고)', 2.6, true],
+  ];
+  for (const [attack, name, telegraph, strong] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1800);
+    await game.send(`heal; boss black_knight use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`knight-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`knight-${attack}-hit`, `${name} 내려친 순간`);
+  }
+  await game.send('heal; clear; boss black_knight hurt 0.36');
+  await game.wait(800);
+  await game.shot('knight-phase2', '2페이즈 포효');
   await game.context.close();
 }
 
@@ -2982,7 +3027,7 @@ async function time(browser) {
   await game.context.close();
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });
