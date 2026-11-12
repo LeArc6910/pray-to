@@ -433,7 +433,9 @@ namespace Game.Client
         // Faster than this (tiles a second) it is darting, not walking.
         const float DartSpeed = 6;
         // The sheathing ends this long after the cut.
-        const float NotoDone = 0.36f;
+        const float NotoDone = 0.56f;
+        // The hand stays on the hilt, still, until then (zanshin).
+        const float ZanshinDone = 0.85f;
         // How far through a draw's telegraph the blade starts easing out of the scabbard.
         const float PullFrom = 0.6f;
 
@@ -500,18 +502,24 @@ namespace Game.Client
                 else if (progress < PullFrom) (pose, frame) = (SamuraiPose.Stance, Mathf.Min(5, Mathf.FloorToInt(progress / PullFrom * 6)));
                 else (pose, frame) = (SamuraiPose.Pull, Mathf.Min(3, Mathf.FloorToInt((progress - PullFrom) / (1 - PullFrom) * 4)));
             }
-            else if (body.BossState == BossState.Recover && attack != null && since < NotoDone)
+            else if (body.BossState == BossState.Recover && attack != null && since < ZanshinDone)
             {
                 // The cut in three quick frames (from the scabbard, or down from overhead), the blood flicked off, then
                 // the blade slid home slowly.
                 // Then all at once: out and through in a fifth of a second, the blood flicked off and the blade home
                 // almost before it is seen.
+                // After pixel-art and iaido practice (Docs/Bosses.md): one smear frame between the stance and the cut, the
+                // cut held a moment (contact), the follow-through and a recovery frame, the blade opened to the side and
+                // flicked (chiburi), slid home in three quick frames (noto) and the hand left on the hilt (zanshin).
                 var cut = FromAbove(attack) ? SamuraiPose.Kiri : SamuraiPose.Draw;
-                if (since < 0.02f) (pose, frame) = (cut, 0);
-                else if (since < 0.1f) (pose, frame) = (cut, 1);
-                else if (since < 0.18f) (pose, frame) = (cut, 2);
-                else if (since < 0.24f) (pose, frame) = (SamuraiPose.Chiburi, 0);
-                else (pose, frame) = (SamuraiPose.Noto, Mathf.Min(2, Mathf.FloorToInt((since - 0.24f) / ((NotoDone - 0.24f) / 3))));
+                if (since < 0.03f) (pose, frame) = (cut, 0);
+                else if (since < 0.18f) (pose, frame) = (cut, 1);
+                else if (since < 0.26f) (pose, frame) = (cut, 2);
+                else if (since < 0.34f) (pose, frame) = (cut, 3);
+                else if (since < 0.38f) (pose, frame) = (SamuraiPose.Chiburi, 0);
+                else if (since < 0.44f) (pose, frame) = (SamuraiPose.Chiburi, 1);
+                else if (since < NotoDone) (pose, frame) = (SamuraiPose.Noto, Mathf.Min(2, Mathf.FloorToInt((since - 0.44f) / ((NotoDone - 0.44f) / 3))));
+                else (pose, frame) = (SamuraiPose.Noto, 3);
             }
 
             // The body turns with the cut: wound away from the viewer while it gathers (the shoulder turned in, the
@@ -521,9 +529,9 @@ namespace Game.Client
                 SamuraiPose.Stance => frame >= 2 ? -1 : 0,
                 SamuraiPose.Pull => -1,
                 SamuraiPose.Jodan => frame >= 3 ? -1 : 0,
-                SamuraiPose.Draw or SamuraiPose.Kiri => frame == 0 ? 0 : 1,
+                SamuraiPose.Draw or SamuraiPose.Kiri => frame == 3 ? 0 : 1,
                 SamuraiPose.Chiburi => 1,
-                SamuraiPose.Noto => frame == 0 ? 1 : 0,
+                SamuraiPose.Noto => 0,
                 _ => 0,
             };
             sector = Twist(sector, twist);

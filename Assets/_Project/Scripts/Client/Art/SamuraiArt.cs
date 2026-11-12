@@ -358,37 +358,40 @@ namespace Game.Client
                     // pointing back into the scabbard's mouth.
                     return new Hold(1 + 1.6f * f, 0.5f, back, 0.1f + 0.08f * f);
                 case SamuraiPose.Draw:
-                    // Nukitsuke: the hand pulls the hilt forward out of the scabbard, the blade leaving it level and cutting
-                    // across at full reach, then sweeping on and up.
+                    // Nukitsuke: frame 0 is the smear (drawn by Smear, no blade: it is too fast to see), 1 the cut at full
+                    // reach, held; 2 the blade carried on and up; 3 coming back down to recover.
                     return f switch
                     {
-                        0 => new Hold(3, 1, 4, 0.55f),
+                        0 => new Hold(7, 1, 0, 0),
                         1 => new Hold(10, 2, 2, 1),
-                        _ => new Hold(8, 6, 38, 1),
+                        2 => new Hold(8, 6, 38, 1),
+                        _ => new Hold(7, 3, 15, 1),
                     };
                 case SamuraiPose.Jodan:
                     // Furikaburi: the blade drawn and raised over the head, higher through the wind-up.
                     float t = f / 5f;
                     return new Hold(1 + 2 * t, 9 + 7 * t, 120 + 30 * t, 1);
                 case SamuraiPose.Kiri:
-                    // Kirioroshi: brought down from overhead to the front.
+                    // Kirioroshi: the smear down from overhead, the cut held low in front, on through, back up a little.
                     return f switch
                     {
-                        0 => new Hold(7, 13, 70, 1),
+                        0 => new Hold(9, 8, 0, 0),
                         1 => new Hold(10, 4, -25, 1),
-                        _ => new Hold(9, 1, -40, 1),
+                        2 => new Hold(9, 1, -40, 1),
+                        _ => new Hold(8, 3, -20, 1),
                     };
                 case SamuraiPose.Chiburi:
-                    // The blood shaken off: a sharp flick out and down.
-                    return new Hold(9, 3, -55, 1);
+                    // Yoko chiburi (Eishin-ryu): the blade opened out to the side and snapped level, then still.
+                    return f == 0 ? new Hold(9, 4, 22, 1) : new Hold(11, 2, -12, 1);
                 case SamuraiPose.Noto:
-                    // Noto: the hand back at the hip, the blade laid along the scabbard and slid home, slowly.
-                    // The blade points back along the scabbard, tip first into its mouth.
+                    // Noto: the hand back at the hip, the blade laid along the scabbard and slid home tip first; frame 3 is home,
+                    // the hand still on the hilt (zanshin).
                     return f switch
                     {
                         0 => new Hold(5, 3, back + 25, 1),
                         1 => new Hold(2, 1, back, 0.6f),
-                        _ => new Hold(1, 0, back, 0.25f),
+                        2 => new Hold(1, 0, back, 0.25f),
+                        _ => (Hold?)null,
                     };
                 case SamuraiPose.Dash:
                     // Running in with the hand on the hilt, the blade out and trailing low behind.
@@ -414,11 +417,12 @@ namespace Game.Client
                     // Feet set wide, the front foot forward, sinking lower.
                     return (3 + 2 * t, 0, -2 - t, 0);
                 case SamuraiPose.Pull:
-                    return (5, 0, -3, 0);
+                    // On the last frame the weight sinks onto the back foot: the pull back before the snap.
+                    return f >= 3 ? (4, 0, -4, 0) : (5, 0, -3, 0);
                 case SamuraiPose.Draw:
                 case SamuraiPose.Kiri:
-                    // A long lunge on the front foot.
-                    return (f == 0 ? 4 : 6, 0, -4, 0);
+                    // A long lunge on the front foot, the back foot drawn after it on the recovery.
+                    return f >= 3 ? (5, 0, -1, 0) : (f == 0 ? 5 : 6, 0, -4, 0);
                 case SamuraiPose.Chiburi:
                     return (4, 0, -3, 0);
                 case SamuraiPose.Noto:
@@ -495,6 +499,30 @@ namespace Game.Client
             if (image.Inside(gx + 1, gy)) image[gx + 1, gy] = Skin;
         }
 
+        // A smear frame (2026-11-12, after pixel-art practice: one blurred in-between along the arc between two strong keys):
+        // a crescent band from the angle the blade left to the one it reaches, bright at the tip's edge and thinning in
+        // toward the hand; flatten squashes it top to bottom (a level sweep seen from above).
+        static void Smear(PixelImage image, int hx, int hy, float from, float to, int length, float flatten)
+        {
+            float span = to - from;
+            int steps = (int)(System.Math.Abs(span) / 3) + 1;
+            for (int i = 0; i <= steps; i++)
+            {
+                float a = (from + span * i / steps) * (float)System.Math.PI / 180;
+                // Wider toward the end of the sweep, where the blade is fastest.
+                float t = i / (float)steps;
+                int inner = (int)(length * (0.75f - 0.45f * t));
+                for (int r = inner; r <= length; r++)
+                {
+                    int x = hx + (int)System.Math.Round(System.Math.Cos(a) * r);
+                    int y = hy - (int)System.Math.Round(System.Math.Sin(a) * r * flatten);
+                    if (!image.Inside(x, y)) continue;
+                    var c = r >= length - 1 ? Edge : r >= length - 3 ? Steel : (r + i) % 3 == 0 ? new Rgba(170, 200, 235) : (Rgba?)null;
+                    if (c is Rgba colour) image[x, y] = colour;
+                }
+            }
+        }
+
         // The arm from the shoulder to the hand: a crimson sleeve, two pixels wide, outlined.
         static void Arm(PixelImage image, int sx, int sy, int hx, int hy)
         {
@@ -541,13 +569,15 @@ namespace Game.Client
                     stretch = -0.08f - 0.1f * t;
                     break;
                 case SamuraiPose.Pull:
-                    lean = 5;
-                    stretch = -0.18f;
+                    // Coiled tighter each frame; on the last, the body sinks back before the snap (anticipation).
+                    lean = frame >= 3 ? 2 : 5;
+                    stretch = frame >= 3 ? -0.22f : -0.18f;
                     break;
                 case SamuraiPose.Draw:
                 case SamuraiPose.Kiri:
-                    lean = new[] { 6, 8, 5 }[System.Math.Min(frame, 2)];
-                    stretch = new[] { -0.16f, -0.12f, -0.06f }[System.Math.Min(frame, 2)];
+                    // The smear frame is stretched along the cut, the contact squat and planted, then rising.
+                    lean = new[] { 9, 8, 5, 3 }[System.Math.Min(frame, 3)];
+                    stretch = new[] { -0.2f, -0.12f, -0.06f, -0.03f }[System.Math.Min(frame, 3)];
                     break;
                 case SamuraiPose.Chiburi:
                     lean = 4;
@@ -573,22 +603,24 @@ namespace Game.Client
             // The whole body carried with the cut (2026-11-12, the person: "the sword swings but the body does not move"):
             // shoved forward into the lunge and dropped low on the cut, back and up as the blade goes home.
             int c2 = System.Math.Min(frame, 2);
+            int c3 = System.Math.Min(frame, 3);
             int shove = pose switch
             {
-                SamuraiPose.Stance or SamuraiPose.Pull => -1,
-                SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 4, 9, 8 }[c2],
+                SamuraiPose.Stance => -1,
+                SamuraiPose.Pull => frame >= 3 ? -3 : -1,
+                SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 10, 9, 8, 6 }[c3],
                 SamuraiPose.Chiburi => 6,
-                SamuraiPose.Noto => new[] { 4, 2, 0 }[c2],
+                SamuraiPose.Noto => new[] { 5, 4, 3, 2 }[c3],
                 SamuraiPose.Dash => 4,
                 _ => 0,
             };
             int drop = pose switch
             {
                 SamuraiPose.Stance => frame >= 3 ? 1 : 0,
-                SamuraiPose.Pull => 1,
-                SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 1, 3, 2 }[c2],
+                SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 2, 3, 2, 1 }[c3],
                 SamuraiPose.Chiburi => 2,
-                SamuraiPose.Noto => new[] { 1, 1, 0 }[c2],
+                SamuraiPose.Noto => new[] { 1, 1, 0, 0 }[c3],
+                SamuraiPose.Pull => frame >= 3 ? 2 : 1,
                 _ => 0,
             };
             if (!side)
@@ -652,7 +684,15 @@ namespace Game.Client
                 else
                 {
                     if (System.Math.Abs(hx - mouth.X) + System.Math.Abs(hy - mouth.Y) > 4) Arm(image, shoulder.X, shoulder.Y, hx, hy);
-                    Blade(image, hx, hy, angle, grip.Out, length);
+                    if (grip.Out > 0) Blade(image, hx, hy, angle, grip.Out, length);
+                    else if (pose == SamuraiPose.Draw || pose == SamuraiPose.Kiri)
+                    {
+                        // The smear: the blade's path from where it started to the cut, too fast to see as a blade. A
+                        // draw sweeps level round the front of the body (from behind, past the viewer, to ahead: flattened
+                        // as the ground is); a cut from above comes over the top.
+                        if (pose == SamuraiPose.Draw) Smear(image, hx, hy, side ? 200 : 160, side ? 360 : 330, length, side ? 0.5f : 0.8f);
+                        else Smear(image, hx, hy, side ? 150 : 120, side ? -25 : -40, length, 1);
+                    }
                 }
             }
             else if (pose == SamuraiPose.Stance && frame >= 1)

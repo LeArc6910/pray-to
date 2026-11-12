@@ -953,8 +953,9 @@ namespace Game.Client
                 Enumerable.Range(0, frames).Select(f => (pose, f, seconds)).ToArray();
             // As WorldView times them (AnimateSamurai): a slow pull from the scabbard, the cut in a fifth of a second, the
             // blade flicked and home in a tenth.
-            (SamuraiPose, int, float)[] Sheathe() => new[] { (SamuraiPose.Chiburi, 0, 0.06f) }.Concat(Run(SamuraiPose.Noto, 3, 0.04f)).Concat(new[] { (SamuraiPose.Idle, 0, 0.4f) }).ToArray();
-            (SamuraiPose, int, float)[] Cut(SamuraiPose pose) => new[] { (pose, 0, 0.02f), (pose, 1, 0.08f), (pose, 2, 0.08f) };
+            (SamuraiPose, int, float)[] Sheathe() => new[] { (SamuraiPose.Chiburi, 0, 0.04f), (SamuraiPose.Chiburi, 1, 0.06f) }.Concat(Run(SamuraiPose.Noto, 3, 0.04f))
+                .Concat(new[] { (SamuraiPose.Noto, 3, 0.3f), (SamuraiPose.Idle, 0, 0.3f) }).ToArray();
+            (SamuraiPose, int, float)[] Cut(SamuraiPose pose) => new[] { (pose, 0, 0.04f), (pose, 1, 0.16f), (pose, 2, 0.08f), (pose, 3, 0.08f) };
             var rows = new[]
             {
                 Run(SamuraiPose.Walk, 4, 0.14f).Concat(Run(SamuraiPose.Walk, 4, 0.14f)).ToArray(),
@@ -994,9 +995,9 @@ namespace Game.Client
                             SamuraiPose.Stance => step.Item2 >= 2 ? -1 : 0,
                             SamuraiPose.Pull => -1,
                             SamuraiPose.Jodan => step.Item2 >= 3 ? -1 : 0,
-                            SamuraiPose.Draw or SamuraiPose.Kiri => step.Item2 == 0 ? 0 : 1,
+                            SamuraiPose.Draw or SamuraiPose.Kiri => step.Item2 == 3 ? 0 : 1,
                             SamuraiPose.Chiburi => 1,
-                            SamuraiPose.Noto => step.Item2 == 0 ? 1 : 0,
+                            SamuraiPose.Noto => 0,
                             _ => 0,
                         };
                         var sideView = twist < 0 ? BossView.BackSide : twist > 0 ? BossView.FrontSide : BossView.Side;
