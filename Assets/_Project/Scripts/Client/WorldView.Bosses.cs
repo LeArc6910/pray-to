@@ -411,7 +411,6 @@ namespace Game.Client
 
         static readonly Color SteelColor = new Color(0.86f, 0.92f, 1f);
         static readonly Color PetalColor = new Color(1f, 0.72f, 0.82f);
-        static readonly Color PetalDeep = new Color(0.94f, 0.45f, 0.6f);
 
         // Seconds the picture holds still when the blade comes out, and how long the line it leaves stays.
         const float DrawStop = 0.07f;
@@ -445,6 +444,82 @@ namespace Game.Client
             attack.Shape == AttackShape.Cross || attack.Shape == AttackShape.Burst || attack.Shape == AttackShape.Circle && attack.Target == AttackTarget.Each;
 
         static Sprite CrescentSprite => Sprites.Centered("shot/crescent", () => EffectArt.Swing(24, 2));
+
+        // Cherry blossom (2026-11-12, the person: "make the blossom stand out, more splendid"): petals pale and deep and
+        // whole flowers, in their own colours.
+        static Sprite[] _petalSprites;
+        static Sprite[] PetalSprites => _petalSprites ??= new[]
+        {
+            Sprites.Centered("fx/petal0", () => EffectArt.Petal(0)),
+            Sprites.Centered("fx/petal1", () => EffectArt.Petal(1)),
+            Sprites.Centered("fx/petal2", () => EffectArt.Petal(2)),
+        };
+
+        // Petals thrown from a point, along toward (every way when it is zero): slowing, blown down and aside, swaying
+        // and turning over as they fall, bright until late. One in four is a whole flower.
+        void Petals(Vector3 at, Vector3 toward, int count, float speed, float life, float spread = 0.3f)
+        {
+            if (!Feel.Bits) return;
+            var sprites = PetalSprites;
+            var way = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.zero;
+            float scatter = way == Vector3.zero ? 1 : 0.5f;
+            for (int i = 0; i < count; i++)
+            {
+                var sprite = sprites[UnityEngine.Random.value < 0.25f ? 2 : UnityEngine.Random.value < 0.5f ? 0 : 1];
+                var petal = Renderer(_root.transform, "Petal", sprite, Color.white);
+                petal.transform.localPosition = at + (Vector3)(UnityEngine.Random.insideUnitCircle * spread);
+                petal.sortingOrder = 19450;
+                var velocity = (way + (Vector3)(UnityEngine.Random.insideUnitCircle * scatter)) * speed * UnityEngine.Random.Range(0.6f, 1.2f);
+                _bits.Add(new Bit
+                {
+                    Renderer = petal, Velocity = velocity, Color = Color.white, Life = life * UnityEngine.Random.Range(0.8f, 1.25f),
+                    Drag = 2.2f, Fall = new Vector3(-0.25f, -0.7f, 0), Sway = 0.8f, Spin = UnityEngine.Random.Range(-240f, 240f),
+                    Phase = UnityEngine.Random.Range(0, Mathf.PI * 2), Tumble = true, LateFade = true,
+                });
+            }
+        }
+
+        // The air of its shrine: petals blowing in from the top and the right of the screen, thicker each phase.
+        void PetalWind(int phase)
+        {
+            if (!Feel.Bits || UnityEngine.Random.value > 0.2f + 0.2f * phase) return;
+            float high = _camera.orthographicSize, wide = high * _camera.aspect;
+            var middle = _camera.transform.position - _root.transform.position;
+            var at = UnityEngine.Random.value < 0.6f
+                ? new Vector3(middle.x + UnityEngine.Random.Range(-wide, wide + 2), middle.y + high + 0.5f, 0)
+                : new Vector3(middle.x + wide + 0.5f, middle.y + UnityEngine.Random.Range(-high, high), 0);
+            var petal = Renderer(_root.transform, "Petal", PetalSprites[UnityEngine.Random.value < 0.2f ? 2 : UnityEngine.Random.value < 0.6f ? 0 : 1], Color.white);
+            petal.transform.localPosition = at;
+            petal.sortingOrder = 19300;
+            float speed = UnityEngine.Random.Range(0.8f, 1.4f);
+            _bits.Add(new Bit
+            {
+                Renderer = petal, Velocity = new Vector3(-1.3f, -1f, 0) * speed, Color = new Color(1, 1, 1, 0.85f),
+                Life = (2 * high + 1) / speed + 1, Drag = 0, Sway = 0.9f, Spin = UnityEngine.Random.Range(-180f, 180f),
+                Phase = UnityEngine.Random.Range(0, Mathf.PI * 2), Tumble = true, LateFade = true,
+            });
+        }
+
+        // An afterimage where the samurai is now: its white silhouette, white, pink and deep pink in turn, left behind
+        // to fade, and a petal shed behind it.
+        void Echo(Body body)
+        {
+            if (Time.time < body.EchoAt || body.Glow.sprite == null) return;
+            body.EchoAt = Time.time + 0.03f;
+            body.Echoes++;
+            var color = (body.Echoes % 3) switch
+            {
+                0 => new Color(1, 1, 1, 0.75f),
+                1 => new Color(1f, 0.62f, 0.78f, 0.7f),
+                _ => new Color(0.95f, 0.35f, 0.58f, 0.6f),
+            };
+            var ghost = Renderer(_root.transform, "Afterimage", body.Glow.sprite, color);
+            ghost.transform.localPosition = body.Shape.transform.position - _root.transform.position;
+            ghost.flipX = body.Shape.flipX;
+            ghost.sortingOrder = body.Shape.sortingOrder - 1;
+            _bits.Add(new Bit { Renderer = ghost, Velocity = Vector3.zero, Color = color, Life = 0.32f });
+            Petals(body.Position + new Vector3(0, 0.4f, 0), body.LastPosition - body.Position, 1, 1.2f, 0.9f);
+        }
 
         // Things to happen a moment later: the cut opening along a line already drawn.
         readonly System.Collections.Generic.List<(float At, System.Action Do)> _later = new System.Collections.Generic.List<(float, System.Action)>();
@@ -561,15 +636,30 @@ namespace Game.Client
             if (view.BossState == BossState.Telegraph && attack != null)
             {
                 float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
-                // Gathering itself: petals drawn in toward it, more as the draw nears.
-                if (puff && UnityEngine.Random.value < 0.3f + progress)
+                // Gathering itself: petals swirling in round it, more as the draw nears, a wide storm for the ultimate.
+                bool strong = attack.Warning == AttackWarning.Strong;
+                if (puff && UnityEngine.Random.value < 0.4f + progress)
                 {
-                    var from = feet + (Vector3)(UnityEngine.Random.insideUnitCircle.normalized * 2.2f) + new Vector3(0, 0.8f, 0);
-                    Kick(from, feet + new Vector3(0, 0.8f, 0) - from, UnityEngine.Random.value < 0.5f ? PetalColor : PetalDeep, 1);
+                    var middle = feet + new Vector3(0, 0.8f, 0);
+                    var from = middle + (Vector3)(UnityEngine.Random.insideUnitCircle.normalized * (strong ? 3.2f : 2.2f));
+                    var inward = middle - from;
+                    Petals(from, inward + new Vector3(-inward.y, inward.x, 0) * 0.8f, strong ? 3 : 2, 2.4f, 0.8f, 0.1f);
                 }
-                // A flash step: gone just before it lands behind its target.
-                if (attack.GoesAway && progress > 0.6f) body.Shape.color = new Color(1, 1, 1, Mathf.Max(0.08f, 1 - (progress - 0.6f) * 4));
+                // A flash step: gone in a burst of petals just before it lands behind its target.
+                if (attack.GoesAway && progress > 0.6f)
+                {
+                    body.Shape.color = new Color(1, 1, 1, Mathf.Max(0.08f, 1 - (progress - 0.6f) * 4));
+                    if (!body.Vanished)
+                    {
+                        body.Vanished = true;
+                        Echo(body);
+                        Petals(feet + new Vector3(0, 0.8f, 0), Vector3.zero, 16, 4, 1.3f, 0.4f);
+                    }
+                }
             }
+            if (view.BossState != BossState.Telegraph) body.Vanished = false;
+            // Petals on the air all through the fight, thicker each phase.
+            if (puff) PetalWind(Mathf.Clamp(body.BossPhase, 1, 3));
             // The blade home: the guard clicks against the scabbard's mouth.
             if (view.BossState == BossState.Recover && attack != null && since >= NotoDone && !body.Clicked)
             {
@@ -583,14 +673,8 @@ namespace Game.Client
             var moved = body.Position - body.LastPosition;
             bool darting = moved.magnitude / Mathf.Max(1e-3f, Time.deltaTime) > DartSpeed;
             if (darting || view.BossState == BossState.Charge) SpeedLines(feet, moved);
-            if (darting && view.BossState != BossState.Charge && puff)
-            {
-                var echo = Renderer(_root.transform, "Afterimage", body.Shape.sprite, new Color(1f, 0.45f, 0.55f, 0.45f));
-                echo.transform.localPosition = body.Shape.transform.position - _root.transform.position;
-                echo.flipX = body.Shape.flipX;
-                echo.sortingOrder = body.Shape.sortingOrder - 1;
-                _bits.Add(new Bit { Renderer = echo, Velocity = Vector3.zero, Color = new Color(1f, 0.45f, 0.55f, 0.45f), Life = 0.2f });
-            }
+            // Afterimages all along a dash or a dart (2026-11-12, the person: "leave afterimages on the dash").
+            if (darting || view.BossState == BossState.Charge) Echo(body);
             // The ultimate's wind-up dims the room.
             bool gathering = view.BossState == BossState.Telegraph && attack != null && attack.Warning == AttackWarning.Strong;
             Dim(gathering ? 0.5f * Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph)) : 0);
@@ -601,12 +685,6 @@ namespace Game.Client
                     body.Dashing = true;
                     body.DashFrom = feet;
                 }
-                // Afterimages along the dash.
-                var ghost = Renderer(_root.transform, "Afterimage", body.Shape.sprite, new Color(1f, 0.5f, 0.6f, 0.55f));
-                ghost.transform.localPosition = body.Shape.transform.position - _root.transform.position;
-                ghost.flipX = body.Shape.flipX;
-                ghost.sortingOrder = body.Shape.sortingOrder - 1;
-                _bits.Add(new Bit { Renderer = ghost, Velocity = Vector3.zero, Color = new Color(1f, 0.5f, 0.6f, 0.55f), Life = 0.25f });
             }
             else if (body.Dashing)
             {
@@ -626,6 +704,10 @@ namespace Game.Client
             _shake = Mathf.Max(_shake, 0.18f);
             Hear(Sound.Heavy, body.Position, 1);
             Hear(Sound.Crit, body.Position, 0.6f);
+            // Blossom thrown off the draw, a ring of it.
+            var chest = body.Position + new Vector3(0, 0.8f, 0);
+            Petals(chest, Vector3.zero, 14, 4.5f, 1.3f, 0.4f);
+            AddFlash(chest, 1.6f, PetalColor, FlashKind.Ring);
         }
 
         // Where the blade went: a pink glow, a pale blue band and a white core, bright and gone fast; a beat later the cut
@@ -662,7 +744,8 @@ namespace Game.Client
                 {
                     var at = Vector3.Lerp(from, to, i / (float)steps);
                     AddFlash(at, 0.6f * heavy, SteelColor, FlashKind.Impact);
-                    Kick(at, normal * (i % 2 == 0 ? 1 : -1), i % 2 == 0 ? PetalColor : PetalDeep, 4);
+                    Kick(at, normal * (i % 2 == 0 ? 1 : -1), SteelColor, 2);
+                    Petals(at, normal * (i % 2 == 0 ? 1 : -1), Mathf.RoundToInt(3 * heavy), 3.2f, 1.2f, 0.2f);
                 }
                 AddFlash(middle, Mathf.Min(2.4f, length * 0.35f) * heavy, PetalColor, FlashKind.Burst);
                 _shake = Mathf.Max(_shake, 0.16f * heavy);
@@ -748,6 +831,13 @@ namespace Game.Client
                     }
                     AddFlash(at, hazard.Size, Color.white, FlashKind.Ring);
                     AddFlash(at, hazard.Size * 0.7f, PetalColor, FlashKind.Ring);
+                    // A storm of blossom whirling out from it.
+                    for (int i = 0; i < 40; i++)
+                    {
+                        float a = i * 9 * Mathf.Deg2Rad;
+                        var dir = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0);
+                        Petals(at + dir * 0.5f, dir + new Vector3(-dir.y, dir.x, 0) * 0.7f, 1, hazard.Size * 1.4f, 1.8f, 0.2f);
+                    }
                     ScreenFlash(new Color(1, 1, 1, 0.75f), 0.18f);
                     if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, DrawStop * 2.2f);
                     _shake = Mathf.Max(_shake, 0.45f);
@@ -764,10 +854,12 @@ namespace Game.Client
                     // A cut in the air: an X where it lands, in petals.
                     Cut(at - (along + across) * hazard.Size * 0.8f, at + (along + across) * hazard.Size * 0.8f, 0.9f);
                     Cut(at - (along - across) * hazard.Size * 0.8f, at + (along - across) * hazard.Size * 0.8f, 0.9f);
+                    Petals(at, Vector3.zero, 10, 3, 1.4f, hazard.Size * 0.5f);
                     return true;
                 case AttackShape.Leap:
                     // Out of nowhere beside its target: one cut straight down through where it stood.
                     Cut(at + new Vector3(-0.8f, 1.6f, 0), at + new Vector3(0.8f, -0.8f, 0), 1.3f);
+                    Petals(at + new Vector3(0, 0.8f, 0), Vector3.zero, 16, 4, 1.3f, 0.4f);
                     return true;
             }
             return false;

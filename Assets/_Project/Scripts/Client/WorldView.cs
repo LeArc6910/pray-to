@@ -90,6 +90,11 @@ namespace Game.Client
             public Vector3 DashFrom;
             // Its blade has clicked home after the last cut.
             public bool Clicked;
+            // When it last left an afterimage, how many it has left (they take turns in colour), and whether it has
+            // vanished in petals for a flash step.
+            public float EchoAt;
+            public int Echoes;
+            public bool Vanished;
             public EnemyState EnemyState;
             // When a monster may cry out again on noticing someone, and where another player was last frame and how
             // far they have walked since their last step (2026-11-09, sounds).
@@ -209,6 +214,15 @@ namespace Game.Client
             public float Age;
             public Color Color;
             public float Life = BitSeconds;
+            // How fast it slows; a petal (2026-11-12, the samurai) slows less, is blown down and aside, sways, turns
+            // over and over (its width shrinking and growing), and stays bright until late in its life.
+            public float Drag = 6;
+            public Vector3 Fall;
+            public float Sway;
+            public float Spin;
+            public float Phase;
+            public bool Tumble;
+            public bool LateFade;
         }
 
         // Where a body was and what colour it was, kept for the frame it is removed in: its death event comes after.
@@ -1860,6 +1874,9 @@ namespace Game.Client
                     _projectiles[projectile.Id] = renderer;
                 }
                 renderer.transform.localPosition = new Vector3(projectile.Position.X, projectile.Position.Y, 0);
+                // The samurai's crescents shed petals as they fly.
+                if (!projectile.Friendly && _bossInView?.Id == "shrine_samurai" && UnityEngine.Random.value < 0.45f)
+                    Petals(new Vector3(projectile.Position.X, projectile.Position.Y, 0), -new Vector3(projectile.Velocity.X, projectile.Velocity.Y, 0), 1, 1.5f, 0.8f, 0.2f);
             }
 
             _gone.Clear();
@@ -2945,11 +2962,23 @@ namespace Game.Client
                     _bits.RemoveAt(i);
                     continue;
                 }
-                bit.Velocity *= Mathf.Exp(-6 * deltaTime);
-                bit.Renderer.transform.localPosition += bit.Velocity * deltaTime;
+                bit.Velocity *= Mathf.Exp(-bit.Drag * deltaTime);
+                bit.Velocity += bit.Fall * deltaTime;
+                var step = bit.Velocity;
+                if (bit.Sway != 0) step.x += Mathf.Sin(bit.Age * 4 + bit.Phase) * bit.Sway;
+                var place = bit.Renderer.transform;
+                place.localPosition += step * deltaTime;
+                if (bit.Spin != 0) place.localRotation = Quaternion.Euler(0, 0, bit.Phase * Mathf.Rad2Deg + bit.Spin * bit.Age);
+                if (bit.Tumble)
+                {
+                    var scale = place.localScale;
+                    scale.x = scale.y * Mathf.Max(0.2f, Mathf.Abs(Mathf.Cos(bit.Age * 7 + bit.Phase)));
+                    place.localScale = scale;
+                }
                 var color = bit.Color;
-                // Fading from the alpha it started with (a faint flash stays faint).
-                color.a = bit.Color.a * (1 - bit.Age / bit.Life);
+                // Fading from the alpha it started with (a faint flash stays faint); a petal only over its last third.
+                float left = 1 - bit.Age / bit.Life;
+                color.a = bit.Color.a * (bit.LateFade ? Mathf.Clamp01(left * 3) : left);
                 bit.Renderer.color = color;
             }
         }

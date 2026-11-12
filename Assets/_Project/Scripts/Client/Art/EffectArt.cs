@@ -62,6 +62,55 @@ namespace Game.Client
             return image.Outlined(new Rgba(40, 8, 8));
         }
 
+        // Cherry blossom for the shrine samurai's fight (2026-11-12, the person: "make the blossom stand out, more
+        // splendid"), drawn in its own colours: a single petal, notched at its broad end, pale or deep (kind 0, 1), or a
+        // whole five-petal flower with a gold heart (kind 2). A faint dark edge keeps them on a pale floor.
+        public static PixelImage Petal(int kind)
+        {
+            if (kind == 2)
+            {
+                const int size = 9;
+                var flower = new PixelImage(size, size);
+                float c = (size - 1) / 2f;
+                for (int y = 0; y < size; y++)
+                {
+                    for (int x = 0; x < size; x++)
+                    {
+                        for (int k = 0; k < 5; k++)
+                        {
+                            double a = (90 + 72 * k) * System.Math.PI / 180;
+                            float px = c + 2.3f * (float)System.Math.Cos(a), py = c - 2.3f * (float)System.Math.Sin(a);
+                            float d = (x - px) * (x - px) + (y - py) * (y - py);
+                            if (d > 2.1f) continue;
+                            // Paler toward the tip, deeper toward the heart.
+                            float out2 = (x - c) * (x - c) + (y - c) * (y - c);
+                            flower[x, y] = out2 > 9 ? new Rgba(255, 228, 238) : out2 > 4 ? new Rgba(255, 178, 204) : new Rgba(236, 112, 152);
+                        }
+                    }
+                }
+                flower[(int)c, (int)c] = new Rgba(255, 214, 110);
+                return flower.Outlined(new Rgba(90, 24, 48, 150));
+            }
+            // Tilted, broad and notched at the top right, narrowing to its foot at the bottom left.
+            string[] rows =
+            {
+                "...a.a",
+                "..abbb",
+                ".abbbc",
+                "abbbc.",
+                ".bcc..",
+                ".c....",
+            };
+            var light = kind == 0 ? new Rgba(255, 238, 244) : new Rgba(255, 196, 214);
+            var body = kind == 0 ? new Rgba(255, 178, 204) : new Rgba(240, 120, 160);
+            var deep = kind == 0 ? new Rgba(234, 116, 156) : new Rgba(196, 64, 112);
+            var image = new PixelImage(6, 6);
+            for (int y = 0; y < 6; y++)
+                for (int x = 0; x < 6; x++)
+                    image[x, y] = rows[y][x] switch { 'a' => light, 'b' => body, 'c' => deep, _ => image[x, y] };
+            return image.Outlined(new Rgba(90, 24, 48, 150));
+        }
+
         // A rock in flight or falling (the vein eater's throws and cave-in, 2026-11-12), drawn in its own colours.
         public static PixelImage Rock(int size)
         {
