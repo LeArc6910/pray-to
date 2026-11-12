@@ -558,18 +558,42 @@ namespace Game.Client
                     stretch = 0.05f;
                     break;
             }
+            // The whole body carried with the cut (2026-11-12, the person: "the sword swings but the body does not move"):
+            // shoved forward into the lunge and dropped low on the cut, back and up as the blade goes home.
+            int c2 = System.Math.Min(frame, 2);
+            int shove = pose switch
+            {
+                SamuraiPose.Stance => -1,
+                SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 4, 9, 8 }[c2],
+                SamuraiPose.Chiburi => 6,
+                SamuraiPose.Noto => new[] { 4, 2, 0 }[c2],
+                SamuraiPose.Dash => 4,
+                _ => 0,
+            };
+            int drop = pose switch
+            {
+                SamuraiPose.Stance => frame >= 3 ? 1 : 0,
+                SamuraiPose.Draw or SamuraiPose.Kiri => new[] { 1, 3, 2 }[c2],
+                SamuraiPose.Chiburi => 2,
+                SamuraiPose.Noto => new[] { 1, 1, 0 }[c2],
+                _ => 0,
+            };
             if (!side)
             {
                 stretch -= lean * 0.012f;
                 lean = 0;
+                // From the front or back a shove forward shows as a step down or up the screen.
+                drop += view == BossView.Front ? shove / 3 : -shove / 3;
+                shove = 0;
             }
 
             int w = body.Width, h = body.Height;
             int tall = System.Math.Max(4, (int)System.Math.Round(h * (1 + stretch)));
             int wide = System.Math.Max(4, (int)System.Math.Round(w * (1 - stretch * 0.5f)));
             var image = new PixelImage(Width, Height);
-            int left = (Width - wide) / 2;
-            int ground = Height - 1;
+            int left = (Width - wide) / 2 + shove;
+            int ground = Height - 1 - System.Math.Max(0, -drop);
+            tall -= System.Math.Max(0, drop);
             // Where a picture point lands once leaned and squashed.
             (int X, int Y) Place(int x, int y)
             {

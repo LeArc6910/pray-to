@@ -984,7 +984,19 @@ namespace Game.Client
                     }
                     for (int column = 0; column < 2; column++)
                     {
-                        var image = SamuraiArt.Draw(column == 0 ? BossView.Side : BossView.Front, step.Item1, step.Item2, 1);
+                        // The body turns with the cut as WorldView turns it (AnimateSamurai): away while it gathers,
+                        // toward the viewer through the cut. Shown on the side view.
+                        int twist = step.Item1 switch
+                        {
+                            SamuraiPose.Stance => step.Item2 >= 2 ? -1 : 0,
+                            SamuraiPose.Jodan => step.Item2 >= 3 ? -1 : 0,
+                            SamuraiPose.Draw or SamuraiPose.Kiri => step.Item2 == 0 ? 0 : 1,
+                            SamuraiPose.Chiburi => 1,
+                            SamuraiPose.Noto => step.Item2 == 0 ? 1 : 0,
+                            _ => 0,
+                        };
+                        var sideView = twist < 0 ? BossView.BackSide : twist > 0 ? BossView.FrontSide : BossView.Side;
+                        var image = SamuraiArt.Draw(column == 0 ? sideView : BossView.Front, step.Item1, step.Item2, 1);
                         for (int y = 0; y < cellHeight; y++)
                         {
                             for (int x = 0; x < cellWidth; x++)

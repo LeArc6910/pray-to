@@ -419,6 +419,17 @@ namespace Game.Client
         // A beat after the line, the cut opens.
         const float CutDelay = 0.13f;
 
+        // A way faced turned one step toward the viewer (+1, down the screen) or away (-1, up); facing straight up or down,
+        // a step aside.
+        static int Twist(int sector, int toward)
+        {
+            if (toward == 0) return sector;
+            int target = toward > 0 ? 6 : 2;
+            if (sector == target || sector == (target + 4) % 8) return (sector + toward + 8) % 8;
+            int clockwise = (target - sector + 8) % 8;
+            return clockwise < 4 ? (sector + 1) % 8 : (sector + 7) % 8;
+        }
+
         // Faster than this (tiles a second) it is darting, not walking.
         const float DartSpeed = 6;
         // The sheathing ends this long after the cut.
@@ -491,6 +502,19 @@ namespace Game.Client
                 else if (since < 0.4f) (pose, frame) = (SamuraiPose.Chiburi, 0);
                 else (pose, frame) = (SamuraiPose.Noto, Mathf.Min(2, Mathf.FloorToInt((since - 0.4f) / ((NotoDone - 0.4f) / 3))));
             }
+
+            // The body turns with the cut: wound away from the viewer while it gathers (the shoulder turned in, the
+            // scabbard drawn back), unwound toward the viewer as the blade comes through, back square as it sheathes.
+            int twist = pose switch
+            {
+                SamuraiPose.Stance => frame >= 2 ? -1 : 0,
+                SamuraiPose.Jodan => frame >= 3 ? -1 : 0,
+                SamuraiPose.Draw or SamuraiPose.Kiri => frame == 0 ? 0 : 1,
+                SamuraiPose.Chiburi => 1,
+                SamuraiPose.Noto => frame == 0 ? 1 : 0,
+                _ => 0,
+            };
+            sector = Twist(sector, twist);
 
             var (view, turned) = BossSectors[sector];
             int phase = Mathf.Clamp(body.BossPhase, 1, 3);
