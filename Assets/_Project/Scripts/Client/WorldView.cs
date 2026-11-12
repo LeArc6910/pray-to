@@ -2664,7 +2664,7 @@ namespace Game.Client
 
             if (body.Kind == BodyKind.Boss && body.Id == "vein_eater")
             {
-                AnimateVeinEater(body, facing, dead);
+                AnimateVeinEater(body, facing, dead, moving);
                 return;
             }
 

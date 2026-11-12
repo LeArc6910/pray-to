@@ -95,7 +95,7 @@ namespace Game.Client
 
         // Its pose from what it is doing: each kind of attack has a wind-up of its own (VeinPose), run through its
         // telegraph in four steps, and a follow-through just after; a spin turns it round and round.
-        void AnimateVeinEater(Body body, Vec2 facing, bool dead)
+        void AnimateVeinEater(Body body, Vec2 facing, bool dead, bool moving)
         {
             var attack = body.BossAttack;
             float since = Time.time - body.BossSince;
@@ -107,15 +107,22 @@ namespace Game.Client
             {
                 frame = 0;
             }
+            else if (moving && (body.BossState == BossState.Approach || body.BossState == BossState.Recover || body.BossState == BossState.Dormant))
+            {
+                // Walking: a step a foot about every seventh of a second at its pace.
+                pose = VeinPose.Walk;
+                frame = Mathf.FloorToInt(body.Walked * 7) % 4;
+            }
             else if (body.BossState == BossState.Roar)
             {
                 pose = VeinPose.Roar;
-                frame = 0;
+                frame = Mathf.FloorToInt(Time.time * 8) % 2;
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
                 float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
-                frame = Mathf.Min(3, Mathf.FloorToInt(progress * 4));
+                // Six steps through a wind-up.
+                frame = Mathf.Min(5, Mathf.FloorToInt(progress * 6));
                 switch (attack.Shape)
                 {
                     case AttackShape.Cone:
@@ -146,7 +153,7 @@ namespace Game.Client
                         break;
                     case AttackShape.Summon:
                         pose = VeinPose.Roar;
-                        frame = 0;
+                        frame = Mathf.FloorToInt(Time.time * 8) % 2;
                         break;
                     default:
                         pose = VeinPose.Slam;
@@ -155,8 +162,9 @@ namespace Game.Client
             }
             else if (body.BossState == BossState.Charge)
             {
+                // Running flat out: legs at twice the walk.
                 pose = VeinPose.Rush;
-                frame = 0;
+                frame = Mathf.FloorToInt(Time.time * 14) % 4;
                 rage = attack != null && attack.Count > 1;
             }
             else if (body.BossState == BossState.Recover && attack != null)
@@ -170,7 +178,8 @@ namespace Game.Client
                 }
                 else if (since < 0.45f)
                 {
-                    frame = 0;
+                    // Three frames of follow-through.
+                    frame = Mathf.Min(2, Mathf.FloorToInt(since / 0.15f));
                     pose = attack.Shape switch
                     {
                         AttackShape.Cone => VeinPose.Swipe,
@@ -182,13 +191,14 @@ namespace Game.Client
                         AttackShape.Summon => VeinPose.Roar,
                         _ => VeinPose.Pound,
                     };
-                    if (attack.Shape == AttackShape.Trail) frame = 3;
+                    if (attack.Shape == AttackShape.Trail) frame = 5;
+                    if (attack.Shape == AttackShape.Charge || attack.Shape == AttackShape.Summon) frame = 0;
                 }
             }
 
             var (view, turned) = BossSectors[sector];
             int phase = Mathf.Clamp(body.BossPhase, 1, 3);
-            int code = 300000 + ((((int)pose * 8 + (int)view) * 4 + frame) * 4 + phase) * 4 + (rage ? 2 : 0) + (turned ? 1 : 0);
+            int code = 300000 + ((((int)pose * 8 + (int)view) * 8 + frame) * 4 + phase) * 4 + (rage ? 2 : 0) + (turned ? 1 : 0);
             if (code == body.Frame) return;
             body.Frame = code;
             string key = $"vein/{view}/{pose}/{frame}/{phase}/{rage}";

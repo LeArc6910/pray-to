@@ -886,22 +886,24 @@ namespace Game.Client
 
         // A row a boss. First column: turning, 0.5 seconds a way. Second and third: the pattern facing down-right and
         // up-left: idle, a wind-up of a second, the strike, idle, a charge, idle, a roar, idle.
-        // The vein eater's wind-ups and blows (2026-11-12, VeinEaterArt), a row an attack as WorldView plays them,
-        // facing right and facing down: claw, rock throw, rush, burrow, cave-in, spikes, spin, frenzy, quake, call.
+        // The vein eater's walk, wind-ups and blows (2026-11-12, VeinEaterArt), a row each as WorldView plays them,
+        // facing right and facing down: walk, claw, rock throw, rush, burrow, cave-in, spikes, spin, frenzy, quake,
+        // roar.
         static void VeinEater(string path, PixelImage arena)
         {
             var rows = new (VeinPose Pose, int Frame, float Seconds, bool Rage, int Phase)[][]
             {
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Rear, 0, 0.2f, false, 1), (VeinPose.Rear, 1, 0.2f, false, 1), (VeinPose.Rear, 2, 0.2f, false, 1), (VeinPose.Rear, 3, 0.2f, false, 1), (VeinPose.Swipe, 0, 0.3f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Lift, 0, 0.25f, false, 1), (VeinPose.Lift, 1, 0.2f, false, 1), (VeinPose.Lift, 2, 0.25f, false, 1), (VeinPose.Lift, 3, 0.2f, false, 1), (VeinPose.Throw, 0, 0.3f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Crouch, 0, 0.15f, false, 1), (VeinPose.Crouch, 1, 0.15f, false, 1), (VeinPose.Crouch, 2, 0.15f, false, 1), (VeinPose.Crouch, 3, 0.15f, false, 1), (VeinPose.Rush, 0, 0.5f, false, 1) },
+                new[] { (VeinPose.Walk, 0, 0.14f, false, 1), (VeinPose.Walk, 1, 0.14f, false, 1), (VeinPose.Walk, 2, 0.14f, false, 1), (VeinPose.Walk, 3, 0.14f, false, 1) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Rear, 0, 0.13f, false, 1), (VeinPose.Rear, 1, 0.13f, false, 1), (VeinPose.Rear, 2, 0.13f, false, 1), (VeinPose.Rear, 3, 0.13f, false, 1), (VeinPose.Rear, 4, 0.13f, false, 1), (VeinPose.Rear, 5, 0.13f, false, 1), (VeinPose.Swipe, 0, 0.15f, false, 1), (VeinPose.Swipe, 1, 0.15f, false, 1), (VeinPose.Swipe, 2, 0.15f, false, 1), (VeinPose.Idle, 0, 0.3f, false, 1) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Lift, 0, 0.15f, false, 1), (VeinPose.Lift, 1, 0.15f, false, 1), (VeinPose.Lift, 2, 0.15f, false, 1), (VeinPose.Lift, 3, 0.15f, false, 1), (VeinPose.Lift, 4, 0.15f, false, 1), (VeinPose.Lift, 5, 0.15f, false, 1), (VeinPose.Throw, 0, 0.15f, false, 1), (VeinPose.Throw, 1, 0.15f, false, 1), (VeinPose.Throw, 2, 0.15f, false, 1), (VeinPose.Idle, 0, 0.3f, false, 1) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Crouch, 0, 0.1f, false, 1), (VeinPose.Crouch, 1, 0.1f, false, 1), (VeinPose.Crouch, 0, 0.1f, false, 1), (VeinPose.Crouch, 1, 0.1f, false, 1), (VeinPose.Rush, 0, 0.07f, false, 1), (VeinPose.Rush, 1, 0.07f, false, 1), (VeinPose.Rush, 2, 0.07f, false, 1), (VeinPose.Rush, 3, 0.07f, false, 1), (VeinPose.Rush, 0, 0.07f, false, 1), (VeinPose.Rush, 1, 0.07f, false, 1), (VeinPose.Rush, 2, 0.07f, false, 1), (VeinPose.Rush, 3, 0.07f, false, 1) },
                 new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Sink, 0, 0.2f, false, 1), (VeinPose.Sink, 1, 0.2f, false, 1), (VeinPose.Sink, 2, 0.2f, false, 1), (VeinPose.Sink, 3, 0.5f, false, 1), (VeinPose.Rise, 0, 0.3f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Slam, 0, 0.3f, false, 2), (VeinPose.Slam, 1, 0.3f, false, 2), (VeinPose.Slam, 2, 0.3f, false, 2), (VeinPose.Slam, 3, 0.3f, false, 2), (VeinPose.Pound, 0, 0.4f, false, 2) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Plunge, 0, 0.2f, false, 2), (VeinPose.Plunge, 1, 0.2f, false, 2), (VeinPose.Plunge, 2, 0.2f, false, 2), (VeinPose.Plunge, 3, 0.4f, false, 2) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Curl, 0, 0.2f, false, 2), (VeinPose.Curl, 1, 0.2f, false, 2), (VeinPose.Curl, 2, 0.2f, false, 2), (VeinPose.Curl, 3, 0.4f, false, 2) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Crouch, 0, 0.12f, true, 3), (VeinPose.Crouch, 2, 0.12f, true, 3), (VeinPose.Rush, 0, 0.3f, true, 3), (VeinPose.Crouch, 1, 0.12f, true, 3), (VeinPose.Rush, 0, 0.3f, true, 3) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Leap, 0, 0.4f, false, 3), (VeinPose.Leap, 1, 0.15f, false, 3), (VeinPose.Leap, 2, 0.15f, false, 3), (VeinPose.Leap, 3, 0.4f, false, 3), (VeinPose.Pound, 0, 0.4f, false, 3) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Roar, 0, 0.5f, false, 3), (VeinPose.Roar, 1, 0.5f, false, 3) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Slam, 0, 0.2f, false, 2), (VeinPose.Slam, 1, 0.2f, false, 2), (VeinPose.Slam, 2, 0.2f, false, 2), (VeinPose.Slam, 3, 0.2f, false, 2), (VeinPose.Slam, 4, 0.2f, false, 2), (VeinPose.Slam, 5, 0.2f, false, 2), (VeinPose.Pound, 0, 0.15f, false, 2), (VeinPose.Pound, 1, 0.15f, false, 2), (VeinPose.Pound, 2, 0.15f, false, 2), (VeinPose.Idle, 0, 0.3f, false, 2) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Plunge, 0, 0.12f, false, 2), (VeinPose.Plunge, 1, 0.12f, false, 2), (VeinPose.Plunge, 2, 0.12f, false, 2), (VeinPose.Plunge, 3, 0.12f, false, 2), (VeinPose.Plunge, 4, 0.12f, false, 2), (VeinPose.Plunge, 5, 0.12f, false, 2) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Curl, 0, 0.12f, false, 2), (VeinPose.Curl, 1, 0.12f, false, 2), (VeinPose.Curl, 2, 0.12f, false, 2), (VeinPose.Curl, 3, 0.12f, false, 2), (VeinPose.Curl, 4, 0.12f, false, 2), (VeinPose.Curl, 5, 0.12f, false, 2) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Crouch, 0, 0.08f, true, 3), (VeinPose.Crouch, 1, 0.08f, true, 3), (VeinPose.Rush, 0, 0.07f, true, 3), (VeinPose.Rush, 1, 0.07f, true, 3), (VeinPose.Rush, 2, 0.07f, true, 3), (VeinPose.Rush, 3, 0.07f, true, 3), (VeinPose.Crouch, 0, 0.08f, true, 3), (VeinPose.Crouch, 1, 0.08f, true, 3), (VeinPose.Rush, 0, 0.07f, true, 3), (VeinPose.Rush, 1, 0.07f, true, 3), (VeinPose.Rush, 2, 0.07f, true, 3), (VeinPose.Rush, 3, 0.07f, true, 3) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Leap, 0, 0.4f, false, 3), (VeinPose.Leap, 1, 0.12f, false, 3), (VeinPose.Leap, 2, 0.12f, false, 3), (VeinPose.Leap, 3, 0.4f, false, 3), (VeinPose.Pound, 0, 0.15f, false, 3), (VeinPose.Pound, 1, 0.15f, false, 3), (VeinPose.Pound, 2, 0.15f, false, 3) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Roar, 0, 0.25f, false, 3), (VeinPose.Roar, 1, 0.25f, false, 3), (VeinPose.Roar, 0, 0.25f, false, 3), (VeinPose.Roar, 1, 0.25f, false, 3) },
             };
             const int scale = 2;
             int cellWidth = VeinEaterArt.Width * scale;
@@ -909,7 +911,7 @@ namespace Game.Client
             int width = cellWidth * 2;
             int height = cellHeight * rows.Length;
             var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
-            for (float time = 0; time < 3; time += 0.05f)
+            for (float time = 0; time < 3.2f; time += 0.04f)
             {
                 var pixels = new Rgba[width * height];
                 for (int row = 0; row < rows.Length; row++)
@@ -937,7 +939,7 @@ namespace Game.Client
                         }
                     }
                 }
-                frames.Add((pixels, 5));
+                frames.Add((pixels, 4));
             }
             Gif.Save(path, width, height, frames);
         }
