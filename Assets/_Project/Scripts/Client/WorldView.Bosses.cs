@@ -357,13 +357,14 @@ namespace Game.Client
             switch (attack.Shape)
             {
                 case AttackShape.Cone:
-                    // Three drill slashes across the wedge, sparks off the drills.
+                    // The drills strike across the wedge: three hits, sparks and grit off them (no blade's whirl).
                     for (int i = -1; i <= 1; i++)
                     {
                         var turned = Quaternion.Euler(0, 0, i * attack.Angle * 0.3f) * along;
                         AddFlash(at + turned * (hazard.Size * 0.6f), 0.7f, SlashColor, FlashKind.Impact);
+                        Kick(at + turned * (hazard.Size * 0.6f), turned, OreColor, 3);
                     }
-                    AddFlash(at + along * (hazard.Size * 0.5f), hazard.Size * 0.55f, SlashColor, FlashKind.Vortex);
+                    AddFlash(at + along * (hazard.Size * 0.55f), hazard.Size * 0.4f, DirtColor, FlashKind.Burst);
                     Burst(at + along * (hazard.Size * 0.6f), OreColor, 1);
                     return true;
                 case AttackShape.Burrow:

@@ -1900,6 +1900,9 @@ namespace Game.Client
                         if (finisher) AddFlash(attacker.Position + (Vector3)(attacker.Lunge * 0.45f), 0.35f, ImpactWhite, FlashKind.Ring);
                         break;
                     }
+                    // A boss lunges but draws no blade's arc in front of it: its blows show where they land (2026-11-12,
+                    // the person: the sword-swing arc in front of a boss is better gone).
+                    if (attacker.Kind == BodyKind.Boss) break;
                     attacker.SwingTime = SwingSeconds;
                     attacker.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     // The second cut comes back up: the crescent mirrored across the way it points. The finisher is bigger.
