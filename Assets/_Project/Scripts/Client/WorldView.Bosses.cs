@@ -39,6 +39,12 @@ namespace Game.Client
         public int MarksShown => _marks.Values.Count(m => m.State.Warning != AttackWarning.Hidden);
         public bool WarningShown => _others.Values.Any(b => b.Sign != null && b.Sign.enabled);
 
+        // How far the last frame got (1 entities, 2 past them, 3 past the marks, 4 past the events), and how each boss
+        // body is drawn: where, its sprite and its colour, for the playtests to see why a boss would not show.
+        int _rendered;
+        public string RenderTrace => _rendered + " " + string.Join(" ", _others.Values.Where(b => b.Kind == BodyKind.Boss).Select(b =>
+            $"{b.Id}@{b.Root.localPosition.x:0.0},{b.Root.localPosition.y:0.0}:{(b.Shape.sprite == null ? "nosprite" : b.Shape.sprite.name + "/" + b.Shape.sprite.rect.width + "x" + b.Shape.sprite.rect.height)}:a{b.Shape.color.a:0.00}:o{b.Shape.sortingOrder}:{(b.Shape.enabled ? "on" : "off")}:f{b.Frame}"));
+
         BossAttack AttackOf(HazardState hazard) =>
             _bossInView != null && hazard.Cause >= 1 && hazard.Cause <= _bossInView.Attacks.Count ? _bossInView.Attacks[hazard.Cause - 1] : null;
 

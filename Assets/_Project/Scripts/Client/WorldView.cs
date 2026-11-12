@@ -496,7 +496,9 @@ namespace Game.Client
             }
             ShowAura(_self, _client.PlayerId, selfBuffs);
 
+            _rendered = 1;
             DrawEntities(deltaTime);
+            _rendered = 2;
             DrawCrops();
             DrawMachines();
             DrawPeople();
@@ -506,11 +508,13 @@ namespace Game.Client
             DrawChickens();
             SwingDoors();
             DrawMarks();
+            _rendered = 3;
             DrawProjectiles();
             DrawTarget();
             SwayScarecrows();
 
             foreach (var e in _client.TakeEvents()) Show(e);
+            _rendered = 4;
             UpdateFlashes(deltaTime);
             UpdateTracers(deltaTime);
             UpdateRain(deltaTime);

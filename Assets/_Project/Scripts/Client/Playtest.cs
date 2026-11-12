@@ -779,6 +779,7 @@ namespace Game.Client
                 // the vein eater announces only by its wind-up lays hazards no one sees, 2026-11-12).
                 json.Field("marksShown", root.MarksShown);
                 json.Field("warningSign", root.WarningShown);
+                json.Field("renderTrace", root.RenderTrace);
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
                 // The nearest copper vein within 16 tiles, as the minimap marks it (MapView.Sense).
                 (int X, int Y)? vein = null;
