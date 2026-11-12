@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.81.0";
+        public const string Version = "0.82.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -79,6 +79,18 @@ namespace Game.Core
         }
 
         internal static Vec2 ReadCompact(this BinaryReader reader) => new Vec2(reader.ReadInt16() / 64f, reader.ReadInt16() / 64f);
+
+        // A place in the world (2026-11-12): unsigned, so the whole 1024-tile map fits at a sixty-fourth of a tile.
+        // WriteCompact's signed range stops at 512, and since the map grew everything past it was drawn at 512.
+        internal static void WritePosition(this BinaryWriter writer, Vec2 value)
+        {
+            writer.Write(UnsignedSixtyfourths(value.X));
+            writer.Write(UnsignedSixtyfourths(value.Y));
+        }
+
+        internal static Vec2 ReadPosition(this BinaryReader reader) => new Vec2(reader.ReadUInt16() / 64f, reader.ReadUInt16() / 64f);
+
+        static ushort UnsignedSixtyfourths(float value) => (ushort)Math.Clamp((int)MathF.Round(value * 64), 0, ushort.MaxValue);
 
         static short Sixtyfourths(float value) => (short)Math.Clamp((int)MathF.Round(value * 64), short.MinValue, short.MaxValue);
 
@@ -1136,7 +1148,7 @@ namespace Game.Core
                 w.Write(entity.Id);
                 w.Write((byte)entity.Kind);
                 w.Write((byte)entity.Type);
-                w.WriteCompact(entity.Position);
+                w.WritePosition(entity.Position);
                 w.Write(Protocol.PackDirection(entity.Facing));
                 w.Write(Protocol.Whole(entity.Health));
                 w.Write(Protocol.Whole(entity.MaxHealth));
@@ -1148,7 +1160,7 @@ namespace Game.Core
             foreach (var projectile in Projectiles)
             {
                 w.Write(projectile.Id);
-                w.WriteCompact(projectile.Position);
+                w.WritePosition(projectile.Position);
                 w.WriteCompact(projectile.Velocity);
                 w.Write((byte)Math.Clamp((int)MathF.Round(projectile.Radius * 32), 0, 255));
                 // The seven tags fit under the top bit, which says whose it is.
@@ -1160,7 +1172,7 @@ namespace Game.Core
             {
                 w.Write(hazard.Id);
                 w.Write((byte)hazard.Shape);
-                w.WriteCompact(hazard.Position);
+                w.WritePosition(hazard.Position);
                 w.Write(Protocol.PackDirection(hazard.Direction));
                 w.Write(Protocol.Eighths(hazard.Size));
                 w.Write(Protocol.Eighths(hazard.Width));
@@ -1177,7 +1189,7 @@ namespace Game.Core
                 w.Write((byte)e.Type);
                 w.Write(e.Source);
                 // An event that happens somewhere has no target, so its position takes the target's four bytes.
-                if (SimEvent.HasPosition(e.Type)) w.WriteCompact(e.Position);
+                if (SimEvent.HasPosition(e.Type)) w.WritePosition(e.Position);
                 else w.Write(e.Target);
                 w.Write((short)Math.Clamp(e.Amount, short.MinValue, short.MaxValue));
                 // A crit in the low bit; for a weapon's elemental hit (World.ElementalCause) the element's place + 1 above it.
@@ -1230,7 +1242,7 @@ namespace Game.Core
                     r.ReadInt32(),
                     (EntityKind)r.ReadByte(),
                     r.ReadByte(),
-                    r.ReadCompact(),
+                    r.ReadPosition(),
                     Protocol.UnpackDirection(r.ReadByte()),
                     r.ReadUInt16(),
                     r.ReadUInt16(),
@@ -1243,7 +1255,7 @@ namespace Game.Core
             for (int i = 0; i < projectileCount; i++)
             {
                 int id = r.ReadInt32();
-                var at = r.ReadCompact();
+                var at = r.ReadPosition();
                 var velocity = r.ReadCompact();
                 float radius = r.ReadByte() / 32f;
                 byte owner = r.ReadByte();
@@ -1257,7 +1269,7 @@ namespace Game.Core
                 hazards.Add(new HazardState(
                     r.ReadInt32(),
                     (HazardShape)r.ReadByte(),
-                    r.ReadCompact(),
+                    r.ReadPosition(),
                     Protocol.UnpackDirection(r.ReadByte()),
                     r.ReadUInt16() / 8f,
                     r.ReadUInt16() / 8f,
@@ -1275,7 +1287,7 @@ namespace Game.Core
                 var type = (SimEventType)r.ReadByte();
                 int source = r.ReadInt32();
                 bool located = SimEvent.HasPosition(type);
-                var at = located ? r.ReadCompact() : Vec2.Zero;
+                var at = located ? r.ReadPosition() : Vec2.Zero;
                 int target = located ? 0 : r.ReadInt32();
                 int amount = r.ReadInt16();
                 int flags = r.ReadByte();

@@ -96,17 +96,17 @@ namespace Game.Core.Tests
             var snapshot = SnapshotMessage.Decode(new SnapshotMessage(
                 99,
                 new SelfState(2, new Vec2(1, 2), 50, 100, 5, new[] { 0, 120, 7, 0 }, new[] { 0, 0, 0, 240 }, 250),
-                new[] { new EntityState(7, EntityKind.Boss, 0, new Vec2(3.3f, 4.71f), new Vec2(-1, 0), 1234.2f, 2000, (byte)BossState.Telegraph, 2) },
+                new[] { new EntityState(7, EntityKind.Boss, 0, new Vec2(703.3f, 4.71f), new Vec2(-1, 0), 1234.2f, 2000, (byte)BossState.Telegraph, 2) },
                 new[]
                 {
                     new ProjectileState(8, new Vec2(5, 6), new Vec2(-7, 0.5f), 0.3f),
                     new ProjectileState(10, new Vec2(1, 1), new Vec2(12, 0), 0.25f, true, SkillTag.Ranged | SkillTag.Fire | SkillTag.Lightning),
                 },
-                new[] { new HazardState(9, HazardShape.Cone, new Vec2(3, 4), new Vec2(0, 1), 4.5f, 110, 12, 21, true, AttackWarning.Strong, 4) },
+                new[] { new HazardState(9, HazardShape.Cone, new Vec2(3, 900), new Vec2(0, 1), 4.5f, 110, 12, 21, true, AttackWarning.Strong, 4) },
                 new[]
                 {
                     new SimEvent(SimEventType.Hit, 1, 7, 6, critical: true),
-                    new SimEvent(SimEventType.Burst, 1, amount: 2, position: new Vec2(12.5f, -3.25f)),
+                    new SimEvent(SimEventType.Burst, 1, amount: 2, position: new Vec2(812.5f, 1003.25f)),
                 }).Encode());
             Assert.AreEqual(99, snapshot.Tick);
             Assert.AreEqual(2, snapshot.Self.Corrections);
@@ -118,7 +118,7 @@ namespace Game.Core.Tests
             Assert.AreEqual((byte)BossState.Telegraph, entity.State);
             Assert.AreEqual(2, entity.Phase);
             Assert.AreEqual(1235, entity.Health, "health travels as a whole number, rounded up");
-            Assert.AreEqual(3.3f, entity.Position.X, 1 / 64f);
+            Assert.AreEqual(703.3f, entity.Position.X, 1 / 64f);
             Assert.AreEqual(4.71f, entity.Position.Y, 1 / 64f);
             var projectile = snapshot.Projectiles[0];
             Assert.AreEqual(-7, projectile.Velocity.X, 1 / 64f);
@@ -129,6 +129,7 @@ namespace Game.Core.Tests
             Assert.AreEqual(SkillTag.Ranged | SkillTag.Fire | SkillTag.Lightning, snapshot.Projectiles[1].Tags);
             var hazard = snapshot.Hazards.Single();
             Assert.AreEqual(HazardShape.Cone, hazard.Shape);
+            Assert.AreEqual(900, hazard.Position.Y, 1 / 64f);
             Assert.AreEqual(110, hazard.Width, 1 / 8f);
             Assert.AreEqual(4.5f, hazard.Size, 1 / 8f);
             Assert.AreEqual(12, hazard.TicksLeft);
@@ -145,7 +146,8 @@ namespace Game.Core.Tests
             var burst = snapshot.Events[1];
             Assert.AreEqual(SimEventType.Burst, burst.Type);
             Assert.AreEqual(2, burst.Amount);
-            Assert.AreEqual(new Vec2(12.5f, -3.25f), burst.Position);
+            // Anywhere on the 1024-tile map (2026-11-12: past 512 everything used to arrive at 512).
+            Assert.AreEqual(new Vec2(812.5f, 1003.25f), burst.Position);
         }
 
         [Test]
