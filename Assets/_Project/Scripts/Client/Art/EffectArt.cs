@@ -44,6 +44,42 @@ namespace Game.Client
             return image.Outlined(new Rgba(20, 16, 24, 200));
         }
 
+        // The warning over a boss winding up one of its strongest blows (2026-11-12, AttackWarning.Strong): a red
+        // triangle with a white '!' and a dark edge, drawn in its own colours (not tinted).
+        public static PixelImage WarningSign()
+        {
+            const int size = 13;
+            var image = new PixelImage(size, size - 1);
+            var red = new Rgba(232, 52, 36);
+            var shine = new Rgba(255, 120, 90);
+            for (int y = 0; y < size - 1; y++)
+            {
+                int half = y / 2 + 1;
+                for (int x = size / 2 - half + 1; x <= size / 2 + half - 1; x++) image[x, y] = y < 3 ? shine : red;
+            }
+            for (int y = 3; y <= 7; y++) image[size / 2, y] = Rgba.White;
+            image[size / 2, 9] = Rgba.White;
+            return image.Outlined(new Rgba(40, 8, 8));
+        }
+
+        // A rock in flight or falling (the vein eater's throws and cave-in, 2026-11-12), drawn in its own colours.
+        public static PixelImage Rock(int size)
+        {
+            var image = new PixelImage(size, size);
+            float r = size / 2f - 0.5f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float dx = (x - r) / r, dy = (y - r) / (r * 0.85f);
+                    float d = dx * dx + dy * dy;
+                    if (d > 1) continue;
+                    image[x, y] = dx + dy < -0.6f ? new Rgba(170, 154, 136) : dx + dy > 0.7f ? new Rgba(70, 58, 52) : (x * 5 + y * 3) % 7 == 0 ? new Rgba(92, 78, 70) : new Rgba(124, 108, 96);
+                }
+            }
+            return image.Outlined(new Rgba(24, 16, 14));
+        }
+
         // A ring of light opening out: thick and bright at first, then thinner and dimmer, and broken into bits at
         // the end. For novas, summons and anything that spreads from a spot.
         public static PixelImage Ring(int diameter, int frame)

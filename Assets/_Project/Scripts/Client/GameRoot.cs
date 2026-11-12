@@ -84,6 +84,10 @@ namespace Game.Client
         NetLink _net;
         WorldView _view;
         // Rounded-corner tiles within ten cells of the player (WorldView.CornersNear), for the playtests.
+        // Boss marks on the ground and the warning sign, as drawn (WorldView.Bosses.cs), for the playtests.
+        internal int MarksShown => _view?.MarksShown ?? 0;
+        internal bool WarningShown => _view != null && _view.WarningShown;
+
         internal int CornersNear => _view == null || _client?.Map == null ? -1
             : _view.CornersNear(TileMap.Cell(_client.Position.X), TileMap.Cell(_client.Position.Y), 10);
         InventoryWindow _inventory;

@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.80.0";
+        public const string Version = "0.81.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -939,8 +939,11 @@ namespace Game.Core
     // A telegraphed area. TicksLeft counts from the snapshot's tick to when it lands, out of Duration in all.
     public readonly struct HazardState
     {
-        public HazardState(int id, HazardShape shape, Vec2 position, Vec2 direction, float size, float width, int ticksLeft, int duration, bool harmful)
+        public HazardState(int id, HazardShape shape, Vec2 position, Vec2 direction, float size, float width, int ticksLeft, int duration, bool harmful,
+            AttackWarning warning = AttackWarning.Marked, byte cause = 0)
         {
+            Warning = warning;
+            Cause = cause;
             Id = id;
             Shape = shape;
             Position = position;
@@ -962,6 +965,10 @@ namespace Game.Core
         public int Duration { get; }
         // False for a charge's path, which only shows where the boss will run.
         public bool Harmful { get; }
+        // Hidden: nothing is drawn on the ground until it lands; Strong: a warning sign too (AttackWarning).
+        public AttackWarning Warning { get; }
+        // The boss's attack that laid it (its place in the sheet plus one; 0 for a roar's blast), for its own blast.
+        public byte Cause { get; }
     }
 
     // What only the receiving player needs about themselves.
@@ -1160,6 +1167,8 @@ namespace Game.Core
                 w.Write((short)Math.Clamp(hazard.TicksLeft, short.MinValue, short.MaxValue));
                 w.Write((short)Math.Clamp(hazard.Duration, 0, short.MaxValue));
                 w.Write(hazard.Harmful);
+                w.Write((byte)hazard.Warning);
+                w.Write(hazard.Cause);
             }
 
             w.Write((ushort)Events.Count);
@@ -1254,7 +1263,9 @@ namespace Game.Core
                     r.ReadUInt16() / 8f,
                     r.ReadInt16(),
                     r.ReadInt16(),
-                    r.ReadBoolean()));
+                    r.ReadBoolean(),
+                    (AttackWarning)r.ReadByte(),
+                    r.ReadByte()));
             }
 
             int eventCount = r.ReadUInt16();

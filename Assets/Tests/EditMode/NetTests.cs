@@ -102,7 +102,7 @@ namespace Game.Core.Tests
                     new ProjectileState(8, new Vec2(5, 6), new Vec2(-7, 0.5f), 0.3f),
                     new ProjectileState(10, new Vec2(1, 1), new Vec2(12, 0), 0.25f, true, SkillTag.Ranged | SkillTag.Fire | SkillTag.Lightning),
                 },
-                new[] { new HazardState(9, HazardShape.Cone, new Vec2(3, 4), new Vec2(0, 1), 4.5f, 110, 12, 21, true) },
+                new[] { new HazardState(9, HazardShape.Cone, new Vec2(3, 4), new Vec2(0, 1), 4.5f, 110, 12, 21, true, AttackWarning.Strong, 4) },
                 new[]
                 {
                     new SimEvent(SimEventType.Hit, 1, 7, 6, critical: true),
@@ -134,6 +134,8 @@ namespace Game.Core.Tests
             Assert.AreEqual(12, hazard.TicksLeft);
             Assert.AreEqual(21, hazard.Duration);
             Assert.IsTrue(hazard.Harmful);
+            Assert.AreEqual(AttackWarning.Strong, hazard.Warning);
+            Assert.AreEqual(4, hazard.Cause);
             Assert.AreEqual(-1, entity.Facing.X, 0.001f);
             Assert.AreEqual(0, entity.Facing.Y, 0.03f);
             var hit = snapshot.Events[0];

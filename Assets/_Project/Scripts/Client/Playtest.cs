@@ -775,6 +775,10 @@ namespace Game.Client
                 json.Field("projectiles", world.Projectiles.Count(p => p.Source == player.Id));
                 json.Field("hazards", world.Hazards.Count);
                 json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly));
+                // What a player sees of them: marks drawn on the ground and the warning sign over the boss (an attack
+                // the vein eater announces only by its wind-up lays hazards no one sees, 2026-11-12).
+                json.Field("marksShown", root.MarksShown);
+                json.Field("warningSign", root.WarningShown);
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
                 // The nearest copper vein within 16 tiles, as the minimap marks it (MapView.Sense).
                 (int X, int Y)? vein = null;

@@ -28,6 +28,22 @@ namespace Game.Core
         Spiral,
         // A circle on the target whose damage is shared among everyone standing in it: co-op players stack up.
         Share,
+        // The boss digs in and cannot be hurt while the telegraph lasts, then bursts up where the target stood: a
+        // circle there, and count rocks flung all round at speed (2026-11-12).
+        Burrow,
+        // The same as Burrow through the air: the boss leaps up out of reach and lands on where the target stood.
+        Leap,
+    }
+
+    // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
+    // before: its area on the ground and the boss glowing the colour of its Tell. Hidden lays nothing on the ground
+    // and gives no glow: only the boss's own wind-up shows it is coming (as Don't Starve's bosses do). Strong is for
+    // the few blows that hurt most: the area on the ground and a warning sign over the boss.
+    public enum AttackWarning : byte
+    {
+        Marked,
+        Hidden,
+        Strong,
     }
 
     // How a boss shows what is coming while it winds up (Docs/Bosses.md 전조 말, 2026-11-11, the research report's
@@ -75,8 +91,10 @@ namespace Game.Core
             float speed,
             float cooldown,
             int weight,
-            MonsterDefinition summon)
+            MonsterDefinition summon,
+            AttackWarning warning = AttackWarning.Marked)
         {
+            Warning = warning;
             Id = id;
             Name = name;
             Phases = phases;
@@ -123,6 +141,11 @@ namespace Game.Core
         public float Cooldown { get; }
         public int Weight { get; }
         public MonsterDefinition Summon { get; }
+        // How plainly it is announced (warn column: blank, none or strong).
+        public AttackWarning Warning { get; }
+
+        // A burrow or a leap: the boss is away (out of reach) while it winds up and comes down on the target.
+        public bool GoesAway => Shape == AttackShape.Burrow || Shape == AttackShape.Leap;
 
         public bool InPhase(int phase) => Phases.Count == 0 || Phases.Contains(phase);
 
@@ -358,7 +381,8 @@ namespace Game.Core
                         Number(row, "speed"),
                         Number(row, "cooldown"),
                         Whole(row, "weight"),
-                        row["summon"].Length > 0 ? FindMonster(monsters, row["summon"]) : null);
+                        row["summon"].Length > 0 ? FindMonster(monsters, row["summon"]) : null,
+                        Warning(row["warn"]));
                     Validate(attack);
                     boss.Add(attack);
                 });
@@ -409,8 +433,21 @@ namespace Game.Core
                 case AttackShape.Share:
                     Need(attack.Radius > 0 && attack.Damage > 0, "radius, damage");
                     break;
+                case AttackShape.Burrow:
+                case AttackShape.Leap:
+                    Need(attack.Radius > 0 && attack.Damage > 0 && (attack.Count == 0 || attack.Speed > 0), "radius, damage(돌을 흩뿌리면 count와 speed)");
+                    break;
             }
         }
+
+        // The warn column: blank as before (marked on the ground), none (only the boss's wind-up shows it) or strong.
+        static AttackWarning Warning(string cell) => cell switch
+        {
+            "" => AttackWarning.Marked,
+            "none" => AttackWarning.Hidden,
+            "strong" => AttackWarning.Strong,
+            _ => throw new FormatException($"warn은 비우거나 none, strong 가운데 하나여야 합니다('{cell}')."),
+        };
 
         static MonsterDefinition FindMonster(MonsterData monsters, string id) =>
             monsters?.Monsters.FirstOrDefault(m => m.Id == id) ?? throw new FormatException($"몬스터 '{id}'가 {MonsterSheet.File}에 없습니다.");

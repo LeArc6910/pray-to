@@ -1379,6 +1379,16 @@ namespace Game.Client
             // orb, the sunken crown on its hood.
             "crown_wraith" => VoidLord(frame, view, pose, "#1E4A4E", "#7AD8C8", "#A8F0FF", "#E8FFFF", crown: true),
             "antlion" => Antlion(frame, view, pose),
+            // The vein eater of the mining village (2026-11-12): a Retro Diffusion picture posed in code. WorldView draws
+            // its own wind-up for each attack (VeinPose); these are its plain poses for everywhere else.
+            "vein_eater" => VeinEaterArt.Draw(view, pose switch
+            {
+                BossPose.Windup => VeinPose.Rear,
+                BossPose.Strike => VeinPose.Swipe,
+                BossPose.Charge => VeinPose.Rush,
+                BossPose.Roar => VeinPose.Roar,
+                _ => VeinPose.Idle,
+            }, frame, 1, false),
             _ => Warden(color, frame, view, pose),
         };
 

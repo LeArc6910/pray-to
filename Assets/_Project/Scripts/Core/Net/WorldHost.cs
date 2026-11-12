@@ -656,7 +656,7 @@ namespace Game.Core
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
                     b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, World.BossStateByte(b),
-                    Protocol.WithStatus(b.Phase, b.Afflictions.Bits)));
+                    Protocol.WithStatus(World.BossPhaseField(b), b.Afflictions.Bits)));
             var minions = World.Minions
                 .Where(m => InView(m.Position))
                 .Select(m => new EntityState(
@@ -700,7 +700,8 @@ namespace Game.Core
                 .Take(_config.MaxHazardsPerSnapshot)
                 .Select(h => new HazardState(
                     h.Id, h.Shape, h.Position, h.Direction, h.Size, h.Width,
-                    (int)(h.ResolveTick - World.Tick), (int)(h.ResolveTick - h.StartTick), h.Damage > 0))
+                    (int)(h.ResolveTick - World.Tick), (int)(h.ResolveTick - h.StartTick), h.Damage > 0,
+                    WarningOf(h), (byte)Math.Min(h.Cause, 255)))
                 .ToList();
 
             // When there are too many, what changes the fight matters most and swings least. A fallen boss is no longer
@@ -852,6 +853,13 @@ namespace Game.Core
         }
 
         List<int> ClassIndexes(Player player) => player.Classes.Select(c => IndexOf(_classes?.Classes, c)).ToList();
+
+        // How plainly the attack that laid a hazard is announced (a roar's blast, cause 0, is marked).
+        AttackWarning WarningOf(Hazard hazard)
+        {
+            var attacks = World.FindBoss(hazard.Source)?.Definition.Attacks;
+            return attacks != null && hazard.Cause >= 1 && hazard.Cause <= attacks.Count ? attacks[hazard.Cause - 1].Warning : AttackWarning.Marked;
+        }
 
         static int IndexOf<T>(IReadOnlyList<T> list, T item) where T : class
         {

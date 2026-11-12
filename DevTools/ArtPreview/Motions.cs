@@ -456,6 +456,7 @@ namespace Game.Client
             PlayerTurn(Path.Combine(folder, "player_turn.gif"), sword, floor);
             PlayerMotions(Path.Combine(folder, "player_motions.gif"), sword, bow, staff, potion, food, floor);
             Bosses(Path.Combine(folder, "bosses.gif"), arena);
+            VeinEater(Path.Combine(folder, "vein_eater.gif"), arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
             StoryPeople(Path.Combine(folder, "story_people.gif"), floor);
@@ -885,6 +886,62 @@ namespace Game.Client
 
         // A row a boss. First column: turning, 0.5 seconds a way. Second and third: the pattern facing down-right and
         // up-left: idle, a wind-up of a second, the strike, idle, a charge, idle, a roar, idle.
+        // The vein eater's wind-ups and blows (2026-11-12, VeinEaterArt), a row an attack as WorldView plays them,
+        // facing right and facing down: claw, rock throw, rush, burrow, cave-in, spikes, spin, frenzy, quake, call.
+        static void VeinEater(string path, PixelImage arena)
+        {
+            var rows = new (VeinPose Pose, int Frame, float Seconds, bool Rage, int Phase)[][]
+            {
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Rear, 0, 0.2f, false, 1), (VeinPose.Rear, 1, 0.2f, false, 1), (VeinPose.Rear, 2, 0.2f, false, 1), (VeinPose.Rear, 3, 0.2f, false, 1), (VeinPose.Swipe, 0, 0.3f, false, 1) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Lift, 0, 0.25f, false, 1), (VeinPose.Lift, 1, 0.2f, false, 1), (VeinPose.Lift, 2, 0.25f, false, 1), (VeinPose.Lift, 3, 0.2f, false, 1), (VeinPose.Throw, 0, 0.3f, false, 1) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Crouch, 0, 0.15f, false, 1), (VeinPose.Crouch, 1, 0.15f, false, 1), (VeinPose.Crouch, 2, 0.15f, false, 1), (VeinPose.Crouch, 3, 0.15f, false, 1), (VeinPose.Rush, 0, 0.5f, false, 1) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Sink, 0, 0.2f, false, 1), (VeinPose.Sink, 1, 0.2f, false, 1), (VeinPose.Sink, 2, 0.2f, false, 1), (VeinPose.Sink, 3, 0.5f, false, 1), (VeinPose.Rise, 0, 0.3f, false, 1) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Slam, 0, 0.3f, false, 2), (VeinPose.Slam, 1, 0.3f, false, 2), (VeinPose.Slam, 2, 0.3f, false, 2), (VeinPose.Slam, 3, 0.3f, false, 2), (VeinPose.Pound, 0, 0.4f, false, 2) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Plunge, 0, 0.2f, false, 2), (VeinPose.Plunge, 1, 0.2f, false, 2), (VeinPose.Plunge, 2, 0.2f, false, 2), (VeinPose.Plunge, 3, 0.4f, false, 2) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Curl, 0, 0.2f, false, 2), (VeinPose.Curl, 1, 0.2f, false, 2), (VeinPose.Curl, 2, 0.2f, false, 2), (VeinPose.Curl, 3, 0.4f, false, 2) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Crouch, 0, 0.12f, true, 3), (VeinPose.Crouch, 2, 0.12f, true, 3), (VeinPose.Rush, 0, 0.3f, true, 3), (VeinPose.Crouch, 1, 0.12f, true, 3), (VeinPose.Rush, 0, 0.3f, true, 3) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Leap, 0, 0.4f, false, 3), (VeinPose.Leap, 1, 0.15f, false, 3), (VeinPose.Leap, 2, 0.15f, false, 3), (VeinPose.Leap, 3, 0.4f, false, 3), (VeinPose.Pound, 0, 0.4f, false, 3) },
+                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Roar, 0, 0.5f, false, 3), (VeinPose.Roar, 1, 0.5f, false, 3) },
+            };
+            const int scale = 2;
+            int cellWidth = VeinEaterArt.Width * scale;
+            int cellHeight = VeinEaterArt.Height * scale;
+            int width = cellWidth * 2;
+            int height = cellHeight * rows.Length;
+            var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
+            for (float time = 0; time < 3; time += 0.05f)
+            {
+                var pixels = new Rgba[width * height];
+                for (int row = 0; row < rows.Length; row++)
+                {
+                    float total = rows[row].Sum(f => f.Seconds);
+                    float at = time % total;
+                    var step = rows[row].First();
+                    foreach (var f in rows[row])
+                    {
+                        step = f;
+                        if (at < f.Seconds) break;
+                        at -= f.Seconds;
+                    }
+                    for (int column = 0; column < 2; column++)
+                    {
+                        var image = VeinEaterArt.Draw(column == 0 ? BossView.Side : BossView.Front, step.Pose, step.Frame, step.Phase, step.Rage);
+                        for (int y = 0; y < cellHeight; y++)
+                        {
+                            for (int x = 0; x < cellWidth; x++)
+                            {
+                                var floor = arena[x / scale % arena.Width, y / scale % arena.Height];
+                                var c = image[x / scale, y / scale];
+                                pixels[(row * cellHeight + y) * width + column * cellWidth + x] = c.A > 0 ? c : floor;
+                            }
+                        }
+                    }
+                }
+                frames.Add((pixels, 5));
+            }
+            Gif.Save(path, width, height, frames);
+        }
+
         static void Bosses(string path, PixelImage arena)
         {
             string[] ids = { "cave_warden", "antlion", "crystal_queen", "lava_titan", "void_lord", "tide_serpent" };

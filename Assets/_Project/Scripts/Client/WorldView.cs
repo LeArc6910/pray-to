@@ -13,7 +13,7 @@ namespace Game.Client
     // health bar, swings, hit flashes, damage numbers, skills (rings, bursts, buff auras, coloured by their tags),
     // the dark of the caves and the lights in it, and in a boss fight the telegraphed areas, projectiles, screen
     // shake and banners. Pure presentation; nothing here changes the game.
-    sealed class WorldView : IDisposable
+    sealed partial class WorldView : IDisposable
     {
         enum BodyKind
         {
@@ -76,6 +76,15 @@ namespace Game.Client
             public Sprite Holding;
             // A boss's state as the snapshots say, for its pose; a monster's likewise.
             public BossState BossState;
+            // The attack a boss is on, when it took it up (or changed state) and its phase; the warning sign over it
+            // and, for the vein eater, the mound it runs under the floor and when it last threw up dust
+            // (WorldView.Bosses.cs).
+            public BossAttack BossAttack;
+            public float BossSince;
+            public int BossPhase;
+            public SpriteRenderer Sign;
+            public SpriteRenderer Mound;
+            public float DustAt;
             public EnemyState EnemyState;
             // When a monster may cry out again on noticing someone, and where another player was last frame and how
             // far they have walked since their last step (2026-11-09, sounds).
@@ -107,6 +116,8 @@ namespace Game.Client
             public SpriteRenderer Edge;
             public SpriteRenderer Fill;
             public HazardState State;
+            // A rock falling onto it from the roof (the vein eater's cave-in, WorldView.Bosses.cs).
+            public SpriteRenderer Rock;
         }
 
         // A player's pet (Pets.cs): its monster drawn small, trotting after them a little behind, hopping or bobbing.
@@ -718,6 +729,7 @@ namespace Game.Client
         {
             ActiveBoss = null;
             BossInSight = null;
+            _bossInView = null;
             _seen.Clear();
             foreach (var view in _client.Others())
             {
@@ -741,7 +753,7 @@ namespace Game.Client
                     _others[view.Id] = body;
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
-                if (view.Kind == EntityKind.Boss) body.BossState = view.BossState;
+                if (view.Kind == EntityKind.Boss) TrackBoss(body, view);
                 if (view.Kind == EntityKind.Monster)
                 {
                     // Its voice: a cry on coming for someone (not more than every CrySeconds), a sound as it winds up.
@@ -801,8 +813,9 @@ namespace Game.Client
                             tint = DormantTint;
                             break;
                         case BossState.Telegraph:
-                            // The same glow for the same kind of attack on every boss (World.TellOf, Docs/Bosses.md 전조 말).
-                            glow = TellGlow(view.Tell);
+                            // The same glow for the same kind of attack on every boss (World.TellOf, Docs/Bosses.md 전조 말),
+                            // but none for an attack only the boss's wind-up announces (AttackWarning.Hidden).
+                            if (!Unmarked(view)) glow = TellGlow(view.Tell);
                             break;
                         case BossState.Charge:
                             glow = Faded(ChargeColor, 0.5f);
@@ -818,6 +831,7 @@ namespace Game.Client
                 Place(body, view.Position, view.Facing, view.Health, view.MaxHealth, tint, glow, deltaTime, pulse,
                     showHealth: view.Kind != EntityKind.Boss && view.Kind != EntityKind.Minion,
                     weapon: view.Weapon);
+                if (view.Kind == EntityKind.Boss) BossExtras(body, view);
                 if (view.IsPlayer)
                 {
                     _buffBits[view.Id] = view.State;
@@ -836,6 +850,7 @@ namespace Game.Client
                 // the view in the same update its death arrives.
                 if (pair.Value.Kind == BodyKind.Boss && _bossesSeen.TryGetValue(pair.Key, out var left))
                     _bossesSeen[pair.Key] = (BossState.Dormant, 1, left.Name);
+                if (pair.Value.Mound != null) Object.Destroy(pair.Value.Mound.gameObject);
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
             }
@@ -1005,7 +1020,16 @@ namespace Game.Client
                 {
                     mark = MakeMark(hazard);
                     _marks[hazard.Id] = mark;
-                    Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
+                    if (hazard.Warning != AttackWarning.Hidden) Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
+                }
+                FallingRock(mark, hazard, view.Progress);
+                // An attack only the boss's wind-up announces lays nothing to see: its mark is kept (for its blast
+                // when it lands) but clear (AttackWarning.Hidden, 2026-11-12).
+                if (hazard.Warning == AttackWarning.Hidden)
+                {
+                    mark.Edge.color = Color.clear;
+                    mark.Fill.color = Color.clear;
+                    continue;
                 }
 
                 var color = hazard.Shape == HazardShape.Share ? ShareColor : hazard.Harmful ? DangerColor : PathColor;
@@ -1038,6 +1062,7 @@ namespace Game.Client
             foreach (var pair in _marks)
             {
                 if (_seen.Contains(pair.Key)) continue;
+                if (pair.Value.Rock != null) Object.Destroy(pair.Value.Rock.gameObject);
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
                 _landed[pair.Key] = (pair.Value.State, Time.time);
@@ -1057,6 +1082,7 @@ namespace Game.Client
             else if (_landed.TryGetValue(id, out var gone)) hazard = gone.State;
             else return;
             if (!hazard.Harmful) return;
+            if (VeinEaterLanded(hazard)) return;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             switch (hazard.Shape)
@@ -1810,8 +1836,10 @@ namespace Game.Client
                     // reads, or an arrow pointing the way it flies; an enemy's is a spiked ball.
                     bool arrow = projectile.Friendly && (projectile.Tags & SkillTag.Ranged) != 0;
                     var color = projectile.Friendly ? Palette.Of(projectile.Tags) : ProjectileColor;
-                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : SporeSprite;
-                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : color);
+                    // The vein eater's are rocks (2026-11-12).
+                    bool rock = !projectile.Friendly && _bossInView?.Id == "vein_eater";
+                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : SporeSprite;
+                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock ? Color.white : color);
                     float across = sprite.rect.height / Sprites.PixelsPerUnit;
                     renderer.transform.localScale = Vector3.one * (arrow ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
                     renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
@@ -2628,6 +2656,12 @@ namespace Game.Client
                 default:
                     frame = Mathf.FloorToInt(Time.time * (moving ? 4 : 1.5f)) % CreatureArt.IdleFrames;
                     break;
+            }
+
+            if (body.Kind == BodyKind.Boss && body.Id == "vein_eater")
+            {
+                AnimateVeinEater(body, facing, dead);
+                return;
             }
 
             if (body.Kind == BodyKind.Boss)

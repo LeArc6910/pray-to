@@ -13,6 +13,7 @@ namespace Game.Core
         // The kind of warning each attack shape gives (Tell, Docs/Bosses.md 전조 말).
         public static Tell TellOf(AttackShape shape) => shape switch
         {
+            // A burrow or a leap marks where it comes down, like any area.
             AttackShape.Charge => Tell.Dash,
             AttackShape.Share => Tell.Gather,
             AttackShape.Burst or AttackShape.Spiral => Tell.Barrage,
@@ -23,6 +24,17 @@ namespace Game.Core
         // A boss's state for the wire: its BossState in the low four bits, and while it winds up, its Tell above them.
         public static byte BossStateByte(Boss boss) =>
             (byte)((byte)boss.State | (boss.State == BossState.Telegraph && boss.Attack != null ? (int)TellOf(boss.Attack.Shape) << 4 : 0));
+
+        // The boss's phase for the wire with the attack it is on (its place in the sheet, plus one) above it, so the
+        // view can draw that attack's own wind-up (2026-11-12). An attack past the fifteenth is sent as none.
+        public static int BossPhaseField(Boss boss)
+        {
+            int index = boss.Attack == null || boss.State == BossState.Dormant || boss.State == BossState.Roar ? 0 : Cause(boss, boss.Attack);
+            return Math.Min(boss.Phase, BossPhaseMask) | (index <= 15 ? index : 0) << BossAttackShift;
+        }
+
+        public const int BossPhaseMask = 3;
+        public const int BossAttackShift = 2;
 
         // How far outside the arena players still count as fighting it.
         const float ArenaMargin = 6;
@@ -221,19 +233,22 @@ namespace Game.Core
             }
         }
 
-        // Marks where the attack will land. Circles stay where their target stood, so moving away dodges them.
-        void StartTelegraph(Boss boss, Player target, List<Player> fighters)
+        // Marks where the attack will land. Circles stay where their target stood, so moving away dodges them. A charge
+        // that runs again (count) winds up the later runs in less time (again).
+        void StartTelegraph(Boss boss, Player target, List<Player> fighters, bool again = false)
         {
             var attack = boss.Attack;
             var aim = target.Position - boss.Position;
             if (aim.LengthSquared > 1e-6f) boss.Facing = aim.Normalized;
             boss.State = BossState.Telegraph;
-            boss.StateTicks = Ticks(attack.Telegraph);
+            boss.StateTicks = Ticks(again ? attack.Telegraph * AgainTelegraph : attack.Telegraph);
+            if (!again) boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
             long resolve = Tick + boss.StateTicks;
             int cause = Cause(boss, attack);
 
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
             if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;
+            if (attack.GoesAway) boss.LandAt = LandingFor(boss, target.Position);
 
             // A later phase sometimes lays another area attack of this phase at once, on someone (else, when there is
             // anyone else), resolving a moment after.
@@ -253,6 +268,18 @@ namespace Game.Core
 
         // Seconds after the first that a second attack laid with it lands.
         const float SecondDelay = 0.4f;
+
+        // How much of its telegraph a charge's later runs take.
+        const float AgainTelegraph = 0.5f;
+
+        // Where a burrow or leap aimed at a spot can come down: on open ground inside the arena.
+        Vec2 LandingFor(Boss boss, Vec2 spot)
+        {
+            var fromHome = spot - boss.Home;
+            float limit = Math.Max(0, boss.ArenaRadius - boss.Definition.Radius);
+            if (fromHome.Length > limit) spot = boss.Home + fromHome.Normalized * limit;
+            return Collision.Resolve(Map, spot, boss.Definition.Radius);
+        }
 
         // The marked areas of an attack, aimed along facing (cones, lines, trails) at the target, resolving at tick
         // resolve. A charge's path is marked without harm: the charge itself hurts.
@@ -309,6 +336,11 @@ namespace Game.Core
                 case AttackShape.Share:
                     AddHazard(boss, cause, HazardShape.Share, target.Position, facing, attack.Radius, 0, attack.Damage, resolve);
                     break;
+                case AttackShape.Burrow:
+                case AttackShape.Leap:
+                    // Where it will come down, which is where the boss will stand.
+                    AddHazard(boss, cause, HazardShape.Circle, LandingFor(boss, target.Position), facing, attack.Radius, 0, attack.Damage, resolve);
+                    break;
             }
         }
 
@@ -333,6 +365,16 @@ namespace Game.Core
                     boss.VolleysLeft = Math.Max(1, (int)attack.Width) - 1;
                     boss.VolleyTicks = Ticks(SpiralSeconds);
                     Volley(boss, attack, boss.VolleyAngle);
+                    break;
+                case AttackShape.Burrow:
+                case AttackShape.Leap:
+                    // Up out of the ground, or down out of the air, where it marked; rocks fly out all round.
+                    var from = boss.Position;
+                    boss.Position = boss.LandAt;
+                    var moved = boss.Position - from;
+                    if (moved.LengthSquared > 1e-6f) boss.Facing = moved.Normalized;
+                    _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: (int)MathF.Ceiling(attack.Radius) + 2));
+                    if (attack.Count > 0) Burst(boss, attack, 0.4f);
                     break;
                 case AttackShape.Summon:
                     for (int i = 0; i < attack.Count; i++)
@@ -362,8 +404,9 @@ namespace Game.Core
             }
         }
 
-        // Evenly spaced projectiles: all the way round from a random start, or fanned out toward the target.
-        void Burst(Boss boss, BossAttack attack)
+        // Evenly spaced projectiles: all the way round from a random start, or fanned out toward the target. A burrow or
+        // leap flings rocks of the size given (its own radius is the circle's).
+        void Burst(Boss boss, BossAttack attack, float rockRadius = 0)
         {
             bool fan = attack.Angle > 0 && attack.Angle < 360;
             float spread = (fan ? attack.Angle : 360) * MathF.PI / 180f;
@@ -378,8 +421,8 @@ namespace Game.Core
                     Cause(boss, attack),
                     boss.Position + direction * boss.Definition.Radius,
                     direction * attack.Speed,
-                    attack.Radius,
-                    attack.Damage,
+                    rockRadius > 0 ? rockRadius : attack.Radius,
+                    rockRadius > 0 ? Math.Max(1, attack.Damage / 3) : attack.Damage,
                     Ticks(ProjectileSeconds)));
             }
         }
@@ -403,6 +446,16 @@ namespace Game.Core
             bool blocked = Vec2.Distance(before, boss.Position) < step.Length * 0.3f;
             if (--boss.StateTicks > 0 && !blocked) return;
             _events.Add(new SimEvent(SimEventType.Impact, boss.Id, amount: 6));
+            // Another run at whoever is nearest now, wound up in less time.
+            var fighters = Fighters(boss);
+            if (boss.ChargesLeft > 0 && fighters.Count > 0)
+            {
+                boss.ChargesLeft--;
+                var next = PickTarget(boss, AttackTarget.Nearest, fighters);
+                boss.TargetId = next.Id;
+                StartTelegraph(boss, next, fighters, again: true);
+                return;
+            }
             boss.State = BossState.Recover;
             boss.StateTicks = Ticks(attack.Cooldown * Tempo(boss.Phase));
         }

@@ -376,6 +376,14 @@ namespace Game.Client
                 ArpVolume = 0.12f, Rest = 0.3f, Pad = Wave.Sine, PadVolume = 0.06f, Kick = "x...........x...", Tom = "......x.......x.",
                 Echo = 0.4f, Seed = 28,
             },
+            // The vein eater in the mine (2026-11-12): a heavy dorian work song, a walking saw bass and anvil-like teks on
+            // the off-beats, as if the miners' hammers went on underground.
+            "vein_eater" => new Style
+            {
+                Bpm = 122, Root = 41, Scale = Dorian, Chords = new[] { 0, 6, 3, 4 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Saw, BassNotes = 4,
+                Lead = Wave.Square, LeadVolume = 0.2f, Arp = Wave.Triangle, ArpRate = 2, ArpVolume = 0.1f, Rest = 0.3f,
+                Kick = "x.....x.x.......", Snare = "....X.......X...", Tek = "..x...x...x...x.", Tom = "..........x.x...", Echo = 0.2f, Seed = 29,
+            },
             // Any other boss: fast harmonic minor with driving drums.
             _ => new Style
             {

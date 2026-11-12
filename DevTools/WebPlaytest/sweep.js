@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -711,6 +711,58 @@ async function patterns(browser) {
     await game.wait(1200);
     await game.shot(`pattern-${attack}-land`, `${name}이 떨어진 자리`);
   }
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 광맥 포식자 그룸 (2026-11-12, Docs/Bosses.md)
+// Most of its attacks lay nothing on the ground and give no glow: only its wind-up shows them. The strongest show their
+// area and a warning sign over it. Each attack is called once: a picture mid wind-up and one as it lands.
+async function veineater(browser) {
+  note('\n## 광맥 포식자 그룸 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss vein_eater');
+  const woke = await game.until(t => has(t.banner, '그룸'), 8000, game.texts);
+  check(!!woke, `철곡 광산촌 곁 아레나에서 깨면 "광맥 포식자 그룸 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  await game.wait(1500);
+  await game.shot('vein-awake', '깨어난 그룸');
+  // [attack, name, telegraph seconds, strong]
+  const uses = [
+    ['claw', '드릴 발톱(뒤로 젖히며 드릴을 든다)', 0.8, false],
+    ['rock_throw', '바위 던지기(웅크려 바위를 들어 올린다)', 0.9, false],
+    ['tunnel_rush', '굴착 돌진(머리를 낮추고 땅을 긁는다)', 1.0, false],
+    ['burrow', '땅속 습격(땅으로 들어가 흙더미가 달려온다, 경고)', 1.6, true],
+    ['cave_in', '갱도 붕괴(주먹을 들고 천장에서 바위가 떨어진다, 경고)', 1.5, true],
+    ['spike_line', '종유석 솟기(드릴을 땅에 박는다)', 0.9, false],
+    ['drill_spin', '드릴 회전(몸을 말았다가 돈다)', 0.9, false],
+    ['frenzy', '광폭 연속 돌진(붉어지고 김을 뿜는다)', 0.9, false],
+    ['quake', '대지 분쇄(깊이 웅크렸다 뛰어오른다, 경고)', 1.8, true],
+    ['call_beetles', '딱정벌레 부르기(천장을 향해 포효)', 0.9, false],
+  ];
+  for (const [attack, name, telegraph, strong] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss vein_eater use ${attack}`);
+    await game.wait(Math.round(telegraph * (attack === 'burrow' ? 700 : 550)));
+    const s = await game.state();
+    const shown = s.marksShown || 0;
+    if (strong) check(shown > 0 && s.warningSign, `${name}: 바닥 표시와 경고 표지가 보인다 (표시 ${shown}, 표지 ${s.warningSign})`);
+    else check(shown === 0 && !s.warningSign, `${name}: 바닥 표시도 경고 표지도 없다, 모션만 (표시 ${shown}, 표지 ${s.warningSign})`);
+    await game.shot(`vein-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 450) + 250);
+    await game.shot(`vein-${attack}-land`, `${name} 터진 뒤`);
+  }
+  // The phases: the roar into each, and the last phase's ore burning.
+  await game.send('heal; clear; boss vein_eater hurt 0.36');
+  await game.wait(600);
+  await game.shot('vein-phase2', '2페이즈 포효');
+  await game.send('heal; boss vein_eater hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('vein_eater') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('vein-phase3', '3페이즈(광석이 달아오른다)');
   await game.context.close();
 }
 
@@ -2886,7 +2938,7 @@ async function time(browser) {
   await game.context.close();
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

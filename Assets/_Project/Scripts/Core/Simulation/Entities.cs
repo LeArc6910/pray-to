@@ -544,7 +544,9 @@ namespace Game.Core
         public int TargetId { get; internal set; }
         public BossAttack Attack { get; internal set; }
         public bool IsDead => Health <= 0;
-        public bool Invulnerable => State == BossState.Roar;
+        // Out of reach while it roars, and while it is underground or in the air before a burrow or a leap comes down.
+        public bool Invulnerable => State == BossState.Roar || Away;
+        public bool Away => State == BossState.Telegraph && Attack != null && Attack.GoesAway;
 
         internal Vec2 ChargeDirection { get; set; }
         internal HashSet<int> ChargeHits { get; } = new HashSet<int>();
@@ -556,6 +558,10 @@ namespace Game.Core
         internal int EmptyTicks { get; set; }
         // Just past a roar: the next attack is one the new phase brought (World.Boss.cs, phases).
         internal bool OpensPhase { get; set; }
+        // Where a burrow or a leap comes down.
+        internal Vec2 LandAt { get; set; }
+        // Charges still to come after this one (an attack with count runs that many in a row).
+        internal int ChargesLeft { get; set; }
     }
 
     public enum HazardShape : byte

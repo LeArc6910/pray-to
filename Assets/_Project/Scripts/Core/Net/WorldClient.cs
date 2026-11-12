@@ -46,7 +46,9 @@ namespace Game.Core
             Health = health;
             MaxHealth = maxHealth;
             State = state;
-            Phase = phase & Protocol.PhaseMask;
+            // A boss's phase carries the attack it is on above it (World.BossPhaseField).
+            Phase = kind == EntityKind.Boss ? phase & World.BossPhaseMask : phase & Protocol.PhaseMask;
+            BossAttack = kind == EntityKind.Boss && boss != null ? AttackAt(boss, (phase & Protocol.PhaseMask) >> World.BossAttackShift) : null;
             Status = (byte)(phase >> 6);
             DropBase = dropBase;
             DropRune = dropRune;
@@ -71,6 +73,10 @@ namespace Game.Core
         // While a boss winds up, the kind of warning its attack gives (World.BossStateByte).
         public Tell Tell => (Tell)(State >> 4);
         public int Phase { get; }
+        // The attack a boss is winding up, making or resting from (null between attacks, asleep or roaring).
+        public BossAttack BossAttack { get; }
+
+        static BossAttack AttackAt(BossDefinition boss, int index) => index >= 1 && index <= boss.Attacks.Count ? boss.Attacks[index - 1] : null;
         // Burning, chilled (StatusBits).
         public byte Status { get; }
         public bool Burning => (Status & StatusBits.Burning) != 0;
