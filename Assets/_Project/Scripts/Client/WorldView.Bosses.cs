@@ -704,9 +704,10 @@ namespace Game.Client
             _shake = Mathf.Max(_shake, 0.18f);
             Hear(Sound.Heavy, body.Position, 1);
             Hear(Sound.Crit, body.Position, 0.6f);
-            // Blossom thrown off the draw, a ring of it.
+            // Blossom thrown off the draw, a ring of it: a few petals only, so the blade stays clear in front (2026-11-12,
+            // the person: "fewer petals right in front of the blade as it swings").
             var chest = body.Position + new Vector3(0, 0.8f, 0);
-            Petals(chest, Vector3.zero, 14, 4.5f, 1.3f, 0.4f);
+            Petals(chest, Vector3.zero, 4, 4.5f, 1.3f, 0.4f);
             AddFlash(chest, 1.6f, PetalColor, FlashKind.Ring);
         }
 
@@ -745,7 +746,7 @@ namespace Game.Client
                     var at = Vector3.Lerp(from, to, i / (float)steps);
                     AddFlash(at, 0.6f * heavy, SteelColor, FlashKind.Impact);
                     Kick(at, normal * (i % 2 == 0 ? 1 : -1), SteelColor, 2);
-                    Petals(at, normal * (i % 2 == 0 ? 1 : -1), Mathf.RoundToInt(3 * heavy), 3.2f, 1.2f, 0.2f);
+                    if (i % 2 == 0) Petals(at, normal * (i % 4 == 0 ? 1 : -1), 1, 3.2f, 1.2f, 0.2f);
                 }
                 AddFlash(middle, Mathf.Min(2.4f, length * 0.35f) * heavy, PetalColor, FlashKind.Burst);
                 _shake = Mathf.Max(_shake, 0.16f * heavy);
