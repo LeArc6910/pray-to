@@ -170,4 +170,6 @@ ComfyUI에서 쓸 무료 모델:
 - Pro `rd_pro__topdown` 48px 한 장($0.18, "giant armored mole beast boss … iron drill claws, glowing orange ore crystals on its back … top-down three-quarter view", `remove_bg`). 배경을 지울 때 머리 뒤에 남은 어두운 갈색은 가장자리부터 그 두 색만 지우고, 떨어진 점 몇 개를 지웠다
 - 그 그림으로 8방향 돌리기($0.10, 48px, 3×3 시트). 돌린 그림이 처음 그림보다 낫다(등의 광석 가시, 꼬리). 우리가 쓰는 다섯 모습(앞, 앞옆, 옆, 뒤옆, 뒤)을 40×39로 잘라 33색 팔레트와 행으로 옮겼다(`Art/VeinEaterArt.cs`). 왼쪽은 뒤집는다
 - 공격·피격 같은 움직임은 그림을 더 사지 않고 코드로 만든다(기울이기·늘이기·뛰어오르기·가라앉기·광석 빛내기, 바위와 흙더미를 덧그리기). RD의 공격 움직임(`rd_advanced_animation__attack`)은 쓰지 않았다
-- 이 그림은 Retro Diffusion으로 만들었고 상업 이용이 된다(유료 크레딧으로 만든 그림) 바닥은 Fast 그대로는 안 맞고 색을 다시 입혀야 한다.
+- 이 그림은 Retro Diffusion으로 만들었고 상업 이용이 된다(유료 크레딧으로 만든 그림)
+
+네 번째(2026-11-12, $0.28, 잔액 $2.79): **벚꽃 검귀 시구레**(사무라이 보스). Pro `rd_pro__topdown` 48px 한 장("samurai swordsman boss, ronin in dark crimson lacquered armor and a wide straw hat, long katana sheathed at the left hip …", `remove_bg`, 배경 손질 없이 깨끗했다)과 8방향 돌리기. 다섯 모습을 40×42로 잘라 21색 팔레트와 행으로 옮겼다(`Art/SamuraiArt.cs`). 뽑은 칼날, 발도·납도·돌진 자세와 이펙트는 모두 코드다 바닥은 Fast 그대로는 안 맞고 색을 다시 입혀야 한다.

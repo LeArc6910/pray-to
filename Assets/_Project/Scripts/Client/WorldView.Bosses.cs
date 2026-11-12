@@ -66,8 +66,10 @@ namespace Game.Client
         {
             bool strong = view.BossState == BossState.Telegraph && view.BossAttack != null && view.BossAttack.Warning == AttackWarning.Strong;
             ShowWarningSign(body, strong);
+            RunLater();
             if (body.Id == "vein_eater") VeinEaterExtras(body, view);
             else if (body.Mound != null) body.Mound.enabled = false;
+            if (body.Id == "shrine_samurai") SamuraiExtras(body, view);
         }
 
         void ShowWarningSign(Body body, bool on)
@@ -350,6 +352,7 @@ namespace Game.Client
         // those).
         bool VeinEaterLanded(HazardState hazard)
         {
+            if (SamuraiLanded(hazard)) return true;
             var attack = AttackOf(hazard);
             if (attack == null || _bossInView.Id != "vein_eater") return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
@@ -397,6 +400,235 @@ namespace Game.Client
                     AddFlash(at, hazard.Size * 0.9f, RockColor, FlashKind.Burst);
                     AddFlash(at, 0.6f, Color.white, FlashKind.Impact);
                     Kick(at, Vector3.up, RockColor, 5);
+                    return true;
+            }
+            return false;
+        }
+
+        // ---- The shrine samurai (2026-11-12, Docs/Bosses.md 벚꽃 검귀 시구레): iaido. A long, plain stance with the hand on
+        // the hilt (and the marks on the ground), then the draw too fast to see: the picture stops for a moment, a white
+        // line is left where the blade went, and a beat later the cut opens along it in sparks and petals. ----
+
+        static readonly Color SteelColor = new Color(0.86f, 0.92f, 1f);
+        static readonly Color PetalColor = new Color(1f, 0.72f, 0.82f);
+        static readonly Color PetalDeep = new Color(0.94f, 0.45f, 0.6f);
+
+        // Seconds the picture holds still when the blade comes out, and how long the line it leaves stays.
+        const float DrawStop = 0.07f;
+        const float CutLine = 0.32f;
+        // A beat after the line, the cut opens.
+        const float CutDelay = 0.13f;
+
+        static Sprite CrescentSprite => Sprites.Centered("shot/crescent", () => EffectArt.Swing(24, 2));
+
+        // Things to happen a moment later: the cut opening along a line already drawn.
+        readonly System.Collections.Generic.List<(float At, System.Action Do)> _later = new System.Collections.Generic.List<(float, System.Action)>();
+
+        void Later(float seconds, System.Action action) => _later.Add((Time.time + seconds, action));
+
+        void RunLater()
+        {
+            for (int i = _later.Count - 1; i >= 0; i--)
+            {
+                if (Time.time < _later[i].At) continue;
+                var action = _later[i].Do;
+                _later.RemoveAt(i);
+                action();
+            }
+        }
+
+        void AnimateSamurai(Body body, Vec2 facing, bool dead, bool moving)
+        {
+            var attack = body.BossAttack;
+            float since = Time.time - body.BossSince;
+            int sector = SectorOf(facing);
+            var pose = SamuraiPose.Idle;
+            int frame = Mathf.FloorToInt(Time.time * 1.5f) % 2;
+            if (dead)
+            {
+                frame = 0;
+            }
+            else if (body.BossState == BossState.Roar)
+            {
+                pose = SamuraiPose.Kiai;
+                frame = Mathf.FloorToInt(Time.time * 8) % 2;
+            }
+            else if (moving && (body.BossState == BossState.Approach || body.BossState == BossState.Recover || body.BossState == BossState.Dormant))
+            {
+                pose = SamuraiPose.Walk;
+                frame = Mathf.FloorToInt(body.Walked * 8) % 4;
+            }
+            else if (body.BossState == BossState.Telegraph && attack != null)
+            {
+                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                frame = Mathf.Min(5, Mathf.FloorToInt(progress * 6));
+                // Cuts across (a cross, a crescent wave, the petals) are raised overhead; everything else is drawn from
+                // the scabbard, low.
+                pose = attack.Shape == AttackShape.Cross || attack.Shape == AttackShape.Burst || attack.Shape == AttackShape.Circle && attack.Target == AttackTarget.Each
+                    ? SamuraiPose.Jodan : SamuraiPose.Stance;
+            }
+            else if (body.BossState == BossState.Charge)
+            {
+                pose = SamuraiPose.Dash;
+                frame = Mathf.FloorToInt(Time.time * 16) % 4;
+            }
+            else if (body.BossState == BossState.Recover && attack != null && since < 0.95f)
+            {
+                // The draw in three quick frames, held, then the blade shaken and put away.
+                if (since < 0.21f) (pose, frame) = (SamuraiPose.Draw, Mathf.FloorToInt(since / 0.07f));
+                else if (since < 0.5f) (pose, frame) = (SamuraiPose.Draw, 2);
+                else (pose, frame) = (SamuraiPose.Sheathe, Mathf.Min(2, Mathf.FloorToInt((since - 0.5f) / 0.15f)));
+            }
+
+            var (view, turned) = BossSectors[sector];
+            int phase = Mathf.Clamp(body.BossPhase, 1, 3);
+            int code = 400000 + ((((int)pose * 8 + (int)view) * 8 + frame) * 4 + phase) * 2 + (turned ? 1 : 0);
+            if (code == body.Frame) return;
+            body.Frame = code;
+            string key = $"samurai/{view}/{pose}/{frame}/{phase}";
+            System.Func<PixelImage> draw = () => SamuraiArt.Draw(view, pose, frame, phase);
+            body.Shape.sprite = Sprites.Standing(key, draw);
+            body.Glow.sprite = Sprites.Standing(key + "/white", () => draw().Silhouette());
+            body.Shape.flipX = turned;
+            body.Glow.flipX = turned;
+            body.Top = -body.Feet + SamuraiArt.BodyHeight / (float)Sprites.PixelsPerUnit;
+        }
+
+        // While it winds up, petals stir round it; dashing, it leaves afterimages; out of a dash, the line it cut.
+        void SamuraiExtras(Body body, EntityView view)
+        {
+            var attack = view.BossAttack;
+            float since = Time.time - body.BossSince;
+            bool puff = Time.time >= body.DustAt;
+            if (puff) body.DustAt = Time.time + 0.08f;
+            var feet = body.Position;
+            if (view.BossState == BossState.Telegraph && attack != null)
+            {
+                float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
+                // Gathering itself: petals drawn in toward it, more as the draw nears.
+                if (puff && UnityEngine.Random.value < 0.3f + progress)
+                {
+                    var from = feet + (Vector3)(UnityEngine.Random.insideUnitCircle.normalized * 2.2f) + new Vector3(0, 0.8f, 0);
+                    Kick(from, feet + new Vector3(0, 0.8f, 0) - from, UnityEngine.Random.value < 0.5f ? PetalColor : PetalDeep, 1);
+                }
+                // A flash step: gone just before it lands behind its target.
+                if (attack.GoesAway && progress > 0.6f) body.Shape.color = new Color(1, 1, 1, Mathf.Max(0.08f, 1 - (progress - 0.6f) * 4));
+            }
+            if (view.BossState == BossState.Charge)
+            {
+                if (!body.Dashing)
+                {
+                    body.Dashing = true;
+                    body.DashFrom = feet;
+                }
+                // Afterimages along the dash.
+                var ghost = Renderer(_root.transform, "Afterimage", body.Shape.sprite, new Color(0.75f, 0.85f, 1f, 0.5f));
+                ghost.transform.localPosition = body.Shape.transform.position - _root.transform.position;
+                ghost.flipX = body.Shape.flipX;
+                ghost.sortingOrder = body.Shape.sortingOrder - 1;
+                _bits.Add(new Bit { Renderer = ghost, Velocity = Vector3.zero, Color = new Color(0.75f, 0.85f, 1f, 0.5f), Life = 0.22f });
+            }
+            else if (body.Dashing)
+            {
+                // Out of the dash: the line it cut, and the cut opening along it a beat later.
+                body.Dashing = false;
+                Cut(body.DashFrom + new Vector3(0, 0.5f, 0), feet + new Vector3(0, 0.5f, 0), 1.2f);
+            }
+        }
+
+        // The draw itself: the picture stops for an instant, the sound of steel.
+        void SamuraiDraws(Body body)
+        {
+            if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, DrawStop);
+            _shake = Mathf.Max(_shake, 0.18f);
+            Hear(Sound.Heavy, body.Position, 1);
+            Hear(Sound.Crit, body.Position, 0.6f);
+        }
+
+        // A white line where the blade went, thick and bright and gone fast; a beat later the cut opens along it.
+        void Cut(Vector3 from, Vector3 to, float heavy)
+        {
+            var along = to - from;
+            float length = along.magnitude;
+            if (length < 0.05f) return;
+            float angle = Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg;
+            void Line(float thickness, Color color, float life, int order)
+            {
+                var line = Renderer(_root.transform, "Cut", Shapes.Square, color);
+                line.transform.localPosition = (from + to) / 2;
+                line.transform.localRotation = Quaternion.Euler(0, 0, angle);
+                line.transform.localScale = new Vector3(length + 0.6f, thickness, 1);
+                line.sortingOrder = order;
+                _bits.Add(new Bit { Renderer = line, Velocity = Vector3.zero, Color = color, Life = life });
+            }
+            Line(5f / Sprites.PixelsPerUnit * heavy, new Color(0.7f, 0.85f, 1f, 0.55f), CutLine * 1.2f, 19500);
+            Line(2f / Sprites.PixelsPerUnit, Color.white, CutLine, 19501);
+            Later(CutDelay, () =>
+            {
+                int steps = Mathf.Max(2, Mathf.RoundToInt(length / 1.1f));
+                for (int i = 0; i <= steps; i++)
+                {
+                    var at = Vector3.Lerp(from, to, i / (float)steps);
+                    AddFlash(at, 0.55f * heavy, SteelColor, FlashKind.Impact);
+                    Kick(at, (Vector3)UnityEngine.Random.insideUnitCircle, UnityEngine.Random.value < 0.5f ? PetalColor : PetalDeep, 2);
+                }
+                _shake = Mathf.Max(_shake, 0.12f * heavy);
+                Hear(Sound.Hit, (from + to) / 2, 0.7f);
+            });
+        }
+
+        // Where one of the samurai's cuts lands: its line drawn the way the blade went, the cut opening after.
+        bool SamuraiLanded(HazardState hazard)
+        {
+            var attack = AttackOf(hazard);
+            if (attack == null || _bossInView.Id != "shrine_samurai") return false;
+            var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
+            var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
+            var across = new Vector3(-along.y, along.x, 0);
+            switch (attack.Shape)
+            {
+                case AttackShape.Cone:
+                {
+                    // A sweep across the front: a curve of short lines round the wedge.
+                    float half = attack.Angle / 2;
+                    Vector3 Point(float a) => at + Quaternion.Euler(0, 0, a) * along * (hazard.Size * 0.7f);
+                    for (float a = -half; a < half; a += half / 3) Cut(Point(a), Point(a + half / 3), 1);
+                    return true;
+                }
+                case AttackShape.Line:
+                    // One arm of the cross: a long straight cut.
+                    Cut(at, at + along * hazard.Size, 1.2f);
+                    return true;
+                case AttackShape.Ring:
+                    // The thousand flashes: lines every way through the band, a white shockwave, the picture stopping.
+                    for (int i = 0; i < 9; i++)
+                    {
+                        float a = (i * 40 + UnityEngine.Random.Range(-12f, 12f)) * Mathf.Deg2Rad;
+                        var dir = new Vector3(Mathf.Cos(a), Mathf.Sin(a), 0);
+                        var mid = at + dir * ((hazard.Size + hazard.Width) / 2);
+                        var cross = new Vector3(-dir.y, dir.x, 0) * 2.6f;
+                        Cut(mid - cross, mid + cross, 1.3f);
+                    }
+                    AddFlash(at, hazard.Size, Color.white, FlashKind.Ring);
+                    if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, DrawStop * 1.8f);
+                    _shake = Mathf.Max(_shake, 0.45f);
+                    return true;
+                case AttackShape.Circle when attack.Target == AttackTarget.Self:
+                    // A turn with the blade: a ring of cuts round it.
+                    for (int i = 0; i < 6; i++)
+                    {
+                        float a0 = i * 60 * Mathf.Deg2Rad, a1 = (i + 1) * 60 * Mathf.Deg2Rad;
+                        Cut(at + new Vector3(Mathf.Cos(a0), Mathf.Sin(a0)) * hazard.Size * 0.8f, at + new Vector3(Mathf.Cos(a1), Mathf.Sin(a1)) * hazard.Size * 0.8f, 1);
+                    }
+                    return true;
+                case AttackShape.Circle:
+                    // A cut in the air: an X where it lands, in petals.
+                    Cut(at - (along + across) * hazard.Size * 0.8f, at + (along + across) * hazard.Size * 0.8f, 0.9f);
+                    Cut(at - (along - across) * hazard.Size * 0.8f, at + (along - across) * hazard.Size * 0.8f, 0.9f);
+                    return true;
+                case AttackShape.Leap:
+                    // Out of nowhere beside its target: one cut straight down through where it stood.
+                    Cut(at + new Vector3(-0.8f, 1.6f, 0), at + new Vector3(0.8f, -0.8f, 0), 1.3f);
                     return true;
             }
             return false;

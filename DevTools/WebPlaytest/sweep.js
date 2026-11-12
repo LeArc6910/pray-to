@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -763,6 +763,50 @@ async function veineater(browser) {
   const last = await game.state();
   check((last.bosses || '').includes('vein_eater') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
   await game.shot('vein-phase3', '3페이즈(광석이 달아오른다)');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 벚꽃 검귀 시구레 (2026-11-12, Docs/Bosses.md)
+// Iaido: every attack is marked on the ground through a long, plain stance; the draw itself is instant. The ultimate
+// (오의 천섬) shows a warning sign too. A picture mid stance and one just as the blade comes out.
+async function samurai(browser) {
+  note('\n## 벚꽃 검귀 시구레 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss shrine_samurai');
+  const woke = await game.until(t => has(t.banner, '시구레'), 8000, game.texts);
+  check(!!woke, `잊힌 신전 곁 아레나에서 깨면 "벚꽃 검귀 시구레 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  await game.wait(1500);
+  await game.shot('samurai-awake', '깨어난 시구레');
+  // [attack, name, telegraph seconds, strong]
+  const uses = [
+    ['iai', '거합 베기(웅크려 칼자루에 손)', 0.9, false],
+    ['issen', '일섬(먼 사람에게 순식간에 돌진)', 1.1, false],
+    ['juji', '십자 베기(상단 자세)', 1.0, false],
+    ['sanren', '삼연 발도(돌진 세 번)', 0.9, false],
+    ['getsuei', '월광참(초승달 검기 다섯)', 1.0, false],
+    ['kaiten', '회전 발도(둘레 원)', 0.9, false],
+    ['sakura', '벚꽃 난무(사람마다 허공 베기 넷)', 1.1, false],
+    ['shunpo', '순보 일섬(사라졌다 곁에서 베기)', 1.2, false],
+    ['ougi', '오의 천섬(곁만 안전, 경고)', 1.8, true],
+  ];
+  for (const [attack, name, telegraph, strong] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss shrine_samurai use ${attack}`);
+    await game.wait(Math.round(telegraph * 550));
+    const s = await game.state();
+    if (attack !== 'getsuei') check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`samurai-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 450) + 60);
+    await game.shot(`samurai-${attack}-draw`, `${name} 발도 순간`);
+  }
+  await game.send('heal; clear; boss shrine_samurai hurt 0.36');
+  await game.wait(600);
+  await game.shot('samurai-phase2', '2페이즈 기합');
   await game.context.close();
 }
 
@@ -2938,7 +2982,7 @@ async function time(browser) {
   await game.context.close();
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -384,6 +384,14 @@ namespace Game.Client
                 Lead = Wave.Square, LeadVolume = 0.2f, Arp = Wave.Triangle, ArpRate = 2, ArpVolume = 0.1f, Rest = 0.3f,
                 Kick = "x.....x.x.......", Snare = "....X.......X...", Tek = "..x...x...x...x.", Tom = "..........x.x...", Echo = 0.2f, Seed = 29,
             },
+            // The shrine samurai (2026-11-12): a plucked bell like a koto over a phrygian drone, slow and spare, struck
+            // through by taiko-like toms and long silences.
+            "shrine_samurai" => new Style
+            {
+                Bpm = 104, Root = 45, Scale = Phrygian, Chords = new[] { 0, 1, 0, 5 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Triangle, BassNotes = 2,
+                Lead = Wave.Bell, LeadOctave = 1, LeadVolume = 0.26f, Arp = Wave.Pulse, ArpRate = 2, ArpVolume = 0.07f, Rest = 0.45f,
+                Pad = Wave.Sine, PadVolume = 0.05f, Kick = "x.........x.....", Tom = "x.....x...x.x...", Echo = 0.35f, Seed = 30,
+            },
             // Any other boss: fast harmonic minor with driving drums.
             _ => new Style
             {

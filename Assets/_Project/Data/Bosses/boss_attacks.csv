@@ -97,3 +97,12 @@ vein_eater,drill_spin,드릴 회전,2|3,spiral,self,0.9,16,0.35,,20,5,6,,7,1.4,1
 vein_eater,frenzy,광폭 연속 돌진,3,charge,nearest,0.9,30,,9,,2.4,3,,18,1.4,18,,none
 vein_eater,quake,대지 분쇄,3,leap,farthest,1.8,70,3.2,,,,12,,9,1.6,14,,strong
 vein_eater,call_beetles,딱정벌레 부르기,3,summon,self,0.9,,,,,,3,3,,1.0,10,cave_beetle,none
+shrine_samurai,iai,거합 베기,,cone,nearest,0.9,34,,4.0,150,,,,,0.8,30,,
+shrine_samurai,issen,일섬,,charge,farthest,1.1,40,,10,,1.6,,,40,1.0,24,,
+shrine_samurai,juji,십자 베기,,cross,nearest,1.0,32,,5,45,1.2,,,,0.9,18,,
+shrine_samurai,sanren,삼연 발도,2|3,charge,nearest,0.9,30,,8,,1.4,3,,40,1.2,18,,
+shrine_samurai,getsuei,월광참,2|3,burst,nearest,1.0,24,0.5,,50,,5,,13,1.0,16,,
+shrine_samurai,kaiten,회전 발도,2|3,circle,self,0.9,32,3.2,,,,1,,,0.9,14,,
+shrine_samurai,sakura,벚꽃 난무,3,circle,each,1.1,26,1.1,,,,4,3,,1.0,16,,
+shrine_samurai,shunpo,순보 일섬,3,leap,nearest,1.2,36,1.6,,,,,,,1.0,14,,
+shrine_samurai,ougi,오의 천섬,3,ring,self,1.8,64,1.6,8,,,,,,1.6,12,,strong

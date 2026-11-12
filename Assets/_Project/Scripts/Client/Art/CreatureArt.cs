@@ -1389,6 +1389,16 @@ namespace Game.Client
                 BossPose.Roar => VeinPose.Roar,
                 _ => VeinPose.Idle,
             }, frame, 1, false),
+            // The samurai of the forgotten shrine (2026-11-12): likewise a Retro Diffusion picture posed in code, its blade
+            // drawn in code (SamuraiPose in WorldView).
+            "shrine_samurai" => SamuraiArt.Draw(view, pose switch
+            {
+                BossPose.Windup => SamuraiPose.Stance,
+                BossPose.Strike => SamuraiPose.Draw,
+                BossPose.Charge => SamuraiPose.Dash,
+                BossPose.Roar => SamuraiPose.Kiai,
+                _ => SamuraiPose.Idle,
+            }, frame, 1),
             _ => Warden(color, frame, view, pose),
         };
 

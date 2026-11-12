@@ -457,6 +457,7 @@ namespace Game.Client
             PlayerMotions(Path.Combine(folder, "player_motions.gif"), sword, bow, staff, potion, food, floor);
             Bosses(Path.Combine(folder, "bosses.gif"), arena);
             VeinEater(Path.Combine(folder, "vein_eater.gif"), arena);
+            Samurai(Path.Combine(folder, "samurai.gif"), arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
             StoryPeople(Path.Combine(folder, "story_people.gif"), floor);
@@ -928,6 +929,61 @@ namespace Game.Client
                     for (int column = 0; column < 2; column++)
                     {
                         var image = VeinEaterArt.Draw(column == 0 ? BossView.Side : BossView.Front, step.Pose, step.Frame, step.Phase, step.Rage);
+                        for (int y = 0; y < cellHeight; y++)
+                        {
+                            for (int x = 0; x < cellWidth; x++)
+                            {
+                                var floor = arena[x / scale % arena.Width, y / scale % arena.Height];
+                                var c = image[x / scale, y / scale];
+                                pixels[(row * cellHeight + y) * width + column * cellWidth + x] = c.A > 0 ? c : floor;
+                            }
+                        }
+                    }
+                }
+                frames.Add((pixels, 4));
+            }
+            Gif.Save(path, width, height, frames);
+        }
+
+        // The shrine samurai's walk and iaido (2026-11-12, SamuraiArt), a row each, facing right and facing down: walk,
+        // stance and draw and sheathing, a dash, the blade raised overhead and brought down, a shout.
+        static void Samurai(string path, PixelImage arena)
+        {
+            (SamuraiPose, int, float)[] Run(SamuraiPose pose, int frames, float seconds) =>
+                Enumerable.Range(0, frames).Select(f => (pose, f, seconds)).ToArray();
+            var rows = new[]
+            {
+                Run(SamuraiPose.Walk, 4, 0.14f).Concat(Run(SamuraiPose.Walk, 4, 0.14f)).ToArray(),
+                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.15f)).Concat(Run(SamuraiPose.Draw, 3, 0.07f))
+                    .Concat(new[] { (SamuraiPose.Draw, 2, 0.3f) }).Concat(Run(SamuraiPose.Sheathe, 3, 0.15f)).ToArray(),
+                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.1f)).Concat(Run(SamuraiPose.Dash, 4, 0.05f))
+                    .Concat(Run(SamuraiPose.Draw, 3, 0.1f)).Concat(Run(SamuraiPose.Sheathe, 3, 0.15f)).ToArray(),
+                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Jodan, 6, 0.15f)).Concat(Run(SamuraiPose.Draw, 3, 0.08f))
+                    .Concat(Run(SamuraiPose.Sheathe, 3, 0.15f)).ToArray(),
+                new[] { (SamuraiPose.Idle, 0, 0.3f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f) },
+            };
+            const int scale = 2;
+            int cellWidth = SamuraiArt.Width * scale;
+            int cellHeight = SamuraiArt.Height * scale;
+            int width = cellWidth * 2;
+            int height = cellHeight * rows.Length;
+            var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
+            for (float time = 0; time < 3.4f; time += 0.04f)
+            {
+                var pixels = new Rgba[width * height];
+                for (int row = 0; row < rows.Length; row++)
+                {
+                    float at = time % rows[row].Sum(f => f.Item3);
+                    var step = rows[row][0];
+                    foreach (var f in rows[row])
+                    {
+                        step = f;
+                        if (at < f.Item3) break;
+                        at -= f.Item3;
+                    }
+                    for (int column = 0; column < 2; column++)
+                    {
+                        var image = SamuraiArt.Draw(column == 0 ? BossView.Side : BossView.Front, step.Item1, step.Item2, 1);
                         for (int y = 0; y < cellHeight; y++)
                         {
                             for (int x = 0; x < cellWidth; x++)

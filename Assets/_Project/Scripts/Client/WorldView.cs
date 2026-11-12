@@ -85,6 +85,9 @@ namespace Game.Client
             public SpriteRenderer Sign;
             public SpriteRenderer Mound;
             public float DustAt;
+            // The samurai dashing, and where the dash began (WorldView.Bosses.cs).
+            public bool Dashing;
+            public Vector3 DashFrom;
             public EnemyState EnemyState;
             // When a monster may cry out again on noticing someone, and where another player was last frame and how
             // far they have walked since their last step (2026-11-09, sounds).
@@ -1842,8 +1845,10 @@ namespace Game.Client
                     var color = projectile.Friendly ? Palette.Of(projectile.Tags) : ProjectileColor;
                     // The vein eater's are rocks (2026-11-12).
                     bool rock = !projectile.Friendly && _bossInView?.Id == "vein_eater";
-                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : SporeSprite;
-                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock ? Color.white : color);
+                    // The samurai's are crescents of light, the blade's cut flying (2026-11-12).
+                    bool crescent = !projectile.Friendly && _bossInView?.Id == "shrine_samurai";
+                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : SporeSprite;
+                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock ? Color.white : crescent ? SteelColor : color);
                     float across = sprite.rect.height / Sprites.PixelsPerUnit;
                     renderer.transform.localScale = Vector3.one * (arrow ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
                     renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
@@ -1902,7 +1907,11 @@ namespace Game.Client
                     }
                     // A boss lunges but draws no blade's arc in front of it: its blows show where they land (2026-11-12,
                     // the person: the sword-swing arc in front of a boss is better gone).
-                    if (attacker.Kind == BodyKind.Boss) break;
+                    if (attacker.Kind == BodyKind.Boss)
+                    {
+                        if (attacker.Id == "shrine_samurai") SamuraiDraws(attacker);
+                        break;
+                    }
                     attacker.SwingTime = SwingSeconds;
                     attacker.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     // The second cut comes back up: the crescent mirrored across the way it points. The finisher is bigger.
@@ -2668,6 +2677,11 @@ namespace Game.Client
             if (body.Kind == BodyKind.Boss && body.Id == "vein_eater")
             {
                 AnimateVeinEater(body, facing, dead, moving);
+                return;
+            }
+            if (body.Kind == BodyKind.Boss && body.Id == "shrine_samurai")
+            {
+                AnimateSamurai(body, facing, dead, moving);
                 return;
             }
 

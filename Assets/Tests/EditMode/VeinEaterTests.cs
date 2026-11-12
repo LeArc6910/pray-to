@@ -58,7 +58,7 @@ namespace Game.Core.Tests
             for (int phase = 2; phase <= eater.PhaseCount; phase++)
                 Assert.IsTrue(eater.Attacks.Any(a => a.Phases.Count > 0 && a.Phases.Min() == phase), $"phase {phase} brings something new");
             // The bosses from before are announced as they always were.
-            foreach (var boss in Bosses.Shipped.Bosses.Where(b => b.Id != "vein_eater"))
+            foreach (var boss in Bosses.Shipped.Bosses.Where(b => b.Id != "vein_eater" && b.Id != "shrine_samurai"))
                 Assert.IsTrue(boss.Attacks.All(a => a.Warning == AttackWarning.Marked), boss.Id);
             var wrong = Bosses.Parse(Bosses.BossesHeader + "dummy,허수아비,1000,50,0,2,1,,1,3,10\n", Header + "dummy,a,공격,,circle,nearest,1,30,2,,,,1,,,1,1,,loud\n");
             Assert.IsFalse(wrong.Success);
@@ -141,6 +141,24 @@ namespace Game.Core.Tests
             // Asleep, a boss is on no attack.
             var sleeper = Arena(out var asleep, definition);
             Assert.AreEqual(1, World.BossPhaseField(asleep));
+        }
+
+        // The shrine samurai (2026-11-12): iaido. Every cut is marked through its stance, only its ultimate carries the
+        // warning sign; each phase brings cuts of its own; and a draw-dash is over in a blink.
+        [Test]
+        public void TheSamuraiIsMarkedThroughItsStanceAndDrawsInABlink()
+        {
+            var samurai = Bosses.Shipped.Find("shrine_samurai");
+            Assert.AreEqual("old_temple", samurai.Place);
+            Assert.AreEqual(AttackWarning.Strong, samurai.Attacks.Single(a => a.Id == "ougi").Warning);
+            Assert.IsTrue(samurai.Attacks.Where(a => a.Id != "ougi").All(a => a.Warning == AttackWarning.Marked));
+            for (int phase = 2; phase <= samurai.PhaseCount; phase++)
+                Assert.IsTrue(samurai.Attacks.Any(a => a.Phases.Count > 0 && a.Phases.Min() == phase), $"phase {phase} brings something new");
+            foreach (var dash in samurai.Attacks.Where(a => a.Shape == AttackShape.Charge))
+            {
+                Assert.Less(dash.Length / dash.Speed, 0.3f, $"{dash.Id} is over in a blink");
+                Assert.GreaterOrEqual(dash.Telegraph, 0.9f, $"{dash.Id} gives a stance long enough to read");
+            }
         }
     }
 }

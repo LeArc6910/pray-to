@@ -151,7 +151,7 @@ namespace CoreSandbox
                     Drunk++;
                     break;
                 case SimEventType.Hit:
-                    string by = e.Cause == 0 ? "기본 공격" : Player.Skills[e.Cause - 1].Name;
+                    string by = e.Cause == 0 ? "기본 공격" : e.Cause <= Player.Skills.Count ? Player.Skills[e.Cause - 1].Name : "기타";
                     _dealt[by] = _dealt.GetValueOrDefault(by) + e.Amount;
                     break;
             }
