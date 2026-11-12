@@ -169,6 +169,10 @@ namespace Game.Core
         // sheet order (2026-11-10).
         public string Place { get; internal set; }
 
+        // How it closes in (2026-11-12, gait column): blank walks at its speed; burst darts in a sudden rush and then all
+        // but stops, over and over (the shrine samurai), a little faster than walking on the whole.
+        public bool Bursts { get; internal set; }
+
         readonly List<BossAttack> _attacks = new List<BossAttack>();
 
         internal BossDefinition(
@@ -331,7 +335,7 @@ namespace Game.Core
                         Whole(row, "potion_count"),
                         row["material"],
                         Whole(row, "material_count"),
-                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"] });
+                        row["element"].Length == 0 ? SkillTag.None : BossElement(row["element"])) { Level = Whole(row, "level"), Place = row["place"].Length == 0 ? null : row["place"], Bursts = Gait(row["gait"]) });
                 });
             }
             return bosses;
@@ -439,6 +443,14 @@ namespace Game.Core
                     break;
             }
         }
+
+        // The gait column: blank (walks) or burst.
+        static bool Gait(string cell) => cell switch
+        {
+            "" => false,
+            "burst" => true,
+            _ => throw new FormatException($"gait은 비우거나 burst여야 합니다('{cell}')."),
+        };
 
         // The warn column: blank as before (marked on the ground), none (only the boss's wind-up shows it) or strong.
         static AttackWarning Warning(string cell) => cell switch

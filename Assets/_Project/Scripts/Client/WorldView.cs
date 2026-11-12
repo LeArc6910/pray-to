@@ -737,6 +737,8 @@ namespace Game.Client
             ActiveBoss = null;
             BossInSight = null;
             _bossInView = null;
+            // The samurai's dimming holds only while it is there to set it (WorldView.Bosses.cs).
+            if (_dim != null) _dim.color = Color.clear;
             _seen.Clear();
             foreach (var view in _client.Others())
             {
@@ -2681,7 +2683,7 @@ namespace Game.Client
             }
             if (body.Kind == BodyKind.Boss && body.Id == "shrine_samurai")
             {
-                AnimateSamurai(body, facing, dead, moving);
+                AnimateSamurai(body, facing, dead, moving, speed);
                 return;
             }
 
@@ -2944,7 +2946,8 @@ namespace Game.Client
                 bit.Velocity *= Mathf.Exp(-6 * deltaTime);
                 bit.Renderer.transform.localPosition += bit.Velocity * deltaTime;
                 var color = bit.Color;
-                color.a = 1 - bit.Age / bit.Life;
+                // Fading from the alpha it started with (a faint flash stays faint).
+                color.a = bit.Color.a * (1 - bit.Age / bit.Life);
                 bit.Renderer.color = color;
             }
         }

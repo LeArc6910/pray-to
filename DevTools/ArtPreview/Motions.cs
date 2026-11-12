@@ -951,15 +951,16 @@ namespace Game.Client
         {
             (SamuraiPose, int, float)[] Run(SamuraiPose pose, int frames, float seconds) =>
                 Enumerable.Range(0, frames).Select(f => (pose, f, seconds)).ToArray();
+            (SamuraiPose, int, float)[] Sheathe() => new[] { (SamuraiPose.Chiburi, 0, 0.14f) }.Concat(Run(SamuraiPose.Noto, 3, 0.18f)).ToArray();
             var rows = new[]
             {
                 Run(SamuraiPose.Walk, 4, 0.14f).Concat(Run(SamuraiPose.Walk, 4, 0.14f)).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.15f)).Concat(Run(SamuraiPose.Draw, 3, 0.07f))
-                    .Concat(new[] { (SamuraiPose.Draw, 2, 0.3f) }).Concat(Run(SamuraiPose.Sheathe, 3, 0.15f)).ToArray(),
+                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.15f)).Concat(new[] { (SamuraiPose.Draw, 0, 0.04f), (SamuraiPose.Draw, 1, 0.1f), (SamuraiPose.Draw, 2, 0.12f) })
+                    .Concat(Sheathe()).ToArray(),
                 new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.1f)).Concat(Run(SamuraiPose.Dash, 4, 0.05f))
-                    .Concat(Run(SamuraiPose.Draw, 3, 0.1f)).Concat(Run(SamuraiPose.Sheathe, 3, 0.15f)).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Jodan, 6, 0.15f)).Concat(Run(SamuraiPose.Draw, 3, 0.08f))
-                    .Concat(Run(SamuraiPose.Sheathe, 3, 0.15f)).ToArray(),
+                    .Concat(new[] { (SamuraiPose.Draw, 1, 0.1f), (SamuraiPose.Draw, 2, 0.12f) }).Concat(Sheathe()).ToArray(),
+                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Jodan, 6, 0.15f)).Concat(new[] { (SamuraiPose.Kiri, 0, 0.04f), (SamuraiPose.Kiri, 1, 0.1f), (SamuraiPose.Kiri, 2, 0.12f) })
+                    .Concat(Sheathe()).ToArray(),
                 new[] { (SamuraiPose.Idle, 0, 0.3f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f) },
             };
             const int scale = 2;

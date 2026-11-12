@@ -133,7 +133,7 @@ namespace Game.Core
                         StartTelegraph(boss, target, fighters);
                         break;
                     }
-                    MoveBoss(boss, (target.Position - boss.Position).Normalized * (boss.Definition.Speed * TickSeconds));
+                    MoveBoss(boss, (target.Position - boss.Position).Normalized * (boss.Definition.Speed * GaitFactor(boss) * TickSeconds));
                     break;
 
                 case BossState.Telegraph:
@@ -201,6 +201,7 @@ namespace Game.Core
             }
             boss.Attack = _random.PickWeighted(choices, a => PhaseWeight(a, boss.Phase));
             boss.VolleysLeft = 0;
+            boss.GaitTicks = 0;
             boss.TargetId = PickTarget(boss, boss.Attack.Target, fighters).Id;
             boss.State = BossState.Approach;
             boss.StateTicks = Ticks(ApproachSeconds);
@@ -268,6 +269,19 @@ namespace Game.Core
 
         // Seconds after the first that a second attack laid with it lands.
         const float SecondDelay = 0.4f;
+
+        // A bursting gait (2026-11-12): a rush at five times its pace for a short moment, then barely moving, over and over.
+        const float BurstSeconds = 0.12f;
+        const float BurstCycle = 0.7f;
+        const float BurstRush = 5;
+        const float BurstRest = 0.3f;
+
+        static float GaitFactor(Boss boss)
+        {
+            if (!boss.Definition.Bursts) return 1;
+            int at = boss.GaitTicks++ % Ticks(BurstCycle);
+            return at < Ticks(BurstSeconds) ? BurstRush : BurstRest;
+        }
 
         // How much of its telegraph a charge's later runs take.
         const float AgainTelegraph = 0.5f;

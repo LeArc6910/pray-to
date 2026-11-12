@@ -562,6 +562,8 @@ namespace Game.Core
         internal Vec2 LandAt { get; set; }
         // Charges still to come after this one (an attack with count runs that many in a row).
         internal int ChargesLeft { get; set; }
+        // Ticks into its rush-and-stop gait while it closes in (BossDefinition.Bursts).
+        internal int GaitTicks { get; set; }
     }
 
     public enum HazardShape : byte

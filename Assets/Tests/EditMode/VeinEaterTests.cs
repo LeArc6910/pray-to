@@ -154,11 +154,36 @@ namespace Game.Core.Tests
             Assert.IsTrue(samurai.Attacks.Where(a => a.Id != "ougi").All(a => a.Warning == AttackWarning.Marked));
             for (int phase = 2; phase <= samurai.PhaseCount; phase++)
                 Assert.IsTrue(samurai.Attacks.Any(a => a.Phases.Count > 0 && a.Phases.Min() == phase), $"phase {phase} brings something new");
+            Assert.IsTrue(samurai.Bursts, "it closes in by rushes");
             foreach (var dash in samurai.Attacks.Where(a => a.Shape == AttackShape.Charge))
             {
                 Assert.Less(dash.Length / dash.Speed, 0.3f, $"{dash.Id} is over in a blink");
                 Assert.GreaterOrEqual(dash.Telegraph, 0.9f, $"{dash.Id} gives a stance long enough to read");
             }
+        }
+
+        // A bursting gait (2026-11-12): it rushes in a sudden dart and then all but stops, a little faster than a walk on
+        // the whole, so the fastest step is several times its walking pace.
+        [Test]
+        public void ABurstingBossClosesInByRushes()
+        {
+            var definition = Bosses.Parse(Bosses.BossesHeader.TrimEnd('\n') + ",gait\n" + "dummy,허수아비,1000,50,0,2,1,,1,3,10,burst\n",
+                Header + "dummy,a,베기,,cone,nearest,1,30,,2,90,,,,,1,1,,\n").Find("dummy");
+            var world = Arena(out var boss, definition);
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -7));
+            var steps = new List<float>();
+            for (int i = 0; i < World.Ticks(0.7f); i++)
+            {
+                var before = boss.Position;
+                world.Step();
+                world.TakeEvents();
+                if (boss.State != BossState.Approach) break;
+                steps.Add(Vec2.Distance(before, boss.Position));
+            }
+            Assert.That(steps.Count, Is.GreaterThan(5));
+            Assert.Greater(steps.Max(), steps.Min() * 8, "a rush and a near stop");
+            Assert.Greater(steps.Max() * World.TicksPerSecond, definition.Speed * 4, "the rush is several times its pace");
         }
     }
 }

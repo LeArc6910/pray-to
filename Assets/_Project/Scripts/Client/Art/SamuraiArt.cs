@@ -2,19 +2,23 @@ using System.Collections.Generic;
 
 namespace Game.Client
 {
-    // What the shrine's samurai is doing, which picks its frame (WorldView.Bosses.cs). Its attacks are iaido: a long,
-    // plain stance with a hand on the hilt (Stance), then the draw too fast to follow (Draw), the blade shaken and put
-    // back (Sheathe); a dash with the blade trailing (Dash), the blade raised overhead (Jodan) and a shout (Kiai).
+    // What the shrine's samurai is doing, which picks its frame (WorldView.Bosses.cs). Its attacks are iaido, in the
+    // order of the art: a long, plain stance with the right hand on the hilt at the left hip (Stance); the draw that is
+    // the cut, the blade leaving the scabbard level at full reach (Draw, nukitsuke); for a cut from above, the blade
+    // raised overhead (Jodan, furikaburi) and brought down (Kiri, kirioroshi); the blood shaken off (Chiburi); the blade
+    // slid back home (Noto). A dash with the blade trailing (Dash) and a shout (Kiai).
     enum SamuraiPose
     {
         Idle,
         Walk,
         Stance,
         Draw,
-        Sheathe,
         Dash,
         Jodan,
         Kiai,
+        Kiri,
+        Chiburi,
+        Noto,
     }
 
     // The samurai of the forgotten shrine (2026-11-12): a ronin in crimson lacquered armour and a straw hat, a katana
@@ -23,8 +27,8 @@ namespace Game.Client
     // their own (a box each per view), the body leans, crouches and lunges.
     static class SamuraiArt
     {
-        public const int Width = 72;
-        public const int Height = 64;
+        public const int Width = 80;
+        public const int Height = 70;
         // How tall the body itself stands, for the name and marks over it.
         public const int BodyHeight = 40;
 
@@ -300,31 +304,98 @@ namespace Game.Client
             return image;
         }
 
-        // The legs of each view (left, top, right, bottom, inclusive), the near or left one first; and where the hand
-        // holds the hilt, from which the blade is drawn.
-        static ((int X0, int Y0, int X1, int Y1) A, (int X0, int Y0, int X1, int Y1) B, (int X, int Y) Hand) Frame(BossView view) => view switch
+        // The legs of each view (left, top, right, bottom, inclusive), the near or left one first; the mouth of the
+        // scabbard at the left hip, where the right hand takes the hilt; and which way the scabbard runs from it
+        // (degrees on the screen, 0 right, 90 up).
+        static ((int X0, int Y0, int X1, int Y1) A, (int X0, int Y0, int X1, int Y1) B, (int X, int Y) Hip, float Scabbard) Frame(BossView view) => view switch
         {
-            BossView.Front => ((12, 30, 18, 37), (21, 30, 28, 37), (22, 22)),
-            BossView.FrontSide => ((13, 29, 19, 38), (20, 29, 26, 33), (25, 21)),
-            BossView.Side => ((15, 30, 18, 40), (19, 30, 21, 40), (25, 18)),
-            BossView.BackSide => ((14, 29, 18, 34), (19, 29, 26, 37), (26, 26)),
-            _ => ((13, 29, 18, 37), (21, 29, 27, 37), (27, 24)),
+            BossView.Front => ((12, 30, 18, 37), (21, 30, 28, 37), (22, 23), -8),
+            BossView.FrontSide => ((13, 29, 19, 38), (20, 29, 26, 33), (25, 22), 200),
+            BossView.Side => ((15, 30, 18, 40), (19, 30, 21, 40), (24, 20), 200),
+            BossView.BackSide => ((14, 29, 18, 34), (19, 29, 26, 37), (25, 26), 190),
+            _ => ((13, 29, 18, 37), (21, 29, 27, 37), (26, 24), 180),
         };
 
-        const int Margin = 16;
-        const int Headroom = 8;
+        const int Margin = 18;
+        const int Headroom = 14;
 
         static readonly Rgba Steel = new Rgba(214, 224, 234);
         static readonly Rgba Edge = Rgba.White;
         static readonly Rgba SteelShade = new Rgba(140, 152, 168);
         static readonly Rgba Guard = new Rgba(212, 170, 72);
         static readonly Rgba Grip = new Rgba(40, 24, 30);
+        static readonly Rgba Skin = new Rgba(222, 180, 132);
+        static readonly Rgba Sleeve = new Rgba(92, 24, 34);
         static readonly Rgba Ink = new Rgba(12, 6, 8);
         static readonly Rgba Glint = new Rgba(255, 250, 220);
 
-        // How a pose moves the legs (step forward, lift), and where the blade is: its angle in degrees (0 ahead, 90 up,
-        // 180 behind; null when sheathed) and how far out of the scabbard (0..1).
-        static (float StepA, float LiftA, float StepB, float LiftB, float? Blade, float Out) MovesOf(SamuraiPose pose, int frame)
+        // Where the sword is in a pose's frame, after iaido (2026-11-12, the person: "draw it from the hip, swing it and
+        // put it away"). The hand's place from the scabbard's mouth (ahead, up, in pixels), the blade's angle (0 ahead, 90
+        // up, 180 behind) and how much of it is out of the scabbard (0 sheathed .. 1). From the side ahead is right.
+        struct Hold
+        {
+            public float Ahead, Up, Angle, Out;
+
+            public Hold(float ahead, float up, float angle, float outOf)
+            {
+                Ahead = ahead;
+                Up = up;
+                Angle = angle;
+                Out = outOf;
+            }
+        }
+
+        static Hold? HoldOf(SamuraiPose pose, int frame, float scabbard)
+        {
+            int f = System.Math.Max(0, frame);
+            float back = scabbard;
+            switch (pose)
+            {
+                case SamuraiPose.Draw:
+                    // Nukitsuke: the hand pulls the hilt forward out of the scabbard, the blade leaving it level and cutting
+                    // across at full reach, then sweeping on and up.
+                    return f switch
+                    {
+                        0 => new Hold(3, 1, 4, 0.55f),
+                        1 => new Hold(10, 2, 2, 1),
+                        _ => new Hold(8, 6, 38, 1),
+                    };
+                case SamuraiPose.Jodan:
+                    // Furikaburi: the blade drawn and raised over the head, higher through the wind-up.
+                    float t = f / 5f;
+                    return new Hold(1 + 2 * t, 9 + 7 * t, 120 + 30 * t, 1);
+                case SamuraiPose.Kiri:
+                    // Kirioroshi: brought down from overhead to the front.
+                    return f switch
+                    {
+                        0 => new Hold(7, 13, 70, 1),
+                        1 => new Hold(10, 4, -25, 1),
+                        _ => new Hold(9, 1, -40, 1),
+                    };
+                case SamuraiPose.Chiburi:
+                    // The blood shaken off: a sharp flick out and down.
+                    return new Hold(9, 3, -55, 1);
+                case SamuraiPose.Noto:
+                    // Noto: the hand back at the hip, the blade laid along the scabbard and slid home, slowly.
+                    // The blade points back along the scabbard, tip first into its mouth.
+                    return f switch
+                    {
+                        0 => new Hold(5, 3, back + 25, 1),
+                        1 => new Hold(2, 1, back, 0.6f),
+                        _ => new Hold(1, 0, back, 0.25f),
+                    };
+                case SamuraiPose.Dash:
+                    // Running in with the hand on the hilt, the blade out and trailing low behind.
+                    return new Hold(4, 1, 195, 1);
+                case SamuraiPose.Kiai:
+                    return new Hold(2, 15 + (f % 2), 100, 1);
+                default:
+                    return null;
+            }
+        }
+
+        // How a pose moves the legs: a step forward and a lift for each.
+        static (float StepA, float LiftA, float StepB, float LiftB) StepsOf(SamuraiPose pose, int frame)
         {
             float t = frame / 5f;
             int f = System.Math.Max(0, frame);
@@ -332,26 +403,27 @@ namespace Game.Client
             {
                 case SamuraiPose.Walk:
                     float step = new[] { 2, 0, -2, 0 }[f % 4];
-                    return (step, f % 4 == 0 ? 2 : 0, -step, f % 4 == 2 ? 2 : 0, null, 0);
+                    return (step, f % 4 == 0 ? 2 : 0, -step, f % 4 == 2 ? 2 : 0);
                 case SamuraiPose.Stance:
-                    // Feet set wide, sinking lower; the blade still in its scabbard.
-                    return (2 + 2 * t, 0, -2 - t, 0, null, 0);
+                    // Feet set wide, the front foot forward, sinking lower.
+                    return (3 + 2 * t, 0, -2 - t, 0);
                 case SamuraiPose.Draw:
-                    // Out and through in one: level at full reach, then rising, then high.
-                    return (4, 0, -3, 0, new[] { -4f, 28, 64 }[System.Math.Min(f, 2)], 1);
-                case SamuraiPose.Sheathe:
-                    // A flick of the blade down (chiburi), then slid home.
-                    return (2, 0, -2, 0, f >= 2 ? (float?)null : new[] { -40f, 200 }[f], f == 1 ? 0.5f : 1);
+                case SamuraiPose.Kiri:
+                    // A long lunge on the front foot.
+                    return (f == 0 ? 4 : 6, 0, -4, 0);
+                case SamuraiPose.Chiburi:
+                    return (4, 0, -3, 0);
+                case SamuraiPose.Noto:
+                    return (3 - f, 0, -2, 0);
                 case SamuraiPose.Dash:
-                    float run = new[] { 4, 0, -4, 0 }[f % 4];
-                    return (run, f % 4 == 0 ? 2 : 0, -run, f % 4 == 2 ? 2 : 0, 192, 1);
+                    float run = new[] { 5, 0, -5, 0 }[f % 4];
+                    return (run, f % 4 == 0 ? 2 : 0, -run, f % 4 == 2 ? 2 : 0);
                 case SamuraiPose.Jodan:
-                    // The blade raised overhead, higher through the wind-up.
-                    return (2, 0, -1, 0, 70 + 30 * t, 1);
+                    return (2, 0, -1 - t, 0);
                 case SamuraiPose.Kiai:
-                    return (1, 0, -1, 0, 80 + 10 * (f % 2), 1);
+                    return (1, 0, -1, 0);
                 default:
-                    return (0, 0, 0, 0, null, 0);
+                    return (0, 0, 0, 0);
             }
         }
 
@@ -359,7 +431,7 @@ namespace Game.Client
         static PixelImage Compose(BossView view, float stepA, float liftA, float stepB, float liftB)
         {
             var image = ViewOf(view);
-            var (a, b, _) = Frame(view);
+            var (a, b, _, _) = Frame(view);
             bool side = view != BossView.Front && view != BossView.Back;
             int w = image.Width, h = image.Height;
             var canvas = new PixelImage(w + 2 * Margin, h + Headroom);
@@ -372,9 +444,7 @@ namespace Game.Client
                 for (int x = 0; x < w; x++)
                 {
                     var c = image[x, y];
-                    if (c.A == 0) continue;
-                    if (In(a, x, y)) continue;
-                    if (In(b, x, y)) continue;
+                    if (c.A == 0 || In(a, x, y) || In(b, x, y)) continue;
                     canvas[x + Margin, y + Headroom] = c;
                 }
             }
@@ -389,27 +459,21 @@ namespace Game.Client
             return canvas;
         }
 
-        // A katana from the hand at an angle (degrees on the screen, 0 right, 90 up): a grip, a gold guard, a long
+        // A katana held at (hx, hy) at an angle (degrees on the screen): a grip back from the hand, a gold guard, a long
         // pale blade with a white edge and a dark outline, as much of it as is out of the scabbard.
         static void Blade(PixelImage image, int hx, int hy, float angle, float outOf, int length)
         {
             double a = angle * System.Math.PI / 180;
             double dx = System.Math.Cos(a), dy = -System.Math.Sin(a);
-            int n = System.Math.Max(3, (int)System.Math.Round(length * outOf));
+            int n = System.Math.Max(2, (int)System.Math.Round(length * outOf));
             var points = new List<(int X, int Y, Rgba C)>();
-            for (int i = -3; i <= n; i++)
+            for (int i = -4; i <= n; i++)
             {
                 int x = hx + (int)System.Math.Round(dx * i), y = hy + (int)System.Math.Round(dy * i);
                 var c = i < 0 ? Grip : i == 0 ? Guard : i >= n - 1 ? Edge : (i % 4 == 1 ? SteelShade : Steel);
                 points.Add((x, y, c));
-                if (i > 0 && i < n - 1)
-                {
-                    // The edge: a white line along one side of the steel.
-                    int ex = x + (int)System.Math.Round(-dy), ey = y + (int)System.Math.Round(dx);
-                    points.Add((ex, ey, Edge));
-                }
+                if (i > 0 && i < n - 1) points.Add((x + (int)System.Math.Round(-dy), y + (int)System.Math.Round(dx), Edge));
             }
-            // The guard is a little bar across the blade.
             for (int s = -1; s <= 1; s += 2) points.Add((hx + (int)System.Math.Round(-dy * s), hy + (int)System.Math.Round(dx * s), Guard));
             foreach (var (x, y, _) in points)
                 for (int oy = -1; oy <= 1; oy++)
@@ -417,15 +481,40 @@ namespace Game.Client
                         if (image.Inside(x + ox, y + oy) && image[x + ox, y + oy].A == 0) image[x + ox, y + oy] = Ink;
             foreach (var (x, y, c) in points)
                 if (image.Inside(x, y)) image[x, y] = c;
+            // The hand round the grip.
+            int gx = hx - (int)System.Math.Round(dx * 2), gy = hy - (int)System.Math.Round(dy * 2);
+            if (image.Inside(gx, gy)) image[gx, gy] = Skin;
+            if (image.Inside(gx + 1, gy)) image[gx + 1, gy] = Skin;
         }
 
-        // One frame. A wind-up (Stance, Jodan) runs frame 0..5 through its telegraph, the draw and the sheathing 0..2,
-        // a walk or a dash 0..3 (and 0..1 breathing at rest); phase 3 tints the armour darker and the eyes of the hat's
-        // shadow red. Faces right; WorldView flips it for the left.
+        // The arm from the shoulder to the hand: a crimson sleeve, two pixels wide, outlined.
+        static void Arm(PixelImage image, int sx, int sy, int hx, int hy)
+        {
+            int steps = System.Math.Max(System.Math.Abs(hx - sx), System.Math.Abs(hy - sy));
+            if (steps < 3) return;
+            var points = new List<(int X, int Y)>();
+            for (int i = 0; i <= steps; i++)
+            {
+                int x = sx + (hx - sx) * i / steps, y = sy + (hy - sy) * i / steps;
+                points.Add((x, y));
+                points.Add((x, y + 1));
+            }
+            foreach (var (x, y) in points)
+                for (int oy = -1; oy <= 1; oy++)
+                    for (int ox = -1; ox <= 1; ox++)
+                        if (image.Inside(x + ox, y + oy) && image[x + ox, y + oy].A == 0) image[x + ox, y + oy] = Ink;
+            foreach (var (x, y) in points)
+                if (image.Inside(x, y)) image[x, y] = Sleeve;
+        }
+
+        // One frame. A wind-up (Stance, Jodan) runs frame 0..5 through its telegraph; a cut (Draw, Kiri) and the
+        // sheathing (Noto) 0..2; a walk or a dash 0..3 (and 0..1 breathing at rest); phase 3 darkens the armour. Faces
+        // right; WorldView flips it for the left.
         public static PixelImage Draw(BossView view, SamuraiPose pose, int frame, int phase)
         {
-            var (stepA, liftA, stepB, liftB, blade, outOf) = MovesOf(pose, frame);
+            var (stepA, liftA, stepB, liftB) = StepsOf(pose, frame);
             var body = Compose(view, stepA, liftA, stepB, liftB);
+            var (_, _, hip, scabbard) = Frame(view);
             bool side = view != BossView.Front && view != BossView.Back;
             float t = frame / 5f;
             float lean = 0, stretch = 0;
@@ -440,24 +529,29 @@ namespace Game.Client
                     break;
                 case SamuraiPose.Stance:
                     // Low and still, leaning in over the hilt: the longer it holds, the lower.
-                    lean = 2 + 2 * t;
-                    stretch = -0.06f - 0.1f * t;
+                    lean = 3 + 2 * t;
+                    stretch = -0.08f - 0.1f * t;
                     break;
                 case SamuraiPose.Draw:
-                    lean = new[] { 7, 5, 2 }[System.Math.Min(frame, 2)];
-                    stretch = new[] { -0.14f, -0.06f, 0.02f }[System.Math.Min(frame, 2)];
+                case SamuraiPose.Kiri:
+                    lean = new[] { 6, 8, 5 }[System.Math.Min(frame, 2)];
+                    stretch = new[] { -0.16f, -0.12f, -0.06f }[System.Math.Min(frame, 2)];
                     break;
-                case SamuraiPose.Sheathe:
-                    lean = 1;
-                    stretch = -0.03f;
+                case SamuraiPose.Chiburi:
+                    lean = 4;
+                    stretch = -0.08f;
+                    break;
+                case SamuraiPose.Noto:
+                    lean = 2 - frame;
+                    stretch = -0.04f + 0.02f * frame;
                     break;
                 case SamuraiPose.Dash:
-                    lean = 9;
-                    stretch = -0.16f;
+                    lean = 10;
+                    stretch = -0.18f;
                     break;
                 case SamuraiPose.Jodan:
                     lean = -1 - t;
-                    stretch = 0.03f + 0.04f * t;
+                    stretch = 0.02f + 0.04f * t;
                     break;
                 case SamuraiPose.Kiai:
                     lean = -3;
@@ -476,8 +570,13 @@ namespace Game.Client
             var image = new PixelImage(Width, Height);
             int left = (Width - wide) / 2;
             int ground = Height - 1;
-            var hand = Frame(view).Hand;
-            int handX = 0, handY = 0;
+            // Where a picture point lands once leaned and squashed.
+            (int X, int Y) Place(int x, int y)
+            {
+                int row = ground - (tall - 1) + (y + Headroom) * tall / h;
+                float up = (ground - row) / (float)(tall - 1);
+                return (left + (int)System.Math.Round((x + Margin) * wide / (float)w + lean * up), row);
+            }
             for (int y = 0; y < tall; y++)
             {
                 int row = ground - (tall - 1 - y);
@@ -485,11 +584,6 @@ namespace Game.Client
                 int sy = y * h / tall;
                 float up = (tall - 1 - y) / (float)(tall - 1);
                 int shift = (int)System.Math.Round(lean * up);
-                if (sy == hand.Y + Headroom)
-                {
-                    handX = left + (int)System.Math.Round((hand.X + Margin) * wide / (float)w) + shift;
-                    handY = row;
-                }
                 for (int x = 0; x < wide; x++)
                 {
                     var c = body[x * w / wide, sy];
@@ -499,34 +593,43 @@ namespace Game.Client
                     if (image.Inside(px, row)) image[px, row] = c;
                 }
             }
-            if (blade is float angle)
+
+            var mouth = Place(hip.X, hip.Y);
+            if (HoldOf(pose, frame, scabbard) is Hold grip)
             {
-                // From the side ahead is right; from the front ahead is toward the viewer (down and a little aside),
-                // from behind away (up); the blade is drawn behind the body seen from the back.
-                float screen = side ? angle : view == BossView.Front ? -60 + angle * 1.2f : 110 - angle * 0.4f;
+                // From the side ahead is right; from the front ahead is toward the viewer (down and a little aside), from
+                // behind away (up). The hand moves with the grip; the arm reaches to it from the shoulder.
+                float ahead = grip.Ahead, upward = grip.Up;
+                int hx = side ? mouth.X + (int)System.Math.Round(ahead) : mouth.X + (int)System.Math.Round(ahead * 0.35f);
+                int hy = mouth.Y - (int)System.Math.Round(upward) + (side ? 0 : view == BossView.Front ? (int)System.Math.Round(ahead * 0.4f) : -(int)System.Math.Round(ahead * 0.3f));
+                float angle = side ? grip.Angle : view == BossView.Front ? -70 + grip.Angle * 0.9f : 110 - grip.Angle * 0.4f;
                 int length = side ? 26 : 22;
+                var shoulder = Place(hip.X - (side ? 2 : -2), hip.Y - 9);
                 if (view == BossView.Back)
                 {
                     var front = image.Copy();
                     image = new PixelImage(Width, Height);
-                    Blade(image, handX, handY, screen, outOf, length);
+                    Blade(image, hx, hy, angle, grip.Out, length);
                     image.Draw(front, 0, 0);
                 }
                 else
                 {
-                    Blade(image, handX, handY, screen, outOf, length);
+                    if (System.Math.Abs(hx - mouth.X) + System.Math.Abs(hy - mouth.Y) > 4) Arm(image, shoulder.X, shoulder.Y, hx, hy);
+                    Blade(image, hx, hy, angle, grip.Out, length);
                 }
             }
-            else if (pose == SamuraiPose.Stance && frame >= 2)
+            else if (pose == SamuraiPose.Stance && frame >= 1)
             {
-                // The hilt catching the light, brighter as the draw nears.
-                image[handX, handY - 1] = Glint;
-                if (frame >= 4)
+                // Koiguchi: the thumb eases the guard from the scabbard, which catches the light, brighter as the draw
+                // nears.
+                image[mouth.X, mouth.Y - 1] = Glint;
+                if (frame >= 3)
                 {
-                    image[handX - 1, handY - 1] = Glint;
-                    image[handX + 1, handY - 1] = Glint;
-                    image[handX, handY - 2] = Glint;
+                    image[mouth.X - 1, mouth.Y - 1] = Glint;
+                    image[mouth.X + 1, mouth.Y - 1] = Glint;
+                    image[mouth.X, mouth.Y - 2] = Glint;
                 }
+                if (frame >= 5) image[mouth.X, mouth.Y] = Glint;
             }
             return image;
         }
