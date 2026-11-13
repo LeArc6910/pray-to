@@ -111,6 +111,63 @@ namespace Game.Client
             return image.Outlined(new Rgba(90, 24, 48, 150));
         }
 
+        // The line a cut leaves (2026-11-13, the samurai): not a bar but a blade of light, a point at each end and full in
+        // the middle, bowed a little like the katana that made it; a white core, a pale steel-blue body and a blush of
+        // blossom pink at its edges, in its own colours (not tinted). Drawn along +x, as long as asked.
+        public static PixelImage Slash(int length)
+        {
+            const int half = 4;
+            float bow = Math.Min(3, length / 28f);
+            var image = new PixelImage(length, 2 * half + 1 + (int)Math.Ceiling(bow));
+            for (int x = 0; x < length; x++)
+            {
+                float t = (x + 0.5f) / length;
+                // Fat through the middle, drawn out to a point at each end.
+                float wide = half * (float)Math.Pow(Math.Sin(Math.PI * t), 0.55);
+                float middle = half + bow * (1 - (float)Math.Sin(Math.PI * t));
+                for (int y = 0; y < image.Height; y++)
+                {
+                    float off = Math.Abs(y - middle);
+                    if (off > wide + 0.35f) continue;
+                    image[x, y] = SlashColour(wide < 0.01f ? 0 : off / Math.Max(1, wide), wide, x, y);
+                }
+            }
+            return image;
+        }
+
+        // The same blade of light bent round an arc: a sweep across the front (a wedge) or right round (a turn). The arc
+        // is centred on +x from the middle of the picture, so many degrees wide, its radius in pixels.
+        public static PixelImage SlashArc(int radius, int degrees)
+        {
+            const int half = 4;
+            int size = 2 * (radius + half) + 2;
+            var image = new PixelImage(size, size);
+            float centre = size / 2f, span = degrees / 2f;
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float u = x + 0.5f - centre, v = centre - (y + 0.5f);
+                    float angle = (float)(Math.Atan2(v, u) * 180 / Math.PI);
+                    if (Math.Abs(angle) > span) continue;
+                    float wide = half * (float)Math.Pow(Math.Cos(angle / span * Math.PI / 2), 0.55);
+                    float off = Math.Abs((float)Math.Sqrt(u * u + v * v) - radius);
+                    if (off > wide + 0.35f) continue;
+                    image[x, y] = SlashColour(off / Math.Max(1, wide), wide, x, y);
+                }
+            }
+            return image;
+        }
+
+        // Across a cut's line: white at its heart, then pale steel, then blossom, the outermost pixels thinned out.
+        static Rgba SlashColour(float across, float wide, int x, int y)
+        {
+            if (across < 0.3f || wide < 1.2f) return Rgba.White;
+            if (across < 0.62f) return new Rgba(206, 226, 250);
+            if (across < 0.9f) return new Rgba(255, 176, 206, 230);
+            return ((x + y) & 1) == 0 ? new Rgba(255, 150, 190, 150) : Rgba.Clear;
+        }
+
         // A rock in flight or falling (the vein eater's throws and cave-in, 2026-11-12), drawn in its own colours.
         public static PixelImage Rock(int size)
         {

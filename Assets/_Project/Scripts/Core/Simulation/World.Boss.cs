@@ -284,7 +284,7 @@ namespace Game.Core
         }
 
         // How much of its telegraph a charge's later runs take.
-        const float AgainTelegraph = 0.5f;
+        public const float AgainTelegraph = 0.5f;
 
         // Where a burrow or leap aimed at a spot can come down: on open ground inside the arena.
         Vec2 LandingFor(Boss boss, Vec2 spot)

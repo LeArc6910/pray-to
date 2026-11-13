@@ -47,10 +47,16 @@ namespace Game.Client
         {
             Kind.Swing => (point * 3.3f, 8, 4),
             Kind.Strike => (point * 3.3f, 20, 6),
-            Kind.Instant => (1000, 20, 4),
+            // The feet's line may move as far as the lunge carries the body: seen from the front the samurai's draw now
+            // truly comes at the viewer (2026-11-13; before, that view only squashed the body where it stood).
+            Kind.Instant => (1000, 20, 8),
             Kind.Air => (16, 16, 16),
             _ => (point, 6, 4),
         };
+
+        // A pixel of a frame over the ground: as the game shows it, a half-clear pixel (the fading arc of a cut) lets the
+        // ground through.
+        static Rgba Over(Rgba ground, Rgba c) => c.A == 255 ? c : c.A == 0 ? ground : ground.Mix(c.WithAlpha(255), c.A / 255f);
 
         public static int Write(string folder, string name, string[] rowNames, List<Step>[] rows, PixelImage arena, int width, int height, float point)
         {
@@ -86,7 +92,7 @@ namespace Game.Client
                             for (int x = 0; x < cellWidth; x++)
                             {
                                 var c = image[x / scale, y / scale];
-                                pixels[(r * cellHeight + y) * gifWidth + column * cellWidth + x] = c.A > 0 ? c : arena[x / scale % arena.Width, y / scale % arena.Height];
+                                pixels[(r * cellHeight + y) * gifWidth + column * cellWidth + x] = Over(arena[x / scale % arena.Width, y / scale % arena.Height], c);
                             }
                     }
                 }
@@ -113,7 +119,7 @@ namespace Game.Client
                                 var c = image[x, y];
                                 var ground = arena[x % arena.Width, y % arena.Height];
                                 if (c.A == 0 && before != null && before[x, y].A > 0) c = ground.Mix(new Rgba(120, 200, 255), 0.35f);
-                                strip[k * width + x, v * height + y] = c.A > 0 ? c : ground;
+                                strip[k * width + x, v * height + y] = Over(ground, c);
                             }
                     }
                 }

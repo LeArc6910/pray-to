@@ -331,6 +331,8 @@ namespace Game.Client
             }
             // Drawn in their own colours, not tinted: the samurai's warning sign, rocks and cherry blossom (2026-11-12).
             images.Add(new List<PixelImage> { EffectArt.WarningSign(), EffectArt.Rock(7), EffectArt.Rock(13), EffectArt.Petal(0), EffectArt.Petal(1), EffectArt.Petal(2) });
+            // The lines the samurai's cuts leave (2026-11-13): straight, and bent round a wedge.
+            images.Add(new List<PixelImage> { EffectArt.Slash(32), EffectArt.Slash(96), EffectArt.SlashArc(44, 150) });
             const int gap = 4;
             int width = images.Max(row => row.Sum(image => image.Width + gap)) + gap;
             int height = images.Sum(row => row.Max(image => image.Height) + gap) + gap;

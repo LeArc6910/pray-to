@@ -29,6 +29,8 @@ namespace Game.Client
             public SpriteRenderer Shape;
             // The same sprite in white over the shape, for flashes: hit, winding up, charging.
             public SpriteRenderer Glow;
+            // Makes the white picture of the frame just set, when the animation leaves it until it is shown (WhiteOf).
+            public System.Func<Sprite> White;
             public SpriteRenderer Shadow;
             // A player's weapon in hand, and which one it shows.
             public SpriteRenderer Weapon;
@@ -81,6 +83,8 @@ namespace Game.Client
             // (WorldView.Bosses.cs).
             public BossAttack BossAttack;
             public float BossSince;
+            // Winding up straight out of a charge to charge again (a chain of dashes), in less time.
+            public bool BossAgain;
             public int BossPhase;
             public SpriteRenderer Sign;
             public SpriteRenderer Mound;
@@ -95,6 +99,13 @@ namespace Game.Client
             public float EchoAt;
             public int Echoes;
             public bool Vanished;
+            // Where its last afterimage was left (they are spaced by distance, not by time), and whether it is leaving
+            // them now; where the mouth of its scabbard is from its middle; and whether the guard has glinted before
+            // this draw.
+            public Vector3 EchoFrom;
+            public bool Echoing;
+            public Vector3 Hip;
+            public bool Glinted;
             // The black knight's last walking frame, for a thud as each foot comes down (WorldView.Knight.cs).
             public int KnightStep = -1;
             public EnemyState EnemyState;
@@ -225,6 +236,10 @@ namespace Game.Client
             public float Phase;
             public bool Tumble;
             public bool LateFade;
+            // The line of a cut (2026-11-13, the samurai) stays whole a moment and then closes to nothing across its
+            // width, from the size it was made at.
+            public bool Thin;
+            public Vector3 Scale;
         }
 
         // Where a body was and what colour it was, kept for the frame it is removed in: its death event comes after.
@@ -2633,6 +2648,7 @@ namespace Game.Client
             body.Shape.sortingOrder = order;
             body.Glow.transform.localScale = body.Shape.transform.localScale;
             body.Glow.color = dead ? Color.clear : body.FlashTime > 0 ? HitFlash : glow;
+            if (body.Glow.color.a > 0) WhiteOf(body);
             body.Glow.sortingOrder = order + 1;
             body.Shadow.enabled = !dead;
 
@@ -2982,6 +2998,7 @@ namespace Game.Client
                     scale.x = scale.y * Mathf.Max(0.2f, Mathf.Abs(Mathf.Cos(bit.Age * 7 + bit.Phase)));
                     place.localScale = scale;
                 }
+                if (bit.Thin) place.localScale = new Vector3(bit.Scale.x, bit.Scale.y * Mathf.Clamp01((1 - bit.Age / bit.Life) * 1.8f), 1);
                 var color = bit.Color;
                 // Fading from the alpha it started with (a faint flash stays faint); a petal only over its last third.
                 float left = 1 - bit.Age / bit.Life;

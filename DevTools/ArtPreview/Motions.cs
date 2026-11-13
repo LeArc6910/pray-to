@@ -1084,9 +1084,10 @@ namespace Game.Client
         static float Distance(float x, float y) => (float)System.Math.Sqrt(x * x + y * y);
 
         // The shrine samurai's motions (2026-11-13, SamuraiArt), each as WorldView plays it (AnimateSamurai): walk; the
-        // iaido draw (stance, slow pull, the cut, the blood shaken off, home); the dash and draw; the cut from overhead;
-        // the shout. Written with every frame in strips and a continuity report (MotionCheck): the hand and the blade's
-        // tip are tracked.
+        // iaido draw (stance, slow pull, the cut, the blood shaken off, home); the dash and the cut swept round out of
+        // it; a chain of dashes; the cut from overhead; the draw turned right round; the dart between attacks; the shout. Each is shown facing right and facing the viewer just as the game shows
+        // it (SamuraiArt.Facing: the trunk turned by the frame's twist, the blade kept on its aim). Written with every
+        // frame in strips and a continuity report (MotionCheck): the hand and the blade's tip are tracked.
         static void Samurai(string folder, PixelImage arena)
         {
             MotionCheck.Step S(SamuraiPose pose, int frame, float seconds, MotionCheck.Kind kind = MotionCheck.Kind.Normal)
@@ -1096,7 +1097,12 @@ namespace Game.Client
                 {
                     Label = $"{pose}{frame}", Seconds = seconds, Kind = kind,
                     SideView = twist < 0 ? BossView.BackSide : twist > 0 ? BossView.FrontSide : BossView.Side,
-                    Draw = view => SamuraiArt.Draw(view, pose, frame, 1),
+                    Draw = view =>
+                    {
+                        var (turned, mirrored, aim) = SamuraiArt.Facing(view == BossView.Front ? 6 : 0, pose, frame);
+                        var image = SamuraiArt.Draw(turned, pose, frame, 1, aim);
+                        return mirrored ? image.FlippedX() : image;
+                    },
                     Measure = view =>
                     {
                         var j = SamuraiArt.JointsOf(view, pose, frame);
@@ -1111,17 +1117,31 @@ namespace Game.Client
                     .Concat(Enumerable.Range(0, SamuraiArt.FramesOf(SamuraiPose.Chiburi)).Select(f => S(SamuraiPose.Chiburi, f, SamuraiArt.FrameSeconds(SamuraiPose.Chiburi, f), f == 2 ? MotionCheck.Kind.Swing : MotionCheck.Kind.Normal)))
                     .Concat(Enumerable.Range(0, SamuraiArt.FramesOf(SamuraiPose.Noto)).Select(f => S(SamuraiPose.Noto, f, SamuraiArt.FrameSeconds(SamuraiPose.Noto, f), f < SamuraiArt.NotoHome + 1 ? MotionCheck.Kind.Swing : MotionCheck.Kind.Normal)));
             var rest = new[] { S(SamuraiPose.Idle, 0, 0.4f) };
+            // Pulling up out of a dart: the body straightens at once.
+            var halt = new[] { S(SamuraiPose.Idle, 0, 0.4f, MotionCheck.Kind.Strike) };
+            // The telegraphs at the speed of the plain draw (0.9 s: the stance over its first 60%, the pull over the rest)
+            // and of the cross (1.0 s: stance 20%, pull 15%, the blade raised over the rest).
+            int stance = SamuraiArt.FramesOf(SamuraiPose.Stance), pull = SamuraiArt.FramesOf(SamuraiPose.Pull), jodan = SamuraiArt.FramesOf(SamuraiPose.Jodan);
             var rows = new[]
             {
                 Run(SamuraiPose.Walk, 0.07f).Concat(Run(SamuraiPose.Walk, 0.07f)),
-                rest.Concat(Run(SamuraiPose.Stance, 0.05f)).Concat(Run(SamuraiPose.Pull, 0.05f)).Concat(Cut(SamuraiPose.Draw)).Concat(rest),
-                rest.Concat(Run(SamuraiPose.Stance, 0.05f)).Concat(new[] { S(SamuraiPose.Dash, 0, 0.03f, MotionCheck.Kind.Strike) })
-                    .Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Dash, f, 0.03f))).Concat(new[] { S(SamuraiPose.Draw, 0, 0.03f, MotionCheck.Kind.Cut) })
-                    .Concat(Cut(SamuraiPose.Draw).Skip(1)).Concat(rest),
-                rest.Concat(Run(SamuraiPose.Stance, 0.03f)).Concat(Run(SamuraiPose.Pull, 0.03f)).Concat(Run(SamuraiPose.Jodan, 0.035f)).Concat(Cut(SamuraiPose.Kiri)).Concat(rest),
-                rest.Concat(Run(SamuraiPose.Kiai, 0.04f)).Concat(Enumerable.Range(SamuraiArt.KiaiRise, 4).Select(f => S(SamuraiPose.Kiai, f, 0.12f))),
+                rest.Concat(Run(SamuraiPose.Stance, 0.54f / stance)).Concat(Run(SamuraiPose.Pull, 0.36f / pull)).Concat(Cut(SamuraiPose.Draw)).Concat(rest),
+                rest.Concat(Run(SamuraiPose.Stance, 0.54f / stance)).Concat(Run(SamuraiPose.Pull, 0.36f / pull)).Concat(new[] { S(SamuraiPose.Dash, 0, 0.03f, MotionCheck.Kind.Strike) })
+                    .Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Dash, f, 0.03f))).Concat(Cut(SamuraiPose.Sweep)).Concat(rest),
+                // A chain of dashes (the triple draw, two of its runs): out of the first the blade goes home in a flash
+                // and is eased out again over the shorter wind-up (0.45 s), then the second run and its cut.
+                rest.Concat(Run(SamuraiPose.Stance, 0.54f / stance)).Concat(Run(SamuraiPose.Pull, 0.36f / pull)).Concat(new[] { S(SamuraiPose.Dash, 0, 0.03f, MotionCheck.Kind.Strike) })
+                    .Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Dash, f, 0.03f)))
+                    .Concat(Enumerable.Range(0, SamuraiArt.FramesOf(SamuraiPose.Again)).Select(f => S(SamuraiPose.Again, f, SamuraiArt.FrameSeconds(SamuraiPose.Again, f), f == 0 ? MotionCheck.Kind.Strike : MotionCheck.Kind.Swing)))
+                    .Concat(Run(SamuraiPose.Pull, (0.45f - SamuraiArt.AgainSeconds) / pull)).Concat(new[] { S(SamuraiPose.Dash, 0, 0.03f, MotionCheck.Kind.Strike) })
+                    .Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Dash, f, 0.03f))).Concat(Cut(SamuraiPose.Sweep)).Concat(rest),
+                rest.Concat(Run(SamuraiPose.Stance, 0.2f / stance)).Concat(Run(SamuraiPose.Pull, 0.15f / pull)).Concat(Run(SamuraiPose.Jodan, 0.65f / jodan)).Concat(Cut(SamuraiPose.Kiri)).Concat(rest),
+                rest.Concat(Run(SamuraiPose.Stance, 0.54f / stance)).Concat(Run(SamuraiPose.Pull, 0.36f / pull)).Concat(Cut(SamuraiPose.Whirl)).Concat(rest),
+                rest.Concat(new[] { S(SamuraiPose.Rush, 0, 0.03f, MotionCheck.Kind.Strike) }).Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Rush, f, 0.03f))).Concat(halt)
+                    .Concat(new[] { S(SamuraiPose.Rush, 0, 0.03f, MotionCheck.Kind.Strike) }).Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Rush, f, 0.03f))).Concat(halt),
+                rest.Concat(Enumerable.Range(0, SamuraiArt.KiaiRise).Select(f => S(SamuraiPose.Kiai, f, 0.035f))).Concat(Enumerable.Range(SamuraiArt.KiaiRise, 4).Select(f => S(SamuraiPose.Kiai, f, 0.12f))),
             };
-            MotionCheck.Write(folder, "samurai", new[] { "walk", "iai", "dash", "kiri", "kiai" }, rows.Select(r => r.ToList()).ToArray(), arena,
+            MotionCheck.Write(folder, "samurai", new[] { "walk", "iai", "dash", "chain", "kiri", "whirl", "rush", "kiai" }, rows.Select(r => r.ToList()).ToArray(), arena,
                 SamuraiArt.Width, SamuraiArt.Height, 7);
         }
 
