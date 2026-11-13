@@ -14,104 +14,120 @@ namespace Game.Client
         static readonly Color CrackColor = new Color(0.06f, 0.04f, 0.04f, 0.9f);
         static readonly Color SparkColor = new Color(1f, 0.82f, 0.5f);
 
-        // The blow's frames once its telegraph ends: the swing too fast to see, the impact, held in the floor, hauled out.
-        const float KnightSmear = 0.05f;
-        const float KnightImpact = 0.17f;
-        const float KnightHeld = 0.6f;
-        const float KnightHauled = 0.95f;
         // How far through a leap's telegraph it springs up and away.
         const float KnightSpring = 0.55f;
 
         // A sweep is a wide cone; a narrower one is brought down from overhead.
         static bool Sweeps(BossAttack attack) => attack.Shape == AttackShape.Cone && attack.Angle >= 120;
 
-        // Its pose from what it is doing: a wind-up of its own for each kind of blow, run through the telegraph in six
-        // steps, and the blow in four frames after it.
+        // The blow that follows a wind-up: a sweep, a smash ahead (and the shockwave, which starts from one), or the hammer
+        // pounded at its feet (everything else).
+        static KnightPose BlowOf(BossAttack attack) => attack.Shape switch
+        {
+            AttackShape.Cone when Sweeps(attack) => KnightPose.Sweep,
+            AttackShape.Cone or AttackShape.Trail => KnightPose.Smash,
+            _ => KnightPose.Pound,
+        };
+
+        // Its pose from what it is doing (2026-11-13, more frames: KnightArt.FramesOf). A wind-up runs through its
+        // telegraph, and the blow's swing frames fill the telegraph's last moment so the hammer meets the floor as the
+        // mark lands; after it, each frame of the blow for its own time (KnightArt.FrameSeconds), then rest.
         void AnimateKnight(Body body, Vec2 facing, bool dead, bool moving)
         {
             var attack = body.BossAttack;
             float since = Time.time - body.BossSince;
             int sector = SectorOf(facing);
             var pose = KnightPose.Idle;
-            int frame = Mathf.FloorToInt(Time.time * 1.2f) % 2;
+            int frame = Mathf.FloorToInt(Time.time * 2.4f) % KnightArt.FramesOf(KnightPose.Idle);
             body.Shape.color = Color.white;
+            int Through(KnightPose p, float progress) => Mathf.Clamp(Mathf.FloorToInt(progress * KnightArt.FramesOf(p)), 0, KnightArt.FramesOf(p) - 1);
             if (dead)
             {
                 frame = 0;
             }
             else if (body.BossState == BossState.Roar)
             {
+                // The hammer lifted overhead, then shaking there.
                 pose = KnightPose.Roar;
-                frame = Mathf.FloorToInt(Time.time * 6) % 2;
+                int rise = Mathf.FloorToInt(since / 0.08f);
+                frame = rise < KnightArt.RoarRise ? rise : KnightArt.RoarRise + Mathf.FloorToInt(Time.time * 10) % 4;
             }
             else if (body.BossState == BossState.Charge)
             {
                 pose = KnightPose.Charge;
-                frame = Mathf.FloorToInt(Time.time * 10) % 4;
+                frame = Mathf.FloorToInt(Time.time * 20) % KnightArt.FramesOf(pose);
             }
             else if (moving && (body.BossState == BossState.Approach || body.BossState == BossState.Recover || body.BossState == BossState.Dormant))
             {
-                // A step a foot about every fifth of a tile: slow, heavy.
+                // A stride each way about every tile: slow, heavy.
                 pose = KnightPose.Walk;
-                frame = Mathf.FloorToInt(body.Walked * 4.5f) % 4;
+                frame = Mathf.FloorToInt(body.Walked * 9) % KnightArt.FramesOf(pose);
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
                 float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
-                frame = Mathf.Min(5, Mathf.FloorToInt(progress * 6));
                 switch (attack.Shape)
                 {
-                    case AttackShape.Cone when Sweeps(attack):
-                        pose = KnightPose.Wind;
-                        break;
                     case AttackShape.Charge:
-                        pose = KnightPose.Brace;
+                        (pose, frame) = (KnightPose.Brace, Through(KnightPose.Brace, progress));
                         break;
                     case AttackShape.Leap:
                         // A deep crouch, then up and out of sight; it lands where the mark is.
-                        if (progress < KnightSpring) (pose, frame) = (KnightPose.Crouch, Mathf.Min(5, Mathf.FloorToInt(progress / KnightSpring * 6)));
+                        if (progress < KnightSpring) (pose, frame) = (KnightPose.Crouch, Through(KnightPose.Crouch, progress / KnightSpring));
                         else
                         {
                             pose = KnightPose.Leap;
-                            frame = Mathf.Min(3, Mathf.FloorToInt((progress - KnightSpring) / 0.12f));
+                            frame = Through(KnightPose.Leap, (progress - KnightSpring) / 0.3f);
                             body.Shape.color = new Color(1, 1, 1, Mathf.Clamp01(1 - (progress - KnightSpring - 0.3f) * 6));
                         }
                         break;
                     default:
-                        // Every other blow: the hammer hauled up overhead, slowly.
-                        pose = KnightPose.Raise;
+                    {
+                        // Hauled up overhead (or drawn back for a sweep), slowly; then the swing in its last moment.
+                        var blow = BlowOf(attack);
+                        var windUp = blow == KnightPose.Sweep ? KnightPose.Wind : KnightPose.Raise;
+                        int strike = KnightArt.StrikeFrame(blow);
+                        float swing = strike * KnightArt.FrameSeconds(blow, 0);
+                        float wound = 1 - Mathf.Min(0.5f, swing / Mathf.Max(0.1f, attack.Telegraph));
+                        if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
+                        else (pose, frame) = (blow, Mathf.Min(strike - 1, Mathf.FloorToInt((progress - wound) * attack.Telegraph / KnightArt.FrameSeconds(blow, 0))));
                         break;
+                    }
                 }
             }
-            else if (body.BossState == BossState.Recover && attack != null && since < KnightHauled)
+            else if (body.BossState == BossState.Recover && attack != null)
             {
-                pose = attack.Shape switch
+                if (attack.Shape == AttackShape.Charge)
                 {
-                    AttackShape.Cone when Sweeps(attack) => KnightPose.Sweep,
-                    AttackShape.Cone or AttackShape.Trail => KnightPose.Smash,
-                    AttackShape.Charge => KnightPose.Brace,
-                    _ => KnightPose.Pound,
-                };
-                frame = since < KnightSmear ? 0 : since < KnightImpact ? 1 : since < KnightHeld ? 2 : 3;
-                if (pose == KnightPose.Brace) frame = 0;
+                    // Out of the run: straightening up again.
+                    int back = KnightArt.FramesOf(KnightPose.Brace) - 1 - Mathf.FloorToInt(since / 0.07f);
+                    if (back >= 0) (pose, frame) = (KnightPose.Brace, back);
+                }
+                else
+                {
+                    // From the strike on, each frame for its own time; a leap lands straight into the strike.
+                    var blow = attack.Shape == AttackShape.Leap ? KnightPose.Pound : BlowOf(attack);
+                    float left = since;
+                    for (int f = KnightArt.StrikeFrame(blow); f < KnightArt.FramesOf(blow); f++)
+                    {
+                        left -= KnightArt.FrameSeconds(blow, f);
+                        if (left >= 0) continue;
+                        (pose, frame) = (blow, f);
+                        break;
+                    }
+                }
             }
 
-            // The body turns with the blow: away from the viewer as the hammer goes back, round toward the viewer as a
-            // sweep comes across.
-            int twist = pose switch
-            {
-                KnightPose.Raise or KnightPose.Wind => frame >= 2 ? -1 : 0,
-                KnightPose.Sweep => frame <= 1 ? 1 : 0,
-                _ => 0,
-            };
-            sector = Twist(sector, twist);
+            // The body turns with the motion: away from the viewer as the hammer goes back, round toward the viewer as a
+            // sweep comes across (KnightArt.TwistOf).
+            sector = Twist(sector, KnightArt.TwistOf(pose, frame));
 
             var (view, turned) = BossSectors[sector];
             int phase = Mathf.Clamp(body.BossPhase, 1, 3);
-            int code = 500000 + ((((int)pose * 8 + (int)view) * 8 + frame) * 4 + phase) * 2 + (turned ? 1 : 0);
+            int code = 500000 + ((((int)pose * 8 + (int)view) * 64 + frame) * 4 + phase) * 2 + (turned ? 1 : 0);
             if (code == body.Frame) return;
-            // A foot coming down on a heavy step.
-            if (pose == KnightPose.Walk && (frame == 1 || frame == 3) && body.KnightStep != frame) Thud(body, 0.07f, 0.5f);
+            // A foot coming down on a heavy step (frames 2 and 6 of the stride).
+            if (pose == KnightPose.Walk && (frame == 2 || frame == 6) && body.KnightStep != frame) Thud(body, 0.07f, 0.5f);
             body.KnightStep = pose == KnightPose.Walk ? frame : -1;
             // The swing begins: a heavy whoosh.
             if ((pose == KnightPose.Smash || pose == KnightPose.Sweep || pose == KnightPose.Pound) && frame == 0) Hear(Sound.Heavy, body.Position, 1);

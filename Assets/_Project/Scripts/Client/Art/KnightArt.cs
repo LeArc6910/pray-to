@@ -508,171 +508,282 @@ namespace Game.Client
             public float Foreshorten;
         }
 
+        // ---- The frames (2026-11-13, the person: "more frames, so the motion is natural; check every frame's body, the
+        // hammer's place and way, and that it follows on from the frames either side"). Wind-ups and loops are a few key
+        // poses eased into each other; each blow is laid out frame by frame. Every motion starts from and comes back to
+        // the same rest (the hammer's head on the floor behind it, as it drags it walking), and the hammer's angle runs
+        // on through each motion without jumping (from behind, up over the shoulder, overhead, down ahead, and dragged
+        // back along the floor: -150, -205, -384, -510 are the same turns of one way round). ----
+
+        // How many frames each pose has: a wind-up through its telegraph, a blow through its swing and recovery, a loop.
+        public static int FramesOf(KnightPose pose) => pose switch
+        {
+            KnightPose.Idle => 4,
+            KnightPose.Walk => 8,
+            KnightPose.Raise => 12,
+            KnightPose.Wind => 12,
+            KnightPose.Smash => SmashFrames.Length,
+            KnightPose.Pound => PoundFrames.Length,
+            KnightPose.Sweep => SweepFrames.Length,
+            KnightPose.Brace => 8,
+            KnightPose.Charge => 8,
+            KnightPose.Crouch => 8,
+            KnightPose.Leap => 14,
+            KnightPose.Roar => RoarRise + 4,
+            _ => 4,
+        };
+
+        // A blow's frames come in stages, each frame shown for its stage's time: the swing (too fast to see, a smear
+        // behind it), the strike, the rebound, held in the floor, hauled out, dragged back to rest.
+        enum Stage : byte
+        {
+            Swing,
+            Strike,
+            Rebound,
+            Held,
+            Haul,
+            // Dragged back to rest in two halves joined without a stop: speeding up to where the hammer swings past
+            // beside it (shortened, pointing at the viewer, so its head does not sink into the floor), slowing to rest.
+            DragStart,
+            Drag,
+        }
+
+        static float StageSeconds(Stage stage) => stage switch
+        {
+            Stage.Swing => 0.03f,
+            Stage.Strike => 0.1f,
+            Stage.Rebound => 0.1f,
+            Stage.Held => 0.125f,
+            Stage.Haul => 0.1f,
+            _ => 0.075f,
+        };
+
+        static Stage[] StagesOf(KnightPose pose) => pose == KnightPose.Smash ? SmashStages : pose == KnightPose.Pound ? PoundStages : pose == KnightPose.Sweep ? SweepStages : null;
+
+        // How long a blow's frame is shown (seconds); 0 for anything else.
+        public static float FrameSeconds(KnightPose pose, int frame)
+        {
+            var stages = StagesOf(pose);
+            return stages == null ? 0 : StageSeconds(stages[System.Math.Max(0, System.Math.Min(stages.Length - 1, frame))]);
+        }
+
+        // The frames of a blow in which the hammer is swinging too fast to see (drawn with a smear behind it), and the
+        // frame it strikes.
+        public static bool Swinging(KnightPose pose, int frame)
+        {
+            var stages = StagesOf(pose);
+            return stages != null && frame < stages.Length && (stages[frame] == Stage.Swing || stages[frame] == Stage.Strike);
+        }
+
+        public static int StrikeFrame(KnightPose pose) => System.Array.IndexOf(StagesOf(pose) ?? new Stage[0], Stage.Strike);
+
+        // How the body turns with the motion, a step of the eight views: away from the viewer (-1) as the hammer goes up
+        // and back, unwinding through the swing (a sweep turns on round toward the viewer, +1), square again after.
+        public static int TwistOf(KnightPose pose, int frame) => pose switch
+        {
+            KnightPose.Raise or KnightPose.Wind => frame >= FramesOf(pose) / 3 ? -1 : 0,
+            KnightPose.Smash or KnightPose.Pound => frame == 0 ? -1 : 0,
+            KnightPose.Sweep => frame == 0 ? -1 : frame <= StrikeFrame(pose) ? 1 : 0,
+            _ => 0,
+        };
+
+        // The frames a roar takes to lift the hammer overhead, before it shakes there (frames RoarRise.. loop).
+        public const int RoarRise = 12;
+
+        // The rest every motion starts from and returns to.
+        const float RestAngle = -150;
+
+        static Pose P(float raise, float reach, float angle, float lean = 0, float stretch = 0, float together = 0.6f, float stepA = 0, float stepB = 0,
+            float drop = 0, float shove = 0, float lift = 0, float liftA = 0, float liftB = 0, float fore = 1) => new Pose
+        {
+            Raise = raise, Reach = reach, Angle = angle, Lean = lean, Stretch = stretch, Together = together, StepA = stepA, StepB = stepB,
+            Drop = drop, Shove = shove, Lift = lift, LiftA = liftA, LiftB = liftB, Foreshorten = fore,
+        };
+
+        static readonly Pose Rest = P(0, -2, RestAngle);
+
+        static Pose Lerp(Pose a, Pose b, float u)
+        {
+            float L(float x, float y) => x + (y - x) * u;
+            return new Pose
+            {
+                Raise = L(a.Raise, b.Raise), Reach = L(a.Reach, b.Reach), Together = L(a.Together, b.Together), StepA = L(a.StepA, b.StepA),
+                LiftA = L(a.LiftA, b.LiftA), StepB = L(a.StepB, b.StepB), LiftB = L(a.LiftB, b.LiftB), Lean = L(a.Lean, b.Lean),
+                Stretch = L(a.Stretch, b.Stretch), Lift = L(a.Lift, b.Lift), Shove = L(a.Shove, b.Shove), Drop = L(a.Drop, b.Drop),
+                Angle = L(a.Angle, b.Angle), Foreshorten = L(a.Foreshorten, b.Foreshorten),
+            };
+        }
+
+        // Key poses at times 0..1, eased in and out between each pair (the weight of a slow, heavy movement).
+        static Pose Keys(float t, params (float At, Pose Pose)[] keys)
+        {
+            if (t <= keys[0].At) return keys[0].Pose;
+            for (int i = 1; i < keys.Length; i++)
+            {
+                if (t > keys[i].At) continue;
+                float u = (t - keys[i - 1].At) / (keys[i].At - keys[i - 1].At);
+                return Lerp(keys[i - 1].Pose, keys[i].Pose, u * u * (3 - 2 * u));
+            }
+            return keys[keys.Length - 1].Pose;
+        }
+
+        static Pose Blow(Pose[] frames, int frame) => frames[System.Math.Max(0, System.Math.Min(frames.Length - 1, frame))];
+
+        static Pose Smeared(Pose p, float from)
+        {
+            p.SmearFrom = from;
+            p.SmearTo = p.Angle;
+            return p;
+        }
+
+        // A blow laid out from key poses: each stage moves from the pose before to its own over so many frames; a swing
+        // speeds up toward the strike and leaves a smear from where the hammer was a frame before, the rest ease in and
+        // out. To smooth a stage, give it more frames.
+        static (Pose[] Frames, Stage[] Stages) Expand(Pose from, params (Stage Stage, int Frames, Pose To)[] stages)
+        {
+            var frames = new List<Pose>();
+            var kinds = new List<Stage>();
+            var at = from;
+            var previous = (Stage)255;
+            foreach (var (stage, count, to) in stages)
+            {
+                bool joined = previous == Stage.DragStart;
+                previous = stage;
+                for (int k = 1; k <= count; k++)
+                {
+                    float u = k / (float)count;
+                    bool fast = stage == Stage.Swing || stage == Stage.Strike;
+                    float eased = fast ? (float)System.Math.Pow(u, 1.3) : stage == Stage.DragStart ? u * u : stage == Stage.Drag && joined ? 1 - (1 - u) * (1 - u) : u * u * (3 - 2 * u);
+                    var p = Lerp(at, to, eased);
+                    if (fast) p = Smeared(p, frames.Count > 0 ? frames[frames.Count - 1].Angle : from.Angle);
+                    frames.Add(p);
+                    kinds.Add(stage);
+                }
+                at = to;
+            }
+            return (frames.ToArray(), kinds.ToArray());
+        }
+
+        static readonly Pose RaiseTop = P(26, -5, -226, lean: -5, stretch: 0.08f, together: 0.95f, stepA: 3, stepB: -3);
+        static readonly Pose WindBack = P(4, -11, -174, lean: -4, stretch: -0.06f, together: 0.75f, stepA: 2, stepB: -4);
+        static readonly Pose Braced = P(0, -4, -162, lean: 9, stretch: -0.14f, stepA: 4, stepB: -4, drop: 1);
+        static readonly Pose Crouched = P(8, 1, -250, lean: 3, stretch: -0.2f, together: 0.95f, stepA: 3, stepB: -3, drop: 2);
+        // Back at rest after a blow: the same as Rest, the hammer having come one full way round.
+        static readonly Pose Rested = P(0, -2, RestAngle - 360);
+
+        // Overhead and down ahead: the swing speeding up over three frames, the strike with the whole body squashed
+        // behind it, a rebound, held in the floor and straining, hauled out, and dragged back along the floor to rest.
+        static readonly (Pose[] Frames, Stage[] Stages) Smash = Expand(RaiseTop,
+            (Stage.Swing, 4, P(4, 10, -345, lean: 5, stretch: -0.06f, together: 0.95f, stepA: 5, stepB: -4, drop: 1, shove: 4)),
+            (Stage.Strike, 1, P(-3, 14, -384, lean: 9, stretch: -0.15f, together: 0.95f, stepA: 6, stepB: -4, drop: 3, shove: 6)),
+            (Stage.Rebound, 1, P(-1, 14, -380, lean: 8, stretch: -0.1f, together: 0.95f, stepA: 6, stepB: -4, drop: 2, shove: 6)),
+            (Stage.Held, 2, P(-2, 13, -384, lean: 7, stretch: -0.11f, together: 0.9f, stepA: 6, stepB: -4, drop: 2, shove: 5)),
+            (Stage.Haul, 2, P(1, 9, -400, lean: 4, stretch: -0.04f, together: 0.85f, stepA: 4, stepB: -3, drop: 1, shove: 3)),
+            (Stage.DragStart, 5, P(6, 4, -450, lean: 2, together: 0.7f, stepA: 2, stepB: -2, fore: 0.5f)),
+            (Stage.Drag, 6, Rested));
+
+        // Straight down at its own feet.
+        static readonly (Pose[] Frames, Stage[] Stages) Pound = Expand(RaiseTop,
+            (Stage.Swing, 4, P(5, 6, -360, lean: 4, stretch: -0.08f, together: 1, stepA: 4, stepB: -4, drop: 2)),
+            (Stage.Strike, 1, P(-2, 9, -405, lean: 6, stretch: -0.17f, together: 1, stepA: 4, stepB: -4, drop: 4)),
+            (Stage.Rebound, 1, P(0, 9, -400, lean: 5, stretch: -0.12f, together: 1, stepA: 4, stepB: -4, drop: 3)),
+            (Stage.Held, 2, P(-1, 8, -404, lean: 4, stretch: -0.11f, together: 0.95f, stepA: 4, stepB: -4, drop: 2)),
+            (Stage.Haul, 2, P(1, 6, -420, lean: 2, stretch: -0.04f, together: 0.85f, stepA: 3, stepB: -3, drop: 1)),
+            (Stage.DragStart, 4, P(5, 3, -450, lean: 1, together: 0.7f, stepA: 2, stepB: -2, fore: 0.5f)),
+            (Stage.Drag, 6, Rested));
+
+        // Across the front at the waist: out of the wind-up behind, a flat smear past the viewer (the hammer pointing at
+        // the viewer, shortened), out ahead, on a little, and dragged back round to rest.
+        static readonly (Pose[] Frames, Stage[] Stages) Sweep = Expand(WindBack,
+            (Stage.Swing, 2, P(1, 4, -90, lean: 3, together: 0.8f, stepA: 4, stepB: -3, shove: 2, fore: 0.45f)),
+            (Stage.Swing, 1, P(1, 11, -30, lean: 6, stretch: -0.05f, together: 0.8f, stepA: 5, stepB: -3, shove: 4, fore: 0.85f)),
+            (Stage.Strike, 1, P(1, 13, 4, lean: 7, stretch: -0.07f, together: 0.8f, stepA: 5, stepB: -3, shove: 5)),
+            (Stage.Rebound, 1, P(0, 12, -6, lean: 6, stretch: -0.06f, together: 0.8f, stepA: 5, stepB: -3, shove: 5)),
+            (Stage.Held, 1, P(0, 10, -16, lean: 5, stretch: -0.04f, together: 0.75f, stepA: 4, stepB: -3, shove: 4)),
+            (Stage.DragStart, 8, P(5, 4, -90, lean: 2, together: 0.7f, stepA: 2, stepB: -1, shove: 2, fore: 0.5f)),
+            (Stage.Drag, 8, P(0, -2, RestAngle)));
+
+        static Pose[] SmashFrames => Smash.Frames;
+        static Stage[] SmashStages => Smash.Stages;
+        static Pose[] PoundFrames => Pound.Frames;
+        static Stage[] PoundStages => Pound.Stages;
+        static Pose[] SweepFrames => Sweep.Frames;
+        static Stage[] SweepStages => Sweep.Stages;
+
         static Pose PoseOf(KnightPose pose, int frame)
         {
-            int f = System.Math.Max(0, frame);
-            float t = f / 5f;
-            var p = new Pose { Together = 0.6f, Angle = -38, Foreshorten = 1 };
+            int count = FramesOf(pose);
+            int f = ((frame % count) + count) % count;
+            float t = count > 1 ? f / (float)(count - 1) : 0;
+            float cycle = f / (float)count * 2 * (float)System.Math.PI;
+            float s = (float)System.Math.Sin(cycle), c = (float)System.Math.Cos(cycle);
             switch (pose)
             {
                 case KnightPose.Idle:
-                    // The hammer's head rests on the floor ahead, both hands on the haft; breathing.
-                    p.Reach = 2;
-                    p.Raise = f % 2;
-                    p.Stretch = f % 2 == 1 ? 0.015f : 0;
-                    break;
+                {
+                    // Breathing over the hammer resting behind it.
+                    float b = 0.5f - 0.5f * c;
+                    return P(b, -2, RestAngle + 2 * b, stretch: 0.015f * b);
+                }
                 case KnightPose.Walk:
-                    // Each heavy step in turn, the head of the hammer dragged behind on the floor.
-                    p.StepA = new[] { 3, 0, -3, 0 }[f % 4];
-                    p.LiftA = f % 4 == 0 ? 2 : 0;
-                    p.StepB = -p.StepA;
-                    p.LiftB = f % 4 == 2 ? 2 : 0;
-                    p.Reach = -3;
-                    p.Angle = -152;
-                    p.Lean = 1;
-                    p.Stretch = f % 2 == 1 ? -0.025f : 0;
-                    p.Drop = f % 2 == 1 ? 1 : 0;
-                    break;
+                    // One stride each way per loop: the foot coming forward lifted, the body sinking as each lands
+                    // (frames 2 and 6), the hammer's head dragged behind and wobbling with the steps.
+                    return P(0, -3 + 0.6f * s, RestAngle - 2 + 2 * s, lean: 1, stretch: -0.025f * (1 - System.Math.Abs(c)), stepA: 3 * s, stepB: -3 * s,
+                        drop: 1.2f * (1 - System.Math.Abs(c)), liftA: 2 * System.Math.Max(0, c), liftB: 2 * System.Math.Max(0, -c));
                 case KnightPose.Raise:
-                    // Hauled up overhead and back, slowly, rising tall on the back foot: the long anticipation.
-                    p.Raise = 6 + 20 * t;
-                    p.Reach = -2 - 4 * t;
-                    p.Together = 0.95f;
-                    p.Angle = 95 + 60 * t;
-                    p.Lean = -1 - 4 * t;
-                    p.Stretch = 0.02f + 0.06f * t;
-                    p.StepA = 3;
-                    p.StepB = -3;
-                    break;
-                case KnightPose.Smash:
-                    // Down in one blur, the head driven into the floor ahead with the whole body squashed behind it,
-                    // held there, then hauled out.
-                    p.Together = 0.95f;
-                    p.StepA = 6;
-                    p.StepB = -4;
-                    switch (System.Math.Min(f, 3))
-                    {
-                        case 0:
-                            (p.Raise, p.Reach, p.Angle, p.Lean, p.Shove) = (12, 9, 35, 4, 3);
-                            (p.SmearFrom, p.SmearTo) = (150, 20);
-                            break;
-                        case 1:
-                            (p.Raise, p.Reach, p.Angle, p.Lean, p.Stretch, p.Shove, p.Drop) = (-3, 14, -24, 9, -0.15f, 6, 3);
-                            break;
-                        case 2:
-                            (p.Raise, p.Reach, p.Angle, p.Lean, p.Stretch, p.Shove, p.Drop) = (-3, 14, -24, 8, -0.11f, 6, 2);
-                            break;
-                        default:
-                            (p.Raise, p.Reach, p.Angle, p.Lean, p.Stretch, p.Shove, p.Drop) = (0, 10, -20, 5, -0.05f, 4, 1);
-                            break;
-                    }
-                    break;
-                case KnightPose.Pound:
-                    // Straight down at its own feet: the floor round it breaks.
-                    p.Together = 1;
-                    p.StepA = 4;
-                    p.StepB = -4;
-                    switch (System.Math.Min(f, 3))
-                    {
-                        case 0:
-                            (p.Raise, p.Reach, p.Angle, p.Lean) = (14, 5, 60, 2);
-                            (p.SmearFrom, p.SmearTo) = (140, -60);
-                            break;
-                        case 1:
-                            (p.Raise, p.Reach, p.Angle, p.Lean, p.Stretch, p.Drop) = (-2, 9, -45, 6, -0.17f, 4);
-                            break;
-                        case 2:
-                            (p.Raise, p.Reach, p.Angle, p.Lean, p.Stretch, p.Drop) = (-2, 9, -45, 5, -0.12f, 3);
-                            break;
-                        default:
-                            (p.Raise, p.Reach, p.Angle, p.Lean, p.Stretch, p.Drop) = (0, 7, -38, 3, -0.05f, 1);
-                            break;
-                    }
-                    break;
+                    // Hauled up from the floor behind it, over the shoulder, high overhead: the body dips as it heaves, then
+                    // rises tall and leans back onto the back foot.
+                    return Keys(t,
+                        (0, Rest),
+                        (0.3f, P(5, -1, -178, lean: 0.5f, stretch: -0.03f, together: 0.8f, stepA: 2, stepB: -2, drop: 1)),
+                        (0.65f, P(17, -3, -206, lean: -2.5f, stretch: 0.04f, together: 0.95f, stepA: 3, stepB: -3)),
+                        (1, RaiseTop));
                 case KnightPose.Wind:
-                    // Drawn far back and low for the sweep, the body turning away with it.
-                    p.Raise = 2 + 2 * t;
-                    p.Reach = -6 - 5 * t;
-                    p.Together = 0.75f;
-                    p.Angle = 172 + 14 * t;
-                    p.Lean = -2 - 2 * t;
-                    p.Stretch = -0.02f - 0.04f * t;
-                    p.StepA = 2;
-                    p.StepB = -4;
-                    break;
-                case KnightPose.Sweep:
-                    // Across the front at the waist: a flat smear toward the viewer, then out ahead and on.
-                    p.Together = 0.8f;
-                    p.StepA = 5;
-                    p.StepB = -3;
-                    switch (System.Math.Min(f, 3))
-                    {
-                        case 0:
-                            (p.Reach, p.Raise, p.Angle, p.Lean, p.Foreshorten, p.Shove) = (6, 1, -90, 4, 0.45f, 2);
-                            (p.SmearFrom, p.SmearTo) = (190, 360);
-                            break;
-                        case 1:
-                            (p.Reach, p.Raise, p.Angle, p.Lean, p.Stretch, p.Shove) = (13, 1, 4, 7, -0.07f, 5);
-                            break;
-                        case 2:
-                            (p.Reach, p.Raise, p.Angle, p.Lean, p.Stretch, p.Shove) = (12, 0, -16, 6, -0.05f, 5);
-                            break;
-                        default:
-                            (p.Reach, p.Raise, p.Angle, p.Lean, p.Stretch, p.Shove) = (7, -1, -34, 3, -0.02f, 3);
-                            break;
-                    }
-                    break;
+                    // Drawn further back and low, the arms reaching behind, the body coiling away.
+                    return Keys(t,
+                        (0, Rest),
+                        (0.45f, P(2, -6, -162, lean: -2, stretch: -0.03f, together: 0.7f, stepA: 1, stepB: -3)),
+                        (1, WindBack));
                 case KnightPose.Brace:
-                    // The shoulder lowered, the hammer held low behind, sinking for the run.
-                    p.Lean = 6 + 3 * t;
-                    p.Stretch = -0.07f - 0.07f * t;
-                    p.Reach = -4;
-                    p.Angle = 198;
-                    p.StepA = 4;
-                    p.StepB = -4;
-                    p.Drop = 1;
-                    break;
+                    return Keys(t,
+                        (0, Rest),
+                        (0.45f, P(-1, -3, -158, lean: 4, stretch: -0.06f, stepA: 2, stepB: -2)),
+                        (1, Braced));
                 case KnightPose.Charge:
-                    p.StepA = new[] { 5, 0, -5, 0 }[f % 4];
-                    p.LiftA = f % 4 == 0 ? 3 : 0;
-                    p.StepB = -p.StepA;
-                    p.LiftB = f % 4 == 2 ? 3 : 0;
-                    p.Lean = 10;
-                    p.Stretch = -0.1f;
-                    p.Reach = -4;
-                    p.Angle = 195;
-                    break;
+                    // Running: longer strides, the hammer trailing.
+                    return P(0, -4, -165 + 3 * s, lean: 10, stretch: -0.1f - 0.02f * (1 - System.Math.Abs(c)), stepA: 5 * s, stepB: -5 * s,
+                        drop: 1 - System.Math.Abs(c), liftA: 3 * System.Math.Max(0, c), liftB: 3 * System.Math.Max(0, -c));
                 case KnightPose.Crouch:
-                    // Down into a deep crouch for the jump, the hammer drawn up to the shoulder.
-                    p.Stretch = -0.06f - 0.14f * t;
-                    p.Lean = 3;
-                    p.Raise = 2 + 6 * t;
-                    p.Reach = 1;
-                    p.Together = 0.9f;
-                    p.Angle = 110;
-                    p.StepA = 3;
-                    p.StepB = -3;
-                    break;
+                    // The hammer swung up from behind to the shoulder while it sinks into a deep crouch.
+                    return Keys(t,
+                        (0, Rest),
+                        (0.5f, P(4, 0, -205, lean: 2, stretch: -0.08f, together: 0.85f, stepA: 2, stepB: -2, drop: 1)),
+                        (1, Crouched));
                 case KnightPose.Leap:
-                    // Up and out of the top of the picture with the hammer over its head.
-                    p.Lift = new[] { 16, 34, 54, 78 }[System.Math.Min(f, 3)];
-                    p.Stretch = 0.08f;
-                    p.Raise = 22;
-                    p.Together = 1;
-                    p.Angle = 100;
-                    p.LiftA = p.LiftB = 3;
-                    break;
+                    // Out of the crouch: a last push down, the spring up (stretching tall), then up and out of the top of
+                    // the picture with the hammer over its head.
+                    return Keys(t,
+                        (0, Crouched),
+                        (0.15f, P(10, 1, -252, lean: 2, stretch: -0.06f, together: 1, stepA: 2, stepB: -2, drop: 1)),
+                        (0.35f, P(14, 0, -255, lean: 1, stretch: 0.12f, together: 1, stepA: 1, stepB: -1, lift: 8, liftA: 2, liftB: 2)),
+                        (1, P(22, 0, -260, stretch: 0.06f, together: 1, lift: 84, liftA: 3, liftB: 3)));
+                case KnightPose.Smash:
+                    return Blow(SmashFrames, f);
+                case KnightPose.Pound:
+                    return Blow(PoundFrames, f);
+                case KnightPose.Sweep:
+                    return Blow(SweepFrames, f);
                 case KnightPose.Roar:
-                    p.Raise = 22 + f % 2;
-                    p.Together = 1;
-                    p.Angle = 90;
-                    p.Lean = -3;
-                    p.Stretch = 0.05f;
-                    p.StepA = 3;
-                    p.StepB = -3;
-                    break;
+                    // The hammer lifted from rest up over its head, then held high, shaking with the roar.
+                    if (f < RoarRise)
+                        return Keys(f / (float)RoarRise,
+                            (0, Rest),
+                            (0.58f, P(12, -3, -222, lean: -1.5f, stretch: 0.025f, together: 0.9f, stepA: 2, stepB: -2)),
+                            (1, P(22, 0, -270, lean: -3, stretch: 0.05f, together: 1, stepA: 3, stepB: -3)));
+                    return P(22 + s, 0, -270 + 3 * s, lean: -3, stretch: 0.05f, together: 1, stepA: 3, stepB: -3);
+                default:
+                    return Rest;
             }
-            return p;
         }
 
         // The picture with each part at its place, on a canvas with room round it; and where the two fists are.
@@ -888,7 +999,7 @@ namespace Game.Client
         {
             double a = angle * System.Math.PI / 180;
             float ahead = (float)System.Math.Cos(a);
-            return view == BossView.Back || view == BossView.BackSide ? ahead > -0.2f : ahead < -0.35f && view != BossView.Front;
+            return view == BossView.Back || view == BossView.BackSide ? ahead > -0.2f : ahead < -0.35f;
         }
 
         static bool IsTabard(Rgba c) => c.B > c.R + 25 && c.B > 50;
@@ -899,8 +1010,25 @@ namespace Game.Client
         // Sweep) 0..3, a smear, the impact, held, recovering; a walk or a charge 0..3, a leap 0..3 rising (and 0..1
         // breathing at rest). In the last phase the tabard is soaked dark red and the hammer's edge glows like a forge.
         // Faces right; WorldView flips it for the left.
-        public static PixelImage Draw(BossView view, KnightPose pose, int frame, int phase)
+        public static PixelImage Draw(BossView view, KnightPose pose, int frame, int phase) => Render(view, pose, frame, phase, out _);
+
+        // Where the hands, the hammer's head and the body are in a frame (canvas pixels): for the preview's check that
+        // nothing jumps from one frame to the next.
+        public struct Joints
         {
+            public float HandX, HandY, HeadX, HeadY;
+            public int Top, Bottom, Left, Right;
+        }
+
+        public static Joints JointsOf(BossView view, KnightPose pose, int frame)
+        {
+            Render(view, pose, frame, 1, out var joints);
+            return joints;
+        }
+
+        static PixelImage Render(BossView view, KnightPose pose, int frame, int phase, out Joints joints)
+        {
+            joints = new Joints { Top = int.MaxValue, Left = int.MaxValue, Bottom = -1, Right = -1 };
             var p = PoseOf(pose, frame);
             bool side = view != BossView.Front && view != BossView.Back;
             var body = Compose(view, p, out var hands);
@@ -931,6 +1059,12 @@ namespace Game.Client
             var way = Way(view, p.Angle);
             var (hx, hy) = Place(hands.X, hands.Y);
             bool behind = HammerBehind(view, p.Angle);
+            float seen = (float)System.Math.Sqrt(way.X * way.X + way.Y * way.Y);
+            float reach = HaftLength * p.Foreshorten * System.Math.Max(0.3f, seen);
+            joints.HandX = hx;
+            joints.HandY = hy;
+            joints.HeadX = hx + way.X / System.Math.Max(1e-3f, seen) * reach;
+            joints.HeadY = hy - way.Y / System.Math.Max(1e-3f, seen) * reach;
             bool hot = phase >= 3;
             if (behind) Hammer(image, hx, hy, way.X, way.Y, p.Foreshorten, hot);
             for (int y = 0; y < tall; y++)
@@ -947,14 +1081,27 @@ namespace Game.Client
                     if (phase >= 3 && IsTabard(c)) c = c.Mix(Blood, 0.7f);
                     int px = left + x + shift;
                     if (image.Inside(px, row)) image[px, row] = c;
+                    joints.Top = System.Math.Min(joints.Top, row);
+                    joints.Bottom = System.Math.Max(joints.Bottom, row);
+                    joints.Left = System.Math.Min(joints.Left, px);
+                    joints.Right = System.Math.Max(joints.Right, px);
                 }
             }
+            // A swing too fast to see: a smear along the way the head came this frame, the hammer where it is now.
             if (p.SmearFrom is float from && p.SmearTo is float to)
             {
                 if (side) Smear(image, hx, hy, from, to, HaftLength + 4, pose == KnightPose.Sweep ? 0.45f : 1);
-                else Smear(image, hx, hy, view == BossView.Front ? 160 : 20, view == BossView.Front ? 380 : -200, HaftLength * 0.6f, 0.5f);
+                else
+                {
+                    var a = Way(view, from);
+                    float sweep = (float)(System.Math.Atan2(way.Y, way.X) - System.Math.Atan2(a.Y, a.X)) * 180 / (float)System.Math.PI;
+                    if (sweep > 180) sweep -= 360;
+                    if (sweep < -180) sweep += 360;
+                    float start = (float)(System.Math.Atan2(a.Y, a.X) * 180 / System.Math.PI);
+                    Smear(image, hx, hy, start, start + sweep, HaftLength * 0.8f, 1);
+                }
             }
-            else if (!behind) Hammer(image, hx, hy, way.X, way.Y, p.Foreshorten, hot);
+            if (!behind) Hammer(image, hx, hy, way.X, way.Y, p.Foreshorten, hot);
             return image;
         }
     }
