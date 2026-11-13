@@ -443,110 +443,243 @@ namespace Game.Client
             public int ArmAX, ArmAY, ArmBX, ArmBY, LegAX, LegAY, LegBX, LegBY;
         }
 
-        static Moves MovesOf(BossView view, VeinPose pose, int frame)
+        // ---- The frames (2026-11-13, the person: more frames for natural motion, each checked against the frames either
+        // side). A pose is a set of numbers eased between key poses: how high each drill arm is raised and how far it
+        // reaches, how far apart they spread, the feet's steps and lifts, the body's lean, stretch, lift off the ground
+        // and sink into it, and the rock and the mound of earth. Every motion starts from rest and comes back to it; a
+        // blow is laid out in stages (swing, strike, follow, recover), a wind-up it came out of plays backward to stand
+        // up again (the charge's crouch, the spin's curl, the drills pulled out of the floor). ----
+
+        struct VPose
         {
-            float t = frame / 5f;
-            float raiseA = 0, reachA = 0, raiseB = 0, reachB = 0, spread = 0, stepA = 0, liftA = 0, stepB = 0, liftB = 0;
-            void Arms(float raise, float reach)
+            public float RaiseA, ReachA, RaiseB, ReachB, Spread, StepA, LiftA, StepB, LiftB, Lean, Stretch, Lift, Sink;
+            // The rock held overhead (over 0.5 shows it); the mound of earth (half width, height; ahead of it from the
+            // side when Ahead).
+            public float Rock, MoundHalf, MoundHeight;
+            public bool Ahead;
+        }
+
+        static VPose V(float raise = 0, float reach = 0, float spread = 0, float lean = 0, float stretch = 0, float stepA = 0, float stepB = 0,
+            float liftA = 0, float liftB = 0, float lift = 0, float sink = 0, float? raiseB = null, float? reachB = null, float rock = 0,
+            float mound = 0, float moundHeight = 0, bool ahead = false) => new VPose
+        {
+            RaiseA = raise, ReachA = reach, RaiseB = raiseB ?? raise, ReachB = reachB ?? reach, Spread = spread, Lean = lean, Stretch = stretch,
+            StepA = stepA, StepB = stepB, LiftA = liftA, LiftB = liftB, Lift = lift, Sink = sink, Rock = rock, MoundHalf = mound, MoundHeight = moundHeight,
+            Ahead = ahead,
+        };
+
+        static VPose Lerp(VPose a, VPose b, float u)
+        {
+            float L(float x, float y) => x + (y - x) * u;
+            return new VPose
             {
-                raiseA = raiseB = raise;
-                reachA = reachB = reach;
+                RaiseA = L(a.RaiseA, b.RaiseA), ReachA = L(a.ReachA, b.ReachA), RaiseB = L(a.RaiseB, b.RaiseB), ReachB = L(a.ReachB, b.ReachB),
+                Spread = L(a.Spread, b.Spread), StepA = L(a.StepA, b.StepA), LiftA = L(a.LiftA, b.LiftA), StepB = L(a.StepB, b.StepB),
+                LiftB = L(a.LiftB, b.LiftB), Lean = L(a.Lean, b.Lean), Stretch = L(a.Stretch, b.Stretch), Lift = L(a.Lift, b.Lift), Sink = L(a.Sink, b.Sink),
+                Rock = L(a.Rock, b.Rock), MoundHalf = L(a.MoundHalf, b.MoundHalf), MoundHeight = L(a.MoundHeight, b.MoundHeight),
+                Ahead = u < 0.5f ? a.Ahead : b.Ahead,
+            };
+        }
+
+        static VPose Keys(float t, params (float At, VPose Pose)[] keys)
+        {
+            if (t <= keys[0].At) return keys[0].Pose;
+            for (int i = 1; i < keys.Length; i++)
+            {
+                if (t > keys[i].At) continue;
+                float u = (t - keys[i - 1].At) / (keys[i].At - keys[i - 1].At);
+                return Lerp(keys[i - 1].Pose, keys[i].Pose, u * u * (3 - 2 * u));
             }
-            int f = System.Math.Max(0, frame);
+            return keys[keys.Length - 1].Pose;
+        }
+
+        static readonly VPose Rest = V();
+
+        // A blow's stages, each frame shown for its stage's time.
+        enum Stage : byte
+        {
+            Swing,
+            Strike,
+            Follow,
+            Recover,
+        }
+
+        static float StageSeconds(Stage stage) => stage switch
+        {
+            Stage.Swing => 0.04f,
+            Stage.Strike => 0.1f,
+            Stage.Follow => 0.12f,
+            _ => 0.07f,
+        };
+
+        static (VPose[] Frames, Stage[] Stages) Expand(VPose from, params (Stage Stage, int Frames, VPose To)[] stages)
+        {
+            var frames = new List<VPose>();
+            var kinds = new List<Stage>();
+            var at = from;
+            foreach (var (stage, count, to) in stages)
+            {
+                for (int k = 1; k <= count; k++)
+                {
+                    float u = k / (float)count;
+                    bool fast = stage == Stage.Swing || stage == Stage.Strike;
+                    frames.Add(Lerp(at, to, fast ? (float)System.Math.Pow(u, 1.3) : u * u * (3 - 2 * u)));
+                    kinds.Add(stage);
+                }
+                at = to;
+            }
+            return (frames.ToArray(), kinds.ToArray());
+        }
+
+        // The wind-ups' last poses, which the blows start from.
+        static readonly VPose Reared = V(13, -5, spread: 2, lean: -5, stretch: 0.1f, stepA: -1);
+        static readonly VPose Lifted = V(11, -1, lean: -3, stretch: 0.06f, rock: 1);
+        static readonly VPose Slammed = V(15, 0, spread: 3, lean: -2, stretch: 0.12f);
+        static readonly VPose Sunk = V(sink: 39, raise: 2, reach: 3, mound: 18, moundHeight: 7);
+        static readonly VPose Sprung = V(7, 0, stretch: 0.08f, lift: 70, liftA: 3, liftB: 3);
+
+        // The claw: the drills brought down and across, the far one a frame behind, then back to rest.
+        static readonly (VPose[] Frames, Stage[] Stages) Swipe = Expand(Reared,
+            (Stage.Swing, 3, V(7, 6, lean: 3, stretch: -0.04f, stepA: 2, raiseB: 11, reachB: 1)),
+            (Stage.Strike, 1, V(0, 10, lean: 6, stretch: -0.06f, stepA: 2, raiseB: 4, reachB: 7)),
+            (Stage.Follow, 1, V(-3, 5, lean: 5, stretch: -0.06f, stepA: 2)),
+            (Stage.Recover, 6, Rest));
+
+        // The rock thrown: brought forward from overhead and let go, the arms following through.
+        static readonly (VPose[] Frames, Stage[] Stages) Throw = Expand(Lifted,
+            (Stage.Swing, 2, V(9, 6, lean: 3, stretch: -0.04f, stepA: 2, rock: 0.6f)),
+            (Stage.Strike, 1, V(2, 10, lean: 6, stretch: -0.04f, stepA: 2)),
+            (Stage.Follow, 1, V(-1, 4, lean: 4, stretch: -0.04f, stepA: 2)),
+            (Stage.Recover, 6, Rest));
+
+        // Both fists brought down on the floor (the cave-in, and landing from the quake).
+        static readonly (VPose[] Frames, Stage[] Stages) Pound = Expand(Slammed,
+            (Stage.Swing, 2, V(5, 2, lean: 1, stretch: -0.02f)),
+            (Stage.Strike, 1, V(-4, 5, lean: 2, stretch: -0.16f, mound: 8, moundHeight: 2, ahead: true)),
+            (Stage.Follow, 2, V(-2, 2, lean: 2, stretch: -0.08f, mound: 8, moundHeight: 2, ahead: true)),
+            (Stage.Recover, 6, Rest));
+
+        // Up out of the floor where the mark was: bursting up tall, arms high, then settling.
+        static readonly (VPose[] Frames, Stage[] Stages) Rise = Expand(Sunk,
+            (Stage.Swing, 5, V(9, 0, spread: 2, stretch: 0.06f, sink: 8, mound: 18, moundHeight: 4)),
+            (Stage.Strike, 1, V(11, 0, spread: 3, stretch: 0.12f, lift: 3, mound: 18, moundHeight: 3)),
+            (Stage.Follow, 2, V(6, 0, spread: 2, stretch: 0.04f, mound: 14, moundHeight: 2)),
+            (Stage.Recover, 6, Rest));
+
+        static (VPose[] Frames, Stage[] Stages) BlowOf(VeinPose pose) => pose switch
+        {
+            VeinPose.Swipe => Swipe,
+            VeinPose.Throw => Throw,
+            VeinPose.Pound => Pound,
+            VeinPose.Rise => Rise,
+            _ => (null, null),
+        };
+
+        // How many frames each pose has.
+        public static int FramesOf(VeinPose pose) => BlowOf(pose).Frames?.Length ?? pose switch
+        {
+            VeinPose.Idle => 4,
+            VeinPose.Walk => 8,
+            VeinPose.Rush => 8,
+            VeinPose.Leap => 18,
+            VeinPose.Roar => RoarRise + 4,
+            _ => 12,
+        };
+
+        // The frames a roar takes to rear up, before it shakes there.
+        public const int RoarRise = 8;
+
+        // How long a blow's frame is shown (seconds); 0 for anything else.
+        public static float FrameSeconds(VeinPose pose, int frame)
+        {
+            var stages = BlowOf(pose).Stages;
+            return stages == null ? 0 : StageSeconds(stages[System.Math.Max(0, System.Math.Min(stages.Length - 1, frame))]);
+        }
+
+        public static int StrikeFrame(VeinPose pose) => System.Array.IndexOf(BlowOf(pose).Stages ?? new Stage[0], Stage.Strike);
+
+        public static bool Swinging(VeinPose pose, int frame)
+        {
+            var stages = BlowOf(pose).Stages;
+            return stages != null && frame < stages.Length && (stages[frame] == Stage.Swing || stages[frame] == Stage.Strike);
+        }
+
+        static VPose PoseOf(VeinPose pose, int frame)
+        {
+            int count = FramesOf(pose);
+            int f = ((frame % count) + count) % count;
+            var blow = BlowOf(pose).Frames;
+            if (blow != null) return blow[f];
+            float t = count > 1 ? f / (float)(count - 1) : 0;
+            float cycle = f / (float)count * 2 * (float)System.Math.PI;
+            float s = (float)System.Math.Sin(cycle), c = (float)System.Math.Cos(cycle);
             switch (pose)
             {
                 case VeinPose.Idle:
-                    Arms(f % 2 == 1 ? 1 : 0, 0);
-                    break;
+                {
+                    float b = 0.5f - 0.5f * c;
+                    return V(b, stretch: 0.02f * b);
+                }
                 case VeinPose.Walk:
-                    // A step each side in turn, the arms swinging against the legs.
-                    stepA = new[] { 2, 0, -2, 0 }[f % 4];
-                    liftA = f % 4 == 0 ? 2 : 0;
-                    stepB = -stepA;
-                    liftB = f % 4 == 2 ? 2 : 0;
-                    reachA = -stepA;
-                    reachB = stepA;
-                    raiseA = liftB / 2;
-                    raiseB = liftA / 2;
-                    break;
+                    // A stride each way: the foot coming forward lifted, the drills swinging against the legs, the body
+                    // dipping as each foot lands.
+                    return V(raise: System.Math.Max(0, -c), reach: -2 * s, raiseB: System.Math.Max(0, c), reachB: 2 * s, lean: 1,
+                        stretch: -0.03f * (1 - System.Math.Abs(c)), stepA: 2 * s, stepB: -2 * s, liftA: 2 * System.Math.Max(0, c), liftB: 2 * System.Math.Max(0, -c));
                 case VeinPose.Rear:
-                    // The drills drawn up and back over its shoulders.
-                    Arms(3 + 10 * t, -2 - 3 * t);
-                    spread = 2 * t;
-                    stepA = -t;
-                    break;
-                case VeinPose.Swipe:
-                    // Brought down and through: high and out, across, low; the far arm a frame behind.
-                    Arms(new[] { 7, 0, -3 }[System.Math.Min(f, 2)], new[] { 6, 10, 5 }[System.Math.Min(f, 2)]);
-                    if (f == 0) (raiseB, reachB) = (11, 0);
-                    stepA = 2;
-                    break;
+                    // The drills drawn up and back over its shoulders, rearing up onto the back foot.
+                    return Keys(t, (0, Rest), (0.45f, V(6, -2, spread: 1, lean: -2, stretch: 0.05f, stepA: -0.5f)), (1, Reared));
                 case VeinPose.Lift:
                     // Scooping down for the rock, then up with it overhead.
-                    if (t < 0.4f) Arms(-3, 4);
-                    else Arms(11, -1);
-                    if (t < 0.4f) stepA = 1;
-                    break;
-                case VeinPose.Throw:
-                    Arms(new[] { 9, 2, -1 }[System.Math.Min(f, 2)], new[] { 6, 10, 4 }[System.Math.Min(f, 2)]);
-                    stepA = 2;
-                    break;
+                    return Keys(t, (0, Rest), (0.35f, V(-3, 4, lean: 3, stretch: -0.12f, stepA: 1)), (0.55f, V(3, 3, lean: 1, stretch: -0.06f, stepA: 1, rock: 1)),
+                        (1, Lifted));
                 case VeinPose.Crouch:
-                    // Pawing the ground: the front drill scrapes back and forth, the back foot set.
-                    raiseA = -1;
-                    raiseB = -2;
-                    reachB = f % 2 == 0 ? 4 : -1;
-                    stepB = -2;
-                    break;
+                {
+                    // Head down, pawing the ground: settling into the crouch, then the front drill scraping back and forth.
+                    float settle = System.Math.Min(1, t / 0.25f);
+                    settle = settle * settle * (3 - 2 * settle);
+                    float paw = (float)System.Math.Sin(t * System.Math.PI * 6) * settle;
+                    return V(raise: -settle, reach: 0, raiseB: -2 * settle, reachB: 1.5f * settle + 2.5f * paw, lean: 5 * settle, stretch: -0.1f * settle, stepB: -2 * settle);
+                }
                 case VeinPose.Rush:
                     // Running: the drills swept back, the legs going fast.
-                    Arms(1, -3);
-                    stepA = new[] { 3, 0, -3, 0 }[f % 4];
-                    liftA = f % 4 == 0 ? 2 : 0;
-                    stepB = -stepA;
-                    liftB = f % 4 == 2 ? 2 : 0;
-                    break;
+                    return V(1, -3, lean: 7, stretch: -0.1f - 0.02f * (1 - System.Math.Abs(c)), stepA: 3 * s, stepB: -3 * s,
+                        liftA: 2 * System.Math.Max(0, c), liftB: 2 * System.Math.Max(0, -c));
                 case VeinPose.Sink:
-                    // Digging in, drill after drill.
-                    raiseA = f % 2 == 0 ? -3 : 2;
-                    raiseB = f % 2 == 0 ? 2 : -3;
-                    reachA = reachB = 3;
-                    break;
-                case VeinPose.Rise:
-                    Arms(11, 0);
-                    spread = 3;
-                    break;
+                {
+                    // Digging in, drill after drill, going down into the earth.
+                    float dig = (float)System.Math.Sin(t * System.Math.PI * 4);
+                    var p = Keys(t, (0, Rest), (1, Sunk));
+                    p.RaiseA = 2 + 3 * dig;
+                    p.RaiseB = 2 - 3 * dig;
+                    p.ReachA = p.ReachB = 3 * System.Math.Min(1, t * 4);
+                    return p;
+                }
                 case VeinPose.Slam:
                     // Both fists raised higher and higher for the cave-in.
-                    Arms(4 + 11 * t, 0);
-                    spread = 3 * t;
-                    break;
-                case VeinPose.Pound:
-                    Arms(new[] { -2, -4, -2 }[System.Math.Min(f, 2)], new[] { 3, 5, 2 }[System.Math.Min(f, 2)]);
-                    break;
+                    return Keys(t, (0, Rest), (0.5f, V(8, 0, spread: 1.5f, lean: -1, stretch: 0.07f)), (1, Slammed));
                 case VeinPose.Plunge:
-                    // Up, then driven down into the floor ahead.
-                    Arms(7 - 13 * t, 4);
-                    stepA = 1;
-                    break;
+                    // Up, then driven down into the floor ahead; earth heaped where they go in.
+                    return Keys(t, (0, Rest), (0.4f, V(7, 4, lean: 3, stretch: -0.07f, stepA: 1)), (0.75f, V(-4, 4, lean: 5, stretch: -0.14f, stepA: 1, mound: 6, moundHeight: 1, ahead: true)),
+                        (1, V(-6, 4, lean: 6, stretch: -0.16f, stepA: 1, mound: 8, moundHeight: 2, ahead: true)));
                 case VeinPose.Curl:
-                    Arms(2, 0);
-                    spread = -3;
-                    liftA = liftB = 1;
-                    break;
+                    // Curling into a ball for the spin.
+                    return Keys(t, (0, Rest), (1, V(2, 0, spread: -3, stretch: -0.22f, liftA: 1, liftB: 1)));
                 case VeinPose.Leap:
-                    if (f == 0) Arms(-3, 2);
-                    else
-                    {
-                        Arms(7, 0);
-                        liftA = liftB = 3;
-                    }
-                    break;
+                    // A deep crouch, a last push down, then up and out of the top of the picture.
+                    return Keys(t, (0, Rest), (0.4f, V(-3, 2, stretch: -0.2f)), (0.5f, V(1, 1, stretch: -0.1f)), (0.6f, V(6, 0, stretch: 0.1f, lift: 6, liftA: 2, liftB: 2)), (1, Sprung));
                 case VeinPose.Roar:
-                    Arms(5 + (f % 2), 0);
-                    spread = 5;
-                    break;
+                    if (f < RoarRise)
+                        return Keys(f / (float)RoarRise, (0, Rest), (1, V(5, 0, spread: 5, lean: -4, stretch: 0.08f)));
+                    return V(5 + (s + 1) / 2, 0, spread: 5, lean: -4, stretch: 0.08f);
+                default:
+                    return Rest;
             }
+        }
+
+        static Moves MovesOf(BossView view, VPose p)
+        {
+            float raiseA = p.RaiseA, reachA = p.ReachA, raiseB = p.RaiseB, reachB = p.ReachB, spread = p.Spread;
+            float stepA = p.StepA, liftA = p.LiftA, stepB = p.StepB, liftB = p.LiftB;
             bool side = view != BossView.Front && view != BossView.Back;
             int R(float v) => (int)System.Math.Round(v);
             var moves = new Moves();
@@ -575,11 +708,11 @@ namespace Game.Client
         }
 
         // The picture with each part at its place for the pose, on a canvas with room above and to the sides.
-        static PixelImage Compose(BossView view, VeinPose pose, int frame)
+        static PixelImage Compose(BossView view, VPose pose)
         {
             var image = ViewOf(view);
             var parts = PartsOf(view);
-            var moves = MovesOf(view, pose, frame);
+            var moves = MovesOf(view, pose);
             int w = image.Width, h = image.Height;
             var canvas = new PixelImage(w + 2 * Margin, h + Headroom);
             // The body first; where a part that has moved was inside the body, shadow.
@@ -635,80 +768,52 @@ namespace Game.Client
         // One frame. A wind-up runs frame 0..5 through its telegraph, a follow-through (Swipe, Throw, Rise, Pound)
         // 0..2, a walk or a run 0..3, sinking 0..3, a leap 0 crouched and 1..3 rising (and 0..1 breathing at rest);
         // phase 3 burns its ore hot; rage turns it red (the frenzy). Faces right; WorldView flips it for the left.
-        public static PixelImage Draw(BossView view, VeinPose pose, int frame, int phase, bool rage)
+        public static PixelImage Draw(BossView view, VeinPose pose, int frame, int phase, bool rage) => Render(view, pose, frame, phase, rage, out _);
+
+        // Where the two drill arms (the middle of each) and the body's edges are in a frame: for the preview's check that
+        // nothing jumps from one frame to the next.
+        public struct Joints
         {
-            var body = Compose(view, pose, frame);
+            public float AX, AY, BX, BY;
+            public int Top, Bottom, Left, Right;
+        }
+
+        public static Joints JointsOf(BossView view, VeinPose pose, int frame)
+        {
+            Render(view, pose, frame, 1, false, out var joints);
+            return joints;
+        }
+
+        static readonly Dictionary<BossView, (float AX, float AY, float BX, float BY)> ArmMiddles = new Dictionary<BossView, (float, float, float, float)>();
+
+        static (float AX, float AY, float BX, float BY) ArmMiddle(BossView view)
+        {
+            if (ArmMiddles.TryGetValue(view, out var known)) return known;
+            var parts = PartsOf(view);
+            float ax = 0, ay = 0, bx = 0, by = 0;
+            int na = 0, nb = 0;
+            for (int y = 0; y < parts.GetLength(1); y++)
+                for (int x = 0; x < parts.GetLength(0); x++)
+                {
+                    if (parts[x, y] == Part.ArmA) { ax += x; ay += y; na++; }
+                    if (parts[x, y] == Part.ArmB) { bx += x; by += y; nb++; }
+                }
+            known = (ax / System.Math.Max(1, na), ay / System.Math.Max(1, na), bx / System.Math.Max(1, nb), by / System.Math.Max(1, nb));
+            ArmMiddles[view] = known;
+            return known;
+        }
+
+        // One frame. Phase 3 burns its ore hot; rage turns it red (the frenzy); rearing for the cave-in, the quake or bursting
+        // up out of the floor heats it. Faces right; WorldView flips it for the left.
+        static PixelImage Render(BossView view, VeinPose pose, int frame, int phase, bool rage, out Joints joints)
+        {
+            joints = new Joints { Top = int.MaxValue, Left = int.MaxValue, Bottom = -1, Right = -1 };
+            var p = PoseOf(pose, frame);
+            var body = Compose(view, p);
             bool side = view != BossView.Front && view != BossView.Back;
-            float t = frame / 5f;
             // Lean (top moves ahead), stretch (taller and thinner), lift (up off the ground) and sink (into it).
-            float lean = 0, stretch = 0, lift = 0;
-            int sink = 0;
-            switch (pose)
-            {
-                case VeinPose.Idle:
-                    stretch = frame % 2 == 1 ? 0.02f : 0;
-                    break;
-                case VeinPose.Walk:
-                    // Down a little as each foot lands.
-                    stretch = frame % 2 == 1 ? -0.03f : 0;
-                    lean = 1;
-                    break;
-                case VeinPose.Rear:
-                    lean = -2 - 3 * t;
-                    stretch = 0.04f + 0.06f * t;
-                    break;
-                case VeinPose.Swipe:
-                    lean = new[] { 3, 6, 5 }[System.Math.Min(frame, 2)];
-                    stretch = -0.06f;
-                    break;
-                case VeinPose.Lift:
-                    stretch = t < 0.4f ? -0.12f : 0.06f;
-                    lean = t < 0.4f ? 3 : -3;
-                    break;
-                case VeinPose.Throw:
-                    lean = new[] { 3, 6, 4 }[System.Math.Min(frame, 2)];
-                    stretch = -0.04f;
-                    break;
-                case VeinPose.Crouch:
-                    lean = 5;
-                    stretch = -0.1f;
-                    break;
-                case VeinPose.Rush:
-                    lean = 7;
-                    stretch = -0.1f;
-                    break;
-                case VeinPose.Sink:
-                    sink = 6 + frame * 11;
-                    break;
-                case VeinPose.Rise:
-                    stretch = 0.12f;
-                    lift = 3;
-                    break;
-                case VeinPose.Slam:
-                    lean = -2;
-                    stretch = 0.06f + 0.06f * t;
-                    break;
-                case VeinPose.Pound:
-                    lean = 2;
-                    stretch = new[] { -0.1f, -0.16f, -0.08f }[System.Math.Min(frame, 2)];
-                    break;
-                case VeinPose.Plunge:
-                    lean = 2 + 4 * t;
-                    stretch = -0.06f - 0.1f * t;
-                    break;
-                case VeinPose.Curl:
-                    stretch = -0.14f - 0.08f * t;
-                    break;
-                case VeinPose.Leap:
-                    // Down into a deep crouch, then up and away out of the top of the picture.
-                    stretch = frame == 0 ? -0.2f : 0.08f;
-                    lift = frame == 0 ? 0 : frame * 14;
-                    break;
-                case VeinPose.Roar:
-                    lean = -4;
-                    stretch = 0.08f;
-                    break;
-            }
+            float lean = p.Lean, stretch = p.Stretch, lift = p.Lift;
+            int sink = (int)System.Math.Round(p.Sink);
             if (!side)
             {
                 // Seen from the front or back a lean shows as a dip or a rise.
@@ -722,7 +827,8 @@ namespace Game.Client
             int wide = System.Math.Max(4, (int)System.Math.Round(w * (1 - stretch * 0.5f)));
             var image = new PixelImage(Width, Height);
             int left = (Width - wide) / 2;
-            int ground = Height - 1 - (int)lift;
+            int ground = Height - 1 - (int)System.Math.Round(lift);
+            bool heated = pose == VeinPose.Slam || pose == VeinPose.Leap || pose == VeinPose.Rise;
             // Sinking: the body goes down into the ground, cut off at the ground line.
             for (int y = 0; y < tall; y++)
             {
@@ -740,32 +846,32 @@ namespace Game.Client
                     {
                         if (rage) c = c.Mix(Rage, 0.7f);
                         else if (phase >= 3) c = c.Mix(Hot, 0.55f);
-                        else if (pose == VeinPose.Slam || pose == VeinPose.Leap || pose == VeinPose.Rise) c = c.Mix(Hot, 0.35f);
+                        else if (heated) c = c.Mix(Hot, 0.35f);
                     }
                     int px = left + x + shift;
-                    if (image.Inside(px, row)) image[px, row] = c;
+                    if (!image.Inside(px, row)) continue;
+                    image[px, row] = c;
+                    joints.Top = System.Math.Min(joints.Top, row);
+                    joints.Bottom = System.Math.Max(joints.Bottom, row);
+                    joints.Left = System.Math.Min(joints.Left, px);
+                    joints.Right = System.Math.Max(joints.Right, px);
                 }
             }
-
-            // Where the head is: below the room left over the picture.
-            int top = ground - tall + 1 + sink + (int)System.Math.Round(Headroom * tall / (float)h);
-            int middle = Width / 2 + (int)System.Math.Round(lean * 0.8f);
-            switch (pose)
+            // The arms' middles, moved and carried with the body.
+            var moves = MovesOf(view, p);
+            var middle0 = ArmMiddle(view);
+            (float X, float Y) Place(float x, float y)
             {
-                case VeinPose.Lift when t >= 0.4f:
-                    Boulder(image, middle - 1, top - 9, 7);
-                    break;
-                case VeinPose.Sink:
-                    Mound(image, Width / 2, Height - 1, 12 + frame * 2, 3 + frame);
-                    break;
-                case VeinPose.Rise:
-                    Mound(image, Width / 2, Height - 1, 18, 3);
-                    break;
-                case VeinPose.Pound:
-                case VeinPose.Plunge when frame >= 3:
-                    Mound(image, Width / 2 + (side ? 10 : 0), Height - 1, 8, 2);
-                    break;
+                float row = ground - (tall - 1) + sink + y * tall / h;
+                float up = (ground - row + sink) / (tall - 1);
+                return (left + x * wide / w + lean * up, row);
             }
+            (joints.AX, joints.AY) = Place(middle0.AX + Margin + moves.ArmAX, middle0.AY + Headroom + moves.ArmAY);
+            (joints.BX, joints.BY) = Place(middle0.BX + Margin + moves.ArmBX, middle0.BY + Headroom + moves.ArmBY);
+
+            // The rock is held between the two drills, just above the higher one.
+            if (p.Rock > 0.5f) Boulder(image, (int)System.Math.Round((joints.AX + joints.BX) / 2), (int)System.Math.Round(System.Math.Min(joints.AY, joints.BY)) - 7, 7);
+            if (p.MoundHeight >= 0.5f) Mound(image, Width / 2 + (p.Ahead && side ? 10 : 0), Height - 1, (int)System.Math.Round(p.MoundHalf), (int)System.Math.Round(p.MoundHeight));
             return image;
         }
 

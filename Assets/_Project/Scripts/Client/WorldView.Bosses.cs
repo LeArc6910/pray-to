@@ -104,62 +104,80 @@ namespace Game.Client
             float since = Time.time - body.BossSince;
             int sector = SectorOf(facing);
             var pose = VeinPose.Idle;
-            int frame = Mathf.FloorToInt(Time.time * 1.5f) % 2;
+            int frame = Mathf.FloorToInt(Time.time * 2.4f) % VeinEaterArt.FramesOf(VeinPose.Idle);
             bool rage = false;
+            int Through(VeinPose p, float progress) => Mathf.Clamp(Mathf.FloorToInt(progress * VeinEaterArt.FramesOf(p)), 0, VeinEaterArt.FramesOf(p) - 1);
+            // The blow after a wind-up, and the wind-up itself (2026-11-13, more frames: VeinEaterArt.FramesOf).
+            VeinPose BlowOf(AttackShape shape) => shape switch
+            {
+                AttackShape.Cone => VeinPose.Swipe,
+                AttackShape.Burst => VeinPose.Throw,
+                AttackShape.Burrow => VeinPose.Rise,
+                _ => VeinPose.Pound,
+            };
             if (dead)
             {
                 frame = 0;
             }
             else if (moving && (body.BossState == BossState.Approach || body.BossState == BossState.Recover || body.BossState == BossState.Dormant))
             {
-                // Walking: a step a foot about every seventh of a second at its pace.
+                // Walking: a stride each way about every tile and a bit at its pace.
                 pose = VeinPose.Walk;
-                frame = Mathf.FloorToInt(body.Walked * 7) % 4;
+                frame = Mathf.FloorToInt(body.Walked * 7) % VeinEaterArt.FramesOf(pose);
             }
             else if (body.BossState == BossState.Roar)
             {
                 pose = VeinPose.Roar;
-                frame = Mathf.FloorToInt(Time.time * 8) % 2;
+                int rise = Mathf.FloorToInt(since / 0.08f);
+                frame = rise < VeinEaterArt.RoarRise ? rise : VeinEaterArt.RoarRise + Mathf.FloorToInt(Time.time * 10) % 4;
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
                 float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
-                // Six steps through a wind-up.
-                frame = Mathf.Min(5, Mathf.FloorToInt(progress * 6));
                 switch (attack.Shape)
                 {
                     case AttackShape.Cone:
-                        pose = VeinPose.Rear;
-                        break;
                     case AttackShape.Burst:
-                        pose = VeinPose.Lift;
+                    case AttackShape.Circle:
+                    case AttackShape.Ring:
+                    case AttackShape.Line:
+                    case AttackShape.Cross:
+                    {
+                        // The wind-up, then the blow's swing in the telegraph's last moment.
+                        var blow = BlowOf(attack.Shape);
+                        var windUp = attack.Shape == AttackShape.Cone ? VeinPose.Rear : attack.Shape == AttackShape.Burst ? VeinPose.Lift : VeinPose.Slam;
+                        int strike = VeinEaterArt.StrikeFrame(blow);
+                        float wound = 1 - Mathf.Min(0.5f, strike * VeinEaterArt.FrameSeconds(blow, 0) / Mathf.Max(0.1f, attack.Telegraph));
+                        if (progress < wound) (pose, frame) = (windUp, Through(windUp, progress / wound));
+                        else (pose, frame) = (blow, Mathf.Min(strike - 1, Mathf.FloorToInt((progress - wound) * attack.Telegraph / VeinEaterArt.FrameSeconds(blow, 0))));
                         break;
+                    }
                     case AttackShape.Charge:
-                        pose = VeinPose.Crouch;
+                        (pose, frame) = (VeinPose.Crouch, Through(VeinPose.Crouch, progress));
                         rage = attack.Count > 1;
-                        // Pawing the ground: the crouch rocks back and forth.
-                        frame = Mathf.FloorToInt(Time.time * 12) % 2 == 0 ? 1 : 3;
                         break;
                     case AttackShape.Burrow:
-                        pose = VeinPose.Sink;
-                        frame = Mathf.Min(3, Mathf.FloorToInt(progress / 0.35f * 3));
+                        // Digging down over the first part, then gone under the floor.
+                        (pose, frame) = (VeinPose.Sink, Through(VeinPose.Sink, progress / 0.4f));
                         break;
                     case AttackShape.Leap:
-                        pose = VeinPose.Leap;
-                        frame = progress < 0.4f ? 0 : Mathf.Min(3, 1 + Mathf.FloorToInt((progress - 0.4f) / 0.1f));
+                        (pose, frame) = (VeinPose.Leap, Through(VeinPose.Leap, progress / 0.7f));
                         break;
                     case AttackShape.Trail:
-                        pose = VeinPose.Plunge;
+                        (pose, frame) = (VeinPose.Plunge, Through(VeinPose.Plunge, progress));
                         break;
                     case AttackShape.Spiral:
-                        pose = VeinPose.Curl;
+                        (pose, frame) = (VeinPose.Curl, Through(VeinPose.Curl, progress));
                         break;
                     case AttackShape.Summon:
+                    {
                         pose = VeinPose.Roar;
-                        frame = Mathf.FloorToInt(Time.time * 8) % 2;
+                        int rise = Mathf.FloorToInt(since / 0.08f);
+                        frame = rise < VeinEaterArt.RoarRise ? rise : VeinEaterArt.RoarRise + Mathf.FloorToInt(Time.time * 10) % 4;
                         break;
+                    }
                     default:
-                        pose = VeinPose.Slam;
+                        (pose, frame) = (VeinPose.Slam, Through(VeinPose.Slam, progress));
                         break;
                 }
             }
@@ -167,41 +185,64 @@ namespace Game.Client
             {
                 // Running flat out: legs at twice the walk.
                 pose = VeinPose.Rush;
-                frame = Mathf.FloorToInt(Time.time * 14) % 4;
+                frame = Mathf.FloorToInt(Time.time * 16) % VeinEaterArt.FramesOf(pose);
                 rage = attack != null && attack.Count > 1;
             }
             else if (body.BossState == BossState.Recover && attack != null)
             {
-                if (attack.Shape == AttackShape.Spiral && since < attack.Width * 0.3f + 0.2f)
+                int last = VeinEaterArt.FramesOf(VeinPose.Curl) - 1;
+                switch (attack.Shape)
                 {
-                    // Spinning on the spot while the volleys fly.
-                    pose = VeinPose.Curl;
-                    frame = 3;
-                    sector = Mathf.FloorToInt(Time.time * 18) % 8;
-                }
-                else if (since < 0.45f)
-                {
-                    // Three frames of follow-through.
-                    frame = Mathf.Min(2, Mathf.FloorToInt(since / 0.15f));
-                    pose = attack.Shape switch
+                    case AttackShape.Spiral:
                     {
-                        AttackShape.Cone => VeinPose.Swipe,
-                        AttackShape.Burst => VeinPose.Throw,
-                        AttackShape.Burrow => VeinPose.Rise,
-                        AttackShape.Leap => VeinPose.Pound,
-                        AttackShape.Trail => VeinPose.Plunge,
-                        AttackShape.Charge => VeinPose.Crouch,
-                        AttackShape.Summon => VeinPose.Roar,
-                        _ => VeinPose.Pound,
-                    };
-                    if (attack.Shape == AttackShape.Trail) frame = 5;
-                    if (attack.Shape == AttackShape.Charge || attack.Shape == AttackShape.Summon) frame = 0;
+                        // Spinning on the spot while the volleys fly, then uncurling.
+                        float spin = attack.Width * 0.3f + 0.2f;
+                        if (since < spin)
+                        {
+                            (pose, frame) = (VeinPose.Curl, last);
+                            sector = Mathf.FloorToInt(Time.time * 18) % 8;
+                        }
+                        else if (since - spin < 0.04f * (last + 1)) (pose, frame) = (VeinPose.Curl, last - Mathf.FloorToInt((since - spin) / 0.04f));
+                        break;
+                    }
+                    case AttackShape.Charge:
+                    {
+                        // Out of the run: straightening up again.
+                        int back = VeinEaterArt.FramesOf(VeinPose.Crouch) - 1 - Mathf.FloorToInt(since / 0.03f);
+                        if (back >= 0) (pose, frame) = (VeinPose.Crouch, back);
+                        rage = attack.Count > 1;
+                        break;
+                    }
+                    case AttackShape.Trail:
+                    {
+                        // The drills held in the floor a moment, then pulled out.
+                        int plunged = VeinEaterArt.FramesOf(VeinPose.Plunge) - 1;
+                        if (since < 0.3f) (pose, frame) = (VeinPose.Plunge, plunged);
+                        else if (since - 0.3f < 0.05f * (plunged + 1)) (pose, frame) = (VeinPose.Plunge, plunged - Mathf.FloorToInt((since - 0.3f) / 0.05f));
+                        break;
+                    }
+                    case AttackShape.Summon:
+                        break;
+                    default:
+                    {
+                        // From the strike on, each frame for its own time (a burrow bursts up, a quake lands).
+                        var blow = attack.Shape == AttackShape.Leap ? VeinPose.Pound : BlowOf(attack.Shape);
+                        float left = since;
+                        for (int f = VeinEaterArt.StrikeFrame(blow); f < VeinEaterArt.FramesOf(blow); f++)
+                        {
+                            left -= VeinEaterArt.FrameSeconds(blow, f);
+                            if (left >= 0) continue;
+                            (pose, frame) = (blow, f);
+                            break;
+                        }
+                        break;
+                    }
                 }
             }
 
             var (view, turned) = BossSectors[sector];
             int phase = Mathf.Clamp(body.BossPhase, 1, 3);
-            int code = 300000 + ((((int)pose * 8 + (int)view) * 8 + frame) * 4 + phase) * 4 + (rage ? 2 : 0) + (turned ? 1 : 0);
+            int code = 300000 + ((((int)pose * 8 + (int)view) * 64 + frame) * 4 + phase) * 4 + (rage ? 2 : 0) + (turned ? 1 : 0);
             if (code == body.Frame) return;
             body.Frame = code;
             string key = $"vein/{view}/{pose}/{frame}/{phase}/{rage}";
@@ -434,9 +475,7 @@ namespace Game.Client
         // Faster than this (tiles a second) it is darting, not walking.
         const float DartSpeed = 6;
         // The sheathing ends this long after the cut.
-        const float NotoDone = 0.56f;
-        // The hand stays on the hilt, still, until then (zanshin).
-        const float ZanshinDone = 0.85f;
+        static float NotoDone => SamuraiArt.SecondsToHome;
         // How far through a draw's telegraph the blade starts easing out of the scabbard.
         const float PullFrom = 0.6f;
 
@@ -545,77 +584,69 @@ namespace Game.Client
             float since = Time.time - body.BossSince;
             int sector = SectorOf(facing);
             var pose = SamuraiPose.Idle;
-            int frame = Mathf.FloorToInt(Time.time * 1.5f) % 2;
+            int frame = Mathf.FloorToInt(Time.time * 2.4f) % SamuraiArt.FramesOf(SamuraiPose.Idle);
+            int Through(SamuraiPose p, float progress) => Mathf.Clamp(Mathf.FloorToInt(progress * SamuraiArt.FramesOf(p)), 0, SamuraiArt.FramesOf(p) - 1);
             if (dead)
             {
                 frame = 0;
             }
             else if (body.BossState == BossState.Roar)
             {
+                // The blade drawn and raised, then shaking with the shout (2026-11-13, more frames: SamuraiArt).
                 pose = SamuraiPose.Kiai;
-                frame = Mathf.FloorToInt(Time.time * 8) % 2;
+                int rise = Mathf.FloorToInt(since / 0.04f);
+                frame = rise < SamuraiArt.KiaiRise ? rise : SamuraiArt.KiaiRise + Mathf.FloorToInt(Time.time * 8) % 4;
             }
             else if (body.BossState == BossState.Charge || moving && speed > DartSpeed)
             {
                 // Dashing, or darting in: low, the blade trailing.
                 pose = SamuraiPose.Dash;
-                frame = Mathf.FloorToInt(Time.time * 16) % 4;
+                frame = Mathf.FloorToInt(Time.time * 32) % SamuraiArt.FramesOf(pose);
             }
             else if (moving && (body.BossState == BossState.Approach || body.BossState == BossState.Recover || body.BossState == BossState.Dormant))
             {
                 pose = SamuraiPose.Walk;
-                frame = Mathf.FloorToInt(body.Walked * 8) % 4;
+                frame = Mathf.FloorToInt(body.Walked * 16) % SamuraiArt.FramesOf(pose);
             }
             else if (body.BossState == BossState.Telegraph && attack != null)
             {
                 float progress = Mathf.Clamp01(since / Mathf.Max(0.1f, attack.Telegraph));
                 // The draw starts slow: held still in the stance, then the blade eased out of the scabbard over the last
-                // part of the telegraph (a cut from above eases it out first, then raises it).
+                // part of the telegraph. A cut from above takes the stance and eases the blade out quickly, then raises it.
                 if (FromAbove(attack))
                 {
-                    if (progress < 0.35f) (pose, frame) = (SamuraiPose.Pull, Mathf.Min(3, Mathf.FloorToInt(progress / 0.35f * 4)));
-                    else (pose, frame) = (SamuraiPose.Jodan, Mathf.Min(5, Mathf.FloorToInt((progress - 0.35f) / 0.65f * 6)));
+                    if (progress < 0.2f) (pose, frame) = (SamuraiPose.Stance, Through(SamuraiPose.Stance, progress / 0.2f));
+                    else if (progress < 0.35f) (pose, frame) = (SamuraiPose.Pull, Through(SamuraiPose.Pull, (progress - 0.2f) / 0.15f));
+                    else (pose, frame) = (SamuraiPose.Jodan, Through(SamuraiPose.Jodan, (progress - 0.35f) / 0.65f));
                 }
-                else if (progress < PullFrom) (pose, frame) = (SamuraiPose.Stance, Mathf.Min(5, Mathf.FloorToInt(progress / PullFrom * 6)));
-                else (pose, frame) = (SamuraiPose.Pull, Mathf.Min(3, Mathf.FloorToInt((progress - PullFrom) / (1 - PullFrom) * 4)));
+                else if (progress < PullFrom) (pose, frame) = (SamuraiPose.Stance, Through(SamuraiPose.Stance, progress / PullFrom));
+                else (pose, frame) = (SamuraiPose.Pull, Through(SamuraiPose.Pull, (progress - PullFrom) / (1 - PullFrom)));
             }
-            else if (body.BossState == BossState.Recover && attack != null && since < ZanshinDone)
+            else if (body.BossState == BossState.Recover && attack != null)
             {
-                // The cut in three quick frames (from the scabbard, or down from overhead), the blood flicked off, then
-                // the blade slid home slowly.
-                // Then all at once: out and through in a fifth of a second, the blood flicked off and the blade home
-                // almost before it is seen.
-                // After pixel-art and iaido practice (Docs/Bosses.md): one smear frame between the stance and the cut, the
-                // cut held a moment (contact), the follow-through and a recovery frame, the blade opened to the side and
-                // flicked (chiburi), slid home in three quick frames (noto) and the hand left on the hilt (zanshin).
+                // Then all at once, each frame for its own time (SamuraiArt.FrameSeconds, the person's beat): the smear,
+                // the cut held a moment, carried on and recovered; the blood shaken off; the blade turned and slid home;
+                // the hand left on the hilt (zanshin), then let go.
                 var cut = FromAbove(attack) ? SamuraiPose.Kiri : SamuraiPose.Draw;
-                if (since < 0.03f) (pose, frame) = (cut, 0);
-                else if (since < 0.18f) (pose, frame) = (cut, 1);
-                else if (since < 0.26f) (pose, frame) = (cut, 2);
-                else if (since < 0.34f) (pose, frame) = (cut, 3);
-                else if (since < 0.38f) (pose, frame) = (SamuraiPose.Chiburi, 0);
-                else if (since < 0.44f) (pose, frame) = (SamuraiPose.Chiburi, 1);
-                else if (since < NotoDone) (pose, frame) = (SamuraiPose.Noto, Mathf.Min(2, Mathf.FloorToInt((since - 0.44f) / ((NotoDone - 0.44f) / 3))));
-                else (pose, frame) = (SamuraiPose.Noto, 3);
+                float left = since;
+                foreach (var part in new[] { cut, SamuraiPose.Chiburi, SamuraiPose.Noto })
+                {
+                    for (int f = 0; f < SamuraiArt.FramesOf(part) && left >= 0; f++)
+                    {
+                        left -= SamuraiArt.FrameSeconds(part, f);
+                        if (left < 0) (pose, frame) = (part, f);
+                    }
+                    if (left < 0) break;
+                }
             }
 
-            // The body turns with the cut: wound away from the viewer while it gathers (the shoulder turned in, the
-            // scabbard drawn back), unwound toward the viewer as the blade comes through, back square as it sheathes.
-            int twist = pose switch
-            {
-                SamuraiPose.Stance => frame >= 2 ? -1 : 0,
-                SamuraiPose.Pull => -1,
-                SamuraiPose.Jodan => frame >= 3 ? -1 : 0,
-                SamuraiPose.Draw or SamuraiPose.Kiri => frame == 3 ? 0 : 1,
-                SamuraiPose.Chiburi => 1,
-                SamuraiPose.Noto => 0,
-                _ => 0,
-            };
-            sector = Twist(sector, twist);
+            // The body turns with the cut: wound away from the viewer while it gathers, unwound toward the viewer as the
+            // blade comes through, back square as it sheathes (SamuraiArt.TwistOf).
+            sector = Twist(sector, SamuraiArt.TwistOf(pose, frame));
 
             var (view, turned) = BossSectors[sector];
             int phase = Mathf.Clamp(body.BossPhase, 1, 3);
-            int code = 400000 + ((((int)pose * 8 + (int)view) * 8 + frame) * 4 + phase) * 2 + (turned ? 1 : 0);
+            int code = 400000 + ((((int)pose * 8 + (int)view) * 64 + frame) * 4 + phase) * 2 + (turned ? 1 : 0);
             if (code == body.Frame) return;
             body.Frame = code;
             string key = $"samurai/{view}/{pose}/{frame}/{phase}";

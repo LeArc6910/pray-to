@@ -456,8 +456,8 @@ namespace Game.Client
             PlayerTurn(Path.Combine(folder, "player_turn.gif"), sword, floor);
             PlayerMotions(Path.Combine(folder, "player_motions.gif"), sword, bow, staff, potion, food, floor);
             Bosses(Path.Combine(folder, "bosses.gif"), arena);
-            VeinEater(Path.Combine(folder, "vein_eater.gif"), arena);
-            Samurai(Path.Combine(folder, "samurai.gif"), arena);
+            VeinEater(folder, arena);
+            Samurai(folder, arena);
             Knight(Path.Combine(folder, "knight.gif"), arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
@@ -886,64 +886,50 @@ namespace Game.Client
             });
         }
 
-        // A row a boss. First column: turning, 0.5 seconds a way. Second and third: the pattern facing down-right and
-        // up-left: idle, a wind-up of a second, the strike, idle, a charge, idle, a roar, idle.
-        // The vein eater's walk, wind-ups and blows (2026-11-12, VeinEaterArt), a row each as WorldView plays them,
-        // facing right and facing down: walk, claw, rock throw, rush, burrow, cave-in, spikes, spin, frenzy, quake,
-        // roar.
-        static void VeinEater(string path, PixelImage arena)
+        // The vein eater's motions (2026-11-13, VeinEaterArt), each as WorldView plays it (AnimateVeinEater): walk; claw;
+        // rock throw; tunnel rush; burrow and burst up; cave-in; drill spikes; spin; quake; roar. Written with every frame
+        // in strips and a continuity report (MotionCheck): the two drill arms are tracked.
+        static void VeinEater(string folder, PixelImage arena)
         {
-            var rows = new (VeinPose Pose, int Frame, float Seconds, bool Rage, int Phase)[][]
+            MotionCheck.Step S(VeinPose pose, int frame, float seconds, int phase = 1, bool rage = false, MotionCheck.Kind kind = MotionCheck.Kind.Normal) => new MotionCheck.Step
             {
-                new[] { (VeinPose.Walk, 0, 0.14f, false, 1), (VeinPose.Walk, 1, 0.14f, false, 1), (VeinPose.Walk, 2, 0.14f, false, 1), (VeinPose.Walk, 3, 0.14f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Rear, 0, 0.13f, false, 1), (VeinPose.Rear, 1, 0.13f, false, 1), (VeinPose.Rear, 2, 0.13f, false, 1), (VeinPose.Rear, 3, 0.13f, false, 1), (VeinPose.Rear, 4, 0.13f, false, 1), (VeinPose.Rear, 5, 0.13f, false, 1), (VeinPose.Swipe, 0, 0.15f, false, 1), (VeinPose.Swipe, 1, 0.15f, false, 1), (VeinPose.Swipe, 2, 0.15f, false, 1), (VeinPose.Idle, 0, 0.3f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Lift, 0, 0.15f, false, 1), (VeinPose.Lift, 1, 0.15f, false, 1), (VeinPose.Lift, 2, 0.15f, false, 1), (VeinPose.Lift, 3, 0.15f, false, 1), (VeinPose.Lift, 4, 0.15f, false, 1), (VeinPose.Lift, 5, 0.15f, false, 1), (VeinPose.Throw, 0, 0.15f, false, 1), (VeinPose.Throw, 1, 0.15f, false, 1), (VeinPose.Throw, 2, 0.15f, false, 1), (VeinPose.Idle, 0, 0.3f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Crouch, 0, 0.1f, false, 1), (VeinPose.Crouch, 1, 0.1f, false, 1), (VeinPose.Crouch, 0, 0.1f, false, 1), (VeinPose.Crouch, 1, 0.1f, false, 1), (VeinPose.Rush, 0, 0.07f, false, 1), (VeinPose.Rush, 1, 0.07f, false, 1), (VeinPose.Rush, 2, 0.07f, false, 1), (VeinPose.Rush, 3, 0.07f, false, 1), (VeinPose.Rush, 0, 0.07f, false, 1), (VeinPose.Rush, 1, 0.07f, false, 1), (VeinPose.Rush, 2, 0.07f, false, 1), (VeinPose.Rush, 3, 0.07f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 1), (VeinPose.Sink, 0, 0.2f, false, 1), (VeinPose.Sink, 1, 0.2f, false, 1), (VeinPose.Sink, 2, 0.2f, false, 1), (VeinPose.Sink, 3, 0.5f, false, 1), (VeinPose.Rise, 0, 0.3f, false, 1) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Slam, 0, 0.2f, false, 2), (VeinPose.Slam, 1, 0.2f, false, 2), (VeinPose.Slam, 2, 0.2f, false, 2), (VeinPose.Slam, 3, 0.2f, false, 2), (VeinPose.Slam, 4, 0.2f, false, 2), (VeinPose.Slam, 5, 0.2f, false, 2), (VeinPose.Pound, 0, 0.15f, false, 2), (VeinPose.Pound, 1, 0.15f, false, 2), (VeinPose.Pound, 2, 0.15f, false, 2), (VeinPose.Idle, 0, 0.3f, false, 2) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Plunge, 0, 0.12f, false, 2), (VeinPose.Plunge, 1, 0.12f, false, 2), (VeinPose.Plunge, 2, 0.12f, false, 2), (VeinPose.Plunge, 3, 0.12f, false, 2), (VeinPose.Plunge, 4, 0.12f, false, 2), (VeinPose.Plunge, 5, 0.12f, false, 2) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 2), (VeinPose.Curl, 0, 0.12f, false, 2), (VeinPose.Curl, 1, 0.12f, false, 2), (VeinPose.Curl, 2, 0.12f, false, 2), (VeinPose.Curl, 3, 0.12f, false, 2), (VeinPose.Curl, 4, 0.12f, false, 2), (VeinPose.Curl, 5, 0.12f, false, 2) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Crouch, 0, 0.08f, true, 3), (VeinPose.Crouch, 1, 0.08f, true, 3), (VeinPose.Rush, 0, 0.07f, true, 3), (VeinPose.Rush, 1, 0.07f, true, 3), (VeinPose.Rush, 2, 0.07f, true, 3), (VeinPose.Rush, 3, 0.07f, true, 3), (VeinPose.Crouch, 0, 0.08f, true, 3), (VeinPose.Crouch, 1, 0.08f, true, 3), (VeinPose.Rush, 0, 0.07f, true, 3), (VeinPose.Rush, 1, 0.07f, true, 3), (VeinPose.Rush, 2, 0.07f, true, 3), (VeinPose.Rush, 3, 0.07f, true, 3) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Leap, 0, 0.4f, false, 3), (VeinPose.Leap, 1, 0.12f, false, 3), (VeinPose.Leap, 2, 0.12f, false, 3), (VeinPose.Leap, 3, 0.4f, false, 3), (VeinPose.Pound, 0, 0.15f, false, 3), (VeinPose.Pound, 1, 0.15f, false, 3), (VeinPose.Pound, 2, 0.15f, false, 3) },
-                new[] { (VeinPose.Idle, 0, 0.3f, false, 3), (VeinPose.Roar, 0, 0.25f, false, 3), (VeinPose.Roar, 1, 0.25f, false, 3), (VeinPose.Roar, 0, 0.25f, false, 3), (VeinPose.Roar, 1, 0.25f, false, 3) },
-            };
-            const int scale = 2;
-            int cellWidth = VeinEaterArt.Width * scale;
-            int cellHeight = VeinEaterArt.Height * scale;
-            int width = cellWidth * 2;
-            int height = cellHeight * rows.Length;
-            var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
-            for (float time = 0; time < 3.2f; time += 0.04f)
-            {
-                var pixels = new Rgba[width * height];
-                for (int row = 0; row < rows.Length; row++)
+                Label = $"{pose}{frame}", Seconds = seconds, Kind = kind,
+                Draw = view => VeinEaterArt.Draw(view, pose, frame, phase, rage),
+                Measure = view =>
                 {
-                    float total = rows[row].Sum(f => f.Seconds);
-                    float at = time % total;
-                    var step = rows[row].First();
-                    foreach (var f in rows[row])
-                    {
-                        step = f;
-                        if (at < f.Seconds) break;
-                        at -= f.Seconds;
-                    }
-                    for (int column = 0; column < 2; column++)
-                    {
-                        var image = VeinEaterArt.Draw(column == 0 ? BossView.Side : BossView.Front, step.Pose, step.Frame, step.Phase, step.Rage);
-                        for (int y = 0; y < cellHeight; y++)
-                        {
-                            for (int x = 0; x < cellWidth; x++)
-                            {
-                                var floor = arena[x / scale % arena.Width, y / scale % arena.Height];
-                                var c = image[x / scale, y / scale];
-                                pixels[(row * cellHeight + y) * width + column * cellWidth + x] = c.A > 0 ? c : floor;
-                            }
-                        }
-                    }
-                }
-                frames.Add((pixels, 4));
+                    var j = VeinEaterArt.JointsOf(view, pose, frame);
+                    return new MotionCheck.Measure { Points = new[] { (j.AX, j.AY), (j.BX, j.BY) }, Top = j.Top, Bottom = j.Bottom };
+                },
+            };
+            IEnumerable<MotionCheck.Step> Run(VeinPose pose, float seconds, int phase = 1, MotionCheck.Kind kind = MotionCheck.Kind.Normal, bool backward = false)
+            {
+                var frames = Enumerable.Range(0, VeinEaterArt.FramesOf(pose));
+                return (backward ? frames.Reverse() : frames).Select(f => S(pose, f, seconds, phase, false, kind));
             }
-            Gif.Save(path, width, height, frames);
+            IEnumerable<MotionCheck.Step> Blow(VeinPose pose, int phase = 1, bool fromStrike = false) =>
+                Enumerable.Range(fromStrike ? VeinEaterArt.StrikeFrame(pose) : 0, VeinEaterArt.FramesOf(pose) - (fromStrike ? VeinEaterArt.StrikeFrame(pose) : 0))
+                    .Select(f => S(pose, f, VeinEaterArt.FrameSeconds(pose, f), phase, false,
+                        f == VeinEaterArt.StrikeFrame(pose) ? (fromStrike ? MotionCheck.Kind.Cut : MotionCheck.Kind.Strike) : VeinEaterArt.Swinging(pose, f) ? (pose == VeinPose.Rise ? MotionCheck.Kind.Air : MotionCheck.Kind.Swing) : MotionCheck.Kind.Normal));
+            IEnumerable<MotionCheck.Step> Rest(int phase = 1) => new[] { S(VeinPose.Idle, 0, 0.4f, phase) };
+            var rows = new[]
+            {
+                Run(VeinPose.Walk, 0.1f).Concat(Run(VeinPose.Walk, 0.1f)),
+                Rest().Concat(Run(VeinPose.Rear, 0.06f)).Concat(Blow(VeinPose.Swipe)).Concat(Rest()),
+                Rest().Concat(Run(VeinPose.Lift, 0.07f)).Concat(Blow(VeinPose.Throw)).Concat(Rest()),
+                Rest().Concat(Run(VeinPose.Crouch, 0.08f)).Concat(Run(VeinPose.Rush, 0.05f)).Concat(Run(VeinPose.Rush, 0.05f))
+                    .Concat(Run(VeinPose.Crouch, 0.03f, backward: true)).Concat(Rest()),
+                Rest().Concat(Run(VeinPose.Sink, 0.1f, kind: MotionCheck.Kind.Air)).Concat(Blow(VeinPose.Rise)).Concat(Rest()),
+                Rest(2).Concat(Run(VeinPose.Slam, 0.1f, 2)).Concat(Blow(VeinPose.Pound, 2)).Concat(Rest(2)),
+                Rest(2).Concat(Run(VeinPose.Plunge, 0.08f, 2)).Concat(new[] { S(VeinPose.Plunge, VeinEaterArt.FramesOf(VeinPose.Plunge) - 1, 0.3f, 2) })
+                    .Concat(Run(VeinPose.Plunge, 0.05f, 2, backward: true)).Concat(Rest(2)),
+                Rest(2).Concat(Run(VeinPose.Curl, 0.07f, 2)).Concat(new[] { S(VeinPose.Curl, VeinEaterArt.FramesOf(VeinPose.Curl) - 1, 0.6f, 2) })
+                    .Concat(Run(VeinPose.Curl, 0.04f, 2, backward: true)).Concat(Rest(2)),
+                Rest(3).Concat(Run(VeinPose.Leap, 0.08f, 3, MotionCheck.Kind.Air)).Concat(Blow(VeinPose.Pound, 3, fromStrike: true)).Concat(Rest(3)),
+                Rest(3).Concat(Enumerable.Range(0, VeinEaterArt.RoarRise).Select(f => S(VeinPose.Roar, f, 0.08f, 3)))
+                    .Concat(Enumerable.Range(VeinEaterArt.RoarRise, 4).Select(f => S(VeinPose.Roar, f, 0.1f, 3))),
+            };
+            MotionCheck.Write(folder, "vein_eater", new[] { "walk", "claw", "throw", "rush", "burrow", "cavein", "spikes", "spin", "quake", "roar" },
+                rows.Select(r => r.ToList()).ToArray(), arena, VeinEaterArt.Width, VeinEaterArt.Height, 8);
         }
 
         // The shrine samurai's walk and iaido (2026-11-12, SamuraiArt), a row each, facing right and facing down: walk,
@@ -1097,75 +1083,46 @@ namespace Game.Client
 
         static float Distance(float x, float y) => (float)System.Math.Sqrt(x * x + y * y);
 
-        static void Samurai(string path, PixelImage arena)
+        // The shrine samurai's motions (2026-11-13, SamuraiArt), each as WorldView plays it (AnimateSamurai): walk; the
+        // iaido draw (stance, slow pull, the cut, the blood shaken off, home); the dash and draw; the cut from overhead;
+        // the shout. Written with every frame in strips and a continuity report (MotionCheck): the hand and the blade's
+        // tip are tracked.
+        static void Samurai(string folder, PixelImage arena)
         {
-            (SamuraiPose, int, float)[] Run(SamuraiPose pose, int frames, float seconds) =>
-                Enumerable.Range(0, frames).Select(f => (pose, f, seconds)).ToArray();
-            // As WorldView times them (AnimateSamurai): a slow pull from the scabbard, the cut in a fifth of a second, the
-            // blade flicked and home in a tenth.
-            (SamuraiPose, int, float)[] Sheathe() => new[] { (SamuraiPose.Chiburi, 0, 0.04f), (SamuraiPose.Chiburi, 1, 0.06f) }.Concat(Run(SamuraiPose.Noto, 3, 0.04f))
-                .Concat(new[] { (SamuraiPose.Noto, 3, 0.3f), (SamuraiPose.Idle, 0, 0.3f) }).ToArray();
-            (SamuraiPose, int, float)[] Cut(SamuraiPose pose) => new[] { (pose, 0, 0.04f), (pose, 1, 0.16f), (pose, 2, 0.08f), (pose, 3, 0.08f) };
+            MotionCheck.Step S(SamuraiPose pose, int frame, float seconds, MotionCheck.Kind kind = MotionCheck.Kind.Normal)
+            {
+                int twist = SamuraiArt.TwistOf(pose, frame);
+                return new MotionCheck.Step
+                {
+                    Label = $"{pose}{frame}", Seconds = seconds, Kind = kind,
+                    SideView = twist < 0 ? BossView.BackSide : twist > 0 ? BossView.FrontSide : BossView.Side,
+                    Draw = view => SamuraiArt.Draw(view, pose, frame, 1),
+                    Measure = view =>
+                    {
+                        var j = SamuraiArt.JointsOf(view, pose, frame);
+                        return new MotionCheck.Measure { Points = new[] { (j.HandX, j.HandY), (j.TipX, j.TipY) }, Top = j.Top, Bottom = j.Bottom };
+                    },
+                };
+            }
+            IEnumerable<MotionCheck.Step> Run(SamuraiPose pose, float seconds) => Enumerable.Range(0, SamuraiArt.FramesOf(pose)).Select(f => S(pose, f, seconds));
+            // The cut and all after it, each frame for its own time: the smear and the snap of the blade out are instant.
+            IEnumerable<MotionCheck.Step> Cut(SamuraiPose cut) =>
+                Enumerable.Range(0, SamuraiArt.FramesOf(cut)).Select(f => S(cut, f, SamuraiArt.FrameSeconds(cut, f), f <= 1 ? MotionCheck.Kind.Instant : MotionCheck.Kind.Swing))
+                    .Concat(Enumerable.Range(0, SamuraiArt.FramesOf(SamuraiPose.Chiburi)).Select(f => S(SamuraiPose.Chiburi, f, SamuraiArt.FrameSeconds(SamuraiPose.Chiburi, f), f == 2 ? MotionCheck.Kind.Swing : MotionCheck.Kind.Normal)))
+                    .Concat(Enumerable.Range(0, SamuraiArt.FramesOf(SamuraiPose.Noto)).Select(f => S(SamuraiPose.Noto, f, SamuraiArt.FrameSeconds(SamuraiPose.Noto, f), f < SamuraiArt.NotoHome + 1 ? MotionCheck.Kind.Swing : MotionCheck.Kind.Normal)));
+            var rest = new[] { S(SamuraiPose.Idle, 0, 0.4f) };
             var rows = new[]
             {
-                Run(SamuraiPose.Walk, 4, 0.14f).Concat(Run(SamuraiPose.Walk, 4, 0.14f)).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.1f)).Concat(Run(SamuraiPose.Pull, 4, 0.12f)).Concat(Cut(SamuraiPose.Draw))
-                    .Concat(Sheathe()).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Stance, 6, 0.1f)).Concat(Run(SamuraiPose.Dash, 4, 0.05f))
-                    .Concat(Cut(SamuraiPose.Draw)).Concat(Sheathe()).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f) }.Concat(Run(SamuraiPose.Pull, 4, 0.1f)).Concat(Run(SamuraiPose.Jodan, 6, 0.12f)).Concat(Cut(SamuraiPose.Kiri))
-                    .Concat(Sheathe()).ToArray(),
-                new[] { (SamuraiPose.Idle, 0, 0.3f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f), (SamuraiPose.Kiai, 0, 0.2f), (SamuraiPose.Kiai, 1, 0.2f) },
+                Run(SamuraiPose.Walk, 0.07f).Concat(Run(SamuraiPose.Walk, 0.07f)),
+                rest.Concat(Run(SamuraiPose.Stance, 0.05f)).Concat(Run(SamuraiPose.Pull, 0.05f)).Concat(Cut(SamuraiPose.Draw)).Concat(rest),
+                rest.Concat(Run(SamuraiPose.Stance, 0.05f)).Concat(new[] { S(SamuraiPose.Dash, 0, 0.03f, MotionCheck.Kind.Strike) })
+                    .Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Dash, f, 0.03f))).Concat(new[] { S(SamuraiPose.Draw, 0, 0.03f, MotionCheck.Kind.Cut) })
+                    .Concat(Cut(SamuraiPose.Draw).Skip(1)).Concat(rest),
+                rest.Concat(Run(SamuraiPose.Stance, 0.03f)).Concat(Run(SamuraiPose.Pull, 0.03f)).Concat(Run(SamuraiPose.Jodan, 0.035f)).Concat(Cut(SamuraiPose.Kiri)).Concat(rest),
+                rest.Concat(Run(SamuraiPose.Kiai, 0.04f)).Concat(Enumerable.Range(SamuraiArt.KiaiRise, 4).Select(f => S(SamuraiPose.Kiai, f, 0.12f))),
             };
-            const int scale = 2;
-            int cellWidth = SamuraiArt.Width * scale;
-            int cellHeight = SamuraiArt.Height * scale;
-            int width = cellWidth * 2;
-            int height = cellHeight * rows.Length;
-            var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
-            for (float time = 0; time < 3.4f; time += 0.02f)
-            {
-                var pixels = new Rgba[width * height];
-                for (int row = 0; row < rows.Length; row++)
-                {
-                    float at = time % rows[row].Sum(f => f.Item3);
-                    var step = rows[row][0];
-                    foreach (var f in rows[row])
-                    {
-                        step = f;
-                        if (at < f.Item3) break;
-                        at -= f.Item3;
-                    }
-                    for (int column = 0; column < 2; column++)
-                    {
-                        // The body turns with the cut as WorldView turns it (AnimateSamurai): away while it gathers,
-                        // toward the viewer through the cut. Shown on the side view.
-                        int twist = step.Item1 switch
-                        {
-                            SamuraiPose.Stance => step.Item2 >= 2 ? -1 : 0,
-                            SamuraiPose.Pull => -1,
-                            SamuraiPose.Jodan => step.Item2 >= 3 ? -1 : 0,
-                            SamuraiPose.Draw or SamuraiPose.Kiri => step.Item2 == 3 ? 0 : 1,
-                            SamuraiPose.Chiburi => 1,
-                            SamuraiPose.Noto => 0,
-                            _ => 0,
-                        };
-                        var sideView = twist < 0 ? BossView.BackSide : twist > 0 ? BossView.FrontSide : BossView.Side;
-                        var image = SamuraiArt.Draw(column == 0 ? sideView : BossView.Front, step.Item1, step.Item2, 1);
-                        for (int y = 0; y < cellHeight; y++)
-                        {
-                            for (int x = 0; x < cellWidth; x++)
-                            {
-                                var floor = arena[x / scale % arena.Width, y / scale % arena.Height];
-                                var c = image[x / scale, y / scale];
-                                pixels[(row * cellHeight + y) * width + column * cellWidth + x] = c.A > 0 ? c : floor;
-                            }
-                        }
-                    }
-                }
-                frames.Add((pixels, 2));
-            }
-            Gif.Save(path, width, height, frames);
+            MotionCheck.Write(folder, "samurai", new[] { "walk", "iai", "dash", "kiri", "kiai" }, rows.Select(r => r.ToList()).ToArray(), arena,
+                SamuraiArt.Width, SamuraiArt.Height, 7);
         }
 
         static void Bosses(string path, PixelImage arena)
