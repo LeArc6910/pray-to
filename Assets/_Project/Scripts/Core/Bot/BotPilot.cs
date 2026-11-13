@@ -472,7 +472,7 @@ namespace Game.Core
         // Standing in a warning on the floor (not a share marker): toward the nearest spot out of every one.
         Vec2? WayOutOfDanger()
         {
-            bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Contains(at, World.PlayerRadius));
+            bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Contains(at, World.PlayerRadius));
             if (!Danger(_player.Position)) return null;
             foreach (float reach in new[] { 1.5f, 2.5f, 3.5f, 5f })
             {

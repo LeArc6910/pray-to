@@ -59,6 +59,11 @@ namespace Game.Client
         Hammer,
         // A monster tramping through a crop at night: leaves crushed and a dull thud (2026-11-09).
         Trample,
+        // The silk mother (2026-11-13): its hiss, the wet slap of silk or venom landing, and the dry ticking of its
+        // feet as it runs.
+        Hiss,
+        Squelch,
+        Skitter,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -163,6 +168,24 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Triangle, 0, 0.09f, 420, 300, 0.5f, decay: 6));
                     parts.Add(Noise(0, 0.025f, 0.3f, 0.8f, decay: 9));
                     level = 0.45f;
+                    break;
+                case Sound.Hiss:
+                    parts.Add(Noise(0, 0.55f, 0.8f, 0.9f, attack: 0.04f, decay: 2.2f, seed: 41));
+                    parts.Add(Noise(0.05f, 0.4f, 0.4f, 0.97f, attack: 0.08f, decay: 3, seed: 42));
+                    parts.Add(Tone(Wave.Saw, 0, 0.45f, 1900, 1300, 0.12f, decay: 2, vibrato: 0.06f, vibratoRate: 31));
+                    level = 0.6f;
+                    break;
+                case Sound.Squelch:
+                    parts.Add(Noise(0, 0.16f, 0.9f, 0.3f, attack: 0.004f, decay: 5, seed: 43));
+                    parts.Add(Tone(Wave.Sine, 0, 0.14f, 420, 150, 0.5f, decay: 4));
+                    parts.Add(Tone(Wave.Sine, 0.07f, 0.1f, 260, 520, 0.25f, decay: 5));
+                    level = 0.6f;
+                    break;
+                case Sound.Skitter:
+                    parts.Add(Noise(0, 0.025f, 0.7f, 0.9f, decay: 8, seed: 44));
+                    parts.Add(Tone(Wave.Square, 0, 0.02f, 2400, 1800, 0.25f, decay: 8));
+                    parts.Add(Noise(0.05f, 0.02f, 0.5f, 0.92f, decay: 8, seed: 45));
+                    level = 0.35f;
                     break;
                 case Sound.Trample:
                     parts.Add(Noise(0, 0.2f, 0.55f, 0.35f, decay: 3, seed: 7));
@@ -573,7 +596,7 @@ namespace Game.Client
             : monster.Contains("wisp") ? CreatureVoice.Wisp
             : monster.Contains("crab") ? CreatureVoice.Crab
             : monster.Contains("worm") || monster.Contains("demon") ? CreatureVoice.Worm
-            : monster.Contains("beetle") || monster.Contains("stalker") || monster.Contains("scorpion") ? CreatureVoice.Bug
+            : monster.Contains("beetle") || monster.Contains("stalker") || monster.Contains("scorpion") || monster.Contains("spider") ? CreatureVoice.Bug
             : CreatureVoice.Slime;
 
         public static float[] Creature(CreatureVoice creature, Voice voice)

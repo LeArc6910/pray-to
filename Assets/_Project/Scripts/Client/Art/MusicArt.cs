@@ -154,6 +154,8 @@ namespace Game.Client
         // Phrygian with a major third, the "hijaz" of desert tunes.
         static readonly int[] Hijaz = { 0, 1, 4, 5, 7, 8, 10 };
         static readonly int[] Major = { 0, 2, 4, 5, 7, 9, 11 };
+        // The darkest of them: a flat second and a flat fifth, nothing to rest on.
+        static readonly int[] Locrian = { 0, 1, 3, 5, 6, 8, 10 };
         static readonly int[] Mixolydian = { 0, 2, 4, 5, 7, 9, 10 };
 
         static Style StyleOf(Tune tune) => tune switch
@@ -399,6 +401,15 @@ namespace Game.Client
                 Bpm = 84, Root = 38, Scale = Minor, Chords = new[] { 0, 5, 3, 4 }, BarsPerChord = 2, Bars = 16, Bass = Wave.Saw, BassNotes = 2,
                 Lead = Wave.Square, LeadOctave = 0, LeadVolume = 0.18f, Arp = Wave.Triangle, ArpRate = 1, ArpVolume = 0.08f, Rest = 0.4f,
                 Pad = Wave.Saw, PadVolume = 0.07f, Kick = "x.......x.......", Snare = "........X.......", Tom = "x.....x.x.......", Echo = 0.3f, Seed = 31,
+            },
+            // The silk mother (2026-11-13): locrian, with nowhere to rest. A plucked pulse that scuttles in sixteenths
+            // like eight feet, a thin high bell over a low drone, ticking hats and almost no drum: the dread is in the
+            // quiet, and each phase tightens it.
+            "silk_mother" => new Style
+            {
+                Bpm = 132, Root = 40, Scale = Locrian, Chords = new[] { 0, 4, 1, 0 }, BarsPerChord = 2, Bars = 16, Bass = Wave.Triangle, BassNotes = 2,
+                Lead = Wave.Bell, LeadOctave = 1, LeadVolume = 0.2f, Arp = Wave.Pulse, ArpRate = 4, ArpVolume = 0.12f, Rest = 0.5f,
+                Pad = Wave.Saw, PadVolume = 0.045f, Kick = "x.........x.....", Tek = "x.xx..x.x.xx..x.", Hat = "..x...x...x...xx", Tom = "............x.x.", Echo = 0.4f, Seed = 32,
             },
             // Any other boss: fast harmonic minor with driving drums.
             _ => new Style

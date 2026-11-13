@@ -187,7 +187,7 @@ namespace Game.Core
         public bool Sleeping { get; internal set; }
         internal Vec2 SleptAt { get; set; }
         // How fast the player may move now: slower while chilled.
-        public float MoveSpeed => Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1);
+        public float MoveSpeed => Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1) * (Afflictions.Snared ? World.PlayerSnareSpeed : 1);
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
         public ConsumableDefinition Food { get; private set; }
         public int FoodTicks { get; private set; }
@@ -575,6 +575,10 @@ namespace Game.Core
         Ring,
         // A circle whose damage is shared among the players in it.
         Share,
+        // What a circle left behind (2026-11-13, PoolKind): a web that snares whoever is in it, a pool of venom that
+        // hurts whoever stands in it, each until its ResolveTick, when it is simply gone.
+        Web,
+        Venom,
     }
 
     // A marked area that hurts every player inside it when ResolveTick comes. Zero damage marks a charge's path.
@@ -609,6 +613,8 @@ namespace Game.Core
         public int Damage { get; }
         public long StartTick { get; }
         public long ResolveTick { get; }
+        // A web or a pool of venom: it does its work while it lies there, and nothing when its time is up.
+        public bool Lingers => Shape == HazardShape.Web || Shape == HazardShape.Venom;
 
         // Whether a circle of the given radius at point touches the area.
         public bool Contains(Vec2 point, float radius)
@@ -620,6 +626,10 @@ namespace Game.Core
                 case HazardShape.Circle:
                 case HazardShape.Share:
                     return distance <= Size + radius;
+                case HazardShape.Web:
+                case HazardShape.Venom:
+                    // A pool takes whoever's feet are in it, not whoever brushes its edge.
+                    return distance <= Size;
                 case HazardShape.Ring:
                     return distance <= Size + radius && distance >= Width - radius;
                 case HazardShape.Cone:

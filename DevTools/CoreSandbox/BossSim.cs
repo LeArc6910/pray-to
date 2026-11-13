@@ -151,6 +151,11 @@ namespace CoreSandbox
         internal static Vec2 Escape(World world, Player player, int reactionTicks)
         {
             var away = Vec2.Zero;
+            // Beams that cross where the bot stands (a star of them, 2026-11-13): their sideways pushes cancel, so it
+            // heads out from the crossing and toward the edge of the beam it is nearest to leaving.
+            int beams = 0;
+            var outOfStar = Vec2.Zero;
+            float widest = -1;
             foreach (var hazard in world.Hazards)
             {
                 if (world.Tick - hazard.StartTick < reactionTicks) continue;
@@ -160,7 +165,15 @@ namespace CoreSandbox
                 {
                     // Sideways, toward whichever edge is nearer.
                     var side = new Vec2(-hazard.Direction.Y, hazard.Direction.X);
-                    away += side * (Vec2.Dot(offset, side) >= 0 ? 1 : -1);
+                    float across = Vec2.Dot(offset, side);
+                    away += side * (across >= 0 ? 1 : -1);
+                    beams++;
+                    if (MathF.Abs(across) > widest)
+                    {
+                        widest = MathF.Abs(across);
+                        var fromMiddle = player.Position - (hazard.Position + hazard.Direction * (hazard.Size / 2));
+                        outOfStar = (fromMiddle.LengthSquared > 1e-4f ? fromMiddle.Normalized : hazard.Direction) + side * (across >= 0 ? 1 : -1);
+                    }
                 }
                 else if (hazard.Shape == HazardShape.Ring)
                 {
@@ -169,8 +182,9 @@ namespace CoreSandbox
                     var outward = distance > 1e-4f ? offset / distance : new Vec2(1, 0);
                     away += distance - hazard.Width < hazard.Size - distance ? outward * -1 : outward;
                 }
-                else if (hazard.Shape == HazardShape.Share)
+                else if (hazard.Shape == HazardShape.Share || hazard.Shape == HazardShape.Web)
                 {
+                    // A web only slows: a bot walks through it to get at the boss.
                     // Taken together: the bots stay in and share it (alone, the one in it takes it all).
                     continue;
                 }
@@ -191,6 +205,7 @@ namespace CoreSandbox
                 if (MathF.Abs(across) > projectile.Radius + World.PlayerRadius + 0.2f) continue;
                 away += side * (across >= 0 ? 1 : -1);
             }
+            if (beams >= 2 && away.Length < 1.2f) away = outOfStar;
             return away.Normalized;
         }
     }

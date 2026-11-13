@@ -332,6 +332,18 @@ namespace Game.Core
                 case AttackShape.Cross:
                     var crossing = attack.Target == AttackTarget.Self ? boss.Position : target.Position;
                     float turn = attack.Angle * MathF.PI / 180f;
+                    if (attack.Count >= 2)
+                    {
+                        // A star (2026-11-13, the silk mother's eight legs): count pairs of beams evenly turned, each arm
+                        // laid by itself from radius out to length, so the middle is clear and no arm lies on another.
+                        int arms = 4 * attack.Count;
+                        for (int arm = 0; arm < arms; arm++)
+                        {
+                            var outward = Vec2.FromAngle(turn + arm * 2 * MathF.PI / arms);
+                            AddHazard(boss, cause, HazardShape.Line, crossing + outward * attack.Radius, outward, attack.Length - attack.Radius, attack.Width, attack.Damage, resolve);
+                        }
+                        break;
+                    }
                     for (int arm = 0; arm < 2; arm++)
                     {
                         var along = Vec2.FromAngle(turn + arm * MathF.PI / 2);
@@ -570,14 +582,54 @@ namespace Game.Core
             for (int i = _hazards.Count - 1; i >= 0; i--)
             {
                 var hazard = _hazards[i];
+                if (hazard.Lingers)
+                {
+                    if (Tick >= hazard.ResolveTick) _hazards.RemoveAt(i);
+                    else Linger(hazard);
+                    continue;
+                }
                 if (Tick < hazard.ResolveTick) continue;
                 _hazards.RemoveAt(i);
+                LeavePool(hazard);
                 if (hazard.Damage <= 0) continue;
                 var hit = _players.Where(p => !p.IsDead && hazard.Contains(p.Position, PlayerRadius)).ToList();
                 // A shared circle splits its damage among everyone in it; alone, one takes it all.
                 int damage = hazard.Shape == HazardShape.Share ? (int)MathF.Ceiling(hazard.Damage / (float)Math.Max(1, hit.Count)) : hazard.Damage;
                 foreach (var player in hit) AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
                 _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size)));
+            }
+        }
+
+        // What a landed circle leaves behind (boss_attacks.csv pool): a web or a pool of venom the same size, for the
+        // attack's linger. Too many at once and the oldest goes: the arena fills but never wholly, and with a star's
+        // eight arms marked as well they still fit in a snapshot (WorldHost.MaxHazardsPerSnapshot).
+        public const int MaxPools = 6;
+
+        void LeavePool(Hazard hazard)
+        {
+            if (hazard.Shape != HazardShape.Circle || hazard.Cause <= 0) return;
+            var boss = FindBoss(hazard.Source);
+            if (boss == null || boss.IsDead || hazard.Cause > boss.Definition.Attacks.Count) return;
+            var attack = boss.Definition.Attacks[hazard.Cause - 1];
+            if (attack.Pool == PoolKind.None) return;
+            var pools = _hazards.Where(h => h.Lingers && h.Source == boss.Id).OrderBy(h => h.StartTick).ToList();
+            if (pools.Count >= MaxPools) _hazards.Remove(pools[0]);
+            bool web = attack.Pool == PoolKind.Web;
+            int damage = web ? 0 : Math.Max(1, (int)MathF.Round(attack.Damage * VenomShare));
+            _hazards.Add(new Hazard(_nextId++, boss.Id, hazard.Cause, web ? HazardShape.Web : HazardShape.Venom, hazard.Position, hazard.Direction,
+                hazard.Size, 0, damage, Tick, Tick + Ticks(attack.Linger)));
+        }
+
+        // A web snares whoever is in it; venom hurts whoever stands in it, every VenomSeconds from when it fell.
+        void Linger(Hazard pool)
+        {
+            bool bites = pool.Shape == HazardShape.Venom && Tick > pool.StartTick && (Tick - pool.StartTick) % Ticks(VenomSeconds) == 0;
+            if (pool.Shape != HazardShape.Web && !bites) return;
+            foreach (var player in _players)
+            {
+                if (player.IsDead || !pool.Contains(player.Position, PlayerRadius)) continue;
+                if (pool.Shape == HazardShape.Web) player.Afflictions.SnareTicks = Math.Max(player.Afflictions.SnareTicks, Ticks(SnareSeconds));
+                else HurtPlayer(player, pool.Source, pool.Damage, pool.Cause, armor: false);
             }
         }
 

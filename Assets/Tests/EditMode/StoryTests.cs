@@ -276,13 +276,13 @@ namespace Game.Core.Tests
         public void TheNestsLordHasAnArenaBesideIt([Range(1, 24)] int seed)
         {
             // The nest's, (2026-11-11) the harbour's and (2026-11-12) the mining village's, the forgotten shrine's and
-            // the hero's hut's: places.csv arena.
+            // the hero's hut's: places.csv arena. And (2026-11-13) the shrine's second, the silk mother's ("old_temple:2").
             var generated = WorldGenerator.Generate((ulong)seed, story: Tales.Shipped);
-            Assert.AreEqual(generated.CaveArenas + 5, generated.Arenas.Count);
-            foreach (string id in new[] { "demon_nest", "mist_harbor", "iron_valley", "old_temple", "hero_hut" })
+            Assert.AreEqual(generated.CaveArenas + 6, generated.Arenas.Count);
+            foreach (string id in new[] { "demon_nest", "mist_harbor", "iron_valley", "old_temple", "hero_hut", "old_temple:2" })
             {
                 Assert.IsTrue(generated.PlaceArenas.TryGetValue(id, out var arena), $"seed {seed}: no arena by {id}");
-                var place = generated.Places.Single(p => p.Definition.Id == id);
+                var place = generated.Places.Single(p => p.Definition.Id == id.Split(':')[0]);
                 foreach (var other in generated.Places.Where(p => p != place))
                     Assert.Greater(Vec2.Distance(other.Center, arena), other.Radius + WorldGenerator.ArenaRadius, $"seed {seed}: {id}'s arena on {other.Definition.Id}");
                 var field = new FlowField(generated.Map);

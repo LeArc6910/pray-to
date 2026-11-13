@@ -33,7 +33,7 @@ namespace Game.Client
     //   hearts <person> <n>       that many hearts with the person (merchant, blacksmith, fisher)
     //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health> | use <attack>
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
-    //   goto spawn | <dx> <dy> | boss <id> | biome <name> | tile <type> | near <type>
+    //   goto spawn | <dx> <dy> | boss <id> | pool | biome <name> | tile <type> | near <type>
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
@@ -350,6 +350,12 @@ namespace Game.Client
                     var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[2]) ?? throw new ArgumentException($"no boss '{words[2]}' standing");
                     to = Nearest(map, TileMap.Cell(boss.Home.X), TileMap.Cell(boss.Home.Y) - 4, (x, y) => Walkable(map, x, y))
                         ?? throw new InvalidOperationException("no floor in the arena");
+                    break;
+                // The middle of the nearest web or pool of venom a boss's blow left on the floor (2026-11-13).
+                case "pool":
+                    var pool = world.Hazards.Where(h => h.Lingers).OrderBy(h => Vec2.Distance(h.Position, player.Position)).FirstOrDefault()
+                        ?? throw new InvalidOperationException("no web or pool on the floor");
+                    to = pool.Position;
                     break;
                 case "biome":
                     var biome = (Biome)Enum.Parse(typeof(Biome), words[2], ignoreCase: true);
@@ -756,7 +762,7 @@ namespace Game.Client
                 json.Field("bossAt", awake == null ? null : $"{awake.Position.X - player.Position.X:0.00},{awake.Position.Y - player.Position.Y:0.00}");
                 // Standing in a warning on the floor: the nearest way out of every warning (a share marker is to stand
                 // in), or 0,0 when there is none; null when safe.
-                bool Danger(Vec2 at) => world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Contains(at, World.PlayerRadius));
+                bool Danger(Vec2 at) => world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Contains(at, World.PlayerRadius));
                 if (Danger(player.Position))
                 {
                     string way = "0,0";
@@ -779,6 +785,11 @@ namespace Game.Client
                 // the vein eater announces only by its wind-up lays hazards no one sees, 2026-11-12).
                 json.Field("marksShown", root.MarksShown);
                 json.Field("warningSign", root.WarningShown);
+                // What the silk mother's blows left on the floor: webs and pools of venom (in the world, and drawn), and
+                // whether the player is caught in a web (2026-11-13).
+                json.Field("pools", world.Hazards.Count(h => h.Lingers));
+                json.Field("poolsShown", root.PoolsShown);
+                json.Field("snared", player.Afflictions.Snared);
                 json.Field("renderTrace", root.RenderTrace);
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
                 // The nearest copper vein within 16 tiles, as the minimap marks it (MapView.Sense).

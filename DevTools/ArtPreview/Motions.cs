@@ -442,6 +442,30 @@ namespace Game.Client
 
         // ---- The pictures ----
 
+        // One boss's motions alone (Program's --only).
+        public static bool WriteOnly(string folder, string name)
+        {
+            var arena = TileArt.Ground(TileArt.Index(GroundKind.Arena, 0, 0));
+            switch (name)
+            {
+                case "spider":
+                    Spider(folder, arena);
+                    return true;
+                case "knight":
+                    Knight(Path.Combine(folder, "knight.gif"), arena);
+                    return true;
+                case "samurai":
+                    Samurai(folder, arena);
+                    return true;
+                case "vein_eater":
+                    VeinEater(folder, arena);
+                    return true;
+                default:
+                    Console.Error.WriteLine($"--only {name}: spider, knight, samurai or vein_eater");
+                    return false;
+            }
+        }
+
         public static void Write(string folder, LootData loot, MonsterData monsters, NpcData npcs)
         {
             Directory.CreateDirectory(folder);
@@ -459,6 +483,7 @@ namespace Game.Client
             VeinEater(folder, arena);
             Samurai(folder, arena);
             Knight(Path.Combine(folder, "knight.gif"), arena);
+            Spider(folder, arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
             StoryPeople(Path.Combine(folder, "story_people.gif"), floor);
@@ -930,6 +955,86 @@ namespace Game.Client
             };
             MotionCheck.Write(folder, "vein_eater", new[] { "walk", "claw", "throw", "rush", "burrow", "cavein", "spikes", "spin", "quake", "roar" },
                 rows.Select(r => r.ToList()).ToArray(), arena, VeinEaterArt.Width, VeinEaterArt.Height, 8);
+        }
+
+        // The silk mother's motions (2026-11-13, SpiderArt), each as WorldView plays it (AnimateSpider): rest, the
+        // wind-up through a telegraph, the blow with its swing in the telegraph's last moment, back to rest. A row each,
+        // facing right and facing the viewer: walk; rear and bite; cock and stab; spin and shoot; crouch, run and skid;
+        // gape and spit; up its thread and down; all eight legs up and down; screech; flinch; death. All eight feet, the
+        // mouth and the abdomen are tracked (spider_continuity.txt). And every pose's key frame turned all eight ways
+        // (spider_turn.png).
+        static void Spider(string folder, PixelImage arena)
+        {
+            MotionCheck.Step S(SpiderPose pose, int frame, float seconds, int phase = 1, MotionCheck.Kind kind = MotionCheck.Kind.Normal) => new MotionCheck.Step
+            {
+                Label = $"{pose}{frame}", Seconds = seconds, Kind = kind,
+                Draw = view => SpiderArt.Draw(view, pose, frame, phase),
+                Measure = view =>
+                {
+                    var j = SpiderArt.JointsOf(view, pose, frame);
+                    return new MotionCheck.Measure { Points = j.Feet.Concat(new[] { (j.MouthX, j.MouthY), (j.AbdomenX, j.AbdomenY) }).ToArray(), Top = j.Top, Bottom = j.Bottom };
+                },
+            };
+            IEnumerable<MotionCheck.Step> Run(SpiderPose pose, float seconds, int phase = 1, MotionCheck.Kind kind = MotionCheck.Kind.Normal, int from = 0) =>
+                Enumerable.Range(from, SpiderArt.FramesOf(pose) - from).Select(f => S(pose, f, seconds, phase, kind));
+            IEnumerable<MotionCheck.Step> Blow(SpiderPose pose, int phase = 1, bool fromStrike = false) =>
+                Enumerable.Range(fromStrike ? SpiderArt.StrikeFrame(pose) : 0, SpiderArt.FramesOf(pose) - (fromStrike ? SpiderArt.StrikeFrame(pose) : 0))
+                    .Select(f => S(pose, f, SpiderArt.FrameSeconds(pose, f), phase,
+                        f == SpiderArt.StrikeFrame(pose) ? (fromStrike ? MotionCheck.Kind.Cut : MotionCheck.Kind.Strike) : SpiderArt.Swinging(pose, f) ? MotionCheck.Kind.Swing : MotionCheck.Kind.Normal));
+            IEnumerable<MotionCheck.Step> Rest(int phase = 1) => new[] { S(SpiderPose.Idle, 0, 0.4f, phase) };
+            var rows = new[]
+            {
+                Run(SpiderPose.Walk, 0.04f).Concat(Run(SpiderPose.Walk, 0.04f)).Concat(Run(SpiderPose.Walk, 0.04f)),
+                Run(SpiderPose.Idle, 0.3f).Concat(Run(SpiderPose.Idle, 0.3f)),
+                Rest().Concat(Run(SpiderPose.Rear, 0.06f)).Concat(Blow(SpiderPose.Bite)).Concat(Rest()),
+                Rest().Concat(Run(SpiderPose.Cock, 0.075f)).Concat(Blow(SpiderPose.Stab)).Concat(Rest()),
+                Rest().Concat(Run(SpiderPose.Spin, 0.075f)).Concat(Blow(SpiderPose.Shoot)).Concat(Rest()),
+                Rest().Concat(Run(SpiderPose.Crouch, 0.1f)).Concat(Run(SpiderPose.Spring, 0.025f, kind: MotionCheck.Kind.Swing)).Concat(Run(SpiderPose.Rush, 0.04f, kind: MotionCheck.Kind.Swing)).Concat(Run(SpiderPose.Rush, 0.04f, kind: MotionCheck.Kind.Swing))
+                    .Concat(Run(SpiderPose.Skid, 0.05f, from: 1)).Concat(Rest()),
+                Rest(2).Concat(Run(SpiderPose.Gape, 0.07f, 2)).Concat(Blow(SpiderPose.Spit, 2)).Concat(Rest(2)),
+                Rest(2).Concat(Run(SpiderPose.Gather, 0.1f, 2)).Concat(Run(SpiderPose.Rise, 0.035f, 2, MotionCheck.Kind.Air))
+                    .Concat(new[] { S(SpiderPose.Rise, SpiderArt.FramesOf(SpiderPose.Rise) - 1, 0.4f, 2) })
+                    .Concat(Blow(SpiderPose.Land, 2, fromStrike: true)).Concat(Rest(2)),
+                Rest(3).Concat(Run(SpiderPose.Splay, 0.12f, 3)).Concat(Blow(SpiderPose.Slam, 3)).Concat(Rest(3)),
+                Rest(3).Concat(Enumerable.Range(0, SpiderArt.ScreechRise).Select(f => S(SpiderPose.Screech, f, 0.07f, 3)))
+                    .Concat(Enumerable.Range(0, 8).Select(i => S(SpiderPose.Screech, SpiderArt.ScreechRise + i % 4, 0.08f, 3))),
+                Rest().Concat(Run(SpiderPose.Flinch, 0.05f)).Concat(Rest()),
+                Rest(3).Concat(Run(SpiderPose.Die, 0.07f, 3)).Concat(new[] { S(SpiderPose.Die, SpiderArt.FramesOf(SpiderPose.Die) - 1, 0.8f, 3) }),
+            };
+            MotionCheck.Write(folder, "spider", new[] { "walk", "idle", "bite", "stab", "web", "pounce", "spit", "drop", "eightlegs", "screech", "flinch", "die" },
+                rows.Select(r => r.ToList()).ToArray(), arena, SpiderArt.Width, SpiderArt.Height, 7);
+
+            // Each pose's telling frame, turned all eight ways as WorldView turns it (five views, three of them flipped).
+            var poses = new (SpiderPose Pose, int Frame, int Phase)[]
+            {
+                (SpiderPose.Idle, 0, 1), (SpiderPose.Walk, 3, 1), (SpiderPose.Rear, SpiderArt.FramesOf(SpiderPose.Rear) - 1, 1), (SpiderPose.Bite, SpiderArt.StrikeFrame(SpiderPose.Bite), 1),
+                (SpiderPose.Cock, SpiderArt.FramesOf(SpiderPose.Cock) - 1, 1), (SpiderPose.Stab, SpiderArt.StrikeFrame(SpiderPose.Stab), 1),
+                (SpiderPose.Spin, SpiderArt.FramesOf(SpiderPose.Spin) - 1, 1), (SpiderPose.Crouch, SpiderArt.FramesOf(SpiderPose.Crouch) - 1, 1), (SpiderPose.Rush, 2, 1),
+                (SpiderPose.Gape, SpiderArt.FramesOf(SpiderPose.Gape) - 1, 2), (SpiderPose.Gather, SpiderArt.FramesOf(SpiderPose.Gather) - 1, 2), (SpiderPose.Rise, 6, 2),
+                (SpiderPose.Land, SpiderArt.StrikeFrame(SpiderPose.Land), 2), (SpiderPose.Splay, SpiderArt.FramesOf(SpiderPose.Splay) - 1, 3), (SpiderPose.Slam, SpiderArt.StrikeFrame(SpiderPose.Slam), 3),
+                (SpiderPose.Screech, SpiderArt.ScreechRise, 3), (SpiderPose.Die, SpiderArt.FramesOf(SpiderPose.Die) - 1, 3),
+            };
+            // Clockwise from facing right: right, down-right, down, down-left, left, up-left, up, up-right.
+            var ways = new (BossView View, bool Flip)[]
+            {
+                (BossView.Side, false), (BossView.FrontSide, false), (BossView.Front, false), (BossView.FrontSide, true),
+                (BossView.Side, true), (BossView.BackSide, true), (BossView.Back, false), (BossView.BackSide, false),
+            };
+            var sheet = new PixelImage(ways.Length * SpiderArt.Width, poses.Length * SpiderArt.Height);
+            for (int r = 0; r < poses.Length; r++)
+                for (int w = 0; w < ways.Length; w++)
+                {
+                    var image = SpiderArt.Draw(ways[w].View, poses[r].Pose, poses[r].Frame, poses[r].Phase);
+                    if (ways[w].Flip) image = image.FlippedX();
+                    for (int y = 0; y < SpiderArt.Height; y++)
+                        for (int x = 0; x < SpiderArt.Width; x++)
+                        {
+                            var c = image[x, y];
+                            var ground = arena[x % arena.Width, y % arena.Height];
+                            sheet[w * SpiderArt.Width + x, r * SpiderArt.Height + y] = c.A == 255 ? c : c.A == 0 ? ground : ground.Mix(c.WithAlpha(255), c.A / 255f);
+                        }
+                }
+            Png.Save(sheet, Path.Combine(folder, "spider_turn.png"));
         }
 
         // The shrine samurai's walk and iaido (2026-11-12, SamuraiArt), a row each, facing right and facing down: walk,

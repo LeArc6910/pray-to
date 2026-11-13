@@ -18,15 +18,20 @@ namespace Game.Core
         // Burn damage dealt but not yet reported.
         internal float BurnOwed { get; set; }
         internal int ChillTicks { get; set; }
+        // Caught in a web (2026-11-13, HazardShape.Web): slowed while in it and a moment after.
+        public bool Snared => SnareTicks > 0;
+        internal int SnareTicks { get; set; }
 
-        // As the network carries it (EntityState.Status).
-        public byte Bits => (byte)((Burning ? StatusBits.Burning : 0) | (Chilled ? StatusBits.Chilled : 0));
+        // As the network carries it (EntityState.Status). Snared is only in a player's own state (the entities' phase
+        // byte has room for two marks).
+        public byte Bits => (byte)((Burning ? StatusBits.Burning : 0) | (Chilled ? StatusBits.Chilled : 0) | (Snared ? StatusBits.Snared : 0));
 
         internal void Clear()
         {
             BurnTicks = 0;
             BurnOwed = 0;
             ChillTicks = 0;
+            SnareTicks = 0;
         }
 
         // A new burn replaces the old one when it has more damage still to deal.
@@ -42,6 +47,7 @@ namespace Game.Core
         internal float TickBurn()
         {
             if (ChillTicks > 0) ChillTicks--;
+            if (SnareTicks > 0) SnareTicks--;
             if (BurnTicks <= 0) return 0;
             BurnTicks--;
             BurnOwed += BurnPerTick;
@@ -56,6 +62,8 @@ namespace Game.Core
         // Only in the player's own state: on the way home, and lying in bed (World.Sleep).
         public const byte Recalling = 4;
         public const byte Sleeping = 8;
+        // Only in the player's own state: caught in a web.
+        public const byte Snared = 16;
     }
 
     // Fire burns for a share of the hit over a few seconds, cold slows, lightning jumps to enemies nearby. A monster
@@ -72,6 +80,12 @@ namespace Game.Core
         const int ChillSkip = 2;
         const int ChillCycle = 5;
         public const float PlayerChillSpeed = 0.7f;
+        // Caught in a web a player moves at this share of their pace, while in it and for SnareSeconds after.
+        public const float PlayerSnareSpeed = 0.55f;
+        public const float SnareSeconds = 0.4f;
+        // A pool of venom hurts whoever stands in it this often, for this share of the blow that left it.
+        public const float VenomSeconds = 0.5f;
+        public const float VenomShare = 0.12f;
         public const float ChainShare = 0.5f;
         public const float ChainRange = 3.5f;
         public const int ChainTargets = 2;

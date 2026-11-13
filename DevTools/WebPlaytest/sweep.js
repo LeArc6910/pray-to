@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight spider world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -852,6 +852,85 @@ async function knight(browser) {
   await game.send('heal; clear; boss black_knight hurt 0.36');
   await game.wait(800);
   await game.shot('knight-phase2', '2페이즈 포효');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 실 잣는 어미 아라네 (2026-11-13, Docs/Bosses.md)
+// A spider that takes the arena piece by piece. Its fangs are announced by its body alone (no mark, no sign); the rest
+// are marked through a wind-up of their own; the thread drop and the eight legs show a warning sign too. Its silk and
+// venom stay on the floor: a web that snares, a pool that hurts. A picture mid wind-up and one just as the blow lands,
+// and the floor a moment after.
+async function spider(browser) {
+  note('\n## 실 잣는 어미 아라네 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss silk_mother');
+  const woke = await game.until(t => has(t.banner, '아라네'), 8000, game.texts);
+  check(!!woke, `잊힌 신전 곁 둘째 아레나에서 깨면 "실 잣는 어미 아라네 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  await game.wait(1500);
+  await game.shot('spider-awake', '깨어난 아라네');
+  // [attack, name, telegraph seconds, marked on the ground, warning sign, what it leaves on the floor]
+  const uses = [
+    ['fang', '독니 찌르기(앞다리를 쳐들고 몸을 세움, 바닥 표시 없음)', 0.8, false, false, 0],
+    ['leg_stab', '앞다리 연타(앞다리를 머리 뒤로 젖힘)', 1.0, true, false, 0],
+    ['web_shot', '거미줄 뿜기(배를 등 위로 세움, 거미줄이 남는다)', 1.1, true, false, 3],
+    ['pounce', '덮치기(납작 엎드림)', 1.0, true, false, 0],
+    ['venom_spit', '독액 뿜기(몸을 빼고 배를 부풀림)', 1.0, false, false, 0],
+    ['venom_pool', '독 웅덩이(독액을 토해 던짐, 웅덩이가 남는다)', 1.3, true, false, 2],
+    ['thread_drop', '실 타고 내려찍기(실을 타고 사라졌다 내려옴, 경고, 거미줄이 남는다)', 1.8, true, true, 1],
+    ['brood', '알주머니 터뜨리기(새끼 거미 넷)', 1.0, false, false, 0],
+    ['eight_legs', '여덟 다리 내려찍기(여덟 다리를 치켜듦, 경고)', 2.0, true, true, 0],
+  ];
+  for (const [attack, name, telegraph, marked, strong, pools] of uses) {
+    await game.send('heal; clear');
+    // Long enough for what the last attack left on the floor to be gone.
+    await game.wait(pools > 0 ? 1800 : 1500);
+    await game.send(`heal; boss silk_mother use ${attack}`);
+    await game.wait(Math.round(telegraph * 600));
+    const s = await game.state();
+    const shots = attack === 'venom_spit' || attack === 'brood';
+    if (!shots) check(((s.marksShown || 0) > 0) === marked, `${name}: 전조 동안 바닥 표시 ${marked ? '있음' : '없음'} (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    check(has(s.bosses, `:Telegraph:${attack}`), `${name}: 그 공격의 전조 중 (${s.bosses})`);
+    await game.shot(`spider-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 400) + 80);
+    await game.shot(`spider-${attack}-hit`, `${name} 터진 순간`);
+    if (pools > 0) {
+      await game.wait(500);
+      const after = await game.state();
+      check((after.pools || 0) >= pools && (after.poolsShown || 0) >= pools, `${name}: 바닥에 ${pools}개 넘게 남는다 (월드 ${after.pools}, 화면 ${after.poolsShown})`);
+      await game.shot(`spider-${attack}-floor`, `${name} 뒤 바닥`);
+    }
+  }
+  // Walk into a web: caught, and slower.
+  await game.send('heal; clear');
+  await game.wait(8000);
+  await game.send('heal; boss silk_mother use web_shot');
+  await game.wait(1500);
+  const webbed = await game.state();
+  check((webbed.pools || 0) >= 3, `거미줄 셋이 깔렸다 (${webbed.pools})`);
+  await game.send('heal; goto pool');
+  await game.wait(400);
+  const caught = await game.state();
+  check(caught.snared === true, `거미줄 위에 서면 묶인다 (snared ${caught.snared})`);
+  const moved = await game.state();
+  check(Math.abs(moved.x - caught.x) + Math.abs(moved.y - caught.y) < 2, '묶인 자리에 그대로 있다');
+  await game.shot('spider-snared', '거미줄에 묶인 플레이어');
+  await game.send('heal; clear; boss silk_mother hurt 0.36');
+  await game.wait(700);
+  await game.shot('spider-phase2', '2페이즈 울부짖음');
+  await game.send('heal; boss silk_mother hurt 0.34');
+  await game.wait(2600);
+  const last = await game.state();
+  check(has(last.bosses, 'silk_mother') && has(last.bosses, ':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('spider-phase3', '3페이즈(무늬가 타오르고 독이 흐른다)');
+  await game.send('heal; boss silk_mother hurt 1');
+  await game.wait(900);
+  await game.shot('spider-fall', '쓰러지는 아라네(다리를 오므린다)');
+  await game.wait(1500);
+  await game.shot('spider-fallen', '쓰러진 뒤');
   await game.context.close();
 }
 
@@ -3027,7 +3106,7 @@ async function time(browser) {
   await game.context.close();
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, spider, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

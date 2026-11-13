@@ -20,7 +20,8 @@ namespace Game.Core
         Summon,
         // A ring on the ground, from radius out to length: safe close to its centre (the boss, or a player).
         Ring,
-        // Two beams crossing on the target (or the boss), each length out from the centre, turned by angle.
+        // Two beams crossing on the target (or the boss), each length out from the centre, turned by angle. With a
+        // count of two or more it is a star: 4 x count arms evenly round, each from radius out to length.
         Cross,
         // Circles from the boss toward the target, one after another, the blasts walking out at speed.
         Trail,
@@ -61,6 +62,15 @@ namespace Game.Core
         Call,
     }
 
+    // What a circle leaves on the ground after it lands (2026-11-13, the silk mother, boss_attacks.csv pool): a web
+    // that snares whoever walks through it, or a pool of venom that hurts whoever stands in it.
+    public enum PoolKind : byte
+    {
+        None,
+        Web,
+        Venom,
+    }
+
     public enum AttackTarget : byte
     {
         Nearest,
@@ -92,9 +102,13 @@ namespace Game.Core
             float cooldown,
             int weight,
             MonsterDefinition summon,
-            AttackWarning warning = AttackWarning.Marked)
+            AttackWarning warning = AttackWarning.Marked,
+            PoolKind pool = PoolKind.None,
+            float linger = 0)
         {
             Warning = warning;
+            Pool = pool;
+            Linger = linger;
             Id = id;
             Name = name;
             Phases = phases;
@@ -143,6 +157,10 @@ namespace Game.Core
         public MonsterDefinition Summon { get; }
         // How plainly it is announced (warn column: blank, none or strong).
         public AttackWarning Warning { get; }
+
+        // What each of its circles leaves behind once it has landed, and for how many seconds (pool column, "web:6").
+        public PoolKind Pool { get; }
+        public float Linger { get; }
 
         // A burrow or a leap: the boss is away (out of reach) while it winds up and comes down on the target.
         public bool GoesAway => Shape == AttackShape.Burrow || Shape == AttackShape.Leap;
@@ -368,6 +386,7 @@ namespace Game.Core
                         throw new FormatException($"phases는 1~{boss.PhaseCount} 사이여야 합니다 ('{boss.Id}'는 {boss.PhaseCount}페이즈).");
 
                     var shape = SheetValues.ParseEnum<AttackShape>(row["shape"], "shape");
+                    var pool = Pool(row["pool"], shape);
                     var attack = new BossAttack(
                         id,
                         Required(row, "name"),
@@ -386,7 +405,9 @@ namespace Game.Core
                         Number(row, "cooldown"),
                         Whole(row, "weight"),
                         row["summon"].Length > 0 ? FindMonster(monsters, row["summon"]) : null,
-                        Warning(row["warn"]));
+                        Warning(row["warn"]),
+                        pool.Kind,
+                        pool.Seconds);
                     Validate(attack);
                     boss.Add(attack);
                 });
@@ -426,7 +447,7 @@ namespace Game.Core
                     Need(attack.Radius > 0 && attack.Length > attack.Radius && attack.Damage > 0, "radius(안쪽), radius보다 큰 length(바깥), damage");
                     break;
                 case AttackShape.Cross:
-                    Need(attack.Length > 0 && attack.Width > 0 && attack.Damage > 0, "length, width, damage");
+                    Need(attack.Length > 0 && attack.Width > 0 && attack.Damage > 0 && attack.Radius >= 0 && attack.Radius < attack.Length, "length, width, damage(별이면 length보다 작은 radius)");
                     break;
                 case AttackShape.Trail:
                     Need(attack.Count > 0 && attack.Radius > 0 && attack.Length > 0 && attack.Speed > 0 && attack.Damage > 0, "count, radius, length, speed, damage");
@@ -460,6 +481,22 @@ namespace Game.Core
             "strong" => AttackWarning.Strong,
             _ => throw new FormatException($"warn은 비우거나 none, strong 가운데 하나여야 합니다('{cell}')."),
         };
+
+        // The pool column: blank, or what a circle leaves behind and for how long, as web:6 or venom:4.5. Only the
+        // shapes that land as circles can leave one.
+        static (PoolKind Kind, float Seconds) Pool(string cell, AttackShape shape)
+        {
+            if (cell.Length == 0) return (PoolKind.None, 0);
+            var parts = cell.Split(':');
+            PoolKind kind = parts[0] == "web" ? PoolKind.Web : parts[0] == "venom" ? PoolKind.Venom
+                : throw new FormatException($"pool은 비우거나 web:초, venom:초여야 합니다('{cell}').");
+            if (parts.Length != 2) throw new FormatException($"pool은 web:초, venom:초처럼 적습니다('{cell}').");
+            float seconds = SheetValues.ParseDecimal(parts[1], "pool");
+            if (seconds <= 0 || seconds > 30) throw new FormatException("pool의 시간은 0보다 크고 30초 이하여야 합니다.");
+            if (shape != AttackShape.Circle && shape != AttackShape.Trail && shape != AttackShape.Burrow && shape != AttackShape.Leap)
+                throw new FormatException($"pool은 원으로 떨어지는 공격(circle, trail, burrow, leap)에만 씁니다({shape}).");
+            return (kind, seconds);
+        }
 
         static MonsterDefinition FindMonster(MonsterData monsters, string id) =>
             monsters?.Monsters.FirstOrDefault(m => m.Id == id) ?? throw new FormatException($"몬스터 '{id}'가 {MonsterSheet.File}에 없습니다.");

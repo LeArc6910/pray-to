@@ -108,6 +108,20 @@ namespace Game.Client
             public bool Glinted;
             // The black knight's last walking frame, for a thud as each foot comes down (WorldView.Knight.cs).
             public int KnightStep = -1;
+            // The silk mother (WorldView.Spider.cs): its last walking frame, for the tick of its feet; where its mouth and
+            // spinnerets are from its middle in the frame it shows; how see-through it is (gone up its thread); which
+            // state's first and late cues have played; the picture of it coming down its thread, the thread and the
+            // shadow under it; and its hurt time last frame, to tell a fresh blow.
+            public int SpiderStep = -1;
+            public Vector3 SpiderMouth;
+            public Vector3 SpiderSpinneret;
+            public float SpiderAlpha = 1;
+            public float CueSince = -1;
+            public bool CueLate;
+            public SpriteRenderer Dropper;
+            public SpriteRenderer DropThread;
+            public SpriteRenderer DropShadow;
+            public float SpiderHurt;
             public EnemyState EnemyState;
             // When a monster may cry out again on noticing someone, and where another player was last frame and how
             // far they have walked since their last step (2026-11-09, sounds).
@@ -523,6 +537,7 @@ namespace Game.Client
             _self.Name = _client.Name;
             _self.Sleeping = _client.Sleeping;
             DrawPet(_client.PlayerId, _self, _client.Pet, deltaTime);
+            ShowSnare();
             Footsteps(_self.Position - _self.LastPosition);
             StreamChunks(_self.Position);
             int selfBuffs = 0;
@@ -556,6 +571,7 @@ namespace Game.Client
             UpdateRain(deltaTime);
             BobBobbers();
             UpdateBits(deltaTime);
+            UpdateFalls();
             for (int i = _floating.Count - 1; i >= 0; i--)
             {
                 _floating[i].Age += deltaTime;
@@ -893,6 +909,12 @@ namespace Game.Client
                 if (pair.Value.Kind == BodyKind.Boss && _bossesSeen.TryGetValue(pair.Key, out var left))
                     _bossesSeen[pair.Key] = (BossState.Dormant, 1, left.Name);
                 if (pair.Value.Mound != null) Object.Destroy(pair.Value.Mound.gameObject);
+                if (pair.Value.Dropper != null)
+                {
+                    Object.Destroy(pair.Value.Dropper.gameObject);
+                    Object.Destroy(pair.Value.DropThread.gameObject);
+                    Object.Destroy(pair.Value.DropShadow.gameObject);
+                }
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
             }
@@ -1060,11 +1082,18 @@ namespace Game.Client
                 _seen.Add(hazard.Id);
                 if (!_marks.TryGetValue(hazard.Id, out var mark))
                 {
-                    mark = MakeMark(hazard);
+                    // What a blow left on the floor (a web, a pool of venom) is no warning: it is drawn as itself.
+                    mark = IsPool(hazard) ? MakePool(hazard) : MakeMark(hazard);
                     _marks[hazard.Id] = mark;
-                    if (hazard.Warning != AttackWarning.Hidden) Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
+                    if (hazard.Warning != AttackWarning.Hidden && !IsPool(hazard)) Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
                 }
-                FallingRock(mark, hazard, view.Progress);
+                if (IsPool(hazard))
+                {
+                    mark.State = hazard;
+                    DrawPool(mark, view);
+                    continue;
+                }
+                if (!FlyingGob(mark, hazard, view.Progress)) FallingRock(mark, hazard, view.Progress);
                 // An attack only the boss's wind-up announces lays nothing to see: its mark is kept (for its blast
                 // when it lands) but clear (AttackWarning.Hidden, 2026-11-12).
                 if (hazard.Warning == AttackWarning.Hidden)
@@ -1123,8 +1152,9 @@ namespace Game.Client
             if (_marks.TryGetValue(id, out var mark)) hazard = mark.State;
             else if (_landed.TryGetValue(id, out var gone)) hazard = gone.State;
             else return;
-            if (!hazard.Harmful) return;
-            if (VeinEaterLanded(hazard) || KnightLanded(hazard)) return;
+            // A web or a pool of venom running out is no blow.
+            if (!hazard.Harmful || IsPool(hazard)) return;
+            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard)) return;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             switch (hazard.Shape)
@@ -1882,8 +1912,10 @@ namespace Game.Client
                     bool rock = !projectile.Friendly && _bossInView?.Id == "vein_eater";
                     // The samurai's are crescents of light, the blade's cut flying (2026-11-12).
                     bool crescent = !projectile.Friendly && _bossInView?.Id == "shrine_samurai";
-                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : SporeSprite;
-                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock ? Color.white : crescent ? SteelColor : color);
+                    // The silk mother's are gobs of venom (2026-11-13).
+                    bool venom = !projectile.Friendly && _bossInView?.Id == "silk_mother";
+                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : venom ? VenomGlobSprite : SporeSprite;
+                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock || venom ? Color.white : crescent ? SteelColor : color);
                     float across = sprite.rect.height / Sprites.PixelsPerUnit;
                     renderer.transform.localScale = Vector3.one * (arrow ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
                     renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
@@ -1891,6 +1923,9 @@ namespace Game.Client
                     _projectiles[projectile.Id] = renderer;
                 }
                 renderer.transform.localPosition = new Vector3(projectile.Position.X, projectile.Position.Y, 0);
+                // The silk mother's venom sheds drops as it flies.
+                if (!projectile.Friendly && _bossInView?.Id == "silk_mother" && UnityEngine.Random.value < 0.3f)
+                    Drip(new Vector3(projectile.Position.X, projectile.Position.Y, 0), VenomColor);
                 // The samurai's crescents shed petals as they fly.
                 if (!projectile.Friendly && _bossInView?.Id == "shrine_samurai" && UnityEngine.Random.value < 0.45f)
                     Petals(new Vector3(projectile.Position.X, projectile.Position.Y, 0), -new Vector3(projectile.Velocity.X, projectile.Velocity.Y, 0), 1, 1.5f, 0.8f, 0.2f);
@@ -2355,12 +2390,15 @@ namespace Game.Client
                     else if (Find(e.Source) is Body fallen)
                     {
                         if (!_bossesSeen.ContainsKey(e.Source)) Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position, fallen.Kind == BodyKind.Minion ? 0.4f : 1);
-                        if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Kind == BodyKind.Minion ? 0.6f : fallen.Diameter);
+                        if (fallen.Kind == BodyKind.Boss && fallen.Id == "silk_mother") SpiderFalls(fallen.Position);
+                        else if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Kind == BodyKind.Minion ? 0.6f : fallen.Diameter);
                     }
                     else if (_departed.TryGetValue(e.Source, out var gone))
                     {
                         if (!_bossesSeen.ContainsKey(e.Source)) Hear(gone.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, gone.Position, gone.Kind == BodyKind.Minion ? 0.4f : 1);
-                        if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : gone.Kind == BodyKind.Minion ? 0.6f : 0.8f);
+                        // The silk mother does not burst: it sinks where it stood and its legs curl in over it.
+                        if (gone.Kind == BodyKind.Boss && _bossInView?.Id == "silk_mother" && _bossesSeen.ContainsKey(e.Source)) SpiderFalls(gone.Position);
+                        else if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : gone.Kind == BodyKind.Minion ? 0.6f : 0.8f);
                     }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
                     {
@@ -2728,6 +2766,11 @@ namespace Game.Client
                 AnimateKnight(body, facing, dead, moving);
                 return;
             }
+            if (body.Kind == BodyKind.Boss && body.Id == "silk_mother")
+            {
+                AnimateSpider(body, facing, dead, moving);
+                return;
+            }
 
             if (body.Kind == BodyKind.Boss)
             {
@@ -2928,11 +2971,14 @@ namespace Game.Client
         static (Color Tint, Color Glow) StatusLook(byte status, Color tint, Color glow)
         {
             if ((status & StatusBits.Chilled) != 0) tint *= ChillTint;
+            // Caught in a web (only one's own state says so): paled, as if wrapped in it.
+            if ((status & StatusBits.Snared) != 0) tint *= SnareTint;
             if ((status & StatusBits.Burning) != 0 && glow.a <= 0) glow = Faded(BurnColor, 0.18f + 0.14f * Mathf.Abs(Mathf.Sin(Time.time * 17)));
             return (tint, glow);
         }
 
         static readonly Color ChillTint = new Color(0.62f, 0.82f, 1f);
+        static readonly Color SnareTint = new Color(0.86f, 0.86f, 0.9f);
         static readonly Color BurnColor = new Color(1f, 0.5f, 0.15f);
         static readonly Color BoltColor = new Color(1f, 0.95f, 0.5f);
         static readonly Color RecallColor = new Color(0.55f, 0.75f, 1f);
