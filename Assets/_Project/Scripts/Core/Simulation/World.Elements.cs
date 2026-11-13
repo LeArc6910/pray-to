@@ -10,6 +10,9 @@ namespace Game.Core
     {
         public bool Burning => BurnTicks > 0;
         public bool Chilled => ChillTicks > 0;
+        // Caught in a web (2026-11-13, HazardShape.Web): slowed while it lasts. Not sent with the others: the screen
+        // sees the webs themselves.
+        public bool Webbed => WebTicks > 0;
 
         internal float BurnPerTick { get; set; }
         internal int BurnTicks { get; set; }
@@ -18,6 +21,7 @@ namespace Game.Core
         // Burn damage dealt but not yet reported.
         internal float BurnOwed { get; set; }
         internal int ChillTicks { get; set; }
+        internal int WebTicks { get; set; }
 
         // As the network carries it (EntityState.Status).
         public byte Bits => (byte)((Burning ? StatusBits.Burning : 0) | (Chilled ? StatusBits.Chilled : 0));
@@ -27,6 +31,7 @@ namespace Game.Core
             BurnTicks = 0;
             BurnOwed = 0;
             ChillTicks = 0;
+            WebTicks = 0;
         }
 
         // A new burn replaces the old one when it has more damage still to deal.
@@ -42,6 +47,7 @@ namespace Game.Core
         internal float TickBurn()
         {
             if (ChillTicks > 0) ChillTicks--;
+            if (WebTicks > 0) WebTicks--;
             if (BurnTicks <= 0) return 0;
             BurnTicks--;
             BurnOwed += BurnPerTick;

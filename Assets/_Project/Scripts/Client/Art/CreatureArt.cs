@@ -956,6 +956,38 @@ namespace Game.Client
             },
         };
 
+        // A spiderling of the venom spider's brood (2026-11-13): a small purple-black spider, its abdomen marked green,
+        // its legs stepping in turn.
+        static readonly string[][] Spiderling =
+        {
+            new[]
+            {
+                "................",
+                ".....K..K..K....",
+                "....K.KK.KK.K...",
+                "..LLL.K..K.K.K..",
+                ".LMgMM.LLLL..K..",
+                ".MgggMMMMMMeM...",
+                ".MMgMMmMMMMMMd..",
+                "..mMMm.mmmmm.K..",
+                "..K..K.K..K.K.K.",
+                ".K..K...K..K...K",
+            },
+            new[]
+            {
+                "................",
+                "....K..K..K.....",
+                "...K.KK.KK.K....",
+                "..LLLK..K.K.K...",
+                ".LMgMM.LLLL.K...",
+                ".MgggMMMMMMeM...",
+                ".MMgMMmMMMMMMd..",
+                "..mMMm.mmmmm..K.",
+                ".K..K.K..K.K.K..",
+                "K..K...K..K...K.",
+            },
+        };
+
         // A sand worm (2026-11-09): a banded body risen out of a drift of sand, its round mouth open to spit, then shut
         // and leaning the other way.
         static readonly string[][] SandWorm =
@@ -1288,6 +1320,12 @@ namespace Game.Client
             {
                 ['y'] = Rgba.Hex("#FFE070"),
             },
+            // The venom spider's young: dark legs, a green mark, a red eye.
+            ["spiderling"] = new Dictionary<char, Rgba>
+            {
+                ['K'] = Rgba.Hex("#1E1428"),
+                ['g'] = Rgba.Hex("#9FE35D"),
+            },
         };
 
         // Monsters face right; the view flips them to face left. Seen from behind their eyes are hidden; a pose reshapes
@@ -1323,6 +1361,7 @@ namespace Game.Client
                 "sand_worm" => SandWorm,
                 "demon_soldier" => DemonSoldier,
                 "demon_caster" => DemonCaster,
+                "spiderling" => Spiderling,
                 _ => Slime,
             };
             var image = PixelImage.FromRows(colors, frames[frame % frames.Length]);
@@ -1409,6 +1448,16 @@ namespace Game.Client
                 BossPose.Roar => KnightPose.Roar,
                 _ => KnightPose.Idle,
             }, frame, 1),
+            // The venom spider of the mushroom hollow (2026-11-13): likewise, its legs drawn in code (SpiderPose in
+            // WorldView).
+            "venom_spider" => SpiderArt.Draw(view, pose switch
+            {
+                BossPose.Windup => SpiderPose.Rear,
+                BossPose.Strike => SpiderPose.Bite,
+                BossPose.Charge => SpiderPose.Walk,
+                BossPose.Roar => SpiderPose.Roar,
+                _ => SpiderPose.Idle,
+            }, pose == BossPose.Windup ? 11 : pose == BossPose.Strike ? SpiderArt.StrikeFrame(SpiderPose.Bite) : pose == BossPose.Roar ? SpiderArt.RoarRise : frame, 1),
             _ => Warden(color, frame, view, pose),
         };
 

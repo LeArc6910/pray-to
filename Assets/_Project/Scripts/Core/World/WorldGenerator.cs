@@ -8,7 +8,7 @@ namespace Game.Core
     {
         public GeneratedWorld(TileMap map, int spawnX, int spawnY, int arenaX, int arenaY, int arenaRadius, int deepArenaX, int deepArenaY,
             BiomeMap biomes = null, (int X, int Y)? lavaArena = null, (int X, int Y)? abyssArena = null, (int X, int Y)? lakeArena = null,
-            (int X, int Y)? sandArena = null)
+            (int X, int Y)? sandArena = null, (int X, int Y)? mushroomArena = null)
         {
             Biomes = biomes ?? BiomeMap.Plain(map.Width, map.Height);
             Map = map;
@@ -22,6 +22,7 @@ namespace Game.Core
             if (abyssArena is (int ax, int ay)) arenas.Add(TileMap.Center(ax, ay));
             if (lakeArena is (int kx, int ky)) arenas.Add(TileMap.Center(kx, ky));
             if (sandArena is (int sx, int sy)) arenas.Add(TileMap.Center(sx, sy));
+            if (mushroomArena is (int mx, int my)) arenas.Add(TileMap.Center(mx, my));
             _arenas = arenas;
             CaveArenas = arenas.Count;
         }
@@ -221,6 +222,10 @@ namespace Game.Core
         // the first arena.
         const ulong SandStream = 12;
         static readonly (int Along, int Across) SandArenaOffset = (44, 12);
+        // The mushroom hollow (Docs/Biomes.md, 2026-11-13, the venom spider's lair), after the sand caves: the seventh
+        // arena in the mushroom forest's near band, at the same distances as the sand arena on the flank further from the
+        // first and the sand arena, reached by a tunnel from the spawn.
+        const ulong MushroomStream = 14;
 
         // The arena lies in one of eight directions from the spawn, about ArenaDistance tiles away.
         static readonly (int X, int Y)[] ArenaOffsets =
@@ -428,7 +433,7 @@ namespace Game.Core
                 // Where it can, its road keeps clear of the other places (2026-11-12: the hut's arena beyond the royal
                 // city cut through the city's wall); only where nothing else will do does it pass one.
                 for (int pass = 0; pass < 2 && best == null; pass++)
-                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 60 && best == null; reach += 2)
+                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 90 && best == null; reach += 2)
                 {
                     foreach (var way in Ways)
                     {
@@ -1414,8 +1419,21 @@ namespace Game.Core
             var (sandX, sandY) = Far(flanks[0]) == Far(flanks[1]) ? flanks[sand.Next(2)] : Far(flanks[0]) > Far(flanks[1]) ? flanks[0] : flanks[1];
             sandX = Clamp(sandX, ArenaRadius + 2, width - ArenaRadius - 3);
             sandY = Clamp(sandY, ArenaRadius + 2, height - ArenaRadius - 3);
+            // The mushroom hollow (carved after the sand): of the two flanks of the mushroom quarter, the one further from both
+            // the first arena and the sand arena.
+            var (mushroomCornerX, mushroomCornerY) = mushroomFirst ? (cornerX, -cornerY) : (-cornerX, cornerY);
+            var hollows = new[]
+            {
+                (spawnX + mushroomCornerX * SandArenaOffset.Along * k, spawnY + mushroomCornerY * SandArenaOffset.Across * k),
+                (spawnX + mushroomCornerX * SandArenaOffset.Across * k, spawnY + mushroomCornerY * SandArenaOffset.Along * k),
+            };
+            int Apart((int X, int Y) f) => Math.Min(Far(f), (f.X - sandX) * (f.X - sandX) + (f.Y - sandY) * (f.Y - sandY));
+            var (hollowX, hollowY) = Apart(hollows[0]) == Apart(hollows[1]) ? hollows[new GameRandom(seed, MushroomStream).Next(2)]
+                : Apart(hollows[0]) > Apart(hollows[1]) ? hollows[0] : hollows[1];
+            hollowX = Clamp(hollowX, ArenaRadius + 2, width - ArenaRadius - 3);
+            hollowY = Clamp(hollowY, ArenaRadius + 2, height - ArenaRadius - 3);
             var biomes = BiomeMap.Make(seed, width, height, spawnX, spawnY, (cornerX, cornerY), mushroomFirst, (abyssCornerX, abyssCornerY),
-                (lakeCornerX, lakeCornerY), (sandX, sandY));
+                (lakeCornerX, lakeCornerY), (sandX, sandY), (hollowX, hollowY));
 
             var lava = new GameRandom(seed, LavaStream);
             int lavaX = Clamp(spawnX - cornerX * DeepArenaOffset * k, ArenaRadius + 2, width - ArenaRadius - 3);
@@ -1487,8 +1505,19 @@ namespace Game.Core
                     if (map[x, y] == TileType.Water && biomes[x, y] == Biome.Sand) map[x, y] = TileType.Wall;
                 }
             }
+            // The mushroom hollow: a tunnel from the spawn and its arena, pools close by turned back to rock.
+            CarveTunnel(map, spawnX, spawnY, hollowX, hollowY);
+            ClearDisc(map, hollowX, hollowY, ArenaRadius);
+            for (int y = hollowY - ArenaRadius - 3; y <= hollowY + ArenaRadius + 3; y++)
+            {
+                for (int x = hollowX - ArenaRadius - 3; x <= hollowX + ArenaRadius + 3; x++)
+                {
+                    if (IsInside(map, x, y) && map[x, y] == TileType.Water && (x - hollowX) * (x - hollowX) + (y - hollowY) * (y - hollowY) <= (ArenaRadius + 3) * (ArenaRadius + 3))
+                        map[x, y] = TileType.Wall;
+                }
+            }
             return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY), (abyssX, abyssY), (lakeX, lakeY),
-                (sandX, sandY));
+                (sandX, sandY), (hollowX, hollowY));
         }
 
         static int Clamp(int value, int min, int max) => value < min ? min : value > max ? max : value;

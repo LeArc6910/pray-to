@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight spider world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -852,6 +852,81 @@ async function knight(browser) {
   await game.send('heal; clear; boss black_knight hurt 0.36');
   await game.wait(800);
   await game.shot('knight-phase2', '2페이즈 포효');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 독그물 거미 아락사 (2026-11-13)
+// The venom spider of the mushroom hollow: each of its ten attacks called in turn, a picture mid wind-up (the whole
+// body in it: reared up, front legs raised, the abdomen over its back, gone up its thread) and one just after it lands.
+// Marked attacks show their area on the floor while they come; the spit, the brood and the spray lay none; only the
+// ceiling drop and the web burst show the warning sign. Its webs stay on the floor and slow whoever stands in them.
+async function spider(browser) {
+  note('\n## 독그물 거미 아락사 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss venom_spider');
+  const woke = await game.until(t => has(t.banner, '아락사'), 8000, game.texts);
+  check(!!woke, `버섯 숲 아레나에서 깨면 "독그물 거미 아락사 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  const theme = await game.until(t => t.music === 'boss_venom_spider_1', 4000);
+  check(!!theme, `거미의 곡 (${(theme || await game.state()).music})`);
+  await game.wait(1500);
+  await game.shot('spider-awake', '깨어난 아락사(걷기, 버섯 숲 포자)');
+  // [attack, name, telegraph seconds, marks on the floor, strong]
+  const uses = [
+    ['bite', '독니 물기(앞몸을 들고 송곳니를 벌림)', 0.8, true, false],
+    ['stab', '앞다리 찍기(앞다리 두 쌍을 높이 듦)', 1.0, true, false],
+    ['net', '거미줄 그물(배를 등 위로 치켜듦)', 1.1, true, false],
+    ['spit', '독침 뱉기(머리를 젖히고 독이 맺힘)', 0.8, false, false],
+    ['drop', '천장 낙하(실을 타고 사라졌다가 떨어짐, 경고)', 1.9, true, true],
+    ['brood', '알주머니(배를 들고 떨림)', 1.0, false, false],
+    ['snare', '거미줄 감옥(둘레에 거미줄)', 1.2, true, false],
+    ['miasma', '독안개 회오리(배를 들고 제자리 회전)', 0.9, false, false],
+    ['rain', '그물 비(사람마다)', 1.2, true, false],
+    ['pluck', '그물 폭발(바닥 거미줄이 빛나며 떨림, 경고)', 1.6, true, true],
+  ];
+  for (const [attack, name, telegraph, marked, strong] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1800);
+    await game.send(`heal; boss venom_spider use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    const marks = (s.marksShown || 0) - (s.webs || 0);
+    check(marked ? marks > 0 : marks <= 0, `${name}: 전조 동안 바닥 표시 ${marked ? '있음' : '없음'} (표시 ${s.marksShown}, 거미줄 ${s.webs})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`spider-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`spider-${attack}-hit`, `${name} 터진 순간`);
+    if (attack === 'net' || attack === 'snare' || attack === 'rain') {
+      const after = await game.state();
+      check((after.webs || 0) > 0, `${name}: 떨어진 자리에 거미줄이 남는다 (${after.webs})`);
+    }
+  }
+  // Webs round the player, one under their feet: it holds them (slower) until they step out.
+  await game.send('heal; clear; scene webs');
+  await game.wait(600);
+  let w = await game.state();
+  check(!!w.webbed, `거미줄 위에 서면 붙잡힌다 (webbed ${w.webbed}, 빠르기 ${w.moveSpeed})`);
+  await game.shot('spider-webs', '바닥의 거미줄과 붙잡힌 플레이어');
+  await game.send('heal; boss venom_spider use pluck');
+  await game.wait(1100);
+  await game.shot('spider-pluck-glow', '그물 폭발 전조: 거미줄이 빛나며 떨림');
+  await game.wait(700);
+  await game.shot('spider-pluck-burst', '그물 폭발: 거미줄마다 독이 터짐');
+  w = await game.state();
+  check((w.webs || 0) === 0, `그물 폭발 뒤 거미줄이 사라진다 (${w.webs})`);
+  await game.send('heal; clear; boss venom_spider hurt 0.36');
+  await game.wait(800);
+  await game.shot('spider-phase2', '2페이즈 포효(앞다리를 벌리고 일어섬)');
+  await game.send('heal; clear; boss venom_spider hurt 0.34');
+  await game.wait(2500);
+  await game.shot('spider-phase3', '3페이즈(무늬가 더 밝게 빛남)');
+  await game.send('heal; clear; boss venom_spider hurt 1');
+  const dead = await game.until(t => has(t.banner, '처치'), 4000, game.texts);
+  check(!!dead, `"독그물 거미 아락사 처치!" 배너`);
+  await game.wait(500);
+  await game.shot('spider-fall', '쓰러짐: 다리가 오그라든다');
   await game.context.close();
 }
 
@@ -3027,7 +3102,7 @@ async function time(browser) {
   await game.context.close();
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, spider, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

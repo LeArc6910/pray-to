@@ -185,7 +185,7 @@ namespace Game.Core
         // The attacks that can be laid alongside another: marked areas only (no charge, spray, spiral or summons).
         static bool LaysAreas(BossAttack attack) => attack.Shape switch
         {
-            AttackShape.Circle or AttackShape.Cone or AttackShape.Line or AttackShape.Ring or AttackShape.Cross or AttackShape.Trail => true,
+            AttackShape.Circle or AttackShape.Cone or AttackShape.Line or AttackShape.Ring or AttackShape.Cross or AttackShape.Trail or AttackShape.Web => true,
             _ => false,
         };
 
@@ -355,7 +355,60 @@ namespace Game.Core
                     // Where it will come down, which is where the boss will stand.
                     AddHazard(boss, cause, HazardShape.Circle, LandingFor(boss, target.Position), facing, attack.Radius, 0, attack.Damage, resolve);
                     break;
+                case AttackShape.Web:
+                {
+                    // Like circles, each leaving a sticky web where it lands (UpdateHazards).
+                    var spots = attack.Target == AttackTarget.Self ? new[] { boss.Position }
+                        : attack.Target == AttackTarget.Each ? fighters.Select(p => p.Position).ToArray()
+                        : new[] { target.Position };
+                    foreach (var spot in spots)
+                    {
+                        for (int i = 0; i < attack.Count; i++)
+                        {
+                            var offset = attack.Spread > 0
+                                ? Vec2.FromAngle(_random.NextFloat() * 2 * MathF.PI) * (MathF.Sqrt(_random.NextFloat()) * attack.Spread)
+                                : Vec2.Zero;
+                            AddHazard(boss, cause, HazardShape.Circle, spot + offset, facing, attack.Radius, 0, attack.Damage, resolve).Lingers = attack.Length;
+                        }
+                    }
+                    break;
+                }
+                case AttackShape.Pluck:
+                {
+                    // Every web of its own bursts; with none down, a circle under each fighter.
+                    var webs = _hazards.Where(h => h.Source == boss.Id && h.Shape == HazardShape.Web).ToList();
+                    foreach (var web in webs)
+                        AddHazard(boss, cause, HazardShape.Circle, web.Position, facing, web.Size + PluckReach, 0, attack.Damage, resolve).Plucks = web.Id;
+                    if (webs.Count == 0)
+                    {
+                        foreach (var player in fighters)
+                            AddHazard(boss, cause, HazardShape.Circle, player.Position, facing, attack.Radius, 0, attack.Damage, resolve);
+                    }
+                    break;
+                }
             }
+        }
+
+        // ---- Webs (2026-11-13, the venom spider, Docs/Bosses.md 독그물 거미 아락사) ----
+
+        // How much a web slows whoever stands in it, and how long that lasts after they step out.
+        public const float WebSpeed = 0.45f;
+        const float WebHoldSeconds = 0.25f;
+        // How far past a plucked web its burst reaches.
+        public const float PluckReach = 0.4f;
+        // The most webs one boss keeps down at once; a new one takes the oldest away.
+        public const int MostWebs = 10;
+
+        // For the playtests: a web of the boss's own at once where it is wanted, for so long.
+        internal void LayWeb(Boss boss, Vec2 at, float radius, float seconds) =>
+            SpinWeb(new Hazard(0, boss.Id, 0, HazardShape.Circle, at, boss.Facing, radius, 0, 0, Tick, Tick) { Lingers = seconds });
+
+        void SpinWeb(Hazard landed)
+        {
+            var webs = _hazards.Where(h => h.Source == landed.Source && h.Shape == HazardShape.Web).OrderBy(h => h.StartTick).ToList();
+            for (int i = 0; i <= webs.Count - MostWebs; i++) _hazards.Remove(webs[i]);
+            _hazards.Add(new Hazard(_nextId++, landed.Source, landed.Cause, HazardShape.Web, landed.Position, landed.Direction, landed.Size, 0, 0, Tick,
+                Tick + Ticks(landed.Lingers)));
         }
 
         // The telegraph is over. Marked areas resolve by themselves in UpdateHazards; this fires, charges or summons.
@@ -553,8 +606,12 @@ namespace Game.Core
             _projectiles.RemoveAll(p => p.Source == boss.Id);
         }
 
-        void AddHazard(Boss boss, int cause, HazardShape shape, Vec2 position, Vec2 direction, float size, float width, int damage, long resolve) =>
-            _hazards.Add(new Hazard(_nextId++, boss.Id, cause, shape, position, direction, size, width, damage, Tick, resolve));
+        Hazard AddHazard(Boss boss, int cause, HazardShape shape, Vec2 position, Vec2 direction, float size, float width, int damage, long resolve)
+        {
+            var hazard = new Hazard(_nextId++, boss.Id, cause, shape, position, direction, size, width, damage, Tick, resolve);
+            _hazards.Add(hazard);
+            return hazard;
+        }
 
         static int Cause(Boss boss, BossAttack attack)
         {
@@ -567,11 +624,25 @@ namespace Game.Core
 
         void UpdateHazards()
         {
+            var plucked = new List<int>();
             for (int i = _hazards.Count - 1; i >= 0; i--)
             {
+                if (i >= _hazards.Count) continue;
                 var hazard = _hazards[i];
+                // A web holds whoever stands in it until it is gone.
+                if (hazard.Shape == HazardShape.Web && Tick < hazard.ResolveTick)
+                {
+                    foreach (var player in _players)
+                    {
+                        if (!player.IsDead && hazard.Contains(player.Position, 0))
+                            player.Afflictions.WebTicks = Math.Max(player.Afflictions.WebTicks, Ticks(WebHoldSeconds));
+                    }
+                    continue;
+                }
                 if (Tick < hazard.ResolveTick) continue;
                 _hazards.RemoveAt(i);
+                if (hazard.Lingers > 0) SpinWeb(hazard);
+                if (hazard.Plucks != 0) plucked.Add(hazard.Plucks);
                 if (hazard.Damage <= 0) continue;
                 var hit = _players.Where(p => !p.IsDead && hazard.Contains(p.Position, PlayerRadius)).ToList();
                 // A shared circle splits its damage among everyone in it; alone, one takes it all.
@@ -579,6 +650,8 @@ namespace Game.Core
                 foreach (var player in hit) AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
                 _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size)));
             }
+            // A plucked web bursts and is gone.
+            if (plucked.Count > 0) _hazards.RemoveAll(h => h.Shape == HazardShape.Web && plucked.Contains(h.Id));
         }
 
         void UpdateProjectiles()

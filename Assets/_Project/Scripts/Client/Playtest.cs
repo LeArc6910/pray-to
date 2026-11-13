@@ -24,7 +24,7 @@ namespace Game.Client
     //   texts                     JSON: the HUD's lines, the corner lines, the banner, the menu's status line, the labels laid out with Ui.Wrap
     //   touch on|off              report (JSON: the player, the time, the monsters, the machines, the screen)
     // In a solo game:
-    //   scene combo|machines|defense|rift|skylight|set
+    //   scene combo|machines|defense|rift|skylight|set|webs
     //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step, 0 pauses>
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
@@ -481,6 +481,15 @@ namespace Game.Client
                     var floor = Near(1, 1);
                     Lay((floor.X, floor.Y, TileType.Skylight));
                     break;
+                case "webs":
+                    // The venom spider's webs round the player, one under their feet (2026-11-13): to see them on the floor
+                    // and that they hold whoever stands in them.
+                    var spider = world.Bosses.FirstOrDefault(b => b.Definition.Id == "venom_spider") ?? throw new InvalidOperationException("no venom spider standing");
+                    world.LayWeb(spider, player.Position, 1.6f, 30);
+                    world.LayWeb(spider, player.Position + new Vec2(3.5f, 1), 1.4f, 30);
+                    world.LayWeb(spider, player.Position + new Vec2(-3, 2), 1.5f, 30);
+                    world.LayWeb(spider, player.Position + new Vec2(0.5f, -3.5f), 1.2f, 30);
+                    break;
                 case "set":
                     var generator = new LootGenerator(loot);
                     foreach (var piece in generator.LegendariesOf(World.RiftLegendaries).Where(b => b.Set != null))
@@ -774,6 +783,10 @@ namespace Game.Client
                 }
                 json.Field("projectiles", world.Projectiles.Count(p => p.Source == player.Id));
                 json.Field("hazards", world.Hazards.Count);
+                // The venom spider's webs on the floor, and whether one holds the player (2026-11-13).
+                json.Field("webs", world.Hazards.Count(h => h.Shape == HazardShape.Web));
+                json.Field("webbed", player.Afflictions.Webbed);
+                json.Field("moveSpeed", player.MoveSpeed);
                 json.Field("bossShots", world.Projectiles.Count(p => !p.Friendly));
                 // What a player sees of them: marks drawn on the ground and the warning sign over the boss (an attack
                 // the vein eater announces only by its wind-up lays hazards no one sees, 2026-11-12).

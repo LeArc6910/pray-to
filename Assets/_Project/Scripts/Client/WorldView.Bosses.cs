@@ -56,6 +56,7 @@ namespace Game.Client
             {
                 // A charge that runs again winds up straight out of the last run (World.StartTelegraph, again).
                 if (view.BossState == BossState.Telegraph) body.BossAgain = body.BossState == BossState.Charge;
+                if (view.BossState != body.BossState) body.BossWas = body.BossState;
                 body.BossSince = Time.time;
             }
             body.BossState = view.BossState;
@@ -76,6 +77,7 @@ namespace Game.Client
             else if (body.Mound != null) body.Mound.enabled = false;
             if (body.Id == "shrine_samurai") SamuraiExtras(body, view);
             if (body.Id == "black_knight") KnightExtras(body, view);
+            if (body.Id == "venom_spider") SpiderExtras(body, view);
         }
 
         void ShowWarningSign(Body body, bool on)

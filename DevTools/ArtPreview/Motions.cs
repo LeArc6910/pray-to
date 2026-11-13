@@ -459,6 +459,8 @@ namespace Game.Client
             VeinEater(folder, arena);
             Samurai(folder, arena);
             Knight(Path.Combine(folder, "knight.gif"), arena);
+            // The venom spider (2026-11-13): its motions, frames, continuity and eight directions (SpiderMotions).
+            SpiderMotions.Write(folder, arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
             StoryPeople(Path.Combine(folder, "story_people.gif"), floor);

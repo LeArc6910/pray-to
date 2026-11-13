@@ -108,6 +108,23 @@ namespace Game.Client
             public bool Glinted;
             // The black knight's last walking frame, for a thud as each foot comes down (WorldView.Knight.cs).
             public int KnightStep = -1;
+            // A boss's state before this one (the venom spider comes down from a roar). The venom spider's pose, frame and
+            // view as drawn (for where its head and spinnerets are), when its legs last ticked, whether it has hissed and
+            // how many times it has plucked in this wind-up, and its body coming down its thread over the mark with the
+            // thread and its shadow (WorldView.Spider.cs).
+            public BossState BossWas;
+            public SpiderPose SpiderPose;
+            public int SpiderFrame;
+            public BossView SpiderView;
+            public bool SpiderTurned;
+            public float SkitterAt;
+            public bool Hissed;
+            public int Twangs;
+            public SpriteRenderer Faller;
+            public SpriteRenderer FallerThread;
+            public SpriteRenderer FallerShadow;
+            // Whether it was plucking its webs last frame (the room dimmed).
+            public bool Plucked;
             public EnemyState EnemyState;
             // When a monster may cry out again on noticing someone, and where another player was last frame and how
             // far they have walked since their last step (2026-11-09, sounds).
@@ -141,6 +158,8 @@ namespace Game.Client
             public HazardState State;
             // A rock falling onto it from the roof (the vein eater's cave-in, WorldView.Bosses.cs).
             public SpriteRenderer Rock;
+            // When strands next cling to whoever stands in this web (the venom spider's, WorldView.Spider.cs).
+            public float StuckAt;
         }
 
         // A player's pet (Pets.cs): its monster drawn small, trotting after them a little behind, hopping or bobbing.
@@ -245,16 +264,23 @@ namespace Game.Client
         // Where a body was and what colour it was, kept for the frame it is removed in: its death event comes after.
         readonly struct Departed
         {
-            public Departed(Vector3 position, Color color, BodyKind kind)
+            public Departed(Vector3 position, Color color, BodyKind kind, string id = null, BossView view = BossView.Front, bool turned = false)
             {
                 Position = position;
                 Color = color;
                 Kind = kind;
+                Id = id;
+                View = view;
+                Turned = turned;
             }
 
             public Vector3 Position { get; }
             public Color Color { get; }
             public BodyKind Kind { get; }
+            // Which body it was and the way it was drawn last (the venom spider falls as it stood).
+            public string Id { get; }
+            public BossView View { get; }
+            public bool Turned { get; }
         }
 
         sealed class Floating
@@ -556,6 +582,7 @@ namespace Game.Client
             UpdateRain(deltaTime);
             BobBobbers();
             UpdateBits(deltaTime);
+            UpdateSpiderRemains();
             for (int i = _floating.Count - 1; i >= 0; i--)
             {
                 _floating[i].Age += deltaTime;
@@ -886,7 +913,7 @@ namespace Game.Client
             foreach (var pair in _others)
             {
                 if (_seen.Contains(pair.Key)) continue;
-                _departed[pair.Key] = new Departed(pair.Value.Position, BodyColor(pair.Value), pair.Value.Kind);
+                _departed[pair.Key] = new Departed(pair.Value.Position, BodyColor(pair.Value), pair.Value.Kind, pair.Value.Id, pair.Value.SpiderView, pair.Value.SpiderTurned);
                 // A boss out of sight may go back to sleep (its arena empty) unseen, so it counts as asleep: seen awake
                 // again, it is announced again. Its name stays for the "처치!" banner, since a boss that falls leaves
                 // the view in the same update its death arrives.
@@ -1062,9 +1089,15 @@ namespace Game.Client
                 {
                     mark = MakeMark(hazard);
                     _marks[hazard.Id] = mark;
-                    if (hazard.Warning != AttackWarning.Hidden) Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
+                    if (hazard.Warning != AttackWarning.Hidden && hazard.Shape != HazardShape.Web) Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
                 }
                 FallingRock(mark, hazard, view.Progress);
+                // A web the venom spider left on the floor (2026-11-13): drawn as a web, not a warning.
+                if (hazard.Shape == HazardShape.Web)
+                {
+                    SpiderWeb(mark, view);
+                    continue;
+                }
                 // An attack only the boss's wind-up announces lays nothing to see: its mark is kept (for its blast
                 // when it lands) but clear (AttackWarning.Hidden, 2026-11-12).
                 if (hazard.Warning == AttackWarning.Hidden)
@@ -1105,6 +1138,13 @@ namespace Game.Client
             {
                 if (_seen.Contains(pair.Key)) continue;
                 if (pair.Value.Rock != null) Object.Destroy(pair.Value.Rock.gameObject);
+                // A web gone (its time over, or plucked) fades away rather than vanishing.
+                if (pair.Value.State.Shape == HazardShape.Web && pair.Value.Fill.color.a > 0)
+                {
+                    var web = pair.Value.Fill;
+                    web.transform.SetParent(_root.transform, true);
+                    _bits.Add(new Bit { Renderer = web, Velocity = Vector3.zero, Color = web.color, Life = 0.35f, Drag = 0 });
+                }
                 Object.Destroy(pair.Value.Root.gameObject);
                 _gone.Add(pair.Key);
                 _landed[pair.Key] = (pair.Value.State, Time.time);
@@ -1124,7 +1164,7 @@ namespace Game.Client
             else if (_landed.TryGetValue(id, out var gone)) hazard = gone.State;
             else return;
             if (!hazard.Harmful) return;
-            if (VeinEaterLanded(hazard) || KnightLanded(hazard)) return;
+            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard)) return;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             switch (hazard.Shape)
@@ -1882,8 +1922,10 @@ namespace Game.Client
                     bool rock = !projectile.Friendly && _bossInView?.Id == "vein_eater";
                     // The samurai's are crescents of light, the blade's cut flying (2026-11-12).
                     bool crescent = !projectile.Friendly && _bossInView?.Id == "shrine_samurai";
-                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : SporeSprite;
-                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock ? Color.white : crescent ? SteelColor : color);
+                    // The venom spider's are globs of venom (2026-11-13).
+                    bool venom = !projectile.Friendly && _bossInView?.Id == "venom_spider";
+                    var sprite = arrow ? ArrowSprite : projectile.Friendly ? OrbSprite : rock ? RockSprite : crescent ? CrescentSprite : venom ? VenomSprite : SporeSprite;
+                    renderer = Renderer(_root.transform, "Projectile", sprite, arrow ? Color.Lerp(Color.white, color, 0.3f) : rock || venom ? Color.white : crescent ? SteelColor : color);
                     float across = sprite.rect.height / Sprites.PixelsPerUnit;
                     renderer.transform.localScale = Vector3.one * (arrow ? 1 : Mathf.Max(1, projectile.Radius * (projectile.Friendly ? 2.6f : 2) / across));
                     renderer.transform.localRotation = Quaternion.Euler(0, 0, projectile.Velocity.Angle * Mathf.Rad2Deg);
@@ -1894,6 +1936,9 @@ namespace Game.Client
                 // The samurai's crescents shed petals as they fly.
                 if (!projectile.Friendly && _bossInView?.Id == "shrine_samurai" && UnityEngine.Random.value < 0.45f)
                     Petals(new Vector3(projectile.Position.X, projectile.Position.Y, 0), -new Vector3(projectile.Velocity.X, projectile.Velocity.Y, 0), 1, 1.5f, 0.8f, 0.2f);
+                // The venom spider's drip as they fly.
+                if (!projectile.Friendly && _bossInView?.Id == "venom_spider" && UnityEngine.Random.value < 0.35f)
+                    Venom(new Vector3(projectile.Position.X, projectile.Position.Y, 0), -new Vector3(projectile.Velocity.X, projectile.Velocity.Y, 0), 1, 0.6f);
             }
 
             _gone.Clear();
@@ -1948,6 +1993,7 @@ namespace Game.Client
                     if (attacker.Kind == BodyKind.Boss)
                     {
                         if (attacker.Id == "shrine_samurai") SamuraiDraws(attacker);
+                        if (attacker.Id == "venom_spider") SpiderUnleashes(attacker);
                         break;
                     }
                     attacker.SwingTime = SwingSeconds;
@@ -1963,6 +2009,7 @@ namespace Game.Client
                     target.HurtTime = HurtSeconds;
                     bool hurtsMe = e.Target == _client.PlayerId;
                     var hitter = Find(e.Source);
+                    if (target.Kind == BodyKind.Boss && target.Id == "venom_spider") SpiderStruck(target, hitter, e.Critical);
                     // A finisher's blow: the hitter is a player still in the strike of the combo's last step.
                     bool heavy = hitter != null && hitter.Kind == BodyKind.Player && hitter.Combo == World.ComboSteps - 1 && hitter.StrikeTime > 0;
                     // A weapon's elemental hit (World.AddElements) in its element's colour, a little aside of the blow's own number.
@@ -2355,12 +2402,15 @@ namespace Game.Client
                     else if (Find(e.Source) is Body fallen)
                     {
                         if (!_bossesSeen.ContainsKey(e.Source)) Hear(fallen.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, fallen.Position, fallen.Kind == BodyKind.Minion ? 0.4f : 1);
-                        if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Kind == BodyKind.Minion ? 0.6f : fallen.Diameter);
+                        if (fallen.Kind == BodyKind.Boss && fallen.Id == "venom_spider") SpiderFalls(fallen.Position, fallen.SpiderView, fallen.SpiderTurned);
+                        else if (fallen.Kind != BodyKind.Player) Burst(fallen.Position, BodyColor(fallen), fallen.Kind == BodyKind.Minion ? 0.6f : fallen.Diameter);
                     }
                     else if (_departed.TryGetValue(e.Source, out var gone))
                     {
                         if (!_bossesSeen.ContainsKey(e.Source)) Hear(gone.Kind == BodyKind.Player ? Sound.Down : Sound.Pop, gone.Position, gone.Kind == BodyKind.Minion ? 0.4f : 1);
-                        if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : gone.Kind == BodyKind.Minion ? 0.6f : 0.8f);
+                        // The venom spider falls where it stood, its legs curling up (WorldView.Spider.cs).
+                        if (gone.Kind == BodyKind.Boss && gone.Id == "venom_spider") SpiderFalls(gone.Position, gone.View, gone.Turned);
+                        else if (gone.Kind != BodyKind.Player) Burst(gone.Position, gone.Color, gone.Kind == BodyKind.Boss ? 2.4f : gone.Kind == BodyKind.Minion ? 0.6f : 0.8f);
                     }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
                     {
@@ -2726,6 +2776,11 @@ namespace Game.Client
             if (body.Kind == BodyKind.Boss && body.Id == "black_knight")
             {
                 AnimateKnight(body, facing, dead, moving);
+                return;
+            }
+            if (body.Kind == BodyKind.Boss && body.Id == "venom_spider")
+            {
+                AnimateSpider(body, facing, dead, moving, speed);
                 return;
             }
 

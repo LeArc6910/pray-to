@@ -141,7 +141,7 @@ namespace CoreSandbox
                 input = toTarget.Normalized;
             }
 
-            var next = PlayerMotor.Step(world.Map, player.Position, input, player.Stats.MoveSpeed);
+            var next = PlayerMotor.Step(world.Map, player.Position, input, player.MoveSpeed);
             world.MovePlayer(player.Id, next, facing, 1);
             bool inReach = slime != null || (boss != null && gap <= FightSim.Reach(player));
             world.SetAttacking(player.Id, inReach);

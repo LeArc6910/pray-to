@@ -187,7 +187,7 @@ namespace Game.Core
         public bool Sleeping { get; internal set; }
         internal Vec2 SleptAt { get; set; }
         // How fast the player may move now: slower while chilled.
-        public float MoveSpeed => Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1);
+        public float MoveSpeed => Stats.MoveSpeed * Math.Min(Afflictions.Chilled ? World.PlayerChillSpeed : 1, Afflictions.Webbed ? World.WebSpeed : 1);
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
         public ConsumableDefinition Food { get; private set; }
         public int FoodTicks { get; private set; }
@@ -575,6 +575,9 @@ namespace Game.Core
         Ring,
         // A circle whose damage is shared among the players in it.
         Share,
+        // (2026-11-13) A sticky web left on the floor (AttackShape.Web): no harm, but whoever stands in it is slowed
+        // until ResolveTick, when it is gone.
+        Web,
     }
 
     // A marked area that hurts every player inside it when ResolveTick comes. Zero damage marks a charge's path.
@@ -609,6 +612,10 @@ namespace Game.Core
         public int Damage { get; }
         public long StartTick { get; }
         public long ResolveTick { get; }
+        // Seconds the sticky web this circle leaves where it lands stays (AttackShape.Web); 0 for none.
+        public float Lingers { get; internal set; }
+        // The web whose burst this is (AttackShape.Pluck), taken away when it lands; 0 for none.
+        public int Plucks { get; internal set; }
 
         // Whether a circle of the given radius at point touches the area.
         public bool Contains(Vec2 point, float radius)
@@ -619,6 +626,7 @@ namespace Game.Core
             {
                 case HazardShape.Circle:
                 case HazardShape.Share:
+                case HazardShape.Web:
                     return distance <= Size + radius;
                 case HazardShape.Ring:
                     return distance <= Size + radius && distance >= Width - radius;

@@ -18,3 +18,4 @@ sand_scorpion,모래 전갈,2,110,16,20,2.3,0.42,8,0.6,0.55,1.1,55,25,8,10,amber
 sand_worm,모래 지렁이,2,70,14,5,1.6,0.38,10,7,0.7,1.6,45,25,8,10,amber,25,ranged,8,4.5,,#C8965A,sand,,,
 demon_soldier,마족 병사,4,95,16,12,2.6,0.42,8,0.6,0.5,1.0,100,25,8,8,void_ore,20,melee,,,,#8A2A3A,,fire:25|cold:-15,,demon_nest
 demon_caster,마족 주술사,4,60,13,4,2.0,0.38,10,7,0.8,2.2,60,25,10,10,void_essence,8,ranged,7,5,,#6A3A9A,,cold:-20,fire,demon_nest
+spiderling,새끼 독거미,4,180,32,10,3.4,0.32,12,0.5,0.35,0.9,0,10,4,6,glow_spore,20,melee,,,,#4A3A5E,mushroom,,,

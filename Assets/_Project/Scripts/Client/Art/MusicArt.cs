@@ -151,6 +151,8 @@ namespace Game.Client
         static readonly int[] Lydian = { 0, 2, 4, 6, 7, 9, 11 };
         static readonly int[] Phrygian = { 0, 1, 3, 5, 7, 8, 10 };
         static readonly int[] Harmonic = { 0, 2, 3, 5, 7, 8, 11 };
+        // The diminished fifth's mode (2026-11-13, the venom spider): nothing in it ever settles.
+        static readonly int[] Locrian = { 0, 1, 3, 5, 6, 8, 10 };
         // Phrygian with a major third, the "hijaz" of desert tunes.
         static readonly int[] Hijaz = { 0, 1, 4, 5, 7, 8, 10 };
         static readonly int[] Major = { 0, 2, 4, 5, 7, 9, 11 };
@@ -399,6 +401,15 @@ namespace Game.Client
                 Bpm = 84, Root = 38, Scale = Minor, Chords = new[] { 0, 5, 3, 4 }, BarsPerChord = 2, Bars = 16, Bass = Wave.Saw, BassNotes = 2,
                 Lead = Wave.Square, LeadOctave = 0, LeadVolume = 0.18f, Arp = Wave.Triangle, ArpRate = 1, ArpVolume = 0.08f, Rest = 0.4f,
                 Pad = Wave.Saw, PadVolume = 0.07f, Kick = "x.......x.......", Snare = "........X.......", Tom = "x.....x.x.......", Echo = 0.3f, Seed = 31,
+            },
+            // The venom spider of the mushroom hollow (2026-11-13): creeping and unsettled, locrian over a slow, low
+            // triangle bass; a plucked pulse like a thread snapping, quick quiet bells running in sixteenths like many
+            // legs, dry teks ticking like claws on stone, a cave's hum of a pad, and long silences to listen in.
+            "venom_spider" => new Style
+            {
+                Bpm = 96, Root = 44, Scale = Locrian, Chords = new[] { 0, 1, 4, 0 }, BarsPerChord = 1, Bars = 16, Bass = Wave.Triangle, BassNotes = 2,
+                Lead = Wave.Pulse, LeadOctave = 1, LeadVolume = 0.2f, Arp = Wave.Bell, ArpRate = 4, ArpOctave = 2, ArpVolume = 0.07f, Rest = 0.45f,
+                Pad = Wave.Sine, PadVolume = 0.06f, Kick = "x.......x.......", Tom = "x..........x.x..", Tek = "x.x...x.x.x...x.", Echo = 0.35f, Seed = 38,
             },
             // Any other boss: fast harmonic minor with driving drums.
             _ => new Style

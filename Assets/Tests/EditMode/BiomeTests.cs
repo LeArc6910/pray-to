@@ -46,6 +46,14 @@ namespace Game.Core.Tests
             Assert.Greater(Vec2.Dot(world.Arenas[5] - world.Spawn, deep), 0, "on the deep arena's side");
             Assert.Less(Vec2.Distance(world.Arenas[5], world.Spawn), Vec2.Distance(world.Arenas[1], world.Spawn));
             Assert.Greater(Vec2.Distance(world.Arenas[5], world.Arenas[0]), 2 * world.ArenaRadius, "apart from the first arena");
+            // The mushroom forest's near band holds the seventh arena, the venom spider's hollow (2026-11-13), on the side
+            // away from the deep arena's, apart from the first and the sand arena.
+            Assert.AreEqual(Biome.Mushroom, biomes.At(world.Arenas[6]));
+            Assert.Less(Vec2.Distance(world.Arenas[6], world.Spawn), Vec2.Distance(world.Arenas[1], world.Spawn));
+            Assert.Greater(Vec2.Distance(world.Arenas[6], world.Arenas[0]), 2 * world.ArenaRadius, "apart from the first arena");
+            Assert.Greater(Vec2.Distance(world.Arenas[6], world.Arenas[5]), 2 * world.ArenaRadius, "apart from the sand arena");
+            for (int other = 1; other <= 4; other++)
+                Assert.Greater(Vec2.Distance(world.Arenas[6], world.Arenas[other]), 2 * world.ArenaRadius, $"apart from arena {other}");
 
             var counts = Count(biomes);
             foreach (Biome biome in System.Enum.GetValues(typeof(Biome)))
@@ -92,6 +100,10 @@ namespace Game.Core.Tests
             // first arena and dried the pools in them: they count as crystal did, away from that arena and tunnel.
             var sandTunnel = NearLine(world, world.Arenas[0], world.Arenas[5], 2);
             var sand = world.Arenas[5];
+            // The mushroom hollow (2026-11-13) carved its arena and a tunnel from the spawn, and made the tiles round it
+            // mushroom forest: they are left out like the sand's.
+            var hollowTunnel = NearLine(world, world.Spawn, world.Arenas[6], 2);
+            var hollow = world.Arenas[6];
             int floors = 0;
             for (int y = 0; y < world.Map.Height; y++)
             {
@@ -99,7 +111,9 @@ namespace Game.Core.Tests
                 {
                     var biome = world.Biomes[x, y];
                     bool carved = tunnel[y * world.Map.Width + x] || lakeTunnel[y * world.Map.Width + x] || sandTunnel[y * world.Map.Width + x]
-                        || Vec2.Distance(TileMap.Center(x, y), lake) <= world.ArenaRadius + 1 || Vec2.Distance(TileMap.Center(x, y), sand) <= world.ArenaRadius + 1;
+                        || hollowTunnel[y * world.Map.Width + x]
+                        || Vec2.Distance(TileMap.Center(x, y), lake) <= world.ArenaRadius + 1 || Vec2.Distance(TileMap.Center(x, y), sand) <= world.ArenaRadius + 1
+                        || Vec2.Distance(TileMap.Center(x, y), hollow) <= 16;
                     bool elsewhere = (biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Crystal || biome == Biome.Lake || biome == Biome.Sand) && !carved;
                     if (elsewhere && world.Map[x, y] == TileType.Floor) floors++;
                 }
@@ -113,8 +127,10 @@ namespace Game.Core.Tests
         // arena and tunnel too, whose floors were in the 5367 before; the lake itself only carved those and set pools
         // into rock, so the rest of these caves are the same tiles. Since the sand caves (2026-11-09, 4855 before) it
         // leaves out their arena and tunnel from the first arena as well; the sand only carved those and turned pools
-        // to rock, and the tiles round its arena counted as sand whatever their biome was.
-        const int FloorsElsewhereOfSeedSeven = 4522;
+        // to rock, and the tiles round its arena counted as sand whatever their biome was. Since the mushroom hollow
+        // (2026-11-13, 4522 before) it leaves out that arena's surroundings (16 tiles round it, which it made mushroom
+        // forest) and its tunnel from the spawn too; outside those, the floors are the tiles they were.
+        const int FloorsElsewhereOfSeedSeven = 4075;
 
         // Tiles within reach of the straight line between two points, drawn the way tunnels are.
         static bool[] NearLine(GeneratedWorld world, Vec2 from, Vec2 to, int reach)

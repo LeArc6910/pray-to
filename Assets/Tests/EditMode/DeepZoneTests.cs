@@ -16,7 +16,7 @@ namespace Game.Core.Tests
         public void TheDeepArenaLiesBeyondTheFirstAndCanBeReached(ulong seed)
         {
             var world = WorldGenerator.Generate(seed);
-            Assert.AreEqual(6, world.Arenas.Count, "the first, the deep, the lava, the abyss, the lake and the sand arena");
+            Assert.AreEqual(7, world.Arenas.Count, "the first, the deep, the lava, the abyss, the lake, the sand arena and the mushroom hollow");
             Assert.AreEqual(world.Arena, world.Arenas[0]);
             var deep = world.Arenas[1];
 
@@ -49,13 +49,15 @@ namespace Game.Core.Tests
             var host = new WorldHost(7, Monsters.Shipped, Gear.Data, null, new WorldConfig { EnemyTarget = 0 }, Bosses.Shipped, Classes.Shipped, Tiles.Shipped);
             var arenas = WorldGenerator.Generate(7).Arenas;
 
-            Assert.AreEqual(6, host.World.Bosses.Count);
+            Assert.AreEqual(7, host.World.Bosses.Count);
             Assert.AreEqual(arenas[0], host.World.Bosses.Single(b => b.Definition == Warden).Position);
             Assert.AreEqual(arenas[1], host.World.Bosses.Single(b => b.Definition == Queen).Position);
             Assert.AreEqual(arenas[2], host.World.Bosses.Single(b => b.Definition.Id == "lava_titan").Position);
             Assert.AreEqual(arenas[3], host.World.Bosses.Single(b => b.Definition.Id == "void_lord").Position);
             Assert.AreEqual(arenas[4], host.World.Bosses.Single(b => b.Definition.Id == "tide_serpent").Position);
             Assert.AreEqual(arenas[5], host.World.Bosses.Single(b => b.Definition.Id == "antlion").Position);
+            // The venom spider in the mushroom hollow (2026-11-13), the seventh boss with no place.
+            Assert.AreEqual(arenas[6], host.World.Bosses.Single(b => b.Definition.Id == "venom_spider").Position);
         }
 
         [Test]

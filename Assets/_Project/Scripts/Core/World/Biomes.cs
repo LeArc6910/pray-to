@@ -33,6 +33,8 @@ namespace Game.Core
         public const int SandRadius = 52;
         // And all of it this near the sand arena (WorldGenerator), so the arena is always in it.
         const int SandArenaReach = 15;
+        // And the mushroom forest all of it this near the mushroom hollow (2026-11-13, the venom spider's arena).
+        const int HollowReach = 15;
         const int Wobble = 8;
         const int Cell = 16;
 
@@ -71,7 +73,7 @@ namespace Game.Core
         // opposite; mushroomFirst picks which of the other two corners gets the mushroom forest.
         // abyss is the corner whose far end is the abyss, lake the one whose far end is the lake; null for none.
         public static BiomeMap Make(ulong seed, int width, int height, int spawnX, int spawnY, (int X, int Y) corner, bool mushroomFirst,
-            (int X, int Y)? abyss = null, (int X, int Y)? lake = null, (int X, int Y)? sandArena = null)
+            (int X, int Y)? abyss = null, (int X, int Y)? lake = null, (int X, int Y)? sandArena = null, (int X, int Y)? hollow = null)
         {
             var tiles = new Biome[width * height];
             // Every distance and the borders' wobble grow with the map (2026-11-11: the game's map is four times as wide
@@ -89,6 +91,11 @@ namespace Game.Core
                     if (sandArena is (int ax0, int ay0) && (x - ax0) * (x - ax0) + (y - ay0) * (y - ay0) <= sandArenaReach * sandArenaReach)
                     {
                         tiles[y * width + x] = Biome.Sand;
+                        continue;
+                    }
+                    if (hollow is (int hx0, int hy0) && (x - hx0) * (x - hx0) + (y - hy0) * (y - hy0) <= HollowReach * k * HollowReach * k)
+                    {
+                        tiles[y * width + x] = Biome.Mushroom;
                         continue;
                     }
                     if (dx * dx + dy * dy < caveRadius * caveRadius) continue;

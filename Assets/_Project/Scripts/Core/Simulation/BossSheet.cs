@@ -33,6 +33,12 @@ namespace Game.Core
         Burrow,
         // The same as Burrow through the air: the boss leaps up out of reach and lands on where the target stood.
         Leap,
+        // (2026-11-13, the venom spider) Circles like Circle that, where they land, leave a sticky web for length seconds:
+        // whoever stands in it is slowed (World.WebSpeed). radius, count, spread as Circle.
+        Web,
+        // (2026-11-13, the venom spider) The boss plucks its webs: every web of its own on the floor is marked and bursts
+        // (the web gone with it). With no web down, a circle of radius under each fighter instead.
+        Pluck,
     }
 
     // How plainly an attack is announced (2026-11-12, the vein eater). Marked is how every boss announced every attack
@@ -159,6 +165,7 @@ namespace Game.Core
             AttackShape.Share => 14,
             AttackShape.Trail => Length,
             AttackShape.Cross => 14,
+            AttackShape.Web => 14,
             _ => float.PositiveInfinity,
         };
     }
@@ -440,6 +447,12 @@ namespace Game.Core
                 case AttackShape.Burrow:
                 case AttackShape.Leap:
                     Need(attack.Radius > 0 && attack.Damage > 0 && (attack.Count == 0 || attack.Speed > 0), "radius, damage(돌을 흩뿌리면 count와 speed)");
+                    break;
+                case AttackShape.Web:
+                    Need(attack.Radius > 0 && attack.Count > 0 && attack.Length > 0 && attack.Damage > 0, "radius, count, length(거미줄이 남는 초), damage");
+                    break;
+                case AttackShape.Pluck:
+                    Need(attack.Radius > 0 && attack.Damage > 0, "radius(거미줄이 없을 때 발밑 원), damage");
                     break;
             }
         }

@@ -115,3 +115,13 @@ black_knight,leap,도약 내려찍기,2|3,leap,nearest,1.9,160,2.8,,,,8,,7,1.6,1
 black_knight,fissure,십자 균열,3,cross,self,1.7,120,,9,0,1.6,,,,1.4,16,,
 black_knight,rubble,무너지는 천장,3,circle,each,1.4,80,1.5,,,,3,3,,1.2,14,,
 black_knight,judgement,심판의 일격,3,circle,self,2.6,220,7,,,,1,,,2.0,10,,strong
+venom_spider,bite,독니 물기,,cone,nearest,0.8,100,,3.6,80,,,,,0.8,28,,
+venom_spider,stab,앞다리 찍기,,trail,nearest,1.0,85,1.1,6.4,,,4,,16,0.9,22,,
+venom_spider,net,거미줄 그물,,web,random,1.1,60,1.6,7,,,3,2.2,,0.9,20,,
+venom_spider,spit,독침 뱉기,1|2,burst,nearest,0.8,60,0.45,,50,,5,,9,0.8,18,,
+venom_spider,drop,천장 낙하,2|3,leap,nearest,1.9,175,2.6,,,,8,,7,1.4,14,,strong
+venom_spider,brood,알주머니,2|3,summon,self,1.0,,,,,,3,2.5,,1.0,10,spiderling,
+venom_spider,snare,거미줄 감옥,2|3,web,self,1.2,50,1.5,8,,,6,5.5,,0.9,16,,
+venom_spider,miasma,독안개 회오리,3,spiral,self,0.9,50,0.4,,22,5,6,,7,1.2,14,,
+venom_spider,rain,그물 비,3,web,each,1.2,60,1.4,7,,,2,2.0,,0.9,14,,
+venom_spider,pluck,그물 폭발,3,pluck,self,1.6,190,2.0,,,,,,,1.5,14,,strong

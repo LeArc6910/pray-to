@@ -59,6 +59,12 @@ namespace Game.Client
         Hammer,
         // A monster tramping through a crop at night: leaves crushed and a dull thud (2026-11-09).
         Trample,
+        // The venom spider (2026-11-13): a long hiss as it rears; a thread shot out (a quick rising whip); its legs
+        // ticking on stone as it skitters; and the wet crunch of fangs or venom landing.
+        Hiss,
+        Web,
+        Skitter,
+        Squelch,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -168,6 +174,28 @@ namespace Game.Client
                     parts.Add(Noise(0, 0.2f, 0.55f, 0.35f, decay: 3, seed: 7));
                     parts.Add(Tone(Wave.Triangle, 0, 0.13f, 170, 85, 0.5f, decay: 5));
                     level = 0.55f;
+                    break;
+                case Sound.Hiss:
+                    parts.Add(Noise(0, 0.5f, 0.8f, 0.95f, attack: 0.08f, decay: 2.2f, seed: 31));
+                    parts.Add(Noise(0, 0.45f, 0.35f, 0.5f, attack: 0.05f, decay: 2.5f, seed: 32));
+                    parts.Add(Tone(Wave.Saw, 0, 0.35f, 1900, 1500, 0.06f, attack: 0.05f, decay: 2));
+                    level = 0.55f;
+                    break;
+                case Sound.Web:
+                    parts.Add(Tone(Wave.Triangle, 0, 0.12f, 420, 1700, 0.45f, decay: 3));
+                    parts.Add(Noise(0, 0.12f, 0.45f, 0.75f, attack: 0.01f, decay: 5, seed: 33));
+                    level = 0.55f;
+                    break;
+                case Sound.Skitter:
+                    for (int i = 0; i < 6; i++) parts.Add(Noise(i * 0.034f, 0.022f, i % 2 == 0 ? 0.7f : 0.5f, 1, decay: 9, seed: 34 + i));
+                    parts.Add(Tone(Wave.Pulse, 0, 0.18f, 2400, 2200, 0.05f, decay: 6));
+                    level = 0.45f;
+                    break;
+                case Sound.Squelch:
+                    parts.Add(Tone(Wave.Sine, 0, 0.2f, 260, 70, 0.75f, decay: 4));
+                    parts.Add(Noise(0, 0.16f, 0.8f, 0.25f, decay: 4, seed: 41));
+                    parts.Add(Noise(0.05f, 0.14f, 0.5f, 0.55f, decay: 5, seed: 42));
+                    level = 0.75f;
                     break;
                 case Sound.Shoot:
                     parts.Add(Tone(Wave.Triangle, 0, 0.14f, 720, 250, 0.7f, decay: 4));
