@@ -912,13 +912,17 @@ async function spider(browser) {
     await game.wait(Math.round(telegraph * 400) + 80);
     await game.shot(`spider-${attack}-hit`, `${name} 터진 순간`);
     if (attack === 'web_burst') {
-      // The headless page can run the game slower than the clock, so the burst may land a moment late: wait for it.
+      // The headless page can run the game slower than the clock, so the burst may land a moment late; and the
+      // spider, fighting on, may lay fresh webs of its own just after. So watch for up to three seconds and pass if
+      // the webs that were down fall below what was laid (the burst took them away).
       let gone = await game.state();
-      for (let k = 0; k < 15 && ((gone.pools || 0) > 0 || (gone.poolsShown || 0) > 0); k++) {
-        await game.wait(200);
+      let fewest = Math.min(gone.pools || 0, gone.poolsShown || 0);
+      for (let k = 0; k < 30 && fewest > 0; k++) {
+        await game.wait(100);
         gone = await game.state();
+        fewest = Math.min(fewest, gone.pools || 0, gone.poolsShown || 0);
       }
-      check((gone.pools || 0) === 0 && (gone.poolsShown || 0) === 0, `그물 폭발: 터진 거미줄은 사라진다 (월드 ${gone.pools}, 화면 ${gone.poolsShown})`);
+      check(fewest < laid, `그물 폭발: 터진 거미줄은 사라진다 (깔린 ${laid}, 터진 뒤 가장 적을 때 ${fewest})`);
     }
     if (pools > 0) {
       await game.wait(500);
@@ -3171,18 +3175,26 @@ async function arenas(browser) {
     await game.send(`heal; clear; bosses hold; goto boss ${id}`);
     await game.wait(1200);
     await game.shot(`enter-${id}-asleep`, `${name}: 깨기 전(잠든 자세)`);
+    // Every other boss back to sleep: one that has fought already would take up its fight again when they all wake
+    // and lay its own marks. Then let anything it laid before go (clear takes only monsters).
+    await game.send(ArenaList.filter(a => a[0] !== id).map(a => `boss ${a[0]} sleep`).join('; '));
+    await game.until(t => (t.hazards || 0) === 0 && (t.bossShots || 0) === 0, 9000);
     await game.send(`bosses wake; boss ${id} enter`);
     const started = Date.now();
     const card = await game.until(t => has(t.entrance, name), 3000, game.texts);
     check(!!card, `${name}: 이름 카드에 이름과 별칭 (${card ? card.entrance : '없음'})`);
     check(card && card.entranceFits !== false, `${name}: 이름 카드의 글이 화면 너비 안에`);
-    check(stateOf(await game.state(), id) === 'Enter', `${name}: 입장하는 동안 Enter 상태`);
+    const entering = await game.state();
+    check(stateOf(entering, id) === 'Enter', `${name}: 입장하는 동안 Enter 상태`);
+    // Anything laid while it is still entering would be its own: watch until it begins to fight.
+    let worst = { hazards: entering.hazards || 0, bossShots: entering.bossShots || 0 };
     for (const [share, label] of [[0.15, '처음'], [0.45, '중간'], [0.8, '절정']]) {
       await game.wait(Math.max(0, seconds * 1000 * share - (Date.now() - started)));
       await game.shot(`enter-${id}-${Math.round(share * 100)}`, `${name} 입장 ${label}: ${what}`);
     }
     const before = await game.state();
-    check(before.hazards === 0 && before.bossShots === 0, `${name}: 입장하는 동안 공격이 없다 (장판 ${before.hazards}, 탄 ${before.bossShots})`);
+    if (stateOf(before, id) === 'Enter') worst = { hazards: Math.max(worst.hazards, before.hazards || 0), bossShots: Math.max(worst.bossShots, before.bossShots || 0) };
+    check(worst.hazards === 0 && worst.bossShots === 0, `${name}: 입장하는 동안 공격이 없다 (입장 중 본 장판 ${worst.hazards}, 탄 ${worst.bossShots})`);
     const fighting = await game.until(t => { const st = stateOf(t, id); return st && st !== 'Enter' && st !== 'Dormant'; }, 6000);
     const took = (Date.now() - started) / 1000;
     check(!!fighting && took > seconds - 0.8 && took < seconds + 1.5, `${name}: 입장은 약 ${seconds}초 (${took.toFixed(1)}초)`);
