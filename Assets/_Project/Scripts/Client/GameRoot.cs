@@ -831,6 +831,10 @@ namespace Game.Client
         internal IReadOnlyList<string> HudLines => _hudLines;
         internal IEnumerable<string> AcquiredLines => _acquired.Select(a => a.Text);
         internal string Banner => _view?.ShowingBanner;
+        internal bool EntranceFits => _view == null || _view.EntranceFits;
+        // The boss whose entrance is on show: its id, name and title as the card writes them, or null.
+        internal string EntranceShown => _view?.EntranceShown is string id && _bosses?.Bosses.FirstOrDefault(b => b.Id == id) is BossDefinition entering
+            ? $"{id}|{entering.Name}|{entering.Arena?.Title}" : null;
         internal int OpenDoors => _view?.OpenDoors ?? 0;
         internal bool MapOpen => _map != null && _map.FullOpen;
         internal IEnumerable<string> FloatingTexts => _view?.FloatingTexts ?? Enumerable.Empty<string>();
@@ -1519,6 +1523,7 @@ namespace Game.Client
             // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
             if (Setting(Strings.T("menu.font", "글꼴"), Settings.PixelFont ? Strings.T("menu.font_pixel", "도트") : Strings.T("menu.font_smooth", "매끈"))) Settings.PixelFont = !Settings.PixelFont;
             if (Setting(Strings.T("menu.shake", "화면 흔들림"), Strings.OnOff(Settings.ScreenShake))) Settings.ScreenShake = !Settings.ScreenShake;
+            if (Setting(Strings.T("menu.bossintro", "보스 등장 연출"), Strings.OnOff(Settings.BossIntro))) Settings.BossIntro = !Settings.BossIntro;
             // The words' language, when the string sheet has another (Strings, Docs/Strings.md).
             if (Strings.HasOthers && Setting(Strings.T("menu.language", "언어"), Strings.NameOf(Settings.Language))) Settings.Language = Strings.NextLanguage();
             Heading(Strings.T("menu.play_group", "플레이"));

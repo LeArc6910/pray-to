@@ -48,7 +48,9 @@ namespace Game.Core
             State = state;
             // A boss's phase carries the attack it is on above it (World.BossPhaseField).
             Phase = kind == EntityKind.Boss ? phase & World.BossPhaseMask : phase & Protocol.PhaseMask;
-            BossAttack = kind == EntityKind.Boss && boss != null ? AttackAt(boss, (phase & Protocol.PhaseMask) >> World.BossAttackShift) : null;
+            bool entering = kind == EntityKind.Boss && (BossState)(state & 0x0F) == BossState.Enter;
+            BossAttack = kind == EntityKind.Boss && boss != null && !entering ? AttackAt(boss, (phase & Protocol.PhaseMask) >> World.BossAttackShift) : null;
+            EntersAgain = entering && (phase & Protocol.PhaseMask) >> World.BossAttackShift == World.EntranceAgain;
             Status = (byte)(phase >> 6);
             DropBase = dropBase;
             DropRune = dropRune;
@@ -75,6 +77,8 @@ namespace Game.Core
         public int Phase { get; }
         // The attack a boss is winding up, making or resting from (null between attacks, asleep or roaring).
         public BossAttack BossAttack { get; }
+        // A boss coming in (BossState.Enter) the short way: it has come in before in this world.
+        public bool EntersAgain { get; }
 
         static BossAttack AttackAt(BossDefinition boss, int index) => index >= 1 && index <= boss.Attacks.Count ? boss.Attacks[index - 1] : null;
         // Burning, chilled (StatusBits).
@@ -270,6 +274,8 @@ namespace Game.Core
         public Vec2 Arena { get; private set; }
         // Every boss arena, the first one's first (GeneratedWorld.Arenas).
         public IReadOnlyList<Vec2> Arenas { get; private set; } = new Vec2[0];
+        // What each is made to look like, alongside Arenas (GeneratedWorld.ArenaKinds).
+        public IReadOnlyList<ArenaKind> ArenaKinds { get; private set; } = new ArenaKind[0];
         // Which kind of cave each tile is in, worked out from the seed like the map.
         public BiomeMap Biomes { get; private set; } = BiomeMap.Plain(1, 1);
         public float ArenaRadius { get; private set; }
@@ -1509,13 +1515,14 @@ namespace Game.Core
             ApplyKit(welcome.Classes, welcome.SkillOrder);
             PlayerId = welcome.PlayerId;
             Seed = welcome.Seed;
-            var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story);
+            var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story, _bosses?.Arenas);
             Map = generated.Map;
             _builtTiles.Clear();
             Signposts = generated.Signposts;
             Places = generated.Places;
             Arena = generated.Arena;
             Arenas = generated.Arenas;
+            ArenaKinds = generated.ArenaKinds;
             Biomes = generated.Biomes;
             ArenaRadius = generated.ArenaRadius;
             Position = welcome.Spawn;

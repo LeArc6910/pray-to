@@ -460,8 +460,11 @@ namespace Game.Client
                 case "vein_eater":
                     VeinEater(folder, arena);
                     return true;
+                case "entrances":
+                    Entrances(folder, arena);
+                    return true;
                 default:
-                    Console.Error.WriteLine($"--only {name}: spider, knight, samurai or vein_eater");
+                    Console.Error.WriteLine($"--only {name}: spider, knight, samurai, vein_eater, entrances or arenas");
                     return false;
             }
         }
@@ -484,6 +487,7 @@ namespace Game.Client
             Samurai(folder, arena);
             Knight(Path.Combine(folder, "knight.gif"), arena);
             Spider(folder, arena);
+            Entrances(folder, arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
             StoryPeople(Path.Combine(folder, "story_people.gif"), floor);
@@ -952,8 +956,11 @@ namespace Game.Client
                 Rest(3).Concat(Run(VeinPose.Leap, 0.08f, 3, MotionCheck.Kind.Air)).Concat(Blow(VeinPose.Pound, 3, fromStrike: true)).Concat(Rest(3)),
                 Rest(3).Concat(Enumerable.Range(0, VeinEaterArt.RoarRise).Select(f => S(VeinPose.Roar, f, 0.08f, 3)))
                     .Concat(Enumerable.Range(VeinEaterArt.RoarRise, 4).Select(f => S(VeinPose.Roar, f, 0.1f, 3))),
+                // The entrance (arenas.csv, 3.2 s): asleep under its mound, then up through the floor.
+                new[] { S(VeinPose.Emerge, 0, 0.6f) }.Concat(Enumerable.Range(0, VeinEaterArt.FramesOf(VeinPose.Emerge))
+                    .Select(f => S(VeinPose.Emerge, f, 0.1f, 1, false, VeinEaterArt.Emerging(f) ? MotionCheck.Kind.Air : MotionCheck.Kind.Normal))).Concat(Rest()),
             };
-            MotionCheck.Write(folder, "vein_eater", new[] { "walk", "claw", "throw", "rush", "burrow", "cavein", "spikes", "spin", "quake", "roar" },
+            MotionCheck.Write(folder, "vein_eater", new[] { "walk", "claw", "throw", "rush", "burrow", "cavein", "spikes", "spin", "quake", "roar", "enter" },
                 rows.Select(r => r.ToList()).ToArray(), arena, VeinEaterArt.Width, VeinEaterArt.Height, 8);
         }
 
@@ -1001,8 +1008,11 @@ namespace Game.Client
                 Rest().Concat(Run(SpiderPose.Flinch, 0.05f)).Concat(Rest()),
                 Rest(3).Concat(Run(SpiderPose.Die, 0.07f, 3)).Concat(new[] { S(SpiderPose.Die, SpiderArt.FramesOf(SpiderPose.Die) - 1, 0.8f, 3) }),
                 Rest(3).Concat(Run(SpiderPose.Tug, 0.063f, 3)).Concat(Blow(SpiderPose.Snap, 3)).Concat(Rest(3)),
+                // The entrance (arenas.csv, 3.4 s): down its thread from the roof, the legs opening, and its threat.
+                Enumerable.Range(0, SpiderArt.FramesOf(SpiderPose.Descend))
+                    .Select(f => S(SpiderPose.Descend, f, 0.074f, 1, SpiderArt.Descending(f) ? MotionCheck.Kind.Air : MotionCheck.Kind.Normal)).Concat(Rest()),
             };
-            MotionCheck.Write(folder, "spider", new[] { "walk", "idle", "bite", "stab", "web", "pounce", "spit", "drop", "eightlegs", "screech", "flinch", "die", "pluck" },
+            MotionCheck.Write(folder, "spider", new[] { "walk", "idle", "bite", "stab", "web", "pounce", "spit", "drop", "eightlegs", "screech", "flinch", "die", "pluck", "enter" },
                 rows.Select(r => r.ToList()).ToArray(), arena, SpiderArt.Width, SpiderArt.Height, 7);
 
             // Each pose's telling frame, turned all eight ways as WorldView turns it (five views, three of them flipped).
@@ -1068,10 +1078,12 @@ namespace Game.Client
                     .Concat(Blow(KnightPose.Pound).Skip(KnightArt.StrikeFrame(KnightPose.Pound)))
                     .ToArray(),
                 rest.Concat(Run(KnightPose.Roar, 0.08f)).Concat(Run(KnightPose.Roar, 0.1f, KnightArt.RoarRise)).Concat(Run(KnightPose.Roar, 0.1f, KnightArt.RoarRise)).ToArray(),
+                // The entrance (arenas.csv, 4.6 s): up off its knee, two strides, the hammer brought down.
+                new[] { (KnightPose.Enter, 0, 0.6f) }.Concat(Blow(KnightPose.Enter)).Concat(rest).ToArray(),
             };
         }
 
-        static readonly string[] KnightRows = { "walk", "smash", "sweep", "charge", "pound", "leap", "roar" };
+        static readonly string[] KnightRows = { "walk", "smash", "sweep", "charge", "pound", "leap", "roar", "enter" };
 
         // The body turns with the blow as WorldView turns it (AnimateKnight.Twist).
         static BossView KnightSideView(KnightPose pose, int frame)
@@ -1247,10 +1259,92 @@ namespace Game.Client
                 rest.Concat(new[] { S(SamuraiPose.Rush, 0, 0.03f, MotionCheck.Kind.Strike) }).Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Rush, f, 0.03f))).Concat(halt)
                     .Concat(new[] { S(SamuraiPose.Rush, 0, 0.03f, MotionCheck.Kind.Strike) }).Concat(Enumerable.Range(1, 7).Select(f => S(SamuraiPose.Rush, f, 0.03f))).Concat(halt),
                 rest.Concat(Enumerable.Range(0, SamuraiArt.KiaiRise).Select(f => S(SamuraiPose.Kiai, f, 0.035f))).Concat(Enumerable.Range(SamuraiArt.KiaiRise, 4).Select(f => S(SamuraiPose.Kiai, f, 0.12f))),
+                // The entrance (arenas.csv, 3.6 s): up from sitting on its heels, the hand to the hilt.
+                new[] { S(SamuraiPose.Seiza, 0, 0.6f) }.Concat(Run(SamuraiPose.Seiza, 0.12f)).Concat(rest),
             };
-            MotionCheck.Write(folder, "samurai", new[] { "walk", "iai", "dash", "chain", "kiri", "whirl", "rush", "kiai" }, rows.Select(r => r.ToList()).ToArray(), arena,
+            MotionCheck.Write(folder, "samurai", new[] { "walk", "iai", "dash", "chain", "kiri", "whirl", "rush", "kiai", "enter" }, rows.Select(r => r.ToList()).ToArray(), arena,
                 SamuraiArt.Width, SamuraiArt.Height, 7);
         }
+
+        // The four entrances (2026-11-17, Docs/Bosses.md 입장 연출) side by side as the game plays them, facing the viewer
+        // (entrances.gif), and each one's telling frames turned all eight ways as WorldView turns it
+        // (<name>_enter_turn.png: a row a frame; right, down-right, down, down-left, left, up-left, up, up-right).
+        public static void Entrances(string folder, PixelImage arena)
+        {
+            var ways = new (BossView View, bool Flip, int Sector)[]
+            {
+                (BossView.Side, false, 0), (BossView.FrontSide, false, 7), (BossView.Front, false, 6), (BossView.FrontSide, true, 5),
+                (BossView.Side, true, 4), (BossView.BackSide, true, 3), (BossView.Back, false, 2), (BossView.BackSide, false, 1),
+            };
+            PixelImage SamuraiWay(int sector, int frame)
+            {
+                var (turned, mirrored, aim) = SamuraiArt.Facing(sector, SamuraiPose.Seiza, frame);
+                var image = SamuraiArt.Draw(turned, SamuraiPose.Seiza, frame, 1, aim);
+                return mirrored ? image.FlippedX() : image;
+            }
+            var bosses = new (string Name, int Width, int Height, int Frames, float Seconds, Func<int, int, PixelImage> Draw, Func<float, int> FrameAt)[]
+            {
+                ("vein_eater", VeinEaterArt.Width, VeinEaterArt.Height, VeinEaterArt.FramesOf(VeinPose.Emerge), 3.2f,
+                    (w, f) => Flip(VeinEaterArt.Draw(ways[w].View, VeinPose.Emerge, f, 1, false), ways[w].Flip), null),
+                ("spider", SpiderArt.Width, SpiderArt.Height, SpiderArt.FramesOf(SpiderPose.Descend), 3.4f,
+                    (w, f) => Flip(SpiderArt.Draw(ways[w].View, SpiderPose.Descend, f, 1), ways[w].Flip), null),
+                ("samurai", SamuraiArt.Width, SamuraiArt.Height, SamuraiArt.FramesOf(SamuraiPose.Seiza), 3.6f,
+                    (w, f) => SamuraiWay(ways[w].Sector, f), null),
+                ("knight", KnightArt.Width, KnightArt.Height, KnightArt.FramesOf(KnightPose.Enter), 4.6f,
+                    (w, f) => Flip(KnightArt.Draw(ways[w].View, KnightPose.Enter, f, 1), ways[w].Flip), p => KnightArt.EnterFrameAt(p, false)),
+            };
+            PixelImage Over(PixelImage image)
+            {
+                var result = new PixelImage(image.Width, image.Height);
+                for (int y = 0; y < image.Height; y++)
+                    for (int x = 0; x < image.Width; x++)
+                    {
+                        var c = image[x, y];
+                        var ground = arena[x % arena.Width, y % arena.Height];
+                        result[x, y] = c.A == 255 ? c : c.A == 0 ? ground : ground.Mix(c.WithAlpha(255), c.A / 255f);
+                    }
+                return result;
+            }
+            foreach (var boss in bosses)
+            {
+                // Seven frames evenly through it, the first and the last among them.
+                int rows = 7;
+                var sheet = new PixelImage(ways.Length * boss.Width, rows * boss.Height);
+                for (int r = 0; r < rows; r++)
+                    for (int w = 0; w < ways.Length; w++)
+                        sheet.Draw(Over(boss.Draw(w, r * (boss.Frames - 1) / (rows - 1))), w * boss.Width, r * boss.Height);
+                Png.Save(sheet, Path.Combine(folder, boss.Name + "_enter_turn.png"));
+            }
+
+            // Side by side, each for its own time and then held at rest; half a second asleep first.
+            int cellWidth = bosses.Max(b => b.Width), cellHeight = bosses.Max(b => b.Height);
+            float longest = bosses.Max(b => b.Seconds) + 1.3f;
+            var cache = new Dictionary<(int, int), PixelImage>();
+            var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
+            for (float time = 0; time < longest; time += 0.04f)
+            {
+                var pixels = new Rgba[cellWidth * bosses.Length * cellHeight];
+                for (int b = 0; b < bosses.Length; b++)
+                {
+                    var boss = bosses[b];
+                    float progress = Math.Clamp((time - 0.5f) / boss.Seconds, 0, 1);
+                    int frame = boss.FrameAt != null ? boss.FrameAt(progress) : Math.Min(boss.Frames - 1, (int)(progress * boss.Frames));
+                    if (!cache.TryGetValue((b, frame), out var image)) cache[(b, frame)] = image = boss.Draw(2, frame);
+                    int left = (cellWidth - boss.Width) / 2, top = cellHeight - boss.Height;
+                    for (int y = 0; y < cellHeight; y++)
+                        for (int x = 0; x < cellWidth; x++)
+                        {
+                            var ground = arena[x % arena.Width, y % arena.Height];
+                            var c = image.Inside(x - left, y - top) ? image[x - left, y - top] : Rgba.Clear;
+                            pixels[y * cellWidth * bosses.Length + b * cellWidth + x] = c.A == 255 ? c : c.A == 0 ? ground : ground.Mix(c.WithAlpha(255), c.A / 255f);
+                        }
+                }
+                frames.Add((pixels, 4));
+            }
+            Gif.Save(Path.Combine(folder, "entrances.gif"), cellWidth * bosses.Length, cellHeight, frames);
+        }
+
+        static PixelImage Flip(PixelImage image, bool flip) => flip ? image.FlippedX() : image;
 
         static void Bosses(string path, PixelImage arena)
         {

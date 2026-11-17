@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Game.Client
 {
@@ -21,6 +22,10 @@ namespace Game.Client
         Leap,
         Pound,
         Roar,
+        // Its entrance (2026-11-17, Docs/Bosses.md 입장 연출): down on one knee behind its hammer stood upright; it
+        // pushes itself up and lets the hammer fall behind it; two heavy strides dragging it; hauled up overhead and
+        // brought down on the floor; and dragged back to rest.
+        Enter,
     }
 
     // The black knight of the hero's hut (2026-11-12): a hulking knight in dark plate with a great helm and a torn blue
@@ -530,6 +535,7 @@ namespace Game.Client
             KnightPose.Crouch => 8,
             KnightPose.Leap => 14,
             KnightPose.Roar => RoarRise + 4,
+            KnightPose.Enter => EnterFrames.Length,
             _ => 4,
         };
 
@@ -546,6 +552,8 @@ namespace Game.Client
             // beside it (shortened, pointing at the viewer, so its head does not sink into the floor), slowing to rest.
             DragStart,
             Drag,
+            // The slow parts of the entrance: getting up, striding, hauling the hammer up.
+            Slow,
         }
 
         static float StageSeconds(Stage stage) => stage switch
@@ -555,10 +563,11 @@ namespace Game.Client
             Stage.Rebound => 0.1f,
             Stage.Held => 0.125f,
             Stage.Haul => 0.1f,
+            Stage.Slow => 0.085f,
             _ => 0.075f,
         };
 
-        static Stage[] StagesOf(KnightPose pose) => pose == KnightPose.Smash ? SmashStages : pose == KnightPose.Pound ? PoundStages : pose == KnightPose.Sweep ? SweepStages : null;
+        static Stage[] StagesOf(KnightPose pose) => pose == KnightPose.Smash ? SmashStages : pose == KnightPose.Pound ? PoundStages : pose == KnightPose.Sweep ? SweepStages : pose == KnightPose.Enter ? EnterStages : null;
 
         // How long a blow's frame is shown (seconds); 0 for anything else.
         public static float FrameSeconds(KnightPose pose, int frame)
@@ -703,6 +712,59 @@ namespace Game.Client
             (Stage.DragStart, 8, P(5, 4, -90, lean: 2, together: 0.7f, stepA: 2, stepB: -1, shove: 2, fore: 0.5f)),
             (Stage.Drag, 8, P(0, -2, RestAngle)));
 
+        // The entrance. Down on one knee, both hands on the haft of the hammer stood head up before it (-275 is the
+        // same way as 85, a little back from straight up, on the turn that comes down behind to rest at -150).
+        static readonly Pose Kneeling = P(6, 5, -275, lean: 6, stretch: -0.2f, together: 1, stepA: 5, stepB: -5, drop: 4);
+
+        static readonly (Pose[] Frames, Stage[] Stages) Entrance = Expand(Kneeling,
+            // Up off the knee, leaning on the hammer; then the hammer let go back over the shoulder to the floor behind.
+            (Stage.Slow, 6, P(8, 4, -268, lean: 3, stretch: -0.07f, together: 1, stepA: 3, stepB: -3, drop: 1)),
+            (Stage.Slow, 4, P(6, 0, -215, lean: 0, stretch: 0.01f, together: 0.8f, stepA: 1, stepB: -1)),
+            (Stage.Slow, 6, Rest),
+            // Two strides: a foot lifted and brought through, then planted with the body sinking onto it.
+            (Stage.Slow, 3, P(0, -3, -152, lean: 2, stepA: 2, stepB: -1, shove: 1, liftA: 2)),
+            (Stage.Slow, 2, P(0, -3, -150, lean: 1, stretch: -0.03f, stepA: 4, stepB: -3, drop: 1.2f, shove: 2)),
+            (Stage.Slow, 3, P(0, -3, -152, lean: 2, stepA: 2, stepB: 1, shove: 3, liftB: 2)),
+            (Stage.Slow, 2, P(0, -3, -150, lean: 1, stretch: -0.03f, stepA: -2, stepB: 3, drop: 1.2f, shove: 4)),
+            // Hauled up from the floor behind it, over the shoulder, overhead.
+            (Stage.Slow, 4, P(5, -1, -178, lean: 0.5f, stretch: -0.03f, together: 0.8f, stepA: 1, stepB: -1, drop: 1, shove: 4)),
+            (Stage.Slow, 5, P(17, -3, -206, lean: -2.5f, stretch: 0.04f, together: 0.95f, stepA: 3, stepB: -3, shove: 4)),
+            (Stage.Slow, 4, P(26, -5, -226, lean: -5, stretch: 0.08f, together: 0.95f, stepA: 3, stepB: -3, shove: 4)),
+            // And down on the floor at its feet, as the pound.
+            (Stage.Swing, 4, P(5, 6, -360, lean: 4, stretch: -0.08f, together: 1, stepA: 4, stepB: -4, drop: 2, shove: 4)),
+            (Stage.Strike, 1, P(-2, 9, -405, lean: 6, stretch: -0.17f, together: 1, stepA: 4, stepB: -4, drop: 4, shove: 4)),
+            (Stage.Rebound, 1, P(0, 9, -400, lean: 5, stretch: -0.12f, together: 1, stepA: 4, stepB: -4, drop: 3, shove: 4)),
+            (Stage.Held, 3, P(-1, 8, -404, lean: 4, stretch: -0.11f, together: 0.95f, stepA: 4, stepB: -4, drop: 2, shove: 4)),
+            (Stage.Haul, 2, P(1, 6, -420, lean: 2, stretch: -0.04f, together: 0.85f, stepA: 3, stepB: -3, drop: 1, shove: 3)),
+            (Stage.DragStart, 4, P(5, 3, -450, lean: 1, together: 0.7f, stepA: 2, stepB: -2, fore: 0.5f, shove: 1.5f)),
+            (Stage.Drag, 6, Rested));
+
+        // The kneeling pose it sleeps in is the entrance's start, held: one more frame before the first of the rise.
+        static readonly Pose[] EnterFrames = new[] { Kneeling }.Concat(Entrance.Frames).ToArray();
+        static readonly Stage[] EnterStages = new[] { Stage.Slow }.Concat(Entrance.Stages).ToArray();
+        // Where the entrance's parts end: on its feet with the hammer behind it (seen before, the entrance stops here).
+        public const int EnterStood = 16;
+        // The frames its feet come down on the two strides.
+        public static bool EnterStep(int frame) => frame == EnterStood + 5 || frame == EnterStood + 10;
+
+        // The entrance's frames: the whole of it, or seen before, only getting up off its knee.
+        public static (int From, int To) EnterSpan(bool again) => (0, again ? EnterStood : EnterFrames.Length - 1);
+
+        // The frame of the entrance so far through it (0..1), each frame for its own stage's time.
+        public static int EnterFrameAt(float progress, bool again)
+        {
+            var (from, to) = EnterSpan(again);
+            float total = 0;
+            for (int f = from; f <= to; f++) total += StageSeconds(EnterStages[f]);
+            float at = System.Math.Max(0, System.Math.Min(1, progress)) * total;
+            for (int f = from; f <= to; f++)
+            {
+                at -= StageSeconds(EnterStages[f]);
+                if (at < 0) return f;
+            }
+            return to;
+        }
+
         static Pose[] SmashFrames => Smash.Frames;
         static Stage[] SmashStages => Smash.Stages;
         static Pose[] PoundFrames => Pound.Frames;
@@ -773,6 +835,8 @@ namespace Game.Client
                     return Blow(PoundFrames, f);
                 case KnightPose.Sweep:
                     return Blow(SweepFrames, f);
+                case KnightPose.Enter:
+                    return Blow(EnterFrames, f);
                 case KnightPose.Roar:
                     // The hammer lifted from rest up over its head, then held high, shaking with the roar.
                     if (f < RoarRise)

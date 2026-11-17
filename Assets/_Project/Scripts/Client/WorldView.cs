@@ -83,6 +83,13 @@ namespace Game.Client
             // (WorldView.Bosses.cs).
             public BossAttack BossAttack;
             public float BossSince;
+            // Its entrance (WorldView.Entrance.cs): whether it has a motion of its own, the short way or the whole, how
+            // long it takes, the frame of it shown (-1 asleep) and the last frame whose sounds and dust were made.
+            public bool OwnEntrance;
+            public bool EntersAgain;
+            public float EnterSeconds = 1;
+            public int EnterFrame = -1;
+            public int EnterCue = -1;
             // Winding up straight out of a charge to charge again (a chain of dashes), in less time.
             public bool BossAgain;
             public int BossPhase;
@@ -586,7 +593,9 @@ namespace Game.Client
                 _bannerAge = 0;
             }
 
-            _cameraTarget = Vector3.Lerp(_cameraTarget, new Vector3(selfPosition.X, selfPosition.Y, _cameraTarget.z), 1 - Mathf.Exp(-12 * deltaTime));
+            // The view goes to a boss as it comes in and back again (WorldView.Entrance.cs).
+            var focus = EntranceFocus(new Vector3(selfPosition.X, selfPosition.Y, _cameraTarget.z));
+            _cameraTarget = Vector3.Lerp(_cameraTarget, focus, 1 - Mathf.Exp(-12 * deltaTime));
             // Off in the menu (Settings.ScreenShake), hits still flash and sound but the view holds still.
             _shake = Settings.ScreenShake && Feel.Shake ? _shake * Mathf.Exp(-10 * deltaTime) : 0;
             var jolt = (Vector3)(UnityEngine.Random.insideUnitCircle * _shake);
@@ -769,6 +778,7 @@ namespace Game.Client
                 Label(text.Position + new Vector3(0, 0.6f + t * 0.8f, 0), text.Text, color);
             }
 
+            DrawEntranceCard();
             if (_bannerAge < BannerSeconds)
             {
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
@@ -871,6 +881,10 @@ namespace Game.Client
                     {
                         case BossState.Dormant:
                             tint = DormantTint;
+                            break;
+                        case BossState.Enter:
+                            // Out of the dim it slept in, over the first part of coming in.
+                            tint = Color.Lerp(DormantTint, Color.white, Mathf.Clamp01((Time.time - body.BossSince) / (0.4f * body.EnterSeconds)));
                             break;
                         case BossState.Telegraph:
                             // The same glow for the same kind of attack on every boss (World.TellOf, Docs/Bosses.md 전조 말),
@@ -993,8 +1007,10 @@ namespace Game.Client
             bool known = _bossesSeen.TryGetValue(view.Id, out var before);
             if (view.BossState != BossState.Dormant && (!known || before.State == BossState.Dormant))
             {
+                // Coming in the whole way it has its card (BeginEntrance); else the banner, as before.
                 // Under the level it is made for, a word of warning with it (bosses.csv level).
-                ShowBanner(view.Boss.Level > _client.Level ? $"{view.Boss.Name} 등장! (권장 레벨 {view.Boss.Level})" : $"{view.Boss.Name} 등장!");
+                if (!BeginEntrance(view))
+                    ShowBanner(view.Boss.Level > _client.Level ? $"{view.Boss.Name} 등장! (권장 레벨 {view.Boss.Level})" : $"{view.Boss.Name} 등장!");
                 Sounds.Play(Sound.Wake);
             }
             else if (known && view.Phase > before.Phase)
@@ -3201,7 +3217,11 @@ namespace Game.Client
 
         TileBase GroundAt(int x, int y) => Sprites.Ground(GroundIndex(x, y));
 
-        int GroundIndex(int x, int y) => TileArt.GroundAt(_client.Map, x, y, InArena(_client, x, y), _client.Biomes[x, y]);
+        int GroundIndex(int x, int y)
+        {
+            var arena = ArenaAt(_client, x, y);
+            return TileArt.GroundAt(_client.Map, x, y, arena.HasValue, _client.Biomes[x, y], arena ?? ArenaKind.Plain);
+        }
 
         // How many tiles round the given cell have a rounded-corner layer on them, read back from the tilemap (Playtest).
         internal int CornersNear(int cx, int cy, int reach)
@@ -3228,16 +3248,21 @@ namespace Game.Client
             return Sprites.Corners(_cornerSources);
         }
 
-        // Whether the tile is in any boss's arena.
-        public static bool InArena(WorldClient client, int x, int y)
+        // The kind of the arena the tile is in (arenas.csv), or null outside them all.
+        public static ArenaKind? ArenaAt(WorldClient client, int x, int y)
         {
             var center = TileMap.Center(x, y);
-            foreach (var arena in client.Arenas)
+            for (int i = 0; i < client.Arenas.Count; i++)
             {
-                if (Vec2.Distance(center, arena) <= client.ArenaRadius) return true;
+                // A dressed arena reaches a tile past the round room (an eight-sided or squared one's corners).
+                bool dressed = i < client.ArenaKinds.Count && client.ArenaKinds[i] != ArenaKind.Plain;
+                if (Vec2.Distance(center, client.Arenas[i]) <= client.ArenaRadius + (dressed ? 1 : 0)) return dressed ? client.ArenaKinds[i] : ArenaKind.Plain;
             }
-            return false;
+            return null;
         }
+
+        // Whether the tile is in any boss's arena.
+        public static bool InArena(WorldClient client, int x, int y) => ArenaAt(client, x, y).HasValue;
 
         static readonly (int X, int Y)[] Neighbourhood = { (0, 0), (1, 0), (-1, 0), (0, 1), (0, -1) };
 

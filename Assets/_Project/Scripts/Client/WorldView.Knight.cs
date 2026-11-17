@@ -45,6 +45,14 @@ namespace Game.Client
             {
                 frame = 0;
             }
+            else if (Entering(body))
+            {
+                // Down on one knee behind its hammer; woken, it gets up, strides out and brings the hammer down
+                // (KnightPose.Enter, each frame for its own time).
+                pose = KnightPose.Enter;
+                frame = body.BossState == BossState.Dormant ? 0 : KnightArt.EnterFrameAt((Time.time - body.BossSince) / body.EnterSeconds, body.EntersAgain);
+                body.EnterFrame = body.BossState == BossState.Dormant ? -1 : frame;
+            }
             else if (body.BossState == BossState.Roar)
             {
                 // The hammer lifted overhead, then shaking there.

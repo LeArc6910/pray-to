@@ -32,8 +32,9 @@ namespace Game.Client
     //   classes <id,id> [order]   other classes at once, no workbench needed; order: which of their skills in each slot
     //   hearts <person> <n>       that many hearts with the person (merchant, blacksmith, fisher)
     //   spawn <monster> <dx> <dy> [health]                         boss <id> hurt <fraction of its health> | use <attack>
+    //   bosses hold|wake          (asleep whoever walks in)        boss <id> sleep | enter [again]   (its entrance, arenas.csv)
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
-    //   goto spawn | <dx> <dy> | boss <id> | pool | biome <name> | tile <type> | near <type>
+    //   goto spawn | <dx> <dy> | boss <id> | arena <id> (its middle) | pool | biome <name> | tile <type> | near <type>
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
@@ -221,6 +222,13 @@ namespace Game.Client
                     var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[1]) ?? throw new ArgumentException($"no boss '{words[1]}' standing");
                     if (words[2] == "hurt") world.Hurt(boss, Math.Max(1, (int)(boss.MaxHealth * Float(words[3]))));
                     else if (words[2] == "use" && !world.ForceAttack(boss, words[3])) throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (awake, someone in the arena?)");
+                    // Its entrance (arenas.csv, 2026-11-17): asleep again, or coming in now (the whole way, or "again").
+                    else if (words[2] == "sleep") world.ForceSleep(boss);
+                    else if (words[2] == "enter" && !world.ForceEntrance(boss, words.Length > 3 && words[3] == "again")) throw new ArgumentException($"'{words[1]}' has no entrance (arenas.csv)");
+                    return null;
+                // Bosses stay asleep whoever walks in ("hold"), to look at an arena; or wake as they do ("wake").
+                case "bosses":
+                    world.BossesHold = words[1] == "hold";
                     return null;
                 case "drop":
                     Drop(root, words);
@@ -349,6 +357,12 @@ namespace Game.Client
                 case "boss":
                     var boss = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[2]) ?? throw new ArgumentException($"no boss '{words[2]}' standing");
                     to = Nearest(map, TileMap.Cell(boss.Home.X), TileMap.Cell(boss.Home.Y) - 4, (x, y) => Walkable(map, x, y))
+                        ?? throw new InvalidOperationException("no floor in the arena");
+                    break;
+                // The middle of a boss's arena, to look at how it is dressed (with "bosses hold", or it wakes).
+                case "arena":
+                    var keeper = world.Bosses.FirstOrDefault(b => b.Definition.Id == words[2]) ?? throw new ArgumentException($"no boss '{words[2]}' standing");
+                    to = Nearest(map, TileMap.Cell(keeper.Home.X), TileMap.Cell(keeper.Home.Y) - 2, (x, y) => Walkable(map, x, y))
                         ?? throw new InvalidOperationException("no floor in the arena");
                     break;
                 // The middle of the nearest web or pool of venom a boss's blow left on the floor (2026-11-13).
@@ -601,6 +615,9 @@ namespace Game.Client
                 .Field("hud", Strings(root.HudLines.Select(l => l.Replace('\n', ' '))))
                 .Field("acquired", Strings(root.AcquiredLines))
                 .Field("banner", root.Banner)
+                // The boss whose entrance is on show (its card: name and title), or null (WorldView.Entrance.cs).
+                .Field("entrance", root.EntranceShown)
+                .Field("entranceFits", root.EntranceFits)
                 .Field("floating", Strings(root.FloatingTexts))
                 .Field("status", root.Status)
                 .Field("written", Strings(Ui.LastWritten))
@@ -741,6 +758,14 @@ namespace Game.Client
                         if (world.Map[tx, ty] == TileType.TimberWall) timber++;
                 json.Field("timberNear", timber);
                 json.Field("ground", Recordings.GroundAt(world.Map, world.Biomes, TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)).ToString());
+                // The arena the player stands in: its kind and how much of its dressing is round them (arenas.csv).
+                var arenaKind = root.LocalClient == null ? null : WorldView.ArenaAt(root.LocalClient, px, py);
+                int dressing = 0;
+                for (int ty = py - 12; ty <= py + 12; ty++)
+                    for (int tx = px - 12; tx <= px + 12; tx++)
+                        if (Structures.IsArenaFloor(world.Map[tx, ty]) || Structures.IsDecor(world.Map[tx, ty])) dressing++;
+                json.Field("arena", arenaKind?.ToString());
+                json.Field("arenaDressing", dressing);
                 json.Field("feelOff", Feel.Off);
                 json.Field("weather", world.WeatherToday.ToString());
                 json.Field("event", world.EventToday.ToString());

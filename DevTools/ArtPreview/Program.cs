@@ -21,13 +21,13 @@ namespace Game.Client
         static int Main(string[] args)
         {
             // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them.
-            if (args.Length == 2 && args[0] == "--only")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
                 return Motions.WriteOnly(anim, args[1]) ? 0 : 1;
             }
-            string output = args.Length > 0 ? args[0] : Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
+            string output = args.Length > 0 && args[0] != "--only" ? args[0] : Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
             Directory.CreateDirectory(output);
             var loot = LoadLoot();
             var monsters = MonsterSheet.Parse(File.ReadAllText(Path.Combine(FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters")), MonsterSheet.File)));
@@ -50,6 +50,14 @@ namespace Game.Client
             }
 
             var lights = new WorldLights(tiles);
+            // --only arenas: just the arenas' pictures (arenas.png, arenas_unlit.png, arenas/).
+            if (args.Length == 2 && args[0] == "--only")
+            {
+                output = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
+                Arenas(lights, output);
+                WorldArenas(lights, output, monsters, story);
+                return 0;
+            }
             // How long the game takes to draw every ground tile when it builds its atlas (Sprites).
             var clock = System.Diagnostics.Stopwatch.StartNew();
             for (int i = 0; i < TileArt.GroundCount; i++) TileArt.Ground(i);
@@ -89,6 +97,8 @@ namespace Game.Client
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
+            Arenas(lights, output);
+            WorldArenas(lights, output, monsters, story);
             string classFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
             var classes = ClassSheet.Parse(File.ReadAllText(Path.Combine(classFolder, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classFolder, ClassSheet.SkillsFile)));
             if (!classes.Success)
@@ -722,6 +732,92 @@ namespace Game.Client
             return scene.Image;
         }
 
+        // Every boss's arena as its kind dresses it (arenas.csv, WorldGenerator.Arenas.cs), the boss in the middle and
+        // someone walking in: one picture each (arenas/<boss>.png, lit as in the game; arenas/<boss>_unlit.png to see
+        // the dressing plainly) and all of them on one sheet (arenas.png).
+        static readonly (string Boss, ArenaKind Kind)[] ArenaBosses =
+        {
+            ("cave_warden", ArenaKind.Ruin), ("crystal_queen", ArenaKind.Nest), ("lava_titan", ArenaKind.Caldera), ("void_lord", ArenaKind.Altar),
+            ("tide_serpent", ArenaKind.Flooded), ("antlion", ArenaKind.Pit), ("mad_general", ArenaKind.Warcamp), ("crown_wraith", ArenaKind.Chapel),
+            ("vein_eater", ArenaKind.Mine), ("shrine_samurai", ArenaKind.Dojo), ("black_knight", ArenaKind.Hall), ("silk_mother", ArenaKind.Web),
+        };
+
+        static PixelImage BossPicture(string id) => id switch
+        {
+            "vein_eater" => VeinEaterArt.Draw(BossView.Front, VeinPose.Idle, 0, 1, false),
+            "shrine_samurai" => SamuraiArt.Draw(BossView.Front, SamuraiPose.Idle, 0, 1),
+            "black_knight" => KnightArt.Draw(BossView.Front, KnightPose.Idle, 0, 1),
+            "silk_mother" => SpiderArt.Draw(BossView.Front, SpiderPose.Idle, 0, 1),
+            _ => CreatureArt.Boss(id, BossColor, 0),
+        };
+
+        // The same arenas where a real world has them (seed 7, the game's size, the story's places and roads): among
+        // the caves, turned to their ways in, with the tunnels and roads that reach them (arenas_world.png, and
+        // arenas/world_<boss>.png each).
+        static void WorldArenas(WorldLights lights, string output, MonsterData monsters, StoryData story)
+        {
+            string bossFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Bosses"));
+            var bosses = BossSheet.Parse(File.ReadAllText(Path.Combine(bossFolder, BossSheet.BossesFile)), File.ReadAllText(Path.Combine(bossFolder, BossSheet.AttacksFile)), monsters);
+            var arenas = ArenaSheet.Parse(File.ReadAllText(Path.Combine(bossFolder, ArenaSheet.File)), bosses);
+            foreach (string error in arenas.Errors) Console.Error.WriteLine(error);
+            var world = WorldGenerator.Generate(7, WorldGenerator.GameSize, WorldGenerator.GameSize, story, arenas);
+            var images = new List<PixelImage>();
+            int cave = 0;
+            foreach (var boss in bosses.Bosses)
+            {
+                Vec2 at;
+                if (boss.Place == null) at = world.Arenas[cave++];
+                else if (!world.PlaceArenas.TryGetValue(boss.Place, out at)) continue;
+                int cx = TileMap.Cell(at.X), cy = TileMap.Cell(at.Y);
+                var kind = world.ArenaKindAt(at) ?? ArenaKind.Plain;
+                var scene = new Scene(world.Map, cx - 13, cy - 13, 27, 27, p => Vec2.Distance(p, at) <= WorldGenerator.ArenaRadius + 1) { Arena = kind };
+                scene.Places(world.Places);
+                scene.Lit(lights, WorldLights.ArenaAmbient(new[] { at }, WorldGenerator.ArenaRadius));
+                scene.Body(at.X, at.Y, 1.2f, BossPicture(boss.Id));
+                var image = scene.Image;
+                Save(image, Path.Combine(output, "arenas", "world_" + boss.Id + ".png"), 2);
+                images.Add(image);
+            }
+            int w = images[0].Width + 4, h = images[0].Height + 4;
+            var sheet = new PixelImage(4 * w, (images.Count + 3) / 4 * h);
+            sheet.Fill(0, 0, sheet.Width, sheet.Height, Rgba.Hex("#0A0A0E"));
+            for (int i = 0; i < images.Count; i++) sheet.Draw(images[i], i % 4 * w + 2, i / 4 * h + 2);
+            Save(sheet, Path.Combine(output, "arenas_world.png"), 1);
+        }
+
+        static void Arenas(WorldLights lights, string output)
+        {
+            string folder = Path.Combine(output, "arenas");
+            Directory.CreateDirectory(folder);
+            var lit = new List<PixelImage>();
+            var plain = new List<PixelImage>();
+            foreach (var (boss, kind) in ArenaBosses)
+            {
+                var map = WorldGenerator.ArenaSample(kind, 7);
+                int c = map.Width / 2;
+                var middle = TileMap.Center(c, c);
+                foreach (bool dark in new[] { true, false })
+                {
+                    var scene = new Scene(map, 1, 1, map.Width - 2, map.Height - 2, p => Vec2.Distance(p, middle) <= WorldGenerator.ArenaRadius + 1) { Arena = kind };
+                    scene.Places(null);
+                    if (dark) scene.Lit(lights, WorldLights.ArenaAmbient(new[] { middle }, WorldGenerator.ArenaRadius));
+                    scene.Body(c + 0.5f, c + 0.5f, 1.2f, BossPicture(boss));
+                    scene.Player(c + 0.5f, c - 6.5f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
+                    var image = scene.Image;
+                    Save(image, Path.Combine(folder, boss + (dark ? ".png" : "_unlit.png")), 2);
+                    (dark ? lit : plain).Add(image);
+                }
+            }
+            foreach (var (images, name) in new[] { (lit, "arenas.png"), (plain, "arenas_unlit.png") })
+            {
+                int w = images[0].Width + 4, h = images[0].Height + 4;
+                var sheet = new PixelImage(4 * w, 3 * h);
+                sheet.Fill(0, 0, sheet.Width, sheet.Height, Rgba.Hex("#0A0A0E"));
+                for (int i = 0; i < images.Count; i++) sheet.Draw(images[i], i % 4 * w + 2, i / 4 * h + 2);
+                Save(sheet, Path.Combine(output, name), 1);
+            }
+        }
+
         // A window of the map drawn the way WorldView draws it, with things placed in world units (y up).
         sealed class Scene
         {
@@ -731,6 +827,8 @@ namespace Game.Client
             readonly int _width;
             readonly int _height;
             readonly Func<Vec2, bool> _inArena;
+            // The kind of the arena in the scene (its floor's stone).
+            public ArenaKind Arena = ArenaKind.Plain;
             readonly List<(float Y, Action<PixelImage> Draw)> _bodies = new List<(float, Action<PixelImage>)>();
             IReadOnlyList<PlaceSite> _places;
 
@@ -781,7 +879,7 @@ namespace Game.Client
                         for (int x = _left; x < _left + _width; x++)
                         {
                             var (px, py) = Corner(x, y + 1);
-                            image.Draw(TileArt.Ground(TileArt.GroundAt(_map, x, y, _inArena(TileMap.Center(x, y)))), px, py);
+                            image.Draw(TileArt.Ground(TileArt.GroundAt(_map, x, y, _inArena(TileMap.Center(x, y)), Biome.Cave, Arena)), px, py);
                             // The floor that runs under things (PropArt.Underlay), as WorldView's underlay layer draws it.
                             var under = PropArt.Underlay(_map, _places, x, y);
                             if (under != null) image.Draw(TileArt.Object(under.Value), px, py);

@@ -24,6 +24,7 @@ namespace Game.Client
         static readonly Choice GuideChoice = new Choice("settings.guide", true);
         static readonly Choice ScreenShakeChoice = new Choice("settings.shake", true);
         static readonly Choice RecordedChoice = new Choice("settings.recorded", true);
+        static readonly Choice BossIntroChoice = new Choice("settings.bossintro", true);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -124,6 +125,15 @@ namespace Game.Client
         {
             get => ScreenShakeChoice.Value;
             set => ScreenShakeChoice.Value = value;
+        }
+
+        // A boss's entrance (WorldView.Entrance.cs, Docs/Bosses.md 입장 연출): the view going to it and its name card. Off,
+        // the view stays on the player and the boss is only announced; the boss still takes its moment to come in, as
+        // the host decides that for everyone.
+        public static bool BossIntro
+        {
+            get => BossIntroChoice.Value;
+            set => BossIntroChoice.Value = value;
         }
 
         // Recorded sounds (CC0 recordings in Resources/Sfx, 2026-11-11) where there are some, or the ones made in code

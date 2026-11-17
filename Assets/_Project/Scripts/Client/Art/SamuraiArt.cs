@@ -28,6 +28,9 @@ namespace Game.Client
         Sweep,
         Whirl,
         Again,
+        // Its entrance (2026-11-17, Docs/Bosses.md 입장 연출): sat on its heels, still, the hat down; the hat comes up;
+        // a foot forward and it rises; standing, the hand goes to the hilt and the thumb eases the guard; and at rest.
+        Seiza,
     }
 
     // The samurai of the forgotten shrine (2026-11-12): a ronin in crimson lacquered armour and a straw hat, a katana
@@ -562,6 +565,7 @@ namespace Game.Client
             SamuraiPose.Dash => 8,
             SamuraiPose.Rush => 8,
             SamuraiPose.Kiai => KiaiRise + 4,
+            SamuraiPose.Seiza => 30,
             _ => 4,
         };
 
@@ -590,6 +594,14 @@ namespace Game.Client
             SamuraiPose.Again => 0.0135f,
             _ => 0,
         };
+
+        // The entrance's frames: the whole of it, or seen before, from where it starts to rise.
+        public static (int From, int To) EnterFrames(bool again) => (again ? 7 : 0, FramesOf(SamuraiPose.Seiza) - 1);
+        // The frame of the entrance in which the hand comes to the hilt (a click).
+        public const int SeizaGrip = 23;
+
+        // Sat on its heels: the trunk sunk right down over the folded legs, the hat low.
+        static readonly SPose Seated = P(lean: 1, drop: 11, nod: 3);
 
         static SPose PoseOf(SamuraiPose pose, int frame)
         {
@@ -642,6 +654,16 @@ namespace Game.Client
                     // Darting in between attacks: as low, but the blade still home and the hand on its hilt.
                     return P(lean: 8, shove: 3, drop: System.Math.Abs(s) > 0.7f ? 4 : 3, stepA: 6 * s, stepB: -6 * s, liftA: 3 * System.Math.Max(0, c), liftB: 3 * System.Math.Max(0, -c),
                         nod: 2, head: 1, grip: 1, glint: 2);
+                case SamuraiPose.Seiza:
+                    return Keys(t,
+                        (0, Seated),
+                        (0.12f, Seated),
+                        (0.24f, P(lean: 1, drop: 11, nod: 1)),
+                        (0.48f, P(lean: 4, drop: 7, stepA: 3, nod: 1)),
+                        (0.66f, P(lean: 2, drop: 2, stepA: 3, stepB: -2)),
+                        (0.8f, Set),
+                        (0.9f, P(lean: 3, drop: 2, stepA: 3, stepB: -3, nod: 2, grip: 1, glint: 3)),
+                        (1, Rest));
                 case SamuraiPose.Kiai:
                     // The blade drawn and raised high, then held there shaking with the shout.
                     if (f < KiaiRise)

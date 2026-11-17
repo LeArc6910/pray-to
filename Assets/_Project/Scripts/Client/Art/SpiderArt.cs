@@ -38,6 +38,10 @@ namespace Game.Client
         // go twice and drawn back a third time (Tug), then the front legs flicked up and wide (Snap).
         Tug,
         Snap,
+        // Its entrance (2026-11-17, Docs/Bosses.md 입장 연출): out of sight in the roof, down its own thread with the
+        // legs folded, the legs opening as it hangs, down onto the floor with all eight wide, reared up to show its
+        // fangs, and down to rest.
+        Descend,
     }
 
     // The silk mother of the forgotten shrine (2026-11-13, Docs/Bosses.md 실 잣는 어미 아라네): a great cave spider, its
@@ -623,8 +627,16 @@ namespace Game.Client
             SpiderPose.Flinch => 6,
             SpiderPose.Die => 20,
             SpiderPose.Tug => 24,
+            SpiderPose.Descend => 46,
             _ => BlowOf(pose)?.Frames.Length ?? 1,
         };
+
+        // The entrance's frames: the whole of it, or seen before, from where it comes into sight.
+        public static (int From, int To) EnterFrames(bool again) => (again ? 13 : 0, FramesOf(SpiderPose.Descend) - 1);
+        // The frame of the entrance in which its feet meet the floor.
+        public const int DescendLands = 27;
+        // The frames in which it is on its thread, off the floor.
+        public static bool Descending(int frame) => frame < DescendLands;
 
         // How long a blow's frame is shown (seconds); 0 for anything else.
         public static float FrameSeconds(SpiderPose pose, int frame)
@@ -792,6 +804,18 @@ namespace Game.Client
                         (TwangAt[1] + 0.03f, Loosed),
                         (0.94f, Taut),
                         (1, Taut));
+                case SpiderPose.Descend:
+                    // Down the thread at an even pace; the legs open as it nears the floor; onto it low and wide; up on
+                    // the hind legs with the fangs open; and down.
+                    return Keys(t,
+                        (0, Hauled),
+                        (0.4f, P(up: 26, pitch: -4, abUp: 4, abFwd: 2, tuck: 0.75f, thread: 1)),
+                        (0.52f, P(up: 12, pitch: -3, abUp: 4, abFwd: 1, tuck: 0.4f, thread: 1, p0: (2, 3, 4), p1: (0, 4, 4), p2: (0, 4, 4), p3: (-2, 3, 4))),
+                        (0.6f, P(up: 1, pitch: -2, abUp: 2, tuck: 0.1f, thread: 0.8f, p0: (3, 6, 2), p1: (0, 7, 2), p2: (0, 7, 2), p3: (-3, 6, 2))),
+                        (0.66f, P(up: -4.5f, abUp: -1, swell: 0.06f, thread: 0.3f, p0: (4, 7, 0), p1: (0, 8, 0), p2: (0, 8, 0), p3: (-4, 7, 0))),
+                        (0.82f, P(fwd: -3, up: 6, pitch: 22, fang: 1, glow: 0.4f, p0: (-10, 7, 22), p1: (-3, 5, 9), p2: (0, 1, 0), p3: (-3, 2, 0))),
+                        (0.86f, P(fwd: -3, up: 6.3f, pitch: 23, fang: 1, glow: 0.5f, p0: (-10.5f, 7.5f, 23), p1: (-3, 5, 9.5f), p2: (0, 1, 0), p3: (-3, 2, 0))),
+                        (1, Rest));
                 case SpiderPose.Flinch:
                     // Knocked back off its front feet, and down again.
                     return Keys(t,

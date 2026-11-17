@@ -512,6 +512,9 @@ namespace Game.Core
         Recover,
         // Between phases: unhurt, then a blast around itself.
         Roar,
+        // Coming in (2026-11-17, arenas.csv): woken, it takes a moment to rise, come down or walk out before the fight
+        // starts. It does not attack and cannot be hurt; the view shows its entrance.
+        Enter,
     }
 
     public sealed class Boss
@@ -545,7 +548,7 @@ namespace Game.Core
         public BossAttack Attack { get; internal set; }
         public bool IsDead => Health <= 0;
         // Out of reach while it roars, and while it is underground or in the air before a burrow or a leap comes down.
-        public bool Invulnerable => State == BossState.Roar || Away;
+        public bool Invulnerable => State == BossState.Roar || State == BossState.Enter || Away;
         public bool Away => State == BossState.Telegraph && Attack != null && Attack.GoesAway;
 
         internal Vec2 ChargeDirection { get; set; }
@@ -562,6 +565,8 @@ namespace Game.Core
         internal Vec2 LandAt { get; set; }
         // Charges still to come after this one (an attack with count runs that many in a row).
         internal int ChargesLeft { get; set; }
+        // Coming in for the first time in this world (the whole entrance) or again (the short one).
+        public bool EntersAgain { get; internal set; }
         // Ticks into its rush-and-stop gait while it closes in (BossDefinition.Bursts).
         internal int GaitTicks { get; set; }
     }

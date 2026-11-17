@@ -19,6 +19,9 @@ namespace Game.Client
         Lava,
         VoidOre,
         Water,
+        // The arena floors past the eighth (ArenaIndex): an arena's floor is drawn once for each kind of arena, in the
+        // slots a kind's biomes would take.
+        ArenaMore,
     }
 
     // The cave tiles, 16 pixels a tile, seen from above and a little in front like Core Keeper: a wall shows its
@@ -31,7 +34,7 @@ namespace Game.Client
         public const int Size = 16;
         public const int Variants = 4;
         const int Masks = 16;
-        const int Kinds = 11;
+        const int Kinds = 12;
         // Every kind is drawn once for each biome, in that biome's colours (Docs/Biomes.md).
         public static readonly int Biomes = System.Enum.GetValues(typeof(Biome)).Length;
         // Neighbour bits: which sides are rock.
@@ -46,8 +49,17 @@ namespace Game.Client
         // The arena floor and bedrock look the same everywhere, so they always use the plain cave's.
         public static int Index(GroundKind kind, int mask, int variant, Biome biome = Biome.Cave)
         {
-            if (kind == GroundKind.Arena || kind == GroundKind.Bedrock) biome = Biome.Cave;
+            if (kind == GroundKind.Arena || kind == GroundKind.ArenaMore || kind == GroundKind.Bedrock) biome = Biome.Cave;
             return (((int)biome * Kinds + (int)kind) * Masks + mask) * Variants + variant;
+        }
+
+        // The floor of an arena of a kind (2026-11-17, Docs/Bosses.md 아레나 컨셉): each kind has its own stone. The
+        // kinds take the slots the biomes would (an arena's floor never changed with its biome).
+        public static int ArenaIndex(ArenaKind arena, int mask, int variant)
+        {
+            int style = (int)arena;
+            var kind = style < Biomes ? GroundKind.Arena : GroundKind.ArenaMore;
+            return ((style % Biomes * Kinds + (int)kind) * Masks + mask) * Variants + variant;
         }
 
         public static bool IsRock(TileType type) =>
@@ -96,7 +108,7 @@ namespace Game.Client
         }
 
         // Which ground tile goes at (x, y), in the colours of its biome. Outside the map reads as wall.
-        public static int GroundAt(TileMap map, int x, int y, bool inArena, Biome biome = Biome.Cave)
+        public static int GroundAt(TileMap map, int x, int y, bool inArena, Biome biome = Biome.Cave, ArenaKind arena = ArenaKind.Plain)
         {
             int mask = (IsRock(map[x, y + 1]) ? Up : 0)
                 | (IsRock(map[x + 1, y]) ? Right : 0)
@@ -130,6 +142,7 @@ namespace Game.Client
                     | (map[x, y - 1] != TileType.Lava ? Down : 0)
                     | (map[x - 1, y] != TileType.Lava ? Left : 0);
             }
+            if (kind == GroundKind.Arena) return ArenaIndex(arena, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants));
             return Index(kind, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants), biome);
         }
 
@@ -141,12 +154,16 @@ namespace Game.Client
             int variant = index % Variants;
             // Kinds that look the same in every biome are only ever asked for as the plain cave's; the other
             // biomes' slots get a blank.
-            if (biome != Biome.Cave && (kind == GroundKind.Arena || kind == GroundKind.Bedrock)) return new PixelImage(Size, Size);
+            if (biome != Biome.Cave && kind == GroundKind.Bedrock) return new PixelImage(Size, Size);
+            if (kind == GroundKind.Arena || kind == GroundKind.ArenaMore)
+            {
+                int style = (int)biome + (kind == GroundKind.ArenaMore ? Biomes : 0);
+                return style < ArenaStyles.Length ? ArenaFloor(mask, variant, ArenaStyles[style]) : new PixelImage(Size, Size);
+            }
             var rock = RockOf(biome);
             return kind switch
             {
                 GroundKind.Floor => Floor(mask, variant, FloorOf(biome), biome),
-                GroundKind.Arena => ArenaFloor(mask, variant),
                 GroundKind.Rock => Decorated(Rock(mask, variant, rock), mask, variant, biome),
                 GroundKind.Bedrock => Rock(mask, variant, BedrockColors),
                 GroundKind.CopperOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#D6783F")),
@@ -461,6 +478,8 @@ namespace Game.Client
             TileType.Road => Road(15),
             TileType.Dock => DockTile,
             TileType.Rail => RailTile,
+            // The patterns on the arenas' floors (PropArt.Arena.cs).
+            TileType.ArenaInlay or TileType.RuneFloor or TileType.Cobweb or TileType.Petals or TileType.Fissure or TileType.ArenaCarpet => PropArt.ArenaFloor(type),
             // Under the harbour's boats (PropArt.Underlay): open water with no shore.
             TileType.Water => Ground(Index(GroundKind.Water, 0, 0)),
             TileType.Waypoint => WaypointTile,
@@ -626,30 +645,83 @@ namespace Game.Client
             }
         }
 
-        static readonly Rgba Slab = Rgba.Hex("#4A302D");
-        static readonly Rgba SlabAlt = Rgba.Hex("#432B29");
-        static readonly Rgba SlabLight = Rgba.Hex("#5B3C37");
-        static readonly Rgba Mortar = Rgba.Hex("#26181A");
+        // An arena's floor: the stone's two tones, its lit edge and the mortar between; whether it is laid in slabs
+        // (one to a tile) or is loose ground (sand, trodden earth); and the colour its cracks show.
+        sealed class ArenaStyle
+        {
+            public Rgba Slab, SlabAlt, Light, Mortar, Crack;
+            public bool Loose;
+        }
 
-        // The boss arena: old red flagstones, one to a tile, so it reads as a made place and not a cave.
-        static PixelImage ArenaFloor(int mask, int variant)
+        static ArenaStyle Style(string slab, string alt, string light, string mortar, bool loose = false, string crack = null) => new ArenaStyle
+        {
+            Slab = Rgba.Hex(slab), SlabAlt = Rgba.Hex(alt), Light = Rgba.Hex(light), Mortar = Rgba.Hex(mortar), Loose = loose,
+            Crack = Rgba.Hex(crack ?? mortar),
+        };
+
+        // One for each ArenaKind, in its order (Docs/Bosses.md 아레나 컨셉).
+        static readonly ArenaStyle[] ArenaStyles =
+        {
+            // Plain: the old red flagstones.
+            Style("#4A302D", "#432B29", "#5B3C37", "#26181A"),
+            // Ruin: old grey-green temple stone.
+            Style("#4E5248", "#454A40", "#646A5A", "#2A2D27"),
+            // Nest: stone dusted blue with crystal.
+            Style("#3E4660", "#373F58", "#56618A", "#20263A"),
+            // Caldera: black basalt, its cracks glowing.
+            Style("#3A2C2A", "#322523", "#503A32", "#1C1414", crack: "#E8642A"),
+            // Altar: violet-black void stone.
+            Style("#322A48", "#2B2440", "#483C68", "#18142A", crack: "#8A6AE0"),
+            // Flooded: wet green-blue stone.
+            Style("#2E4A4E", "#284246", "#3E666A", "#162A2E"),
+            // Pit: sand.
+            Style("#8A7450", "#7E6A48", "#A48E66", "#64533A", loose: true),
+            // Warcamp: trodden red earth.
+            Style("#54392E", "#4B3329", "#684A3C", "#33221B", loose: true),
+            // Chapel: pale blue-grey marble.
+            Style("#46506A", "#3F4962", "#5E6C8C", "#262E44"),
+            // Mine: packed earth and grit.
+            Style("#5A4A3A", "#514233", "#70604C", "#382D22", loose: true),
+            // Dojo: a court of light grey stone.
+            Style("#5C605A", "#535751", "#74796E", "#33362F"),
+            // Hall: black iron slate.
+            Style("#2E3038", "#25272E", "#444854", "#14151A"),
+            // Web: grey stone under dust and silk.
+            Style("#48424E", "#403B46", "#5C5566", "#28232C"),
+        };
+
+        // The boss arena: flagstones, one to a tile, so it reads as a made place and not a cave; or loose ground,
+        // grained and pebbled, for the pit, the camp and the mine.
+        static PixelImage ArenaFloor(int mask, int variant, ArenaStyle style)
         {
             var image = new PixelImage(Size, Size);
             int salt = 200 + variant;
-            var stone = variant % 2 == 0 ? Slab : SlabAlt;
+            var stone = variant % 2 == 0 ? style.Slab : style.SlabAlt;
             for (int y = 0; y < Size; y++)
             {
                 for (int x = 0; x < Size; x++)
                 {
-                    var color = stone;
-                    if (x == 0 || y == 0) color = Mortar;
-                    else if (x == 1 || y == 1) color = SlabLight;
-                    else if (x == Size - 1 || y == Size - 1) color = stone.Scale(0.85f);
-                    else if (Smooth(x, y, 4, salt, 200) > 0.7f) color = stone.Scale(0.93f);
+                    Rgba color;
+                    if (style.Loose)
+                    {
+                        // Soft drifts of two tones, no joints (the tones meet across tiles on the shared lattice).
+                        float n = Smooth(x, y, 4, salt, 200);
+                        color = n > 0.68f ? style.Light.Mix(style.Slab, 0.5f) : n < 0.3f ? style.SlabAlt.Scale(0.92f) : style.Slab;
+                        if (PixelNoise.Hash(x, y, salt) % 41 == 0 && x > 0 && x < Size - 2) color = style.Mortar;
+                        else if (x > 1 && PixelNoise.Hash(x - 1, y, salt) % 41 == 0 && x < Size - 1) color = style.Mortar.Mix(style.Slab, 0.4f);
+                    }
+                    else
+                    {
+                        color = stone;
+                        if (x == 0 || y == 0) color = style.Mortar;
+                        else if (x == 1 || y == 1) color = style.Light;
+                        else if (x == Size - 1 || y == Size - 1) color = stone.Scale(0.85f);
+                        else if (Smooth(x, y, 4, salt, 200) > 0.7f) color = stone.Scale(0.93f);
+                    }
                     image[x, y] = color;
                 }
             }
-            if (variant >= 2) Crack(image, salt, Mortar);
+            if (variant >= 2 && !style.Loose) Crack(image, salt, style.Crack);
             CastShadow(image, mask);
             return image;
         }

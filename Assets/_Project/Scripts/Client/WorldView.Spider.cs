@@ -90,6 +90,13 @@ namespace Game.Client
             {
                 frame = 0;
             }
+            else if (Entering(body))
+            {
+                // Out of sight in the roof; woken, down its thread (SpiderPose.Descend, Docs/Bosses.md 입장 연출).
+                (pose, frame) = (SpiderPose.Descend, EnterFrame(body, SpiderArt.EnterFrames(body.EntersAgain)));
+                // In the roof it is not there to see; it comes into sight as it comes down.
+                alpha = body.BossState == BossState.Dormant ? 0 : Mathf.Clamp01(since / 0.3f);
+            }
             else if (body.BossState == BossState.Roar)
             {
                 pose = SpiderPose.Screech;

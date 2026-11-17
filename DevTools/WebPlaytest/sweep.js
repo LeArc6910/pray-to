@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight spider world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -638,8 +638,8 @@ async function bosses(browser) {
     // The two bosses of the places (2026-11-11, the content audit: they were not yet checked).
     ['mad_general', '미쳐 버린 장군 모르그'], ['crown_wraith', '왕관의 망령']]) {
     await game.send(`heal; goto boss ${id}`);
-    const woke = await game.until(t => has(t.banner, '등장'), 6000, game.texts);
-    check(!!woke, `${name}: "${name} 등장!" 배너`);
+    const woke = await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
+    check(!!woke, `${name}: "${name} 등장!" 배너나 이름 카드`);
     const theme = await game.until(t => t.music === `boss_${id}_1`, 4000);
     check(!!theme, `${name}: 보스 곡 1페이즈 (${(theme || await game.state()).music})`);
     await game.wait(2500);
@@ -699,7 +699,7 @@ async function patterns(browser) {
   for (const [id, attack, name] of uses) {
     if (woken !== id) {
       await game.send(`heal; goto boss ${id}`);
-      await game.until(t => has(t.banner, '등장'), 6000, game.texts);
+      await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
       woken = id;
     }
     await game.wait(1500);
@@ -724,8 +724,8 @@ async function veineater(browser) {
   await game.wait(1200);
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   await game.send('heal; goto boss vein_eater');
-  const woke = await game.until(t => has(t.banner, '그룸'), 8000, game.texts);
-  check(!!woke, `철곡 광산촌 곁 아레나에서 깨면 "광맥 포식자 그룸 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  const woke = await game.until(t => has(t.banner, '그룸') || has(t.entrance, '그룸'), 8000, game.texts);
+  check(!!woke, `철곡 광산촌 곁 아레나에서 깨면 "광맥 포식자 그룸 등장" 배너나 이름 카드 (${woke ? woke.banner || woke.entrance : '없음'})`);
   await game.wait(1500);
   await game.shot('vein-awake', '깨어난 그룸');
   // [attack, name, telegraph seconds, strong]
@@ -776,8 +776,8 @@ async function samurai(browser) {
   await game.wait(1200);
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   await game.send('heal; goto boss shrine_samurai');
-  const woke = await game.until(t => has(t.banner, '시구레'), 8000, game.texts);
-  check(!!woke, `잊힌 신전 곁 아레나에서 깨면 "벚꽃 검귀 시구레 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  const woke = await game.until(t => has(t.banner, '시구레') || has(t.entrance, '시구레'), 8000, game.texts);
+  check(!!woke, `잊힌 신전 곁 아레나에서 깨면 "벚꽃 검귀 시구레 등장" 배너나 이름 카드 (${woke ? woke.banner || woke.entrance : '없음'})`);
   await game.wait(1500);
   await game.shot('samurai-awake', '깨어난 시구레');
   // [attack, name, telegraph seconds, strong]
@@ -821,8 +821,8 @@ async function knight(browser) {
   await game.wait(1200);
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   await game.send('heal; goto boss black_knight');
-  const woke = await game.until(t => has(t.banner, '발두인'), 8000, game.texts);
-  check(!!woke, `용사의 오두막 곁 아레나에서 깨면 "흑철 기사 발두인 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  const woke = await game.until(t => has(t.banner, '발두인') || has(t.entrance, '발두인'), 8000, game.texts);
+  check(!!woke, `용사의 오두막 곁 아레나에서 깨면 "흑철 기사 발두인 등장" 배너나 이름 카드 (${woke ? woke.banner || woke.entrance : '없음'})`);
   await game.wait(1500);
   await game.shot('knight-awake', '깨어난 발두인');
   // [attack, name, telegraph seconds, strong]
@@ -867,8 +867,8 @@ async function spider(browser) {
   await game.wait(1200);
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   await game.send('heal; goto boss silk_mother');
-  const woke = await game.until(t => has(t.banner, '아라네'), 8000, game.texts);
-  check(!!woke, `잊힌 신전 곁 둘째 아레나에서 깨면 "실 잣는 어미 아라네 등장" 배너 (${woke ? woke.banner : '없음'})`);
+  const woke = await game.until(t => has(t.banner, '아라네') || has(t.entrance, '아라네'), 8000, game.texts);
+  check(!!woke, `잊힌 신전 곁 둘째 아레나에서 깨면 "실 잣는 어미 아라네 등장" 배너나 이름 카드 (${woke ? woke.banner || woke.entrance : '없음'})`);
   await game.wait(1500);
   await game.shot('spider-awake', '깨어난 아라네');
   // [attack, name, telegraph seconds, marked on the ground, warning sign, what it leaves on the floor]
@@ -3129,7 +3129,111 @@ async function time(browser) {
   await game.context.close();
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, spider, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+// ---------------------------------------------------------------- 아레나 컨셉과 입장 연출 (2026-11-17, Docs/Bosses.md)
+// Every boss's arena is dressed to its own idea (arenas.csv): a picture of each with the boss held asleep, and the
+// report says its kind and that it is dressed. Then the entrances: the four with a motion of their own are photographed
+// as they come in (asleep, early, midway, the beat, at rest), with their name card; a common one; the short way the
+// second time; and the card on a phone held upright and sideways with the longest name.
+const ArenaList = [
+  ['cave_warden', 'Ruin', '동굴 수호자', '무너진 신전'], ['crystal_queen', 'Nest', '수정 거미 여왕', '수정 둥지'], ['lava_titan', 'Caldera', '용암 거인', '용암 분지'],
+  ['void_lord', 'Altar', '공허의 군주', '소환 제단'], ['tide_serpent', 'Flooded', '물살 뱀', '수몰된 홀'], ['antlion', 'Pit', '개미귀신', '모래 구덩이'],
+  ['mad_general', 'Warcamp', '미쳐 버린 장군 모르그', '전쟁 진지'], ['crown_wraith', 'Chapel', '왕관의 망령', '가라앉은 예배당'],
+  ['vein_eater', 'Mine', '광맥 포식자 그룸', '광산 갱도'], ['shrine_samurai', 'Dojo', '벚꽃 검귀 시구레', '벚꽃 결투장'],
+  ['black_knight', 'Hall', '흑철 기사 발두인', '흑철 왕좌의 방'], ['silk_mother', 'Web', '실 잣는 어미 아라네', '거미줄 납골당'],
+];
+// [boss, whole entrance seconds, short seconds, what it does]
+const OwnEntrances = [
+  ['vein_eater', 3.2, 1.2, '흙더미가 들썩이다 바닥을 뚫고 솟는다'], ['silk_mother', 3.4, 1.2, '천장에서 실을 타고 내려와 다리를 편다'],
+  ['shrine_samurai', 3.6, 1.2, '정좌에서 일어나 칼자루에 손을 얹는다'], ['black_knight', 4.6, 1.4, '무릎을 펴고 망치를 끌며 나와 바닥을 내려찍는다'],
+];
+
+async function arenas(browser) {
+  note('\n## 아레나 컨셉 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('bosses hold');
+  for (const [id, kind, name, stage] of ArenaList) {
+    await game.send(`heal; clear; goto arena ${id}`);
+    await game.wait(1500);
+    const s = await game.state();
+    check(s.arena === kind, `${name}: 아레나 종류 ${kind} (${s.arena})`);
+    check((s.arenaDressing || 0) >= 20, `${name}: ${stage}으로 꾸며져 있다 (꾸밈 칸 ${s.arenaDressing})`);
+    check(new RegExp(`${id}:\\d+/\\d+:p1:Dormant`).test(s.bosses || ''), `${name}: 붙잡아 두면 잠든 채 (${(s.bosses || '').split(' ').find(b => b.startsWith(id))})`);
+    await game.shot(`arena-${id}`, `${name}의 아레나(${stage})`);
+  }
+
+  note('\n## 입장 연출 (PC)\n');
+  await game.send('bosses wake');
+  const stateOf = (s, id) => (((s || {}).bosses || '').match(new RegExp(`${id}:\\d+/\\d+:p\\d:(\\w+)`)) || [])[1];
+  for (const [id, seconds, again, what] of OwnEntrances) {
+    const name = ArenaList.find(a => a[0] === id)[2];
+    await game.send(`heal; clear; bosses hold; goto boss ${id}`);
+    await game.wait(1200);
+    await game.shot(`enter-${id}-asleep`, `${name}: 깨기 전(잠든 자세)`);
+    await game.send(`bosses wake; boss ${id} enter`);
+    const started = Date.now();
+    const card = await game.until(t => has(t.entrance, name), 3000, game.texts);
+    check(!!card, `${name}: 이름 카드에 이름과 별칭 (${card ? card.entrance : '없음'})`);
+    check(card && card.entranceFits !== false, `${name}: 이름 카드의 글이 화면 너비 안에`);
+    check(stateOf(await game.state(), id) === 'Enter', `${name}: 입장하는 동안 Enter 상태`);
+    for (const [share, label] of [[0.15, '처음'], [0.45, '중간'], [0.8, '절정']]) {
+      await game.wait(Math.max(0, seconds * 1000 * share - (Date.now() - started)));
+      await game.shot(`enter-${id}-${Math.round(share * 100)}`, `${name} 입장 ${label}: ${what}`);
+    }
+    const before = await game.state();
+    check(before.hazards === 0 && before.bossShots === 0, `${name}: 입장하는 동안 공격이 없다 (장판 ${before.hazards}, 탄 ${before.bossShots})`);
+    const fighting = await game.until(t => { const st = stateOf(t, id); return st && st !== 'Enter' && st !== 'Dormant'; }, 6000);
+    const took = (Date.now() - started) / 1000;
+    check(!!fighting && took > seconds - 0.8 && took < seconds + 1.5, `${name}: 입장은 약 ${seconds}초 (${took.toFixed(1)}초)`);
+    await game.shot(`enter-${id}-done`, `${name}: 입장이 끝나고 싸움 시작`);
+    // Seen once: the short way, no card.
+    await game.send(`heal; clear; boss ${id} enter again`);
+    const quick = Date.now();
+    await game.wait(350);
+    const short = await game.texts();
+    check(!short.entrance, `${name}: 다시 볼 때는 이름 카드 없이 (${short.entrance || '없음'}, 배너 ${short.banner || '없음'})`);
+    await game.shot(`enter-${id}-again`, `${name}: 다시 볼 때 짧은 입장`);
+    const again2 = await game.until(t => { const st = stateOf(t, id); return st && st !== 'Enter' && st !== 'Dormant'; }, 4000);
+    check(!!again2 && (Date.now() - quick) / 1000 < again + 1.2, `${name}: 짧은 입장은 약 ${again}초 (${((Date.now() - quick) / 1000).toFixed(1)}초)`);
+    await game.send(`boss ${id} sleep; bosses hold`);
+  }
+  // A boss with the common entrance.
+  await game.send('heal; clear; bosses wake; goto arena void_lord; boss void_lord enter');
+  const common = await game.until(t => has(t.entrance, '공허의 군주'), 3000, game.texts);
+  check(!!common && has(common.entrance, '제단이 부른 것'), `공허의 군주: 공통 연출의 이름 카드 (${common ? common.entrance : '없음'})`);
+  await game.wait(900);
+  await game.shot('enter-void_lord', '공허의 군주: 공통 입장 연출(카메라, 이름 카드, 소환의 고리)');
+  await game.context.close();
+
+  // The card on phones: the longest name, upright and sideways.
+  for (const profile of ['phone', 'phone-wide', 'pc-small']) {
+    note(`\n## 입장 이름 카드 ${profile}\n`);
+    const small = await open(browser, run, Profiles[profile], url);
+    if (small.touch) {
+      await menuPage(small, '게임 시작');
+      await small.press('혼자 하기');
+      await small.until(s => s.playing, 25000);
+      await small.wait(800);
+    } else {
+      await small.startSolo();
+    }
+    await small.wait(1200);
+    for (const id of ['mad_general', 'black_knight']) {
+      const name = ArenaList.find(a => a[0] === id)[2];
+      await small.send(`heal; clear; bosses wake; goto boss ${id}; boss ${id} enter`);
+      const card = await small.until(t => has(t.entrance, name), 3000, small.texts);
+      check(!!card && card.entranceFits === true, `${profile} ${name}: 이름 카드가 화면 너비 안에 (${card ? card.entrance : '없음'})`);
+      await small.wait(700);
+      await small.shot(`enter-card-${id}`, `${name}의 이름 카드`);
+      await small.send(`boss ${id} sleep; bosses hold`);
+      await small.wait(900);
+    }
+    await small.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

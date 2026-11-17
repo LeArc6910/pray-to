@@ -61,6 +61,12 @@ namespace Game.Client
             body.BossState = view.BossState;
             body.BossAttack = view.BossAttack;
             body.BossPhase = view.Phase;
+            // How it comes in (arenas.csv, WorldView.Entrance.cs): its own motion or the common one, the whole of it
+            // or the short way, and for how long.
+            var arena = view.Boss.Arena;
+            body.OwnEntrance = arena != null && arena.Entrance != BossEntrance.Common;
+            body.EntersAgain = view.EntersAgain;
+            body.EnterSeconds = arena == null ? 1 : Mathf.Max(0.1f, view.EntersAgain ? arena.Again : arena.Seconds);
         }
 
         // An attack the boss alone announces gives no glow: only its wind-up.
@@ -72,6 +78,7 @@ namespace Game.Client
             bool strong = view.BossState == BossState.Telegraph && view.BossAttack != null && view.BossAttack.Warning == AttackWarning.Strong;
             ShowWarningSign(body, strong);
             RunLater();
+            EntranceExtras(body, view);
             if (body.Id == "vein_eater") VeinEaterExtras(body, view);
             else if (body.Mound != null) body.Mound.enabled = false;
             if (body.Id == "shrine_samurai") SamuraiExtras(body, view);
@@ -124,6 +131,11 @@ namespace Game.Client
             if (dead)
             {
                 frame = 0;
+            }
+            else if (Entering(body))
+            {
+                // Asleep under its mound; woken, up through the floor (VeinPose.Emerge, Docs/Bosses.md 입장 연출).
+                (pose, frame) = (VeinPose.Emerge, EnterFrame(body, VeinEaterArt.EnterFrames(body.EntersAgain)));
             }
             else if (moving && (body.BossState == BossState.Approach || body.BossState == BossState.Recover || body.BossState == BossState.Dormant))
             {
@@ -631,6 +643,11 @@ namespace Game.Client
             if (dead)
             {
                 frame = 0;
+            }
+            else if (Entering(body))
+            {
+                // Sat on its heels; woken, it rises and its hand goes to the hilt (SamuraiPose.Seiza).
+                (pose, frame) = (SamuraiPose.Seiza, EnterFrame(body, SamuraiArt.EnterFrames(body.EntersAgain)));
             }
             else if (body.BossState == BossState.Roar)
             {

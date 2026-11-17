@@ -27,6 +27,9 @@ namespace Game.Client
         Curl,
         Leap,
         Roar,
+        // Its entrance (2026-11-17, Docs/Bosses.md 입장 연출): under the floor with only a low mound to show for it,
+        // the mound heaving, then up through it tall with the drills high, a roar, and down to rest.
+        Emerge,
     }
 
     // The vein eater of the mining village (2026-11-12): a hulking armoured mole with drill claws and orange ore
@@ -536,6 +539,8 @@ namespace Game.Client
         static readonly VPose Lifted = V(11, -1, lean: -3, stretch: 0.06f, rock: 1);
         static readonly VPose Slammed = V(15, 0, spread: 3, lean: -2, stretch: 0.12f);
         static readonly VPose Sunk = V(sink: 39, raise: 2, reach: 3, mound: 18, moundHeight: 7);
+        // Asleep under the floor: nothing to see but a low mound.
+        static readonly VPose Buried = V(sink: 39, raise: 2, reach: 3, mound: 11, moundHeight: 3);
         static readonly VPose Sprung = V(7, 0, stretch: 0.08f, lift: 70, liftA: 3, liftB: 3);
 
         // The claw: the drills brought down and across, the far one a frame behind, then back to rest.
@@ -583,8 +588,16 @@ namespace Game.Client
             VeinPose.Rush => 8,
             VeinPose.Leap => 18,
             VeinPose.Roar => RoarRise + 4,
+            VeinPose.Emerge => 32,
             _ => 12,
         };
+
+        // The entrance's frames: the whole of it, or seen before, from where it bursts up.
+        public static (int From, int To) EnterFrames(bool again) => (again ? 12 : 0, FramesOf(VeinPose.Emerge) - 1);
+        // The frame of the entrance in which it breaks the floor (dust, a shake).
+        public const int EmergeBreak = 14;
+        // The frames in which it comes up through the floor, fast.
+        public static bool Emerging(int frame) => frame >= 12 && frame <= 24;
 
         // The frames a roar takes to rear up, before it shakes there.
         public const int RoarRise = 8;
@@ -671,6 +684,20 @@ namespace Game.Client
                     if (f < RoarRise)
                         return Keys(f / (float)RoarRise, (0, Rest), (1, V(5, 0, spread: 5, lean: -4, stretch: 0.08f)));
                     return V(5 + (s + 1) / 2, 0, spread: 5, lean: -4, stretch: 0.08f);
+                case VeinPose.Emerge:
+                    // Buried, the mound over it low; the mound heaves twice; up through it; tall, the drills thrown
+                    // wide in a roar; and down to rest.
+                    return Keys(t,
+                        (0, Buried),
+                        (0.14f, V(sink: 39, raise: 2, reach: 3, mound: 16, moundHeight: 6)),
+                        (0.22f, V(sink: 39, raise: 2, reach: 3, mound: 13, moundHeight: 4)),
+                        (0.36f, Sunk),
+                        (0.54f, V(9, 0, spread: 2, stretch: 0.06f, sink: 8, mound: 18, moundHeight: 4)),
+                        (0.62f, V(11, 0, spread: 3, stretch: 0.12f, lift: 3, mound: 18, moundHeight: 3)),
+                        (0.72f, V(6, 0, spread: 2, stretch: 0.04f, mound: 14, moundHeight: 2)),
+                        (0.84f, V(5, 0, spread: 5, lean: -4, stretch: 0.08f)),
+                        (0.92f, V(6, 0, spread: 5, lean: -4, stretch: 0.08f)),
+                        (1, Rest));
                 default:
                     return Rest;
             }
@@ -828,7 +855,7 @@ namespace Game.Client
             var image = new PixelImage(Width, Height);
             int left = (Width - wide) / 2;
             int ground = Height - 1 - (int)System.Math.Round(lift);
-            bool heated = pose == VeinPose.Slam || pose == VeinPose.Leap || pose == VeinPose.Rise;
+            bool heated = pose == VeinPose.Slam || pose == VeinPose.Leap || pose == VeinPose.Rise || pose == VeinPose.Emerge;
             // Sinking: the body goes down into the ground, cut off at the ground line.
             for (int y = 0; y < tall; y++)
             {

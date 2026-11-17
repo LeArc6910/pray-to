@@ -49,6 +49,16 @@ namespace Game.Core
         // reached by a tunnel from the first, then the lava one in the opposite corner, reached from the spawn. All
         // have ArenaRadius. After the caves' own come those beside places of the story (PlaceArenas).
         public IReadOnlyList<Vec2> Arenas => _arenas;
+        // What each arena is made to look like, alongside Arenas (arenas.csv, WorldGenerator.DressArenas); all plain
+        // when the world was made without the sheet.
+        public IReadOnlyList<ArenaKind> ArenaKinds { get; internal set; } = new ArenaKind[0];
+        // The kind of the arena a spot is in, or null outside them all.
+        public ArenaKind? ArenaKindAt(Vec2 position)
+        {
+            for (int i = 0; i < _arenas.Count; i++)
+                if (Vec2.Distance(position, _arenas[i]) <= ArenaRadius + 1) return i < ArenaKinds.Count ? ArenaKinds[i] : ArenaKind.Plain;
+            return null;
+        }
         // How many of Arenas are the caves' own, for the bosses with no place, in sheet order.
         public int CaveArenas { get; }
         // The arena beside each place of the story that has one, by place id (bosses.csv place).
@@ -160,7 +170,7 @@ namespace Game.Core
     // off with a tunnel to it, every cave the spawn cannot reach filled in, then ore veins in the rock. Only integer
     // math, so the host and every client build the same map from the same seed and the host only sends the tiles
     // players have changed since.
-    public static class WorldGenerator
+    public static partial class WorldGenerator
     {
         public const int DefaultSize = 128;
         // The map the game makes (2026-11-11, the owner: "the map is too small; the waypoints at least 200 tiles
@@ -257,10 +267,13 @@ namespace Game.Core
         // How far apart the places of the story stand at least, on the game's map (scaled for smaller maps).
         public const int MinPlaceGap = 200;
 
-        public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null)
+        // With the arenas' sheet (arenas.csv), each boss's arena is shaped and dressed for it last of all
+        // (WorldGenerator.Arenas.cs); without it every arena is the plain round room.
+        public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null, ArenaData arenas = null)
         {
             var world = GenerateCaves(seed, width, height);
             if (story != null && story.Places.Count > 0) world.Places = CarvePlaces(world, seed, story);
+            DressArenas(world, seed, arenas);
             return world;
         }
 

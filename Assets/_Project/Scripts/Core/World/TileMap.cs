@@ -180,6 +180,20 @@ namespace Game.Core
         RoyalStall,
         DemonStall,
         OreStall,
+        // What the boss arenas are dressed with (2026-11-17, Docs/Bosses.md 아레나 컨셉, WorldGenerator.Arenas.cs), laid
+        // by the generator and never dug. Walked on: a darker inlaid slab, a glowing rune, a web across the floor,
+        // fallen petals, a glowing crack, a red runner.
+        ArenaInlay,
+        RuneFloor,
+        Cobweb,
+        Petals,
+        Fissure,
+        ArenaCarpet,
+        // Standing (solid): a shrine gate's post, a cherry tree, a cocoon of silk, a suit of armour on a stand.
+        Torii,
+        CherryTree,
+        Cocoon,
+        ArmorStand,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -192,7 +206,10 @@ namespace Game.Core
         public const TileType LastMore = TileType.Lantern;
 
         // Laid by the generator round a place, never dug (no row in tiles.csv), drawn standing on the floor.
-        public static bool IsDecor(TileType type) => type >= First && type <= Last || type >= FirstMore && type <= LastMore;
+        public static bool IsDecor(TileType type) => type >= First && type <= Last || type >= FirstMore && type <= LastMore || type >= TileType.Torii && type <= TileType.ArmorStand;
+
+        // The floors the arenas are dressed with: walked like the road, never built on or dug.
+        public static bool IsArenaFloor(TileType type) => type >= TileType.ArenaInlay && type <= TileType.ArenaCarpet;
 
         // How many tiles across and up a structure stands on, from the tile its type is on (its lower left).
         public static (int W, int H) Footprint(TileType type) => type switch
@@ -206,7 +223,7 @@ namespace Game.Core
         };
 
         // Floors the places lay that are walked like the road: never built on or dug.
-        public static bool IsWay(TileType type) => type == TileType.Road || type == TileType.Dock || type == TileType.Rail;
+        public static bool IsWay(TileType type) => type == TileType.Road || type == TileType.Dock || type == TileType.Rail || IsArenaFloor(type);
     }
 
     // One tile that is no longer what the seed made it: dug out or built on.

@@ -29,12 +29,30 @@ namespace Game.Core
         // view can draw that attack's own wind-up (2026-11-12). An attack past the fifteenth is sent as none.
         public static int BossPhaseField(Boss boss)
         {
+            // Coming in, the attack's place says which entrance it is: the whole one or the short one (EntranceWhole,
+            // EntranceAgain).
+            if (boss.State == BossState.Enter) return Math.Min(boss.Phase, BossPhaseMask) | (boss.EntersAgain ? EntranceAgain : EntranceWhole) << BossAttackShift;
             int index = boss.Attack == null || boss.State == BossState.Dormant || boss.State == BossState.Roar ? 0 : Cause(boss, boss.Attack);
             return Math.Min(boss.Phase, BossPhaseMask) | (index <= 15 ? index : 0) << BossAttackShift;
         }
 
         public const int BossPhaseMask = 3;
         public const int BossAttackShift = 2;
+        public const int EntranceWhole = 1;
+        public const int EntranceAgain = 2;
+
+        // The bosses that have come in once since this world was started (by id). A boss comes in the short way
+        // (arenas.csv again) when it has, or when everyone at hand has felled it before (their records, which their
+        // characters keep): nobody sits through an entrance they have seen, and a newcomer beside a veteran still sees it.
+        readonly HashSet<string> _bossesMet = new HashSet<string>();
+        public IReadOnlyCollection<string> BossesMet => _bossesMet;
+
+        bool SeenBefore(Boss boss)
+        {
+            if (_bossesMet.Contains(boss.Definition.Id)) return true;
+            var near = _players.Where(p => !p.IsDead && Vec2.Distance(p.Position, boss.Home) <= boss.ArenaRadius + ArenaMargin + NearArena).ToList();
+            return near.Count > 0 && near.All(p => p.Records.TryGetValue((RecordKind.Boss, boss.Definition.Id), out int felled) && felled > 0);
+        }
 
         // How far outside the arena players still count as fighting it.
         const float ArenaMargin = 6;
@@ -80,6 +98,19 @@ namespace Game.Core
             boss.Phase = 1;
             boss.EmptyTicks = 0;
             _events.Add(new SimEvent(SimEventType.BossAwake, boss.Id));
+            // It comes in first (arenas.csv): a moment in which it neither attacks nor can be hurt. The host decides
+            // it, so everyone in the game sees the same entrance and the fight starts for all at once.
+            boss.EntersAgain = SeenBefore(boss);
+            float seconds = definition.Arena == null ? 0 : boss.EntersAgain ? definition.Arena.Again : definition.Arena.Seconds;
+            int enter = seconds > 0 ? Ticks(seconds) : 0;
+            _bossesMet.Add(definition.Id);
+            if (enter > 0)
+            {
+                boss.Attack = null;
+                boss.State = BossState.Enter;
+                boss.StateTicks = enter;
+                return;
+            }
             ChooseAttack(boss, Fighters(boss));
         }
 
@@ -107,7 +138,7 @@ namespace Game.Core
         {
             if (boss.State == BossState.Dormant)
             {
-                if (_players.Any(p => !p.IsDead && Vec2.Distance(p.Position, boss.Home) <= boss.ArenaRadius - 1)) Wake(boss);
+                if (!BossesHold && _players.Any(p => !p.IsDead && Vec2.Distance(p.Position, boss.Home) <= boss.ArenaRadius - 1)) Wake(boss);
                 return;
             }
 
@@ -142,6 +173,10 @@ namespace Game.Core
 
                 case BossState.Charge:
                     Charge(boss);
+                    break;
+
+                case BossState.Enter:
+                    if (--boss.StateTicks <= 0) ChooseAttack(boss, fighters);
                     break;
 
                 case BossState.Recover:
@@ -205,6 +240,25 @@ namespace Game.Core
             boss.TargetId = PickTarget(boss, boss.Attack.Target, fighters).Id;
             boss.State = BossState.Approach;
             boss.StateTicks = Ticks(ApproachSeconds);
+        }
+
+        // For the playtests: bosses stay asleep whoever walks in, so an arena can be looked at; a boss is put back to
+        // sleep; and a boss asleep is made to come in now, the whole way or the short one.
+        internal bool BossesHold { get; set; }
+
+        internal void ForceSleep(Boss boss)
+        {
+            if (!boss.IsDead) ResetBoss(boss);
+        }
+
+        internal bool ForceEntrance(Boss boss, bool again)
+        {
+            if (boss.IsDead || boss.Definition.Arena == null) return false;
+            ResetBoss(boss);
+            if (again) _bossesMet.Add(boss.Definition.Id);
+            else _bossesMet.Remove(boss.Definition.Id);
+            Wake(boss);
+            return boss.State == BossState.Enter;
         }
 
         // For the playtests: the awake boss lays down that attack's telegraph at once, on the target its rule picks.

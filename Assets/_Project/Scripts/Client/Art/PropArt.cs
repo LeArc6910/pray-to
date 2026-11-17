@@ -10,7 +10,7 @@ namespace Game.Client
     // dark), every shape ringed in a dark outline. Drawn from a few brushes (boxes, columns, ovals) so they are lit
     // alike. WorldView draws each with its feet on its footprint's bottom edge, in front of or behind people by
     // where they stand, and the floor of the place (Underlay) under it.
-    static class PropArt
+    static partial class PropArt
     {
         const int T = 16;
         static readonly Rgba Ink = Rgba.Hex("#1A1218");
@@ -199,6 +199,11 @@ namespace Game.Client
             TileType.MineCart => MineCart(),
             TileType.OrePile => OrePile(),
             TileType.Lantern => Lantern(),
+            // The arenas' own (PropArt.Arena.cs).
+            TileType.Torii => Torii(),
+            TileType.CherryTree => CherryTree(),
+            TileType.Cocoon => Cocoon(),
+            TileType.ArmorStand => ArmorStand(),
             // The things players build, standing too (2026-11-10, Stands).
             TileType.Workbench => Workbench(),
             TileType.Furnace => Furnace(),
@@ -444,6 +449,7 @@ namespace Game.Client
             TileType.Brazier, TileType.Fountain, TileType.Tent,
             TileType.Boat, TileType.Lighthouse, TileType.NetRack, TileType.Bollard, TileType.Anchor, TileType.BrokenPillar, TileType.FallenColumn,
             TileType.Rubble, TileType.RuneStone, TileType.Altar, TileType.MineEntrance, TileType.MineCart, TileType.OrePile, TileType.Lantern,
+            TileType.Torii, TileType.CherryTree, TileType.Cocoon, TileType.ArmorStand,
             TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Anvil, TileType.Bed, TileType.Table, TileType.Torch, TileType.Lamp,
             TileType.Pot, TileType.Banner, TileType.WardStone, TileType.RiftAltar,
             TileType.Drill, TileType.Smelter, TileType.Generator, TileType.Turret, TileType.Keg, TileType.PreservesJar, TileType.Assembler,
@@ -1568,6 +1574,8 @@ namespace Game.Client
             (TileType.Altar, 4.5f, "#B08AFF"),
             (TileType.Lantern, 5, "#FFC27A"),
             (TileType.MineEntrance, 3, "#FFC27A"),
+            // A crack in an arena's floor glows a little from below.
+            (TileType.Fissure, 2.2f, "#FF8A3C"),
         };
     }
 }

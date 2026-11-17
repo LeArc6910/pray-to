@@ -1027,6 +1027,10 @@ DevTools/Local/setup.sh --commit
 - [ ] 141단계: 계단식 성장(레벨·장비 단계마다 능력치가 크게 뛰고 보스·몬스터가 그에 맞게 세짐, `Docs/Bosses.md` 계단식 성장)
   - 명령 한 줄을 다시 돌린다(코드·시트가 바뀌었다). 새 파일 `Tests/EditMode/GrowthCurveTests.cs`의 `.meta`가 생기면 커밋한다. 통신 버전이 0.84.0으로 올라 옛 빌드와는 함께 놀 수 없다
   - (사람) 레벨 10·20·30·40에서, 새 단계 장비를 입는 순간 세졌다는 것이 느껴지는지. 제 단계 장비로 보스가 "물약을 쓰며 집중하면 잡는" 정도인지, 한 단계 아래로는 벽이되 억울하지 않은지. 흑철 기사(레벨 40)·실 잣는 어미(43)로 옮긴 자리가 흐름에 맞는지, 궁수로 수정 거미 여왕이 너무 어렵지 않은지
+- [ ] 142단계: 아레나 컨셉과 보스 입장 연출(`Docs/Bosses.md` 아레나 컨셉과 입장 연출)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/Bosses/arenas.csv`가 `GameSheets.arenas`에 들어가야 빌드에 실린다(돌리기 전에는 옛 아레나·입장 없음으로 동작). 새 파일 `arenas.csv`, `Core/Simulation/ArenaSheet.cs`, `Core/World/WorldGenerator.Arenas.cs`, `Client/WorldView.Entrance.cs`, `Client/Art/PropArt.Arena.cs`, `Tests/EditMode/ArenaTests.cs`의 `.meta`가 생기면 커밋한다. 아레나 꾸밈은 새 월드에서만 보인다. 통신 0.85.0
+  - (클라우드 웹 점검) `sweep.js --only arenas`, 보스 구역들
+  - (사람) 처음 들어설 때 카메라·이름 카드·입장 모션이 멋있는지, 너무 길지 않은지(두 번째부터는 짧음, [설정]의 [보스 등장 연출]로 끔). 휴대폰 세로에서 이름 카드가 한 줄에 들어가는지. 그룸(흙더미만)·아라네(안 보임)가 들어서기 전에 없는 것처럼 보이는 것이 괜찮은지
 
 ## 결과 보고
 

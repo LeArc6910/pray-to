@@ -104,6 +104,8 @@ namespace Game.Core
         readonly GameRandom _gearRandom;
         readonly ulong _seed;
         readonly GeneratedWorld _generated;
+        // The world as the seed made it: its arenas and what each is dressed as.
+        public GeneratedWorld Generated => _generated;
 
         // The first boss in the sheet waits in the arena; without boss data the caves have none. Without class data
         // everyone plays classless.
@@ -130,7 +132,7 @@ namespace Game.Core
             _loot = loot ?? throw new ArgumentNullException(nameof(loot));
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
-            _generated = WorldGenerator.Generate(seed, _config.MapSize, _config.MapSize, story);
+            _generated = WorldGenerator.Generate(seed, _config.MapSize, _config.MapSize, story, bosses?.Arenas);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles, _generated.Biomes);
             // Each boss in its own arena, in sheet order: the first near the spawn, the next in the deep zone.
             // A boss with a place (bosses.csv place, 2026-11-10) waits in the arena beside it, when the world has it.

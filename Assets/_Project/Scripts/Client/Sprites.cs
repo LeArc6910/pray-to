@@ -29,6 +29,7 @@ namespace Game.Client
             TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
             TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow, TileType.Fence,
             TileType.LockedDoor, TileType.Road, TileType.Waypoint, TileType.Dock, TileType.Rail, TileType.Water, TileType.RoyalStall, TileType.DemonStall, TileType.OreStall,
+            TileType.ArenaInlay, TileType.RuneFloor, TileType.Cobweb, TileType.Petals, TileType.Fissure, TileType.ArenaCarpet,
         };
 
         // A sprite made from the drawing the first time its key is asked for. The pivot is in the sprite's own

@@ -137,6 +137,17 @@ namespace Game.Core.Tests
 
         public static readonly BossData Shipped = BossSheet.Parse(Read(BossSheet.BossesFile), Read(BossSheet.AttacksFile), Monsters.Shipped);
 
+        // The shipped bosses with their arenas and entrances (arenas.csv). Read apart from Shipped, which stays without
+        // them: the fights' own tests start the moment a boss wakes.
+        public static readonly BossData Staged = WithArenas();
+
+        static BossData WithArenas()
+        {
+            var data = BossSheet.Parse(Read(BossSheet.BossesFile), Read(BossSheet.AttacksFile), Monsters.Shipped);
+            ArenaSheet.Parse(Read(ArenaSheet.File), data);
+            return data;
+        }
+
         public const string BossesHeader = "id,name,health,health_per_player,armor,speed,radius,phases,roar,roar_radius,roar_damage\n";
         public const string AttacksHeader =
             "boss,id,name,phases,shape,target,telegraph,damage,radius,length,angle,width,count,spread,speed,cooldown,weight,summon\n";

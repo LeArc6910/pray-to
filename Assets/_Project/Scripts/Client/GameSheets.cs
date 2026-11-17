@@ -23,6 +23,8 @@ namespace Game.Client
         public TextAsset monsters;
         public TextAsset bosses;
         public TextAsset bossAttacks;
+        // Each boss's arena and entrance (arenas.csv, 2026-11-17, Docs/Bosses.md 아레나 컨셉).
+        public TextAsset arenas;
         public TextAsset classes;
         public TextAsset skills;
         public TextAsset passives;
@@ -48,7 +50,13 @@ namespace Game.Client
 
         public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
 
-        public BossData LoadBosses(MonsterData monsterData) => BossSheet.Parse(Text(bosses), Text(bossAttacks), monsterData);
+        // Without the arenas' sheet (an asset made before it existed) every arena is plain and no boss has an entrance.
+        public BossData LoadBosses(MonsterData monsterData)
+        {
+            var data = BossSheet.Parse(Text(bosses), Text(bossAttacks), monsterData);
+            foreach (string error in ArenaSheet.Parse(Text(arenas), data).Errors) Debug.LogError(error);
+            return data;
+        }
 
         public ClassData LoadClasses() => ClassSheet.Parse(Text(classes), Text(skills), Text(passives));
 

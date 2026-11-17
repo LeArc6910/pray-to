@@ -300,5 +300,29 @@ namespace Game.Client.Tests
             yield return Screens.Take("story-city");
             Assert.IsTrue(_root.Playing);
         }
+
+        // The arenas and the entrances (Docs/Bosses.md 아레나 컨셉과 입장 연출, 2026-11-17): the black knight's hall is
+        // dressed (the arenas' sheet was read), the knight kneels asleep in it, and woken it comes in before it fights.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ABossComesInToItsArena()
+        {
+            yield return Start();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "black_knight");
+            Assert.IsNotNull(boss, "No black knight: the story's places were not carved.");
+            Assert.IsNotNull(boss.Definition.Arena, "No arenas: arenas.csv was not read (Game > Set Up Main Scene).");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            Assert.AreEqual(BossState.Dormant, boss.State);
+            yield return Screens.Take("arena-hall");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(1.6f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the knight comes in first.");
+            yield return Screens.Take("entrance-knight");
+            yield return new WaitForSecondsRealtime(4.5f);
+            Assert.AreNotEqual(BossState.Enter, boss.State, "The entrance ends and the fight starts.");
+            Assert.IsTrue(_root.Playing);
+        }
     }
 }

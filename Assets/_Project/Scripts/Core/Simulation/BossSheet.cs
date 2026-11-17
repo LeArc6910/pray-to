@@ -271,6 +271,8 @@ namespace Game.Core
         // The element of every attack (bosses.csv element): fire burns whoever it hits, cold slows them.
         public SkillTag Element { get; }
         public IReadOnlyList<BossAttack> Attacks => _attacks;
+        // What its arena is made to look like and how it comes in (arenas.csv, ArenaSheet), or null with no row.
+        public ArenaDefinition Arena { get; internal set; }
 
         internal void Add(BossAttack attack) => _attacks.Add(attack);
     }
@@ -286,6 +288,8 @@ namespace Game.Core
         public IReadOnlyList<BossDefinition> Bosses { get; }
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;
+        // The arenas' sheet, once read (ArenaSheet.Parse); null before it, and every arena is plain.
+        public ArenaData Arenas { get; internal set; }
 
         public BossDefinition Find(string id) =>
             Bosses.FirstOrDefault(b => b.Id == id) ?? throw new ArgumentException($"Unknown boss '{id}'.", nameof(id));
