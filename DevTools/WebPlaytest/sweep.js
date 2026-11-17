@@ -912,8 +912,12 @@ async function spider(browser) {
     await game.wait(Math.round(telegraph * 400) + 80);
     await game.shot(`spider-${attack}-hit`, `${name} 터진 순간`);
     if (attack === 'web_burst') {
-      await game.wait(400);
-      const gone = await game.state();
+      // The headless page can run the game slower than the clock, so the burst may land a moment late: wait for it.
+      let gone = await game.state();
+      for (let k = 0; k < 15 && ((gone.pools || 0) > 0 || (gone.poolsShown || 0) > 0); k++) {
+        await game.wait(200);
+        gone = await game.state();
+      }
       check((gone.pools || 0) === 0 && (gone.poolsShown || 0) === 0, `그물 폭발: 터진 거미줄은 사라진다 (월드 ${gone.pools}, 화면 ${gone.poolsShown})`);
     }
     if (pools > 0) {
