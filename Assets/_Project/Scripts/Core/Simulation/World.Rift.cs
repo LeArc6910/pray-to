@@ -63,10 +63,10 @@ namespace Game.Core
         // What tiers 3 and up give for the rift band and charm (recipes.csv).
         public const string RiftShard = "rift_shard";
         // A rift monster's health and hit against its sheet at tier 1, and how much more each tier adds.
-        const float RiftHealth = 5f;
-        const float RiftHealthPerTier = 1.5f;
-        const float RiftPower = 1.8f;
-        const float RiftPowerPerTier = 0.45f;
+        const float RiftHealth = 7f;
+        const float RiftHealthPerTier = 2.2f;
+        const float RiftPower = 2.3f;
+        const float RiftPowerPerTier = 0.6f;
         // How far from the altar its monsters appear.
         const float RiftInner = 3;
         const float RiftOuter = 7;

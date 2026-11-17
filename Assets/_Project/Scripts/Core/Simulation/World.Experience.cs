@@ -3,13 +3,40 @@ using System.Linq;
 
 namespace Game.Core
 {
-    // Character levels (Docs/Loot.md, 레벨과 착용 레벨): experience from monsters and bosses, a little more health
-    // each level, and gear that asks for a level before it can be worn.
+    // Character levels (Docs/Loot.md, 레벨과 착용 레벨): experience from monsters and bosses, more health and damage
+    // each level with a jump at every tenth (the level the next tier of gear is worn at, Docs/Bosses.md 계단식 성장),
+    // and gear that asks for a level before it can be worn.
     public static class Leveling
     {
         public const int MaxLevel = 50;
         // Maximum health each level past the first adds.
-        public const int HealthPerLevel = 2;
+        public const int HealthPerLevel = 3;
+        // Percent more damage (basic attacks, skills and summons alike) each level past the first adds.
+        public const int DamagePerLevel = 1;
+        // A step: every StepLevels levels (10, 20, 30, 40, 50: where the next tier of gear opens) the character
+        // jumps by this much health and percent damage on top, as much as ten ordinary levels.
+        public const int StepLevels = 10;
+        public const int StepHealth = 30;
+        public const int StepDamage = 10;
+
+        // How many steps the level has climbed: 0 below level 10, 5 at the top.
+        public static int StepsAt(int level) => Math.Clamp(level, 1, MaxLevel) / StepLevels;
+
+        // What the level alone adds: maximum health, and percent more damage.
+        public static int HealthAt(int level) => (Math.Clamp(level, 1, MaxLevel) - 1) * HealthPerLevel + StepsAt(level) * StepHealth;
+
+        public static int DamageAt(int level) => (Math.Clamp(level, 1, MaxLevel) - 1) * DamagePerLevel + StepsAt(level) * StepDamage;
+
+        // One line for the character page: what the level has added so far and where the next step is.
+        public static string Summary(int level)
+        {
+            string so = $"레벨 성장 생명력 +{HealthAt(level)} · 피해 +{DamageAt(level)}%";
+            int next = NextStep(level);
+            return next > 0 ? $"{so} · 다음 계단 Lv {next}" : so;
+        }
+
+        // The level the next step comes at, or 0 past the last.
+        public static int NextStep(int level) => StepsAt(level) * StepLevels + StepLevels <= MaxLevel ? StepsAt(level) * StepLevels + StepLevels : 0;
         // Players this far from a monster when it dies share in its experience, each getting all of it.
         public const float ShareRange = 16;
         // Experience it takes from nothing to reach the level: 14 × (level − 1)².

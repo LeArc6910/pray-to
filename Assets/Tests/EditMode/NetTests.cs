@@ -926,7 +926,7 @@ namespace Game.Core.Tests
             session.Host.Receive(1, alice.InsertRuneCommand(iron.Id, Gear.Data.FindRune("earth")));
             session.Tick();
             Assert.AreEqual("earth", alice.Equipment[ItemSlot.Weapon].Sockets[0].Id);
-            Assert.AreEqual(9 + 4, alice.Stats.Damage, 0.001f, "the earth rune adds 4 to a weapon");
+            Assert.AreEqual((9 + 4) * (1 + Leveling.DamageAt(player.Level) / 100f), alice.Stats.Damage, 0.001f, "the earth rune adds 4 to a weapon, and the level its share");
             Assert.AreEqual(player.Stats.Damage, alice.Stats.Damage);
 
             var copper = alice.Bag.Items.Single(item => !item.Base.IsPickaxe);

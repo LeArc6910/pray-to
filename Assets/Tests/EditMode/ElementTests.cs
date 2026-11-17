@@ -70,15 +70,15 @@ namespace Game.Core.Tests
         [Test]
         public void ABurnThatKillsCountsAsThePlayersKill()
         {
-            var weak = MonsterSheet.Parse(Monsters.Header.Replace("weight\n", "weight,drop_chance\n") + "weak,약골,1,25,0,0,1,0.4,0,0.5,0.5,1,1,100\n");
+            var weak = MonsterSheet.Parse(Monsters.Header.Replace("weight\n", "weight,drop_chance\n") + "weak,약골,1,30,0,0,1,0.4,0,0.5,0.5,1,1,100\n");
             var world = Room(monsters: weak);
             var player = Learned(world.AddPlayer("a", Gear.Wearing("mithril_sword"), FireMage));
             var target = world.SpawnEnemy(weak.Monsters[0], player.Position + new Vec2(0, -1));
             world.UseSkill(player.Id, Slot(player, "flame_brand"), Vec2.Zero);
-            // The sword's lowest 17, fire mage's 15% more: 20 of 25, and the burn's 30% of 20 finishes it.
+            // The sword's lowest 21, fire mage's 15% more: 24 of 30, and the burn's 30% of 24 finishes it.
             var hit = AttackOnce(world, player);
             Assume.That(target.IsDead, Is.False, "a critical hit killed it at once");
-            Assert.AreEqual(20, hit.Single(e => e.Type == SimEventType.Hit).Amount);
+            Assert.AreEqual(24, hit.Single(e => e.Type == SimEventType.Hit).Amount);
 
             var events = Run(world, World.BurnSeconds + 0.5f);
             Assert.IsTrue(events.Any(e => e.Type == SimEventType.Died && e.Source == target.Id));

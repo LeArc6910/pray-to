@@ -48,7 +48,7 @@ namespace Game.Core.Tests
         {
             var mother = Bosses.Shipped.Find("silk_mother");
             Assert.AreEqual("old_temple:2", mother.Place);
-            Assert.AreEqual(36, mother.Level);
+            Assert.AreEqual(43, mother.Level);
             // Its fangs are read from its body alone; the three heaviest blows carry the warning sign; the rest are marked.
             Assert.AreEqual(AttackWarning.Hidden, mother.Attacks.Single(a => a.Id == "fang").Warning);
             CollectionAssert.AreEquivalent(new[] { "thread_drop", "eight_legs", "web_burst" }, mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Select(a => a.Id));

@@ -43,7 +43,8 @@ namespace Game.Core.Tests
             var world = Room();
             var player = world.AddPlayer("a", Gear.Wearing("obsidian_sword"));
 
-            int kills = 400;
+            // Few enough that the ground never fills (World keeps 200 things lying about and drops the oldest).
+            int kills = 250;
             for (int i = 0; i < kills; i++)
             {
                 world.SpawnEnemy(Slime, player.Position + new Vec2(1.2f, 0));
@@ -140,7 +141,7 @@ namespace Game.Core.Tests
 
             Assert.AreSame(iron, player.Equipment[ItemSlot.Weapon]);
             CollectionAssert.AreEqual(new[] { ring, worn }, player.Inventory.Items);
-            Assert.AreEqual(9, player.Stats.Damage, 0.001f);
+            Assert.AreEqual(9 * (1 + Leveling.DamageAt(5) / 100f), player.Stats.Damage, 0.001f, "the sword's 9, and what four levels add");
             Assert.Greater(player.InventoryVersion, version);
             Assert.IsFalse(world.EquipItem(player.Id, iron.Id), "already worn, not in the bag");
         }
@@ -296,7 +297,7 @@ namespace Game.Core.Tests
                 Assert.AreEqual(Leveling.LevelFor(300), player.Level);
                 Assert.IsTrue(events.Count(e => e.Type == SimEventType.LevelUp && e.Source == player.Id) == player.Level - 1);
             }
-            Assert.AreEqual(health + (alice.Level - 1) * Leveling.HealthPerLevel, alice.Stats.MaxHealth, 0.01f, "a little more health a level");
+            Assert.AreEqual(health + Leveling.HealthAt(alice.Level), alice.Stats.MaxHealth, 0.01f, "more health a level");
         }
 
         [Test]

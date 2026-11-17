@@ -2,9 +2,9 @@ id,kind,name,slots,level,weight,modifier
 # 접두사: 피해와 방어
 sharp,prefix,날카로운,weapon|ring|amulet,1,1000,Damage+1~2
 sharp,,,,10,700,Damage+3~4
-sharp,,,,20,400,Damage+6~8
-sharp,,,,30,200,Damage+11~14
-sharp,,,,50,100,Damage+15~19
+sharp,,,,20,400,Damage+7~9
+sharp,,,,30,200,Damage+14~18
+sharp,,,,50,100,Damage+24~30
 cruel,prefix,잔인한,weapon|amulet,1,1000,Damage+10~15%
 cruel,,,,10,700,Damage+16~22%
 cruel,,,,20,400,Damage+23~30%
@@ -12,14 +12,14 @@ cruel,,,,30,200,Damage+31~40%
 cruel,,,,50,100,Damage+42~54%
 sturdy,prefix,단단한,armor,1,1000,Armor+2~3
 sturdy,,,,10,700,Armor+5~7
-sturdy,,,,20,400,Armor+10~13
-sturdy,,,,30,200,Armor+18~24
-sturdy,,,,50,100,Armor+24~32
+sturdy,,,,20,400,Armor+11~14
+sturdy,,,,30,200,Armor+22~28
+sturdy,,,,50,100,Armor+36~46
 vital,prefix,강인한,armor|jewelry,1,1000,MaxHealth+5~8
 vital,,,,10,700,MaxHealth+10~15
 vital,,,,20,400,MaxHealth+20~28
-vital,,,,30,200,MaxHealth+35~45
-vital,,,,50,100,MaxHealth+47~61
+vital,,,,30,200,MaxHealth+40~50
+vital,,,,50,100,MaxHealth+65~80
 blazing,prefix,불타는,weapon|ring|amulet,1,800,Fire:Damage+10~15%
 blazing,,,,10,560,Fire:Damage+16~22%
 blazing,,,,20,320,Fire:Damage+23~30%

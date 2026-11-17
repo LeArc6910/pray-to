@@ -215,6 +215,8 @@ namespace Game.Client
         {
             GUILayout.Label(Fit($"{_client.Name} · Lv {_client.Level} ({(int)(Leveling.Progress(_client.Experience) * 100)}%) · " +
                 (_client.Classes.Count == 0 ? "클래스 없음" : string.Join(" + ", _client.Classes.Select(c => c.Name))), _textWidth));
+            // What the level alone gives, and the level of the next step (Docs/Bosses.md, 계단식 성장).
+            GUILayout.Label(Fit(Leveling.Summary(_client.Level), _textWidth));
             float cell = Controls.UsingTouch ? 52 : 48;
             // Helmet and amulet on top, weapon, chest and ring across the middle, boots below.
             var places = new (ItemSlot Slot, int Column, int Row)[]

@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.83.0";
+        public const string Version = "0.84.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -97,6 +97,20 @@ namespace Game.Core
         internal static ushort Ticks(int value) => (ushort)Math.Clamp(value, 0, ushort.MaxValue);
 
         internal static ushort Whole(float value) => (ushort)Math.Clamp((int)MathF.Ceiling(value), 0, ushort.MaxValue);
+
+        // An entity's health in two bytes: whole points up to 32767, and above that (the later bosses and the rift's
+        // guardians, with more players) in steps of 64 with the top bit set, up to about two million. Rounded up, so
+        // something alive never reads as dead.
+        public const int CoarseHealthStep = 64;
+
+        internal static ushort Health(float value)
+        {
+            int whole = Math.Max(0, (int)MathF.Ceiling(value));
+            if (whole <= 0x7FFF) return (ushort)whole;
+            return (ushort)(0x8000 | Math.Min(0x7FFF, (whole + CoarseHealthStep - 1) / CoarseHealthStep));
+        }
+
+        internal static float ReadHealth(ushort packed) => (packed & 0x8000) == 0 ? packed : (packed & 0x7FFF) * (float)CoarseHealthStep;
 
         internal static ushort Eighths(float value) => (ushort)Math.Clamp((int)MathF.Round(value * 8), 0, ushort.MaxValue);
 
@@ -1150,8 +1164,8 @@ namespace Game.Core
                 w.Write((byte)entity.Type);
                 w.WritePosition(entity.Position);
                 w.Write(Protocol.PackDirection(entity.Facing));
-                w.Write(Protocol.Whole(entity.Health));
-                w.Write(Protocol.Whole(entity.MaxHealth));
+                w.Write(Protocol.Health(entity.Health));
+                w.Write(Protocol.Health(entity.MaxHealth));
                 w.Write(entity.State);
                 w.Write((byte)entity.Phase);
             }
@@ -1244,8 +1258,8 @@ namespace Game.Core
                     r.ReadByte(),
                     r.ReadPosition(),
                     Protocol.UnpackDirection(r.ReadByte()),
-                    r.ReadUInt16(),
-                    r.ReadUInt16(),
+                    Protocol.ReadHealth(r.ReadUInt16()),
+                    Protocol.ReadHealth(r.ReadUInt16()),
                     r.ReadByte(),
                     r.ReadByte()));
             }
