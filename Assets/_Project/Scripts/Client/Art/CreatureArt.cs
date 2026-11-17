@@ -861,6 +861,36 @@ namespace Game.Client
             },
         };
 
+        // One of the silk mother's young (2026-11-13): a round abdomen with her green mark, a small head, eight thin
+        // legs that scuttle (two frames).
+        static readonly string[][] Spiderling =
+        {
+            new[]
+            {
+                ".K..K......K..K.",
+                "K.K..KLLLL.K.K.K",
+                "K..KLMMgMMMK...K",
+                "...LMMgggMMmKK..",
+                ".KKmMMMgMMMmMeK.",
+                "K..mmMMMMMmdMMK.",
+                "K.K.dmmmmmd.KK..",
+                ".K.K.K...K.K.K..",
+                "K..K.K...K..K.K.",
+            },
+            new[]
+            {
+                "..K..K....K..K..",
+                ".K.K.KLLLL..K.K.",
+                "K..KLMMgMMMK..K.",
+                "K..LMMgggMMmKK.K",
+                ".KKmMMMgMMMmMeK.",
+                ".K.mmMMMMMmdMMK.",
+                "K.K.dmmmmmd.KK..",
+                "K..K.K...K.K..K.",
+                ".K.K..K...K.K..K",
+            },
+        };
+
         // A lake crab: a wide low shell on six legs, two big claws raised, tipped red. The claws open and close.
         static readonly string[][] Crab =
         {
@@ -1225,6 +1255,11 @@ namespace Game.Client
                 ['w'] = Rgba.Hex("#103038"),
                 ['h'] = Rgba.Hex("#BFF4EC"),
             },
+            ["silk_spiderling"] = new Dictionary<char, Rgba>
+            {
+                ['K'] = Rgba.Hex("#140B1C"),
+                ['g'] = Rgba.Hex("#9FE35D"),
+            },
             ["cave_beetle"] = new Dictionary<char, Rgba>
             {
                 ['K'] = Rgba.Hex("#58422E"),
@@ -1323,6 +1358,7 @@ namespace Game.Client
                 "sand_worm" => SandWorm,
                 "demon_soldier" => DemonSoldier,
                 "demon_caster" => DemonCaster,
+                "silk_spiderling" => Spiderling,
                 _ => Slime,
             };
             var image = PixelImage.FromRows(colors, frames[frame % frames.Length]);
@@ -1409,6 +1445,22 @@ namespace Game.Client
                 BossPose.Roar => KnightPose.Roar,
                 _ => KnightPose.Idle,
             }, frame, 1),
+            // The silk mother of the forgotten shrine (2026-11-13): its body from a Retro Diffusion picture, its eight
+            // legs drawn and moved in code (SpiderPose in WorldView).
+            "silk_mother" => SpiderArt.Draw(view, pose switch
+            {
+                BossPose.Windup => SpiderPose.Rear,
+                BossPose.Strike => SpiderPose.Bite,
+                BossPose.Charge => SpiderPose.Rush,
+                BossPose.Roar => SpiderPose.Screech,
+                _ => SpiderPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => SpiderArt.FramesOf(SpiderPose.Rear) - 1,
+                BossPose.Strike => SpiderArt.StrikeFrame(SpiderPose.Bite),
+                BossPose.Roar => SpiderArt.ScreechRise + frame % 4,
+                _ => frame,
+            }, 1),
             _ => Warden(color, frame, view, pose),
         };
 

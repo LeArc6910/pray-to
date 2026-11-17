@@ -20,6 +20,13 @@ namespace Game.Client
 
         static int Main(string[] args)
         {
+            // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them.
+            if (args.Length == 2 && args[0] == "--only")
+            {
+                string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
+                Directory.CreateDirectory(anim);
+                return Motions.WriteOnly(anim, args[1]) ? 0 : 1;
+            }
             string output = args.Length > 0 ? args[0] : Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
             Directory.CreateDirectory(output);
             var loot = LoadLoot();
@@ -103,7 +110,7 @@ namespace Game.Client
             return 0;
         }
 
-        static readonly string[] BossIds = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion", "mad_general", "crown_wraith" };
+        static readonly string[] BossIds = { "cave_warden", "crystal_queen", "lava_titan", "void_lord", "tide_serpent", "antlion", "mad_general", "crown_wraith", "silk_mother" };
 
         static bool WriteSounds(string folder)
         {
@@ -333,6 +340,9 @@ namespace Game.Client
             images.Add(new List<PixelImage> { EffectArt.WarningSign(), EffectArt.Rock(7), EffectArt.Rock(13), EffectArt.Petal(0), EffectArt.Petal(1), EffectArt.Petal(2) });
             // The lines the samurai's cuts leave (2026-11-13): straight, and bent round a wedge.
             images.Add(new List<PixelImage> { EffectArt.Slash(32), EffectArt.Slash(96), EffectArt.SlashArc(44, 150) });
+            // What the silk mother leaves on the floor and throws (2026-11-13): webs, a pool of venom bubbling, gobs.
+            images.Add(new List<PixelImage> { EffectArt.Web(61, 0), EffectArt.Web(61, 1), EffectArt.Web(90, 2), EffectArt.Glob(9, true), EffectArt.Glob(7, false) });
+            images.Add(Enumerable.Range(0, EffectArt.VenomFrames).Select(f => EffectArt.VenomPool(48, f)).ToList());
             const int gap = 4;
             int width = images.Max(row => row.Sum(image => image.Width + gap)) + gap;
             int height = images.Sum(row => row.Max(image => image.Height) + gap) + gap;

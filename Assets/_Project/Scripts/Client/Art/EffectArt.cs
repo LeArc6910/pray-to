@@ -186,6 +186,125 @@ namespace Game.Client
             return image.Outlined(new Rgba(24, 16, 14));
         }
 
+        // A web left on the floor (2026-11-13, the silk mother, HazardShape.Web): spokes from its middle, not quite
+        // evenly, joined by rings of thread that sag between them. Each of a few kinds is a little different.
+        public static PixelImage Web(int diameter, int kind)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float r = diameter / 2f - 1;
+            float cx = diameter / 2f - 0.5f, cy = cx;
+            var thread = new Rgba(236, 236, 244, 205);
+            var faint = new Rgba(222, 222, 236, 120);
+            var knot = new Rgba(255, 255, 255, 240);
+            const int spokes = 11;
+            var angles = new float[spokes];
+            for (int i = 0; i < spokes; i++) angles[i] = (i + (PixelNoise.Value(i, kind, 91) - 0.5f) * 0.5f) * 2 * (float)System.Math.PI / spokes;
+            void Thread(float x0, float y0, float x1, float y1, Rgba color)
+            {
+                int steps = (int)(System.Math.Max(System.Math.Abs(x1 - x0), System.Math.Abs(y1 - y0)) * 1.5f) + 1;
+                for (int i = 0; i <= steps; i++)
+                {
+                    int x = (int)System.Math.Round(x0 + (x1 - x0) * i / steps), y = (int)System.Math.Round(y0 + (y1 - y0) * i / steps);
+                    if (image.Inside(x, y) && image[x, y].A < color.A) image[x, y] = color;
+                }
+            }
+            // A thin veil under it, so the patch reads as a patch on any floor.
+            for (int y = 0; y < diameter; y++)
+                for (int x = 0; x < diameter; x++)
+                {
+                    float d = (float)System.Math.Sqrt((x - cx) * (x - cx) + (y - cy) * (y - cy)) / r;
+                    if (d <= 0.97f && ((x + y) & 1) == 0) image[x, y] = new Rgba(210, 210, 228, d > 0.8f ? 26 : 44);
+                }
+            for (int i = 0; i < spokes; i++)
+            {
+                float reach = r * (0.9f + 0.1f * PixelNoise.Value(i, kind, 92));
+                Thread(cx, cy, cx + (float)System.Math.Cos(angles[i]) * reach, cy + (float)System.Math.Sin(angles[i]) * reach, thread);
+            }
+            foreach (float ring in new[] { 0.24f, 0.46f, 0.68f, 0.88f })
+            {
+                for (int i = 0; i < spokes; i++)
+                {
+                    int next = (i + 1) % spokes;
+                    float a = r * ring * (0.94f + 0.1f * PixelNoise.Value(i, kind + (int)(ring * 100), 93));
+                    float b = r * ring * (0.94f + 0.1f * PixelNoise.Value(next, kind + (int)(ring * 100), 93));
+                    float ax = cx + (float)System.Math.Cos(angles[i]) * a, ay = cy + (float)System.Math.Sin(angles[i]) * a;
+                    float bx = cx + (float)System.Math.Cos(angles[next]) * b, by = cy + (float)System.Math.Sin(angles[next]) * b;
+                    // Sagging toward the middle between two spokes.
+                    float mx = (ax + bx) / 2 + (cx - (ax + bx) / 2) * 0.12f, my = (ay + by) / 2 + (cy - (ay + by) / 2) * 0.12f;
+                    Thread(ax, ay, mx, my, ring > 0.8f ? thread : faint);
+                    Thread(mx, my, bx, by, ring > 0.8f ? thread : faint);
+                    int kx = (int)System.Math.Round(ax), ky = (int)System.Math.Round(ay);
+                    if (image.Inside(kx, ky)) image[kx, ky] = knot;
+                }
+            }
+            return image;
+        }
+
+        public const int VenomFrames = 4;
+
+        // A pool of venom on the floor (HazardShape.Venom): a sickly green puddle with a dark rim and a ragged edge,
+        // bubbles rising and bursting on it frame by frame.
+        public static PixelImage VenomPool(int diameter, int frame)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float r = diameter / 2f - 1;
+            float cx = diameter / 2f - 0.5f, cy = cx;
+            for (int y = 0; y < diameter; y++)
+                for (int x = 0; x < diameter; x++)
+                {
+                    float dx = x - cx, dy = y - cy;
+                    float d = (float)System.Math.Sqrt(dx * dx + dy * dy) / r;
+                    double angle = System.Math.Atan2(dy, dx);
+                    float edge = 0.9f + 0.07f * (float)System.Math.Sin(angle * 5 + 1) + 0.04f * (float)System.Math.Sin(angle * 11);
+                    if (d > edge) continue;
+                    image[x, y] = d > edge - 0.09f ? new Rgba(38, 78, 34, 225)
+                        : d > edge - 0.2f ? new Rgba(74, 138, 52, 205)
+                        : PixelNoise.Value(x, y, 60 + frame / 2) > 0.965f ? new Rgba(196, 248, 130, 220)
+                        : new Rgba(104, 180, 64, 190);
+                }
+            // Bubbles: each swells over the frames and bursts to a ring.
+            for (int i = 0; i < 5; i++)
+            {
+                float a = PixelNoise.Value(i, diameter, 71) * 6.283f, at = PixelNoise.Value(i, diameter, 72) * 0.6f * r;
+                int bx = (int)(cx + System.Math.Cos(a) * at), by = (int)(cy + System.Math.Sin(a) * at);
+                int age = (frame + i) % VenomFrames;
+                if (age == VenomFrames - 1)
+                {
+                    foreach (var (ox, oy) in new[] { (-2, 0), (2, 0), (0, -2), (0, 2) })
+                        if (image.Inside(bx + ox, by + oy) && image[bx + ox, by + oy].A > 0) image[bx + ox, by + oy] = new Rgba(214, 255, 150, 230);
+                    continue;
+                }
+                for (int oy = -age; oy <= age; oy++)
+                    for (int ox = -age; ox <= age; ox++)
+                    {
+                        if (ox * ox + oy * oy > age * age + 1 || !image.Inside(bx + ox, by + oy) || image[bx + ox, by + oy].A == 0) continue;
+                        image[bx + ox, by + oy] = ox + oy < 0 ? new Rgba(214, 255, 150, 235) : new Rgba(150, 226, 92, 225);
+                    }
+            }
+            return image;
+        }
+
+        // A gob of venom or of silk in flight.
+        public static PixelImage Glob(int size, bool silk)
+        {
+            var image = new PixelImage(size + 3, size);
+            float r = size / 2f - 0.5f;
+            var light = silk ? Rgba.White : new Rgba(214, 255, 150);
+            var main = silk ? new Rgba(232, 232, 242) : new Rgba(150, 226, 92);
+            var dark = silk ? new Rgba(176, 176, 200) : new Rgba(74, 138, 52);
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size + 3; x++)
+                {
+                    // A ball at the front (the right), drawn out into a tail behind it.
+                    float dx = (x - 3 - r) / r, dy = (y - r) / r;
+                    float d = dx * dx + dy * dy;
+                    bool tail = x < 3 + r && System.Math.Abs(y - r) <= r * (x / (3 + r)) * 0.8f;
+                    if (d > 1 && !tail) continue;
+                    image[x, y] = d <= 1 && dx - dy > 0.5f ? light : d <= 1 && dx - dy < -0.7f ? dark : main;
+                }
+            return image.Outlined(silk ? new Rgba(120, 120, 150) : new Rgba(24, 48, 22));
+        }
+
         // A ring of light opening out: thick and bright at first, then thinner and dimmer, and broken into bits at
         // the end. For novas, summons and anything that spreads from a spot.
         public static PixelImage Ring(int diameter, int frame)

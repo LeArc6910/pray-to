@@ -36,7 +36,7 @@ namespace Game.Client
 
         // For the playtests: marks drawn on the ground (an unmarked attack's are kept but clear), and whether a
         // warning sign shows over a boss.
-        public int MarksShown => _marks.Values.Count(m => m.State.Warning != AttackWarning.Hidden);
+        public int MarksShown => _marks.Values.Count(m => m.State.Warning != AttackWarning.Hidden && !IsPool(m.State));
         public bool WarningShown => _others.Values.Any(b => b.Sign != null && b.Sign.enabled);
 
         // How far the last frame got (1 entities, 2 past them, 3 past the marks, 4 past the events), and how each boss
@@ -76,6 +76,7 @@ namespace Game.Client
             else if (body.Mound != null) body.Mound.enabled = false;
             if (body.Id == "shrine_samurai") SamuraiExtras(body, view);
             if (body.Id == "black_knight") KnightExtras(body, view);
+            if (body.Id == "silk_mother") SpiderExtras(body, view);
         }
 
         void ShowWarningSign(Body body, bool on)

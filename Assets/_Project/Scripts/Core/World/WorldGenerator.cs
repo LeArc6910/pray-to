@@ -417,7 +417,10 @@ namespace Game.Core
 
             // Beside the demon nest, its lord's arena (2026-11-10, bosses.csv place): on the side away from the road
             // that comes in, clear of the other places and arenas, reached from the nest by a short road.
-            foreach (var (place, cx, cy) in spots.Where(s => s.Place.Arena).ToList())
+            // A place with two (places.csv arena 2, 2026-11-13) gets the second after every place has its first, so
+            // the first ones stand where they stood; a boss names it "<place>:2".
+            foreach (var (place, cx, cy, nth) in spots.Where(s => s.Place.Arena).Select(s => (s.Place, s.X, s.Y, 1))
+                .Concat(spots.Where(s => s.Place.Arenas > 1).Select(s => (s.Place, s.X, s.Y, 2))).ToList())
             {
                 int r = place.Radius;
                 var from = spots.FirstOrDefault(s => s.Place.Id == place.Road);
@@ -428,7 +431,8 @@ namespace Game.Core
                 // Where it can, its road keeps clear of the other places (2026-11-12: the hut's arena beyond the royal
                 // city cut through the city's wall); only where nothing else will do does it pass one.
                 for (int pass = 0; pass < 2 && best == null; pass++)
-                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + 60 && best == null; reach += 2)
+                // A second arena looks further out: the first has taken the best ground near by.
+                for (int reach = r + ArenaRadius + 3; reach <= r + ArenaRadius + (nth == 1 ? 60 : 160) && best == null; reach += 2)
                 {
                     foreach (var way in Ways)
                     {
@@ -475,7 +479,7 @@ namespace Game.Core
                                 if (IsInside(map, tx, ty) && !InPlaza(tx, ty) && Square(tx - bx, ty - by) > ArenaRadius * ArenaRadius) map[tx, ty] = TileType.Road;
                     }
                 }
-                world.AddPlaceArena(place.Id, TileMap.Center(bx, by));
+                world.AddPlaceArena(nth == 1 ? place.Id : $"{place.Id}:{nth}", TileMap.Center(bx, by));
                 arenas.Add((bx, by));
             }
 

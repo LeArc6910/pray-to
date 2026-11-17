@@ -87,6 +87,7 @@ namespace Game.Client
         // Boss marks on the ground and the warning sign, as drawn (WorldView.Bosses.cs), for the playtests.
         internal int MarksShown => _view?.MarksShown ?? 0;
         internal bool WarningShown => _view != null && _view.WarningShown;
+        internal int PoolsShown => _view?.PoolsShown ?? 0;
         internal string RenderTrace => _view?.RenderTrace;
 
         internal int CornersNear => _view == null || _client?.Map == null ? -1

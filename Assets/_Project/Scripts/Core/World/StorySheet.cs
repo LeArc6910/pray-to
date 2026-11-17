@@ -9,9 +9,9 @@ namespace Game.Core
     public sealed class PlaceDefinition
     {
         internal PlaceDefinition(int index, string id, string name, string kind, int distance, int radius, string road, bool waypoint, TileType floor, string text,
-            string style = "", bool arena = false, int shops = 0)
+            string style = "", int arenas = 0, int shops = 0)
         {
-            Arena = arena;
+            Arenas = arenas;
             Shops = shops;
             Style = style;
             Index = index;
@@ -44,7 +44,9 @@ namespace Game.Core
         // How it is dressed (WorldGenerator.Decorate): village, kingdom, hut, nest, or "" for a bare plaza with lamps.
         public string Style { get; }
         // Whether a boss arena is carved beside it (places.csv arena, 2026-11-11), for a boss with this place.
-        public bool Arena { get; }
+        public bool Arena => Arenas > 0;
+        // How many (yes is one; 2 carves a second, 2026-11-13, for a boss whose place is "<id>:2").
+        public int Arenas { get; }
         // How many shop buildings stand round it (places.csv shops, 2026-11-11): small timber rooms with a door, where
         // the people who keep shop there stand behind their stalls (World.PlaceNpcs).
         public int Shops { get; }
@@ -310,7 +312,8 @@ namespace Game.Core
                         bool waypoint = row["waypoint"].Length == 0 || row["waypoint"] == "yes";
                         string style = row["style"];
                         if (style.Length > 0 && !Styles.Contains(style)) throw new FormatException($"style은 비우거나 {string.Join(", ", Styles)} 가운데 하나여야 합니다.");
-                        bool arena = row["arena"] == "yes";
+                        int arena = row["arena"] == "yes" ? 1 : row["arena"].Length == 0 ? 0 : SheetValues.ParseNumber(row["arena"], "arena");
+                        if (arena < 0 || arena > 2) throw new FormatException("arena는 비우거나 yes(하나), 2(둘)여야 합니다.");
                         int shops = row["shops"].Length == 0 ? 0 : SheetValues.ParseNumber(row["shops"], "shops");
                         if (shops < 0 || shops > MaxShops) throw new FormatException($"shops는 0~{MaxShops}이어야 합니다.");
                         places.Add(new PlaceDefinition(places.Count, id, row["name"], row["kind"], distance, radius, road, waypoint, floor, row["text"], style, arena, shops));
