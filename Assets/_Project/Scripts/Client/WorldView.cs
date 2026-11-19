@@ -793,7 +793,10 @@ namespace Game.Client
             {
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
                 var rect = new Rect(0, Ui.Height * 0.25f, Ui.Width, 60);
+                // A long one (a level's gains, 2026-11-19) in smaller letters until it fits the width.
+                for (int size = 32; size >= 14 && _bannerStyle.CalcSize(new GUIContent(_banner)).x > Ui.Width - 24; size -= 2) Ui.Text(_bannerStyle, size, bold: true);
                 Shadowed(rect, _banner, new Color(1f, 0.85f, 0.4f, fade), _bannerStyle);
+                Ui.Text(_bannerStyle, 34, bold: true);
             }
         }
 
@@ -2360,9 +2363,16 @@ namespace Game.Client
                     if (e.Source != _client.PlayerId) break;
                     Sounds.Play(Sound.LevelUp);
                     // A class slot opens at levels 10 and 20 (Docs/Classes.md, 클래스 고르기).
+                    // What the level gave (2026-11-19, Leveling): health and damage, more on a step (every tenth level).
+                    int gainedHealth = Leveling.HealthAt(e.Amount) - Leveling.HealthAt(e.Amount - 1);
+                    int gainedDamage = Leveling.DamageAt(e.Amount) - Leveling.DamageAt(e.Amount - 1);
+                    bool stepped = Leveling.StepsAt(e.Amount) > Leveling.StepsAt(e.Amount - 1);
+                    string gained = $"{(stepped ? "계단! " : "")}생명력 +{gainedHealth} · 피해 +{gainedDamage}%";
                     ShowBanner(ClassRules.SlotsAt(e.Amount) > ClassRules.SlotsAt(e.Amount - 1)
-                        ? $"레벨 {e.Amount}! 클래스를 하나 더 고를 수 있다(가방 [스킬] 탭)"
-                        : $"레벨 {e.Amount}! 스킬·특성 포인트 +1");
+                        ? $"레벨 {e.Amount}! {gained} · 클래스를 하나 더 고를 수 있다(가방 [스킬] 탭)"
+                        : $"레벨 {e.Amount}! {gained} · 스킬·특성 포인트 +1");
+                    // And over the head, the health and damage it gave, a moment after the level.
+                    _floating.Add(new Floating { Position = climber.Position + new Vector3(0, 1.1f, 0), Text = $"+{gainedHealth} 생명력 · +{gainedDamage}% 피해", Color = LevelColor, Big = stepped });
                     break;
                 case SimEventType.Recall:
                     var traveller = Find(e.Source);
