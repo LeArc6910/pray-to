@@ -808,10 +808,19 @@ namespace Game.Client
             if (_bannerStyle != null && _bannerAge < BannerSeconds)
             {
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
-                var rect = new Rect(0, Ui.Height * 0.25f, Ui.Width, 60);
-                // A long one (a level's gains, 2026-11-19) in smaller letters until it fits the width.
-                for (int size = 32; size >= 14 && _bannerStyle.CalcSize(new GUIContent(_banner)).x > Ui.Width - 24; size -= 2) Ui.Text(_bannerStyle, size, bold: true);
-                Shadowed(rect, _banner, new Color(1f, 0.85f, 0.4f, fade), _bannerStyle);
+                // A long one (a level's gains, 2026-11-19) in smaller letters until it fits the width, and on a narrow
+                // screen (a phone held upright) over two lines rather than letters too small to read.
+                float room = Ui.Width - 24;
+                for (int size = 32; size >= 20 && _bannerStyle.CalcSize(new GUIContent(_banner)).x > room; size -= 2) Ui.Text(_bannerStyle, size, bold: true);
+                string text = _bannerStyle.CalcSize(new GUIContent(_banner)).x > room ? Ui.Wrap(_banner, _bannerStyle, room) : _banner;
+                var size2 = _bannerStyle.CalcSize(new GUIContent(text));
+                var rect = new Rect(0, Ui.Height * 0.25f, Ui.Width, Mathf.Max(60, size2.y + 8));
+                // A dim strip behind it, so it reads over the quest tracker and a bright floor.
+                var previous = GUI.color;
+                GUI.color = new Color(0, 0, 0, 0.5f * fade);
+                GUI.DrawTexture(new Rect((Ui.Width - size2.x) / 2 - 12, rect.center.y - size2.y / 2 - 4, size2.x + 24, size2.y + 8), Texture2D.whiteTexture);
+                GUI.color = previous;
+                Shadowed(rect, text, new Color(1f, 0.85f, 0.4f, fade), _bannerStyle);
                 Ui.Text(_bannerStyle, 34, bold: true);
             }
         }
