@@ -799,7 +799,13 @@ namespace Game.Client
             }
 
             DrawEntranceCard();
-            if (_bannerAge < BannerSeconds)
+        }
+
+        // Over the HUD (GameRoot draws it after its panels): a level's banner is long enough to reach under the quest
+        // tracker on the left (2026-11-19).
+        public void DrawBanner()
+        {
+            if (_bannerStyle != null && _bannerAge < BannerSeconds)
             {
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
                 var rect = new Rect(0, Ui.Height * 0.25f, Ui.Width, 60);

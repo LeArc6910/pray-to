@@ -3261,6 +3261,9 @@ async function hero(browser) {
       await game.startSolo();
     }
     await game.wait(1200);
+    // Out of the starting village: its people stand on the hero, and monsters are kept out of places.
+    await game.send('goto wild; heal');
+    await game.wait(1200);
     await clearRoom(game, 4, 4);
     const weapons = [['copper_sword', '검'], ['copper_bow', '활'], ['copper_staff', '지팡이'], ['copper_pickaxe', '곡괭이'], ['none', '맨손']];
     for (const [weapon, name] of weapons) {

@@ -1184,6 +1184,7 @@ namespace Game.Client
             }
             _view?.DrawGui();
             DrawHud(compact: _inventory.Open);
+            _view?.DrawBanner();
             // Not while the bag is open: skills cannot be used then (ReadSkillPress), a tap in the window must not fire
             // one, and a slot would show in the gap beside the window.
             if (_client.Status == ClientStatus.Playing && !_inventory.Open)
