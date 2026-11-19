@@ -36,6 +36,7 @@ const Variants = [
   ['no-numbers', '숫자 끔', ['numbers']],
   ['no-swing', '휘두름 호 끔', ['swing']],
   ['no-squash', '찌그러짐 끔', ['squash']],
+  ['no-wave', '쇼크웨이브 끔', ['wave']],
   ['all-off', '모두 끔', ['all']],
 ];
 const StrikeSeconds = 3.2;

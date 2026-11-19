@@ -32,6 +32,8 @@ namespace Game.Client
         public static bool Bits = true;
         // A pixel of squash when struck, of stretch while lunging (2026-11-11).
         public static bool Squash = true;
+        // The ring flung out from a heavy blow (2026-11-19).
+        public static bool Wave = true;
 
         static readonly Dictionary<string, Action<bool>> Switches = new Dictionary<string, Action<bool>>
         {
@@ -46,6 +48,7 @@ namespace Game.Client
             ["hurtglow"] = on => HurtGlow = on,
             ["bits"] = on => Bits = on,
             ["squash"] = on => Squash = on,
+            ["wave"] = on => Wave = on,
         };
 
         public static IEnumerable<string> Names => Switches.Keys;

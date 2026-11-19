@@ -305,6 +305,26 @@ namespace Game.Client
             return image.Outlined(silk ? new Rgba(120, 120, 150) : new Rgba(24, 48, 22));
         }
 
+        // A shockwave's ring (2026-11-19): a hard white outer edge and, inside it, a band of thickness pixels fading
+        // inward, the floor showing through, so it reads as a ripple rather than a solid hoop.
+        public static PixelImage Shockwave(int diameter, int thickness)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float centre = diameter / 2f;
+            float outer = centre - 0.5f;
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    float r = Distance(x, y, centre);
+                    if (r > outer || r < outer - thickness - 2) continue;
+                    float depth = outer - r;
+                    image[x, y] = depth < 1 ? Core : depth < thickness ? new Rgba(Light.R, Light.G, Light.B, 200) : new Rgba(Mid.R, Mid.G, Mid.B, 90);
+                }
+            }
+            return image;
+        }
+
         // A ring of light opening out: thick and bright at first, then thinner and dimmer, and broken into bits at
         // the end. For novas, summons and anything that spreads from a spot.
         public static PixelImage Ring(int diameter, int frame)

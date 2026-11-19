@@ -286,10 +286,13 @@ namespace Game.Client
             public string Text;
             public Color Color;
             public float Age;
+            // A crit's or a finisher's number, drawn larger (2026-11-19).
+            public bool Big;
         }
 
         const float SwingSeconds = 0.15f;
-        const float FlashSeconds = 0.12f;
+        // 0.08 s (2026-11-19, the hit-feel short the person sent: a white flash of 0.05~0.1 s; it was 0.12).
+        const float FlashSeconds = 0.08f;
         const float FloatSeconds = 0.8f;
         const float BannerSeconds = 2.2f;
         const float FlashLife = 0.35f;
@@ -346,7 +349,11 @@ namespace Game.Client
         // Hit feel: how long a struck body is knocked back, how long a heavy blow of one's own holds the picture still
         // (hit-stop), and how long the screen's edges glow red when one is hurt.
         const float KnockSeconds = 0.12f;
-        const float HitStopSeconds = 0.06f;
+        // A crit or a finisher holds the picture 0.09 s, any other blow of one's own 0.04 s, a boss's last blow 0.22 s
+        // (2026-11-19, the hit-feel short: 0.05~0.15 s, past 0.3 it stutters; were 0.06 and none).
+        const float HitStopSeconds = 0.09f;
+        const float LightStopSeconds = 0.04f;
+        const float LastBlowStopSeconds = 0.22f;
         const float HurtGlowSeconds = 0.4f;
         static readonly Color ImpactWhite = new Color(1, 1, 1, 0.95f);
         static readonly Color ImpactGold = new Color(1f, 0.85f, 0.3f, 0.95f);
@@ -576,6 +583,7 @@ namespace Game.Client
             foreach (var e in _client.TakeEvents()) Show(e);
             _rendered = 4;
             UpdateFlashes(deltaTime);
+            UpdateWaves(deltaTime);
             UpdateTracers(deltaTime);
             UpdateRain(deltaTime);
             BobBobbers();
@@ -775,7 +783,9 @@ namespace Game.Client
                 float t = text.Age / FloatSeconds;
                 var color = text.Color;
                 color.a = 1 - t * t;
-                Label(text.Position + new Vector3(0, 0.6f + t * 0.8f, 0), text.Text, color);
+                // A big one pops in larger and settles (1.6 times, then 1.35).
+                if (text.Big) BigLabel(text.Position + new Vector3(0, 0.6f + t * 0.8f, 0), text.Text, color, text.Age < 0.08f ? 1.6f : 1.35f);
+                else Label(text.Position + new Vector3(0, 0.6f + t * 0.8f, 0), text.Text, color);
             }
 
             DrawEntranceCard();
@@ -1024,6 +1034,7 @@ namespace Game.Client
                     AddFlash(boss.Position, boss.Diameter * 2.2f, WindupColor, FlashKind.Ring);
                     AddFlash(boss.Position, boss.Diameter * 1.4f, ImpactGold, FlashKind.Vortex);
                     AddFlash(boss.Position, boss.Diameter, WindupColor, FlashKind.Burst);
+                    Shockwave(boss.Position, boss.Diameter * 3.2f, ImpactWhite);
                     _shake = Mathf.Max(_shake, 0.35f);
                 }
             }
@@ -2022,7 +2033,7 @@ namespace Game.Client
                     var element = World.ElementOfCause(e.Cause);
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : element != SkillTag.None ? Palette.Of(element) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
                     var numberAt = element == SkillTag.None ? target.Position : target.Position + new Vector3(0.35f, 0.2f, 0);
-                    if (Feel.Numbers) _floating.Add(new Floating { Position = numberAt, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color });
+                    if (Feel.Numbers) _floating.Add(new Floating { Position = numberAt, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color, Big = e.Critical || heavy });
                     // And a burst of the element where it struck, for everyone to see (2026-11-09).
                     if (element != SkillTag.None) AddFlash(target.Position + new Vector3(0, target.Diameter * 0.15f, 0), 0.5f, Palette.Of(element), FlashKind.Burst);
                     // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
@@ -2046,8 +2057,11 @@ namespace Game.Client
                     }
                     else if (e.Source == _client.PlayerId)
                     {
-                        _shake = Mathf.Max(_shake, heavy ? 0.1f : e.Critical ? 0.07f : 0.025f);
-                        if (heavy || e.Critical) _hitStop = HitStopSeconds;
+                        // Shake only for the strong blows (an ordinary one's 0.025 was under half a pixel, 2026-11-19).
+                        if (heavy || e.Critical) _shake = Mathf.Max(_shake, heavy ? 0.1f : 0.07f);
+                        _hitStop = Mathf.Max(_hitStop, heavy || e.Critical ? HitStopSeconds : LightStopSeconds);
+                        // A finisher or a crit sends a ring out from where it landed.
+                        if (heavy || e.Critical) Shockwave(landed, heavy ? 1.3f + target.Diameter * 0.3f : 0.9f + target.Diameter * 0.2f, e.Critical && !heavy ? ImpactGold : ImpactWhite);
                         _combatUntil = Time.time + CombatHold;
                     }
                     Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
@@ -2420,6 +2434,16 @@ namespace Game.Client
                     }
                     if (_bossesSeen.TryGetValue(e.Source, out var boss))
                     {
+                        // The last blow on a boss: the picture held longer, a wide ring and the screen flashing (2026-11-19, in
+                        // place of the short's slow motion, which co-op cannot have).
+                        var fallenAt = Find(e.Source)?.Position ?? (_departed.TryGetValue(e.Source, out var left) ? left.Position : (Vector3?)null);
+                        if (fallenAt is Vector3 felled)
+                        {
+                            if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, LastBlowStopSeconds);
+                            Shockwave(felled, 6, ImpactWhite);
+                            Shockwave(felled, 3.5f, ImpactGold);
+                            _shake = Mathf.Max(_shake, 0.3f);
+                        }
                         Sounds.Play(Sound.Victory);
                         ShowBanner($"{boss.Name} 처치!", first: true);
                         _bossesSeen.Remove(e.Source);
@@ -2465,6 +2489,8 @@ namespace Game.Client
                     else if ((skill.Tags & SkillTag.Fire) != 0 && skill.Radius >= 3)
                         AddFlash(caster.Position, skill.Radius, color, FlashKind.Burst);
                     if (e.Source == _client.PlayerId) _shake = Mathf.Max(_shake, 0.06f);
+                    // A wide blast sends a ring out past its edge (2026-11-19).
+                    if (skill.Damage > 0 && skill.Radius >= 2) Shockwave(caster.Position, skill.Radius + World.PlayerRadius + 0.6f, Color.Lerp(color, Color.white, 0.6f));
                     break;
                 case SkillKind.Buff:
                 case SkillKind.Summon:
@@ -2617,6 +2643,57 @@ namespace Game.Client
             int frame = Mathf.FloorToInt(Time.time * 10) % EffectArt.AuraFrames;
             body.Aura.sprite = Sprites.Centered($"fx/aura/{body.AuraDiameter}/{frame}", () => EffectArt.Aura(body.AuraDiameter, frame));
             body.Aura.sortingOrder = body.Shape.sortingOrder - 1;
+        }
+
+        // ---- Shockwaves (2026-11-19, the hit-feel short): a thin ring flung out from a heavy blow, opening fast and
+        // slowing, thinning and fading as it goes. Drawn crisp at each size (the sizes are kept in steps of two pixels).
+        sealed class Wave
+        {
+            public SpriteRenderer Renderer;
+            public float Age;
+            public float Life;
+            public float Radius;
+            public Color Color;
+        }
+
+        readonly List<Wave> _waves = new List<Wave>();
+
+        void Shockwave(Vector3 position, float radius, Color color)
+        {
+            if (!Feel.Wave) return;
+            var renderer = Renderer(_root.transform, "Wave", null, color);
+            renderer.transform.localPosition = position;
+            renderer.sortingOrder = 18990;
+            _waves.Add(new Wave { Renderer = renderer, Life = 0.22f + 0.04f * Mathf.Min(4, radius), Radius = radius, Color = color });
+            UpdateWave(_waves[_waves.Count - 1]);
+        }
+
+        void UpdateWaves(float deltaTime)
+        {
+            for (int i = _waves.Count - 1; i >= 0; i--)
+            {
+                var wave = _waves[i];
+                wave.Age += deltaTime;
+                if (wave.Age >= wave.Life)
+                {
+                    Object.Destroy(wave.Renderer.gameObject);
+                    _waves.RemoveAt(i);
+                    continue;
+                }
+                UpdateWave(wave);
+            }
+        }
+
+        void UpdateWave(Wave wave)
+        {
+            float t = Mathf.Clamp01(wave.Age / wave.Life);
+            float open = 1 - (1 - t) * (1 - t) * (1 - t);
+            int diameter = Mathf.Max(6, 2 * Mathf.RoundToInt(wave.Radius * Sprites.PixelsPerUnit * (0.15f + 0.85f * open)));
+            int thickness = t < 0.4f ? 3 : t < 0.75f ? 2 : 1;
+            wave.Renderer.sprite = Sprites.Centered($"fx/wave/{diameter}/{thickness}", () => EffectArt.Shockwave(diameter, thickness));
+            var color = wave.Color;
+            color.a *= (1 - t) * (1 - t * 0.5f);
+            wave.Renderer.color = color;
         }
 
         void AddFlash(Vector3 position, float radius, Color color, FlashKind kind)
@@ -3480,6 +3557,19 @@ namespace Game.Client
             _darkTexture.Apply(false);
             _dark.transform.localPosition = new Vector3(left, bottom, 0);
             DevInfo.DarkTime((float)timer.Elapsed.TotalMilliseconds);
+        }
+
+        GUIStyle _bigLabelStyle;
+
+        // A label at a size times the usual (a crit's number).
+        void BigLabel(Vector3 world, string text, Color color, float size)
+        {
+            Vector3 screen = _camera.WorldToScreenPoint(world);
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            _bigLabelStyle ??= new GUIStyle(_labelStyle);
+            Ui.Text(_bigLabelStyle, Mathf.RoundToInt(15 * size), bold: true);
+            Shadowed(new Rect(point.x - 100, point.y - 18, 200, 36), text, color, _bigLabelStyle);
         }
 
         void Label(Vector3 world, string text, Color color)
