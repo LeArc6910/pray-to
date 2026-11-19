@@ -79,16 +79,19 @@ namespace Game.Client
     //  - the hands are placed, the arms drawn shoulder to hand, the weapon drawn from the hand it is held in, in
     //    front of the body or behind it by where it points;
     //  - key poses are eased frame to frame in stages, each frame shown for its stage's time (Clip).
-    // The picture is a 64-pixel canvas with the feet at FeetX, FeetY, as drawn at one pixel a world pixel: the figure
-    // is 16 wide and 26 tall, the room round it is for the weapon.
+    // The picture is a 48-pixel canvas with the feet at FeetX, FeetY, as drawn at one pixel a world pixel: the figure
+    // is 12 wide and 18 tall, the size of the world's other people (PeopleArt), the room round it is for the weapon.
+    // (2026-11-19, the person: "the character is too big, make it about an NPC's size": the 32-pixel drawing was
+    // redrawn by hand at two thirds its size, the same head, hair, tunic and belt, and the rig brought down with it:
+    // the poses are still written at the drawing's first size and scaled where they are placed, Solve.)
     static class HeroArt
     {
-        public const int Size = 64;
+        public const int Size = 48;
         // The canvas pixel the feet stand on: the middle of the bottom of the outline under the boots.
-        public const int FeetX = 32;
-        public const int FeetY = 48;
+        public const int FeetX = 24;
+        public const int FeetY = 36;
         // The figure's height, outline and all (pixels).
-        public const int Tall = 26;
+        public const int Tall = 18;
 
         static readonly Rgba Ink = Rgba.Hex("#140A0E");
 
@@ -106,152 +109,117 @@ namespace Game.Client
             ['O'] = Rgba.Hex("#704F44"),
         };
 
-        // ---- The drawing: the head (rows 4 to 14 of the 32-pixel cell, columns 8 to 23) and the trunk with its
-        // sleeve caps (rows 15 to 23, columns 6 to 25), their outlines taken off (each part is outlined again where it
-        // lands). 'e' is an eye, shut in a blink or a flinch. ----
+        // ---- The drawing: the head (eight rows) and the trunk with its sleeve caps (five rows), each twelve columns
+        // about the figure's middle, redrawn by hand from the 32-pixel drawing's five views at two thirds their size;
+        // no outlines (each part is outlined where it lands). 'e' is an eye, shut in a blink or a flinch. ----
 
         static readonly string[] HeadDown =
         {
-            ".....HHhHHH.....",
-            "...HHHhHHHHHh...",
-            "..HHHhHHHHHHHH..",
-            "..hHhhHHhHHhHh..",
-            "..HHHhhhHhHHHH..",
-            "..HhhhshhhhHhH..",
-            "..hhhSSSHrhhhh..",
-            "...SHeesreehH...",
-            "...HHsessesHH...",
-            "....ssrssSss....",
-            ".....sSssSs.....",
+            "...HHhHHH...",
+            "..HHhHHHHh..",
+            ".HHHhhHHhHH.",
+            ".HhhhshhhHh.",
+            ".hhsSssSshh.",
+            ".hHesssseHh.",
+            "..sesssses..",
+            "...sSssSs...",
         };
 
         static readonly string[] HeadDownSide =
         {
-            ".....HHhHHH.....",
-            "...hHHHHHHhHH...",
-            "...HHHHHHHHhHH..",
-            "..HHhhHHHHhHHh..",
-            "..HhhHHhhhhHhh..",
-            "..HhhHhhshhhhh..",
-            "..hhhhhssrhShh..",
-            "...SrrseSseh....",
-            "...rsssesses....",
-            "....rssrssrr....",
-            ".....rsssss.....",
+            "...HHhHHH...",
+            "..hHHHHHhHH.",
+            ".HHhhHHHhHh.",
+            ".HhhHhhshhh.",
+            ".hhhhSssShh.",
+            ".hhSessseh..",
+            "..rsessses..",
+            "...rsssss...",
         };
 
         static readonly string[] HeadSide =
         {
-            ".......HHHHH....",
-            "....hHHHhhHHH...",
-            "...hHHHHHHHhHH..",
-            "...HHHHhHHHHhHh.",
-            "..HHHhHhHHhhHH..",
-            "..HHhhhhhhshhh..",
-            "..hhhhhhhhSsh...",
-            "...hhhSrheess...",
-            "....hrssrSesr...",
-            "......rsssSss...",
-            ".......rSssS....",
+            "....HHHHH...",
+            "..hHHHhhHHH.",
+            ".hHHHHHHhHH.",
+            ".HHhHhHHhhH.",
+            ".HhhhhhhSsh.",
+            ".hhhhSrhess.",
+            "..hhrssSess.",
+            "....rsssSs..",
         };
 
         static readonly string[] HeadUpSide =
         {
-            ".....HHHHHH.....",
-            "...HHHHHhHHHH...",
-            "..hHHHhHHhhHHH..",
-            "..hHHHHHHHhhHH..",
-            "..HHhHHHHHhhh...",
-            "..hHHHHHhhhhh...",
-            "..hhHHHhhhhhh...",
-            "...hhHhhhhhHh...",
-            "...hhhhhhhhS....",
-            "....hhhhhhSs....",
-            ".....hhhhhh.....",
+            "...HHHHHH...",
+            "..HHHhHHHH..",
+            ".hHHhHHhhHH.",
+            ".hHHHHHHhhH.",
+            ".HhHHHHhhhh.",
+            ".hhHHhhhhhS.",
+            "..hhhhhhhSs.",
+            "...hhhhhh...",
         };
 
         static readonly string[] HeadUp =
         {
-            ".....HHHhHH.....",
-            "...hHHHHHhHHH...",
-            "..HHHHHHhHHHHH..",
-            "..hhHHHhHHHHhh..",
-            "..HHHHHhHHHHhh..",
-            "..hhhHHHHHHhHh..",
-            "..hhhHHHHhhhhh..",
-            "...hhhhHHhhhh...",
-            "...rhhhhhhhhr...",
-            "....hhhhhhhh....",
-            "......HHHh......",
+            "...HHhHHH...",
+            "..hHHHhHHH..",
+            ".HHHHhHHHHH.",
+            ".hHHhHHHHhh.",
+            ".HHHHhHHHhh.",
+            ".hhhHHHHhhh.",
+            "..rhhhhhhr..",
+            "...hHHHh....",
         };
 
         static readonly string[] TrunkDown =
         {
-            "......tdhhhhdt......",
-            ".....TTddrsSdTT.....",
-            "....TTTTTdddTTTT....",
-            "....tddTTTTTTddt....",
-            ".......TTTTTT.......",
-            ".......TTTTTT.......",
-            ".......bbOObb.......",
-            ".......tttttt.......",
-            ".......tTTTtt.......",
+            "...tdsSdt...",
+            "..TTTddTTT..",
+            "...TTTTTT...",
+            "...bbOObb...",
+            "...tTTTTt...",
         };
 
         static readonly string[] TrunkDownSide =
         {
-            ".......thhhdd.......",
-            "......TTddsrdT......",
-            ".....TTTTdddTd......",
-            ".....TTTTTTTTd......",
-            ".......dTTTTT.......",
-            ".......dTTTTT.......",
-            ".......bbbOOb.......",
-            ".......tttttt.......",
-            ".......ttTTTT.......",
+            "....tdsdd...",
+            "..TTTTddTd..",
+            "...dTTTTT...",
+            "...bbbOOb...",
+            "...ttTTTT...",
         };
 
         static readonly string[] TrunkSide =
         {
-            "........tddd........",
-            ".......TTTTd........",
-            ".......TTdTTd.......",
-            ".......tddTTT.......",
-            ".......tTTddT.......",
-            ".......tTTTdT.......",
-            ".......bbbbbO.......",
-            ".......tttttt.......",
-            ".......tTTTTT.......",
+            "....tddd....",
+            "...TTTTdT...",
+            "...tTTddT...",
+            "...bbbbbO...",
+            "...tTTTTT...",
         };
 
         static readonly string[] TrunkUpSide =
         {
-            "......dddddT........",
-            "......dTddTTTT......",
-            ".....TdTTTTTTTd.....",
-            ".....ddTTTTtTT......",
-            "......dTTTTd........",
-            "......dTTTTd........",
-            "......bbbbbb........",
-            "......dTTTTd........",
-            "......tTTTTd........",
+            "...ddddT....",
+            "..TdTTTTTd..",
+            "...dTTTTd...",
+            "...bbbbbb...",
+            "...tTTTTd...",
         };
 
         static readonly string[] TrunkUp =
         {
-            "......tddddddT......",
-            ".....TTTTTTTTTT.....",
-            "....TTdTTTTTTdTT....",
-            "....tddTTTTTTddt....",
-            "......dTTTTTTd......",
-            "......bbbbbbbb......",
-            "......dddddddd......",
-            "......TTTTTTTT......",
-            ".......dddddd.......",
+            "...tddddT...",
+            "..TTdTTdTT..",
+            "...dTTTTd...",
+            "...bbbbbb...",
+            "...dTTTTd...",
         };
 
         // Where the parts' top left corners sit on the canvas at rest.
-        const int HeadX = 24, HeadY = 23, TrunkX = 22, TrunkY = 34;
+        const int HeadX = FeetX - 6, HeadY = FeetY - 17, TrunkX = FeetX - 6, TrunkY = FeetY - 9;
 
         // The eight ways round from facing right, turning counterclockwise (as WorldView.Sectors): the view drawn and
         // whether it is mirrored.
@@ -391,7 +359,7 @@ namespace Game.Client
         // How far a hand or the weapon's end may move from one frame to the next, in any of the five views (pixels):
         // an ordinary frame, and a swing or a blow. The preview's continuity check (MotionCheck) holds every frame to
         // the same (HeroPreview).
-        public const float StepPixels = 5, SwingPixels = 12;
+        public const float StepPixels = 3.5f, SwingPixels = 8.5f;
         const int MostFrames = 28;
 
         static HeroWeapon _making;
@@ -419,7 +387,7 @@ namespace Game.Client
                     for (int i = 1; i <= count && smooth; i++)
                     {
                         var pose = Lerp(last, stage.To, Eased(stage.Ease, (float)i / count));
-                        smooth = Moved(before, pose, step ? 4 : 7, step ? 3 : 4) <= most;
+                        smooth = Moved(before, pose, step ? 3 : 6, step ? 2 : 4) <= most;
                         before = pose;
                     }
                     if (smooth) break;
@@ -1423,10 +1391,10 @@ namespace Game.Client
         // exactly this box.
         public static PixelImage Figure(PixelImage canvas)
         {
-            var result = new PixelImage(20, Tall + 2);
+            var result = new PixelImage(16, Tall + 2);
             for (int y = 0; y < result.Height; y++)
                 for (int x = 0; x < result.Width; x++)
-                    result[x, y] = canvas[FeetX - 10 + x, FeetY - Tall - 2 + y];
+                    result[x, y] = canvas[FeetX - 8 + x, FeetY - Tall - 2 + y];
             return result;
         }
 
@@ -1435,8 +1403,12 @@ namespace Game.Client
         // (the drawing gives the views almost no depth), for the feet, for how far a hand reaches, for the weapon.
         const float BodyDepth = 0.2f, FootDepth = 0.35f, ReachDepth = 0.8f, WeaponDepth = 0.8f;
         // Half the head's width and a little.
-        const float HeadHalf = 6.5f;
-        const float ShoulderWide = 5.5f, ShoulderHigh = 10, HipWide = 3, HipHigh = 4, ArmLong = 7.5f;
+        const float HeadHalf = 5.5f;
+        const float ShoulderWide = 4.5f, ShoulderHigh = 6.5f, HipWide = 2.4f, HipHigh = 3, ArmLong = 5.2f;
+        // The poses are written for the first, larger drawing: how much of their sideways and of their other measures
+        // the smaller figure takes (its arms hang just outside the trunk, so sideways shrinks less), and how much of
+        // a weapon's length.
+        const float Sideways = 0.8f, Scale = 0.68f, GearScale = 0.78f;
 
         static (Look Look, bool Flip) WayOf(float degrees)
         {
@@ -1467,6 +1439,15 @@ namespace Game.Client
         static Rig Solve(Look look, Pose pose, HeroWeapon weapon)
         {
             var rig = new Rig();
+            pose.Lean *= Scale;
+            pose.Shift *= Scale;
+            pose.Drop *= Scale;
+            pose.Hop *= Scale;
+            pose.Nod *= Scale;
+            pose.HandR = new V3(pose.HandR.S * Sideways, pose.HandR.F * Scale, pose.HandR.U * Scale);
+            pose.HandL = new V3(pose.HandL.S * Sideways, pose.HandL.F * Scale, pose.HandL.U * Scale);
+            pose.FootR = new V3(pose.FootR.S * Sideways, pose.FootR.F * Scale, pose.FootR.U * Scale);
+            pose.FootL = new V3(pose.FootL.S * Sideways, pose.FootL.F * Scale, pose.FootL.U * Scale);
             float hips = (AngleOf(look) + pose.Pivot) * Deg;
             float fx = MathF.Cos(hips), fy = MathF.Sin(hips), rx = fy, ry = -fx;
             float trunkTurn = hips + pose.Twist * Deg;
@@ -1486,7 +1467,7 @@ namespace Game.Client
             // Shoulders, on the turned trunk, a little behind its middle.
             (float X, float Y, float Depth) Shoulder(float side)
             {
-                float gx = carryX + trx * side - tfx, gy = carryY + try_ * side - tfy;
+                float gx = carryX + trx * side - tfx * 0.5f, gy = carryY + try_ * side - tfy * 0.5f;
                 return (FeetX + gx, FeetY - 1 - (ShoulderHigh + rise) - gy * BodyDepth, gy);
             }
             rig.ShoulderR = Shoulder(ShoulderWide);
@@ -1507,12 +1488,12 @@ namespace Game.Client
                 }
                 // Reaching away from the viewer the hand would be lost behind the head: it goes out past the head on
                 // its own side (more the further away it reaches), so what it holds shows beside the head.
-                float away = Math.Max(0, Math.Min(1, (gy - Behind) / 4));
+                float away = Math.Max(0, Math.Min(1, (gy - Behind) / 3));
                 float toSide = Math.Max(-1, Math.Min(1, rx * side * 3));
                 float clear = HeadHalf * away;
                 float pushed = toSide > 0 ? MathF.Max(x, FeetX + clear) : MathF.Min(x, FeetX - clear);
                 x += (pushed - x) * MathF.Abs(toSide);
-                return Within(shoulder, (x, y, gy), ArmLong + 1.5f);
+                return Within(shoulder, (x, y, gy), ArmLong + 1);
             }
             var handR = Hand(pose.HandR, rig.ShoulderR, 1);
             var handL = Hand(pose.HandL, rig.ShoulderL, -1);
@@ -1539,25 +1520,25 @@ namespace Game.Client
             if (bow)
             {
                 float draw = Math.Max(0, Math.Min(1, pose.Draw));
-                float back = (2.6f + 1.4f * draw + 6.5f * pose.Draw) * MathF.Max(0.6f, reach);
+                float back = (2.6f + 1.4f * draw + 6.5f * pose.Draw) * GearScale * MathF.Max(0.6f, reach);
                 rig.NockX = grip.X - wx * back;
                 rig.NockY = grip.Y - wy * back;
-                float on = MathF.Min(1, pose.Draw * 3) * Math.Max(0, Math.Min(1, 1 - (grip.Depth - Behind) / 4));
-                handR = Within(rig.ShoulderR, (handR.X + (rig.NockX - handR.X) * on, handR.Y + (rig.NockY - handR.Y) * on, handR.Depth), ArmLong + 2.5f);
+                float on = MathF.Min(1, pose.Draw * 3) * Math.Max(0, Math.Min(1, 1 - (grip.Depth - Behind) / 3));
+                handR = Within(rig.ShoulderR, (handR.X + (rig.NockX - handR.X) * on, handR.Y + (rig.NockY - handR.Y) * on, handR.Depth), ArmLong + 1.5f);
             }
             // The other hand on the haft as well.
             if (pose.Both > 0 && weapon != HeroWeapon.None && !bow)
             {
-                float along = weapon == HeroWeapon.Sword ? -2 : 4;
+                float along = (weapon == HeroWeapon.Sword ? -2 : 4) * GearScale;
                 float tx = handR.X + wx * along * reach, ty = handR.Y + wy * along * reach;
                 handL = (handL.X + (tx - handL.X) * pose.Both, handL.Y + (ty - handL.Y) * pose.Both, handL.Depth + (handR.Depth - handL.Depth) * pose.Both);
                 // As far along it as the arm reaches.
-                handL = Within(rig.ShoulderL, handL, ArmLong + 1.5f);
+                handL = Within(rig.ShoulderL, handL, ArmLong + 1);
             }
             rig.HandR = handR;
             rig.HandL = handL;
             rig.Grip = grip;
-            rig.WeaponDepth = grip.Depth + wayGy * 6;
+            rig.WeaponDepth = grip.Depth + wayGy * 4.5f;
 
             (float X, float Y, float Depth, float Hip) Foot(V3 at, float side)
             {
@@ -1570,7 +1551,7 @@ namespace Game.Client
             rig.HipY = FeetY - 1 - (HipHigh + rise);
             rig.Toe = MathF.Abs(fx) > 0.5f ? (fx > 0 ? 1 : -1) : 0;
 
-            float length_ = LengthOf(weapon);
+            float length_ = LengthOf(weapon) * GearScale;
             var joints = new Joints
             {
                 RightX = handR.X, RightY = handR.Y, LeftX = handL.X, LeftY = handL.Y,
@@ -1605,7 +1586,7 @@ namespace Game.Client
         }
 
         // Things further from the viewer than this (pixels behind the body's middle) are drawn behind the body.
-        const float Behind = 1.5f;
+        const float Behind = 1;
 
         static PixelImage Render(Look look, Pose pose, HeroGear gear, Rgba tunic, bool blink, out Joints joints)
         {
@@ -1739,29 +1720,20 @@ namespace Game.Client
             if (image.Inside(px, py)) image[px, py] = color;
         }
 
-        // A bare arm two pixels thick from under the sleeve to the hand, a leather band at the wrist.
+        // A bare arm a pixel thick from under the sleeve to the hand (its outline makes it three), the hand in shade.
         static void Arm(PixelImage image, float x0, float y0, float x1, float y1)
         {
-            float sx = Round(x0), sy = Round(y0), hx = Round(x1), hy = Round(y1);
-            Line(image, sx, sy, hx, hy, 0.95f, Colors['s']);
-            float dx = hx - sx, dy = hy - sy, length = MathF.Sqrt(dx * dx + dy * dy);
-            if (length < 2.5f) return;
-            // The band a third of the way down, the underside of the hand in shade.
-            float bx = sx + dx * 0.4f, by = sy + dy * 0.4f;
-            Line(image, bx - dy / length * 0.5f, by + dx / length * 0.5f, bx + dy / length * 0.5f, by - dx / length * 0.5f, 0.75f, Colors['O']);
-            Line(image, hx, hy, hx, hy, 0.95f, Colors['S']);
-            // Only where the arm already is.
+            Thin(image, x0, y0, x1, y1, Colors['s']);
+            Dot(image, x1, y1, Colors['S']);
         }
 
         // A leg from the hip to the foot: trousers two pixels wide, a boot under them with a toe the way they face.
         static void Leg(PixelImage image, float hipX, float hipY, float footX, float footY, int toe)
         {
             int x = Round(footX), y = Round(footY), hx = Round(hipX), hy = Round(hipY);
-            if (y - 2 > hy) Line(image, hx, hy, x, y - 2, 0.95f, Colors['p']);
-            else Line(image, x, y - 2.5f, x, y - 2, 0.95f, Colors['p']);
-            image.Fill(x - 1, y - 2, 2, 2, Colors['O']);
-            image[x - 1 + (toe < 0 ? 0 : 1), y - 1] = Colors['o'];
-            if (toe != 0 && image.Inside(x + (toe > 0 ? 1 : -2), y - 1)) image[x + (toe > 0 ? 1 : -2), y - 1] = Colors['o'];
+            if (y - 1 > hy) Line(image, hx, hy, x, y - 1, 0.95f, Colors['p']);
+            image.Fill(x - 1, y - 1, 2, 1, Colors['O']);
+            if (toe != 0 && image.Inside(x + (toe > 0 ? 0 : -1), y - 1)) image[x + (toe > 0 ? 0 : -1), y - 1] = Colors['o'];
         }
 
         static readonly Rgba Wood = Rgba.Hex("#8E5C34"), WoodDark = Rgba.Hex("#5E3C20"), GripRed = Rgba.Hex("#A8442E"), Gold = Rgba.Hex("#F2CC5C"), GoldDark = Rgba.Hex("#B88A2A"),
@@ -1771,7 +1743,7 @@ namespace Game.Client
         static void Weapon(PixelImage image, HeroGear gear, float hx, float hy, float wx, float wy, float reach, Pose pose, float stringX, float stringY)
         {
             float nx = -wy, ny = wx;
-            (float X, float Y) At(float along, float across = 0) => (hx + wx * along * reach + nx * across, hy + wy * along * reach + ny * across);
+            (float X, float Y) At(float along, float across = 0) => (hx + wx * along * GearScale * reach + nx * across * GearScale, hy + wy * along * GearScale * reach + ny * across * GearScale);
             void Thick(float from, float to, float radius, Rgba color, float across = 0)
             {
                 var a = At(from, across);
@@ -1788,7 +1760,7 @@ namespace Game.Client
             {
                 case HeroWeapon.Sword:
                 {
-                    Thick(3, 12, 0.95f, gear.Main);
+                    Thick(3, 12, 0.75f, gear.Main);
                     Fine(3, 0.45f, 12.4f, 0.2f, gear.Light);
                     Fine(3, -0.6f, 11, -0.6f, gear.Shade);
                     var tip = At(12.8f);
@@ -1804,13 +1776,13 @@ namespace Game.Client
                     Thick(-5.5f, 8, 0.7f, WoodDark);
                     Fine(-5.5f, 0.3f, 8, 0.3f, Wood);
                     var stone = At(9.6f);
-                    Line(image, stone.X, stone.Y, stone.X, stone.Y, 1.9f, gear.Main);
-                    Line(image, stone.X, stone.Y, stone.X, stone.Y, 1.1f, pose.Glow > 0.5f ? gear.Gem.Mix(White, 0.5f) : gear.Gem);
+                    Line(image, stone.X, stone.Y, stone.X, stone.Y, 1.6f, gear.Main);
+                    Line(image, stone.X, stone.Y, stone.X, stone.Y, 0.9f, pose.Glow > 0.5f ? gear.Gem.Mix(White, 0.5f) : gear.Gem);
                     Dot(image, stone.X + 0.6f, stone.Y + 0.6f, pose.Glow > 0.5f ? gear.Gem : gear.GemDark);
                     if (pose.Glow > 0.25f)
                     {
                         // Rays about the stone as it gathers.
-                        float far = pose.Glow > 0.75f ? 3.6f : 2.9f;
+                        float far = pose.Glow > 0.75f ? 3.2f : 2.6f;
                         foreach (var (dx, dy) in new[] { (1f, 0f), (-1f, 0f), (0f, 1f), (0f, -1f) })
                             Dot(image, stone.X + dx * far, stone.Y + dy * far, gear.Gem.Mix(White, 0.35f));
                         if (pose.Glow > 0.75f) Dot(image, stone.X, stone.Y, White);
@@ -1852,7 +1824,7 @@ namespace Game.Client
                     if (pose.Arrow > 0.5f)
                     {
                         float ax = wx, ay = wy;
-                        float shaft = 10.5f * MathF.Max(0.6f, reach);
+                        float shaft = 10.5f * GearScale * MathF.Max(0.6f, reach);
                         Thin(image, nockX, nockY, nockX + ax * shaft, nockY + ay * shaft, Wood);
                         Dot(image, nockX, nockY, String);
                         Line(image, nockX + ax * shaft, nockY + ay * shaft, nockX + ax * (shaft + 1), nockY + ay * (shaft + 1), 0.75f, gear.Light);
@@ -1871,13 +1843,13 @@ namespace Game.Client
 
         // The floor point the body tips over about, and how far the picture slides back as it goes down so it lies
         // across where it stood.
-        const float TipX = FeetX + 4, TipY = FeetY - 2, TipSlide = 11;
+        const float TipX = FeetX + 3, TipY = FeetY - 2, TipSlide = 7.5f;
 
         static (float X, float Y) Turned(float x, float y, float degrees)
         {
             float a = degrees * Deg, c = MathF.Cos(a), s = MathF.Sin(a);
             float dx = x - TipX, dy = y - TipY;
-            return (TipX + dx * c - dy * s - TipSlide * degrees / 90, TipY + dx * s + dy * c + 1.5f * degrees / 90);
+            return (TipX + dx * c - dy * s - TipSlide * degrees / 90, TipY + dx * s + dy * c + degrees / 90);
         }
 
         // The picture turned clockwise about the tipping point (each pixel taken from where it came from).
@@ -1885,7 +1857,7 @@ namespace Game.Client
         {
             var result = new PixelImage(Size, Size);
             float a = degrees * Deg, c = MathF.Cos(a), s = MathF.Sin(a);
-            float slide = TipSlide * degrees / 90, sink = 1.5f * degrees / 90;
+            float slide = TipSlide * degrees / 90, sink = degrees / 90;
             for (int y = 0; y < Size; y++)
             {
                 for (int x = 0; x < Size; x++)

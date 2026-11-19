@@ -595,12 +595,7 @@ namespace Game.Client
                 {
                     var canvas = HeroArt.Draw(look, move, frame, HeroGear.Plain(weapon), tunic);
                     if (flip) canvas = canvas.FlippedX();
-                    // The middle of the canvas: the figure and the reach of its weapon.
-                    var image = new PixelImage(48, 52);
-                    for (int y = 0; y < image.Height; y++)
-                        for (int x = 0; x < image.Width; x++)
-                            image[x, y] = canvas[x + 8, y + 6];
-                    row.Add(image);
+                    row.Add(canvas);
                 }
                 rows.Add(row);
             }
