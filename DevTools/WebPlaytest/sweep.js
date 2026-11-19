@@ -3271,8 +3271,11 @@ async function hero(browser) {
       const struck = await game.until(s => s.hurtMonsters > 0, 4000);
       check(!!struck, `${profile} ${name}: 공격이 슬라임에 닿는다`);
       // Six pictures a little apart catch different frames of the three steps.
+      // Healed between pictures: a first-level hero falls to three slimes before the weapons have gone round, and
+      // gets up again in the village (2026-11-19).
       for (let i = 0; i < 6; i++) {
         await game.wait(170);
+        await game.send('heal');
         await game.shot(`hero-${profile}-${weapon}-${i}`, `${name} 연타 ${i + 1}`);
       }
       // The same weapon the other three ways (only on the PC: the phone's pictures are for size and fit).
@@ -3280,6 +3283,7 @@ async function hero(browser) {
         for (const [dx, dy, way] of [[0, 1, '위'], [-1, 0, '왼쪽'], [0, -1, '아래']]) {
           await game.send(`heal; hero ${weapon} ${dx} ${dy}`);
           await game.wait(450);
+          await game.send('heal');
           await game.shot(`hero-${profile}-${weapon}-${way}`, `${name} ${way}로`);
           await game.wait(230);
           await game.shot(`hero-${profile}-${weapon}-${way}-2`, `${name} ${way}로 (다음 장)`);
