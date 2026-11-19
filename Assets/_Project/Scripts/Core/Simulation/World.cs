@@ -47,7 +47,9 @@ namespace Game.Core
         public const float ComboWindowSeconds = 0.6f;
         public const int FinisherDamagePercent = 150;
         public const int FinisherRecoveryPercent = 130;
-        const float FinisherReach = 0.3f;
+        // 0.9 past a plain swing's reach (2026-11-19, the person: the finisher should reach wider; at 0.3 the first two
+        // blows' knockback often pushed the target out of its reach).
+        public const float FinisherReach = 0.9f;
         const float FinisherArcDegrees = 170;
         const float FinisherPush = 1.8f;
         const float FinisherShotRadius = 1.6f;

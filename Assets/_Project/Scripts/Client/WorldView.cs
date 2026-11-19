@@ -1034,7 +1034,8 @@ namespace Game.Client
                     AddFlash(boss.Position, boss.Diameter * 2.2f, WindupColor, FlashKind.Ring);
                     AddFlash(boss.Position, boss.Diameter * 1.4f, ImpactGold, FlashKind.Vortex);
                     AddFlash(boss.Position, boss.Diameter, WindupColor, FlashKind.Burst);
-                    Shockwave(boss.Position, boss.Diameter * 3.2f, ImpactWhite);
+                    Shockwave(boss.Position, boss.Diameter * 3.2f, ImpactWhite, bold: true);
+                    Shockwave(boss.Position, boss.Diameter * 2f, ImpactGold, bold: true);
                     _shake = Mathf.Max(_shake, 0.35f);
                 }
             }
@@ -2017,7 +2018,7 @@ namespace Game.Client
                     attacker.SwingTime = SwingSeconds;
                     attacker.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
                     // The second cut comes back up: the crescent mirrored across the way it points. The finisher is bigger.
-                    attacker.Swing.transform.localScale = step == 1 ? new Vector3(1, -1, 1) : finisher ? Vector3.one * 1.4f : Vector3.one;
+                    attacker.Swing.transform.localScale = step == 1 ? new Vector3(1, -1, 1) : finisher ? Vector3.one * FinisherSwingScale(attacker) : Vector3.one;
                     break;
                 case SimEventType.Hit:
                     var target = Find(e.Target);
@@ -2440,7 +2441,7 @@ namespace Game.Client
                         if (fallenAt is Vector3 felled)
                         {
                             if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, LastBlowStopSeconds);
-                            Shockwave(felled, 6, ImpactWhite);
+                            Shockwave(felled, 6, ImpactWhite, bold: true);
                             Shockwave(felled, 3.5f, ImpactGold);
                             _shake = Mathf.Max(_shake, 0.3f);
                         }
@@ -2654,17 +2655,19 @@ namespace Game.Client
             public float Life;
             public float Radius;
             public Color Color;
+            // Twice as thick, for a boss changing phase or falling (2026-11-19, the person: the phase ring thicker).
+            public bool Bold;
         }
 
         readonly List<Wave> _waves = new List<Wave>();
 
-        void Shockwave(Vector3 position, float radius, Color color)
+        void Shockwave(Vector3 position, float radius, Color color, bool bold = false)
         {
             if (!Feel.Wave) return;
             var renderer = Renderer(_root.transform, "Wave", null, color);
             renderer.transform.localPosition = position;
             renderer.sortingOrder = 18990;
-            _waves.Add(new Wave { Renderer = renderer, Life = 0.22f + 0.04f * Mathf.Min(4, radius), Radius = radius, Color = color });
+            _waves.Add(new Wave { Renderer = renderer, Life = 0.22f + 0.04f * Mathf.Min(4, radius) + (bold ? 0.12f : 0), Radius = radius, Color = color, Bold = bold });
             UpdateWave(_waves[_waves.Count - 1]);
         }
 
@@ -2689,12 +2692,16 @@ namespace Game.Client
             float t = Mathf.Clamp01(wave.Age / wave.Life);
             float open = 1 - (1 - t) * (1 - t) * (1 - t);
             int diameter = Mathf.Max(6, 2 * Mathf.RoundToInt(wave.Radius * Sprites.PixelsPerUnit * (0.15f + 0.85f * open)));
-            int thickness = t < 0.4f ? 3 : t < 0.75f ? 2 : 1;
+            int thickness = (t < 0.4f ? 3 : t < 0.75f ? 2 : 1) * (wave.Bold ? 2 : 1);
             wave.Renderer.sprite = Sprites.Centered($"fx/wave/{diameter}/{thickness}", () => EffectArt.Shockwave(diameter, thickness));
             var color = wave.Color;
             color.a *= (1 - t) * (1 - t * 0.5f);
             wave.Renderer.color = color;
         }
+
+        // The finisher's crescent drawn out to its longer reach (World.FinisherReach).
+        static float FinisherSwingScale(Body body) =>
+            (body.Diameter + 2 * (World.MeleeReach + World.FinisherReach)) / (body.Diameter + 2 * World.MeleeReach);
 
         void AddFlash(Vector3 position, float radius, Color color, FlashKind kind)
         {

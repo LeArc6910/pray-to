@@ -319,7 +319,8 @@ namespace Game.Client
                     float r = Distance(x, y, centre);
                     if (r > outer || r < outer - thickness - 2) continue;
                     float depth = outer - r;
-                    image[x, y] = depth < 1 ? Core : depth < thickness ? new Rgba(Light.R, Light.G, Light.B, 200) : new Rgba(Mid.R, Mid.G, Mid.B, 90);
+                    // A thick ring's hard edge is two pixels.
+                    image[x, y] = depth < (thickness >= 4 ? 2 : 1) ? Core : depth < thickness ? new Rgba(Light.R, Light.G, Light.B, 200) : new Rgba(Mid.R, Mid.G, Mid.B, 90);
                 }
             }
             return image;

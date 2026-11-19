@@ -44,6 +44,34 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void TheFinisherReachesWhatThePlainSwingsCannot()
+        {
+            // 2026-11-19: the finisher reaches 0.9 further, so a target pushed back by the first two blows is still in
+            // reach. Here a dummy stands past a plain swing's reach but within the finisher's: only the third step hits it.
+            var world = Room();
+            var player = world.AddPlayer("a", Gear.Wearing("copper_sword"));
+            float edge = World.PlayerRadius + Monsters.Dummy.Radius;
+            var dummy = world.SpawnEnemy(Monsters.Dummy, player.Position + new Vec2(edge + World.MeleeReach + World.FinisherReach * 0.6f, 0));
+            Face(world, player, new Vec2(1, 0));
+            world.SetAttacking(player.Id, true);
+            var spot = dummy.Position;
+            var events = new List<SimEvent>();
+            for (int i = 0; i < World.TicksPerSecond * 4; i++)
+            {
+                events.AddRange(Run(world, 1));
+                dummy.Position = spot;
+                dummy.Knockback = Vec2.Zero;
+            }
+            var steps = new List<int>();
+            foreach (var e in events)
+            {
+                if (e.Type == SimEventType.Attack && e.Source == player.Id) steps.Add(World.ComboStepOf(e.Amount));
+                else if (e.Type == SimEventType.Hit && e.Target == dummy.Id) Assert.AreEqual(World.ComboSteps - 1, steps.Last(), "only the finisher reaches");
+            }
+            Assert.IsTrue(events.Any(e => e.Type == SimEventType.Hit && e.Target == dummy.Id), "the finisher reached it");
+        }
+
+        [Test]
         public void BasicAttacksGoThroughAComboOfThreeAndTheThirdHitsHarder()
         {
             var world = Room();
