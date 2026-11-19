@@ -211,6 +211,23 @@ namespace Game.Client
                     // Each base given at its best plain rolls, worn at once whatever its level.
                     foreach (string id in words.Skip(1)) player.Equip(Plain(loot, id, Rarity.Rare, 0));
                     return null;
+                case "hero":
+                    // The hero's attack with a weapon (2026-11-19, HeroArt): the weapon in hand (none: bare hands), three
+                    // sturdy slimes the way given, and the attack held that way so the three steps go round.
+                    if (words[1] == "none") player.Unequip(ItemSlot.Weapon);
+                    else player.Equip(Plain(loot, words[1], Rarity.Rare, 0));
+                    var way = words.Length > 3 ? new Vec2(Float(words[2]), Float(words[3])) : new Vec2(1, 0);
+                    var ahead = way.Normalized;
+                    var across = new Vec2(-ahead.Y, ahead.X);
+                    foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
+                    for (int i = -1; i <= 1; i++)
+                    {
+                        var dummy = world.SpawnEnemy(root.MonsterSheet.Find("slime"), player.Position + ahead * 1.3f + across * (i * 0.6f));
+                        dummy.MaxHealth = dummy.Health = 50000;
+                    }
+                    root.HoldAttack = true;
+                    root.HeldAim = way;
+                    return null;
                 case "drink":
                     return world.UseConsumable(player.Id, Consumable(loot, words[1])) ? null : $"error drink {words[1]}: refused";
                 case "spawn":

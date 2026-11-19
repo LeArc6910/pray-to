@@ -43,7 +43,7 @@ namespace Game.Client
 
             var loops = new List<(string Name, IReadOnlyList<PixelImage> Frames)>();
             foreach (var look in new[] { Look.Down, Look.DownSide, Look.Side, Look.UpSide, Look.Up })
-                loops.Add(($"플레이어 걷기 {look}", Enumerable.Range(0, CreatureArt.WalkFrames).Select(f => CreatureArt.Player(look, f, Rgba.Hex("#3F7FD8"))).ToList()));
+                loops.Add(($"플레이어 걷기 {look}", Enumerable.Range(0, HeroArt.WalkFrames).Select(f => HeroArt.Figure(HeroArt.Draw(look, HeroMove.Walk, f, HeroGear.None, Rgba.Hex("#3F7FD8")))).ToList()));
             foreach (var monster in monsters.Monsters)
                 loops.Add(($"몬스터 {monster.Id}", Enumerable.Range(0, CreatureArt.IdleFrames).Select(f => CreatureArt.Monster(monster.Id, Rgba.Hex(monster.Color), f)).ToList()));
 

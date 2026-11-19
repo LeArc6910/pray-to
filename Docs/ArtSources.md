@@ -181,3 +181,9 @@ ComfyUI에서 쓸 무료 모델:
 일곱 번째(2026-11-12, $0.18, 잔액 $1.94): **발도 접촉 자세 시험**. 사람이 "자세마다 RD로 받으면 어떨지" 물어, 시구레 옆모습을 넣고 `rd_pro__edit`(128px)로 칼을 뽑아 앞으로 뻗은 접촉 자세를 한 장 받아 코드 자세와 비교 GIF를 만들었다. 인물은 지켰지만 큰 자세 변화는 따르지 않고 배경도 흰색으로 채워 와서 쓰지 않았다. 자세는 코드로 짠다(앞의 다섯 번째와 같은 결론)
 
 여덟 번째(2026-11-13, $0.28, 잔액 $1.66): **실 잣는 어미 아라네**(거미 보스). Pro `rd_pro__topdown` 64px 한 장("giant cave spider boss, huge bloated dark purple-black abdomen with glowing sickly green markings, armored chitin carapace, eight small glowing red eyes, curved venom fangs, eight long jointed hairy legs spread wide", 배경 투명, $0.18)과 64px 8방향 돌리기(`rd_advanced_animation__rotate`, $0.10). 여덟 칸은 머리가 향하는 쪽으로 0 오른쪽 아래, 1 아래, 2 왼쪽 아래, 3 왼쪽, 4 왼쪽 위, 5 위, 6 오른쪽 위, 7 오른쪽이다. 다섯 모습(정면 1, 대각 앞 0, 옆 7, 대각 뒤 6, 뒤 5)에서 **배와 머리가슴만** 타원으로 잘라 25색 팔레트와 행으로 옮겼다(`Art/SpiderArt.cs`, 시점마다 배 한 장과 머리가슴 한 장). 다리 여덟 개는 그림의 것이 가늘고 몸에 붙어 있어 부위로 떼어 움직일 수 없으므로 쓰지 않고, 코드가 엉덩이에서 발까지 두 마디로 다시 그린다(색은 그림의 다리 색에서 골랐다). 송곳니, 독, 실, 거미줄과 독 웅덩이(`EffectArt.Web`·`VenomPool`·`Glob`), 새끼 거미(`CreatureArt`의 `Spiderling`)도 코드로 그린다.
+
+아홉 번째(2026-11-19, $0.28, 잔액 $1.38): **플레이어 주인공**. 사람 요청 "지금 플레이 주인공도 rd 이용해서 뽑고 무기에 따른 다양한 모션도 추가해보자". Pro `rd_pro__topdown` 32px 한 장("young adventurer hero, brown messy hair, simple blue tunic with a brown leather belt, dark trousers, brown boots, empty hands, no weapon", 배경 투명, $0.18)과 32px 8방향 돌리기(`rd_advanced_animation__rotate`, $0.10). 여덟 칸의 순서는 보스 때와 같다(0 오른쪽 아래, 1 정면, 2 왼쪽 아래, 3 왼쪽, 4 왼쪽 위, 5 뒤, 6 오른쪽 위, 7 오른쪽).
+- 다섯 모습(정면 1, 대각 앞 0, 옆 7, 대각 뒤 6, 뒤 5)에서 **머리(11줄)와 몸통(소매 끝까지, 9줄)만** 14색 팔레트의 행으로 옮겼다(`Art/HeroArt.cs`). 왼쪽 세 방향은 오른쪽 그림을 뒤집는다. 바깥 외곽선은 떼고 부위마다 다시 두른다. 머리카락 가장자리의 튀는 점 몇 개와 눈 옆 흰 점은 손으로 정리했다
+- 팔, 다리, 무기는 RD 그림을 쓰지 않고 코드로 그린다(리그). 그래서 무기별 모션이 여덟 방향에서 한 번에 나온다. 튜닉의 세 색(밝은 쪽·그늘·어두운 쪽)은 플레이어 색의 띠로 바꿔 칠한다
+- 크기는 RD가 준 그대로 쓴다(폭 16, 키 26픽셀, 1픽셀 = 세상 1픽셀). 줄이지 않은 이유와 NPC와의 차이는 `Docs/ArtPipeline.md`의 주인공 절
+- 이 그림은 Retro Diffusion으로 만들었고 상업 이용이 된다(유료 크레딧으로 만든 그림). Steam AI 공개 대상인 것은 보스 그림과 같다

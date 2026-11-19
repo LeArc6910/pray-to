@@ -27,16 +27,10 @@ namespace Game.Client
         const float SwingSeconds = 0.15f;
         const float FlashSeconds = 0.12f;
         const float LungeSeconds = 0.14f;
+        // A boss's strike pose (a player's strike lasts as long as its picture, HeroArt).
         const float StrikeSeconds = 0.24f;
-        const float WindUpSeconds = 0.07f;
-        const float CastSeconds = 0.3f;
-        const float ShootSeconds = 0.3f;
-        const float DrinkSeconds = 0.6f;
-        const float ThrustSeconds = 0.32f;
-        const float SpinSeconds = 0.36f;
         const float HurtSeconds = 0.25f;
         const float KnockSeconds = 0.12f;
-        const float BreathSeconds = 0.8f;
         const float BlinkEvery = 3.4f;
         const float BlinkSeconds = 0.13f;
         const float LungeDistance = 2f / Ppu;
@@ -44,8 +38,6 @@ namespace Game.Client
         enum Motion
         {
             None,
-            Shoot,
-            Zap,
             Drink,
             Thrust,
             Spin,
@@ -192,21 +184,21 @@ namespace Game.Client
             public ItemBase Weapon;
             public bool Moving;
             public float Walked;
-            public float StrikeTime, StrikeLength, SwingTime, LungeTime, LungeReach = 1, CastTime, HurtTime, FlashTime;
+            public float StrikeTime, StrikeLength, SwingTime, LungeTime, LungeReach = 1, CastTime, CastLength, HurtTime, FlashTime;
             public float KnockTime, KnockReach = 1;
             public Vec2 Lunge, Knock;
             public int Combo;
             public Motion Motion;
             public float MotionTime, MotionLength;
-            public int SpinFrom;
             public PixelImage Holding;
 
-            void Start(Motion motion, float seconds, Vec2 facing)
+            HeroGear Gear => ItemArt.Held(Weapon);
+
+            void Start(Motion motion)
             {
                 Motion = motion;
-                MotionTime = seconds;
-                MotionLength = seconds;
-                SpinFrom = SectorOf(facing);
+                MotionTime = HeroArt.SecondsOf(motion == Motion.Spin ? HeroMove.Spread : motion == Motion.Drink ? HeroMove.Drink : HeroMove.Thrust, Gear.Kind);
+                MotionLength = MotionTime;
                 StrikeTime = 0;
             }
 
@@ -218,35 +210,38 @@ namespace Game.Client
                 LungeTime = LungeSeconds;
                 LungeReach = finisher ? 2 : 1;
                 Lunge = Facing;
-                StrikeLength = finisher ? StrikeSeconds * 1.4f : StrikeSeconds;
-                StrikeTime = StrikeLength;
-                if (kind != BasicAttackKind.Swing)
-                {
-                    Start(kind == BasicAttackKind.Arrow ? Motion.Shoot : Motion.Zap, ShootSeconds, Facing);
-                    return;
-                }
-                SwingTime = SwingSeconds;
+                var move = (HeroMove)((int)HeroMove.Attack1 + step);
+                bool chained = StrikeTime > 0;
+                StrikeLength = HeroArt.SecondsOf(move, Gear.Kind);
+                StrikeTime = StrikeLength - (chained ? HeroArt.ChainSeconds(move, Gear.Kind) : 0);
+                Motion = Motion.None;
+                MotionTime = 0;
+                if (kind == BasicAttackKind.Swing) SwingTime = SwingSeconds;
             }
 
             public void Drink(PixelImage held)
             {
-                Start(Motion.Drink, DrinkSeconds, new Vec2(0, 0));
+                Start(Motion.Drink);
                 Holding = held;
             }
 
-            public void Nova() => Start(Motion.Spin, SpinSeconds, Facing);
+            public void Nova() => Start(Motion.Spin);
 
-            bool Melee => Weapon == null || (Weapon.Tags & (SkillTag.Ranged | SkillTag.Magic)) == 0;
+            bool Melee => Gear.Kind != HeroWeapon.Bow && Gear.Kind != HeroWeapon.Staff;
 
             public void Projectile()
             {
-                Start(Motion.Thrust, ThrustSeconds, Facing);
+                Start(Motion.Thrust);
                 if (!Melee) return;
                 Combo = 0;
                 SwingTime = SwingSeconds;
             }
 
-            public void Buff() => CastTime = CastSeconds;
+            public void Buff()
+            {
+                CastLength = HeroArt.SecondsOf(HeroMove.Cast, Gear.Kind);
+                CastTime = CastLength;
+            }
 
             public void Hit(Vec2 from)
             {
@@ -257,37 +252,27 @@ namespace Game.Client
                 KnockReach = 1;
             }
 
-            // WorldView.PlayerPose.
-            (Pose, int) PoseNow(float time)
+            // WorldView.HeroPose.
+            (HeroMove, int, bool) PoseNow(float time)
             {
-                if (HurtTime > 0) return (Client.Pose.Hurt, 0);
+                var held = Gear.Kind;
+                if (HurtTime > 0) return (HeroMove.Hurt, HeroArt.FrameAt(HeroMove.Hurt, held, HurtSeconds - HurtTime), false);
                 if (Motion != Motion.None && MotionTime > 0)
                 {
-                    int second = MotionTime < MotionLength * 0.45f ? 1 : 0;
-                    return Motion switch
-                    {
-                        Motion.Shoot => (Client.Pose.Shoot, second),
-                        Motion.Zap => (Client.Pose.Zap, second),
-                        Motion.Drink => (Client.Pose.Drink, MotionTime < MotionLength * 0.6f ? 1 : 0),
-                        Motion.Spin => (Client.Pose.Spread, 0),
-                        _ => (Client.Pose.Thrust, 0),
-                    };
+                    var move = Motion == Motion.Drink ? HeroMove.Drink : Motion == Motion.Spin ? HeroMove.Spread : HeroMove.Thrust;
+                    return (move, HeroArt.FrameAt(move, move == HeroMove.Drink ? HeroWeapon.None : held, MotionLength - MotionTime), false);
                 }
                 if (StrikeTime > 0)
                 {
-                    bool finisher = Combo == World.ComboSteps - 1;
-                    float length = StrikeLength > 0 ? StrikeLength : StrikeSeconds;
-                    bool early = StrikeTime > length - (finisher ? WindUpSeconds * 2 : WindUpSeconds);
-                    if (finisher && early) return (Client.Pose.Cast, 0);
-                    return (Client.Pose.Strike, Combo == 1 ? (early ? 1 : 0) : (early ? 0 : 1));
+                    var move = (HeroMove)((int)HeroMove.Attack1 + Combo);
+                    return (move, HeroArt.FrameAt(move, held, StrikeLength - StrikeTime), false);
                 }
-                if (CastTime > 0) return (Client.Pose.Cast, 0);
-                if (Moving) return (Client.Pose.Walk, (int)MathF.Floor(Walked * 8) % CreatureArt.WalkFrames);
-                if (time % BlinkEvery < BlinkSeconds) return (Client.Pose.Stand, CreatureArt.Blink);
-                return (Client.Pose.Stand, (int)MathF.Floor(time / BreathSeconds) % 2 == 1 ? CreatureArt.Breath : 0);
+                if (CastTime > 0) return (HeroMove.Cast, HeroArt.FrameAt(HeroMove.Cast, held, CastLength - CastTime), false);
+                if (Moving) return (HeroMove.Walk, HeroArt.FrameAt(HeroMove.Walk, held, Walked), false);
+                return (HeroMove.Stand, HeroArt.FrameAt(HeroMove.Stand, held, time), time % BlinkEvery < BlinkSeconds);
             }
 
-            // WorldView.Place, Animate and ShowWeapon for this frame, then the timers run down.
+            // WorldView.Place, AnimateHero and ShowWeapon for this frame, then the timers run down.
             public List<Draw> Frame(float time, float deltaTime)
             {
                 const float radius = World.PlayerRadius;
@@ -295,11 +280,12 @@ namespace Game.Client
                 var draws = new List<Draw>();
                 Walked = Moving ? Walked + deltaTime : 0;
 
-                int sector = SectorOf(Facing);
-                if (Motion == Motion.Spin && MotionTime > 0) sector = (SpinFrom + (int)MathF.Floor((1 - MotionTime / MotionLength) * 8)) % 8;
-                var (look, left) = Sectors[sector];
-                var (pose, frame) = PoseNow(time);
-                var body = CreatureArt.Player(look, frame, Tunic, pose);
+                var (look, left) = Sectors[SectorOf(Facing)];
+                var (move, frame, blink) = PoseNow(time);
+                var gear = move == HeroMove.Drink ? HeroGear.None : Gear;
+                var body = HeroArt.Draw(look, move, frame, gear, Tunic, blink);
+                // The canvas stands on the hero's feet point (Sprites.Anchored).
+                const float pivotX = HeroArt.FeetX / (float)HeroArt.Size, pivotY = 1 - HeroArt.FeetY / (float)HeroArt.Size;
 
                 float lean = LungeTime > 0 ? MathF.Sin(LungeTime / LungeSeconds * MathF.PI) * LungeDistance * LungeReach : 0;
                 float knock = KnockTime > 0 ? MathF.Sin(KnockTime / KnockSeconds * MathF.PI) * LungeDistance * KnockReach : 0;
@@ -309,8 +295,8 @@ namespace Game.Client
                 const int order = 10000;
                 int shadowWidth = Math.Max(6, (int)MathF.Round(radius * 2 * Ppu * 0.9f));
                 draws.Add(Sprite(CreatureArt.Shadow(shadowWidth), 0, -feet + 1f / Ppu, 0.5f, 0.5f, -30));
-                draws.Add(Sprite(body, offsetX, -feet + offsetY, 0.5f, 0, order, left));
-                if (FlashTime > 0) draws.Add(Sprite(body.Silhouette(), offsetX, -feet + offsetY, 0.5f, 0, order + 1, left, tint: new Rgba(255, 255, 255, 217)));
+                draws.Add(Sprite(body, offsetX, -feet + offsetY, pivotX, pivotY, order, left));
+                if (FlashTime > 0) draws.Add(Sprite(body.Silhouette(), offsetX, -feet + offsetY, pivotX, pivotY, order + 1, left, tint: new Rgba(255, 255, 255, 217)));
                 LungeTime = MathF.Max(0, LungeTime - deltaTime);
                 Held(draws, offsetX, offsetY, feet, order);
 
@@ -324,60 +310,17 @@ namespace Game.Client
                 return draws;
             }
 
-            // WorldView.ShowWeapon.
+            // WorldView.ShowWeapon: the bottle or food at the drinking hand.
             void Held(List<Draw> draws, float offsetX, float offsetY, float feet, int order)
             {
+                if (!(Motion == Motion.Drink && MotionTime > 0 && Holding != null)) return;
                 var (look, left) = Sectors[SectorOf(Facing)];
-                bool away = look == Look.Up || look == Look.UpSide;
-                if (Motion == Motion.Drink && MotionTime > 0 && Holding != null)
-                {
-                    float tip = 20 + (120 - 20) * (1 - MotionTime / MotionLength);
-                    bool mirrored = Facing.X < 0;
-                    float side = away ? 0.22f : 0.2f;
-                    draws.Add(Sprite(Holding, (mirrored ? -side : side) + offsetX, -feet + (away ? 0.6f : 0.52f) + offsetY, 0.5f, 0.5f, away ? order - 1 : order + 2,
-                        mirrored, mirrored ? -tip : tip, 0.55f, 0.55f));
-                    return;
-                }
-                if (Weapon == null) return;
-                bool bow = (Weapon.Tags & SkillTag.Ranged) != 0;
-                var icon = ItemArt.Gear(Weapon);
-                float pivotX = bow ? 0.35f : 0.2f;
-                float pivotY = bow ? 0.5f : 0.2f;
-                float x = look == Look.Up ? -0.22f : look == Look.Down ? 0.24f : left ? -0.24f : 0.24f;
-                if (look == Look.UpSide) x = left ? -0.2f : 0.2f;
-                if (look == Look.DownSide) x = left ? -0.26f : 0.26f;
-                int weaponOrder = away ? order - 1 : order + 2;
-                bool aimed = MotionTime > 0 && (Motion == Motion.Shoot || Motion == Motion.Zap || Motion == Motion.Thrust && !Melee);
-                if (aimed)
-                {
-                    float angle = MathF.Atan2(Facing.Y, Facing.X) * 180 / MathF.PI;
-                    bool raised = Motion == Motion.Zap && MotionTime >= MotionLength * 0.45f;
-                    float length = MathF.Sqrt(Facing.X * Facing.X + Facing.Y * Facing.Y);
-                    float wayX = Facing.X / length, wayY = Facing.Y / length;
-                    if (raised)
-                    {
-                        draws.Add(Sprite(icon, x + offsetX, -feet + 0.5f + offsetY, pivotX, pivotY, weaponOrder));
-                    }
-                    else if (bow)
-                    {
-                        draws.Add(Sprite(icon, wayX * 0.42f + offsetX, -feet + 0.5f + wayY * 0.38f + offsetY, pivotX, pivotY, weaponOrder, angle: angle + 180));
-                    }
-                    else
-                    {
-                        float aheadX = wayX, aheadY = wayY * 0.6f;
-                        float ahead = MathF.Sqrt(aheadX * aheadX + aheadY * aheadY);
-                        aheadX = aheadX / ahead * 0.28f;
-                        aheadY = aheadY / ahead * 0.28f;
-                        draws.Add(Sprite(icon, aheadX + offsetX, -feet + 0.42f + aheadY * 0.5f + offsetY, pivotX, pivotY, weaponOrder, angle: angle - 45));
-                    }
-                    return;
-                }
-                float through = SwingTime / SwingSeconds;
-                float sweep = SwingTime <= 0 ? 0
-                    : Combo == 1 ? Lerp(40, -80, through)
-                    : Combo == World.ComboSteps - 1 ? Lerp(-115, 70, through)
-                    : Lerp(-80, 40, through);
-                draws.Add(Sprite(icon, x + offsetX, -feet + 0.3f + offsetY, pivotX, pivotY, weaponOrder, left, left ? -sweep : sweep));
+                int frame = HeroArt.FrameAt(HeroMove.Drink, HeroWeapon.None, MotionLength - MotionTime);
+                var joints = HeroArt.JointsOf(look, HeroMove.Drink, frame, HeroGear.None);
+                float x = (joints.RightX - HeroArt.FeetX) / Ppu, y = (HeroArt.FeetY - joints.RightY) / Ppu;
+                float tip = joints.RightAngle - 90;
+                draws.Add(Sprite(Holding, (left ? -x : x) + offsetX, -feet + y + 2f / Ppu + offsetY, 0.5f, 0.5f, joints.RightInFront ? order + 2 : order - 1,
+                    left, left ? -tip : tip, 0.55f, 0.55f));
             }
         }
 
@@ -463,8 +406,10 @@ namespace Game.Client
                 case "entrances":
                     Entrances(folder, arena);
                     return true;
+                case "hero":
+                    return HeroPreview.Write(folder, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) == 0;
                 default:
-                    Console.Error.WriteLine($"--only {name}: spider, knight, samurai, vein_eater, entrances or arenas");
+                    Console.Error.WriteLine($"--only {name}: spider, knight, samurai, vein_eater, hero, entrances or arenas");
                     return false;
             }
         }
@@ -729,7 +674,7 @@ namespace Game.Client
             {
                 var npc = list[column];
                 int frame = (int)MathF.Floor(time * PeopleArt.FramesPerSecond) % PeopleArt.Frames;
-                var person = PeopleArt.Person(npc.Id, Rgba.Hex(npc.Color), frame) ?? CreatureArt.Player(Look.Down, 0, Rgba.Hex(npc.Color), Pose.Stand);
+                var person = PeopleArt.Person(npc.Id, Rgba.Hex(npc.Color), frame) ?? HeroArt.Figure(HeroArt.Draw(Look.Down, HeroMove.Stand, 0, HeroGear.None, Rgba.Hex(npc.Color)));
                 return new List<Draw>
                 {
                     Sprite(TileArt.Object(npc.Tile), 0, 0, 0.5f, 0.5f, 0),

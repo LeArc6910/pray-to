@@ -48,6 +48,40 @@ namespace Game.Client
             return sprite;
         }
 
+        // A sprite cut down to what is drawn on a larger canvas, pivoted on a point of that canvas (the hero's feet on
+        // HeroArt's, which leaves room all round for the weapon): the texture holds only the figure and what it holds.
+        public static Sprite Anchored(string key, Func<PixelImage> draw, int anchorX, int anchorY)
+        {
+            if (Made.TryGetValue(key, out var sprite) && sprite != null) return sprite;
+            var image = draw();
+            int left = image.Width, right = -1, top = image.Height, bottom = -1;
+            for (int y = 0; y < image.Height; y++)
+            {
+                for (int x = 0; x < image.Width; x++)
+                {
+                    if (!image.IsSet(x, y)) continue;
+                    if (x < left) left = x;
+                    if (x > right) right = x;
+                    if (y < top) top = y;
+                    if (y > bottom) bottom = y;
+                }
+            }
+            if (right < 0) (left, right, top, bottom) = (anchorX, anchorX, anchorY - 1, anchorY - 1);
+            int width = right - left + 1, height = bottom - top + 1;
+            var cut = new PixelImage(width, height);
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                    cut[x, y] = image[left + x, top + y];
+            var texture = Texture(width, height);
+            texture.SetPixels32(Pixels(cut));
+            texture.Apply(false, true);
+            var pivot = new Vector2((anchorX - left) / (float)width, (top + height - anchorY) / (float)height);
+            sprite = Sprite.Create(texture, new Rect(0, 0, width, height), pivot, PixelsPerUnit, 0, SpriteMeshType.FullRect);
+            sprite.name = key;
+            Made[key] = sprite;
+            return sprite;
+        }
+
         public static Sprite Centered(string key, Func<PixelImage> draw) => Get(key, draw, new Vector2(0.5f, 0.5f));
 
         public static Sprite Standing(string key, Func<PixelImage> draw) => Get(key, draw, new Vector2(0.5f, 0));

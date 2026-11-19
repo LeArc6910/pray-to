@@ -171,32 +171,50 @@ namespace Game.Client
             "....mm....",
         };
 
-        public static PixelImage Gear(ItemBase item)
+        // The colours a piece of gear is drawn in: its metal by tier, its stones.
+        static (Ramp Metal, Rgba Stone, Rgba StoneDark) GearColors(ItemBase item)
         {
             // A legendary is gold, with fiery stones.
             // Tinged with its boss's colour, so legendaries of one slot differ (LegendaryStones).
             var metal = item.IsLegendary ? Ramp.Of(Rgba.Hex("#E8B23A").Mix(LegendaryStones(item.Legendary).Light, 0.3f)) : Metal(item.Level);
-            var colors = new Dictionary<char, Rgba>(Common)
-            {
-                ['L'] = metal.Light,
-                ['M'] = metal.Main,
-                ['m'] = metal.Shade,
-                ['d'] = metal.Dark,
-                ['g'] = item.Slot == ItemSlot.Weapon ? Rgba.Hex("#C88CFF") : Rgba.Hex("#E8485A"),
-                ['G'] = item.Slot == ItemSlot.Weapon ? Rgba.Hex("#7E46D0") : Rgba.Hex("#9A2234"),
-            };
-            if (item.IsLegendary) (colors['g'], colors['G']) = LegendaryStones(item.Legendary);
+            var stones = item.Slot == ItemSlot.Weapon ? (Rgba.Hex("#C88CFF"), Rgba.Hex("#7E46D0")) : (Rgba.Hex("#E8485A"), Rgba.Hex("#9A2234"));
+            if (item.IsLegendary) stones = LegendaryStones(item.Legendary);
             // A weapon that adds an element's damage (2026-11-09) wears that element's stone: ember, frost or spark.
             var adds = item.Implicits.Select(m => m.Stat).FirstOrDefault(s => s == StatType.FireDamage || s == StatType.ColdDamage || s == StatType.LightningDamage);
             if (!item.IsLegendary && adds != default)
             {
-                (colors['g'], colors['G']) = adds switch
+                stones = adds switch
                 {
                     StatType.FireDamage => (Rgba.Hex("#FF9A3C"), Rgba.Hex("#C8401A")),
                     StatType.ColdDamage => (Rgba.Hex("#A8E8FF"), Rgba.Hex("#3E8CC8")),
                     _ => (Rgba.Hex("#FFF06A"), Rgba.Hex("#C8A020")),
                 };
             }
+            return (metal, stones.Item1, stones.Item2);
+        }
+
+        // A weapon as the hero holds it (HeroArt draws it in the hand, turned with the motion): its kind and its
+        // icon's colours. Nothing in hand for no weapon.
+        public static HeroGear Held(ItemBase item)
+        {
+            if (item == null || item.Slot != ItemSlot.Weapon) return HeroGear.None;
+            var kind = item.IsPickaxe ? HeroWeapon.Pick : (item.Tags & SkillTag.Ranged) != 0 ? HeroWeapon.Bow : (item.Tags & SkillTag.Magic) != 0 ? HeroWeapon.Staff : HeroWeapon.Sword;
+            var (metal, stone, stoneDark) = GearColors(item);
+            return new HeroGear(kind, item.Id, metal.Light, metal.Main, metal.Shade, stone, stoneDark);
+        }
+
+        public static PixelImage Gear(ItemBase item)
+        {
+            var (metal, stone, stoneDark) = GearColors(item);
+            var colors = new Dictionary<char, Rgba>(Common)
+            {
+                ['L'] = metal.Light,
+                ['M'] = metal.Main,
+                ['m'] = metal.Shade,
+                ['d'] = metal.Dark,
+                ['g'] = stone,
+                ['G'] = stoneDark,
+            };
             if (item.Slot == ItemSlot.Weapon && item.IsPickaxe)
             {
                 colors['o'] = Outline;

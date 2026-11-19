@@ -58,12 +58,16 @@ namespace Game.Client
         // ground through.
         static Rgba Over(Rgba ground, Rgba c) => c.A == 255 ? c : c.A == 0 ? ground : ground.Mix(c.WithAlpha(255), c.A / 255f);
 
-        public static int Write(string folder, string name, string[] rowNames, List<Step>[] rows, PixelImage arena, int width, int height, float point)
+        // views: the views shown side by side and measured (the side one as each step turns it); two, side and front,
+        // unless given (the hero is shown and measured in all five).
+        public static int Write(string folder, string name, string[] rowNames, List<Step>[] rows, PixelImage arena, int width, int height, float point,
+            BossView[] views = null, int scale = 2)
         {
+            views ??= new[] { BossView.Side, BossView.Front };
+            BossView Shown(Step step, int column) => views[column] == BossView.Side ? step.SideView : views[column];
             // The moving preview.
-            const int scale = 2;
             int cellWidth = width * scale, cellHeight = height * scale;
-            int gifWidth = cellWidth * 2, gifHeight = cellHeight * rows.Length;
+            int gifWidth = cellWidth * views.Length, gifHeight = cellHeight * rows.Length;
             var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
             float longest = rows.Max(r => r.Sum(s => s.Seconds));
             var cache = new Dictionary<(Step, BossView), PixelImage>();
@@ -85,9 +89,9 @@ namespace Game.Client
                         if (at < s.Seconds) break;
                         at -= s.Seconds;
                     }
-                    for (int column = 0; column < 2; column++)
+                    for (int column = 0; column < views.Length; column++)
                     {
-                        var image = Drawn(step, column == 0 ? step.SideView : BossView.Front);
+                        var image = Drawn(step, Shown(step, column));
                         for (int y = 0; y < cellHeight; y++)
                             for (int x = 0; x < cellWidth; x++)
                             {
@@ -106,13 +110,13 @@ namespace Game.Client
                 var steps = new List<Step>();
                 foreach (var s in rows[r])
                     if (steps.Count == 0 || steps[steps.Count - 1].Label != s.Label) steps.Add(s);
-                var strip = new PixelImage(steps.Count * width, 2 * height);
+                var strip = new PixelImage(steps.Count * width, views.Length * height);
                 for (int k = 0; k < steps.Count; k++)
                 {
-                    for (int v = 0; v < 2; v++)
+                    for (int v = 0; v < views.Length; v++)
                     {
-                        var image = Drawn(steps[k], v == 0 ? steps[k].SideView : BossView.Front);
-                        var before = k > 0 ? Drawn(steps[k - 1], v == 0 ? steps[k - 1].SideView : BossView.Front) : null;
+                        var image = Drawn(steps[k], Shown(steps[k], v));
+                        var before = k > 0 ? Drawn(steps[k - 1], Shown(steps[k - 1], v)) : null;
                         for (int y = 0; y < height; y++)
                             for (int x = 0; x < width; x++)
                             {
@@ -131,7 +135,7 @@ namespace Game.Client
             int jumps = 0;
             for (int r = 0; r < rows.Length; r++)
             {
-                foreach (var view in new[] { BossView.Side, BossView.Front })
+                foreach (var view in views)
                 {
                     report.AppendLine($"## {rowNames[r]} ({view})");
                     Measure? last = null;

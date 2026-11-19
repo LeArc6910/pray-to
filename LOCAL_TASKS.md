@@ -1031,6 +1031,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 시트 `Data/Bosses/arenas.csv`가 `GameSheets.arenas`에 들어가야 빌드에 실린다(돌리기 전에는 옛 아레나·입장 없음으로 동작). 새 파일 `arenas.csv`, `Core/Simulation/ArenaSheet.cs`, `Core/World/WorldGenerator.Arenas.cs`, `Client/WorldView.Entrance.cs`, `Client/Art/PropArt.Arena.cs`, `Tests/EditMode/ArenaTests.cs`의 `.meta`가 생기면 커밋한다. 아레나 꾸밈은 새 월드에서만 보인다. 통신 0.85.0
   - (클라우드 웹 점검) `sweep.js --only arenas`, 보스 구역들
   - (사람) 처음 들어설 때 카메라·이름 카드·입장 모션이 멋있는지, 너무 길지 않은지(두 번째부터는 짧음, [설정]의 [보스 등장 연출]로 끔). 휴대폰 세로에서 이름 카드가 한 줄에 들어가는지. 그룸(흙더미만)·아라네(안 보임)가 들어서기 전에 없는 것처럼 보이는 것이 괜찮은지
+- [ ] 143단계: 새 주인공 그림과 무기별 모션(`Docs/ArtPipeline.md` 주인공, `Docs/Combat.md`)
+  - 명령 한 줄을 다시 돌린다(화면 코드만 바뀜, 통신 그대로). 새 파일 `Client/Art/HeroArt.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/HeroPreview.cs`는 Unity 밖이라 `.meta` 없음)
+  - (클라우드 웹 점검) `sweep.js --only hero`
+  - (사람) 검 3단(내려베기·올려베기·돌며 넓게 베기), 활 당겨 쏘기, 지팡이 모아 쏘기, 곡괭이 내리찍기, 맨손 주먹을 직접 휘둘러 보며 손맛이 나는지, 연타할 때 끊기지 않는지. 주인공이 NPC보다 1.4배쯤 커 보이는 것이 어색하지 않은지. 협동 상대의 튜닉 색이 구별되는지
 
 ## 결과 보고
 

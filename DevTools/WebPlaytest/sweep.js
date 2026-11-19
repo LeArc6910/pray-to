@@ -3245,7 +3245,59 @@ async function arenas(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+// The hero's attacks by weapon (2026-11-19, HeroArt): with each weapon the attack is held at three sturdy slimes and
+// pictures are taken through the combo's three steps, to the right and then up, down and left; then a skill sent
+// forward and one all round, a drink, and the hero struck. On a PC and on a phone held upright.
+async function hero(browser) {
+  for (const profile of ['pc', 'phone']) {
+    note(`\n## 주인공 무기별 모션 (${profile === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, Profiles[profile], url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await clearRoom(game, 4, 4);
+    const weapons = [['copper_sword', '검'], ['copper_bow', '활'], ['copper_staff', '지팡이'], ['copper_pickaxe', '곡괭이'], ['none', '맨손']];
+    for (const [weapon, name] of weapons) {
+      await game.send(`heal; hero ${weapon} 1 0`);
+      const struck = await game.until(s => s.hurtMonsters > 0, 4000);
+      check(!!struck, `${profile} ${name}: 공격이 슬라임에 닿는다`);
+      // Six pictures a little apart catch different frames of the three steps.
+      for (let i = 0; i < 6; i++) {
+        await game.wait(170);
+        await game.shot(`hero-${profile}-${weapon}-${i}`, `${name} 연타 ${i + 1}`);
+      }
+      // The same weapon the other three ways (only on the PC: the phone's pictures are for size and fit).
+      if (profile === 'pc') {
+        for (const [dx, dy, way] of [[0, 1, '위'], [-1, 0, '왼쪽'], [0, -1, '아래']]) {
+          await game.send(`heal; hero ${weapon} ${dx} ${dy}`);
+          await game.wait(450);
+          await game.shot(`hero-${profile}-${weapon}-${way}`, `${name} ${way}로`);
+          await game.wait(230);
+          await game.shot(`hero-${profile}-${weapon}-${way}-2`, `${name} ${way}로 (다음 장)`);
+        }
+      }
+      await game.send('attack off; clear');
+      await game.wait(500);
+    }
+    // Standing with nothing to do, then struck by a slime.
+    await game.send('equip copper_sword; clear');
+    await game.wait(900);
+    await game.shot(`hero-${profile}-stand`, '검을 들고 서 있기');
+    await game.send('spawn slime 1.2 0');
+    await game.wait(2600);
+    await game.shot(`hero-${profile}-hurt`, '슬라임에게 맞는 순간 무렵');
+    await game.send('clear; heal');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

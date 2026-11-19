@@ -20,7 +20,8 @@ namespace Game.Client
 
         static int Main(string[] args)
         {
-            // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them.
+            // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them; --only hero
+            // the player's.
             if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
@@ -91,9 +92,16 @@ namespace Game.Client
             Save(RoadView(storyWorld, lights), Path.Combine(pieces, "road.png"), 3);
             // Square cave corners beside rounded ones, for a person to judge (Corners, 2026-11-11).
             Save(Corners.Compare(), Path.Combine(pieces, "corners_compare.png"), 3);
-            Save(Players(), Path.Combine(output, "player.png"), 6);
+            Save(Players(), Path.Combine(output, "player.png"), 3);
             Save(Bosses(), Path.Combine(output, "bosses.png"), 3);
             Motions.Write(Path.Combine(output, "anim"), loot, monsters, npcs);
+            // The hero's motions, every frame checked against the one before (HeroPreview): a jump fails the run.
+            int heroJumps = HeroPreview.Write(Path.Combine(output, "anim"), TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0)), monsters, npcs);
+            if (heroJumps > 0)
+            {
+                Console.Error.WriteLine($"The hero's motions jump in {heroJumps} places (anim/hero_*_continuity.txt)");
+                return 1;
+            }
             Save(Cave(loot, monsters, lights, dark: true), Path.Combine(output, "cave.png"), 3);
             Save(Cave(loot, monsters, lights, dark: false), Path.Combine(output, "cave_unlit.png"), 3);
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
@@ -455,30 +463,28 @@ namespace Game.Client
             var players = new List<PixelImage>();
             foreach (var look in new[] { Look.Down, Look.DownSide, Look.Side, Look.UpSide, Look.Up })
             {
-                for (int frame = 0; frame < CreatureArt.WalkFrames; frame++) players.Add(CreatureArt.Player(look, frame, Rgba.Hex("#3F7FD8")));
+                for (int frame = 0; frame < HeroArt.WalkFrames; frame++) players.Add(Hero(look, HeroMove.Walk, frame, "#3F7FD8"));
             }
-            players.Add(CreatureArt.Player(Look.Down, 0, Rgba.Hex("#4DB06A")));
-            players.Add(CreatureArt.Player(Look.Down, 0, Rgba.Hex("#E08A3C")));
+            players.Add(Hero(Look.Down, HeroMove.Stand, 0, "#4DB06A"));
+            players.Add(Hero(Look.Down, HeroMove.Stand, 0, "#E08A3C"));
             rows.Add(players);
 
             // The people, each beside their stall.
             var people = new List<PixelImage>();
             foreach (var npc in npcs.Npcs)
             {
-                people.Add(PeopleArt.Person(npc.Id, Rgba.Hex(npc.Color), 0) ?? CreatureArt.Player(Look.Down, 0, Rgba.Hex(npc.Color), Pose.Stand));
+                people.Add(PeopleArt.Person(npc.Id, Rgba.Hex(npc.Color), 0) ?? Hero(Look.Down, HeroMove.Stand, 0, npc.Color));
                 people.Add(TileArt.Object(npc.Tile));
             }
             rows.Add(people);
 
-            // Every pose but walking, in each direction: standing (still, breathing in, blinking), the strike's two
-            // frames, casting, flinching.
+            // Standing (the breath's frames), flinching and casting, in three directions. Every motion is in player.png
+            // and anim/hero_*.
             var poses = new List<PixelImage>();
             foreach (var look in new[] { Look.Down, Look.Side, Look.Up })
             {
-                for (int frame = 0; frame < CreatureArt.StandFrames; frame++) poses.Add(CreatureArt.Player(look, frame, Rgba.Hex("#3F7FD8"), Pose.Stand));
-                for (int frame = 0; frame < CreatureArt.StrikeFrames; frame++) poses.Add(CreatureArt.Player(look, frame, Rgba.Hex("#3F7FD8"), Pose.Strike));
-                poses.Add(CreatureArt.Player(look, 0, Rgba.Hex("#3F7FD8"), Pose.Cast));
-                poses.Add(CreatureArt.Player(look, 0, Rgba.Hex("#3F7FD8"), Pose.Hurt));
+                for (int frame = 0; frame < HeroArt.FramesOf(HeroMove.Stand, HeroWeapon.None); frame += 2) poses.Add(Hero(look, HeroMove.Stand, frame, "#3F7FD8"));
+                poses.Add(Hero(look, HeroMove.Hurt, HeroArt.StrikeFrame(HeroMove.Hurt, HeroWeapon.None), "#3F7FD8"));
             }
             rows.Add(poses);
 
@@ -543,29 +549,58 @@ namespace Game.Client
             return sheet;
         }
 
-        // Every look of the player (eight ways: the five drawn and three of them flipped) in every pose and frame, a row
-        // a look, for checking the motions side by side (2026-11-09): walk 0-3, stand 0-2, strike 0-1, cast, hurt,
-        // shoot 0-1, zap 0-1, drink 0-1, thrust, spread.
+        // The hero alone, standing in a tunic of a colour with nothing in hand, cut to the figure (sheets).
+        static PixelImage Hero(Look look, HeroMove move, int frame, string tunic) => HeroArt.Figure(HeroArt.Draw(look, move, frame, HeroGear.None, Rgba.Hex(tunic)));
+
+        // The hero as a scene stands them: the canvas down to the feet, a plain sword in hand.
+        static PixelImage HeroStanding(Look look, HeroMove move, int frame, string tunic, HeroWeapon weapon = HeroWeapon.Sword)
+        {
+            var canvas = HeroArt.Draw(look, move, frame, HeroGear.Plain(weapon), Rgba.Hex(tunic));
+            var result = new PixelImage(HeroArt.Size, HeroArt.FeetY);
+            for (int y = 0; y < result.Height; y++)
+                for (int x = 0; x < result.Width; x++)
+                    result[x, y] = canvas[x, y];
+            return result;
+        }
+
+        // Every look of the player (eight ways: the five drawn and three of them flipped), a row a look, in the telling
+        // frames of every motion (2026-11-19, HeroArt): standing, the walk's eight, then with each weapon its three
+        // attacks (wound up, the blow, held after), and with a sword the cast, the thrust, the turn, the flinch, and
+        // with nothing drinking and lying down. Every frame of every motion is in anim/hero_*_frames_*.png.
         static PixelImage Players()
         {
             var tunic = Rgba.Hex("#3F7FD8");
-            var rows = new List<IList<PixelImage>>();
-            var poses = new List<(Pose Pose, int Frames)>
+            var columns = new List<(HeroMove Move, int Frame, HeroWeapon Weapon)> { (HeroMove.Stand, 0, HeroWeapon.Sword) };
+            for (int frame = 0; frame < HeroArt.WalkFrames; frame++) columns.Add((HeroMove.Walk, frame, HeroWeapon.Sword));
+            foreach (var weapon in new[] { HeroWeapon.Sword, HeroWeapon.Bow, HeroWeapon.Staff, HeroWeapon.Pick, HeroWeapon.None })
             {
-                (Pose.Walk, CreatureArt.WalkFrames), (Pose.Stand, CreatureArt.StandFrames), (Pose.Strike, CreatureArt.StrikeFrames), (Pose.Cast, 1),
-                (Pose.Hurt, 1), (Pose.Shoot, 2), (Pose.Zap, 2), (Pose.Drink, 2), (Pose.Thrust, 1), (Pose.Spread, 1),
-            };
+                foreach (var move in new[] { HeroMove.Attack1, HeroMove.Attack2, HeroMove.Attack3 })
+                {
+                    int strike = HeroArt.StrikeFrame(move, weapon);
+                    columns.Add((move, HeroArt.FrameAt(move, weapon, HeroArt.ChainSeconds(move, weapon)), weapon));
+                    columns.Add((move, strike, weapon));
+                    columns.Add((move, Math.Min(strike + 2, HeroArt.FramesOf(move, weapon) - 1), weapon));
+                }
+            }
+            foreach (var move in new[] { HeroMove.Cast, HeroMove.Thrust, HeroMove.Spread, HeroMove.Hurt })
+                columns.Add((move, Math.Max(HeroArt.StrikeFrame(move, HeroWeapon.Sword), HeroArt.FramesOf(move, HeroWeapon.Sword) / 3), HeroWeapon.Sword));
+            columns.Add((HeroMove.Drink, HeroArt.FramesOf(HeroMove.Drink, HeroWeapon.None) / 2, HeroWeapon.None));
+            columns.Add((HeroMove.Fall, HeroArt.FramesOf(HeroMove.Fall, HeroWeapon.None) - 1, HeroWeapon.None));
+            var rows = new List<IList<PixelImage>>();
             foreach (var (look, flip) in new[] { (Look.Down, false), (Look.DownSide, false), (Look.Side, false), (Look.UpSide, false), (Look.Up, false),
                 (Look.UpSide, true), (Look.Side, true), (Look.DownSide, true) })
             {
                 var row = new List<PixelImage>();
-                foreach (var (pose, frames) in poses)
+                foreach (var (move, frame, weapon) in columns)
                 {
-                    for (int frame = 0; frame < frames; frame++)
-                    {
-                        var image = CreatureArt.Player(look, frame, tunic, pose);
-                        row.Add(flip ? image.FlippedX() : image);
-                    }
+                    var canvas = HeroArt.Draw(look, move, frame, HeroGear.Plain(weapon), tunic);
+                    if (flip) canvas = canvas.FlippedX();
+                    // The middle of the canvas: the figure and the reach of its weapon.
+                    var image = new PixelImage(48, 52);
+                    for (int y = 0; y < image.Height; y++)
+                        for (int x = 0; x < image.Width; x++)
+                            image[x, y] = canvas[x + 8, y + 6];
+                    row.Add(image);
                 }
                 rows.Add(row);
             }
@@ -646,9 +681,9 @@ namespace Game.Client
             scene.Machine(sx + 1, sy - 3, 0, TileArt.Cracks(2));
             scene.Machine(sx + 1, sy - 5, 0, TileArt.Cracks(TileArt.CrackStages));
 
-            scene.Player(sx + 0.5f, sy + 0.5f, CreatureArt.Player(Look.Down, 0, Rgba.Hex("#3F7FD8")));
-            scene.Player(sx + 2.5f, sy + 1.2f, CreatureArt.Player(Look.Side, 1, Rgba.Hex("#4DB06A")));
-            scene.Player(sx - 1.5f, sy + 1.6f, CreatureArt.Player(Look.Up, 1, Rgba.Hex("#E08A3C")));
+            scene.Player(sx + 0.5f, sy + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+            scene.Player(sx + 2.5f, sy + 1.2f, HeroStanding(Look.Side, HeroMove.Walk, 2, "#4DB06A"));
+            scene.Player(sx - 1.5f, sy + 1.6f, HeroStanding(Look.Up, HeroMove.Walk, 2, "#E08A3C"));
             float mx = sx + 6;
             foreach (var monster in monsters.Monsters)
             {
@@ -676,7 +711,7 @@ namespace Game.Client
             scene.Places(world.Places);
             foreach (var (character, at) in site.People)
                 scene.Player(at.X, at.Y - 0.3f, PeopleArt.Look(character.Look, Rgba.Hex(character.Color), 0));
-            scene.Player(site.X + 0.5f, site.Y - 1.5f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
+            scene.Player(site.X + 0.5f, site.Y - 1.5f, HeroStanding(Look.Up, HeroMove.Stand, 0, "#3F7FD8"));
             return scene.Image;
         }
 
@@ -725,8 +760,8 @@ namespace Game.Client
             var scene = new Scene(world.Map, ax - 13, ay - 8, 26, 16, p => Vec2.Distance(p, arena) <= world.ArenaRadius);
             scene.Lit(lights, WorldLights.ArenaAmbient(world.Arenas, world.ArenaRadius));
             scene.Body(ax + 0.5f, ay + 1.5f, 1.2f, CreatureArt.Boss("cave_warden", BossColor, 0));
-            scene.Player(ax - 2.5f, ay - 3f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
-            scene.Player(ax + 3.5f, ay - 2.5f, CreatureArt.Player(Look.Side, 0, Rgba.Hex("#4DB06A")).FlippedX());
+            scene.Player(ax - 2.5f, ay - 3f, HeroStanding(Look.Up, HeroMove.Stand, 0, "#3F7FD8"));
+            scene.Player(ax + 3.5f, ay - 2.5f, HeroStanding(Look.Side, HeroMove.Stand, 0, "#4DB06A").FlippedX());
             scene.Shot(ax - 1.5f, ay - 1.5f, ItemArt.Orb);
             scene.Shot(ax + 2f, ay - 0.5f, ItemArt.Spore);
             return scene.Image;
@@ -802,7 +837,7 @@ namespace Game.Client
                     scene.Places(null);
                     if (dark) scene.Lit(lights, WorldLights.ArenaAmbient(new[] { middle }, WorldGenerator.ArenaRadius));
                     scene.Body(c + 0.5f, c + 0.5f, 1.2f, BossPicture(boss));
-                    scene.Player(c + 0.5f, c - 6.5f, CreatureArt.Player(Look.Up, 0, Rgba.Hex("#3F7FD8")));
+                    scene.Player(c + 0.5f, c - 6.5f, HeroStanding(Look.Up, HeroMove.Stand, 0, "#3F7FD8"));
                     var image = scene.Image;
                     Save(image, Path.Combine(folder, boss + (dark ? ".png" : "_unlit.png")), 2);
                     (dark ? lit : plain).Add(image);
