@@ -168,6 +168,15 @@ namespace Game.Core
         {
             Memory.Observe();
             var intent = Decide(target);
+            // Not back into a warning it has just stepped out of (2026-11-21, monsters' marks: a slime's landing): it
+            // holds at the edge, striking what is in reach, until the mark has landed.
+            if (intent.Do == BotDo.Move && intent.Direction.LengthSquared > 1e-6f && !Danger(_player.Position)
+                && Danger(_player.Position + intent.Direction.Normalized * 0.5f))
+            {
+                intent = FoeInReach(target) is (int _, Vec2 foe, float _)
+                    ? new BotIntent { Do = BotDo.Fight, Direction = foe - _player.Position, Why = "예고 밖에서 싸움" }
+                    : new BotIntent { Do = BotDo.Wait, Why = "예고가 끝나기를 기다림" };
+            }
             string line = $"{Clock(_world.Tick - Memory.StartTick)} {target} {intent}";
             string key = $"{target} {intent.Do} {intent.Goal}";
             if (key != _lastLine)
@@ -202,7 +211,7 @@ namespace Game.Core
                 _planTick = long.MinValue;
             }
 
-            var danger = WayOutOfDanger();
+            var danger = WayOutOfDanger(target);
             if (danger is Vec2 away) return new BotIntent { Do = BotDo.Move, Direction = away, Why = "예고를 피함" };
 
             // Getting nowhere: give the goal up for a while and go back to where the bot last got on.
@@ -469,18 +478,30 @@ namespace Game.Core
             return nearest == null ? ((int, Vec2, float)?)null : (nearest.Id, nearest.Position, nearest.Health);
         }
 
+        // A warning on the floor there (not a share marker, nor a cloud that only fills monsters or the mark of where a
+        // monster will blink to), with a little to spare so the bot does not stop on its very edge.
+        bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Shape != HazardShape.Balm
+            && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f));
+
         // Standing in a warning on the floor (not a share marker): toward the nearest spot out of every one.
-        Vec2? WayOutOfDanger()
+        // Fighting a boss, not a spot outside its ground while there is one inside (2026-11-21: stepping out of its
+        // slimes' marks always the same way, the bot walked out of the arena and the boss went back to sleep).
+        Vec2? WayOutOfDanger(BotTarget target)
         {
-            bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Contains(at, World.PlayerRadius));
             if (!Danger(_player.Position)) return null;
-            foreach (float reach in new[] { 1.5f, 2.5f, 3.5f, 5f })
+            var boss = target.Aim == BotAim.BossFight ? BossOf(target.Id) : null;
+            foreach (bool inside in new[] { true, false })
             {
-                for (int k = 0; k < 8; k++)
+                if (inside && boss == null) continue;
+                foreach (float reach in new[] { 1.5f, 2.5f, 3.5f, 5f })
                 {
-                    var step = new Vec2(MathF.Cos(k * MathF.PI / 4), MathF.Sin(k * MathF.PI / 4)) * reach;
-                    var to = _player.Position + step;
-                    if (Nav.Walkable(TileMap.Cell(to.X), TileMap.Cell(to.Y)) && !Danger(to)) return step;
+                    for (int k = 0; k < 8; k++)
+                    {
+                        var step = new Vec2(MathF.Cos(k * MathF.PI / 4), MathF.Sin(k * MathF.PI / 4)) * reach;
+                        var to = _player.Position + step;
+                        if (inside && Vec2.Distance(to, boss.Home) > boss.ArenaRadius) continue;
+                        if (Nav.Walkable(TileMap.Cell(to.X), TileMap.Cell(to.Y)) && !Danger(to)) return step;
+                    }
                 }
             }
             return null;

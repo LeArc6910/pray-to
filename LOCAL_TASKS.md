@@ -1046,6 +1046,10 @@ DevTools/Local/setup.sh --commit
 - [ ] 146단계: 지도의 뼈대(생성기 2판, `Docs/WorldRework.md` 1a)
   - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/terrain.csv`가 `GameSheets.terrain`에 들어가야 빌드에 실린다(돌리기 전에는 코드 기본값으로 같은 지도). 새 파일 `terrain.csv`, `Core/World/WorldGenerator.Rooms.cs`, `Core/World/TerrainSheet.cs`, `Tests/EditMode/RoomMapTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.87.0, 월드 저장본 형식 12(옛 저장본은 1판으로 그대로 열린다)
   - (사람) 새 월드를 만들어 걸어 보기: 생물군계마다 지형이 다르게 느껴지는지(버섯 미로, 얼음 홀, 용암 강과 다리, 수정 틈, 모래 언덕, 호수 섬), 방·통로가 탐험하는 맛을 주는지, 길이 막혀 답답하지 않은지. 옛 월드가 예전처럼 열리는지. 주의: 1b·1c에서 2판 지형이 또 바뀔 수 있어 그 사이 만든 새 월드의 기지가 바위에 묻힐 수 있다
+- [ ] 147단계: 일반 몬스터 공격 엔진(`Docs/Combat.md` 몬스터의 공격 시트, `Docs/WorldRework.md` 2b-1)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/Monsters/monster_attacks.csv`가 `GameSheets.monsterAttacks`에 들어가야 빌드에 실린다(돌리기 전에는 모든 종이 예전처럼 싸운다). 새 파일 `monster_attacks.csv`, `Core/Simulation/MonsterAttackSheet.cs`, `Core/Simulation/World.MonsterAttacks.cs`, `Client/Art/MonsterFx.cs`, `Client/WorldView.MonsterFx.cs`, `Tests/EditMode/MonsterAttackTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `MonstersWarnAndStrikeFromTheSheet`. 통신 0.88.0
+  - (클라우드 웹 점검) `sweep.js --only monsterfx`, `speed 0`이 이제 실제로 멈추므로 `skillfx`·`combat` 구역도 다시
+  - (사람) 슬라임 덮치기·깨물기·갈라짐, 딱정벌레 돌진과 앞 등딱지·비틀거림, 서리 정령 서리 고리·고드름, 공허 정령 돌아오는 구슬·중력 우물·점멸: 예고를 보고 피할 만한지, 손맛과 소리
 
 ## 결과 보고
 

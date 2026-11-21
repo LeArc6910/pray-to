@@ -324,5 +324,33 @@ namespace Game.Client.Tests
             Assert.AreNotEqual(BossState.Enter, boss.State, "The entrance ends and the fight starts.");
             Assert.IsTrue(_root.Playing);
         }
+
+        // Ordinary monsters' attacks from monster_attacks.csv (Docs/Combat.md 몬스터의 공격 시트, 2026-11-21): a slime's
+        // pounce is marked where it will land, a frost wisp rings itself (a mark the screen makes from the monster's
+        // state), and both draw their pieces; after they land nothing is left.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator MonstersWarnAndStrikeFromTheSheet()
+        {
+            yield return Start();
+            Assert.IsNotEmpty(_root.MonsterSheet.Find("slime").Attacks, "No monster attacks: monster_attacks.csv was not read (Game > Set Up Main Scene).");
+            World.MonstersHold = true;
+            var slime = Spawn("slime", Player.Position + new Vec2(3.2f, 0));
+            var wisp = Spawn("frost_wisp", Player.Position + new Vec2(-2.2f, 0));
+            slime.MaxHealth = slime.Health = wisp.MaxHealth = wisp.Health = 5000;
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsTrue(World.ForceAttack(slime, "pounce"));
+            Assert.IsTrue(World.ForceAttack(wisp, "frost_ring"));
+            yield return new WaitForSecondsRealtime(0.35f);
+            Assert.GreaterOrEqual(_root.MonsterMarksShown, 2, "The landing's mark and the ring made from the wisp's state are both drawn.");
+            Assert.Greater(_root.MonsterFxPieces, 0);
+            yield return Screens.Take("monster-warnings");
+            yield return new WaitForSecondsRealtime(0.45f);
+            yield return Screens.Take("monster-blows");
+            yield return new WaitForSecondsRealtime(1.5f);
+            Assert.AreEqual(0, _root.MonsterMarksShown);
+            Assert.AreEqual(0, _root.MonsterFxAlive);
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
     }
 }

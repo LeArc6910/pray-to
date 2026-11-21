@@ -31,19 +31,33 @@ namespace CoreSandbox
             var killsByMonster = new Dictionary<string, int>();
             var takenByMonster = new Dictionary<string, int>();
             var names = new Dictionary<int, string>();
+            // What hurt the bot, by kind and by which of its attacks (monster_attacks.csv): one attack past 60% of a
+            // kind's damage means its telegraph is too short (Docs/WorldRework.md 봇과 시험).
+            var kinds = new Dictionary<int, MonsterDefinition>();
+            var takenByAttack = new Dictionary<string, Dictionary<string, int>>();
             for (int tick = 0; tick < seconds * World.TicksPerSecond; tick++)
             {
                 if (tick % 10 == 0) toEnemies.Build(world.Enemies.Select(e => e.Position), 64);
                 Drive(world, player, toEnemies, dodge);
                 var nearest = world.Enemies.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
                 skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
-                foreach (var enemy in world.Enemies) names[enemy.Id] = enemy.Definition.Name;
+                foreach (var enemy in world.Enemies)
+                {
+                    names[enemy.Id] = enemy.Definition.Name;
+                    kinds[enemy.Id] = enemy.Definition;
+                }
                 world.Step();
                 foreach (var e in world.TakeEvents())
                 {
                     skills.Count(e);
                     if (e.Type == SimEventType.Died && names.TryGetValue(e.Source, out string killed)) killsByMonster[killed] = killsByMonster.GetValueOrDefault(killed) + 1;
                     if (e.Type == SimEventType.Hit && e.Target == player.Id && names.TryGetValue(e.Source, out string hitter)) takenByMonster[hitter] = takenByMonster.GetValueOrDefault(hitter) + e.Amount;
+                    if (e.Type == SimEventType.Hit && e.Target == player.Id && kinds.TryGetValue(e.Source, out var kind) && kind.Attacks.Count > 0)
+                    {
+                        string attack = e.Cause >= 1 && e.Cause <= kind.Attacks.Count ? kind.Attacks[e.Cause - 1].Name : "그 밖(화상, 웅덩이)";
+                        if (!takenByAttack.TryGetValue(kind.Name, out var byAttack)) takenByAttack[kind.Name] = byAttack = new Dictionary<string, int>();
+                        byAttack[attack] = byAttack.GetValueOrDefault(attack) + e.Amount;
+                    }
                     if (e.Type == SimEventType.Attack && e.Source == player.Id) swings++;
                     if (e.Type == SimEventType.Hit && e.Source == player.Id)
                     {
@@ -60,6 +74,11 @@ namespace CoreSandbox
             foreach (var item in equipment.Items) Console.WriteLine("  " + ItemText.Describe(item)[0] + " / " + string.Join(", ", item.Implicits.Select(StatText.Describe)));
             Console.WriteLine($"처치 {kills} (분당 {kills * 60.0 / seconds:0.0}), 사망 {deaths}");
             Console.WriteLine("  몬스터별 처치: " + string.Join(", ", killsByMonster.Select(p => $"{p.Key} {p.Value}")) + " / 받은 피해: " + string.Join(", ", takenByMonster.Select(p => $"{p.Key} {p.Value}")));
+            foreach (var pair in takenByAttack)
+            {
+                int all = pair.Value.Values.Sum();
+                Console.WriteLine($"  {pair.Key}의 공격별: " + string.Join(", ", pair.Value.OrderByDescending(p => p.Value).Select(p => $"{p.Key} {p.Value} ({p.Value * 100 / Math.Max(1, all)}%)")));
+            }
             Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 기본 공격 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)");
             Console.WriteLine($"  나눠 보면: {skills.Summary()}");
             Console.WriteLine($"받은 피해 {taken} (초당 {taken / (double)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}, 마신 물약 {skills.Drunk}개, 구르기 {player.Rolls}번(흘린 타격 {player.Dodges})");

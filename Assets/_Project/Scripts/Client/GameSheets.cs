@@ -23,6 +23,8 @@ namespace Game.Client
         // How each biome's rooms are carved (terrain.csv, 2026-11-21, Docs/Biomes.md 지형).
         public TextAsset terrain;
         public TextAsset monsters;
+        // What the ordinary monsters do (monster_attacks.csv, 2026-11-21, Docs/Combat.md 몬스터의 공격 시트).
+        public TextAsset monsterAttacks;
         public TextAsset bosses;
         public TextAsset bossAttacks;
         // Each boss's arena and entrance (arenas.csv, 2026-11-17, Docs/Bosses.md 아레나 컨셉).
@@ -51,7 +53,8 @@ namespace Game.Client
         // Without the terrain sheet (an asset made before it existed) the rooms are carved by the copy in code.
         public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain));
 
-        public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
+        // Without the attacks' sheet (an asset made before it existed) every monster fights the old way.
+        public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters), Text(monsterAttacks));
 
         // Without the arenas' sheet (an asset made before it existed) every arena is plain and no boss has an entrance.
         public BossData LoadBosses(MonsterData monsterData)

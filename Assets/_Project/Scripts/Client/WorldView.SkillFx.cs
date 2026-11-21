@@ -376,6 +376,7 @@ namespace Game.Client
                 var renderer = _fxPool[_fxUsed];
                 renderer.enabled = true;
                 renderer.sprite = sprite;
+                if (stamp.Tint != 0) color = new Color((stamp.Tint >> 16 & 255) / 255f, (stamp.Tint >> 8 & 255) / 255f, (stamp.Tint & 255) / 255f);
                 color.a = stamp.Alpha * alpha;
                 renderer.color = color;
                 var place = renderer.transform;

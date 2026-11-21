@@ -249,6 +249,36 @@ namespace Game.Client
                     else if (words[2] == "sleep") world.ForceSleep(boss);
                     else if (words[2] == "enter" && !world.ForceEntrance(boss, words.Length > 3 && words[3] == "again")) throw new ArgumentException($"'{words[1]}' has no entrance (arenas.csv)");
                     return null;
+                case "mob":
+                {
+                    // mob <id> use <attack>: the nearest monster of that kind (one is put three tiles ahead if none is
+                    // near) starts that attack of monster_attacks.csv now. mob <id> kill [zone]: it falls to the
+                    // player, as one of that zone would (a split comes past the first). mob <id> hurt <share>.
+                    var kind = root.MonsterSheet.Find(words[1]);
+                    var mob = world.Enemies.Where(e => !e.IsDead && e.Definition == kind && Vec2.Distance(e.Position, player.Position) < 12)
+                        .OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
+                    if (mob == null)
+                    {
+                        mob = world.SpawnEnemy(kind, player.Position + (player.Facing.LengthSquared > 0.01f ? player.Facing.Normalized : new Vec2(1, 0)) * 3);
+                        mob.MaxHealth = mob.Health = 5000;
+                    }
+                    if (words[2] == "use" && !world.ForceAttack(mob, words[3]))
+                        throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (its attacks: {string.Join(", ", kind.Attacks.Select(a => a.Id))})");
+                    else if (words[2] == "hurt") world.Hurt(mob, player, Math.Max(1, mob.MaxHealth * Float(words[3])));
+                    else if (words[2] == "kill")
+                    {
+                        if (words.Length > 3) mob.ZoneLevels = Math.Max(0, Int(words[3]) - 1);
+                        mob.MaxHealth = kind.Health;
+                        mob.Health = 1;
+                        world.Hurt(mob, player, 100000);
+                    }
+                    return null;
+                }
+                // Monsters neither notice anyone nor start anything by themselves ("hold"), so a picture shows only
+                // the attack that was asked for; or go about as they do ("go").
+                case "monsters":
+                    world.MonstersHold = words[1] == "hold";
+                    return null;
                 // Bosses stay asleep whoever walks in ("hold"), to look at an arena; or wake as they do ("wake").
                 case "bosses":
                     world.BossesHold = words[1] == "hold";
@@ -868,6 +898,18 @@ namespace Game.Client
                 json.Field("pools", world.Hazards.Count(h => h.Lingers));
                 json.Field("poolsShown", root.PoolsShown);
                 json.Field("snared", player.Afflictions.Snared);
+                // Ordinary monsters' attacks (monster_attacks.csv, 2026-11-21): those near that fight from the sheet with
+                // their state and attack, their marks and what they left in the world, and what the screen draws of them
+                // (marks on the ground with those made from a monster's state, pools, one-off effects, pieces, shots).
+                json.Field("mobs", string.Join(" ", near.Where(e => e.Definition.Attacks.Count > 0).Select(e => $"{e.Definition.Id}:{e.State}:{e.Attack?.Id ?? "-"}")));
+                json.Field("mobHazards", world.Hazards.Count(h => h.Mark != 0 && !h.Lingers));
+                json.Field("mobPools", world.Hazards.Count(h => h.Mark != 0 && h.Lingers));
+                json.Field("mobMarksShown", root.MonsterMarksShown);
+                json.Field("mobPoolsShown", root.MonsterPoolsShown);
+                json.Field("mobFx", root.MonsterFxAlive);
+                json.Field("mobFxPieces", root.MonsterFxPieces);
+                json.Field("mobShots", root.MonsterShotsDrawn);
+                json.Field("rooted", player.Afflictions.Rooted);
                 json.Field("renderTrace", root.RenderTrace);
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
                 // The nearest copper vein within 16 tiles, as the minimap marks it (MapView.Sense).

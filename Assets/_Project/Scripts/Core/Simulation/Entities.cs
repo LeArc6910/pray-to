@@ -187,7 +187,8 @@ namespace Game.Core
         public bool Sleeping { get; internal set; }
         internal Vec2 SleptAt { get; set; }
         // How fast the player may move now: slower while chilled.
-        public float MoveSpeed => Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1) * (Afflictions.Snared ? World.PlayerSnareSpeed : 1);
+        public float MoveSpeed => Afflictions.Rooted ? 0
+            : Stats.MoveSpeed * (Afflictions.Chilled ? World.PlayerChillSpeed : 1) * (Afflictions.Snared ? World.PlayerSnareSpeed : 1);
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
         public ConsumableDefinition Food { get; private set; }
         public int FoodTicks { get; private set; }
@@ -317,6 +318,10 @@ namespace Game.Core
         Recover,
         // A charging monster rushing along its marked path.
         Charge,
+        // Holding a line to an ally it mends (MonsterAttackShape.Mend); a hit breaks it.
+        Channel,
+        // Dazed after running into a wall (MonsterTraitKind.Stagger): still, unguarded, taking more.
+        Stagger,
     }
 
     public sealed class Enemy
@@ -340,8 +345,8 @@ namespace Game.Core
         public float SpeedScale { get; internal set; } = 1;
         // 0 for an ordinary monster, RiftMonster or RiftGuardian for one a rift brought.
         public int Rift { get; internal set; }
-        public float Damage => Definition.Damage * Power;
-        public float Speed => Definition.Speed * SpeedScale;
+        public float Damage => Definition.Damage * Power * (Empowered ? 1 + EmpowerShare : 1);
+        public float Speed => Definition.Speed * SpeedScale * (Empowered ? 1 + EmpowerShare : 1);
         public Vec2 Position { get; internal set; }
         public Vec2 Facing { get; internal set; } = new Vec2(0, -1);
         public float Health { get; internal set; }
@@ -355,6 +360,36 @@ namespace Game.Core
         internal Vec2 Knockback { get; set; }
         internal Vec2 ChargeDirection { get; set; }
         internal HashSet<int> ChargeHits { get; } = new HashSet<int>();
+
+        // ---- Sheet attacks (monster_attacks.csv, World.MonsterAttacks.cs) ----
+
+        // The attack it is winding up, making or resting from; null between attacks and for one that fights the old way.
+        public MonsterAttack Attack { get; internal set; }
+        // Under the ground before a burrow comes up: out of reach and not drawn.
+        public bool Away => State == EnemyState.Windup && Attack != null
+            && (Attack.Shape == MonsterAttackShape.Burrow || Attack.Shape == MonsterAttackShape.Ambush);
+        // One a split left: smaller, weaker, and it neither splits again nor drops anything.
+        public bool Small { get; internal set; }
+        // Made stronger by an ally (MonsterAttackShape.Empower) for these ticks, by this share.
+        public bool Empowered => EmpowerTicks > 0;
+        internal int EmpowerTicks { get; set; }
+        internal float EmpowerShare { get; set; }
+        // The ally it mends while it channels, and the ticks between its fills.
+        public int TetherId { get; internal set; }
+        // The tick each attack (by its place in the sheet) can next be picked.
+        internal long[] ReadyAt { get; set; }
+        internal bool[] Used { get; set; }
+        // Where a leap, burrow or blink comes down, and where the leap began.
+        internal Vec2 LandAt { get; set; }
+        internal Vec2 LeapFrom { get; set; }
+        // Charges, lobbed circles or shots still to come after the first, and the ticks to the next.
+        internal int RepeatsLeft { get; set; }
+        internal int RepeatTicks { get; set; }
+        // How fast its rush is and how long (a sheet charge's own, not the definition's).
+        internal float RushSpeed { get; set; }
+        // Ticks since it last left a pool behind it (MonsterTraitKind.Trail).
+        internal int TrailTicks { get; set; }
+        internal Vec2 TrailAt { get; set; }
     }
 
     // A spirit a summon skill called. It follows its player, goes after enemies near them and lasts the skill's
@@ -482,6 +517,13 @@ namespace Game.Core
         Rolled,
         // A blow of Source's passed through Target, a player, who was rolling. Once a roll.
         Dodged,
+        // Source, a monster, took a hit on its guard (MonsterTraitKind.Guard, 2026-11-21): most of it was turned.
+        Guarded,
+        // Source, a monster, began mending Target, an ally, for Amount ticks; Amount 0: the line broke or ran out.
+        Tether,
+        // Something a monster's attack or trait did at Position, for the screen and the ear only: Amount is which
+        // (World.MonsterFx*), Source the monster (which may be gone already).
+        MonsterFx,
     }
 
     public readonly struct SimEvent
@@ -514,7 +556,8 @@ namespace Game.Core
             type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
             || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift || type == SimEventType.Npc
             || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot
-            || type == SimEventType.AnimalsPetted || type == SimEventType.Trampled || type == SimEventType.MovedIn;
+            || type == SimEventType.AnimalsPetted || type == SimEventType.Trampled || type == SimEventType.MovedIn
+            || type == SimEventType.MonsterFx;
     }
 
     public enum BossState : byte
@@ -601,6 +644,18 @@ namespace Game.Core
         // hurts whoever stands in it, each until its ResolveTick, when it is simply gone.
         Web,
         Venom,
+        // What a monster's attack leaves (2026-11-21, MonsterPool): fire burns whoever stands in it, ice chills them,
+        // spores hurt like venom, sand slows like a web.
+        Fire,
+        Ice,
+        Spore,
+        Sand,
+        // A cloud that fills the monsters in it and does nothing to players (MonsterTraitKind.Deathcloud).
+        Balm,
+        // A circle that drags the players in it toward its middle at Width tiles a second until it bursts.
+        Pull,
+        // A trap: a circle that waits, and goes off early when someone steps into it once it is armed.
+        Mine,
     }
 
     // A marked area that hurts every player inside it when ResolveTick comes. Zero damage marks a charge's path.
@@ -626,7 +681,7 @@ namespace Game.Core
         public int Cause { get; }
         public HazardShape Shape { get; }
         // Centre of a circle, or where a cone or line starts.
-        public Vec2 Position { get; }
+        public Vec2 Position { get; internal set; }
         public Vec2 Direction { get; }
         // Circle radius, a ring's outer radius, or cone and line length.
         public float Size { get; }
@@ -634,11 +689,24 @@ namespace Game.Core
         public float Width { get; }
         public int Damage { get; }
         public long StartTick { get; }
-        public long ResolveTick { get; }
+        public long ResolveTick { get; internal set; }
+        // A monster's own (2026-11-21): drawn from the monster's state on the screen, so it is not sent (Attached); what
+        // its hit does besides damage; what it leaves behind and for how long; and for a trap, the tick it is armed.
+        public bool Attached { get; internal set; }
+        internal HitEffect Effect { get; set; }
+        internal float EffectAmount { get; set; }
+        internal MonsterPool Leaves { get; set; }
+        internal float LeavesSeconds { get; set; }
+        public long ArmTick { get; internal set; }
+        // 0 for a boss's; for a monster's, the attack shape that laid it plus one, or DeathFlash (what the wire
+        // carries in place of the cause, HazardState.MonsterShape).
+        public byte Mark { get; internal set; }
+        public const byte DeathFlash = 100;
         // The web whose burst this marks (AttackShape.Pluck), taken away when it lands; 0 for none.
         public int Plucks { get; internal set; }
         // A web or a pool of venom: it does its work while it lies there, and nothing when its time is up.
-        public bool Lingers => Shape == HazardShape.Web || Shape == HazardShape.Venom;
+        public bool Lingers => Shape == HazardShape.Web || Shape == HazardShape.Venom || Shape == HazardShape.Fire || Shape == HazardShape.Ice
+            || Shape == HazardShape.Spore || Shape == HazardShape.Sand || Shape == HazardShape.Balm;
 
         // Whether a circle of the given radius at point touches the area.
         public bool Contains(Vec2 point, float radius)
@@ -649,9 +717,16 @@ namespace Game.Core
             {
                 case HazardShape.Circle:
                 case HazardShape.Share:
+                case HazardShape.Pull:
+                case HazardShape.Mine:
                     return distance <= Size + radius;
                 case HazardShape.Web:
                 case HazardShape.Venom:
+                case HazardShape.Fire:
+                case HazardShape.Ice:
+                case HazardShape.Spore:
+                case HazardShape.Sand:
+                case HazardShape.Balm:
                     // A pool takes whoever's feet are in it, not whoever brushes its edge.
                     return distance <= Size;
                 case HazardShape.Ring:
@@ -767,8 +842,17 @@ namespace Game.Core
         // attack).
         public int Cause { get; }
         public Vec2 Position { get; internal set; }
-        // Tiles per second.
-        public Vec2 Velocity { get; }
+        // Tiles per second. A bouncing or returning shot's changes on the way (2026-11-21).
+        public Vec2 Velocity { get; internal set; }
+        // A monster's: how many more walls it comes off; and for one that comes back, the ticks until it turns (0 for
+        // one that does not, -1 once it has turned) and the pause left at the turn.
+        internal int BouncesLeft { get; set; }
+        internal int TurnTicks { get; set; }
+        internal int PauseTicks { get; set; }
+        internal float Pace { get; set; }
+        // What its hit does besides damage (MonsterAttack.Effect).
+        internal HitEffect Effect { get; set; }
+        internal float EffectAmount { get; set; }
         public float Radius { get; }
         // Before armor. A player's projectile rolls its damage and crit when it is fired; one that goes through
         // monsters (SkillSupports.Pierces) is softer after each.

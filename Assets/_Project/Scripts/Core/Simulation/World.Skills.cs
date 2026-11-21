@@ -489,8 +489,9 @@ namespace Game.Core
         void HitEnemy(Player player, Enemy enemy, float damage, bool critical, Vec2 from, SkillTag tags, int cause = 0, bool knockback = true,
             bool chained = false, float push = 1)
         {
-            if (enemy.IsDead) return;
-            int amount = Combat.Mitigate(damage * ElementFactor(enemy.Definition, tags), enemy.Definition.Armor);
+            // One under the ground is out of reach; a guard turns most of a blow from its front (World.MonsterAttacks.cs).
+            if (enemy.IsDead || enemy.Away) return;
+            int amount = Combat.Mitigate(damage * ElementFactor(enemy.Definition, tags) * TakenShare(enemy, from), enemy.Definition.Armor);
             enemy.Health -= amount;
             if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed * push;
             _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));

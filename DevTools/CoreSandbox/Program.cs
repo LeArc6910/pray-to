@@ -372,7 +372,7 @@ namespace CoreSandbox
         static MonsterData LoadMonsters()
         {
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
-            var data = MonsterSheet.Parse(File.ReadAllText(Path.Combine(folder, MonsterSheet.File)));
+            var data = MonsterSheet.Parse(File.ReadAllText(Path.Combine(folder, MonsterSheet.File)), File.ReadAllText(Path.Combine(folder, MonsterAttackSheet.File)));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

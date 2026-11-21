@@ -95,6 +95,12 @@ namespace Game.Client
         internal int SkillShotsDrawn => _view?.SkillShotsDrawn ?? 0;
         internal bool WarningShown => _view != null && _view.WarningShown;
         internal int PoolsShown => _view?.PoolsShown ?? 0;
+        // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
+        internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;
+        internal int MonsterPoolsShown => _view?.MonsterPoolsShown ?? 0;
+        internal int MonsterFxAlive => _view?.MonsterFxAlive ?? 0;
+        internal int MonsterFxPieces => _view?.MonsterFxPieces ?? 0;
+        internal int MonsterShotsDrawn => _view?.MonsterShotsDrawn ?? 0;
         internal string RenderTrace => _view?.RenderTrace;
 
         internal int CornersNear => _view == null || _client?.Map == null ? -1
@@ -788,7 +794,8 @@ namespace Game.Client
 
             if (_host == null) return;
             // Only a playtest runs a solo world faster than time (Playtest.cs, "speed").
-            int ticks = _mode == Mode.Solo ? Mathf.Clamp(HostTicksPerStep, 1, 60) : 1;
+            // 0 holds the world still (for a picture), as the playtest's "speed 0" says.
+            int ticks = _mode == Mode.Solo ? Mathf.Clamp(HostTicksPerStep, 0, 60) : 1;
             for (int i = 0; i < ticks; i++)
             {
                 _host.Tick();

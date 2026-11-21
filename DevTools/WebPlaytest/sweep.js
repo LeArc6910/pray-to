@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -2199,6 +2199,143 @@ async function skillfx(browser) {
   await phone.context.close();
 }
 
+// ---------------------------------------------------------------- 일반 몬스터의 공격 (monster_attacks.csv)
+
+// The monsters that fight from monster_attacks.csv (2026-11-21, Docs/Combat.md 몬스터의 공격 시트), one attack at a time
+// in the wild: "monsters hold" keeps them from starting anything themselves, "mob <id> use <attack>" starts the one
+// asked for. Three pictures each: the warning (the host stopped in the middle of the telegraph), the blow (its effect
+// held at 0.06 s) and what thins out (0.3 s). A mark that starts at the monster is not sent as a hazard: the screen
+// makes it from the monster's state, so "mobMarksShown" counts it while the world's "mobHazards" is the host's own.
+// [monster, name, attack, kind, how far to the right the monster stands]
+const MobAttacks = [
+  ['slime', '슬라임', 'pounce', 'mark', 3.2],
+  ['slime', '슬라임', 'bite', 'mark', 1.1],
+  ['cave_beetle', '동굴 딱정벌레', 'ram', 'rush', 3],
+  ['frost_wisp', '서리 정령', 'frost_ring', 'mark', 1.8],
+  ['frost_wisp', '서리 정령', 'icicle', 'mark', 5],
+  ['void_wisp', '공허 정령', 'orb', 'shot', 5],
+  ['void_wisp', '공허 정령', 'gravity_well', 'mark', 5],
+  ['void_wisp', '공허 정령', 'shift', 'blink', 2],
+];
+
+async function mobAttack(game, [id, name, attack, kind, gap], prefix = 'monsterfx') {
+  const tag = `${prefix}-${id}-${attack}`;
+  await game.send(`fxhold off; speed 1; clear; heal; face 1 0`);
+  await game.wait(700);
+  await game.send(`spawn ${id} ${gap} 0 5000`);
+  await game.wait(300);
+  const before = await game.state();
+  await game.send(`mob ${id} use ${attack}`);
+  // The warning: wait until the screen has it, then hold the world still for the picture.
+  const warned = await pollState(game, st => st.mobMarksShown > 0 || (kind === 'shot' && /Windup/.test(st.mobs || '')), 2000);
+  await game.send('speed 0');
+  await game.wait(250);
+  const held = await game.state();
+  check(new RegExp(`${id}:Windup:${attack}`).test(held.mobs || ''), `${name} ${attack}: 예고가 시작된다 (${held.mobs})`);
+  if (kind !== 'shot') {
+    check(held.mobHazards > 0, `${name} ${attack}: 호스트에 장판이 있다 (${held.mobHazards}개)`);
+    check(warned.mobMarksShown > 0 && held.mobFxPieces > 0, `${name} ${attack}: 바닥 표시가 그려진다 (표시 ${held.mobMarksShown}개, 조각 ${held.mobFxPieces}개)`);
+  } else {
+    check(held.mobFxPieces > 0, `${name} ${attack}: 쏘기 전 몸짓이 그려진다 (조각 ${held.mobFxPieces}개)`);
+  }
+  await game.shot(`${tag}-1`, `${name} ${attack}: 예고`);
+
+  if (kind === 'shot') {
+    // Let it fire, and stop again with the shot in the air.
+    await game.send('speed 1');
+    const flying = await pollState(game, st => st.bossShots > 0, 3000);
+    await game.send('speed 0');
+    check(flying.bossShots > 0, `${name} ${attack}: 탄이 나간다`);
+    const drawn = await pollState(game, st => st.mobShots > 0, 2000);
+    check(drawn.mobShots > 0, `${name} ${attack}: 탄이 그 몬스터의 모습으로 그려진다 (조각 ${drawn.mobFxPieces}개)`);
+    await game.shot(`${tag}-2`, `${name} ${attack}: 날아가는 중`);
+    await game.send('speed 1');
+    const home = await pollState(game, st => st.bossShots === 0, 6000);
+    check(home.bossShots === 0, `${name} ${attack}: 탄이 돌아가 사라진다`);
+    await game.shot(`${tag}-3`, `${name} ${attack}: 끝난 뒤`);
+    return;
+  }
+
+  // The blow, held at its brightest; then what thins out.
+  await game.send('fxhold 0.06; speed 1');
+  const landed = await pollState(game, st => st.mobHazards === 0, 5000);
+  check(landed.mobHazards === 0, `${name} ${attack}: 장판이 터지고 사라진다`);
+  if (kind === 'mark') {
+    const blow = await pollState(game, st => st.mobFx > 0, 1500);
+    check(blow.mobFx > 0, `${name} ${attack}: 터지는 이펙트가 그려진다 (조각 ${blow.mobFxPieces}개)`);
+    if (attack === 'frost_ring') check((await pollState(game, st => st.rooted, 800)).rooted, `${name} ${attack}: 맞으면 묶인다`);
+    if (attack === 'pounce' || attack === 'bite' || attack === 'frost_ring') check(landed.health < before.health || (await game.state()).health < before.health, `${name} ${attack}: 서 있으면 맞는다`);
+  }
+  await game.shot(`${tag}-2`, `${name} ${attack}: ${kind === 'mark' ? '터지는 순간(0.06초)' : kind === 'rush' ? '달리는 중' : '옮겨 간 뒤'}`);
+  if (kind === 'blink') {
+    const after = await game.state();
+    check(before.foe !== after.foe, `${name} ${attack}: 다른 자리로 옮겨 갔다 (${before.foe} → ${after.foe})`);
+  }
+  await game.send('fxhold 0.3');
+  await game.wait(450);
+  await game.shot(`${tag}-3`, `${name} ${attack}: 흩어짐(0.3초)`);
+  await game.send('fxhold off');
+  const gone = await pollState(game, st => st.mobFx === 0 && st.mobMarksShown === 0, 2500);
+  check(gone.mobFx === 0 && gone.mobMarksShown === 0, `${name} ${attack}: 끝난 뒤 남는 것이 없다 (이펙트 ${gone.mobFx}개, 표시 ${gone.mobMarksShown}개)`);
+}
+
+async function monsterfx(browser) {
+  note('\n## 일반 몬스터의 공격과 이펙트 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 9, 6);
+  await game.send('monsters hold; equip iron_armor; heal');
+  for (const row of MobAttacks) await mobAttack(game, row);
+
+  // The old look of the first, for setting side by side: marks filled in the way a boss's are, no pieces.
+  await game.send('fxhold off; speed 1; clear; heal; face 1 0; feel monsterfx off');
+  await game.wait(600);
+  await game.send('spawn slime 3.2 0 5000');
+  await game.wait(300);
+  await game.send('mob slime use pounce');
+  await pollState(game, st => st.mobMarksShown > 0, 2000);
+  await game.send('speed 0');
+  await game.wait(250);
+  check((await game.state()).mobFxPieces === 0, '끄면(feel monsterfx off) 조각이 그려지지 않는다');
+  await game.shot('monsterfx-slime-pounce-old', '슬라임 pounce: 끈 모습(feel monsterfx off)');
+  await game.send('feel monsterfx on; speed 1');
+
+  // A slime of the second zone splits when it falls; the small ones are drawn smaller.
+  await game.send('clear; heal');
+  await game.wait(600);
+  await game.send('spawn slime 2.5 0 5000');
+  await game.wait(300);
+  await game.send('mob slime kill 2');
+  const split = await pollState(game, st => st.monsters === 2, 2000);
+  check(split.monsters === 2 && split.monsterKinds === 'slime', `구역 2의 슬라임은 죽으면 둘로 갈라진다 (${split.monsters}마리)`);
+  await game.shot('monsterfx-slime-split', '슬라임이 갈라진 뒤');
+
+  // A beetle's front turns most of a blow; struck there it clangs.
+  await game.send('clear; heal');
+  await game.wait(600);
+  await game.send('spawn cave_beetle 1.4 0 5000');
+  await game.wait(600);
+  await game.send('fxhold 0.05; mob cave_beetle hurt 0.02');
+  await game.wait(350);
+  await game.shot('monsterfx-beetle-guard', '딱정벌레의 앞 등딱지에 막힌 순간');
+  await game.send('fxhold off; clear; monsters go');
+  await game.context.close();
+
+  note('\n## 일반 몬스터의 공격 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 9, 6);
+  await phone.send('monsters hold; equip iron_armor; heal');
+  await mobAttack(phone, MobAttacks[3], 'monsterfx-phone');
+  await mobAttack(phone, MobAttacks[6], 'monsterfx-phone');
+  await phone.send('monsters go');
+  await phone.context.close();
+}
+
 // ---------------------------------------------------------------- 바닥, 문, 장식 (41단계)
 async function base(browser) {
   note('\n## 바닥·문·장식 (PC)\n');
@@ -3619,7 +3756,7 @@ async function roll(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, base, save, story, deploysave, layout, touch };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

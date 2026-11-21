@@ -53,7 +53,7 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 
 # 도트 그림과 효과음·음악을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, player.png, bosses.png, anim/*.gif, cave.png, cave_unlit.png, arena.png, effects.png, sounds/, music/)
 dotnet run --project DevTools/ArtPreview
-# 보스 하나의 움직임만 다시(anim/의 GIF, 프레임표, 연속성 보고서. spider, knight, samurai, vein_eater). hero는 주인공의 무기별 모션(hero_*), entrances는 네 보스의 입장만, arenas는 아레나 그림만(arenas.png, arenas_unlit.png, arenas_world.png, arenas/), skillfx는 스킬 이펙트만(skillfx/의 클래스별 프레임표·GIF, Docs/SkillEffects.md)
+# 보스 하나의 움직임만 다시(anim/의 GIF, 프레임표, 연속성 보고서. spider, knight, samurai, vein_eater). hero는 주인공의 무기별 모션(hero_*), entrances는 네 보스의 입장만, arenas는 아레나 그림만(arenas.png, arenas_unlit.png, arenas_world.png, arenas/), skillfx는 스킬 이펙트만(skillfx/의 클래스별 프레임표·GIF, Docs/SkillEffects.md), monsterfx는 일반 몬스터의 예고와 이펙트만(monsterfx/의 종별 프레임표·GIF, Docs/Combat.md 몬스터의 공격 시트)
 dotnet run --project DevTools/ArtPreview -- --only spider
 # 생성된 지도 그림만(out/map/: 생성기 1판·2판, 시드 1~3의 온 지도와 시작 지점, 시드 1의 생물군계마다와 방 그래프)
 dotnet run --project DevTools/ArtPreview -- --only map

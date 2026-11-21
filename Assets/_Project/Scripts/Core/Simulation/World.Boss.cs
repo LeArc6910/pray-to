@@ -660,9 +660,14 @@ namespace Game.Core
                     else Linger(hazard);
                     continue;
                 }
-                if (Tick < hazard.ResolveTick) continue;
+                if (Tick < hazard.ResolveTick)
+                {
+                    Pending(hazard);
+                    if (Tick < hazard.ResolveTick) continue;
+                }
                 _hazards.RemoveAt(i);
                 LeavePool(hazard);
+                LeaveMonsterPool(hazard);
                 if (hazard.Plucks != 0) (plucked ??= new List<int>()).Add(hazard.Plucks);
                 if (hazard.Damage <= 0) continue;
                 var hit = _players.Where(p => !p.IsDead && hazard.Contains(p.Position, PlayerRadius)).ToList();
@@ -673,7 +678,11 @@ namespace Game.Core
                 }
                 // A shared circle splits its damage among everyone in it; alone, one takes it all.
                 int damage = hazard.Shape == HazardShape.Share ? (int)MathF.Ceiling(hazard.Damage / (float)Math.Max(1, hit.Count)) : hazard.Damage;
-                foreach (var player in hit) AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
+                foreach (var player in hit)
+                {
+                    AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
+                    Affect(player, hazard.Effect, hazard.EffectAmount, hazard.Position);
+                }
                 _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size)));
             }
             // A plucked web bursts and is gone.
@@ -703,6 +712,11 @@ namespace Game.Core
         // A web snares whoever is in it; venom hurts whoever stands in it, every VenomSeconds from when it fell.
         void Linger(Hazard pool)
         {
+            if (pool.Shape != HazardShape.Web && pool.Shape != HazardShape.Venom)
+            {
+                LingerMonsterPool(pool);
+                return;
+            }
             bool bites = pool.Shape == HazardShape.Venom && Tick > pool.StartTick && (Tick - pool.StartTick) % Ticks(VenomSeconds) == 0;
             if (pool.Shape != HazardShape.Web && !bites) return;
             foreach (var player in _players)
@@ -723,7 +737,10 @@ namespace Game.Core
                 var projectile = flying[i];
                 if (!_projectiles.Contains(projectile)) continue;
                 projectile.Position += projectile.Velocity * TickSeconds;
-                bool ended = --projectile.RemainingTicks <= 0 || Collision.Overlaps(Map, projectile.Position, projectile.Radius * 0.5f);
+                // A monster's shot may come off the wall or turn back there (World.MonsterAttacks.cs).
+                bool wall = Collision.Overlaps(Map, projectile.Position, projectile.Radius * 0.5f);
+                if (wall && !projectile.Friendly && Rebound(projectile)) wall = false;
+                bool ended = --projectile.RemainingTicks <= 0 || wall || ComesBack(projectile);
                 bool gone = projectile.Friendly ? FlyFriendly(projectile, ended) : ended || StrikePlayer(projectile);
                 if (gone) _projectiles.Remove(projectile);
             }
@@ -732,12 +749,18 @@ namespace Game.Core
         // A boss's projectile stops at the first player it touches.
         bool StrikePlayer(Projectile projectile)
         {
-            var victim = _players.FirstOrDefault(p => !p.IsDead && Vec2.Distance(p.Position, projectile.Position) <= projectile.Radius + PlayerRadius);
+            // A returning shot goes on through, striking each player once on the way out and once on the way back.
+            bool returns = projectile.TurnTicks != 0;
+            var victim = _players.FirstOrDefault(p => !p.IsDead && Vec2.Distance(p.Position, projectile.Position) <= projectile.Radius + PlayerRadius
+                && !(returns && projectile.Pierced.Contains(p.Id)));
             if (victim == null) return false;
             // It flies on through a rolling player (World.Roll.cs).
             if (Dodges(victim, projectile.Source)) return false;
             AfflictPlayer(victim, projectile.Source, HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause));
-            return true;
+            Affect(victim, projectile.Effect, projectile.EffectAmount, projectile.Position - projectile.Velocity * TickSeconds);
+            if (!returns) return true;
+            projectile.Pierced.Add(victim.Id);
+            return false;
         }
     }
 }

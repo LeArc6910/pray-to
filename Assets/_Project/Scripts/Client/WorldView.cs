@@ -84,6 +84,19 @@ namespace Game.Client
             public float DownTime = -1;
             public float RiseTime;
             // A boss's state as the snapshots say, for its pose; a monster's likewise.
+            // A monster that fights from the sheet (WorldView.MonsterFx.cs): its colours, the attack it is on, when (by
+            // the host's clock) and where its wind-up began and which way it faced, and how long that wind-up is.
+            public bool MobLooked;
+            public FxRamp MobRamp;
+            public uint MobTint;
+            public MonsterAttack MobAttack;
+            public EnemyState MobState;
+            public bool MobWinding;
+            public double MobSince;
+            public float MobElapsed;
+            public float MobTelegraph;
+            public Vec2 MobDir;
+            public Vec2 MobAt;
             public BossState BossState;
             // The attack a boss is on, when it took it up (or changed state) and its phase; the warning sign over it
             // and, for the vein eater, the mound it runs under the floor and when it last threw up dust
@@ -175,6 +188,8 @@ namespace Game.Client
             public HazardState State;
             // A rock falling onto it from the roof (the vein eater's cave-in, WorldView.Bosses.cs).
             public SpriteRenderer Rock;
+            // A monster's trap, once it has been heard arming (WorldView.MonsterFx.cs).
+            public bool Armed;
         }
 
         // A player's pet (Pets.cs): its monster drawn small, trotting after them a little behind, hopping or bobbing.
@@ -615,6 +630,7 @@ namespace Game.Client
             foreach (var e in _client.TakeEvents()) Show(e);
             _rendered = 4;
             UpdateFlashes(deltaTime);
+            DrawMonsterFx(deltaTime);
             UpdateSkillFx(deltaTime);
             UpdateWaves(deltaTime);
             UpdateTracers(deltaTime);
@@ -862,6 +878,7 @@ namespace Game.Client
             // The samurai's dimming holds only while it is there to set it (WorldView.Bosses.cs).
             if (_dim != null) _dim.color = Color.clear;
             _seen.Clear();
+            _attachedMarks.Clear();
             foreach (var view in _client.Others())
             {
                 _seen.Add(view.Id);
@@ -925,6 +942,9 @@ namespace Game.Client
                 {
                     glow = Faded(WindupColor, 0.35f + 0.25f * Mathf.Sin(Time.time * 30));
                     pulse = 0.06f;
+                    // One that fights from the sheet glows as a boss does for the same kind of warning (Docs/Bosses.md
+                    // 전조 말): red for an area, yellow for a rush, a white flicker for shots, violet for a call.
+                    if (view.MonsterAttack != null && Feel.MonsterFx) glow = TellGlow(view.EnemyTell);
                 }
                 if (view.Kind == EntityKind.Monster && view.EnemyState == EnemyState.Charge) glow = Faded(ChargeColor, 0.45f);
                 (tint, glow) = StatusLook(view.Status, tint, glow);
@@ -967,6 +987,7 @@ namespace Game.Client
                     showHealth: view.Kind != EntityKind.Boss && view.Kind != EntityKind.Minion,
                     weapon: view.Weapon);
                 if (view.Kind == EntityKind.Boss) BossExtras(body, view);
+                if (view.Kind == EntityKind.Monster) MonsterExtras(body, view);
                 if (view.IsPlayer)
                 {
                     _buffBits[view.Id] = view.State;
@@ -1157,10 +1178,20 @@ namespace Game.Client
         void DrawMarks()
         {
             _seen.Clear();
-            foreach (var view in _client.Hazards())
+            // With them, the marks of monsters' attacks that start at the monster, made here from the sheet
+            // (WorldView.MonsterFx.cs): those are not sent.
+            foreach (var view in _client.Hazards().Concat(_attachedMarks))
             {
                 var hazard = view.State;
                 _seen.Add(hazard.Id);
+                // An ordinary monster's mark is drawn its own way: a thin rim, a faint fill (a web or venom it left is
+                // drawn as a boss's is).
+                if (hazard.FromMonster && !IsPool(hazard))
+                {
+                    if (!_marks.TryGetValue(hazard.Id, out var own)) _marks[hazard.Id] = own = MakeMonsterMark(hazard);
+                    DrawMonsterMark(own, view);
+                    continue;
+                }
                 if (!_marks.TryGetValue(hazard.Id, out var mark))
                 {
                     // What a blow left on the floor (a web, a pool of venom) is no warning: it is drawn as itself.
@@ -1233,6 +1264,11 @@ namespace Game.Client
             if (_marks.TryGetValue(id, out var mark)) hazard = mark.State;
             else if (_landed.TryGetValue(id, out var gone)) hazard = gone.State;
             else return;
+            if (hazard.FromMonster && !IsPool(hazard) && Feel.MonsterFx)
+            {
+                MonsterLanded(hazard);
+                return;
+            }
             // A web or a pool of venom running out is no blow.
             if (!hazard.Harmful || IsPool(hazard)) return;
             if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard)) return;
@@ -2008,6 +2044,8 @@ namespace Game.Client
                 // A skill's projectile is drawn by the skill's own effect instead (WorldView.SkillFx); the plain one
                 // stays, unseen, for its light.
                 renderer.enabled = !DrawSkillShot(projectile, isNew, deltaTime);
+                // A monster's shot from the sheet likewise, in its monster's colours (WorldView.MonsterFx).
+                if (!projectile.Friendly && DrawMonsterShot(projectile, isNew)) renderer.enabled = false;
                 // The silk mother's venom sheds drops as it flies.
                 if (!projectile.Friendly && _bossInView?.Id == "silk_mother" && UnityEngine.Random.value < 0.3f)
                     Drip(new Vector3(projectile.Position.X, projectile.Position.Y, 0), VenomColor);
@@ -2027,6 +2065,7 @@ namespace Game.Client
             {
                 _projectiles.Remove(id);
                 SkillShotGone(id);
+                MonsterShotGone(id);
             }
         }
 
@@ -2167,11 +2206,17 @@ namespace Game.Client
                     _floating.Add(new Floating { Position = raised.Position + new Vector3(0, 0.7f, 0), Text = "일어났다!", Color = LevelColor });
                     Hear(Sound.Learn, raised.Position);
                     break;
+                case SimEventType.Guarded:
+                case SimEventType.Tether:
+                case SimEventType.MonsterFx:
+                    ShowMonsterEvent(e);
+                    break;
                 case SimEventType.Impact:
                     if (e.Target != 0) HazardLanded(e.Target);
                     var source = Find(e.Source);
                     if (source == null || Vector3.Distance(source.Position, _self.Position) > ShakeRange) break;
-                    _shake = Mathf.Max(_shake, Mathf.Min(0.45f, e.Amount * 0.07f));
+                    // An ordinary monster's blow jolts the screen far less than a boss's.
+                    _shake = Mathf.Max(_shake, source.Kind == BodyKind.Monster ? Mathf.Min(0.08f, e.Amount * 0.025f) : Mathf.Min(0.45f, e.Amount * 0.07f));
                     Hear(Sound.Boom, source.Position, Mathf.Min(1, 0.4f + e.Amount * 0.1f));
                     break;
                 case SimEventType.SkillUsed:

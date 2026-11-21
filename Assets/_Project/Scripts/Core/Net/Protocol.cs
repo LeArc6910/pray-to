@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.87.0";
+        public const string Version = "0.88.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -1011,7 +1011,12 @@ namespace Game.Core
         // Hidden: nothing is drawn on the ground until it lands; Strong: a warning sign too (AttackWarning).
         public AttackWarning Warning { get; }
         // The boss's attack that laid it (its place in the sheet plus one; 0 for a roar's blast), for its own blast.
+        // With MonsterMark set it is an ordinary monster's instead, and the rest is which kind of attack laid it
+        // (Hazard.Mark: the MonsterAttackShape plus one, or Hazard.DeathFlash), so the screen draws it as that.
         public byte Cause { get; }
+        public const int MonsterMark = 0x80;
+        public bool FromMonster => (Cause & MonsterMark) != 0;
+        public int MonsterShape => (Cause & (MonsterMark - 1)) - 1;
     }
 
     // What only the receiving player needs about themselves.

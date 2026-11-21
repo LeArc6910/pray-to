@@ -345,7 +345,7 @@ namespace Game.Client
             }
         }
 
-        static void Over(PixelImage image, PixelImage piece, int left, int top, float alpha)
+        internal static void Over(PixelImage image, PixelImage piece, int left, int top, float alpha)
         {
             for (int y = 0; y < piece.Height; y++)
             {
@@ -357,7 +357,7 @@ namespace Game.Client
             }
         }
 
-        static PixelImage Sheet(List<List<PixelImage>> rows)
+        internal static PixelImage Sheet(List<List<PixelImage>> rows)
         {
             const int gap = 2;
             int width = rows.Max(row => row.Sum(i => i.Width + gap)) + gap, height = rows.Sum(row => row[0].Height + gap) + gap;
@@ -424,7 +424,7 @@ namespace Game.Client
             return Sheet(rows);
         }
 
-        static PixelImage Grey(PixelImage image)
+        internal static PixelImage Grey(PixelImage image)
         {
             var grey = new PixelImage(image.Width, image.Height);
             for (int y = 0; y < image.Height; y++)
@@ -439,7 +439,7 @@ namespace Game.Client
             return grey;
         }
 
-        static PixelImage Scaled(PixelImage image, int scale)
+        internal static PixelImage Scaled(PixelImage image, int scale)
         {
             var result = new PixelImage(image.Width * scale, image.Height * scale);
             for (int y = 0; y < result.Height; y++)
@@ -450,7 +450,7 @@ namespace Game.Client
 
         static PixelImage Doubled(PixelImage image) => Scaled(image, 2);
 
-        static Rgba[] Flat(PixelImage image)
+        internal static Rgba[] Flat(PixelImage image)
         {
             var pixels = new Rgba[image.Width * image.Height];
             for (int y = 0; y < image.Height; y++)

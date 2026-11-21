@@ -176,6 +176,7 @@ namespace Game.Core
             }
             foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id);
             _enemies.RemoveAll(e => e.IsDead);
+            UpdateMonsterExtras();
             RemoveDefeatedBosses();
 
             if (Tick % FlowFieldInterval == 1)
@@ -355,8 +356,17 @@ namespace Game.Core
                 enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, enemy.Knockback * TickSeconds, monster: true);
                 enemy.Knockback *= KnockbackDecay;
             }
+            TickMonster(enemy);
+            if (MonstersHold && (enemy.State == EnemyState.Idle || enemy.State == EnemyState.Chase)) return;
 
             var target = FindPlayer(enemy.TargetId);
+            // One with attacks in monster_attacks.csv fights from that sheet once it has someone to fight
+            // (World.MonsterAttacks.cs); the others go on the old way below.
+            if (definition.Attacks.Count > 0 && enemy.State != EnemyState.Idle)
+            {
+                UpdateFighter(enemy, target);
+                return;
+            }
             switch (enemy.State)
             {
                 case EnemyState.Idle:

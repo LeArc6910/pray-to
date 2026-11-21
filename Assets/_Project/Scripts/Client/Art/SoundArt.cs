@@ -69,6 +69,24 @@ namespace Game.Client
         // The dodge roll (World.Roll.cs): cloth and air going over, and the feet coming down. Dodge: a blow going by.
         Roll,
         Dodge,
+        // Ordinary monsters (2026-11-21, Docs/Combat.md 몬스터의 공격 시트). The four kinds of warning: a low hum for an
+        // area, a scrape for a rush, a short hiss for shots, a bell for a call.
+        MobArea,
+        MobDash,
+        MobBarrage,
+        MobCall,
+        // A soft body coming down ("퐁"); a shot off a wall ("팅"); a blink; ice or crystal breaking; a blow turned by
+        // a shell; a head into rock ("쿵"); a pull's drone caving in; a trap armed and a trap set off; water mending.
+        Plop,
+        Ricochet,
+        Blink,
+        Shatter,
+        Clang,
+        Daze,
+        Implode,
+        TrapSet,
+        TrapSnap,
+        Mend,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -370,6 +388,87 @@ namespace Game.Client
                     parts.Add(Noise(0, 0.3f, 1, 0.35f, attack: 0.005f, decay: 4, seed: 12));
                     parts.Add(Tone(Wave.Sine, 0, 0.12f, 500, 1200, 0.4f, decay: 3));
                     level = 0.7f;
+                    break;
+                case Sound.MobArea:
+                    parts.Add(Tone(Wave.Sine, 0, 0.14f, 150, 120, 0.8f, attack: 0.01f, decay: 2.5f));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.1f, 300, 240, 0.2f, decay: 4));
+                    level = 0.5f;
+                    break;
+                case Sound.MobDash:
+                    parts.Add(Noise(0, 0.07f, 0.8f, 0.5f, attack: 0.004f, decay: 5, seed: 51));
+                    parts.Add(Noise(0.09f, 0.07f, 0.8f, 0.5f, attack: 0.004f, decay: 5, seed: 52));
+                    parts.Add(Tone(Wave.Saw, 0, 0.16f, 110, 90, 0.2f, decay: 2));
+                    level = 0.45f;
+                    break;
+                case Sound.MobBarrage:
+                    parts.Add(Noise(0, 0.07f, 0.9f, 0.95f, attack: 0.002f, decay: 6, seed: 53));
+                    parts.Add(Tone(Wave.Square, 0, 0.04f, 2200, 2600, 0.12f, decay: 6));
+                    level = 0.4f;
+                    break;
+                case Sound.MobCall:
+                    parts.Add(Tone(Wave.Sine, 0, 0.5f, 880, 880, 0.5f, attack: 0.003f, decay: 4));
+                    parts.Add(Tone(Wave.Sine, 0, 0.4f, 1320, 1318, 0.2f, attack: 0.003f, decay: 5));
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 2640, 2630, 0.08f, decay: 7));
+                    level = 0.45f;
+                    break;
+                case Sound.Plop:
+                    parts.Add(Tone(Wave.Sine, 0, 0.11f, 520, 170, 0.8f, attack: 0.002f, decay: 4));
+                    parts.Add(Tone(Wave.Sine, 0.06f, 0.08f, 240, 420, 0.3f, decay: 5));
+                    parts.Add(Noise(0, 0.05f, 0.35f, 0.4f, decay: 7, seed: 54));
+                    level = 0.55f;
+                    break;
+                case Sound.Ricochet:
+                    parts.Add(Tone(Wave.Triangle, 0, 0.16f, 2100, 2500, 0.6f, attack: 0.001f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0, 0.1f, 3300, 3100, 0.25f, decay: 7));
+                    level = 0.4f;
+                    break;
+                case Sound.Blink:
+                    parts.Add(Tone(Wave.Sine, 0, 0.18f, 300, 1500, 0.5f, attack: 0.01f, decay: 2));
+                    parts.Add(Noise(0, 0.2f, 0.4f, 0.9f, attack: 0.05f, decay: 3, seed: 55));
+                    parts.Add(Tone(Wave.Sine, 0.12f, 0.12f, 1500, 500, 0.3f, decay: 4));
+                    level = 0.45f;
+                    break;
+                case Sound.Shatter:
+                    parts.Add(Noise(0, 0.22f, 0.9f, 0.96f, attack: 0.001f, decay: 5, seed: 56));
+                    parts.Add(Tone(Wave.Sine, 0, 0.08f, 3200, 2400, 0.3f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.04f, 0.1f, 4100, 3000, 0.2f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.09f, 0.12f, 2700, 2000, 0.15f, decay: 6));
+                    level = 0.5f;
+                    break;
+                case Sound.Clang:
+                    parts.Add(Tone(Wave.Square, 0, 0.12f, 1250, 1180, 0.35f, attack: 0.001f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0, 0.2f, 1870, 1850, 0.3f, decay: 5));
+                    parts.Add(Noise(0, 0.03f, 0.5f, 0.9f, decay: 8, seed: 57));
+                    level = 0.45f;
+                    break;
+                case Sound.Daze:
+                    parts.Add(Tone(Wave.Sine, 0, 0.22f, 130, 55, 0.9f, attack: 0.002f, decay: 4));
+                    parts.Add(Noise(0, 0.14f, 0.7f, 0.3f, decay: 5, seed: 58));
+                    parts.Add(Tone(Wave.Sine, 0.18f, 0.25f, 900, 700, 0.15f, decay: 3, vibrato: 0.05f, vibratoRate: 9));
+                    level = 0.65f;
+                    break;
+                case Sound.Implode:
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 220, 60, 0.7f, attack: 0.02f, decay: 2));
+                    parts.Add(Noise(0, 0.3f, 0.5f, 0.6f, attack: 0.15f, decay: 2, seed: 59));
+                    parts.Add(Tone(Wave.Sine, 0.25f, 0.12f, 90, 45, 0.6f, decay: 5));
+                    level = 0.6f;
+                    break;
+                case Sound.TrapSet:
+                    parts.Add(Tone(Wave.Triangle, 0, 0.1f, 500, 760, 0.5f, attack: 0.004f, decay: 4));
+                    parts.Add(Tone(Wave.Sine, 0.08f, 0.14f, 1140, 1140, 0.3f, decay: 5));
+                    level = 0.4f;
+                    break;
+                case Sound.TrapSnap:
+                    parts.Add(Tone(Wave.Square, 0, 0.05f, 1500, 900, 0.4f, attack: 0.001f, decay: 7));
+                    parts.Add(Tone(Wave.Square, 0.07f, 0.05f, 1700, 1000, 0.4f, attack: 0.001f, decay: 7));
+                    parts.Add(Noise(0, 0.03f, 0.5f, 0.8f, decay: 8, seed: 60));
+                    level = 0.4f;
+                    break;
+                case Sound.Mend:
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 520, 780, 0.4f, attack: 0.03f, decay: 2.5f, vibrato: 0.02f, vibratoRate: 7));
+                    parts.Add(Noise(0, 0.3f, 0.3f, 0.6f, attack: 0.05f, decay: 3, seed: 61));
+                    parts.Add(Tone(Wave.Sine, 0.1f, 0.25f, 1040, 1300, 0.2f, decay: 3));
+                    level = 0.4f;
                     break;
                 case Sound.Step:
                     // A soft scuff on stone.

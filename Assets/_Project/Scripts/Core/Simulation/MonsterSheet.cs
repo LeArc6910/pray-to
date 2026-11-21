@@ -20,6 +20,23 @@ namespace Game.Core
         // whatever the zone's level or the biome, and only such monsters come there. Null for the caves at large.
         public string Place { get; internal set; }
 
+        // How it fights (monsters.csv role), what is always true of it (traits) and whether it comes in packs (pack),
+        // and the attacks it picks among (monster_attacks.csv, 2026-11-21, Docs/WorldRework.md 2b). One with no attack
+        // in that sheet fights the old way, by its Behavior.
+        public MonsterRole Role { get; internal set; }
+        public IReadOnlyList<MonsterTrait> Traits { get; internal set; } = Array.Empty<MonsterTrait>();
+        // "always", "solo" or empty for either (read by the packs of stage 2).
+        public string Pack { get; internal set; } = "";
+        readonly List<MonsterAttack> _attacks = new List<MonsterAttack>();
+        public IReadOnlyList<MonsterAttack> Attacks => _attacks;
+        internal void AddAttack(MonsterAttack attack) => _attacks.Add(attack);
+        public MonsterTrait Trait(MonsterTraitKind kind)
+        {
+            foreach (var trait in Traits) if (trait.Kind == kind) return trait;
+            return null;
+        }
+        public bool Has(MonsterTraitKind kind) => Trait(kind) != null;
+
         internal MonsterDefinition(
             string id,
             string name,
@@ -145,7 +162,8 @@ namespace Game.Core
         // A monster has to fit through a one-tile gap.
         const float MaxRadius = 0.45f;
 
-        public static MonsterData Parse(string csv)
+        // attacksCsv is monster_attacks.csv (MonsterAttackSheet); without it every monster fights by its behavior.
+        public static MonsterData Parse(string csv, string attacksCsv = null)
         {
             var errors = new List<string>();
             var monsters = new List<MonsterDefinition>();
@@ -209,15 +227,25 @@ namespace Game.Core
                         color,
                         biome,
                         resists,
-                        element) { Place = row["place"].Length == 0 ? null : row["place"] });
+                        element)
+                    {
+                        Place = row["place"].Length == 0 ? null : row["place"],
+                        Role = row["role"].Length == 0 ? MonsterRole.None : SheetValues.ParseEnum<MonsterRole>(row["role"], "role"),
+                        Traits = MonsterAttackSheet.Traits(row["traits"]),
+                        Pack = Pack(row["pack"]),
+                    });
                 }
                 catch (FormatException e)
                 {
                     errors.Add($"{File} {row.Line}행: {e.Message}");
                 }
             }
+            MonsterAttackSheet.Parse(attacksCsv, monsters, errors);
             return new MonsterData(monsters, errors);
         }
+
+        static string Pack(string cell) =>
+            cell == "" || cell == "always" || cell == "solo" ? cell : throw new FormatException($"pack은 비우거나 always, solo입니다('{cell}').");
 
         static readonly SkillTag[] ElementTags = { SkillTag.Fire, SkillTag.Cold, SkillTag.Lightning };
 

@@ -17,6 +17,8 @@ namespace Game.Client
         public float Alpha;
         // On the floor, under everyone (cracks, burns, rune circles, shadows); otherwise over everyone.
         public bool Ground;
+        // 0, or a colour (0x1RRGGBB) the view multiplies the piece by: a monster's own, over the Plain ramp (MonsterFx).
+        public uint Tint;
 
         public long Key => ((long)Shape << 48) | ((long)Ramp << 40) | ((long)(Size & 0xFFFF) << 16) | (long)(Frame & 0xFFFF);
     }
@@ -128,29 +130,29 @@ namespace Game.Client
 
         // ---- helpers ----
 
-        static void Put(List<FxStamp> o, FxShape shape, FxRamp ramp, int size, int frame, float x, float y, float alpha = 1, float angle = 0, bool ground = false)
+        internal static void Put(List<FxStamp> o, FxShape shape, FxRamp ramp, int size, int frame, float x, float y, float alpha = 1, float angle = 0, bool ground = false)
         {
             if (alpha <= 0.03f || size <= 0) return;
             o.Add(new FxStamp { Shape = shape, Ramp = ramp, Size = size, Frame = frame, X = x, Y = y, Alpha = Math.Min(1, alpha), Angle = angle, Ground = ground });
         }
 
-        static float U(float t, float from, float to) => Math.Clamp((t - from) / (to - from), 0, 1);
+        internal static float U(float t, float from, float to) => Math.Clamp((t - from) / (to - from), 0, 1);
 
-        static bool In(float t, float from, float to) => t >= from && t < to;
+        internal static bool In(float t, float from, float to) => t >= from && t < to;
 
         // Fast, then slow: sizes grow on this so the last one is the one that reads (rule 2).
-        static float Out(float u) => 1 - (1 - u) * (1 - u) * (1 - u);
+        internal static float Out(float u) => 1 - (1 - u) * (1 - u) * (1 - u);
 
-        static float Rnd(int seed, int i, int salt) => PixelNoise.Value(seed * 31 + i, i * 17 + salt, salt);
+        internal static float Rnd(int seed, int i, int salt) => PixelNoise.Value(seed * 31 + i, i * 17 + salt, salt);
 
-        static float Cos(float degrees) => (float)Math.Cos(degrees / Deg);
+        internal static float Cos(float degrees) => (float)Math.Cos(degrees / Deg);
 
-        static float Sin(float degrees) => (float)Math.Sin(degrees / Deg);
+        internal static float Sin(float degrees) => (float)Math.Sin(degrees / Deg);
 
-        static float Frac(float value) => value - (float)Math.Floor(value);
+        internal static float Frac(float value) => value - (float)Math.Floor(value);
 
         // Lines drawn in toward a point: radial lines pull the eye to the middle (rule 3), the anticipation.
-        static void Gather(List<FxStamp> o, FxRamp ramp, float t, float until, float radius, int count, int seed, float cx = 0, float cy = Body)
+        internal static void Gather(List<FxStamp> o, FxRamp ramp, float t, float until, float radius, int count, int seed, float cx = 0, float cy = Body)
         {
             if (!In(t, 0, until)) return;
             float u = t / until;
@@ -163,7 +165,7 @@ namespace Game.Client
         }
 
         // The thin edge at the skill's real reach (rule 5): opens fast and slows, thins, and is gone.
-        static void Ring(List<FxStamp> o, FxRamp ramp, float t, float from, float radius, int thick = 2, float grow = 0.12f, float life = 0.32f, float cx = 0, float cy = 0, bool ground = false)
+        internal static void Ring(List<FxStamp> o, FxRamp ramp, float t, float from, float radius, int thick = 2, float grow = 0.12f, float life = 0.32f, float cx = 0, float cy = 0, bool ground = false)
         {
             if (!In(t, from, from + life)) return;
             float k = (t - from) / life;
@@ -174,7 +176,7 @@ namespace Game.Client
 
         // Bits thrown out from a point, slowing as they go; with a hop they arc up and come down, with a rise they
         // drift up. Turned the way they fly when aimed.
-        static void Fly(List<FxStamp> o, FxShape shape, FxRamp ramp, int size, int frame, int count, float t, float from, float life, float near, float far, int seed,
+        internal static void Fly(List<FxStamp> o, FxShape shape, FxRamp ramp, int size, int frame, int count, float t, float from, float life, float near, float far, int seed,
             float hop = 0, float rise = 0, float cx = 0, float cy = 0, bool aimed = false, float cone = 360, float toward = 0, float alpha = 1)
         {
             if (!In(t, from, from + life * 1.2f)) return;
@@ -191,7 +193,7 @@ namespace Game.Client
         }
 
         // Bits rising from somewhere in a disc, one after another: embers, motes, sparkles.
-        static void Float(List<FxStamp> o, FxShape shape, FxRamp ramp, int size, int frame, int count, float t, float from, float to, float radius, float rise, int seed,
+        internal static void Float(List<FxStamp> o, FxShape shape, FxRamp ramp, int size, int frame, int count, float t, float from, float to, float radius, float rise, int seed,
             float cx = 0, float cy = 0, float alpha = 1)
         {
             if (!In(t, from, to)) return;

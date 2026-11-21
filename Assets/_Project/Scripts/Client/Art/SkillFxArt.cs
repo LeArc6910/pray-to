@@ -75,6 +75,11 @@ namespace Game.Client
         Gold,
         // Pale mist, for what cold leaves behind.
         Mist,
+        // Monsters' effects (2026-11-21, MonsterFx): the red of an enemy's mark on the ground, the violet of a call
+        // and of the void, and greys that the view tints with a monster's own colour.
+        Danger,
+        Violet,
+        Plain,
     }
 
     static class SkillFxArt
@@ -94,6 +99,9 @@ namespace Game.Client
             new[] { Rgba.Hex("#3A3440"), Rgba.Hex("#5A525E"), Rgba.Hex("#7C7280"), Rgba.Hex("#9A909C") },
             new[] { Rgba.Hex("#9A5A1E"), Rgba.Hex("#E0A030"), Rgba.Hex("#FFD860"), Rgba.Hex("#FFF6C0") },
             new[] { Rgba.Hex("#8AA8C0"), Rgba.Hex("#B4CCDC"), Rgba.Hex("#DCEAF2"), Rgba.Hex("#F4FAFF") },
+            new[] { Rgba.Hex("#8A1E1A"), Rgba.Hex("#E03A30"), Rgba.Hex("#FF5A48"), Rgba.Hex("#FFC8B8") },
+            new[] { Rgba.Hex("#4A2A8A"), Rgba.Hex("#9058E0"), Rgba.Hex("#C49CFF"), Rgba.Hex("#F0E4FF") },
+            new[] { Rgba.Hex("#5E5E5E"), Rgba.Hex("#A8A8A8"), Rgba.Hex("#E0E0E0"), Rgba.Hex("#FFFFFF") },
         };
 
         public static Rgba[] Ramp(FxRamp ramp) => Ramps[(int)ramp];

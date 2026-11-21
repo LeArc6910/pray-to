@@ -120,7 +120,9 @@ namespace Game.Core.Tests
 
     public static class Monsters
     {
-        public static readonly MonsterData Shipped = MonsterSheet.Parse(File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Monsters/monsters.csv")));
+        public static readonly MonsterData Shipped = MonsterSheet.Parse(
+            File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Monsters/monsters.csv")),
+            File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Monsters/monster_attacks.csv")));
 
         public const string Header = "id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight\n";
 

@@ -47,7 +47,10 @@ namespace Game.Core
             MaxHealth = maxHealth;
             State = state;
             // A boss's phase carries the attack it is on above it (World.BossPhaseField).
-            Phase = kind == EntityKind.Boss ? phase & World.BossPhaseMask : phase & Protocol.PhaseMask;
+            // A monster's carries its rift mark, and above it the attack it is on (World.EnemyPhaseField).
+            Phase = kind == EntityKind.Boss ? phase & World.BossPhaseMask : kind == EntityKind.Monster ? phase & World.EnemyRiftMask : phase & Protocol.PhaseMask;
+            int attack = kind == EntityKind.Monster && monster != null ? (phase & Protocol.PhaseMask) >> World.EnemyAttackShift : 0;
+            MonsterAttack = attack >= 1 && attack <= monster.Attacks.Count ? monster.Attacks[attack - 1] : null;
             bool entering = kind == EntityKind.Boss && (BossState)(state & 0x0F) == BossState.Enter;
             BossAttack = kind == EntityKind.Boss && boss != null && !entering ? AttackAt(boss, (phase & Protocol.PhaseMask) >> World.BossAttackShift) : null;
             EntersAgain = entering && (phase & Protocol.PhaseMask) >> World.BossAttackShift == World.EntranceAgain;
@@ -70,7 +73,13 @@ namespace Game.Core
         public float Health { get; }
         public float MaxHealth { get; }
         public byte State { get; }
-        public EnemyState EnemyState => (EnemyState)State;
+        // A monster's state byte (World.EnemyStateByte): its state, the warning of the attack it winds up, and marks.
+        public EnemyState EnemyState => (EnemyState)(State & World.EnemyStateMask);
+        public Tell EnemyTell => (Tell)((State >> World.EnemyTellShift) & 7);
+        public bool Empowered => Kind == EntityKind.Monster && (State & World.EnemyEmpoweredBit) != 0;
+        public bool Small => Kind == EntityKind.Monster && (State & World.EnemySmallBit) != 0;
+        // The sheet attack a monster is winding up, making or resting from; null for one that fights the old way.
+        public MonsterAttack MonsterAttack { get; }
         public BossState BossState => (BossState)(State & 0x0F);
         // While a boss winds up, the kind of warning its attack gives (World.BossStateByte).
         public Tell Tell => (Tell)(State >> 4);
@@ -997,6 +1006,16 @@ namespace Game.Core
                         World.RollSlow((SelfStatus & StatusBits.Chilled) != 0, (SelfStatus & StatusBits.Snared) != 0), _myDoors);
                 }
                 else Position = PlayerMotor.Step(Map, Position, move, MoveSpeed, _myDoors);
+                // A circle that drags (HazardShape.Pull) moves this player here as it does on the host.
+                if (_snapshots.Count > 0)
+                {
+                    var latest = _snapshots[_snapshots.Count - 1];
+                    foreach (var hazard in latest.Hazards)
+                    {
+                        if (hazard.Shape == HazardShape.Pull && HostTick <= latest.Tick + hazard.TicksLeft)
+                            Position = World.PullStep(Map, Position, hazard.Position, hazard.Size, hazard.Width, _myDoors);
+                    }
+                }
             }
             _sequence++;
             int age = Rolling ? World.RollTicks - RollTicks + 1 : 0;

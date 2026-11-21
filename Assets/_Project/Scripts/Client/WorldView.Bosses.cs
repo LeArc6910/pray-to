@@ -36,7 +36,7 @@ namespace Game.Client
 
         // For the playtests: marks drawn on the ground (an unmarked attack's are kept but clear), and whether a
         // warning sign shows over a boss.
-        public int MarksShown => _marks.Values.Count(m => m.State.Warning != AttackWarning.Hidden && !IsPool(m.State));
+        public int MarksShown => _marks.Values.Count(m => m.State.Warning != AttackWarning.Hidden && !IsPool(m.State) && !m.State.FromMonster);
         public bool WarningShown => _others.Values.Any(b => b.Sign != null && b.Sign.enabled);
 
         // How far the last frame got (1 entities, 2 past them, 3 past the marks, 4 past the events), and how each boss

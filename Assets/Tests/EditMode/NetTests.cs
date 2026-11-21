@@ -448,8 +448,11 @@ namespace Game.Core.Tests
             Assert.AreEqual(SkillTag.Magic | SkillTag.Fire, flying.Tags, "the fireball's tags, flame brand's fire included");
 
             var bursts = new List<SimEvent>();
+            // Where the slime was when the fireball burst: it pounces on afterwards (monster_attacks.csv).
+            var struckAt = target.Position;
             for (int i = 0; i < 20; i++)
             {
+                if (bursts.Count == 0) struckAt = target.Position;
                 session.Tick();
                 bursts.AddRange(bob.TakeEvents().Where(e => e.Type == SimEventType.Burst));
             }
@@ -457,7 +460,7 @@ namespace Game.Core.Tests
             var burst = bursts.Single();
             Assert.AreEqual(alice.PlayerId, burst.Source);
             Assert.AreEqual("fireball", bob.SkillOf(burst.Source, burst.Amount).Id);
-            Assert.Less(Vec2.Distance(burst.Position, target.Position), 1.5f);
+            Assert.Less(Vec2.Distance(burst.Position, struckAt), 1.5f);
             Assert.Less(target.Health, Monsters.Shipped.Find("slime").Health);
             Assert.IsEmpty(bob.Projectiles());
         }

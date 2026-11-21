@@ -27,6 +27,11 @@ namespace Game.Client
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).
                 return WriteSkillFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "monsterfx")
+            {
+                // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
+                return WriteMonsterFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
@@ -36,7 +41,8 @@ namespace Game.Client
             string output = args.Length > 0 && args[0] != "--only" ? args[0] : Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
             Directory.CreateDirectory(output);
             var loot = LoadLoot();
-            var monsters = MonsterSheet.Parse(File.ReadAllText(Path.Combine(FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters")), MonsterSheet.File)));
+            string monsterFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
+            var monsters = MonsterSheet.Parse(File.ReadAllText(Path.Combine(monsterFolder, MonsterSheet.File)), File.ReadAllText(Path.Combine(monsterFolder, MonsterAttackSheet.File)));
             string world = FindFolder(Path.Combine("Assets", "_Project", "Data", "World"));
             var tiles = TileSheet.Parse(
                 File.ReadAllText(Path.Combine(world, TileSheet.File)),
@@ -135,6 +141,7 @@ namespace Game.Client
             if (!effectsFine) return 1;
             // Every skill's effect played out (2026-11-21, Docs/SkillEffects.md).
             if (!WriteSkillFx(output)) return 1;
+            if (!WriteMonsterFx(output)) return 1;
             // The pixel slips the eye misses at sheet size (ArtLint): fails only when a count goes up.
             if (!ArtLint.Run(loot, monsters, FindFolder(Path.Combine("DevTools", "ArtPreview")), output)) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
@@ -142,6 +149,19 @@ namespace Game.Client
             if (!WriteMusic(Path.Combine(output, "music"))) return 1;
             Console.WriteLine($"Wrote sheet.png, player.png, bosses.png, anim/, cave.png, cave_unlit.png, arena.png, skills.png, effects.png, sounds/ and music/ to {output}");
             return 0;
+        }
+
+        static bool WriteMonsterFx(string output)
+        {
+            string monsterFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
+            var monsters = MonsterSheet.Parse(File.ReadAllText(Path.Combine(monsterFolder, MonsterSheet.File)), File.ReadAllText(Path.Combine(monsterFolder, MonsterAttackSheet.File)));
+            if (!monsters.Success)
+            {
+                foreach (string error in monsters.Errors) Console.Error.WriteLine(error);
+                return false;
+            }
+            return MonsterFxPreview.Write(Path.Combine(output, "monsterfx"), monsters, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0)),
+                HeroArt.Draw(Look.Side, HeroMove.Stand, 0, HeroGear.Plain(HeroWeapon.Sword), Rgba.Hex("#4D7FD9")));
         }
 
         static bool WriteSkillFx(string output)

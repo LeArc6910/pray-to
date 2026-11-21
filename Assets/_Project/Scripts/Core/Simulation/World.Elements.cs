@@ -21,10 +21,14 @@ namespace Game.Core
         // Caught in a web (2026-11-13, HazardShape.Web): slowed while in it and a moment after.
         public bool Snared => SnareTicks > 0;
         internal int SnareTicks { get; set; }
+        // Held where they stand by a monster's blow (2026-11-21, HitEffect.Root).
+        public bool Rooted => RootTicks > 0;
+        internal int RootTicks { get; set; }
 
         // As the network carries it (EntityState.Status). Snared is only in a player's own state (the entities' phase
         // byte has room for two marks).
-        public byte Bits => (byte)((Burning ? StatusBits.Burning : 0) | (Chilled ? StatusBits.Chilled : 0) | (Snared ? StatusBits.Snared : 0));
+        public byte Bits => (byte)((Burning ? StatusBits.Burning : 0) | (Chilled ? StatusBits.Chilled : 0) | (Snared ? StatusBits.Snared : 0)
+            | (Rooted ? StatusBits.Rooted : 0));
 
         internal void Clear()
         {
@@ -32,6 +36,7 @@ namespace Game.Core
             BurnOwed = 0;
             ChillTicks = 0;
             SnareTicks = 0;
+            RootTicks = 0;
         }
 
         // A new burn replaces the old one when it has more damage still to deal.
@@ -48,6 +53,7 @@ namespace Game.Core
         {
             if (ChillTicks > 0) ChillTicks--;
             if (SnareTicks > 0) SnareTicks--;
+            if (RootTicks > 0) RootTicks--;
             if (BurnTicks <= 0) return 0;
             BurnTicks--;
             BurnOwed += BurnPerTick;
@@ -64,6 +70,8 @@ namespace Game.Core
         public const byte Sleeping = 8;
         // Only in the player's own state: caught in a web.
         public const byte Snared = 16;
+        // Only in the player's own state: held in place (HitEffect.Root).
+        public const byte Rooted = 32;
     }
 
     // Fire burns for a share of the hit over a few seconds, cold slows, lightning jumps to enemies nearby. A monster

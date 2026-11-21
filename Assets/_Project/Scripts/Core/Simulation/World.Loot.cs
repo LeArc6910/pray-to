@@ -82,6 +82,9 @@ namespace Game.Core
 
         void DropFrom(Enemy enemy, Player killer)
         {
+            // Its traits first (a split, shards, a cloud); a small one a split left drops nothing.
+            MonsterDied(enemy);
+            if (enemy.Small) return;
             int before = _groundLoot.Count;
             DropFromMonster(enemy, killer);
             Own(before, killer, Tick + Ticks(KillerLootSeconds));

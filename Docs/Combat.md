@@ -95,6 +95,89 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
   - `melee`: 다가와서 예고한 뒤 친다. 예고가 끝날 때 아직 사거리 안에 있으면 맞는다(슬라임)
   - `ranged`: `keep_distance`보다 가까우면 물러나고, 틈이 `reach` 이하면 예고한 뒤 그때 플레이어가 있던 쪽으로 투사체를 쏜다(초당 `shot_speed`타일, 사거리의 1.5배까지). 투사체는 처음 닿는 플레이어를 맞히고 벽에서 사라진다(가시 버섯)
   - `charge`: 틈이 `reach` 이하면 그 방향으로 노란 길을 예고하고, 예고가 끝나면 그 길로 초당 `charge_speed`타일로 `reach + 2`타일 돌진한다. 부딪힌 플레이어는 한 번씩 맞고, 벽에 막히면 멈춘다. 옆으로 비키면 피한다(동굴 딱정벌레)
+- **시트로 싸우는 몬스터**(2026-11-21): `monster_attacks.csv`에 줄이 있는 종은 위의 `behavior` 대신 그 공격들 가운데서 골라 싸운다. 아래 "몬스터의 공격 시트". 줄이 없는 종은 위 그대로다
+
+## 몬스터의 공격 시트
+
+사람 말(2026-11-21): "일반 몬스터들의 패턴도 다양화해서 단순히 근접에서 한방, 원거리에서 투사체 한방이 아닌 독특한 이펙트와 공격수단을 가지게 해줘". 설계는 `Docs/WorldRework.md` 2b단계, 종마다의 패턴은 `Docs/MonsterPatterns.md`. 이 절은 만들어진 엔진(묶음 2b-1)이다. 코드는 `Core/Simulation/World.MonsterAttacks.cs`와 `MonsterAttackSheet.cs`, 화면은 `Client/Art/MonsterFx.cs`와 `Client/WorldView.MonsterFx.cs`.
+
+- **고르기.** 쫓는 중에 틱마다, 쓸 수 있는 공격(다시 쓸 때가 됐고, 틈이 `range_min`~`range_max` 사이고, `when`이 맞고, 벽에 가리지 않은 것) 가운데 `weight`로 하나를 뽑아 곧바로 예고한다. 쓸 것이 없으면 가장 가까이서 쓰는 공격의 사거리까지 다가가고(`keep_distance`가 있으면 그보다 가까이 가지 않고, 플레이어가 더 다가오면 물러난다), 거기서 기다린다
+- **예고 → 터짐 → 쉬기.** 보스와 같다. 예고(`telegraph`) 동안 바닥 표시가 보이고, 끝나면 터지고, 몬스터는 `monsters.csv`의 `cooldown`만큼 쉰다. 공격 자체는 제 `cooldown`이 지나야 다시 뽑힌다(점멸 6초처럼 공격마다 다르게)
+- **맞는 것은 모두 보스의 장판·투사체다.** 봇과 플레이어가 같은 것을 읽고 피한다. 받는 피해는 그 종 `damage`의 `damage`%이고, 구역과 균열의 배율이 그대로 곱해진다
+- **걸어서 피할 수 있다.** 모든 바닥 표시는 예고가 `(빠져나갈 거리 + 0.35) / 5 + 0.25`초 이상이다(걷기 초당 5칸, 알아차리는 데 0.25초. 원은 반지름, 부채꼴은 끝이나 옆 가운데 가까운 쪽, 선은 너비의 반, 끄는 원은 걷는 속도에서 끄는 속도를 뺀다). `MonsterAttackSheet.LeastTelegraph`가 이 식이고 시트 시험이 모든 줄을 본다. 구르기(4a)는 아직 셈에 넣지 않았다
+- **공격 순번.** 한 사람을 노리는 바닥 표시(덮치기·던지기·끄는 원·덫처럼 몬스터에게서 떨어진 것)는 동시에 넷까지, 떼의 `strike`는 셋까지만 예고한다. 나머지는 차례를 기다린다(`World.MaxMarksPerTarget`, `MaxStrikesPerTarget`)
+
+패턴 말(`shape`). 굵은 것이 이번에 엔진에 새로 든 조각 일곱이고, 보스의 장판·투사체에도 쓸 수 있게 만들었다(보스 시트는 아직 쓰지 않는다. 보스의 동작은 그대로다).
+
+| shape | 하는 일 | 쓰는 열 |
+|---|---|---|
+| `strike`, `sweep` | 앞의 부채꼴. `sweep`은 `count`개를 0.4초 사이로 좌우로 틀어서 | length, angle |
+| `thrust`, `beam` | 앞의 선 | length, width |
+| `slam`, `nova`, `explode` | 제 둘레 원(`nova`에 length를 주면 radius~length의 고리). `explode`는 원이 몸을 따라오고 터지면 죽는다 | radius |
+| `leap` | 웅크렸다가 예고의 마지막 0.2초에 표시한 자리로 뛴다. 몬스터를 막는 칸(문)은 넘지 않는다 | radius |
+| `burrow`, `ambush` | 예고 동안 땅속(맞지 않고 보이지 않는다), 플레이어 자리에서 솟는다. `ambush`의 숨은 대기는 2b-2 | radius |
+| `lob`, `delayed` | 플레이어 자리에 원. `count`가 2 이상이면 0.4초마다 그때 있는 자리에 하나씩 더 | radius, count |
+| `charge`, `swoop` | 노란 길을 예고하고 달린다. `charge`의 `count`는 연달아 돌진(둘째부터 예고가 반) | length, width, speed |
+| `spread`, `volley` | 부채꼴로 `count`발, 또는 0.25초마다 한 발씩 `count`발 | radius, speed, angle, count |
+| **`bounce`** | 벽에서 `count`번 튕기는 탄. 튕길 때마다 속도는 그대로, 방향만 바뀐다 | radius, speed, count |
+| **`boomerang`** | `length`칸 나갔다가 0.25초 서고 쏜 몬스터에게 돌아오는 탄. 가는 길과 오는 길에 한 번씩 맞는다. 벽에 닿으면 거기서 돌아선다 | radius, speed, length |
+| **`blink`** | `length`칸 떨어진, 플레이어에게서 먼 쪽의 열린 자리에 노란 고리를 띄우고 예고가 끝나면 거기 있다. 갈 자리가 없으면 쓰지 않는다 | length |
+| **`pull`** | 플레이어 자리의 원. 터질 때까지 안의 사람을 가운데로 초당 `speed`칸 끈다(걷는 속도보다 작아야 한다). 호스트와 내 화면이 같은 식(`World.PullStep`)으로 끌어서 어긋나지 않는다 | radius, speed |
+| `push` | 몬스터에게서 플레이어 쪽으로 걸어 나오는 원 `count`개. 맞으면 밀린다(기본 2칸) | radius, length, speed, count |
+| **`mine`** | 플레이어 둘레 `spread`칸에 덫 `count`개. 예고가 끝나면 켜지고, 밟으면 걸어 나올 시간만 남기고 터지고, `duration`초가 지나면 저절로 터진다. 한 마리가 넷까지 | radius, spread, count, duration |
+| `summon` | `summon`의 몬스터 `count`마리를 둘레에 부른다 | summon, count, spread |
+| **`mend`** | `length`칸 안의 가장 다친 동료에게 줄을 대고 `duration`초 동안 초당 그 동료 생명력의 `damage`%를 채운다. 예고나 줄 중에 맞으면 끊긴다 | length, duration, damage |
+| **`empower`** | `radius`칸 안의 다른 몬스터가 `duration`초 동안 피해와 걸음 +`damage`%. 예고 중에 맞으면 끊긴다 | radius, duration, damage |
+
+### monster_attacks.csv
+
+`Assets/_Project/Data/Monsters/monster_attacks.csv`. 한 줄이 공격 하나, 한 종에 일곱까지다(통신에 세 비트). 열은 `boss_attacks.csv`와 같고 아래가 다르다.
+
+| 열 | 내용 |
+|---|---|
+| monster, id, name | 몬스터 id, 공격 id, 화면 이름 |
+| shape | 위의 패턴 말 |
+| target | `nearest`(기본), `self`, `random`, `ally` |
+| telegraph | 예고 초 |
+| damage | 그 종 `damage`의 %(`mend`·`empower`는 위 표) |
+| radius, length, angle, width, count, spread, speed | 모양마다(위 표) |
+| cooldown | 이 공격을 다시 뽑을 수 있을 때까지의 초 |
+| weight | 뽑힐 비율 |
+| range_min, range_max | 플레이어와의 틈(몸 가장자리 사이)이 이 사이일 때만. `range_max`를 비우면 끝이 없다 |
+| pool | (선택) 터진 자리에 남는 것과 초: `fire:3`(서 있으면 화상), `ice:4`(느려짐), `spore:3`(반 초마다 피해), `sand:3`(걸음 55%), `web`, `venom`(보스의 것). 선과 돌진은 길 따라 여럿. 한 마리가 넷까지(선은 여섯) |
+| when | (선택) `hp<30`(생명력 30% 아래), `once`(한 번만), `allies>=2`(8칸 안의 동료 수). `\|`로 잇는다 |
+| warn | (선택) `strong` |
+| effect | (선택) 맞으면: `root:1`(1초 못 움직인다), `push:2`(2칸 밀린다) |
+| duration | (선택) `mend`·`empower`가 이어지는 초, `mine`이 기다리는 초 |
+| summon | (선택) `summon`이 부르는 몬스터 id |
+
+`monsters.csv`의 새 열(아래 표에도 있다): `role`, `traits`, `pack`.
+
+성질(`traits`, `\|`로 잇는다). 만들어진 것:
+
+| 성질 | 하는 일 |
+|---|---|
+| `split:n` | 죽으면 작은 것 n마리(생명력 30%, 피해 50%, 그림 0.6배). 작은 것은 다시 갈라지지 않고 아무것도 떨어뜨리지 않는다. 구역 1에서는 갈라지지 않는다(첫 10분을 어렵게 하지 않는다) |
+| `guard:각` | 앞쪽 그 각도에서 온 타격은 피해의 30%만 받는다. 공격 뒤 쉬는 동안과 비틀거리는 동안은 내린다(피하고 나서 치는 틈) |
+| `stagger` | `charge`가 벽에 막혀 끝나면 1.5초 멈추고 그동안 받는 피해 +50% |
+| `trail:종류:초` | 0.8칸 걸을 때마다 반지름 0.4칸 웅덩이를 남긴다 |
+| `deathburst:수:퍼센트` | 죽은 자리가 0.5초 번쩍인 뒤 파편이 사방으로(초당 8칸, 3칸) |
+| `deathcloud` | 죽은 자리에 3초 구름(반지름 1.8칸). 안의 몬스터가 초당 생명력의 7%를 채운다. 플레이어에게는 아무 일도 없다 |
+| `rooted` | 움직이지 않는다 |
+| `aura`, `burrowed`, `orbit` | 시트가 읽기만 한다. 동작은 2b-2 |
+
+옮긴 종(2b-1, 엔진을 보이려고 넷. 나머지 열다섯은 2b-2까지 예전 `behavior`대로 싸운다):
+
+| 종 | 공격 | 성질 |
+|---|---|---|
+| 슬라임 | 덮치기(`leap`, 2~4칸 밖에서, 원 0.9칸, 예고 0.6초), 깨물기(`strike`, 붙었을 때, 부채꼴 80°·1.1칸, 예고 0.5초) | `split:2` |
+| 동굴 딱정벌레 | 돌진(`charge`, 6칸, 초당 10칸, 예고 0.7초) | `guard:120`, `stagger` |
+| 서리 정령 | 서리 고리(`nova`, 3칸 안에 오면, 원 2.5칸, 예고 0.85초, 피해 60%, 1초 묶임), 고드름(`lob` 둘, 원 1.0칸, 예고 0.7초, 피해 90%) | |
+| 공허 정령 | 돌아오는 구슬(`boomerang`, 7칸, 초당 8칸, 피해 80%), 중력 우물(`pull`, 원 2.5칸, 2초, 초당 2칸, 피해 150%), 점멸(`blink`, 2.5칸 안에 오면 4칸) | |
+
+통신(`Docs/WorldRework.md` 통신): 몬스터의 상태 바이트는 아래 세 비트가 상태, 그 위 세 비트가 전조 종류, 그 위가 북돋임과 작은 것(`World.EnemyStateByte`). 단계 칸에 균열 표시 두 비트와 공격 번호 세 비트(`EnemyPhaseField`). 몬스터에게서 시작하는 공격(부채꼴, 선, 제 둘레 원, 돌진 길)의 장판은 보내지 않고 화면이 시트와 몬스터의 방향으로 그린다. 떨어진 것(착지 원, 덫, 웅덩이, 끄는 원, 점멸 자리)만 장판으로 가고, 원인 칸의 맨 위 비트가 "일반 몬스터의 것", 나머지가 패턴 말이다(`HazardState.FromMonster`·`MonsterShape`). 새 사건 셋: `Guarded`, `Tether`, `MonsterFx`. 내 상태 비트에 묶임(`StatusBits.Rooted`)
+
+화면과 소리(`Docs/SkillEffects.md`의 규칙): 예고 = 몬스터의 몸짓(전조 종류의 빛과 종류마다의 표시)과 바닥 표시, 터짐 = 0.06~0.1초의 가장 밝은 순간, 흩어짐 = 0.2~0.45초. 바닥 표시는 실제 판정 크기(플레이어 반지름 포함)의 가는 붉은 테이고 속은 옅게 차오른다. 돌진 길과 점멸 자리는 노랑. 바닥에 남는 것은 가는 붉은 테 안에 원소의 모양(불꽃, 결정, 떠오르는 포자, 도는 모래), 회복 구름만 붉은 테가 없다. 몬스터의 탄은 몸 색에 밝은 앞머리와 어두운 테. 이펙트 하나는 조각 24개까지(`MonsterFx.Most`, 미리보기가 센다). 전조 소리 넷(범위 "웅", 돌진 긁는 소리, 탄막 "칙", 부르기 종)과 덮치기 "퐁", 튕김 "팅", 점멸, 얼음 깨짐, 등딱지 쇳소리, 비틀거림 "쿵", 우물이 꺼지는 소리, 덫 켜짐·터짐, 치유. `feel monsterfx off`면 표시를 보스처럼 채워 그리고 조각을 그리지 않는다(견줘 보기)
 
 ## 원소
 
@@ -138,7 +221,10 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
 | reach | 플레이어와의 틈이 이 이하가 되면 공격을 예고한다 |
 | windup | 예고 시간(초). 짧을수록 피하기 어렵다 |
 | cooldown | 공격 후 다시 쫓기까지 쉬는 시간(초) |
-| behavior | `melee`, `ranged`, `charge`. 비우면 melee |
+| behavior | `melee`, `ranged`, `charge`. 비우면 melee. `monster_attacks.csv`에 줄이 있는 종은 쓰지 않는다 |
+| role | (선택, 2026-11-21) `swarm`(떼), `bruiser`(튼튼한 적), `shooter`(쏘는 적), `support`(돕는 적), `heavy`(무거운 적). 무리(2단계)가 읽는다 |
+| traits | (선택) 늘 켜진 성질, `split:2\|guard:120`처럼. 위 "몬스터의 공격 시트" |
+| pack | (선택) `always`, `solo`, 비우면 어느 쪽이나. 무리(2단계)가 읽는다 |
 | shot_speed, keep_distance | ranged의 투사체 속도(초당 타일)와 물러나는 거리(타일) |
 | charge_speed | charge의 돌진 속도(초당 타일) |
 | color | 화면에서 칠할 색, `#RRGGBB`. 비우면 초록 |

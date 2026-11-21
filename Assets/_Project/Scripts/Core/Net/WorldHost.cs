@@ -678,12 +678,13 @@ namespace Game.Core
                     m.Id, EntityKind.Minion, IndexOf(_classes?.Skills, m.Skill), m.Position, m.Facing, m.TicksLeft, m.Skill.DurationTicks, 0));
             var shownSoFar = players.Concat(bosses).Concat(minions).ToList();
             var enemies = World.Enemies
-                .Where(e => InView(e.Position))
+                // One under the ground (a burrow) is not there to be seen.
+                .Where(e => InView(e.Position) && !e.Away)
                 .OrderBy(e => Distance(e.Position))
                 .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
                 .Select(e => new EntityState(
-                    e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.MaxHealth, (byte)e.State,
-                    Protocol.WithStatus(e.Rift, e.Afflictions.Bits)));
+                    e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.MaxHealth, World.EnemyStateByte(e),
+                    Protocol.WithStatus(World.EnemyPhaseField(e), e.Afflictions.Bits)));
             var drops = World.GroundLoot
                 .Where(l => InView(l.Position) && l.For(viewer.Id, World.Tick))
                 .OrderBy(l => Distance(l.Position))
@@ -709,14 +710,16 @@ namespace Game.Core
                 .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly, p.Tags))
                 .ToList();
 
+            // A monster's attack that starts at the monster is drawn from its state and the sheet, so its area is not
+            // sent (Hazard.Attached, Docs/WorldRework.md 통신).
             var hazards = World.Hazards
-                .Where(h => InView(h.Position, h.Size))
+                .Where(h => !h.Attached && InView(h.Position, h.Size))
                 .OrderBy(h => h.ResolveTick)
                 .Take(_config.MaxHazardsPerSnapshot)
                 .Select(h => new HazardState(
                     h.Id, h.Shape, h.Position, h.Direction, h.Size, h.Width,
                     (int)(h.ResolveTick - World.Tick), (int)(h.ResolveTick - h.StartTick), h.Damage > 0,
-                    WarningOf(h), (byte)Math.Min(h.Cause, 255)))
+                    WarningOf(h), h.Mark != 0 ? (byte)(HazardState.MonsterMark | h.Mark) : (byte)Math.Min(h.Cause, HazardState.MonsterMark - 1)))
                 .ToList();
 
             // When there are too many, what changes the fight matters most and swings least. A fallen boss is no longer
@@ -725,6 +728,7 @@ namespace Game.Core
             var events = _pendingEvents
                 .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift
                     || e.Type == SimEventType.Died && e.Position.LengthSquared > 0 && InView(e.Position)
+                    || e.Type == SimEventType.MonsterFx && InView(e.Position)
                     || e.Type == SimEventType.Defense || e.Type == SimEventType.TurretShot || e.Type == SimEventType.Rain)
                 .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)
@@ -872,6 +876,8 @@ namespace Game.Core
         // How plainly the attack that laid a hazard is announced (a roar's blast, cause 0, is marked).
         AttackWarning WarningOf(Hazard hazard)
         {
+            var monster = hazard.Mark != 0 ? World.FindEnemy(hazard.Source)?.Definition.Attacks : null;
+            if (monster != null) return hazard.Cause >= 1 && hazard.Cause <= monster.Count ? monster[hazard.Cause - 1].Warning : AttackWarning.Marked;
             var attacks = World.FindBoss(hazard.Source)?.Definition.Attacks;
             return attacks != null && hazard.Cause >= 1 && hazard.Cause <= attacks.Count ? attacks[hazard.Cause - 1].Warning : AttackWarning.Marked;
         }
