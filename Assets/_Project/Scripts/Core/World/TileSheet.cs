@@ -128,6 +128,9 @@ namespace Game.Core
 
         public IReadOnlyList<MachineDefinition> Machines { get; }
 
+        // How each biome's rooms are carved (terrain.csv, TerrainSheet); the sheet as shipped when it was not read.
+        public TerrainData Terrain { get; internal set; } = TerrainSheet.Default;
+
         // Null for a tile that is not a machine.
         public MachineDefinition Machine(TileType tile) => Machines.FirstOrDefault(m => m.Tile == tile);
 
@@ -153,9 +156,11 @@ namespace Game.Core
         public const string MachinesFile = "machines.csv";
 
         // Without a crops sheet nothing grows; without a machines sheet no machine runs.
-        public static TileData Parse(string csv, LootData loot, string cropsCsv = "", string machinesCsv = "")
+        public static TileData Parse(string csv, LootData loot, string cropsCsv = "", string machinesCsv = "", string terrainCsv = "")
         {
             var errors = new List<string>();
+            var terrain = TerrainSheet.Parse(terrainCsv);
+            errors.AddRange(terrain.Errors);
             var tiles = new List<TileDefinition>();
             var crops = ParseCrops(cropsCsv, loot, errors);
             var machines = ParseMachines(machinesCsv, errors);
@@ -164,7 +169,7 @@ namespace Game.Core
             if (missing.Count > 0)
             {
                 errors.Add($"{File}: 열이 없습니다: {string.Join(", ", missing)}");
-                return new TileData(tiles, crops, machines, errors);
+                return new TileData(tiles, crops, machines, errors) { Terrain = terrain };
             }
 
             foreach (var row in table.Rows)
@@ -203,7 +208,7 @@ namespace Game.Core
                     errors.Add($"{File} {row.Line}행: {e.Message}");
                 }
             }
-            return new TileData(tiles, crops, machines, errors);
+            return new TileData(tiles, crops, machines, errors) { Terrain = terrain };
         }
 
         // The view lights at most this far around a tile; more would not fit its light map.

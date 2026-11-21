@@ -14,14 +14,16 @@ namespace CoreSandbox
         // How far "a short walk" is, for counting biomes near the spawn.
         const int NearSteps = 60;
 
-        public static void Run(StoryData story, IEnumerable<ulong> seeds)
+        // version: the generator's (WorldGenerator.CaveVersion, RoomVersion), with the terrain sheet for the second.
+        public static void Run(StoryData story, IEnumerable<ulong> seeds, int version = WorldGenerator.CaveVersion, TerrainData terrain = null,
+            ArenaData arenas = null, int size = WorldGenerator.GameSize)
         {
             var places = story?.Places.Select(p => p.Id).ToList() ?? new List<string>();
             Console.WriteLine("| 시드 | 구리 광맥 | 철 광맥 | 첫 보스 아레나 | " + string.Join(" | ", places) + $" | {NearSteps}걸음 안 생물군계 |");
             Console.WriteLine("|---|---|---|---|" + string.Concat(places.Select(_ => "---|")) + "---|");
             foreach (ulong seed in seeds)
             {
-                var world = WorldGenerator.Generate(seed, WorldGenerator.GameSize, WorldGenerator.GameSize, story);
+                var world = WorldGenerator.Generate(seed, size, size, story, arenas, version, terrain);
                 var steps = Walk(world.Map, world.SpawnX, world.SpawnY);
                 int Near(Func<int, int, bool> what)
                 {

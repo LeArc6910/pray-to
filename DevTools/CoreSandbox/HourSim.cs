@@ -12,18 +12,18 @@ namespace CoreSandbox
     // and where it gave up (with a small map).
     static class HourSim
     {
-        public static void Run(BotSheets sheets, int minutes, string seeds, int mapSize = WorldGenerator.GameSize)
+        public static void Run(BotSheets sheets, int minutes, string seeds, int mapSize = WorldGenerator.GameSize, int mapVersion = WorldGenerator.NewWorldVersion)
         {
             var runs = new List<BotRunResult>();
             foreach (string text in seeds.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
                 ulong seed = ulong.Parse(text.Trim());
                 var watch = Stopwatch.StartNew();
-                var run = BotRun.FirstHour(sheets, seed, minutes, mapSize: mapSize);
+                var run = BotRun.FirstHour(sheets, seed, minutes, mapSize: mapSize, mapVersion: mapVersion);
                 runs.Add(run);
                 Console.Error.WriteLine($"시드 {seed}: 게임 {BotReport.Time(run.Ticks)}을 {watch.Elapsed.TotalSeconds:0.0}초에");
             }
-            Console.WriteLine($"## 첫 한 시간 봇 ({minutes}분까지, 레벨 5 목표에서 멈춤)");
+            Console.WriteLine($"## 첫 한 시간 봇 ({minutes}분까지, 레벨 5 목표에서 멈춤, 생성기 {mapVersion}판)");
             Console.WriteLine();
             Console.WriteLine(BotReport.Table(runs));
             Console.WriteLine("### 안내 목표별 도달 시간");

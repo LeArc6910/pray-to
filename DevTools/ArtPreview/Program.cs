@@ -27,7 +27,7 @@ namespace Game.Client
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).
                 return WriteSkillFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -42,7 +42,8 @@ namespace Game.Client
                 File.ReadAllText(Path.Combine(world, TileSheet.File)),
                 loot,
                 File.ReadAllText(Path.Combine(world, TileSheet.CropsFile)),
-                File.ReadAllText(Path.Combine(world, TileSheet.MachinesFile)));
+                File.ReadAllText(Path.Combine(world, TileSheet.MachinesFile)),
+                File.ReadAllText(Path.Combine(world, TerrainSheet.File)));
             string npcFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Npcs"));
             var npcs = NpcSheet.Parse(File.ReadAllText(Path.Combine(npcFolder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(npcFolder, NpcSheet.ShopFile)), loot,
                 File.ReadAllText(Path.Combine(npcFolder, NpcSheet.RequestsFile)));
@@ -57,6 +58,12 @@ namespace Game.Client
 
             var lights = new WorldLights(tiles);
             // --only arenas: just the arenas' pictures (arenas.png, arenas_unlit.png, arenas/).
+            // --only map: just the generated map's pictures, three seeds for each generator version (out/map/, MapPreview).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "map")
+            {
+                MapPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1, 2, 3 });
+                return 0;
+            }
             if (args.Length == 2 && args[0] == "--only")
             {
                 output = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
@@ -112,6 +119,8 @@ namespace Game.Client
             Save(Arena(lights), Path.Combine(output, "arena.png"), 3);
             Arenas(lights, output);
             WorldArenas(lights, output, monsters, story);
+            // The generated map, one seed for each generator version (map/, MapPreview).
+            MapPreview.Write(output, story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1 });
             string classFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
             var classes = ClassSheet.Parse(File.ReadAllText(Path.Combine(classFolder, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classFolder, ClassSheet.SkillsFile)));
             if (!classes.Success)
@@ -805,6 +814,13 @@ namespace Game.Client
         // The same arenas where a real world has them (seed 7, the game's size, the story's places and roads): among
         // the caves, turned to their ways in, with the tunnels and roads that reach them (arenas_world.png, and
         // arenas/world_<boss>.png each).
+        static ArenaData WorldArenaSheet(MonsterData monsters)
+        {
+            string bossFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Bosses"));
+            var bosses = BossSheet.Parse(File.ReadAllText(Path.Combine(bossFolder, BossSheet.BossesFile)), File.ReadAllText(Path.Combine(bossFolder, BossSheet.AttacksFile)), monsters);
+            return ArenaSheet.Parse(File.ReadAllText(Path.Combine(bossFolder, ArenaSheet.File)), bosses);
+        }
+
         static void WorldArenas(WorldLights lights, string output, MonsterData monsters, StoryData story)
         {
             string bossFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Bosses"));

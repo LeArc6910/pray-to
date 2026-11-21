@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.86.0";
+        public const string Version = "0.87.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -730,8 +730,10 @@ namespace Game.Core
     // The client builds the same caves from the seed, so the map itself is never sent.
     public sealed class WelcomeMessage
     {
-        public WelcomeMessage(int playerId, ulong seed, int width, int height, Vec2 spawn, IReadOnlyList<int> classes = null, IReadOnlyList<int> skillOrder = null)
+        public WelcomeMessage(int playerId, ulong seed, int width, int height, Vec2 spawn, IReadOnlyList<int> classes = null, IReadOnlyList<int> skillOrder = null,
+            int generator = WorldGenerator.CaveVersion)
         {
+            Generator = generator;
             SkillOrder = skillOrder ?? Array.Empty<int>();
             PlayerId = playerId;
             Seed = seed;
@@ -745,6 +747,8 @@ namespace Game.Core
         public ulong Seed { get; }
         public int Width { get; }
         public int Height { get; }
+        // Which generator the host made the map with (WorldGenerator.CaveVersion, RoomVersion).
+        public int Generator { get; }
         public Vec2 Spawn { get; }
         // The classes the host accepted, as indexes into the class sheet.
         public IReadOnlyList<int> Classes { get; }
@@ -760,10 +764,11 @@ namespace Game.Core
             w.Write(Spawn);
             Protocol.WriteIndexes(w, Classes);
             Protocol.WriteIndexes(w, SkillOrder);
+            w.Write((byte)Generator);
         });
 
         public static WelcomeMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Welcome, r =>
-            new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2(), Protocol.ReadIndexes(r), Protocol.ReadIndexes(r)));
+            new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2(), Protocol.ReadIndexes(r), Protocol.ReadIndexes(r), r.ReadByte()));
     }
 
     // A player asking for other classes (indexes into the class sheet) or another order of their skills; and the

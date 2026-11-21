@@ -20,6 +20,8 @@ namespace Game.Client
         public TextAsset tiles;
         public TextAsset crops;
         public TextAsset machines;
+        // How each biome's rooms are carved (terrain.csv, 2026-11-21, Docs/Biomes.md 지형).
+        public TextAsset terrain;
         public TextAsset monsters;
         public TextAsset bosses;
         public TextAsset bossAttacks;
@@ -46,7 +48,8 @@ namespace Game.Client
         public LootData LoadLoot() =>
             LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes), Text(sets));
 
-        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines));
+        // Without the terrain sheet (an asset made before it existed) the rooms are carved by the copy in code.
+        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain));
 
         public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters));
 

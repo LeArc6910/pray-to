@@ -20,7 +20,8 @@ namespace Game.Core
         // defense level and the day it was last defended (Docs/Defense.md).
         // 10 (2026-11-09): each machine ends with an animal house's affection and the day it was last petted.
         // 11 (2026-11-09): locked doors and their owners, after the beds.
-        const int FormatVersion = 11;
+        // 12 (2026-11-21): which generator made the map, after its size (Docs/WorldRework.md 옛 월드).
+        const int FormatVersion = 12;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -67,6 +68,9 @@ namespace Game.Core
         // The map's size when it was made: a world saved before the bigger map (2026-11-11) goes on at its own size.
         public int Width { get; private set; } = WorldGenerator.DefaultSize;
         public int Height { get; private set; } = WorldGenerator.DefaultSize;
+        // Which generator made the map (WorldGenerator.CaveVersion, RoomVersion): a world saved before there were two
+        // is the caves of version 1, and goes on as them.
+        public int Generator { get; private set; } = WorldGenerator.CaveVersion;
         // Seconds since 1970 when it was saved, as the caller counted them. Nothing grows by it: a closed world waits.
         public long SavedAt { get; }
         // The world's clock (Calendar); 0, the first morning, for a save from before days.
@@ -126,7 +130,7 @@ namespace Game.Core
         }
         public IReadOnlyList<string> Warnings { get; }
 
-        public static byte[] Write(World world, ulong seed, long savedAt)
+        public static byte[] Write(World world, ulong seed, long savedAt, int generator = WorldGenerator.CaveVersion)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -136,6 +140,7 @@ namespace Game.Core
                 w.Write(seed);
                 w.Write(world.Map.Width);
                 w.Write(world.Map.Height);
+                w.Write((byte)generator);
                 w.Write(savedAt);
                 w.Write(world.Clock);
                 w.Write(world.RiftTier);
@@ -231,6 +236,7 @@ namespace Game.Core
                 ulong seed = r.ReadUInt64();
                 int width = r.ReadInt32();
                 int height = r.ReadInt32();
+                int generator = version >= 12 ? r.ReadByte() : WorldGenerator.CaveVersion;
                 long savedAt = r.ReadInt64();
                 long clock = version >= 7 ? r.ReadInt64() : 0;
                 int riftTier = version >= 8 ? r.ReadInt32() : 1;
@@ -335,7 +341,7 @@ namespace Game.Core
                     locks.Add((x, y, r.ReadString()));
                 }
                 return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds,
-                    defenseLevel, defenseDay, locks) { Width = width, Height = height };
+                    defenseLevel, defenseDay, locks) { Width = width, Height = height, Generator = generator };
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

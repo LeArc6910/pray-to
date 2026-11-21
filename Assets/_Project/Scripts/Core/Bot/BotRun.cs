@@ -21,11 +21,12 @@ namespace Game.Core
     public static class BotRun
     {
         public static BotRunResult FirstHour(BotSheets sheets, ulong seed, int minutes = 60, string stopAfter = "level5", Action<FirstHourBot> each = null,
-            int mapSize = WorldGenerator.DefaultSize)
+            int mapSize = WorldGenerator.DefaultSize, int mapVersion = WorldGenerator.CaveVersion)
         {
             // mapSize: the tests keep the small map; CoreSandbox --hour plays the game's (WorldGenerator.GameSize).
+            // mapVersion: likewise the tests keep the caves of version 1, and --hour plays what a new world is made with.
             var host = new WorldHost(seed, sheets.Monsters, sheets.Loot, bosses: sheets.Bosses, classes: sheets.Classes, tiles: sheets.Tiles,
-                guide: sheets.Guide, npcs: sheets.Npcs, config: new HostConfig { MapSize = mapSize }, worldConfig: new WorldConfig { Forage = true }, story: sheets.Story);
+                guide: sheets.Guide, npcs: sheets.Npcs, config: new HostConfig { MapSize = mapSize, MapVersion = mapVersion }, worldConfig: new WorldConfig { Forage = true }, story: sheets.Story);
             host.Receive(1, new JoinMessage("bot", "봇").Encode());
             var world = host.World;
             var player = world.Players[0];

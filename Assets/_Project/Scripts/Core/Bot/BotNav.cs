@@ -51,6 +51,21 @@ namespace Game.Core
             PickaxeLevel = best;
         }
 
+        // Each tile type's row of tiles.csv (null for one with none), looked up once: a search asks for every tile it
+        // looks at, and on a map of rooms it looks at a great many (2026-11-21).
+        TileDefinition[] _definitions;
+
+        TileDefinition Definition(TileType type)
+        {
+            if (_definitions == null)
+            {
+                _definitions = new TileDefinition[256];
+                if (_world.Tiles != null)
+                    foreach (var tile in _world.Tiles.Tiles) _definitions[(int)tile.Tile] ??= tile;
+            }
+            return _definitions[(int)type];
+        }
+
         public bool Walkable(int x, int y)
         {
             var map = _world.Map;
@@ -64,7 +79,7 @@ namespace Game.Core
         {
             var map = _world.Map;
             if (PickaxeLevel < 0 || !map.InBounds(x, y) || map.IsEdge(x, y)) return false;
-            var tile = _world.Tiles?.Find(map[x, y]);
+            var tile = Definition(map[x, y]);
             return tile != null && (tile.Tile == TileType.Wall || tile.Tile == TileType.IronWall || tile.Drillable) && tile.Pickaxe <= PickaxeLevel;
         }
 
@@ -75,7 +90,7 @@ namespace Game.Core
             if (Avoid != null && Avoid(x, y)) return -1;
             if (Walkable(x, y)) return WalkTicks;
             if (!Diggable(x, y)) return -1;
-            var tile = _world.Tiles.Find(_world.Map[x, y]);
+            var tile = Definition(_world.Map[x, y]);
             int swings = Math.Max(1, (int)MathF.Ceiling(tile.Hardness / DigPower - 1e-4f));
             return WalkTicks + swings * SwingTicks;
         }

@@ -29,6 +29,9 @@ namespace CoreSandbox
     // dotnet run -- --hour [minutes] [seed,seed,...] [map size, 512]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
     // dotnet run -- --supply                          which system supplies which, from the sheets (Docs/Systems.md)
     // dotnet run -- --flow [seeds]                    steps from the spawn to the first veins, arena and places (Docs/WorldFlow.md)
+    // dotnet run -- --mapstats [seeds] [map size]     the map as numbers: rock, lumps, open floor, each biome, rooms, time (Docs/WorldRework.md)
+    // add --gen <1|2> to --flow, --hour or --mapstats for the generator's version (--mapstats shows both without it;
+    // the others play what a new world is made with, WorldGenerator.NewWorldVersion)
     static class Program
     {
         static void Main(string[] args)
@@ -96,6 +99,13 @@ namespace CoreSandbox
                 SkillBot.Build = LoadClassData();
                 args = args.Where(a => a != "--build").ToArray();
             }
+            int generator = 0;
+            int genFlag = Array.IndexOf(args, "--gen");
+            if (genFlag >= 0)
+            {
+                generator = int.Parse(args[genFlag + 1]);
+                args = args.Where((_, i) => i != genFlag && i != genFlag + 1).ToArray();
+            }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();
             // The bots roll through blows about to land (RollBot); --no-roll is how they fought before the roll.
@@ -155,7 +165,16 @@ namespace CoreSandbox
                     var flowMonsters = LoadMonsters();
                     var flowStory = StorySheet.Parse(FlowFile(StorySheet.PlacesFile), FlowFile(StorySheet.CharactersFile), FlowFile(StorySheet.StoryFile), data, LoadBosses(flowMonsters));
                     var seedList = args.Length > 1 && !args[1].StartsWith("--") ? args[1].Split(',').Select(ulong.Parse) : Enumerable.Range(1, 12).Select(i => (ulong)i);
-                    FlowSim.Run(flowStory, seedList);
+                    FlowSim.Run(flowStory, seedList, generator > 0 ? generator : WorldGenerator.NewWorldVersion, LoadTiles(data).Terrain);
+                    break;
+                case "--mapstats":
+                    var statSheets = LoadSheets(data);
+                    var statSeeds = args.Length > 1 ? args[1].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 };
+                    // With the arenas' sheet, as the game makes a world (the other sims fight without entrances).
+                    var statArenas = ArenaSheet.Parse(File.ReadAllText(Path.Combine(FindFolder(Path.Combine("Assets", "_Project", "Data", "Bosses")), ArenaSheet.File)), statSheets.Bosses);
+                    MapStats.Run(statSheets.Story, statArenas, statSheets.Tiles.Terrain, statSeeds,
+                        generator > 0 ? new[] { generator } : new[] { WorldGenerator.CaveVersion, WorldGenerator.RoomVersion },
+                        args.Length > 2 ? int.Parse(args[2]) : WorldGenerator.GameSize);
                     break;
                 case "--supply":
                     var supplyMonsters = LoadMonsters();
@@ -169,7 +188,8 @@ namespace CoreSandbox
                     FactorySim.Run(data, LoadMonsters(), LoadTiles(data), LoadNpcs(data), Number(1, 30));
                     break;
                 case "--hour":
-                    HourSim.Run(LoadSheets(data), Number(1, 60), args.Length > 2 ? args[2] : "1,2,3", args.Length > 3 ? int.Parse(args[3]) : WorldGenerator.GameSize);
+                    HourSim.Run(LoadSheets(data), Number(1, 60), args.Length > 2 ? args[2] : "1,2,3", args.Length > 3 ? int.Parse(args[3]) : WorldGenerator.GameSize,
+                        generator > 0 ? generator : WorldGenerator.NewWorldVersion);
                     break;
                 case "--boss":
                     var monsters = LoadMonsters();
@@ -184,7 +204,9 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --rift [tiers] [seed] [--players 2] [--gear ...] [--classes ...]");
                     Console.WriteLine("       dotnet run -- --economy");
                     Console.WriteLine("       dotnet run -- --factory [minutes]");
-                    Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...] [map size]");
+                    Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...] [map size] [--gen 1|2]");
+                    Console.WriteLine("       dotnet run -- --flow [seeds] [--gen 1|2]");
+                    Console.WriteLine("       dotnet run -- --mapstats [seeds] [map size] [--gen 1|2]");
                     break;
             }
         }
@@ -327,7 +349,7 @@ namespace CoreSandbox
         {
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "World"));
             string Read(string file) => File.ReadAllText(Path.Combine(folder, file));
-            var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile));
+            var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile), Read(TerrainSheet.File));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

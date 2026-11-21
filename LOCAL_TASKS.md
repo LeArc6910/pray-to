@@ -1043,6 +1043,9 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(통신 0.86.0, 옛 빌드와 함께 못 논다). 새 파일 `Core/Simulation/World.Roll.cs`, `Tests/EditMode/RollTests.cs`의 `.meta`가 생기면 커밋한다(`DevTools/CoreSandbox/RollBot.cs`는 Unity 밖). PlayMode `LayoutTests`에 구르기 칸이 들어갔다
   - (클라우드 웹 점검) `sweep.js --only roll`
   - (사람) 구르기의 손맛(왼쪽 Shift, 휴대폰은 물약 단추 위), 휴대폰에서 단추가 엄지에 닿는지, 웹 협동에서 무적이 지연 때문에 어긋나지 않는지, 보스전이 너무 쉬워지지 않았는지
+- [ ] 146단계: 지도의 뼈대(생성기 2판, `Docs/WorldRework.md` 1a)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/terrain.csv`가 `GameSheets.terrain`에 들어가야 빌드에 실린다(돌리기 전에는 코드 기본값으로 같은 지도). 새 파일 `terrain.csv`, `Core/World/WorldGenerator.Rooms.cs`, `Core/World/TerrainSheet.cs`, `Tests/EditMode/RoomMapTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.87.0, 월드 저장본 형식 12(옛 저장본은 1판으로 그대로 열린다)
+  - (사람) 새 월드를 만들어 걸어 보기: 생물군계마다 지형이 다르게 느껴지는지(버섯 미로, 얼음 홀, 용암 강과 다리, 수정 틈, 모래 언덕, 호수 섬), 방·통로가 탐험하는 맛을 주는지, 길이 막혀 답답하지 않은지. 옛 월드가 예전처럼 열리는지. 주의: 1b·1c에서 2판 지형이 또 바뀔 수 있어 그 사이 만든 새 월드의 기지가 바위에 묻힐 수 있다
 
 ## 결과 보고
 

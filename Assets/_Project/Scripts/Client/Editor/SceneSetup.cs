@@ -63,6 +63,7 @@ namespace Game.Client.Editor
             sheets.tiles = Sheet(WorldFolder + TileSheet.File);
             sheets.crops = Sheet(WorldFolder + TileSheet.CropsFile);
             sheets.machines = Sheet(WorldFolder + TileSheet.MachinesFile);
+            sheets.terrain = Sheet(WorldFolder + TerrainSheet.File);
             sheets.monsters = Sheet(MonstersFolder + MonsterSheet.File);
             sheets.bosses = Sheet(BossesFolder + BossSheet.BossesFile);
             sheets.bossAttacks = Sheet(BossesFolder + BossSheet.AttacksFile);

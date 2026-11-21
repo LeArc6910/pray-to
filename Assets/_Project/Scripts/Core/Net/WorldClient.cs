@@ -1543,7 +1543,7 @@ namespace Game.Core
             ApplyKit(welcome.Classes, welcome.SkillOrder);
             PlayerId = welcome.PlayerId;
             Seed = welcome.Seed;
-            var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story, _bosses?.Arenas);
+            var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story, _bosses?.Arenas, welcome.Generator, _tiles?.Terrain);
             Map = generated.Map;
             _builtTiles.Clear();
             Signposts = generated.Signposts;

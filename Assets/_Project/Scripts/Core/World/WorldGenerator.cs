@@ -65,6 +65,10 @@ namespace Game.Core
         public IReadOnlyDictionary<string, Vec2> PlaceArenas => _placeArenas;
         // Which kind of cave each tile is in (Docs/Biomes.md).
         public BiomeMap Biomes { get; }
+        // Which generator made it (WorldGenerator.CaveVersion, RoomVersion), and for a world of rooms, the rooms and
+        // the ways between them; null for the caves of version 1.
+        public int Version { get; internal set; } = WorldGenerator.CaveVersion;
+        public RoomGraph Rooms { get; internal set; }
         // The places of the story (Docs/Story.md), in sheet order; none when made without the sheets.
         public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
         // The small places along the roads (CarveLandmarks); none without the story sheets.
@@ -269,11 +273,23 @@ namespace Game.Core
 
         // With the arenas' sheet (arenas.csv), each boss's arena is shaped and dressed for it last of all
         // (WorldGenerator.Arenas.cs); without it every arena is the plain round room.
-        public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null, ArenaData arenas = null)
+        // version: which generator (WorldGenerator.Rooms.cs). CaveVersion is the caves below, as every world was before
+        // 2026-11-21 and as a world saved then must stay; RoomVersion carves rooms and corridors by the terrain sheet
+        // (terrain.csv; the sheet as shipped when none is given), under the same places, roads and arenas.
+        public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null, ArenaData arenas = null,
+            int version = CaveVersion, TerrainData terrain = null)
         {
-            var world = GenerateCaves(seed, width, height);
+            bool rooms = version >= RoomVersion;
+            var world = rooms ? GenerateRooms(seed, width, height, terrain ?? TerrainSheet.Default) : GenerateCaves(seed, width, height);
             if (story != null && story.Places.Count > 0) world.Places = CarvePlaces(world, seed, story);
             DressArenas(world, seed, arenas);
+            if (rooms)
+            {
+                // A place built across a way, or dressing set in an arena's door, must not shut a room off.
+                JoinRooms(world.Map, world.Rooms.Nodes, world.Arenas.Take(world.CaveArenas).Select(a => (TileMap.Cell(a.X), TileMap.Cell(a.Y))).ToList(),
+                    world.SpawnX, world.SpawnY, pockets: true);
+                EnsureCopper(world);
+            }
             return world;
         }
 
