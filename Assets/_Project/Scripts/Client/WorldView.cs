@@ -149,6 +149,8 @@ namespace Game.Client
             public float HurtTime;
             public Vector3 Position;
             public Vector3 LastPosition;
+            // The way it faced when last placed (the buffs' cues sit at the weapon hand, WorldView.SkillFx).
+            public Vec2 Faced;
             public float Walked;
             public int Frame = -1;
             public string Name;
@@ -586,13 +588,15 @@ namespace Game.Client
             SwingDoors();
             DrawMarks();
             _rendered = 3;
-            DrawProjectiles();
+            BeginSkillFx();
+            DrawProjectiles(deltaTime);
             DrawTarget();
             SwayScarecrows();
 
             foreach (var e in _client.TakeEvents()) Show(e);
             _rendered = 4;
             UpdateFlashes(deltaTime);
+            UpdateSkillFx(deltaTime);
             UpdateWaves(deltaTime);
             UpdateTracers(deltaTime);
             UpdateRain(deltaTime);
@@ -1954,13 +1958,14 @@ namespace Game.Client
         static Sprite[] UndergroundSprites => _undergroundSprites ??= Enumerable.Range(0, ItemArt.BeltFrames)
             .Select(frame => Sprites.Centered("machine/underground" + frame, () => ItemArt.Underground(frame))).ToArray();
 
-        void DrawProjectiles()
+        void DrawProjectiles(float deltaTime)
         {
             _seen.Clear();
             foreach (var projectile in _client.Projectiles())
             {
                 _seen.Add(projectile.Id);
-                if (!_projectiles.TryGetValue(projectile.Id, out var renderer))
+                bool isNew = !_projectiles.TryGetValue(projectile.Id, out var renderer);
+                if (isNew)
                 {
                     // A player's is a glowing ball in the colour of its tags, a little larger than it really is so it
                     // reads, or an arrow pointing the way it flies; an enemy's is a spiked ball.
@@ -1981,6 +1986,9 @@ namespace Game.Client
                     _projectiles[projectile.Id] = renderer;
                 }
                 renderer.transform.localPosition = new Vector3(projectile.Position.X, projectile.Position.Y, 0);
+                // A skill's projectile is drawn by the skill's own effect instead (WorldView.SkillFx); the plain one
+                // stays, unseen, for its light.
+                renderer.enabled = !DrawSkillShot(projectile, isNew, deltaTime);
                 // The silk mother's venom sheds drops as it flies.
                 if (!projectile.Friendly && _bossInView?.Id == "silk_mother" && UnityEngine.Random.value < 0.3f)
                     Drip(new Vector3(projectile.Position.X, projectile.Position.Y, 0), VenomColor);
@@ -1996,7 +2004,11 @@ namespace Game.Client
                 Object.Destroy(pair.Value.gameObject);
                 _gone.Add(pair.Key);
             }
-            foreach (int id in _gone) _projectiles.Remove(id);
+            foreach (int id in _gone)
+            {
+                _projectiles.Remove(id);
+                SkillShotGone(id);
+            }
         }
 
         static Sprite ArrowSprite => Sprites.Centered("shot/arrow", () => ItemArt.Arrow);
@@ -2442,7 +2454,9 @@ namespace Game.Client
                     // A jagged line of light from what was struck to where the lightning jumped.
                     var from = Find(e.Source);
                     var to = Find(e.Target);
-                    if (from != null && to != null) Bolt(from.Position + new Vector3(0, 0.3f, 0), to.Position + new Vector3(0, 0.3f, 0));
+                    if (from == null || to == null) break;
+                    if (Feel.SkillFx) ShowChainFx(from.Position, to.Position);
+                    else Bolt(from.Position + new Vector3(0, 0.3f, 0), to.Position + new Vector3(0, 0.3f, 0));
                     break;
                 case SimEventType.Healed:
                     var drinker = Find(e.Source);
@@ -2463,7 +2477,8 @@ namespace Game.Client
                     var burst = _client.SkillOf(e.Source, e.Amount);
                     if (burst == null) break;
                     var at = new Vector3(e.Position.X, e.Position.Y, 0);
-                    AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), FlashKind.Burst);
+                    if (HasSkillFx(burst)) ShowBurstFx(burst, at, e.Source == _client.PlayerId);
+                    else AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), FlashKind.Burst);
                     if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.08f);
                     Hear(Sound.Boom, at, 0.7f);
                     break;
@@ -2530,6 +2545,13 @@ namespace Game.Client
                 };
                 Hear(sound, caster.Position);
                 if (skill.Kind == SkillKind.Nova && skill.Radius >= 3) Hear(Sound.Boom, caster.Position, 0.6f);
+            }
+            // Its own effect (WorldView.SkillFx, Docs/SkillEffects.md); below is the old look by kind, kept for a skill
+            // without one and for the playtest's "feel skillfx off".
+            if (HasSkillFx(skill))
+            {
+                ShowSkillFx(e, skill, caster);
+                return;
             }
             switch (skill.Kind)
             {
@@ -2684,7 +2706,8 @@ namespace Game.Client
             {
                 if ((bits & (1 << slot)) == 0) continue;
                 var skill = _client.SkillOf(playerId, slot);
-                if (skill == null) continue;
+                // A buff with a cue of its own (WorldView.SkillFx) is shown by that instead.
+                if (skill == null || Feel.SkillFx && SkillFx.HasLoop(skill.Id)) continue;
                 mixed += Palette.Of(skill.Tags | skill.Grants);
                 count++;
             }
@@ -2807,6 +2830,7 @@ namespace Game.Client
             ItemBase weapon = null)
         {
             body.LastPosition = body.Position;
+            body.Faced = facing;
             body.Position = new Vector3(position.X, position.Y, 0);
             body.Root.localPosition = body.Position;
             int order = 10000 - Mathf.RoundToInt(position.Y * 10);
@@ -3557,6 +3581,7 @@ namespace Game.Client
             _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time);
             AddSkyLights(left, bottom, size);
             AddNightLights(left, bottom, size);
+            AddFxLights();
             foreach (var shot in _projectiles.Values)
             {
                 if (shot.sprite == ArrowSprite) continue;

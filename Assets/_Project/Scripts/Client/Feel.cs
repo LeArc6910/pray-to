@@ -34,6 +34,11 @@ namespace Game.Client
         public static bool Squash = true;
         // The ring flung out from a heavy blow (2026-11-19).
         public static bool Wave = true;
+        // Each skill's own effect (2026-11-21, Docs/SkillEffects.md); off, skills look as they did before, by kind.
+        public static bool SkillFx = true;
+        // The playtest's "fxhold": skill effects stop at this age in seconds so a picture catches one phase of them
+        // (anticipation, impact, dissipation); below zero they run as usual.
+        public static float SkillFxHold = -1;
 
         static readonly Dictionary<string, Action<bool>> Switches = new Dictionary<string, Action<bool>>
         {
@@ -49,6 +54,7 @@ namespace Game.Client
             ["bits"] = on => Bits = on,
             ["squash"] = on => Squash = on,
             ["wave"] = on => Wave = on,
+            ["skillfx"] = on => SkillFx = on,
         };
 
         public static IEnumerable<string> Names => Switches.Keys;
@@ -71,6 +77,7 @@ namespace Game.Client
         {
             ("lunge", Lunge), ("swing", Swing), ("flash", Flash), ("knock", Knock), ("impact", Impact), ("numbers", Numbers),
             ("shake", Shake), ("hitstop", HitStop), ("hurtglow", HurtGlow), ("bits", Bits), ("squash", Squash),
+            ("wave", Wave), ("skillfx", SkillFx),
         }.Where(p => !p.On).Select(p => p.Name));
     }
 }

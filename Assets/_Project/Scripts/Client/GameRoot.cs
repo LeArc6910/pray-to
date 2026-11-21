@@ -86,6 +86,9 @@ namespace Game.Client
         // Rounded-corner tiles within ten cells of the player (WorldView.CornersNear), for the playtests.
         // Boss marks on the ground and the warning sign, as drawn (WorldView.Bosses.cs), for the playtests.
         internal int MarksShown => _view?.MarksShown ?? 0;
+        // Skill effects running and their pieces on screen (WorldView.SkillFx), for the playtests.
+        internal int SkillFxAlive => _view?.SkillFxAlive ?? 0;
+        internal int SkillFxPieces => _view?.SkillFxPieces ?? 0;
         internal bool WarningShown => _view != null && _view.WarningShown;
         internal int PoolsShown => _view?.PoolsShown ?? 0;
         internal string RenderTrace => _view?.RenderTrace;

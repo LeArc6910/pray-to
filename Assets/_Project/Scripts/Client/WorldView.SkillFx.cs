@@ -1,0 +1,352 @@
+using System.Collections.Generic;
+using Game.Core;
+using UnityEngine;
+
+namespace Game.Client
+{
+    // Each skill's own effect (2026-11-21, Docs/SkillEffects.md): SkillFx says which pieces are where at each moment
+    // of an effect, and this draws them with sprites kept in a pool. Nothing here decides anything about the game: the
+    // effects start from the events and the projectiles the host sends. Feel.SkillFx off brings the old look back.
+    sealed partial class WorldView
+    {
+        sealed class Fx
+        {
+            public FxProgram Program;
+            public string Skill;
+            public FxContext Context;
+            public Vector3 At;
+            public float Age;
+            // The player's own; others' are drawn a little dimmer so one's own read first.
+            public bool Mine;
+            // Whoever the effect stays on (a buff, a summoning), or null for one that stays where it happened.
+            public Body Follow;
+            // The caster's picture when the effect began, for afterimages.
+            public Sprite Ghost;
+            // How far its flash lights the dark, in tiles, and in what colour.
+            public float Light;
+        }
+
+        // A skill just used whose projectiles have yet to show up in a snapshot: they are known for the skill's by
+        // appearing beside its caster a moment later (the snapshot does not name a projectile's skill).
+        sealed class Launch
+        {
+            public SkillDefinition Skill;
+            public Vector3 From;
+            public float Until;
+            public int Left;
+            public bool Mine;
+            public FxRamp Main;
+        }
+
+        sealed class SkillShot
+        {
+            public SkillDefinition Skill;
+            public bool Mine;
+            public float Age;
+            public Vector3 Last;
+            public float Dir;
+            public FxRamp Main;
+            public int Seed;
+        }
+
+        readonly List<Fx> _fx = new List<Fx>();
+        readonly List<Launch> _launches = new List<Launch>();
+        readonly Dictionary<int, SkillShot> _skillShots = new Dictionary<int, SkillShot>();
+        readonly List<FxStamp> _fxStamps = new List<FxStamp>();
+        readonly List<SpriteRenderer> _fxPool = new List<SpriteRenderer>();
+        readonly float[][] _fxPoints = { null, new float[2], new float[4], new float[6], new float[8] };
+        static readonly Dictionary<long, Sprite> FxSprites = new Dictionary<long, Sprite>();
+        int _fxUsed;
+        int _fxSeed;
+
+        // The most pieces on screen at once, and the most effects alive: past these the newest lesser ones are dropped
+        // (a web build draws each piece as a sprite).
+        const int FxMostStamps = 420;
+        const int FxMostAlive = 48;
+        const float OthersFxAlpha = 0.6f;
+        const int FxGroundOrder = 20;
+        const int FxOverOrder = 19010;
+
+        // Effects running and pieces drawn this frame, for the playtests.
+        public int SkillFxAlive => _fx.Count;
+        public int SkillFxPieces => _fxUsed;
+
+        static bool HasSkillFx(SkillDefinition skill) => Feel.SkillFx && skill != null && SkillFx.Knows(skill.Id);
+
+        // The colours of a skill with no element of its own: steel or wind, or the element a running buff lends.
+        static FxRamp MainRamp(SkillDefinition skill, SkillTag granted)
+        {
+            var tags = skill.Tags | skill.Grants | granted;
+            return SkillFx.MainOf(skill.Id, (tags & SkillTag.Fire) != 0, (tags & SkillTag.Cold) != 0, (tags & SkillTag.Lightning) != 0);
+        }
+
+        Fx AddFx(FxProgram program, string skill, Vector3 at, FxContext context, bool mine, Body follow = null, float light = 0)
+        {
+            if (_fx.Count >= FxMostAlive) return null;
+            context.Seed = ++_fxSeed & 0xFFFF;
+            var fx = new Fx { Program = program, Skill = skill, Context = context, At = at, Mine = mine, Follow = follow, Light = light };
+            _fx.Add(fx);
+            return fx;
+        }
+
+        // What a skill looks like where it is used: the caster's motion as before, then the skill's own effect.
+        void ShowSkillFx(SimEvent e, SkillDefinition skill, Body caster)
+        {
+            bool mine = e.Source == _client.PlayerId;
+            var context = new FxContext
+            {
+                Radius = skill.Radius > 0 ? (skill.Radius + World.PlayerRadius) * Sprites.PixelsPerUnit : 0,
+                Dir = e.Direction.Angle,
+                Main = MainRamp(skill, GrantedTags(e.Source)),
+            };
+            // Effects are laid out from the feet; a nova's is lifted so its edge is centred where the host measures from.
+            var feet = caster.Position - new Vector3(0, caster.Feet, 0);
+            Body follow = null;
+            Sprite ghost = null;
+            float light = 0;
+            switch (skill.Kind)
+            {
+                case SkillKind.Nova:
+                    Start(caster, Motion.Spin);
+                    context.Lift = caster.Feet * Sprites.PixelsPerUnit;
+                    if (mine) _shake = Mathf.Max(_shake, skill.Radius >= 3 ? 0.08f : 0.06f);
+                    light = skill.Radius + 2;
+                    break;
+                case SkillKind.Buff:
+                case SkillKind.Summon:
+                case SkillKind.Heal:
+                    Cast(caster);
+                    follow = caster;
+                    if (skill.Id == "spirit_pact") context.Points = (float[])SpiritsNear(caster, feet)?.Clone();
+                    break;
+                case SkillKind.Dash:
+                    Start(caster, Motion.Thrust);
+                    // How far the host really took them (a wall cuts a dash short), when the view already shows it.
+                    float moved = Vector3.Distance(caster.Position, caster.LastPosition);
+                    context.Length = (moved > 0.5f ? Mathf.Min(moved, skill.Range) : skill.Range) * Sprites.PixelsPerUnit;
+                    ghost = caster.Shape.sprite;
+                    if (mine) _shake = Mathf.Max(_shake, 0.05f);
+                    break;
+                case SkillKind.Projectile:
+                    Start(caster, Motion.Thrust);
+                    if (caster.Gear.Kind != HeroWeapon.Bow && caster.Gear.Kind != HeroWeapon.Staff)
+                    {
+                        caster.Combo = 0;
+                        caster.SwingTime = SwingSeconds;
+                        caster.Swing.transform.localRotation = Quaternion.Euler(0, 0, e.Direction.Angle * Mathf.Rad2Deg);
+                        caster.Swing.transform.localScale = Vector3.one;
+                    }
+                    // A few more than the sheet says: a support gem adds projectiles.
+                    _launches.Add(new Launch { Skill = skill, From = caster.Position, Until = Time.time + 0.3f, Left = Mathf.Max(1, skill.Count) + 2, Mine = mine, Main = context.Main });
+                    follow = caster;
+                    break;
+            }
+            var fx = AddFx(FxProgram.Cast, skill.Id, feet, context, mine, follow, light);
+            if (fx != null) fx.Ghost = ghost;
+        }
+
+        // Where the caster's spirits are, from the caster's feet in pixels (the nearest four; the snapshot does not say
+        // whose a spirit is, so with two summoners side by side a line may go to the other's).
+        float[] SpiritsNear(Body caster, Vector3 feet)
+        {
+            int count = 0;
+            var points = _fxPoints[4];
+            foreach (var body in _others.Values)
+            {
+                if (body.Kind != BodyKind.Minion || count >= 4 || Vector3.Distance(body.Position, caster.Position) > 7.5f) continue;
+                points[count * 2] = (body.Position.x - feet.x) * Sprites.PixelsPerUnit;
+                points[count * 2 + 1] = (body.Position.y - feet.y) * Sprites.PixelsPerUnit - 8;
+                count++;
+            }
+            if (count == 0) return null;
+            var exact = _fxPoints[count];
+            System.Array.Copy(points, exact, count * 2);
+            return exact;
+        }
+
+        // A burst where a skill's projectile lands (the host says where).
+        void ShowBurstFx(SkillDefinition skill, Vector3 at, bool mine)
+        {
+            AddFx(FxProgram.Hit, skill.Id, at, new FxContext { Radius = skill.Radius * Sprites.PixelsPerUnit, Main = MainRamp(skill, SkillTag.None) }, mine, light: skill.Radius + 2.5f);
+        }
+
+        // Lightning's jump between two bodies.
+        void ShowChainFx(Vector3 from, Vector3 to)
+        {
+            var along = to - from;
+            AddFx(FxProgram.Chain, "chain_lightning", (from + to) / 2,
+                new FxContext { Length = along.magnitude * Sprites.PixelsPerUnit, Dir = Mathf.Atan2(along.y, along.x) }, mine: true, light: 2.5f);
+            Hear(Sound.Zap, to, 0.5f);
+        }
+
+        // A player's projectile as its skill draws it. False for one that is no skill's (a bow's arrow, a staff's bolt),
+        // which keeps the plain look.
+        bool DrawSkillShot(ProjectileView projectile, bool isNew, float deltaTime)
+        {
+            if (!projectile.Friendly) return false;
+            var at = new Vector3(projectile.Position.X, projectile.Position.Y, 0);
+            if (isNew)
+            {
+                Launch best = null;
+                float nearest = float.MaxValue;
+                foreach (var launch in _launches)
+                {
+                    // As far as it can have flown since, and a little.
+                    float distance = Vector3.Distance(launch.From, at);
+                    if (launch.Left <= 0 || distance > nearest || distance > 1 + launch.Skill.Speed * 0.2f) continue;
+                    nearest = distance;
+                    best = launch;
+                }
+                if (best == null || !HasSkillFx(best.Skill)) return false;
+                best.Left--;
+                _skillShots[projectile.Id] = new SkillShot { Skill = best.Skill, Mine = best.Mine, Main = best.Main, Seed = ++_fxSeed & 0xFFFF };
+            }
+            if (!_skillShots.TryGetValue(projectile.Id, out var shot)) return false;
+            if (!Feel.SkillFx) return false;
+            shot.Age += deltaTime;
+            shot.Last = at;
+            shot.Dir = projectile.Velocity.Angle;
+            _fxStamps.Clear();
+            SkillFx.Stamps(FxProgram.Shot, shot.Skill.Id, new FxContext { Dir = shot.Dir, Seed = shot.Seed, Main = shot.Main }, shot.Age, _fxStamps);
+            EmitFx(at, shot.Mine ? 1 : OthersFxAlpha, null);
+            return true;
+        }
+
+        // A skill's projectile is gone: one that bursts is shown by the host's Burst; the others end here.
+        void SkillShotGone(int id)
+        {
+            if (!_skillShots.TryGetValue(id, out var shot)) return;
+            _skillShots.Remove(id);
+            if (!Feel.SkillFx || shot.Skill.Radius > 0 || shot.Age <= 0) return;
+            AddFx(FxProgram.Hit, shot.Skill.Id, shot.Last, new FxContext { Dir = shot.Dir, Main = shot.Main }, shot.Mine);
+        }
+
+        void BeginSkillFx()
+        {
+            _fxUsed = 0;
+            for (int i = _launches.Count - 1; i >= 0; i--)
+            {
+                if (Time.time > _launches[i].Until) _launches.RemoveAt(i);
+            }
+        }
+
+        // Every running effect's pieces for this frame, then the quiet cues of the buffs running, and the rest of the
+        // pool put away.
+        void UpdateSkillFx(float deltaTime)
+        {
+            for (int i = _fx.Count - 1; i >= 0; i--)
+            {
+                var fx = _fx[i];
+                fx.Age += deltaTime;
+                if (Feel.SkillFxHold >= 0) fx.Age = Mathf.Min(fx.Age, Feel.SkillFxHold);
+                if (fx.Follow != null && fx.Follow.Root != null) fx.At = fx.Follow.Position - new Vector3(0, fx.Follow.Feet, 0);
+                _fxStamps.Clear();
+                bool alive = Feel.SkillFx && SkillFx.Stamps(fx.Program, fx.Skill, fx.Context, fx.Age, _fxStamps);
+                if (!alive)
+                {
+                    _fx.RemoveAt(i);
+                    continue;
+                }
+                EmitFx(fx.At, fx.Mine ? 1 : OthersFxAlpha, fx.Ghost);
+            }
+            if (Feel.SkillFx)
+            {
+                int selfBuffs = 0;
+                for (int slot = 0; slot < _client.Skills.Count; slot++)
+                {
+                    if (_client.BuffLeft(slot) > 0) selfBuffs |= 1 << slot;
+                }
+                BuffCues(_self, _client.PlayerId, selfBuffs, true);
+                foreach (var pair in _buffBits)
+                {
+                    if (pair.Value != 0 && _others.TryGetValue(pair.Key, out var body)) BuffCues(body, pair.Key, pair.Value, false);
+                }
+            }
+            for (int i = _fxUsed; i < _fxPool.Count; i++)
+            {
+                if (_fxPool[i].enabled) _fxPool[i].enabled = false;
+            }
+        }
+
+        // The cue of each buff running on a player, for as long as it runs (Docs/SkillEffects.md: small, near the body,
+        // a slow pulse).
+        void BuffCues(Body body, int playerId, int bits, bool mine)
+        {
+            var feet = body.Position - new Vector3(0, body.Feet, 0);
+            for (int slot = 0; slot < 8; slot++)
+            {
+                if ((bits & (1 << slot)) == 0) continue;
+                var skill = _client.SkillOf(playerId, slot);
+                if (skill == null || !SkillFx.HasLoop(skill.Id)) continue;
+                var context = new FxContext { Dir = Mathf.Atan2(body.Faced.Y, body.Faced.X), Seed = playerId & 0xFF };
+                if (skill.Id == "spirit_pact") context.Points = SpiritsNear(body, feet);
+                _fxStamps.Clear();
+                SkillFx.Stamps(FxProgram.Loop, skill.Id, context, Time.time + playerId * 0.37f, _fxStamps);
+                EmitFx(feet, mine ? 1 : OthersFxAlpha, null);
+            }
+        }
+
+        // Lays this frame's pieces of one effect on pooled sprites, each on the world's pixel grid.
+        void EmitFx(Vector3 origin, float alpha, Sprite ghost)
+        {
+            const float pixel = 1f / Sprites.PixelsPerUnit;
+            foreach (var stamp in _fxStamps)
+            {
+                if (_fxUsed >= FxMostStamps) return;
+                Sprite sprite;
+                var color = Color.white;
+                if (stamp.Shape == FxShape.Ghost)
+                {
+                    if (ghost == null) continue;
+                    sprite = ghost;
+                    var tint = SkillFxArt.Ramp(stamp.Ramp)[2];
+                    color = new Color(tint.R / 255f, tint.G / 255f, tint.B / 255f);
+                }
+                else if (!FxSprites.TryGetValue(stamp.Key, out sprite) || sprite == null)
+                {
+                    var copy = stamp;
+                    sprite = Sprites.Centered($"sfx/{(int)copy.Shape}/{(int)copy.Ramp}/{copy.Size}/{copy.Frame}", () => SkillFxArt.Draw(copy.Shape, copy.Ramp, copy.Size, copy.Frame));
+                    FxSprites[stamp.Key] = sprite;
+                }
+                if (_fxUsed == _fxPool.Count)
+                {
+                    var made = Renderer(_root.transform, "SkillFx", null, Color.white);
+                    _fxPool.Add(made);
+                }
+                var renderer = _fxPool[_fxUsed];
+                renderer.enabled = true;
+                renderer.sprite = sprite;
+                color.a = stamp.Alpha * alpha;
+                renderer.color = color;
+                var place = renderer.transform;
+                // A sprite of odd width sits half a pixel off its centre, so its pixels still land on the grid.
+                float x = origin.x + stamp.X * pixel, y = origin.y + stamp.Y * pixel;
+                if (stamp.Angle == 0 && stamp.Shape != FxShape.Ghost)
+                {
+                    float halfWide = sprite.rect.width * 0.5f * pixel, halfTall = sprite.rect.height * 0.5f * pixel;
+                    x = Mathf.Round((x - halfWide) * Sprites.PixelsPerUnit) * pixel + halfWide;
+                    y = Mathf.Round((y - halfTall) * Sprites.PixelsPerUnit) * pixel + halfTall;
+                }
+                place.localPosition = new Vector3(x, y, 0);
+                place.localRotation = stamp.Angle == 0 ? Quaternion.identity : Quaternion.Euler(0, 0, stamp.Angle);
+                renderer.sortingOrder = stamp.Ground ? FxGroundOrder : FxOverOrder + (_fxUsed & 511);
+                _fxUsed++;
+            }
+        }
+
+        // A blast lights the dark around it for a moment, in its element's colour.
+        void AddFxLights()
+        {
+            foreach (var fx in _fx)
+            {
+                if (fx.Light <= 0 || fx.Age > 0.45f || fx.Age < (fx.Program == FxProgram.Cast ? SkillFx.Lead : 0)) continue;
+                var ramp = fx.Skill == "chain_lightning" || fx.Skill == "thunderclap" ? FxRamp.Bolt
+                    : fx.Program == FxProgram.Hit ? FxRamp.Fire
+                    : fx.Skill == "fire_ring" || fx.Skill == "inferno" ? FxRamp.Fire
+                    : fx.Skill == "frost_ring" || fx.Skill == "blizzard" ? FxRamp.Cold
+                    : fx.Skill == "spirit_blast" ? FxRamp.Spirit : fx.Context.Main;
+                _lights.Add(new LightSource(new Vec2(fx.At.x, fx.At.y), fx.Light, 0.9f * (1 - fx.Age / 0.45f), SkillFxArt.Ramp(ramp)[1], tints: true));
+            }
+        }
+    }
+}

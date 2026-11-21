@@ -128,6 +128,10 @@ namespace Game.Client
                     // feel <piece|all> <on|off>: one piece of a blow's feedback (Feel, Docs/Feel.md).
                     if (!Feel.Set(words[1], words.Length < 3 || words[2] != "off")) return $"no feel '{words[1]}' (all, {string.Join(", ", Feel.Names)})";
                     return $"ok feel off: {Feel.Off}";
+                case "fxhold":
+                    // fxhold <seconds|off>: skill effects stop at that age, for a picture of one phase (Docs/SkillEffects.md).
+                    Feel.SkillFxHold = words[1] == "off" ? -1 : Float(words[1]);
+                    return $"ok fxhold {Feel.SkillFxHold}";
                 case "daylength":
                     // daylength <minutes>: how long a day of this world takes (Calendar.DayLengths).
                     world.SetDayMinutes(Int(words[1]));
@@ -826,6 +830,9 @@ namespace Game.Client
                 // What a player sees of them: marks drawn on the ground and the warning sign over the boss (an attack
                 // the vein eater announces only by its wind-up lays hazards no one sees, 2026-11-12).
                 json.Field("marksShown", root.MarksShown);
+                // Skill effects running and the pieces they draw (WorldView.SkillFx).
+                json.Field("skillFx", root.SkillFxAlive);
+                json.Field("skillFxPieces", root.SkillFxPieces);
                 json.Field("warningSign", root.WarningShown);
                 // What the silk mother's blows left on the floor: webs and pools of venom (in the world, and drawn), and
                 // whether the player is caught in a web (2026-11-13).

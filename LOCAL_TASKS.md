@@ -1035,6 +1035,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(화면 코드만 바뀜, 통신 그대로). 새 파일 `Client/Art/HeroArt.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/HeroPreview.cs`는 Unity 밖이라 `.meta` 없음)
   - (클라우드 웹 점검) `sweep.js --only hero`
   - (사람) 검 3단(내려베기·올려베기·돌며 넓게 베기), 활 당겨 쏘기, 지팡이 모아 쏘기, 곡괭이 내리찍기, 맨손 주먹을 직접 휘둘러 보며 손맛이 나는지, 연타할 때 끊기지 않는지. 주인공이 NPC보다 1.4배쯤 커 보이는 것이 어색하지 않은지. 협동 상대의 튜닉 색이 구별되는지
+- [ ] 144단계: 스킬 서른 가지의 이펙트(`Docs/SkillEffects.md`)
+  - 명령 한 줄을 다시 돌린다(화면 코드만 바뀜, 통신 그대로). 새 파일 `Client/Art/SkillFx.cs`, `Client/Art/SkillFxArt.cs`, `Client/WorldView.SkillFx.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/SkillFxPreview.cs`는 Unity 밖이라 `.meta` 없음)
+  - (클라우드 웹 점검) `sweep.js --only skillfx`. 비교는 `feel skillfx off|on`
+  - (사람) 클래스마다 스킬을 써 보며 모으기·터짐·흩어짐이 시원한지, 화면이 너무 어지럽지 않은지(특히 지옥불·눈보라·칼날 폭풍), 보스 예고 표시와 헷갈리지 않는지, 휴대폰에서 끊김이 없는지
 
 ## 결과 보고
 

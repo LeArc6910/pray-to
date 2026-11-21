@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1997,6 +1997,168 @@ async function skills(browser) {
   await game.context.close();
 }
 
+// ---------------------------------------------------------------- 스킬 서른 가지의 이펙트 (2026-11-21, Docs/SkillEffects.md)
+// Every skill of every class cast at slimes, with a picture of each phase of its effect: the gathering before the blow,
+// the blow, and what is left to thin out. "fxhold <seconds>" stops effects at that age so the picture catches the
+// phase; a projectile's flight is caught by stopping the host a moment after the cast ("speed 0"). The old look (feel
+// skillfx off) is pictured once for each class's first skill, for setting side by side. Then a few on a phone held
+// upright, where an area must still fit the narrow screen.
+const SkillKinds = {
+  whirlwind: 'nova', war_cry: 'buff', charge: 'dash', ground_slam: 'nova', iron_skin: 'buff', blade_storm: 'nova',
+  fireball: 'shot', flame_brand: 'buff', fire_ring: 'nova', meteor: 'shot', flame_burst: 'shot', inferno: 'nova',
+  volley: 'shot', eagle_eye: 'buff', gale_step: 'dash', power_shot: 'shot', explosive_arrow: 'shot', arrow_rain: 'shot',
+  spirits: 'summon', spirit_pact: 'buff', life_spring: 'heal', spirit_horde: 'summon', spirit_blast: 'nova', guardian: 'summon',
+  chain_lightning: 'shot', frost_ring: 'nova', ice_lance: 'shot', storm_mantle: 'buff', thunderclap: 'nova', blizzard: 'nova',
+};
+
+async function castSkillFx(game, cls, name, id, slot, withOld, spiritsSlot) {
+  const kind = SkillKinds[id];
+  const far = kind === 'shot';
+  // Slimes sturdy enough to stay for the pictures: near for an area, far for a projectile (two more for the chain).
+  const slimes = far ? 'spawn slime 4.5 0 5000; spawn slime 5 1.6 5000; spawn slime 4 -1.6 5000' : 'spawn slime 1.6 0 5000; spawn slime -1.2 1.2 5000; spawn slime 0.4 -1.6 5000';
+  // teach clears the cooldowns; the spirits called before stay for the pact's lines.
+  const ready = `fxhold off; speed 1; teach 2; heal; mana 100; clear; ${slimes}; face 1 0`;
+  if (withOld) {
+    await game.send(`${ready}; feel skillfx off`);
+    await game.wait(350);
+    await game.send(`skill ${slot}`);
+    await game.wait(far ? 260 : 120);
+    await game.shot(`skillfx-${cls}-${id}-old`, `${name} ${id}: 예전 모습(feel skillfx off)`);
+    await game.wait(900);
+    await game.send('feel skillfx on');
+  }
+  await game.send(ready);
+  await game.wait(350);
+  if (id === 'spirit_pact' && spiritsSlot >= 0) {
+    // Spirits first, so the pact has someone to bind: its lines run to them.
+    await game.send(`skill ${spiritsSlot}`);
+    await game.wait(1300);
+    await game.send('mana 100');
+  }
+  const before = (await game.state()).mana;
+  await game.send(`fxhold 0.06; skill ${slot}`);
+  await game.wait(250);
+  const cast = await game.state();
+  check(cast.mana < before, `${name} ${id}: 스킬이 나간다`);
+  check(cast.skillFx > 0 && cast.skillFxPieces > 0, `${name} ${id}: 이펙트가 그려진다 (효과 ${cast.skillFx}개, 조각 ${cast.skillFxPieces}개)`);
+  await game.shot(`skillfx-${cls}-${id}-1`, `${name} ${id}: 모으기(0.06초)`);
+  if (far) {
+    // The projectile was let fly while the cast's effect was held: cast again and stop the host mid-flight.
+    await game.wait(900);
+    await game.send(ready);
+    await game.wait(350);
+    await game.send(`skill ${slot}`);
+    await game.wait(id === 'meteor' ? 320 : id === 'power_shot' ? 90 : 150);
+    await game.send('speed 0');
+    await game.wait(120);
+    const flying = await game.state();
+    check(flying.projectiles > 0, `${name} ${id}: 투사체가 날아간다 (${flying.projectiles}발)`);
+    await game.shot(`skillfx-${cls}-${id}-2`, `${name} ${id}: 날아가는 중`);
+    await game.send('fxhold 0.1; speed 1');
+    await game.wait(800);
+    await game.shot(`skillfx-${cls}-${id}-3`, `${name} ${id}: 맞은 순간(0.1초)`);
+    await game.send('fxhold 0.45');
+    await game.wait(500);
+    await game.shot(`skillfx-${cls}-${id}-4`, `${name} ${id}: 흩어짐(0.45초)`);
+  } else {
+    await game.send(`fxhold ${id === 'blade_storm' || id === 'inferno' || id === 'blizzard' ? 0.3 : 0.2}`);
+    await game.wait(350);
+    const impact = await game.state();
+    await game.shot(`skillfx-${cls}-${id}-2`, `${name} ${id}: 터지는 순간`);
+    check(impact.skillFxPieces > 0, `${name} ${id}: 터지는 순간의 조각 (${impact.skillFxPieces}개)`);
+    await game.send('fxhold 0.6');
+    await game.wait(500);
+    await game.shot(`skillfx-${cls}-${id}-3`, `${name} ${id}: 흩어짐(0.6초)`);
+    if (kind === 'buff') {
+      // The quiet cue while the buff runs.
+      await game.send('fxhold off');
+      await game.wait(1500);
+      check((await game.state()).skillFxPieces > 0, `${name} ${id}: 버프가 도는 동안 표시가 남는다`);
+      await game.shot(`skillfx-${cls}-${id}-loop`, `${name} ${id}: 버프가 도는 동안`);
+    }
+  }
+  await game.send('fxhold off; speed 1');
+  await game.wait(700);
+  const after = await game.state();
+  check(after.skillFx <= 1, `${name} ${id}: 이펙트가 오래 남지 않는다 (남은 효과 ${after.skillFx}개)`);
+}
+
+async function skillfx(browser) {
+  note('\n## 스킬 서른 가지의 이펙트 (PC)\n');
+  const classes = [['warrior', '전사'], ['fire_mage', '화염 마법사'], ['archer', '궁수'], ['summoner', '소환사'], ['storm_caller', '폭풍술사']];
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 7, 5);
+  let seen = 0;
+  for (const [cls, name] of classes) {
+    await game.send(`classes ${cls}; xp 21300; teach 2; heal; clear`);
+    await game.wait(800);
+    let inv = await game.inventory();
+    check(inv.classes === cls && inv.skills.split(',').length === 4, `${name}: 배운 스킬 넷이 칸에 (${inv.skills})`);
+    // The first four slots, then the last two skills swapped in.
+    for (const order of [null, '4,5,0,1']) {
+      if (order) {
+        await game.send(`classes ${cls} ${order}; teach 2`);
+        await game.wait(600);
+        inv = await game.inventory();
+      }
+      for (const slot of order ? [0, 1] : [0, 1, 2, 3]) {
+        const id = inv.skills.split(',')[slot];
+        if (!SkillKinds[id]) {
+          check(false, `${name} ${id}: 이펙트 시험에 없는 스킬`);
+          continue;
+        }
+        await castSkillFx(game, cls, name, id, slot, seen % 6 === 0, inv.skills.split(',').indexOf('spirits'));
+        seen++;
+        if (SkillKinds[id] === 'dash') {
+          // A dash carries the player along: back to open ground.
+          await game.send('goto wild');
+          await clearRoom(game, 7, 5);
+        }
+      }
+    }
+  }
+  check(seen === 30, `스킬 서른 가지를 모두 써 봤다 (${seen})`);
+  await game.context.close();
+
+  // A phone held upright: the widest areas and a projectile, by the same commands (the effect's size on a narrow screen
+  // is what is looked at; tapping the skill buttons is the touch section's).
+  note('\n## 스킬 이펙트 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  check(await phone.press('게임 시작'), '[게임 시작]을 탭한다');
+  check(await phone.press('혼자 하기'), '[혼자 하기]를 탭한다');
+  check(!!(await phone.until(s => s.playing, 25000)), '탭으로 게임이 시작된다');
+  const { width, height } = Profiles.phone.context.viewport;
+  await phone.page.touchscreen.tap(width / 2, height / 3);
+  await phone.wait(800);
+  await phone.send('goto wild');
+  await clearRoom(phone, 7, 5);
+  for (const [cls, name, order] of [['warrior', '전사', '4,5,0,1'], ['fire_mage', '화염 마법사', '4,5,0,1'], ['storm_caller', '폭풍술사', '4,5,0,1']]) {
+    await phone.send(`classes ${cls}; xp 21300; teach 2; heal; clear`);
+    await phone.wait(600);
+    await phone.send(`classes ${cls} ${order}; teach 2`);
+    await phone.wait(600);
+    const inv = await phone.inventory();
+    // The class's last skill (its widest area) and its first.
+    for (const slot of [1, 2]) {
+      const id = inv.skills.split(',')[slot];
+      const far = SkillKinds[id] === 'shot';
+      await phone.send(`fxhold off; speed 1; teach 2; heal; mana 100; clear; spawn slime ${far ? 3.5 : 1.6} 0 5000; face 1 0`);
+      await phone.wait(350);
+      await phone.send(`fxhold ${far ? 0.1 : 0.22}; skill ${slot}`);
+      await phone.wait(far ? 900 : 450);
+      const state = await phone.state();
+      check(state.skillFxPieces > 0, `휴대폰 ${name} ${id}: 이펙트가 그려진다 (조각 ${state.skillFxPieces}개)`);
+      await phone.shot(`skillfx-phone-${cls}-${id}`, `휴대폰 세로 ${name} ${id}`);
+      await phone.send('fxhold off');
+      await phone.wait(900);
+    }
+  }
+  await phone.context.close();
+}
+
 // ---------------------------------------------------------------- 바닥, 문, 장식 (41단계)
 async function base(browser) {
   note('\n## 바닥·문·장식 (PC)\n');
@@ -3304,7 +3466,7 @@ async function hero(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, base, save, story, deploysave, layout, touch };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });
