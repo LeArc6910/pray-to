@@ -2080,11 +2080,20 @@ async function castSkillFx(game, cls, name, id, slot, withOld, spiritsSlot) {
     const drawn = await pollState(game, s => s.skillShots > 0);
     check(drawn.skillShots > 0, `${name} ${id}: 날아가는 투사체가 스킬의 모습으로 그려진다 (${drawn.skillShots}발, 조각 ${drawn.skillFxPieces}개)`);
     await game.shot(`skillfx-${cls}-${id}-2`, `${name} ${id}: 날아가는 중`);
-    // Let it land with effects held at a tenth of a second: the cast's is held too, so the landing makes a second one.
-    await game.send('fxhold 0.1; speed 1');
+    // Let it land: once the projectiles are gone, what is still drawn is the landing (an arrow's hit lasts a few
+    // tenths of a second, so this looks at the most seen over a while rather than holding an age, 2026-11-21).
+    // The landing, on a cast of its own let fly without stopping the host (stopped and let go, the slimes rush in
+    // while it is held): once the projectiles are gone, what is still drawn is the landing.
+    await game.send('fxhold off; speed 1');
+    await game.wait(900);
+    await game.send(ready);
+    await game.wait(350);
+    await game.send(`skill ${slot}`);
+    await pollState(game, s => s.projectiles > 0, 2000);
     await pollState(game, s => s.projectiles === 0, 4000);
-    const landed = await pollState(game, s => s.skillFx >= 2 && s.skillFxPieces > 0);
-    check(landed.skillFx >= 2 && landed.skillFxPieces > 0, `${name} ${id}: 닿은 곳에 이펙트가 그려진다 (효과 ${landed.skillFx}개, 조각 ${landed.skillFxPieces}개)`);
+    const landedPieces = await mostOver(game, 'skillFxPieces', 1200);
+    check(landedPieces > 0, `${name} ${id}: 닿은 곳에 이펙트가 그려진다 (조각 ${landedPieces}개)`);
+    await game.send('fxhold 0.1');
     await game.shot(`skillfx-${cls}-${id}-3`, `${name} ${id}: 맞은 순간(0.1초)`);
     await game.send('fxhold 0.45');
     await game.wait(500);
