@@ -89,6 +89,7 @@ namespace Game.Client
         // Skill effects running and their pieces on screen (WorldView.SkillFx), for the playtests.
         internal int SkillFxAlive => _view?.SkillFxAlive ?? 0;
         internal int SkillFxPieces => _view?.SkillFxPieces ?? 0;
+        internal int SkillShotsDrawn => _view?.SkillShotsDrawn ?? 0;
         internal bool WarningShown => _view != null && _view.WarningShown;
         internal int PoolsShown => _view?.PoolsShown ?? 0;
         internal string RenderTrace => _view?.RenderTrace;

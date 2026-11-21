@@ -833,6 +833,8 @@ namespace Game.Client
                 // Skill effects running and the pieces they draw (WorldView.SkillFx).
                 json.Field("skillFx", root.SkillFxAlive);
                 json.Field("skillFxPieces", root.SkillFxPieces);
+                // Projectiles drawn in their skill's own look (not the plain orb or arrow).
+                json.Field("skillShots", root.SkillShotsDrawn);
                 json.Field("warningSign", root.WarningShown);
                 // What the silk mother's blows left on the floor: webs and pools of venom (in the world, and drawn), and
                 // whether the player is caught in a web (2026-11-13).

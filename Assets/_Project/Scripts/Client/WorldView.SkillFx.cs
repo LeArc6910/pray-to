@@ -32,6 +32,7 @@ namespace Game.Client
         {
             public SkillDefinition Skill;
             public Vector3 From;
+            public float Start;
             public float Until;
             public int Left;
             public bool Mine;
@@ -52,6 +53,14 @@ namespace Game.Client
         readonly List<Fx> _fx = new List<Fx>();
         readonly List<Launch> _launches = new List<Launch>();
         readonly Dictionary<int, SkillShot> _skillShots = new Dictionary<int, SkillShot>();
+        // Friendly projectiles seen lately that no skill is known for yet (when first seen, where and which way they
+        // were last), and ones of those already gone.
+        readonly Dictionary<int, (float Seen, Vector3 Last, float Dir)> _youngShots = new Dictionary<int, (float, Vector3, float)>();
+        readonly List<(Vector3 Last, float Dir, float Time)> _pendingGone = new List<(Vector3, float, float)>();
+        const float YoungShotSeconds = 1f;
+        int _skillShotsDrawn;
+        int _fxShown;
+        int _skillShotsShown;
         readonly List<FxStamp> _fxStamps = new List<FxStamp>();
         readonly List<SpriteRenderer> _fxPool = new List<SpriteRenderer>();
         readonly float[][] _fxPoints = { null, new float[2], new float[4], new float[6], new float[8] };
@@ -69,7 +78,10 @@ namespace Game.Client
 
         // Effects running and pieces drawn this frame, for the playtests.
         public int SkillFxAlive => _fx.Count;
-        public int SkillFxPieces => _fxUsed;
+        // (As of the last frame drawn through: the counts themselves start over in the middle of a frame.)
+        public int SkillFxPieces => _fxShown;
+        // Projectiles drawn in their skill's own look that frame.
+        public int SkillShotsDrawn => _skillShotsShown;
 
         static bool HasSkillFx(SkillDefinition skill) => Feel.SkillFx && skill != null && SkillFx.Knows(skill.Id);
 
@@ -137,7 +149,7 @@ namespace Game.Client
                         caster.Swing.transform.localScale = Vector3.one;
                     }
                     // A few more than the sheet says: a support gem adds projectiles.
-                    _launches.Add(new Launch { Skill = skill, From = caster.Position, Until = Time.time + 0.3f, Left = Mathf.Max(1, skill.Count) + 2, Mine = mine, Main = context.Main });
+                    _launches.Add(new Launch { Skill = skill, From = caster.Position, Start = Time.time, Until = Time.time + 1f, Left = Mathf.Max(1, skill.Count) + 2, Mine = mine, Main = context.Main });
                     follow = caster;
                     break;
             }
@@ -180,50 +192,95 @@ namespace Game.Client
         }
 
         // A player's projectile as its skill draws it. False for one that is no skill's (a bow's arrow, a staff's bolt),
-        // which keeps the plain look.
+        // which keeps the plain look. A projectile is usually seen a moment before the event of the skill that fired it
+        // is shown (projectiles are drawn before the frame's events), so one not yet known for a skill's is tried again
+        // while it is young.
         bool DrawSkillShot(ProjectileView projectile, bool isNew, float deltaTime)
         {
             if (!projectile.Friendly) return false;
             var at = new Vector3(projectile.Position.X, projectile.Position.Y, 0);
-            if (isNew)
+            float dir = projectile.Velocity.Angle;
+            if (!_skillShots.TryGetValue(projectile.Id, out var shot))
             {
-                Launch best = null;
-                float nearest = float.MaxValue;
-                foreach (var launch in _launches)
+                if (isNew) _youngShots[projectile.Id] = (Time.time, at, dir);
+                if (!_youngShots.TryGetValue(projectile.Id, out var young)) return false;
+                if (Time.time - young.Seen > YoungShotSeconds)
                 {
-                    // As far as it can have flown since, and a little.
-                    float distance = Vector3.Distance(launch.From, at);
-                    if (launch.Left <= 0 || distance > nearest || distance > 1 + launch.Skill.Speed * 0.2f) continue;
-                    nearest = distance;
-                    best = launch;
+                    _youngShots.Remove(projectile.Id);
+                    return false;
                 }
-                if (best == null || !HasSkillFx(best.Skill)) return false;
-                best.Left--;
-                _skillShots[projectile.Id] = new SkillShot { Skill = best.Skill, Mine = best.Mine, Main = best.Main, Seed = ++_fxSeed & 0xFFFF };
+                _youngShots[projectile.Id] = (young.Seen, at, dir);
+                shot = MatchShot(projectile.Id, at);
+                if (shot == null) return false;
             }
-            if (!_skillShots.TryGetValue(projectile.Id, out var shot)) return false;
-            if (!Feel.SkillFx) return false;
             shot.Age += deltaTime;
             shot.Last = at;
-            shot.Dir = projectile.Velocity.Angle;
+            shot.Dir = dir;
+            if (!Feel.SkillFx) return false;
             _fxStamps.Clear();
             SkillFx.Stamps(FxProgram.Shot, shot.Skill.Id, new FxContext { Dir = shot.Dir, Seed = shot.Seed, Main = shot.Main }, shot.Age, _fxStamps);
             EmitFx(at, shot.Mine ? 1 : OthersFxAlpha, null);
+            _skillShotsDrawn++;
             return true;
         }
 
-        // A skill's projectile is gone: one that bursts is shown by the host's Burst; the others end here.
+        // The skill just used that this projectile is of: the nearest caster it can have come from since. Null for none.
+        SkillShot MatchShot(int id, Vector3 at)
+        {
+            Launch best = null;
+            float nearest = float.MaxValue;
+            foreach (var launch in _launches)
+            {
+                // As far as it can have flown since the skill was used, and a little.
+                float distance = Vector3.Distance(launch.From, at);
+                if (launch.Left <= 0 || distance > nearest || distance > 1 + launch.Skill.Speed * (Time.time - launch.Start + 0.2f)) continue;
+                nearest = distance;
+                best = launch;
+            }
+            if (best == null || !HasSkillFx(best.Skill)) return null;
+            best.Left--;
+            _youngShots.Remove(id);
+            var shot = new SkillShot { Skill = best.Skill, Mine = best.Mine, Main = best.Main, Seed = ++_fxSeed & 0xFFFF };
+            _skillShots[id] = shot;
+            return shot;
+        }
+
+        // A skill's projectile is gone: one that bursts is shown by the host's Burst; the others end here. One that
+        // was gone before its skill's event was shown (it struck something right beside the caster) is matched now.
         void SkillShotGone(int id)
         {
-            if (!_skillShots.TryGetValue(id, out var shot)) return;
+            if (!_skillShots.TryGetValue(id, out var shot) && _youngShots.TryGetValue(id, out var young))
+            {
+                _pendingGone.Add((young.Last, young.Dir, Time.time));
+            }
+            _youngShots.Remove(id);
+            if (shot == null) return;
             _skillShots.Remove(id);
-            if (!Feel.SkillFx || shot.Skill.Radius > 0 || shot.Age <= 0) return;
+            if (!Feel.SkillFx || shot.Skill.Radius > 0) return;
             AddFx(FxProgram.Hit, shot.Skill.Id, shot.Last, new FxContext { Dir = shot.Dir, Main = shot.Main }, shot.Mine);
+        }
+
+        // Projectiles that went before any skill was known for them: once this frame's events are shown, one whose
+        // skill has turned up gets its ending after all.
+        void EndGoneShots()
+        {
+            for (int i = _pendingGone.Count - 1; i >= 0; i--)
+            {
+                var (last, dir, time) = _pendingGone[i];
+                var shot = MatchShot(-1 - i, last);
+                if (shot != null)
+                {
+                    _skillShots.Remove(-1 - i);
+                    if (Feel.SkillFx && shot.Skill.Radius <= 0) AddFx(FxProgram.Hit, shot.Skill.Id, last, new FxContext { Dir = dir, Main = shot.Main }, shot.Mine);
+                }
+                if (shot != null || Time.time - time > YoungShotSeconds) _pendingGone.RemoveAt(i);
+            }
         }
 
         void BeginSkillFx()
         {
             _fxUsed = 0;
+            _skillShotsDrawn = 0;
             for (int i = _launches.Count - 1; i >= 0; i--)
             {
                 if (Time.time > _launches[i].Until) _launches.RemoveAt(i);
@@ -234,6 +291,7 @@ namespace Game.Client
         // pool put away.
         void UpdateSkillFx(float deltaTime)
         {
+            EndGoneShots();
             for (int i = _fx.Count - 1; i >= 0; i--)
             {
                 var fx = _fx[i];
@@ -266,6 +324,8 @@ namespace Game.Client
             {
                 if (_fxPool[i].enabled) _fxPool[i].enabled = false;
             }
+            _fxShown = _fxUsed;
+            _skillShotsShown = _skillShotsDrawn;
         }
 
         // The cue of each buff running on a player, for as long as it runs (Docs/SkillEffects.md: small, near the body,

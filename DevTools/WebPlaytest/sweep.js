@@ -2011,18 +2011,44 @@ const SkillKinds = {
   chain_lightning: 'shot', frost_ring: 'nova', ice_lance: 'shot', storm_mantle: 'buff', thunderclap: 'nova', blizzard: 'nova',
 };
 
+// The state asked again and again (every 50 ms or so) until it passes the test; the last one asked when it never does.
+// The headless browser draws up to a second behind the host while it records, so these checks wait for what they look
+// for instead of sleeping a fixed time.
+async function pollState(game, test, ms = 3000) {
+  const deadline = Date.now() + ms;
+  let last = await game.state();
+  while (!test(last) && Date.now() < deadline) {
+    await game.wait(50);
+    last = await game.state();
+  }
+  return last;
+}
+
+// The most a count reaches over a while: a buff's quiet cue pulses, and is down to a piece or two between pulses.
+async function mostOver(game, field, ms) {
+  const deadline = Date.now() + ms;
+  let most = 0;
+  while (Date.now() < deadline) {
+    most = Math.max(most, (await game.state())[field] || 0);
+    await game.wait(50);
+  }
+  return most;
+}
+
 async function castSkillFx(game, cls, name, id, slot, withOld, spiritsSlot) {
   const kind = SkillKinds[id];
   const far = kind === 'shot';
-  // Slimes sturdy enough to stay for the pictures: near for an area, far for a projectile (two more for the chain).
-  const slimes = far ? 'spawn slime 4.5 0 5000; spawn slime 5 1.6 5000; spawn slime 4 -1.6 5000' : 'spawn slime 1.6 0 5000; spawn slime -1.2 1.2 5000; spawn slime 0.4 -1.6 5000';
+  // Slimes sturdy enough to stay for the pictures: near for an area, far enough for a projectile to be caught in flight
+  // (two more within the chain's reach of the first).
+  const slimes = far ? 'spawn slime 6.5 0 5000; spawn slime 7 1.6 5000; spawn slime 6 -1.6 5000' : 'spawn slime 1.6 0 5000; spawn slime -1.2 1.2 5000; spawn slime 0.4 -1.6 5000';
   // teach clears the cooldowns; the spirits called before stay for the pact's lines.
   const ready = `fxhold off; speed 1; teach 2; heal; mana 100; clear; ${slimes}; face 1 0`;
   if (withOld) {
     await game.send(`${ready}; feel skillfx off`);
     await game.wait(350);
     await game.send(`skill ${slot}`);
-    await game.wait(far ? 260 : 120);
+    if (far) await pollState(game, s => s.projectiles > 0, 2000);
+    await game.wait(far ? 150 : 120);
     await game.shot(`skillfx-${cls}-${id}-old`, `${name} ${id}: 예전 모습(feel skillfx off)`);
     await game.wait(900);
     await game.send('feel skillfx on');
@@ -2037,25 +2063,28 @@ async function castSkillFx(game, cls, name, id, slot, withOld, spiritsSlot) {
   }
   const before = (await game.state()).mana;
   await game.send(`fxhold 0.06; skill ${slot}`);
-  await game.wait(250);
-  const cast = await game.state();
+  const cast = await pollState(game, s => s.skillFx > 0 && s.skillFxPieces > 0);
   check(cast.mana < before, `${name} ${id}: 스킬이 나간다`);
   check(cast.skillFx > 0 && cast.skillFxPieces > 0, `${name} ${id}: 이펙트가 그려진다 (효과 ${cast.skillFx}개, 조각 ${cast.skillFxPieces}개)`);
   await game.shot(`skillfx-${cls}-${id}-1`, `${name} ${id}: 모으기(0.06초)`);
   if (far) {
-    // The projectile was let fly while the cast's effect was held: cast again and stop the host mid-flight.
+    // The projectile was let fly while the cast's effect was held: cast again and stop the host as soon as it is in
+    // the air, then wait for the screen to show it in its skill's own look (not the plain orb or arrow).
     await game.wait(900);
     await game.send(ready);
     await game.wait(350);
     await game.send(`skill ${slot}`);
-    await game.wait(id === 'meteor' ? 320 : id === 'power_shot' ? 90 : 150);
+    const flying = await pollState(game, s => s.projectiles > 0, 2000);
     await game.send('speed 0');
-    await game.wait(120);
-    const flying = await game.state();
     check(flying.projectiles > 0, `${name} ${id}: 투사체가 날아간다 (${flying.projectiles}발)`);
+    const drawn = await pollState(game, s => s.skillShots > 0);
+    check(drawn.skillShots > 0, `${name} ${id}: 날아가는 투사체가 스킬의 모습으로 그려진다 (${drawn.skillShots}발, 조각 ${drawn.skillFxPieces}개)`);
     await game.shot(`skillfx-${cls}-${id}-2`, `${name} ${id}: 날아가는 중`);
+    // Let it land with effects held at a tenth of a second: the cast's is held too, so the landing makes a second one.
     await game.send('fxhold 0.1; speed 1');
-    await game.wait(800);
+    await pollState(game, s => s.projectiles === 0, 4000);
+    const landed = await pollState(game, s => s.skillFx >= 2 && s.skillFxPieces > 0);
+    check(landed.skillFx >= 2 && landed.skillFxPieces > 0, `${name} ${id}: 닿은 곳에 이펙트가 그려진다 (효과 ${landed.skillFx}개, 조각 ${landed.skillFxPieces}개)`);
     await game.shot(`skillfx-${cls}-${id}-3`, `${name} ${id}: 맞은 순간(0.1초)`);
     await game.send('fxhold 0.45');
     await game.wait(500);
@@ -2063,23 +2092,23 @@ async function castSkillFx(game, cls, name, id, slot, withOld, spiritsSlot) {
   } else {
     await game.send(`fxhold ${id === 'blade_storm' || id === 'inferno' || id === 'blizzard' ? 0.3 : 0.2}`);
     await game.wait(350);
-    const impact = await game.state();
+    const impact = await pollState(game, s => s.skillFxPieces > 0);
     await game.shot(`skillfx-${cls}-${id}-2`, `${name} ${id}: 터지는 순간`);
     check(impact.skillFxPieces > 0, `${name} ${id}: 터지는 순간의 조각 (${impact.skillFxPieces}개)`);
     await game.send('fxhold 0.6');
     await game.wait(500);
     await game.shot(`skillfx-${cls}-${id}-3`, `${name} ${id}: 흩어짐(0.6초)`);
     if (kind === 'buff') {
-      // The quiet cue while the buff runs.
+      // The quiet cue while the buff runs: once the cast's effect is over, the most pieces over a pulse or so.
       await game.send('fxhold off');
-      await game.wait(1500);
-      check((await game.state()).skillFxPieces > 0, `${name} ${id}: 버프가 도는 동안 표시가 남는다`);
+      await pollState(game, s => s.skillFx === 0, 3000);
+      const cue = await mostOver(game, 'skillFxPieces', 1000);
+      check(cue > 0, `${name} ${id}: 버프가 도는 동안 표시가 남는다 (조각 최대 ${cue}개)`);
       await game.shot(`skillfx-${cls}-${id}-loop`, `${name} ${id}: 버프가 도는 동안`);
     }
   }
   await game.send('fxhold off; speed 1');
-  await game.wait(700);
-  const after = await game.state();
+  const after = await pollState(game, s => s.skillFx <= 1, 4000);
   check(after.skillFx <= 1, `${name} ${id}: 이펙트가 오래 남지 않는다 (남은 효과 ${after.skillFx}개)`);
 }
 
@@ -2148,8 +2177,10 @@ async function skillfx(browser) {
       await phone.send(`fxhold off; speed 1; teach 2; heal; mana 100; clear; spawn slime ${far ? 3.5 : 1.6} 0 5000; face 1 0`);
       await phone.wait(350);
       await phone.send(`fxhold ${far ? 0.1 : 0.22}; skill ${slot}`);
-      await phone.wait(far ? 900 : 450);
-      const state = await phone.state();
+      if (far) await pollState(phone, s => s.projectiles > 0, 2000);
+      if (far) await pollState(phone, s => s.projectiles === 0, 4000);
+      await phone.wait(far ? 200 : 450);
+      const state = await pollState(phone, s => s.skillFxPieces > 0);
       check(state.skillFxPieces > 0, `휴대폰 ${name} ${id}: 이펙트가 그려진다 (조각 ${state.skillFxPieces}개)`);
       await phone.shot(`skillfx-phone-${cls}-${id}`, `휴대폰 세로 ${name} ${id}`);
       await phone.send('fxhold off');
