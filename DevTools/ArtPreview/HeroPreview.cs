@@ -81,7 +81,9 @@ namespace Game.Client
                     chain = chain.Take(chain.Count() - RecoveryFrames(next == HeroMove.Attack2 ? HeroMove.Attack1 : HeroMove.Attack2, weapon)).Concat(steps);
                 }
                 rows.Add(chain.Concat(Rest(gear)).ToList());
-                jumps += MotionCheck.Write(folder, name, new[] { "attack1", "attack2", "attack3", "chain" }, rows.ToArray(), floor, HeroArt.Size, HeroArt.Size, Point, Views, 3);
+                // The dodge roll, which looks different by what is held (HeroMove.Roll).
+                rows.Add(Once(HeroMove.Roll, gear).ToList());
+                jumps += MotionCheck.Write(folder, name, new[] { "attack1", "attack2", "attack3", "chain", "roll" }, rows.ToArray(), floor, HeroArt.Size, HeroArt.Size, Point, Views, 3);
             }
 
             // What every weapon does the same way, with a sword in hand and with nothing.

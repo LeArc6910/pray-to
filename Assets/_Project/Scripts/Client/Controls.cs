@@ -7,12 +7,12 @@ using UnityEngine.InputSystem;
 namespace Game.Client
 {
     // Keyboard and mouse: WASD or arrow keys to move, the mouse to aim, left button or space to attack (held to keep
-    // swinging), Q E R F for the skill slots, C to drink a potion, M for the map (those keys can be changed in the
-    // menu, KeyBindings). Touch: two sticks that appear where a finger lands. The
+    // swinging), Q E R F for the skill slots, C to drink a potion, left Shift to roll, M for the map (those keys can be
+    // changed in the menu, KeyBindings). Touch: two sticks that appear where a finger lands. The
     // left half moves; the right half attacks for as long as it is held and aims where it is pulled. Pressed without
     // pulling, the attack goes where the player walks, or where they already face when standing still. Touches that
     // start on a UI button or window, which OnGUI marks with Block, are left to the UI; ones on a skill button, which
-    // OnGUI marks with SkillButton, use that skill. Skill buttons read touches directly rather than through IMGUI so
+    // OnGUI marks with SkillButton, use that skill; the potion and roll buttons likewise. Skill buttons read touches directly rather than through IMGUI so
     // they work while another finger holds a stick.
     static class Controls
     {
@@ -61,6 +61,8 @@ namespace Game.Client
         static bool _mouseOverUi;
         static readonly List<Rect> _potionButtons = new List<Rect>();
         static bool _potionTapped;
+        static readonly List<Rect> _rollButtons = new List<Rect>();
+        static bool _rollTapped;
         static readonly Predicate<int> Released = id => !Held(id);
         static readonly Stick _move = new Stick();
         static readonly Stick _aim = new Stick();
@@ -82,6 +84,7 @@ namespace Game.Client
             _skillTaps.Clear();
             _hotbarTaps.Clear();
             _potionTapped = false;
+            _rollTapped = false;
             _touches.Clear();
             var screen = Touchscreen.current;
             if (screen != null)
@@ -116,6 +119,8 @@ namespace Game.Client
                 _mouseOverUi = Blocked(point);
                 if (mouse.leftButton.wasPressedThisFrame)
                 {
+                    // The roll's slot on the PC bar can be clicked too.
+                    foreach (var area in _rollButtons) _rollTapped |= area.Contains(point);
                     foreach (var (area, slot) in _hotbarButtons)
                     {
                         if (area.Contains(point)) _hotbarTaps.Add(slot);
@@ -125,6 +130,7 @@ namespace Game.Client
             _blocked.Clear();
             _skillButtons.Clear();
             _potionButtons.Clear();
+            _rollButtons.Clear();
             _hotbarButtons.Clear();
         }
 
@@ -165,6 +171,22 @@ namespace Game.Client
         }
 
         public static string PotionKeyName => KeyBindings.Name(KeyAction.Potion);
+
+        // Marks the roll button, in points: a finger landing on it (or a click) rolls. Call from OnGUI.
+        public static void RollButton(Rect area)
+        {
+            if (Event.current.type == EventType.Repaint) _rollButtons.Add(area);
+        }
+
+        public static string RollKeyName => KeyBindings.Name(KeyAction.Roll);
+
+        // Whether the roll key was pressed or the roll button tapped this frame.
+        public static bool TakeRollPress()
+        {
+            bool pressed = _rollTapped || KeyBindings.Pressed(KeyAction.Roll);
+            _rollTapped = false;
+            return pressed;
+        }
 
         // Whether the potion key was pressed or the potion button tapped this frame.
         public static bool TakePotionPress()
@@ -299,6 +321,13 @@ namespace Game.Client
             {
                 if (!area.Contains(point)) continue;
                 _potionTapped = true;
+                _ignored.Add(id);
+                return;
+            }
+            foreach (var area in _rollButtons)
+            {
+                if (!area.Contains(point)) continue;
+                _rollTapped = true;
                 _ignored.Add(id);
                 return;
             }

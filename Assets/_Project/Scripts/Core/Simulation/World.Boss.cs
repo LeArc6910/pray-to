@@ -734,6 +734,8 @@ namespace Game.Core
         {
             var victim = _players.FirstOrDefault(p => !p.IsDead && Vec2.Distance(p.Position, projectile.Position) <= projectile.Radius + PlayerRadius);
             if (victim == null) return false;
+            // It flies on through a rolling player (World.Roll.cs).
+            if (Dodges(victim, projectile.Source)) return false;
             AfflictPlayer(victim, projectile.Source, HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause));
             return true;
         }

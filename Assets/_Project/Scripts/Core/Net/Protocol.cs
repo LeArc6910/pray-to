@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.85.0";
+        public const string Version = "0.86.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -688,20 +688,29 @@ namespace Game.Core
     }
 
     // Sent every tick. Sequence counts the client's ticks, so the host knows how far the player may have moved.
+    // While the player rolls (World.Roll.cs) every message says so: RollAge is which tick of the roll this is, from 1
+    // (0 when not rolling), so the host hears of the roll even if its first message is lost, and RollDirection the way
+    // it goes.
     public sealed class InputMessage
     {
-        public InputMessage(int sequence, Vec2 position, Vec2 facing, bool attacking)
+        public InputMessage(int sequence, Vec2 position, Vec2 facing, bool attacking, int rollAge = 0, Vec2 rollDirection = default)
         {
             Sequence = sequence;
             Position = position;
             Facing = facing;
             Attacking = attacking;
+            RollAge = rollAge;
+            RollDirection = rollDirection;
         }
 
         public int Sequence { get; }
         public Vec2 Position { get; }
         public Vec2 Facing { get; }
         public bool Attacking { get; }
+        public int RollAge { get; }
+        public Vec2 RollDirection { get; }
+        // The Sequence of the tick the roll began, which names the roll.
+        public int RollStart => Sequence - RollAge + 1;
 
         public byte[] Encode() => Protocol.Build(MessageType.Input, w =>
         {
@@ -709,10 +718,13 @@ namespace Game.Core
             w.Write(Position);
             w.Write(Facing);
             w.Write(Attacking);
+            w.Write((byte)Math.Clamp(RollAge, 0, 255));
+            w.Write(Protocol.PackDirection(RollDirection));
         });
 
         public static InputMessage Decode(byte[] data) =>
-            Protocol.Read(data, MessageType.Input, r => new InputMessage(r.ReadInt32(), r.ReadVec2(), r.ReadVec2(), r.ReadBoolean()));
+            Protocol.Read(data, MessageType.Input, r => new InputMessage(r.ReadInt32(), r.ReadVec2(), r.ReadVec2(), r.ReadBoolean(), r.ReadByte(),
+                Protocol.UnpackDirection(r.ReadByte())));
     }
 
     // The client builds the same caves from the seed, so the map itself is never sent.

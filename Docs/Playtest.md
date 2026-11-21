@@ -33,6 +33,8 @@ node DevTools/WebPlaytest/sweep.js --only menu,npc,touch
 - **휴대폰 세로·가로, 터치**: 탭하면 터치 화면이 되는지, 왼쪽 스틱을 끌어 걷기, 스킬 단추, 공격 스틱, 미니맵 아래 [가방] 단추, 기계 장면
 - 확인마다 게임의 상태(위치, 마나, 맞은 몬스터 수, 기계의 전력, 날씨·행사, 방어·균열)를 읽어 통과·실패를 적는다. 브라우저 콘솔의 에러와 예외는 모두 모은다
 
+`sweep.js --only roll`(2026-11-21, 구르기): PC는 왼쪽 Shift, 휴대폰 세로·가로는 구르기 단추 탭으로 구른다. 단추가 화면 안에 있고 다른 단추와 겹치지 않는지(휴대폰은 48점인지), 바라보는 쪽으로 3.2칸쯤 가는지, 다시 쓰기 시간 안의 둘째 누름이 안 먹는지, 벽 앞에서 서는지, 구르기 3틱째의 타격은 지나가고("회피") 12틱째의 타격은 맞는지를 상태 보고로 확인한다. 사진: 단추와 스킬 단추(`roll-button`, 세로·가로), 구르는 중, 벽 앞, PC에서는 검·활·지팡이의 모습. 손맛과 단추가 엄지에 닿는지는 사람에게.
+
 ## 처음 10분과 처음 한 시간 (2026-11-09)
 
 `sweep.js --only first`: 새 캐릭터가 목표 안내만 보고 목표 1~6을 해 본다. 돌 모으기, 작업대, 횃불, 돌 바닥, 구리 광석, 구리 장비 하나다. 손은 봇 자신의 것이다(키, 가방 단추, 벽 쪽으로 공격). `give`·`build`는 쓰지 않는다. 화면이 자리를 알려 주지 않는 곳(다음 구리 광맥, 작업대로 돌아가기)만 `goto`로 옮기고 보고에 적는다. 봇은 둘레 벽을 파 작은 방을 만들고, 놓을 수 없으면 다른 빈 쪽으로 다시 해 본다. 목표마다 걸린 시간과 막힌 곳이 `report.md`에 남는다.
@@ -129,20 +131,21 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 | `give <재료> <개수>`, `potion <소모품> <개수>`, `drink <소모품>`, `mana <양>` | 가방과 마나 |
 | `spawn <몬스터> <dx> <dy> [생명력]` | 곁에 몬스터를 둔다 |
 | `hero <무기 id\|none> [dx dy]` | 그 무기를 들고(none은 맨손) 그 방향에 튼튼한 슬라임 셋을 두고 공격을 누르고 있는다(주인공 무기별 모션, `sweep.js --only hero`) |
+| `roll`, `rollhit <양> <틱>`, `scene roll` | 구르기(키나 단추를 누른 것처럼. 걷는 쪽, 없으면 바라보는 쪽), 다음 구르기의 그 틱째에 들어오는 타격(무적 안팎 확인), 동쪽으로 구를 바닥 줄과 8칸 앞의 벽. 상태 보고의 `rolls`·`dodges`(호스트가 받은 구르기, 흘린 타격), `rolling`·`dodging`, `rollsShown`·`dodgesShown`(화면이 보인 것). `sweep.js --only roll` |
 | `attack on\|off [x y]`, `skill <칸>`, `touch on\|off`, `bag on\|off\|<탭 이름>` | 조작. `bag 스킬`처럼 탭 이름을 주면 그 탭으로 가방을 연다 |
 | `hearts <사람> <호감>` | 그 사람(merchant, blacksmith, fisher)과 그만큼 호감 |
 | `classes <id,id> [순서]` | 작업대와 레벨의 클래스 칸 없이 바로 그 클래스로(순서: 칸마다 클래스 스킬 목록의 몇 번째). 새 캐릭터는 클래스가 없어서(2026-11-09) `startSolo`가 안내 봇이 아니면 `classes warrior,fire_mage`를 보낸다 |
 | `learn <스킬>`, `teach [단계]` | 포인트로 스킬 하나 배우기(단추와 같은 규칙), 클래스의 모든 스킬을 그 단계로 가르치기(포인트 없이) |
 | `report` | 상태 한 줄(JSON) |
 | `solo <이름> keep` | 저장본을 지우지 않고 이어서 시작한다 |
-| `probe on`, `buttons` | 마지막 프레임에 그린 단추마다 글자, 줄(앞에 쓴 이름), 화면 위치(점), 눌리는지, 목록에서 보이는지(JSON). 스킬 칸·물약·퀵슬롯도 `skill N`, `potion`, `quick N`으로 |
+| `probe on`, `buttons` | 마지막 프레임에 그린 단추마다 글자, 줄(앞에 쓴 이름), 화면 위치(점), 눌리는지, 목록에서 보이는지(JSON). 스킬 칸·물약·구르기·퀵슬롯도 `skill N`, `potion`, `roll`, `quick N`으로 |
 | `texts` | HUD 줄(경험치 막대 글자, 상태 상자의 줄, 미니맵 아래 글자, 목표 목록 "목표 1/44: 돌 10개 모으기 (0/10) 보상: …"), 왼쪽 아래 줄(획득·알림), 가운데 배너, 떠 있는 글, 메뉴의 알림 줄(JSON) |
 | `goto spawn\|<dx> <dy>\|boss <id>\|biome <이름>\|tile <칸>\|near <칸>` | 옮긴다. `near`는 그 칸 곁에 서서 바라본다 |
 | `nav wall\|tile <칸>\|near <칸>\|monster [id]\|boss <id>\|fight <id>\|explore\|loot\|at <x> <y>` | 상태로 움직이는 봇의 다음 행동(JSON: `do` move·dig·fight·arrived·wait·noway, `x`·`y` 갈 쪽, `tile` 캘 칸, `goal`, `steps`, `stalled`, `why`). `probe on`일 때만 |
 | `sense`, `botreport [이름]`, `botreset` | 봇의 지표(탐색률, 생물군계, 처치, 순간, 목표, 근처 몬스터, 작은 지도), 지표 표(Markdown), 새 실행 |
 | `build <칸> <dx> <dy> [방향]`, `fill <dx> <dy> <재료> <개수>`, `look <dx> <dy>` | 칸을 짓고, 기계·상자에 넣고, 칸·기계·상자·작물을 읽는다 |
 | `drop item <베이스> [등급] [소켓]\|rune\|potion <id>\|material <id>`, `inventory` | 발밑에 떨어뜨리고, 가방을 읽는다 |
-| `speed <틱>` | 혼자 하기 월드를 한 걸음에 그만큼 돌린다(0은 멈춤, 최대 60) |
+| `speed <틱>` | 혼자 하기 월드를 한 걸음에 그만큼 돌린다(1~60. 0도 1로 돈다) |
 | `hurt <양>`, `boss <id> hurt <비율>`, `xp <양>`, `heal`, `clear`, `equip <베이스...>`, `face <x> <y>\|off` | 싸움과 같은 길로 다치고, 레벨을 올리고, 바라본다 |
 
 단추는 모두 `Ui.Button`·`Ui.LayoutButton`·`Ui.Toolbar`를 거친다(`Ui.cs`). 시험이 `probe on`을 켜 두면 그린 단추를 기억하고, 시험 도구(`lib.js`의 `press`)는 그 자리를 진짜 클릭이나 탭으로 누른다. 목록 밖으로 스크롤된 단추는 마우스 휠로 찾아간다. 새 단추를 만들 때도 이 셋을 쓴다.

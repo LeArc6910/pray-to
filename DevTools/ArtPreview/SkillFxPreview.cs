@@ -89,10 +89,77 @@ namespace Game.Client
                 Png.Save(Scaled(Grey(sheet), 3), Path.Combine(folder, cls.Id + "_gray.png"));
                 Gif.Save(Path.Combine(folder, cls.Id + ".gif"), wide * 2, tall * 2, frames);
             }
+            fine &= WriteRolls(folder, floor, report);
             // Every piece on its own, in every element it is used in most.
             Png.Save(Scaled(Pieces(), 4), Path.Combine(folder, "pieces.png"));
             File.WriteAllText(Path.Combine(folder, "report.txt"), report.ToString());
             Console.WriteLine($"Wrote skillfx/<class>.png, <class>_gray.png, <class>.gif, pieces.png and report.txt to {folder}");
+            return fine;
+        }
+
+        // The dodge roll's three looks (SkillFx.Roll, HeroMove.Roll), which are no class's skill: the hero goes the
+        // roll's length in its time with the motion of what they hold, and the effect is laid from where it began
+        // (roll.png, roll_gray.png, roll.gif), held to the same budget as a skill's.
+        static bool WriteRolls(string folder, PixelImage floor, StringBuilder report)
+        {
+            bool fine = true;
+            var rows = new List<List<PixelImage>>();
+            var frames = new List<(Rgba[] Pixels, int Centiseconds)>();
+            float length = World.RollDistance * Tile;
+            int wide = (int)length + 80, tall = 80, startX = 30;
+            var tunic = Rgba.Hex("#4D7FD9");
+            foreach (var (id, weapon) in new[] { (SkillFx.Roll, HeroWeapon.Sword), (SkillFx.RollSlide, HeroWeapon.Bow), (SkillFx.RollBlink, HeroWeapon.Staff) })
+            {
+                var gear = HeroGear.Plain(weapon);
+                var context = new FxContext { Dir = 0, Length = length, Seed = 7, Main = FxRamp.Mist };
+                var some = new List<FxStamp>();
+                int CountAt(float t)
+                {
+                    some.Clear();
+                    SkillFx.Stamps(FxProgram.Cast, id, context, t, some);
+                    return some.Count;
+                }
+                float life = 0;
+                while (SkillFx.Stamps(FxProgram.Cast, id, context, life, some) && life < 5) life += 0.01f;
+                int most = 0;
+                for (float t = 0; t < life; t += 0.02f) most = Math.Max(most, CountAt(t));
+                PixelImage At(float t)
+                {
+                    var scene = new Scene { Width = wide, Height = tall, HeroY = 52 };
+                    scene.HeroX = startX + (int)Math.Round(length * Math.Min(1, t / World.RollSeconds));
+                    scene.Hero = t < World.RollSeconds
+                        ? HeroArt.Draw(Look.Side, HeroMove.Roll, HeroArt.FrameAt(HeroMove.Roll, weapon, t), gear, tunic)
+                        : HeroArt.Draw(Look.Side, HeroMove.Stand, 0, gear, tunic);
+                    var image = new PixelImage(wide, tall);
+                    for (int y = 0; y < tall; y += floor.Height)
+                        for (int x = 0; x < wide; x += floor.Width)
+                            image.Draw(floor, x, y);
+                    CountAt(t);
+                    foreach (var stamp in some)
+                    {
+                        if (stamp.Ground) Blit(image, scene, startX - scene.HeroX, 0, stamp);
+                    }
+                    image.Draw(scene.Hero, scene.HeroX - HeroArt.FeetX, scene.HeroY - HeroArt.FeetY);
+                    foreach (var stamp in some)
+                    {
+                        if (!stamp.Ground) Blit(image, scene, startX - scene.HeroX, 0, stamp);
+                    }
+                    return image;
+                }
+                rows.Add(Enumerable.Range(0, Columns).Select(i => At(life * i / Columns)).ToList());
+                for (float t = 0; t < life; t += 0.04f) frames.Add((Flat(Doubled(At(t))), 4));
+                frames.Add((frames[frames.Count - 1].Pixels, 30));
+                report.AppendLine($"{id,-16} {life,6:0.00} {life,8:0.00} {most,12}");
+                if (life > Longest || most > MostStamps || CountAt(0.04f) == 0 || CountAt(life * 0.9f) == 0)
+                {
+                    Console.Error.WriteLine($"{id}: {life:0.00} s (at most {Longest}), {most} pieces at once (at most {MostStamps}), or nothing drawn at its start or its end");
+                    fine = false;
+                }
+            }
+            var sheet = Sheet(rows);
+            Png.Save(Scaled(sheet, 3), Path.Combine(folder, "roll.png"));
+            Png.Save(Scaled(Grey(sheet), 3), Path.Combine(folder, "roll_gray.png"));
+            Gif.Save(Path.Combine(folder, "roll.gif"), wide * 2, tall * 2, frames);
             return fine;
         }
 

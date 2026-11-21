@@ -20,6 +20,8 @@
 
 스킬 이펙트(2026-11-21, `Docs/SkillEffects.md`): 조각 그림은 `Client/Art/SkillFxArt.cs`, 스킬마다의 시간표는 `Client/Art/SkillFx.cs`(둘 다 UnityEngine 없이, 미리보기와 함께 쓴다), 사건·투사체에서 시작해 스프라이트 풀로 그리는 것은 `Client/WorldView.SkillFx.cs`. 스킬을 시트에 새로 넣으면 `SkillFx`에 그 스킬의 이펙트를 더한다(없으면 종류별 옛 모습으로 그려지고 ArtPreview가 실패한다).
 
+구르기(2026-11-21, `Docs/Combat.md` 구르기): 규칙은 `Core/Simulation/World.Roll.cs`(시작, 무적, 다시 쓰기)와 `World.cs`의 `PlayerMotor.Roll`·`MovePlayer`·`HurtPlayer`, 통신은 `Protocol.cs`의 `InputMessage.RollAge`와 `WorldHost.ApplyInput`, 예측은 `WorldClient.Step`. 화면 쪽은 `Controls`(키와 단추), `SkillBar.RollArea`(칸과 단추 자리), `HeroArt`의 `HeroMove.Roll`(무기별 세 모습), `SkillFx.Roll*`(이펙트), `WorldView.StartRoll`. 봇은 `DevTools/CoreSandbox/RollBot.cs`, 시험은 `Assets/Tests/EditMode/RollTests.cs`와 `NetTests.cs`.
+
 보스 아레나의 꾸밈과 입장 연출(2026-11-17, `Docs/Bosses.md` 아레나 컨셉과 입장 연출): 아레나를 종류대로 깎고 꾸미는 것은 `Core/World/WorldGenerator.Arenas.cs`, 시트는 `Core/Simulation/ArenaSheet.cs`, 입장 상태는 `World.Boss.cs`의 `BossState.Enter`. 화면 쪽은 `Client/WorldView.Entrance.cs`(카메라, 이름 카드, 박자마다의 소리와 효과, 공통 연출), 바닥 무늬와 새 소품 그림은 `Client/Art/PropArt.Arena.cs`, 아레나 종류별 바닥은 `TileArt.ArenaIndex`. 네 보스의 입장 모션은 각자의 그림 파일에 있다.
 
 전체 콘텐츠 점검(시스템마다 개수, 고립·도달 불가, 같은 그림, 문서 어긋남)은 `Docs/ContentAudit.md`.

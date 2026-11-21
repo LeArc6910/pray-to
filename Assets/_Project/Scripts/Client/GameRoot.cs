@@ -88,6 +88,9 @@ namespace Game.Client
         internal int MarksShown => _view?.MarksShown ?? 0;
         // Skill effects running and their pieces on screen (WorldView.SkillFx), for the playtests.
         internal int SkillFxAlive => _view?.SkillFxAlive ?? 0;
+        // Rolls begun on the screen and dodged blows shown (WorldView.StartRoll), for the playtests.
+        internal int RollsShown => _view?.RollsShown ?? 0;
+        internal int DodgesShown => _view?.DodgesShown ?? 0;
         internal int SkillFxPieces => _view?.SkillFxPieces ?? 0;
         internal int SkillShotsDrawn => _view?.SkillShotsDrawn ?? 0;
         internal bool WarningShown => _view != null && _view.WarningShown;
@@ -706,9 +709,12 @@ namespace Game.Client
         {
             var slots = Controls.TakeSkillPresses();
             bool potion = Controls.TakePotionPress();
+            bool roll = Controls.TakeRollPress();
             var quick = Controls.TakeHotbarPresses();
             bool machine = Controls.MachinePressed();
             if (_inventory.Open || (_map != null && _map.FullOpen)) return;
+            // The roll is the player's own movement (WorldClient.Step), so it waits for the next fixed tick.
+            RollPressed |= roll;
             var aim = Controls.SkillAim(_camera, _client.Position);
             // On touch a skill button alone aims at the nearest foe, so it needs no second thumb on the stick.
             if (Controls.UsingTouch && aim.LengthSquared < 0.01f) aim = NearestFoeDirection();
@@ -776,7 +782,8 @@ namespace Game.Client
                 if (foe.LengthSquared > 0.01f) aim = foe;
             }
             if ((HoldAttack || AimHeld) && HeldAim.LengthSquared > 1e-6f) aim = HeldAim;
-            byte[] input = _client.Step(move, aim, attack);
+            byte[] input = _client.Step(move, aim, attack, RollPressed);
+            RollPressed = false;
             if (input != null) SendToHost(input);
 
             if (_host == null) return;
@@ -785,12 +792,36 @@ namespace Game.Client
             for (int i = 0; i < ticks; i++)
             {
                 _host.Tick();
+                StrikeRoller();
                 foreach (var message in _host.TakeOutgoing())
                 {
                     if (message.Connection == LocalConnection) _client.Receive(message.Data);
                     else _net?.Send(message.Connection, message.Data, message.Reliable);
                 }
             }
+        }
+
+        // Playtests ("rollhit", Playtest.cs): a blow on the player so many host ticks into their next roll, to see
+        // that it goes through inside the roll's unhurt ticks and lands after them.
+        float _rollHit;
+        int _rollHitAfter;
+        int _rollHitRolls;
+        int _rollHitTicks;
+
+        internal void ArmRollHit(float amount, int afterTicks)
+        {
+            _rollHit = amount;
+            _rollHitAfter = afterTicks;
+            _rollHitRolls = HostPlayer?.Rolls ?? 0;
+            _rollHitTicks = 0;
+        }
+
+        void StrikeRoller()
+        {
+            var player = _rollHit > 0 ? HostPlayer : null;
+            if (player == null || player.Rolls <= _rollHitRolls || ++_rollHitTicks < _rollHitAfter) return;
+            HostWorld.Hurt(player, _rollHit);
+            _rollHit = 0;
         }
 
         void SendToHost(byte[] data)
@@ -824,6 +855,8 @@ namespace Game.Client
         // The guide's goals, for the playtest bot's numbers (PlaytestBot.cs).
         internal GuideData GuideSheet => _guide;
         internal bool HoldAttack { get; set; }
+        // The roll key or button was pressed since the last fixed tick (also set by Playtest.cs, "roll").
+        internal bool RollPressed { get; set; }
         internal Vec2 HeldAim { get; set; }
         // Facing HeldAim without attacking, as a mouse held to one side does (Playtest.cs, "face").
         internal bool AimHeld { get; set; }

@@ -187,6 +187,8 @@ namespace Game.Client
         Hotbar5,
         Hotbar6,
         Machine,
+        // The dodge roll (World.Roll.cs). New actions go at the end: saved keys are kept by name.
+        Roll,
     }
 
     // Which key does what, changed in the menu and kept on this device (Prefs, by key name). Every action has
@@ -196,7 +198,7 @@ namespace Game.Client
         public static readonly KeyAction[] Actions = (KeyAction[])Enum.GetValues(typeof(KeyAction));
         static readonly Key[] Defaults =
         {
-            Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M, Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.G,
+            Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M, Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.G, Key.LeftShift,
         };
         static readonly Key[] Fixed =
         {
@@ -236,6 +238,7 @@ namespace Game.Client
             KeyAction.Bag => "가방",
             KeyAction.Map => "지도",
             KeyAction.Machine => "기계 켜기/끄기",
+            KeyAction.Roll => "구르기",
             _ => $"퀵슬롯 {action - KeyAction.Hotbar1 + 1}",
         };
 

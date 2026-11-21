@@ -44,6 +44,23 @@ namespace Game.Client
             return image;
         }
 
+        // The dodge roll (World.Roll.cs), which is no class's skill: a turn of the body and the ground it goes over.
+        public static PixelImage Roll()
+        {
+            var ramp = Ramp.Of(Rgba.Hex("#D9C7A0"));
+            var image = Tile(ramp);
+            var c = new Canvas(image, ramp);
+            c.Arc(9, 7, 4, -60, 200, ramp.Light);
+            // The arrowhead where the turn comes down.
+            c.Line(11, 11, 13, 11, ramp.Light);
+            c.Line(13, 11, 13, 9, ramp.Light);
+            c.Line(2, 13, 6, 13, ramp.Shade);
+            c.Dot(8, 13, ramp.Shade);
+            c.Dot(3, 10, ramp.Main);
+            c.Dot(2, 7, ramp.Shade);
+            return image;
+        }
+
         // Whether the skill has a picture of its own rather than its kind's (ArtPreview checks the shipped ones do).
         public static bool HasOwnPicture(SkillDefinition skill) => Pictures.ContainsKey(skill.Id);
 

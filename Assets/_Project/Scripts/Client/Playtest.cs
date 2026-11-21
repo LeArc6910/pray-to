@@ -24,8 +24,8 @@ namespace Game.Client
     //   texts                     JSON: the HUD's lines, the corner lines, the banner, the menu's status line, the labels laid out with Ui.Wrap
     //   touch on|off              report (JSON: the player, the time, the monsters, the machines, the screen)
     // In a solo game:
-    //   scene combo|machines|defense|rift|skylight|set
-    //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step, 0 pauses>
+    //   scene combo|machines|defense|rift|skylight|set|roll   (roll: a lane of floor east of the player, a wall 8 tiles on)
+    //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step>
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
     //   teach [rank]              every skill of the player's classes at the rank, no points needed
@@ -39,6 +39,8 @@ namespace Game.Client
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
     //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off|<tab name>
+    //   roll                      the dodge roll, as its key or button would (the way walked, or faced)
+    //   rollhit <amount> <ticks>  a blow on the player that many host ticks into their next roll (its unhurt ticks)
     //   nav <target>   sense   botreport [name]   botreset      the bot by the Core's state (PlaytestBot.cs), with probe on
     static partial class Playtest
     {
@@ -292,6 +294,13 @@ namespace Game.Client
                     return null;
                 case "skill":
                     return root.UseSkill(Int(words[1])) ? null : $"error skill {words[1]}: not ready";
+                case "roll":
+                    root.RollPressed = true;
+                    return null;
+                case "rollhit":
+                    // rollhit <amount> <ticks>: a blow on the player that many host ticks into their next roll.
+                    root.ArmRollHit(Float(words[1]), Int(words[2]));
+                    return null;
                 case "bag":
                     if (words[1] == "on" || words[1] == "off") root.BagOpen = words[1] == "on";
                     else root.ShowBag(words[1]);
@@ -518,6 +527,15 @@ namespace Game.Client
                     player.InventoryVersion++;
                     if (!world.OpenRift(player.Id)) throw new InvalidOperationException("the rift did not open");
                     break;
+                case "roll":
+                    // Room to roll three times east and then a wall to roll into (World.Roll.cs).
+                    foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
+                    for (int dy = -1; dy <= 1; dy++)
+                    {
+                        for (int dx = -2; dx <= 7; dx++) world.Build(px + dx, py + dy, TileType.Floor);
+                        world.Build(px + 8, py + dy, TileType.Wall);
+                    }
+                    break;
                 case "skylight":
                     var floor = Near(1, 1);
                     Lay((floor.X, floor.Y, TileType.Skylight));
@@ -607,7 +625,7 @@ namespace Game.Client
 
         // Every button the last frame drew: its label, its rect in points, whether it could be pressed and whether
         // it showed. The skill and quick slots (drawn as panels, pressed through Controls) come as "skill N",
-        // "potion" and "quick N". The screen's size in points comes along, to turn points into the page's pixels.
+        // "potion", "roll" and "quick N". The screen's size in points comes along, to turn points into the page's pixels.
         static string Buttons(GameRoot root)
         {
             var list = new Json('[');
@@ -623,6 +641,7 @@ namespace Game.Client
                     string label = slot == skills ? "potion" : $"skill {slot}";
                     list.Item(new Json('{').Field("label", label).Field("rect", Rect(SkillBar.Area(slot, skills))).Field("enabled", true).Field("shown", true).Raw('}'));
                 }
+                list.Item(new Json('{').Field("label", "roll").Field("rect", Rect(SkillBar.RollArea(skills))).Field("enabled", true).Field("shown", true).Raw('}'));
                 for (int slot = 0; slot < Hotbar.Slots; slot++)
                 {
                     list.Item(new Json('{').Field("label", $"quick {slot}").Field("rect", Rect(Hotbar.Area(slot, skills))).Field("enabled", true).Field("shown", true).Raw('}'));
@@ -760,6 +779,14 @@ namespace Game.Client
                 json.Field("experience", player.Experience);
                 json.Field("attacking", player.Attacking);
                 json.Field("combo", player.ComboStep);
+                // The dodge roll (World.Roll.cs): how many the host took and how many blows went through them; whether
+                // one is going and its unhurt ticks; and what the screen has shown of them.
+                json.Field("rolls", player.Rolls);
+                json.Field("dodges", player.Dodges);
+                json.Field("rolling", player.Rolling);
+                json.Field("dodging", player.Dodging);
+                json.Field("rollsShown", root.RollsShown);
+                json.Field("dodgesShown", root.DodgesShown);
                 json.Field("weapon", player.Equipment[ItemSlot.Weapon]?.Base.Id);
                 json.Field("day", world.Today);
                 json.Field("clock", Calendar.Text(world.Clock));

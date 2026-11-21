@@ -7,7 +7,7 @@ namespace CoreSandbox
 {
     // A party of bots against a boss in its arena (the first unless --boss-id names another). Each bot walks in, hits the boss, uses its class skills
     // when ready, and steps out of a telegraph once it has had `reaction` seconds to notice it, the way a person
-    // would. Prints how long the kill took, how often the party wiped, which attacks did the damage, and how the
+    // would; a blow about to land on it anyway it rolls through (RollBot, --no-roll to compare). Prints how long the kill took, how often the party wiped, which attacks did the damage, and how the
     // bots' own damage splits between the basic attack and each skill.
     static class BossSim
     {
@@ -88,7 +88,7 @@ namespace CoreSandbox
                 }
             }
 
-            Console.WriteLine($"{definition.Name}: seed = {seed}, 봇 {players}명, 장비 {string.Join(", ", gear)}, 클래스 {FightSim.ClassNames(classes)}, 반응 {reaction}초, 피하기 {(dodge ? "켬" : "끔")}");
+            Console.WriteLine($"{definition.Name}: seed = {seed}, 봇 {players}명, 장비 {string.Join(", ", gear)}, 클래스 {FightSim.ClassNames(classes)}, 반응 {reaction}초, 피하기 {(dodge ? "켬" : "끔")}, 구르기 {(dodge && RollBot.Enabled ? "켬" : "끔")}");
             var first = bots[0].Player.Stats;
             Console.WriteLine($"  봇 능력치: 생명력 {first.MaxHealth:0}, 피해 {first.Damage:0.#}, 초당 공격 {first.AttacksPerSecond:0.##}, 방어도 {first.Armor:0}");
             Console.WriteLine(killedAt.HasValue
@@ -96,7 +96,7 @@ namespace CoreSandbox
                 : $"처치 못 함 ({seconds}초, 보스를 깨운 횟수 {wakes})");
             Console.WriteLine("  페이즈 시작: " + string.Join(", ", phaseStarts.Select(p => $"{p.Phase}페이즈 {p.Seconds:0.0}초")));
             Console.WriteLine($"  보스에게 준 피해 {dealt}");
-            foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}, 마신 물약 {bot.Skills.Drunk}개, 준 피해 {bot.Skills.Summary()}");
+            foreach (var bot in bots) Console.WriteLine($"  {bot.Player.Name}: 사망 {bot.Deaths}, 받은 피해 {bot.Taken}, 마신 물약 {bot.Skills.Drunk}개, 구르기 {bot.Player.Rolls}번(흘린 타격 {bot.Player.Dodges}), 준 피해 {bot.Skills.Summary()}");
             Console.WriteLine("  받은 피해 출처:");
             foreach (var pair in takenByAttack.OrderByDescending(p => p.Value)) Console.WriteLine($"    {pair.Key,-8} {pair.Value}");
 
@@ -141,8 +141,7 @@ namespace CoreSandbox
                 input = toTarget.Normalized;
             }
 
-            var next = PlayerMotor.Step(world.Map, player.Position, input, player.Stats.MoveSpeed);
-            world.MovePlayer(player.Id, next, facing, 1);
+            RollBot.Move(world, player, input, facing, escape, dodge);
             bool inReach = slime != null || (boss != null && gap <= FightSim.Reach(player));
             world.SetAttacking(player.Id, inReach);
         }

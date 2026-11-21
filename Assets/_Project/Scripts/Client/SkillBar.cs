@@ -6,7 +6,9 @@ namespace Game.Client
 {
     // The quick slots: the skills, then the potion. On PC a row of Q E R F and C at the bottom middle; on touch
     // screens the skills are a block of buttons two wide in the bottom right corner, under the thumb that aims, with
-    // the potion button left of its bottom row. Each is a panel (UiSkin) with a stripe in its colour, a shade that
+    // the potion button left of its bottom row. The dodge roll has a smaller slot of its own: right of the potion on
+    // PC, above the potion button on touch screens (beside the skills' upper row, nearest the thumb that aims).
+    // Each is a panel (UiSkin) with a stripe in its colour, a shade that
     // shrinks as it cools down, and for a skill a coloured edge while its buff runs; the potion shows its icon. Using
     // them goes through Controls; this draws and marks the buttons.
     static class SkillBar
@@ -15,6 +17,8 @@ namespace Game.Client
         // The most skill slots a player can have, for keeping room for all of them.
         public const int MostSkills = ClassRules.SkillSlots;
         const float ButtonSize = 62;
+        // The roll's slot, on PC and touch alike (Docs/WorldRework.md 구르기: a 48-point button).
+        public const float RollSize = 48;
         const float Gap = 6;
         const float Margin = 12;
         const float TooltipWidth = 260;
@@ -45,10 +49,21 @@ namespace Game.Client
             return new Rect((Ui.Width - width) / 2 + slot * (KeySize + Gap), Ui.Height - Margin - KeySize, KeySize, KeySize);
         }
 
+        // The dodge roll's slot.
+        public static Rect RollArea(int skills)
+        {
+            var potion = Area(skills, skills);
+            return Controls.UsingTouch
+                ? new Rect(potion.xMax - RollSize, potion.y - Gap - RollSize, RollSize, RollSize)
+                : new Rect(potion.xMax + Gap, potion.yMax - RollSize, RollSize, RollSize);
+        }
+
         // Everything the slots cover, for keeping other text clear of them.
         public static Rect Bounds(int skills)
         {
             var bounds = Area(skills, skills);
+            var roll = RollArea(skills);
+            bounds = Rect.MinMaxRect(Mathf.Min(bounds.xMin, roll.xMin), Mathf.Min(bounds.yMin, roll.yMin), Mathf.Max(bounds.xMax, roll.xMax), Mathf.Max(bounds.yMax, roll.yMax));
             for (int slot = 0; slot < skills; slot++)
             {
                 var area = Area(slot, skills);
@@ -119,6 +134,30 @@ namespace Game.Client
                 }
             }
             DrawPotion(client, Area(count, count));
+            DrawRoll(client, RollArea(count));
+        }
+
+        // The dodge roll: its picture, dim and shaded while it cannot be used again yet. Tapped or clicked through
+        // Controls, like the potion, so it works while both sticks are held.
+        static void DrawRoll(WorldClient client, Rect area)
+        {
+            Controls.Block(area);
+            Controls.RollButton(area);
+            Panel(area, Palette.Roll);
+
+            var previous = GUI.color;
+            GUI.color = client.CanRoll ? Color.white : new Color(1, 1, 1, 0.45f);
+            float icon = SkillArt.Size * 2;
+            Sprites.DrawInGui(new Rect(area.center.x - icon / 2, area.y + Inner + (area.height - Inner * 2 - 6 - icon) / 2, icon, icon), Sprites.RollIcon);
+            GUI.color = previous;
+            if (!Controls.UsingTouch) GUI.Label(KeyArea(area), Controls.RollKeyName, _keyStyle);
+            float share = client.RollCooldownShare;
+            if (share > 0) Fill(new Rect(area.x, area.y, area.width, area.height * share), new Color(0, 0, 0, 0.5f));
+
+            if (!Controls.UsingTouch && area.Contains(Event.current.mousePosition))
+            {
+                DrawTooltip($"구르기 ({Controls.RollKeyName})\n움직이는 쪽으로 {World.RollDistance:0.#}칸을 구른다. 구르는 앞 {World.DodgeSeconds:0.#}초 동안은 공격이 지나간다. {World.RollCooldownSeconds:0.#}초 뒤에 다시 쓸 수 있다", area);
+            }
         }
 
         // The first consumable in the bag and how many there are; dim when there is none or it is still waiting.

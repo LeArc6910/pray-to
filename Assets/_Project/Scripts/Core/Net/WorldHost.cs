@@ -61,6 +61,8 @@ namespace Game.Core
         {
             public Player Player;
             public int LastSequence;
+            // The roll the host last took from this player (InputMessage.RollStart), or 0.
+            public int RollStart;
             // The player's InventoryVersion when their inventory was last sent.
             public int SentInventory = -1;
             // The chest whose contents were last sent (its tile index, -1 for none) and that chest's version then.
@@ -620,7 +622,15 @@ namespace Game.Core
             if (sender.Player == null || input.Sequence <= sender.LastSequence) return;
             int elapsed = sender.LastSequence == 0 ? 1 : input.Sequence - sender.LastSequence;
             sender.LastSequence = input.Sequence;
-            World.MovePlayer(sender.Player.Id, input.Position, input.Facing, elapsed);
+            // A roll (World.Roll.cs) is named by the tick it began. One the host has not heard of begins now, if it may;
+            // the faster steps are taken only for a roll the host took, and only for as many ticks as a roll lasts.
+            bool rolling = false;
+            if (input.RollAge > 0 && input.RollAge <= World.RollTicks)
+            {
+                if (input.RollStart > sender.RollStart && World.Roll(sender.Player.Id, input.RollDirection)) sender.RollStart = input.RollStart;
+                rolling = input.RollStart == sender.RollStart;
+            }
+            World.MovePlayer(sender.Player.Id, input.Position, input.Facing, elapsed, rolling);
             World.SetAttacking(sender.Player.Id, input.Attacking);
         }
 

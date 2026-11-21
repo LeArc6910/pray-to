@@ -192,6 +192,19 @@ namespace Game.Core
         public ConsumableDefinition Food { get; private set; }
         public int FoodTicks { get; private set; }
 
+        // The dodge roll (World.Roll.cs): ticks of the roll left, ticks left in which blows pass through, ticks until the
+        // next may begin, and the way it goes. Rolls and Dodges count them since joining, for the sims.
+        public int RollTicks { get; internal set; }
+        public int DodgeTicks { get; internal set; }
+        public int RollCooldown { get; internal set; }
+        public Vec2 RollDirection { get; internal set; }
+        public bool Rolling => RollTicks > 0;
+        public bool Dodging => DodgeTicks > 0;
+        public int Rolls { get; internal set; }
+        public int Dodges { get; internal set; }
+        // Whether this roll's first dodged blow was told already.
+        internal bool Dodged { get; set; }
+
         internal int AttackCooldown { get; set; }
         // The basic attack combo (World.Attack): the step of the last attack, when it was, and how long it took to
         // recover from.
@@ -465,6 +478,10 @@ namespace Game.Core
         Waypoint,
         // Source, a player, got Target, a fallen player, back up where they fell (World.Revive, 2026-11-11).
         Revived,
+        // Source, a player, began a dodge roll along Direction (World.Roll.cs).
+        Rolled,
+        // A blow of Source's passed through Target, a player, who was rolling. Once a roll.
+        Dodged,
     }
 
     public readonly struct SimEvent

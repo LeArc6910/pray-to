@@ -72,7 +72,15 @@ namespace Game.Client
             "volley", "eagle_eye", "gale_step", "power_shot", "explosive_arrow", "arrow_rain",
             "spirits", "spirit_pact", "life_spring", "spirit_horde", "spirit_blast", "guardian",
             "chain_lightning", "frost_ring", "ice_lance", "storm_mantle", "thunderclap", "blizzard",
+            Roll, RollSlide, RollBlink,
         };
+
+        // The dodge roll's three looks (HeroMove.Roll), which are no skill's: a tumble's dust, a slide's scuffed
+        // floor, a gliding step's afterimages. Each starts where the roll begins and stays there, with Dir the way
+        // of the roll and Length how far it goes (a wall cuts it short), so the pieces lie along the way the body goes.
+        public const string Roll = "roll", RollSlide = "roll_slide", RollBlink = "roll_blink";
+        // How long the roll takes to go its Length, in seconds (World.RollSeconds).
+        const float RollTime = 0.3f;
 
         // A skill without an effect of its own (a new one in the sheet) keeps the old look of its kind.
         public static bool Knows(string skill) => skill != null && Known.Contains(skill);
@@ -332,6 +340,58 @@ namespace Game.Client
                     Ring(o, m, t, 0, R, 2, 0.08f, 0.22f);
                     Fly(o, FxShape.Dot, FxRamp.Dust, 2, 2, 6, t, 0.08f, 0.4f, 4, 16, seed, rise: 3);
                     return 0.55f;
+                }
+                // ---------------- the dodge roll ----------------
+                case Roll:
+                {
+                    float fx = (float)Math.Cos(c.Dir), fy = (float)Math.Sin(c.Dir), L = c.Length;
+                    // Dust where they threw themselves down, a puff each time the body comes round onto the floor, and
+                    // grit kicked ahead where they come up.
+                    Puffs(o, FxRamp.Dust, 4, t, 0, 0.35f, 2, 8, seed, 5, 0.55f, 0, 0, 4);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float share = (i + 1) / 3.5f, from = RollTime * share;
+                        Puffs(o, FxRamp.Dust, 2, t, from, from + 0.3f, 1, 5, seed + i + 1, 5, 0.45f, fx * L * share, fy * L * share, 3);
+                    }
+                    Fly(o, FxShape.Dot, FxRamp.Dust, 2, 2, 5, t, RollTime - 0.03f, 0.26f, 2, 10, seed, rise: 3, cx: fx * L, cy: fy * L, cone: 140, toward: face);
+                    return 0.58f;
+                }
+                case RollSlide:
+                {
+                    float fx = (float)Math.Cos(c.Dir), fy = (float)Math.Sin(c.Dir), L = c.Length;
+                    Puffs(o, FxRamp.Dust, 3, t, 0, 0.3f, 2, 7, seed, 5, 0.5f, 0, 0, 3);
+                    // The floor scuffed along the way, each mark laid as the feet pass and thinning after.
+                    for (int i = 0; i < 6; i++)
+                    {
+                        float share = (i + 0.5f) / 6, from = RollTime * share, aside = (i % 2 == 0 ? 3 : -3) + (Rnd(seed, i, 13) - 0.5f) * 2;
+                        if (!In(t, from, from + 0.24f)) continue;
+                        Put(o, FxShape.Streak, FxRamp.Dust, 8 + 2 * (i % 2), 1, fx * L * share - fy * aside, 1 + fy * L * share + fx * aside, 0.7f * (1 - U(t, from, from + 0.24f)), face);
+                    }
+                    // Grit sprayed ahead off the leading foot where the slide stops.
+                    Fly(o, FxShape.Dot, FxRamp.Dust, 2, 2, 6, t, RollTime - 0.06f, 0.28f, 3, 14, seed, rise: 2, cx: fx * L, cy: fy * L, cone: 70, toward: face);
+                    Puffs(o, FxRamp.Dust, 2, t, RollTime - 0.04f, RollTime + 0.3f, 2, 6, seed + 9, 5, 0.4f, fx * L, fy * L, 3);
+                    return 0.6f;
+                }
+                case RollBlink:
+                {
+                    float fx = (float)Math.Cos(c.Dir), fy = (float)Math.Sin(c.Dir), L = c.Length;
+                    // A glint where they left and where they arrive, afterimages left along the way as the body passes
+                    // (the first to be left the first to go), and motes that hang a moment and rise.
+                    if (In(t, 0, 0.12f)) Put(o, FxShape.Glint, m, 9, 1, 0, Body, 1 - U(t, 0.05f, 0.12f));
+                    for (int k = 0; k < 3; k++)
+                    {
+                        float share = (k + 0.3f) / 3.3f, from = RollTime * share;
+                        if (In(t, from, from + 0.26f)) Put(o, FxShape.Ghost, m, 1, 0, fx * L * share, fy * L * share, 0.5f * (1 - U(t, from, from + 0.26f)));
+                    }
+                    for (int i = 0; i < 7; i++)
+                    {
+                        float share = (i + Rnd(seed, i, 14)) / 7, from = RollTime * share, u = U(t, from, from + 0.32f);
+                        if (!In(t, from, from + 0.32f)) continue;
+                        float aside = (Rnd(seed, i, 15) - 0.5f) * 10;
+                        Put(o, FxShape.Dot, m, 1, 2, fx * L * share - fy * aside, Body - 4 + fy * L * share + fx * aside + 7 * u, 1 - u);
+                    }
+                    if (In(t, RollTime - 0.04f, RollTime + 0.12f)) Put(o, FxShape.Glint, m, 7, 0, fx * L, Body + fy * L, 1 - U(t, RollTime + 0.02f, RollTime + 0.12f));
+                    return 0.62f;
                 }
                 case "ground_slam":
                 {

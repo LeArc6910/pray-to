@@ -311,8 +311,10 @@ namespace Game.Client
             fine = true;
             const int gap = 2;
             int columns = classes.Classes.Max(c => c.Skills.Count);
-            var sheet = new PixelImage(gap + columns * (SkillArt.Size + gap), gap + classes.Classes.Count * (SkillArt.Size + gap));
+            var sheet = new PixelImage(gap + columns * (SkillArt.Size + gap), gap + (classes.Classes.Count + 1) * (SkillArt.Size + gap));
             sheet.Fill(0, 0, sheet.Width, sheet.Height, Backdrop);
+            // Under the classes: the dodge roll's slot, which is no class's skill (SkillBar).
+            sheet.Draw(SkillArt.Roll(), gap, gap + classes.Classes.Count * (SkillArt.Size + gap));
             var seen = new Dictionary<string, string>();
             for (int row = 0; row < classes.Classes.Count; row++)
             {

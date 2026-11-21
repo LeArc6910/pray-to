@@ -35,6 +35,10 @@ namespace Game.Client
         // Knees give, down on the floor (the last frame is held while they lie there); and getting up again.
         Fall,
         Rise,
+        // The dodge roll (World.Roll.cs), the same rule for everyone and a different look by what they hold: with a
+        // sword, a pickaxe or bare hands a tumble over the floor, with a bow a low slide, with a staff a gliding step
+        // that leaves afterimages (WorldView). It is drawn facing the way they roll and lasts as long as the roll.
+        Roll,
     }
 
     // The weapon as the hero's picture needs it: its kind and the colours of its icon (ItemArt.Held).
@@ -554,6 +558,7 @@ namespace Game.Client
                 case HeroMove.Drink: return Drinking(rest);
                 case HeroMove.Hurt: return Flinch(rest);
                 case HeroMove.Fall: return Falling(rest);
+                case HeroMove.Roll: return weapon == HeroWeapon.Bow ? Sliding(rest) : weapon == HeroWeapon.Staff ? Gliding(rest) : Tumbling(rest, weapon);
                 default: return Rising(rest);
             }
         }
@@ -1364,6 +1369,118 @@ namespace Game.Client
                 St(0.2f, With(down, (ref Pose p) => p.Tip = 0), Ease.Out, Beat.Swing, least: 6),
                 St(0.12f, With(rest, (ref Pose p) => { p.Drop = 2; p.Nod = 1; }), least: 3),
                 St(0.15f, rest, Ease.Both, least: 4));
+        }
+
+        // ---- The dodge roll: 0.3 s in all (World.RollSeconds), ahead being the way they roll ----
+
+        // A tumble: a dive onto the hands, the body tucked small and turned right over (seen from above, the views go
+        // by all the way round), and up onto the feet again. The weapon is held in against the body through it.
+        static Clip Tumbling(Pose rest, HeroWeapon weapon)
+        {
+            bool armed = weapon != HeroWeapon.None;
+            var dive = With(rest, (ref Pose p) =>
+            {
+                p.Lean = 3.5f;
+                p.Drop = 3;
+                p.Nod = 1.5f;
+                p.HandR = armed ? V(4.5f, 2, 5) : V(4, 4.5f, 4.5f);
+                p.HandL = V(-4, 4.5f, 4.5f);
+                p.FootR = V(3, -3.5f, 0.5f);
+                p.FootL = V(-3, 1.5f, 0);
+                if (armed)
+                {
+                    // Upright against the back, so it turns with the body without sweeping round.
+                    p.Yaw = -150;
+                    p.Pitch = 78;
+                }
+            });
+            var tucked = With(dive, (ref Pose p) =>
+            {
+                p.Pivot = 180;
+                p.Lean = 1;
+                p.Drop = 6;
+                p.Nod = 2.5f;
+                p.Hop = 1;
+                p.HandR = armed ? V(3.5f, 1.5f, 3.5f) : V(3, 2.5f, 3);
+                p.HandL = V(-3, 2.5f, 3);
+                p.FootR = V(2, 1, 1.5f);
+                p.FootL = V(-2, 1, 1.5f);
+                p.Shut = 1;
+            });
+            var over = With(tucked, (ref Pose p) =>
+            {
+                p.Pivot = 360;
+                p.Drop = 4.5f;
+                p.Hop = 0;
+                p.Nod = 1.5f;
+                p.Lean = 2;
+                p.FootR = V(3, 2.5f, 0);
+                p.FootL = V(-3, -1.5f, 0);
+                p.Shut = 0;
+            });
+            var up = With(rest, (ref Pose p) => p.Pivot = 360);
+            return Build(rest,
+                St(0.05f, dive, Ease.Out, Beat.Swing, least: 2),
+                St(0.09f, tucked, Ease.Even, Beat.Swing, least: 4),
+                St(0.09f, over, Ease.Even, Beat.Swing, least: 4),
+                St(0.07f, up, Ease.Out, Beat.Swing, least: 3));
+        }
+
+        // A slide: the body thrown low and back over the leading leg, the string hand down on the floor behind, the bow
+        // kept up ahead; held, and up again.
+        static Clip Sliding(Pose rest)
+        {
+            var low = With(rest, (ref Pose p) =>
+            {
+                p.Lean = -3;
+                p.Drop = 4.5f;
+                p.Twist = 25;
+                p.HandL = V(-5.5f, 4, 6.5f);
+                p.HandR = V(5, -4.5f, 2);
+                p.FootL = V(-2, 6, 0);
+                p.FootR = V(3, 2, 0);
+                p.Yaw = 20;
+            });
+            var held = With(low, (ref Pose p) =>
+            {
+                p.Lean = -3.5f;
+                p.Drop = 5;
+                p.FootL = V(-2, 6.5f, 0);
+                p.HandR = V(5, -5, 1.5f);
+            });
+            return Build(rest,
+                St(0.06f, low, Ease.Out, Beat.Swing, least: 3),
+                St(0.15f, held, Ease.Even, least: 3),
+                St(0.09f, rest, Ease.Both, Beat.Swing, least: 4));
+        }
+
+        // A gliding step: up off the floor and carried ahead upright, the staff drawn in close with its stone alight,
+        // the free hand and the feet trailing; set down again. The afterimages are the screen's (WorldView).
+        static Clip Gliding(Pose rest)
+        {
+            var lifted = With(rest, (ref Pose p) =>
+            {
+                p.Hop = 2;
+                p.Lean = 2.5f;
+                p.Drop = 0.5f;
+                p.HandR = V(5, 2.5f, 8);
+                p.HandL = V(-5.5f, -3, 6.5f);
+                p.FootR = V(2, -2, 0.5f);
+                p.FootL = V(-2, -3.5f, 1);
+                p.Pitch = 70;
+                p.Yaw = -60;
+                p.Glow = 1;
+            });
+            var carried = With(lifted, (ref Pose p) =>
+            {
+                p.Hop = 2.5f;
+                p.Lean = 3;
+                p.FootL = V(-2, -4, 1.5f);
+            });
+            return Build(rest,
+                St(0.05f, lifted, Ease.Out, Beat.Swing, least: 3),
+                St(0.17f, carried, Ease.Even, least: 3),
+                St(0.08f, With(rest, (ref Pose p) => p.Glow = 0.4f), Ease.Both, Beat.Swing, least: 4));
         }
 
         // ---- Drawing ----

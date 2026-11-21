@@ -239,6 +239,112 @@ namespace Game.Core.Tests
             Assert.AreEqual(start, alice.Position);
         }
 
+        // The roll is the client's own, like its walking: it moves first, and the host takes the faster steps and gives
+        // the unhurt ticks (World.Roll.cs).
+        [Test]
+        public void TheHostTakesAClientsRollAndOthersAreTold()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            var bob = session.Join(2, "밥");
+            session.Tick(4);
+            bob.TakeEvents();
+            var player = session.Host.World.FindPlayer(alice.PlayerId);
+            var start = alice.Position;
+            // Somewhere with room to roll east.
+            Assert.IsFalse(Collision.Overlaps(alice.Map, start + new Vec2(World.RollDistance, 0), World.PlayerRadius), "the spawn has room east");
+
+            var events = new List<SimEvent>();
+            for (int i = 0; i < World.RollTicks + 2; i++)
+            {
+                session.Host.Receive(1, alice.Step(new Vec2(1, 0), Vec2.Zero, false, roll: i == 0));
+                session.Host.Receive(2, bob.Step(Vec2.Zero, Vec2.Zero, false));
+                if (i == 0)
+                {
+                    Assert.IsTrue(alice.Rolling);
+                    Assert.IsFalse(alice.CanRoll);
+                }
+                session.Host.Tick();
+                if (i == 0) Assert.IsTrue(player.Dodging, "unhurt from the tick the host hears of it");
+                session.Deliver();
+                events.AddRange(bob.TakeEvents());
+            }
+
+            // Nine ticks of the roll and two of walking.
+            float walked = 2 * alice.MoveSpeed * World.TickSeconds;
+            Assert.AreEqual(World.RollDistance + walked, alice.Position.X - start.X, 1e-3f);
+            Assert.AreEqual(alice.Position, player.Position, "the host went along");
+            Assert.AreEqual(0, player.Corrections);
+            Assert.AreEqual(1, player.Rolls);
+            Assert.AreEqual(1, alice.Rolls);
+            Assert.AreEqual(1, events.Count(e => e.Type == SimEventType.Rolled && e.Source == alice.PlayerId), "the other player's screen is told once");
+        }
+
+        [Test]
+        public void TheRollsFirstMessagesCanBeLost()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            session.Tick(4);
+            var player = session.Host.World.FindPlayer(alice.PlayerId);
+
+            for (int i = 0; i < World.RollTicks; i++)
+            {
+                byte[] input = alice.Step(new Vec2(1, 0), Vec2.Zero, false, roll: i == 0);
+                // The first two never arrive.
+                if (i >= 2) session.Host.Receive(1, input);
+                session.Host.Tick();
+                session.Deliver();
+            }
+
+            Assert.AreEqual(1, player.Rolls);
+            Assert.AreEqual(alice.Position, player.Position);
+            Assert.AreEqual(0, player.Corrections);
+        }
+
+        [Test]
+        public void AClientCannotRollAgainBeforeTheCooldownAndTheHostRefusesOneThatTries()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            session.Tick(4);
+            var player = session.Host.World.FindPlayer(alice.PlayerId);
+
+            session.Host.Receive(1, alice.Step(new Vec2(1, 0), Vec2.Zero, false, roll: true));
+            session.Host.Tick();
+            for (int i = 0; i < World.RollTicks + 2; i++)
+            {
+                session.Host.Receive(1, alice.Step(new Vec2(1, 0), Vec2.Zero, false, roll: true));
+                session.Host.Tick();
+            }
+            session.Deliver();
+            Assert.AreEqual(1, alice.Rolls, "the key held down does not roll again");
+            Assert.AreEqual(1, player.Rolls);
+
+            // A message that claims a second roll at once: the host does not take it, and puts the player back.
+            var at = player.Position;
+            byte[] still = alice.Step(Vec2.Zero, Vec2.Zero, false);
+            session.Host.Receive(1, still);
+            var input = InputMessage.Decode(still);
+            var claimed = PlayerMotor.Roll(alice.Map, at, new Vec2(1, 0));
+            session.Host.Receive(1, new InputMessage(input.Sequence + 1, claimed, new Vec2(1, 0), false, 1, new Vec2(1, 0)).Encode());
+            session.Host.Tick();
+            Assert.AreEqual(1, player.Rolls);
+            Assert.AreEqual(at, player.Position);
+            Assert.AreEqual(1, player.Corrections);
+        }
+
+        [Test]
+        public void TheRollRidesTheInputMessage()
+        {
+            var input = InputMessage.Decode(new InputMessage(40, new Vec2(1, 2), new Vec2(0, 1), false, 3, new Vec2(-1, 0)).Encode());
+            Assert.AreEqual(3, input.RollAge);
+            Assert.AreEqual(38, input.RollStart);
+            Assert.AreEqual(-1, input.RollDirection.X, 0.02f);
+            Assert.AreEqual(0, input.RollDirection.Y, 0.02f);
+            Assert.AreEqual(0, InputMessage.Decode(new InputMessage(1, Vec2.Zero, Vec2.Zero, false).Encode()).RollAge);
+        }
+
         [Test]
         public void WrongVersionsAndFullHostsAreRefused()
         {

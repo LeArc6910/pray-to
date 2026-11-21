@@ -962,18 +962,46 @@ namespace Game.Core
             }
         }
 
+        // The player's own dodge roll (World.Roll.cs), begun here first like their walking: ticks of it left, ticks
+        // until the next may begin, the way it goes, and how many have begun (for the screen to play each once).
+        public int RollTicks { get; private set; }
+        public int RollCooldown { get; private set; }
+        public Vec2 RollDirection { get; private set; }
+        public int Rolls { get; private set; }
+        public bool Rolling => RollTicks > 0;
+        public bool CanRoll => Status == ClientStatus.Playing && !IsDead && RollCooldown == 0;
+        // How much of the cooldown is left, 1 to 0, for the button.
+        public float RollCooldownShare => RollCooldown / (float)World.RollCooldownTicks;
+
         // One fixed tick of the local player. Returns the input message to send to the host, or null before joining.
-        public byte[] Step(Vec2 move, Vec2 aim, bool attack)
+        // roll: the roll key or button was pressed this tick; it goes the way of move, or the way the player faces.
+        public byte[] Step(Vec2 move, Vec2 aim, bool attack, bool roll = false)
         {
             if (Status != ClientStatus.Playing) return null;
             PreviousPosition = Position;
-            if (!IsDead)
+            if (RollCooldown > 0) RollCooldown--;
+            if (IsDead) RollTicks = 0;
+            else
             {
-                Position = PlayerMotor.Step(Map, Position, move, MoveSpeed, _myDoors);
                 if (aim.LengthSquared > 1e-6f) Facing = aim.Normalized;
+                if (roll && CanRoll)
+                {
+                    RollDirection = move.LengthSquared > 1e-6f ? move.Normalized : Facing;
+                    RollTicks = World.RollTicks;
+                    RollCooldown = World.RollCooldownTicks;
+                    Rolls++;
+                }
+                if (Rolling)
+                {
+                    Position = PlayerMotor.Roll(Map, Position, RollDirection,
+                        World.RollSlow((SelfStatus & StatusBits.Chilled) != 0, (SelfStatus & StatusBits.Snared) != 0), _myDoors);
+                }
+                else Position = PlayerMotor.Step(Map, Position, move, MoveSpeed, _myDoors);
             }
             _sequence++;
-            return new InputMessage(_sequence, Position, Facing, attack && !IsDead).Encode();
+            int age = Rolling ? World.RollTicks - RollTicks + 1 : 0;
+            if (Rolling) RollTicks--;
+            return new InputMessage(_sequence, Position, Facing, attack && !IsDead, age, RollDirection).Encode();
         }
 
         // Moves the clock that other entities are drawn at. Call once per rendered frame.

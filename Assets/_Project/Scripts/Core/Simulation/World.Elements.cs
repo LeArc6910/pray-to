@@ -195,7 +195,7 @@ namespace Game.Core
                 var afflictions = player.Afflictions;
                 afflictions.TickBurn();
                 int amount = TakeOwed(afflictions, false);
-                if (amount > 0) HurtPlayer(player, afflictions.BurnSource, amount, armor: false);
+                if (amount > 0) HurtPlayer(player, afflictions.BurnSource, amount, armor: false, dodge: false);
             }
         }
 

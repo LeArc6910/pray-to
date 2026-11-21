@@ -66,6 +66,9 @@ namespace Game.Client
         Skitter,
         // A taut thread of its web plucked: a dull string, bending down (2026-11-17).
         Twang,
+        // The dodge roll (World.Roll.cs): cloth and air going over, and the feet coming down. Dodge: a blow going by.
+        Roll,
+        Dodge,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -307,6 +310,20 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Sine, 0, 0.2f, 90, 45, 0.7f, decay: 3));
                     parts.Add(Noise(0, 0.08f, 0.5f, 0.6f, decay: 6, seed: 22));
                     level = 0.95f;
+                    break;
+                case Sound.Roll:
+                    // Shorter and lower than a dash's rush, with a soft landing at the roll's end.
+                    parts.Add(Noise(0, 0.24f, 0.6f, 0.22f, attack: 0.04f, decay: 2, seed: 31));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.2f, 260, 150, 0.22f, attack: 0.02f, decay: 2));
+                    parts.Add(Tone(Wave.Sine, 0.24f, 0.09f, 110, 60, 0.45f, decay: 5));
+                    parts.Add(Noise(0.24f, 0.06f, 0.4f, 0.5f, decay: 7, seed: 32));
+                    level = 0.5f;
+                    break;
+                case Sound.Dodge:
+                    // A thin whistle of air sliding up: something missed.
+                    parts.Add(Noise(0, 0.12f, 0.35f, 0.15f, attack: 0.02f, decay: 3, seed: 33));
+                    parts.Add(Tone(Wave.Sine, 0, 0.14f, 900, 1500, 0.25f, attack: 0.01f, decay: 3));
+                    level = 0.4f;
                     break;
                 case Sound.Dash:
                     parts.Add(Noise(0, 0.28f, 0.7f, 0.35f, attack: 0.03f, decay: 2.5f, seed: 13));

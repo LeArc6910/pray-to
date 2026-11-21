@@ -149,6 +149,8 @@ namespace Game.Client
             public float HurtTime;
             public Vector3 Position;
             public Vector3 LastPosition;
+            // The way a player's roll goes, while its motion plays (Motion.Roll).
+            public Vec2 RollWay;
             // The way it faced when last placed (the buffs' cues sit at the weapon hand, WorldView.SkillFx).
             public Vec2 Faced;
             public float Walked;
@@ -317,6 +319,8 @@ namespace Game.Client
             Drink,
             Thrust,
             Spin,
+            // The dodge roll (HeroMove.Roll): drawn the way it goes (Body.RollWay) whichever way they aim.
+            Roll,
         }
 
         // The eight ways a player looks, from facing right and turning counterclockwise: right, up-right, up, up-left,
@@ -497,6 +501,11 @@ namespace Game.Client
         Vector3 _cameraTarget;
         float _shake;
         float _hitStop;
+        // How many of the player's own rolls the screen has begun (WorldClient.Rolls).
+        int _rollsShown;
+        // Rolls begun on screen and blows that went through a roller, since the session began (for the playtests).
+        public int RollsShown { get; private set; }
+        public int DodgesShown { get; private set; }
         float _hurtGlow;
         float _hurtGlowStrength;
         Texture2D _vignette;
@@ -550,6 +559,11 @@ namespace Game.Client
             _hurtGlow = Mathf.Max(0, _hurtGlow - deltaTime);
             // A heavy blow of one's own holds the picture still for a moment (hit-stop); the world goes on underneath and
             // the events wait. Off with screen shake.
+            // One's own roll begins on the screen the tick it is pressed (WorldClient.Step): it is not held up by a
+            // hit-stop, and the host's word of it (Rolled) is not waited for.
+            bool rolled = _client.Rolls != _rollsShown;
+            _rollsShown = _client.Rolls;
+            if (rolled) _hitStop = 0;
             if (_hitStop > 0 && Settings.ScreenShake && Feel.HitStop)
             {
                 _hitStop -= deltaTime;
@@ -560,6 +574,11 @@ namespace Game.Client
             _hitStop = 0;
             var selfPosition = Vec2.Lerp(_client.PreviousPosition, _client.Position, Mathf.Clamp01(tickFraction));
             var (selfTint, selfGlow) = StatusLook(_client.SelfStatus, Color.white, Color.clear);
+            if (rolled)
+            {
+                StartRoll(_self, _client.RollDirection, _client.PreviousPosition, _client.PlayerId,
+                    World.RollSlow((_client.SelfStatus & StatusBits.Chilled) != 0, (_client.SelfStatus & StatusBits.Snared) != 0));
+            }
             Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, selfTint, selfGlow, deltaTime,
                 weapon: _client.Equipment[ItemSlot.Weapon]?.Base);
             _self.Name = _client.Name;
@@ -2125,6 +2144,21 @@ namespace Game.Client
                     }
                     Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
                     break;
+                case SimEventType.Rolled:
+                    // Another player's roll; one's own began when it was pressed (Render).
+                    if (e.Source == _client.PlayerId) break;
+                    var roller = Find(e.Source);
+                    if (roller != null) StartRoll(roller, e.Direction, new Vec2(roller.Position.x, roller.Position.y), e.Source);
+                    break;
+                case SimEventType.Dodged:
+                    // A blow went through someone rolling: a word over them and a whistle of air.
+                    var dodger = Find(e.Target);
+                    if (dodger == null) break;
+                    DodgesShown++;
+                    bool mineDodged = e.Target == _client.PlayerId;
+                    _floating.Add(new Floating { Position = dodger.Position + new Vector3(0, 0.6f, 0), Text = "회피", Color = mineDodged ? DodgeColor : Faded(DodgeColor, 0.7f) });
+                    Hear(Sound.Dodge, dodger.Position, mineDodged ? 1 : 0.5f);
+                    break;
                 case SimEventType.Revived:
                     // An ally got someone up where they fell (World.Revive): a burst of light on them.
                     var raised = Find(e.Target);
@@ -3028,6 +3062,8 @@ namespace Game.Client
                 body.DownTime = -1;
                 body.RiseTime = HeroArt.SecondsOf(HeroMove.Rise, HeroWeapon.None);
             }
+            // A roll is drawn the way it goes, whichever way they aim.
+            if (!dead && body.Motion == Motion.Roll && body.MotionTime > 0) facing = body.RollWay;
             var (look, left) = Sectors[SectorOf(facing)];
             var (move, frame, blink) = HeroPose(body, moving, dead);
             body.RiseTime = Mathf.Max(0, body.RiseTime - deltaTime);
@@ -3047,6 +3083,44 @@ namespace Game.Client
             body.Top = -body.Feet + HeroArt.Tall / (float)Sprites.PixelsPerUnit;
         }
 
+        static readonly Color DodgeColor = new Color(0.8f, 0.95f, 1f);
+
+        // A player's roll begins (World.Roll.cs): the motion for what they hold, drawn the way it goes; its effect laid
+        // from where it began along the way it will go (a tumble's dust, a slide's scuffs, a gliding step's
+        // afterimages, SkillFx.Roll and Docs/SkillEffects.md), as far as the walls let it; and its sound. from is where
+        // they were when it began, slow what a chill or a web takes off it.
+        void StartRoll(Body body, Vec2 way, Vec2 from, int playerId, float slow = 1)
+        {
+            bool mine = playerId == _client.PlayerId;
+            if (way.LengthSquared < 1e-6f) way = body.Faced.LengthSquared > 1e-6f ? body.Faced : new Vec2(0, -1);
+            way = way.Normalized;
+            Start(body, Motion.Roll, World.RollSeconds);
+            body.RollWay = way;
+            body.CastTime = 0;
+            body.HurtTime = 0;
+            body.SwingTime = 0;
+            RollsShown++;
+            Hear(Sound.Roll, body.Position, mine ? 1 : 0.6f);
+            var feet = new Vector3(from.X, from.Y - body.Feet, 0);
+            if (!Feel.SkillFx)
+            {
+                AddFlash(feet, 0.8f, Palette.Dust, FlashKind.Burst);
+                return;
+            }
+            var at = from;
+            if (_client.Map != null)
+            {
+                for (int i = 0; i < World.RollTicks; i++) at = PlayerMotor.Roll(_client.Map, at, way, slow);
+            }
+            else at = from + way * World.RollDistance;
+            var held = body.Gear.Kind;
+            var tags = GrantedTags(playerId);
+            var ramp = (tags & SkillTag.Fire) != 0 ? FxRamp.Fire : (tags & SkillTag.Cold) != 0 ? FxRamp.Cold : (tags & SkillTag.Lightning) != 0 ? FxRamp.Bolt : FxRamp.Mist;
+            var fx = AddFx(FxProgram.Cast, held == HeroWeapon.Bow ? SkillFx.RollSlide : held == HeroWeapon.Staff ? SkillFx.RollBlink : SkillFx.Roll, feet,
+                new FxContext { Dir = way.Angle, Length = Vec2.Distance(from, at) * Sprites.PixelsPerUnit, Main = ramp }, mine);
+            if (fx != null) fx.Ghost = body.Shape.sprite;
+        }
+
         // How long past its blow a strike holds the legs still; after that, walking takes over from the way back to rest.
         const float PlantSeconds = 0.1f;
 
@@ -3059,6 +3133,7 @@ namespace Game.Client
             var held = body.Gear.Kind;
             if (dead) return (HeroMove.Fall, HeroArt.FrameAt(HeroMove.Fall, HeroWeapon.None, body.DownTime), false);
             if (body.RiseTime > 0) return (HeroMove.Rise, HeroArt.FrameAt(HeroMove.Rise, HeroWeapon.None, HeroArt.SecondsOf(HeroMove.Rise, HeroWeapon.None) - body.RiseTime), false);
+            if (body.Motion == Motion.Roll && body.MotionTime > 0) return (HeroMove.Roll, HeroArt.FrameAt(HeroMove.Roll, held, body.MotionLength - body.MotionTime), false);
             if (body.HurtTime > 0) return (HeroMove.Hurt, HeroArt.FrameAt(HeroMove.Hurt, held, HurtSeconds - body.HurtTime), false);
             if (body.Motion != Motion.None && body.MotionTime > 0)
             {

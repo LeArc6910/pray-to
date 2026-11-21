@@ -127,15 +127,17 @@ namespace Game.Core
 
         // The owning client moves its player with PlayerMotor and reports where it ended up, so its own movement
         // never waits for the network. The host accepts the report unless the player could not have got there in
-        // the elapsed ticks or it overlaps a wall; then the player stays put and the client is corrected.
-        public bool MovePlayer(int id, Vec2 reported, Vec2 facing, int elapsedTicks)
+        // the elapsed ticks or it overlaps a wall; then the player stays put and the client is corrected. rolling: the
+        // steps were those of a roll the host took (World.Roll), which are faster than walking.
+        public bool MovePlayer(int id, Vec2 reported, Vec2 facing, int elapsedTicks, bool rolling = false)
         {
             var player = FindPlayer(id);
             if (player == null) return false;
             if (facing.LengthSquared > 1e-6f && !player.IsDead) player.Facing = facing.Normalized;
             if (reported.Equals(player.Position)) return true;
 
-            float allowed = player.MoveSpeed * TickSeconds * Math.Clamp(elapsedTicks, 1, 10) * 1.25f + 0.05f;
+            float speed = rolling ? Math.Max(player.MoveSpeed, RollSpeed * RollSlow(player.Afflictions.Chilled, player.Afflictions.Snared)) : player.MoveSpeed;
+            float allowed = speed * TickSeconds * Math.Clamp(elapsedTicks, 1, 10) * 1.25f + 0.05f;
             bool valid = !player.IsDead
                 && reported.IsFinite
                 && Vec2.Distance(player.Position, reported) <= allowed
@@ -230,8 +232,10 @@ namespace Game.Core
             BurnInLava(player);
             UpdateRecall(player);
             UpdateFishing(player);
+            UpdateRoll(player);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
-            if (player.Attacking && player.AttackCooldown == 0) Attack(player);
+            // No swing comes out in the middle of a roll.
+            if (player.Attacking && player.AttackCooldown == 0 && !player.Rolling) Attack(player);
         }
 
         // A swing that hits nobody strikes the tile ahead. Rock (walls and ore veins) only gives way to a pickaxe in
@@ -537,10 +541,12 @@ namespace Game.Core
             if (!boss.IsDead) DamageBoss(boss, 0, amount, false);
         }
 
-        // Returns the damage dealt. A burn's damage is not lessened by armor.
-        int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true)
+        // Returns the damage dealt. A burn's damage is not lessened by armor. A blow (dodge) passes through a player in
+        // the unhurt ticks of a roll (World.Roll.cs); a burn already on them does not.
+        int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true, bool dodge = true)
         {
             if (player.IsDead) return 0;
+            if (dodge && Dodges(player, source)) return 0;
             int amount = armor ? Combat.Mitigate(damage, player.Stats.Armor) : Math.Max(1, (int)MathF.Round(damage));
             BreakRecall(player);
             EndFishing(player, FishingReeled);
@@ -551,6 +557,7 @@ namespace Game.Core
             if (!player.IsDead) return amount;
 
             player.Health = 0;
+            EndRoll(player);
             player.Attacking = false;
             player.HealTicks = 0;
             player.ClearBuffs();
@@ -704,6 +711,11 @@ namespace Game.Core
         // the locked doors they walk through (World.DoorsFor), the same on the host and in the client's prediction.
         public static Vec2 Step(TileMap map, Vec2 position, Vec2 input, float moveSpeed, ISet<int> doors = null) =>
             Collision.Move(map, position, World.PlayerRadius, input.ClampLength(1) * (moveSpeed * World.TickSeconds), passable: doors);
+
+        // One tick of a roll along direction (World.Roll.cs): the same for everyone whatever their move speed, shorter
+        // by slow (World.RollSlow) when chilled or snared. Walls stop it as they stop a walk.
+        public static Vec2 Roll(TileMap map, Vec2 position, Vec2 direction, float slow = 1, ISet<int> doors = null) =>
+            Collision.Move(map, position, World.PlayerRadius, direction.Normalized * (World.RollSpeed * slow * World.TickSeconds), passable: doors);
     }
 
     public static class Combat

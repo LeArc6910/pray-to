@@ -14,6 +14,8 @@ namespace CoreSandbox
     // add --gear <base,base> to --fight to change its gear (copper_sword by default), --no-dodge to stand still
     // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss (--boss-id for another)
     // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
+    // add --no-roll to --fight or --boss for bots that do not use the dodge roll (as before it was made), or
+    // --roll-miss <0..1> for bots that fumble that share of their rolls
     // add --classes <class,class> to --fight or --boss to give the bots classes; they use every skill when it is ready
     // dotnet run -- --farm [minutes] [crop]          a plot of soil kept by a sprinkler and a harvester: harvest an hour
     // dotnet run -- --rift [tiers] [seed]             bots open void rifts tier after tier (--players, --gear, --classes)
@@ -96,6 +98,15 @@ namespace CoreSandbox
             }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();
+            // The bots roll through blows about to land (RollBot); --no-roll is how they fought before the roll.
+            RollBot.Enabled = !args.Contains("--no-roll");
+            args = args.Where(a => a != "--no-roll").ToArray();
+            int missFlag = Array.IndexOf(args, "--roll-miss");
+            if (missFlag >= 0)
+            {
+                RollBot.Miss = float.Parse(args[missFlag + 1], System.Globalization.CultureInfo.InvariantCulture);
+                args = args.Where((_, i) => i != missFlag && i != missFlag + 1).ToArray();
+            }
 
             var data = LoadLoot();
             switch (args.Length > 0 ? args[0] : "")
@@ -168,7 +179,7 @@ namespace CoreSandbox
                     Console.WriteLine("usage: dotnet run -- --item [level] [seed] | --loot [level] [count] [seed] | --progression [count] [seed]");
                     Console.WriteLine("       add --rarity <percent> to --item or --loot");
                     Console.WriteLine("       dotnet run -- --fight [seconds] [seed] [--gear copper_sword,copper_armor] [--classes warrior,fire_mage] [--no-dodge]");
-                    Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--classes ...] [--no-dodge] [--boss-id crystal_queen]");
+                    Console.WriteLine("       dotnet run -- --boss [seconds] [seed] [--players 2] [--reaction 0.25] [--gear ...] [--classes ...] [--no-dodge] [--no-roll] [--roll-miss 0.3] [--boss-id crystal_queen]");
                     Console.WriteLine("       dotnet run -- --farm [minutes] [crop]");
                     Console.WriteLine("       dotnet run -- --rift [tiers] [seed] [--players 2] [--gear ...] [--classes ...]");
                     Console.WriteLine("       dotnet run -- --economy");

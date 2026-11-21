@@ -53,6 +53,7 @@ namespace Game.Client.Tests
                     Ui.HudHeight = 160;
                     Controls.ForceTouch(touch);
                     var keys = Enumerable.Range(0, skills + 1).Select(slot => ($"스킬 {slot}", SkillBar.Area(slot, skills))).ToList();
+                    keys.Add(("구르기", SkillBar.RollArea(skills)));
                     var quick = Enumerable.Range(0, Hotbar.Slots).Select(slot => ($"퀵슬롯 {slot}", Hotbar.Area(slot, skills))).ToList();
                     // The time and place lines: up to four small lines (an online room's code the fourth).
                     var top = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea), ("HUD", Ui.HudArea), ("시간·장소 줄", Ui.InfoArea(60)) };

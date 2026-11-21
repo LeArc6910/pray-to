@@ -111,6 +111,9 @@ namespace Game.Client
         static Sprite MakeIcon(MaterialDefinition material) =>
             Remember(material, Centered("material/" + material.Id, () => ItemArt.Material(material)));
 
+        // The dodge roll's slot (SkillBar).
+        public static Sprite RollIcon => Centered("skill/roll", SkillArt.Roll);
+
         static Sprite MakeIcon(SkillDefinition skill) => Remember(skill, Centered("skill/" + skill.Id, () => SkillArt.Icon(skill)));
 
         static Sprite Known(object definition) => Icons.TryGetValue(definition, out var sprite) && sprite != null ? sprite : null;

@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3506,7 +3506,120 @@ async function hero(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, base, save, story, deploysave, layout, touch };
+// ---------------------------------------------------------------- 구르기 (월드 다시 짜기 4a, Docs/Combat.md 구르기)
+// The dodge roll by its real key (PC: left Shift) and its real button (phone: a tap on "roll"): it moves the hero
+// its distance, does not come again inside its cooldown, lets a blow through in its first moment and not after, and
+// stops at a wall. The button's place on a phone held upright and sideways is photographed with four skills beside
+// it, and checked against every other button drawn.
+async function roll(browser) {
+  for (const name of ['pc', 'phone', 'phone-wide']) {
+    const profile = Profiles[name];
+    note(`\n## 구르기 (${name === 'pc' ? 'PC, Shift' : name === 'phone' ? '휴대폰 세로, 단추' : '휴대폰 가로, 단추'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+      await game.send('classes warrior,fire_mage');
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1000);
+    // Four skills on the bar, out of the village, in a lane of floor with a wall eight tiles east.
+    await game.send('teach; goto wild; heal');
+    await game.wait(1200);
+    await game.send('scene roll; face 1 0');
+    await game.wait(600);
+    const press = async () => {
+      if (game.touch) return game.press('roll');
+      await game.page.keyboard.press('ShiftLeft');
+      return true;
+    };
+
+    // The button: drawn, on the screen, and on no other button.
+    const buttons = (await game.buttons()).filter(b => b.shown);
+    const button = buttons.find(b => b.label === 'roll');
+    check(!!button, `${name}: 구르기 단추(칸)가 그려진다`);
+    if (button) {
+      const [x, y, w, h] = button.rect;
+      check(x >= 0 && y >= 0 && x + w <= button.screen.width + 0.5 && y + h <= button.screen.height + 0.5, `${name}: 구르기 단추가 화면 안에 있다 (${x.toFixed(0)},${y.toFixed(0)} ${w}×${h})`);
+      const over = buttons.filter(b => b !== button && b.rect[0] < x + w && x < b.rect[0] + b.rect[2] && b.rect[1] < y + h && y < b.rect[1] + b.rect[3]);
+      check(over.length === 0, `${name}: 구르기 단추가 다른 단추와 겹치지 않는다${over.length ? ` (겹침: ${over.map(b => b.label).join(', ')})` : ''}`);
+      if (game.touch) check(Math.abs(w - 48) < 0.5 && Math.abs(h - 48) < 0.5, `${name}: 단추는 48점이다 (${w}×${h})`);
+    }
+    await game.shot('roll-button', '구르기 단추와 스킬 단추');
+
+    // It moves the hero its distance (3.2 tiles), the way they face.
+    const before = await game.state();
+    check(await press(), `${name}: 구르기를 누른다`);
+    await game.wait(150);
+    await game.shot('roll-during', '구르는 중');
+    await game.wait(700);
+    const after = await game.state();
+    const moved = after.x - before.x;
+    check(after.rolls === before.rolls + 1, `${name}: 호스트가 구르기를 한 번 받았다 (${before.rolls} → ${after.rolls})`);
+    check(moved > 2.9 && moved < 3.5 && Math.abs(after.y - before.y) < 0.2, `${name}: 바라보는 쪽으로 3.2칸쯤 간다 (${moved.toFixed(2)}칸)`);
+    check(after.rollsShown > before.rollsShown, `${name}: 화면이 구르기 모션을 시작했다`);
+
+    // Twice in a row, quicker than the cooldown: one roll.
+    await game.wait(600);
+    const twice = await game.state();
+    await press();
+    await press();
+    await game.wait(300);
+    const once = await game.state();
+    check(once.rolls === twice.rolls + 1, `${name}: 다시 쓰기 시간(0.9초) 안의 둘째 누름은 구르지 않는다 (${once.rolls - twice.rolls}번)`);
+
+    // Into the wall: the hero stops against it. (About 6.4 tiles gone; the wall's face is 7.5 from where they began.)
+    await game.wait(1100);
+    await press();
+    await game.wait(900);
+    const walled = await game.state();
+    const wall = Math.floor(before.x) + 8;
+    check(walled.x < wall - 0.3 && walled.x > wall - 0.6, `${name}: 벽을 지나가지 않고 그 앞에 선다 (x ${walled.x.toFixed(2)}, 벽 ${wall})`);
+    await game.shot('roll-wall', '벽 앞에서 멈춤');
+
+    // The unhurt moment: a blow three host ticks into the roll goes through, and one twelve ticks in (the roll and
+    // its unhurt ticks over) lands. The blow is armed first and the roll is the real key or tap.
+    await game.send('face -1 0; heal');
+    await game.wait(1200);
+    const whole = await game.state();
+    await game.send('rollhit 10 3');
+    await press();
+    await game.wait(700);
+    const dodged = await game.state();
+    check(dodged.rolls === whole.rolls + 1, `${name}: 구른다`);
+    check(dodged.health === whole.health && dodged.dodges === whole.dodges + 1, `${name}: 구르기 0.1초 뒤의 타격은 지나간다 (생명력 ${whole.health} → ${dodged.health}, 흘린 타격 ${dodged.dodges - whole.dodges})`);
+    check(dodged.dodgesShown > whole.dodgesShown, `${name}: 화면에 "회피"가 뜬다`);
+    await game.shot('roll-dodged', '타격을 흘린 뒤');
+    await game.wait(600);
+    await game.send('rollhit 10 12');
+    await press();
+    await game.wait(900);
+    const struck = await game.state();
+    check(struck.rolls === dodged.rolls + 1 && struck.health < dodged.health && struck.dodges === dodged.dodges,
+      `${name}: 무적이 끝난 뒤(0.4초)의 타격은 맞는다 (${dodged.health} → ${struck.health})`);
+
+    // The look with each weapon (a tumble, a slide, a gliding step), on the PC.
+    if (!game.touch) {
+      // Back and forth along the lane, so each has room.
+      for (const [weapon, look, way] of [['copper_sword', '구르기', 1], ['copper_bow', '미끄러지기', -1], ['copper_staff', '잔상 걸음', 1]]) {
+        await game.send(`equip ${weapon}; face ${way} 0`);
+        await game.wait(1100);
+        await press();
+        await game.wait(130);
+        await game.shot(`roll-${weapon}`, `${look} (${weapon})`);
+        await game.wait(120);
+        await game.shot(`roll-${weapon}-2`, `${look} 끝 무렵`);
+      }
+    }
+    await game.send('face off');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -1039,6 +1039,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(화면 코드만 바뀜, 통신 그대로). 새 파일 `Client/Art/SkillFx.cs`, `Client/Art/SkillFxArt.cs`, `Client/WorldView.SkillFx.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/SkillFxPreview.cs`는 Unity 밖이라 `.meta` 없음)
   - (클라우드 웹 점검) `sweep.js --only skillfx`. 비교는 `feel skillfx off|on`
   - (사람) 클래스마다 스킬을 써 보며 모으기·터짐·흩어짐이 시원한지, 화면이 너무 어지럽지 않은지(특히 지옥불·눈보라·칼날 폭풍), 보스 예고 표시와 헷갈리지 않는지, 휴대폰에서 끊김이 없는지
+- [ ] 145단계: 구르기(`Docs/Combat.md` 구르기, `Docs/WorldRework.md` 4a)
+  - 명령 한 줄을 다시 돌린다(통신 0.86.0, 옛 빌드와 함께 못 논다). 새 파일 `Core/Simulation/World.Roll.cs`, `Tests/EditMode/RollTests.cs`의 `.meta`가 생기면 커밋한다(`DevTools/CoreSandbox/RollBot.cs`는 Unity 밖). PlayMode `LayoutTests`에 구르기 칸이 들어갔다
+  - (클라우드 웹 점검) `sweep.js --only roll`
+  - (사람) 구르기의 손맛(왼쪽 Shift, 휴대폰은 물약 단추 위), 휴대폰에서 단추가 엄지에 닿는지, 웹 협동에서 무적이 지연 때문에 어긋나지 않는지, 보스전이 너무 쉬워지지 않았는지
 
 ## 결과 보고
 
