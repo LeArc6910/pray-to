@@ -195,6 +195,9 @@ namespace Game.Client
                     _skillPicked = skill;
                     _skillSheet = true;
                     _swapSlot = -1;
+                    // Its actions ([올리기], [칸에 넣기]) are at the top of the detail: show them, not where a
+                    // short screen was left scrolled (the crystals, after [변형]).
+                    _skillDetailScroll = Vector2.zero;
                 }
             }
         }

@@ -529,6 +529,9 @@ namespace Game.Client
                 {
                     _pickedPassive = node;
                     CenterOn(node);
+                    // The picked point's card, with its [배우기], is at the top of the side pane: on a short screen
+                    // the drawer sits below it, scrolled, so the card would stay out of sight.
+                    _treeSideScroll = Vector2.zero;
                 }
                 GUILayout.Space(4);
             }

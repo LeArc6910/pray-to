@@ -5386,18 +5386,18 @@ async function growth(browser) {
     s = await game.state();
     check(s.growth.sky[2] > 200 && s.growth.sky[3] > 150, `하늘이 넓다 (${s.growth.sky.map(Math.round).join(',')})`);
     const drawer = () => game.buttons().then(all => all.filter(b => b.shown && b.row === '지금 배울 수 있는 점' && /: /.test(b.label)));
-    let open = await drawer();
-    check(open.length > 0, `"지금 배울 수 있는 점" 서랍에 점이 있다 (${open.length})`);
+    let learnable = await drawer();
+    check(learnable.length > 0, `"지금 배울 수 있는 점" 서랍에 점이 있다 (${learnable.length})`);
     // A star pressed in the sky (a real click or tap), then [배우기] on its card.
-    const name = open.length > 0 ? open[0].label.split(':')[0] : '';
+    const name = learnable.length > 0 ? learnable[0].label.split(':')[0] : '';
     check(await game.press(name, '특성 트리'), `하늘의 별 [${name}]을 누른다`);
     check((await game.state()).growth.passive === name, '누른 점이 카드에 나온다');
     await shot('tree-picked', `고른 점 ${name}의 카드`);
     check(await game.press('배우기'), '카드의 [배우기]');
     check(!!(await game.until(i => i.passives === 1, 3000, game.inventory)), '별을 눌러 배운다');
     // A point from the drawer.
-    open = await drawer();
-    if (open.length > 0) await game.tapAt(open[0].cx, open[0].cy);
+    learnable = await drawer();
+    if (learnable.length > 0) await game.tapAt(learnable[0].cx, learnable[0].cy);
     await game.wait(400);
     check(await game.press('배우기'), '서랍의 점을 누르고 [배우기]');
     check(!!(await game.until(i => i.passives === 2, 3000, game.inventory)), '서랍으로도 배운다');
