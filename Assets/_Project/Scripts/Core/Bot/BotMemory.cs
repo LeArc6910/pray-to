@@ -36,7 +36,7 @@ namespace Game.Core
             _world = world ?? throw new ArgumentNullException(nameof(world));
             _player = player ?? throw new ArgumentNullException(nameof(player));
             _guide = guide;
-            _seen = new bool[world.Map.Width * world.Map.Height];
+            _seen = new bool[world.Map.Width * world.Map.Rows];
             StartTick = world.Tick;
             _startFalls = player.Falls;
             LastProgressTick = world.Tick;

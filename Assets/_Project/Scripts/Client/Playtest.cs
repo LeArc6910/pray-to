@@ -54,6 +54,12 @@ namespace Game.Client
     //   director [build|peak|relax|rest [tension] | ambush | raid]   JSON: the pacing director for the player (state, tension,
     //                             clocks, what it sent, the dust and howls the screen showed); or that state set, or one now
     //   goto narrow [n]           the middle of the nth nearest narrow way (two tiles or less) where an ambush can come
+    //   goto gate [n]             on the nth nearest dungeon gate (묶음 5a);   goto exit [n] | far   in the dungeon: by its nth door
+    //                             out (0 the entrance's), or the middle of its last room
+    //   dungeon [enter|leave|menu|die|close]   JSON: the gates, the dungeons standing, the player's part on host and screen,
+    //                             going in or out, the name card; or the gate's or door's button, [던전 나가기], a fall where
+    //                             the player stands, every empty dungeon back to rock now
+    //   scene dungeon             on the nearest dungeon gate, the monsters held
     //   traps                     JSON: the nearest trap room: phase, band, wave, the grates down on host and screen, who is
     //                             shut in, the chest (opened, usable on host and screen), the banners shown
     //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways, roads
@@ -343,6 +349,26 @@ namespace Game.Client
                     return "pois " + PoisJson(root);
                 case "usepoi":
                     return root.UsePoi() ? "ok usepoi" : "error usepoi: nothing to use within reach";
+                // The dungeons (묶음 5a). "dungeon": JSON of the gates, the slots and the player's part; "dungeon enter|leave",
+                // as the gate's or the door's button would; "dungeon menu", as [던전 나가기]; "dungeon die": the player falls
+                // where they stand; "dungeon close": every dungeon nobody is in goes back to rock now.
+                case "dungeon":
+                    if (words.Length == 1) return "dungeon " + DungeonJson(root);
+                    switch (words[1])
+                    {
+                        case "enter":
+                        case "leave":
+                            return root.UseDungeon() ? $"ok dungeon {words[1]}" : $"error dungeon {words[1]}: no gate or door within reach";
+                        case "menu":
+                            return root.LeaveDungeonFromMenu() ? "ok dungeon menu" : "error dungeon menu: not in a dungeon";
+                        case "die":
+                            world.Hurt(player, player.Health + 100000);
+                            return "ok dungeon die";
+                        case "close":
+                            int closed = world.CloseEmptyDungeons();
+                            return $"ok dungeon close {closed}";
+                    }
+                    return $"error dungeon {words[1]}: enter|leave|menu|die|close";
                 // The pacing director and the trap rooms (2026-11-22, 묶음 4b). "director": the player's pace; "director
                 // <build|peak|relax|rest> [tension]": set as if it had come; "director ambush|raid": one now, where the player
                 // stands (an ambush only in a narrow way: "goto narrow" first). "traps": the nearest trap room.
@@ -557,6 +583,25 @@ namespace Game.Client
                             && Vec2.Distance(TileMap.Center(x, y), station.Center) is float d && d >= 0.9f && d <= World.PoiReach - 0.4f)
                         ?? station.Center;
                     break;
+                // On the nth nearest dungeon gate (묶음 5a): "gate [n]", on the floor between its posts.
+                case "gate":
+                    int nthGate = words.Length > 2 ? Int(words[2]) : 0;
+                    var gate = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).Skip(nthGate).FirstOrDefault()
+                        ?? throw new InvalidOperationException($"no gate {nthGate}: not a world of rooms, or no gate room");
+                    to = Game.Core.Collision.Resolve(map, gate.Center, World.PlayerRadius);
+                    break;
+                // In the dungeon the player is in, by a door out (its nth: 0 the entrance's, 1 the end's) or at its far end.
+                case "exit":
+                    var inside = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
+                    int nthExit = words.Length > 2 ? Int(words[2]) : 0;
+                    var door = inside.Layout.Exits[Math.Min(nthExit, inside.Layout.Exits.Count - 1)];
+                    to = TileMap.Center(door.X, door.Y);
+                    break;
+                case "far":
+                    var deep = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
+                    var last = deep.Layout.Rooms[deep.Layout.Rooms.Count - 1];
+                    to = TileMap.Center(last.Left + last.W / 2, last.Bottom + last.H / 2);
+                    break;
                 // Below the wandering merchant's stall, facing it (3c).
                 case "wanderer":
                     var stall = world.WandererAt ?? throw new InvalidOperationException("no wandering merchant (no camps)");
@@ -750,6 +795,42 @@ namespace Game.Client
                 .Field("wandererBiome", wanderer is (int wx, int wy) ? world.Biomes[wx, wy].ToString() : "")
                 .Field("wandererShop", npc == null || client == null ? 0 : client.ShopTodayOf(npc).Count)
                 .Field("inReach", world.PoiNear(player.Position, player)?.Definition.Id ?? "")
+                .Close('}');
+        }
+
+        // The dungeons (묶음 5a): the gates, the dungeons standing, the player's part of the map on the host and the screen, how
+        // far through going in or out, whether the pocket the screen laid is the host's, and the name card.
+        static string DungeonJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var client = root.LocalClient;
+            var dungeons = new Json('[');
+            foreach (var dungeon in world.Dungeons)
+                dungeons.Item(new RawJson(new Json('{').Field("slot", dungeon.Slot).Field("gate", dungeon.Gate.Index).Field("serial", dungeon.Serial)
+                    .Field("name", dungeon.Name).Field("level", dungeon.Level).Field("biome", dungeon.Biome.ToString()).Field("rooms", dungeon.Layout.Rooms.Count)
+                    .Field("players", world.PlayersIn(dungeon).Count()).Field("clientPlayers", client.PlayersIn(client.DungeonAt(dungeon.Layout.Entrance)))
+                    .Close('}')));
+            var here = world.DungeonAt(player.Position);
+            bool same = true;
+            var map = world.Map;
+            for (int y = map.Height; y < map.Rows && same; y++)
+                for (int x = 0; x < map.Width && same; x++)
+                    same = map[x, y] == client.Map[x, y];
+            var gate = world.GateNear(player.Position);
+            var nearest = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault();
+            return new Json('{').Field("gates", world.Gates.Count).Field("slots", DungeonPocket.SlotsOf(map)).Field("rows", map.Rows).Field("height", map.Height)
+                .Field("dungeons", dungeons.Raw(']'))
+                .Field("inPocket", world.InPocket(player.Position)).Field("area", world.AreaOf(player.Position)).Field("slot", here?.Slot ?? -1)
+                .Field("clientInPocket", client.InPocket).Field("clientSlot", client.DungeonHere?.Slot ?? -1)
+                .Field("x", player.Position.X).Field("y", player.Position.Y).Field("dead", player.IsDead)
+                .Field("gateNear", gate?.Index ?? -1).Field("clientGateNear", client.GateNear()?.Index ?? -1)
+                .Field("nearestGate", nearest?.Index ?? -1).Field("nearestGateDistance", nearest == null ? -1 : Vec2.Distance(nearest.Center, player.Position))
+                .Field("exitNear", client.ExitNear() != null).Field("atEntrance", here != null && Vec2.Distance(player.Position, here.Layout.Entrance) < 1.5f)
+                .Field("charging", player.DungeonCharging).Field("clientCharge", client.DungeonCharge).Field("clientChargeKind", client.DungeonChargeKind)
+                .Field("pocketSame", same).Field("version", world.DungeonVersion).Field("clientVersion", client.DungeonVersion)
+                .Field("cards", root.DungeonCardsShown).Field("cardName", root.DungeonCardName).Field("cardShowing", root.DungeonCardShowing)
+                .Field("mapOpen", root.Map?.FullOpen ?? false)
                 .Close('}');
         }
 
@@ -1012,6 +1093,14 @@ namespace Game.Client
 
             switch (scene)
             {
+                // On the nearest dungeon gate with the monsters held (묶음 5a): its button shows over it.
+                case "dungeon":
+                    var gate = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault()
+                        ?? throw new InvalidOperationException("no gate: not a world of rooms, or no gate room");
+                    world.MonstersHold = true;
+                    player.Position = Game.Core.Collision.Resolve(world.Map, gate.Center, World.PlayerRadius);
+                    player.Corrections++;
+                    break;
                 // A pack of five slimes east of the player, the nearest six tiles off and the furthest eleven (most out
                 // of sight), standing still under "monsters hold" until let go (2026-11-22, Docs/WorldRework.md 무리).
                 case "pack":

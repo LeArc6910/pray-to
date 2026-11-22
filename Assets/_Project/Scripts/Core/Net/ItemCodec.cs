@@ -224,6 +224,10 @@ namespace Game.Core
         GetUp,
         // Opens the chest or cart, or prays at the shrine, of index Item within reach (World.UsePoi, 2026-11-22).
         UsePoi,
+        // Goes into the dungeon of the gate of index Item within reach (World.EnterDungeon, 묶음 5a); out of the dungeon the
+        // player is in, by a door (Item 0) or from the menu (Item 1) (World.LeaveDungeon).
+        EnterDungeon,
+        LeaveDungeon,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

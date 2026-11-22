@@ -220,7 +220,8 @@ namespace Game.Client
         {
             int margin = (int)Math.Ceiling(_reach);
             if (margin == 0) return;
-            for (int y = Math.Max(0, bottom - margin); y < Math.Min(map.Height, bottom + size + margin); y++)
+            // The torches of the dungeons' pocket too (TileMap.Rows).
+            for (int y = Math.Max(0, bottom - margin); y < Math.Min(map.Rows, bottom + size + margin); y++)
             {
                 for (int x = Math.Max(0, left - margin); x < Math.Min(map.Width, left + size + margin); x++)
                 {

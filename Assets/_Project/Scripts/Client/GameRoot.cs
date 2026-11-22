@@ -98,6 +98,10 @@ namespace Game.Client
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;
         internal int MonsterPoolsShown => _view?.MonsterPoolsShown ?? 0;
+        // A dungeon's name cards shown, and the last name (WorldView.Dungeon.cs).
+        internal int DungeonCardsShown => _view?.DungeonCardsShown ?? 0;
+        internal string DungeonCardName => _view?.DungeonCardName ?? "";
+        internal bool DungeonCardShowing => _view != null && _view.DungeonCardShowing;
         internal int MonsterFxAlive => _view?.MonsterFxAlive ?? 0;
         internal int MonsterFxPieces => _view?.MonsterFxPieces ?? 0;
         internal int MonsterShotsDrawn => _view?.MonsterShotsDrawn ?? 0;
@@ -267,6 +271,13 @@ namespace Game.Client
             var changedTiles = _client.TakeChangedTiles();
             _view.UpdateTiles(changedTiles);
             _map.UpdateTiles(changedTiles);
+            // A dungeon laid in the pocket or gone back to rock (WorldClient.TakeRebuiltSlots, 묶음 5a).
+            var slots = _client.TakeRebuiltSlots();
+            if (slots.Count > 0)
+            {
+                _view.RelaySlots(slots);
+                _map.ResetSlots(slots);
+            }
             _view.ShowTarget = (_inventory != null && _inventory.Open) || (_hotbar != null && _hotbar.PointsAtGround);
             _view.TargetSoil = _inventory != null && _inventory.Open && _inventory.PointsAtSoil || _hotbar != null && _hotbar.PointsAtSoil;
             // A hammer's tap now and then while something is being made by hand (2026-11-09).
@@ -314,6 +325,13 @@ namespace Game.Client
         void UpdateBiome(float deltaTime)
         {
             var biome = _client.Biomes.At(_client.Position);
+            // In a dungeon its name card says where (WorldView.Dungeon.cs); its biome is the one settled in, for the music.
+            if (_client.InPocket)
+            {
+                _biomeHere = _biomeAnnounced = biome;
+                _biomeTime = 0;
+                return;
+            }
             if (biome != _biomeHere)
             {
                 _biomeHere = biome;
@@ -472,7 +490,8 @@ namespace Game.Client
             Vector2 point = Ui.FromScreen(screen);
             var rect = new Rect(point.x - 70, point.y - 13, 140, 26);
             Controls.Block(rect);
-            if (!Ui.Button(rect, "집에서 일어나기")) return;
+            // In a dungeon, at its entrance (World.Dungeon.cs).
+            if (!Ui.Button(rect, _client.DungeonHere != null ? "입구에서 일어나기" : "집에서 일어나기")) return;
             Sounds.Play(Sound.Click);
             SendToHost(_client.GetUpCommand());
         }
@@ -747,8 +766,9 @@ namespace Game.Client
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
             foreach (int slot in quick) UseQuickSlot(slot);
-            // The same key opens the chest or cart, or prays at the shrine, beside the player when no machine is ahead.
-            if (machine && !ToggleMachine()) UsePoi();
+            // The same key opens the chest or cart, or prays at the shrine, beside the player when no machine is ahead; else
+            // goes into the dungeon at the gate, or out by its door (묶음 5a).
+            if (machine && !ToggleMachine() && !UsePoi()) UseDungeon();
         }
 
         // Opens the chest or cart, or prays at the shrine, within reach (World.UsePoi): the key, or the button over it.
@@ -759,6 +779,92 @@ namespace Game.Client
             Sounds.Play(Sound.Click);
             SendToHost(_client.UsePoiCommand(poi));
             return true;
+        }
+
+        // ---- Dungeons (World.Dungeon.cs, 묶음 5a) ----
+
+        // Goes into the dungeon at the gate within reach, or out by the door of the dungeon within reach: the key, or the
+        // button over it. False when there is neither, or the player is going in or out already.
+        internal bool UseDungeon()
+        {
+            if (_client == null || _client.IsDead || _client.DungeonChargeKind != 0) return false;
+            if (_client.GateNear() is DungeonGate gate)
+            {
+                Sounds.Play(Sound.Click);
+                SendToHost(_client.EnterDungeonCommand(gate));
+                return true;
+            }
+            if (_client.ExitNear() == null) return false;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.LeaveDungeonCommand(byMenu: false));
+            return true;
+        }
+
+        // Out of the dungeon from anywhere in it, slower (the button under the time lines).
+        internal bool LeaveDungeonFromMenu()
+        {
+            if (_client == null || _client.IsDead || _client.DungeonHere == null || _client.DungeonChargeKind != 0) return false;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.LeaveDungeonCommand(byMenu: true));
+            return true;
+        }
+
+        // A button over the gate within reach ("○○의 던전 들어가기", with how many are in it), or over the door out of the
+        // dungeon; and, in a dungeon, [던전 나가기] under the time lines. While going in or out, a bar fills under the
+        // player. For a finger or the mouse; on a keyboard the gate's and door's show the key, which does the same.
+        void DrawDungeonButtons()
+        {
+            if (_client.Riding) return;
+            bool going = _client.DungeonChargeKind != 0;
+            var gate = _client.GateNear();
+            var exit = gate == null ? _client.ExitNear() : null;
+            if (gate != null || exit != null)
+            {
+                var spot = gate != null ? gate.Center : TileMap.Center(exit.Value.X, exit.Value.Y);
+                Vector3 screen = _camera.WorldToScreenPoint(new Vector3(spot.X, spot.Y + 1.5f, 0));
+                if (screen.z >= 0)
+                {
+                    Vector2 point = Ui.FromScreen(screen);
+                    string text;
+                    if (gate != null)
+                    {
+                        var standing = _client.DungeonOf(gate);
+                        int inside = standing == null ? 0 : _client.PlayersIn(standing);
+                        text = $"{World.DungeonName(gate.Biome)} 들어가기" + (inside > 0 ? $" (안에 {inside}명)" : "");
+                    }
+                    else text = "던전 나가기";
+                    if (going) text = gate != null ? "들어가는 중…" : "나가는 중…";
+                    else if (!Controls.UsingTouch) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
+                    float width = Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length);
+                    var rect = new Rect(point.x - width / 2, point.y - 13, width, 26);
+                    Controls.Block(rect);
+                    GUI.enabled = !going && !_client.IsDead;
+                    if (Ui.Button(rect, text)) UseDungeon();
+                    GUI.enabled = true;
+                }
+            }
+            if (_client.DungeonHere != null && !_client.IsDead)
+            {
+                var info = Ui.InfoArea(0);
+                var rect = new Rect(Ui.MinimapArea.xMax - 120, Mathf.Max(info.y, Ui.InfoBottom) + 4, 120, 30);
+                Controls.Block(rect);
+                GUI.enabled = !going;
+                if (Ui.Button(rect, _client.DungeonChargeKind == World.DungeonLeavingMenu ? "나가는 중…" : "던전 나가기")) LeaveDungeonFromMenu();
+                GUI.enabled = true;
+            }
+            if (going)
+            {
+                Vector3 feet = _camera.WorldToScreenPoint(new Vector3(_client.Position.X, _client.Position.Y - 0.9f, 0));
+                if (feet.z < 0) return;
+                Vector2 under = Ui.FromScreen(feet);
+                var bar = new Rect(under.x - 40, under.y, 80, 8);
+                var previous = GUI.color;
+                GUI.color = new Color(0, 0, 0, 0.7f);
+                GUI.DrawTexture(bar, Texture2D.whiteTexture);
+                GUI.color = new Color(0.72f, 0.55f, 1f);
+                GUI.DrawTexture(new Rect(bar.x + 1, bar.y + 1, (bar.width - 2) * _client.DungeonCharge, bar.height - 2), Texture2D.whiteTexture);
+                GUI.color = previous;
+            }
         }
 
         // Opens the list of waypoints and waystones, as the button over an open one does (Playtest "waypoints").
@@ -1301,6 +1407,7 @@ namespace Game.Client
             {
                 DrawMachineSwitch();
                 DrawPoiButton();
+                DrawDungeonButtons();
                 DrawBedButton();
                 DrawGetUpButton();
                 DrawRiftButton();
@@ -1846,7 +1953,9 @@ namespace Game.Client
             var lines = new List<string> { $"{Calendar.Text(clock)} {Calendar.PhaseName(Calendar.Phase(clock))}" };
             var weather = World.WeatherOf(today);
             string place = BiomeMap.Name(_client.Biomes.At(_client.Position));
-            lines.Add(weather != Weather.Clear ? $"{World.WeatherName(weather)} · {place}" : place);
+            // In a dungeon its name and level, and no weather down there (묶음 5a).
+            if (_client.DungeonHere is DungeonInstance dungeon) lines.Add($"{dungeon.Name} · 레벨 {dungeon.Level}");
+            else lines.Add(weather != Weather.Clear ? $"{World.WeatherName(weather)} · {place}" : place);
             if (World.EventOf(today) != DayEvent.None) lines.Add(World.EventName(World.EventOf(today)));
             if (_mode != Mode.Solo)
             {

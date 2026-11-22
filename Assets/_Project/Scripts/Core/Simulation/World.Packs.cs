@@ -120,6 +120,8 @@ namespace Game.Core
             _restRooms = rooms?.Nodes.Where(n => n.Role == RoomRole.Rest).ToList() ?? new List<RoomNode>();
             // The camps, shrines, chests and carts in them (World.Pois.cs).
             SetPois(rooms);
+            // The dungeons' gates in their gate rooms (World.Dungeon.cs).
+            SetGates(rooms);
             _entrances.Clear();
             if (RoomPacks) _enemies.RemoveAll(e => e.Rift == 0);
         }

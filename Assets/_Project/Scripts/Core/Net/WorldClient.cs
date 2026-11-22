@@ -433,6 +433,105 @@ namespace Game.Core
         // Goes up with every PoisMessage, for the screen.
         public int PoiVersion { get; private set; }
 
+        // ---- Dungeons (World.Dungeon.cs, 묶음 5a): the gates are found from the seed as the host finds them; the dungeons
+        // standing come in DungeonsMessage and are laid here from their seeds. ----
+
+        public IReadOnlyList<DungeonGate> Gates { get; private set; } = Array.Empty<DungeonGate>();
+        DungeonInstance[] _dungeons = Array.Empty<DungeonInstance>();
+        readonly List<int> _rebuiltSlots = new List<int>();
+        public IEnumerable<DungeonInstance> Dungeons => _dungeons.Where(d => d != null);
+        // Goes up whenever a slot of the pocket is laid or goes back to rock.
+        public int DungeonVersion { get; private set; }
+
+        public DungeonInstance DungeonAt(Vec2 position)
+        {
+            int slot = DungeonPocket.SlotAt(Map, position);
+            return slot >= 0 && slot < _dungeons.Length ? _dungeons[slot] : null;
+        }
+
+        // The dungeon the player is in, or null.
+        public DungeonInstance DungeonHere => DungeonAt(Position);
+        public bool InPocket => Map != null && Map.InPocket(Position);
+
+        public DungeonInstance DungeonOf(DungeonGate gate) => gate == null ? null : _dungeons.FirstOrDefault(d => d != null && d.Gate == gate);
+
+        // The gate within reach (out in the world), or null; and a door out of the dungeon the player is in.
+        public DungeonGate GateNear() => Map == null || InPocket ? null : World.GateNear(Gates, Position);
+        public (int X, int Y)? ExitNear() => World.ExitNear(DungeonHere?.Layout, Position);
+
+        // How many players are in the dungeon now, this one among them ("안에 2명").
+        public int PlayersIn(DungeonInstance dungeon)
+        {
+            if (dungeon == null) return 0;
+            int count = DungeonAt(Position) == dungeon ? 1 : 0;
+            foreach (var other in Others())
+                if (other.IsPlayer && DungeonAt(other.Position) == dungeon) count++;
+            return count;
+        }
+
+        public byte[] EnterDungeonCommand(DungeonGate gate) => new InventoryCommandMessage(InventoryCommand.EnterDungeon, gate.Index).Encode();
+        public byte[] LeaveDungeonCommand(bool byMenu) => new InventoryCommandMessage(InventoryCommand.LeaveDungeon, byMenu ? 1 : 0).Encode();
+
+        // The slots laid or cleared since the last call, for the screen to draw again.
+        public List<int> TakeRebuiltSlots()
+        {
+            var slots = new List<int>(_rebuiltSlots);
+            _rebuiltSlots.Clear();
+            return slots;
+        }
+
+        void ApplyDungeons(DungeonsMessage message)
+        {
+            if (Map == null) return;
+            var seen = new bool[_dungeons.Length];
+            foreach (var (slot, gateIndex, serial, seed, state, level) in message.Dungeons)
+            {
+                if (slot < 0 || slot >= _dungeons.Length || gateIndex >= Gates.Count) continue;
+                seen[slot] = true;
+                var gate = Gates[gateIndex];
+                var have = _dungeons[slot];
+                if (have == null || have.Gate != gate || have.Serial != serial || have.Seed != seed)
+                {
+                    _dungeons[slot] = new DungeonInstance(slot, gate, serial, seed, level, DungeonPocket.Carve(Map, slot, seed));
+                    Biomes.SetPocket(slot, gate.Biome);
+                    _rebuiltSlots.Add(slot);
+                }
+                _dungeons[slot].State = state;
+            }
+            for (int slot = 0; slot < _dungeons.Length; slot++)
+            {
+                if (seen[slot] || _dungeons[slot] == null) continue;
+                _dungeons[slot] = null;
+                DungeonPocket.Clear(Map, slot);
+                _rebuiltSlots.Add(slot);
+            }
+            DungeonVersion++;
+        }
+
+        // Going in or out (World.EnterDungeon, LeaveDungeon), as the host's events tell: which (a Dungeon event's Amount,
+        // 0 for none) and how far through (0 to 1). The events come with the snapshots, which may be lost: a second past
+        // its time it counts as over whatever came of it.
+        public int DungeonChargeKind => _chargeKind != 0 && HostTick - _chargeFrom <= _chargeTicks + World.TicksPerSecond ? _chargeKind : 0;
+        int _chargeKind;
+        double _chargeFrom;
+        int _chargeTicks;
+        public float DungeonCharge => DungeonChargeKind == 0 || _chargeTicks <= 0 ? 0 : (float)Math.Clamp((HostTick - _chargeFrom) / _chargeTicks, 0, 1);
+
+        void NoteDungeon(SimEvent e)
+        {
+            if (e.Type != SimEventType.Dungeon || e.Source != PlayerId) return;
+            float seconds = e.Amount switch
+            {
+                World.DungeonEntering => World.EnterSeconds,
+                World.DungeonLeaving => World.LeaveSeconds,
+                World.DungeonLeavingMenu => World.MenuLeaveSeconds,
+                _ => 0,
+            };
+            _chargeKind = seconds > 0 ? e.Amount : 0;
+            _chargeFrom = HostTick;
+            _chargeTicks = World.Ticks(seconds);
+        }
+
         // The local player, moved here first; PreviousPosition is where it was one tick earlier, for smoothing.
         public Vec2 Position { get; private set; }
         public Vec2 PreviousPosition { get; private set; }
@@ -1099,6 +1198,9 @@ namespace Game.Core
                     case MessageType.Pois:
                         ApplyPois(PoisMessage.Decode(data));
                         break;
+                    case MessageType.Dungeons:
+                        ApplyDungeons(DungeonsMessage.Decode(data));
+                        break;
                     case MessageType.Locks:
                         _locks.Clear();
                         _myDoors.Clear();
@@ -1747,6 +1849,8 @@ namespace Game.Core
             Biomes = generated.Biomes;
             ArenaRadius = generated.ArenaRadius;
             Rooms = generated.Rooms;
+            Gates = DungeonPocket.Gates(generated.Rooms, Map);
+            _dungeons = new DungeonInstance[DungeonPocket.SlotsOf(Map)];
             Position = welcome.Spawn;
             PreviousPosition = welcome.Spawn;
             Spawn = welcome.Spawn;
@@ -1794,6 +1898,7 @@ namespace Game.Core
                         BiteTick = HostTick;
                     }
                 }
+                NoteDungeon(e);
                 if (e.Type == SimEventType.GoalReward && e.Source == PlayerId && Guide != null && e.Amount >= 0 && e.Amount < Guide.Goals.Count)
                 {
                     ClaimedGoals.Add(Guide.Goals[e.Amount].Id);

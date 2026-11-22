@@ -87,10 +87,12 @@ namespace Game.Client
         {
             _client = client;
             _map = client.Map;
-            _pixels = new Color32[_map.Width * _map.Height];
-            _explored = MapSave.Read(saved, _map.Width, _map.Height) ?? new bool[_pixels.Length];
+            // The world's rows and the dungeons' pocket above them (TileMap.Rows, 묶음 5a); only the world's are kept.
+            _pixels = new Color32[_map.Width * _map.Rows];
+            _explored = new bool[_pixels.Length];
+            if (MapSave.Read(saved, _map.Width, _map.Height) is bool[] kept) Array.Copy(kept, _explored, kept.Length);
             _heard = MapSave.ReadRumors(saved, _map.Width, _map.Height);
-            _texture = new Texture2D(_map.Width, _map.Height, TextureFormat.RGBA32, false)
+            _texture = new Texture2D(_map.Width, _map.Rows, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Point,
                 wrapMode = TextureWrapMode.Clamp,
@@ -137,6 +139,36 @@ namespace Game.Client
             return false;
         }
 
+        bool[] _worldSeen;
+
+        // A slot of the pocket laid again or gone back to rock (WorldClient.TakeRebuiltSlots): nothing of it seen.
+        public void ResetSlots(IEnumerable<int> slots)
+        {
+            foreach (int slot in slots)
+            {
+                var (left, bottom, w, h) = DungeonPocket.Box(_map, slot);
+                for (int y = bottom; y < bottom + h; y++)
+                    for (int x = left; x < left + w; x++)
+                    {
+                        _explored[y * _map.Width + x] = false;
+                        _pixels[y * _map.Width + x] = default;
+                    }
+            }
+            _revealedX = _revealedY = int.MinValue;
+            _dirty = true;
+        }
+
+        // The part of the map the player is in: the world, or their dungeon's slot of the pocket.
+        Rect Shown()
+        {
+            if (_client.DungeonHere is DungeonInstance dungeon)
+            {
+                var (x, y) = DungeonPocket.Inside(_map, dungeon.Slot);
+                return new Rect(x, y, DungeonPocket.Inner, DungeonPocket.Inner);
+            }
+            return new Rect(0, 0, _map.Width, _map.Height);
+        }
+
         // Whether more has been explored since the last Save.
         public bool Changed { get; private set; }
 
@@ -144,7 +176,10 @@ namespace Game.Client
         public byte[] Save()
         {
             Changed = false;
-            return MapSave.Write(_explored, _map.Width, _map.Height, _heard);
+            // The world's rows only: what was seen in a dungeon is for that dungeon (Docs/WorldRework.md 지도와 화면).
+            _worldSeen ??= new bool[_map.Width * _map.Height];
+            Array.Copy(_explored, _worldSeen, _worldSeen.Length);
+            return MapSave.Write(_worldSeen, _map.Width, _map.Height, _heard);
         }
 
         // ---- Rumours (묶음 4c, Docs/WorldRework.md 덜 정확한 안내) ----
@@ -315,9 +350,10 @@ namespace Game.Client
             Controls.Block(area);
             Framed(area);
             float half = MinimapTiles / 2f;
-            // Keep the window inside the map so the edges never smear.
-            float left = Mathf.Clamp(_client.Position.X - half, 0, Mathf.Max(0, _map.Width - MinimapTiles));
-            float bottom = Mathf.Clamp(_client.Position.Y - half, 0, Mathf.Max(0, _map.Height - MinimapTiles));
+            // Keep the window inside the map (or the dungeon the player is in) so the edges never smear.
+            var shown = Shown();
+            float left = Mathf.Clamp(_client.Position.X - half, shown.x, Mathf.Max(shown.x, shown.xMax - MinimapTiles));
+            float bottom = Mathf.Clamp(_client.Position.Y - half, shown.y, Mathf.Max(shown.y, shown.yMax - MinimapTiles));
             var window = new Rect(left, bottom, MinimapTiles, MinimapTiles);
             DrawTiles(area, window);
             Ui.Probe("지도", area);
@@ -338,12 +374,22 @@ namespace Game.Client
             GUI.Box(panel, GUIContent.none);
             var area = new Rect(panel.x + pad, panel.y + pad + lineHeight, size, size);
             Fill(area, Backdrop);
-            DrawTiles(area, new Rect(0, 0, _map.Width, _map.Height));
+            // In a dungeon, the dungeon alone (Docs/WorldRework.md 지도와 화면).
+            var dungeon = _client.DungeonHere;
+            var shown = Shown();
+            DrawTiles(area, shown);
 
-            string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
+            string close = (dungeon != null ? dungeon.Name : "지도") + (Controls.UsingTouch ? " (탭하면 닫힘)" : " (클릭하거나 M·Esc로 닫기)");
             GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
-            string key = "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리" + (Settings.Rumors ? "   ○ 소문(옅은 원)" : "");
+            string key = dungeon != null ? "● 나   ● 다른 플레이어   ◆ 나가는 문"
+                : "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리   ◆ 던전 문" + (Settings.Rumors ? "   ○ 소문(옅은 원)" : "");
             GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), Ui.Wrap(key, GUI.skin.label, size));
+            if (dungeon != null)
+            {
+                Ui.Probe("지도 닫기", screen);
+                if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
+                return;
+            }
             // Each place's name beside its dot (with rumours, only the places whose spot is known).
             var window = new Rect(0, 0, _map.Width, _map.Height);
             foreach (var site in _client.Places)
@@ -363,7 +409,7 @@ namespace Game.Client
         // Draws the tiles of the given window of the map (in tiles, y up) into a GUI area, then the markers.
         void DrawTiles(Rect area, Rect window)
         {
-            var uv = new Rect(window.x / _map.Width, window.y / _map.Height, window.width / _map.Width, window.height / _map.Height);
+            var uv = new Rect(window.x / _map.Width, window.y / _map.Rows, window.width / _map.Width, window.height / _map.Rows);
             GUI.DrawTextureWithTexCoords(area, _texture, uv);
             // The rumours' faint circles (묶음 4c), over the tiles and under the marks; on the full map only, as a circle
             // is wider than the minimap's window.
@@ -392,6 +438,7 @@ namespace Game.Client
                 Leads(area, window, side, new Color(1f, 0.95f, 0.75f, breath * 0.8f), MarkerSize * 2.2f, full);
             }
             DrawPoiMarks(area, window);
+            DrawDungeonMarks(area, window);
             foreach (var position in _others) Marker(area, window, position, Shapes.Circle, OtherPlayer, MarkerSize);
             Marker(area, window, _client.Position, Shapes.Circle, Color.white, MarkerSize);
         }
@@ -437,6 +484,40 @@ namespace Game.Client
                 Marker(area, window, scrapped.Center, Shapes.Ring, new Color(1f, 0.9f, 0.5f, 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 3)), MarkerSize * 2.4f);
             foreach (var (x, y) in _camps)
                 if (Seen(x, y)) Marker(area, window, TileMap.Center(x, y), Skull, new Color(1f, 0.3f, 0.25f), MarkerSize * 1.8f);
+        }
+
+        static readonly Color GateMark = new Color(0.72f, 0.55f, 1f);
+
+        // The dungeons' gates once seen (World.Dungeon.cs, 묶음 5a), brighter with someone inside; in a dungeon, its doors out.
+        void DrawDungeonMarks(Rect area, Rect window)
+        {
+            foreach (var gate in _client.Gates)
+            {
+                if (!Seen(gate.X, gate.Y)) continue;
+                bool busy = _client.DungeonOf(gate) is DungeonInstance standing && _client.PlayersIn(standing) > 0;
+                Marker(area, window, gate.Center, Diamond, busy ? GateMark : new Color(GateMark.r, GateMark.g, GateMark.b, 0.65f), MarkerSize * 1.6f);
+            }
+            if (_client.DungeonHere is DungeonInstance dungeon)
+                foreach (var (x, y) in dungeon.Layout.Exits)
+                    if (Seen(x, y)) Marker(area, window, TileMap.Center(x, y), Diamond, GateMark, MarkerSize * 1.6f);
+        }
+
+        static Sprite _diamond;
+
+        // A small diamond, drawn in pixels: a dungeon's gate or door out on the map.
+        static Sprite Diamond
+        {
+            get
+            {
+                if (_diamond != null) return _diamond;
+                string[] rows = { "...#...", "..###..", ".#####.", "#######", ".#####.", "..###..", "...#..." };
+                var texture = new Texture2D(7, 7, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+                for (int y = 0; y < 7; y++)
+                    for (int x = 0; x < 7; x++)
+                        texture.SetPixel(x, 6 - y, rows[y][x] == '#' ? Color.white : Color.clear);
+                texture.Apply();
+                return _diamond = Sprite.Create(texture, new Rect(0, 0, 7, 7), new Vector2(0.5f, 0.5f), 7);
+            }
         }
 
         static Sprite _skull;
@@ -517,7 +598,7 @@ namespace Game.Client
                     _explored[index] = true;
                     _pixels[index] = TileColor(x, y);
                     _dirty = true;
-                    Changed = true;
+                    if (!_map.InPocket(y)) Changed = true;
                 }
             }
         }

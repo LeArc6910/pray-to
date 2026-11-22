@@ -31,6 +31,7 @@ namespace Game.Core
         Locks = 25,
         Journey = 26,
         Pois = 27,
+        Dungeons = 28,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -42,7 +43,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.97.0";
+        public const string Version = "0.98.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -81,17 +82,32 @@ namespace Game.Core
 
         internal static Vec2 ReadCompact(this BinaryReader reader) => new Vec2(reader.ReadInt16() / 64f, reader.ReadInt16() / 64f);
 
-        // A place in the world (2026-11-12): unsigned, so the whole 1024-tile map fits at a sixty-fourth of a tile.
-        // WriteCompact's signed range stops at 512, and since the map grew everything past it was drawn at 512.
-        internal static void WritePosition(this BinaryWriter writer, Vec2 value)
+        // A place in the world or the dungeons' pocket above it, as seen from origin (the receiver's own place,
+        // which the snapshot carries whole): the difference in sixty-fourths of a tile, two bytes each way, so the pocket's
+        // rows past 1024 cost nothing more and nothing is less exact (묶음 5a; before it, unsigned sixty-fourths from the
+        // map's corner, which stop at 1024 tiles). One further than WriteCompact reaches (another player across the map)
+        // goes whole after a marker.
+        internal static void WriteNear(this BinaryWriter writer, Vec2 value, Vec2 origin)
         {
-            writer.Write(UnsignedSixtyfourths(value.X));
-            writer.Write(UnsignedSixtyfourths(value.Y));
+            float dx = (value.X - origin.X) * 64, dy = (value.Y - origin.Y) * 64;
+            if (value.IsFinite && MathF.Abs(dx) < short.MaxValue && MathF.Abs(dy) < short.MaxValue)
+            {
+                writer.Write((short)MathF.Round(dx));
+                writer.Write((short)MathF.Round(dy));
+                return;
+            }
+            writer.Write(FarMarker);
+            writer.Write(value);
         }
 
-        internal static Vec2 ReadPosition(this BinaryReader reader) => new Vec2(reader.ReadUInt16() / 64f, reader.ReadUInt16() / 64f);
+        internal static Vec2 ReadNear(this BinaryReader reader, Vec2 origin)
+        {
+            short dx = reader.ReadInt16();
+            if (dx == FarMarker) return reader.ReadVec2();
+            return new Vec2(origin.X + dx / 64f, origin.Y + reader.ReadInt16() / 64f);
+        }
 
-        static ushort UnsignedSixtyfourths(float value) => (ushort)Math.Clamp((int)MathF.Round(value * 64), 0, ushort.MaxValue);
+        const short FarMarker = short.MinValue;
 
         static short Sixtyfourths(float value) => (short)Math.Clamp((int)MathF.Round(value * 64), short.MinValue, short.MaxValue);
 
@@ -469,6 +485,42 @@ namespace Game.Core
             var sides = new List<(string, int, bool)>();
             for (int n = r.ReadByte(); n > 0; n--) sides.Add((r.ReadString(), r.ReadUInt16(), r.ReadBoolean()));
             return new JourneyMessage(step, taken, waypoints, choices, sides);
+        });
+    }
+
+    // The dungeons standing in the pocket (World.Dungeon.cs, 묶음 5a): for each, its slot, gate, how often the gate had
+    // been entered before it (its seed's part), its seed, state and level. A client lays each from the seed
+    // (DungeonPocket.Carve), so its tiles are never sent; a slot left out goes back to rock. Sent when one is made or
+    // closes, before the snapshot that brings a player into it, and to each player who joins.
+    public sealed class DungeonsMessage
+    {
+        public DungeonsMessage(IReadOnlyList<(int Slot, int Gate, int Serial, ulong Seed, DungeonState State, int Level)> dungeons)
+        {
+            Dungeons = dungeons ?? Array.Empty<(int, int, int, ulong, DungeonState, int)>();
+        }
+
+        public IReadOnlyList<(int Slot, int Gate, int Serial, ulong Seed, DungeonState State, int Level)> Dungeons { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Dungeons, w =>
+        {
+            w.Write((byte)Math.Min(Dungeons.Count, byte.MaxValue));
+            foreach (var (slot, gate, serial, seed, state, level) in Dungeons.Take(byte.MaxValue))
+            {
+                w.Write((byte)slot);
+                w.Write((ushort)gate);
+                w.Write(serial);
+                w.Write(seed);
+                w.Write((byte)state);
+                w.Write((ushort)Math.Clamp(level, 0, ushort.MaxValue));
+            }
+        });
+
+        public static DungeonsMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Dungeons, r =>
+        {
+            var dungeons = new List<(int, int, int, ulong, DungeonState, int)>();
+            for (int count = r.ReadByte(); count > 0; count--)
+                dungeons.Add((r.ReadByte(), r.ReadUInt16(), r.ReadInt32(), r.ReadUInt64(), (DungeonState)r.ReadByte(), r.ReadUInt16()));
+            return new DungeonsMessage(dungeons);
         });
     }
 
@@ -1285,7 +1337,7 @@ namespace Game.Core
                 w.Write(entity.Id);
                 w.Write((byte)entity.Kind);
                 w.Write((byte)entity.Type);
-                w.WritePosition(entity.Position);
+                w.WriteNear(entity.Position, Self.Position);
                 w.Write(Protocol.PackDirection(entity.Facing));
                 w.Write(Protocol.Health(entity.Health));
                 w.Write(Protocol.Health(entity.MaxHealth));
@@ -1307,7 +1359,7 @@ namespace Game.Core
             foreach (var projectile in Projectiles)
             {
                 w.Write(projectile.Id);
-                w.WritePosition(projectile.Position);
+                w.WriteNear(projectile.Position, Self.Position);
                 w.WriteCompact(projectile.Velocity);
                 w.Write((byte)Math.Clamp((int)MathF.Round(projectile.Radius * 32), 0, 255));
                 // The seven tags fit under the top bit, which says whose it is.
@@ -1319,7 +1371,7 @@ namespace Game.Core
             {
                 w.Write(hazard.Id);
                 w.Write((byte)hazard.Shape);
-                w.WritePosition(hazard.Position);
+                w.WriteNear(hazard.Position, Self.Position);
                 w.Write(Protocol.PackDirection(hazard.Direction));
                 w.Write(Protocol.Eighths(hazard.Size));
                 w.Write(Protocol.Eighths(hazard.Width));
@@ -1336,7 +1388,7 @@ namespace Game.Core
                 w.Write((byte)e.Type);
                 w.Write(e.Source);
                 // An event that happens somewhere has no target, so its position takes the target's four bytes.
-                if (SimEvent.HasPosition(e.Type)) w.WritePosition(e.Position);
+                if (SimEvent.HasPosition(e.Type)) w.WriteNear(e.Position, Self.Position);
                 else w.Write(e.Target);
                 w.Write((short)Math.Clamp(e.Amount, short.MinValue, short.MaxValue));
                 // A crit in the low bit; for a weapon's elemental hit (World.ElementalCause) the element's place + 1 above it.
@@ -1389,7 +1441,7 @@ namespace Game.Core
                     r.ReadInt32(),
                     (EntityKind)r.ReadByte(),
                     r.ReadByte(),
-                    r.ReadPosition(),
+                    r.ReadNear(position),
                     Protocol.UnpackDirection(r.ReadByte()),
                     Protocol.ReadHealth(r.ReadUInt16()),
                     Protocol.ReadHealth(r.ReadUInt16()),
@@ -1409,7 +1461,7 @@ namespace Game.Core
             for (int i = 0; i < projectileCount; i++)
             {
                 int id = r.ReadInt32();
-                var at = r.ReadPosition();
+                var at = r.ReadNear(position);
                 var velocity = r.ReadCompact();
                 float radius = r.ReadByte() / 32f;
                 byte owner = r.ReadByte();
@@ -1423,7 +1475,7 @@ namespace Game.Core
                 hazards.Add(new HazardState(
                     r.ReadInt32(),
                     (HazardShape)r.ReadByte(),
-                    r.ReadPosition(),
+                    r.ReadNear(position),
                     Protocol.UnpackDirection(r.ReadByte()),
                     r.ReadUInt16() / 8f,
                     r.ReadUInt16() / 8f,
@@ -1441,7 +1493,7 @@ namespace Game.Core
                 var type = (SimEventType)r.ReadByte();
                 int source = r.ReadInt32();
                 bool located = SimEvent.HasPosition(type);
-                var at = located ? r.ReadPosition() : Vec2.Zero;
+                var at = located ? r.ReadNear(position) : Vec2.Zero;
                 int target = located ? 0 : r.ReadInt32();
                 int amount = r.ReadInt16();
                 int flags = r.ReadByte();

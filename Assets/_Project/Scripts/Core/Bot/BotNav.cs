@@ -114,7 +114,7 @@ namespace Game.Core
         {
             LastRest = 0;
             var map = _world.Map;
-            int size = map.Width * map.Height;
+            int size = map.Width * map.Rows;
             if (_cost.Length != size)
             {
                 _cost = new int[size];

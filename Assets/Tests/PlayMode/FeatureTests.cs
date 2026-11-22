@@ -656,6 +656,61 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // A dungeon (2026-11-22, Docs/WorldRework.md 묶음 5a): the gate room's button, going in (the bar filling, then the dark
+        // and the dungeon's name in a band), the dungeon alone on the full map, a fall and getting up at its entrance, and
+        // out again by the door of its entrance room. The solo game's world is one of rooms.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ADungeonGateLeadsIntoThePocketAndOut()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            Assert.IsNotEmpty(World.Gates, "No dungeon gate: rooms.csv has no gate chunk, or the world is of caves.");
+            var gate = World.Gates.OrderBy(g => Vec2.Distance(g.Center, Player.Position)).First();
+            Player.Position = Game.Core.Collision.Resolve(World.Map, gate.Center, World.PlayerRadius);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(1);
+            Assert.IsNotNull(_root.LocalClient.GateNear(), "The screen knows the gate is in reach.");
+            yield return Screens.Take("dungeon-gate");
+            Assert.IsTrue(_root.UseDungeon(), "The gate's button starts going in.");
+            yield return new WaitForSecondsRealtime(0.7f);
+            Assert.IsNotNull(_root.LocalClient.DungeonOf(_root.LocalClient.GateNear()), "The screen laid the dungeon while gathering.");
+            yield return Screens.Take("dungeon-entering");
+            yield return new WaitForSecondsRealtime(World.EnterSeconds);
+            var dungeon = World.DungeonAt(Player.Position);
+            Assert.IsNotNull(dungeon, "In the dungeon.");
+            Assert.AreEqual(dungeon.Slot, _root.LocalClient.DungeonHere?.Slot, "The screen is in it too.");
+            Assert.IsTrue(_root.DungeonCardShowing, "Its name card shows.");
+            yield return Screens.Take("dungeon-inside");
+            _root.Map.FullOpen = true;
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("dungeon-map");
+            _root.Map.FullOpen = false;
+
+            var last = dungeon.Layout.Rooms[dungeon.Layout.Rooms.Count - 1];
+            Player.Position = TileMap.Center(last.Left + last.W / 2, last.Bottom + last.H / 2);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(0.8f);
+            World.Hurt(Player, Player.Health + 100000);
+            yield return new WaitForSecondsRealtime(new WorldConfig().RespawnSeconds + 1);
+            Assert.IsFalse(Player.IsDead);
+            Assert.Less(Vec2.Distance(Player.Position, dungeon.Layout.Entrance), 1.5f, "Up again at the dungeon's entrance.");
+            yield return Screens.Take("dungeon-rose");
+
+            var door = dungeon.Layout.Exits[0];
+            Player.Position = TileMap.Center(door.X, door.Y);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(0.8f);
+            Assert.IsNotNull(_root.LocalClient.ExitNear(), "The screen knows the door out is in reach.");
+            yield return Screens.Take("dungeon-door");
+            Assert.IsTrue(_root.UseDungeon(), "The door's button starts going out.");
+            yield return new WaitForSecondsRealtime(World.LeaveSeconds + 0.6f);
+            Assert.IsFalse(World.InPocket(Player.Position), "Out at the gate.");
+            Assert.Less(Vec2.Distance(Player.Position, gate.Center), 1.5f);
+            yield return Screens.Take("dungeon-out");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

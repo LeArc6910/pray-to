@@ -115,6 +115,8 @@ namespace Game.Core
             _flow = new FlowField(map);
             _toStone = new FlowField(map);
             _toStoneThrough = new FlowField(map) { Through = BuiltBarrier };
+            // The dungeons' slots, when the map has the pocket (World.Dungeon.cs); the gates come with the rooms.
+            _dungeons = new DungeonInstance[DungeonPocket.SlotsOf(map)];
             for (int i = 0; i < _config.EnemyTarget; i++) TrySpawnEnemy();
         }
 
@@ -228,6 +230,7 @@ namespace Game.Core
             UpdateRift();
             UpdateDefense();
             UpdateWeather();
+            UpdateDungeons();
 
             if (--_spawnTimer <= 0)
             {
@@ -259,13 +262,17 @@ namespace Game.Core
             if (player.ConsumableCooldown > 0) player.ConsumableCooldown--;
             if (player.IsDead)
             {
+                BreakDungeonCharge(player);
                 if (Revive(player)) return;
                 if (--player.RespawnTicks > 0) return;
-                // By the last camp rested at, or at home (World.Pois.cs).
-                player.Position = RisingPlace(player);
+                // At the entrance of the dungeon they fell in, however often (World.Dungeon.cs); else by the last camp
+                // rested at, or at home (World.Pois.cs).
+                var inDungeon = DungeonRising(player);
+                player.Position = inDungeon ?? RisingPlace(player);
                 player.Health = player.Stats.MaxHealth;
                 player.Mana = player.Stats.MaxMana;
                 player.Corrections++;
+                if (inDungeon != null) _events.Add(new SimEvent(SimEventType.Dungeon, player.Id, amount: DungeonRose, position: player.Position));
                 return;
             }
 
@@ -274,6 +281,7 @@ namespace Game.Core
             UpdatePois(player);
             BurnInLava(player);
             UpdateRecall(player);
+            UpdateDungeonCharge(player);
             UpdateFishing(player);
             UpdateRoll(player);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
@@ -614,6 +622,7 @@ namespace Game.Core
             if (dodge && Dodges(player, source)) return 0;
             int amount = armor ? Combat.Mitigate(damage, player.Stats.Armor) : Math.Max(1, (int)MathF.Round(damage));
             BreakRecall(player);
+            BreakDungeonCharge(player);
             EndFishing(player, FishingReeled);
             player.Sleeping = false;
             player.Health -= amount;
@@ -684,8 +693,10 @@ namespace Game.Core
 
         // The zone level at a place: ZoneLevel at the spawn, one more every ZoneRing tiles out.
         // The ring grows with the map (WorldGenerator.ScaleOf, 2026-11-11), so a big map has the same zones, wider.
+        // In a dungeon, the dungeon's (World.Dungeon.cs).
         public int ZoneLevelAt(Vec2 position) =>
-            _config.ZoneLevel + (_config.ZoneRing > 0 ? (int)(Vec2.Distance(position, Spawn) / (_config.ZoneRing * MapScale)) : 0);
+            Map.InPocket(position) && DungeonAt(position) is DungeonInstance dungeon ? dungeon.Level
+            : _config.ZoneLevel + (_config.ZoneRing > 0 ? (int)(Vec2.Distance(position, Spawn) / (_config.ZoneRing * MapScale)) : 0);
 
         // How many times WorldGenerator.DefaultSize the map is across.
         public int MapScale => WorldGenerator.ScaleOf(Map.Width, Map.Height);
@@ -743,7 +754,8 @@ namespace Game.Core
         {
             if (!_monsters.Monsters.Any(m => m.Level <= _config.ZoneLevel && m.Weight > 0)) return;
             // Not round a player the pacing director keeps quiet (World.Director.cs).
-            var round = SpawnsNearPlayers ? _players.Where(p => !p.IsDead && !Hushed(p)).ToList() : null;
+            // Nor round one in a dungeon: the field's monsters do not come into the pocket (World.Dungeon.cs).
+            var round = SpawnsNearPlayers ? _players.Where(p => !p.IsDead && !Hushed(p) && !InPocket(p.Position)).ToList() : null;
             if (round != null && round.Count == 0) return;
 
             for (int attempt = 0; attempt < 30; attempt++)
@@ -764,6 +776,7 @@ namespace Game.Core
                 }
                 var position = TileMap.Center(x, y);
                 if (Map.IsSolid(x, y)
+                    || Map.InPocket(y)
                     || Map[x, y] == TileType.Lava
                     // Not on the roads or in the places of the story (World.Story.cs).
                     || Structures.IsWay(Map[x, y]) || Map[x, y] == TileType.Waypoint || Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + 2)

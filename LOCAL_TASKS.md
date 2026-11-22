@@ -1086,6 +1086,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/World.Director.cs`, `Core/Simulation/World.Traps.cs`, `Tests/EditMode/DirectorTests.cs`, `Tests/EditMode/TrapRoomTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `TrapsShutTheRoomAndTheDirectorSendsAmbushes`(사진 trap-before, trap-shut, trap-wave, trap-won, ambush-dust, ambush). 통신 0.97.0(새 사건 둘, 볼거리 메시지에 함정, 가방 명령의 번호가 2바이트)
   - (클라우드 웹 점검) `sweep.js --only pace,travel,guide`
   - (사람) 긴 플레이(30분 넘게)에서 몰아치고 쉬는 완급이 느껴지는지, 쉬는 동안 정말 조용한지, 좁은 길 매복과 습격 울음소리가 긴장되는지 억울한지, 함정 상자를 열면 창살이 내려오고 두 무리를 이기는 맛, 큰 동굴·얼음 함정 방의 창살이 너무 많지 않은지
+- [ ] 157단계: 인스턴스 던전 바탕(주머니 줄, 들어가기·나가기, 빈 던전, `Docs/WorldRework.md` 5a)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/DungeonPocket.cs`, `Core/Simulation/World.Dungeon.cs`, `Client/WorldView.Dungeon.cs`, `Tests/EditMode/DungeonTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `ADungeonGateLeadsIntoThePocketAndOut`(사진 일곱). 통신 0.98.0(스냅숏 위치가 받는 사람 기준 차이로), 월드 저장본 형식 15(문마다 들어간 횟수)
+  - (클라우드 웹 점검) `sweep.js --only dungeon`
+  - (사람) 던전 문에서 1.5초 모아 들어가고 나오는 느낌(어둠·이름 띠·소리), 던전 안에서 쓰러지면 입구에서 다시, 협동에서 둘이 같은 던전에 들어가는지. 던전 안은 아직 비어 있다(5b)
 
 ## 결과 보고
 

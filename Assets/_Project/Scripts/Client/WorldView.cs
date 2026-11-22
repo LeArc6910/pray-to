@@ -758,8 +758,8 @@ namespace Game.Client
         // Names, damage numbers and banners. Call from OnGUI.
         public void DrawGui()
         {
-            // Fog drifts over the view, and a storm's lightning flashes white.
-            if (Event.current.type == EventType.Repaint) DrawWeather();
+            // Fog drifts over the view, and a storm's lightning flashes white; not in a dungeon (WorldView.Dungeon.cs).
+            if (Event.current.type == EventType.Repaint && !_client.InPocket) DrawWeather();
             // The signals of things to find in range but off the screen (WorldView.Pois.cs).
             DrawFarSignals();
             // Hurt: the screen's edges glow red for a moment, more for a harder blow.
@@ -863,6 +863,8 @@ namespace Game.Client
         // tracker on the left (2026-11-19).
         public void DrawBanner()
         {
+            // A dungeon's name card and the dark of going in or out (WorldView.Dungeon.cs).
+            DrawDungeonCard();
             if (_bannerStyle != null && _bannerAge < BannerSeconds)
             {
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
@@ -1917,7 +1919,8 @@ namespace Game.Client
 
         void UpdateRain(float deltaTime)
         {
-            var weather = World.WeatherOf(Calendar.Day(_client.Clock));
+            // No rain seeps down into a dungeon's pocket (묶음 5a).
+            var weather = _client.InPocket ? Weather.Clear : World.WeatherOf(Calendar.Day(_client.Clock));
             bool raining = weather is Weather.Rain or Weather.Storm;
             UpdateStorm(weather == Weather.Storm, deltaTime);
             if (!raining)
@@ -2115,7 +2118,7 @@ namespace Game.Client
         void Show(SimEvent e)
         {
             // The things to find in the rooms (WorldView.Pois.cs).
-            if (ShowPoi(e) || ShowTravel(e) || ShowPace(e)) return;
+            if (ShowPoi(e) || ShowTravel(e) || ShowPace(e) || ShowDungeon(e)) return;
             switch (e.Type)
             {
                 case SimEventType.Attack:
@@ -3446,7 +3449,8 @@ namespace Game.Client
         {
             var map = _client.Map;
             int cx = Mathf.FloorToInt(at.x) / ChunkSize, cy = Mathf.FloorToInt(at.y) / ChunkSize;
-            int across = (map.Width + ChunkSize - 1) / ChunkSize, up = (map.Height + ChunkSize - 1) / ChunkSize;
+            // Up to the dungeons' pocket's top (TileMap.Rows, 묶음 5a), so a dungeon is drawn like the world.
+            int across = (map.Width + ChunkSize - 1) / ChunkSize, up = (map.Rows + ChunkSize - 1) / ChunkSize;
             for (int y = cy - ChunkReach; y <= cy + ChunkReach; y++)
                 for (int x = cx - ChunkReach; x <= cx + ChunkReach; x++)
                     if (x >= 0 && y >= 0 && x < across && y < up && _chunks.Add((x, y))) LayChunk(x, y, true);
@@ -3465,7 +3469,7 @@ namespace Game.Client
         {
             var map = _client.Map;
             int x0 = chunkX * ChunkSize, y0 = chunkY * ChunkSize;
-            int w = Mathf.Min(ChunkSize, map.Width - x0), h = Mathf.Min(ChunkSize, map.Height - y0);
+            int w = Mathf.Min(ChunkSize, map.Width - x0), h = Mathf.Min(ChunkSize, map.Rows - y0);
             var ground = new TileBase[w * h];
             var corners = new TileBase[w * h];
             var underlay = new TileBase[w * h];

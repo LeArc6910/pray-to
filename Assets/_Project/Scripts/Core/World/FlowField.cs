@@ -27,7 +27,7 @@ namespace Game.Core
         public FlowField(TileMap map)
         {
             _map = map ?? throw new ArgumentNullException(nameof(map));
-            _distance = new int[map.Width * map.Height];
+            _distance = new int[map.Width * map.Rows];
             Array.Fill(_distance, Unreached);
         }
 

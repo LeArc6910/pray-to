@@ -25,7 +25,9 @@ namespace Game.Core
         // carts opened, by index, the day each player last prayed at each shrine and the camp each last rested at, after
         // the locks.
         // 14 (2026-11-22): the minecart lines mended (World.Travel.cs, Docs/WorldRework.md 광차, 묶음 3c), by index, last.
-        const int FormatVersion = 14;
+        // 15 (2026-11-22): how often each dungeon gate has been entered (World.DungeonEntries, 묶음 5a), by gate index, last.
+        // The dungeons themselves are not kept: the pocket's rows are never written (World.SavedTiles holds the world's).
+        const int FormatVersion = 15;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -57,6 +59,7 @@ namespace Game.Core
             Prayers = new List<(string, int, int)>();
             LastCamps = new List<(string, int)>();
             FixedRails = new List<int>();
+            DungeonEntries = new List<(int, int)>();
             DefenseLevel = defenseLevel;
             DefenseDay = defenseDay;
             Beds = beds ?? new List<(int, int, string)>();
@@ -105,6 +108,8 @@ namespace Game.Core
         public IReadOnlyList<(string Name, int Poi)> LastCamps { get; private set; }
         // The minecart lines mended (World.FixedRails); empty for a save from before format 14.
         public IReadOnlyList<int> FixedRails { get; private set; }
+        // How often each dungeon gate was entered, by gate index; empty for a save from before format 15.
+        public IReadOnlyList<(int Gate, int Entered)> DungeonEntries { get; private set; }
 
         public sealed class SavedMachine
         {
@@ -258,6 +263,13 @@ namespace Game.Core
                 var rails = world.FixedRails.ToList();
                 w.Write(rails.Count);
                 foreach (int line in rails) w.Write((ushort)line);
+                var entries = world.DungeonEntries.ToList();
+                w.Write(entries.Count);
+                foreach (var (gate, entered) in entries)
+                {
+                    w.Write((ushort)gate);
+                    w.Write(entered);
+                }
             }
             return stream.ToArray();
         }
@@ -386,10 +398,12 @@ namespace Game.Core
                 for (int count = version >= 13 ? r.ReadInt32() : 0; count > 0; count--) camps.Add((r.ReadString(), r.ReadUInt16()));
                 var rails = new List<int>();
                 for (int count = version >= 14 ? r.ReadInt32() : 0; count > 0; count--) rails.Add(r.ReadUInt16());
+                var entries = new List<(int, int)>();
+                for (int count = version >= 15 ? r.ReadInt32() : 0; count > 0; count--) entries.Add((r.ReadUInt16(), r.ReadInt32()));
                 return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds,
                     defenseLevel, defenseDay, locks)
                 {
-                    Width = width, Height = height, Generator = generator, OpenedPois = opened, Prayers = prayers, LastCamps = camps, FixedRails = rails,
+                    Width = width, Height = height, Generator = generator, OpenedPois = opened, Prayers = prayers, LastCamps = camps, FixedRails = rails, DungeonEntries = entries,
                 };
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class

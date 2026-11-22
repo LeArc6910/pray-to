@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4558,7 +4558,104 @@ async function pace(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, base, save, story, deploysave, layout, touch };
+// A dungeon (Docs/WorldRework.md 5단계, 묶음 5a), on a PC and a phone held upright: the gate room's own button (with a real
+// click or tap) and the bar filling, the dark and the dungeon's name, the screen laying the same pocket as the host,
+// the dungeon alone on the full map, a fight in its first room, a fall and getting up at its entrance, out by
+// [던전 나가기] and again by the door of its entrance room, and the empty dungeon going back to rock. How going in feels
+// (the dark, the sound) is the person's.
+async function dungeon(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on');
+    const first = await game.ask('dungeon');
+    check(first.gates >= 6 && first.slots === 4 && first.rows === first.height + 160,
+      `${name}: 던전 문 ${first.gates}개, 주머니 칸 ${first.slots}, 줄 ${first.height} + ${first.rows - first.height}`);
+
+    // The gate: its button over it, pressed for real; the bar fills and the dungeon is laid on the screen meanwhile.
+    const went = (await game.send('goto gate')).join(' ');
+    await game.wait(1500);
+    const atGate = await game.ask('dungeon');
+    check(/^ok/.test(went) && atGate.gateNear >= 0 && atGate.clientGateNear === atGate.gateNear, `${name}: 던전 문 위에 선다 (${went}, 문 ${atGate.gateNear}, 화면 ${atGate.clientGateNear})`);
+    await game.shot('dungeon-gate', '던전 문(도리이 둘 사이)과 [들어가기] 단추');
+    const enter = (await game.buttons()).find(b => /던전 들어가기/.test(b.label));
+    check(!!enter && await game.press(enter.label), `${name}: [${enter ? enter.label : '들어가기 단추 없음'}]를 누른다`);
+    const gathering = await game.ask('dungeon');
+    check(gathering.charging || gathering.inPocket, `${name}: 들어가기를 모은다 (화면 ${Math.round(gathering.clientCharge * 100)}%)`);
+    await game.shot('dungeon-entering', '들어가는 중(발밑 막대)');
+    const inside = await game.until(d => d.inPocket && d.clientInPocket, 5000, () => game.ask('dungeon'));
+    check(!!inside && inside.slot >= 0 && inside.clientSlot === inside.slot && inside.pocketSame && inside.atEntrance,
+      `${name}: 던전 입구에 들어왔다 (칸 ${inside ? inside.slot : '-'}, 화면 ${inside ? inside.clientSlot : '-'}, 주머니가 호스트와 같다 ${inside ? inside.pocketSame : '-'})`);
+    check(!!inside && inside.cards >= 1 && inside.cardShowing && /던전/.test(inside.cardName), `${name}: 던전 이름이 크게 뜬다 (${inside ? inside.cardName : ''})`);
+    await game.wait(300);
+    await game.shot('dungeon-inside', '던전 입구 방(이름 띠, 횃불, 나가는 문)');
+
+    // The full map: the dungeon alone.
+    await game.press('지도');
+    await game.wait(600);
+    const mapped = await game.ask('dungeon');
+    check(mapped.mapOpen, `${name}: 던전 안에서 지도를 연다`);
+    await game.shot('dungeon-map', '던전 안의 전체 지도(그 던전만)');
+    await game.press('지도 닫기');
+    await game.wait(400);
+
+    // A fight in its first room: a slime let go beside the player.
+    await game.send('spawn slime 3 0; monsters go; attack on');
+    await game.wait(2500);
+    await game.shot('dungeon-fight', '던전 안의 한 방 싸움');
+    await game.send('attack off; clear; monsters hold; heal');
+
+    // A fall: up again at the entrance.
+    await game.send('goto far');
+    await game.wait(800);
+    await game.send('dungeon die');
+    const rose = await game.until(d => !d.dead && d.inPocket, 9000, () => game.ask('dungeon'));
+    check(!!rose && rose.atEntrance, `${name}: 쓰러지면 던전 입구에서 다시 일어난다 (${rose ? `입구 ${rose.atEntrance}` : '일어나지 않음'})`);
+    await game.shot('dungeon-rose', '쓰러진 뒤 던전 입구에서 일어남');
+
+    // Out by [던전 나가기] (from anywhere, three seconds).
+    const menu = (await game.buttons()).find(b => b.label === '던전 나가기');
+    check(!!menu && await game.press('던전 나가기'), `${name}: [던전 나가기]를 누른다`);
+    const out = await game.until(d => !d.inPocket && !d.clientInPocket, 6000, () => game.ask('dungeon'));
+    check(!!out && out.nearestGateDistance < 1.5, `${name}: 던전 문 앞으로 나왔다 (${out ? `문까지 ${out.nearestGateDistance.toFixed(1)}칸` : '나오지 않음'})`);
+    await game.wait(400);
+    await game.shot('dungeon-out', '나온 뒤의 던전 문');
+
+    // In again (the same dungeon while it stands), and out by the door of the entrance room.
+    await game.press(/던전 들어가기/);
+    const again = await game.until(d => d.inPocket && d.clientInPocket, 5000, () => game.ask('dungeon'));
+    check(!!again && again.slot === inside.slot && again.dungeons.length === 1 && again.dungeons[0].serial === 0,
+      `${name}: 다시 들어가면 서 있는 같은 던전이다 (칸 ${again ? again.slot : '-'})`);
+    await game.send('goto exit');
+    await game.wait(900);
+    const door = await game.ask('dungeon');
+    check(door.exitNear, `${name}: 입구 방의 나가는 문 위에 선다`);
+    await game.shot('dungeon-door', '나가는 문 위(문 위의 [던전 나가기])');
+    const doorButton = (await game.buttons()).find(b => /던전 나가기/.test(b.label) && b.label !== '던전 나가기' || /던전 나가기/.test(b.label) && game.touch);
+    check(!!doorButton && await game.press(doorButton.label), `${name}: 문 위의 [${doorButton ? doorButton.label : '단추 없음'}]를 누른다`);
+    const left = await game.until(d => !d.inPocket, 5000, () => game.ask('dungeon'));
+    check(!!left, `${name}: 문으로 나왔다`);
+
+    // Nobody in it: back to rock (now, rather than after a minute), on the screen too.
+    const closed = (await game.send('dungeon close')).join(' ');
+    await game.wait(800);
+    const rock = await game.ask('dungeon');
+    check(/ok dungeon close 1/.test(closed) && rock.dungeons.length === 0 && rock.pocketSame, `${name}: 빈 던전이 바위로 돌아간다 (${closed}, 화면도 같다 ${rock.pocketSame})`);
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

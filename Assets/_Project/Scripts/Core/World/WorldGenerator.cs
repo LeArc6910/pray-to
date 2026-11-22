@@ -301,6 +301,8 @@ namespace Game.Core
                 JoinRooms(world.Map, world.Rooms.Nodes, world.Arenas.Take(world.CaveArenas).Select(a => (TileMap.Cell(a.X), TileMap.Cell(a.Y))).ToList(),
                     world.SpawnX, world.SpawnY, pockets: true, kept: world.Rooms.Kept);
                 EnsureCopper(world);
+                // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
+                if (DungeonPocket.Fits(width)) world.Map.AddPocket(DungeonPocket.Rows);
             }
             return world;
         }

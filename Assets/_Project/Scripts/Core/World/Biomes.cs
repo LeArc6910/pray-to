@@ -48,8 +48,20 @@ namespace Game.Core
         public int Width { get; }
         public int Height { get; }
 
-        // Outside the map counts as the nearest tile inside it.
-        public Biome this[int x, int y] => _tiles[Math.Clamp(y, 0, Height - 1) * Width + Math.Clamp(x, 0, Width - 1)];
+        // Outside the map counts as the nearest tile inside it; the dungeons' pocket above the world (DungeonPocket), once a
+        // dungeon has been made in it, as the biome of the dungeon in that slot (SetPocket).
+        public Biome this[int x, int y] => y >= Height && _pocket != null
+            ? _pocket[Math.Clamp(x / DungeonPocket.Span, 0, _pocket.Length - 1)]
+            : _tiles[Math.Clamp(y, 0, Height - 1) * Width + Math.Clamp(x, 0, Width - 1)];
+
+        Biome[] _pocket;
+
+        // The biome of the dungeon in a slot of the pocket (Docs/WorldRework.md 지도와 화면: its light, music and tiles).
+        public void SetPocket(int slot, Biome biome)
+        {
+            _pocket ??= new Biome[DungeonPocket.MaxSlots];
+            if (slot >= 0 && slot < _pocket.Length) _pocket[slot] = biome;
+        }
 
         public Biome At(Vec2 position) => this[TileMap.Cell(position.X), TileMap.Cell(position.Y)];
 

@@ -262,7 +262,8 @@ namespace Game.Core
         // Where the director leaves a player alone (빼는 곳).
         public bool LeftAlone(Player player)
         {
-            if (player.IsDead || player.Riding || player.Level < DirectorLevel) return true;
+            // Nor in a dungeon (World.Dungeon.cs): it keeps its own pace.
+            if (player.IsDead || player.Riding || player.Level < DirectorLevel || InPocket(player.Position)) return true;
             if (Quiet(player.Position)) return true;
             if (ActiveRift != null && Vec2.Distance(ActiveRift.Center, player.Position) <= EventQuiet) return true;
             if (ActiveDefense != null && Vec2.Distance(ActiveDefense.Center, player.Position) <= EventQuiet) return true;

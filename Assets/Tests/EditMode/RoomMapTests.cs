@@ -229,7 +229,8 @@ namespace Game.Core.Tests
                     int x = at % Size, y = at / Size;
                     foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
                     {
-                        if (!map.InBounds(nx, ny) || lump[ny * Size + nx] != 0 || !Rock(nx, ny)) continue;
+                        // The world's rows: the dungeons' pocket above them is rock too (DungeonPocket), but not the world's.
+                        if (!map.InBounds(nx, ny) || ny >= map.Height || lump[ny * Size + nx] != 0 || !Rock(nx, ny)) continue;
                         lump[ny * Size + nx] = sizes.Count + 1;
                         stack.Push(ny * Size + nx);
                     }

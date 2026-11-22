@@ -265,9 +265,13 @@ namespace Game.Core
         public TileType Type { get; }
     }
 
+    // The world's tiles. Height is the world's rows, which everything that walks the world loops over (the generator,
+    // the biomes, saving); Rows is what is stored, the world and above it the dungeons' pocket (Docs/WorldRework.md 5단계
+    // 주머니의 모양, DungeonPocket): rows no generator, save or map of the world knows of, read and written like any
+    // other, and never dug or built on (IsEdge holds them all).
     public sealed class TileMap
     {
-        readonly TileType[] _tiles;
+        TileType[] _tiles;
 
         public TileMap(int width, int height, TileType fill = TileType.Wall)
         {
@@ -275,12 +279,31 @@ namespace Game.Core
             if (height <= 0) throw new ArgumentOutOfRangeException(nameof(height));
             Width = width;
             Height = height;
+            Rows = height;
             _tiles = new TileType[width * height];
             if (fill != default) Array.Fill(_tiles, fill);
         }
 
         public int Width { get; }
         public int Height { get; }
+        // Height and the pocket's rows above it (AddPocket); Height alone without one.
+        public int Rows { get; private set; }
+        public bool HasPocket => Rows > Height;
+
+        // Whether a row is the pocket's, not the world's.
+        public bool InPocket(int y) => y >= Height && y < Rows;
+        public bool InPocket(Vec2 position) => InPocket(Cell(position.Y));
+
+        // Adds that many rows of rock above the world, once (WorldGenerator.Generate, for a world of rooms wide enough).
+        public void AddPocket(int rows)
+        {
+            if (rows <= 0 || HasPocket) return;
+            var tiles = new TileType[Width * (Height + rows)];
+            Array.Copy(_tiles, tiles, _tiles.Length);
+            Array.Fill(tiles, TileType.Wall, _tiles.Length, Width * rows);
+            _tiles = tiles;
+            Rows = Height + rows;
+        }
 
         // Outside the map reads as wall, so nothing can walk off the edge.
         public TileType this[int x, int y]
@@ -293,7 +316,7 @@ namespace Game.Core
             }
         }
 
-        public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Height;
+        public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Rows;
 
         public bool IsSolid(int x, int y)
         {
@@ -351,7 +374,8 @@ namespace Game.Core
             return false;
         }
 
-        // The outermost ring, which nobody can dig through.
+        // The outermost ring, which nobody can dig through; and the whole pocket above the world, where nothing is dug or
+        // built (Docs/WorldRework.md 주머니의 모양).
         public bool IsEdge(int x, int y) => x <= 0 || y <= 0 || x >= Width - 1 || y >= Height - 1;
 
         public static int Cell(float coordinate) => (int)MathF.Floor(coordinate);

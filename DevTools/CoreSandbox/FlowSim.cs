@@ -63,7 +63,7 @@ namespace CoreSandbox
             }
         }
 
-        static int StepsAt(int[] steps, TileMap map, int x, int y) => map.InBounds(x, y) ? steps[y * map.Width + x] : -1;
+        static int StepsAt(int[] steps, TileMap map, int x, int y) => map.InBounds(x, y) && y < map.Height ? steps[y * map.Width + x] : -1;
 
         // Steps from the start to every tile through open floor, -1 where walking cannot reach.
         public static int[] Walk(TileMap map, int startX, int startY)
@@ -79,7 +79,7 @@ namespace CoreSandbox
                 foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) })
                 {
                     int nx = x + dx, ny = y + dy;
-                    if (!map.InBounds(nx, ny) || steps[ny * map.Width + nx] >= 0 || map.IsSolid(nx, ny)) continue;
+                    if (!map.InBounds(nx, ny) || ny >= map.Height || steps[ny * map.Width + nx] >= 0 || map.IsSolid(nx, ny)) continue;
                     var type = map[nx, ny];
                     if (type == TileType.Water || type == TileType.Lava) continue;
                     steps[ny * map.Width + nx] = here + 1;

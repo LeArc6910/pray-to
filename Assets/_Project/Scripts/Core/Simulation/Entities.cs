@@ -183,6 +183,11 @@ namespace Game.Core
         // Ticks until a recall scroll takes the player home, or 0.
         public int RecallTicks { get; internal set; }
         public bool Recalling => RecallTicks > 0;
+        // Going into a dungeon or out of one (World.Dungeon.cs): ticks left, or 0, and where to: a gate's index going in,
+        // World.LeaveByDoor or World.LeaveByMenu going out.
+        public int DungeonTicks { get; internal set; }
+        public int DungeonGoal { get; internal set; }
+        public bool DungeonCharging => DungeonTicks > 0;
         // Lying in their bed, waiting for everyone else to, and where they lay down (World.Sleep).
         public bool Sleeping { get; internal set; }
         internal Vec2 SleptAt { get; set; }
@@ -623,6 +628,11 @@ namespace Game.Core
         // A trap room (World.Traps.cs), at its chest: its doors fell (Amount World.TrapSprung), a band came
         // (World.TrapWave + its number), it was won (TrapWon) or lost (TrapLost).
         Trap,
+        // A dungeon (World.Dungeon.cs, 묶음 5a): Source, a player, began going in at the gate at Position (Amount
+        // World.DungeonEntering) or out (DungeonLeaving, DungeonLeavingMenu), came in at its entrance (DungeonEntered), out by
+        // its gate (DungeonLeft), got up at its entrance after falling (DungeonRose), was stopped (DungeonBroken), or found
+        // every slot of the pocket taken (DungeonFull).
+        Dungeon,
     }
 
     public readonly struct SimEvent
@@ -657,7 +667,7 @@ namespace Game.Core
             || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot
             || type == SimEventType.AnimalsPetted || type == SimEventType.Trampled || type == SimEventType.MovedIn
             || type == SimEventType.MonsterFx || type == SimEventType.PoiOpened || type == SimEventType.Blessed
-            || type == SimEventType.Ambush || type == SimEventType.Trap;
+            || type == SimEventType.Ambush || type == SimEventType.Trap || type == SimEventType.Dungeon;
     }
 
     public enum BossState : byte

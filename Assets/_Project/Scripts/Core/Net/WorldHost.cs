@@ -93,6 +93,9 @@ namespace Game.Core
             public int SentLocks = -1;
             // The world's PoiVersion when the things to find were last sent (PoisMessage).
             public int SentPois = -1;
+            // The world's DungeonVersion when the dungeons standing were last sent (DungeonsMessage); 0 sends none to one
+            // who joins before any was made.
+            public int SentDungeons;
             // The player's JourneyVersion when their place in the story was last sent.
             public int SentJourney = -1;
         }
@@ -218,6 +221,14 @@ namespace Game.Core
             foreach (byte[] message in TileChangesMessage.EncodeAll(tileChanges).Concat(CropChangesMessage.EncodeAll(cropChanges)))
             {
                 foreach (var pair in _connections.Where(pair => pair.Value.Player != null)) Send(pair.Key, message, reliable: true);
+            }
+
+            // The dungeons standing (World.Dungeon.cs), before the snapshot that brings a player in, so their client has laid it.
+            foreach (var pair in _connections)
+            {
+                if (pair.Value.Player == null || pair.Value.SentDungeons == World.DungeonVersion) continue;
+                pair.Value.SentDungeons = World.DungeonVersion;
+                Send(pair.Key, DungeonsNow().Encode(), reliable: true);
             }
 
             // Where each player is in the story.
@@ -435,6 +446,8 @@ namespace Game.Core
                 World.HeldTraps.ToList());
         }
 
+        DungeonsMessage DungeonsNow() => new DungeonsMessage(World.Dungeons.Select(d => (d.Slot, d.Gate.Index, d.Serial, d.Seed, d.State, d.Level)).ToList());
+
         // The world as a save file, stamped with the caller's clock (seconds since 1970).
         public byte[] SaveWorld(long now) => WorldSave.Write(World, _seed, now, _generated.Version);
 
@@ -452,6 +465,7 @@ namespace Game.Core
             World.PlaceNpcs();
             World.RestorePois(save.OpenedPois, save.Prayers, save.LastCamps);
             World.RestoreRails(save.FixedRails);
+            World.RestoreDungeons(save.DungeonEntries);
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -489,6 +503,12 @@ namespace Game.Core
                     break;
                 case InventoryCommand.ToggleMachine:
                     World.ToggleMachine(player.Id);
+                    break;
+                case InventoryCommand.EnterDungeon:
+                    World.EnterDungeon(player.Id, command.Item);
+                    break;
+                case InventoryCommand.LeaveDungeon:
+                    World.LeaveDungeon(player.Id, byMenu: command.Item != 0);
                     break;
                 case InventoryCommand.UsePoi:
                     World.UsePoi(player.Id, command.Item);
@@ -670,7 +690,9 @@ namespace Game.Core
         SnapshotMessage Snapshot(Player viewer)
         {
             float Distance(Vec2 position) => Vec2.Distance(position, viewer.Position);
-            bool InView(Vec2 position, float size = 0) => Distance(position) <= _config.ViewRange + size;
+            // Only what is in the viewer's part of the map: the world, or their dungeon's slot of the pocket (World.AreaOf).
+            int area = World.AreaOf(viewer.Position);
+            bool InView(Vec2 position, float size = 0) => Distance(position) <= _config.ViewRange + size && World.AreaOf(position) == area;
 
             var slots = Enumerable.Range(0, viewer.Skills.Count).ToList();
             var self = new SelfState(
