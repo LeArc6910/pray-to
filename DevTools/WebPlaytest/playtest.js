@@ -181,7 +181,10 @@ async function playPc(browser, profile) {
 
   await game.page.keyboard.press('Tab');
   await game.page.waitForTimeout(600);
-  check((await state(game)).bag, 'Tab 키로 가방이 열린다');
+  const opened = await state(game);
+  check(opened.bag, 'Tab 키로 가방이 열린다');
+  // The UI skin (Docs/UiRework.md U1): frames at whole device pixels, and the bag's close button in its head.
+  check(opened.ui && opened.ui.dots === Math.max(1, Math.round(2 * opened.ui.scale)), `틀의 픽셀이 기기 픽셀의 정수 배 (${opened.ui && opened.ui.scale} → ${opened.ui && opened.ui.dots})`);
   await shot(game, profile, 'bag', '가방 창');
   await game.page.keyboard.press('Tab');
   await send(game, 'scene set; bag on');

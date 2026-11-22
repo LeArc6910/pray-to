@@ -1097,6 +1097,10 @@ DevTools/Local/setup.sh --commit
 - [ ] 159단계: 대화 초상 그림(`Docs/UiRework.md` 대화 초상)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/PortraitArt.cs`의 `.meta`가 생기면 커밋한다. 아직 화면에 붙이지 않았다(U3에서 대화 화면에 붙인다)
   - (사람) 인물마다 월드 모습과 닮았는지, 표정이 잘 읽히는지(`art-preview` 아티팩트의 `portraits/`)
+- [ ] 160단계: UI 겹침 고침과 새 틀(`Docs/UiRework.md` U0·U1)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/UiMotion.cs`, `Client/Art/UiFrameArt.cs`의 `.meta`가 생기면 커밋한다. PlayMode `LayoutTests`에 `WorldButtonsNeverShareASpot`, `TheBossBarKeepsClearOfThePlayer`
+  - (클라우드 웹 점검) `sweep.js --only ui`
+  - (사람) 창을 열고 닫는 움직임(0.15초 튕김)과 단추 누름의 손맛, UI 소리 여섯이 거슬리지 않는지, [설정]의 "움직임: 줄이기", 실제 휴대폰에서 틀의 선이 고르게 보이는지
 
 ## 결과 보고
 

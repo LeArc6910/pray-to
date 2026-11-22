@@ -24,15 +24,21 @@ namespace Game.Client.Tests
         };
 
         float _hudHeight;
+        float _leftBottom;
 
         [SetUp]
-        public void Remember() => _hudHeight = Ui.HudHeight;
+        public void Remember()
+        {
+            _hudHeight = Ui.HudHeight;
+            _leftBottom = Ui.LeftColumnBottom;
+        }
 
         [TearDown]
         public void PutBack()
         {
             Ui.SizeOverride = null;
             Ui.HudHeight = _hudHeight;
+            Ui.LeftColumnBottom = _leftBottom;
             Controls.ForceTouch(false);
         }
 
@@ -82,6 +88,64 @@ namespace Game.Client.Tests
                         }
                     }
                 }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        // Buttons over things in the world never sit on one spot (U0, 2026-11-22: on a phone a machine's [끄기] lay under
+        // [○○와 말하기]): however many want the same place, each is moved up past the ones before, stays on the screen
+        // across, and is a finger's 40 points tall on a touch screen.
+        [Test]
+        public void WorldButtonsNeverShareASpot()
+        {
+            var problems = new List<string>();
+            foreach (var (name, width, height, touch) in Sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Controls.ForceTouch(touch);
+                float tall = Ui.WorldButtonHeight;
+                if (touch && tall < 40) problems.Add($"{name}: 월드 단추 높이 {tall}");
+                var taken = new List<Rect>();
+                var wanted = new[] { 80f, 220f, 140f, 300f, 88f };
+                for (int i = 0; i < wanted.Length; i++)
+                {
+                    // All round the middle of the screen, a few points apart, as a machine and a person in reach are.
+                    var rect = Ui.Stack(new Rect(width / 2 - wanted[i] / 2 + i * 6, height / 2 - tall / 2 - i * 3, wanted[i], tall), taken, width);
+                    foreach (var other in taken)
+                        if (Overlap(rect, other)) problems.Add($"{name}: 겹침 {rect} / {other}");
+                    if (rect.xMin < 0 || rect.xMax > width) problems.Add($"{name}: 화면 밖 {rect}");
+                    taken.Add(rect);
+                }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        // The goal list folds to one line on a phone held upright, and in a boss fight whose bar goes under it (U0,
+        // phone-boss-bar: the list took 40% of the top and pushed the bar over the player). The boss bar lies inside the
+        // screen, clear of the minimap column, and above the player (the middle of the screen) by a head's height.
+        [Test]
+        public void TheBossBarKeepsClearOfThePlayer()
+        {
+            var problems = new List<string>();
+            foreach (var (name, width, height, touch) in Sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Controls.ForceTouch(touch);
+                if (height > width && width < 600 && !GameRoot.TrackerFolds(false)) problems.Add($"{name}: 세로 휴대폰에서 목표 목록이 접히지 않는다");
+                bool folds = GameRoot.TrackerFolds(true);
+                if (!GameRoot.BossBarBesideHud && !folds) problems.Add($"{name}: 보스 막대가 아래로 가는데 목표 목록이 접히지 않는다");
+                // In a boss fight under the HUD, the box is its bars and a line; the folded list one line under it.
+                Ui.HudHeight = GameRoot.BossBarBesideHud ? 200 : GameRoot.HudBarsHeight;
+                Ui.LeftColumnBottom = Ui.HudArea.yMax + 6 + (folds ? 34 : 220);
+                var bar = GameRoot.BossBarArea(40);
+                string where = $"{name} {width}×{height}";
+                if (!Inside(bar, width, height)) problems.Add($"{where}: 화면 밖 {bar}");
+                if (bar.width < 160) problems.Add($"{where}: 너무 좁다 {bar}");
+                if (bar.yMax > height / 2 - 30) problems.Add($"{where}: 플레이어 머리 위를 덮는다 {bar}");
+                var column = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea), ("HUD", Ui.HudArea) };
+                if (touch) column.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
+                foreach (var (part, rect) in column)
+                    if (Overlap(bar, rect)) problems.Add($"{where}: 겹침 - {part}");
             }
             Assert.IsEmpty(problems, string.Join("\n", problems));
         }

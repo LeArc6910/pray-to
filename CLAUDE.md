@@ -63,6 +63,8 @@ dotnet run --project DevTools/ArtPreview -- --only spider
 dotnet run --project DevTools/ArtPreview -- --only map
 # UI 개편 시안(out/uimock/: 양식 A·B·C와 추천 조합의 가방·대화·상점·성장 화면, 휴대폰 세로 가방·대화, compare_abc.png. Docs/UiRework.md 4-4)
 dotnet run --project DevTools/ArtPreview -- --only uimock
+# 게임의 UI 스킨만(out/ui/: skin.png 조각 전부, windows.png 지금 화면에 입힌 모습, pixels.png 정수 배 틀. Docs/UiRework.md U1)
+dotnet run --project DevTools/ArtPreview -- --only ui
 # 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/)
 dotnet run --project DevTools/ArtPreview -- --only dungeons
 # 대화 초상만(out/portraits/: 인물마다 여섯 표정의 sheet.png, 4배 close_*.png, 대화 상자 시안 dialogue.png. Docs/UiRework.md 4-2)

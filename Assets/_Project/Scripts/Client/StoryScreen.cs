@@ -124,11 +124,8 @@ namespace Game.Client
         {
             Vector3 screen = camera.WorldToScreenPoint(world);
             if (screen.z < 0) return false;
-            Vector2 point = Ui.FromScreen(screen);
             float width = Mathf.Max(120, GUI.skin.button.CalcSize(new GUIContent(text)).x + 16);
-            var rect = new Rect(point.x - width / 2, point.y - 14, width, 28);
-            Controls.Block(rect);
-            return Ui.Button(rect, text);
+            return Ui.WorldButton(Ui.FromScreen(screen), text, width);
         }
 
         // What talking to them says: the lines of the step they give (main story first, then a side story), a reminder
@@ -205,6 +202,8 @@ namespace Game.Client
             else if (_waypoints) DrawWaypoints();
         }
 
+        // The talk at the bottom of the screen (U1): a window whose head band is the speaker's colour with their name (and
+        // their hearts, for someone whose liking counts), the words under it, the answers or [다음] at the bottom.
         void DrawTalk()
         {
             float width = Mathf.Min(560, Ui.Width - 24);
@@ -214,20 +213,33 @@ namespace Game.Client
             float textHeight = label.CalcHeight(new GUIContent(wrapped), width - 32);
             bool asking = _choices != null && _line >= _lines.Count - 1;
             const float ChoiceRow = 38;
-            float height = textHeight + 96 + (asking ? _choices.Count * ChoiceRow : 0);
+            float button = Controls.UsingTouch ? Ui.TouchButtonHeight : 30;
+            float top = UiSkin.FrameEdge + UiSkin.HeadHeight + 8;
+            float height = top + textHeight + 14 + button + (asking ? _choices.Count * ChoiceRow : 0);
             // Above the quick slots and skill keys (2026-11-10: at the very bottom it covered them), as low as fits.
             var panel = new Rect((Ui.Width - width) / 2, Mathf.Max(8, Ui.Height - height - TalkLift), width, height);
             Controls.Block(panel);
-            GUI.Box(panel, GUIContent.none);
-            var previous = GUI.color;
-            GUI.color = new Color(1f, 0.85f, 0.35f);
-            GUI.Label(new Rect(panel.x + 16, panel.y + 10, width - 32, 24), name.Length > 0 ? name : "할 일");
-            GUI.color = previous;
-            GUI.Label(new Rect(panel.x + 16, panel.y + 38, width - 32, textHeight), wrapped);
+            var speaker = name.Length > 0 ? _client.Story?.Characters.FirstOrDefault(c => c.Name == name) : null;
+            Color? accent = speaker != null && ColorUtility.TryParseHtmlString(speaker.Color.StartsWith("#") ? speaker.Color : "#" + speaker.Color, out var color)
+                ? Color.Lerp(color, new Color(0.35f, 0.25f, 0.2f), 0.25f) : (Color?)null;
+            var kind = accent != null ? UiKind.Talk : UiKind.Stone;
+            UiMotion.BeginWindow("talk", panel, kind, accent);
+            UiSkin.Window(panel, kind, name.Length > 0 ? name : "할 일", accent != null ? null : UiIcons.Book, out var head, accent);
+            // A merchant's liking as hearts beside the name (Docs/UiRework.md 4-2).
+            var npc = name.Length > 0 ? _client.Npcs?.Npcs.FirstOrDefault(n => n.Name == name) : null;
+            if (npc != null && _client.Friendships.ContainsKey(npc.Id)) UiSkin.Hearts(head, UiSkin.CloseRect(head).x - 8, _client.HeartsWith(npc), World.MaxHearts);
+            if (UiSkin.CloseButton(head))
+            {
+                _lines = null;
+                _choices = null;
+                UiMotion.EndWindow();
+                return;
+            }
+            GUI.Label(new Rect(panel.x + 16, panel.y + top, width - 32, textHeight), wrapped);
             if (asking)
             {
                 // The answers, one under another below the words; picking one tells the host.
-                float y = panel.y + 44 + textHeight;
+                float y = panel.y + top + textHeight + 6;
                 for (int i = 0; i < _choices.Count; i++)
                 {
                     if (Ui.Button(new Rect(panel.x + 16, y + i * ChoiceRow, width - 32, ChoiceRow - 6), _choices[i].Text))
@@ -239,26 +251,41 @@ namespace Game.Client
                         _answeredAt = asker?.Index ?? -1;
                         _lines = null;
                         _choices = null;
+                        UiMotion.EndWindow();
                         return;
                     }
                 }
-                GUI.Label(new Rect(panel.x + 16, panel.yMax - 36, 120, 24), $"{_line + 1}/{_lines.Count}");
+                Counter(panel, button);
+                UiMotion.EndWindow();
                 return;
             }
             bool last = _line >= _lines.Count - 1;
             string next = last ? (_tellsHost ? "알겠다" : "닫기") : "다음";
-            if (Ui.Button(new Rect(panel.xMax - 116, panel.yMax - 40, 100, 30), next))
+            if (Ui.Button(new Rect(panel.xMax - 116, panel.yMax - button - 10, 100, button), next, last && _tellsHost ? Ui.Look.Primary : Ui.Look.Normal))
             {
                 Sounds.Play(Sound.Click);
                 if (!last)
                 {
                     _line++;
-                    return;
                 }
-                if (_tellsHost) _send(_client.TalkStoryCommand());
-                _lines = null;
+                else
+                {
+                    if (_tellsHost) _send(_client.TalkStoryCommand());
+                    _lines = null;
+                }
             }
-            GUI.Label(new Rect(panel.x + 16, panel.yMax - 36, 120, 24), $"{_line + 1}/{_lines?.Count ?? 0}");
+            if (_lines != null) Counter(panel, button);
+            UiMotion.EndWindow();
+        }
+
+        static GUIStyle _counter;
+
+        // Which line of how many, small at the bottom left.
+        void Counter(Rect panel, float button)
+        {
+            _counter ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleLeft };
+            _counter.normal.textColor = UiSkin.Muted;
+            GUI.Label(new Rect(panel.x + 16, panel.yMax - button - 10, 120, button), $"{_line + 1}/{_lines?.Count ?? 0}", _counter);
         }
 
         // The waypoints and the waystones (3c) open to this player, to go to from the one they stand by: a list that
@@ -269,16 +296,28 @@ namespace Game.Client
             var stones = _client.Stones.OrderBy(s => s.Biome).ToList();
             float width = Mathf.Min(420, Ui.Width - 24);
             float row = 34;
-            var panel = ListArea(width, 70 + row * (places.Count + stones.Count + (stones.Count > 0 ? 1 : 0)) + 50);
+            var panel = ListArea(width, 70 + UiSkin.HeadHeight + row * (places.Count + stones.Count + (stones.Count > 0 ? 1 : 0)) + 50);
             Controls.Block(panel);
             var here = _client.WaypointNear()?.Definition;
             if (here != null && !_client.Waypoints.Contains(here.Index)) here = null;
             var hereStone = _client.StoneNear();
             if (hereStone != null && !_client.StoneOpen(hereStone.Index)) hereStone = null;
             bool by = here != null || hereStone != null;
+            // A tap outside the list closes it, as outside a sheet on a phone (Docs/UiRework.md 4-5 닫기).
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && !panel.Contains(e.mousePosition) && !Ui.MinimapArea.Contains(e.mousePosition))
+            {
+                _waypoints = false;
+                UiMotion.Cancel();
+                e.Use();
+                return;
+            }
             Ui.TouchScroll(panel, ref _waypointScroll);
-            GUILayout.BeginArea(panel, GUI.skin.box);
-            GUILayout.Label("웨이포인트: 가 본 곳으로 간다", GUILayout.Height(24));
+            UiMotion.BeginWindow("waypoints", panel, UiKind.Journal);
+            var inside = UiSkin.Window(panel, UiKind.Journal, "웨이포인트", UiIcons.Waypoint, out var head);
+            if (UiSkin.CloseButton(head)) _waypoints = false;
+            GUILayout.BeginArea(inside);
+            GUILayout.Label("가 본 곳으로 간다", GUILayout.Height(24));
             _waypointScroll = Ui.BeginScrollView(_waypointScroll, GUILayout.ExpandHeight(true));
             foreach (var place in places)
             {
@@ -312,6 +351,7 @@ namespace Game.Client
             if (Ui.LayoutButton("닫기", GUILayout.Width(100), GUILayout.Height(30))) _waypoints = false;
             GUILayout.EndHorizontal();
             GUILayout.EndArea();
+            UiMotion.EndWindow();
             // Walked away from the waypoint or stone: the list goes.
             if (!by) _waypoints = false;
         }

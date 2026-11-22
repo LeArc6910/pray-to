@@ -360,47 +360,64 @@ namespace Game.Client
             if (GUI.Button(area, GUIContent.none, GUIStyle.none)) FullOpen = true;
         }
 
-        // The whole map over the game, in a panel with its title above it and its key below, so neither sits on what
-        // is under them. Tapping or clicking anywhere closes it.
+        // The whole map over the game (a full screen, U1): the world darkened behind it, red at the edges while the
+        // player is being hurt; a parchment-headed window with the map's name in its head, the map as large as fits, and
+        // its key under it, as many lines as it needs (on a phone it was one line, cut off). Tapping or clicking anywhere
+        // closes it, as the close button in the head does.
         public void DrawFull()
         {
             const float lineHeight = 26;
             var screen = new Rect(0, 0, Ui.Width, Ui.Height);
             Controls.Block(screen);
-            Fill(screen, new Color(0, 0, 0, 0.75f));
-            float pad = UiSkin.PanelPadding;
-            float size = Mathf.Min(Ui.Width - 2 * (10 + pad), Ui.Height - 2 * (10 + pad) - lineHeight * 2);
-            var panel = new Rect((Ui.Width - size) / 2 - pad, (Ui.Height - size) / 2 - lineHeight - pad, size + pad * 2, size + lineHeight * 2 + pad * 2);
-            GUI.Box(panel, GUIContent.none);
-            var area = new Rect(panel.x + pad, panel.y + pad + lineHeight, size, size);
-            Fill(area, Backdrop);
-            // In a dungeon, the dungeon alone (Docs/WorldRework.md 지도와 화면).
+            UiSkin.FullBackdrop(screen);
             var dungeon = _client.DungeonHere;
-            var shown = Shown();
-            DrawTiles(area, shown);
-
-            string close = (dungeon != null ? dungeon.Name : "지도") + (Controls.UsingTouch ? " (탭하면 닫힘)" : " (클릭하거나 M·Esc로 닫기)");
-            GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
             string key = dungeon != null ? "● 나   ● 다른 플레이어   ◆ 나가는 문   ● 남은 무리   ☠ 주인   ◆ 상자   ● 모닥불·지름길 돌"
                 : "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리   ◆ 던전 문" + (Settings.Rumors ? "   ○ 소문(옅은 원)" : "");
-            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), Ui.Wrap(key, GUI.skin.label, size));
-            if (dungeon != null)
+            float pad = UiSkin.PanelPadding;
+            float head = UiSkin.FrameEdge + UiSkin.HeadHeight + 6;
+            // The key is as tall as it wraps to at the map's width; the map is as big as what is left allows.
+            float size = Mathf.Min(Ui.Width - 2 * (10 + pad), Ui.Height - 20 - head - pad - lineHeight * 2);
+            string wrappedKey = Ui.Wrap(key, GUI.skin.label, size);
+            float keyHeight = GUI.skin.label.CalcHeight(new GUIContent(wrappedKey), size);
+            size = Mathf.Max(80, Mathf.Min(size, Ui.Height - 20 - head - pad - keyHeight - 4));
+            wrappedKey = Ui.Wrap(key, GUI.skin.label, size);
+            keyHeight = GUI.skin.label.CalcHeight(new GUIContent(wrappedKey), size);
+            float height = head + size + 4 + keyHeight + pad - 2;
+            var panel = new Rect((Ui.Width - size) / 2 - pad, Mathf.Max(10, (Ui.Height - height) / 2), size + pad * 2, height);
+            UiMotion.BeginWindow("map", panel, UiKind.Journal);
+            string title = dungeon != null ? dungeon.Name : "지도";
+            UiSkin.Window(panel, UiKind.Journal, title, UiIcons.Map, out var band);
+            bool closed = UiSkin.CloseButton(band, "지도 닫기");
+            var area = new Rect(panel.x + pad, panel.y + head, size, size);
+            UiSkin.Inset(new Rect(area.x - 2, area.y - 2, area.width + 4, area.height + 4));
+            Fill(area, Backdrop);
+            // In a dungeon, the dungeon alone (Docs/WorldRework.md 지도와 화면).
+            var shown = Shown();
+            DrawTiles(area, shown);
+            GUI.Label(new Rect(area.x, area.yMax + 4, size, keyHeight), wrappedKey);
+            if (dungeon == null)
             {
-                Ui.Probe("지도 닫기", screen);
-                if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
-                return;
+                // Each place's name beside its dot (with rumours, only the places whose spot is known).
+                var window = new Rect(0, 0, _map.Width, _map.Height);
+                foreach (var site in _client.Places)
+                {
+                    if (KnowledgeOf(site) != WayKnown.Known) continue;
+                    float u = site.Center.X / window.width, v = site.Center.Y / window.height;
+                    var at = new Vector2(area.x + u * area.width, area.yMax - v * area.height);
+                    var previous = GUI.color;
+                    GUI.color = _client.Waypoints.Contains(site.Definition.Index) ? WaypointOpen : Color.white;
+                    // Kept inside the map's frame, so a name near the right edge is not cut off the screen.
+                    float nameWidth = Mathf.Min(200, GUI.skin.label.CalcSize(new GUIContent(site.Definition.Name)).x + 4);
+                    float nameX = at.x + MarkerSize + nameWidth > area.xMax ? at.x - MarkerSize - nameWidth : at.x + MarkerSize;
+                    GUI.Label(new Rect(nameX, at.y - lineHeight / 2, nameWidth, lineHeight), site.Definition.Name);
+                    GUI.color = previous;
+                }
             }
-            // Each place's name beside its dot (with rumours, only the places whose spot is known).
-            var window = new Rect(0, 0, _map.Width, _map.Height);
-            foreach (var site in _client.Places)
+            UiMotion.EndWindow();
+            if (closed)
             {
-                if (KnowledgeOf(site) != WayKnown.Known) continue;
-                float u = site.Center.X / window.width, v = site.Center.Y / window.height;
-                var at = new Vector2(area.x + u * area.width, area.yMax - v * area.height);
-                var previous = GUI.color;
-                GUI.color = _client.Waypoints.Contains(site.Definition.Index) ? WaypointOpen : Color.white;
-                GUI.Label(new Rect(at.x + MarkerSize, at.y - lineHeight / 2, 200, lineHeight), site.Definition.Name);
-                GUI.color = previous;
+                FullOpen = false;
+                return;
             }
             Ui.Probe("지도 닫기", screen);
             if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
@@ -610,8 +627,8 @@ namespace Game.Client
         // The pixel-art panel (UiSkin) around the map, and the dark under its unexplored tiles.
         static void Framed(Rect area)
         {
-            float frame = UiArt.PanelBorder * UiArt.Scale;
-            GUI.Box(new Rect(area.x - frame, area.y - frame, area.width + frame * 2, area.height + frame * 2), GUIContent.none);
+            float frame = UiSkin.FrameEdge;
+            UiSkin.Panel(new Rect(area.x - frame, area.y - frame, area.width + frame * 2, area.height + frame * 2));
             Fill(area, Backdrop);
         }
 

@@ -1479,6 +1479,14 @@ namespace Game.Client
             json.Field("typing", Controls.Typing);
             json.Field("map", root.MapOpen);
             json.Field("speed", root.HostTicksPerStep);
+            // Where the UI's parts were drawn (U0·U1, sweep.js "ui"): the bag window, the "획득" lines, the boss bar, the
+            // left column's bottom (the HUD and goal list) and whether the goal list is folded, the player on the screen,
+            // and the frames' device pixels per art pixel.
+            json.Field("ui", new Json('{').Field("bag", Rect(root.BagOpen ? InventoryWindow.AreaOf() : default))
+                .Field("acquired", Rect(GameRoot.AcquiredArea)).Field("bossBar", Rect(GameRoot.BossBarShown))
+                .Field("leftBottom", Ui.LeftColumnBottom).Field("folded", root.Playing && GameRoot.TrackerFolds(root.BossShown))
+                .Field("player", Rect(root.PlayerOnScreen)).Field("scale", Ui.Scale).Field("dots", UiSkin.Dots)
+                .Field("motion", Settings.ReduceMotion ? "reduced" : "normal").Raw('}'));
             var world = root.HostWorld;
             var player = root.HostPlayer;
             if (world != null && player != null)

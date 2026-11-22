@@ -24,10 +24,16 @@ namespace Game.Client
         static AudioSource[] _sources;
         static int _next;
 
+        // When a UI sound last played: a button's own sound (Ui.Button, UiMotion) stands in for the click its caller
+        // still plays after it, so the two do not sound together (Docs/UiRework.md 4-6: 52 callers play the click).
+        static float _uiSound = -10;
+
         public static void Play(Sound sound, float volume = 1)
         {
             if (!Settings.Sound || volume <= 0) return;
             float now = Time.unscaledTime;
+            if (sound >= Sound.UiOpen) _uiSound = now;
+            else if (sound == Sound.Click && now - _uiSound < 0.12f) return;
             int index = (int)sound;
             if (now - LastPlayed[index] < MinGap && LastPlayed[index] > 0) return;
             LastPlayed[index] = now;

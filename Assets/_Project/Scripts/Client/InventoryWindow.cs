@@ -32,7 +32,6 @@ namespace Game.Client
         // Points one notch of the mouse wheel scrolls; IMGUI's own step is a fraction of a line in browsers.
         const float WheelStep = 30;
 
-        static GUIStyle _tooltipStyle;
         static readonly string[] PageNames = { "장비", "재료·제작", "스킬", "특성", "상자", "상인", "캐릭터", "일지" };
         static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
@@ -100,23 +99,7 @@ namespace Game.Client
             }
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
-            // Left of the minimap column, full height; on narrow screens under the column. The page scrolls when it
-            // does not fit.
-            Rect area;
-            float room = Ui.MinimapArea.x - 20;
-            if (room >= MinWidth)
-            {
-                float width = Mathf.Min(MaxWidth, room);
-                area = new Rect(Ui.MinimapArea.x - 10 - width, 10, width, Ui.Height - 20);
-            }
-            else
-            {
-                float top = Ui.RightColumnBottom + 10;
-                area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
-            }
-            // Under the HUD where the two would overlap. While the bag is open the HUD is only its health bar.
-            var hud = Ui.HudArea;
-            if (area.x < hud.xMax + 10 && area.y < hud.yMax + 10) area = Rect.MinMaxRect(area.x, hud.yMax + 10, area.xMax, area.yMax);
+            var area = AreaOf();
             bool besideWindow = area.x >= TooltipWidth + 20;
             float inner = area.width - GUI.skin.box.padding.horizontal;
             float scrollbar = GUI.skin.verticalScrollbar.fixedWidth + 8;
@@ -130,11 +113,6 @@ namespace Game.Client
             Controls.Block(area);
             Wheel(area);
             Ui.TouchScroll(area, ref _scroll[(int)_page]);
-            GUILayout.BeginArea(area, GUI.skin.box);
-            string close = Controls.UsingTouch ? "가방 버튼으로 닫기" : "Tab 또는 I로 닫기";
-            // Without room beside the window the hint goes in the title, so nothing sits over the list.
-            string hint = besideWindow ? "" : Controls.UsingTouch ? " · 이름을 누르고 있으면 설명" : " · 이름에 마우스를 올리면 설명";
-            GUILayout.Label(Fit($"가방 ({close}){hint}", inner));
             // The chest tab is there only while a chest is in reach, the merchant's while she is.
             bool chest = _client.Chest.IsOpen;
             var person = _client.NpcNear();
@@ -146,6 +124,27 @@ namespace Game.Client
             _pages.AddRange(new[] { Page.Gear, Page.Materials, Page.Classes, Page.Passives, Page.Character, Page.Journal });
             if (chest) _pages.Add(Page.Chest);
             if (merchant) _pages.Add(Page.Merchant);
+
+            // The head band says what the page is (Docs/UiRework.md, the person's pick of 2026-11-22): the bag's
+            // leather, the growth pages' night, the journal's parchment, a merchant's awning with her hearts, a chest's
+            // steel; the coins at its right, and the close button in the corner.
+            var kind = KindOf(_page);
+            string title = _page switch
+            {
+                Page.Classes or Page.Passives or Page.Journal or Page.Chest => PageNames[(int)_page],
+                Page.Merchant => person.Value.Npc.Name,
+                _ => "가방",
+            };
+            UiMotion.BeginWindow("bag", area, kind);
+            var inside = UiSkin.Window(area, kind, title, TabIcons[(int)_page], out var head);
+            float right = UiSkin.CloseRect(head).x - 6;
+            right = DrawCoins(head, right);
+            if (_page == Page.Merchant) UiSkin.Hearts(head, right - 4, _client.HeartsWith(person.Value.Npc), World.MaxHearts);
+            if (UiSkin.CloseButton(head)) Open = false;
+            GUILayout.BeginArea(inside);
+            // Without room beside the window a line says how to see a description, so nothing sits over the list.
+            if (!besideWindow && !Ui.Short)
+                GUILayout.Label(Fit(Controls.UsingTouch ? "이름이나 칸을 누르고 있으면 설명" : "이름이나 칸에 마우스를 올리면 설명", inner));
             _page = Tabs(_page, _pages, inner);
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
@@ -163,10 +162,70 @@ namespace Game.Client
             if (Event.current.type == EventType.Repaint)
             {
                 var rows = GUILayoutUtility.GetLastRect();
-                _rows = new Rect(area.x + rows.x, area.y + rows.y, rows.width, rows.height);
+                _rows = new Rect(inside.x + rows.x, inside.y + rows.y, rows.width, rows.height);
             }
             GUILayout.EndArea();
+            UiMotion.EndWindow();
             DrawTooltip(area, besideWindow);
+        }
+
+        // Where the bag goes: left of the minimap column, full height; on narrow screens under the column; under the HUD
+        // where the two would overlap (while the bag is open the HUD is only its bars). The page scrolls when it does not
+        // fit.
+        internal static Rect AreaOf()
+        {
+            Rect area;
+            float room = Ui.MinimapArea.x - 20;
+            if (room >= MinWidth)
+            {
+                float width = Mathf.Min(MaxWidth, room);
+                area = new Rect(Ui.MinimapArea.x - 10 - width, 10, width, Ui.Height - 20);
+            }
+            else
+            {
+                float top = Ui.RightColumnBottom + 10;
+                area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
+            }
+            var hud = Ui.HudArea;
+            if (area.x < hud.xMax + 10 && area.y < hud.yMax + 10) area = Rect.MinMaxRect(area.x, hud.yMax + 10, area.xMax, area.yMax);
+            return area;
+        }
+
+        static UiKind KindOf(Page page) => page switch
+        {
+            Page.Classes or Page.Passives => UiKind.Growth,
+            Page.Journal => UiKind.Journal,
+            Page.Merchant => UiKind.Shop,
+            Page.Chest => UiKind.Machine,
+            _ => UiKind.Bag,
+        };
+
+        // The small picture of each page, on its tab and in the head (in Page's order).
+        static readonly string[][] TabIcons = { UiIcons.Bag, UiIcons.Hammer, UiIcons.Skills, UiIcons.Tree, UiIcons.Chest, UiIcons.Shop, UiIcons.Person, UiIcons.Book };
+
+        static GUIStyle _coinStyle;
+
+        // The coins in the bag at the right of the head, a moment gold and larger when they change; gives where the
+        // coins start.
+        float DrawCoins(Rect head, float right)
+        {
+            var coin = _client.Bag.Materials.Keys.FirstOrDefault(m => m.Id == World.Coin);
+            int coins = coin == null ? 0 : _client.Bag.CountOf(coin);
+            _coinStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleRight, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0), wordWrap = false };
+            Ui.Text(_coinStyle, 12, bold: true);
+            var ink = UiArt.HeadInk(KindOf(_page));
+            _coinStyle.normal.textColor = new Color(ink.R / 255f, ink.G / 255f, ink.B / 255f);
+            string text = coins.ToString("N0");
+            float width = _coinStyle.CalcSize(new GUIContent(text)).x;
+            float band = UiArt.HeadBand * UiSkin.Pt;
+            float middle = _page == Page.Merchant ? head.y + 10.5f * UiSkin.Pt : head.y + band / 2;
+            var line = new Rect(right - width, middle - 9, width, 18);
+            var icon = UiSkin.IconSize(UiIcons.Coin);
+            // Only where it does not crowd the title.
+            if (head.width < 300) return right;
+            UiSkin.Count(line, "coins", coins, text, _coinStyle);
+            UiSkin.Icon(new Rect(line.x - icon.x - 3, middle - icon.y / 2, icon.x, icon.y), UiIcons.Coin, new Color(0.95f, 0.75f, 0.25f));
+            return line.x - icon.x - 6;
         }
 
         // Tabs that switch as soon as they are pressed. IMGUI's toolbar switches on release, and in the browser its
@@ -196,17 +255,43 @@ namespace Game.Client
                     if (page != pages[i])
                     {
                         page = pages[i];
-                        Sounds.Play(Sound.Click);
+                        UiMotion.Confirm();
                     }
                     e.Use();
                 }
-                Ui.Probe(PageLabels[(int)pages[i]].text, tab);
-                if (e.type == EventType.Repaint) GUI.skin.button.Draw(tab, PageLabels[(int)pages[i]], tab.Contains(e.mousePosition), false, page == pages[i], false);
+                var label = PageLabels[(int)pages[i]];
+                Ui.Probe(label.text, tab);
+                if (e.type == EventType.Repaint) DrawTab(tab, label, TabIcons[(int)pages[i]], page == pages[i], tab.Contains(e.mousePosition));
                 // Points to spend: a gold dot in the corner of the skills or passives tab.
                 bool points = pages[i] == Page.Classes && _client.SkillPoints > 0 || pages[i] == Page.Passives && _client.PassivePoints > 0;
                 if (points && e.type == EventType.Repaint) Badge(tab);
             }
             return page;
+        }
+
+        // A tab: the chosen one gold and standing two points taller than the rest; its icon beside its name where the
+        // tab is wide enough for both (Docs/UiRework.md 4-4 탭 두 단).
+        static void DrawTab(Rect tab, GUIContent label, string[] icon, bool chosen, bool hover)
+        {
+            var face = chosen ? tab : new Rect(tab.x, tab.y + 2, tab.width, tab.height - 2);
+            UiSkin.ButtonFrame(face, hover && !chosen, false, chosen, false);
+            var style = UiSkin.Bare(GUI.skin.button);
+            float text = style.CalcSize(label).x - style.padding.horizontal;
+            var iconSize = UiSkin.IconSize(icon);
+            bool withIcon = face.width >= iconSize.x + 4 + text + 12;
+            if (!withIcon)
+            {
+                style.Draw(face, label, hover, false, chosen, false);
+                return;
+            }
+            float left = face.x + (face.width - iconSize.x - 4 - text) / 2;
+            UiSkin.Icon(new Rect(left, face.y, iconSize.x, face.height), icon, chosen ? new Color(1f, 0.92f, 0.62f) : new Color(0.85f, 0.72f, 0.5f));
+            style.alignment = TextAnchor.MiddleLeft;
+            var padding = style.padding;
+            style.padding = new RectOffset(0, 0, padding.top, padding.bottom);
+            style.Draw(new Rect(left + iconSize.x + 4, face.y, text + 4, face.height), label, hover, false, chosen, false);
+            style.padding = padding;
+            style.alignment = TextAnchor.MiddleCenter;
         }
 
         // The character (as Core Keeper shows one): the worn slots laid out round the body, the picked one's panel,
@@ -676,7 +761,8 @@ namespace Game.Client
             }
 
             GUILayout.Space(4);
-            GUILayout.BeginVertical(GUI.skin.box);
+            // A well inside the window (Docs/UiRework.md 4-4 판 위계).
+            UiSkin.BeginWell(_pickedWell);
             float width = _textWidth - GUI.skin.box.padding.horizontal;
             if (item != null)
             {
@@ -709,9 +795,9 @@ namespace Game.Client
                     // Too high a level to wear yet: the button says which level instead.
                     bool wearable = item.Base.RequiredLevel <= _client.Level;
                     GUI.enabled = wearable;
-                    if (Ui.LayoutButton(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", GUILayout.Width(64))) Send(_client.EquipCommand(item.Id), Sound.Place);
+                    if (Ui.LayoutButton(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", Ui.Look.Primary, GUILayout.Width(64))) Send(_client.EquipCommand(item.Id), Sound.Place);
                     GUI.enabled = true;
-                    if (Ui.LayoutButton("버리기", GUILayout.Width(64))) Send(_client.DiscardCommand(item.Id), Sound.Click);
+                    if (Ui.LayoutButton("버리기", Ui.Look.Danger, GUILayout.Width(64))) Send(_client.DiscardCommand(item.Id), Sound.Click);
                 }
                 RuneButton(item);
                 RefineButton(item);
@@ -738,8 +824,11 @@ namespace Game.Client
                 GUILayout.FlexibleSpace();
                 GUILayout.EndHorizontal();
             }
-            GUILayout.EndVertical();
+            _pickedWell = UiSkin.EndWell(_pickedWell);
         }
+
+        // Where the picked thing's well was laid out last.
+        Rect _pickedWell;
 
         // What wearing the item instead of the other would change, stat by stat ("피해 +12", "방어도 -3").
         static List<string> Compare(Item item, Item other)
@@ -807,44 +896,61 @@ namespace Game.Client
             return pressed;
         }
 
+        static readonly Color EpicEdge = Palette.Of(Rarity.Epic), LegendEdge = Palette.Of(Rarity.Legendary);
+
         static bool Cell(Rect area, Sprite icon, string name, string corner, Color edge, bool picked, string tooltip, bool dim = false)
         {
             Ui.Probe(name, area);
-            bool pressed = GUI.Button(area, GUIContent.none);
+            var e = Event.current;
+            bool hover = area.Contains(e.mousePosition) && (!Controls.UsingTouch || Ui.Held);
+            bool down = hover && Ui.Held && area.Contains(Ui.DownAt);
+            bool pressed = GUI.Button(area, GUIContent.none, GUIStyle.none);
+            if (pressed) UiMotion.Confirm();
             Hover(area, tooltip);
+            // A well with a rim of the thing's colour (Docs/UiRework.md 4-4 희귀도 테두리), epic and legendary breathing.
+            UiSkin.SlotFrame(area, edge, glow: edge == EpicEdge || edge == LegendEdge);
             var previous = GUI.color;
-            GUI.color = new Color(edge.r, edge.g, edge.b, 0.8f);
-            Frame(area, 2);
-            if (picked)
+            if (picked || hover)
             {
-                GUI.color = Color.white;
+                GUI.color = picked ? new Color(1f, 0.9f, 0.6f, previous.a) : new Color(1, 1, 1, 0.7f * previous.a);
                 Frame(new Rect(area.x - 2, area.y - 2, area.width + 4, area.height + 4), 2);
             }
-            GUI.color = dim ? new Color(1, 1, 1, 0.5f) : Color.white;
+            GUI.color = dim ? new Color(1, 1, 1, 0.5f * previous.a) : new Color(1, 1, 1, previous.a);
             float inset = Mathf.Round(area.width * 0.18f);
-            Sprites.DrawInGui(new Rect(area.x + inset, area.y + inset, area.width - inset * 2, area.height - inset * 2), icon);
+            var face = UiMotion.Face(area, hover, down);
+            Sprites.DrawInGui(new Rect(face.x + inset, face.y + inset, face.width - inset * 2, face.height - inset * 2), icon);
             GUI.color = previous;
             if (!string.IsNullOrEmpty(corner))
             {
                 _countStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerRight, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0) };
                 Ui.Text(_countStyle, 12, bold: true);
                 var box = new Rect(area.x + 2, area.y + 2, area.width - 5, area.height - 4);
-                GUI.color = new Color(0, 0, 0, 0.9f);
+                GUI.color = new Color(0, 0, 0, 0.9f * previous.a);
                 GUI.Label(new Rect(box.x + 1, box.y + 1, box.width, box.height), corner, _countStyle);
                 GUI.color = previous;
-                GUI.Label(box, corner, _countStyle);
+                // A count that changes pops (Docs/UiRework.md 4-6 숫자).
+                if (int.TryParse(corner, out int number))
+                {
+                    var size = _countStyle.CalcSize(new GUIContent(corner));
+                    int cut = name.IndexOf(" ×", StringComparison.Ordinal);
+                    UiSkin.Count(new Rect(box.xMax - size.x, box.yMax - size.y, size.x, size.y), "cell:" + (cut > 0 ? name.Substring(0, cut) : name), number, corner, _countStyle);
+                }
+                else
+                {
+                    GUI.Label(box, corner, _countStyle);
+                }
             }
             return pressed;
         }
 
-        // A worn slot with nothing in it: its name, faint.
+        // A worn slot with nothing in it: its name, faint, in an empty well.
         static void EmptyCell(Rect area, string slot)
         {
             _slotStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, padding = new RectOffset(0, 0, 0, 0), wordWrap = true };
             Ui.Text(_slotStyle, 12);
+            UiSkin.SlotFrame(area, null);
             var previous = GUI.color;
-            GUI.color = new Color(1, 1, 1, 0.35f);
-            GUI.Box(area, GUIContent.none);
+            GUI.color = new Color(1, 1, 1, 0.35f * previous.a);
             GUI.Label(area, slot, _slotStyle);
             GUI.color = previous;
         }
@@ -908,14 +1014,12 @@ namespace Game.Client
             var pointer = Event.current.mousePosition;
             bool hovering = !string.IsNullOrEmpty(_hover) && _rows.Contains(pointer);
             if (!hovering && !besideWindow) return;
-            _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
             string text = hovering ? _hover
                 : Controls.UsingTouch ? "이름이나 칸을 누르고 있으면 설명이 보입니다." : "이름이나 칸에 마우스를 올리면 설명이 보입니다.";
             float room = Mathf.Min(TooltipWidth, Ui.Width - 20);
-            var content = new GUIContent(Ui.Wrap(text, _tooltipStyle, room));
-            // As wide as the longest line needs, so short descriptions get a small box.
-            float width = Mathf.Min(room, Mathf.Ceil(_tooltipStyle.CalcSize(content).x) + 2);
-            float height = _tooltipStyle.CalcHeight(content, width);
+            // As wide as the longest line needs, so short descriptions get a small card.
+            var size = Ui.CardSize(text, room, out string wrapped);
+            float width = size.x, height = size.y;
             float x;
             float y;
             if (besideWindow)
@@ -933,7 +1037,8 @@ namespace Game.Client
             }
             x = Mathf.Clamp(x, 10, Mathf.Max(10, Ui.Width - width - 10));
             y = Mathf.Clamp(y, 10, Mathf.Max(10, Ui.Height - height - 10));
-            GUI.Box(new Rect(x, y, width, height), content, _tooltipStyle);
+            // A floating card over everything, drawn last (Ui.LateCard): the minimap and touch buttons come after the bag.
+            Ui.LateCard(new Rect(x, y, width, height), wrapped);
         }
 
         // With the classes, what each damaging skill would hit for now: the same tag rules as the host, so swapping
@@ -1646,7 +1751,7 @@ namespace Game.Client
             int cost = _client.SkillResetCost;
             var coin = _client.Loot.FindMaterial(World.Coin);
             GUI.enabled = cost > 0 && coin != null && _client.Bag.CountOf(coin) >= cost;
-            if (Ui.LayoutButton(cost > 0 ? $"되돌리기 (금화 {cost})" : "되돌리기", GUILayout.Width(146))) Send(_client.ResetSkillsCommand(), Sound.Click);
+            if (Ui.LayoutButton(cost > 0 ? $"되돌리기 (금화 {cost})" : "되돌리기", Ui.Look.Danger, GUILayout.Width(146))) Send(_client.ResetSkillsCommand(), Sound.Click);
             GUI.enabled = true;
             GUILayout.EndHorizontal();
             GUILayout.Space(4);
@@ -1942,7 +2047,7 @@ namespace Game.Client
                 int resetCost = _client.Passives.Count * ClassRules.PassiveResetCoinsPerPoint;
                 var gold = _client.Loot.FindMaterial(World.Coin);
                 GUI.enabled = gold != null && _client.Bag.CountOf(gold) >= resetCost;
-                if (Ui.LayoutButton($"모두 되돌리기 (금화 {resetCost})", GUILayout.Width(180))) Send(_client.ResetPassivesCommand(), Sound.Click);
+                if (Ui.LayoutButton($"모두 되돌리기 (금화 {resetCost})", Ui.Look.Danger, GUILayout.Width(180))) Send(_client.ResetPassivesCommand(), Sound.Click);
                 GUI.enabled = true;
             }
             GUILayout.EndHorizontal();

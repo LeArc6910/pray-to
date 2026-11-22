@@ -32,7 +32,7 @@ namespace Game.Client
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
                 return WriteMonsterFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "dungeons" && args[1] != "portraits")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -91,6 +91,12 @@ namespace Game.Client
             // --only portraits: just the talk box's portraits, every person in every expression (out/portraits/, PortraitPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "portraits")
                 return PortraitPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, npcs) ? 0 : 1;
+            // --only ui: just the game's UI skin, its pieces and the existing screens in it (out/ui/, UiPreview).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "ui")
+            {
+                UiPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot);
+                return 0;
+            }
             // --only dungeons: just the instance dungeons as they are laid (dungeons.png, dungeons/, DungeonPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "dungeons")
             {
@@ -110,6 +116,7 @@ namespace Game.Client
             Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
             Save(Sheet(loot, monsters, npcs), Path.Combine(output, "sheet.png"), 4);
             Save(UiMock(), Path.Combine(output, "ui_mock.png"), 3);
+            UiPreview.Write(output, loot);
             // The shapes taken from CC0 packs (Docs/ArtSources.md), in each tier's colours: picks and ingots.
             var imported = new[] { "_bar", "cave_minnow", "ice_trout", "crystal_eel", "void_angler", "warden_core", "queen_heart", "void_essence", "frost_berry",
                 "berry_juice", "moon_wine", "milk", "lotus_tea", "hoe", "watering_can" };

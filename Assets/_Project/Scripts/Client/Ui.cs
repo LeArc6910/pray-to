@@ -97,7 +97,33 @@ namespace Game.Client
             Scale = PixelRatio();
             GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1));
             StartProbe();
+            // Whether a mouse button or finger is down, and where it went down: a button shows itself pressed only while
+            // the press that started on it lasts (UiMotion.Face).
+            var e = Event.current;
+            if (e.type == EventType.MouseDown)
+            {
+                Held = true;
+                DownAt = e.mousePosition;
+            }
+            else if (e.type == EventType.MouseUp)
+            {
+                Held = false;
+            }
+            UiMotion.StartPass();
+            if (e.type == EventType.Repaint) UiMotion.StartRepaint();
+            WorldTaken.Clear();
+            _late = false;
         }
+
+        // At the end of every OnGUI: the card held back for the top (LateCard), and the windows that closed this frame.
+        public static void End()
+        {
+            DrawLate();
+            UiMotion.EndPass();
+        }
+
+        public static bool Held { get; private set; }
+        public static Vector2 DownAt { get; private set; }
 
         static void LoadFont(bool pixel)
         {
@@ -269,46 +295,188 @@ namespace Game.Client
             if (Probing && Event.current.type == EventType.Repaint) _row = text ?? "";
         }
 
-        public static bool Button(Rect rect, string text)
+        // The three kinds of button (Docs/UiRework.md 4-4 단추 세 가지): the usual one; the screen's one main action, in
+        // gold; and one that throws something away or cannot be taken back, red rimmed.
+        public enum Look
+        {
+            Normal,
+            Primary,
+            Danger,
+        }
+
+        public static bool Button(Rect rect, string text) => Button(rect, text, GUI.skin.button, Look.Normal);
+
+        public static bool Button(Rect rect, string text, GUIStyle style) => Button(rect, text, style, Look.Normal);
+
+        public static bool Button(Rect rect, string text, Look look) => Button(rect, text, GUI.skin.button, look);
+
+        // A button that shows one text and is known to the playtests by another (a setting shows its value, and is
+        // found as "name: value").
+        public static bool Button(Rect rect, string shown, string probed)
+        {
+            Probe(probed, rect);
+            Temp.text = shown;
+            Temp.tooltip = null;
+            return Pressable(rect, Temp, GUI.skin.button, Look.Normal, false);
+        }
+
+        public static bool Button(Rect rect, string text, GUIStyle style, Look look, bool chosen = false)
         {
             Probe(text, rect);
-            return GUI.Button(rect, text);
+            Temp.text = text;
+            Temp.tooltip = null;
+            return Pressable(rect, Temp, style, look, chosen);
         }
 
-        public static bool Button(Rect rect, string text, GUIStyle style)
+        public static bool LayoutButton(string text, params GUILayoutOption[] options) => LayoutButton(text, GUI.skin.button, Look.Normal, options);
+
+        public static bool LayoutButton(string text, GUIStyle style, params GUILayoutOption[] options) => LayoutButton(text, style, Look.Normal, options);
+
+        public static bool LayoutButton(string text, Look look, params GUILayoutOption[] options) => LayoutButton(text, GUI.skin.button, look, options);
+
+        public static bool LayoutButton(GUIContent content, params GUILayoutOption[] options) => LayoutButton(content, GUI.skin.button, Look.Normal, options);
+
+        public static bool LayoutButton(string text, GUIStyle style, Look look, params GUILayoutOption[] options)
         {
+            Temp.text = text;
+            Temp.tooltip = null;
+            return LayoutButton(Temp, style, look, options);
+        }
+
+        // Laid out as GUILayout.Button lays out (its rect from the style and options), then drawn here.
+        static bool LayoutButton(GUIContent content, GUIStyle style, Look look, GUILayoutOption[] options)
+        {
+            var rect = GUILayoutUtility.GetRect(content, style, options);
+            string text = content.text;
+            bool pressed = Pressable(rect, content, style, look, false);
             Probe(text, rect);
-            return GUI.Button(rect, text, style);
-        }
-
-        public static bool LayoutButton(string text, params GUILayoutOption[] options)
-        {
-            bool pressed = GUILayout.Button(text, options);
-            Probe(text, GUILayoutUtility.GetLastRect());
             return pressed;
         }
 
-        public static bool LayoutButton(string text, GUIStyle style, params GUILayoutOption[] options)
-        {
-            bool pressed = GUILayout.Button(text, style, options);
-            Probe(text, GUILayoutUtility.GetLastRect());
-            return pressed;
-        }
+        static readonly GUIContent Temp = new GUIContent();
 
-        public static bool LayoutButton(GUIContent content, params GUILayoutOption[] options)
-        {
-            bool pressed = GUILayout.Button(content, options);
-            Probe(content.text, GUILayoutUtility.GetLastRect());
-            return pressed;
-        }
-
+        // Segments in a row, one chosen, as GUILayout.Toolbar, drawn with the buttons' frames.
         public static int Toolbar(int selected, string[] texts, params GUILayoutOption[] options)
         {
-            int chosen = GUILayout.Toolbar(selected, texts, options);
-            var row = GUILayoutUtility.GetLastRect();
+            Temp.text = texts.Length > 0 ? texts[0] : "";
+            Temp.tooltip = null;
+            var row = GUILayoutUtility.GetRect(Temp, GUI.skin.button, options.Length > 0 ? options : new[] { GUILayout.ExpandWidth(true) });
             float width = row.width / Mathf.Max(1, texts.Length);
-            for (int i = 0; i < texts.Length; i++) Probe(texts[i], new Rect(row.x + i * width, row.y, width, row.height));
+            int chosen = selected;
+            for (int i = 0; i < texts.Length; i++)
+            {
+                var segment = new Rect(row.x + i * width, row.y, width - (i < texts.Length - 1 ? 2 : 0), row.height);
+                Probe(texts[i], segment);
+                Temp.text = texts[i];
+                Temp.tooltip = null;
+                if (Pressable(segment, Temp, GUI.skin.button, Look.Normal, i == selected)) chosen = i;
+            }
             return chosen;
+        }
+
+        // A button: its frame drawn crisp (UiSkin.ButtonFrame), lit under the pointer, sunk while pressed, a little
+        // shake when it cannot be used and is pressed anyway (UiMotion), and the text over it in the style's colours.
+        // The press itself is an invisible GUI.Button on the rect, so a button takes clicks and taps exactly as before.
+        // A style without a background (a bare label, GUIStyle.none) gets no frame.
+        static bool Pressable(Rect rect, GUIContent content, GUIStyle style, Look look, bool chosen)
+        {
+            var e = Event.current;
+            bool enabled = GUI.enabled;
+            string key = content.text;
+            if (!enabled && e.type == EventType.MouseDown && rect.Contains(e.mousePosition)) UiMotion.Refuse(key, rect);
+            if (e.type == EventType.Repaint)
+            {
+                float shake = UiMotion.Shake(key, rect);
+                bool hover = enabled && rect.Contains(e.mousePosition) && (!Controls.UsingTouch || Held);
+                bool down = hover && Held && rect.Contains(DownAt);
+                var face = UiMotion.Face(new Rect(rect.x + shake, rect.y, rect.width, rect.height), hover, down);
+                bool framed = style.normal.background != null;
+                if (framed)
+                {
+                    var previous = GUI.color;
+                    if (!enabled) GUI.color = new Color(previous.r, previous.g, previous.b, previous.a * 0.55f);
+                    UiSkin.ButtonFrame(face, hover && !down, down, chosen || look == Look.Primary, look == Look.Danger);
+                    GUI.color = previous;
+                }
+                var bare = framed ? UiSkin.Bare(style) : style;
+                bare.Draw(face, content, hover, down, chosen, false);
+                if (hover) UiMotion.Hover(key + rect.position);
+            }
+            bool pressed = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+            if (pressed) UiMotion.Confirm();
+            return pressed;
+        }
+
+        // ---- Buttons over things in the world ----
+
+        static readonly List<Rect> WorldTaken = new List<Rect>();
+
+        // How tall a button over the world is: a finger's 40 points on a touch screen (Docs/Design.md 기술 원칙 7).
+        public static float WorldButtonHeight => Controls.UsingTouch ? TouchButtonHeight : 28;
+
+        // A button over something in the world, its middle at the point, moved up past those already drawn this pass so
+        // two never sit on one spot (Docs/UiRework.md 2절 겹침 버그: [끄기] under [○○와 말하기] on a phone).
+        public static bool WorldButton(Vector2 point, string text, float width)
+        {
+            float height = WorldButtonHeight;
+            var wanted = new Rect(point.x - width / 2, point.y - height / 2, width, height);
+            var rect = Stack(wanted, WorldTaken, Width);
+            WorldTaken.Add(rect);
+            Controls.Block(rect);
+            return Button(rect, text);
+        }
+
+        // Where a button wanted at that rect goes: on the screen across, and above any taken one it would touch.
+        internal static Rect Stack(Rect wanted, IReadOnlyList<Rect> taken, float screenWidth)
+        {
+            var rect = wanted;
+            rect.x = Mathf.Clamp(rect.x, 4, Mathf.Max(4, screenWidth - rect.width - 4));
+            for (int round = 0; round < 8; round++)
+            {
+                bool moved = false;
+                foreach (var other in taken)
+                {
+                    if (rect.xMin >= other.xMax + 2 || other.xMin >= rect.xMax + 2 || rect.yMin >= other.yMax + 2 || other.yMin >= rect.yMax + 2) continue;
+                    rect.y = other.y - rect.height - 4;
+                    moved = true;
+                }
+                if (!moved) break;
+            }
+            return rect;
+        }
+
+        // ---- A card over everything ----
+
+        static bool _late;
+        static Rect _lateRect;
+        static string _lateText;
+
+        // A card (a description) to draw when the pass ends, over everything drawn after the thing it describes: drawn
+        // at once, the skill slot's description went under the quick slots (Docs/UiRework.md 2절, pc-boss-bar). The last
+        // asked for in a pass is the one drawn.
+        public static void LateCard(Rect rect, string text)
+        {
+            _late = true;
+            _lateRect = rect;
+            _lateText = text;
+        }
+
+        // How big a card for the text is at most `width` wide (wrapped between words), as narrow as its longest line.
+        public static Vector2 CardSize(string text, float width, out string wrapped)
+        {
+            var style = UiSkin.CardText;
+            wrapped = Wrap(text, style, width);
+            var content = new GUIContent(wrapped);
+            float w = Mathf.Min(width, Mathf.Ceil(style.CalcSize(content).x) + 2);
+            return new Vector2(w, style.CalcHeight(content, w));
+        }
+
+        static void DrawLate()
+        {
+            if (!_late) return;
+            _late = false;
+            UiSkin.Card(_lateRect);
+            GUI.Label(_lateRect, _lateText, UiSkin.CardText);
         }
 
         public static Vector2 BeginScrollView(Vector2 position, params GUILayoutOption[] options)

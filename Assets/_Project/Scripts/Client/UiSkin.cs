@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Object = UnityEngine.Object;
 
@@ -6,7 +7,8 @@ namespace Game.Client
     // The pixel-art look of every IMGUI screen: a copy of Unity's default skin with its backgrounds swapped for the
     // frames in Art/UiArt.cs, and warmer text. Ui.Begin sets it at the start of every OnGUI, so styles made from
     // GUI.skin elsewhere (tooltips, slot labels) inherit it. Also draws the bars (health, the boss) in the same frames.
-    static class UiSkin
+    // The frames of windows, buttons, cards and slots are drawn at whole device pixels (Crisp, below).
+    static partial class UiSkin
     {
         static readonly Color Text = new Color(0.94f, 0.9f, 0.84f);
         static readonly Color TextBright = Color.white;
@@ -182,5 +184,435 @@ namespace Game.Client
         static int Edge(int border) => border * UiArt.Scale;
 
         static Texture2D Texture(PixelImage image) => Sprites.TextureOf(UiArt.Enlarged(image));
+
+        // ---- Crisp: frames at whole device pixels (Docs/UiRework.md 4-4 틀은 기기 픽셀 정수 배) ----
+
+        // How many device pixels one pixel of the UI art takes: the art's own doubling (UiArt.Scale) at the screen's
+        // pixel ratio, to the nearest whole number. The skin's frames are stretched by the GUI matrix, so on a phone
+        // whose ratio is 2.625 their pixels came out 5 and 6 device pixels across by turns; these are 5 each. On a
+        // desktop (ratio 1) both are 2, as before. One art pixel is Pt points.
+        public static int Dots => Mathf.Max(1, Mathf.RoundToInt(UiArt.Scale * Ui.Scale));
+        public static float Pt => Dots / Ui.Scale;
+
+        // A rect in the current group's points with its edges moved onto device pixels.
+        public static Rect Snap(Rect rect)
+        {
+            float s = Ui.Scale;
+            var offset = GUIUtility.GUIToScreenPoint(Vector2.zero);
+            return Rect.MinMaxRect(
+                Mathf.Round((rect.xMin + offset.x) * s) / s - offset.x, Mathf.Round((rect.yMin + offset.y) * s) / s - offset.y,
+                Mathf.Round((rect.xMax + offset.x) * s) / s - offset.x, Mathf.Round((rect.yMax + offset.y) * s) / s - offset.y);
+        }
+
+        // A picture of the UI art and how many pixels at each edge keep their size when it is stretched, made into a
+        // texture with Dots texels to each pixel (again when the screen's ratio changes).
+        sealed class Piece
+        {
+            readonly bool _repeat;
+            Texture2D _texture;
+            int _dots;
+
+            public Piece(PixelImage image, int border = 0, bool repeat = false)
+            {
+                Image = image;
+                Border = border;
+                _repeat = repeat;
+            }
+
+            public PixelImage Image { get; }
+            public int Border { get; }
+
+            public Texture2D Texture(int dots)
+            {
+                if (_texture != null && _dots == dots) return _texture;
+                if (_texture != null) Object.Destroy(_texture);
+                var big = new PixelImage(Image.Width * dots, Image.Height * dots);
+                for (int y = 0; y < big.Height; y++)
+                    for (int x = 0; x < big.Width; x++) big[x, y] = Image[x / dots, y / dots];
+                _texture = Sprites.TextureOf(big);
+                _texture.wrapMode = _repeat ? TextureWrapMode.Repeat : TextureWrapMode.Clamp;
+                _dots = dots;
+                return _texture;
+            }
+        }
+
+        static readonly float[] SliceX = new float[4], SliceY = new float[4], SliceU = new float[4], SliceV = new float[4];
+
+        // The picture stretched over the rect by its middle (nine-slice), its edges Border pixels of Dots device pixels.
+        static void Slice(Rect rect, Piece piece)
+        {
+            if (Event.current.type != EventType.Repaint || rect.width <= 0 || rect.height <= 0) return;
+            rect = Snap(rect);
+            float pt = Pt, s = Ui.Scale;
+            var texture = piece.Texture(Dots);
+            float w = piece.Image.Width, h = piece.Image.Height;
+            float bx = Mathf.Min(piece.Border * pt, Mathf.Floor(rect.width / 2 * s) / s);
+            float by = Mathf.Min(piece.Border * pt, Mathf.Floor(rect.height / 2 * s) / s);
+            float ux = bx / pt / w, uy = by / pt / h;
+            SliceX[0] = rect.xMin; SliceX[1] = rect.xMin + bx; SliceX[2] = rect.xMax - bx; SliceX[3] = rect.xMax;
+            SliceY[0] = rect.yMin; SliceY[1] = rect.yMin + by; SliceY[2] = rect.yMax - by; SliceY[3] = rect.yMax;
+            SliceU[0] = 0; SliceU[1] = ux; SliceU[2] = 1 - ux; SliceU[3] = 1;
+            // A texture's rows count from the bottom.
+            SliceV[0] = 1; SliceV[1] = 1 - uy; SliceV[2] = uy; SliceV[3] = 0;
+            for (int j = 0; j < 3; j++)
+            {
+                for (int i = 0; i < 3; i++)
+                {
+                    var dest = Rect.MinMaxRect(SliceX[i], SliceY[j], SliceX[i + 1], SliceY[j + 1]);
+                    if (dest.width <= 0.001f || dest.height <= 0.001f) continue;
+                    GUI.DrawTextureWithTexCoords(dest, texture, new Rect(SliceU[i], SliceV[j + 1], SliceU[i + 1] - SliceU[i], SliceV[j] - SliceV[j + 1]));
+                }
+            }
+        }
+
+        static readonly Dictionary<PixelImage, Piece> Images = new Dictionary<PixelImage, Piece>();
+
+        // A picture of the UI art (an icon, the close button) at its size, its top left at the point.
+        public static void Image(Vector2 at, PixelImage image)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            if (!Images.TryGetValue(image, out var piece)) Images[image] = piece = new Piece(image);
+            var rect = Snap(new Rect(at.x, at.y, image.Width * Pt, image.Height * Pt));
+            GUI.DrawTexture(rect, piece.Texture(Dots));
+        }
+
+        public static Vector2 SizeOf(PixelImage image) => new Vector2(image.Width * Pt, image.Height * Pt);
+
+        // One of the small icons (UiIcons) in a colour, centred in the rect.
+        public static void Icon(Rect area, string[] rows, Color color)
+        {
+            var image = UiIcons.Of(rows, ToRgba(color));
+            var size = SizeOf(image);
+            Image(new Vector2(area.center.x - size.x / 2, area.center.y - size.y / 2), image);
+        }
+
+        public static Vector2 IconSize(string[] rows) => SizeOf(UiIcons.Of(rows, Rgba.White));
+
+        static Rgba ToRgba(Color color) => new Rgba(Mathf.RoundToInt(color.r * 255), Mathf.RoundToInt(color.g * 255), Mathf.RoundToInt(color.b * 255), Mathf.RoundToInt(color.a * 255));
+
+        static int Key(Color color)
+        {
+            var c = ToRgba(color);
+            return c.R << 24 | c.G << 16 | c.B << 8 | c.A;
+        }
+
+        // ---- The three levels of panel (Docs/UiRework.md 4-4 판 위계 3단) ----
+
+        static Piece _panel, _inset, _card, _sign;
+
+        // The ground of a window or a HUD box: dark stone in a thin gold rim.
+        public static void Panel(Rect area) => Slice(area, _panel ??= new Piece(UiArt.Panel, UiArt.PanelBorder));
+
+        // A well inside a panel, darker, for slots, fields and lists.
+        public static void Inset(Rect area) => Slice(area, _inset ??= new Piece(UiArt.Inset, UiArt.InsetBorder));
+
+        // What floats over everything (a description): a step lighter, its gold rim lit.
+        public static void Card(Rect area) => Slice(area, _card ??= new Piece(UiArt.Card, UiArt.CardBorder));
+
+        static readonly Dictionary<int, Piece> ButtonPieces = new Dictionary<int, Piece>();
+
+        // A button's frame: lit under the pointer, sunk while pressed, gold when chosen or the screen's main action, red
+        // rimmed when it does something that cannot be taken back.
+        public static void ButtonFrame(Rect area, bool hover, bool pressed, bool chosen, bool danger)
+        {
+            int key = (hover ? 1 : 0) | (pressed ? 2 : 0) | (chosen ? 4 : 0) | (danger ? 8 : 0);
+            if (!ButtonPieces.TryGetValue(key, out var piece))
+                ButtonPieces[key] = piece = new Piece(UiArt.Button(hover, pressed, chosen, danger), UiArt.ButtonBorder);
+            Slice(area, piece);
+        }
+
+        static readonly Dictionary<(int, bool), Piece> SlotPieces = new Dictionary<(int, bool), Piece>();
+
+        // An item's slot: a dark well with a rim of its colour (a rarity, a potion's red), glowing for epic and up.
+        public static void SlotFrame(Rect area, Color? tint, bool glow = false)
+        {
+            int key = tint is Color color ? Key(color) : 0;
+            if (!SlotPieces.TryGetValue((key, glow), out var piece))
+                SlotPieces[(key, glow)] = piece = new Piece(UiArt.Slot(tint is Color c ? ToRgba(c) : (Rgba?)null, glow), UiArt.SlotBorder);
+            Slice(area, piece);
+            if (glow && tint is Color shine && !UiMotion.Reduced)
+            {
+                // Epic and legendary rims breathe (Docs/UiRework.md 4-6 희귀 아이템).
+                float breath = 0.5f + 0.5f * Mathf.Sin(Time.unscaledTime * 2.4f);
+                var previous = GUI.color;
+                GUI.color = new Color(shine.r, shine.g, shine.b, 0.22f * breath * previous.a);
+                float edge = UiArt.SlotBorder * Pt;
+                Outline(new Rect(area.x + Pt, area.y + Pt, area.width - 2 * Pt, area.height - 2 * Pt), Pt);
+                GUI.color = new Color(shine.r, shine.g, shine.b, 0.1f * breath * previous.a);
+                GUI.DrawTexture(new Rect(area.x + edge, area.y + edge, area.width - 2 * edge, area.height - 2 * edge), Texture2D.whiteTexture);
+                GUI.color = previous;
+            }
+        }
+
+        static void Outline(Rect area, float width)
+        {
+            GUI.DrawTexture(new Rect(area.x, area.y, area.width, width), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(area.x, area.yMax - width, area.width, width), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(area.x, area.y, width, area.height), Texture2D.whiteTexture);
+            GUI.DrawTexture(new Rect(area.xMax - width, area.y, width, area.height), Texture2D.whiteTexture);
+        }
+
+        // ---- Windows: the panel, a head band of the window's kind, a title and a close button ----
+
+        static readonly Dictionary<(UiKind, int, int), Piece> HeadPieces = new Dictionary<(UiKind, int, int), Piece>();
+        static readonly Color DefaultAccent = new Color(0.77f, 0.6f, 0.33f);
+
+        static Piece Head(UiKind kind, Color accent, int part)
+        {
+            int key = kind == UiKind.Talk || kind == UiKind.Stone ? Key(accent) : 0;
+            if (HeadPieces.TryGetValue((kind, key, part), out var piece)) return piece;
+            var rgba = ToRgba(accent);
+            var image = part == 1 ? UiArt.HeadMiddle(kind, rgba) : UiArt.HeadEnd(kind, rgba, left: part == 0);
+            HeadPieces[(kind, key, part)] = piece = new Piece(image, repeat: part == 1);
+            return piece;
+        }
+
+        // How tall a window's head is, and the frame's width round it.
+        public static float HeadHeight => UiArt.HeadHeight * Pt;
+        public static float FrameEdge => UiArt.PanelBorder * Pt;
+
+        // The head band along the top of a window, inside its frame: its material, ends and all.
+        public static Rect HeadOf(Rect window) => new Rect(window.x + FrameEdge, window.y + FrameEdge, window.width - FrameEdge * 2, HeadHeight);
+
+        // The area a window leaves for what it holds: under the head, inside the padding.
+        // On a phone held sideways (Ui.Short) the gaps are smaller, as every row of height counts there.
+        public static Rect InsideOf(Rect window)
+        {
+            float top = HeadOf(window).yMax + (Ui.Short ? 2 : 6);
+            return Rect.MinMaxRect(window.x + PanelPadding, top, window.xMax - PanelPadding, window.yMax - (Ui.Short ? FrameEdge + 2 : PanelPadding - 2));
+        }
+
+        public static void HeadBand(Rect head, UiKind kind, Color? accent = null)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            var color = accent ?? DefaultAccent;
+            head = Snap(head);
+            float pt = Pt;
+            float cap = Mathf.Min(UiArt.HeadCap * pt, head.width / 2);
+            float height = UiArt.HeadHeight * pt;
+            int dots = Dots;
+            GUI.DrawTexture(Snap(new Rect(head.x, head.y, cap, height)), Head(kind, color, 0).Texture(dots));
+            GUI.DrawTexture(Snap(new Rect(head.xMax - cap, head.y, cap, height)), Head(kind, color, 2).Texture(dots));
+            var middle = Snap(new Rect(head.x + cap, head.y, head.width - cap * 2, height));
+            if (middle.width <= 0) return;
+            // Repeated from where the left end left off, so the pattern runs on.
+            float tile = UiArt.HeadTile * pt;
+            GUI.DrawTextureWithTexCoords(middle, Head(kind, color, 1).Texture(dots), new Rect(cap / tile, 0, middle.width / tile, 1));
+        }
+
+        static GUIStyle _headText;
+
+        // Draws a window and gives the area for what it holds: the stone panel, the head band of its kind with the icon
+        // and title (the shop's on a sign under its awning, a speaker's at the left), and room on the right for the close
+        // button. `head` is the band, for what else a window puts in it (coins, hearts, the close button).
+        public static Rect Window(Rect area, UiKind kind, string title, string[] icon, out Rect head, Color? accent = null, bool closable = true)
+        {
+            Panel(area);
+            head = HeadOf(area);
+            HeadBand(head, kind, accent);
+            if (!string.IsNullOrEmpty(title)) Title(head, kind, title, icon, closable);
+            return InsideOf(area);
+        }
+
+        static void Title(Rect head, UiKind kind, string title, string[] icon, bool closable)
+        {
+            _headText ??= new GUIStyle(GUI.skin.label)
+            {
+                alignment = TextAnchor.MiddleLeft,
+                padding = new RectOffset(0, 0, 0, 0),
+                margin = new RectOffset(0, 0, 0, 0),
+                wordWrap = false,
+                clipping = TextClipping.Clip,
+            };
+            Ui.Text(_headText, 12, bold: true);
+            if (Ui.Probing && Event.current.type == EventType.Repaint) Ui.Wrap(title, _headText, 9999);
+            float pt = Pt;
+            float band = UiArt.HeadBand * pt;
+            var iconSize = icon != null ? IconSize(icon) : Vector2.zero;
+            float gap = icon != null ? 4 : 0;
+            float room = head.width - UiArt.HeadCap * pt * 2 - (closable ? CloseRoom : 0);
+            float text = Mathf.Min(_headText.CalcSize(new GUIContent(title)).x, room - iconSize.x - gap);
+            float whole = iconSize.x + gap + text;
+            bool left = kind == UiKind.Talk;
+            float x = left ? head.x + UiArt.HeadCap * pt + 2 : head.x + UiArt.HeadCap * pt + Mathf.Max(0, (room - whole) / 2);
+            float middle = head.y + band / 2;
+            if (kind == UiKind.Shop)
+            {
+                // The name on a board hanging under the awning.
+                middle = head.y + 10.5f * pt;
+                Slice(new Rect(x - 5 * pt, head.y + 6 * pt, whole + 10 * pt, 9 * pt), _sign ??= new Piece(UiArt.Sign, UiArt.SignBorder));
+            }
+            var ink = UiArt.HeadInk(kind);
+            var color = new Color(ink.R / 255f, ink.G / 255f, ink.B / 255f);
+            if (icon != null) Icon(new Rect(x, middle - iconSize.y / 2, iconSize.x, iconSize.y), icon, color);
+            var line = new Rect(x + iconSize.x + gap, middle - 9, text, 18);
+            var previous = GUI.color;
+            if (UiArt.HeadShadow(kind))
+            {
+                GUI.color = new Color(0, 0, 0, 0.7f * previous.a);
+                GUI.Label(new Rect(line.x + 1, line.y + 1, line.width, line.height), title, _headText);
+            }
+            GUI.color = new Color(color.r, color.g, color.b, previous.a);
+            GUI.Label(line, title, _headText);
+            GUI.color = previous;
+        }
+
+        // Room kept at the right of a head for the close button.
+        public static float CloseRoom => (UiArt.CloseSize + 6) * Pt;
+
+        static readonly PixelImage[] CloseImages = new PixelImage[4];
+
+        // Where the close button sits: always the head's top right corner (Docs/UiRework.md 4-4 창 머리).
+        public static Rect CloseRect(Rect head)
+        {
+            float size = UiArt.CloseSize * Pt;
+            return new Rect(head.xMax - size - 3 * Pt, head.y + (UiArt.HeadBand * Pt - size) / 2, size, size);
+        }
+
+        // The close button in a window's head; true when pressed. A finger gets a 44-point target round the small stone.
+        // Its name for the playtests is "창 닫기", apart from the [닫기] buttons they already press.
+        public static bool CloseButton(Rect head, string label = "창 닫기")
+        {
+            var shown = CloseRect(head);
+            var hit = Controls.UsingTouch
+                ? Rect.MinMaxRect(shown.xMax - 44, head.y - FrameEdge, head.xMax + FrameEdge, Mathf.Max(shown.yMax + 4, head.y - FrameEdge + 44))
+                : new Rect(shown.x - 2, shown.y - 2, shown.width + 4, shown.height + 4);
+            Ui.Probe(label, hit);
+            var e = Event.current;
+            bool hover = hit.Contains(e.mousePosition) && (!Controls.UsingTouch || Ui.Held);
+            bool down = hover && Ui.Held && hit.Contains(Ui.DownAt);
+            int index = (hover ? 1 : 0) | (down ? 2 : 0);
+            Image(shown.position, CloseImages[index] ??= UiArt.Close(hover, down));
+            if (!GUI.Button(hit, GUIContent.none, GUIStyle.none)) return false;
+            UiMotion.Cancel();
+            return true;
+        }
+
+        // A row of small hearts (a merchant's liking, Docs/UiRework.md 4-2), from the right edge leftwards; gives where
+        // they start.
+        public static float Hearts(Rect head, float right, int hearts, int most)
+        {
+            var size = IconSize(UiIcons.Heart);
+            float x = right - most * (size.x + 1);
+            float y = head.y + (UiArt.HeadBand * Pt - size.y) / 2;
+            for (int i = 0; i < most; i++)
+                Icon(new Rect(x + i * (size.x + 1), y, size.x, size.y), UiIcons.Heart, i < hearts ? new Color(0.9f, 0.25f, 0.3f) : new Color(0.25f, 0.18f, 0.18f));
+            return x;
+        }
+
+        // ---- Styles for writing over the frames drawn here ----
+
+        static readonly Dictionary<GUIStyle, GUIStyle> BareStyles = new Dictionary<GUIStyle, GUIStyle>();
+
+        // A copy of the style with no backgrounds, its size and colours kept in step with it, for text over a frame
+        // drawn here (or a padded area inside one).
+        public static GUIStyle Bare(GUIStyle style)
+        {
+            if (!BareStyles.TryGetValue(style, out var bare))
+            {
+                bare = new GUIStyle(style);
+                foreach (var state in new[] { bare.normal, bare.hover, bare.active, bare.focused, bare.onNormal, bare.onHover, bare.onActive, bare.onFocused })
+                {
+                    state.background = null;
+#if UNITY_EDITOR
+                    state.scaledBackgrounds = NoScaled;
+#endif
+                }
+                BareStyles[style] = bare;
+            }
+            bare.font = style.font;
+            bare.fontSize = style.fontSize;
+            bare.fontStyle = style.fontStyle;
+            bare.alignment = style.alignment;
+            bare.wordWrap = style.wordWrap;
+            bare.normal.textColor = style.normal.textColor;
+            bare.hover.textColor = style.hover.textColor;
+            bare.active.textColor = style.active.textColor;
+            bare.onNormal.textColor = style.onNormal.textColor;
+            return bare;
+        }
+
+        // An area inside a panel drawn with Panel: the box's padding, no background.
+        public static GUIStyle PanelArea => Bare(GUI.skin.box);
+
+        static GUIStyle _cardText;
+
+        // The writing on a card: the box's padding, wrapped, from the top left.
+        public static GUIStyle CardText
+        {
+            get
+            {
+                _cardText ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
+                _cardText.normal.textColor = new Color(0.97f, 0.93f, 0.85f);
+                return Bare(_cardText);
+            }
+        }
+
+        // A group inside a panel set off as a well (the picked item's panel): the well is drawn where the group was last
+        // laid out, under it, since IMGUI knows a group's size only once it is drawn. The rect stays the same while the
+        // list scrolls (it is in the list's own points), so the well keeps up.
+        public static void BeginWell(Rect last)
+        {
+            Inset(last);
+            GUILayout.BeginVertical(PanelArea);
+        }
+
+        public static Rect EndWell(Rect last)
+        {
+            GUILayout.EndVertical();
+            return Event.current.type == EventType.Repaint ? GUILayoutUtility.GetLastRect() : last;
+        }
+
+        // ---- Full screens (Docs/UiRework.md 사람이 정한 것: the world dark behind, red at the edges when hurt) ----
+
+        static Texture2D _edges;
+
+        public static void FullBackdrop(Rect screen)
+        {
+            var previous = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.7f * previous.a);
+            GUI.DrawTexture(screen, Texture2D.whiteTexture);
+            float hurt = UiMotion.HurtGlow;
+            if (hurt > 0)
+            {
+                _edges ??= Edges();
+                GUI.color = new Color(0.9f, 0.08f, 0.06f, hurt * previous.a);
+                GUI.DrawTexture(screen, _edges, ScaleMode.StretchToFill);
+            }
+            GUI.color = previous;
+        }
+
+        // White fading in towards the edges, for the red of being hurt.
+        static Texture2D Edges()
+        {
+            const int size = 64;
+            var texture = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    float edge = Mathf.Min(Mathf.Min(x, size - 1 - x), Mathf.Min(y, size - 1 - y)) / (size * 0.22f);
+                    float a = Mathf.Clamp01(1 - edge);
+                    texture.SetPixel(x, y, new Color(1, 1, 1, a * a));
+                }
+            }
+            texture.Apply();
+            return texture;
+        }
+
+        // ---- A count that pops when it changes (Docs/UiRework.md 4-6 숫자) ----
+
+        // The text in the rect, a moment larger and gold when the number went up, red when it went down.
+        public static void Count(Rect area, string key, int value, string text, GUIStyle style)
+        {
+            var (scale, tint) = UiMotion.Pop(key, value);
+            var previous = GUI.color;
+            var matrix = GUI.matrix;
+            if (scale != 1) GUIUtility.ScaleAroundPivot(new Vector2(scale, scale), area.center);
+            if (tint.a > 0) GUI.color = Color.Lerp(previous, new Color(tint.r, tint.g, tint.b, previous.a), tint.a);
+            GUI.Label(area, text, style);
+            GUI.color = previous;
+            GUI.matrix = matrix;
+        }
     }
 }

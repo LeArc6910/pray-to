@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4717,7 +4717,141 @@ async function dungeon(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch };
+// ---------------------------------------------------------------- UI 개편 U0·U1 (Docs/UiRework.md)
+// The new skin on the screens there are (bag, talk, waypoints, map, menus) on a PC, a phone held upright, a small phone
+// held sideways and a phone whose pixel ratio is not whole (2.625), and the four overlap bugs of the 2026-11-22 audit:
+// the "획득" lines over the bag and the goal list, the roll's description under the quick slots, two world buttons on
+// one spot, and the goal list pushing the boss bar over the player on a phone held upright.
+const overlaps = (a, b) => a && b && a[2] > 0 && b[2] > 0 && a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+
+async function ui(browser) {
+  const profiles = [
+    Profiles.pc,
+    Profiles.phone,
+    Profiles['phone-wide-small'],
+    { name: 'phone-frac', touch: true, context: { viewport: { width: 390, height: 844 }, deviceScaleFactor: 2.625, isMobile: true, hasTouch: true } },
+  ];
+  for (const profile of profiles) {
+    const { width, height } = profile.context.viewport;
+    note(`\n## UI 개편 ${profile.name} ${width}×${height}\n`);
+    const game = await open(browser, run, profile, url);
+    await game.shot('ui-menu', '시작 화면');
+    await menuPage(game, '설정');
+    await game.wait(300);
+    const motion = (await game.buttons()).find(b => /^움직임: /.test(b.label));
+    check(!!motion, `설정에 [움직임] (${motion ? motion.label : '없음'})`);
+    const back = (await game.buttons()).find(b => b.label === '뒤로');
+    check(!!back && back.rect[1] < 60 + (height - Math.min(520, height - 20)) / 2, `[뒤로]가 창 머리 띠 안에 (${back ? back.rect.map(Math.round).join(',') : '없음'})`);
+    await game.shot('ui-settings', '설정(돌판 창, 머리 띠, [뒤로])');
+    await menuPage(game, '게임 시작');
+    await game.shot('ui-play', '게임 시작 화면(주 동작 [혼자 하기])');
+    await game.startSolo();
+    await game.wait(1200);
+    // A touch on the screen makes it a touch screen (sticks, the [가방] button, 40-point world buttons).
+    if (game.touch) await game.page.touchscreen.tap(width / 2, height / 3);
+    await game.wait(400);
+    let s = await game.state();
+    if (game.touch) check(s.touch, '터치 화면이 된다');
+    check(s.ui && s.ui.dots === Math.max(1, Math.round(2 * s.ui.scale)), `틀의 픽셀은 기기 픽셀의 정수 배 (배율 ${s.ui && s.ui.scale}, 픽셀 ${s.ui && s.ui.dots})`);
+    check(s.ui && s.ui.motion === 'normal', `움직임은 처음에 보통 (${s.ui && s.ui.motion})`);
+
+    // U0 1: the "획득" lines never over the bag nor over the goal list.
+    await game.send('drop item iron_sword; drop item iron_helmet; drop rune; drop potion healing_potion; drop material stone');
+    await game.wait(1500);
+    s = await game.state();
+    check(s.ui.acquired[2] === 0 || s.ui.acquired[1] >= s.ui.leftBottom - 0.5, `획득 줄이 목표 목록 아래에서 멈춘다 (줄 위 ${Math.round(s.ui.acquired[1])}, 목록 아래 ${Math.round(s.ui.leftBottom)})`);
+    await game.shot('ui-acquired', '획득 줄(목표 목록과 겹치지 않음)');
+    await bagTab(game, '장비');
+    await game.wait(400);
+    s = await game.state();
+    check(s.bag && !overlaps(s.ui.acquired, s.ui.bag), `가방이 열린 동안 획득 줄이 가방 위에 그려지지 않는다 (줄 ${s.ui.acquired.map(Math.round).join(',')}, 가방 ${s.ui.bag.map(Math.round).join(',')})`);
+    const close = (await game.buttons()).find(b => b.label === '창 닫기');
+    check(!!close && close.rect[0] + close.rect[2] > s.ui.bag[0] + s.ui.bag[2] - 60 && close.rect[1] < s.ui.bag[1] + 60, `가방 머리 오른쪽 위에 닫기 단추 (${close ? close.rect.map(Math.round).join(',') : '없음'})`);
+    await game.shot('ui-bag', '가방(가죽 머리 띠, 금화, 아이콘 탭, 희귀도 칸)');
+    await pick(game, /철 검/);
+    await game.shot('ui-bag-picked', '고른 장비의 안쪽 칸, [장착] 금색·[버리기] 붉은 테');
+    for (const [tab, caption] of [['스킬', '성장 머리(밤하늘)'], ['특성', '성장 머리(밤하늘)'], ['일지', '기록 머리(양피지)']]) {
+      await game.press(tab);
+      await game.wait(300);
+      await game.shot(`ui-bag-${tab}`, `가방 [${tab}]: ${caption}`);
+    }
+    check(await game.press('창 닫기'), '[창 닫기]를 누른다');
+    await game.wait(400);
+    check(!(await game.state()).bag, '닫기 단추로 가방이 닫힌다');
+
+    // U0 3: two world buttons on one spot (a machine before a person).
+    await game.send('goto person mina; still');
+    await game.wait(900);
+    await game.send('build Drill 0 -1 3; face 0 -1');
+    await game.wait(900);
+    const world = await game.buttons();
+    const off = world.find(b => /^(끄기|켜기)/.test(b.label));
+    const talk = world.find(b => /와 말하기|과 말하기/.test(b.label));
+    check(!!off && !!talk && !overlaps(off.rect, talk.rect), `기계 단추와 말하기 단추가 겹치지 않는다 (${off ? off.label : '-'} ${off ? off.rect.map(Math.round).join(',') : ''} / ${talk ? talk.label : '-'} ${talk ? talk.rect.map(Math.round).join(',') : ''})`);
+    if (game.touch) check(!!talk && talk.rect[3] >= 40 - 0.5, `휴대폰의 월드 단추는 40점 (${talk ? Math.round(talk.rect[3]) : '-'})`);
+    await game.shot('ui-world-buttons', '기계와 사람이 함께 있을 때의 월드 단추');
+
+    // The talk: the speaker's band.
+    check(await game.press(/미나와 말하기/), '[피난민 아이 미나와 말하기]');
+    await game.wait(500);
+    await game.shot('ui-talk', '대화(인물 색 머리 띠, 이름)');
+    for (let i = 0; i < 6 && (await game.press('다음', undefined, { quiet: true })); i++) await game.wait(200);
+    await game.press('닫기', undefined, { quiet: true });
+    await game.send('clear');
+
+    // The waypoint list: parchment head; a tap outside closes it.
+    await game.send('goto place dawn_village');
+    await game.wait(600);
+    await game.send('goto 0 2');
+    await game.wait(900);
+    if (await game.press('웨이포인트', undefined, { quiet: true })) {
+      await game.wait(500);
+      const rows = (await game.buttons()).filter(b => b.label === '창 닫기');
+      check(rows.length > 0, '웨이포인트 목록 머리에 닫기 단추');
+      await game.shot('ui-waypoints', '웨이포인트 목록(양피지 머리 띠)');
+      const box = await game.canvas();
+      await game.tapAt(box.left + 6, box.top + box.height - 6);
+      await game.wait(400);
+      check(!(await game.buttons()).some(b => b.label === '가 본 곳으로 간다' || (b.row || '').startsWith('가 본 곳')) && !(await game.find('창 닫기')).length,
+        '목록 바깥을 누르면 닫힌다');
+    } else {
+      note('- 웨이포인트 단추를 찾지 못해 목록 사진은 건너뛴다');
+    }
+
+    // The map: a full screen over the world darkened, its key whole.
+    if (game.touch) await game.press('지도');
+    else await game.page.keyboard.press('m');
+    await game.wait(600);
+    check((await game.state()).map, '지도가 열린다');
+    await game.shot('ui-map', '전체 지도(어두운 세계 위, 양피지 머리 띠, 범례 전부)');
+    await game.press('지도 닫기');
+    await game.wait(400);
+
+    // U0 2 (PC): the roll's description over the quick slots.
+    if (!game.touch) {
+      const roll = (await game.buttons()).find(b => b.label === 'roll');
+      if (roll) {
+        await game.page.mouse.move(roll.cx, roll.cy);
+        await game.wait(400);
+        await game.shot('ui-roll-card', '구르기 설명 카드(퀵슬롯 위에)');
+        await game.page.mouse.move(10, 10);
+      }
+    }
+
+    // U0 4: a boss fight. The goal list folds on a phone held upright; the boss bar stays clear of the player.
+    await game.send('equip void_sword void_helmet void_armor void_boots; goto boss cave_warden');
+    await game.wait(3000);
+    s = await game.state();
+    const bar = s.ui.bossBar, me = s.ui.player;
+    check(bar[2] > 0, `보스 막대가 보인다 (${bar.map(Math.round).join(',')})`);
+    check(bar[2] > 0 && bar[1] + bar[3] < me[1] - 20, `보스 막대가 플레이어 머리 위를 덮지 않는다 (막대 아래 ${Math.round(bar[1] + bar[3])}, 플레이어 ${Math.round(me[1])})`);
+    if (height > width) check(s.ui.folded, '세로 휴대폰에서 목표 목록이 한 줄로 접힌다');
+    await game.shot('ui-boss', '보스전(접힌 목표 목록과 보스 막대)');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

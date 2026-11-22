@@ -6,7 +6,7 @@ namespace Game.Client
     // buttons with a gold-brown rim that sink when pressed, and dark insets for text fields, scroll tracks and bars. Each is drawn small and
     // stretched by its middle (nine-slice), so its edge pixels keep their size; Border says how many pixels at each
     // edge to keep. UiSkin turns them into the IMGUI skin.
-    static class UiArt
+    static partial class UiArt
     {
         // Every frame is drawn at twice its pixel size, so its edges read on a desktop screen too.
         public const int Scale = 2;
@@ -71,11 +71,13 @@ namespace Game.Client
             ".oooooooo.",
         };
 
-        // Dark leather-brown with a gold-brown rim; under the pointer the rim lights up, and the chosen tab is gold.
-        public static PixelImage Button(bool hover = false, bool pressed = false, bool chosen = false)
+        // Dark leather-brown with a gold-brown rim; under the pointer the rim lights up, and the chosen tab is gold (the
+        // one main action of a screen too). A dangerous one (throw away, forget, undo for coins) has a red rim on a
+        // dark red, so it never looks like the button beside it (Docs/UiRework.md 4-4 단추 세 가지).
+        public static PixelImage Button(bool hover = false, bool pressed = false, bool chosen = false, bool danger = false)
         {
-            var fill = chosen ? Ramp.Of("#8C6A34") : hover ? Ramp.Of("#4A3A2C") : Ramp.Of("#3A2D23");
-            var rim = chosen ? Rgba.Hex("#F0D490") : hover ? Rgba.Hex("#D8B06A") : Rgba.Hex("#8C6C40");
+            var fill = danger ? Ramp.Of(hover ? "#5A2C26" : "#4A2420") : chosen ? Ramp.Of("#8C6A34") : hover ? Ramp.Of("#4A3A2C") : Ramp.Of("#3A2D23");
+            var rim = danger ? Rgba.Hex(hover ? "#F07A5E" : "#C0503C") : chosen ? Rgba.Hex("#F0D490") : hover ? Rgba.Hex("#D8B06A") : Rgba.Hex("#8C6C40");
             var colors = new Dictionary<char, Rgba>
             {
                 ['o'] = Rgba.Hex("#0B0807"),

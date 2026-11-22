@@ -97,6 +97,16 @@ namespace Game.Client
         Sting,
         Puff,
         Chime,
+        // The UI's own (Docs/UiRework.md 4-6 소리, U1): a window opening (a soft rising slide of stone and a lift),
+        // closing (the same falling), the pointer coming onto a button (a tiny tick), a button pressed (a short
+        // wooden knock with a bright top), going back or closing by its button (two notes down), and a press refused
+        // (a low buzz).
+        UiOpen,
+        UiClose,
+        UiHover,
+        UiConfirm,
+        UiCancel,
+        UiFail,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -195,6 +205,37 @@ namespace Game.Client
                 case Sound.Click:
                     parts.Add(Tone(Wave.Pulse, 0, 0.04f, 1200, 1100, 0.3f, decay: 6));
                     level = 0.4f;
+                    break;
+                case Sound.UiOpen:
+                    parts.Add(Noise(0, 0.12f, 0.5f, 0.55f, attack: 0.02f, decay: 4, seed: 71));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.13f, 330, 520, 0.45f, attack: 0.01f, decay: 3));
+                    parts.Add(Tone(Wave.Sine, 0.05f, 0.1f, 784, 784, 0.18f, decay: 5));
+                    level = 0.4f;
+                    break;
+                case Sound.UiClose:
+                    parts.Add(Noise(0, 0.08f, 0.45f, 0.55f, attack: 0.005f, decay: 5, seed: 72));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.09f, 480, 280, 0.45f, decay: 4));
+                    level = 0.35f;
+                    break;
+                case Sound.UiHover:
+                    parts.Add(Tone(Wave.Sine, 0, 0.025f, 1900, 1800, 0.3f, attack: 0.001f, decay: 9));
+                    level = 0.18f;
+                    break;
+                case Sound.UiConfirm:
+                    parts.Add(Tone(Wave.Triangle, 0, 0.06f, 520, 380, 0.6f, attack: 0.001f, decay: 7));
+                    parts.Add(Tone(Wave.Pulse, 0, 0.035f, 1560, 1480, 0.22f, decay: 8));
+                    parts.Add(Noise(0, 0.02f, 0.3f, 0.7f, decay: 9, seed: 73));
+                    level = 0.4f;
+                    break;
+                case Sound.UiCancel:
+                    parts.Add(Tone(Wave.Pulse, 0, 0.05f, 880, 860, 0.35f, decay: 5));
+                    parts.Add(Tone(Wave.Pulse, 0.05f, 0.07f, 587, 570, 0.35f, decay: 5));
+                    level = 0.35f;
+                    break;
+                case Sound.UiFail:
+                    parts.Add(Tone(Wave.Square, 0, 0.16f, 150, 120, 0.5f, attack: 0.003f, decay: 3, vibrato: 0.08f, vibratoRate: 30));
+                    parts.Add(Tone(Wave.Square, 0.08f, 0.1f, 140, 110, 0.4f, decay: 4));
+                    level = 0.45f;
                     break;
                 case Sound.Hammer:
                     parts.Add(Tone(Wave.Pulse, 0, 0.05f, 1700, 1550, 0.45f, decay: 9));

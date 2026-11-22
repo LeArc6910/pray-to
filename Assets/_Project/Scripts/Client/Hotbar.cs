@@ -69,7 +69,6 @@ namespace Game.Client
         float _messageAt = float.NegativeInfinity;
         static GUIStyle _countStyle;
         static GUIStyle _keyStyle;
-        static GUIStyle _tooltipStyle;
 
         public Hotbar(WorldClient client, LootData loot, string character)
         {
@@ -188,7 +187,6 @@ namespace Game.Client
             _keyStyle ??= new GUIStyle(_countStyle) { alignment = TextAnchor.UpperLeft };
             Ui.Text(_countStyle, 12, bold: true);
             Ui.Text(_keyStyle, 12, bold: true);
-            _tooltipStyle ??= new GUIStyle(GUI.skin.box) { wordWrap = true, alignment = TextAnchor.UpperLeft };
 
             string tooltip = null;
             Rect tooltipSlot = default;
@@ -202,7 +200,7 @@ namespace Game.Client
                 var area = Area(slot, skills);
                 Controls.Block(area);
                 Controls.HotbarButton(area, slot);
-                GUI.Box(area, GUIContent.none);
+                UiSkin.Panel(area);
                 float inner = UiArt.PanelBorder * UiArt.Scale;
 
                 var (icon, count, usable, worn, name, does) = Describe(_entries[slot]);
@@ -386,11 +384,12 @@ namespace Game.Client
 
         static void DrawTooltip(string text, Rect slot)
         {
-            var content = new GUIContent(Ui.Wrap(text, _tooltipStyle, TooltipWidth));
-            float height = _tooltipStyle.CalcHeight(content, TooltipWidth);
-            float x = Mathf.Clamp(slot.center.x - TooltipWidth / 2, 10, Ui.Width - TooltipWidth - 10);
-            float y = Mathf.Max(10, slot.y - height - 8);
-            GUI.Box(new Rect(x, y, TooltipWidth, height), content, _tooltipStyle);
+            // A card drawn last (Ui.LateCard), over everything: drawn here the quick slots, drawn after the skills, hid
+            // the roll's description (Docs/UiRework.md 2절, pc-boss-bar).
+            var size = Ui.CardSize(text, TooltipWidth, out string wrapped);
+            float x = Mathf.Clamp(slot.center.x - size.x / 2, 10, Ui.Width - size.x - 10);
+            float y = Mathf.Max(10, slot.y - size.y - 8);
+            Ui.LateCard(new Rect(x, y, size.x, size.y), wrapped);
         }
 
         static void Fill(Rect area, Color color)

@@ -27,6 +27,7 @@ namespace Game.Client
         static readonly Choice BossIntroChoice = new Choice("settings.bossintro", true);
         static readonly Choice RumorsChoice = new Choice("settings.rumors", true);
         static readonly Choice QuickRestChoice = new Choice("settings.quickrest", false);
+        static readonly Choice ReduceMotionChoice = new Choice("settings.reducemotion", false);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -145,6 +146,14 @@ namespace Game.Client
         {
             get => RumorsChoice.Value;
             set => RumorsChoice.Value = value;
+        }
+
+        // "움직임: 줄이기" (Docs/UiRework.md 4-6): windows only fade in and out, without growing; buttons do not sink or
+        // shake; counts change colour without growing (UiMotion).
+        public static bool ReduceMotion
+        {
+            get => ReduceMotionChoice.Value;
+            set => ReduceMotionChoice.Value = value;
         }
 
         // Resting heals as before 묶음 4c (World.QuickRest) in the worlds this player opens or hosts; joiners go by the
