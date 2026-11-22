@@ -519,6 +519,24 @@ namespace Game.Client
             var supports = _client.SupportsOf(skill);
             GUILayout.Label(Ui.Wrap(skill.Description, GUI.skin.label, _textWidth));
             GUILayout.Space(4);
+            // [배우기]/[올리기] and [칸에 넣기]: the screen's main action, and the way to a slot. Above the numbers, so
+            // a short screen (740x360) shows them without scrolling.
+            var buttons = Room(GrowthButton);
+            float learnWidth = Mathf.Min(120, (buttons.width - 6) / 2);
+            Ui.Row("고른 스킬");
+            GUI.enabled = _client.CanRaise(skill);
+            if (Ui.Button(new Rect(buttons.x, buttons.y, learnWidth, buttons.height), rank >= SkillRules.MaxRank ? "최고" : rank > 0 ? "올리기" : "배우기", Ui.Look.Primary))
+                Send(_client.LearnSkillCommand(skill), Sound.Click);
+            bool inSlot = _client.Skills.Contains(skill);
+            GUI.enabled = rank > 0 && (!inSlot || _client.Skills.Count > 1);
+            if (Ui.Button(new Rect(buttons.x + learnWidth + 6, buttons.y, Mathf.Min(120, buttons.width - learnWidth - 6), buttons.height), _placing == skill ? "그만" : "칸에 넣기"))
+            {
+                _placing = _placing == skill ? null : skill;
+                _swapSlot = -1;
+            }
+            GUI.enabled = true;
+            if (inSlot) GUILayout.Label(Fit($"{_client.Skills.ToList().IndexOf(skill) + 1}번 칸에 들어 있다", _textWidth));
+            GUILayout.Space(6);
             // This rank and the next side by side (4-3: 숫자 설명, 다음 단계 비교), a part a line: what changes in green.
             var now = SkillText.Numbers(skill, power, _client.Stats, supports).Split(new[] { " · " }, StringSplitOptions.None);
             bool raising = rank > 0 && rank < SkillRules.MaxRank;
@@ -539,22 +557,6 @@ namespace Game.Client
             if (next != null && !paired) GUILayout.Label(Ui.Wrap("다음 단계: " + string.Join(" · ", next), GUI.skin.label, _textWidth));
             GUILayout.Space(8);
 
-            // [배우기]/[올리기] and [칸에 넣기]: the screen's main action, and the way to a slot.
-            var buttons = Room(GrowthButton);
-            float learnWidth = Mathf.Min(120, (buttons.width - 6) / 2);
-            Ui.Row("고른 스킬");
-            GUI.enabled = _client.CanRaise(skill);
-            if (Ui.Button(new Rect(buttons.x, buttons.y, learnWidth, buttons.height), rank >= SkillRules.MaxRank ? "최고" : rank > 0 ? "올리기" : "배우기", Ui.Look.Primary))
-                Send(_client.LearnSkillCommand(skill), Sound.Click);
-            bool inSlot = _client.Skills.Contains(skill);
-            GUI.enabled = rank > 0 && (!inSlot || _client.Skills.Count > 1);
-            if (Ui.Button(new Rect(buttons.x + learnWidth + 6, buttons.y, Mathf.Min(120, buttons.width - learnWidth - 6), buttons.height), _placing == skill ? "그만" : "칸에 넣기"))
-            {
-                _placing = _placing == skill ? null : skill;
-                _swapSlot = -1;
-            }
-            GUI.enabled = true;
-            if (inSlot) GUILayout.Label(Fit($"{_client.Skills.ToList().IndexOf(skill) + 1}번 칸에 들어 있다", _textWidth));
             GUILayout.Space(8);
             if (Event.current.type == EventType.Repaint) _supportsAt = GUILayoutUtility.GetLastRect().yMax;
             DrawSupports(skill);

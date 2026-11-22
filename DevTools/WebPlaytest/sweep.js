@@ -5396,8 +5396,10 @@ async function growth(browser) {
     check(await game.press('배우기'), '카드의 [배우기]');
     check(!!(await game.until(i => i.passives === 1, 3000, game.inventory)), '별을 눌러 배운다');
     // A point from the drawer.
-    learnable = await drawer();
-    if (learnable.length > 0) await game.tapAt(learnable[0].cx, learnable[0].cy);
+    // Every learnable point in the drawer, shown or not: on a short landscape screen the drawer sits under the picked
+    // point's card in the scrolled side pane, and a press scrolls to it.
+    learnable = await game.buttons().then(all => all.filter(b => b.row === '지금 배울 수 있는 점' && /: /.test(b.label)));
+    if (learnable.length > 0) await game.press(learnable[0].label, '지금 배울 수 있는 점');
     await game.wait(400);
     check(await game.press('배우기'), '서랍의 점을 누르고 [배우기]');
     check(!!(await game.until(i => i.passives === 2, 3000, game.inventory)), '서랍으로도 배운다');
