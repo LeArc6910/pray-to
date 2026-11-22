@@ -217,6 +217,12 @@ namespace Game.Client
         Machine,
         // The dodge roll (World.Roll.cs). New actions go at the end: saved keys are kept by name.
         Roll,
+        // The screens of their own (Docs/UiRework.md U2, the person's keys of 2026-11-22): skills K, passives P, the
+        // journal J, the character U. The bag is Tab (and I), the map M.
+        Skills,
+        Passives,
+        Journal,
+        Character,
     }
 
     // Which key does what, changed in the menu and kept on this device (Prefs, by key name). Every action has
@@ -227,6 +233,7 @@ namespace Game.Client
         static readonly Key[] Defaults =
         {
             Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Tab, Key.M, Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5, Key.Digit6, Key.G, Key.LeftShift,
+            Key.K, Key.P, Key.J, Key.U,
         };
         static readonly Key[] Fixed =
         {
@@ -265,8 +272,12 @@ namespace Game.Client
             KeyAction.Potion => "물약",
             KeyAction.Bag => "가방",
             KeyAction.Map => "지도",
-            KeyAction.Machine => "기계 켜기/끄기 · 상자 열기",
+            KeyAction.Machine => "만나기·기계",
             KeyAction.Roll => "구르기",
+            KeyAction.Skills => "스킬 창",
+            KeyAction.Passives => "특성 창",
+            KeyAction.Journal => "일지",
+            KeyAction.Character => "캐릭터",
             _ => $"퀵슬롯 {action - KeyAction.Hotbar1 + 1}",
         };
 

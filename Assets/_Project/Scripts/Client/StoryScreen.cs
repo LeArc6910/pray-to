@@ -91,7 +91,7 @@ namespace Game.Client
             {
                 bool turn = _client.StepGivenBy(character) != null;
                 string talk = $"{character.Name}{(Final(character.Name) ? "과" : "와")} 말하기";
-                if (WorldButton(camera, new Vector3(at.X, at.Y + 1.35f, 0), turn ? "! " + talk : talk)) Talk(character);
+                if (WorldButton(camera, new Vector3(at.X, at.Y + 1.35f, 0), (turn ? "! " + talk : talk) + KeyHint)) Talk(character);
                 return;
             }
             var waypoint = _client.WaypointNear();
@@ -102,15 +102,26 @@ namespace Game.Client
             }
         }
 
-        // Opens the waypoint list when the player stands by an open waypoint or waystone (for the playtests).
+        // Opens the waypoint list when the player stands by an open waypoint or waystone (G, and the playtests).
         public bool OpenWaypoints()
         {
-            var place = _client.WaypointNear();
-            var stone = _client.StoneNear();
-            if (!(place != null && _client.Waypoints.Contains(place.Definition.Index) || stone != null && _client.StoneOpen(stone.Index))) return false;
+            if (!CanOpenWaypoints) return false;
             _waypoints = true;
             return true;
         }
+
+        public bool CanOpenWaypoints
+        {
+            get
+            {
+                var place = _client.WaypointNear();
+                var stone = _client.StoneNear();
+                return place != null && _client.Waypoints.Contains(place.Definition.Index) || stone != null && _client.StoneOpen(stone.Index);
+            }
+        }
+
+        // What follows the name on the button over a person: " (G)" on a PC while G would talk to them (GameRoot.Meet).
+        public string KeyHint { get; set; } = "";
 
         // Whether the name ends in a closed Hangul syllable (세라핀 → 과, 바르도 → 와).
         static bool Final(string name)

@@ -127,6 +127,10 @@ namespace Game.Client
         internal int CornersNear => _view == null || _client?.Map == null ? -1
             : _view.CornersNear(TileMap.Cell(_client.Position.X), TileMap.Cell(_client.Position.Y), 10);
         InventoryWindow _inventory;
+        // Which screen is open (the bag, growth, records), one at a time (Docs/UiRework.md U2), and the version of it the
+        // last OnGUI saw, to let go of the keyboard when it changes.
+        ScreenStack _screens = new ScreenStack();
+        int _screensSeen;
         // The biome the player is in, how long they have been there, and the last one announced (UpdateBiome).
         Biome _biomeHere;
         float _biomeTime;
@@ -218,16 +222,15 @@ namespace Game.Client
             NoteSteps(Time.unscaledDeltaTime);
             if (_map != null && Controls.MapPressed())
             {
-                _map.FullOpen = !_map.FullOpen;
+                _screens.Toggle(GameScreen.Map);
                 DevInfo.Note(_map.FullOpen ? "지도 열림" : "지도 닫힘");
             }
             else if (Controls.LeavePressed())
             {
-                // Esc closes the full map first.
-                if (_map != null && _map.FullOpen)
-                {
-                    _map.FullOpen = false;
-                }
+                // Esc goes one step back: the hub, the open screen, the talk or waypoint list; with nothing open it leaves
+                // the game, as before.
+                if (_screens.Back()) DevInfo.Note("화면 닫힘");
+                else if (_storyScreen != null && _storyScreen.Open) _storyScreen.Close();
                 else
                 {
                     EndSession("");
@@ -239,11 +242,13 @@ namespace Game.Client
                 EndSession("참가 거절: " + _client.RefusedReason);
                 return;
             }
-            if (Controls.BagPressed())
+            // The screens' keys (the person's keys of 2026-11-22): Tab·I the bag, K skills, P passives, U the character, J
+            // the journal. A screen's key again closes it; another's switches to it.
+            if (_client.Status == ClientStatus.Playing)
             {
-                _inventory.Open = !_inventory.Open;
-                _dropFocus = true;
-                DevInfo.Note(_inventory.Open ? "가방 열림" : "가방 닫힘");
+                if (Controls.BagPressed()) ToggleScreen(GameScreen.Bag);
+                foreach (var screen in new[] { GameScreen.Skills, GameScreen.Passives, GameScreen.Character, GameScreen.Journal })
+                    if (Controls.ScreenPressed(screen)) ToggleScreen(screen);
             }
             ReadSkillPress();
 
@@ -262,7 +267,7 @@ namespace Game.Client
             _view ??= new WorldView(_client, _camera);
             // A world of rooms made before its map was kept under the generator (2026-11-22) left it under the seed alone.
             _map ??= new MapView(_client, SaveStore.Read(MapKey)
-                ?? (_client.Generator > WorldGenerator.CaveVersion ? SaveStore.Read(SaveStore.MapKey(_client.Seed, WorldGenerator.CaveVersion, CharacterName)) : null));
+                ?? (_client.Generator > WorldGenerator.CaveVersion ? SaveStore.Read(SaveStore.MapKey(_client.Seed, WorldGenerator.CaveVersion, CharacterName)) : null)) { Screens = _screens };
             // A map scrap read marks a thing on this player's map (WorldView.Travel.cs).
             _view.MapScrap ??= () => _map?.ReadScrap();
             _client.AdvanceRenderClock(Time.deltaTime);
@@ -280,16 +285,17 @@ namespace Game.Client
                 _view.RelaySlots(slots);
                 _map.ResetSlots(slots);
             }
-            _view.ShowTarget = (_inventory != null && _inventory.Open) || (_hotbar != null && _hotbar.PointsAtGround);
-            _view.TargetSoil = _inventory != null && _inventory.Open && _inventory.PointsAtSoil || _hotbar != null && _hotbar.PointsAtSoil;
+            bool bag = _screens.Current == GameScreen.Bag;
+            _view.ShowTarget = bag || (_hotbar != null && _hotbar.PointsAtGround);
+            _view.TargetSoil = bag && _inventory.PointsAtSoil || _hotbar != null && _hotbar.PointsAtSoil;
             // A hammer's tap now and then while something is being made by hand (2026-11-09).
             if (_client.Crafting != null && Time.time >= _hammerAt)
             {
                 Sounds.Play(Sound.Hammer, 0.5f);
                 _hammerAt = Time.time + 0.6f;
             }
-            _view.TargetSize = Math.Max(_inventory != null && _inventory.Open ? _inventory.PointsAtSize : 1, _hotbar != null ? _hotbar.PointsAtSize : 1);
-            if (_inventory != null) _inventory.CrackAhead = _inventory.Open ? _view.CrackAhead() : null;
+            _view.TargetSize = Math.Max(bag ? _inventory.PointsAtSize : 1, _hotbar != null ? _hotbar.PointsAtSize : 1);
+            if (_inventory != null) _inventory.CrackAhead = bag ? _view.CrackAhead() : null;
             // Typing a pet's name keeps the keys from the game; the bag closing lets go of the field.
             bool typing = _inventory != null && _inventory.Typing;
             if (Controls.Typing && !typing && _inventory != null && !_inventory.Open) GUIUtility.keyboardControl = 0;
@@ -747,7 +753,7 @@ namespace Game.Client
             bool roll = Controls.TakeRollPress();
             var quick = Controls.TakeHotbarPresses();
             bool machine = Controls.MachinePressed();
-            if (_inventory.Open || (_map != null && _map.FullOpen)) return;
+            if (_screens.Current != GameScreen.None || _screens.HubOpen) return;
             // The roll is the player's own movement (WorldClient.Step), so it waits for the next fixed tick.
             RollPressed |= roll;
             var aim = Controls.SkillAim(_camera, _client.Position);
@@ -757,9 +763,104 @@ namespace Game.Client
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
             foreach (int slot in quick) UseQuickSlot(slot);
-            // The same key opens the chest or cart, or prays at the shrine, beside the player when no machine is ahead; else
-            // goes into the dungeon at the gate, or out by its door (묶음 5a).
-            if (machine && !ToggleMachine() && !UsePoi()) UseDungeon();
+            // G meets what is in reach (Docs/UiRework.md 4-1, the person's pick of 2026-11-22): see Meet.
+            if (machine) Meet();
+        }
+
+        // ---- G, the key that meets things (Docs/UiRework.md U2) ----
+
+        // What G would do now, in this order: a machine ahead is switched (its [끄기 (G)]); a person of the story in
+        // reach is talked to; a merchant in reach opens her tab of the bag; an open waypoint or waystone opens its list;
+        // a chest, cart or shrine of the world is used; a dungeon's gate, door or thing; a storage chest by the player
+        // opens the bag's [상자]; an anvil the bag's [장비] (다듬기); a workbench or furnace the bag's [재료·제작]. Facing
+        // a machine wins because that is aimed; a person before a place because talking is what a person is for.
+        internal enum Meeting
+        {
+            None,
+            Machine,
+            Person,
+            Merchant,
+            Waypoint,
+            Poi,
+            Dungeon,
+            Chest,
+            Anvil,
+            Station,
+        }
+
+        // Asked by every button's label each OnGUI pass, so worked out once a frame.
+        int _meetFrame = -1;
+        Meeting _meet;
+
+        internal Meeting NextMeeting()
+        {
+            if (_meetFrame == Time.frameCount) return _meet;
+            _meetFrame = Time.frameCount;
+            _meet = FindMeeting();
+            return _meet;
+        }
+
+        Meeting FindMeeting()
+        {
+            if (_client == null || _client.Status != ClientStatus.Playing || _client.IsDead) return Meeting.None;
+            if (_client.MachineAhead() != null) return Meeting.Machine;
+            // Not while a talk is on (G again would start it over).
+            if (_storyScreen != null && _storyScreen.Open) return Meeting.None;
+            if (!_client.Riding && _client.Places.Count > 0 && _client.CharacterNear() != null) return Meeting.Person;
+            if (_client.NpcNear() != null) return Meeting.Merchant;
+            if (!_client.Riding && _storyScreen != null && _storyScreen.CanOpenWaypoints) return Meeting.Waypoint;
+            if (!_client.Riding && _client.PoiNear() != null) return Meeting.Poi;
+            if (!_client.Riding && _client.DungeonChargeKind == 0 && (_client.DungeonThingNear() != null || _client.GateNear() != null || _client.ExitNear() != null)) return Meeting.Dungeon;
+            if (_client.Chest.IsOpen) return Meeting.Chest;
+            if (_client.NearAnvil) return Meeting.Anvil;
+            var map = _client.Map;
+            if (map != null && (map.Near(_client.Position, TileType.Workbench, World.StationReach) || map.Near(_client.Position, TileType.Furnace, World.StationReach))) return Meeting.Station;
+            return Meeting.None;
+        }
+
+        // Does what G does now (NextMeeting). False when there is nothing to meet.
+        internal bool Meet()
+        {
+            _meetFrame = -1;
+            switch (NextMeeting())
+            {
+                case Meeting.Machine: return ToggleMachine();
+                case Meeting.Person: return _storyScreen.TalkNear();
+                case Meeting.Merchant: return OpenBagPage("상인");
+                case Meeting.Waypoint:
+                    Sounds.Play(Sound.Click);
+                    return _storyScreen.OpenWaypoints();
+                case Meeting.Poi: return UsePoi();
+                case Meeting.Dungeon: return UseDungeon();
+                case Meeting.Chest: return OpenBagPage("상자");
+                case Meeting.Anvil: return OpenBagPage("장비");
+                case Meeting.Station: return OpenBagPage("재료·제작");
+                default: return false;
+            }
+        }
+
+        bool OpenBagPage(string page)
+        {
+            _inventory.Show(page);
+            return true;
+        }
+
+        // On a PC, " (G)" after the label of a button over the thing G would meet now, so the key is learnt.
+        string MeetHint(Meeting meeting) => !Controls.UsingTouch && NextMeeting() == meeting ? $" ({KeyBindings.Name(KeyAction.Machine)})" : "";
+
+        // A screen's key: closes it when open, else shows it in place of any other.
+        void ToggleScreen(GameScreen screen)
+        {
+            _screens.Toggle(screen);
+            DevInfo.Note(_screens.Current == screen ? $"{ScreenStack.NameOf(screen)} 열림" : $"{ScreenStack.NameOf(screen)} 닫힘");
+        }
+
+        ScreenStack NewScreens()
+        {
+            var screens = new ScreenStack();
+            // A screen opening ends the talk and shuts the waypoint list (Docs/UiRework.md 4-1: 대화는 다른 화면 위에 남지 않는다).
+            screens.Opened += () => _storyScreen?.Close();
+            return screens;
         }
 
         // Opens the chest or cart, or prays at the shrine, within reach (World.UsePoi): the key, or the button over it.
@@ -834,7 +935,7 @@ namespace Game.Client
                     else if (thing != null) text = DungeonThingLabel(thing);
                     else text = "던전 나가기";
                     if (going) text = gate != null ? "들어가는 중…" : "나가는 중…";
-                    else if (!Controls.UsingTouch) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
+                    else text += MeetHint(Meeting.Dungeon);
                     float width = Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length);
                     GUI.enabled = !going && !_client.IsDead;
                     if (Ui.WorldButton(point, text, width)) UseDungeon();
@@ -911,7 +1012,7 @@ namespace Game.Client
             bool usable = true;
             // A minecart station (3c): ride, mend the broken end, or why not (WorldView.Travel.cs).
             if (poi.Kind == PoiKind.Station) (text, usable) = TravelText.StationButton(_client, poi);
-            if (!Controls.UsingTouch && usable) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
+            if (usable) text += MeetHint(Meeting.Poi);
             float width = Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length);
             GUI.enabled = usable;
             if (Ui.WorldButton(point, text, width)) UsePoi();
@@ -961,8 +1062,10 @@ namespace Game.Client
         void FixedTick()
         {
             var (move, aim, attack) = Controls.Read(_camera, _client.Position);
-            // Clicking in the bag or on the map should not swing the sword.
-            if (_inventory.Open || (_map != null && _map.FullOpen)) attack = false;
+            // Clicking in the bag, on a screen or the hub should not swing the sword; a full screen also holds the walk
+            // (Docs/UiRework.md U2: the world takes no input under it).
+            if (_screens.Current != GameScreen.None || _screens.HubOpen) attack = false;
+            if (_screens.Full) move = Vec2.Zero;
             if (HoldAttack) attack = true;
             // A tap on the attack stick without pulling it swings at the nearest foe rather than where one walks
             // (Docs/WebDemo.md 터치, 2026-11-11, the research report's candidate 16).
@@ -1088,13 +1191,29 @@ namespace Game.Client
 
         internal bool BossShown => _view?.ActiveBoss != null;
 
+        // Whether one of the screens that were the bag's tabs is up (the bag, a growth screen or the journal; the playtests'
+        // "bag"); set, it opens the bag or shuts that screen.
         internal bool BagOpen
         {
             get => _inventory.Open;
             set => _inventory.Open = value;
         }
 
+        // Opens the page of that old tab name: the bag's pages in the bag, 스킬·특성·캐릭터·일지·지도 as their screens.
         internal void ShowBag(string page) => _inventory.Show(page);
+
+        // The open screen by name ("" for none), the hub, and opening one by name (Playtest "screen", Docs/UiRework.md U2).
+        internal string ScreenName => ScreenStack.NameOf(_screens.Current);
+        internal GameScreen OpenScreen => _screens.Current;
+        internal bool HubOpen => _screens.HubOpen;
+        internal string BagPage => _inventory?.BagPage ?? "";
+
+        internal void ShowScreen(GameScreen screen) => _screens.Show(screen);
+
+        internal void ShowHub(bool open)
+        {
+            if (open != _screens.HubOpen) _screens.ToggleHub();
+        }
 
         // Whether the frame on the tile a [놓기] would build on is drawn (WorldView.ShowTarget).
         internal bool TargetShown => _view != null && _view.ShowTarget;
@@ -1210,7 +1329,8 @@ namespace Game.Client
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
-            _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
+            _screens = NewScreens();
+            _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens);
             _storyScreen = new StoryScreen(_client, SendToHost, () => _map);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
@@ -1263,7 +1383,8 @@ namespace Game.Client
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
-            _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
+            _screens = NewScreens();
+            _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens);
             _storyScreen = new StoryScreen(_client, SendToHost, () => _map);
             _joinSent = false;
             _net.Connected += id =>
@@ -1388,6 +1509,7 @@ namespace Game.Client
             _host = null;
             _client = null;
             _inventory = null;
+            _screens = new ScreenStack();
             _guideProgress = null;
             _dayPhase = null;
             _acquired.Clear();
@@ -1415,33 +1537,39 @@ namespace Game.Client
 
         void DrawScreen()
         {
-            if (_dropFocus)
+            // A screen opened or shut (or the menu's name field was left focused): IMGUI's keyboard focus goes, so a
+            // pet's name field on a screen now gone does not keep taking keys.
+            if (_dropFocus || _screens.Version != _screensSeen)
             {
                 GUIUtility.keyboardControl = 0;
                 _dropFocus = false;
+                _screensSeen = _screens.Version;
             }
             if (_client == null)
             {
                 DrawMenu();
                 return;
             }
-            // The full map covers everything, and nothing else is drawn under it: no HUD for its title to sit on,
-            // and no button a tap meant to close the map could press instead.
-            if (_map != null && _map.FullOpen)
+            // A full screen (growth, records) covers everything, and nothing else is drawn under it: the world darkened
+            // 70% and red at the edges while the player is hurt, no HUD for its title to sit on, and no button a tap meant
+            // for the screen could press instead (Docs/UiRework.md 4-5 전체 화면, 4-7 그리는 순서).
+            if (_screens.Full && _client.Status == ClientStatus.Playing)
             {
-                _map.DrawFull();
+                DrawFullScreen();
                 return;
             }
+            bool bag = _screens.Current == GameScreen.Bag;
             _view?.DrawGui();
-            DrawHud(compact: _inventory.Open);
+            DrawHud(compact: bag);
             _view?.DrawBanner();
             // The "획득: …" lines under every window (Docs/UiRework.md 4-7 그리는 순서): drawn after the bag, they ran
             // over it on a phone (phone-bag-gear).
             DrawAcquired();
-            // Not while the bag is open: skills cannot be used then (ReadSkillPress), a tap in the window must not fire
-            // one, and a slot would show in the gap beside the window. Nor under the waypoint list: a button drawn before
-            // it would take a tap meant for one of its rows (2026-11-22, the web sweep on a phone).
-            if (_client.Status == ClientStatus.Playing && !_inventory.Open && !(_storyScreen?.ListOpen ?? false))
+            // Not while the bag or the hub is open: skills cannot be used then (ReadSkillPress), a tap in the window must
+            // not fire one, and a slot would show in the gap beside the window. Nor under the waypoint list: a button
+            // drawn before it would take a tap meant for one of its rows (2026-11-22, the web sweep on a phone).
+            if (_storyScreen != null) _storyScreen.KeyHint = MeetHint(Meeting.Person);
+            if (_client.Status == ClientStatus.Playing && !bag && !_screens.HubOpen && !(_storyScreen?.ListOpen ?? false))
             {
                 DrawMachineSwitch();
                 DrawPoiButton();
@@ -1456,15 +1584,31 @@ namespace Game.Client
             }
             // A window closing shrinks away under the one opening.
             UiMotion.DrawGhosts();
-            _inventory?.Draw();
+            if (bag) _inventory?.Draw();
             // The story's talk and the waypoint list, over the rest (Docs/Story.md).
-            if (_client.Status == ClientStatus.Playing && !_inventory.Open) _storyScreen?.DrawPanels();
+            if (_client.Status == ClientStatus.Playing && !bag) _storyScreen?.DrawPanels();
             _map?.DrawMinimap(Ui.MinimapArea);
             if (Controls.UsingTouch)
             {
                 DrawTouchButtons();
                 Controls.DrawTouch();
             }
+        }
+
+        // A full screen over the darkened world: the growth screens and the journal (InventoryWindow), or the map.
+        void DrawFullScreen()
+        {
+            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            Controls.Block(screen);
+            if (_screens.Current == GameScreen.Map)
+            {
+                if (_map != null) _map.DrawFull();
+                else _screens.Close();
+                return;
+            }
+            UiSkin.FullBackdrop(screen);
+            UiMotion.DrawGhosts();
+            _inventory?.Draw();
         }
 
         // The "획득: …" lines in the bottom left, or above the skill buttons where they reach that far, newest at the
@@ -1481,7 +1625,7 @@ namespace Game.Client
             slots = Rect.MinMaxRect(Mathf.Min(slots.xMin, quick.xMin), Mathf.Min(slots.yMin, quick.yMin), Mathf.Max(slots.xMax, quick.xMax), slots.yMax);
             float y = slots.x < 14 + width ? slots.y - 6 : Ui.Height - 10;
             float floor = Ui.LeftColumnBottom + 4;
-            Rect? bag = _inventory.Open ? InventoryWindow.AreaOf() : (Rect?)null;
+            Rect? bag = _screens.Current == GameScreen.Bag ? InventoryWindow.AreaOf() : (Rect?)null;
             var shown = Rect.zero;
             for (int i = _acquired.Count - 1; i >= 0; i--)
             {
@@ -1501,17 +1645,21 @@ namespace Game.Client
         // Where the "획득" lines were drawn in the last repaint (zero when none), for the playtests.
         internal static Rect AcquiredArea { get; private set; }
 
-        // Stand-ins for Tab and Esc on phones, under the minimap.
+        // On phones, under the minimap (Docs/UiRework.md 4-1 허브, 4-5 허브): [가방] for Tab, and [메뉴], the hub, a grid
+        // of the screens' buttons (가방, 스킬, 특성, 캐릭터, 일지, 지도) and [나가기], which was beside [가방] before. A gold dot
+        // on [메뉴] while there are skill or passive points to spend.
         void DrawTouchButtons()
         {
             var bag = Ui.TouchButtonArea(0, 2);
-            var leave = Ui.TouchButtonArea(1, 2);
+            var menu = Ui.TouchButtonArea(1, 2);
             Controls.Block(bag);
-            Controls.Block(leave);
-            if (Ui.Button(bag, "가방")) _inventory.Open = !_inventory.Open;
-            if (_client.SkillPoints > 0 || _client.PassivePoints > 0) InventoryWindow.Badge(bag);
+            Controls.Block(menu);
+            if (Ui.Button(bag, "가방")) ToggleScreen(GameScreen.Bag);
+            if (Ui.Button(menu, ScreenStack.HubButton, _screens.HubOpen ? Ui.Look.Primary : Ui.Look.Normal)) _screens.ToggleHub();
+            bool skillPoints = _client.SkillPoints > 0 || _client.Classes.Count < ClassRules.SlotsAt(_client.Level), passivePoints = _client.PassivePoints > 0;
+            if (skillPoints || passivePoints) InventoryWindow.Badge(menu);
             // Ends on the next Update, after this OnGUI has finished with the session.
-            if (Ui.Button(leave, "나가기")) _endReason = "";
+            if (_screens.DrawHub(skillPoints, passivePoints)) _endReason = "";
         }
 
         // Name and how to play on one side, classes on the other; one above the other on a narrow screen. Scrolls
@@ -1861,10 +2009,10 @@ namespace Game.Client
             {
                 var names = _savedClasses.Select(id => _classes.Classes.First(c => c.Id == id).Name);
                 GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_of", "{0}의 클래스: {1}"), CharacterName, string.Join(" + ", names)), GUI.skin.label, _menuColumn));
-                GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_saved", "저장된 캐릭터는 이 클래스로 시작한다. 빈 클래스 칸(레벨 {0}에 둘째, {1}에 셋째)은 게임 안 가방 [스킬] 탭에서 그냥 고르고, 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다(금화 {2}부터, 레벨이 오를수록 더 든다)."), ClassRules.SlotLevels[1], ClassRules.SlotLevels[2], ClassRules.ChangeCoins(1)), GUI.skin.label, _menuColumn));
+                GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_saved", "저장된 캐릭터는 이 클래스로 시작한다. 빈 클래스 칸(레벨 {0}에 둘째, {1}에 셋째)은 게임 안 [스킬] 화면(K, 휴대폰은 [메뉴]의 [스킬])에서 그냥 고르고, 고른 클래스를 다른 것으로 바꾸려면 작업대 곁에서 금화를 낸다(금화 {2}부터, 레벨이 오를수록 더 든다)."), ClassRules.SlotLevels[1], ClassRules.SlotLevels[2], ClassRules.ChangeCoins(1)), GUI.skin.label, _menuColumn));
                 return;
             }
-            GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_new", "클래스는 게임 안에서 고른다: 가방(PC는 Tab·휴대폰은 [가방])의 [스킬] 탭에서 처음에 하나, 레벨 {0}에 둘째, {1}에 셋째. 고르기 전에는 기본 공격만 쓴다."), ClassRules.SlotLevels[1], ClassRules.SlotLevels[2]), GUI.skin.label, _menuColumn));
+            GUILayout.Label(Ui.Wrap(string.Format(Strings.T("menu.classes_new", "클래스는 게임 안에서 고른다: [스킬] 화면(PC는 K·휴대폰은 [메뉴]의 [스킬])에서 처음에 하나, 레벨 {0}에 둘째, {1}에 셋째. 고르기 전에는 기본 공격만 쓴다."), ClassRules.SlotLevels[1], ClassRules.SlotLevels[2]), GUI.skin.label, _menuColumn));
             foreach (var option in _classes.Classes)
             {
                 GUILayout.Label(Ui.Wrap($"{option.Name}: {option.Description}", GUI.skin.label, _menuColumn));
@@ -1931,11 +2079,13 @@ namespace Game.Client
                         lines.Add($"{Whole("잘 쉼")} {left / 60}:{left % 60:00}");
                     }
                     var points = new List<string>();
-                    // An open class slot (Docs/Classes.md, 클래스 고르기): picked in the bag's skills page.
+                    // An open class slot (Docs/Classes.md, 클래스 고르기): picked on the skills screen.
                     if (_client.Classes.Count < ClassRules.SlotsAt(_client.Level)) points.Add(Whole(_client.Classes.Count == 0 ? "클래스 고르기" : "클래스 하나 더"));
                     if (_client.SkillPoints > 0) points.Add(Whole($"스킬 포인트 {_client.SkillPoints}"));
                     if (_client.PassivePoints > 0) points.Add(Whole($"특성 포인트 {_client.PassivePoints}"));
-                    if (points.Count > 0) lines.Add($"{string.Join(" · ", points)} (가방에서)");
+                    // Where to spend them (U2): the skills and passives screens' keys, or the hub on a phone.
+                    string where = Controls.UsingTouch ? "[메뉴]에서" : $"{KeyBindings.Name(KeyAction.Skills)}·{KeyBindings.Name(KeyAction.Passives)}";
+                    if (points.Count > 0) lines.Add($"{string.Join(" · ", points)} ({where})");
                 }
             }
 

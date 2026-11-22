@@ -296,8 +296,22 @@ namespace Game.Client
             return Scrapped;
         }
 
+        // The screen manager (ScreenStack): the full map is its map screen, in the records group with the journal.
+        public ScreenStack Screens { get; set; }
+
+        bool _fullOpen;
+
         // The full map is showing. Touches and attacks are held back meanwhile.
-        public bool FullOpen { get; set; }
+        public bool FullOpen
+        {
+            get => Screens != null ? Screens.Current == GameScreen.Map : _fullOpen;
+            set
+            {
+                if (Screens == null) _fullOpen = value;
+                else if (value) Screens.Show(GameScreen.Map);
+                else if (Screens.Current == GameScreen.Map) Screens.Close();
+            }
+        }
 
         public void Dispose() => Object.Destroy(_texture);
 
@@ -360,10 +374,11 @@ namespace Game.Client
             if (GUI.Button(area, GUIContent.none, GUIStyle.none)) FullOpen = true;
         }
 
-        // The whole map over the game (a full screen, U1): the world darkened behind it, red at the edges while the
-        // player is being hurt; a parchment-headed window with the map's name in its head, the map as large as fits, and
-        // its key under it, as many lines as it needs (on a phone it was one line, cut off). Tapping or clicking anywhere
-        // closes it, as the close button in the head does.
+        // The whole map over the game (a full screen, U1; the records group's map, U2): the world darkened behind it, red at
+        // the edges while the player is being hurt; a parchment-headed window as large as the records' (ScreenStack.
+        // FullArea) with the map's name and key in its head, the records' tabs ([일지][지도]) under it, the map as large as
+        // fits, and its key under that, as many lines as it needs. A press outside the window closes it, as the close
+        // button in the head does.
         public void DrawFull()
         {
             const float lineHeight = 26;
@@ -373,22 +388,22 @@ namespace Game.Client
             var dungeon = _client.DungeonHere;
             string key = dungeon != null ? "● 나   ● 다른 플레이어   ◆ 나가는 문   ● 남은 무리   ☠ 주인   ◆ 상자   ● 모닥불·지름길 돌"
                 : "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리   ◆ 던전 문" + (Settings.Rumors ? "   ○ 소문(옅은 원)" : "");
-            float pad = UiSkin.PanelPadding;
-            float head = UiSkin.FrameEdge + UiSkin.HeadHeight + 6;
+            var panel = ScreenStack.FullArea();
+            UiMotion.BeginWindow(ScreenStack.MotionKey(GameScreen.Map), panel, UiKind.Journal);
+            string title = (dungeon != null ? dungeon.Name : "지도") + ScreenStack.KeyHint(GameScreen.Map);
+            var inside = UiSkin.Window(panel, UiKind.Journal, title, UiIcons.Map, out var band);
+            bool closed = UiSkin.CloseButton(band, "지도 닫기");
+            float tabs = Ui.Short ? 34 : ScreenStack.TabHeight;
+            if (Screens != null) Screens.Tabs(new Rect(inside.x, inside.y, inside.width, tabs), GameScreen.Map);
+            float top = inside.y + (Screens != null ? tabs + 6 : 0);
             // The key is as tall as it wraps to at the map's width; the map is as big as what is left allows.
-            float size = Mathf.Min(Ui.Width - 2 * (10 + pad), Ui.Height - 20 - head - pad - lineHeight * 2);
+            float size = Mathf.Min(inside.width, inside.yMax - top - lineHeight * 2);
             string wrappedKey = Ui.Wrap(key, GUI.skin.label, size);
             float keyHeight = GUI.skin.label.CalcHeight(new GUIContent(wrappedKey), size);
-            size = Mathf.Max(80, Mathf.Min(size, Ui.Height - 20 - head - pad - keyHeight - 4));
+            size = Mathf.Max(80, Mathf.Min(size, inside.yMax - top - keyHeight - 4));
             wrappedKey = Ui.Wrap(key, GUI.skin.label, size);
             keyHeight = GUI.skin.label.CalcHeight(new GUIContent(wrappedKey), size);
-            float height = head + size + 4 + keyHeight + pad - 2;
-            var panel = new Rect((Ui.Width - size) / 2 - pad, Mathf.Max(10, (Ui.Height - height) / 2), size + pad * 2, height);
-            UiMotion.BeginWindow("map", panel, UiKind.Journal);
-            string title = dungeon != null ? dungeon.Name : "지도";
-            UiSkin.Window(panel, UiKind.Journal, title, UiIcons.Map, out var band);
-            bool closed = UiSkin.CloseButton(band, "지도 닫기");
-            var area = new Rect(panel.x + pad, panel.y + head, size, size);
+            var area = new Rect(Mathf.Round(inside.center.x - size / 2), top + 2, size, size);
             UiSkin.Inset(new Rect(area.x - 2, area.y - 2, area.width + 4, area.height + 4));
             Fill(area, Backdrop);
             // In a dungeon, the dungeon alone (Docs/WorldRework.md 지도와 화면).
@@ -419,8 +434,13 @@ namespace Game.Client
                 FullOpen = false;
                 return;
             }
-            Ui.Probe("지도 닫기", screen);
-            if (GUI.Button(screen, GUIContent.none, GUIStyle.none)) FullOpen = false;
+            // Outside the window (the sides of a wide screen), a press closes it.
+            var e = Event.current;
+            if (e.type == EventType.MouseDown && !panel.Contains(e.mousePosition))
+            {
+                FullOpen = false;
+                e.Use();
+            }
         }
 
         // Draws the tiles of the given window of the map (in tiles, y up) into a GUI area, then the markers.

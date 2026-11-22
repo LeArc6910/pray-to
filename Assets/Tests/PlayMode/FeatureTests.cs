@@ -226,6 +226,44 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The screens of their own (Docs/UiRework.md U2): the bag, the growth screens, the journal and the map, one at a
+        // time, each by its name as the playtests' "screen" command opens it, then the touch hub ([메뉴]) on a touch
+        // screen. A picture of each.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator EveryScreenDraws()
+        {
+            yield return Start();
+            World.GainExperience(Player, Leveling.TotalFor(5));
+            yield return new WaitForSecondsRealtime(0.5f);
+            try
+            {
+                foreach (var screen in ScreenStack.All)
+                {
+                    _root.ShowScreen(screen);
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    Assert.AreEqual(screen, _root.OpenScreen, "One screen at a time, the one asked for.");
+                    Assert.AreEqual(screen != GameScreen.Map, _root.BagOpen, "The bag's old tabs count as the bag; the map does not.");
+                    yield return Screens.Take("screen-" + screen.ToString().ToLowerInvariant());
+                }
+                _root.ShowScreen(GameScreen.None);
+                Controls.ForceTouch(true);
+                _root.ShowHub(true);
+                yield return new WaitForSecondsRealtime(0.6f);
+                Assert.IsTrue(_root.HubOpen);
+                yield return Screens.Take("screen-hub");
+                _root.ShowScreen(GameScreen.Passives);
+                yield return new WaitForSecondsRealtime(0.6f);
+                Assert.IsFalse(_root.HubOpen, "Opening a screen shuts the hub.");
+                yield return Screens.Take("screen-passives-phone");
+                _root.ShowScreen(GameScreen.None);
+            }
+            finally
+            {
+                Controls.ForceTouch(false);
+            }
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Mana spent and drunk back, and the set and rift legendaries worn.
         [UnityTest, Category(Screens.Category)]
         public IEnumerator ManaAndSetsDraw()

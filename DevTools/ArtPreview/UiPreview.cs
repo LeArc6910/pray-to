@@ -11,7 +11,9 @@ namespace Game.Client
     //  - skin.png: every piece — the three levels of panel, the buttons' kinds and states, the close button, the item slot
     //    in each rarity, the head band of each kind of window, the icons;
     //  - windows.png: the existing screens in the new skin — the bag with its icon tabs and slots and a card over it, the
-    //    talk with a speaker's band and hearts, the waypoint list, the full map's window, a menu page;
+    //    talk with a speaker's band and hearts, the waypoint list, the full map's window, a menu page; and under them
+    //    the screens of their own (U2): skills and the passive tree on its night with the growth tabs, the journal and
+    //    the map with the records' tabs, and a phone held upright with [BAG][MENU] and the touch hub open;
     //  - pixels.png: why the frames are drawn at whole device pixels — a corner at a phone's pixel ratio 2.625 the old way
     //    (stretched: pixels 5 and 6 device pixels across by turns) and the new (5 each).
     // The writing is the preview's small Latin font (UiMockKit), as the tool cannot draw the game's.
@@ -212,7 +214,7 @@ namespace Game.Client
 
         static PixelImage Windows(LootData loot)
         {
-            var g = Canvas(640, 360);
+            var g = Canvas(820, 680);
             // A cave floor's colours behind, so the panels read as they will over the game.
             for (int y = 0; y < g.Height; y++)
                 for (int x = 0; x < g.Width; x++)
@@ -220,13 +222,15 @@ namespace Game.Client
 
             // The bag (right, as on a PC): leather head with coins, icon tabs, worn row and carried grid.
             int bx = 390, by = 8, bw = 244, bh = 344;
-            int top = Window(g, bx, by, bw, bh, UiKind.Bag, "BAG", UiIcons.Bag, default);
+            int top = Window(g, bx, by, bw, bh, UiKind.Bag, "BAG (TAB)", UiIcons.Bag, default);
             g.Draw(UiIcons.Of(UiIcons.Coin, Rgba.Hex("#F2C040")), bx + bw - 60, by + 9);
             g.Text(bx + bw - 51, by + 9, "1250", Rgba.Hex("#FFF2CC"), Shadow);
-            var tabs = new[] { ("GEAR", UiIcons.Bag), ("CRAFT", UiIcons.Hammer), ("SKILLS", UiIcons.Skills), ("TREE", UiIcons.Tree), ("HERO", UiIcons.Person), ("LOG", UiIcons.Book) };
-            int tw = (bw - 12 - 10) / 3;
-            for (int i = 0; i < tabs.Length; i++) Button(g, bx + 6 + i % 3 * (tw + 5), top + i / 3 * 22, tw, 20, tabs[i].Item1, i == 0 ? Press.Primary : Press.Normal, tabs[i].Item2, tab: true);
-            int gy = top + 50;
+            // Since U2 the bag keeps only its own tabs (and the chest's and a merchant's while in reach): skills, the tree,
+            // the character and the journal are screens of their own (below).
+            var tabs = new[] { ("GEAR", UiIcons.Bag), ("CRAFT", UiIcons.Hammer) };
+            int tw = (bw - 12 - 5) / 2;
+            for (int i = 0; i < tabs.Length; i++) Button(g, bx + 6 + i * (tw + 5), top, tw, 20, tabs[i].Item1, i == 0 ? Press.Primary : Press.Normal, tabs[i].Item2, tab: true);
+            int gy = top + 28;
             g.Text(bx + 8, gy, "WORN", Dim, Shadow);
             var gear = loot.Bases.Select(ItemArt.Gear).ToList();
             var random = new Random(3);
@@ -298,7 +302,138 @@ namespace Game.Client
             g.Small(bx - 122, gy + 72, "+4 FIRE ON HIT", Rgba.Hex("#F6ECD6"));
             g.Small(bx - 122, gy + 82, "SELLS FOR 120", Rgba.Hex("#E8C878"));
 
+            ScreensOfTheirOwn(g, loot);
             return g;
+        }
+
+        // ---- U2: the screens of their own and the touch hub (Docs/UiRework.md U2) ----
+
+        // Under the U1 windows: the growth screens (skills with its group tabs, the passive tree on its night), the records
+        // (the journal and the map with their tabs); at the top right a phone held upright with [BAG][MENU] under the
+        // minimap and the hub open under them. The windows are full screens in the game, drawn here smaller.
+        static void ScreensOfTheirOwn(PixelImage g, LootData loot)
+        {
+            g.Fill(0, 352, g.Width, 1, Rgba.Hex("#3A3040"));
+            g.Small(8, 356, "U2 SCREENS OF THEIR OWN: ONE AT A TIME, ESC OR ITS KEY AGAIN CLOSES IT", Dim);
+
+            // Skills (K): night head, the growth tabs, the slot row, a class's skills.
+            int sx = 8, sy = 364, sw = 260, sh = 308;
+            int top = Window(g, sx, sy, sw, sh, UiKind.Growth, "SKILLS (K)", UiIcons.Skills, default);
+            GroupTabs(g, sx + 6, top, sw - 12, new[] { ("SKILLS", UiIcons.Skills), ("TREE", UiIcons.Tree), ("HERO", UiIcons.Person) }, 0, badge: 1);
+            int y = top + 26;
+            g.Text(sx + 10, y, "POINTS 2   CLASSES 1/3", Ink, Shadow);
+            for (int i = 0; i < 4; i++) Slot(g, sx + 10 + i * 30, y + 12, 26, i < 2 ? Rarities[2] : null, null);
+            string[] keys = { "Q", "E", "R", "F" };
+            for (int i = 0; i < 4; i++) g.Small(sx + 12 + i * 30, y + 14, keys[i], Rgba.Hex("#E8C878"));
+            y += 46;
+            g.Text(sx + 10, y, "WARRIOR", Rgba.Hex("#E8907A"), Shadow);
+            var marks = new[] { MockGlyph.Sword, MockGlyph.Shield, MockGlyph.Star, MockGlyph.Flame, MockGlyph.Bolt, MockGlyph.Snow };
+            for (int i = 0; i < 6; i++)
+            {
+                int ry = y + 12 + i * 22;
+                Slice(g, UiArt.Inset, UiArt.InsetBorder, sx + 10, ry, sw - 20, 20);
+                g.Draw(UiIcons.Of(marks[i], Rgba.Hex("#E8C878")), sx + 14, ry + 6);
+                g.Bars(sx + 26, ry + 7, 110, 1, Ink.WithAlpha(150), i + 3);
+                g.Small(sx + 140, ry + 8, i < 2 ? "2/5" : i < 4 ? "LV 8" : "", Dim);
+                if (i < 3) Button(g, sx + sw - 62, ry + 2, 48, 16, i < 2 ? "RAISE" : "LEARN", i == 2 ? Press.Primary : Press.Normal);
+            }
+
+            // Passives (P): the same head, the tree on the night (the one screen unlike the rest).
+            int px = 276, py = 364, pw = 260, ph = 308;
+            top = Window(g, px, py, pw, ph, UiKind.Growth, "TREE (P)", UiIcons.Tree, default);
+            var stars = UiArt.StarField();
+            int nx0 = px + UiArt.PanelBorder, ny0 = py + UiArt.PanelBorder + UiArt.HeadHeight;
+            for (int yy = ny0; yy < py + ph - UiArt.PanelBorder; yy++)
+                for (int xx = nx0; xx < px + pw - UiArt.PanelBorder; xx++)
+                    g[xx, yy] = stars[(xx - nx0) % UiArt.StarTile, (yy - ny0) % UiArt.StarTile];
+            GroupTabs(g, px + 6, top, pw - 12, new[] { ("SKILLS", UiIcons.Skills), ("TREE", UiIcons.Tree), ("HERO", UiIcons.Person) }, 1, badge: 1);
+            g.Text(px + 10, top + 26, "POINTS 1", Ink, Shadow);
+            Button(g, px + pw - 96, top + 24, 84, 14, "RESET (5)", Press.Danger);
+            var nodes = new List<(int X, int Y, int State)>();
+            int cx = px + pw / 2, cy = py + 190;
+            for (int ring = 0; ring < 3; ring++)
+                for (int k = 0; k < 6 + ring * 2; k++)
+                {
+                    double a = k * Math.PI * 2 / (6 + ring * 2) + ring * 0.3;
+                    int r = 22 + ring * 26;
+                    nodes.Add((cx + (int)(Math.Cos(a) * r), cy + (int)(Math.Sin(a) * r * 0.85), ring == 0 ? 2 : ring == 1 && k % 3 == 0 ? 1 : 0));
+                }
+            foreach (var (x, yv, state) in nodes) g.Line(cx, cy, x, yv, state == 2 ? Rgba.Hex("#E8C878") : Rgba.Hex("#4A4A78"), 1, 2);
+            g.Glow(cx, cy, 8, Rgba.Hex("#FFE9A0"), 60);
+            g.Disc(cx, cy, 4, Rgba.Hex("#FFE9A0"));
+            foreach (var (x, yv, state) in nodes)
+            {
+                var c = state == 2 ? Rgba.Hex("#E8C878") : state == 1 ? Rgba.White : Rgba.Hex("#5A5A80");
+                g.Disc(x, yv, state == 1 ? 3.5f : 3f, c);
+                if (state == 1) g.Ring(x, yv, 5.5f, Rgba.Hex("#9AB4FF"));
+            }
+
+            // The records (J, M): parchment heads, the journal and the map with their tabs.
+            int jx = 544, jy = 364, jw = 268, jh = 150;
+            top = Window(g, jx, jy, jw, jh, UiKind.Journal, "JOURNAL (J)", UiIcons.Book, default);
+            GroupTabs(g, jx + 6, top, jw - 12, new[] { ("JOURNAL", UiIcons.Book), ("MAP", UiIcons.Map) }, 0);
+            for (int i = 0; i < 3; i++) Button(g, jx + 10 + i * 82, top + 26, 78, 14, new[] { "GOALS", "BESTIARY", "DEEDS" }[i], i == 0 ? Press.Primary : Press.Normal);
+            g.Bars(jx + 12, top + 50, jw - 30, 5, Ink.WithAlpha(140), 9);
+            int mx = 544, my = 522, mw = 268, mh = 150;
+            top = Window(g, mx, my, mw, mh, UiKind.Journal, "MAP (M)", UiIcons.Map, default);
+            GroupTabs(g, mx + 6, top, mw - 12, new[] { ("JOURNAL", UiIcons.Book), ("MAP", UiIcons.Map) }, 1);
+            int size = mh - (top - my) - 40;
+            int ax = mx + (mw - size) / 2, ay = top + 24;
+            Slice(g, UiArt.Inset, UiArt.InsetBorder, ax - 2, ay - 2, size + 4, size + 4);
+            for (int yy = ay; yy < ay + size; yy++)
+                for (int xx = ax; xx < ax + size; xx++)
+                    g[xx, yy] = PixelNoise.Value(xx / 4, yy / 4, 9) > 0.45f ? Rgba.Hex("#6A5A40") : Rgba.Hex("#1A1612");
+            g.Small(ax, ay + size + 4, "* ME  * PLACES", Dim);
+
+            // A phone held upright (390 x 844 at 0.4): the minimap, [BAG][MENU] under it, the hub open under them.
+            int fx = 652, fy = 8, fw = 156, fh = 338;
+            g.Fill(fx - 2, fy - 2, fw + 4, fh + 4, Rgba.Hex("#000000"));
+            for (int yy = fy; yy < fy + fh; yy++)
+                for (int xx = fx; xx < fx + fw; xx++)
+                    g[xx, yy] = PixelNoise.Value(xx / 6, yy / 6, 5) > 0.55f ? Rgba.Hex("#2E2832") : Rgba.Hex("#1E1A22");
+            int mm = 48, mmx = fx + fw - 4 - mm, mmy = fy + 4;
+            Slice(g, UiArt.Inset, UiArt.InsetBorder, mmx, mmy, mm, mm);
+            for (int yy = mmy + 3; yy < mmy + mm - 3; yy++)
+                for (int xx = mmx + 3; xx < mmx + mm - 3; xx++)
+                    g[xx, yy] = PixelNoise.Value(xx / 3, yy / 3, 4) > 0.5f ? Rgba.Hex("#6A5A40") : Rgba.Hex("#1A1612");
+            int bw = (mm - 4) / 2, by = mmy + mm + 4;
+            Button(g, mmx, by, bw, 16, "BAG");
+            Button(g, mmx + bw + 4, by, bw, 16, "MENU", Press.Primary);
+            g.Disc(mmx + mm - 2, by + 2, 2, Rgba.Hex("#FFD24A"));
+            Slice(g, UiArt.Panel, UiArt.PanelBorder, fx + 4, fy + 4, 60, 30);
+            g.Small(fx + 10, fy + 12, "HP", Dim);
+            var hub = new[] { ("BAG", UiIcons.Bag), ("SKILLS", UiIcons.Skills), ("TREE", UiIcons.Tree), ("HERO", UiIcons.Person), ("LOG", UiIcons.Book), ("MAP", UiIcons.Map), ("LEAVE", (string[])null) };
+            int cw = 37, ch = 20, gap = 3, pad = 4;
+            int hw = 2 * cw + gap + 2 * pad, hh = 4 * ch + 3 * gap + 2 * pad;
+            int hx = mmx + mm - hw, hy = by + 16 + 3;
+            Card(g, hx, hy, hw, hh);
+            for (int i = 0; i < hub.Length; i++)
+            {
+                int cx2 = hx + pad + i % 2 * (cw + gap), cy2 = hy + pad + i / 2 * (ch + gap);
+                Slice(g, UiArt.Button(false, false, false, false), UiArt.ButtonBorder, cx2, cy2, cw, ch);
+                if (hub[i].Item2 == null)
+                {
+                    g.Small(cx2 + (cw - MockFont.SmallWidth(hub[i].Item1)) / 2, cy2 + (ch - 5) / 2, hub[i].Item1, Ink);
+                    continue;
+                }
+                var icon = UiIcons.Of(hub[i].Item2, Rgba.Hex("#E8C878"));
+                g.Draw(icon, cx2 + (cw - icon.Width) / 2, cy2 + 2);
+                g.Small(cx2 + (cw - MockFont.SmallWidth(hub[i].Item1)) / 2, cy2 + ch - 7, hub[i].Item1, Ink);
+                if (i == 1 || i == 2) g.Disc(cx2 + cw - 3, cy2 + 3, 1.5f, Rgba.Hex("#FFD24A"));
+            }
+            g.Small(fx + 6, fy + fh - 10, "PHONE: [MENU] HUB", Dim);
+        }
+
+        // A group's tabs in a row (ScreenStack.Tabs, InventoryWindow.Tabs): the chosen gold and standing taller; a gold
+        // dot where there are points to spend.
+        static void GroupTabs(PixelImage g, int x, int y, int w, (string Name, string[] Icon)[] tabs, int chosen, int badge = -1)
+        {
+            int gap = 3, tw = (w - gap * (tabs.Length - 1)) / tabs.Length;
+            for (int i = 0; i < tabs.Length; i++)
+            {
+                Button(g, x + i * (tw + gap), y, tw, 18, tabs[i].Name, i == chosen ? Press.Primary : Press.Normal, tabs[i].Icon, tab: true);
+                if (i == badge) g.Disc(x + i * (tw + gap) + tw - 4, y + 4, 2, Rgba.Hex("#FFD24A"));
+            }
         }
 
         // ---- pixels.png: a corner of a panel at a phone's ratio, the old way and the new ----

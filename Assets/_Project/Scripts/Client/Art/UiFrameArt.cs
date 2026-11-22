@@ -343,6 +343,49 @@ namespace Game.Client
             }
         }
 
+        // The passive tree's night (Docs/UiRework.md 4-3, the one screen meant to look unlike the rest): a tile of deep
+        // blue to violet sky with drifts of cloud and stars of three sizes, repeated behind the tree (U2 lays it under the
+        // page; U4 builds the full-screen tree on it). Its edges meet, so it tiles without seams.
+        public const int StarTile = 96;
+
+        public static PixelImage StarField()
+        {
+            var g = new PixelImage(StarTile, StarTile);
+            for (int y = 0; y < StarTile; y++)
+            {
+                for (int x = 0; x < StarTile; x++)
+                {
+                    // A slow wave of light down the tile, so the repeat does not read as stripes.
+                    float wave = 0.5f + 0.5f * (float)Math.Sin((x + y * 0.6f) / StarTile * Math.PI * 2);
+                    var c = Rgba.Hex("#070A1E").Mix(Rgba.Hex("#140D33"), 0.35f + 0.4f * wave);
+                    float cloud = PixelNoise.Value(x / 12, y / 8, 61) * 0.7f + PixelNoise.Value(x / 4, y / 3, 62) * 0.3f;
+                    if (cloud > 0.58f) c = c.Mix(Rgba.Hex("#2E2066"), (cloud - 0.58f) * 1.4f);
+                    // Banded to a few steps, as the head band's night is.
+                    g[x, y] = new Rgba(c.R / 4 * 4, c.G / 4 * 4, c.B / 4 * 4);
+                }
+            }
+            for (int y = 0; y < StarTile; y++)
+            {
+                for (int x = 0; x < StarTile; x++)
+                {
+                    uint hash = PixelNoise.Hash(x, y, 67);
+                    if (hash % 97 == 0) g[x, y] = hash / 97 % 3 == 0 ? Rgba.Hex("#9AB4FF") : Rgba.Hex("#C8C8E8");
+                    else if (hash % 1499 == 1)
+                    {
+                        // A brighter star with a small cross of light.
+                        var light = hash / 1499 % 2 == 0 ? Rgba.White : Rgba.Hex("#FFE9A8");
+                        var glow = light.Mix(g[x, y], 0.55f);
+                        g[x, y] = light;
+                        g[(x + 1) % StarTile, y] = glow;
+                        g[(x + StarTile - 1) % StarTile, y] = glow;
+                        g[x, (y + 1) % StarTile] = glow;
+                        g[x, (y + StarTile - 1) % StarTile] = glow;
+                    }
+                }
+            }
+            return g;
+        }
+
         static void Stud(PixelImage g, int x, int y)
         {
             g.Fill(x, y, 3, 3, GoldMid);

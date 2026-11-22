@@ -844,7 +844,7 @@ namespace Game.Client
                 var at = new Vector3(x + 0.5f, y + 2.05f, 0);
                 if (Vector3.Distance(at, _self.Position) >= 5) continue;
                 bool near = dealing != null && dealing.Value.Npc == npc;
-                Label(at, $"{npc.Name} 호감 {_client.HeartsWith(npc)}/{World.MaxHearts}" + (near ? " · 가방에서 거래" : ""), PowerLabel);
+                Label(at, $"{npc.Name} 호감 {_client.HeartsWith(npc)}/{World.MaxHearts}" + (near ? (Controls.UsingTouch ? " · [가방]에서 거래" : $" · 거래 ({KeyBindings.Name(KeyAction.Machine)})") : ""), PowerLabel);
             }
             foreach (var text in _floating)
             {
@@ -2486,7 +2486,7 @@ namespace Game.Client
                     if (e.Source == _client.PlayerId) Sounds.Play(Sound.LevelUp);
                     // A level that opens a special perk: say where to pick it.
                     if (e.Source == _client.PlayerId && Array.IndexOf(LifeSkills.PerkLevels, e.Amount % 16) >= 0)
-                        ShowBanner($"{LifeSkills.Name(skill)} {e.Amount % 16}레벨! 가방 [캐릭터]에서 특별 혜택을 고른다");
+                        ShowBanner($"{LifeSkills.Name(skill)} {e.Amount % 16}레벨! [캐릭터] 화면에서 특별 혜택을 고른다");
                     break;
                 case SimEventType.Rain:
                     if (e.Amount > 0) ShowBanner("비가 스며 밭이 젖었다");
@@ -2558,7 +2558,7 @@ namespace Game.Client
                     bool stepped = Leveling.StepsAt(e.Amount) > Leveling.StepsAt(e.Amount - 1);
                     string gained = $"{(stepped ? "계단! " : "")}생명력 +{gainedHealth} · 피해 +{gainedDamage}%";
                     ShowBanner(ClassRules.SlotsAt(e.Amount) > ClassRules.SlotsAt(e.Amount - 1)
-                        ? $"레벨 {e.Amount}! {gained} · 클래스를 하나 더 고를 수 있다(가방 [스킬] 탭)"
+                        ? $"레벨 {e.Amount}! {gained} · 클래스를 하나 더 고를 수 있다([스킬] 화면)"
                         : $"레벨 {e.Amount}! {gained} · 스킬·특성 포인트 +1");
                     // And over the head, the health and damage it gave, a moment after the level.
                     _floating.Add(new Floating { Position = climber.Position + new Vector3(0, 1.1f, 0), Text = $"+{gainedHealth} 생명력 · +{gainedDamage}% 피해", Color = LevelColor, Big = stepped });

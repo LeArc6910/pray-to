@@ -79,6 +79,8 @@ namespace Game.Client
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
     //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off|<tab name>
+    //   screen <name>|off|hub     a screen by name (가방 스킬 특성 캐릭터 일지 지도, or skills passives ...), none, or the
+    //                             touch hub; "bag <tab>" opens the old tab names on the screen that has them now (U2)
     //   roll                      the dodge roll, as its key or button would (the way walked, or faced)
     //   rollhit <amount> <ticks>  a blow on the player that many host ticks into their next roll (its unhurt ticks)
     //   nav <target>   sense   botreport [name]   botreset      the bot by the Core's state (PlaytestBot.cs), with probe on
@@ -480,8 +482,17 @@ namespace Game.Client
                     root.ArmRollHit(Float(words[1]), Int(words[2]));
                     return null;
                 case "bag":
+                    // The old bag tabs by name (Docs/UiRework.md 4-7 입구를 옮긴다): 장비·재료·제작·상자·상인 in the bag,
+                    // 스킬·특성·캐릭터·일지 (and 지도) as their own screens. "bag off" shuts whichever of them is up.
                     if (words[1] == "on" || words[1] == "off") root.BagOpen = words[1] == "on";
                     else root.ShowBag(words[1]);
+                    return null;
+                case "screen":
+                    // screen <가방|스킬|특성|캐릭터|일지|지도|off|hub>: a screen by its name (U2), none, or the touch hub.
+                    if (words[1] == "off" || words[1] == "none") root.ShowScreen(GameScreen.None);
+                    else if (words[1] == "hub" || words[1] == ScreenStack.HubButton) root.ShowHub(true);
+                    else if (ScreenStack.FromName(words[1]) is var screen && screen != GameScreen.None) root.ShowScreen(screen);
+                    else return $"error screen: no screen '{words[1]}'";
                     return null;
                 default:
                     return $"error {words[0]}: no such command";
@@ -1478,11 +1489,22 @@ namespace Game.Client
             json.Field("doorsOpen", root.OpenDoors);
             json.Field("typing", Controls.Typing);
             json.Field("map", root.MapOpen);
+            // The screen open (Docs/UiRework.md U2: 가방, 스킬, 특성, 캐릭터, 일지, 지도, or ""; "screen" above is the size), whether
+            // the touch hub is up, and
+            // what G would meet now (GameRoot.Meeting: Machine, Person, Merchant, Waypoint, Poi, Dungeon, Chest, Anvil,
+            // Station or None).
+            json.Field("window", root.ScreenName);
+            json.Field("hub", root.HubOpen);
+            json.Field("meet", root.Playing ? root.NextMeeting().ToString() : "None");
+            // The bag's page (장비, 재료·제작, 상자, 상인) and whether a talk is on screen.
+            json.Field("bagPage", root.BagPage);
+            json.Field("talking", root.TalkText != null);
             json.Field("speed", root.HostTicksPerStep);
             // Where the UI's parts were drawn (U0·U1, sweep.js "ui"): the bag window, the "획득" lines, the boss bar, the
             // left column's bottom (the HUD and goal list) and whether the goal list is folded, the player on the screen,
             // and the frames' device pixels per art pixel.
-            json.Field("ui", new Json('{').Field("bag", Rect(root.BagOpen ? InventoryWindow.AreaOf() : default))
+            json.Field("ui", new Json('{').Field("bag", Rect(root.BagOpen ? ScreenStack.AreaOf(root.OpenScreen) : default))
+                .Field("window", Rect(ScreenStack.AreaOf(root.OpenScreen)))
                 .Field("acquired", Rect(GameRoot.AcquiredArea)).Field("bossBar", Rect(GameRoot.BossBarShown))
                 .Field("leftBottom", Ui.LeftColumnBottom).Field("folded", root.Playing && GameRoot.TrackerFolds(root.BossShown))
                 .Field("player", Rect(root.PlayerOnScreen)).Field("scale", Ui.Scale).Field("dots", UiSkin.Dots)

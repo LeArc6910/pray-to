@@ -150,6 +150,65 @@ namespace Game.Client.Tests
             Assert.IsEmpty(problems, string.Join("\n", problems));
         }
 
+        // Every screen of its own (Docs/UiRework.md U2: the bag, skills, passives, character, journal, map) fits the
+        // screens the person named (a small PC window, a small phone held upright and on its side) and the rest: inside
+        // the screen with room under its head and its close button on the screen; the full screens cover a phone; the bag
+        // keeps clear of the minimap column so [가방]·[메뉴] stay in reach; and the touch hub's buttons are a finger's
+        // size, inside the screen, apart, and clear of the column.
+        [Test]
+        public void EveryScreenFits()
+        {
+            var problems = new List<string>();
+            var sizes = new List<(string Name, float Width, float Height, bool Touch)>
+            {
+                ("작은 PC 창 (U2)", 800, 600, false),
+                ("작은 휴대폰 세로 (U2)", 375, 812, true),
+                ("작은 휴대폰 가로 (U2)", 740, 360, true),
+            };
+            sizes.AddRange(Sizes);
+            foreach (var (name, width, height, touch) in sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Ui.HudHeight = 160;
+                Controls.ForceTouch(touch);
+                string where = $"{name} {width}×{height}";
+                var column = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea) };
+                if (touch) column.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
+                foreach (var screen in ScreenStack.All)
+                {
+                    // While the bag is open the HUD box is only its bars (GameRoot.DrawHud compact), and the bag goes under it.
+                    Ui.HudHeight = screen == GameScreen.Bag ? GameRoot.HudBarsHeight : 160;
+                    var area = ScreenStack.AreaOf(screen);
+                    string what = $"{where}, {ScreenStack.NameOf(screen)}";
+                    if (!Inside(area, width, height)) problems.Add($"{what}: 화면 밖 {area}");
+                    var inside = UiSkin.InsideOf(area);
+                    if (inside.width < 260 || inside.height < 150) problems.Add($"{what}: 내용 자리가 좁다 {inside}");
+                    var close = UiSkin.CloseRect(UiSkin.HeadOf(area));
+                    if (!Inside(close, width, height)) problems.Add($"{what}: 닫기 단추가 화면 밖 {close}");
+                    if (ScreenStack.IsFull(screen) && touch && (width < 600 || height < 480) && (area.width < width - 10 || area.height < height - 10))
+                        problems.Add($"{what}: 휴대폰에서 전체 화면이 아니다 {area}");
+                    if (screen == GameScreen.Bag && touch)
+                        foreach (var (part, rect) in column)
+                            if (Overlap(area, rect)) problems.Add($"{what}: 겹침 - {part}");
+                }
+                if (!touch) continue;
+                var (panel, cells) = ScreenStack.HubLayout();
+                if (!Inside(panel, width, height)) problems.Add($"{where}, 메뉴: 화면 밖 {panel}");
+                if (cells.Count != 7) problems.Add($"{where}, 메뉴: 단추 {cells.Count}개");
+                for (int i = 0; i < cells.Count; i++)
+                {
+                    var (label, _, rect) = cells[i];
+                    if (rect.height < 40 || rect.width < 80) problems.Add($"{where}, 메뉴 [{label}]: 작다 {rect}");
+                    if (!Inside(rect, width, height)) problems.Add($"{where}, 메뉴 [{label}]: 화면 밖 {rect}");
+                    for (int j = i + 1; j < cells.Count; j++)
+                        if (Overlap(rect, cells[j].Rect)) problems.Add($"{where}, 메뉴: 겹침 - {label} / {cells[j].Name}");
+                }
+                foreach (var (part, rect) in column)
+                    if (Overlap(panel, rect)) problems.Add($"{where}, 메뉴: 겹침 - {part}");
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
         // The waypoint and waystone list (StoryScreen.ListArea, 2026-11-22: centred on a phone held upright, the minimap
         // and the [가방]·[나가기] buttons covered its top rows and took their taps) lies inside every screen and clear of
         // the top right column, however long the list.

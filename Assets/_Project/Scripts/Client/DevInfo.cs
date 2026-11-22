@@ -15,10 +15,11 @@ namespace Game.Client
         // Smoothing for the frame numbers: about the last second.
         const float Smoothing = 0.05f;
 
-        static readonly Key[] Watched = { Key.Tab, Key.I, Key.M, Key.Escape, Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Space };
+        static readonly Key[] Watched = { Key.Tab, Key.I, Key.M, Key.Escape, Key.Q, Key.E, Key.R, Key.F, Key.C, Key.Space, Key.K, Key.P, Key.J, Key.U, Key.G };
         static readonly KeyCode[] WatchedCodes =
         {
             KeyCode.Tab, KeyCode.I, KeyCode.M, KeyCode.Escape, KeyCode.Q, KeyCode.E, KeyCode.R, KeyCode.F, KeyCode.C, KeyCode.Space,
+            KeyCode.K, KeyCode.P, KeyCode.J, KeyCode.U, KeyCode.G,
         };
         static readonly List<string> Log = new List<string>();
         static float _frameMs = 16;

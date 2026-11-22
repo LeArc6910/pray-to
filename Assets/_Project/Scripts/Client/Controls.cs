@@ -7,8 +7,9 @@ using UnityEngine.InputSystem;
 namespace Game.Client
 {
     // Keyboard and mouse: WASD or arrow keys to move, the mouse to aim, left button or space to attack (held to keep
-    // swinging), Q E R F for the skill slots, C to drink a potion, left Shift to roll, M for the map (those keys can be
-    // changed in the menu, KeyBindings). Touch: two sticks that appear where a finger lands. The
+    // swinging), Q E R F for the skill slots, C to drink a potion, left Shift to roll, G to meet what is in reach, and the
+    // screens' keys: Tab (or I) the bag, K skills, P passives, U the character, J the journal, M the map (those keys can
+    // be changed in the menu, KeyBindings). Touch: two sticks that appear where a finger lands. The
     // left half moves; the right half attacks for as long as it is held and aims where it is pulled. Pressed without
     // pulling, the attack goes where the player walks, or where they already face when standing still. Touches that
     // start on a UI button or window, which OnGUI marks with Block, are left to the UI; ones on a skill button, which
@@ -296,6 +297,9 @@ namespace Game.Client
             || (KeyBindings.Capturing == null && !Typing && !KeyBindings.IsBound(Key.I) && Keyboard.current != null && Keyboard.current[Key.I].wasPressedThisFrame);
 
         public static bool MapPressed() => KeyBindings.Pressed(KeyAction.Map);
+
+        // A screen's key (K skills, P passives, U the character, J the journal; Docs/UiRework.md U2).
+        public static bool ScreenPressed(GameScreen screen) => ScreenStack.KeyOf(screen) is KeyAction action && KeyBindings.Pressed(action);
 
         public static bool MachinePressed() => KeyBindings.Pressed(KeyAction.Machine);
 

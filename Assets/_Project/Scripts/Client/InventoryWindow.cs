@@ -6,10 +6,11 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // The bag screen, opened with Tab or I, in tabs: gear (stats, consumables, worn gear, carried items, runes),
-    // materials (materials with [놓기]/[심기], and the crafting list), and while the player stands by a chest, the
-    // chest (what it holds with [꺼내기], what the bag holds with [넣기]). Every button only asks the host for the
-    // change; the window redraws from the next inventory message.
+    // The bag and the screens that were once its tabs (Docs/UiRework.md U2): the bag (Tab or I) with its gear, materials
+    // and crafting, and the chest's and the merchant's tabs while one is in reach; the growth screens (skills K, passives
+    // P, character U) and the journal (J), each its own full-screen window with its own head and close button and the
+    // tabs of its group (ScreenStack). Which is open is the screen manager's (ScreenStack); this draws it. Every button
+    // only asks the host for the change; the window redraws from the next inventory message.
     sealed class InventoryWindow
     {
         enum Page
@@ -22,6 +23,8 @@ namespace Game.Client
             Merchant,
             Character,
             Journal,
+            // Only a tab of the records group: pressing it shows the map (MapView), not a page here.
+            Map,
         }
 
         const float MaxWidth = 520;
@@ -32,12 +35,15 @@ namespace Game.Client
         // Points one notch of the mouse wheel scrolls; IMGUI's own step is a fraction of a line in browsers.
         const float WheelStep = 30;
 
-        static readonly string[] PageNames = { "장비", "재료·제작", "스킬", "특성", "상자", "상인", "캐릭터", "일지" };
+        static readonly string[] PageNames = { "장비", "재료·제작", "스킬", "특성", "상자", "상인", "캐릭터", "일지", "지도" };
         static readonly GUIContent[] PageLabels = PageNames.Select(name => new GUIContent(name)).ToArray();
 
         readonly WorldClient _client;
         readonly Action<byte[]> _send;
         readonly Hotbar _hotbar;
+        readonly ScreenStack _screens;
+        // The bag's page while it is shut or another screen is up, so it opens again where it was left.
+        Page _bagPage;
         readonly Vector2[] _scroll = new Vector2[PageNames.Length];
         Page _page;
         RuneDefinition _selectedRune;
@@ -55,14 +61,50 @@ namespace Game.Client
         const float IconSize = 24;
         const float IconRoom = IconSize + 4;
 
-        public InventoryWindow(WorldClient client, Action<byte[]> send, Hotbar hotbar = null)
+        public InventoryWindow(WorldClient client, Action<byte[]> send, Hotbar hotbar = null, ScreenStack screens = null)
         {
             _client = client;
             _send = send;
             _hotbar = hotbar;
+            _screens = screens ?? new ScreenStack();
         }
 
-        public bool Open { get; set; }
+        // Whether one of the screens drawn here is up (the bag, a growth screen or the journal; not the map). Setting it
+        // true shows the bag (in place of any other screen); false shuts whichever of them is open.
+        public bool Open
+        {
+            get => Draws(_screens.Current);
+            set
+            {
+                if (value) _screens.Show(GameScreen.Bag);
+                else if (!value && Open) _screens.Close();
+            }
+        }
+
+        public static bool Draws(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Map;
+
+        // The bag's own pages (the rest are screens of their own).
+        static bool InBag(Page page) => page is Page.Gear or Page.Materials or Page.Chest or Page.Merchant;
+
+        static GameScreen ScreenOf(Page page) => page switch
+        {
+            Page.Classes => GameScreen.Skills,
+            Page.Passives => GameScreen.Passives,
+            Page.Character => GameScreen.Character,
+            Page.Journal => GameScreen.Journal,
+            Page.Map => GameScreen.Map,
+            _ => GameScreen.Bag,
+        };
+
+        // The page the open screen shows.
+        Page PageOf(GameScreen screen) => screen switch
+        {
+            GameScreen.Skills => Page.Classes,
+            GameScreen.Passives => Page.Passives,
+            GameScreen.Character => Page.Character,
+            GameScreen.Journal => Page.Journal,
+            _ => _bagPage,
+        };
         // The pointer is over a button that works the ground right ahead (plant, water, till, fertilize, lay a floor):
         // the world's frame then marks World.TileAhead, not where a thing would be put (2026-11-09).
         public bool PointsAtSoil { get; private set; }
@@ -75,14 +117,23 @@ namespace Game.Client
             if (Event.current.type == EventType.Repaint && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition)) PointsAtSoil = true;
         }
 
-        // Opens the bag on the page with that tab name (장비, 재료·제작, 스킬, 특성), for the tests' pictures.
+        // Opens the page with that old tab name (장비, 재료·제작, 상자, 상인 in the bag; 스킬, 특성, 캐릭터, 일지, 지도 as
+        // their own screens), for G, the goal list and the tests (Playtest "bag <tab>", the play mode tests' ShowBag).
         internal void Show(string page)
         {
             int index = Array.IndexOf(PageNames, page);
             if (index < 0) throw new ArgumentException($"no bag page '{page}'");
-            _page = (Page)index;
-            Open = true;
+            var chosen = (Page)index;
+            if (InBag(chosen)) _bagPage = chosen;
+            _screens.Show(ScreenOf(chosen));
         }
+
+        // Where the open screen is drawn: the bag beside the minimap column (or under it), a growth screen or the journal
+        // over the whole screen.
+        internal Rect Area => ScreenStack.AreaOf(_screens.Current);
+
+        // The bag's page by its tab name, for the playtests.
+        internal string BagPage => PageNames[(int)_bagPage];
 
         public void Draw()
         {
@@ -99,7 +150,10 @@ namespace Game.Client
             }
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
-            var area = AreaOf();
+            var screen = _screens.Current;
+            _page = PageOf(screen);
+            var area = Area;
+            bool full = ScreenStack.IsFull(screen);
             bool besideWindow = area.x >= TooltipWidth + 20;
             float inner = area.width - GUI.skin.box.padding.horizontal;
             float scrollbar = GUI.skin.verticalScrollbar.fixedWidth + 8;
@@ -119,33 +173,56 @@ namespace Game.Client
             bool merchant = person != null;
             // The tab is named for whoever is near: 상인, 대장장이, 어부.
             if (merchant) PageLabels[(int)Page.Merchant].text = person.Value.Npc.Role;
-            if (!chest && _page == Page.Chest || !merchant && _page == Page.Merchant) _page = Page.Gear;
+            if (!chest && _bagPage == Page.Chest || !merchant && _bagPage == Page.Merchant) _bagPage = Page.Gear;
+            _page = PageOf(screen);
+            // The tabs of the screen's group: the bag's own pages (with the chest's and merchant's while in reach), the
+            // growth screens, or the records (the journal and the map).
             _pages.Clear();
-            _pages.AddRange(new[] { Page.Gear, Page.Materials, Page.Classes, Page.Passives, Page.Character, Page.Journal });
-            if (chest) _pages.Add(Page.Chest);
-            if (merchant) _pages.Add(Page.Merchant);
+            switch (ScreenStack.GroupOf(screen))
+            {
+                case ScreenGroup.Growth:
+                    _pages.AddRange(new[] { Page.Classes, Page.Passives, Page.Character });
+                    break;
+                case ScreenGroup.Records:
+                    _pages.AddRange(new[] { Page.Journal, Page.Map });
+                    break;
+                default:
+                    _pages.AddRange(new[] { Page.Gear, Page.Materials });
+                    if (chest) _pages.Add(Page.Chest);
+                    if (merchant) _pages.Add(Page.Merchant);
+                    break;
+            }
 
-            // The head band says what the page is (Docs/UiRework.md, the person's pick of 2026-11-22): the bag's
-            // leather, the growth pages' night, the journal's parchment, a merchant's awning with her hearts, a chest's
-            // steel; the coins at its right, and the close button in the corner.
+            // The head band says what the screen is (Docs/UiRework.md, the person's pick of 2026-11-22): the bag's
+            // leather, the growth screens' night, the journal's parchment, a merchant's awning with her hearts, a chest's
+            // steel; the coins at its right, and the close button in the corner. On a PC the title carries its key.
             var kind = KindOf(_page);
             string title = _page switch
             {
-                Page.Classes or Page.Passives or Page.Journal or Page.Chest => PageNames[(int)_page],
+                Page.Chest => PageNames[(int)_page],
                 Page.Merchant => person.Value.Npc.Name,
-                _ => "가방",
+                _ when screen == GameScreen.Bag => "가방" + ScreenStack.KeyHint(screen),
+                _ => PageNames[(int)_page] + ScreenStack.KeyHint(screen),
             };
-            UiMotion.BeginWindow("bag", area, kind);
+            UiMotion.BeginWindow(ScreenStack.MotionKey(screen), area, kind);
             var inside = UiSkin.Window(area, kind, title, TabIcons[(int)_page], out var head);
+            // The passive tree under its night (4-3: the one screen unlike the rest; U4 makes the tree itself).
+            if (_page == Page.Passives) UiSkin.Stars(Rect.MinMaxRect(area.x + UiSkin.FrameEdge, head.yMax, area.xMax - UiSkin.FrameEdge, area.yMax - UiSkin.FrameEdge), 0.9f);
             float right = UiSkin.CloseRect(head).x - 6;
             right = DrawCoins(head, right);
             if (_page == Page.Merchant) UiSkin.Hearts(head, right - 4, _client.HeartsWith(person.Value.Npc), World.MaxHearts);
-            if (UiSkin.CloseButton(head)) Open = false;
+            if (UiSkin.CloseButton(head)) _screens.Close();
             GUILayout.BeginArea(inside);
             // Without room beside the window a line says how to see a description, so nothing sits over the list.
-            if (!besideWindow && !Ui.Short)
+            if (!besideWindow && !Ui.Short && !full)
                 GUILayout.Label(Fit(Controls.UsingTouch ? "이름이나 칸을 누르고 있으면 설명" : "이름이나 칸에 마우스를 올리면 설명", inner));
-            _page = Tabs(_page, _pages, inner);
+            var chosen = Tabs(_page, _pages, inner);
+            if (chosen != _page)
+            {
+                if (InBag(chosen)) _bagPage = chosen;
+                else _screens.Show(ScreenOf(chosen));
+                if (chosen != Page.Map) _page = chosen;
+            }
             if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
             int page = (int)_page;
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
@@ -193,15 +270,15 @@ namespace Game.Client
 
         static UiKind KindOf(Page page) => page switch
         {
-            Page.Classes or Page.Passives => UiKind.Growth,
-            Page.Journal => UiKind.Journal,
+            Page.Classes or Page.Passives or Page.Character => UiKind.Growth,
+            Page.Journal or Page.Map => UiKind.Journal,
             Page.Merchant => UiKind.Shop,
             Page.Chest => UiKind.Machine,
             _ => UiKind.Bag,
         };
 
         // The small picture of each page, on its tab and in the head (in Page's order).
-        static readonly string[][] TabIcons = { UiIcons.Bag, UiIcons.Hammer, UiIcons.Skills, UiIcons.Tree, UiIcons.Chest, UiIcons.Shop, UiIcons.Person, UiIcons.Book };
+        static readonly string[][] TabIcons = { UiIcons.Bag, UiIcons.Hammer, UiIcons.Skills, UiIcons.Tree, UiIcons.Chest, UiIcons.Shop, UiIcons.Person, UiIcons.Book, UiIcons.Map };
 
         static GUIStyle _coinStyle;
 
@@ -261,37 +338,15 @@ namespace Game.Client
                 }
                 var label = PageLabels[(int)pages[i]];
                 Ui.Probe(label.text, tab);
-                if (e.type == EventType.Repaint) DrawTab(tab, label, TabIcons[(int)pages[i]], page == pages[i], tab.Contains(e.mousePosition));
+                bool hover = tab.Contains(e.mousePosition);
+                if (e.type == EventType.Repaint) UiSkin.Tab(tab, label, TabIcons[(int)pages[i]], page == pages[i], hover);
+                // On a PC the mouse over a tab of a screen with a key says the key.
+                if (hover && !Controls.UsingTouch && !InBag(pages[i])) ScreenStack.TabHint(tab, ScreenOf(pages[i]));
                 // Points to spend: a gold dot in the corner of the skills or passives tab.
                 bool points = pages[i] == Page.Classes && _client.SkillPoints > 0 || pages[i] == Page.Passives && _client.PassivePoints > 0;
                 if (points && e.type == EventType.Repaint) Badge(tab);
             }
             return page;
-        }
-
-        // A tab: the chosen one gold and standing two points taller than the rest; its icon beside its name where the
-        // tab is wide enough for both (Docs/UiRework.md 4-4 탭 두 단).
-        static void DrawTab(Rect tab, GUIContent label, string[] icon, bool chosen, bool hover)
-        {
-            var face = chosen ? tab : new Rect(tab.x, tab.y + 2, tab.width, tab.height - 2);
-            UiSkin.ButtonFrame(face, hover && !chosen, false, chosen, false);
-            var style = UiSkin.Bare(GUI.skin.button);
-            float text = style.CalcSize(label).x - style.padding.horizontal;
-            var iconSize = UiSkin.IconSize(icon);
-            bool withIcon = face.width >= iconSize.x + 4 + text + 12;
-            if (!withIcon)
-            {
-                style.Draw(face, label, hover, false, chosen, false);
-                return;
-            }
-            float left = face.x + (face.width - iconSize.x - 4 - text) / 2;
-            UiSkin.Icon(new Rect(left, face.y, iconSize.x, face.height), icon, chosen ? new Color(1f, 0.92f, 0.62f) : new Color(0.85f, 0.72f, 0.5f));
-            style.alignment = TextAnchor.MiddleLeft;
-            var padding = style.padding;
-            style.padding = new RectOffset(0, 0, padding.top, padding.bottom);
-            style.Draw(new Rect(left + iconSize.x + 4, face.y, text + 4, face.height), label, hover, false, chosen, false);
-            style.padding = padding;
-            style.alignment = TextAnchor.MiddleCenter;
         }
 
         // The character (as Core Keeper shows one): the worn slots laid out round the body, the picked one's panel,

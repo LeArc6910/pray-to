@@ -563,6 +563,50 @@ namespace Game.Client
             return Event.current.type == EventType.Repaint ? GUILayoutUtility.GetLastRect() : last;
         }
 
+        // ---- Tabs (Docs/UiRework.md 4-4 탭 두 단) ----
+
+        // A tab: the chosen one gold and standing two points taller than the rest; its icon beside its name where the
+        // tab is wide enough for both. The bag's tabs and the screens' group tabs (ScreenStack.Tabs) both draw with it.
+        public static void Tab(Rect tab, GUIContent label, string[] icon, bool chosen, bool hover)
+        {
+            var face = chosen ? tab : new Rect(tab.x, tab.y + 2, tab.width, tab.height - 2);
+            ButtonFrame(face, hover && !chosen, false, chosen, false);
+            var style = Bare(GUI.skin.button);
+            float text = style.CalcSize(label).x - style.padding.horizontal;
+            var iconSize = icon != null ? IconSize(icon) : Vector2.zero;
+            bool withIcon = icon != null && face.width >= iconSize.x + 4 + text + 12;
+            if (!withIcon)
+            {
+                style.Draw(face, label, hover, false, chosen, false);
+                return;
+            }
+            float left = face.x + (face.width - iconSize.x - 4 - text) / 2;
+            Icon(new Rect(left, face.y, iconSize.x, face.height), icon, chosen ? new Color(1f, 0.92f, 0.62f) : new Color(0.85f, 0.72f, 0.5f));
+            style.alignment = TextAnchor.MiddleLeft;
+            var padding = style.padding;
+            style.padding = new RectOffset(0, 0, padding.top, padding.bottom);
+            style.Draw(new Rect(left + iconSize.x + 4, face.y, text + 4, face.height), label, hover, false, chosen, false);
+            style.padding = padding;
+            style.alignment = TextAnchor.MiddleCenter;
+        }
+
+        // ---- The passive tree's night (Docs/UiRework.md 4-3: the one screen unlike the rest) ----
+
+        static Piece _stars;
+
+        // The star field tiled over the rect at whole device pixels, faded to `alpha`, under what the page draws.
+        public static void Stars(Rect area, float alpha = 1)
+        {
+            if (Event.current.type != EventType.Repaint || area.width <= 0 || area.height <= 0) return;
+            _stars ??= new Piece(UiArt.StarField(), repeat: true);
+            area = Snap(area);
+            float tile = UiArt.StarTile * Pt;
+            var previous = GUI.color;
+            GUI.color = new Color(previous.r, previous.g, previous.b, previous.a * alpha);
+            GUI.DrawTextureWithTexCoords(area, _stars.Texture(Dots), new Rect(0, 0, area.width / tile, area.height / tile));
+            GUI.color = previous;
+        }
+
         // ---- Full screens (Docs/UiRework.md 사람이 정한 것: the world dark behind, red at the edges when hurt) ----
 
         static Texture2D _edges;

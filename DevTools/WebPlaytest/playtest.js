@@ -191,6 +191,15 @@ async function playPc(browser, profile) {
   await game.page.waitForTimeout(800);
   await shot(game, profile, 'bag-set', '공허 순례자 세트를 입은 가방 창');
   await send(game, 'bag off');
+  // The screens of their own (Docs/UiRework.md U2): K the skills, over the whole screen; K again shuts it.
+  await game.page.keyboard.press('k');
+  await game.page.waitForTimeout(600);
+  const skills = await state(game);
+  check(skills.window === '스킬' && skills.bag, `K 키로 [스킬] 화면이 열린다 (${skills.window || '없음'})`);
+  await shot(game, profile, 'skills', '[스킬] 화면(K)');
+  await game.page.keyboard.press('k');
+  await game.page.waitForTimeout(400);
+  check((await state(game)).window === '', 'K를 다시 누르면 닫힌다');
 
   await send(game, 'scene machines');
   await game.page.waitForTimeout(3500);
@@ -339,7 +348,19 @@ async function playPhone(browser, profile) {
   await game.page.waitForTimeout(800);
   check((await state(game)).bag, '미니맵 아래 [가방] 단추로 가방이 열린다');
   await shot(game, profile, 'bag', '가방 창');
-  await send(game, 'bag off; scene machines');
+  await send(game, 'bag off');
+  // The [메뉴] hub beside [가방] (Docs/UiRework.md U2): the screens' buttons; [특성] opens the passives as a full sheet.
+  await game.page.waitForTimeout(400);
+  await game.page.touchscreen.tap(width - 10 - 120 + 55 + 10 + 27, 10 + 120 + 10 + 20);
+  await game.page.waitForTimeout(600);
+  check((await state(game)).hub, '미니맵 아래 [메뉴] 단추로 허브가 열린다');
+  await shot(game, profile, 'hub', '[메뉴] 허브');
+  await send(game, 'screen 특성');
+  await game.page.waitForTimeout(600);
+  const passives = await state(game);
+  check(passives.window === '특성' && !passives.hub, `화면을 열면 허브가 닫힌다 (${passives.window})`);
+  await shot(game, profile, 'passives', '[특성] 전체 화면(별하늘)');
+  await send(game, 'screen off; scene machines');
   await game.page.waitForTimeout(2500);
   await shot(game, profile, 'machines', '기계 장면');
   await game.context.close();

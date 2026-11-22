@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -31,12 +31,43 @@ const { note, check } = run;
 
 const has = (text, word) => (text || '').includes(word);
 
-// A tab of the bag window, opened.
+// The screens of their own (Docs/UiRework.md U2, the person's keys of 2026-11-22): what were the bag's tabs 스킬, 특성,
+// 캐릭터 and 일지 are screens with keys of their own (K P U J; the map M), in two groups whose windows have the group's
+// tabs (성장: 스킬·특성·캐릭터, 기록: 일지·지도). On a touch screen they open from the [메뉴] hub under the minimap.
+const ScreenKeys = { '가방': 'Tab', '스킬': 'k', '특성': 'p', '캐릭터': 'u', '일지': 'j', '지도': 'm' };
+const ScreenGroups = { '가방': 'bag', '스킬': 'growth', '특성': 'growth', '캐릭터': 'growth', '일지': 'records', '지도': 'records' };
+
+// A screen by its name, opened as a person would: a tab of the group when one of its screens is up, else its key on a
+// PC, or on a touch screen the hub's button (after the open screen's close button: a full screen covers the hub).
+async function openScreen(game, name) {
+  const s = await game.state();
+  if (s.window === name) return true;
+  if (s.window && ScreenGroups[s.window] === ScreenGroups[name] && name !== '가방') {
+    await game.press(name);
+  } else if (game.touch) {
+    if (s.window) await game.press(s.window === '지도' ? '지도 닫기' : '창 닫기');
+    await game.wait(300);
+    if (name === '가방') await game.press('가방');
+    else {
+      if (!(await game.state()).hub) await game.press('메뉴');
+      await game.wait(300);
+      await game.press(name, '메뉴');
+    }
+  } else {
+    await game.page.keyboard.press(ScreenKeys[name]);
+  }
+  return !!(await game.until(t => t.window === name, 3000));
+}
+
+// A tab of the bag window, opened; the old tab names of what are now screens of their own open those screens.
 async function bagTab(game, tab) {
-  if (!(await game.state()).bag) {
-    if (game.touch) await game.press('가방');
-    else await game.page.keyboard.press('Tab');
-    await game.wait(500);
+  if (tab && ScreenKeys[tab] && tab !== '가방') {
+    await openScreen(game, tab);
+    return;
+  }
+  if ((await game.state()).window !== '가방') {
+    await openScreen(game, '가방');
+    await game.wait(200);
   }
   if (tab) await game.press(tab);
 }
@@ -1319,8 +1350,8 @@ async function npc(browser) {
   const told = await game.until(i => (i.stories || {}).merchant === 1, 3000, game.inventory);
   check(!!told && count(told, 'coin') > coinsBefore, `이야기 1단계를 마치면 금화를 받고 다음 단계로 (${JSON.stringify((told || {}).stories)})`);
   await game.shot('shop-story-done', '첫 단계를 마친 [이야기]');
-  // The journal: the merchant's story one step along, and today's request.
-  await game.press('일지');
+  // The journal: the merchant's story one step along, and today's request (a screen of its own since U2, J).
+  await bagTab(game, '일지');
   const journal = (await game.buttons()).length >= 0;
   await game.shot('journal', '[일지] 탭');
   // The bestiary and the achievements, two more pages of the journal (Docs/Guide.md 도감과 업적).
@@ -1348,8 +1379,8 @@ async function npc(browser) {
   const grown = await game.until(i => i.petLevel >= 5, 3000, game.inventory);
   check(!!grown, `경험치를 받으면 펫도 자란다 (Lv ${grown && grown.petLevel})`);
   check((await game.allText()).includes('Lv 5이 되었다'), '"펫 말랑이이(가) Lv 5이 되었다!" 알림');
-  await bagTab(game);
-  check(journal && await game.press('캐릭터'), '[캐릭터] 탭을 연다');
+  await bagTab(game, '캐릭터');
+  check(journal && (await game.state()).window === '캐릭터', '[캐릭터] 화면을 연다');
   // A name for the pet (2026-11-09): typed into the field, then [이름 짓기]. Keys typed must not walk the player.
   // No monsters about, so nothing knocks them aside meanwhile.
   await game.send('clear');
@@ -1568,7 +1599,7 @@ async function gear(browser) {
   const moved = await game.until(i => i.items.some(x => x.base === 'iron_sword' && x.upgrade === 2), 3000, game.inventory);
   const old = moved && moved.items.find(x => x.base === 'copper_sword');
   check(!!moved && old && old.upgrade === 0, `철 검이 +2, 구리 검은 +0이 된다 (구리 검 +${old && old.upgrade})`);
-  await game.press('특성');
+  await bagTab(game, '특성');
   await game.shot('passives', '[특성] 탭');
   const node = (await game.buttons()).find(b => b.shown && /: /.test(b.label) && b.label.length > 4);
   if (node) {
@@ -3963,7 +3994,7 @@ async function map(browser) {
     else await game.page.keyboard.press('m');
     await game.wait(700);
     await game.shot('map-whole', '전체 지도');
-    if (game.touch) await game.press('지도');
+    if (game.touch) await game.press('지도 닫기');
     else await game.page.keyboard.press('m');
     await game.wait(400);
 
@@ -4771,13 +4802,13 @@ async function ui(browser) {
     await pick(game, /철 검/);
     await game.shot('ui-bag-picked', '고른 장비의 안쪽 칸, [장착] 금색·[버리기] 붉은 테');
     for (const [tab, caption] of [['스킬', '성장 머리(밤하늘)'], ['특성', '성장 머리(밤하늘)'], ['일지', '기록 머리(양피지)']]) {
-      await game.press(tab);
+      await bagTab(game, tab);
       await game.wait(300);
       await game.shot(`ui-bag-${tab}`, `가방 [${tab}]: ${caption}`);
     }
     check(await game.press('창 닫기'), '[창 닫기]를 누른다');
     await game.wait(400);
-    check(!(await game.state()).bag, '닫기 단추로 가방이 닫힌다');
+    check(!(await game.state()).bag, '닫기 단추로 창이 닫힌다');
 
     // U0 3: two world buttons on one spot (a machine before a person).
     // Still first: the person snaps home, then the player goes beside them (the other way round she had walked off).
@@ -4854,7 +4885,169 @@ async function ui(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui };
+// ---------------------------------------------------------------- 화면 나누기 (Docs/UiRework.md U2, 2026-11-22)
+// The screen manager: the bag, skills, passives, character, journal and map each their own window, one at a time. On a
+// PC their keys (Tab K P U J M) open them and close them again, Esc closes one, a tab of the group switches; G meets
+// what is in reach (talks next to a person, opens the bag's crafting next to a workbench, switches a machine). On a
+// phone held upright and a small one on its side, the [메뉴] hub under the minimap opens each as a full sheet, which its
+// head's close button shuts.
+async function screens(browser) {
+  const names = ['가방', '스킬', '특성', '캐릭터', '일지', '지도'];
+  const closeOf = name => (name === '지도' ? '지도 닫기' : '창 닫기');
+  {
+    note('\n## 화면 나누기 PC 1280×720 (U2)\n');
+    const game = await open(browser, run, Profiles.pc, url);
+    check(await game.startSolo(), '혼자 하기가 시작된다');
+    await game.wait(1500);
+    await game.send('xp 400');
+    await game.wait(800);
+    for (const name of names) {
+      const key = ScreenKeys[name];
+      await game.page.keyboard.press(key);
+      const opened = await game.until(s => s.window === name, 3000);
+      const s = opened || (await game.state());
+      check(!!opened, `${key} 키로 [${name}]이 열린다 (${s.window || '없음'})`);
+      check(s.map === (name === '지도') && s.bag === (name !== '지도'), `한 번에 하나: [${name}]만 (지도 ${s.map}, 가방 종류 ${s.bag})`);
+      if (name !== '가방') check(s.ui.window[2] >= 700 && s.ui.window[3] >= 680, `[${name}]은 전체 화면 창 (${s.ui.window.map(Math.round).join(',')})`);
+      const labels = (await game.buttons()).map(b => b.label);
+      check(labels.includes(closeOf(name)), `[${name}] 머리에 [${closeOf(name)}]`);
+      const group = Object.keys(ScreenGroups).filter(n => ScreenGroups[n] === ScreenGroups[name] && n !== '가방');
+      if (name !== '가방') check(group.every(n => labels.includes(n)), `[${name}]에 묶음의 탭 (${group.join('·')})`);
+      check(!labels.some(l => /^(skill|quick|potion)/.test(l)) || name === '가방', `[${name}] 아래의 스킬 칸·퀵슬롯은 그리지 않는다`);
+      check((await game.allText()).includes(`(${key === 'Tab' ? 'Tab' : key.toUpperCase()})`), `PC에서 머리에 키 (${key})`);
+      await game.shot(`screens-pc-${name}`, `[${name}] (${key})`);
+      await game.page.keyboard.press(key);
+      check(!!(await game.until(t => t.window === '', 3000)), `${key}를 다시 누르면 [${name}]이 닫힌다`);
+    }
+    // One at a time: a key of another screen switches; a tab of the group switches within it.
+    await game.page.keyboard.press('k');
+    await game.until(t => t.window === '스킬', 3000);
+    await game.page.keyboard.press('Tab');
+    check(!!(await game.until(t => t.window === '가방', 3000)), '[스킬]이 열린 채 Tab을 누르면 가방으로 바뀐다(하나만)');
+    await game.page.keyboard.press('j');
+    await game.until(t => t.window === '일지', 3000);
+    check(await game.press('지도') && !!(await game.until(t => t.window === '지도' && t.map, 3000)), '[일지]의 [지도] 탭으로 지도');
+    check(await game.press('일지') && !!(await game.until(t => t.window === '일지', 3000)), '지도의 [일지] 탭으로 일지');
+    await game.shot('screens-pc-records-tabs', '기록 묶음의 탭');
+    // The world takes no input under a full screen: holding D does not walk.
+    await game.page.keyboard.press('k');
+    await game.until(t => t.window === '스킬', 3000);
+    await game.send('clear');
+    const before = await game.state();
+    await game.page.keyboard.down('d');
+    await game.wait(700);
+    await game.page.keyboard.up('d');
+    const after = await game.state();
+    check(Math.abs(after.x - before.x) < 0.05, `전체 화면이 열린 동안 걷지 않는다 (x ${before.x.toFixed(2)} → ${after.x.toFixed(2)})`);
+    // Esc closes the screen and does not leave the game.
+    await game.page.keyboard.press('Escape');
+    const shut = await game.until(t => t.window === '', 3000);
+    check(!!shut && shut.playing, 'Esc는 열린 화면을 닫고 게임은 그대로');
+
+    // G next to a person talks; Esc then closes the talk, not the game.
+    await game.send('still');
+    await game.wait(600);
+    await game.send('goto person mina');
+    await game.wait(900);
+    let s = await game.state();
+    check(s.meet === 'Person', `사람 곁에서 G는 말하기 (${s.meet})`);
+    const talk = (await game.buttons()).find(b => /와 말하기|과 말하기/.test(b.label));
+    check(!!talk && /\(G\)$/.test(talk.label), `말하기 단추에 (G) (${talk ? talk.label : '없음'})`);
+    await game.page.keyboard.press('g');
+    check(!!(await game.until(t => t.talking, 3000)), 'G로 미나와 말한다');
+    await game.shot('screens-pc-g-talk', 'G로 연 대화');
+    await game.page.keyboard.press('Escape');
+    const quiet = await game.until(t => !t.talking, 3000);
+    check(!!quiet && quiet.playing, 'Esc는 대화를 닫고 게임은 그대로');
+
+    // G next to a workbench opens the bag's crafting; by an anvil its gear; a machine ahead is switched first.
+    await game.send('goto biome Cave');
+    await game.wait(1200);
+    await clearRoom(game, 3, 2);
+    await game.send('build Workbench -1 0; face 1 0');
+    await game.wait(700);
+    s = await game.state();
+    check(s.meet === 'Station', `작업대 곁에서 G는 작업대 열기 (${s.meet})`);
+    await game.page.keyboard.press('g');
+    const bench = await game.until(t => t.window === '가방', 3000);
+    check(!!bench && bench.bagPage === '재료·제작', `G로 작업대의 제작(가방 [재료·제작])이 열린다 (${bench ? bench.bagPage : '닫힘'})`);
+    await game.shot('screens-pc-g-workbench', 'G로 연 작업대 제작');
+    await game.page.keyboard.press('Tab');
+    await game.until(t => t.window === '', 3000);
+    await game.send('build Anvil 0 1');
+    await game.wait(600);
+    s = await game.state();
+    check(s.meet === 'Anvil', `모루 곁에서 G는 모루(가방 [장비]) (${s.meet})`);
+    await game.page.keyboard.press('g');
+    const anvil = await game.until(t => t.window === '가방', 3000);
+    check(!!anvil && anvil.bagPage === '장비', `G로 가방 [장비]가 열린다 (${anvil ? anvil.bagPage : '닫힘'})`);
+    await game.page.keyboard.press('Escape');
+    await game.until(t => t.window === '', 3000);
+    await game.send('build Drill 0 -1 3; face 0 -1');
+    await game.wait(800);
+    s = await game.state();
+    check(s.meet === 'Machine', `기계를 마주 보면 G는 기계가 먼저 (${s.meet})`);
+    const off = (await game.buttons()).find(b => /^끄기/.test(b.label));
+    check(!!off && /\(G\)$/.test(off.label), `[끄기 (G)]가 그대로 (${off ? off.label : '없음'})`);
+    await game.page.keyboard.press('g');
+    await game.wait(600);
+    check(((await game.look(0, -1)).machine || {}).enabled === false, 'G로 기계가 꺼진다');
+    await game.context.close();
+  }
+
+  for (const profileName of ['phone-small', 'phone-wide-small']) {
+    const profile = Profiles[profileName];
+    const { width, height } = profile.context.viewport;
+    note(`\n## 화면 나누기 ${profileName} ${width}×${height} (U2, [메뉴] 허브)\n`);
+    const game = await open(browser, run, profile, url);
+    check(await game.press('게임 시작'), '[게임 시작]을 탭한다');
+    check(await game.press('혼자 하기'), '[혼자 하기]를 탭한다');
+    check(!!(await game.until(t => t.playing, 25000)), '탭으로 게임이 시작된다');
+    await game.page.touchscreen.tap(width / 2, height / 3);
+    await game.wait(800);
+    await game.send('xp 400');
+    await game.wait(800);
+    const labels = (await game.buttons()).map(b => b.label);
+    check(labels.includes('가방') && labels.includes('메뉴') && !labels.includes('나가기'), `미니맵 아래 [가방][메뉴] (${labels.filter(l => l === '가방' || l === '메뉴' || l === '나가기').join(', ')})`);
+    check(await game.press('메뉴') && !!(await game.until(t => t.hub, 2000)), '[메뉴]를 탭하면 허브가 열린다');
+    const hub = (await game.buttons()).filter(b => b.row === '메뉴' && b.shown);
+    const hubNames = hub.map(b => b.label);
+    check(names.every(n => hubNames.includes(n)) && hubNames.includes('나가기'), `허브에 가방·스킬·특성·캐릭터·일지·지도·나가기 (${hubNames.join(', ')})`);
+    const small = hub.filter(b => b.rect[3] < 40 - 0.5 || b.rect[0] < 0 || b.rect[1] < 0 || b.rect[0] + b.rect[2] > width + 0.5 || b.rect[1] + b.rect[3] > height + 0.5);
+    check(small.length === 0, `허브 단추는 40점 이상이고 화면 안 (${small.map(b => b.label).join(', ') || '모두'})`);
+    await game.shot('screens-hub', '[메뉴] 허브');
+    check(await game.press('메뉴') && !!(await game.until(t => !t.hub, 2000)), '[메뉴]를 다시 탭하면 허브가 닫힌다');
+    for (const name of names) {
+      await game.press('메뉴');
+      await game.until(t => t.hub, 2000);
+      await game.press(name, '메뉴');
+      const opened = await game.until(t => t.window === name, 3000);
+      const s = opened || (await game.state());
+      check(!!opened && !s.hub, `허브의 [${name}]으로 화면이 열리고 허브는 닫힌다 (${s.window || '없음'})`);
+      if (name !== '가방') {
+        const w = s.ui.window;
+        check(w[0] <= 5 && w[1] <= 5 && w[0] + w[2] >= width - 5 && w[1] + w[3] >= height - 5, `[${name}]은 화면 전체 시트 (${w.map(Math.round).join(',')})`);
+      }
+      const shown = (await game.buttons()).filter(b => b.shown);
+      const outside = shown.filter(b => b.rect[0] < -0.5 || b.rect[0] + b.rect[2] > width + 0.5);
+      check(outside.length === 0, `[${name}]의 단추가 옆으로 넘치지 않는다 (${outside.map(b => b.label).slice(0, 4).join(', ') || '모두 안'})`);
+      await game.shot(`screens-${name}`, `허브로 연 [${name}]`);
+      check(await game.press(closeOf(name)), `[${name}] 머리의 [${closeOf(name)}]를 탭한다`);
+      check(!!(await game.until(t => t.window === '', 3000)), `[${name}]이 닫힌다`);
+    }
+    // Within a group, its tabs switch.
+    await game.press('메뉴');
+    await game.until(t => t.hub, 2000);
+    await game.press('스킬', '메뉴');
+    await game.until(t => t.window === '스킬', 3000);
+    check(await game.press('특성') && !!(await game.until(t => t.window === '특성', 3000)), '[스킬] 화면의 [특성] 탭으로 특성');
+    await game.shot('screens-passives-tab', '탭으로 바꾼 [특성](별하늘)');
+    await game.press('창 닫기');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

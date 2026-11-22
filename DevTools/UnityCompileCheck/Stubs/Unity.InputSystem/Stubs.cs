@@ -90,6 +90,10 @@ namespace UnityEngine.InputSystem
         Digit5,
         Digit6,
         LeftShift,
+        K,
+        P,
+        J,
+        U,
     }
 
     public class InputDevice
