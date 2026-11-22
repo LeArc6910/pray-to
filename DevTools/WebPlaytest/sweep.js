@@ -4961,7 +4961,9 @@ async function screens(browser) {
     check(!!quiet && quiet.playing, 'Esc는 대화를 닫고 게임은 그대로');
 
     // G next to a workbench opens the bag's crafting; by an anvil its gear; a machine ahead is switched first.
-    await game.send('goto biome Cave');
+    // Open floor outside the places: "goto biome Cave" lands on the first village's waypoint, and an open
+    // waypoint in reach (1.6 tiles) is met before a workbench.
+    await game.send('goto wild');
     await game.wait(1200);
     await clearRoom(game, 3, 2);
     await game.send('build Workbench -1 0; face 1 0');
