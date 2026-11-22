@@ -2400,7 +2400,10 @@ async function monsterfx(browser) {
   await game.send('clear; heal');
   await game.wait(600);
   await game.send('spawn cave_beetle 1.4 0 5000');
-  await game.wait(600);
+  await game.wait(300);
+  // Held, it keeps the way it was made facing; turned to the player its shell takes the blow.
+  await game.send('mob cave_beetle face');
+  await game.wait(300);
   const unguarded = await game.state();
   await game.send('fxhold 0.05; mob cave_beetle hurt 0.02');
   await game.wait(350);
@@ -4016,7 +4019,10 @@ async function map(browser) {
     await game.shot('map-ice', '얼음 바닥에서 미끄러지는 중');
     await game.wait(900);
     const still = await game.state();
-    check(slide > 0.5, `${name}: 얼음 위에서는 손을 떼도 미끄러진다 (뗀 뒤 속도 ${slide.toFixed(1)}칸/초)`);
+    // The distance the game measured with nothing held (Playtest "coast") is the sure sign; the speed asked for can
+    // come after a short slide is over on a late screen.
+    const coast = (await game.state()).coast;
+    check(slide > 0.5 || coast > 0.2, `${name}: 얼음 위에서는 손을 떼도 미끄러진다 (뗀 뒤 속도 ${slide.toFixed(1)}칸/초, 손 떼고 간 거리 ${coast.toFixed(2)}칸)`);
     check(still.slide < 0.05 && still.underfoot === 'IceFloor', `${name}: 곧 멈춘다 (속도 ${still.slide.toFixed(2)}, 바닥 ${still.underfoot})`);
     const pace = async scene => {
       await game.send('goto wild; clear');

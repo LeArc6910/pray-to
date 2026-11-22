@@ -105,6 +105,8 @@ namespace Game.Client
         internal int MonsterMoundsShown => _view?.MonsterMoundsShown ?? 0;
         internal int MonsterLinksShown => _view?.MonsterLinksShown ?? 0;
         internal int ExplosionsShown => _view?.ExplosionsShown ?? 0;
+        // How far the local player has moved with nothing held since a playtest scene (Playtest.cs "coast").
+        internal float Coasted { get; set; }
         internal int GuardedNumbersShown => _view?.GuardedNumbersShown ?? 0;
         internal string RenderTrace => _view?.RenderTrace;
 
@@ -795,7 +797,9 @@ namespace Game.Client
                 if (foe.LengthSquared > 0.01f) aim = foe;
             }
             if ((HoldAttack || AimHeld) && HeldAim.LengthSquared > 1e-6f) aim = HeldAim;
+            var before = _client.Position;
             byte[] input = _client.Step(move, aim, attack, RollPressed);
+            if (move.LengthSquared < 1e-6f && !_client.Rolling) Coasted += Vec2.Distance(before, _client.Position);
             RollPressed = false;
             if (input != null) SendToHost(input);
 

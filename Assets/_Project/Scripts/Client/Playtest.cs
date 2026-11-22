@@ -124,6 +124,7 @@ namespace Game.Client
             switch (words[0])
             {
                 case "scene":
+                    root.Coasted = 0;
                     Scene(root, words[1]);
                     return null;
                 case "clock":
@@ -272,6 +273,8 @@ namespace Game.Client
                     if (words[2] == "use" && !world.ForceAttack(mob, words[3]))
                         throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (its attacks: {string.Join(", ", kind.Attacks.Select(a => a.Id))})");
                     else if (words[2] == "hurt") world.Hurt(mob, player, Math.Max(1, mob.MaxHealth * Float(words[3])));
+                    // mob <id> face: it turns to the player (one held by "monsters hold" keeps the way it was made facing).
+                    else if (words[2] == "face") mob.Facing = (player.Position - mob.Position).Normalized;
                     // mob <id> melt: it falls to fire (an ice slime then leaves no shards).
                     else if (words[2] == "melt")
                     {
@@ -921,6 +924,9 @@ namespace Game.Client
                 // room the player is nearest the middle of with what it is for (the generator's version 2).
                 json.Field("underfoot", world.Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)].ToString());
                 json.Field("slide", root.LocalClient?.Velocity.Length ?? 0f);
+                // How far the player has gone with nothing held since the last scene: the slide on ice, measured where it
+                // happens (the screen of a headless browser runs late, so asking for the speed can miss a short slide).
+                json.Field("coast", root.Coasted);
                 json.Field("generator", root.HostGenerated?.Version ?? 0);
                 var roomHere = root.HostGenerated?.Rooms?.Nearest(TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y));
                 json.Field("room", roomHere?.Role.ToString() ?? "");
