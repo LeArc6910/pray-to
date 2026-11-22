@@ -617,6 +617,12 @@ namespace Game.Core
         // Source, a player, read a map scrap (consumables.csv effect map): their own map marks the nearest thing to
         // find they have not seen.
         MapRead,
+        // The pacing director (World.Director.cs): dust falling off a wall before an ambush comes out of it (Amount
+        // World.AmbushDust), or a raid's howl far off (World.RaidHowl), at Position; Source the player it is for.
+        Ambush,
+        // A trap room (World.Traps.cs), at its chest: its doors fell (Amount World.TrapSprung), a band came
+        // (World.TrapWave + its number), it was won (TrapWon) or lost (TrapLost).
+        Trap,
     }
 
     public readonly struct SimEvent
@@ -650,7 +656,8 @@ namespace Game.Core
             || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift || type == SimEventType.Npc
             || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot
             || type == SimEventType.AnimalsPetted || type == SimEventType.Trampled || type == SimEventType.MovedIn
-            || type == SimEventType.MonsterFx || type == SimEventType.PoiOpened || type == SimEventType.Blessed;
+            || type == SimEventType.MonsterFx || type == SimEventType.PoiOpened || type == SimEventType.Blessed
+            || type == SimEventType.Ambush || type == SimEventType.Trap;
     }
 
     public enum BossState : byte

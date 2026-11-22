@@ -2115,7 +2115,7 @@ namespace Game.Client
         void Show(SimEvent e)
         {
             // The things to find in the rooms (WorldView.Pois.cs).
-            if (ShowPoi(e) || ShowTravel(e)) return;
+            if (ShowPoi(e) || ShowTravel(e) || ShowPace(e)) return;
             switch (e.Type)
             {
                 case SimEventType.Attack:

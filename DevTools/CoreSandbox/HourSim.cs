@@ -17,6 +17,7 @@ namespace CoreSandbox
             var runs = new List<BotRunResult>();
             var elites = new List<string>();
             var pois = new List<string>();
+            var paces = new List<string>();
             foreach (string text in seeds.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
                 ulong seed = ulong.Parse(text.Trim());
@@ -28,7 +29,7 @@ namespace CoreSandbox
                 {
                     last = bot;
                     seen.Look(bot.World, bot.Player);
-                }, mapSize: mapSize, mapVersion: mapVersion);
+                }, mapSize: mapSize, mapVersion: mapVersion, director: Program.Director);
                 elites.Add($"- 시드 {seed}: {seen.Summary(run.Ticks)}");
                 // The things to find it used on its way (묶음 3a) and what they gave, beside the coins it holds at the end.
                 if (last != null)
@@ -36,6 +37,9 @@ namespace CoreSandbox
                     var coin = last.World.Loot?.Materials.FirstOrDefault(m => m.Id == World.Coin);
                     int held = coin == null ? 0 : last.Player.Inventory.CountOf(coin);
                     var kinds = last.PoisUsed.GroupBy(p => p.Kind).Select(g => $"{g.Key} {g.Count()}");
+                    // What the pacing director did (묶음 4b).
+                    var pace = last.World.PaceOf(last.Player);
+                    paces.Add($"- 시드 {seed}: 보낸 떠돌이 {pace.Sends}, 매복 {pace.Ambushes}, 습격 {pace.Raids}, 정점 {pace.Peaks}, 쉬기 {pace.Rests}{(last.World.Directs ? "" : " (감독 끔)")}");
                     pois.Add($"- 시드 {seed}: {last.PoisUsed.Count}곳({string.Join(", ", kinds)}), 금화 {last.PoiCoins}(끝에 가진 금화 {held}), 장비 {last.PoiItems}");
                 }
                 runs.Add(run);
@@ -50,6 +54,10 @@ namespace CoreSandbox
             Console.WriteLine("### 정예");
             Console.WriteLine();
             foreach (string line in elites) Console.WriteLine(line);
+            Console.WriteLine();
+            Console.WriteLine("### 완급 감독");
+            Console.WriteLine();
+            foreach (string line in paces) Console.WriteLine(line);
             Console.WriteLine();
             Console.WriteLine("### 지나며 쓴 볼거리");
             Console.WriteLine();

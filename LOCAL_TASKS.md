@@ -1082,6 +1082,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(바뀐 시트 `goals.csv`, `characters.csv`, `story.csv`, `strings.csv`, `pois.csv`가 빌드에 실린다). 새 파일 `Core/Guide/Rumors.cs`, `Tests/EditMode/RumorTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `RumoursAndSlowRest`(사진 guide-rumor-talk, guide-rumor-tracker, guide-rumor-map, guide-arrow-tracker), `LayoutTests.TheWaypointListKeepsClearOfTheMinimapColumn`. 통신 0.96.0(목표 순서가 바뀌었다), 기기의 가 본 곳 지도 형식 2
   - (클라우드 웹 점검) `sweep.js --only guide,travel`
   - (사람) 소문만 듣고 찾아가는 것이 탐험하는 맛을 주는지 답답한지, 느린 회복(8초 뒤 초당 1.5%)이 야영지·물약을 쓰게 하는지 짜증 나는지, 설정의 [길 안내: 소문/화살표]·[쉴 때 회복: 느림/빠름]이 찾기 쉬운지
+- [ ] 156단계: 완급 감독, 함정 방 매복, 길잡이 돌 이동 고침(`Docs/WorldRework.md` 4b, `Docs/Combat.md` 완급 감독·함정 방)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/World.Director.cs`, `Core/Simulation/World.Traps.cs`, `Tests/EditMode/DirectorTests.cs`, `Tests/EditMode/TrapRoomTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `TrapsShutTheRoomAndTheDirectorSendsAmbushes`(사진 trap-before, trap-shut, trap-wave, trap-won, ambush-dust, ambush). 통신 0.97.0(새 사건 둘, 볼거리 메시지에 함정, 가방 명령의 번호가 2바이트)
+  - (클라우드 웹 점검) `sweep.js --only pace,travel,guide`
+  - (사람) 긴 플레이(30분 넘게)에서 몰아치고 쉬는 완급이 느껴지는지, 쉬는 동안 정말 조용한지, 좁은 길 매복과 습격 울음소리가 긴장되는지 억울한지, 함정 상자를 열면 창살이 내려오고 두 무리를 이기는 맛, 큰 동굴·얼음 함정 방의 창살이 너무 많지 않은지
 
 ## 결과 보고
 

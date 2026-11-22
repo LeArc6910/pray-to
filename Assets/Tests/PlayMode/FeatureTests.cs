@@ -455,7 +455,9 @@ namespace Game.Client.Tests
                 Player.Corrections++;
             }
 
-            var chest = Nearest(PoiKind.Chest);
+            // Not a trap room's: that one shuts the room first (TrapsShutTheRoomAndTheDirectorSendsAmbushes).
+            var chest = World.Pois.Where(p => p.Kind == PoiKind.Chest && p.Definition.Role != RoomRole.Trap && World.CanUse(p, Player) && Beside(p) != null)
+                .OrderBy(p => Vec2.Distance(p.Center, Player.Position)).First();
             StandBy(chest);
             yield return new WaitForSecondsRealtime(1);
             yield return Screens.Take("poi-chest");
@@ -591,6 +593,66 @@ namespace Game.Client.Tests
             PlaceSite.Still = false;
             Settings.Rumors = rumors;
             Settings.QuickRest = quick;
+            Assert.IsTrue(_root.Playing);
+        }
+
+        // A trap room and the pacing director (2026-11-22, Docs/WorldRework.md 묶음 4b): the trap chest opened by its button's
+        // path shuts the room with grates (on the screen too) and the first band comes; won, the grates lift and the
+        // chest is open; then an ambush's dust in a narrow way and the band out of the walls.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TrapsShutTheRoomAndTheDirectorSendsAmbushes()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            Player.Experience = Leveling.TotalFor(6);
+            Player.Health = Player.Stats.MaxHealth;
+            var chest = World.Pois.Where(p => p.Kind == PoiKind.Chest && p.Definition.Role == RoomRole.Trap && World.CanUse(p, Player) && Beside(p) != null)
+                .OrderBy(p => Vec2.Distance(p.Center, Player.Position)).FirstOrDefault();
+            Assert.IsNotNull(chest, "No trap chest: rooms.csv has no trap chunk with a chest, or the world is of caves.");
+            Player.Position = Beside(chest).Value;
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(1);
+            yield return Screens.Take("trap-before");
+            Assert.IsTrue(_root.UsePoi(), "The trap chest within reach springs the trap.");
+            yield return new WaitForSecondsRealtime(0.6f);
+            var trap = World.TrapAt(chest.Index);
+            Assert.IsNotNull(trap);
+            Assert.IsTrue(trap.Active);
+            Assert.IsTrue(trap.Doors.All(d => _root.LocalClient.Map[d.X, d.Y] == TileType.Grate), "The screen has the grates.");
+            yield return Screens.Take("trap-shut");
+            yield return new WaitForSecondsRealtime(World.TrapFirstSeconds + 0.3f);
+            Assert.AreEqual(TrapPhase.Fighting, trap.Phase);
+            yield return Screens.Take("trap-wave");
+            for (int wave = trap.Wave; wave <= World.TrapWaves; wave++)
+            {
+                foreach (var enemy in World.Enemies.Where(e => e.PackId == trap.Band?.Id)) enemy.Health = 0;
+                yield return new WaitForSecondsRealtime(World.TrapBetweenSeconds + 0.6f);
+            }
+            Assert.AreEqual(TrapPhase.Won, trap.Phase);
+            Assert.IsTrue(World.Opened(chest.Index));
+            yield return Screens.Take("trap-won");
+
+            // An ambush in the nearest narrow way the director acts in.
+            var rooms = _root.HostGenerated.Rooms;
+            bool sprung = false;
+            foreach (var edge in rooms.Edges.Where(e => e.Kind == RoomEdgeKind.Way && e.Width <= World.AmbushWidth && e.Path != null && e.Path.Count >= 24)
+                .OrderBy(e => Vec2.Distance(TileMap.Center(e.Path[e.Path.Count / 2].X, e.Path[e.Path.Count / 2].Y), Player.Position)))
+            {
+                var (x, y) = edge.Path[edge.Path.Count / 2];
+                Player.Position = TileMap.Center(x, y);
+                if (Game.Core.Collision.Overlaps(World.Map, Player.Position, World.PlayerRadius) || World.LeftAlone(Player)) continue;
+                Player.Corrections++;
+                if (!World.Ambush(Player)) continue;
+                sprung = true;
+                break;
+            }
+            Assert.IsTrue(sprung, "No narrow way for an ambush.");
+            yield return new WaitForSecondsRealtime(0.3f);
+            yield return Screens.Take("ambush-dust");
+            yield return new WaitForSecondsRealtime(World.AmbushWarn + 0.3f);
+            Assert.GreaterOrEqual(World.Enemies.Count(e => e.TargetId == Player.Id && e.State == EnemyState.Chase), World.AmbushMin);
+            yield return Screens.Take("ambush");
+            World.MonstersHold = false;
             Assert.IsTrue(_root.Playing);
         }
 

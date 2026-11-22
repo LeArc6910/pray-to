@@ -103,6 +103,9 @@ namespace Game.Client
         internal int MonsterShotsDrawn => _view?.MonsterShotsDrawn ?? 0;
         internal int MonsterBlowsShown => _view?.MonsterBlowsShown ?? 0;
         internal int AlertsShown => _view?.AlertsShown ?? 0;
+        // What the screen showed of the trap rooms and the pacing director (WorldView.ShowPace), for the playtests.
+        internal (int Banners, int Dust, int Howls, int Grates) PaceShown => _view == null ? (0, 0, 0, 0)
+            : (_view.TrapBanners, _view.AmbushDustShown, _view.RaidHowlsHeard, _view.GratesDropped);
         // Field elites' name tags drawn, the widest in points, and a guarding leader's lines (WorldView.MonsterFx).
         internal int EliteTagsShown => _view?.EliteTagsShown ?? 0;
         internal float EliteTagWidest => _view?.EliteTagWidest ?? 0;
@@ -1048,7 +1051,7 @@ namespace Game.Client
             _host = new WorldHost(seed, _monsters, _loot,
                 new HostConfig { MapSize = world?.Width ?? WorldGenerator.GameSize, MapVersion = world?.Generator ?? WorldGenerator.NewWorldVersion },
                 bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
-                worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes, QuickRest = Settings.QuickRest }, story: _story);
+                worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes, QuickRest = Settings.QuickRest, Director = true }, story: _story);
             if (world != null)
             {
                 _host.Restore(world);

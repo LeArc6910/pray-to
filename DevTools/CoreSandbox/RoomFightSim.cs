@@ -19,7 +19,7 @@ namespace CoreSandbox
             Biome? biome = biomeName == "any" ? (Biome?)null : (Biome)Enum.Parse(typeof(Biome), biomeName, ignoreCase: true);
             var host = new WorldHost(seed, sheets.Monsters, sheets.Loot, bosses: sheets.Bosses, classes: sheets.Classes, tiles: sheets.Tiles,
                 guide: sheets.Guide, npcs: sheets.Npcs, config: new HostConfig { MapSize = WorldGenerator.GameSize, MapVersion = WorldGenerator.RoomVersion },
-                story: sheets.Story);
+                worldConfig: new WorldConfig { Director = Program.Director }, story: sheets.Story);
             var world = host.World;
             var rooms = host.Generated.Rooms;
             var random = new GameRandom(seed, 99);

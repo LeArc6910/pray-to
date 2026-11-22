@@ -378,10 +378,15 @@ namespace Game.Core
             return null;
         }
 
+        // The trap rooms' chests that cannot be opened now (World.HeldTraps).
+        readonly HashSet<int> _heldTraps = new HashSet<int>();
+
+        public bool TrapHeld(int poi) => _heldTraps.Contains(poi);
+
         // Whether the thing would give to this player now (World.CanUse).
         public bool CanUse(Poi poi) => poi.Definition.Again switch
         {
-            PoiAgain.Once => !PoiOpened(poi.Index),
+            PoiAgain.Once => !PoiOpened(poi.Index) && !_heldTraps.Contains(poi.Index),
             PoiAgain.Daily => !PrayedToday(poi.Index),
             _ => true,
         };
@@ -420,6 +425,8 @@ namespace Game.Core
             foreach (int line in message.FixedRails) _fixedRails.Add(line);
             _riders.Clear();
             _riders.AddRange(message.Riders);
+            _heldTraps.Clear();
+            foreach (int index in message.HeldTraps) _heldTraps.Add(index);
             PoiVersion++;
         }
 

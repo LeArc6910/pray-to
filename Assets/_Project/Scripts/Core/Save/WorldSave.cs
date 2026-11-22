@@ -163,7 +163,8 @@ namespace Game.Core
                 w.Write(world.DefenseDay);
                 w.Write(world.ProgressLevel);
 
-                var tiles = world.ChangedTiles();
+                // A trap's grates still down go as the floor they fell on (World.SavedTiles).
+                var tiles = world.SavedTiles();
                 var names = tiles.Select(t => t.Type.ToString()).Distinct().ToList();
                 w.Write((ushort)names.Count);
                 foreach (string name in names) w.Write(name);

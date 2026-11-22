@@ -42,7 +42,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.96.0";
+        public const string Version = "0.97.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -481,8 +481,9 @@ namespace Game.Core
     {
         public PoisMessage(IReadOnlyList<bool> opened, IReadOnlyList<int> prayed, int lastCamp, int blessing, int blessingTicks, int restedTicks,
             IReadOnlyList<int> stones = null, IReadOnlyList<int> fixedRails = null,
-            IReadOnlyList<(int Player, int Line, bool Forward, long Start, float Speed)> riders = null)
+            IReadOnlyList<(int Player, int Line, bool Forward, long Start, float Speed)> riders = null, IReadOnlyList<int> heldTraps = null)
         {
+            HeldTraps = heldTraps ?? Array.Empty<int>();
             Stones = stones ?? Array.Empty<int>();
             FixedRails = fixedRails ?? Array.Empty<int>();
             Riders = riders ?? Array.Empty<(int, int, bool, long, float)>();
@@ -505,6 +506,9 @@ namespace Game.Core
         public IReadOnlyList<int> Stones { get; }
         public IReadOnlyList<int> FixedRails { get; }
         public IReadOnlyList<(int Player, int Line, bool Forward, long Start, float Speed)> Riders { get; }
+        // 4b (World.Traps.cs): the trap rooms' chests that cannot be opened now (their bands are in, or they were lost
+        // today), by index.
+        public IReadOnlyList<int> HeldTraps { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Pois, w =>
         {
@@ -535,6 +539,8 @@ namespace Game.Core
                 w.Write(start);
                 w.Write(speed);
             }
+            w.Write((ushort)HeldTraps.Count);
+            foreach (int index in HeldTraps) w.Write((ushort)index);
         });
 
         public static PoisMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Pois, r =>
@@ -555,7 +561,9 @@ namespace Game.Core
             for (int n = r.ReadByte(); n > 0; n--) rails.Add(r.ReadByte());
             var riders = new List<(int, int, bool, long, float)>();
             for (int n = r.ReadByte(); n > 0; n--) riders.Add((r.ReadInt32(), r.ReadByte(), r.ReadBoolean(), r.ReadInt64(), r.ReadSingle()));
-            return new PoisMessage(opened, prayed, lastCamp, blessing, blessingTicks, restedTicks, stones, rails, riders);
+            var held = new List<int>();
+            for (int n = r.ReadUInt16(); n > 0; n--) held.Add(r.ReadUInt16());
+            return new PoisMessage(opened, prayed, lastCamp, blessing, blessingTicks, restedTicks, stones, rails, riders, held);
         });
     }
 

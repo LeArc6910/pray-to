@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4345,7 +4345,10 @@ async function travel(browser) {
     check(!!away && await game.press(away.label), `${name}: 다른 길잡이 돌로 간다 (${away ? away.label : '단추 없음'})`);
     await game.wait(1200);
     const went = await game.ask('travel');
-    check(Math.hypot(went.x - touched.x, went.y - touched.y) > 20, `${name}: 길잡이 돌로 옮겼다 (${Math.round(Math.hypot(went.x - touched.x, went.y - touched.y))}칸)`);
+    // Beside another stone, not only away (2026-11-22: the row's command lost its stone on the way and, when the cut
+    // number was an open place, took the player there instead, which passed as tiles moved).
+    check(Math.hypot(went.x - touched.x, went.y - touched.y) > 20 && went.stoneNear >= 0 && went.stoneNear !== touched.stoneNear,
+      `${name}: 길잡이 돌로 옮겼다 (${Math.round(Math.hypot(went.x - touched.x, went.y - touched.y))}칸, 곁의 돌 ${touched.stoneNear} → ${went.stoneNear})`);
 
     // The wandering merchant by a camp, and their shop: potions, the map scrap and the camp's biome's seeds.
     const wanderer = (await game.send('goto wanderer')).join(' ');
@@ -4452,7 +4455,102 @@ async function guide(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, base, save, story, deploysave, layout, touch };
+// The trap rooms and the pacing director (2026-11-22, Docs/WorldRework.md 묶음 4b): a trap chest's [열기] shuts the room
+// with grates (on the host and on the screen, with the banner), two bands come one after the other, and winning lifts
+// the grates and the chest gives a tier higher; an ambush's dust in a narrow way and the band out of the walls; a raid's
+// howl and the band running in; the rest set and kept. The thud of the grates, the howl and the rhythm over a long play
+// are the person's.
+async function pace(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 함정 방과 완급 감독 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    // Past level 3: the director leaves a new character alone.
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; xp 3000');
+    const traps = await game.ask('traps');
+    check(traps.chests >= 4, `${name}: 함정 상자가 놓였다 (${traps.chests})`);
+
+    // The trap chest: its own button springs the trap.
+    const went = (await game.send('goto poi trap')).join(' ');
+    await game.wait(1500);
+    const ready = await game.ask('traps');
+    check(/^ok/.test(went) && ready.phase === 'Ready' && ready.clientCanUse, `${name}: 함정 상자 곁으로 간다 (${went}, ${ready.phase}, 화면 열 수 있음 ${ready.clientCanUse})`);
+    await game.shot('pace-trap-before', '함정 방의 상자(바닥의 함정 판)');
+    const button = (await game.buttons()).find(b => /열기/.test(b.label));
+    check(!!button && await game.press(button.label), `${name}: 함정 상자의 [열기]를 누른다 (${button ? button.label : '단추 없음'})`);
+    await game.wait(900);
+    const shut = await game.ask('traps');
+    check(shut.phase !== 'Ready' && shut.inside && shut.doors > 0 && shut.grates === shut.doors && shut.clientGrates === shut.doors,
+      `${name}: 창살이 내려와 방이 닫혔다 (${shut.phase}, 문 ${shut.doors}, 호스트 ${shut.grates}, 화면 ${shut.clientGrates}, 갇힘 ${shut.inside})`);
+    check(shut.bannersShown >= 1 && !shut.clientCanUse && !shut.opened, `${name}: 알림 줄이 뜨고 상자는 아직 닫혀 있다 (알림 ${shut.bannersShown}, ${shut.tile})`);
+    await game.shot('pace-trap-shut', '창살이 내려온 함정 방과 알림 줄');
+    const first = await game.until(t => t.phase === 'Fighting' && t.wave === 1, 5000, () => game.ask('traps'));
+    check(!!first && first.band >= 3, `${name}: 첫 무리가 온다 (${first ? first.band : 0}마리)`);
+    await game.wait(300);
+    await game.shot('pace-trap-wave1', '함정 방의 첫 무리(1/2)');
+    await game.send('clear');
+    const second = await game.until(t => t.phase === 'Fighting' && t.wave === 2, 6000, () => game.ask('traps'));
+    check(!!second && second.band >= 3, `${name}: 두 번째 무리가 온다 (${second ? second.band : 0}마리)`);
+    await game.wait(300);
+    await game.shot('pace-trap-wave2', '함정 방의 마지막 무리(2/2)');
+    await game.send('clear');
+    const won = await game.until(t => t.phase === 'Won', 5000, () => game.ask('traps'));
+    check(!!won && won.opened && won.tile === 'OpenChest' && won.grates === 0 && won.clientGrates === 0 && won.items >= ready.items + 2,
+      `${name}: 이기면 창살이 올라가고 상자가 한 단계 위로 준다 (${won ? `${won.tile}, 창살 ${won.grates}/${won.clientGrates}, 장비 ${ready.items} → ${won.items}` : '끝나지 않음'})`);
+    await game.wait(400);
+    await game.shot('pace-trap-won', '함정을 이긴 뒤(열린 상자와 올라간 창살)');
+
+    // An ambush in a narrow way: dust off the walls, then the band before and behind.
+    const narrow = (await game.send('clear; heal; goto narrow')).join(' ');
+    await game.wait(1500);
+    check(/goto narrow at/.test(narrow), `${name}: 좁은 길로 간다 (${narrow})`);
+    const calm = await game.ask('director');
+    check(calm.acts && !calm.leftAlone, `${name}: 감독이 이 자리에서 일한다 (${calm.state}, 긴장도 ${Math.round(calm.tension)})`);
+    const ambush = (await game.send('director ambush')).join(' ');
+    await game.wait(350);
+    const dusty = await game.ask('director');
+    check(/^ok/.test(ambush) && dusty.dustShown - calm.dustShown >= 2, `${name}: 매복 전에 앞뒤 벽에서 먼지가 떨어진다 (${ambush}, 먼지 ${dusty.dustShown - calm.dustShown})`);
+    await game.shot('pace-ambush-dust', '매복 1초 전: 벽에서 떨어지는 먼지');
+    await game.wait(1200);
+    const ambushed = await game.ask('director');
+    check(ambushed.chasing >= 4 && ambushed.ambushes >= 0, `${name}: 벽에서 무리가 나와 쫓는다 (${ambushed.chasing}마리)`);
+    await game.shot('pace-ambush', '좁은 길의 매복(앞뒤에서)');
+
+    // A raid in a wide room: a far howl, and the band running in.
+    await game.send('clear; heal; goto room plain any');
+    await game.wait(1500);
+    const before = await game.ask('director');
+    const raid = (await game.send('director raid')).join(' ');
+    await game.wait(500);
+    const howled = await game.ask('director');
+    check(/^ok/.test(raid) && howled.howlsHeard > before.howlsHeard, `${name}: 습격 전에 멀리서 울음소리 (${raid}, 들은 것 ${howled.howlsHeard - before.howlsHeard})`);
+    await game.shot('pace-raid-howl', '습격: 멀리서 울음소리(글자)');
+    await game.send('monsters go');
+    await game.wait(2500);
+    await game.shot('pace-raid', '습격: 몰려오는 무리');
+    const raided = await game.ask('director');
+    check(raided.chasing >= 4, `${name}: 습격한 무리가 쫓아온다 (${raided.chasing}마리, 12칸 안 ${raided.near})`);
+    await game.send('monsters hold; clear; heal');
+
+    // The rest: set, it holds and sends nothing.
+    await game.send('director rest');
+    await game.wait(2000);
+    const rest = await game.ask('director');
+    check(rest.state === 'Rest' && rest.restLeft > 30 && rest.hunters === 0, `${name}: 쉬기 (${rest.state}, 남은 ${Math.round(rest.restLeft)}초, 보낸 것 ${rest.hunters})`);
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

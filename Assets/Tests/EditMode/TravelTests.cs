@@ -240,6 +240,33 @@ namespace Game.Core.Tests
             Assert.IsFalse(world.Teleport(player.Id, World.StoneTarget + there.Index));
         }
 
+        // Through the wire, as the waypoint list's row sends it: a waystone's target (StoneTarget + its index, past 255)
+        // reaches the host whole (2026-11-22: the command's index went as one byte, so a press on a row sent the player
+        // to a place, or nowhere).
+        [Test]
+        public void AWaystoneIsGoneToByTheClientsCommand()
+        {
+            var host = Host(2);
+            var world = host.World;
+            var client = new WorldClient("key", "a", Monsters.Shipped, Bosses.Shipped, Gear.Data, Classes.Shipped, null, Tiles.Shipped)
+                { Story = Tales.Shipped, Npcs = People.Shipped };
+            host.Receive(1, client.JoinMessage());
+            host.Tick();
+            foreach (var message in host.TakeOutgoing()) client.Receive(message.Data);
+            var player = world.FindPlayer(client.PlayerId);
+            var here = world.Stones[0];
+            var there = world.Stones[1];
+            world.OpenStone(player, here);
+            world.OpenStone(player, there);
+            player.Position = Beside(world, here);
+
+            var sent = InventoryCommandMessage.Decode(client.TravelToStoneCommand(there));
+            Assert.AreEqual(World.StoneTarget + there.Index, sent.Index);
+            host.Receive(1, client.TravelToStoneCommand(there));
+            host.Tick();
+            Assert.Less(Vec2.Distance(player.Position, there.Center), 2.2f);
+        }
+
         [Test]
         public void MendedLinesAreSavedAndWhatTheClientIsTold()
         {

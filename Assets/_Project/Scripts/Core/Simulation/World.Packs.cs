@@ -617,6 +617,9 @@ namespace Game.Core
         void IdleAbout(Enemy enemy)
         {
             if (enemy.Rift != 0) return;
+            // One the director sent after a player walks to them; a trap's band at whoever is shut in with it
+            // (World.Director.cs, World.Traps.cs).
+            if (HuntOn(enemy) || TrapHuntOn(enemy)) return;
             if (enemy.PackId != 0 && Vec2.Distance(enemy.Position, enemy.Home) > StrayReach) TurnBack(enemy);
             else if (enemy.Wanders) Wander(enemy);
         }

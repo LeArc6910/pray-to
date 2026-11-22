@@ -93,6 +93,12 @@ namespace Game.Core
             Drink();
             // A chest, cart or shrine it walks by it uses (Docs/WorldRework.md 3단계 확인: 봇이 지나며 연 볼거리).
             if (_world.Tick % ClaimEvery == 1 && _world.PoiNear(_player.Position, _player) is Poi poi && poi.Kind != PoiKind.Station) UsePoi(poi);
+            // Shut in a trap room (World.Traps.cs): its bands are fought to the last before anything else.
+            if (_world.TrapOf(_player) != null)
+            {
+                FightShutIn();
+                return;
+            }
             var goal = Current;
             if (goal == null)
             {
@@ -757,6 +763,18 @@ namespace Game.Core
                     _world.SetAttacking(_player.Id, false);
                     break;
             }
+        }
+
+        void FightShutIn()
+        {
+            Doing = "함정 방에서 싸움";
+            if (!_world.Enemies.Any(e => !e.IsDead && !e.Away && Vec2.Distance(e.Position, _player.Position) < 24))
+            {
+                _world.SetAttacking(_player.Id, false);
+                return;
+            }
+            var intent = Pilot.Next(BotTarget.Monster());
+            if (intent.Do != BotDo.NoWay) Execute(intent);
         }
 
         void Walk(Vec2 direction, Vec2? facing = null)

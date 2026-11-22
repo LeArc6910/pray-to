@@ -25,6 +25,10 @@ namespace Game.Core
         // sends a player to camps, shrines and potions (8 seconds, 1.5%). Off unless the host chose it in the menu
         // (Settings.QuickRest, Docs/WorldRework.md 사람이 정한 것 2).
         public bool QuickRest { get; set; }
+        // The pacing director acts (World.Director.cs, Docs/WorldRework.md 완급 감독): wanderers sent, ambushes, raids
+        // and the quiet after a peak. Off unless asked: the game's host and the bots that play as it turn it on; tests
+        // and sims count without it.
+        public bool Director { get; set; }
     }
 
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
@@ -190,6 +194,7 @@ namespace Game.Core
             }
             foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id);
             NotePackFalls();
+            NotePaceFalls();
             _enemies.RemoveAll(e => e.IsDead);
             UpdateMonsterExtras();
             RemoveDefeatedBosses();
@@ -242,6 +247,9 @@ namespace Game.Core
                 else if (_enemies.Count < EnemyTargetNow) TrySpawnEnemy();
             }
             UpdatePacks();
+            // The trap rooms' bands, and the pacing director (World.Traps.cs, World.Director.cs).
+            UpdateTraps();
+            UpdateDirector();
         }
 
         void UpdatePlayer(Player player)
@@ -416,7 +424,7 @@ namespace Game.Core
                     // for the stone and breaks in.
                     bool walledOut = enemy.Rift == DefenseMonster && _flow.DistanceAt(TileMap.Cell(enemy.Position.X), TileMap.Cell(enemy.Position.Y)) == FlowField.Unreached;
                     var nearest = walledOut ? null : _players
-                        .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= definition.Aggro * AggroScale && !InSafePlace(p.Position))
+                        .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= definition.Aggro * AggroScale && !InSafePlace(p.Position) && !Unheeded(enemy, p))
                         .OrderBy(p => Vec2.Distance(p.Position, enemy.Position))
                         .FirstOrDefault();
                     if (nearest == null)
@@ -610,6 +618,7 @@ namespace Game.Core
             player.Sleeping = false;
             player.Health -= amount;
             player.RestingTicks = 0;
+            Strain(player, amount);
             _events.Add(new SimEvent(SimEventType.Hit, source, player.Id, amount, cause: cause));
             if (!player.IsDead) return amount;
 
@@ -715,11 +724,26 @@ namespace Game.Core
         public static bool Comes(MonsterDefinition monster, int zone, Biome biome) =>
             monster.Biome == null ? monster.Level <= zone : monster.Biome == biome && monster.Level <= zone + 1;
 
+        // The kinds that come one by one at a tile: round a place some monsters keep to (monsters.csv place), only those;
+        // elsewhere never them. A wanderer of a world of rooms walks: never one that is rooted.
+        List<MonsterDefinition> FieldKinds(Vec2 position, int x, int y)
+        {
+            int zone = ZoneLevelAt(position);
+            var biome = Biomes[x, y];
+            var haunt = Places.FirstOrDefault(p => Vec2.Distance(position, p.Center) <= p.Radius + HauntReach
+                && _monsters.Monsters.Any(m => m.Place == p.Definition.Id && m.Weight > 0));
+            var choices = haunt != null
+                ? _monsters.Monsters.Where(m => m.Place == haunt.Definition.Id && m.Weight > 0).ToList()
+                : _monsters.Monsters.Where(m => m.Place == null && m.Weight > 0 && Comes(m, zone, biome)).ToList();
+            if (RoomPacks) choices.RemoveAll(m => m.Has(MonsterTraitKind.Rooted));
+            return choices;
+        }
+
         void TrySpawnEnemy()
         {
             if (!_monsters.Monsters.Any(m => m.Level <= _config.ZoneLevel && m.Weight > 0)) return;
-            var biomes = Biomes;
-            var round = SpawnsNearPlayers ? _players.Where(p => !p.IsDead).ToList() : null;
+            // Not round a player the pacing director keeps quiet (World.Director.cs).
+            var round = SpawnsNearPlayers ? _players.Where(p => !p.IsDead && !Hushed(p)).ToList() : null;
             if (round != null && round.Count == 0) return;
 
             for (int attempt = 0; attempt < 30; attempt++)
@@ -753,15 +777,7 @@ namespace Game.Core
                 // A big world of caves: a pack as one clump, when one comes there.
                 if (ClumpPacks && round != null && TryClump(position, round.OrderBy(p => Vec2.Distance(p.Position, position)).First())) return;
                 int zone = ZoneLevelAt(position);
-                var biome = biomes[x, y];
-                // Round a place some monsters keep to (monsters.csv place), only those come; elsewhere never them.
-                var haunt = Places.FirstOrDefault(p => Vec2.Distance(position, p.Center) <= p.Radius + HauntReach
-                    && _monsters.Monsters.Any(m => m.Place == p.Definition.Id && m.Weight > 0));
-                var choices = haunt != null
-                    ? _monsters.Monsters.Where(m => m.Place == haunt.Definition.Id && m.Weight > 0).ToList()
-                    : _monsters.Monsters.Where(m => m.Place == null && m.Weight > 0 && Comes(m, zone, biome)).ToList();
-                // A wanderer walks: never one that is rooted.
-                if (RoomPacks) choices.RemoveAll(m => m.Has(MonsterTraitKind.Rooted));
+                var choices = FieldKinds(position, x, y);
                 if (choices.Count == 0) continue;
                 var kind = _random.PickWeighted(choices, m => m.Weight);
                 var first = SpawnEnemy(kind, position);

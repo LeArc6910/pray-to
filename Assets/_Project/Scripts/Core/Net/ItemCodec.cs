@@ -228,7 +228,9 @@ namespace Game.Core
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is
     // used by Unequip; Index is a sheet index: the rune for InsertRune, the consumable for UseConsumable, the
-    // recipe for Craft, the material for Place and the crop for Plant.
+    // recipe for Craft, the material for Place and the crop for Plant. Index goes as two bytes (2026-11-22: as one, a
+    // waystone's target, World.StoneTarget + its index, came to the host cut short and a press on its row did nothing);
+    // one out of range (a -1) still comes as a number past every sheet.
     public sealed class InventoryCommandMessage
     {
         public InventoryCommandMessage(InventoryCommand command, int item, ItemSlot slot = ItemSlot.Weapon, int index = 0)
@@ -249,11 +251,11 @@ namespace Game.Core
             w.Write((byte)Command);
             w.Write(Item);
             w.Write((byte)Slot);
-            w.Write((byte)Index);
+            w.Write((ushort)Index);
         });
 
         public static InventoryCommandMessage Decode(byte[] data) => Protocol.Read(data, MessageType.InventoryCommand, r =>
-            new InventoryCommandMessage((InventoryCommand)r.ReadByte(), r.ReadInt32(), (ItemSlot)r.ReadByte(), r.ReadByte()));
+            new InventoryCommandMessage((InventoryCommand)r.ReadByte(), r.ReadInt32(), (ItemSlot)r.ReadByte(), r.ReadUInt16()));
     }
 
     // Everything a player carries: what they wear, their bag, runes, consumables and materials. Sent whenever any of

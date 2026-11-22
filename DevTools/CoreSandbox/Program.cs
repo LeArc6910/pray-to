@@ -32,6 +32,9 @@ namespace CoreSandbox
     // dotnet run -- --hour [minutes] [seed,seed,...] [map size, 512]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
     // dotnet run -- --supply                          which system supplies which, from the sheets (Docs/Systems.md)
     // dotnet run -- --flow [seeds]                    steps from the spawn to the first veins, arena and places (Docs/WorldFlow.md)
+    // dotnet run -- --pace [minutes] [seeds]          the pacing director's rhythm: a bot roaming a world of rooms, its tension
+    //                                                 as a curve, the states, what was sent (--gear, --classes, --level; Docs/WorldRework.md)
+    // add --no-director anywhere for the director not acting (as before it was made)
     // dotnet run -- --mapstats [seeds] [map size]     the map as numbers: rock, lumps, open floor, each biome, rooms, time (Docs/WorldRework.md)
     // add --gen <1|2> to --flow, --hour or --mapstats for the generator's version (--mapstats shows both without it;
     // the others play what a new world is made with, WorldGenerator.NewWorldVersion)
@@ -39,11 +42,15 @@ namespace CoreSandbox
     {
         // --no-packs: the monsters without packs.csv, one by one as before packs (Docs/WorldRework.md 묶음 2-1).
         static bool NoPacks;
+        // --no-director: the pacing director does not act (World.Director.cs, 묶음 4b), as before it was made.
+        public static bool Director = true;
 
         static void Main(string[] args)
         {
             NoPacks = args.Contains("--no-packs");
             args = args.Where(a => a != "--no-packs").ToArray();
+            Director = !args.Contains("--no-director");
+            args = args.Where(a => a != "--no-director").ToArray();
             int itemRarity = 0;
             int rarityFlag = Array.IndexOf(args, "--rarity");
             if (rarityFlag >= 0)
@@ -221,6 +228,11 @@ namespace CoreSandbox
                     HourSim.Run(LoadSheets(data), Number(1, 60), args.Length > 2 ? args[2] : "1,2,3", args.Length > 3 ? int.Parse(args[3]) : WorldGenerator.GameSize,
                         generator > 0 ? generator : WorldGenerator.NewWorldVersion);
                     break;
+                case "--pace":
+                    var paceSeeds = args.Length > 2 && !args[2].StartsWith("--") ? args[2].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 };
+                    PaceSim.Run(LoadSheets(data), Number(1, 30), paceSeeds, gearFlag >= 0 ? gear : new[] { "iron_sword", "iron_armor", "iron_helmet", "iron_boots" },
+                        LoadClasses(classIds.Length > 0 ? classIds : new[] { "warrior" }), Director, SkillBot.Level ?? 8);
+                    break;
                 case "--boss":
                     var monsters = LoadMonsters();
                     BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge, bossId);
@@ -237,6 +249,7 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...] [map size] [--gen 1|2]");
                     Console.WriteLine("       dotnet run -- --flow [seeds] [--gen 1|2]");
                     Console.WriteLine("       dotnet run -- --mapstats [seeds] [map size] [--gen 1|2]");
+                    Console.WriteLine("       dotnet run -- --pace [minutes] [seeds] [--gear ...] [--classes ...] [--level 8] [--no-director]");
                     break;
             }
         }

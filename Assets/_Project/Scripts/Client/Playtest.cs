@@ -51,6 +51,11 @@ namespace Game.Client
     //   rumors                    JSON (묶음 4c): the menu's two choices, the rumours heard, how well the way to where the story
     //                             leads and to each arena is known, and the goal list's story line
     //   guidance rumor|arrow      the menu's [길 안내]     quickrest on|off   the menu's [쉴 때 회복], and the running world's
+    //   director [build|peak|relax|rest [tension] | ambush | raid]   JSON: the pacing director for the player (state, tension,
+    //                             clocks, what it sent, the dust and howls the screen showed); or that state set, or one now
+    //   goto narrow [n]           the middle of the nth nearest narrow way (two tiles or less) where an ambush can come
+    //   traps                     JSON: the nearest trap room: phase, band, wave, the grates down on host and screen, who is
+    //                             shut in, the chest (opened, usable on host and screen), the banners shown
     //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways, roads
     //   packs                     JSON: the packs about the player (World.Packs.cs): each one's room, kind, size, monsters standing,
     //                             noticing and out of their own sight; the wanderers, the field's monsters and the caps
@@ -338,6 +343,18 @@ namespace Game.Client
                     return "pois " + PoisJson(root);
                 case "usepoi":
                     return root.UsePoi() ? "ok usepoi" : "error usepoi: nothing to use within reach";
+                // The pacing director and the trap rooms (2026-11-22, 묶음 4b). "director": the player's pace; "director
+                // <build|peak|relax|rest> [tension]": set as if it had come; "director ambush|raid": one now, where the player
+                // stands (an ambush only in a narrow way: "goto narrow" first). "traps": the nearest trap room.
+                case "director":
+                    if (words.Length == 1) return "director " + DirectorJson(root);
+                    if (words[1] == "ambush") return world.Ambush(player) ? "ok director ambush" : "error director ambush: not in a narrow way with room before and behind";
+                    if (words[1] == "raid") return world.Raid(player) ? "ok director raid" : "error director raid: no room for a raid out of sight here";
+                    var paceState = (PaceState)Enum.Parse(typeof(PaceState), words[1], ignoreCase: true);
+                    world.SetPace(player, paceState, words.Length > 2 ? Float(words[2]) : paceState == PaceState.Peak ? World.PeakTension : 0);
+                    return null;
+                case "traps":
+                    return "traps " + TrapsJson(root);
                 // The minecarts, waystones and the wandering merchant (2026-11-22, 묶음 3c).
                 case "travel":
                     return "travel " + TravelJson(root);
@@ -500,6 +517,29 @@ namespace Game.Client
                                 && Vec2.Distance(TileMap.Center(x, y), thing.Center) <= World.PoiReach - 0.3f)
                             ?? TileMap.Center(room0.AnchorX, room0.AnchorY);
                     }
+                    break;
+                // In a narrow way where an ambush comes (묶음 4b): "narrow [n]", the middle of the nth nearest way two tiles
+                // wide or less and long enough, out of the places the director leaves alone, facing along it.
+                case "narrow":
+                    int nthWay = words.Length > 2 ? Int(words[2]) : 0;
+                    var ways = root.HostGenerated?.Rooms ?? throw new InvalidOperationException("not a world of rooms");
+                    var narrowAt = ways.Edges.Where(e => e.Kind == RoomEdgeKind.Way && e.Width <= World.AmbushWidth && e.Path != null && e.Path.Count >= 24)
+                        .Select(e => (Edge: e, Middle: e.Path[e.Path.Count / 2]))
+                        .Where(w => Walkable(map, w.Middle.X, w.Middle.Y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(w.Middle.X, w.Middle.Y), World.PlayerRadius))
+                        .OrderBy(w => Vec2.Distance(TileMap.Center(w.Middle.X, w.Middle.Y), player.Position))
+                        .Where(w =>
+                        {
+                            var was = player.Position;
+                            player.Position = TileMap.Center(w.Middle.X, w.Middle.Y);
+                            bool alone = world.LeftAlone(player);
+                            player.Position = was;
+                            return !alone;
+                        }).Skip(nthWay).FirstOrDefault();
+                    if (narrowAt.Edge == null) throw new InvalidOperationException($"no narrow way {nthWay}");
+                    to = TileMap.Center(narrowAt.Middle.X, narrowAt.Middle.Y);
+                    var next = narrowAt.Edge.Path[narrowAt.Edge.Path.Count / 2 + 1];
+                    root.AimHeld = true;
+                    root.HeldAim = new Vec2(next.X - narrowAt.Middle.X, next.Y - narrowAt.Middle.Y);
                     break;
                 // Before the crack of a hidden room in the rock, or the obsidian or void wall of a locked room, facing it
                 // (묶음 3b): "crack [n]", "lock [n]".
@@ -729,6 +769,54 @@ namespace Game.Client
                 .Field("arenas", arenas)
                 .Field("story", string.Join(" | ", root.HudLines.Where(l => l.StartsWith("이야기") || l.Contains("장 ·")).Select(l => l.Replace('\n', ' '))))
                 .Field("health", root.HostPlayer?.Health ?? 0).Field("maxHealth", root.HostPlayer?.Stats.MaxHealth ?? 0)
+                .Close('}');
+        }
+
+        // The pacing director for the player (World.Director.cs, 묶음 4b): state, tension, its clocks, what it did, the
+        // monsters it has sent after someone, and what the screen showed of the ambush dust and the raids' howls.
+        static string DirectorJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var pace = world.PaceOf(player);
+            var shown = root.PaceShown;
+            return new Json('{').Field("acts", world.Directs).Field("state", pace.State.ToString()).Field("tension", pace.Tension)
+                .Field("seconds", (world.Tick - pace.Since) / (float)World.TicksPerSecond)
+                .Field("restLeft", Math.Max(0, pace.RestUntil - world.Tick) / (float)World.TicksPerSecond)
+                .Field("nextSend", (pace.NextSend - world.Tick) / (float)World.TicksPerSecond).Field("nextSurge", (pace.NextSurge - world.Tick) / (float)World.TicksPerSecond)
+                .Field("leftAlone", world.LeftAlone(player))
+                .Field("peaks", pace.Peaks).Field("rests", pace.Rests).Field("sends", pace.Sends).Field("ambushes", pace.Ambushes).Field("raids", pace.Raids)
+                .Field("hunters", world.Hunters)
+                .Field("chasing", world.Enemies.Count(e => !e.IsDead && e.TargetId == player.Id && e.State != EnemyState.Idle))
+                .Field("near", world.Enemies.Count(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) < 12))
+                .Field("dustShown", shown.Dust).Field("howlsHeard", shown.Howls)
+                .Close('}');
+        }
+
+        // The trap room nearest the player (World.Traps.cs, 묶음 4b): its phase and band, the doors the grates fell on
+        // (and how many the screen sees), who is shut in, and the chest as the host and the screen have it.
+        static string TrapsJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var client = root.LocalClient;
+            var chest = world.Pois.Where(p => p.Kind == PoiKind.Chest && p.Definition.Role == RoomRole.Trap)
+                .OrderBy(p => Vec2.Distance(p.Center, player.Position)).FirstOrDefault();
+            var json = new Json('{').Field("chests", world.Pois.Count(p => p.Kind == PoiKind.Chest && p.Definition.Role == RoomRole.Trap));
+            var shown = root.PaceShown;
+            json.Field("bannersShown", shown.Banners).Field("gratesShown", shown.Grates);
+            if (chest == null) return json.Close('}');
+            var trap = world.TrapAt(chest.Index);
+            int band = trap?.Band == null ? 0 : world.MembersOf(trap.Band).Count();
+            return json.Field("chest", chest.Index).Field("distance", Vec2.Distance(chest.Center, player.Position))
+                .Field("phase", trap?.Phase.ToString() ?? "Ready").Field("wave", trap?.Wave ?? 0).Field("band", band)
+                .Field("doors", trap?.Doors.Count ?? 0)
+                .Field("grates", trap == null ? 0 : trap.Doors.Count(d => world.Map[d.X, d.Y] == TileType.Grate))
+                .Field("clientGrates", trap == null || client?.Map == null ? 0 : trap.Doors.Count(d => client.Map[d.X, d.Y] == TileType.Grate))
+                .Field("inside", trap?.Inside.Contains(player.Id) ?? false)
+                .Field("opened", world.Opened(chest.Index)).Field("tile", world.Map[chest.X, chest.Y].ToString())
+                .Field("canUse", world.CanUse(chest, player)).Field("clientCanUse", client?.CanUse(chest) ?? false)
+                .Field("items", player.Inventory.Items.Count)
                 .Close('}');
         }
 

@@ -113,7 +113,7 @@ namespace Game.Core
         // Whether it gives now: a chest or cart not yet opened, a shrine the player has not prayed at today.
         public bool CanUse(Poi poi, Player player) => poi.Definition.Again switch
         {
-            PoiAgain.Once => !Opened(poi.Index),
+            PoiAgain.Once => !Opened(poi.Index) && TrapReady(poi),
             PoiAgain.Daily => player == null || !PrayedToday(player.Name).Contains(poi.Index),
             _ => true,
         };
@@ -136,6 +136,8 @@ namespace Game.Core
                 Grant(player, poi);
                 _events.Add(new SimEvent(SimEventType.Blessed, player.Id, amount: index, position: poi.Center));
             }
+            // A trap room's chest shuts the room and calls its bands first (World.Traps.cs); it opens once they fell.
+            else if (IsTrapChest(poi) && SpringTrap(player, poi)) return true;
             else
             {
                 _poiOpened[index] = true;
@@ -151,10 +153,11 @@ namespace Game.Core
             return true;
         }
 
-        // What the thing gives one player, by its sheet's reward.
-        void Grant(Player player, Poi poi)
+        // What the thing gives one player, by its sheet's reward (or another row's: a trap's chest won gives the chest's a
+        // tier higher, World.Traps.cs).
+        void Grant(Player player, Poi poi, PoiDefinition definition = null)
         {
-            var definition = poi.Definition;
+            definition ??= poi.Definition;
             int level = Math.Max(ProgressLevel, ZoneLevelAt(poi.Center)) + definition.RewardLevel;
             int rarity = (int)player.Stats.ItemRarity;
             foreach (var reward in definition.Rewards)

@@ -50,6 +50,8 @@ dotnet run --project DevTools/CoreSandbox -- --skills 60 --gear iron_sword
 dotnet run --project DevTools/CoreSandbox -- --supports 60 --gear iron_sword
 # 새 캐릭터의 첫 한 시간을 안내대로(상태와 길찾기로 움직이는 봇, Docs/Playtest.md). 시드마다 지표 표와 막힘 보고서
 dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
+# 완급 감독의 긴장 곡선(쌓기·절정·풀기·쉬기, 보낸 것, 싸움 사이 시간. Docs/WorldRework.md 묶음 4b). --no-director로 감독 끄기
+dotnet run --project DevTools/CoreSandbox -- --pace 30 1,2,3
 
 # 도트 그림과 효과음·음악을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, player.png, bosses.png, anim/*.gif, cave.png, cave_unlit.png, arena.png, effects.png, sounds/, music/)
 dotnet run --project DevTools/ArtPreview

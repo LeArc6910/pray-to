@@ -293,6 +293,90 @@ namespace Game.Client
         }
     }
 
+    partial class WorldView
+    {
+        static readonly Color TrapColor = new Color(0.95f, 0.35f, 0.25f);
+        static readonly Color AmbushDustColor = new Color(0.66f, 0.6f, 0.52f);
+        // Within this of a trap's chest the banners speak to the player (they are shut in, or by it).
+        const float TrapHeard = 24;
+
+        // What the screen has shown of the trap rooms and the pacing director, for the playtests' state report.
+        public int TrapBanners { get; private set; }
+        public int AmbushDustShown { get; private set; }
+        public int RaidHowlsHeard { get; private set; }
+        public int GratesDropped { get; private set; }
+
+        // A trap room's doors, bands and end (SimEventType.Trap), and the director's ambush dust and raid howl
+        // (SimEventType.Ambush, Docs/WorldRework.md 완급 감독). True when it was one of those.
+        bool ShowPace(SimEvent e)
+        {
+            if (e.Type != SimEventType.Trap && e.Type != SimEventType.Ambush) return false;
+            var at = new Vector3(e.Position.X, e.Position.Y, 0);
+            bool near = Vector3.Distance(at, _self.Position) <= TrapHeard;
+            if (e.Type == SimEventType.Ambush)
+            {
+                if (e.Amount == World.AmbushDust)
+                {
+                    // Dust and grit off the wall, a second before the ambush comes out of it.
+                    AmbushDustShown++;
+                    for (int i = 0; i < 3; i++) Kick(at + new Vector3(UnityEngine.Random.Range(-0.4f, 0.4f), 0.6f, 0), Vector3.down * 0.6f, AmbushDustColor, 3);
+                    AddFlash(at, 0.8f, AmbushDustColor, FlashKind.Burst);
+                    Hear(Sound.Break, at, 0.8f);
+                    _shake = Mathf.Max(_shake, 0.06f);
+                    return true;
+                }
+                // A raid's howl from far off: heard, and a word on the side it came from.
+                RaidHowlsHeard++;
+                Hear(Sound.Roar, at, 0.7f);
+                var toward = at - _self.Position;
+                var side = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.up;
+                _floating.Add(new Floating { Position = _self.Position + side * 2.5f + new Vector3(0, 0.6f, 0), Text = "멀리서 울음소리…", Color = TrapColor });
+                return true;
+            }
+            switch (e.Amount)
+            {
+                case World.TrapSprung:
+                    // The grates fall across the ways out: a thud and dust where each came down.
+                    Hear(Sound.DoorShut, at, 1);
+                    Hear(Sound.Thump, at, 0.8f);
+                    _shake = Mathf.Max(_shake, near ? 0.25f : 0);
+                    var map = _client.Map;
+                    int cx = TileMap.Cell(e.Position.X), cy = TileMap.Cell(e.Position.Y);
+                    for (int y = cy - 32; y <= cy + 32; y++)
+                        for (int x = cx - 32; x <= cx + 32; x++)
+                        {
+                            if (map == null || !map.InBounds(x, y) || map[x, y] != TileType.Grate) continue;
+                            GratesDropped++;
+                            Kick(new Vector3(x + 0.5f, y + 0.9f, 0), Vector3.down * 0.8f, AmbushDustColor, 1);
+                        }
+                    if (near) Banner("함정이다! 창살이 내려와 방이 닫혔다");
+                    break;
+                case World.TrapWon:
+                    Hear(Sound.Victory, at, 1);
+                    AddFlash(at + new Vector3(0, 0.4f, 0), 1.6f, GlintColor, FlashKind.Burst);
+                    if (near) Banner("함정을 이겨 냈다! 창살이 올라가고 상자가 한 단계 좋아졌다");
+                    break;
+                case World.TrapLost:
+                    Hear(Sound.Down, at, 0.8f);
+                    if (near) Banner("함정 방의 창살이 올라갔다. 상자는 내일 새벽에 다시 열 수 있다");
+                    break;
+                default:
+                    int wave = e.Amount - World.TrapWave;
+                    Hear(Sound.Roar, at, 0.9f);
+                    AddFlash(at, 3, TrapColor, FlashKind.Ring);
+                    if (near) Banner(wave >= World.TrapWaves ? $"마지막 무리가 온다! ({wave}/{World.TrapWaves})" : $"무리가 몰려온다! ({wave}/{World.TrapWaves})");
+                    break;
+            }
+            return true;
+        }
+
+        void Banner(string text)
+        {
+            TrapBanners++;
+            ShowBanner(text);
+        }
+    }
+
     // The words the screen uses for the things to find.
     static class PoiText
     {
