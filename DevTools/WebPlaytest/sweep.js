@@ -4254,8 +4254,8 @@ async function pois(browser) {
     check(/^ok/.test(lock), `${name}: 자물쇠 벽 앞에 선다 (${lock})`);
     await game.wait(1200);
     await game.send('attack on');
-    await game.wait(1500);
-    const refused = await game.ask('texts');
+    // The reminder floats only a moment (and then rests 2.5 seconds), so it is watched for rather than read once.
+    const refused = (await game.until(r => (r.floating || []).some(t => /더 좋은 곡괭이/.test(t)), 3000, () => game.ask('texts'))) || {};
     await game.send('attack off');
     await game.wait(300);
     check((refused.floating || []).some(t => /더 좋은 곡괭이/.test(t)), `${name}: 철 곡괭이로 자물쇠 벽을 치면 "더 좋은 곡괭이가 필요하다" (${(refused.floating || []).join(' / ') || '글 없음'})`);
