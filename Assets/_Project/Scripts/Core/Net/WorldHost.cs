@@ -22,8 +22,11 @@ namespace Game.Core
         public int MapVersion { get; set; } = WorldGenerator.CaveVersion;
         // These keep a snapshot inside one network packet (Netcode's limit is about 1250 bytes). With 43 bytes for
         // the header and the player's own state, 17 an entity or drop, 14 a projectile, 19 a hazard and 13 an event,
-        // the maximum comes to about 1.19 KB.
-        public int MaxEntitiesPerSnapshot { get; set; } = 20;
+        // the maximum with 20 entities comes to about 1.19 KB. Entities are 32 since packs (two packs and four players,
+        // 2026-11-22, Docs/WorldRework.md 상한); a snapshot that would come past MaxSnapshotBytes leaves out the
+        // furthest monsters (WorldHost.SnapshotBytes).
+        public int MaxEntitiesPerSnapshot { get; set; } = 32;
+        public int MaxSnapshotBytes { get; set; } = 1200;
         public int MaxDropsPerSnapshot { get; set; } = 8;
         public int MaxProjectilesPerSnapshot { get; set; } = 20;
         public int MaxHazardsPerSnapshot { get; set; } = 16;
@@ -153,6 +156,8 @@ namespace Game.Core
             // The places first: some people keep shop in them.
             if (story != null) World.SetStory(story, _generated.Places);
             if (npcs != null) World.SetNpcs(npcs);
+            // A world of rooms keeps its monsters in packs in its pack rooms (World.Packs.cs).
+            World.SetRooms(_generated.Rooms);
         }
 
         readonly NpcData _npcs;
@@ -280,7 +285,7 @@ namespace Game.Core
 
             foreach (var pair in _connections)
             {
-                if (pair.Value.Player != null) Send(pair.Key, Snapshot(pair.Value.Player).Encode(), reliable: false);
+                if (pair.Value.Player != null) Send(pair.Key, SnapshotBytes(pair.Value.Player), reliable: false);
             }
             _pendingEvents.Clear();
         }
@@ -742,6 +747,34 @@ namespace Game.Core
                 defending == null ? 0 : (int)Math.Ceiling(defending.StoneHealth / defending.MaxStoneHealth * 100));
             return new SnapshotMessage(World.Tick, self, entities, projectiles, hazards, events, World.Clock, World.Sleepers, rift, defense, World.DayMinutes);
         }
+
+        // The snapshot as it goes out: up to MaxEntitiesPerSnapshot (two packs and four players, 2026-11-22), but never
+        // past MaxSnapshotBytes; over it, the furthest monsters are left out first (Docs/WorldRework.md 상한).
+        byte[] SnapshotBytes(Player viewer)
+        {
+            var message = Snapshot(viewer);
+            var data = message.Encode();
+            while (data.Length > _config.MaxSnapshotBytes)
+            {
+                var entities = message.Entities.ToList();
+                int over = (data.Length - _config.MaxSnapshotBytes + EntityBytes - 1) / EntityBytes;
+                int dropped = 0;
+                for (int i = entities.Count - 1; i >= 0 && dropped < over; i--)
+                {
+                    if (entities[i].Kind != EntityKind.Monster) continue;
+                    entities.RemoveAt(i);
+                    dropped++;
+                }
+                if (dropped == 0) break;
+                message = new SnapshotMessage(message.Tick, message.Self, entities, message.Projectiles, message.Hazards, message.Events, message.Clock, message.Sleepers,
+                    message.Rift, message.Defense, message.DayMinutes);
+                data = message.Encode();
+            }
+            return data;
+        }
+
+        // What one entity takes in a snapshot.
+        const int EntityBytes = 17;
 
         (int X, int Y, int Crop, long Grown, long WetFrom, long WetUntil) CropEntry(CropChange change) =>
             (change.X, change.Y, change.Crop == null ? -1 : IndexOf(_tiles?.Crops, change.Crop.Definition), change.Crop?.Grown ?? 0,

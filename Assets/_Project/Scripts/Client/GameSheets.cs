@@ -28,6 +28,8 @@ namespace Game.Client
         public TextAsset monsters;
         // What the ordinary monsters do (monster_attacks.csv, 2026-11-21, Docs/Combat.md 몬스터의 공격 시트).
         public TextAsset monsterAttacks;
+        // The packs the pack rooms hold (packs.csv, 2026-11-22, Docs/Combat.md 무리).
+        public TextAsset packs;
         public TextAsset bosses;
         public TextAsset bossAttacks;
         // Each boss's arena and entrance (arenas.csv, 2026-11-17, Docs/Bosses.md 아레나 컨셉).
@@ -56,8 +58,14 @@ namespace Game.Client
         // Without the terrain sheet (an asset made before it existed) the rooms are carved by the copy in code.
         public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain), Text(rooms), Text(roomRoles));
 
-        // Without the attacks' sheet (an asset made before it existed) every monster fights the old way.
-        public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters), Text(monsterAttacks));
+        // Without the attacks' sheet (an asset made before it existed) every monster fights the old way; without the
+        // packs' sheet monsters come one by one, as before there were packs.
+        public MonsterData LoadMonsters()
+        {
+            var data = MonsterSheet.Parse(Text(monsters), Text(monsterAttacks));
+            foreach (string error in PackSheet.Parse(Text(packs), data).Errors) Debug.LogError(error);
+            return data;
+        }
 
         // Without the arenas' sheet (an asset made before it existed) every arena is plain and no boss has an entrance.
         public BossData LoadBosses(MonsterData monsterData)

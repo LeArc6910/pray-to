@@ -68,6 +68,7 @@ namespace Game.Client.Editor
             sheets.roomRoles = Sheet(WorldFolder + RoomSheet.RolesFile);
             sheets.monsters = Sheet(MonstersFolder + MonsterSheet.File);
             sheets.monsterAttacks = Sheet(MonstersFolder + MonsterAttackSheet.File);
+            sheets.packs = Sheet(MonstersFolder + PackSheet.File);
             sheets.bosses = Sheet(BossesFolder + BossSheet.BossesFile);
             sheets.bossAttacks = Sheet(BossesFolder + BossSheet.AttacksFile);
             sheets.arenas = Sheet(BossesFolder + ArenaSheet.File);

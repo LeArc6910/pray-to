@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4051,7 +4051,63 @@ async function map(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, base, save, story, deploysave, layout, touch };
+// Packs in their rooms (2026-11-22, Docs/WorldRework.md 묶음 2-1): a pack stands in each pack room visited (in that
+// room, four or more), the monsters about stay inside the caps, and a pack notices the player together (those further
+// than they see come too), each with a mark over its head.
+const PackVisits = [['any', '가까운 무리 방'], ['mushroom', '버섯 숲의 무리 방'], ['ice', '얼음 동굴의 무리 방'], ['sand', '모래 동굴의 무리 방']];
+
+async function packs(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 무리 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on');
+
+    for (const [biome, label] of PackVisits) {
+      const answer = (await game.send(`goto room pack ${biome}`)).join(' ');
+      await game.wait(1600);
+      const seen = await game.ask('packs');
+      const here = (seen.packs || [])[0];
+      check(/^ok/.test(answer) && seen.rooms === true, `${name}: ${label}에 간다 (${answer})`);
+      check(!!here && here.standing >= 4 && here.inRoom === here.standing,
+        `${name}: ${label}에 무리가 방 안에 선다 (${here ? `${here.kind}, ${here.standing}마리, 방 안 ${here.inRoom}, ${here.biome}` : '없음'})`);
+      check(seen.field <= seen.hostCap && seen.near <= seen.partyCap, `${name}: ${label}: 몬스터 수가 상한 안이다 (둘레 ${seen.near}/${seen.partyCap}, 전체 ${seen.field}/${seen.hostCap}, 떠돌이 ${seen.wanderers})`);
+      await game.shot(`packs-room-${biome}`, `${label} (${here ? here.kind : '무리 없음'})`);
+    }
+
+    // Beside the nearest pack, most of it out of sight; let them go: they come together, each with a mark.
+    await game.send('goto room pack any');
+    await game.wait(1500);
+    await game.send('goto pack');
+    await game.wait(500);
+    const before = await game.ask('packs');
+    await game.send('monsters go');
+    await game.wait(700);
+    await game.shot('packs-alert', '무리가 함께 알아차린 순간(머리 위 느낌표)');
+    await game.wait(700);
+    const after = await game.ask('packs');
+    const pack = (after.packs || [])[0] || {};
+    check(pack.alerted && pack.chasing >= pack.standing - 1 && pack.standing >= 3,
+      `${name}: 무리가 함께 알아차린다 (${pack.chasing}/${pack.standing}마리가 쫓는다, 그 가운데 제 시야 밖 ${pack.unseen})`);
+    check(after.alertsShown - (before.alertsShown || 0) >= Math.min(3, pack.standing || 3),
+      `${name}: 머리 위에 느낌표가 뜬다 (${after.alertsShown - (before.alertsShown || 0)}개)`);
+    await game.wait(1500);
+    await game.shot('packs-fight', '무리와 싸우는 중');
+    await game.send('clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

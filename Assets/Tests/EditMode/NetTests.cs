@@ -924,6 +924,54 @@ namespace Game.Core.Tests
             Assert.IsTrue(seen.Contains(SimEventType.PhaseChanged), $"the fight got far enough to matter: boss {(world.Bosses.Count > 0 ? world.Bosses[0].Health + "/" + world.Bosses[0].MaxHealth + " phase " + world.Bosses[0].Phase + " " + world.Bosses[0].State : "gone")}, players {string.Join(",", world.Players.Select(p => p.Health))}, events {string.Join(",", seen)}");
         }
 
+        // Two packs on four players (2026-11-22, Docs/WorldRework.md 상한): a snapshot carries more than the old 20
+        // entities, the nearest monsters always among them, and never comes past one packet.
+        [Test]
+        public void SnapshotsStayInsideOnePacketWithTwoPacksOnFourPlayers()
+        {
+            var session = new Session(new HostConfig { StarterGear = new[] { "obsidian_sword", "obsidian_armor" } });
+            var host = session.Host;
+            var world = host.World;
+            var clients = Enumerable.Range(1, 4).Select(i => session.Join((ulong)i, "플레이어" + i, Protocol.Version, i % 2 == 0 ? "warrior" : "fire_mage")).ToList();
+            var centre = world.Players[0].Position;
+            for (int i = 0; i < 4; i++) Walk(world, world.Players[i], centre + Vec2.FromAngle(i * 1.6f) * 1.5f);
+            // Two packs of eight with two more for each player past the first: 14 each, as World.UpdatePacks makes them.
+            int each = 8 + World.PackExtraPerPlayer * 3;
+            var kinds = new[] { "slime", "cave_beetle", "spore_shooter", "myconid" };
+            for (int i = 0; i < 2 * each; i++)
+            {
+                var enemy = world.SpawnEnemy(Monsters.Shipped.Find(kinds[i % kinds.Length]), centre + Vec2.FromAngle(i * 0.45f) * (4 + i % 5));
+                enemy.MaxHealth = enemy.Health = 5000;
+            }
+
+            int largest = 0, most = 0;
+            for (int tick = 0; tick < 10 * World.TicksPerSecond; tick++)
+            {
+                foreach (var player in world.Players)
+                {
+                    world.SetAttacking(player.Id, true);
+                    for (int slot = 0; slot < player.Skills.Count; slot++) world.UseSkill(player.Id, slot, new Vec2(1, 0));
+                }
+                host.Tick();
+                foreach (var message in host.TakeOutgoing())
+                {
+                    largest = Math.Max(largest, message.Data.Length);
+                    if (Protocol.TypeOf(message.Data) != MessageType.Snapshot) continue;
+                    var snapshot = SnapshotMessage.Decode(message.Data);
+                    most = Math.Max(most, snapshot.Entities.Count);
+                    // Whatever was left out was further than everything sent.
+                    var viewer = world.Players.First(p => message.Connection == (ulong)(world.Players.ToList().IndexOf(p) + 1));
+                    var sent = snapshot.Entities.Where(e => e.Kind == EntityKind.Monster).Select(e => e.Id).ToHashSet();
+                    if (sent.Count == 0) continue;
+                    float furthestSent = world.Enemies.Where(e => sent.Contains(e.Id)).Max(e => Vec2.Distance(e.Position, viewer.Position));
+                    Assert.IsFalse(world.Enemies.Any(e => !sent.Contains(e.Id) && !e.Away && Vec2.Distance(e.Position, viewer.Position) < furthestSent - 0.5f),
+                        "the nearest monsters are sent");
+                }
+            }
+            Assert.LessOrEqual(largest, 1200);
+            Assert.Greater(most, 20, "more than the old twenty entities when they fit");
+        }
+
         [Test]
         public void ClientsSeeTheBossAndItsTelegraphsCountingDown()
         {

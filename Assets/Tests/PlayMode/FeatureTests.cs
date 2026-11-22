@@ -353,6 +353,27 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // A pack notices together (2026-11-22, Docs/WorldRework.md 무리): five slimes as one pack, most further off than
+        // they see; one notices the player and the rest come too, each with a mark over its head.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator APackNoticesTogetherWithMarks()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var members = Enumerable.Range(0, 5).Select(i => Spawn("slime", Player.Position + new Vec2(6 + i * 1.3f, (i % 2 == 0 ? 1 : -1) * (i * 0.4f)))).ToList();
+            foreach (var member in members) member.MaxHealth = member.Health = 5000;
+            var pack = World.Gather(members);
+            yield return new WaitForSecondsRealtime(0.5f);
+            int shown = _root.AlertsShown;
+            World.MonstersHold = false;
+            yield return new WaitForSecondsRealtime(0.45f);
+            yield return Screens.Take("pack-alert");
+            Assert.IsTrue(pack.Alerted, "The nearest saw the player.");
+            Assert.IsTrue(members.All(m => m.State != EnemyState.Idle), "And the rest came with it, the furthest well out of its sight.");
+            Assert.GreaterOrEqual(_root.AlertsShown - shown, members.Count, "A mark over each head.");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The rest of the kinds on the sheet (Docs/MonsterPatterns.md, 2026-11-22): a scorpion lying in wait is a mound
         // and not a body, two demon soldiers side by side are joined by a line, a stalker's wedge and a caster's runes
         // are marked, and a blow a beetle's shell turns shows a grey number. Every blow shown is counted.

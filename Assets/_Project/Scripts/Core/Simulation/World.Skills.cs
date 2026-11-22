@@ -497,6 +497,8 @@ namespace Game.Core
             if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed * push;
             _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
             Leech(player, cause, amount);
+            // A pack's monster struck before it noticed anyone wakes its pack (World.Packs.cs).
+            Provoked(enemy, player);
             if (enemy.IsDead)
             {
                 _events.Add(new SimEvent(SimEventType.Died, enemy.Id));

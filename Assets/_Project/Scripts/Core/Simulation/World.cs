@@ -175,6 +175,7 @@ namespace Game.Core
                 PetBites(player);
             }
             foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id);
+            NotePackFalls();
             _enemies.RemoveAll(e => e.IsDead);
             UpdateMonsterExtras();
             RemoveDefeatedBosses();
@@ -209,8 +210,20 @@ namespace Game.Core
             {
                 _spawnTimer = Ticks(_config.SpawnIntervalSeconds);
                 if (SpawnsNearPlayers) ClearFarMonsters();
-                if (_enemies.Count < EnemyTargetNow) TrySpawnEnemy();
+                // A world of rooms keeps its packs in their rooms (UpdatePacks) and brings only wanderers here; a big
+                // world of caves brings clumps up to the parties' caps; anything else one monster at a time, as before
+                // there were packs (World.Packs.cs).
+                if (RoomPacks)
+                {
+                    if (WantsWanderer()) TrySpawnEnemy();
+                }
+                else if (ClumpPacks)
+                {
+                    if (FieldCount < EnemyTargetNow) TrySpawnEnemy();
+                }
+                else if (_enemies.Count < EnemyTargetNow) TrySpawnEnemy();
             }
+            UpdatePacks();
         }
 
         void UpdatePlayer(Player player)
@@ -358,6 +371,8 @@ namespace Game.Core
             }
             TickMonster(enemy);
             if (MonstersHold && (enemy.State == EnemyState.Idle || enemy.State == EnemyState.Chase)) return;
+            // A pack's alarm, its leash and the way home, and a wanderer's (World.Packs.cs).
+            if ((enemy.PackId != 0 || enemy.Wanders) && PackTick(enemy)) return;
 
             var target = FindPlayer(enemy.TargetId);
             // One with attacks in monster_attacks.csv fights from that sheet once it has someone to fight
@@ -385,12 +400,15 @@ namespace Game.Core
                         .FirstOrDefault();
                     if (nearest == null)
                     {
-                        // One that came for the ward stone goes on for it.
+                        // One that came for the ward stone goes on for it; a pack's that strayed goes home, a wanderer
+                        // goes on its way.
                         MarchOnStone(enemy);
+                        IdleAbout(enemy);
                         break;
                     }
                     enemy.TargetId = nearest.Id;
                     enemy.State = EnemyState.Chase;
+                    Noticed(enemy, nearest);
                     break;
 
                 case EnemyState.Chase:
@@ -664,7 +682,8 @@ namespace Game.Core
         {
             var alive = _players.Where(p => !p.IsDead).ToList();
             if (alive.Count == 0) return;
-            _enemies.RemoveAll(e => e.Rift == 0 && alive.All(p => Vec2.Distance(p.Position, e.Position) > DespawnReach));
+            // A room's pack goes with its room (World.UpdatePacks), not here.
+            _enemies.RemoveAll(e => e.Rift == 0 && PackOf(e)?.Room == null && alive.All(p => Vec2.Distance(p.Position, e.Position) > DespawnReach));
         }
 
         // Whether a monster comes at a tile of this zone level and biome. A biome's own monsters come one zone early
@@ -702,10 +721,14 @@ namespace Game.Core
                     // Not on the roads or in the places of the story (World.Story.cs).
                     || Structures.IsWay(Map[x, y]) || Map[x, y] == TileType.Waypoint || Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + 2)
                     || Vec2.Distance(position, Spawn) < _config.SpawnDistance
-                    || _players.Any(p => Vec2.Distance(p.Position, position) < _config.SpawnDistance))
+                    || _players.Any(p => Vec2.Distance(p.Position, position) < _config.SpawnDistance)
+                    // A world of rooms: wanderers only, between the rooms with no pack, off the roads (World.Packs.cs).
+                    || RoomPacks && !WandererSpot(x, y))
                 {
                     continue;
                 }
+                // A big world of caves: a pack as one clump, when one comes there.
+                if (ClumpPacks && round != null && TryClump(position, round.OrderBy(p => Vec2.Distance(p.Position, position)).First())) return;
                 int zone = ZoneLevelAt(position);
                 var biome = biomes[x, y];
                 // Round a place some monsters keep to (monsters.csv place), only those come; elsewhere never them.
@@ -714,8 +737,21 @@ namespace Game.Core
                 var choices = haunt != null
                     ? _monsters.Monsters.Where(m => m.Place == haunt.Definition.Id && m.Weight > 0).ToList()
                     : _monsters.Monsters.Where(m => m.Place == null && m.Weight > 0 && Comes(m, zone, biome)).ToList();
+                // A wanderer walks: never one that is rooted.
+                if (RoomPacks) choices.RemoveAll(m => m.Has(MonsterTraitKind.Rooted));
                 if (choices.Count == 0) continue;
-                ToughenForZone(SpawnEnemy(_random.PickWeighted(choices, m => m.Weight), position), zone);
+                var kind = _random.PickWeighted(choices, m => m.Weight);
+                var first = SpawnEnemy(kind, position);
+                ToughenForZone(first, zone);
+                if (!RoomPacks) return;
+                first.Wanders = true;
+                // One of those that always go in packs wanders with another.
+                if (kind.Pack != "always") return;
+                var beside = position + Vec2.FromAngle(_random.NextFloat() * 2 * MathF.PI) * PackSpacingMin;
+                if (Collision.Overlaps(Map, beside, kind.Radius, monster: true)) return;
+                var second = SpawnEnemy(kind, beside);
+                ToughenForZone(second, zone);
+                second.Wanders = true;
                 return;
             }
         }

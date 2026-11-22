@@ -314,8 +314,17 @@ namespace Game.Core.Tests
             world.SetAttacking(near.Id, true);
             for (int i = 0; i < 60 && !target.IsDead; i++) world.Step();
             Assert.IsTrue(target.IsDead);
-            Assert.AreEqual(Leveling.ForMonster(slime.Level), near.Experience);
+            Assert.AreEqual(Leveling.ForMonster(slime.Level), near.Experience, "one that came alone gives it all");
             Assert.AreEqual(0, far.Experience, "too far away");
+
+            // One of a pack gives its share (monsters.csv reward, 2026-11-22): many come at once.
+            Assert.Less(slime.RewardPercent, 100);
+            var packed = world.SpawnEnemy(slime, near.Position + new Vec2(0, -1));
+            world.Gather(new[] { packed });
+            for (int i = 0; i < 60 && !packed.IsDead; i++) world.Step();
+            Assert.IsTrue(packed.IsDead);
+            Assert.AreEqual(Leveling.ForMonster(slime.Level) + Math.Max(1, (int)MathF.Round(Leveling.ForMonster(slime.Level) * slime.RewardPercent / 100f)), near.Experience);
+            world.SetAttacking(near.Id, false);
 
             Assert.AreEqual(3 * 10 + 6, Leveling.ForMonster(Math.Max(slime.Level, 10)), "after the first boss");
             Assert.AreEqual(1, Leveling.LevelFor(0));

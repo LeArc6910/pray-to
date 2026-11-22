@@ -276,6 +276,7 @@ namespace Game.Core
             enemy.TargetId = near.Id;
             Ready(enemy, ambush);
             StartAttack(enemy, ambush, near);
+            Noticed(enemy, near);
         }
 
         // Turns a facing toward another by no more than the given degrees.

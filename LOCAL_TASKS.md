@@ -1062,6 +1062,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(바뀐 시트 `Data/Story/places.csv`의 `links` 열이 빌드에 실린다). 새 파일 `Core/World/WorldGenerator.Roads.cs`의 `.meta`가 생기면 커밋한다. 통신 0.91.0. 2판 월드의 길이 바뀌어 1b까지 만든 2판 월드의 기지는 길에 잘리거나 바위에 묻힐 수 있다(1판 월드는 그대로)
   - (클라우드 웹 점검) `sweep.js --only map`
   - (사람) 큰길을 따라 다른 장소까지 걸어 보기: 길이 굽어 돌며 방을 지나는 것이 탐험하는 맛을 주는지, 너무 돌아가 지루하지 않은지, 금 간 벽 너머 샛길을 찾는 맛
+- [ ] 151단계: 몬스터 무리, 함께 알아차리기, 줄, 떠돌이, 상한(`Docs/WorldRework.md` 2-1, `Docs/Combat.md`)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/Monsters/packs.csv`가 `GameSheets.packs`에 들어가야 빌드에 실린다(돌리기 전에는 예전처럼 한 마리씩 나온다). 새 파일 `packs.csv`, `Core/Simulation/World.Packs.cs`, `Core/Simulation/PackSheet.cs`, `Tests/EditMode/PackTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `APackNoticesTogetherWithMarks`(사진 `pack-alert`). 통신 0.92.0
+  - (클라우드 웹 점검) `sweep.js --only packs,map`
+  - (사람) 무리 방에 들어가 무리가 함께 알아차리고 몰려오는 맛(핵앤슬래시처럼 몰아 잡는 느낌), 너무 많거나 억울하지 않은지, 머리 위 느낌표와 소리, 멀리 끌고 가면 돌아가는 모습, 협동에서 사람 수만큼 느는지
 
 ## 결과 보고
 

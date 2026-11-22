@@ -246,11 +246,13 @@ namespace Game.Core
 
         (int X, int Y) Anchor(RoomNode room) => (room.AnchorX, room.AnchorY);
 
-        // The rooms from the one nearest (x, y) to the one nearest (tx, ty), fewest tiles between their middles first,
+        // The rooms from the one nearest (x, y) to the one nearest (tx, ty), fewest tiles between their middles first
+        // (a pack's room counted three times),
         // by the ways the bot can take: not through a cracked wall it cannot dig, not into an arena but the goal's,
         // not to a room it has given up on. Null when there is none.
         public List<RoomNode> Route(int x, int y, int tx, int ty)
         {
+            const int PackRoomCost = 3;
             if (Rooms == null || Rooms.Nodes.Count == 0) return null;
             var start = Rooms.Nearest(x, y);
             var end = Rooms.Nearest(tx, ty);
@@ -279,7 +281,11 @@ namespace Game.Core
                     var next = Rooms.Nodes[edge.A == at ? edge.B : edge.A];
                     if (next.Kind == RoomKind.Arena && next != end) continue;
                     if (next != end && (Avoid != null && Avoid(next.AnchorX, next.AnchorY) || _badRooms.Contains(next.Index))) continue;
-                    int total = here + (int)Math.Sqrt((double)(next.X - node.X) * (next.X - node.X) + (double)(next.Y - node.Y) * (next.Y - node.Y)) + 1;
+                    int step = (int)Math.Sqrt((double)(next.X - node.X) * (next.X - node.X) + (double)(next.Y - node.Y) * (next.Y - node.Y)) + 1;
+                    // Through a pack's room only when the way round is much longer: a player on their way somewhere
+                    // keeps to the roads and the empty rooms (2026-11-22, Docs/WorldRework.md 묶음 2-1).
+                    if (next != end && (next.Role == RoomRole.Pack || next.Role == RoomRole.Elite)) step *= PackRoomCost;
+                    int total = here + step;
                     if (total >= cost[next.Index]) continue;
                     if (cost[next.Index] != int.MaxValue) open.Remove((cost[next.Index], next.Index));
                     cost[next.Index] = total;

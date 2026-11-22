@@ -397,6 +397,35 @@ namespace Game.Core
         internal int OrbitSide { get; set; }
         // The elements of the blow that last hurt it (a deathburst that fire quenches).
         internal SkillTag LastTags { get; set; }
+
+        // ---- Packs and wanderers (World.Packs.cs, Docs/WorldRework.md 무리) ----
+
+        // The pack it came with (World.Pack.Id), or 0 for one that came alone.
+        public int PackId { get; internal set; }
+        // Its place in its pack's roster, or -1 for one more than the roster (for more players, at night) or one a split
+        // left: those are not counted when the pack is felled.
+        internal int PackSlot { get; set; } = -1;
+        // Where it stood when it came, which it goes back to.
+        internal Vec2 Home { get; set; }
+        // Walking back to Home the way it came after it was drawn too far (World.PackLeash), healing as it goes and
+        // heeding no one.
+        public bool Returning { get; internal set; }
+        // The way it came since it left Home, a point every World.TrailStep tiles, walked back along when it returns.
+        internal List<Vec2> Trail { get; } = new List<Vec2>();
+        // Ticks until it takes up its pack's alarm, and the player it then goes after.
+        internal int AlertTicks { get; set; }
+        internal int AlertTarget { get; set; }
+        // One that goes about alone between rooms (World.Wander), and where it is on its way: the room it is in or
+        // left, the way it walks and which tile of it, which way along, how long it stands, how long it has been stuck.
+        public bool Wanders { get; internal set; }
+        internal int WanderRoom { get; set; } = -1;
+        internal int WanderEdge { get; set; } = -1;
+        internal int WanderStep { get; set; }
+        internal int WanderWay { get; set; }
+        internal int WanderPause { get; set; }
+        internal int Stuck { get; set; }
+        // Ticks left to be home in before it is put there (World.HomeInTime).
+        internal int HomeTicks { get; set; }
     }
 
     // A spirit a summon skill called. It follows its player, goes after enemies near them and lasts the skill's
@@ -531,6 +560,9 @@ namespace Game.Core
         // Something a monster's attack or trait did at Position, for the screen and the ear only: Amount is which
         // (World.MonsterFx*), Source the monster (which may be gone already).
         MonsterFx,
+        // Source, a monster of a pack (or a wanderer that joined it), noticed Target, a player: the pack's alarm, one
+        // after another (World.Packs.cs). The screen puts a mark over its head.
+        Alerted,
     }
 
     public readonly struct SimEvent

@@ -1,0 +1,17 @@
+id,biome,zone,weight,members,size,place
+cave_slimes,,1,100,slime:4-6,,
+cave_spores,,2,60,slime:3-5|spore_shooter:1,,
+cave_beetles,,2,50,slime:3-4|cave_beetle:1,,
+cave_mixed,,2,80,slime:3-4|cave_beetle:1|spore_shooter:1,,
+mush_grove,mushroom,2,100,glow_bat:3|myconid:1,,
+mush_bats,mushroom,2,60,glow_bat:3|spore_shooter:1,,
+ice_hall,ice,2,100,slime:3|ice_slime:1|frost_wisp:0-1,,
+ice_court,ice,3,40,slime:3|ice_slime:1-2|frost_wisp:1,big,
+crystal_flock,crystal,2,100,crystal_bat:3|crystal_wisp:1,,
+lava_brood,lava,2,100,fire_bat:3-4|magma_slime:1,,
+lava_forge,lava,3,50,fire_bat:3|magma_slime:2,big,
+lake_shore,lake,2,100,slime:3|lake_crab:1|tide_wisp:0-1,,
+abyss_wisps,abyss,3,100,slime:3-4|void_wisp:1-2,,
+sand_swarm,sand,3,60,sand_scorpion:3|sand_worm:1,big,
+sand_nest,sand,2,100,slime:3-4|sand_scorpion:1|sand_worm:1,,
+nest_guard,,1,100,demon_soldier:3-5|demon_caster:1,,demon_nest

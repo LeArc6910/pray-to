@@ -2230,6 +2230,7 @@ namespace Game.Client
                     break;
                 case SimEventType.Tether:
                 case SimEventType.MonsterFx:
+                case SimEventType.Alerted:
                     ShowMonsterEvent(e);
                     break;
                 case SimEventType.Impact:

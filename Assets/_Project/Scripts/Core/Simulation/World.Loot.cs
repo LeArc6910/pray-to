@@ -97,29 +97,37 @@ namespace Game.Core
             if (_lootGenerator == null) return;
             var definition = enemy.Definition;
             int level = Math.Max(definition.Level, ProgressLevel);
-            if (_random.Chance(definition.DropChance / 100f))
+            // One of a pack gives its share of each chance (monsters.csv reward, World.RewardShare).
+            float share = RewardShare(enemy);
+            if (_random.Chance(definition.DropChance / 100f * share))
             {
                 DropItem(_lootGenerator.RollItem(level, _random, (int)(killer?.Stats.ItemRarity ?? 0)), Scatter(enemy.Position));
             }
-            if (_random.Chance(definition.RuneChance / 100f))
+            if (_random.Chance(definition.RuneChance / 100f * share))
             {
                 var rune = _lootGenerator.RollRune(level, _random);
                 if (rune != null) DropRune(rune, Scatter(enemy.Position));
             }
             // Only rolled for monsters that can drop one, so older sheets keep their random sequence.
-            if (definition.PotionChance > 0 && _random.Chance(definition.PotionChance / 100f))
+            if (definition.PotionChance > 0 && _random.Chance(definition.PotionChance / 100f * share))
             {
                 var consumable = RollConsumable(level);
                 if (consumable != null) DropConsumable(consumable, Scatter(enemy.Position));
             }
-            if (definition.MaterialChance > 0 && _random.Chance(definition.MaterialChance / 100f))
+            if (definition.MaterialChance > 0 && _random.Chance(definition.MaterialChance / 100f * share))
             {
                 var material = Loot.Materials.FirstOrDefault(m => m.Id == definition.MaterialId);
                 if (material != null) DropMaterial(material, Scatter(enemy.Position));
             }
             DropEgg(enemy, killer);
-            if (_random.Chance(CoinChance)) DropCoins(1 + level / CoinLevels + _random.Next(level / CoinLevels + 1), Scatter(enemy.Position));
+            if (_random.Chance(CoinChance * share)) DropCoins(1 + level / CoinLevels + _random.Next(level / CoinLevels + 1), Scatter(enemy.Position));
         }
+
+        // What share of its experience and of its chances of dropping things a monster gives: its sheet's reward for one
+        // of a room's pack (many come at once, so each gives less, Docs/WorldRework.md 숫자 다시 맞추기), all of them for
+        // one that came alone (a wanderer, one a test or a rift put down, the caves of a small map) or in a clump of a
+        // world of caves (Pack.Shares).
+        internal float RewardShare(Enemy enemy) => PackOf(enemy)?.Shares == true ? enemy.Definition.RewardPercent / 100f : 1;
 
         // One of the consumables that drop at this level, by weight; null when there are none.
         ConsumableDefinition RollConsumable(int level)

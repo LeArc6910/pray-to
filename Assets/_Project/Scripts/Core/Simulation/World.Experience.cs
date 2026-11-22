@@ -75,6 +75,9 @@ namespace Game.Core
         void ExperienceFrom(Enemy enemy)
         {
             int amount = Leveling.ForMonster(Math.Max(enemy.Definition.Level, ProgressLevel) + enemy.ZoneLevels);
+            // One of a pack gives its share (monsters.csv reward, World.RewardShare), never less than 1.
+            float share = RewardShare(enemy);
+            if (share < 1) amount = Math.Max(1, (int)MathF.Round(amount * share));
             if (FullMoonNight) amount = amount * FullMoonExperiencePercent / 100;
             foreach (var player in _players)
             {

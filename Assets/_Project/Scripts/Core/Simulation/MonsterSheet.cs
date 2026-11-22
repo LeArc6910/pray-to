@@ -25,8 +25,12 @@ namespace Game.Core
         // in that sheet fights the old way, by its Behavior.
         public MonsterRole Role { get; internal set; }
         public IReadOnlyList<MonsterTrait> Traits { get; internal set; } = Array.Empty<MonsterTrait>();
-        // "always", "solo" or empty for either (read by the packs of stage 2).
+        // "always", "solo" or empty for either: whether it comes in packs (packs.csv) or alone (a wanderer, World.Packs.cs).
         public string Pack { get; internal set; } = "";
+        // The share of its experience and of its chances of dropping things it gives when it came in a pack, in percent
+        // (monsters.csv reward, 2026-11-22, World.RewardShare): many come at once, so each gives less
+        // (Docs/WorldRework.md 숫자 다시 맞추기).
+        public int RewardPercent { get; internal set; } = 100;
         readonly List<MonsterAttack> _attacks = new List<MonsterAttack>();
         public IReadOnlyList<MonsterAttack> Attacks => _attacks;
         internal void AddAttack(MonsterAttack attack) => _attacks.Add(attack);
@@ -148,6 +152,9 @@ namespace Game.Core
 
         public IReadOnlyList<MonsterDefinition> Monsters { get; }
         public IReadOnlyList<string> Errors { get; }
+        // The packs the rooms of a world hold (packs.csv, PackSheet.Parse puts them here); null without the sheet, and
+        // then monsters come one by one (Docs/WorldRework.md 무리).
+        public PackData Packs { get; internal set; }
         public bool Success => Errors.Count == 0;
 
         public MonsterDefinition Find(string id) =>
@@ -233,6 +240,7 @@ namespace Game.Core
                         Role = row["role"].Length == 0 ? MonsterRole.None : SheetValues.ParseEnum<MonsterRole>(row["role"], "role"),
                         Traits = MonsterAttackSheet.Traits(row["traits"]),
                         Pack = Pack(row["pack"]),
+                        RewardPercent = row["reward"].Length == 0 ? 100 : Positive(SheetValues.ParseNumber(row["reward"], "reward"), "reward"),
                     });
                 }
                 catch (FormatException e)

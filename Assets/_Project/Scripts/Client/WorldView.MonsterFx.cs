@@ -65,6 +65,10 @@ namespace Game.Client
         // Blows of monsters' attacks shown since the game began (a count that only grows: a playtest that looks a
         // moment late still sees that one was shown).
         public int MonsterBlowsShown { get; private set; }
+        // The marks over the heads of a pack that noticed someone (SimEventType.Alerted, Docs/WorldRework.md 무리).
+        public int AlertsShown { get; private set; }
+        float _alertHeard;
+        static readonly Color AlertColor = new Color(1f, 0.82f, 0.25f);
         // Bombers' blasts shown since the game began.
         public int ExplosionsShown { get; private set; }
         // Mounds drawn last frame for monsters under the ground, and the lines between those that stand in a line.
@@ -489,6 +493,17 @@ namespace Game.Client
             var at = new Vector3(e.Position.X, e.Position.Y, 0);
             switch (e.Type)
             {
+                // A pack's alarm: a mark over each head in turn, and one call for the pack (not one each).
+                case SimEventType.Alerted:
+                    if (body == null) break;
+                    _floating.Add(new Floating { Position = body.Position + new Vector3(0, body.Diameter * 0.6f + 0.35f, 0), Text = "!", Color = AlertColor, Big = true });
+                    AlertsShown++;
+                    if (Time.time - _alertHeard > 0.6f)
+                    {
+                        _alertHeard = Time.time;
+                        Hear(Sound.Warning, body.Position, 0.45f);
+                    }
+                    break;
                 case SimEventType.Guarded:
                     if (body == null) break;
                     // Toward whoever struck it: the nearest player, as near as the screen knows.

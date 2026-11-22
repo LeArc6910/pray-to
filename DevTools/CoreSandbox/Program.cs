@@ -13,6 +13,8 @@ namespace CoreSandbox
     // dotnet run -- --fight [seconds] [seed]        a bot fights slimes in a generated cave
     // add --gear <base,base> to --fight to change its gear (copper_sword by default), --no-dodge to stand still
     // add --monsters <id,id> to --fight for those kinds alone, four at a time round the bot (a biome's own monsters)
+    // add --rooms [biome] to --fight to fight in a world of rooms, from pack room to pack room (in that biome, or any),
+    // and --no-packs anywhere for the monsters without packs.csv (one by one, as before packs)
     // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss (--boss-id for another)
     // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
     // add --no-roll to --fight or --boss for bots that do not use the dodge roll (as before it was made), or
@@ -35,8 +37,13 @@ namespace CoreSandbox
     // the others play what a new world is made with, WorldGenerator.NewWorldVersion)
     static class Program
     {
+        // --no-packs: the monsters without packs.csv, one by one as before packs (Docs/WorldRework.md 묶음 2-1).
+        static bool NoPacks;
+
         static void Main(string[] args)
         {
+            NoPacks = args.Contains("--no-packs");
+            args = args.Where(a => a != "--no-packs").ToArray();
             int itemRarity = 0;
             int rarityFlag = Array.IndexOf(args, "--rarity");
             if (rarityFlag >= 0)
@@ -114,6 +121,15 @@ namespace CoreSandbox
                 onlyMonsters = args[monstersFlag + 1].Split(',');
                 args = args.Where((_, i) => i != monstersFlag && i != monstersFlag + 1).ToArray();
             }
+            // --rooms [biome]: --fight in a world of rooms, from pack room to pack room (RoomFightSim).
+            string roomsBiome = null;
+            int roomsFlag = Array.IndexOf(args, "--rooms");
+            if (roomsFlag >= 0)
+            {
+                bool named = roomsFlag + 1 < args.Length && !args[roomsFlag + 1].StartsWith("--") && !char.IsDigit(args[roomsFlag + 1][0]);
+                roomsBiome = named ? args[roomsFlag + 1] : "any";
+                args = args.Where((_, i) => i != roomsFlag && (!named || i != roomsFlag + 1)).ToArray();
+            }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();
             // The bots roll through blows about to land (RollBot); --no-roll is how they fought before the roll.
@@ -137,6 +153,9 @@ namespace CoreSandbox
                     break;
                 case "--progression":
                     PrintProgression(data, Number(1, 2000), Seed(2));
+                    break;
+                case "--fight" when roomsBiome != null:
+                    RoomFightSim.Run(LoadSheets(data), Number(1, 180), Seed(2), gear, LoadClasses(classIds), dodge, roomsBiome);
                     break;
                 case "--fight":
                     FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge, onlyMonsters);
@@ -381,6 +400,10 @@ namespace CoreSandbox
         {
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
             var data = MonsterSheet.Parse(File.ReadAllText(Path.Combine(folder, MonsterSheet.File)), File.ReadAllText(Path.Combine(folder, MonsterAttackSheet.File)));
+            // The packs of the rooms (packs.csv, Docs/WorldRework.md 무리); --no-packs plays without them, as before.
+            var packs = NoPacks ? null : PackSheet.Parse(File.ReadAllText(Path.Combine(folder, PackSheet.File)), data);
+            foreach (string error in packs?.Errors ?? new List<string>()) Console.Error.WriteLine(error);
+            if (packs != null && !packs.Success) Environment.Exit(1);
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

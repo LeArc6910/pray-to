@@ -26,6 +26,7 @@ namespace Game.Client
     // In a solo game:
     //   scene combo|machines|defense|rift|skylight|set|roll   (roll: a lane of floor east of the player, a wall 8 tiles on)
     //   scene ice|quicksand       a lane of that floor east of the player, a wall 12 tiles on (PlayerMotor)
+    //   scene pack                five slimes east of the player as one pack (World.Gather), most of them out of its sight
     //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step>
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
@@ -40,6 +41,10 @@ namespace Game.Client
     //   goto road <n> [percent]   onto the nth road of a world of rooms (GeneratedWorld.Roads), that far along it (50)
     //   goto byway <n>            onto the nth by-way (places.csv links), a few steps before its cracked wall
     //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways, roads
+    //   packs                     JSON: the packs about the player (World.Packs.cs): each one's room, kind, size, monsters standing,
+    //                             noticing and out of their own sight; the wanderers, the field's monsters and the caps
+    //   goto pack                 beside the nearest pack out in the world, on the far side of it from its middle, so most
+    //                             of it is out of sight (to see it notice together)
     //   room <role> [biome|any] [n]   JSON: that room (where, its chunk, steps walked from the spawn; -1 for no way)
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
@@ -308,6 +313,8 @@ namespace Game.Client
                     return Goto(root, words);
                 case "rooms":
                     return "rooms " + Rooms(root);
+                case "packs":
+                    return "packs " + PacksJson(root);
                 case "room":
                     return "room " + RoomJson(root, RoomOf(root, words, 1));
                 case "build":
@@ -423,6 +430,19 @@ namespace Game.Client
                 case "room":
                     var room = RoomOf(root, words, 2);
                     to = TileMap.Center(room.AnchorX, room.AnchorY);
+                    break;
+                // Beside the nearest pack out in the world (2026-11-22, Docs/WorldRework.md 묶음 2-1): three tiles
+                // past the one of it furthest from the others' middle, so the rest stand further off than they see.
+                case "pack":
+                    var pack = world.Packs.Where(k => k.Active && world.MembersOf(k).Any()).OrderBy(k => Vec2.Distance(k.Home, player.Position)).FirstOrDefault()
+                        ?? throw new InvalidOperationException("no pack out (goto room pack first)");
+                    var members = world.MembersOf(pack).ToList();
+                    var middle = members.Aggregate(Vec2.Zero, (sum, m) => sum + m.Position) / members.Count;
+                    var edge = members.OrderByDescending(m => Vec2.Distance(m.Position, middle)).First();
+                    var outward = (edge.Position - middle).LengthSquared > 1e-4f ? (edge.Position - middle).Normalized : new Vec2(1, 0);
+                    int ex = TileMap.Cell(edge.Position.X + outward.X * 3), ey = TileMap.Cell(edge.Position.Y + outward.Y * 3);
+                    to = Nearest(map, ex, ey, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius))
+                        ?? throw new InvalidOperationException("no floor beside the pack");
                     break;
                 // Along a road of a world of rooms (2026-11-22, Docs/WorldRework.md 묶음 1c), or before a by-way's
                 // cracked wall.
@@ -564,6 +584,39 @@ namespace Game.Client
             .Field("shut", room.Inside is (int ix, int iy) && StepsFromSpawn(root.HostWorld, ix, iy) < 0)
             .Close('}');
 
+        // The packs within 80 tiles of the player, nearest first (World.Packs.cs): its room and kind, how many it has
+        // and how many stand, how many go after someone and how many of those are further from the player than they
+        // see (they took up the alarm), and the counts against the caps.
+        static string PacksJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var json = new Json('{').Field("rooms", world.Rooms != null);
+            var list = new Json('[');
+            foreach (var pack in world.Packs.Where(k => Vec2.Distance(k.Home, player.Position) < World.PackSleepReach).OrderBy(k => Vec2.Distance(k.Home, player.Position)))
+            {
+                var members = world.MembersOf(pack).ToList();
+                var after = members.Where(m => m.State != EnemyState.Idle || m.Returning).ToList();
+                list.Item(new RawJson(new Json('{')
+                    .Field("id", pack.Id).Field("room", pack.Room?.Index ?? -1).Field("role", pack.Room?.Role.ToString() ?? "")
+                    .Field("biome", (pack.Room?.Biome ?? world.Biomes.At(pack.Home)).ToString()).Field("kind", pack.Definition?.Id ?? "")
+                    .Field("size", pack.Size).Field("standing", members.Count).Field("active", pack.Active).Field("cleared", pack.Cleared)
+                    .Field("alerted", pack.Alerted).Field("chasing", after.Count)
+                    .Field("unseen", after.Count(m => Vec2.Distance(m.Position, player.Position) > m.Definition.Aggro))
+                    .Field("distance", Vec2.Distance(pack.Home, player.Position))
+                    .Field("inRoom", pack.Room == null ? members.Count : members.Count(m => Vec2.Distance(m.Position, pack.Room.Center) <= pack.Room.Radius + 1.5f))
+                    .Field("kinds", string.Join(",", members.Select(m => m.Definition.Id).Distinct()))
+                    .Close('}')));
+            }
+            json.Field("packs", list.Raw(']'));
+            json.Field("wanderers", world.Enemies.Count(e => e.Wanders && !e.IsDead));
+            json.Field("field", world.Enemies.Count(e => e.Rift == 0 && !e.IsDead));
+            json.Field("near", world.Enemies.Count(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) < World.PackWakeReach));
+            json.Field("partyCap", World.PartyCap).Field("hostCap", World.HostCap);
+            json.Field("alertsShown", root.AlertsShown);
+            return json.Close('}');
+        }
+
         // The rooms of the world: which generator, how many of each role, how many have a chunk, the ways shut by a
         // cracked wall, and the tiles the rooms brought.
         static string Rooms(GameRoot root)
@@ -628,6 +681,17 @@ namespace Game.Client
 
             switch (scene)
             {
+                // A pack of five slimes east of the player, the nearest six tiles off and the furthest eleven (most out
+                // of sight), standing still under "monsters hold" until let go (2026-11-22, Docs/WorldRework.md 무리).
+                case "pack":
+                    var members = new List<Enemy>();
+                    for (int i = 0; i < 5; i++)
+                    {
+                        var at = player.Position + new Vec2(6 + i * 1.3f, (i % 2 == 0 ? 1 : -1) * (i * 0.4f));
+                        if (!Game.Core.Collision.Overlaps(world.Map, at, 0.45f, monster: true)) members.Add(Spawn("slime", at, 5000));
+                    }
+                    world.Gather(members);
+                    break;
                 case "combo":
                     for (int i = 0; i < 5; i++) Spawn("slime", player.Position + new Vec2(1.2f, (i - 2) * 0.5f), 5000);
                     root.HoldAttack = true;
@@ -1045,6 +1109,8 @@ namespace Game.Client
                 // ground near and their mounds drawn, lines between soldiers, bombers' blasts, grey numbers for blows a
                 // guard turned, and whether the player is poisoned.
                 json.Field("mobBlows", root.MonsterBlowsShown);
+                // Marks shown over the heads of packs that noticed someone (a count that only grows, World.Packs.cs).
+                json.Field("alertsShown", root.AlertsShown);
                 json.Field("mobBuried", near.Count(e => e.Buried));
                 json.Field("mobMounds", root.MonsterMoundsShown);
                 json.Field("mobLinks", root.MonsterLinksShown);

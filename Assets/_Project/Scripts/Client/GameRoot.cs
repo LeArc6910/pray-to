@@ -102,6 +102,7 @@ namespace Game.Client
         internal int MonsterFxPieces => _view?.MonsterFxPieces ?? 0;
         internal int MonsterShotsDrawn => _view?.MonsterShotsDrawn ?? 0;
         internal int MonsterBlowsShown => _view?.MonsterBlowsShown ?? 0;
+        internal int AlertsShown => _view?.AlertsShown ?? 0;
         internal int MonsterMoundsShown => _view?.MonsterMoundsShown ?? 0;
         internal int MonsterLinksShown => _view?.MonsterLinksShown ?? 0;
         internal int ExplosionsShown => _view?.ExplosionsShown ?? 0;

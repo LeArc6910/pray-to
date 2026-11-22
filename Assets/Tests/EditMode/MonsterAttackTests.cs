@@ -143,7 +143,7 @@ namespace Game.Core.Tests
             Assert.IsFalse(mark.Attached, "a landing away from the monster is sent as a hazard");
 
             var events = Run(world, 0.6f);
-            Assert.AreEqual(9, Taken(events, player), "standing in the mark is hit for the slime's damage");
+            Assert.AreEqual(Monsters.Shipped.Find("slime").Damage, Taken(events, player), "standing in the mark is hit for the slime's damage");
             Assert.Less(Vec2.Distance(slime.Position, player.Position), 0.9f, "and the slime has landed there");
             Assert.IsEmpty(world.Hazards);
         }
@@ -168,7 +168,7 @@ namespace Game.Core.Tests
             Assert.AreEqual("bite", slime.Attack?.Id);
             Assert.IsTrue(world.Hazards.Single(h => h.Source == slime.Id).Attached);
             world.TakeEvents();
-            Assert.AreEqual(9, Taken(Run(world, 0.6f), player));
+            Assert.AreEqual(Monsters.Shipped.Find("slime").Damage, Taken(Run(world, 0.6f), player));
         }
 
         [Test]
