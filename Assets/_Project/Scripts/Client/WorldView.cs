@@ -527,7 +527,8 @@ namespace Game.Client
         // For the playtests: numbers drawn grey because a guard turned the blow.
         public int GuardedNumbersShown { get; private set; }
         int _guardedId;
-        int _guardedFrame = -1;
+        float _guardedAt = -1f;
+        const float GuardedWindow = 0.25f;
         static readonly Color GuardedColor = new Color(0.62f, 0.64f, 0.68f);
         float _hurtGlow;
         float _hurtGlowStrength;
@@ -2158,7 +2159,8 @@ namespace Game.Client
                     var element = World.ElementOfCause(e.Cause);
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : element != SkillTag.None ? Palette.Of(element) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
                     // A blow a guard turned (the Guarded event comes just before its hit): its number is grey and never big.
-                    bool guarded = !hurtsMe && e.Target == _guardedId && Time.frameCount == _guardedFrame;
+                    // (within a moment of it: on the web the two can be handled a frame apart)
+                    bool guarded = !hurtsMe && e.Target == _guardedId && Time.unscaledTime - _guardedAt < GuardedWindow;
                     if (guarded)
                     {
                         color = GuardedColor;
@@ -2223,7 +2225,7 @@ namespace Game.Client
                     break;
                 case SimEventType.Guarded:
                     _guardedId = e.Source;
-                    _guardedFrame = Time.frameCount;
+                    _guardedAt = Time.unscaledTime;
                     ShowMonsterEvent(e);
                     break;
                 case SimEventType.Tether:

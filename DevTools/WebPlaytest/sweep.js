@@ -4005,11 +4005,13 @@ async function map(browser) {
     await game.send('scene ice; face off');
     await game.wait(700);
     await walk(1, 0, 600);
+    // Polled for a while: on the phone the stick walks slower and the screen runs late, so the player may reach the
+    // ice only after the stick is let go.
     let slide = 0;
-    for (let i = 0; i < 5; i++) {
+    for (let i = 0; i < 30 && slide <= 0.5; i++) {
       const s = await game.state();
       if (s.underfoot === 'IceFloor') slide = Math.max(slide, s.slide);
-      await game.wait(40);
+      await game.wait(50);
     }
     await game.shot('map-ice', '얼음 바닥에서 미끄러지는 중');
     await game.wait(900);
