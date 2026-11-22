@@ -509,7 +509,7 @@ namespace Game.Client
                     }
                     if (mark.Label) Name(p, mark.Name, view);
                 }
-                float hit = Controls.UsingTouch ? 36 : 20;
+                float hit = Controls.UsingTouch ? 44 : 20;
                 Ui.Probe(mark.Name, new Rect(p.x - hit / 2, p.y - hit / 2, hit, hit));
             }
             Ui.Row("");

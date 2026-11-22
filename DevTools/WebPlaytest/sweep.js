@@ -4761,8 +4761,8 @@ async function dungeon(browser) {
     const atChest = await game.ask('dungeon');
     check(atChest.run && atChest.run.thing >= 0 && atChest.run.clientThing === atChest.run.thing, `${name}: 보상 상자 곁 (${atChest.run ? atChest.run.thing : '-'})`);
     await game.shot('dungeon-chest', '끝 방의 보상 상자와 [보상 상자 열기]');
-    const open = (await game.buttons()).find(b => /보상 상자 열기/.test(b.label));
-    check(!!open && await game.press(open.label), `${name}: [${open ? open.label : '보상 상자 단추 없음'}]를 누른다`);
+    const chestButton = (await game.buttons()).find(b => /보상 상자 열기/.test(b.label));
+    check(!!chestButton && await game.press(chestButton.label), `${name}: [${chestButton ? chestButton.label : '보상 상자 단추 없음'}]를 누른다`);
     const cleared = await game.until(d => d.run && d.run.clientState === 'Done' && d.run.clearsShown >= 1, 4000, () => game.ask('dungeon'));
     check(!!cleared && cleared.run.chestTile === 'OpenChest' && /완주/.test(cleared.cardName) && cleared.run.items > atChest.run.items,
       `${name}: 완주 (${cleared ? `${cleared.cardName} · ${cleared.cardLine}, 장비 ${atChest.run.items} → ${cleared.run.items}` : '끝나지 않음'})`);

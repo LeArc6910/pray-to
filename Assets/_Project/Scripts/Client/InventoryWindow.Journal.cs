@@ -355,7 +355,9 @@ namespace Game.Client
 
         const float NotePad = 8;
 
-        float NoteLeft(Note n) => n.Person != null ? 58 : n.Icon != null ? 34 : 12;
+        // Past the portrait drawn at r.x + 10 (its box grows with the whole-pixel scale, so a fixed 58 let it cover the
+        // first letters on some screens).
+        float NoteLeft(Note n) => n.Person != null ? Mathf.Max(58, 10 + PortraitBox.x + 6) : n.Icon != null ? 34 : 12;
 
         float NoteHeight(Note n)
         {
