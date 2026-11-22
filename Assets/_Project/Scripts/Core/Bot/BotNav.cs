@@ -37,6 +37,16 @@ namespace Game.Core
         public int Budget { get; set; } = 30000;
         // Tiles looked at by the last search.
         public int Searched { get; private set; }
+        // The rooms of a world of rooms (GeneratedWorld.Rooms, generator version 2), or null: a far goal is then gone to
+        // room by room (Toward), not by one search across the whole map.
+        public RoomGraph Rooms { get; set; }
+        // Further than this (tiles, along both axes) a goal is far.
+        public int FarTiles { get; set; } = 64;
+        // How far (tiles) from the bot the room it heads for next may be, along the rooms toward a far goal.
+        public int LegTiles { get; set; } = 48;
+        // After Toward, about how many tiles are left from the end of the path it gave to the goal (0 when the path
+        // goes all the way): a bot counts it as getting on when this and the path together shrink.
+        public int LastRest { get; private set; }
 
         // Sets the costs from the player: their speed, their swing and the best pickaxe they carry.
         public void Fit(Player player)
@@ -102,6 +112,7 @@ namespace Game.Core
         // the real cost) makes it an A* toward one goal.
         public List<(int X, int Y)> Find(int x, int y, Func<int, int, bool> goal, bool enter = true, Func<int, int, int> heuristic = null)
         {
+            LastRest = 0;
             var map = _world.Map;
             int size = map.Width * map.Height;
             if (_cost.Length != size)
@@ -156,6 +167,139 @@ namespace Game.Core
         // A* to one tile (walked onto, or with `enter` false reached beside).
         public List<(int X, int Y)> To(int x, int y, int tx, int ty, bool enter = true) =>
             Find(x, y, (gx, gy) => gx == tx && gy == ty, enter, (hx, hy) => (Math.Abs(hx - tx) + Math.Abs(hy - ty) - (enter ? 0 : 1)) * WalkTicks);
+
+        // Toward one tile: near, or with no rooms, as To; far on a map of rooms (2026-11-22, Docs/WorldRework.md 묶음 1c:
+        // one A* across a map of rooms looked at a quarter of a million tiles), along the rooms from the one nearest the
+        // bot to the one nearest the goal (Route), the path going only as far as the furthest room on that way within
+        // LegTiles. The way and the room headed for are kept while the goal stays the same, and the next room is only
+        // chosen once the bot is at that one, so a bot does not turn back and forth between two ways as the room nearest
+        // it changes. A room with no path to it is left out of the way for that goal. Falls back on To when the rooms
+        // give no way.
+        public List<(int X, int Y)> Toward(int x, int y, int tx, int ty, bool enter = true)
+        {
+            if (Rooms == null || Math.Abs(tx - x) <= FarTiles && Math.Abs(ty - y) <= FarTiles) return To(x, y, tx, ty, enter);
+            if (_legGoal != (tx, ty))
+            {
+                _legGoal = (tx, ty);
+                _legRoute = null;
+                _badRooms.Clear();
+            }
+            for (int attempt = 0; attempt < 3; attempt++)
+            {
+                if (_legRoute != null)
+                {
+                    var (wx, wy) = Anchor(_legRoute[_leg]);
+                    int off = Math.Max(Math.Abs(wx - x), Math.Abs(wy - y));
+                    // Knocked or led far off the way: it is found again.
+                    if (off > 2 * LegTiles) _legRoute = null;
+                    // There: on to the furthest room of the way within a leg.
+                    else if (off <= 2) _leg = Math.Max(_leg + 1, Furthest(_legRoute, x, y, _leg + 1));
+                }
+                if (_legRoute == null)
+                {
+                    _legRoute = Route(x, y, tx, ty);
+                    if (_legRoute == null) break;
+                    _leg = Math.Max(1, Furthest(_legRoute, x, y, 1));
+                }
+                // The last room of the way is the goal's: from there it is gone to straight.
+                if (_leg >= _legRoute.Count - 1) break;
+                var room = _legRoute[_leg];
+                var (ax, ay) = Anchor(room);
+                var path = To(x, y, ax, ay);
+                if (path != null && path.Count > 0)
+                {
+                    int rest = 0;
+                    for (int i = _leg; i + 1 < _legRoute.Count; i++)
+                    {
+                        var (bx, by) = Anchor(_legRoute[i]);
+                        var (cx, cy) = Anchor(_legRoute[i + 1]);
+                        rest += Math.Abs(cx - bx) + Math.Abs(cy - by);
+                    }
+                    var (lx, ly) = Anchor(_legRoute[_legRoute.Count - 1]);
+                    LastRest = rest + Math.Abs(tx - lx) + Math.Abs(ty - ly);
+                    return path;
+                }
+                if (path != null && path.Count == 0) continue;
+                // No way to that room: the way is found again without it.
+                _badRooms.Add(room.Index);
+                _legRoute = null;
+            }
+            return To(x, y, tx, ty, enter);
+        }
+
+        (int X, int Y)? _legGoal;
+        List<RoomNode> _legRoute;
+        int _leg;
+        readonly HashSet<int> _badRooms = new HashSet<int>();
+
+        // The furthest room of the way, from the index on, within LegTiles of (x, y) (the last room not counted); -1 for none.
+        int Furthest(List<RoomNode> route, int x, int y, int from)
+        {
+            int leg = -1;
+            for (int i = from; i < route.Count - 1; i++)
+            {
+                var (ax, ay) = Anchor(route[i]);
+                if (Math.Abs(ax - x) <= LegTiles && Math.Abs(ay - y) <= LegTiles) leg = i;
+            }
+            return leg;
+        }
+
+        (int X, int Y) Anchor(RoomNode room) => (room.AnchorX, room.AnchorY);
+
+        // The rooms from the one nearest (x, y) to the one nearest (tx, ty), fewest tiles between their middles first,
+        // by the ways the bot can take: not through a cracked wall it cannot dig, not into an arena but the goal's,
+        // not to a room it has given up on. Null when there is none.
+        public List<RoomNode> Route(int x, int y, int tx, int ty)
+        {
+            if (Rooms == null || Rooms.Nodes.Count == 0) return null;
+            var start = Rooms.Nearest(x, y);
+            var end = Rooms.Nearest(tx, ty);
+            bool cracked = Diggable(TileType.CrackedWall);
+            int count = Rooms.Nodes.Count;
+            var cost = new int[count];
+            var came = new int[count];
+            for (int i = 0; i < count; i++)
+            {
+                cost[i] = int.MaxValue;
+                came[i] = -1;
+            }
+            var open = new SortedSet<(int Cost, int Node)>();
+            cost[start.Index] = 0;
+            open.Add((0, start.Index));
+            while (open.Count > 0)
+            {
+                var (here, at) = open.Min;
+                open.Remove(open.Min);
+                if (at == end.Index) break;
+                var node = Rooms.Nodes[at];
+                foreach (int way in node.Edges)
+                {
+                    var edge = Rooms.Edges[way];
+                    if (edge.Kind == RoomEdgeKind.Cracked && !cracked) continue;
+                    var next = Rooms.Nodes[edge.A == at ? edge.B : edge.A];
+                    if (next.Kind == RoomKind.Arena && next != end) continue;
+                    if (next != end && (Avoid != null && Avoid(next.AnchorX, next.AnchorY) || _badRooms.Contains(next.Index))) continue;
+                    int total = here + (int)Math.Sqrt((double)(next.X - node.X) * (next.X - node.X) + (double)(next.Y - node.Y) * (next.Y - node.Y)) + 1;
+                    if (total >= cost[next.Index]) continue;
+                    if (cost[next.Index] != int.MaxValue) open.Remove((cost[next.Index], next.Index));
+                    cost[next.Index] = total;
+                    came[next.Index] = at;
+                    open.Add((total, next.Index));
+                }
+            }
+            if (cost[end.Index] == int.MaxValue) return null;
+            var route = new List<RoomNode>();
+            for (int at = end.Index; at >= 0; at = came[at]) route.Add(Rooms.Nodes[at]);
+            route.Reverse();
+            return route;
+        }
+
+        // Whether the bot's pickaxe breaks a tile of the type (its row of tiles.csv).
+        bool Diggable(TileType type)
+        {
+            var tile = Definition(type);
+            return PickaxeLevel >= 0 && tile != null && tile.Pickaxe <= PickaxeLevel;
+        }
 
         // The ticks of the last path found to the tile at its end.
         public int CostTo((int X, int Y) tile)

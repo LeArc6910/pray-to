@@ -36,8 +36,26 @@ namespace Game.Core.Tests
             Assert.IsTrue(SaveKeys.TryParse(SaveKeys.Map(18446744073709551615, "x:y"), out kind, out name));
             Assert.AreEqual((SaveKind.Map, "x:y"), (kind, name));
 
-            foreach (string bad in new[] { null, "", "character:", "world:", "map:12:", "map:12", "map:-1:x", "map::x", "save.6162", "World:x" })
+            foreach (string bad in new[] { null, "", "character:", "world:", "map:12:", "map:12", "map:-1:x", "map::x", "save.6162", "World:x",
+                "map:12.:x", "map:12.1:x", "map:12.0:x", "map:.2:x", "map:12.x:y", "map:12.-2:x" })
                 Assert.IsFalse(SaveKeys.TryParse(bad, out _, out _), bad ?? "null");
+        }
+
+        // A world of rooms (generator version 2, 2026-11-22) keeps its explored map under the version too, so the caves
+        // of the same seed and the rooms do not share one; the caves' maps keep the name they always had.
+        [Test]
+        public void AMapKeyNamesItsGenerator()
+        {
+            Assert.AreEqual("map:5:모험가", SaveKeys.Map(5, "모험가"));
+            Assert.AreEqual("map:5:모험가", SaveKeys.Map(5, "모험가", WorldGenerator.CaveVersion));
+            Assert.AreEqual("map:5.2:모험가", SaveKeys.Map(5, "모험가", WorldGenerator.RoomVersion));
+            Assert.AreNotEqual(SaveKeys.Map(5, "2:x"), SaveKeys.Map(5, "x", WorldGenerator.RoomVersion), "a name with a colon is not taken for a version");
+            Assert.IsTrue(SaveKeys.TryParse(SaveKeys.Map(18446744073709551615, "x:y", 2), out var kind, out string name));
+            Assert.AreEqual((SaveKind.Map, "x:y"), (kind, name));
+            Assert.AreEqual(WorldGenerator.RoomVersion, SaveKeys.MapVersion(SaveKeys.Map(5, "a:b", WorldGenerator.RoomVersion)));
+            Assert.AreEqual(WorldGenerator.CaveVersion, SaveKeys.MapVersion(SaveKeys.Map(5, "2:b")));
+            Assert.AreEqual(0, SaveKeys.MapVersion(SaveKeys.World("w")));
+            Assert.AreEqual("'모험가'의 지도", SaveBundle.Describe(SaveKeys.Map(5, "모험가", WorldGenerator.RoomVersion)));
         }
 
         [Test]

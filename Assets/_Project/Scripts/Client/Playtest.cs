@@ -37,7 +37,9 @@ namespace Game.Client
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
     //   goto spawn | <dx> <dy> | boss <id> | arena <id> (its middle) | pool | biome <name> | tile <type> | near <type>
     //   goto room <role> [biome|any] [n]   into the nth room of the role (the generator's version 2), nearest the spawn first
-    //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways
+    //   goto road <n> [percent]   onto the nth road of a world of rooms (GeneratedWorld.Roads), that far along it (50)
+    //   goto byway <n>            onto the nth by-way (places.csv links), a few steps before its cracked wall
+    //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways, roads
     //   room <role> [biome|any] [n]   JSON: that room (where, its chunk, steps walked from the spawn; -1 for no way)
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
@@ -419,6 +421,20 @@ namespace Game.Client
                     var room = RoomOf(root, words, 2);
                     to = TileMap.Center(room.AnchorX, room.AnchorY);
                     break;
+                // Along a road of a world of rooms (2026-11-22, Docs/WorldRework.md 묶음 1c), or before a by-way's
+                // cracked wall.
+                case "road":
+                case "byway":
+                    var routes = root.HostGenerated?.Roads.Where(r => r.Kind == (words[1] == "road" ? RoadKind.Road : RoadKind.Link)).ToList();
+                    int nth = words.Length > 2 ? int.Parse(words[2]) : 0;
+                    if (routes == null || nth >= routes.Count) throw new InvalidOperationException($"no {words[1]} {nth}");
+                    var route = routes[nth];
+                    int at = words[1] == "road"
+                        ? Math.Min(route.Tiles.Count - 1, route.Tiles.Count * (words.Length > 3 ? int.Parse(words[3]) : 50) / 100)
+                        : route.Cracked is (int cx, int cy) ? Math.Max(0, route.Tiles.ToList().FindIndex(t => t.X == cx && t.Y == cy) - 4) : route.Tiles.Count / 2;
+                    var (roadX, roadY) = route.Tiles[Math.Max(0, at)];
+                    to = Nearest(map, roadX, roadY, (x, y) => Walkable(map, x, y)) ?? throw new InvalidOperationException("no floor by the road");
+                    break;
                 // A place of the story (Docs/Story.md), just below its waypoint; or beside one of its people.
                 case "place":
                     var site = world.Places.FirstOrDefault(p => p.Definition.Id == words[2]) ?? throw new ArgumentException($"no place '{words[2]}'");
@@ -557,6 +573,10 @@ namespace Game.Client
             json.Field("chunks", rooms.Nodes.Count(n => n.Chunk != null));
             json.Field("cracked", rooms.Edges.Count(e => e.Kind == RoomEdgeKind.Cracked));
             json.Field("marks", rooms.Marks.Count);
+            json.Field("roads", generated.Roads.Count(r => r.Kind == RoadKind.Road));
+            json.Field("byways", generated.Roads.Count(r => r.Kind == RoadKind.Link));
+            json.Field("bywayWalls", generated.Roads.Count(r => r.Kind == RoadKind.Link && r.Cracked != null));
+            json.Field("roadRooms", generated.Roads.Where(r => r.Kind == RoadKind.Road).Sum(r => r.Rooms.Count));
             var roles = new Json('{');
             foreach (RoomRole role in Enum.GetValues(typeof(RoomRole)))
                 roles.Field(role.ToString().ToLowerInvariant(), rooms.Nodes.Count(n => n.Kind == RoomKind.Room && n.Role == role));

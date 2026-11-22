@@ -277,6 +277,134 @@ namespace Game.Core.Tests
             foreach (var node in rooms.Nodes) Assert.GreaterOrEqual(node.Edges.Count, 1);
         }
 
+        // The roads of a world of rooms (2026-11-22, Docs/WorldRework.md 길과 고리; the person: "I only feel I am walking
+        // to where I am going"): along the rooms and the ways between them, winding as they wind, paved and widened,
+        // with only a short leg through rock from each plaza, and the rooms they run through kept safe.
+        [Test]
+        public void TheRoadsFollowTheRoomsAndWind()
+        {
+            for (ulong seed = 1; seed <= 3; seed++)
+            {
+                var world = Rooms(seed);
+                var rooms = world.Rooms;
+                var map = world.Map;
+                var roads = world.Roads.Where(r => r.Kind == RoadKind.Road).ToList();
+                Assert.AreEqual(Tales.Shipped.Places.Count(p => p.Road.Length > 0), roads.Count, $"seed {seed}: a road for each place's road");
+                Assert.IsEmpty(world.Landmarks, "the small places by the roads are rooms now");
+                double winding = 0;
+                foreach (var road in roads)
+                {
+                    string name = $"seed {seed}: the road from {road.From.Id} to {road.To.Id}";
+                    Assert.GreaterOrEqual(road.Rooms.Count, 3, name + " runs through rooms");
+                    Assert.LessOrEqual(road.Tunnels, 2, name + ": tunnels through the rock");
+                    // Room to room by their ways.
+                    for (int i = 0; i < road.Ways.Count; i++)
+                    {
+                        var edge = rooms.Edges[road.Ways[i]];
+                        Assert.IsTrue(road.Rooms.Contains(edge.A) && road.Rooms.Contains(edge.B), name);
+                    }
+                    Assert.AreEqual(road.Rooms.Count - 1, road.Ways.Count + road.Tunnels, name + ": a way or a tunnel between each two rooms");
+                    // Its tiles are paved (but in the plazas), and nearly all lie in its rooms or along its ways.
+                    var along = new HashSet<(int, int)>();
+                    foreach (int way in road.Ways)
+                        foreach (var (x, y) in rooms.Edges[way].Path)
+                            for (int dy = -3; dy <= 3; dy++)
+                                for (int dx = -3; dx <= 3; dx++) along.Add((x + dx, y + dy));
+                    int off = 0, bare = 0;
+                    foreach (var (x, y) in road.Tiles)
+                    {
+                        bool plaza = world.Places.Any(p => (x - p.X) * (x - p.X) + (y - p.Y) * (y - p.Y) <= (p.Radius + 1) * (p.Radius + 1));
+                        if (plaza) continue;
+                        if (map[x, y] != TileType.Road) bare++;
+                        bool inRoom = road.Rooms.Any(r => (x - rooms.Nodes[r].X) * (x - rooms.Nodes[r].X) + (y - rooms.Nodes[r].Y) * (y - rooms.Nodes[r].Y) <= (rooms.Nodes[r].Radius + 3) * (rooms.Nodes[r].Radius + 3));
+                        if (!inRoom && !along.Contains((x, y))) off++;
+                    }
+                    Assert.LessOrEqual(bare, road.Tiles.Count / 50, name + ": tiles not paved");
+                    // The legs from the plazas to the first room and any tunnel (a cell and a half each) are all that is not.
+                    Assert.LessOrEqual(off, 2 * rooms.CellSize + road.Tunnels * rooms.CellSize * 3 / 2, name + ": tiles off its rooms and ways");
+                    // Rooms a road runs through take no pack (Docs/Design.md: no monsters on the roads).
+                    foreach (int r in road.Rooms.Where(r => rooms.Nodes[r].Kind == RoomKind.Room))
+                        Assert.IsTrue(rooms.Nodes[r].Roadside, name + $": the room at ({rooms.Nodes[r].X}, {rooms.Nodes[r].Y}) is by the road");
+                    winding += Winding(road);
+                }
+                // Not lines: on the whole half again as long as the straight way, so the way bends where the rooms do.
+                Assert.That(winding / roads.Count, Is.InRange(1.2, 2.0), $"seed {seed}: how much longer than straight the roads are");
+            }
+        }
+
+        // How much longer than the straight line between its ends a road is, measured every eighth tile.
+        static double Winding(RoadRoute road)
+        {
+            double walked = 0;
+            for (int i = 8, last = 0; last < road.Tiles.Count - 1; last = i, i = Math.Min(road.Tiles.Count - 1, i + 8))
+                walked += Math.Sqrt(Math.Pow(road.Tiles[i].X - road.Tiles[last].X, 2) + Math.Pow(road.Tiles[i].Y - road.Tiles[last].Y, 2));
+            var (a, b) = (road.Tiles[0], road.Tiles[road.Tiles.Count - 1]);
+            return walked / Math.Max(1, Math.Sqrt(Math.Pow(b.X - a.X, 2) + Math.Pow(b.Y - a.Y, 2)));
+        }
+
+        // The by-ways (places.csv links): each pair of places joined a second way, a narrow path with a cracked wall
+        // half way, so the roads make rings; through it or round by the roads, every place is still walked to.
+        [Test]
+        public void ByWaysCloseRingsOfRoads()
+        {
+            for (ulong seed = 1; seed <= 3; seed++)
+            {
+                var world = Rooms(seed);
+                var map = world.Map;
+                var links = world.Roads.Where(r => r.Kind == RoadKind.Link).ToList();
+                int pairs = Tales.Shipped.Places.Sum(p => p.Links.Count);
+                Assert.AreEqual(3, pairs, "the sheet's by-ways");
+                Assert.AreEqual(pairs, links.Count, $"seed {seed}: a by-way for each link");
+                // Rings: the places and the roads and by-ways between them, as a graph.
+                var joined = world.Roads.Where(r => r.Kind != RoadKind.Arena).Select(r => (Math.Min(r.From.Index, r.To.Index), Math.Max(r.From.Index, r.To.Index))).Distinct().Count();
+                Assert.GreaterOrEqual(joined - world.Places.Count + 1, 3, $"seed {seed}: rings of roads");
+                int cracked = 0;
+                foreach (var link in links)
+                {
+                    string name = $"seed {seed}: the by-way from {link.From.Id} to {link.To.Id}";
+                    Assert.GreaterOrEqual(link.Rooms.Count, 3, name);
+                    if (link.Cracked is not (int cx, int cy)) continue;
+                    cracked++;
+                    Assert.AreEqual(TileType.CrackedWall, map[cx, cy], name + ": the cracked wall");
+                    Assert.AreEqual(RoomEdgeKind.Cracked, world.Rooms.Edges[link.CrackedWay.Value].Kind, name);
+                    // Dug through, it is walked end to end along itself.
+                    var path = new HashSet<(int, int)>();
+                    foreach (var (x, y) in link.Tiles)
+                        for (int dy = -2; dy <= 2; dy++)
+                            for (int dx = -2; dx <= 2; dx++) path.Add((x + dx, y + dy));
+                    // From where it leaves one plaza to where it comes into the other (a plaza is its place's to dress).
+                    bool Out((int X, int Y) t) => !map.IsSolid(t.X, t.Y)
+                        && world.Places.All(p => (t.X - p.X) * (t.X - p.X) + (t.Y - p.Y) * (t.Y - p.Y) > (p.Radius + 3) * (p.Radius + 3));
+                    var start = link.Tiles.First(Out);
+                    var end = link.Tiles.Last(Out);
+                    var seen = new HashSet<(int, int)> { start };
+                    var open = new Queue<(int X, int Y)>(seen);
+                    while (open.Count > 0)
+                    {
+                        var (x, y) = open.Dequeue();
+                        foreach (var next in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                        {
+                            if (!path.Contains(next) || seen.Contains(next)) continue;
+                            var type = map[next.Item1, next.Item2];
+                            if (map.IsSolid(next.Item1, next.Item2) && type != TileType.CrackedWall) continue;
+                            seen.Add(next);
+                            open.Enqueue(next);
+                        }
+                    }
+                    Assert.IsTrue(seen.Contains(end), name + ": walked along once its wall is dug");
+                }
+                Assert.GreaterOrEqual(cracked, 2, $"seed {seed}: by-ways with a cracked wall");
+            }
+        }
+
+        [Test]
+        public void TheCavesKeepTheirLineRoads()
+        {
+            var caves = WorldGenerator.Generate(3, Size, Size, Tales.Shipped, Bosses.Staged.Arenas);
+            Assert.IsEmpty(caves.Roads, "version 1 lays its roads as lines, as it always did");
+            Assert.IsNotEmpty(caves.Landmarks);
+        }
+
         [Test]
         public void CopperIsNearTheSpawn()
         {

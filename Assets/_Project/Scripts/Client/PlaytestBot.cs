@@ -34,6 +34,7 @@ namespace Game.Client
                 _botWorld = world;
                 _botPlayer = player;
                 _pilot = new BotPilot(world, player, new BotMemory(world, player, root.GuideSheet));
+                _pilot.Nav.Rooms = root.HostGenerated?.Rooms;
                 _botStart = world.Tick;
                 _firstBoss = world.Bosses.Where(b => b.Definition.Place == null).OrderBy(b => Vec2.Distance(b.Home, world.Spawn)).FirstOrDefault()?.Definition.Id ?? "cave_warden";
             }

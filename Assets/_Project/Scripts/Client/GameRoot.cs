@@ -244,7 +244,9 @@ namespace Game.Client
             if (_client.Status != ClientStatus.Playing) return;
             SaveProgress(Time.deltaTime);
             _view ??= new WorldView(_client, _camera);
-            _map ??= new MapView(_client, SaveStore.Read(MapKey));
+            // A world of rooms made before its map was kept under the generator (2026-11-22) left it under the seed alone.
+            _map ??= new MapView(_client, SaveStore.Read(MapKey)
+                ?? (_client.Generator > WorldGenerator.CaveVersion ? SaveStore.Read(SaveStore.MapKey(_client.Seed, WorldGenerator.CaveVersion, CharacterName)) : null));
             _client.AdvanceRenderClock(Time.deltaTime);
             UpdateGuide(Time.deltaTime);
             UpdateBiome(Time.deltaTime);
@@ -1142,7 +1144,7 @@ namespace Game.Client
         }
 
         // Where this character's map of this world is kept, by the world's seed so a joined world has one too.
-        string MapKey => SaveStore.MapKey(_client.Seed, CharacterName);
+        string MapKey => SaveStore.MapKey(_client.Seed, _client.Generator, CharacterName);
 
         static void Save(string key, byte[] data)
         {

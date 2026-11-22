@@ -18,6 +18,10 @@ namespace Game.Core
         const ulong ChunkStream = 46;
         const ulong PatchStream = 47;
         const ulong PlugStream = 48;
+        const ulong WaysideStream = 49;
+        // What the rooms by a road are, in turn, about every LandmarkEvery tiles of it (in place of version 1's small
+        // places by the roads, CarveLandmarks).
+        static readonly RoomRole[] WaysideRoles = { RoomRole.Rest, RoomRole.Shrine, RoomRole.Cart };
         // A walk this wide is cleared round a walled chunk, so its doors open on floor and the room's ways meet round it.
         const int ChunkWalk = 2;
         // Nothing but plain rooms within this many rooms of the spawn's; no leaders or traps within NoDangerDepth.
@@ -93,13 +97,27 @@ namespace Game.Core
             {
                 Survey();
                 Patches(new GameRandom(_seed, PatchStream));
+                Wayside(new GameRandom(_seed, WaysideStream));
                 Deal(new GameRandom(_seed, RoleStream));
                 Plug(new GameRandom(_seed, PlugStream));
             }
 
             // Which rooms a road runs through, which something was built over, and how many rooms each is from the spawn's.
+            // A by-way (places.csv links) is no road: the rooms it runs through keep their packs, its narrow path does not.
             void Survey()
             {
+                var byWays = new HashSet<int>();
+                foreach (var route in _world.Roads.Where(r => r.Kind == RoadKind.Link))
+                    foreach (var (x, y) in route.Tiles)
+                        for (int oy = -1; oy <= 1; oy++)
+                            for (int ox = -1; ox <= 1; ox++)
+                                byWays.Add((y + oy) * _width + x + ox);
+                // Where a by-way runs along a road, it is the road.
+                foreach (var route in _world.Roads.Where(r => r.Kind != RoadKind.Link))
+                    foreach (var (x, y) in route.Tiles)
+                        for (int oy = -2; oy <= 2; oy++)
+                            for (int ox = -2; ox <= 2; ox++)
+                                byWays.Remove((y + oy) * _width + x + ox);
                 foreach (var node in _graph.Nodes)
                 {
                     node.AnchorX = node.X;
@@ -116,8 +134,10 @@ namespace Game.Core
                         {
                             if (!_map.InBounds(x, y) || Square(x - node.X, y - node.Y) > reach * reach) continue;
                             var type = _map[x, y];
-                            if (Structures.IsWay(type) || type == TileType.Waypoint) road = true;
-                            else if (!Natural(type)) built = true;
+                            if ((Structures.IsWay(type) || type == TileType.Waypoint) && !byWays.Contains(y * _width + x)) road = true;
+                            // A road's lamps, signposts and rest spot stand by it in the rooms it runs through
+                            // (1c): they make the room a road's, not a town's.
+                            else if (!Natural(type) && type != TileType.LampPost && type != TileType.Signpost && type != TileType.Campfire && type != TileType.Bench) built = true;
                         }
                     }
                     node.Roadside = road;
@@ -168,6 +188,48 @@ namespace Game.Core
                                 laid++;
                             }
                         }
+                    }
+                }
+            }
+
+            // The small places along the roads (in place of version 1's, CarveLandmarks): about every LandmarkEvery tiles
+            // of each road, a room it runs through, or else one beside it, becomes a camp, a shrine or a cart in turn.
+            void Wayside(GameRandom random)
+            {
+                int every = Math.Max(40, LandmarkEvery * Math.Min(_width, _height) / GameSize);
+                int turn = random.Next(WaysideRoles.Length);
+                foreach (var route in _world.Roads.Where(r => r.Kind == RoadKind.Road))
+                {
+                    var rooms = route.Rooms.Select(i => _graph.Nodes[i]).ToList();
+                    var along = new List<int>();
+                    int walked = 0;
+                    for (int i = 0; i < rooms.Count; i++)
+                    {
+                        if (i > 0) walked += (int)Math.Sqrt(Square(rooms[i].X - rooms[i - 1].X, rooms[i].Y - rooms[i - 1].Y));
+                        along.Add(walked);
+                    }
+                    for (int mark = every / 2; mark < walked - every / 3; mark += every)
+                    {
+                        // The room of the road nearest the mark, then those beside it off the road, nearest first.
+                        int at = 0;
+                        for (int i = 1; i < rooms.Count; i++)
+                            if (Math.Abs(along[i] - mark) < Math.Abs(along[at] - mark)) at = i;
+                        var spots = new[] { rooms[at] }
+                            .Concat(Neighbours(rooms[at]).Where(n => !n.Roadside).OrderBy(n => Square(n.X - rooms[at].X, n.Y - rooms[at].Y)).ThenBy(n => n.Index))
+                            .Concat(new[] { at - 1, at + 1 }.Where(i => i >= 0 && i < rooms.Count).Select(i => rooms[i]))
+                            .Where(n => n.Kind == RoomKind.Room && !_dealt[n.Index]).Distinct().ToList();
+                        bool placed = false;
+                        foreach (var spot in spots)
+                        {
+                            for (int k = 0; k < WaysideRoles.Length && !placed; k++)
+                            {
+                                var role = WaysideRoles[(turn + k) % WaysideRoles.Length];
+                                if (!Allowed(spot, role) || Near(spot, _rooms.Rule(spot.Biome, role).MinGap, n => n.Role == role && _dealt[n.Index])) continue;
+                                if (Take(spot, role)) placed = true;
+                            }
+                            if (placed) break;
+                        }
+                        if (placed) turn++;
                     }
                 }
             }
@@ -278,7 +340,9 @@ namespace Game.Core
             bool Allowed(RoomNode node, RoomRole role)
             {
                 if (_built[node.Index] || node.Depth <= PlainDepth) return false;
-                if (node.Roadside) return role == RoomRole.Rest || role == RoomRole.Cart || role == RoomRole.Shrine;
+                // Veins and a pool bring no monsters either (2026-11-22: with the roads along the rooms, a road runs
+                // through some eighty rooms, and with only three roles for them stretches of the road had nothing by it).
+                if (node.Roadside) return role == RoomRole.Rest || role == RoomRole.Cart || role == RoomRole.Shrine || role == RoomRole.Ore || role == RoomRole.Pond;
                 if ((role == RoomRole.Elite || role == RoomRole.Trap) && node.Depth <= NoDangerDepth) return false;
                 return true;
             }
@@ -308,7 +372,11 @@ namespace Game.Core
                     var chunk = _chunkRandom.PickWeighted(pool, c => c.Weight);
                     int way = chunk.Turn ? _chunkRandom.Next(8) : 0;
                     int shift = Math.Max(2, node.Radius / 2);
-                    foreach (var (ox, oy) in new[] { (0, 0), (shift, 0), (-shift, 0), (0, shift), (0, -shift) })
+                    // A road through the middle of the room: further off to either side, clear of it.
+                    var offsets = new[] { (0, 0), (shift, 0), (-shift, 0), (0, shift), (0, -shift) };
+                    int far = node.Radius;
+                    if (node.Roadside) offsets = offsets.Concat(new[] { (far, 0), (-far, 0), (0, far), (0, -far), (far, far), (-far, -far), (far, -far), (-far, far) }).ToArray();
+                    foreach (var (ox, oy) in offsets)
                     {
                         if (!Fits(node, chunk, way, node.X + ox, node.Y + oy)) continue;
                         Set(node, chunk, way, node.X + ox, node.Y + oy);

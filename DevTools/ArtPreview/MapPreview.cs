@@ -109,6 +109,51 @@ namespace Game.Client
             return image;
         }
 
+        // The roads of a world of rooms over the map dimmed (WorldGenerator.Roads.cs): roads cream, the ways to the
+        // places' arenas orange, the by-ways pink, a by-way's cracked wall a red cross, the places white rings, the
+        // rooms a road runs through grey dots. One tile a pixel.
+        static PixelImage Roads(GeneratedWorld world)
+        {
+            int size = world.Map.Width;
+            var image = new PixelImage(size, size);
+            for (int y = 0; y < size; y++)
+                for (int x = 0; x < size; x++)
+                    image[x, size - 1 - y] = Colour(world, x, y).Scale(0.35f);
+            void Put(int x, int y, Rgba colour)
+            {
+                if (x >= 0 && y >= 0 && x < size && y < size) image[x, size - 1 - y] = colour;
+            }
+            foreach (var road in world.Roads)
+                foreach (int r in road.Rooms)
+                {
+                    var room = world.Rooms.Nodes[r];
+                    for (int oy = -1; oy <= 1; oy++)
+                        for (int ox = -1; ox <= 1; ox++) Put(room.X + ox, room.Y + oy, Rgba.Hex("#9A9A9A"));
+                }
+            foreach (var road in world.Roads.OrderBy(r => r.Kind == RoadKind.Road ? 1 : 0))
+            {
+                var colour = road.Kind switch { RoadKind.Road => Rgba.Hex("#FFF1C8"), RoadKind.Arena => Rgba.Hex("#FF9A3C"), _ => Rgba.Hex("#FF5CC8") };
+                foreach (var (x, y) in road.Tiles)
+                {
+                    Put(x, y, colour);
+                    if (road.Kind == RoadKind.Road) Put(x + 1, y, colour);
+                }
+                if (road.Cracked is (int cx, int cy))
+                    for (int d = -4; d <= 4; d++)
+                    {
+                        Put(cx + d, cy + d, Rgba.Hex("#FF2020"));
+                        Put(cx + d, cy - d, Rgba.Hex("#FF2020"));
+                    }
+            }
+            foreach (var place in world.Places)
+                for (int a = 0; a < 72; a++)
+                {
+                    double angle = a * Math.PI / 36;
+                    Put(place.X + (int)Math.Round((place.Radius + 3) * Math.Cos(angle)), place.Y + (int)Math.Round((place.Radius + 3) * Math.Sin(angle)), Rgba.White);
+                }
+            return image;
+        }
+
         // A room's dot on the graph picture, by what it is for.
         static Rgba RoleColour(RoomRole role) => role switch
         {
@@ -187,6 +232,7 @@ namespace Game.Client
                     Png.Save(Picture(world, 0, 0, size, size, 1), Path.Combine(folder, $"v{version}_seed{seed}.png"));
                     Png.Save(Picture(world, world.SpawnX - SpawnCloseUp / 2, world.SpawnY - SpawnCloseUp / 2, SpawnCloseUp, SpawnCloseUp, 4),
                         Path.Combine(folder, $"v{version}_seed{seed}_spawn.png"));
+                    if (world.Roads.Count > 0) Png.Save(Roads(world), Path.Combine(folder, $"v{version}_seed{seed}_roads.png"));
                     if (seed != first || !closeUps) continue;
                     if (world.Rooms != null)
                     {

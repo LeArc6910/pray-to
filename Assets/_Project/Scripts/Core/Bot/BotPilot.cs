@@ -136,6 +136,7 @@ namespace Game.Core
         string _lastLine;
         long _targetProgressTick;
         int _bestSteps = int.MaxValue;
+        int _pathRest;
         int _stallsHere;
         long _backUntil;
         long _planTick = long.MinValue;
@@ -285,11 +286,13 @@ namespace Game.Core
                     return new BotIntent { Do = BotDo.NoWay, Stalled = stalled, Why = why };
                 }
                 Path = found;
+                // A path along the rooms ends short of a far goal: what is left after it counts too (BotNav.Toward).
+                _pathRest = Nav.LastRest;
                 _planTick = _world.Tick;
             }
-            if (Path.Count < _bestSteps)
+            if (Path.Count + _pathRest < _bestSteps)
             {
-                _bestSteps = Path.Count;
+                _bestSteps = Path.Count + _pathRest;
                 _targetProgressTick = _world.Tick;
             }
             var intent = Follow(Path);
@@ -342,7 +345,7 @@ namespace Game.Core
                     if (path == null && !(_noFarWay.TryGetValue(target.Tile, out long until) && until > _world.Tick)
                         && NearestTile(target.Tile, In) is (int fx, int fy))
                     {
-                        path = Nav.To(hx, hy, fx, fy, enter: false);
+                        path = Nav.Toward(hx, hy, fx, fy, enter: false);
                         if (path == null)
                         {
                             // Not that one for a while: the next nearest is tried when the wait is over.
@@ -382,8 +385,11 @@ namespace Game.Core
                     if (Vec2.Distance(_player.Position, boss.Home) <= ring + 1)
                         return (null, "", new BotIntent { Do = BotDo.Arrived, Direction = boss.Home - _player.Position, Why = "아레나" });
                     int bx = TileMap.Cell(boss.Home.X), by = TileMap.Cell(boss.Home.Y);
-                    var path = Nav.Find(hx, hy, (x, y) => Vec2.Distance(TileMap.Center(x, y), boss.Home) <= ring && Nav.Walkable(x, y),
-                        heuristic: (x, y) => Math.Max(0, (int)(Math.Abs(x - bx) + Math.Abs(y - by) - ring - 1)) * Nav.WalkTicks);
+                    // Far on a map of rooms: room by room toward its middle (BotNav.Toward).
+                    var path = Nav.Rooms != null && Math.Max(Math.Abs(bx - hx), Math.Abs(by - hy)) > Nav.FarTiles
+                        ? Nav.Toward(hx, hy, bx, by)
+                        : Nav.Find(hx, hy, (x, y) => Vec2.Distance(TileMap.Center(x, y), boss.Home) <= ring && Nav.Walkable(x, y),
+                            heuristic: (x, y) => Math.Max(0, (int)(Math.Abs(x - bx) + Math.Abs(y - by) - ring - 1)) * Nav.WalkTicks);
                     return (path, path == null ? "아레나에 갈 길 없음" : "", null);
                 }
                 case BotAim.BossFight:
@@ -416,7 +422,7 @@ namespace Game.Core
                 default:
                 {
                     if (hx == target.X && hy == target.Y) return (null, "", Arrive(null));
-                    var path = Nav.To(hx, hy, target.X, target.Y);
+                    var path = Nav.Toward(hx, hy, target.X, target.Y);
                     return (path, path == null ? "길 없음" : "", null);
                 }
             }

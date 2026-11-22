@@ -31,6 +31,8 @@ namespace Game.Core
             var world = host.World;
             var player = world.Players[0];
             var bot = new FirstHourBot(world, player, sheets.Monsters, sheets.Loot, sheets.Classes, sheets.Guide, sheets.Tiles, stopAfter);
+            // In a world of rooms a far goal is gone to room by room (BotNav.Toward).
+            bot.Pilot.Nav.Rooms = host.Generated?.Rooms;
             // The first boss: the nearest of the caves' (the warden), chosen now, since a felled one leaves World.Bosses.
             var first = world.Bosses.Where(b => b.Definition.Place == null).OrderBy(b => Vec2.Distance(b.Home, world.Spawn)).FirstOrDefault();
             long end = world.Tick + (long)minutes * 60 * World.TicksPerSecond;

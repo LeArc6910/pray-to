@@ -18,8 +18,8 @@ namespace Game.Client
 
         public static string WorldKey(string name) => SaveKeys.World(name);
 
-        // The map a character has explored in the world of this seed (MapSave).
-        public static string MapKey(ulong seed, string character) => SaveKeys.Map(seed, character);
+        // The map a character has explored in the world of this seed and generator (MapSave).
+        public static string MapKey(ulong seed, int generator, string character) => SaveKeys.Map(seed, character, generator);
 
         // The keys of every save on this device, in no set order. Only files: a save still in an old build's
         // PlayerPrefs is not listed until it is asked for by name (it then becomes a file).

@@ -276,6 +276,9 @@ namespace Game.Core
         public TileMap Map { get; private set; }
         // The world's seed, from the host: what this client's own records of the world (its explored map) are kept under.
         public ulong Seed { get; private set; }
+        // Which generator made the map (WorldGenerator.CaveVersion, RoomVersion), from the host: the explored map is kept
+        // under it too, so a world of rooms and the caves of the same seed have their own (SaveKeys.Map).
+        public int Generator { get; private set; } = WorldGenerator.CaveVersion;
         // What the tiles do (tiles.csv); null when the client was made without the sheet.
         public TileData Tiles => _tiles;
         public MonsterData MonsterKinds => _monsters;
@@ -1578,6 +1581,7 @@ namespace Game.Core
             ApplyKit(welcome.Classes, welcome.SkillOrder);
             PlayerId = welcome.PlayerId;
             Seed = welcome.Seed;
+            Generator = welcome.Generator;
             var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story, _bosses?.Arenas, welcome.Generator, _tiles?.Terrain);
             Map = generated.Map;
             _builtTiles.Clear();

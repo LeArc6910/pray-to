@@ -64,6 +64,37 @@ namespace Game.Core.Tests
             Assert.IsFalse(path.Any(t => world.Map.IsEdge(t.X, t.Y)));
         }
 
+        // On a map of rooms (generator version 2, 2026-11-22) a far goal is gone to room by room: each path ends at a room
+        // on the way within a leg, so no search looks across the whole map, and the legs get there.
+        [Test]
+        public void GoesFarRoomByRoomOnAMapOfRooms()
+        {
+            var host = new WorldHost(3, Monsters.Shipped, Gear.Data, config: new HostConfig { MapSize = 512, MapVersion = WorldGenerator.RoomVersion },
+                bosses: Bosses.Shipped, classes: Classes.Shipped, tiles: Tiles.Shipped, story: Tales.Shipped);
+            host.Receive(1, new JoinMessage("bot", "봇").Encode());
+            var world = host.World;
+            var player = world.Players[0];
+            var nav = new BotNav(world) { Rooms = host.Generated.Rooms };
+            nav.Fit(player);
+            var far = host.Generated.Places.OrderByDescending(p => Vec2.Distance(p.Center, world.Spawn)).First();
+            int x = TileMap.Cell(world.Spawn.X), y = TileMap.Cell(world.Spawn.Y);
+            int legs = 0;
+            while (System.Math.Max(System.Math.Abs(far.X - x), System.Math.Abs(far.Y - y)) > nav.FarTiles)
+            {
+                var path = nav.Toward(x, y, far.X, far.Y);
+                Assert.IsNotNull(path, $"leg {legs} from {x},{y}");
+                Assert.IsNotEmpty(path);
+                Assert.Greater(nav.LastRest, 0, "a leg stops short of a far goal");
+                Assert.Less(nav.Searched, 20000, "a leg looks at a small part of the map");
+                (x, y) = path[path.Count - 1];
+                Assert.LessOrEqual(System.Math.Max(System.Math.Abs(path[path.Count - 1].X - path[0].X), System.Math.Abs(path[path.Count - 1].Y - path[0].Y)), nav.LegTiles + 2);
+                Assert.Less(++legs, 60, "the legs get there");
+            }
+            Assert.IsNotNull(nav.Toward(x, y, far.X, far.Y), "the last stretch");
+            Assert.AreEqual(0, nav.LastRest);
+            Assert.IsNull(new BotNav(world).Rooms, "a bot with no rooms searches as it did");
+        }
+
         [Test]
         public void DigsTowardTheNearestVeinAndStandsBesideAWorkbench()
         {

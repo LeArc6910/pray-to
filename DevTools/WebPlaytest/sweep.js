@@ -3911,6 +3911,9 @@ async function map(browser) {
     check(missing.length === 0, `${name}: 역할마다 방이 있다 (${Object.entries(roles).map(([r, n]) => `${r} ${n}`).join(', ')})${missing.length ? ` 없음: ${missing.join(', ')}` : ''}`);
     check(rooms.chunks >= 300, `${name}: 조각을 끼운 방이 300개 넘는다 (${rooms.chunks})`);
     check(rooms.cracked > 0, `${name}: 금 간 벽으로 막힌 지름길이 있다 (${rooms.cracked})`);
+    // The roads go along the rooms, and by-ways close rings of them (Docs/WorldRework.md 묶음 1c).
+    check(rooms.roads >= 6 && rooms.roadRooms >= rooms.roads * 5, `${name}: 길이 방을 따라 간다 (길 ${rooms.roads}개, 지나는 방 ${rooms.roadRooms}개)`);
+    check(rooms.byways >= 3 && rooms.bywayWalls >= 2, `${name}: 장소 사이 샛길이 고리를 만든다 (샛길 ${rooms.byways}개, 금 간 벽 ${rooms.bywayWalls}곳)`);
     await game.shot('map-spawn', '시작 지점');
 
     // Walking, with real keys or the stick, from the spawn toward the nearest pack room by the game's path finding:
@@ -3960,6 +3963,15 @@ async function map(browser) {
     if (game.touch) await game.press('지도');
     else await game.page.keyboard.press('m');
     await game.wait(400);
+
+    // Halfway along a road (it winds through rooms, not a line through the rock), and before a by-way's cracked wall.
+    for (const [command, shot, label] of [['goto road 0 50', 'map-road', '길 가운데(방을 지나는 굽은 길)'], ['goto road 3 30', 'map-road2', '다른 길'],
+      ['goto byway 0', 'map-byway', '샛길의 금 간 벽 앞']]) {
+      const answer = (await game.send(command)).join(' ');
+      await game.wait(1100);
+      check(/^ok/.test(answer) && !(await game.state()).dead, `${name}: ${label}에 간다 (${answer})`);
+      await game.shot(shot, label);
+    }
 
     // A room of each role: walked to from the spawn (the game counts the steps), drawn from its chunk, and the hidden
     // and locked ones shut until their wall is dug.

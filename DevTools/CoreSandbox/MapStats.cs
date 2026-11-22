@@ -28,6 +28,7 @@ namespace CoreSandbox
             public Dictionary<Biome, (int Tiles, double Rock, double Water, double Lava, double Open9, int Rooms)> Biomes
                 = new Dictionary<Biome, (int, double, double, double, double, int)>();
             public RoomGraph Rooms;
+            public IReadOnlyList<RoadRoute> Roads;
         }
 
         const int BigLump = 100;
@@ -36,7 +37,7 @@ namespace CoreSandbox
         {
             var map = world.Map;
             int width = map.Width, height = map.Height, total = width * height;
-            var numbers = new Numbers { Rooms = world.Rooms };
+            var numbers = new Numbers { Rooms = world.Rooms, Roads = world.Roads };
             // Rock is whatever is solid but water; open is whatever is walked on (lava too: it burns, it does not stop).
             var rock = new bool[total];
             var open = new bool[total];
@@ -228,6 +229,47 @@ namespace CoreSandbox
             return $"{gaps.Average():0}초 / {gaps[(int)(gaps.Count * 0.95)]:0}초";
         }
 
+        // Walking a road from one end to the other, the seconds between one room worth stopping at and the next, where a
+        // room counts when the road runs through it or past its door (the rooms beside those it runs through); the ends
+        // (the places) count too.
+        static string RoadGap(RoomGraph rooms, IReadOnlyList<RoadRoute> roads)
+        {
+            var gaps = new List<double>();
+            foreach (var road in roads.Where(r => r.Kind == RoadKind.Road))
+            {
+                var path = road.Rooms.Select(i => rooms.Nodes[i]).ToList();
+                double walked = 0, last = 0;
+                for (int i = 0; i < path.Count; i++)
+                {
+                    if (i > 0) walked += Vec2.Distance(path[i].Center, path[i - 1].Center);
+                    bool notable = Special(path[i]) || Beside(rooms, path[i]).Any(Special);
+                    if (!notable && i < path.Count - 1) continue;
+                    gaps.Add((walked - last) / WalkSpeed);
+                    last = walked;
+                }
+            }
+            if (gaps.Count == 0) return "-";
+            gaps.Sort();
+            return $"{gaps.Average():0}초 / {gaps[(int)(gaps.Count * 0.95)]:0}초";
+        }
+
+        // How much longer the roads are than the straight line between their ends: the mean and the most.
+        static string Winding(IEnumerable<RoadRoute> roads)
+        {
+            var ratios = roads.Select(r =>
+            {
+                var (ax, ay) = r.Tiles[0];
+                var (bx, by) = r.Tiles[r.Tiles.Count - 1];
+                double straight = Math.Max(1, Math.Sqrt((double)(bx - ax) * (bx - ax) + (double)(by - ay) * (by - ay)));
+                // Every eighth tile, so the steps of a slanting way and its wandering do not count as length.
+                double walked = 0;
+                for (int i = 8, last = 0; last < r.Tiles.Count - 1; last = i, i = Math.Min(r.Tiles.Count - 1, i + 8))
+                    walked += Math.Sqrt((double)(r.Tiles[i].X - r.Tiles[last].X) * (r.Tiles[i].X - r.Tiles[last].X) + (double)(r.Tiles[i].Y - r.Tiles[last].Y) * (r.Tiles[i].Y - r.Tiles[last].Y));
+                return (Ratio: walked / straight, Length: walked);
+            }).ToList();
+            return ratios.Count == 0 ? "-" : $"{ratios.Average(r => r.Ratio):0.00}배, {ratios.Max(r => r.Ratio):0.00}배 ({ratios.Sum(r => r.Length):0}칸)";
+        }
+
         public static void Run(StoryData story, ArenaData arenas, TerrainData terrain, IEnumerable<ulong> seeds, IEnumerable<int> versions, int size)
         {
             var seedList = seeds.ToList();
@@ -269,6 +311,14 @@ namespace CoreSandbox
                     Row("금 간 벽으로 막힌 고리(지름길)", n => n.Rooms.Edges.Count(e => e.Kind == RoomEdgeKind.Cracked).ToString());
                     Row("조각을 끼운 방", n => n.Rooms.Nodes.Count(r => r.Chunk != null).ToString());
                     Row("길이 지나는 방", n => n.Rooms.Nodes.Count(r => r.Kind == RoomKind.Room && r.Roadside).ToString());
+                    Row("길 수(길·아레나 길·샛길)", n => $"{n.Roads.Count(r => r.Kind == RoadKind.Road)} · {n.Roads.Count(r => r.Kind == RoadKind.Arena)} · {n.Roads.Count(r => r.Kind == RoadKind.Link)}");
+                    Row("길 길이 / 곧은 거리(평균, 가장 큰 것)", n => Winding(n.Roads.Where(r => r.Kind == RoadKind.Road)));
+                    Row("샛길 길이 / 곧은 거리(평균, 가장 큰 것)", n => Winding(n.Roads.Where(r => r.Kind == RoadKind.Link)));
+                    Row("금 간 벽이 있는 샛길", n => n.Roads.Count(r => r.Kind == RoadKind.Link && r.Cracked != null).ToString());
+                    Row("길을 걸을 때 새것 사이(평균 / 95%)", n => RoadGap(n.Rooms, n.Roads));
+                    Row("길이 지나는 방의 쉼터·제단·수레", n => n.Roads.Where(r => r.Kind == RoadKind.Road).SelectMany(r => r.Rooms).Distinct()
+                        .Count(i => n.Rooms.Nodes[i].Role == RoomRole.Rest || n.Rooms.Nodes[i].Role == RoomRole.Shrine || n.Rooms.Nodes[i].Role == RoomRole.Cart).ToString());
+                    Row("길이 지나는 방(길마다 평균)", n => n.Roads.Count(r => r.Kind == RoadKind.Road) == 0 ? "-" : n.Roads.Where(r => r.Kind == RoadKind.Road).Average(r => r.Rooms.Count).ToString("0.0"));
                     foreach (RoomRole role in Enum.GetValues(typeof(RoomRole)))
                         Row($"역할 {role.ToString().ToLowerInvariant()}", n => n.Rooms.Nodes.Count(r => r.Kind == RoomKind.Room && r.Role == role).ToString());
                     Row($"{WorldGenerator.SpecialWithin}방 안에 새것이 없는 방", n => Bare(n.Rooms).ToString());

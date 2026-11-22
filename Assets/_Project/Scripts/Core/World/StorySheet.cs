@@ -9,8 +9,9 @@ namespace Game.Core
     public sealed class PlaceDefinition
     {
         internal PlaceDefinition(int index, string id, string name, string kind, int distance, int radius, string road, bool waypoint, TileType floor, string text,
-            string style = "", int arenas = 0, int shops = 0)
+            string style = "", int arenas = 0, int shops = 0, IReadOnlyList<string> links = null)
         {
+            Links = links ?? new string[0];
             Arenas = arenas;
             Shops = shops;
             Style = style;
@@ -50,6 +51,10 @@ namespace Game.Core
         // How many shop buildings stand round it (places.csv shops, 2026-11-11): small timber rooms with a door, where
         // the people who keep shop there stand behind their stalls (World.PlaceNpcs).
         public int Shops { get; }
+        // The places a by-way runs to besides its road (places.csv links, 2026-11-22, Docs/WorldRework.md 길과 고리): a
+        // narrow way with no lamps and a cracked wall half way, laid only in a world of rooms (generator version 2), so
+        // the roads make rings. Each pair is written once, on either place's row.
+        public IReadOnlyList<string> Links { get; }
     }
 
     // Someone in the story (Docs/Story.md, 인물): where they live, how they look, and what they say when it is not
@@ -316,7 +321,9 @@ namespace Game.Core
                         if (arena < 0 || arena > 2) throw new FormatException("arena는 비우거나 yes(하나), 2(둘)여야 합니다.");
                         int shops = row["shops"].Length == 0 ? 0 : SheetValues.ParseNumber(row["shops"], "shops");
                         if (shops < 0 || shops > MaxShops) throw new FormatException($"shops는 0~{MaxShops}이어야 합니다.");
-                        places.Add(new PlaceDefinition(places.Count, id, row["name"], row["kind"], distance, radius, road, waypoint, floor, row["text"], style, arena, shops));
+                        var links = row["links"].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim()).Where(l => l.Length > 0).ToList();
+                        if (links.Contains(id)) throw new FormatException("links에 제 id를 적을 수 없습니다.");
+                        places.Add(new PlaceDefinition(places.Count, id, row["name"], row["kind"], distance, radius, road, waypoint, floor, row["text"], style, arena, shops, links));
                     }
                     catch (FormatException e)
                     {
@@ -324,6 +331,11 @@ namespace Game.Core
                     }
                 }
             }
+
+            // A by-way may run to a place further down the sheet, so the names are looked up once all are read.
+            foreach (var place in places)
+                foreach (string link in place.Links)
+                    if (places.All(p => p.Id != link)) errors.Add($"{PlacesFile}: {place.Id}의 links '{link}'는 시트에 없는 장소입니다.");
 
             var characterTable = CsvTable.Read(charactersCsv ?? "");
             missing = characterTable.MissingColumns("id", "name", "place");

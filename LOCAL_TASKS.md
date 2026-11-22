@@ -1058,6 +1058,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(바뀐 시트 `monster_attacks.csv`, `monsters.csv`가 빌드에 실린다). 새 파일 `Tests/EditMode/MonsterKindTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.90.0
   - (클라우드 웹 점검) `sweep.js --only monsterfx,map`
   - (사람) 매복 전갈·땅속 지렁이·등 뒤로 오는 심연 추적자·자폭하는 불 박쥐·방패 게·대열 병사·룬 덫 주술사: 예고를 보고 피할 만한지, 억울하지 않은지, 손맛과 소리. 얼음·용암 지대가 너무 아프지 않은지
+- [ ] 150단계: 길을 방 그래프로, 샛길 고리, 지도 기록 이름에 생성기 판(`Docs/WorldRework.md` 1c, `Docs/Story.md`, `Docs/Saving.md`)
+  - 명령 한 줄을 다시 돌린다(바뀐 시트 `Data/Story/places.csv`의 `links` 열이 빌드에 실린다). 새 파일 `Core/World/WorldGenerator.Roads.cs`의 `.meta`가 생기면 커밋한다. 통신 0.91.0. 2판 월드의 길이 바뀌어 1b까지 만든 2판 월드의 기지는 길에 잘리거나 바위에 묻힐 수 있다(1판 월드는 그대로)
+  - (클라우드 웹 점검) `sweep.js --only map`
+  - (사람) 큰길을 따라 다른 장소까지 걸어 보기: 길이 굽어 돌며 방을 지나는 것이 탐험하는 맛을 주는지, 너무 돌아가 지루하지 않은지, 금 간 벽 너머 샛길을 찾는 맛
 
 ## 결과 보고
 

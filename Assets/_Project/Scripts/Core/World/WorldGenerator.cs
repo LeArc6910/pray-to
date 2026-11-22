@@ -73,6 +73,9 @@ namespace Game.Core
         public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
         // The small places along the roads (CarveLandmarks); none without the story sheets.
         public IReadOnlyList<Landmark> Landmarks { get; internal set; } = new List<Landmark>();
+        // In a world of rooms, the roads, by-ways and arena roads as laid along the rooms (WorldGenerator.Roads.cs);
+        // none in the caves of version 1, whose roads are lines.
+        public IReadOnlyList<RoadRoute> Roads { get; internal set; } = new List<RoadRoute>();
         // The signposts by the roads (2026-11-11) and the place each points to along its road, for the screen.
         public IReadOnlyList<(int X, int Y, PlaceDefinition Toward)> Signposts => _signposts;
         readonly List<(int X, int Y, PlaceDefinition Toward)> _signposts = new List<(int, int, PlaceDefinition)>();
@@ -401,7 +404,11 @@ namespace Game.Core
             bool InPlaza(int x, int y) => spots.Any(s => Square(x - s.X, y - s.Y) <= s.Place.Radius * s.Place.Radius);
             int ArenaTiles(List<(int X, int Y)> line) => line.Count(p => arenas.Any(a => Square(p.X - a.X, p.Y - a.Y) <= (ArenaRadius + 2) * (ArenaRadius + 2)));
             var roads = new List<(List<(int X, int Y)> Path, (PlaceDefinition Place, int X, int Y) From, (PlaceDefinition Place, int X, int Y) To)>();
-            foreach (var spot in spots)
+            // A world of rooms (version 2) lays its roads along the rooms once the places' arenas are cut (RoadLayer,
+            // WorldGenerator.Roads.cs); version 1's lines below stay as they were for the worlds made with them.
+            bool rooms = world.Rooms != null;
+            var arenaRoads = new List<(PlaceDefinition Place, int X, int Y, int Arena)>();
+            foreach (var spot in rooms ? new List<(PlaceDefinition Place, int X, int Y)>() : spots)
             {
                 var from = spots.FirstOrDefault(s => s.Place.Id == spot.Place.Road);
                 if (from.Place == null || from.Place == spot.Place) continue;
@@ -483,6 +490,13 @@ namespace Game.Core
                 }
                 if (best is not (int bx, int by)) continue;
                 ClearDisc(map, bx, by, ArenaRadius);
+                if (rooms)
+                {
+                    world.AddPlaceArena(nth == 1 ? place.Id : $"{place.Id}:{nth}", TileMap.Center(bx, by));
+                    arenas.Add((bx, by));
+                    arenaRoads.Add((place, cx, cy, arenas.Count - 1));
+                    continue;
+                }
                 // A road that would cut through another place bends once round it instead.
                 bool Crosses(int x0, int y0, int x1, int y1) => spots.Any(s => s.Place != place && SegmentDistance(x0, y0, x1, y1, s.X, s.Y) < s.Place.Radius + TunnelHalfWidth + 2);
                 var bends = new List<(int X, int Y)> { (cx, cy) };
@@ -513,6 +527,17 @@ namespace Game.Core
                 }
                 world.AddPlaceArena(nth == 1 ? place.Id : $"{place.Id}:{nth}", TileMap.Center(bx, by));
                 arenas.Add((bx, by));
+            }
+
+            if (rooms)
+            {
+                var layer = new RoadLayer(world, spots, arenas);
+                layer.Roads();
+                foreach (var (place, cx, cy, arena) in arenaRoads) layer.ToArena(place, cx, cy, arena);
+                layer.Links();
+                foreach (var route in layer.Routes.Where(r => r.Kind == RoadKind.Road))
+                    roads.Add((route.Tiles.ToList(), spots.First(s => s.Place == route.From), spots.First(s => s.Place == route.To)));
+                world.Roads = layer.Routes;
             }
 
             // Along each road (2026-11-11, Docs/Story.md 길가): a lamp post just past its edge every RoadLampEvery
@@ -648,7 +673,8 @@ namespace Game.Core
                 }
             }
 
-            world.Landmarks = CarveLandmarks(map, roads.Select(rd => rd.Path).ToList(), spots.Select(sp => (sp.X, sp.Y, sp.Place.Radius)).ToList(), arenas, new GameRandom(seed, LandmarkStream), size);
+            // In a world of rooms the rooms along the roads are its small places (WorldGenerator.Roles.cs, Wayside).
+            if (!rooms) world.Landmarks = CarveLandmarks(map, roads.Select(rd => rd.Path).ToList(), spots.Select(sp => (sp.X, sp.Y, sp.Place.Radius)).ToList(), arenas, new GameRandom(seed, LandmarkStream), size);
 
             var sites = new List<PlaceSite>();
             foreach (var (place, cx, cy) in spots)

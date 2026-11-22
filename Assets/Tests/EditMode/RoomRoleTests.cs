@@ -151,7 +151,8 @@ namespace Game.Core.Tests
                 double Share(RoomRole role) => 100.0 * plain.Count(n => n.Role == role) / count;
                 // Of a hundred rooms (Docs/WorldRework.md 방의 역할): the design's numbers, give or take.
                 Assert.That(Share(RoomRole.Pack), Is.InRange(34, 50), $"seed {seed}: pack");
-                Assert.That(Share(RoomRole.Plain), Is.InRange(12, 26), $"seed {seed}: plain");
+                // The roads run through rooms along the ways (1c), and those stay plain but for a camp, a shrine or a cart.
+                Assert.That(Share(RoomRole.Plain), Is.InRange(12, 29), $"seed {seed}: plain");
                 Assert.That(Share(RoomRole.Ore), Is.InRange(7, 14), $"seed {seed}: ore");
                 Assert.That(Share(RoomRole.Rest), Is.InRange(2.5, 5), $"seed {seed}: rest");
                 Assert.That(Share(RoomRole.Elite), Is.InRange(2, 4), $"seed {seed}: elite");
@@ -180,7 +181,9 @@ namespace Game.Core.Tests
                     if (room.Depth <= 1) Assert.AreEqual(RoomRole.Plain, role, where + " beside the spawn");
                     if (room.Depth <= 3) Assert.IsFalse(role == RoomRole.Elite || role == RoomRole.Trap, where + " near the spawn");
                     // No monsters where a road runs (Docs/Design.md).
-                    if (room.Roadside) Assert.IsTrue(role == RoomRole.Plain || role == RoomRole.Rest || role == RoomRole.Cart || role == RoomRole.Shrine, where + " on a road");
+                    if (room.Roadside)
+                        Assert.IsTrue(role == RoomRole.Plain || role == RoomRole.Rest || role == RoomRole.Cart || role == RoomRole.Shrine || role == RoomRole.Ore || role == RoomRole.Pond,
+                            where + " on a road");
                 }
                 // A treasure has a pack or a leader beside it or one room further (but where roads and towns leave no room for one).
                 var treasures = plain.Where(n => n.Role == RoomRole.Treasure).ToList();
@@ -251,10 +254,23 @@ namespace Game.Core.Tests
             }
             Assert.Less(strayIce, counts[TileType.IceFloor] / 10);
             Assert.Less(straySand, counts[TileType.Quicksand] / 10);
-            // Ways shut by a cracked wall are loops: short cuts, never the only way.
+            // Ways shut by a cracked wall are short cuts, never the only way: every room is reached by the others.
             var cracked = rooms.Edges.Where(e => e.Kind == RoomEdgeKind.Cracked).ToList();
             Assert.GreaterOrEqual(cracked.Count, 10, "ways shut by a cracked wall");
-            Assert.IsTrue(cracked.All(e => e.Loop));
+            var reached = new HashSet<int> { rooms.Nodes.First(n => n.Kind == RoomKind.Spawn).Index };
+            var open = new Stack<int>(reached);
+            while (open.Count > 0)
+            {
+                var node = rooms.Nodes[open.Pop()];
+                foreach (int way in node.Edges)
+                {
+                    var edge = rooms.Edges[way];
+                    if (edge.Kind == RoomEdgeKind.Cracked) continue;
+                    int next = edge.A == node.Index ? edge.B : edge.A;
+                    if (reached.Add(next)) open.Push(next);
+                }
+            }
+            Assert.AreEqual(rooms.Nodes.Count, reached.Count, "rooms reached only through a cracked wall");
         }
 
         [Test]
