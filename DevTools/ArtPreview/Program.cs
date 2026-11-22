@@ -32,7 +32,7 @@ namespace Game.Client
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
                 return WriteMonsterFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "dungeons")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "dungeons" && args[1] != "portraits")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -88,6 +88,9 @@ namespace Game.Client
                 UiMockPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot, mockClasses, passives, Place(mockWorld, mockWorld.Places[0], lights));
                 return 0;
             }
+            // --only portraits: just the talk box's portraits, every person in every expression (out/portraits/, PortraitPreview).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "portraits")
+                return PortraitPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, npcs) ? 0 : 1;
             // --only dungeons: just the instance dungeons as they are laid (dungeons.png, dungeons/, DungeonPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "dungeons")
             {

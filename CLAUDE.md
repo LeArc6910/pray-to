@@ -65,6 +65,8 @@ dotnet run --project DevTools/ArtPreview -- --only map
 dotnet run --project DevTools/ArtPreview -- --only uimock
 # 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/)
 dotnet run --project DevTools/ArtPreview -- --only dungeons
+# 대화 초상만(out/portraits/: 인물마다 여섯 표정의 sheet.png, 4배 close_*.png, 대화 상자 시안 dialogue.png. Docs/UiRework.md 4-2)
+dotnet run --project DevTools/ArtPreview -- --only portraits
 
 # Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(몇 분, 에디터와 웹 플레이어의 엔진 DLL만 .unity/에 받는다)
 DevTools/UnityCompileCheck/fetch-unity.sh
