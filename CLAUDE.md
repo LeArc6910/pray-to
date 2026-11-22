@@ -59,6 +59,8 @@ dotnet run --project DevTools/ArtPreview
 dotnet run --project DevTools/ArtPreview -- --only spider
 # 생성된 지도 그림만(out/map/: 생성기 1판·2판, 시드 1~3의 온 지도와 시작 지점, 시드 1의 생물군계마다와 방 그래프, 역할마다의 방(v2_seed1_roles.png, rooms_art.png, rooms_art_lit.png), 새 칸(room_tiles.png), 길과 샛길(v2_seed1~3_roads.png))
 dotnet run --project DevTools/ArtPreview -- --only map
+# UI 개편 시안(out/uimock/: 양식 A·B·C와 추천 조합의 가방·대화·상점·성장 화면, 휴대폰 세로 가방·대화, compare_abc.png. Docs/UiRework.md 4-4)
+dotnet run --project DevTools/ArtPreview -- --only uimock
 
 # Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(몇 분, 에디터와 웹 플레이어의 엔진 DLL만 .unity/에 받는다)
 DevTools/UnityCompileCheck/fetch-unity.sh

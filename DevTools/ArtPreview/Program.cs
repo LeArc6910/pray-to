@@ -32,7 +32,7 @@ namespace Game.Client
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
                 return WriteMonsterFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -72,6 +72,16 @@ namespace Game.Client
             {
                 string mapOut = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
                 MapPreview.Write(mapOut, story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1, 2, 3 }, rooms: world => RoomViews(world, lights, Path.Combine(mapOut, "map")));
+                return 0;
+            }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "uimock")
+            {
+                // --only uimock: the UI overhaul's candidate looks as mockups over a village (out/uimock/, UiMockPreview).
+                string classSheets = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
+                string passives = File.ReadAllText(Path.Combine(classSheets, ClassSheet.PassivesFile));
+                var mockClasses = ClassSheet.Parse(File.ReadAllText(Path.Combine(classSheets, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classSheets, ClassSheet.SkillsFile)), passives);
+                var mockWorld = WorldGenerator.Generate(7, story: story);
+                UiMockPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot, mockClasses, passives, Place(mockWorld, mockWorld.Places[0], lights));
                 return 0;
             }
             if (args.Length == 2 && args[0] == "--only")
