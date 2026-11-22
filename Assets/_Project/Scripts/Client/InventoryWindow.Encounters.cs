@@ -27,6 +27,9 @@ namespace Game.Client
         GameScreen _encounterSeen;
         // The station's tab: a station in reach, or null for what is made by hand; the anvil's tab.
         TileType? _stationTab;
+        // False when the station window has just opened: the first tab is the station nearest (null is 손 제작, so
+        // a null tab alone cannot mean "not chosen yet").
+        bool _stationTabPicked;
         bool _anvilRecipes;
 
         // Opens an encounter window (its things start at the top).
@@ -75,7 +78,7 @@ namespace Game.Client
             {
                 _encounterSeen = screen;
                 _thingScroll = _bagScroll = Vector2.zero;
-                if (screen == GameScreen.Station) _stationTab = null;
+                if (screen == GameScreen.Station) _stationTabPicked = false;
             }
             Controls.Block(area);
             var kind = ScreenStack.KindOf(screen);
@@ -550,7 +553,8 @@ namespace Game.Client
                 top += bar + 16;
             }
             var tabs = stations.Select(s => (TileType?)s).Append(null).ToList();
-            if (!tabs.Contains(_stationTab)) _stationTab = tabs[0];
+            if (!_stationTabPicked || !tabs.Contains(_stationTab)) _stationTab = tabs[0];
+            _stationTabPicked = true;
             var names = tabs.Select(t => t == null ? "손 제작" : StationName(t.Value)).ToArray();
             // [만들 수 있는 것만] beside the tabs, or under them in a narrow window.
             float toggle = 156;
