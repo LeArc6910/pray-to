@@ -24,6 +24,8 @@ namespace Game.Client
         Chest,
         Station,
         Anvil,
+        // The settings in the game ([메뉴] → [설정], U7): the start menu's page, a full screen.
+        Settings,
     }
 
     // Screens of one kind share a window: its head, its place, and tabs that switch between them.
@@ -181,6 +183,7 @@ namespace Game.Client
             GameScreen.Chest => "상자",
             GameScreen.Station => "작업대",
             GameScreen.Anvil => "모루",
+            GameScreen.Settings => "설정",
             _ => "",
         };
 
@@ -198,6 +201,7 @@ namespace Game.Client
                 "records" => GameScreen.Journal,
                 "상인" or "merchant" => GameScreen.Shop,
                 "화로" or "workbench" or "furnace" => GameScreen.Station,
+                "설정" or "settings" => GameScreen.Settings,
                 _ => GameScreen.None,
             };
         }
@@ -225,6 +229,7 @@ namespace Game.Client
             GameScreen.Chest => UiIcons.Chest,
             GameScreen.Station => UiIcons.Hammer,
             GameScreen.Anvil => UiIcons.Hammer,
+            GameScreen.Settings => UiIcons.Gear,
             _ => null,
         };
 
@@ -303,9 +308,15 @@ namespace Game.Client
             if (PhoneSheet) return new Rect(4, 4, Ui.Width - 8, Ui.Height - 8);
             float left = 10, right = Ui.MinimapArea.x - 10;
             float wanted = screen == GameScreen.Chest || screen == GameScreen.Anvil ? 760 : EncounterMaxWidth;
+            // Clear of the HUD's bars at the top left (U7; they were under the window on a PC, U3 남은 문제): beside them
+            // when the two panes still have room there, else under them.
+            var hud = Ui.HudArea;
+            float top = 10, bottom = Ui.Height - 10;
+            if (right - (hud.xMax + 10) >= 560) left = hud.xMax + 10;
+            else if (!Ui.Short) top = hud.yMax + 10;
             float width = Mathf.Min(wanted, right - left);
-            float height = Mathf.Min(EncounterMaxHeight, Ui.Height - 20);
-            return new Rect(Mathf.Round(left + (right - left - width) / 2), Mathf.Round(Mathf.Max(10, (Ui.Height - height) / 2)), width, height);
+            float height = Mathf.Min(EncounterMaxHeight, bottom - top);
+            return new Rect(Mathf.Round(left + (right - left - width) / 2), Mathf.Round(Mathf.Max(top, top + (bottom - top - height) / 2)), width, height);
         }
 
         // ---- The group's tabs ----
@@ -356,8 +367,8 @@ namespace Game.Client
 
         // ---- The touch hub (Docs/UiRework.md 4-1 허브, 4-5 허브) ----
 
-        // What the hub offers, in its order, then [나가기] (which [메뉴] took the place of).
-        static readonly GameScreen[] HubScreens = { GameScreen.Bag, GameScreen.Skills, GameScreen.Passives, GameScreen.Character, GameScreen.Journal, GameScreen.Map };
+        // What the hub offers, in its order, then [나가기] (which [메뉴] took the place of). [설정] since U7.
+        static readonly GameScreen[] HubScreens = { GameScreen.Bag, GameScreen.Skills, GameScreen.Passives, GameScreen.Character, GameScreen.Journal, GameScreen.Map, GameScreen.Settings };
         public const string Leave = "나가기";
         public const string HubButton = "메뉴";
         // The row name the hub's buttons are probed under, apart from [가방] and the minimap's [지도] drawn before it.
@@ -377,7 +388,14 @@ namespace Game.Client
             float top = Ui.RightColumnBottom + 6;
             Rect panel = default;
             int columns = 0;
-            foreach (int tried in new[] { 2, 3, 4, count })
+            // On a PC it is the Esc menu (U7): in the middle of the screen, four to a row.
+            if (!Controls.UsingTouch)
+            {
+                columns = HubSize(4, count).x <= Ui.Width - 20 ? 4 : 2;
+                var size = HubSize(columns, count);
+                panel = new Rect(Mathf.Round((Ui.Width - size.x) / 2), Mathf.Round(Mathf.Max(10, (Ui.Height - size.y) / 2)), size.x, size.y);
+            }
+            else foreach (int tried in new[] { 2, 3, 4, count })
             {
                 var size = HubSize(tried, count);
                 if (size.x > Ui.Width - 20 || top + size.y > Ui.Height - 10) continue;

@@ -227,14 +227,14 @@ namespace Game.Client
             }
             else if (Controls.LeavePressed())
             {
-                // Esc goes one step back: the hub, the open screen, the talk or waypoint list; with nothing open it leaves
-                // the game, as before.
+                // Esc goes one step back: the hub, the open screen, the talk or waypoint list; with nothing open it opens
+                // the menu (U7: the hub's screens, [설정] and [나가기]), from which the game is left.
                 if (_screens.Back()) DevInfo.Note("화면 닫힘");
                 else if (_storyScreen != null && _storyScreen.Open) _storyScreen.Close();
                 else
                 {
-                    EndSession("");
-                    return;
+                    _screens.ToggleHub();
+                    DevInfo.Note("메뉴 열림");
                 }
             }
             if (_client.Status == ClientStatus.Refused)
@@ -297,13 +297,13 @@ namespace Game.Client
                 _hammerAt = Time.time + 0.6f;
             }
             _view.TargetSize = Math.Max(bag ? _inventory.PointsAtSize : 1, _hotbar != null ? _hotbar.PointsAtSize : 1);
-            if (_inventory != null) _inventory.CrackAhead = bag ? _view.CrackAhead() : null;
             // Typing a pet's name keeps the keys from the game; the bag closing lets go of the field.
             bool typing = _inventory != null && _inventory.Typing;
             if (Controls.Typing && !typing && _inventory != null && !_inventory.Open) GUIUtility.keyboardControl = 0;
             Controls.Typing = typing;
             _view.Render(_tickClock / World.TickSeconds, Time.deltaTime);
             UiMotion.NoteHealth(_client.Health);
+            UiMotion.HealthShare = _client.IsDead ? 0 : _client.MaxHealth > 0 ? _client.Health / _client.MaxHealth : 1;
             _map.Update();
 
             for (int i = _acquired.Count - 1; i >= 0; i--)
@@ -483,20 +483,6 @@ namespace Game.Client
         // When the player fell; for the time left before getting up at home in co-op.
         float _downSince;
         bool _wasDown;
-
-        // In co-op, over the fallen player: get up at home now rather than wait for an ally (World.GetUp).
-        void DrawGetUpButton()
-        {
-            if (_client.IsDead && !_wasDown) _downSince = Time.time;
-            _wasDown = _client.IsDead;
-            if (!_client.IsDead || _client.Names.Count <= 1) return;
-            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(_client.Position.X, _client.Position.Y + 1.3f, 0));
-            if (screen.z < 0) return;
-            // In a dungeon, at its entrance (World.Dungeon.cs).
-            if (!Ui.WorldButton(Ui.FromScreen(screen), _client.DungeonHere != null ? "입구에서 일어나기" : "집에서 일어나기", 140)) return;
-            Sounds.Play(Sound.Click);
-            SendToHost(_client.GetUpCommand());
-        }
 
         void DrawBedButton()
         {
@@ -788,6 +774,8 @@ namespace Game.Client
         {
             None,
             Machine,
+            // The door or cracked wall ahead: lock, unlock or mend it (U6).
+            Door,
             Person,
             Merchant,
             Waypoint,
@@ -814,6 +802,7 @@ namespace Game.Client
         {
             if (_client == null || _client.Status != ClientStatus.Playing || _client.IsDead) return Meeting.None;
             if (_client.MachineAhead() != null) return Meeting.Machine;
+            if (DoorWork() != null) return Meeting.Door;
             // Not while a talk is on (G again would start it over).
             if (_storyScreen != null && _storyScreen.Open) return Meeting.None;
             if (!_client.Riding && _client.Places.Count > 0 && _client.CharacterNear() != null) return Meeting.Person;
@@ -835,6 +824,7 @@ namespace Game.Client
             switch (NextMeeting())
             {
                 case Meeting.Machine: return ToggleMachine();
+                case Meeting.Door: return DoDoorWork();
                 case Meeting.Person: return _storyScreen.TalkNear();
                 case Meeting.Merchant: return _storyScreen.TalkMerchantNear();
                 case Meeting.Waypoint:
@@ -1281,6 +1271,11 @@ namespace Game.Client
         internal GameScreen OpenScreen => _screens.Current;
         internal bool HubOpen => _screens.HubOpen;
         internal string BagPage => _inventory?.BagPage ?? "";
+        // The bag's kind chip and the picked thing's card title (U6), for the playtests.
+        internal string BagFilter => _inventory?.FilterName ?? "";
+        internal bool SetBagFilter(string name) => _inventory != null && _inventory.SetFilter(name);
+        internal string BagCard => _inventory?.CardTitle ?? "";
+        internal string QuickNames => _hotbar?.SlotNames() ?? "";
 
         internal void ShowScreen(GameScreen screen) => _screens.Show(screen);
 
@@ -1619,47 +1614,87 @@ namespace Game.Client
                 _dropFocus = false;
                 _screensSeen = _screens.Version;
             }
+            // The settings opened in the game ([메뉴] → [설정], U7) are the start menu's page: back to the first page once shut.
+            if (_screens.Current != GameScreen.Settings && (_page == MenuPage.Settings || _page == MenuPage.Keys) && _client != null) _page = MenuPage.Main;
             if (_client == null)
             {
                 DrawMenu();
                 return;
             }
-            // A full screen (growth, records) covers everything, and nothing else is drawn under it: the world darkened
-            // 70% and red at the edges while the player is hurt, no HUD for its title to sit on, and no button a tap meant
-            // for the screen could press instead (Docs/UiRework.md 4-5 전체 화면, 4-7 그리는 순서).
+            bool dead = _client.Status == ClientStatus.Playing && _client.IsDead;
+            if (dead && !_wasDown) _downSince = Time.time;
+            _wasDown = dead;
+            // Fallen (U7 쓰러짐 화면): the card is drawn over everything, a window left open included, and nothing under it
+            // takes a press meant for its button (IMGUI gives a press to the first control drawn under it, so the press
+            // is hidden from the rest while they draw).
+            var card = dead ? DeathCardArea() : default;
+            var e = Event.current;
+            var held = EventType.Ignore;
+            if (dead && (e.isMouse || e.type == EventType.ScrollWheel) && card.Contains(e.mousePosition))
+            {
+                held = e.type;
+                e.type = EventType.Ignore;
+            }
+            // A full screen (growth, records, settings) covers everything, and nothing else is drawn under it: the world
+            // darkened 70% and red at the edges while the player is hurt or low, no HUD for its title to sit on, and no
+            // button a tap meant for the screen could press instead (Docs/UiRework.md 4-5 전체 화면, 4-7 그리는 순서).
             // On a phone an encounter window is a sheet over everything too (U3): no HUD piece under it takes its taps.
             if (_screens.Covers && _client.Status == ClientStatus.Playing)
             {
+                // A banner waits for the full screen to shut (U7: never under a window).
+                _view?.HoldBanner();
                 DrawFullScreen();
-                return;
             }
+            else DrawPlay(dead);
+            if (held != EventType.Ignore) e.type = held;
+            if (Event.current.type == EventType.Repaint) DeathShown = Rect.zero;
+            if (dead) DrawDeath(card);
+        }
+
+        void DrawPlay(bool dead)
+        {
             // The bag or an encounter window beside the world (Docs/UiRework.md U3): the HUD is its bars, no world button,
-            // skill key or quick slot is drawn under it.
+            // skill key or quick slot is drawn under it. On a low screen (a phone held sideways) the box is not drawn at
+            // all while a window is open (4-5 가로 화면: the window takes the height), though its lines are still read.
             bool side = _screens.Current != GameScreen.None;
             var window = side ? ScreenStack.AreaOf(_screens.Current) : default;
             _view?.DrawGui();
-            DrawHud(compact: side);
-            _view?.DrawBanner();
+            // Low on health: the screen's edges glow red, pulsing slowly unless motion is reduced (U7).
+            if (!dead && _client.Status == ClientStatus.Playing && Feel.HurtGlow) UiSkin.RedEdges(new Rect(0, 0, Ui.Width, Ui.Height), UiMotion.LowHealthGlow(LowHealthShare));
+            if (side && Ui.Short)
+            {
+                var color = GUI.color;
+                GUI.color = Color.clear;
+                DrawHud(compact: true);
+                GUI.color = color;
+            }
+            else
+            {
+                DrawHud(compact: side);
+            }
+            // Banners in the room the windows, the hub and the two columns leave (U7: never over a window).
+            _view?.DrawBanner(BannerRoom(_screens.Covers ? default : window, _screens.HubOpen ? ScreenStack.HubLayout().Panel : (Rect?)null));
             // The "획득: …" lines under every window (Docs/UiRework.md 4-7 그리는 순서): drawn after the bag, they ran
             // over it on a phone (phone-bag-gear).
-            DrawAcquired();
+            DrawAcquired(dead);
             // Not while the bag, a window or the hub is open: skills cannot be used then (ReadSkillPress), a tap in the
             // window must not fire one, and a slot would show in the gap beside the window. Nor under the waypoint list: a
             // button drawn before it would take a tap meant for one of its rows (2026-11-22, the web sweep on a phone).
             // While a talk is up its box sits where the skill keys and quick slots are, which are not drawn then
-            // (Docs/UiRework.md 4-2; on a phone held upright the box lay over the quick slots, the U1 sweep).
+            // (Docs/UiRework.md 4-2; on a phone held upright the box lay over the quick slots, the U1 sweep). Nor while
+            // fallen: the card's button is the one thing to press then (U7).
             if (_storyScreen != null)
             {
                 _storyScreen.KeyHint = MeetHint(Meeting.Person);
                 _storyScreen.MerchantKeyHint = MeetHint(Meeting.Merchant);
             }
-            if (_client.Status == ClientStatus.Playing && !side && !_screens.HubOpen && !(_storyScreen?.ListOpen ?? false))
+            if (_client.Status == ClientStatus.Playing && !side && !_screens.HubOpen && !(_storyScreen?.ListOpen ?? false) && !dead)
             {
                 DrawMachineSwitch();
+                DrawDoorButtons();
                 DrawPoiButton();
                 DrawDungeonButtons();
                 DrawBedButton();
-                DrawGetUpButton();
                 DrawRiftButton();
                 if (!(_storyScreen?.TalkOpen ?? false)) DrawStationButtons();
                 _storyScreen?.DrawWorldButtons(_camera);
@@ -1682,9 +1717,15 @@ namespace Game.Client
                 DrawTouchButtons();
                 Controls.DrawTouch();
             }
+            // On a PC the hub is the Esc menu (U7): the screens, [설정] and [나가기], in the middle of the screen.
+            else if (_screens.HubOpen && _screens.DrawHub(HasSkillPoints, _client.PassivePoints > 0))
+            {
+                _endReason = "";
+            }
         }
 
-        // A full screen over the darkened world: the growth screens and the journal (InventoryWindow), or the map.
+        // A full screen over the darkened world: the growth screens and the journal (InventoryWindow), the map, or the
+        // settings.
         void DrawFullScreen()
         {
             var screen = new Rect(0, 0, Ui.Width, Ui.Height);
@@ -1697,14 +1738,165 @@ namespace Game.Client
             }
             if (_screens.Full) UiSkin.FullBackdrop(screen);
             UiMotion.DrawGhosts();
+            // The settings in the game ([메뉴] → [설정], U7): the start menu's page over the darkened world; its [뒤로]
+            // (or Esc) shuts it.
+            if (_screens.Current == GameScreen.Settings)
+            {
+                if (_page != MenuPage.Settings && _page != MenuPage.Keys) _page = MenuPage.Settings;
+                string status = _status;
+                _status = "";
+                DrawMenuPage(true);
+                _status = status;
+                if (_page == MenuPage.Main) _screens.Close();
+                return;
+            }
             _inventory?.Draw();
+        }
+
+        bool HasSkillPoints => _client.SkillPoints > 0 || _client.Classes.Count < ClassRules.SlotsAt(_client.Level);
+
+        // Where a banner may go: a quarter down the screen, across what a side window leaves, beside the HUD's column and
+        // the minimap's (and the hub's panel) where it would meet them, or under them where too little is left beside.
+        // No width when there is no room (a window across the middle): the banner then waits (WorldView.HoldBanner).
+        internal static Rect BannerRoom(Rect window, Rect? hub)
+        {
+            float left = 0, right = Ui.Width;
+            if (window.width > 0)
+            {
+                // The wider side of the window.
+                if (window.x - 6 >= Ui.Width - window.xMax - 6) right = window.x - 6;
+                else left = window.xMax + 6;
+                if (right - left < 200) return new Rect(left, Mathf.Round(Ui.Height * 0.25f), 0, 0);
+            }
+            const float tall = 64;
+            float top = Mathf.Round(Ui.Height * 0.25f);
+            var obstacles = new List<Rect>
+            {
+                Rect.MinMaxRect(Ui.HudArea.x, Ui.HudArea.y, Ui.HudArea.xMax, Mathf.Max(Ui.HudArea.yMax, Ui.LeftColumnBottom)),
+                Rect.MinMaxRect(Ui.MinimapArea.x, Ui.MinimapArea.y, Ui.MinimapArea.xMax, Mathf.Max(Ui.RightColumnBottom, Ui.InfoBottom)),
+            };
+            if (hub is Rect panel) obstacles.Add(panel);
+            float l = left, r = right;
+            foreach (var o in obstacles)
+            {
+                if (top >= o.yMax || top + tall <= o.y || o.xMax <= l || o.x >= r) continue;
+                if (o.center.x < (l + r) / 2) l = Mathf.Max(l, o.xMax + 8);
+                else r = Mathf.Min(r, o.x - 8);
+            }
+            if (r - l >= Mathf.Min(260, right - left)) return new Rect(l, top, r - l, tall);
+            // Too little beside them: under the lowest of them that reaches across.
+            foreach (var o in obstacles)
+                if (o.xMax > left && o.x < right) top = Mathf.Max(top, o.yMax + 8);
+            return new Rect(left, Mathf.Min(top, Ui.Height - tall - 10), right - left, tall);
+        }
+
+        // ---- The fallen card (Docs/UiRework.md 4-1 쓰러짐, U7) ----
+
+        // Where the card goes: in the lower part of the screen, clear of the player in the middle, a finger's button in it.
+        internal static Rect DeathCardArea()
+        {
+            float width = Mathf.Min(380, Ui.Width - 24);
+            const float height = 150;
+            float y = Ui.Short ? Ui.Height - height - 10 : Mathf.Round(Ui.Height * 0.62f - height / 2);
+            return new Rect(Mathf.Round((Ui.Width - width) / 2), Mathf.Clamp(y, 10, Ui.Height - height - 10), width, height);
+        }
+
+        // Where the card was drawn in the last repaint (zero when not), for the playtests.
+        internal static Rect DeathShown { get; private set; }
+        internal string DeathCause => _view?.DeathCause ?? "";
+
+        static GUIStyle _deathTitle, _deathLine;
+
+        // The screen darkened and red at its edges, and a card over everything: "쓰러졌다", what felled the player when
+        // known, when and where they get up, and [집에서 일어나기] (in a dungeon [입구에서 일어나기]) to get up there now
+        // (World.GetUp: alone or with others).
+        void DrawDeath(Rect card)
+        {
+            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            Controls.Block(card);
+            if (Event.current.type == EventType.Repaint)
+            {
+                var previous = GUI.color;
+                GUI.color = new Color(0, 0, 0, 0.4f * previous.a);
+                GUI.DrawTexture(screen, Texture2D.whiteTexture);
+                GUI.color = previous;
+                UiSkin.RedEdges(screen, 0.55f);
+                DeathShown = card;
+            }
+            UiSkin.Card(card);
+            _deathTitle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
+            _deathLine ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.UpperCenter, wordWrap = true };
+            Ui.Text(_deathTitle, 24, bold: true);
+            Ui.Text(_deathLine, 12);
+            float x = card.x + 12, width = card.width - 24;
+            var title = new Rect(x, card.y + 8, width, 32);
+            var shade = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.8f * shade.a);
+            GUI.Label(new Rect(title.x + 1, title.y + 2, title.width, title.height), "쓰러졌다", _deathTitle);
+            GUI.color = new Color(1f, 0.42f, 0.36f, shade.a);
+            GUI.Label(title, "쓰러졌다", _deathTitle);
+            GUI.color = shade;
+            bool together = _client.Names.Count > 1;
+            bool dungeon = _client.DungeonHere != null;
+            string cause = DeathCause;
+            string when = together ? $"동료가 곁에 {World.ReviveSeconds:0}초 서 있으면 이 자리에서 일어난다 · {DownLeft()}초 뒤 {(dungeon ? "던전 입구" : "집")}에서"
+                : dungeon ? "잠시 후 던전 입구에서 일어난다"
+                : _client.LastCamp != null ? "잠시 후 마지막에 쉰 야영지에서 일어난다" : "잠시 후 집에서 일어난다";
+            string words = (cause.Length > 0 ? $"{cause}에게 당했다\n" : "") + when;
+            GUI.Label(new Rect(x, title.yMax + 2, width, card.yMax - 56 - title.yMax), Ui.Wrap(words, _deathLine, width), _deathLine);
+            float button = Mathf.Min(220, width);
+            var rise = new Rect(card.center.x - button / 2, card.yMax - 52, button, 44);
+            if (Ui.Button(rise, dungeon ? "입구에서 일어나기" : "집에서 일어나기", Ui.Look.Primary))
+            {
+                Sounds.Play(Sound.Click);
+                SendToHost(_client.GetUpCommand());
+            }
+        }
+
+        // ---- Doors and cracked walls (U6: from the bag's [재료·제작] to buttons over them) ----
+
+        // What G or the button over the door or wall ahead does now: lock the door, unlock one locked by the player,
+        // mend a cracked wall (with its cost); null for none.
+        string DoorWork()
+        {
+            if (_client == null || _client.Map == null || _client.Riding) return null;
+            if (_client.DoorAhead() is (int x, int y))
+            {
+                if (_client.Map[x, y] == TileType.Door) return "문 잠그기";
+                return _client.IsMyDoor(x, y) ? "잠금 풀기" : null;
+            }
+            if (_view?.CrackAhead() is TileType cracked) return $"고치기 ({(cracked == TileType.IronWall ? "철 주괴 1" : "돌 1")})";
+            return null;
+        }
+
+        bool DoDoorWork()
+        {
+            string work = DoorWork();
+            if (work == null) return false;
+            if (work == "문 잠그기") SendToHost(_client.LockDoorCommand());
+            else if (work == "잠금 풀기") SendToHost(_client.UnlockDoorCommand());
+            else SendToHost(_client.RepairCommand());
+            Sounds.Play(work == "문 잠그기" ? Sound.DoorShut : work == "잠금 풀기" ? Sound.Door : Sound.Place);
+            return true;
+        }
+
+        // The button over the door or the cracked wall ahead ([문 잠그기]/[잠금 풀기]/[고치기 (…)], "(G)" on a PC).
+        void DrawDoorButtons()
+        {
+            string work = DoorWork();
+            if (work == null) return;
+            var (x, y) = _client.DoorAhead() ?? World.TileAhead(_client.Position, _client.Facing);
+            Vector3 point = _camera.WorldToScreenPoint(new Vector3(x + 0.5f, y + 1.35f, 0));
+            if (point.z < 0) return;
+            string text = work + MeetHint(Meeting.Door);
+            if (Ui.WorldButton(Ui.FromScreen(point), text, Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length))) DoDoorWork();
         }
 
         // The "획득: …" lines in the bottom left, or above the skill buttons where they reach that far, newest at the
         // bottom. Each line is as tall as the font needs and a long one wraps between words, so none is cut off. They
         // stop under the goal list rather than run into it (a phone held sideways, phone-wide-small-hud-field), and a
         // line that would fall on the open bag is not drawn (phone-bag-gear): it shows again once the bag closes.
-        void DrawAcquired()
+        void DrawAcquired(bool dead)
         {
             var label = GUI.skin.label;
             float width = Mathf.Min(400, Ui.Width - 28);
@@ -1725,6 +1917,8 @@ namespace Game.Client
                 if (y < floor) break;
                 var line = new Rect(14, y, width, height);
                 if (bag is Rect window && line.Overlaps(window)) continue;
+                // Nor over a banner or the fallen card (U7: the lines, banners and cards never on one another).
+                if (line.Overlaps(WorldView.BannerShown) || dead && line.Overlaps(DeathCardArea())) continue;
                 ShadowLabel(line, content.text, label, new Color(1, 1, 1, Mathf.Clamp01((AcquiredSeconds - age) / 1f)));
                 shown = shown == Rect.zero ? line : Rect.MinMaxRect(Mathf.Min(shown.xMin, line.xMin), Mathf.Min(shown.yMin, line.yMin), Mathf.Max(shown.xMax, line.xMax), Mathf.Max(shown.yMax, line.yMax));
             }
@@ -1745,7 +1939,7 @@ namespace Game.Client
             Controls.Block(menu);
             if (Ui.Button(bag, "가방")) ToggleScreen(GameScreen.Bag);
             if (Ui.Button(menu, ScreenStack.HubButton, _screens.HubOpen ? Ui.Look.Primary : Ui.Look.Normal)) _screens.ToggleHub();
-            bool skillPoints = _client.SkillPoints > 0 || _client.Classes.Count < ClassRules.SlotsAt(_client.Level), passivePoints = _client.PassivePoints > 0;
+            bool skillPoints = HasSkillPoints, passivePoints = _client.PassivePoints > 0;
             if (skillPoints || passivePoints) InventoryWindow.Badge(menu);
             // Ends on the next Update, after this OnGUI has finished with the session.
             if (_screens.DrawHub(skillPoints, passivePoints)) _endReason = "";
@@ -2116,56 +2310,58 @@ namespace Game.Client
         // only the bars show, so the bag can sit just under them. Lines that do not fit wrap between words.
         void DrawHud(bool compact)
         {
-            var lines = new List<string>();
+            // Each line with whether the box writes it: the buffs' lines are icons with their time (U7), but the
+            // playtests read every line (_hudLines), as before.
+            var all = new List<(string Text, bool Drawn)>();
             bool playing = _client.Status == ClientStatus.Playing;
             // The lines about someone being down: the only ones the box keeps in a boss fight whose bar goes under it.
             int urgent = 0;
             if (!playing)
             {
-                lines.Add(_status);
+                all.Add((_status, true));
             }
             else
             {
                 // In co-op a fallen player waits for an ally (World.Revive), and allies are told who is down.
                 bool together = _client.Names.Count > 1;
-                if (_client.IsDead && !together) lines.Add(_client.LastCamp != null ? "쓰러졌습니다. 잠시 후 마지막에 쉰 야영지에서 일어납니다." : "쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
+                if (_client.IsDead && !together) all.Add((_client.LastCamp != null ? "쓰러졌습니다. 잠시 후 마지막에 쉰 야영지에서 일어납니다." : "쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.", true));
                 if (_client.IsDead && together)
-                    lines.Add($"쓰러졌다. 동료가 곁에 {World.ReviveSeconds:0}초 서 있으면 이 자리에서 일어난다 ({Mathf.Max(0, Mathf.CeilToInt(World.DownSeconds - (Time.time - _downSince)))}초 뒤 집에서)");
+                    all.Add(($"쓰러졌다. 동료가 곁에 {World.ReviveSeconds:0}초 서 있으면 이 자리에서 일어난다 ({DownLeft()}초 뒤 집에서)", true));
                 if (!_client.IsDead)
                 {
                     foreach (var other in _client.Others())
                     {
                         if (other.Kind == EntityKind.Player && other.Health <= 0 && _client.Names.TryGetValue(other.Id, out var fallen))
-                            lines.Add($"{fallen}이(가) 쓰러졌다: 곁에 {World.ReviveSeconds:0}초 서 있으면 일으킨다");
+                            all.Add(($"{fallen}이(가) 쓰러졌다: 곁에 {World.ReviveSeconds:0}초 서 있으면 일으킨다", true));
                     }
                 }
-                urgent = lines.Count;
+                urgent = all.Count;
                 if (!compact)
                 {
                     if (_client.Sleeping)
                     {
                         int everyone = Math.Max(1, _client.Names.Count);
-                        lines.Add(everyone > 1 ? $"자는 중… 모두 누우면 아침이 된다 ({_client.Sleepers}/{everyone}명)" : "자는 중…");
+                        all.Add((everyone > 1 ? $"자는 중… 모두 누우면 아침이 된다 ({_client.Sleepers}/{everyone}명)" : "자는 중…", true));
                     }
-                    if ((_client.SelfStatus & StatusBits.Recalling) != 0) lines.Add("귀환 중… 맞으면 끊긴다");
+                    if ((_client.SelfStatus & StatusBits.Recalling) != 0) all.Add(("귀환 중… 맞으면 끊긴다", true));
                     // Making something by hand (World.StartCrafting): what, how far, how many more.
                     if (_client.Crafting != null)
-                        lines.Add($"만드는 중: {Whole(_client.Crafting.Name)} {_client.CraftProgress * 100:0}%" + (_client.CraftLeft > 1 ? $" (남은 {_client.CraftLeft}개)" : ""));
+                        all.Add(($"만드는 중: {Whole(_client.Crafting.Name)} {_client.CraftProgress * 100:0}%" + (_client.CraftLeft > 1 ? $" (남은 {_client.CraftLeft}개)" : ""), true));
+                    // A food's buff, a shrine's blessing and a camp's rest (World.Pois.cs): icons with their time (Buffs).
                     if (_client.Food != null)
                     {
                         int left = Mathf.CeilToInt(_client.FoodLeft);
-                        lines.Add($"{Whole(_client.Food.Name)} {left / 60}:{left % 60:00}");
+                        all.Add(($"{Whole(_client.Food.Name)} {left / 60}:{left % 60:00}", false));
                     }
-                    // A shrine's blessing and a camp's rest (World.Pois.cs).
                     if (_client.Blessing != null)
                     {
                         int left = Mathf.CeilToInt(_client.BlessingSeconds);
-                        lines.Add($"{Whole(_client.Blessing.Name)}의 축복 {left / 60}:{left % 60:00}");
+                        all.Add(($"{Whole(_client.Blessing.Name)}의 축복 {left / 60}:{left % 60:00}", false));
                     }
                     if (_client.RestedSeconds > 0)
                     {
                         int left = Mathf.CeilToInt(_client.RestedSeconds);
-                        lines.Add($"{Whole("잘 쉼")} {left / 60}:{left % 60:00}");
+                        all.Add(($"{Whole("잘 쉼")} {left / 60}:{left % 60:00}", false));
                     }
                     var points = new List<string>();
                     // An open class slot (Docs/Classes.md, 클래스 고르기): picked on the skills screen.
@@ -2174,14 +2370,16 @@ namespace Game.Client
                     if (_client.PassivePoints > 0) points.Add(Whole($"특성 포인트 {_client.PassivePoints}"));
                     // Where to spend them (U2): the skills and passives screens' keys, or the hub on a phone.
                     string where = Controls.UsingTouch ? "[메뉴]에서" : $"{KeyBindings.Name(KeyAction.Skills)}·{KeyBindings.Name(KeyAction.Passives)}";
-                    if (points.Count > 0) lines.Add($"{string.Join(" · ", points)} ({where})");
+                    if (points.Count > 0) all.Add(($"{string.Join(" · ", points)} ({where})", true));
                 }
             }
 
             // In a boss fight on a narrow screen the box shows only the bars and those lines, so the boss bar under it
             // stays clear of the player (Docs/UiRework.md U0, phone-boss-bar); the playtests still read every line.
-            var shownLines = new List<string>(lines);
-            if (playing && !compact && _view?.ActiveBoss != null && !BossBarBesideHud) lines.RemoveRange(urgent, lines.Count - urgent);
+            var shownLines = all.Select(l => l.Text).ToList();
+            bool squeezed = playing && !compact && _view?.ActiveBoss != null && !BossBarBesideHud;
+            var lines = all.Where((l, i) => l.Drawn && (!squeezed || i < urgent)).Select(l => l.Text).ToList();
+            var buffs = playing && !compact && !squeezed ? Buffs() : new List<Buff>();
             var box = GUI.skin.box;
             // Lines a point apart rather than the label's usual gap.
             _hudLine ??= new GUIStyle(GUI.skin.label)
@@ -2196,23 +2394,31 @@ namespace Game.Client
             float height = box.padding.vertical + (lines.Count > 0 ? label.margin.top + label.margin.bottom + gap * (lines.Count - 1) : 0);
             foreach (string line in lines) height += label.CalcHeight(new GUIContent(line), width);
             if (playing) height += HealthBarHeight + ManaBarHeight + ExperienceBarHeight + 4;
+            if (buffs.Count > 0) height += BuffSize + 6;
             Ui.HudHeight = Mathf.Ceil(height) + 2;
 
             UiSkin.Panel(Ui.HudArea);
             GUILayout.BeginArea(Ui.HudArea, UiSkin.PanelArea);
             if (playing)
             {
-                var bar = GUILayoutUtility.GetRect(width, HealthBarHeight, GUILayout.ExpandWidth(true));
+                // The bars with their marks (U7): a heart, a drop of mana, the level's star; the heart beats while low.
                 float share = _client.MaxHealth > 0 ? _client.Health / _client.MaxHealth : 0;
+                var bar = MarkedBar(width, HealthBarHeight, UiIcons.Heart, new Color(0.95f, 0.32f, 0.3f), share > 0 && share <= LowHealthShare ? UiMotion.LowHealthBeat() : 1);
                 UiSkin.Bar(bar, share, $"생명력 {Mathf.CeilToInt(_client.Health)} / {Mathf.CeilToInt(_client.MaxHealth)}");
                 GUILayout.Space(2);
-                var manaBar = GUILayoutUtility.GetRect(width, ManaBarHeight, GUILayout.ExpandWidth(true));
                 float manaShare = _client.MaxMana > 0 ? _client.Mana / _client.MaxMana : 0;
+                var manaBar = MarkedBar(width, ManaBarHeight, GrowthArt.Drop, new Color(0.45f, 0.65f, 1f), 1);
                 UiSkin.Bar(manaBar, manaShare, $"마나 {Mathf.FloorToInt(_client.Mana)} / {Mathf.CeilToInt(_client.MaxMana)}", mana: true, textSize: 12);
                 GUILayout.Space(2);
-                var experienceBar = GUILayoutUtility.GetRect(width, ExperienceBarHeight, GUILayout.ExpandWidth(true));
                 float progress = Leveling.Progress(_client.Experience);
+                var experienceBar = MarkedBar(width, ExperienceBarHeight, GrowthArt.Point, new Color(1f, 0.82f, 0.35f), 1);
                 UiSkin.Bar(experienceBar, progress, $"Lv {_client.Level} · {(int)(progress * 100)}%", textSize: 12, experience: true);
+                if (buffs.Count > 0)
+                {
+                    GUILayout.Space(4);
+                    var row = GUILayoutUtility.GetRect(width, BuffSize, GUILayout.ExpandWidth(true));
+                    DrawBuffs(row, buffs);
+                }
             }
             foreach (string line in lines) GUILayout.Label(line, label);
             GUILayout.EndArea();
@@ -2229,6 +2435,124 @@ namespace Game.Client
             if (Event.current.type == EventType.Repaint) BossBarShown = Rect.zero;
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss, _client.Level);
             else if (playing) DrawDungeonBossBar();
+        }
+
+        // Seconds until a fallen player gets up at home in co-op.
+        int DownLeft() => Mathf.Max(0, Mathf.CeilToInt(World.DownSeconds - (Time.time - _downSince)));
+
+        // A bar's row in the HUD with its mark at the left (the mark's brightness for a beat); gives the bar's rect.
+        static Rect MarkedBar(float width, float height, string[] mark, Color color, float beat)
+        {
+            var row = GUILayoutUtility.GetRect(width, height, GUILayout.ExpandWidth(true));
+            if (Event.current.type == EventType.Repaint)
+            {
+                var size = UiSkin.IconSize(mark);
+                var tint = new Color(color.r * beat, color.g * beat, color.b * beat, color.a);
+                UiSkin.Icon(new Rect(row.x, row.y + (row.height - size.y) / 2, Mathf.Max(size.x, MarkWidth - 4), size.y), mark, tint);
+            }
+            return new Rect(row.x + MarkWidth, row.y, row.width - MarkWidth, row.height);
+        }
+
+        const float MarkWidth = 18;
+        // Health at or under this share is low: the screen's edges glow red and the heart beats (U7).
+        internal const float LowHealthShare = 0.3f;
+
+        // ---- Buffs and ailments (U7): icons under the bars with their time ----
+
+        internal const float BuffSize = 26;
+
+        internal struct Buff
+        {
+            public string Name;
+            public string Time;
+            public string Tip;
+            public string[] Glyph;
+            public Sprite Icon;
+            public Color Color;
+            public bool Bad;
+        }
+
+        List<Buff> Buffs()
+        {
+            var buffs = new List<Buff>();
+            static string Clock(float seconds)
+            {
+                int left = Mathf.CeilToInt(seconds);
+                return $"{left / 60}:{left % 60:00}";
+            }
+            if (_client.Food != null)
+                buffs.Add(new Buff { Name = _client.Food.Name, Time = Clock(_client.FoodLeft), Tip = _client.Food.Description, Icon = Sprites.Icon(_client.Food), Color = Color.white });
+            if (_client.Blessing != null)
+                buffs.Add(new Buff { Name = $"{_client.Blessing.Name}의 축복", Time = Clock(_client.BlessingSeconds), Tip = PoiText.BlessingLine(_client.Blessing), Glyph = MapIcons.Shrine, Color = new Color(1f, 0.85f, 0.4f) });
+            if (_client.RestedSeconds > 0)
+                buffs.Add(new Buff { Name = "잘 쉼", Time = Clock(_client.RestedSeconds), Tip = "야영지에서 쉬었다: 생명력이 더 빨리 찬다", Glyph = MapIcons.Camp, Color = new Color(1f, 0.6f, 0.3f) });
+            byte status = _client.SelfStatus;
+            if ((status & StatusBits.Burning) != 0) buffs.Add(new Buff { Name = "불붙음", Tip = "불이 붙었다: 잠시 피해를 입는다", Glyph = GrowthArt.Flame, Color = new Color(1f, 0.55f, 0.25f), Bad = true });
+            if ((status & StatusBits.Chilled) != 0) buffs.Add(new Buff { Name = "얼어붙음", Tip = "차가워졌다: 잠시 느려진다", Glyph = GrowthArt.Snow, Color = new Color(0.65f, 0.9f, 1f), Bad = true });
+            if ((status & StatusBits.Poisoned) != 0) buffs.Add(new Buff { Name = "독", Tip = "독에 걸렸다: 잠시 피해를 입는다", Glyph = GrowthArt.Drop, Color = new Color(0.55f, 0.95f, 0.4f), Bad = true });
+            if ((status & StatusBits.Snared) != 0) buffs.Add(new Buff { Name = "거미줄", Tip = "거미줄에 걸렸다: 느려진다", Glyph = GrowthArt.Boot, Color = new Color(0.9f, 0.9f, 0.9f), Bad = true });
+            if ((status & StatusBits.Rooted) != 0) buffs.Add(new Buff { Name = "묶임", Tip = "발이 묶였다: 움직이지 못한다", Glyph = UiIcons.Lock, Color = new Color(0.85f, 0.75f, 0.6f), Bad = true });
+            return buffs;
+        }
+
+        // Where the buffs were drawn in the last repaint and their names, for the playtests.
+        internal static Rect BuffsShown { get; private set; }
+        internal static string BuffNames { get; private set; } = "";
+
+        static GUIStyle _buffTime;
+
+        // Each buff a small well with its icon (red rimmed for an ailment), its time under it in small letters; the mouse
+        // over one (a finger held on it) shows a card with its name and what it does. Known to the playtests by its name
+        // (row "버프").
+        static void DrawBuffs(Rect row, List<Buff> buffs)
+        {
+            _buffTime ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerRight, padding = new RectOffset(0, 1, 0, 0), margin = new RectOffset(0, 0, 0, 0), wordWrap = false };
+            Ui.Text(_buffTime, 12, bold: true);
+            Ui.Row("버프");
+            var e = Event.current;
+            float x = row.x;
+            var names = new List<string>();
+            foreach (var buff in buffs)
+            {
+                float w = buff.Time != null ? Mathf.Max(BuffSize, _buffTime.CalcSize(new GUIContent(buff.Time)).x + 6) : BuffSize;
+                var cell = new Rect(x, row.y, w, BuffSize);
+                if (cell.xMax > row.xMax) break;
+                x += w + 3;
+                names.Add(buff.Name);
+                Ui.Probe(buff.Name, cell);
+                if (e.type == EventType.Repaint)
+                {
+                    UiSkin.SlotFrame(cell, buff.Bad ? new Color(0.9f, 0.3f, 0.25f) : (Color?)null);
+                    var icon = new Rect(cell.x + (cell.width - 16) / 2, cell.y + 2, 16, 16);
+                    if (buff.Icon != null) Sprites.DrawInGui(icon, buff.Icon);
+                    else if (buff.Glyph != null)
+                    {
+                        var size = UiSkin.IconSize(buff.Glyph);
+                        UiSkin.Icon(new Rect(cell.x + (cell.width - size.x) / 2, cell.y + 3, size.x, size.y), buff.Glyph, buff.Color);
+                    }
+                    if (buff.Time != null)
+                    {
+                        var previous = GUI.color;
+                        GUI.color = new Color(0, 0, 0, 0.9f * previous.a);
+                        GUI.Label(new Rect(cell.x + 1, cell.y + 1, cell.width - 2, cell.height - 1), buff.Time, _buffTime);
+                        GUI.color = previous;
+                        GUI.Label(new Rect(cell.x, cell.y, cell.width - 2, cell.height - 2), buff.Time, _buffTime);
+                    }
+                }
+                bool over = cell.Contains(e.mousePosition) && (!Controls.UsingTouch || Ui.Held);
+                if (over)
+                {
+                    string text = buff.Time != null ? $"{buff.Name} · {buff.Time}\n{buff.Tip}" : $"{buff.Name}\n{buff.Tip}";
+                    var size = Ui.CardSize(text, 240, out string wrapped);
+                    Ui.LateCard(new Rect(Mathf.Clamp(cell.x, 4, Mathf.Max(4, Ui.Width - size.x - 4)), cell.yMax + 4, size.x, size.y), wrapped);
+                }
+            }
+            Ui.Row("");
+            if (e.type == EventType.Repaint)
+            {
+                BuffsShown = new Rect(row.x, row.y, x - row.x, BuffSize);
+                BuffNames = string.Join(",", names);
+            }
         }
 
         // The time line's place in a dungeon: its name, level, how long the run has gone and how many rooms are cleared;
@@ -2406,57 +2730,139 @@ namespace Game.Client
             float width = area.width - box.padding.horizontal;
             foreach (var (title, raw) in entries) shown.Add($"{title}: {raw.Replace('\n', ' ')}");
             var previous = GUI.color;
-            // Folded to its first line on a phone held upright and in a boss fight that needs the room (TrackerFolds): the
-            // lines above still carry every entry for the playtests. A tap opens the journal.
+            // Folded to one line on a phone held upright, in a boss fight that needs the room, and when folded by hand
+            // (TrackerFolds): the followed entry if any (U5 추적), else the first, "+N" for the rest and the journal's book;
+            // a tap opens the journal's goals. The lines above still carry every entry for the playtests.
+            bool canFold = !TrackerFoldsAnyway(_view?.ActiveBoss != null);
+            float toggle = Controls.UsingTouch ? Ui.TouchButtonHeight : 20;
             if (TrackerFolds(_view?.ActiveBoss != null))
             {
-                string first = entries[0].Title + (entries.Count > 1 ? $"  +{entries.Count - 1}" : "");
+                var (firstTitle, _) = entries[trackedAt >= 0 ? trackedAt : 0];
                 float lineHeight = _trackerTitle.CalcHeight(new GUIContent("가"), width);
-                var folded = new Rect(area.x, area.yMax + 6, area.width, Mathf.Ceil(lineHeight + box.padding.vertical - 4));
+                var folded = FoldedTrackerArea(lineHeight + box.padding.vertical - 4);
                 GUI.color = new Color(1, 1, 1, 0.85f * previous.a);
                 UiSkin.Panel(folded);
                 GUI.color = previous;
+                // From the right: [목표 펴기] (when folded by hand), the book, "+N", then the title cut to what is left.
+                float right = folded.xMax - box.padding.right;
+                if (canFold)
+                {
+                    var unfold = new Rect(folded.xMax - toggle - 2, folded.y + (folded.height - Mathf.Min(toggle, folded.height)) / 2, toggle, Mathf.Min(toggle, folded.height));
+                    Controls.Block(unfold);
+                    if (FoldButton(unfold, "목표 펴기", folds: false)) TrackerFoldedByHand = false;
+                    right = unfold.x - 2;
+                }
+                var book = UiSkin.IconSize(UiIcons.Book);
+                UiSkin.Icon(new Rect(right - book.x, folded.y + (folded.height - book.y) / 2, book.x, book.y), UiIcons.Book, new Color(0.95f, 0.85f, 0.6f));
+                right -= book.x + 8;
                 _trackerTitle.wordWrap = false;
                 _trackerTitle.clipping = TextClipping.Clip;
-                ShadowLabel(new Rect(folded.x + box.padding.left, folded.y + (folded.height - lineHeight) / 2, width - 14, lineHeight), first, _trackerTitle, new Color(1f, 0.85f, 0.4f));
+                if (entries.Count > 1)
+                {
+                    string more = $"+{entries.Count - 1}";
+                    float moreWidth = _trackerTitle.CalcSize(new GUIContent(more)).x;
+                    ShadowLabel(new Rect(right - moreWidth, folded.y + (folded.height - lineHeight) / 2, moreWidth + 2, lineHeight), more, _trackerTitle, new Color(0.9f, 0.88f, 0.8f));
+                    right -= moreWidth + 8;
+                }
+                float left = folded.x + box.padding.left;
+                if (trackedAt >= 0)
+                {
+                    var flag = UiSkin.IconSize(MapIcons.Pin);
+                    UiSkin.Icon(new Rect(left, folded.y + (folded.height - flag.y) / 2, flag.x, flag.y), MapIcons.Pin, new Color(0.9f, 0.3f, 0.22f));
+                    left += flag.x + 4;
+                }
+                ShadowLabel(new Rect(left, folded.y + (folded.height - lineHeight) / 2, Mathf.Max(0, right - left), lineHeight), Shortened(firstTitle, _trackerTitle, right - left), _trackerTitle, new Color(1f, 0.85f, 0.4f));
                 _trackerTitle.wordWrap = true;
-                UiSkin.Icon(new Rect(folded.xMax - box.padding.right - 10, folded.y, 12, folded.height), UiIcons.Book, new Color(0.95f, 0.85f, 0.6f));
-                Ui.Probe("일지 열기", folded);
+                var tap = canFold ? Rect.MinMaxRect(folded.x, folded.y, folded.xMax - toggle - 4, folded.yMax) : folded;
+                Ui.Probe("일지 열기", tap);
                 Controls.Block(folded);
-                if (GUI.Button(folded, GUIContent.none, GUIStyle.none)) _inventory.ShowJournal(InventoryWindow.JournalSection.Goals);
+                if (GUI.Button(tap, GUIContent.none, GUIStyle.none)) _inventory.ShowJournal(InventoryWindow.JournalSection.Goals);
                 Ui.LeftColumnBottom = folded.yMax;
                 return shown;
             }
-            var laid = new List<(string Title, string Text, float TitleHeight, float TextHeight)>();
+            // Unfolded: [목표 접기] in the top right corner (not on a phone held upright, where it is always one line), the
+            // first entry kept clear of it.
+            var laid = new List<(string Title, string Text, float TitleHeight, float TextHeight, float Width)>();
             float height = box.padding.vertical;
-            foreach (var (title, raw) in entries)
+            for (int i = 0; i < entries.Count; i++)
             {
-                string text = string.Join("\n", raw.Split('\n').Select(part => Ui.Wrap(part, style, width)));
-                float titleHeight = _trackerTitle.CalcHeight(new GUIContent(title), width);
-                float textHeight = style.CalcHeight(new GUIContent(text), width);
-                laid.Add((title, text, titleHeight, textHeight));
+                var (title, raw) = entries[i];
+                float room = i == 0 && canFold ? width - toggle - 2 : width;
+                string text = string.Join("\n", raw.Split('\n').Select(part => Ui.Wrap(part, style, room)));
+                float titleHeight = _trackerTitle.CalcHeight(new GUIContent(title), room);
+                float textHeight = style.CalcHeight(new GUIContent(text), room);
+                laid.Add((title, text, titleHeight, textHeight, room));
                 height += titleHeight + textHeight + 4;
             }
+            if (canFold && Controls.UsingTouch) height = Mathf.Max(height, toggle + 4);
             var frame = new Rect(area.x, area.yMax + 6, area.width, Mathf.Ceil(height));
             GUI.color = new Color(1, 1, 1, 0.85f * previous.a);
             UiSkin.Panel(frame);
             GUI.color = previous;
+            if (canFold)
+            {
+                var fold = new Rect(frame.xMax - toggle - 2, frame.y + 2, toggle, toggle);
+                Controls.Block(fold);
+                if (FoldButton(fold, "목표 접기", folds: true)) TrackerFoldedByHand = true;
+            }
             float y = frame.y + box.padding.top;
             for (int i = 0; i < laid.Count; i++)
             {
-                var (title, text, titleHeight, textHeight) = laid[i];
-                ShadowLabel(new Rect(frame.x + box.padding.left, y, width, titleHeight), title, _trackerTitle, new Color(1f, 0.85f, 0.4f));
+                var (title, text, titleHeight, textHeight, room) = laid[i];
+                ShadowLabel(new Rect(frame.x + box.padding.left, y, room, titleHeight), title, _trackerTitle, new Color(1f, 0.85f, 0.4f));
                 if (i == trackedAt)
                 {
                     var flag = UiSkin.IconSize(MapIcons.Pin);
-                    UiSkin.Icon(new Rect(frame.xMax - box.padding.right - flag.x + 2, y + 1, flag.x, flag.y), MapIcons.Pin, new Color(0.9f, 0.3f, 0.22f));
+                    UiSkin.Icon(new Rect(frame.x + box.padding.left + room - flag.x + 2, y + 1, flag.x, flag.y), MapIcons.Pin, new Color(0.9f, 0.3f, 0.22f));
                 }
                 y += titleHeight;
-                ShadowLabel(new Rect(frame.x + box.padding.left, y, width, textHeight), text, style, Color.white);
+                ShadowLabel(new Rect(frame.x + box.padding.left, y, room, textHeight), text, style, Color.white);
                 y += textHeight + 4;
             }
             Ui.LeftColumnBottom = frame.yMax;
             return shown;
+        }
+
+        // The goal list folded by hand ([목표 접기], U7): this device's choice for this game, not saved.
+        internal static bool TrackerFoldedByHand { get; set; }
+
+        // A small chevron button that folds or unfolds the goal list, known to the playtests by its name.
+        static bool FoldButton(Rect rect, string name, bool folds)
+        {
+            Ui.Probe(name, rect);
+            bool hover = rect.Contains(Event.current.mousePosition) && !Controls.UsingTouch;
+            if (Event.current.type == EventType.Repaint)
+            {
+                var glyph = folds ? FoldUp : FoldDown;
+                var size = UiSkin.IconSize(glyph);
+                UiSkin.Icon(new Rect(rect.center.x - size.x / 2, rect.center.y - size.y / 2, size.x, size.y), glyph, hover ? UiSkin.Gold : new Color(0.9f, 0.8f, 0.6f));
+            }
+            bool pressed = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+            if (pressed) UiMotion.Confirm();
+            return pressed;
+        }
+
+        static readonly string[] FoldUp = { "...#...", "..#o#..", ".#ooo#.", "#oo#oo#", "##...##" };
+        static readonly string[] FoldDown = { "##...##", "#oo#oo#", ".#ooo#.", "..#o#..", "...#..." };
+
+        // The text cut with "…" to fit the width in the style.
+        static string Shortened(string text, GUIStyle style, float width)
+        {
+            if (width <= 0) return "";
+            if (style.CalcSize(new GUIContent(text)).x <= width) return text;
+            for (int length = text.Length - 1; length > 0; length--)
+            {
+                string cut = text.Substring(0, length).TrimEnd() + "…";
+                if (style.CalcSize(new GUIContent(cut)).x <= width) return cut;
+            }
+            return "…";
+        }
+
+        // Where the folded goal list goes under the HUD box: one line, a finger tall on a touch screen.
+        internal static Rect FoldedTrackerArea(float lineHeight)
+        {
+            var area = Ui.HudArea;
+            return new Rect(area.x, area.yMax + 6, area.width, Mathf.Ceil(Controls.UsingTouch ? Mathf.Max(Ui.TouchButtonHeight, lineHeight) : lineHeight));
         }
 
         GUIStyle _trackerTitle;
@@ -2479,7 +2885,10 @@ namespace Game.Client
         // Whether the goal list folds to one line (Docs/UiRework.md 4-5 10): on a phone held upright, where it covered
         // 40% of the top, and in a boss fight whose bar has to go under it, where it pushed the bar down over the player
         // (phone-boss-bar).
-        internal static bool TrackerFolds(bool boss) => Ui.Width < 600 && Ui.Height > Ui.Width || boss && !BossBarBesideHud;
+        // Folded by hand too ([목표 접기], U7), where it is not folded anyway.
+        internal static bool TrackerFolds(bool boss) => TrackerFoldsAnyway(boss) || TrackerFoldedByHand;
+
+        internal static bool TrackerFoldsAnyway(bool boss) => Ui.Width < 600 && Ui.Height > Ui.Width || boss && !BossBarBesideHud;
 
         // Whether the boss bar fits between the HUD box and the minimap; else it goes under the left column.
         internal static bool BossBarBesideHud => Ui.MinimapArea.x - 10 - (Ui.HudArea.xMax + 10) >= 200;
@@ -2506,6 +2915,10 @@ namespace Game.Client
         // Where the boss bar was drawn in the last repaint (zero when none), for the playtests.
         internal static Rect BossBarShown { get; private set; }
 
+        static GUIStyle _bossTitle;
+
+        // The boss's bar (U7 보스 막대 장식): its name line over a dark strip with a skull at the left and a pip for each
+        // phase at the right (passed ones dark red, the one now bright), the bar in a framed well under it.
         static void DrawBossBar(EntityView boss, int level)
         {
             var place = BossBarArea(0);
@@ -2513,8 +2926,39 @@ namespace Game.Client
             // The name line as tall as the font needs, so it is not cut off, and the bar under it.
             string advice = boss.Boss.Level > level ? $" · 권장 Lv {boss.Boss.Level}" : "";
             var title = new GUIContent($"{boss.Boss.Name} · {boss.Phase}/{boss.Boss.PhaseCount}페이즈{advice}");
-            float titleHeight = GUI.skin.label.CalcHeight(title, width);
-            GUI.Label(new Rect(x, top, width, titleHeight), title);
+            _bossTitle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            Ui.Text(_bossTitle, 12, bold: true);
+            int phases = Mathf.Max(1, boss.Boss.PhaseCount);
+            const float pip = 8;
+            float pips = phases * (pip + 3);
+            var skull = UiSkin.IconSize(MapIcons.Skull);
+            float room = Mathf.Max(40, width - skull.x - 8 - pips - 8);
+            float titleHeight = Mathf.Max(20, _bossTitle.CalcHeight(title, room));
+            var line = new Rect(x, top, width, titleHeight);
+            if (Event.current.type == EventType.Repaint)
+            {
+                var previous = GUI.color;
+                GUI.color = new Color(0.05f, 0.02f, 0.02f, 0.6f * previous.a);
+                GUI.DrawTexture(line, Texture2D.whiteTexture);
+                GUI.color = previous;
+                UiSkin.Icon(new Rect(x + 4, top + (titleHeight - skull.y) / 2, skull.x, skull.y), MapIcons.Skull, new Color(0.92f, 0.85f, 0.75f));
+                for (int i = 0; i < phases; i++)
+                {
+                    var at = new Rect(line.xMax - 4 - pips + i * (pip + 3), top + (titleHeight - pip) / 2, pip, pip);
+                    GUI.color = new Color(0, 0, 0, 0.8f * previous.a);
+                    GUI.DrawTexture(at, Texture2D.whiteTexture);
+                    GUI.color = i + 1 < boss.Phase ? new Color(0.45f, 0.12f, 0.1f, previous.a) : i + 1 == boss.Phase ? new Color(1f, 0.4f, 0.3f, previous.a) : new Color(0.35f, 0.3f, 0.28f, previous.a);
+                    GUI.DrawTexture(new Rect(at.x + 1, at.y + 1, at.width - 2, at.height - 2), Texture2D.whiteTexture);
+                }
+                GUI.color = previous;
+            }
+            var words = new Rect(x + skull.x + 8, top, room, titleHeight);
+            var shade = GUI.color;
+            GUI.color = new Color(0, 0, 0, 0.85f * shade.a);
+            GUI.Label(new Rect(words.x + 1, words.y + 1, words.width, words.height), title, _bossTitle);
+            GUI.color = new Color(1f, 0.88f, 0.8f, shade.a);
+            GUI.Label(words, title, _bossTitle);
+            GUI.color = shade;
             float share = boss.MaxHealth > 0 ? Mathf.Clamp01(boss.Health / boss.MaxHealth) : 0;
             UiSkin.Bar(new Rect(x, top + titleHeight, width, 18), share, "", boss: true);
             if (Event.current.type == EventType.Repaint) BossBarShown = new Rect(x, top, width, titleHeight + 18);

@@ -84,8 +84,9 @@ namespace Game.Client
         }
 
         // The hero large in the middle as dressed now, the slots at either side: weapon, ring and amulet at the left,
-        // helmet, chest and boots at the right (Core Keeper and Diablo lay a doll so). Pressing a worn piece picks it.
-        void DrawDoll()
+        // helmet, chest and boots at the right (Core Keeper and Diablo lay a doll so). Pressing a worn piece picks it. The
+        // bag draws the same doll (U6), its slots on the row "착용".
+        void DrawDoll(string row = "캐릭터")
         {
             float cell = Controls.UsingTouch ? 52 : 48;
             float column = cell * 3 + CellGap * 2;
@@ -110,10 +111,10 @@ namespace Game.Client
                 (ItemSlot.Weapon, left, 0), (ItemSlot.Ring, left, 1), (ItemSlot.Amulet, left, 2),
                 (ItemSlot.Helmet, stage.xMax + 8, 0), (ItemSlot.Chest, stage.xMax + 8, 1), (ItemSlot.Boots, stage.xMax + 8, 2),
             };
-            Ui.Row("캐릭터");
-            foreach (var (slot, columnX, row) in places)
+            Ui.Row(row);
+            foreach (var (slot, columnX, line) in places)
             {
-                var area = new Rect(columnX, doll.y + 4 + row * (cell + CellGap), cell, cell);
+                var area = new Rect(columnX, doll.y + 4 + line * (cell + CellGap), cell, cell);
                 var item = _client.Equipment[slot];
                 if (item == null)
                 {

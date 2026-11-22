@@ -85,6 +85,8 @@ namespace Game.Client
     //                             도감 업적 open the journal on that one, U5), none, or the touch hub; "bag <tab>"
     //                             opens the old tab names on the screen that has them now (U2; 상인 and 상자 the shop and
     //                             chest windows, U3). An encounter window shuts at once with nothing of its kind in reach
+    //   bag filter <chip>         (U6) the bag's kind chip: 전체 장비 재료 먹을것 놓을것; "screen 설정" the settings (U7)
+    //   tracker fold|unfold       (U7) the goal list folded by hand, as [목표 접기]/[목표 펴기] would
     //   talk merchant             (U3) the talk of the stall keeper in reach, as her button or G would
     //   roll                      the dodge roll, as its key or button would (the way walked, or faced)
     //   rollhit <amount> <ticks>  a blow on the player that many host ticks into their next roll (its unhurt ticks)
@@ -492,7 +494,13 @@ namespace Game.Client
                     // The old bag tabs by name (Docs/UiRework.md 4-7 입구를 옮긴다): 장비·재료·제작·상자·상인 in the bag,
                     // 스킬·특성·캐릭터·일지 (and 지도) as their own screens. "bag off" shuts whichever of them is up.
                     if (words[1] == "on" || words[1] == "off") root.BagOpen = words[1] == "on";
+                    // bag filter <전체|장비|재료|먹을것|놓을것>: the bag's kind chip (U6).
+                    else if (words[1] == "filter") return root.SetBagFilter(words[2]) ? null : $"error bag filter: no chip '{words[2]}'";
                     else root.ShowBag(words[1]);
+                    return null;
+                case "tracker":
+                    // tracker fold|unfold: the goal list folded by hand or not ([목표 접기], U7).
+                    GameRoot.TrackerFoldedByHand = words[1] == "fold";
                     return null;
                 case "screen":
                     // screen <가방|스킬|특성|캐릭터|일지|지도|off|hub>: a screen by its name (U2), none, or the touch hub.
@@ -1522,6 +1530,14 @@ namespace Game.Client
             json.Field("meet", root.Playing ? root.NextMeeting().ToString() : "None");
             // The bag's page (장비, 재료·제작, 상자, 상인) and whether a talk is on screen.
             json.Field("bagPage", root.BagPage);
+            // The bag's kind chip and the picked thing's card (U6: "철 검", "" for nothing picked).
+            json.Field("bagFilter", root.BagFilter);
+            json.Field("card", root.BagCard);
+            // What each quick slot holds, by name ("철 검,,횃불,..."), for the card's [퀵슬롯 N] (U6).
+            json.Field("quick", root.QuickNames);
+            // The HUD (U7): the buffs' names, what felled the player (when known).
+            json.Field("buffs", GameRoot.BuffNames);
+            json.Field("deathCause", root.DeathCause);
             json.Field("talking", root.TalkText != null);
             // The talk box (U3): its line still being typed, the portrait ("merchant:Happy", "" without one), which line of
             // how many ("2/5"); the shop's tab, and the stall keeper in reach (her name, "" for none). Where the box was
@@ -1554,7 +1570,12 @@ namespace Game.Client
                 .Field("acquired", Rect(GameRoot.AcquiredArea)).Field("bossBar", Rect(GameRoot.BossBarShown))
                 .Field("leftBottom", Ui.LeftColumnBottom).Field("folded", root.Playing && GameRoot.TrackerFolds(root.BossShown))
                 .Field("player", Rect(root.PlayerOnScreen)).Field("scale", Ui.Scale).Field("dots", UiSkin.Dots)
-                .Field("motion", Settings.ReduceMotion ? "reduced" : "normal").Raw('}'));
+                .Field("motion", Settings.ReduceMotion ? "reduced" : "normal")
+                // U7: the HUD box, the buffs' row, the fallen card, the banner's strip, the hub's panel (when open), how
+                // strong the low-health red is at the screen's edges, and whether the goal list was folded by hand.
+                .Field("hud", Rect(Ui.HudArea)).Field("buffs", Rect(GameRoot.BuffsShown)).Field("death", Rect(GameRoot.DeathShown))
+                .Field("banner", Rect(WorldView.BannerShown)).Field("hub", Rect(root.HubOpen ? ScreenStack.HubLayout().Panel : default))
+                .Field("lowHealth", UiMotion.LowHealthGlow(GameRoot.LowHealthShare)).Field("foldedByHand", GameRoot.TrackerFoldedByHand).Raw('}'));
             var world = root.HostWorld;
             var player = root.HostPlayer;
             if (world != null && player != null)

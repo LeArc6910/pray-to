@@ -733,13 +733,19 @@ namespace Game.Client
             var previous = GUI.color;
             GUI.color = new Color(0, 0, 0, 0.7f * previous.a);
             GUI.DrawTexture(screen, Texture2D.whiteTexture);
-            float hurt = UiMotion.HurtGlow;
-            if (hurt > 0)
-            {
-                _edges ??= Edges();
-                GUI.color = new Color(0.9f, 0.08f, 0.06f, hurt * previous.a);
-                GUI.DrawTexture(screen, _edges, ScaleMode.StretchToFill);
-            }
+            float hurt = Mathf.Max(UiMotion.HurtGlow, UiMotion.LowHealthGlow(GameRoot.LowHealthShare));
+            GUI.color = previous;
+            RedEdges(screen, hurt);
+        }
+
+        // The screen's edges glowing red, that strong (being hurt, low health: U1, U7).
+        public static void RedEdges(Rect screen, float strength)
+        {
+            if (strength <= 0 || Event.current.type != EventType.Repaint) return;
+            _edges ??= Edges();
+            var previous = GUI.color;
+            GUI.color = new Color(0.9f, 0.08f, 0.06f, strength * previous.a);
+            GUI.DrawTexture(screen, _edges, ScaleMode.StretchToFill);
             GUI.color = previous;
         }
 

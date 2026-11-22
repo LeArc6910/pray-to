@@ -17,6 +17,8 @@ namespace Game.Client
     //  - encounters.png, encounters_phone.png: the encounter windows of U3 at their size in points (UiPreview.Encounters.cs);
     //  - growth.png, growth_phone.png: the growth screens of U4 (skills, the passive tree, the character) on a PC and on
     //    phones held either way (UiPreview.Growth.cs);
+    //  - bag_hud.png, bag_hud_phone.png: the bag of U6 and the HUD of U7 (the bag with a card, the HUD in play, a boss at
+    //    low health, the fallen card over a window, the Esc menu and the hub with a banner) (UiPreview.BagHud.cs);
     //  - pixels.png: why the frames are drawn at whole device pixels — a corner at a phone's pixel ratio 2.625 the old way
     //    (stretched: pixels 5 and 6 device pixels across by turns) and the new (5 each).
     // The writing is the preview's small Latin font (UiMockKit), as the tool cannot draw the game's.
@@ -41,6 +43,8 @@ namespace Game.Client
             Png.Save(EncountersPhone(loot), Path.Combine(folder, "encounters_phone.png"));
             Png.Save(Growth(loot, classes), Path.Combine(folder, "growth.png"));
             Png.Save(GrowthPhone(loot, classes), Path.Combine(folder, "growth_phone.png"));
+            Png.Save(BagHud(loot), Path.Combine(folder, "bag_hud.png"));
+            Png.Save(BagHudPhone(loot), Path.Combine(folder, "bag_hud_phone.png"));
             if (world != null)
             {
                 Png.Save(Records(loot, world, monsters), Path.Combine(folder, "records.png"));

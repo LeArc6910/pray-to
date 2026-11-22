@@ -1123,6 +1123,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only records,npc,story,guide,travel,dungeon`
   - 클라우드 확인 (2026-11-22, `fadc518`~`156a521`): [x] `npc`·`story`·`guide`·`travel` 모두 통과, `records` 휴대폰 지도 표시 칸을 44점으로 고친 뒤 모두 통과. 일지 쪽지에서 초상이 글 첫 글자를 덮던 것 고침(`a19de66`). 사진: PC 일지(리본 목차, 쪽지와 막대, [추적 그만]), PC 지도(양피지, 범례, 표시 카드와 [여기로 길 안내]), 세로 휴대폰 도감 격자(실루엣과 "?")와 지도 아래 범례
   - (사람) 양피지 책·인장 모습이 마음에 드는지, 지도 끌기·확대의 손맛(휠, 실제 휴대폰 두 손가락), 표시를 눌러 뜨는 카드와 [여기로 길 안내]가 쓸 만한지
+- [ ] 165단계: 가방 정리와 HUD(`Docs/UiRework.md` U6·U7, UI 개편 마무리)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/InventoryWindow.Bag.cs`의 `.meta`가 생기면 커밋한다. PlayMode `LayoutTests.TheBagAndHudFit`, 사진 장면 `FeatureTests.TheBagAndHudDraw`. 메뉴 단추 수 시험이 8로 바뀌었다
+  - (클라우드 웹 점검) `sweep.js --only hud,basics,base,first,firstphone,touch,menu,save,screens,layout`
+  - (사람) 가방의 분류 칩·카드·비교가 쓰기 편한지, 낮은 생명력의 붉은 가장자리와 하트 뜀이 거슬리지 않는지, 쓰러짐 카드와 [집에서 일어나기], PC에서 아무것도 안 열린 때 Esc가 메뉴를 여는 것이 괜찮은지(전에는 바로 나갔다)
 
 ## 결과 보고
 

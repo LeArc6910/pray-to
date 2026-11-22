@@ -83,7 +83,7 @@ namespace Game.Client
             }
         }
 
-        public static bool Draws(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Map;
+        public static bool Draws(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Map && screen != GameScreen.Settings;
 
         // The bag's own pages (the rest are screens of their own; the chest's and the merchant's are encounter windows
         // since U3).
@@ -179,81 +179,7 @@ namespace Game.Client
                 DrawJournalScreen();
                 return;
             }
-            _page = PageOf(screen);
-            var area = Area;
-            bool full = ScreenStack.IsFull(screen);
-            bool besideWindow = area.x >= TooltipWidth + 20;
-            float inner = area.width - GUI.skin.box.padding.horizontal;
-            float scrollbar = GUI.skin.verticalScrollbar.fixedWidth + 8;
-            // A label in the list is that wide less its own margins.
-            _textWidth = inner - scrollbar - GUI.skin.label.margin.horizontal;
-            // Room for two buttons and [퀵] beside each name, and for [끼우기] while a rune is picked and [다듬기] by
-            // an anvil: without that room a row ran past the window, its [퀵] cut off.
-            float extra = (_selectedRune != null ? ExtraButton : 0) + (_client.NearAnvil ? ExtraButton : 0);
-            _nameWidth = Mathf.Clamp(_textWidth - IconRoom - 150 - QuickWidth - extra, 60, 240);
-            _recipeWidth = _textWidth - IconRoom - 120;
-            Controls.Block(area);
-            Wheel(area);
-            Ui.TouchScroll(area, ref _scroll[(int)_page]);
-            // The chest's and the merchant's pages are windows of their own since U3 (ShowEncounter).
-            if (_bagPage == Page.Chest || _bagPage == Page.Merchant) _bagPage = Page.Gear;
-            _page = PageOf(screen);
-            // The tabs of the screen's group: the bag's own pages, the growth screens, or the records (the journal and the
-            // map).
-            _pages.Clear();
-            switch (ScreenStack.GroupOf(screen))
-            {
-                case ScreenGroup.Growth:
-                    _pages.AddRange(new[] { Page.Classes, Page.Passives, Page.Character });
-                    break;
-                case ScreenGroup.Records:
-                    _pages.AddRange(new[] { Page.Journal, Page.Map });
-                    break;
-                default:
-                    _pages.AddRange(new[] { Page.Gear, Page.Materials });
-                    break;
-            }
-
-            // The head band says what the screen is (Docs/UiRework.md, the person's pick of 2026-11-22): the bag's
-            // leather, the growth screens' night, the journal's parchment; the coins at its right, and the close button
-            // in the corner. On a PC the title carries its key.
-            var kind = KindOf(_page);
-            string title = _page switch
-            {
-                _ when screen == GameScreen.Bag => "가방" + ScreenStack.KeyHint(screen),
-                _ => PageNames[(int)_page] + ScreenStack.KeyHint(screen),
-            };
-            UiMotion.BeginWindow(ScreenStack.MotionKey(screen), area, kind);
-            var inside = UiSkin.Window(area, kind, title, TabIcons[(int)_page], out var head);
-            float right = UiSkin.CloseRect(head).x - 6;
-            DrawCoins(head, right);
-            if (UiSkin.CloseButton(head)) _screens.Close();
-            GUILayout.BeginArea(inside);
-            // Without room beside the window a line says how to see a description, so nothing sits over the list.
-            if (!besideWindow && !Ui.Short && !full)
-                GUILayout.Label(Fit(Controls.UsingTouch ? "이름이나 칸을 누르고 있으면 설명" : "이름이나 칸에 마우스를 올리면 설명", inner));
-            var chosen = Tabs(_page, _pages, inner);
-            if (chosen != _page)
-            {
-                if (InBag(chosen)) _bagPage = chosen;
-                else _screens.Show(ScreenOf(chosen));
-                if (chosen != Page.Map) _page = chosen;
-            }
-            if (_hotbar != null && _hotbar.ShowsMessage) GUILayout.Label(Fit(_hotbar.Message, inner));
-            int page = (int)_page;
-            // The list takes whatever height the title and tabs leave, so it never runs past the frame.
-            _scroll[page] = Ui.BeginScrollView(_scroll[page], GUILayout.ExpandHeight(true));
-            if (_page == Page.Gear) DrawGear();
-            else DrawMaterialsPage();
-            Ui.EndScrollView();
-            if (Event.current.type == EventType.Repaint)
-            {
-                var rows = GUILayoutUtility.GetLastRect();
-                _rows = new Rect(inside.x + rows.x, inside.y + rows.y, rows.width, rows.height);
-            }
-            GUILayout.EndArea();
-            UiMotion.EndWindow();
-            DrawTooltip(area, besideWindow);
+            DrawBag();
         }
 
         // Where the bag goes: left of the minimap column, full height; on narrow screens under the column; under the HUD
@@ -273,8 +199,10 @@ namespace Game.Client
                 float top = Ui.RightColumnBottom + 10;
                 area = new Rect(10, top, Ui.Width - 20, Ui.Height - top - 10);
             }
+            // On a low screen (a phone held sideways) the HUD box is not drawn while the bag is open (4-5 가로 화면), so the
+            // bag keeps the whole height; elsewhere it goes under the box's bars.
             var hud = Ui.HudArea;
-            if (area.x < hud.xMax + 10 && area.y < hud.yMax + 10) area = Rect.MinMaxRect(area.x, hud.yMax + 10, area.xMax, area.yMax);
+            if (!Ui.Short && area.x < hud.xMax + 10 && area.y < hud.yMax + 10) area = Rect.MinMaxRect(area.x, hud.yMax + 10, area.xMax, area.yMax);
             return area;
         }
 
@@ -317,50 +245,6 @@ namespace Game.Client
             return line.x - icon.x - 6;
         }
 
-        // Tabs that switch as soon as they are pressed. IMGUI's toolbar switches on release, and in the browser its
-        // first click after the bag opened was sometimes lost (LOCAL_TASKS.md, the 2026-10-31 UI check).
-        readonly List<Page> _pages = new List<Page>();
-
-        Page Tabs(Page page, IReadOnlyList<Page> pages, float width)
-        {
-            int count = pages.Count;
-            const float gap = 4;
-            // In two rows when one would make the tabs too narrow for their names (a phone held upright). Decided
-            // from the window's width, which is the same in every event: a rect from GetRect is a dummy while IMGUI
-            // lays out, so deciding from it asked for a second row there and not when drawing, and the mismatch
-            // threw and left every page blank.
-            int perRow = (width - gap * (count - 1)) / count < 64 ? (count + 1) / 2 : count;
-            var probe = GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true));
-            var second = perRow < count ? GUILayoutUtility.GetRect(GUIContent.none, GUI.skin.button, GUILayout.Height(TabHeight), GUILayout.ExpandWidth(true)) : probe;
-            float tabWidth = (probe.width - gap * (perRow - 1)) / perRow;
-            var e = Event.current;
-            for (int i = 0; i < count; i++)
-            {
-                var row = i < perRow ? probe : second;
-                int column = i < perRow ? i : i - perRow;
-                var tab = new Rect(row.x + column * (tabWidth + gap), row.y, tabWidth, row.height);
-                if (e.type == EventType.MouseDown && tab.Contains(e.mousePosition))
-                {
-                    if (page != pages[i])
-                    {
-                        page = pages[i];
-                        UiMotion.Confirm();
-                    }
-                    e.Use();
-                }
-                var label = PageLabels[(int)pages[i]];
-                Ui.Probe(label.text, tab);
-                bool hover = tab.Contains(e.mousePosition);
-                if (e.type == EventType.Repaint) UiSkin.Tab(tab, label, TabIcons[(int)pages[i]], page == pages[i], hover);
-                // On a PC the mouse over a tab of a screen with a key says the key.
-                if (hover && !Controls.UsingTouch && !InBag(pages[i])) ScreenStack.TabHint(tab, ScreenOf(pages[i]));
-                // Points to spend: a gold dot in the corner of the skills or passives tab.
-                bool points = pages[i] == Page.Classes && _client.SkillPoints > 0 || pages[i] == Page.Passives && _client.PassivePoints > 0;
-                if (points && e.type == EventType.Repaint) Badge(tab);
-            }
-            return page;
-        }
-
         // The guide's progress for the journal (GameRoot hands it over when the guide starts).
         public GuideProgress Guide { get; set; }
 
@@ -394,91 +278,6 @@ namespace Game.Client
             e.Use();
         }
 
-        // The gear page as a grid, the way Terraria and Core Keeper show a bag: the six worn slots in a row, then
-        // every carried item, consumable and rune as a square with its icon, rarity edge and count. Pressing one picks
-        // it, and the panel under the grid tells what it is and holds its buttons ([장착], [버리기], [마시기], ...).
-        // With a rune picked, an item's panel offers [끼우기]. Stats and life skills fold away at the bottom.
-        void DrawGear()
-        {
-            // By an anvil, the anvil's window works the gear (U3); a picked thing's [다듬기] opens it on that piece.
-            if (_client.NearAnvil)
-            {
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(Fit("모루 곁: 장비를 고르고 [다듬기], 또는 모루 창에서 강화·분해·룬 빼기·접사 다시", _textWidth - 104), GUILayout.Width(_textWidth - 104));
-                if (Ui.LayoutButton("모루 열기", GUILayout.Width(96))) ShowEncounter(GameScreen.Anvil);
-                GUILayout.EndHorizontal();
-                GUILayout.Space(4);
-            }
-
-            float cell = Controls.UsingTouch ? 48 : 44;
-            GUILayout.Label(Fit("착용", _textWidth));
-            var slots = (ItemSlot[])Enum.GetValues(typeof(ItemSlot));
-            var worn = Grid(slots.Length, cell);
-            for (int i = 0; i < slots.Length; i++)
-            {
-                var item = _client.Equipment[slots[i]];
-                var area = CellAt(worn, i, cell);
-                if (item == null)
-                {
-                    EmptyCell(area, ItemText.SlotName(slots[i]));
-                    continue;
-                }
-                if (Cell(area, Sprites.Icon(item.Base), ItemText.Name(item), null, Palette.Of(item.Rarity), _picked == item.Id, ItemTooltip(item)))
-                {
-                    Pick(item.Id, null);
-                }
-            }
-
-            GUILayout.Space(4);
-            var items = _client.Bag.Items.ToList();
-            var consumables = _client.Bag.Consumables.ToList();
-            var runes = _client.Bag.Runes.ToList();
-            float wait = _client.ConsumableCooldownLeft;
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(Fit($"소지품 {items.Count}/{Inventory.Capacity}" + (wait > 0 ? $" · 소모품은 {Mathf.CeilToInt(wait)}초 뒤에" : ""), _textWidth - 68), GUILayout.Width(_textWidth - 68));
-            // Gear in slot order, the best first (Inventory.Sort).
-            GUI.enabled = items.Count > 1;
-            if (Ui.LayoutButton("정렬", GUILayout.Width(60))) Send(_client.SortBagCommand(), Sound.Click);
-            GUI.enabled = true;
-            GUILayout.EndHorizontal();
-            int count = Math.Max(items.Count + consumables.Count + runes.Count, 1);
-            var grid = Grid(count, cell);
-            int index = 0;
-            foreach (var item in items)
-            {
-                bool wearable = item.Base.RequiredLevel <= _client.Level;
-                if (Cell(CellAt(grid, index++, cell), Sprites.Icon(item.Base), ItemText.Name(item), wearable ? null : $"Lv{item.Base.RequiredLevel}",
-                    Palette.Of(item.Rarity), _picked == item.Id, ItemTooltip(item), dim: !wearable))
-                {
-                    Pick(item.Id, null);
-                }
-            }
-            foreach (var (consumable, number) in consumables)
-            {
-                if (Cell(CellAt(grid, index++, cell), Sprites.Icon(consumable), $"{consumable.Name} ×{number}", number.ToString(), Palette.Potion,
-                    _pickedConsumable == consumable, consumable.Description))
-                {
-                    Pick(0, consumable);
-                }
-            }
-            foreach (var (rune, number) in runes)
-            {
-                var tooltip = string.Join("\n", new[] { SlotCategory.Weapon, SlotCategory.Armor, SlotCategory.Jewelry }
-                    .Select(c => $"{CategoryName(c)}: {string.Join(", ", rune.ModifiersFor(c).Select(StatText.Describe))}"));
-                if (Cell(CellAt(grid, index++, cell), Sprites.Icon(rune), $"{rune.Name} ×{number}", number.ToString(), Palette.Rune,
-                    _selectedRune == rune, $"{rune.Name}\n{tooltip}"))
-                {
-                    _selectedRune = _selectedRune == rune ? null : rune;
-                    Sounds.Play(Sound.Click);
-                }
-            }
-            if (index == 0) GUILayout.Label(Fit("가방이 비었다", _textWidth));
-
-            DrawPicked();
-
-            GUILayout.Space(8);
-            GUILayout.Label(Fit("능력치와 생활 기술은 [캐릭터] 탭에 있다", _textWidth));
-        }
         // The item (by id) or consumable picked in the grid; nothing picked when both are empty.
         int _picked;
         ConsumableDefinition _pickedConsumable;
@@ -488,104 +287,25 @@ namespace Game.Client
         {
             _picked = item;
             _pickedConsumable = consumable;
+            _pickedMaterial = null;
             Sounds.Play(Sound.Click);
         }
 
-        // What is picked, under the grid: its icon and name, what it is, and what can be done with it. A rune picked
-        // for socketing says so here too.
+        // What is picked, as the bag's card (U6, InventoryWindow.Bag.cs), in the flow of a page (the character screen).
         void DrawPicked()
         {
-            if (_selectedRune != null)
-            {
-                GUILayout.Space(4);
-                GUILayout.BeginHorizontal();
-                Icon(Sprites.Icon(_selectedRune));
-                GUILayout.Label(Fit($"{_selectedRune.Name}: 끼울 아이템을 고르고 [끼우기]. 넣은 룬은 모루에서 정수를 들여야 뺄 수 있다", _textWidth - IconRoom - 64));
-                if (Ui.LayoutButton("그만", GUILayout.Width(56))) _selectedRune = null;
-                GUILayout.EndHorizontal();
-            }
-
-            var item = _picked == 0 ? null : _client.Equipment.Items.Concat(_client.Bag.Items).FirstOrDefault(i => i.Id == _picked);
-            if (item == null) _picked = 0;
-            if (_pickedConsumable != null && _client.Bag.CountOf(_pickedConsumable) == 0) _pickedConsumable = null;
-            if (item == null && _pickedConsumable == null)
-            {
-                if (_selectedRune == null) GUILayout.Label(Fit(Controls.UsingTouch ? "칸을 누르면 여기에 자세히 나온다" : "칸을 누르면 여기에 자세히 나온다(마우스를 올려도 설명)", _textWidth));
-                return;
-            }
-
+            // Only worn gear is picked there; a material or potion picked in the bag stays the bag's.
+            if (_picked == 0) return;
+            var card = CardOf();
+            if (card == null) return;
             GUILayout.Space(4);
-            // A well inside the window (Docs/UiRework.md 4-4 판 위계).
-            UiSkin.BeginWell(_pickedWell);
-            float width = _textWidth - GUI.skin.box.padding.horizontal;
-            if (item != null)
-            {
-                bool wearing = _client.Equipment[item.Base.Slot] == item;
-                GUILayout.BeginHorizontal();
-                Icon(Sprites.Icon(item.Base));
-                var previous = GUI.color;
-                GUI.color = Palette.Of(item.Rarity);
-                GUILayout.Label(Fit(ItemText.Name(item) + (wearing ? " (착용 중)" : ""), width - IconRoom));
-                GUI.color = previous;
-                GUILayout.EndHorizontal();
-                GUILayout.Label(Ui.Wrap(string.Join("\n", ItemText.Describe(item).Skip(1).Select(line => line.Trim())), GUI.skin.label, width));
-                // Against what is worn in its slot: what putting it on would change.
-                var worn = _client.Equipment[item.Base.Slot];
-                if (!wearing && worn != null)
-                {
-                    var change = Compare(item, worn);
-                    var previousColor = GUI.color;
-                    GUI.color = new Color(0.85f, 0.9f, 1f);
-                    GUILayout.Label(Ui.Wrap(change.Count == 0 ? $"지금 낀 {ItemText.Name(worn)}와 같다" : $"지금 낀 {ItemText.Name(worn)}보다: {string.Join(", ", change)}", GUI.skin.label, width));
-                    GUI.color = previousColor;
-                }
-                GUILayout.BeginHorizontal();
-                if (wearing)
-                {
-                    if (Ui.LayoutButton("벗기", GUILayout.Width(64))) Send(_client.UnequipCommand(item.Base.Slot), Sound.Click);
-                }
-                else
-                {
-                    // Too high a level to wear yet: the button says which level instead.
-                    bool wearable = item.Base.RequiredLevel <= _client.Level;
-                    GUI.enabled = wearable;
-                    if (Ui.LayoutButton(wearable ? "장착" : $"Lv{item.Base.RequiredLevel}", Ui.Look.Primary, GUILayout.Width(64))) Send(_client.EquipCommand(item.Id), Sound.Place);
-                    GUI.enabled = true;
-                    if (Ui.LayoutButton("버리기", Ui.Look.Danger, GUILayout.Width(64))) Send(_client.DiscardCommand(item.Id), Sound.Click);
-                }
-                RuneButton(item);
-                RefineButton(item);
-                QuickButton(_hotbar?.SlotOf(item), () => _hotbar.Toggle(item));
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-            }
-            else
-            {
-                var consumable = _pickedConsumable;
-                GUILayout.BeginHorizontal();
-                Icon(Sprites.Icon(consumable));
-                GUILayout.Label(Fit($"{consumable.Name} ×{_client.Bag.CountOf(consumable)}", width - IconRoom));
-                GUILayout.EndHorizontal();
-                GUILayout.Label(Ui.Wrap(consumable.Description, GUI.skin.label, width));
-                GUILayout.BeginHorizontal();
-                // A potion is drunk; a food is eaten, and still gives its buff at full health.
-                if (Ui.LayoutButton(consumable.IsFood ? "먹기" : consumable.Recalls ? "쓰기" : consumable.ReadsMap ? "읽기" : "마시기", GUILayout.Width(64)))
-                {
-                    byte[] command = _client.UseConsumableCommand(consumable);
-                    if (command != null) _send(command);
-                }
-                QuickButton(_hotbar?.SlotOf(consumable), () => _hotbar.Toggle(consumable));
-                GUILayout.FlexibleSpace();
-                GUILayout.EndHorizontal();
-            }
-            _pickedWell = UiSkin.EndWell(_pickedWell);
+            var rect = GUILayoutUtility.GetRect(_textWidth, CardHeight(card, _textWidth), GUILayout.Width(_textWidth));
+            DrawCard(card, rect);
         }
 
-        // Where the picked thing's well was laid out last.
-        Rect _pickedWell;
-
-        // What wearing the item instead of the other would change, stat by stat ("피해 +12", "방어도 -3").
-        static List<string> Compare(Item item, Item other)
+        // What wearing the item instead of the other would change, stat by stat ("피해 +12", "방어도 -3"), and whether
+        // each is a gain.
+        static List<(string Text, bool Up)> Compare(Item item, Item other)
         {
             var totals = new Dictionary<(StatType, ModifierKind, SkillTag), int>();
             void Add(Item from, int sign)
@@ -599,7 +319,7 @@ namespace Game.Client
             Add(item, 1);
             Add(other, -1);
             return totals.Where(pair => pair.Value != 0)
-                .Select(pair => StatText.Describe(new Modifier(pair.Key.Item1, pair.Key.Item2, pair.Value, pair.Key.Item3)))
+                .Select(pair => (StatText.Describe(new Modifier(pair.Key.Item1, pair.Key.Item2, pair.Value, pair.Key.Item3)), pair.Value > 0))
                 .ToList();
         }
 
@@ -767,9 +487,9 @@ namespace Game.Client
         {
             var pointer = Event.current.mousePosition;
             bool hovering = !string.IsNullOrEmpty(_hover) && _rows.Contains(pointer);
-            if (!hovering && !besideWindow) return;
-            string text = hovering ? _hover
-                : Controls.UsingTouch ? "이름이나 칸을 누르고 있으면 설명이 보입니다." : "이름이나 칸에 마우스를 올리면 설명이 보입니다.";
+            // Nothing while nothing is hovered: the card that stood beside the bag saying how to see one is gone (U6).
+            if (!hovering) return;
+            string text = _hover;
             float room = Mathf.Min(TooltipWidth, Ui.Width - 20);
             // As wide as the longest line needs, so short descriptions get a small card.
             var size = Ui.CardSize(text, room, out string wrapped);
@@ -779,7 +499,7 @@ namespace Game.Client
             if (besideWindow)
             {
                 x = window.x - width - 10;
-                y = hovering ? pointer.y - 12 : Mathf.Max(window.y, Ui.HudArea.yMax + 10);
+                y = pointer.y - 12;
             }
             else
             {
@@ -797,8 +517,6 @@ namespace Game.Client
 
         // Materials, counted by kind. One that builds gets [놓기], a seed gets [심기] and the watering can [물 주기];
         // all act on the tile the player faces.
-        // The cracked built tile ahead, when there is one (GameRoot sets it from the view): mended from the bag.
-        public TileType? CrackAhead { get; set; }
 
         // What the player's goals still ask for (WorldClient.NeededMaterials), worked out once a frame.
         Dictionary<MaterialDefinition, (string For, int Count)> _needed = new Dictionary<MaterialDefinition, (string For, int Count)>();
@@ -841,38 +559,9 @@ namespace Game.Client
 
         void DrawMaterials()
         {
-            if (CrackAhead is TileType cracked)
-            {
-                string name = _client.TileName(cracked);
-                string cost = cracked == TileType.IronWall ? "철 주괴 1" : "돌 1";
-                GUILayout.BeginHorizontal();
-                GUILayout.Label(Fit($"앞의 {name}에 금이 갔다", _textWidth - 120), GUILayout.Width(_textWidth - 120));
-                if (Ui.LayoutButton($"고치기 ({cost})", GUILayout.Width(112))) Send(_client.RepairCommand(), Sound.Place);
-                GUILayout.EndHorizontal();
-            }
-            // The door ahead (World.LockDoor, 2026-11-09): locked, only whoever locked it walks through.
-            if (_client.DoorAhead() is (int doorX, int doorY))
-            {
-                GUILayout.BeginHorizontal();
-                if (_client.Map[doorX, doorY] == TileType.Door)
-                {
-                    GUILayout.Label(Fit("앞의 문: 잠그면 나만 지나간다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
-                    if (Ui.LayoutButton("문 잠그기", GUILayout.Width(96))) Send(_client.LockDoorCommand(), Sound.DoorShut);
-                }
-                else if (_client.IsMyDoor(doorX, doorY))
-                {
-                    GUILayout.Label(Fit("앞의 문: 내가 잠갔다. 나만 지나간다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
-                    if (Ui.LayoutButton("잠금 풀기", GUILayout.Width(96))) Send(_client.UnlockDoorCommand(), Sound.Door);
-                }
-                else
-                {
-                    string owner = _client.LockOwner(doorX, doorY);
-                    GUILayout.Label(Fit(owner != null ? $"앞의 문: {owner}이(가) 잠가서 지나갈 수 없다" : "앞의 문: 잠겨 있다", _textWidth));
-                }
-                GUILayout.EndHorizontal();
-            }
-            GUILayout.Label("재료");
-            if (_client.Bag.Materials.Count == 0) GUILayout.Label(Fit("아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.", _textWidth));
+            // What can be done here and now (U6): the machine ahead, then a row for each material that is put down, planted,
+            // used or put in it. Every material is in the [장비] tab's grid ([재료] chip); a cracked wall or a door ahead
+            // has its own button over it in the world (GameRoot.DrawDoorButtons).
             DrawStash();
             // The machine the player faces, for the filter and generator buttons.
             var ahead = _client.MachineAhead();
@@ -997,43 +686,19 @@ namespace Game.Client
                 }
                 GUILayout.EndHorizontal();
             }
+            if (_client.Bag.Materials.Count == 0) GUILayout.Label(Fit("재료가 아직 없다. 벽을 캐거나 몬스터를 잡으면 모인다.", _textWidth));
+            else if (plain.Count == _client.Bag.Materials.Count) GUILayout.Label(Fit("놓거나 심거나 쓸 재료가 없다.", _textWidth));
             if (plain.Count == 0) return;
-            GUILayout.Space(4);
-            float cell = Controls.UsingTouch ? 48 : 44;
-            var grid = Grid(plain.Count, cell);
-            for (int i = 0; i < plain.Count; i++)
+            // The rest are only kept: they are in the [장비] tab's grid under [재료], where a picked one can be locked.
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(Fit($"다른 재료 {plain.Count}가지는 [장비] 탭의 [재료]에서 본다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+            if (Ui.LayoutButton("재료 보기", GUILayout.Width(96)))
             {
-                var (material, count) = (plain[i].Key, plain[i].Value);
-                string wanted = NeededText(material);
-                bool locked = _hotbar?.IsLocked(material) ?? false;
-                var area = CellAt(grid, i, cell);
-                // A goal's material carries the badge (as a tab with points to spend does); a locked one says so.
-                if (Cell(area, Sprites.Icon(material), $"{material.Name} ×{count}{(wanted != null ? " · 필요" : "")}{(locked ? " · 잠금" : "")}",
-                    locked ? $"잠{count}" : count.ToString(), Palette.Material, _pickedMaterial == material,
-                    $"{material.Name} ×{count}\n{material.Description}{(wanted != null ? "\n" + wanted : "")}{(locked ? "\n잠금: [상자에 넣기]가 두고 간다" : "")}"))
-                {
-                    _pickedMaterial = material;
-                    Sounds.Play(Sound.Click);
-                }
-                if (wanted != null && Event.current.type == EventType.Repaint) Badge(area);
+                _bagPage = Page.Gear;
+                _filter = BagFilter.Materials;
+                _scroll[(int)Page.Gear] = Vector2.zero;
             }
-            if (_pickedMaterial != null && plain.Any(p => p.Key == _pickedMaterial))
-            {
-                string wanted = NeededText(_pickedMaterial);
-                GUILayout.Label(Fit($"{_pickedMaterial.Name} ×{_client.Bag.CountOf(_pickedMaterial)}: {_pickedMaterial.Description}" + (wanted != null ? $" ({wanted})" : ""), _textWidth));
-                if (_hotbar != null)
-                {
-                    GUILayout.BeginHorizontal();
-                    bool locked = _hotbar.IsLocked(_pickedMaterial);
-                    GUILayout.Label(Fit(locked ? "잠금: [상자에 넣기]가 가방에 남긴다" : "잠그면 [상자에 넣기]가 가방에 남긴다", _textWidth - 104), GUILayout.Width(_textWidth - 104));
-                    if (Ui.LayoutButton(locked ? "잠금 풀기" : "잠그기", GUILayout.Width(96)))
-                    {
-                        _hotbar.ToggleLock(_pickedMaterial);
-                        Sounds.Play(Sound.Click);
-                    }
-                    GUILayout.EndHorizontal();
-                }
-            }
+            GUILayout.EndHorizontal();
         }
 
         MaterialDefinition _pickedMaterial;
@@ -1161,19 +826,17 @@ namespace Game.Client
             foreach (var pair in contents.Runes.ToList()) Stack(StackKind.Rune, pair.Key, Sprites.Icon(pair.Key), pair.Key.Name, pair.Value, "");
         }
 
-        // Every recipe, with what it takes against what the bag and the chests nearby hold, and the station it needs
-        // when that is not in reach. [만들기] only works with everything at hand; [×N] makes it up to five times over.
+        // What is made by hand (U6: the bag keeps only these; a station's recipes are in its window, U3), with what each
+        // takes against what the bag and the chests nearby hold; [만들기] only works with everything at hand, [×N] makes it
+        // up to five times over. Facing an assembler, what it can be set to make ([조립기에]). By a workbench or furnace a
+        // button opens its window; elsewhere a line says where the rest are made.
         void DrawCrafting()
         {
             var recipes = _client.Recipes;
             if (recipes.Count == 0) return;
             GUILayout.Space(6);
-            GUILayout.BeginHorizontal();
-            GUILayout.Label(Fit("제작", _textWidth - 160), GUILayout.Width(_textWidth - 160));
-            if (Ui.LayoutButton(_craftableOnly ? "모두 보기" : "만들 수 있는 것만", GUILayout.Width(156))) _craftableOnly = !_craftableOnly;
-            GUILayout.EndHorizontal();
             var enabled = GUI.enabled;
-            // What is being made by hand (World.StartCrafting, 2026-11-09): a bar, how many more, and [그만].
+            // What is being made (World.StartCrafting, 2026-11-09): a bar, how many more, and [그만].
             if (_client.Crafting != null)
             {
                 GUILayout.BeginHorizontal();
@@ -1181,69 +844,78 @@ namespace Game.Client
                 GUILayout.Label(Fit($"만드는 중: {_client.Crafting.Name}{more} (작업대 곁을 떠나면 멈춘다)", _textWidth - 64), GUILayout.Width(_textWidth - 64));
                 if (Ui.LayoutButton("그만", GUILayout.Width(56))) Send(_client.StopCraftCommand(), Sound.Click);
                 GUILayout.EndHorizontal();
-                var bar = GUILayoutUtility.GetRect(_textWidth, 8);
-                GUI.DrawTexture(bar, Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0, new Color(0.2f, 0.2f, 0.2f, 0.8f), 0, 0);
-                GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * _client.CraftProgress, bar.height), Texture2D.whiteTexture, ScaleMode.StretchToFill, false, 0,
-                    new Color(1f, 0.8f, 0.35f), 0, 0);
+                var bar = GUILayoutUtility.GetRect(_textWidth, 10);
+                if (Event.current.type == EventType.Repaint) UiSkin.Bar(bar, _client.CraftProgress, "");
                 GUILayout.Space(4);
             }
-            // Facing an assembler, a recipe it can make gets [조립기에] (World.SetRecipe).
+            // Facing an assembler: what it makes, [멈추기], and each recipe it can make with [조립기에] (World.SetRecipe).
             var assembler = _client.MachineAhead() is MachineView m && World.IsAssembler(m.Kind) ? m : (MachineView?)null;
             if (assembler != null)
             {
                 GUILayout.BeginHorizontal();
-                GUILayout.Label(Fit($"조립기: {assembler.Value.Recipe?.Name ?? "정하지 않음"} (조합법의 [조립기에]로 정한다)", _textWidth - 64));
+                GUILayout.Label(Fit($"조립기: {assembler.Value.Recipe?.Name ?? "정하지 않음"} (아래의 [조립기에]로 정한다)", _textWidth - 64));
                 if (assembler.Value.Recipe != null && Ui.LayoutButton("멈추기", GUILayout.Width(56))) Send(_client.SetRecipeCommand(null), Sound.Click);
                 GUILayout.EndHorizontal();
-            }
-            // By where they are made: by hand, then at each station, the station's own name over its recipes.
-            // No heading yet: started on a group no recipe has.
-            bool started = false;
-            TileType? group = null;
-            bool any = false;
-            foreach (var recipe in recipes.Where(r => !_client.MadeByMachine(r)).OrderBy(r => r.Station.HasValue ? 1 + (int)r.Station.Value : 0))
-            {
-                if (_craftableOnly && _client.CraftableTimes(recipe) == 0) continue;
-                any = true;
-                if (!started || recipe.Station != group)
+                foreach (var recipe in recipes.Where(r => !_client.MadeByMachine(r) && World.Assembles(r)))
                 {
-                    started = true;
-                    group = recipe.Station;
-                    string where = recipe.Station == null ? "손으로" : $"{StationName(recipe.Station.Value)}에서" + (_client.MissingStation(recipe) != null ? " (가까이 없다)" : "");
-                    var heading = GUI.color;
-                    GUI.color = new Color(1f, 0.85f, 0.4f);
-                    GUILayout.Label(Fit(where, _textWidth));
-                    GUI.color = heading;
+                    string makes = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {i.Count}"));
+                    GUILayout.BeginHorizontal();
+                    Icon(RecipeIcon(recipe));
+                    TipLabel(new GUIContent(Fit($"{RecipeName(recipe)}\n{makes}", _recipeWidth + 44), RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth + 44));
+                    if (Ui.LayoutButton("조립기에", GUILayout.Width(72))) Send(_client.SetRecipeCommand(recipe), Sound.Click);
+                    GUILayout.EndHorizontal();
                 }
+                GUILayout.Space(6);
+            }
+            GUILayout.BeginHorizontal();
+            GUILayout.Label(Fit("손 제작", _textWidth - 160), GUILayout.Width(_textWidth - 160));
+            if (Ui.LayoutButton(_craftableOnly ? "모두 보기" : "만들 수 있는 것만", GUILayout.Width(156))) _craftableOnly = !_craftableOnly;
+            GUILayout.EndHorizontal();
+            bool any = false;
+            foreach (var recipe in recipes.Where(r => !_client.MadeByMachine(r) && r.Station == null))
+            {
+                int times = _client.CraftableTimes(recipe);
+                if (_craftableOnly && times == 0) continue;
+                any = true;
                 string needs = string.Join(" · ", recipe.Ingredients.Select(i => $"{i.Material.Name} {_client.Available(i.Material)}/{i.Count}"));
-                // A thing that takes time by hand says how long (CraftRules.Seconds); an assembler makes it unattended.
+                // A thing that takes time by hand says how long (CraftRules.Seconds).
                 float seconds = _client.CraftSeconds(recipe);
                 if (seconds > 0) needs += $" · {seconds:0.#}초";
-                var station = _client.MissingStation(recipe);
-                if (station != null) needs += $" · {StationName(station.Value)} 필요";
-                string name = recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
                 GUILayout.BeginHorizontal();
-                Icon(recipe.Item != null ? Sprites.Icon(recipe.Item) : recipe.Consumable != null ? Sprites.Icon(recipe.Consumable) : Sprites.Icon(recipe.Material));
-                // Facing an assembler the row has [조립기에] too: the text gives it room, or the row ran past the window
-                // and the button was out of sight.
-                bool toAssembler = assembler != null && World.Assembles(recipe);
-                float width = toAssembler ? Mathf.Max(80, _recipeWidth - 76) : _recipeWidth;
-                TipLabel(new GUIContent(Fit($"{name}\n{needs}", width), RecipeTooltip(recipe)), GUILayout.Width(width));
-                int times = _client.CraftableTimes(recipe);
+                Icon(RecipeIcon(recipe));
+                TipLabel(new GUIContent(Fit($"{RecipeName(recipe)}\n{needs}", _recipeWidth), RecipeTooltip(recipe)), GUILayout.Width(_recipeWidth));
                 GUI.enabled = enabled && times > 0;
                 // One that takes time sounds when it is done (SimEventType.Crafted), not when pressed.
                 var pressed = seconds > 0 ? Sound.Click : Sound.Craft;
-                if (Ui.LayoutButton("만들기", GUILayout.Width(64))) Send(_client.CraftCommand(recipe), pressed);
+                if (Ui.LayoutButton("만들기", Ui.Look.Primary, GUILayout.Width(64))) Send(_client.CraftCommand(recipe), pressed);
                 GUI.enabled = enabled && times > 1;
                 int bulk = Mathf.Clamp(times, 2, BulkCraft);
                 if (Ui.LayoutButton($"×{bulk}", GUILayout.Width(40))) Send(_client.CraftCommand(recipe, bulk), pressed);
                 GUI.enabled = enabled;
-                if (toAssembler && Ui.LayoutButton("조립기에", GUILayout.Width(72)))
-                    Send(_client.SetRecipeCommand(recipe), Sound.Click);
                 GUILayout.EndHorizontal();
             }
-            if (!any) GUILayout.Label(Fit(_craftableOnly ? "지금 가진 재료와 곁의 작업대로 만들 수 있는 것이 없다" : "만들 것이 없다", _textWidth));
+            if (!any) GUILayout.Label(Fit(_craftableOnly ? "지금 가진 재료로 손으로 만들 수 있는 것이 없다" : "손으로 만들 것이 없다", _textWidth));
+            // The rest are made at a station, in its window (U3).
+            GUILayout.Space(4);
+            var near = StationsNear();
+            if (near.Count > 0)
+            {
+                string names = string.Join("·", near.Select(StationName));
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Fit($"곁의 {names}에서 만드는 것은 {names} 창에서 만든다", _textWidth - 120), GUILayout.Width(_textWidth - 120));
+                if (Ui.LayoutButton($"{StationName(near[0])} 열기", GUILayout.Width(112))) ShowEncounter(GameScreen.Station);
+                GUILayout.EndHorizontal();
+            }
+            else
+            {
+                GUILayout.Label(Fit("작업대·화로·모루에서 만드는 것은 그 곁의 [작업대 열기]·[화로 열기]·[모루 열기]로 연 창에서 만든다", _textWidth));
+            }
         }
+
+        static string RecipeName(Recipe recipe) => recipe.Count > 1 ? $"{recipe.Name} ×{recipe.Count}" : recipe.Name;
+
+        static Sprite RecipeIcon(Recipe recipe) =>
+            recipe.Item != null ? Sprites.Icon(recipe.Item) : recipe.Consumable != null ? Sprites.Icon(recipe.Consumable) : Sprites.Icon(recipe.Material);
 
         // The crafting list shows only what can be made now (CraftableTimes) when this is on.
         bool _craftableOnly;
@@ -1316,13 +988,6 @@ namespace Game.Client
             if (!Ui.LayoutButton("다듬기", GUILayout.Width(56))) return;
             _refining = item.Id;
             if (_screens.Current != GameScreen.Anvil) ShowEncounter(GameScreen.Anvil);
-        }
-
-        // Shown while a rune is picked and the item still has room for it.
-        void RuneButton(Item item)
-        {
-            if (_selectedRune == null || !item.Sockets.Contains(null)) return;
-            if (Ui.LayoutButton("끼우기", GUILayout.Width(56))) Send(_client.InsertRuneCommand(item.Id, _selectedRune), Sound.Craft);
         }
 
         static string CategoryName(SlotCategory category) => category switch

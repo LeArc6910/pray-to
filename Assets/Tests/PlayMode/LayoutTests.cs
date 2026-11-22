@@ -137,7 +137,8 @@ namespace Game.Client.Tests
                 if (!GameRoot.BossBarBesideHud && !folds) problems.Add($"{name}: 보스 막대가 아래로 가는데 목표 목록이 접히지 않는다");
                 // In a boss fight under the HUD, the box is its bars and a line; the folded list one line under it.
                 Ui.HudHeight = GameRoot.BossBarBesideHud ? 200 : GameRoot.HudBarsHeight;
-                Ui.LeftColumnBottom = Ui.HudArea.yMax + 6 + (folds ? 34 : 220);
+                // The folded line is a finger tall on a touch screen (U7).
+                Ui.LeftColumnBottom = Ui.HudArea.yMax + 6 + (folds ? GameRoot.FoldedTrackerArea(28).height : 220);
                 var bar = GameRoot.BossBarArea(40);
                 string where = $"{name} {width}×{height}";
                 if (!Inside(bar, width, height)) problems.Add($"{where}: 화면 밖 {bar}");
@@ -195,7 +196,7 @@ namespace Game.Client.Tests
                 if (!touch) continue;
                 var (panel, cells) = ScreenStack.HubLayout();
                 if (!Inside(panel, width, height)) problems.Add($"{where}, 메뉴: 화면 밖 {panel}");
-                if (cells.Count != 7) problems.Add($"{where}, 메뉴: 단추 {cells.Count}개");
+                if (cells.Count != 8) problems.Add($"{where}, 메뉴: 단추 {cells.Count}개");
                 for (int i = 0; i < cells.Count; i++)
                 {
                     var (label, _, rect) = cells[i];
@@ -500,6 +501,109 @@ namespace Game.Client.Tests
                     if (list.height < 120) problems.Add($"{where}: 너무 낮다 {list}");
                     foreach (var (part, rect) in column)
                         if (Overlap(list, rect)) problems.Add($"{where}: 겹침 - {part}");
+                }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        // The bag and the HUD (Docs/UiRework.md U6, U7) fit the screens the person named (a small PC window, a small phone
+        // held upright and on its side) and the rest: the bag's tabs (a rail on a low screen), its kind chips and [정렬]
+        // inside it and clear of one another, a finger tall on a touch screen, the list with room left beside a tall card
+        // and the card under it; the folded goal line, the fallen card and its button inside the screen, a finger tall, clear
+        // of the minimap column; an encounter window clear of the HUD's bars on a PC; a banner kept off the open hub, the bag
+        // and the two columns.
+        [Test]
+        public void TheBagAndHudFit()
+        {
+            var problems = new List<string>();
+            var sizes = new List<(string Name, float Width, float Height, bool Touch)>
+            {
+                ("작은 PC 창 (U6)", 800, 600, false),
+                ("작은 휴대폰 세로 (U6)", 375, 812, true),
+                ("작은 휴대폰 가로 (U6)", 740, 360, true),
+            };
+            sizes.AddRange(Sizes);
+            foreach (var (name, width, height, touch) in sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Controls.ForceTouch(touch);
+                Ui.HudHeight = GameRoot.HudBarsHeight;
+                Ui.LeftColumnBottom = Ui.HudArea.yMax;
+                string where = $"{name} {width}×{height}";
+                var column = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea) };
+                if (touch) column.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
+                float finger = touch ? 39.5f : 0;
+
+                // The bag, with a card as tall as it may be.
+                var bag = ScreenStack.AreaOf(GameScreen.Bag);
+                var inside = UiSkin.InsideOf(bag);
+                foreach (float card in new[] { 0f, 160f, 2000f })
+                {
+                    var parts = InventoryWindow.BagLayout(inside, card, true);
+                    string what = $"{where}, 가방 (카드 {card})";
+                    var pieces = new List<(string, Rect)>();
+                    for (int i = 0; i < parts.Tabs.Length; i++) pieces.Add(($"탭 {i}", parts.Tabs[i]));
+                    for (int i = 0; i < parts.Chips.Length; i++) pieces.Add(($"칩 {InventoryWindow.FilterNames[i]}", parts.Chips[i]));
+                    pieces.Add(("정렬", parts.Sort));
+                    pieces.Add(("목록", parts.List));
+                    if (parts.Card.height > 0) pieces.Add(("카드", parts.Card));
+                    foreach (var (part, rect) in pieces)
+                    {
+                        if (rect.xMin < inside.xMin - 0.5f || rect.xMax > inside.xMax + 0.5f || rect.yMin < inside.yMin - 0.5f || rect.yMax > inside.yMax + 0.5f)
+                            problems.Add($"{what}: 창 밖 - {part} {rect}");
+                    }
+                    for (int i = 0; i < pieces.Count; i++)
+                        for (int j = i + 1; j < pieces.Count; j++)
+                            if (Overlap(pieces[i].Item2, pieces[j].Item2)) problems.Add($"{what}: 겹침 - {pieces[i].Item1} / {pieces[j].Item1}");
+                    foreach (var chip in parts.Chips.Append(parts.Sort))
+                    {
+                        if (chip.height < finger) problems.Add($"{what}: 칩이 손가락보다 낮다 {chip}");
+                        if (chip.width < 44) problems.Add($"{what}: 칩이 좁다 {chip}");
+                    }
+                    if (parts.List.height < 100) problems.Add($"{what}: 목록이 낮다 {parts.List}");
+                    if (card > 0 && parts.Card.height < 60) problems.Add($"{what}: 카드가 낮다 {parts.Card}");
+                    if (parts.Rail != (height < 480)) problems.Add($"{what}: 낮은 화면에서만 탭 레일 ({parts.Rail})");
+                }
+                if (touch)
+                    foreach (var (part, rect) in column)
+                        if (Overlap(bag, rect)) problems.Add($"{where}, 가방: 겹침 - {part}");
+
+                // The HUD's pieces.
+                if (!Inside(Ui.HudArea, width, height)) problems.Add($"{where}: HUD 상자가 화면 밖 {Ui.HudArea}");
+                var folded = GameRoot.FoldedTrackerArea(20);
+                if (!Inside(folded, width, height)) problems.Add($"{where}: 접힌 목표 줄이 화면 밖 {folded}");
+                if (folded.height < finger) problems.Add($"{where}: 접힌 목표 줄이 손가락보다 낮다 {folded}");
+                var death = GameRoot.DeathCardArea();
+                var rise = new Rect(death.center.x - Mathf.Min(220, death.width - 24) / 2, death.yMax - 52, Mathf.Min(220, death.width - 24), 44);
+                if (!Inside(death, width, height)) problems.Add($"{where}: 쓰러짐 카드가 화면 밖 {death}");
+                if (rise.yMin < death.yMin + 60 || rise.yMax > death.yMax) problems.Add($"{where}: [집에서 일어나기]가 카드 안 아래에 없다 {rise}");
+                if (Overlap(death, folded) || Overlap(death, Ui.HudArea)) problems.Add($"{where}: 쓰러짐 카드가 HUD를 덮는다 {death}");
+                foreach (var (part, rect) in column)
+                {
+                    if (Overlap(death, rect)) problems.Add($"{where}: 쓰러짐 카드 겹침 - {part}");
+                    if (Overlap(folded, rect)) problems.Add($"{where}: 접힌 목표 줄 겹침 - {part}");
+                }
+
+                // An encounter window beside the world (not a phone's sheet) keeps off the HUD's bars.
+                if (!ScreenStack.PhoneSheet)
+                    foreach (var screen in ScreenStack.Encounters)
+                        if (Overlap(ScreenStack.AreaOf(screen), Ui.HudArea)) problems.Add($"{where}, {ScreenStack.NameOf(screen)}: HUD 상자를 덮는다");
+
+                // A banner: inside the screen, off the bag, off the hub, off the two columns.
+                var room = GameRoot.BannerRoom(default, null);
+                var withBag = GameRoot.BannerRoom(bag, null);
+                // With the bag across the middle there may be no room: the banner then waits for it to shut (width 0).
+                if (!Inside(room, width, height) || withBag.width > 0 && !Inside(withBag, width, height)) problems.Add($"{where}: 배너 자리가 화면 밖 {room} {withBag}");
+                if (withBag.width > 0 && Overlap(withBag, bag)) problems.Add($"{where}: 배너가 가방에 겹친다 {withBag}");
+                if (withBag.width > 0 && withBag.width < 200 || room.width < 200) problems.Add($"{where}: 배너 자리가 좁다 {room} {withBag}");
+                foreach (var (part, rect) in column)
+                    if (Overlap(room, rect)) problems.Add($"{where}: 배너 겹침 - {part}");
+                if (touch)
+                {
+                    var hub = ScreenStack.HubLayout().Panel;
+                    var beside = GameRoot.BannerRoom(default, hub);
+                    if (Overlap(beside, hub)) problems.Add($"{where}: 배너가 [메뉴] 판에 겹친다 {beside} {hub}");
+                    if (!Inside(beside, width, height)) problems.Add($"{where}: 메뉴가 열린 배너가 화면 밖 {beside}");
                 }
             }
             Assert.IsEmpty(problems, string.Join("\n", problems));

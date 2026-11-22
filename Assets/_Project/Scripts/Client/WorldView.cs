@@ -659,7 +659,10 @@ namespace Game.Client
                 _floating[i].Age += deltaTime;
                 if (_floating[i].Age > FloatSeconds) _floating.RemoveAt(i);
             }
-            _bannerAge += deltaTime;
+            // A banner waits while there is no room for it (a window over the middle of the screen, a full screen: U7),
+            // so it is seen once the window shuts rather than lost under it.
+            if (!_bannerHeld) _bannerAge += deltaTime;
+            _bannerHeld = false;
             if (_bannerQueue.Count > 0 && _bannerAge >= BannerTurnSeconds)
             {
                 _banner = _bannerQueue.Dequeue();
@@ -857,31 +860,70 @@ namespace Game.Client
             DrawEntranceCard();
         }
 
-        // Over the HUD (GameRoot draws it after its panels): a level's banner is long enough to reach under the quest
-        // tracker on the left (2026-11-19).
-        public void DrawBanner()
+        // Over the HUD (GameRoot draws it after its panels), in the room GameRoot leaves it (U7: across what a window, the
+        // hub and the two columns leave, never over them): a level's banner is long enough to need it (2026-11-19).
+        public void DrawBanner(Rect room)
         {
+            if (Event.current.type == EventType.Repaint) BannerShown = Rect.zero;
             // A dungeon's name card and the dark of going in or out (WorldView.Dungeon.cs).
             DrawDungeonCard();
+            if (room.width <= 0)
+            {
+                HoldBanner();
+                return;
+            }
             if (_bannerStyle != null && _bannerAge < BannerSeconds)
             {
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
                 // A long one (a level's gains, 2026-11-19) in smaller letters until it fits the width, and on a narrow
                 // screen (a phone held upright) over two lines rather than letters too small to read.
-                float room = Ui.Width - 24;
-                for (int size = 32; size >= 20 && _bannerStyle.CalcSize(new GUIContent(_banner)).x > room; size -= 2) Ui.Text(_bannerStyle, size, bold: true);
-                string text = _bannerStyle.CalcSize(new GUIContent(_banner)).x > room ? Ui.Wrap(_banner, _bannerStyle, room) : _banner;
+                float width = room.width > 0 ? room.width - 24 : Ui.Width - 24;
+                for (int size = 32; size >= 20 && _bannerStyle.CalcSize(new GUIContent(_banner)).x > width; size -= 2) Ui.Text(_bannerStyle, size, bold: true);
+                string text = _bannerStyle.CalcSize(new GUIContent(_banner)).x > width ? Ui.Wrap(_banner, _bannerStyle, width) : _banner;
                 var size2 = _bannerStyle.CalcSize(new GUIContent(text));
-                var rect = new Rect(0, Ui.Height * 0.25f, Ui.Width, Mathf.Max(60, size2.y + 8));
-                // A dim strip behind it, so it reads over the quest tracker and a bright floor.
+                var rect = new Rect(room.x, room.y, room.width, Mathf.Max(60, size2.y + 8));
+                var strip = new Rect(rect.center.x - size2.x / 2 - 12, rect.center.y - size2.y / 2 - 4, size2.x + 24, size2.y + 8);
+                // A dim strip behind it, so it reads over a bright floor.
                 var previous = GUI.color;
                 GUI.color = new Color(0, 0, 0, 0.5f * fade);
-                GUI.DrawTexture(new Rect((Ui.Width - size2.x) / 2 - 12, rect.center.y - size2.y / 2 - 4, size2.x + 24, size2.y + 8), Texture2D.whiteTexture);
+                GUI.DrawTexture(strip, Texture2D.whiteTexture);
                 GUI.color = previous;
                 Shadowed(rect, text, new Color(1f, 0.85f, 0.4f, fade), _bannerStyle);
                 Ui.Text(_bannerStyle, 34, bold: true);
+                if (Event.current.type == EventType.Repaint) BannerShown = strip;
             }
         }
+
+        bool _bannerHeld;
+
+        // Keeps the banner (and those queued after it) from running down this frame: nowhere to show it now.
+        public void HoldBanner()
+        {
+            if (_bannerAge < BannerSeconds) _bannerHeld = true;
+        }
+
+        // Where the banner's strip was drawn in the last repaint (zero when none): the "획득" lines keep off it, and the
+        // playtests read it.
+        public static Rect BannerShown { get; private set; }
+
+        string _hurtBy;
+        float _hurtByAt = -100;
+
+        void NoteHurtBy(int source)
+        {
+            foreach (var view in _client.Others())
+            {
+                if (view.Id != source) continue;
+                string name = view.Kind == EntityKind.Boss ? view.Boss?.Name : view.Kind == EntityKind.Monster ? view.Monster?.Name : view.IsPlayer ? view.Name : null;
+                if (string.IsNullOrEmpty(name)) return;
+                _hurtBy = name;
+                _hurtByAt = Time.time;
+                return;
+            }
+        }
+
+        // What felled the player, when a blow came within a few seconds of falling: its name, or "".
+        public string DeathCause => _client.IsDead && _hurtBy != null && Time.time - _hurtByAt < 12 ? _hurtBy : "";
 
         public void Dispose()
         {
@@ -2213,6 +2255,8 @@ namespace Game.Client
                     AddFlash(landed, heavy || e.Critical ? 0.55f : 0.38f, hurtsMe ? ImpactRed : e.Critical ? ImpactGold : ImpactWhite, FlashKind.Impact);
                     if (hurtsMe)
                     {
+                        // Who struck, for the fallen card (U7): a boss's or monster's name, another player's.
+                        NoteHurtBy(e.Source);
                         // The harder the blow for the health one has, the more the screen jolts and its edges glow red.
                         float share = Mathf.Clamp01(e.Amount / Mathf.Max(1, _client.MaxHealth) * 4);
                         _shake = Mathf.Max(_shake, 0.12f + 0.25f * share);

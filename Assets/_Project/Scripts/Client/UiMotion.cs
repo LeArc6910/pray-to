@@ -229,5 +229,25 @@ namespace Game.Client
 
         // How strong the red is now: full when hurt, gone in 0.8 seconds.
         public static float HurtGlow => Mathf.Clamp01(1 - (Now - _hurtAt) / 0.8f) * 0.85f;
+
+        // ---- Low health (Docs/UiRework.md U7) ----
+
+        // The player's share of health (GameRoot sets it each frame; 0 while down).
+        public static float HealthShare { get; set; } = 1;
+
+        // How strong the red at the screen's edges is while health is low (at or under `low`, not while down): deeper the
+        // lower it is, pulsing slowly (about a beat a second); steady when motion is reduced and in the playtests.
+        public static float LowHealthGlow(float low)
+        {
+            float share = HealthShare;
+            if (share <= 0 || share > low) return 0;
+            float strength = 0.3f + 0.35f * (1 - share / low);
+            if (Reduced) return strength;
+            float pulse = 0.5f + 0.5f * Mathf.Sin(Now * Mathf.PI * 2 * 0.9f);
+            return strength * (0.6f + 0.4f * pulse);
+        }
+
+        // The heart by the health bar beating while health is low: its brightness now (1 when still).
+        public static float LowHealthBeat() => Reduced ? 1 : 0.7f + 0.3f * (0.5f + 0.5f * Mathf.Sin(Now * Mathf.PI * 2 * 1.4f));
     }
 }

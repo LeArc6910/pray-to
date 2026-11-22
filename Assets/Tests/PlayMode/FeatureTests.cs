@@ -347,6 +347,59 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The bag and the HUD (Docs/UiRework.md U6, U7): the bag on each kind chip with a picked sword's card, the HUD with a
+        // food's buff and at low health, and the fallen card over the journal left open; on a PC and a touch screen.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheBagAndHudDraw()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            World.GainExperience(Player, Leveling.TotalFor(6));
+            Give("stone", 20);
+            Give("slime_gel", 6);
+            yield return new WaitForSecondsRealtime(1);
+            try
+            {
+                foreach (bool touch in new[] { false, true })
+                {
+                    Controls.ForceTouch(touch);
+                    string tag = touch ? "-touch" : "";
+                    _root.ShowBag("장비");
+                    foreach (string chip in InventoryWindow.FilterNames)
+                    {
+                        Assert.IsTrue(_root.SetBagFilter(chip), $"No chip {chip}.");
+                        yield return new WaitForSecondsRealtime(0.4f);
+                        Assert.AreEqual(chip, _root.BagFilter);
+                        yield return Screens.Take($"bag-{chip}{tag}");
+                    }
+                    _root.SetBagFilter("전체");
+                    _root.BagOpen = false;
+                    World.UseConsumable(Player.Id, _root.LootSheet.Consumables.First(c => c.Id == "mushroom_soup"));
+                    World.Hurt(Player, Player.Health - Player.Stats.MaxHealth * 0.15f);
+                    yield return new WaitForSecondsRealtime(0.8f);
+                    StringAssert.Contains("버섯 수프", GameRoot.BuffNames, "The food's buff has no icon.");
+                    Assert.Greater(UiMotion.LowHealthGlow(GameRoot.LowHealthShare), 0f, "No red at the edges at low health.");
+                    yield return Screens.Take($"hud-low{tag}");
+                    _root.ShowScreen(GameScreen.Journal);
+                    World.Hurt(Player, Player.Health + 100000);
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    Assert.Greater(GameRoot.DeathShown.width, 0f, "No fallen card over the journal.");
+                    Assert.AreEqual(GameScreen.Journal, _root.OpenScreen, "The journal shut on falling.");
+                    yield return Screens.Take($"death-window{tag}");
+                    World.GetUp(Player.Id);
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    Assert.IsFalse(Player.IsDead, "Not up after GetUp.");
+                    _root.ShowScreen(GameScreen.None);
+                    Player.Health = Player.Stats.MaxHealth;
+                }
+            }
+            finally
+            {
+                Controls.ForceTouch(false);
+            }
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The encounter windows (Docs/UiRework.md U3): a chest, a workbench, a furnace and an anvil laid round the player
         // open their windows (each counts as the bag's, and shuts once its thing is out of reach); a merchant's stall: her
         // talk with her portrait and choices, then her shop; the village child's talk with her portrait and the line's face.
@@ -482,12 +535,12 @@ namespace Game.Client.Tests
             _root.HeldAim = new Vec2(1, 0);
             yield return new WaitForSecondsRealtime(0.6f);
             Assert.IsTrue(World.LockDoor(Player.Id), "The door ahead did not lock.");
-            _root.ShowBag("재료·제작");
+            // [잠금 풀기] stands over the door in the world (Docs/UiRework.md U6), no longer in the bag.
             yield return new WaitForSecondsRealtime(SceneSeconds);
             yield return Screens.Take("locked-door");
             Assert.AreEqual(TileType.LockedDoor, World.Map[door.X, door.Y]);
             Assert.IsTrue(_root.LocalClient.IsMyDoor(door.X, door.Y), "The client never heard the lock was its own.");
-            _root.BagOpen = false;
+            Assert.AreEqual(GameRoot.Meeting.Door, _root.NextMeeting(), "G does not meet the locked door ahead.");
             _root.AimHeld = false;
             Assert.IsTrue(_root.Playing);
         }

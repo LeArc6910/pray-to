@@ -339,6 +339,25 @@ namespace Game.Client
             Save();
         }
 
+        // What is in each slot by name ("" for an empty one), comma-separated, for the playtests.
+        public string SlotNames() => string.Join(",", _entries.Select(e => e.IsEmpty ? "" : Describe(e).Name));
+
+        // Puts it in that slot (Docs/UiRework.md U6, the bag's card): whatever was there comes off, and it leaves the
+        // slot it was in; pressing the slot it is in already takes it out.
+        public void Put(Item item, int slot) => PutAt(GearEntry(item), slot);
+        public void Put(ConsumableDefinition consumable, int slot) => PutAt(new Entry(Kind.Consumable, consumable.Id), slot);
+        public void Put(MaterialDefinition material, int slot) => PutAt(new Entry(Kind.Material, material.Id), slot);
+
+        void PutAt(Entry entry, int slot)
+        {
+            if (slot < 0 || slot >= Slots) return;
+            _ready = true;
+            int was = SlotOf(entry);
+            if (was >= 0) _entries[was] = default;
+            if (was != slot) _entries[slot] = entry;
+            Save();
+        }
+
         int SlotOf(Entry entry) => System.Array.FindIndex(_entries, e => !e.IsEmpty && e.Same(entry));
 
         void Save()
