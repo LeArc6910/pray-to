@@ -37,6 +37,10 @@ namespace Game.Core
         // Its monsters give their share of experience and drops (monsters.csv reward, World.RewardShare): a room's pack,
         // which brings more monsters than the field had. Not a clump of a world of caves, which keeps the caves' cap.
         public bool Shares { get; internal set; }
+        // A camp's elites (World.Elites.cs): a leader first in its roster, or every one of it a champion; and their
+        // affixes. None for an ordinary pack.
+        public EliteRank Elite { get; internal set; }
+        public RiftAffix Affixes { get; internal set; }
         public int Size => Roster.Count;
         public int FallenCount => Fallen.Count(f => f);
         // Every one of today's roster fell: the room is empty until dawn.
@@ -134,7 +138,8 @@ namespace Game.Core
         // once on the first boss's way were twelve monsters at a level 5 bot in copper, dead in six seconds).
         public const int SecondPackZone = 3;
 
-        int Slots(RoomNode room) => BigRoom(room) && ZoneLevelAt(room.Center) >= SecondPackZone ? 2 : 1;
+        // A camp of elites holds its band alone.
+        int Slots(RoomNode room) => room.Role != RoomRole.Elite && BigRoom(room) && ZoneLevelAt(room.Center) >= SecondPackZone ? 2 : 1;
 
         // ---- The parties and the caps (상한) ----
 
@@ -250,8 +255,8 @@ namespace Game.Core
             }
         }
 
-        // A room's pack, its roster made for today.
-        Pack RoomPack(RoomNode room, int slot)
+        // A room's pack, its roster made for today (internal for the tests).
+        internal Pack RoomPack(RoomNode room, int slot)
         {
             int key = room.Index * 2 + slot;
             if (!_roomPacks.TryGetValue(key, out var pack))
@@ -277,12 +282,23 @@ namespace Game.Core
             pack.Roster.Clear();
             pack.Spots.Clear();
             pack.Definition = null;
+            pack.Elite = EliteRank.None;
+            pack.Affixes = RiftAffix.None;
             pack.Fallen = Array.Empty<bool>();
             if (InSafePlace(room.Center)) return;
             var random = PackRandom(room, pack.Slot, pack.Day);
             var choices = PackChoices(room.Center, room.Biome, BigRoom(room));
             if (choices.Count == 0) return;
             pack.Definition = random.PickWeighted(choices, p => p.Weight);
+            // A camp of elites (묶음 2-2): its leader's pack or its champions, each day anew.
+            if (room.Role == RoomRole.Elite && pack.Slot == 0 && _rooms != null)
+            {
+                MusterElite(pack, random);
+                while (pack.Roster.Count > pack.Spots.Count) pack.Roster.RemoveAt(pack.Roster.Count - 1);
+                pack.Fallen = new bool[pack.Roster.Count];
+                if (pack.Roster.Count == 0) pack.Definition = null;
+                return;
+            }
             foreach (var member in pack.Definition.Members)
             {
                 int count = member.Min + random.Next(member.Max - member.Min + 1);
@@ -294,6 +310,7 @@ namespace Game.Core
                 ? _rooms.Marks.Where(m => m.Room == room.Index && m.Kind == RoomMarkKind.Monster).Select(m => TileMap.Center(m.X, m.Y)).ToList()
                 : new List<Vec2>();
             pack.Spots.AddRange(Spread(middle, marks, pack.Roster.Count, random, at => InRoom(room, at) && Clear(at) && !NearEntrance(room, at)));
+            Crowd(pack, middle, random);
             // A room too cramped for all of them keeps those that found a spot.
             while (pack.Roster.Count > pack.Spots.Count) pack.Roster.RemoveAt(pack.Roster.Count - 1);
             pack.Fallen = new bool[pack.Roster.Count];
@@ -360,6 +377,30 @@ namespace Game.Core
 
         static bool InRoom(RoomNode room, Vec2 at) => Vec2.Distance(at, room.Center) <= room.Radius + 1;
 
+        // A small room of a maze (the mushroom forest's are three or four tiles across, most of it its ways in) may not
+        // hold a whole pack: the rest stand in the turns of the maze round it, up to PackSpill tiles past its edge, by
+        // its ways in and closer together (2026-11-22: the web sweep found a mushroom room's pack of one; 5~8% of pack
+        // rooms, nearly all in the mushroom forest, held fewer than their pack's least).
+        public const float PackSpill = 4;
+
+        public static bool InPackRoom(RoomNode room, Vec2 at) => Vec2.Distance(at, room.Center) <= room.Radius + PackSpill + 0.5f;
+
+        void Crowd(Pack pack, Vec2 middle, GameRandom random)
+        {
+            var room = pack.Room;
+            int least = pack.Elite != EliteRank.None || pack.Definition == null ? pack.Roster.Count : Math.Min(pack.Roster.Count, pack.Definition.MinCount);
+            if (pack.Spots.Count >= least) return;
+            var more = Spread(pack.Spots.Count > 0 ? pack.Spots[0] : middle, pack.Spots.ToList(), pack.Roster.Count, random,
+                at => Vec2.Distance(at, room.Center) <= room.Radius + PackSpill && Clear(at));
+            if (more.Count <= pack.Spots.Count) return;
+            // The ones placed first keep their spots (an elite leader its E).
+            var kept = pack.Spots.ToList();
+            pack.Spots.Clear();
+            pack.Spots.AddRange(kept);
+            foreach (var spot in more)
+                if (pack.Spots.Count < pack.Roster.Count && !kept.Any(k => Vec2.Distance(k, spot) < 0.5f)) pack.Spots.Add(spot);
+        }
+
         // Open floor a monster stands on, out of the places, not by a road or a camp.
         bool Clear(Vec2 at)
         {
@@ -420,13 +461,17 @@ namespace Game.Core
             for (int i = 0; i < pack.Roster.Count; i++)
             {
                 if (pack.Fallen[i]) continue;
-                Join(pack, pack.Roster[i], pack.Spots[i], i, zone, random);
+                var enemy = Join(pack, pack.Roster[i], pack.Spots[i], i, zone, random);
+                if (pack.Elite == EliteRank.Champion || pack.Elite == EliteRank.Leader && i == 0) MakeElite(enemy, pack.Elite, pack.Affixes);
             }
-            if (extra > 0 && pack.Spots.Count > 0)
+            // More players and the night bring more of its first kind; of a leader's, more of its minions; champions
+            // stay three.
+            var more = pack.Elite == EliteRank.None ? pack.Roster[0] : pack.Elite == EliteRank.Leader && pack.Roster.Count > 1 ? pack.Roster[1] : null;
+            if (extra > 0 && pack.Spots.Count > 0 && more != null)
             {
-                var more = Spread(pack.Spots[0], new List<Vec2>(), extra + 1, random, at => (pack.Room == null || InRoom(pack.Room, at)) && Clear(at)
+                var spots = Spread(pack.Spots[0], new List<Vec2>(), extra + 1, random, at => (pack.Room == null || InRoom(pack.Room, at)) && Clear(at)
                     && !pack.Spots.Any(s => Vec2.Distance(s, at) < 1));
-                for (int i = 1; i < more.Count; i++) Join(pack, pack.Roster[0], more[i], -1, zone, random);
+                for (int i = 1; i < spots.Count; i++) Join(pack, more, spots[i], -1, zone, random);
             }
             pack.Active = true;
             pack.Alerted = false;

@@ -15,11 +15,15 @@ namespace CoreSandbox
         public static void Run(BotSheets sheets, int minutes, string seeds, int mapSize = WorldGenerator.GameSize, int mapVersion = WorldGenerator.NewWorldVersion)
         {
             var runs = new List<BotRunResult>();
+            var elites = new List<string>();
             foreach (string text in seeds.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
                 ulong seed = ulong.Parse(text.Trim());
                 var watch = Stopwatch.StartNew();
-                var run = BotRun.FirstHour(sheets, seed, minutes, mapSize: mapSize, mapVersion: mapVersion);
+                // The field elites it met on the way (묶음 2-2).
+                var seen = new EliteWatch();
+                var run = BotRun.FirstHour(sheets, seed, minutes, each: bot => seen.Look(bot.World, bot.Player), mapSize: mapSize, mapVersion: mapVersion);
+                elites.Add($"- 시드 {seed}: {seen.Summary(run.Ticks)}");
                 runs.Add(run);
                 Console.Error.WriteLine($"시드 {seed}: 게임 {BotReport.Time(run.Ticks)}을 {watch.Elapsed.TotalSeconds:0.0}초에");
             }
@@ -29,6 +33,10 @@ namespace CoreSandbox
             Console.WriteLine("### 안내 목표별 도달 시간");
             Console.WriteLine();
             Console.WriteLine(BotReport.Goals(runs));
+            Console.WriteLine("### 정예");
+            Console.WriteLine();
+            foreach (string line in elites) Console.WriteLine(line);
+            Console.WriteLine();
             string stuck = BotReport.Stuck(runs);
             if (stuck.Length > 0)
             {

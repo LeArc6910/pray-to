@@ -16,6 +16,12 @@ namespace Game.Core
         Fierce = 4,
         // Each wave has half again as many.
         Swarm = 8,
+        // The field's own four (Docs/WorldRework.md 들판 정예, World.Elites.cs), never a rift's: fire where it walked,
+        // a frost circle under it every few seconds, its minions near it take less, it calls more as it is hurt.
+        Fire = 16,
+        Frost = 32,
+        Guard = 64,
+        Summon = 128,
     }
 
     // A void rift opened at an altar (Docs/Bosses.md, 공허 균열): waves of stronger monsters around it with one to three
@@ -80,13 +86,7 @@ namespace Game.Core
         // Affixes for a rift of the tier: one, and one more every three tiers, at most three, never the same twice.
         static readonly RiftAffix[] AllAffixes = { RiftAffix.Swift, RiftAffix.Tough, RiftAffix.Fierce, RiftAffix.Swarm };
 
-        public static string AffixNames(RiftAffix affixes) => string.Join(", ", AllAffixes.Where(a => (affixes & a) != 0).Select(a => a switch
-        {
-            RiftAffix.Swift => "빠름",
-            RiftAffix.Tough => "단단함",
-            RiftAffix.Fierce => "사나움",
-            _ => "떼",
-        }));
+        public static string AffixNames(RiftAffix affixes) => string.Join(", ", AllAffixes.Where(a => (affixes & a) != 0).Select(AffixName));
 
         // A player beside an altar with a key opens a rift of the world's tier there. False when one is open already,
         // or there is no altar or key.

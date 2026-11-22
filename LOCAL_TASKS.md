@@ -1066,6 +1066,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 시트 `Data/Monsters/packs.csv`가 `GameSheets.packs`에 들어가야 빌드에 실린다(돌리기 전에는 예전처럼 한 마리씩 나온다). 새 파일 `packs.csv`, `Core/Simulation/World.Packs.cs`, `Core/Simulation/PackSheet.cs`, `Tests/EditMode/PackTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `APackNoticesTogetherWithMarks`(사진 `pack-alert`). 통신 0.92.0
   - (클라우드 웹 점검) `sweep.js --only packs,map`
   - (사람) 무리 방에 들어가 무리가 함께 알아차리고 몰려오는 맛(핵앤슬래시처럼 몰아 잡는 느낌), 너무 많거나 억울하지 않은지, 머리 위 느낌표와 소리, 멀리 끌고 가면 돌아가는 모습, 협동에서 사람 수만큼 느는지
+- [ ] 152단계: 들판 정예와 접사, 이름표(`Docs/WorldRework.md` 2-2, `Docs/Combat.md` 들판 정예)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/World.Elites.cs`, `Tests/EditMode/EliteTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `ElitesWearTheirNamesAndWarnOfTheirBigAttack`(사진 `elite-tags`, `elite-warning`). 통신 0.93.0(스냅숏에 정예 목록이 붙는다)
+  - (클라우드 웹 점검) `sweep.js --only packs`
+  - (사람) 정예 야영지의 우두머리(이름표·접사·빛): 큰 공격의 긴 예고를 보고 피할 만한지, 맞서기만 하면 아프게 벌받는지, 억울한 한 방은 없는지, 보상이 싸울 만한지, 휴대폰 세로에서 이름표가 화면에 들어가는지
 
 ## 결과 보고
 

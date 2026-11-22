@@ -32,8 +32,11 @@ namespace Game.Core
             ConsumableDefinition dropConsumable = null,
             MaterialDefinition dropMaterial = null,
             ItemBase weapon = null,
-            SkillDefinition skill = null)
+            SkillDefinition skill = null,
+            int elite = 0)
         {
+            Elite = kind == EntityKind.Monster ? (EliteRank)(elite >> 8) : EliteRank.None;
+            Affixes = kind == EntityKind.Monster ? (RiftAffix)(elite & 0xFF) : RiftAffix.None;
             Weapon = weapon;
             Skill = skill;
             Id = id;
@@ -82,6 +85,12 @@ namespace Game.Core
         public bool Buried => Kind == EntityKind.Monster && EnemyState != EnemyState.Windup && ((State >> World.EnemyTellShift) & 7) == World.EnemyBuriedTell;
         // The sheet attack a monster is winding up, making or resting from; null for one that fights the old way.
         public MonsterAttack MonsterAttack { get; }
+        // A field elite's rank and affixes (World.Elites.cs), its name made from them, and how its attack is warned.
+        public EliteRank Elite { get; }
+        public RiftAffix Affixes { get; }
+        public string EliteName => World.EliteName(Monster, Elite, Affixes);
+        public float AttackTelegraph => MonsterAttack == null ? 0 : World.TelegraphOf(Elite, Monster, MonsterAttack);
+        public AttackWarning AttackWarning => MonsterAttack == null ? AttackWarning.Marked : World.WarningOf(Elite, Monster, MonsterAttack);
         public BossState BossState => (BossState)(State & 0x0F);
         // While a boss winds up, the kind of warning its attack gives (World.BossStateByte).
         public Tell Tell => (Tell)(State >> 4);
@@ -1088,7 +1097,8 @@ namespace Game.Core
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Consumable ? _loot.Consumables[entity.Type] : null,
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Material ? _loot.Materials[entity.Type] : null,
                     entity.IsPlayer && entity.Type > 0 ? _loot.Bases[entity.Type - 1] : null,
-                    entity.Kind == EntityKind.Minion ? _classes.Skills[entity.Type] : null));
+                    entity.Kind == EntityKind.Minion ? _classes.Skills[entity.Type] : null,
+                    entity.Elite));
             }
             return views;
         }

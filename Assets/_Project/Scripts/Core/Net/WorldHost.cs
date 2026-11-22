@@ -690,7 +690,7 @@ namespace Game.Core
                 .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
                 .Select(e => new EntityState(
                     e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.MaxHealth, World.EnemyStateByte(e),
-                    Protocol.WithStatus(World.EnemyPhaseField(e), e.Afflictions.Bits)));
+                    Protocol.WithStatus(World.EnemyPhaseField(e), e.Afflictions.Bits), World.EliteField(e)));
             var drops = World.GroundLoot
                 .Where(l => InView(l.Position) && l.For(viewer.Id, World.Tick))
                 .OrderBy(l => Distance(l.Position))
@@ -910,8 +910,11 @@ namespace Game.Core
         // How plainly the attack that laid a hazard is announced (a roar's blast, cause 0, is marked).
         AttackWarning WarningOf(Hazard hazard)
         {
-            var monster = hazard.Mark != 0 ? World.FindEnemy(hazard.Source)?.Definition.Attacks : null;
-            if (monster != null) return hazard.Cause >= 1 && hazard.Cause <= monster.Count ? monster[hazard.Cause - 1].Warning : AttackWarning.Marked;
+            // A monster's: as its sheet says, or strong for an elite leader's big attack (World.WarningOf).
+            var enemy = hazard.Mark != 0 ? World.FindEnemy(hazard.Source) : null;
+            var monster = enemy?.Definition.Attacks;
+            if (monster != null)
+                return hazard.Cause >= 1 && hazard.Cause <= monster.Count ? World.WarningOf(enemy.Elite, enemy.Definition, monster[hazard.Cause - 1]) : AttackWarning.Marked;
             var attacks = World.FindBoss(hazard.Source)?.Definition.Attacks;
             return attacks != null && hazard.Cause >= 1 && hazard.Cause <= attacks.Count ? attacks[hazard.Cause - 1].Warning : AttackWarning.Marked;
         }

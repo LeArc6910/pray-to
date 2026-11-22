@@ -41,7 +41,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.92.0";
+        public const string Version = "0.93.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -930,8 +930,9 @@ namespace Game.Core
     // or for a player which skill slots have a buff running (bit 0 for slot 0).
     public readonly struct EntityState
     {
-        public EntityState(int id, EntityKind kind, int type, Vec2 position, Vec2 facing, float health, float maxHealth, byte state, int phase = 0)
+        public EntityState(int id, EntityKind kind, int type, Vec2 position, Vec2 facing, float health, float maxHealth, byte state, int phase = 0, int elite = 0)
         {
+            Elite = elite;
             Id = id;
             Kind = kind;
             Type = type;
@@ -954,7 +955,11 @@ namespace Game.Core
         public byte State { get; }
         // A boss's current phase.
         public int Phase { get; }
+        // A monster's elite marks (World.EliteField): its EliteRank above its affixes' eight bits; 0 for any other.
+        public int Elite { get; }
         public bool IsDead => Health <= 0;
+
+        public EntityState WithElite(int elite) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, elite);
     }
 
     // Clients move projectiles on by their velocity between snapshots, so they are drawn where they really are.
@@ -1191,6 +1196,16 @@ namespace Game.Core
                 w.Write(entity.State);
                 w.Write((byte)entity.Phase);
             }
+            // The few elites among them (World.EliteField, 묶음 2-2): each its place in the list, rank and affixes, so an
+            // ordinary monster costs nothing more.
+            var elites = Enumerable.Range(0, Entities.Count).Where(i => Entities[i].Elite != 0).ToList();
+            w.Write((byte)Math.Min(elites.Count, 255));
+            foreach (int i in elites.Take(255))
+            {
+                w.Write((ushort)i);
+                w.Write((byte)(Entities[i].Elite >> 8));
+                w.Write((byte)Entities[i].Elite);
+            }
 
             w.Write((ushort)Projectiles.Count);
             foreach (var projectile in Projectiles)
@@ -1284,6 +1299,13 @@ namespace Game.Core
                     Protocol.ReadHealth(r.ReadUInt16()),
                     r.ReadByte(),
                     r.ReadByte()));
+            }
+            for (int elites = r.ReadByte(); elites > 0; elites--)
+            {
+                int index = r.ReadUInt16();
+                int rank = r.ReadByte();
+                int affixes = r.ReadByte();
+                if (index < entities.Count) entities[index] = entities[index].WithElite(rank << 8 | affixes);
             }
 
             int projectileCount = r.ReadUInt16();

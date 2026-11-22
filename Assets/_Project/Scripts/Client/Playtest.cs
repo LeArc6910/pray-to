@@ -27,6 +27,8 @@ namespace Game.Client
     //   scene combo|machines|defense|rift|skylight|set|roll   (roll: a lane of floor east of the player, a wall 8 tiles on)
     //   scene ice|quicksand       a lane of that floor east of the player, a wall 12 tiles on (PlayerMotor)
     //   scene pack                five slimes east of the player as one pack (World.Gather), most of them out of its sight
+    //   scene elite               a mushroom soldiers' leader with fire and guard and three slime minions east of the player,
+    //                             and three fierce champion beetles west of it (World.MakeEliteHere), all held still
     //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step>
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
@@ -45,6 +47,9 @@ namespace Game.Client
     //                             noticing and out of their own sight; the wanderers, the field's monsters and the caps
     //   goto pack                 beside the nearest pack out in the world, on the far side of it from its middle, so most
     //                             of it is out of sight (to see it notice together)
+    //   goto elite                five tiles from the nearest elite out in the world, toward the player (goto room elite first)
+    //   elites                    JSON: the field elites about the player (World.Elites.cs): rank, name, affixes, health, and
+    //                             the name tags, the widest of them against the screen, guard lines and the warning sign drawn
     //   room <role> [biome|any] [n]   JSON: that room (where, its chunk, steps walked from the spawn; -1 for no way)
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
@@ -315,6 +320,8 @@ namespace Game.Client
                     return "rooms " + Rooms(root);
                 case "packs":
                     return "packs " + PacksJson(root);
+                case "elites":
+                    return "elites " + ElitesJson(root);
                 case "room":
                     return "room " + RoomJson(root, RoomOf(root, words, 1));
                 case "build":
@@ -443,6 +450,15 @@ namespace Game.Client
                     int ex = TileMap.Cell(edge.Position.X + outward.X * 3), ey = TileMap.Cell(edge.Position.Y + outward.Y * 3);
                     to = Nearest(map, ex, ey, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius))
                         ?? throw new InvalidOperationException("no floor beside the pack");
+                    break;
+                // Five tiles from the nearest elite out in the world, on the player's side of it (2026-11-22, 묶음 2-2).
+                case "elite":
+                    var elite = world.Enemies.Where(e => e.Elite != EliteRank.None && !e.IsDead).OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault()
+                        ?? throw new InvalidOperationException("no elite out (goto room elite first)");
+                    var back = (player.Position - elite.Position).LengthSquared > 1e-4f ? (player.Position - elite.Position).Normalized : new Vec2(-1, 0);
+                    int lx = TileMap.Cell(elite.Position.X + back.X * 5), ly = TileMap.Cell(elite.Position.Y + back.Y * 5);
+                    to = Nearest(map, lx, ly, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius))
+                        ?? throw new InvalidOperationException("no floor before the elite");
                     break;
                 // Along a road of a world of rooms (2026-11-22, Docs/WorldRework.md 묶음 1c), or before a by-way's
                 // cracked wall.
@@ -604,7 +620,7 @@ namespace Game.Client
                     .Field("alerted", pack.Alerted).Field("chasing", after.Count)
                     .Field("unseen", after.Count(m => Vec2.Distance(m.Position, player.Position) > m.Definition.Aggro))
                     .Field("distance", Vec2.Distance(pack.Home, player.Position))
-                    .Field("inRoom", pack.Room == null ? members.Count : members.Count(m => Vec2.Distance(m.Position, pack.Room.Center) <= pack.Room.Radius + 1.5f))
+                    .Field("inRoom", pack.Room == null ? members.Count : members.Count(m => World.InPackRoom(pack.Room, m.Position)))
                     .Field("kinds", string.Join(",", members.Select(m => m.Definition.Id).Distinct()))
                     .Close('}')));
             }
@@ -615,6 +631,33 @@ namespace Game.Client
             json.Field("partyCap", World.PartyCap).Field("hostCap", World.HostCap);
             json.Field("alertsShown", root.AlertsShown);
             return json.Close('}');
+        }
+
+        // The field elites within 80 tiles of the player, nearest first (World.Elites.cs, 묶음 2-2): rank, name as the
+        // screen makes it, affixes, health, state; the camps about; and what the screen drew: name tags, the widest of
+        // them against the screen's width (a phone held upright), the guard's lines and the warning sign.
+        static string ElitesJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var list = new Json('[');
+            foreach (var elite in world.Enemies.Where(e => e.Elite != EliteRank.None && !e.IsDead && Vec2.Distance(e.Position, player.Position) < World.PackSleepReach)
+                .OrderBy(e => Vec2.Distance(e.Position, player.Position)))
+            {
+                var pack = world.PackOf(elite);
+                list.Item(new RawJson(new Json('{')
+                    .Field("id", elite.Id).Field("rank", elite.Elite.ToString()).Field("kind", elite.Definition.Id)
+                    .Field("name", World.EliteName(elite.Definition, elite.Elite, elite.Affixes)).Field("affixes", World.EliteAffixLine(elite.Affixes))
+                    .Field("health", elite.Health).Field("maxHealth", elite.MaxHealth).Field("state", elite.State.ToString())
+                    .Field("distance", Vec2.Distance(elite.Position, player.Position))
+                    .Field("pack", pack == null ? 0 : world.MembersOf(pack).Count()).Field("room", pack?.Room?.Role.ToString() ?? "")
+                    .Close('}')));
+            }
+            return new Json('{').Field("elites", list.Raw(']'))
+                .Field("camps", world.Packs.Count(p => p.Elite != EliteRank.None && p.Active))
+                .Field("tagsShown", root.EliteTagsShown).Field("tagWidest", root.EliteTagWidest).Field("screenWidth", Ui.Width)
+                .Field("guardLinks", root.EliteGuardLinksShown).Field("warningSign", root.WarningShown)
+                .Close('}');
         }
 
         // The rooms of the world: which generator, how many of each role, how many have a chunk, the ways shut by a
@@ -691,6 +734,14 @@ namespace Game.Client
                         if (!Game.Core.Collision.Overlaps(world.Map, at, 0.45f, monster: true)) members.Add(Spawn("slime", at, 5000));
                     }
                     world.Gather(members);
+                    break;
+                // A field elite's camp in small (2026-11-22, Docs/WorldRework.md 들판 정예): a leader of mushroom
+                // soldiers with fire and guard, three slimes round it, six tiles east; three fierce champion beetles six
+                // tiles west. Under "monsters hold" they stand until let go.
+                case "elite":
+                    var spot = player.Position + new Vec2(6, 0);
+                    world.MakeEliteHere(root.MonsterSheet.Find("myconid"), spot, EliteRank.Leader, RiftAffix.Fire | RiftAffix.Guard, root.MonsterSheet.Find("slime"), 3);
+                    world.MakeEliteHere(root.MonsterSheet.Find("cave_beetle"), player.Position + new Vec2(-6, 0), EliteRank.Champion, RiftAffix.Fierce);
                     break;
                 case "combo":
                     for (int i = 0; i < 5; i++) Spawn("slime", player.Position + new Vec2(1.2f, (i - 2) * 0.5f), 5000);

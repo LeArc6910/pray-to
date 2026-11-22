@@ -130,6 +130,9 @@ namespace CoreSandbox
                 roomsBiome = named ? args[roomsFlag + 1] : "any";
                 args = args.Where((_, i) => i != roomsFlag && (!named || i != roomsFlag + 1)).ToArray();
             }
+            // --camps: with --rooms, from elite camp to elite camp (묶음 2-2).
+            bool camps = args.Contains("--camps");
+            args = args.Where(a => a != "--camps").ToArray();
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();
             // The bots roll through blows about to land (RollBot); --no-roll is how they fought before the roll.
@@ -155,7 +158,7 @@ namespace CoreSandbox
                     PrintProgression(data, Number(1, 2000), Seed(2));
                     break;
                 case "--fight" when roomsBiome != null:
-                    RoomFightSim.Run(LoadSheets(data), Number(1, 180), Seed(2), gear, LoadClasses(classIds), dodge, roomsBiome);
+                    RoomFightSim.Run(LoadSheets(data), Number(1, 180), Seed(2), gear, LoadClasses(classIds), dodge, roomsBiome, camps);
                     break;
                 case "--fight":
                     FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge, onlyMonsters);

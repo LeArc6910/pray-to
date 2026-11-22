@@ -333,5 +333,25 @@ namespace Game.Core.Tests
             Assert.IsFalse(pack.Cleared);
             Assert.That(size, Is.GreaterThan(0));
         }
+
+        [Test]
+        public void ASmallRoomOfAMazeHoldsItsWholePack()
+        {
+            // 2026-11-22: the web sweep found a mushroom forest room holding a pack of one. Its rooms are three or four
+            // tiles across and most of that is their ways in; the rest of the pack stands in the maze round the room.
+            var host = new WorldHost(1, Monsters.Shipped, Gear.Data, new HostConfig { MapSize = WorldGenerator.GameSize, MapVersion = WorldGenerator.RoomVersion },
+                tiles: Tiles.Shipped, story: Tales.Shipped);
+            var world = host.World;
+            int mushroom = 0;
+            foreach (var room in host.Generated.Rooms.Nodes.Where(n => n.Kind == RoomKind.Room && n.Role == RoomRole.Pack && !n.Roadside))
+            {
+                var pack = world.RoomPack(room, 0);
+                if (pack.Definition == null) continue;
+                if (room.Biome == Biome.Mushroom) mushroom++;
+                Assert.That(pack.Size, Is.GreaterThanOrEqualTo(pack.Definition.MinCount), $"room {room.Index} ({room.Biome}, radius {room.Radius}): {pack.Definition.Id}");
+                Assert.IsTrue(pack.Spots.All(s => World.InPackRoom(room, s)), $"room {room.Index}: in or round its room");
+            }
+            Assert.Greater(mushroom, 10, "the mushroom forest's small rooms were among them");
+        }
     }
 }

@@ -119,7 +119,8 @@ namespace Game.Client
             }
             // One under the ground is not drawn as itself: only its mound, and a ripple behind it when it travels.
             bool buried = view.Buried && Feel.MonsterFx;
-            float size = buried ? 0 : view.Small ? 0.6f : 1;
+            // An elite leader stands a head taller than its pack (Docs/WorldRework.md 들판 정예: 그림 1.3배).
+            float size = buried ? 0 : view.Small ? 0.6f : view.Elite == EliteRank.Leader ? EliteSize : 1;
             if (body.Root.localScale.x != size) body.Root.localScale = Vector3.one * size;
 
             var state = view.EnemyState;
@@ -168,8 +169,9 @@ namespace Game.Client
                 body.MobElapsed = 0;
                 body.MobDir = view.Facing;
                 body.MobAt = view.Position;
-                // A charge's later runs wind up in less time (World.AgainTelegraph).
-                body.MobTelegraph = attack.Telegraph * (body.MobState == EnemyState.Charge ? World.AgainTelegraph : 1);
+                // A charge's later runs wind up in less time (World.AgainTelegraph); an elite leader's big attack in more
+                // (World.TelegraphOf).
+                body.MobTelegraph = World.TelegraphOf(view.Elite, view.Monster, attack) * (body.MobState == EnemyState.Charge ? World.AgainTelegraph : 1);
                 // A bomber's fuse is its own sound: beeps that come faster.
                 Hear(attack.Shape == MonsterAttackShape.Explode ? Sound.Fuse : TellSound(attack.Tell), body.Position, 0.8f);
             }
@@ -197,6 +199,7 @@ namespace Game.Client
                 }
             }
 
+            EliteExtras(body, view, winding ? attack : null, feet);
             if (state == EnemyState.Stagger) QueueMob(MobFx.Stars, feet, new MobContext(), Time.time);
             if (view.Empowered) QueueMob(MobFx.Empowered, feet, new MobContext(), Time.time + view.Id * 0.3f);
             if (_tethers.TryGetValue(view.Id, out int allyId))
@@ -280,7 +283,7 @@ namespace Game.Client
                 _markLooks[id] = (body.MobRamp, body.MobTint, attack, body.MobKind);
                 _attachedMarks.Add(new HazardView(
                     new HazardState(id, shape, at, facing, reach, width, Mathf.CeilToInt((total - elapsed) * World.TicksPerSecond), Mathf.CeilToInt(total * World.TicksPerSecond),
-                        !rush, attack.Warning, (byte)(HazardState.MonsterMark | ((int)attack.Shape + 1))),
+                        !rush, World.WarningOf(view.Elite, view.Monster, attack), (byte)(HazardState.MonsterMark | ((int)attack.Shape + 1))),
                     Mathf.Clamp01(elapsed / total)));
             }
         }
@@ -571,6 +574,10 @@ namespace Game.Client
                             AddMobFx(MobFx.Dive, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new MobContext { Ramp = ramp, Tint = tint });
                             Hear(Sound.Burrow, at, 0.5f);
                             break;
+                        case World.MonsterFxCall:
+                            AddMobFx(MobFx.Rally, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new MobContext { Size = 3f * Ppu });
+                            Hear(Sound.MobCall, at, 0.9f);
+                            break;
                         case World.MonsterFxExplode:
                         {
                             // The bomber leaves the view with its blast, so the host says where; its reach is its
@@ -632,11 +639,76 @@ namespace Game.Client
             }
             MonsterMoundsShown = _mounds;
             MonsterLinksShown = _links;
+            EliteGuardLinksShown = _guardLinks;
             _mounds = 0;
             _links = 0;
+            _guardLinks = 0;
             _mobPieces = _fxUsed - before;
             _mobShotsShown = _mobShotsDrawn;
             _mobShotsDrawn = 0;
+        }
+
+        // ---- Field elites (Docs/WorldRework.md 들판 정예, World.Elites.cs) ----
+
+        // How much bigger an elite leader is drawn.
+        const float EliteSize = 1.3f;
+        // Name tags drawn in the last repaint, and the widest of them in points (a phone held upright must hold it).
+        public int EliteTagsShown { get; private set; }
+        public float EliteTagWidest { get; private set; }
+        // The lines drawn last frame from a guarding leader to the minions it shields (RiftAffix.Guard).
+        public int EliteGuardLinksShown { get; private set; }
+        int _guardLinks;
+
+        // After an elite is placed: the warning sign over it while it winds up its big attack (as a boss's strongest),
+        // and a guarding leader's lines to the minions it shields.
+        void EliteExtras(Body body, EntityView view, MonsterAttack winding, Vector3 feet)
+        {
+            if (view.Elite == EliteRank.None) return;
+            ShowWarningSign(body, winding != null && World.IsBigAttack(view.Elite, view.Monster, winding));
+            if (view.Elite != EliteRank.Leader || (view.Affixes & RiftAffix.Guard) == 0 || body.MobBuried) return;
+            foreach (var other in _others.Values)
+            {
+                if (other == body || other.Kind != BodyKind.Monster || other.Elite != EliteRank.None || other.MobBuried) continue;
+                if (Vector2.Distance(other.Position, body.Position) > World.GuardReach) continue;
+                var line = other.Position - new Vector3(0, other.Feet, 0) - feet;
+                QueueMob(MobFx.Link, feet, new MobContext { Dir = Mathf.Atan2(line.y, line.x), Size = line.magnitude * Ppu }, Time.time);
+                _guardLinks++;
+            }
+        }
+
+        // Each elite's name over its head, gold for a leader and blue for a champion, its affixes under it; kept inside
+        // the screen's width (a phone held upright, Docs/Design.md 기술 원칙 7). Call from DrawGui.
+        void DrawEliteTags()
+        {
+            bool repaint = Event.current.type == EventType.Repaint;
+            int shown = 0;
+            float widest = 0;
+            foreach (var body in _others.Values)
+            {
+                if (body.Kind != BodyKind.Monster || body.Elite == EliteRank.None || string.IsNullOrEmpty(body.EliteName)) continue;
+                float scale = body.Root.localScale.y;
+                if (scale <= 0) continue;
+                var head = body.Position + new Vector3(0, scale * (body.Top + 0.15f) + 0.3f, 0);
+                var color = body.Elite == EliteRank.Leader ? EliteGold : ChampionBlue;
+                widest = Mathf.Max(widest, EliteLabel(head + new Vector3(0, 0.36f, 0), body.EliteName, color));
+                if (!string.IsNullOrEmpty(body.EliteLine)) widest = Mathf.Max(widest, EliteLabel(head, body.EliteLine, EliteLineColor));
+                shown++;
+            }
+            if (!repaint) return;
+            EliteTagsShown = shown;
+            EliteTagWidest = widest;
+        }
+
+        // A label centred over the spot but moved in to stay whole on the screen; its width in points.
+        float EliteLabel(Vector3 world, string text, Color color)
+        {
+            Vector3 screen = _camera.WorldToScreenPoint(world);
+            if (screen.z < 0) return 0;
+            Vector2 point = Ui.FromScreen(screen);
+            float width = _labelStyle.CalcSize(new GUIContent(text)).x + 8;
+            float x = Mathf.Clamp(point.x - width / 2, 2, Mathf.Max(2, Ui.Width - width - 2));
+            Shadowed(new Rect(x, point.y - 12, width, 24), text, color, _labelStyle);
+            return width;
         }
     }
 }

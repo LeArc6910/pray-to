@@ -190,6 +190,7 @@ namespace Game.Core
                 UpdateEnemy(enemy);
                 KeepOutOfPlaces(enemy);
             }
+            UpdateElites();
             UpdateBosses();
             UpdateMinions();
             UpdateAfflictions();

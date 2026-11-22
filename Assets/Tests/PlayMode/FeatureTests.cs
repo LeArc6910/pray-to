@@ -374,6 +374,30 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Field elites (2026-11-22, Docs/WorldRework.md 들판 정예): a leader with fire and guard among three slimes and
+        // three fierce champion beetles, each with its name over its head inside the screen, lines from the guard to its
+        // minions, and the warning sign while the leader winds up its big attack.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ElitesWearTheirNamesAndWarnOfTheirBigAttack()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var leader = World.MakeEliteHere(_root.MonsterSheet.Find("myconid"), Player.Position + new Vec2(4, 0.5f), EliteRank.Leader,
+                RiftAffix.Fire | RiftAffix.Guard, _root.MonsterSheet.Find("slime"), 3);
+            World.MakeEliteHere(_root.MonsterSheet.Find("cave_beetle"), Player.Position + new Vec2(-4.5f, 0), EliteRank.Champion, RiftAffix.Fierce);
+            foreach (var monster in World.Enemies) monster.MaxHealth = monster.Health = 5000;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.AreEqual(4, _root.EliteTagsShown, "A name over the leader and each champion.");
+            Assert.LessOrEqual(_root.EliteTagWidest, Ui.Width, "Every name fits the screen.");
+            Assert.GreaterOrEqual(_root.EliteGuardLinksShown, 1, "The guard's lines to its minions.");
+            yield return Screens.Take("elite-tags");
+            Assert.IsTrue(World.ForceAttack(leader, "spore_smash"));
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsTrue(_root.WarningShown, "The warning sign over a leader winding up its big attack.");
+            yield return Screens.Take("elite-warning");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The rest of the kinds on the sheet (Docs/MonsterPatterns.md, 2026-11-22): a scorpion lying in wait is a mound
         // and not a body, two demon soldiers side by side are joined by a line, a stalker's wedge and a caster's runes
         // are marked, and a blow a beetle's shell turns shows a grey number. Every blow shown is counted.

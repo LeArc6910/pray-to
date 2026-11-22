@@ -10,10 +10,11 @@ namespace CoreSandbox
     // spawn (in the biome, or any). It fights what it meets as --fight does and, with nothing about, walks to the
     // nearest pack room not yet emptied today. Kills, experience and drops a minute, the hurt it took, and the seconds
     // each pack took from its alarm to its last fall. With --no-packs the same world brings its monsters one by one,
-    // as before packs, for the numbers to set beside.
+    // as before packs, for the numbers to set beside. With --camps (묶음 2-2) it goes from elite camp to elite camp
+    // instead, and says how the elites went (EliteWatch).
     static class RoomFightSim
     {
-        public static void Run(BotSheets sheets, int seconds, ulong seed, string[] gear, ClassDefinition[] classes, bool dodge, string biomeName)
+        public static void Run(BotSheets sheets, int seconds, ulong seed, string[] gear, ClassDefinition[] classes, bool dodge, string biomeName, bool camps = false)
         {
             Biome? biome = biomeName == "any" ? (Biome?)null : (Biome)Enum.Parse(typeof(Biome), biomeName, ignoreCase: true);
             var host = new WorldHost(seed, sheets.Monsters, sheets.Loot, bosses: sheets.Bosses, classes: sheets.Classes, tiles: sheets.Tiles,
@@ -32,8 +33,10 @@ namespace CoreSandbox
             var player = world.AddPlayer("bot", equipment, classes);
             var skills = new SkillBot(player, sheets.Loot);
 
-            bool InBiome(RoomNode r) => biome == null || r.Biome == biome;
-            var packRooms = rooms.Nodes.Where(n => n.Kind == RoomKind.Room && !n.Roadside && n.Role == RoomRole.Pack && InBiome(n)).ToList();
+            // The camps of "any" are the plain cave's: the stage a copper sword is for.
+            bool InBiome(RoomNode r) => biome == null ? !camps || r.Biome == Biome.Cave : r.Biome == biome;
+            var goalRole = camps ? RoomRole.Elite : RoomRole.Pack;
+            var packRooms = rooms.Nodes.Where(n => n.Kind == RoomKind.Room && !n.Roadside && n.Role == goalRole && InBiome(n)).ToList();
             if (packRooms.Count == 0)
             {
                 Console.WriteLine($"{biomeName}에 무리 방이 없습니다.");
@@ -62,6 +65,7 @@ namespace CoreSandbox
             var felled = new HashSet<int>();
             int largestCrowd = 0, idleTicks = 0;
             var emptied = new HashSet<int>();
+            var elites = new EliteWatch();
 
             for (int tick = 0; tick < seconds * World.TicksPerSecond; tick++)
             {
@@ -108,7 +112,9 @@ namespace CoreSandbox
                 foreach (var enemy in world.Enemies) names[enemy.Id] = enemy.Definition.Name;
                 var packOf = world.Enemies.Where(e => e.PackId != 0).ToDictionary(e => e.Id, e => e.PackId);
                 world.Step();
-                foreach (var e in world.TakeEvents())
+                var events = world.TakeEvents();
+                elites.Look(world, player, events);
+                foreach (var e in events)
                 {
                     skills.Count(e);
                     if (e.Type == SimEventType.Alerted && packOf.TryGetValue(e.Source, out int alarm) && !alarmed.ContainsKey(alarm))
@@ -145,12 +151,13 @@ namespace CoreSandbox
 
             float minutes = seconds / 60f;
             int experience = player.Experience - startExperience;
-            Console.WriteLine($"seed = {seed}, {seconds}초, 방으로 된 지도({biomeName}), 무리: {(sheets.Monsters.Packs != null ? "있음" : "없음(하나씩)")}, 장비: {string.Join(", ", gear)}, "
+            Console.WriteLine($"seed = {seed}, {seconds}초, 방으로 된 지도({biomeName}{(camps ? ", 정예 야영지로" : "")}), 무리: {(sheets.Monsters.Packs != null ? "있음" : "없음(하나씩)")}, 장비: {string.Join(", ", gear)}, "
                 + $"클래스: {FightSim.ClassNames(classes)}, 피하기: {(dodge ? "켬" : "끔")}");
             Console.WriteLine($"처치 {kills} (분당 {kills / minutes:0.0}), 경험치 {experience} (분당 {experience / minutes:0.0}), 떨어진 것 {drops} (분당 {drops / minutes:0.0}, 장비 {items}), 사망 {deaths}");
             Console.WriteLine($"받은 피해 {taken} (초당 {taken / (float)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}, 레벨 {player.Level}, 마신 물약 {skills.Drunk}개");
             Console.WriteLine($"만난 무리 {packsMet}, 다 잡은 무리 {packSeconds.Count} (마리 {(packSizes.Count > 0 ? packSizes.Average() : 0):0.0}, 걸린 초 평균 {(packSeconds.Count > 0 ? packSeconds.Average() : 0):0.0}, "
                 + $"가장 긴 {(packSeconds.Count > 0 ? packSeconds.Max() : 0):0.0}), 한 번에 쫓아온 가장 많은 수 {largestCrowd}, 걸은 시간 {idleTicks / (float)World.TicksPerSecond:0}초, 다음 방으로 {roomsWalked}번");
+            Console.WriteLine(elites.Summary(seconds * World.TicksPerSecond));
             Console.WriteLine("  몬스터별 처치: " + string.Join(", ", killsBy.OrderByDescending(p => p.Value).Select(p => $"{p.Key} {p.Value}")));
             Console.WriteLine("  받은 피해: " + string.Join(", ", takenBy.OrderByDescending(p => p.Value).Select(p => $"{p.Key} {p.Value}")));
         }

@@ -110,7 +110,9 @@ namespace Game.Core
         readonly List<(long Tick, Vec2 Position, int Source, int Count, float Damage, bool Chills)> _deathbursts =
             new List<(long Tick, Vec2 Position, int Source, int Count, float Damage, bool Chills)>();
 
-        static int DamageOf(Enemy enemy, MonsterAttack attack) => Math.Max(1, (int)MathF.Round(enemy.Damage * attack.Damage / 100f));
+        // An elite leader's big attack hits BigHitShare harder again (World.Elites.cs).
+        static int DamageOf(Enemy enemy, MonsterAttack attack) =>
+            Math.Max(1, (int)MathF.Round(enemy.Damage * attack.Damage / 100f * (IsBigAttack(enemy.Elite, enemy.Definition, attack) ? BigHitShare : 1)));
 
         // Every tick, whichever way the monster fights: a buff runs down and a trail is left.
         void TickMonster(Enemy enemy)
@@ -126,11 +128,13 @@ namespace Game.Core
                 if (buried && Tick > 0) _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxDive, position: enemy.Position));
             }
             var trail = enemy.Definition.Trait(MonsterTraitKind.Trail);
-            if (trail == null || enemy.Away) return;
+            // An elite with the fire affix leaves fire where it walks while it fights (World.Elites.cs).
+            bool burning = trail == null && (enemy.Affixes & RiftAffix.Fire) != 0 && enemy.State != EnemyState.Idle && !enemy.Returning;
+            if (trail == null && !burning || enemy.Away) return;
             if (++enemy.TrailTicks == 1) enemy.TrailAt = enemy.Position;
             if (Vec2.Distance(enemy.TrailAt, enemy.Position) < TrailRadius * 2) return;
             enemy.TrailAt = enemy.Position;
-            var (kind, seconds) = MonsterAttackSheet.Pool(trail.Arguments[0] + ":" + trail.Arguments[1]);
+            var (kind, seconds) = burning ? (MonsterPool.Fire, FireSeconds) : MonsterAttackSheet.Pool(trail.Arguments[0] + ":" + trail.Arguments[1]);
             LayPool(enemy.Id, 0, kind, enemy.Position, TrailRadius, seconds, enemy.Damage * TrailShare);
         }
 
@@ -221,7 +225,8 @@ namespace Game.Core
             if (enemy.State == EnemyState.Channel || enemy.State == EnemyState.Windup && enemy.Attack != null && enemy.Attack.Tell == Tell.Call)
                 EndAttack(enemy, broken: true);
             if (enemy.State == EnemyState.Stagger) return StaggerMore;
-            float share = 1 - AuraGuard(enemy);
+            // Shoulder to shoulder with its kind, and near a guarding elite leader (World.EliteGuard).
+            float share = (1 - AuraGuard(enemy)) * (1 - EliteGuard(enemy));
             var guard = enemy.Definition.Trait(MonsterTraitKind.Guard);
             // Its guard is down while it rests after an attack: the opening for whoever got out of its way.
             if (guard == null || enemy.State == EnemyState.Recover) return share;
@@ -393,8 +398,9 @@ namespace Game.Core
                     // One that turns slowly attacks only what is in front of it; whoever walks round it has an opening.
                     var turn = definition.Trait(MonsterTraitKind.Turn);
                     bool facingIt = turn == null || InFront(enemy, toTarget, TurnAim);
+                    // An elite never blows itself up (a fire bat's dive bomb): it is the fight, not a bomb.
                     var choices = definition.Attacks.Where(a => (facingIt || a.Target != MonsterAttackTarget.Nearest || a.Shape == MonsterAttackShape.Burrow)
-                        && Fits(enemy, a, target, gap)).ToList();
+                        && (enemy.Elite == EliteRank.None || a.Shape != MonsterAttackShape.Explode) && Fits(enemy, a, target, gap)).ToList();
                     if (choices.Count > 0 && StartAttack(enemy, _random.PickWeighted(choices, a => a.Weight), target)) break;
 
                     var facing = toTarget.LengthSquared > 1e-6f ? toTarget.Normalized : enemy.Facing;
@@ -535,7 +541,9 @@ namespace Game.Core
             var definition = enemy.Definition;
             var aim = target.Position - enemy.Position;
             var facing = aim.LengthSquared > 1e-6f ? aim.Normalized : enemy.Facing;
-            int ticks = Ticks(again ? attack.Telegraph * AgainTelegraph : attack.Telegraph);
+            // An elite leader's big attack is warned longer (World.TelegraphOf).
+            float telegraph = TelegraphOf(enemy, attack);
+            int ticks = Ticks(again ? telegraph * AgainTelegraph : telegraph);
             long resolve = Tick + ticks;
             int damage = DamageOf(enemy, attack);
 
@@ -722,7 +730,7 @@ namespace Game.Core
             if (attack.Shape == MonsterAttackShape.Lob || attack.Shape == MonsterAttackShape.Delayed)
             {
                 enemy.RepeatTicks = Ticks(LobSeconds);
-                Lay(enemy, attack, HazardShape.Circle, target.Position, enemy.Facing, attack.Radius, 0, DamageOf(enemy, attack), Tick + Ticks(attack.Telegraph));
+                Lay(enemy, attack, HazardShape.Circle, target.Position, enemy.Facing, attack.Radius, 0, DamageOf(enemy, attack), Tick + Ticks(TelegraphOf(enemy, attack)));
             }
             else if (attack.Shape == MonsterAttackShape.Volley && enemy.State == EnemyState.Recover)
             {

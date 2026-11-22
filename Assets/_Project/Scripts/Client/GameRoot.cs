@@ -103,6 +103,10 @@ namespace Game.Client
         internal int MonsterShotsDrawn => _view?.MonsterShotsDrawn ?? 0;
         internal int MonsterBlowsShown => _view?.MonsterBlowsShown ?? 0;
         internal int AlertsShown => _view?.AlertsShown ?? 0;
+        // Field elites' name tags drawn, the widest in points, and a guarding leader's lines (WorldView.MonsterFx).
+        internal int EliteTagsShown => _view?.EliteTagsShown ?? 0;
+        internal float EliteTagWidest => _view?.EliteTagWidest ?? 0;
+        internal int EliteGuardLinksShown => _view?.EliteGuardLinksShown ?? 0;
         internal int MonsterMoundsShown => _view?.MonsterMoundsShown ?? 0;
         internal int MonsterLinksShown => _view?.MonsterLinksShown ?? 0;
         internal int ExplosionsShown => _view?.ExplosionsShown ?? 0;

@@ -4052,8 +4052,10 @@ async function map(browser) {
 }
 
 // Packs in their rooms (2026-11-22, Docs/WorldRework.md 묶음 2-1): a pack stands in each pack room visited (in that
-// room, four or more), the monsters about stay inside the caps, and a pack notices the player together (those further
-// than they see come too), each with a mark over its head.
+// room or the maze round a small one, four or more), the monsters about stay inside the caps, and a pack notices the
+// player together (those further than they see come too), each with a mark over its head. Field elites (묶음 2-2): an
+// elite camp holds a leader or champions with a name tag that fits the screen, and a leader's big attack shows the
+// warning sign.
 const PackVisits = [['any', '가까운 무리 방'], ['mushroom', '버섯 숲의 무리 방'], ['ice', '얼음 동굴의 무리 방'], ['sand', '모래 동굴의 무리 방']];
 
 async function packs(browser) {
@@ -4102,6 +4104,46 @@ async function packs(browser) {
       `${name}: 머리 위에 느낌표가 뜬다 (${after.alertsShown - (before.alertsShown || 0)}개)`);
     await game.wait(1500);
     await game.shot('packs-fight', '무리와 싸우는 중');
+    await game.send('clear');
+
+    // An elite camp out in the world: its band stands, and its elite has its name over its head, inside the screen.
+    // The nearest camps first; one by a road or an arena's door holds no band, so up to four are tried.
+    let camp = {};
+    for (let n = 0; n < 4 && !(camp.elites || []).length; n++) {
+      await game.send(`monsters hold; heal; goto room elite any ${n}`);
+      await game.wait(1600);
+      camp = await game.ask('elites');
+    }
+    const first = (camp.elites || [])[0];
+    check(camp.camps >= 1 && !!first, `${name}: 정예 야영지에 정예가 선다 (${first ? `${first.name}, ${first.affixes}, ${first.rank}, 무리 ${first.pack}` : '없음'})`);
+    await game.send('goto elite');
+    await game.wait(900);
+    const tagged = await game.ask('elites');
+    check(tagged.tagsShown >= 1 && tagged.tagWidest > 0 && tagged.tagWidest <= tagged.screenWidth,
+      `${name}: 정예 머리 위에 이름표가 화면 안에 보인다 (이름표 ${tagged.tagsShown}개, 가장 넓은 ${Math.round(tagged.tagWidest)}/${Math.round(tagged.screenWidth)}점)`);
+    await game.shot('packs-elite-camp', `정예 야영지의 이름표 (${first ? first.name : '없음'})`);
+
+    // The elite scene: a leader with fire and guard (lines to its minions) and three champions; its big attack shows
+    // the warning sign while it winds up a whole second.
+    await game.send('clear; goto spawn');
+    await game.wait(900);
+    await game.send('monsters hold; heal; scene elite');
+    await game.wait(900);
+    const scene = await game.ask('elites');
+    const leader = (scene.elites || []).find(e => e.rank === 'Leader') || {};
+    check(leader.name === '수호의 버섯 병정 대장' && leader.affixes === '불길 · 수호',
+      `${name}: 우두머리의 이름 (${leader.name}, ${leader.affixes})`);
+    check(scene.tagsShown >= 4, `${name}: 우두머리와 챔피언 셋의 이름표 (${scene.tagsShown}개)`);
+    check(scene.guardLinks >= 1, `${name}: 수호 우두머리에서 부하로 이음줄 (${scene.guardLinks}개)`);
+    await game.shot('packs-elite-tags', '정예 장면: 금빛 우두머리와 푸른 챔피언의 이름표, 수호의 이음줄');
+    await game.send('mob myconid use spore_smash');
+    let warned = false;
+    for (let i = 0; i < 25 && !warned; i++) {
+      await game.wait(60);
+      warned = (await game.ask('elites')).warningSign === true;
+    }
+    check(warned, `${name}: 우두머리의 큰 공격에 경고 표지가 뜬다`);
+    await game.shot('packs-elite-warning', '우두머리의 큰 공격(포자 강타) 예고와 경고 표지');
     await game.send('clear');
     await game.context.close();
   }

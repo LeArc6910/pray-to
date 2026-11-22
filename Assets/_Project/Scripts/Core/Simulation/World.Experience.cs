@@ -78,6 +78,8 @@ namespace Game.Core
             // One of a pack gives its share (monsters.csv reward, World.RewardShare), never less than 1.
             float share = RewardShare(enemy);
             if (share < 1) amount = Math.Max(1, (int)MathF.Round(amount * share));
+            // An elite gives several times its kind's (World.EliteExperience).
+            amount *= EliteExperience(enemy);
             if (FullMoonNight) amount = amount * FullMoonExperiencePercent / 100;
             foreach (var player in _players)
             {

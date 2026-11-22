@@ -54,6 +54,9 @@ namespace Game.Core
 
         public BotMemory Memory { get; }
         public BotPilot Pilot { get; }
+        // Whose world and player it plays, for whoever watches the run (CoreSandbox --hour).
+        public World World => _world;
+        public Player Player => _player;
         public string ClassId { get; set; } = "warrior";
         // The goal the bot is on (null when done).
         public Goal Current => _goals.FirstOrDefault(g => !Memory.Goals.ContainsKey(g.Id) && !Memory.Skipped.ContainsKey(g.Id));

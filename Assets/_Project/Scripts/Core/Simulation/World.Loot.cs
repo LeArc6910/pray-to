@@ -97,6 +97,13 @@ namespace Game.Core
             if (_lootGenerator == null) return;
             var definition = enemy.Definition;
             int level = Math.Max(definition.Level, ProgressLevel);
+            // A leader gives its own (World.DropFromElite) and its coins; a champion its own and its kind's.
+            if (enemy.Elite != EliteRank.None) DropFromElite(enemy, killer, level);
+            if (enemy.Elite == EliteRank.Leader)
+            {
+                DropEgg(enemy, killer);
+                return;
+            }
             // One of a pack gives its share of each chance (monsters.csv reward, World.RewardShare).
             float share = RewardShare(enemy);
             if (_random.Chance(definition.DropChance / 100f * share))
@@ -127,7 +134,8 @@ namespace Game.Core
         // of a room's pack (many come at once, so each gives less, Docs/WorldRework.md 숫자 다시 맞추기), all of them for
         // one that came alone (a wanderer, one a test or a rift put down, the caves of a small map) or in a clump of a
         // world of caves (Pack.Shares).
-        internal float RewardShare(Enemy enemy) => PackOf(enemy)?.Shares == true ? enemy.Definition.RewardPercent / 100f : 1;
+        // An elite gives all of its (and more, World.DropFromElite).
+        internal float RewardShare(Enemy enemy) => enemy.Elite == EliteRank.None && PackOf(enemy)?.Shares == true ? enemy.Definition.RewardPercent / 100f : 1;
 
         // One of the consumables that drop at this level, by weight; null when there are none.
         ConsumableDefinition RollConsumable(int level)

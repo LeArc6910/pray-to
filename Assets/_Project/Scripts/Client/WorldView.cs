@@ -100,6 +100,11 @@ namespace Game.Client
             public float MobTelegraph;
             public Vec2 MobDir;
             public Vec2 MobAt;
+            // A field elite (World.Elites.cs): its rank and affixes, and the name and affix line over its head.
+            public EliteRank Elite;
+            public RiftAffix Affixes;
+            public string EliteName;
+            public string EliteLine;
             public BossState BossState;
             // The attack a boss is on, when it took it up (or changed state) and its phase; the warning sign over it
             // and, for the vein eater, the mound it runs under the floor and when it last threw up dust
@@ -783,6 +788,7 @@ namespace Game.Client
             {
                 if (!string.IsNullOrEmpty(body.Name)) Label(body.Position + new Vector3(0, body.Top + 0.4f, 0), body.Name, Color.white);
             }
+            DrawEliteTags();
             // Whoever is lying in bed, with a slow "Zz" rising over them.
             foreach (var body in _others.Values.Append(_self))
             {
@@ -962,6 +968,20 @@ namespace Game.Client
                 else if (view.Kind == EntityKind.Monster && view.Phase >= World.RiftMonster && glow.a < 0.01f)
                     glow = Faded(RiftColor, view.Phase == World.RiftGuardian ? 0.35f + 0.15f * Mathf.Sin(Time.time * 4) : 0.18f);
                 if (view.Kind == EntityKind.Monster && view.Phase == World.RiftGuardian) body.Name = "균열 수호자";
+                // A field elite (Docs/WorldRework.md 들판 정예): its name over its head, a leader glowing gold and a
+                // champion blue, so one is known at a glance among its pack.
+                if (view.Kind == EntityKind.Monster)
+                {
+                    if (body.Elite != view.Elite || body.Affixes != view.Affixes)
+                    {
+                        body.Elite = view.Elite;
+                        body.Affixes = view.Affixes;
+                        body.EliteName = view.EliteName;
+                        body.EliteLine = view.Elite == EliteRank.None ? null : World.EliteAffixLine(view.Affixes);
+                    }
+                    if (view.Elite != EliteRank.None && glow.a < 0.01f)
+                        glow = Faded(view.Elite == EliteRank.Leader ? EliteGold : ChampionBlue, 0.16f + 0.08f * Mathf.Sin(Time.time * 3 + view.Id));
+                }
                 // A spirit flickers in its last two seconds (its health counts down the ticks it has left).
                 if (view.Kind == EntityKind.Minion && view.Health < World.TicksPerSecond * 2) tint = new Color(1, 1, 1, 0.35f + 0.65f * Mathf.Abs(Mathf.Sin(Time.time * 12)));
                 if (view.Kind == EntityKind.Boss)
@@ -1993,6 +2013,10 @@ namespace Game.Client
         static readonly Color OffLabel = new Color(1f, 0.55f, 0.45f);
         static readonly Color SleepLabel = new Color(0.75f, 0.85f, 1f);
         static readonly Color RiftColor = new Color(0.7f, 0.45f, 1f);
+        // A field elite's glow and name: a leader's gold, a champion's blue (as the elites of the games they come from).
+        static readonly Color EliteGold = new Color(1f, 0.78f, 0.25f);
+        static readonly Color ChampionBlue = new Color(0.45f, 0.72f, 1f);
+        static readonly Color EliteLineColor = new Color(0.95f, 0.88f, 0.72f);
         // Monsters come for the ward stone glow orange; turret shots are a brief yellow streak.
         static readonly Color DefenseColor = new Color(1f, 0.55f, 0.2f);
         static readonly Color TracerColor = new Color(1f, 0.9f, 0.45f, 0.9f);
@@ -2988,7 +3012,8 @@ namespace Game.Client
             body.Swing.sortingOrder = order + 3;
 
             float share = maxHealth > 0 ? Mathf.Clamp01(health / maxHealth) : 0;
-            bool barVisible = showHealth && !dead && share < 0.999f;
+            // An elite's bar is always there (Docs/WorldRework.md 들판 정예).
+            bool barVisible = showHealth && !dead && (share < 0.999f || body.Elite != EliteRank.None);
             body.HealthBack.enabled = barVisible;
             body.HealthFill.enabled = barVisible;
             body.HealthBack.transform.localPosition = new Vector3(0, body.Top + 0.15f, 0);

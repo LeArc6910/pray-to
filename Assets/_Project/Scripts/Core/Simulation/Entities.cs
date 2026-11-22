@@ -426,6 +426,15 @@ namespace Game.Core
         internal int Stuck { get; set; }
         // Ticks left to be home in before it is put there (World.HomeInTime).
         internal int HomeTicks { get; set; }
+
+        // ---- Field elites (World.Elites.cs, Docs/WorldRework.md 들판 정예) ----
+
+        // A pack's leader or one of a band of champions, and its affixes; None and no affixes for every other monster.
+        public EliteRank Elite { get; internal set; }
+        public RiftAffix Affixes { get; internal set; }
+        // How many times it has called its minions (RiftAffix.Summon), and the ticks to its next frost burst.
+        internal int Summons { get; set; }
+        internal int FrostTicks { get; set; }
     }
 
     // A spirit a summon skill called. It follows its player, goes after enemies near them and lasts the skill's
