@@ -4780,7 +4780,10 @@ async function ui(browser) {
     check(!(await game.state()).bag, '닫기 단추로 가방이 닫힌다');
 
     // U0 3: two world buttons on one spot (a machine before a person).
-    await game.send('goto person mina; still');
+    // Still first: the person snaps home, then the player goes beside them (the other way round she had walked off).
+    await game.send('still');
+    await game.wait(600);
+    await game.send('goto person mina');
     await game.wait(900);
     await game.send('build Drill 0 -1 3; face 0 -1');
     await game.wait(900);
