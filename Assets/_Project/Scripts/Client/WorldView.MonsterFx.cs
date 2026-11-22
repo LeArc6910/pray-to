@@ -677,35 +677,74 @@ namespace Game.Client
         }
 
         // Each elite's name over its head, gold for a leader and blue for a champion, its affixes under it; kept inside
-        // the screen's width (a phone held upright, Docs/Design.md 기술 원칙 7). Call from DrawGui.
+        // the screen's width (a phone held upright, Docs/Design.md 기술 원칙 7). Call from DrawGui. Champions of one name
+        // standing together share one tag ("… ×3") rather than piling unreadable copies on each other, and a tag that would
+        // still cover another is lifted above it (EliteTagsShown counts the elites whose name is on the screen).
         void DrawEliteTags()
         {
             bool repaint = Event.current.type == EventType.Repaint;
-            int shown = 0;
-            float widest = 0;
+            _tagGroups.Clear();
             foreach (var body in _others.Values)
             {
                 if (body.Kind != BodyKind.Monster || body.Elite == EliteRank.None || string.IsNullOrEmpty(body.EliteName)) continue;
                 float scale = body.Root.localScale.y;
                 if (scale <= 0) continue;
                 var head = body.Position + new Vector3(0, scale * (body.Top + 0.15f) + 0.3f, 0);
-                var color = body.Elite == EliteRank.Leader ? EliteGold : ChampionBlue;
-                widest = Mathf.Max(widest, EliteLabel(head + new Vector3(0, 0.36f, 0), body.EliteName, color));
-                if (!string.IsNullOrEmpty(body.EliteLine)) widest = Mathf.Max(widest, EliteLabel(head, body.EliteLine, EliteLineColor));
-                shown++;
+                Vector3 screen = _camera.WorldToScreenPoint(head);
+                if (screen.z < 0) continue;
+                Vector2 point = Ui.FromScreen(screen);
+                TagGroup group = null;
+                foreach (var other in _tagGroups)
+                    if (other.Name == body.EliteName && Vector2.Distance(other.Point / other.Count, point) < TagGatherPoints) { group = other; break; }
+                if (group == null)
+                {
+                    group = new TagGroup { Name = body.EliteName, Line = body.EliteLine, Leader = body.Elite == EliteRank.Leader };
+                    _tagGroups.Add(group);
+                }
+                group.Point += point;
+                group.Count++;
+            }
+            int shown = 0;
+            float widest = 0;
+            _tagRects.Clear();
+            foreach (var group in _tagGroups)
+            {
+                var at = group.Point / group.Count;
+                string name = group.Count > 1 ? group.Name + " ×" + group.Count : group.Name;
+                bool line = !string.IsNullOrEmpty(group.Line);
+                float width = Mathf.Max(TagWidth(name), line ? TagWidth(group.Line) : 0);
+                // The block of the name (and the affix line under it), lifted until it covers no tag already drawn.
+                var block = new Rect(at.x - width / 2, at.y - TagNameRise - 12, width, TagNameRise + 24);
+                for (int tries = 0; tries < 4 && _tagRects.Exists(r => r.Overlaps(block)); tries++) block.y -= block.height + 2;
+                _tagRects.Add(block);
+                widest = Mathf.Max(widest, EliteLabel(new Vector2(at.x, block.y + 12), name, group.Leader ? EliteGold : ChampionBlue));
+                if (line) widest = Mathf.Max(widest, EliteLabel(new Vector2(at.x, block.y + 12 + TagNameRise), group.Line, EliteLineColor));
+                shown += group.Count;
             }
             if (!repaint) return;
             EliteTagsShown = shown;
             EliteTagWidest = widest;
         }
 
-        // A label centred over the spot but moved in to stay whole on the screen; its width in points.
-        float EliteLabel(Vector3 world, string text, Color color)
+        sealed class TagGroup
         {
-            Vector3 screen = _camera.WorldToScreenPoint(world);
-            if (screen.z < 0) return 0;
-            Vector2 point = Ui.FromScreen(screen);
-            float width = _labelStyle.CalcSize(new GUIContent(text)).x + 8;
+            public string Name, Line;
+            public bool Leader;
+            public Vector2 Point;
+            public int Count;
+        }
+        readonly List<TagGroup> _tagGroups = new List<TagGroup>();
+        readonly List<Rect> _tagRects = new List<Rect>();
+        // Points between the heads of same-named champions that share a tag, and from a name down to its affix line.
+        const float TagGatherPoints = 70f;
+        const float TagNameRise = 20f;
+
+        float TagWidth(string text) => _labelStyle.CalcSize(new GUIContent(text)).x + 8;
+
+        // A label centred over the point (in Ui points) but moved in to stay whole on the screen; its width in points.
+        float EliteLabel(Vector2 point, string text, Color color)
+        {
+            float width = TagWidth(text);
             float x = Mathf.Clamp(point.x - width / 2, 2, Mathf.Max(2, Ui.Width - width - 2));
             Shadowed(new Rect(x, point.y - 12, width, 24), text, color, _labelStyle);
             return width;

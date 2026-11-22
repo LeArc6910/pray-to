@@ -4135,6 +4135,8 @@ async function packs(browser) {
     // the warning sign while it winds up a whole second.
     await game.send('clear; goto spawn');
     await game.wait(900);
+    await game.send('goto wild; clear');
+    await game.wait(900);
     await game.send('monsters hold; heal; scene elite');
     await game.wait(900);
     const scene = await game.ask('elites');
