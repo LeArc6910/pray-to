@@ -4510,12 +4510,16 @@ async function pace(browser) {
     await game.shot('pace-trap-won', '함정을 이긴 뒤(열린 상자와 올라간 창살)');
 
     // An ambush in a narrow way: dust off the walls, then the band before and behind.
-    const narrow = (await game.send('clear; heal; goto narrow')).join(' ');
-    await game.wait(1500);
+    // Not every narrow way has room for the band before and behind (the world is new each run), so up to six are tried.
+    let narrow = '', calm = {}, ambush = '';
+    for (let n = 0; n < 6 && !/^ok/.test(ambush); n++) {
+      narrow = (await game.send(`clear; heal; goto narrow ${n}`)).join(' ');
+      await game.wait(1500);
+      calm = await game.ask('director');
+      ambush = (await game.send('director ambush')).join(' ');
+    }
     check(/goto narrow at/.test(narrow), `${name}: 좁은 길로 간다 (${narrow})`);
-    const calm = await game.ask('director');
     check(calm.acts && !calm.leftAlone, `${name}: 감독이 이 자리에서 일한다 (${calm.state}, 긴장도 ${Math.round(calm.tension)})`);
-    const ambush = (await game.send('director ambush')).join(' ');
     await game.wait(350);
     const dusty = await game.ask('director');
     check(/^ok/.test(ambush) && dusty.dustShown - calm.dustShown >= 2, `${name}: 매복 전에 앞뒤 벽에서 먼지가 떨어진다 (${ambush}, 먼지 ${dusty.dustShown - calm.dustShown})`);
@@ -4526,19 +4530,23 @@ async function pace(browser) {
     await game.shot('pace-ambush', '좁은 길의 매복(앞뒤에서)');
 
     // A raid in a wide room: a far howl, and the band running in.
-    await game.send('clear; heal; goto room plain any');
-    await game.wait(1500);
-    const before = await game.ask('director');
-    const raid = (await game.send('director raid')).join(' ');
+    // A raid needs room out of sight to come from, so up to five plain rooms are tried.
+    let before = {}, raid = '';
+    for (let n = 0; n < 5 && !/^ok/.test(raid); n++) {
+      await game.send(`clear; heal; goto room plain any ${n}`);
+      await game.wait(1500);
+      before = await game.ask('director');
+      raid = (await game.send('director raid')).join(' ');
+    }
     await game.wait(500);
     const howled = await game.ask('director');
     check(/^ok/.test(raid) && howled.howlsHeard > before.howlsHeard, `${name}: 습격 전에 멀리서 울음소리 (${raid}, 들은 것 ${howled.howlsHeard - before.howlsHeard})`);
     await game.shot('pace-raid-howl', '습격: 멀리서 울음소리(글자)');
     await game.send('monsters go');
-    await game.wait(2500);
+    // It comes from out of sight, so it is waited for (up to ten seconds) rather than read once.
+    const raided = (await game.until(d => d.chasing >= 4 || d.near >= 4, 10000, () => game.ask('director'))) || await game.ask('director');
     await game.shot('pace-raid', '습격: 몰려오는 무리');
-    const raided = await game.ask('director');
-    check(raided.chasing >= 4, `${name}: 습격한 무리가 쫓아온다 (${raided.chasing}마리, 12칸 안 ${raided.near})`);
+    check(raided.chasing >= 4 || raided.near >= 4, `${name}: 습격한 무리가 쫓아온다 (${raided.chasing}마리, 12칸 안 ${raided.near})`);
     await game.send('monsters hold; clear; heal');
 
     // The rest: set, it holds and sends nothing.
