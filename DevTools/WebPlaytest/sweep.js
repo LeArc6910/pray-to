@@ -4007,7 +4007,16 @@ async function map(browser) {
     await game.wait(900);
     await game.send('scene ice; face off');
     await game.wait(700);
+    const onIce = (await game.state()).x;
     await walk(1, 0, 600);
+    // A stick drag that did not take (the first touch after the room pictures now and then goes nowhere) is tried once
+    // more, so the check is of the ice and not of that touch.
+    if (Math.abs((await game.state()).x - onIce) < 0.2) {
+      run.note(`- ${name}: 스틱 걸음이 먹지 않아 한 번 더`);
+      await game.send('scene ice; face off');
+      await game.wait(700);
+      await walk(1, 0, 600);
+    }
     // Polled for a while: on the phone the stick walks slower and the screen runs late, so the player may reach the
     // ice only after the stick is let go.
     let slide = 0;
