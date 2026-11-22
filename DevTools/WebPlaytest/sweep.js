@@ -4081,7 +4081,8 @@ async function packs(browser) {
         answer = (await game.send(`goto room pack ${biome} ${n}`)).join(' ');
         await game.wait(1600);
         seen = await game.ask('packs');
-        if ((seen.packs || []).length) break;
+        // The list holds the empty one of the room before an arena's door too (no kind, none standing).
+        if (((seen.packs || [])[0] || {}).standing > 0) break;
       }
       return { answer, seen };
     };
