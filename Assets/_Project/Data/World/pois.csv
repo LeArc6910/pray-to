@@ -14,3 +14,5 @@ vault_obsidian,흑요석 금고,locked,cave|mushroom|sand|ice|crystal|lake,10,it
 vault_void,공허석 금고,locked,lava|abyss,10,items:2:rare|material:void_ore:6-10|coins:20-40|runes:30,1,yes,once,glint,10,,GoldChest
 trap_chest,함정 상자,trap,,10,items:1:uncommon|ore:3-5|potions:1|coins:8-16,,yes,once,glint,8,,IronChest
 cart,버려진 수레,cart,,10,forage:5-10|coins:5-15,,no,once,glint,6,,
+station,광차역,cart,,10,ride:16|repair:iron_bar:5,,no,always,lamps,16,,
+waystone,길잡이 돌,rest,,10,waypoint:1,,yes,always,flame,16,,Waystone

@@ -92,7 +92,7 @@ namespace Game.Core
             }
             Drink();
             // A chest, cart or shrine it walks by it uses (Docs/WorldRework.md 3단계 확인: 봇이 지나며 연 볼거리).
-            if (_world.Tick % ClaimEvery == 1 && _world.PoiNear(_player.Position, _player) is Poi poi) UsePoi(poi);
+            if (_world.Tick % ClaimEvery == 1 && _world.PoiNear(_player.Position, _player) is Poi poi && poi.Kind != PoiKind.Station) UsePoi(poi);
             var goal = Current;
             if (goal == null)
             {

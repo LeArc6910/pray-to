@@ -34,15 +34,15 @@ namespace Game.Core.Tests
         public void FourPeopleEachWithAStallAndAShop()
         {
             Assert.IsTrue(People.Shipped.Success, string.Join("\n", People.Shipped.Errors));
-            CollectionAssert.AreEqual(new[] { "merchant", "blacksmith", "fisher", "alchemist", "royal_trader", "demon_trader", "ore_trader" },
+            CollectionAssert.AreEqual(new[] { "merchant", "blacksmith", "fisher", "alchemist", "royal_trader", "demon_trader", "ore_trader", "wanderer" },
                 People.Shipped.Npcs.Select(n => n.Id));
             Assert.AreEqual(3, People.Shipped.StoryOf(Person("alchemist")).Count, "the alchemist has a story too");
             var world = Town("blacksmith", out _);
             foreach (var npc in People.Shipped.Npcs)
             {
                 // The four by the spawn stand there; those who keep shop in a place of the story stand nowhere in a world
-                // without the story's places.
-                Assert.AreEqual(npc.Place == null ? 1 : 0, Enumerable.Range(0, 24).Sum(y => Enumerable.Range(0, 24).Count(x => world.Map[x, y] == npc.Tile)), npc.Id);
+                // without the story's places, nor the wandering merchant in a world without camps (TravelTests).
+                Assert.AreEqual(npc.Place == null && !npc.Wanders ? 1 : 0, Enumerable.Range(0, 24).Sum(y => Enumerable.Range(0, 24).Count(x => world.Map[x, y] == npc.Tile)), npc.Id);
                 Assert.IsNotEmpty(World.ShopFor(People.Shipped, 3, npc), $"{npc.Id} sells something");
             }
             Assert.IsTrue(World.ShopFor(People.Shipped, 3, Person("blacksmith")).All(e => e.Npc == Person("blacksmith")));

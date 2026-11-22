@@ -19,6 +19,7 @@ namespace Game.Client
         int _line;
         bool _tellsHost;
         bool _waypoints;
+        Vector2 _waypointScroll;
         // What the player may answer at the end of the talk (story.csv choices, 2026-11-10), or null.
         IReadOnlyList<(string Text, int Step)> _choices;
         // After an answer: who asked and at which step, so their next words follow on as soon as the host moves on.
@@ -47,7 +48,16 @@ namespace Game.Client
         // The buttons over the person in reach and the waypoint in reach.
         public void DrawWorldButtons(Camera camera)
         {
-            if (Open || _client.Places.Count == 0) return;
+            if (Open || _client.Riding) return;
+            // A waystone touched (3c, World.Travel.cs): its button opens the same list as a place's waypoint.
+            var stone = _client.StoneNear();
+            if (stone != null && _client.StoneOpen(stone.Index) && WorldButton(camera, new Vector3(stone.Center.X, stone.Center.Y + 1.6f, 0), "길잡이 돌"))
+            {
+                _waypoints = true;
+                Sounds.Play(Sound.Click);
+                return;
+            }
+            if (_client.Places.Count == 0) return;
             var near = _client.CharacterNear();
             if (near is var (character, at))
             {
@@ -62,6 +72,16 @@ namespace Game.Client
                 _waypoints = true;
                 Sounds.Play(Sound.Click);
             }
+        }
+
+        // Opens the waypoint list when the player stands by an open waypoint or waystone (for the playtests).
+        public bool OpenWaypoints()
+        {
+            var place = _client.WaypointNear();
+            var stone = _client.StoneNear();
+            if (!(place != null && _client.Waypoints.Contains(place.Definition.Index) || stone != null && _client.StoneOpen(stone.Index))) return false;
+            _waypoints = true;
+            return true;
         }
 
         // Whether the name ends in a closed Hangul syllable (세라핀 → 과, 바르도 → 와).
@@ -188,34 +208,60 @@ namespace Game.Client
             GUI.Label(new Rect(panel.x + 16, panel.yMax - 36, 120, 24), $"{_line + 1}/{_lines?.Count ?? 0}");
         }
 
+        // The waypoints and the waystones (3c) open to this player, to go to from the one they stand by: a list that
+        // scrolls when it is longer than the screen (a finger drags it).
         void DrawWaypoints()
         {
             var places = _client.Story?.Places.Where(p => p.Waypoint).ToList() ?? new List<PlaceDefinition>();
+            var stones = _client.Stones.OrderBy(s => s.Biome).ToList();
             float width = Mathf.Min(420, Ui.Width - 24);
             float row = 34;
-            float height = 70 + row * places.Count + 40;
-            var panel = new Rect((Ui.Width - width) / 2, Mathf.Max(8, (Ui.Height - height) / 2), width, Mathf.Min(height, Ui.Height - 16));
+            float height = Mathf.Min(70 + row * (places.Count + stones.Count + (stones.Count > 0 ? 1 : 0)) + 50, Ui.Height - 16);
+            var panel = new Rect((Ui.Width - width) / 2, Mathf.Max(8, (Ui.Height - height) / 2), width, height);
             Controls.Block(panel);
-            GUI.Box(panel, GUIContent.none);
-            GUI.Label(new Rect(panel.x + 16, panel.y + 10, width - 32, 24), "웨이포인트: 가 본 곳으로 간다");
             var here = _client.WaypointNear()?.Definition;
-            float y = panel.y + 44;
+            if (here != null && !_client.Waypoints.Contains(here.Index)) here = null;
+            var hereStone = _client.StoneNear();
+            if (hereStone != null && !_client.StoneOpen(hereStone.Index)) hereStone = null;
+            bool by = here != null || hereStone != null;
+            Ui.TouchScroll(panel, ref _waypointScroll);
+            GUILayout.BeginArea(panel, GUI.skin.box);
+            GUILayout.Label("웨이포인트: 가 본 곳으로 간다", GUILayout.Height(24));
+            _waypointScroll = Ui.BeginScrollView(_waypointScroll, GUILayout.ExpandHeight(true));
             foreach (var place in places)
             {
                 bool open = _client.Waypoints.Contains(place.Index);
                 string text = place == here ? $"{place.Name} (여기)" : open ? place.Name : $"{place.Name} — 아직 가 보지 않았다";
-                GUI.enabled = open && place != here && here != null;
-                if (Ui.Button(new Rect(panel.x + 16, y, width - 32, row - 4), text))
+                GUI.enabled = open && place != here && by;
+                if (Ui.LayoutButton(text, GUILayout.Height(row - 4)))
                 {
                     _send(_client.TeleportCommand(place));
                     _waypoints = false;
                 }
                 GUI.enabled = true;
-                y += row;
             }
-            if (Ui.Button(new Rect(panel.xMax - 116, panel.yMax - 40, 100, 30), "닫기")) _waypoints = false;
-            // Walked away from the waypoint: the list goes.
-            if (here == null) _waypoints = false;
+            if (stones.Count > 0) GUILayout.Label("길잡이 돌", GUILayout.Height(22));
+            foreach (var stone in stones)
+            {
+                bool open = _client.StoneOpen(stone.Index);
+                string name = $"{BiomeMap.Name(stone.Biome)}의 {stone.Definition.Name}";
+                string text = stone == hereStone ? $"{name} (여기)" : open ? name : $"{name} — 아직 만지지 않았다";
+                GUI.enabled = open && stone != hereStone && by;
+                if (Ui.LayoutButton(text, GUILayout.Height(row - 4)))
+                {
+                    _send(_client.TravelToStoneCommand(stone));
+                    _waypoints = false;
+                }
+                GUI.enabled = true;
+            }
+            Ui.EndScrollView();
+            GUILayout.BeginHorizontal();
+            GUILayout.FlexibleSpace();
+            if (Ui.LayoutButton("닫기", GUILayout.Width(100), GUILayout.Height(30))) _waypoints = false;
+            GUILayout.EndHorizontal();
+            GUILayout.EndArea();
+            // Walked away from the waypoint or stone: the list goes.
+            if (!by) _waypoints = false;
         }
 
         // The goal list's lines for the story: the main story's, then each side story taken (one on a short screen),

@@ -135,6 +135,8 @@ namespace Game.Core
             if (player == null) return false;
             if (facing.LengthSquared > 1e-6f && !player.IsDead) player.Facing = facing.Normalized;
             if (reported.Equals(player.Position)) return true;
+            // A rider goes where the cart goes (World.Travel.cs): what the client reports meanwhile is let pass.
+            if (player.Riding) return true;
 
             float speed = rolling ? Math.Max(player.MoveSpeed, RollSpeed * RollSlow(player.Afflictions.Chilled, player.Afflictions.Snared)) : player.MoveSpeed;
             float allowed = speed * TickSeconds * Math.Clamp(elapsedTicks, 1, 10) * 1.25f + 0.05f;
@@ -199,6 +201,8 @@ namespace Game.Core
             UpdateProjectiles();
             UpdateForage();
             UpdateStory();
+            UpdateStones();
+            UpdateWanderer();
             UpdateLoot();
             UpdateCrops();
             UpdateMachines();
@@ -246,6 +250,7 @@ namespace Game.Core
             }
 
             Heal(player);
+            UpdateRide(player);
             UpdatePois(player);
             BurnInLava(player);
             UpdateRecall(player);
@@ -253,7 +258,7 @@ namespace Game.Core
             UpdateRoll(player);
             if (player.AttackCooldown > 0) player.AttackCooldown--;
             // No swing comes out in the middle of a roll.
-            if (player.Attacking && player.AttackCooldown == 0 && !player.Rolling) Attack(player);
+            if (player.Attacking && player.AttackCooldown == 0 && !player.Rolling && !player.Riding) Attack(player);
         }
 
         // A swing that hits nobody strikes the tile ahead. Rock (walls and ore veins) only gives way to a pickaxe in
@@ -584,6 +589,8 @@ namespace Game.Core
         int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true, bool dodge = true)
         {
             if (player.IsDead) return 0;
+            // Nothing touches one riding a minecart (World.Travel.cs).
+            if (player.Riding) return 0;
             if (dodge && Dodges(player, source)) return 0;
             int amount = armor ? Combat.Mitigate(damage, player.Stats.Armor) : Math.Max(1, (int)MathF.Round(damage));
             BreakRecall(player);

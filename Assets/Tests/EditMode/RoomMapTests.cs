@@ -21,7 +21,7 @@ namespace Game.Core.Tests
             WorldGenerator.Generate(seed, size, size, version: WorldGenerator.RoomVersion, terrain: Tiles.Shipped.Terrain);
 
         // Every tile of the map folded into one number (FNV-1a).
-        static ulong Hash(TileMap map)
+        internal static ulong Hash(TileMap map)
         {
             ulong hash = 14695981039346656037UL;
             for (int y = 0; y < map.Height; y++)

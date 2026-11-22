@@ -522,7 +522,7 @@ namespace Game.Client
             TileType.MerchantStall => MerchantStallTile,
             TileType.SmithStall => SmithStallTile,
             TileType.FisherHut => FisherHutTile,
-            TileType.RoyalStall or TileType.DemonStall or TileType.OreStall => MerchantStallTile,
+            TileType.RoyalStall or TileType.DemonStall or TileType.OreStall or TileType.WandererStall => MerchantStallTile,
             TileType.AlchemyTable => AlchemyTableTile,
             TileType.Keg => KegTile,
             TileType.PreservesJar => JarTile,
@@ -2146,6 +2146,8 @@ namespace Game.Client
         static readonly PixelImage RoyalAwning = Restriped(MerchantAwning, "#C8323A", "#8A1E2A", "#F0BE40", "#B8862A");
         static readonly PixelImage DemonAwning = Restriped(MerchantAwning, "#581A34", "#380E22", "#E2DCCA", "#B4AC96");
         static readonly PixelImage OreAwning = Restriped(MerchantAwning, "#985028", "#603018", "#9A9488", "#6E6A62");
+        // The wandering merchant's (2026-11-22, 묶음 3c): teal and saffron, a travelling tent's colours.
+        static readonly PixelImage WandererAwning = Restriped(MerchantAwning, "#2EA89A", "#1E7068", "#F2B640", "#B8822A");
 
         // The awning for a person's stall, or null for any other tile.
         public static PixelImage Awning(TileType stall) => stall switch
@@ -2157,6 +2159,7 @@ namespace Game.Client
             TileType.RoyalStall => RoyalAwning,
             TileType.DemonStall => DemonAwning,
             TileType.OreStall => OreAwning,
+            TileType.WandererStall => WandererAwning,
             _ => null,
         };
 

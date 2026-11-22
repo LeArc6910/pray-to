@@ -729,7 +729,7 @@ namespace Game.Client
                 GUILayout.Label(Ui.Wrap(consumable.Description, GUI.skin.label, width));
                 GUILayout.BeginHorizontal();
                 // A potion is drunk; a food is eaten, and still gives its buff at full health.
-                if (Ui.LayoutButton(consumable.IsFood ? "먹기" : consumable.Recalls ? "쓰기" : "마시기", GUILayout.Width(64)))
+                if (Ui.LayoutButton(consumable.IsFood ? "먹기" : consumable.Recalls ? "쓰기" : consumable.ReadsMap ? "읽기" : "마시기", GUILayout.Width(64)))
                 {
                     byte[] command = _client.UseConsumableCommand(consumable);
                     if (command != null) _send(command);

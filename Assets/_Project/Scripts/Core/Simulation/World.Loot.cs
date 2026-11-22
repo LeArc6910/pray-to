@@ -271,10 +271,12 @@ namespace Game.Core
             if (player == null || player.IsDead || consumable == null || player.ConsumableCooldown > 0) return false;
             // A potion is no use at full health; a food still gives its buff, a recall scroll still takes them home.
             if (player.Health >= player.Stats.MaxHealth && !consumable.UsableAtFullHealth) return false;
-            if (consumable.Recalls && player.Recalling) return false;
+            if (consumable.Recalls && (player.Recalling || player.Riding)) return false;
             if (consumable.RestoresMana && player.Mana >= player.Stats.MaxMana) return false;
             if (!player.Inventory.TakeConsumable(consumable)) return false;
             if (consumable.Recalls) StartRecall(player);
+            // A map scrap: the reader's own map marks the nearest thing to find they have not seen (MapView).
+            if (consumable.ReadsMap) _events.Add(new SimEvent(SimEventType.MapRead, player.Id, position: player.Position));
 
             if (consumable.IsFood)
             {

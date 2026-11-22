@@ -11,7 +11,9 @@ namespace Game.Core
             IReadOnlyCollection<object> dislikes, IReadOnlyList<string> lines, string role = "", string color = "#9A5AC8", bool buysGear = false,
             IReadOnlyList<(int Hearts, object Thing, int Count)> gifts = null, IReadOnlyDictionary<int, string> stories = null, string place = null)
         {
-            Place = string.IsNullOrEmpty(place) ? null : place;
+            // "camps": the wandering merchant (2026-11-22, Docs/Npcs.md 떠돌이 상인): a different camp each day.
+            Wanders = place == WanderPlace;
+            Place = string.IsNullOrEmpty(place) || Wanders ? null : place;
             Role = role.Length > 0 ? role : name;
             Color = color;
             BuysGear = buysGear;
@@ -32,6 +34,10 @@ namespace Game.Core
         public TileType Tile { get; }
         // The place of the story (places.csv id) their stall stands in, or null for near the spawn (2026-11-10).
         public string Place { get; }
+        // Stands by a different camp of the rooms each day (npcs.csv place "camps", World.MoveWanderer), never in a place
+        // or a house; their shop's rows with biomes are those of the camp's biome.
+        public bool Wanders { get; }
+        public const string WanderPlace = "camps";
         // Materials and consumables.
         public IReadOnlyCollection<object> Loves { get; }
         public IReadOnlyCollection<object> Likes { get; }
@@ -54,8 +60,9 @@ namespace Game.Core
     public sealed class ShopEntry
     {
         internal ShopEntry(MaterialDefinition material, ConsumableDefinition consumable, int buy, int sell, bool daily, int hearts, NpcDefinition npc = null,
-            DayEvent onlyOn = DayEvent.None)
+            DayEvent onlyOn = DayEvent.None, IReadOnlyList<Biome> biomes = null)
         {
+            Biomes = biomes ?? Array.Empty<Biome>();
             OnlyOn = onlyOn;
             Npc = npc;
             Material = material;
@@ -71,6 +78,9 @@ namespace Game.Core
         // Sold only on that day (the festival's goods, 2026-11-09), or None for any day.
         public DayEvent OnlyOn { get; }
         public object Thing => (object)Material ?? Consumable;
+        // On sale only where its person stands in one of these biomes (the wandering merchant's seeds); none for anywhere.
+        public IReadOnlyList<Biome> Biomes { get; }
+        public bool SoldIn(Biome? biome) => Biomes.Count == 0 || biome is Biome b && Biomes.Contains(b);
         public string Name => Material?.Name ?? Consumable.Name;
         // 0 when not sold, or not bought.
         public int Buy { get; }
@@ -311,7 +321,10 @@ namespace Game.Core
                     int hearts = row["hearts"].Length == 0 ? 0 : SheetValues.ParseNumber(row["hearts"], "hearts");
                     if (hearts > World.MaxHearts) throw new FormatException($"hearts는 {World.MaxHearts} 이하입니다.");
                     var onlyOn = row["event"].Length == 0 ? DayEvent.None : SheetValues.ParseEnum<DayEvent>(row["event"], "event");
-                    shop.Add(new ShopEntry(thing as MaterialDefinition, thing as ConsumableDefinition, buy, sell, daily, hearts, npc, onlyOn));
+                    var biomes = row["biomes"].Split(new[] { '|' }, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(b => SheetValues.ParseEnum<Biome>(b.Trim(), "biomes")).ToList();
+                    if (biomes.Count > 0 && npc?.Wanders != true) throw new FormatException("biomes는 떠돌이 상인(place camps)의 줄에만 씁니다.");
+                    shop.Add(new ShopEntry(thing as MaterialDefinition, thing as ConsumableDefinition, buy, sell, daily, hearts, npc, onlyOn, biomes));
                 }
                 catch (FormatException e)
                 {

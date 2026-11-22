@@ -121,6 +121,15 @@ namespace Game.Core.Tests
                             Assert.AreEqual(RoomRole.Cart, room.Role, where);
                             Assert.AreEqual(TileType.MineCart, type, where);
                             break;
+                        // 3c: a station at a line's end on its rails, a waystone standing by a camp (TravelTests).
+                        case PoiKind.Station:
+                            Assert.AreEqual(RoomRole.Cart, room.Role, where);
+                            Assert.AreEqual(TileType.Rail, type, where);
+                            break;
+                        case PoiKind.Waystone:
+                            Assert.AreEqual(RoomRole.Rest, room.Role, where);
+                            Assert.AreEqual(TileType.Waystone, type, where);
+                            break;
                         default:
                             Assert.AreEqual(poi.Definition.Role, room.Role, where);
                             Assert.AreEqual(poi.Definition.Tile, type, where);

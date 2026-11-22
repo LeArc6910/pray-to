@@ -213,6 +213,11 @@ namespace Game.Core
         IronChest,
         GoldChest,
         OpenChest,
+        // A waystone by a camp (2026-11-22, Docs/WorldRework.md 길잡이 돌, 묶음 3c): a standing stone with a blue flame,
+        // a waypoint of the field. Standing (solid), never dug or built on.
+        Waystone,
+        // The wandering merchant's stall (Docs/Npcs.md 떠돌이 상인, 묶음 3c): it stands by a different camp each day.
+        WandererStall,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.

@@ -29,6 +29,8 @@ namespace CoreSandbox
                 = new Dictionary<Biome, (int, double, double, double, double, int)>();
             public RoomGraph Rooms;
             public IReadOnlyList<RoadRoute> Roads;
+            // Each minecart line (3c): its length, the seconds a cart takes, and the seconds walked between its stations.
+            public List<(float Length, double Ride, double Walk)> Rails = new List<(float, double, double)>();
         }
 
         const int BigLump = 100;
@@ -38,6 +40,20 @@ namespace CoreSandbox
             var map = world.Map;
             int width = map.Width, height = map.Height, total = width * height;
             var numbers = new Numbers { Rooms = world.Rooms, Roads = world.Roads };
+            // The minecart lines (3c): the ride against the walk between the same stations (eight ways, no digging).
+            if (world.Rooms != null && world.Rooms.Lines.Count > 0)
+            {
+                var flow = new FlowField(map);
+                foreach (var line in world.Rooms.Lines)
+                {
+                    var a = world.Rooms.Pois[line.StationA];
+                    var b = world.Rooms.Pois[line.StationB];
+                    flow.Build(new[] { a.Center }, 4000);
+                    int steps = flow.DistanceAt(b.X, b.Y);
+                    var ride = world.Rooms.Pois[line.StationA].Definition.Reward(PoiRewardKind.Ride);
+                    numbers.Rails.Add((line.Length, line.Length / (ride?.Min ?? 16), steps == FlowField.Unreached ? double.NaN : steps / WalkSpeed));
+                }
+            }
             // Rock is whatever is solid but water; open is whatever is walked on (lava too: it burns, it does not stop).
             var rock = new bool[total];
             var open = new bool[total];
@@ -353,6 +369,12 @@ namespace CoreSandbox
                         .Select(t => n.Rooms.Pois.Count(p => p.Definition.Tile == t))));
                     Row("바위 속 숨은 방 / 숨은 방", n => $"{n.Rooms.Nodes.Count(r => r.Buried)} / {n.Rooms.Nodes.Count(r => r.Role == RoomRole.Hidden)}");
                     Row("방에서 가장 가까운 볼거리까지 방 수(평균 / 95%)", n => PoiRooms(n.Rooms));
+                    Row("광차 줄(역은 둘씩)", n => n.Rails.Count.ToString());
+                    Row("광차 줄 길이(짧은 ~ 긴)", n => n.Rails.Count == 0 ? "-" : $"{n.Rails.Min(r => r.Length):0} ~ {n.Rails.Max(r => r.Length):0}칸");
+                    Row("광차로 / 걸어서 역 사이(평균)", n => n.Rails.Count == 0 ? "-" : $"{n.Rails.Average(r => r.Ride):0}초 / {n.Rails.Average(r => r.Walk):0}초");
+                    Row("광차 줄이 잇는 생물군계", n => n.Rails.Count == 0 ? "-" : string.Join(", ", n.Rooms.Lines.Select(l =>
+                        $"{BiomeMap.Name(n.Rooms.Pois[l.StationA].Biome)}-{BiomeMap.Name(n.Rooms.Pois[l.StationB].Biome)}")));
+                    Row("길잡이 돌(생물군계마다 하나)", n => n.Rooms.Pois.Count(p => p.Kind == PoiKind.Waystone).ToString());
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();

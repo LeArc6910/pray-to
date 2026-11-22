@@ -160,17 +160,17 @@ lake,pond,8,2,any
 |---|---|
 | id | 볼거리 id |
 | name | 화면에 보이는 이름 |
-| role | 놓이는 방 역할: `rest`(야영지), `shrine`(제단), `cart`(수레), `treasure`·`hidden`·`locked`·`trap`(상자) |
+| role | 놓이는 방 역할: `rest`(야영지·길잡이 돌), `shrine`(제단), `cart`(수레·광차역), `treasure`·`hidden`·`locked`·`trap`(상자) |
 | biomes | 쓰는 생물군계 `lava\|abyss`. 비우면 어디나. 역할마다 모든 생물군계에 줄이 있어야 한다(시트 시험) |
 | weight | 같은 역할·생물군계 안에서 뽑힐 비율 |
 | reward | 주는 것, `\|`로 잇는다(아래 표) |
 | reward_level | 장비를 굴리는 레벨에 더할 수. 장비는 그 자리의 구역 레벨과 진행 레벨(보스) 가운데 높은 쪽 |
 | per_player | `yes`면 곁(12칸)의 사람마다 따로 굴린다(보스 보상처럼). `no`면 연 사람의 것 |
-| again | `once`(월드에 한 번, 저장), `daily`(사람마다 하루 한 번, 제단), `always`(야영지) |
-| signal | 멀리서 보이는 신호: `smoke`(연기와 불빛), `beam`(하얀 빛기둥), `glint`(금빛 반짝임) |
+| again | `once`(월드에 한 번, 저장), `daily`(사람마다 하루 한 번, 제단), `always`(야영지·광차역·길잡이 돌) |
+| signal | 멀리서 보이는 신호: `smoke`(연기와 불빛), `beam`(하얀 빛기둥), `glint`(금빛 반짝임), `lamps`(역에서 선로를 따라 등불 빛, 3c), `flame`(푸른 불, 3c) |
 | signal_range | 신호가 보이는 거리(칸) |
 | buff | 축복(`bless`)이 주는 것. 능력치 글(`Docs/Loot.md`)을 `;`로 |
-| tile | 상자의 칸: `WoodChest`, `IronChest`, `GoldChest` |
+| tile | 상자의 칸: `WoodChest`, `IronChest`, `GoldChest`. 길잡이 돌은 `Waystone` |
 
 | reward | 뜻 |
 |---|---|
@@ -185,9 +185,14 @@ lake,pond,8,2,any
 | `bless:S` | `buff`를 S초 동안. 새 축복은 앞의 것을 바꾼다 |
 | `rest:P` | 모닥불 4칸 안에서 초당 P% 회복 |
 | `rested:S` | 모닥불 곁에 3초 있으면 S초 동안 "잘 쉼"(경험치 +10%), 쓰러지면 이 야영지에서 일어난다 |
+| `ride:V` | (3c) 광차역. 역의 광차를 만지면 선로를 따라 초당 V칸(4~40)으로 반대쪽 역까지 간다. `role`은 `cart` |
+| `repair:id:N` | (3c) 광차역의 끊긴 선로를 그 재료 N개로 고친다. `ride`와 함께 |
+| `waypoint:1` | (3c) 길잡이 돌. 만지면(2.2칸 안) 열리는 들판의 웨이포인트. `role`은 `rest`, `tile`은 `Waystone` |
 
 ```
 id,name,role,biomes,weight,reward,reward_level,per_player,again,signal,signal_range,buff,tile
+station,광차역,cart,,10,ride:16|repair:iron_bar:5,,no,always,lamps,16,,
+waystone,길잡이 돌,rest,,10,waypoint:1,,yes,always,flame,16,,Waystone
 camp,야영지,rest,,10,rest:10|rested:600,,no,always,smoke,20,,
 shrine_might,힘의 제단,shrine,,10,bless:300|heal:100,,yes,daily,beam,14,Damage+20%,
 chest_wood,나무 상자,treasure,,6,items:1|ore:2-4|potions:1|coins:4-10,,yes,once,glint,10,,WoodChest
@@ -195,9 +200,10 @@ vault_void,공허석 금고,locked,lava|abyss,10,items:2:rare|material:void_ore:
 cart,버려진 수레,cart,,10,forage:5-10|coins:5-15,,no,once,glint,6,,
 ```
 
-- 시트 시험(`PoiSheet.Parse`): 모르는 reward, 없는 재료, `bless`와 `buff`는 함께, 상자에는 상자 칸, `always`는 야영지에만, 신호가 있으면 거리, 역할마다 모든 생물군계에 줄
+- 시트 시험(`PoiSheet.Parse`): 모르는 reward, 없는 재료, `bless`와 `buff`는 함께, 상자에는 상자 칸, `always`는 야영지·광차역·길잡이 돌에만, 신호가 있으면 거리, 역할마다 모든 생물군계에 줄(표시에 놓이는 줄만 센다). `ride`는 `cart`에, `waypoint`는 `rest`와 `Waystone` 칸에, `repair`는 `ride`와 함께
+- **광차역과 길잡이 돌**(3c, 2026-11-22, `WorldGenerator.Rails.cs`): 조각의 표시에 놓이지 않는다. `ride`가 있는 줄은 광차역, `waypoint`가 있는 줄은 길잡이 돌이다(`PoiDefinition.Kind`, `OnMark`가 거짓). 생성기가 수레 방 둘 사이에 선로를 깔 때 양 끝에 역을, 생물군계마다 야영지 하나의 모닥불 곁(2~4칸, 둘레 여덟 칸이 열린 바닥)에 돌을 놓는다. 둘 다 표시에서 놓인 볼거리 뒤에 번호가 붙어서 3a의 번호는 그대로다. 규칙은 `Docs/WorldRework.md` 묶음 3c
 - 시트가 없는 게임(시트를 읽지 못한 옛 에셋)은 표시만 있고 볼거리가 없다. 상자는 닫힌 나무 상자로 서 있다
-- 지금 열다섯 줄: 야영지 하나, 제단 다섯(힘·바람·행운·샘·수호), 보물 상자 셋(나무·철·금), 숨은 방 상자 둘, 금고 둘(흑요석·공허석), 함정 상자 하나, 수레 하나
+- 지금 열일곱 줄: 야영지 하나, 제단 다섯(힘·바람·행운·샘·수호), 보물 상자 셋(나무·철·금), 숨은 방 상자 둘, 금고 둘(흑요석·공허석), 함정 상자 하나, 수레 하나, 광차역 하나, 길잡이 돌 하나
 
 ## 생물군계마다
 

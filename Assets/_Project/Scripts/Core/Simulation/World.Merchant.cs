@@ -40,6 +40,8 @@ namespace Game.Core
         static readonly int[] GiftPoints = { -20, 20, 45, 80 };
         // Daily shop rows on sale each day, and how much kinder the prices get with each heart (percent).
         public const int DailyShopItems = 2;
+        // The wandering merchant's daily rows on sale each day, from those of the camp's biome and the rest (3c).
+        public const int WandererDailyItems = 3;
         public const int HeartPercent = 4;
         // The most of one row bought or sold at once.
         public const int MaxTrade = 99;
@@ -106,18 +108,20 @@ namespace Game.Core
         }
 
         // What a person has on sale the day: every everyday row of theirs and DailyShopItems of their daily rows,
-        // picked by the day alone so every client works out the same. Without a person, the merchant.
-        public static IReadOnlyList<ShopEntry> ShopFor(NpcData npcs, int day, NpcDefinition npc = null)
+        // picked by the day alone so every client works out the same. Without a person, the merchant. biome: where the
+        // person stands, for the wandering merchant's rows of a biome (ShopEntry.Biomes); those are off sale elsewhere.
+        public static IReadOnlyList<ShopEntry> ShopFor(NpcData npcs, int day, NpcDefinition npc = null, Biome? biome = null)
         {
             if (npcs == null) return Array.Empty<ShopEntry>();
             npc ??= npcs.Merchant;
             // An event's goods only on its day (the festival, 2026-11-09).
             var today = EventOf(day);
-            var own = npcs.Shop.Where(e => e.Npc == npc && (e.OnlyOn == DayEvent.None || e.OnlyOn == today)).ToList();
+            var own = npcs.Shop.Where(e => e.Npc == npc && (e.OnlyOn == DayEvent.None || e.OnlyOn == today) && e.SoldIn(biome)).ToList();
             var daily = own.Where(e => e.Daily && e.Buy > 0).ToList();
             var random = new GameRandom((ulong)Math.Max(1, day) * 31 + (ulong)Math.Max(0, npcs.IndexOf(npc)), stream: 11);
             var picked = new HashSet<ShopEntry>();
-            while (picked.Count < Math.Min(DailyShopItems, daily.Count)) picked.Add(daily[random.Next(daily.Count)]);
+            int count = npc != null && npc.Wanders ? WandererDailyItems : DailyShopItems;
+            while (picked.Count < Math.Min(count, daily.Count)) picked.Add(daily[random.Next(daily.Count)]);
             return own.Where(e => e.Buy > 0 && (!e.Daily || picked.Contains(e))).ToList();
         }
 
@@ -145,7 +149,8 @@ namespace Game.Core
             if (Npcs == null) return;
             foreach (var npc in Npcs.Npcs)
             {
-                if (HasTile(npc.Tile)) continue;
+                // The wandering merchant goes from camp to camp (MoveWanderer).
+                if (npc.Wanders || HasTile(npc.Tile)) continue;
                 // Behind the counter of a free shop of their place (2026-11-11, WorldGenerator.CarveShops): the one
                 // of the story's place they keep shop in, or for the others the village round the spawn.
                 var home = npc.Place != null ? Places.FirstOrDefault(p => p.Definition.Id == npc.Place) : Places.FirstOrDefault(p => p.Definition.Distance == 0);
@@ -390,7 +395,8 @@ namespace Game.Core
         {
             var at = AtMerchant(playerId);
             var coin = CoinMaterial;
-            if (at == null || coin == null || entry == null || entry.Npc != at.Value.Npc || !ShopFor(Npcs, Today, at.Value.Npc).Contains(entry)) return false;
+            if (at == null || coin == null || entry == null || entry.Npc != at.Value.Npc || !ShopFor(Npcs, Today, at.Value.Npc, ShopBiome(at.Value.Player, at.Value.Npc)).Contains(entry))
+                return false;
             var (player, _, friendship) = at.Value;
             if (friendship.Hearts < entry.Hearts) return false;
             count = Math.Clamp(count, 1, MaxTrade);
@@ -492,5 +498,68 @@ namespace Game.Core
             return reaction;
         }
 
+
+        // ---- The wandering merchant (2026-11-22, Docs/WorldRework.md 볼거리 떠돌이 상인, Docs/Npcs.md, 묶음 3c) ----
+
+        // The day the wandering merchant was last put at a camp, and where their stall stands.
+        int _wandererDay = int.MinValue;
+        (int X, int Y)? _wandererAt;
+
+        // The biome a person's rows of a biome are sold in: where the wandering merchant stands; null for anyone else.
+        Biome? ShopBiome(Player player, NpcDefinition npc) =>
+            npc != null && npc.Wanders && NpcNear(player.Position) is (_, int x, int y) ? Biomes[x, y] : (Biome?)null;
+
+        // The camp (index into the camps of the rooms) the wandering merchant stands by on a day, by the world's seed
+        // and the day: the camps are shuffled once by the seed and halved, and an even day picks one of the first half,
+        // an odd day one of the second, so it is never by the same camp two days running.
+        public static int WandererCamp(ulong seed, int day, int camps)
+        {
+            if (camps <= 1) return camps - 1;
+            var order = Enumerable.Range(0, camps).ToArray();
+            var shuffle = new GameRandom(seed, stream: 54);
+            for (int i = camps - 1; i > 0; i--)
+            {
+                int j = shuffle.Next(i + 1);
+                (order[i], order[j]) = (order[j], order[i]);
+            }
+            int half = camps / 2;
+            var pick = new GameRandom(seed + (ulong)Math.Max(0, day) * 7919UL, stream: 53);
+            return (day & 1) == 0 ? order[pick.Next(half)] : order[half + pick.Next(camps - half)];
+        }
+
+        // Where the wandering merchant's stall stands now, or null (no camps, or no room by today's).
+        public (int X, int Y)? WandererAt => _wandererAt;
+
+        // Once a second: on a new day the wandering merchant goes to another camp.
+        void UpdateWanderer()
+        {
+            if (Tick % TicksPerSecond == 0 && _wandererDay != Today) MoveWanderer();
+        }
+
+        // Takes the wandering merchant's stall from wherever it stood (by any camp, as a save may have left it) and sets
+        // it on open floor by today's camp, below the fire.
+        void MoveWanderer()
+        {
+            var npc = Npcs?.Npcs.FirstOrDefault(n => n.Wanders);
+            if (npc == null || _camps.Count == 0) return;
+            _wandererDay = Today;
+            if (_wandererAt is (int ox, int oy) && Map[ox, oy] == npc.Tile) SetTile(ox, oy, TileType.Floor);
+            foreach (var camp in _camps)
+            {
+                for (int y = camp.Y - 5; y <= camp.Y + 5; y++)
+                    for (int x = camp.X - 5; x <= camp.X + 5; x++)
+                        if (Map.InBounds(x, y) && Map[x, y] == npc.Tile) SetTile(x, y, TileType.Floor);
+            }
+            _wandererAt = null;
+            int first = WandererCamp(_forageSeed, Today, _camps.Count);
+            for (int i = 0; i < _camps.Count; i++)
+            {
+                var camp = _camps[(first + i) % _camps.Count];
+                if (WorldGenerator.OpenSpot(Map, camp.X, camp.Y, 2, 4, up: false) is not (int x, int y)) continue;
+                SetTile(x, y, npc.Tile);
+                _wandererAt = (x, y);
+                return;
+            }
+        }
     }
 }

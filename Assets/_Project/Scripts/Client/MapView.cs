@@ -144,6 +144,20 @@ namespace Game.Client
             return MapSave.Write(_explored, _map.Width, _map.Height);
         }
 
+        // The thing a map scrap pointed to (SimEventType.MapRead, 3c), ringed on the map until it is seen; null for none.
+        public Poi Scrapped { get; private set; }
+
+        // A map scrap read: the nearest thing to find that still gives and whose tile this map has not seen (not one
+        // in a hidden room still shut in the rock). Null when there is none.
+        public Poi ReadScrap()
+        {
+            var rooms = _client.Rooms;
+            Scrapped = _client.Pois.Where(p => p.Kind != PoiKind.Camp && !_explored[p.Y * _map.Width + p.X] && _client.CanUse(p)
+                    && !(rooms != null && rooms.Nodes[p.Room].Buried))
+                .OrderBy(p => Vec2.Distance(p.Center, _client.Position)).FirstOrDefault();
+            return Scrapped;
+        }
+
         // The full map is showing. Touches and attacks are held back meanwhile.
         public bool FullOpen { get; set; }
 
@@ -269,7 +283,9 @@ namespace Game.Client
         }
 
         // The things to find (묶음 3a), once their tile has been seen: a camp orange, a shrine white (grey once prayed at
-        // today), a chest gold and a cart brown (faint once opened); an elite camp a red skull (2-2's mark).
+        // today), a chest gold and a cart brown (faint once opened); an elite camp a red skull (2-2's mark). 3c: a
+        // minecart station steel (a ring while its line is broken), a waystone blue (pale until touched), the
+        // wandering merchant's stall teal, and a thing a map scrap marked ringed until it is seen.
         void DrawPoiMarks(Rect area, Rect window)
         {
             bool Seen(int x, int y) => _map.InBounds(x, y) && _explored[y * _map.Width + x];
@@ -277,6 +293,19 @@ namespace Game.Client
             {
                 if (!Seen(poi.X, poi.Y)) continue;
                 bool live = _client.CanUse(poi);
+                if (poi.Kind == PoiKind.Station)
+                {
+                    var line = _client.LineOf(poi);
+                    bool running = line != null && _client.RailFixed(line.Index);
+                    Marker(area, window, poi.Center, running ? Shapes.Square : Shapes.Ring, new Color(0.72f, 0.78f, 0.88f), MarkerSize * 1.3f);
+                    continue;
+                }
+                if (poi.Kind == PoiKind.Waystone)
+                {
+                    bool open = _client.StoneOpen(poi.Index);
+                    Marker(area, window, poi.Center, Shapes.Circle, open ? WaypointOpen : new Color(0.55f, 0.75f, 1f, 0.6f), MarkerSize * (open ? 1.4f : 1.1f));
+                    continue;
+                }
                 var color = poi.Kind switch
                 {
                     PoiKind.Camp => new Color(1f, 0.6f, 0.25f),
@@ -287,6 +316,11 @@ namespace Game.Client
                 Marker(area, window, poi.Center, poi.Kind == PoiKind.Camp || poi.Kind == PoiKind.Shrine ? Shapes.Circle : Shapes.Square, color,
                     MarkerSize * (live ? 1.1f : 0.8f));
             }
+            // The wandering merchant's stall where it stands today, once seen there.
+            if (_client.WandererAt() is (int wx, int wy) && Seen(wx, wy)) Marker(area, window, TileMap.Center(wx, wy), Shapes.Square, new Color(0.18f, 0.66f, 0.6f), MarkerSize * 1.5f);
+            // A thing a map scrap pointed to, not seen yet: a breathing ring where it is.
+            if (Scrapped is Poi scrapped && !Seen(scrapped.X, scrapped.Y))
+                Marker(area, window, scrapped.Center, Shapes.Ring, new Color(1f, 0.9f, 0.5f, 0.6f + 0.4f * Mathf.Sin(Time.unscaledTime * 3)), MarkerSize * 2.4f);
             foreach (var (x, y) in _camps)
                 if (Seen(x, y)) Marker(area, window, TileMap.Center(x, y), Skull, new Color(1f, 0.3f, 0.25f), MarkerSize * 1.8f);
         }
@@ -386,6 +420,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Grate) return new Color32(150, 160, 172, 255);
             if (_map[x, y] >= TileType.WoodChest && _map[x, y] <= TileType.GoldChest) return new Color32(255, 214, 90, 255);
             if (_map[x, y] == TileType.OpenChest) return new Color32(150, 126, 80, 255);
+            if (_map[x, y] == TileType.Waystone) return new Color32(110, 190, 255, 255);
             if (_map[x, y] == TileType.IceFloor) return new Color32(200, 232, 248, 255);
             if (_map[x, y] == TileType.Quicksand) return new Color32(196, 160, 84, 255);
             if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);
@@ -407,7 +442,7 @@ namespace Game.Client
             if (TileMap.IsSoil(_map[x, y])) return new Color32(110, 80, 56, 255);
             if (_map[x, y] == TileType.Filter) return Palette.Splitter;
             if (_map[x, y] == TileType.MerchantStall || _map[x, y] == TileType.SmithStall || _map[x, y] == TileType.FisherHut || _map[x, y] == TileType.AlchemyTable
-                || _map[x, y] == TileType.RoyalStall || _map[x, y] == TileType.DemonStall || _map[x, y] == TileType.OreStall)
+                || _map[x, y] == TileType.RoyalStall || _map[x, y] == TileType.DemonStall || _map[x, y] == TileType.OreStall || _map[x, y] == TileType.WandererStall)
                 return new Color32(220, 90, 100, 255);
             if (_map[x, y] == TileType.WardStone || _map[x, y] == TileType.TeslaTower) return new Color32(140, 224, 255, 255);
             if (World.IsPowerNode(_map[x, y]) || _map[x, y] == TileType.Lever) return Palette.Drill;

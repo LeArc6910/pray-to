@@ -944,7 +944,7 @@ namespace Game.Core
         void Affect(Player player, HitEffect effect, float amount, Vec2 from, int source = 0, float blow = 0)
         {
             // A blow rolled through (World.Roll.cs) neither roots nor pushes, as it does no damage.
-            if (player.IsDead || player.Dodging) return;
+            if (player.IsDead || player.Dodging || player.Riding) return;
             switch (effect)
             {
                 case HitEffect.Root:

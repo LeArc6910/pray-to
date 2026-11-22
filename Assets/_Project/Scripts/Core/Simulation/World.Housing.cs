@@ -201,6 +201,7 @@ namespace Game.Core
             var at = AtMerchant(playerId);
             if (at == null) return "곁에 아무도 없다";
             var (player, npc, friendship) = at.Value;
+            if (npc.Wanders) return "떠돌이 상인은 한곳에 머물지 않는다";
             if (friendship.Hearts < Housing.InviteHearts) return $"호감 {Housing.InviteHearts}부터 이사를 권할 수 있다";
             if (LivesHere(npc)) return "이미 방에 산다";
             var near = BedOf(player) is (int bx, int by) ? TileMap.Center(bx, by) : Spawn;

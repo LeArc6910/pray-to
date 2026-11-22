@@ -137,7 +137,7 @@ namespace Game.Core.Tests
                     if (map.InBounds(nx, ny) && !map.IsSolid(nx, ny) && reached.Add((nx, ny))) open.Enqueue((nx, ny));
             }
             int inShops = 0;
-            foreach (var npc in People.Shipped.Npcs)
+            foreach (var npc in People.Shipped.Npcs.Where(n => !n.Wanders))
             {
                 var site = npc.Place != null ? world.Places.Single(p => p.Definition.Id == npc.Place) : world.Places.Single(p => p.Definition.Distance == 0);
                 var counter = site.Shops.FirstOrDefault(c => map[c.X, c.Y] == npc.Tile);
@@ -150,7 +150,8 @@ namespace Game.Core.Tests
                 Assert.AreEqual(TileType.Door, map[counter.X, counter.Y - WorldGenerator.ShopHeight + 2], $"seed {seed}: {npc.Id} door");
                 Assert.IsTrue(reached.Contains((counter.X, counter.Y - 1)), $"seed {seed}: {npc.Id}'s counter is walked up to from the spawn");
             }
-            Assert.GreaterOrEqual(inShops, People.Shipped.Npcs.Count - 1, $"seed {seed}: the merchants are in shops");
+            // The wandering merchant has no shop (it goes from camp to camp, TravelTests).
+            Assert.GreaterOrEqual(inShops, People.Shipped.Npcs.Count(n => !n.Wanders) - 1, $"seed {seed}: the merchants are in shops");
         }
 
         [Test]

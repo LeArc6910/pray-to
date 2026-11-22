@@ -67,6 +67,8 @@ namespace Game.Client
                 case TileType.Crates: return Rgba.Hex("#FFE27A");
                 // The chests of the rooms (묶음 3a).
                 case TileType.WoodChest: case TileType.IronChest: case TileType.GoldChest: case TileType.OpenChest: return Rgba.Hex("#FFE27A");
+                // The waystones (묶음 3c); the minecart lines are their rails.
+                case TileType.Waystone: return Rgba.Hex("#6EC0FF");
             }
             if (world.Map.IsSolid(x, y) || type == TileType.Waypoint) return Built;
             if (world.ArenaKindAt(TileMap.Center(x, y)) != null) return ArenaFloor;

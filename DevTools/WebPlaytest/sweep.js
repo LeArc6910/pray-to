@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4177,7 +4177,9 @@ async function pois(browser) {
       await game.startSolo();
     }
     await game.wait(1200);
-    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; clock 22');
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on');
+    const night = (await game.send('clock 1 22')).join(' ');
+    check(!/^error/.test(night), `${name}: 밤 10시로 (${night || 'ok'})`);
     const all = await game.ask('pois');
     check(all.count > 100 && all.camp > 10 && all.shrine > 10 && all.chest > 50 && all.cart > 5,
       `${name}: 볼거리가 놓였다 (모두 ${all.count}: 야영지 ${all.camp}, 제단 ${all.shrine}, 상자 ${all.chest}, 수레 ${all.cart})`);
@@ -4247,12 +4249,16 @@ async function pois(browser) {
     check(/^ok/.test(crack), `${name}: 숨은 방의 금 간 벽 앞에 선다 (${crack})`);
 
     // A lock: an iron pickaxe is not enough.
-    await game.send('equip iron_pickaxe; goto lock');
+    await game.send('equip iron_pickaxe');
+    const lock = (await game.send('goto lock')).join(' ');
+    check(/^ok/.test(lock), `${name}: 자물쇠 벽 앞에 선다 (${lock})`);
     await game.wait(1200);
     await game.send('attack on');
     await game.wait(1500);
+    const refused = await game.ask('texts');
     await game.send('attack off');
     await game.wait(300);
+    check((refused.floating || []).some(t => /더 좋은 곡괭이/.test(t)), `${name}: 철 곡괭이로 자물쇠 벽을 치면 "더 좋은 곡괭이가 필요하다" (${(refused.floating || []).join(' / ') || '글 없음'})`);
     await game.shot('pois-lock-refused', '철 곡괭이로 흑요석 벽을 치면 "더 좋은 곡괭이"');
 
     // An elite camp's red flag, from afar.
@@ -4261,12 +4267,106 @@ async function pois(browser) {
     await game.send('goto 0 -14');
     await game.wait(1200);
     await game.shot('pois-elite-flag', '정예 야영지의 붉은 깃발(멀리서)');
-    await game.send('clock 9');
+    await game.send('clock 1 9');
     await game.context.close();
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, base, save, story, deploysave, layout, touch };
+// Getting about (2026-11-22, Docs/WorldRework.md 묶음 3c): a minecart line's broken end (its button says what mends
+// it), mended with five iron bars and ridden (the cart under the player, the rails going by), a waystone's blue flame
+// and the waypoint list it opens, the wandering merchant's stall by a camp and its shop (a map scrap bought and read).
+// The rattle of the cart and the feel of the ride are the person's.
+async function travel(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 광차·길잡이 돌·떠돌이 상인 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on');
+    const all = await game.ask('travel');
+    check(all.lines.length >= 4 && all.stones >= 6 && all.wanderer,
+      `${name}: 광차 줄 ${all.lines.length}, 길잡이 돌 ${all.stones}, 떠돌이 상인 ${all.wanderer ? '있음' : '없음'}(${all.wandererBiome})`);
+
+    // A line's broken end: its button says what mends it, and cannot be pressed without it.
+    const broken = (await game.send('goto station broken')).join(' ');
+    await game.wait(1500);
+    check(/^ok/.test(broken), `${name}: 끊긴 광차역 곁으로 간다 (${broken})`);
+    const mendButton = (await game.buttons()).find(b => /선로 고치기/.test(b.label));
+    check(!!mendButton && !mendButton.enabled, `${name}: 철 주괴 없이는 [선로 고치기]가 눌리지 않는다 (${mendButton ? mendButton.label : '단추 없음'})`);
+    await game.shot('travel-station-broken', '끊긴 선로의 광차역(뜯긴 선로와 [선로 고치기 0/5])');
+    await game.send('give iron_bar 5');
+    await game.wait(900);
+    const before = (await game.ask('travel')).lines.filter(l => l.fixed).length;
+    check(await game.press(/선로 고치기/), `${name}: 철 주괴 5개로 [선로 고치기]를 누른다`);
+    await game.wait(900);
+    const mended = await game.ask('travel');
+    check(mended.lines.filter(l => l.fixed).length === before + 1, `${name}: 선로가 고쳐졌다 (고친 줄 ${before} → ${mended.lines.filter(l => l.fixed).length})`);
+
+    // Ridden: the cart under the player along the rails, then off at the other end.
+    check(await game.press(/광차 타기/), `${name}: [광차 타기]를 누른다`);
+    await game.wait(1500);
+    const riding = await game.ask('travel');
+    check(riding.riding && riding.clientRiding, `${name}: 광차를 탔다 (호스트 ${riding.riding}, 화면 ${riding.clientRiding})`);
+    await game.shot('travel-riding', '광차를 타고 가는 중(선로와 광차)');
+    await game.wait(2500);
+    await game.shot('travel-riding-later', '광차를 타고 가는 중(2.5초 뒤)');
+    const ridden = !!(await game.until(t => !t.riding, 25000, () => game.ask('travel')));
+    const arrived = await game.ask('travel');
+    check(ridden && Math.hypot(arrived.x - riding.x, arrived.y - riding.y) > 60, `${name}: 반대쪽 역에 내렸다 (${Math.round(Math.hypot(arrived.x - riding.x, arrived.y - riding.y))}칸 옮김)`);
+    await game.shot('travel-arrived', '반대쪽 역에 내린 뒤');
+
+    // A waystone: touched, it opens; its button opens the waypoint list with the stones.
+    const stone = (await game.send('goto poi waystone')).join(' ');
+    await game.wait(1500);
+    const touched = await game.ask('travel');
+    check(/^ok/.test(stone) && touched.stonesOpen >= 1 && touched.clientStonesOpen >= 1, `${name}: 길잡이 돌을 만지면 열린다 (${stone}, 열린 돌 ${touched.stonesOpen})`);
+    await game.shot('travel-waystone', '길잡이 돌(푸른 불)');
+    await game.send('stones all');
+    await game.wait(600);
+    check(await game.press('길잡이 돌'), `${name}: 돌 위의 [길잡이 돌] 단추로 목록을 연다`);
+    await game.wait(600);
+    await game.shot('travel-waypoints', '웨이포인트와 길잡이 돌 목록');
+    const away = (await game.buttons()).find(b => /의 길잡이 돌$/.test(b.label) && b.enabled);
+    check(!!away && await game.press(away.label), `${name}: 다른 길잡이 돌로 간다 (${away ? away.label : '단추 없음'})`);
+    await game.wait(1200);
+    const went = await game.ask('travel');
+    check(Math.hypot(went.x - touched.x, went.y - touched.y) > 20, `${name}: 길잡이 돌로 옮겼다 (${Math.round(Math.hypot(went.x - touched.x, went.y - touched.y))}칸)`);
+
+    // The wandering merchant by a camp, and their shop: potions, the map scrap and the camp's biome's seeds.
+    const wanderer = (await game.send('goto wanderer')).join(' ');
+    await game.wait(1500);
+    check(/^ok/.test(wanderer), `${name}: 떠돌이 상인 곁으로 간다 (${wanderer})`);
+    await game.shot('travel-wanderer', '야영지의 떠돌이 상인(색 천막)');
+    await bagTab(game, '떠돌이 상인');
+    await game.press('사기');
+    await game.wait(500);
+    check((await game.find('사기', /^지도 조각/)).length > 0, `${name}: 떠돌이 상인이 지도 조각을 판다 (팔 것 ${(await game.ask('travel')).wandererShop}줄)`);
+    await game.shot('travel-wanderer-shop', '떠돌이 상인의 [사기]');
+    await game.send('give coin 200');
+    await game.wait(500);
+    await game.press('사기', '지도 조각');
+    await game.wait(600);
+    const bought = ((await game.inventory()).consumables || {}).map_scrap || 0;
+    check(bought === 1, `${name}: 금화로 지도 조각을 산다 (${bought})`);
+    await closeBag(game);
+    await game.send('drink map_scrap');
+    await game.wait(800);
+    const read = await game.ask('texts');
+    check(/지도 조각/.test(read.banner || ''), `${name}: 지도 조각을 읽으면 알림이 뜬다 (${read.banner})`);
+    await game.shot('travel-map-scrap', '지도 조각을 읽은 뒤(알림 줄)');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

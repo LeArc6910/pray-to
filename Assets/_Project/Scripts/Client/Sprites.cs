@@ -28,7 +28,7 @@ namespace Game.Client
             TileType.Anvil, TileType.RiftAltar, TileType.Assembler, TileType.PowerPole, TileType.FastConveyor, TileType.UndergroundBelt, TileType.MerchantStall, TileType.SmithStall, TileType.FisherHut, TileType.AlchemyTable, TileType.Keg, TileType.PreservesJar, TileType.Coop, TileType.CrabPot, TileType.WardStone, TileType.Turret, TileType.Barn,
             TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
             TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow, TileType.Fence,
-            TileType.LockedDoor, TileType.Road, TileType.Waypoint, TileType.Dock, TileType.Rail, TileType.Water, TileType.RoyalStall, TileType.DemonStall, TileType.OreStall,
+            TileType.LockedDoor, TileType.Road, TileType.Waypoint, TileType.Dock, TileType.Rail, TileType.Water, TileType.RoyalStall, TileType.DemonStall, TileType.OreStall, TileType.WandererStall,
             TileType.ArenaInlay, TileType.RuneFloor, TileType.Cobweb, TileType.Petals, TileType.Fissure, TileType.ArenaCarpet,
             TileType.CrackedWall, TileType.Grate, TileType.ObsidianWall, TileType.VoidWall, TileType.IceFloor, TileType.Quicksand,
         };

@@ -107,6 +107,11 @@ namespace Game.Client
             Save(Row(new[] { TileArt.Object(TileType.Road), TileArt.Object(TileType.Waypoint) }.ToList()), Path.Combine(pieces, "road_waypoint.png"), 6);
             // Every structure of the places, standing on its feet, and castle wall blocks joined as on a wall.
             Save(Row(PropArt.All.Select(type => PropArt.Prop(type)).ToList()), Path.Combine(pieces, "structures.png"), 4);
+            // Getting about (묶음 3c): the waystone, a station's cart (and a rider's), the broken end of a line, the
+            // wandering merchant's stall under its awning.
+            Save(Row(new[] { PropArt.Prop(TileType.Waystone), PropArt.RideCart(), PropArt.BrokenRail(), TileArt.Object(TileType.WandererStall),
+                TileArt.Awning(TileType.WandererStall) }.Concat(loot.Consumables.Where(c => c.Id == "map_scrap").Select(ItemArt.Consumable)).ToList()),
+                Path.Combine(pieces, "travel.png"), 6);
             Save(Row(new[] { 0, 2 | 8, 1 | 4, 1 | 2, 15 }.Select(sides => PropArt.Prop(TileType.CastleWall, sides)).ToList()), Path.Combine(pieces, "castle_walls.png"), 6);
             var storyWorld = WorldGenerator.Generate(7, story: story);
             foreach (var site in storyWorld.Places) Save(Place(storyWorld, site, lights), Path.Combine(pieces, $"place_{site.Definition.Id}.png"), 3);

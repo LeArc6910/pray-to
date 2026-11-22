@@ -1,3 +1,4 @@
+using System;
 using Game.Core;
 
 namespace Game.Client
@@ -75,6 +76,63 @@ namespace Game.Client
                 Rect(image, 7, 11, 2, 2, Brass.Shade);
             }
             return Finish(image, ShadowLayer(T, h, 8, 17.5f, 7, 2));
+        }
+
+        // ---- 3c (2026-11-22, Docs/WorldRework.md 광차·길잡이 돌): the waystone, a station's cart and a broken rail ----
+
+        static readonly Ramp BlueFlame = new Ramp(Rgba.Hex("#E8FAFF"), Rgba.Hex("#8AD8FF"), Rgba.Hex("#3E8CE8"), Rgba.Hex("#24489C"));
+        static readonly Ramp SlateBlue = new Ramp(Rgba.Hex("#9AA6BC"), Rgba.Hex("#6E7A92"), Rgba.Hex("#4E586E"), Rgba.Hex("#333A4C"));
+
+        // A waystone: a squat standing stone of bluish slate, a ring of runes glowing on its face and a blue flame
+        // burning in a hollow on its top, so it reads as a waypoint of the field (the places' waypoints glow blue too).
+        static PixelImage Waystone()
+        {
+            const int h = 34;
+            var body = new PixelImage(T, h);
+            // The stone, wider at the foot, its top rounded with a hollow.
+            for (int y = 10; y < 31; y++)
+            {
+                float half = Math.Min(5.5f, 3.5f + (y - 10) * 0.1f);
+                for (int x = (int)(8 - half); x <= (int)(8 + half); x++)
+                {
+                    float t = (x - (8 - half)) / (half * 2);
+                    body[x, y] = t < 0.28f ? SlateBlue.Light : t < 0.72f ? SlateBlue.Main : SlateBlue.Shade;
+                }
+            }
+            Rect(body, 5, 10, 6, 1, SlateBlue.Dark);
+            Rect(body, 6, 11, 4, 1, SlateBlue.Shade);
+            // A ring of runes on its face.
+            foreach (var (x, y) in new[] { (8, 15), (10, 16), (11, 18), (10, 20), (8, 21), (6, 20), (5, 18), (6, 16) }) body[x, y] = Rune;
+            body[8, 18] = RuneCore;
+            body[7, 18] = Rune;
+            body[9, 18] = Rune;
+            // Its foot sunk in the floor.
+            Box(body, 2, 29, 12, 1, 3, DarkStone);
+            // The flame in its hollow: a tongue of blue, white at the heart.
+            Oval(body, 8, 7, 2.6f, 3.4f, BlueFlame.Shade);
+            Oval(body, 8, 7.5f, 1.8f, 2.6f, BlueFlame.Main);
+            Oval(body, 8, 8.5f, 1, 1.5f, BlueFlame.Light);
+            body[8, 3] = BlueFlame.Main;
+            body[9, 4] = BlueFlame.Shade;
+            return Finish(body, ShadowLayer(T, h, 9, 32, 7, 2));
+        }
+
+        // A station's cart, and the cart a rider sits in: the mine cart of the places, ore and all.
+        public static PixelImage RideCart() => MineCart();
+
+        // The broken end of a line not yet mended: a bent rail and a sleeper torn up, rubble over them.
+        public static PixelImage BrokenRail()
+        {
+            var body = new PixelImage(T, 12);
+            Rect(body, 2, 6, 5, 1, Iron.Main);
+            Rect(body, 7, 5, 1, 1, Iron.Main);
+            Rect(body, 8, 4, 3, 1, Iron.Light);
+            Rect(body, 9, 9, 5, 1, Iron.Shade);
+            Rect(body, 3, 8, 7, 2, DarkWood.Main);
+            Rect(body, 3, 8, 7, 1, DarkWood.Light);
+            LitOval(body, 11, 7, 2.2f, 1.8f, DarkStone);
+            LitOval(body, 5, 4, 1.6f, 1.3f, Stone);
+            return Finish(body, ShadowLayer(T, 12, 8, 10, 6, 1.5f));
         }
     }
 }

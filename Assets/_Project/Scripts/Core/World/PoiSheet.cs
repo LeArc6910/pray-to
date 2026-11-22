@@ -12,6 +12,11 @@ namespace Game.Core
         Shrine,
         Chest,
         Cart,
+        // A minecart station at either end of a line of rails (3c, Docs/WorldRework.md 광차): ridden to the other end.
+        Station,
+        // A waypoint of the field by a camp, one to a biome (3c, 길잡이 돌): touched, it opens, and from it a player
+        // goes to any open waypoint or stone.
+        Waystone,
     }
 
     // How often it gives again (pois.csv again).
@@ -35,6 +40,10 @@ namespace Game.Core
         Beam,
         // A gold glint, seen through a grate too.
         Glint,
+        // A line of lamps along the rails from the station (3c).
+        Lamps,
+        // A blue flame on the stone (3c).
+        Flame,
     }
 
     public enum PoiRewardKind : byte
@@ -60,6 +69,12 @@ namespace Game.Core
         Rest,
         // "Rested" for Min seconds: more experience (a camp).
         Rested,
+        // Rides the rails at Min tiles a second (a station, 3c).
+        Ride,
+        // What mends the broken end of its line: Min of the Material (a station, 3c).
+        Repair,
+        // Opens as a waypoint when touched (a waystone, 3c).
+        Waypoint,
     }
 
     // One part of what a thing gives (pois.csv reward, split by '|'): "items:2:uncommon", "coins:20-40",
@@ -85,7 +100,7 @@ namespace Game.Core
         {
             string range = Max != Min ? $"{Min}-{Max}" : $"{Min}";
             string name = Kind.ToString().ToLowerInvariant();
-            return Kind == PoiRewardKind.Material ? $"{name}:{Material}:{range}"
+            return Kind == PoiRewardKind.Material || Kind == PoiRewardKind.Repair ? $"{name}:{Material}:{range}"
                 : Kind == PoiRewardKind.Items && Rarity != Rarity.Common ? $"{name}:{range}:{Rarity.ToString().ToLowerInvariant()}"
                 : $"{name}:{range}";
         }
@@ -110,6 +125,9 @@ namespace Game.Core
             SignalRange = signalRange;
             Buff = buff;
             Tile = tile;
+            Kind = rewards.Any(r => r.Kind == PoiRewardKind.Ride) ? PoiKind.Station
+                : rewards.Any(r => r.Kind == PoiRewardKind.Waypoint) ? PoiKind.Waystone
+                : KindOf(role);
         }
 
         public string Id { get; }
@@ -129,9 +147,13 @@ namespace Game.Core
         public int SignalRange { get; }
         // What its blessing does while it lasts (bless).
         public IReadOnlyList<Modifier> Buff { get; }
-        // A chest's tile while shut.
+        // A chest's tile while shut; a waystone's stone.
         public TileType? Tile { get; }
-        public PoiKind Kind => KindOf(Role);
+        // What it is: by its room's role, but a station (ride) or waystone (waypoint) by what it gives (3c). Those two
+        // are laid by the generator along the rails and by the camps, never on a chunk's mark.
+        public PoiKind Kind { get; }
+        // Laid on a chunk's mark in a room of its role (3a), rather than along the rails or by a camp (3c).
+        public bool OnMark => Kind == KindOf(Role);
 
         public bool For(Biome biome) => Biomes.Count == 0 || Biomes.Contains(biome);
 
@@ -187,8 +209,11 @@ namespace Game.Core
 
         public PoiDefinition Find(string id) => Pois.FirstOrDefault(p => p.Id == id);
 
-        // The rows a thing of the role in the biome can be, in sheet order.
-        public IEnumerable<PoiDefinition> For(RoomRole role, Biome biome) => Pois.Where(p => p.Role == role && p.For(biome));
+        // The rows a thing on a chunk's mark of the role in the biome can be, in sheet order.
+        public IEnumerable<PoiDefinition> For(RoomRole role, Biome biome) => Pois.Where(p => p.Role == role && p.OnMark && p.For(biome));
+
+        // The rows of a kind laid by the generator itself (a station, a waystone) for the biome, in sheet order.
+        public IEnumerable<PoiDefinition> Of(PoiKind kind, Biome biome) => Pois.Where(p => p.Kind == kind && p.For(biome));
     }
 
     // Reads Assets/_Project/Data/World/pois.csv (Docs/Biomes.md 볼거리).
@@ -236,12 +261,19 @@ namespace Game.Core
                     bool blesses = rewards.Any(r => r.Kind == PoiRewardKind.Bless);
                     if (blesses != (buff.Count > 0)) throw new FormatException(blesses ? "bless에는 buff가 있어야 합니다." : "buff는 bless와 함께 씁니다.");
                     TileType? tile = row["tile"].Length == 0 ? (TileType?)null : SheetValues.ParseEnum<TileType>(row["tile"], "tile");
-                    var kind = PoiDefinition.KindOf(role);
+                    bool rides = rewards.Any(r => r.Kind == PoiRewardKind.Ride), opens = rewards.Any(r => r.Kind == PoiRewardKind.Waypoint);
+                    var kind = rides ? PoiKind.Station : opens ? PoiKind.Waystone : PoiDefinition.KindOf(role);
+                    if (rides && opens) throw new FormatException("ride와 waypoint는 함께 쓰지 않습니다.");
+                    if (rides && role != RoomRole.Cart) throw new FormatException("ride(광차역)는 role이 cart입니다.");
+                    if (opens && role != RoomRole.Rest) throw new FormatException("waypoint(길잡이 돌)는 role이 rest입니다.");
+                    if (rewards.Any(r => r.Kind == PoiRewardKind.Repair) && !rides) throw new FormatException("repair는 ride와 함께 씁니다.");
                     if (kind == PoiKind.Chest && tile is not (TileType.WoodChest or TileType.IronChest or TileType.GoldChest))
                         throw new FormatException("상자는 tile이 WoodChest, IronChest, GoldChest 가운데 하나입니다.");
-                    if (kind != PoiKind.Chest && tile != null) throw new FormatException("tile은 상자에만 씁니다.");
-                    if (kind == PoiKind.Camp && again != PoiAgain.Always) throw new FormatException("야영지는 again이 always입니다.");
-                    if (kind != PoiKind.Camp && again == PoiAgain.Always) throw new FormatException("always는 야영지에만 씁니다.");
+                    if (kind == PoiKind.Waystone && tile != TileType.Waystone) throw new FormatException("길잡이 돌은 tile이 Waystone입니다.");
+                    if (kind != PoiKind.Chest && kind != PoiKind.Waystone && tile != null) throw new FormatException("tile은 상자와 길잡이 돌에만 씁니다.");
+                    bool always = kind is PoiKind.Camp or PoiKind.Station or PoiKind.Waystone;
+                    if (always && again != PoiAgain.Always) throw new FormatException("야영지·광차역·길잡이 돌은 again이 always입니다.");
+                    if (!always && again == PoiAgain.Always) throw new FormatException("always는 야영지·광차역·길잡이 돌에만 씁니다.");
                     pois.Add(new PoiDefinition(id, name, role, biomes, weight, rewards, level, perPlayer, again, signal, range, buff, tile));
                 }
                 catch (FormatException e)
@@ -252,7 +284,7 @@ namespace Game.Core
             // Every kind of room with things to find has a row for every biome.
             foreach (var role in new[] { RoomRole.Rest, RoomRole.Shrine, RoomRole.Cart, RoomRole.Treasure, RoomRole.Hidden, RoomRole.Locked, RoomRole.Trap })
                 foreach (Biome biome in Enum.GetValues(typeof(Biome)))
-                    if (pois.Count > 0 && !pois.Any(p => p.Role == role && p.For(biome)))
+                    if (pois.Count > 0 && !pois.Any(p => p.Role == role && p.OnMark && p.For(biome)))
                         errors.Add($"{File}: {role.ToString().ToLowerInvariant()} 방의 볼거리가 {biome.ToString().ToLowerInvariant()}에 없습니다.");
             return new PoiData(pois, errors);
         }
@@ -264,9 +296,9 @@ namespace Game.Core
             var kind = SheetValues.ParseEnum<PoiRewardKind>(parts[0], "reward");
             string material = null;
             int at = 1;
-            if (kind == PoiRewardKind.Material)
+            if (kind == PoiRewardKind.Material || kind == PoiRewardKind.Repair)
             {
-                if (parts.Length < 3) throw new FormatException($"'{text}': material:재료id:수처럼 적습니다.");
+                if (parts.Length < 3) throw new FormatException($"'{text}': {parts[0]}:재료id:수처럼 적습니다.");
                 material = parts[1];
                 if (loot != null && loot.Materials.All(m => m.Id != material)) throw new FormatException($"'{text}': 없는 재료 '{material}'.");
                 at = 2;
@@ -280,6 +312,7 @@ namespace Game.Core
             if (kind == PoiRewardKind.Items && parts.Length > at + 1) rarity = SheetValues.ParseEnum<Rarity>(parts[at + 1], "희귀도");
             else if (parts.Length > at + 1) throw new FormatException($"'{text}': 뒤에 남는 것이 있습니다.");
             if ((kind == PoiRewardKind.Heal || kind == PoiRewardKind.Rest) && max > 100) throw new FormatException($"'{text}': 회복은 100% 이하입니다.");
+            if (kind == PoiRewardKind.Ride && (min < 4 || min > 40)) throw new FormatException($"'{text}': 광차는 초당 4~40칸입니다.");
             return new PoiReward(kind, min, max, rarity, material);
         }
     }

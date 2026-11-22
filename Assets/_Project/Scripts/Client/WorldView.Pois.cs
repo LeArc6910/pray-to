@@ -39,6 +39,8 @@ namespace Game.Client
         {
             PoiSignal.Smoke => new Color(1f, 0.62f, 0.25f),
             PoiSignal.Beam => Color.white,
+            PoiSignal.Lamps => LampColor,
+            PoiSignal.Flame => FlameColor,
             _ => GlintColor,
         };
 
@@ -109,6 +111,10 @@ namespace Game.Client
                     case PoiSignal.Glint:
                         if (glint && Feel.Bits && Random.value < 0.7f)
                             Puff(at + new Vector3(Random.Range(-0.3f, 0.3f), Random.Range(0.1f, 0.6f), 0), GlintColor, new Vector3(0, 0.25f, 0), 0.6f, 2);
+                        break;
+                    // 3c (WorldView.Travel.cs): a waystone's flame; a station's lamps are its lights alone.
+                    case PoiSignal.Flame:
+                        Flicker(at, deltaTime);
                         break;
                 }
             }
@@ -226,8 +232,12 @@ namespace Game.Client
                     case PoiSignal.Glint:
                         if (Signals(poi)) _lights.Add(new LightSource(poi.Center, 2.5f, 0.7f + 0.2f * Mathf.Sin(Time.time * 3 + poi.Index), Rgba.Hex("#FFD86A"), tints: true));
                         break;
+                    case PoiSignal.Flame:
+                        _lights.Add(new LightSource(poi.Center, 4.5f, 0.75f + 0.15f * Mathf.Sin(Time.time * 7 + poi.Index), Rgba.Hex("#7ACCFF"), tints: true));
+                        break;
                 }
             }
+            AddTravelLights(Near);
             foreach (var at in CampFlags())
                 if (Near(at)) _lights.Add(new LightSource(at, 3.5f, 0.8f, Rgba.Hex("#FF5A40"), tints: true));
         }
@@ -304,6 +314,7 @@ namespace Game.Client
         {
             PoiKind.Shrine => "기도하기",
             PoiKind.Cart => "뒤지기",
+            PoiKind.Station => "타기",
             _ => "열기",
         };
     }

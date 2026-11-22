@@ -293,6 +293,10 @@ namespace Game.Core
                 Furnish(world, seed, terrain ?? TerrainSheet.Default);
                 // The camps, shrines, chests and carts in them (WorldGenerator.Pois.cs, pois.csv).
                 LayPois(world, seed, terrain);
+                // The minecart lines between cart rooms and their stations, then a waystone by a camp of each biome
+                // (WorldGenerator.Rails.cs, 3c). Laid after the rest, so the things above are numbered as before.
+                LayRails(world, seed, terrain);
+                LayWaystones(world, seed, terrain);
                 // A place built across a way, or dressing set in an arena's door, must not shut a room off.
                 JoinRooms(world.Map, world.Rooms.Nodes, world.Arenas.Take(world.CaveArenas).Select(a => (TileMap.Cell(a.X), TileMap.Cell(a.Y))).ToList(),
                     world.SpawnX, world.SpawnY, pockets: true, kept: world.Rooms.Kept);

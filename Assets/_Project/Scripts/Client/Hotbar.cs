@@ -278,7 +278,7 @@ namespace Game.Client
                     var consumable = ConsumableOf(entry);
                     if (consumable == null) return (null, -1, false, false, "", "");
                     int left = _client.Bag.CountOf(consumable);
-                    string action = consumable.IsFood ? "먹는다" : consumable.Recalls ? "침대(없으면 시작 지점)로 돌아간다" : "마신다";
+                    string action = consumable.IsFood ? "먹는다" : consumable.Recalls ? "침대(없으면 시작 지점)로 돌아간다" : consumable.ReadsMap ? "읽고 지도에 못 본 볼거리 하나를 표시한다" : "마신다";
                     return (Sprites.Icon(consumable), left, left > 0, false, consumable.Name, action);
                 case Kind.Material:
                     var material = MaterialOf(entry);

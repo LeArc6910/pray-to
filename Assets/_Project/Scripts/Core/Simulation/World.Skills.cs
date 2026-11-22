@@ -185,7 +185,7 @@ namespace Game.Core
         public bool UseSkill(int playerId, int slot, Vec2 aim)
         {
             var player = FindPlayer(playerId);
-            if (player == null || player.IsDead || slot < 0 || slot >= player.Skills.Count || player.CooldownTicks(slot) > 0) return false;
+            if (player == null || player.IsDead || player.Riding || slot < 0 || slot >= player.Skills.Count || player.CooldownTicks(slot) > 0) return false;
             var skill = player.Skills[slot];
             if (player.Mana < player.ManaCost(skill)) return false;
             if (aim.IsFinite && aim.LengthSquared > 1e-6f) player.Facing = aim.Normalized;

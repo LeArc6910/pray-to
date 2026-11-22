@@ -431,7 +431,7 @@ namespace Game.Core
             var rows = _tiles?.Terrain?.Pois?.Pois;
             int blessing = player.Blessing == null || rows == null ? -1 : rows.ToList().IndexOf(player.Blessing);
             return new PoisMessage(opened, World.PrayedToday(player.Name).ToList(), World.LastCampOf(player.Name) ?? -1, blessing,
-                blessing >= 0 ? player.BlessingTicks : 0, player.RestedTicks);
+                blessing >= 0 ? player.BlessingTicks : 0, player.RestedTicks, World.OpenStones(player).ToList(), World.FixedRails.ToList(), World.Riders.ToList());
         }
 
         // The world as a save file, stamped with the caller's clock (seconds since 1970).
@@ -450,6 +450,7 @@ namespace Game.Core
                 m.Affection, m.PettedDay);
             World.PlaceNpcs();
             World.RestorePois(save.OpenedPois, save.Prayers, save.LastCamps);
+            World.RestoreRails(save.FixedRails);
         }
 
         void Apply(Player player, InventoryCommandMessage command)

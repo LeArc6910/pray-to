@@ -117,8 +117,40 @@ namespace Game.Core
         // The things to find in the rooms (WorldGenerator.Pois.cs), numbered as laid: Poi.Index is the place here.
         public IReadOnlyList<Poi> Pois => PoiList;
         internal readonly List<Poi> PoiList = new List<Poi>();
+        // The minecart lines between the stations (WorldGenerator.Rails.cs, 3c), in the order laid.
+        public IReadOnlyList<RailLine> Lines => LineList;
+        internal readonly List<RailLine> LineList = new List<RailLine>();
         // The rock of the chunks' walls (y * width + x): nothing that joins rooms digs through it.
         internal HashSet<int> Kept = new HashSet<int>();
+
+        // A locked room's lock (3b): a tile of its obsidian or void wall, and the open floor beside it that is walked to
+        // from the room's anchor without digging (the chunk's door, or outside the chunk), nearest the anchor first; null
+        // when there is none. The vaults' lock is inside the chunk's own rock, behind its door, so the walk goes in.
+        public static ((int X, int Y) Wall, (int X, int Y) Stand)? LockOf(TileMap map, RoomNode room)
+        {
+            if (room?.Box is not (int left, int bottom, int w, int h)) return null;
+            int x0 = left - 3, y0 = bottom - 3, x1 = left + w + 2, y1 = bottom + h + 2;
+            var seen = new HashSet<(int, int)> { (room.AnchorX, room.AnchorY) };
+            var queue = new Queue<(int X, int Y)>();
+            queue.Enqueue((room.AnchorX, room.AnchorY));
+            var sides = new[] { (0, 1), (1, 0), (-1, 0), (0, -1) };
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+                foreach (var (dx, dy) in sides)
+                {
+                    var type = map[x + dx, y + dy];
+                    if (type == TileType.ObsidianWall || type == TileType.VoidWall) return ((x + dx, y + dy), (x, y));
+                }
+                foreach (var (dx, dy) in sides)
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if (nx < x0 || ny < y0 || nx > x1 || ny > y1 || !map.InBounds(nx, ny) || map.IsSolid(nx, ny) || !seen.Add((nx, ny))) continue;
+                    queue.Enqueue((nx, ny));
+                }
+            }
+            return null;
+        }
 
         // The room whose middle is nearest a tile, or null with no rooms.
         public RoomNode Nearest(int x, int y)

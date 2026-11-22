@@ -172,15 +172,17 @@ namespace Game.Core
             }
         }
 
-        // From beside an open waypoint to another open one: the player stands just below it. False when they are not by
-        // an open waypoint or that one is not open to them.
+        // From beside an open waypoint or waystone (World.Travel.cs) to another open one: the player stands just below
+        // it. A target of World.StoneTarget or more is a waystone (StoneTarget + its index in Pois), any other a place.
+        // False when they are not by an open one or the other is not open to them.
         public bool Teleport(int playerId, int placeIndex)
         {
             var player = FindPlayer(playerId);
-            if (player == null || player.IsDead || Story == null || placeIndex < 0 || placeIndex >= Story.Places.Count) return false;
-            var here = WaypointNear(Places, player.Position);
+            if (player == null || player.IsDead || player.Riding) return false;
+            if (placeIndex >= StoneTarget) return TravelToStone(player, placeIndex - StoneTarget);
+            if (Story == null || placeIndex < 0 || placeIndex >= Story.Places.Count) return false;
             var there = SiteOf(Story.Places[placeIndex]);
-            if (here == null || there == null || here == there || !player.Waypoints.Contains(here.Definition.Id) || !player.Waypoints.Contains(there.Definition.Id))
+            if (!AtOpenWaypoint(player, out var here, out _) || there == null || here == there || !player.Waypoints.Contains(there.Definition.Id))
                 return false;
             player.Position = Collision.Resolve(Map, TileMap.Center(there.X, there.Y - 1), PlayerRadius);
             player.Corrections++;
@@ -210,7 +212,8 @@ namespace Game.Core
             foreach (var (at, choice) in choices ?? Enumerable.Empty<(int, int)>()) player.StoryChoices[at] = choice;
             foreach (string id in waypoints ?? Enumerable.Empty<string>())
             {
-                if (Story == null || Story.Place(id) != null) player.Waypoints.Add(id);
+                // A waystone's (World.Travel.cs) is kept whatever the world: each has one to a biome.
+                if (Story == null || Story.Place(id) != null || IsStoneId(id)) player.Waypoints.Add(id);
             }
             player.JourneyVersion++;
         }

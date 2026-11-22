@@ -44,6 +44,10 @@ namespace Game.Core
             _pois = rooms?.Pois ?? (IReadOnlyList<Poi>)Array.Empty<Poi>();
             _poiOpened = new bool[_pois.Count];
             _camps = _pois.Where(p => p.Kind == PoiKind.Camp).ToList();
+            // The minecart lines and the waystones (World.Travel.cs, 3c), and where the wandering merchant stands today.
+            SetTravel(rooms);
+            _wandererDay = int.MinValue;
+            MoveWanderer();
             PoiVersion++;
         }
 
@@ -81,18 +85,21 @@ namespace Game.Core
                 if (poi >= 0 && poi < _pois.Count && _pois[poi].Kind == PoiKind.Camp) _lastCamps[name] = poi;
             // A chest opened shows open.
             foreach (int index in OpenedPois) if (_pois[index].Kind == PoiKind.Chest) Map[_pois[index].X, _pois[index].Y] = TileType.OpenChest;
+            // The save's tiles may hold the wandering merchant's stall by the camp of the day it was saved.
+            _wandererDay = int.MinValue;
+            MoveWanderer();
             PoiVersion++;
         }
 
-        // The thing to find within PoiReach of the position that can be used now, nearest first; camps are not used by
-        // hand.
+        // The thing to find within PoiReach of the position that can be used now, nearest first; camps and waystones are
+        // not used by hand (a waystone opens when touched and is gone from by its waypoint list).
         public Poi PoiNear(Vec2 position, Player player = null)
         {
             Poi best = null;
             float bestDistance = PoiReach;
             foreach (var poi in _pois)
             {
-                if (poi.Kind == PoiKind.Camp || !CanUse(poi, player)) continue;
+                if (poi.Kind == PoiKind.Camp || poi.Kind == PoiKind.Waystone || !CanUse(poi, player)) continue;
                 float distance = Vec2.Distance(position, poi.Center);
                 if (distance > bestDistance) continue;
                 (best, bestDistance) = (poi, distance);
@@ -115,7 +122,9 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || index < 0 || index >= _pois.Count) return false;
             var poi = _pois[index];
-            if (poi.Kind == PoiKind.Camp || Vec2.Distance(player.Position, poi.Center) > PoiReach || !CanUse(poi, player)) return false;
+            // A station's cart is ridden, or its broken rails mended (World.Travel.cs).
+            if (poi.Kind == PoiKind.Station) return Vec2.Distance(player.Position, poi.Center) <= PoiReach && UseStation(player, poi);
+            if (poi.Kind == PoiKind.Camp || poi.Kind == PoiKind.Waystone || Vec2.Distance(player.Position, poi.Center) > PoiReach || !CanUse(poi, player)) return false;
             var definition = poi.Definition;
             if (poi.Kind == PoiKind.Shrine)
             {

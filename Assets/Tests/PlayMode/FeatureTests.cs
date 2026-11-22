@@ -496,6 +496,58 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Getting about (2026-11-22, Docs/WorldRework.md 묶음 3c): a line's broken end mended and its cart ridden (the
+        // cart under the player, the rails running by), a waystone with its blue flame and the waypoint list it opens,
+        // and the wandering merchant's stall by a camp with its shop open. The solo game's world is one of rooms.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator MinecartsWaystonesAndTheWanderingMerchant()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            Assert.IsNotEmpty(World.Lines, "No minecart lines: pois.csv has no station row, or the world is of caves.");
+            void StandAt(Vec2 at)
+            {
+                Player.Position = at;
+                Player.Corrections++;
+            }
+
+            var line = World.Lines.OrderBy(l => Vec2.Distance(World.Pois[l.StationB].Center, Player.Position)).First();
+            var broken = World.Pois[line.StationB];
+            StandAt(Beside(broken) ?? broken.Center);
+            yield return new WaitForSecondsRealtime(1);
+            yield return Screens.Take("travel-station-broken");
+            Assert.IsFalse(_root.UsePoi() && World.RailFixed(line.Index), "Without iron bars the line stays broken.");
+            Player.Inventory.AddMaterial(Material("iron_bar"), 5);
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.IsTrue(_root.UsePoi(), "The broken end is mended with five iron bars.");
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.IsTrue(World.RailFixed(line.Index));
+            Assert.IsTrue(_root.UsePoi(), "The cart is ridden.");
+            yield return new WaitForSecondsRealtime(2);
+            Assert.IsTrue(Player.Riding);
+            Assert.IsTrue(_root.LocalClient.Riding, "The screen knows the player rides.");
+            yield return Screens.Take("travel-riding");
+            yield return new WaitForSecondsRealtime(line.Length / 16f);
+            Assert.IsFalse(Player.Riding, "Off at the other end.");
+            Assert.Less(Vec2.Distance(Player.Position, World.Pois[line.StationA].Center), 2f);
+
+            var stone = World.Stones.OrderBy(s => Vec2.Distance(s.Center, Player.Position)).First();
+            StandAt(Beside(stone) ?? stone.Center);
+            yield return new WaitForSecondsRealtime(1.2f);
+            Assert.IsTrue(World.OpenStones(Player).Contains(stone.Index), "Touched, the stone opens.");
+            yield return Screens.Take("travel-waystone");
+            Assert.IsTrue(_root.OpenWaypoints(), "The waypoint list opens by an open stone.");
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("travel-waypoints");
+
+            var stall = World.WandererAt ?? throw new AssertionException("No wandering merchant: npcs.csv has no row with place camps.");
+            StandAt(Game.Core.Collision.Resolve(World.Map, TileMap.Center(stall.X, stall.Y - 1), World.PlayerRadius));
+            yield return new WaitForSecondsRealtime(1);
+            yield return Screens.Take("travel-wanderer");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

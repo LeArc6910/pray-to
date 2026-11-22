@@ -42,7 +42,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.94.0";
+        public const string Version = "0.95.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -479,8 +479,13 @@ namespace Game.Core
     // player who joins.
     public sealed class PoisMessage
     {
-        public PoisMessage(IReadOnlyList<bool> opened, IReadOnlyList<int> prayed, int lastCamp, int blessing, int blessingTicks, int restedTicks)
+        public PoisMessage(IReadOnlyList<bool> opened, IReadOnlyList<int> prayed, int lastCamp, int blessing, int blessingTicks, int restedTicks,
+            IReadOnlyList<int> stones = null, IReadOnlyList<int> fixedRails = null,
+            IReadOnlyList<(int Player, int Line, bool Forward, long Start, float Speed)> riders = null)
         {
+            Stones = stones ?? Array.Empty<int>();
+            FixedRails = fixedRails ?? Array.Empty<int>();
+            Riders = riders ?? Array.Empty<(int, int, bool, long, float)>();
             Opened = opened;
             Prayed = prayed;
             LastCamp = lastCamp;
@@ -495,6 +500,11 @@ namespace Game.Core
         public int Blessing { get; }
         public int BlessingTicks { get; }
         public int RestedTicks { get; }
+        // 3c (World.Travel.cs): the waystones open to this player and the minecart lines mended, by index, and everyone
+        // riding a cart: who, the line, which way, the tick it set off and its speed.
+        public IReadOnlyList<int> Stones { get; }
+        public IReadOnlyList<int> FixedRails { get; }
+        public IReadOnlyList<(int Player, int Line, bool Forward, long Start, float Speed)> Riders { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Pois, w =>
         {
@@ -512,6 +522,19 @@ namespace Game.Core
             w.Write((short)Math.Clamp(Blessing, -1, short.MaxValue));
             w.Write(BlessingTicks);
             w.Write(RestedTicks);
+            w.Write((ushort)Stones.Count);
+            foreach (int index in Stones) w.Write((ushort)index);
+            w.Write((byte)FixedRails.Count);
+            foreach (int line in FixedRails) w.Write((byte)line);
+            w.Write((byte)Riders.Count);
+            foreach (var (player, line, forward, start, speed) in Riders)
+            {
+                w.Write(player);
+                w.Write((byte)line);
+                w.Write(forward);
+                w.Write(start);
+                w.Write(speed);
+            }
         });
 
         public static PoisMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Pois, r =>
@@ -525,7 +548,14 @@ namespace Game.Core
             }
             var prayed = new List<int>();
             for (int n = r.ReadUInt16(); n > 0; n--) prayed.Add(r.ReadUInt16());
-            return new PoisMessage(opened, prayed, r.ReadInt16(), r.ReadInt16(), r.ReadInt32(), r.ReadInt32());
+            int lastCamp = r.ReadInt16(), blessing = r.ReadInt16(), blessingTicks = r.ReadInt32(), restedTicks = r.ReadInt32();
+            var stones = new List<int>();
+            for (int n = r.ReadUInt16(); n > 0; n--) stones.Add(r.ReadUInt16());
+            var rails = new List<int>();
+            for (int n = r.ReadByte(); n > 0; n--) rails.Add(r.ReadByte());
+            var riders = new List<(int, int, bool, long, float)>();
+            for (int n = r.ReadByte(); n > 0; n--) riders.Add((r.ReadInt32(), r.ReadByte(), r.ReadBoolean(), r.ReadInt64(), r.ReadSingle()));
+            return new PoisMessage(opened, prayed, lastCamp, blessing, blessingTicks, restedTicks, stones, rails, riders);
         });
     }
 

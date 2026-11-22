@@ -254,6 +254,8 @@ namespace Game.Client
             // A world of rooms made before its map was kept under the generator (2026-11-22) left it under the seed alone.
             _map ??= new MapView(_client, SaveStore.Read(MapKey)
                 ?? (_client.Generator > WorldGenerator.CaveVersion ? SaveStore.Read(SaveStore.MapKey(_client.Seed, WorldGenerator.CaveVersion, CharacterName)) : null));
+            // A map scrap read marks a thing on this player's map (WorldView.Travel.cs).
+            _view.MapScrap ??= () => _map?.ReadScrap();
             _client.AdvanceRenderClock(Time.deltaTime);
             UpdateGuide(Time.deltaTime);
             UpdateBiome(Time.deltaTime);
@@ -750,26 +752,34 @@ namespace Game.Client
         // False when there is none.
         internal bool UsePoi()
         {
-            if (_client?.PoiNear() is not Poi poi) return false;
+            if (_client == null || _client.Riding || _client.PoiNear() is not Poi poi) return false;
             Sounds.Play(Sound.Click);
             SendToHost(_client.UsePoiCommand(poi));
             return true;
         }
 
+        // Opens the list of waypoints and waystones, as the button over an open one does (Playtest "waypoints").
+        internal bool OpenWaypoints() => _storyScreen != null && _storyScreen.OpenWaypoints();
+
         // A button over the chest, cart or shrine within reach that would give now (Docs/WorldRework.md 3단계 볼거리),
         // for a finger or the mouse; on a keyboard it shows the key, which does the same.
         void DrawPoiButton()
         {
-            if (_client.PoiNear() is not Poi poi || _client.MachineAhead() != null) return;
+            if (_client.Riding || _client.PoiNear() is not Poi poi || _client.MachineAhead() != null) return;
             Vector3 screen = _camera.WorldToScreenPoint(new Vector3(poi.X + 0.5f, poi.Y + 1.5f, 0));
             if (screen.z < 0) return;
             Vector2 point = Ui.FromScreen(screen);
             string text = $"{poi.Definition.Name} {PoiText.Verb(poi)}";
-            if (!Controls.UsingTouch) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
+            bool usable = true;
+            // A minecart station (3c): ride, mend the broken end, or why not (WorldView.Travel.cs).
+            if (poi.Kind == PoiKind.Station) (text, usable) = TravelText.StationButton(_client, poi);
+            if (!Controls.UsingTouch && usable) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
             float width = Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length);
             var rect = new Rect(point.x - width / 2, point.y - 13, width, 26);
             Controls.Block(rect);
+            GUI.enabled = usable;
             if (Ui.Button(rect, text)) UsePoi();
+            GUI.enabled = true;
         }
 
         // Switches the machine ahead off or on: the key, or the button over it. False when there is none.

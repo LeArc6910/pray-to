@@ -636,6 +636,7 @@ namespace Game.Client
             SwingDoors();
             DrawMarks();
             DrawPois(deltaTime);
+            DrawTravel(deltaTime);
             _rendered = 3;
             BeginSkillFx();
             DrawProjectiles(deltaTime);
@@ -2114,7 +2115,7 @@ namespace Game.Client
         void Show(SimEvent e)
         {
             // The things to find in the rooms (WorldView.Pois.cs).
-            if (ShowPoi(e)) return;
+            if (ShowPoi(e) || ShowTravel(e)) return;
             switch (e.Type)
             {
                 case SimEventType.Attack:

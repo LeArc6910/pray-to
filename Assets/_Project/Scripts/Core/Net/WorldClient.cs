@@ -324,6 +324,60 @@ namespace Game.Core
         public float BlessingSeconds => _blessing == null ? 0 : (float)Math.Max(0, (_blessingTicks - (HostTick - _poiTick)) / World.TicksPerSecond);
         public float RestedSeconds => (float)Math.Max(0, (_restedTicks - (HostTick - _poiTick)) / World.TicksPerSecond);
 
+        // ---- The minecarts and waystones as the host last told (World.Travel.cs, 3c) ----
+
+        readonly HashSet<int> _stones = new HashSet<int>();
+        readonly HashSet<int> _fixedRails = new HashSet<int>();
+        readonly List<(int Player, int Line, bool Forward, long Start, float Speed)> _riders = new List<(int, int, bool, long, float)>();
+
+        public IReadOnlyList<RailLine> Lines => Rooms?.Lines ?? (IReadOnlyList<RailLine>)Array.Empty<RailLine>();
+        public bool RailFixed(int line) => _fixedRails.Contains(line);
+        public bool StoneOpen(int index) => _stones.Contains(index);
+        public IEnumerable<Poi> Stones => Pois.Where(p => p.Kind == PoiKind.Waystone);
+        public IEnumerable<Poi> OpenStones => Stones.Where(p => _stones.Contains(p.Index));
+
+        // The line a station is an end of, or null.
+        public RailLine LineOf(Poi station) => station == null ? null : Lines.FirstOrDefault(l => l.StationA == station.Index || l.StationB == station.Index);
+
+        // The waystone within reach, or null; whether it is open to this player is StoneOpen.
+        public Poi StoneNear() => World.StoneNear(Stones, Position);
+
+        public byte[] TravelToStoneCommand(Poi stone) => new InventoryCommandMessage(InventoryCommand.Teleport, 0, index: World.StoneTarget + stone.Index).Encode();
+
+        // A player riding a cart now, and where along its line (the host's own reckoning, World.Travelled), or null.
+        public (RailLine Line, Vec2 At, Vec2 Way)? RideOf(int player)
+        {
+            foreach (var (id, index, forward, start, speed) in _riders)
+            {
+                if (id != player || index < 0 || index >= Lines.Count) continue;
+                var line = Lines[index];
+                float travelled = World.Travelled(start, speed, HostTick);
+                if (travelled >= line.Length) return null;
+                var at = line.RidePoint(forward, travelled);
+                var ahead = line.RidePoint(forward, Math.Min(line.Length, travelled + 0.6f));
+                var way = ahead - at;
+                return (line, at, way.LengthSquared > 1e-6f ? way.Normalized : new Vec2(1, 0));
+            }
+            return null;
+        }
+
+        public bool Riding => RideOf(PlayerId) != null;
+
+        // Where the wandering merchant's stall stands (by a camp, World.MoveWanderer), as the tiles show it, or null.
+        public (int X, int Y)? WandererAt()
+        {
+            var npc = Npcs?.Npcs.FirstOrDefault(n => n.Wanders);
+            if (npc == null || Map == null) return null;
+            foreach (var camp in Pois)
+            {
+                if (camp.Kind != PoiKind.Camp) continue;
+                for (int y = camp.Y - 5; y <= camp.Y + 5; y++)
+                    for (int x = camp.X - 5; x <= camp.X + 5; x++)
+                        if (Map.InBounds(x, y) && Map[x, y] == npc.Tile) return (x, y);
+            }
+            return null;
+        }
+
         // Whether the thing would give to this player now (World.CanUse).
         public bool CanUse(Poi poi) => poi.Definition.Again switch
         {
@@ -339,7 +393,7 @@ namespace Game.Core
             float bestDistance = World.PoiReach;
             foreach (var poi in Pois)
             {
-                if (poi.Kind == PoiKind.Camp || !CanUse(poi)) continue;
+                if (poi.Kind == PoiKind.Camp || poi.Kind == PoiKind.Waystone || !CanUse(poi)) continue;
                 float distance = Vec2.Distance(Position, poi.Center);
                 if (distance > bestDistance) continue;
                 (best, bestDistance) = (poi, distance);
@@ -360,6 +414,12 @@ namespace Game.Core
             _blessingTicks = message.BlessingTicks;
             _restedTicks = message.RestedTicks;
             _poiTick = HostTick;
+            _stones.Clear();
+            foreach (int index in message.Stones) _stones.Add(index);
+            _fixedRails.Clear();
+            foreach (int line in message.FixedRails) _fixedRails.Add(line);
+            _riders.Clear();
+            _riders.AddRange(message.Riders);
             PoiVersion++;
         }
 
@@ -483,7 +543,8 @@ namespace Game.Core
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
             Records.Select(pair => (pair.Key.Kind.ToString(), pair.Key.Id, pair.Value)), Achievements, Pet?.Id,
             PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)),
-            Classes.Select(c => c.Id), SkillOrder, JourneyStep, JourneyTaken, Waypoints.Select(i => Story?.Places[i].Id).Where(id => id != null),
+            Classes.Select(c => c.Id), SkillOrder, JourneyStep, JourneyTaken,
+            Waypoints.Select(i => Story?.Places[i].Id).Where(id => id != null).Concat(OpenStones.Select(s => World.StoneId(s.Biome))),
             StoryChoices.Select(pair => (pair.Key, pair.Value)), SideStories());
 
         // Where each begun side story stands, as the save and the host keep it.
@@ -750,7 +811,9 @@ namespace Game.Core
         // What the merchant has on sale today (World.ShopFor), or another person.
         public IReadOnlyList<ShopEntry> ShopToday => World.ShopFor(Npcs, Today);
 
-        public IReadOnlyList<ShopEntry> ShopTodayOf(NpcDefinition npc) => World.ShopFor(Npcs, Today, npc);
+        // The wandering merchant's rows of a biome are those of where their stall stands.
+        public IReadOnlyList<ShopEntry> ShopTodayOf(NpcDefinition npc) =>
+            World.ShopFor(Npcs, Today, npc, npc != null && npc.Wanders && NpcNear() is (_, int x, int y) ? Biomes[x, y] : (Biome?)null);
 
         // What the person asks of this player today (World.RequestFor).
         public RequestDefinition RequestOf(NpcDefinition npc) => World.RequestFor(Npcs, npc, HeartsWith(npc), Today);
@@ -1076,6 +1139,14 @@ namespace Game.Core
             {
                 RollTicks = 0;
                 Velocity = Vec2.Zero;
+            }
+            else if (RideOf(PlayerId) is var (_, rideAt, rideWay))
+            {
+                // On a minecart (World.Travel.cs): carried along the rails as the host reckons it, no walking or rolling.
+                Position = rideAt;
+                Facing = rideWay;
+                Velocity = Vec2.Zero;
+                RollTicks = 0;
             }
             else
             {

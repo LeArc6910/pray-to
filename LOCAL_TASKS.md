@@ -1074,6 +1074,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/pois.csv`가 `GameSheets.pois`에 들어가야 빌드에 실린다(돌리기 전에는 볼거리가 없다). 새 파일 `pois.csv`, `Core/World/PoiSheet.cs`, `Core/World/WorldGenerator.Pois.cs`, `Core/Simulation/World.Pois.cs`, `Client/WorldView.Pois.cs`, `Client/Art/PropArt.Pois.cs`, `Tests/EditMode/PoiTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `TheThingsToFindDrawAndGive`(사진 poi-chest, poi-chest-open, poi-shrine-blessed, poi-camp, poi-signal-far). 통신 0.94.0, 월드 저장본 형식 13(12 이하도 읽힌다). 이 묶음 전에 만든 2판 월드는 숨은 방 자리가 바뀐다
   - (클라우드 웹 점검) `sweep.js --only pois`
   - (사람) 멀리서 보이는 야영지 연기·제단 빛기둥·상자 반짝임·정예 깃발이 "가 보고 싶게" 하는지, 화면 가장자리 신호 점이 어수선하지 않은지, 북·바람 소리가 알아들을 만한지, 상자 보상이 돌아갈 만한지, 금 간 벽 너머 숨은 방을 찾는 맛, 철 상자가 나무 상자와 구별되는지
+- [ ] 154단계: 광차 선로, 길잡이 돌, 떠돌이 상인, 지도 조각(`Docs/WorldRework.md` 3c, `Docs/Npcs.md`)
+  - 명령 한 줄을 다시 돌린다(바뀐 시트 `pois.csv`, `npcs.csv`, `shop.csv`, `consumables.csv`가 빌드에 실린다). 새 파일 `Core/World/WorldGenerator.Rails.cs`, `Core/Simulation/World.Travel.cs`, `Client/WorldView.Travel.cs`, `Tests/EditMode/TravelTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `MinecartsWaystonesAndTheWanderingMerchant`(사진 travel-station-broken, travel-riding, travel-waystone, travel-waypoints, travel-wanderer). 통신 0.95.0, 월드 저장본 형식 14(13 이하는 모든 선로가 끊긴 채로 읽힌다)
+  - (클라우드 웹 점검) `sweep.js --only travel,pois`
+  - (사람) 광차 타는 손맛(초당 16칸이 빠른지, 덜컹 소리), 끊긴 선로를 철 주괴 5개로 고칠 만한지, 길잡이 돌로 오가는 것이 걷기의 지루함을 덜어 주는지, 떠돌이 상인을 찾아가는 맛과 물건
 
 ## 결과 보고
 

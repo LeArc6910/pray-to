@@ -199,6 +199,15 @@ namespace Game.Core
         public int RestedTicks { get; internal set; }
         // Ticks by a camp's fire without leaving it.
         internal int CampTicks { get; set; }
+        // Riding a minecart (World.Travel.cs, 3c): the line (RoomGraph.Lines), or -1; whether from its A end, the tick
+        // the cart set off and its speed, tiles a second. Blows pass by a rider, who goes where the cart goes.
+        public int RideLine { get; internal set; } = -1;
+        public bool RideForward { get; internal set; }
+        public long RideStart { get; internal set; }
+        public float RideSpeed { get; internal set; }
+        public bool Riding => RideLine >= 0;
+        // Rides taken since joining, for the sims.
+        public int Rides { get; internal set; }
 
         // The dodge roll (World.Roll.cs): ticks of the roll left, ticks left in which blows pass through, ticks until the
         // next may begin, and the way it goes. Rolls and Dodges count them since joining, for the sims.
@@ -599,6 +608,15 @@ namespace Game.Core
         PoiOpened,
         // A shrine blessed a player, or a player rested at a camp: Source the player, Amount the thing's index, at it.
         Blessed,
+        // A minecart (World.Travel.cs, 3c): Source the player, Amount the station's index (World.Pois), Target which
+        // (World.RailMended, RailSet, RailArrived), at the station.
+        Rail,
+        // Source, a player, opened the waystone Amount (World.Pois) (Target World.StoneOpened) or came to it from a
+        // waypoint (World.StoneUsed), at it.
+        Waystone,
+        // Source, a player, read a map scrap (consumables.csv effect map): their own map marks the nearest thing to
+        // find they have not seen.
+        MapRead,
     }
 
     public readonly struct SimEvent

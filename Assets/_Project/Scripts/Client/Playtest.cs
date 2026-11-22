@@ -29,7 +29,7 @@ namespace Game.Client
     //   scene pack                five slimes east of the player as one pack (World.Gather), most of them out of its sight
     //   scene elite               a mushroom soldiers' leader with fire and guard and three slime minions east of the player,
     //                             and three fierce champion beetles west of it (World.MakeEliteHere), all held still
-    //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step>
+    //   clock [day] <hour>        weather clear|rain|storm|fog      speed <host ticks a step>
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
     //   teach [rank]              every skill of the player's classes at the rank, no points needed
@@ -42,6 +42,11 @@ namespace Game.Client
     //   goto room <role> [biome|any] [n]   into the nth room of the role (the generator's version 2), nearest the spawn first
     //   goto road <n> [percent]   onto the nth road of a world of rooms (GeneratedWorld.Roads), that far along it (50)
     //   goto byway <n>            onto the nth by-way (places.csv links), a few steps before its cracked wall
+    //   goto station [broken|fixed] [n]   beside the nth nearest minecart station (3c), or the broken end of a line not
+    //                             mended, or a station of a mended line;   goto wanderer   below the wandering merchant's stall
+    //   travel                    JSON: the minecart lines (length, mended, broken end), the player's ride on host and screen,
+    //                             the waystones open, where the wandering merchant stands today and how many rows they sell
+    //   mend <line|all>   stones all (every waystone open to the player)   waypoints (the waypoint list, by an open one)
     //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways, roads
     //   packs                     JSON: the packs about the player (World.Packs.cs): each one's room, kind, size, monsters standing,
     //                             noticing and out of their own sight; the wanderers, the field's monsters and the caps
@@ -138,10 +143,12 @@ namespace Game.Client
                     Scene(root, words[1]);
                     return null;
                 case "clock":
-                    // A day starts at six in the morning; an hour before six is that day's night.
-                    float hour = Float(words[2]);
+                    // "clock <day> <hour>", or "clock <hour>" for today. A day starts at six in the morning; an hour before
+                    // six is that day's night.
+                    float hour = Float(words.Length > 2 ? words[2] : words[1]);
+                    int clockDay = words.Length > 2 ? Int(words[1]) : world.Today;
                     float into = ((hour - Calendar.MorningHour) % 24 + 24) % 24;
-                    world.RestoreClock((long)((Int(words[1]) - 1 + into / 24) * Calendar.TicksPerDay));
+                    world.RestoreClock((long)((clockDay - 1 + into / 24) * Calendar.TicksPerDay));
                     return null;
                 case "feel":
                     // feel <piece|all> <on|off>: one piece of a blow's feedback (Feel, Docs/Feel.md).
@@ -327,6 +334,20 @@ namespace Game.Client
                     return "pois " + PoisJson(root);
                 case "usepoi":
                     return root.UsePoi() ? "ok usepoi" : "error usepoi: nothing to use within reach";
+                // The minecarts, waystones and the wandering merchant (2026-11-22, 묶음 3c).
+                case "travel":
+                    return "travel " + TravelJson(root);
+                case "mend":
+                    // mend <line|all>: the line's broken end mended, as a player with five iron bars would.
+                    foreach (var line in world.Lines.Where(l => words[1] == "all" || l.Index == Int(words[1]))) world.MendRail(line.Index);
+                    return $"ok mend {world.FixedRails.Count()}/{world.Lines.Count}";
+                case "stones":
+                    // stones all: every waystone open to the player, as if they had touched each.
+                    foreach (var stone in world.Stones) world.OpenStone(player, stone);
+                    return $"ok stones {world.OpenStones(player).Count()}/{world.Stones.Count}";
+                case "waypoints":
+                    // The list of waypoints and waystones, as the button over one opens it.
+                    return root.OpenWaypoints() ? "ok waypoints" : "error waypoints: no open waypoint or waystone within reach";
                 case "room":
                     return "room " + RoomJson(root, RoomOf(root, words, 1));
                 case "build":
@@ -466,6 +487,28 @@ namespace Game.Client
                     break;
                 // Before the crack of a hidden room in the rock, or the obsidian or void wall of a locked room, facing it
                 // (묶음 3b): "crack [n]", "lock [n]".
+                // Beside a minecart station (3c): "station [broken|fixed] [n]": the nth nearest, or the nth nearest broken end
+                // of a line not mended, or a station of a mended line; on the rails beside its cart.
+                case "station":
+                    string state = words.Length > 2 && (words[2] == "broken" || words[2] == "fixed") ? words[2] : "any";
+                    int nthStation = words.Length > (state == "any" ? 2 : 3) ? Int(words[state == "any" ? 2 : 3]) : 0;
+                    var station = world.Lines.SelectMany(l => new[] { (l, world.Pois[l.StationA]), (l, world.Pois[l.StationB]) })
+                        .Where(s => state == "any" || state == "broken" && !world.RailFixed(s.l.Index) && s.Item2.Index == s.l.Broken
+                            || state == "fixed" && world.RailFixed(s.l.Index))
+                        .OrderBy(s => Vec2.Distance(s.Item2.Center, player.Position)).Skip(nthStation).Select(s => s.Item2).FirstOrDefault()
+                        ?? throw new InvalidOperationException($"no {state} station {nthStation}");
+                    to = Nearest(map, station.X, station.Y, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius)
+                            && Vec2.Distance(TileMap.Center(x, y), station.Center) is float d && d >= 0.9f && d <= World.PoiReach - 0.4f)
+                        ?? station.Center;
+                    break;
+                // Below the wandering merchant's stall, facing it (3c).
+                case "wanderer":
+                    var stall = world.WandererAt ?? throw new InvalidOperationException("no wandering merchant (no camps)");
+                    to = Nearest(map, stall.X, stall.Y - 1, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius))
+                        ?? throw new InvalidOperationException("nowhere to stand by the wandering merchant");
+                    root.AimHeld = true;
+                    root.HeldAim = new Vec2(stall.X + 0.5f - to.X, stall.Y + 0.5f - to.Y);
+                    break;
                 case "crack":
                 case "lock":
                     int which = words.Length > 2 ? int.Parse(words[2]) : 0;
@@ -622,21 +665,36 @@ namespace Game.Client
             return null;
         }
 
-        // An obsidian or void wall tile of a locked room with open floor outside it that is not the room's inside.
-        static ((int X, int Y) Wall, (int X, int Y) Stand)? LockOf(TileMap map, RoomNode room)
+        // An obsidian or void wall tile of a locked room and the floor before it, walked to from the room (RoomGraph.LockOf).
+        static ((int X, int Y) Wall, (int X, int Y) Stand)? LockOf(TileMap map, RoomNode room) => RoomGraph.LockOf(map, room);
+
+        // The minecarts, waystones and the wandering merchant (3c): the lines (length, mended, which end is broken), the
+        // player's ride as the host and the screen see it, the waystones open, and where the merchant stands today.
+        static string TravelJson(GameRoot root)
         {
-            var (left, bottom, w, h) = room.Box.Value;
-            for (int y = bottom - 1; y <= bottom + h; y++)
-            {
-                for (int x = left - 1; x <= left + w; x++)
-                {
-                    bool inside = x >= left && y >= bottom && x < left + w && y < bottom + h;
-                    if (inside || !map.InBounds(x, y) || map.IsSolid(x, y)) continue;
-                    if (Faced(map, x, y, t => t == TileType.ObsidianWall || t == TileType.VoidWall) is var found && found != null) return found;
-                }
-            }
-            // A door through the chunk's own wall: the floor just outside its door looks at the lock.
-            return Faced(map, room.AnchorX, room.AnchorY, t => t == TileType.ObsidianWall || t == TileType.VoidWall);
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var client = root.LocalClient;
+            var lines = new Json('[');
+            foreach (var line in world.Lines)
+                lines.Item(new RawJson(new Json('{').Field("index", line.Index).Field("length", line.Length).Field("fixed", world.RailFixed(line.Index))
+                    .Field("a", line.StationA).Field("b", line.StationB).Field("broken", line.Broken)
+                    .Field("distance", Math.Min(Vec2.Distance(world.Pois[line.StationA].Center, player.Position), Vec2.Distance(world.Pois[line.StationB].Center, player.Position)))
+                    .Close('}')));
+            var wanderer = world.WandererAt;
+            var npc = world.Npcs?.Npcs.FirstOrDefault(n => n.Wanders);
+            return new Json('{').Field("lines", lines.Raw(']'))
+                .Field("riding", player.Riding).Field("rideLine", player.RideLine).Field("rides", player.Rides)
+                .Field("clientRiding", client?.Riding ?? false)
+                .Field("x", player.Position.X).Field("y", player.Position.Y)
+                .Field("stones", world.Stones.Count).Field("stonesOpen", world.OpenStones(player).Count())
+                .Field("clientStonesOpen", client?.OpenStones.Count() ?? 0)
+                .Field("stoneNear", world.StoneNear(player.Position)?.Index ?? -1)
+                .Field("wanderer", wanderer != null).Field("wandererX", wanderer?.X ?? -1).Field("wandererY", wanderer?.Y ?? -1)
+                .Field("wandererBiome", wanderer is (int wx, int wy) ? world.Biomes[wx, wy].ToString() : "")
+                .Field("wandererShop", npc == null || client == null ? 0 : client.ShopTodayOf(npc).Count)
+                .Field("inReach", world.PoiNear(player.Position, player)?.Definition.Id ?? "")
+                .Close('}');
         }
 
         // The things to find: how many of each kind, opened, near the player, and the player's blessing and rest.

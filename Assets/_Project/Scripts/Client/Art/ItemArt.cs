@@ -390,6 +390,31 @@ namespace Game.Client
             ".occobo.......",
             "..oo.o........");
 
+        // A torn scrap of a map (2026-11-22, 묶음 3c): yellowed parchment, a dotted way across it to a red cross, a
+        // corner torn off.
+        static readonly PixelImage MapScrap = PixelImage.FromRows(new Dictionary<char, Rgba>
+            {
+                ['o'] = Rgba.Hex("#2A1C12"),
+                ['p'] = Rgba.Hex("#F2DFA8"),
+                ['s'] = Rgba.Hex("#C9A866"),
+                ['d'] = Rgba.Hex("#7A5A34"),
+                ['r'] = Rgba.Hex("#D8362A"),
+                ['g'] = Rgba.Hex("#6E9A5A"),
+            },
+            ".oooooooooo...",
+            "oppppppppppo..",
+            "opdpppggppppo.",
+            "oppdppgggpppo.",
+            "opppdpppppppo.",
+            "oppppdpppprpro",
+            "opppppddpprrpo",
+            "oppgpppppdrprp",
+            "opggppppppppro",
+            "opppppppppppso",
+            "osppppppsppsso",
+            ".osspsppssso..",
+            "..oo.oooooo...");
+
         // A bowl of creamy soup with bits of mushroom.
         // Made on first use: the rows below are set after this line in the type's start-up.
         static PixelImage _mushroomSoup;
@@ -440,6 +465,7 @@ namespace Game.Client
             "spicy_fry" => SpicyFry,
             "mushroom_soup" => MushroomSoup,
             "recall_scroll" => RecallScroll,
+            "map_scrap" => MapScrap,
             "mana_potion" => ManaPotion,
             "grilled_fish" => RampedOwn(Fish16, Ramp.Of("#C4783E")),
             "fish_stew" => Soup("#C88A4A"),
