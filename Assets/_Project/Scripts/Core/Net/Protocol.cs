@@ -43,7 +43,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.98.0";
+        public const string Version = "0.99.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -488,38 +488,92 @@ namespace Game.Core
         });
     }
 
-    // The dungeons standing in the pocket (World.Dungeon.cs, 묶음 5a): for each, its slot, gate, how often the gate had
-    // been entered before it (its seed's part), its seed, state and level. A client lays each from the seed
-    // (DungeonPocket.Carve), so its tiles are never sent; a slot left out goes back to rock. Sent when one is made or
-    // closes, before the snapshot that brings a player into it, and to each player who joins.
-    public sealed class DungeonsMessage
+    // One dungeon standing in the pocket, as the host tells it (DungeonsMessage): where, which, from what seed, and how
+    // far its run has come (묶음 5b).
+    public sealed class DungeonStatus
     {
-        public DungeonsMessage(IReadOnlyList<(int Slot, int Gate, int Serial, ulong Seed, DungeonState State, int Level)> dungeons)
+        public DungeonStatus(int slot, int gate, int serial, ulong seed, DungeonState state, int level, int definition = NoDefinition,
+            DungeonFlags flags = DungeonFlags.None, uint cleared = 0, uint used = 0, long started = -1, int clearSeconds = 0, int deaths = 0)
         {
-            Dungeons = dungeons ?? Array.Empty<(int, int, int, ulong, DungeonState, int)>();
+            Slot = slot;
+            Gate = gate;
+            Serial = serial;
+            Seed = seed;
+            State = state;
+            Level = level;
+            Definition = definition;
+            Flags = flags;
+            Cleared = cleared;
+            Used = used;
+            Started = started;
+            ClearSeconds = clearSeconds;
+            Deaths = deaths;
         }
 
-        public IReadOnlyList<(int Slot, int Gate, int Serial, ulong Seed, DungeonState State, int Level)> Dungeons { get; }
+        // The definition of 5a's plain dungeon (no row of dungeons.csv).
+        public const int NoDefinition = byte.MaxValue;
+
+        public int Slot { get; }
+        public int Gate { get; }
+        public int Serial { get; }
+        public ulong Seed { get; }
+        public DungeonState State { get; }
+        public int Level { get; }
+        // Its row's index in dungeons.csv (DungeonDefinition.Index), or NoDefinition.
+        public int Definition { get; }
+        public DungeonFlags Flags { get; }
+        public uint Cleared { get; }
+        public uint Used { get; }
+        // The host's tick the run began, or -1.
+        public long Started { get; }
+        public int ClearSeconds { get; }
+        public int Deaths { get; }
+
+        public static DungeonStatus Of(DungeonInstance d) => new DungeonStatus(d.Slot, d.Gate.Index, d.Serial, d.Seed, d.State, d.Level,
+            d.Definition?.Index ?? NoDefinition, d.Flags, d.ClearedRooms, d.UsedThings, d.Started, d.ClearSeconds, d.Deaths);
+    }
+
+    // The dungeons standing in the pocket (World.Dungeon.cs, 묶음 5a·5b): for each, its slot, gate, how often it had been
+    // entered before (its seed's part), its seed, state, level, row of dungeons.csv and its run's progress. A client lays
+    // each from the seed (DungeonGenerator.Lay, or 5a's DungeonPocket.Carve) and opens the doors the progress says
+    // (DungeonInstance.ApplyTiles), so its tiles are never sent; a slot left out goes back to rock. Sent when one is made,
+    // closes or its run moves on, before the snapshot that brings a player into it, and to each player who joins.
+    public sealed class DungeonsMessage
+    {
+        public DungeonsMessage(IReadOnlyList<DungeonStatus> dungeons)
+        {
+            Dungeons = dungeons ?? Array.Empty<DungeonStatus>();
+        }
+
+        public IReadOnlyList<DungeonStatus> Dungeons { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Dungeons, w =>
         {
             w.Write((byte)Math.Min(Dungeons.Count, byte.MaxValue));
-            foreach (var (slot, gate, serial, seed, state, level) in Dungeons.Take(byte.MaxValue))
+            foreach (var d in Dungeons.Take(byte.MaxValue))
             {
-                w.Write((byte)slot);
-                w.Write((ushort)gate);
-                w.Write(serial);
-                w.Write(seed);
-                w.Write((byte)state);
-                w.Write((ushort)Math.Clamp(level, 0, ushort.MaxValue));
+                w.Write((byte)d.Slot);
+                w.Write((ushort)d.Gate);
+                w.Write(d.Serial);
+                w.Write(d.Seed);
+                w.Write((byte)d.State);
+                w.Write((ushort)Math.Clamp(d.Level, 0, ushort.MaxValue));
+                w.Write((byte)Math.Clamp(d.Definition, 0, byte.MaxValue));
+                w.Write((ushort)d.Flags);
+                w.Write(d.Cleared);
+                w.Write(d.Used);
+                w.Write(d.Started);
+                w.Write((ushort)Math.Clamp(d.ClearSeconds, 0, ushort.MaxValue));
+                w.Write((ushort)Math.Clamp(d.Deaths, 0, ushort.MaxValue));
             }
         });
 
         public static DungeonsMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Dungeons, r =>
         {
-            var dungeons = new List<(int, int, int, ulong, DungeonState, int)>();
+            var dungeons = new List<DungeonStatus>();
             for (int count = r.ReadByte(); count > 0; count--)
-                dungeons.Add((r.ReadByte(), r.ReadUInt16(), r.ReadInt32(), r.ReadUInt64(), (DungeonState)r.ReadByte(), r.ReadUInt16()));
+                dungeons.Add(new DungeonStatus(r.ReadByte(), r.ReadUInt16(), r.ReadInt32(), r.ReadUInt64(), (DungeonState)r.ReadByte(), r.ReadUInt16(), r.ReadByte(),
+                    (DungeonFlags)r.ReadUInt16(), r.ReadUInt32(), r.ReadUInt32(), r.ReadInt64(), r.ReadUInt16(), r.ReadUInt16()));
             return new DungeonsMessage(dungeons);
         });
     }

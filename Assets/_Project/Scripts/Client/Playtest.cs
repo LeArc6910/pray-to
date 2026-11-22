@@ -59,6 +59,10 @@ namespace Game.Client
     //   dungeon [enter|leave|menu|die|close]   JSON: the gates, the dungeons standing, the player's part on host and screen,
     //                             going in or out, the name card; or the gate's or door's button, [던전 나가기], a fall where
     //                             the player stands, every empty dungeon back to rock now
+    //   dungeon use | kill | open <id>   (묶음 5b) the chest's or shrine's button within reach; every monster in the room the
+    //                             player stands in (and its doorways) felled; the nearest gate's next dungeon that row of dungeons.csv
+    //   goto droom <letter> [n]   in the dungeon: just inside the nth room of that letter (E C K L M R B X T S H), on its way in;
+    //   goto chest                by the end chest;   goto stone   by the rest room's shortcut stone
     //   scene dungeon             on the nearest dungeon gate, the monsters held
     //   traps                     JSON: the nearest trap room: phase, band, wave, the grates down on host and screen, who is
     //                             shut in, the chest (opened, usable on host and screen), the banners shown
@@ -367,8 +371,31 @@ namespace Game.Client
                         case "close":
                             int closed = world.CloseEmptyDungeons();
                             return $"ok dungeon close {closed}";
+                        // 묶음 5b: the chest's or shrine's button; the room's pack felled at once; the gate's next dungeon.
+                        case "use":
+                            return root.LocalClient.DungeonThingNear() != null && root.UseDungeon() ? "ok dungeon use" : "error dungeon use: no chest or shrine within reach";
+                        case "kill":
+                        {
+                            var inRun = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
+                            var standing = inRun.Layout.RoomAt(player.Position, 3);
+                            int felled = 0;
+                            foreach (var foe in world.Enemies.Where(e => !e.IsDead && world.DungeonAt(e.Position) == inRun
+                                && (standing != null ? standing.Contains(e.Position, 6) : Vec2.Distance(e.Position, player.Position) < 16)).ToList())
+                            {
+                                foe.Health = 0;
+                                felled++;
+                            }
+                            return $"ok dungeon kill {felled}";
+                        }
+                        case "open":
+                        {
+                            var nearestGate = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault()
+                                ?? throw new InvalidOperationException("no gate");
+                            return words.Length > 2 && world.ChooseDungeon(nearestGate.Index, words[2]) ? $"ok dungeon open {words[2]} at gate {nearestGate.Index}"
+                                : $"error dungeon open: no row '{(words.Length > 2 ? words[2] : "")}' in dungeons.csv";
+                        }
                     }
-                    return $"error dungeon {words[1]}: enter|leave|menu|die|close";
+                    return $"error dungeon {words[1]}: enter|leave|menu|die|close|use|kill|open";
                 // The pacing director and the trap rooms (2026-11-22, 묶음 4b). "director": the player's pace; "director
                 // <build|peak|relax|rest> [tension]": set as if it had come; "director ambush|raid": one now, where the player
                 // stands (an ambush only in a narrow way: "goto narrow" first). "traps": the nearest trap room.
@@ -597,6 +624,38 @@ namespace Game.Client
                     var door = inside.Layout.Exits[Math.Min(nthExit, inside.Layout.Exits.Count - 1)];
                     to = TileMap.Center(door.X, door.Y);
                     break;
+                // In the dungeon (묶음 5b): just inside a room of the letter, on the side it is entered from; by the end chest;
+                // by the rest room's shortcut stone.
+                case "droom":
+                {
+                    var run = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
+                    char letter = words.Length > 2 && words[2].Length == 1 ? char.ToUpperInvariant(words[2][0]) : 'C';
+                    int nthRoom = words.Length > 3 ? Int(words[3]) : 0;
+                    var droom = run.Layout.Nodes.Where(n => n.Letter == letter).Skip(nthRoom).FirstOrDefault()
+                        ?? throw new InvalidOperationException($"no room {letter} {nthRoom}");
+                    var from = droom.Parent >= 0 ? run.Layout.Nodes[droom.Parent].Center : droom.Center + new Vec2(0, -1);
+                    var side = from - droom.Center;
+                    side = Math.Abs(side.X) > Math.Abs(side.Y) ? new Vec2(Math.Sign(side.X), 0) : new Vec2(0, Math.Sign(side.Y));
+                    var spot = droom.Center + new Vec2(side.X * (droom.Box.W / 2f - 1.5f), side.Y * (droom.Box.H / 2f - 1.5f));
+                    to = Game.Core.Collision.Resolve(map, spot, World.PlayerRadius);
+                    break;
+                }
+                case "chest":
+                {
+                    var run = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
+                    var chest = run.Layout.Things.First(t => t.End);
+                    to = Nearest(map, chest.X, chest.Y - 1, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius)
+                        && Vec2.Distance(TileMap.Center(x, y), chest.Center) <= World.PoiReach - 0.4f) ?? chest.Center;
+                    break;
+                }
+                case "stone":
+                {
+                    var run = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
+                    var (stoneX, stoneY) = run.Layout.ShortcutTo ?? throw new InvalidOperationException("no shortcut in this dungeon");
+                    to = Nearest(map, stoneX, stoneY, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius)
+                        && Vec2.Distance(TileMap.Center(x, y), TileMap.Center(stoneX, stoneY)) <= World.StoneReach - 0.2f) ?? TileMap.Center(stoneX, stoneY);
+                    break;
+                }
                 case "far":
                     var deep = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
                     var last = deep.Layout.Rooms[deep.Layout.Rooms.Count - 1];
@@ -831,7 +890,39 @@ namespace Game.Client
                 .Field("pocketSame", same).Field("version", world.DungeonVersion).Field("clientVersion", client.DungeonVersion)
                 .Field("cards", root.DungeonCardsShown).Field("cardName", root.DungeonCardName).Field("cardShowing", root.DungeonCardShowing)
                 .Field("mapOpen", root.Map?.FullOpen ?? false)
+                .Field("run", RunJson(root, here, client))
                 .Close('}');
+        }
+
+        // The run through the dungeon the player is in (묶음 5b): its row, rooms, what is cleared and open, the master, the
+        // room the player stands in and what is in it, the chest or shrine within reach, on the host and on the screen.
+        static RawJson RunJson(GameRoot root, DungeonInstance here, WorldClient client)
+        {
+            if (here == null) return new RawJson("null");
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var mine = client.DungeonHere;
+            var room = here.Layout.RoomAt(player.Position, 1);
+            var master = world.Enemies.FirstOrDefault(e => e.Id == here.BossId && !e.IsDead);
+            int packs = here.Layout.Nodes.Count(n => DungeonSheet.HasPack(n.Letter));
+            int cleared = here.Layout.Nodes.Count(n => DungeonSheet.HasPack(n.Letter) && here.RoomCleared(n.Index));
+            var thing = World.ThingNear(here, player.Position);
+            var chest = here.Layout.Things.FirstOrDefault(t => t.End);
+            return new RawJson(new Json('{').Field("id", here.Definition?.Id ?? "").Field("key", here.Key).Field("letters", new string(here.Layout.Nodes.Select(n => n.Letter).ToArray()))
+                .Field("packs", packs).Field("cleared", cleared).Field("flags", (int)here.Flags).Field("clientFlags", (int)(mine?.Flags ?? 0))
+                .Field("clientCleared", (int)(mine?.ClearedRooms ?? 0)).Field("state", here.State.ToString()).Field("clientState", (mine?.State ?? DungeonState.Closed).ToString())
+                .Field("keyTaken", here.Has(DungeonFlags.KeyTaken)).Field("bossDown", here.Has(DungeonFlags.BossDown)).Field("chestOpen", here.Has(DungeonFlags.ChestOpen))
+                .Field("master", master == null ? "" : World.EliteName(master.Definition, master.Elite, master.Affixes))
+                .Field("masterHealth", master?.Health ?? 0).Field("masterMax", master?.MaxHealth ?? 0)
+                .Field("room", room == null ? "" : room.Letter.ToString()).Field("clientRoom", client.DungeonRoomHere?.Letter.ToString() ?? "")
+                .Field("enemiesHere", room == null ? 0 : world.Enemies.Count(e => !e.IsDead && room.Contains(e.Position, 2)))
+                .Field("clientEnemiesHere", room == null ? 0 : client.Others().Count(o => o.Kind == EntityKind.Monster && o.Health > 0 && room.Contains(o.Position, 2)))
+                .Field("thing", thing?.Index ?? -1).Field("clientThing", client.DungeonThingNear()?.Index ?? -1)
+                .Field("chestTile", chest == null ? "" : client.Map[chest.X, chest.Y].ToString())
+                .Field("clearSeconds", here.ClearSeconds).Field("deaths", here.Deaths).Field("clearsShown", root.DungeonClearsShown)
+                .Field("cardLine", root.DungeonCardLine).Field("goalWay", string.Join(" | ", root.HudLines.Where(l => l.Contains("칸") || l.Contains("던전 문에서")).Select(l => l.Replace('\n', ' '))))
+                .Field("items", player.Inventory.Items.Count)
+                .Close('}'));
         }
 
         // The rumours (묶음 4c): the choices, what has been heard, how well the ways are known, the story's goal line.

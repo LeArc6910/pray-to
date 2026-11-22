@@ -1,0 +1,6 @@
+id,name,biome,level,graph,rooms,boss,chest,minutes
+slime_cellar,끈적한 지하실,cave,2,cellar,6-8,elite:slime,chest_iron,5
+spore_depths,포자 굴,mushroom,3,branching,9-11,elite:myconid,chest_gold,9
+frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,elite:frost_wisp,chest_gold,10
+ember_forge,잿불 대장간,lava,3,locked,12-14,elite:magma_slime,chest_gold,13
+deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8

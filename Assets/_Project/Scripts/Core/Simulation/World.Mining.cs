@@ -74,7 +74,8 @@ namespace Game.Core
         {
             if (Tiles == null) return null;
             var (x, y) = DigAhead(player.Position, player.Facing);
-            if (Map.IsEdge(x, y) || Map[x, y] == TileType.Lava) return null;
+            // In the pocket nothing is dug but a dungeon's hidden room's cracked wall (World.Dungeon.cs).
+            if (Map.IsEdge(x, y) && !IsDungeonCrack(x, y) || Map[x, y] == TileType.Lava) return null;
             // A laid floor or a door only comes up to a pickaxe, so swinging at monsters in a base never takes it up.
             if ((TileMap.IsPaving(Map[x, y]) || TileMap.IsDoor(Map[x, y])) && !HoldsPickaxe(player)) return null;
             // A locked door comes up only to whoever locked it (World.LockDoor).
@@ -114,6 +115,7 @@ namespace Game.Core
             }
 
             _wallDamage.Remove(key);
+            if (StrikeDungeonCrack(x, y, broken)) return;
             var machine = MachineAt(x, y);
             if (machine != null) Empty(machine, player);
             ClearTile(x, y);

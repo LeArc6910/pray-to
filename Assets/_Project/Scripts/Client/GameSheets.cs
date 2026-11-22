@@ -27,6 +27,9 @@ namespace Game.Client
         public TextAsset roomRoles;
         // The things to find in the rooms: camps, shrines, chests, carts (pois.csv, 2026-11-22, Docs/Biomes.md 볼거리).
         public TextAsset pois;
+        // The instance dungeons and their graphs (dungeons.csv, dungeon_graphs.csv, 2026-11-22, Docs/Biomes.md 던전).
+        public TextAsset dungeons;
+        public TextAsset dungeonGraphs;
         public TextAsset monsters;
         // What the ordinary monsters do (monster_attacks.csv, 2026-11-21, Docs/Combat.md 몬스터의 공격 시트).
         public TextAsset monsterAttacks;
@@ -58,7 +61,8 @@ namespace Game.Client
             LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes), Text(sets));
 
         // Without the terrain sheet (an asset made before it existed) the rooms are carved by the copy in code.
-        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain), Text(rooms), Text(roomRoles), Text(pois));
+        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain), Text(rooms), Text(roomRoles), Text(pois),
+            Text(dungeons), Text(dungeonGraphs));
 
         // Without the attacks' sheet (an asset made before it existed) every monster fights the old way; without the
         // packs' sheet monsters come one by one, as before there were packs.

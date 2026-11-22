@@ -89,16 +89,25 @@ namespace Game.Core
     {
         readonly Dictionary<Biome, TerrainRule> _byBiome = new Dictionary<Biome, TerrainRule>();
 
-        internal TerrainData(IEnumerable<TerrainRule> rules, IReadOnlyList<string> errors, RoomData rooms = null, PoiData pois = null)
+        internal TerrainData(IEnumerable<TerrainRule> rules, IReadOnlyList<string> errors, RoomData rooms = null, PoiData pois = null, DungeonData dungeons = null)
         {
             foreach (var rule in rules) _byBiome[rule.Biome] = rule;
             Rooms = rooms ?? RoomData.None;
             Pois = pois ?? PoiData.None;
+            Dungeons = dungeons ?? DungeonData.None;
             var all = errors.ToList();
             if (rooms != null) all.AddRange(rooms.Errors.Where(e => !all.Contains(e)));
             if (pois != null) all.AddRange(pois.Errors.Where(e => !all.Contains(e)));
+            if (dungeons != null) all.AddRange(dungeons.Errors.Where(e => !all.Contains(e)));
             Errors = all;
         }
+
+        // The instance dungeons and their graphs (dungeons.csv, dungeon_graphs.csv, Docs/WorldRework.md 5단계, 묶음 5b): none
+        // when the game did not read them, and then a gate leads to the plain dungeon of 묶음 5a.
+        public DungeonData Dungeons { get; }
+
+        // The same rules with the dungeons beside them.
+        internal TerrainData With(DungeonData dungeons) => new TerrainData(_byBiome.Values, Errors, Rooms, Pois, dungeons);
 
         // The things to find in the rooms (pois.csv, Docs/WorldRework.md 3단계): none when the game did not read them,
         // and then the rooms keep their chests shut and their fires only warm.
@@ -109,13 +118,13 @@ namespace Game.Core
         public RoomData Rooms { get; }
 
         // The same rules with the room sheets beside them.
-        internal TerrainData With(RoomData rooms) => new TerrainData(_byBiome.Values, Errors, rooms, Pois);
+        internal TerrainData With(RoomData rooms) => new TerrainData(_byBiome.Values, Errors, rooms, Pois, Dungeons);
 
         // The same rules with the things to find beside them.
-        internal TerrainData With(PoiData pois) => new TerrainData(_byBiome.Values, Errors, Rooms, pois);
+        internal TerrainData With(PoiData pois) => new TerrainData(_byBiome.Values, Errors, Rooms, pois, Dungeons);
 
         // The same without the things to find (a game whose asset was made before pois.csv).
-        internal TerrainData WithoutPois() => new TerrainData(_byBiome.Values, Errors, Rooms, PoiData.None);
+        internal TerrainData WithoutPois() => new TerrainData(_byBiome.Values, Errors, Rooms, PoiData.None, Dungeons);
 
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;

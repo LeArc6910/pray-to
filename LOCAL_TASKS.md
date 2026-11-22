@@ -1090,6 +1090,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/DungeonPocket.cs`, `Core/Simulation/World.Dungeon.cs`, `Client/WorldView.Dungeon.cs`, `Tests/EditMode/DungeonTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `ADungeonGateLeadsIntoThePocketAndOut`(사진 일곱). 통신 0.98.0(스냅숏 위치가 받는 사람 기준 차이로), 월드 저장본 형식 15(문마다 들어간 횟수)
   - (클라우드 웹 점검) `sweep.js --only dungeon`
   - (사람) 던전 문에서 1.5초 모아 들어가고 나오는 느낌(어둠·이름 띠·소리), 던전 안에서 쓰러지면 입구에서 다시, 협동에서 둘이 같은 던전에 들어가는지. 던전 안은 아직 비어 있다(5b)
+- [ ] 158단계: 던전 생성기, 무리와 주인 방, 끝 상자, 완주 기록(`Docs/WorldRework.md` 5b, `Docs/Biomes.md` 던전 시트)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/dungeons.csv`, `Data/World/dungeon_graphs.csv`가 `GameSheets`에 들어가야 빌드에 실린다(돌리기 전에는 5a의 빈 던전). 새 파일 `dungeons.csv`, `dungeon_graphs.csv`, `Core/World/DungeonSheet.cs`, `Core/World/DungeonGenerator.cs`, `Tests/EditMode/DungeonGeneratorTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `ADungeonRunGoesToItsMasterAndItsEndChest`(사진 다섯). 통신 0.99.0, 월드 저장본 형식 16(던전마다 들어간 횟수·가장 빠른 완주·완주 수)
+  - (클라우드 웹 점검) `sweep.js --only dungeon`(로컬이 시트를 실은 빌드가 배포된 뒤)
+  - (사람) 던전 한 판의 길이와 밀도, 주인(큰 정예)과 싸우는 손맛, 끝 상자 보상이 들판보다 나은지, 완주 띠와 소리, 지름길 돌·잠긴 방·숨은 방을 찾는 맛
 
 ## 결과 보고
 

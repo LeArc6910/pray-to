@@ -67,6 +67,8 @@ namespace Game.Client.Editor
             sheets.rooms = Sheet(WorldFolder + RoomSheet.File);
             sheets.roomRoles = Sheet(WorldFolder + RoomSheet.RolesFile);
             sheets.pois = Sheet(WorldFolder + PoiSheet.File);
+            sheets.dungeons = Sheet(WorldFolder + DungeonSheet.File);
+            sheets.dungeonGraphs = Sheet(WorldFolder + DungeonSheet.GraphsFile);
             sheets.monsters = Sheet(MonstersFolder + MonsterSheet.File);
             sheets.monsterAttacks = Sheet(MonstersFolder + MonsterAttackSheet.File);
             sheets.packs = Sheet(MonstersFolder + PackSheet.File);

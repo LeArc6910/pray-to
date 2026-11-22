@@ -101,6 +101,8 @@ namespace Game.Client
         // A dungeon's name cards shown, and the last name (WorldView.Dungeon.cs).
         internal int DungeonCardsShown => _view?.DungeonCardsShown ?? 0;
         internal string DungeonCardName => _view?.DungeonCardName ?? "";
+        internal string DungeonCardLine => _view?.DungeonCardLine ?? "";
+        internal int DungeonClearsShown => _view?.ClearsShown ?? 0;
         internal bool DungeonCardShowing => _view != null && _view.DungeonCardShowing;
         internal int MonsterFxAlive => _view?.MonsterFxAlive ?? 0;
         internal int MonsterFxPieces => _view?.MonsterFxPieces ?? 0;
@@ -788,6 +790,13 @@ namespace Game.Client
         internal bool UseDungeon()
         {
             if (_client == null || _client.IsDead || _client.DungeonChargeKind != 0) return false;
+            // A chest or shrine of the dungeon within reach comes first (묶음 5b).
+            if (_client.DungeonThingNear() is DungeonThing thing)
+            {
+                Sounds.Play(Sound.Click);
+                SendToHost(_client.UseDungeonThingCommand(thing));
+                return true;
+            }
             if (_client.GateNear() is DungeonGate gate)
             {
                 Sounds.Play(Sound.Click);
@@ -817,10 +826,11 @@ namespace Game.Client
             if (_client.Riding) return;
             bool going = _client.DungeonChargeKind != 0;
             var gate = _client.GateNear();
-            var exit = gate == null ? _client.ExitNear() : null;
-            if (gate != null || exit != null)
+            var thing = gate == null ? _client.DungeonThingNear() : null;
+            var exit = gate == null && thing == null ? _client.ExitNear() : null;
+            if (gate != null || exit != null || thing != null)
             {
-                var spot = gate != null ? gate.Center : TileMap.Center(exit.Value.X, exit.Value.Y);
+                var spot = gate != null ? gate.Center : thing != null ? thing.Center : TileMap.Center(exit.Value.X, exit.Value.Y);
                 Vector3 screen = _camera.WorldToScreenPoint(new Vector3(spot.X, spot.Y + 1.5f, 0));
                 if (screen.z >= 0)
                 {
@@ -830,8 +840,9 @@ namespace Game.Client
                     {
                         var standing = _client.DungeonOf(gate);
                         int inside = standing == null ? 0 : _client.PlayersIn(standing);
-                        text = $"{World.DungeonName(gate.Biome)} 들어가기" + (inside > 0 ? $" (안에 {inside}명)" : "");
+                        text = $"{_client.DungeonNameOf(gate)} 들어가기" + (inside > 0 ? $" (안에 {inside}명)" : "");
                     }
+                    else if (thing != null) text = DungeonThingLabel(thing);
                     else text = "던전 나가기";
                     if (going) text = gate != null ? "들어가는 중…" : "나가는 중…";
                     else if (!Controls.UsingTouch) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
@@ -864,6 +875,36 @@ namespace Game.Client
                 GUI.color = new Color(0.72f, 0.55f, 1f);
                 GUI.DrawTexture(new Rect(bar.x + 1, bar.y + 1, (bar.width - 2) * _client.DungeonCharge, bar.height - 2), Texture2D.whiteTexture);
                 GUI.color = previous;
+            }
+        }
+
+        // What the button over a dungeon's chest or shrine says (묶음 5b).
+        static string DungeonThingLabel(DungeonThing thing) => thing.Kind == DungeonThingKind.Shrine
+            ? $"{thing.Definition?.Name ?? "제단"}에 기도하기"
+            : thing.End ? "보상 상자 열기" : $"{thing.Definition?.Name ?? "상자"} 열기";
+
+        // The dungeon's master while someone fights it: the bar of the leader standing in the boss room (묶음 5b).
+        void DrawDungeonBossBar()
+        {
+            var dungeon = _client.DungeonHere;
+            var room = dungeon?.Layout.Room('B');
+            if (room == null || dungeon.Has(DungeonFlags.BossDown) || !room.Contains(_client.Position, 2)) return;
+            foreach (var other in _client.Others())
+            {
+                if (other.Elite != EliteRank.Leader || !room.Contains(other.Position, 4) || other.Health <= 0) continue;
+                var kind = other.Monster;
+                float left = Ui.HudArea.xMax + 10, right = Ui.MinimapArea.x - 10, top = 20;
+                if (right - left < 240)
+                {
+                    left = 20;
+                    top = Ui.LeftColumnBottom + 10;
+                }
+                float width = Mathf.Min(600, right - left), x = left + (right - left - width) / 2;
+                var title = new GUIContent($"{dungeon.Name}의 주인 · {World.EliteName(kind, EliteRank.Leader, other.Affixes)} · {World.EliteAffixLine(other.Affixes)}");
+                float titleHeight = GUI.skin.label.CalcHeight(title, width);
+                GUI.Label(new Rect(x, top, width, titleHeight), title);
+                UiSkin.Bar(new Rect(x, top + titleHeight, width, 18), other.MaxHealth > 0 ? Mathf.Clamp01(other.Health / other.MaxHealth) : 0, "", boss: true);
+                return;
             }
         }
 
@@ -1922,6 +1963,20 @@ namespace Game.Client
             // A boss in sight, still asleep: its first phase made ahead for when it wakes.
             if (_view?.BossInSight is string sleeper) Music.Prepare(Song.Of(sleeper, 1));
             if (_view?.ActiveBoss is EntityView boss) DrawBossBar(boss, _client.Level);
+            else if (playing) DrawDungeonBossBar();
+        }
+
+        // The time line's place in a dungeon: its name, level, how long the run has gone and how many rooms are cleared;
+        // once done, its time (묶음 5b).
+        string DungeonLine(DungeonInstance dungeon)
+        {
+            string line = $"{dungeon.Name} · 레벨 {dungeon.Level}";
+            int packs = dungeon.Layout.Nodes.Count(n => DungeonSheet.HasPack(n.Letter));
+            if (packs == 0) return line;
+            int cleared = dungeon.Layout.Nodes.Count(n => DungeonSheet.HasPack(n.Letter) && dungeon.RoomCleared(n.Index));
+            int seconds = dungeon.State == DungeonState.Done ? dungeon.ClearSeconds
+                : dungeon.Started < 0 ? 0 : (int)Math.Max(0, (_client.HostTick - dungeon.Started) / World.TicksPerSecond);
+            return $"{line} · {seconds / 60}:{seconds % 60:00} · 방 {cleared}/{packs}" + (dungeon.State == DungeonState.Done ? " · 완주" : "");
         }
 
         GUIStyle _smallLine;
@@ -1954,7 +2009,7 @@ namespace Game.Client
             var weather = World.WeatherOf(today);
             string place = BiomeMap.Name(_client.Biomes.At(_client.Position));
             // In a dungeon its name and level, and no weather down there (묶음 5a).
-            if (_client.DungeonHere is DungeonInstance dungeon) lines.Add($"{dungeon.Name} · 레벨 {dungeon.Level}");
+            if (_client.DungeonHere is DungeonInstance dungeon) lines.Add(DungeonLine(dungeon));
             else lines.Add(weather != Weather.Clear ? $"{World.WeatherName(weather)} · {place}" : place);
             if (World.EventOf(today) != DayEvent.None) lines.Add(World.EventName(World.EventOf(today)));
             if (_mode != Mode.Solo)

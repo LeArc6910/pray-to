@@ -211,6 +211,7 @@ namespace Game.Core
                 UpdateEnemy(enemy);
                 KeepOutOfPlaces(enemy);
                 KeepOutOfCamps(enemy);
+                KeepOutOfDungeonRooms(enemy);
             }
             UpdateElites();
             UpdateBosses();
@@ -641,6 +642,7 @@ namespace Game.Core
             player.RespawnTicks = Ticks(_players.Count > 1 ? Math.Max(DownSeconds, _config.RespawnSeconds) : _config.RespawnSeconds);
             player.ReviveTicks = 0;
             player.Falls++;
+            NoteDungeonFall(player);
             _events.Add(new SimEvent(SimEventType.Died, player.Id));
             return amount;
         }
@@ -726,7 +728,8 @@ namespace Game.Core
             var alive = _players.Where(p => !p.IsDead).ToList();
             if (alive.Count == 0) return;
             // A room's pack goes with its room (World.UpdatePacks), not here.
-            _enemies.RemoveAll(e => e.Rift == 0 && PackOf(e)?.Room == null && alive.All(p => Vec2.Distance(p.Position, e.Position) > DespawnReach));
+            // Nor a dungeon's, which stays until its dungeon goes back to rock (World.Dungeon.cs).
+            _enemies.RemoveAll(e => e.Rift == 0 && PackOf(e)?.Room == null && !Map.InPocket(e.Position) && alive.All(p => Vec2.Distance(p.Position, e.Position) > DespawnReach));
         }
 
         // Whether a monster comes at a tile of this zone level and biome. A biome's own monsters come one zone early

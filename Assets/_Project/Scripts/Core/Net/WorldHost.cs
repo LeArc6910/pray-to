@@ -393,6 +393,7 @@ namespace Game.Core
                     RecordKind.Kill => IndexOf(_monsters.Monsters, _monsters.Monsters.FirstOrDefault(m => m.Id == pair.Key.Id)),
                     RecordKind.Boss => IndexOf(_bosses?.Bosses, _bosses?.Bosses.FirstOrDefault(b => b.Id == pair.Key.Id)),
                     RecordKind.Found => IndexOf(_loot?.Materials, _loot?.Materials.FirstOrDefault(m => m.Id == pair.Key.Id)),
+                    RecordKind.Dungeon => World.Tiles?.Terrain?.Dungeons?.IndexOfKey(pair.Key.Id) ?? -1,
                     _ => IndexOf(_loot?.Bases, _loot?.Bases.FirstOrDefault(b => b.Id == pair.Key.Id)),
                 };
                 if (index >= 0) records.Add((pair.Key.Kind, index, pair.Value));
@@ -446,7 +447,7 @@ namespace Game.Core
                 World.HeldTraps.ToList());
         }
 
-        DungeonsMessage DungeonsNow() => new DungeonsMessage(World.Dungeons.Select(d => (d.Slot, d.Gate.Index, d.Serial, d.Seed, d.State, d.Level)).ToList());
+        DungeonsMessage DungeonsNow() => new DungeonsMessage(World.Dungeons.Select(DungeonStatus.Of).ToList());
 
         // The world as a save file, stamped with the caller's clock (seconds since 1970).
         public byte[] SaveWorld(long now) => WorldSave.Write(World, _seed, now, _generated.Version);
@@ -465,7 +466,7 @@ namespace Game.Core
             World.PlaceNpcs();
             World.RestorePois(save.OpenedPois, save.Prayers, save.LastCamps);
             World.RestoreRails(save.FixedRails);
-            World.RestoreDungeons(save.DungeonEntries);
+            World.RestoreDungeons(save.DungeonRecords, save.DungeonEntries);
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -509,6 +510,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.LeaveDungeon:
                     World.LeaveDungeon(player.Id, byMenu: command.Item != 0);
+                    break;
+                case InventoryCommand.UseDungeonThing:
+                    World.UseDungeonThing(player.Id, command.Item);
                     break;
                 case InventoryCommand.UsePoi:
                     World.UsePoi(player.Id, command.Item);

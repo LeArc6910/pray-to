@@ -352,11 +352,14 @@ namespace Game.Client
         // once the way is known, and "북동쪽, 버섯 숲 어딘가" before.
         string Way(PlaceSite site)
         {
-            if (site.Contains(_client.Position)) return $"{site.Definition.Name} (여기)";
+            // In a dungeon, from its gate out in the world (묶음 5b: the pocket's rows lie past the world's edge).
+            var from = _client.WorldPosition;
+            if (site.Contains(from)) return $"{site.Definition.Name} (여기)";
             var known = _map()?.KnowledgeOf(site) ?? WayKnown.Known;
-            var here = _client.Biomes[TileMap.Cell(_client.Position.X), TileMap.Cell(_client.Position.Y)];
+            var here = _client.Biomes[TileMap.Cell(from.X), TileMap.Cell(from.Y)];
             var there = _client.Biomes[TileMap.Cell(site.Center.X), TileMap.Cell(site.Center.Y)];
-            return $"{site.Definition.Name}, {Rumors.Way(known, _client.Position, site.Center, there, here)}";
+            string way = $"{site.Definition.Name}, {Rumors.Way(known, from, site.Center, there, here)}";
+            return _client.DungeonHere != null ? way + " (던전 문에서)" : way;
         }
     }
 }

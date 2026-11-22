@@ -228,6 +228,11 @@ namespace CoreSandbox
                     HourSim.Run(LoadSheets(data), Number(1, 60), args.Length > 2 ? args[2] : "1,2,3", args.Length > 3 ? int.Parse(args[3]) : WorldGenerator.GameSize,
                         generator > 0 ? generator : WorldGenerator.NewWorldVersion);
                     break;
+                // --dungeon <id> [seeds] (묶음 5b): bots run a dungeon of dungeons.csv to its end chest (DungeonSim).
+                case "--dungeon":
+                    var dungeonSeeds = args.Length > 2 && !args[2].StartsWith("--") ? args[2].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 };
+                    DungeonSim.Run(LoadSheets(data), args.Length > 1 ? args[1] : "slime_cellar", dungeonSeeds, players, gear, LoadClasses(classIds), dodge);
+                    break;
                 case "--pace":
                     var paceSeeds = args.Length > 2 && !args[2].StartsWith("--") ? args[2].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 };
                     PaceSim.Run(LoadSheets(data), Number(1, 30), paceSeeds, gearFlag >= 0 ? gear : new[] { "iron_sword", "iron_armor", "iron_helmet", "iron_boots" },
@@ -392,7 +397,8 @@ namespace CoreSandbox
         {
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "World"));
             string Read(string file) => File.ReadAllText(Path.Combine(folder, file));
-            var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile), Read(TerrainSheet.File), Read(RoomSheet.File), Read(RoomSheet.RolesFile), Read(PoiSheet.File));
+            var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile), Read(TerrainSheet.File), Read(RoomSheet.File), Read(RoomSheet.RolesFile), Read(PoiSheet.File),
+                Read(DungeonSheet.File), Read(DungeonSheet.GraphsFile));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

@@ -95,8 +95,9 @@ namespace Game.Core.Tests
                 Assert.AreEqual(chunk.Rows[0][0], chunk.At(0, 0, 0));
                 Assert.AreEqual(chunk.Rows[0][chunk.Width - 1], chunk.At(0, 0, 4), $"{chunk.Id} mirrored");
                 Assert.AreEqual(chunk.Rows[chunk.Height - 1][chunk.Width - 1], chunk.At(0, 0, 2), $"{chunk.Id} turned half round");
-                // Something shut in is shut by a wall that is dug.
-                if (chunk.Role == RoomRole.Hidden) Assert.IsTrue(chunk.Rows.Any(r => r.Contains('X')), $"{chunk.Id}: a cracked wall");
+                // Something shut in is shut by a wall that is dug (a dungeon's hidden room by the crack on its way in,
+                // DungeonGenerator).
+                if (chunk.Role == RoomRole.Hidden && chunk.Field) Assert.IsTrue(chunk.Rows.Any(r => r.Contains('X')), $"{chunk.Id}: a cracked wall");
                 if (chunk.Role == RoomRole.Locked) Assert.IsTrue(chunk.Rows.Any(r => r.Contains('O') || r.Contains('V')) && chunk.Rows.Any(r => r.Contains('G')), $"{chunk.Id}: a lock and a grate");
             }
             // The roles' numbers: the sheet's rows over the code's.

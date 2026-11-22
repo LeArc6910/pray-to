@@ -66,10 +66,8 @@ namespace Game.Client
                     _dungeonFade = DungeonFadeSeconds;
                     var dungeon = _client.DungeonAt(e.Position);
                     if (dungeon == null) break;
-                    _dungeonCardName = dungeon.Name;
-                    _dungeonCardLine = $"레벨 {dungeon.Level} · 쓰러지면 입구에서 다시 일어난다";
-                    _dungeonCardAge = 0;
-                    DungeonCardsShown++;
+                    int minutes = dungeon.Definition?.Minutes ?? 0;
+                    ShowDungeonCard(dungeon.Name, $"레벨 {dungeon.Level}" + (minutes > 0 ? $" · 약 {minutes}분" : "") + " · 쓰러지면 입구에서 다시 일어난다");
                     break;
                 case World.DungeonLeft:
                     Hear(Sound.Door, at, mine ? 1 : 0.5f);
@@ -90,8 +88,98 @@ namespace Game.Client
                 case World.DungeonFull:
                     if (mine) ShowBanner("던전 자리가 모두 찼다: 다른 던전이 빌 때까지 기다려야 한다");
                     break;
+                // 묶음 5b: the run's turns, told to everyone in the dungeon (the host sends a dungeon's events to its part only).
+                case World.DungeonKey:
+                    Hear(Sound.LevelUp, at, 1);
+                    AddFlash(at, 2.4f, EliteKeyGold, FlashKind.Burst);
+                    ShowBanner("열쇠를 얻었다: 잠긴 방의 창살 앞에 서면 열린다");
+                    break;
+                case World.DungeonDoorOpened:
+                    Hear(Sound.Door, at, 1);
+                    AddFlash(at, 2f, GateGlow, FlashKind.Ring);
+                    break;
+                case World.DungeonBossWoke:
+                {
+                    Hear(Sound.Roar, at, 1);
+                    var woke = _client.DungeonAt(e.Position);
+                    string master = BodyName(e.Source);
+                    ShowDungeonCard(master ?? "던전의 주인", $"{woke?.Name ?? "던전"}의 주인이 깨어났다 · 크게 휘두르기 전에 비켜서라");
+                    break;
+                }
+                case World.DungeonBossDown:
+                    Hear(Sound.Victory, at, 1);
+                    AddFlash(at, 3f, EliteKeyGold, FlashKind.Burst);
+                    ShowDungeonCard("주인을 쓰러뜨렸다", "끝 방의 창살이 열렸다 · 보상 상자를 열자");
+                    break;
+                case World.DungeonRoomCleared:
+                {
+                    var run = _client.DungeonAt(e.Position);
+                    if (run == null) break;
+                    int packs = 0, cleared = 0;
+                    foreach (var room in run.Layout.Nodes)
+                    {
+                        if (!DungeonSheet.HasPack(room.Letter)) continue;
+                        packs++;
+                        if (run.RoomCleared(room.Index)) cleared++;
+                    }
+                    ShowBanner($"방을 비웠다 ({cleared}/{packs})");
+                    break;
+                }
+                case World.DungeonShortcutOpened:
+                    Hear(Sound.Cast, at, 1);
+                    AddFlash(at, 2f, GateGlow, FlashKind.Ring);
+                    ShowBanner("지름길이 열렸다: 입구의 푸른 돌에 닿으면 이 쉼터로 온다");
+                    break;
+                case World.DungeonShortcutTaken:
+                    Hear(Sound.Blink, at, mine ? 1 : 0.5f);
+                    AddFlash(at + new Vector3(0, 0.5f, 0), 1.8f, GateGlow, FlashKind.Burst);
+                    if (mine) _dungeonFade = DungeonFadeSeconds * 0.6f;
+                    break;
+                case World.DungeonUsed:
+                    Hear(Sound.Door, at, mine ? 1 : 0.6f);
+                    AddFlash(at, 1.6f, EliteKeyGold, FlashKind.Burst);
+                    break;
+                case World.DungeonCleared:
+                {
+                    Hear(Sound.Victory, at, 1);
+                    var done = _client.DungeonAt(e.Position);
+                    if (done == null) break;
+                    string line = $"{done.ClearSeconds / 60}분 {done.ClearSeconds % 60}초 · 쓰러짐 {done.Deaths}";
+                    if (done.Has(DungeonFlags.BestTime)) line += " · 가장 빠른 기록";
+                    if (done.Has(DungeonFlags.FirstToday)) line += " · 오늘 첫 완주: 희귀 장비와 룬 하나 더";
+                    ShowDungeonCard($"{done.Name} 완주!", line + " · 끝 방의 문으로 나간다");
+                    ClearsShown++;
+                    break;
+                }
             }
             return true;
+        }
+
+        static readonly Color EliteKeyGold = new Color(1f, 0.82f, 0.35f);
+
+        // For the playtests: how many clear cards have shown.
+        public int ClearsShown { get; private set; }
+        public string DungeonCardLine => _dungeonCardLine;
+
+        // The name of a body on screen (an elite's as its tag shows it), or null.
+        string BodyName(int id)
+        {
+            foreach (var other in _client.Others())
+            {
+                if (other.Id != id) continue;
+                var kind = other.Monster;
+                return World.EliteName(kind, other.Elite, other.Affixes) ?? kind?.Name;
+            }
+            return null;
+        }
+
+        // The band across the middle: a name large and a line under it.
+        void ShowDungeonCard(string name, string line)
+        {
+            _dungeonCardName = name;
+            _dungeonCardLine = line;
+            _dungeonCardAge = 0;
+            DungeonCardsShown++;
         }
 
         // Over everything but the HUD's buttons: the dark lifting, then the dungeon's name in a band.

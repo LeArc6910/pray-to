@@ -39,8 +39,39 @@ namespace Game.Core
         }
 
         public Vec2 Entrance { get; }
+        // The doors out: the entrance room's first, the end room's second.
         public IReadOnlyList<(int X, int Y)> Exits { get; }
+        // Each room's box of floor, in the order of Nodes (the entrance first; 5a's plain dungeon: the end last).
         public IReadOnlyList<(int Left, int Bottom, int W, int H)> Rooms { get; }
+
+        // ---- What DungeonGenerator lays from a row of dungeons.csv (묶음 5b); empty for 5a's plain dungeon. ----
+
+        // Its row, and the biome it is laid in (the gate's).
+        public DungeonDefinition Definition { get; internal set; }
+        public Biome Biome { get; internal set; }
+        // The rooms: the spine in order (the entrance first, the end last of it), then the side rooms.
+        public IReadOnlyList<DungeonRoom> Nodes { get; internal set; } = Array.Empty<DungeonRoom>();
+        // The chests, the shrine and the rest room's fire, by index (DungeonInstance.Used).
+        public IReadOnlyList<DungeonThing> Things { get; internal set; } = Array.Empty<DungeonThing>();
+        // The tiles of the doors: the locked room's grate (opens with the key room's pack felled), the end room's grate
+        // (opens when the boss falls) and the hidden room's cracked wall (opens to blows).
+        public IReadOnlyList<(int X, int Y)> KeyDoor { get; internal set; } = Array.Empty<(int, int)>();
+        public IReadOnlyList<(int X, int Y)> BossDoor { get; internal set; } = Array.Empty<(int, int)>();
+        public IReadOnlyList<(int X, int Y)> Crack { get; internal set; } = Array.Empty<(int, int)>();
+        // The shortcut's stones (dungeon_graphs.csv loop): touched in the rest room it opens, and then the entrance's takes
+        // whoever steps to it on to the rest room's. Null without one.
+        public (int X, int Y)? ShortcutFrom { get; internal set; }
+        public (int X, int Y)? ShortcutTo { get; internal set; }
+
+        public DungeonRoom Room(char letter) => Nodes.FirstOrDefault(n => n.Letter == letter);
+
+        // The room whose box (with a margin) holds the spot, or null.
+        public DungeonRoom RoomAt(Vec2 at, float margin = 0)
+        {
+            foreach (var room in Nodes)
+                if (room.Contains(at, margin)) return room;
+            return null;
+        }
     }
 
     // The dungeons' pocket (Docs/WorldRework.md 5단계 주머니의 모양, 묶음 5a): Rows rows of rock above the world, in the same
@@ -87,6 +118,22 @@ namespace Game.Core
         public static ulong SeedFor(ulong world, int gate, int entered)
         {
             ulong x = world ^ ((ulong)(gate + 1) * 0x9E3779B97F4A7C15UL) ^ ((ulong)(entered + 1) * 0xC2B2AE3D27D4EB4FUL);
+            x ^= x >> 31;
+            x *= 0xBF58476D1CE4E5B9UL;
+            x ^= x >> 27;
+            return x;
+        }
+
+        // The seed of a dungeon of dungeons.csv (묶음 5b): the world's, the dungeon's key and how often it was entered.
+        public static ulong SeedFor(ulong world, string key, int entered)
+        {
+            ulong hash = 14695981039346656037UL;
+            foreach (char c in key ?? "")
+            {
+                hash ^= c;
+                hash *= 1099511628211UL;
+            }
+            ulong x = world ^ hash ^ ((ulong)(entered + 1) * 0xC2B2AE3D27D4EB4FUL);
             x ^= x >> 31;
             x *= 0xBF58476D1CE4E5B9UL;
             x ^= x >> 27;

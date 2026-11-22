@@ -711,6 +711,76 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // A run through a dungeon of dungeons.csv (Docs/WorldRework.md 묶음 5b): a pack room with its pack standing, the map
+        // inside with the rooms' marks, the boss room (its arena's inlay, the master's name and bar), the end chest by its
+        // button and the clear card. The monsters are held for the pictures and felled by hand.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ADungeonRunGoesToItsMasterAndItsEndChest()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var gate = World.Gates.OrderBy(g => Vec2.Distance(g.Center, Player.Position)).First();
+            Player.Position = Game.Core.Collision.Resolve(World.Map, gate.Center, World.PlayerRadius);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.IsTrue(_root.UseDungeon(), "The gate's button starts going in.");
+            yield return new WaitForSecondsRealtime(World.EnterSeconds + 0.6f);
+            var dungeon = World.DungeonAt(Player.Position);
+            Assert.IsNotNull(dungeon?.Definition, "In a dungeon of dungeons.csv.");
+            var layout = dungeon.Layout;
+
+            IEnumerator GoTo(DungeonRoom room)
+            {
+                var from = room.Parent >= 0 ? layout.Nodes[room.Parent].Center : room.Center;
+                var side = from - room.Center;
+                side = Mathf.Abs(side.X) > Mathf.Abs(side.Y) ? new Vec2(Mathf.Sign(side.X), 0) : new Vec2(0, Mathf.Sign(side.Y));
+                Player.Position = Game.Core.Collision.Resolve(World.Map, room.Center + new Vec2(side.X * (room.Box.W / 2f - 1.5f), side.Y * (room.Box.H / 2f - 1.5f)), World.PlayerRadius);
+                Player.Corrections++;
+                yield return new WaitForSecondsRealtime(1.2f);
+            }
+            void Fell(DungeonRoom room)
+            {
+                foreach (var enemy in World.Enemies.Where(e => !e.IsDead && room.Contains(e.Position, 6)).ToList()) enemy.Health = 0;
+            }
+
+            var first = layout.Room('C');
+            yield return GoTo(first);
+            Assert.GreaterOrEqual(World.Enemies.Count(e => !e.IsDead && first.Contains(e.Position, 2)), World.DungeonPackLeast, "The pack room's pack came.");
+            yield return Screens.Take("dungeon-pack");
+            _root.Map.FullOpen = true;
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("dungeon-run-map");
+            _root.Map.FullOpen = false;
+            foreach (var room in layout.Nodes.Where(n => DungeonSheet.HasPack(n.Letter) && n.Letter != 'B'))
+            {
+                yield return GoTo(room);
+                Fell(room);
+                yield return new WaitForSecondsRealtime(0.4f);
+            }
+            var boss = layout.Room('B');
+            yield return GoTo(boss);
+            Player.Health = Player.Stats.MaxHealth;
+            Assert.IsTrue(World.Enemies.Any(e => e.Elite == EliteRank.Leader && boss.Contains(e.Position, 2)), "The master in its room.");
+            yield return Screens.Take("dungeon-boss");
+            Fell(boss);
+            yield return new WaitForSecondsRealtime(1);
+            Assert.IsTrue(_root.LocalClient.DungeonHere.Has(DungeonFlags.BossDown), "The screen knows the master fell.");
+
+            var chest = layout.Things.First(t => t.End);
+            Player.Position = Game.Core.Collision.Resolve(World.Map, chest.Center + new Vec2(0, -1.3f), World.PlayerRadius);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(0.8f);
+            Assert.AreEqual(chest.Index, _root.LocalClient.DungeonThingNear()?.Index, "The end chest's button shows.");
+            yield return Screens.Take("dungeon-chest");
+            Assert.IsTrue(_root.UseDungeon(), "Its button opens it.");
+            yield return new WaitForSecondsRealtime(0.8f);
+            Assert.AreEqual(DungeonState.Done, _root.LocalClient.DungeonHere.State);
+            Assert.AreEqual(TileType.OpenChest, _root.LocalClient.Map[chest.X, chest.Y]);
+            yield return Screens.Take("dungeon-clear");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

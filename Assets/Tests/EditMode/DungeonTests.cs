@@ -123,7 +123,7 @@ namespace Game.Core.Tests
             var dungeon = world.DungeonOf(gate);
             Assert.IsNotNull(dungeon, "made as soon as someone starts going in");
             Assert.AreEqual(Biome.Mushroom, world.Biomes.At(dungeon.Layout.Entrance), "the pocket's slot takes the dungeon's biome");
-            Assert.AreEqual("버섯 숲의 던전", dungeon.Name);
+            Assert.AreEqual("포자 굴", dungeon.Name, "its row of dungeons.csv (묶음 5b)");
             Run(world, World.EnterSeconds - 0.2f);
             Assert.IsFalse(world.InPocket(player.Position), "still gathering");
             Run(world, 0.3f);
@@ -286,7 +286,7 @@ namespace Game.Core.Tests
             var second = world.DungeonOf(gate);
             Assert.AreEqual(1, second.Serial);
             Assert.AreNotEqual(firstSeed, second.Seed, "every time in is another");
-            CollectionAssert.AreEqual(new[] { (gate.Index, 2) }, world.DungeonEntries.ToList());
+            Assert.AreEqual(2, world.DungeonRecordOf(second.Key).Entered, "entered twice, counted by the dungeon's key (묶음 5b)");
         }
 
         [Test]
@@ -322,8 +322,10 @@ namespace Game.Core.Tests
             int far = new SnapshotMessage(9, self, entities.Skip(1).Take(1).ToList(), new List<ProjectileState>(), new List<HazardState>(), new List<SimEvent>()).Encode().Length;
             Assert.AreEqual(far - none - 6, near - none);
 
-            var message = DungeonsMessage.Decode(new DungeonsMessage(new[] { (2, 7, 3, 0xFEDCBA9876543210UL, DungeonState.Open, 12) }).Encode());
-            Assert.AreEqual((2, 7, 3, 0xFEDCBA9876543210UL, DungeonState.Open, 12), message.Dungeons.Single());
+            var sent = new DungeonStatus(2, 7, 3, 0xFEDCBA9876543210UL, DungeonState.Done, 12, 4, DungeonFlags.KeyTaken | DungeonFlags.BossDown, 0b1011, 0b100, 123456789L, 312, 3);
+            var got = DungeonsMessage.Decode(new DungeonsMessage(new[] { sent }).Encode()).Dungeons.Single();
+            Assert.AreEqual((sent.Slot, sent.Gate, sent.Serial, sent.Seed, sent.State, sent.Level, sent.Definition), (got.Slot, got.Gate, got.Serial, got.Seed, got.State, got.Level, got.Definition));
+            Assert.AreEqual((sent.Flags, sent.Cleared, sent.Used, sent.Started, sent.ClearSeconds, sent.Deaths), (got.Flags, got.Cleared, got.Used, got.Started, got.ClearSeconds, got.Deaths));
         }
 
         static readonly HostConfig RoomConfig = new HostConfig { MapSize = 512, MapVersion = WorldGenerator.RoomVersion };
@@ -427,15 +429,21 @@ namespace Game.Core.Tests
             Run(world, World.EnterSeconds + 0.1f);
             byte[] data = WorldSave.Write(world, 7, 5, WorldGenerator.RoomVersion);
             var save = WorldSave.Read(data, Tiles.Shipped, Gear.Data);
-            CollectionAssert.AreEqual(new[] { (gate.Index, 1) }, save.DungeonEntries.ToList());
+            Assert.AreEqual(world.DungeonOf(gate).Key, save.DungeonRecords.Single().Key);
+            Assert.AreEqual(1, save.DungeonRecords.Single().Entered);
             Assert.IsTrue(save.Tiles.All(t => t.Y < world.Map.Height), "no tile of the pocket is saved");
 
             var again = Hand(out var gateAgain, out _);
-            again.RestoreDungeons(save.DungeonEntries);
+            again.RestoreDungeons(save.DungeonRecords);
             var back = At(again, "a", gateAgain.Center);
             again.EnterDungeon(back.Id, gateAgain.Index);
             Assert.AreEqual(1, again.DungeonOf(gateAgain).Serial, "the next one in is the second, not the first again");
             Assert.AreNotEqual(world.DungeonOf(gate).Seed, again.DungeonOf(gateAgain).Seed);
+
+            // A save of format 15 counted by gate: its count goes to the dungeon that gate leads to now.
+            var fifteen = Hand(out var gate15, out _);
+            fifteen.RestoreDungeons(null, new[] { (gate15.Index, 3) });
+            Assert.AreEqual(3, fifteen.DungeonRecordOf(fifteen.DungeonFor(gate15).KeyFor(gate15.Biome)).Entered);
 
             // A save of format 14 (no counts at its end) reads with none.
             var fresh = Hand(out _, out _);
@@ -443,6 +451,7 @@ namespace Game.Core.Tests
             old.RemoveRange(old.Count - 4, 4);
             old[4] = 14;
             Assert.IsEmpty(WorldSave.Read(old.ToArray(), Tiles.Shipped).DungeonEntries);
+            Assert.IsEmpty(WorldSave.Read(old.ToArray(), Tiles.Shipped).DungeonRecords);
         }
     }
 }

@@ -226,7 +226,7 @@ namespace Game.Client
         {
             bool sure = !Settings.Rumors || Rumors.FirstChapter(_client.Story, _client.JourneyStep) || _client.Waypoints.Contains(site.Definition.Index) || Seen(site.Center);
             bool signposted = !sure && _client.Signposts.Any(p => p.Toward == site.Definition && Seen(p.X, p.Y));
-            return Rumors.Knowledge(Settings.Rumors, sure, Vec2.Distance(site.Center, _client.Position), signposted);
+            return Rumors.Knowledge(Settings.Rumors, sure, Vec2.Distance(site.Center, _client.WorldPosition), signposted);
         }
 
         // How well an arena's spot is known: the first boss's always (the first hour as before), any once seen.
@@ -234,7 +234,7 @@ namespace Game.Client
         {
             var at = _client.Arenas[index];
             bool sure = index == 0 || Seen(at) || Seen(TileMap.Cell(at.X) + 3, TileMap.Cell(at.Y)) || Seen(TileMap.Cell(at.X) - 3, TileMap.Cell(at.Y));
-            return Rumors.Knowledge(Settings.Rumors, sure, Vec2.Distance(at, _client.Position));
+            return Rumors.Knowledge(Settings.Rumors, sure, Vec2.Distance(at, _client.WorldPosition));
         }
 
         // The rumours on the map: the things heard of and not yet seen, the arenas, and where the story leads when
@@ -292,7 +292,7 @@ namespace Game.Client
             var rooms = _client.Rooms;
             Scrapped = _client.Pois.Where(p => p.Kind != PoiKind.Camp && !_explored[p.Y * _map.Width + p.X] && _client.CanUse(p)
                     && !(rooms != null && rooms.Nodes[p.Room].Buried))
-                .OrderBy(p => Vec2.Distance(p.Center, _client.Position)).FirstOrDefault();
+                .OrderBy(p => Vec2.Distance(p.Center, _client.WorldPosition)).FirstOrDefault();
             return Scrapped;
         }
 
@@ -381,7 +381,7 @@ namespace Game.Client
 
             string close = (dungeon != null ? dungeon.Name : "지도") + (Controls.UsingTouch ? " (탭하면 닫힘)" : " (클릭하거나 M·Esc로 닫기)");
             GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
-            string key = dungeon != null ? "● 나   ● 다른 플레이어   ◆ 나가는 문"
+            string key = dungeon != null ? "● 나   ● 다른 플레이어   ◆ 나가는 문   ● 남은 무리   ☠ 주인   ◆ 상자   ● 모닥불·지름길 돌"
                 : "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리   ◆ 던전 문" + (Settings.Rumors ? "   ○ 소문(옅은 원)" : "");
             GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), Ui.Wrap(key, GUI.skin.label, size));
             if (dungeon != null)
@@ -498,8 +498,48 @@ namespace Game.Client
                 Marker(area, window, gate.Center, Diamond, busy ? GateMark : new Color(GateMark.r, GateMark.g, GateMark.b, 0.65f), MarkerSize * 1.6f);
             }
             if (_client.DungeonHere is DungeonInstance dungeon)
+            {
                 foreach (var (x, y) in dungeon.Layout.Exits)
                     if (Seen(x, y)) Marker(area, window, TileMap.Center(x, y), Diamond, GateMark, MarkerSize * 1.6f);
+                DrawDungeonRooms(area, window, dungeon);
+            }
+        }
+
+        static readonly Color ChestMark = new Color(1f, 0.85f, 0.35f);
+        static readonly Color FireMark = new Color(1f, 0.6f, 0.25f);
+
+        // In a dungeon (묶음 5b), once seen: its master's room a skull (grey once it fell), the chests gold (dim once opened),
+        // the rest room's fire, the shortcut's stones, and a pack room not yet cleared a red dot.
+        void DrawDungeonRooms(Rect area, Rect window, DungeonInstance dungeon)
+        {
+            foreach (var room in dungeon.Layout.Nodes)
+            {
+                if (!SeenRoom(room)) continue;
+                if (room.Letter == 'B')
+                    Marker(area, window, room.Center, Skull, dungeon.Has(DungeonFlags.BossDown) ? new Color(0.6f, 0.6f, 0.6f, 0.8f) : new Color(1f, 0.3f, 0.25f), MarkerSize * 2.2f);
+                else if (DungeonSheet.HasPack(room.Letter) && !dungeon.RoomCleared(room.Index))
+                    Marker(area, window, room.Center, Shapes.Circle, room.Letter == 'M' ? new Color(1f, 0.6f, 0.2f) : new Color(0.95f, 0.3f, 0.3f), MarkerSize * 1.2f);
+            }
+            foreach (var thing in dungeon.Layout.Things)
+            {
+                if (!Seen(thing.X, thing.Y)) continue;
+                var colour = thing.Kind == DungeonThingKind.Fire ? FireMark : thing.Kind == DungeonThingKind.Shrine ? new Color(0.4f, 0.9f, 0.95f) : ChestMark;
+                if (dungeon.ThingUsed(thing.Index)) colour.a = 0.45f;
+                Marker(area, window, thing.Center, thing.Kind == DungeonThingKind.Chest ? Diamond : Shapes.Circle, colour, MarkerSize * (thing.End ? 1.8f : 1.3f));
+            }
+            foreach (var stone in new[] { dungeon.Layout.ShortcutFrom, dungeon.Layout.ShortcutTo })
+                if (stone is (int sx, int sy) && Seen(sx, sy))
+                    Marker(area, window, TileMap.Center(sx, sy), Shapes.Circle, dungeon.Has(DungeonFlags.ShortcutOpen) ? new Color(0.43f, 0.75f, 1f) : new Color(0.43f, 0.75f, 1f, 0.4f), MarkerSize * 1.2f);
+        }
+
+        // A room is on the map once any tile of its box was seen.
+        bool SeenRoom(DungeonRoom room)
+        {
+            var (l, b, w, h) = room.Box;
+            for (int y = b; y < b + h; y += 2)
+                for (int x = l; x < l + w; x += 2)
+                    if (Seen(x, y)) return true;
+            return false;
         }
 
         static Sprite _diamond;

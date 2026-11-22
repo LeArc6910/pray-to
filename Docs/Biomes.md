@@ -116,7 +116,7 @@ lake,pond,8,2,any
 
 ## 방 조각 (rooms.csv)
 
-역할이 있는 방에는 글자로 그린 조각을 끼운다(`Assets/_Project/Data/World/rooms.csv`, `Core/World/RoomSheet.cs`). 지금 58개다.
+역할이 있는 방에는 글자로 그린 조각을 끼운다(`Assets/_Project/Data/World/rooms.csv`, `Core/World/RoomSheet.cs`). 지금 74개다(들판 58, 던전 16).
 
 | 열 | 내용 |
 |---|---|
@@ -151,6 +151,7 @@ lake,pond,8,2,any
 - 시트 시험(`RoomSheet.Check`): 줄 길이가 같은지, 모르는 글자, `+`가 테두리에 있고 모서리가 아닌지, 표시와 바닥이 **문 하나하나에서**(꾸밈은 테두리에서) 걸어서(또는 `X`·`O`·`V`를 지나) 닿는지. 문이 여럿인 조각은 하나만 열릴 수 있기 때문이다
 - 새 칸 여섯(`TileType`): `CrackedWall`(금 간 벽, 아무 곡괭이로 한 번), `Grate`(창살, 못 지나가고 못 캐고 빛은 지난다), `ObsidianWall`(미스릴 곡괭이부터), `VoidWall`(흑요석 곡괭이부터), `IceFloor`(얼음 바닥), `Quicksand`(모래늪). 얼음과 모래늪 위에는 짓지 못한다. 그림은 `Client/Art/RoomTileArt.cs`
 - 그림으로 보기: `ArtPreview --only map`의 `out/map/v2_seed1_roles.png`(역할마다 방의 지도 그림), `rooms_art.png`·`rooms_art_lit.png`(게임 그림 그대로), `room_tiles.png`(새 칸)
+- **던전의 조각**(`where`가 `dungeon`, 2026-11-22, 묶음 5b): 들판의 방에는 놓이지 않는다(`RoomData.For`는 `field`만, 시험). 던전 생성기(`DungeonGenerator`)가 그래프의 글자마다 역할로 고른다: 입구(`E`)·끝(`X`)은 `gate`(입구는 `C` 없이, 끝은 `C` 있게, 둘 다 `D` 한 쌍이 나가는 문), 무리 방·열쇠 방·잠긴 방(`C`·`K`·`L`)은 `pack`, 챔피언 방(`M`)은 `elite`의 작은 것, 보스 방(`B`)은 `elite`의 가장 큰 것, 보물(`T`)은 `treasure`, 숨은 방(`H`)은 `hidden`, 제단(`S`)은 `shrine`, 쉼터(`R`)는 `rest`. 던전의 조각은 문(`+`) 없는 꾸밈만 쓰고(벽을 두른 건물은 빼고 고른다), 가로세로 20칸까지(상자 둘레 2칸과 함께 칸 24칸 안에). 숨은 방의 금 간 벽은 조각이 아니라 그 방으로 드는 통로에 생성기가 놓아서, 던전의 `hidden` 조각에는 `X`가 없어도 된다. 횃불·등불·모닥불이 없는 조각의 방에는 생성기가 위 두 구석에 횃불을 놓는다
 
 ## 볼거리 (pois.csv, 2026-11-22, 묶음 3a)
 
@@ -204,6 +205,57 @@ cart,버려진 수레,cart,,10,forage:5-10|potions:1|coins:5-15,,no,once,glint,6
 - **광차역과 길잡이 돌**(3c, 2026-11-22, `WorldGenerator.Rails.cs`): 조각의 표시에 놓이지 않는다. `ride`가 있는 줄은 광차역, `waypoint`가 있는 줄은 길잡이 돌이다(`PoiDefinition.Kind`, `OnMark`가 거짓). 생성기가 수레 방 둘 사이에 선로를 깔 때 양 끝에 역을, 생물군계마다 야영지 하나의 모닥불 곁(2~4칸, 둘레 여덟 칸이 열린 바닥)에 돌을 놓는다. 둘 다 표시에서 놓인 볼거리 뒤에 번호가 붙어서 3a의 번호는 그대로다. 규칙은 `Docs/WorldRework.md` 묶음 3c
 - 시트가 없는 게임(시트를 읽지 못한 옛 에셋)은 표시만 있고 볼거리가 없다. 상자는 닫힌 나무 상자로 서 있다
 - 지금 열일곱 줄: 야영지 하나, 제단 다섯(힘·바람·행운·샘·수호), 보물 상자 셋(나무·철·금), 숨은 방 상자 둘, 금고 둘(흑요석·공허석), 함정 상자 하나, 수레 하나, 광차역 하나, 길잡이 돌 하나
+
+## 던전 (dungeons.csv, dungeon_graphs.csv, 2026-11-22, 묶음 5b)
+
+들판의 던전 문(문 방 `gate`의 도리이 사이, 생물군계마다 하나)은 그 생물군계의 던전으로 이어진다(`Assets/_Project/Data/World/dungeons.csv`, `Core/World/DungeonSheet.cs`). 그 생물군계의 줄이 없으면 `biome`이 빈 줄(어느 생물군계든)로, 그 문의 생물군계 몬스터·그림으로 간다. 던전은 들어갈 때마다 다시 깔린다(시드 = 월드 시드, 던전의 열쇠, 들어간 횟수). 생성은 `Core/World/DungeonGenerator.cs`, 규칙은 `Docs/WorldRework.md` 5단계와 묶음 5b.
+
+| 열 | 내용 |
+|---|---|
+| id | 던전 id(저장의 열쇠). `biome`이 빈 줄은 `id@생물군계`가 열쇠다(`deep_hollow@sand`) |
+| name | 화면 이름. `biome`이 빈 줄은 "그 생물군계 이름의 name"("모래 동굴의 깊은 굴") |
+| biome | 이 생물군계의 문이 여기로 온다. 비우면 줄이 없는 생물군계 모두(하나만) |
+| level | 던전의 구역 레벨의 아래 끝(`World.ZoneLevelAt`의 수, `packs.csv`의 `zone`과 같은 자). 문 자리의 구역 레벨이 더 높으면 그것. 몬스터의 생명력·힘과 보상 레벨이 이것을 따른다 |
+| graph | `dungeon_graphs.csv`의 id |
+| rooms | 줄(spine)의 방 수 `6-8`. 그래프의 줄보다 많으면 남는 만큼 무리 방(`C`)을 `M`·`R`·`B` 앞에 끼운다. 곁가지까지 18개를 넘지 않는다 |
+| boss | `elite:몬스터 id`면 그 종의 큰 정예가 보스 방의 주인, `elite`면 그 던전 무리의 우두머리 종. 던전만의 보스(`bosses.csv`)는 아직 없다 |
+| chest | 끝 상자의 `pois.csv` 줄(상자여야 한다, 시트 시험) |
+| minutes | 대강 몇 분(화면의 이름 띠에 "약 N분") |
+
+```
+id,name,biome,level,graph,rooms,boss,chest,minutes
+slime_cellar,끈적한 지하실,cave,2,cellar,6-8,elite:slime,chest_iron,5
+spore_depths,포자 굴,mushroom,3,branching,9-11,elite:myconid,chest_gold,9
+frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,elite:frost_wisp,chest_gold,10
+ember_forge,잿불 대장간,lava,3,locked,12-14,elite:magma_slime,chest_gold,13
+deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8
+```
+
+`dungeon_graphs.csv`(개념 그래프):
+
+| 열 | 내용 |
+|---|---|
+| id | 그래프 id |
+| spine | 꼭 지나는 방들, 빈칸으로 띄운 글자. `E`로 시작하고 `B X`로 끝나며 `E`·`B`·`X`는 하나씩. `L`은 그 앞의 `K`와 함께 |
+| branches | 줄의 무리 방(`C`)에 붙는 곁가지: `T`(보물), `H`(숨은 방) |
+| loop | `shortcut`이면 쉼터(`R`)의 돌과 입구의 돌이 지름길이 된다(`R`이 있어야 한다). 비우면 없다 |
+
+| 글자 | 방 | 하는 일 |
+|---|---|---|
+| `E` | 입구 | 들어오고 쓰러지면 일어나는 곳, 나가는 문. 몬스터가 들어오지 못한다 |
+| `C` | 무리 방 | 그 던전의 생물군계·레벨의 `packs.csv` 무리 하나(4~8, 사람마다 둘 더) |
+| `K` | 열쇠 방 | 무리 방. 다 잡으면 열쇠 |
+| `L` | 잠긴 방 | 무리 방. 들어가는 길이 창살로 막혀 있고 열쇠를 얻은 뒤 곁에 서면 열린다 |
+| `M` | 챔피언 방 | 챔피언 셋(접사 하나) |
+| `R` | 쉼터 | 모닥불(곁 4칸에서 초당 10% 회복), 몬스터가 들어오지 못한다, 지름길의 돌 |
+| `B` | 보스 방 | 던전의 주인(큰 정예: 우두머리, 접사 둘, 생명력 12배, 사람마다 60% 더)과 부하 3~5. 바닥에 아레나 무늬 |
+| `X` | 끝 | 보상 상자와 나가는 문. 주인이 쓰러질 때까지 창살로 막힌다 |
+| `T` | 보물 방 | `pois.csv`의 `treasure` 상자 |
+| `H` | 숨은 방 | 들어가는 길이 금 간 벽(아무 무기로 한 번에 깨진다), `hidden` 상자 |
+| `S` | 제단 | `pois.csv`의 `shrine` 축복(곁의 사람 모두, 한 판에 한 번) |
+
+- 시트 시험(`DungeonSheet.Parse`, `TileSheet.Parse`): 열, 없는 그래프, 줄보다 적은 `rooms`, `boss`의 형식, 상자가 아닌 `chest`, 그래프의 글자와 순서
+- 그림으로 보기: `ArtPreview --only dungeons`의 `out/dungeons.png`(줄마다 시드 넷의 배치. 방 가운데 네모가 글자의 색: 입구 초록, 무리 빨강, 챔피언 주황, 보스 진홍, 끝 금색, 보물·숨은 노랑, 제단 하늘, 쉼터 흰색. 회색 창살, 갈색 금 간 벽, 붉은 도리이, 파란 지름길 돌), `out/dungeons/<id>.png`(첫 시드를 게임 그림으로, 어둠과 빛까지, 무리 자리에 몬스터), `<id>_rooms.png`(방마다 잘라서), `report.txt`(방 글자, 다시 깐 횟수, 걸린 시간)
 
 ## 생물군계마다
 

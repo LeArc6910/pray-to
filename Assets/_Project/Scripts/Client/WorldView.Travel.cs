@@ -186,7 +186,7 @@ namespace Game.Client
                     if (found == null) ShowBanner("지도 조각: 더 표시할 것이 없다");
                     else
                     {
-                        var way = found.Center - _client.Position;
+                        var way = found.Center - _client.WorldPosition;
                         ShowBanner($"지도 조각: {found.Definition.Name}, {Compass(way.X, way.Y)} {Mathf.RoundToInt(way.Length)}칸 (지도에 표시)");
                     }
                     return true;

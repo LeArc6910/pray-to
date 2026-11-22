@@ -228,6 +228,8 @@ namespace Game.Core
         // player is in, by a door (Item 0) or from the menu (Item 1) (World.LeaveDungeon).
         EnterDungeon,
         LeaveDungeon,
+        // Opens the chest or uses the shrine of index Item in the dungeon the player is in (World.UseDungeonThing, 묶음 5b).
+        UseDungeonThing,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

@@ -12,6 +12,8 @@ namespace Game.Core
         Boss,
         Found,
         Gear,
+        // Runs through a dungeon to its end chest, by the dungeon's key (World.Dungeon.cs, 묶음 5b).
+        Dungeon,
     }
 
     // The groups the bestiary shows and the achievements count in.

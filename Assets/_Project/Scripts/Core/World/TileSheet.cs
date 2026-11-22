@@ -157,7 +157,7 @@ namespace Game.Core
 
         // Without a crops sheet nothing grows; without a machines sheet no machine runs.
         public static TileData Parse(string csv, LootData loot, string cropsCsv = "", string machinesCsv = "", string terrainCsv = "", string roomsCsv = "",
-            string roomRolesCsv = "", string poisCsv = "")
+            string roomRolesCsv = "", string poisCsv = "", string dungeonsCsv = "", string dungeonGraphsCsv = "")
         {
             var errors = new List<string>();
             var terrain = TerrainSheet.Parse(terrainCsv);
@@ -167,6 +167,14 @@ namespace Game.Core
             if (rooms != RoomData.None) terrain = terrain.With(rooms);
             var pois = PoiSheet.Parse(poisCsv, loot);
             if (pois != PoiData.None) terrain = terrain.With(pois);
+            // The instance dungeons (dungeons.csv, dungeon_graphs.csv, DungeonSheet): each one's end chest is a row of pois.csv.
+            var dungeons = DungeonSheet.Parse(dungeonsCsv, dungeonGraphsCsv);
+            if (dungeons != DungeonData.None)
+            {
+                var chests = dungeons.Dungeons.Where(d => pois.Find(d.Chest)?.Kind != PoiKind.Chest).Select(d => $"{DungeonSheet.File}: '{d.Id}'의 chest '{d.Chest}'가 {PoiSheet.File}의 상자가 아닙니다.").ToList();
+                if (chests.Count > 0) dungeons = new DungeonData(dungeons.Dungeons, dungeons.Graphs, dungeons.Errors.Concat(chests).ToList());
+                terrain = terrain.With(dungeons);
+            }
             errors.AddRange(terrain.Errors);
             var tiles = new List<TileDefinition>();
             var crops = ParseCrops(cropsCsv, loot, errors);

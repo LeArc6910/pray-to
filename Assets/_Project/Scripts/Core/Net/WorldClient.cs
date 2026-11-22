@@ -451,6 +451,10 @@ namespace Game.Core
 
         // The dungeon the player is in, or null.
         public DungeonInstance DungeonHere => DungeonAt(Position);
+
+        // Where the player is in the world: in a dungeon its gate's spot (the pocket's own rows mean nothing to the ways
+        // and distances of the story, the goals and the rumours), else where they stand.
+        public Vec2 WorldPosition => DungeonHere?.Gate.Center ?? Position;
         public bool InPocket => Map != null && Map.InPocket(Position);
 
         public DungeonInstance DungeonOf(DungeonGate gate) => gate == null ? null : _dungeons.FirstOrDefault(d => d != null && d.Gate == gate);
@@ -470,6 +474,17 @@ namespace Game.Core
         }
 
         public byte[] EnterDungeonCommand(DungeonGate gate) => new InventoryCommandMessage(InventoryCommand.EnterDungeon, gate.Index).Encode();
+        public byte[] UseDungeonThingCommand(DungeonThing thing) => new InventoryCommandMessage(InventoryCommand.UseDungeonThing, thing.Index).Encode();
+
+        // The dungeons of this client's sheets (dungeons.csv): what a gate leads to and its name, before it stands.
+        public DungeonData DungeonSheet => _tiles?.Terrain?.Dungeons ?? DungeonData.None;
+        public string DungeonNameOf(DungeonGate gate) => DungeonOf(gate)?.Name ?? World.DungeonNameOf(DungeonSheet, gate);
+
+        // The chest or shrine within reach in the dungeon the player is in, that can be used now; or null.
+        public DungeonThing DungeonThingNear() => World.ThingNear(DungeonHere, Position);
+
+        // The room of the dungeon the player is in that they stand in (its box, a tile round it), or null.
+        public DungeonRoom DungeonRoomHere => DungeonHere?.Layout.RoomAt(Position, 1);
         public byte[] LeaveDungeonCommand(bool byMenu) => new InventoryCommandMessage(InventoryCommand.LeaveDungeon, byMenu ? 1 : 0).Encode();
 
         // The slots laid or cleared since the last call, for the screen to draw again.
@@ -484,19 +499,44 @@ namespace Game.Core
         {
             if (Map == null) return;
             var seen = new bool[_dungeons.Length];
-            foreach (var (slot, gateIndex, serial, seed, state, level) in message.Dungeons)
+            foreach (var status in message.Dungeons)
             {
-                if (slot < 0 || slot >= _dungeons.Length || gateIndex >= Gates.Count) continue;
+                int slot = status.Slot;
+                if (slot < 0 || slot >= _dungeons.Length || status.Gate >= Gates.Count) continue;
                 seen[slot] = true;
-                var gate = Gates[gateIndex];
+                var gate = Gates[status.Gate];
                 var have = _dungeons[slot];
-                if (have == null || have.Gate != gate || have.Serial != serial || have.Seed != seed)
+                var definition = status.Definition < DungeonSheet.Dungeons.Count ? DungeonSheet.Dungeons[status.Definition] : null;
+                if (have == null || have.Gate != gate || have.Serial != status.Serial || have.Seed != status.Seed || have.Definition != definition)
                 {
-                    _dungeons[slot] = new DungeonInstance(slot, gate, serial, seed, level, DungeonPocket.Carve(Map, slot, seed));
+                    var layout = definition != null
+                        ? DungeonGenerator.Lay(Map, slot, status.Seed, definition, gate.Biome, _tiles.Terrain)
+                        : DungeonPocket.Carve(Map, slot, status.Seed);
+                    _dungeons[slot] = have = new DungeonInstance(slot, gate, status.Serial, status.Seed, status.Level, layout, definition?.KeyFor(gate.Biome));
                     Biomes.SetPocket(slot, gate.Biome);
                     _rebuiltSlots.Add(slot);
                 }
-                _dungeons[slot].State = state;
+                // The run's progress: the doors it opened and the chests opened, laid over the seed's tiles.
+                bool moved = have.Flags != status.Flags || have.UsedThings != status.Used;
+                have.State = status.State;
+                have.Flags = status.Flags;
+                have.ClearedRooms = status.Cleared;
+                have.UsedThings = status.Used;
+                have.Started = status.Started;
+                have.ClearSeconds = status.ClearSeconds;
+                have.Deaths = status.Deaths;
+                if (moved)
+                {
+                    // The doors and chests that changed, as changed tiles for the screen and the map (a slot laid again
+                    // would forget what the map had seen of it).
+                    var layout = have.Layout;
+                    var spots = layout.KeyDoor.Concat(layout.BossDoor).Concat(layout.Crack).Concat(layout.Things.Select(t => (t.X, t.Y))).ToList();
+                    var before = spots.Select(t => Map[t.Item1, t.Item2]).ToList();
+                    have.ApplyTiles(Map);
+                    if (!_rebuiltSlots.Contains(slot))
+                        for (int i = 0; i < spots.Count; i++)
+                            if (Map[spots[i].Item1, spots[i].Item2] != before[i]) _changedTiles.Add(new TileChange(spots[i].Item1, spots[i].Item2, Map[spots[i].Item1, spots[i].Item2]));
+                }
             }
             for (int slot = 0; slot < _dungeons.Length; slot++)
             {
@@ -1129,6 +1169,7 @@ namespace Game.Core
                                 RecordKind.Kill => index < _monsters.Monsters.Count ? _monsters.Monsters[index].Id : null,
                                 RecordKind.Boss => _bosses != null && index < _bosses.Bosses.Count ? _bosses.Bosses[index].Id : null,
                                 RecordKind.Found => _loot != null && index < _loot.Materials.Count ? _loot.Materials[index].Id : null,
+                                RecordKind.Dungeon => DungeonSheet.KeyOfIndex(index),
                                 _ => _loot != null && index < _loot.Bases.Count ? _loot.Bases[index].Id : null,
                             };
                             if (id != null) held.Item1[(kind, id)] = count;

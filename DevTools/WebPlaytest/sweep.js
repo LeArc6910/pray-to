@@ -4561,8 +4561,9 @@ async function pace(browser) {
 // A dungeon (Docs/WorldRework.md 5단계, 묶음 5a), on a PC and a phone held upright: the gate room's own button (with a real
 // click or tap) and the bar filling, the dark and the dungeon's name, the screen laying the same pocket as the host,
 // the dungeon alone on the full map, a fight in its first room, a fall and getting up at its entrance, out by
-// [던전 나가기] and again by the door of its entrance room, and the empty dungeon going back to rock. How going in feels
-// (the dark, the sound) is the person's.
+// [던전 나가기] and again by the door of its entrance room, and the empty dungeon going back to rock. 묶음 5b: a run through
+// it (a pack room, the map's marks, the master, the end chest by its own button, the clear card, the goals' ways). How
+// going in feels (the dark, the sound) and how a run plays are the person's.
 async function dungeon(browser) {
   for (const name of ['pc', 'phone']) {
     const profile = Profiles[name];
@@ -4596,7 +4597,8 @@ async function dungeon(browser) {
     const inside = await game.until(d => d.inPocket && d.clientInPocket, 5000, () => game.ask('dungeon'));
     check(!!inside && inside.slot >= 0 && inside.clientSlot === inside.slot && inside.pocketSame && inside.atEntrance,
       `${name}: 던전 입구에 들어왔다 (칸 ${inside ? inside.slot : '-'}, 화면 ${inside ? inside.clientSlot : '-'}, 주머니가 호스트와 같다 ${inside ? inside.pocketSame : '-'})`);
-    check(!!inside && inside.cards >= 1 && inside.cardShowing && /던전/.test(inside.cardName), `${name}: 던전 이름이 크게 뜬다 (${inside ? inside.cardName : ''})`);
+    check(!!inside && inside.cards >= 1 && inside.cardShowing && inside.dungeons.length > 0 && inside.cardName === inside.dungeons[0].name,
+      `${name}: 던전 이름이 크게 뜬다 (${inside ? inside.cardName : ''}, ${inside && inside.run ? inside.run.letters : '-'})`);
     await game.wait(300);
     await game.shot('dungeon-inside', '던전 입구 방(이름 띠, 횃불, 나가는 문)');
 
@@ -4645,6 +4647,66 @@ async function dungeon(browser) {
     check(!!doorButton && await game.press(doorButton.label), `${name}: 문 위의 [${doorButton ? doorButton.label : '단추 없음'}]를 누른다`);
     const left = await game.until(d => !d.inPocket, 5000, () => game.ask('dungeon'));
     check(!!left, `${name}: 문으로 나왔다`);
+
+    // 묶음 5b: a run through it. In again; a pack room's pack standing (held), the map with the rooms' marks, each pack
+    // room felled at once, the master in its room (its bar and name), down, the end chest's own button pressed for real,
+    // the clear card, and the goals' ways from the gate rather than the pocket.
+    await game.press(/던전 들어가기/);
+    const back = await game.until(d => d.inPocket && d.clientInPocket && d.run, 5000, () => game.ask('dungeon'));
+    check(!!back && back.run.id.length > 0 && /^E.*BX/.test(back.run.letters) && back.run.packs >= 3,
+      `${name}: 던전의 방 (${back ? `${back.run.id}: ${back.run.letters}, 무리 방 ${back.run.packs}` : '없음'})`);
+    check(!!back && (back.run.goalWay === '' || !/[0-9]{3,}칸/.test(back.run.goalWay) || /던전 문에서/.test(back.run.goalWay)),
+      `${name}: 던전 안의 목표 길은 문 자리에서 잰다 (${back ? back.run.goalWay || '목표 줄 없음' : '-'})`);
+    await game.send('goto droom C');
+    await game.wait(1500);
+    const pack = await game.ask('dungeon');
+    check(pack.run && pack.run.room === 'C' && pack.run.enemiesHere >= 4 && pack.run.clientEnemiesHere >= 4,
+      `${name}: 무리 방에 무리가 서 있다 (호스트 ${pack.run ? pack.run.enemiesHere : '-'}, 화면 ${pack.run ? pack.run.clientEnemiesHere : '-'})`);
+    await game.shot('dungeon-pack', '던전의 무리 방(조각, 무리)');
+    await game.press('지도');
+    await game.wait(600);
+    await game.shot('dungeon-run-map', '던전 안의 지도(남은 무리, 주인, 상자, 모닥불)');
+    await game.press('지도 닫기');
+    await game.wait(300);
+    const letters = (back && back.run ? back.run.letters : '').split('');
+    const seen = {};
+    for (const letter of letters) {
+      seen[letter] = (seen[letter] || 0) + 1;
+      if (!'CKLM'.includes(letter)) continue;
+      await game.send(`goto droom ${letter} ${seen[letter] - 1}`);
+      await game.wait(700);
+      await game.send('dungeon kill');
+      await game.wait(500);
+    }
+    const felled = await game.ask('dungeon');
+    check(felled.run && felled.run.cleared === felled.run.packs - 1 && (!/K/.test(felled.run.letters) || felled.run.keyTaken),
+      `${name}: 주인 방 말고 다 비웠다 (${felled.run ? `${felled.run.cleared}/${felled.run.packs}, 열쇠 ${felled.run.keyTaken}` : '-'})`);
+    await game.send('goto droom B; heal');
+    await game.wait(1800);
+    const boss = await game.ask('dungeon');
+    check(boss.run && boss.run.room === 'B' && boss.run.master.length > 0 && boss.run.masterMax > 0 && /대장/.test(boss.run.master),
+      `${name}: 보스 방에 던전의 주인 (${boss.run ? `${boss.run.master}, 생명력 ${Math.round(boss.run.masterMax)}` : '-'})`);
+    await game.shot('dungeon-boss', '보스 방(아레나 무늬, 주인의 이름표와 막대)');
+    await game.send('dungeon kill');
+    const down = await game.until(d => d.run && d.run.bossDown && (d.run.clientFlags & 16) !== 0, 4000, () => game.ask('dungeon'));
+    check(!!down && /쓰러뜨렸다/.test(down.cardName), `${name}: 주인이 쓰러지고 끝 방이 열린다 (${down ? down.cardName : '그대로'})`);
+    await game.send('goto chest; heal');
+    await game.wait(900);
+    const atChest = await game.ask('dungeon');
+    check(atChest.run && atChest.run.thing >= 0 && atChest.run.clientThing === atChest.run.thing, `${name}: 보상 상자 곁 (${atChest.run ? atChest.run.thing : '-'})`);
+    await game.shot('dungeon-chest', '끝 방의 보상 상자와 [보상 상자 열기]');
+    const open = (await game.buttons()).find(b => /보상 상자 열기/.test(b.label));
+    check(!!open && await game.press(open.label), `${name}: [${open ? open.label : '보상 상자 단추 없음'}]를 누른다`);
+    const cleared = await game.until(d => d.run && d.run.clientState === 'Done' && d.run.clearsShown >= 1, 4000, () => game.ask('dungeon'));
+    check(!!cleared && cleared.run.chestTile === 'OpenChest' && /완주/.test(cleared.cardName) && cleared.run.items > atChest.run.items,
+      `${name}: 완주 (${cleared ? `${cleared.cardName} · ${cleared.cardLine}, 장비 ${atChest.run.items} → ${cleared.run.items}` : '끝나지 않음'})`);
+    await game.wait(300);
+    await game.shot('dungeon-clear', '완주 띠와 열린 상자');
+    await game.send('goto exit 1');
+    await game.wait(900);
+    const endDoor = (await game.buttons()).find(b => /던전 나가기/.test(b.label) && b.label !== '던전 나가기' || /던전 나가기/.test(b.label) && game.touch);
+    check(!!endDoor && await game.press(endDoor.label), `${name}: 끝 방의 문으로 나간다`);
+    await game.until(d => !d.inPocket, 5000, () => game.ask('dungeon'));
 
     // Nobody in it: back to rock (now, rather than after a minute), on the screen too.
     const closed = (await game.send('dungeon close')).join(' ');
