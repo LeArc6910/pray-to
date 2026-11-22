@@ -1059,6 +1059,9 @@ namespace Game.Client
         internal string TalkLine => _storyScreen?.LineShown ?? "";
         internal bool TalkMerchantNear() => _storyScreen != null && _storyScreen.TalkMerchantNear();
         internal string ShopTab => _inventory?.ShopTab ?? "";
+        // The growth screens' state for the playtests (U4): the tree's zoom, pan, sky and picked point, the picked skill,
+        // a phone's sheet, the drawer, the skill waiting for a slot.
+        internal InventoryWindow.GrowthState Growth => _inventory?.Growth ?? default;
         internal string Shopkeeper => _client?.NpcNear()?.Npc.Name ?? "";
         internal string LastRumor => _storyScreen?.LastRumor;
         internal MapView Map => _map;

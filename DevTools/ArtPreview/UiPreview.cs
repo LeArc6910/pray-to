@@ -15,6 +15,8 @@ namespace Game.Client
     //    the screens of their own (U2): skills and the passive tree on its night with the growth tabs, the journal and
     //    the map with the records' tabs, and a phone held upright with [BAG][MENU] and the touch hub open;
     //  - encounters.png, encounters_phone.png: the encounter windows of U3 at their size in points (UiPreview.Encounters.cs);
+    //  - growth.png, growth_phone.png: the growth screens of U4 (skills, the passive tree, the character) on a PC and on
+    //    phones held either way (UiPreview.Growth.cs);
     //  - pixels.png: why the frames are drawn at whole device pixels — a corner at a phone's pixel ratio 2.625 the old way
     //    (stretched: pixels 5 and 6 device pixels across by turns) and the new (5 each).
     // The writing is the preview's small Latin font (UiMockKit), as the tool cannot draw the game's.
@@ -29,7 +31,7 @@ namespace Game.Client
             Rgba.Hex("#D9D9D9"), Rgba.Hex("#73F273"), Rgba.Hex("#73B3FF"), Rgba.Hex("#CC80FF"), Rgba.Hex("#FF9E2E"),
         };
 
-        public static void Write(string output, LootData loot)
+        public static void Write(string output, LootData loot, ClassData classes)
         {
             string folder = Directory.CreateDirectory(Path.Combine(output, "ui")).FullName;
             Png.Save(Times(Skin(loot), 3), Path.Combine(folder, "skin.png"));
@@ -37,6 +39,8 @@ namespace Game.Client
             Png.Save(Pixels(), Path.Combine(folder, "pixels.png"));
             Png.Save(Encounters(loot), Path.Combine(folder, "encounters.png"));
             Png.Save(EncountersPhone(loot), Path.Combine(folder, "encounters_phone.png"));
+            Png.Save(Growth(loot, classes), Path.Combine(folder, "growth.png"));
+            Png.Save(GrowthPhone(loot, classes), Path.Combine(folder, "growth_phone.png"));
             Console.WriteLine($"Wrote the UI skin to {folder}");
         }
 

@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
+using Game.Core;
 using NUnit.Framework;
 using UnityEngine;
 
@@ -205,6 +206,102 @@ namespace Game.Client.Tests
                 }
                 foreach (var (part, rect) in column)
                     if (Overlap(panel, rect)) problems.Add($"{where}, 메뉴: 겹침 - {part}");
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        // The growth screens (Docs/UiRework.md U4: skills, the passive tree, the character) fit the screens the person
+        // named (a small PC window, a small phone held upright and on its side) and the rest: every part inside the area
+        // under the tabs and clear of the others; the skills' slots and their [바꾸기] inside the bar, a finger tall on a
+        // touch screen, apart; the list and the picked skill's panel with room; the tree's sky with room, its zoom buttons
+        // in it, and on a phone the points, [모두 되돌리기], the point's card and the drawer over the sky without covering
+        // one another or the zoom buttons, the sky's middle still free; the character's two columns (or one) inside.
+        [Test]
+        public void TheGrowthScreensFit()
+        {
+            var problems = new List<string>();
+            var sizes = new List<(string Name, float Width, float Height, bool Touch)>
+            {
+                ("작은 PC 창 (U4)", 800, 600, false),
+                ("작은 휴대폰 세로 (U4)", 375, 812, true),
+                ("작은 휴대폰 가로 (U4)", 740, 360, true),
+            };
+            sizes.AddRange(Sizes);
+            foreach (var (name, width, height, touch) in sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Ui.HudHeight = 160;
+                Controls.ForceTouch(touch);
+                float finger = touch ? 40 : 28;
+                foreach (var screen in ScreenStack.Members(ScreenGroup.Growth))
+                {
+                    string where = $"{name} {width}×{height}, {ScreenStack.NameOf(screen)}";
+                    var area = ScreenStack.AreaOf(screen);
+                    if (!Inside(area, width, height)) problems.Add($"{where}: 화면 밖 {area}");
+                    var body = InventoryWindow.GrowthBody(area);
+                    if (body.width < 300 || body.height < 200) problems.Add($"{where}: 내용 자리가 좁다 {body}");
+                    bool Within(Rect r) => r.xMin >= body.xMin - 0.5f && r.yMin >= body.yMin - 0.5f && r.xMax <= body.xMax + 0.5f && r.yMax <= body.yMax + 0.5f;
+                    var parts = new List<(string, Rect)>();
+                    if (screen == GameScreen.Skills)
+                    {
+                        var lay = InventoryWindow.LaySkills(body);
+                        parts.Add(("스킬 칸 줄", lay.Slots));
+                        parts.Add(("포인트", lay.Points));
+                        parts.Add(("스킬 목록", lay.List));
+                        if (lay.Side) parts.Add(("고른 스킬", lay.Detail));
+                        if (lay.List.height < 120 || lay.List.width < 280) problems.Add($"{where}: 스킬 목록이 좁다 {lay.List}");
+                        if (lay.Detail.height < 120 || lay.Detail.width < 260) problems.Add($"{where}: 고른 스킬 판이 좁다 {lay.Detail}");
+                        var slots = new List<Rect>();
+                        for (int i = 0; i < ClassRules.SkillSlots; i++)
+                        {
+                            var (cell, swap) = InventoryWindow.SlotRects(lay, i);
+                            foreach (var (part, rect) in new[] { ($"칸 {i + 1}", cell), ($"칸 {i + 1} [바꾸기]", swap) })
+                            {
+                                if (!lay.Slots.Contains(rect.min) || !lay.Slots.Contains(rect.max - Vector2.one * 0.01f)) problems.Add($"{where}: {part}이 칸 줄 밖 {rect}");
+                                if (rect.height < finger - 0.5f) problems.Add($"{where}: {part}이 낮다 {rect.height}");
+                                foreach (var other in slots)
+                                    if (Overlap(rect, other)) problems.Add($"{where}: {part}이 다른 칸과 겹친다");
+                                slots.Add(rect);
+                            }
+                        }
+                    }
+                    else if (screen == GameScreen.Passives)
+                    {
+                        // A phone's worst: the drawer open with many points, a long card.
+                        var lay = InventoryWindow.LayTree(body, true, 8, touch ? 150 : 0);
+                        parts.Add(("하늘", lay.View));
+                        if (lay.HasSide) parts.Add(("옆 판", lay.Side));
+                        if (lay.View.width < 260 || lay.View.height < 180) problems.Add($"{where}: 하늘이 좁다 {lay.View}");
+                        if (!lay.View.Contains(lay.Zoom.min) || !lay.View.Contains(lay.Zoom.max - Vector2.one * 0.01f)) problems.Add($"{where}: 확대 단추가 하늘 밖 {lay.Zoom}");
+                        if (lay.Zoom.height < finger - 0.5f) problems.Add($"{where}: 확대 단추가 낮다 {lay.Zoom.height}");
+                        if (!lay.HasSide)
+                        {
+                            var over = new List<(string, Rect)> { ("확대 단추", lay.Zoom), ("포인트", lay.Points), ("모두 되돌리기", lay.Reset), ("고른 점", lay.Card), ("서랍", lay.Drawer) };
+                            for (int i = 0; i < over.Count; i++)
+                            {
+                                var (part, rect) = over[i];
+                                if (!lay.View.Contains(rect.min) || !lay.View.Contains(rect.max - Vector2.one * 0.01f)) problems.Add($"{where}: {part}이 하늘 밖 {rect}");
+                                for (int j = i + 1; j < over.Count; j++)
+                                    if (Overlap(rect, over[j].Item2)) problems.Add($"{where}: {part}과 {over[j].Item1}이 겹친다");
+                            }
+                            if (lay.Card.y - lay.Reset.yMax < 100) problems.Add($"{where}: 고른 점과 서랍이 하늘을 거의 다 덮는다 ({lay.Card.y - lay.Reset.yMax})");
+                        }
+                    }
+                    else
+                    {
+                        var (left, right, split) = InventoryWindow.LaySheet(body);
+                        parts.Add(("그림 열", left));
+                        if (split) parts.Add(("능력치 열", right));
+                        if (left.width < 280) problems.Add($"{where}: 그림 열이 좁다 {left}");
+                    }
+                    for (int i = 0; i < parts.Count; i++)
+                    {
+                        var (part, rect) = parts[i];
+                        if (!Within(rect)) problems.Add($"{where}: {part}이 내용 자리 밖 {rect} (자리 {body})");
+                        for (int j = i + 1; j < parts.Count; j++)
+                            if (Overlap(rect, parts[j].Item2)) problems.Add($"{where}: {part}과 {parts[j].Item1}이 겹친다");
+                    }
+                }
             }
             Assert.IsEmpty(problems, string.Join("\n", problems));
         }

@@ -26,6 +26,7 @@ namespace Game.Client
         static PixelImage Encounters(LootData loot)
         {
             Faces.Clear();
+            Pictures.Clear();
             var g = Canvas(910, 806);
             Floor(g, 0, 0, g.Width, g.Height, 11);
             var icons = Icons(loot);
@@ -43,6 +44,7 @@ namespace Game.Client
         static PixelImage EncountersPhone(LootData loot)
         {
             Faces.Clear();
+            Pictures.Clear();
             var g = Canvas(1000, 440);
             Floor(g, 0, 0, g.Width, g.Height, 3);
             var icons = Icons(loot);
@@ -83,6 +85,10 @@ namespace Game.Client
                 for (int j = 0; j < shown * scale; j++)
                     for (int i = 0; i < image.Width * scale; i++) big.Blend(x + i, y + j, image[i / scale, j / scale]);
             }
+            foreach (var (x, y, image, scale) in Pictures)
+                for (int j = 0; j < image.Height * scale; j++)
+                    for (int i = 0; i < image.Width * scale; i++) big.Blend(x + i, y + j, image[i / scale, j / scale]);
+            Pictures.Clear();
             return big;
         }
 

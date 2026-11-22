@@ -78,6 +78,11 @@ namespace Game.Client
         // For the play mode tests: lay the screen out as for a touch screen, or not, without a finger.
         internal static void ForceTouch(bool touch) => UsingTouch = touch;
 
+        // The fingers on the screen this frame, in UI points (two of them pinch the passive tree, Docs/UiRework.md U4).
+        public static int FingerCount => _touches.Count;
+
+        public static Vector2 FingerAt(int index) => Ui.FromScreen(_touches[index].Pixels);
+
         // Once per frame, before Read: follows the fingers. Then drops last frame's UI areas; OnGUI marks them again.
         public static void UpdateTouches()
         {

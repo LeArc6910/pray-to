@@ -243,14 +243,19 @@ namespace Game.Client
 
         // Wide enough for the old bag pages to breathe, not so wide that a line runs across a big screen.
         const float FullMaxWidth = 760;
+        // The growth screens (U4) are wider: the skills' cards beside the picked one's panel, the passive tree's sky
+        // beside its panel, the character's picture beside the stats (Docs/UiRework.md 4-3: 둘 다 전체 화면).
+        const float GrowthMaxWidth = 1180;
 
         // A full screen: the whole screen on a phone (4 points from its edges), else centred, up to FullMaxWidth wide and
         // the screen's height less a margin.
-        public static Rect FullArea()
+        public static Rect FullArea() => FullArea(FullMaxWidth);
+
+        static Rect FullArea(float most)
         {
             bool phone = Controls.UsingTouch && (Ui.Width < 600 || Ui.Short);
             float margin = phone ? 4 : 10;
-            float width = Mathf.Min(Ui.Width - 2 * margin, FullMaxWidth);
+            float width = Mathf.Min(Ui.Width - 2 * margin, most);
             return new Rect(Mathf.Round((Ui.Width - width) / 2), margin, width, Ui.Height - 2 * margin);
         }
 
@@ -259,6 +264,7 @@ namespace Game.Client
             GameScreen.None => default,
             GameScreen.Bag => InventoryWindow.AreaOf(),
             _ when IsEncounter(screen) => EncounterArea(screen),
+            _ when GroupOf(screen) == ScreenGroup.Growth => FullArea(GrowthMaxWidth),
             _ => FullArea(),
         };
 

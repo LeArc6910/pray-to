@@ -1112,6 +1112,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only encounter,basics,npc,gear,screens`
   - 클라우드 확인 (2026-11-22, `d5b1833`·`8d12969`): [x] `--only encounter,basics,npc,gear,screens` 330/331 통과. 실패 하나는 진짜 버그(작업대 창이 [손 제작] 탭으로 열려 작업대 조합법이 안 보임)라 `8d12969`에서 고치고 `--only encounter` 81개 모두 통과. 사진: PC·휴대폰 대화의 초상(3배·2배)과 이름 띠, 휴대폰에서 대화 동안 퀵슬롯이 없음, 상인 상점 창(천막·간판, 작은 초상·하트, 다섯 탭, 값 카드와 가방 칸), 휴대폰 상점 시트, 작업대 창(만드는 중 막대, [작업대][손 제작] 탭, 조합법 카드), 모루 창([강화 +1] 금색·[분해] 붉은 테, 글이 칸 안에)
   - (사람) 대사가 한 자씩 찍히는 빠르기와 넘기기(누르기·G·Space·Enter), 대사마다 고른 표정이 말과 맞는지, 상점에서 사고팔기의 손맛, 휴대폰에서 만남 창 동안 걷지 못하는 것이 괜찮은지
+- [ ] 163단계: 성장 화면(스킬 카드, 별하늘 특성 트리, 캐릭터 판. `Docs/UiRework.md` U4)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/InventoryWindow.Growth.cs`, `Client/InventoryWindow.Skills.cs`, `Client/InventoryWindow.Passives.cs`, `Client/InventoryWindow.Character.cs`, `Client/Art/GrowthArt.cs`의 `.meta`가 생기면 커밋한다. PlayMode `LayoutTests.TheGrowthScreensFit`, 사진 장면 `FeatureTests.TheGrowthScreensDraw`
+  - (클라우드 웹 점검) `sweep.js --only growth,gear,first,firstphone,screens,layout`
+  - (사람) 특성 트리를 끌고 확대하는 손맛(마우스 휠, 실제 휴대폰의 두 손가락), 배울 수 있는 점의 숨쉬는 테두리와 배울 때의 번쩍임, 스킬 카드에서 칸에 넣는 흐름이 자연스러운지
 
 ## 결과 보고
 

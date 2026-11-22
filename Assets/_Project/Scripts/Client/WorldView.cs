@@ -465,7 +465,7 @@ namespace Game.Client
         const float MinionLight = 3f;
 
         // Tunics: blue for you, and a colour per player for the others so they can be told apart.
-        static readonly Rgba SelfTunic = Rgba.Hex("#3F7FD8");
+        internal static readonly Rgba SelfTunic = Rgba.Hex("#3F7FD8");
         static readonly Rgba[] OtherTunics = { Rgba.Hex("#4DB06A"), Rgba.Hex("#E08A3C"), Rgba.Hex("#A070DC"), Rgba.Hex("#3CB8B0") };
         static readonly Rgba SlimeColor = Rgba.Hex("#8CD94D");
         static readonly Rgba BossColor = new Rgba(158, 143, 128);

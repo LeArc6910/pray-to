@@ -312,12 +312,14 @@ namespace Game.Client
 
         // A button that shows one text and is known to the playtests by another (a setting shows its value, and is
         // found as "name: value").
-        public static bool Button(Rect rect, string shown, string probed)
+        public static bool Button(Rect rect, string shown, string probed) => Button(rect, shown, probed, Look.Normal);
+
+        public static bool Button(Rect rect, string shown, string probed, Look look)
         {
             Probe(probed, rect);
             Temp.text = shown;
             Temp.tooltip = null;
-            return Pressable(rect, Temp, GUI.skin.button, Look.Normal, false);
+            return Pressable(rect, Temp, GUI.skin.button, look, false);
         }
 
         public static bool Button(Rect rect, string text, GUIStyle style, Look look, bool chosen = false)

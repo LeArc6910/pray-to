@@ -264,6 +264,49 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The growth screens laid out anew (Docs/UiRework.md U4): a warrior and fire mage of level 12 with skills learned
+        // and raised, a crystal in the whirlwind, points spent on the tree's left and a pet; the skills' cards and the
+        // picked skill's panel, the tree on its night, the character's sheet; then on a touch screen the same three. A
+        // picture of each.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheGrowthScreensDraw()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            World.GainExperience(Player, Leveling.TotalFor(12));
+            foreach (string id in new[] { "war_cry", "war_cry", "charge", "whirlwind", "whirlwind", "flame_brand" })
+                World.LearnSkill(Player.Id, _root.ClassSheet.Skills.First(s => s.Id == id));
+            Give("support_area", 1);
+            Give("support_leech", 1);
+            Assert.IsTrue(World.AddSupport(Player.Id, _root.ClassSheet.Skills.First(s => s.Id == "whirlwind"), Material("support_area")), "The crystal goes into the whirlwind.");
+            foreach (string id in new[] { "str1", "str2", "str3", "str5", "dex1", "int1" })
+                Assert.IsTrue(World.AllocatePassive(Player.Id, _root.ClassSheet.FindPassive(id)), $"The tree's {id} is learned.");
+            Give("slime_egg", 1);
+            World.Hatch(Player.Id, Material("slime_egg"));
+            Give("coin", 300);
+            yield return new WaitForSecondsRealtime(1);
+            try
+            {
+                foreach (bool touch in new[] { false, true })
+                {
+                    Controls.ForceTouch(touch);
+                    foreach (var screen in ScreenStack.Members(ScreenGroup.Growth))
+                    {
+                        _root.ShowScreen(screen);
+                        yield return new WaitForSecondsRealtime(0.8f);
+                        Assert.AreEqual(screen, _root.OpenScreen, "The growth screen asked for is up.");
+                        yield return Screens.Take($"growth-{screen.ToString().ToLowerInvariant()}{(touch ? "-touch" : "")}");
+                    }
+                    _root.ShowScreen(GameScreen.None);
+                }
+            }
+            finally
+            {
+                Controls.ForceTouch(false);
+            }
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The encounter windows (Docs/UiRework.md U3): a chest, a workbench, a furnace and an anvil laid round the player
         // open their windows (each counts as the bag's, and shuts once its thing is out of reach); a merchant's stall: her
         // talk with her portrait and choices, then her shop; the village child's talk with her portrait and the line's face.

@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1684,9 +1684,13 @@ async function gear(browser) {
   check(await game.press('빼기'), '[빼기]를 누른다');
   const out = await game.until(i => !i.supports && count(i, 'support_area') === 1, 3000, game.inventory);
   check(!!out, '빼면 결정이 가방으로 돌아온다');
+  // The slots' order (U4: a slot's skill picked, [칸에 넣기], then the other slot; they swap).
   const skills = (await game.inventory()).skills;
-  await game.press('▼');
-  check((await game.inventory()).skills !== skills, `▼로 스킬 칸 순서를 바꾼다 (${skills} → ${(await game.inventory()).skills})`);
+  await game.press('스킬 칸 1');
+  await game.press('칸에 넣기');
+  await game.press('스킬 칸 2');
+  const reordered = await game.until(i => i.skills !== skills, 3000, game.inventory);
+  check(!!reordered, `[칸에 넣기]로 스킬 칸 순서를 바꾼다 (${skills} → ${(await game.inventory()).skills})`);
   // Giving the fire mage up for the archer: a change, for coins by level (2026-11-09); two slots at this level.
   await game.press('[2] 화염 마법사');
   await game.press('[ ] 궁수');
@@ -5292,7 +5296,182 @@ async function encounter(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter };
+// ---------------------------------------------------------------- 성장 화면 (Docs/UiRework.md U4)
+// The skills (the slot bar, cards or a phone's rows, the picked skill's panel or a phone's sheet, a crystal in and out,
+// a slot picked and filled, [바꾸기], [되돌리기]), the passive tree (a star pressed then [배우기], a point from the
+// drawer, the sky dragged and zoomed by the wheel or two fingers and [+]/[-], back to the middle, [모두 되돌리기]) and the
+// character's sheet with a pet and a life skill's perk; on a PC, a small phone held upright and a small phone held
+// sideways. Photos of each.
+async function growth(browser) {
+  for (const profileName of ['pc', 'phone-small', 'phone-wide-small']) {
+    const profile = Profiles[profileName];
+    const { width, height } = profile.context.viewport;
+    note(`\n## 성장 화면 ${profileName} ${width}×${height} (U4)\n`);
+    const game = await open(browser, run, profile, url);
+    check(await game.startSolo(), '혼자 하기가 시작된다');
+    await game.wait(1500);
+    if (game.touch) {
+      await game.page.touchscreen.tap(width / 2, height / 3);
+      await game.wait(800);
+    }
+    const narrow = game.touch && width < 600;
+    const shot = (name, caption) => game.shot(`growth-${profileName}-${name}`, `${profileName}: ${caption}`);
+    // Every shown button on the screen, and on a touch screen the growth screens' own a finger tall.
+    const fits = async what => {
+      const shown = (await game.buttons()).filter(b => b.shown);
+      const out = shown.filter(b => b.rect[0] < -0.5 || b.rect[1] < -0.5 || b.rect[0] + b.rect[2] > width + 0.5 || b.rect[1] + b.rect[3] > height + 0.5);
+      check(out.length === 0, `${what}: 단추가 화면 안 (${out.map(b => b.label).slice(0, 4).join(', ') || '모두'})`);
+      if (!game.touch) return;
+      const words = /^(배우기|올리기|최고|변형|빼기|고르기|미리보기|바꾸기|그만|칸에 넣기|목록으로|되돌리기|모두 되돌리기|지금 배울 수 있는 점|확대|축소|가운데로|이름 짓기|추천)|끼우기|: /;
+      const small = shown.filter(b => words.test(b.label) && b.rect[3] < 39.5);
+      check(small.length === 0, `${what}: 손가락 단추 40점 이상 (${small.map(b => `${b.label} ${Math.round(b.rect[3])}`).slice(0, 4).join(', ') || '모두'})`);
+    };
+    // A pet first, hatched from the bag (Docs/Animals.md), and what the screens need.
+    await game.send('xp 9000; give support_area 1; give support_leech 1; give coin 500; give slime_egg 1; lifexp mining 1000; clear');
+    await game.wait(1000);
+    await bagTab(game, '재료·제작');
+    check(await game.press('부화', '말랑한 알'), '말랑한 알의 [부화]');
+    await closeBag(game);
+
+    // ---- 스킬 ----
+    check(await openScreen(game, '스킬'), '[스킬] 화면이 열린다');
+    await game.wait(400);
+    await shot('skills', '[스킬]: 칸 줄, 포인트, 클래스마다 스킬(카드 또는 줄)');
+    await fits('[스킬]');
+    check(await game.press('배우기', '전투 함성'), '[전투 함성]의 [배우기]');
+    check(!!(await game.until(i => /war_cry:1/.test(i.ranks), 3000, game.inventory)), '전투 함성을 배운다');
+    check(await game.press('올리기', '전투 함성'), '[전투 함성]의 [올리기]');
+    check(!!(await game.until(i => /war_cry:2/.test(i.ranks), 3000, game.inventory)), '전투 함성이 2단계');
+    if (narrow) await game.press('목록으로', undefined, { quiet: true });
+    check(await game.press('회전베기', /^회전베기/), '회전베기 카드(줄)를 누른다');
+    let s = await game.until(t => t.growth.skill === 'whirlwind', 3000);
+    check(!!s, `누른 스킬이 판에 나온다 (${(await game.state()).growth.skill})`);
+    if (narrow) check(!!s && s.growth.sheet, '휴대폰 세로: 고른 스킬이 목록 위 시트로');
+    await shot('skill-picked', '고른 스킬: 지금·다음 단계, [올리기]·[칸에 넣기], 변형 결정');
+    if (narrow) check(await game.press('목록으로'), '[목록으로]로 목록에 돌아간다');
+    check(await game.press('변형', '회전베기'), '회전베기의 [변형]');
+    check(await game.press(/^확산의 결정 끼우기/), '[확산의 결정 끼우기]');
+    check(!!(await game.until(i => /whirlwind:support_area/.test(i.supports), 3000, game.inventory)), '확산의 결정이 회전베기에 들어간다');
+    await shot('skill-crystal', '회전베기에 끼운 결정과 [빼기]');
+    check(await game.press('빼기'), '[빼기]');
+    check(!!(await game.until(i => !i.supports, 3000, game.inventory)), '결정이 가방으로 돌아온다');
+    if (narrow) await game.press('목록으로', undefined, { quiet: true });
+    // A slot's skill picked, [칸에 넣기], then the other slot: the two swap.
+    let order = (await game.inventory()).skills;
+    check(await game.press('스킬 칸 1'), '[스킬 칸 1]을 누른다');
+    check(await game.press('칸에 넣기'), '[칸에 넣기]');
+    check((await game.state()).growth.placing !== '', '넣을 칸을 기다린다');
+    await shot('skill-placing', '넣을 칸을 누르기를 기다리는 칸 줄');
+    check(await game.press('스킬 칸 2'), '[스킬 칸 2]를 누른다');
+    const swapped = await game.until(i => i.skills !== order, 3000, game.inventory);
+    check(!!swapped && swapped.skills.split(',')[1] === order.split(',')[0], `두 칸이 바뀐다 (${order} → ${swapped && swapped.skills})`);
+    if (narrow) await game.press('목록으로', undefined, { quiet: true });
+    // [바꾸기]: more learned than slots, a slot filled from the rest.
+    await game.press('배우기', '돌진');
+    await game.press('배우기', '불꽃 부여');
+    order = (await game.inventory()).skills;
+    check(await game.press('바꾸기'), '칸 아래 [바꾸기]');
+    check(await game.press(/^\d번 칸에: /), '[N번 칸에: …]로 칸에 없는 스킬을 넣는다');
+    check(!!(await game.until(i => i.skills !== order, 3000, game.inventory)), `칸이 바뀐다 (${order} → ${(await game.inventory()).skills})`);
+    const points = (await game.inventory()).skillPoints;
+    check(await game.press(/^되돌리기 \(금화 \d+\)$/), '[되돌리기 (금화 N)]');
+    check(!!(await game.until(i => i.skillPoints > points, 3000, game.inventory)), '되돌리면 포인트가 돌아온다');
+    await shot('skills-reset', '되돌린 [스킬]');
+
+    // ---- 특성 ----
+    check(await openScreen(game, '특성'), '[특성] 화면이 열린다');
+    await game.wait(400);
+    await shot('tree', '별하늘 특성 트리: 배울 수 있는 점이 숨쉬고, 서랍이 열려 있다');
+    await fits('[특성]');
+    s = await game.state();
+    check(s.growth.sky[2] > 200 && s.growth.sky[3] > 150, `하늘이 넓다 (${s.growth.sky.map(Math.round).join(',')})`);
+    const drawer = () => game.buttons().then(all => all.filter(b => b.shown && b.row === '지금 배울 수 있는 점' && /: /.test(b.label)));
+    let open = await drawer();
+    check(open.length > 0, `"지금 배울 수 있는 점" 서랍에 점이 있다 (${open.length})`);
+    // A star pressed in the sky (a real click or tap), then [배우기] on its card.
+    const name = open.length > 0 ? open[0].label.split(':')[0] : '';
+    check(await game.press(name, '특성 트리'), `하늘의 별 [${name}]을 누른다`);
+    check((await game.state()).growth.passive === name, '누른 점이 카드에 나온다');
+    await shot('tree-picked', `고른 점 ${name}의 카드`);
+    check(await game.press('배우기'), '카드의 [배우기]');
+    check(!!(await game.until(i => i.passives === 1, 3000, game.inventory)), '별을 눌러 배운다');
+    // A point from the drawer.
+    open = await drawer();
+    if (open.length > 0) await game.tapAt(open[0].cx, open[0].cy);
+    await game.wait(400);
+    check(await game.press('배우기'), '서랍의 점을 누르고 [배우기]');
+    check(!!(await game.until(i => i.passives === 2, 3000, game.inventory)), '서랍으로도 배운다');
+    await shot('tree-learned', '두 점을 배운 트리(이어진 선이 금빛)');
+    // Dragging the sky pans it; the wheel or two fingers and [+]/[-] zoom.
+    s = await game.state();
+    const box = await game.canvas();
+    const sx = box.width / width, sy = box.height / height;
+    const sky = s.growth.sky;
+    const cx = box.left + (sky[0] + sky[2] / 2) * sx, cy = box.top + (sky[1] + sky[3] * 0.4) * sy;
+    const pan = [s.growth.panX, s.growth.panY];
+    if (game.touch) await game.drag(cx, cy, 60, 40, 200);
+    else {
+      await game.page.mouse.move(cx, cy);
+      await game.page.mouse.down();
+      await game.page.mouse.move(cx + 60, cy + 40, { steps: 8 });
+      await game.page.mouse.up();
+    }
+    await game.wait(400);
+    s = await game.state();
+    check(Math.hypot(s.growth.panX - pan[0], s.growth.panY - pan[1]) > 20, `하늘을 끌면 옮겨진다 (${pan.map(Math.round)} → ${Math.round(s.growth.panX)},${Math.round(s.growth.panY)})`);
+    let zoom = s.growth.zoom;
+    if (game.touch) {
+      // Two fingers apart (the DevTools protocol's touches).
+      const cdp = await game.context.newCDPSession(game.page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx - 20, y: cy, id: 1 }, { x: cx + 20, y: cy, id: 2 }] });
+      for (let i = 1; i <= 8; i++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx - 20 - i * 8, y: cy, id: 1 }, { x: cx + 20 + i * 8, y: cy, id: 2 }] });
+        await game.wait(60);
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await game.page.mouse.move(cx, cy);
+      await game.page.mouse.wheel(0, -300);
+    }
+    await game.wait(500);
+    s = await game.state();
+    check(s.growth.zoom > zoom + 1, `${game.touch ? '두 손가락을 벌리면' : '휠을 올리면'} 확대된다 (${Math.round(zoom)} → ${Math.round(s.growth.zoom)})`);
+    await shot('tree-zoomed', '확대한 트리(점 아래 이름)');
+    zoom = s.growth.zoom;
+    check(await game.press('축소'), '[-] 축소');
+    check((await game.state()).growth.zoom < zoom, '[-]로 작아진다');
+    zoom = (await game.state()).growth.zoom;
+    check(await game.press('확대'), '[+] 확대');
+    check((await game.state()).growth.zoom > zoom, '[+]로 커진다');
+    check(await game.press('가운데로'), '[◇] 가운데로');
+    await shot('tree-centred', '가운데로 돌아온 트리');
+    check(await game.press('지금 배울 수 있는 점'), '서랍 머리를 누르면 접힌다');
+    check(!(await game.state()).growth.drawer, '서랍이 접힌다');
+    await shot('tree-drawer-shut', '서랍을 접은 트리');
+    await game.press('지금 배울 수 있는 점');
+    check(await game.press(/^모두 되돌리기 \(금화 \d+\)$/), '[모두 되돌리기 (금화 N)]');
+    check(!!(await game.until(i => i.passives === 0, 3000, game.inventory)), '되돌리면 배운 점이 없다');
+
+    // ---- 캐릭터 ----
+    check(await openScreen(game, '캐릭터'), '[캐릭터] 화면이 열린다');
+    await game.wait(400);
+    await shot('character', '캐릭터: 큰 주인공 그림과 착용 칸, 레벨, 능력치 묶음, 펫, 생활 기술');
+    await fits('[캐릭터]');
+    const text = await game.allText();
+    check(/생명력 \d+/.test(text) && /초당 공격/.test(text) && text.includes('생활 기술'), '능력치 묶음과 생활 기술이 보인다');
+    check(await game.press('추천', '펫') && (await game.press('이름 짓기', '펫')), '펫의 [추천]과 [이름 짓기]');
+    check(!!(await game.until(i => i.petName && i.petName !== '말랑이', 2000, game.inventory)), '펫에 이름이 붙는다');
+    check(await game.press('고르기', '날쌘 곡괭이'), '채굴 5레벨 혜택 [고르기]');
+    const perks = await game.until(i => (i.perks || '').split(',').map(Number)[4] === 2, 3000, game.inventory);
+    check(!!perks, '날쌘 곡괭이를 고른다');
+    await shot('character-perk', '혜택을 고른 캐릭터');
+    await game.press('창 닫기');
+    check(!!(await game.until(t => t.window === '', 3000)), '[창 닫기]로 닫힌다');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

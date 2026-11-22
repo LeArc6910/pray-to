@@ -1528,6 +1528,12 @@ namespace Game.Client
             json.Field("talkLine", root.TalkLine);
             json.Field("shopTab", root.ShopTab);
             json.Field("shopkeeper", root.Shopkeeper);
+            // The growth screens (U4): the tree's zoom (points a step), pan and sky (points), the picked point's name, the
+            // picked skill's id, whether a phone's skill sheet and the tree's drawer are open, a skill waiting for a slot.
+            var growth = root.Growth;
+            json.Field("growth", new Json('{').Field("zoom", growth.Zoom).Field("panX", growth.Pan.x).Field("panY", growth.Pan.y)
+                .Field("sky", Rect(growth.Sky)).Field("passive", growth.Passive ?? "").Field("skill", growth.Skill ?? "")
+                .Field("sheet", growth.Sheet).Field("drawer", growth.Drawer).Field("placing", growth.Placing ?? "").Raw('}'));
             json.Field("speed", root.HostTicksPerStep);
             // Where the UI's parts were drawn (U0·U1, sweep.js "ui"): the bag window, the "획득" lines, the boss bar, the
             // left column's bottom (the HUD and goal list) and whether the goal list is folded, the player on the screen,

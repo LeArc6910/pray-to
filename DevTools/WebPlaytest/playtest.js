@@ -196,6 +196,9 @@ async function playPc(browser, profile) {
   await game.page.waitForTimeout(600);
   const skills = await state(game);
   check(skills.window === '스킬' && skills.bag, `K 키로 [스킬] 화면이 열린다 (${skills.window || '없음'})`);
+  // U4: the slot bar along the top and the picked skill's panel beside the cards.
+  const slotBar = await send(game, 'buttons');
+  check(slotBar.join('').includes('스킬 칸 1') && skills.growth && skills.growth.skill !== '', `[스킬] 위에 스킬 칸 줄, 옆에 고른 스킬 (${skills.growth ? skills.growth.skill : '없음'})`);
   await shot(game, profile, 'skills', '[스킬] 화면(K)');
   await game.page.keyboard.press('k');
   await game.page.waitForTimeout(400);
@@ -375,6 +378,8 @@ async function playPhone(browser, profile) {
   await game.page.waitForTimeout(600);
   const passives = await state(game);
   check(passives.window === '특성' && !passives.hub, `화면을 열면 허브가 닫힌다 (${passives.window})`);
+  // U4: on a touch screen the tree opens zoomed so a finger's 40 points press a point.
+  check(passives.growth && passives.growth.zoom >= 40, `휴대폰의 특성 트리는 손가락 크기로 확대되어 열린다 (${passives.growth ? Math.round(passives.growth.zoom) : '-'})`);
   await shot(game, profile, 'passives', '[특성] 전체 화면(별하늘)');
   await send(game, 'screen off; scene machines');
   await game.page.waitForTimeout(2500);
