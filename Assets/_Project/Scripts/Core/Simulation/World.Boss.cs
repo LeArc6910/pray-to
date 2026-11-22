@@ -681,7 +681,7 @@ namespace Game.Core
                 foreach (var player in hit)
                 {
                     AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
-                    Affect(player, hazard.Effect, hazard.EffectAmount, hazard.Position);
+                    Affect(player, hazard.Effect, hazard.EffectAmount, hazard.Position, hazard.Source, damage);
                 }
                 _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size)));
             }
@@ -757,7 +757,7 @@ namespace Game.Core
             // It flies on through a rolling player (World.Roll.cs).
             if (Dodges(victim, projectile.Source)) return false;
             AfflictPlayer(victim, projectile.Source, HurtPlayer(victim, projectile.Source, projectile.Damage, projectile.Cause));
-            Affect(victim, projectile.Effect, projectile.EffectAmount, projectile.Position - projectile.Velocity * TickSeconds);
+            Affect(victim, projectile.Effect, projectile.EffectAmount, projectile.Position - projectile.Velocity * TickSeconds, projectile.Source, projectile.Damage);
             if (!returns) return true;
             projectile.Pierced.Add(victim.Id);
             return false;

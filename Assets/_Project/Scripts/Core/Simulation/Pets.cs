@@ -166,7 +166,7 @@ namespace Game.Core
         void PetBites(Player player)
         {
             if (player.Pet == null || !player.Pet.Bites || player.IsDead || Tick % Ticks(Pets.BiteSeconds) != 0) return;
-            var target = _enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) <= Pets.BiteReach + e.Definition.Radius)
+            var target = _enemies.Where(e => !e.IsDead && !e.Away && Vec2.Distance(e.Position, player.Position) <= Pets.BiteReach + e.Definition.Radius)
                 .OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
             if (target == null) return;
             HitEnemy(player, target, player.Stats.DamageFor(SkillTag.Melee) * Pets.BiteShareAt(player.PetLevel), false, player.Position, SkillTag.None, knockback: false);

@@ -87,6 +87,9 @@ namespace Game.Client
             // A monster that fights from the sheet (WorldView.MonsterFx.cs): its colours, the attack it is on, when (by
             // the host's clock) and where its wind-up began and which way it faced, and how long that wind-up is.
             public bool MobLooked;
+            public MobLook MobKind;
+            public bool MobBuried;
+            public Vector3 MobLast;
             public FxRamp MobRamp;
             public uint MobTint;
             public MonsterAttack MobAttack;
@@ -521,6 +524,11 @@ namespace Game.Client
         // Rolls begun on screen and blows that went through a roller, since the session began (for the playtests).
         public int RollsShown { get; private set; }
         public int DodgesShown { get; private set; }
+        // For the playtests: numbers drawn grey because a guard turned the blow.
+        public int GuardedNumbersShown { get; private set; }
+        int _guardedId;
+        int _guardedFrame = -1;
+        static readonly Color GuardedColor = new Color(0.62f, 0.64f, 0.68f);
         float _hurtGlow;
         float _hurtGlowStrength;
         Texture2D _vignette;
@@ -2149,8 +2157,15 @@ namespace Game.Client
                     // A weapon's elemental hit (World.AddElements) in its element's colour, a little aside of the blow's own number.
                     var element = World.ElementOfCause(e.Cause);
                     var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : element != SkillTag.None ? Palette.Of(element) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
+                    // A blow a guard turned (the Guarded event comes just before its hit): its number is grey and never big.
+                    bool guarded = !hurtsMe && e.Target == _guardedId && Time.frameCount == _guardedFrame;
+                    if (guarded)
+                    {
+                        color = GuardedColor;
+                        GuardedNumbersShown++;
+                    }
                     var numberAt = element == SkillTag.None ? target.Position : target.Position + new Vector3(0.35f, 0.2f, 0);
-                    if (Feel.Numbers) _floating.Add(new Floating { Position = numberAt, Text = e.Critical ? e.Amount + "!" : e.Amount.ToString(), Color = color, Big = e.Critical || heavy });
+                    if (Feel.Numbers) _floating.Add(new Floating { Position = numberAt, Text = e.Critical && !guarded ? e.Amount + "!" : e.Amount.ToString(), Color = color, Big = (e.Critical || heavy) && !guarded });
                     // And a burst of the element where it struck, for everyone to see (2026-11-09).
                     if (element != SkillTag.None) AddFlash(target.Position + new Vector3(0, target.Diameter * 0.15f, 0), 0.5f, Palette.Of(element), FlashKind.Burst);
                     // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
@@ -2207,6 +2222,10 @@ namespace Game.Client
                     Hear(Sound.Learn, raised.Position);
                     break;
                 case SimEventType.Guarded:
+                    _guardedId = e.Source;
+                    _guardedFrame = Time.frameCount;
+                    ShowMonsterEvent(e);
+                    break;
                 case SimEventType.Tether:
                 case SimEventType.MonsterFx:
                     ShowMonsterEvent(e);

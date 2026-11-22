@@ -12,6 +12,7 @@ namespace CoreSandbox
     // add --rarity <percent> to --item or --loot for the finder's item rarity bonus
     // dotnet run -- --fight [seconds] [seed]        a bot fights slimes in a generated cave
     // add --gear <base,base> to --fight to change its gear (copper_sword by default), --no-dodge to stand still
+    // add --monsters <id,id> to --fight for those kinds alone, four at a time round the bot (a biome's own monsters)
     // dotnet run -- --boss [seconds] [seed]         a bot party against the first boss (--boss-id for another)
     // add --players <n> and --reaction <seconds> to --boss, as well as --gear and --no-dodge
     // add --no-roll to --fight or --boss for bots that do not use the dodge roll (as before it was made), or
@@ -106,6 +107,13 @@ namespace CoreSandbox
                 generator = int.Parse(args[genFlag + 1]);
                 args = args.Where((_, i) => i != genFlag && i != genFlag + 1).ToArray();
             }
+            string[] onlyMonsters = null;
+            int monstersFlag = Array.IndexOf(args, "--monsters");
+            if (monstersFlag >= 0)
+            {
+                onlyMonsters = args[monstersFlag + 1].Split(',');
+                args = args.Where((_, i) => i != monstersFlag && i != monstersFlag + 1).ToArray();
+            }
             bool dodge = !args.Contains("--no-dodge");
             args = args.Where(a => a != "--no-dodge").ToArray();
             // The bots roll through blows about to land (RollBot); --no-roll is how they fought before the roll.
@@ -131,7 +139,7 @@ namespace CoreSandbox
                     PrintProgression(data, Number(1, 2000), Seed(2));
                     break;
                 case "--fight":
-                    FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge);
+                    FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge, onlyMonsters);
                     break;
                 case "--farm":
                     FarmSim.Run(data, LoadTiles(data), LoadMonsters(), Number(1, 120), args.Length > 2 ? args[2] : "mushroom");

@@ -158,6 +158,8 @@ namespace CoreSandbox
             foreach (var hazard in world.Hazards)
             {
                 if (world.Tick - hazard.StartTick < reactionTicks) continue;
+                // A cloud that only fills monsters and the mark of where one will come out harm no one.
+                if (hazard.Shape == HazardShape.Balm || hazard.Damage == 0 && hazard.Mark == (byte)MonsterAttackShape.Blink + 1) continue;
                 if (!hazard.Contains(player.Position, World.PlayerRadius + 0.3f)) continue;
                 var offset = player.Position - hazard.Position;
                 if (hazard.Shape == HazardShape.Line)

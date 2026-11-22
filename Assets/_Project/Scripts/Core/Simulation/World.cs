@@ -370,6 +370,12 @@ namespace Game.Core
             switch (enemy.State)
             {
                 case EnemyState.Idle:
+                    // One that lies in wait stays under the ground until someone is right over it (World.LieInWait).
+                    if (WaitsInAmbush(enemy))
+                    {
+                        LieInWait(enemy);
+                        break;
+                    }
                     // One come for the ward stone goes after a player only if it can walk to them; walled out, it goes on
                     // for the stone and breaks in.
                     bool walledOut = enemy.Rift == DefenseMonster && _flow.DistanceAt(TileMap.Cell(enemy.Position.X), TileMap.Cell(enemy.Position.Y)) == FlowField.Unreached;
@@ -544,7 +550,7 @@ namespace Game.Core
         internal int Hurt(Player player, float damage) => HurtPlayer(player, 0, damage, armor: false);
 
         // For the playtests and tests: the player's hit on the monster, as a blow of theirs would land.
-        internal void Hurt(Enemy enemy, Player by, float damage) => HitEnemy(by, enemy, damage, false, by.Position, SkillTag.None);
+        internal void Hurt(Enemy enemy, Player by, float damage, SkillTag tags = SkillTag.None) => HitEnemy(by, enemy, damage, false, by.Position, tags);
 
         internal void Hurt(Boss boss, int amount)
         {

@@ -108,6 +108,8 @@ namespace Game.Core
         public (int X, int Y)? Goal { get; set; }
         public int Steps { get; set; }
         public bool Stalled { get; set; }
+        // Fighting: where to step meanwhile (round a guard's front, Flank), zero to stand.
+        public Vec2 Step { get; set; }
         public string Why { get; set; } = "";
 
         public override string ToString() =>
@@ -246,7 +248,11 @@ namespace Game.Core
                 if (id != _foeId || health < _foeHealth) _targetProgressTick = _world.Tick;
                 _foeId = id;
                 _foeHealth = health;
-                return new BotIntent { Do = BotDo.Fight, Direction = at - _player.Position, Why = "곁의 적" };
+                // A guard's front turns most of a blow: round to its side while striking, not into a warning.
+                var foe = _world.Enemies.FirstOrDefault(e => e.Id == id);
+                var round = foe != null ? Flank(foe, _player.Position) : Vec2.Zero;
+                if (round.LengthSquared > 0 && Danger(_player.Position + round * 0.5f)) round = Vec2.Zero;
+                return new BotIntent { Do = BotDo.Fight, Direction = at - _player.Position, Step = round, Why = round.LengthSquared > 0 ? "방패 옆으로" : "곁의 적" };
             }
             if (stalled && _foeId != 0)
             {
@@ -354,7 +360,7 @@ namespace Game.Core
                             && e.Definition.Level <= _player.Level + 2
                             && Vec2.Distance(e.Position, _player.Position) <= Sense
                             && !Memory.IsBlocked(TileMap.Cell(e.Position.X), TileMap.Cell(e.Position.Y)))
-                        .OrderBy(e => Vec2.Distance(e.Position, _player.Position)).ThenBy(e => e.Id)
+                        .OrderBy(e => First(e) ? 0 : 1).ThenBy(e => Vec2.Distance(e.Position, _player.Position)).ThenBy(e => e.Id)
                         .FirstOrDefault();
                     if (foe == null) return Explore("몬스터 없음: 탐험");
                     int fx = TileMap.Cell(foe.Position.X), fy = TileMap.Cell(foe.Position.Y);
@@ -484,23 +490,67 @@ namespace Game.Core
             float best = float.MaxValue;
             foreach (var enemy in _world.Enemies)
             {
-                if (enemy.IsDead || _ignored.TryGetValue(enemy.Id, out long until) && until > _world.Tick) continue;
+                // One under the ground cannot be hit: swinging at its mound is not fighting it.
+                if (enemy.IsDead || enemy.Away || _ignored.TryGetValue(enemy.Id, out long until) && until > _world.Tick) continue;
                 float d = Vec2.Distance(enemy.Position, _player.Position);
-                if (d > enemy.Definition.Radius + World.PlayerRadius + World.MeleeReach * 0.9f || d >= best) continue;
+                if (d > enemy.Definition.Radius + World.PlayerRadius + World.MeleeReach * 0.9f) continue;
+                // One that mends or rouses the rest is struck before the nearest (support first).
+                if (First(enemy)) d -= 100;
+                if (d >= best) continue;
                 best = d;
                 nearest = enemy;
             }
             return nearest == null ? ((int, Vec2, float)?)null : (nearest.Id, nearest.Position, nearest.Health);
         }
 
+        // Struck first, before the nearest: one that mends or rouses the others (Docs/MonsterPatterns.md 돕는 적, "먼저
+        // 잡아라").
+        public static bool First(Enemy enemy) => enemy.Definition.Role == MonsterRole.Support;
+
+        // Of a monster that guards its front (MonsterTraitKind.Guard), with its guard up and whoever is at from inside
+        // that front: the way round it, along a circle about it toward its nearer side and in or out to a swing's
+        // reach, so a fighter keeps striking while it gets to the flank. Zero when there is nothing to go round
+        // (Docs/MonsterPatterns.md 호수 게 "옆으로 돌아라", 마족 병사 "뒤로 돌아").
+        // One that turns slowly (MonsterTraitKind.Turn) is circled on until the bot is well behind it: it keeps turning
+        // after the bot, which runs round faster. Any other faces whoever it chases at once, so going round it is only
+        // worth it while it winds up (its front held where it began) and then is also the way out of its blow.
+        public static Vec2 Flank(Enemy enemy, Vec2 from)
+        {
+            var guard = enemy.Definition.Trait(MonsterTraitKind.Guard);
+            if (guard == null || enemy.IsDead || enemy.State == EnemyState.Recover || enemy.State == EnemyState.Stagger) return Vec2.Zero;
+            bool turns = enemy.Definition.Has(MonsterTraitKind.Turn);
+            if (!turns && enemy.State != EnemyState.Windup) return Vec2.Zero;
+            var toward = from - enemy.Position;
+            if (toward.LengthSquared < 1e-6f || enemy.Facing.LengthSquared < 1e-6f) return Vec2.Zero;
+            var outward = toward.Normalized;
+            var facing = enemy.Facing.Normalized;
+            float arc = turns ? 180 - FlankBehind : guard.Number(0, 120) * 0.5f + FlankMargin;
+            if (Vec2.Dot(outward, facing) < MathF.Cos(arc * MathF.PI / 180f)) return Vec2.Zero;
+            float cross = facing.X * outward.Y - facing.Y * outward.X;
+            var side = cross >= 0 ? new Vec2(-outward.Y, outward.X) : new Vec2(outward.Y, -outward.X);
+            // In or out toward a swing's reach of it (going round a circle by straight steps drifts outward).
+            float keep = enemy.Definition.Radius + World.PlayerRadius + World.MeleeReach * 0.6f;
+            return (side + outward * Math.Clamp(keep - toward.Length, -1, 1)).Normalized;
+        }
+
+        // How far past a guard's edge the bot goes round one that faces it at once, and how near straight behind one
+        // that turns slowly it stops, in degrees.
+        public const float FlankMargin = 20;
+        public const float FlankBehind = 30;
+
         // A warning on the floor there (not a share marker, nor a cloud that only fills monsters or the mark of where a
         // monster will blink to), with a little to spare so the bot does not stop on its very edge.
+        // A monster's cloud of spores, ice or sand only bites a little or slows: walked through to get at whoever
+        // left it (2026-11-22: kept out by the clouds a rooted mushroom throws again and again, the bot never reached
+        // it and gave a request up).
         bool Danger(Vec2 at) => _world.Hazards.Any(h => h.Shape != HazardShape.Share && h.Shape != HazardShape.Web && h.Shape != HazardShape.Balm
-            && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f));
+            && !Mild(h) && !(h.Damage == 0 && h.Mark == (byte)MonsterAttackShape.Blink + 1) && h.Contains(at, World.PlayerRadius + 0.1f));
 
         // Standing in a warning on the floor (not a share marker): toward the nearest spot out of every one.
         // Fighting a boss, not a spot outside its ground while there is one inside (2026-11-21: stepping out of its
         // slimes' marks always the same way, the bot walked out of the arena and the boss went back to sleep).
+        static bool Mild(Hazard h) => h.Mark != 0 && (h.Shape == HazardShape.Spore || h.Shape == HazardShape.Ice || h.Shape == HazardShape.Sand);
+
         Vec2? WayOutOfDanger(BotTarget target)
         {
             if (!Danger(_player.Position)) return null;
@@ -508,18 +558,45 @@ namespace Game.Core
             foreach (bool inside in new[] { true, false })
             {
                 if (inside && boss == null) continue;
+                // Marks thrown from afar (a wisp's icicles): of the ways out, the one that goes on along the bot's path,
+                // so it closes on whoever throws them (2026-11-22: stepping out always the same way, a bot under three
+                // wisps' icicles never reached them and fell sixty times). Up close the first way out, as before.
+                var onward = Path.Count > 0 && ThrownFromAfar() ? TileMap.Center(Path[0].X, Path[0].Y) - _player.Position : Vec2.Zero;
+                if (onward.LengthSquared > 1e-6f) onward = onward.Normalized;
                 foreach (float reach in new[] { 1.5f, 2.5f, 3.5f, 5f })
                 {
+                    Vec2? best = null;
+                    float bestDot = float.NegativeInfinity;
                     for (int k = 0; k < 8; k++)
                     {
                         var step = new Vec2(MathF.Cos(k * MathF.PI / 4), MathF.Sin(k * MathF.PI / 4)) * reach;
                         var to = _player.Position + step;
                         if (inside && Vec2.Distance(to, boss.Home) > boss.ArenaRadius) continue;
-                        if (Nav.Walkable(TileMap.Cell(to.X), TileMap.Cell(to.Y)) && !Danger(to)) return step;
+                        if (!Nav.Walkable(TileMap.Cell(to.X), TileMap.Cell(to.Y)) || Danger(to)) continue;
+                        float dot = Vec2.Dot(step, onward);
+                        if (dot <= bestDot + 1e-4f) continue;
+                        bestDot = dot;
+                        best = step;
                     }
+                    if (best != null) return best;
                 }
             }
             return null;
+        }
+
+        // Whether every mark the bot stands in was laid by a monster well out of reach.
+        bool ThrownFromAfar()
+        {
+            bool any = false;
+            foreach (var hazard in _world.Hazards)
+            {
+                if (hazard.Shape == HazardShape.Share || hazard.Shape == HazardShape.Web || hazard.Shape == HazardShape.Balm || Mild(hazard)) continue;
+                if (!hazard.Contains(_player.Position, World.PlayerRadius + 0.1f)) continue;
+                var from = _world.Enemies.FirstOrDefault(e => e.Id == hazard.Source);
+                if (from == null || Vec2.Distance(from.Position, _player.Position) < 3.5f) return false;
+                any = true;
+            }
+            return any;
         }
 
         // Writes down where the bot gave up and why (BotMemory.Stuck).

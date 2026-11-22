@@ -11,10 +11,14 @@ namespace CoreSandbox
     // and classes kill and how much the bot gets hurt.
     static class FightSim
     {
-        public static void Run(LootData loot, MonsterData monsters, int seconds, ulong seed, string[] gear, ClassDefinition[] classes, bool dodge)
+        // only: instead of what the cave brings, these kinds alone, kept at four round the bot (--monsters a,b: how a
+        // biome's own monsters fight, whatever zone they live in; Docs/MonsterPatterns.md).
+        public static void Run(LootData loot, MonsterData monsters, int seconds, ulong seed, string[] gear, ClassDefinition[] classes, bool dodge, string[] only = null)
         {
             var generated = WorldGenerator.Generate(seed);
-            var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = 40, SpawnDistance = 6 }, loot);
+            var kindsOnly = (only ?? Array.Empty<string>()).Select(id => monsters.Find(id) ?? throw new ArgumentException("몬스터가 없습니다: " + id)).ToList();
+            var world = new World(generated.Map, generated.Spawn, monsters, seed, new WorldConfig { EnemyTarget = kindsOnly.Count > 0 ? 0 : 40, SpawnDistance = 6 }, loot);
+            var bring = new GameRandom(seed, 7);
             var random = new GameRandom(seed, 99);
             var generator = new LootGenerator(loot);
             var equipment = new Equipment();
@@ -27,7 +31,7 @@ namespace CoreSandbox
             var skills = new SkillBot(player, loot);
             var toEnemies = new FlowField(world.Map);
 
-            int kills = 0, deaths = 0, dealt = 0, taken = 0, swings = 0, hits = 0;
+            int kills = 0, deaths = 0, dealt = 0, taken = 0, swings = 0, hits = 0, guarded = 0;
             var killsByMonster = new Dictionary<string, int>();
             var takenByMonster = new Dictionary<string, int>();
             var names = new Dictionary<int, string>();
@@ -37,9 +41,20 @@ namespace CoreSandbox
             var takenByAttack = new Dictionary<string, Dictionary<string, int>>();
             for (int tick = 0; tick < seconds * World.TicksPerSecond; tick++)
             {
-                if (tick % 10 == 0) toEnemies.Build(world.Enemies.Select(e => e.Position), 64);
+                if (kindsOnly.Count > 0 && tick % 30 == 0 && world.Enemies.Count(e => !e.IsDead) < 4)
+                {
+                    // Somewhere open six to eight tiles off, so they come as a field's monsters do.
+                    for (int tries = 0; tries < 20; tries++)
+                    {
+                        var at = player.Position + Vec2.FromAngle(bring.NextFloat() * 2 * MathF.PI) * (6 + bring.NextFloat() * 2);
+                        if (!world.Map.InBounds(TileMap.Cell(at.X), TileMap.Cell(at.Y)) || Collision.Overlaps(world.Map, at, 0.5f, monster: true)) continue;
+                        world.SpawnEnemy(kindsOnly[bring.Next(kindsOnly.Count)], at);
+                        break;
+                    }
+                }
+                if (tick % 10 == 0) toEnemies.Build(world.Enemies.Where(e => !e.Away).Select(e => e.Position), 64);
                 Drive(world, player, toEnemies, dodge);
-                var nearest = world.Enemies.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
+                var nearest = world.Enemies.Where(e => !e.Away).OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
                 skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
                 foreach (var enemy in world.Enemies)
                 {
@@ -59,6 +74,7 @@ namespace CoreSandbox
                         byAttack[attack] = byAttack.GetValueOrDefault(attack) + e.Amount;
                     }
                     if (e.Type == SimEventType.Attack && e.Source == player.Id) swings++;
+                    if (e.Type == SimEventType.Guarded) guarded++;
                     if (e.Type == SimEventType.Hit && e.Source == player.Id)
                     {
                         hits++;
@@ -79,7 +95,8 @@ namespace CoreSandbox
                 int all = pair.Value.Values.Sum();
                 Console.WriteLine($"  {pair.Key}의 공격별: " + string.Join(", ", pair.Value.OrderByDescending(p => p.Value).Select(p => $"{p.Key} {p.Value} ({p.Value * 100 / Math.Max(1, all)}%)")));
             }
-            Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 기본 공격 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)");
+            Console.WriteLine($"준 피해 {dealt} (초당 {dealt / (double)seconds:0.0}), 기본 공격 {swings}회, 맞힌 횟수 {hits}회 (한 번에 여럿 맞힐 수 있음)"
+                + (guarded > 0 ? $", 등딱지·방패에 막힌 타격 {guarded}회" : ""));
             Console.WriteLine($"  나눠 보면: {skills.Summary()}");
             Console.WriteLine($"받은 피해 {taken} (초당 {taken / (double)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}, 마신 물약 {skills.Drunk}개, 구르기 {player.Rolls}번(흘린 타격 {player.Dodges})");
             Console.WriteLine($"주운 것: 아이템 {player.Inventory.Items.Count}개, 룬 {player.Inventory.Runes.Values.Sum()}개, 남은 물약 {player.Inventory.Consumables.Values.Sum()}개 (바닥에 남은 것 {world.GroundLoot.Count}개)");
@@ -91,10 +108,20 @@ namespace CoreSandbox
         internal static void Drive(World world, Player player, FlowField toEnemies, bool dodge)
         {
             if (player.IsDead) return;
-            var target = world.Enemies.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
+            // One under the ground cannot be hit: the bot goes for what it can reach (and steps off marks meanwhile).
+            // One that mends or rouses the rest is gone for first when it is near (BotPilot.First), else the nearest.
+            var nearestOf = world.Enemies.Where(e => !e.Away).OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
+            var target = world.Enemies.Where(e => !e.Away)
+                .OrderBy(e => BotPilot.First(e) && Vec2.Distance(e.Position, player.Position) < 6 ? 0 : 1)
+                .ThenBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
             if (target == null)
             {
                 world.SetAttacking(player.Id, false);
+                var flee = dodge ? BossSim.Escape(world, player, World.Ticks(0.25f)) : Vec2.Zero;
+                // Nothing to hit but mounds: toward the nearest, as a player who sees one goes to spring it.
+                var mound = world.Enemies.Where(e => e.Buried).OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
+                var go = flee.LengthSquared > 0 || mound == null ? flee : (mound.Position - player.Position).Normalized;
+                RollBot.Move(world, player, go, go, flee, dodge);
                 return;
             }
 
@@ -116,14 +143,39 @@ namespace CoreSandbox
             {
                 input = -toTarget.Normalized;
             }
+            else if (dodge && gap <= reach && BotPilot.Flank(target, player.Position) is Vec2 round && round.LengthSquared > 0)
+            {
+                // In reach of a guard's front: round to its side while striking.
+                input = round;
+            }
             else if (gap > reach * 0.7f)
             {
-                input = gap < 2 ? toTarget.Normalized : toEnemies.DirectionFrom(player.Position);
+                // Straight at one that is not the nearest (a mender gone for first) while rock is not in the way, else
+                // the way to the nearest.
+                bool straight = gap < 2 || !ReferenceEquals(target, nearestOf)
+                    && !Collision.Overlaps(world.Map, player.Position + toTarget.Normalized * 0.6f, World.PlayerRadius);
+                input = straight ? toTarget.Normalized : toEnemies.DirectionFrom(player.Position);
                 if (input.LengthSquared < 1e-6f) input = toTarget.Normalized;
             }
 
+            // Not through what burns or bites on the floor (a magma slime's trail, a spore cloud): round it.
+            if (dodge && escape.LengthSquared == 0 && input.LengthSquared > 0) input = RoundPools(world, player, input.Normalized);
             RollBot.Move(world, player, input, toTarget, escape, dodge);
             world.SetAttacking(player.Id, gap <= reach);
+        }
+
+        static bool Harms(World world, Vec2 at) => world.Hazards.Any(h => (h.Shape == HazardShape.Fire || h.Shape == HazardShape.Spore || h.Shape == HazardShape.Venom)
+            && Vec2.Distance(h.Position, at) <= h.Size + 0.15f);
+
+        // The way the bot meant to go, turned aside while the next step of it lands in a pool; stood still if every way does.
+        static Vec2 RoundPools(World world, Player player, Vec2 way)
+        {
+            foreach (float turn in new[] { 0f, 0.7f, -0.7f, 1.4f, -1.4f })
+            {
+                var turned = Vec2.FromAngle(way.Angle + turn);
+                if (!Harms(world, player.Position + turned * 0.5f) && !Collision.Overlaps(world.Map, player.Position + turned * 0.5f, World.PlayerRadius)) return turned;
+            }
+            return Harms(world, player.Position) ? way : Vec2.Zero;
         }
 
         // How close a bot gets before attacking: in swinging reach, or well inside a shot's range so the target

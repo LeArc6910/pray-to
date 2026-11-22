@@ -391,7 +391,7 @@ namespace Game.Core
             float bestDistance = float.MaxValue;
             foreach (var enemy in _enemies)
             {
-                if (enemy.IsDead || !InRange(enemy.Position, enemy.Definition.Radius)) continue;
+                if (enemy.IsDead || enemy.Away || !InRange(enemy.Position, enemy.Definition.Radius)) continue;
                 if (enemy.Id == minion.TargetId) return (enemy.Id, enemy.Position, enemy.Definition.Radius);
                 float distance = Vec2.Distance(enemy.Position, minion.Position);
                 if (distance < bestDistance)
@@ -441,7 +441,7 @@ namespace Game.Core
             if (owner == null) return true;
             var at = projectile.Position;
             var pierced = projectile.Pierced;
-            bool touching = _enemies.Any(e => !e.IsDead && !pierced.Contains(e.Id) && Vec2.Distance(e.Position, at) <= projectile.Radius + e.Definition.Radius)
+            bool touching = _enemies.Any(e => !e.IsDead && !e.Away && !pierced.Contains(e.Id) && Vec2.Distance(e.Position, at) <= projectile.Radius + e.Definition.Radius)
                 || _bosses.Any(b => !b.IsDead && !pierced.Contains(b.Id) && Vec2.Distance(b.Position, at) <= projectile.Radius + b.Definition.Radius);
             if (!touching && !ended) return false;
             // One that goes through hits what it touches and flies on, softer, while it has monsters left to pass.
@@ -493,6 +493,7 @@ namespace Game.Core
             if (enemy.IsDead || enemy.Away) return;
             int amount = Combat.Mitigate(damage * ElementFactor(enemy.Definition, tags) * TakenShare(enemy, from), enemy.Definition.Armor);
             enemy.Health -= amount;
+            enemy.LastTags = tags;
             if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed * push;
             _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
             Leech(player, cause, amount);

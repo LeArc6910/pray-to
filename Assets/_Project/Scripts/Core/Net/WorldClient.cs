@@ -78,6 +78,8 @@ namespace Game.Core
         public Tell EnemyTell => (Tell)((State >> World.EnemyTellShift) & 7);
         public bool Empowered => Kind == EntityKind.Monster && (State & World.EnemyEmpoweredBit) != 0;
         public bool Small => Kind == EntityKind.Monster && (State & World.EnemySmallBit) != 0;
+        // Under the ground between attacks or lying in wait (Enemy.Buried): drawn as a mound, not as itself.
+        public bool Buried => Kind == EntityKind.Monster && EnemyState != EnemyState.Windup && ((State >> World.EnemyTellShift) & 7) == World.EnemyBuriedTell;
         // The sheet attack a monster is winding up, making or resting from; null for one that fights the old way.
         public MonsterAttack MonsterAttack { get; }
         public BossState BossState => (BossState)(State & 0x0F);

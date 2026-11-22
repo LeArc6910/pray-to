@@ -39,9 +39,11 @@ namespace Game.Core
         Nova,
         // Goes under (out of reach) and comes up under its target.
         Burrow,
-        // Burrow from hiding (the hidden wait comes with the sheets, 2b-2).
+        // Burrow from hiding: one with this attack waits under the ground, unseen but for its mound, until someone
+        // comes within the attack's range (World.WaitsInAmbush).
         Ambush,
-        // Marks a spot length away and is there a moment later.
+        // Marks a spot length away and is there a moment later. Aimed at itself it goes away from its target; aimed at
+        // its target it is gone while the mark shows and comes out that far behind them (MonsterAttack.Behind).
         Blink,
         // A circle on its target that drags whoever is in it to its middle at speed, then bursts.
         Pull,
@@ -89,6 +91,10 @@ namespace Game.Core
         Root,
         // Shoved that many tiles away from the blow.
         Push,
+        // Poisoned for that many seconds: World.PoisonShare of the blow again, a bite every half second.
+        Venom,
+        // Slowed for that many seconds, as by a cold monster's blow.
+        Chill,
     }
 
     // How a monster fights and how many come together (monsters.csv role, Docs/WorldRework.md 소모전과 회피전).
@@ -110,7 +116,7 @@ namespace Game.Core
         Guard,
         // Trail:kind:seconds — leaves a pool where it walks.
         Trail,
-        // Aura:kind — parsed for the sheets to come (2b-2).
+        // Aura:guard:reach:percent — with another of its kind within reach, both take that percent less.
         Aura,
         // Deathburst:count:percent — where it fell flashes, then count shards fly out, each that percent of its damage.
         Deathburst,
@@ -118,11 +124,15 @@ namespace Game.Core
         Deathcloud,
         // Never walks.
         Rooted,
-        // Parsed for the sheets to come (2b-2).
+        // Burrowed:seconds — goes under the ground between attacks (out of reach, a ripple on the screen) and stays up
+        // that long after each.
         Burrowed,
+        // Orbit:tiles — never stands: with nothing to do it circles its target that far out.
         Orbit,
         // A charge that ends at a wall leaves it dazed: still, unguarded and taking more for World.StaggerSeconds.
         Stagger,
+        // Turn:degrees — turns no faster than that a second, and only attacks what is in front of it: walk round it.
+        Turn,
     }
 
     public sealed class MonsterTrait
@@ -171,6 +181,8 @@ namespace Game.Core
         public float RangeMax { get; internal set; }
         public MonsterPool Pool { get; internal set; }
         public float Linger { get; internal set; }
+        // The pool's own radius when the sheet gives one (fire:4:0.9); 0 for the size of the blow that left it.
+        public float PoolRadius { get; internal set; }
         // hp<N: below that percent of its health. once: one time in its life. allies>=N: that many others at hand.
         public int HealthBelow { get; internal set; }
         public bool Once { get; internal set; }
@@ -181,6 +193,12 @@ namespace Game.Core
         // Mend and Empower: how long they last. Mine: how long a trap waits.
         public float Duration { get; internal set; }
         public MonsterDefinition Summon { get; internal set; }
+        // The attack it goes straight into when this one is done, with no rest between (a blink, then a cut).
+        public MonsterAttack Then { get; internal set; }
+        internal string ThenId { get; set; }
+
+        // A blink that comes out behind its target, the monster gone while its mark shows.
+        public bool Behind => Shape == MonsterAttackShape.Blink && Target != MonsterAttackTarget.Self;
 
         public Tell Tell => MonsterAttackSheet.TellOf(Shape);
 
@@ -312,8 +330,9 @@ namespace Game.Core
                         Warning = row["warn"] == "" ? AttackWarning.Marked : row["warn"] == "strong" ? AttackWarning.Strong
                             : throw new FormatException($"warn은 비우거나 strong입니다('{row["warn"]}')."),
                         Duration = Number(row, "duration"),
+                        ThenId = row["then"],
                     };
-                    (attack.Pool, attack.Linger) = Pool(row["pool"]);
+                    (attack.Pool, attack.Linger, attack.PoolRadius) = PoolOf(row["pool"]);
                     (attack.Effect, attack.EffectAmount) = Effect(row["effect"]);
                     When(row["when"], attack);
                     if (row["summon"].Length > 0)
@@ -324,6 +343,17 @@ namespace Game.Core
                 catch (FormatException e)
                 {
                     errors.Add($"{File} {row.Line}행: {e.Message}");
+                }
+            }
+
+            foreach (var monster in monsters)
+            {
+                foreach (var attack in monster.Attacks)
+                {
+                    if (string.IsNullOrEmpty(attack.ThenId)) continue;
+                    attack.Then = monster.Attacks.FirstOrDefault(a => a.Id == attack.ThenId);
+                    if (attack.Then == null || attack.Then == attack || attack.Then.Then == attack)
+                        errors.Add($"{File}: '{monster.Id}'의 공격 '{attack.Id}'의 then '{attack.ThenId}'는 그 몬스터의 다른 공격이어야 합니다.");
                 }
             }
         }
@@ -408,20 +438,29 @@ namespace Game.Core
         // "fire:3": what is left and for how many seconds.
         internal static (MonsterPool Kind, float Seconds) Pool(string cell)
         {
-            if (cell.Length == 0) return (MonsterPool.None, 0);
+            var (kind, seconds, _) = PoolOf(cell);
+            return (kind, seconds);
+        }
+
+        // "fire:4:0.9": with a third number, the pool is that wide whatever the blow's size.
+        internal static (MonsterPool Kind, float Seconds, float Radius) PoolOf(string cell)
+        {
+            if (cell.Length == 0) return (MonsterPool.None, 0, 0);
             string[] parts = cell.Split(':');
-            if (parts.Length != 2) throw new FormatException($"pool은 fire:3처럼 적습니다('{cell}').");
+            if (parts.Length != 2 && parts.Length != 3) throw new FormatException($"pool은 fire:3이나 fire:3:0.9처럼 적습니다('{cell}').");
             var kind = SheetValues.ParseEnum<MonsterPool>(parts[0].Trim(), "pool");
             float seconds = SheetValues.ParseDecimal(parts[1].Trim(), "pool");
             if (kind == MonsterPool.None || seconds <= 0 || seconds > 30) throw new FormatException("pool의 시간은 0보다 크고 30초 이하여야 합니다.");
-            return (kind, seconds);
+            float radius = parts.Length == 3 ? SheetValues.ParseDecimal(parts[2].Trim(), "pool") : 0;
+            if (radius < 0 || radius > 5) throw new FormatException("pool의 반지름은 5칸 이하여야 합니다.");
+            return (kind, seconds, radius);
         }
 
         static (HitEffect Kind, float Amount) Effect(string cell)
         {
             if (cell.Length == 0) return (HitEffect.None, 0);
             string[] parts = cell.Split(':');
-            if (parts.Length != 2) throw new FormatException($"effect는 root:1, push:2처럼 적습니다('{cell}').");
+            if (parts.Length != 2) throw new FormatException($"effect는 root:1, push:2, venom:3, chill:2처럼 적습니다('{cell}').");
             var kind = SheetValues.ParseEnum<HitEffect>(parts[0].Trim(), "effect");
             float amount = SheetValues.ParseDecimal(parts[1].Trim(), "effect");
             if (kind == HitEffect.None || amount <= 0 || amount > 5) throw new FormatException("effect의 값은 0보다 크고 5 이하여야 합니다.");
@@ -457,10 +496,21 @@ namespace Game.Core
                         break;
                     case MonsterTraitKind.Guard:
                         if (trait.Number(0, 0) <= 0 || trait.Number(0, 0) > 360) throw new FormatException("guard:각의 각은 0보다 크고 360 이하입니다.");
+                        if (trait.Number(1, 70) <= 0 || trait.Number(1, 70) >= 100) throw new FormatException("guard:각:퍼센트의 퍼센트는 1~99입니다.");
                         break;
                     case MonsterTraitKind.Trail:
                         if (pieces.Length != 3) throw new FormatException("trail은 trail:fire:3처럼 적습니다.");
                         Pool(pieces[1] + ":" + pieces[2]);
+                        break;
+                    case MonsterTraitKind.Aura:
+                        if (pieces.Length != 4 || pieces[1].Trim() != "guard" || trait.Number(1, 0) <= 0 || trait.Number(2, 0) <= 0 || trait.Number(2, 0) >= 100)
+                            throw new FormatException("aura는 aura:guard:1.5:20처럼 적습니다(종류는 guard, 거리, 덜 받는 퍼센트).");
+                        break;
+                    case MonsterTraitKind.Turn:
+                        if (trait.Number(0, 0) < 30) throw new FormatException("turn:각의 각은 초당 30도 이상입니다.");
+                        break;
+                    case MonsterTraitKind.Deathburst:
+                        if (pieces.Length > 3) SheetValues.ParseEnum<SkillTag>(pieces[3].Trim(), "deathburst");
                         break;
                 }
                 traits.Add(trait);

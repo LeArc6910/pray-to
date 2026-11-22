@@ -87,6 +87,16 @@ namespace Game.Client
         TrapSet,
         TrapSnap,
         Mend,
+        // The rest of the kinds (2026-11-22): a bomber's fuse (beeps that come faster), earth breaking as something
+        // comes up or goes under, one going to smoke, fire meeting wet or cold, a sting, a puff of spores, crystal
+        // ringing.
+        Fuse,
+        Burrow,
+        Vanish,
+        Sizzle,
+        Sting,
+        Puff,
+        Chime,
     }
 
     // A monster's kind of voice (2026-11-09): what it sounds like when it notices someone, attacks and is struck.
@@ -468,6 +478,52 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Sine, 0, 0.3f, 520, 780, 0.4f, attack: 0.03f, decay: 2.5f, vibrato: 0.02f, vibratoRate: 7));
                     parts.Add(Noise(0, 0.3f, 0.3f, 0.6f, attack: 0.05f, decay: 3, seed: 61));
                     parts.Add(Tone(Wave.Sine, 0.1f, 0.25f, 1040, 1300, 0.2f, decay: 3));
+                    level = 0.4f;
+                    break;
+                case Sound.Fuse:
+                    // Six beeps over the bomber's 0.9 s, each sooner and higher than the last.
+                    float when = 0;
+                    for (int i = 0; i < 6; i++)
+                    {
+                        parts.Add(Tone(Wave.Square, when, 0.05f, 1400 + 160 * i, 1400 + 160 * i, 0.3f, attack: 0.002f, decay: 6));
+                        when += 0.24f - 0.035f * i;
+                    }
+                    level = 0.4f;
+                    break;
+                case Sound.Burrow:
+                    parts.Add(Noise(0, 0.26f, 0.9f, 0.22f, attack: 0.02f, decay: 3, seed: 62));
+                    parts.Add(Tone(Wave.Sine, 0, 0.2f, 95, 60, 0.6f, attack: 0.01f, decay: 3));
+                    parts.Add(Noise(0.1f, 0.14f, 0.4f, 0.6f, decay: 5, seed: 63));
+                    level = 0.55f;
+                    break;
+                case Sound.Vanish:
+                    parts.Add(Noise(0, 0.3f, 0.5f, 0.75f, attack: 0.12f, decay: 3, seed: 64));
+                    parts.Add(Tone(Wave.Sine, 0, 0.28f, 420, 110, 0.5f, attack: 0.02f, decay: 2.5f));
+                    parts.Add(Tone(Wave.Sine, 0.2f, 0.1f, 1900, 2300, 0.1f, decay: 6));
+                    level = 0.45f;
+                    break;
+                case Sound.Sizzle:
+                    parts.Add(Noise(0, 0.32f, 0.8f, 0.97f, attack: 0.005f, decay: 3.5f, seed: 65));
+                    parts.Add(Noise(0.05f, 0.2f, 0.4f, 0.85f, decay: 4, seed: 66));
+                    parts.Add(Tone(Wave.Sine, 0, 0.08f, 300, 160, 0.3f, decay: 5));
+                    level = 0.4f;
+                    break;
+                case Sound.Sting:
+                    parts.Add(Noise(0, 0.07f, 0.8f, 0.92f, attack: 0.001f, decay: 7, seed: 67));
+                    parts.Add(Tone(Wave.Saw, 0, 0.07f, 1500, 600, 0.3f, attack: 0.001f, decay: 6));
+                    parts.Add(Tone(Wave.Sine, 0.1f, 0.09f, 700, 380, 0.25f, decay: 6));
+                    level = 0.45f;
+                    break;
+                case Sound.Puff:
+                    parts.Add(Noise(0, 0.2f, 0.7f, 0.4f, attack: 0.015f, decay: 4, seed: 68));
+                    parts.Add(Tone(Wave.Sine, 0, 0.12f, 260, 150, 0.4f, attack: 0.005f, decay: 5));
+                    level = 0.45f;
+                    break;
+                case Sound.Chime:
+                    parts.Add(Tone(Wave.Sine, 0, 0.3f, 2350, 2340, 0.4f, attack: 0.001f, decay: 5));
+                    parts.Add(Tone(Wave.Sine, 0.03f, 0.26f, 3130, 3120, 0.25f, decay: 5));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.05f, 1570, 1570, 0.3f, decay: 8));
+                    parts.Add(Noise(0, 0.03f, 0.3f, 0.95f, decay: 8, seed: 69));
                     level = 0.4f;
                     break;
                 case Sound.Step:

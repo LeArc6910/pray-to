@@ -1054,6 +1054,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/rooms.csv`, `Data/World/room_roles.csv`가 `GameSheets`(`rooms`, `roomRoles`)에 들어가야 빌드에 실린다(돌리기 전에는 역할만 있고 조각 없음). 새 파일 `rooms.csv`, `room_roles.csv`, `Core/World/RoomSheet.cs`, `Core/World/WorldGenerator.Roles.cs`, `Client/Art/RoomTileArt.cs`, `Tests/EditMode/RoomRoleTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.89.0. 2판 지형이 바뀌어 1a로 만든 새 월드의 기지는 바위에 묻힐 수 있다
   - (클라우드 웹 점검) `sweep.js --only map`
   - (사람) 얼음 바닥에서 미끄러지는 손맛(PC와 휴대폰 스틱), 모래늪, 방마다 다른 모습(제단·보물·쉼터·잠긴 방·함정·금 간 벽 지름길)이 탐험하는 맛을 주는지
+- [ ] 149단계: 일반 몬스터 열아홉 종의 패턴(`Docs/MonsterPatterns.md`, `Docs/Combat.md` 몬스터의 공격 시트, `Docs/WorldRework.md` 2b-2)
+  - 명령 한 줄을 다시 돌린다(바뀐 시트 `monster_attacks.csv`, `monsters.csv`가 빌드에 실린다). 새 파일 `Tests/EditMode/MonsterKindTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.90.0
+  - (클라우드 웹 점검) `sweep.js --only monsterfx,map`
+  - (사람) 매복 전갈·땅속 지렁이·등 뒤로 오는 심연 추적자·자폭하는 불 박쥐·방패 게·대열 병사·룬 덫 주술사: 예고를 보고 피할 만한지, 억울하지 않은지, 손맛과 소리. 얼음·용암 지대가 너무 아프지 않은지
 
 ## 결과 보고
 

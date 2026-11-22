@@ -24,11 +24,16 @@ namespace Game.Core
         // Held where they stand by a monster's blow (2026-11-21, HitEffect.Root).
         public bool Rooted => RootTicks > 0;
         internal int RootTicks { get; set; }
+        // Poisoned by a monster's sting (HitEffect.Venom): a bite every half second until it runs out.
+        public bool Poisoned => PoisonTicks > 0;
+        internal int PoisonTicks { get; set; }
+        internal float PoisonBite { get; set; }
+        internal int PoisonSource { get; set; }
 
         // As the network carries it (EntityState.Status). Snared is only in a player's own state (the entities' phase
         // byte has room for two marks).
         public byte Bits => (byte)((Burning ? StatusBits.Burning : 0) | (Chilled ? StatusBits.Chilled : 0) | (Snared ? StatusBits.Snared : 0)
-            | (Rooted ? StatusBits.Rooted : 0));
+            | (Rooted ? StatusBits.Rooted : 0) | (Poisoned ? StatusBits.Poisoned : 0));
 
         internal void Clear()
         {
@@ -37,6 +42,7 @@ namespace Game.Core
             ChillTicks = 0;
             SnareTicks = 0;
             RootTicks = 0;
+            PoisonTicks = 0;
         }
 
         // A new burn replaces the old one when it has more damage still to deal.
@@ -72,6 +78,8 @@ namespace Game.Core
         public const byte Snared = 16;
         // Only in the player's own state: held in place (HitEffect.Root).
         public const byte Rooted = 32;
+        // Only in the player's own state: poisoned (HitEffect.Venom).
+        public const byte Poisoned = 64;
     }
 
     // Fire burns for a share of the hit over a few seconds, cold slows, lightning jumps to enemies nearby. A monster
@@ -185,6 +193,7 @@ namespace Game.Core
                 var afflictions = enemy.Afflictions;
                 enemy.Health -= afflictions.TickBurn();
                 if (!ReportBurn(afflictions, enemy.Id, enemy.IsDead)) continue;
+                enemy.LastTags = SkillTag.Fire;
                 _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
                 DropFrom(enemy, FindPlayer(afflictions.BurnSource));
             }
@@ -204,6 +213,8 @@ namespace Game.Core
                 afflictions.TickBurn();
                 int amount = TakeOwed(afflictions, false);
                 if (amount > 0) HurtPlayer(player, afflictions.BurnSource, amount, armor: false, dodge: false);
+                if (afflictions.PoisonTicks > 0 && --afflictions.PoisonTicks % Ticks(VenomSeconds) == 0 && !player.IsDead)
+                    HurtPlayer(player, afflictions.PoisonSource, afflictions.PoisonBite, armor: false, dodge: false);
             }
         }
 

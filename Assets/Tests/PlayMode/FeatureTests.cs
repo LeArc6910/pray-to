@@ -352,5 +352,45 @@ namespace Game.Client.Tests
             World.MonstersHold = false;
             Assert.IsTrue(_root.Playing);
         }
+
+        // The rest of the kinds on the sheet (Docs/MonsterPatterns.md, 2026-11-22): a scorpion lying in wait is a mound
+        // and not a body, two demon soldiers side by side are joined by a line, a stalker's wedge and a caster's runes
+        // are marked, and a blow a beetle's shell turns shows a grey number. Every blow shown is counted.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator EveryKindHasItsOwnAttacks()
+        {
+            yield return Start();
+            Assert.IsNotEmpty(_root.MonsterSheet.Find("abyss_stalker").Attacks, "No rows for the later monsters: monster_attacks.csv is old (Game > Set Up Main Scene).");
+            World.MonstersHold = true;
+            var scorpion = Spawn("sand_scorpion", Player.Position + new Vec2(-3.5f, 2));
+            var soldier = Spawn("demon_soldier", Player.Position + new Vec2(3, 2.2f));
+            var second = Spawn("demon_soldier", Player.Position + new Vec2(3, 3.3f));
+            var stalker = Spawn("abyss_stalker", Player.Position + new Vec2(2, -0.5f));
+            var caster = Spawn("demon_caster", Player.Position + new Vec2(-4, -2));
+            foreach (var monster in new[] { scorpion, soldier, second, stalker, caster }) monster.MaxHealth = monster.Health = 5000;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.IsTrue(scorpion.Buried, "A scorpion that has not made its ambush lies under the ground.");
+            Assert.GreaterOrEqual(_root.MonsterMoundsShown, 1, "It is drawn as a mound.");
+            Assert.GreaterOrEqual(_root.MonsterLinksShown, 1, "Two soldiers side by side are joined by a line.");
+            int blows = _root.MonsterBlowsShown;
+            Assert.IsTrue(World.ForceAttack(stalker, "cleave"));
+            Assert.IsTrue(World.ForceAttack(caster, "rune_trap"));
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.GreaterOrEqual(_root.MonsterMarksShown, 3, "The stalker's wedge and the caster's two runes are drawn.");
+            yield return Screens.Take("monster-kinds-warnings");
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.Greater(_root.MonsterBlowsShown, blows, "The stalker's cut is shown when it lands.");
+            yield return Screens.Take("monster-kinds-blows");
+
+            var beetle = Spawn("cave_beetle", Player.Position + new Vec2(1.4f, 1));
+            beetle.MaxHealth = beetle.Health = 5000;
+            beetle.Facing = (Player.Position - beetle.Position).Normalized;
+            int grey = _root.GuardedNumbersShown;
+            World.Hurt(beetle, Player, 100);
+            yield return new WaitForSecondsRealtime(0.3f);
+            Assert.Greater(_root.GuardedNumbersShown, grey, "A blow its shell turned shows a grey number.");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
     }
 }

@@ -678,8 +678,9 @@ namespace Game.Core
                     m.Id, EntityKind.Minion, IndexOf(_classes?.Skills, m.Skill), m.Position, m.Facing, m.TicksLeft, m.Skill.DurationTicks, 0));
             var shownSoFar = players.Concat(bosses).Concat(minions).ToList();
             var enemies = World.Enemies
-                // One under the ground (a burrow) is not there to be seen.
-                .Where(e => InView(e.Position) && !e.Away)
+                // One under the ground for a burrow or gone for a shadow step is not there to be seen; one that lives
+                // under it or lies in wait is sent, to be drawn as its mound (World.EnemyBuriedTell).
+                .Where(e => InView(e.Position) && (!e.Away || e.Buried))
                 .OrderBy(e => Distance(e.Position))
                 .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
                 .Select(e => new EntityState(

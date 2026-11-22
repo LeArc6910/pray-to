@@ -50,7 +50,7 @@ namespace Game.Client
         // The marks of attacks that start at their monster, made here each frame.
         readonly List<HazardView> _attachedMarks = new List<HazardView>();
         // Whose colours a mark is drawn in and which attack laid it, by the mark's id.
-        readonly Dictionary<int, (FxRamp Ramp, uint Tint, MonsterAttack Attack)> _markLooks = new Dictionary<int, (FxRamp, uint, MonsterAttack)>();
+        readonly Dictionary<int, (FxRamp Ramp, uint Tint, MonsterAttack Attack, MobLook Look)> _markLooks = new Dictionary<int, (FxRamp, uint, MonsterAttack, MobLook)>();
         int _mobPieces;
         int _mobShotsDrawn;
         int _mobShotsShown;
@@ -62,6 +62,16 @@ namespace Game.Client
         public int MonsterFxAlive => _mobFx.Count;
         public int MonsterFxPieces => _mobPieces;
         public int MonsterShotsDrawn => _mobShotsShown;
+        // Blows of monsters' attacks shown since the game began (a count that only grows: a playtest that looks a
+        // moment late still sees that one was shown).
+        public int MonsterBlowsShown { get; private set; }
+        // Bombers' blasts shown since the game began.
+        public int ExplosionsShown { get; private set; }
+        // Mounds drawn last frame for monsters under the ground, and the lines between those that stand in a line.
+        public int MonsterMoundsShown { get; private set; }
+        public int MonsterLinksShown { get; private set; }
+        int _mounds;
+        int _links;
 
         const float Ppu = Sprites.PixelsPerUnit;
 
@@ -100,14 +110,54 @@ namespace Game.Client
                 body.MobLooked = true;
                 body.MobRamp = MonsterFx.RampOf(view.Monster.Id, view.Monster.Element);
                 body.MobTint = MonsterFx.TintOf(body.Color);
+                body.MobKind = MonsterFx.LookOf(view.Monster.Id);
+                body.MobLast = body.Position;
             }
-            float size = view.Small ? 0.6f : 1;
+            // One under the ground is not drawn as itself: only its mound, and a ripple behind it when it travels.
+            bool buried = view.Buried && Feel.MonsterFx;
+            float size = buried ? 0 : view.Small ? 0.6f : 1;
             if (body.Root.localScale.x != size) body.Root.localScale = Vector3.one * size;
 
             var state = view.EnemyState;
             var attack = view.MonsterAttack;
             bool winding = state == EnemyState.Windup && attack != null;
             var feet = body.Position - new Vector3(0, body.Feet, 0);
+            if (buried)
+            {
+                var went = body.Position - body.MobLast;
+                bool moving = went.sqrMagnitude > 1e-6f;
+                if (moving) body.MobDir = new Vec2(went.x, went.y).Normalized;
+                QueueMob(MobFx.Mound, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = body.MobDir.Angle, Armed = moving, Seed = view.Id & 0xFFFF, Look = body.MobKind },
+                    Time.time);
+                _mounds++;
+            }
+            body.MobLast = body.Position;
+            body.MobBuried = buried;
+            // Shoulder to shoulder (MonsterTraitKind.Aura): a thin red line to the nearest of its kind in reach, drawn
+            // once, from the one with the lower id.
+            var aura = view.Monster.Trait(MonsterTraitKind.Aura);
+            if (aura != null && !buried)
+            {
+                float reach = aura.Number(1, 1.5f);
+                Body mate = null;
+                foreach (var other in _others.Values)
+                {
+                    if (other == body || other.Kind != BodyKind.Monster || other.Id != body.Id) continue;
+                    float distance = Vector2.Distance(other.Position, body.Position);
+                    if (distance > reach) continue;
+                    reach = distance;
+                    mate = other;
+                }
+                if (mate != null && body.Position.x <= mate.Position.x)
+                {
+                    var line = mate.Position - new Vector3(0, mate.Feet, 0) - feet;
+                    QueueMob(MobFx.Link, feet, new MobContext { Dir = Mathf.Atan2(line.y, line.x), Size = line.magnitude * Ppu }, Time.time);
+                    _links++;
+                }
+            }
+            // A swoop leaves afterimages behind it.
+            if (state == EnemyState.Charge && body.MobAttack != null && body.MobAttack.Shape == MonsterAttackShape.Swoop)
+                QueueMob(MobFx.Wake, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = view.Facing.Angle, Look = body.MobKind }, Time.time);
             if (winding && (!body.MobWinding || body.MobAttack != attack))
             {
                 body.MobSince = MobNow;
@@ -116,7 +166,8 @@ namespace Game.Client
                 body.MobAt = view.Position;
                 // A charge's later runs wind up in less time (World.AgainTelegraph).
                 body.MobTelegraph = attack.Telegraph * (body.MobState == EnemyState.Charge ? World.AgainTelegraph : 1);
-                Hear(TellSound(attack.Tell), body.Position, 0.8f);
+                // A bomber's fuse is its own sound: beeps that come faster.
+                Hear(attack.Shape == MonsterAttackShape.Explode ? Sound.Fuse : TellSound(attack.Tell), body.Position, 0.8f);
             }
             bool wasWinding = body.MobWinding;
             body.MobWinding = winding;
@@ -130,13 +181,13 @@ namespace Game.Client
                 float before = body.MobElapsed;
                 float elapsed = (float)(MobNow - body.MobSince);
                 body.MobElapsed = elapsed;
-                if (doing.Attached) AttachMarks(body, view, doing, before, elapsed, winding, wasWinding);
+                if (doing.Attached) AttachMarks(body, view, doing, before, elapsed, winding, wasWinding, state);
                 if (winding)
                 {
                     QueueMob(MobFx.Tell, feet, new MobContext
                     {
                         Shape = doing.Shape, Ramp = body.MobRamp, Tint = body.MobTint, Dir = body.MobDir.Angle, Life = body.MobTelegraph,
-                        Size = (doing.Radius + World.PlayerRadius) * Ppu, Seed = view.Id & 0xFFFF,
+                        Size = (doing.Radius + World.PlayerRadius) * Ppu, Seed = view.Id & 0xFFFF, Look = body.MobKind,
                     }, elapsed);
                     if (doing.Shape == MonsterAttackShape.Leap && Feel.MonsterFx) Hop(body, elapsed, body.MobTelegraph);
                 }
@@ -179,7 +230,7 @@ namespace Game.Client
 
         // The marks of an attack that starts at the monster, as the host lays them (World.StartAttack): made from the
         // sheet, where the monster stood and the way it faced when it began. When one's time is up, its blow is shown.
-        void AttachMarks(Body body, EntityView view, MonsterAttack attack, float before, float elapsed, bool winding, bool wasWinding)
+        void AttachMarks(Body body, EntityView view, MonsterAttack attack, float before, float elapsed, bool winding, bool wasWinding, EnemyState state)
         {
             int count = attack.Shape == MonsterAttackShape.Sweep ? Mathf.Max(1, attack.Count) : 1;
             bool rush = attack.Tell == Tell.Dash;
@@ -215,11 +266,14 @@ namespace Game.Client
                 bool over = i == 0 ? !winding : elapsed >= total;
                 if (over)
                 {
-                    bool landed = i == 0 ? wasWinding && elapsed >= total * 0.8f : before < total;
-                    if (landed && !rush) MonsterBlow(attack.Shape, shape, new Vector3(at.X, at.Y, 0), facing, reach, width, body.MobRamp, body.MobTint);
+                    // It landed if the monster went on to rest from it (or, straight into the next attack, by the
+                    // clock). Not by the clock alone: the screen may have seen the wind-up begin late (2026-11-22: a
+                    // slime's half-second bite showed no blow when the first of it came a tenth of a second late).
+                    bool landed = i == 0 ? wasWinding && (state == EnemyState.Recover || elapsed >= total * 0.8f) : before < total;
+                    if (landed && !rush) MonsterBlow(attack.Shape, shape, new Vector3(at.X, at.Y, 0), facing, reach, width, body.MobRamp, body.MobTint, body.MobKind);
                     continue;
                 }
-                _markLooks[id] = (body.MobRamp, body.MobTint, attack);
+                _markLooks[id] = (body.MobRamp, body.MobTint, attack, body.MobKind);
                 _attachedMarks.Add(new HazardView(
                     new HazardState(id, shape, at, facing, reach, width, Mathf.CeilToInt((total - elapsed) * World.TicksPerSecond), Mathf.CeilToInt(total * World.TicksPerSecond),
                         !rush, attack.Warning, (byte)(HazardState.MonsterMark | ((int)attack.Shape + 1))),
@@ -239,10 +293,10 @@ namespace Game.Client
         }
 
         // Whose colours a monster's mark away from it is drawn in: the nearest monster doing that kind of attack.
-        (FxRamp Ramp, uint Tint, MonsterAttack Attack) LookOf(HazardState hazard)
+        (FxRamp Ramp, uint Tint, MonsterAttack Attack, MobLook Look) LookOf(HazardState hazard)
         {
             if (_markLooks.TryGetValue(hazard.Id, out var look)) return look;
-            look = (FxRamp.Plain, 0x1D8D8D8u, null);
+            look = (FxRamp.Plain, 0x1D8D8D8u, null, MobLook.Plain);
             float best = 14;
             foreach (var body in _others.Values)
             {
@@ -250,7 +304,7 @@ namespace Game.Client
                 float distance = Vector2.Distance(body.Position, new Vector2(hazard.Position.X, hazard.Position.Y));
                 if (distance >= best) continue;
                 best = distance;
-                look = (body.MobRamp, body.MobTint, body.MobAttack);
+                look = (body.MobRamp, body.MobTint, body.MobAttack, body.MobKind);
             }
             if (_markLooks.Count > 96) _markLooks.Clear();
             _markLooks[hazard.Id] = look;
@@ -340,6 +394,7 @@ namespace Game.Client
                 Seed = hazard.Id & 0xFFFF,
                 Armed = armed,
                 Harmless = flash,
+                Look = look.Look,
             }, Time.time);
         }
 
@@ -349,13 +404,14 @@ namespace Game.Client
             if (!hazard.Harmful || IsMonsterPool(hazard.Shape) || hazard.MonsterShape + 1 == Hazard.DeathFlash) return;
             var look = LookOf(hazard);
             MonsterBlow((MonsterAttackShape)hazard.MonsterShape, hazard.Shape, new Vector3(hazard.Position.X, hazard.Position.Y, 0), hazard.Direction, hazard.Size, hazard.Width,
-                look.Ramp, look.Tint);
+                look.Ramp, look.Tint, look.Look);
         }
 
         // The blow itself and its sound: the brightest and shortest part, then what thins out (MonsterFx.Land).
-        void MonsterBlow(MonsterAttackShape shape, HazardShape area, Vector3 at, Vec2 facing, float reach, float width, FxRamp ramp, uint tint)
+        void MonsterBlow(MonsterAttackShape shape, HazardShape area, Vector3 at, Vec2 facing, float reach, float width, FxRamp ramp, uint tint, MobLook kind = MobLook.Plain)
         {
             bool line = area == HazardShape.Line, cone = area == HazardShape.Cone;
+            MonsterBlowsShown++;
             AddMobFx(MobFx.Land, at, new MobContext
             {
                 Shape = shape,
@@ -365,13 +421,24 @@ namespace Game.Client
                 Dir = facing.Angle,
                 Size = (reach + World.PlayerRadius) * Ppu,
                 Width = cone ? width : width * Ppu,
+                Look = kind,
             });
+            // The kind's own sound where it has one (spores puff, crystal rings, a sting hisses, magma sizzles, water
+            // splashes); else the shape's.
             var sound = shape switch
             {
+                MonsterAttackShape.Explode => Sound.Boom,
+                MonsterAttackShape.Beam => Sound.Zap,
+                MonsterAttackShape.Thrust when kind == MobLook.Sand => Sound.Sting,
+                MonsterAttackShape.Lob or MonsterAttackShape.Sweep when kind == MobLook.Spore => Sound.Puff,
+                MonsterAttackShape.Leap or MonsterAttackShape.Thrust when kind == MobLook.Ember || kind == MobLook.Hex => Sound.Sizzle,
+                _ when kind == MobLook.Water => Sound.Splash,
+                MonsterAttackShape.Burrow or MonsterAttackShape.Ambush => Sound.Burrow,
+                MonsterAttackShape.Lob when kind == MobLook.Sand => Sound.Burrow,
+                _ when kind == MobLook.Crystal => Sound.Chime,
                 MonsterAttackShape.Leap => Sound.Plop,
                 MonsterAttackShape.Strike or MonsterAttackShape.Sweep => Sound.Swing,
                 MonsterAttackShape.Thrust => Sound.Heavy,
-                MonsterAttackShape.Beam => Sound.Zap,
                 MonsterAttackShape.Pull => Sound.Implode,
                 MonsterAttackShape.Push => Sound.Splash,
                 MonsterAttackShape.Mine or MonsterAttackShape.Explode or MonsterAttackShape.Delayed => Sound.Boom,
@@ -473,6 +540,34 @@ namespace Game.Client
                             AddMobFx(MobFx.Trip, at, new MobContext { Size = 1.2f * Ppu });
                             Hear(Sound.TrapSnap, at);
                             break;
+                        case World.MonsterFxVanish:
+                            AddMobFx(MobFx.Vanish, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new MobContext { Ramp = body != null ? ramp : FxRamp.Violet, Tint = tint });
+                            Hear(Sound.Vanish, at, 0.8f);
+                            break;
+                        case World.MonsterFxQuench:
+                            AddMobFx(MobFx.Quench, at, new MobContext { Ramp = FxRamp.Cold });
+                            Hear(Sound.Sizzle, at, 0.8f);
+                            break;
+                        case World.MonsterFxSurface:
+                            AddMobFx(MobFx.Surface, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new MobContext { Ramp = ramp, Tint = tint });
+                            Hear(Sound.Burrow, at, 0.8f);
+                            break;
+                        case World.MonsterFxDive:
+                            AddMobFx(MobFx.Dive, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new MobContext { Ramp = ramp, Tint = tint });
+                            Hear(Sound.Burrow, at, 0.5f);
+                            break;
+                        case World.MonsterFxExplode:
+                        {
+                            // The bomber leaves the view with its blast, so the host says where; its reach is its
+                            // attack's (Target is the attack's place in its sheet) or, unseen, a bat's.
+                            var bomb = body != null && body.Kind == BodyKind.Monster ? body.MobAttack : null;
+                            float reach = bomb != null && bomb.Shape == MonsterAttackShape.Explode ? bomb.Radius : 1.5f;
+                            MonsterBlow(MonsterAttackShape.Explode, HazardShape.Circle, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new Vec2(1, 0), reach, 0,
+                                body != null ? ramp : FxRamp.Fire, tint, body != null ? body.MobKind : MobLook.Ember);
+                            if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.12f);
+                            ExplosionsShown++;
+                            break;
+                        }
                     }
                     break;
             }
@@ -513,6 +608,17 @@ namespace Game.Client
                     _fxStamps.Add(new FxStamp { Shape = FxShape.Shard, Ramp = FxRamp.Cold, Size = 6, X = Mathf.Cos(i * Mathf.PI / 2 + 0.8f) * 6, Y = Mathf.Sin(i * Mathf.PI / 2 + 0.8f) * 4, Angle = 90, Alpha = 1 });
                 EmitFx(_self.Position - new Vector3(0, _self.Feet, 0), 1, null);
             }
+            // Poisoned (HitEffect.Venom): green drops off the player.
+            if (Feel.MonsterFx && (_client.SelfStatus & StatusBits.Poisoned) != 0)
+            {
+                _fxStamps.Clear();
+                MonsterFx.Stamps(MobFx.Poisoned, new MobContext(), Time.time, _fxStamps);
+                EmitFx(_self.Position - new Vector3(0, _self.Feet, 0), 1, null);
+            }
+            MonsterMoundsShown = _mounds;
+            MonsterLinksShown = _links;
+            _mounds = 0;
+            _links = 0;
             _mobPieces = _fxUsed - before;
             _mobShotsShown = _mobShotsDrawn;
             _mobShotsDrawn = 0;

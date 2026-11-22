@@ -286,7 +286,7 @@ namespace Game.Core
 
         // The nearest monster in range a shot from here can reach (never a boss).
         Enemy TurretTarget(Vec2 at, float range, IEnumerable<Enemy> skip = null) => _enemies
-            .Where(e => !e.IsDead && Vec2.Distance(e.Position, at) <= range && (skip == null || !skip.Contains(e))
+            .Where(e => !e.IsDead && !e.Away && Vec2.Distance(e.Position, at) <= range && (skip == null || !skip.Contains(e))
                 && ClearLine(at + (e.Position - at).Normalized * 0.7f, e.Position, 0.2f))
             .OrderBy(e => Vec2.Distance(e.Position, at))
             .FirstOrDefault();
@@ -326,7 +326,7 @@ namespace Game.Core
                 TurretHit(from, target, TurretDamage * TeslaDamagePercent / 100f, SkillTag.Lightning, 3);
                 from = target.Position;
                 target = _enemies
-                    .Where(e => !e.IsDead && !struck.Contains(e) && Vec2.Distance(e.Position, from) <= TeslaLeap)
+                    .Where(e => !e.IsDead && !e.Away && !struck.Contains(e) && Vec2.Distance(e.Position, from) <= TeslaLeap)
                     .OrderBy(e => Vec2.Distance(e.Position, from))
                     .FirstOrDefault();
             }

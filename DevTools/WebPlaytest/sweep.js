@@ -2206,37 +2206,83 @@ async function skillfx(browser) {
 // asked for. Three pictures each: the warning (the host stopped in the middle of the telegraph), the blow (its effect
 // held at 0.06 s) and what thins out (0.3 s). A mark that starts at the monster is not sent as a hazard: the screen
 // makes it from the monster's state, so "mobMarksShown" counts it while the world's "mobHazards" is the host's own.
-// [monster, name, attack, kind, how far to the right the monster stands]
+// [monster, name, attack, kind, how far to the right the monster stands, options]
+// kind: mark (a warning that lands as a blow), rush (a path it runs), shot, blink, step (a blink to behind the player
+// that goes straight into the next attack), bomb (it goes off and is gone), trap (marks that wait), call (a mend or a
+// rally: it needs an ally). options: pool (the blow leaves something on the floor, which must show and then clear),
+// buried (it is under the ground before: a mound, not a body), hits (standing still is hit), setup (commands first),
+// then (the attack it goes straight into), poison, ally (who a call is for).
 const MobAttacks = [
-  ['slime', '슬라임', 'pounce', 'mark', 3.2],
-  ['slime', '슬라임', 'bite', 'mark', 1.1],
+  ['slime', '슬라임', 'pounce', 'mark', 3.2, { hits: true }],
+  ['slime', '슬라임', 'bite', 'mark', 1.1, { hits: true }],
+  ['spore_shooter', '가시 버섯', 'spore_sac', 'mark', 5.5, { pool: true }],
+  ['spore_shooter', '가시 버섯', 'thorn_fan', 'shot', 2.5],
   ['cave_beetle', '동굴 딱정벌레', 'ram', 'rush', 3],
-  ['frost_wisp', '서리 정령', 'frost_ring', 'mark', 1.8],
+  ['crystal_bat', '수정 박쥐', 'swoop', 'rush', 3],
+  ['crystal_wisp', '수정 정령', 'prism', 'shot', 5],
+  ['crystal_wisp', '수정 정령', 'ray', 'mark', 5, { hits: true }],
+  ['crystal_wisp', '수정 정령', 'shift', 'blink', 2],
+  ['myconid', '버섯 병정', 'spore_smash', 'mark', 1.3, { hits: true }],
+  ['glow_bat', '빛 박쥐', 'swoop', 'rush', 3, { pool: true }],
+  ['ice_slime', '얼음 슬라임', 'pounce', 'mark', 3, { pool: true }],
+  ['ice_slime', '얼음 슬라임', 'bite', 'mark', 1.1],
+  ['frost_wisp', '서리 정령', 'frost_ring', 'mark', 1.8, { hits: true }],
   ['frost_wisp', '서리 정령', 'icicle', 'mark', 5],
+  ['magma_slime', '용암 슬라임', 'eruption', 'mark', 3.2, { pool: true }],
+  ['magma_slime', '용암 슬라임', 'bite', 'mark', 1.1],
+  ['fire_bat', '불 박쥐', 'swoop', 'rush', 3, { pool: true }],
+  ['fire_bat', '불 박쥐', 'dive_bomb', 'bomb', 3, { setup: 'mob fire_bat low 0.2' }],
   ['void_wisp', '공허 정령', 'orb', 'shot', 5],
   ['void_wisp', '공허 정령', 'gravity_well', 'mark', 5],
   ['void_wisp', '공허 정령', 'shift', 'blink', 2],
+  ['abyss_stalker', '심연 추적자', 'shadow_step', 'step', 4, { then: 'cleave' }],
+  ['abyss_stalker', '심연 추적자', 'cleave', 'mark', 1.3, { hits: true }],
+  ['abyss_stalker', '심연 추적자', 'triple', 'rush', 3.5],
+  ['lake_crab', '호수 게', 'claws', 'mark', 1.3, { hits: true }],
+  ['lake_crab', '호수 게', 'mud_dive', 'mark', 6],
+  ['tide_wisp', '물살 정령', 'wave', 'mark', 4.5],
+  ['tide_wisp', '물살 정령', 'mend', 'call', 4, { ally: 'lake_crab' }],
+  ['sand_scorpion', '모래 전갈', 'ambush', 'mark', 2.5, { buried: true, hits: true }],
+  ['sand_scorpion', '모래 전갈', 'pincer', 'mark', 1.2, { then: 'sting' }],
+  ['sand_scorpion', '모래 전갈', 'sting', 'mark', 1.8, { poison: true }],
+  ['sand_worm', '모래 지렁이', 'sand_spit', 'mark', 5, { pool: true, buried: true }],
+  ['sand_worm', '모래 지렁이', 'bite', 'mark', 5, { buried: true }],
+  ['demon_soldier', '마족 병사', 'spear', 'mark', 2, { hits: true }],
+  ['demon_caster', '마족 주술사', 'rune_trap', 'trap', 5],
+  ['demon_caster', '마족 주술사', 'rally', 'call', 4, { ally: 'demon_soldier' }],
+  ['demon_caster', '마족 주술사', 'fire_wall', 'mark', 3.5, { pool: true }],
 ];
 
-async function mobAttack(game, [id, name, attack, kind, gap], prefix = 'monsterfx') {
+async function mobAttack(game, [id, name, attack, kind, gap, options], prefix = 'monsterfx') {
+  const opts = options || {};
   const tag = `${prefix}-${id}-${attack}`;
   await game.send(`fxhold off; speed 1; clear; heal; face 1 0`);
   await game.wait(700);
   await game.send(`spawn ${id} ${gap} 0 5000`);
+  if (opts.ally) await game.send(`spawn ${opts.ally} ${gap - 1} 2 5000; mob ${opts.ally} hurt 0.5`);
+  if (opts.setup) await game.send(opts.setup);
   await game.wait(300);
+  if (opts.buried) {
+    // Under the ground it is a mound, not a body (the screen may show it a moment after the host has it).
+    const under = await pollState(game, st => st.mobBuried > 0 && st.mobMounds > 0, 2500);
+    check(under.mobBuried > 0 && under.mobMounds > 0, `${name}: 땅속에 있을 때 흙무더기로 보인다 (땅속 ${under.mobBuried}마리, 무더기 ${under.mobMounds}개)`);
+    await game.shot(`${tag}-0`, `${name}: 땅속(흙무더기)`);
+  }
   const before = await game.state();
   await game.send(`mob ${id} use ${attack}`);
   // The warning: wait until the screen has it, then hold the world still for the picture.
-  const warned = await pollState(game, st => st.mobMarksShown > 0 || (kind === 'shot' && /Windup/.test(st.mobs || '')), 2000);
+  const marked = kind !== 'shot' && kind !== 'call';
+  const warned = await pollState(game, st => st.mobMarksShown > 0 || (!marked && /Windup/.test(st.mobs || '')), 2000);
   await game.send('speed 0');
   await game.wait(250);
-  const held = await game.state();
+  // The screen can lag the host by a second in a recorded headless browser: looked at for a while, not once.
+  const held = await pollState(game, st => new RegExp(`${id}:Windup:${attack}`).test(st.mobs || '') && st.mobFxPieces > 0 && (!marked || st.mobMarksShown > 0), 2500);
   check(new RegExp(`${id}:Windup:${attack}`).test(held.mobs || ''), `${name} ${attack}: 예고가 시작된다 (${held.mobs})`);
-  if (kind !== 'shot') {
+  if (marked) {
     check(held.mobHazards > 0, `${name} ${attack}: 호스트에 장판이 있다 (${held.mobHazards}개)`);
-    check(warned.mobMarksShown > 0 && held.mobFxPieces > 0, `${name} ${attack}: 바닥 표시가 그려진다 (표시 ${held.mobMarksShown}개, 조각 ${held.mobFxPieces}개)`);
+    check((warned.mobMarksShown > 0 || held.mobMarksShown > 0) && held.mobFxPieces > 0, `${name} ${attack}: 바닥 표시가 그려진다 (표시 ${held.mobMarksShown}개, 조각 ${held.mobFxPieces}개)`);
   } else {
-    check(held.mobFxPieces > 0, `${name} ${attack}: 쏘기 전 몸짓이 그려진다 (조각 ${held.mobFxPieces}개)`);
+    check(held.mobFxPieces > 0, `${name} ${attack}: ${kind === 'call' ? '부르는' : '쏘기 전'} 몸짓이 그려진다 (조각 ${held.mobFxPieces}개)`);
   }
   await game.shot(`${tag}-1`, `${name} ${attack}: 예고`);
 
@@ -2250,23 +2296,57 @@ async function mobAttack(game, [id, name, attack, kind, gap], prefix = 'monsterf
     check(drawn.mobShots > 0, `${name} ${attack}: 탄이 그 몬스터의 모습으로 그려진다 (조각 ${drawn.mobFxPieces}개)`);
     await game.shot(`${tag}-2`, `${name} ${attack}: 날아가는 중`);
     await game.send('speed 1');
-    const home = await pollState(game, st => st.bossShots === 0, 6000);
-    check(home.bossShots === 0, `${name} ${attack}: 탄이 돌아가 사라진다`);
+    const home = await pollState(game, st => st.bossShots === 0, 7000);
+    check(home.bossShots === 0, `${name} ${attack}: 탄이 사라진다`);
     await game.shot(`${tag}-3`, `${name} ${attack}: 끝난 뒤`);
+    return;
+  }
+
+  if (kind === 'call') {
+    // Made when the telegraph is over: a line to the ally it mends, or a ring and flames at the feet of the roused.
+    await game.send('fxhold 0.1; speed 1');
+    const made = await pollState(game, st => attack === 'mend' ? /:Channel:/.test(st.mobs || '') : st.mobFx > 0, 3000);
+    check(attack === 'mend' ? /:Channel:/.test(made.mobs || '') : made.mobFx > 0, `${name} ${attack}: 예고가 끝나면 이루어진다 (${made.mobs})`);
+    await game.wait(300);
+    const drawn = await pollState(game, st => st.mobFxPieces > 0, 1500);
+    check(drawn.mobFxPieces > 0, `${name} ${attack}: 이음줄이나 북돋인 표시가 그려진다 (조각 ${drawn.mobFxPieces}개)`);
+    await game.shot(`${tag}-2`, `${name} ${attack}: 이루어진 뒤`);
+    await game.send('fxhold off');
     return;
   }
 
   // The blow, held at its brightest; then what thins out.
   await game.send('fxhold 0.06; speed 1');
-  const landed = await pollState(game, st => st.mobHazards === 0, 5000);
-  check(landed.mobHazards === 0, `${name} ${attack}: 장판이 터지고 사라진다`);
-  if (kind === 'mark') {
-    const blow = await pollState(game, st => st.mobFx > 0, 1500);
-    check(blow.mobFx > 0, `${name} ${attack}: 터지는 이펙트가 그려진다 (조각 ${blow.mobFxPieces}개)`);
-    if (attack === 'frost_ring') check((await pollState(game, st => st.rooted, 800)).rooted, `${name} ${attack}: 맞으면 묶인다`);
-    if (attack === 'pounce' || attack === 'bite' || attack === 'frost_ring') check(landed.health < before.health || (await game.state()).health < before.health, `${name} ${attack}: 서 있으면 맞는다`);
+  if (opts.then) {
+    // Straight into the next attack: its wind-up shows before anything else is waited for.
+    const next = await pollState(game, st => new RegExp(`${id}:Windup:${opts.then}`).test(st.mobs || ''), 3000);
+    check(new RegExp(`${id}:Windup:${opts.then}`).test(next.mobs || ''), `${name} ${attack}: 쉬지 않고 ${opts.then}으로 이어진다 (${next.mobs})`);
+    if (kind === 'step') {
+      check(before.foe !== next.foe, `${name} ${attack}: 플레이어 뒤로 옮겨 갔다 (${before.foe} → ${next.foe})`);
+      await game.shot(`${tag}-2`, `${name} ${attack}: 뒤에 나타나 ${opts.then}을 예고`);
+    }
   }
-  await game.shot(`${tag}-2`, `${name} ${attack}: ${kind === 'mark' ? '터지는 순간(0.06초)' : kind === 'rush' ? '달리는 중' : '옮겨 간 뒤'}`);
+  const landed = await pollState(game, st => st.mobHazards === 0, kind === 'trap' ? 10000 : 6000);
+  check(landed.mobHazards === 0, `${name} ${attack}: 장판이 터지고 사라진다`);
+  if (kind === 'mark' || kind === 'trap' || kind === 'bomb') {
+    // Counted since the game began, so a look that comes a moment late still sees it (2026-11-22: "mobFx > 0" read
+    // once missed a slime's bite in a recorded browser whose screen ran a second behind).
+    const blow = await pollState(game, st => st.mobBlows > before.mobBlows, 3000);
+    check(blow.mobBlows > before.mobBlows, `${name} ${attack}: 터지는 이펙트가 그려진다 (${blow.mobBlows - before.mobBlows}번, 조각 ${blow.mobFxPieces}개)`);
+    if (attack === 'frost_ring') check((await pollState(game, st => st.rooted, 800)).rooted, `${name} ${attack}: 맞으면 묶인다`);
+    if (opts.poison) check((await pollState(game, st => st.poisoned, 1500)).poisoned, `${name} ${attack}: 맞으면 독에 걸린다`);
+    if (opts.hits) check((await pollState(game, st => st.health < before.health, 1500)).health < before.health, `${name} ${attack}: 서 있으면 맞는다`);
+    if (kind === 'bomb') {
+      const gone = await pollState(game, st => st.explosions > before.explosions && st.monsters === 0, 2000);
+      check(gone.explosions > before.explosions && gone.monsters === 0, `${name} ${attack}: 터지고 사라진다 (폭발 ${gone.explosions - before.explosions}번, 남은 몬스터 ${gone.monsters})`);
+    }
+  }
+  if (opts.pool) {
+    // Before the picture: a swoop's trail lasts two seconds.
+    const left = await pollState(game, st => st.mobPools > 0 && st.mobPoolsShown > 0, 2500);
+    check(left.mobPools > 0 && left.mobPoolsShown > 0, `${name} ${attack}: 바닥에 남는 것이 그려진다 (호스트 ${left.mobPools}개, 화면 ${left.mobPoolsShown}개)`);
+  }
+  if (kind !== 'step') await game.shot(`${tag}-2`, `${name} ${attack}: ${kind === 'rush' ? '달리는 중' : kind === 'blink' ? '옮겨 간 뒤' : '터지는 순간(0.06초)'}`);
   if (kind === 'blink') {
     const after = await game.state();
     check(before.foe !== after.foe, `${name} ${attack}: 다른 자리로 옮겨 갔다 (${before.foe} → ${after.foe})`);
@@ -2275,8 +2355,12 @@ async function mobAttack(game, [id, name, attack, kind, gap], prefix = 'monsterf
   await game.wait(450);
   await game.shot(`${tag}-3`, `${name} ${attack}: 흩어짐(0.3초)`);
   await game.send('fxhold off');
-  const gone = await pollState(game, st => st.mobFx === 0 && st.mobMarksShown === 0, 2500);
+  const gone = await pollState(game, st => st.mobFx === 0 && st.mobMarksShown === 0 && st.mobHazards === 0, opts.then ? 5000 : 2500);
   check(gone.mobFx === 0 && gone.mobMarksShown === 0, `${name} ${attack}: 끝난 뒤 남는 것이 없다 (이펙트 ${gone.mobFx}개, 표시 ${gone.mobMarksShown}개)`);
+  if (opts.pool) {
+    const cleared = await pollState(game, st => st.mobPools === 0 && st.mobPoolsShown === 0, 6000);
+    check(cleared.mobPools === 0 && cleared.mobPoolsShown === 0, `${name} ${attack}: 바닥에 남은 것이 시간이 지나면 사라진다 (호스트 ${cleared.mobPools}개, 화면 ${cleared.mobPoolsShown}개)`);
+  }
 }
 
 async function monsterfx(browser) {
@@ -2317,9 +2401,40 @@ async function monsterfx(browser) {
   await game.wait(600);
   await game.send('spawn cave_beetle 1.4 0 5000');
   await game.wait(600);
+  const unguarded = await game.state();
   await game.send('fxhold 0.05; mob cave_beetle hurt 0.02');
   await game.wait(350);
+  const turned = await pollState(game, st => st.guardedNumbers > unguarded.guardedNumbers, 2000);
+  check(turned.guardedNumbers > unguarded.guardedNumbers, `등딱지에 막힌 피해 숫자는 회색이다 (${turned.guardedNumbers - unguarded.guardedNumbers}개)`);
   await game.shot('monsterfx-beetle-guard', '딱정벌레의 앞 등딱지에 막힌 순간');
+
+  // An ice slime felled by steel throws shards after a flash; felled by fire it melts and throws none.
+  await game.send('fxhold off; clear; heal');
+  await game.wait(600);
+  await game.send('spawn ice_slime 3 0 5000');
+  await game.wait(300);
+  await game.send('mob ice_slime kill');
+  const shards = await pollState(game, st => st.bossShots > 0, 2500);
+  check(shards.bossShots > 0, `얼음 슬라임은 죽으면 파편을 날린다 (${shards.bossShots}발)`);
+  await game.shot('monsterfx-ice-slime-shards', '얼음 슬라임의 파편');
+  await pollState(game, st => st.bossShots === 0, 3000);
+  await game.send('clear; heal');
+  await game.wait(600);
+  await game.send('spawn ice_slime 3 0 5000');
+  await game.wait(300);
+  await game.send('fxhold 0.15; mob ice_slime melt');
+  await game.wait(1200);
+  const melted = await game.state();
+  check(melted.bossShots === 0 && melted.mobHazards === 0, `화염으로 잡은 얼음 슬라임은 파편을 날리지 않는다 (탄 ${melted.bossShots}발, 표시 ${melted.mobHazards}개)`);
+  await game.shot('monsterfx-ice-slime-melt', '화염으로 녹은 얼음 슬라임(김)');
+
+  // Two demon soldiers shoulder to shoulder: a thin red line between them.
+  await game.send('fxhold off; clear; heal');
+  await game.wait(600);
+  await game.send('spawn demon_soldier 3 0 5000; spawn demon_soldier 3 1.1 5000');
+  const line = await pollState(game, st => st.mobLinks > 0, 2500);
+  check(line.mobLinks > 0, `붙어 선 마족 병사 사이에 이음줄이 그려진다 (${line.mobLinks}개)`);
+  await game.shot('monsterfx-soldier-line', '마족 병사의 대열(붉은 이음줄)');
   await game.send('fxhold off; clear; monsters go');
   await game.context.close();
 
@@ -2330,8 +2445,9 @@ async function monsterfx(browser) {
   await phone.send('goto wild');
   await clearRoom(phone, 9, 6);
   await phone.send('monsters hold; equip iron_armor; heal');
-  await mobAttack(phone, MobAttacks[3], 'monsterfx-phone');
-  await mobAttack(phone, MobAttacks[6], 'monsterfx-phone');
+  const onPhone = (id, attack) => MobAttacks.find(row => row[0] === id && row[2] === attack);
+  for (const row of [onPhone('frost_wisp', 'frost_ring'), onPhone('void_wisp', 'gravity_well'), onPhone('abyss_stalker', 'cleave'), onPhone('demon_caster', 'rune_trap')])
+    await mobAttack(phone, row, 'monsterfx-phone');
   await phone.send('monsters go');
   await phone.context.close();
 }
@@ -3859,7 +3975,7 @@ async function map(browser) {
       await game.send(`goto room ${role} ${biome}`);
       await game.wait(1100);
       const at = await game.state();
-      check(at.room.toLowerCase() === role && !at.dead, `${name}: ${label}에 선다 (${at.room}, ${at.roomChunk || '조각 없음'}, 바닥 ${at.ground})`);
+      check(at.room.toLowerCase() === role && !at.dead, `${name}: ${label}에 선다 (${at.room}, ${at.roomChunk || '조각 없음'}, 바닥 ${at.underfoot})`);
       await game.shot(`map-room-${role}-${biome}`, `${label} (${room.biome}, ${room.chunk || '조각 없음'})`);
     }
 
@@ -3880,14 +3996,14 @@ async function map(browser) {
     let slide = 0;
     for (let i = 0; i < 5; i++) {
       const s = await game.state();
-      if (s.ground === 'IceFloor') slide = Math.max(slide, s.slide);
+      if (s.underfoot === 'IceFloor') slide = Math.max(slide, s.slide);
       await game.wait(40);
     }
     await game.shot('map-ice', '얼음 바닥에서 미끄러지는 중');
     await game.wait(900);
     const still = await game.state();
     check(slide > 0.5, `${name}: 얼음 위에서는 손을 떼도 미끄러진다 (뗀 뒤 속도 ${slide.toFixed(1)}칸/초)`);
-    check(still.slide < 0.05 && still.ground === 'IceFloor', `${name}: 곧 멈춘다 (속도 ${still.slide.toFixed(2)}, 바닥 ${still.ground})`);
+    check(still.slide < 0.05 && still.underfoot === 'IceFloor', `${name}: 곧 멈춘다 (속도 ${still.slide.toFixed(2)}, 바닥 ${still.underfoot})`);
     const pace = async scene => {
       await game.send('goto wild; clear');
       await game.wait(700);

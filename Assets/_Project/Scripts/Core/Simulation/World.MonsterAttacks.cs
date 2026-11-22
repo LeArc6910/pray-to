@@ -17,6 +17,16 @@ namespace Game.Core
         // on them; the rest hold off (Docs/WorldRework.md 전조와 이펙트, 공격 순번).
         public const int MaxMarksPerTarget = 4;
         public const int MaxStrikesPerTarget = 3;
+        // Of a pack that swoops, this many at a time on one player (Docs/MonsterPatterns.md 박쥐).
+        public const int MaxSwoopsPerTarget = 2;
+        // One that turns slowly (MonsterTraitKind.Turn) only attacks a target within this many degrees of its front.
+        public const float TurnAim = 35;
+        // A sting's poison (HitEffect.Venom) deals this share of the blow again over its seconds.
+        public const float PoisonShare = 0.5f;
+        // How far out one circles with no reach given (MonsterTraitKind.Orbit), and how long one that lives under the
+        // ground stays up after an attack with no time given (MonsterTraitKind.Burrowed).
+        public const float OrbitReach = 3;
+        public const float SurfaceSeconds = 2.5f;
         // A hit on a guarding monster's front does this share of its damage; a dazed one takes this much more.
         public const float GuardShare = 0.3f;
         public const float StaggerSeconds = 1.5f;
@@ -40,6 +50,8 @@ namespace Game.Core
         // A fire pool burns for this share of the blow that left it a second; a trail's pool is this wide.
         public const float FirePoolShare = 0.25f;
         public const float TrailRadius = 0.4f;
+        // A trail's pool burns or bites as a blow of this share of its monster's damage would have left it.
+        public const float TrailShare = 0.5f;
         // Where a monster fell: the flash before its shards, the shards' pace and reach; the cloud's size, time and fill.
         public const float DeathburstSeconds = 0.5f;
         public const float DeathburstSpeed = 8;
@@ -59,6 +71,15 @@ namespace Game.Core
         public const int MonsterFxDeathburst = 6;
         public const int MonsterFxMine = 7;
         public const int MonsterFxTurn = 8;
+        // One vanished to come out behind its target; a deathburst put out by the element that quenches it; one that
+        // lives under the ground or lay in wait came up; one went back under.
+        public const int MonsterFxVanish = 9;
+        public const int MonsterFxQuench = 10;
+        public const int MonsterFxSurface = 11;
+        public const int MonsterFxDive = 12;
+        // A bomber went off (it leaves the view with its blast, so the screen is told where; Target is its attack's
+        // place in the sheet).
+        public const int MonsterFxExplode = 13;
 
         // ---- The wire (Docs/WorldRework.md 통신): a monster's state byte carries its EnemyState in the low three bits,
         // the Tell of the attack it winds up above them, then whether it is empowered and whether it is a small one. Its
@@ -67,6 +88,8 @@ namespace Game.Core
         // and no hazard is sent for it. ----
         public const int EnemyStateMask = 7;
         public const int EnemyTellShift = 3;
+        // In the tell's bits of one that is not winding up: it is under the ground (Enemy.Buried), drawn as a mound.
+        public const int EnemyBuriedTell = 7;
         public const int EnemyEmpoweredBit = 64;
         public const int EnemySmallBit = 128;
         public const int EnemyRiftMask = 3;
@@ -74,7 +97,8 @@ namespace Game.Core
 
         public static byte EnemyStateByte(Enemy enemy) =>
             (byte)((int)enemy.State
-                | (enemy.State == EnemyState.Windup && enemy.Attack != null ? (int)enemy.Attack.Tell << EnemyTellShift : 0)
+                | (enemy.State == EnemyState.Windup && enemy.Attack != null ? (int)enemy.Attack.Tell << EnemyTellShift
+                    : enemy.Buried ? EnemyBuriedTell << EnemyTellShift : 0)
                 | (enemy.Empowered ? EnemyEmpoweredBit : 0)
                 | (enemy.Small ? EnemySmallBit : 0));
 
@@ -83,7 +107,8 @@ namespace Game.Core
 
         readonly List<(MonsterDefinition Definition, Vec2 Position, Enemy From, bool Small)> _queuedMonsters =
             new List<(MonsterDefinition Definition, Vec2 Position, Enemy From, bool Small)>();
-        readonly List<(long Tick, Vec2 Position, int Source, int Count, float Damage)> _deathbursts = new List<(long Tick, Vec2 Position, int Source, int Count, float Damage)>();
+        readonly List<(long Tick, Vec2 Position, int Source, int Count, float Damage, bool Chills)> _deathbursts =
+            new List<(long Tick, Vec2 Position, int Source, int Count, float Damage, bool Chills)>();
 
         static int DamageOf(Enemy enemy, MonsterAttack attack) => Math.Max(1, (int)MathF.Round(enemy.Damage * attack.Damage / 100f));
 
@@ -91,13 +116,22 @@ namespace Game.Core
         void TickMonster(Enemy enemy)
         {
             if (enemy.EmpowerTicks > 0) enemy.EmpowerTicks--;
+            bool buried = (enemy.State == EnemyState.Idle || enemy.State == EnemyState.Chase)
+                && (enemy.Definition.Has(MonsterTraitKind.Burrowed) || WaitsInAmbush(enemy));
+            if (buried != enemy.Buried)
+            {
+                enemy.Buried = buried;
+                enemy.Knockback = Vec2.Zero;
+                // Coming up for an attack shows by the attack itself; going back under gets its own puff.
+                if (buried && Tick > 0) _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxDive, position: enemy.Position));
+            }
             var trail = enemy.Definition.Trait(MonsterTraitKind.Trail);
             if (trail == null || enemy.Away) return;
             if (++enemy.TrailTicks == 1) enemy.TrailAt = enemy.Position;
             if (Vec2.Distance(enemy.TrailAt, enemy.Position) < TrailRadius * 2) return;
             enemy.TrailAt = enemy.Position;
             var (kind, seconds) = MonsterAttackSheet.Pool(trail.Arguments[0] + ":" + trail.Arguments[1]);
-            LayPool(enemy.Id, 0, kind, enemy.Position, TrailRadius, seconds, enemy.Damage);
+            LayPool(enemy.Id, 0, kind, enemy.Position, TrailRadius, seconds, enemy.Damage * TrailShare);
         }
 
         // Monsters that came out of a split or a call join the world between ticks (a blow that fells one may land
@@ -131,7 +165,12 @@ namespace Game.Core
                 {
                     var direction = Vec2.FromAngle(start + 2 * MathF.PI * k / burst.Count);
                     _projectiles.Add(new Projectile(_nextId++, burst.Source, 0, burst.Position + direction * 0.2f, direction * DeathburstSpeed, MonsterShotRadius,
-                        burst.Damage, Ticks(DeathburstReach / DeathburstSpeed)));
+                        burst.Damage, Ticks(DeathburstReach / DeathburstSpeed))
+                    {
+                        // Its monster is gone by now, so the shard carries the cold itself.
+                        Effect = burst.Chills ? HitEffect.Chill : HitEffect.None,
+                        EffectAmount = PlayerChillSeconds,
+                    });
                 }
                 _events.Add(new SimEvent(SimEventType.MonsterFx, burst.Source, amount: MonsterFxDeathburst, position: burst.Position));
             }
@@ -155,12 +194,16 @@ namespace Game.Core
                 _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxSplit, position: enemy.Position));
             }
             var burst = definition.Trait(MonsterTraitKind.Deathburst);
-            if (burst != null && !enemy.Small)
+            // Felled by the element that quenches it (an ice slime melted by fire), it leaves no shards.
+            bool quenched = burst != null && burst.Arguments.Count > 2 && Enum.TryParse(burst.Arguments[2], true, out SkillTag quench) && (enemy.LastTags & quench) != 0;
+            if (quenched && !enemy.Small) _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxQuench, position: enemy.Position));
+            if (burst != null && !enemy.Small && !quenched)
             {
                 int ticks = Ticks(DeathburstSeconds);
                 // The flash: a mark that harms nothing, so it is seen and a bot steps off it.
                 _hazards.Add(new Hazard(_nextId++, 0, 0, HazardShape.Circle, enemy.Position, enemy.Facing, 0.4f, 0, 0, Tick, Tick + ticks) { Mark = Hazard.DeathFlash });
-                _deathbursts.Add((Tick + ticks, enemy.Position, enemy.Id, (int)burst.Number(0, 4), enemy.Damage * burst.Number(1, 50) / 100f));
+                _deathbursts.Add((Tick + ticks, enemy.Position, enemy.Id, (int)burst.Number(0, 4), enemy.Damage * burst.Number(1, 50) / 100f,
+                    definition.Element == SkillTag.Cold));
             }
             var cloud = definition.Trait(MonsterTraitKind.Deathcloud);
             if (cloud != null && !enemy.Small)
@@ -178,15 +221,76 @@ namespace Game.Core
             if (enemy.State == EnemyState.Channel || enemy.State == EnemyState.Windup && enemy.Attack != null && enemy.Attack.Tell == Tell.Call)
                 EndAttack(enemy, broken: true);
             if (enemy.State == EnemyState.Stagger) return StaggerMore;
+            float share = 1 - AuraGuard(enemy);
             var guard = enemy.Definition.Trait(MonsterTraitKind.Guard);
             // Its guard is down while it rests after an attack: the opening for whoever got out of its way.
-            if (guard == null || enemy.State == EnemyState.Recover) return 1;
+            if (guard == null || enemy.State == EnemyState.Recover) return share;
             var toward = from - enemy.Position;
-            if (toward.LengthSquared < 1e-6f) return 1;
-            if (Vec2.Dot(toward.Normalized, enemy.Facing.Normalized) < MathF.Cos(guard.Number(0, 120) * 0.5f * MathF.PI / 180f)) return 1;
+            if (toward.LengthSquared < 1e-6f) return share;
+            if (Vec2.Dot(toward.Normalized, enemy.Facing.Normalized) < MathF.Cos(guard.Number(0, 120) * 0.5f * MathF.PI / 180f)) return share;
             _events.Add(new SimEvent(SimEventType.Guarded, enemy.Id));
-            return GuardShare;
+            return share * (1 - guard.Number(1, (1 - GuardShare) * 100) / 100f);
         }
+
+        // The share of a blow a monster's aura turns: with another of its kind within the aura's reach, both take that
+        // much less (aura:guard:reach:percent). 0 for one that stands alone.
+        float AuraGuard(Enemy enemy) => AuraMate(enemy) != null ? enemy.Definition.Trait(MonsterTraitKind.Aura).Number(2, 0) / 100f : 0;
+
+        // The nearest other of its kind inside its aura, or null.
+        public Enemy AuraMate(Enemy enemy)
+        {
+            var aura = enemy.Definition.Trait(MonsterTraitKind.Aura);
+            if (aura == null || enemy.IsDead) return null;
+            float reach = aura.Number(1, 1.5f);
+            Enemy mate = null;
+            foreach (var other in _enemies)
+            {
+                if (other == enemy || other.IsDead || other.Definition != enemy.Definition) continue;
+                float distance = Vec2.Distance(other.Position, enemy.Position);
+                if (distance > reach) continue;
+                reach = distance;
+                mate = other;
+            }
+            return mate;
+        }
+
+        // One with an ambush it has not made yet lies under the ground until someone comes within the ambush's range.
+        static MonsterAttack AmbushOf(Enemy enemy)
+        {
+            foreach (var attack in enemy.Definition.Attacks)
+                if (attack.Shape == MonsterAttackShape.Ambush && (enemy.Used == null || !enemy.Used[attack.Index])) return attack;
+            return null;
+        }
+
+        bool WaitsInAmbush(Enemy enemy) => enemy.State == EnemyState.Idle && !enemy.Small && enemy.Rift == 0 && AmbushOf(enemy) != null;
+
+        // Idle and lying in wait: it comes up under the first player inside its ambush's range, and not before.
+        void LieInWait(Enemy enemy)
+        {
+            var ambush = AmbushOf(enemy);
+            var near = _players
+                .Where(p => !p.IsDead && Gap(enemy, p) <= ambush.RangeMax && !InSafePlace(p.Position) && OpenToMonsters(enemy.Position, p.Position, enemy.Definition.Radius))
+                .OrderBy(p => Vec2.Distance(p.Position, enemy.Position))
+                .FirstOrDefault();
+            if (near == null) return;
+            enemy.TargetId = near.Id;
+            Ready(enemy, ambush);
+            StartAttack(enemy, ambush, near);
+        }
+
+        // Turns a facing toward another by no more than the given degrees.
+        static Vec2 TurnToward(Vec2 facing, Vec2 wanted, float degrees)
+        {
+            float from = facing.Angle, to = wanted.Angle;
+            float delta = to - from;
+            while (delta > MathF.PI) delta -= 2 * MathF.PI;
+            while (delta < -MathF.PI) delta += 2 * MathF.PI;
+            float most = degrees * MathF.PI / 180f;
+            return MathF.Abs(delta) <= most ? wanted : Vec2.FromAngle(from + MathF.Sign(delta) * most);
+        }
+
+        static bool InFront(Enemy enemy, Vec2 toward, float degrees) =>
+            toward.LengthSquared < 1e-6f || Vec2.Dot(toward.Normalized, enemy.Facing.Normalized) >= MathF.Cos(degrees * MathF.PI / 180f);
 
         // ---- Picking ----
 
@@ -211,6 +315,8 @@ namespace Game.Core
         bool Fits(Enemy enemy, MonsterAttack attack, Player target, float gap)
         {
             if (!Ready(enemy, attack)) return false;
+            // Standing on its target (a leap lands there) is as near as can be, not out of range.
+            gap = Math.Max(0, gap);
             if (gap < attack.RangeMin || gap > attack.RangeMax) return false;
             if (attack.HealthBelow > 0 && enemy.Health * 100 >= enemy.MaxHealth * attack.HealthBelow) return false;
             if (attack.AlliesAtLeast > 0 && AlliesOf(enemy) < attack.AlliesAtLeast) return false;
@@ -232,9 +338,21 @@ namespace Game.Core
             // Too many warnings on one player are not read: the others wait their turn.
             if (attack.MarksGround && _enemies.Count(e => e != enemy && e.State == EnemyState.Windup && e.Attack != null && e.Attack.MarksGround && e.TargetId == target.Id)
                 >= MaxMarksPerTarget) return false;
+            // Circles that fall one after another count each: those lying round the player now, those still to come
+            // and this attack's own may not pass the cap either (three wisps' icicles were six circles at once).
+            if (attack.Shape == MonsterAttackShape.Lob || attack.Shape == MonsterAttackShape.Delayed)
+            {
+                int lying = _hazards.Count(h => h.Mark != 0 && !h.Attached && !h.Lingers && h.Damage > 0 && h.Shape == HazardShape.Circle
+                    && Vec2.Distance(h.Position, target.Position) <= h.Size + 2);
+                int coming = _enemies.Where(e => e != enemy && !e.IsDead && e.TargetId == target.Id && e.Attack != null
+                    && (e.Attack.Shape == MonsterAttackShape.Lob || e.Attack.Shape == MonsterAttackShape.Delayed)).Sum(e => e.RepeatsLeft);
+                if (lying + coming + attack.Count > MaxMarksPerTarget) return false;
+            }
             if (attack.Shape == MonsterAttackShape.Strike
                 && _enemies.Count(e => e != enemy && e.State == EnemyState.Windup && e.Attack?.Shape == MonsterAttackShape.Strike && e.TargetId == target.Id) >= MaxStrikesPerTarget)
                 return false;
+            if (attack.Shape == MonsterAttackShape.Swoop && _enemies.Count(e => e != enemy && e.Attack?.Shape == MonsterAttackShape.Swoop && e.TargetId == target.Id
+                && (e.State == EnemyState.Windup || e.State == EnemyState.Charge)) >= MaxSwoopsPerTarget) return false;
             return true;
         }
 
@@ -271,10 +389,33 @@ namespace Game.Core
                     }
                     var toTarget = target.Position - enemy.Position;
                     float gap = Gap(enemy, target);
-                    var choices = definition.Attacks.Where(a => Fits(enemy, a, target, gap)).ToList();
+                    // One that turns slowly attacks only what is in front of it; whoever walks round it has an opening.
+                    var turn = definition.Trait(MonsterTraitKind.Turn);
+                    bool facingIt = turn == null || InFront(enemy, toTarget, TurnAim);
+                    var choices = definition.Attacks.Where(a => (facingIt || a.Target != MonsterAttackTarget.Nearest || a.Shape == MonsterAttackShape.Burrow)
+                        && Fits(enemy, a, target, gap)).ToList();
                     if (choices.Count > 0 && StartAttack(enemy, _random.PickWeighted(choices, a => a.Weight), target)) break;
 
                     var facing = toTarget.LengthSquared > 1e-6f ? toTarget.Normalized : enemy.Facing;
+                    if (turn != null)
+                    {
+                        // It comes on sideways if it must, always turning its front to its target.
+                        facing = TurnToward(enemy.Facing, facing, turn.Number(0, 120) * TickSeconds);
+                        if (gap > EngageGap(enemy) || !ClearLine(enemy.Position, target.Position, ThinLine))
+                        {
+                            var way = gap < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);
+                            if (way.LengthSquared < 1e-6f) way = toTarget.Normalized;
+                            enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, way * (enemy.Speed * TickSeconds), monster: true);
+                        }
+                        enemy.Facing = facing;
+                        break;
+                    }
+                    var orbit = definition.Trait(MonsterTraitKind.Orbit);
+                    if (orbit != null && gap <= orbit.Number(0, OrbitReach) + 2 && ClearLine(enemy.Position, target.Position, ThinLine))
+                    {
+                        Circle(enemy, target, orbit.Number(0, OrbitReach));
+                        break;
+                    }
                     if (definition.Has(MonsterTraitKind.Rooted))
                     {
                         enemy.Facing = facing;
@@ -337,6 +478,24 @@ namespace Game.Core
             }
         }
 
+        // One that never stands (MonsterTraitKind.Orbit): round its target at that reach, turning back where rock stops it.
+        void Circle(Enemy enemy, Player target, float reach)
+        {
+            if (enemy.OrbitSide == 0) enemy.OrbitSide = (enemy.Id & 1) == 0 ? 1 : -1;
+            var offset = enemy.Position - target.Position;
+            float distance = offset.Length;
+            var outward = distance > 1e-4f ? offset / distance : -enemy.Facing;
+            var along = new Vec2(-outward.Y, outward.X) * enemy.OrbitSide;
+            // Along the circle, and in or out toward its reach.
+            float want = reach + enemy.Definition.Radius + PlayerRadius;
+            var direction = (along + outward * Math.Clamp(want - distance, -1, 1)).Normalized;
+            var before = enemy.Position;
+            float step = enemy.Speed * TickSeconds;
+            enemy.Position = Collision.Move(Map, enemy.Position, enemy.Definition.Radius, direction * step, monster: true);
+            if (Vec2.Distance(before, enemy.Position) < step * 0.3f) enemy.OrbitSide = -enemy.OrbitSide;
+            enemy.Facing = direction;
+        }
+
         // For the playtests: monsters that are doing nothing stay so, whoever comes near; one made to attack still does.
         internal bool MonstersHold { get; set; }
 
@@ -362,6 +521,7 @@ namespace Game.Core
                 EffectAmount = attack.EffectAmount,
                 Leaves = attack.Pool,
                 LeavesSeconds = attack.Linger,
+                LeavesRadius = attack.PoolRadius,
             };
             _hazards.Add(hazard);
             return hazard;
@@ -380,7 +540,7 @@ namespace Game.Core
 
             if (attack.Shape == MonsterAttackShape.Blink)
             {
-                var spot = BlinkSpot(enemy, target, attack.Length);
+                var spot = attack.Behind ? SpotBehind(enemy, target, attack.Length) : BlinkSpot(enemy, target, attack.Length);
                 if (spot == null)
                 {
                     enemy.ReadyAt[attack.Index] = Tick + Ticks(1);
@@ -389,7 +549,12 @@ namespace Game.Core
                 enemy.LandAt = spot.Value;
                 // Where it will be: a mark that harms nothing.
                 Lay(enemy, attack, HazardShape.Circle, enemy.LandAt, facing, definition.Radius + 0.25f, 0, 0, resolve);
+                if (attack.Behind) _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxVanish, position: enemy.Position));
             }
+            // One that was under the ground comes up to make it (a burrow comes up where it lands, by itself).
+            if (enemy.Buried && attack.Shape != MonsterAttackShape.Burrow && attack.Shape != MonsterAttackShape.Ambush)
+                _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxSurface, position: enemy.Position));
+            enemy.Buried = false;
 
             enemy.Attack = attack;
             enemy.Facing = facing;
@@ -494,6 +659,24 @@ namespace Game.Core
                 if (!Map.InBounds(TileMap.Cell(spot.X), TileMap.Cell(spot.Y))) continue;
                 if (Collision.Overlaps(Map, spot, enemy.Definition.Radius, monster: true)) continue;
                 if (!OpenToMonsters(enemy.Position, spot, enemy.Definition.Radius)) continue;
+                if (InSafePlace(spot)) continue;
+                return spot;
+            }
+            return null;
+        }
+
+        // A spot that far behind the player (the way they are not looking), or as near to behind as is open and in
+        // their sight: where a shadow step comes out.
+        Vec2? SpotBehind(Enemy enemy, Player target, float length)
+        {
+            float back = (-target.Facing).Angle;
+            float reach = length + enemy.Definition.Radius + PlayerRadius;
+            foreach (float turn in new[] { 0f, 0.5f, -0.5f, 1f, -1f, 1.6f, -1.6f, 2.4f, -2.4f, MathF.PI })
+            {
+                var spot = target.Position + Vec2.FromAngle(back + turn) * reach;
+                if (!Map.InBounds(TileMap.Cell(spot.X), TileMap.Cell(spot.Y))) continue;
+                if (Collision.Overlaps(Map, spot, enemy.Definition.Radius, monster: true)) continue;
+                if (!OpenToMonsters(target.Position, spot, enemy.Definition.Radius) || !ClearLine(target.Position, spot, ThinLine)) continue;
                 if (InSafePlace(spot)) continue;
                 return spot;
             }
@@ -621,10 +804,16 @@ namespace Game.Core
                     _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxBlink, position: enemy.Position));
                     enemy.Position = enemy.LandAt;
                     enemy.Knockback = Vec2.Zero;
+                    if (attack.Behind && target != null)
+                    {
+                        var look = target.Position - enemy.Position;
+                        if (look.LengthSquared > 1e-6f) enemy.Facing = look.Normalized;
+                    }
                     break;
                 case MonsterAttackShape.Explode:
                     // It is gone with its blast (which lands this same tick) and leaves nothing.
                     enemy.Health = 0;
+                    _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, attack.Index, MonsterFxExplode, position: enemy.Position));
                     _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
                     return;
                 case MonsterAttackShape.Summon:
@@ -655,6 +844,13 @@ namespace Game.Core
                     _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxEmpower, position: enemy.Position));
                     break;
             }
+            // Straight into the attack that follows it (a shadow step's cut), with no rest between.
+            if (attack.Then != null && target != null && !target.IsDead)
+            {
+                enemy.ReadyAt[attack.Index] = Tick + Ticks(attack.Cooldown);
+                Ready(enemy, attack.Then);
+                if (StartAttack(enemy, attack.Then, target)) return;
+            }
             Rest(enemy);
         }
 
@@ -671,6 +867,9 @@ namespace Game.Core
                 else if (attack.Shape == MonsterAttackShape.Volley) still = enemy.RepeatsLeft * Ticks(VolleySeconds) + 1;
                 else if (attack.Shape == MonsterAttackShape.Lob || attack.Shape == MonsterAttackShape.Delayed) still = enemy.RepeatsLeft * Ticks(LobSeconds) + 1;
             }
+            // One that lives under the ground stays up a while after it has struck: the time to hit it.
+            var burrowed = enemy.Definition.Trait(MonsterTraitKind.Burrowed);
+            if (burrowed != null) still = Math.Max(still, Ticks(burrowed.Number(0, SurfaceSeconds)));
             enemy.State = EnemyState.Recover;
             enemy.StateTicks = Math.Max(Ticks(enemy.Definition.Cooldown), still);
         }
@@ -702,12 +901,12 @@ namespace Game.Core
                 if (Vec2.Distance(player.Position, enemy.Position) > Math.Max(definition.Radius, attack.Width / 2) + PlayerRadius) continue;
                 enemy.ChargeHits.Add(player.Id);
                 AfflictPlayer(player, enemy.Id, HurtPlayer(player, enemy.Id, DamageOf(enemy, attack), attack.Index));
-                Affect(player, attack.Effect, attack.EffectAmount, enemy.Position);
+                Affect(player, attack.Effect, attack.EffectAmount, enemy.Position, enemy.Id, DamageOf(enemy, attack));
             }
             if (attack.Pool != MonsterPool.None && Vec2.Distance(enemy.TrailAt, enemy.Position) >= attack.Width)
             {
                 enemy.TrailAt = enemy.Position;
-                LayPool(enemy.Id, attack.Index, attack.Pool, enemy.Position, attack.Width / 2, attack.Linger, DamageOf(enemy, attack));
+                LayPool(enemy.Id, attack.Index, attack.Pool, enemy.Position, attack.Width / 2, attack.Linger, DamageOf(enemy, attack), MaxPools);
             }
 
             bool blocked = Vec2.Distance(before, enemy.Position) < step.Length * 0.3f;
@@ -733,7 +932,7 @@ namespace Game.Core
         // ---- Pieces of the hazard and projectile engine (called from World.Boss.cs) ----
 
         // What a blow does besides its damage.
-        void Affect(Player player, HitEffect effect, float amount, Vec2 from)
+        void Affect(Player player, HitEffect effect, float amount, Vec2 from, int source = 0, float blow = 0)
         {
             // A blow rolled through (World.Roll.cs) neither roots nor pushes, as it does no damage.
             if (player.IsDead || player.Dodging) return;
@@ -748,6 +947,15 @@ namespace Game.Core
                     // The host moves them and their client is told where they are now.
                     player.Position = Collision.Move(Map, player.Position, PlayerRadius, away.Normalized * amount, passable: DoorsFor(player));
                     player.Corrections++;
+                    break;
+                case HitEffect.Venom:
+                    int bites = Math.Max(1, Ticks(amount) / Ticks(VenomSeconds));
+                    player.Afflictions.PoisonTicks = bites * Ticks(VenomSeconds);
+                    player.Afflictions.PoisonBite = Math.Max(1, blow * PoisonShare / bites);
+                    player.Afflictions.PoisonSource = source;
+                    break;
+                case HitEffect.Chill:
+                    player.Afflictions.ChillTicks = Math.Max(player.Afflictions.ChillTicks, Ticks(amount));
                     break;
             }
         }
@@ -794,7 +1002,7 @@ namespace Game.Core
             }
             else if (hazard.Shape == HazardShape.Circle || hazard.Shape == HazardShape.Ring)
             {
-                LayPool(hazard.Source, hazard.Cause, hazard.Leaves, hazard.Position, hazard.Size, hazard.LeavesSeconds, damage);
+                LayPool(hazard.Source, hazard.Cause, hazard.Leaves, hazard.Position, hazard.LeavesRadius > 0 ? hazard.LeavesRadius : hazard.Size, hazard.LeavesSeconds, damage);
             }
         }
 

@@ -108,7 +108,8 @@ namespace Game.Core.Tests
         {
             var world = Room();
             var player = world.AddPlayer("a", null);
-            var close = world.SpawnEnemy(Shooter, player.Position + new Vec2(2, 0));
+            // The thorn mushroom is rooted now (2b-2); the tide wisp is a shooter that still backs away.
+            var close = world.SpawnEnemy(Monsters.Shipped.Find("tide_wisp"), player.Position + new Vec2(2, 0));
 
             Run(world, 1);
             Assert.Greater(Vec2.Distance(close.Position, player.Position), 2.5f, "backed away");

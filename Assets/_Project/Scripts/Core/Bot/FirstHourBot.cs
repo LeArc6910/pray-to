@@ -728,7 +728,9 @@ namespace Game.Core
                     break;
                 case BotDo.Fight:
                     Hold(pickaxe: false);
-                    Face(intent.Direction);
+                    // Round a guard's front while striking at it (BotPilot.Flank).
+                    if (intent.Step.LengthSquared > 0) Walk(intent.Step, intent.Direction);
+                    else Face(intent.Direction);
                     _world.SetAttacking(_player.Id, true);
                     break;
                 default:

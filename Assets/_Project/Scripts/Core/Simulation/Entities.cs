@@ -366,8 +366,11 @@ namespace Game.Core
         // The attack it is winding up, making or resting from; null between attacks and for one that fights the old way.
         public MonsterAttack Attack { get; internal set; }
         // Under the ground before a burrow comes up: out of reach and not drawn.
-        public bool Away => State == EnemyState.Windup && Attack != null
-            && (Attack.Shape == MonsterAttackShape.Burrow || Attack.Shape == MonsterAttackShape.Ambush);
+        public bool Away => Buried || State == EnemyState.Windup && Attack != null
+            && (Attack.Shape == MonsterAttackShape.Burrow || Attack.Shape == MonsterAttackShape.Ambush || Attack.Behind);
+        // Under the ground between attacks (MonsterTraitKind.Burrowed) or lying in wait (MonsterAttackShape.Ambush):
+        // out of reach, and on the screen only a mound or a ripple where it is.
+        public bool Buried { get; internal set; }
         // One a split left: smaller, weaker, and it neither splits again nor drops anything.
         public bool Small { get; internal set; }
         // Made stronger by an ally (MonsterAttackShape.Empower) for these ticks, by this share.
@@ -390,6 +393,10 @@ namespace Game.Core
         // Ticks since it last left a pool behind it (MonsterTraitKind.Trail).
         internal int TrailTicks { get; set; }
         internal Vec2 TrailAt { get; set; }
+        // Which way round its target it circles (MonsterTraitKind.Orbit): 1 or -1, turned when it runs into rock.
+        internal int OrbitSide { get; set; }
+        // The elements of the blow that last hurt it (a deathburst that fire quenches).
+        internal SkillTag LastTags { get; set; }
     }
 
     // A spirit a summon skill called. It follows its player, goes after enemies near them and lasts the skill's
@@ -697,6 +704,7 @@ namespace Game.Core
         internal float EffectAmount { get; set; }
         internal MonsterPool Leaves { get; set; }
         internal float LeavesSeconds { get; set; }
+        internal float LeavesRadius { get; set; }
         public long ArmTick { get; internal set; }
         // 0 for a boss's; for a monster's, the attack shape that laid it plus one, or DeathFlash (what the wire
         // carries in place of the cause, HazardState.MonsterShape).

@@ -75,9 +75,14 @@ namespace Game.Core.Tests
             }
             foreach (var monster in Monsters.Shipped.Monsters.Where(m => m.Attacks.Count > 0))
                 Assert.LessOrEqual(monster.Attacks.Count, 3, $"{monster.Id}: a kind has two or three patterns, so it is known by sight");
-            foreach (string id in new[] { "slime", "cave_beetle", "frost_wisp", "void_wisp" })
-                Assert.IsNotEmpty(Monsters.Shipped.Find(id).Attacks, id);
-            Assert.IsEmpty(Monsters.Shipped.Find("spore_shooter").Attacks, "the others fight the old way until their rows come");
+            // Every ordinary kind fights from the sheet (2b-2); only the spider queen's brood keeps the old one blow.
+            foreach (var monster in Monsters.Shipped.Monsters.Where(m => m.Id != "silk_spiderling"))
+            {
+                Assert.IsNotEmpty(monster.Attacks, monster.Id);
+                Assert.AreNotEqual(MonsterRole.None, monster.Role, monster.Id);
+                Assert.GreaterOrEqual(monster.Attacks.Count + monster.Traits.Count, 2, $"{monster.Id}: more than one thing to do");
+            }
+            Assert.IsEmpty(Monsters.Shipped.Find("silk_spiderling").Attacks);
             Assert.AreEqual(MonsterRole.Swarm, Monsters.Shipped.Find("slime").Role);
             Assert.IsTrue(Monsters.Shipped.Find("cave_beetle").Has(MonsterTraitKind.Guard));
             Assert.AreEqual("solo", Monsters.Shipped.Find("abyss_stalker").Pack);
@@ -647,7 +652,7 @@ namespace Game.Core.Tests
             Assert.AreEqual(0, seen.Phase, "no rift mark");
 
             // One that fights the old way reads as before: no warning kind, no attack.
-            var shooter = world.SpawnEnemy(Monsters.Shipped.Find("spore_shooter"), player.Position + open * 3);
+            var shooter = world.SpawnEnemy(Monsters.Shipped.Find("silk_spiderling"), player.Position + open * 3);
             Tick(World.Ticks(1.5f));
             var old = client.Others().Single(e => e.Id == shooter.Id);
             Assert.IsNull(old.MonsterAttack);

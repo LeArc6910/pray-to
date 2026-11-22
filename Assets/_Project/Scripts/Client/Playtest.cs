@@ -257,7 +257,8 @@ namespace Game.Client
                 {
                     // mob <id> use <attack>: the nearest monster of that kind (one is put three tiles ahead if none is
                     // near) starts that attack of monster_attacks.csv now. mob <id> kill [zone]: it falls to the
-                    // player, as one of that zone would (a split comes past the first). mob <id> hurt <share>.
+                    // player, as one of that zone would (a split comes past the first). mob <id> hurt <share>,
+                    // melt (felled by fire), low <share> (its health set).
                     var kind = root.MonsterSheet.Find(words[1]);
                     var mob = world.Enemies.Where(e => !e.IsDead && e.Definition == kind && Vec2.Distance(e.Position, player.Position) < 12)
                         .OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
@@ -269,6 +270,14 @@ namespace Game.Client
                     if (words[2] == "use" && !world.ForceAttack(mob, words[3]))
                         throw new ArgumentException($"'{words[1]}' cannot use '{words[3]}' now (its attacks: {string.Join(", ", kind.Attacks.Select(a => a.Id))})");
                     else if (words[2] == "hurt") world.Hurt(mob, player, Math.Max(1, mob.MaxHealth * Float(words[3])));
+                    // mob <id> melt: it falls to fire (an ice slime then leaves no shards).
+                    else if (words[2] == "melt")
+                    {
+                        mob.Health = 1;
+                        world.Hurt(mob, player, 100000, SkillTag.Fire);
+                    }
+                    // mob <id> low <share>: its health is set to that share (a bomber goes off under 0.3).
+                    else if (words[2] == "low") mob.Health = Math.Max(1, mob.MaxHealth * Float(words[3]));
                     else if (words[2] == "kill")
                     {
                         if (words.Length > 3) mob.ZoneLevels = Math.Max(0, Int(words[3]) - 1);
@@ -890,7 +899,7 @@ namespace Game.Client
                 json.Field("biome", world.Biomes.At(player.Position).ToString());
                 // The floor underfoot (ice slides, quicksand slows: PlayerMotor), the speed the client carries, and the
                 // room the player is nearest the middle of with what it is for (the generator's version 2).
-                json.Field("ground", world.Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)].ToString());
+                json.Field("underfoot", world.Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)].ToString());
                 json.Field("slide", root.LocalClient?.Velocity.Length ?? 0f);
                 json.Field("generator", root.HostGenerated?.Version ?? 0);
                 var roomHere = root.HostGenerated?.Rooms?.Nearest(TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y));
@@ -1006,6 +1015,16 @@ namespace Game.Client
                 json.Field("mobFxPieces", root.MonsterFxPieces);
                 json.Field("mobShots", root.MonsterShotsDrawn);
                 json.Field("rooted", player.Afflictions.Rooted);
+                // The rest of the kinds (2026-11-22): blows shown so far (a count that only grows), those under the
+                // ground near and their mounds drawn, lines between soldiers, bombers' blasts, grey numbers for blows a
+                // guard turned, and whether the player is poisoned.
+                json.Field("mobBlows", root.MonsterBlowsShown);
+                json.Field("mobBuried", near.Count(e => e.Buried));
+                json.Field("mobMounds", root.MonsterMoundsShown);
+                json.Field("mobLinks", root.MonsterLinksShown);
+                json.Field("explosions", root.ExplosionsShown);
+                json.Field("guardedNumbers", root.GuardedNumbersShown);
+                json.Field("poisoned", player.Afflictions.Poisoned);
                 json.Field("renderTrace", root.RenderTrace);
                 json.Field("loot", world.GroundLoot.Count(l => Vec2.Distance(l.Position, player.Position) < 6));
                 // The nearest copper vein within 16 tiles, as the minimap marks it (MapView.Sense).
