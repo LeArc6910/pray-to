@@ -4074,10 +4074,19 @@ async function packs(browser) {
     await game.wait(1200);
     await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on');
 
+    // The room before an arena's door holds no pack (Docs/WorldRework.md 2-1), so up to four of the nearest are tried.
+    const visitPack = async biome => {
+      let answer = '', seen = {};
+      for (let n = 0; n < 4; n++) {
+        answer = (await game.send(`goto room pack ${biome} ${n}`)).join(' ');
+        await game.wait(1600);
+        seen = await game.ask('packs');
+        if ((seen.packs || []).length) break;
+      }
+      return { answer, seen };
+    };
     for (const [biome, label] of PackVisits) {
-      const answer = (await game.send(`goto room pack ${biome}`)).join(' ');
-      await game.wait(1600);
-      const seen = await game.ask('packs');
+      const { answer, seen } = await visitPack(biome);
       const here = (seen.packs || [])[0];
       check(/^ok/.test(answer) && seen.rooms === true, `${name}: ${label}에 간다 (${answer})`);
       check(!!here && here.standing >= 4 && here.inRoom === here.standing,
@@ -4087,8 +4096,7 @@ async function packs(browser) {
     }
 
     // Beside the nearest pack, most of it out of sight; let them go: they come together, each with a mark.
-    await game.send('goto room pack any');
-    await game.wait(1500);
+    await visitPack('any');
     await game.send('goto pack');
     await game.wait(500);
     const before = await game.ask('packs');
