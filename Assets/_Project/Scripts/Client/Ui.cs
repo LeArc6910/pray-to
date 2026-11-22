@@ -341,6 +341,7 @@ namespace Game.Client
         // Call before drawing the list, with the area it is in. Once the finger has moved a few points it is a drag,
         // not a press, so the button it started on is let go and does not fire when the finger lifts.
         const float DragStart = 8;
+        const float JumpLimit = 48;
         static bool _dragArmed;
         static bool _dragging;
         static Vector2 _dragFrom;
@@ -359,6 +360,13 @@ namespace Game.Client
                     break;
                 case EventType.MouseDrag:
                     if (!_dragArmed) break;
+                    // A jump at once, before any drag, is no finger moving but the pointer catching up with a tap
+                    // somewhere else (a phone's touch, 2026-11-22): it starts the drag from there, so the tap stays a tap.
+                    if (!_dragging && (e.mousePosition - _dragLast).magnitude > JumpLimit)
+                    {
+                        _dragFrom = _dragLast = e.mousePosition;
+                        break;
+                    }
                     if (!_dragging && (e.mousePosition - _dragFrom).magnitude > DragStart)
                     {
                         _dragging = true;

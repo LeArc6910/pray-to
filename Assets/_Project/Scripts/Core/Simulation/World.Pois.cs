@@ -64,6 +64,9 @@ namespace Game.Core
             return days.Where(p => p.Value == today).Select(p => p.Key).OrderBy(i => i);
         }
 
+        // Whether the player has ever prayed at a shrine of this world (the guide's poi:shrine, 묶음 4c).
+        public bool PrayedEver(string name) => name != null && _prayed.TryGetValue(name, out var days) && days.Count > 0;
+
         public int? LastCampOf(string name) => name != null && _lastCamps.TryGetValue(name, out int camp) && camp < _pois.Count ? camp : (int?)null;
 
         // Everything the save keeps of the things to find: the opened, the shrines' days by name, the last camps by name.
@@ -267,9 +270,12 @@ namespace Game.Core
                 player.CampTicks = 0;
                 return;
             }
+            // The fire heals, and since rest away from it is slow (묶음 4c, World.Heal) it brings the mana back as fast.
             var rest = near.Definition.Reward(PoiRewardKind.Rest);
             if (rest != null && player.Health < player.Stats.MaxHealth)
                 player.Health = Math.Min(player.Stats.MaxHealth, player.Health + player.Stats.MaxHealth * rest.Min / 100f * TickSeconds);
+            if (rest != null && player.Mana < player.Stats.MaxMana)
+                player.Mana = Math.Min(player.Stats.MaxMana, player.Mana + player.Stats.MaxMana * rest.Min / 100f * TickSeconds);
             if (++player.CampTicks != Ticks(RestSeconds)) return;
             bool moved = LastCampOf(player.Name) != near.Index;
             _lastCamps[player.Name] = near.Index;

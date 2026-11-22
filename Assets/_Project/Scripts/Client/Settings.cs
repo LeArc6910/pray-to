@@ -25,6 +25,8 @@ namespace Game.Client
         static readonly Choice ScreenShakeChoice = new Choice("settings.shake", true);
         static readonly Choice RecordedChoice = new Choice("settings.recorded", true);
         static readonly Choice BossIntroChoice = new Choice("settings.bossintro", true);
+        static readonly Choice RumorsChoice = new Choice("settings.rumors", true);
+        static readonly Choice QuickRestChoice = new Choice("settings.quickrest", false);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -134,6 +136,23 @@ namespace Game.Client
         {
             get => BossIntroChoice.Value;
             set => BossIntroChoice.Value = value;
+        }
+
+        // The way to the story's places and the bosses shown as rumours (묶음 4c, Docs/WorldRework.md 덜 정확한 안내): which
+        // way and in which biome, a faint ring on the map, until the player has been near; off, arrows and distances
+        // as before. On unless chosen (the person's call, 2026-11-21).
+        public static bool Rumors
+        {
+            get => RumorsChoice.Value;
+            set => RumorsChoice.Value = value;
+        }
+
+        // Resting heals as before 묶음 4c (World.QuickRest) in the worlds this player opens or hosts; joiners go by the
+        // host's. Off unless chosen: rest is slower, and camps, shrines and potions matter (the person's call, 2026-11-21).
+        public static bool QuickRest
+        {
+            get => QuickRestChoice.Value;
+            set => QuickRestChoice.Value = value;
         }
 
         // Recorded sounds (CC0 recordings in Resources/Sfx, 2026-11-11) where there are some, or the ones made in code

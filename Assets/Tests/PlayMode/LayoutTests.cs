@@ -85,5 +85,31 @@ namespace Game.Client.Tests
             }
             Assert.IsEmpty(problems, string.Join("\n", problems));
         }
+
+        // The waypoint and waystone list (StoryScreen.ListArea, 2026-11-22: centred on a phone held upright, the minimap
+        // and the [가방]·[나가기] buttons covered its top rows and took their taps) lies inside every screen and clear of
+        // the top right column, however long the list.
+        [Test]
+        public void TheWaypointListKeepsClearOfTheMinimapColumn()
+        {
+            var problems = new List<string>();
+            foreach (var (name, width, height, touch) in Sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Controls.ForceTouch(touch);
+                foreach (float wanted in new[] { 200f, 664f, 2000f })
+                {
+                    var list = StoryScreen.ListArea(Mathf.Min(420, width - 24), wanted);
+                    var column = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea) };
+                    if (touch) column.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
+                    string where = $"{name} {width}×{height}, 목록 {wanted}";
+                    if (!Inside(list, width, height)) problems.Add($"{where}: 화면 밖 {list}");
+                    if (list.height < 120) problems.Add($"{where}: 너무 낮다 {list}");
+                    foreach (var (part, rect) in column)
+                        if (Overlap(list, rect)) problems.Add($"{where}: 겹침 - {part}");
+                }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
     }
 }

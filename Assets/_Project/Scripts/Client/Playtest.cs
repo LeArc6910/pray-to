@@ -47,6 +47,10 @@ namespace Game.Client
     //   travel                    JSON: the minecart lines (length, mended, broken end), the player's ride on host and screen,
     //                             the waystones open, where the wandering merchant stands today and how many rows they sell
     //   mend <line|all>   stones all (every waystone open to the player)   waypoints (the waypoint list, by an open one)
+    //   talk                      to the person of the story in reach, as their button would: JSON of the lines and the rumour
+    //   rumors                    JSON (묶음 4c): the menu's two choices, the rumours heard, how well the way to where the story
+    //                             leads and to each arena is known, and the goal list's story line
+    //   guidance rumor|arrow      the menu's [길 안내]     quickrest on|off   the menu's [쉴 때 회복], and the running world's
     //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways, roads
     //   packs                     JSON: the packs about the player (World.Packs.cs): each one's room, kind, size, monsters standing,
     //                             noticing and out of their own sight; the wanderers, the field's monsters and the caps
@@ -345,6 +349,18 @@ namespace Game.Client
                     // stones all: every waystone open to the player, as if they had touched each.
                     foreach (var stone in world.Stones) world.OpenStone(player, stone);
                     return $"ok stones {world.OpenStones(player).Count()}/{world.Stones.Count}";
+                // Rumours instead of arrows, and slow rest (2026-11-22, 묶음 4c).
+                case "talk":
+                    if (!root.TalkNear()) return "error talk: nobody of the story in reach";
+                    return "talk " + new Json('{').Field("text", root.TalkText ?? "").Field("rumor", root.LastRumor ?? "").Close('}');
+                case "rumors":
+                    return "rumors " + RumorsJson(root);
+                case "guidance":
+                    Settings.Rumors = words[1] != "arrow";
+                    return $"ok guidance {(Settings.Rumors ? "rumor" : "arrow")}";
+                case "quickrest":
+                    Settings.QuickRest = world.QuickRest = words[1] == "on";
+                    return $"ok quickrest {world.QuickRest}";
                 case "waypoints":
                     // The list of waypoints and waystones, as the button over one opens it.
                     return root.OpenWaypoints() ? "ok waypoints" : "error waypoints: no open waypoint or waystone within reach";
@@ -694,6 +710,25 @@ namespace Game.Client
                 .Field("wandererBiome", wanderer is (int wx, int wy) ? world.Biomes[wx, wy].ToString() : "")
                 .Field("wandererShop", npc == null || client == null ? 0 : client.ShopTodayOf(npc).Count)
                 .Field("inReach", world.PoiNear(player.Position, player)?.Definition.Id ?? "")
+                .Close('}');
+        }
+
+        // The rumours (묶음 4c): the choices, what has been heard, how well the ways are known, the story's goal line.
+        static string RumorsJson(GameRoot root)
+        {
+            var client = root.LocalClient;
+            var map = root.Map;
+            var heard = new Json('[');
+            foreach (var rumor in map?.Heard ?? new List<HeardRumor>())
+                heard.Item(new RawJson(new Json('{').Field("kind", rumor.Kind.ToString()).Field("index", rumor.Index).Field("day", rumor.Day).Close('}')));
+            var leads = client?.SiteOf(client.CurrentStep?.Target);
+            string arenas = map == null || client == null ? "" : string.Join(",", Enumerable.Range(0, client.Arenas.Count).Select(i => map.KnowledgeOfArena(i).ToString()));
+            return new Json('{').Field("rumors", Settings.Rumors).Field("quickRest", root.HostWorld?.QuickRest ?? false).Field("quickRestChoice", Settings.QuickRest)
+                .Field("heard", heard.Raw(']')).Field("firstChapter", client != null && Rumors.FirstChapter(client.Story, client.JourneyStep))
+                .Field("leads", leads?.Definition.Id ?? "").Field("leadsKnown", leads == null || map == null ? "" : map.KnowledgeOf(leads).ToString())
+                .Field("arenas", arenas)
+                .Field("story", string.Join(" | ", root.HudLines.Where(l => l.StartsWith("이야기") || l.Contains("장 ·")).Select(l => l.Replace('\n', ' '))))
+                .Field("health", root.HostPlayer?.Health ?? 0).Field("maxHealth", root.HostPlayer?.Stats.MaxHealth ?? 0)
                 .Close('}');
         }
 

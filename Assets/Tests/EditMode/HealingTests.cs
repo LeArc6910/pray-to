@@ -62,18 +62,44 @@ namespace Game.Core.Tests
             Assert.IsTrue(TestLoot.Parse().Success);
         }
 
+        // Rest is slower since 묶음 4c (Docs/WorldRework.md 탐험에서 얻는 회복): eight seconds unhurt, then 1.5% a second,
+        // so camps, shrines and potions matter.
         [Test]
-        public void RestingHealsOnceUnhurtForSixSeconds()
+        public void RestingHealsOnceUnhurtForEightSeconds()
         {
             var world = Room(Pebbles);
+            Assert.IsFalse(world.QuickRest, "slow rest unless the host chose otherwise");
             var player = Hurt(world);
 
-            Run(world, 5);
-            Assert.AreEqual(60, player.Health, 0.01f, "still within six seconds of the hit");
+            Run(world, 7);
+            Assert.AreEqual(60, player.Health, 0.01f, "still within eight seconds of the hit");
 
             Run(world, 3);
-            // About two and a half seconds of resting at 3% of 100 a second.
+            // About two and a half seconds of resting at 1.5% of 100 a second.
+            Assert.That(player.Health, Is.InRange(62.5f, 64.5f));
+        }
+
+        // The host's menu choice brings back the rest of before (Settings.QuickRest): six seconds, then 3% a second;
+        // it may change as the world runs.
+        [Test]
+        public void QuickRestHealsAsBeforeAndMayBeTurnedOnInAWorld()
+        {
+            var world = new World(Maps.Room(14), TileMap.Center(7, 7), Pebbles, 1, new WorldConfig { EnemyTarget = 0, QuickRest = true }, Gear.Data);
+            Assert.IsTrue(world.QuickRest);
+            var player = Hurt(world);
+            Run(world, 5);
+            Assert.AreEqual(60, player.Health, 0.01f, "still within six seconds of the hit");
+            Run(world, 3);
             Assert.That(player.Health, Is.InRange(66f, 69f));
+
+            var later = Room(Pebbles);
+            var other = Hurt(later);
+            later.QuickRest = true;
+            Run(later, 8);
+            Assert.That(other.Health, Is.InRange(66f, 69f), "turned on in a running world, rest goes as before");
+            Assert.AreEqual(3f, World.QuickRestHealPercent);
+            Assert.AreEqual(1.5f, World.RestHealPercent);
+            Assert.AreEqual(8f, World.RestDelaySeconds);
         }
 
         [Test]
@@ -94,7 +120,7 @@ namespace Game.Core.Tests
             Assert.AreEqual(95, player.Health, 0.01f);
             Assert.IsFalse(world.UseConsumable(player.Id, Potion), "still waiting");
 
-            Run(world, 8);
+            Run(world, 11);
             Assert.AreEqual(player.Stats.MaxHealth, player.Health, "rested the last of it back");
             Assert.IsFalse(world.UseConsumable(player.Id, Potion), "nothing to heal");
             Assert.AreEqual(1, player.Inventory.CountOf(Potion));

@@ -21,6 +21,10 @@ namespace Game.Core
         public bool Forage { get; set; }
         // Minutes of play a day takes (Calendar.DayLengths); the host's choice (Docs/Time.md 하루 길이).
         public int DayMinutes { get; set; } = Calendar.BaseDayMinutes;
+        // Resting heals as it did before 묶음 4c (6 seconds unhurt, then 3% a second) instead of the slower rest that
+        // sends a player to camps, shrines and potions (8 seconds, 1.5%). Off unless the host chose it in the menu
+        // (Settings.QuickRest, Docs/WorldRework.md 사람이 정한 것 2).
+        public bool QuickRest { get; set; }
     }
 
     // The host's simulation. It steps at a fixed TicksPerSecond and is the only thing that changes game state;
@@ -67,9 +71,16 @@ namespace Game.Core
         // the enemy and player having moved during the wind-up.
         const float StrikeSlack = 0.2f;
         const float MonsterShotRadius = 0.2f;
-        // A player who has not been hurt for this long heals this percent of their maximum health a second.
-        const float RestDelaySeconds = 6;
-        const float RestHealPercent = 3;
+        // A player who has not been hurt for this long heals this percent of their maximum health a second (묶음 4c,
+        // Docs/WorldRework.md 탐험에서 얻는 회복: less than before, so camps, shrines and potions matter); with the host's
+        // QuickRest, as before.
+        public const float RestDelaySeconds = 8;
+        public const float RestHealPercent = 1.5f;
+        public const float QuickRestDelaySeconds = 6;
+        public const float QuickRestHealPercent = 3;
+
+        // Whether resting heals as before 묶음 4c (WorldConfig.QuickRest); the host may change it as the world runs.
+        public bool QuickRest { get; set; }
 
         readonly List<Player> _players = new List<Player>();
         readonly List<Enemy> _enemies = new List<Enemy>();
@@ -92,6 +103,7 @@ namespace Game.Core
             _monsters = monsters ?? throw new ArgumentNullException(nameof(monsters));
             _config = config ?? new WorldConfig();
             DayMinutes = Calendar.DayMinutesOf(_config.DayMinutes);
+            QuickRest = _config.QuickRest;
             _random = new GameRandom(seed, stream: 2);
             _forageSeed = seed;
             Loot = loot;
@@ -559,9 +571,9 @@ namespace Game.Core
         {
             player.Mana = Math.Min(player.Stats.MaxMana, player.Mana + player.Stats.ManaRegen * TickSeconds);
             float perSecond = player.Stats.HealthRegen;
-            int restTicks = Ticks(RestDelaySeconds);
+            int restTicks = Ticks(QuickRest ? QuickRestDelaySeconds : RestDelaySeconds);
             if (player.RestingTicks < restTicks) player.RestingTicks++;
-            else perSecond += player.Stats.MaxHealth * RestHealPercent / 100f;
+            else perSecond += player.Stats.MaxHealth * (QuickRest ? QuickRestHealPercent : RestHealPercent) / 100f;
 
             float amount = perSecond * TickSeconds;
             if (player.HealTicks > 0)

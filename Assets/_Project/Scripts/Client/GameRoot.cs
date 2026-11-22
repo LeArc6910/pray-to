@@ -760,6 +760,11 @@ namespace Game.Client
 
         // Opens the list of waypoints and waystones, as the button over an open one does (Playtest "waypoints").
         internal bool OpenWaypoints() => _storyScreen != null && _storyScreen.OpenWaypoints();
+        // The talk and the rumours (묶음 4c), for the playtests.
+        internal bool TalkNear() => _storyScreen != null && _storyScreen.TalkNear();
+        internal string TalkText => _storyScreen?.TalkText;
+        internal string LastRumor => _storyScreen?.LastRumor;
+        internal MapView Map => _map;
 
         // A button over the chest, cart or shrine within reach that would give now (Docs/WorldRework.md 3단계 볼거리),
         // for a finger or the mouse; on a keyboard it shows the key, which does the same.
@@ -1043,7 +1048,7 @@ namespace Game.Client
             _host = new WorldHost(seed, _monsters, _loot,
                 new HostConfig { MapSize = world?.Width ?? WorldGenerator.GameSize, MapVersion = world?.Generator ?? WorldGenerator.NewWorldVersion },
                 bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
-                worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes }, story: _story);
+                worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes, QuickRest = Settings.QuickRest }, story: _story);
             if (world != null)
             {
                 _host.Restore(world);
@@ -1063,7 +1068,7 @@ namespace Game.Client
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
-            _storyScreen = new StoryScreen(_client, SendToHost);
+            _storyScreen = new StoryScreen(_client, SendToHost, () => _map);
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
             _status = "";
@@ -1116,7 +1121,7 @@ namespace Game.Client
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar);
-            _storyScreen = new StoryScreen(_client, SendToHost);
+            _storyScreen = new StoryScreen(_client, SendToHost, () => _map);
             _joinSent = false;
             _net.Connected += id =>
             {
@@ -1287,8 +1292,9 @@ namespace Game.Client
             DrawHud(compact: _inventory.Open);
             _view?.DrawBanner();
             // Not while the bag is open: skills cannot be used then (ReadSkillPress), a tap in the window must not fire
-            // one, and a slot would show in the gap beside the window.
-            if (_client.Status == ClientStatus.Playing && !_inventory.Open)
+            // one, and a slot would show in the gap beside the window. Nor under the waypoint list: a button drawn before
+            // it would take a tap meant for one of its rows (2026-11-22, the web sweep on a phone).
+            if (_client.Status == ClientStatus.Playing && !_inventory.Open && !(_storyScreen?.ListOpen ?? false))
             {
                 DrawMachineSwitch();
                 DrawPoiButton();
@@ -1632,6 +1638,14 @@ namespace Game.Client
             Heading(Strings.T("menu.play_group", "플레이"));
             // The goals for new players in the HUD; met goals still count while it is off (Settings.Guide).
             if (Setting(Strings.T("menu.guide", "목표 안내"), Strings.OnOff(Settings.Guide))) Settings.Guide = !Settings.Guide;
+            // Rumours or arrows, and slow or quick rest (묶음 4c, the person's call 2026-11-21: on, with the old way a
+            // press away). Rest is the host's: it holds in the worlds this player opens or hosts.
+            if (Setting(Strings.T("menu.rumors", "길 안내"), Settings.Rumors ? Strings.T("menu.rumors_on", "소문") : Strings.T("menu.rumors_off", "화살표")))
+                Settings.Rumors = !Settings.Rumors;
+            if (Setting(Strings.T("menu.rest", "쉴 때 회복"), Settings.QuickRest ? Strings.T("menu.rest_quick", "빠름(예전)") : Strings.T("menu.rest_slow", "느림")))
+                Settings.QuickRest = !Settings.QuickRest;
+            GUILayout.Label(Ui.Wrap(Strings.T("menu.rumors_note", "소문: 갈 곳을 방향과 생물군계로만 알려 주고 지도에는 옅은 원을 그린다. 느림: 쉬면 8초 뒤 초당 1.5% 찬다(예전은 6초 뒤 3%). 야영지·제단·물약으로 회복한다"),
+                GUI.skin.label, _menuColumn));
             // Frames a second, the dark's cost and the last inputs, for checking the game on a device (DevInfo).
             if (Setting(Strings.T("menu.devinfo", "개발 정보"), Strings.OnOff(Settings.DevInfo))) Settings.DevInfo = !Settings.DevInfo;
             // Keys only matter with a keyboard.
@@ -1888,7 +1902,8 @@ namespace Game.Client
                 string progress = _goalProgress != null ? $" ({_goalProgress})" : "";
                 string text = goal.Text + progress;
                 if (goal.Rewards.Count > 0 && !Ui.Short) text += $"\n보상: {goal.RewardText}";
-                if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) text += $"\n{goal.Hint}";
+                // With rumours (묶음 4c) the hint as hearsay: no marker to walk to.
+                if (!Ui.Short && Time.time - _goalShownAt < GoalHintSeconds) text += $"\n{(Settings.Rumors ? goal.Rumor : goal.Hint)}";
                 entries.Add(($"목표 {_guideProgress.Done + 1}/{_guideProgress.Total}", text));
             }
             // The next story step of each person met whose hearts allow it (Docs/Npcs.md, 이야기), then today's

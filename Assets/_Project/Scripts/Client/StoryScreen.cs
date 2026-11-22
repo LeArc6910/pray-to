@@ -29,14 +29,42 @@ namespace Game.Client
         // How far up from the bottom of the screen the talk sits, clear of the quick slots and skill keys.
         const float TalkLift = 140;
 
-        public StoryScreen(WorldClient client, Action<byte[]> send)
+        // The map (for what has been seen and the rumours heard, 묶음 4c); null before it is made.
+        readonly Func<MapView> _map;
+
+        public StoryScreen(WorldClient client, Action<byte[]> send, Func<MapView> map = null)
         {
             _client = client;
             _send = send;
+            _map = map ?? (() => null);
         }
+
+        // The rumour told in the talk on screen, or null (for the playtests).
+        public string LastRumor { get; private set; }
 
         // Whether a talk or the waypoint list covers the screen (the game keeps running underneath).
         public bool Open => _lines != null || _waypoints;
+
+        // Whether the waypoint list is open: nothing that takes a tap is drawn under it then (GameRoot), since in IMGUI
+        // a control drawn earlier wins a press over one drawn on top of it.
+        public bool ListOpen => _waypoints;
+
+        // Where the waypoint list goes (2026-11-22, the web sweep on a phone held upright: centred, its top rows sat
+        // under the minimap and the [가방]·[나가기] buttons, which are drawn later and took the taps): clear of the top
+        // right column, beside it where the screen is wide enough, else under it; centred in what is left, as tall as
+        // it wants up to that.
+        public static Rect ListArea(float width, float wanted)
+        {
+            float right = Ui.MinimapArea.x - 8, top = 8;
+            float x = (Ui.Width - width) / 2;
+            if (x + width > right)
+            {
+                if (right - width >= 8) x = right - width;
+                else top = Ui.RightColumnBottom + 8;
+            }
+            float height = Mathf.Max(80, Mathf.Min(wanted, Ui.Height - top - 8));
+            return new Rect(x, top + Mathf.Max(0, (Ui.Height - top - 8 - height) / 2), width, height);
+        }
 
         public void Close()
         {
@@ -111,6 +139,7 @@ namespace Game.Client
             _line = 0;
             _tellsHost = false;
             _choices = null;
+            LastRumor = null;
             if (_client.StepGivenBy(character) is (StoryStep step, bool taken))
             {
                 var said = step.LinesFor(_client.StoryChoices);
@@ -134,7 +163,31 @@ namespace Game.Client
                 return;
             }
             _lines = new List<(string, string)> { (character.Name, character.LineFor(_client.Today, _client.StoryChoices)) };
+            // Then a rumour of something to find not yet known (묶음 4c, characters.csv rumor): a faint ring on the map.
+            var map = _map();
+            if (map == null) return;
+            var targets = Rumors.Targets(_client.Rooms, _client.WandererAt(), _client.Biomes);
+            var from = _client.SiteOf(character.Place)?.Center ?? _client.Position;
+            // What was heard today counts as not yet known, so asked again today the person says the same.
+            int today = _client.Today;
+            var told = Rumors.Tell(character, targets, _client.Seed, today, from, t => map.Knows(t) && !map.HeardOn(t, today));
+            if (told == null) return;
+            var (line, target) = told.Value;
+            map.Hear(target, today);
+            LastRumor = line;
+            _lines.Add((character.Name, line + "\n(소문: 지도에 옅은 원으로 적었다)"));
         }
+
+        // Talks to the person of the story nearest the player, as their button would (for the playtests).
+        public bool TalkNear()
+        {
+            if (!(_client.CharacterNear() is var (character, _))) return false;
+            Talk(character);
+            return true;
+        }
+
+        // The lines of the talk on screen, joined (for the playtests).
+        public string TalkText => _lines == null ? null : string.Join(" / ", _lines.Select(l => l.Text));
 
         int Held(StoryStep step) => step.Material != null ? _client.Bag.CountOf(step.Material) : _client.Bag.CountOf(step.Consumable);
 
@@ -216,8 +269,7 @@ namespace Game.Client
             var stones = _client.Stones.OrderBy(s => s.Biome).ToList();
             float width = Mathf.Min(420, Ui.Width - 24);
             float row = 34;
-            float height = Mathf.Min(70 + row * (places.Count + stones.Count + (stones.Count > 0 ? 1 : 0)) + 50, Ui.Height - 16);
-            var panel = new Rect((Ui.Width - width) / 2, Mathf.Max(8, (Ui.Height - height) / 2), width, height);
+            var panel = ListArea(width, 70 + row * (places.Count + stones.Count + (stones.Count > 0 ? 1 : 0)) + 50);
             Controls.Block(panel);
             var here = _client.WaypointNear()?.Definition;
             if (here != null && !_client.Waypoints.Contains(here.Index)) here = null;
@@ -280,7 +332,8 @@ namespace Game.Client
                 var site = _client.SiteOf(taken ? step.Target : step.Who.Place);
                 if (site != null && (step.Goal == StoryGoal.Reach || !taken || step.Goal == StoryGoal.Have))
                     text += " · " + Way(site);
-                if (!Ui.Short && !side && !string.IsNullOrEmpty(step.Hint) && taken) text += "\n" + step.Hint;
+                string hint = Settings.Rumors ? step.Rumor : step.Hint;
+                if (!Ui.Short && !side && !string.IsNullOrEmpty(hint) && taken) text += "\n" + hint;
                 entries.Add((title, text));
             }
             return entries;
@@ -295,22 +348,15 @@ namespace Game.Client
             _ => $"{step.Who.Name}에게 말 걸기",
         };
 
-        // "왕도 루미나, 북동 34칸", or the name alone once there.
+        // "왕도 루미나, 북동 34칸", or the name alone once there. With rumours (묶음 4c, MapView.KnowledgeOf) "북동쪽"
+        // once the way is known, and "북동쪽, 버섯 숲 어딘가" before.
         string Way(PlaceSite site)
         {
-            float dx = site.Center.X - _client.Position.X, dy = site.Center.Y - _client.Position.Y;
-            float distance = Mathf.Sqrt(dx * dx + dy * dy);
             if (site.Contains(_client.Position)) return $"{site.Definition.Name} (여기)";
-            return $"{site.Definition.Name}, {Compass(dx, dy)} {Mathf.RoundToInt(distance)}칸";
-        }
-
-        // Which of eight ways (y up is north).
-        static string Compass(float dx, float dy)
-        {
-            string[] names = { "동", "북동", "북", "북서", "서", "남서", "남", "남동" };
-            float angle = Mathf.Atan2(dy, dx) * Mathf.Rad2Deg;
-            int index = Mathf.RoundToInt((angle + 360) % 360 / 45f) % 8;
-            return names[index];
+            var known = _map()?.KnowledgeOf(site) ?? WayKnown.Known;
+            var here = _client.Biomes[TileMap.Cell(_client.Position.X), TileMap.Cell(_client.Position.Y)];
+            var there = _client.Biomes[TileMap.Cell(site.Center.X), TileMap.Cell(site.Center.Y)];
+            return $"{site.Definition.Name}, {Rumors.Way(known, _client.Position, site.Center, there, here)}";
         }
     }
 }

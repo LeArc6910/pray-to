@@ -15,7 +15,8 @@ namespace Game.Core
             Tile = tile;
         }
 
-        // "have", "place", "plant", "boss", "pet", "rune", "request", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank" or "classes".
+        // "have", "place", "plant", "boss", "pet", "rune", "request", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank",
+        // "classes", or the things to find of 묶음 4c: "poi" (Id the kind), "stone", "rail" and "rarity" (Count the rarity).
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
@@ -31,8 +32,9 @@ namespace Game.Core
     // conditions).
     public sealed class Goal
     {
-        internal Goal(string id, string text, string hint, IReadOnlyList<GoalCondition> conditions, IReadOnlyList<GoalReward> rewards = null)
+        internal Goal(string id, string text, string hint, IReadOnlyList<GoalCondition> conditions, IReadOnlyList<GoalReward> rewards = null, string rumor = null)
         {
+            Rumor = string.IsNullOrEmpty(rumor) ? hint : rumor;
             Id = id;
             Text = text;
             Hint = hint;
@@ -43,6 +45,9 @@ namespace Game.Core
         public string Id { get; }
         public string Text { get; }
         public string Hint { get; }
+        // The hint as hearsay, shown instead when rumours guide (goals.csv rumor, 묶음 4c): no marker to walk to. The
+        // hint itself where the sheet has none.
+        public string Rumor { get; }
         public IReadOnlyList<GoalCondition> Conditions { get; }
         // What the host gives the first time the goal is done (goals.csv reward), maybe nothing.
         public IReadOnlyList<GoalReward> Rewards { get; }
@@ -87,8 +92,13 @@ namespace Game.Core
     {
         public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1,
             int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0, int skillsSpent = 0, int topRank = 0,
-            int classes = 0, Func<string, int> bossesFelled = null, bool hasPet = false, bool hasRune = false, bool didRequest = false)
+            int classes = 0, Func<string, int> bossesFelled = null, bool hasPet = false, bool hasRune = false, bool didRequest = false,
+            Func<string, bool> found = null, bool hasStone = false, bool railFixed = false, Rarity bestRarity = Rarity.Common)
         {
+            Found = found ?? (_ => false);
+            HasStone = hasStone;
+            RailFixed = railFixed;
+            BestRarity = bestRarity;
             HasPet = hasPet;
             HasRune = hasRune;
             DidRequest = didRequest;
@@ -115,6 +125,14 @@ namespace Game.Core
         public bool HasPet { get; }
         public bool HasRune { get; }
         public bool DidRequest { get; }
+        // The things to find (묶음 4c, Docs/Guide.md): whether the player has rested at a camp ("camp") or prayed at a
+        // shrine ("shrine"), and whether a chest ("chest"), one behind a cracked wall ("hidden"), a vault ("vault") or a
+        // cart ("cart") has been opened in the world (as "place" counts anyone's); a waystone open to the player; a
+        // minecart line mended in the world; the best rarity of the gear carried or worn.
+        public Func<string, bool> Found { get; }
+        public bool HasStone { get; }
+        public bool RailFixed { get; }
+        public Rarity BestRarity { get; }
         // Whether a tile of the type stands anywhere in the world.
         public Func<TileType, bool> HasTile { get; }
         public bool HasCrop { get; }
@@ -149,13 +167,31 @@ namespace Game.Core
             bool HasTile(TileType type) => client.Built(type);
 
             int hearts = client.Friendships.Values.Select(f => World.HeartsOf(f.Points)).DefaultIfEmpty(0).Max();
+            bool Found(string kind) => kind switch
+            {
+                "camp" => client.LastCamp != null,
+                "shrine" => client.Blessing != null || client.Pois.Any(p => p.Kind == PoiKind.Shrine && client.PrayedToday(p.Index)),
+                _ => client.Pois.Any(p => client.PoiOpened(p.Index) && FoundKind(p) == kind),
+            };
             return new GuideFacts(CountOf, HasTile, client.Crops.Count > 0, Vec2.Distance(client.Position, client.Spawn), client.Level,
                 client.Passives.Count, client.LifeLevel, Math.Max(1, client.Rift.Unlocked), hearts,
                 SkillRules.SpentPoints(client.SkillRanks), client.SkillRanks.Values.DefaultIfEmpty(0).Max(), client.Classes.Count,
                 id => client.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0,
                 client.Pet != null, client.Equipment.Items.Any(i => i.Sockets.Any(r => r != null)),
-                client.Friendships.Values.Any(f => f.RequestDay > 0));
+                client.Friendships.Values.Any(f => f.RequestDay > 0),
+                Found, client.OpenStones.Any(), client.Lines.Any(l => client.RailFixed(l.Index)), BestOf(client.Bag.Items.Concat(client.Equipment.Items)));
         }
+
+        // What an opened thing to find counts as for "poi": a chest of a treasure or trap room "chest", of a hidden room
+        // "hidden", a vault "vault", a cart "cart"; null for the rest.
+        public static string FoundKind(Poi poi) => poi.Kind switch
+        {
+            PoiKind.Cart => "cart",
+            PoiKind.Chest => poi.Definition.Role == RoomRole.Hidden ? "hidden" : poi.Definition.Role == RoomRole.Locked ? "vault" : "chest",
+            _ => null,
+        };
+
+        static Rarity BestOf(IEnumerable<Item> items) => items.Select(i => i.Rarity).DefaultIfEmpty(Rarity.Common).Max();
 
         // The same facts as the host sees them, to check a claimed reward.
         public static GuideFacts Of(World world, Player player)
@@ -173,12 +209,19 @@ namespace Game.Core
             bool HasTile(TileType type) => world.Built(type);
 
             int hearts = player.Friendships.Values.Select(f => f.Hearts).DefaultIfEmpty(0).Max();
+            bool Found(string kind) => kind switch
+            {
+                "camp" => world.LastCampOf(player.Name) != null,
+                "shrine" => world.PrayedEver(player.Name),
+                _ => world.Pois.Any(p => world.Opened(p.Index) && FoundKind(p) == kind),
+            };
             return new GuideFacts(CountOf, HasTile, world.Crops.Count > 0, Vec2.Distance(player.Position, world.Spawn), player.Level,
                 player.Passives.Count, skill => World.LifeLevel(player, skill), world.RiftTier, hearts,
                 SkillRules.SpentPoints(player.SkillRanks), player.SkillRanks.Values.DefaultIfEmpty(0).Max(), player.Classes.Count,
                 id => player.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0,
                 player.Pet != null, player.Equipment.Items.Any(i => i.Sockets.Any(r => r != null)),
-                player.Friendships.Values.Any(f => f.RequestDay > 0));
+                player.Friendships.Values.Any(f => f.RequestDay > 0),
+                Found, world.OpenStones(player).Any(), world.FixedRails.Any(), BestOf(player.Inventory.Items.Concat(player.Equipment.Items)));
         }
     }
 
@@ -207,6 +250,8 @@ namespace Game.Core
         {
             "life_mining", "merchant", "passive", "anvil", "assembler", "power_pole", "keg", "coop", "crab_pot", "friend", "rift_altar", "rift",
             "free_power", "arc_furnace", "skill", "rank3", "serpent", "antlion", "level3", "class", "second_class", "third_class", "mad_general",
+            // The things to find (묶음 4c).
+            "camp", "shrine", "chest", "wanderer", "waystone", "minecart", "hidden", "elite", "vault",
         };
 
         // Goals moved after the first boss (2026-11-11, the research report's candidate 4: the first half hour is
@@ -289,6 +334,10 @@ namespace Game.Core
             "skills" => facts.SkillsSpent >= condition.Count,
             "rank" => facts.TopRank >= condition.Count,
             "classes" => facts.Classes >= condition.Count,
+            "poi" => facts.Found(condition.Id),
+            "stone" => facts.HasStone,
+            "rail" => facts.RailFixed,
+            "rarity" => (int)facts.BestRarity >= condition.Count,
             _ => false,
         };
     }
@@ -297,6 +346,9 @@ namespace Game.Core
     public static class GuideSheet
     {
         public const string File = "goals.csv";
+
+        // What poi:<kind> may name (GuideFacts.Found).
+        public static readonly string[] PoiKinds = { "camp", "shrine", "chest", "hidden", "vault", "cart" };
 
         public static GuideData Parse(string csv, LootData loot)
         {
@@ -322,7 +374,7 @@ namespace Game.Core
                     if (text.Length == 0) throw new FormatException("'text' 칸이 비어 있습니다.");
                     var conditions = row["done"].Split('|').Select(part => Condition(part.Trim(), loot)).ToList();
                     var rewards = row["reward"].Length == 0 ? new List<GoalReward>() : row["reward"].Split('|').Select(part => Reward(part.Trim(), loot)).ToList();
-                    goals.Add(new Goal(id, text, row["hint"], conditions, rewards));
+                    goals.Add(new Goal(id, text, row["hint"], conditions, rewards, row["rumor"]));
                 }
                 catch (FormatException e)
                 {
@@ -363,6 +415,19 @@ namespace Game.Core
                 case "request":
                     if (parts.Length != 1) throw new FormatException($"{parts[0]}에는 덧붙이는 값이 없습니다.");
                     return new GoalCondition(parts[0], null, 0, default);
+                // The things to find (묶음 4c): poi:<kind>, a waystone open, a minecart line mended, gear of a rarity.
+                case "poi":
+                    if (parts.Length != 2 || Array.IndexOf(PoiKinds, parts[1]) < 0)
+                        throw new FormatException($"'{text}'는 poi:<{string.Join("|", PoiKinds)}>로 적습니다.");
+                    return new GoalCondition("poi", parts[1], 1, default);
+                case "stone":
+                case "rail":
+                    if (parts.Length != 1) throw new FormatException($"{parts[0]}에는 덧붙이는 값이 없습니다.");
+                    return new GoalCondition(parts[0], null, 1, default);
+                case "rarity":
+                    if (parts.Length != 2 || !Enum.TryParse<Rarity>(parts[1], true, out var rarity) || int.TryParse(parts[1], out _))
+                        throw new FormatException($"'{text}'는 rarity:<uncommon|rare|epic|legendary>로 적습니다.");
+                    return new GoalCondition("rarity", parts[1].ToLowerInvariant(), (int)rarity, default);
                 case "reach":
                     if (parts.Length != 2) throw new FormatException($"'{text}'는 reach:<타일 수>로 적습니다.");
                     int tiles = SheetValues.ParseNumber(parts[1], "타일 수");
@@ -391,7 +456,7 @@ namespace Game.Core
                     if (lifeLevel < 1 || lifeLevel > LifeSkills.MaxLevel) throw new FormatException($"생활 기술 레벨은 1~{LifeSkills.MaxLevel}이어야 합니다.");
                     return new GoalCondition("life", parts[1].ToLowerInvariant(), lifeLevel, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, boss, pet, rune, request, reach, level, passive, life, rift, friend, skills, rank, classes 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, boss, pet, rune, request, reach, level, passive, life, rift, friend, skills, rank, classes, poi, stone, rail, rarity 중 하나)");
             }
         }
 

@@ -62,8 +62,9 @@ namespace Game.Core
     public sealed class CharacterDefinition
     {
         internal CharacterDefinition(int index, string id, string name, PlaceDefinition place, string look, string color, IReadOnlyList<(string Text, StoryWhen When)> lines,
-            string walk = "wander")
+            string walk = "wander", IReadOnlyList<(RumorKind Kind, string Text)> rumors = null)
         {
+            Rumors = rumors ?? Array.Empty<(RumorKind, string)>();
             Walk = walk;
             Index = index;
             Id = id;
@@ -86,6 +87,9 @@ namespace Game.Core
         public string Walk { get; }
         // What they say when it is not their turn, each line maybe only after an answer (StoryWhen).
         public IReadOnlyList<(string Text, StoryWhen When)> Lines { get; }
+        // What they tell of the things to find (characters.csv rumor, 묶음 4c): for each kind they speak of, a line with
+        // {dir} and {biome} for the way and the biome (Rumors.Tell). None for one who tells no rumours.
+        public IReadOnlyList<(RumorKind Kind, string Text)> Rumors { get; }
 
         // The day's line among those that hold for the answers given (none given: the lines without a condition).
         public string LineFor(int day, IReadOnlyDictionary<int, int> choices = null)
@@ -152,8 +156,9 @@ namespace Game.Core
     {
         internal StoryStep(int index, string chapter, string title, CharacterDefinition who, IReadOnlyList<(CharacterDefinition Speaker, string Text, StoryWhen When)> lines,
             StoryGoal goal, PlaceDefinition place, string boss, MaterialDefinition material, ConsumableDefinition consumable, int count,
-            IReadOnlyList<GoalReward> rewards, string hint, string chain = "")
+            IReadOnlyList<GoalReward> rewards, string hint, string chain = "", string rumor = "")
         {
+            Rumor = string.IsNullOrEmpty(rumor) ? hint : rumor;
             Chain = chain;
             Index = index;
             Chapter = chapter;
@@ -187,6 +192,9 @@ namespace Game.Core
         public int Count { get; }
         public IReadOnlyList<GoalReward> Rewards { get; }
         public string Hint { get; }
+        // The hint as hearsay, for the goal list when rumours guide (story.csv rumor, 묶음 4c): no ring on the map or
+        // exact spot in it. The hint itself where the sheet has none.
+        public string Rumor { get; }
         // What the player may answer at the end of the talk (story.csv choices, 2026-11-10), each with the step it
         // leads to (index); none for a step that only talks or asks for something.
         public IReadOnlyList<(string Text, int Step)> Choices { get; internal set; } = Array.Empty<(string, int)>();
@@ -355,7 +363,17 @@ namespace Game.Core
                         var lines = row["lines"].Split('|').Select(l => l.Trim()).Where(l => l.Length > 0).Select(When).ToList();
                         string walk = row["walk"].Length == 0 ? "wander" : row["walk"];
                         if (walk != "wander" && walk != "run" && walk != "stay") throw new FormatException($"walk '{walk}'는 비우거나 wander, run, stay 가운데 하나여야 합니다.");
-                        characters.Add(new CharacterDefinition(characters.Count, id, row["name"], place, row["look"], row["color"], lines, walk));
+                        var rumors = new List<(RumorKind, string)>();
+                        foreach (string written in row["rumor"].Split('|').Select(l => l.Trim()).Where(l => l.Length > 0))
+                        {
+                            int colon = written.IndexOf(':');
+                            if (colon <= 0 || !Game.Core.Rumors.TryParseKind(written.Substring(0, colon).Trim(), out var kind))
+                                throw new FormatException($"rumor '{written}'는 <종류>:<할 말>로 적습니다(camp, shrine, chest, hidden, vault, cart, station, waystone, elite, wanderer, arena).");
+                            string said = written.Substring(colon + 1).Trim();
+                            if (said.Length == 0) throw new FormatException($"rumor '{written}'에 할 말이 없습니다.");
+                            rumors.Add((kind, said));
+                        }
+                        characters.Add(new CharacterDefinition(characters.Count, id, row["name"], place, row["look"], row["color"], lines, walk, rumors));
                     }
                     catch (FormatException e)
                     {
@@ -408,7 +426,7 @@ namespace Game.Core
                             ? new List<GoalReward>()
                             : row["reward"].Split('|').Select(part => GuideSheet.Reward(part.Trim(), loot)).ToList();
                         if (row["choices"].Length > 0 && goal != StoryGoal.None) throw new FormatException("choices는 goal이 빈 단계(말만 하는 단계)에만 적습니다.");
-                        steps.Add(new StoryStep(steps.Count, row["chapter"], row["title"], who, lines, goal, place, boss, material, consumable, count, rewards, row["hint"], chain));
+                        steps.Add(new StoryStep(steps.Count, row["chapter"], row["title"], who, lines, goal, place, boss, material, consumable, count, rewards, row["hint"], chain, row["rumor"]));
                         links.Add((steps[steps.Count - 1], row["choices"], row["next"], row["after"], line));
                     }
                     catch (FormatException e)

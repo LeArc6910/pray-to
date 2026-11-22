@@ -197,7 +197,7 @@ camp,야영지,rest,,10,rest:10|rested:600,,no,always,smoke,20,,
 shrine_might,힘의 제단,shrine,,10,bless:300|heal:100,,yes,daily,beam,14,Damage+20%,
 chest_wood,나무 상자,treasure,,6,items:1|ore:2-4|potions:1|coins:4-10,,yes,once,glint,10,,WoodChest
 vault_void,공허석 금고,locked,lava|abyss,10,items:2:rare|material:void_ore:6-10|coins:20-40|runes:30,1,yes,once,glint,10,,GoldChest
-cart,버려진 수레,cart,,10,forage:5-10|coins:5-15,,no,once,glint,6,,
+cart,버려진 수레,cart,,10,forage:5-10|potions:1|coins:5-15,,no,once,glint,6,,
 ```
 
 - 시트 시험(`PoiSheet.Parse`): 모르는 reward, 없는 재료, `bless`와 `buff`는 함께, 상자에는 상자 칸, `always`는 야영지·광차역·길잡이 돌에만, 신호가 있으면 거리, 역할마다 모든 생물군계에 줄(표시에 놓이는 줄만 센다). `ride`는 `cart`에, `waypoint`는 `rest`와 `Waystone` 칸에, `repair`는 `ride`와 함께

@@ -548,6 +548,52 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Rumours instead of arrows and slow rest (2026-11-22, Docs/WorldRework.md 묶음 4c): the village child tells of
+        // something to find with a line and a faint ring on the map; past the first chapter the story's goal line says
+        // only which way and in which biome; the old arrows come back with the menu's choice. Rest heals slowly unless
+        // the host chose otherwise.
+        [UnityTest]
+        public IEnumerator RumoursAndSlowRest()
+        {
+            bool rumors = Settings.Rumors, quick = Settings.QuickRest;
+            Settings.Rumors = true;
+            Settings.QuickRest = false;
+            yield return Start();
+            World.MonstersHold = true;
+            Assert.IsFalse(World.QuickRest, "Slow rest unless the menu chose quick.");
+            PlaceSite.Still = true;
+            var mina = World.Places.SelectMany(p => p.PeopleAt(World.Clock, World.DayMinutes)).FirstOrDefault(p => p.Character.Id == "mina");
+            Assert.IsNotNull(mina.Character, "No village child: characters.csv has no mina.");
+            Player.Position = mina.At + new Vec2(0, -1);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(1);
+            Assert.IsTrue(_root.TalkNear(), "The child is in reach.");
+            Assert.IsNotEmpty(_root.LastRumor ?? "", "A rumour of a chest, a cart or the wandering merchant: " + _root.TalkText);
+            Assert.IsNotEmpty(_root.Map.Heard, "The rumour is kept for the map.");
+            yield return new WaitForSecondsRealtime(0.3f);
+            yield return Screens.Take("guide-rumor-talk");
+
+            // Past the first chapter, the hero's hut is a rumour on the map and in the goal list.
+            World.RestoreJourney(Player, 4, true, null);
+            yield return new WaitForSecondsRealtime(1.5f);
+            Assert.IsTrue(_root.HudLines.Any(l => l.Contains("어딘가") || l.Contains("쪽")), "The goal list says only which way: " + string.Join(" / ", _root.HudLines));
+            yield return Screens.Take("guide-rumor-tracker");
+            _root.Map.FullOpen = true;
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("guide-rumor-map");
+            _root.Map.FullOpen = false;
+            Settings.Rumors = false;
+            yield return new WaitForSecondsRealtime(1);
+            Assert.IsTrue(_root.HudLines.Any(l => l.Contains("칸")), "With arrows, the distance again: " + string.Join(" / ", _root.HudLines));
+            yield return Screens.Take("guide-arrow-tracker");
+
+            World.MonstersHold = false;
+            PlaceSite.Still = false;
+            Settings.Rumors = rumors;
+            Settings.QuickRest = quick;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

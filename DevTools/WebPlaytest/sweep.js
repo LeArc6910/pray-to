@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4334,7 +4334,14 @@ async function travel(browser) {
     check(await game.press('길잡이 돌'), `${name}: 돌 위의 [길잡이 돌] 단추로 목록을 연다`);
     await game.wait(600);
     await game.shot('travel-waypoints', '웨이포인트와 길잡이 돌 목록');
-    const away = (await game.buttons()).find(b => /의 길잡이 돌$/.test(b.label) && b.enabled);
+    // The list keeps clear of the minimap column and its touch buttons (2026-11-22: on a phone held upright they
+    // covered its top rows and took their taps, StoryScreen.ListArea).
+    const drawn = await game.buttons();
+    const column = drawn.filter(b => b.label === '지도' || b.label === '가방' || b.label === '나가기');
+    const rows = drawn.filter(b => b.shown && (/길잡이 돌/.test(b.label) && b.label !== '길잡이 돌' || /^(새벽 마을|왕도 루미나)/.test(b.label)));
+    const covered = rows.filter(r => column.some(c => r.rect[0] < c.rect[0] + c.rect[2] && c.rect[0] < r.rect[0] + r.rect[2] && r.rect[1] < c.rect[1] + c.rect[3] && c.rect[1] < r.rect[1] + r.rect[3]));
+    check(rows.length > 0 && covered.length === 0, `${name}: 목록의 줄이 미니맵·[가방]·[나가기]에 가리지 않는다 (줄 ${rows.length}, 가린 줄 ${covered.map(r => r.label).join(', ') || '없음'})`);
+    const away = drawn.find(b => /의 길잡이 돌$/.test(b.label) && b.enabled);
     check(!!away && await game.press(away.label), `${name}: 다른 길잡이 돌로 간다 (${away ? away.label : '단추 없음'})`);
     await game.wait(1200);
     const went = await game.ask('travel');
@@ -4366,7 +4373,86 @@ async function travel(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, base, save, story, deploysave, layout, touch };
+// Rumours instead of arrows, and slow rest (2026-11-22, Docs/WorldRework.md 묶음 4c): the menu's two choices, a
+// village child's rumour (a line and a faint ring on the map), the story's goal line past the first chapter saying only
+// which way and in which biome, the old arrows back with the choice, and rest that waits eight seconds and heals
+// slowly. Whether hunting by rumour feels like exploring is the person's.
+async function guide(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 소문 안내와 느린 회복 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    await game.send('probe on');
+    await menuPage(game, '설정');
+    let labels = (await game.buttons()).map(b => b.label);
+    check(labels.includes('길 안내: 소문') && labels.includes('쉴 때 회복: 느림'), `${name}: [설정]에 [길 안내: 소문]·[쉴 때 회복: 느림]이 기본 (${labels.filter(l => /길 안내|쉴 때/.test(l)).join(', ')})`);
+    await game.shot('guide-settings', '설정의 [길 안내]·[쉴 때 회복]');
+    await game.press('길 안내: 소문');
+    check((await game.find('길 안내: 화살표')).length === 1, `${name}: [길 안내: 소문]을 누르면 화살표`);
+    await game.press('길 안내: 화살표');
+    check((await game.find('길 안내: 소문')).length === 1, `${name}: 다시 누르면 소문`);
+    await menuPage(game, '게임 시작');
+    await game.press('혼자 하기');
+    await game.until(s => s.playing, 25000);
+    await game.wait(1500);
+    await game.send('monsters hold; still; probe on');
+
+    // A rumour from the village child: a line in the talk and a faint ring on the map.
+    await game.send('goto person mina');
+    await game.wait(900);
+    check(await game.press(/미나와 말하기/), `${name}: 아이 곁에서 [피난민 아이 미나와 말하기]`);
+    await game.wait(500);
+    for (let i = 0; i < 4 && (await game.press('다음', undefined, { quiet: true })); i++) await game.wait(300);
+    const told = await game.ask('rumors');
+    const text = await game.allText();
+    check(told.heard.length >= 1 && /소문: 지도에 옅은 원/.test(text), `${name}: 아이가 소문을 들려준다 (들은 소문 ${told.heard.map(h => h.kind).join(', ')})`);
+    await game.shot('guide-rumor', '아이가 들려준 소문(방향과 생물군계)');
+    await game.press('닫기', undefined, { quiet: true });
+    await game.wait(300);
+
+    // Past the first chapter the story's goal line says which way and in which biome, not how far.
+    await game.send('journey 5 taken');
+    await game.wait(1500);
+    const rumored = await game.ask('rumors');
+    check(!rumored.firstChapter && rumored.leadsKnown !== 'Known' && !/\d+칸/.test(rumored.story), `${name}: 첫 장 뒤에는 거리 없이 방향만 (${rumored.leadsKnown}: ${rumored.story})`);
+    await game.shot('guide-tracker', '소문 안내의 목표 목록(방향과 생물군계)');
+    if (game.touch) await game.press('지도');
+    else await game.page.keyboard.press('m');
+    await game.wait(700);
+    await game.shot('guide-map', '지도의 옅은 원(소문)과 아레나의 원');
+    if (game.touch) await game.press('지도 닫기', undefined, { quiet: true }) || await game.press('지도', undefined, { quiet: true });
+    else await game.page.keyboard.press('m');
+    await game.wait(400);
+
+    // The old arrows, as the menu's choice brings them back.
+    await game.send('guidance arrow');
+    await game.wait(1200);
+    const arrows = await game.ask('rumors');
+    check(/\d+칸/.test(arrows.story), `${name}: [길 안내: 화살표]면 방향과 거리 (${arrows.story})`);
+    await game.shot('guide-arrow', '화살표 안내의 목표 목록(방향과 거리)');
+    await game.send('guidance rumor');
+
+    // Rest waits eight seconds and heals 1.5% a second; quick rest as before.
+    await game.send('quickrest off; heal; hurt 40');
+    await game.wait(300);
+    const hurt = (await game.ask('rumors')).health;
+    await game.wait(6000);
+    const waited = (await game.ask('rumors')).health;
+    await game.wait(5000);
+    const rested = await game.ask('rumors');
+    check(!rested.quickRest && waited <= hurt + 1 && rested.health > waited, `${name}: 느린 회복은 8초 기다린 뒤 조금씩 (${hurt.toFixed(0)} → 6초 ${waited.toFixed(0)} → 11초 ${rested.health.toFixed(0)} / ${rested.maxHealth.toFixed(0)})`);
+    await game.send('quickrest on; heal; hurt 40');
+    await game.wait(300);
+    const quickHurt = (await game.ask('rumors')).health;
+    await game.wait(9000);
+    const quick = await game.ask('rumors');
+    check(quick.quickRest && quick.health - quickHurt > rested.health - waited, `${name}: 빠른 회복(예전)은 더 빨리 (${quickHurt.toFixed(0)} → 9초 ${quick.health.toFixed(0)})`);
+    await game.send('quickrest off');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

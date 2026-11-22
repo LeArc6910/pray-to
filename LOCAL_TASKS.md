@@ -1078,6 +1078,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(바뀐 시트 `pois.csv`, `npcs.csv`, `shop.csv`, `consumables.csv`가 빌드에 실린다). 새 파일 `Core/World/WorldGenerator.Rails.cs`, `Core/Simulation/World.Travel.cs`, `Client/WorldView.Travel.cs`, `Tests/EditMode/TravelTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `MinecartsWaystonesAndTheWanderingMerchant`(사진 travel-station-broken, travel-riding, travel-waystone, travel-waypoints, travel-wanderer). 통신 0.95.0, 월드 저장본 형식 14(13 이하는 모든 선로가 끊긴 채로 읽힌다)
   - (클라우드 웹 점검) `sweep.js --only travel,pois`
   - (사람) 광차 타는 손맛(초당 16칸이 빠른지, 덜컹 소리), 끊긴 선로를 철 주괴 5개로 고칠 만한지, 길잡이 돌로 오가는 것이 걷기의 지루함을 덜어 주는지, 떠돌이 상인을 찾아가는 맛과 물건
+- [ ] 155단계: 소문 안내, 느린 회복, 볼거리 안내 목표 아홉(`Docs/WorldRework.md` 4c, `Docs/Guide.md`)
+  - 명령 한 줄을 다시 돌린다(바뀐 시트 `goals.csv`, `characters.csv`, `story.csv`, `strings.csv`, `pois.csv`가 빌드에 실린다). 새 파일 `Core/Guide/Rumors.cs`, `Tests/EditMode/RumorTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `RumoursAndSlowRest`(사진 guide-rumor-talk, guide-rumor-tracker, guide-rumor-map, guide-arrow-tracker), `LayoutTests.TheWaypointListKeepsClearOfTheMinimapColumn`. 통신 0.96.0(목표 순서가 바뀌었다), 기기의 가 본 곳 지도 형식 2
+  - (클라우드 웹 점검) `sweep.js --only guide,travel`
+  - (사람) 소문만 듣고 찾아가는 것이 탐험하는 맛을 주는지 답답한지, 느린 회복(8초 뒤 초당 1.5%)이 야영지·물약을 쓰게 하는지 짜증 나는지, 설정의 [길 안내: 소문/화살표]·[쉴 때 회복: 느림/빠름]이 찾기 쉬운지
 
 ## 결과 보고
 

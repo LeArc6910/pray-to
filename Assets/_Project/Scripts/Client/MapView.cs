@@ -8,9 +8,11 @@ using Object = UnityEngine.Object;
 namespace Game.Client
 {
     // The minimap in the top right corner and the full map it opens. Only tiles that have come within a few tiles of
-    // the local player are drawn, so the map fills in as the caves are explored; the boss arena is always marked, as
-    // the HUD already points to it. What has been explored is a view, not game state: it is not shared, and each
-    // player keeps their own on their device for each character and world (MapSave, GameRoot.MapKey).
+    // the local player are drawn, so the map fills in as the caves are explored. With rumours guiding (Settings.Rumors,
+    // 묶음 4c) a boss arena, a place or where the story leads that has not been seen is a wide faint circle on the full
+    // map (Rumors.Circle), as are the rumours heard from people; with arrows, they are marked as before. What has been
+    // explored and heard is a view, not game state: it is not shared, and each player keeps their own on their device
+    // for each character and world (MapSave, GameRoot.MapKey).
     sealed class MapView : IDisposable
     {
         // Matches what the camera shows around the player.
@@ -87,6 +89,7 @@ namespace Game.Client
             _map = client.Map;
             _pixels = new Color32[_map.Width * _map.Height];
             _explored = MapSave.Read(saved, _map.Width, _map.Height) ?? new bool[_pixels.Length];
+            _heard = MapSave.ReadRumors(saved, _map.Width, _map.Height);
             _texture = new Texture2D(_map.Width, _map.Height, TextureFormat.RGBA32, false)
             {
                 filterMode = FilterMode.Point,
@@ -141,8 +144,108 @@ namespace Game.Client
         public byte[] Save()
         {
             Changed = false;
-            return MapSave.Write(_explored, _map.Width, _map.Height);
+            return MapSave.Write(_explored, _map.Width, _map.Height, _heard);
         }
+
+        // ---- Rumours (묶음 4c, Docs/WorldRework.md 덜 정확한 안내) ----
+
+        // The rumours heard here, oldest first (MapSave format 2).
+        readonly List<HeardRumor> _heard;
+        public IReadOnlyList<HeardRumor> Heard => _heard;
+
+        // Whether the tile has been seen on this map.
+        public bool Seen(int x, int y) => _map.InBounds(x, y) && _explored[y * _map.Width + x];
+        public bool Seen(Vec2 at) => Seen(TileMap.Cell(at.X), TileMap.Cell(at.Y));
+
+        // Notes a rumour heard (the person's line, StoryScreen): its faint ring shows on the full map until the thing is
+        // seen (the wandering merchant's for the day only).
+        public void Hear(RumorTarget target, int day)
+        {
+            _heard.RemoveAll(h => h.Kind == target.Kind && h.Index == target.Index);
+            _heard.Add(new HeardRumor(target.Kind, target.Index, day));
+            Changed = true;
+        }
+
+        // Whether the rumour of it was heard on that day (a person tells today's rumour again however often asked).
+        public bool HeardOn(RumorTarget target, int day) => _heard.Any(h => h.Kind == target.Kind && h.Index == target.Index && h.Day == day);
+
+        public bool HasHeard(RumorTarget target) => _heard.Any(h => h.Kind == target.Kind && h.Index == target.Index && (target.Kind != RumorKind.Wanderer || h.Day == _client.Today));
+
+        // Whether a thing is already known, so a person tells of another (Rumors.Pick): seen, heard of, or used up
+        // (an opened chest, a mended line, a touched waystone).
+        public bool Knows(RumorTarget target)
+        {
+            if (Seen(target.X, target.Y) || HasHeard(target)) return true;
+            if (target.Kind == RumorKind.Elite || target.Kind == RumorKind.Wanderer || target.Kind == RumorKind.Arena) return false;
+            var poi = target.Index >= 0 && target.Index < _client.Pois.Count ? _client.Pois[target.Index] : null;
+            if (poi == null) return true;
+            if (poi.Kind == PoiKind.Waystone) return _client.StoneOpen(poi.Index);
+            if (poi.Kind == PoiKind.Station) return _client.LineOf(poi) is RailLine line && _client.RailFixed(line.Index);
+            return !_client.CanUse(poi) && poi.Definition.Again == PoiAgain.Once;
+        }
+
+        // How well the way to a place of the story is known (Rumors.Knowledge): for sure with arrows chosen, in the
+        // story's first chapter, once its waypoint is open or its middle seen; the way once a signpost toward it has
+        // been seen or within Rumors.PathReach.
+        public WayKnown KnowledgeOf(PlaceSite site)
+        {
+            bool sure = !Settings.Rumors || Rumors.FirstChapter(_client.Story, _client.JourneyStep) || _client.Waypoints.Contains(site.Definition.Index) || Seen(site.Center);
+            bool signposted = !sure && _client.Signposts.Any(p => p.Toward == site.Definition && Seen(p.X, p.Y));
+            return Rumors.Knowledge(Settings.Rumors, sure, Vec2.Distance(site.Center, _client.Position), signposted);
+        }
+
+        // How well an arena's spot is known: the first boss's always (the first hour as before), any once seen.
+        public WayKnown KnowledgeOfArena(int index)
+        {
+            var at = _client.Arenas[index];
+            bool sure = index == 0 || Seen(at) || Seen(TileMap.Cell(at.X) + 3, TileMap.Cell(at.Y)) || Seen(TileMap.Cell(at.X) - 3, TileMap.Cell(at.Y));
+            return Rumors.Knowledge(Settings.Rumors, sure, Vec2.Distance(at, _client.Position));
+        }
+
+        // The rumours on the map: the things heard of and not yet seen, the arenas, and where the story leads when
+        // only its way is known. Each a disc and its rim, wide and faint, never centred on the thing.
+        void DrawRumors(Rect area, Rect window)
+        {
+            float breath = 0.75f + 0.25f * Mathf.Sin(Time.unscaledTime * 2);
+            var targets = _heard.Count == 0 ? null : Rumors.Targets(_client.Rooms, _client.WandererAt(), _client.Biomes);
+            foreach (var heard in _heard)
+            {
+                if (heard.Kind == RumorKind.Wanderer && heard.Day != _client.Today) continue;
+                int at = targets.FindIndex(t => t.Kind == heard.Kind && t.Index == heard.Index);
+                if (at < 0) continue;
+                var target = targets[at];
+                if (Seen(target.X, target.Y)) continue;
+                Faint(area, window, Rumors.Circle(_client.Seed, target, Rumors.RumorRadius), Rumors.RumorRadius, RumorColor(target.Kind), breath);
+            }
+            for (int i = 0; i < _client.Arenas.Count; i++)
+            {
+                var known = KnowledgeOfArena(i);
+                if (known == WayKnown.Known) continue;
+                float radius = known == WayKnown.Path ? Rumors.PathRadius : Rumors.RumorRadius;
+                Faint(area, window, Rumors.Circle(_client.Seed, RumorKind.Arena, i, _client.Arenas[i], radius), radius, ArenaMark, breath);
+            }
+        }
+
+        static Color RumorColor(RumorKind kind) => kind switch
+        {
+            RumorKind.Camp => new Color(1f, 0.6f, 0.25f),
+            RumorKind.Shrine or RumorKind.Waystone => new Color(0.75f, 0.88f, 1f),
+            RumorKind.Elite => new Color(1f, 0.3f, 0.25f),
+            RumorKind.Wanderer => new Color(0.18f, 0.8f, 0.7f),
+            RumorKind.Station or RumorKind.Cart => new Color(0.78f, 0.6f, 0.4f),
+            _ => new Color(1f, 0.84f, 0.3f),
+        };
+
+        // A wide faint disc of the given radius in tiles, and its rim.
+        static void Faint(Rect area, Rect window, Vec2 center, float radius, Color color, float alpha)
+        {
+            float size = radius * 2 / window.width * area.width;
+            Marker(area, window, center, Shapes.Circle, new Color(color.r, color.g, color.b, 0.14f * alpha), size);
+            Marker(area, window, center, Rim, new Color(color.r, color.g, color.b, 0.55f * alpha), size);
+        }
+
+        static Sprite _rim;
+        static Sprite Rim => _rim ??= Shapes.Donut(0.93f);
 
         // The thing a map scrap pointed to (SimEventType.MapRead, 3c), ringed on the map until it is seen; null for none.
         public Poi Scrapped { get; private set; }
@@ -239,11 +342,13 @@ namespace Game.Client
 
             string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
             GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
-            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리");
-            // Each place's name beside its dot.
+            string key = "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리" + (Settings.Rumors ? "   ○ 소문(옅은 원)" : "");
+            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), Ui.Wrap(key, GUI.skin.label, size));
+            // Each place's name beside its dot (with rumours, only the places whose spot is known).
             var window = new Rect(0, 0, _map.Width, _map.Height);
             foreach (var site in _client.Places)
             {
+                if (KnowledgeOf(site) != WayKnown.Known) continue;
                 float u = site.Center.X / window.width, v = site.Center.Y / window.height;
                 var at = new Vector2(area.x + u * area.width, area.yMax - v * area.height);
                 var previous = GUI.color;
@@ -260,22 +365,31 @@ namespace Game.Client
         {
             var uv = new Rect(window.x / _map.Width, window.y / _map.Height, window.width / _map.Width, window.height / _map.Height);
             GUI.DrawTextureWithTexCoords(area, _texture, uv);
+            // The rumours' faint circles (묶음 4c), over the tiles and under the marks; on the full map only, as a circle
+            // is wider than the minimap's window.
+            if (window.width >= _map.Width) DrawRumors(area, window);
 
-            foreach (var arena in _client.Arenas) Marker(area, window, arena, Shapes.Ring, ArenaMark, MarkerSize * 2.2f);
+            for (int i = 0; i < _client.Arenas.Count; i++)
+                if (KnowledgeOfArena(i) == WayKnown.Known) Marker(area, window, _client.Arenas[i], Shapes.Ring, ArenaMark, MarkerSize * 2.2f);
             // The nearest veins, breathing so they catch the eye.
             float breath = 0.55f + 0.45f * Mathf.Sin(Time.unscaledTime * 4);
             foreach (var (at, color) in _veins) Marker(area, window, at, Shapes.Ring, new Color(color.r, color.g, color.b, breath), MarkerSize * 1.6f);
             // The places of the story (Docs/Story.md, 2026-11-10): blue where the waypoint is open, grey elsewhere,
             // and the place the story leads to now ringed in gold.
+            // With rumours (묶음 4c) a place not yet known shows only as the faint circle where the story leads.
+            bool full = window.width >= _map.Width;
             foreach (var site in _client.Places)
+            {
+                if (KnowledgeOf(site) != WayKnown.Known) continue;
                 Marker(area, window, site.Center, Shapes.Circle, _client.Waypoints.Contains(site.Definition.Index) ? WaypointOpen : PlaceMark, MarkerSize * 1.5f);
+            }
             var leads = _client.SiteOf(_client.CurrentStep?.Target);
-            if (leads != null) Marker(area, window, leads.Center, Shapes.Ring, new Color(1f, 0.85f, 0.35f, breath), MarkerSize * 2.8f);
+            if (leads != null) Leads(area, window, leads, new Color(1f, 0.85f, 0.35f, breath), MarkerSize * 2.8f, full);
             // A side story taken leads too, in a paler, smaller ring (2026-11-11).
             foreach (var (step, taken) in _client.CurrentSteps)
             {
                 if (step.Chain.Length == 0 || !taken || !(_client.SiteOf(step.Target) is PlaceSite side) || side == leads) continue;
-                Marker(area, window, side.Center, Shapes.Ring, new Color(1f, 0.95f, 0.75f, breath * 0.8f), MarkerSize * 2.2f);
+                Leads(area, window, side, new Color(1f, 0.95f, 0.75f, breath * 0.8f), MarkerSize * 2.2f, full);
             }
             DrawPoiMarks(area, window);
             foreach (var position in _others) Marker(area, window, position, Shapes.Circle, OtherPlayer, MarkerSize);
@@ -341,6 +455,20 @@ namespace Game.Client
                 texture.Apply();
                 return _skull = Sprite.Create(texture, new Rect(0, 0, 7, 7), new Vector2(0.5f, 0.5f), 7);
             }
+        }
+
+        // Where the story leads: a ring on the spot once it is known, else (on the full map) a faint circle about it.
+        void Leads(Rect area, Rect window, PlaceSite site, Color color, float size, bool full)
+        {
+            var known = KnowledgeOf(site);
+            if (known == WayKnown.Known)
+            {
+                Marker(area, window, site.Center, Shapes.Ring, color, size);
+                return;
+            }
+            if (!full) return;
+            float radius = known == WayKnown.Path ? Rumors.PathRadius : Rumors.RumorRadius;
+            Faint(area, window, Rumors.Circle(_client.Seed, RumorKind.Arena, 1000 + site.Definition.Index, site.Center, radius), radius, color, 1);
         }
 
         static readonly Color WaypointOpen = new Color(0.5f, 0.78f, 1f);
