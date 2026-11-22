@@ -31,7 +31,7 @@ namespace Game.Client
             Rgba.Hex("#D9D9D9"), Rgba.Hex("#73F273"), Rgba.Hex("#73B3FF"), Rgba.Hex("#CC80FF"), Rgba.Hex("#FF9E2E"),
         };
 
-        public static void Write(string output, LootData loot, ClassData classes)
+        public static void Write(string output, LootData loot, ClassData classes, GeneratedWorld world = null, MonsterData monsters = null)
         {
             string folder = Directory.CreateDirectory(Path.Combine(output, "ui")).FullName;
             Png.Save(Times(Skin(loot), 3), Path.Combine(folder, "skin.png"));
@@ -41,6 +41,11 @@ namespace Game.Client
             Png.Save(EncountersPhone(loot), Path.Combine(folder, "encounters_phone.png"));
             Png.Save(Growth(loot, classes), Path.Combine(folder, "growth.png"));
             Png.Save(GrowthPhone(loot, classes), Path.Combine(folder, "growth_phone.png"));
+            if (world != null)
+            {
+                Png.Save(Records(loot, world, monsters), Path.Combine(folder, "records.png"));
+                Png.Save(RecordsPhone(loot, world, monsters), Path.Combine(folder, "records_phone.png"));
+            }
             Console.WriteLine($"Wrote the UI skin to {folder}");
         }
 

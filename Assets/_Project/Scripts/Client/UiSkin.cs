@@ -607,6 +607,62 @@ namespace Game.Client
             GUI.color = previous;
         }
 
+        // ---- The records' parchment (Docs/UiRework.md 4-4 기록은 양피지, U5) ----
+
+        static Piece _parchment, _pageFrame;
+
+        // The parchment tiled over the rect at whole device pixels, its colour times `tint` (the map's fog is a darker
+        // sheet), from the rect's own corner.
+        // `origin` pins the pattern to a point (the map's corner, so it moves with the map), else to the rect's corner.
+        public static void Parchment(Rect area, Color? tint = null, Vector2? origin = null)
+        {
+            if (Event.current.type != EventType.Repaint || area.width <= 0 || area.height <= 0) return;
+            _parchment ??= new Piece(RecordArt.Parchment(), repeat: true);
+            area = Snap(area);
+            float tile = RecordArt.PageTile * Pt;
+            var previous = GUI.color;
+            var c = tint ?? Color.white;
+            GUI.color = new Color(previous.r * c.r, previous.g * c.g, previous.b * c.b, previous.a * c.a);
+            GUI.DrawTextureWithTexCoords(area, _parchment.Texture(Dots), Repeat(area, tile, origin));
+            GUI.color = previous;
+        }
+
+        // The texture coordinates that repeat a tile over the rect, its pattern starting at the origin (top left).
+        static Rect Repeat(Rect area, float tile, Vector2? origin)
+        {
+            var o = origin ?? area.position;
+            float dx = (area.x - o.x) / tile, dy = (area.y - o.y) / tile;
+            return new Rect(dx, -dy - area.height / tile, area.width / tile, area.height / tile);
+        }
+
+        static Piece _hatch;
+
+        // The map's hatching over the rect (the unexplored), from the rect's own corner.
+        public static void Hatch(Rect area, Vector2? origin = null)
+        {
+            if (Event.current.type != EventType.Repaint || area.width <= 0 || area.height <= 0) return;
+            _hatch ??= new Piece(RecordArt.Hatch(), repeat: true);
+            area = Snap(area);
+            GUI.DrawTextureWithTexCoords(area, _hatch.Texture(Dots), Repeat(area, RecordArt.HatchTile * Pt, origin));
+        }
+
+        // A page: the parchment with its burnt, darkened edge round it.
+        public static void Page(Rect area)
+        {
+            Parchment(area);
+            PageEdge(area);
+        }
+
+        // Only the burnt edge, round something already drawn (the map over its fog).
+        public static void PageEdge(Rect area) => Slice(area, _pageFrame ??= new Piece(RecordArt.PageFrame, RecordArt.PageBorder));
+
+        // A picture of the UI art centred on the point.
+        public static void ImageCentred(Vector2 center, PixelImage image)
+        {
+            var size = SizeOf(image);
+            Image(new Vector2(Mathf.Round(center.x - size.x / 2), Mathf.Round(center.y - size.y / 2)), image);
+        }
+
         // ---- Portraits (Docs/UiRework.md 4-2 대화 화면, U3) ----
 
         static readonly Dictionary<(PixelImage, int), Texture2D> Portraits = new Dictionary<(PixelImage, int), Texture2D>();

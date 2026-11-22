@@ -1117,6 +1117,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only growth,gear,first,firstphone,screens,layout`
   - 클라우드 확인 (2026-11-22, `ba3ed92`~`709bc7c`): [x] `first`·`firstphone`·`gear`·`layout`·`screens` 239개 모두 통과. `growth`는 740×360에서 [칸에 넣기]가 수치 표 아래 판 밖에 있던 것을 표 위로 옮기고(`709bc7c`), 고를 때 옆 판을 맨 위로(`88df400`), 시험의 변수 이름과 서랍 누르기를 고친 뒤 170개 모두 통과. 사진: PC 스킬 창(칸 줄, 큰 금색 포인트, 클래스 카드의 무기 든 주인공, 스킬 카드와 단계 점, 고른 스킬의 지금·다음 비교와 결정 칸), 별하늘 트리(기호 점, 금빛 길, 이름, 고른 점 카드와 [배우기], 서랍), 세로 휴대폰 캐릭터 판(주인공과 착용 칸, 능력치 묶음)
   - (사람) 특성 트리를 끌고 확대하는 손맛(마우스 휠, 실제 휴대폰의 두 손가락), 배울 수 있는 점의 숨쉬는 테두리와 배울 때의 번쩍임, 스킬 카드에서 칸에 넣는 흐름이 자연스러운지
+- [ ] 164단계: 일지와 지도 새로 짜기(`Docs/UiRework.md` U5)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/InventoryWindow.Journal.cs`, `Client/MapView.Full.cs`, `Client/Art/RecordArt.cs`의 `.meta`가 생기면 커밋한다. PlayMode `LayoutTests.TheRecordsScreensFit`, 사진 장면 `FeatureTests.TheRecordsScreensDraw`
+  - (클라우드 웹 점검) `sweep.js --only records,npc,story,guide,travel,dungeon`
+  - (사람) 양피지 책·인장 모습이 마음에 드는지, 지도 끌기·확대의 손맛(휠, 실제 휴대폰 두 손가락), 표시를 눌러 뜨는 카드와 [여기로 길 안내]가 쓸 만한지
 
 ## 결과 보고
 

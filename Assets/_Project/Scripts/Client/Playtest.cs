@@ -81,7 +81,8 @@ namespace Game.Client
     //   inventory                 JSON: the bag
     //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off|<tab name>
     //   screen <name>|off|hub     a screen by name (가방 스킬 특성 캐릭터 일지 지도, the encounter windows 상점 상자 작업대
-    //                             모루, or skills passives shop chest station anvil ...), none, or the touch hub; "bag <tab>"
+    //                             모루, or skills passives shop chest station anvil ...; the journal's sections 목표 이야기 소문
+    //                             도감 업적 open the journal on that one, U5), none, or the touch hub; "bag <tab>"
     //                             opens the old tab names on the screen that has them now (U2; 상인 and 상자 the shop and
     //                             chest windows, U3). An encounter window shuts at once with nothing of its kind in reach
     //   talk merchant             (U3) the talk of the stall keeper in reach, as her button or G would
@@ -497,6 +498,8 @@ namespace Game.Client
                     // screen <가방|스킬|특성|캐릭터|일지|지도|off|hub>: a screen by its name (U2), none, or the touch hub.
                     if (words[1] == "off" || words[1] == "none") root.ShowScreen(GameScreen.None);
                     else if (words[1] == "hub" || words[1] == ScreenStack.HubButton) root.ShowHub(true);
+                    // The journal's sections by name (U5: 목표 이야기 소문 도감 업적) open the journal on that one.
+                    else if (Array.IndexOf(InventoryWindow.JournalNames, words[1]) is int section && section >= 0) root.ShowJournal((InventoryWindow.JournalSection)section);
                     else if (ScreenStack.FromName(words[1]) is var screen && screen != GameScreen.None) root.ShowScreen(screen);
                     else return $"error screen: no screen '{words[1]}'";
                     return null;
@@ -1534,6 +1537,14 @@ namespace Game.Client
             json.Field("growth", new Json('{').Field("zoom", growth.Zoom).Field("panX", growth.Pan.x).Field("panY", growth.Pan.y)
                 .Field("sky", Rect(growth.Sky)).Field("passive", growth.Passive ?? "").Field("skill", growth.Skill ?? "")
                 .Field("sheet", growth.Sheet).Field("drawer", growth.Drawer).Field("placing", growth.Placing ?? "").Raw('}'));
+            // The records (U5): the journal's section, the bestiary's group and picked entry, what the goal list follows
+            // (ScreenStack.Tracked); the full map's zoom (points a tile), middle tile and view (points), the legend's hidden
+            // toggles, the mark whose card shows, and the spot the journal asked the map to show.
+            var map = root.Map;
+            json.Field("records", new Json('{').Field("section", root.JournalSection).Field("group", root.BestiaryGroup).Field("entry", root.BestiaryPick)
+                .Field("tracked", root.Tracked).Field("zoom", map?.Zoom ?? 0).Field("cx", map?.Middle.x ?? 0).Field("cy", map?.Middle.y ?? 0)
+                .Field("view", Rect(map?.ViewShown ?? default)).Field("hidden", map?.HiddenNames ?? "").Field("mark", map?.Picked ?? "")
+                .Field("focus", map?.FocusName ?? "").Raw('}'));
             json.Field("speed", root.HostTicksPerStep);
             // Where the UI's parts were drawn (U0·U1, sweep.js "ui"): the bag window, the "획득" lines, the boss bar, the
             // left column's bottom (the HUD and goal list) and whether the goal list is folded, the player on the screen,

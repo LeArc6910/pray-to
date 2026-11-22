@@ -173,6 +173,12 @@ namespace Game.Client
                 DrawGrowth(screen);
                 return;
             }
+            // The journal is a parchment book of its own (U5, InventoryWindow.Journal.cs).
+            if (screen == GameScreen.Journal)
+            {
+                DrawJournalScreen();
+                return;
+            }
             _page = PageOf(screen);
             var area = Area;
             bool full = ScreenStack.IsFull(screen);
@@ -238,8 +244,7 @@ namespace Game.Client
             // The list takes whatever height the title and tabs leave, so it never runs past the frame.
             _scroll[page] = Ui.BeginScrollView(_scroll[page], GUILayout.ExpandHeight(true));
             if (_page == Page.Gear) DrawGear();
-            else if (_page == Page.Materials) DrawMaterialsPage();
-            else DrawJournal();
+            else DrawMaterialsPage();
             Ui.EndScrollView();
             if (Event.current.type == EventType.Repaint)
             {
@@ -354,218 +359,6 @@ namespace Game.Client
                 if (points && e.type == EventType.Repaint) Badge(tab);
             }
             return page;
-        }
-
-        bool _showPassedGoals;
-
-        static readonly RecordGroup[] BestiaryGroups = { RecordGroup.Monsters, RecordGroup.Bosses, RecordGroup.Fish, RecordGroup.Crops, RecordGroup.Gear };
-
-        // Each group: how many of all there are found, the names of those found (with how many felled, for monsters
-        // and bosses), and how many are still unknown.
-        void DrawBestiary()
-        {
-            var records = _client.Records;
-            int felled = Records.Progress(RecordGroup.Felled, records, System.Array.Empty<(RecordKind, string, string)>());
-            JournalHeading($"잡은 몬스터 모두 {felled}마리");
-            foreach (var group in BestiaryGroups)
-            {
-                var entries = _client.RecordEntries(group);
-                if (entries.Count == 0) continue;
-                int found = Records.Progress(group, records, entries);
-                JournalHeading($"{Records.GroupName(group)} {found}/{entries.Count}");
-                bool counted = group == RecordGroup.Monsters || group == RecordGroup.Bosses;
-                var known = entries.Where(e => records.TryGetValue((e.Kind, e.Id), out int count) && count > 0)
-                    .Select(e => counted ? $"{e.Name} {records[(e.Kind, e.Id)]}" : e.Name).ToList();
-                GUILayout.Label(Ui.Wrap(known.Count == 0 ? "아직 없다" : string.Join(" · ", known), GUI.skin.label, _textWidth));
-                if (found < entries.Count)
-                {
-                    var faint = GUI.color;
-                    GUI.color = new Color(1, 1, 1, 0.5f);
-                    GUILayout.Label(Fit($"모르는 것 {entries.Count - found}", _textWidth));
-                    GUI.color = faint;
-                }
-            }
-        }
-
-        // Every achievement: done or how far along, and its reward (handed out the moment it is reached).
-        void DrawAchievements()
-        {
-            int done = Records.Achievements.Count(a => _client.Achievements.Contains(a.Id));
-            JournalHeading($"업적 {done}/{Records.Achievements.Count} · 이루면 보상을 바로 받는다");
-            foreach (var achievement in Records.Achievements)
-            {
-                var entries = _client.RecordEntries(achievement.Group);
-                int need = Records.Needed(achievement, entries);
-                int have = Math.Min(need, Records.Progress(achievement.Group, _client.Records, entries));
-                bool had = _client.Achievements.Contains(achievement.Id);
-                var previous = GUI.color;
-                if (had) GUI.color = new Color(0.75f, 1f, 0.75f);
-                GUILayout.Label(Ui.Wrap($"{(had ? "[완료] " : "")}{achievement.Name} ({have}/{need}) · 보상 {Records.RewardText(achievement, _client.Loot)}",
-                    GUI.skin.label, _textWidth));
-                GUI.color = previous;
-            }
-        }
-
-        // What the player is doing and has done: the guide's goal and how far along, the goals passed, each person's
-        // story and today's requests, a rift or defense under way.
-        // The journal's three pages: goals and stories, the bestiary, the achievements (Docs/Guide.md 도감과 업적).
-        int _journalPage;
-        static readonly string[] JournalPages = { "목표·이야기", "도감", "업적" };
-
-        void JournalHeading(string text)
-        {
-            GUILayout.Space(6);
-            var previous = GUI.color;
-            GUI.color = new Color(1f, 0.85f, 0.4f);
-            GUILayout.Label(Fit(text, _textWidth));
-            GUI.color = previous;
-        }
-
-        void DrawJournal()
-        {
-            GUILayout.BeginHorizontal();
-            float pageWidth = (_textWidth - 8) / JournalPages.Length;
-            for (int i = 0; i < JournalPages.Length; i++)
-            {
-                var previous = GUI.color;
-                if (i == _journalPage) GUI.color = new Color(1f, 0.9f, 0.55f);
-                if (Ui.LayoutButton(JournalPages[i], GUILayout.Width(pageWidth)) && _journalPage != i)
-                {
-                    _journalPage = i;
-                    Sounds.Play(Sound.Click);
-                }
-                GUI.color = previous;
-            }
-            GUILayout.EndHorizontal();
-            if (_journalPage == 1)
-            {
-                DrawBestiary();
-                return;
-            }
-            if (_journalPage == 2)
-            {
-                DrawAchievements();
-                return;
-            }
-            if (_client.Rift.Open) GUILayout.Label(Fit($"공허 균열 {_client.Rift.Tier}단계 · 남은 적 {_client.Rift.MonstersLeft} · {_client.Rift.SecondsLeft / 60}:{_client.Rift.SecondsLeft % 60:00}", _textWidth));
-            if (_client.Defense.Active) GUILayout.Label(Fit($"기지 방어 {_client.Defense.Level}단계 · {_client.Defense.Wave}/{World.DefenseWaves} 물결 · 수호석 {_client.Defense.StonePercent}%", _textWidth));
-
-            var heading = new Color(1f, 0.85f, 0.4f);
-            void Heading(string text)
-            {
-                GUILayout.Space(6);
-                var previous = GUI.color;
-                GUI.color = heading;
-                GUILayout.Label(Fit(text, _textWidth));
-                GUI.color = previous;
-            }
-
-            var guide = Guide;
-            if (guide != null)
-            {
-                Heading($"목표 안내 {guide.Done}/{guide.Total}");
-                var goal = guide.Current;
-                if (goal == null) GUILayout.Label(Fit("안내한 목표를 모두 마쳤다", _textWidth));
-                else
-                {
-                    string progress = GuideProgress.Progress(goal, GuideFacts.Of(_client)) is string p ? $" ({p})" : "";
-                    GUILayout.Label(Fit($"지금: {goal.Text}{progress}", _textWidth));
-                    GUILayout.Label(Fit(goal.Hint, _textWidth));
-                    if (goal.Rewards.Count > 0) GUILayout.Label(Fit($"보상: {goal.RewardText}", _textWidth));
-                }
-                if (guide.Done > 0 && Ui.LayoutButton(_showPassedGoals ? "마친 목표 접기" : $"마친 목표 보기 ({guide.Done})")) _showPassedGoals = !_showPassedGoals;
-                if (_showPassedGoals)
-                {
-                    foreach (var passed in guide.PassedGoals) GUILayout.Label(Fit($"· {passed.Text}", _textWidth));
-                }
-            }
-
-            DrawStoryLog(Heading);
-
-            var people = _client.Npcs?.Npcs ?? (IReadOnlyList<NpcDefinition>)Array.Empty<NpcDefinition>();
-            Heading("사람들의 이야기");
-            foreach (var npc in people)
-            {
-                var story = _client.Npcs.StoryOf(npc);
-                if (story.Count == 0) continue;
-                int done = _client.StorySteps.TryGetValue(npc.Id, out int d) ? d : 0;
-                var next = _client.StoryStepOf(npc);
-                string state = next == null ? "모두 들었다"
-                    : _client.HeartsWith(npc) < next.Hearts ? $"다음: {next.Title} (호감 {next.Hearts}에 열린다)"
-                    : $"다음: {next.Title}";
-                GUILayout.Label(Fit($"{npc.Name} {done}/{story.Count} · {state}", _textWidth));
-            }
-
-            Heading("오늘의 부탁");
-            bool any = false;
-            foreach (var npc in people)
-            {
-                if (!_client.Friendships.ContainsKey(npc.Id)) continue;
-                var request = _client.RequestOf(npc);
-                if (request == null) continue;
-                any = true;
-                GUILayout.Label(Fit($"{npc.Name}: {request.NeedText} → {request.RewardText}{(_client.RequestDoneToday(npc) ? " (마침)" : "")}", _textWidth));
-            }
-            if (!any) GUILayout.Label(Fit("만난 사람에게 말을 걸면 그날의 부탁을 알려 준다", _textWidth));
-        }
-
-        // The story so far (Docs/Story.md, 2026-11-11): each chapter's steps passed, with the answers given, then the
-        // step on now; and each side story, how far along, or when it opens.
-        void DrawStoryLog(Action<string> heading)
-        {
-            var story = _client.Story;
-            if (story == null || story.Steps.Count == 0) return;
-            heading("큰 이야기");
-            string chapter = null;
-            foreach (var step in story.Passed(0, _client.JourneyStep, _client.StoryChoices))
-            {
-                if (step.Chapter != chapter && !string.IsNullOrEmpty(step.Chapter))
-                {
-                    chapter = step.Chapter;
-                    GUILayout.Label(Fit(chapter, _textWidth));
-                }
-                GUILayout.Label(Fit($"  · {step.Title}", _textWidth));
-                if (step.Choices.Count > 0 && _client.StoryChoices.TryGetValue(step.Index, out int answer) && answer < step.Choices.Count)
-                    GUILayout.Label(Fit($"     고른 말: \"{step.Choices[answer].Text}\"", _textWidth));
-            }
-            var now = _client.CurrentStep;
-            GUILayout.Label(Fit(now == null ? "이야기는 여기까지다. 다음 이야기가 곧 이어진다" : $"지금: {now.Title} · {StoryGoal(now, _client.JourneyTaken)}", _textWidth));
-
-            if (story.Chains.Count == 0) return;
-            heading("곁이야기");
-            foreach (var chain in story.Chains)
-            {
-                var rows = story.Steps.Where(s => s.Chain == chain.Id).ToList();
-                string name = string.IsNullOrEmpty(chain.First.Chapter) ? chain.First.Title : chain.First.Chapter;
-                if (_client.JourneyStep < chain.After)
-                {
-                    GUILayout.Label(Fit($"{name} · 큰 이야기 {chain.After}단계를 마치면 열린다", _textWidth));
-                    continue;
-                }
-                int at = _client.SideSteps.TryGetValue(chain.Id, out int saved) ? saved : chain.First.Index;
-                int done = story.Passed(chain.First.Index, at, _client.StoryChoices).Count;
-                var step = story.Step(at);
-                if (step == null || step.Chain != chain.Id)
-                {
-                    GUILayout.Label(Fit($"{name} {rows.Count}/{rows.Count} · 마쳤다", _textWidth));
-                    continue;
-                }
-                bool taken = _client.SideTaken.Contains(chain.Id);
-                GUILayout.Label(Fit($"{name} {done}/{rows.Count} · {step.Title}: {StoryGoal(step, taken)}", _textWidth));
-            }
-        }
-
-        // What a step asks, in a few words.
-        string StoryGoal(StoryStep step, bool taken)
-        {
-            if (!taken) return $"{step.Who.Name}에게 말 걸기 ({step.Who.Place.Name})";
-            return step.Goal switch
-            {
-                Game.Core.StoryGoal.Reach => $"{step.Place.Name}에 가기",
-                Game.Core.StoryGoal.Boss => $"{_client.BossName(step.Boss)} 쓰러뜨리기",
-                Game.Core.StoryGoal.Have => $"{step.Material?.Name ?? step.Consumable?.Name} {step.Count}개를 {step.Who.Name}에게",
-                _ => $"{step.Who.Name}에게 말 걸기",
-            };
         }
 
         // The guide's progress for the journal (GameRoot hands it over when the guide starts).

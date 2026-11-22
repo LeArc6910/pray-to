@@ -203,6 +203,23 @@ async function playPc(browser, profile) {
   await game.page.keyboard.press('k');
   await game.page.waitForTimeout(400);
   check((await state(game)).window === '', 'K를 다시 누르면 닫힌다');
+  // U5: J the journal as a parchment book on its goals; its index opens the bestiary. M the map on its sheet with the
+  // legend's toggles.
+  await game.page.keyboard.press('j');
+  await game.page.waitForTimeout(600);
+  const journal = await state(game);
+  check(journal.window === '일지' && journal.records && journal.records.section === '목표', `J 키로 [일지]가 목표 쪽으로 열린다 (${journal.window || '없음'} ${journal.records ? journal.records.section : '-'})`);
+  const index = (await send(game, 'buttons')).join(' ');
+  check(['목표', '이야기', '소문', '도감', '업적'].every(n => index.includes(n)), '[일지] 목차에 목표·이야기·소문·도감·업적');
+  await shot(game, profile, 'journal', '[일지] 양피지 책(목표)');
+  await game.page.keyboard.press('m');
+  await game.page.waitForTimeout(700);
+  const map = await state(game);
+  check(map.map && map.records && map.records.zoom > 0 && map.records.view[2] > 300, `M 키로 지도가 양피지 위에 열린다 (확대 ${map.records ? map.records.zoom.toFixed(1) : '-'})`);
+  check(index.length > 0 && (await send(game, 'buttons')).join(' ').includes('장소'), '지도 옆에 범례 단추');
+  await shot(game, profile, 'map-sheet', '지도(빗금 친 안 가 본 곳, 표시, 범례)');
+  await game.page.keyboard.press('m');
+  await game.page.waitForTimeout(400);
   // The encounter windows (Docs/UiRework.md U3): G by a chest opens its window, the workbench's button its own.
   await send(game, 'scene encounter');
   await game.page.waitForTimeout(800);
@@ -381,6 +398,12 @@ async function playPhone(browser, profile) {
   // U4: on a touch screen the tree opens zoomed so a finger's 40 points press a point.
   check(passives.growth && passives.growth.zoom >= 40, `휴대폰의 특성 트리는 손가락 크기로 확대되어 열린다 (${passives.growth ? Math.round(passives.growth.zoom) : '-'})`);
   await shot(game, profile, 'passives', '[특성] 전체 화면(별하늘)');
+  // U5: the map on a phone, its legend under it, the toggles a finger tall.
+  await send(game, 'screen 지도');
+  await game.page.waitForTimeout(700);
+  const phoneMap = await state(game);
+  check(phoneMap.map && phoneMap.records && phoneMap.records.zoom > 0, `휴대폰에서 지도가 열린다 (확대 ${phoneMap.records ? phoneMap.records.zoom.toFixed(1) : '-'})`);
+  await shot(game, profile, 'map-sheet', '휴대폰 지도(범례가 아래)');
   await send(game, 'screen off; scene machines');
   await game.page.waitForTimeout(2500);
   await shot(game, profile, 'machines', '기계 장면');

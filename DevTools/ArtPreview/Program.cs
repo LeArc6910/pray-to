@@ -94,7 +94,7 @@ namespace Game.Client
             // --only ui: just the game's UI skin, its pieces and the existing screens in it (out/ui/, UiPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "ui")
             {
-                UiPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot, LoadClassesWithTree());
+                UiPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot, LoadClassesWithTree(), RecordsWorld(story, monsters, tiles.Terrain), monsters);
                 return 0;
             }
             // --only dungeons: just the instance dungeons as they are laid (dungeons.png, dungeons/, DungeonPreview).
@@ -116,7 +116,7 @@ namespace Game.Client
             Console.WriteLine($"{TileArt.GroundCount} ground tiles in {clock.ElapsedMilliseconds} ms");
             Save(Sheet(loot, monsters, npcs), Path.Combine(output, "sheet.png"), 4);
             Save(UiMock(), Path.Combine(output, "ui_mock.png"), 3);
-            UiPreview.Write(output, loot, LoadClassesWithTree());
+            UiPreview.Write(output, loot, LoadClassesWithTree(), RecordsWorld(story, monsters, tiles.Terrain), monsters);
             // The shapes taken from CC0 packs (Docs/ArtSources.md), in each tier's colours: picks and ingots.
             var imported = new[] { "_bar", "cave_minnow", "ice_trout", "crystal_eel", "void_angler", "warden_core", "queen_heart", "void_essence", "frost_berry",
                 "berry_juice", "moon_wine", "milk", "lotus_tea", "hoe", "watering_can" };
@@ -1214,6 +1214,10 @@ namespace Game.Client
             }
             return result;
         }
+
+        // A world as the game makes one (seed 1, rooms), for the map's pictures (UiPreview.Records.cs).
+        static GeneratedWorld RecordsWorld(StoryData story, MonsterData monsters, TerrainData terrain) =>
+            WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.RoomVersion, terrain);
 
         // The classes, skills and passive tree, for the growth screens' pictures (UiPreview.Growth.cs).
         static ClassData LoadClassesWithTree()

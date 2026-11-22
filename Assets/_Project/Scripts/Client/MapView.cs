@@ -7,13 +7,13 @@ using Object = UnityEngine.Object;
 
 namespace Game.Client
 {
-    // The minimap in the top right corner and the full map it opens. Only tiles that have come within a few tiles of
+    // The minimap in the top right corner and the full map it opens (the full map's window, U5: MapView.Full.cs). Only tiles that have come within a few tiles of
     // the local player are drawn, so the map fills in as the caves are explored. With rumours guiding (Settings.Rumors,
     // 묶음 4c) a boss arena, a place or where the story leads that has not been seen is a wide faint circle on the full
     // map (Rumors.Circle), as are the rumours heard from people; with arrows, they are marked as before. What has been
     // explored and heard is a view, not game state: it is not shared, and each player keeps their own on their device
     // for each character and world (MapSave, GameRoot.MapKey).
-    sealed class MapView : IDisposable
+    sealed partial class MapView : IDisposable
     {
         // Matches what the camera shows around the player.
         const int RevealRadius = 8;
@@ -89,6 +89,7 @@ namespace Game.Client
             _map = client.Map;
             // The world's rows and the dungeons' pocket above them (TileMap.Rows, 묶음 5a); only the world's are kept.
             _pixels = new Color32[_map.Width * _map.Rows];
+            _sheetPixels = new Color32[_pixels.Length];
             _explored = new bool[_pixels.Length];
             if (MapSave.Read(saved, _map.Width, _map.Height) is bool[] kept) Array.Copy(kept, _explored, kept.Length);
             _heard = MapSave.ReadRumors(saved, _map.Width, _map.Height);
@@ -100,7 +101,7 @@ namespace Game.Client
             // Unexplored pixels stay transparent.
             for (int i = 0; i < _explored.Length; i++)
             {
-                if (_explored[i]) _pixels[i] = TileColor(i % _map.Width, i / _map.Width);
+                if (_explored[i]) Paint(i % _map.Width, i / _map.Width);
             }
             _texture.SetPixels32(_pixels);
             _texture.Apply();
@@ -152,10 +153,12 @@ namespace Game.Client
                     {
                         _explored[y * _map.Width + x] = false;
                         _pixels[y * _map.Width + x] = default;
+                        _sheetPixels[y * _map.Width + x] = default;
                     }
             }
             _revealedX = _revealedY = int.MinValue;
             _dirty = true;
+            _sheetDirty = true;
         }
 
         // The part of the map the player is in: the world, or their dungeon's slot of the pocket.
@@ -261,7 +264,7 @@ namespace Game.Client
             }
         }
 
-        static Color RumorColor(RumorKind kind) => kind switch
+        internal static Color RumorColor(RumorKind kind) => kind switch
         {
             RumorKind.Camp => new Color(1f, 0.6f, 0.25f),
             RumorKind.Shrine or RumorKind.Waystone => new Color(0.75f, 0.88f, 1f),
@@ -269,6 +272,21 @@ namespace Game.Client
             RumorKind.Wanderer => new Color(0.18f, 0.8f, 0.7f),
             RumorKind.Station or RumorKind.Cart => new Color(0.78f, 0.6f, 0.4f),
             _ => new Color(1f, 0.84f, 0.3f),
+        };
+
+        // The mark of a rumour's kind on the full map and in the journal (MapIcons).
+        internal static string[] IconOf(RumorKind kind) => kind switch
+        {
+            RumorKind.Camp => MapIcons.Camp,
+            RumorKind.Shrine => MapIcons.Shrine,
+            RumorKind.Chest or RumorKind.Hidden or RumorKind.Vault => MapIcons.Chest,
+            RumorKind.Cart => MapIcons.Cart,
+            RumorKind.Station => MapIcons.Station,
+            RumorKind.Waystone => MapIcons.Stone,
+            RumorKind.Elite => MapIcons.Skull,
+            RumorKind.Wanderer => MapIcons.Stall,
+            RumorKind.Arena => MapIcons.Arena,
+            _ => MapIcons.Rumor,
         };
 
         // A wide faint disc of the given radius in tiles, and its rim.
@@ -313,7 +331,11 @@ namespace Game.Client
             }
         }
 
-        public void Dispose() => Object.Destroy(_texture);
+        public void Dispose()
+        {
+            Object.Destroy(_texture);
+            if (_sheet != null) Object.Destroy(_sheet);
+        }
 
         // Redraws dug or built tiles that have already been explored.
         public void UpdateTiles(IEnumerable<TileChange> changes)
@@ -322,7 +344,7 @@ namespace Game.Client
             {
                 int index = change.Y * _map.Width + change.X;
                 if (!_explored[index]) continue;
-                _pixels[index] = TileColor(change.X, change.Y);
+                Paint(change.X, change.Y);
                 _dirty = true;
             }
         }
@@ -372,75 +394,6 @@ namespace Game.Client
             DrawTiles(area, window);
             Ui.Probe("지도", area);
             if (GUI.Button(area, GUIContent.none, GUIStyle.none)) FullOpen = true;
-        }
-
-        // The whole map over the game (a full screen, U1; the records group's map, U2): the world darkened behind it, red at
-        // the edges while the player is being hurt; a parchment-headed window as large as the records' (ScreenStack.
-        // FullArea) with the map's name and key in its head, the records' tabs ([일지][지도]) under it, the map as large as
-        // fits, and its key under that, as many lines as it needs. A press outside the window closes it, as the close
-        // button in the head does.
-        public void DrawFull()
-        {
-            const float lineHeight = 26;
-            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
-            Controls.Block(screen);
-            UiSkin.FullBackdrop(screen);
-            var dungeon = _client.DungeonHere;
-            string key = dungeon != null ? "● 나   ● 다른 플레이어   ◆ 나가는 문   ● 남은 무리   ☠ 주인   ◆ 상자   ● 모닥불·지름길 돌"
-                : "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리   ◆ 던전 문" + (Settings.Rumors ? "   ○ 소문(옅은 원)" : "");
-            var panel = ScreenStack.FullArea();
-            UiMotion.BeginWindow(ScreenStack.MotionKey(GameScreen.Map), panel, UiKind.Journal);
-            string title = (dungeon != null ? dungeon.Name : "지도") + ScreenStack.KeyHint(GameScreen.Map);
-            var inside = UiSkin.Window(panel, UiKind.Journal, title, UiIcons.Map, out var band);
-            bool closed = UiSkin.CloseButton(band, "지도 닫기");
-            float tabs = Ui.Short ? 34 : ScreenStack.TabHeight;
-            if (Screens != null) Screens.Tabs(new Rect(inside.x, inside.y, inside.width, tabs), GameScreen.Map);
-            float top = inside.y + (Screens != null ? tabs + 6 : 0);
-            // The key is as tall as it wraps to at the map's width; the map is as big as what is left allows.
-            float size = Mathf.Min(inside.width, inside.yMax - top - lineHeight * 2);
-            string wrappedKey = Ui.Wrap(key, GUI.skin.label, size);
-            float keyHeight = GUI.skin.label.CalcHeight(new GUIContent(wrappedKey), size);
-            size = Mathf.Max(80, Mathf.Min(size, inside.yMax - top - keyHeight - 4));
-            wrappedKey = Ui.Wrap(key, GUI.skin.label, size);
-            keyHeight = GUI.skin.label.CalcHeight(new GUIContent(wrappedKey), size);
-            var area = new Rect(Mathf.Round(inside.center.x - size / 2), top + 2, size, size);
-            UiSkin.Inset(new Rect(area.x - 2, area.y - 2, area.width + 4, area.height + 4));
-            Fill(area, Backdrop);
-            // In a dungeon, the dungeon alone (Docs/WorldRework.md 지도와 화면).
-            var shown = Shown();
-            DrawTiles(area, shown);
-            GUI.Label(new Rect(area.x, area.yMax + 4, size, keyHeight), wrappedKey);
-            if (dungeon == null)
-            {
-                // Each place's name beside its dot (with rumours, only the places whose spot is known).
-                var window = new Rect(0, 0, _map.Width, _map.Height);
-                foreach (var site in _client.Places)
-                {
-                    if (KnowledgeOf(site) != WayKnown.Known) continue;
-                    float u = site.Center.X / window.width, v = site.Center.Y / window.height;
-                    var at = new Vector2(area.x + u * area.width, area.yMax - v * area.height);
-                    var previous = GUI.color;
-                    GUI.color = _client.Waypoints.Contains(site.Definition.Index) ? WaypointOpen : Color.white;
-                    // Kept inside the map's frame, so a name near the right edge is not cut off the screen.
-                    float nameWidth = Mathf.Min(200, GUI.skin.label.CalcSize(new GUIContent(site.Definition.Name)).x + 4);
-                    float nameX = at.x + MarkerSize + nameWidth > area.xMax ? at.x - MarkerSize - nameWidth : at.x + MarkerSize;
-                    GUI.Label(new Rect(nameX, at.y - lineHeight / 2, nameWidth, lineHeight), site.Definition.Name);
-                    GUI.color = previous;
-                }
-            }
-            UiMotion.EndWindow();
-            if (closed)
-            {
-                FullOpen = false;
-                return;
-            }
-            // Outside the window (the sides of a wide screen), a press closes it.
-            var e = Event.current;
-            if (e.type == EventType.MouseDown && !panel.Contains(e.mousePosition))
-            {
-                FullOpen = false;
-                e.Use();
-            }
         }
 
         // Draws the tiles of the given window of the map (in tiles, y up) into a GUI area, then the markers.
@@ -673,11 +626,56 @@ namespace Game.Client
                     int index = y * _map.Width + x;
                     if (_explored[index] || _buried.Count > 0 && Shut(x, y)) continue;
                     _explored[index] = true;
-                    _pixels[index] = TileColor(x, y);
+                    Paint(x, y);
                     _dirty = true;
                     if (!_map.InPocket(y)) Changed = true;
                 }
             }
+        }
+
+        // ---- The full map's own colours (U5) ----
+
+        // The full map is drawn on parchment, as a map is inked (MapView.Full.cs): the walls dark ink, the floors pale with
+        // their biome's tint, the rest (ore, water, lava, roads, machines) as on the minimap; the unexplored left as the
+        // bare sheet. Kept beside the minimap's colours and sent to its texture only while the full map is up.
+        readonly Color32[] _sheetPixels;
+        Texture2D _sheet;
+        bool _sheetDirty = true;
+        static readonly Color32 SheetInk = new Color32(72, 54, 38, 255);
+        static readonly Color32 SheetPaper = new Color32(236, 222, 186, 255);
+
+        void Paint(int x, int y)
+        {
+            int index = y * _map.Width + x;
+            var c = TileColor(x, y);
+            _pixels[index] = c;
+            _sheetPixels[index] = SheetColor(x, y, c);
+            _sheetDirty = true;
+        }
+
+        Color32 SheetColor(int x, int y, Color32 c)
+        {
+            static bool Same(Color32 a, Color32 b) => a.r == b.r && a.g == b.g && a.b == b.b;
+            if (Same(c, Wall)) return SheetInk;
+            if (Same(c, ArenaFloor) || Same(c, BiomeFloor(_client.Biomes[x, y])) || Same(c, Floor)) return Color32.Lerp(c, SheetPaper, 0.62f);
+            return c;
+        }
+
+        // The full map's texture, brought up to date.
+        Texture2D Sheet()
+        {
+            if (_sheet == null)
+            {
+                _sheet = new Texture2D(_map.Width, _map.Rows, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+                _sheetDirty = true;
+            }
+            if (_sheetDirty)
+            {
+                _sheet.SetPixels32(_sheetPixels);
+                _sheet.Apply();
+                _sheetDirty = false;
+            }
+            return _sheet;
         }
 
         Color32 TileColor(int x, int y)

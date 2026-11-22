@@ -686,15 +686,31 @@ namespace Game.Client
 
         // The goal list's lines for the story: the main story's, then each side story taken (one on a short screen),
         // each its chapter and title, then what to do and which way.
-        public List<(string Title, string Text)> TrackerEntries()
+        // A side story followed from the journal ([추적], `tracked` its chain) comes right after the main story's and
+        // always shows; `at` is its place in the list (-1 for none).
+        public List<(string Title, string Text)> TrackerEntries() => TrackerEntries(null, out _);
+
+        public List<(string Title, string Text)> TrackerEntries(string tracked, out int at)
         {
             var entries = new List<(string, string)>();
+            at = -1;
             int sides = 0;
-            foreach (var (step, taken) in _client.CurrentSteps)
+            var steps = new List<(StoryStep Step, bool Taken)>(_client.CurrentSteps);
+            int first = steps.FindIndex(s => s.Step.Chain.Length > 0 && s.Taken && s.Step.Chain == tracked);
+            if (first > 0)
+            {
+                var followed = steps[first];
+                steps.RemoveAt(first);
+                int main = steps.FindIndex(s => s.Step.Chain.Length == 0);
+                steps.Insert(main + 1, followed);
+            }
+            foreach (var (step, taken) in steps)
             {
                 bool side = step.Chain.Length > 0;
-                if (side && (!taken || sides >= (Ui.Short ? 1 : 2))) continue;
+                bool followed = side && taken && step.Chain == tracked;
+                if (side && (!taken || sides >= (Ui.Short ? 1 : 2)) && !followed) continue;
                 if (side) sides++;
+                if (followed) at = entries.Count;
                 string title = string.IsNullOrEmpty(step.Chapter) ? $"이야기: {step.Title}" : $"{step.Chapter}: {step.Title}";
                 string text = taken ? Doing(step) : $"{step.Who.Name}에게 말 걸기";
                 var site = _client.SiteOf(taken ? step.Target : step.Who.Place);

@@ -269,7 +269,7 @@ namespace Game.Client
             _view ??= new WorldView(_client, _camera);
             // A world of rooms made before its map was kept under the generator (2026-11-22) left it under the seed alone.
             _map ??= new MapView(_client, SaveStore.Read(MapKey)
-                ?? (_client.Generator > WorldGenerator.CaveVersion ? SaveStore.Read(SaveStore.MapKey(_client.Seed, WorldGenerator.CaveVersion, CharacterName)) : null)) { Screens = _screens };
+                ?? (_client.Generator > WorldGenerator.CaveVersion ? SaveStore.Read(SaveStore.MapKey(_client.Seed, WorldGenerator.CaveVersion, CharacterName)) : null)) { Screens = _screens, Send = SendToHost };
             // A map scrap read marks a thing on this player's map (WorldView.Travel.cs).
             _view.MapScrap ??= () => _map?.ReadScrap();
             _client.AdvanceRenderClock(Time.deltaTime);
@@ -1062,6 +1062,12 @@ namespace Game.Client
         // The growth screens' state for the playtests (U4): the tree's zoom, pan, sky and picked point, the picked skill,
         // a phone's sheet, the drawer, the skill waiting for a slot.
         internal InventoryWindow.GrowthState Growth => _inventory?.Growth ?? default;
+        // The records (U5): the journal's section, the bestiary's group and picked entry, what the goal list follows.
+        internal string JournalSection => _inventory?.JournalSectionName ?? "";
+        internal string BestiaryGroup => _inventory?.BestiaryGroupName ?? "";
+        internal string BestiaryPick => _inventory?.BestiaryPick ?? "";
+        internal string Tracked => _screens?.Tracked ?? "";
+        internal void ShowJournal(InventoryWindow.JournalSection section) => _inventory?.ShowJournal(section);
         internal string Shopkeeper => _client?.NpcNear()?.Npc.Name ?? "";
         internal string LastRumor => _storyScreen?.LastRumor;
         internal MapView Map => _map;
@@ -1398,7 +1404,7 @@ namespace Game.Client
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _screens = NewScreens();
-            _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens);
+            _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens) { Map = () => _map };
             _storyScreen = new StoryScreen(_client, SendToHost, () => _map) { OpenShop = tab => _inventory?.ShowShop(tab) };
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
@@ -1452,7 +1458,7 @@ namespace Game.Client
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _screens = NewScreens();
-            _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens);
+            _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens) { Map = () => _map };
             _storyScreen = new StoryScreen(_client, SendToHost, () => _map) { OpenShop = tab => _inventory?.ShowShop(tab) };
             _joinSent = false;
             _net.Connected += id =>
@@ -2310,7 +2316,22 @@ namespace Game.Client
             }
             // The story first (Docs/Story.md): where it leads and which way, then the side stories taken.
             int storyAt = entries.Count;
-            if (_storyScreen != null) entries.AddRange(_storyScreen.TrackerEntries());
+            // What the journal or the map was asked to follow (Docs/UiRework.md U5 추적, ScreenStack.Tracked): a spot on the
+            // map first, which way and how far; a side story right after the main story's; a person's story or request
+            // before the other people's. It is marked with a flag beside its title.
+            string tracked = _screens.Tracked ?? "";
+            int trackedAt = -1;
+            if (tracked == "pin")
+            {
+                trackedAt = entries.Count;
+                entries.Add(($"길 안내: {_screens.PinName}", PinWay()));
+                storyAt = entries.Count;
+            }
+            if (_storyScreen != null)
+            {
+                entries.AddRange(_storyScreen.TrackerEntries(tracked.StartsWith("side:") ? tracked.Substring(5) : null, out int side));
+                if (side >= 0) trackedAt = storyAt + side;
+            }
             var goal = Settings.Guide ? _guideProgress?.Current : null;
             // One next thing, not two (Docs/Guide.md 하나의 다음 목표, 2026-11-11, the research report's candidate 4): when
             // the guide's goal is the boss the story's step asks for, the story's entry says it and carries the guide's
@@ -2341,20 +2362,25 @@ namespace Game.Client
                 int have = n.Thing is MaterialDefinition m ? _client.Bag.CountOfKind(m) : _client.Bag.CountOf((ConsumableDefinition)n.Thing);
                 return $"{RequestDefinition.NameOf(n.Thing)} {Math.Min(have, n.Count)}/{n.Count}";
             }));
-            foreach (var npc in _client.Npcs?.Npcs ?? Enumerable.Empty<NpcDefinition>())
+            var everyone = (_client.Npcs?.Npcs ?? Enumerable.Empty<NpcDefinition>()).OrderBy(n => tracked == "story:" + n.Id || tracked == "request:" + n.Id ? 0 : 1).ToList();
+            foreach (var npc in everyone)
             {
-                if (entries.Count(e => e.Title.StartsWith("이야기") || e.Title.StartsWith("부탁")) >= people) break;
+                bool follow = tracked == "story:" + npc.Id;
+                if (!follow && entries.Count(e => e.Title.StartsWith("이야기") || e.Title.StartsWith("부탁")) >= people) continue;
                 if (!_client.Friendships.ContainsKey(npc.Id)) continue;
                 var step = _client.StoryStepOf(npc);
                 if (step == null || _client.HeartsWith(npc) < step.Hearts) continue;
+                if (follow) trackedAt = entries.Count;
                 entries.Add(($"이야기: {npc.Name} — {step.Title}", Needs(step) + (Ui.Short ? "" : $"\n보답: {step.RewardText}")));
             }
-            foreach (var npc in _client.Npcs?.Npcs ?? Enumerable.Empty<NpcDefinition>())
+            foreach (var npc in everyone)
             {
-                if (entries.Count(e => e.Title.StartsWith("이야기") || e.Title.StartsWith("부탁")) >= people) break;
+                bool follow = tracked == "request:" + npc.Id;
+                if (!follow && entries.Count(e => e.Title.StartsWith("이야기") || e.Title.StartsWith("부탁")) >= people) continue;
                 if (!_client.Friendships.ContainsKey(npc.Id) || _client.RequestDoneToday(npc)) continue;
                 var request = _client.RequestOf(npc);
                 if (request == null) continue;
+                if (follow) trackedAt = entries.Count;
                 var needs = request.Need.Select(n =>
                 {
                     int have = n.Thing is MaterialDefinition m ? _client.Bag.CountOfKind(m) : _client.Bag.CountOf((ConsumableDefinition)n.Thing);
@@ -2397,7 +2423,7 @@ namespace Game.Client
                 UiSkin.Icon(new Rect(folded.xMax - box.padding.right - 10, folded.y, 12, folded.height), UiIcons.Book, new Color(0.95f, 0.85f, 0.6f));
                 Ui.Probe("일지 열기", folded);
                 Controls.Block(folded);
-                if (GUI.Button(folded, GUIContent.none, GUIStyle.none)) _inventory.Show("일지");
+                if (GUI.Button(folded, GUIContent.none, GUIStyle.none)) _inventory.ShowJournal(InventoryWindow.JournalSection.Goals);
                 Ui.LeftColumnBottom = folded.yMax;
                 return shown;
             }
@@ -2416,9 +2442,15 @@ namespace Game.Client
             UiSkin.Panel(frame);
             GUI.color = previous;
             float y = frame.y + box.padding.top;
-            foreach (var (title, text, titleHeight, textHeight) in laid)
+            for (int i = 0; i < laid.Count; i++)
             {
+                var (title, text, titleHeight, textHeight) = laid[i];
                 ShadowLabel(new Rect(frame.x + box.padding.left, y, width, titleHeight), title, _trackerTitle, new Color(1f, 0.85f, 0.4f));
+                if (i == trackedAt)
+                {
+                    var flag = UiSkin.IconSize(MapIcons.Pin);
+                    UiSkin.Icon(new Rect(frame.xMax - box.padding.right - flag.x + 2, y + 1, flag.x, flag.y), MapIcons.Pin, new Color(0.9f, 0.3f, 0.22f));
+                }
                 y += titleHeight;
                 ShadowLabel(new Rect(frame.x + box.padding.left, y, width, textHeight), text, style, Color.white);
                 y += textHeight + 4;
@@ -2428,6 +2460,16 @@ namespace Game.Client
         }
 
         GUIStyle _trackerTitle;
+
+        // Which way and how far the spot picked on the map lies ([여기로 길 안내], U5); "도착" once there.
+        string PinWay()
+        {
+            var from = _client.WorldPosition;
+            var pin = _screens.PinAt;
+            if (Vec2.Distance(from, pin) < 3) return "도착";
+            var here = _client.Biomes[TileMap.Cell(from.X), TileMap.Cell(from.Y)];
+            return Rumors.Way(WayKnown.Known, from, pin, here, here);
+        }
 
         GUIStyle _hudLine;
 

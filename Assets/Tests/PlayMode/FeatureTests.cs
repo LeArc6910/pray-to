@@ -307,6 +307,46 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The records laid out anew (Docs/UiRework.md U5): the journal as a parchment book on each of its five sections
+        // (goals, story, rumours, bestiary, deeds), then the map on its sheet with its legend. On a PC and on a touch
+        // screen. A picture of each.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheRecordsScreensDraw()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            World.GainExperience(Player, Leveling.TotalFor(6));
+            Give("copper_ore", 12);
+            Give("coin", 300);
+            yield return new WaitForSecondsRealtime(1);
+            try
+            {
+                foreach (bool touch in new[] { false, true })
+                {
+                    Controls.ForceTouch(touch);
+                    for (int i = 0; i < InventoryWindow.JournalNames.Length; i++)
+                    {
+                        _root.ShowJournal((InventoryWindow.JournalSection)i);
+                        yield return new WaitForSecondsRealtime(0.6f);
+                        Assert.AreEqual(GameScreen.Journal, _root.OpenScreen, "The journal is up.");
+                        Assert.AreEqual(InventoryWindow.JournalNames[i], _root.JournalSection, "On the section asked for.");
+                        yield return Screens.Take($"records-journal-{i}{(touch ? "-touch" : "")}");
+                    }
+                    _root.ShowScreen(GameScreen.Map);
+                    yield return new WaitForSecondsRealtime(0.8f);
+                    Assert.IsTrue(_root.MapOpen, "The map is up.");
+                    Assert.Greater(_root.Map.Zoom, 0f, "The map has a zoom.");
+                    yield return Screens.Take($"records-map{(touch ? "-touch" : "")}");
+                    _root.ShowScreen(GameScreen.None);
+                }
+            }
+            finally
+            {
+                Controls.ForceTouch(false);
+            }
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The encounter windows (Docs/UiRework.md U3): a chest, a workbench, a furnace and an anvil laid round the player
         // open their windows (each counts as the bag's, and shuts once its thing is out of reach); a merchant's stall: her
         // talk with her portrait and choices, then her shop; the village child's talk with her portrait and the line's face.

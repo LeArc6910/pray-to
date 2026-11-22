@@ -1385,14 +1385,14 @@ async function npc(browser) {
   await bagTab(game, '일지');
   const journal = (await game.buttons()).length >= 0;
   await game.shot('journal', '[일지] 탭');
-  // The bestiary and the achievements, two more pages of the journal (Docs/Guide.md 도감과 업적).
+  // The bestiary and the achievements, two more sections of the journal (Docs/Guide.md 도감과 업적; U5: the book's index).
   check(await game.press('도감'), '[일지]의 [도감]을 누른다');
   await game.shot('journal-bestiary', '[일지] 도감');
   check(await game.press('업적'), '[일지]의 [업적]을 누른다');
   await game.shot('journal-achievements', '[일지] 업적');
   const seen = await game.inventory();
   check(seen.records > 0, `가진 재료와 장비가 도감에 든다 (${seen.records})`);
-  await game.press('목표·이야기');
+  await game.press('목표');
   // A pet (Docs/Animals.md 펫): an egg hatched from the materials tab follows the player.
   await closeBag(game);
   await game.send('give slime_egg 1');
@@ -2750,8 +2750,10 @@ async function story(browser) {
   await game.shot('side-story-branch', '고른 말에 따라 바뀌는 대사');
   await game.press('알겠다', undefined, { quiet: true });
   await game.press('닫기', undefined, { quiet: true });
-  // The journal's story so far (2026-11-11): the chapters passed, the answer given, and the side stories.
+  // The journal's story so far (2026-11-11): the chapters passed, the answer given, and the side stories (U5: the
+  // [이야기] section of the book).
   await bagTab(game, '일지');
+  await game.press('이야기');
   await game.wait(400);
   const log = await game.allText();
   check(/큰 이야기/.test(log) && /고른 말/.test(log) && /아무것도 없었다고 한다/.test(log), '[일지]에 지나온 큰 이야기와 고른 말');
@@ -5473,7 +5475,181 @@ async function growth(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth };
+// ---------------------------------------------------------------- 기록: 일지와 지도 (U5)
+// The records laid out anew (Docs/UiRework.md U5) on a PC, a small phone held upright and a small one on its side: the
+// journal as a parchment book (J or the [메뉴] hub) on each of its sections, a goal's note, the story's chapters, a
+// rumour's [지도에서 보기] opening the map on its ring, a bestiary entry's card, the deeds, [추적] on a request; then the
+// map (M or the minimap) dragged, zoomed (wheel or two fingers, [+]/[-]/[◇]), a legend toggle, a mark's card and
+// [여기로 길 안내] the goal list then follows.
+async function records(browser) {
+  for (const profileName of ['pc', 'phone-small', 'phone-wide-small']) {
+    const profile = Profiles[profileName];
+    const { width, height } = profile.context.viewport;
+    note(`\n## 기록 화면 ${profileName} ${width}×${height} (U5)\n`);
+    const game = await open(browser, run, profile, url);
+    check(await game.startSolo(), '혼자 하기가 시작된다');
+    await game.wait(1500);
+    if (game.touch) {
+      await game.page.touchscreen.tap(width / 2, height / 3);
+      await game.wait(800);
+    }
+    const shot = (name, caption) => game.shot(`records-${profileName}-${name}`, `${profileName}: ${caption}`);
+    const records = async () => (await game.state()).records || {};
+    // Every shown button on the screen, and on a touch screen the records' own a finger tall.
+    const fits = async what => {
+      const shown = (await game.buttons()).filter(b => b.shown);
+      const out = shown.filter(b => b.rect[0] < -0.5 || b.rect[1] < -0.5 || b.rect[0] + b.rect[2] > width + 0.5 || b.rect[1] + b.rect[3] > height + 0.5);
+      check(out.length === 0, `${what}: 단추가 화면 안 (${out.map(b => b.label).slice(0, 4).join(', ') || '모두'})`);
+      if (!game.touch) return;
+      const words = /^(목표|이야기|소문|도감|업적|지도에서 보기|추적|추적 그만|마친 목표|여기로 길 안내|길 안내 그만|이동|확대|축소|가운데로)/;
+      const small = shown.filter(b => (words.test(b.label) || b.row === '범례' || b.row === '도감 묶음') && b.rect[3] < 39.5);
+      check(small.length === 0, `${what}: 손가락 단추 40점 이상 (${small.map(b => `${b.label} ${Math.round(b.rect[3])}`).slice(0, 4).join(', ') || '모두'})`);
+    };
+    await game.send('monsters hold; still; xp 2000; hearts merchant 1; give copper_ore 5');
+    await game.wait(600);
+    // A rumour from the village child (as the guide section hears one), for the journal's rumours and the map's ring.
+    await game.send('goto person mina');
+    await game.wait(900);
+    if (await game.press(/미나와 말하기/, undefined, { quiet: true })) {
+      for (let i = 0; i < 4 && (await game.press('다음', undefined, { quiet: true })); i++) await game.wait(300);
+      await game.press('알겠다', undefined, { quiet: true });
+      await game.press('닫기', undefined, { quiet: true });
+    }
+    const heard = await game.ask('rumors');
+    note(`  - 들은 소문 ${(heard.heard || []).length}`);
+
+    // ---- 일지 ----
+    check(await openScreen(game, '일지'), '[일지]가 열린다');
+    await game.wait(500);
+    let r = await records();
+    check(r.section === '목표', `일지는 목표 쪽으로 열린다 (${r.section})`);
+    const index = (await game.buttons()).filter(b => b.row === '일지').map(b => b.label);
+    check(['목표', '이야기', '소문', '도감', '업적'].every(n => index.includes(n)), `목차에 다섯 쪽 (${index.join(', ')})`);
+    let text = await game.allText();
+    check(/목표 안내 \d+\/\d+/.test(text) && /지금: /.test(text), '목표 쪽에 목표 안내의 쪽지(지금 목표, 진행)');
+    await shot('journal-goals', '일지 목표: 목표 안내, 이야기 단계, 오늘의 부탁 쪽지');
+    await fits('[일지] 목표');
+    // [추적] on today's request: the goal list follows it.
+    const follow = (await game.buttons()).find(b => b.label === '추적');
+    if (follow) {
+      await game.press('추적', follow.row);
+      r = await records();
+      check(/^(request|story|side):/.test(r.tracked), `[추적]을 누르면 목표 목록이 그것을 따른다 (${r.tracked})`);
+      await shot('journal-tracked', '추적 중인 쪽지(붉은 테, [추적 그만])');
+    } else note('  - [추적]할 쪽지가 없다(부탁이 없는 날)');
+    check(await game.press('이야기', '일지'), '목차의 [이야기]');
+    await game.wait(300);
+    text = await game.allText();
+    check((await records()).section === '이야기' && /큰 이야기/.test(text), '이야기 쪽: 큰 이야기와 장 제목');
+    await shot('journal-story', '일지 이야기: 장마다 지나온 단계, 곁이야기, 사람들의 이야기(초상)');
+    await fits('[일지] 이야기');
+    check(await game.press('소문', '일지'), '목차의 [소문]');
+    await game.wait(300);
+    await shot('journal-rumors', '일지 소문: 들은 소문과 방향, [지도에서 보기]');
+    if ((await game.find('지도에서 보기')).length > 0) {
+      check(await game.press('지도에서 보기'), '소문의 [지도에서 보기]');
+      const onMap = await game.until(t => t.window === '지도' && t.records && t.records.focus !== '', 3000);
+      check(!!onMap, `[지도에서 보기]로 지도가 그 소문 쪽으로 열린다 (${onMap ? onMap.records.focus : '없음'})`);
+      await shot('rumor-on-map', '소문의 옅은 원 쪽으로 열린 지도');
+      await game.press('일지');
+      await game.until(t => t.window === '일지', 3000);
+      check((await records()).section === '소문', '지도의 [일지] 탭으로 보던 쪽에 돌아온다');
+    } else note('  - 들은 소문이 없어 [지도에서 보기]를 건너뛴다');
+    check(await game.press('도감', '일지'), '목차의 [도감]');
+    await game.wait(300);
+    await game.press('장비', '도감 묶음');
+    await game.wait(300);
+    const found = (await game.buttons()).filter(b => b.row === '도감' && b.label !== '모르는 것');
+    check(found.length > 0, `도감에 찾은 것의 그림 칸 (${found.length}) · 모르는 것은 실루엣`);
+    if (found.length > 0) {
+      await game.press(found[0].label, '도감');
+      r = await records();
+      check(r.entry !== '', `그림 칸을 누르면 위에 그 카드 (${r.group} ${r.entry})`);
+    }
+    await shot('journal-bestiary', '일지 도감: 묶음 탭, 고른 것의 카드, 그림 칸과 실루엣');
+    await fits('[일지] 도감');
+    check(await game.press('업적', '일지'), '목차의 [업적]');
+    await game.wait(300);
+    check(/업적 \d+\/\d+/.test(await game.allText()), '업적 쪽: 업적 수와 진행 막대 쪽지');
+    await shot('journal-deeds', '일지 업적: 진행 막대, 이룬 것에 붉은 밀랍 인장');
+    await fits('[일지] 업적');
+
+    // ---- 지도 ----
+    await game.press('창 닫기');
+    await game.until(t => t.window === '', 3000);
+    if (game.touch) await game.press('지도');
+    else await game.page.keyboard.press('m');
+    let s = await game.until(t => t.window === '지도' && t.map, 3000);
+    check(!!s, `${game.touch ? '미니맵을 누르면' : 'M으로'} 지도가 열린다`);
+    r = await records();
+    check(r.zoom > 0 && r.view[2] > 200 && r.view[3] > 150, `지도가 넓다 (${(r.view || []).map(Math.round).join(',')}, 확대 ${r.zoom && r.zoom.toFixed(2)})`);
+    await shot('map', '지도: 양피지, 빗금 친 안 가 본 곳, 표시, 범례');
+    await fits('[지도]');
+    // Dragging pans it.
+    const box = await game.canvas();
+    const sx = box.width / width, sy = box.height / height;
+    const view = r.view;
+    const cx = box.left + (view[0] + view[2] * 0.5) * sx, cy = box.top + (view[1] + view[3] * 0.35) * sy;
+    const middle = [r.cx, r.cy];
+    if (game.touch) await game.drag(cx, cy, 70, 40, 200);
+    else {
+      await game.page.mouse.move(cx, cy);
+      await game.page.mouse.down();
+      await game.page.mouse.move(cx + 70, cy + 40, { steps: 8 });
+      await game.page.mouse.up();
+    }
+    await game.wait(400);
+    r = await records();
+    check(Math.hypot(r.cx - middle[0], r.cy - middle[1]) > 3, `지도를 끌면 옮겨진다 (${middle.map(Math.round)} → ${Math.round(r.cx)},${Math.round(r.cy)})`);
+    let zoom = r.zoom;
+    if (game.touch) {
+      const cdp = await game.context.newCDPSession(game.page);
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: cx - 20, y: cy, id: 1 }, { x: cx + 20, y: cy, id: 2 }] });
+      for (let i = 1; i <= 8; i++) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: cx - 20 - i * 8, y: cy, id: 1 }, { x: cx + 20 + i * 8, y: cy, id: 2 }] });
+        await game.wait(60);
+      }
+      await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    } else {
+      await game.page.mouse.move(cx, cy);
+      await game.page.mouse.wheel(0, -300);
+    }
+    await game.wait(500);
+    r = await records();
+    check(r.zoom > zoom * 1.1, `${game.touch ? '두 손가락을 벌리면' : '휠을 올리면'} 확대된다 (${zoom.toFixed(2)} → ${r.zoom.toFixed(2)})`);
+    zoom = r.zoom;
+    check(await game.press('축소', '지도') && (await records()).zoom < zoom, '[-] 축소');
+    zoom = (await records()).zoom;
+    check(await game.press('확대', '지도') && (await records()).zoom > zoom, '[+] 확대');
+    check(await game.press('가운데로', '지도'), '[◇] 가운데로');
+    await shot('map-zoomed', '확대하고 가운데로 돌아온 지도');
+    // A legend toggle hides its marks and shows them again.
+    check(await game.press('장소', '범례'), '범례의 [장소]');
+    check(/장소/.test((await records()).hidden), `[장소]를 끄면 장소 표시가 숨는다 (${(await records()).hidden})`);
+    await shot('map-legend-off', '범례 [장소]를 끈 지도(줄 그은 단추)');
+    await game.press('장소', '범례');
+    check(!/장소/.test((await records()).hidden), '다시 누르면 보인다');
+    // A mark pressed: its card, then [여기로 길 안내].
+    const marks = (await game.buttons()).filter(b => b.row === '지도 표시' && b.shown && b.label !== '나');
+    note(`  - 지도의 표시 ${marks.length}개: ${marks.slice(0, 6).map(b => b.label).join(', ')}`);
+    if (marks.length > 0) {
+      await game.press(marks[0].label, '지도 표시');
+      r = await records();
+      check(r.mark !== '', `표시를 누르면 카드가 나온다 (${r.mark})`);
+      await shot('map-card', `표시의 카드 (${r.mark})`);
+      if (await game.press('여기로 길 안내', undefined, { quiet: true })) {
+        check((await records()).tracked === 'pin', '[여기로 길 안내]를 누르면 목표 목록이 그곳을 따른다');
+        await game.press('지도 닫기');
+        await game.wait(400);
+        check(/길 안내: /.test(await game.allText()), '목표 목록에 "길 안내: …" 줄');
+        await shot('map-guided', '길 안내를 따르는 목표 목록');
+      }
+    } else note('  - 누를 표시가 지도에 없다');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

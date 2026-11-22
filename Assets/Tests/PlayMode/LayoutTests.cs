@@ -306,6 +306,85 @@ namespace Game.Client.Tests
             Assert.IsEmpty(problems, string.Join("\n", problems));
         }
 
+        // The records (Docs/UiRework.md U5: the journal and the map) fit the screens the person named (a small PC window, a
+        // small phone held upright and on its side) and the rest: the window inside the screen; the journal's book under
+        // its tabs, its page with room to read, the index's five entries inside the index and the book, apart, a finger tall
+        // on a touch screen; the map with room, its zoom buttons in it, and the legend's toggles (in the world and in a
+        // dungeon) inside the legend and the area under the tabs, apart, clear of the map, a finger tall on a touch screen.
+        [Test]
+        public void TheRecordsScreensFit()
+        {
+            var problems = new List<string>();
+            var sizes = new List<(string Name, float Width, float Height, bool Touch)>
+            {
+                ("작은 PC 창 (U5)", 800, 600, false),
+                ("작은 휴대폰 세로 (U5)", 375, 812, true),
+                ("작은 휴대폰 가로 (U5)", 740, 360, true),
+            };
+            sizes.AddRange(Sizes);
+            foreach (var (name, width, height, touch) in sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Ui.HudHeight = 160;
+                Controls.ForceTouch(touch);
+                float finger = touch ? 40 : 28;
+                string where = $"{name} {width}×{height}";
+                bool Within(Rect r, Rect area) => r.xMin >= area.xMin - 0.5f && r.yMin >= area.yMin - 0.5f && r.xMax <= area.xMax + 0.5f && r.yMax <= area.yMax + 0.5f;
+
+                // The journal.
+                var area = ScreenStack.AreaOf(GameScreen.Journal);
+                if (!Inside(area, width, height)) problems.Add($"{where}, 일지: 화면 밖 {area}");
+                var body = InventoryWindow.GrowthBody(area);
+                var lay = InventoryWindow.LayJournal(body);
+                if (!Within(lay.Book, body)) problems.Add($"{where}, 일지: 책이 내용 자리 밖 {lay.Book}");
+                if (!Within(lay.Page, lay.Book) || !Within(lay.Index, lay.Book)) problems.Add($"{where}, 일지: 쪽이나 목차가 책 밖 {lay.Page} {lay.Index}");
+                if (lay.Page.width < 260 || lay.Page.height < 150) problems.Add($"{where}, 일지: 쪽이 좁다 {lay.Page}");
+                if (Overlap(lay.Page, lay.Index)) problems.Add($"{where}, 일지: 쪽과 목차가 겹친다");
+                if (touch && width < 600 && height > width && !lay.Strip) problems.Add($"{where}, 일지: 세로 휴대폰에서 목차가 위의 탭 줄이 아니다");
+                var entries = new List<Rect>();
+                for (int i = 0; i < InventoryWindow.JournalNames.Length; i++)
+                {
+                    var entry = InventoryWindow.IndexEntry(lay, i);
+                    string part = $"{where}, 일지 [{InventoryWindow.JournalNames[i]}]";
+                    if (!Within(entry, lay.Index)) problems.Add($"{part}: 목차 밖 {entry} (목차 {lay.Index})");
+                    if (entry.height < finger - 0.5f) problems.Add($"{part}: 낮다 {entry.height}");
+                    if (entry.width < (lay.Strip ? 56 : 120)) problems.Add($"{part}: 좁다 {entry.width}");
+                    foreach (var other in entries)
+                        if (Overlap(entry, other)) problems.Add($"{part}: 다른 목차와 겹친다");
+                    entries.Add(entry);
+                }
+
+                // The map, in the world and in a dungeon.
+                var panel = ScreenStack.AreaOf(GameScreen.Map);
+                if (!Inside(panel, width, height)) problems.Add($"{where}, 지도: 화면 밖 {panel}");
+                var mapBody = MapView.FullBody(panel);
+                foreach (bool dungeon in new[] { false, true })
+                {
+                    string part = $"{where}, 지도{(dungeon ? "(던전)" : "")}";
+                    int count = MapView.LegendCount(dungeon);
+                    var map = MapView.LayMap(mapBody, count);
+                    if (!Within(map.View, mapBody)) problems.Add($"{part}: 지도가 내용 자리 밖 {map.View}");
+                    if (map.View.width < 260 || map.View.height < 180) problems.Add($"{part}: 지도가 좁다 {map.View}");
+                    if (!Within(map.Zoom, map.View)) problems.Add($"{part}: 확대 단추가 지도 밖 {map.Zoom}");
+                    if (map.Zoom.height < finger - 0.5f) problems.Add($"{part}: 확대 단추가 낮다 {map.Zoom.height}");
+                    if (!Within(map.Legend, mapBody)) problems.Add($"{part}: 범례가 내용 자리 밖 {map.Legend}");
+                    if (Overlap(map.Legend, map.View)) problems.Add($"{part}: 범례와 지도가 겹친다");
+                    var chips = new List<Rect>();
+                    for (int i = 0; i < count; i++)
+                    {
+                        var chip = MapView.LegendChip(map, i);
+                        if (!Within(chip, map.Legend)) problems.Add($"{part}: 범례 {i}이 범례 밖 {chip} (범례 {map.Legend})");
+                        if (chip.height < finger - 0.5f) problems.Add($"{part}: 범례 {i}이 낮다 {chip.height}");
+                        if (chip.width < 40) problems.Add($"{part}: 범례 {i}이 좁다 {chip.width}");
+                        foreach (var other in chips)
+                            if (Overlap(chip, other)) problems.Add($"{part}: 범례 {i}이 다른 것과 겹친다");
+                        chips.Add(chip);
+                    }
+                }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
         // The encounter windows (Docs/UiRework.md U3: the shop, the chest, the crafting station, the anvil) fit the screens
         // the person named (a small PC window, a small phone held upright and on its side) and the rest: inside the screen
         // with room for their two panes under the head, the close button on the screen; a sheet over the whole screen on a

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Game.Core;
 using UnityEngine;
 
 namespace Game.Client
@@ -53,6 +54,21 @@ namespace Game.Client
         public bool HubOpen { get; private set; }
 
         public int Version { get; private set; }
+
+        // What the goal list follows besides the story and the guide (Docs/UiRework.md U5 추적): "side:<chain>" a side story,
+        // "story:<person>" a stall keeper's story, "request:<person>" today's request, all picked in the journal, or "pin"
+        // a spot picked on the map ([여기로 길 안내]), at PinAt and called PinName; "" for none. One at a time, and only
+        // this device's view: nothing of it goes to the host or into a save.
+        public string Tracked { get; set; } = "";
+        public Vec2 PinAt { get; set; }
+        public string PinName { get; set; } = "";
+
+        // Follows that one (or lets it go when it was already followed); true when it is now followed.
+        public bool Track(string key)
+        {
+            Tracked = Tracked == key ? "" : key;
+            return Tracked == key;
+        }
 
         // A screen opened (or another took its place).
         public event Action Opened;
@@ -247,9 +263,15 @@ namespace Game.Client
         // beside its panel, the character's picture beside the stats (Docs/UiRework.md 4-3: 둘 다 전체 화면).
         const float GrowthMaxWidth = 1180;
 
+        // The records (U5) are wider too: the journal's index beside its page, the map beside its legend.
+        const float RecordsMaxWidth = 1060;
+
         // A full screen: the whole screen on a phone (4 points from its edges), else centred, up to FullMaxWidth wide and
         // the screen's height less a margin.
         public static Rect FullArea() => FullArea(FullMaxWidth);
+
+        // The records' window (the journal and the map).
+        public static Rect RecordsArea() => FullArea(RecordsMaxWidth);
 
         static Rect FullArea(float most)
         {
@@ -265,6 +287,7 @@ namespace Game.Client
             GameScreen.Bag => InventoryWindow.AreaOf(),
             _ when IsEncounter(screen) => EncounterArea(screen),
             _ when GroupOf(screen) == ScreenGroup.Growth => FullArea(GrowthMaxWidth),
+            _ when GroupOf(screen) == ScreenGroup.Records => RecordsArea(),
             _ => FullArea(),
         };
 
