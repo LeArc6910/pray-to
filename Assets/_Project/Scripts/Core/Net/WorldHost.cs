@@ -91,6 +91,8 @@ namespace Game.Core
             public int SentRecords = -1;
             // The world's LockVersion when the locked doors were last sent.
             public int SentLocks = -1;
+            // The world's PoiVersion when the things to find were last sent (PoisMessage).
+            public int SentPois = -1;
             // The player's JourneyVersion when their place in the story was last sent.
             public int SentJourney = -1;
         }
@@ -239,6 +241,14 @@ namespace Game.Core
                 pair.Value.SentLocks = World.LockVersion;
                 var locks = World.Locks.Select(l => (l.X, l.Y, l.Owner, l.Owner == player.Name)).ToList();
                 Send(pair.Key, new LocksMessage(locks).Encode(), reliable: true);
+            }
+            // The things to find (World.Pois.cs): what was opened, and this player's shrines, camp, blessing and rest.
+            foreach (var pair in _connections)
+            {
+                var player = pair.Value.Player;
+                if (player == null || World.Pois.Count == 0 || pair.Value.SentPois == World.PoiVersion) continue;
+                pair.Value.SentPois = World.PoiVersion;
+                Send(pair.Key, PoisFor(player).Encode(), reliable: true);
             }
             foreach (var pair in _connections)
             {
@@ -415,6 +425,15 @@ namespace Game.Core
             }
         }
 
+        PoisMessage PoisFor(Player player)
+        {
+            var opened = Enumerable.Range(0, World.Pois.Count).Select(World.Opened).ToList();
+            var rows = _tiles?.Terrain?.Pois?.Pois;
+            int blessing = player.Blessing == null || rows == null ? -1 : rows.ToList().IndexOf(player.Blessing);
+            return new PoisMessage(opened, World.PrayedToday(player.Name).ToList(), World.LastCampOf(player.Name) ?? -1, blessing,
+                blessing >= 0 ? player.BlessingTicks : 0, player.RestedTicks);
+        }
+
         // The world as a save file, stamped with the caller's clock (seconds since 1970).
         public byte[] SaveWorld(long now) => WorldSave.Write(World, _seed, now, _generated.Version);
 
@@ -430,6 +449,7 @@ namespace Game.Core
             foreach (var m in save.Machines) World.RestoreMachine(m.X, m.Y, m.Direction, m.Timer, m.Carried, m.Progress, m.Input, m.Output, m.Settings, m.Recipe,
                 m.Affection, m.PettedDay);
             World.PlaceNpcs();
+            World.RestorePois(save.OpenedPois, save.Prayers, save.LastCamps);
         }
 
         void Apply(Player player, InventoryCommandMessage command)
@@ -467,6 +487,9 @@ namespace Game.Core
                     break;
                 case InventoryCommand.ToggleMachine:
                     World.ToggleMachine(player.Id);
+                    break;
+                case InventoryCommand.UsePoi:
+                    World.UsePoi(player.Id, command.Item);
                     break;
                 case InventoryCommand.Fish:
                     World.Fish(player.Id, command.Item > 0 ? command.Item - 1 : (int?)null);

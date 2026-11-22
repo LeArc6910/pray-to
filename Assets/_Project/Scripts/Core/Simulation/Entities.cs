@@ -192,6 +192,13 @@ namespace Game.Core
         // The last food eaten while its buff lasts, and the ticks it has left. Falling does not end it.
         public ConsumableDefinition Food { get; private set; }
         public int FoodTicks { get; private set; }
+        // A shrine's blessing while it lasts (World.Pois.cs): the shrine's row and the ticks left. A new one replaces it.
+        public PoiDefinition Blessing { get; private set; }
+        public int BlessingTicks { get; private set; }
+        // Rested at a camp's fire: more experience for these ticks.
+        public int RestedTicks { get; internal set; }
+        // Ticks by a camp's fire without leaving it.
+        internal int CampTicks { get; set; }
 
         // The dodge roll (World.Roll.cs): ticks of the roll left, ticks left in which blows pass through, ticks until the
         // next may begin, and the way it goes. Rolls and Dodges count them since joining, for the sims.
@@ -269,6 +276,22 @@ namespace Game.Core
             RefreshStats();
         }
 
+        internal void Bless(PoiDefinition shrine, int ticks)
+        {
+            Blessing = shrine;
+            BlessingTicks = ticks;
+            RefreshStats();
+        }
+
+        // The blessing and the rest running out.
+        internal void TickPoiBuffs()
+        {
+            if (RestedTicks > 0) RestedTicks--;
+            if (BlessingTicks <= 0 || --BlessingTicks > 0) return;
+            Blessing = null;
+            RefreshStats();
+        }
+
         // One tick of cooldowns and buffs.
         internal void TickSkills()
         {
@@ -303,7 +326,7 @@ namespace Game.Core
             {
                 if (HasBuff(slot)) buffs.Add(Skills[slot]);
             }
-            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives, Pet == null ? null : Pets.ModifiersAt(Pet, PetLevel));
+            Stats = PlayerStats.From(Equipment, Classes, buffs, Food, Level, Passives, Pet == null ? null : Pets.ModifiersAt(Pet, PetLevel), Blessing?.Buff);
             if (!IsDead) Health = healthShare * Stats.MaxHealth;
             Mana = manaShare * Stats.MaxMana;
         }
@@ -572,6 +595,10 @@ namespace Game.Core
         // Source, a monster of a pack (or a wanderer that joined it), noticed Target, a player: the pack's alarm, one
         // after another (World.Packs.cs). The screen puts a mark over its head.
         Alerted,
+        // A chest or a cart was opened (World.UsePoi): Source the opener, Amount the thing's index (World.Pois), at it.
+        PoiOpened,
+        // A shrine blessed a player, or a player rested at a camp: Source the player, Amount the thing's index, at it.
+        Blessed,
     }
 
     public readonly struct SimEvent
@@ -605,7 +632,7 @@ namespace Game.Core
             || type == SimEventType.Recall || type == SimEventType.Fishing || type == SimEventType.Rift || type == SimEventType.Npc
             || type == SimEventType.LifeLevel || type == SimEventType.Defense || type == SimEventType.TurretShot
             || type == SimEventType.AnimalsPetted || type == SimEventType.Trampled || type == SimEventType.MovedIn
-            || type == SimEventType.MonsterFx;
+            || type == SimEventType.MonsterFx || type == SimEventType.PoiOpened || type == SimEventType.Blessed;
     }
 
     public enum BossState : byte

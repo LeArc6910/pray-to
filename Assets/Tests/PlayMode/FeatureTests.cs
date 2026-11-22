@@ -437,5 +437,75 @@ namespace Game.Client.Tests
             World.MonstersHold = false;
             Assert.IsTrue(_root.Playing);
         }
+
+        // The things to find in the rooms (2026-11-22, Docs/WorldRework.md 묶음 3a·3b): a chest opened by its button's
+        // path (GameRoot.UsePoi), a shrine's blessing on the status line, a camp rested at, and a shrine's pillar of light
+        // seen from twelve tiles off. The solo game's world is one of rooms, so its things are there.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheThingsToFindDrawAndGive()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            Assert.IsNotEmpty(World.Pois, "No things to find: pois.csv is not in GameSheets (Game > Set Up Main Scene), or the world is of caves.");
+            Poi Nearest(PoiKind kind) => World.Pois.Where(p => p.Kind == kind && World.CanUse(p, Player) && Beside(p) != null)
+                .OrderBy(p => Vec2.Distance(p.Center, Player.Position)).First();
+            void StandBy(Poi poi)
+            {
+                Player.Position = Beside(poi).Value;
+                Player.Corrections++;
+            }
+
+            var chest = Nearest(PoiKind.Chest);
+            StandBy(chest);
+            yield return new WaitForSecondsRealtime(1);
+            yield return Screens.Take("poi-chest");
+            Assert.IsTrue(_root.UsePoi(), "The chest within reach opens.");
+            yield return new WaitForSecondsRealtime(0.8f);
+            Assert.IsTrue(World.Opened(chest.Index));
+            Assert.AreEqual(TileType.OpenChest, World.Map[chest.X, chest.Y]);
+            yield return Screens.Take("poi-chest-open");
+
+            var shrine = Nearest(PoiKind.Shrine);
+            StandBy(shrine);
+            yield return new WaitForSecondsRealtime(0.8f);
+            Assert.IsTrue(_root.UsePoi(), "The shrine within reach blesses.");
+            yield return new WaitForSecondsRealtime(0.8f);
+            Assert.IsNotNull(Player.Blessing);
+            yield return Screens.Take("poi-shrine-blessed");
+
+            var camp = World.Pois.Where(p => p.Kind == PoiKind.Camp && Beside(p) != null).OrderBy(p => Vec2.Distance(p.Center, Player.Position)).First();
+            StandBy(camp);
+            yield return new WaitForSecondsRealtime(World.RestSeconds + 1);
+            Assert.Greater(Player.RestedTicks, 0, "Rested by the fire.");
+            yield return Screens.Take("poi-camp");
+
+            // A shrine not yet prayed at, from twelve tiles off: its pillar of light over the dark.
+            var far = Nearest(PoiKind.Shrine);
+            var away = (World.Spawn - far.Center).LengthSquared > 0.01f ? (World.Spawn - far.Center).Normalized : new Vec2(-1, 0);
+            for (float reach = 12; reach > 6; reach -= 0.5f)
+            {
+                var at = far.Center + away * reach;
+                if (Game.Core.Collision.Overlaps(World.Map, at, World.PlayerRadius)) continue;
+                Player.Position = at;
+                Player.Corrections++;
+                break;
+            }
+            yield return new WaitForSecondsRealtime(1);
+            yield return Screens.Take("poi-signal-far");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
+        // Open floor within reach of a thing to find, or null.
+        Vec2? Beside(Poi poi)
+        {
+            for (float reach = 1; reach <= World.PoiReach - 0.3f; reach += 0.25f)
+                for (int k = 0; k < 32; k++)
+                {
+                    var at = poi.Center + Vec2.FromAngle(2 * Mathf.PI * k / 32) * reach;
+                    if (!Game.Core.Collision.Overlaps(World.Map, at, World.PlayerRadius)) return at;
+                }
+            return null;
+        }
     }
 }

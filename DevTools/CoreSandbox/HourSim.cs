@@ -16,14 +16,28 @@ namespace CoreSandbox
         {
             var runs = new List<BotRunResult>();
             var elites = new List<string>();
+            var pois = new List<string>();
             foreach (string text in seeds.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
                 ulong seed = ulong.Parse(text.Trim());
                 var watch = Stopwatch.StartNew();
                 // The field elites it met on the way (묶음 2-2).
                 var seen = new EliteWatch();
-                var run = BotRun.FirstHour(sheets, seed, minutes, each: bot => seen.Look(bot.World, bot.Player), mapSize: mapSize, mapVersion: mapVersion);
+                FirstHourBot last = null;
+                var run = BotRun.FirstHour(sheets, seed, minutes, each: bot =>
+                {
+                    last = bot;
+                    seen.Look(bot.World, bot.Player);
+                }, mapSize: mapSize, mapVersion: mapVersion);
                 elites.Add($"- 시드 {seed}: {seen.Summary(run.Ticks)}");
+                // The things to find it used on its way (묶음 3a) and what they gave, beside the coins it holds at the end.
+                if (last != null)
+                {
+                    var coin = last.World.Loot?.Materials.FirstOrDefault(m => m.Id == World.Coin);
+                    int held = coin == null ? 0 : last.Player.Inventory.CountOf(coin);
+                    var kinds = last.PoisUsed.GroupBy(p => p.Kind).Select(g => $"{g.Key} {g.Count()}");
+                    pois.Add($"- 시드 {seed}: {last.PoisUsed.Count}곳({string.Join(", ", kinds)}), 금화 {last.PoiCoins}(끝에 가진 금화 {held}), 장비 {last.PoiItems}");
+                }
                 runs.Add(run);
                 Console.Error.WriteLine($"시드 {seed}: 게임 {BotReport.Time(run.Ticks)}을 {watch.Elapsed.TotalSeconds:0.0}초에");
             }
@@ -36,6 +50,10 @@ namespace CoreSandbox
             Console.WriteLine("### 정예");
             Console.WriteLine();
             foreach (string line in elites) Console.WriteLine(line);
+            Console.WriteLine();
+            Console.WriteLine("### 지나며 쓴 볼거리");
+            Console.WriteLine();
+            foreach (string line in pois) Console.WriteLine(line);
             Console.WriteLine();
             string stuck = BotReport.Stuck(runs);
             if (stuck.Length > 0)

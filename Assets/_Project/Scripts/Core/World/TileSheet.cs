@@ -157,13 +157,16 @@ namespace Game.Core
 
         // Without a crops sheet nothing grows; without a machines sheet no machine runs.
         public static TileData Parse(string csv, LootData loot, string cropsCsv = "", string machinesCsv = "", string terrainCsv = "", string roomsCsv = "",
-            string roomRolesCsv = "")
+            string roomRolesCsv = "", string poisCsv = "")
         {
             var errors = new List<string>();
             var terrain = TerrainSheet.Parse(terrainCsv);
-            // The room chunks and the roles' numbers ride with the terrain (rooms.csv, room_roles.csv, RoomSheet).
+            // The room chunks and the roles' numbers ride with the terrain (rooms.csv, room_roles.csv, RoomSheet), and
+            // the things to find in the rooms (pois.csv, PoiSheet).
             var rooms = RoomSheet.Parse(roomsCsv, roomRolesCsv);
             if (rooms != RoomData.None) terrain = terrain.With(rooms);
+            var pois = PoiSheet.Parse(poisCsv, loot);
+            if (pois != PoiData.None) terrain = terrain.With(pois);
             errors.AddRange(terrain.Errors);
             var tiles = new List<TileDefinition>();
             var crops = ParseCrops(cropsCsv, loot, errors);

@@ -322,6 +322,11 @@ namespace Game.Client
                     return "packs " + PacksJson(root);
                 case "elites":
                     return "elites " + ElitesJson(root);
+                // The things to find in the rooms (2026-11-22, Docs/WorldRework.md 묶음 3a·3b).
+                case "pois":
+                    return "pois " + PoisJson(root);
+                case "usepoi":
+                    return root.UsePoi() ? "ok usepoi" : "error usepoi: nothing to use within reach";
                 case "room":
                     return "room " + RoomJson(root, RoomOf(root, words, 1));
                 case "build":
@@ -437,6 +442,43 @@ namespace Game.Client
                 case "room":
                     var room = RoomOf(root, words, 2);
                     to = TileMap.Center(room.AnchorX, room.AnchorY);
+                    break;
+                // Beside a thing to find (2026-11-22, 묶음 3a): "poi <camp|shrine|chest|cart|treasure|hidden|locked|trap> [n]
+                // [tiles]": the nth nearest that still gives (a camp always), on open floor in its reach, or that many
+                // tiles off on the spawn's side (to see its signal from afar). A hidden or locked room's chest is reached
+                // only once its wall is dug: "crack" and "lock" stand before the wall.
+                case "poi":
+                    var (thing, room0) = PoiOf(root, words);
+                    float off = words.Length > 4 ? float.Parse(words[4], System.Globalization.CultureInfo.InvariantCulture) : 0;
+                    if (off > 0)
+                    {
+                        var away = (world.Spawn - thing.Center).LengthSquared > 1e-4f ? (world.Spawn - thing.Center).Normalized : new Vec2(-1, 0);
+                        var far = thing.Center + away * off;
+                        to = Nearest(map, TileMap.Cell(far.X), TileMap.Cell(far.Y), (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius))
+                            ?? throw new InvalidOperationException("no floor that far from it");
+                    }
+                    else
+                    {
+                        to = Nearest(map, thing.X, thing.Y, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius)
+                                && Vec2.Distance(TileMap.Center(x, y), thing.Center) <= World.PoiReach - 0.3f)
+                            ?? TileMap.Center(room0.AnchorX, room0.AnchorY);
+                    }
+                    break;
+                // Before the crack of a hidden room in the rock, or the obsidian or void wall of a locked room, facing it
+                // (묶음 3b): "crack [n]", "lock [n]".
+                case "crack":
+                case "lock":
+                    int which = words.Length > 2 ? int.Parse(words[2]) : 0;
+                    var generated = root.HostGenerated?.Rooms ?? throw new InvalidOperationException("not a world of rooms");
+                    var walls = words[1] == "crack"
+                        ? generated.Nodes.Where(n => n.Buried).Select(n => (n, Wall: Faced(map, n.AnchorX, n.AnchorY, t => t == TileType.CrackedWall)))
+                        : generated.Nodes.Where(n => n.Role == RoomRole.Locked && n.Box != null).Select(n => (n, Wall: LockOf(map, n)));
+                    var picked = walls.Where(w => w.Wall != null).OrderBy(w => Vec2.Distance(w.n.Center, player.Position)).Skip(which).FirstOrDefault();
+                    if (picked.n == null) throw new InvalidOperationException($"no {words[1]} {which}");
+                    var ((wx, wy), (sx, sy)) = picked.Wall.Value;
+                    to = TileMap.Center(sx, sy);
+                    root.AimHeld = true;
+                    root.HeldAim = new Vec2(wx - sx, wy - sy);
                     break;
                 // Beside the nearest pack out in the world (2026-11-22, Docs/WorldRework.md 묶음 2-1): three tiles
                 // past the one of it furthest from the others' middle, so the rest stand further off than they see.
@@ -554,6 +596,71 @@ namespace Game.Client
             player.Position = to;
             player.Corrections++;
             return $"ok goto {words[1]} at {TileMap.Cell(to.X)},{TileMap.Cell(to.Y)}";
+        }
+
+        // The nth nearest thing to find of a kind or of a room role that still gives, and its room: "poi <kind|role> [n]".
+        static (Poi Poi, RoomNode Room) PoiOf(GameRoot root, string[] words)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var rooms = root.HostGenerated?.Rooms ?? throw new InvalidOperationException("not a world of rooms");
+            string what = words.Length > 2 ? words[2] : "chest";
+            int nth = words.Length > 3 ? int.Parse(words[3]) : 0;
+            bool kind = Enum.TryParse(what, true, out PoiKind wanted);
+            var role = kind ? RoomRole.Plain : (RoomRole)Enum.Parse(typeof(RoomRole), what, ignoreCase: true);
+            var poi = world.Pois.Where(p => (kind ? p.Kind == wanted : rooms.Nodes[p.Room].Role == role) && world.CanUse(p, player))
+                .OrderBy(p => Vec2.Distance(p.Center, player.Position)).Skip(nth).FirstOrDefault()
+                ?? throw new InvalidOperationException($"no {what} {nth} that still gives");
+            return (poi, rooms.Nodes[poi.Room]);
+        }
+
+        // A tile of the wanted wall beside the floor tile (x, y), and that floor tile; or null.
+        static ((int X, int Y) Wall, (int X, int Y) Stand)? Faced(TileMap map, int x, int y, Func<TileType, bool> wanted)
+        {
+            foreach (var (dx, dy) in new[] { (0, 1), (1, 0), (-1, 0), (0, -1) })
+                if (map.InBounds(x + dx, y + dy) && wanted(map[x + dx, y + dy])) return ((x + dx, y + dy), (x, y));
+            return null;
+        }
+
+        // An obsidian or void wall tile of a locked room with open floor outside it that is not the room's inside.
+        static ((int X, int Y) Wall, (int X, int Y) Stand)? LockOf(TileMap map, RoomNode room)
+        {
+            var (left, bottom, w, h) = room.Box.Value;
+            for (int y = bottom - 1; y <= bottom + h; y++)
+            {
+                for (int x = left - 1; x <= left + w; x++)
+                {
+                    bool inside = x >= left && y >= bottom && x < left + w && y < bottom + h;
+                    if (inside || !map.InBounds(x, y) || map.IsSolid(x, y)) continue;
+                    if (Faced(map, x, y, t => t == TileType.ObsidianWall || t == TileType.VoidWall) is var found && found != null) return found;
+                }
+            }
+            // A door through the chunk's own wall: the floor just outside its door looks at the lock.
+            return Faced(map, room.AnchorX, room.AnchorY, t => t == TileType.ObsidianWall || t == TileType.VoidWall);
+        }
+
+        // The things to find: how many of each kind, opened, near the player, and the player's blessing and rest.
+        static string PoisJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var client = root.LocalClient;
+            var near = new Json('[');
+            foreach (var poi in world.Pois.OrderBy(p => Vec2.Distance(p.Center, player.Position)).Take(6))
+            {
+                near.Item(new RawJson(new Json('{').Field("index", poi.Index).Field("id", poi.Definition.Id).Field("kind", poi.Kind.ToString())
+                    .Field("x", poi.X).Field("y", poi.Y).Field("distance", Vec2.Distance(poi.Center, player.Position)).Field("gives", world.CanUse(poi, player))
+                    .Field("tile", world.Map[poi.X, poi.Y].ToString()).Close('}')));
+            }
+            var json = new Json('{').Field("count", world.Pois.Count);
+            foreach (PoiKind kind in Enum.GetValues(typeof(PoiKind))) json.Field(kind.ToString().ToLowerInvariant(), world.Pois.Count(p => p.Kind == kind));
+            return json.Field("opened", world.OpenedPois.Count()).Field("prayedToday", world.PrayedToday(player.Name).Count())
+                .Field("inReach", world.PoiNear(player.Position, player)?.Definition.Id ?? "")
+                .Field("blessing", player.Blessing?.Id ?? "").Field("blessingSeconds", player.BlessingTicks / (float)World.TicksPerSecond)
+                .Field("restedSeconds", player.RestedTicks / (float)World.TicksPerSecond).Field("lastCamp", world.LastCampOf(player.Name) ?? -1)
+                .Field("clientOpened", client == null ? 0 : client.Pois.Count(p => client.PoiOpened(p.Index)))
+                .Field("clientBlessing", client?.Blessing?.Id ?? "")
+                .Field("near", near.Raw(']')).Close('}');
         }
 
         // The nth room of a role, in a biome or any, the rooms nearest the spawn (by rooms) first: "<role> [biome|any] [n]".

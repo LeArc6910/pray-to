@@ -65,6 +65,21 @@ namespace Game.Core
         public string Doing { get; private set; } = "";
 
         // One tick of the player's client: call before the host's tick.
+        // The things to find it used on its way, in order, and the coins and gear they gave.
+        public List<Poi> PoisUsed { get; } = new List<Poi>();
+        public int PoiCoins { get; private set; }
+        public int PoiItems { get; private set; }
+
+        void UsePoi(Poi poi)
+        {
+            var coin = _world.Loot?.Materials.FirstOrDefault(m => m.Id == World.Coin);
+            int coins = coin == null ? 0 : _player.Inventory.CountOf(coin), items = _player.Inventory.Items.Count;
+            if (!_world.UsePoi(_player.Id, poi.Index)) return;
+            PoisUsed.Add(poi);
+            PoiCoins += (coin == null ? 0 : _player.Inventory.CountOf(coin)) - coins;
+            PoiItems += Math.Max(0, _player.Inventory.Items.Count - items);
+        }
+
         public void Tick()
         {
             Memory.Observe();
@@ -76,6 +91,8 @@ namespace Game.Core
                 return;
             }
             Drink();
+            // A chest, cart or shrine it walks by it uses (Docs/WorldRework.md 3단계 확인: 봇이 지나며 연 볼거리).
+            if (_world.Tick % ClaimEvery == 1 && _world.PoiNear(_player.Position, _player) is Poi poi) UsePoi(poi);
             var goal = Current;
             if (goal == null)
             {

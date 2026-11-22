@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using Game.Core;
 using UnityEngine;
 using Object = UnityEngine.Object;
@@ -98,6 +99,39 @@ namespace Game.Client
             }
             _texture.SetPixels32(_pixels);
             _texture.Apply();
+            // The hidden rooms set into the rock (묶음 3b): their tiles are not revealed while their cracked wall stands.
+            var rooms = client.Rooms;
+            if (rooms != null)
+            {
+                foreach (var room in rooms.Nodes)
+                {
+                    if (!room.Buried || room.Box is not (int left, int bottom, int w, int h)) continue;
+                    _buried.Add((left, bottom, w, h));
+                }
+            }
+            foreach (var room in rooms?.Nodes.Where(n => n.Role == RoomRole.Elite) ?? Enumerable.Empty<RoomNode>())
+            {
+                var mark = rooms.Marks.Where(m => m.Room == room.Index && m.Kind == RoomMarkKind.Elite).Select(m => (RoomMark?)m).FirstOrDefault();
+                _camps.Add(mark is RoomMark leader ? (leader.X, leader.Y) : (room.X, room.Y));
+            }
+        }
+
+        // The hidden rooms in the rock, by their boxes, and where each elite camp's leader stands.
+        readonly List<(int Left, int Bottom, int W, int H)> _buried = new List<(int, int, int, int)>();
+        readonly List<(int X, int Y)> _camps = new List<(int, int)>();
+
+        // Whether the tile is in a hidden room whose cracked wall still stands.
+        bool Shut(int x, int y)
+        {
+            foreach (var (left, bottom, w, h) in _buried)
+            {
+                if (x < left || y < bottom || x >= left + w || y >= bottom + h) continue;
+                for (int ty = bottom; ty < bottom + h; ty++)
+                    for (int tx = left; tx < left + w; tx++)
+                        if (_map[tx, ty] == TileType.CrackedWall) return true;
+                return false;
+            }
+            return false;
         }
 
         // Whether more has been explored since the last Save.
@@ -191,7 +225,7 @@ namespace Game.Client
 
             string close = Controls.UsingTouch ? "지도 (탭하면 닫힘)" : "지도 (클릭하거나 M·Esc로 닫기)";
             GUI.Label(new Rect(area.x, panel.y + pad - 2, size, lineHeight), close);
-            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소");
+            GUI.Label(new Rect(area.x, area.yMax + 2, size, lineHeight), "● 나   ● 다른 플레이어   ○ 보스 아레나   ○ 가까운 광맥   ● 장소·볼거리");
             // Each place's name beside its dot.
             var window = new Rect(0, 0, _map.Width, _map.Height);
             foreach (var site in _client.Places)
@@ -229,8 +263,50 @@ namespace Game.Client
                 if (step.Chain.Length == 0 || !taken || !(_client.SiteOf(step.Target) is PlaceSite side) || side == leads) continue;
                 Marker(area, window, side.Center, Shapes.Ring, new Color(1f, 0.95f, 0.75f, breath * 0.8f), MarkerSize * 2.2f);
             }
+            DrawPoiMarks(area, window);
             foreach (var position in _others) Marker(area, window, position, Shapes.Circle, OtherPlayer, MarkerSize);
             Marker(area, window, _client.Position, Shapes.Circle, Color.white, MarkerSize);
+        }
+
+        // The things to find (묶음 3a), once their tile has been seen: a camp orange, a shrine white (grey once prayed at
+        // today), a chest gold and a cart brown (faint once opened); an elite camp a red skull (2-2's mark).
+        void DrawPoiMarks(Rect area, Rect window)
+        {
+            bool Seen(int x, int y) => _map.InBounds(x, y) && _explored[y * _map.Width + x];
+            foreach (var poi in _client.Pois)
+            {
+                if (!Seen(poi.X, poi.Y)) continue;
+                bool live = _client.CanUse(poi);
+                var color = poi.Kind switch
+                {
+                    PoiKind.Camp => new Color(1f, 0.6f, 0.25f),
+                    PoiKind.Shrine => live ? Color.white : new Color(0.6f, 0.6f, 0.6f),
+                    PoiKind.Chest => live ? new Color(1f, 0.84f, 0.3f) : new Color(0.55f, 0.48f, 0.3f, 0.8f),
+                    _ => live ? new Color(0.78f, 0.55f, 0.32f) : new Color(0.45f, 0.36f, 0.28f, 0.8f),
+                };
+                Marker(area, window, poi.Center, poi.Kind == PoiKind.Camp || poi.Kind == PoiKind.Shrine ? Shapes.Circle : Shapes.Square, color,
+                    MarkerSize * (live ? 1.1f : 0.8f));
+            }
+            foreach (var (x, y) in _camps)
+                if (Seen(x, y)) Marker(area, window, TileMap.Center(x, y), Skull, new Color(1f, 0.3f, 0.25f), MarkerSize * 1.8f);
+        }
+
+        static Sprite _skull;
+
+        // A small skull, drawn in pixels: an elite camp on the map.
+        static Sprite Skull
+        {
+            get
+            {
+                if (_skull != null) return _skull;
+                string[] rows = { ".#####.", "#######", "#..#..#", "#######", ".##.##.", ".#.#.#.", "......." };
+                var texture = new Texture2D(7, 7, TextureFormat.RGBA32, false) { filterMode = FilterMode.Point, wrapMode = TextureWrapMode.Clamp };
+                for (int y = 0; y < 7; y++)
+                    for (int x = 0; x < 7; x++)
+                        texture.SetPixel(x, 6 - y, rows[y][x] == '#' ? Color.white : Color.clear);
+                texture.Apply();
+                return _skull = Sprite.Create(texture, new Rect(0, 0, 7, 7), new Vector2(0.5f, 0.5f), 7);
+            }
         }
 
         static readonly Color WaypointOpen = new Color(0.5f, 0.78f, 1f);
@@ -275,7 +351,7 @@ namespace Game.Client
                     int dy = y - cy;
                     if (dx * dx + dy * dy > RevealRadius * RevealRadius) continue;
                     int index = y * _map.Width + x;
-                    if (_explored[index]) continue;
+                    if (_explored[index] || _buried.Count > 0 && Shut(x, y)) continue;
                     _explored[index] = true;
                     _pixels[index] = TileColor(x, y);
                     _dirty = true;
@@ -308,6 +384,8 @@ namespace Game.Client
             if (_map[x, y] == TileType.ObsidianWall) return new Color32(96, 60, 150, 255);
             if (_map[x, y] == TileType.VoidWall) return new Color32(170, 130, 245, 255);
             if (_map[x, y] == TileType.Grate) return new Color32(150, 160, 172, 255);
+            if (_map[x, y] >= TileType.WoodChest && _map[x, y] <= TileType.GoldChest) return new Color32(255, 214, 90, 255);
+            if (_map[x, y] == TileType.OpenChest) return new Color32(150, 126, 80, 255);
             if (_map[x, y] == TileType.IceFloor) return new Color32(200, 232, 248, 255);
             if (_map[x, y] == TileType.Quicksand) return new Color32(196, 160, 84, 255);
             if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);

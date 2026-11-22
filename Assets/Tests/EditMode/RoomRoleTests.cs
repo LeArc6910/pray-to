@@ -227,7 +227,9 @@ namespace Game.Core.Tests
                 {
                     case RoomMarkKind.Monster:
                     case RoomMarkKind.Elite: Assert.IsFalse(map.IsSolid(mark.X, mark.Y), where); break;
-                    case RoomMarkKind.Chest: Assert.AreEqual(TileType.Crates, type, where); break;
+                    // A chest is wood, iron or gold by its row of pois.csv (묶음 3a).
+                    case RoomMarkKind.Chest: Assert.That(type, Is.EqualTo(TileType.WoodChest).Or.EqualTo(TileType.IronChest).Or.EqualTo(TileType.GoldChest), where); break;
+                    case RoomMarkKind.Cart: Assert.AreEqual(TileType.MineCart, type, where); break;
                     case RoomMarkKind.Campfire: Assert.AreEqual(TileType.Campfire, type, where); break;
                     case RoomMarkKind.Shrine: Assert.AreEqual(TileType.RuneStone, type, where); break;
                     case RoomMarkKind.Trap: Assert.AreEqual(TileType.RuneFloor, type, where); break;

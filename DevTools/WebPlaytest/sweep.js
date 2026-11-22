@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4160,7 +4160,113 @@ async function packs(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, base, save, story, deploysave, layout, touch };
+// The things to find in the rooms (2026-11-22, Docs/WorldRework.md 묶음 3a·3b): a picture of each kind, the signals seen
+// from afar, a chest opened (its own button, then once only), a shrine's blessing, a camp's rest, a hidden room's crack
+// broken by a sword, and a lock refusing an iron pickaxe. Sounds (the drum, the draught, the bell) are the person's.
+async function pois(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 볼거리 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; clock 22');
+    const all = await game.ask('pois');
+    check(all.count > 100 && all.camp > 10 && all.shrine > 10 && all.chest > 50 && all.cart > 5,
+      `${name}: 볼거리가 놓였다 (모두 ${all.count}: 야영지 ${all.camp}, 제단 ${all.shrine}, 상자 ${all.chest}, 수레 ${all.cart})`);
+
+    // From afar: a camp's smoke, a shrine's pillar of light, a chest's glint, twelve tiles off in the dark.
+    for (const [kind, label] of [['camp', '야영지의 연기와 불빛'], ['shrine', '제단의 빛기둥'], ['treasure', '보물 상자의 반짝임']]) {
+      const answer = (await game.send(`goto poi ${kind} 0 12`)).join(' ');
+      await game.wait(1500);
+      check(/^ok/.test(answer), `${name}: ${label}이 12칸 앞에 보이는 자리로 간다 (${answer})`);
+      await game.shot(`pois-far-${kind}`, `12칸 밖에서 본 ${label}`);
+    }
+
+    // Each kind up close.
+    for (const [kind, label] of [['camp', '야영지'], ['shrine', '제단'], ['treasure', '보물 상자'], ['cart', '버려진 수레'], ['locked', '자물쇠 방의 금고(창살 너머)']]) {
+      const answer = (await game.send(kind === 'locked' ? 'goto lock' : `goto poi ${kind}`)).join(' ');
+      await game.wait(1200);
+      const here = await game.ask('pois');
+      check(/^ok/.test(answer), `${name}: ${label} 곁으로 간다 (${answer}, 가까운 것 ${here.near && here.near[0] ? here.near[0].id : '없음'})`);
+      await game.shot(`pois-${kind}`, label);
+    }
+
+    // A chest: its button over it opens it, once.
+    await game.send('heal; goto poi treasure');
+    await game.wait(1200);
+    const before = await game.ask('pois');
+    check(before.inReach !== '', `${name}: 상자가 손 닿는 곳에 있다 (${before.inReach})`);
+    let opened = false;
+    const button = (await game.buttons()).find(b => /열기/.test(b.label));
+    if (button) {
+      await game.press(button.label);
+      await game.wait(900);
+      opened = (await game.ask('pois')).opened > before.opened;
+    }
+    check(!!button && opened, `${name}: 상자 위의 [열기] 단추로 연다 (${button ? button.label : '단추 없음'})`);
+    await game.shot('pois-chest-open', '연 상자(뚜껑이 열린 그림과 이름)');
+    const again = await game.ask('pois');
+    check(again.clientOpened >= again.opened && again.inReach !== before.inReach, `${name}: 연 상자는 다시 열리지 않는다 (화면이 아는 연 것 ${again.clientOpened})`);
+
+    // A shrine blesses once a day.
+    await game.send('hurt 40; goto poi shrine');
+    await game.wait(1200);
+    const prayed = (await game.send('usepoi')).join(' ');
+    await game.wait(900);
+    const blessed = await game.ask('pois');
+    check(/^ok/.test(prayed) && blessed.blessing !== '' && blessed.clientBlessing === blessed.blessing,
+      `${name}: 제단이 축복한다 (${blessed.blessing}, ${Math.round(blessed.blessingSeconds)}초)`);
+    await game.shot('pois-shrine-blessed', '제단의 축복(알림 줄과 상태 줄)');
+    const twice = (await game.send('usepoi')).join(' ');
+    check(/^error/.test(twice), `${name}: 같은 날 두 번은 안 된다 (${twice})`);
+
+    // A camp: resting by the fire.
+    await game.send('hurt 60; goto poi camp');
+    await game.wait(4200);
+    const rested = await game.ask('pois');
+    check(rested.restedSeconds > 500 && rested.lastCamp >= 0, `${name}: 야영지에서 쉬었다 (잘 쉼 ${Math.round(rested.restedSeconds)}초, 마지막 야영지 ${rested.lastCamp})`);
+    await game.shot('pois-camp-rested', '야영지에서 쉰 뒤(잘 쉼)');
+
+    // A hidden room in the rock: dust from its crack, and a sword breaks it.
+    const crack = (await game.send('goto crack')).join(' ');
+    await game.wait(1400);
+    await game.shot('pois-crack', '바위 속 숨은 방의 금 간 벽(먼지)');
+    await game.send('attack on');
+    await game.wait(2500);
+    await game.send('attack off');
+    await game.wait(500);
+    await game.shot('pois-crack-broken', '깬 금 간 벽 너머의 숨은 방');
+    check(/^ok/.test(crack), `${name}: 숨은 방의 금 간 벽 앞에 선다 (${crack})`);
+
+    // A lock: an iron pickaxe is not enough.
+    await game.send('equip iron_pickaxe; goto lock');
+    await game.wait(1200);
+    await game.send('attack on');
+    await game.wait(1500);
+    await game.send('attack off');
+    await game.wait(300);
+    await game.shot('pois-lock-refused', '철 곡괭이로 흑요석 벽을 치면 "더 좋은 곡괭이"');
+
+    // An elite camp's red flag, from afar.
+    await game.send('equip obsidian_sword; goto room elite any');
+    await game.wait(1200);
+    await game.send('goto 0 -14');
+    await game.wait(1200);
+    await game.shot('pois-elite-flag', '정예 야영지의 붉은 깃발(멀리서)');
+    await game.send('clock 9');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

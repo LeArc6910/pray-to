@@ -51,7 +51,8 @@ namespace Game.Client
                 File.ReadAllText(Path.Combine(world, TileSheet.MachinesFile)),
                 File.ReadAllText(Path.Combine(world, TerrainSheet.File)),
                 File.ReadAllText(Path.Combine(world, RoomSheet.File)),
-                File.ReadAllText(Path.Combine(world, RoomSheet.RolesFile)));
+                File.ReadAllText(Path.Combine(world, RoomSheet.RolesFile)),
+                File.ReadAllText(Path.Combine(world, PoiSheet.File)));
             string npcFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Npcs"));
             var npcs = NpcSheet.Parse(File.ReadAllText(Path.Combine(npcFolder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(npcFolder, NpcSheet.ShopFile)), loot,
                 File.ReadAllText(Path.Combine(npcFolder, NpcSheet.RequestsFile)));

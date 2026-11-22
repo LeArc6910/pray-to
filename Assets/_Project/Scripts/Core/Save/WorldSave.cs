@@ -21,7 +21,10 @@ namespace Game.Core
         // 10 (2026-11-09): each machine ends with an animal house's affection and the day it was last petted.
         // 11 (2026-11-09): locked doors and their owners, after the beds.
         // 12 (2026-11-21): which generator made the map, after its size (Docs/WorldRework.md 옛 월드).
-        const int FormatVersion = 12;
+        // 13 (2026-11-22): the things to find in the rooms (World.Pois.cs, Docs/WorldRework.md 저장과 통신): the chests and
+        // carts opened, by index, the day each player last prayed at each shrine and the camp each last rested at, after
+        // the locks.
+        const int FormatVersion = 13;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -49,6 +52,9 @@ namespace Game.Core
             List<(int X, int Y, string Owner)> locks = null)
         {
             Locks = locks ?? new List<(int, int, string)>();
+            OpenedPois = new List<int>();
+            Prayers = new List<(string, int, int)>();
+            LastCamps = new List<(string, int)>();
             DefenseLevel = defenseLevel;
             DefenseDay = defenseDay;
             Beds = beds ?? new List<(int, int, string)>();
@@ -90,6 +96,11 @@ namespace Game.Core
         // Whose lock is on which door (World.LockDoor), by player name.
         public IReadOnlyList<(int X, int Y, string Owner)> Locks { get; }
         public IReadOnlyList<SavedMachine> Machines { get; }
+        // The chests and carts opened (World.OpenedPois), the shrines prayed at by name and day, and each name's last
+        // camp; all empty for a save from before format 13.
+        public IReadOnlyList<int> OpenedPois { get; private set; }
+        public IReadOnlyList<(string Name, int Poi, int Day)> Prayers { get; private set; }
+        public IReadOnlyList<(string Name, int Poi)> LastCamps { get; private set; }
 
         public sealed class SavedMachine
         {
@@ -220,6 +231,25 @@ namespace Game.Core
                     w.Write((ushort)y);
                     w.Write(owner);
                 }
+
+                var opened = world.OpenedPois.ToList();
+                w.Write(opened.Count);
+                foreach (int index in opened) w.Write((ushort)index);
+                var prayers = world.Prayers.ToList();
+                w.Write(prayers.Count);
+                foreach (var (name, poi, day) in prayers)
+                {
+                    w.Write(name);
+                    w.Write((ushort)poi);
+                    w.Write(day);
+                }
+                var camps = world.LastCamps.ToList();
+                w.Write(camps.Count);
+                foreach (var (name, poi) in camps)
+                {
+                    w.Write(name);
+                    w.Write((ushort)poi);
+                }
             }
             return stream.ToArray();
         }
@@ -340,8 +370,14 @@ namespace Game.Core
                     int y = r.ReadUInt16();
                     locks.Add((x, y, r.ReadString()));
                 }
+                var opened = new List<int>();
+                for (int count = version >= 13 ? r.ReadInt32() : 0; count > 0; count--) opened.Add(r.ReadUInt16());
+                var prayers = new List<(string, int, int)>();
+                for (int count = version >= 13 ? r.ReadInt32() : 0; count > 0; count--) prayers.Add((r.ReadString(), r.ReadUInt16(), r.ReadInt32()));
+                var camps = new List<(string, int)>();
+                for (int count = version >= 13 ? r.ReadInt32() : 0; count > 0; count--) camps.Add((r.ReadString(), r.ReadUInt16()));
                 return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds,
-                    defenseLevel, defenseDay, locks) { Width = width, Height = height, Generator = generator };
+                    defenseLevel, defenseDay, locks) { Width = width, Height = height, Generator = generator, OpenedPois = opened, Prayers = prayers, LastCamps = camps };
 
                 void Add<T>(T definition, Action<T> add, string id) where T : class
                 {

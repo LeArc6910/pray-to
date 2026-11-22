@@ -118,6 +118,8 @@ namespace Game.Core
                     && !n.Edges.Any(i => rooms.Nodes[rooms.Edges[i].A == n.Index ? rooms.Edges[i].B : rooms.Edges[i].A].Kind == RoomKind.Arena)).ToList()
                 ?? new List<RoomNode>();
             _restRooms = rooms?.Nodes.Where(n => n.Role == RoomRole.Rest).ToList() ?? new List<RoomNode>();
+            // The camps, shrines, chests and carts in them (World.Pois.cs).
+            SetPois(rooms);
             _entrances.Clear();
             if (RoomPacks) _enemies.RemoveAll(e => e.Rift == 0);
         }

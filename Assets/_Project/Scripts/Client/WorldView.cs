@@ -635,6 +635,7 @@ namespace Game.Client
             DrawChickens();
             SwingDoors();
             DrawMarks();
+            DrawPois(deltaTime);
             _rendered = 3;
             BeginSkillFx();
             DrawProjectiles(deltaTime);
@@ -758,6 +759,8 @@ namespace Game.Client
         {
             // Fog drifts over the view, and a storm's lightning flashes white.
             if (Event.current.type == EventType.Repaint) DrawWeather();
+            // The signals of things to find in range but off the screen (WorldView.Pois.cs).
+            DrawFarSignals();
             // Hurt: the screen's edges glow red for a moment, more for a harder blow.
             if (_hurtGlow > 0 && Feel.HurtGlow && Event.current.type == EventType.Repaint)
             {
@@ -2110,6 +2113,8 @@ namespace Game.Client
 
         void Show(SimEvent e)
         {
+            // The things to find in the rooms (WorldView.Pois.cs).
+            if (ShowPoi(e)) return;
             switch (e.Type)
             {
                 case SimEventType.Attack:
@@ -3751,6 +3756,7 @@ namespace Game.Client
             _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time);
             AddSkyLights(left, bottom, size);
             AddNightLights(left, bottom, size);
+            AddPoiLights(left, bottom, size);
             AddFxLights();
             foreach (var shot in _projectiles.Values)
             {

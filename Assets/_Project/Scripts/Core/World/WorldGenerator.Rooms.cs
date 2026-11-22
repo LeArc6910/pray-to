@@ -58,6 +58,11 @@ namespace Game.Core
         public int AnchorY { get; internal set; }
         // For a room shut behind a wall that must be dug (Hidden, Locked): a tile inside, come to only through that wall.
         public (int X, int Y)? Inside { get; internal set; }
+        // Where its chunk was set: its lower left tile and size (null for a room left as carved).
+        public (int Left, int Bottom, int Width, int Height)? Box { get; internal set; }
+        // A hidden room set into the rock beside its room rather than in its middle (3b): from outside only a crack in
+        // the rock face shows. Its Box is the hidden room itself.
+        public bool Buried { get; internal set; }
     }
 
     // What a way is, beyond a corridor (Docs/WorldRework.md 뼈대, 간선).
@@ -109,6 +114,9 @@ namespace Game.Core
         // What the chunks marked for later (where a pack stands, where the chest is), in room order.
         public IReadOnlyList<RoomMark> Marks => MarkList;
         internal readonly List<RoomMark> MarkList = new List<RoomMark>();
+        // The things to find in the rooms (WorldGenerator.Pois.cs), numbered as laid: Poi.Index is the place here.
+        public IReadOnlyList<Poi> Pois => PoiList;
+        internal readonly List<Poi> PoiList = new List<Poi>();
         // The rock of the chunks' walls (y * width + x): nothing that joins rooms digs through it.
         internal HashSet<int> Kept = new HashSet<int>();
 

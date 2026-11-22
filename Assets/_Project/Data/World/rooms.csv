@@ -24,11 +24,11 @@ treasure_island,treasure,lake,field,14,yes,?WWWWW?/WW.C.WW/W.....W/WW.t.WW/?W...
 treasure_lava_bridge,treasure,lava,field,14,yes,?LLLLL?/LLtCtLL/L.....L/LLL.LLL/?LL.LL?/??...??
 treasure_geode,treasure,crystal,field,14,yes,#######/#^.C.^#/#.....#/#^...^#/###+###
 treasure_cellar,treasure,mushroom,field,14,yes,#####/#mCm#/#...#/##+##
-vault_obsidian,locked,cave|mushroom|sand|ice|crystal,field,10,yes,#######/#OcCcO#/G.....G/#Ot.tO#/##OOO##/###+###
-vault_long,locked,cave|mushroom|sand|ice|crystal,field,6,yes,####G#####/#C......O+/####G#####
+vault_obsidian,locked,cave|mushroom|sand|ice|crystal|lake,field,10,yes,#######/#OcCcO#/G.....G/#Ot.tO#/##OOO##/###+###
+vault_long,locked,cave|mushroom|sand|ice|crystal|lake,field,6,yes,####G#####/#C......O+/####G#####
 vault_ice,locked,ice,field,12,yes,##G#G##/#OiCiO#/#OiiiO#/#OO.OO#/##OOO##/###+###
 vault_crystal,locked,crystal,field,12,yes,#G###G#/#^.C.^#/#.....#/#OO.OO#/##OOO##/###+###
-vault_void,locked,lava|abyss|lake,field,10,yes,###G###/#VcCcV#/#V...V#/G..t..G/#VV.VV#/##VVV##/###+###
+vault_void,locked,lava|abyss,field,10,yes,###G###/#VcCcV#/#V...V#/G..t..G/#VV.VV#/##VVV##/###+###
 hidden_cache,hidden,,field,10,yes,#####/#.C.#/#...#/##X##/##+##
 hidden_closet,hidden,,field,10,yes,#####/#BCB#/#...#/##X##/##+##
 hidden_gallery,hidden,,field,8,yes,#######/#c.C.c#/#t...t#/###X###/###+###

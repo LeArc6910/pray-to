@@ -65,6 +65,8 @@ namespace Game.Client
                 case TileType.RuneFloor: return Rgba.Hex("#5BE0E6");
                 case TileType.Cobweb: return Rgba.Hex("#C8C8D0");
                 case TileType.Crates: return Rgba.Hex("#FFE27A");
+                // The chests of the rooms (묶음 3a).
+                case TileType.WoodChest: case TileType.IronChest: case TileType.GoldChest: case TileType.OpenChest: return Rgba.Hex("#FFE27A");
             }
             if (world.Map.IsSolid(x, y) || type == TileType.Waypoint) return Built;
             if (world.ArenaKindAt(TileMap.Center(x, y)) != null) return ArenaFloor;

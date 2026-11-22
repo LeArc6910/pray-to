@@ -302,6 +302,69 @@ namespace Game.Core
         // Which kind of cave each tile is in, worked out from the seed like the map.
         public BiomeMap Biomes { get; private set; } = BiomeMap.Plain(1, 1);
         public float ArenaRadius { get; private set; }
+        // The rooms of a world of rooms and the things to find in them, laid from the seed like the map (null and none
+        // for a world of caves).
+        public RoomGraph Rooms { get; private set; }
+        public IReadOnlyList<Poi> Pois => Rooms?.Pois ?? (IReadOnlyList<Poi>)Array.Empty<Poi>();
+
+        // ---- What became of the things to find, as the host last told (PoisMessage, World.Pois.cs) ----
+
+        bool[] _poiOpened = Array.Empty<bool>();
+        readonly HashSet<int> _prayed = new HashSet<int>();
+        double _poiTick;
+        int _blessingTicks, _restedTicks;
+
+        public bool PoiOpened(int index) => index >= 0 && index < _poiOpened.Length && _poiOpened[index];
+        public bool PrayedToday(int index) => _prayed.Contains(index);
+        // The camp this player gets up at when they fall, or null.
+        public int? LastCamp { get; private set; }
+        // The shrine's blessing on this player while it lasts, and the seconds it and their rest have left.
+        public PoiDefinition Blessing => BlessingSeconds > 0 ? _blessing : null;
+        PoiDefinition _blessing;
+        public float BlessingSeconds => _blessing == null ? 0 : (float)Math.Max(0, (_blessingTicks - (HostTick - _poiTick)) / World.TicksPerSecond);
+        public float RestedSeconds => (float)Math.Max(0, (_restedTicks - (HostTick - _poiTick)) / World.TicksPerSecond);
+
+        // Whether the thing would give to this player now (World.CanUse).
+        public bool CanUse(Poi poi) => poi.Definition.Again switch
+        {
+            PoiAgain.Once => !PoiOpened(poi.Index),
+            PoiAgain.Daily => !PrayedToday(poi.Index),
+            _ => true,
+        };
+
+        // The chest, cart or shrine within reach that would give now, nearest first, or null (World.PoiNear).
+        public Poi PoiNear()
+        {
+            Poi best = null;
+            float bestDistance = World.PoiReach;
+            foreach (var poi in Pois)
+            {
+                if (poi.Kind == PoiKind.Camp || !CanUse(poi)) continue;
+                float distance = Vec2.Distance(Position, poi.Center);
+                if (distance > bestDistance) continue;
+                (best, bestDistance) = (poi, distance);
+            }
+            return best;
+        }
+
+        public byte[] UsePoiCommand(Poi poi) => new InventoryCommandMessage(InventoryCommand.UsePoi, poi.Index).Encode();
+
+        void ApplyPois(PoisMessage message)
+        {
+            _poiOpened = message.Opened.ToArray();
+            _prayed.Clear();
+            foreach (int index in message.Prayed) _prayed.Add(index);
+            LastCamp = message.LastCamp >= 0 ? message.LastCamp : (int?)null;
+            var rows = _tiles?.Terrain?.Pois?.Pois;
+            _blessing = message.Blessing >= 0 && rows != null && message.Blessing < rows.Count ? rows[message.Blessing] : null;
+            _blessingTicks = message.BlessingTicks;
+            _restedTicks = message.RestedTicks;
+            _poiTick = HostTick;
+            PoiVersion++;
+        }
+
+        // Goes up with every PoisMessage, for the screen.
+        public int PoiVersion { get; private set; }
 
         // The local player, moved here first; PreviousPosition is where it was one tick earlier, for smoothing.
         public Vec2 Position { get; private set; }
@@ -963,6 +1026,9 @@ namespace Game.Core
                         }
                         JourneyVersion++;
                         break;
+                    case MessageType.Pois:
+                        ApplyPois(PoisMessage.Decode(data));
+                        break;
                     case MessageType.Locks:
                         _locks.Clear();
                         _myDoors.Clear();
@@ -1602,6 +1668,7 @@ namespace Game.Core
             ArenaKinds = generated.ArenaKinds;
             Biomes = generated.Biomes;
             ArenaRadius = generated.ArenaRadius;
+            Rooms = generated.Rooms;
             Position = welcome.Spawn;
             PreviousPosition = welcome.Spawn;
             Spawn = welcome.Spawn;

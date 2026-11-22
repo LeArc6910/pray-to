@@ -81,6 +81,37 @@ namespace CoreSandbox
                 Console.WriteLine($"레벨 {level,2}: 평균 {values.Average(),5:0.0} 금화 (가장 비싼 것 {values.Max()})");
             }
 
+            // The things to find in the rooms (묶음 3a): what one chest or cart of each row is worth, sold at best, at the
+            // item level of the zone it is in (first zones 5, the middle 10).
+            Console.WriteLine();
+            Console.WriteLine("== 볼거리: 상자·수레 하나의 값 (금화 + 장비를 판 값 + 재료를 판 값, 룬·물약 빼고) ==");
+            float Mean(string id) => loot.Materials.FirstOrDefault(m => m.Id == id) is MaterialDefinition m ? Best(m).Value : 0;
+            float forage = World.ForageOf.Values.Average(Mean);
+            foreach (var poi in tiles.Terrain.Pois.Pois.Where(p => p.Kind == PoiKind.Chest || p.Kind == PoiKind.Cart))
+            {
+                var parts = new List<string>();
+                foreach (int level in new[] { 5, 10 })
+                {
+                    float total = 0;
+                    foreach (var reward in poi.Rewards)
+                    {
+                        float count = (reward.Min + reward.Max) / 2f;
+                        total += reward.Kind switch
+                        {
+                            PoiRewardKind.Coins => count,
+                            PoiRewardKind.Items => count * (float)Enumerable.Range(0, 400)
+                                .Average(_ => World.ItemValue(generator.RollItem(level + poi.RewardLevel, random, 0, reward.Rarity), 0)),
+                            PoiRewardKind.Ore => count * (level <= 5 ? Mean("copper_ore") : Mean("iron_ore")),
+                            PoiRewardKind.Forage => count * forage,
+                            PoiRewardKind.Material => count * Mean(reward.Material),
+                            _ => 0,
+                        };
+                    }
+                    parts.Add($"레벨 {level,2}: {total,5:0}");
+                }
+                Console.WriteLine($"{Pad(poi.Name + " (" + poi.Id + ")", 28)} {string.Join(" · ", parts)} 금화");
+            }
+
             Console.WriteLine();
             Console.WriteLine("== 비싼 것을 사려면 ==");
             float berryFarm = 8 * tiles.Crops.Where(c => c.Id == "cave_berry").Select(c => c.Count * Minute * 60 / c.RegrowTicks * Best(c.HarvestMaterial).Value).FirstOrDefault();

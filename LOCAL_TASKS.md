@@ -1070,6 +1070,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/World.Elites.cs`, `Tests/EditMode/EliteTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `ElitesWearTheirNamesAndWarnOfTheirBigAttack`(사진 `elite-tags`, `elite-warning`). 통신 0.93.0(스냅숏에 정예 목록이 붙는다)
   - (클라우드 웹 점검) `sweep.js --only packs`
   - (사람) 정예 야영지의 우두머리(이름표·접사·빛): 큰 공격의 긴 예고를 보고 피할 만한지, 맞서기만 하면 아프게 벌받는지, 억울한 한 방은 없는지, 보상이 싸울 만한지, 휴대폰 세로에서 이름표가 화면에 들어가는지
+- [ ] 153단계: 볼거리(야영지·제단·상자·금고·수레), 숨은 방, 곡괭이 자물쇠, 멀리서 보이는 신호(`Docs/WorldRework.md` 3a·3b, `Docs/Biomes.md` pois.csv)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/pois.csv`가 `GameSheets.pois`에 들어가야 빌드에 실린다(돌리기 전에는 볼거리가 없다). 새 파일 `pois.csv`, `Core/World/PoiSheet.cs`, `Core/World/WorldGenerator.Pois.cs`, `Core/Simulation/World.Pois.cs`, `Client/WorldView.Pois.cs`, `Client/Art/PropArt.Pois.cs`, `Tests/EditMode/PoiTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `TheThingsToFindDrawAndGive`(사진 poi-chest, poi-chest-open, poi-shrine-blessed, poi-camp, poi-signal-far). 통신 0.94.0, 월드 저장본 형식 13(12 이하도 읽힌다). 이 묶음 전에 만든 2판 월드는 숨은 방 자리가 바뀐다
+  - (클라우드 웹 점검) `sweep.js --only pois`
+  - (사람) 멀리서 보이는 야영지 연기·제단 빛기둥·상자 반짝임·정예 깃발이 "가 보고 싶게" 하는지, 화면 가장자리 신호 점이 어수선하지 않은지, 북·바람 소리가 알아들을 만한지, 상자 보상이 돌아갈 만한지, 금 간 벽 너머 숨은 방을 찾는 맛, 철 상자가 나무 상자와 구별되는지
 
 ## 결과 보고
 

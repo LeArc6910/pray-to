@@ -237,7 +237,7 @@ namespace Game.Client
             KeyAction.Potion => "물약",
             KeyAction.Bag => "가방",
             KeyAction.Map => "지도",
-            KeyAction.Machine => "기계 켜기/끄기",
+            KeyAction.Machine => "기계 켜기/끄기 · 상자 열기",
             KeyAction.Roll => "구르기",
             _ => $"퀵슬롯 {action - KeyAction.Hotbar1 + 1}",
         };

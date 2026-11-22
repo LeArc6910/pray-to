@@ -222,6 +222,8 @@ namespace Game.Core
         TransferUpgrade,
         // A fallen player gets up at home now rather than wait for an ally (World.GetUp, 2026-11-11).
         GetUp,
+        // Opens the chest or cart, or prays at the shrine, of index Item within reach (World.UsePoi, 2026-11-22).
+        UsePoi,
     }
 
     // A player asking the host to change their gear, use a consumable, craft or build. Item is an item id; Slot is

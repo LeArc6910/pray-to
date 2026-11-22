@@ -742,7 +742,34 @@ namespace Game.Client
             foreach (int slot in slots) UseSkill(slot, aim);
             if (potion) DrinkPotion();
             foreach (int slot in quick) UseQuickSlot(slot);
-            if (machine) ToggleMachine();
+            // The same key opens the chest or cart, or prays at the shrine, beside the player when no machine is ahead.
+            if (machine && !ToggleMachine()) UsePoi();
+        }
+
+        // Opens the chest or cart, or prays at the shrine, within reach (World.UsePoi): the key, or the button over it.
+        // False when there is none.
+        internal bool UsePoi()
+        {
+            if (_client?.PoiNear() is not Poi poi) return false;
+            Sounds.Play(Sound.Click);
+            SendToHost(_client.UsePoiCommand(poi));
+            return true;
+        }
+
+        // A button over the chest, cart or shrine within reach that would give now (Docs/WorldRework.md 3단계 볼거리),
+        // for a finger or the mouse; on a keyboard it shows the key, which does the same.
+        void DrawPoiButton()
+        {
+            if (_client.PoiNear() is not Poi poi || _client.MachineAhead() != null) return;
+            Vector3 screen = _camera.WorldToScreenPoint(new Vector3(poi.X + 0.5f, poi.Y + 1.5f, 0));
+            if (screen.z < 0) return;
+            Vector2 point = Ui.FromScreen(screen);
+            string text = $"{poi.Definition.Name} {PoiText.Verb(poi)}";
+            if (!Controls.UsingTouch) text += $" ({KeyBindings.Name(KeyAction.Machine)})";
+            float width = Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length);
+            var rect = new Rect(point.x - width / 2, point.y - 13, width, 26);
+            Controls.Block(rect);
+            if (Ui.Button(rect, text)) UsePoi();
         }
 
         // Switches the machine ahead off or on: the key, or the button over it. False when there is none.
@@ -1254,6 +1281,7 @@ namespace Game.Client
             if (_client.Status == ClientStatus.Playing && !_inventory.Open)
             {
                 DrawMachineSwitch();
+                DrawPoiButton();
                 DrawBedButton();
                 DrawGetUpButton();
                 DrawRiftButton();
@@ -1669,7 +1697,7 @@ namespace Game.Client
             {
                 // In co-op a fallen player waits for an ally (World.Revive), and allies are told who is down.
                 bool together = _client.Names.Count > 1;
-                if (_client.IsDead && !together) lines.Add("쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
+                if (_client.IsDead && !together) lines.Add(_client.LastCamp != null ? "쓰러졌습니다. 잠시 후 마지막에 쉰 야영지에서 일어납니다." : "쓰러졌습니다. 잠시 후 시작 지점에서 일어납니다.");
                 if (_client.IsDead && together)
                     lines.Add($"쓰러졌다. 동료가 곁에 {World.ReviveSeconds:0}초 서 있으면 이 자리에서 일어난다 ({Mathf.Max(0, Mathf.CeilToInt(World.DownSeconds - (Time.time - _downSince)))}초 뒤 집에서)");
                 if (!_client.IsDead)
@@ -1695,6 +1723,17 @@ namespace Game.Client
                     {
                         int left = Mathf.CeilToInt(_client.FoodLeft);
                         lines.Add($"{Whole(_client.Food.Name)} {left / 60}:{left % 60:00}");
+                    }
+                    // A shrine's blessing and a camp's rest (World.Pois.cs).
+                    if (_client.Blessing != null)
+                    {
+                        int left = Mathf.CeilToInt(_client.BlessingSeconds);
+                        lines.Add($"{Whole(_client.Blessing.Name)}의 축복 {left / 60}:{left % 60:00}");
+                    }
+                    if (_client.RestedSeconds > 0)
+                    {
+                        int left = Mathf.CeilToInt(_client.RestedSeconds);
+                        lines.Add($"{Whole("잘 쉼")} {left / 60}:{left % 60:00}");
                     }
                     var points = new List<string>();
                     // An open class slot (Docs/Classes.md, 클래스 고르기): picked in the bag's skills page.

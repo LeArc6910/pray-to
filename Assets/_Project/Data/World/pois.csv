@@ -1,0 +1,16 @@
+id,name,role,biomes,weight,reward,reward_level,per_player,again,signal,signal_range,buff,tile
+camp,야영지,rest,,10,rest:10|rested:600,,no,always,smoke,20,,
+shrine_might,힘의 제단,shrine,,10,bless:300|heal:100,,yes,daily,beam,14,Damage+20%,
+shrine_wind,바람의 제단,shrine,,10,bless:300|heal:100,,yes,daily,beam,14,MoveSpeed+25%,
+shrine_fortune,행운의 제단,shrine,,10,bless:300|heal:100,,yes,daily,beam,14,ItemRarity+50%,
+shrine_spring,샘의 제단,shrine,,10,bless:300|heal:100,,yes,daily,beam,14,HealthRegen+4,
+shrine_ward,수호의 제단,shrine,,10,bless:300|heal:100,,yes,daily,beam,14,Armor+30%,
+chest_wood,나무 상자,treasure,,6,items:1|ore:2-4|potions:1|coins:4-10,,yes,once,glint,10,,WoodChest
+chest_iron,철 상자,treasure,,3,items:1:uncommon|ore:3-5|potions:1|coins:8-16|runes:15,,yes,once,glint,10,,IronChest
+chest_gold,금 상자,treasure,,1,items:2:rare|potions:2|coins:16-30|runes:30,1,yes,once,glint,10,,GoldChest
+hidden_iron,숨은 철 상자,hidden,,3,items:1:uncommon|ore:3-5|potions:1|coins:8-16|runes:30,,yes,once,glint,6,,IronChest
+hidden_gold,숨은 금 상자,hidden,,1,items:2:rare|potions:2|coins:16-30|runes:60,1,yes,once,glint,6,,GoldChest
+vault_obsidian,흑요석 금고,locked,cave|mushroom|sand|ice|crystal|lake,10,items:2:rare|material:obsidian_ore:6-10|coins:16-30|runes:30,1,yes,once,glint,10,,GoldChest
+vault_void,공허석 금고,locked,lava|abyss,10,items:2:rare|material:void_ore:6-10|coins:20-40|runes:30,1,yes,once,glint,10,,GoldChest
+trap_chest,함정 상자,trap,,10,items:1:uncommon|ore:3-5|potions:1|coins:8-16,,yes,once,glint,8,,IronChest
+cart,버려진 수레,cart,,10,forage:5-10|coins:5-15,,no,once,glint,6,,

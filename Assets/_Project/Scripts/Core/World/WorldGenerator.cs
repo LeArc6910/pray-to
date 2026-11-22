@@ -291,6 +291,8 @@ namespace Game.Core
                 // What each room is for, and the chunks set into them (WorldGenerator.Roles.cs): after the places and the
                 // roads, which decide where a pack may live.
                 Furnish(world, seed, terrain ?? TerrainSheet.Default);
+                // The camps, shrines, chests and carts in them (WorldGenerator.Pois.cs, pois.csv).
+                LayPois(world, seed, terrain);
                 // A place built across a way, or dressing set in an arena's door, must not shut a room off.
                 JoinRooms(world.Map, world.Rooms.Nodes, world.Arenas.Take(world.CaveArenas).Select(a => (TileMap.Cell(a.X), TileMap.Cell(a.Y))).ToList(),
                     world.SpawnX, world.SpawnY, pockets: true, kept: world.Rooms.Kept);

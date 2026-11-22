@@ -207,6 +207,12 @@ namespace Game.Core
         // never dug or built on.
         IceFloor,
         Quicksand,
+        // The chests of the rooms of version 2 (2026-11-22, Docs/WorldRework.md 3단계 볼거리): wood, iron and gold,
+        // shut until someone opens them (World.Pois.cs), then an open one. Standing (solid), never dug or built on.
+        WoodChest,
+        IronChest,
+        GoldChest,
+        OpenChest,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.

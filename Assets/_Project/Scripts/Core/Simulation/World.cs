@@ -189,6 +189,7 @@ namespace Game.Core
                 if (SkipsTick(enemy)) continue;
                 UpdateEnemy(enemy);
                 KeepOutOfPlaces(enemy);
+                KeepOutOfCamps(enemy);
             }
             UpdateElites();
             UpdateBosses();
@@ -236,7 +237,8 @@ namespace Game.Core
             {
                 if (Revive(player)) return;
                 if (--player.RespawnTicks > 0) return;
-                player.Position = HomeOf(player);
+                // By the last camp rested at, or at home (World.Pois.cs).
+                player.Position = RisingPlace(player);
                 player.Health = player.Stats.MaxHealth;
                 player.Mana = player.Stats.MaxMana;
                 player.Corrections++;
@@ -244,6 +246,7 @@ namespace Game.Core
             }
 
             Heal(player);
+            UpdatePois(player);
             BurnInLava(player);
             UpdateRecall(player);
             UpdateFishing(player);
@@ -634,7 +637,7 @@ namespace Game.Core
         // just outside its edge. The ward stone's raiders and the bosses keep to their own ground and are not stopped.
         public const float SafeMargin = 1;
 
-        public bool InSafePlace(Vec2 position) => Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + SafeMargin);
+        public bool InSafePlace(Vec2 position) => Places.Any(p => Vec2.Distance(position, p.Center) <= p.Radius + SafeMargin) || InCamp(position);
 
         void KeepOutOfPlaces(Enemy enemy)
         {

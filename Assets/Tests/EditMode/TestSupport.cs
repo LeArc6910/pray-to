@@ -173,7 +173,7 @@ namespace Game.Core.Tests
     {
         static string Read(string file) => File.ReadAllText(RepoFile.Find("Assets/_Project/Data/World/" + file));
 
-        public static readonly TileData Shipped = TileSheet.Parse(Read(TileSheet.File), Gear.Data, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile), Read(TerrainSheet.File), Read(RoomSheet.File), Read(RoomSheet.RolesFile));
+        public static readonly TileData Shipped = TileSheet.Parse(Read(TileSheet.File), Gear.Data, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile), Read(TerrainSheet.File), Read(RoomSheet.File), Read(RoomSheet.RolesFile), Read(PoiSheet.File));
     }
 
     public static class People

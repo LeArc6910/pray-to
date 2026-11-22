@@ -204,6 +204,8 @@ namespace Game.Client
             TileType.CherryTree => CherryTree(),
             TileType.Cocoon => Cocoon(),
             TileType.ArmorStand => ArmorStand(),
+            // The chests of the rooms (PropArt.Pois.cs).
+            TileType.WoodChest or TileType.IronChest or TileType.GoldChest or TileType.OpenChest => PoiChest(type),
             // The things players build, standing too (2026-11-10, Stands).
             TileType.Workbench => Workbench(),
             TileType.Furnace => Furnace(),
@@ -432,6 +434,7 @@ namespace Game.Client
         // the crafting stations, the chest, the bed and the furniture. Machines with moving parts drawn over them stay
         // tiles, so their parts are not hidden.
         public static bool Stands(TileType type) => type == TileType.Workbench || type == TileType.Furnace || type == TileType.Chest
+            || type >= TileType.WoodChest && type <= TileType.OpenChest
             || type == TileType.Anvil || type == TileType.Bed || type == TileType.Table || type == TileType.Torch || type == TileType.Lamp
             || type == TileType.Pot || type == TileType.Banner || type == TileType.WardStone || type == TileType.RiftAltar
             || RaisedMachines.Contains(type);
@@ -450,6 +453,7 @@ namespace Game.Client
             TileType.Boat, TileType.Lighthouse, TileType.NetRack, TileType.Bollard, TileType.Anchor, TileType.BrokenPillar, TileType.FallenColumn,
             TileType.Rubble, TileType.RuneStone, TileType.Altar, TileType.MineEntrance, TileType.MineCart, TileType.OrePile, TileType.Lantern,
             TileType.Torii, TileType.CherryTree, TileType.Cocoon, TileType.ArmorStand,
+            TileType.WoodChest, TileType.IronChest, TileType.GoldChest, TileType.OpenChest,
             TileType.Workbench, TileType.Furnace, TileType.Chest, TileType.Anvil, TileType.Bed, TileType.Table, TileType.Torch, TileType.Lamp,
             TileType.Pot, TileType.Banner, TileType.WardStone, TileType.RiftAltar,
             TileType.Drill, TileType.Smelter, TileType.Generator, TileType.Turret, TileType.Keg, TileType.PreservesJar, TileType.Assembler,

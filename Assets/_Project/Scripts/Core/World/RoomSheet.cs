@@ -77,6 +77,8 @@ namespace Game.Core
         Trap,
         Barrel,
         DungeonDoor,
+        // An abandoned mine cart ('j'): a cart room's things to find (3단계 볼거리).
+        Cart,
     }
 
     public readonly struct RoomMark
@@ -222,7 +224,7 @@ namespace Game.Core
         {
             '#' => TileType.Wall,
             '.' or 'M' or 'E' => TileType.Floor,
-            'C' => TileType.Crates,
+            'C' => TileType.WoodChest,
             'F' => TileType.Campfire,
             'S' => TileType.RuneStone,
             'X' => TileType.CrackedWall,
@@ -270,6 +272,7 @@ namespace Game.Core
             'T' => RoomMarkKind.Trap,
             'B' => RoomMarkKind.Barrel,
             'D' => RoomMarkKind.DungeonDoor,
+            'j' => RoomMarkKind.Cart,
             _ => null,
         };
 

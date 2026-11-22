@@ -96,6 +96,8 @@ namespace Game.Core
         public void GainExperience(Player player, int amount)
         {
             if (amount <= 0) return;
+            // Rested at a camp (World.Pois.cs): a tenth more, at least one.
+            if (player.RestedTicks > 0) amount += Math.Max(1, amount * RestedExperiencePercent / 100);
             FeedPet(player, amount);
             int before = player.Level;
             player.Experience = Math.Min(player.Experience + amount, Leveling.TotalFor(Leveling.MaxLevel));

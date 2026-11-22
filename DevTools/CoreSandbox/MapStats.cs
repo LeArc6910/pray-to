@@ -169,6 +169,28 @@ namespace CoreSandbox
             return numbers;
         }
 
+        // From each room, how many rooms along the ways to the nearest that holds a thing to find.
+        static string PoiRooms(RoomGraph rooms)
+        {
+            var holds = new HashSet<int>(rooms.Pois.Select(p => p.Room));
+            if (holds.Count == 0) return "-";
+            var steps = new List<int>();
+            foreach (var start in rooms.Nodes.Where(n => n.Kind == RoomKind.Room))
+            {
+                var seen = new HashSet<int> { start.Index };
+                var ring = new List<RoomNode> { start };
+                int step = 0;
+                while (ring.Count > 0 && !ring.Any(r => holds.Contains(r.Index)) && step < 30)
+                {
+                    ring = ring.SelectMany(r => Beside(rooms, r)).Where(r => seen.Add(r.Index)).ToList();
+                    step++;
+                }
+                steps.Add(step);
+            }
+            steps.Sort();
+            return $"{steps.Average():0.0} / {steps[steps.Count * 95 / 100]}";
+        }
+
         static bool Special(RoomNode room) => room.Kind != RoomKind.Room || room.Role != RoomRole.Plain && room.Role != RoomRole.Pack;
 
         static IEnumerable<RoomNode> Beside(RoomGraph rooms, RoomNode room) =>
@@ -324,6 +346,13 @@ namespace CoreSandbox
                     Row($"{WorldGenerator.SpecialWithin}방 안에 새것이 없는 방", n => Bare(n.Rooms).ToString());
                     Row("새것 사이 걷는 시간(평균 / 95%)", n => Gap(n.Rooms, false));
                     Row("무리 방도 세면(평균 / 95%)", n => Gap(n.Rooms, true));
+                    // The things to find (묶음 3a·3b): how many of each, and from each room's middle the walk to the nearest.
+                    foreach (PoiKind kind in Enum.GetValues(typeof(PoiKind)))
+                        Row($"볼거리 {kind.ToString().ToLowerInvariant()}", n => n.Rooms.Pois.Count(p => p.Kind == kind).ToString());
+                    Row("상자: 나무 · 철 · 금", n => string.Join(" · ", new[] { TileType.WoodChest, TileType.IronChest, TileType.GoldChest }
+                        .Select(t => n.Rooms.Pois.Count(p => p.Definition.Tile == t))));
+                    Row("바위 속 숨은 방 / 숨은 방", n => $"{n.Rooms.Nodes.Count(r => r.Buried)} / {n.Rooms.Nodes.Count(r => r.Role == RoomRole.Hidden)}");
+                    Row("방에서 가장 가까운 볼거리까지 방 수(평균 / 95%)", n => PoiRooms(n.Rooms));
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();

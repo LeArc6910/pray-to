@@ -89,19 +89,33 @@ namespace Game.Core
     {
         readonly Dictionary<Biome, TerrainRule> _byBiome = new Dictionary<Biome, TerrainRule>();
 
-        internal TerrainData(IEnumerable<TerrainRule> rules, IReadOnlyList<string> errors, RoomData rooms = null)
+        internal TerrainData(IEnumerable<TerrainRule> rules, IReadOnlyList<string> errors, RoomData rooms = null, PoiData pois = null)
         {
             foreach (var rule in rules) _byBiome[rule.Biome] = rule;
             Rooms = rooms ?? RoomData.None;
-            Errors = rooms == null || rooms.Errors.Count == 0 ? errors : errors.Concat(rooms.Errors).ToList();
+            Pois = pois ?? PoiData.None;
+            var all = errors.ToList();
+            if (rooms != null) all.AddRange(rooms.Errors.Where(e => !all.Contains(e)));
+            if (pois != null) all.AddRange(pois.Errors.Where(e => !all.Contains(e)));
+            Errors = all;
         }
+
+        // The things to find in the rooms (pois.csv, Docs/WorldRework.md 3단계): none when the game did not read them,
+        // and then the rooms keep their chests shut and their fires only warm.
+        public PoiData Pois { get; }
 
         // The room chunks and the roles' numbers (rooms.csv, room_roles.csv); none when the game did not read them, and
         // then the rooms get their roles by the code's numbers and no chunks.
         public RoomData Rooms { get; }
 
         // The same rules with the room sheets beside them.
-        internal TerrainData With(RoomData rooms) => new TerrainData(_byBiome.Values, Errors, rooms);
+        internal TerrainData With(RoomData rooms) => new TerrainData(_byBiome.Values, Errors, rooms, Pois);
+
+        // The same rules with the things to find beside them.
+        internal TerrainData With(PoiData pois) => new TerrainData(_byBiome.Values, Errors, Rooms, pois);
+
+        // The same without the things to find (a game whose asset was made before pois.csv).
+        internal TerrainData WithoutPois() => new TerrainData(_byBiome.Values, Errors, Rooms, PoiData.None);
 
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;

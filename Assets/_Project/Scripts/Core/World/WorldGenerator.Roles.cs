@@ -351,7 +351,8 @@ namespace Game.Core
             // needs a chunk and none fits there.
             bool Take(RoomNode node, RoomRole role)
             {
-                bool stamped = Stamp(node, role);
+                // A hidden room goes into the rock beside its room first (3b), and only where none fits into its middle.
+                bool stamped = role == RoomRole.Hidden && Bury(node) || Stamp(node, role);
                 if (!stamped && role != RoomRole.Ore) return false;
                 node.Role = role;
                 _dealt[node.Index] = true;
@@ -478,6 +479,7 @@ namespace Game.Core
 
                 node.Chunk = chunk;
                 node.ChunkWay = way;
+                node.Box = (left, bottom, w, h);
                 if (opened.Count > 0)
                 {
                     // The tile of the walk just outside a door.
@@ -487,6 +489,127 @@ namespace Game.Core
                 }
                 else if (inside is (int ix, int iy)) (node.AnchorX, node.AnchorY) = (ix, iy);
                 if (Shut(chunk)) node.Inside = inside;
+            }
+
+            // ---- A hidden room in the rock (2026-11-22, Docs/WorldRework.md 숨은 방과 금 간 벽, 묶음 3b) ----
+
+            // How far from its room's middle a buried room's door may open, beyond the room's radius.
+            const int BuryReach = 4;
+            // Of the floor at its room's edge, how many tiles are tried for a buried room's door.
+            const int BuryTries = 80;
+
+            // Sets a hidden room's chunk into the solid rock beside the room, its door against the room's floor and the
+            // door itself a cracked wall: from the room it is only a crack in the rock face. A rock all round it, so
+            // nothing shows it but the crack (and what the screen makes of it: dust, a draught). False when no rock
+            // beside the room is thick enough; then it stands in the room's middle as before (Stamp).
+            bool Bury(RoomNode node)
+            {
+                var choices = _rooms.For(RoomRole.Hidden, node.Biome).Where(c => c.Walled).ToList();
+                if (choices.Count == 0) return false;
+                var chunk = _chunkRandom.PickWeighted(choices, c => c.Weight);
+                int reach = Math.Max(3, node.Radius) + BuryReach;
+                // The room's floor along its rock: each tile with the way into the rock.
+                var faces = new List<(int X, int Y, int Dx, int Dy)>();
+                for (int y = node.Y - reach; y <= node.Y + reach; y++)
+                {
+                    for (int x = node.X - reach; x <= node.X + reach; x++)
+                    {
+                        if (!Inside(x, y) || Square(x - node.X, y - node.Y) > reach * reach || !Bare(_map[x, y]) || _taken.Contains(y * _width + x)) continue;
+                        // Not a crumb of floor: a floor tile with floor on two sides at least.
+                        int open = 0;
+                        foreach (var (dx, dy) in Sides)
+                            if (Bare(_map[x + dx, y + dy])) open++;
+                        if (open < 2) continue;
+                        foreach (var (dx, dy) in Sides)
+                            if (_map[x + dx, y + dy] == TileType.Wall) faces.Add((x, y, dx, dy));
+                    }
+                }
+                for (int tries = 0; tries < BuryTries && faces.Count > 0; tries++)
+                {
+                    int pick = _chunkRandom.Next(faces.Count);
+                    var (fx, fy, ix, iy) = faces[pick];
+                    faces[pick] = faces[faces.Count - 1];
+                    faces.RemoveAt(faces.Count - 1);
+                    // The ways round whose door looks out of the rock toward the floor.
+                    int first = _chunkRandom.Next(8);
+                    for (int k = 0; k < (chunk.Turn ? 8 : 1); k++)
+                    {
+                        int way = chunk.Turn ? (first + k) % 8 : 0;
+                        var (w, h) = chunk.Size(way);
+                        for (int cy = 0; cy < h; cy++)
+                        {
+                            for (int cx = 0; cx < w; cx++)
+                            {
+                                if (chunk.At(cx, cy, way) != RoomSheet.Door) continue;
+                                // The door's way out of the chunk must be back toward the floor.
+                                int outX = cx == 0 ? -1 : cx == w - 1 ? 1 : 0, outY = cy == 0 ? 1 : cy == h - 1 ? -1 : 0;
+                                if (outX != -ix || outY != -iy) continue;
+                                int left = fx + ix - cx, bottom = fy + iy - (h - 1 - cy);
+                                if (!Solid(node, left, bottom, w, h, -ix, -iy)) continue;
+                                Inter(node, chunk, way, left, bottom, fx, fy);
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            }
+
+            static readonly (int Dx, int Dy)[] Sides = { (1, 0), (-1, 0), (0, 1), (0, -1) };
+
+            static bool Bare(TileType type) => type == TileType.Floor || type == TileType.IceFloor || type == TileType.Quicksand;
+
+            // Whether the chunk's box and a tile round it are the generator's own rock, but on the side its door looks
+            // out of (ox, oy), where the room's floor is.
+            bool Solid(RoomNode node, int left, int bottom, int w, int h, int ox, int oy)
+            {
+                for (int y = bottom - 1; y <= bottom + h; y++)
+                {
+                    for (int x = left - 1; x <= left + w; x++)
+                    {
+                        if (ox == -1 && x == left - 1 || ox == 1 && x == left + w || oy == -1 && y == bottom - 1 || oy == 1 && y == bottom + h) continue;
+                        if (!Inside(x, y) || _taken.Contains(y * _width + x) || _graph.Kept.Contains(y * _width + x)) return false;
+                        if (_middles.TryGetValue(y * _width + x, out int other) && other != node.Index) return false;
+                        var type = _map[x, y];
+                        if (type != TileType.Wall && !type.ToString().EndsWith("Ore")) return false;
+                        foreach (var arena in _world.Arenas)
+                            if (Square(TileMap.Cell(arena.X) - x, TileMap.Cell(arena.Y) - y) <= (ArenaRadius + ArenaWall + 1) * (ArenaRadius + ArenaWall + 1)) return false;
+                    }
+                }
+                return true;
+            }
+
+            // Lays a buried chunk: as Set, but its door is a cracked wall too and nothing round it is opened.
+            void Inter(RoomNode node, RoomChunk chunk, int way, int left, int bottom, int fx, int fy)
+            {
+                var (w, h) = chunk.Size(way);
+                for (int y = bottom - 1; y <= bottom + h; y++)
+                    for (int x = left - 1; x <= left + w; x++)
+                        _taken.Add(y * _width + x);
+                (int X, int Y)? inside = null;
+                int mx = left + w / 2, my = bottom + h / 2;
+                for (int y = 0; y < h; y++)
+                {
+                    for (int x = 0; x < w; x++)
+                    {
+                        char letter = chunk.At(x, y, way);
+                        int tx = left + x, ty = bottom + h - 1 - y;
+                        if (letter == '?') continue;
+                        TileType type = letter == RoomSheet.Door ? TileType.CrackedWall
+                            : letter == '%' ? (_chunkRandom.Next(2) == 0 ? TileType.Wall : TileType.Floor)
+                            : RoomSheet.Tile(letter) ?? TileType.Floor;
+                        _map[tx, ty] = type;
+                        if (type == TileType.Wall && letter != '%') _graph.Kept.Add(ty * _width + tx);
+                        if (RoomSheet.Mark(letter) is RoomMarkKind mark) _graph.MarkList.Add(new RoomMark(node.Index, mark, tx, ty));
+                        if (letter == '.' && (inside == null || Square(tx - mx, ty - my) < Square(inside.Value.X - mx, inside.Value.Y - my))) inside = (tx, ty);
+                    }
+                }
+                node.Chunk = chunk;
+                node.ChunkWay = way;
+                node.Box = (left, bottom, w, h);
+                node.Buried = true;
+                (node.AnchorX, node.AnchorY) = (fx, fy);
+                node.Inside = inside;
             }
 
             // A chunk whose inside is behind a wall that must be dug.

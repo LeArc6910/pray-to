@@ -144,10 +144,13 @@ namespace Game.Core
             ConsumableDefinition food = null,
             int level = 1,
             IEnumerable<PassiveNode> passives = null,
-            IEnumerable<Modifier> pet = null)
+            IEnumerable<Modifier> pet = null,
+            IEnumerable<Modifier> blessing = null)
         {
             var sheet = new StatSheet();
             if (pet != null) sheet.Add(pet.ToList());
+            // A shrine's blessing (World.Pois.cs).
+            if (blessing != null) sheet.Add(blessing.ToList());
             foreach (var point in passives ?? Enumerable.Empty<PassiveNode>()) sheet.Add(point.Modifiers);
             if (level > 1)
             {

@@ -30,6 +30,7 @@ namespace Game.Core
         Records = 24,
         Locks = 25,
         Journey = 26,
+        Pois = 27,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -41,7 +42,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.93.0";
+        public const string Version = "0.94.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -468,6 +469,63 @@ namespace Game.Core
             var sides = new List<(string, int, bool)>();
             for (int n = r.ReadByte(); n > 0; n--) sides.Add((r.ReadString(), r.ReadUInt16(), r.ReadBoolean()));
             return new JourneyMessage(step, taken, waypoints, choices, sides);
+        });
+    }
+
+    // What became of the things to find in the rooms (World.Pois.cs, 2026-11-22, Docs/WorldRework.md 저장과 통신), for one
+    // player: the chests and carts opened (a bit each, by index), the shrines they prayed at today, the camp they last
+    // rested at (-1 for none), their blessing (its row's place in pois.csv, -1 for none) and the ticks it and their rest
+    // have left. Where the things are is laid from the seed and never sent. Sent when any of it changes, and to each
+    // player who joins.
+    public sealed class PoisMessage
+    {
+        public PoisMessage(IReadOnlyList<bool> opened, IReadOnlyList<int> prayed, int lastCamp, int blessing, int blessingTicks, int restedTicks)
+        {
+            Opened = opened;
+            Prayed = prayed;
+            LastCamp = lastCamp;
+            Blessing = blessing;
+            BlessingTicks = blessingTicks;
+            RestedTicks = restedTicks;
+        }
+
+        public IReadOnlyList<bool> Opened { get; }
+        public IReadOnlyList<int> Prayed { get; }
+        public int LastCamp { get; }
+        public int Blessing { get; }
+        public int BlessingTicks { get; }
+        public int RestedTicks { get; }
+
+        public byte[] Encode() => Protocol.Build(MessageType.Pois, w =>
+        {
+            w.Write((ushort)Opened.Count);
+            for (int start = 0; start < Opened.Count; start += 8)
+            {
+                int bits = 0;
+                for (int i = 0; i < 8 && start + i < Opened.Count; i++)
+                    if (Opened[start + i]) bits |= 1 << i;
+                w.Write((byte)bits);
+            }
+            w.Write((ushort)Prayed.Count);
+            foreach (int index in Prayed) w.Write((ushort)index);
+            w.Write((short)Math.Clamp(LastCamp, -1, short.MaxValue));
+            w.Write((short)Math.Clamp(Blessing, -1, short.MaxValue));
+            w.Write(BlessingTicks);
+            w.Write(RestedTicks);
+        });
+
+        public static PoisMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Pois, r =>
+        {
+            int count = r.ReadUInt16();
+            var opened = new bool[count];
+            for (int start = 0; start < count; start += 8)
+            {
+                int bits = r.ReadByte();
+                for (int i = 0; i < 8 && start + i < count; i++) opened[start + i] = (bits & (1 << i)) != 0;
+            }
+            var prayed = new List<int>();
+            for (int n = r.ReadUInt16(); n > 0; n--) prayed.Add(r.ReadUInt16());
+            return new PoisMessage(opened, prayed, r.ReadInt16(), r.ReadInt16(), r.ReadInt32(), r.ReadInt32());
         });
     }
 
