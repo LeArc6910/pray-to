@@ -786,6 +786,9 @@ namespace Game.Core
                 .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift
                     || e.Type == SimEventType.Died && e.Position.LengthSquared > 0 && InView(e.Position)
                     || e.Type == SimEventType.MonsterFx && InView(e.Position)
+                    // A dungeon's own turns (room cleared, key, master down, door open) come from no one: told to
+                    // everyone in that dungeon's part of the pocket, wherever in it they stand.
+                    || e.Type == SimEventType.Dungeon && e.Source == 0 && World.AreaOf(e.Position) == area
                     || e.Type == SimEventType.Defense || e.Type == SimEventType.TurretShot || e.Type == SimEventType.Rain)
                 .OrderBy(e => e.Type == SimEventType.Attack ? 2 : e.Type == SimEventType.Hit ? 1 : 0)
                 .Take(_config.MaxEventsPerSnapshot)

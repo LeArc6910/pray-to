@@ -4655,7 +4655,7 @@ async function dungeon(browser) {
     const atGate = await game.ask('dungeon');
     check(/^ok/.test(went) && atGate.gateNear >= 0 && atGate.clientGateNear === atGate.gateNear, `${name}: 던전 문 위에 선다 (${went}, 문 ${atGate.gateNear}, 화면 ${atGate.clientGateNear})`);
     await game.shot('dungeon-gate', '던전 문(도리이 둘 사이)과 [들어가기] 단추');
-    const enter = (await game.buttons()).find(b => /던전 들어가기/.test(b.label));
+    const enter = (await game.buttons()).find(b => /^\S.* 들어가기( \(|$)/.test(b.label));
     check(!!enter && await game.press(enter.label), `${name}: [${enter ? enter.label : '들어가기 단추 없음'}]를 누른다`);
     const gathering = await game.ask('dungeon');
     check(gathering.charging || gathering.inPocket, `${name}: 들어가기를 모은다 (화면 ${Math.round(gathering.clientCharge * 100)}%)`);
@@ -4700,7 +4700,7 @@ async function dungeon(browser) {
     await game.shot('dungeon-out', '나온 뒤의 던전 문');
 
     // In again (the same dungeon while it stands), and out by the door of the entrance room.
-    await game.press(/던전 들어가기/);
+    await game.press(/^\S.* 들어가기( \(|$)/);
     const again = await game.until(d => d.inPocket && d.clientInPocket, 5000, () => game.ask('dungeon'));
     check(!!again && again.slot === inside.slot && again.dungeons.length === 1 && again.dungeons[0].serial === 0,
       `${name}: 다시 들어가면 서 있는 같은 던전이다 (칸 ${again ? again.slot : '-'})`);
@@ -4716,8 +4716,11 @@ async function dungeon(browser) {
 
     // 묶음 5b: a run through it. In again; a pack room's pack standing (held), the map with the rooms' marks, each pack
     // room felled at once, the master in its room (its bar and name), down, the end chest's own button pressed for real,
-    // the clear card, and the goals' ways from the gate rather than the pocket.
-    await game.press(/던전 들어가기/);
+    // the clear card, and the goals' ways from the gate rather than the pocket. The door out leaves the player before
+    // the gate, not on it, so back onto the gate first for its button.
+    await game.send('goto gate');
+    await game.wait(1200);
+    await game.press(/^\S.* 들어가기( \(|$)/);
     const back = await game.until(d => d.inPocket && d.clientInPocket && d.run, 5000, () => game.ask('dungeon'));
     check(!!back && back.run.id.length > 0 && /^E.*BX/.test(back.run.letters) && back.run.packs >= 3,
       `${name}: 던전의 방 (${back ? `${back.run.id}: ${back.run.letters}, 무리 방 ${back.run.packs}` : '없음'})`);

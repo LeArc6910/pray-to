@@ -393,9 +393,14 @@ namespace Game.Core.Tests
             a.Position = Collision.Resolve(world.Map, boss.Center + new Vec2(0, -boss.Box.H / 2f + 1.5f), World.PlayerRadius);
             a.Corrections++;
             Pass(0.4f);
+            alice.TakeEvents();
             foreach (var enemy in world.Enemies.Where(e => boss.Contains(e.Position, 3)).ToList()) enemy.Health = 0;
             Pass(0.4f);
             Assert.IsTrue(mine.Has(DungeonFlags.BossDown));
+            // The dungeon's own turns come from no one; they still reach whoever is in it (the screen's "주인을 쓰러뜨렸다").
+            var heard = alice.TakeEvents().Where(e => e.Type == SimEventType.Dungeon).Select(e => e.Amount).ToList();
+            CollectionAssert.Contains(heard, World.DungeonBossDown, "the master's fall is told to the client");
+            CollectionAssert.Contains(heard, World.DungeonDoorOpened, "and the end room's door opening");
             Assert.AreEqual(Hash(world.Map, dungeon.Slot), Hash(alice.Map, dungeon.Slot), "the same doors open");
             Assert.IsTrue(mine.RoomCleared(boss.Index));
 
