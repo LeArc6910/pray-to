@@ -349,7 +349,7 @@ namespace CoreSandbox
         {
             string folder = FindFolder(Path.Combine("Assets", "_Project", "Data", "World"));
             string Read(string file) => File.ReadAllText(Path.Combine(folder, file));
-            var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile), Read(TerrainSheet.File));
+            var data = TileSheet.Parse(Read(TileSheet.File), loot, Read(TileSheet.CropsFile), Read(TileSheet.MachinesFile), Read(TerrainSheet.File), Read(RoomSheet.File), Read(RoomSheet.RolesFile));
             if (data.Success) return data;
 
             foreach (string error in data.Errors) Console.Error.WriteLine(error);

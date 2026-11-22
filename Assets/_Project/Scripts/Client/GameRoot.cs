@@ -854,6 +854,8 @@ namespace Game.Client
         // For the play mode tests (Assets/Tests/PlayMode/FeatureTests.cs): the host's world in a solo or hosted game
         // and this player in it, the sheets, and the attack held down toward HeldAim as if the button were.
         internal World HostWorld => _host?.World;
+        // The world as the generator made it: its rooms and what each is for (Playtest "rooms", "goto room").
+        internal GeneratedWorld HostGenerated => _host?.Generated;
         internal WorldClient LocalClient => _client;
         internal Player HostPlayer => _client == null ? null : _host?.World.FindPlayer(_client.PlayerId);
         internal MonsterData MonsterSheet => _monsters;

@@ -168,6 +168,66 @@ namespace CoreSandbox
             return numbers;
         }
 
+        static bool Special(RoomNode room) => room.Kind != RoomKind.Room || room.Role != RoomRole.Plain && room.Role != RoomRole.Pack;
+
+        static IEnumerable<RoomNode> Beside(RoomGraph rooms, RoomNode room) =>
+            room.Edges.Select(e => rooms.Nodes[rooms.Edges[e].A == room.Index ? rooms.Edges[e].B : rooms.Edges[e].A]);
+
+        // Rooms with nothing but plain rooms and packs within WorldGenerator.SpecialWithin rooms of them.
+        static int Bare(RoomGraph rooms)
+        {
+            int bare = 0;
+            foreach (var room in rooms.Nodes)
+            {
+                if (room.Kind != RoomKind.Room || Special(room)) continue;
+                var seen = new HashSet<int> { room.Index };
+                var ring = new List<RoomNode> { room };
+                bool found = false;
+                for (int step = 0; step < WorldGenerator.SpecialWithin && !found; step++)
+                {
+                    ring = ring.SelectMany(r => Beside(rooms, r)).Where(r => seen.Add(r.Index)).ToList();
+                    found = ring.Any(Special);
+                }
+                if (!found) bare++;
+            }
+            return bare;
+        }
+
+        // Walking out from the spawn along the rooms (the shortest way by rooms), the seconds between one room worth
+        // stopping at and the next, at a walk of WalkSpeed tiles a second: the mean and the 95th of a hundred.
+        const double WalkSpeed = 5;
+
+        static string Gap(RoomGraph rooms, bool packs)
+        {
+            bool Notable(RoomNode room) => Special(room) || packs && room.Role == RoomRole.Pack;
+            var spawn = rooms.Nodes.First(r => r.Kind == RoomKind.Spawn);
+            var parent = new Dictionary<int, RoomNode> { [spawn.Index] = null };
+            var open = new Queue<RoomNode>();
+            open.Enqueue(spawn);
+            var gaps = new List<double>();
+            while (open.Count > 0)
+            {
+                var room = open.Dequeue();
+                foreach (var next in Beside(rooms, room))
+                {
+                    if (parent.ContainsKey(next.Index)) continue;
+                    parent[next.Index] = room;
+                    open.Enqueue(next);
+                }
+                if (room == spawn || !Notable(room)) continue;
+                double walked = 0;
+                for (var at = room; parent[at.Index] is RoomNode before; at = before)
+                {
+                    walked += Vec2.Distance(at.Center, before.Center);
+                    if (Notable(before)) break;
+                }
+                gaps.Add(walked / WalkSpeed);
+            }
+            if (gaps.Count == 0) return "-";
+            gaps.Sort();
+            return $"{gaps.Average():0}초 / {gaps[(int)(gaps.Count * 0.95)]:0}초";
+        }
+
         public static void Run(StoryData story, ArenaData arenas, TerrainData terrain, IEnumerable<ulong> seeds, IEnumerable<int> versions, int size)
         {
             var seedList = seeds.ToList();
@@ -206,6 +266,14 @@ namespace CoreSandbox
                     Row("통로", n => n.Rooms.Edges.Count.ToString());
                     Row("고리(되살린 통로)", n => n.Rooms.Loops.ToString());
                     Row("막다른 방", n => n.Rooms.DeadEnds.ToString());
+                    Row("금 간 벽으로 막힌 고리(지름길)", n => n.Rooms.Edges.Count(e => e.Kind == RoomEdgeKind.Cracked).ToString());
+                    Row("조각을 끼운 방", n => n.Rooms.Nodes.Count(r => r.Chunk != null).ToString());
+                    Row("길이 지나는 방", n => n.Rooms.Nodes.Count(r => r.Kind == RoomKind.Room && r.Roadside).ToString());
+                    foreach (RoomRole role in Enum.GetValues(typeof(RoomRole)))
+                        Row($"역할 {role.ToString().ToLowerInvariant()}", n => n.Rooms.Nodes.Count(r => r.Kind == RoomKind.Room && r.Role == role).ToString());
+                    Row($"{WorldGenerator.SpecialWithin}방 안에 새것이 없는 방", n => Bare(n.Rooms).ToString());
+                    Row("새것 사이 걷는 시간(평균 / 95%)", n => Gap(n.Rooms, false));
+                    Row("무리 방도 세면(평균 / 95%)", n => Gap(n.Rooms, true));
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();

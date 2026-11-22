@@ -302,6 +302,14 @@ namespace Game.Client
             if (_map[x, y] == TileType.VoidOre) return new Color32(180, 140, 255, 255);
             if (TileMap.IsPaving(_map[x, y])) return new Color32(150, 138, 120, 255);
             if (TileMap.IsDoor(_map[x, y])) return new Color32(170, 120, 70, 255);
+            // The rooms' own tiles (Docs/WorldRework.md 방의 역할): a cracked wall shows as a paler wall, so a short cut
+            // or a hidden room can be found on the map by one who looks.
+            if (_map[x, y] == TileType.CrackedWall) return new Color32(132, 112, 92, 255);
+            if (_map[x, y] == TileType.ObsidianWall) return new Color32(96, 60, 150, 255);
+            if (_map[x, y] == TileType.VoidWall) return new Color32(170, 130, 245, 255);
+            if (_map[x, y] == TileType.Grate) return new Color32(150, 160, 172, 255);
+            if (_map[x, y] == TileType.IceFloor) return new Color32(200, 232, 248, 255);
+            if (_map[x, y] == TileType.Quicksand) return new Color32(196, 160, 84, 255);
             if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);
             if (_map[x, y] == TileType.Dock) return new Color32(168, 116, 68, 255);
             if (_map[x, y] == TileType.Rail) return new Color32(120, 110, 100, 255);

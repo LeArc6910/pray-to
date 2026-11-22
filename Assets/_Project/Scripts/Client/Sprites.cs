@@ -30,7 +30,26 @@ namespace Game.Client
             TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow, TileType.Fence,
             TileType.LockedDoor, TileType.Road, TileType.Waypoint, TileType.Dock, TileType.Rail, TileType.Water, TileType.RoyalStall, TileType.DemonStall, TileType.OreStall,
             TileType.ArenaInlay, TileType.RuneFloor, TileType.Cobweb, TileType.Petals, TileType.Fissure, TileType.ArenaCarpet,
+            TileType.CrackedWall, TileType.Grate, TileType.ObsidianWall, TileType.VoidWall, TileType.IceFloor, TileType.Quicksand,
         };
+
+        // A patch of ice or quicksand whose edges follow its neighbours (RoomTileArt.Patch), made the first time each
+        // is seen: two floors, sixteen sets of sides, two layings.
+        static readonly Dictionary<int, Tile> PatchTiles = new Dictionary<int, Tile>();
+
+        public static TileBase Patch(TileType type, int mask, int laying)
+        {
+            int key = ((int)type << 5) | (laying & 1) << 4 | (mask & 15);
+            if (PatchTiles.TryGetValue(key, out var tile) && tile != null) return tile;
+            var texture = Texture(TileArt.Size, TileArt.Size);
+            texture.SetPixels32(Pixels(RoomTileArt.Patch(type, mask, laying)));
+            texture.Apply(false, true);
+            tile = ScriptableObject.CreateInstance<Tile>();
+            tile.sprite = Sprite.Create(texture, new Rect(0, 0, TileArt.Size, TileArt.Size), new Vector2(0.5f, 0.5f), PixelsPerUnit, 0, SpriteMeshType.FullRect);
+            tile.colliderType = Tile.ColliderType.None;
+            PatchTiles[key] = tile;
+            return tile;
+        }
 
         // A sprite made from the drawing the first time its key is asked for. The pivot is in the sprite's own
         // terms, (0.5, 0) for the middle of its bottom edge.

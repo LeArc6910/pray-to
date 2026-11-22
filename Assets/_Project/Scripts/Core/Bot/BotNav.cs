@@ -80,7 +80,7 @@ namespace Game.Core
             var map = _world.Map;
             if (PickaxeLevel < 0 || !map.InBounds(x, y) || map.IsEdge(x, y)) return false;
             var tile = Definition(map[x, y]);
-            return tile != null && (tile.Tile == TileType.Wall || tile.Tile == TileType.IronWall || tile.Drillable) && tile.Pickaxe <= PickaxeLevel;
+            return tile != null && (tile.Tile == TileType.Wall || tile.Tile == TileType.IronWall || tile.Drillable || TileMap.IsRoomWall(tile.Tile)) && tile.Pickaxe <= PickaxeLevel;
         }
 
         // The ticks it takes to stand on the tile from beside it: a step, and before that the swings that break it.

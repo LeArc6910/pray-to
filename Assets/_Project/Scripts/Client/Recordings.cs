@@ -126,6 +126,8 @@ namespace Game.Client
             if (type == TileType.Rail || World.IsBelt(type) || type == TileType.Splitter || type == TileType.Filter) return Ground.Metal;
             if (type == TileType.Road || type == TileType.Waypoint || TileMap.IsPaving(type)) return Ground.Stone;
             if (TileMap.IsSoil(type)) return Ground.Dirt;
+            if (type == TileType.IceFloor) return Ground.Ice;
+            if (type == TileType.Quicksand) return Ground.Sand;
             return biomes[x, y] switch
             {
                 Biome.Mushroom => Ground.Leaves,

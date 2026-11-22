@@ -194,6 +194,19 @@ namespace Game.Core
         CherryTree,
         Cocoon,
         ArmorStand,
+        // What the rooms of the generator's version 2 are made of beyond rock and floor (2026-11-21, Docs/WorldRework.md
+        // 방의 역할, Docs/Biomes.md 지형). A wall with a crack through it, dug by any pickaxe in a blow or two: behind it
+        // a hidden room or a short cut. A grate: nothing walks through it, but it is seen through and light passes. Walls
+        // of obsidian and of void stone, which only a pickaxe of their tier digs (tiles.csv pickaxe): the locks of the
+        // locked rooms.
+        CrackedWall,
+        Grate,
+        ObsidianWall,
+        VoidWall,
+        // Floors that change how a player walks (PlayerMotor): ice keeps them sliding, quicksand slows them. Walked on,
+        // never dug or built on.
+        IceFloor,
+        Quicksand,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -275,8 +288,12 @@ namespace Game.Core
         {
             var type = this[x, y];
             return type != TileType.Floor && !World.IsBelt(type) && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
-                && type != TileType.Door && !IsSoil(type) && !Structures.IsWay(type) && type != TileType.Waypoint;
+                && type != TileType.Door && !IsSoil(type) && !Structures.IsWay(type) && type != TileType.Waypoint
+                && type != TileType.IceFloor && type != TileType.Quicksand;
         }
+
+        // The walls only the generator lays (version 2's rooms): rock to the eye and to light, each dug by its own rule.
+        public static bool IsRoomWall(TileType type) => type == TileType.CrackedWall || type == TileType.ObsidianWall || type == TileType.VoidWall;
 
         public static bool IsSoil(TileType type) => type == TileType.Soil || type == TileType.FertileSoil || SoilBiome(type) != null;
 

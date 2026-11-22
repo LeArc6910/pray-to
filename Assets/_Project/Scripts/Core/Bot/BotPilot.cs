@@ -331,7 +331,19 @@ namespace Game.Core
                     var path = Nav.Find(hx, hy, (x, y) => map[x, y] == target.Tile && In(x, y) && !Memory.IsBlocked(x, y), enter: false);
                     // Further than the search round (the merchant's stall from the far caves of a 512-tile world): the
                     // nearest such tile as the crow flies, by A* toward it.
-                    if (path == null && NearestTile(target.Tile, In) is (int fx, int fy)) path = Nav.To(hx, hy, fx, fy, enter: false);
+                    // A far search that found no way is not made again at once (2026-11-21: on a map of rooms one such
+                    // A* looks at a quarter of a million tiles, and the bot asked for it every tick for eight minutes).
+                    if (path == null && !(_noFarWay.TryGetValue(target.Tile, out long until) && until > _world.Tick)
+                        && NearestTile(target.Tile, In) is (int fx, int fy))
+                    {
+                        path = Nav.To(hx, hy, fx, fy, enter: false);
+                        if (path == null)
+                        {
+                            // Not that one for a while: the next nearest is tried when the wait is over.
+                            Memory.Block((fx, fy), 120 * World.TicksPerSecond);
+                            _noFarWay[target.Tile] = _world.Tick + FarWayWait;
+                        }
+                    }
                     return (path, path == null ? target.Tile + "에 갈 길 없음" : "", null);
                 }
                 case BotAim.Monster:
@@ -411,6 +423,9 @@ namespace Game.Core
             var path = Nav.Find(hx, hy, (x, y) => (x != hx || y != hy) && Memory.IsFrontier(x, y) && !Memory.IsBlocked(x, y));
             return (path, path == null ? why + " (갈 곳 없음)" : why, null);
         }
+
+        readonly Dictionary<TileType, long> _noFarWay = new Dictionary<TileType, long>();
+        const int FarWayWait = 5 * World.TicksPerSecond;
 
         // The nearest tile of the type anywhere (not given up on), as the crow flies.
         (int X, int Y)? NearestTile(TileType type, Func<int, int, bool> also)

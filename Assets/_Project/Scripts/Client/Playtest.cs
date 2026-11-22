@@ -25,6 +25,7 @@ namespace Game.Client
     //   touch on|off              report (JSON: the player, the time, the monsters, the machines, the screen)
     // In a solo game:
     //   scene combo|machines|defense|rift|skylight|set|roll   (roll: a lane of floor east of the player, a wall 8 tiles on)
+    //   scene ice|quicksand       a lane of that floor east of the player, a wall 12 tiles on (PlayerMotor)
     //   clock <day> <hour>        weather clear|rain|storm|fog      speed <host ticks a step>
     //   give <material> <count>   potion <consumable> <count>   drink <consumable>   mana <amount>   heal   hurt <amount>
     //   equip <base> ...          clear (the monsters nearby fall)   xp <amount>   learn <skill> (a point, as the button would)
@@ -35,6 +36,9 @@ namespace Game.Client
     //   bosses hold|wake          (asleep whoever walks in)        boss <id> sleep | enter [again]   (its entrance, arenas.csv)
     //   drop item <base> [rarity] [sockets] | rune | potion <id> | material <id>   (at the player's feet)
     //   goto spawn | <dx> <dy> | boss <id> | arena <id> (its middle) | pool | biome <name> | tile <type> | near <type>
+    //   goto room <role> [biome|any] [n]   into the nth room of the role (the generator's version 2), nearest the spawn first
+    //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways
+    //   room <role> [biome|any] [n]   JSON: that room (where, its chunk, steps walked from the spawn; -1 for no way)
     //   build <type> <dx> <dy> [direction 0 east 1 north 2 west 3 south]   fill <dx> <dy> <material> <count>
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
@@ -288,6 +292,10 @@ namespace Game.Client
                     return null;
                 case "goto":
                     return Goto(root, words);
+                case "rooms":
+                    return "rooms " + Rooms(root);
+                case "room":
+                    return "room " + RoomJson(root, RoomOf(root, words, 1));
                 case "build":
                     var type = Tile(words[1]);
                     int bx = px + Int(words[2]), by = py + Int(words[3]);
@@ -396,6 +404,12 @@ namespace Game.Client
                 case "spawn":
                     to = world.Spawn;
                     break;
+                // A room of a role (2026-11-21, Docs/WorldRework.md 방의 역할): the tile the generator keeps walked to
+                // (its middle, or outside the door of the chunk on its middle).
+                case "room":
+                    var room = RoomOf(root, words, 2);
+                    to = TileMap.Center(room.AnchorX, room.AnchorY);
+                    break;
                 // A place of the story (Docs/Story.md), just below its waypoint; or beside one of its people.
                 case "place":
                     var site = world.Places.FirstOrDefault(p => p.Definition.Id == words[2]) ?? throw new ArgumentException($"no place '{words[2]}'");
@@ -476,6 +490,69 @@ namespace Game.Client
             player.Position = to;
             player.Corrections++;
             return $"ok goto {words[1]} at {TileMap.Cell(to.X)},{TileMap.Cell(to.Y)}";
+        }
+
+        // The nth room of a role, in a biome or any, the rooms nearest the spawn (by rooms) first: "<role> [biome|any] [n]".
+        static RoomNode RoomOf(GameRoot root, string[] words, int at)
+        {
+            var rooms = root.HostGenerated?.Rooms ?? throw new InvalidOperationException("this world has no rooms (the generator's version 1)");
+            var role = (RoomRole)Enum.Parse(typeof(RoomRole), words[at], ignoreCase: true);
+            Biome? biome = words.Length > at + 1 && words[at + 1] != "any" ? (Biome)Enum.Parse(typeof(Biome), words[at + 1], ignoreCase: true) : (Biome?)null;
+            int nth = words.Length > at + 2 ? Int(words[at + 2]) : 0;
+            var found = rooms.Nodes.Where(n => n.Kind == RoomKind.Room && n.Role == role && (biome == null || n.Biome == biome)).OrderBy(n => n.Depth).ThenBy(n => n.Index).ToList();
+            if (found.Count == 0) throw new InvalidOperationException($"no {role} room{(biome == null ? "" : " in " + biome)}");
+            return found[Math.Min(nth, found.Count - 1)];
+        }
+
+        // Steps walked from the spawn to a tile, not through anything solid, water or lava; -1 for no way.
+        static int StepsFromSpawn(World world, int tx, int ty)
+        {
+            var map = world.Map;
+            int start = TileMap.Cell(world.Spawn.Y) * map.Width + TileMap.Cell(world.Spawn.X), goal = ty * map.Width + tx;
+            var steps = new Dictionary<int, int> { [start] = 0 };
+            var open = new Queue<int>();
+            open.Enqueue(start);
+            while (open.Count > 0)
+            {
+                int tile = open.Dequeue();
+                if (tile == goal) return steps[tile];
+                int x = tile % map.Width, y = tile / map.Width;
+                foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                {
+                    if (!Walkable(map, nx, ny) || steps.ContainsKey(ny * map.Width + nx)) continue;
+                    steps[ny * map.Width + nx] = steps[tile] + 1;
+                    open.Enqueue(ny * map.Width + nx);
+                }
+            }
+            return -1;
+        }
+
+        static string RoomJson(GameRoot root, RoomNode room) => new Json('{')
+            .Field("index", room.Index).Field("role", room.Role.ToString()).Field("biome", room.Biome.ToString())
+            .Field("x", room.AnchorX).Field("y", room.AnchorY).Field("middleX", room.X).Field("middleY", room.Y).Field("radius", room.Radius)
+            .Field("chunk", room.Chunk?.Id ?? "").Field("depth", room.Depth).Field("ways", room.Edges.Count).Field("roadside", room.Roadside)
+            .Field("steps", StepsFromSpawn(root.HostWorld, room.AnchorX, room.AnchorY))
+            // A room behind a wall that is dug: whether its inside is shut (as it should be until the wall is dug).
+            .Field("shut", room.Inside is (int ix, int iy) && StepsFromSpawn(root.HostWorld, ix, iy) < 0)
+            .Close('}');
+
+        // The rooms of the world: which generator, how many of each role, how many have a chunk, the ways shut by a
+        // cracked wall, and the tiles the rooms brought.
+        static string Rooms(GameRoot root)
+        {
+            var generated = root.HostGenerated;
+            var json = new Json('{').Field("generator", generated?.Version ?? 0);
+            var rooms = generated?.Rooms;
+            if (rooms == null) return json.Field("rooms", 0).Close('}');
+            json.Field("rooms", rooms.Nodes.Count(n => n.Kind == RoomKind.Room));
+            json.Field("chunks", rooms.Nodes.Count(n => n.Chunk != null));
+            json.Field("cracked", rooms.Edges.Count(e => e.Kind == RoomEdgeKind.Cracked));
+            json.Field("marks", rooms.Marks.Count);
+            var roles = new Json('{');
+            foreach (RoomRole role in Enum.GetValues(typeof(RoomRole)))
+                roles.Field(role.ToString().ToLowerInvariant(), rooms.Nodes.Count(n => n.Kind == RoomKind.Room && n.Role == role));
+            json.Field("roles", new RawJson(roles.Close('}')));
+            return json.Close('}');
         }
 
         // The tile nearest (x, y), by rings outward, that passes the test.
@@ -564,6 +641,17 @@ namespace Game.Client
                     {
                         for (int dx = -2; dx <= 7; dx++) world.Build(px + dx, py + dy, TileType.Floor);
                         world.Build(px + 8, py + dy, TileType.Wall);
+                    }
+                    break;
+                case "ice":
+                case "quicksand":
+                    // A lane of the floor east of the player with a wall at its end, to slide along or wade through
+                    // (PlayerMotor, Docs/Combat.md 바닥).
+                    foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
+                    for (int dy = -2; dy <= 2; dy++)
+                    {
+                        for (int dx = -2; dx <= 11; dx++) world.Build(px + dx, py + dy, dx < 0 ? TileType.Floor : scene == "ice" ? TileType.IceFloor : TileType.Quicksand);
+                        world.Build(px + 12, py + dy, TileType.Wall);
                     }
                     break;
                 case "skylight":
@@ -800,6 +888,14 @@ namespace Game.Client
                 var (ax, ay) = World.TileAhead(player.Position, player.Facing);
                 json.Field("ahead", world.Map[ax, ay].ToString());
                 json.Field("biome", world.Biomes.At(player.Position).ToString());
+                // The floor underfoot (ice slides, quicksand slows: PlayerMotor), the speed the client carries, and the
+                // room the player is nearest the middle of with what it is for (the generator's version 2).
+                json.Field("ground", world.Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y)].ToString());
+                json.Field("slide", root.LocalClient?.Velocity.Length ?? 0f);
+                json.Field("generator", root.HostGenerated?.Version ?? 0);
+                var roomHere = root.HostGenerated?.Rooms?.Nearest(TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y));
+                json.Field("room", roomHere?.Role.ToString() ?? "");
+                json.Field("roomChunk", roomHere?.Chunk?.Id ?? "");
                 json.Field("health", player.Health);
                 json.Field("maxHealth", player.Stats.MaxHealth);
                 json.Field("dead", player.IsDead);

@@ -22,6 +22,9 @@ namespace Game.Client
         public TextAsset machines;
         // How each biome's rooms are carved (terrain.csv, 2026-11-21, Docs/Biomes.md 지형).
         public TextAsset terrain;
+        // The room chunks drawn in letters and the roles' numbers (rooms.csv, room_roles.csv, 2026-11-21, Docs/Biomes.md 방 조각).
+        public TextAsset rooms;
+        public TextAsset roomRoles;
         public TextAsset monsters;
         // What the ordinary monsters do (monster_attacks.csv, 2026-11-21, Docs/Combat.md 몬스터의 공격 시트).
         public TextAsset monsterAttacks;
@@ -51,7 +54,7 @@ namespace Game.Client
             LootSheets.Parse(Text(itemBases), Text(affixes), Text(runes), Text(runewords), Text(consumables), Text(materials), Text(recipes), Text(sets));
 
         // Without the terrain sheet (an asset made before it existed) the rooms are carved by the copy in code.
-        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain));
+        public TileData LoadTiles(LootData loot) => TileSheet.Parse(Text(tiles), loot, Text(crops), Text(machines), Text(terrain), Text(rooms), Text(roomRoles));
 
         // Without the attacks' sheet (an asset made before it existed) every monster fights the old way.
         public MonsterData LoadMonsters() => MonsterSheet.Parse(Text(monsters), Text(monsterAttacks));

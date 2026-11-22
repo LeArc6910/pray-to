@@ -978,6 +978,9 @@ namespace Game.Core
         public Vec2 RollDirection { get; private set; }
         public int Rolls { get; private set; }
         public bool Rolling => RollTicks > 0;
+        // The speed the local player carries from tick to tick, tiles a second: what keeps them sliding on ice
+        // (PlayerMotor.Step).
+        public Vec2 Velocity { get; private set; }
         public bool CanRoll => Status == ClientStatus.Playing && !IsDead && RollCooldown == 0;
         // How much of the cooldown is left, 1 to 0, for the button.
         public float RollCooldownShare => RollCooldown / (float)World.RollCooldownTicks;
@@ -989,7 +992,11 @@ namespace Game.Core
             if (Status != ClientStatus.Playing) return null;
             PreviousPosition = Position;
             if (RollCooldown > 0) RollCooldown--;
-            if (IsDead) RollTicks = 0;
+            if (IsDead)
+            {
+                RollTicks = 0;
+                Velocity = Vec2.Zero;
+            }
             else
             {
                 if (aim.LengthSquared > 1e-6f) Facing = aim.Normalized;
@@ -1004,8 +1011,15 @@ namespace Game.Core
                 {
                     Position = PlayerMotor.Roll(Map, Position, RollDirection,
                         World.RollSlow((SelfStatus & StatusBits.Chilled) != 0, (SelfStatus & StatusBits.Snared) != 0), _myDoors);
+                    // A roll that ends on ice slides on at a walk.
+                    Velocity = RollDirection * MoveSpeed;
                 }
-                else Position = PlayerMotor.Step(Map, Position, move, MoveSpeed, _myDoors);
+                else
+                {
+                    var velocity = Velocity;
+                    Position = PlayerMotor.Step(Map, Position, ref velocity, move, MoveSpeed, _myDoors);
+                    Velocity = velocity;
+                }
                 // A circle that drags (HazardShape.Pull) moves this player here as it does on the host.
                 if (_snapshots.Count > 0)
                 {
@@ -1668,6 +1682,7 @@ namespace Game.Core
                 _seenCorrections = self.Corrections;
                 Position = self.Position;
                 PreviousPosition = self.Position;
+                Velocity = Vec2.Zero;
             }
         }
     }

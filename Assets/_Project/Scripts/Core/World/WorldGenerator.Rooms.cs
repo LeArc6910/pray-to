@@ -28,6 +28,8 @@ namespace Game.Core
             Biome = biome;
             Style = style;
             Kind = kind;
+            AnchorX = x;
+            AnchorY = y;
         }
 
         public int Index { get; }
@@ -41,6 +43,30 @@ namespace Game.Core
         public Vec2 Center => TileMap.Center(X, Y);
         public IReadOnlyList<int> Edges => Ways;
         public bool DeadEnd => Ways.Count == 1;
+        // What the room is for (WorldGenerator.Roles.cs); Plain for the spawn's room and the arenas.
+        public RoomRole Role { get; internal set; }
+        // The chunk of rooms.csv set into it and which of the eight ways round, or null for a room left as carved.
+        public RoomChunk Chunk { get; internal set; }
+        public int ChunkWay { get; internal set; }
+        // A road of the story runs through it: no monsters come into being there (Docs/Design.md).
+        public bool Roadside { get; internal set; }
+        // Rooms from the spawn's room, along the ways.
+        public int Depth { get; internal set; }
+        // A tile of its open floor that is walked to from the spawn: its middle, or with a walled chunk on its middle,
+        // the tile outside the chunk's door.
+        public int AnchorX { get; internal set; }
+        public int AnchorY { get; internal set; }
+        // For a room shut behind a wall that must be dug (Hidden, Locked): a tile inside, come to only through that wall.
+        public (int X, int Y)? Inside { get; internal set; }
+    }
+
+    // What a way is, beyond a corridor (Docs/WorldRework.md 뼈대, 간선).
+    public enum RoomEdgeKind : byte
+    {
+        Way,
+        // A wall with a crack across it, a tile or two thick: dug through, the way is a short cut. Only ever a loop,
+        // so nothing lies behind it that is not reached another way.
+        Cracked,
     }
 
     // A way between two rooms. Loop: opened again after the spanning tree was made, so it closes a ring.
@@ -58,6 +84,9 @@ namespace Game.Core
         public int B { get; }
         public int Width { get; }
         public bool Loop { get; }
+        public RoomEdgeKind Kind { get; internal set; }
+        // The tiles of the way as it was carved, from A to B, for what is set across it later.
+        internal List<(int X, int Y)> Path;
     }
 
     // The rooms of a version 2 world and the ways between them (Docs/WorldRework.md 뼈대). Kept on GeneratedWorld for
@@ -77,6 +106,24 @@ namespace Game.Core
         public IReadOnlyList<RoomEdge> Edges { get; }
         public int Loops => Edges.Count(e => e.Loop);
         public int DeadEnds => Nodes.Count(n => n.Kind == RoomKind.Room && n.DeadEnd);
+        // What the chunks marked for later (where a pack stands, where the chest is), in room order.
+        public IReadOnlyList<RoomMark> Marks => MarkList;
+        internal readonly List<RoomMark> MarkList = new List<RoomMark>();
+        // The rock of the chunks' walls (y * width + x): nothing that joins rooms digs through it.
+        internal HashSet<int> Kept = new HashSet<int>();
+
+        // The room whose middle is nearest a tile, or null with no rooms.
+        public RoomNode Nearest(int x, int y)
+        {
+            RoomNode best = null;
+            long bestDistance = long.MaxValue;
+            foreach (var node in Nodes)
+            {
+                long distance = (long)(node.X - x) * (node.X - x) + (long)(node.Y - y) * (node.Y - y);
+                if (distance < bestDistance) (best, bestDistance) = (node, distance);
+            }
+            return best;
+        }
     }
 
     // ---- Version 2 of the generator (2026-11-21, the person: "the map only got bigger; I never feel I am exploring,
@@ -286,7 +333,8 @@ namespace Game.Core
         // nearest ground that is, through rock, ore, lava and water only: never through another arena's ring of rock,
         // nor through anything built. Run when the rooms are carved, and again after the places and the arenas'
         // dressing are laid over them, when pockets of open ground those left shut in the rock are opened too.
-        static void JoinRooms(TileMap map, IReadOnlyList<RoomNode> rooms, IReadOnlyList<(int X, int Y)> arenas, int spawnX, int spawnY, bool pockets)
+        static void JoinRooms(TileMap map, IReadOnlyList<RoomNode> rooms, IReadOnlyList<(int X, int Y)> arenas, int spawnX, int spawnY, bool pockets,
+            HashSet<int> kept = null)
         {
             int width = map.Width, height = map.Height;
             int keep = ArenaRadius + ArenaWall;
@@ -319,7 +367,7 @@ namespace Game.Core
                     {
                         int next = ny * width + nx;
                         if (nx < Border || ny < Border || nx >= width - Border || ny >= height - Border || from.ContainsKey(next)) continue;
-                        if (map.IsSolid(nx, ny) && !Dug(map[nx, ny]) || Held(nx, ny, exempt)) continue;
+                        if (map.IsSolid(nx, ny) && !Dug(map[nx, ny]) || Held(nx, ny, exempt) || kept != null && kept.Contains(next)) continue;
                         from[next] = at;
                         if (cameTo[next])
                         {
@@ -337,6 +385,7 @@ namespace Game.Core
                         {
                             int tx = at % width + ox, ty = at / width + oy;
                             if (tx < Border || ty < Border || tx >= width - Border || ty >= height - Border || Held(tx, ty, exempt)) continue;
+                            if (kept != null && kept.Contains(ty * width + tx)) continue;
                             if (Dug(map[tx, ty])) map[tx, ty] = TileType.Floor;
                         }
                     }
@@ -346,10 +395,12 @@ namespace Game.Core
             Walk(spawnY * width + spawnX);
             foreach (var room in rooms)
             {
-                int start = room.Y * width + room.X;
+                // Its middle, or with a walled chunk there, the tile outside the chunk's door.
+                int rx = room.Chunk != null ? room.AnchorX : room.X, ry = room.Chunk != null ? room.AnchorY : room.Y;
+                int start = ry * width + rx;
                 if (walked[start]) continue;
                 // A room whose middle something was built on is that thing's now.
-                if (map.IsSolid(room.X, room.Y) && !Dug(map[room.X, room.Y])) continue;
+                if (map.IsSolid(rx, ry) && !Dug(map[rx, ry])) continue;
                 int exempt = room.Kind == RoomKind.Arena ? arenas.ToList().IndexOf((room.X, room.Y)) : -1;
                 if (Dig(start, exempt, walked)) Walk(start);
             }
@@ -357,19 +408,21 @@ namespace Game.Core
 
             // Then any open ground come to by no way at all, even through lava: a small place by a road whose path
             // ran corner to corner through the rock, a stall behind a town.
+            // What lies behind a wall that is dug (a hidden room, a locked one) is come to in its own time.
             var reached = new bool[width * height];
-            Flood(map, spawnY * width + spawnX, reached, stack, overLava: true);
+            Flood(map, spawnY * width + spawnX, reached, stack, overLava: true, through: true);
             for (int at = 0; at < reached.Length; at++)
             {
                 if (reached[at] || map.IsSolid(at % width, at / width)) continue;
                 Dig(at, -1, reached);
-                Flood(map, at, reached, stack, overLava: true);
+                Flood(map, at, reached, stack, overLava: true, through: true);
             }
         }
 
         // Marks every open tile come to from the start by its sides (the start too), over lava or not. The map's
         // border is rock, so no step leaves it. stack: room for every tile.
-        static void Flood(TileMap map, int start, bool[] seen, int[] stack, bool overLava)
+        // through: the walls a pickaxe opens (cracked, obsidian, void stone) are walked through too.
+        static void Flood(TileMap map, int start, bool[] seen, int[] stack, bool overLava, bool through = false)
         {
             int width = map.Width, count = 0;
             seen[start] = true;
@@ -382,7 +435,7 @@ namespace Game.Core
                     int next = way == 0 ? at + 1 : way == 1 ? at - 1 : way == 2 ? at + width : at - width;
                     if (seen[next]) continue;
                     int x = next % width, y = next / width;
-                    if (map.IsSolid(x, y) || !overLava && map[x, y] == TileType.Lava) continue;
+                    if (map.IsSolid(x, y) && !(through && TileMap.IsRoomWall(map[x, y])) || !overLava && map[x, y] == TileType.Lava) continue;
                     seen[next] = true;
                     stack[count++] = next;
                 }
@@ -705,9 +758,26 @@ namespace Game.Core
                     }
                     case TerrainStyle.Hall:
                     {
-                        bool wide = random.Next(2) == 0;
-                        int a = wide ? r * 5 / 4 : r * 3 / 4, b = wide ? r * 3 / 4 : r * 5 / 4;
-                        return () => Box(x, y, a, b, Math.Max(2, r / 3));
+                        // A long hall lying any way: a row of round hollows run together, each its own size, the row bent
+                        // a little, so no two halls have the same outline (2026-11-21: boxes read as a grid of rectangles).
+                        int way = random.Next(Ways.Length);
+                        int bend = (way + random.Next(5) - 2 + Ways.Length) % Ways.Length;
+                        int reach = r * random.Next(60, 101) / 100;
+                        var patches = new List<(int X, int Y, int R)>
+                        {
+                            (x, y, r * random.Next(85, 106) / 100),
+                            (x + Ways[way].X * reach / 1000, y + Ways[way].Y * reach / 1000, Math.Max(3, r * random.Next(60, 91) / 100)),
+                            (x - Ways[bend].X * reach / 1000, y - Ways[bend].Y * reach / 1000, Math.Max(3, r * random.Next(60, 91) / 100)),
+                        };
+                        if (random.Next(2) == 0)
+                        {
+                            var (sx, sy) = Ways[random.Next(Ways.Length)];
+                            patches.Add((x + sx * r * 6 / 10000, y + sy * r * 6 / 10000, Math.Max(3, r * random.Next(30, 51) / 100)));
+                        }
+                        return () =>
+                        {
+                            foreach (var (px, py, pr) in patches) Blob(px, py, pr, Math.Max(1, pr / 4), noise, TileType.Floor);
+                        };
                     }
                     case TerrainStyle.Fissure:
                     {
@@ -736,15 +806,46 @@ namespace Game.Core
                     }
                     case TerrainStyle.Shards:
                     {
-                        // A slab with four straight sides, leaning any way.
-                        int first = random.Next(Ways.Length);
-                        var u = Ways[first];
-                        var v = Ways[(first + 4 + random.Next(5)) % Ways.Length];
+                        // A broken slab: five to seven straight sides at uneven angles, each its own distance from the
+                        // middle and chipped along its length, with a splinter or two lying off it (2026-11-21: slabs of
+                        // four even sides read as a grid of diamonds).
+                        var sides = new List<(int X, int Y, int D)>();
+                        int count = 5 + random.Next(3), turn = random.Next(Ways.Length);
+                        for (int i = 0; i < count; i++)
+                        {
+                            var (nx, ny) = Ways[(turn + i * Ways.Length / count + random.Next(3) - 1 + Ways.Length) % Ways.Length];
+                            sides.Add((nx, ny, r * random.Next(60, 111) / 100));
+                        }
+                        var splinters = new List<(int X, int Y, int R)>();
+                        for (int i = random.Next(3); i > 0; i--)
+                        {
+                            var (sx, sy) = Ways[random.Next(Ways.Length)];
+                            splinters.Add((x + sx * r * random.Next(70, 111) / 100000, y + sy * r * random.Next(70, 111) / 100000, Math.Max(2, r * random.Next(20, 41) / 100)));
+                        }
+                        void Slab(int cx, int cy, int scale, int lean)
+                        {
+                            int reach = r * scale / 100 + 2;
+                            for (int dy = -reach; dy <= reach; dy++)
+                            {
+                                for (int dx = -reach; dx <= reach; dx++)
+                                {
+                                    int px = cx + dx, py = cy + dy;
+                                    if (px < 0 || py < 0) continue;
+                                    int chip = Rough(noise, px, py, 4, 1);
+                                    bool inside = true;
+                                    for (int i = 0; i < sides.Count && inside; i++)
+                                    {
+                                        var side = sides[(i + lean) % sides.Count];
+                                        inside = dx * side.X + dy * side.Y <= (side.D * scale / 100 + chip) * 1000;
+                                    }
+                                    if (inside) Floor(px, py);
+                                }
+                            }
+                        }
                         return () =>
                         {
-                            for (int dy = -2 * r; dy <= 2 * r; dy++)
-                                for (int dx = -2 * r; dx <= 2 * r; dx++)
-                                    if (Math.Abs(dx * u.X + dy * u.Y) + Math.Abs(dx * v.X + dy * v.Y) <= r * 1000) Floor(x + dx, y + dy);
+                            Slab(x, y, 100, 0);
+                            for (int i = 0; i < splinters.Count; i++) Slab(splinters[i].X, splinters[i].Y, 100 * splinters[i].R / r, i + 1);
                         };
                     }
                     case TerrainStyle.Dunes:
@@ -852,7 +953,8 @@ namespace Game.Core
                 var a = _nodes[edge.A];
                 var b = _nodes[edge.B];
                 int exempt = b.Kind == RoomKind.Arena ? Array.IndexOf(_arenas, (b.X, b.Y)) : -1;
-                var style = b.Kind == RoomKind.Arena ? TerrainStyle.Hall : a.Style;
+                // The way into an arena runs straight.
+                var style = b.Kind == RoomKind.Arena ? TerrainStyle.Fissure : a.Style;
                 List<(int X, int Y)> path;
                 switch (style)
                 {
@@ -868,6 +970,7 @@ namespace Game.Core
                     case TerrainStyle.Cave:
                     case TerrainStyle.Dunes:
                     case TerrainStyle.Rivers:
+                    case TerrainStyle.Hall:
                     {
                         // Bent once, the bend pushed off the straight line by up to a quarter of its length.
                         int dx = b.X - a.X, dy = b.Y - a.Y;
@@ -886,13 +989,16 @@ namespace Game.Core
                 if (path.Any(p => Held(p.X, p.Y, edge.Width, exempt))) path = Steps(a.X, a.Y, b.X, b.Y);
                 // The ways of the round caves wander a little as they go; a narrow one stays where it is, to stay whole.
                 bool wanders = edge.Width >= 3 && b.Kind != RoomKind.Arena
-                    && (style == TerrainStyle.Cave || style == TerrainStyle.Dunes || style == TerrainStyle.Rivers);
+                    && (style == TerrainStyle.Cave || style == TerrainStyle.Dunes || style == TerrainStyle.Rivers || style == TerrainStyle.Hall);
                 ulong noise = _seed + 104729UL * (ulong)(edge.A + 1);
+                var carved = new List<(int X, int Y)>(path.Count);
                 foreach (var (x, y) in path)
                 {
-                    if (!wanders || Held(x, y, edge.Width + 4, exempt)) Brush(x, y, edge.Width, exempt);
-                    else Brush(x + Rough(noise, x, y, 6, 2), y + Rough(noise + 1, x, y, 6, 2), edge.Width, exempt);
+                    var at = !wanders || Held(x, y, edge.Width + 4, exempt) ? (x, y) : (x + Rough(noise, x, y, 6, 2), y + Rough(noise + 1, x, y, 6, 2));
+                    Brush(at.Item1, at.Item2, edge.Width, exempt);
+                    carved.Add(at);
                 }
+                edge.Path = carved;
             }
 
             bool Held(int x, int y, int width, int exempt)

@@ -92,8 +92,13 @@ namespace Game.Core.Tests
                 int At(int x, int y) => steps[y * Size + x];
                 Assert.AreEqual(WorldGenerator.RoomVersion, world.Version);
                 // A place of the story may stand on a room's middle; without the story every room's middle is floor.
-                var bare = Walk(Bare(seed));
-                foreach (var room in world.Rooms.Nodes) Assert.GreaterOrEqual(bare[room.Y * Size + room.X], 0, $"seed {seed}: the {room.Biome} room at ({room.X}, {room.Y})");
+                // A room with a chunk on its middle is walked to at the tile the generator keeps for it (RoomNode.AnchorX).
+                var rooms = Bare(seed);
+                var bare = Walk(rooms);
+                foreach (var room in rooms.Rooms.Nodes)
+                    Assert.GreaterOrEqual(bare[room.AnchorY * Size + room.AnchorX], 0, $"seed {seed}: the {room.Biome} {room.Role} room at ({room.X}, {room.Y})");
+                foreach (var room in world.Rooms.Nodes.Where(r => r.Chunk != null))
+                    Assert.GreaterOrEqual(At(room.AnchorX, room.AnchorY), 0, $"seed {seed}, with the story: the {room.Biome} {room.Role} room at ({room.X}, {room.Y})");
                 foreach (var arena in world.Arenas)
                     Assert.GreaterOrEqual(At(TileMap.Cell(arena.X), TileMap.Cell(arena.Y)), 0, $"seed {seed}: the arena at {arena.X}, {arena.Y}");
                 Assert.AreEqual(Tales.Shipped.Places.Count, world.Places.Count);
@@ -115,7 +120,8 @@ namespace Game.Core.Tests
                     int x = at % Size, y = at / Size;
                     foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
                     {
-                        if (!map.InBounds(nx, ny) || open[ny * Size + nx] || map.IsSolid(nx, ny)) continue;
+                        // What lies behind a wall that is dug (a hidden room, a locked one) is come to in its time.
+                        if (!map.InBounds(nx, ny) || open[ny * Size + nx] || map.IsSolid(nx, ny) && !TileMap.IsRoomWall(map[nx, ny])) continue;
                         open[ny * Size + nx] = true;
                         stack.Push(ny * Size + nx);
                     }
@@ -313,7 +319,8 @@ namespace Game.Core.Tests
                     }
                     foreach (var arena in world.Arenas)
                         Assert.IsTrue(seen.Contains(TileMap.Cell(arena.Y) * size + TileMap.Cell(arena.X)), $"{size}, seed {seed}: the arena at {arena.X}, {arena.Y}");
-                    foreach (var room in world.Rooms.Nodes) Assert.IsTrue(seen.Contains(room.Y * size + room.X), $"{size}, seed {seed}: the room at ({room.X}, {room.Y})");
+                    foreach (var room in world.Rooms.Nodes)
+                        Assert.IsTrue(seen.Contains(room.AnchorY * size + room.AnchorX), $"{size}, seed {seed}: the {room.Role} room at ({room.X}, {room.Y})");
                     for (int i = 0; i < size; i++)
                         Assert.IsTrue(map.IsSolid(i, 0) && map.IsSolid(i, size - 1) && map.IsSolid(0, i) && map.IsSolid(size - 1, i), "the border is rock");
 
@@ -379,8 +386,10 @@ namespace Game.Core.Tests
                 var b = TerrainSheet.Default.Of(biome);
                 Assert.IsTrue(shipped.Rules.Contains(a), $"{biome} has a row");
                 Assert.AreEqual(
-                    (b.Style, b.RoomFill, b.Rooms, b.RoomMin, b.RoomMax, b.CorridorMin, b.CorridorMax, b.LoopPercent, b.DeadEndPercent, b.WallTarget, b.LiquidTarget, b.Feature, b.FeaturePercent),
-                    (a.Style, a.RoomFill, a.Rooms, a.RoomMin, a.RoomMax, a.CorridorMin, a.CorridorMax, a.LoopPercent, a.DeadEndPercent, a.WallTarget, a.LiquidTarget, a.Feature, a.FeaturePercent),
+                    (b.Style, b.RoomFill, b.Rooms, b.RoomMin, b.RoomMax, b.CorridorMin, b.CorridorMax, b.LoopPercent, b.DeadEndPercent, b.WallTarget, b.LiquidTarget, b.Feature, b.FeaturePercent,
+                        b.Ground, b.GroundPercent, b.ChunkPercent),
+                    (a.Style, a.RoomFill, a.Rooms, a.RoomMin, a.RoomMax, a.CorridorMin, a.CorridorMax, a.LoopPercent, a.DeadEndPercent, a.WallTarget, a.LiquidTarget, a.Feature, a.FeaturePercent,
+                        a.Ground, a.GroundPercent, a.ChunkPercent),
                     $"{biome}: terrain.csv and TerrainSheet.Default");
             }
             Assert.AreSame(TerrainSheet.Default, TerrainSheet.Parse(""), "no sheet: the one in code");

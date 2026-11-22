@@ -338,8 +338,55 @@ namespace Game.Core
             Doing = material.Name + " 놓기";
             _world.SetAttacking(_player.Id, false);
             bool paving = material.Places is TileType laid && TileMap.IsPaving(laid);
-            if (FaceEach(() => (paving || Roomy(World.PlaceAhead(_player.Position, _player.Facing))) && _world.PlaceTile(_player.Id, material))) return;
+            if (FaceEach(() => (paving || Roomy(World.PlaceAhead(_player.Position, _player.Facing))) && _world.PlaceTile(_player.Id, material)))
+            {
+                _placeFrom = null;
+                return;
+            }
+            // Not here (2026-11-21: in a world of rooms the bot came to this in the boss's arena it had just won, whose
+            // floor nothing is built on and whose one door a wander never found): to the nearest tile with bare
+            // ground beside it that takes something, out of the arenas and off the roads.
+            int hx = TileMap.Cell(_player.Position.X), hy = TileMap.Cell(_player.Position.Y);
+            if (_placeFrom is (int fx, int fy) && (fx == hx && fy == hy || !Buildable(fx, fy) || Memory.IsBlocked(fx, fy)))
+            {
+                // Stood there and it did not take: not that tile again for a while.
+                if (fx == hx && fy == hy) Memory.Block((fx, fy), 120 * World.TicksPerSecond);
+                _placeFrom = null;
+            }
+            if (_placeFrom == null)
+            {
+                var path = Pilot.Nav.Find(hx, hy, (x, y) => (x != hx || y != hy) && Buildable(x, y) && !Memory.IsBlocked(x, y));
+                if (path != null && path.Count > 0) _placeFrom = path[path.Count - 1];
+            }
+            if (_placeFrom is (int tx, int ty))
+            {
+                if (++_tries > 900)
+                {
+                    Skip(Current, "놓을 자리를 못 찾음");
+                    return;
+                }
+                Go(BotTarget.At(tx, ty));
+                return;
+            }
             Wander();
+        }
+
+        (int X, int Y)? _placeFrom;
+
+        // A tile to stand on with bare ground beside it where something solid can go: not in a boss's arena, and with
+        // room round it.
+        bool Buildable(int x, int y)
+        {
+            var nav = Pilot.Nav;
+            if (!nav.Walkable(x, y)) return false;
+            foreach (var (dx, dy) in BotNav.Ways)
+            {
+                int nx = x + dx, ny = y + dy;
+                if (!TileMap.IsGround(_world.Map[nx, ny]) || _world.Map.IsEdge(nx, ny)) continue;
+                if (_world.Bosses.Any(b => Vec2.Distance(TileMap.Center(nx, ny), b.Home) <= b.ArenaRadius + 1)) continue;
+                if (BotNav.Ways.Count(w => nav.Walkable(nx + w.X, ny + w.Y)) >= 3) return true;
+            }
+            return false;
         }
 
         // Whether something solid can go on the tile and leave room round it (2026-11-11: the bot set its workbench and

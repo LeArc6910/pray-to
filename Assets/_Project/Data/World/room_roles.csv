@@ -1,0 +1,8 @@
+biome,role,per_100,min_gap,where
+mushroom,hidden,7,3,any
+mushroom,pond,2,3,any
+sand,pack,50,0,any
+sand,pond,0,0,any
+lava,pond,0,0,any
+crystal,ore,14,2,deadend
+lake,pond,8,2,any

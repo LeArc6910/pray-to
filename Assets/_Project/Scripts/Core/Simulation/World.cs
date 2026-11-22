@@ -717,10 +717,49 @@ namespace Game.Core
 
     public static class PlayerMotor
     {
+        // Floors that change the walk (2026-11-21, the person: ice slides, quicksand slows; Docs/Combat.md 바닥). On ice
+        // the player keeps the speed they had and it turns toward the stick only so fast: with the stick held, IceGrip
+        // move speeds a second (a quarter of a second from rest to full speed, half a second to turn right round, and
+        // a quarter turn at a run is carried 0.9 of a tile wide); with it let go, IceDrag (0.4 of a second and one
+        // tile to stop from a run). Tuned so a phone's stick still goes where it points: the slide is felt at a turn
+        // and at a stop, never as a loss of the stick. Quicksand is walked at QuicksandSlow of the speed. A slide never
+        // goes faster than a walk, so the host's check of a reported step (World.MovePlayer) holds as it is.
+        public const float IceGrip = 4f;
+        public const float IceDrag = 2.5f;
+        public const float QuicksandSlow = 0.55f;
+
+        static TileType Under(TileMap map, Vec2 position) => map[TileMap.Cell(position.X), TileMap.Cell(position.Y)];
+
+        // What share of their speed a player walks at on the floor under them.
+        public static float GroundSpeed(TileMap map, Vec2 position) => Under(map, position) == TileType.Quicksand ? QuicksandSlow : 1;
+
+        public static bool OnIce(TileMap map, Vec2 position) => Under(map, position) == TileType.IceFloor;
+
         // One tick of a player's own movement. Input is the stick or WASD direction; longer than 1 is clamped. doors are
         // the locked doors they walk through (World.DoorsFor), the same on the host and in the client's prediction.
+        // This one keeps no speed from tick to tick, so it never slides (bots, tests); quicksand slows it all the same.
         public static Vec2 Step(TileMap map, Vec2 position, Vec2 input, float moveSpeed, ISet<int> doors = null) =>
-            Collision.Move(map, position, World.PlayerRadius, input.ClampLength(1) * (moveSpeed * World.TickSeconds), passable: doors);
+            Collision.Move(map, position, World.PlayerRadius, input.ClampLength(1) * (moveSpeed * GroundSpeed(map, position) * World.TickSeconds), passable: doors);
+
+        // The same with the speed carried from the tick before (tiles a second), which the caller keeps: what a player's
+        // own client moves them with (WorldClient.Step). Off the ice it is the step above.
+        public static Vec2 Step(TileMap map, Vec2 position, ref Vec2 velocity, Vec2 input, float moveSpeed, ISet<int> doors = null)
+        {
+            var wanted = input.ClampLength(1) * (moveSpeed * GroundSpeed(map, position));
+            if (OnIce(map, position))
+            {
+                // Slowed since the last tick (chilled, snared): the slide slows with them.
+                velocity = velocity.ClampLength(moveSpeed);
+                float rate = (input.LengthSquared > 1e-6f ? IceGrip : IceDrag) * moveSpeed * World.TickSeconds;
+                var change = wanted - velocity;
+                velocity = change.Length <= rate ? wanted : velocity + change.Normalized * rate;
+            }
+            else velocity = wanted;
+            var to = Collision.Move(map, position, World.PlayerRadius, velocity * World.TickSeconds, passable: doors);
+            // A wall takes the speed it stopped.
+            velocity = (to - position) / World.TickSeconds;
+            return to;
+        }
 
         // One tick of a roll along direction (World.Roll.cs): the same for everyone whatever their move speed, shorter
         // by slow (World.RollSlow) when chilled or snared. Walls stop it as they stop a walk.

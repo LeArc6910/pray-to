@@ -49,7 +49,9 @@ namespace Game.Client
                 loot,
                 File.ReadAllText(Path.Combine(world, TileSheet.CropsFile)),
                 File.ReadAllText(Path.Combine(world, TileSheet.MachinesFile)),
-                File.ReadAllText(Path.Combine(world, TerrainSheet.File)));
+                File.ReadAllText(Path.Combine(world, TerrainSheet.File)),
+                File.ReadAllText(Path.Combine(world, RoomSheet.File)),
+                File.ReadAllText(Path.Combine(world, RoomSheet.RolesFile)));
             string npcFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Npcs"));
             var npcs = NpcSheet.Parse(File.ReadAllText(Path.Combine(npcFolder, NpcSheet.NpcsFile)), File.ReadAllText(Path.Combine(npcFolder, NpcSheet.ShopFile)), loot,
                 File.ReadAllText(Path.Combine(npcFolder, NpcSheet.RequestsFile)));
@@ -67,7 +69,8 @@ namespace Game.Client
             // --only map: just the generated map's pictures, three seeds for each generator version (out/map/, MapPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "map")
             {
-                MapPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1, 2, 3 });
+                string mapOut = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
+                MapPreview.Write(mapOut, story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1, 2, 3 }, rooms: world => RoomViews(world, lights, Path.Combine(mapOut, "map")));
                 return 0;
             }
             if (args.Length == 2 && args[0] == "--only")
@@ -126,7 +129,7 @@ namespace Game.Client
             Arenas(lights, output);
             WorldArenas(lights, output, monsters, story);
             // The generated map, one seed for each generator version (map/, MapPreview).
-            MapPreview.Write(output, story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1 });
+            MapPreview.Write(output, story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1 }, rooms: world => RoomViews(world, lights, Path.Combine(output, "map")));
             string classFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
             var classes = ClassSheet.Parse(File.ReadAllText(Path.Combine(classFolder, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classFolder, ClassSheet.SkillsFile)));
             if (!classes.Success)
@@ -503,6 +506,7 @@ namespace Game.Client
                     TileType.ArcFurnace, TileType.WaterWheel, TileType.SolarPanel, TileType.TeslaTower, TileType.Skylight, TileType.IronWall, TileType.Fold,
                     TileType.RedCarpet, TileType.BlueCarpet, TileType.YellowCarpet, TileType.TapestryWall, TileType.ShieldWall, TileType.Scarecrow, TileType.Fence,
                     TileType.LockedDoor, TileType.Road, TileType.Waypoint,
+                    TileType.CrackedWall, TileType.Grate, TileType.ObsidianWall, TileType.VoidWall, TileType.IceFloor, TileType.Quicksand,
                 }
                 .Select(TileArt.Object).Append(TileArt.OpenDoor).Append(TileArt.BigAssembler).Append(TileArt.BigSmelter).Concat(Enumerable.Range(0, ItemArt.BeltFrames).Select(f => ItemArt.Belt(f)))
                 .Concat(new[] { ItemArt.Belt(0, fast: true), ItemArt.Underground(0), TileArt.MerchantCounter, ItemArt.Chicken(0), ItemArt.Chicken(1), ItemArt.Cow(0), ItemArt.Cow(1), ItemArt.Sheep(0), ItemArt.Sheep(1), ItemArt.TurretBarrel })
@@ -780,6 +784,66 @@ namespace Game.Client
             return scene.Image;
         }
 
+        // The rooms of each role as the game draws them (2026-11-21, Docs/WorldRework.md 방의 역할): up to three rooms
+        // of a role with different chunks, a row to a role, once with the lights off and once as the dark cave shows
+        // them (rooms_art.png, rooms_art_lit.png), and the six new tiles by themselves with the patches' edges
+        // (room_tiles.png).
+        static void RoomViews(GeneratedWorld world, WorldLights lights, string folder)
+        {
+            const int across = 26, up = 18, columns = 3;
+            var roles = Enum.GetValues(typeof(RoomRole)).Cast<RoomRole>().Where(r => r != RoomRole.Plain).ToList();
+            foreach (bool lit in new[] { false, true })
+            {
+                var sheet = new PixelImage(columns * (across * TileArt.Size + 4), roles.Count * (up * TileArt.Size + 4));
+                sheet.Fill(0, 0, sheet.Width, sheet.Height, Rgba.Hex("#30303A"));
+                for (int row = 0; row < roles.Count; row++)
+                {
+                    var rooms = world.Rooms.Nodes.Where(n => n.Role == roles[row] && (n.Chunk != null || roles[row] == RoomRole.Ore))
+                        .GroupBy(n => n.Chunk?.Id ?? "").Select(g => g.First()).GroupBy(n => n.Biome).Select(g => g.First()).Take(columns).ToList();
+                    for (int i = 0; i < rooms.Count; i++)
+                    {
+                        var room = rooms[i];
+                        var scene = new Scene(world.Map, room.X - across / 2, room.Y - up / 2, across, up, _ => false) { Biome = room.Biome };
+                        if (lit) scene.Lit(lights, null);
+                        scene.Places(world.Places);
+                        scene.Player(room.AnchorX + 0.5f, room.AnchorY + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+                        sheet.Draw(scene.Image, i * (across * TileArt.Size + 4) + 2, row * (up * TileArt.Size + 4) + 2);
+                    }
+                }
+                Save(sheet, Path.Combine(folder, lit ? "rooms_art_lit.png" : "rooms_art.png"), 1);
+            }
+            var tiles = new[] { TileType.CrackedWall, TileType.Grate, TileType.ObsidianWall, TileType.VoidWall }.Select(type =>
+            {
+                // Over the rock it stands on, as in the world (the grate over floor).
+                var tile = TileArt.Ground(TileArt.Index(type == TileType.Grate ? GroundKind.Floor : GroundKind.Rock, type == TileType.Grate ? 0 : TileArt.Up | TileArt.Left | TileArt.Right, 0)).Copy();
+                var over = TileArt.Object(type);
+                for (int y = 0; y < TileArt.Size; y++)
+                    for (int x = 0; x < TileArt.Size; x++)
+                        if (over.IsSet(x, y)) tile[x, y] = over[x, y];
+                return tile;
+            }).ToList();
+            foreach (var type in new[] { TileType.IceFloor, TileType.Quicksand })
+            {
+                // A patch three by three with one corner tile left bare, on its biome's floor.
+                var biome = type == TileType.IceFloor ? Biome.Ice : Biome.Sand;
+                var map = new TileMap(5, 5, TileType.Floor);
+                for (int y = 1; y <= 3; y++)
+                    for (int x = 1; x <= 3; x++)
+                        if (x != 3 || y != 3) map[x, y] = type;
+                var patch = new PixelImage(5 * TileArt.Size, 5 * TileArt.Size);
+                for (int y = 0; y < 5; y++)
+                {
+                    for (int x = 0; x < 5; x++)
+                    {
+                        patch.Draw(TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, (x + y) % TileArt.Variants, biome)), x * TileArt.Size, (4 - y) * TileArt.Size);
+                        if (map[x, y] == type) patch.Draw(RoomTileArt.Patch(type, RoomTileArt.PatchMask(map, x, y), RoomTileArt.Laying(x, y)), x * TileArt.Size, (4 - y) * TileArt.Size);
+                    }
+                }
+                tiles.Add(patch);
+            }
+            Save(Row(tiles), Path.Combine(folder, "room_tiles.png"), 6);
+        }
+
         // Images side by side with a gap, on a dark ground.
         static PixelImage Row(List<PixelImage> images)
         {
@@ -916,6 +980,8 @@ namespace Game.Client
             readonly Func<Vec2, bool> _inArena;
             // The kind of the arena in the scene (its floor's stone).
             public ArenaKind Arena = ArenaKind.Plain;
+            // The biome whose colours the ground is drawn in.
+            public Biome Biome = Biome.Cave;
             readonly List<(float Y, Action<PixelImage> Draw)> _bodies = new List<(float, Action<PixelImage>)>();
             IReadOnlyList<PlaceSite> _places;
 
@@ -966,13 +1032,15 @@ namespace Game.Client
                         for (int x = _left; x < _left + _width; x++)
                         {
                             var (px, py) = Corner(x, y + 1);
-                            image.Draw(TileArt.Ground(TileArt.GroundAt(_map, x, y, _inArena(TileMap.Center(x, y)), Biome.Cave, Arena)), px, py);
+                            image.Draw(TileArt.Ground(TileArt.GroundAt(_map, x, y, _inArena(TileMap.Center(x, y)), Biome, Arena)), px, py);
                             // The floor that runs under things (PropArt.Underlay), as WorldView's underlay layer draws it.
                             var under = PropArt.Underlay(_map, _places, x, y);
                             if (under != null) image.Draw(TileArt.Object(under.Value), px, py);
                             // Things that stand (PropArt.Stands) are drawn with the bodies, as WorldView.DrawProps does.
                             var placed = PropArt.Stands(_map[x, y]) ? null
-                                : _map[x, y] == TileType.Road ? TileArt.Road(TileArt.RoadVariant(_map, x, y)) : TileArt.Object(_map[x, y]);
+                                : _map[x, y] == TileType.Road ? TileArt.Road(TileArt.RoadVariant(_map, x, y))
+                                : RoomTileArt.IsPatch(_map[x, y]) ? RoomTileArt.Patch(_map[x, y], RoomTileArt.PatchMask(_map, x, y), RoomTileArt.Laying(x, y))
+                                : TileArt.Object(_map[x, y]);
                             if (placed != null) image.Draw(placed, px, py);
                         }
                     }

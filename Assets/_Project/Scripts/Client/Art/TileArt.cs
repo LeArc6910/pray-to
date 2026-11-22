@@ -64,7 +64,7 @@ namespace Game.Client
 
         public static bool IsRock(TileType type) =>
             type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre
-            || type == TileType.ObsidianOre || type == TileType.VoidOre;
+            || type == TileType.ObsidianOre || type == TileType.VoidOre || TileMap.IsRoomWall(type);
 
         // Rounded cave corners (Docs/ArtPipeline.md 둥근 모서리, 2026-11-11): a square corner is cut or filled by a
         // three-pixel step. Where rock sticks out into open floor (its two sides and the diagonal open) the corner is
@@ -117,6 +117,8 @@ namespace Game.Client
             var kind = map[x, y] switch
             {
                 TileType.Wall => map.IsEdge(x, y) ? GroundKind.Bedrock : GroundKind.Rock,
+                // The rooms' own walls stand on rock; what makes each its own is drawn over it (RoomTileArt).
+                TileType.CrackedWall or TileType.ObsidianWall or TileType.VoidWall => GroundKind.Rock,
                 TileType.CopperOre => GroundKind.CopperOre,
                 TileType.IronOre => GroundKind.IronOre,
                 TileType.MithrilOre => GroundKind.MithrilOre,
@@ -484,6 +486,12 @@ namespace Game.Client
             TileType.Water => Ground(Index(GroundKind.Water, 0, 0)),
             TileType.Waypoint => WaypointTile,
             TileType.IronWall => IronWallTile,
+            TileType.CrackedWall => RoomTileArt.Cracked,
+            TileType.ObsidianWall => RoomTileArt.Obsidian,
+            TileType.VoidWall => RoomTileArt.VoidStone,
+            TileType.Grate => RoomTileArt.Grate,
+            // Alone on the floor; in the world its edges follow its neighbours (RoomTileArt.Patch).
+            TileType.IceFloor or TileType.Quicksand => RoomTileArt.Patch(type, 0),
             TileType.Fold => FoldTile,
             TileType.RedCarpet => RedCarpetTile,
             TileType.BlueCarpet => BlueCarpetTile,

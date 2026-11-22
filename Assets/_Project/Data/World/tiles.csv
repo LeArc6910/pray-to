@@ -59,3 +59,6 @@ Fence,울타리,1,fence,1,,,,,,
 BigAssembler,대형 조립기,3,big_assembler,1,,,,,,
 BigSmelter,대형 제련로,3,big_smelter,1,,,,5,#FF8A3C,
 LockedDoor,잠긴 문,2,door,1,,,,,,
+CrackedWall,금 간 벽,1,stone,1,,,,,,
+ObsidianWall,흑요석 벽,18,stone,2,,,,,,20
+VoidWall,공허석 벽,24,stone,2,,,,,,30

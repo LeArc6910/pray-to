@@ -3445,7 +3445,10 @@ namespace Game.Client
 
         // The tile at x, y, a road matched to its neighbours (TileArt.RoadVariant).
         static TileBase ObjectTileAt(TileMap map, int x, int y) =>
-            map[x, y] == TileType.Road ? Sprites.Road(TileArt.RoadVariant(map, x, y)) : ObjectTile(map[x, y]);
+            map[x, y] == TileType.Road ? Sprites.Road(TileArt.RoadVariant(map, x, y))
+            // Ice and quicksand, their edges matched to their neighbours (RoomTileArt.Patch).
+            : RoomTileArt.IsPatch(map[x, y]) ? Sprites.Patch(map[x, y], RoomTileArt.PatchMask(map, x, y), RoomTileArt.Laying(x, y))
+            : ObjectTile(map[x, y]);
 
         static Tilemap AddTilemap(Transform grid, string name, int order)
         {

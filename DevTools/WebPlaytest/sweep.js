@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx base save deploysave layout touch
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map base save deploysave layout touch
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3756,7 +3756,157 @@ async function roll(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, base, save, story, deploysave, layout, touch };
+// ---------------------------------------------------------------- 방으로 된 지도 (Docs/WorldRework.md 1단계)
+// The rooms of the generator's version 2 (2026-11-21): a new world is made of rooms, each role has rooms and a chunk,
+// the player walks from the spawn into a room with real keys (a stick on the phone), every role room is come to on
+// foot (by the game's own count of steps), the hidden and locked ones are shut, ice slides and quicksand slows.
+// Pictures of a room of each role and of each biome, on a PC and a phone held upright.
+const RoomVisits = [
+  ['pack', 'any', '무리 방'], ['pack', 'ice', '얼음 동굴의 무리 방'], ['elite', 'any', '정예 야영지'], ['treasure', 'any', '보물 방'],
+  ['rest', 'any', '야영지(모닥불)'], ['locked', 'any', '자물쇠 방'], ['hidden', 'any', '숨은 방(금 간 벽)'], ['shrine', 'any', '제단'],
+  ['trap', 'any', '함정 방'], ['cart', 'any', '버려진 수레'], ['pond', 'any', '물웅덩이'], ['ore', 'any', '광맥 방'], ['gate', 'cave', '던전 입구 자리'],
+  ['treasure', 'lava', '용암 지대의 보물 방'], ['pack', 'sand', '모래 동굴의 무리 방'], ['elite', 'abyss', '심연의 정예 야영지'],
+];
+const MapBiomes = ['cave', 'mushroom', 'ice', 'crystal', 'lava', 'abyss', 'lake', 'sand'];
+
+async function map(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 방으로 된 지도 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+      await game.send('classes warrior,fire_mage');
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip iron_armor; heal; probe on');
+
+    // A new world is one of rooms, and every role has rooms.
+    const rooms = await game.ask('rooms');
+    check(rooms.generator === 2, `${name}: 새 월드는 생성기 2판이다 (${rooms.generator})`);
+    check(rooms.rooms >= 700, `${name}: 방이 700개 넘는다 (${rooms.rooms})`);
+    const roles = rooms.roles || {};
+    const missing = ['pack', 'plain', 'ore', 'rest', 'elite', 'treasure', 'shrine', 'hidden', 'locked', 'trap', 'cart', 'gate', 'pond'].filter(r => !(roles[r] > 0));
+    check(missing.length === 0, `${name}: 역할마다 방이 있다 (${Object.entries(roles).map(([r, n]) => `${r} ${n}`).join(', ')})${missing.length ? ` 없음: ${missing.join(', ')}` : ''}`);
+    check(rooms.chunks >= 300, `${name}: 조각을 끼운 방이 300개 넘는다 (${rooms.chunks})`);
+    check(rooms.cracked > 0, `${name}: 금 간 벽으로 막힌 지름길이 있다 (${rooms.cracked})`);
+    await game.shot('map-spawn', '시작 지점');
+
+    // Walking, with real keys or the stick, from the spawn toward the nearest pack room by the game's path finding:
+    // the player gets nearer by twenty tiles or gets there.
+    const near = await game.ask('room pack any 0');
+    check(near.steps > 0, `${name}: 가장 가까운 무리 방까지 걸어서 ${near.steps}걸음`);
+    const screen = await game.canvas();
+    const stick = { x: screen.left + screen.width * 0.25, y: screen.top + screen.height * 0.55 };
+    const cdp = game.touch ? await game.context.newCDPSession(game.page) : null;
+    const walk = async (dx, dy, ms) => {
+      if (game.touch) {
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: stick.x, y: stick.y }] });
+        await game.wait(40);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: stick.x + dx * 45, y: stick.y - dy * 45 }] });
+        await game.wait(ms);
+        await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+        return;
+      }
+      const keys = [dx > 0.3 ? 'd' : dx < -0.3 ? 'a' : null, dy > 0.3 ? 'w' : dy < -0.3 ? 's' : null].filter(Boolean);
+      for (const key of keys) await game.page.keyboard.down(key);
+      await game.wait(ms);
+      for (const key of keys) await game.page.keyboard.up(key);
+    };
+    const from = await game.state();
+    const far = s => Math.hypot(s.x - near.x - 0.5, s.y - near.y - 0.5);
+    let arrived = false;
+    const until = Date.now() + 70000;
+    while (Date.now() < until && !arrived) {
+      const intent = await game.ask(`nav at ${near.x} ${near.y}`);
+      if (intent.do === 'arrived') arrived = true;
+      else if (intent.do === 'move') {
+        const length = Math.hypot(intent.x, intent.y) || 1;
+        await walk(intent.x / length, intent.y / length, 260);
+      } else if (intent.do === 'fight' || intent.do === 'dig') await game.send('clear');
+      else await game.wait(300);
+    }
+    const walked = await game.state();
+    check(arrived || far(from) - far(walked) >= 20,
+      `${name}: 시작 지점에서 ${game.touch ? '스틱으로' : '키보드로'} 걸어 방으로 간다 (${far(from).toFixed(0)}칸 → ${far(walked).toFixed(0)}칸${arrived ? ', 도착' : ''})`);
+    await game.shot('map-walked', '걸어서 닿은 곳');
+
+    // The whole map.
+    if (game.touch) await game.press('지도');
+    else await game.page.keyboard.press('m');
+    await game.wait(700);
+    await game.shot('map-whole', '전체 지도');
+    if (game.touch) await game.press('지도');
+    else await game.page.keyboard.press('m');
+    await game.wait(400);
+
+    // A room of each role: walked to from the spawn (the game counts the steps), drawn from its chunk, and the hidden
+    // and locked ones shut until their wall is dug.
+    for (const [role, biome, label] of RoomVisits) {
+      const room = await game.ask(`room ${role} ${biome}`);
+      if (!room.role) {
+        check(false, `${name}: ${label}: 그런 방이 없다`);
+        continue;
+      }
+      check(room.steps >= 0, `${name}: ${label}(${room.biome}, 조각 ${room.chunk || '없음'})까지 시작 지점에서 걸어서 ${room.steps}걸음`);
+      if (role !== 'ore' && role !== 'pack') check(!!room.chunk, `${name}: ${label}에 조각이 끼워져 있다 (${room.chunk})`);
+      if (role === 'hidden' || role === 'locked') check(room.shut, `${name}: ${label}의 안쪽은 벽을 캐기 전에는 닿지 않는다`);
+      await game.send(`goto room ${role} ${biome}`);
+      await game.wait(1100);
+      const at = await game.state();
+      check(at.room.toLowerCase() === role && !at.dead, `${name}: ${label}에 선다 (${at.room}, ${at.roomChunk || '조각 없음'}, 바닥 ${at.ground})`);
+      await game.shot(`map-room-${role}-${biome}`, `${label} (${room.biome}, ${room.chunk || '조각 없음'})`);
+    }
+
+    // Each biome's own terrain.
+    for (const biome of MapBiomes) {
+      const answer = (await game.send(`goto biome ${biome}`)).join(' ');
+      await game.wait(1100);
+      check(/^ok/.test(answer) && (await game.state()).biome.toLowerCase() === biome, `${name}: ${biome}에 간다`);
+      await game.shot(`map-biome-${biome}`, `생물군계 ${biome}`);
+    }
+
+    // Ice slides (the stick let go, the player goes on) and stops; quicksand is waded through slower than floor.
+    await game.send('goto wild; clear');
+    await game.wait(900);
+    await game.send('scene ice; face off');
+    await game.wait(700);
+    await walk(1, 0, 600);
+    let slide = 0;
+    for (let i = 0; i < 5; i++) {
+      const s = await game.state();
+      if (s.ground === 'IceFloor') slide = Math.max(slide, s.slide);
+      await game.wait(40);
+    }
+    await game.shot('map-ice', '얼음 바닥에서 미끄러지는 중');
+    await game.wait(900);
+    const still = await game.state();
+    check(slide > 0.5, `${name}: 얼음 위에서는 손을 떼도 미끄러진다 (뗀 뒤 속도 ${slide.toFixed(1)}칸/초)`);
+    check(still.slide < 0.05 && still.ground === 'IceFloor', `${name}: 곧 멈춘다 (속도 ${still.slide.toFixed(2)}, 바닥 ${still.ground})`);
+    const pace = async scene => {
+      await game.send('goto wild; clear');
+      await game.wait(700);
+      await game.send(`scene ${scene}`);
+      await game.wait(700);
+      const before = await game.state();
+      await walk(1, 0, 1200);
+      await game.wait(500);
+      return (await game.state()).x - before.x;
+    };
+    const onFloor = await pace('roll');
+    const onSand = await pace('quicksand');
+    await game.shot('map-quicksand', '모래늪');
+    check(onSand > 0.5 && onSand < onFloor * 0.8, `${name}: 모래늪에서는 느리게 걷는다 (같은 시간에 바닥 ${onFloor.toFixed(1)}칸, 모래늪 ${onSand.toFixed(1)}칸)`);
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, base, save, story, deploysave, layout, touch };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -30,8 +30,12 @@ namespace Game.Core
     public sealed class TerrainRule
     {
         internal TerrainRule(Biome biome, TerrainStyle style, int roomFill, int rooms, int roomMin, int roomMax, int corridorMin, int corridorMax,
-            int loopPercent, int deadEndPercent, int wallTarget, int liquidTarget, TileType? feature, int featurePercent)
+            int loopPercent, int deadEndPercent, int wallTarget, int liquidTarget, TileType? feature, int featurePercent,
+            TileType? ground = null, int groundPercent = 0, int chunkPercent = 0)
         {
+            Ground = ground;
+            GroundPercent = groundPercent;
+            ChunkPercent = chunkPercent;
             Biome = biome;
             Style = style;
             RoomFill = roomFill;
@@ -72,17 +76,32 @@ namespace Game.Core
         // room's tiles it takes; null for none.
         public TileType? Feature { get; }
         public int FeaturePercent { get; }
+        // A floor laid in patches over the rooms' own (ice, quicksand), and how many in a hundred of a room's tiles it
+        // takes; null for none.
+        public TileType? Ground { get; }
+        public int GroundPercent { get; }
+        // Of the pack rooms, how many in a hundred are set with a chunk from rooms.csv; the other roles always are,
+        // where one fits.
+        public int ChunkPercent { get; }
     }
 
     public sealed class TerrainData
     {
         readonly Dictionary<Biome, TerrainRule> _byBiome = new Dictionary<Biome, TerrainRule>();
 
-        internal TerrainData(IEnumerable<TerrainRule> rules, IReadOnlyList<string> errors)
+        internal TerrainData(IEnumerable<TerrainRule> rules, IReadOnlyList<string> errors, RoomData rooms = null)
         {
             foreach (var rule in rules) _byBiome[rule.Biome] = rule;
-            Errors = errors;
+            Rooms = rooms ?? RoomData.None;
+            Errors = rooms == null || rooms.Errors.Count == 0 ? errors : errors.Concat(rooms.Errors).ToList();
         }
+
+        // The room chunks and the roles' numbers (rooms.csv, room_roles.csv); none when the game did not read them, and
+        // then the rooms get their roles by the code's numbers and no chunks.
+        public RoomData Rooms { get; }
+
+        // The same rules with the room sheets beside them.
+        internal TerrainData With(RoomData rooms) => new TerrainData(_byBiome.Values, Errors, rooms);
 
         public IReadOnlyList<string> Errors { get; }
         public bool Success => Errors.Count == 0;
@@ -101,15 +120,17 @@ namespace Game.Core
         // existed). TerrainTests holds the two together: the host and a client must carve the same rooms.
         public static readonly TerrainData Default = new TerrainData(new[]
         {
-            new TerrainRule(Biome.Cave, TerrainStyle.Cave, 85, 1, 18, 26, 3, 3, 30, 15, 55, 0, null, 0),
-            new TerrainRule(Biome.Mushroom, TerrainStyle.Maze, 80, 4, 7, 12, 2, 2, 45, 25, 60, 0, TileType.MushroomTree, 2),
-            new TerrainRule(Biome.Ice, TerrainStyle.Hall, 80, 1, 22, 30, 4, 5, 20, 10, 45, 0, null, 0),
-            new TerrainRule(Biome.Crystal, TerrainStyle.Fissure, 90, 1, 26, 34, 2, 2, 25, 20, 65, 0, null, 0),
-            new TerrainRule(Biome.Lava, TerrainStyle.Rivers, 85, 1, 20, 28, 3, 3, 30, 15, 48, 8, null, 0),
-            new TerrainRule(Biome.Abyss, TerrainStyle.Shards, 88, 1, 18, 28, 2, 2, 20, 25, 68, 0, null, 0),
-            new TerrainRule(Biome.Lake, TerrainStyle.Islands, 92, 1, 16, 24, 2, 2, 35, 15, 35, 28, null, 0),
-            new TerrainRule(Biome.Sand, TerrainStyle.Dunes, 92, 1, 26, 34, 6, 6, 60, 5, 35, 0, TileType.Wall, 2),
+            new TerrainRule(Biome.Cave, TerrainStyle.Cave, 85, 1, 18, 26, 3, 3, 30, 15, 55, 0, null, 0, null, 0, DefaultChunkPercent),
+            new TerrainRule(Biome.Mushroom, TerrainStyle.Maze, 80, 4, 7, 12, 2, 2, 45, 25, 60, 0, TileType.MushroomTree, 2, null, 0, DefaultChunkPercent),
+            new TerrainRule(Biome.Ice, TerrainStyle.Hall, 80, 1, 22, 30, 4, 5, 20, 10, 45, 0, null, 0, TileType.IceFloor, 30, DefaultChunkPercent),
+            new TerrainRule(Biome.Crystal, TerrainStyle.Fissure, 90, 1, 26, 34, 2, 2, 25, 20, 65, 0, null, 0, null, 0, DefaultChunkPercent),
+            new TerrainRule(Biome.Lava, TerrainStyle.Rivers, 85, 1, 20, 28, 3, 3, 30, 15, 48, 8, null, 0, null, 0, DefaultChunkPercent),
+            new TerrainRule(Biome.Abyss, TerrainStyle.Shards, 88, 1, 18, 28, 2, 2, 20, 25, 68, 0, null, 0, null, 0, DefaultChunkPercent),
+            new TerrainRule(Biome.Lake, TerrainStyle.Islands, 92, 1, 16, 24, 2, 2, 35, 15, 35, 28, null, 0, null, 0, DefaultChunkPercent),
+            new TerrainRule(Biome.Sand, TerrainStyle.Dunes, 92, 1, 26, 34, 6, 6, 60, 5, 35, 0, TileType.Wall, 2, TileType.Quicksand, 8, DefaultChunkPercent),
         }, Array.Empty<string>());
+
+        public const int DefaultChunkPercent = 35;
 
         public static TerrainData Parse(string csv)
         {
@@ -143,9 +164,14 @@ namespace Game.Core
                     int corridorMin = Number("corridor_min", 1, 8), corridorMax = Number("corridor_max", 1, 8);
                     if (corridorMax < corridorMin) throw new FormatException("corridor_max는 corridor_min 이상이어야 합니다.");
                     TileType? feature = row["feature"].Length == 0 ? (TileType?)null : SheetValues.ParseEnum<TileType>(row["feature"], "feature");
+                    // Columns added with the rooms' roles (2026-11-21); a sheet without them has no patches and the usual share of chunks.
+                    bool patches = table.Header.Contains("ground");
+                    TileType? ground = !patches || row["ground"].Length == 0 ? (TileType?)null : SheetValues.ParseEnum<TileType>(row["ground"], "ground");
+                    if (ground is TileType laid && laid != TileType.IceFloor && laid != TileType.Quicksand) throw new FormatException("ground는 IceFloor나 Quicksand입니다.");
                     rules.Add(new TerrainRule(biome, SheetValues.ParseEnum<TerrainStyle>(row["style"], "style"), Number("room_fill", 1, 100), rooms, roomMin, roomMax,
                         corridorMin, corridorMax, Number("loop_percent", 0, 100), Number("deadend_percent", 0, 100), Number("wall_target", 0, 100),
-                        Number("liquid_target", 0, 100), feature, Number("feature_percent", 0, 20)));
+                        Number("liquid_target", 0, 100), feature, Number("feature_percent", 0, 20),
+                        ground, patches ? Number("ground_percent", 0, 60) : 0, table.Header.Contains("chunk_percent") ? Number("chunk_percent", 0, 100) : DefaultChunkPercent));
                 }
                 catch (FormatException e)
                 {

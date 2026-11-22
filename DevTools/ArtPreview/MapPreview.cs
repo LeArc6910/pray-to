@@ -53,6 +53,18 @@ namespace Game.Client
                 case TileType.VoidOre: return Ore;
                 case TileType.Road: return Road;
                 case TileType.MushroomTree: return Feature;
+                case TileType.CrackedWall: return Rgba.Hex("#B89A6A");
+                case TileType.Grate: return Rgba.Hex("#9AA4B0");
+                case TileType.ObsidianWall: return Rgba.Hex("#6A3FA8");
+                case TileType.VoidWall: return Rgba.Hex("#C9A8FF");
+                case TileType.IceFloor: return Rgba.Hex("#DDF4FF");
+                case TileType.Quicksand: return Rgba.Hex("#D9B24A");
+                case TileType.Torch: return Rgba.Hex("#FFD23F");
+                case TileType.Campfire: return Rgba.Hex("#FF9A3C");
+                case TileType.Rail: return Rgba.Hex("#8A6A4A");
+                case TileType.RuneFloor: return Rgba.Hex("#5BE0E6");
+                case TileType.Cobweb: return Rgba.Hex("#C8C8D0");
+                case TileType.Crates: return Rgba.Hex("#FFE27A");
             }
             if (world.Map.IsSolid(x, y) || type == TileType.Waypoint) return Built;
             if (world.ArenaKindAt(TileMap.Center(x, y)) != null) return ArenaFloor;
@@ -92,9 +104,46 @@ namespace Game.Client
                     }
                 }
                 foreach (var node in world.Rooms.Nodes)
-                    Dot(node.Center.X, node.Center.Y, node.Kind == RoomKind.Arena ? Rgba.Hex("#FF3B30") : node.DeadEnd ? Rgba.Hex("#FF8AD8") : Rgba.White, Math.Max(1, scale / 2));
+                    Dot(node.Center.X, node.Center.Y, node.Kind == RoomKind.Arena ? Rgba.Hex("#FF3B30") : RoleColour(node.Role), node.Role == RoomRole.Plain || node.Role == RoomRole.Pack ? Math.Max(1, scale / 2) : scale);
             }
             return image;
+        }
+
+        // A room's dot on the graph picture, by what it is for.
+        static Rgba RoleColour(RoomRole role) => role switch
+        {
+            RoomRole.Pack => Rgba.Hex("#E0564A"),
+            RoomRole.Ore => Rgba.Hex("#E6C02E"),
+            RoomRole.Rest => Rgba.Hex("#FF9A3C"),
+            RoomRole.Elite => Rgba.Hex("#FF2BD6"),
+            RoomRole.Treasure => Rgba.Hex("#FFF27A"),
+            RoomRole.Shrine => Rgba.Hex("#5BE0E6"),
+            RoomRole.Hidden => Rgba.Hex("#B89A6A"),
+            RoomRole.Locked => Rgba.Hex("#A070FF"),
+            RoomRole.Trap => Rgba.Hex("#FF7A1A"),
+            RoomRole.Cart => Rgba.Hex("#8A6A4A"),
+            RoomRole.Gate => Rgba.Hex("#3CFF8A"),
+            RoomRole.Pond => Rgba.Hex("#2F7BE0"),
+            _ => Rgba.White,
+        };
+
+        // One room of each role (the first with a chunk in each of up to four biomes), 36 tiles across, on one sheet: a
+        // row to a role.
+        const int RoleCloseUp = 36;
+
+        static PixelImage Roles(GeneratedWorld world)
+        {
+            var roles = Enum.GetValues(typeof(RoomRole)).Cast<RoomRole>().Where(r => r != RoomRole.Plain).ToList();
+            const int scale = 6, across = 5, cell = RoleCloseUp * scale + 6;
+            var sheet = new PixelImage(across * cell, roles.Count * cell);
+            sheet.Fill(0, 0, sheet.Width, sheet.Height, Rgba.Hex("#30303A"));
+            for (int row = 0; row < roles.Count; row++)
+            {
+                var rooms = world.Rooms.Nodes.Where(n => n.Role == roles[row] && (n.Chunk != null || roles[row] == RoomRole.Ore)).GroupBy(n => n.Chunk?.Id ?? "").Select(g => g.First()).Take(across).ToList();
+                for (int i = 0; i < rooms.Count; i++)
+                    sheet.Draw(Picture(world, rooms[i].X - RoleCloseUp / 2, rooms[i].Y - RoleCloseUp / 2, RoleCloseUp, RoleCloseUp, scale), i * cell + 3, row * cell + 3);
+            }
+            return sheet;
         }
 
         // The middle of the biome's biggest stretch: the tile furthest inside it, on a coarse grid.
@@ -123,7 +172,8 @@ namespace Game.Client
             return best;
         }
 
-        public static void Write(string output, StoryData story, ArenaData arenas, TerrainData terrain, IEnumerable<ulong> seeds, bool closeUps = true)
+        public static void Write(string output, StoryData story, ArenaData arenas, TerrainData terrain, IEnumerable<ulong> seeds, bool closeUps = true,
+            Action<GeneratedWorld> rooms = null)
         {
             string folder = Path.Combine(output, "map");
             Directory.CreateDirectory(folder);
@@ -138,7 +188,13 @@ namespace Game.Client
                     Png.Save(Picture(world, world.SpawnX - SpawnCloseUp / 2, world.SpawnY - SpawnCloseUp / 2, SpawnCloseUp, SpawnCloseUp, 4),
                         Path.Combine(folder, $"v{version}_seed{seed}_spawn.png"));
                     if (seed != first || !closeUps) continue;
-                    if (world.Rooms != null) Png.Save(Picture(world, 0, 0, size, size, 2, rooms: true), Path.Combine(folder, $"v{version}_seed{seed}_rooms.png"));
+                    if (world.Rooms != null)
+                    {
+                        Png.Save(Picture(world, 0, 0, size, size, 2, rooms: true), Path.Combine(folder, $"v{version}_seed{seed}_rooms.png"));
+                        Png.Save(Roles(world), Path.Combine(folder, $"v{version}_seed{seed}_roles.png"));
+                        // The same rooms as the game draws them (Program.RoomViews).
+                        rooms?.Invoke(world);
+                    }
                     // Every biome side by side on one sheet, and each on its own.
                     var biomes = Enum.GetValues(typeof(Biome)).Cast<Biome>().ToList();
                     var sheet = new PixelImage(4 * (CloseUp * 4 + 8), (biomes.Count + 3) / 4 * (CloseUp * 4 + 8));

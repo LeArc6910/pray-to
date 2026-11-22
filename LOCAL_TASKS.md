@@ -1050,6 +1050,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 시트 `Data/Monsters/monster_attacks.csv`가 `GameSheets.monsterAttacks`에 들어가야 빌드에 실린다(돌리기 전에는 모든 종이 예전처럼 싸운다). 새 파일 `monster_attacks.csv`, `Core/Simulation/MonsterAttackSheet.cs`, `Core/Simulation/World.MonsterAttacks.cs`, `Client/Art/MonsterFx.cs`, `Client/WorldView.MonsterFx.cs`, `Tests/EditMode/MonsterAttackTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `MonstersWarnAndStrikeFromTheSheet`. 통신 0.88.0
   - (클라우드 웹 점검) `sweep.js --only monsterfx`, `speed 0`이 이제 실제로 멈추므로 `skillfx`·`combat` 구역도 다시
   - (사람) 슬라임 덮치기·깨물기·갈라짐, 딱정벌레 돌진과 앞 등딱지·비틀거림, 서리 정령 서리 고리·고드름, 공허 정령 돌아오는 구슬·중력 우물·점멸: 예고를 보고 피할 만한지, 손맛과 소리
+- [ ] 148단계: 방 역할과 방 조각, 새 칸 여섯, 얼음 미끄러짐(`Docs/WorldRework.md` 1b, `Docs/Biomes.md`)
+  - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/rooms.csv`, `Data/World/room_roles.csv`가 `GameSheets`(`rooms`, `roomRoles`)에 들어가야 빌드에 실린다(돌리기 전에는 역할만 있고 조각 없음). 새 파일 `rooms.csv`, `room_roles.csv`, `Core/World/RoomSheet.cs`, `Core/World/WorldGenerator.Roles.cs`, `Client/Art/RoomTileArt.cs`, `Tests/EditMode/RoomRoleTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.89.0. 2판 지형이 바뀌어 1a로 만든 새 월드의 기지는 바위에 묻힐 수 있다
+  - (클라우드 웹 점검) `sweep.js --only map`
+  - (사람) 얼음 바닥에서 미끄러지는 손맛(PC와 휴대폰 스틱), 모래늪, 방마다 다른 모습(제단·보물·쉼터·잠긴 방·함정·금 간 벽 지름길)이 탐험하는 맛을 주는지
 
 ## 결과 보고
 
