@@ -1093,6 +1093,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 158단계: 던전 생성기, 무리와 주인 방, 끝 상자, 완주 기록(`Docs/WorldRework.md` 5b, `Docs/Biomes.md` 던전 시트)
   - 명령 한 줄을 다시 돌린다. 새 시트 `Data/World/dungeons.csv`, `Data/World/dungeon_graphs.csv`가 `GameSheets`에 들어가야 빌드에 실린다(돌리기 전에는 5a의 빈 던전). 새 파일 `dungeons.csv`, `dungeon_graphs.csv`, `Core/World/DungeonSheet.cs`, `Core/World/DungeonGenerator.cs`, `Tests/EditMode/DungeonGeneratorTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 장면 `ADungeonRunGoesToItsMasterAndItsEndChest`(사진 다섯). 통신 0.99.0, 월드 저장본 형식 16(던전마다 들어간 횟수·가장 빠른 완주·완주 수)
   - (클라우드 웹 점검) `sweep.js --only dungeon`(로컬이 시트를 실은 빌드가 배포된 뒤)
+  - 클라우드 확인 (2026-11-22, `156a521`): [x] 시트가 실린 배포에서 `--only dungeon` PC·휴대폰 모두 통과(끈적한 지하실 ECCRBXT: 무리 방, 보스 방의 떼 거느린 슬라임 대장, 끝 상자, "끈적한 지하실 완주!" 띠). 처음 돌릴 때 방 비움·열쇠·주인 쓰러짐 사건이 화면에 한 번도 가지 않던 호스트 버그를 찾아 고쳤다(출처 없는 사건이 스냅숏에서 빠졌다)
   - (사람) 던전 한 판의 길이와 밀도, 주인(큰 정예)과 싸우는 손맛, 끝 상자 보상이 들판보다 나은지, 완주 띠와 소리, 지름길 돌·잠긴 방·숨은 방을 찾는 맛
 - [ ] 159단계: 대화 초상 그림(`Docs/UiRework.md` 대화 초상)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/PortraitArt.cs`의 `.meta`가 생기면 커밋한다. 아직 화면에 붙이지 않았다(U3에서 대화 화면에 붙인다)
@@ -1120,6 +1121,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 164단계: 일지와 지도 새로 짜기(`Docs/UiRework.md` U5)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/InventoryWindow.Journal.cs`, `Client/MapView.Full.cs`, `Client/Art/RecordArt.cs`의 `.meta`가 생기면 커밋한다. PlayMode `LayoutTests.TheRecordsScreensFit`, 사진 장면 `FeatureTests.TheRecordsScreensDraw`
   - (클라우드 웹 점검) `sweep.js --only records,npc,story,guide,travel,dungeon`
+  - 클라우드 확인 (2026-11-22, `fadc518`~`156a521`): [x] `npc`·`story`·`guide`·`travel` 모두 통과, `records` 휴대폰 지도 표시 칸을 44점으로 고친 뒤 모두 통과. 일지 쪽지에서 초상이 글 첫 글자를 덮던 것 고침(`a19de66`). 사진: PC 일지(리본 목차, 쪽지와 막대, [추적 그만]), PC 지도(양피지, 범례, 표시 카드와 [여기로 길 안내]), 세로 휴대폰 도감 격자(실루엣과 "?")와 지도 아래 범례
   - (사람) 양피지 책·인장 모습이 마음에 드는지, 지도 끌기·확대의 손맛(휠, 실제 휴대폰 두 손가락), 표시를 눌러 뜨는 카드와 [여기로 길 안내]가 쓸 만한지
 
 ## 결과 보고
