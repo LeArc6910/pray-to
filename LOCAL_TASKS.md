@@ -1107,6 +1107,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only screens,ui`
   - 클라우드 확인 (2026-11-22, `0b70737`): [x] `--only screens,ui` 모두 통과(screens 139, ui와 합쳐 처음 211개 중 실패 3은 시험이 작업대를 첫 마을 웨이포인트 1.6칸 안에 놓아 G가 웨이포인트 목록을 먼저 연 탓: 장소 밖 빈 바닥으로 옮겨 고침). 사진: PC 스킬 창(밤하늘 머리, [스킬][특성][캐릭터] 묶음 탭, 남은 포인트 금색 점), 특성 창 안의 별하늘 트리, 휴대폰 [메뉴] 판 일곱 단추, 세로 휴대폰 특성 전체 시트, 작은 가로 스킬 시트. 남은 것: 휴대폰 [메뉴] 판이 레벨업 알림 글을 가린다
   - (사람) 키로 창을 여닫는 느낌, Esc가 한 단계씩 닫는지, G의 우선순위(기계 → 사람 → 상인 → 목록 → 볼거리 → 던전 → 상자 → 모루 → 작업대)가 자연스러운지, 휴대폰 [메뉴] 판이 손가락에 잘 맞는지, 전체 화면 창 동안 걷지 못하는 것이 괜찮은지(협동 중이면 바꿀 수 있다)
+- [ ] 162단계: 만남 창(대화 초상·타자, 상점, 상자, 작업대, 모루. `Docs/UiRework.md` U3)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/InventoryWindow.Encounters.cs`의 `.meta`가 생기면 커밋한다. PlayMode `LayoutTests.EveryEncounterWindowFits`·`TheTalkBoxFits`, 사진 장면 `FeatureTests.TheEncounterWindowsDraw`(`encounter-*`)
+  - (클라우드 웹 점검) `sweep.js --only encounter,basics,npc,gear,screens`
+  - (사람) 대사가 한 자씩 찍히는 빠르기와 넘기기(누르기·G·Space·Enter), 대사마다 고른 표정이 말과 맞는지, 상점에서 사고팔기의 손맛, 휴대폰에서 만남 창 동안 걷지 못하는 것이 괜찮은지
 
 ## 결과 보고
 

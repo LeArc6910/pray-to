@@ -264,6 +264,91 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The encounter windows (Docs/UiRework.md U3): a chest, a workbench, a furnace and an anvil laid round the player
+        // open their windows (each counts as the bag's, and shuts once its thing is out of reach); a merchant's stall: her
+        // talk with her portrait and choices, then her shop; the village child's talk with her portrait and the line's face.
+        // A picture of each, the station's and the talk's on a touch screen too.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheEncounterWindowsDraw()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var chest = Near(-1, 0);
+            var bench = Near(1, 0);
+            var furnace = Near(0, 1);
+            var anvil = Near(0, -1);
+            Lay((chest.X, chest.Y, TileType.Chest), (bench.X, bench.Y, TileType.Workbench), (furnace.X, furnace.Y, TileType.Furnace), (anvil.X, anvil.Y, TileType.Anvil));
+            Give("stone", 30);
+            Give("copper_ore", 12);
+            Give("coin", 300);
+            Player.Inventory.TryAdd(new LootGenerator(_root.LootSheet).RollItem(5, new GameRandom(7)));
+            Player.InventoryVersion++;
+            yield return new WaitForSecondsRealtime(1);
+            try
+            {
+                foreach (var screen in new[] { GameScreen.Chest, GameScreen.Station, GameScreen.Anvil })
+                {
+                    _root.ShowScreen(screen);
+                    yield return new WaitForSecondsRealtime(0.6f);
+                    Assert.AreEqual(screen, _root.OpenScreen, $"The {screen} window shut: nothing of its kind in reach.");
+                    Assert.IsTrue(_root.BagOpen, "An encounter window counts as the bag's.");
+                    yield return Screens.Take("encounter-" + screen.ToString().ToLowerInvariant());
+                }
+                Controls.ForceTouch(true);
+                _root.ShowScreen(GameScreen.Station);
+                yield return new WaitForSecondsRealtime(0.6f);
+                yield return Screens.Take("encounter-station-touch");
+                Controls.ForceTouch(false);
+                _root.ShowScreen(GameScreen.None);
+
+                // The merchant at a stall of her own away from the rest: walking off the chest shuts its window.
+                var merchant = World.Npcs.Merchant;
+                Assert.IsNotNull(merchant, "npcs.csv has no merchant at a stall.");
+                var stall = Near(6, 0);
+                for (int dx = -1; dx <= 1; dx++)
+                    for (int dy = -2; dy <= -1; dy++) Lay((stall.X + dx, stall.Y + dy, TileType.Floor));
+                Lay((stall.X, stall.Y, merchant.Tile));
+                _root.ShowScreen(GameScreen.Chest);
+                Player.Position = TileMap.Center(stall.X, stall.Y - 1);
+                Player.Corrections++;
+                yield return new WaitForSecondsRealtime(1);
+                Assert.AreEqual(GameScreen.None, _root.OpenScreen, "Walked away from the chest, its window shut.");
+                Assert.IsTrue(_root.TalkMerchantNear(), "The stall keeper is in reach.");
+                yield return new WaitForSecondsRealtime(0.6f);
+                Assert.IsTrue(_root.Talking);
+                StringAssert.StartsWith(merchant.Id + ":", _root.TalkPortrait, "Her portrait is in the talk box.");
+                yield return Screens.Take("encounter-merchant-talk");
+                _root.ShowBag("상인");
+                yield return new WaitForSecondsRealtime(0.6f);
+                Assert.AreEqual(GameScreen.Shop, _root.OpenScreen, "\"bag 상인\" opens her shop.");
+                Assert.IsFalse(_root.Talking, "The shop takes the talk's place.");
+                yield return Screens.Take("encounter-shop");
+                _root.ShowScreen(GameScreen.None);
+
+                // A person of the story: the child's talk, her portrait.
+                PlaceSite.Still = true;
+                var mina = World.Places.SelectMany(p => p.PeopleAt(World.Clock, World.DayMinutes)).FirstOrDefault(p => p.Character.Id == "mina");
+                Assert.IsNotNull(mina.Character, "No village child: characters.csv has no mina.");
+                Player.Position = mina.At + new Vec2(0, -1);
+                Player.Corrections++;
+                yield return new WaitForSecondsRealtime(1);
+                Assert.IsTrue(_root.TalkNear(), "The child is in reach.");
+                yield return new WaitForSecondsRealtime(0.6f);
+                StringAssert.StartsWith("mina:", _root.TalkPortrait);
+                yield return Screens.Take("encounter-talk");
+                Controls.ForceTouch(true);
+                yield return new WaitForSecondsRealtime(0.4f);
+                yield return Screens.Take("encounter-talk-touch");
+            }
+            finally
+            {
+                Controls.ForceTouch(false);
+                PlaceSite.Still = false;
+                World.MonstersHold = false;
+            }
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Mana spent and drunk back, and the set and rift legendaries worn.
         [UnityTest, Category(Screens.Category)]
         public IEnumerator ManaAndSetsDraw()

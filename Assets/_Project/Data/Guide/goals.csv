@@ -14,7 +14,7 @@ plant,버섯 심기,가방 재료의 버섯 포자를 [심기]로 흙 동굴 바
 hoe,밭 갈기,작업대에서 호미를 만들고 [밭 갈기]로 바닥을 밭으로 만든다. 밭에 심으면 빨리 자란다,place:Soil,fertilizer:3,
 fishing,물고기 낚기,작업대에서 낚싯대를 만들고 동굴 가장자리 물웅덩이를 바라보고 [낚시]. 입질(!)이 오면 바로 다시 누른다,have:cave_minnow|have:spore_catfish|have:ice_trout|have:crystal_eel|have:void_angler|have:firefly_catfish,xp:30,
 cook,요리 하나 만들기,화로 곁에서 동굴 송사리 2로 생선 구이를 만든다. 요리를 먹으면 한동안 능력치가 오른다. 밭에서 거둔 버섯·작물로 만드는 요리도 화로에서 만든다,have:grilled_fish|have:roasted_mushroom|have:mushroom_soup|have:spicy_fry,mushroom_spore:3,
-merchant,상인에게 팔아 금화 10개 모으기,시작 지점 가까이 줄무늬 노점에 상인 도라가 있다. 곁에서 가방을 열면 [상인] 탭에서 물고기·작물·장비를 판다,have:coin:10,coin:15,
+merchant,상인에게 팔아 금화 10개 모으기,시작 지점 가까이 줄무늬 노점에 상인 도라가 있다. 곁에서 [상인 도라와 말하기](PC는 G)를 누르고 [거래]의 [팔기]에서 물고기·작물·장비를 판다,have:coin:10,coin:15,
 request,부탁 하나 들어주기,사람 곁에서 가방을 열면 그 사람 탭에 오늘의 부탁이 보인다. 필요한 것을 모아 [건네기]를 누르면 보답과 호감을 준다. 부탁은 하루에 하나씩 바뀐다,request,coin:20,
 life_mining,채굴 기술 2레벨 되기,손으로 벽을 깰 때마다 채굴 기술이 오르고 레벨마다 더 빨리 캔다. [캐릭터] 화면(PC는 U)의 생활 기술에 보인다,life:mining:2,xp:20,
 level5,레벨 5 되기,몬스터를 잡으면 경험치가 오른다. 철 장비는 레벨 5부터 입는다,level:5,healing_potion:3,

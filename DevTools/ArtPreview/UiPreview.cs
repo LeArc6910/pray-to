@@ -14,10 +14,11 @@ namespace Game.Client
     //    talk with a speaker's band and hearts, the waypoint list, the full map's window, a menu page; and under them
     //    the screens of their own (U2): skills and the passive tree on its night with the growth tabs, the journal and
     //    the map with the records' tabs, and a phone held upright with [BAG][MENU] and the touch hub open;
+    //  - encounters.png, encounters_phone.png: the encounter windows of U3 at their size in points (UiPreview.Encounters.cs);
     //  - pixels.png: why the frames are drawn at whole device pixels — a corner at a phone's pixel ratio 2.625 the old way
     //    (stretched: pixels 5 and 6 device pixels across by turns) and the new (5 each).
     // The writing is the preview's small Latin font (UiMockKit), as the tool cannot draw the game's.
-    static class UiPreview
+    static partial class UiPreview
     {
         static readonly Rgba Ground = Rgba.Hex("#17141C");
         static readonly Rgba Ink = Rgba.Hex("#EFE4CC");
@@ -34,6 +35,8 @@ namespace Game.Client
             Png.Save(Times(Skin(loot), 3), Path.Combine(folder, "skin.png"));
             Png.Save(Times(Windows(loot), 3), Path.Combine(folder, "windows.png"));
             Png.Save(Pixels(), Path.Combine(folder, "pixels.png"));
+            Png.Save(Encounters(loot), Path.Combine(folder, "encounters.png"));
+            Png.Save(EncountersPhone(loot), Path.Combine(folder, "encounters_phone.png"));
             Console.WriteLine($"Wrote the UI skin to {folder}");
         }
 

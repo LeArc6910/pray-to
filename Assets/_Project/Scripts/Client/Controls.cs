@@ -303,6 +303,17 @@ namespace Game.Client
 
         public static bool MachinePressed() => KeyBindings.Pressed(KeyAction.Machine);
 
+        // Space or Enter this frame: a talk on screen goes on (Docs/UiRework.md 4-2). Space is also the attack, which a
+        // talk holds back while it is down (SpaceHeld).
+        public static bool AdvancePressed()
+        {
+            var keyboard = Typing ? null : Keyboard.current;
+            return keyboard != null && KeyBindings.Capturing == null
+                && (keyboard[Key.Space].wasPressedThisFrame || keyboard[Key.Enter].wasPressedThisFrame || keyboard[Key.NumpadEnter].wasPressedThisFrame);
+        }
+
+        public static bool SpaceHeld => !Typing && Keyboard.current != null && Keyboard.current[Key.Space].isPressed;
+
         // Both sticks over the game. Call from OnGUI.
         public static void DrawTouch()
         {

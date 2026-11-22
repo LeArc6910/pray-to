@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -59,17 +59,49 @@ async function openScreen(game, name) {
   return !!(await game.until(t => t.window === name, 3000));
 }
 
-// A tab of the bag window, opened; the old tab names of what are now screens of their own open those screens.
-async function bagTab(game, tab) {
-  if (tab && ScreenKeys[tab] && tab !== '가방') {
-    await openScreen(game, tab);
-    return;
+// The encounter windows (Docs/UiRework.md U3): what were the bag's [상인] and [상자] tabs are windows of their own,
+// opened by meeting the thing, and the workbench and anvil have theirs. The old tab names (and a stall keeper's role)
+// open them.
+const Encounters = { '상인': '상점', '상점': '상점', '상자': '상자', '작업대': '작업대', '모루': '모루' };
+const Roles = ['대장장이', '어부', '연금술사', '왕실 상인', '마족 상인', '광석상', '떠돌이 상인'];
+
+// An encounter window opened as a person would: the button over the thing (a real click or tap; [○○와 말하기] then the
+// talk's [거래] for a stall keeper), else, when another thing in reach stood first, the playtest command. True once open.
+async function meet(game, name) {
+  const window = Encounters[name] || (Roles.includes(name) ? '상점' : name);
+  let s = await game.state();
+  if (s.window === window) return true;
+  if (s.window || s.talking) {
+    await game.send('screen off');
+    if (s.talking) await game.page.keyboard.press('Escape');
+    await game.wait(300);
+    s = await game.state();
   }
+  const escape = text => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  if (window === '상점' && s.shopkeeper) {
+    if (await game.press(new RegExp(`^${escape(s.shopkeeper)}(와|과) 말하기`), undefined, { quiet: true })) {
+      await game.until(t => t.talking, 2000);
+      await game.press('거래', undefined, { quiet: true });
+    }
+  } else {
+    const label = { '상자': /^상자 열기/, '작업대': /^(작업대|화로) 열기/, '모루': /^모루 열기/ }[window];
+    if (label) await game.press(label, undefined, { quiet: true });
+  }
+  if (await game.until(t => t.window === window, 2000)) return true;
+  await game.send(`screen ${window}`);
+  return !!(await game.until(t => t.window === window, 2000));
+}
+
+// A tab of the bag window, opened; the old tab names of what are now screens of their own open those screens, and the
+// merchant's and chest's tabs their windows (meet). True once open.
+async function bagTab(game, tab) {
+  if (tab && (Encounters[tab] || Roles.includes(tab))) return meet(game, tab);
+  if (tab && ScreenKeys[tab] && tab !== '가방') return openScreen(game, tab);
   if ((await game.state()).window !== '가방') {
     await openScreen(game, '가방');
     await game.wait(200);
   }
-  if (tab) await game.press(tab);
+  return tab ? game.press(tab) : true;
 }
 
 // Picks a thing in the bag's [장비] grid by its square (the name, a RegExp for names that may carry more), so the
@@ -405,10 +437,10 @@ async function basics(browser) {
   await game.wait(300);
   await game.press('놓기', '상자 ×');
   check((await game.look(-1, 0)).tile === 'Chest', '상자를 놓는다');
-  check(await game.press('상자'), '상자 곁에서 [상자] 탭이 생긴다');
+  check(await bagTab(game, '상자'), '상자 곁에서 [상자 열기]로 상자 창이 열린다(U3)');
   await game.press('넣기', /^돌 ×/);
   check(((await game.look(-1, 0)).chest || {}).stone > 0, '[넣기]로 상자에 돌이 들어간다');
-  await game.shot('bag-chest', '[상자] 탭');
+  await game.shot('bag-chest', '상자 창');
   await game.press('꺼내기', /^돌 ×/);
   check(!((await game.look(-1, 0)).chest || {}).stone, '[꺼내기]로 다시 가방에');
   // [상자에 넣기] (2026-11-11, Docs/Research2026-11.md 후보 8): what a chest nearby holds already goes in whole;
@@ -421,7 +453,7 @@ async function basics(browser) {
   check((await game.find('잠금 풀기')).length === 1, '잠그면 [잠금 풀기]로 바뀐다');
   await game.shot('bag-lock', '잠근 슬라임 젤');
   await bagTab(game, '상자');
-  check(await game.press('상자에 넣기'), '[상자] 탭에 [상자에 넣기]가 있다');
+  check(await game.press('상자에 넣기'), '상자 창에 [상자에 넣기]가 있다');
   await game.wait(800);
   let stashed = await game.inventory();
   const inChest = (await game.look(-1, 0)).chest || {};
@@ -1301,8 +1333,7 @@ async function npc(browser) {
   const shop = await game.state();
   check(shop.timberNear >= 12, `상인이 나무 벽 상점 안에 있다 (둘레 나무 벽 ${shop.timberNear}칸)`);
   await game.shot('merchant', '상점 안의 상인');
-  await bagTab(game);
-  check(await game.press('상인'), '노점 곁에서 가방에 [상인] 탭');
+  check(await bagTab(game, '상인'), '노점 곁에서 [상인 도라와 말하기] → [거래]로 상점 창(U3)');
   await game.press('말 걸기');
   check(((await game.inventory()).friends || {}).merchant > 0, '[말 걸기]로 호감이 오른다');
   await game.press('사기');
@@ -1413,8 +1444,7 @@ async function npc(browser) {
   await game.send('goto near AlchemyTable; hearts alchemist 1');
   await game.wait(800);
   await game.shot('alchemist', '연금술사의 탁자');
-  await bagTab(game);
-  check(await game.press('연금술사'), '연금술사 곁에서 가방에 [연금술사] 탭');
+  check(await bagTab(game, '연금술사') && /^연금술사/.test((await game.state()).shopkeeper), '연금술사 곁에서 그의 상점 창');
   await game.press('이야기');
   check((await game.find('아직 모자라다')).length === 1 || (await game.find('건네기')).length === 1, '연금술사의 [이야기] 첫 단계(빛 버섯 연구)가 보인다');
   await game.shot('alchemist-story', '연금술사의 [이야기]');
@@ -1431,10 +1461,10 @@ async function npc(browser) {
   for (const [tile, role] of [['SmithStall', '대장장이'], ['FisherHut', '어부']]) {
     await game.send(`goto near ${tile}`);
     await game.wait(800);
-    await bagTab(game);
-    check((await game.find(role)).length === 1, `${role} 곁에서 가방 탭 이름이 "${role}"`);
-    await game.press(role);
-    await game.shot(`npc-${tile}`, `${role}의 탭`);
+    const opened = await bagTab(game, role);
+    const keeper = (await game.state()).shopkeeper;
+    check(opened && keeper.startsWith(role), `${role} 곁에서 그의 상점 창 (${keeper || '없음'})`);
+    await game.shot(`npc-${tile}`, `${role}의 상점 창`);
     await closeBag(game);
   }
 
@@ -1463,8 +1493,8 @@ async function npc(browser) {
   await game.shot('moved-in', '방으로 이사 온 상인');
   await bagTab(game, '상인');
   check((await game.find('이사 권하기')).length === 0 && (await game.find('말 걸기')).length + (await game.find('오늘은 이야기했다')).length === 1,
-    '방에서도 [상인] 탭이 열리고 [이사 권하기]는 없다');
-  await game.shot('moved-in-tab', '방에 사는 상인의 탭');
+    '방에서도 상점 창이 열리고 [이사 권하기]는 없다');
+  await game.shot('moved-in-tab', '방에 사는 상인의 상점 창');
   await closeBag(game);
   await game.context.close();
 }
@@ -3495,8 +3525,7 @@ async function firstRun(browser, profile, hourLong) {
 
     // Ten coins: what the merchant buys of the bag (fish, ore, mushrooms), at the stall near the spawn.
     await taken('near MerchantStall', '상인 노점으로 갈 때');
-    await bagTab(game);
-    await game.press('상인');
+    await bagTab(game, '상인');
     await game.press('팔기');
     for (let i = 0; i < 40 && count(await inv(), 'coin') < 10; i++) {
       const sell = (await game.find('팔기')).find(b => b.enabled && b.shown && /광석|송사리|메기|송어|게 ×|새우|버섯|젤/.test(b.row || ''));
@@ -4960,7 +4989,7 @@ async function screens(browser) {
     const quiet = await game.until(t => !t.talking, 3000);
     check(!!quiet && quiet.playing, 'Esc는 대화를 닫고 게임은 그대로');
 
-    // G next to a workbench opens the bag's crafting; by an anvil its gear; a machine ahead is switched first.
+    // G next to a workbench opens its station window (U3); by an anvil the anvil's window; a machine ahead is switched first.
     // Open floor outside the places: "goto biome Cave" lands on the first village's waypoint, and an open
     // waypoint in reach (1.6 tiles) is met before a workbench.
     await game.send('goto wild');
@@ -4970,19 +4999,21 @@ async function screens(browser) {
     await game.wait(700);
     s = await game.state();
     check(s.meet === 'Station', `작업대 곁에서 G는 작업대 열기 (${s.meet})`);
+    const benchButton = (await game.buttons()).find(b => /^작업대 열기/.test(b.label));
+    check(!!benchButton && /\(G\)$/.test(benchButton.label), `작업대 위에 [작업대 열기 (G)] (${benchButton ? benchButton.label : '없음'})`);
     await game.page.keyboard.press('g');
-    const bench = await game.until(t => t.window === '가방', 3000);
-    check(!!bench && bench.bagPage === '재료·제작', `G로 작업대의 제작(가방 [재료·제작])이 열린다 (${bench ? bench.bagPage : '닫힘'})`);
-    await game.shot('screens-pc-g-workbench', 'G로 연 작업대 제작');
-    await game.page.keyboard.press('Tab');
+    const bench = await game.until(t => t.window === '작업대', 3000);
+    check(!!bench, `G로 작업대 창이 열린다(U3) (${bench ? bench.window : '닫힘'})`);
+    await game.shot('screens-pc-g-workbench', 'G로 연 작업대 창');
+    await game.page.keyboard.press('Escape');
     await game.until(t => t.window === '', 3000);
     await game.send('build Anvil 0 1');
     await game.wait(600);
     s = await game.state();
-    check(s.meet === 'Anvil', `모루 곁에서 G는 모루(가방 [장비]) (${s.meet})`);
+    check(s.meet === 'Anvil', `모루 곁에서 G는 모루 창 (${s.meet})`);
     await game.page.keyboard.press('g');
-    const anvil = await game.until(t => t.window === '가방', 3000);
-    check(!!anvil && anvil.bagPage === '장비', `G로 가방 [장비]가 열린다 (${anvil ? anvil.bagPage : '닫힘'})`);
+    const anvil = await game.until(t => t.window === '모루', 3000);
+    check(!!anvil, `G로 모루 창이 열린다(U3) (${anvil ? anvil.window : '닫힘'})`);
     await game.page.keyboard.press('Escape');
     await game.until(t => t.window === '', 3000);
     await game.send('build Drill 0 -1 3; face 0 -1');
@@ -5049,7 +5080,219 @@ async function screens(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens };
+// ---------------------------------------------------------------- 만남 화면 (Docs/UiRework.md U3)
+// The talk box (portrait, the speaker's band and hearts, the words, G·Space·Enter·a tap·[다음] going on, the answers),
+// a stall keeper's talk and her shop (사기·팔기·선물·부탁), the chest, the workbench and the anvil windows; on a PC, a
+// small phone held upright and a small phone held sideways. Photos of each.
+const inScreen = (r, w, h) => r && r[2] > 0 && r[0] >= -0.5 && r[1] >= -0.5 && r[0] + r[2] <= w + 0.5 && r[1] + r[3] <= h + 0.5;
+const overlapping = (a, b) => a && b && a[0] < b[0] + b[2] && b[0] < a[0] + a[2] && a[1] < b[1] + b[3] && b[1] < a[1] + a[3];
+
+async function encounter(browser) {
+  {
+    note('\n## 만남 화면 PC 1280×720 (U3)\n');
+    const game = await open(browser, run, Profiles.pc, url);
+    check(await game.startSolo(), '혼자 하기가 시작된다');
+    await game.wait(1500);
+    await game.send('still');
+    await game.wait(600);
+    // The chief's talk: five lines, his portrait, his band.
+    await game.send('goto person chief');
+    await game.wait(900);
+    let s = await game.state();
+    check(s.meet === 'Person', `촌장 곁에서 G는 말하기 (${s.meet})`);
+    await game.page.keyboard.press('g');
+    s = (await game.until(t => t.talking, 3000)) || (await game.state());
+    check(s.talking && /^chief:/.test(s.portrait), `G로 촌장과 말하고 대화 상자에 그의 초상 (${s.portrait || '없음'})`);
+    check(!s.talkTyping, '시험에서는 대사가 바로 다 나온다(타자 효과는 시험과 "움직임: 줄이기"에서 끈다)');
+    check(inScreen(s.ui.talk, 1280, 720), `대화 상자가 화면 안 (${(s.ui.talk || []).map(Math.round).join(',')})`);
+    check(!(await game.buttons()).some(b => /^(skill|quick|potion)/.test(b.label)), '대화 동안 스킬 칸·퀵슬롯은 그리지 않는다');
+    await game.shot('encounter-talk', '촌장과의 대화(초상·인물 색 띠·대사)');
+    // Going on: Space, Enter, a click on the words, [다음].
+    const lines = [s.talkLine];
+    await game.page.keyboard.press('Space');
+    await game.wait(400);
+    lines.push((await game.state()).talkLine);
+    await game.page.keyboard.press('Enter');
+    await game.wait(400);
+    lines.push((await game.state()).talkLine);
+    await game.press('대화 넘기기');
+    lines.push((await game.state()).talkLine);
+    check(new Set(lines).size === 4, `Space·Enter·대사 누르기가 다음 줄로 넘긴다 (${lines.join(' → ')})`);
+    for (let i = 0; i < 8 && (await game.press('다음', undefined, { quiet: true })); i++) await game.wait(200);
+    await game.shot('encounter-talk-last', '마지막 줄의 [알겠다]');
+    check(await game.press('알겠다'), '마지막 줄에서 [알겠다]');
+    s = (await game.until(t => t.journeyTaken && !t.talking, 3000)) || (await game.state());
+    check(s.journeyTaken && !s.talking, '[알겠다]로 단계를 받고 대화가 닫힌다');
+    // A question: the queen at step 9 asks; her answers come under her words.
+    await game.send('journey 9; goto person queen');
+    await game.wait(1200);
+    await game.press(/여왕 세라핀과 말하기/);
+    for (let i = 0; i < 12 && (await game.press('다음', undefined, { quiet: true })); i++) await game.wait(200);
+    s = await game.state();
+    check(/^queen:/.test(s.portrait), `여왕의 초상 (${s.portrait})`);
+    await game.shot('encounter-talk-choice', '여왕의 물음과 답(초상의 표정)');
+    check(await game.press('아무것도 없었다고 한다'), '답을 고른다');
+    await game.wait(800);
+    for (let i = 0; i < 12 && (await game.press('다음', undefined, { quiet: true })); i++) await game.wait(200);
+    await game.press('알겠다', undefined, { quiet: true });
+    await game.press('닫기', undefined, { quiet: true });
+
+    // A stall keeper: her button with (G), G talks, her choices, [거래] her shop.
+    await game.send('goto near MerchantStall; give coin 300; give copper_ore 30; give star_melon 1');
+    await game.wait(1200);
+    s = await game.state();
+    const keeper = s.shopkeeper;
+    check(/^상인/.test(keeper), `노점 곁에 상인 (${keeper || '없음'})`);
+    const button = (await game.buttons()).find(b => /(와|과) 말하기/.test(b.label) && b.label.startsWith(keeper));
+    check(!!button, `상인 위에 [${keeper}와 말하기] (${button ? button.label : '없음'})`);
+    if (s.meet === 'Merchant') {
+      check(/\(G\)$/.test(button ? button.label : ''), '상인의 말하기 단추에 (G)');
+      await game.page.keyboard.press('g');
+    } else if (button) await game.press(button.label);
+    s = (await game.until(t => t.talking, 3000)) || (await game.state());
+    check(s.talking && /^merchant:/.test(s.portrait), `상인과 말하고 그의 초상 (${s.portrait || '없음'})`);
+    const choices = (await game.buttons()).map(b => b.label);
+    check(['거래', '부탁', '선물', '이야기', '닫기'].every(l => choices.includes(l)), `상인의 고를 것 [거래][부탁][선물][이야기][말 걸기][닫기] (${choices.filter(l => /거래|부탁|선물|이야기|말 걸기|닫기/.test(l)).join(', ')})`);
+    await game.shot('encounter-merchant-talk', '상인과의 대화(하트, 고를 것)');
+    check(await game.press('거래'), '[거래]를 누른다');
+    s = (await game.until(t => t.window === '상점', 3000)) || (await game.state());
+    check(s.window === '상점' && s.shopTab === '사기' && !s.talking, `[거래]로 상점 창의 [사기], 대화는 닫힌다 (${s.window}, ${s.shopTab})`);
+    check(inScreen(s.ui.window, 1280, 720) && s.ui.window[0] + s.ui.window[2] <= 1280 - 130, `상점 창이 화면 안, 미니맵 칸 왼쪽 (${s.ui.window.map(Math.round).join(',')})`);
+    check((await game.find('사기', /^회복 물약/)).length > 0, '[사기]에 회복 물약 카드');
+    await game.shot('encounter-shop-buy', '상점 창 [사기](천막 머리, 초상, 카드, 가방 칸)');
+    const potions = ((await game.inventory()).consumables || {}).healing_potion || 0;
+    await game.press('사기', '회복 물약');
+    check(!!(await game.until(i => ((i.consumables || {}).healing_potion || 0) === potions + 1, 3000, game.inventory)), '카드의 [사기]로 회복 물약을 산다');
+    await game.press('팔기');
+    const ore = count(await game.inventory(), 'copper_ore');
+    await game.press('팔기', /^구리 광석 ×/);
+    check(!!(await game.until(i => count(i, 'copper_ore') === ore - 1, 3000, game.inventory)), '[팔기]의 카드로 구리 광석 하나를 판다');
+    await game.shot('encounter-shop-sell', '상점 창 [팔기]');
+    await game.press('선물');
+    await game.press('선물', '별 수박');
+    await game.wait(600);
+    check(((await game.inventory()).friends || {}).merchant > 0, '[선물]로 호감이 오른다');
+    await game.press('부탁');
+    await game.shot('encounter-shop-request', '상점 창 [부탁]');
+    check(await game.press('창 닫기') && !!(await game.until(t => t.window === '', 3000)), '머리의 [창 닫기]로 상점이 닫힌다');
+
+    // The chest, the workbench and the anvil out in the wild, each with its button over it.
+    await game.send('goto wild');
+    await game.wait(1200);
+    await clearRoom(game, 3, 2);
+    await game.send('build Chest -1 0; build Workbench 1 0; build Anvil 0 2; give stone 20; give copper_ore 12; give essence 60; give iron_bar 10');
+    await game.wait(900);
+    const over = (await game.buttons()).map(b => b.label);
+    check(['상자 열기', '작업대 열기', '모루 열기'].every(w => over.some(l => l.startsWith(w))), `상자·작업대·모루 위에 여는 단추 (${over.filter(l => /열기/.test(l)).join(', ')})`);
+    await game.shot('encounter-buttons', '상자·작업대·모루 위의 단추');
+    check(await game.press(/^상자 열기/) && !!(await game.until(t => t.window === '상자', 3000)), '[상자 열기]로 상자 창');
+    await game.press('넣기', /^돌 ×/);
+    check(((await game.look(-1, 0)).chest || {}).stone > 0, '상자 창의 [넣기]로 돌이 상자에');
+    await game.shot('encounter-chest', '상자 창(상자와 가방 두 판)');
+    await game.press('꺼내기', /^돌 ×/);
+    check(!((await game.look(-1, 0)).chest || {}).stone, '상자 창의 [꺼내기]로 다시 가방에');
+    await game.page.keyboard.press('Escape');
+    await game.until(t => t.window === '', 3000);
+    check(await game.press(/^작업대 열기/) && !!(await game.until(t => t.window === '작업대', 3000)), '[작업대 열기]로 작업대 창');
+    const swords = items(await game.inventory(), 'copper_sword');
+    check(await game.press('만들기', /^구리 검/), '작업대 창의 구리 검 카드에서 [만들기]');
+    await game.wait(800);
+    await game.shot('encounter-station', '작업대 창(만드는 중 막대, 조합법 카드, 재료)');
+    check(!!(await game.until(i => items(i, 'copper_sword') + (i.worn.Weapon === 'copper_sword' ? 1 : 0) > swords, 6000, game.inventory)), '작업대 창에서 구리 검이 만들어진다');
+    await game.page.keyboard.press('Escape');
+    await game.until(t => t.window === '', 3000);
+    await game.send('drop item iron_sword rare');
+    await game.wait(1500);
+    check(await game.press(/^모루 열기/) && !!(await game.until(t => t.window === '모루', 3000)), '[모루 열기]로 모루 창');
+    await pick(game, /철 검/);
+    await game.shot('encounter-anvil', '모루 창(장비 칸과 다듬기 판)');
+    check(await game.press(/^강화 \+1/), '모루 창에서 철 검의 [강화 +1]');
+    check(!!(await game.until(i => i.items.some(x => x.base === 'iron_sword' && x.upgrade === 1), 3000, game.inventory)), '철 검이 +1');
+    // Walking away shuts the window.
+    await game.send('goto 6 0');
+    check(!!(await game.until(t => t.window === '', 3000)), '모루 곁을 떠나면 모루 창이 닫힌다');
+    await game.context.close();
+  }
+
+  for (const profileName of ['phone-small', 'phone-wide-small']) {
+    const profile = Profiles[profileName];
+    const { width, height } = profile.context.viewport;
+    note(`\n## 만남 화면 ${profileName} ${width}×${height} (U3)\n`);
+    const game = await open(browser, run, profile, url);
+    check(await game.press('게임 시작'), '[게임 시작]을 탭한다');
+    check(await game.press('혼자 하기'), '[혼자 하기]를 탭한다');
+    check(!!(await game.until(t => t.playing, 25000)), '탭으로 게임이 시작된다');
+    await game.page.touchscreen.tap(width / 2, height / 3);
+    await game.wait(800);
+    await game.send('still');
+    await game.wait(600);
+    const column = (await game.buttons()).filter(b => b.label === '가방' || b.label === '메뉴' || b.label === '지도');
+    await game.send('goto person chief');
+    await game.wait(900);
+    check(await game.press(/촌장 바르도와 말하기/), '[촌장 바르도와 말하기]를 탭한다');
+    let s = (await game.until(t => t.talking, 3000)) || (await game.state());
+    const talk = s.ui.talk;
+    check(s.talking && /^chief:/.test(s.portrait), `대화 상자에 촌장의 초상 (${s.portrait || '없음'})`);
+    check(inScreen(talk, width, height), `대화 상자가 화면 안 (${(talk || []).map(Math.round).join(',')})`);
+    const drawn = await game.buttons();
+    check(!drawn.some(b => /^(skill|quick|potion)/.test(b.label)), '대화 동안 퀵슬롯·스킬 칸을 그리지 않는다(대화 상자가 퀵슬롯을 덮지 않는다)');
+    const hidden = column.filter(c => overlapping(talk, c.rect));
+    check(hidden.length === 0, `대화 상자가 미니맵·[가방]·[메뉴]를 덮지 않는다 (${hidden.map(c => c.label).join(', ') || '없음'})`);
+    const next = drawn.find(b => b.label === '다음');
+    check(!!next && next.rect[3] >= 40 - 0.5, `[다음]이 손가락 크기 (${next ? Math.round(next.rect[3]) : '-'})`);
+    await game.shot('encounter-talk', '대화 상자(초상, 띠, 대사)');
+    const before = s.talkLine;
+    await game.press('대화 넘기기');
+    check((await game.state()).talkLine !== before, `대사를 탭하면 다음 줄 (${before} → ${(await game.state()).talkLine})`);
+    await game.page.keyboard.press('Escape');
+    await game.until(t => !t.talking, 2000);
+
+    await game.send('goto near MerchantStall; give coin 300; give copper_ore 30');
+    await game.wait(1200);
+    s = await game.state();
+    check(await game.press(new RegExp(`^${s.shopkeeper}(와|과) 말하기`)), `[${s.shopkeeper}와 말하기]를 탭한다`);
+    s = (await game.until(t => t.talking, 3000)) || (await game.state());
+    const small = (await game.buttons()).filter(b => /^(거래|부탁|선물|이야기|말 걸기|닫기)$/.test(b.label) && b.rect[3] < 40 - 0.5);
+    check(s.talking && small.length === 0, `상인의 고를 것이 손가락 크기 (${small.map(b => b.label).join(', ') || '모두'})`);
+    check(inScreen(s.ui.talk, width, height), '상인의 대화 상자가 화면 안');
+    await game.shot('encounter-merchant-talk', '상인과의 대화');
+    check(await game.press('거래') && !!(await game.until(t => t.window === '상점', 3000)), '[거래]로 상점 창');
+    s = await game.state();
+    const w = s.ui.window;
+    check(w[0] <= 5 && w[1] <= 5 && w[0] + w[2] >= width - 5 && w[1] + w[3] >= height - 5, `휴대폰에서 상점은 화면 전체 시트 (${w.map(Math.round).join(',')})`);
+    const labels = (await game.buttons()).map(b => b.label);
+    check(!labels.includes('가방') && !labels.includes('메뉴'), '상점 시트 아래의 [가방]·[메뉴]는 그리지 않는다');
+    const outside = (await game.buttons()).filter(b => b.shown && (b.rect[0] < -0.5 || b.rect[0] + b.rect[2] > width + 0.5));
+    check(outside.length === 0, `상점의 단추가 옆으로 넘치지 않는다 (${outside.map(b => b.label).slice(0, 4).join(', ') || '모두 안'})`);
+    await game.shot('encounter-shop', '상점 시트 [사기]');
+    await game.press('팔기');
+    const ore = count(await game.inventory(), 'copper_ore');
+    await game.press('팔기', /^구리 광석 ×/);
+    check(!!(await game.until(i => count(i, 'copper_ore') === ore - 1, 3000, game.inventory)), '탭으로 구리 광석 하나를 판다');
+    await game.shot('encounter-shop-sell', '상점 시트 [팔기]');
+    check(await game.press('창 닫기') && !!(await game.until(t => t.window === '', 3000)), '[창 닫기]로 상점이 닫힌다');
+
+    await game.send('goto wild');
+    await game.wait(1200);
+    await clearRoom(game, 3, 2);
+    await game.send('build Chest -1 0; build Workbench 1 0; give stone 20; give copper_ore 12');
+    await game.wait(900);
+    check(await game.press(/^작업대 열기/) && !!(await game.until(t => t.window === '작업대', 3000)), '[작업대 열기]를 탭해 작업대 시트');
+    const make = (await game.find('만들기')).filter(b => b.shown);
+    check(make.length > 0 && make.every(b => b.rect[3] >= 40 - 0.5), `작업대의 [만들기]가 손가락 크기 (${make.length}개)`);
+    await game.shot('encounter-station', '작업대 시트');
+    await game.press('창 닫기');
+    await game.until(t => t.window === '', 3000);
+    check(await game.press(/^상자 열기/) && !!(await game.until(t => t.window === '상자', 3000)), '[상자 열기]를 탭해 상자 시트');
+    await game.press('넣기', /^돌 ×/);
+    check(((await game.look(-1, 0)).chest || {}).stone > 0, '탭으로 상자에 돌을 넣는다');
+    await game.shot('encounter-chest', '상자 시트');
+    await game.press('창 닫기');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

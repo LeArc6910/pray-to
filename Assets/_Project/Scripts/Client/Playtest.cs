@@ -64,6 +64,7 @@ namespace Game.Client
     //   goto droom <letter> [n]   in the dungeon: just inside the nth room of that letter (E C K L M R B X T S H), on its way in;
     //   goto chest                by the end chest;   goto stone   by the rest room's shortcut stone
     //   scene dungeon             on the nearest dungeon gate, the monsters held
+    //   scene encounter           (U3) a chest west, a workbench east, an anvil two north, stone, ore, essence and bars
     //   traps                     JSON: the nearest trap room: phase, band, wave, the grates down on host and screen, who is
     //                             shut in, the chest (opened, usable on host and screen), the banners shown
     //   rooms                     JSON: the generator's version, how many rooms of each role, chunks, cracked ways, roads
@@ -79,8 +80,11 @@ namespace Game.Client
     //   look <dx> <dy>            JSON: the tile, its machine, chest or crop
     //   inventory                 JSON: the bag
     //   attack on|off [x y]       face <x> <y> | face off   skill <slot>   bag on|off|<tab name>
-    //   screen <name>|off|hub     a screen by name (가방 스킬 특성 캐릭터 일지 지도, or skills passives ...), none, or the
-    //                             touch hub; "bag <tab>" opens the old tab names on the screen that has them now (U2)
+    //   screen <name>|off|hub     a screen by name (가방 스킬 특성 캐릭터 일지 지도, the encounter windows 상점 상자 작업대
+    //                             모루, or skills passives shop chest station anvil ...), none, or the touch hub; "bag <tab>"
+    //                             opens the old tab names on the screen that has them now (U2; 상인 and 상자 the shop and
+    //                             chest windows, U3). An encounter window shuts at once with nothing of its kind in reach
+    //   talk merchant             (U3) the talk of the stall keeper in reach, as her button or G would
     //   roll                      the dodge roll, as its key or button would (the way walked, or faced)
     //   rollhit <amount> <ticks>  a blow on the player that many host ticks into their next roll (its unhurt ticks)
     //   nav <target>   sense   botreport [name]   botreset      the bot by the Core's state (PlaytestBot.cs), with probe on
@@ -423,6 +427,8 @@ namespace Game.Client
                     return $"ok stones {world.OpenStones(player).Count()}/{world.Stones.Count}";
                 // Rumours instead of arrows, and slow rest (2026-11-22, 묶음 4c).
                 case "talk":
+                    if (words.Length > 1 && words[1] == "merchant")
+                        return root.TalkMerchantNear() ? null : "error talk: no stall keeper in reach";
                     if (!root.TalkNear()) return "error talk: nobody of the story in reach";
                     return "talk " + new Json('{').Field("text", root.TalkText ?? "").Field("rumor", root.LastRumor ?? "").Close('}');
                 case "rumors":
@@ -1195,6 +1201,21 @@ namespace Game.Client
 
             switch (scene)
             {
+                // The encounter windows' things (Docs/UiRework.md U3): floor round the player, a chest west, a workbench
+                // east, an anvil two tiles north, each with its [… 열기] over it; stone, copper ore, essence and iron bars
+                // in the bag to put away, make and refine with.
+                case "encounter":
+                    for (int dx = -3; dx <= 3; dx++)
+                        for (int dy = -2; dy <= 2; dy++)
+                            if (dx != 0 || dy != 0) Lay((px + dx, py + dy, TileType.Floor));
+                    Lay((px - 1, py, TileType.Chest), (px + 1, py, TileType.Workbench), (px, py + 2, TileType.Anvil));
+                    foreach (var (id, count) in new[] { ("stone", 20), ("copper_ore", 12), ("essence", 40), ("iron_bar", 10) })
+                    {
+                        var material = loot.FindMaterial(id);
+                        if (material != null) player.Inventory.AddMaterial(material, count);
+                    }
+                    player.InventoryVersion++;
+                    break;
                 // On the nearest dungeon gate with the monsters held (묶음 5a): its button shows over it.
                 case "dungeon":
                     var gate = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault()
@@ -1377,7 +1398,7 @@ namespace Game.Client
             {
                 list.Item(new Json('{').Field("label", drawn.Label).Field("row", drawn.Row.Replace('\n', ' ')).Field("rect", Rect(drawn.Rect)).Field("enabled", drawn.Enabled).Field("shown", drawn.Shown).Raw('}'));
             }
-            if (root.Playing && !root.BagOpen && !root.MapOpen)
+            if (root.Playing && !root.BagOpen && !root.MapOpen && !root.Talking)
             {
                 int skills = root.SkillCount;
                 for (int slot = 0; slot <= skills; slot++)
@@ -1499,12 +1520,20 @@ namespace Game.Client
             // The bag's page (장비, 재료·제작, 상자, 상인) and whether a talk is on screen.
             json.Field("bagPage", root.BagPage);
             json.Field("talking", root.TalkText != null);
+            // The talk box (U3): its line still being typed, the portrait ("merchant:Happy", "" without one), which line of
+            // how many ("2/5"); the shop's tab, and the stall keeper in reach (her name, "" for none). Where the box was
+            // drawn is ui.talk.
+            json.Field("talkTyping", root.TalkTyping);
+            json.Field("portrait", root.TalkPortrait);
+            json.Field("talkLine", root.TalkLine);
+            json.Field("shopTab", root.ShopTab);
+            json.Field("shopkeeper", root.Shopkeeper);
             json.Field("speed", root.HostTicksPerStep);
             // Where the UI's parts were drawn (U0·U1, sweep.js "ui"): the bag window, the "획득" lines, the boss bar, the
             // left column's bottom (the HUD and goal list) and whether the goal list is folded, the player on the screen,
             // and the frames' device pixels per art pixel.
             json.Field("ui", new Json('{').Field("bag", Rect(root.BagOpen ? ScreenStack.AreaOf(root.OpenScreen) : default))
-                .Field("window", Rect(ScreenStack.AreaOf(root.OpenScreen)))
+                .Field("window", Rect(ScreenStack.AreaOf(root.OpenScreen))).Field("talk", Rect(StoryScreen.TalkShown))
                 .Field("acquired", Rect(GameRoot.AcquiredArea)).Field("bossBar", Rect(GameRoot.BossBarShown))
                 .Field("leftBottom", Ui.LeftColumnBottom).Field("folded", root.Playing && GameRoot.TrackerFolds(root.BossShown))
                 .Field("player", Rect(root.PlayerOnScreen)).Field("scale", Ui.Scale).Field("dots", UiSkin.Dots)

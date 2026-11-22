@@ -209,6 +209,100 @@ namespace Game.Client.Tests
             Assert.IsEmpty(problems, string.Join("\n", problems));
         }
 
+        // The encounter windows (Docs/UiRework.md U3: the shop, the chest, the crafting station, the anvil) fit the screens
+        // the person named (a small PC window, a small phone held upright and on its side) and the rest: inside the screen
+        // with room for their two panes under the head, the close button on the screen; a sheet over the whole screen on a
+        // phone (nothing of the HUD under it takes a tap), and elsewhere clear of the minimap column (the minimap and, on a
+        // tablet, [가방]·[메뉴] stay in reach).
+        [Test]
+        public void EveryEncounterWindowFits()
+        {
+            var problems = new List<string>();
+            var sizes = new List<(string Name, float Width, float Height, bool Touch)>
+            {
+                ("작은 PC 창 (U3)", 800, 600, false),
+                ("작은 휴대폰 세로 (U3)", 375, 812, true),
+                ("작은 휴대폰 가로 (U3)", 740, 360, true),
+            };
+            sizes.AddRange(Sizes);
+            foreach (var (name, width, height, touch) in sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Ui.HudHeight = GameRoot.HudBarsHeight;
+                Controls.ForceTouch(touch);
+                string where = $"{name} {width}×{height}";
+                var column = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea) };
+                if (touch) column.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
+                bool phone = touch && (width < 600 || height < 480);
+                foreach (var screen in ScreenStack.Encounters)
+                {
+                    var area = ScreenStack.AreaOf(screen);
+                    string what = $"{where}, {ScreenStack.NameOf(screen)}";
+                    if (!ScreenStack.IsEncounter(screen) || ScreenStack.IsFull(screen)) problems.Add($"{what}: 만남 화면이 아니다");
+                    if (!Inside(area, width, height)) problems.Add($"{what}: 화면 밖 {area}");
+                    var inside = UiSkin.InsideOf(area);
+                    if (inside.width < 300 || inside.height < 240) problems.Add($"{what}: 내용 자리가 좁다 {inside}");
+                    var close = UiSkin.CloseRect(UiSkin.HeadOf(area));
+                    if (!Inside(close, width, height)) problems.Add($"{what}: 닫기 단추가 화면 밖 {close}");
+                    if (phone && (area.width < width - 10 || area.height < height - 10)) problems.Add($"{what}: 휴대폰에서 시트가 아니다 {area}");
+                    if (!phone)
+                        foreach (var (part, rect) in column)
+                            if (Overlap(area, rect)) problems.Add($"{what}: 겹침 - {part}");
+                }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        // The talk box (Docs/UiRework.md 4-2, U3) at the bottom of every screen, with or without a portrait, with one to
+        // three rows of buttons under a line of one to five rows: inside the screen, clear of the minimap column and the
+        // touch buttons, its portrait, words and buttons inside it, the buttons a finger tall on a touch screen. The skill
+        // keys and quick slots are not drawn while it is up (on a phone held upright it lay over them, the U1 sweep), so it
+        // may stand where they were; on a phone held upright it stays in the lower part, a talk of two rows of buttons
+        // under 45% of the height.
+        [Test]
+        public void TheTalkBoxFits()
+        {
+            var problems = new List<string>();
+            var sizes = new List<(string Name, float Width, float Height, bool Touch)>
+            {
+                ("작은 PC 창 (U3)", 800, 600, false),
+                ("작은 휴대폰 세로 (U3)", 375, 812, true),
+                ("작은 휴대폰 가로 (U3)", 740, 360, true),
+            };
+            sizes.AddRange(Sizes);
+            foreach (var (name, width, height, touch) in sizes)
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Controls.ForceTouch(touch);
+                var column = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea) };
+                if (touch) column.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
+                foreach (bool portrait in new[] { true, false })
+                {
+                    foreach (int rows in new[] { 1, 2, 3 })
+                    {
+                        foreach (float text in new[] { 18f, 54f, 90f })
+                        {
+                            var lay = StoryScreen.Lay(text, portrait, rows);
+                            string where = $"{name} {width}×{height}, 초상 {portrait}, 단추 {rows}줄, 글 {text}";
+                            if (!Inside(lay.Panel, width, height)) problems.Add($"{where}: 화면 밖 {lay.Panel}");
+                            foreach (var (part, rect) in column)
+                                if (Overlap(lay.Panel, rect)) problems.Add($"{where}: 겹침 - {part}");
+                            foreach (var (part, rect) in new[] { ("초상", lay.Slot), ("글", lay.Text), ("단추", lay.Actions) })
+                            {
+                                if (part == "초상" && !portrait) continue;
+                                if (!lay.Panel.Contains(rect.min) || !lay.Panel.Contains(rect.max - Vector2.one * 0.01f)) problems.Add($"{where}: {part}이 상자 밖 {rect}");
+                            }
+                            if (portrait && Overlap(lay.Slot, lay.Text)) problems.Add($"{where}: 초상과 글이 겹친다");
+                            if (Overlap(lay.Text, lay.Actions)) problems.Add($"{where}: 글과 단추가 겹친다");
+                            if (touch && lay.Actions.height < rows * 40 - 0.5f) problems.Add($"{where}: 단추가 손가락보다 낮다 {lay.Actions.height}");
+                            if (touch && height > width && rows <= 2 && text <= 54 && lay.Panel.height > height * 0.45f) problems.Add($"{where}: 세로 휴대폰에서 너무 높다 {lay.Panel.height}");
+                        }
+                    }
+                }
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
         // The waypoint and waystone list (StoryScreen.ListArea, 2026-11-22: centred on a phone held upright, the minimap
         // and the [가방]·[나가기] buttons covered its top rows and took their taps) lies inside every screen and clear of
         // the top right column, however long the list.

@@ -263,6 +263,8 @@ namespace Game.Client
             if (ticks == MaxTicksPerFrame) _tickClock = 0;
 
             if (_client.Status != ClientStatus.Playing) return;
+            // An encounter window shuts once its thing is out of reach (walked away from the stall, chest or station).
+            if (ScreenStack.IsEncounter(_screens.Current) && _inventory != null && !_inventory.InReach(_screens.Current)) _screens.Close();
             SaveProgress(Time.deltaTime);
             _view ??= new WorldView(_client, _camera);
             // A world of rooms made before its map was kept under the generator (2026-11-22) left it under the seed alone.
@@ -753,7 +755,14 @@ namespace Game.Client
             bool roll = Controls.TakeRollPress();
             var quick = Controls.TakeHotbarPresses();
             bool machine = Controls.MachinePressed();
+            bool advance = Controls.AdvancePressed();
             if (_screens.Current != GameScreen.None || _screens.HubOpen) return;
+            // While a talk is up, G, Space and Enter go to it (Docs/UiRework.md 4-2): the rest of the line, then the next.
+            if (_storyScreen != null && _storyScreen.TalkOpen && (machine || advance))
+            {
+                _storyScreen.Advance();
+                machine = false;
+            }
             // The roll is the player's own movement (WorldClient.Step), so it waits for the next fixed tick.
             RollPressed |= roll;
             var aim = Controls.SkillAim(_camera, _client.Position);
@@ -770,10 +779,11 @@ namespace Game.Client
         // ---- G, the key that meets things (Docs/UiRework.md U2) ----
 
         // What G would do now, in this order: a machine ahead is switched (its [끄기 (G)]); a person of the story in
-        // reach is talked to; a merchant in reach opens her tab of the bag; an open waypoint or waystone opens its list;
-        // a chest, cart or shrine of the world is used; a dungeon's gate, door or thing; a storage chest by the player
-        // opens the bag's [상자]; an anvil the bag's [장비] (다듬기); a workbench or furnace the bag's [재료·제작]. Facing
-        // a machine wins because that is aimed; a person before a place because talking is what a person is for.
+        // reach is talked to; a stall keeper in reach is talked to (her talk opens her shop, U3); an open waypoint or
+        // waystone opens its list; a chest, cart or shrine of the world is used; a dungeon's gate, door or thing; a storage
+        // chest by the player opens the chest window; an anvil the anvil's window (다듬기); a workbench or furnace the
+        // station's window (U3: each a window of its own, no longer the bag's tabs). Facing a machine wins because that is
+        // aimed; a person before a place because talking is what a person is for.
         internal enum Meeting
         {
             None,
@@ -826,23 +836,67 @@ namespace Game.Client
             {
                 case Meeting.Machine: return ToggleMachine();
                 case Meeting.Person: return _storyScreen.TalkNear();
-                case Meeting.Merchant: return OpenBagPage("상인");
+                case Meeting.Merchant: return _storyScreen.TalkMerchantNear();
                 case Meeting.Waypoint:
                     Sounds.Play(Sound.Click);
                     return _storyScreen.OpenWaypoints();
                 case Meeting.Poi: return UsePoi();
                 case Meeting.Dungeon: return UseDungeon();
-                case Meeting.Chest: return OpenBagPage("상자");
-                case Meeting.Anvil: return OpenBagPage("장비");
-                case Meeting.Station: return OpenBagPage("재료·제작");
+                case Meeting.Chest: return OpenEncounter(GameScreen.Chest);
+                case Meeting.Anvil: return OpenEncounter(GameScreen.Anvil);
+                case Meeting.Station: return OpenEncounter(GameScreen.Station);
                 default: return false;
             }
         }
 
-        bool OpenBagPage(string page)
+        bool OpenEncounter(GameScreen screen)
         {
-            _inventory.Show(page);
+            Sounds.Play(Sound.Click);
+            _inventory.ShowEncounter(screen);
             return true;
+        }
+
+        // Buttons over the storage chest, the crafting stations and the anvil in reach (U3, Docs/UiRework.md U2 남은 문제:
+        // a workbench had no sign that G opens it), for a finger or the mouse; on a PC the one G would open says "(G)".
+        void DrawStationButtons()
+        {
+            if (_client.Riding || _client.Map == null) return;
+            if (_client.Chest.IsOpen) StationButton(_client.Chest.X, _client.Chest.Y, "상자 열기" + MeetHint(Meeting.Chest), GameScreen.Chest);
+            foreach (var (tile, name, screen, meeting) in new[] { (TileType.Anvil, "모루", GameScreen.Anvil, Meeting.Anvil), (TileType.Workbench, "작업대", GameScreen.Station, Meeting.Station), (TileType.Furnace, "화로", GameScreen.Station, Meeting.Station) })
+            {
+                if (NearestTile(tile) is not (int x, int y)) continue;
+                StationButton(x, y, $"{name} 열기" + MeetHint(meeting), screen);
+            }
+        }
+
+        void StationButton(int x, int y, string text, GameScreen screen)
+        {
+            Vector3 point = _camera.WorldToScreenPoint(new Vector3(x + 0.5f, y + 1.45f, 0));
+            if (point.z < 0) return;
+            float width = Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length);
+            if (Ui.WorldButton(Ui.FromScreen(point), text, width)) OpenEncounter(screen);
+        }
+
+        // The nearest tile of the kind within reach of the player (World.StationReach), or null.
+        (int X, int Y)? NearestTile(TileType tile)
+        {
+            var map = _client.Map;
+            int r = (int)Mathf.Ceil(World.StationReach) + 1;
+            int cx = TileMap.Cell(_client.Position.X), cy = TileMap.Cell(_client.Position.Y);
+            (int, int)? best = null;
+            float bestDistance = float.MaxValue;
+            for (int y = cy - r; y <= cy + r; y++)
+            {
+                for (int x = cx - r; x <= cx + r; x++)
+                {
+                    if (!map.InBounds(x, y) || map[x, y] != tile) continue;
+                    float distance = Vec2.Distance(_client.Position, TileMap.Center(x, y));
+                    if (distance > World.StationReach || distance >= bestDistance) continue;
+                    best = (x, y);
+                    bestDistance = distance;
+                }
+            }
+            return best;
         }
 
         // On a PC, " (G)" after the label of a button over the thing G would meet now, so the key is learnt.
@@ -997,6 +1051,15 @@ namespace Game.Client
         // The talk and the rumours (묶음 4c), for the playtests.
         internal bool TalkNear() => _storyScreen != null && _storyScreen.TalkNear();
         internal string TalkText => _storyScreen?.TalkText;
+        // The talk box (U3): whether one is up, its line still being typed, the portrait ("id:Expression"), where it was
+        // drawn; a stall keeper's talk in reach; the shop's tab and who keeps the stall in reach.
+        internal bool Talking => _storyScreen != null && _storyScreen.TalkOpen;
+        internal bool TalkTyping => _storyScreen != null && _storyScreen.Typing;
+        internal string TalkPortrait => _storyScreen?.PortraitShown ?? "";
+        internal string TalkLine => _storyScreen?.LineShown ?? "";
+        internal bool TalkMerchantNear() => _storyScreen != null && _storyScreen.TalkMerchantNear();
+        internal string ShopTab => _inventory?.ShopTab ?? "";
+        internal string Shopkeeper => _client?.NpcNear()?.Npc.Name ?? "";
         internal string LastRumor => _storyScreen?.LastRumor;
         internal MapView Map => _map;
 
@@ -1065,7 +1128,9 @@ namespace Game.Client
             // Clicking in the bag, on a screen or the hub should not swing the sword; a full screen also holds the walk
             // (Docs/UiRework.md U2: the world takes no input under it).
             if (_screens.Current != GameScreen.None || _screens.HubOpen) attack = false;
-            if (_screens.Full) move = Vec2.Zero;
+            // Space goes to a talk on screen, not the sword (Docs/UiRework.md 4-2).
+            if (_storyScreen != null && _storyScreen.TalkOpen && Controls.SpaceHeld) attack = false;
+            if (_screens.Covers) move = Vec2.Zero;
             if (HoldAttack) attack = true;
             // A tap on the attack stick without pulling it swings at the nearest foe rather than where one walks
             // (Docs/WebDemo.md 터치, 2026-11-11, the research report's candidate 16).
@@ -1331,7 +1396,7 @@ namespace Game.Client
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _screens = NewScreens();
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens);
-            _storyScreen = new StoryScreen(_client, SendToHost, () => _map);
+            _storyScreen = new StoryScreen(_client, SendToHost, () => _map) { OpenShop = tab => _inventory?.ShowShop(tab) };
             _host.Receive(LocalConnection, _client.JoinMessage());
             _mode = mode;
             _status = "";
@@ -1385,7 +1450,7 @@ namespace Game.Client
             _hotbar = new Hotbar(_client, _loot, CharacterName);
             _screens = NewScreens();
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens);
-            _storyScreen = new StoryScreen(_client, SendToHost, () => _map);
+            _storyScreen = new StoryScreen(_client, SendToHost, () => _map) { OpenShop = tab => _inventory?.ShowShop(tab) };
             _joinSent = false;
             _net.Connected += id =>
             {
@@ -1553,23 +1618,33 @@ namespace Game.Client
             // A full screen (growth, records) covers everything, and nothing else is drawn under it: the world darkened
             // 70% and red at the edges while the player is hurt, no HUD for its title to sit on, and no button a tap meant
             // for the screen could press instead (Docs/UiRework.md 4-5 전체 화면, 4-7 그리는 순서).
-            if (_screens.Full && _client.Status == ClientStatus.Playing)
+            // On a phone an encounter window is a sheet over everything too (U3): no HUD piece under it takes its taps.
+            if (_screens.Covers && _client.Status == ClientStatus.Playing)
             {
                 DrawFullScreen();
                 return;
             }
-            bool bag = _screens.Current == GameScreen.Bag;
+            // The bag or an encounter window beside the world (Docs/UiRework.md U3): the HUD is its bars, no world button,
+            // skill key or quick slot is drawn under it.
+            bool side = _screens.Current != GameScreen.None;
+            var window = side ? ScreenStack.AreaOf(_screens.Current) : default;
             _view?.DrawGui();
-            DrawHud(compact: bag);
+            DrawHud(compact: side);
             _view?.DrawBanner();
             // The "획득: …" lines under every window (Docs/UiRework.md 4-7 그리는 순서): drawn after the bag, they ran
             // over it on a phone (phone-bag-gear).
             DrawAcquired();
-            // Not while the bag or the hub is open: skills cannot be used then (ReadSkillPress), a tap in the window must
-            // not fire one, and a slot would show in the gap beside the window. Nor under the waypoint list: a button
-            // drawn before it would take a tap meant for one of its rows (2026-11-22, the web sweep on a phone).
-            if (_storyScreen != null) _storyScreen.KeyHint = MeetHint(Meeting.Person);
-            if (_client.Status == ClientStatus.Playing && !bag && !_screens.HubOpen && !(_storyScreen?.ListOpen ?? false))
+            // Not while the bag, a window or the hub is open: skills cannot be used then (ReadSkillPress), a tap in the
+            // window must not fire one, and a slot would show in the gap beside the window. Nor under the waypoint list: a
+            // button drawn before it would take a tap meant for one of its rows (2026-11-22, the web sweep on a phone).
+            // While a talk is up its box sits where the skill keys and quick slots are, which are not drawn then
+            // (Docs/UiRework.md 4-2; on a phone held upright the box lay over the quick slots, the U1 sweep).
+            if (_storyScreen != null)
+            {
+                _storyScreen.KeyHint = MeetHint(Meeting.Person);
+                _storyScreen.MerchantKeyHint = MeetHint(Meeting.Merchant);
+            }
+            if (_client.Status == ClientStatus.Playing && !side && !_screens.HubOpen && !(_storyScreen?.ListOpen ?? false))
             {
                 DrawMachineSwitch();
                 DrawPoiButton();
@@ -1577,17 +1652,22 @@ namespace Game.Client
                 DrawBedButton();
                 DrawGetUpButton();
                 DrawRiftButton();
+                if (!(_storyScreen?.TalkOpen ?? false)) DrawStationButtons();
                 _storyScreen?.DrawWorldButtons(_camera);
                 DrawDefenseButton();
-                SkillBar.Draw(_client);
-                _hotbar?.Draw(_client.Skills.Count);
+                if (!(_storyScreen?.TalkOpen ?? false))
+                {
+                    SkillBar.Draw(_client);
+                    _hotbar?.Draw(_client.Skills.Count);
+                }
             }
             // A window closing shrinks away under the one opening.
             UiMotion.DrawGhosts();
-            if (bag) _inventory?.Draw();
+            if (side) _inventory?.Draw();
             // The story's talk and the waypoint list, over the rest (Docs/Story.md).
-            if (_client.Status == ClientStatus.Playing && !bag) _storyScreen?.DrawPanels();
-            _map?.DrawMinimap(Ui.MinimapArea);
+            if (_client.Status == ClientStatus.Playing && !side) _storyScreen?.DrawPanels();
+            // Not where a window lies over it (an encounter window on a small screen reaches the column).
+            if (!side || !window.Overlaps(Ui.MinimapArea)) _map?.DrawMinimap(Ui.MinimapArea);
             if (Controls.UsingTouch)
             {
                 DrawTouchButtons();
@@ -1606,7 +1686,7 @@ namespace Game.Client
                 else _screens.Close();
                 return;
             }
-            UiSkin.FullBackdrop(screen);
+            if (_screens.Full) UiSkin.FullBackdrop(screen);
             UiMotion.DrawGhosts();
             _inventory?.Draw();
         }
@@ -1625,7 +1705,7 @@ namespace Game.Client
             slots = Rect.MinMaxRect(Mathf.Min(slots.xMin, quick.xMin), Mathf.Min(slots.yMin, quick.yMin), Mathf.Max(slots.xMax, quick.xMax), slots.yMax);
             float y = slots.x < 14 + width ? slots.y - 6 : Ui.Height - 10;
             float floor = Ui.LeftColumnBottom + 4;
-            Rect? bag = _screens.Current == GameScreen.Bag ? InventoryWindow.AreaOf() : (Rect?)null;
+            Rect? bag = _screens.Current != GameScreen.None ? ScreenStack.AreaOf(_screens.Current) : (Rect?)null;
             var shown = Rect.zero;
             for (int i = _acquired.Count - 1; i >= 0; i--)
             {

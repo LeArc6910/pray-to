@@ -200,6 +200,22 @@ async function playPc(browser, profile) {
   await game.page.keyboard.press('k');
   await game.page.waitForTimeout(400);
   check((await state(game)).window === '', 'K를 다시 누르면 닫힌다');
+  // The encounter windows (Docs/UiRework.md U3): G by a chest opens its window, the workbench's button its own.
+  await send(game, 'scene encounter');
+  await game.page.waitForTimeout(800);
+  await game.page.keyboard.press('g');
+  await game.page.waitForTimeout(600);
+  const chest = await state(game);
+  check(chest.window === '상자', `상자 곁에서 G로 상자 창이 열린다 (${chest.window || '없음'})`);
+  await shot(game, profile, 'chest', '상자 창(상자와 가방 두 판)');
+  await game.page.keyboard.press('Escape');
+  await game.page.waitForTimeout(400);
+  await send(game, 'screen 작업대');
+  await game.page.waitForTimeout(600);
+  const station = await state(game);
+  check(station.window === '작업대', `작업대 창이 열린다 (${station.window || '없음'})`);
+  await shot(game, profile, 'station', '작업대 창(조합법 카드)');
+  await send(game, 'screen off');
 
   await send(game, 'scene machines');
   await game.page.waitForTimeout(3500);

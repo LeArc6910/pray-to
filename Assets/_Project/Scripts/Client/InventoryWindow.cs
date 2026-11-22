@@ -6,12 +6,13 @@ using UnityEngine;
 
 namespace Game.Client
 {
-    // The bag and the screens that were once its tabs (Docs/UiRework.md U2): the bag (Tab or I) with its gear, materials
-    // and crafting, and the chest's and the merchant's tabs while one is in reach; the growth screens (skills K, passives
-    // P, character U) and the journal (J), each its own full-screen window with its own head and close button and the
-    // tabs of its group (ScreenStack). Which is open is the screen manager's (ScreenStack); this draws it. Every button
-    // only asks the host for the change; the window redraws from the next inventory message.
-    sealed class InventoryWindow
+    // The bag and the screens that were once its tabs (Docs/UiRework.md U2, U3): the bag (Tab or I) with its gear,
+    // materials and crafting; the growth screens (skills K, passives P, character U) and the journal (J), each its own
+    // full-screen window with its own head and close button and the tabs of its group (ScreenStack); and the encounter
+    // windows (U3, InventoryWindow.Encounters.cs): a merchant's shop, a chest, a crafting station and the anvil, each
+    // beside the bag's things. Which is open is the screen manager's (ScreenStack); this draws it. Every button only asks
+    // the host for the change; the window redraws from the next inventory message.
+    sealed partial class InventoryWindow
     {
         enum Page
         {
@@ -69,7 +70,8 @@ namespace Game.Client
             _screens = screens ?? new ScreenStack();
         }
 
-        // Whether one of the screens drawn here is up (the bag, a growth screen or the journal; not the map). Setting it
+        // Whether one of the screens drawn here is up (the bag, a growth screen, the journal or an encounter window; not
+        // the map). Setting it
         // true shows the bag (in place of any other screen); false shuts whichever of them is open.
         public bool Open
         {
@@ -83,8 +85,9 @@ namespace Game.Client
 
         public static bool Draws(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Map;
 
-        // The bag's own pages (the rest are screens of their own).
-        static bool InBag(Page page) => page is Page.Gear or Page.Materials or Page.Chest or Page.Merchant;
+        // The bag's own pages (the rest are screens of their own; the chest's and the merchant's are encounter windows
+        // since U3).
+        static bool InBag(Page page) => page is Page.Gear or Page.Materials;
 
         static GameScreen ScreenOf(Page page) => page switch
         {
@@ -117,10 +120,18 @@ namespace Game.Client
             if (Event.current.type == EventType.Repaint && GUILayoutUtility.GetLastRect().Contains(Event.current.mousePosition)) PointsAtSoil = true;
         }
 
-        // Opens the page with that old tab name (장비, 재료·제작, 상자, 상인 in the bag; 스킬, 특성, 캐릭터, 일지, 지도 as
-        // their own screens), for G, the goal list and the tests (Playtest "bag <tab>", the play mode tests' ShowBag).
+        // Opens the page with that old tab name (장비, 재료·제작 in the bag; 스킬, 특성, 캐릭터, 일지, 지도 as their own
+        // screens; 상자 the chest window, 상인 or a stall keeper's role or name the shop, U3), or an encounter window by its
+        // name (상점, 상자, 작업대, 모루), for G, the goal list and the tests (Playtest "bag <tab>", the play mode tests'
+        // ShowBag).
         internal void Show(string page)
         {
+            var meeting = ScreenStack.FromName(page);
+            if (ScreenStack.IsEncounter(meeting) || _client.Npcs != null && _client.Npcs.Npcs.Any(n => n.Role == page || n.Name == page))
+            {
+                ShowEncounter(ScreenStack.IsEncounter(meeting) ? meeting : GameScreen.Shop);
+                return;
+            }
             int index = Array.IndexOf(PageNames, page);
             if (index < 0) throw new ArgumentException($"no bag page '{page}'");
             var chosen = (Page)index;
@@ -151,6 +162,11 @@ namespace Game.Client
             if (_selectedRune != null && _client.Bag.CountOf(_selectedRune) == 0) _selectedRune = null;
 
             var screen = _screens.Current;
+            if (ScreenStack.IsEncounter(screen))
+            {
+                DrawEncounter(screen);
+                return;
+            }
             _page = PageOf(screen);
             var area = Area;
             bool full = ScreenStack.IsFull(screen);
@@ -167,16 +183,11 @@ namespace Game.Client
             Controls.Block(area);
             Wheel(area);
             Ui.TouchScroll(area, ref _scroll[(int)_page]);
-            // The chest tab is there only while a chest is in reach, the merchant's while she is.
-            bool chest = _client.Chest.IsOpen;
-            var person = _client.NpcNear();
-            bool merchant = person != null;
-            // The tab is named for whoever is near: 상인, 대장장이, 어부.
-            if (merchant) PageLabels[(int)Page.Merchant].text = person.Value.Npc.Role;
-            if (!chest && _bagPage == Page.Chest || !merchant && _bagPage == Page.Merchant) _bagPage = Page.Gear;
+            // The chest's and the merchant's pages are windows of their own since U3 (ShowEncounter).
+            if (_bagPage == Page.Chest || _bagPage == Page.Merchant) _bagPage = Page.Gear;
             _page = PageOf(screen);
-            // The tabs of the screen's group: the bag's own pages (with the chest's and merchant's while in reach), the
-            // growth screens, or the records (the journal and the map).
+            // The tabs of the screen's group: the bag's own pages, the growth screens, or the records (the journal and the
+            // map).
             _pages.Clear();
             switch (ScreenStack.GroupOf(screen))
             {
@@ -188,19 +199,15 @@ namespace Game.Client
                     break;
                 default:
                     _pages.AddRange(new[] { Page.Gear, Page.Materials });
-                    if (chest) _pages.Add(Page.Chest);
-                    if (merchant) _pages.Add(Page.Merchant);
                     break;
             }
 
             // The head band says what the screen is (Docs/UiRework.md, the person's pick of 2026-11-22): the bag's
-            // leather, the growth screens' night, the journal's parchment, a merchant's awning with her hearts, a chest's
-            // steel; the coins at its right, and the close button in the corner. On a PC the title carries its key.
+            // leather, the growth screens' night, the journal's parchment; the coins at its right, and the close button
+            // in the corner. On a PC the title carries its key.
             var kind = KindOf(_page);
             string title = _page switch
             {
-                Page.Chest => PageNames[(int)_page],
-                Page.Merchant => person.Value.Npc.Name,
                 _ when screen == GameScreen.Bag => "가방" + ScreenStack.KeyHint(screen),
                 _ => PageNames[(int)_page] + ScreenStack.KeyHint(screen),
             };
@@ -209,8 +216,7 @@ namespace Game.Client
             // The passive tree under its night (4-3: the one screen unlike the rest; U4 makes the tree itself).
             if (_page == Page.Passives) UiSkin.Stars(Rect.MinMaxRect(area.x + UiSkin.FrameEdge, head.yMax, area.xMax - UiSkin.FrameEdge, area.yMax - UiSkin.FrameEdge), 0.9f);
             float right = UiSkin.CloseRect(head).x - 6;
-            right = DrawCoins(head, right);
-            if (_page == Page.Merchant) UiSkin.Hearts(head, right - 4, _client.HeartsWith(person.Value.Npc), World.MaxHearts);
+            DrawCoins(head, right);
             if (UiSkin.CloseButton(head)) _screens.Close();
             GUILayout.BeginArea(inside);
             // Without room beside the window a line says how to see a description, so nothing sits over the list.
@@ -231,10 +237,8 @@ namespace Game.Client
             else if (_page == Page.Materials) DrawMaterialsPage();
             else if (_page == Page.Classes) DrawClasses();
             else if (_page == Page.Passives) DrawPassives();
-            else if (_page == Page.Merchant) DrawMerchant();
             else if (_page == Page.Character) DrawCharacter();
-            else if (_page == Page.Journal) DrawJournal();
-            else DrawChest();
+            else DrawJournal();
             Ui.EndScrollView();
             if (Event.current.type == EventType.Repaint)
             {
@@ -284,18 +288,20 @@ namespace Game.Client
 
         // The coins in the bag at the right of the head, a moment gold and larger when they change; gives where the
         // coins start.
-        float DrawCoins(Rect head, float right)
+        float DrawCoins(Rect head, float right) => DrawCoins(head, right, KindOf(_page));
+
+        float DrawCoins(Rect head, float right, UiKind kind)
         {
             var coin = _client.Bag.Materials.Keys.FirstOrDefault(m => m.Id == World.Coin);
             int coins = coin == null ? 0 : _client.Bag.CountOf(coin);
             _coinStyle ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleRight, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0), wordWrap = false };
             Ui.Text(_coinStyle, 12, bold: true);
-            var ink = UiArt.HeadInk(KindOf(_page));
+            var ink = UiArt.HeadInk(kind);
             _coinStyle.normal.textColor = new Color(ink.R / 255f, ink.G / 255f, ink.B / 255f);
             string text = coins.ToString("N0");
             float width = _coinStyle.CalcSize(new GUIContent(text)).x;
             float band = UiArt.HeadBand * UiSkin.Pt;
-            float middle = _page == Page.Merchant ? head.y + 10.5f * UiSkin.Pt : head.y + band / 2;
+            float middle = kind == UiKind.Shop ? head.y + 10.5f * UiSkin.Pt : head.y + band / 2;
             var line = new Rect(right - width, middle - 9, width, 18);
             var icon = UiSkin.IconSize(UiIcons.Coin);
             // Only where it does not crowd the title.
@@ -709,7 +715,15 @@ namespace Game.Client
         // With a rune picked, an item's panel offers [끼우기]. Stats and life skills fold away at the bottom.
         void DrawGear()
         {
-            DrawRefining();
+            // By an anvil, the anvil's window works the gear (U3); a picked thing's [다듬기] opens it on that piece.
+            if (_client.NearAnvil)
+            {
+                GUILayout.BeginHorizontal();
+                GUILayout.Label(Fit("모루 곁: 장비를 고르고 [다듬기], 또는 모루 창에서 강화·분해·룬 빼기·접사 다시", _textWidth - 104), GUILayout.Width(_textWidth - 104));
+                if (Ui.LayoutButton("모루 열기", GUILayout.Width(96))) ShowEncounter(GameScreen.Anvil);
+                GUILayout.EndHorizontal();
+                GUILayout.Space(4);
+            }
 
             float cell = Controls.UsingTouch ? 48 : 44;
             GUILayout.Label(Fit("착용", _textWidth));
@@ -1395,8 +1409,7 @@ namespace Game.Client
 
         MaterialDefinition _pickedMaterial;
 
-        // Both sides of the chest: what it holds, each with [꺼내기], and what the bag holds, each with [넣기]. Stacks
-        // move whole.
+        // The shop's tabs (InventoryWindow.Encounters.cs).
         enum ShopMode
         {
             Buy,
@@ -1408,53 +1421,6 @@ namespace Game.Client
 
         ShopMode _shopMode;
         static readonly string[] ShopModeNames = { "사기", "팔기", "선물", "부탁", "이야기" };
-
-        // The merchant (World.Merchant.cs): who she is and how well this player knows her, today's line, a chat once a
-        // day, and buying, selling and a gift once a day.
-        void DrawMerchant()
-        {
-            var near = _client.NpcNear();
-            if (near == null) return;
-            var npc = near.Value.Npc;
-            int hearts = _client.HeartsWith(npc);
-            var coin = _client.Bag.Materials.Keys.FirstOrDefault(m => m.Id == World.Coin);
-            int coins = coin == null ? 0 : _client.Bag.CountOf(coin);
-            GUILayout.Label(Fit($"{npc.Name} · 호감 {hearts}/{World.MaxHearts} ({_client.PointsWith(npc)}/{World.MaxHearts * World.PointsPerHeart}) · 금화 {coins}", _textWidth));
-            GUILayout.Label(Fit($"\"{npc.LineFor(_client.Today, hearts)}\"", _textWidth));
-            // The stories told with each heart gift, once had.
-            foreach (var story in npc.Stories.OrderBy(p => p.Key))
-            {
-                if (_client.HadHeartGift(npc, story.Key)) GUILayout.Label(Fit($"(호감 {story.Key}) \"{story.Value}\"", _textWidth));
-            }
-            GUILayout.BeginHorizontal();
-            var enabled = GUI.enabled;
-            GUI.enabled = enabled && !_client.TalkedToday(npc);
-            if (Ui.LayoutButton(_client.TalkedToday(npc) ? "오늘은 이야기했다" : "말 걸기")) Send(_client.TalkCommand(), Sound.Click);
-            // Moving in (Docs/Npcs.md, 이사): [이사 권하기] once they like the player enough and a room is free.
-            var (home, fault) = HousingOf(npc, near.Value.X, near.Value.Y);
-            if (!home)
-            {
-                GUI.enabled = enabled && fault == null;
-                if (Ui.LayoutButton("이사 권하기")) Send(_client.InviteCommand(), Sound.Click);
-            }
-            GUI.enabled = enabled;
-            GUILayout.EndHorizontal();
-            if (home) GUILayout.Label(Fit($"기지의 방에 산다: 말 걸기와 선물로 오르는 호감이 {Housing.FriendshipBonus}배다.", _textWidth));
-            else if (fault != null) GUILayout.Label(Fit($"이사: {fault}", _textWidth));
-            GUILayout.Label(Fit($"호감이 오를 때마다 사는 값은 {World.HeartPercent}% 싸지고 파는 값은 {World.HeartPercent}% 비싸진다.", _textWidth));
-            int mode = Ui.Toolbar((int)_shopMode, ShopModeNames);
-            if (mode != (int)_shopMode)
-            {
-                _shopMode = (ShopMode)mode;
-                Sounds.Play(Sound.Click);
-            }
-            GUILayout.Space(4);
-            if (_shopMode == ShopMode.Buy) DrawBuying(npc, hearts, coins);
-            else if (_shopMode == ShopMode.Sell) DrawSelling(npc, hearts);
-            else if (_shopMode == ShopMode.Gift) DrawGifts(npc);
-            else if (_shopMode == ShopMode.Request) DrawRequest(npc);
-            else DrawStory(npc, hearts);
-        }
 
         // Whether the person lives in a room and why they could not move in, worked out from the map once a frame
         // (IMGUI draws the window several times a frame).
@@ -1537,102 +1503,8 @@ namespace Game.Client
             GUI.enabled = enabled;
         }
 
-        void DrawBuying(NpcDefinition npc, int hearts, int coins)
-        {
-            var enabled = GUI.enabled;
-            foreach (var entry in _client.ShopTodayOf(npc))
-            {
-                GUILayout.BeginHorizontal();
-                Icon(entry.Material != null ? Sprites.Icon(entry.Material) : Sprites.Icon(entry.Consumable));
-                int price = World.BuyPrice(entry, hearts, Calendar.Day(_client.Clock));
-                string note = entry.Daily ? " (오늘만)" : "";
-                bool open = hearts >= entry.Hearts;
-                string text = open ? $"{entry.Name}{note} · 금화 {price}" : $"{entry.Name} · 호감 {entry.Hearts}에 열린다";
-                TipLabel(new GUIContent(Fit(text, _recipeWidth), entry.Material?.Description ?? entry.Consumable.Description), GUILayout.Width(_recipeWidth));
-                GUI.enabled = enabled && open && coins >= price;
-                if (Ui.LayoutButton("사기", GUILayout.Width(56))) Send(_client.BuyCommand(entry, 1), Sound.Craft);
-                GUI.enabled = enabled && open && coins >= price * 5;
-                if (Ui.LayoutButton("×5", GUILayout.Width(40))) Send(_client.BuyCommand(entry, 5), Sound.Craft);
-                GUI.enabled = enabled;
-                GUILayout.EndHorizontal();
-            }
-        }
-
-        void DrawSelling(NpcDefinition npc, int hearts)
-        {
-            bool any = false;
-            foreach (var entry in _client.Npcs.Shop.Where(e => e.Sell > 0 && e.Npc == npc))
-            {
-                // Each person takes only so many of a thing a day (World.DailySellLimit).
-                int left = _client.SellLeft(entry);
-                // A crop in each quality the bag holds, the better ones dearer.
-                var kinds = entry.Material != null ? entry.Material.AllQualities.Cast<object>() : new object[] { entry.Consumable };
-                foreach (var thing in kinds)
-                {
-                    var material = thing as MaterialDefinition;
-                    int have = material != null ? _client.Bag.CountOf(material) : _client.Bag.CountOf(entry.Consumable);
-                    if (have == 0) continue;
-                    any = true;
-                    GUILayout.BeginHorizontal();
-                    Icon(material != null ? Sprites.Icon(material) : Sprites.Icon(entry.Consumable));
-                    string name = material?.Name ?? entry.Name;
-                    string room = left > 0 ? $" · 오늘 {left}개 더" : " · 오늘은 그만 산다";
-                    GUILayout.Label(Fit($"{name} ×{have} · 하나에 금화 {World.SellPrice(entry, hearts, material?.Quality ?? 0, Calendar.Day(_client.Clock))}{room}", _recipeWidth), GUILayout.Width(_recipeWidth));
-                    GUI.enabled = left > 0;
-                    if (Ui.LayoutButton("팔기", GUILayout.Width(56))) Send(_client.SellCommand(thing, 1), Sound.Pickup);
-                    if (Ui.LayoutButton("모두", GUILayout.Width(48))) Send(_client.SellCommand(thing, Math.Min(Math.Min(have, left), World.MaxTrade)), Sound.Pickup);
-                    GUI.enabled = true;
-                    GUILayout.EndHorizontal();
-                }
-            }
-            foreach (var item in npc.BuysGear ? _client.Bag.Items.ToList() : new List<Item>())
-            {
-                any = true;
-                GUILayout.BeginHorizontal();
-                ItemLabel(item);
-                if (Ui.LayoutButton($"팔기 {World.ItemValue(item, hearts)}", GUILayout.Width(88))) Send(_client.SellItemCommand(item), Sound.Pickup);
-                GUILayout.EndHorizontal();
-            }
-            if (!any) GUILayout.Label(Fit(npc.BuysGear ? "팔 것이 없다. 입은 장비는 벗어야 판다." : "이 사람이 사는 것이 가방에 없다.", _textWidth));
-        }
-
-        void DrawGifts(NpcDefinition npc)
-        {
-            if (_client.GiftedToday(npc))
-            {
-                GUILayout.Label(Fit("오늘은 선물을 주었다. 내일 또 줄 수 있다.", _textWidth));
-                return;
-            }
-            GUILayout.Label(Fit("하루에 하나. 좋아하는 것을 주면 호감이 크게 오른다.", _textWidth));
-            foreach (var pair in _client.Bag.Consumables.ToList())
-            {
-                GUILayout.BeginHorizontal();
-                Icon(Sprites.Icon(pair.Key));
-                GUILayout.Label(Fit($"{pair.Key.Name} ×{pair.Value}", _recipeWidth), GUILayout.Width(_recipeWidth));
-                if (Ui.LayoutButton("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
-                GUILayout.EndHorizontal();
-            }
-            foreach (var pair in _client.Bag.Materials.Where(p => p.Key.Id != World.Coin).ToList())
-            {
-                GUILayout.BeginHorizontal();
-                Icon(Sprites.Icon(pair.Key));
-                GUILayout.Label(Fit($"{pair.Key.Name} ×{pair.Value}", _recipeWidth), GUILayout.Width(_recipeWidth));
-                if (Ui.LayoutButton("선물", GUILayout.Width(56))) Send(_client.GiftCommand(pair.Key), Sound.Pop);
-                GUILayout.EndHorizontal();
-            }
-        }
-
-        void DrawChest()
-        {
-            var chest = _client.Chest.Contents;
-            GUILayout.Label($"상자 ({chest.Items.Count}/{Inventory.Capacity})");
-            DrawContents(chest, "꺼내기", item => _client.TakeItemCommand(item.Id), (kind, definition) => _client.TakeStackCommand(kind, definition));
-            GUILayout.Space(8);
-            DrawStash();
-            GUILayout.Label($"가방 ({_client.Bag.Items.Count}/{Inventory.Capacity})");
-            DrawContents(_client.Bag, "넣기", item => _client.StoreItemCommand(item.Id), (kind, definition) => _client.StoreStackCommand(kind, definition));
-        }
-
+        // A chest's or the bag's things as rows, each with the button that moves it to the other side ([꺼내기], [넣기]).
+        // Stacks move whole.
         void DrawContents(Inventory contents, string action, Func<Item, byte[]> moveItem, Func<StackKind, object, byte[]> moveStack)
         {
             if (contents.Items.Count == 0 && contents.Runes.Count == 0 && contents.Consumables.Count == 0 && contents.Materials.Count == 0)
@@ -2179,70 +2051,13 @@ namespace Game.Client
             GUI.color = previous;
         }
 
-        // Beside an anvil: picks the item to work on, or puts it back.
+        // Beside an anvil: the anvil's window on this piece (U3), or in that window, this piece to work on.
         void RefineButton(Item item)
         {
             if (!_client.NearAnvil) return;
-            if (Ui.LayoutButton(_refining == item.Id ? "닫기" : "다듬기", GUILayout.Width(56))) _refining = _refining == item.Id ? 0 : item.Id;
-        }
-
-        // At the top of the gear page while an anvil is near: what can be done to the picked item and what it costs.
-        void DrawRefining()
-        {
-            if (!_client.NearAnvil)
-            {
-                _refining = 0;
-                return;
-            }
-            var loot = _client.Loot;
-            var essence = loot?.FindMaterial(World.Essence);
-            int have = essence == null ? 0 : _client.Bag.CountOf(essence);
-            var worn = _client.Equipment.Items.FirstOrDefault(i => i.Id == _refining);
-            var item = worn ?? _client.Bag.Find(_refining);
-            if (item == null)
-            {
-                _refining = 0;
-                GUILayout.Label(Fit($"모루: 장비의 [다듬기]를 누르면 강화, 분해, 룬 빼기, 접사 다시 굴리기를 한다. 강화 정수 {have}개", _textWidth));
-                GUILayout.Space(6);
-                return;
-            }
-            GUILayout.Label(Fit($"모루: {ItemText.Name(item)} · 강화 정수 {have}개", _textWidth));
-            GUILayout.BeginHorizontal();
-            if (World.UpgradeCost(item, loot) is var (cost, metal, metalCount))
-            {
-                bool can = have >= cost && (metal == null || _client.Bag.CountOf(metal) >= metalCount);
-                string needs = metal == null ? $"정수 {cost}" : $"정수 {cost}, {metal.Name} {metalCount}";
-                GUI.enabled = can;
-                if (Ui.LayoutButton($"강화 +{item.Upgrade + 1} ({needs})")) Send(_client.RefineCommand(InventoryCommand.Upgrade, item.Id), Sound.Craft);
-                GUI.enabled = true;
-            }
-            else
-            {
-                GUILayout.Label($"최대 강화(+{Item.MaxUpgrade})");
-            }
-            GUILayout.EndHorizontal();
-            // Older gear of the same slot upgraded further: its steps can move onto this one (World.TransferUpgrade).
-            var source = World.UpgradeSource(item, _client.Equipment.Items.Concat(_client.Bag.Items));
-            if (source != null)
-            {
-                GUILayout.BeginHorizontal();
-                GUI.enabled = have >= World.TransferEssence;
-                if (Ui.LayoutButton($"강화 옮기기: {source.Base.Name}의 +{source.Upgrade}를 여기로 (정수 {World.TransferEssence})"))
-                    Send(_client.RefineCommand(InventoryCommand.TransferUpgrade, item.Id), Sound.Craft);
-                GUI.enabled = true;
-                GUILayout.EndHorizontal();
-            }
-            GUILayout.BeginHorizontal();
-            if (worn == null && Ui.LayoutButton($"분해 (정수 +{World.SalvageValue(item)})")) Send(_client.RefineCommand(InventoryCommand.Salvage, item.Id), Sound.Break);
-            GUI.enabled = have >= World.UnsocketEssence;
-            if (item.Sockets.Any(r => r != null) && Ui.LayoutButton($"룬 빼기 (정수 {World.UnsocketEssence})"))
-                Send(_client.RefineCommand(InventoryCommand.Unsocket, item.Id), Sound.Click);
-            int reroll = World.RerollCost(item);
-            GUI.enabled = have >= reroll;
-            if (reroll > 0 && Ui.LayoutButton($"접사 다시 (정수 {reroll})")) Send(_client.RefineCommand(InventoryCommand.Reroll, item.Id), Sound.Craft);
-            GUI.enabled = true;
-            GUILayout.EndHorizontal();
-            GUILayout.Space(6);
+            if (!Ui.LayoutButton("다듬기", GUILayout.Width(56))) return;
+            _refining = item.Id;
+            if (_screens.Current != GameScreen.Anvil) ShowEncounter(GameScreen.Anvil);
         }
 
         // Shown while a rune is picked and the item still has room for it.

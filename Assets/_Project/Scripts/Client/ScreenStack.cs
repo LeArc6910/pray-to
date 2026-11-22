@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using UnityEngine;
 
 namespace Game.Client
@@ -16,6 +17,12 @@ namespace Game.Client
         Character,
         Journal,
         Map,
+        // The encounter windows (Docs/UiRework.md 4-1 만남, U3): a merchant's shop, a storage chest, a crafting station
+        // (workbench or furnace) and the anvil. Each is a window of its own beside the world, the bag's things in it.
+        Shop,
+        Chest,
+        Station,
+        Anvil,
     }
 
     // Screens of one kind share a window: its head, its place, and tabs that switch between them.
@@ -25,14 +32,17 @@ namespace Game.Client
         Bag,
         Growth,
         Records,
+        Encounter,
     }
 
     // The screen manager (Docs/UiRework.md U2): which screen is open, one at a time. Rules:
     //  - Opening a screen closes the one open (a key of another screen switches to it; Tab while the skills are up shows
     //    the bag), the touch hub, and the story's talk and waypoint list (StoryScreen, through Opened).
     //  - A screen's own key again closes it; Esc (Back) closes the hub, else the screen, one step at a time.
-    //  - While a full screen is open (all but the bag) nothing under it is drawn and the world takes no input: no walking,
-    //    attacking, skills, quick slots or world buttons (GameRoot). The bag is a side panel as before: walking goes on.
+    //  - While a full screen is open (all but the bag and the encounter windows) nothing under it is drawn and the world
+    //    takes no input: no walking, attacking, skills, quick slots or world buttons (GameRoot). The bag is a side panel as
+    //    before: walking goes on. The encounter windows (U3) are side panels on a PC and sheets over everything on a
+    //    phone (Covers), and shut once their thing is out of reach (GameRoot, InventoryWindow.InReach).
     //  - Every change bumps Version, and GameRoot then lets go of IMGUI's keyboard focus (a pet's name field).
     // The game state is not touched: a screen only draws and sends the same commands as before.
     sealed class ScreenStack
@@ -49,11 +59,23 @@ namespace Game.Client
 
         public static readonly GameScreen[] All = { GameScreen.Bag, GameScreen.Skills, GameScreen.Passives, GameScreen.Character, GameScreen.Journal, GameScreen.Map };
 
+        // The encounter windows (U3), opened by meeting the thing (G or the button over it), not by a key of their own.
+        public static readonly GameScreen[] Encounters = { GameScreen.Shop, GameScreen.Chest, GameScreen.Station, GameScreen.Anvil };
+
         // Full screens cover everything at every size (4-5 전체 화면); the bag stays a side panel on a PC and a sheet under
         // the minimap column on a phone (4-5 세로 화면), so [가방]·[메뉴] stay in reach.
         public bool Full => IsFull(Current);
 
-        public static bool IsFull(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Bag;
+        public static bool IsFull(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Bag && !IsEncounter(screen);
+
+        public static bool IsEncounter(GameScreen screen) => GroupOf(screen) == ScreenGroup.Encounter;
+
+        // Whether the open screen covers the whole screen: a full screen anywhere, and an encounter window on a phone,
+        // where it is a sheet over everything (Docs/UiRework.md U3: the HUD pieces it would sit on are not drawn).
+        public bool Covers => Full || IsEncounter(Current) && PhoneSheet;
+
+        // A phone held either way: the encounter windows are a sheet over the whole screen there.
+        public static bool PhoneSheet => Controls.UsingTouch && (Ui.Width < 600 || Ui.Short);
 
         public void Show(GameScreen screen)
         {
@@ -114,6 +136,7 @@ namespace Game.Client
             GameScreen.Bag => ScreenGroup.Bag,
             GameScreen.Skills or GameScreen.Passives or GameScreen.Character => ScreenGroup.Growth,
             GameScreen.Journal or GameScreen.Map => ScreenGroup.Records,
+            GameScreen.Shop or GameScreen.Chest or GameScreen.Station or GameScreen.Anvil => ScreenGroup.Encounter,
             _ => ScreenGroup.None,
         };
 
@@ -138,13 +161,17 @@ namespace Game.Client
             GameScreen.Character => "캐릭터",
             GameScreen.Journal => "일지",
             GameScreen.Map => "지도",
+            GameScreen.Shop => "상점",
+            GameScreen.Chest => "상자",
+            GameScreen.Station => "작업대",
+            GameScreen.Anvil => "모루",
             _ => "",
         };
 
         // A screen by its name, Korean or English ("스킬" or "skills"); None for anything else.
         public static GameScreen FromName(string name)
         {
-            foreach (var screen in All)
+            foreach (var screen in All.Concat(Encounters))
             {
                 if (name == NameOf(screen) || string.Equals(name, screen.ToString(), StringComparison.OrdinalIgnoreCase)) return screen;
             }
@@ -153,6 +180,8 @@ namespace Game.Client
                 "skill" or "growth" => GameScreen.Skills,
                 "passive" or "tree" => GameScreen.Passives,
                 "records" => GameScreen.Journal,
+                "상인" or "merchant" => GameScreen.Shop,
+                "화로" or "workbench" or "furnace" => GameScreen.Station,
                 _ => GameScreen.None,
             };
         }
@@ -176,15 +205,21 @@ namespace Game.Client
             GameScreen.Character => UiIcons.Person,
             GameScreen.Journal => UiIcons.Book,
             GameScreen.Map => UiIcons.Map,
+            GameScreen.Shop => UiIcons.Shop,
+            GameScreen.Chest => UiIcons.Chest,
+            GameScreen.Station => UiIcons.Hammer,
+            GameScreen.Anvil => UiIcons.Hammer,
             _ => null,
         };
 
         // The head band of the window (4-4 화면 종류의 표시): the bag's leather, the growth screens' night, the records'
         // parchment.
-        public static UiKind KindOf(GameScreen screen) => GroupOf(screen) switch
+        public static UiKind KindOf(GameScreen screen) => screen == GameScreen.Shop ? UiKind.Shop : GroupOf(screen) switch
         {
             ScreenGroup.Growth => UiKind.Growth,
             ScreenGroup.Records => UiKind.Journal,
+            // A chest, a station and the anvil: steel with bolts (4-4: 만남은 나무(상점)·쇠(기계·모루)).
+            ScreenGroup.Encounter => UiKind.Machine,
             _ => UiKind.Bag,
         };
 
@@ -193,6 +228,7 @@ namespace Game.Client
         {
             ScreenGroup.Growth => "growth",
             ScreenGroup.Records => "records",
+            ScreenGroup.Encounter => "meet:" + screen,
             _ => "bag",
         };
 
@@ -222,8 +258,26 @@ namespace Game.Client
         {
             GameScreen.None => default,
             GameScreen.Bag => InventoryWindow.AreaOf(),
+            _ when IsEncounter(screen) => EncounterArea(screen),
             _ => FullArea(),
         };
+
+        // How wide an encounter window would be, with its two panes (the thing's and the bag's) side by side.
+        const float EncounterMaxWidth = 880;
+        const float EncounterMaxHeight = 640;
+
+        // An encounter window (U3): on a phone a sheet over the whole screen (4 points from its edges); elsewhere left of
+        // the minimap column (so the minimap and, on a tablet, [가방]·[메뉴] stay in reach), centred in the room there, as
+        // tall as the screen less a margin up to EncounterMaxHeight.
+        public static Rect EncounterArea(GameScreen screen)
+        {
+            if (PhoneSheet) return new Rect(4, 4, Ui.Width - 8, Ui.Height - 8);
+            float left = 10, right = Ui.MinimapArea.x - 10;
+            float wanted = screen == GameScreen.Chest || screen == GameScreen.Anvil ? 760 : EncounterMaxWidth;
+            float width = Mathf.Min(wanted, right - left);
+            float height = Mathf.Min(EncounterMaxHeight, Ui.Height - 20);
+            return new Rect(Mathf.Round(left + (right - left - width) / 2), Mathf.Round(Mathf.Max(10, (Ui.Height - height) / 2)), width, height);
+        }
 
         // ---- The group's tabs ----
 

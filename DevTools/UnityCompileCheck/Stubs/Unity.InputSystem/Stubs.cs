@@ -94,6 +94,7 @@ namespace UnityEngine.InputSystem
         P,
         J,
         U,
+        NumpadEnter,
     }
 
     public class InputDevice

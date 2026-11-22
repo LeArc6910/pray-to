@@ -835,16 +835,14 @@ namespace Game.Client
                 Label(post, way, new Color(1f, 0.95f, 0.75f));
             }
 
-            // Each person's name and how well this player knows them, close by; the one near enough to deal with also
-            // says where to (the bag's tab named for them).
-            var dealing = _client.NpcNear();
+            // Each person's name and how well this player knows them, close by. The one near enough to deal with has a
+            // [○○와 말하기] over this (StoryScreen, U3), so the old "가방에서 거래" note is gone.
             foreach (var (x, y, npc) in _stalls)
             {
                 // Above the awning on the tile over the stall (2026-11-09), not across it.
                 var at = new Vector3(x + 0.5f, y + 2.05f, 0);
                 if (Vector3.Distance(at, _self.Position) >= 5) continue;
-                bool near = dealing != null && dealing.Value.Npc == npc;
-                Label(at, $"{npc.Name} 호감 {_client.HeartsWith(npc)}/{World.MaxHearts}" + (near ? (Controls.UsingTouch ? " · [가방]에서 거래" : $" · 거래 ({KeyBindings.Name(KeyAction.Machine)})") : ""), PowerLabel);
+                Label(at, $"{npc.Name} 호감 {_client.HeartsWith(npc)}/{World.MaxHearts}", PowerLabel);
             }
             foreach (var text in _floating)
             {

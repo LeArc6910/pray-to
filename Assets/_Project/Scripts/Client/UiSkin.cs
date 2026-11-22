@@ -607,6 +607,67 @@ namespace Game.Client
             GUI.color = previous;
         }
 
+        // ---- Portraits (Docs/UiRework.md 4-2 대화 화면, U3) ----
+
+        static readonly Dictionary<(PixelImage, int), Texture2D> Portraits = new Dictionary<(PixelImage, int), Texture2D>();
+
+        // How many device pixels one pixel of a portrait takes at so many points a pixel: a whole number, so its pixels
+        // stay square (3 points a pixel on a PC is 3 device pixels; 2 on a phone of ratio 2.625 is 5).
+        public static int PortraitDots(float pointsPerPixel) => Mathf.Max(1, Mathf.RoundToInt(pointsPerPixel * Ui.Scale));
+
+        // The size of a portrait at so many points a pixel (its top `rows` rows only when given: the head and shoulders on
+        // a low screen).
+        public static Vector2 PortraitSize(float pointsPerPixel, int rows = 0)
+        {
+            float pixel = PortraitDots(pointsPerPixel) / Ui.Scale;
+            return new Vector2(PortraitArt.Width * pixel, (rows > 0 ? rows : PortraitArt.Height) * pixel);
+        }
+
+        // A person's portrait in its slot: a well filled with their colour, the picture at a whole number of device pixels
+        // a pixel, centred across and standing on the slot's bottom (Docs/UiRework.md 4-2). Only the top `rows` rows when
+        // given.
+        public static void Portrait(Rect slot, PixelImage image, float pointsPerPixel, Color backing, int rows = 0)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            var previous = GUI.color;
+            Inset(slot);
+            float edge = UiArt.InsetBorder * Pt;
+            var inner = Snap(Rect.MinMaxRect(slot.xMin + edge, slot.yMin + edge, slot.xMax - edge, slot.yMax - edge));
+            GUI.color = new Color(backing.r, backing.g, backing.b, 0.55f * previous.a);
+            GUI.DrawTexture(inner, Texture2D.whiteTexture);
+            GUI.color = previous;
+            if (image == null) return;
+            int dots = PortraitDots(pointsPerPixel);
+            if (!Portraits.TryGetValue((image, dots), out var texture))
+            {
+                var big = new PixelImage(image.Width * dots, image.Height * dots);
+                for (int y = 0; y < big.Height; y++)
+                    for (int x = 0; x < big.Width; x++) big[x, y] = image[x / dots, y / dots];
+                Portraits[(image, dots)] = texture = Sprites.TextureOf(big);
+                texture.wrapMode = TextureWrapMode.Clamp;
+            }
+            int shown = rows > 0 ? Mathf.Min(rows, image.Height) : image.Height;
+            var size = PortraitSize(pointsPerPixel, shown);
+            var rect = Snap(new Rect(inner.center.x - size.x / 2, inner.yMax - size.y, size.x, size.y));
+            // A texture's rows count from the bottom: the top `shown` rows of the picture.
+            float share = shown / (float)image.Height;
+            GUI.BeginClip(inner);
+            GUI.DrawTextureWithTexCoords(new Rect(rect.x - inner.x, rect.y - inner.y, rect.width, rect.height), texture, new Rect(0, 1 - share, 1, share));
+            GUI.EndClip();
+        }
+
+        // A small bouncing arrow: more to read (the talk's line is all shown, Docs/UiRework.md 4-2). Still with less motion.
+        public static void NextArrow(Vector2 at, Color color)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            float bob = UiMotion.Reduced ? 0 : Mathf.Round(Mathf.Abs(Mathf.Sin(Time.unscaledTime * 5)) * 3);
+            var previous = GUI.color;
+            GUI.color = new Color(color.r, color.g, color.b, previous.a);
+            for (int row = 0; row < 4; row++)
+                GUI.DrawTexture(new Rect(at.x - 4 + row, at.y + bob + row * 1.5f, 8 - row * 2, 1.5f), Texture2D.whiteTexture);
+            GUI.color = previous;
+        }
+
         // ---- Full screens (Docs/UiRework.md 사람이 정한 것: the world dark behind, red at the edges when hurt) ----
 
         static Texture2D _edges;
