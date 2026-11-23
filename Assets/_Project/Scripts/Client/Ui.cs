@@ -97,6 +97,7 @@ namespace Game.Client
             Scale = PixelRatio();
             GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1));
             StartProbe();
+            ProbeCover = Rect.zero;
             // Whether a mouse button or finger is down, and where it went down: a button shows itself pressed only while
             // the press that started on it lasts (UiMotion.Face).
             var e = Event.current;
@@ -286,8 +287,14 @@ namespace Game.Client
 
         internal static void Probe(string label, Rect rect)
         {
-            if (Probing && Event.current.type == EventType.Repaint) Drawing.Add(new Drawn(label, _row, ToPoints(rect), GUI.enabled, true));
+            if (!Probing || Event.current.type != EventType.Repaint) return;
+            var points = ToPoints(rect);
+            Drawing.Add(new Drawn(label, _row, points, GUI.enabled, !(ProbeCover.width > 0 && ProbeCover.Contains(points.center))));
         }
+
+        // Where something drawn later covers the screen and takes the presses there (the fallen card, U7), in points; zero
+        // for none. A button drawn under it is not shown to the playtests: a press there is the card's.
+        internal static Rect ProbeCover { get; set; }
 
         // Notes the text a row starts with, for the buttons after it.
         internal static void Row(string text)

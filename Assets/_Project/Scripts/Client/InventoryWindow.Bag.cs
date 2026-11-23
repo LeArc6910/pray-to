@@ -99,7 +99,8 @@ namespace Game.Client
             // (a phone held sideways had about one row of squares over a card under it).
             if (SideCard(content) && card > 0)
             {
-                parts.Card = new Rect(content.xMax - SideCardWidth, top, SideCardWidth, content.yMax - top);
+                float side = SideCardWidth(content);
+                parts.Card = new Rect(content.xMax - side, top, side, content.yMax - top);
                 parts.List = Rect.MinMaxRect(content.x, top, parts.Card.x - 6, content.yMax);
                 return parts;
             }
@@ -109,12 +110,19 @@ namespace Game.Client
             return parts;
         }
 
-        const float SideCardWidth = 220;
+        // The side card is 220 points where there is the room, narrower down to 170 so the grid beside it keeps 190 (three
+        // squares across): a phone held sideways (844×390, 740×360) has a content 394 wide, and at a fixed 220 the card
+        // went under the list instead, where the worn row left no room for the grid at all (the U6·U7 web sweep).
+        const float SideCardMax = 220;
+        const float SideCardMin = 170;
+        const float SideListMin = 190;
 
-        static bool SideCard(Rect content) => Ui.Short && content.width >= 2 * SideCardWidth - 40;
+        static float SideCardWidth(Rect content) => Mathf.Min(SideCardMax, content.width - 6 - SideListMin);
+
+        static bool SideCard(Rect content) => Ui.Short && SideCardWidth(content) >= SideCardMin;
 
         // How wide the card is drawn in this content: the whole width under the list, or the side card's.
-        static float CardWidth(Rect content) => SideCard(content) ? SideCardWidth : content.width;
+        static float CardWidth(Rect content) => SideCard(content) ? SideCardWidth(content) : content.width;
 
         void DrawBag()
         {

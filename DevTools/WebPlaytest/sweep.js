@@ -129,10 +129,12 @@ async function stationTab(game, name) {
 }
 
 // Leaving a game in play (U7): Esc with nothing open opens the menu (the hub's screens, [설정], [나가기]); its [나가기]
-// leaves.
+// leaves. Esc first shuts whatever is open (the map, a screen, a talk), one step at a time, as it does for a person.
 async function leaveGame(game) {
-  await game.page.keyboard.press('Escape');
-  await game.until(s => s.hub, 2000);
+  for (let i = 0; i < 4 && !(await game.state()).hub; i++) {
+    await game.page.keyboard.press('Escape');
+    await game.until(s => s.hub, 1500);
+  }
   await game.press('나가기', '메뉴');
 }
 
@@ -278,7 +280,7 @@ async function menu(browser) {
     const after = await game.state();
     check(after.mana < before.mana, `게임에서 1이 스킬 1을 쓴다 (마나 ${before.mana} → ${after.mana})`);
     await game.shot('key-1', '스킬 칸 글자가 1');
-    await game.page.keyboard.press('Escape');
+    await leaveGame(game);
     await game.until(s => !s.playing, 8000);
     if ((await game.find('처음 키로')).length === 0) {
       await menuPage(game, '설정');
@@ -437,14 +439,16 @@ async function basics(browser) {
   await game.send('give copper_ore 12');
   await game.wait(300);
   const swordsBefore = items(await game.inventory(), 'copper_sword');
+  // The copper sword is the workbench's (U6: the bag keeps what is made by hand): its window by [작업대 열기] over it.
+  check(await stationTab(game, '구리 검'), '작업대 위 [작업대 열기]로 연 작업대 창에 구리 검');
   await game.press('만들기', /^구리 검/);
   // Gear takes time by hand (2026-11-09): a bar fills for 3 seconds while the player stays by the workbench.
   await game.wait(800);
   check(/만드는 중: 구리 검/.test(await game.allText()), '구리 검은 바로 나오지 않고 "만드는 중: 구리 검"과 막대가 보인다');
-  await game.shot('bag-crafting', '만드는 중의 막대와 [그만]');
+  await game.shot('bag-crafting', '작업대 창: 만드는 중의 막대와 [그만]');
   const swordDone = await game.until(i => items(i, 'copper_sword') + (i.worn.Weapon === 'copper_sword' ? 1 : 0) > swordsBefore, 5000, game.inventory);
   check(!!swordDone, '작업대 곁에서 3초 뒤 구리 검이 나온다');
-  await game.shot('bag-crafted', '작업대 곁 제작 목록');
+  await game.shot('bag-crafted', '작업대 창의 제작 목록');
   // [만들 수 있는 것만]: the list shrinks to what the bag and the stations near make now, and back.
   const all = (await game.find('만들기')).length;
   check(await game.press('만들 수 있는 것만'), '[만들 수 있는 것만]을 누른다');
@@ -453,9 +457,10 @@ async function basics(browser) {
   await game.shot('bag-craftable', '만들 수 있는 것만 본 제작 목록');
   await game.press('모두 보기');
 
-  // A chest beside it: the chest tab, put in and take out.
-  await game.send('give chest 1; face -1 0');
+  // A chest beside it: the chest tab, put in and take out. Placed from the bag's [재료·제작], as the workbench was.
+  await game.send('screen off; give chest 1; face -1 0');
   await game.wait(300);
+  await bagTab(game, '재료·제작');
   await game.press('놓기', '상자 ×');
   check((await game.look(-1, 0)).tile === 'Chest', '상자를 놓는다');
   check(await bagTab(game, '상자'), '상자 곁에서 [상자 열기]로 상자 창이 열린다(U3)');
@@ -1819,8 +1824,11 @@ async function save(browser) {
   const level = (await game.state()).level;
   await leaveGame(game);
   await game.until(s => !s.playing, 8000);
-  await game.shot('menu-saved', '나간 뒤 메뉴(이어하기)');
-  // The menu remembers the character's classes (2026-11-09) instead of asking again.
+  // The menu remembers the character's classes (2026-11-09) instead of asking again: on the [게임 시작] page since the
+  // start screen has pages (2026-11-11).
+  await menuPage(game, '게임 시작');
+  await game.wait(300);
+  await game.shot('menu-saved', '나간 뒤 [게임 시작](이어하기)');
   const menuText = await game.allText();
   check(/savetest의 클래스: 전사 \+ 화염 마법사/.test(menuText), '메뉴가 저장된 캐릭터의 클래스를 보인다(savetest의 클래스: 전사 + 화염 마법사)');
   check((await game.find(/^\[[ \d]\] /)).length === 0, '저장된 캐릭터는 메뉴에서 클래스 단추가 없다(게임 안에서 바꾼다)');
@@ -1834,6 +1842,7 @@ async function save(browser) {
   await game.wait(600);
   await game.shot('map-saved', '다시 들어온 뒤 지도(가 본 곳)');
   await game.page.keyboard.press('m');
+  await game.until(r => !r.map, 2000);
   await leaveGame(game);
   await game.until(r => !r.playing, 8000);
 
@@ -1991,6 +2000,8 @@ async function touch(browser) {
     await game.shot('bag', '가방 [장비]');
     // Can a finger drag the list down? Many things make it long.
     await game.send('give stone 5; give copper_ore 5; give iron_ore 5; give slime_gel 5; give iron_bar 5; give mushroom 5; give fire_pepper 5; give egg 5; give milk 5');
+    // Fourteen squares fit a phone held upright without scrolling (U6's grid is denser than the old rows): more.
+    await game.send('give mithril_ore 5; give mithril_bar 5; give ice_crystal 5; give obsidian_ore 5; give glow_spore 5; give void_ore 5; give essence 5; give iron_gear 5; give copper_wire 5; give glow_cap 5; give frost_berry 5; give cave_minnow 5');
     // The bag's one grid (U6) holds them all, under the hero: long enough to drag.
     await game.press('장비');
     await game.wait(500);
@@ -2024,9 +2035,10 @@ async function touch(browser) {
     check((await game.state()).mana < full.mana, '둘째 스킬 단추를 탭한다');
     // A skill button alone aims at the nearest foe (2026-11-11, Docs/WebDemo.md 터치): a slime above, the stick untouched.
     // Outside the places (monsters are kept out of them), with the second skill (an aimed one, not a buff).
-    // The skill was just used above: its cooldown (about 12 seconds) runs out first.
-    await game.wait(12000);
-    await game.send('goto wild; face off; heal; mana 100; clear; spawn slime 0 3 5000');
+    // The skill was just used above: its cooldown (over 12 seconds) runs out first. The slime is held where it is put:
+    // a slime's pounce (monster_attacks.csv) lands right on the player, where no way is "toward it".
+    await game.wait(16000);
+    await game.send('goto wild; face off; heal; mana 100; clear; monsters hold; spawn slime 0 3 5000');
     await game.wait(1500);
     await game.press('skill 1');
     await game.wait(600);
@@ -2034,6 +2046,7 @@ async function touch(browser) {
     const aimed = ((await game.state()).skillAim || '0,0').split(',').map(Number);
     check(aimed[1] > 0.6, `스틱 없이 스킬 단추만 탭해도 가장 가까운 적(위쪽)으로 쓴다 (조준 ${aimed.join(',')})`);
     await game.shot('touch-autoaim', '스틱 없이 쓴 스킬');
+    await game.send('monsters go');
     await game.context.close();
   }
 }
@@ -2595,11 +2608,21 @@ async function base(browser) {
     const p = await game.state();
     return [doorX - Math.floor(p.x), doorY - Math.floor(p.y)];
   };
-  await game.send('goto near Door');
-  await game.wait(500);
-  let [ddx, ddy] = await doorFrom();
-  await game.send(`face ${ddx} ${ddy}`);
-  await game.wait(300);
+  // Beside this door on one side (1 east, -1 west), facing it. Not "goto near Door": a house's door in a village close
+  // by can be nearer (the 2026-11-23 sweep went to one 7 tiles off). goto is from the host's tile, which can be one off
+  // the reported x when the player stopped on a tile's edge (x 511.0): once in a tile's middle the rest is exact.
+  const besideDoor = async side => {
+    let [dx, dy] = await doorFrom();
+    for (let i = 0; i < 2 && (dx !== -side || dy !== 0); i++) {
+      await game.send(`goto ${dx + side} ${dy}`);
+      await game.wait(400);
+      [dx, dy] = await doorFrom();
+    }
+    await game.send(`face ${-side} 0`);
+    await game.wait(400);
+    return doorFrom();
+  };
+  let [ddx, ddy] = await besideDoor(1);
   // Over the door in the world since U6 ("(G)" on a PC), not in the bag.
   check(await game.press(/^문 잠그기/), `문을 마주 보면 문 위에 [문 잠그기] (문이 ${ddx},${ddy})`);
   await game.wait(900);
@@ -2618,10 +2641,8 @@ async function base(browser) {
   check(west ? past.x < doorX : past.x > doorX + 1, `잠근 사람은 잠긴 문을 지나간다 (x ${locked.x.toFixed(1)} → ${past.x.toFixed(1)}, 문 ${doorX})`);
   // From the far side, beside it, the lock comes off.
   const side = west ? -1 : 1;
-  await game.send(`goto ${doorX + side - Math.floor(past.x)} ${doorY - Math.floor(past.y)}; face ${-side} 0`);
-  await game.wait(500);
-  [ddx, ddy] = await doorFrom();
-  check(await game.press(/^잠금 풀기/), '안쪽에서도 [잠금 풀기]');
+  [ddx, ddy] = await besideDoor(side);
+  check(await game.press(/^잠금 풀기/), `안쪽에서도 문 위에 [잠금 풀기] (문이 ${ddx},${ddy})`);
   await game.wait(900);
   check((await game.look(ddx, ddy)).tile === 'Door', `[잠금 풀기]로 다시 문이 된다 (${(await game.look(ddx, ddy)).tile})`);
   await closeBag(game);
@@ -5696,9 +5717,11 @@ async function hud(browser) {
     }
     const shot = (name, caption) => game.shot(`hud-${profileName}-${name}`, `${profileName}: ${caption}`);
     const inside = r => r && r[2] > 0 && r[0] >= -0.5 && r[1] >= -0.5 && r[0] + r[2] <= width + 0.5 && r[1] + r[3] <= height + 0.5;
-    // Every shown button inside the screen, and on a touch screen those of the bag and the HUD a finger tall.
-    const fits = async what => {
-      const shown = (await game.buttons()).filter(b => b.shown);
+    // Every shown button inside the screen, and on a touch screen those of the bag and the HUD a finger tall. With a
+    // rect, only the buttons in it (the fallen card's own).
+    const fits = async (what, within) => {
+      const shown = (await game.buttons()).filter(b => b.shown && (!within || (b.rect[0] + b.rect[2] / 2 >= within[0] && b.rect[0] + b.rect[2] / 2 <= within[0] + within[2]
+        && b.rect[1] + b.rect[3] / 2 >= within[1] && b.rect[1] + b.rect[3] / 2 <= within[1] + within[3])));
       const out = shown.filter(b => !inside(b.rect));
       check(out.length === 0, `${what}: 단추가 화면 안 (${out.map(b => b.label).slice(0, 4).join(', ') || '모두'})`);
       if (!game.touch) return;
@@ -5783,7 +5806,8 @@ async function hud(browser) {
     await game.send('build Floor 1 0; face off');
 
     // ---- 버프 ----
-    await game.send('drink mushroom_soup');
+    // A bowl in the bag first: drinking takes it from there (World.UseConsumable).
+    await game.send('potion mushroom_soup 1; drink mushroom_soup');
     await game.wait(800);
     s = await game.state();
     check(/버섯 수프/.test(s.buffs || ''), `먹은 것의 버프가 아이콘으로 (${s.buffs})`);
@@ -5853,8 +5877,16 @@ async function hud(browser) {
     check(inside(card) && overlapping(card, s.ui.window), `쓰러짐 카드가 창 위에 (${card.map(Math.round).join(',')})`);
     const rise = (await game.find(/^(집|입구)에서 일어나기$/)).find(b => b.shown && b.enabled);
     check(!!rise && rise.rect[0] >= card[0] && rise.rect[1] >= card[1] && rise.rect[0] + rise.rect[2] <= card[0] + card[2] + 0.5, `카드 안에 [집에서 일어나기] (${rise ? rise.label : '없음'})`);
-    check(((await game.texts()).hud || []).some(l => /쓰러졌습니다/.test(l)), 'HUD 글 줄에 "쓰러졌습니다"가 남는다');
-    await fits('쓰러짐 카드');
+    // Beside a side window (the bag) the HUD box is still there with its line; a full screen (the journal on a PC) has
+    // no HUD under it (Docs/UiRework.md 4-5), so there the card's own words say it.
+    if (screen === '가방') check(((await game.texts()).hud || []).some(l => /쓰러졌습니다/.test(l)), 'HUD 글 줄에 "쓰러졌습니다"가 남는다');
+    else check(((await game.texts()).written || []).some(l => /잠시 후 .*일어난다/.test(l)), '전체 화면 위에서는 카드가 "잠시 후 … 일어난다"를 알린다');
+    // The card's own button a finger tall; what is left of the window round the card is the window's (U6 measured it).
+    await fits('쓰러짐 카드', card);
+    // Under the card nothing is pressable (its press is the card's): the probe says so too.
+    const under = (await game.buttons()).filter(b => b.shown && !/^(집|입구)에서 일어나기$/.test(b.label)
+      && b.rect[0] + b.rect[2] / 2 > card[0] && b.rect[0] + b.rect[2] / 2 < card[0] + card[2] && b.rect[1] + b.rect[3] / 2 > card[1] && b.rect[1] + b.rect[3] / 2 < card[1] + card[3]);
+    check(under.length === 0, `카드 밑의 단추는 누를 수 없다(보이는 단추로 치지 않는다) (${under.map(b => b.label).slice(0, 4).join(', ') || '없음'})`);
     await shot('death-window', `[${screen}] 위의 쓰러짐 카드`);
     check(!!rise && await game.press(rise.label), `[${rise ? rise.label : '집에서 일어나기'}]를 누른다`);
     const up = await game.until(t => !t.dead, 2500);

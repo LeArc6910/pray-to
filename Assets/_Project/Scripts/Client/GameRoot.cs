@@ -1628,6 +1628,7 @@ namespace Game.Client
             // takes a press meant for its button (IMGUI gives a press to the first control drawn under it, so the press
             // is hidden from the rest while they draw).
             var card = dead ? DeathCardArea() : default;
+            Ui.ProbeCover = card;
             var e = Event.current;
             var held = EventType.Ignore;
             if (dead && (e.isMouse || e.type == EventType.ScrollWheel) && card.Contains(e.mousePosition))
@@ -1647,6 +1648,7 @@ namespace Game.Client
             }
             else DrawPlay(dead);
             if (held != EventType.Ignore) e.type = held;
+            Ui.ProbeCover = Rect.zero;
             if (Event.current.type == EventType.Repaint) DeathShown = Rect.zero;
             if (dead) DrawDeath(card);
         }
@@ -1673,7 +1675,13 @@ namespace Game.Client
                 DrawHud(compact: side);
             }
             // Banners in the room the windows, the hub and the two columns leave (U7: never over a window).
-            _view?.DrawBanner(BannerRoom(_screens.Covers ? default : window, _screens.HubOpen ? ScreenStack.HubLayout().Panel : (Rect?)null));
+            var bannerWindow = _screens.Covers ? default : window;
+            Rect? hubPanel = _screens.HubOpen ? ScreenStack.HubLayout().Panel : (Rect?)null;
+            var bannerRoom = BannerRoom(bannerWindow, hubPanel);
+            // A long banner (a level's gains) wraps over lines in a narrow room: the room again, as tall as that.
+            float bannerTall = _view?.BannerHeight(bannerRoom.width) ?? 0;
+            if (bannerTall > bannerRoom.height) bannerRoom = BannerRoom(bannerWindow, hubPanel, bannerTall);
+            _view?.DrawBanner(bannerRoom);
             // The "획득: …" lines under every window (Docs/UiRework.md 4-7 그리는 순서): drawn after the bag, they ran
             // over it on a phone (phone-bag-gear).
             DrawAcquired(dead);
@@ -1758,7 +1766,7 @@ namespace Game.Client
         // Where a banner may go: a quarter down the screen, across what a side window leaves, beside the HUD's column and
         // the minimap's (and the hub's panel) where it would meet them, or under them where too little is left beside.
         // No width when there is no room (a window across the middle): the banner then waits (WorldView.HoldBanner).
-        internal static Rect BannerRoom(Rect window, Rect? hub)
+        internal static Rect BannerRoom(Rect window, Rect? hub, float tall = 64)
         {
             float left = 0, right = Ui.Width;
             if (window.width > 0)
@@ -1768,7 +1776,6 @@ namespace Game.Client
                 else left = window.xMax + 6;
                 if (right - left < 200) return new Rect(left, Mathf.Round(Ui.Height * 0.25f), 0, 0);
             }
-            const float tall = 64;
             float top = Mathf.Round(Ui.Height * 0.25f);
             var obstacles = new List<Rect>
             {
@@ -1776,6 +1783,10 @@ namespace Game.Client
                 Rect.MinMaxRect(Ui.MinimapArea.x, Ui.MinimapArea.y, Ui.MinimapArea.xMax, Mathf.Max(Ui.RightColumnBottom, Ui.InfoBottom)),
             };
             if (hub is Rect panel) obstacles.Add(panel);
+            // One that starts inside the banner's lower part (the [메뉴] panel on a low screen, under a banner over two or
+            // three lines): the banner rises above it where the screen has the room, rather than run onto it.
+            foreach (var o in obstacles)
+                if (o.y > top && o.y < top + tall && o.xMax > left && o.x < right && o.y - 8 - tall >= 8) top = o.y - 8 - tall;
             float l = left, r = right;
             foreach (var o in obstacles)
             {

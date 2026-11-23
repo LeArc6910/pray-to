@@ -877,10 +877,7 @@ namespace Game.Client
                 float fade = Mathf.Clamp01((BannerSeconds - _bannerAge) / 0.5f);
                 // A long one (a level's gains, 2026-11-19) in smaller letters until it fits the width, and on a narrow
                 // screen (a phone held upright) over two lines rather than letters too small to read.
-                float width = room.width > 0 ? room.width - 24 : Ui.Width - 24;
-                for (int size = 32; size >= 20 && _bannerStyle.CalcSize(new GUIContent(_banner)).x > width; size -= 2) Ui.Text(_bannerStyle, size, bold: true);
-                string text = _bannerStyle.CalcSize(new GUIContent(_banner)).x > width ? Ui.Wrap(_banner, _bannerStyle, width) : _banner;
-                var size2 = _bannerStyle.CalcSize(new GUIContent(text));
+                var (text, size2) = BannerText(room.width > 0 ? room.width - 24 : Ui.Width - 24);
                 var rect = new Rect(room.x, room.y, room.width, Mathf.Max(60, size2.y + 8));
                 var strip = new Rect(rect.center.x - size2.x / 2 - 12, rect.center.y - size2.y / 2 - 4, size2.x + 24, size2.y + 8);
                 // A dim strip behind it, so it reads over a bright floor.
@@ -892,6 +889,24 @@ namespace Game.Client
                 Ui.Text(_bannerStyle, 34, bold: true);
                 if (Event.current.type == EventType.Repaint) BannerShown = strip;
             }
+        }
+
+        // The banner's letters for this width: smaller until it fits, then over lines (the style is left at that size).
+        (string Text, Vector2 Size) BannerText(float width)
+        {
+            for (int size = 32; size >= 20 && _bannerStyle.CalcSize(new GUIContent(_banner)).x > width; size -= 2) Ui.Text(_bannerStyle, size, bold: true);
+            string text = _bannerStyle.CalcSize(new GUIContent(_banner)).x > width ? Ui.Wrap(_banner, _bannerStyle, width) : _banner;
+            return (text, _bannerStyle.CalcSize(new GUIContent(text)));
+        }
+
+        // How tall the banner showing now is drawn in a room this wide (DrawBanner), or 0 when none shows: a long one
+        // over two or three lines in a narrow room is taller than GameRoot.BannerRoom's usual 64 points.
+        public float BannerHeight(float roomWidth)
+        {
+            if (_bannerStyle == null || _bannerAge >= BannerSeconds || roomWidth <= 0) return 0;
+            var (_, size) = BannerText(roomWidth - 24);
+            Ui.Text(_bannerStyle, 34, bold: true);
+            return Mathf.Max(60, size.y + 8);
         }
 
         bool _bannerHeld;
