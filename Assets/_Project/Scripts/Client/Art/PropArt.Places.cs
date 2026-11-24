@@ -44,15 +44,18 @@ namespace Game.Client
         // Which look a thing takes in a biome: the dirt cave's, the mushroom forest's, or the old one (no biome given,
         // any other biome, any other thing).
         public static int BiomeLook(TileType type, Biome? biome) =>
-            !HasBiomeLook(type) ? 0 : biome == Biome.Cave ? CaveLook : biome == Biome.Mushroom ? ForestLook : 0;
+            !HasBiomeLook(type) ? 0 : biome == Biome.Cave ? CaveLook : biome == Biome.Mushroom ? ForestLook : biome == Biome.Ice ? IceLook : biome == Biome.Sand ? SandLook : 0;
 
         // The light a thing with a biome look gives there, or null for its own (PropArt.Lights).
         public static Rgba? BiomeLight(TileType type, Biome biome) =>
-            !HasBiomeLook(type) ? (Rgba?)null : biome == Biome.Mushroom ? Rgba.Hex("#B8F25A") : biome == Biome.Cave ? LampGlow : (Rgba?)null;
+            !HasBiomeLook(type) ? (Rgba?)null : biome == Biome.Mushroom ? Rgba.Hex("#B8F25A") : biome == Biome.Cave ? LampGlow
+            // The ice cave's frosted lanterns burn pale blue, the sand cave's braziers gold (묶음 B2a).
+            : biome == Biome.Ice ? FrostGlow : biome == Biome.Sand ? GoldLight : (Rgba?)null;
 
         // The drawing of a place's thing in a look (CaveLook, ForestLook), the same size as the old one.
         public static PixelImage PlaceProp(TileType type, int look)
         {
+            if (look == IceLook || look == SandLook) return IceSandPlaceProp(type, look);
             bool cave = look != ForestLook;
             return type switch
             {
@@ -69,10 +72,10 @@ namespace Game.Client
         }
 
         // The rows of a landmark's picture that fade when someone is behind it.
-        public static int LandmarkCanopy(TileType type) => type == TileType.MinerHut ? 30 : 0;
+        public static int LandmarkCanopy(TileType type) => type == TileType.MinerHut ? 30 : IceSandLandmarkCanopy(type);
 
         // The landmarks that stand like the places' structures (the fairy ring's caps are BiomeArt's).
-        public static PixelImage Landmark(TileType type) => type == TileType.MinerHut ? OldMinerHut() : type == TileType.MineFrame ? DriftFrame() : null;
+        public static PixelImage Landmark(TileType type) => type == TileType.MinerHut ? OldMinerHut() : type == TileType.MineFrame ? DriftFrame() : IceSandLandmark(type);
 
         // ---- Brushes ----
 

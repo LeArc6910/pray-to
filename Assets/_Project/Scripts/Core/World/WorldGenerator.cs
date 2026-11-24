@@ -309,7 +309,7 @@ namespace Game.Core
                 if (version >= PropVersion) LayProps(world, seed, version);
                 // The camps' trapdoors and the mid-bosses' lairs (WorldGenerator.Cellars.cs, 묶음 B1c), version 4 on: a world
                 // of version 3 keeps its camps as they were.
-                if (version >= LandmarkVersion) LayCellars(world, seed, terrain ?? TerrainSheet.Default);
+                if (version >= LandmarkVersion) LayCellars(world, seed, terrain ?? TerrainSheet.Default, version);
                 // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
                 if (DungeonPocket.Fits(width)) world.Map.AddPocket(DungeonPocket.Rows);
             }

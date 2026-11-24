@@ -109,6 +109,20 @@ namespace Game.Client
     //   b1                        JSON (B1b): the monsters about the player (kind, size, health, state, in a cloud, lit where
     //                             they stand), the spore clouds, the light round the player, the timber ambushes, the screen's
     //                             haze and the green numbers shown
+    //   scene b2monsters          (B2b) the ice and sand caves' new kinds in a row east of the player where each fits (bomb
+    //                             scarab, frost lord, frost wolf, frost beetle, sandstone beetle, scorpion queen, yeti, great
+    //                             worm, frost mammoth, temple guardian), 5000 health each, the monsters held
+    //   scene iceslide            (B2b) a lane of ice to a wall four tiles west of the player, a frost wolf three tiles east charging at
+    //                             once: its charge slides on over the ice into the wall and it is dazed
+    //   scene icicles             (B2b) an icicle over the player now and another a tile and a half east (their shadow first)
+    //   scene sandfall            (B2b) a sand scorpion five tiles east and a great worm eight tiles east, let loose: they go
+    //                             under and sand pours onto them where the floor is the sand cave's
+    //   scene dormant             (B2b) a temple guardian seven tiles east and a frost mammoth seven tiles west, let loose:
+    //                             statues until someone comes within three tiles or strikes them
+    //   b2                        JSON (B2b): the monsters about the player (kind, size, state, buried, under falling sand,
+    //                             dormant, drawn pixels), the icicles falling near, whether the player stands under the ice
+    //                             halls' icicles, the icicles fallen, the screen's streams of sand and icicles shown, and the
+    //                             dungeons the ice and sand gates lead to
     static partial class Playtest
     {
         const string Name = "playtest";
@@ -393,6 +407,8 @@ namespace Game.Client
                     return "sizes " + SizesJson(root);
                 case "b1":
                     return "b1 " + BiomeMonstersJson(root);
+                case "b2":
+                    return "b2 " + IceSandJson(root);
                 // The rest of B1 (묶음 B1c, Docs/BiomeRework.md): "b1c" the camp trapdoor nearest the player (shut or open on
                 // the host and the screen, its band, the button), the lairs (their mid-boss, awake or felled), the gates'
                 // dungeons and their light colours, and what a charge smashed; "b1c fell" fells the nearest camp's band (its
@@ -489,7 +505,11 @@ namespace Game.Client
                     if (words.Length == 1) return "biomes " + BiomesJson(root);
                     if (words[1] == "at")
                     {
-                        TileType wanted = words[2] == "sac" ? TileType.SporeSac : words[2] == "cap" ? TileType.GiantCap : TileType.UnlitLamp;
+                        // 묶음 B2a: "crystal" before the ice cave's crystals, "urn" before the sand cave's urn (a swing breaks
+                        // either), "pillar" behind the ice pillar and "ribs" behind the fossil ribs (their tops fade).
+                        TileType wanted = words[2] == "sac" ? TileType.SporeSac : words[2] == "cap" ? TileType.GiantCap : words[2] == "crystal" ? TileType.IceCrystals
+                            : words[2] == "urn" ? TileType.BrokenUrn : words[2] == "pillar" ? TileType.IcePillar : words[2] == "ribs" ? TileType.RibArch : TileType.UnlitLamp;
+                        bool behind = wanted == TileType.GiantCap || wanted == TileType.IcePillar || wanted == TileType.RibArch;
                         Vec2? spot = null;
                         if (words[2] == "grass")
                         {
@@ -498,9 +518,9 @@ namespace Game.Client
                         }
                         else
                         {
-                            var thing = Nearest(world.Map, _biomesAnchor.X, _biomesAnchor.Y, (x, y) => world.Map[x, y] == wanted && !world.Map.IsSolid(x, y + (wanted == TileType.GiantCap ? 1 : -1)));
+                            var thing = Nearest(world.Map, _biomesAnchor.X, _biomesAnchor.Y, (x, y) => world.Map[x, y] == wanted && !world.Map.IsSolid(x, y + (behind ? 1 : -1)));
                             // Before it, or for the giant cap behind it (under its cap, which fades).
-                            if (thing is Vec2 found) spot = found + new Vec2(0, wanted == TileType.GiantCap ? 1 : -1);
+                            if (thing is Vec2 found) spot = found + new Vec2(0, behind ? 1 : -1);
                         }
                         if (spot == null) return $"error biomes at {words[2]}: none near";
                         player.Position = spot.Value;
@@ -524,7 +544,10 @@ namespace Game.Client
                         else if (words[2] == "cap") spot = Nearest(world.Map, _placesAnchor.X, _placesAnchor.Y, (x, y) => world.Map[x, y] == TileType.RingCap);
                         else
                         {
-                            var kind = words[2] == "hut" ? BiomeLandmarkKind.MinerHut : words[2] == "frame" ? BiomeLandmarkKind.MineFrame : BiomeLandmarkKind.FairyRing;
+                            var kind = words[2] == "hut" ? BiomeLandmarkKind.MinerHut : words[2] == "frame" ? BiomeLandmarkKind.MineFrame
+                                // 묶음 B2a: the ice cave's and the sand cave's.
+                                : words[2] == "beast" ? BiomeLandmarkKind.FrozenBeast : words[2] == "ruin" ? BiomeLandmarkKind.IceRuin
+                                : words[2] == "temple" ? BiomeLandmarkKind.TempleFront : words[2] == "skull" ? BiomeLandmarkKind.GiantSkull : BiomeLandmarkKind.FairyRing;
                             var marks = root.HostGenerated?.BiomeLandmarks.Where(l => l.Kind == kind).ToList();
                             if (marks != null && marks.Count > 0)
                             {
@@ -1339,6 +1362,43 @@ namespace Game.Client
             world.Gates.Where(g => g.Cellar).OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault();
 
         // B1c: the nearest camp trapdoor, the lairs, the gates' dungeons and their light, the props smashed near the player.
+        // The ice and sand caves' monsters and rules about the player (B2b): each monster near, whether it is buried, under
+        // falling sand or dormant; the icicles; the screen's streams and icicles; the gates' dungeons.
+        static string IceSandJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var list = new Json('[');
+            foreach (var monster in world.Enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) < 24).OrderBy(e => Vec2.Distance(e.Position, player.Position)))
+            {
+                var kind = monster.Definition;
+                var drawn = root.MonsterDrawn(monster.Id);
+                list.Item(new RawJson(new Json('{')
+                    .Field("id", monster.Id).Field("kind", kind.Id).Field("size", MonsterSizes.Name(kind.Size))
+                    .Field("x", monster.Position.X).Field("y", monster.Position.Y)
+                    .Field("distance", Vec2.Distance(monster.Position, player.Position))
+                    .Field("health", monster.Health).Field("maxHealth", monster.MaxHealth).Field("state", monster.State.ToString())
+                    .Field("buried", monster.Buried).Field("underSand", world.UnderFallingSand(monster))
+                    .Field("dormant", World.IsDormant(kind, monster.State))
+                    .Field("drawn", drawn != null).Field("pixels", drawn?.Width ?? 0)
+                    .Close('}')));
+            }
+            var icicles = new Json('[');
+            foreach (var icicle in world.Hazards.Where(h => h.Mark == Hazard.Icicle && Vec2.Distance(h.Position, player.Position) < 24))
+                icicles.Item(new RawJson(new Json('{').Field("x", icicle.Position.X).Field("y", icicle.Position.Y).Field("radius", icicle.Size)
+                    .Field("seconds", (icicle.ResolveTick - world.Tick) / (float)World.TicksPerSecond).Close('}')));
+            var gates = new Json('[');
+            foreach (var gate in world.Gates.Where(g => !g.Cellar && (g.Biome == Biome.Ice || g.Biome == Biome.Sand)))
+                gates.Item(new RawJson(new Json('{').Field("biome", gate.Biome.ToString()).Field("dungeon", world.DungeonFor(gate)?.Id ?? "")
+                    .Field("master", world.DungeonFor(gate)?.Boss ?? "").Field("light", world.DungeonFor(gate)?.Light ?? "").Close('}')));
+            return new Json('{').Field("monsters", list.Raw(']')).Field("icicles", icicles.Raw(']'))
+                .Field("biome", world.Biomes.At(player.Position).ToString())
+                .Field("underIcicles", world.UnderIcicles(player.Position)).Field("iciclesFallen", world.IciclesFallen)
+                .Field("sandFallsShown", root.SandFallsShown).Field("iciclesShown", root.IciclesShown)
+                .Field("gates", gates.Raw(']'))
+                .Close('}');
+        }
+
         static string B1cJson(GameRoot root)
         {
             var world = root.HostWorld;
@@ -1522,7 +1582,8 @@ namespace Game.Client
                         for (int dy = -5; dy <= 6; dy++)
                             if (dx != 0 || dy != 0) Lay((px + dx, py + dy, TileType.Floor));
                     var here = root.HostGenerated.Biomes[px, py];
-                    var kinds = BiomeProps.Of(here).Count > 0 ? BiomeProps.Of(here) : BiomeProps.Of(Biome.Cave);
+                    // The ice cave's and the sand cave's too (묶음 B2a); a frozen fall under two tiles of rock, as it is laid.
+                    var kinds = IceSandProps.Any(here).Count > 0 ? IceSandProps.Any(here) : BiomeProps.Of(Biome.Cave);
                     int col = -7;
                     foreach (var kind in kinds)
                     {
@@ -1530,10 +1591,12 @@ namespace Game.Client
                         int w = Structures.Footprint(kind.Type).W;
                         Lay((px + col, py + 3, kind.Type));
                         if (w > 1) Lay((px + col + 1, py + 3, TileType.StructurePart));
+                        if (IceSandProps.Hangs(kind.Type))
+                            for (int i = 0; i < w; i++) Lay((px + col + i, py + 4, TileType.Wall));
                         col += w + 1;
                     }
                     if (here == Biome.Mushroom) Lay((px + 5, py - 3, TileType.GiantCap));
-                    else Lay((px - 4, py, TileType.LitLamp));
+                    else if (here != Biome.Ice && here != Biome.Sand) Lay((px - 4, py, TileType.LitLamp));
                     Lay((px - 5, py - 3, TileType.MushroomTree));
                     break;
                 }
@@ -1562,7 +1625,20 @@ namespace Game.Client
                         (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (5, 3, TileType.Signpost),
                         (7, 3, TileType.Bench), (1, 5, TileType.Flowerbed), (3, 5, TileType.Crates),
                     }, px, py);
-                    if (root.HostGenerated.Biomes[px, py] == Biome.Cave)
+                    if (root.HostGenerated.Biomes[px, py] == Biome.Ice)
+                    {
+                        // 묶음 B2a: the beast in ice with its crystals, and the keep's two rows of columns.
+                        Set(IceSandProps.FrozenBeast, px - 9, py - 8);
+                        Set(IceSandProps.IceRuin, px + 2, py - 7);
+                    }
+                    else if (root.HostGenerated.Biomes[px, py] == Biome.Sand)
+                    {
+                        // The giant skull with its ribs, and the temple's front under five tiles of rock.
+                        Set(IceSandProps.GiantSkull, px - 9, py - 7);
+                        for (int dx = 3; dx <= 7; dx++) Lay((px + dx, py - 2, TileType.Wall));
+                        Set(IceSandProps.TempleFront, px + 2, py - 6);
+                    }
+                    else if (root.HostGenerated.Biomes[px, py] == Biome.Cave)
                     {
                         Set(BiomeLandmarks.MinerHut, px - 9, py - 7);
                         for (int dx = 3; dx <= 5; dx++) Lay((px + dx, py - 2, TileType.Wall));
@@ -1680,6 +1756,63 @@ namespace Game.Client
                         if (made != null) made.MaxHealth = made.Health = 5000;
                         along += kind.Radius + 0.8f;
                     }
+                    break;
+                // The ice and sand caves' new kinds (B2b), each where a body its size fits, east of the player in a row.
+                case "b2monsters":
+                    world.MonstersHold = true;
+                    float alongB2 = 1.5f;
+                    foreach (var id in new[] { "bomb_scarab", "frost_lord", "frost_wolf", "frost_beetle", "sandstone_beetle", "scorpion_queen", "yeti", "great_worm", "frost_mammoth", "temple_guardian" })
+                    {
+                        var kind = root.MonsterSheet.Find(id);
+                        alongB2 += kind.Radius;
+                        var made = world.SpawnFitting(kind, player.Position + new Vec2(alongB2, 0));
+                        if (made != null)
+                        {
+                            made.MaxHealth = made.Health = 5000;
+                            // Awake, so the mid-bosses are drawn as themselves, not as statues.
+                            (made.TargetId, made.State) = (player.Id, EnemyState.Chase);
+                        }
+                        alongB2 += kind.Radius + 0.8f;
+                    }
+                    break;
+                // A frost wolf's charge sliding over the ice into a wall (B2b): a lane of ice west of the player to a wall,
+                // the wolf three tiles east charging at the player at once.
+                case "iceslide":
+                {
+                    foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
+                    for (int dy = -2; dy <= 2; dy++)
+                    {
+                        for (int dx = -3; dx <= 5; dx++) world.Build(px + dx, py + dy, TileType.IceFloor);
+                        world.Build(px - 4, py + dy, TileType.Wall);
+                    }
+                    var wolf = world.SpawnFitting(root.MonsterSheet.Find("frost_wolf"), TileMap.Center(px + 3, py), 1.5f);
+                    if (wolf == null) break;
+                    wolf.MaxHealth = wolf.Health = 5000;
+                    world.ForceAttack(wolf, "lunge");
+                    break;
+                }
+                // Icicles of the ice halls (B2b): one over the player now and another a tile and a half east.
+                case "icicles":
+                    world.DropIcicle(player, player.Position);
+                    world.DropIcicle(player, player.Position + new Vec2(1.5f, 0));
+                    break;
+                // The sand cave's buried under falling sand (B2b): a scorpion and a great worm let loose east of the player.
+                case "sandfall":
+                    foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
+                    world.SpawnFitting(root.MonsterSheet.Find("sand_scorpion"), player.Position + new Vec2(5, 0));
+                    world.SpawnFitting(root.MonsterSheet.Find("great_worm"), player.Position + new Vec2(8, 0), 1.5f);
+                    world.MonstersHold = false;
+                    break;
+                // The dormant mid-bosses (B2b): a temple guardian east and a frost mammoth west, let loose: statues until
+                // someone comes within three tiles or strikes them.
+                case "dormant":
+                    foreach (var monster in world.Enemies.Where(e => Vec2.Distance(e.Position, player.Position) < 30)) monster.Health = 0;
+                    foreach (var (id, dx) in new[] { ("temple_guardian", 7f), ("frost_mammoth", -7f) })
+                    {
+                        var made = world.SpawnFitting(root.MonsterSheet.Find(id), player.Position + new Vec2(dx, 0), 1.5f);
+                        if (made != null) made.MaxHealth = made.Health = 5000;
+                    }
+                    world.MonstersHold = false;
                     break;
                 // A spore cloud filling a hurt monster (B1b): a myconid at a fifth of its health, a puffball beside it
                 // made to go off so its cloud covers it and the player.
@@ -1822,7 +1955,9 @@ namespace Game.Client
             int ux = TileMap.Cell(seen.Position.X), uy = TileMap.Cell(seen.Position.Y);
             return new Json('{').Field("biome", seen.Biomes[ax, ay].ToString()).Field("generator", root.HostGenerated?.Version ?? 0)
                 .Field("looks", looks).Field("marks", marks).Field("huts", Count(BiomeLandmarkKind.MinerHut)).Field("frames", Count(BiomeLandmarkKind.MineFrame))
-                .Field("rings", Count(BiomeLandmarkKind.FairyRing)).Field("under", seen.Map[ux, uy].ToString()).Field("solidUnder", seen.Map.IsSolid(ux, uy))
+                .Field("rings", Count(BiomeLandmarkKind.FairyRing))
+                .Field("beasts", Count(BiomeLandmarkKind.FrozenBeast)).Field("ruins", Count(BiomeLandmarkKind.IceRuin))
+                .Field("temples", Count(BiomeLandmarkKind.TempleFront)).Field("skulls", Count(BiomeLandmarkKind.GiantSkull)).Field("under", seen.Map[ux, uy].ToString()).Field("solidUnder", seen.Map.IsSolid(ux, uy))
                 .Field("skipped", view?.StandsSkipped ?? 0).Field("renderers", view?.StandRenderers ?? 0)
                 .Field("selfOrder", view?.SelfOrder ?? 0).Field("ax", ax).Field("ay", ay).Field("cells", cells.Raw(']')).Close('}');
         }

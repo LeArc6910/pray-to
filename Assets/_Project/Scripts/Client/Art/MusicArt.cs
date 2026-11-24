@@ -38,6 +38,10 @@ namespace Game.Client
         // creaking, and very seldom a pickaxe far off. The mushroom forest: a damp rustle, spores popping, a low drone.
         DirtCave,
         Spores,
+        // The ice cave: wind whistling through the hall, and now and then the ice cracking. The sand cave: sand hissing
+        // as it runs, dry clicks (묶음 B2a).
+        Frost,
+        Dunes,
     }
 
     // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
@@ -665,6 +669,58 @@ namespace Game.Client
                     for (float t = 0.3f; t < seconds; t += 0.25f + random.Next() * 0.9f)
                         Click(buffer, t, 0.05f + random.Next() * 0.08f, 0.1f + random.Next() * 0.12f, seed: 400 + (int)(t * 20), hiss: true);
                     return Normalised(LowPass(buffer, 0.35f), 0.4f);
+                }
+                case Ambience.Frost:
+                {
+                    // A wide cold hall: a steady wind with a thin whistle that rises and falls over it, and every several
+                    // seconds the ice giving somewhere: a sharp crack and its echoes running off.
+                    float seconds = 28;
+                    var buffer = Wind(seconds, smoothing: 0.03f, volume: 0.7f, swell: 0.9f, seed: 41);
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        double t = i / (double)SampleRate;
+                        // The whistle: a tone near 880 Hz bent by two slow swells (7 and 14 second cycles close the loop).
+                        // Its phase is the integral of the bent pitch, so the bend stays small all through the loop.
+                        double turned = t - 0.035 * 7 / (2 * Math.PI) * Math.Cos(2 * Math.PI * t / 7) - 0.02 * 14 / (2 * Math.PI) * Math.Cos(2 * Math.PI * t / 14);
+                        double loud = Math.Max(0, Math.Sin(2 * Math.PI * t / 14 - 0.6)) * (0.6 + 0.4 * Math.Sin(2 * Math.PI * t / 3.5));
+                        buffer[i] += (float)(Math.Sin(2 * Math.PI * 880 * turned) * 0.05 * loud * loud);
+                    }
+                    var random = new Scramble(42);
+                    for (float t = 2.5f; t < seconds - 1.5f; t += 4.5f + random.Next() * 5)
+                    {
+                        float volume = 0.5f + random.Next() * 0.4f;
+                        Click(buffer, t, 0.012f, volume, seed: 500 + (int)(t * 10));
+                        Sweep(buffer, Wave.Triangle, t, 0.07f, 2400, 700, volume * 0.5f);
+                        for (int echo = 1; echo < 4; echo++)
+                            Click(buffer, t + echo * 0.16f, 0.02f, volume * (float)Math.Pow(0.4, echo), seed: 520 + echo + (int)(t * 10), hiss: true);
+                    }
+                    return Normalised(buffer, 0.4f);
+                }
+                case Ambience.Dunes:
+                {
+                    // Dry still air: sand hissing as it runs somewhere, swelling and dying away, small stones ticking
+                    // down a face, a low breath of wind under it.
+                    float seconds = 26;
+                    var buffer = Wind(seconds, smoothing: 0.008f, volume: 0.3f, swell: 0.5f, seed: 43);
+                    var random = new Scramble(44);
+                    for (float t = 0.8f; t < seconds - 3; t += 3.2f + random.Next() * 3.5f)
+                    {
+                        // A run of sand: many short hisses close together, louder then softer.
+                        float length = 1.4f + random.Next() * 1.4f;
+                        for (float at = 0; at < length; at += 0.045f)
+                        {
+                            float swell = (float)Math.Sin(Math.PI * at / length);
+                            Click(buffer, t + at, 0.05f, 0.16f * swell + 0.02f, seed: 600 + (int)((t + at) * 40), hiss: true);
+                        }
+                    }
+                    for (float t = 1.5f; t < seconds; t += 1.1f + random.Next() * 3.2f)
+                    {
+                        // Dry clicks: a pebble or two.
+                        int taps = 1 + (int)(random.Next() * 3);
+                        for (int tap = 0; tap < taps; tap++)
+                            Click(buffer, t + tap * (0.09f + random.Next() * 0.08f), 0.008f, 0.3f + random.Next() * 0.3f, seed: 700 + tap + (int)(t * 10));
+                    }
+                    return Normalised(buffer, 0.4f);
                 }
                 case Ambience.Hum:
                 {

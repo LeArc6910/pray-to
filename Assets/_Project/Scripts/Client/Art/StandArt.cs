@@ -56,8 +56,9 @@ namespace Game.Client
             if (kind == Kind.Gate) return (Joins.Gate(map, x, y) == true ? 1 : 0) | (open ? 2 : 0);
             var type = map[x, y];
             if (BiomeProps.Is(type)) return BiomeArt.Variant(type, x, y);
-            if (type == TileType.MushroomTree) return biome == Biome.Cave ? 1 : biome == Biome.Mushroom ? 2 : 0;
-            if (type == TileType.RingCap) return BiomeArt.Variant(type, x, y);
+            // 3 in the ice cave (a frozen tree), 4 in the sand cave (a cave palm): 묶음 B2a.
+            if (type == TileType.MushroomTree) return biome == Biome.Cave ? 1 : biome == Biome.Mushroom ? 2 : biome == Biome.Ice ? 3 : biome == Biome.Sand ? 4 : 0;
+            if (type == TileType.RingCap || type == TileType.IceColumn) return BiomeArt.Variant(type, x, y);
             // The places' buildings and dressing in the look of the biome under them (묶음 B1c, PropArt.Places.cs).
             return PropArt.BiomeLook(type, biome);
         }
@@ -67,8 +68,9 @@ namespace Game.Client
         {
             if (kind == Kind.Gate) return PropArt.FenceGate((shape & 1) != 0, (shape & 2) != 0);
             if (BiomeProps.Is(type)) return BiomeArt.Prop(type, shape);
-            if (type == TileType.MushroomTree && shape != 0) return BiomeArt.PlaceTree(shape == 2 ? Biome.Mushroom : Biome.Cave);
+            if (type == TileType.MushroomTree && shape != 0) return BiomeArt.PlaceTree(shape == 2 ? Biome.Mushroom : shape == 3 ? Biome.Ice : shape == 4 ? Biome.Sand : Biome.Cave);
             if (type == TileType.RingCap) return BiomeArt.RingCap(shape);
+            if (type == TileType.IceColumn) return BiomeArt.IceColumn(shape);
             if (BiomeLandmarks.Is(type)) return PropArt.Landmark(type);
             if (shape != 0 && PropArt.HasBiomeLook(type))
             {
@@ -88,7 +90,7 @@ namespace Game.Client
         public static float FootLift(TileType type, Kind kind) =>
             kind == Kind.Gate || type == TileType.Fence ? PropArt.FenceFoot / (float)Pixels
             : type == TileType.Hedge ? PropArt.HedgeFoot / (float)Pixels
-            : BiomeProps.Is(type) ? BiomeArt.FootRows / (float)Pixels
+            : BiomeProps.Is(type) || type == TileType.IceColumn ? BiomeArt.FootRows / (float)Pixels
             : type == TileType.RingCap ? BiomeArt.RingFoot / (float)Pixels
             : 0;
 
@@ -103,7 +105,7 @@ namespace Game.Client
             TileType.BigTent => 12,
             TileType.Lighthouse => 48,
             TileType.MineEntrance => 20,
-            TileType.MinerHut => PropArt.LandmarkCanopy(type),
+            TileType.MinerHut or TileType.FrozenBeast or TileType.GiantSkull => PropArt.LandmarkCanopy(type),
             _ => BiomeArt.CanopyRows(type),
         };
 

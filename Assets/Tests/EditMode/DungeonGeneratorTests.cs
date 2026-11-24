@@ -39,7 +39,7 @@ namespace Game.Core.Tests
         {
             Assert.IsTrue(Sheet.Success, string.Join("\n", Sheet.Errors));
             Assert.GreaterOrEqual(Sheet.Dungeons.Count, 4);
-            Assert.AreEqual(4, Sheet.Graphs.Count);
+            Assert.AreEqual(5, Sheet.Graphs.Count, "cellar, branching, locked, mine and (B2b) temple");
             foreach (var dungeon in Sheet.Dungeons)
             {
                 if (dungeon.Boss != null) Assert.IsNotNull(Monsters.Shipped.Find(dungeon.Boss), $"{dungeon.Id}: its master {dungeon.Boss}");
@@ -49,8 +49,10 @@ namespace Game.Core.Tests
             Assert.AreEqual("abandoned_mine", Sheet.For(Biome.Cave).Id);
             Assert.AreEqual("spore_depths", Sheet.For(Biome.Mushroom).Id);
             foreach (Biome biome in Enum.GetValues(typeof(Biome))) Assert.IsNotNull(Sheet.For(biome), biome.ToString());
-            Assert.AreEqual("deep_hollow@sand", Sheet.For(Biome.Sand).KeyFor(Biome.Sand));
-            Assert.AreEqual("모래 동굴의 깊은 굴", Sheet.For(Biome.Sand).NameFor(Biome.Sand));
+            // A biome with no dungeon of its own (the lake, B2b gave the sand cave its buried temple) goes to the deep hollow.
+            Assert.AreEqual("buried_temple", Sheet.For(Biome.Sand).KeyFor(Biome.Sand));
+            Assert.AreEqual("deep_hollow@lake", Sheet.For(Biome.Lake).KeyFor(Biome.Lake));
+            Assert.AreEqual("지하 호수의 깊은 굴", Sheet.For(Biome.Lake).NameFor(Biome.Lake));
             // The chunks made for dungeons stay out of the world's rooms.
             var rooms = Tiles.Shipped.Terrain.Rooms;
             Assert.IsTrue(rooms.Chunks.Any(c => c.Dungeon && !c.Field));
@@ -227,18 +229,19 @@ namespace Game.Core.Tests
             }
             Assert.IsTrue(dungeon.Has(DungeonFlags.KeyTaken));
 
-            // The master: a frost wisp leader with two affixes and twelve times its zone's health, more for the second player.
+            // The master: the frost mammoth in person (B2), a leader with one affix and its own zone's health, more for the
+            // second player.
             var boss = layout.Room('B');
             foreach (var p in new[] { a, b }) p.Position = Collision.Resolve(world.Map, boss.Center + new Vec2(0, -boss.Box.H / 2f + 1.5f), World.PlayerRadius);
             Run(world, 0.3f);
             var master = world.Enemies.Single(e => e.Elite == EliteRank.Leader && world.DungeonAt(e.Position) == dungeon);
-            Assert.AreEqual("frost_wisp", master.Definition.Id);
-            Assert.AreEqual(World.BigEliteAffixes, Enumerable.Range(0, 8).Count(i => ((int)master.Affixes & 1 << i) != 0));
+            Assert.AreEqual("frost_mammoth", master.Definition.Id);
+            Assert.AreEqual(World.MasterAffixes, Enumerable.Range(0, 8).Count(i => ((int)master.Affixes & 1 << i) != 0));
             float zoneHealth = master.Definition.Health * (1 + World.ZoneHealthStep * (dungeon.Level - 1));
             float tough = (master.Affixes & RiftAffix.Tough) != 0 ? World.ToughShare : 1;
-            Assert.AreEqual(zoneHealth * World.BigEliteHealth * tough * (1 + World.BigElitePerPlayer), master.MaxHealth, 1);
+            Assert.AreEqual(zoneHealth * World.MasterHealth * tough * (1 + World.BigElitePerPlayer), master.MaxHealth, 1);
             Assert.GreaterOrEqual(world.Enemies.Count(e => !e.IsDead && boss.Contains(e.Position, 2)), 1 + World.MinMinions);
-            Assert.AreEqual("서리 정령 대장", World.EliteName(master.Definition, EliteRank.Leader, RiftAffix.None));
+            Assert.AreEqual("서리 매머드", World.EliteName(master.Definition, EliteRank.Leader, RiftAffix.None));
 
             // Nobody in its room a while: it is whole again.
             master.Health = master.MaxHealth / 2;

@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -6210,6 +6210,12 @@ async function b1mobs(browser) {
 const BiomeSets = {
   cave: { name: '흙 동굴', id: 'Cave', room: 'cave', tint: '', ambience: 'DirtCave', kinds: ['Stalagmite', 'PitProp', 'TippedCart', 'OreSack', 'UnlitLamp', 'Boulder', 'CaveIn', 'LitLamp'], critters: ['Cricket', 'Mouse', 'LampMoth'] },
   mushroom: { name: '버섯 숲', id: 'Mushroom', room: 'mushroom', tint: '#A8F06A', ambience: 'Spores', kinds: ['PillarCap', 'ShelfStump', 'SporeSac', 'GlowCaps', 'FallenLog', 'GiantCap'], critters: ['Firefly', 'Snail', 'SporeMoth'] },
+  // 묶음 B2a: the ice cave and the sand cave. hit: a prop a swing breaks (the word of "biomes at", its tile); behind: a
+  // tall one whose top fades with the player behind it.
+  ice: { name: '얼음 동굴', id: 'Ice', room: 'ice', tint: '#A8DCFF', ambience: 'Frost', kinds: ['IceSpike', 'FrozenBush', 'SnowDrift', 'IceCrystals', 'IcePillar', 'FrozenFall'], critters: ['SnowHare', 'IceMoth'],
+    hit: ['crystal', 'IceCrystals', '얼음 결정 무리'], behind: ['pillar', 'IcePillar', '얼음 기둥'] },
+  sand: { name: '모래 동굴', id: 'Sand', room: 'sand', tint: '#FFD28A', ambience: 'Dunes', kinds: ['CaveCactus', 'Skull', 'BrokenUrn', 'SandstonePillar', 'RibArch', 'BuriedColumn'], critters: ['Lizard', 'Scarab'],
+    hit: ['urn', 'BrokenUrn', '깨진 항아리'], behind: ['ribs', 'RibArch', '화석 갈비뼈'] },
 };
 
 async function biomes(browser) {
@@ -6227,7 +6233,7 @@ async function biomes(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand']) {
       const set = BiomeSets[key];
       // The room as the generator made it first (a new world is version 3: its own props stand in it), then the set.
       const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
@@ -6275,6 +6281,27 @@ async function biomes(browser) {
           `${name}: 꺼진 등잔을 치면 불이 붙는다 (켜진 것 ${before.lit}→${after.lit}, 꺼진 것 ${before.unlit}→${after.unlit}; ${at})`);
         check(after.litHere === true, `${name}: 켠 등잔의 빛 안에 서 있다 (${after.litHere})`);
         await game.shot('biomes-cave-lamp', '불을 붙인 등잔');
+      } else if (set.hit) {
+        // 묶음 B2a: a swing breaks the biome's breakable prop, and a tall one's top fades with the player behind it.
+        const [word, type, label] = set.hit;
+        const before = await game.ask('biomes');
+        const at = (await game.send(`biomes at ${word}`)).join(' ');
+        await game.wait(500);
+        await game.send('attack on 0 1');
+        await game.wait(1500);
+        await game.send('attack off');
+        await game.wait(300);
+        const after = await game.ask('biomes');
+        check(new RegExp(`ok biomes at ${word}`).test(at) && ((after.kinds || {})[type] || 0) < ((before.kinds || {})[type] || 0),
+          `${name}: ${label}을(를) 치면 부서진다 (${(before.kinds || {})[type] || 0}→${(after.kinds || {})[type] || 0}; ${at})`);
+        await game.shot(`biomes-${key}-hit`, `${label}을(를) 친 뒤`);
+        const [tallWord, tallType, tallLabel] = set.behind;
+        const went = (await game.send(`biomes at ${tallWord}`)).join(' ');
+        await game.wait(700);
+        const behind = await game.ask('biomes');
+        const tall = (behind.cells || []).find(c => c.type === tallType) || {};
+        check(/ok biomes at/.test(went) && tall.alpha < 0.9, `${name}: ${tallLabel} 뒤에 서면 위쪽이 흐려진다 (알파 ${tall.alpha}; ${went})`);
+        await game.shot(`biomes-${key}-behind`, `${tallLabel} 뒤: 위쪽이 흐려진다`);
       } else {
         // The spore sac: a swing bursts it into the cloud that fills monsters.
         const before = await game.ask('biomes');
@@ -6332,6 +6359,9 @@ async function biomes(browser) {
 const PlaceSets = {
   cave: { name: '흙 동굴', id: 'Cave', room: 'cave', look: 1, marks: ['MinerHut', 'MineFrame'], real: [['hut', 'huts', '옛 광부 오두막'], ['frame', 'frames', '갱도 입구 틀']] },
   mushroom: { name: '버섯 숲', id: 'Mushroom', room: 'mushroom', look: 2, marks: ['RingCap'], real: [['ring', 'rings', '요정 고리']] },
+  // 묶음 B2a (the landmarks are in worlds of version 5 on).
+  ice: { name: '얼음 동굴', id: 'Ice', room: 'ice', look: 3, marks: ['FrozenBeast', 'IceColumn'], real: [['beast', 'beasts', '얼음 속 짐승'], ['ruin', 'ruins', '얼음 성 잔해']] },
+  sand: { name: '모래 동굴', id: 'Sand', room: 'sand', look: 4, marks: ['TempleFront', 'GiantSkull'], real: [['temple', 'temples', '묻힌 신전 정면'], ['skull', 'skulls', '거대 화석 두개골']] },
 };
 const PlaceLooks = ['Cottage', 'Cabin', 'Well', 'LampPost', 'Signpost', 'Bench', 'Flowerbed', 'Crates'];
 
@@ -6350,7 +6380,7 @@ async function places(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand']) {
       const set = PlaceSets[key];
       const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
       await game.wait(2000);
@@ -6358,7 +6388,7 @@ async function places(browser) {
       await game.wait(2500);
       let p = await game.ask('places');
       check(p.biome === set.id, `${name}: ${set.name}의 방에 섰다 (${p.biome}, ${went})`);
-      check(p.generator >= 4, `${name}: 새 월드는 생성기 4판이다(랜드마크는 4판부터, ${p.generator})`);
+      check(p.generator >= (key === 'ice' || key === 'sand' ? 5 : 4), `${name}: 새 월드는 생성기 5판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, ${p.generator})`);
       const cells = p.cells || [];
       const looks = cells.filter(c => PlaceLooks.includes(c.type));
       const missing = PlaceLooks.filter(t => !looks.some(c => c.type === t));
@@ -6517,7 +6547,128 @@ async function b1c(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c };
+// The ice cave and the sand cave's monsters, rules and dungeons (2026-11-24, Docs/BiomeRework.md B2b, Docs/Playtest.md
+// b2mobs), on a PC and a phone held upright: the new kinds in a row each drawn at its size; a frost wolf's charge sliding on
+// over the ice into a wall and dazed; icicles' shadows and their fall; sand pouring onto the sand cave's buried; the two
+// mid-bosses standing as statues; the frozen crypt and the buried temple with a big body in a pack room and their mid-boss
+// in person for master; the new world's lairs of both. How the slide, the icicles and the waking feel are the person's.
+async function b2mobs(browser) {
+  const kinds = [['bomb_scarab', 's', '자폭 풍뎅이'], ['frost_lord', 's', '서리 정령 군주'], ['frost_wolf', 'm', '서리 늑대'], ['frost_beetle', 'm', '서리 딱정벌레'],
+    ['sandstone_beetle', 'm', '사암 딱정벌레'], ['scorpion_queen', 'm', '전갈 여왕'], ['yeti', 'l', '눈 거인'], ['great_worm', 'l', '큰 모래 지렁이'],
+    ['frost_mammoth', 'xl', '서리 매머드'], ['temple_guardian', 'xl', '신전 수호 석상']];
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 얼음 동굴·모래 동굴의 몬스터와 규칙, 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; xp 3000');
+    const start = await game.ask('b2');
+    const crypt = (start.gates || []).find(g => g.dungeon === 'frozen_crypt');
+    const temple = (start.gates || []).find(g => g.dungeon === 'buried_temple');
+    check(!!crypt && crypt.master === 'frost_mammoth' && crypt.light === '#A8DCFF' && !!temple && temple.master === 'temple_guardian' && temple.light === '#FFD28A',
+      `${name}: 얼음 문은 얼어붙은 묘(서리 매머드), 모래 문은 묻힌 신전(신전 수호 석상), 문 방의 불 색 (${crypt ? crypt.light : '-'}, ${temple ? temple.light : '-'})`);
+    const lairs = (await game.ask('b1c')).lairs || [];
+    check(lairs.some(l => l.biome === 'Ice') || lairs.some(l => l.biome === 'Sand'),
+      `${name}: 새 월드(5판)에 얼음·모래 중간 보스의 굴이 있다 (${lairs.map(l => `${l.biome} ${l.boss}`).join(', ')})`);
+
+    // The new kinds in a row.
+    let seen = {}, room = '';
+    for (let n = 0; n < 6; n++) {
+      room = (await game.send(`clear; goto room pack any ${n}`)).join(' ');
+      await game.wait(1200);
+      await game.send('clear; scene b2monsters');
+      await game.wait(900);
+      seen = await game.ask('b2');
+      if (kinds.every(([kind]) => (seen.monsters || []).some(m => m.kind === kind))) break;
+    }
+    for (const [kind, size, label] of kinds) {
+      const m = (seen.monsters || []).find(x => x.kind === kind);
+      const [least, most] = SizeBands[size];
+      check(!!m && m.size === size && m.drawn && m.pixels >= least && m.pixels <= most,
+        `${name}: ${label}(${size.toUpperCase()})가 제 크기로 그려진다 (${m ? `${m.pixels}px` : '없음'}, ${least}~${most}px, ${room})`);
+    }
+    await game.shot('b2mobs-lineup', '새 몬스터 줄: 자폭 풍뎅이, 서리 정령 군주, 서리 늑대, 서리 딱정벌레, 사암 딱정벌레, 전갈 여왕, 눈 거인, 큰 모래 지렁이, 서리 매머드, 신전 수호 석상');
+
+    // A wolf's charge slides on over the ice into the wall and dazes it.
+    await game.send('clear; heal; goto biome ice');
+    await game.wait(1000);
+    await game.send('clear; heal; scene iceslide');
+    await game.wait(1500);
+    await game.shot('b2mobs-iceslide', '얼음 위에서 더 미끄러져 벽에 부딪힌 서리 늑대(별)');
+    const slid = await game.ask('b2');
+    const wolf = (slid.monsters || []).find(m => m.kind === 'frost_wolf');
+    check(!!wolf && wolf.state === 'Stagger', `${name}: 늑대의 돌진이 얼음 위에서 미끄러져 벽에 부딪히고 비틀거린다 (${wolf ? wolf.state : '없음'})`);
+
+    // Icicles: their shadows a second, then they fall.
+    await game.send('clear; heal; scene icicles');
+    await game.wait(350);
+    const falling = await game.ask('b2');
+    check((falling.icicles || []).length >= 2 && falling.iciclesShown >= 2, `${name}: 고드름 그늘이 바닥에 보인다 (${(falling.icicles || []).length}, 화면 ${falling.iciclesShown})`);
+    await game.shot('b2mobs-icicles', '고드름 두 개의 천장 그늘(1초 예고)');
+    await game.wait(900);
+    const fell = await game.ask('b2');
+    check(fell.iciclesFallen >= 2, `${name}: 고드름이 떨어졌다 (${fell.iciclesFallen})`);
+    await game.shot('b2mobs-icicles-fall', '떨어져 깨진 고드름');
+
+    // The sand cave's buried under falling sand.
+    await game.send('clear; heal; goto biome sand');
+    await game.wait(1000);
+    await game.send('clear; heal; scene sandfall');
+    await game.wait(1500);
+    const sand = await game.ask('b2');
+    const buried = (sand.monsters || []).filter(m => m.underSand);
+    check(buried.length >= 1 && sand.sandFallsShown > 0, `${name}: 묻힌 것 위로 모래가 흘러내린다 (${buried.map(m => m.kind).join(', ') || '없음'}, 화면 ${sand.sandFallsShown})`);
+    await game.shot('b2mobs-sandfall', '모래가 흐르는 자리: 묻힌 전갈과 큰 모래 지렁이');
+
+    // The mid-bosses dormant.
+    await game.send('clear; heal; goto room pack any 0');
+    await game.wait(1000);
+    await game.send('clear; heal; scene dormant');
+    await game.wait(1200);
+    const still = await game.ask('b2');
+    const statues = (still.monsters || []).filter(m => m.dormant);
+    check(statues.some(m => m.kind === 'temple_guardian') && statues.some(m => m.kind === 'frost_mammoth'),
+      `${name}: 신전 수호 석상과 서리 매머드가 잠들어 서 있다 (${statues.map(m => m.kind).join(', ') || '없음'})`);
+    await game.shot('b2mobs-dormant', '잠든 중간 보스: 돌이 된 수호 석상, 얼음에 갇힌 매머드');
+
+    // The two dungeons: a pack room with a big body, the mid-boss in person.
+    for (const [id, gateLabel, master, big] of [['frozen_crypt', '얼어붙은 묘', '서리 매머드', 'yeti'], ['buried_temple', '묻힌 신전', '신전 수호 석상', 'great_worm']]) {
+      const to = (await game.send(`monsters hold; clear; heal; goto gate ${id}`)).join(' ');
+      await game.wait(1500);
+      check(/ok goto gate/.test(to), `${name}: ${gateLabel}의 문으로 (${to})`);
+      await game.shot(`b2mobs-${id}-gate`, `${gateLabel}의 문 방`);
+      await game.press(new RegExp(`${gateLabel} 들어가기`));
+      const inside = await game.until(d => d.inPocket && d.clientInPocket && d.run, 6000, () => game.ask('dungeon'));
+      check(!!inside && inside.run.id === id, `${name}: ${gateLabel}에 들어왔다 (${inside ? `${inside.cardName}, ${inside.run.letters}` : '들어가지 못함'})`);
+      await game.send('goto droom C');
+      await game.wait(1500);
+      const pack = await game.ask('b2');
+      const bigs = (pack.monsters || []).filter(m => m.size === 'l' && m.distance < 16);
+      check(bigs.length >= 1, `${name}: ${gateLabel}의 무리 방에 큰 몸 (${bigs.map(m => m.kind).join(', ') || '없음'}; ${big}이 나올 수 있다)`);
+      await game.shot(`b2mobs-${id}-pack`, `${gateLabel}의 무리 방`);
+      await game.send('goto droom B; heal');
+      await game.wait(1800);
+      const boss = await game.ask('dungeon');
+      check(boss.run && boss.run.room === 'B' && new RegExp(master).test(boss.run.master) && !/대장/.test(boss.run.master),
+        `${name}: ${gateLabel}의 주인은 ${master} 그 자신 (${boss.run ? boss.run.master : '-'})`);
+      await game.shot(`b2mobs-${id}-master`, `${gateLabel}의 주인 ${master}`);
+      await game.press('던전 나가기');
+      await game.until(d => !d.inPocket && !d.clientInPocket, 6000, () => game.ask('dungeon'));
+    }
+    await game.send('monsters hold; clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -27,6 +27,8 @@ namespace Game.Core
         // ground stays up after an attack with no time given (MonsterTraitKind.Burrowed).
         public const float OrbitReach = 3;
         public const float SurfaceSeconds = 2.5f;
+        // The longest one that lives under the ground goes after someone unseen before it comes up anyway.
+        public const float BurrowedMostSeconds = 6;
         // A hit on a guarding monster's front does this share of its damage; a dazed one takes this much more.
         public const float GuardShare = 0.3f;
         public const float StaggerSeconds = 1.5f;
@@ -121,8 +123,24 @@ namespace Game.Core
             // What the spore clouds gave it, and the slimes a slime mother sheds (World.BiomeMonsters.cs).
             TellCloudHeal(enemy);
             Shed(enemy);
+            // A dormant mid-boss that has come to fight (World.IceSand.cs).
+            WakeDormant(enemy);
             bool buried = (enemy.State == EnemyState.Idle || enemy.State == EnemyState.Chase)
-                && (enemy.Definition.Has(MonsterTraitKind.Burrowed) || WaitsInAmbush(enemy));
+                && (enemy.Definition.Has(MonsterTraitKind.Burrowed) || WaitsInAmbush(enemy)) && Tick >= enemy.UpUntil;
+            // One that lives under the ground and has gone after someone so long with no attack that fits (a big worm
+            // whose target stands where its body cannot come up) comes up for a while all the same, to be struck
+            // (2026-11-24, B2: the --dungeon bot stood beside a great worm it could never reach).
+            if (buried && enemy.Buried && enemy.State == EnemyState.Chase && enemy.Definition.Has(MonsterTraitKind.Burrowed))
+            {
+                if (++enemy.UnderTicks > Ticks(BurrowedMostSeconds))
+                {
+                    enemy.UnderTicks = 0;
+                    enemy.UpUntil = Tick + Ticks(enemy.Definition.Trait(MonsterTraitKind.Burrowed).Number(0, SurfaceSeconds));
+                    buried = false;
+                    _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxSurface, position: enemy.Position));
+                }
+            }
+            else enemy.UnderTicks = 0;
             if (buried != enemy.Buried)
             {
                 enemy.Buried = buried;
@@ -749,7 +767,8 @@ namespace Game.Core
                         if (toward.Length > enemy.Definition.Radius + PlayerRadius)
                         {
                             enemy.Facing = toward.Normalized;
-                            enemy.Position = Collision.Move(Map, enemy.Position, enemy.Definition.Radius, enemy.Facing * (enemy.Speed * TickSeconds), monster: true);
+                            // Quicksand slows the roll (B2: a bomb scarab, World.GroundPace).
+                            enemy.Position = Collision.Move(Map, enemy.Position, enemy.Definition.Radius, enemy.Facing * (enemy.Speed * GroundPace(enemy) * TickSeconds), monster: true);
                         }
                     }
                     foreach (var hazard in _hazards)
@@ -812,6 +831,7 @@ namespace Game.Core
                 case MonsterAttackShape.Charge:
                 case MonsterAttackShape.Swoop:
                     enemy.State = EnemyState.Charge;
+                    enemy.Slid = false;
                     enemy.RushSpeed = attack.Speed;
                     enemy.StateTicks = Ticks(attack.Length / attack.Speed);
                     enemy.ChargeHits.Clear();
@@ -961,14 +981,18 @@ namespace Game.Core
 
             bool blocked = Vec2.Distance(before, enemy.Position) < step.Length * 0.3f;
             if (--enemy.StateTicks > 0 && !blocked) return;
-            if (blocked && attack.Shape == MonsterAttackShape.Charge && definition.Has(MonsterTraitKind.Stagger))
+            // On the ice (B2, World.IceSand.cs) a charge that ran its length slides on a little, and one that runs into a
+            // wall on the ice is dazed whatever its kind.
+            if (!blocked && SlideOn(enemy)) return;
+            bool icy = attack.Shape == MonsterAttackShape.Charge && (enemy.Slid || OnIce(enemy));
+            if (blocked && attack.Shape == MonsterAttackShape.Charge && (definition.Has(MonsterTraitKind.Stagger) || icy))
             {
                 enemy.RepeatsLeft = 0;
                 // A big body smashes the stalagmite or pit prop it ran into, and is dazed all the same (B1c).
                 SmashAhead(enemy);
                 enemy.State = EnemyState.Stagger;
                 // stagger:seconds for its own (a big beetle's longer daze), else StaggerSeconds.
-                enemy.StateTicks = Ticks(definition.Trait(MonsterTraitKind.Stagger).Number(0, StaggerSeconds));
+                enemy.StateTicks = Ticks(definition.Trait(MonsterTraitKind.Stagger)?.Number(0, StaggerSeconds) ?? StaggerSeconds);
                 _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxStagger, position: enemy.Position));
                 return;
             }

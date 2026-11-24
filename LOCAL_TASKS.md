@@ -1158,6 +1158,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/RailArt.cs`의 `.meta`가 생기면 커밋한다
   - (클라우드 웹 점검) `sweep.js --only b1c,dungeon`(갱도 보스 방의 선로)
   - (사람) 갱도·광산 마을·선로 굴의 철도가 바닥 위에 놓인 레일로 읽히는지, 굽은 곳·갈림이 자연스러운지
+- [ ] 172단계: 얼음 동굴·모래 동굴 — 모습, 소품, 장소, 랜드마크, 새 몬스터 열, 규칙, 던전 둘, 생성기 5판(`Docs/BiomeRework.md` B2a·B2b)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.IceSand.cs`, `Core/World/WorldGenerator.IceSandDungeons.cs`, `Core/Simulation/World.IceSand.cs`, `Client/Art/BiomeArt.IceSand.cs`, `Client/Art/PropArt.IceSand.cs`, `Client/Art/CreatureArt.IceSand.cs`, `Tests/EditMode/IceSandLookTests.cs`, `Tests/EditMode/B2bTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheIceAndSandCavesStandTheirPropsAndThePlacesTakeTheirLooks`(사진 `biomes-ice`, `places-ice`, `biomes-sand`, `places-sand`). 통신 0.104.0. 새 월드는 생성기 5판, 4판 이전 월드는 그대로
+  - (클라우드 웹 점검) `sweep.js --only biomes,places,b2mobs,dungeon,packs`
+  - (사람) 얼음 동굴(하늘빛)과 모래 동굴(금빛)이 서로 다르게 느껴지고 빛 물이 과하지 않은지, 미끄러운 얼음 칸이 새 바닥과 구별되는지, 환경음 둘(바람·얼음 갈라짐, 모래), 흰 토끼·도마뱀이 휴대폰에서 적과 헷갈리지 않는지, 얼음 마을·모래 마을과 랜드마크(얼음 속 짐승, 얼음 성 기둥, 묻힌 신전 정면, 거대 두개골), 얼음 위에서 미끄러지는 돌진과 떨어지는 고드름(휴대폰에서 천장 그늘이 읽히는지), 흐르는 모래 아래에서 튀어나오는 것, 잠든 서리 매머드·신전 수호 석상이 깨어나는 맛, 얼어붙은 묘·묻힌 신전 한 판
 
 ## 결과 보고
 

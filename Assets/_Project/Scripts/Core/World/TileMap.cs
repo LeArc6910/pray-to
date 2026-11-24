@@ -252,6 +252,31 @@ namespace Game.Core
         // tile). Standing (solid, the step down is by its button), never dug or built on.
         Trapdoor,
         OpenTrapdoor,
+        // The ice cave's and the sand cave's own props (2026-11-24, Docs/BiomeRework.md 묶음 B2a), laid by the generator's
+        // version 5 (WorldGenerator.IceSand.cs). The ice cave's: a spike of ice, a frozen bush (broken for frost berry
+        // seeds), a drift of snow, a clump of ice crystals (picked, glowing), a pillar of ice (two tiles wide, glowing)
+        // and a frozen fall set against the rock (two tiles wide).
+        IceSpike,
+        FrozenBush,
+        SnowDrift,
+        IceCrystals,
+        IcePillar,
+        FrozenFall,
+        // The sand cave's: a cave cactus (picked for its fruit), a beast's skull, a broken urn (broken for coins and
+        // amber), a carved sandstone pillar, the ribs of a fossil and a half-buried column (both two tiles wide).
+        CaveCactus,
+        Skull,
+        BrokenUrn,
+        SandstonePillar,
+        RibArch,
+        BuriedColumn,
+        // Their landmarks, rare and never dug: a beast frozen in a block of ice (three tiles by two) and the columns of
+        // an ice keep's ruin in the ice cave; the front of a buried temple set against the rock (five tiles wide) and a
+        // giant fossil skull (three by two) in the sand cave.
+        FrozenBeast,
+        IceColumn,
+        TempleFront,
+        GiantSkull,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -273,12 +298,15 @@ namespace Game.Core
         public static (int W, int H) Footprint(TileType type) => type switch
         {
             TileType.Cottage or TileType.Cabin => (4, 3),
-            TileType.Boat or TileType.MineEntrance or TileType.MinerHut => (3, 2),
+            TileType.Boat or TileType.MineEntrance or TileType.MinerHut or TileType.FrozenBeast or TileType.GiantSkull => (3, 2),
             TileType.Tower or TileType.BigFountain or TileType.BigTent or TileType.Lighthouse => (2, 2),
             TileType.Altar or TileType.MineFrame => (3, 1),
             TileType.FallenColumn => (2, 1),
             // The biomes' wide props (묶음 B1a): pictures two tiles tall, standing on their lower row alone.
             TileType.Boulder or TileType.CaveIn or TileType.FallenLog => (2, 1),
+            // The ice cave's and the sand cave's (묶음 B2a).
+            TileType.IcePillar or TileType.FrozenFall or TileType.RibArch or TileType.BuriedColumn => (2, 1),
+            TileType.TempleFront => (5, 1),
             _ => (1, 1),
         };
 

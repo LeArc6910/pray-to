@@ -71,6 +71,9 @@ namespace Game.Client
         static readonly Color AlertColor = new Color(1f, 0.82f, 0.25f);
         // Bombers' blasts shown since the game began.
         public int ExplosionsShown { get; private set; }
+        // Streams of falling sand drawn over the sand cave's buried, and icicles shown falling, since the game began (B2b).
+        public int SandFallsShown { get; private set; }
+        public int IciclesShown { get; private set; }
         // Mounds drawn last frame for monsters under the ground, and the lines between those that stand in a line.
         public int MonsterMoundsShown { get; private set; }
         public int MonsterLinksShown { get; private set; }
@@ -136,6 +139,12 @@ namespace Game.Client
                 QueueMob(MobFx.Mound, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = body.MobDir.Angle, Armed = moving, Seed = view.Id & 0xFFFF, Look = body.MobKind },
                     Time.time);
                 _mounds++;
+                // In the sand cave sand pours from the ceiling onto it (World.UnderFallingSand, B2b).
+                if (World.UnderFallingSand(_client.Biomes, new Vec2(body.Position.x, body.Position.y), true))
+                {
+                    QueueMob(MobFx.SandFall, feet, new MobContext { Seed = view.Id & 0xFFFF }, Time.time);
+                    SandFallsShown++;
+                }
             }
             body.MobLast = body.Position;
             body.MobBuried = buried;
@@ -286,6 +295,8 @@ namespace Game.Client
         (FxRamp Ramp, uint Tint, MonsterAttack Attack, MobLook Look) LookOf(HazardState hazard)
         {
             if (_markLooks.TryGetValue(hazard.Id, out var look)) return look;
+            // An icicle of the ice halls (Hazard.Icicle, B2b) is the cold's own, no monster's.
+            if (hazard.MonsterShape + 1 == Hazard.Icicle) return (FxRamp.Cold, 0x1DCEFFAu, null, MobLook.Frost);
             look = (FxRamp.Plain, 0x1D8D8D8u, null, MobLook.Plain);
             float best = 14;
             foreach (var body in _others.Values)
@@ -331,7 +342,15 @@ namespace Game.Client
 
             int shapeIndex = hazard.MonsterShape;
             bool flash = shapeIndex + 1 == Hazard.DeathFlash;
-            var shape = flash ? MonsterAttackShape.Slam : (MonsterAttackShape)shapeIndex;
+            // An icicle is drawn as a thing coming down: its shadow grows on the floor and it falls at the end.
+            bool icicle = shapeIndex + 1 == Hazard.Icicle;
+            if (icicle && !mark.Armed)
+            {
+                mark.Armed = true;
+                IciclesShown++;
+                Hear(Sound.MobArea, at, 0.5f);
+            }
+            var shape = flash ? MonsterAttackShape.Slam : icicle ? MonsterAttackShape.Lob : (MonsterAttackShape)shapeIndex;
             bool blink = shape == MonsterAttackShape.Blink;
             var color = hazard.Harmful ? DangerColor : PathColor;
             if (Feel.MonsterFx)
@@ -393,7 +412,7 @@ namespace Game.Client
         {
             if (!hazard.Harmful || IsMonsterPool(hazard.Shape) || hazard.MonsterShape + 1 == Hazard.DeathFlash) return;
             var look = LookOf(hazard);
-            MonsterBlow((MonsterAttackShape)hazard.MonsterShape, hazard.Shape, new Vector3(hazard.Position.X, hazard.Position.Y, 0), hazard.Direction, hazard.Size, hazard.Width,
+            MonsterBlow(hazard.MonsterShape + 1 == Hazard.Icicle ? MonsterAttackShape.Lob : (MonsterAttackShape)hazard.MonsterShape, hazard.Shape, new Vector3(hazard.Position.X, hazard.Position.Y, 0), hazard.Direction, hazard.Size, hazard.Width,
                 look.Ramp, look.Tint, look.Look);
         }
 
@@ -534,6 +553,18 @@ namespace Game.Client
                             AddMobFx(MobFx.Deathburst, at, new MobContext { Ramp = FxRamp.Plain, Tint = 0x19E8060u });
                             Hear(Sound.Shatter, at, 0.9f);
                             if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.12f);
+                            break;
+                        // B2b: a charge slides on over the ice; a dormant mid-boss breaks out of its stone or its ice.
+                        case World.MonsterFxSlide:
+                            AddMobFx(MobFx.Slide, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0),
+                                new MobContext { Dir = body != null ? Mathf.Atan2(body.Faced.Y, body.Faced.X) : 0, Seed = e.Source & 0xFFFF });
+                            Hear(Sound.Shatter, at, 0.45f);
+                            break;
+                        case World.MonsterFxWake:
+                            AddMobFx(MobFx.Rouse, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0),
+                                new MobContext { Ramp = body != null && body.Id == "frost_mammoth" ? FxRamp.Cold : FxRamp.Dust, Seed = e.Source & 0xFFFF });
+                            Hear(Sound.Shatter, at, 1f);
+                            if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.18f);
                             break;
                         case World.MonsterFxEmpower:
                             AddMobFx(MobFx.Rally, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new MobContext { Size = 2.5f * Ppu });

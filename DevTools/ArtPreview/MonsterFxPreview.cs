@@ -463,6 +463,17 @@ namespace Game.Client
                     Tint = MonsterFx.TintOf(Rgba.Hex("#7CD2E2")), Dir = 0, Seed = 11 }, 1, true));
             foreach (var shape in new[] { MonsterAttackShape.Spread, MonsterAttackShape.Bounce, MonsterAttackShape.Boomerang })
                 rows.Add(Row(MobFx.Shot, new MobContext { Shape = shape, Ramp = shape == MonsterAttackShape.Boomerang ? FxRamp.Violet : FxRamp.Plain, Tint = MonsterFx.TintOf(Rgba.Hex("#C8F4FF")), Dir = 0.3f, Seed = 11 }, 1, true));
+            // The ice cave and the sand cave (B2b): an icicle's shadow and fall (a lob's mark and blow in the cold's colours, as
+            // the screen draws Hazard.Icicle), sand pouring onto the buried, ice thrown up by a sliding charge, a dormant
+            // mid-boss breaking out of its ice and out of its stone.
+            rows.Add(Row(MobFx.Mark, new MobContext { Shape = MonsterAttackShape.Lob, Area = HazardShape.Circle, Ramp = FxRamp.Cold, Look = MobLook.Frost,
+                Size = (World.IcicleRadius + World.PlayerRadius) * Tile, Seed = 7 }, World.IcicleTelegraph, false, Growing));
+            rows.Add(Row(MobFx.Land, new MobContext { Shape = MonsterAttackShape.Lob, Area = HazardShape.Circle, Ramp = FxRamp.Cold, Look = MobLook.Frost,
+                Size = (World.IcicleRadius + World.PlayerRadius) * Tile, Seed = 7 }, 0.45f, false));
+            rows.Add(Row(MobFx.SandFall, new MobContext { Seed = 4 }, 1.5f, true));
+            rows.Add(Row(MobFx.Slide, new MobContext { Dir = 0, Seed = 4 }, 0.45f, false));
+            rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Cold, Seed = 4 }, 0.65f, false));
+            rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Dust, Seed = 4 }, 0.65f, false));
             return (SkillFxPreview.Sheet(rows), fine);
         }
 

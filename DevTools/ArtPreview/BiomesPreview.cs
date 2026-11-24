@@ -15,7 +15,10 @@ namespace Game.Client
     // footprint.
     static partial class Program
     {
-        static readonly (Biome Biome, string Id, string Name)[] MadeBiomes = { (Biome.Cave, "cave", "DIRT CAVE"), (Biome.Mushroom, "mushroom", "MUSHROOM FOREST") };
+        static readonly (Biome Biome, string Id, string Name)[] MadeBiomes =
+        {
+            (Biome.Cave, "cave", "DIRT CAVE"), (Biome.Mushroom, "mushroom", "MUSHROOM FOREST"), (Biome.Ice, "ice", "ICE CAVE"), (Biome.Sand, "sand", "SAND CAVE"),
+        };
 
         static bool WriteBiomes(string output, WorldLights lights, TileData tiles, StoryData story, MonsterData monsters)
         {
@@ -27,7 +30,7 @@ namespace Game.Client
                 index.Append($"| `{name}` | {what} |\n");
             }
             bool ok = true;
-            var world = WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.LandmarkVersion, tiles.Terrain);
+            var world = WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.NewWorldVersion, tiles.Terrain);
             foreach (var (biome, id, name) in MadeBiomes)
             {
                 ok &= PropSheet(biome, name, out var sheet);
@@ -56,7 +59,11 @@ namespace Game.Client
                 Write(scene.Image, "place_hero_hut.png", 3, "용사의 오두막(3판): 텃밭 울타리의 두 줄이 모서리 기둥에서 직각으로 만난다");
             }
             // 묶음 B1c: the places' buildings and dressing in each biome's look, and the landmarks.
-            Write(PlaceLooks(), "place_props.png", 3, "장소의 건물·꾸밈을 생물군계마다: 줄마다 예전 그림 / 흙 동굴(광산 야영지) / 버섯 숲. 집은 밤(창에 불)과 낮");
+            Write(PlaceLooks((0, Biome.Cave, "OLD"), (PropArt.CaveLook, Biome.Cave, "DIRT CAVE"), (PropArt.ForestLook, Biome.Mushroom, "MUSHROOM FOREST")),
+                "place_props.png", 3, "장소의 건물·꾸밈을 생물군계마다: 줄마다 예전 그림 / 흙 동굴(광산 야영지) / 버섯 숲. 집은 밤(창에 불)과 낮");
+            // 묶음 B2a: the ice cave's and the sand cave's.
+            Write(PlaceLooks((0, Biome.Cave, "OLD"), (PropArt.IceLook, Biome.Ice, "ICE CAVE"), (PropArt.SandLook, Biome.Sand, "SAND CAVE")),
+                "place_props_ice_sand.png", 3, "장소의 건물·꾸밈: 예전 그림 / 얼음 동굴(눈 덮인 지붕, 얼음 벽돌, 서리 등) / 모래 동굴(흙벽돌 집, 차양, 항아리, 화로). 집은 밤과 낮");
             foreach (var site in world.Places.Where(p => p.Definition.Id == "dawn_village" || p.Definition.Id == "hero_hut"))
             {
                 foreach (var (biome, id, _) in MadeBiomes)
@@ -77,7 +84,11 @@ namespace Game.Client
             }
             foreach (bool lit in new[] { false, true })
                 Write(LandmarkSheet(lights, lit), lit ? "landmarks_lit.png" : "landmarks.png", 3, "랜드마크 셋(옛 광부 오두막과 울타리 마당, 갱도 입구 틀과 끊긴 선로, 요정 고리 큰 것·작은 것)" + (lit ? ", 어둠과 빛" : ", 어둠 없이"));
-            foreach (var kind in new[] { BiomeLandmarkKind.MinerHut, BiomeLandmarkKind.MineFrame, BiomeLandmarkKind.FairyRing })
+            foreach (bool lit in new[] { false, true })
+                Write(IceSandLandmarkSheet(lights, lit), lit ? "landmarks_ice_sand_lit.png" : "landmarks_ice_sand.png", 3,
+                    "얼음·모래의 랜드마크 넷(얼음 속 짐승, 얼음 성 잔해 기둥 / 묻힌 신전 정면, 거대 화석 두개골과 갈비뼈)" + (lit ? ", 어둠과 빛" : ", 어둠 없이"));
+            foreach (var kind in new[] { BiomeLandmarkKind.MinerHut, BiomeLandmarkKind.MineFrame, BiomeLandmarkKind.FairyRing, BiomeLandmarkKind.FrozenBeast, BiomeLandmarkKind.IceRuin,
+                BiomeLandmarkKind.TempleFront, BiomeLandmarkKind.GiantSkull })
             {
                 if (!world.BiomeLandmarks.Any(l => l.Kind == kind))
                 {
@@ -85,7 +96,7 @@ namespace Game.Client
                     continue;
                 }
                 var mark = world.BiomeLandmarks.First(l => l.Kind == kind);
-                var biome = kind == BiomeLandmarkKind.FairyRing ? Biome.Mushroom : Biome.Cave;
+                var biome = world.Biomes[mark.StandX, mark.StandY];
                 foreach (bool lit in new[] { false, true })
                 {
                     var scene = new Scene(world.Map, mark.Left + mark.Width / 2 - 11, mark.Bottom + mark.Height / 2 - 8, 22, 16, _ => false)
@@ -95,14 +106,14 @@ namespace Game.Client
                     scene.Player(mark.StandX + 0.5f, mark.StandY + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
                     if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y]));
                     Write(scene.Image, $"landmark_{kind.ToString().ToLowerInvariant()}{(lit ? "_lit" : "")}.png", 3,
-                        $"생성기 4판 시드 1의 실제 {kind}({mark.Left},{mark.Bottom}){(lit ? ", 어둠과 빛" : ", 어둠 없이")}");
+                        $"생성기 {world.Version}판 시드 1의 실제 {kind}({mark.Left},{mark.Bottom}){(lit ? ", 어둠과 빛" : ", 어둠 없이")}");
                 }
             }
-            foreach (var type in new[] { TileType.MinerHut, TileType.MineFrame })
+            foreach (var type in new[] { TileType.MinerHut, TileType.MineFrame, TileType.FrozenBeast, TileType.IceColumn, TileType.TempleFront, TileType.GiantSkull })
             {
                 var picture = StandArt.Picture(type, StandArt.Kind.Prop, 0, false);
                 int span = Structures.Footprint(type).W * 16;
-                if (picture == null || picture.Width > span + 2)
+                if (picture == null || picture.Width > span + (type == TileType.IceColumn ? 6 : 2))
                 {
                     Console.Error.WriteLine($"biomes: the landmark {type} has no picture or one wider than its footprint.");
                     ok = false;
@@ -111,7 +122,7 @@ namespace Game.Client
             foreach (var type in PlaceLookTypes)
             {
                 var old = PropArt.Prop(type);
-                foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook })
+                foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook, PropArt.IceLook, PropArt.SandLook })
                 {
                     var redrawn = PropArt.PlaceProp(type, look);
                     if (redrawn != null && redrawn.Width == old.Width && redrawn.Height == old.Height) continue;
@@ -131,9 +142,8 @@ namespace Game.Client
 
         // Each of the places' things that is redrawn by biome: the old drawing, the dirt cave's and the mushroom forest's
         // side by side on their floors, the houses by night and by day.
-        static PixelImage PlaceLooks()
+        static PixelImage PlaceLooks(params (int Look, Biome Biome, string Name)[] looks)
         {
-            var looks = new[] { (0, Biome.Cave, "OLD"), (PropArt.CaveLook, Biome.Cave, "DIRT CAVE"), (PropArt.ForestLook, Biome.Mushroom, "MUSHROOM FOREST") };
             const int colW = 150, pad = 6;
             var g = new PixelImage(pad * 2 + colW * 3, 16 + 92 * 2 + 62);
             g.Fill(0, 0, g.Width, g.Height, DepthBack);
@@ -204,6 +214,45 @@ namespace Game.Client
             g.Fill(0, 0, g.Width, g.Height, DepthBack);
             g.Draw(cave, 0, 0);
             g.Draw(forest, 0, cave.Height + 2);
+            return g;
+        }
+
+        // The ice cave's and the sand cave's landmarks laid as the generator lays them (묶음 B2a): the beast in ice and
+        // the keep's columns on the ice cave's floor, the temple's front under rock and the giant skull with its ribs
+        // on the sand cave's.
+        static PixelImage IceSandLandmarkSheet(WorldLights lights, bool lit)
+        {
+            PixelImage Half(Biome biome, bool rock, params (BiomeLandmarkKind Kind, int Left, int Bottom)[] sets)
+            {
+                var map = new TileMap(24, 13);
+                for (int y = 1; y < 10; y++)
+                    for (int x = 1; x < 23; x++)
+                        map[x, y] = TileType.Floor;
+                foreach (var (kind, left, bottom) in sets)
+                    foreach (var (dx, dy, type) in IceSandProps.Layout(kind))
+                    {
+                        var (w, h) = Structures.Footprint(type);
+                        for (int j = 0; j < h; j++)
+                            for (int i = 0; i < w; i++)
+                                map[left + dx + i, bottom + dy + j] = i == 0 && j == 0 ? type : TileType.StructurePart;
+                    }
+                var scene = new Scene(map, 0, 0, 24, 13, _ => false) { Biome = biome, Night = true, BiomeAt = (x, y) => biome };
+                scene.Places(null);
+                scene.Decor(5, (x, y) => biome);
+                foreach (var (kind, left, bottom) in sets)
+                {
+                    var box = IceSandProps.Box(kind);
+                    scene.Player(left + box.StandX + 0.5f, bottom + box.StandY + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+                }
+                if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(biome), (x, y) => WorldLights.BiomeTint(biome));
+                return scene.Image;
+            }
+            var ice = Half(Biome.Ice, false, (BiomeLandmarkKind.FrozenBeast, 2, 3), (BiomeLandmarkKind.IceRuin, 14, 4));
+            var sand = Half(Biome.Sand, true, (BiomeLandmarkKind.TempleFront, 2, 6), (BiomeLandmarkKind.GiantSkull, 14, 3));
+            var g = new PixelImage(ice.Width, ice.Height + sand.Height + 2);
+            g.Fill(0, 0, g.Width, g.Height, DepthBack);
+            g.Draw(ice, 0, 0);
+            g.Draw(sand, 0, ice.Height + 2);
             return g;
         }
 
@@ -281,7 +330,7 @@ namespace Game.Client
         static bool PropSheet(Biome biome, string name, out PixelImage sheet)
         {
             bool ok = true;
-            var kinds = BiomeProps.Of(biome).Select(k => k.Type).ToList();
+            var kinds = IceSandProps.Any(biome).Select(k => k.Type).ToList();
             if (biome == Biome.Cave) kinds.Insert(kinds.IndexOf(TileType.UnlitLamp) + 1, TileType.LitLamp);
             var decor = Enumerable.Range(0, 100).Select(roll => Decor.KindOf(biome, roll)).Distinct().ToList();
             var floor = TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0, biome));
@@ -355,8 +404,7 @@ namespace Game.Client
             int cx = leftPad + 6;
             foreach (CritterKind critter in Enum.GetValues(typeof(CritterKind)))
             {
-                bool cave = critter <= CritterKind.LampMoth;
-                if (cave != (biome == Biome.Cave)) continue;
+                if (CritterArt.HomeOf(critter) != biome) continue;
                 for (int f = 0; f < CritterArt.Frames; f++)
                 {
                     var image = CritterArt.Image(critter, f);
@@ -368,8 +416,7 @@ namespace Game.Client
             cx += 12;
             foreach (MoteKind mote in Enum.GetValues(typeof(MoteKind)))
             {
-                bool cave = mote <= MoteKind.Splash;
-                if (cave != (biome == Biome.Cave)) continue;
+                if (CritterArt.HomeOf(mote) != biome) continue;
                 g.Draw(CritterArt.Mote(mote), cx, y2 + 6);
                 cx += 10;
             }

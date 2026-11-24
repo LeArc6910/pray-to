@@ -23,6 +23,11 @@ namespace Game.Core
         GlowGrass,
         Threads,
         Moss,
+        // The ice cave's and the sand cave's own (묶음 B2a): a tuft of frosted grass, a shallow patch of snow (flat), a
+        // tuft of dry grass.
+        FrostGrass,
+        Snow,
+        DryGrass,
     }
 
     // One tile's pick: what, which of its drawings, mirrored or not, and how far off the tile's middle it stands (in
@@ -58,8 +63,8 @@ namespace Game.Core
         // In a thousand tiles of open floor, before the one-tile spacing thins it a little (B0's low density; the biome
         // packages raise it toward 8 to 12 in a hundred).
         public const int PerThousand = 34;
-        // The biomes whose package is made (B1a: the dirt cave, the mushroom forest): eight to twelve in a hundred
-        // tiles of clear floor once thinned.
+        // The biomes whose package is made (B1a: the dirt cave, the mushroom forest; B2a: the ice cave, the sand cave):
+        // eight to twelve in a hundred tiles of clear floor once thinned.
         public const int DensePerThousand = 270;
         // The clumps: a smooth noise over cells this many tiles wide raises or lowers the chance, so things gather in
         // groups and leave bare floor between (Docs/BiomeRework.md 4-3 배치, Poisson in clumps rather than a grid).
@@ -96,23 +101,24 @@ namespace Game.Core
         public static DecorKind KindOf(Biome biome, int roll) => biome switch
         {
             Biome.Mushroom => roll < 32 ? DecorKind.GlowGrass : roll < 60 ? DecorKind.Caps : roll < 80 ? DecorKind.Threads : DecorKind.Moss,
-            Biome.Ice => roll < 60 ? DecorKind.Shards : DecorKind.Pebbles,
+            Biome.Ice => roll < 30 ? DecorKind.FrostGrass : roll < 60 ? DecorKind.Shards : roll < 85 ? DecorKind.Snow : DecorKind.Pebbles,
             Biome.Crystal => roll < 70 ? DecorKind.Shards : DecorKind.Pebbles,
             Biome.Lava => roll < 60 ? DecorKind.Embers : DecorKind.Pebbles,
             Biome.Abyss => roll < 50 ? DecorKind.Shards : DecorKind.Pebbles,
             Biome.Lake => roll < 60 ? DecorKind.Tuft : DecorKind.Pebbles,
-            Biome.Sand => roll < 40 ? DecorKind.Bones : DecorKind.Pebbles,
+            Biome.Sand => roll < 35 ? DecorKind.DryGrass : roll < 60 ? DecorKind.Bones : DecorKind.Pebbles,
             _ => roll < 40 ? DecorKind.Pebbles : roll < 70 ? DecorKind.Tuft : DecorKind.Caps,
         };
 
         // How many in a thousand tiles roll a thing, by biome.
-        public static int RateOf(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom ? DensePerThousand : PerThousand;
+        public static int RateOf(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Sand ? DensePerThousand : PerThousand;
 
         // The kinds that sway: drawn nudged for a moment when someone brushes past (the client's rustle).
-        public static bool Sways(DecorKind kind) => kind == DecorKind.Tuft || kind == DecorKind.Caps || kind == DecorKind.GlowGrass;
+        public static bool Sways(DecorKind kind) => kind == DecorKind.Tuft || kind == DecorKind.Caps || kind == DecorKind.GlowGrass || kind == DecorKind.FrostGrass
+            || kind == DecorKind.DryGrass;
 
         // The kinds that lie flat on the floor: no shadow, never in front of anyone's feet.
-        public static bool Flat(DecorKind kind) => kind == DecorKind.Web || kind == DecorKind.Threads || kind == DecorKind.Moss;
+        public static bool Flat(DecorKind kind) => kind == DecorKind.Web || kind == DecorKind.Threads || kind == DecorKind.Moss || kind == DecorKind.Snow;
 
         // In a hundred corners of the dirt cave's rock (rock above and at a side), how many have a cobweb.
         public const int WebPercent = 30;

@@ -132,12 +132,12 @@ namespace Game.Client
             }
         }
 
-        // B1c: dungeons/gates.png. A world of the generator's version 4 (seed 1): the dirt cave's and the mushroom
-        // forest's gate rooms lit, their torches in the dungeon's light (dungeons.csv light, WorldLights.GateColors) beside
+        // B1c: dungeons/gates.png. A new world (seed 1): the dirt cave's, the mushroom forest's, the ice cave's and the
+        // sand cave's (B2b) gate rooms lit, their torches in the dungeon's light (dungeons.csv light, WorldLights.GateColors) beside
         // the same rooms in plain torchlight; and a camp's trapdoor shut and thrown open (its cellar's way down).
         static IEnumerable<string> Gates(TerrainData terrain, MonsterData monsters, WorldLights lights, string folder, StoryData story)
         {
-            var world = WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.LandmarkVersion, terrain);
+            var world = WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.NewWorldVersion, terrain);
             var gates = DungeonPocket.Gates(world.Rooms, world.Map);
             var colours = WorldLights.GateColors(gates, terrain.Dungeons);
             const int across = 22, high = 16;
@@ -152,7 +152,8 @@ namespace Game.Client
                 scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y]), recolor);
                 return scene.Image;
             }
-            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom })
+            // And the ice cave's frozen crypt (sky blue) and the sand cave's buried temple (gold), B2b.
+            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom, Biome.Ice, Biome.Sand })
             {
                 var gate = gates.FirstOrDefault(g => !g.Cellar && g.Biome == biome);
                 if (gate == null) continue;

@@ -71,6 +71,7 @@ namespace CoreSandbox
             long quietFrom = 0;
             int total = minutes * 60 * World.TicksPerSecond;
             int falls = player.Falls;
+            var fallPlaces = new List<string>();
             for (int tick = 0; tick < total; tick++)
             {
                 var near = world.Enemies.Where(e => !e.Away && !e.IsDead && Vec2.Distance(e.Position, player.Position) < 16
@@ -131,7 +132,14 @@ namespace CoreSandbox
                     }
                     if (e.Type == SimEventType.Died && e.Source != player.Id && names.ContainsKey(e.Source)) kills++;
                 }
-                if (player.Falls > falls) deaths += player.Falls - falls;
+                if (player.Falls > falls)
+                {
+                    deaths += player.Falls - falls;
+                    // Where it fell and what was about (B2b): to tell a new kind's doing from the run's luck.
+                    var foes = world.Enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) <= 8)
+                        .GroupBy(e => e.Definition.Id).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key} {g.Count()}");
+                    fallPlaces.Add($"{tick / World.TicksPerSecond / 60}:{tick / World.TicksPerSecond % 60:00} {world.Biomes.At(player.Position)} (곁 {string.Join(", ", foes)})");
+                }
                 falls = player.Falls;
                 if (tick % World.TicksPerSecond != 0) continue;
                 // Each second: the state, the tension, and whether a fight is on.
@@ -166,6 +174,7 @@ namespace CoreSandbox
             Console.WriteLine("긴장도 " + curve);
             Console.WriteLine("상태   " + under + "   (· 쌓기, ▲ 정점, ↘ 내려오기, _ 쉬기; 한 칸 30초)");
             Console.WriteLine("```");
+            if (fallPlaces.Count > 0) Console.WriteLine("쓰러진 곳: " + string.Join(" / ", fallPlaces));
             Console.WriteLine();
             int S(PaceState s) => seconds.GetValueOrDefault(s);
             return $"| {seed} | {S(PaceState.Build)} / {S(PaceState.Peak)} / {S(PaceState.Relax)} / {S(PaceState.Rest)} | {pace.Peaks} | {pace.Rests} | {pace.Sends} | {pace.Ambushes} | {pace.Raids} | {fights} "

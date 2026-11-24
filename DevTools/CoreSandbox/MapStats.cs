@@ -424,6 +424,20 @@ namespace CoreSandbox
                     Row("흙 동굴 / 버섯 숲의 방(아레나 빼고)", n => $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Cave)} / "
                         + $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Mushroom)}");
                 }
+                if (version >= WorldGenerator.IceSandVersion)
+                {
+                    // 묶음 B2a: the ice cave's and the sand cave's props and landmarks.
+                    foreach (var biome in new[] { Biome.Ice, Biome.Sand })
+                    {
+                        Row($"{BiomeMap.Name(biome)}: 바닥 100칸에 막는·깨는 소품 / 큰 것 / 꾸밈", n => n.Props.TryGetValue(biome, out var p) && p.Floor > 0
+                            ? $"{100.0 * p.Props / p.Floor:0.0} / {100.0 * p.Big / p.Floor:0.00} / {100.0 * p.Decor / p.Floor:0.0}" : "-");
+                    }
+                    Row("랜드마크: 얼음 속 짐승 / 얼음 성 잔해 / 묻힌 신전 정면 / 거대 두개골", n => $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.FrozenBeast)} / "
+                        + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.IceRuin)} / {n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.TempleFront)} / "
+                        + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.GiantSkull)}");
+                    Row("얼음 동굴 / 모래 동굴의 방(아레나 빼고)", n => $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Ice)} / "
+                        + $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Sand)}");
+                }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();
 

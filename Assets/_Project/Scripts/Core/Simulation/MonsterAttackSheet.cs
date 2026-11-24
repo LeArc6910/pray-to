@@ -142,6 +142,10 @@ namespace Game.Core
         // Shed:kind:percent (2026-11-24, B1b) — each time it loses that share of its health one of that smaller kind
         // drops off it at its edge, whole (a slime mother's slimes).
         Shed,
+        // Dormant[:tiles] (2026-11-24, B2) — while it has no one to fight it stands as a statue or a beast in the ice: it
+        // notices no one further than that (World.DormantReach) until struck or its pack is roused, and the screen draws
+        // it still and stone-grey or iced over (the temple guardian, the frost mammoth).
+        Dormant,
     }
 
     public sealed class MonsterTrait
@@ -559,6 +563,9 @@ namespace Game.Core
                         break;
                     case MonsterTraitKind.Fearlight:
                         if (pieces.Length > 1 && (trait.Number(0, 0) < 1 || trait.Number(0, 0) > 12)) throw new FormatException("fearlight:칸의 칸은 1~12입니다.");
+                        break;
+                    case MonsterTraitKind.Dormant:
+                        if (pieces.Length > 1 && (trait.Number(0, 0) < 1 || trait.Number(0, 0) > 8)) throw new FormatException("dormant:칸의 칸은 1~8입니다.");
                         break;
                     case MonsterTraitKind.Shed:
                         if (pieces.Length != 3 || pieces[1].Trim().Length == 0 || trait.Number(1, 0) < 5 || trait.Number(1, 0) > 50)

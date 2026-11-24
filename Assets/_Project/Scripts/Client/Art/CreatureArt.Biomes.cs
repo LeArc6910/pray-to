@@ -143,7 +143,8 @@ namespace Game.Client
             "armored_beetle" => Beetle,
             "glow_shooter" => ThornCap,
             "myconid_captain" => MushroomSoldier,
-            _ => null,
+            // The ice cave's and the sand cave's (CreatureArt.IceSand.cs, B2b).
+            _ => IceSandFrames(id),
         };
 
         // ---- The big ones ----
@@ -356,7 +357,7 @@ namespace Game.Client
             "mycelium_mother" => new[] { MyceliumMother(0), MyceliumMother(1) },
             // The slime mother (XL): a slime 46 wide with her young swimming inside her.
             "slime_mother" => new[] { Blob(46, 32, 0, BlobLook.Brood), Blob(46, 32, 1, BlobLook.Brood) },
-            _ => null,
+            _ => IceSandBigFrames(id),
         };
 
         // The young inside a slime mother: little slimes of the paler green, seven by five, their eyes the body's.

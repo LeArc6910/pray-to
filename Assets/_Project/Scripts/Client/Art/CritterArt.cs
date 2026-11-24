@@ -14,6 +14,12 @@ namespace Game.Client
         Firefly,
         Snail,
         SporeMoth,
+        // The ice cave (묶음 B2a): a white hare that runs from whoever comes near, ice moths.
+        SnowHare,
+        IceMoth,
+        // The sand cave: a lizard that darts and stops, a scarab rolling its ball.
+        Lizard,
+        Scarab,
     }
 
     // What drifts in the air (4-1 입자): dust in a lamp's light, a drip from the ceiling and its splash, a spore rising.
@@ -25,6 +31,12 @@ namespace Game.Client
         Spore,
         // The snail's trail: a dab of glow left on the floor that fades.
         Trail,
+        // The ice cave (묶음 B2a): a snowflake drifting down, a glint of frost on the floor.
+        Flake,
+        Glint,
+        // The sand cave: a grain sifting down a rock face, dust blown low over the floor.
+        Grain,
+        SandDust,
     }
 
     // A few pixels each, in muted colours a step or two off the floor's, with no outline and no health bar, so none is
@@ -60,26 +72,45 @@ namespace Game.Client
                 case CritterKind.Snail:
                     // Its foot drawn in, then stretched.
                     return second ? Rows("a=#C8A070 b=#8A6A40 c=#A8B878 d=#5A6A3A", "..bb..|.baab.|cccccd") : Rows("a=#C8A070 b=#8A6A40 c=#A8B878 d=#5A6A3A", "..bb..|.baab.|.cccd.");
+                case CritterKind.SnowHare:
+                    // Sitting with its ears up, and stretched out in a bound.
+                    return second ? Rows("a=#E8EEF4 b=#C4D0DC c=#2A2A3A d=#A8B8C8 e=#FFFFFF", "......bb|.....aaa|eaaaaaac|.aaaaa..|d......d")
+                        : Rows("a=#E8EEF4 b=#C4D0DC c=#2A2A3A d=#A8B8C8 e=#FFFFFF", ".....b.b|.....aaa|.aaaaaac|eaaaaaa.|.d...d..");
+                case CritterKind.IceMoth:
+                    return second ? Rows("a=#D4F0FF b=#7AA8C8", "...|aba|aba") : Rows("a=#D4F0FF b=#7AA8C8", "a.a|aba|.b.");
+                case CritterKind.Lizard:
+                    // Its legs under it, then splayed; the tail curls.
+                    return second ? Rows("a=#B89A5A b=#8A7040 c=#D8BC7A d=#6A5430", "b......|.baaaac|..d..d.") : Rows("a=#B89A5A b=#8A7040 c=#D8BC7A d=#6A5430", ".......|bbaaaac|.d..d..");
+                case CritterKind.Scarab:
+                    // Pushing its ball, legs stepping.
+                    return second ? Rows("a=#34466A b=#8A6A40 c=#1E2638 e=#7A9AD0 f=#A88454", ".ea.fb|aaaabb|.c.c..") : Rows("a=#34466A b=#8A6A40 c=#1E2638 e=#7A9AD0 f=#A88454", ".ea.fb|aaaabb|c.c...");
                 default:
                     return second ? Rows("a=#C8E890 b=#6A8A4A", "...|aba|aba") : Rows("a=#C8E890 b=#6A8A4A", "a.a|aba|.b.");
             }
         }
 
         // The critters that fly (no shadow, drawn over what stands) and those that glow in the dark (drawn over it).
-        public static bool Flies(CritterKind kind) => kind == CritterKind.LampMoth || kind == CritterKind.Firefly || kind == CritterKind.SporeMoth;
+        public static bool Flies(CritterKind kind) => kind == CritterKind.LampMoth || kind == CritterKind.Firefly || kind == CritterKind.SporeMoth || kind == CritterKind.IceMoth;
         public static bool Glows(CritterKind kind) => kind == CritterKind.Firefly;
 
         // The biome's critters and how many of each in a hundred, by day and by night (fireflies come out at night).
         public static CritterKind Pick(Biome biome, int roll, bool night) => biome == Biome.Mushroom
             ? roll < (night ? 70 : 40) ? CritterKind.Firefly : roll < (night ? 85 : 70) ? CritterKind.Snail : CritterKind.SporeMoth
+            : biome == Biome.Ice ? roll < 45 ? CritterKind.SnowHare : CritterKind.IceMoth
+            : biome == Biome.Sand ? roll < 55 ? CritterKind.Lizard : CritterKind.Scarab
             : roll < 55 ? CritterKind.Cricket : CritterKind.Mouse;
 
         // The biome a kind belongs to: a critter comes into being where its biome is (a lamp moth at a dirt cave lamp).
         public static Biome HomeOf(CritterKind kind) => kind == CritterKind.Firefly || kind == CritterKind.Snail || kind == CritterKind.SporeMoth
-            ? Biome.Mushroom : Biome.Cave;
+            ? Biome.Mushroom : kind == CritterKind.SnowHare || kind == CritterKind.IceMoth ? Biome.Ice : kind == CritterKind.Lizard || kind == CritterKind.Scarab ? Biome.Sand
+            : Biome.Cave;
+
+        // The biome a mote belongs to (the snail's trail is the forest's).
+        public static Biome HomeOf(MoteKind kind) => kind == MoteKind.Spore || kind == MoteKind.Trail ? Biome.Mushroom
+            : kind == MoteKind.Flake || kind == MoteKind.Glint ? Biome.Ice : kind == MoteKind.Grain || kind == MoteKind.SandDust ? Biome.Sand : Biome.Cave;
 
         // Whether the biome has critters yet (B1a: the dirt cave and the mushroom forest).
-        public static bool Lives(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom;
+        public static bool Lives(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Sand;
 
         public static PixelImage Mote(MoteKind kind) => kind switch
         {
@@ -87,6 +118,10 @@ namespace Game.Client
             MoteKind.Drip => Rows("a=#A8C8E0 b=#E8F4FF", "a|b"),
             MoteKind.Splash => Rows("a=#A8C8E0", "a.a|.a."),
             MoteKind.Spore => Rows("a=#B8F25A b=#EEFFB8", "ab|aa"),
+            MoteKind.Flake => Rows("a=#FFFFFF b=#CFE8FA", "ab"),
+            MoteKind.Glint => Rows("a=#F4FCFF b=#A8DCFF", ".b.|bab|.b."),
+            MoteKind.Grain => Rows("a=#E8CC94 b=#C49C62", "a|b"),
+            MoteKind.SandDust => Rows("a=#D8B882", "aa"),
             _ => Rows("a=#B8F25A", "aa"),
         };
     }

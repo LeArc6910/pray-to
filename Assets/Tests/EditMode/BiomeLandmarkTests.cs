@@ -29,7 +29,7 @@ namespace Game.Core.Tests
         [Test]
         public void VersionsTwoAndThreeHaveNoLandmarksAndVersionFourLaysTheSameOnesEachTime()
         {
-            Assert.AreEqual(WorldGenerator.LandmarkVersion, WorldGenerator.NewWorldVersion);
+            Assert.GreaterOrEqual(WorldGenerator.NewWorldVersion, WorldGenerator.LandmarkVersion, "a new world has the landmarks (and from version 5 the ice cave's and the sand cave's)");
             Assert.Greater(WorldGenerator.LandmarkVersion, WorldGenerator.PropVersion);
             foreach (int version in new[] { WorldGenerator.RoomVersion, WorldGenerator.PropVersion })
             {
@@ -92,7 +92,8 @@ namespace Game.Core.Tests
                 Assert.LessOrEqual(made.BiomeLandmarks.Count, Math.Max(3, rooms / 6), $"seed {seed}: landmarks are rare ({made.BiomeLandmarks.Count} in {rooms} rooms)");
             }
             foreach (BiomeLandmarkKind kind in Enum.GetValues(typeof(BiomeLandmarkKind)))
-                Assert.Greater(counts.GetValueOrDefault(kind), 0, $"{kind} in none of the seeds");
+                // The ice cave's and the sand cave's are version 5's (IceSandLookTests).
+                if (!IceSandProps.Lays(kind)) Assert.Greater(counts.GetValueOrDefault(kind), 0, $"{kind} in none of the seeds");
         }
 
         [Test]

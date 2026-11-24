@@ -1176,6 +1176,49 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The ice cave's and the sand cave's looks (묶음 B2a): in a room of each, the biome's own props stand apart from the
+        // floor, the biome has its light colour, and the places' things take its look with its landmarks beside them.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheIceAndSandCavesStandTheirPropsAndThePlacesTakeTheirLooks()
+        {
+            yield return Start();
+            foreach (var (biome, room, look, mark) in new[] { (Biome.Ice, "ice", PropArt.IceLook, TileType.FrozenBeast), (Biome.Sand, "sand", PropArt.SandLook, TileType.GiantSkull) })
+            {
+                Playtest.Run(_root, $"monsters hold; clear; goto room pack {room} 1");
+                yield return new WaitForSecondsRealtime(1.5f);
+                Playtest.Run(_root, "scene biomes");
+                yield return new WaitForSecondsRealtime(1.5f);
+                var view = _root.View;
+                int px = TileMap.Cell(_root.LocalClient.Position.X), py = TileMap.Cell(_root.LocalClient.Position.Y);
+                Assert.AreEqual(biome, _root.LocalClient.Biomes[px, py], $"a room of the {biome}");
+                Assert.Greater(WorldLights.BiomeTint(biome).A, 0, $"the {biome} has its light colour");
+                int col = -7;
+                foreach (var kind in IceSandProps.Of(biome))
+                {
+                    Assert.AreEqual(kind.Type, World.Map[px + col, py + 3]);
+                    Assert.AreEqual("Prop", view.StandAt(px + col, py + 3).Kind, $"{kind.Type} stands apart from the floor");
+                    col += Structures.Footprint(kind.Type).W + 1;
+                }
+                yield return Screens.Take($"biomes-{room}");
+                Playtest.Run(_root, "clear; scene places");
+                yield return new WaitForSecondsRealtime(1.5f);
+                foreach (var (dx, dy, type) in new[] { (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (3, 5, TileType.Crates) })
+                {
+                    var stand = view.StandAt(px + dx, py + dy);
+                    Assert.AreEqual("Prop", stand.Kind, $"{type} stands apart from the floor");
+                    Assert.AreEqual(look, stand.Shape, $"{type} in the {biome}'s look");
+                }
+                bool found = false;
+                for (int dy = -9; dy <= 0 && !found; dy++)
+                    for (int dx = -10; dx <= 10 && !found; dx++)
+                        found = World.Map[px + dx, py + dy] == mark && view.StandAt(px + dx, py + dy).Kind == "Prop";
+                Assert.IsTrue(found, $"the {mark} stands");
+                yield return Screens.Take($"places-{room}");
+                Playtest.Run(_root, "clear");
+            }
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

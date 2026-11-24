@@ -23,7 +23,7 @@ namespace Game.Core
         // A lair's room holds a square of open floor this wide (MonsterSizes.XlOpenSquare).
         const int LairSquare = 7;
 
-        static void LayCellars(GeneratedWorld world, ulong seed, TerrainData terrain)
+        static void LayCellars(GeneratedWorld world, ulong seed, TerrainData terrain, int version = LandmarkVersion)
         {
             var rooms = world.Rooms;
             var map = world.Map;
@@ -58,15 +58,20 @@ namespace Game.Core
                 rooms.CellarList.Add((room.Index, tx, ty));
             }
 
-            // The lairs: the biomes whose gate's dungeon has a mid-boss of its own for master (dungeons.csv boss).
+            // The lairs: the biomes whose gate's dungeon has a mid-boss of its own for master (dungeons.csv boss), of those
+            // the world's version lays them in (LairsIn: version 4 the dirt cave and the mushroom forest, version 5 on the
+            // ice cave and the sand cave too).
             var dungeons = terrain?.Dungeons ?? DungeonData.None;
             int ring = LairRing * ScaleOf(map.Width, map.Height);
             var spawn = TileMap.Center(world.SpawnX, world.SpawnY);
             foreach (Biome biome in Enum.GetValues(typeof(Biome)))
             {
                 var row = dungeons.For(biome);
-                if (row == null || !row.Master || row.Biome != biome) continue;
-                var fit = rooms.Nodes.Where(n => n.Biome == biome && n.Role == RoomRole.Pack && Holds(n) && Vec2.Distance(n.Center, spawn) >= ring
+                if (row == null || !row.Master || row.Biome != biome || !LairsIn(biome, version)) continue;
+                // The ice cave's and the sand cave's mid-bosses (version 5) are a zone further out (LairRingsOf): the sand cave
+                // holds the first boss's arena in some worlds, and its first hour stays as it was.
+                int from = ring * LairRingsOf(biome);
+                var fit = rooms.Nodes.Where(n => n.Biome == biome && n.Role == RoomRole.Pack && Holds(n) && Vec2.Distance(n.Center, spawn) >= from
                     && OpenSquare(map, n)).ToList();
                 for (int i = 0; i < LairsPerBiome && fit.Count > 0; i++)
                 {

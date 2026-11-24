@@ -21,7 +21,7 @@ namespace Game.Client
         static readonly Rgba Gold = Rgba.Hex("#FFC740");
 
         // The kinds shown, smallest first.
-        static readonly string[] Lineup = { "cave_rat", "puffball", "glow_bat", "slime", "cave_beetle", "big_slime", "big_beetle", "cap_giant", "slime_king", "slime_mother", "mycelium_mother" };
+        static readonly string[] Lineup = { "cave_rat", "puffball", "bomb_scarab", "glow_bat", "slime", "cave_beetle", "frost_wolf", "big_slime", "big_beetle", "cap_giant", "yeti", "great_worm", "slime_king", "slime_mother", "mycelium_mother", "frost_mammoth", "temple_guardian" };
 
         public static bool Write(string output, MonsterData monsters, PixelImage hero)
         {
@@ -46,8 +46,9 @@ namespace Game.Client
             Save(Poses(monsters), Path.Combine(folder, "poses.png"), 4);
             Save(Leaders(monsters), Path.Combine(folder, "leaders.png"), 4);
             Save(ClearancePicture(monsters, hero), Path.Combine(folder, "clearance.png"), 3);
+            Save(IceSand(monsters, hero), Path.Combine(folder, "icesand.png"), 6);
             File.WriteAllText(Path.Combine(folder, "report.txt"), report.ToString());
-            Console.WriteLine($"Wrote sizes/lineup.png, poses.png, leaders.png, clearance.png and report.txt to {folder}");
+            Console.WriteLine($"Wrote sizes/lineup.png, poses.png, leaders.png, clearance.png, icesand.png and report.txt to {folder}");
             return fine;
         }
 
@@ -111,6 +112,49 @@ namespace Game.Client
                 g.Small(cx - MockFont.SmallWidth(px) / 2, 26 + 5 * T + 12, px, Dim, Back);
                 g.Small(cx - MockFont.SmallWidth(radius) / 2, 26 + 5 * T + 20, radius, Dim, Back);
                 x += slot;
+            }
+            return g;
+        }
+
+        // The ice cave's and the sand cave's kinds (B2b), each beside a player on the floor: both frames, the poses, from
+        // behind, and a mid-boss standing dormant (CreatureArt.Dormant) the way the game draws it before it wakes.
+        static readonly string[] IceSandKinds = { "frost_wolf", "frost_beetle", "frost_lord", "yeti", "frost_mammoth", "bomb_scarab", "sandstone_beetle", "scorpion_queen", "great_worm", "temple_guardian" };
+
+        static PixelImage IceSand(MonsterData monsters, PixelImage hero)
+        {
+            var kinds = IceSandKinds.Select(monsters.Find).ToList();
+            var columns = new (string Label, int Frame, MonsterView View, MonsterPose Pose, bool Dormant)[]
+            {
+                ("IDLE 1", 0, MonsterView.Side, MonsterPose.Idle, false), ("IDLE 2", 1, MonsterView.Side, MonsterPose.Idle, false),
+                ("WINDUP", 0, MonsterView.Side, MonsterPose.Windup, false), ("STRIKE", 0, MonsterView.Side, MonsterPose.Strike, false),
+                ("HURT", 0, MonsterView.Side, MonsterPose.Hurt, false), ("BACK", 0, MonsterView.Back, MonsterPose.Idle, false),
+                ("DORMANT", 0, MonsterView.Side, MonsterPose.Idle, true),
+            };
+            var figure = HeroArt.Figure(hero);
+            int cellW = Math.Max(30, kinds.Max(k => Picture(k, 1, MonsterView.Side, MonsterPose.Windup).Width) + 6);
+            var rows = kinds.Select(k => Math.Max(figure.Height, kinds.Where(o => o == k).Max(o => Picture(o, 0, MonsterView.Side, MonsterPose.Strike).Height)) + 14).ToList();
+            var g = new PixelImage(8 + 24 + columns.Length * cellW, 18 + rows.Sum());
+            g.Fill(0, 0, g.Width, g.Height, Back);
+            g.Small(6, 4, "ICE AND SAND CAVE KINDS (B2B): FRAMES, POSES, BACK, DORMANT", Text, Back);
+            int top = 16;
+            for (int r = 0; r < kinds.Count; r++)
+            {
+                int bottom = top + rows[r] - 6;
+                for (int x = 0; x < g.Width; x += T)
+                    g.Draw(TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, (x / T + r) % TileArt.Variants)), x, bottom - 10);
+                g.Draw(figure, 6, bottom - figure.Height);
+                for (int c = 0; c < columns.Length; c++)
+                {
+                    var (label, frame, view, pose, dormant) = columns[c];
+                    if (dormant && !CreatureArt.Sleeps(kinds[r].Id)) continue;
+                    var picture = Picture(kinds[r], frame, view, pose);
+                    if (dormant) picture = CreatureArt.Dormant(kinds[r].Id, picture);
+                    int cx = 32 + c * cellW + cellW / 2;
+                    g.Draw(picture, cx - picture.Width / 2, bottom - picture.Height);
+                    if (r == 0) g.Small(cx - MockFont.SmallWidth(label) / 2, 10, label, Dim, Back);
+                }
+                g.Small(32, top, kinds[r].Id.ToUpperInvariant().Replace('_', ' '), Yellow, Back);
+                top += rows[r];
             }
             return g;
         }

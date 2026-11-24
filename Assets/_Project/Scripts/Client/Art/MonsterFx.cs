@@ -47,6 +47,13 @@ namespace Game.Client
         Link,
         Poisoned,
         Wake,
+        // The ice cave and the sand cave (2026-11-24, B2b). A loop: sand pouring from the ceiling onto one buried in the
+        // sand cave (World.UnderFallingSand), so the buried are seen before they come up. One-offs: ice thrown up behind
+        // a charge that slides on (World.MonsterFxSlide), and a dormant mid-boss breaking out of its stone or its ice
+        // (World.MonsterFxWake).
+        SandFall,
+        Slide,
+        Rouse,
     }
 
     // What a kind's effects are made of besides its colours, so each reads as itself (Docs/MonsterPatterns.md): told
@@ -125,6 +132,11 @@ namespace Game.Client
                 || id == "mycelium_mother") return FxRamp.Spirit;
             if (id == "myconid_captain") return FxRamp.Violet;
             if (id == "sand_scorpion" || id == "sand_worm") return FxRamp.Dust;
+            // The sand cave's new kinds (B2b) are sand too; the queen's stings are venom green. The ice cave's are cold
+            // by their element, its wolf and beetle as well.
+            if (id == "bomb_scarab" || id == "great_worm" || id == "sandstone_beetle" || id == "temple_guardian") return FxRamp.Dust;
+            if (id == "scorpion_queen") return FxRamp.Spirit;
+            if (id == "frost_wolf" || id == "frost_beetle" || id == "frost_mammoth") return FxRamp.Cold;
             if (element == SkillTag.Cold) return FxRamp.Cold;
             if (element == SkillTag.Fire) return FxRamp.Fire;
             return FxRamp.Plain;
@@ -149,12 +161,22 @@ namespace Game.Client
                     return MobLook.Crystal;
                 case "ice_slime":
                 case "frost_wisp":
+                case "frost_wolf":
+                case "yeti":
+                case "frost_beetle":
+                case "frost_lord":
+                case "frost_mammoth":
                     return MobLook.Frost;
                 case "magma_slime":
                 case "fire_bat":
                     return MobLook.Ember;
                 case "sand_scorpion":
                 case "sand_worm":
+                case "bomb_scarab":
+                case "great_worm":
+                case "sandstone_beetle":
+                case "scorpion_queen":
+                case "temple_guardian":
                     return MobLook.Sand;
                 case "lake_crab":
                 case "tide_wisp":
@@ -301,6 +323,36 @@ namespace Game.Client
                     SkillFx.Ring(o, FxRamp.Dust, t, 0, 11, 2, ground: true);
                     SkillFx.Fly(o, FxShape.Chunk, FxRamp.Dust, 3, 0, 7, t, 0, 0.34f, 3, 13, c.Seed, hop: 10);
                     SkillFx.Float(o, FxShape.Smoke, FxRamp.Dust, 7, 2, 2, t, 0.1f, life, 6, 5, c.Seed);
+                    break;
+                case MobFx.SandFall:
+                {
+                    // A thin stream from high above down onto the mound, grains running down it, a little heap and puffs
+                    // where it lands. Pale and soft: the sand's own colour, no red (it is a sign, not a warning).
+                    Put(o, FxShape.Streak, FxRamp.Dust, 32, 2, 0, 22, 0.8f, -90);
+                    Put(o, FxShape.Streak, FxRamp.Dust, 24, 1, 2, 18, 0.5f, -90);
+                    for (int i = 0; i < 8; i++)
+                    {
+                        float u = SkillFx.Frac(t * 1.6f + i / 8f + (c.Seed & 7) / 8f);
+                        Put(o, FxShape.Dot, FxRamp.Dust, i % 3 == 0 ? 2 : 1, i & 1, ((i * 5 + c.Seed) % 5) - 2, 38 - 34 * u, 1);
+                    }
+                    Put(o, FxShape.Blob, FxRamp.Dust, 8, 2, 0, 2);
+                    Put(o, FxShape.Smoke, FxRamp.Dust, 9, 1 + ((int)(t * 4) & 1), 0, 5, 0.6f);
+                    break;
+                }
+                case MobFx.Slide:
+                    // Ice thrown up behind it as it skids, and a cold mist.
+                    life = 0.4f;
+                    SkillFx.Fly(o, FxShape.Shard, FxRamp.Cold, 4, 0, 6, t, 0, 0.3f, 2, 10, c.Seed, hop: 5, cy: 2, cone: 70, toward: c.Dir * Deg + 180);
+                    SkillFx.Float(o, FxShape.Smoke, FxRamp.Mist, 8, 1, 3, t, 0, life, 5, 6, c.Seed, cy: 2);
+                    if (t < 0.1f) Put(o, FxShape.Glint, FxRamp.Cold, 9, 1, 0, 3);
+                    break;
+                case MobFx.Rouse:
+                    // A statue's stone or a beast's ice breaks: a bright flash, chunks thrown wide, a ring on the floor.
+                    life = 0.6f;
+                    if (t < 0.12f) Put(o, FxShape.Glint, c.Ramp, 17, 2, 0, Body * 2);
+                    SkillFx.Fly(o, c.Ramp == FxRamp.Cold ? FxShape.Shard : FxShape.Chunk, c.Ramp, 5, 0, 12, t, 0, 0.45f, 6, 22, c.Seed, hop: 10, cy: Body * 2);
+                    SkillFx.Ring(o, c.Ramp, t, 0, 24, 2, ground: true);
+                    SkillFx.Float(o, FxShape.Smoke, c.Ramp == FxRamp.Cold ? FxRamp.Mist : FxRamp.Dust, 12, 1, 4, t, 0.05f, life, 8, 10, c.Seed, cy: Body);
                     break;
                 case MobFx.Dive:
                     // Back under: the ground closes over it, a puff and a few grains sliding in.

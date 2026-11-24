@@ -14,6 +14,13 @@ namespace Game.Core
         MineFrame,
         // The mushroom forest: a ring of small caps round a clump of glowing ones.
         FairyRing,
+        // The ice cave's and the sand cave's (묶음 B2a, WorldGenerator.IceSand.cs, worlds of version 5): a beast frozen
+        // in a block of ice with crystals round it, the two rows of columns of an ice keep's ruin; the front of a
+        // buried temple against the rock with urns and pillars before it, a giant fossil skull with its ribs.
+        FrozenBeast,
+        IceRuin,
+        TempleFront,
+        GiantSkull,
     }
 
     // One landmark as laid: the box of tiles it took (its lower left and size) and a tile of open floor in front of it.
@@ -44,7 +51,7 @@ namespace Game.Core
     public static class BiomeLandmarks
     {
         // The tiles only a landmark lays.
-        public static bool Is(TileType type) => type >= TileType.MinerHut && type <= TileType.RingCap;
+        public static bool Is(TileType type) => type >= TileType.MinerHut && type <= TileType.RingCap || IceSandProps.IsLandmark(type);
 
         // What each lays, from its box's lower left (y up). A wide thing's type is on its lower left tile; the generator
         // fills the rest of its footprint with StructurePart.

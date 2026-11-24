@@ -104,6 +104,9 @@ namespace Game.Client
         // Whether the screen shows my body in a spore cloud (its green haze, B1b).
         internal bool InSporeCloud => _view != null && _view.InSporeCloud();
         internal int CloudNumbersShown => _view?.CloudNumbers ?? 0;
+        // Streams of falling sand drawn over the sand cave's buried, and icicles shown falling (B2b).
+        internal int SandFallsShown => _view?.SandFallsShown ?? 0;
+        internal int IciclesShown => _view?.IciclesShown ?? 0;
         internal int MonsterPoolsShown => _view?.MonsterPoolsShown ?? 0;
         // A dungeon's name cards shown, and the last name (WorldView.Dungeon.cs).
         internal int DungeonCardsShown => _view?.DungeonCardsShown ?? 0;
@@ -560,6 +563,9 @@ namespace Game.Client
                 Biome.Lava => Ambience.Lava,
                 Biome.Cave => Ambience.DirtCave,
                 Biome.Mushroom => Ambience.Spores,
+                // The ice cave's and the sand cave's (묶음 B2a).
+                Biome.Ice => Ambience.Frost,
+                Biome.Sand => Ambience.Dunes,
                 _ => Ambience.Cave,
             };
             Music.Update(song, ambience, 1 - nearest / MachineHearing, deltaTime);

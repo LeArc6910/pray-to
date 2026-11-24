@@ -1,5 +1,21 @@
 # 웹 플레이 시험 (클라우드가 대신 해 보기)
 
+## 얼음 동굴·모래 동굴의 몬스터와 규칙, 던전 (`b2mobs`, 2026-11-24)
+
+`Docs/BiomeRework.md` B2b를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only b2mobs`(그리고 던전과 무리가 바뀌었으니 `dungeon`, `packs`). 새 월드(생성기 5판)여야 얼음·모래의 굴이 있다(4판 월드는 그대로). 감독이 레벨 5 아래를 건드리지 않으므로 먼저 `xp 3000`. PC와 휴대폰 세로에서:
+
+1. `b2`: 얼음 동굴 문은 `frozen_crypt`(주인 `frost_mammoth`, 빛 `#A8DCFF`), 모래 동굴 문은 `buried_temple`(주인 `temple_guardian`, 빛 `#FFD28A`)인지. `b1c`의 굴 목록에 얼음이나 모래가 있는지
+2. 가까운 무리 방에서 `scene b2monsters`: 자폭 풍뎅이(S)·서리 정령 군주(S)·서리 늑대(M)·서리 딱정벌레(M)·사암 딱정벌레(M)·전갈 여왕(M)·눈 거인(L)·큰 모래 지렁이(L)·서리 매머드(XL)·신전 수호 석상(XL)이 제 크기 폭으로 그려지는지(`b2`의 `pixels`). 사진 `b2mobs-lineup`
+3. `goto biome ice` → `scene iceslide`(서쪽 4칸 벽까지 얼음, 동쪽 3칸 서리 늑대가 바로 달려든다): 1.5초 뒤 늑대가 `Stagger`인지. 사진 `b2mobs-iceslide`
+4. `scene icicles`(플레이어 위와 동쪽 1.5칸에 고드름): 0.35초에 그늘 둘(`icicles`, 화면 `iciclesShown`), 사진 `b2mobs-icicles`. 0.9초 뒤 떨어졌는지(`iciclesFallen`), 사진 `b2mobs-icicles-fall`
+5. `goto biome sand` → `scene sandfall`(동쪽 5칸 전갈, 8칸 큰 모래 지렁이, 풀어 둠): 묻힌 것 위에 모래가 흐르는지(`underSand`, 화면 `sandFallsShown`). 사진 `b2mobs-sandfall`
+6. `scene dormant`(동쪽 7칸 신전 수호 석상, 서쪽 7칸 서리 매머드, 풀어 둠): 둘 다 `dormant`인지. 사진 `b2mobs-dormant`
+7. `goto gate frozen_crypt`, `goto gate buried_temple`마다: 문 방 사진(`b2mobs-<id>-gate`), [얼어붙은 묘 들어가기]·[묻힌 신전 들어가기]를 진짜 클릭·탭으로, `goto droom C`에 큰 몸(L)이 있는지(사진 `b2mobs-<id>-pack`), `goto droom B`의 주인이 "서리 매머드"·"신전 수호 석상"(대장이 붙지 않는다, 사진 `b2mobs-<id>-master`), [던전 나가기]
+
+명령: `scene b2monsters|iceslide|icicles|sandfall|dormant`, `b2`(JSON: 24칸 안의 몬스터마다 종·크기·생명력·상태·땅속인지(`buried`)·모래가 흐르는지(`underSand`)·잠들었는지(`dormant`)·그린 픽셀, 둘레의 고드름(자리·반지름·남은 초), 선 곳의 생물군계, 고드름이 떨어질 자리인지(`underIcicles`), 떨어진 고드름 수, 화면의 모래 줄기·고드름 수, 얼음·모래 문이 가는 던전과 주인·빛 색).
+
+사람에게 남는 것: 늑대가 얼음에서 미끄러져 벽에 박히는 손맛, 고드름 그늘이 휴대폰에서 읽히고 억울하지 않은지, 모래 줄기가 "묻힌 것"으로 읽히는지, 석상·얼음 속 매머드가 깨는 순간, 묘·신전 한 판의 길이.
+
 ## 지하실·갱도·굴·부수기 (`b1c`, 2026-11-24)
 
 `Docs/BiomeRework.md` B1c를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only b1c`(그리고 던전이 바뀌었으니 `dungeon`, 함정 방의 창살이 바뀌었으니 `pace`). 새 월드(생성기 4판)여야 뚜껑 문과 굴이 있다(3판 월드는 그대로). PC와 휴대폰 세로에서:
@@ -189,9 +205,10 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 | `speed <틱>` | 혼자 하기 월드를 한 걸음에 그만큼 돌린다(0은 멈춤, 최대 60). 2026-11-21까지 0이 1로 잘려 멈추지 않던 것을 고쳤다 |
 | `mob <id> use <공격>`, `mob <id> kill [구역]`, `mob <id> hurt <비율>`, `mob <id> melt`, `mob <id> low <비율>`, `monsters hold\|go` | 가까운 그 종(없으면 바라보는 쪽 3칸 앞에 하나 놓는다)이 `monster_attacks.csv`의 그 공격을 지금 예고한다. 그 구역의 몬스터처럼 쓰러뜨린다(갈라짐은 구역 2부터). 다치게 한다. 화염으로 쓰러뜨린다(얼음 슬라임은 파편 없이 녹는다). 생명력을 그 비율로 둔다(불 박쥐는 0.3 아래면 자폭한다). 몬스터가 스스로는 알아차리지도 공격하지도 않게 한다. 상태 보고의 `mobBlows`(보인 터짐 수), `mobBuried`·`mobMounds`(땅속의 몬스터와 그린 흙무더기), `mobLinks`(대열 이음줄), `explosions`(자폭), `guardedNumbers`(회색 숫자), `poisoned` |
 | `hurt <양>`, `boss <id> hurt <비율>`, `xp <양>`, `heal`, `clear`, `equip <베이스...>`, `face <x> <y>\|off` | 싸움과 같은 길로 다치고, 레벨을 올리고, 바라본다 |
-| `scene biomes`, `biomes`, `biomes at <lamp\|sac\|cap\|grass>` | (2026-11-24, `Docs/BiomeRework.md` 묶음 B1a) `scene biomes`는 플레이어가 선 생물군계의 소품 한 벌을 둘레에 세운다(북쪽 줄에 하나씩, 켜진 등잔 또는 거대 갓, 장소의 큰 나무). `biomes`는 JSON: `biome`, `generator`, `tint`(빛 색), `glow`, `ambience`(깔린 환경음), `kinds`(9칸 안 소품 종류마다 수), `lit`·`unlit`(등잔), `trees`, `clouds`(포자 구름), `litHere`(선 자리가 6칸 안 빛 안인가), `props`·`decor`·`skipped`·`renderers`(서 있는 층), `rustled`, `motes`/`moteCap`, `critters`/`critterCap`/`critterKinds`, `lamps`(화면 안 등잔·횃불), `cells`(소품마다 `dx`,`dy`,`type`,`kind`,`shape`,`order`,`alpha`). `biomes at lamp|sac`는 꺼진 등잔·포자 주머니 바로 남쪽에 북쪽을 보고, `cap`은 거대 갓 바로 뒤에, `grass`는 가장 가까운 흔들리는 꾸밈 위에 세운다 |
-| `scene places`, `places`, `places at <behind\|cap\|hut\|frame\|ring>` | (2026-11-24, `Docs/BiomeRework.md` 묶음 B1c) `scene places`는 플레이어 둘레를 바닥으로 깔고 북서에 집과 오두막, 북동에 우물·가로등·표지판·긴 의자·화단·상자 더미를 세운다. 남쪽에는 선 곳이 흙 동굴이면 옛 광부 오두막(울타리 마당)과 바위 아래 갱도 입구 틀, 아니면 요정 고리 큰 것과 작은 것. `places`는 JSON: `biome`, `generator`, `looks`·`marks`(둘레의 다시 그린 것·랜드마크 칸 수), `huts`·`frames`·`rings`(생성기가 이 월드에 놓은 수), `under`·`solidUnder`(발밑 칸과 막힘), `skipped`, `renderers`, `cells`(칸마다 `type`, `kind`, `shape`: 1 흙 동굴 그림·2 버섯 숲 그림·0 예전 그림, `alpha`: 지붕의 흐려짐). `places at behind`는 집 바로 뒤로, `at cap`은 고리의 갓 위로, `at hut\|frame\|ring`은 생성기가 놓은 가장 가까운 그 랜드마크 앞으로(없으면 `error … none`) |
+| `scene biomes`, `biomes`, `biomes at <lamp\|sac\|cap\|grass\|crystal\|urn\|pillar\|ribs>` | (2026-11-24, `Docs/BiomeRework.md` 묶음 B1a) `scene biomes`는 플레이어가 선 생물군계의 소품 한 벌을 둘레에 세운다(북쪽 줄에 하나씩, 켜진 등잔 또는 거대 갓, 장소의 큰 나무). `biomes`는 JSON: `biome`, `generator`, `tint`(빛 색), `glow`, `ambience`(깔린 환경음), `kinds`(9칸 안 소품 종류마다 수), `lit`·`unlit`(등잔), `trees`, `clouds`(포자 구름), `litHere`(선 자리가 6칸 안 빛 안인가), `props`·`decor`·`skipped`·`renderers`(서 있는 층), `rustled`, `motes`/`moteCap`, `critters`/`critterCap`/`critterKinds`, `lamps`(화면 안 등잔·횃불), `cells`(소품마다 `dx`,`dy`,`type`,`kind`,`shape`,`order`,`alpha`). `biomes at lamp|sac`는 꺼진 등잔·포자 주머니 바로 남쪽에 북쪽을 보고, `cap`은 거대 갓 바로 뒤에, `grass`는 가장 가까운 흔들리는 꾸밈 위에 세운다 |
+| `scene places`, `places`, `places at <behind\|cap\|hut\|frame\|ring\|beast\|ruin\|temple\|skull>` | (2026-11-24, `Docs/BiomeRework.md` 묶음 B1c) `scene places`는 플레이어 둘레를 바닥으로 깔고 북서에 집과 오두막, 북동에 우물·가로등·표지판·긴 의자·화단·상자 더미를 세운다. 남쪽에는 선 곳이 흙 동굴이면 옛 광부 오두막(울타리 마당)과 바위 아래 갱도 입구 틀, 아니면 요정 고리 큰 것과 작은 것. `places`는 JSON: `biome`, `generator`, `looks`·`marks`(둘레의 다시 그린 것·랜드마크 칸 수), `huts`·`frames`·`rings`(생성기가 이 월드에 놓은 수), `under`·`solidUnder`(발밑 칸과 막힘), `skipped`, `renderers`, `cells`(칸마다 `type`, `kind`, `shape`: 1 흙 동굴 그림·2 버섯 숲 그림·0 예전 그림, `alpha`: 지붕의 흐려짐). `places at behind`는 집 바로 뒤로, `at cap`은 고리의 갓 위로, `at hut\|frame\|ring`은 생성기가 놓은 가장 가까운 그 랜드마크 앞으로(없으면 `error … none`) |
 | `mob <id> spawn [dx dy]`, `scene sizes`, `sizes` | (2026-11-24, `Docs/BiomeRework.md` B0b) `mob <id> spawn`: 그 종을 몸이 들어가는 자리(기본은 바라보는 쪽 3칸 앞, 6칸 안에서 가장 가까운 곳)에 생명력 5000으로 세운다. 바로 그 자리에 들어가면 그 자리에. 6칸 안에 자리가 없으면(좁은 길의 L·XL) `ok … none`. `scene sizes`: 빛 박쥐(S)·슬라임(M)·큰 슬라임(L)·슬라임 왕(XL)을 동쪽에 들어가는 자리마다, 몬스터는 멈춘 채. `sizes`: JSON으로 20칸 안의 몬스터마다 종·크기 등급(`size`)·반지름·자리·가운데까지 거리(`distance`)와 틈(`gap`)·그 칸의 여유(`room`)와 필요한 여유(`need`)·들어가는지(`fits`)·바위에 겹치는지(`inRock`)·생명력·상태·방 줄(`leash`, 없으면 -1), 화면이 그린 그림의 픽셀(`pixels`×`tall`)·체력 막대 너비(`bar`)·발(`feet`)·배율(`scale`), 그리고 플레이어 칸의 여유(`here`) |
+| `scene b2monsters`, `scene iceslide`, `scene icicles`, `scene sandfall`, `scene dormant`, `b2` | (2026-11-24, `Docs/BiomeRework.md` B2b) 얼음·모래 동굴의 새 종 열을 동쪽에 한 줄로(몬스터는 멈춘 채, 깨운 채), 얼음 길에서 서리 늑대 돌진, 플레이어 위와 곁에 고드름, 묻힌 전갈과 큰 지렁이, 잠든 석상과 매머드. `b2`는 위 `b2mobs`의 JSON |
 | `scene b1monsters`, `scene spores`, `scene torch`, `goto timber [n]`, `director timber`, `b1` | (2026-11-24, `Docs/BiomeRework.md` B1b) 첫 두 생물군계의 새 종 아홉을 동쪽에 한 줄로(몬스터는 멈춘 채), 다친 버섯 병정 곁에서 포자 주머니 터뜨리기, 횃불과 쥐 다섯, 흙 동굴의 너비 3칸 통로로 가서 갱목 매복을 지금. `b1`은 아래 `b1mobs`의 JSON |
 
 단추는 모두 `Ui.Button`·`Ui.LayoutButton`·`Ui.Toolbar`를 거친다(`Ui.cs`). 시험이 `probe on`을 켜 두면 그린 단추를 기억하고, 시험 도구(`lib.js`의 `press`)는 그 자리를 진짜 클릭이나 탭으로 누른다. 목록 밖으로 스크롤된 단추는 마우스 휠로 찾아간다. 새 단추를 만들 때도 이 셋을 쓴다.
@@ -220,6 +237,18 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 4. 생성기가 놓은 것: 이 월드에 있으면(`huts`·`frames`·`rings`가 0보다 크면) `places at hut|frame|ring`으로 가서 한 장(사진 `places-cave-hut`, `places-cave-frame`, `places-mushroom-ring`). 드문 것이라 없으면 보고서에 "없다"만 적는다
 
 사람에게 남는 것: 광산 야영지와 버섯 집이 제 생물군계로 느껴지는지, 여명 마을이 낯설지 않은지, 싸우다 고리의 갓을 캐는 것이 거슬리는지, 휴대폰에서 오두막이 읽히는지.
+
+### 얼음 동굴과 모래 동굴 (묶음 B2a, 2026-11-24)
+
+`biomes`와 `places` 두 구역이 얼음 동굴과 모래 동굴도 돈다(`goto room pack ice 1`, `goto room pack sand 1`). 위와 같은 확인에 더해:
+
+- `scene biomes`는 그 생물군계의 소품 여섯을 북쪽 줄에 세운다(얼음: 고드름 석순, 얼어붙은 덤불, 눈 더미, 얼음 결정 무리, 얼음 기둥, 바위 두 칸 아래의 얼어붙은 폭포 / 모래: 동굴 선인장, 짐승 해골, 깨진 항아리, 사암 기둥, 화석 갈비뼈, 묻힌 기둥). 켜진 등잔은 놓지 않는다
+- 빛 색은 얼음 `#A8DCFF`, 모래 `#FFD28A`, 환경음은 `Frost`, `Dunes`, 작은 생물은 `SnowHare`·`IceMoth`, `Lizard`·`Scarab`
+- `biomes at crystal`(얼음) / `biomes at urn`(모래) 뒤 휘두르면 그 소품이 하나 주는지(사진 `biomes-ice-hit`, `biomes-sand-hit`), `biomes at pillar` / `biomes at ribs`(바로 뒤)에서 위쪽이 흐려지는지(알파 0.9 아래, 사진 `biomes-ice-behind`, `biomes-sand-behind`)
+- `scene places`는 여덟 가지를 그 생물군계의 그림으로(`shape` 3은 얼음, 4는 모래), 남쪽에 얼음은 얼음 속 짐승과 얼음 성 잔해 기둥 여섯, 모래는 거대 두개골과 갈비뼈, 바위 다섯 칸 아래의 묻힌 신전 정면을 놓는다. 새 월드가 생성기 5판인지도 본다
+- 생성기가 놓은 것: `beasts`·`ruins`·`temples`·`skulls`가 0보다 크면 `places at beast|ruin|temple|skull`로 가서 한 장(사진 `places-ice-beast`, `places-ice-ruin`, `places-sand-temple`, `places-sand-skull`)
+
+사람에게 남는 것: 얼음 동굴과 모래 동굴이 제 색·제 물건으로 달라 보이는지, 눈 덮인 집과 흙벽돌 집이 그 땅의 집으로 느껴지는지, 바람 휘파람·얼음 갈라지는 소리와 모래 사각임의 느낌, 흰 토끼·도마뱀이 휴대폰에서 적과 헷갈리지 않는지, 하늘빛·금빛 물이 과하지 않은지.
 
 ## 크기 등급 (`sizes`, 2026-11-24)
 

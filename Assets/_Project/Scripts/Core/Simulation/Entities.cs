@@ -442,6 +442,13 @@ namespace Game.Core
         internal int Shed { get; set; }
         // It went off as a bomber (MonsterAttackShape.Explode) rather than being felled.
         internal bool BlewUp { get; set; }
+        // Its charge has slid on the ice once already (World.SlideOn), and it stood dormant last tick (World.WakeDormant).
+        internal bool Slid { get; set; }
+        // How long it has gone after someone under the ground, and the tick it stays up until when it came up for that
+        // (World.BurrowedMostSeconds).
+        internal int UnderTicks { get; set; }
+        internal long UpUntil { get; set; }
+        internal bool Dormant { get; set; }
 
         // ---- Packs and wanderers (World.Packs.cs, Docs/WorldRework.md 무리) ----
 
@@ -825,6 +832,9 @@ namespace Game.Core
         // carries in place of the cause, HazardState.MonsterShape).
         public byte Mark { get; internal set; }
         public const byte DeathFlash = 100;
+        // An icicle falling in the ice cave's halls (World.UpdateIcicles, B2): drawn as a thing coming down, with its
+        // shadow on the floor, in the cold's colours.
+        public const byte Icicle = 101;
         // The web whose burst this marks (AttackShape.Pluck), taken away when it lands; 0 for none.
         public int Plucks { get; internal set; }
         // A web or a pool of venom: it does its work while it lies there, and nothing when its time is up.

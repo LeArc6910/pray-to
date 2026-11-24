@@ -279,6 +279,9 @@ namespace Game.Client
         public static Rgba BiomeTint(Biome biome) => biome switch
         {
             Biome.Mushroom => Rgba.Hex("#A8F06A"),
+            // The ice cave's sky blue and the sand cave's gold (묶음 B2a).
+            Biome.Ice => Rgba.Hex("#A8DCFF"),
+            Biome.Sand => Rgba.Hex("#FFD28A"),
             _ => Rgba.Clear,
         };
 

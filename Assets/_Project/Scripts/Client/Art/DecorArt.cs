@@ -73,6 +73,16 @@ namespace Game.Client
                 case DecorKind.Bones:
                     Bones(g, variant);
                     break;
+                // The ice cave's and the sand cave's (묶음 B2a).
+                case DecorKind.FrostGrass:
+                    FrostGrass(g, salt, variant);
+                    break;
+                case DecorKind.Snow:
+                    SnowPatch(g, salt, variant);
+                    break;
+                case DecorKind.DryGrass:
+                    DryGrass(g, salt, variant);
+                    break;
             }
             return g;
         }
@@ -158,6 +168,67 @@ namespace Game.Client
                 }
             }
             if (variant == 2) g[7, 5] = Rgba.Hex("#B8F25A");
+        }
+
+        // A tuft of grass frozen stiff: grey-blue blades with white rime at their tips.
+        static void FrostGrass(PixelImage g, int salt, int variant)
+        {
+            var ramp = Ramp.Of("#7E9CB4");
+            var rime = Rgba.Hex("#F0FAFF");
+            Shadow(g, 6, 7);
+            int blades = 4 + variant;
+            for (int i = 0; i < blades; i++)
+            {
+                int x = 2 + i * 7 / blades + (int)(PixelNoise.Hash(i, 1, salt) % 2);
+                int tall = 3 + (int)(PixelNoise.Hash(i, 2, salt) % 4);
+                int lean = i < blades / 2 ? -1 : i > blades / 2 ? 1 : 0;
+                for (int k = 0; k < tall; k++)
+                {
+                    int bx = x + (k > tall / 2 ? lean : 0);
+                    g[bx, Height - 3 - k] = k == tall - 1 ? rime : k == tall - 2 ? ramp.Light : k < 2 ? ramp.Shade : ramp.Main;
+                }
+            }
+            for (int x = 1; x < 11; x++)
+                if (g[x, Height - 3].A > 0) g[x, Height - 3] = ramp.Dark;
+        }
+
+        // A shallow patch of snow: flat, its windward edge bright, a little see-through at its rim.
+        static void SnowPatch(PixelImage g, int salt, int variant)
+        {
+            var snow = Rgba.Hex("#E4F0FA");
+            float rx = 4.2f + variant * 0.6f, ry = 2f + (variant == 1 ? 0.7f : 0);
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    float dx = (x + 0.5f - 6) / rx, dy = (y + 0.5f - 6.5f) / ry;
+                    float d = dx * dx + dy * dy;
+                    if (d > 1 + (PixelNoise.Value(x, y, salt) - 0.5f) * 0.6f) continue;
+                    g[x, y] = d > 0.7f ? Rgba.Hex("#B4CCE0").WithAlpha(190) : -dx * 0.5f - dy * 0.8f > 0.3f ? Rgba.White : snow;
+                }
+            }
+            if (variant == 2) g[8, 6] = Rgba.Hex("#A8DCF4");
+        }
+
+        // A tuft of dry grass: straw-yellow blades, taller than the cave's roots, a seed head on some.
+        static void DryGrass(PixelImage g, int salt, int variant)
+        {
+            var ramp = Ramp.Of("#C8A860");
+            Shadow(g, 6, 7);
+            int blades = 4 + variant;
+            for (int i = 0; i < blades; i++)
+            {
+                int x = 2 + i * 7 / blades + (int)(PixelNoise.Hash(i, 1, salt) % 2);
+                int tall = 4 + (int)(PixelNoise.Hash(i, 2, salt) % 4);
+                int lean = i < blades / 2 ? -1 : i > blades / 2 ? 1 : 0;
+                for (int k = 0; k < tall; k++)
+                {
+                    int bx = x + (k > tall / 2 ? lean : 0);
+                    g[bx, Height - 3 - k] = k == tall - 1 ? (i % 2 == 0 ? Rgba.Hex("#F0E0A0") : ramp.Light) : k < 2 ? ramp.Shade : ramp.Main;
+                }
+            }
+            for (int x = 1; x < 11; x++)
+                if (g[x, Height - 3].A > 0) g[x, Height - 3] = ramp.Dark;
         }
 
         // The stone of the biome's floor, a step lighter so it shows on it.

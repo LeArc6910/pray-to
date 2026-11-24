@@ -3186,13 +3186,22 @@ namespace Game.Client
                     : MonsterPose.Idle;
                 // An elite leader wears a gold ring round its picture, not a bigger one (CreatureArt.Crowned, 2026-11-24).
                 bool crowned = body.Elite == EliteRank.Leader;
-                int monsterCode = 200000 + (crowned ? 100000 : 0) + (((int)monsterPose * 4 + (int)monsterView) * 16 + frame) * 2 + (left ? 1 : 0);
+                // A mid-boss standing dormant (World.IsDormant, B2b) is a still statue: grey stone, or a beast in ice.
+                bool dormant = !dead && body.EnemyState == EnemyState.Idle && CreatureArt.Sleeps(body.Id);
+                if (dormant)
+                {
+                    frame = 0;
+                    monsterPose = MonsterPose.Idle;
+                    monsterView = MonsterView.Side;
+                }
+                int monsterCode = 200000 + (crowned ? 100000 : 0) + (dormant ? 400000 : 0) + (((int)monsterPose * 4 + (int)monsterView) * 16 + frame) * 2 + (left ? 1 : 0);
                 if (monsterCode == body.Frame) return;
                 body.Frame = monsterCode;
-                string monsterKey = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{monsterView}/{monsterPose}/{frame}" + (crowned ? "/leader" : "");
-                Func<PixelImage> drawMonster = () => crowned
-                    ? CreatureArt.Crowned(CreatureArt.Monster(body.Id, body.Color, frame, monsterView, monsterPose), Sprites.ToRgba(EliteGold))
+                string monsterKey = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{monsterView}/{monsterPose}/{frame}" + (crowned ? "/leader" : "") + (dormant ? "/dormant" : "");
+                Func<PixelImage> drawPlain = () => dormant
+                    ? CreatureArt.Dormant(body.Id, CreatureArt.Monster(body.Id, body.Color, frame, monsterView, monsterPose))
                     : CreatureArt.Monster(body.Id, body.Color, frame, monsterView, monsterPose);
+                Func<PixelImage> drawMonster = () => crowned ? CreatureArt.Crowned(drawPlain(), Sprites.ToRgba(EliteGold)) : drawPlain();
                 body.Shape.sprite = Sprites.Standing(monsterKey, drawMonster);
                 body.Glow.sprite = Sprites.Standing(monsterKey + "/white", () => drawMonster().Silhouette());
                 body.Shape.flipX = left;

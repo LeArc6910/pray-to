@@ -166,7 +166,7 @@ namespace Game.Client
             return kind switch
             {
                 GroundKind.Floor => Floor(mask, variant, FloorOf(biome), biome),
-                GroundKind.Rock => Decorated(Rock(mask, variant, rock), mask, variant, biome),
+                GroundKind.Rock => Decorated(Faced(Rock(mask, variant, rock), mask, variant, biome), mask, variant, biome),
                 GroundKind.Bedrock => Rock(mask, variant, BedrockColors),
                 GroundKind.CopperOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#D6783F")),
                 GroundKind.MithrilOre => Ore(Rock(mask, variant, rock), mask, variant, Ramp.Of("#7CD2E2"), sparkle: true),
@@ -287,11 +287,13 @@ namespace Game.Client
             Decor = Rgba.Hex("#8E927A"), DecorLight = Rgba.Hex("#B8F25A"),
         };
 
+        // Smooth frosted blue-grey (4-1 얼음 동굴, 묶음 B2a: the base kept and leant a little toward #34485A; it was
+        // #2E3A46 with white specks on every tile). Decor is the hairline of a crack, DecorLight a glint of frost.
         static readonly FloorPalette IceFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#2E3A46"), Dark = Rgba.Hex("#28323D"), Light = Rgba.Hex("#374552"),
-            Pebble = Rgba.Hex("#4A5A68"), PebbleLight = Rgba.Hex("#6A7E8E"), PebbleShadow = Rgba.Hex("#1E262E"),
-            Decor = Rgba.Hex("#A8D8F0"), DecorLight = Rgba.Hex("#EAF8FF"),
+            Base = Rgba.Hex("#2F3F4E"), Dark = Rgba.Hex("#293744"), Light = Rgba.Hex("#384A5A"),
+            Pebble = Rgba.Hex("#465866"), PebbleLight = Rgba.Hex("#62788A"), PebbleShadow = Rgba.Hex("#1E2832"),
+            Decor = Rgba.Hex("#6E94AE"), DecorLight = Rgba.Hex("#DCEFFA"),
         };
 
         static readonly FloorPalette CrystalFloor = new FloorPalette
@@ -342,7 +344,7 @@ namespace Game.Client
 
         static readonly RockPalette IceRock = new RockPalette
         {
-            Top = Rgba.Hex("#5E7488"), TopDark = Rgba.Hex("#546A7E"), TopLight = Rgba.Hex("#6E869A"), Rim = Rgba.Hex("#C8E4F4"),
+            Top = Rgba.Hex("#5E7488"), TopDark = Rgba.Hex("#546A7E"), TopLight = Rgba.Hex("#6E869A"), Rim = Rgba.Hex("#DCEFFA"),
             FaceTop = Rgba.Hex("#9CB8CC"), FaceBottom = Rgba.Hex("#7690A6"), Strata = Rgba.Hex("#6A8296"), FaceSpeck = Rgba.Hex("#D8F0FF"),
             Contact = Rgba.Hex("#22303C"), Outline = Rgba.Hex("#121A22"),
         };
@@ -370,11 +372,13 @@ namespace Game.Client
         };
 
         // The sand caves (2026-11-09): tan drifts with wind ripples and the odd bleached bone, sandstone in warm layers.
+        // Warm drifted sand (4-1 모래 동굴, 묶음 B2a: the base kept and warmed a step toward #8C6A44; it was #6A5236).
+        // Decor is the crest of a wind ripple, DecorLight a bleached chip of bone.
         static readonly FloorPalette SandFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#6A5236"), Dark = Rgba.Hex("#5C462E"), Light = Rgba.Hex("#7A6040"),
-            Pebble = Rgba.Hex("#8A6E4A"), PebbleLight = Rgba.Hex("#A2845A"), PebbleShadow = Rgba.Hex("#3A2C1C"),
-            Decor = Rgba.Hex("#9C7E52"), DecorLight = Rgba.Hex("#E8DCC0"),
+            Base = Rgba.Hex("#72583A"), Dark = Rgba.Hex("#654C30"), Light = Rgba.Hex("#806444"),
+            Pebble = Rgba.Hex("#8E724C"), PebbleLight = Rgba.Hex("#A6885C"), PebbleShadow = Rgba.Hex("#3E2E1C"),
+            Decor = Rgba.Hex("#9A7C50"), DecorLight = Rgba.Hex("#E8DCC0"),
         };
 
         static readonly RockPalette SandRock = new RockPalette
@@ -405,6 +409,73 @@ namespace Game.Client
             FaceTop = Rgba.Hex("#5C4A44"), FaceBottom = Rgba.Hex("#403432"), Strata = Rgba.Hex("#9A3A1E"), FaceSpeck = Rgba.Hex("#FF8A3A"),
             Contact = Rgba.Hex("#1A1212"), Outline = Rgba.Hex("#100A0A"),
         };
+
+        // The ice cave's and the sand cave's rock (4-1 바닥과 벽, 묶음 B2a). Ice: angled facets catching the light on
+        // its top, clear streaks down its face and icicles hanging off the face's lower edge. Sandstone: its face in
+        // level bands of light and dark stone that waver a little, its top worn in streaks by the wind.
+        static PixelImage Faced(PixelImage rock, int mask, int variant, Biome biome)
+        {
+            if (biome != Biome.Ice && biome != Biome.Sand) return rock;
+            bool openDown = (mask & Down) == 0, openLeft = (mask & Left) == 0, openRight = (mask & Right) == 0, openUp = (mask & Up) == 0;
+            int top = openDown ? Size - FaceHeight : Size;
+            var colors = RockOf(biome);
+            int salt = 700 + variant;
+            bool Edge(int x) => x == 0 && openLeft || x == Size - 1 && openRight;
+            if (biome == Biome.Ice)
+            {
+                for (int i = 0; i < 2; i++)
+                {
+                    int x = 3 + (int)(PixelNoise.Hash(i, 21, salt) % 8), y = 3 + (int)(PixelNoise.Hash(i, 22, salt) % (uint)System.Math.Max(1, top - 9));
+                    int length = 3 + (int)(PixelNoise.Hash(i, 23, salt) % 3);
+                    for (int k = 0; k < length; k++)
+                    {
+                        if (y + k + 1 >= top - 1 || x + k >= Size - 2) break;
+                        rock[x + k, y + k] = colors.TopLight.Mix(colors.Rim, 0.3f);
+                        rock[x + k, y + k + 1] = colors.TopDark;
+                    }
+                }
+                if (!openDown) return rock;
+                for (int x = 0; x < Size; x++)
+                {
+                    if (Edge(x)) continue;
+                    uint hash = PixelNoise.Hash(x, 24, salt) % 5;
+                    // A clear streak down the face.
+                    if (hash == 1)
+                        for (int y = top + 1; y < Size - 1; y++) rock[x, y] = rock[x, y].Mix(colors.FaceSpeck, 0.45f);
+                    // An icicle: the face runs down into the contact row, its tip bright.
+                    if (hash == 0)
+                    {
+                        rock[x, Size - 2] = colors.FaceTop;
+                        rock[x, Size - 1] = colors.FaceSpeck;
+                    }
+                    else if (hash == 3) rock[x, Size - 1] = colors.FaceBottom;
+                }
+                return rock;
+            }
+            // Sandstone: the wind's streaks along the top.
+            for (int i = 0; i < 2; i++)
+            {
+                int x = 2 + (int)(PixelNoise.Hash(i, 25, salt) % 7), y = 3 + (int)(PixelNoise.Hash(i, 26, salt) % (uint)System.Math.Max(1, top - 7));
+                int length = 4 + (int)(PixelNoise.Hash(i, 27, salt) % 4);
+                for (int k = 0; k < length && x + k < Size - 2; k++)
+                    if (y < top - 1) rock[x + k, y] = k == 0 || k == length - 1 ? colors.Top : colors.TopLight;
+            }
+            if (!openDown) return rock;
+            var pale = colors.Strata.Mix(colors.FaceTop, 0.35f);
+            var dark = colors.FaceBottom.Scale(0.86f);
+            for (int x = 0; x < Size; x++)
+            {
+                if (Edge(x)) continue;
+                int wobble = Smooth(x, 3, 6, salt, 360) > 0.62f ? 1 : 0;
+                for (int y = top + 1; y < Size - 1; y++)
+                {
+                    int band = y - top + wobble;
+                    rock[x, y] = band == 1 ? pale : band == 2 ? colors.FaceTop : band == 3 ? dark : band == 4 ? colors.FaceTop.Mix(colors.FaceBottom, 0.6f) : colors.FaceBottom;
+                    if (band == 2 && PixelNoise.Hash(x, y, salt + 5) % 7 == 0) rock[x, y] = colors.FaceSpeck;
+                }
+            }
+            return rock;
+        }
 
         // A biome's touch on the top of its rock: caps of mushrooms growing on it, frost, crystal points, glowing
         // seams. Only on some variants, so walls are not all alike.
@@ -569,6 +640,8 @@ namespace Game.Client
                 }
             }
             int pebbles = (int)(PixelNoise.Hash(variant, 1, salt) % 3);
+            // The ice cave's floor is smooth: a stone on one drawing in four (묶음 B2a).
+            if (biome == Biome.Ice) pebbles = variant == 3 ? 1 : 0;
             for (int i = 0; i < pebbles; i++)
             {
                 int px = 1 + (int)(PixelNoise.Hash(i, 2, salt) % 13);
@@ -617,9 +690,24 @@ namespace Game.Client
                     if (variant == 0) image[x + 2, y - 2] = colors.DecorLight.Mix(colors.Base, 0.25f);
                     break;
                 case Biome.Ice:
-                    image[x, y] = colors.DecorLight;
-                    image[x + 3, y + 2] = colors.Decor;
-                    if (variant % 2 == 0) image[x - 2, y + 3] = colors.Decor;
+                    // A smooth floor (묶음 B2a; it had three pale specks on every tile): a hairline crack across one
+                    // drawing, a forked one on another, a glint of frost on a third.
+                    if (variant == 0)
+                    {
+                        for (int i = 0; i < 6; i++) image[x - 2 + i, y + i / 2] = i % 4 == 3 ? colors.Decor.Mix(colors.DecorLight, 0.3f) : colors.Decor.Mix(colors.Base, 0.35f);
+                    }
+                    else if (variant == 2)
+                    {
+                        for (int i = 0; i < 5; i++) image[x + i / 2, y - 2 + i] = colors.Decor.Mix(colors.Base, 0.4f);
+                        image[x + 3, y] = colors.Decor.Mix(colors.Base, 0.4f);
+                        image[x + 4, y - 1] = colors.Decor.Mix(colors.Base, 0.5f);
+                    }
+                    else if (variant == 1)
+                    {
+                        image[x, y] = colors.DecorLight;
+                        image[x + 1, y] = colors.Decor;
+                        image[x, y + 1] = colors.Decor.Mix(colors.Base, 0.5f);
+                    }
                     break;
                 case Biome.Crystal when variant != 2:
                     image[x, y - 1] = colors.DecorLight;
@@ -641,15 +729,24 @@ namespace Game.Client
                     // A wind ripple across the drift, or a small bleached bone.
                     if (variant % 2 == 0)
                     {
-                        for (int i = -2; i <= 2; i++) image[x + i, y + (i == 0 ? -1 : 0)] = colors.Decor;
-                        for (int i = -1; i <= 1; i++) image[x + i + 1, y + 2] = colors.Decor.Scale(0.85f);
+                        // Two crests of a ripple (묶음 B2a: longer and wavier), each lit above and shaded below.
+                        for (int i = -3; i <= 4; i++)
+                        {
+                            int wave = i == -1 || i == 0 ? -1 : i == 3 ? 1 : 0;
+                            image[x + i, y + wave] = colors.Decor;
+                            image[x + i, y + wave + 1] = colors.Dark;
+                        }
+                        for (int i = -1; i <= 3; i++)
+                        {
+                            image[x + i - 2, y + 4 + (i == 1 ? -1 : 0)] = colors.Decor.Mix(colors.Base, 0.4f);
+                        }
                     }
-                    else
+                    else if (variant == 1)
                     {
-                        image[x - 1, y] = colors.DecorLight;
-                        image[x, y] = colors.DecorLight.Scale(0.85f);
-                        image[x + 1, y] = colors.DecorLight.Scale(0.85f);
-                        image[x + 2, y] = colors.DecorLight;
+                        // A chip of bone, dimmer than it was (the white dashes read as litter).
+                        image[x - 1, y] = colors.DecorLight.Mix(colors.Base, 0.3f);
+                        image[x, y] = colors.DecorLight.Mix(colors.Base, 0.45f);
+                        image[x + 1, y + 1] = colors.Dark;
                     }
                     break;
                 case Biome.Lake:

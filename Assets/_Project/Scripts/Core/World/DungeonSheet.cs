@@ -53,7 +53,7 @@ namespace Game.Core
         public int Index { get; }
         public string Id { get; }
         public string Name { get; }
-        // Null: the gate of any biome without a dungeon of its own leads here, in its own biome ("모래 동굴의 깊은 굴").
+        // Null: the gate of any biome without a dungeon of its own leads here, in its own biome ("지하 호수의 깊은 굴").
         public Biome? Biome { get; }
         // Its zone level at least (World.ZoneLevelAt's scale, as packs.csv zone): the gate's own when that is higher.
         public int Level { get; }

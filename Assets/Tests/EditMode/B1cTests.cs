@@ -173,7 +173,7 @@ namespace Game.Core.Tests
         [TestCase(3UL, 11017054651573430369UL)]
         public void AWorldOfVersionThreeIsLaidAsBefore(ulong seed, ulong hash)
         {
-            Assert.AreEqual(WorldGenerator.LandmarkVersion, WorldGenerator.NewWorldVersion);
+            Assert.GreaterOrEqual(WorldGenerator.NewWorldVersion, WorldGenerator.LandmarkVersion);
             var map = WorldGenerator.Generate(seed, WorldGenerator.GameSize, WorldGenerator.GameSize, Tales.Shipped, Bosses.Shipped.Arenas, WorldGenerator.PropVersion,
                 Tiles.Shipped.Terrain).Map;
             Assert.AreEqual(hash, RoomMapTests.Hash(map));

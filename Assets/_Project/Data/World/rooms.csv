@@ -82,3 +82,13 @@ dungeon_spore_sacs,pack,mushroom,dungeon,12,yes,?.A.....A.?/A..M...M..A/...K...K
 dungeon_spore_stumps,pack,mushroom,dungeon,12,yes,?.H...m...H.?/............./..M..K.K..M../.A....M....A./..M..Z.Z..M../............./?.H...m...H.?
 dungeon_spore_ring,elite,mushroom,dungeon,10,yes,?...........?/.m..K...K..m./...M.....M.../.....A.A...../......E....../.....A.A...../...M.....M.../.m..K...K..m./?...........?
 dungeon_spore_heart,elite,mushroom,dungeon,10,no,?...............?/.A..m...K...m..A./................./..H...........H../.m.............m./.....M.....M...../................./.K......E......K./................./.....M.....M...../.m.............m./..H...........H../................./.Z.............Z./................./.A..m...K...m..A./?...............?
+dungeon_crypt_tombs,pack,ice,dungeon,12,yes,?.s.....s.?/s..M...M..s/..iiiiiii../.Mi.s.s.iM./..iiiiiii../s..M...M..s/?.s.....s.?
+dungeon_crypt_hall,pack,ice,dungeon,12,yes,?.u.......u.?/............./..M.iiiii.M../.iiiiiiiiiii./.iiiiM.Miiii./.iiiiiiiiiii./..M.iiiii.M../............./?.u.......u.?
+dungeon_crypt_ossuary,pack,ice,dungeon,12,yes,?.b.....b.?/b..M...M..b/...u...u.../.M..iii..M./...u...u.../b..M...M..b/?.b.....b.?
+dungeon_crypt_vault,elite,ice,dungeon,10,yes,?.s.......s.?/.t.........t./...M.iii.M.../....iiiii..../.s.ii.E.ii.s./....iiiii..../...M.iii.M.../.t.........t./?.s.......s.?
+dungeon_crypt_heart,elite,ice,dungeon,10,no,?.s...u...u...s.?/.t.............t./................./..s...........s../....iiiiiiiii..../...iiiiiiiiiii.../..u.iiiiiiiii.u../...iiiM...Miii.../...iiii.E.iiii.../...iiiM...Miii.../..u.iiiiiiiii.u../...iiiiiiiiiii.../....iiiiiiiii..../..s...........s../................./.t.............t./?.s...u...u...s.?
+dungeon_temple_sands,pack,sand,dungeon,12,yes,?.P.....P.?/P..M...M..P/..qq...qq../.M.......M./.....M...../..qq...qq../P..M...M..P/?.P.....P.?
+dungeon_temple_colonnade,pack,sand,dungeon,12,yes,?.P...P...P.?/............./..M..u.u..M../.P.........P./...M.....M.../.P.........P./..M..u.u..M../............./?.P...P...P.?
+dungeon_temple_ossuary,pack,sand,dungeon,12,yes,?.o.....o.?/b..M...M..b/...b.u.b.../.M..qqq..M./...b.u.b.../b..M...M..b/?.o.....o.?
+dungeon_temple_court,elite,sand,dungeon,10,yes,?.s.......s.?/.l.........l./...M.===.M.../....=...=..../.s..=.E.=..s./....=...=..../...M.===.M.../.l.........l./?.s.......s.?
+dungeon_temple_sanctum,elite,sand,dungeon,10,no,?.s...P...P...s.?/.l.............l./..qq.........qq../..q...........q../.....=======...../....=.......=..../..P.=.M...M.=.P../....=.......=..../....=...E...=..../....=.......=..../..P.=.M...M.=.P../....=.......=..../.....=======...../..q...........q../..qq.........qq../.l.............l./?.s...P...P...s.?

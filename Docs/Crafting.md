@@ -189,6 +189,25 @@ M4c에서 만든 규칙과 시트 작성법이다. 놓는 물건(작업대, 화�
 
 `GiantCap`(거대 갓)은 줄이 없어 캘 수 없다(랜드마크).
 
+얼음 동굴과 모래 동굴의 소품(2026-11-24, `Docs/BiomeRework.md` 묶음 B2a)도 같은 방식이다. 생성기 5판 월드(`WorldGenerator.IceSandVersion`)에만 놓인다.
+
+| 칸 | 단단함 | 주는 것 | 비고 |
+|---|---|---|---|
+| `IceSpike` 고드름 석순 | 3 | 돌 1, 20%로 얼음 결정 1 | 막는다 |
+| `FrozenBush` 얼어붙은 덤불 | 1 | 서리 열매 씨앗 1, 30%로 하나 더 | |
+| `SnowDrift` 눈 더미 | 1 | 돌 1, 15%로 눈 배추 씨앗 1 | |
+| `IceCrystals` 얼음 결정 무리 | 2 | 얼음 결정 1, 40%로 하나 더 | 하늘빛 3칸(`#8FD8FF`) |
+| `IcePillar` 얼음 기둥(2칸) | 6 | 얼음 결정 2 | 하늘빛 3.5칸, 뒤에 서면 위쪽이 흐려진다. 어느 칸을 쳐도 둘 다 사라진다 |
+| `FrozenFall` 얼어붙은 폭포(2칸) | 6 | 얼음 결정 2 | 하늘빛 2.5칸. 바위 바로 아래에만 선다 |
+| `CaveCactus` 동굴 선인장 | 2 | 선인장 열매 1, 25%로 선인장 씨앗 1 | |
+| `Skull` 짐승 해골 | 2 | 돌 1, 15%로 호박 1 | |
+| `BrokenUrn` 깨진 항아리 | 1 | 금화 3, 35%로 호박 1 | |
+| `SandstonePillar` 사암 기둥 | 4 | 돌 1 | |
+| `RibArch` 화석 갈비뼈(2칸) | 5 | 돌 2, 25%로 호박 1 | 뒤에 서면 위쪽이 흐려진다 |
+| `BuriedColumn` 묻힌 기둥(2칸) | 6 | 돌 2 | |
+
+랜드마크의 칸 `FrozenBeast`(얼음 속 짐승), `IceColumn`(얼음 성 잔해의 기둥), `TempleFront`(묻힌 신전 정면), `GiantSkull`(거대 화석 두개골)은 줄이 없어 캘 수 없다.
+
 ## materials.csv
 
 `Assets/_Project/Data/Loot/materials.csv`. `id, name, places, description`, 그리고 선택 열 `fish`, `fuel`. `places`는 [놓기]로 세우는 칸 종류이고, 비우면 세울 수 없는 재료다. `fish`는 그 생물군계(`cave`, `mushroom`, `ice`, `crystal`, `abyss`)의 물에서 낚이는 물고기라는 뜻이다(`Docs/Fishing.md`). `fuel`은 발전기가 그 재료 하나로 도는 초다(`Docs/Automation.md`).

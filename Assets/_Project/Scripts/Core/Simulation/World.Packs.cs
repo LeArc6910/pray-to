@@ -604,7 +604,9 @@ namespace Game.Core
         // A blow on a pack's monster that had not noticed anyone: it has now, and its pack with it.
         void Provoked(Enemy enemy, Player by)
         {
-            if (by == null || enemy.IsDead || enemy.State != EnemyState.Idle || enemy.Returning || enemy.PackId == 0 || enemy.Rift != 0) return;
+            // A dormant one (B2) wakes when struck whether or not it came with a pack: it notices no one further off.
+            if (by == null || enemy.IsDead || enemy.State != EnemyState.Idle || enemy.Returning || enemy.Rift != 0
+                || enemy.PackId == 0 && !enemy.Definition.Has(MonsterTraitKind.Dormant)) return;
             enemy.TargetId = by.Id;
             enemy.State = EnemyState.Chase;
             Noticed(enemy, by);
