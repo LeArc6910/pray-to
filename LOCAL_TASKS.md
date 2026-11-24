@@ -1152,6 +1152,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 170단계: 장소의 생물군계 모습, 랜드마크, 던전 둘, 야영지 지하실, 중간 보스의 굴, 생성기 4판(`Docs/BiomeRework.md` B1c 두 절)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.BiomeLandmarks.cs`, `Core/World/WorldGenerator.Cellars.cs`, `Core/Simulation/World.Lairs.cs`, `Client/Art/PropArt.Places.cs`, `Tests/EditMode/BiomeLandmarkTests.cs`, `Tests/EditMode/B1cTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.ThePlacesTakeTheDirtCavesLookAndItsLandmarksStand`(사진 `places-cave`, `places-cave-behind`). 통신 0.103.0. 새 월드는 생성기 4판, 오늘 만든 3판 월드와 그 전 월드는 그대로
   - (클라우드 웹 점검) `sweep.js --only places,b1c,dungeon,biomes`
+  - 클라우드 확인 (2026-11-25, `803d7a9`): [x] `places,dungeon,biomes` 141개 모두 통과. `b1c`는 점검 쪽 변수 이름이 공용 함수 `open`을 가려 시작도 못 했던 것을 고친 뒤 26개 모두 통과. 사진: 야영지 우두머리를 잡고 열린 뚜껑 문과 [흙 동굴의 지하실 들어가기 (G)], 버려진 갱도 문 방의 호박빛, 보스 방의 "버려진 갱도의 주인 · 단단한 어미 슬라임" 막대. 남은 것: 버려진 갱도 문이 다른 던전과 같은 붉은 문·돌기둥 그림이다(갱도 입구 틀 그림으로 바꿀 만함, B2와 함께)
   - (사람) 흙 동굴 마을(광산 야영지)과 버섯 숲 마을(버섯 갓 집)이 낯설지 않고 그 생물군계답게 느껴지는지, 랜드마크(광부 오두막·갱도 입구·요정 고리)를 만나는 맛, 싸우다 고리의 갓을 캐는 것이 거슬리지 않는지, 휴대폰에서 3칸 오두막이 읽히는지, 버려진 갱도·포자 굴 한 판의 길이와 주인(어미 슬라임·균사 어미)과의 싸움 손맛, 야영지 우두머리를 잡고 뚜껑 문으로 내려가는 흐름, 문 방의 색 불이 읽히는지, 굴의 중간 보스가 들판에서 억울하지 않은지, 큰 딱정벌레가 석순을 부수는 손맛
 
 ## 결과 보고

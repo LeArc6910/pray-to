@@ -6447,8 +6447,8 @@ async function b1c(browser) {
     await game.send('monsters go');
     await game.wait(600);
     const fell = (await game.send('b1c fell')).join(' ');
-    const open = await game.until(b => b.cellarTile === 'OpenTrapdoor' && b.clientCellarTile === 'OpenTrapdoor', 4000, () => game.ask('b1c'));
-    check(!!open && open.cellarOpen, `${name}: 야영지의 대장이 쓰러지면 뚜껑 문이 열린다 (${fell}; ${open ? open.clientCellarTile : '그대로'})`);
+    const opened = await game.until(b => b.cellarTile === 'OpenTrapdoor' && b.clientCellarTile === 'OpenTrapdoor', 4000, () => game.ask('b1c'));
+    check(!!opened && opened.cellarOpen, `${name}: 야영지의 대장이 쓰러지면 뚜껑 문이 열린다 (${fell}; ${opened ? opened.clientCellarTile : '그대로'})`);
     await game.send('monsters hold; clear; heal');
     await game.wait(400);
     await game.shot('b1c-trapdoor-open', '열린 뚜껑 문과 [지하실 들어가기]');
