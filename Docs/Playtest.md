@@ -5,11 +5,11 @@
 `Docs/BiomeRework.md` B2b를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only b2mobs`(그리고 던전과 무리가 바뀌었으니 `dungeon`, `packs`). 새 월드(생성기 5판)여야 얼음·모래의 굴이 있다(4판 월드는 그대로). 감독이 레벨 5 아래를 건드리지 않으므로 먼저 `xp 3000`. PC와 휴대폰 세로에서:
 
 1. `b2`: 얼음 동굴 문은 `frozen_crypt`(주인 `frost_mammoth`, 빛 `#A8DCFF`), 모래 동굴 문은 `buried_temple`(주인 `temple_guardian`, 빛 `#FFD28A`)인지. `b1c`의 굴 목록에 얼음이나 모래가 있는지
-2. 가까운 무리 방에서 `scene b2monsters`: 자폭 풍뎅이(S)·서리 정령 군주(S)·서리 늑대(M)·서리 딱정벌레(M)·사암 딱정벌레(M)·전갈 여왕(M)·눈 거인(L)·큰 모래 지렁이(L)·서리 매머드(XL)·신전 수호 석상(XL)이 제 크기 폭으로 그려지는지(`b2`의 `pixels`). 사진 `b2mobs-lineup`
-3. `goto biome ice` → `scene iceslide`(서쪽 4칸 벽까지 얼음, 동쪽 3칸 서리 늑대가 바로 달려든다): 1.5초 뒤 늑대가 `Stagger`인지. 사진 `b2mobs-iceslide`
+2. 가까운 무리 방에서 `scene b2monsters`: 자폭 풍뎅이(S)·서리 정령 군주(S)·서리 늑대(M)·서리 딱정벌레(M)·사암 딱정벌레(M)·전갈 여왕(M)·눈 거인(L)·큰 모래 지렁이(L)·서리 매머드(XL)·신전 수호 석상(XL)이 제 크기 폭으로 그려지는지(`b2`의 `pixels`). 줄의 끝(동쪽 20칸쯤)은 호스트가 보내는 거리(22칸) 밖일 수 있어, 아직 안 그려진 종은 동쪽 11칸에서 다시 본다. 사진 `b2mobs-lineup`
+3. `goto biome ice` → `scene iceslide`(서쪽 4칸 벽까지 얼음, 동쪽 3칸 서리 늑대가 바로 달려든다): 곧바로 4초까지 물어 늑대가 `Stagger`가 되는지(지나온 상태를 함께 적는다. 휴대폰은 사진이 느려 그 뒤에 물으면 비틀거림이 끝나 있었다). 사진 `b2mobs-iceslide`
 4. `scene icicles`(플레이어 위와 동쪽 1.5칸에 고드름): 0.35초에 그늘 둘(`icicles`, 화면 `iciclesShown`), 사진 `b2mobs-icicles`. 0.9초 뒤 떨어졌는지(`iciclesFallen`), 사진 `b2mobs-icicles-fall`
-5. `goto biome sand` → `scene sandfall`(동쪽 5칸 전갈, 8칸 큰 모래 지렁이, 풀어 둠): 묻힌 것 위에 모래가 흐르는지(`underSand`, 화면 `sandFallsShown`). 사진 `b2mobs-sandfall`
-6. `scene dormant`(동쪽 7칸 신전 수호 석상, 서쪽 7칸 서리 매머드, 풀어 둠): 둘 다 `dormant`인지. 사진 `b2mobs-dormant`
+5. 모래 동굴의 무리 방(`goto room pack sand n`, 선 곳이 모래 동굴일 때까지 넷) → `scene sandfall; monsters hold`(동쪽 5칸 전갈, 8칸 큰 모래 지렁이): 묻힌 것 위에 모래가 흐르는지(`underSand`, 화면 `sandFallsShown`, 4초까지 기다림). `goto biome sand`는 모래 동굴의 시작 지점 쪽 가장자리라 동쪽 몬스터가 다른 생물군계 바닥에 섰다(2026-11-24). 사진 `b2mobs-sandfall`
+6. 가까운 무리 방(둘이 다 설 때까지 여섯 곳)에서 `scene dormant`(동쪽 7칸 신전 수호 석상, 서쪽 7칸 서리 매머드, 풀어 둠): 둘 다 `dormant`인지. 사진 `b2mobs-dormant`
 7. `goto gate frozen_crypt`, `goto gate buried_temple`마다: 문 방 사진(`b2mobs-<id>-gate`), [얼어붙은 묘 들어가기]·[묻힌 신전 들어가기]를 진짜 클릭·탭으로, `goto droom C`에 큰 몸(L)이 있는지(사진 `b2mobs-<id>-pack`), `goto droom B`의 주인이 "서리 매머드"·"신전 수호 석상"(대장이 붙지 않는다, 사진 `b2mobs-<id>-master`), [던전 나가기]
 
 명령: `scene b2monsters|iceslide|icicles|sandfall|dormant`, `b2`(JSON: 24칸 안의 몬스터마다 종·크기·생명력·상태·땅속인지(`buried`)·모래가 흐르는지(`underSand`)·잠들었는지(`dormant`)·그린 픽셀, 둘레의 고드름(자리·반지름·남은 초), 선 곳의 생물군계, 고드름이 떨어질 자리인지(`underIcicles`), 떨어진 고드름 수, 화면의 모래 줄기·고드름 수, 얼음·모래 문이 가는 던전과 주인·빛 색).

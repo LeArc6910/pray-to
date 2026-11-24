@@ -4812,8 +4812,10 @@ async function dungeon(browser) {
       `${name}: 보스 방에 던전의 주인 (${boss.run ? `${boss.run.master}, 생명력 ${Math.round(boss.run.masterMax)}` : '-'})`);
     await game.shot('dungeon-boss', '보스 방(아레나 무늬, 주인의 이름표와 막대)');
     await game.send('dungeon kill');
-    const down = await game.until(d => d.run && d.run.bossDown && (d.run.clientFlags & 16) !== 0, 4000, () => game.ask('dungeon'));
-    check(!!down && /쓰러뜨렸다/.test(down.cardName), `${name}: 주인이 쓰러지고 끝 방이 열린다 (${down ? down.cardName : '그대로'})`);
+    // Until its card says so too: on a phone the flag reached the screen a frame before the card did (2026-11-24).
+    const down = await game.until(d => d.run && d.run.bossDown && (d.run.clientFlags & 16) !== 0 && /쓰러뜨렸다/.test(d.cardName), 6000, () => game.ask('dungeon'))
+      || await game.ask('dungeon');
+    check(!!down && !!down.run && down.run.bossDown && /쓰러뜨렸다/.test(down.cardName), `${name}: 주인이 쓰러지고 끝 방이 열린다 (${down ? down.cardName : '그대로'})`);
     await game.send('goto chest; heal');
     await game.wait(900);
     const atChest = await game.ask('dungeon');
@@ -6299,7 +6301,9 @@ async function biomes(browser) {
         const went = (await game.send(`biomes at ${tallWord}`)).join(' ');
         await game.wait(700);
         const behind = await game.ask('biomes');
-        const tall = (behind.cells || []).find(c => c.type === tallType) || {};
+        // The one the player stands behind: of that kind within nine tiles, the most faded (another standing in view is
+        // whole and came first in the list on the PC, 2026-11-24).
+        const tall = (behind.cells || []).filter(c => c.type === tallType).sort((a, b) => a.alpha - b.alpha)[0] || {};
         check(/ok biomes at/.test(went) && tall.alpha < 0.9, `${name}: ${tallLabel} 뒤에 서면 위쪽이 흐려진다 (알파 ${tall.alpha}; ${went})`);
         await game.shot(`biomes-${key}-behind`, `${tallLabel} 뒤: 위쪽이 흐려진다`);
       } else {
@@ -6589,6 +6593,22 @@ async function b2mobs(browser) {
       seen = await game.ask('b2');
       if (kinds.every(([kind]) => (seen.monsters || []).some(m => m.kind === kind))) break;
     }
+    // The row reaches some twenty tiles east: its far end can be past what the host sends a client (ViewRange 22), so
+    // a kind not drawn yet is looked at again from the row's middle (a phone held upright stood too far from the
+    // temple guardian, 2026-11-24).
+    const unseen = kinds.filter(([kind]) => !((seen.monsters || []).find(x => x.kind === kind) || {}).drawn);
+    if (unseen.length > 0) {
+      await game.send('goto 11 0');
+      await game.wait(1200);
+      const nearer = await game.ask('b2');
+      for (const [kind] of unseen) {
+        const again = (nearer.monsters || []).find(x => x.kind === kind);
+        const i = (seen.monsters || []).findIndex(x => x.kind === kind);
+        if (again && i >= 0) seen.monsters[i] = again;
+      }
+      await game.send('goto -11 0');
+      await game.wait(600);
+    }
     for (const [kind, size, label] of kinds) {
       const m = (seen.monsters || []).find(x => x.kind === kind);
       const [least, most] = SizeBands[size];
@@ -6601,11 +6621,16 @@ async function b2mobs(browser) {
     await game.send('clear; heal; goto biome ice');
     await game.wait(1000);
     await game.send('clear; heal; scene iceslide');
-    await game.wait(1500);
+    // Asked from the first moment until it is dazed (1.5 seconds of it): a phone's slow picture once took so long that
+    // the daze was over by the time it was asked (2026-11-24).
+    const states = [];
+    const slid = await game.until(b => {
+      const w = (b.monsters || []).find(m => m.kind === 'frost_wolf');
+      if (w && states[states.length - 1] !== w.state) states.push(w.state);
+      return w && w.state === 'Stagger';
+    }, 4000, () => game.ask('b2'));
     await game.shot('b2mobs-iceslide', '얼음 위에서 더 미끄러져 벽에 부딪힌 서리 늑대(별)');
-    const slid = await game.ask('b2');
-    const wolf = (slid.monsters || []).find(m => m.kind === 'frost_wolf');
-    check(!!wolf && wolf.state === 'Stagger', `${name}: 늑대의 돌진이 얼음 위에서 미끄러져 벽에 부딪히고 비틀거린다 (${wolf ? wolf.state : '없음'})`);
+    check(!!slid, `${name}: 늑대의 돌진이 얼음 위에서 미끄러져 벽에 부딪히고 비틀거린다 (${states.join(' → ') || '없음'})`);
 
     // Icicles: their shadows a second, then they fall.
     await game.send('clear; heal; scene icicles');
@@ -6619,24 +6644,38 @@ async function b2mobs(browser) {
     await game.shot('b2mobs-icicles-fall', '떨어져 깨진 고드름');
 
     // The sand cave's buried under falling sand.
-    await game.send('clear; heal; goto biome sand');
-    await game.wait(1000);
-    await game.send('clear; heal; scene sandfall');
-    await game.wait(1500);
-    const sand = await game.ask('b2');
+    // In a sand cave room: "goto biome sand" stands at the sand cave's nearest edge to the spawn, and the scene's monsters
+    // five and eight tiles east were on another biome's floor there (2026-11-24). The monsters held again after the
+    // scene lets them loose, so both lie under the ground (the worm would come up to throw at the player).
+    let sandRoom = '';
+    for (let n = 0; n < 4; n++) {
+      sandRoom = (await game.send(`clear; heal; goto room pack sand ${n}`)).join(' ');
+      await game.wait(1000);
+      if ((await game.ask('b2')).biome === 'Sand') break;
+    }
+    await game.send('clear; heal; scene sandfall; monsters hold');
+    const sand = await game.until(b => (b.monsters || []).some(m => m.underSand) && b.sandFallsShown > 0, 4000, () => game.ask('b2')) || await game.ask('b2');
     const buried = (sand.monsters || []).filter(m => m.underSand);
-    check(buried.length >= 1 && sand.sandFallsShown > 0, `${name}: 묻힌 것 위로 모래가 흘러내린다 (${buried.map(m => m.kind).join(', ') || '없음'}, 화면 ${sand.sandFallsShown})`);
+    check(buried.length >= 1 && sand.sandFallsShown > 0,
+      `${name}: 묻힌 것 위로 모래가 흘러내린다 (${buried.map(m => m.kind).join(', ') || '없음'}, 화면 ${sand.sandFallsShown}; 선 곳 ${sand.biome}, ${(sand.monsters || []).map(m => `${m.kind} ${m.buried ? '묻힘' : m.state}`).join(', ')}; ${sandRoom})`);
     await game.shot('b2mobs-sandfall', '모래가 흐르는 자리: 묻힌 전갈과 큰 모래 지렁이');
 
     // The mid-bosses dormant.
-    await game.send('clear; heal; goto room pack any 0');
-    await game.wait(1000);
-    await game.send('clear; heal; scene dormant');
-    await game.wait(1200);
-    const still = await game.ask('b2');
+    // Up to six of the nearest pack rooms are tried for one with room for both big bodies seven tiles to either side
+    // (a room with rock six tiles east had no place for the guardian, 2026-11-24).
+    let still = {}, dormantRoom = '';
+    for (let n = 0; n < 6; n++) {
+      dormantRoom = (await game.send(`monsters hold; clear; heal; goto room pack any ${n}`)).join(' ');
+      await game.wait(1000);
+      await game.send('clear; heal; scene dormant');
+      await game.wait(1200);
+      still = await game.ask('b2');
+      const kindsHere = (still.monsters || []).map(m => m.kind);
+      if (kindsHere.includes('temple_guardian') && kindsHere.includes('frost_mammoth')) break;
+    }
     const statues = (still.monsters || []).filter(m => m.dormant);
     check(statues.some(m => m.kind === 'temple_guardian') && statues.some(m => m.kind === 'frost_mammoth'),
-      `${name}: 신전 수호 석상과 서리 매머드가 잠들어 서 있다 (${statues.map(m => m.kind).join(', ') || '없음'})`);
+      `${name}: 신전 수호 석상과 서리 매머드가 잠들어 서 있다 (${statues.map(m => m.kind).join(', ') || '없음'}; ${dormantRoom})`);
     await game.shot('b2mobs-dormant', '잠든 중간 보스: 돌이 된 수호 석상, 얼음에 갇힌 매머드');
 
     // The two dungeons: a pack room with a big body, the mid-boss in person.
