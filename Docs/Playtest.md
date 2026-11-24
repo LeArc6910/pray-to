@@ -172,6 +172,7 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 | `mob <id> use <공격>`, `mob <id> kill [구역]`, `mob <id> hurt <비율>`, `mob <id> melt`, `mob <id> low <비율>`, `monsters hold\|go` | 가까운 그 종(없으면 바라보는 쪽 3칸 앞에 하나 놓는다)이 `monster_attacks.csv`의 그 공격을 지금 예고한다. 그 구역의 몬스터처럼 쓰러뜨린다(갈라짐은 구역 2부터). 다치게 한다. 화염으로 쓰러뜨린다(얼음 슬라임은 파편 없이 녹는다). 생명력을 그 비율로 둔다(불 박쥐는 0.3 아래면 자폭한다). 몬스터가 스스로는 알아차리지도 공격하지도 않게 한다. 상태 보고의 `mobBlows`(보인 터짐 수), `mobBuried`·`mobMounds`(땅속의 몬스터와 그린 흙무더기), `mobLinks`(대열 이음줄), `explosions`(자폭), `guardedNumbers`(회색 숫자), `poisoned` |
 | `hurt <양>`, `boss <id> hurt <비율>`, `xp <양>`, `heal`, `clear`, `equip <베이스...>`, `face <x> <y>\|off` | 싸움과 같은 길로 다치고, 레벨을 올리고, 바라본다 |
 | `mob <id> spawn [dx dy]`, `scene sizes`, `sizes` | (2026-11-24, `Docs/BiomeRework.md` B0b) `mob <id> spawn`: 그 종을 몸이 들어가는 자리(기본은 바라보는 쪽 3칸 앞, 6칸 안에서 가장 가까운 곳)에 생명력 5000으로 세운다. 바로 그 자리에 들어가면 그 자리에. 6칸 안에 자리가 없으면(좁은 길의 L·XL) `ok … none`. `scene sizes`: 빛 박쥐(S)·슬라임(M)·큰 슬라임(L)·슬라임 왕(XL)을 동쪽에 들어가는 자리마다, 몬스터는 멈춘 채. `sizes`: JSON으로 20칸 안의 몬스터마다 종·크기 등급(`size`)·반지름·자리·가운데까지 거리(`distance`)와 틈(`gap`)·그 칸의 여유(`room`)와 필요한 여유(`need`)·들어가는지(`fits`)·바위에 겹치는지(`inRock`)·생명력·상태·방 줄(`leash`, 없으면 -1), 화면이 그린 그림의 픽셀(`pixels`×`tall`)·체력 막대 너비(`bar`)·발(`feet`)·배율(`scale`), 그리고 플레이어 칸의 여유(`here`) |
+| `scene b1monsters`, `scene spores`, `scene torch`, `goto timber [n]`, `director timber`, `b1` | (2026-11-24, `Docs/BiomeRework.md` B1b) 첫 두 생물군계의 새 종 아홉을 동쪽에 한 줄로(몬스터는 멈춘 채), 다친 버섯 병정 곁에서 포자 주머니 터뜨리기, 횃불과 쥐 다섯, 흙 동굴의 너비 3칸 통로로 가서 갱목 매복을 지금. `b1`은 아래 `b1mobs`의 JSON |
 
 단추는 모두 `Ui.Button`·`Ui.LayoutButton`·`Ui.Toolbar`를 거친다(`Ui.cs`). 시험이 `probe on`을 켜 두면 그린 단추를 기억하고, 시험 도구(`lib.js`의 `press`)는 그 자리를 진짜 클릭이나 탭으로 누른다. 목록 밖으로 스크롤된 단추는 마우스 휠로 찾아간다. 새 단추를 만들 때도 이 셋을 쓴다.
 
@@ -187,6 +188,19 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 4. 무리 방에서 큰 슬라임을 동쪽 2.05칸에(`mob big_slime spawn 2.05 0`): 가운데는 M 몸이면 칼이 닿지 않는 거리, 가장자리는 닿는 거리. `attack on 1 0`으로 베면 생명력이 주는지(사진 `sizes-edge`)
 
 사람에게 남는 것: 큰 몸이 휴대폰에서 읽히는지(크기와 체력 막대), 큰 슬라임이 갈라질 때와 큰 몸을 칠 때의 손맛.
+
+## 첫 두 생물군계의 몬스터 (`b1mobs`, 2026-11-24)
+
+`Docs/BiomeRework.md` B1b의 새 몬스터와 규칙을 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only b1mobs`. 시작 마을은 몬스터를 둘레 밖으로 밀어내므로(`World.KeepOutOfPlaces`) 모두 바깥의 무리 방에서 하고, 감독은 레벨 5 아래를 건드리지 않으므로 먼저 `xp 3000`. PC와 휴대폰 세로에서:
+
+1. 가까운 무리 방(`goto room pack any n`, 아홉이 다 설 때까지 여섯 곳)에서 `scene b1monsters`. 동굴 쥐(XS)·포자 주머니(S)·철갑 딱정벌레(M)·빛 가시 버섯(S)·버섯 지휘관(M)·큰 딱정벌레(L)·갓 거인(L)·어미 슬라임(XL)·균사 어미(XL)가 제 크기의 그림인지(`b1`의 `pixels`가 등급의 폭 안, `sizes`와 같은 폭). 사진 `b1mobs-lineup`
+2. `scene spores`: 생명력 1/5의 버섯 병정 곁에서 포자 주머니가 터진다. 구름이 남는지(`clouds`), 1.5초 뒤 버섯 병정이 구름 안에서 찼는지(`inCloud`, `health`), 초록 숫자가 떴는지(`greenNumbers`), 구름 안의 플레이어 화면에 초록 안개가 있는지(`haze`). 사진 `b1mobs-cloud`, `b1mobs-heal`, `b1mobs-haze`
+3. `scene torch`: 서쪽 1칸에 횃불, 동쪽 8.5칸(쥐가 알아보는 거리 안)에 쥐 다섯을 풀어 4.5초. 쥐가 빛 안에 없고(`lit`) 가장 가까운 쥐가 4칸 넘게 떨어져 있는지. 사진 `b1mobs-torch`
+4. `goto timber n`(흙 동굴의 너비 3칸 통로, 빛 밖) → `director timber`. 먼지 사진 `b1mobs-timber-dust`, 1.1초 뒤 쥐 3~5마리가 나왔는지. 사진 `b1mobs-timber`
+
+명령: `scene b1monsters|spores|torch`, `goto timber [n]`, `director timber`, `b1`(JSON: 24칸 안의 몬스터마다 종·크기·생명력·상태·구름 안인지(`inCloud`)·빛 안인지(`lit`)·빛을 무서워하는지·그린 픽셀, 구름들(자리·반지름·남은 초), 플레이어가 빛 안인지와 가장 가까운 빛까지 거리, 흙 동굴 통로 위인지(`timberWay`), 갱목 매복 수(`timbers`), 화면의 초록 안개(`haze`)와 지금까지 뜬 초록 숫자(`greenNumbers`)).
+
+사람에게 남는 것: 쥐 떼·포자 주머니 터짐·큰 딱정벌레 돌진의 손맛, 초록 안개가 거슬리지 않는지, 포자 구름이 억울하지 않은지(몬스터를 끌어내는 것이 읽히는지), 휴대폰 세로에서 XS 쥐가 보이는지.
 
 ## 사진으로 알 수 없는 것
 

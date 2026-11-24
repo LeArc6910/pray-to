@@ -98,6 +98,17 @@ namespace Game.Client
     //   sizes                     JSON (B0b): the monsters about the player: kind, size class, radius, where, the room at their
     //                             tile and whether they fit it, whether they overlap rock, health, state, their leash; and how
     //                             the screen draws each (picture pixels, health bar, feet, scale)
+    //   scene b1monsters          (B1b) the first two biomes' new kinds in a row east of the player where each fits (rat,
+    //                             puffball, armoured beetle, glowing shooter, myconid captain, big beetle, cap giant, slime
+    //                             mother, mycelium mother), 5000 health each, the monsters held
+    //   scene spores              (B1b) a myconid at a fifth of its health east of the player, a puffball beside it made to
+    //                             burst (its cloud covers both and the player)
+    //   scene torch               (B1b) a torch a tile west of the player and five rats eight and a half tiles east, let loose
+    //   goto timber [n]           (B1b) the middle of the nth nearest dirt cave way three wide, out of the light, where rats come
+    //                             out of the timbers;   director timber   the timber ambush now, where the player stands
+    //   b1                        JSON (B1b): the monsters about the player (kind, size, health, state, in a cloud, lit where
+    //                             they stand), the spore clouds, the light round the player, the timber ambushes, the screen's
+    //                             haze and the green numbers shown
     static partial class Playtest
     {
         const string Name = "playtest";
@@ -380,6 +391,8 @@ namespace Game.Client
                     return "elites " + ElitesJson(root);
                 case "sizes":
                     return "sizes " + SizesJson(root);
+                case "b1":
+                    return "b1 " + BiomeMonstersJson(root);
                 // The things to find in the rooms (2026-11-22, Docs/WorldRework.md 묶음 3a·3b).
                 case "pois":
                     return "pois " + PoisJson(root);
@@ -452,6 +465,7 @@ namespace Game.Client
                 case "director":
                     if (words.Length == 1) return "director " + DirectorJson(root);
                     if (words[1] == "ambush") return world.Ambush(player) ? "ok director ambush" : "error director ambush: not in a narrow way with room before and behind";
+                    if (words[1] == "timber") return world.TimberAmbush(player) ? "ok director timber" : "error director timber: not in a dirt cave way with timbers out of the light";
                     if (words[1] == "raid") return world.Raid(player) ? "ok director raid" : "error director raid: no room for a raid out of sight here";
                     var paceState = (PaceState)Enum.Parse(typeof(PaceState), words[1], ignoreCase: true);
                     world.SetPace(player, paceState, words.Length > 2 ? Float(words[2]) : paceState == PaceState.Peak ? World.PeakTension : 0);
@@ -642,6 +656,30 @@ namespace Game.Client
                     break;
                 // In a narrow way where an ambush comes (묶음 4b): "narrow [n]", the middle of the nth nearest way two tiles
                 // wide or less and long enough, out of the places the director leaves alone, facing along it.
+                // The middle of a dirt cave way three wide where the timber ambush can come (B1b).
+                case "timber":
+                {
+                    int nthTimber = words.Length > 2 ? Int(words[2]) : 0;
+                    var graph = root.HostGenerated?.Rooms ?? throw new InvalidOperationException("not a world of rooms");
+                    var was = player.Position;
+                    var found = graph.Edges.Where(e => e.Kind == RoomEdgeKind.Way && e.Width > World.AmbushWidth && e.Path != null && e.Path.Count >= 20)
+                        .Select(e => (Edge: e, Middle: e.Path[e.Path.Count / 2]))
+                        .Where(w => Walkable(map, w.Middle.X, w.Middle.Y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(w.Middle.X, w.Middle.Y), World.PlayerRadius))
+                        .OrderBy(w => Vec2.Distance(TileMap.Center(w.Middle.X, w.Middle.Y), was))
+                        .Where(w =>
+                        {
+                            player.Position = TileMap.Center(w.Middle.X, w.Middle.Y);
+                            bool fits = !world.LeftAlone(player) && world.TimberWayAt(player.Position) != null && !world.FearsLight(player.Position);
+                            player.Position = was;
+                            return fits;
+                        }).Skip(nthTimber).FirstOrDefault();
+                    if (found.Edge == null) throw new InvalidOperationException($"no dirt cave way {nthTimber}");
+                    to = TileMap.Center(found.Middle.X, found.Middle.Y);
+                    var onward = found.Edge.Path[found.Edge.Path.Count / 2 + 1];
+                    root.AimHeld = true;
+                    root.HeldAim = new Vec2(onward.X - found.Middle.X, onward.Y - found.Middle.Y);
+                    break;
+                }
                 case "narrow":
                     int nthWay = words.Length > 2 ? Int(words[2]) : 0;
                     var ways = root.HostGenerated?.Rooms ?? throw new InvalidOperationException("not a world of rooms");
@@ -1192,6 +1230,40 @@ namespace Game.Client
         // The monsters about the player with their size classes (B0b, Docs/Playtest.md sizes): where each stands, the room
         // there (World.Clearance) and whether it fits, whether its body overlaps rock, its health and state, its leash, and
         // how the screen draws it.
+        // The first two biomes' monsters and rules about the player (B1b): each monster near, whether a cloud fills it and
+        // whether it stands in light; the clouds; the light round the player; the timber ambushes; the screen's haze.
+        static string BiomeMonstersJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var list = new Json('[');
+            foreach (var monster in world.Enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) < 24).OrderBy(e => Vec2.Distance(e.Position, player.Position)))
+            {
+                var kind = monster.Definition;
+                var drawn = root.MonsterDrawn(monster.Id);
+                list.Item(new RawJson(new Json('{')
+                    .Field("id", monster.Id).Field("kind", kind.Id).Field("size", MonsterSizes.Name(kind.Size))
+                    .Field("x", monster.Position.X).Field("y", monster.Position.Y)
+                    .Field("distance", Vec2.Distance(monster.Position, player.Position))
+                    .Field("health", monster.Health).Field("maxHealth", monster.MaxHealth).Field("state", monster.State.ToString())
+                    .Field("inCloud", world.InCloud(monster)).Field("lit", world.FearsLight(monster.Position))
+                    .Field("fearsLight", kind.Has(MonsterTraitKind.Fearlight))
+                    .Field("drawn", drawn != null).Field("pixels", drawn?.Width ?? 0)
+                    .Close('}')));
+            }
+            var clouds = new Json('[');
+            foreach (var cloud in world.Hazards.Where(h => h.Shape == HazardShape.Balm && Vec2.Distance(h.Position, player.Position) < 24))
+                clouds.Item(new RawJson(new Json('{').Field("x", cloud.Position.X).Field("y", cloud.Position.Y).Field("radius", cloud.Size)
+                    .Field("seconds", (cloud.ResolveTick - world.Tick) / (float)World.TicksPerSecond).Close('}')));
+            var light = world.NearestLight(player.Position, Lights.MostReach);
+            var pace = world.PaceOf(player);
+            return new Json('{').Field("monsters", list.Raw(']')).Field("clouds", clouds.Raw(']'))
+                .Field("playerLit", world.FearsLight(player.Position)).Field("lightDistance", light == null ? -1 : Vec2.Distance(light.Value, player.Position))
+                .Field("timberWay", world.TimberWayAt(player.Position) != null).Field("timbers", pace.Timbers).Field("ambushes", pace.Ambushes)
+                .Field("haze", root.InSporeCloud).Field("greenNumbers", root.CloudNumbersShown)
+                .Close('}');
+        }
+
         static string SizesJson(GameRoot root)
         {
             var world = root.HostWorld;
@@ -1352,6 +1424,35 @@ namespace Game.Client
                         var made = world.SpawnFitting(root.MonsterSheet.Find(id), player.Position + new Vec2(dx, 0));
                         if (made != null) made.MaxHealth = made.Health = 5000;
                     }
+                    break;
+                // The first two biomes' new kinds (B1b), each where a body its size fits, east of the player in a row.
+                case "b1monsters":
+                    world.MonstersHold = true;
+                    float along = 1.5f;
+                    foreach (var id in new[] { "cave_rat", "puffball", "armored_beetle", "glow_shooter", "myconid_captain", "big_beetle", "cap_giant", "slime_mother", "mycelium_mother" })
+                    {
+                        var kind = root.MonsterSheet.Find(id);
+                        along += kind.Radius;
+                        var made = world.SpawnFitting(kind, player.Position + new Vec2(along, 0));
+                        if (made != null) made.MaxHealth = made.Health = 5000;
+                        along += kind.Radius + 0.8f;
+                    }
+                    break;
+                // A spore cloud filling a hurt monster (B1b): a myconid at a fifth of its health, a puffball beside it
+                // made to go off so its cloud covers it and the player.
+                case "spores":
+                    world.MonstersHold = true;
+                    var hurtOne = Spawn("myconid", player.Position + new Vec2(1.6f, 1f), 400);
+                    hurtOne.Health = hurtOne.MaxHealth * 0.2f;
+                    var puff = Spawn("puffball", player.Position + new Vec2(1.5f, 0), 50);
+                    world.ForceAttack(puff, "burst");
+                    break;
+                // Rats and a torch (B1b): they come to the edge of its light and no nearer.
+                case "torch":
+                    var torch = Near(-1, 0);
+                    Lay((torch.X, torch.Y, TileType.Torch));
+                    for (int i = 0; i < 5; i++) Spawn("cave_rat", player.Position + new Vec2(8.5f, (i - 2) * 0.8f), 5000);
+                    world.MonstersHold = false;
                     break;
                 case "elite":
                     var spot = player.Position + new Vec2(6, 0);

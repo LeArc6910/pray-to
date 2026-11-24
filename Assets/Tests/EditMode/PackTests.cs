@@ -253,10 +253,18 @@ namespace Game.Core.Tests
                 player.Position = OpenNear(world, room.Center, 0, 12);
                 return player;
             }).ToList();
+            var wanderersSeen = new HashSet<int>();
             for (int second = 0; second < 20; second++)
             {
                 Run(world, 1);
                 int all = world.Enemies.Count(e => e.Rift == 0);
+                // A few wanderers too, never in a pack's room (2026-11-24: with the host's cap full of packs one that
+                // falls is not made again, so they are counted while they go about).
+                foreach (var one in world.Enemies.Where(e => e.Wanders))
+                {
+                    wanderersSeen.Add(one.Id);
+                    Assert.AreEqual(0, one.PackId);
+                }
                 Assert.That(all, Is.LessThanOrEqualTo(World.HostCap));
                 foreach (var player in players)
                 {
@@ -265,10 +273,7 @@ namespace Game.Core.Tests
                 }
             }
             Assert.IsTrue(players.All(p => world.Packs.Any(k => k.Active && Vec2.Distance(k.Home, p.Position) < World.PackWakeReach)), "each has packs about");
-            // A few wanderers too, never in a pack's room.
-            var wanderers = world.Enemies.Where(e => e.Wanders).ToList();
-            Assert.That(wanderers.Count, Is.GreaterThan(0));
-            Assert.IsTrue(wanderers.All(e => e.PackId == 0));
+            Assert.That(wanderersSeen.Count, Is.GreaterThan(0));
         }
 
         [Test]

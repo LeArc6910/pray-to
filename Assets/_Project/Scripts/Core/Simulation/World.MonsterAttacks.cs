@@ -118,6 +118,9 @@ namespace Game.Core
         void TickMonster(Enemy enemy)
         {
             if (enemy.EmpowerTicks > 0) enemy.EmpowerTicks--;
+            // What the spore clouds gave it, and the slimes a slime mother sheds (World.BiomeMonsters.cs).
+            TellCloudHeal(enemy);
+            Shed(enemy);
             bool buried = (enemy.State == EnemyState.Idle || enemy.State == EnemyState.Chase)
                 && (enemy.Definition.Has(MonsterTraitKind.Burrowed) || WaitsInAmbush(enemy));
             if (buried != enemy.Buried)
@@ -226,7 +229,8 @@ namespace Game.Core
                     definition.Element == SkillTag.Cold));
             }
             var cloud = definition.Trait(MonsterTraitKind.Deathcloud);
-            if (cloud != null && !enemy.Small)
+            // A puffball that went off left its blast's cloud already; felled first, it bursts into its own.
+            if (cloud != null && !enemy.Small && !enemy.BlewUp)
             {
                 _hazards.Add(new Hazard(_nextId++, 0, 0, HazardShape.Balm, enemy.Position, enemy.Facing, cloud.Number(0, DeathcloudRadius), cloud.Number(2, DeathcloudFill), 0,
                     Tick, Tick + Ticks(cloud.Number(1, DeathcloudSeconds))));
@@ -357,6 +361,9 @@ namespace Game.Core
             // Its body goes there: not through what keeps monsters out (a door, a fence).
             if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
                 && !OpenToMonsters(enemy.Position, target.Position, enemy.Definition.Radius)) return false;
+            // One that fears the light does not land in it (World.BiomeMonsters.cs).
+            if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
+                && Shuns(enemy, target.Position)) return false;
             // A big body lands only where it fits, inside its room's leash (World.Sizes.cs).
             if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
                 && enemy.Definition.Big
@@ -855,6 +862,7 @@ namespace Game.Core
                 case MonsterAttackShape.Explode:
                     // It is gone with its blast (which lands this same tick) and leaves nothing.
                     enemy.Health = 0;
+                    enemy.BlewUp = true;
                     _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, attack.Index, MonsterFxExplode, position: enemy.Position));
                     _events.Add(new SimEvent(SimEventType.Died, enemy.Id));
                     return;
@@ -957,7 +965,8 @@ namespace Game.Core
             {
                 enemy.RepeatsLeft = 0;
                 enemy.State = EnemyState.Stagger;
-                enemy.StateTicks = Ticks(StaggerSeconds);
+                // stagger:seconds for its own (a big beetle's longer daze), else StaggerSeconds.
+                enemy.StateTicks = Ticks(definition.Trait(MonsterTraitKind.Stagger).Number(0, StaggerSeconds));
                 _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxStagger, position: enemy.Position));
                 return;
             }
@@ -1055,6 +1064,7 @@ namespace Game.Core
             MonsterPool.Spore => HazardShape.Spore,
             MonsterPool.Web => HazardShape.Web,
             MonsterPool.Venom => HazardShape.Venom,
+            MonsterPool.Cloud => HazardShape.Balm,
             _ => HazardShape.Sand,
         };
 
@@ -1067,7 +1077,9 @@ namespace Game.Core
             if (pools.Count >= most) _hazards.Remove(pools[0]);
             int damage = shape == HazardShape.Venom || shape == HazardShape.Spore ? Math.Max(1, (int)MathF.Round(blow * VenomShare))
                 : shape == HazardShape.Fire ? Math.Max(1, (int)MathF.Round(blow * FirePoolShare)) : 0;
-            _hazards.Add(new Hazard(_nextId++, source, cause, shape, position, new Vec2(0, -1), radius, 0, damage, Tick, Tick + Ticks(seconds)) { Mark = (byte)(1 + (int)kind) });
+            // A spore cloud harms no one; its width is how much of their health it fills the monsters in it a second.
+            float width = shape == HazardShape.Balm ? DeathcloudFill : 0;
+            _hazards.Add(new Hazard(_nextId++, source, cause, shape, position, new Vec2(0, -1), radius, width, damage, Tick, Tick + Ticks(seconds)) { Mark = (byte)(1 + (int)kind) });
         }
 
         // The pools monsters leave, while they lie there (webs and venom are the bosses' own, World.Linger).
@@ -1075,11 +1087,7 @@ namespace Game.Core
         {
             if (pool.Shape == HazardShape.Balm)
             {
-                foreach (var enemy in _enemies)
-                {
-                    if (enemy.IsDead || Vec2.Distance(enemy.Position, pool.Position) > pool.Size) continue;
-                    enemy.Health = Math.Min(enemy.MaxHealth, enemy.Health + enemy.MaxHealth * pool.Width / 100f * TickSeconds);
-                }
+                FillFromCloud(pool);
                 return;
             }
             bool bites = pool.Shape == HazardShape.Spore && Tick > pool.StartTick && (Tick - pool.StartTick) % Ticks(VenomSeconds) == 0;

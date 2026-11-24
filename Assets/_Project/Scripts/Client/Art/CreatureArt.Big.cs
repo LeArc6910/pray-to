@@ -41,7 +41,8 @@ namespace Game.Client
                 "big_slime" => new[] { Blob(26, 19, 0, BlobLook.Bubbles), Blob(26, 19, 1, BlobLook.Bubbles) },
                 // The slime king (XL): 44 by 31, two small slimes riding its crown of jelly, a gold crown and a wide mouth.
                 "slime_king" => new[] { Blob(44, 31, 0, BlobLook.King), Blob(44, 31, 1, BlobLook.King) },
-                _ => null,
+                // The first two biomes' big kinds (CreatureArt.Biomes.cs, B1b).
+                _ => BiomeBigFrames(id),
             };
             BigMade[id] = frames;
             return frames;
@@ -53,6 +54,8 @@ namespace Game.Client
             Plain = 0,
             Bubbles = 1,
             King = 2,
+            // Young slimes swimming inside it (the slime mother, B1b).
+            Brood = 4,
         }
 
         // A slime's body at any size, as rows of the ramp's letters (L light, M main, m shade, d dark, e eyes, w shine):
@@ -144,6 +147,8 @@ namespace Game.Client
                         }
                 }
             }
+
+            if ((look & BlobLook.Brood) != 0) Brood(grid, top, w, h, frame);
 
             // The eyes: tall dark ovals a little below the middle, wider apart on a wider body.
             int eyeW = w >= 40 ? 3 : 2, eyeH = w >= 40 ? 5 : 3;

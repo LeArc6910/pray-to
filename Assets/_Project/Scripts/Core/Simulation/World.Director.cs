@@ -43,6 +43,8 @@ namespace Game.Core
         public int Rests { get; internal set; }
         public int Sends { get; internal set; }
         public int Ambushes { get; internal set; }
+        // Of the ambushes, those of rats out of the dirt cave's timbers (World.TimberAmbush, B1b).
+        public int Timbers { get; internal set; }
         public int Raids { get; internal set; }
         // Where the player was each of the last few seconds: which way they came.
         internal readonly Vec2[] Track = new Vec2[4];
@@ -308,9 +310,12 @@ namespace Game.Core
             {
                 foreach (var player in party)
                 {
-                    if (!Ambush(player)) continue;
+                    // In the dirt cave's wide ways, rats out of the timbers instead (TimberAmbush, B1b).
+                    bool timber = false;
+                    if (!Ambush(player) && !(timber = TimberAmbush(player))) continue;
                     Surged(party);
                     PaceOf(player).Ambushes++;
+                    if (timber) PaceOf(player).Timbers++;
                     return;
                 }
                 // A wide place is most places: a raid comes within a few seconds of the clock, giving a narrow way the
@@ -501,6 +506,117 @@ namespace Game.Core
             if (pace.Tracked < 2) return Vec2.Zero;
             var way = pace.Track[0] - pace.Track[pace.Tracked - 1];
             return way.LengthSquared < 1 ? Vec2.Zero : way.Normalized;
+        }
+
+        // ---- The timber ambush (갱목 매복, 2026-11-24, Docs/BiomeRework.md 4-5 and B1b) ----
+
+        // The dirt cave's ways are three tiles wide, so no narrow way and no ambush came there: in its ways rats burst out
+        // of the walls' timbers instead, TimberMin~TimberMax of TimberKind from a spot TimberAhead steps on (or behind),
+        // after the same dust and on the same clock as the narrow ways' ambush.
+        public const string TimberKind = "cave_rat";
+        public const int TimberMin = 3;
+        public const int TimberMax = 5;
+        public const int TimberAhead = 6;
+
+        // The dirt cave's ways too wide for the ambush (RoomEdge.Width > AmbushWidth, AmbushLength long and more): tile
+        // index → the way and its step.
+        Dictionary<int, (int Edge, int Step)> _timberWays;
+
+        void MapTimberWays()
+        {
+            _timberWays = new Dictionary<int, (int, int)>();
+            if (_rooms == null) return;
+            for (int index = 0; index < _rooms.Edges.Count; index++)
+            {
+                var edge = _rooms.Edges[index];
+                if (edge.Kind != RoomEdgeKind.Way || edge.Width <= AmbushWidth || edge.Path == null || edge.Path.Count < AmbushLength) continue;
+                var a = _rooms.Nodes[edge.A];
+                var b = _rooms.Nodes[edge.B];
+                if (a.Biome != Biome.Cave && b.Biome != Biome.Cave) continue;
+                for (int step = 0; step < edge.Path.Count; step++)
+                {
+                    var (x, y) = edge.Path[step];
+                    var at = TileMap.Center(x, y);
+                    if (Vec2.Distance(at, a.Center) <= a.Radius + 1 || Vec2.Distance(at, b.Center) <= b.Radius + 1) continue;
+                    if (Biomes.At(at) != Biome.Cave) continue;
+                    _timberWays[y * Map.Width + x] = (index, step);
+                }
+            }
+        }
+
+        // The dirt cave way a spot is on, and the step of it (on its tiles or one off).
+        internal (int Edge, int Step)? TimberWayAt(Vec2 position)
+        {
+            if (_timberWays == null) MapTimberWays();
+            int px = TileMap.Cell(position.X), py = TileMap.Cell(position.Y);
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                    if (Map.InBounds(px + dx, py + dy) && _timberWays.TryGetValue((py + dy) * Map.Width + px + dx, out var way)) return way;
+            return null;
+        }
+
+        // What rats come out of: rock of a way's side now; the dirt cave's fallen timbers and rubble when they are tiles
+        // (one place to add them).
+        internal bool TimberSource(int x, int y) => Map.InBounds(x, y) && (Map[x, y] == TileType.Wall || Map[x, y] == TileType.Rubble);
+
+        // Where rats burst out near a tile of a way: the floor tile within two of it nearest it with a TimberSource beside
+        // it, out of the light (they fear it) and not on the player; the source's side is where the dust falls. Null
+        // when there is none.
+        internal (Vec2 Spot, Vec2 Dust)? TimberSpot(int x, int y, Vec2 player)
+        {
+            (Vec2, Vec2)? best = null;
+            float bestDistance = float.MaxValue;
+            var middle = TileMap.Center(x, y);
+            for (int dy = -2; dy <= 2; dy++)
+            {
+                for (int dx = -2; dx <= 2; dx++)
+                {
+                    int fx = x + dx, fy = y + dy;
+                    if (!Map.InBounds(fx, fy) || Map.BlocksMonsters(fx, fy) || Map[fx, fy] == TileType.Water || Map[fx, fy] == TileType.Lava) continue;
+                    var floor = TileMap.Center(fx, fy);
+                    if (Vec2.Distance(floor, player) < 3 || FearsLight(floor) || InSafePlace(floor)) continue;
+                    float distance = Vec2.Distance(floor, middle);
+                    if (distance >= bestDistance) continue;
+                    foreach (var (sx, sy) in new[] { (0, 1), (1, 0), (0, -1), (-1, 0) })
+                    {
+                        if (!TimberSource(fx + sx, fy + sy)) continue;
+                        bestDistance = distance;
+                        best = (floor, TileMap.Center(fx + sx, fy + sy) - new Vec2(sx, sy) * 0.4f);
+                        break;
+                    }
+                }
+            }
+            return best;
+        }
+
+        // Rats out of the timbers of the dirt cave way the player is in: the dust now, TimberMin~TimberMax rats
+        // AmbushWarn later (ComeOut), from a spot TimberAhead steps on the way they go, or as far behind.
+        internal bool TimberAmbush(Player player)
+        {
+            if (!RoomPacks || !(TimberWayAt(player.Position) is (int index, int step))) return false;
+            var kind = _monsters.Monsters.FirstOrDefaultOf(TimberKind);
+            if (kind == null) return false;
+            var edge = _rooms.Edges[index];
+            int way = AlongWay(PaceOf(player), edge, step);
+            int count = TimberMin + PaceRandom.Next(TimberMax - TimberMin + 1);
+            var party = Parties().FirstOrDefault(p => p.Contains(player)) ?? new List<Player> { player };
+            if (!Room(party, count)) return false;
+            foreach (int at in new[] { step + TimberAhead * way, step - TimberAhead * way })
+            {
+                if (at < 0 || at >= edge.Path.Count) continue;
+                var (x, y) = edge.Path[at];
+                if (!(TimberSpot(x, y, player.Position) is (Vec2 spot, Vec2 dust))) continue;
+                _events.Add(new SimEvent(SimEventType.Ambush, player.Id, amount: AmbushDust, position: dust));
+                var members = new List<(Vec2, MonsterDefinition)>();
+                for (int i = 0; i < count; i++)
+                {
+                    var off = i == 0 ? Vec2.Zero : Vec2.FromAngle(2 * MathF.PI * i / (count - 1)) * 0.55f;
+                    members.Add((Collision.Resolve(Map, spot + off, kind.Radius, monster: true), kind));
+                }
+                _lurking.Add((Tick + Ticks(AmbushWarn), members, player.Id, ZoneLevelAt(player.Position)));
+                return true;
+            }
+            return false;
         }
 
         // Ambushes in the narrow way the player is in, if it has room before and behind: AmbushMin~AmbushMax of the

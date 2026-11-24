@@ -229,14 +229,15 @@ namespace Game.Core.Tests
                     for (int i = 0; i < pack.Roster.Count; i++)
                     {
                         if (!pack.Roster[i].Big) continue;
-                        seen++;
-                        Assert.AreEqual(big, pack.Roster[i]);
-                        Assert.AreNotEqual(RoomRole.Elite, room.Role, "no big leader or minion in a camp yet");
+                        if (pack.Roster[i] == big) seen++;
+                        Assert.AreEqual(MonsterSize.L, pack.Roster[i].Size, "the field holds L at most");
+                        // A camp may be led by a big body (B1b), never with a big minion or a band of big champions.
+                        if (room.Role == RoomRole.Elite) Assert.IsTrue(i == 0 && pack.Elite == EliteRank.Leader, $"room {room.Index}: a big body in a camp leads it");
                         Assert.GreaterOrEqual(room.Radius, MonsterSizes.LeastRoomRadius, $"room {room.Index}");
-                        Assert.IsTrue(world.Clearance.Fits(pack.Spots[i], big.Radius), $"room {room.Index}: it stands where it fits");
+                        Assert.IsTrue(world.Clearance.Fits(pack.Spots[i], pack.Roster[i].Radius), $"room {room.Index}: it stands where it fits");
                         Assert.LessOrEqual(Vec2.Distance(pack.Spots[i], room.Center), room.Radius + 0.01f, $"room {room.Index}: inside its room");
                         for (int j = 0; j < pack.Spots.Count; j++)
-                            if (j != i) Assert.GreaterOrEqual(Vec2.Distance(pack.Spots[j], pack.Spots[i]), big.Radius + pack.Roster[j].Radius, $"room {room.Index}: apart");
+                            if (j != i) Assert.GreaterOrEqual(Vec2.Distance(pack.Spots[j], pack.Spots[i]), pack.Roster[i].Radius + pack.Roster[j].Radius, $"room {room.Index}: apart");
                     }
                 }
                 world.RestoreClock(Calendar.NextMorning(world.Clock));

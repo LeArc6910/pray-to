@@ -760,6 +760,22 @@ namespace Game.Client
             return texture;
         }
 
+        // How many green numbers of a spore cloud's filling the screen has shown (for the playtests).
+        public int CloudNumbers { get; private set; }
+
+        // Whether my body stands in a spore cloud the host told of (HazardShape.Balm).
+        public bool InSporeCloud()
+        {
+            if (_self == null) return false;
+            foreach (var view in _client.Hazards())
+            {
+                var hazard = view.State;
+                if (hazard.Shape != HazardShape.Balm) continue;
+                if (Vector2.Distance(new Vector2(hazard.Position.X, hazard.Position.Y), _self.Position) <= hazard.Size + World.PlayerRadius) return true;
+            }
+            return false;
+        }
+
         // Names, damage numbers and banners. Call from OnGUI.
         public void DrawGui()
         {
@@ -774,6 +790,19 @@ namespace Game.Client
                 var before = GUI.color;
                 GUI.color = new Color(0.9f, 0.1f, 0.08f, _hurtGlowStrength * _hurtGlow / HurtGlowSeconds);
                 GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), _vignette);
+                GUI.color = before;
+            }
+            // In a spore cloud (B1b, the mushroom forest): a soft green haze round the edges, the screen a little
+            // dimmed. It does nothing else to a player.
+            if (Event.current.type == EventType.Repaint && InSporeCloud())
+            {
+                _vignette ??= MakeVignette();
+                var before = GUI.color;
+                float breath = 0.32f + 0.06f * Mathf.Sin(Time.time * 2.4f);
+                GUI.color = new Color(0.55f, 0.85f, 0.35f, breath);
+                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), _vignette);
+                GUI.color = new Color(0.5f, 0.7f, 0.35f, 0.07f);
+                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), Texture2D.whiteTexture);
                 GUI.color = before;
             }
             // Centred on their spot and allowed past their box, so a tall font is never cut off at the bottom.
@@ -2602,6 +2631,15 @@ namespace Game.Client
                 case SimEventType.Healed:
                     var drinker = Find(e.Source);
                     if (drinker == null) break;
+                    // A monster filled by a spore cloud (B1b, World.CloudHealed): small green numbers and a few rising
+                    // motes, no potion. The mushroom forest's question is to pull them out of it.
+                    if (drinker.Kind != BodyKind.Player)
+                    {
+                        CloudNumbers++;
+                        _floating.Add(new Floating { Position = drinker.Position + new Vector3(0, drinker.Diameter * 0.4f, 0), Text = "+" + e.Amount, Color = Palette.Heal });
+                        AddFlash(drinker.Position, drinker.Diameter * 0.8f, Palette.Heal, FlashKind.Sparkles);
+                        break;
+                    }
                     _floating.Add(new Floating { Position = drinker.Position, Text = "+" + e.Amount, Color = Palette.Heal });
                     // A potion (not a healing skill, which casts): the bottle to the mouth. Food that heals has
                     // its own motion from Ate just before.

@@ -31,6 +31,7 @@ namespace Game.Core
         // design's six (2026-11-22, --fight --rooms --camps: at six a lake crab's leader took a warrior in iron two to
         // three minutes, five times a pack).
         public const float LeaderHealth = 4;
+        public const float BigLeaderHealth = 2;
         public const float LeaderPower = 1.5f;
         public const float ChampionHealth = 2.5f;
         public const float ChampionPower = 1.25f;
@@ -148,7 +149,7 @@ namespace Game.Core
 
         // The kind that leads a pack: the first of its sturdy, heavy, shooting or helping kinds, in that order; a pack of
         // one kind (slimes) is led by one of them.
-        public static MonsterDefinition LeaderKind(PackDefinition pack)
+        public static MonsterDefinition LeaderKind(PackDefinition pack, bool big = false)
         {
             int Rank(MonsterRole role) => role switch
             {
@@ -159,10 +160,11 @@ namespace Game.Core
                 MonsterRole.None => 4,
                 _ => 5,
             };
-            // Not a big body (L, XL) yet: an elite camp's and a dungeon's leaders stand where an M body does
-            // (Docs/BiomeRework.md B0b; the big elites come with the biomes' mid-bosses).
-            var members = pack.Members.Select(m => m.Monster).Where(m => !m.Big).DefaultIfEmpty(pack.Members[0].Monster);
-            return members.OrderBy(m => Rank(m.Role)).First();
+            // A big body (L) leads only where asked (a camp whose room holds it, B1b: a big beetle, a cap giant); a dungeon's
+            // leaders stand where an M body does. Never an XL: the field has none (Docs/BiomeRework.md 사람이 정한 것).
+            var members = pack.Members.Select(m => m.Monster).Where(m => big ? m.Size != MonsterSize.XL : !m.Big).DefaultIfEmpty(pack.Members[0].Monster);
+            // Of the same rank, the big one first.
+            return members.OrderBy(m => Rank(m.Role)).ThenByDescending(m => m.Big).First();
         }
 
         static RiftAffix RollAffixes(RiftAffix[] from, int count, GameRandom random)
@@ -183,8 +185,10 @@ namespace Game.Core
         void MusterElite(Pack pack, GameRandom random)
         {
             var room = pack.Room;
-            var lead = LeaderKind(pack.Definition);
             pack.Elite = random.NextFloat() < ChampionShare ? EliteRank.Champion : EliteRank.Leader;
+            // A leader may be a big body where the room holds it (B1b); a band of champions never is (three big bodies).
+            var lead = LeaderKind(pack.Definition, big: pack.Elite == EliteRank.Leader);
+            if (!RoomHolds(room, lead)) lead = LeaderKind(pack.Definition);
             if (pack.Elite == EliteRank.Champion)
             {
                 pack.Affixes = RollAffixes(ChampionAffixes, 1, random);
@@ -217,11 +221,27 @@ namespace Game.Core
             bool Fits(Vec2 at) => InRoom(room, at) && Clear(at) && !NearEntrance(room, at);
             var camp = _rooms.Marks.Where(m => m.Room == room.Index && m.Kind == RoomMarkKind.Elite).Select(m => TileMap.Center(m.X, m.Y)).ToList();
             var middle = camp.Count > 0 ? camp[0] : TileMap.Center(room.AnchorX, room.AnchorY);
-            var head = Fits(middle) ? new List<Vec2> { middle } : Spread(middle, new List<Vec2>(), 1, random, Fits);
+            List<Vec2> head;
+            if (lead.Big)
+            {
+                // A big leader where its body fits nearest the camp's mark, its minions clear of it (World.Sizes.cs).
+                var bigSpot = BigSpot(lead, middle, room.Radius, Fits, new List<(Vec2, float)>());
+                head = bigSpot == null ? new List<Vec2>() : new List<Vec2> { bigSpot.Value };
+                if (head.Count == 0)
+                {
+                    // No room for it after all: an M leader of the pack.
+                    lead = LeaderKind(pack.Definition);
+                    for (int i = 0; i < pack.Roster.Count; i++)
+                        if (pack.Roster[i].Big) pack.Roster[i] = lead;
+                }
+            }
+            else head = null;
+            head ??= Fits(middle) ? new List<Vec2> { middle } : Spread(middle, new List<Vec2>(), 1, random, Fits);
             if (head.Count == 0) return;
             var marks = _rooms.Marks.Where(m => m.Room == room.Index && m.Kind == RoomMarkKind.Monster).Select(m => TileMap.Center(m.X, m.Y)).ToList();
             pack.Spots.Add(head[0]);
-            pack.Spots.AddRange(Spread(head[0], marks, pack.Roster.Count - 1, random, at => Fits(at) && Vec2.Distance(at, head[0]) >= PackSpacingMin));
+            float clear = lead.Big ? lead.Radius + MonsterSizes.SlimRadius + MonsterSizes.PackGap : PackSpacingMin;
+            pack.Spots.AddRange(Spread(head[0], marks, pack.Roster.Count - 1, random, at => Fits(at) && Vec2.Distance(at, head[0]) >= Math.Max(PackSpacingMin, clear)));
             Crowd(pack, middle, random);
         }
 
@@ -235,7 +255,8 @@ namespace Game.Core
         {
             enemy.Elite = rank;
             enemy.Affixes = affixes;
-            float health = rank == EliteRank.Leader ? LeaderHealth : ChampionHealth;
+            // A big leader (L, B1b) is already four times an M body: twice its own, not four times.
+            float health = rank == EliteRank.Leader ? enemy.Definition.Big ? BigLeaderHealth : LeaderHealth : ChampionHealth;
             float power = rank == EliteRank.Leader ? LeaderPower : ChampionPower;
             if ((affixes & RiftAffix.Tough) != 0) health *= ToughShare;
             if ((affixes & RiftAffix.Fierce) != 0) power *= FierceShare;

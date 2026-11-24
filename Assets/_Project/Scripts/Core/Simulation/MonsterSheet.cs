@@ -332,6 +332,14 @@ namespace Game.Core
                 if (kind == null) errors.Add($"{at}: split의 '{into}'라는 몬스터가 없습니다.");
                 else if (kind.Size >= monster.Size) errors.Add($"{at}: split으로 나오는 종은 더 작은 등급입니다('{into}').");
             }
+            // A shed (a slime mother's slimes, 2026-11-24): a kind there is, smaller than it.
+            var shed = monster.Trait(MonsterTraitKind.Shed);
+            if (shed != null)
+            {
+                var kind = monsters.FirstOrDefault(m => m.Id == shed.Arguments[0]);
+                if (kind == null) errors.Add($"{at}: shed의 '{shed.Arguments[0]}'라는 몬스터가 없습니다.");
+                else if (kind.Size >= monster.Size) errors.Add($"{at}: shed로 떨어지는 종은 더 작은 등급입니다('{shed.Arguments[0]}').");
+            }
         }
 
         static string Pack(string cell) =>

@@ -1138,6 +1138,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only sizes,packs,monsterfx,combat`
   - 클라우드 확인 (2026-11-24, `298a176`): [x] `sizes` 처음 좁은 길 둘 실패(레벨 1이라 감독이 쉬는 곳만 남아 `goto narrow`가 길을 못 찾음 → 시험에서 경험치를 줌) 뒤 40개 모두 통과, `packs,monsterfx` 모두 통과, `combat`은 시작 마을 안에 슬라임을 세운 6 실패 → 들판 방으로 옮긴 뒤 8개 모두 통과. 사진: 빛 박쥐·슬라임·큰 슬라임·슬라임 왕이 제 크기로 나란히, 좁은 길에서 슬라임 왕은 자리 없음(휴대폰), 가장자리를 베인 큰 슬라임, 몬스터 열세 종
   - (사람) 큰 슬라임(2×2)과 슬라임 왕(3×3, 시험 명령으로만)이 실제 휴대폰에서 읽히는지, 큰 몸을 치고 갈라질 때의 손맛, 정예의 금빛 테가 1.3배 그림보다 나은지
+- [ ] 168단계: 흙 동굴·버섯 숲의 새 몬스터와 규칙(`Docs/BiomeRework.md` B1b)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/Lights.cs`, `Core/Simulation/World.BiomeMonsters.cs`, `Client/Art/CreatureArt.Biomes.cs`, `Tests/EditMode/BiomeMonsterTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.101.0
+  - (클라우드 웹 점검) `sweep.js --only b1mobs,sizes,monsterfx,packs`
+  - (사람) 쥐 떼·포자 주머니 터짐·큰 딱정벌레 돌진의 손맛, 포자 구름 속 초록 안개가 거슬리지 않는지, 구름에서 몬스터를 끌어내는 것이 읽히는지 억울한지, 실제 휴대폰 세로에서 XS 쥐와 L·XL 몸이 읽히는지
 
 ## 결과 보고
 

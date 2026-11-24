@@ -81,6 +81,9 @@ namespace Game.Core
         Web,
         Venom,
         Sand,
+        // A spore cloud (2026-11-24, Docs/BiomeRework.md B1b): it hurts no one and fills the monsters standing in it, as
+        // a myconid's death cloud does (HazardShape.Balm). The mushroom forest's rule: pull them out of it.
+        Cloud,
     }
 
     // What a hit of the attack does besides its damage (monster_attacks.csv effect).
@@ -133,6 +136,12 @@ namespace Game.Core
         Stagger,
         // Turn:degrees — turns no faster than that a second, and only attacks what is in front of it: walk round it.
         Turn,
+        // Fearlight[:tiles] (2026-11-24, B1b) — never steps within that many tiles (World.FearReach) of what gives light
+        // (Lights.Givers): it waits at the edge of a lamp's light, and one the light finds goes out of it (World.FearsLight).
+        Fearlight,
+        // Shed:kind:percent (2026-11-24, B1b) — each time it loses that share of its health one of that smaller kind
+        // drops off it at its edge, whole (a slime mother's slimes).
+        Shed,
     }
 
     public sealed class MonsterTrait
@@ -544,6 +553,16 @@ namespace Game.Core
                         break;
                     case MonsterTraitKind.Deathburst:
                         if (pieces.Length > 3) SheetValues.ParseEnum<SkillTag>(pieces[3].Trim(), "deathburst");
+                        break;
+                    case MonsterTraitKind.Stagger:
+                        if (pieces.Length > 1 && (trait.Number(0, 0) <= 0 || trait.Number(0, 0) > 6)) throw new FormatException("stagger:초의 초는 0보다 크고 6 이하입니다.");
+                        break;
+                    case MonsterTraitKind.Fearlight:
+                        if (pieces.Length > 1 && (trait.Number(0, 0) < 1 || trait.Number(0, 0) > 12)) throw new FormatException("fearlight:칸의 칸은 1~12입니다.");
+                        break;
+                    case MonsterTraitKind.Shed:
+                        if (pieces.Length != 3 || pieces[1].Trim().Length == 0 || trait.Number(1, 0) < 5 || trait.Number(1, 0) > 50)
+                            throw new FormatException("shed는 shed:slime:10처럼 적습니다(떨어지는 종, 그만큼의 생명력 퍼센트마다 하나, 5~50).");
                         break;
                 }
                 traits.Add(trait);

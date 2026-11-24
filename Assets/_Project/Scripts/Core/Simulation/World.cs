@@ -194,7 +194,8 @@ namespace Game.Core
                 RecordHoldings(player);
                 PetBites(player);
             }
-            foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id);
+            // A spore cloud stays where its monster fell or went off (a puffball's blast, World.BiomeMonsters.cs).
+            foreach (var dead in _enemies.Where(e => e.IsDead)) _hazards.RemoveAll(h => h.Source == dead.Id && h.Shape != HazardShape.Balm);
             NotePackFalls();
             NotePaceFalls();
             _enemies.RemoveAll(e => e.IsDead);
@@ -400,6 +401,14 @@ namespace Game.Core
         }
 
         void UpdateEnemy(Enemy enemy)
+        {
+            var before = enemy.Position;
+            MoveEnemy(enemy);
+            // One that fears the light takes back a step into it, or goes out of it (World.BiomeMonsters.cs).
+            if (enemy.Definition.Has(MonsterTraitKind.Fearlight)) ShunLight(enemy, before);
+        }
+
+        void MoveEnemy(Enemy enemy)
         {
             var definition = enemy.Definition;
             if (enemy.Knockback.LengthSquared > 0.01f)

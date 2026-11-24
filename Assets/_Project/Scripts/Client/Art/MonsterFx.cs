@@ -120,7 +120,10 @@ namespace Game.Client
         {
             if (id != null && (id.StartsWith("void") || id.StartsWith("abyss") || id == "demon_caster" || id == "spore_shooter" || id == "myconid")) return FxRamp.Violet;
             // The lake's are water whatever the cold in it; the glowing bat's spores are its own teal; sand is sand.
-            if (id == "lake_crab" || id == "tide_wisp" || id == "glow_bat") return FxRamp.Spirit;
+            // The mushroom forest's new kinds (B1b): its spore clouds are the green-teal of the glowing wood.
+            if (id == "lake_crab" || id == "tide_wisp" || id == "glow_bat" || id == "puffball" || id == "glow_shooter" || id == "cap_giant"
+                || id == "mycelium_mother") return FxRamp.Spirit;
+            if (id == "myconid_captain") return FxRamp.Violet;
             if (id == "sand_scorpion" || id == "sand_worm") return FxRamp.Dust;
             if (element == SkillTag.Cold) return FxRamp.Cold;
             if (element == SkillTag.Fire) return FxRamp.Fire;
@@ -135,6 +138,11 @@ namespace Game.Client
                 case "spore_shooter":
                 case "myconid":
                 case "glow_bat":
+                case "puffball":
+                case "cap_giant":
+                case "glow_shooter":
+                case "myconid_captain":
+                case "mycelium_mother":
                     return MobLook.Spore;
                 case "crystal_bat":
                 case "crystal_wisp":

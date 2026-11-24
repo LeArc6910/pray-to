@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -6101,7 +6101,102 @@ async function sizes(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes };
+// The first two biomes' monsters and rules (2026-11-24, Docs/BiomeRework.md B1b, Docs/Playtest.md b1mobs): the new kinds
+// in a row in a room out in the world, each drawn at its size; a puffball that bursts into a spore cloud which fills a
+// hurt myconid (green numbers) and hazes the screen of a player in it; rats that come to the edge of a torch's light and
+// no nearer; rats out of the timbers of a dirt cave way after the dust. The spawn village sets monsters back outside its
+// edge, so all of it is done in rooms out in the world, and the director leaves a character under level 5 alone (xp 3000).
+// Pictures on the PC and the phone.
+async function b1mobs(browser) {
+  const kinds = [['cave_rat', 'xs', '동굴 쥐'], ['puffball', 's', '포자 주머니'], ['armored_beetle', 'm', '철갑 딱정벌레'], ['glow_shooter', 's', '빛 가시 버섯'],
+    ['myconid_captain', 'm', '버섯 지휘관'], ['big_beetle', 'l', '큰 딱정벌레'], ['cap_giant', 'l', '갓 거인'], ['slime_mother', 'xl', '어미 슬라임'],
+    ['mycelium_mother', 'xl', '균사 어미']];
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 첫 두 생물군계의 몬스터 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip iron_sword; equip iron_armor; heal; probe on; xp 3000');
+
+    // The new kinds in a row: up to six of the nearest pack rooms are tried for one that holds them all.
+    let seen = {}, room = '';
+    for (let n = 0; n < 6; n++) {
+      room = (await game.send(`clear; goto room pack any ${n}`)).join(' ');
+      await game.wait(1200);
+      await game.send('clear; scene b1monsters');
+      await game.wait(900);
+      seen = await game.ask('b1');
+      if (kinds.every(([kind]) => (seen.monsters || []).some(m => m.kind === kind))) break;
+    }
+    for (const [kind, size, label] of kinds) {
+      const m = (seen.monsters || []).find(x => x.kind === kind);
+      const [least, most] = SizeBands[size];
+      check(!!m && m.size === size && m.drawn && m.pixels >= least && m.pixels <= most,
+        `${name}: ${label}(${size.toUpperCase()})가 제 크기로 그려진다 (${m ? `${m.pixels}px` : '없음'}, ${least}~${most}px, ${room})`);
+    }
+    await game.shot('b1mobs-lineup', '새 몬스터 줄: 쥐, 포자 주머니, 철갑 딱정벌레, 빛 가시 버섯, 버섯 지휘관, 큰 딱정벌레, 갓 거인, 어미 슬라임, 균사 어미');
+
+    // A puffball bursts into a cloud; a hurt myconid in it fills, with green numbers; the player in it sees a haze.
+    await game.send('clear; heal; goto room pack any 0');
+    await game.wait(900);
+    await game.send('clear; scene spores');
+    await game.wait(1300);
+    const burst = await game.ask('b1');
+    const hurt = (burst.monsters || []).find(m => m.kind === 'myconid');
+    check((burst.clouds || []).length >= 1, `${name}: 포자 주머니가 터져 구름이 남는다 (구름 ${(burst.clouds || []).length}, ${(burst.clouds || []).map(c => `반지름 ${c.radius.toFixed(1)}`).join(', ')})`);
+    await game.shot('b1mobs-cloud', '포자 주머니가 터진 구름과 그 안의 버섯 병정');
+    await game.wait(1500);
+    const filled = await game.ask('b1');
+    const later = (filled.monsters || []).find(m => m.kind === 'myconid');
+    check(!!hurt && !!later && later.inCloud && later.health > hurt.health,
+      `${name}: 구름 안의 몬스터가 찬다 (${hurt ? Math.round(hurt.health) : '?'} → ${later ? Math.round(later.health) : '?'}/${later ? later.maxHealth : '?'})`);
+    check(filled.greenNumbers > burst.greenNumbers || filled.greenNumbers > 0, `${name}: 찬 만큼 초록 숫자가 뜬다 (${filled.greenNumbers})`);
+    await game.shot('b1mobs-heal', '구름 안에서 차오르는 버섯 병정(초록 숫자)');
+    // The puffball went off beside the player, so the player stands in its cloud too.
+    check(burst.haze === true || filled.haze === true, `${name}: 구름 안의 플레이어 화면에 초록 안개 (${burst.haze}, ${filled.haze})`);
+    await game.shot('b1mobs-haze', '포자 구름 안: 화면 가장자리의 초록 안개');
+
+    // Rats and a torch: they stop at the edge of its light.
+    await game.send('clear; heal; goto room pack any 1');
+    await game.wait(900);
+    await game.send('clear; heal; scene torch');
+    await game.wait(4500);
+    const lit = await game.ask('b1');
+    const rats = (lit.monsters || []).filter(m => m.kind === 'cave_rat');
+    const nearest = rats.length ? Math.min(...rats.map(m => m.distance)) : 0;
+    check(rats.length >= 3 && rats.every(m => !m.lit) && rats.some(m => m.state !== 'Idle'),
+      `${name}: 쥐가 횃불 빛 안으로 들어오지 않는다 (쥐 ${rats.length}, 빛 안 ${rats.filter(m => m.lit).length}, 가장 가까운 ${nearest.toFixed(1)}칸, 플레이어 빛 안 ${lit.playerLit})`);
+    check(nearest > 4, `${name}: 쥐가 빛 가장자리에서 기다린다 (${nearest.toFixed(1)}칸)`);
+    await game.shot('b1mobs-torch', '횃불 빛 가장자리에서 멈춘 쥐 떼');
+
+    // The timber ambush: dust off a dirt cave way's side, then rats.
+    await game.send('monsters hold; clear; heal');
+    let way = '';
+    for (let n = 0; n < 4 && !/goto timber at/.test(way); n++) way = (await game.send(`goto timber ${n}`)).join(' ');
+    await game.wait(1000);
+    const sprung = (await game.send('director timber')).join(' ');
+    await game.wait(350);
+    await game.shot('b1mobs-timber-dust', '갱목 매복: 통로 옆에서 먼지가 떨어진다');
+    await game.wait(1100);
+    const ambush = await game.ask('b1');
+    const came = (ambush.monsters || []).filter(m => m.kind === 'cave_rat' && m.distance < 12);
+    check(/ok director timber/.test(sprung) && came.length >= 3 && came.length <= 5,
+      `${name}: 흙 동굴 통로에서 쥐 3~5마리가 튀어나온다 (${way}; ${sprung}; 쥐 ${came.length})`);
+    await game.shot('b1mobs-timber', '갱목 매복으로 나온 쥐 떼');
+    await game.send('clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

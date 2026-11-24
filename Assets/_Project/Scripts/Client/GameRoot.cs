@@ -101,6 +101,9 @@ namespace Game.Client
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;
         // How a monster is drawn now: its picture's pixels, its health bar, its feet and its scale (the "sizes" playtest).
         internal (int Width, int Height, float Bar, float Feet, float Scale)? MonsterDrawn(int id) => _view?.MonsterDrawn(id);
+        // Whether the screen shows my body in a spore cloud (its green haze, B1b).
+        internal bool InSporeCloud => _view != null && _view.InSporeCloud();
+        internal int CloudNumbersShown => _view?.CloudNumbers ?? 0;
         internal int MonsterPoolsShown => _view?.MonsterPoolsShown ?? 0;
         // A dungeon's name cards shown, and the last name (WorldView.Dungeon.cs).
         internal int DungeonCardsShown => _view?.DungeonCardsShown ?? 0;

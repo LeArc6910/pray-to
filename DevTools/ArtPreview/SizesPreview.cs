@@ -21,7 +21,7 @@ namespace Game.Client
         static readonly Rgba Gold = Rgba.Hex("#FFC740");
 
         // The kinds shown, smallest first.
-        static readonly string[] Lineup = { "glow_bat", "crystal_wisp", "slime", "cave_beetle", "big_slime", "slime_king" };
+        static readonly string[] Lineup = { "cave_rat", "puffball", "glow_bat", "slime", "cave_beetle", "big_slime", "big_beetle", "cap_giant", "slime_king", "slime_mother", "mycelium_mother" };
 
         public static bool Write(string output, MonsterData monsters, PixelImage hero)
         {

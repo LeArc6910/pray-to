@@ -434,6 +434,14 @@ namespace Game.Core
         internal int OrbitSide { get; set; }
         // The elements of the blow that last hurt it (a deathburst that fire quenches).
         internal SkillTag LastTags { get; set; }
+        // What spore clouds gave it since it was last told, and when it may next be told (World.TellCloudHeal); how many
+        // a slime mother has shed (MonsterTraitKind.Shed).
+        internal float CloudGain { get; set; }
+        internal long CloudToldAt { get; set; }
+        internal long CloudTick { get; set; } = -1;
+        internal int Shed { get; set; }
+        // It went off as a bomber (MonsterAttackShape.Explode) rather than being felled.
+        internal bool BlewUp { get; set; }
 
         // ---- Packs and wanderers (World.Packs.cs, Docs/WorldRework.md 무리) ----
 
