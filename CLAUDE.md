@@ -65,6 +65,8 @@ dotnet run --project DevTools/ArtPreview -- --only map
 dotnet run --project DevTools/ArtPreview -- --only uimock
 # 게임의 UI 스킨만(out/ui/: skin.png 조각 전부, windows.png 지금 화면에 입힌 모습, pixels.png 정수 배 틀, encounters.png·encounters_phone.png 상점·상자·작업대·모루·대화 창, growth.png·growth_phone.png 스킬·특성 트리·캐릭터 창, records.png·records_phone.png 일지·지도, bag_hud.png·bag_hud_phone.png 가방·HUD·쓰러짐 카드·메뉴. Docs/UiRework.md U1~U7)
 dotnet run --project DevTools/ArtPreview -- --only ui
+# 생물군계 개편 시안(out/biomemock/: 이어지는 울타리 fences.png, 입체 규칙 depth.png, 생물군계마다 biome_<id>.png, 색 비교 compare_palettes.png, 크기 sizes.png, 한눈 비교 overview.png. Docs/BiomeRework.md)
+dotnet run --project DevTools/ArtPreview -- --only biomemock
 # 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/)
 dotnet run --project DevTools/ArtPreview -- --only dungeons
 # 대화 초상만(out/portraits/: 인물마다 여섯 표정의 sheet.png, 4배 close_*.png, 대화 상자 시안 dialogue.png. Docs/UiRework.md 4-2)

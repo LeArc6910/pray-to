@@ -32,7 +32,7 @@ namespace Game.Client
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
                 return WriteMonsterFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -86,6 +86,12 @@ namespace Game.Client
                 var mockClasses = ClassSheet.Parse(File.ReadAllText(Path.Combine(classSheets, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classSheets, ClassSheet.SkillsFile)), passives);
                 var mockWorld = WorldGenerator.Generate(7, story: story);
                 UiMockPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), loot, mockClasses, passives, Place(mockWorld, mockWorld.Places[0], lights));
+                return 0;
+            }
+            // --only biomemock: the biome rework's mockups (out/biomemock/, BiomeMockPreview, Docs/BiomeRework.md).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "biomemock")
+            {
+                BiomeMockPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"));
                 return 0;
             }
             // --only portraits: just the talk box's portraits, every person in every expression (out/portraits/, PortraitPreview).
