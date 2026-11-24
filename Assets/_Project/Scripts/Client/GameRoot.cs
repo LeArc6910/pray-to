@@ -553,7 +553,15 @@ namespace Game.Client
                 if (site != place && PlaceTune(site.Definition.Style) is Tune next && Vec2.Distance(_client.Position, site.Center) <= site.Radius + PlaceHearing)
                     Music.Prepare(Song.Field(next));
             }
-            var ambience = place != null ? PlaceAmbience(place.Definition.Style) : biome == Biome.Lava ? Ambience.Lava : Ambience.Cave;
+            // The biome's bed (묶음 B1a: the dirt cave's and the mushroom forest's own; the rest keep the bare cave's
+            // until their packages).
+            var ambience = place != null ? PlaceAmbience(place.Definition.Style) : biome switch
+            {
+                Biome.Lava => Ambience.Lava,
+                Biome.Cave => Ambience.DirtCave,
+                Biome.Mushroom => Ambience.Spores,
+                _ => Ambience.Cave,
+            };
             Music.Update(song, ambience, 1 - nearest / MachineHearing, deltaTime);
         }
 

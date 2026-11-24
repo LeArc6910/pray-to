@@ -56,6 +56,17 @@ namespace Game.Client
                 foreach (var kind in Enumerable.Range(0, 100).Select(roll => Decor.KindOf(biome, roll)).Distinct())
                     for (int variant = 0; variant < Decor.Variants; variant++)
                         stills.Add(($"꾸밈 {biome} {kind} {variant}", DecorArt.Image(kind, biome, variant)));
+            // The biomes' props in each drawing (묶음 B1a; a lamp and the giant cap have one) and the places' tree by biome:
+            // looked at only for twins (two drawings of a prop the very same). Their halos and many materials are meant,
+            // so they are not counted for stray pixels or colours.
+            var props = new List<(string Name, PixelImage Image)>();
+            foreach (TileType type in Enum.GetValues(typeof(TileType)))
+            {
+                if (!BiomeProps.Is(type)) continue;
+                int drawings = BiomeProps.IsLamp(type) || type == TileType.GiantCap ? 1 : BiomeArt.Variants;
+                for (int variant = 0; variant < drawings; variant++) props.Add(($"소품 {type} {variant}", BiomeArt.Prop(type, variant)));
+            }
+            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom }) props.Add(($"장소 나무 {biome}", BiomeArt.PlaceTree(biome)));
 
             var loops = new List<(string Name, IReadOnlyList<PixelImage> Frames)>();
             foreach (var look in new[] { Look.Down, Look.DownSide, Look.Side, Look.UpSide, Look.Up })
@@ -84,7 +95,7 @@ namespace Game.Client
 
             // Different things drawn the very same (2026-11-11, the content audit: five materials fell through to the stone's
             // picture). Every id past the first in a group of identical pictures counts; a placed thing and its item are meant to match.
-            var twins = stills.Where(s => !s.Name.StartsWith("칸 ")).GroupBy(s => Key(s.Image)).Where(g => g.Count() > 1).Select(g => g.Select(s => s.Name).ToList()).ToList();
+            var twins = stills.Where(s => !s.Name.StartsWith("칸 ")).Concat(props).GroupBy(s => Key(s.Image)).Where(g => g.Count() > 1).Select(g => g.Select(s => s.Name).ToList()).ToList();
             int twinCount = twins.Sum(g => g.Count - 1);
 
             var counts = new Dictionary<string, int> { ["strays"] = strays.Count, ["colours"] = colourful.Count, ["wobble"] = wobbly.Count, ["twins"] = twinCount };

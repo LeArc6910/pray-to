@@ -40,7 +40,7 @@ dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --
 dotnet run --project DevTools/CoreSandbox -- --farm 120 mushroom
 dotnet run --project DevTools/CoreSandbox -- --economy
 dotnet run --project DevTools/CoreSandbox -- --factory 30
-# 지도를 숫자로: 막힌 칸, 벽 덩어리, 열린 바닥, 생물군계마다, 방·통로, 걷는 걸음, 생성 시간(Docs/WorldRework.md). --gen 1|2로 생성기 판 하나만(--flow와 --hour에도)
+# 지도를 숫자로: 막힌 칸, 벽 덩어리, 열린 바닥, 생물군계마다, 방·통로, 걷는 걸음, 생성 시간(Docs/WorldRework.md). --gen 1|2|3으로 생성기 판 하나만(--flow와 --hour에도. 3판은 생물군계 소품과 꾸밈의 밀도도, Docs/BiomeRework.md B1a)
 dotnet run --project DevTools/CoreSandbox -- --mapstats 1,2,3
 # 어느 시스템이 어느 시스템에 재료를 주는지, 고립된 재료(Docs/Systems.md)
 dotnet run --project DevTools/CoreSandbox -- --supply
@@ -69,6 +69,8 @@ dotnet run --project DevTools/ArtPreview -- --only ui
 dotnet run --project DevTools/ArtPreview -- --only biomemock
 # 서 있는 층·이어지는 울타리만(out/depth/: joined.png 다섯 종류 16모양과 문, pen.png·pen_nofade.png 방목장과 흐려짐, place_*.png 장소의 정렬·흐려짐, biomes.png 생물군계 꾸밈. Docs/BiomeRework.md B0)
 dotnet run --project DevTools/ArtPreview -- --only depth
+# 생물군계의 모습만(out/biomes/: 생물군계마다 소품·꾸밈·작은 생물 표 props_<id>.png, 생성기 3판의 방 하나 room_<id>_unlit.png·room_<id>.png(빛 켠 것), 흙 동굴 마을 place_dawn_village.png, 오두막 울타리 place_hero_hut.png. Docs/BiomeRework.md B1a)
+dotnet run --project DevTools/ArtPreview -- --only biomes
 # 몬스터 크기 등급만(out/sizes/: lineup.png 사람 옆 S·M·L·XL, poses.png 큰 몸의 자세, leaders.png 정예 금빛 테, clearance.png 여유 지도와 길 너비, report.txt 종마다 그림 폭. Docs/BiomeRework.md B0b)
 dotnet run --project DevTools/ArtPreview -- --only sizes
 # 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/)

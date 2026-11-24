@@ -284,6 +284,7 @@ namespace Game.Core
         {
             bool rooms = version >= RoomVersion;
             var world = rooms ? GenerateRooms(seed, width, height, terrain ?? TerrainSheet.Default) : GenerateCaves(seed, width, height);
+            if (rooms) world.Version = version;
             if (story != null && story.Places.Count > 0) world.Places = CarvePlaces(world, seed, story);
             DressArenas(world, seed, arenas);
             if (rooms)
@@ -301,6 +302,9 @@ namespace Game.Core
                 JoinRooms(world.Map, world.Rooms.Nodes, world.Arenas.Take(world.CaveArenas).Select(a => (TileMap.Cell(a.X), TileMap.Cell(a.Y))).ToList(),
                     world.SpawnX, world.SpawnY, pockets: true, kept: world.Rooms.Kept);
                 EnsureCopper(world);
+                // The biomes' props (WorldGenerator.Props.cs, 묶음 B1a), only in a world of version 3 and after everything
+                // that decides what is reached: each stands on open floor with a way round it.
+                if (version >= PropVersion) LayProps(world, seed);
                 // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
                 if (DungeonPocket.Fits(width)) world.Map.AddPocket(DungeonPocket.Rows);
             }
@@ -687,7 +691,7 @@ namespace Game.Core
             var sites = new List<PlaceSite>();
             foreach (var (place, cx, cy) in spots)
             {
-                var wanted = Decorate(map, cx, cy, place);
+                var wanted = Decorate(map, cx, cy, place, world.Version);
                 var people = Stand(map, cx, cy, place, story.Characters.Where(c => c.Place == place).ToList(), wanted);
                 Open(map, cx, cy, place, people.Select(p => (TileMap.Cell(p.Item2.X), TileMap.Cell(p.Item2.Y))));
                 Tidy(map, cx, cy, place);
@@ -896,7 +900,7 @@ namespace Game.Core
         // characters.csv order (more people than that stand round a ring). Nothing goes on the waypoint or right
         // beside it, off the plaza, or on anything but the plaza's own floor; a structure of more than one tile goes
         // only where all of it fits.
-        static List<(int X, int Y)> Decorate(TileMap map, int cx, int cy, PlaceDefinition place)
+        static List<(int X, int Y)> Decorate(TileMap map, int cx, int cy, PlaceDefinition place, int version = CaveVersion)
         {
             int r = place.Radius;
             bool Free(int dx, int dy)
@@ -1130,9 +1134,21 @@ namespace Game.Core
                     // A log cabin, a fenced garden with a scarecrow, a woodpile, a training dummy and a weapon rack
                     // (the hero keeps his hand in), a campfire with a bench, a barrel, a lamp post and giant mushrooms.
                     Put(-3, 2, TileType.Cabin);
-                    foreach (var (dx, dy) in new[] { (2, 3), (3, 3), (2, 4), (3, 4) }) Lay(dx, dy, TileType.Soil);
-                    foreach (var (dx, dy) in new[] { (4, 2), (4, 3), (4, 4), (2, 5), (3, 5) }) Put(dx, dy, TileType.Fence);
-                    Put(2, 2, TileType.Scarecrow);
+                    if (version >= PropVersion)
+                    {
+                        // The garden a tile nearer the middle (묶음 B1a), so the fence's corner post is on the plaza and
+                        // its two runs meet at a right angle. Worlds made before keep theirs, whose runs touch only
+                        // across the corner.
+                        foreach (var (dx, dy) in new[] { (2, 2), (3, 2), (2, 3), (3, 3) }) Lay(dx, dy, TileType.Soil);
+                        foreach (var (dx, dy) in new[] { (4, 1), (4, 2), (4, 3), (4, 4), (3, 4), (2, 4) }) Put(dx, dy, TileType.Fence);
+                        Put(2, 1, TileType.Scarecrow);
+                    }
+                    else
+                    {
+                        foreach (var (dx, dy) in new[] { (2, 3), (3, 3), (2, 4), (3, 4) }) Lay(dx, dy, TileType.Soil);
+                        foreach (var (dx, dy) in new[] { (4, 2), (4, 3), (4, 4), (2, 5), (3, 5) }) Put(dx, dy, TileType.Fence);
+                        Put(2, 2, TileType.Scarecrow);
+                    }
                     Put(1, 2, TileType.Woodpile);
                     Put(-4, -2, TileType.TrainingDummy);
                     Put(-4, 0, TileType.WeaponRack);

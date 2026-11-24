@@ -557,7 +557,9 @@ namespace Game.Core
 
         // What rats come out of: rock of a way's side now; the dirt cave's fallen timbers and rubble when they are tiles
         // (one place to add them).
-        internal bool TimberSource(int x, int y) => Map.InBounds(x, y) && (Map[x, y] == TileType.Wall || Map[x, y] == TileType.Rubble);
+        internal bool TimberSource(int x, int y) => Map.InBounds(x, y) && Map[x, y] is TileType.Wall or TileType.Rubble
+            // The dirt cave's props of a new world (B1a): fallen timbers, a pit prop, a boulder.
+            or TileType.CaveIn or TileType.PitProp or TileType.Boulder;
 
         // Where rats burst out near a tile of a way: the floor tile within two of it nearest it with a TimberSource beside
         // it, out of the light (they fear it) and not on the player; the source's side is where the dust falls. Null

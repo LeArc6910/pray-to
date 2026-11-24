@@ -687,11 +687,17 @@ namespace Game.Core
                     var push = (distance > 1e-4f ? apart / distance : new Vec2(1, 0)) * (minimum - distance);
                     float ra = a.Definition.Radius * a.Definition.Radius, rb = b.Definition.Radius * b.Definition.Radius;
                     float giveA = rb / (ra + rb);
-                    a.Position = Collision.Resolve(Map, a.Position - push * giveA, a.Definition.Radius, monster: true);
-                    b.Position = Collision.Resolve(Map, b.Position + push * (1 - giveA), b.Definition.Radius, monster: true);
+                    var toA = Collision.Resolve(Map, a.Position - push * giveA, a.Definition.Radius, monster: true);
+                    var toB = Collision.Resolve(Map, b.Position + push * (1 - giveA), b.Definition.Radius, monster: true);
+                    // One that fears the light is not shoved into it by the crowd at its edge (B1b, World.ShunLight).
+                    if (!PushedIntoLight(a, toA)) a.Position = toA;
+                    if (!PushedIntoLight(b, toB)) b.Position = toB;
                 }
             }
         }
+
+        bool PushedIntoLight(Enemy enemy, Vec2 to) =>
+            enemy.Definition.Has(MonsterTraitKind.Fearlight) && Shuns(enemy, to) && !Shuns(enemy, enemy.Position);
 
         // The places of the story are safe (2026-11-11, "괴물이 마을 안까지 들어와"): no monster comes into being in
         // one (TrySpawnEnemy), none goes after a player inside one, and one that wanders or is knocked in is set back

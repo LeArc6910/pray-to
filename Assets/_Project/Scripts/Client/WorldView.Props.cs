@@ -114,7 +114,7 @@ namespace Game.Client
                     var kind = StandArt.KindAt(map, x, y);
                     if (kind != StandArt.Kind.None)
                     {
-                        list.Add(new Stand { X = x, Y = y, Type = type, Kind = kind });
+                        list.Add(new Stand { X = x, Y = y, Type = type, Kind = kind, Biome = _client.Biomes[x, y] });
                         continue;
                     }
                     if (type != TileType.Floor) continue;
@@ -200,14 +200,17 @@ namespace Game.Client
                 var (fx, fy) = StandArt.DecorFoot(stand.X, stand.Y, stand.Decor);
                 var pick = stand.Decor;
                 var biome = stand.Biome;
-                long key = 1L << 40 | (long)pick.Kind << 16 | (long)biome << 8 | pick.Variant;
-                if (!PropAtlas.TryGet(key, out var sprite)) sprite = PropAtlas.Get(key, () => DecorArt.Image(pick.Kind, biome, pick.Variant));
+                // What sways is drawn nudged for a moment after someone brushes past it (Rustle).
+                int frame = Decor.Sways(pick.Kind) ? Rustle(stand.Y * map.Width + stand.X, fx, fy) : 0;
+                long key = 1L << 40 | (long)pick.Kind << 16 | (long)biome << 8 | (long)frame << 4 | pick.Variant;
+                if (!PropAtlas.TryGet(key, out var sprite)) sprite = PropAtlas.Get(key, () => DecorArt.Image(pick.Kind, biome, pick.Variant, frame));
                 var renderer = NextStand();
                 renderer.sprite = sprite;
                 renderer.flipX = pick.Flip;
                 renderer.color = Color.white;
                 renderer.transform.localPosition = new Vector3(fx, fy - StandArt.DecorDrop, 0);
-                renderer.sortingOrder = FootOrder(fy, StandArt.DecorTie);
+                // What lies flat (moss, threads, a cobweb) is under everyone's feet; the rest sorts by its foot.
+                renderer.sortingOrder = Decor.Flat(pick.Kind) ? FlatDecorOrder : FootOrder(fy, StandArt.DecorTie);
                 decor++;
             }
             for (int i = _standUsed; i < _standPool.Count; i++)
@@ -220,6 +223,51 @@ namespace Game.Client
             CanopiesFaded = faded;
             StandsSkipped = skipped;
             PropAtlas.Upload();
+        }
+
+        // Flat decor is drawn over the floor's own marks (40 and below) and under everything that stands.
+        const int FlatDecorOrder = 60;
+        // Swaying decor someone brushed past, by tile: when, and which way first (Docs/BiomeRework.md 4-3 흔들림: two
+        // frames, a tenth of a second each, then still). Off with 움직임: 줄이기.
+        readonly Dictionary<int, (float At, bool Right)> _rustles = new Dictionary<int, (float, bool)>();
+        const float RustleReach = 0.45f, RustleFrame = 0.1f;
+        public int Rustled { get; private set; }
+
+        int Rustle(int cell, float x, float y)
+        {
+            if (Settings.ReduceMotion) return 0;
+            if (_rustles.TryGetValue(cell, out var rustle))
+            {
+                float age = Time.time - rustle.At;
+                if (age < RustleFrame) return rustle.Right ? 1 : 2;
+                if (age < RustleFrame * 2) return rustle.Right ? 2 : 1;
+                // Still until whoever brushed it has gone on.
+                if (age < 0.6f) return 0;
+                _rustles.Remove(cell);
+            }
+            float side = 0;
+            if (_self != null && Brushes(_self, x, y, out side) || OthersBrush(x, y, out side))
+            {
+                _rustles[cell] = (Time.time, side >= 0);
+                Rustled++;
+                return side >= 0 ? 1 : 2;
+            }
+            return 0;
+        }
+
+        static bool Brushes(Body body, float x, float y, out float side)
+        {
+            float dx = x - body.Position.x, dy = y - (body.Position.y - body.Feet);
+            side = dx;
+            return dx * dx + dy * dy < RustleReach * RustleReach && (body.Position - body.LastPosition).sqrMagnitude > 1e-6f;
+        }
+
+        bool OthersBrush(float x, float y, out float side)
+        {
+            side = 0;
+            foreach (var body in _others.Values)
+                if (body != null && body.Root != null && body.Root.gameObject.activeSelf && Brushes(body, x, y, out side)) return true;
+            return false;
         }
 
         Comparison<Stand> _nearer;
@@ -245,7 +293,7 @@ namespace Game.Client
         {
             int cell = stand.Y * map.Width + stand.X;
             bool open = stand.Kind == StandArt.Kind.Gate && _openDoors.Contains(cell);
-            int shape = StandArt.ShapeAt(map, stand.X, stand.Y, open);
+            int shape = StandArt.ShapeAt(map, stand.X, stand.Y, open, stand.Biome);
             bool lit = PropArt.LitAtNight(stand.Type) && _windowsLit;
             var type = stand.Type;
             var kind = stand.Kind;
@@ -310,7 +358,7 @@ namespace Game.Client
             var kind = StandArt.KindAt(map, x, y);
             if (kind == StandArt.Kind.None) return ("none", -1, 0);
             bool open = kind == StandArt.Kind.Gate && _openDoors.Contains(y * map.Width + x);
-            return (kind.ToString(), StandArt.ShapeAt(map, x, y, open), FootOrder(y + StandArt.FootLift(map[x, y], kind), StandArt.PropTie));
+            return (kind.ToString(), StandArt.ShapeAt(map, x, y, open, _client.Biomes[x, y]), FootOrder(y + StandArt.FootLift(map[x, y], kind), StandArt.PropTie));
         }
 
         public int SelfOrder => _self == null ? 0 : _self.Shape.sortingOrder;

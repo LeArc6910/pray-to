@@ -34,6 +34,10 @@ namespace Game.Client
         Hum,
         Hearth,
         Waves,
+        // The biomes' own beds (2026-11-24, Docs/BiomeRework.md 4-1 소리, 묶음 B1a). The dirt cave: drips, old timber
+        // creaking, and very seldom a pickaxe far off. The mushroom forest: a damp rustle, spores popping, a low drone.
+        DirtCave,
+        Spores,
     }
 
     // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
@@ -608,6 +612,59 @@ namespace Game.Client
                         if (random.Next() < 0.3f) Sweep(buffer, Wave.Triangle, t + 0.6f, 0.25f, 180, 140, 0.12f);
                     }
                     return Normalised(LowPass(buffer, 0.3f), 0.4f);
+                }
+                case Ambience.DirtCave:
+                {
+                    // A close, still air (less wind than the bare cave's), drips with their echoes, a timber creaking
+                    // every several seconds, and twice in the loop a pickaxe ringing far away, three strokes.
+                    float seconds = 32;
+                    var buffer = Wind(seconds, smoothing: 0.012f, volume: 0.4f, swell: 0.5f, seed: 31);
+                    var random = new Scramble(32);
+                    for (float t = 0.6f; t < seconds; t += 1.0f + random.Next() * 2.4f)
+                    {
+                        float pitch = 1300 + random.Next() * 1000;
+                        float volume = 0.45f + random.Next() * 0.5f;
+                        for (int echo = 0; echo < 3; echo++)
+                            Sweep(buffer, Wave.Sine, t + echo * 0.19f, 0.06f, pitch, pitch * 0.55f, volume * (float)Math.Pow(0.35, echo));
+                    }
+                    for (float t = 3.5f; t < seconds - 2; t += 5.5f + random.Next() * 4.5f)
+                    {
+                        // Wood under load: a low groan sliding up, then a tick.
+                        float from = 70 + random.Next() * 30;
+                        Sweep(buffer, Wave.Triangle, t, 0.5f + random.Next() * 0.3f, from, from * 1.5f, 0.3f);
+                        Click(buffer, t + 0.55f, 0.02f, 0.35f, seed: 300 + (int)(t * 10));
+                    }
+                    foreach (float t in new[] { 9.5f, 24.5f })
+                        for (int stroke = 0; stroke < 3; stroke++)
+                        {
+                            float at = t + stroke * 0.62f;
+                            Sweep(buffer, Wave.Sine, at, 0.09f, 2100, 1900, 0.16f);
+                            Sweep(buffer, Wave.Sine, at + 0.33f, 0.09f, 2100, 1900, 0.05f);
+                        }
+                    return Normalised(buffer, 0.4f);
+                }
+                case Ambience.Spores:
+                {
+                    // A low drone that swells and sinks, a soft damp rustle under it, and spores popping: a short round
+                    // "pong" falling in pitch, now here, now there.
+                    float seconds = 24;
+                    var buffer = Wind(seconds, smoothing: 0.03f, volume: 0.45f, swell: 0.9f, seed: 33);
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        double t = i / (double)SampleRate;
+                        // 55 and 82.5 Hz: whole cycles in the loop, so it closes without a click.
+                        double swell = 0.5 + 0.5 * Math.Sin(2 * Math.PI * t / 12);
+                        buffer[i] += (float)((Math.Sin(2 * Math.PI * 55 * t) * 0.3 + Math.Sin(2 * Math.PI * 82.5 * t) * 0.14) * (0.4 + 0.6 * swell));
+                    }
+                    var random = new Scramble(34);
+                    for (float t = 0.7f; t < seconds; t += 0.9f + random.Next() * 2.6f)
+                    {
+                        float pitch = 420 + random.Next() * 360;
+                        Sweep(buffer, Wave.Sine, t, 0.11f, pitch * 1.5f, pitch, 0.3f + random.Next() * 0.3f);
+                    }
+                    for (float t = 0.3f; t < seconds; t += 0.25f + random.Next() * 0.9f)
+                        Click(buffer, t, 0.05f + random.Next() * 0.08f, 0.1f + random.Next() * 0.12f, seed: 400 + (int)(t * 20), hiss: true);
+                    return Normalised(LowPass(buffer, 0.35f), 0.4f);
                 }
                 case Ambience.Hum:
                 {

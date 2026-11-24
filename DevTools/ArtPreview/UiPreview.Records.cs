@@ -439,7 +439,7 @@ namespace Game.Client
 
         static Rgba MapFloor(Biome biome) => biome switch
         {
-            Biome.Mushroom => new Rgba(92, 72, 104),
+            Biome.Mushroom => new Rgba(78, 96, 58),
             Biome.Ice => new Rgba(84, 108, 128),
             Biome.Crystal => new Rgba(70, 70, 108),
             Biome.Lava => new Rgba(96, 64, 56),

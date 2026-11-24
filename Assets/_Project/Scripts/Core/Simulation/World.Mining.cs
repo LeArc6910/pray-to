@@ -15,6 +15,8 @@ namespace Game.Core
         // A Dug event's Amount when the tile broke, and when the pickaxe in hand is not good enough.
         public const int DugThrough = 100;
         public const int NeedsBetterPickaxe = -2;
+        // A Dug event's Amount when the blow lit a lamp (nothing broke).
+        public const int LampLit = -3;
 
         readonly Dictionary<int, float> _wallDamage = new Dictionary<int, float>();
         readonly Dictionary<int, TileType> _changedTiles = new Dictionary<int, TileType>();
@@ -82,6 +84,8 @@ namespace Game.Core
             if (Map[x, y] == TileType.LockedDoor && LockOwner(x, y) is string owner && owner != player.Name) return null;
             // Striking a big machine's part strikes the machine.
             if (AnchorOf(Map, x, y) is (int ax, int ay)) (x, y) = (ax, ay);
+            // And the right half of a wide prop, the prop (a boulder, a fallen trunk: BiomeProps).
+            if (BiomeProps.AnchorOf(Map, x, y) is (int px, int py)) (x, y) = (px, py);
             var tile = Tiles.Find(Map[x, y]);
             if (tile == null) return null;
             return (x, y, tile);
@@ -92,6 +96,17 @@ namespace Game.Core
             var target = DigTarget(player);
             if (target == null) return;
             var (x, y, tile) = target.Value;
+            // A lamp that is out is lit by the blow and stays lit (Docs/BiomeRework.md 흙 동굴: a tile like any built
+            // one, so it is saved and sent); a lit one stands. Neither is ever dug.
+            if (BiomeProps.IsLamp(tile.Tile))
+            {
+                if (tile.Tile == TileType.UnlitLamp)
+                {
+                    SetTile(x, y, TileType.LitLamp);
+                    _events.Add(new SimEvent(SimEventType.Dug, player.Id, amount: LampLit, position: TileMap.Center(x, y)));
+                }
+                return;
+            }
             // Obsidian and the like need a better pickaxe: a Dug event with Amount -2 says so.
             int held = HoldsPickaxe(player) ? player.Equipment[ItemSlot.Weapon].Base.Level : 0;
             if (tile.Pickaxe > 0 && held < tile.Pickaxe)
@@ -119,6 +134,14 @@ namespace Game.Core
             var machine = MachineAt(x, y);
             if (machine != null) Empty(machine, player);
             ClearTile(x, y);
+            // A wide prop goes with both its tiles; a spore sac bursts into the cloud a spore monster leaves (it fills
+            // the monsters in it and does nothing to players: World.MonsterAttacks' Deathcloud).
+            if (BiomeProps.Wide(tile.Tile) && Map[x + 1, y] == TileType.StructurePart) ClearTile(x + 1, y);
+            if (tile.Tile == TileType.SporeSac)
+            {
+                _hazards.Add(new Hazard(_nextId++, 0, 0, HazardShape.Balm, TileMap.Center(x, y), new Vec2(0, -1), DeathcloudRadius, DeathcloudFill, 0, Tick,
+                    Tick + Ticks(DeathcloudSeconds)));
+            }
             // A third of its hardness, at least one: plain rock 1, ore and harder rock more.
             GainLifeExperience(player, LifeSkill.Mining, Math.Max(1, (tile.Hardness + 2) / 3));
             player.Inventory.AddMaterial(tile.Material, tile.Count);

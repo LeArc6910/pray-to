@@ -45,11 +45,17 @@ namespace Game.Client
 
         // What shape the thing at (x, y) is drawn in: the joined sides for a fence, hedge or wall, for a gate 1 across an
         // east-west run and 0 in a north-south one, plus 2 open; 0 for anything else.
-        public static int ShapeAt(TileMap map, int x, int y, bool open)
+        // A biome's prop: which of its drawings and whether mirrored (BiomeArt.Variant). The places' tall tree: 1 in the
+        // dirt cave (a mine timber with a lantern), 2 in the mushroom forest (the forest's great mushroom), 0 anywhere
+        // else or when the biome is not given (the old blue mushroom tree).
+        public static int ShapeAt(TileMap map, int x, int y, bool open, Biome? biome = null)
         {
             var kind = KindAt(map, x, y);
             if (kind == Kind.Joined) return Joins.Mask(map, x, y);
             if (kind == Kind.Gate) return (Joins.Gate(map, x, y) == true ? 1 : 0) | (open ? 2 : 0);
+            var type = map[x, y];
+            if (BiomeProps.Is(type)) return BiomeArt.Variant(type, x, y);
+            if (type == TileType.MushroomTree) return biome == Biome.Cave ? 1 : biome == Biome.Mushroom ? 2 : 0;
             return 0;
         }
 
@@ -57,6 +63,8 @@ namespace Game.Client
         public static PixelImage Picture(TileType type, Kind kind, int shape, bool lit)
         {
             if (kind == Kind.Gate) return PropArt.FenceGate((shape & 1) != 0, (shape & 2) != 0);
+            if (BiomeProps.Is(type)) return BiomeArt.Prop(type, shape);
+            if (type == TileType.MushroomTree && shape != 0) return BiomeArt.PlaceTree(shape == 2 ? Biome.Mushroom : Biome.Cave);
             if (PropArt.LitAtNight(type)) return lit ? PropArt.Prop(type) : PropArt.Daylit(PropArt.Prop(type));
             return PropArt.Prop(type, kind == Kind.Joined ? shape : 0);
         }
@@ -70,6 +78,7 @@ namespace Game.Client
         public static float FootLift(TileType type, Kind kind) =>
             kind == Kind.Gate || type == TileType.Fence ? PropArt.FenceFoot / (float)Pixels
             : type == TileType.Hedge ? PropArt.HedgeFoot / (float)Pixels
+            : BiomeProps.Is(type) ? BiomeArt.FootRows / (float)Pixels
             : 0;
 
         // The rows from the top of the picture that are its canopy or roof (fading when someone is behind), none for 0.
@@ -83,7 +92,7 @@ namespace Game.Client
             TileType.BigTent => 12,
             TileType.Lighthouse => 48,
             TileType.MineEntrance => 20,
-            _ => 0,
+            _ => BiomeArt.CanopyRows(type),
         };
 
         // The canopy's box in world units for a thing whose picture (w by h pixels, canopy rows on top) stands with its
@@ -99,8 +108,8 @@ namespace Game.Client
         // from what the caller keeps clear (the places, the arenas).
         public static DecorPick DecorAt(TileMap map, ulong seed, Biome biome, int x, int y, System.Func<int, int, bool> keptClear)
         {
-            var pick = Decor.At(seed, biome, x, y);
-            if (!pick.Any || !Decor.Clear(map, x, y) || keptClear != null && keptClear(x, y)) return default;
+            var pick = Decor.On(map, seed, biome, x, y);
+            if (!pick.Any || keptClear != null && keptClear(x, y)) return default;
             return pick;
         }
 
@@ -112,9 +121,9 @@ namespace Game.Client
         public const float DecorDrop = 2f / Pixels;
 
         // A decor thing's picture, mirrored by its pick (its shadow and light are near enough symmetric to mirror).
-        public static PixelImage DecorPicture(DecorPick pick, Biome biome)
+        public static PixelImage DecorPicture(DecorPick pick, Biome biome, int frame = 0)
         {
-            var image = DecorArt.Image(pick.Kind, biome, pick.Variant);
+            var image = DecorArt.Image(pick.Kind, biome, pick.Variant, frame);
             return pick.Flip ? image.FlippedX() : image;
         }
     }

@@ -516,6 +516,7 @@ namespace Game.Client
         readonly List<LightSource> _lights = new List<LightSource>();
         readonly WorldLights _worldLights;
         readonly Func<int, int, float> _arenaGlow;
+        readonly Func<int, int, Rgba> _biomeTint;
         Texture2D _darkTexture;
         Color32[] _darkPixels;
         SpriteRenderer _dark;
@@ -564,6 +565,8 @@ namespace Game.Client
             // The arenas are always dimly lit; the mushroom forest and the lava fields glow a little of themselves.
             var arenas = WorldLights.ArenaAmbient(client.Arenas, client.ArenaRadius);
             _arenaGlow = (x, y) => Mathf.Max(arenas(x, y), WorldLights.BiomeGlow(client.Biomes[x, y]));
+            // The biome's light colour (묶음 B1a), but in an arena, whose own glow is plain.
+            _biomeTint = (x, y) => arenas(x, y) > 0 ? Rgba.Clear : WorldLights.BiomeTint(client.Biomes[x, y]);
             BuildDark(DarkSize);
             _self = MakeBody(BodyKind.Player, "나", 0, World.PlayerRadius, SelfTunic);
             var start = client.Position;
@@ -633,6 +636,7 @@ namespace Game.Client
             DrawPeople();
             DrawStoryPeople();
             DrawStanding(deltaTime);
+            DrawAmbience(deltaTime);
             AnnouncePlace();
             DrawChickens();
             SwingDoors();
@@ -2450,6 +2454,13 @@ namespace Game.Client
                 case SimEventType.Dug:
                     // A puff of dust where the wall was struck, bigger when it gives way.
                     var struck = new Vector3(e.Position.X, e.Position.Y, 0);
+                    if (e.Amount == World.LampLit)
+                    {
+                        // A lamp lit by the blow: a warm flash and the torch's sound.
+                        AddFlash(struck + new Vector3(0, 0.5f, 0), 0.9f, new Color(1f, 0.72f, 0.38f), FlashKind.Sparkles);
+                        Hear(Sound.Place, struck);
+                        break;
+                    }
                     if (e.Amount < 0)
                     {
                         // Rock struck without a (good enough) pickaxe: a dull knock, and every few seconds the reminder.
@@ -3829,7 +3840,7 @@ namespace Game.Client
                 var at = shot.transform.localPosition;
                 _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, Sprites.ToRgba(shot.color), tints: true));
             }
-            _lightMap.Compute(_client.Map, left, bottom, _lights, _arenaGlow);
+            _lightMap.Compute(_client.Map, left, bottom, _lights, _arenaGlow, _biomeTint);
             for (int j = 0; j < size; j++)
             {
                 for (int i = 0; i < size; i++)

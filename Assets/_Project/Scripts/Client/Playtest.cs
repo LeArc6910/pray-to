@@ -462,6 +462,36 @@ namespace Game.Client
                         return $"ok depth at {words[2]} {_depthAnchor.X + sx},{_depthAnchor.Y + sy}";
                     }
                     return $"error depth: no '{words[1]}'";
+                // The biomes' looks (묶음 B1a, Docs/BiomeRework.md 4-1·4-3): "biomes" the state round the "scene biomes" set
+                // (the biome, its light colour and sound bed, the props standing there, decor, motes, critters, lamps);
+                // "biomes at lamp" the player just south of the set's unlit lamp, facing it (a swing lights it); "biomes at
+                // sac" the same before its spore sac; "biomes at cap" behind the giant cap; "biomes at grass" onto the nearest
+                // swaying decor.
+                case "biomes":
+                    if (words.Length == 1) return "biomes " + BiomesJson(root);
+                    if (words[1] == "at")
+                    {
+                        TileType wanted = words[2] == "sac" ? TileType.SporeSac : words[2] == "cap" ? TileType.GiantCap : TileType.UnlitLamp;
+                        Vec2? spot = null;
+                        if (words[2] == "grass")
+                        {
+                            var seen = root.LocalClient;
+                            spot = Nearest(world.Map, _biomesAnchor.X, _biomesAnchor.Y, (x, y) => Decor.Sways(Decor.On(world.Map, seen.Seed, seen.Biomes[x, y], x, y).Kind));
+                        }
+                        else
+                        {
+                            var thing = Nearest(world.Map, _biomesAnchor.X, _biomesAnchor.Y, (x, y) => world.Map[x, y] == wanted && !world.Map.IsSolid(x, y + (wanted == TileType.GiantCap ? 1 : -1)));
+                            // Before it, or for the giant cap behind it (under its cap, which fades).
+                            if (thing is Vec2 found) spot = found + new Vec2(0, wanted == TileType.GiantCap ? 1 : -1);
+                        }
+                        if (spot == null) return $"error biomes at {words[2]}: none near";
+                        player.Position = spot.Value;
+                        player.Corrections++;
+                        root.AimHeld = true;
+                        root.HeldAim = new Vec2(0, 1);
+                        return $"ok biomes at {words[2]} {TileMap.Cell(spot.Value.X)},{TileMap.Cell(spot.Value.Y)}";
+                    }
+                    return $"error biomes: no '{words[1]}'";
                 case "director":
                     if (words.Length == 1) return "director " + DirectorJson(root);
                     if (words[1] == "ambush") return world.Ambush(player) ? "ok director ambush" : "error director ambush: not in a narrow way with room before and behind";
@@ -869,8 +899,11 @@ namespace Game.Client
                         ?? throw new InvalidOperationException($"no open floor in {biome}");
                     break;
                 // Open floor outside the story's places, where monsters may come (World.InSafePlace keeps them out).
+                // Ten tiles clear of every place's safe ring (2026-11-24): a monster put a few tiles off is not set back to
+                // the ring's edge (World.KeepOutOfPlaces) before it acts, as one beside the spawn village was.
                 case "wild":
                     to = Nearest(map, px, py, (x, y) => !world.InSafePlace(TileMap.Center(x, y))
+                            && WildOffsets.All(d => !world.InSafePlace(TileMap.Center(x, y) + d))
                             && Enumerable.Range(-2, 5).All(dx => Enumerable.Range(-2, 5).All(dy => Walkable(map, x + dx, y + dy))))
                         ?? throw new InvalidOperationException("no open floor outside the places");
                     break;
@@ -1316,6 +1349,8 @@ namespace Game.Client
         }
 
         // The tile nearest (x, y), by rings outward, that passes the test.
+        static readonly Vec2[] WildOffsets = { new Vec2(10, 0), new Vec2(-10, 0), new Vec2(0, 10), new Vec2(0, -10), new Vec2(7, 7), new Vec2(-7, 7), new Vec2(7, -7), new Vec2(-7, -7) };
+
         static Vec2? Nearest(TileMap map, int x, int y, Func<int, int, bool> test)
         {
             int reach = Math.Max(map.Width, map.Height);
@@ -1359,6 +1394,31 @@ namespace Game.Client
                 // The standing layer's pen (묶음 B0): floor round the player; a pen of fence west of them with its corners,
                 // T's, a cross, a gate in its bottom run and one in its east run; a mushroom tree north-east and a cottage
                 // south-east to stand behind ("depth at").
+                // The biome's own set where the player stands (묶음 B1a): open floor round them, one of each of the
+                // biome's props in two rows north of them (the dirt cave's, the mushroom forest's; anywhere else the
+                // dirt cave's), a lamp already lit to the west and the places' tree to the south-west.
+                case "biomes":
+                {
+                    _biomesAnchor = (px, py);
+                    for (int dx = -8; dx <= 8; dx++)
+                        for (int dy = -5; dy <= 6; dy++)
+                            if (dx != 0 || dy != 0) Lay((px + dx, py + dy, TileType.Floor));
+                    var here = root.HostGenerated.Biomes[px, py];
+                    var kinds = BiomeProps.Of(here).Count > 0 ? BiomeProps.Of(here) : BiomeProps.Of(Biome.Cave);
+                    int col = -7;
+                    foreach (var kind in kinds)
+                    {
+                        if (kind.Type == TileType.GiantCap) continue;
+                        int w = Structures.Footprint(kind.Type).W;
+                        Lay((px + col, py + 3, kind.Type));
+                        if (w > 1) Lay((px + col + 1, py + 3, TileType.StructurePart));
+                        col += w + 1;
+                    }
+                    if (here == Biome.Mushroom) Lay((px + 5, py - 3, TileType.GiantCap));
+                    else Lay((px - 4, py, TileType.LitLamp));
+                    Lay((px - 5, py - 3, TileType.MushroomTree));
+                    break;
+                }
                 case "depth":
                     _depthAnchor = (px, py);
                     for (int dx = -8; dx <= 7; dx++)
@@ -1545,6 +1605,52 @@ namespace Game.Client
         };
 
         static (int X, int Y) _depthAnchor;
+        static (int X, int Y) _biomesAnchor;
+
+        // The biome's look round the "scene biomes" set: which biome and generator, its light colour and sound bed, the
+        // biome props standing within nine tiles (by kind, and how the view draws each: kind, drawing), the lamps lit and
+        // out, what the standing layer drew, and the motes and critters alive against their caps.
+        static string BiomesJson(GameRoot root)
+        {
+            var view = root.View;
+            var world = root.HostWorld;
+            var seen = root.LocalClient;
+            var (ax, ay) = _biomesAnchor;
+            var biome = seen.Biomes[ax, ay];
+            var kinds = new SortedDictionary<string, int>();
+            var cells = new Json('[');
+            int lit = 0, unlit = 0, trees = 0;
+            for (int dy = 9; dy >= -9; dy--)
+            {
+                for (int dx = -9; dx <= 9; dx++)
+                {
+                    int x = ax + dx, y = ay + dy;
+                    if (!seen.Map.InBounds(x, y)) continue;
+                    var type = seen.Map[x, y];
+                    if (type == TileType.MushroomTree) trees++;
+                    if (!BiomeProps.Is(type)) continue;
+                    kinds[type.ToString()] = kinds.TryGetValue(type.ToString(), out int n) ? n + 1 : 1;
+                    if (type == TileType.LitLamp) lit++;
+                    if (type == TileType.UnlitLamp) unlit++;
+                    var (kind, shape, order) = view != null ? view.StandAt(x, y) : ("none", 0, 0);
+                    cells.Item(new RawJson(new Json('{').Field("dx", dx).Field("dy", dy).Field("type", type.ToString()).Field("kind", kind).Field("shape", shape)
+                        .Field("order", order).Field("alpha", view?.FadeOf(x, y) ?? 1).Close('}')));
+                }
+            }
+            var counts = new Json('{');
+            foreach (var pair in kinds) counts.Field(pair.Key, pair.Value);
+            var tint = WorldLights.BiomeTint(biome);
+            int clouds = world.Hazards.Count(h => h.Shape == HazardShape.Balm);
+            return new Json('{').Field("biome", biome.ToString()).Field("generator", root.HostGenerated?.Version ?? 0)
+                .Field("tint", tint.A == 0 ? "" : "#" + Sprites.Key(tint)).Field("glow", WorldLights.BiomeGlow(biome)).Field("ambience", Music.AmbienceNow)
+                .Field("kinds", new RawJson(counts.Close('}'))).Field("lit", lit).Field("unlit", unlit).Field("trees", trees).Field("clouds", clouds)
+                .Field("litHere", TileLight.Lit(seen.Map, seen.Tiles, seen.Position, 6))
+                .Field("props", view?.PropsDrawn ?? 0).Field("decor", view?.DecorDrawn ?? 0).Field("skipped", view?.StandsSkipped ?? 0)
+                .Field("renderers", view?.StandRenderers ?? 0).Field("rustled", view?.Rustled ?? 0)
+                .Field("motes", view?.MotesDrawn ?? 0).Field("moteCap", WorldView.MoteCap).Field("critters", view?.CrittersAlive ?? 0)
+                .Field("critterCap", WorldView.CritterCap).Field("critterKinds", view?.CritterKinds ?? "").Field("lamps", view?.LampsInView ?? 0)
+                .Field("selfOrder", view?.SelfOrder ?? 0).Field("ax", ax).Field("ay", ay).Field("cells", cells.Raw(']')).Close('}');
+        }
 
         static (int X, int Y) DepthSpot(string name) => name switch
         {

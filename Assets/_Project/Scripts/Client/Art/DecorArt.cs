@@ -14,7 +14,29 @@ namespace Game.Client
         public const int Width = 12, Height = 11;
         static readonly Rgba Ink = Rgba.Hex("#140E18");
 
-        public static PixelImage Image(DecorKind kind, Biome biome, int variant)
+        // frame: 0 at rest; 1 and 2 are a swaying kind (Decor.Sways) nudged a pixel right and left above its foot, shown
+        // for a moment when someone brushes past (Docs/BiomeRework.md 4-3 흔들림).
+        public static PixelImage Image(DecorKind kind, Biome biome, int variant, int frame = 0)
+        {
+            var image = Still(kind, biome, variant);
+            return frame != 0 && Decor.Sways(kind) ? Swayed(image, frame == 1 ? 1 : -1) : image;
+        }
+
+        // The rows above the foot shifted a pixel (the top two rows two), the foot and the shadow where they were.
+        static PixelImage Swayed(PixelImage still, int way)
+        {
+            var g = new PixelImage(still.Width, still.Height);
+            int foot = Height - 4;
+            for (int y = 0; y < still.Height; y++)
+            {
+                int shift = y >= foot ? 0 : y < foot - 4 ? way * 2 : way;
+                for (int x = 0; x < still.Width; x++)
+                    if (still[x, y].A > 0) g[x + shift, y] = still[x, y];
+            }
+            return g;
+        }
+
+        static PixelImage Still(DecorKind kind, Biome biome, int variant)
         {
             var g = new PixelImage(Width, Height);
             int salt = (int)kind * 31 + variant * 7 + (int)biome * 131;
@@ -27,7 +49,20 @@ namespace Game.Client
                     Tuft(g, biome == Biome.Lake ? Ramp.Of("#6E9A54") : Ramp.Of("#B8A27A"), salt, variant, biome == Biome.Lake);
                     break;
                 case DecorKind.Caps:
-                    Caps(g, biome == Biome.Mushroom ? Ramp.Of("#8AC85A") : Ramp.Of("#C88A5A"), salt, variant);
+                    // The forest's little caps tan, some pink; the dirt cave's brown.
+                    Caps(g, biome == Biome.Mushroom ? Ramp.Of(variant == 2 ? "#E88AB0" : "#D8A070") : Ramp.Of("#B8824E"), salt, variant);
+                    break;
+                case DecorKind.Web:
+                    Web(g, variant);
+                    break;
+                case DecorKind.GlowGrass:
+                    GlowGrass(g, salt, variant);
+                    break;
+                case DecorKind.Threads:
+                    Threads(g, salt, variant);
+                    break;
+                case DecorKind.Moss:
+                    MossClump(g, salt, variant);
                     break;
                 case DecorKind.Shards:
                     Shards(g, ShardOf(biome, variant), salt, variant);
@@ -42,17 +77,100 @@ namespace Game.Client
             return g;
         }
 
+        // A cobweb across the upper left corner where two rock faces meet (mirrored for the other corner): thin pale
+        // threads, see-through, flat.
+        static void Web(PixelImage g, int variant)
+        {
+            var thread = new Rgba(226, 220, 208, 150);
+            var faint = new Rgba(226, 220, 208, 90);
+            // Spokes out of the corner, then two or three arcs across them.
+            for (int i = 0; i < 8; i++)
+            {
+                g.Blend(i, i, thread);
+                g.Blend(i, 0, faint);
+                g.Blend(0, i, faint);
+                if (i < 6) g.Blend(i * 2 / 3, i, faint);
+                if (i < 6) g.Blend(i, i * 2 / 3, faint);
+            }
+            foreach (int r in variant == 0 ? new[] { 3, 6 } : variant == 1 ? new[] { 2, 4, 7 } : new[] { 4, 7 })
+                for (int i = 0; i <= r; i++) g.Blend(i, r - i, thread);
+            if (variant == 2) g[5, 4] = Rgba.Hex("#3A2E28");
+        }
+
+        // A tuft of forest grass whose tips glow lime.
+        static void GlowGrass(PixelImage g, int salt, int variant)
+        {
+            var ramp = Ramp.Of("#5E8A3A");
+            var tip = Rgba.Hex("#B8F25A");
+            var core = Rgba.Hex("#EEFFB8");
+            Shadow(g, 6, 7);
+            int blades = 4 + variant;
+            for (int i = 0; i < blades; i++)
+            {
+                int x = 2 + i * 7 / blades + (int)(PixelNoise.Hash(i, 1, salt) % 2);
+                int tall = 4 + (int)(PixelNoise.Hash(i, 2, salt) % 4);
+                int lean = i < blades / 2 ? -1 : i > blades / 2 ? 1 : 0;
+                for (int k = 0; k < tall; k++)
+                {
+                    int bx = x + (k > tall / 2 ? lean : 0);
+                    g[bx, Height - 3 - k] = k == tall - 1 ? (i % 2 == 0 ? core : tip) : k == tall - 2 ? tip : k < 2 ? ramp.Shade : ramp.Main;
+                }
+            }
+            for (int x = 1; x < 11; x++)
+                if (g[x, Height - 3].A > 0) g[x, Height - 3] = ramp.Dark;
+        }
+
+        // White threads of mycelium branching over the floor: flat, see-through.
+        static void Threads(PixelImage g, int salt, int variant)
+        {
+            var thread = new Rgba(216, 224, 200, 150);
+            var faint = new Rgba(216, 224, 200, 80);
+            int y = 5 + variant % 2;
+            for (int x = 0; x < Width; x++)
+            {
+                y += (int)(PixelNoise.Hash(x, variant, salt) % 3) - 1;
+                y = Math.Clamp(y, 2, Height - 3);
+                g.Blend(x, y, thread);
+                // Side branches.
+                if (PixelNoise.Hash(x, 7, salt) % 4 == 0)
+                {
+                    int way = PixelNoise.Hash(x, 8, salt) % 2 == 0 ? -1 : 1;
+                    g.Blend(x, y + way, faint);
+                    g.Blend(x + 1, y + way * 2, faint);
+                }
+            }
+            if (variant == 2) g[6, Math.Clamp(y - 1, 1, Height - 2)] = Rgba.Hex("#EEFFB8");
+        }
+
+        // A low clump of moss: flat, its upper left lit.
+        static void MossClump(PixelImage g, int salt, int variant)
+        {
+            var moss = Ramp.Of("#56682E");
+            float rx = 3.6f + variant * 0.7f, ry = 1.8f + (variant == 1 ? 0.6f : 0);
+            for (int y = 0; y < Height; y++)
+            {
+                for (int x = 0; x < Width; x++)
+                {
+                    float dx = (x + 0.5f - 6) / rx, dy = (y + 0.5f - 6.5f) / ry;
+                    float d = dx * dx + dy * dy;
+                    if (d > 1 + (PixelNoise.Value(x, y, salt) - 0.5f) * 0.5f) continue;
+                    g[x, y] = -dx * 0.5f - dy * 0.8f > 0.35f ? moss.Light.Mix(moss.Main, 0.5f) : d > 0.6f ? moss.Shade : moss.Main;
+                }
+            }
+            if (variant == 2) g[7, 5] = Rgba.Hex("#B8F25A");
+        }
+
         // The stone of the biome's floor, a step lighter so it shows on it.
         static Ramp StoneOf(Biome biome) => biome switch
         {
-            Biome.Mushroom => Ramp.Of("#6E6A5A"),
+            Biome.Mushroom => Ramp.Of("#5E6248"),
             Biome.Ice => Ramp.Of("#7A8C9C"),
             Biome.Crystal => Ramp.Of("#6E7484"),
             Biome.Lava => Ramp.Of("#4E4440"),
             Biome.Abyss => Ramp.Of("#4A4058"),
             Biome.Lake => Ramp.Of("#5E7470"),
             Biome.Sand => Ramp.Of("#A88A62"),
-            _ => Ramp.Of("#7A6A5A"),
+            _ => Ramp.Of("#7A6450"),
         };
 
         static Ramp ShardOf(Biome biome, int variant) => biome switch
@@ -114,11 +232,12 @@ namespace Game.Client
         {
             var stem = Ramp.Of("#D8CCB0");
             Shadow(g, 6, 8);
+            // Two, three, or (the third drawing) a tall one with a small one at its foot.
             int count = 2 + variant % 2;
             for (int i = 0; i < count; i++)
             {
-                int x = 1 + i * 4 + (int)(PixelNoise.Hash(i, 5, salt) % 2);
-                int tall = 2 + (int)(PixelNoise.Hash(i, 6, salt) % 3) + (i == 1 ? 1 : 0);
+                int x = 1 + i * 4 + (int)(PixelNoise.Hash(i, 5, salt) % 2) + (variant == 2 ? 2 : 0);
+                int tall = variant == 2 ? (i == 0 ? 5 : 1) : 2 + (int)(PixelNoise.Hash(i, 6, salt) % 3) + (i == 1 ? 1 : 0);
                 int foot = Height - 3;
                 for (int k = 0; k < tall; k++) g[x + 1, foot - k] = k == 0 ? stem.Shade : stem.Main;
                 int top = foot - tall;

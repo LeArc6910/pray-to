@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -6156,7 +6156,8 @@ async function b1mobs(browser) {
     await game.wait(1500);
     const filled = await game.ask('b1');
     const later = (filled.monsters || []).find(m => m.kind === 'myconid');
-    check(!!hurt && !!later && later.inCloud && later.health > hurt.health,
+    // The cloud may have thinned out by the second look on a slow phone: it was in it at the first.
+    check(!!hurt && !!later && hurt.inCloud && later.health > hurt.health,
       `${name}: 구름 안의 몬스터가 찬다 (${hurt ? Math.round(hurt.health) : '?'} → ${later ? Math.round(later.health) : '?'}/${later ? later.maxHealth : '?'})`);
     check(filled.greenNumbers > burst.greenNumbers || filled.greenNumbers > 0, `${name}: 찬 만큼 초록 숫자가 뜬다 (${filled.greenNumbers})`);
     await game.shot('b1mobs-heal', '구름 안에서 차오르는 버섯 병정(초록 숫자)');
@@ -6196,7 +6197,128 @@ async function b1mobs(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs };
+// The biomes' looks (2026-11-24, Docs/BiomeRework.md 묶음 B1a, Docs/Playtest.md biomes), on a PC and a phone held upright:
+// a room of the dirt cave and one of the mushroom forest, each with the biome's own set laid round the player ("scene
+// biomes": one of each prop, a lit lamp or a giant cap, the places' tree). Read from the view: every prop of the biome
+// stands and is drawn as a standing thing within the cap; the biome's light colour (none in the dirt cave, lime in the
+// forest) and its own sound bed; motes and critters alive and within their caps; a swing at the unlit lamp lights it
+// and the player then stands in its light; a
+// swing at the spore sac bursts it into a cloud; walking through swaying decor rustles it. Whether the biomes feel
+// their own, how the beds sound and how the rustle feels are the person's.
+const BiomeSets = {
+  cave: { name: '흙 동굴', id: 'Cave', room: 'cave', tint: '', ambience: 'DirtCave', kinds: ['Stalagmite', 'PitProp', 'TippedCart', 'OreSack', 'UnlitLamp', 'Boulder', 'CaveIn', 'LitLamp'], critters: ['Cricket', 'Mouse', 'LampMoth'] },
+  mushroom: { name: '버섯 숲', id: 'Mushroom', room: 'mushroom', tint: '#A8F06A', ambience: 'Spores', kinds: ['PillarCap', 'ShelfStump', 'SporeSac', 'GlowCaps', 'FallenLog', 'GiantCap'], critters: ['Firefly', 'Snail', 'SporeMoth'] },
+};
+
+async function biomes(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 생물군계의 모습 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('probe on; monsters hold; heal');
+    for (const key of ['cave', 'mushroom']) {
+      const set = BiomeSets[key];
+      // The room as the generator made it first (a new world is version 3: its own props stand in it), then the set.
+      const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
+      await game.wait(2500);
+      let b = await game.ask('biomes');
+      await game.shot(`biomes-${key}-room`, `${set.name}의 방 그대로(생성기 ${b.generator}판)`);
+      await game.send('scene biomes');
+      await game.wait(2500);
+      b = await game.ask('biomes');
+      check(b.biome === set.id, `${name}: ${set.name}의 방에 섰다 (${b.biome}, ${went})`);
+      check(b.generator >= 3, `${name}: 새 월드는 생성기 3판이다 (${b.generator})`);
+      const missing = set.kinds.filter(k => !(b.kinds || {})[k]);
+      check(missing.length === 0, `${name}: ${set.name}의 소품이 모두 서 있다 (없는 것: ${missing.join(', ') || '없음'})`);
+      const flat = (b.cells || []).filter(c => c.kind !== 'Prop');
+      check((b.cells || []).length >= set.kinds.length && flat.length === 0, `${name}: 소품은 칸에 꽉 찬 타일이 아니라 서 있는 물체로 그려진다 (${(b.cells || []).length}개, 아닌 것 ${flat.length})`);
+      check(b.props >= set.kinds.length && b.skipped === 0 && b.renderers <= (game.touch ? 250 : 400), `${name}: 서 있는 것을 상한 안에서 다 그린다 (소품 ${b.props}, 꾸밈 ${b.decor}, 조각 ${b.renderers}, 뺀 것 ${b.skipped})`);
+      check((b.tint || '') === set.tint, `${name}: ${set.name}의 빛 색 (${b.tint || '없음'}, 기대 ${set.tint || '없음'})`);
+      check(b.ambience === set.ambience, `${name}: ${set.name}의 환경음이 깔린다 (${b.ambience})`);
+      check(b.trees >= 1, `${name}: 장소의 큰 나무 자리 (${b.trees})`);
+      // Motes and critters come in over a few seconds; the caps are never passed.
+      let seen = await game.ask('biomes');
+      for (let tries = 0; tries < 18 && !(seen.motes > 0 && seen.critters > 0); tries++) {
+        await game.wait(500);
+        seen = await game.ask('biomes');
+      }
+      check(seen.motes > 0 && seen.motes <= seen.moteCap, `${name}: 입자가 떠다닌다, 상한 안 (${seen.motes}/${seen.moteCap})`);
+      check(seen.critters > 0 && seen.critters <= seen.critterCap, `${name}: 작은 생물이 있다, 상한 안 (${seen.critters}/${seen.critterCap}: ${seen.critterKinds})`);
+      const strange = (seen.critterKinds || '').split(',').filter(k => k && !set.critters.includes(k));
+      check(strange.length === 0, `${name}: 그 생물군계의 생물만 (${seen.critterKinds || '없음'})`);
+      await game.shot(`biomes-${key}`, `${set.name}: 소품 한 벌, 꾸밈, 작은 생물, 빛`);
+
+      if (key === 'cave') {
+        // The unlit lamp: one swing lights it, and it lights where the player stands.
+        const before = await game.ask('biomes');
+        const at = (await game.send('biomes at lamp')).join(' ');
+        await game.wait(500);
+        await game.send('attack on 0 1');
+        await game.wait(900);
+        await game.send('attack off');
+        await game.wait(600);
+        const after = await game.ask('biomes');
+        check(/ok biomes at lamp/.test(at) && after.lit === before.lit + 1 && after.unlit === before.unlit - 1,
+          `${name}: 꺼진 등잔을 치면 불이 붙는다 (켜진 것 ${before.lit}→${after.lit}, 꺼진 것 ${before.unlit}→${after.unlit}; ${at})`);
+        check(after.litHere === true, `${name}: 켠 등잔의 빛 안에 서 있다 (${after.litHere})`);
+        await game.shot('biomes-cave-lamp', '불을 붙인 등잔');
+      } else {
+        // The spore sac: a swing bursts it into the cloud that fills monsters.
+        const before = await game.ask('biomes');
+        const at = (await game.send('biomes at sac')).join(' ');
+        await game.wait(500);
+        await game.send('attack on 0 1');
+        await game.wait(900);
+        await game.send('attack off');
+        await game.wait(300);
+        const after = await game.ask('biomes');
+        check(/ok biomes at sac/.test(at) && ((after.kinds || {}).SporeSac || 0) < ((before.kinds || {}).SporeSac || 0) && after.clouds >= 1,
+          `${name}: 포자 주머니를 치면 터져 구름이 된다 (주머니 ${(before.kinds || {}).SporeSac || 0}→${(after.kinds || {}).SporeSac || 0}, 구름 ${after.clouds}; ${at})`);
+        await game.shot('biomes-mushroom-sac', '터진 포자 주머니의 구름');
+        // Behind the giant cap its cap fades.
+        const cap = (after.cells || []).find(c => c.type === 'GiantCap');
+        if (cap) {
+          await game.send('biomes at cap');
+          await game.wait(700);
+          const behind = await game.ask('biomes');
+          const now = (behind.cells || []).find(c => c.type === 'GiantCap') || {};
+          check(now.alpha < 0.5, `${name}: 거대 갓 뒤에 서면 갓이 흐려진다 (알파 ${now.alpha})`);
+          await game.shot('biomes-mushroom-cap', '거대 갓 뒤: 갓이 흐려진다');
+        } else check(false, `${name}: 거대 갓이 없다`);
+      }
+      // Brushing through what sways.
+      const still = await game.ask('biomes');
+      const grass = (await game.send('biomes at grass')).join(' ');
+      await game.wait(300);
+      await game.send('face off');
+      // A step east through it: the key on the PC, the left stick on the phone.
+      if (game.touch) {
+        const box = await game.canvas();
+        await game.drag(box.left + box.width * 0.2, box.top + box.height * 0.75, 60, 0, 700);
+      } else {
+        await game.page.keyboard.down('d');
+        await game.wait(600);
+        await game.page.keyboard.up('d');
+      }
+      await game.wait(200);
+      const swayed = await game.ask('biomes');
+      check(/ok biomes at grass/.test(grass) && swayed.rustled > still.rustled, `${name}: 스치면 흔들린다 (${still.rustled}→${swayed.rustled}; ${grass})`);
+    }
+    await game.send('clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

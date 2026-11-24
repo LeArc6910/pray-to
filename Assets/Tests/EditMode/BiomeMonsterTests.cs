@@ -101,6 +101,22 @@ namespace Game.Core.Tests
         }
 
         [Test]
+        public void ACrowdOfRatsAtTheLightsEdgeDoesNotShoveOneIn()
+        {
+            // Ten rats bunched where they stop: pushing apart, none is shoved over the edge (the web check caught two).
+            var world = Room(40);
+            var player = world.AddPlayer("a", null);
+            player.Position = TileMap.Center(6, 20);
+            world.Map[5, 20] = TileType.Torch;
+            var rats = Enumerable.Range(0, 10).Select(i => Spawn(world, "cave_rat", TileMap.Center(13, 20) + new Vec2(0.05f * (i % 3), 0.05f * (i / 3)))).ToList();
+            Run(world, 8, () =>
+            {
+                foreach (var rat in rats)
+                    Assert.IsFalse(world.FearsLight(rat.Position), $"a rat shoved into the light at {rat.Position.X:0.0},{rat.Position.Y:0.0}");
+            });
+        }
+
+        [Test]
         public void RatsDoNotComeIntoTorchlightAndOneTheLightFindsGoesOut()
         {
             var world = Room(40);

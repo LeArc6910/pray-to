@@ -16,6 +16,8 @@ namespace Game.Core
             TileType.Brazier,
             TileType.Lantern,
             TileType.LampPost,
+            // The dirt cave's lamp once a swing has lit it (B1a, TileLight).
+            TileType.LitLamp,
         };
 
         static readonly bool[] Giving = Make();

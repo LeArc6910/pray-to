@@ -33,7 +33,7 @@ namespace Game.Client
 
         static Rgba DungeonFloor(Biome biome) => biome switch
         {
-            Biome.Mushroom => Rgba.Hex("#5C4878"),
+            Biome.Mushroom => Rgba.Hex("#4E603A"),
             Biome.Ice => Rgba.Hex("#8FBAD6"),
             Biome.Crystal => Rgba.Hex("#7458B8"),
             Biome.Lava => Rgba.Hex("#8E3A26"),

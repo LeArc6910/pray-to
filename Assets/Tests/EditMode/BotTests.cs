@@ -164,6 +164,67 @@ namespace Game.Core.Tests
             Assert.IsNotEmpty(stuck.Recent);
         }
 
+        // Hurt badly with a monster near (2026-11-24, the first hour on generator 3: a bot fought a sand cave's crowds
+        // to the last blow by its bed, again and again), a bot that retreats goes away from it along open floor, rests
+        // once out of its way and comes back to the fight when its health is mostly back. One that does not (the web
+        // bot) fights on as before.
+        [Test]
+        public void GetsAwayToRestWhenHurtAmongMonstersAndComesBack()
+        {
+            var world = new World(Maps.Room(40), TileMap.Center(20, 20), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null);
+            var slime = world.SpawnEnemy(Monsters.Shipped.Find("slime"), player.Position + new Vec2(0.8f, 0));
+            world.MonstersHold = true;
+            player.Health = player.Stats.MaxHealth * (BotPilot.RetreatBelow - 0.05f);
+
+            var stays = new BotPilot(world, player, new BotMemory(world, player));
+            Assert.AreEqual(BotDo.Fight, stays.Next(BotTarget.Monster()).Do, "without Retreats it fights on");
+
+            var memory = new BotMemory(world, player);
+            var pilot = new BotPilot(world, player, memory) { Retreats = true };
+            var away = pilot.Next(BotTarget.Monster());
+            Assert.AreEqual(BotDo.Move, away.Do, away.ToString());
+            Assert.AreEqual("물러남", away.Why);
+            Assert.LessOrEqual(Vec2.Dot(away.Direction, slime.Position - player.Position), 0, "not toward the slime");
+            Assert.AreEqual(1, memory.Retreats);
+            var end = away.Goal.Value;
+            Assert.GreaterOrEqual(Vec2.Distance(TileMap.Center(end.X, end.Y), slime.Position), BotPilot.RetreatClear, "to where the slime is well off");
+
+            // Out of its way (it waits where it stood), the bot rests; with its health mostly back it goes at it again.
+            player.Position = slime.Position + new Vec2(-BotPilot.RetreatClear - 1, 0);
+            var rest = pilot.Next(BotTarget.Monster());
+            Assert.AreEqual(BotDo.Wait, rest.Do, rest.ToString());
+            Assert.AreEqual("물러나 쉼", rest.Why);
+            player.Health = player.Stats.MaxHealth * BotPilot.RetreatUntil;
+            var back = pilot.Next(BotTarget.Monster());
+            Assert.AreEqual(BotDo.Move, back.Do, back.ToString());
+            Assert.Greater(Vec2.Dot(back.Direction, slime.Position - player.Position), 0, "back toward the slime");
+            Assert.AreEqual(1, memory.Retreats);
+        }
+
+        // A foe that goes under the ground and mends (a sand worm, 2026-11-24: a bot struck one for eight minutes by the
+        // water it meant to fish at) counts as getting on only when its health goes below the lowest it has been: one
+        // that mends back past every blow is given up after StallTicks.
+        [Test]
+        public void GivesUpOnAFoeThatMendsPastItsBlows()
+        {
+            var world = new World(Maps.Room(20), TileMap.Center(10, 10), Monsters.Shipped, 1, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
+            var player = world.AddPlayer("a", null);
+            var foe = world.SpawnEnemy(Monsters.Shipped.Find("slime"), player.Position + new Vec2(0.8f, 0));
+            world.MonstersHold = true;
+            var pilot = new BotPilot(world, player, new BotMemory(world, player)) { StallTicks = 30 };
+            float most = foe.MaxHealth;
+            bool fought = true;
+            for (int i = 0; i < 120 && fought; i++)
+            {
+                world.Step();
+                // Struck down a little, then mended back above where it was: never lower than its first low.
+                foe.Health = i == 0 ? most * 0.5f : i % 2 == 0 ? most * 0.9f : most * 0.6f;
+                fought = pilot.Next(BotTarget.Monster()).Do == BotDo.Fight;
+            }
+            Assert.IsFalse(fought, "let be once it mended past the blows for StallTicks");
+        }
+
         static BotSheets Shipped => new BotSheets
         {
             Monsters = Monsters.Shipped, Loot = Gear.Data, Bosses = Bosses.Shipped, Classes = Classes.Shipped, Tiles = Tiles.Shipped,

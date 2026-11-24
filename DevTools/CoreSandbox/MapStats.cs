@@ -31,11 +31,15 @@ namespace CoreSandbox
             public IReadOnlyList<RoadRoute> Roads;
             // Each minecart line (3c): its length, the seconds a cart takes, and the seconds walked between its stations.
             public List<(float Length, double Ride, double Walk)> Rails = new List<(float, double, double)>();
+            // The biomes' props (generator version 3, Docs/BiomeRework.md B1a): by biome, the tiles props stand on, the
+            // large ones among them, open floor, and the client's decor on it (Decor.On); and of all tiles, props.
+            public Dictionary<Biome, (int Props, int Big, int Floor, int Decor)> Props = new Dictionary<Biome, (int, int, int, int)>();
+            public double PropShare;
         }
 
         const int BigLump = 100;
 
-        public static Numbers Measure(GeneratedWorld world)
+        public static Numbers Measure(GeneratedWorld world, ulong seed = 0)
         {
             var map = world.Map;
             int width = map.Width, height = map.Height, total = width * height;
@@ -76,6 +80,31 @@ namespace CoreSandbox
                     }
                 }
             }
+            int props = 0;
+            for (int y = 0; y < height; y++)
+            {
+                for (int x = 0; x < width; x++)
+                {
+                    var type = map[x, y];
+                    bool prop = BiomeProps.Is(type);
+                    if (!prop && type != TileType.Floor) continue;
+                    var biome = world.Biomes[x, y];
+                    numbers.Props.TryGetValue(biome, out var row);
+                    if (prop)
+                    {
+                        props += Structures.Footprint(type).W;
+                        row.Props++;
+                        if (Structures.Footprint(type).W > 1 || type == TileType.GiantCap) row.Big++;
+                    }
+                    else
+                    {
+                        row.Floor++;
+                        if (Decor.On(map, seed, biome, x, y).Any) row.Decor++;
+                    }
+                    numbers.Props[biome] = row;
+                }
+            }
+            numbers.PropShare = 100.0 * props / total;
             numbers.Rock = 100.0 * rocks / total;
             numbers.Water = 100.0 * water / total;
             numbers.Lava = 100.0 * lava / total;
@@ -321,7 +350,7 @@ namespace CoreSandbox
                     var watch = Stopwatch.StartNew();
                     var world = WorldGenerator.Generate(seed, size, size, story, arenas, version, terrain);
                     double took = watch.Elapsed.TotalMilliseconds;
-                    var numbers = Measure(world);
+                    var numbers = Measure(world, seed);
                     numbers.Milliseconds = took;
                     runs.Add((seed, numbers));
                 }
@@ -375,6 +404,15 @@ namespace CoreSandbox
                     Row("광차 줄이 잇는 생물군계", n => n.Rails.Count == 0 ? "-" : string.Join(", ", n.Rooms.Lines.Select(l =>
                         $"{BiomeMap.Name(n.Rooms.Pois[l.StationA].Biome)}-{BiomeMap.Name(n.Rooms.Pois[l.StationB].Biome)}")));
                     Row("길잡이 돌(생물군계마다 하나)", n => n.Rooms.Pois.Count(p => p.Kind == PoiKind.Waystone).ToString());
+                }
+                if (version >= WorldGenerator.PropVersion)
+                {
+                    Row("소품이 선 칸(온 지도에서)", n => $"{n.PropShare:0.00}%");
+                    foreach (var biome in new[] { Biome.Cave, Biome.Mushroom })
+                    {
+                        Row($"{BiomeMap.Name(biome)}: 바닥 100칸에 막는·깨는 소품 / 큰 것 / 꾸밈", n => n.Props.TryGetValue(biome, out var p) && p.Floor > 0
+                            ? $"{100.0 * p.Props / p.Floor:0.0} / {100.0 * p.Big / p.Floor:0.00} / {100.0 * p.Decor / p.Floor:0.0}" : "-");
+                    }
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();

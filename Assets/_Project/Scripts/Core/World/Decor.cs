@@ -17,6 +17,12 @@ namespace Game.Core
         Shards,
         Embers,
         Bones,
+        // The dirt cave's and the mushroom forest's own (묶음 B1a): a cobweb in a corner of the rock, a tuft of grass
+        // with glowing tips, white threads of mycelium on the floor, a clump of moss.
+        Web,
+        GlowGrass,
+        Threads,
+        Moss,
     }
 
     // One tile's pick: what, which of its drawings, mirrored or not, and how far off the tile's middle it stands (in
@@ -52,6 +58,9 @@ namespace Game.Core
         // In a thousand tiles of open floor, before the one-tile spacing thins it a little (B0's low density; the biome
         // packages raise it toward 8 to 12 in a hundred).
         public const int PerThousand = 34;
+        // The biomes whose package is made (B1a: the dirt cave, the mushroom forest): eight to twelve in a hundred
+        // tiles of clear floor once thinned.
+        public const int DensePerThousand = 270;
         // The clumps: a smooth noise over cells this many tiles wide raises or lowers the chance, so things gather in
         // groups and leave bare floor between (Docs/BiomeRework.md 4-3 배치, Poisson in clumps rather than a grid).
         const int ClumpCell = 6;
@@ -61,13 +70,14 @@ namespace Game.Core
         // priority keeps its thing (a one-tile Poisson disc).
         public static DecorPick At(ulong seed, Biome biome, int x, int y)
         {
-            if (!Passes(seed, x, y)) return default;
+            int rate = RateOf(biome);
+            if (!Passes(seed, x, y, rate)) return default;
             uint mine = Hash(seed, x, y, 2);
             for (int dy = -1; dy <= 1; dy++)
             {
                 for (int dx = -1; dx <= 1; dx++)
                 {
-                    if (dx == 0 && dy == 0 || !Passes(seed, x + dx, y + dy)) continue;
+                    if (dx == 0 && dy == 0 || !Passes(seed, x + dx, y + dy, rate)) continue;
                     uint theirs = Hash(seed, x + dx, y + dy, 2);
                     // Ties go to the lower tile then the left one, so exactly one of two keeps it.
                     if (theirs > mine || theirs == mine && (dy < 0 || dy == 0 && dx < 0)) return default;
@@ -85,15 +95,41 @@ namespace Game.Core
         // The kinds of each biome and how often, out of a hundred (B0's proof set: a common one and the biome's own).
         public static DecorKind KindOf(Biome biome, int roll) => biome switch
         {
-            Biome.Mushroom => roll < 60 ? DecorKind.Caps : DecorKind.Pebbles,
+            Biome.Mushroom => roll < 32 ? DecorKind.GlowGrass : roll < 60 ? DecorKind.Caps : roll < 80 ? DecorKind.Threads : DecorKind.Moss,
             Biome.Ice => roll < 60 ? DecorKind.Shards : DecorKind.Pebbles,
             Biome.Crystal => roll < 70 ? DecorKind.Shards : DecorKind.Pebbles,
             Biome.Lava => roll < 60 ? DecorKind.Embers : DecorKind.Pebbles,
             Biome.Abyss => roll < 50 ? DecorKind.Shards : DecorKind.Pebbles,
             Biome.Lake => roll < 60 ? DecorKind.Tuft : DecorKind.Pebbles,
             Biome.Sand => roll < 40 ? DecorKind.Bones : DecorKind.Pebbles,
-            _ => roll < 60 ? DecorKind.Pebbles : DecorKind.Tuft,
+            _ => roll < 40 ? DecorKind.Pebbles : roll < 70 ? DecorKind.Tuft : DecorKind.Caps,
         };
+
+        // How many in a thousand tiles roll a thing, by biome.
+        public static int RateOf(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom ? DensePerThousand : PerThousand;
+
+        // The kinds that sway: drawn nudged for a moment when someone brushes past (the client's rustle).
+        public static bool Sways(DecorKind kind) => kind == DecorKind.Tuft || kind == DecorKind.Caps || kind == DecorKind.GlowGrass;
+
+        // The kinds that lie flat on the floor: no shadow, never in front of anyone's feet.
+        public static bool Flat(DecorKind kind) => kind == DecorKind.Web || kind == DecorKind.Threads || kind == DecorKind.Moss;
+
+        // In a hundred corners of the dirt cave's rock (rock above and at a side), how many have a cobweb.
+        public const int WebPercent = 30;
+
+        // The pick as it shows on the map: nothing off clear floor (Clear). In the dirt cave a corner of the rock may
+        // have a cobweb instead, hung into the corner (the upper left, or mirrored into the upper right).
+        public static DecorPick On(TileMap map, ulong seed, Biome biome, int x, int y)
+        {
+            if (!Clear(map, x, y)) return default;
+            if (biome == Biome.Cave && map[x, y + 1] == TileType.Wall)
+            {
+                bool left = map[x - 1, y] == TileType.Wall, right = map[x + 1, y] == TileType.Wall;
+                uint roll = Hash(seed, x, y, 5);
+                if ((left || right) && roll % 100 < WebPercent) return new DecorPick(DecorKind.Web, (int)(roll / 100 % Variants), !left, left ? -2 : 2, Lift);
+            }
+            return At(seed, biome, x, y);
+        }
 
         // Whether the tile may hold a thing at all: open floor, with nothing round it but floor and cave rock (so not
         // on or beside a road, a door, a laid floor, a place's things, an arena's pattern, anything built, water or
@@ -124,9 +160,11 @@ namespace Game.Core
         // The cave's own rock: the walls, ore and the rooms' walls.
         static bool Natural(TileType type) =>
             type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre
-            || type == TileType.ObsidianOre || type == TileType.VoidOre || TileMap.IsRoomWall(type);
+            || type == TileType.ObsidianOre || type == TileType.VoidOre || TileMap.IsRoomWall(type)
+            // The biomes' own props (and the right half of a wide one): cover grows up to their feet.
+            || BiomeProps.Is(type) || type == TileType.MushroomTree || type == TileType.StructurePart;
 
-        static bool Passes(ulong seed, int x, int y)
+        static bool Passes(ulong seed, int x, int y, int rate)
         {
             // The clump: smooth value noise from the corners of the tile's cell, 0.25 to 1.75 times the rate.
             int cx = Floor(x, ClumpCell), cy = Floor(y, ClumpCell);
@@ -136,8 +174,22 @@ namespace Game.Core
             float a = Unit(seed, cx, cy), b = Unit(seed, cx + 1, cy), c = Unit(seed, cx, cy + 1), d = Unit(seed, cx + 1, cy + 1);
             float noise = a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
             float clump = 0.25f + 1.5f * noise * noise * (3 - 2 * noise);
-            float chance = PerThousand / 1000f * clump;
+            float chance = rate / 1000f * clump;
             return (Hash(seed, x, y, 1) & 0xFFFFFF) * (1f / 16777216f) < chance;
+        }
+
+        // The same clumping for another stream's things (the props, WorldGenerator.Props.cs): 0.25 to 1.75, smooth over
+        // cells that many tiles wide.
+        internal static float Clump(ulong seed, int x, int y, int cell, ulong stream)
+        {
+            int cx = Floor(x, cell), cy = Floor(y, cell);
+            float fx = (x - cx * cell + 0.5f) / cell, fy = (y - cy * cell + 0.5f) / cell;
+            fx = fx * fx * (3 - 2 * fx);
+            fy = fy * fy * (3 - 2 * fy);
+            float U(int ux, int uy) => (Hash(seed, ux, uy, 4, stream) & 0xFFFFFF) * (1f / 16777216f);
+            float a = U(cx, cy), b = U(cx + 1, cy), c = U(cx, cy + 1), d = U(cx + 1, cy + 1);
+            float noise = a + (b - a) * fx + (c - a) * fy + (a - b - c + d) * fx * fy;
+            return 0.25f + 1.5f * noise * noise * (3 - 2 * noise);
         }
 
         static int Floor(int value, int size) => value >= 0 ? value / size : (value - size + 1) / size;
@@ -145,11 +197,13 @@ namespace Game.Core
         static float Unit(ulong seed, int cx, int cy) => (Hash(seed, cx, cy, 4) & 0xFFFFFF) * (1f / 16777216f);
 
         // A 32-bit hash of the seed, the tile and a salt (SplitMix64's finaliser): the same on every runtime.
-        static uint Hash(ulong seed, int x, int y, uint salt)
+        static uint Hash(ulong seed, int x, int y, uint salt) => Hash(seed, x, y, salt, Stream);
+
+        internal static uint Hash(ulong seed, int x, int y, uint salt, ulong stream)
         {
             unchecked
             {
-                ulong z = seed ^ (Stream << 56) ^ ((ulong)(uint)x << 32 | (uint)y) * 0x9E3779B97F4A7C15UL ^ (ulong)salt * 0xD1B54A32D192ED03UL;
+                ulong z = seed ^ (stream << 56) ^ ((ulong)(uint)x << 32 | (uint)y) * 0x9E3779B97F4A7C15UL ^ (ulong)salt * 0xD1B54A32D192ED03UL;
                 z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL;
                 z = (z ^ (z >> 27)) * 0x94D049BB133111EBUL;
                 z ^= z >> 31;

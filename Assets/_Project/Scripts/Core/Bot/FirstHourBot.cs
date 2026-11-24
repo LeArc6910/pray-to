@@ -49,7 +49,7 @@ namespace Game.Core
             _goals = guide.Goals.Take(last < 0 ? guide.Goals.Count : last + 1).ToList();
             _bosses = world.Bosses.Select(b => b.Definition).ToList();
             Memory = new BotMemory(world, player, guide) { GoalHorizon = _goals.Count };
-            Pilot = new BotPilot(world, player, Memory);
+            Pilot = new BotPilot(world, player, Memory) { Retreats = true };
         }
 
         public BotMemory Memory { get; }

@@ -46,7 +46,7 @@ namespace Game.Client
 
         // ---- The brushes ----
 
-        // A soft oval of shade on the floor, darkest in the middle.
+        // A crisp oval of shade on the floor straight under a thing.
         static void Ground(PixelImage image, float cx, float cy, float rx, float ry, int alpha = 110)
         {
             for (int y = (int)(cy - ry - 1); y <= (int)(cy + ry + 1); y++)
@@ -56,7 +56,8 @@ namespace Game.Client
                     float dx = (x + 0.5f - cx) / rx, dy = (y + 0.5f - cy) / ry;
                     float d = dx * dx + dy * dy;
                     if (d > 1) continue;
-                    image.Blend(x, y, Shadow.WithAlpha((int)(alpha * (d < 0.45f ? 1f : 0.65f))));
+                    // One crisp step (Docs/BiomeRework.md 4-3 그림자, 묶음 B1a; it was two soft ones).
+                    image.Blend(x, y, Shadow.WithAlpha(alpha));
                 }
             }
         }
@@ -443,6 +444,8 @@ namespace Game.Client
             || type == TileType.Pot || type == TileType.Banner || type == TileType.WardStone || type == TileType.RiftAltar
             // Fences and iron walls join their neighbours and stand too (묶음 B0, Docs/BiomeRework.md 4-4).
             || type == TileType.Fence || type == TileType.IronWall
+            // The biomes' own props (묶음 B1a, BiomeArt).
+            || BiomeProps.Is(type)
             || RaisedMachines.Contains(type);
 
         // Whether a machine's body stands raised (its parts drawn LiftOf higher).

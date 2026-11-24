@@ -45,6 +45,12 @@ namespace Game.Client
         readonly float[] _green;
         readonly float[] _blue;
         readonly float[] _haze;
+        // The biome's own light colour on each tile (Docs/BiomeRework.md 4-1 빛, 묶음 B1a), clear where it has none.
+        readonly Rgba[] _tint;
+        // How much of that colour the dark keeps (the unlit cave is not black but a dim wash of it), and how much of it
+        // lies over what is lit, as a fire's haze does.
+        const float TintInDark = 0.2f;
+        const float TintHaze = 0.18f;
         // Breadth-first search around one light, in a square of side Span centred on it.
         static readonly int Reach = (int)Math.Ceiling(MaxRadius * Detour);
         static readonly int Span = Reach * 2 + 1;
@@ -60,6 +66,7 @@ namespace Game.Client
             _green = new float[size * size];
             _blue = new float[size * size];
             _haze = new float[size * size];
+            _tint = new Rgba[size * size];
         }
 
         public int Size { get; }
@@ -72,7 +79,9 @@ namespace Game.Client
 
         // Lights the window whose bottom left tile is (left, bottom). The ambient function adds to the base
         // brightness of a tile, as the boss arena's glow does; null for none.
-        public void Compute(TileMap map, int left, int bottom, IReadOnlyList<LightSource> lights, Func<int, int, float> ambient)
+        // tint: the biome's light colour at a tile (WorldLights.BiomeTint), clear for none; null for none anywhere. It
+        // changes the colour of the dark and of the lit floor a little, never how bright anything is.
+        public void Compute(TileMap map, int left, int bottom, IReadOnlyList<LightSource> lights, Func<int, int, float> ambient, Func<int, int, Rgba> tint = null)
         {
             Left = left;
             Bottom = bottom;
@@ -83,6 +92,13 @@ namespace Game.Client
                     int k = j * Size + i;
                     _light[k] = ambient?.Invoke(left + i, bottom + j) ?? 0;
                     _red[k] = _green[k] = _blue[k] = _haze[k] = 0;
+                    var colour = tint != null ? tint(left + i, bottom + j) : Rgba.Clear;
+                    _tint[k] = colour;
+                    if (colour.A == 0) continue;
+                    _red[k] = colour.R * TintHaze;
+                    _green[k] = colour.G * TintHaze;
+                    _blue[k] = colour.B * TintHaze;
+                    _haze[k] = TintHaze;
                 }
             }
             foreach (var light in lights) Spread(map, light);
@@ -165,7 +181,11 @@ namespace Game.Client
             if (alpha <= 0) return Rgba.Clear;
             if (_haze[k] <= 0) return new Rgba(0, 0, 0, (int)(alpha * 255 + 0.5f));
             float share = haze * (1 - dark) / alpha / _haze[k];
-            return new Rgba((int)(_red[k] * share + 0.5f), (int)(_green[k] * share + 0.5f), (int)(_blue[k] * share + 0.5f), (int)(alpha * 255 + 0.5f));
+            // The dark's own share is black, or a dim wash of the biome's colour.
+            var tint = _tint[k];
+            float deep = tint.A == 0 ? 0 : TintInDark * dark / alpha;
+            return new Rgba((int)(_red[k] * share + tint.R * deep + 0.5f), (int)(_green[k] * share + tint.G * deep + 0.5f),
+                (int)(_blue[k] * share + tint.B * deep + 0.5f), (int)(alpha * 255 + 0.5f));
         }
     }
 }
@@ -244,6 +264,15 @@ namespace Game.Client
             Biome.Ice => 0.06f,
             Biome.Crystal => 0.06f,
             _ => 0,
+        };
+
+        // The colour of a biome's own light (Docs/BiomeRework.md 4-1 빛), laid over its dark and, faintly, its lit
+        // floor; clear for a biome with none. The dirt cave has none (the first biome teaches the dark: its lamps and
+        // torches are amber); the mushroom forest's life glows lime. The other biomes get theirs with their packages.
+        public static Rgba BiomeTint(Biome biome) => biome switch
+        {
+            Biome.Mushroom => Rgba.Hex("#A8F06A"),
+            _ => Rgba.Clear,
         };
 
         public static Func<int, int, float> ArenaAmbient(IReadOnlyList<Vec2> arenas, float arenaRadius) =>

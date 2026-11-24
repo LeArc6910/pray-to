@@ -36,7 +36,7 @@ namespace CoreSandbox
     //                                                 as a curve, the states, what was sent (--gear, --classes, --level; Docs/WorldRework.md)
     // add --no-director anywhere for the director not acting (as before it was made)
     // dotnet run -- --mapstats [seeds] [map size]     the map as numbers: rock, lumps, open floor, each biome, rooms, time (Docs/WorldRework.md)
-    // add --gen <1|2> to --flow, --hour or --mapstats for the generator's version (--mapstats shows both without it;
+    // add --gen <1|2|3> to --flow, --hour or --mapstats for the generator's version (--mapstats shows both without it;
     // the others play what a new world is made with, WorldGenerator.NewWorldVersion)
     static class Program
     {

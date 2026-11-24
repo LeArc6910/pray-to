@@ -141,7 +141,16 @@ namespace Game.Core
         long _backUntil;
         long _planTick = long.MinValue;
         int _foeId;
-        float _foeHealth;
+        // The monster being walked to, and how far past Sense it is still kept.
+        int _huntId;
+        const float HuntKeep = 8;
+        // The lowest health the foe fought has been seen at: only a new low counts as getting on, so one that goes
+        // under the ground and mends (a sand worm) is let be once it has mended past the bot's blows for StallTicks.
+        float _foeLowest;
+        // Hurt badly among monsters (Retreats): going away from them to rest, and the way out.
+        bool _retreating;
+        long _retreatPlanTick = long.MinValue / 2;
+        List<(int X, int Y)> _retreatPath = new List<(int, int)>();
         // Monsters given up on (they took no harm), till a tick.
         readonly Dictionary<int, long> _ignored = new Dictionary<int, long>();
 
@@ -159,6 +168,17 @@ namespace Game.Core
         public int GiveUp { get; set; } = 3;
         // What the bot is on, for the stuck report (the guide's goal, say).
         public string Goal { get; set; } = "";
+        // Whether the bot gets away from the monsters round it when its health runs low, and rests until it is mostly
+        // back (as a person does), instead of swinging on until it falls. Off unless asked (FirstHourBot turns it on).
+        public bool Retreats { get; set; }
+        // Below this share of its health with a monster within RetreatNear tiles it goes; at RetreatUntil it comes back.
+        public const float RetreatBelow = 0.35f;
+        public const float RetreatUntil = 0.75f;
+        public const float RetreatNear = 6;
+        // It goes to where every monster that is after it is at least this far (tiles), and rests there.
+        public const float RetreatClear = 12;
+        // How many tiles the search for a way out looks at, at most.
+        const int RetreatSearch = 4000;
         public List<(int X, int Y)> Path { get; private set; } = new List<(int, int)>();
         // The tile of the drop the last "loot" went for.
         public (int X, int Y)? LastLoot { get; private set; }
@@ -216,6 +236,7 @@ namespace Game.Core
 
             var danger = WayOutOfDanger(target);
             if (danger is Vec2 away) return new BotIntent { Do = BotDo.Move, Direction = away, Why = "예고를 피함" };
+            if (Retreats && Retreat(target) is BotIntent retreat) return retreat;
 
             // Getting nowhere: give the goal up for a while and go back to where the bot last got on.
             long since = _world.Tick - Math.Max(Memory.LastProgressTick, _targetProgressTick);
@@ -246,9 +267,12 @@ namespace Game.Core
             // harm (2026-11-11: the sim's bot swung at a slime past a corner of rock for half an hour) is let be.
             if (!stalled && FoeInReach(target) is (int id, Vec2 at, float health))
             {
-                if (id != _foeId || health < _foeHealth) _targetProgressTick = _world.Tick;
+                if (id != _foeId || health < _foeLowest - 0.01f)
+                {
+                    _targetProgressTick = _world.Tick;
+                    _foeLowest = health;
+                }
                 _foeId = id;
-                _foeHealth = health;
                 // A guard's front turns most of a blow: round to its side while striking, not into a warning.
                 var foe = _world.Enemies.FirstOrDefault(e => e.Id == id);
                 var round = foe != null ? Flank(foe, _player.Position) : Vec2.Zero;
@@ -298,6 +322,72 @@ namespace Game.Core
             var intent = Follow(Path);
             intent.Stalled = stalled;
             return intent;
+        }
+
+        // Hurt below RetreatBelow with a monster near (2026-11-24, the first hour on generator 3: a bot set its bed by
+        // a sand cave's packs, fought every crowd that came to the last blow, got up by its bed and walked back into the
+        // same crowd fifteen times): away along open floor to where none of the monsters after it is within
+        // RetreatClear, then a rest until RetreatUntil. Not in a boss's fight, nor shut in a trap room. Null when it
+        // fights on: health enough, or no way out (cornered, it fights).
+        BotIntent Retreat(BotTarget target)
+        {
+            if (target.Aim == BotAim.BossFight || _world.TrapOf(_player) != null)
+            {
+                _retreating = false;
+                return null;
+            }
+            float most = _player.Stats.MaxHealth;
+            if (_retreating && _player.Health >= most * RetreatUntil) _retreating = false;
+            var after = new List<Enemy>();
+            bool near = false;
+            foreach (var enemy in _world.Enemies)
+            {
+                if (enemy.IsDead) continue;
+                float d = Vec2.Distance(enemy.Position, _player.Position);
+                if (d <= RetreatNear) near = true;
+                // The ones awake and about (or close by) are after it; a pack asleep further off is not.
+                if (d <= RetreatNear || enemy.State != EnemyState.Idle && d <= RetreatClear) after.Add(enemy);
+            }
+            if (!_retreating)
+            {
+                if (_player.Health >= most * RetreatBelow || !near) return null;
+                _retreating = true;
+                _retreatPath = new List<(int, int)>();
+                _retreatPlanTick = long.MinValue / 2;
+                Memory.Retreats++;
+            }
+            // Resting is getting on: the stall clock waits.
+            Memory.Busy();
+            _targetProgressTick = _world.Tick;
+            if (after.Count == 0) return new BotIntent { Do = BotDo.Wait, Why = "물러나 쉼" };
+            if (_retreatPath.Count > 0 && _retreatPath[0] == Here) _retreatPath.RemoveAt(0);
+            bool adjacent = _retreatPath.Count > 0 && Math.Abs(_retreatPath[0].X - Here.X) + Math.Abs(_retreatPath[0].Y - Here.Y) == 1;
+            // Looked for again every few ticks (each look is a search round the bot), not each tick it finds none.
+            if (_world.Tick - _retreatPlanTick >= Replan / 2 || _retreatPath.Count > 0 && !adjacent)
+            {
+                var (hx, hy) = Here;
+                var avoid = Nav.Avoid;
+                int budget = Nav.Budget;
+                // Open floor only: no digging on the way out. Not far: a way out is near or there is none.
+                Nav.Avoid = (x, y) => !Nav.Walkable(x, y) || Memory.IsBlocked(x, y);
+                Nav.Budget = RetreatSearch;
+                float clear = RetreatClear * RetreatClear;
+                var path = Nav.Find(hx, hy, (x, y) =>
+                {
+                    var at = TileMap.Center(x, y);
+                    foreach (var enemy in after)
+                        if ((enemy.Position - at).LengthSquared < clear) return false;
+                    return true;
+                });
+                Nav.Avoid = avoid;
+                Nav.Budget = budget;
+                _retreatPlanTick = _world.Tick;
+                _retreatPath = path ?? new List<(int, int)>();
+            }
+            if (_retreatPath.Count == 0) return null;
+            var step = Follow(_retreatPath);
+            step.Why = "물러남";
+            return step;
         }
 
         // The next step along a path: dig the next tile if it is rock, else walk at its middle. Beside a tile (the last
@@ -361,10 +451,14 @@ namespace Game.Core
                         .Where(e => !e.IsDead && (target.Id == null || e.Definition.Id == target.Id)
                             && !(_ignored.TryGetValue(e.Id, out long until) && until > _world.Tick)
                             && e.Definition.Level <= _player.Level + 2
-                            && Vec2.Distance(e.Position, _player.Position) <= Sense
+                            // The one already hunted is kept a little past the edge of sense (2026-11-24): the first steps
+                            // of the way to a monster at that edge may lead away from it, and the bot then walked to and
+                            // fro between hunting it and exploring (the first hour on a map with the biomes' props).
+                            && Vec2.Distance(e.Position, _player.Position) <= (e.Id == _huntId ? Sense + HuntKeep : Sense)
                             && !Memory.IsBlocked(TileMap.Cell(e.Position.X), TileMap.Cell(e.Position.Y)))
                         .OrderBy(e => First(e) ? 0 : 1).ThenBy(e => Vec2.Distance(e.Position, _player.Position)).ThenBy(e => e.Id)
                         .FirstOrDefault();
+                    _huntId = foe?.Id ?? 0;
                     if (foe == null) return Explore("몬스터 없음: 탐험");
                     int fx = TileMap.Cell(foe.Position.X), fy = TileMap.Cell(foe.Position.Y);
                     var path = Nav.Find(hx, hy, (x, y) => Math.Max(Math.Abs(x - fx), Math.Abs(y - fy)) <= 1,

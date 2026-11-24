@@ -75,6 +75,8 @@ namespace Game.Core
         public int Deaths => _player.Falls - _startFalls;
         // Recent stretches of no progress the bot noticed, and where it gave up (BotPilot).
         public int Stalls { get; internal set; }
+        // Times the bot got away from the monsters round it to rest, its health low (BotPilot.Retreats).
+        public int Retreats { get; internal set; }
         public List<BotStuck> Stuck { get; } = new List<BotStuck>();
         // Goals the run left behind, and why (FirstHourBot).
         public Dictionary<string, string> Skipped { get; } = new Dictionary<string, string>();

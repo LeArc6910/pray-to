@@ -42,6 +42,8 @@ namespace Game.Client
         static Song? _makingSong;
         static IEnumerator<float[]> _making;
         static Ambience? _ambienceKind;
+        // For the playtests: the bed playing under the music now, or "" for none.
+        public static string AmbienceNow => _ambienceKind?.ToString() ?? "";
 
         // The song playing, by its key (MusicArt Song.Key); null for none.
         public static string Playing => _song?.Key;

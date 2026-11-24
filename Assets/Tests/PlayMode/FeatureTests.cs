@@ -1095,6 +1095,56 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The biomes' looks (묶음 B1a, Docs/BiomeRework.md 4-1·4-3): the dirt cave's set of "scene biomes" stands as things
+        // apart from the floor (each prop drawn by the standing layer, a lit lamp among them), the biome's sound bed
+        // plays, critters and motes come within their caps, and a swing lights the lamp that is out.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheDirtCaveStandsItsPropsAndALampIsLit()
+        {
+            yield return Start();
+            var (px, py) = Near(0, 0);
+            Playtest.Run(_root, "monsters hold; scene biomes");
+            yield return new WaitForSecondsRealtime(1.5f);
+            var view = _root.View;
+            int props = 0;
+            for (int dx = -8; dx <= 8; dx++)
+            {
+                var type = World.Map[px + dx, py + 3];
+                if (!BiomeProps.Is(type)) continue;
+                props++;
+                Assert.AreEqual("Prop", view.StandAt(px + dx, py + 3).Kind, $"{type} stands apart from the floor");
+            }
+            Assert.GreaterOrEqual(props, 7, "one of each of the dirt cave's props");
+            Assert.AreEqual(TileType.LitLamp, World.Map[px - 4, py]);
+            Assert.AreEqual(1, view.StandAt(px - 5, py - 3).Shape, "the places' tree is a mine timber in the dirt cave");
+            yield return new WaitForSecondsRealtime(4);
+            Assert.That(view.CrittersAlive, Is.InRange(1, WorldView.CritterCap), "critters within the cap");
+            Assert.That(view.MotesDrawn, Is.InRange(1, WorldView.MoteCap), "motes within the cap");
+            Assert.AreEqual("DirtCave", Music.AmbienceNow);
+            yield return Screens.Take("biomes-cave");
+
+            Playtest.Run(_root, "biomes at lamp");
+            yield return new WaitForSecondsRealtime(0.3f);
+            int lit = Count(TileType.LitLamp);
+            Playtest.Run(_root, "attack on 0 1");
+            yield return new WaitForSecondsRealtime(1);
+            Playtest.Run(_root, "attack off");
+            Assert.AreEqual(lit + 1, Count(TileType.LitLamp), "a swing lights the lamp");
+            Assert.IsTrue(TileLight.Lit(World.Map, _root.LocalClient.Tiles, _root.HostPlayer.Position, 6));
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("biomes-cave-lamp");
+            Assert.IsTrue(_root.Playing);
+
+            int Count(TileType type)
+            {
+                int count = 0;
+                for (int dy = -6; dy <= 6; dy++)
+                    for (int dx = -9; dx <= 9; dx++)
+                        if (World.Map[px + dx, py + dy] == type) count++;
+                return count;
+            }
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

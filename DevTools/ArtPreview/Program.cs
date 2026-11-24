@@ -37,7 +37,7 @@ namespace Game.Client
                 // --only sizes: just the monsters' size classes as the game draws them (out/sizes/, SizesPreview, B0b).
                 return WriteSizes(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth" && args[1] != "sizes")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth" && args[1] != "sizes" && args[1] != "biomes")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -105,6 +105,9 @@ namespace Game.Client
                 WriteDepth(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, lights);
                 return 0;
             }
+            // --only biomes: the biomes' looks as the game draws them (out/biomes/, BiomesPreview, Docs/BiomeRework.md 묶음 B1a).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "biomes")
+                return WriteBiomes(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), lights, tiles, story, monsters) ? 0 : 1;
             // --only portraits: just the talk box's portraits, every person in every expression (out/portraits/, PortraitPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "portraits")
                 return PortraitPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, npcs) ? 0 : 1;
@@ -202,6 +205,8 @@ namespace Game.Client
             if (!WriteSkillFx(output)) return 1;
             if (!WriteMonsterFx(output)) return 1;
             if (!WriteSizes(output)) return 1;
+            // The biomes' looks (묶음 B1a): prop sheets, a real room of each unlit and lit, the critters.
+            if (!WriteBiomes(output, lights, tiles, story, monsters)) return 1;
             // The pixel slips the eye misses at sheet size (ArtLint): fails only when a count goes up.
             if (!ArtLint.Run(loot, monsters, FindFolder(Path.Combine("DevTools", "ArtPreview")), output)) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
@@ -1069,7 +1074,7 @@ namespace Game.Client
                         if (kind == StandArt.Kind.None) continue;
                         var type = _map[x, y];
                         bool open = kind == StandArt.Kind.Gate && Open != null && Open(x, y);
-                        int shape = StandArt.ShapeAt(_map, x, y, open);
+                        int shape = StandArt.ShapeAt(_map, x, y, open, BiomeAt?.Invoke(x, y));
                         var image = StandArt.Picture(type, kind, shape, Night);
                         if (image == null) continue;
                         int pivot = StandArt.PivotX(kind, shape, image);
@@ -1113,7 +1118,9 @@ namespace Game.Client
                         var (fx, fy) = StandArt.DecorFoot(x, y, pick);
                         var (px, py) = Corner(fx, fy - StandArt.DecorDrop);
                         DecorShown++;
-                        _bodies.Add((Key(fy, StandArt.DecorTie), canvas => canvas.Draw(image, px - image.Width / 2, py - image.Height)));
+                        // What lies flat (moss, threads, a cobweb) is under everything that stands, as in the game.
+                        if (Game.Core.Decor.Flat(pick.Kind)) _overlays.Add(canvas => canvas.Draw(image, px - image.Width / 2, py - image.Height));
+                        else _bodies.Add((Key(fy, StandArt.DecorTie), canvas => canvas.Draw(image, px - image.Width / 2, py - image.Height)));
                     }
                 }
             }
@@ -1134,6 +1141,8 @@ namespace Game.Client
 
             // Whether a gate stands open, the houses' windows lit, canopies fading; how many faded and how much decor.
             public Func<int, int, bool> Open;
+            // The biome of a tile, for the things drawn by it (the places' tall tree); null draws them as they were.
+            public Func<int, int, Biome> BiomeAt;
             public bool Night = true;
             public bool Fade = true;
             public int Faded;
@@ -1191,12 +1200,15 @@ namespace Game.Client
 
             // Lights the scene the way WorldView does: every player carries a light, burning tiles light their
             // surroundings, and the ambient function (the arena's glow) adds to it.
-            public void Lit(WorldLights lights, Func<int, int, float> ambient)
+            public void Lit(WorldLights lights, Func<int, int, float> ambient, Func<int, int, Rgba> tint = null)
             {
                 _lit = true;
                 _lights = lights;
                 _ambient = ambient;
+                _tint = tint;
             }
+
+            Func<int, int, Rgba> _tint;
 
             // The light map stretched over the scene with bilinear smoothing between tile centres, as the view's
             // texture is, then laid over it.
@@ -1209,7 +1221,7 @@ namespace Game.Client
                 var sources = _carriers.Select(WorldLights.Carried).ToList();
                 _lights.AddTiles(sources, _map, left, bottom, size, 0);
                 var lightMap = new LightMap(size);
-                lightMap.Compute(_map, left, bottom, sources, _ambient);
+                lightMap.Compute(_map, left, bottom, sources, _ambient, _tint);
                 for (int py = 0; py < image.Height; py++)
                 {
                     for (int px = 0; px < image.Width; px++)

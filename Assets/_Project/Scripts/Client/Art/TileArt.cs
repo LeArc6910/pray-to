@@ -270,15 +270,21 @@ namespace Game.Client
 
         static readonly FloorPalette CaveFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#352B24"), Dark = Rgba.Hex("#2E251F"), Light = Rgba.Hex("#3C3129"),
-            Pebble = Rgba.Hex("#4A3D33"), PebbleLight = Rgba.Hex("#5C4D40"), PebbleShadow = Rgba.Hex("#241C17"),
+            // Warm packed earth (Docs/BiomeRework.md 4-1 흙 동굴, 묶음 B1a: #3A2B20, refined from #352B24).
+            Base = Rgba.Hex("#3A2B20"), Dark = Rgba.Hex("#32251B"), Light = Rgba.Hex("#423226"),
+            Pebble = Rgba.Hex("#4A382A"), PebbleLight = Rgba.Hex("#5A4636"), PebbleShadow = Rgba.Hex("#2A1E16"),
+            // Fine roots threading the earth.
+            Decor = Rgba.Hex("#4E3C2C"), DecorLight = Rgba.Hex("#5C4836"),
         };
 
         static readonly FloorPalette MushroomFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#2C2532"), Dark = Rgba.Hex("#251F2B"), Light = Rgba.Hex("#362D3D"),
-            Pebble = Rgba.Hex("#43384A"), PebbleLight = Rgba.Hex("#54465C"), PebbleShadow = Rgba.Hex("#1C1722"),
-            Decor = Rgba.Hex("#C86ED8"), DecorLight = Rgba.Hex("#7FF0D8"),
+            // Mossy olive earth with lime life (4-1 버섯 숲, 묶음 B1a: #24291C; it was purple, which is now the abyss's
+            // alone). Light is the moss that patches it.
+            Base = Rgba.Hex("#24291C"), Dark = Rgba.Hex("#1E2217"), Light = Rgba.Hex("#2F3A1E"),
+            Pebble = Rgba.Hex("#343A26"), PebbleLight = Rgba.Hex("#434A30"), PebbleShadow = Rgba.Hex("#151810"),
+            // White mycelium threads and a lime glint.
+            Decor = Rgba.Hex("#8E927A"), DecorLight = Rgba.Hex("#B8F25A"),
         };
 
         static readonly FloorPalette IceFloor = new FloorPalette
@@ -326,11 +332,12 @@ namespace Game.Client
             _ => RockColors,
         };
 
+        // Rotten wood and earth swollen round (4-1 버섯 숲: wall #3E3A2A, its top #565038 mossed).
         static readonly RockPalette MushroomRock = new RockPalette
         {
-            Top = Rgba.Hex("#4E4458"), TopDark = Rgba.Hex("#453C4E"), TopLight = Rgba.Hex("#5A4F66"), Rim = Rgba.Hex("#8E7EA4"),
-            FaceTop = Rgba.Hex("#7A6A8E"), FaceBottom = Rgba.Hex("#5A4E6A"), Strata = Rgba.Hex("#4C4258"), FaceSpeck = Rgba.Hex("#9A8AB0"),
-            Contact = Rgba.Hex("#241E2C"), Outline = Rgba.Hex("#16121C"),
+            Top = Rgba.Hex("#565038"), TopDark = Rgba.Hex("#4C4632"), TopLight = Rgba.Hex("#5E5A3C"), Rim = Rgba.Hex("#8E8658"),
+            FaceTop = Rgba.Hex("#6A6040"), FaceBottom = Rgba.Hex("#3E3A2A"), Strata = Rgba.Hex("#34301F"), FaceSpeck = Rgba.Hex("#C8A070"),
+            Contact = Rgba.Hex("#16180F"), Outline = Rgba.Hex("#0E100A"),
         };
 
         static readonly RockPalette IceRock = new RockPalette
@@ -412,11 +419,13 @@ namespace Game.Client
             switch (biome)
             {
                 case Biome.Mushroom:
-                    rock[x, y] = floor.Decor;
-                    rock[x + 1, y] = floor.Decor;
-                    rock[x + 2, y] = floor.Decor.Scale(0.8f);
-                    rock[x + 1, y - 1] = floor.DecorLight;
-                    rock[x + 1, y + 1] = Rgba.Hex("#E8DCC8");
+                    // A shelf of tan fungus with a lime spore on it (묶음 B1a; it was a purple cap).
+                    rock[x, y] = Rgba.Hex("#E8B070");
+                    rock[x + 1, y] = Rgba.Hex("#E8B070");
+                    rock[x + 2, y] = Rgba.Hex("#A86A3A");
+                    rock[x + 1, y - 1] = Rgba.Hex("#FFD49A");
+                    rock[x + 1, y + 1] = Rgba.Hex("#6E4220");
+                    if (variant % 4 == 0) rock[x + 3, y - 1] = floor.DecorLight;
                     break;
                 case Biome.Ice:
                     rock[x, y] = floor.DecorLight;
@@ -586,19 +595,22 @@ namespace Game.Client
         // Small things on a biome's floor: a glowing mushroom, frost glints, a crystal chip, embers.
         static void FloorDecor(PixelImage image, int variant, FloorPalette colors, Biome biome)
         {
-            if (biome == Biome.Cave) return;
             int salt = 600 + variant;
             int x = 3 + (int)(PixelNoise.Hash(variant, 13, salt) % 10);
             int y = 4 + (int)(PixelNoise.Hash(variant, 14, salt) % 9);
             switch (biome)
             {
-                case Biome.Mushroom when variant != 1:
-                    image[x, y - 1] = colors.Decor;
+                case Biome.Cave when variant == 2:
+                    // A fine root across the packed earth (묶음 B1a): a thread a few pixels long with a fork.
+                    for (int i = 0; i < 6; i++) image[x - 2 + i, y + (i > 2 ? 1 : 0) + (i == 5 ? 1 : 0)] = i % 3 == 1 ? colors.DecorLight : colors.Decor;
                     image[x + 1, y - 1] = colors.Decor;
-                    image[x - 1, y - 1] = colors.Decor.Scale(0.75f);
-                    image[x, y - 2] = colors.DecorLight;
-                    image[x, y] = Rgba.Hex("#D8CCB8");
-                    image[x, y + 1] = colors.PebbleShadow;
+                    image[x + 2, y - 2] = colors.Decor;
+                    break;
+                case Biome.Mushroom when variant != 1:
+                    // A white thread of mycelium over the moss and a lime glint (묶음 B1a; it was a purple mushroom).
+                    for (int i = 0; i < 7; i++) image[x - 3 + i, y + (i > 1 ? 1 : 0) - (i > 4 ? 1 : 0)] = colors.Decor.WithAlpha(255).Mix(colors.Base, i % 2 == 0 ? 0.35f : 0.6f);
+                    image[x, y - 1] = colors.Decor.Mix(colors.Base, 0.6f);
+                    if (variant == 0) image[x + 2, y - 2] = colors.DecorLight.Mix(colors.Base, 0.25f);
                     break;
                 case Biome.Ice:
                     image[x, y] = colors.DecorLight;
@@ -784,16 +796,18 @@ namespace Game.Client
 
         static readonly RockPalette RockColors = new RockPalette
         {
-            Top = Rgba.Hex("#5C4D41"),
-            TopDark = Rgba.Hex("#514337"),
-            TopLight = Rgba.Hex("#68584A"),
-            Rim = Rgba.Hex("#9C8670"),
-            FaceTop = Rgba.Hex("#8A7562"),
-            FaceBottom = Rgba.Hex("#65554A"),
-            Strata = Rgba.Hex("#56483D"),
-            FaceSpeck = Rgba.Hex("#9A846E"),
-            Contact = Rgba.Hex("#2C241E"),
-            Outline = Rgba.Hex("#1B1511"),
+            // Warm earth in level bands (Docs/BiomeRework.md 4-1 흙 동굴, 묶음 B1a: the browns #5C4532 and #7A5E44,
+            // refined from the greyer #5C4D41 and #8A7562).
+            Top = Rgba.Hex("#5C4532"),
+            TopDark = Rgba.Hex("#513C2B"),
+            TopLight = Rgba.Hex("#684F3A"),
+            Rim = Rgba.Hex("#A08260"),
+            FaceTop = Rgba.Hex("#866848"),
+            FaceBottom = Rgba.Hex("#644C36"),
+            Strata = Rgba.Hex("#523D2A"),
+            FaceSpeck = Rgba.Hex("#9A7E5C"),
+            Contact = Rgba.Hex("#2A1F16"),
+            Outline = Rgba.Hex("#1A120C"),
         };
 
         static readonly RockPalette BedrockColors = new RockPalette

@@ -218,6 +218,28 @@ namespace Game.Core
         Waystone,
         // The wandering merchant's stall (Docs/Npcs.md 떠돌이 상인, 묶음 3c): it stands by a different camp each day.
         WandererStall,
+        // The biomes' own props (2026-11-24, Docs/BiomeRework.md 묶음 B1a), laid by the generator last of all and only
+        // in worlds of its version 3 (WorldGenerator.Props.cs). Standing things drawn apart from the floor; only their
+        // footprint blocks. The dirt cave's: a stalagmite, a pit prop (two posts and a beam), a tipped minecart and a
+        // sack of ore (broken for what is in them), a lamp that is out and the same lamp lit (struck, it is lit and
+        // stays lit), a boulder and a cave-in of rock and timbers (two tiles wide).
+        Stalagmite,
+        PitProp,
+        TippedCart,
+        OreSack,
+        UnlitLamp,
+        LitLamp,
+        Boulder,
+        CaveIn,
+        // The mushroom forest's: a tall thin cap, a stump with shelf fungus, a spore sac (broken, it bursts into a cloud
+        // that fills the monsters in it, World.MonsterAttacks' Balm), a clump of glowing caps (picked for glow spores),
+        // a fallen trunk (two tiles wide) and a giant cap whose stem alone blocks.
+        PillarCap,
+        ShelfStump,
+        SporeSac,
+        GlowCaps,
+        FallenLog,
+        GiantCap,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -243,6 +265,8 @@ namespace Game.Core
             TileType.Tower or TileType.BigFountain or TileType.BigTent or TileType.Lighthouse => (2, 2),
             TileType.Altar => (3, 1),
             TileType.FallenColumn => (2, 1),
+            // The biomes' wide props (묶음 B1a): pictures two tiles tall, standing on their lower row alone.
+            TileType.Boulder or TileType.CaveIn or TileType.FallenLog => (2, 1),
             _ => (1, 1),
         };
 

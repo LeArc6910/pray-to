@@ -26,7 +26,7 @@ namespace Game.Client
         // Each biome's floor on the map, so its regions show.
         static Color32 BiomeFloor(Biome biome) => biome switch
         {
-            Biome.Mushroom => new Color32(92, 72, 104, 255),
+            Biome.Mushroom => new Color32(78, 96, 58, 255),
             Biome.Ice => new Color32(84, 108, 128, 255),
             Biome.Crystal => new Color32(70, 70, 108, 255),
             Biome.Lava => new Color32(96, 64, 56, 255),
@@ -719,6 +719,10 @@ namespace Game.Client
             if (_map[x, y] == TileType.Cottage || _map[x, y] == TileType.Cabin) return new Color32(176, 72, 58, 255);
             if (_map[x, y] == TileType.Tower) return new Color32(74, 108, 192, 255);
             if (_map[x, y] == TileType.BigTent || _map[x, y] == TileType.Totem || _map[x, y] == TileType.Brazier) return new Color32(128, 40, 74, 255);
+            // The biomes' props (묶음 B1a): a lit lamp as a fire; the rest a speck between the floor's colour and rock's, so
+            // a room strewn with them does not read as walled off.
+            if (_map[x, y] == TileType.LitLamp) return Palette.Torch;
+            if (BiomeProps.Is(_map[x, y]) || BiomeProps.AnchorOf(_map, x, y) != null) return Color32.Lerp(BiomeFloor(_client.Biomes[x, y]), Wall, 0.4f);
             if (Structures.IsDecor(_map[x, y])) return new Color32(140, 120, 100, 255);
             if (_map[x, y] == TileType.Table || _map[x, y] == TileType.Banner || _map[x, y] == TileType.Pot) return new Color32(200, 160, 110, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);

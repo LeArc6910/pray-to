@@ -18,19 +18,24 @@ namespace CoreSandbox
             var elites = new List<string>();
             var pois = new List<string>();
             var paces = new List<string>();
+            var falls = new List<string>();
             foreach (string text in seeds.Split(',', StringSplitOptions.RemoveEmptyEntries))
             {
                 ulong seed = ulong.Parse(text.Trim());
                 var watch = Stopwatch.StartNew();
                 // The field elites it met on the way (묶음 2-2).
                 var seen = new EliteWatch();
+                // Where it fell, and what was round it.
+                var fell = new FallWatch();
                 FirstHourBot last = null;
                 var run = BotRun.FirstHour(sheets, seed, minutes, each: bot =>
                 {
                     last = bot;
                     seen.Look(bot.World, bot.Player);
+                    fell.Look(bot);
                 }, mapSize: mapSize, mapVersion: mapVersion, director: Program.Director);
                 elites.Add($"- 시드 {seed}: {seen.Summary(run.Ticks)}");
+                falls.Add($"- 시드 {seed}: {fell.Summary(run.Memory)}");
                 // The things to find it used on its way (묶음 3a) and what they gave, beside the coins it holds at the end.
                 if (last != null)
                 {
@@ -58,6 +63,10 @@ namespace CoreSandbox
             Console.WriteLine("### 완급 감독");
             Console.WriteLine();
             foreach (string line in paces) Console.WriteLine(line);
+            Console.WriteLine();
+            Console.WriteLine("### 쓰러진 곳");
+            Console.WriteLine();
+            foreach (string line in falls) Console.WriteLine(line);
             Console.WriteLine();
             Console.WriteLine("### 지나며 쓴 볼거리");
             Console.WriteLine();
