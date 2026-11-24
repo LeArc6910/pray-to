@@ -208,6 +208,15 @@ namespace Game.Client
             return _roads[System.Math.Clamp(variant, 0, TileArt.RoadVariants - 1)];
         }
 
+        static Tile[] _rails;
+
+        // The rail tile for its joined sides from RailArt.Mask (2026-11-25: the track follows its neighbours).
+        public static TileBase Rail(int mask)
+        {
+            BuildAtlas();
+            return _rails[mask & (RailArt.Variants - 1)];
+        }
+
         // The tile for a placed thing, or null for tiles that are only ground.
         public static TileBase Object(TileType type)
         {
@@ -218,9 +227,10 @@ namespace Game.Client
         static void BuildAtlas()
         {
             if (_atlas != null) return;
-            // The ground, the placed things, the open door, and the roads last.
+            // The ground, the placed things, the open door, the roads, and the rails last.
             int roads = TileArt.GroundCount + ObjectTypes.Length + 1;
-            int count = roads + TileArt.RoadVariants;
+            int rails = roads + TileArt.RoadVariants;
+            int count = rails + RailArt.Variants;
             int columns = Mathf.CeilToInt(Mathf.Sqrt(count));
             int size = Mathf.NextPowerOfTwo(columns * Cell);
             var atlas = new PixelImage(size, size);
@@ -229,6 +239,7 @@ namespace Game.Client
             for (int i = 0; i < ObjectTypes.Length; i++) images[TileArt.GroundCount + i] = TileArt.Object(ObjectTypes[i]);
             images[roads - 1] = TileArt.OpenDoor;
             for (int i = 0; i < TileArt.RoadVariants; i++) images[roads + i] = TileArt.Road(i);
+            for (int i = 0; i < RailArt.Variants; i++) images[rails + i] = RailArt.Rail(i);
             for (int i = 0; i < count; i++) Extruded(atlas, images[i], i % columns * Cell, i / columns * Cell);
 
             _atlas = Texture(size, size);
@@ -252,6 +263,8 @@ namespace Game.Client
             _openDoor = MakeTile(roads - 1);
             _roads = new Tile[TileArt.RoadVariants];
             for (int i = 0; i < TileArt.RoadVariants; i++) _roads[i] = MakeTile(roads + i);
+            _rails = new Tile[RailArt.Variants];
+            for (int i = 0; i < RailArt.Variants; i++) _rails[i] = MakeTile(rails + i);
         }
 
         // Draws the image into the atlas with its edge pixels repeated one pixel outward.

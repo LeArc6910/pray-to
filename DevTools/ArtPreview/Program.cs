@@ -22,6 +22,12 @@ namespace Game.Client
         {
             // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them; --only hero
             // the player's.
+            // --only flat: every tile drawn flat on the object layer, and the rails as they join (out/flat/, FlatPreview).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "flat")
+            {
+                FlatPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"));
+                return 0;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "skillfx")
             {
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).
@@ -37,7 +43,7 @@ namespace Game.Client
                 // --only sizes: just the monsters' size classes as the game draws them (out/sizes/, SizesPreview, B0b).
                 return WriteSizes(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth" && args[1] != "sizes" && args[1] != "biomes")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth" && args[1] != "sizes" && args[1] != "biomes" && args[1] != "flat")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -1184,6 +1190,7 @@ namespace Game.Client
                             // Things that stand (StandArt.KindAt) are drawn with the bodies, as WorldView's standing layer does.
                             var placed = StandArt.KindAt(_map, x, y) != StandArt.Kind.None || PropArt.Stands(_map[x, y]) ? null
                                 : _map[x, y] == TileType.Road ? TileArt.Road(TileArt.RoadVariant(_map, x, y))
+                                : _map[x, y] == TileType.Rail ? RailArt.Rail(RailArt.Mask(_map, x, y))
                                 : RoomTileArt.IsPatch(_map[x, y]) ? RoomTileArt.Patch(_map[x, y], RoomTileArt.PatchMask(_map, x, y), RoomTileArt.Laying(x, y))
                                 : TileArt.Object(_map[x, y]);
                             if (placed != null) image.Draw(placed, px, py);

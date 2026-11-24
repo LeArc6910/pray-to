@@ -3570,9 +3570,11 @@ namespace Game.Client
         // The flat tile of a placed thing, or none for one that stands on the floor (PropArt.Stands, the standing layer).
         static TileBase ObjectTile(TileType type) => PropArt.Stands(type) ? null : Sprites.Object(type);
 
-        // The tile at x, y, a road matched to its neighbours (TileArt.RoadVariant).
+        // The tile at x, y, a road or a rail matched to its neighbours (TileArt.RoadVariant, RailArt.Mask).
         static TileBase ObjectTileAt(TileMap map, int x, int y) =>
             map[x, y] == TileType.Road ? Sprites.Road(TileArt.RoadVariant(map, x, y))
+            // The mines' rails, straight, turning or branching with their neighbours (RailArt).
+            : map[x, y] == TileType.Rail ? Sprites.Rail(RailArt.Mask(map, x, y))
             // Ice and quicksand, their edges matched to their neighbours (RoomTileArt.Patch).
             : RoomTileArt.IsPatch(map[x, y]) ? Sprites.Patch(map[x, y], RoomTileArt.PatchMask(map, x, y), RoomTileArt.Laying(x, y))
             // A door in a fence is the fence's gate, standing (Joins.Gate, 묶음 B0).

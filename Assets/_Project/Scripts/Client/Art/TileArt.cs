@@ -488,7 +488,8 @@ namespace Game.Client
             TileType.LockedDoor => LockedDoorTile,
             TileType.Road => Road(15),
             TileType.Dock => DockTile,
-            TileType.Rail => RailTile,
+            // The mines' rails, matched to their neighbours where they are laid (RailArt); alone, north and south.
+            TileType.Rail => RailArt.Rail(1 | 4),
             // The patterns on the arenas' floors (PropArt.Arena.cs).
             TileType.ArenaInlay or TileType.RuneFloor or TileType.Cobweb or TileType.Petals or TileType.Fissure or TileType.ArenaCarpet => PropArt.ArenaFloor(type),
             // Under the harbour's boats (PropArt.Underlay): open water with no shore.
@@ -1953,33 +1954,6 @@ namespace Game.Client
             "PPPPPPPPPPPPPPPP",
             "gggggggggggggggg",
             "llllllllllllllll");
-
-        // A mine's rails (2026-11-10): two iron rails running north and south on wooden sleepers over packed earth.
-        static readonly PixelImage RailTile = PixelImage.FromRows(new Dictionary<char, Rgba>
-            {
-                ['e'] = Rgba.Hex("#6E5C4A"),
-                ['E'] = Rgba.Hex("#5E4E40"),
-                ['s'] = Rgba.Hex("#8A6440"),
-                ['S'] = Rgba.Hex("#64462C"),
-                ['r'] = Rgba.Hex("#C4CAD4"),
-                ['R'] = Rgba.Hex("#727886"),
-            },
-            "eeerReeeeeerReee",
-            "eEerReeeeEerReee",
-            "ssSrRsssssSrRsSs",
-            "SSSrRSSSSSSrRSSS",
-            "eeerReeeeeerReEe",
-            "eeerReeEeeerReee",
-            "eEerReeeeeerReee",
-            "ssSrRsssssSrRsSs",
-            "SSSrRSSSSSSrRSSS",
-            "eeerReeeeEerReee",
-            "eeerReeeeeerReee",
-            "EeerReeeeeerReeE",
-            "ssSrRsssssSrRsSs",
-            "SSSrRSSSSSSrRSSS",
-            "eeerReeEeeerReee",
-            "eeerReeeeeerReee");
 
         // A place's waypoint (Docs/Story.md): a ring of carved stone round a pool of blue light.
         static readonly PixelImage WaypointTile = PixelImage.FromRows(new Dictionary<char, Rgba>

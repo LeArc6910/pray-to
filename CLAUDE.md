@@ -75,6 +75,8 @@ dotnet run --project DevTools/ArtPreview -- --only depth
 dotnet run --project DevTools/ArtPreview -- --only biomes
 # 몬스터 크기 등급만(out/sizes/: lineup.png 사람 옆 S·M·L·XL, poses.png 큰 몸의 자세, leaders.png 정예 금빛 테, clearance.png 여유 지도와 길 너비, report.txt 종마다 그림 폭. Docs/BiomeRework.md B0b)
 dotnet run --project DevTools/ArtPreview -- --only sizes
+# 칸 그림 점검(out/flat/: objects.png 물건 층에 그리는 칸 전부를 흙 동굴 바닥에, 서 있는지(STANDS) 납작한지(FLAT), objects.txt 목록, rails.png·rail_variants.png 이어지는 철도)
+dotnet run --project DevTools/ArtPreview -- --only flat
 # 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/, 문 방의 불 색과 야영지의 뚜껑 문 out/dungeons/gates.png)
 dotnet run --project DevTools/ArtPreview -- --only dungeons
 # 대화 초상만(out/portraits/: 인물마다 여섯 표정의 sheet.png, 4배 close_*.png, 대화 상자 시안 dialogue.png. Docs/UiRework.md 4-2)
