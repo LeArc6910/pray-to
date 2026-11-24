@@ -620,6 +620,9 @@ async function combat(browser) {
   const game = await open(browser, run, Profiles.pc, url);
   await game.startSolo();
   await game.wait(1200);
+  // Out in a room of the world: the spawn's village sets back a monster put inside it (World.KeepOutOfPlaces).
+  await game.send('goto room pack any 0');
+  await game.wait(900);
   await clearRoom(game, 5, 3);
 
   await game.send('spawn slime 2.5 0');
@@ -648,7 +651,8 @@ async function combat(browser) {
   // Bow and staff shoot.
   // An arrow lives a fraction of a second, so the proof is a slime hit four tiles off, out of a sword's reach. On
   // fresh floor, away from where the gallery's monsters pushed the player about.
-  await game.send('heal; goto biome Cave');
+  await game.send('heal; goto room pack any 1');
+  await game.wait(900);
   await clearRoom(game, 5, 2);
   for (const [weapon, name] of [['copper_bow', '활'], ['copper_staff', '지팡이']]) {
     await game.send(`equip ${weapon}; spawn slime 4 0 5000; speed 0`);
@@ -1156,7 +1160,10 @@ async function farm(browser) {
   check(mushrooms(after) > before, `다 자란 버섯 위를 걸으면 거둔다 (${Object.keys(after.materials).filter(id => /^mushroom/.test(id)).join(', ')})`);
 
   // At night a monster on a crop tramples it; a scarecrow guards four tiles round (2026-11-09, Docs/Farming.md).
-  await game.send('goto 0 9');
+  // Out in a room of the world: a place keeps monsters out past its edge (World.KeepOutOfPlaces), and the spawn's
+  // village now reaches nine tiles down, so a slime put there was set back before it stood on the crop.
+  await game.send('monsters hold; goto room pack any 0');
+  await game.wait(900);
   await clearRoom(game, 6, 3);
   await game.send('clock 1 23; give mushroom_spore 2; give scarecrow 1; face 1 0');
   await game.wait(600);
@@ -1184,7 +1191,7 @@ async function farm(browser) {
   const guarded = await game.until(t => /짓밟혔다/.test(t), 5000, game.allText);
   check(!guarded, '허수아비 곁의 작물은 몬스터가 서도 밟히지 않는다');
   await game.shot('scarecrow', '허수아비가 지키는 밭');
-  await game.send('clear; clock 2 9');
+  await game.send('clear; clock 2 9; monsters go');
   await game.context.close();
 }
 
@@ -6060,7 +6067,8 @@ async function sizes(browser) {
     check(moved.length >= 1 && moved.some(d => d > 0.5), `${name}: 큰 몸이 쫓아온다 (${moved.map(d => d.toFixed(1)).join(', ')}칸)`);
 
     // A narrow way: an L or XL is put only where it fits (back in a room near it, or nowhere).
-    await game.send('monsters hold; clear; heal');
+    // The director leaves a character under its level alone (World.DirectorLevel), and goto narrow takes only the ways it works in.
+    await game.send('monsters hold; clear; heal; xp 3000');
     let narrow = '';
     for (let n = 0; n < 4 && !/goto narrow at/.test(narrow); n++) narrow = (await game.send(`goto narrow ${n}`)).join(' ');
     await game.wait(1000);

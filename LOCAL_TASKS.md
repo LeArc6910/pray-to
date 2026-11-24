@@ -1131,10 +1131,12 @@ DevTools/Local/setup.sh --commit
 - [ ] 166단계: 서 있는 층, 발 정렬, 이어지는 울타리, 물체 뒤 흐려짐(`Docs/BiomeRework.md` B0)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/Decor.cs`, `Client/PropAtlas.cs`, `Client/WorldView.Props.cs`, `Client/Art/StandArt.cs`, `Client/Art/PropArt.Fences.cs`, `Client/Art/DecorArt.cs`, `Tests/EditMode/DecorTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheStandingLayerJoinsSortsAndFades`(사진 `depth-pen`·`depth-tree`·`depth-house`·`depth-gate`)
   - (클라우드 웹 점검) `sweep.js --only depth,farm,base,story,pois,dungeon`
+  - 클라우드 확인 (2026-11-24, `144750c`·`298a176`): [x] 처음 196개 중 6 실패 → 시험 쪽 고침(동쪽 세로 문은 선 칸이라 열려 있음, 휴대폰 상자 단추가 [일지 열기]를 누름, 제단 손 닿기 재시도). 밭의 밤 짓밟힘 둘은 시험 자리가 시작 마을 안전 구역 안이라 슬라임이 가장자리로 밀려난 것 → 들판 방으로 옮긴 뒤 `farm` 모두 통과. `depth,pois` 다시 통과. 사진: 울타리 모서리·T자·문, 나무와 집 뒤의 흐려짐, 짓밟힌 밭과 허수아비 안내
   - (사람) 울타리 모서리·T자·문이 자연스러운지, 나무·집 뒤에 섰을 때 흐려지는 손맛, [설정]의 "물체 뒤 흐리게", 사람·몬스터가 물체 앞뒤로 지날 때 순서가 어색하지 않은지, 웹·휴대폰에서 느려지지 않는지
 - [ ] 167단계: 몬스터 크기 등급, 큰 몸의 길·맞기·그림, 큰 슬라임과 슬라임 왕(`Docs/BiomeRework.md` B0b)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/MonsterSize.cs`, `Core/Simulation/World.Sizes.cs`, `Core/World/Clearance.cs`, `Client/Art/CreatureArt.Big.cs`, `Client/MonsterLook.cs`, `Tests/EditMode/MonsterSizeTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.100.0
   - (클라우드 웹 점검) `sweep.js --only sizes,packs,monsterfx,combat`
+  - 클라우드 확인 (2026-11-24, `298a176`): [x] `sizes` 처음 좁은 길 둘 실패(레벨 1이라 감독이 쉬는 곳만 남아 `goto narrow`가 길을 못 찾음 → 시험에서 경험치를 줌) 뒤 40개 모두 통과, `packs,monsterfx` 모두 통과, `combat`은 시작 마을 안에 슬라임을 세운 6 실패 → 들판 방으로 옮긴 뒤 8개 모두 통과. 사진: 빛 박쥐·슬라임·큰 슬라임·슬라임 왕이 제 크기로 나란히, 좁은 길에서 슬라임 왕은 자리 없음(휴대폰), 가장자리를 베인 큰 슬라임, 몬스터 열세 종
   - (사람) 큰 슬라임(2×2)과 슬라임 왕(3×3, 시험 명령으로만)이 실제 휴대폰에서 읽히는지, 큰 몸을 치고 갈라질 때의 손맛, 정예의 금빛 테가 1.3배 그림보다 나은지
 
 ## 결과 보고
