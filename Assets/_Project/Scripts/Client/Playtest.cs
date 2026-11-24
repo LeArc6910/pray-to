@@ -1648,7 +1648,7 @@ namespace Game.Client
                 .Field("props", view?.PropsDrawn ?? 0).Field("decor", view?.DecorDrawn ?? 0).Field("skipped", view?.StandsSkipped ?? 0)
                 .Field("renderers", view?.StandRenderers ?? 0).Field("rustled", view?.Rustled ?? 0)
                 .Field("motes", view?.MotesDrawn ?? 0).Field("moteCap", WorldView.MoteCap).Field("critters", view?.CrittersAlive ?? 0)
-                .Field("critterCap", WorldView.CritterCap).Field("critterKinds", view?.CritterKinds ?? "").Field("lamps", view?.LampsInView ?? 0)
+                .Field("critterCap", WorldView.CritterCap).Field("critterKinds", view?.CritterKinds ?? "").Field("critterAstray", view?.CrittersAstray ?? 0).Field("lamps", view?.LampsInView ?? 0)
                 .Field("selfOrder", view?.SelfOrder ?? 0).Field("ax", ax).Field("ay", ay).Field("cells", cells.Raw(']')).Close('}');
         }
 

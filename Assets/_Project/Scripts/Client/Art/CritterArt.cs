@@ -74,6 +74,10 @@ namespace Game.Client
             ? roll < (night ? 70 : 40) ? CritterKind.Firefly : roll < (night ? 85 : 70) ? CritterKind.Snail : CritterKind.SporeMoth
             : roll < 55 ? CritterKind.Cricket : CritterKind.Mouse;
 
+        // The biome a kind belongs to: a critter comes into being where its biome is (a lamp moth at a dirt cave lamp).
+        public static Biome HomeOf(CritterKind kind) => kind == CritterKind.Firefly || kind == CritterKind.Snail || kind == CritterKind.SporeMoth
+            ? Biome.Mushroom : Biome.Cave;
+
         // Whether the biome has critters yet (B1a: the dirt cave and the mushroom forest).
         public static bool Lives(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom;
 

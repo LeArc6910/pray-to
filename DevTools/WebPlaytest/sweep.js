@@ -4024,7 +4024,8 @@ async function map(browser) {
 
     // A new world is one of rooms, and every role has rooms.
     const rooms = await game.ask('rooms');
-    check(rooms.generator === 2, `${name}: 새 월드는 생성기 2판이다 (${rooms.generator})`);
+    // A new world is version 3 since B1a (the props laid on version 2's rooms).
+    check(rooms.generator >= 2, `${name}: 새 월드는 방으로 된 생성기다 (${rooms.generator}판)`);
     check(rooms.rooms >= 700, `${name}: 방이 700개 넘는다 (${rooms.rooms})`);
     const roles = rooms.roles || {};
     const missing = ['pack', 'plain', 'ore', 'rest', 'elite', 'treasure', 'shrine', 'hidden', 'locked', 'trap', 'cart', 'gate', 'pond'].filter(r => !(roles[r] > 0));
@@ -5948,7 +5949,8 @@ async function depth(browser) {
     // The east gate is the tile the scene stands the player on, so it may already stand open (bit 2): only its run
     // (bit 1 clear, a north-south gate) is checked here; opening it by walking in is checked further down.
     { const c = at(0, 0); check(c.kind === 'Gate' && (c.shape & 1) === 0, `${name}: 동쪽 줄의 세로 문 (0,0: ${c.kind || '없음'} ${c.shape})`); }
-    check(d.props >= 40 && d.skipped === 0, `${name}: 서 있는 것을 다 그린다 (${d.props}개, 꾸밈 ${d.decor}, 뺀 것 ${d.skipped}, 그린 조각 ${d.renderers})`);
+    // The pen, the tree, the house and the lamp post are some thirty; what else stands round them varies with the world.
+    check(d.props >= 30 && d.skipped === 0, `${name}: 서 있는 것을 다 그린다 (${d.props}개, 꾸밈 ${d.decor}, 뺀 것 ${d.skipped}, 그린 조각 ${d.renderers})`);
     check(d.atlasPages >= 1 && d.atlasPages <= 2 && d.atlasSprites > 10, `${name}: 그림은 아틀라스 몇 장에 모였다 (${d.atlasPages}장, 그림 ${d.atlasSprites})`);
     check(d.renderers <= (game.touch ? 250 : 400), `${name}: 상한 안 (${d.renderers})`);
     await game.shot('depth-pen', '이어진 울타리: 모서리·T자·십자·끝, 가로·세로 문');
@@ -6253,8 +6255,10 @@ async function biomes(browser) {
       }
       check(seen.motes > 0 && seen.motes <= seen.moteCap, `${name}: 입자가 떠다닌다, 상한 안 (${seen.motes}/${seen.moteCap})`);
       check(seen.critters > 0 && seen.critters <= seen.critterCap, `${name}: 작은 생물이 있다, 상한 안 (${seen.critters}/${seen.critterCap}: ${seen.critterKinds})`);
-      const strange = (seen.critterKinds || '').split(',').filter(k => k && !set.critters.includes(k));
-      check(strange.length === 0, `${name}: 그 생물군계의 생물만 (${seen.critterKinds || '없음'})`);
+      // Near a border the next biome's kinds are about too (the phone's forest room touches the dirt cave): each critter
+      // must stand where its own biome is, and the set's own kinds must be among them.
+      const own = (seen.critterKinds || '').split(',').filter(k => set.critters.includes(k));
+      check(own.length > 0 && seen.critterAstray === 0, `${name}: 생물마다 제 생물군계에 있다 (${seen.critterKinds || '없음'}, 다른 곳 ${seen.critterAstray})`);
       await game.shot(`biomes-${key}`, `${set.name}: 소품 한 벌, 꾸밈, 작은 생물, 빛`);
 
       if (key === 'cave') {

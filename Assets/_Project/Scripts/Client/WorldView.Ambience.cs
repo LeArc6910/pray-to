@@ -53,6 +53,19 @@ namespace Game.Client
         public int MotesDrawn { get; private set; }
         public int CrittersAlive => _critters.Count;
         public int LampsInView => _lamps.Count;
+        // Critters of another biome than the spot they came into being on (the playtest's check: near a border both
+        // biomes' kinds may be about, but each stands where its own biome is).
+        public int CrittersAstray
+        {
+            get
+            {
+                int astray = 0;
+                foreach (var critter in _critters)
+                    if (CritterArt.HomeOf(critter.Kind) != BiomeOf(critter.Home)) astray++;
+                return astray;
+            }
+        }
+
         public string CritterKinds
         {
             get
@@ -180,11 +193,10 @@ namespace Game.Client
                 int moths = 0;
                 foreach (var critter in _critters)
                     if (critter.Kind == CritterKind.LampMoth) moths++;
-                if (_lamps.Count > 0 && moths < Mathf.Min(3, _lamps.Count * 2) && BiomeOf(_lamps[0]) == Biome.Cave)
-                {
-                    var lamp = _lamps[UnityEngine.Random.Range(0, _lamps.Count)];
+                // A moth only at a dirt cave light: a torch on the forest's edge has none (it was the first lamp's biome).
+                var lamp = _lamps.Count > 0 ? _lamps[UnityEngine.Random.Range(0, _lamps.Count)] : Vector2.zero;
+                if (_lamps.Count > 0 && moths < Mathf.Min(3, _lamps.Count * 2) && BiomeOf(lamp) == Biome.Cave)
                     AddCritter(CritterKind.LampMoth, lamp + UnityEngine.Random.insideUnitCircle * 0.8f, lamp);
-                }
                 else
                 {
                     float angle = UnityEngine.Random.value * Mathf.PI * 2;
