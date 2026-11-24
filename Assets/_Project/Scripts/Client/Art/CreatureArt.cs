@@ -57,7 +57,7 @@ namespace Game.Client
     // monsters bob or squash on the spot. Monsters are drawn in their sheet colour
     // (monsters.csv), so a recoloured monster needs no change here, and a monster with no drawing of its own is a
     // slime in its colour.
-    static class CreatureArt
+    static partial class CreatureArt
     {
         public const int IdleFrames = 2;
         public const int StandFrames = 3;
@@ -829,14 +829,15 @@ namespace Game.Client
         {
             var ramp = Ramp.Of(color);
             var colors = RampColors(ramp);
-            if (Extras.TryGetValue(id, out var extra))
+            if (Extras.TryGetValue(id, out var extra) || BigExtras.TryGetValue(id, out extra))
             {
                 foreach (var pair in extra) colors[pair.Key] = pair.Value;
             }
             if (view == MonsterView.Back) colors['e'] = ramp.Main;
             else if (pose == MonsterPose.Windup) colors['e'] = AngryEye;
             else if (pose == MonsterPose.Hurt) colors['e'] = ramp.Dark;
-            var frames = id switch
+            // The big kinds (L, XL) are drawn at their own size, never stretched (CreatureArt.Big.cs).
+            var frames = BigFrames(id) ?? id switch
             {
                 "ice_slime" => IceCube,
                 "magma_slime" => MagmaBlob,
@@ -863,10 +864,11 @@ namespace Game.Client
             image = pose switch
             {
                 // Crouched: two rows shorter and two wider (one each for the small ones). Striking: a row taller, a
-                // column narrower. Hit: squashed by one.
-                MonsterPose.Windup => image.Height >= 14 ? Reshaped(image, -2, 2) : Reshaped(image, -1, 1),
-                MonsterPose.Strike => Reshaped(image, 1, -1),
-                MonsterPose.Hurt => Reshaped(image, -1, 1),
+                // column narrower. Hit: squashed by one. A big body (CreatureArt.Big.cs) by whole pixels in proportion.
+                MonsterPose.Windup => image.Height >= BigRows ? Reshaped(image, -PoseStep(image) - 1, PoseStep(image) + 1)
+                    : image.Height >= 14 ? Reshaped(image, -2, 2) : Reshaped(image, -1, 1),
+                MonsterPose.Strike => Reshaped(image, PoseStep(image), -PoseStep(image)),
+                MonsterPose.Hurt => Reshaped(image, -PoseStep(image), PoseStep(image)),
                 _ => image,
             };
             return image.Outlined(ramp.Outline);
@@ -876,12 +878,13 @@ namespace Game.Client
 
         // The picture with rows added (or taken away, negative) through its middle and columns likewise, so the
         // outline stays crisp and it stands on the same feet.
+        // A big body's rows come and go low in it, under its eyes (CreatureArt.Big.cs).
         static PixelImage Reshaped(PixelImage image, int rows, int columns)
         {
             int width = System.Math.Max(1, image.Width + columns);
             int height = System.Math.Max(1, image.Height + rows);
             int midX = image.Width / 2;
-            int midY = image.Height / 2;
+            int midY = image.Height >= BigRows ? image.Height * 4 / 5 : image.Height / 2;
             int Source(int at, int middle, int added) => added >= 0
                 ? at < middle ? at : at < middle + added ? middle : at - added
                 : at < middle ? at : at - added;

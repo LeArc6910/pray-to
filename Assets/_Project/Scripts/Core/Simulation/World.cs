@@ -479,8 +479,17 @@ namespace Game.Core
                         enemy.State = EnemyState.Idle;
                         break;
                     }
-                    var direction = gap < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);
-                    if (direction.LengthSquared < 1e-6f) direction = toTarget.Normalized;
+                    var direction = gap < 1.5f ? toTarget.Normalized : WayFor(enemy);
+                    if (direction.LengthSquared < 1e-6f)
+                    {
+                        // A big body waits where no way fits it (WayFor).
+                        if (definition.Big)
+                        {
+                            enemy.Facing = toTarget.Normalized;
+                            break;
+                        }
+                        direction = toTarget.Normalized;
+                    }
                     enemy.Facing = direction;
                     enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, direction * (enemy.Speed * TickSeconds), monster: true);
                     break;
@@ -664,9 +673,13 @@ namespace Game.Core
                     float distance = apart.Length;
                     if (distance >= minimum) continue;
 
-                    var push = (distance > 1e-4f ? apart / distance : new Vec2(1, 0)) * ((minimum - distance) / 2);
-                    a.Position = Collision.Resolve(Map, a.Position - push, a.Definition.Radius, monster: true);
-                    b.Position = Collision.Resolve(Map, b.Position + push, b.Definition.Radius, monster: true);
+                    // Each gives way by the other's share of their bodies (2026-11-24): a swarm parts round a big one
+                    // rather than shoving it, and two of a size share it as before.
+                    var push = (distance > 1e-4f ? apart / distance : new Vec2(1, 0)) * (minimum - distance);
+                    float ra = a.Definition.Radius * a.Definition.Radius, rb = b.Definition.Radius * b.Definition.Radius;
+                    float giveA = rb / (ra + rb);
+                    a.Position = Collision.Resolve(Map, a.Position - push * giveA, a.Definition.Radius, monster: true);
+                    b.Position = Collision.Resolve(Map, b.Position + push * (1 - giveA), b.Definition.Radius, monster: true);
                 }
             }
         }
@@ -750,6 +763,8 @@ namespace Game.Core
                 ? _monsters.Monsters.Where(m => m.Place == haunt.Definition.Id && m.Weight > 0).ToList()
                 : _monsters.Monsters.Where(m => m.Place == null && m.Weight > 0 && Comes(m, zone, biome)).ToList();
             if (RoomPacks) choices.RemoveAll(m => m.Has(MonsterTraitKind.Rooted));
+            // Never a big body (L, XL) one by one: they come only in rooms, with their packs (World.Sizes.cs).
+            choices.RemoveAll(m => m.Big);
             return choices;
         }
 
@@ -875,9 +890,13 @@ namespace Game.Core
             var toTarget = target - origin;
             float distance = toTarget.Length;
             if (distance - targetRadius - World.PlayerRadius > reach) return false;
-            if (distance < 1e-4f) return true;
+            if (distance <= MonsterSizes.Beyond(targetRadius) + 1e-4f) return true;
             float cosine = Vec2.Dot(toTarget / distance, facing.Normalized);
-            return cosine >= MathF.Cos(arcDegrees * 0.5f * MathF.PI / 180f);
+            // Any of the body inside the arc (2026-11-24): a big body is struck by a swing that takes its flank, as far
+            // round as the part of it past an M body's widest (MonsterSizes.Beyond) makes it; an M body's as before.
+            float widen = MathF.Asin(Math.Min(1, MonsterSizes.Beyond(targetRadius) / distance));
+            float half = Math.Min(MathF.PI, arcDegrees * 0.5f * MathF.PI / 180f + widen);
+            return cosine >= MathF.Cos(half);
         }
     }
 }

@@ -274,11 +274,44 @@ namespace Game.Core
             }
         }
 
+        // Whether the attack's mark starts at the monster's middle (a strike, a slam, a nova, a thrust, a rush's path, a
+        // push's walking circles): then a big body's mark reaches MonsterSizes.Beyond further, measured from its edge.
+        public static bool FromBody(MonsterAttack attack) => attack.Shape switch
+        {
+            MonsterAttackShape.Strike or MonsterAttackShape.Sweep or MonsterAttackShape.Thrust or MonsterAttackShape.Beam or MonsterAttackShape.Slam
+                or MonsterAttackShape.Explode or MonsterAttackShape.Nova or MonsterAttackShape.Charge or MonsterAttackShape.Swoop
+                or MonsterAttackShape.Push => true,
+            _ => false,
+        };
+
+        // How much further than the sheet says this monster's mark of the attack reaches (2026-11-24, B0b): 0 for XS to
+        // M and for the marks laid away from the body.
+        public static float Beyond(MonsterDefinition monster, MonsterAttack attack) =>
+            monster != null && FromBody(attack) ? MonsterSizes.Beyond(monster.Radius) : 0;
+
+        // The mark of an attack that starts at the monster, as the host lays it (World.StartAttack) and the screen draws
+        // it (WorldView.AttachMarks): a cone, a line, a circle or a ring from its middle, by the sheet and the body.
+        public static (HazardShape Shape, float Reach, float Width) MarkOf(MonsterDefinition monster, MonsterAttack attack)
+        {
+            float beyond = Beyond(monster, attack);
+            return attack.Shape switch
+            {
+                MonsterAttackShape.Strike or MonsterAttackShape.Sweep => (HazardShape.Cone, attack.Length + beyond, attack.Angle),
+                MonsterAttackShape.Nova when attack.Length > 0 => (HazardShape.Ring, attack.Length + beyond, attack.Radius + beyond),
+                MonsterAttackShape.Slam or MonsterAttackShape.Explode or MonsterAttackShape.Nova => (HazardShape.Circle, attack.Radius + beyond, 0),
+                // A big body's rush is as wide as it is.
+                MonsterAttackShape.Charge or MonsterAttackShape.Swoop => (HazardShape.Line, attack.Length + beyond,
+                    monster != null && monster.Big ? Math.Max(attack.Width, monster.Radius * 2) : attack.Width),
+                _ => (HazardShape.Line, attack.Length + beyond, attack.Width),
+            };
+        }
+
         // The least telegraph that lets a walking player out: (way out + their radius) / their pace + the time to notice.
-        // A pull slows the way out by its drag.
-        public static float LeastTelegraph(MonsterAttack attack)
+        // A pull slows the way out by its drag. With the monster, its body's part (Beyond) is walked too.
+        public static float LeastTelegraph(MonsterAttack attack, MonsterDefinition monster = null)
         {
             float way = WayOut(attack);
+            if (way > 0 && attack.Shape != MonsterAttackShape.Thrust && attack.Shape != MonsterAttackShape.Beam) way += Beyond(monster, attack);
             if (way <= 0) return 0;
             float pace = attack.Shape == MonsterAttackShape.Pull ? Math.Max(0.5f, WalkSpeed - attack.Speed) : WalkSpeed;
             return (way + World.PlayerRadius) / pace + NoticeSeconds;

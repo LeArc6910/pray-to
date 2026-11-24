@@ -514,7 +514,7 @@ namespace Game.Core
             int way = AlongWay(pace, edge, step);
             int front = step + 6 * way, back = step - 5 * way;
             if (Math.Min(front, back) < 1 || Math.Max(front, back) > edge.Path.Count - 2) return false;
-            var choices = PackChoices(player.Position, Biomes.At(player.Position), big: false);
+            var choices = PackChoices(player.Position, Biomes.At(player.Position), big: false, loose: true);
             if (choices.Count == 0) return false;
             int count = AmbushMin + PaceRandom.Next(AmbushMax - AmbushMin + 1);
             var party = Parties().FirstOrDefault(p => p.Contains(player)) ?? new List<Player> { player };
@@ -551,13 +551,16 @@ namespace Game.Core
         List<MonsterDefinition> Roster(PackDefinition pack, int count)
         {
             var roster = new List<MonsterDefinition>();
-            foreach (var member in pack.Members)
+            // Not its big bodies (L, XL): a surge or an ambush comes out of the ways, where they do not fit (World.Sizes.cs).
+            var members = pack.Members.Where(m => !m.Monster.Big).ToList();
+            if (members.Count == 0) return roster;
+            foreach (var member in members)
                 for (int i = 0; i < member.Min && roster.Count < count; i++) roster.Add(member.Monster);
             for (int i = 0; roster.Count < count && i < 64; i++)
             {
-                var member = pack.Members[i % pack.Members.Count];
+                var member = members[i % members.Count];
                 if (roster.Count(m => m == member.Monster) < Math.Max(member.Max, 2)) roster.Add(member.Monster);
-                else if (i >= pack.Members.Count * 4) roster.Add(pack.Members[0].Monster);
+                else if (i >= members.Count * 4) roster.Add(members[0].Monster);
             }
             return roster;
         }
@@ -615,7 +618,7 @@ namespace Game.Core
             Vec2? toward = heading.LengthSquared > 0 && PaceRandom.Chance(RaidBehind) ? heading * -1 : (Vec2?)null;
             var spot = Unseen(player.Position, toward);
             if (spot == null) return false;
-            var choices = PackChoices(spot.Value, Biomes.At(spot.Value), big: true);
+            var choices = PackChoices(spot.Value, Biomes.At(spot.Value), big: true, loose: true);
             if (choices.Count == 0) return false;
             var roster = Roster(PaceRandom.PickWeighted(choices, k => k.Weight), count);
             var spots = Spread(spot.Value, new List<Vec2>(), roster.Count, PaceRandom,

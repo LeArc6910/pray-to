@@ -32,7 +32,12 @@ namespace Game.Client
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
                 return WriteMonsterFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth")
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "sizes")
+            {
+                // --only sizes: just the monsters' size classes as the game draws them (out/sizes/, SizesPreview, B0b).
+                return WriteSizes(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
+            }
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth" && args[1] != "sizes")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -196,6 +201,7 @@ namespace Game.Client
             // Every skill's effect played out (2026-11-21, Docs/SkillEffects.md).
             if (!WriteSkillFx(output)) return 1;
             if (!WriteMonsterFx(output)) return 1;
+            if (!WriteSizes(output)) return 1;
             // The pixel slips the eye misses at sheet size (ArtLint): fails only when a count goes up.
             if (!ArtLint.Run(loot, monsters, FindFolder(Path.Combine("DevTools", "ArtPreview")), output)) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
@@ -216,6 +222,19 @@ namespace Game.Client
             }
             return MonsterFxPreview.Write(Path.Combine(output, "monsterfx"), monsters, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0)),
                 HeroArt.Draw(Look.Side, HeroMove.Stand, 0, HeroGear.Plain(HeroWeapon.Sword), Rgba.Hex("#4D7FD9")));
+        }
+
+        // The monsters' size classes (out/sizes/, SizesPreview, Docs/BiomeRework.md B0b).
+        static bool WriteSizes(string output)
+        {
+            string monsterFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
+            var monsters = MonsterSheet.Parse(File.ReadAllText(Path.Combine(monsterFolder, MonsterSheet.File)), File.ReadAllText(Path.Combine(monsterFolder, MonsterAttackSheet.File)));
+            if (!monsters.Success)
+            {
+                foreach (string error in monsters.Errors) Console.Error.WriteLine(error);
+                return false;
+            }
+            return SizesPreview.Write(output, monsters, HeroArt.Draw(Look.Side, HeroMove.Stand, 0, HeroGear.Plain(HeroWeapon.Sword), Rgba.Hex("#4D7FD9")));
         }
 
         static bool WriteSkillFx(string output)

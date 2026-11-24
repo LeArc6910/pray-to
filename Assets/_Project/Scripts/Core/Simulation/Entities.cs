@@ -463,6 +463,10 @@ namespace Game.Core
         internal int Stuck { get; set; }
         // Ticks left to be home in before it is put there (World.HomeInTime).
         internal int HomeTicks { get; set; }
+        // A big body's room (L, XL, World.Sizes.cs): it steps no further than this from the middle. Endless for every
+        // other monster and for a big one put down with no room (a playtest's).
+        internal Vec2 BoundCenter { get; set; }
+        internal float BoundRadius { get; set; } = float.PositiveInfinity;
 
         // ---- Field elites (World.Elites.cs, Docs/WorldRework.md 들판 정예) ----
 

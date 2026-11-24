@@ -384,7 +384,8 @@ namespace Game.Core.Tests
         [Test]
         public void MonsterSheetReportsBadRows()
         {
-            var data = MonsterSheet.Parse(Monsters.Header + "big,거인,1,10,1,0,1,0.8,5,0.5,0.5,1,1\n");
+            // 0.6 falls between the size classes (M up to 0.45, L from 0.7, MonsterSizes).
+            var data = MonsterSheet.Parse(Monsters.Header + "big,거인,1,10,1,0,1,0.6,5,0.5,0.5,1,1\n");
 
             Assert.IsFalse(data.Success);
             StringAssert.Contains("monsters.csv 2행", data.Errors.Single());

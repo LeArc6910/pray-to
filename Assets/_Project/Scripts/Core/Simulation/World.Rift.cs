@@ -146,7 +146,8 @@ namespace Game.Core
             float speed = (rift.Affixes & RiftAffix.Swift) != 0 ? 1.3f : 1;
             // Only the deepest monsters come through: the rift opens after the last boss.
             int deepest = _monsters.Monsters.Max(m => m.Level);
-            var kinds = _monsters.Monsters.Where(m => m.Level >= deepest - 1).ToList();
+            // Not the big bodies (L, XL): a rift's waves pour out of its mouth (World.Sizes.cs).
+            var kinds = _monsters.Monsters.Where(m => m.Level >= deepest - 1 && !m.Big).ToList();
             if (rift.Wave > RiftWaves)
             {
                 var strongest = kinds.OrderByDescending(m => m.Health).First();

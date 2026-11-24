@@ -102,9 +102,10 @@ namespace Game.Client
                 _look = MonsterFx.LookOf(monster.Id);
                 float gap = Math.Clamp(float.IsInfinity(attack.RangeMax) ? 3 : (attack.RangeMin + attack.RangeMax) / 2 + 0.75f, 1.2f, 5.5f);
                 if (attack.Tell == Tell.Call) gap = 5;
-                _mx = (5 - gap / 2) * Tile;
+                _mx = (5 - (gap + MonsterSizes.Beyond(monster.Radius)) / 2) * Tile;
                 _my = 4.5f * Tile;
-                _px = _mx + gap * Tile;
+                // The player as far from a big body's edge as from an M body's.
+                _px = _mx + (gap + MonsterSizes.Beyond(monster.Radius)) * Tile;
                 _py = _my;
                 // Whoever a call is for: the kind it lives beside.
                 _ally = monsters.Find(monster.Id == "tide_wisp" ? "lake_crab" : monster.Id == "demon_caster" ? "demon_soldier" : monster.Id);
@@ -156,18 +157,24 @@ namespace Game.Client
             (HazardShape Area, float Size, float Width) Geometry()
             {
                 float r = World.PlayerRadius;
+                // A big body's marks reach from its edge, as the game lays them (MonsterAttackSheet.MarkOf).
+                var (_, reach, width) = MonsterAttackSheet.MarkOf(_monster, _attack);
                 switch (_attack.Shape)
                 {
                     case MonsterAttackShape.Strike:
                     case MonsterAttackShape.Sweep:
-                        return (HazardShape.Cone, (_attack.Length + r) * Tile, _attack.Angle);
+                        return (HazardShape.Cone, (reach + r) * Tile, _attack.Angle);
                     case MonsterAttackShape.Thrust:
                     case MonsterAttackShape.Beam:
                     case MonsterAttackShape.Charge:
                     case MonsterAttackShape.Swoop:
-                        return (HazardShape.Line, (_attack.Length + r) * Tile, (_attack.Width + 2 * r) * Tile);
+                        return (HazardShape.Line, (reach + r) * Tile, (width + 2 * r) * Tile);
                     case MonsterAttackShape.Nova when _attack.Length > 0:
-                        return (HazardShape.Ring, (_attack.Length + r) * Tile, _attack.Radius * Tile);
+                        return (HazardShape.Ring, (reach + r) * Tile, width * Tile);
+                    case MonsterAttackShape.Slam:
+                    case MonsterAttackShape.Explode:
+                    case MonsterAttackShape.Nova:
+                        return (HazardShape.Circle, (reach + r) * Tile, 0);
                     case MonsterAttackShape.Pull:
                         return (HazardShape.Pull, (_attack.Radius + r) * Tile, 0);
                     case MonsterAttackShape.Mine:

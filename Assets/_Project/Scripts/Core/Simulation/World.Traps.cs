@@ -111,7 +111,7 @@ namespace Game.Core
             // A world with no monsters (the tests' EnemyTarget 0) springs none.
             if (_rooms == null || poi.Room < 0 || poi.Room >= _rooms.Nodes.Count || PackSheetData == null || _config.EnemyTarget <= 0) return false;
             var room = _rooms.Nodes[poi.Room];
-            if (PackChoices(room.Center, room.Biome, big: false).Count == 0) return false;
+            if (PackChoices(room.Center, room.Biome, big: false, loose: true).Count == 0) return false;
             if (!_traps.TryGetValue(poi.Index, out var trap)) _traps[poi.Index] = trap = new Trap(poi, room);
             trap.InsideList.Clear();
             // The cut with the fewest doorways: a cave room's rim is ragged past its radius, and a little further out
@@ -227,7 +227,7 @@ namespace Game.Core
             var room = trap.Room;
             var random = new GameRandom(unchecked(_forageSeed * 0x9E3779B97F4A7C15UL + (ulong)trap.Chest.Index * 0xBF58476D1CE4E5B9UL
                 + (ulong)Today * 0x94D049BB133111EBUL + (ulong)trap.Wave), stream: 54);
-            var choices = PackChoices(room.Center, room.Biome, big: false);
+            var choices = PackChoices(room.Center, room.Biome, big: false, loose: true);
             var definition = random.PickWeighted(choices, k => k.Weight);
             // The second band is another of the room's packs where there is one.
             if (trap.Wave > 1 && choices.Count > 1 && trap.Band?.Definition == definition) definition = random.PickWeighted(choices.Where(k => k != definition).ToList(), k => k.Weight);
@@ -240,6 +240,8 @@ namespace Game.Core
             }
             int extra = PackExtraPerPlayer * Math.Max(0, inside.Count - 1) + (trap.Wave > 1 ? TrapSecondExtra : 0);
             for (int i = 0; i < extra; i++) roster.Add(definition.Members[0].Monster);
+            // A trap's band comes out at the grates, where a big body (L, XL) does not fit (World.Sizes.cs).
+            LeaveOutBig(roster);
             // Floor tiles shut in, in a seeded order, far enough from everyone inside and apart.
             var floor = trap.Floor.OrderBy(i => i).ToList();
             for (int i = floor.Count - 1; i > 0; i--)

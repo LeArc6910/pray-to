@@ -31,6 +31,12 @@ namespace Game.Core
         // (monsters.csv reward, 2026-11-22, World.RewardShare): many come at once, so each gives less
         // (Docs/WorldRework.md 숫자 다시 맞추기).
         public int RewardPercent { get; internal set; } = 100;
+        // Its size class (monsters.csv size, MonsterSizes; from its radius when the column is blank) and the kind it is
+        // a bigger or smaller make of (monsters.csv base: a big slime of the slime), whose numbers its own are held to.
+        public MonsterSize Size { get; internal set; } = MonsterSize.M;
+        public string Base { get; internal set; }
+        // L or XL: it needs room to walk, comes only in rooms and keeps to its own (World.Packs.cs, Clearance).
+        public bool Big => MonsterSizes.IsBig(Size);
         readonly List<MonsterAttack> _attacks = new List<MonsterAttack>();
         public IReadOnlyList<MonsterAttack> Attacks => _attacks;
         internal void AddAttack(MonsterAttack attack) => _attacks.Add(attack);
@@ -166,8 +172,11 @@ namespace Game.Core
     {
         public const string File = "monsters.csv";
 
-        // A monster has to fit through a one-tile gap.
-        const float MaxRadius = 0.45f;
+        // A monster's radius is held to its size class's band (MonsterSizes, 2026-11-24): XS to M fit through a one-tile
+        // gap, L and XL do not and keep to the rooms. A row with a base is held to it within these shares of what its
+        // class makes of the base's numbers.
+        const float BaseHealthSlack = 2f;
+        const float BaseSpeedSlack = 1.25f;
 
         // attacksCsv is monster_attacks.csv (MonsterAttackSheet); without it every monster fights by its behavior.
         public static MonsterData Parse(string csv, string attacksCsv = null)
@@ -194,7 +203,7 @@ namespace Game.Core
                     if (name.Length == 0) throw new FormatException("'name' 칸이 비어 있습니다.");
 
                     float radius = SheetValues.ParseDecimal(row["radius"], "radius");
-                    if (radius <= 0 || radius > MaxRadius) throw new FormatException($"radius는 0보다 크고 {MaxRadius} 이하여야 합니다.");
+                    var size = Size(row["size"], radius);
                     float speed = SheetValues.ParseDecimal(row["speed"], "speed");
                     if (speed <= 0) throw new FormatException("speed는 0보다 커야 합니다.");
                     var behavior = row["behavior"].Length == 0 ? MonsterBehavior.Melee : SheetValues.ParseEnum<MonsterBehavior>(row["behavior"], "behavior");
@@ -241,6 +250,8 @@ namespace Game.Core
                         Traits = MonsterAttackSheet.Traits(row["traits"]),
                         Pack = Pack(row["pack"]),
                         RewardPercent = row["reward"].Length == 0 ? 100 : Positive(SheetValues.ParseNumber(row["reward"], "reward"), "reward"),
+                        Size = size,
+                        Base = row["base"].Length == 0 ? null : row["base"],
                     });
                 }
                 catch (FormatException e)
@@ -249,7 +260,78 @@ namespace Game.Core
                 }
             }
             MonsterAttackSheet.Parse(attacksCsv, monsters, errors);
+            foreach (var monster in monsters) CheckSize(monster, monsters, errors);
             return new MonsterData(monsters, errors);
+        }
+
+        // "xs", "s", "m", "l", "xl", or blank for the class the radius falls in. The radius has to be in the class's band.
+        static MonsterSize Size(string cell, float radius)
+        {
+            if (radius <= 0) throw new FormatException("radius는 0보다 커야 합니다.");
+            MonsterSize size;
+            if (cell.Length == 0)
+            {
+                size = MonsterSizes.FromRadius(radius)
+                    ?? throw new FormatException($"radius {radius}는 어느 크기 등급에도 들지 않습니다(xs 0.20~0.25, s 0.28~0.35, m 0.38~0.45, l 0.70~0.90, xl 1.20~1.40).");
+            }
+            else
+            {
+                size = cell.ToLowerInvariant() switch
+                {
+                    "xs" => MonsterSize.XS,
+                    "s" => MonsterSize.S,
+                    "m" => MonsterSize.M,
+                    "l" => MonsterSize.L,
+                    "xl" => MonsterSize.XL,
+                    _ => throw new FormatException($"size는 xs, s, m, l, xl 중 하나입니다('{cell}')."),
+                };
+            }
+            var band = MonsterSizes.Of(size);
+            if (!MonsterSizes.Fits(size, radius))
+                throw new FormatException($"{MonsterSizes.Name(size)} 등급의 radius는 {band.MinRadius}~{band.MaxRadius}입니다({radius}).");
+            return size;
+        }
+
+        // The class's band for what the sheet says (Docs/Combat.md 크기 등급): a big body walks no faster and winds up
+        // no quicker than its class allows, in its own wind-up and every attack's; with a base, its health and pace are
+        // what its class makes of the base's within the slack. A split into another kind names a kind there is, smaller.
+        static void CheckSize(MonsterDefinition monster, List<MonsterDefinition> monsters, List<string> errors)
+        {
+            var band = MonsterSizes.Of(monster.Size);
+            string at = $"{File} {monster.Id}";
+            if (monster.Speed > band.MaxSpeed + 1e-4f)
+                errors.Add($"{at}: {MonsterSizes.Name(monster.Size)} 등급은 speed {band.MaxSpeed} 이하입니다({monster.Speed}).");
+            if (monster.Windup < band.LeastWindup - 1e-4f)
+                errors.Add($"{at}: {MonsterSizes.Name(monster.Size)} 등급은 windup {band.LeastWindup}초 이상입니다({monster.Windup}).");
+            foreach (var attack in monster.Attacks)
+            {
+                if (attack.Telegraph < band.LeastWindup - 1e-4f)
+                    errors.Add($"{at}.{attack.Id}: {MonsterSizes.Name(monster.Size)} 등급의 공격 예고는 {band.LeastWindup}초 이상입니다({attack.Telegraph}).");
+            }
+            if (monster.Base != null)
+            {
+                var source = monsters.FirstOrDefault(m => m.Id == monster.Base);
+                if (source == null) errors.Add($"{at}: base '{monster.Base}'라는 몬스터가 없습니다.");
+                else if (source == monster || source.Size == monster.Size) errors.Add($"{at}: base는 크기 등급이 다른 종입니다('{monster.Base}').");
+                else
+                {
+                    var from = MonsterSizes.Of(source.Size);
+                    float health = source.Health * band.Health / from.Health;
+                    float speed = source.Speed * band.Speed / from.Speed;
+                    if (monster.Health < health / BaseHealthSlack || monster.Health > health * BaseHealthSlack)
+                        errors.Add($"{at}: base {source.Id}의 {MonsterSizes.Name(monster.Size)} 등급이면 health는 {health / BaseHealthSlack:0}~{health * BaseHealthSlack:0}입니다({monster.Health}).");
+                    if (monster.Speed < speed / BaseSpeedSlack - 1e-4f || monster.Speed > speed * BaseSpeedSlack + 1e-4f)
+                        errors.Add($"{at}: base {source.Id}의 {MonsterSizes.Name(monster.Size)} 등급이면 speed는 {speed / BaseSpeedSlack:0.##}~{speed * BaseSpeedSlack:0.##}입니다({monster.Speed}).");
+                }
+            }
+            var split = monster.Trait(MonsterTraitKind.Split);
+            string into = split != null && split.Arguments.Count > 1 ? split.Arguments[1] : null;
+            if (into != null)
+            {
+                var kind = monsters.FirstOrDefault(m => m.Id == into);
+                if (kind == null) errors.Add($"{at}: split의 '{into}'라는 몬스터가 없습니다.");
+                else if (kind.Size >= monster.Size) errors.Add($"{at}: split으로 나오는 종은 더 작은 등급입니다('{into}').");
+            }
         }
 
         static string Pack(string cell) =>

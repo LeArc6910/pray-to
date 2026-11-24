@@ -119,8 +119,9 @@ namespace Game.Client
             }
             // One under the ground is not drawn as itself: only its mound, and a ripple behind it when it travels.
             bool buried = view.Buried && Feel.MonsterFx;
-            // An elite leader stands a head taller than its pack (Docs/WorldRework.md 들판 정예: 그림 1.3배).
-            float size = buried ? 0 : view.Small ? 0.6f : view.Elite == EliteRank.Leader ? EliteSize : 1;
+            // An elite leader is no longer drawn bigger (it was 1.3 times, its pixels uneven): it wears a gold ring
+            // round its picture (AnimateCreature, CreatureArt.Crowned), its glow and its name tag (2026-11-24, B0b).
+            float size = buried ? 0 : view.Small ? 0.6f : 1;
             if (body.Root.localScale.x != size) body.Root.localScale = Vector3.one * size;
 
             var state = view.EnemyState;
@@ -248,26 +249,8 @@ namespace Game.Client
                 if (count > 1) facing = Vec2.FromAngle(facing.Angle + (i % 2 == 0 ? -1 : 1) * attack.Angle * World.SweepTurn * Mathf.Deg2Rad);
                 // An exploder carries its circle with it.
                 var at = attack.Shape == MonsterAttackShape.Explode ? view.Position : body.MobAt;
-                HazardShape shape;
-                float reach, width;
-                switch (attack.Shape)
-                {
-                    case MonsterAttackShape.Strike:
-                    case MonsterAttackShape.Sweep:
-                        (shape, reach, width) = (HazardShape.Cone, attack.Length, attack.Angle);
-                        break;
-                    case MonsterAttackShape.Nova when attack.Length > 0:
-                        (shape, reach, width) = (HazardShape.Ring, attack.Length, attack.Radius);
-                        break;
-                    case MonsterAttackShape.Slam:
-                    case MonsterAttackShape.Explode:
-                    case MonsterAttackShape.Nova:
-                        (shape, reach, width) = (HazardShape.Circle, attack.Radius, 0);
-                        break;
-                    default:
-                        (shape, reach, width) = (HazardShape.Line, attack.Length, attack.Width);
-                        break;
-                }
+                // From the sheet and the body, as the host lays it (a big body's reach from its edge).
+                var (shape, reach, width) = MonsterAttackSheet.MarkOf(view.Monster, attack);
                 int id = -1 - (view.Id * 4 + i);
                 // The first is over when the wind-up is (or was broken off); the later wedges of a sweep by the clock.
                 bool over = i == 0 ? !winding : elapsed >= total;
@@ -648,10 +631,18 @@ namespace Game.Client
             _mobShotsDrawn = 0;
         }
 
+        // For the playtests ("sizes", Docs/Playtest.md): how a monster is drawn now: its picture's width and height in
+        // pixels, its health bar's width and its feet below its middle in tiles, and its body's scale (1 for everything
+        // but a split's small one and one under the ground). Null for none on the screen.
+        public (int Width, int Height, float Bar, float Feet, float Scale)? MonsterDrawn(int id)
+        {
+            if (!_others.TryGetValue(id, out var body) || body.Kind != BodyKind.Monster || body.Shape.sprite == null) return null;
+            var rect = body.Shape.sprite.rect;
+            return ((int)rect.width, (int)rect.height, MonsterLook.BarWidth(body.Diameter), body.Feet, body.Root.localScale.x);
+        }
+
         // ---- Field elites (Docs/WorldRework.md 들판 정예, World.Elites.cs) ----
 
-        // How much bigger an elite leader is drawn.
-        const float EliteSize = 1.3f;
         // Name tags drawn in the last repaint, and the widest of them in points (a phone held upright must hold it).
         public int EliteTagsShown { get; private set; }
         public float EliteTagWidest { get; private set; }

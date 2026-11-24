@@ -62,7 +62,11 @@ namespace Game.Core
 
         // Toward the centre of the neighbouring tile that is closest to a target. Zero when there is no way or the
         // position is already on a target's tile.
-        public Vec2 DirectionFrom(Vec2 position)
+        public Vec2 DirectionFrom(Vec2 position) => DirectionFrom(position, null);
+
+        // The same for a body that may step only onto some tiles (a big one onto those with room for it, World.WayFor):
+        // the closest of those, and zero when none of them is closer than where it stands (it waits there).
+        public Vec2 DirectionFrom(Vec2 position, Func<int, int, bool> enter)
         {
             int x = TileMap.Cell(position.X);
             int y = TileMap.Cell(position.Y);
@@ -73,7 +77,7 @@ namespace Game.Core
             int bestY = y;
             foreach (var (dx, dy) in Neighbours)
             {
-                if (!CanStep(x, y, dx, dy)) continue;
+                if (!CanStep(x, y, dx, dy) || enter != null && !enter(x + dx, y + dy)) continue;
                 int distance = DistanceAt(x + dx, y + dy);
                 if (distance >= best) continue;
                 best = distance;

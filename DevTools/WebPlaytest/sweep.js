@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -5994,7 +5994,101 @@ async function depth(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud };
+// The monsters' size classes (2026-11-24, Docs/BiomeRework.md B0b, Docs/Playtest.md sizes): a glow bat (S), a slime (M),
+// a big slime (L) and a slime king (XL) side by side in a room, each standing where it fits, drawn at its own size
+// (scale 1, its picture as wide as its class asks, a wider health bar for the big ones); in a narrow way an L or XL body
+// is put only where it fits, never in rock; let go, they walk after the player and none stands in rock; and a swing
+// lands on a big slime whose middle is out of a sword's reach but whose edge is in it. Pictures on the PC and the phone.
+const SizeBands = { xs: [8, 12], s: [12, 18], m: [14, 20], l: [24, 32], xl: [40, 56] };
+
+async function sizes(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 크기 등급 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip iron_sword; equip iron_armor; heal; probe on');
+
+    // A room with room for all four east of its middle: up to six of the nearest pack rooms are tried.
+    let seen = {}, room = '';
+    for (let n = 0; n < 6; n++) {
+      room = (await game.send(`clear; goto room pack any ${n}`)).join(' ');
+      await game.wait(1200);
+      await game.send('clear; scene sizes');
+      await game.wait(900);
+      seen = await game.ask('sizes');
+      if ((seen.monsters || []).filter(m => ['glow_bat', 'slime', 'big_slime', 'slime_king'].includes(m.kind)).length >= 4) break;
+    }
+    const of = kind => (seen.monsters || []).find(m => m.kind === kind);
+    for (const [kind, size, label] of [['glow_bat', 's', '빛 박쥐'], ['slime', 'm', '슬라임'], ['big_slime', 'l', '큰 슬라임'], ['slime_king', 'xl', '슬라임 왕']]) {
+      const m = of(kind);
+      check(!!m && m.size === size && m.fits && !m.inRock, `${name}: ${label}(${size.toUpperCase()})가 몸이 들어가는 자리에 선다 (${m ? `여유 ${m.room.toFixed(2)}/${m.need.toFixed(2)}, 바위 겹침 ${m.inRock}` : '없음'}, ${room})`);
+      const [least, most] = SizeBands[size];
+      check(!!m && m.drawn && m.scale === 1 && m.pixels >= least && m.pixels <= most,
+        `${name}: ${label}의 그림이 늘리지 않은 제 크기다 (${m ? `${m.pixels}×${m.tall}px, 배율 ${m.scale}` : '없음'}, ${size.toUpperCase()} ${least}~${most}px)`);
+    }
+    const big = of('big_slime'), king = of('slime_king');
+    check(!!big && !!king && king.bar > big.bar && big.bar >= 0.8, `${name}: 큰 몸일수록 체력 막대가 넓다 (L ${big && big.bar.toFixed(2)}, XL ${king && king.bar.toFixed(2)}칸)`);
+    await game.send('mob big_slime hurt 0.3; mob slime_king hurt 0.3; mob slime hurt 0.3; mob glow_bat hurt 0.3');
+    await game.wait(500);
+    await game.shot('sizes-room', '방 안의 S·M·L·XL (빛 박쥐, 슬라임, 큰 슬라임, 슬라임 왕)과 체력 막대');
+
+    // Let go: they come after the player; nobody stands in rock, the big ones keep to where they fit.
+    const before = await game.ask('sizes');
+    await game.send('monsters go');
+    await game.wait(2500);
+    const after = await game.ask('sizes');
+    await game.shot('sizes-moving', '풀어 준 뒤 쫓아오는 큰 몸들');
+    const moved = (after.monsters || []).filter(m => ['big_slime', 'slime_king'].includes(m.kind)).map(m => {
+      const was = (before.monsters || []).find(b => b.id === m.id);
+      return was ? Math.hypot(m.x - was.x, m.y - was.y) : 0;
+    });
+    check((after.monsters || []).every(m => !m.inRock), `${name}: 움직이는 동안 바위에 겹친 몸이 없다 (${(after.monsters || []).filter(m => m.inRock).map(m => m.kind).join(', ') || '없음'})`);
+    check(moved.length >= 1 && moved.some(d => d > 0.5), `${name}: 큰 몸이 쫓아온다 (${moved.map(d => d.toFixed(1)).join(', ')}칸)`);
+
+    // A narrow way: an L or XL is put only where it fits (back in a room near it, or nowhere).
+    await game.send('monsters hold; clear; heal');
+    let narrow = '';
+    for (let n = 0; n < 4 && !/goto narrow at/.test(narrow); n++) narrow = (await game.send(`goto narrow ${n}`)).join(' ');
+    await game.wait(1000);
+    const here = await game.ask('sizes');
+    const tries = [];
+    for (const kind of ['slime', 'big_slime', 'slime_king']) tries.push((await game.send(`mob ${kind} spawn 0 0`)).join(' '));
+    await game.wait(600);
+    const narrowSeen = await game.ask('sizes');
+    const bigs = (narrowSeen.monsters || []).filter(m => m.size === 'l' || m.size === 'xl');
+    check(/goto narrow at/.test(narrow), `${name}: 좁은 길로 간다 (${narrow}, 여유 ${here.here})`);
+    check(bigs.every(m => m.fits && !m.inRock), `${name}: 좁은 길에서 큰 몸은 들어가는 자리에만 선다 (${bigs.map(m => `${m.kind} 여유 ${m.room.toFixed(2)}`).join(', ') || '둘 다 자리 없음'}; ${tries.map(t => t.replace(/^ok mob /, '')).join(' / ')})`);
+    await game.shot('sizes-narrow', '좁은 길: 슬라임은 길에, 큰 몸은 들어가는 곳에만(또는 없음)');
+
+    // A swing at a big slime whose middle is past a sword's reach but whose edge is in it.
+    await game.send('clear; heal');
+    await game.send('goto room pack any 0');
+    await game.wait(900);
+    await game.send('clear; mob big_slime spawn 2.05 0');
+    await game.wait(300);
+    const target = ((await game.ask('sizes')).monsters || []).find(m => m.kind === 'big_slime');
+    await game.send('attack on 1 0');
+    await game.wait(700);
+    await game.send('attack off');
+    const struck = ((await game.ask('sizes')).monsters || []).find(m => m.kind === 'big_slime');
+    check(!!target && !!struck && struck.health < struck.maxHealth,
+      `${name}: 가장자리가 닿는 큰 슬라임을 벤다 (가운데까지 ${target ? target.distance.toFixed(2) : '?'}칸, 틈 ${target ? target.gap.toFixed(2) : '?'}칸, 생명력 ${struck ? Math.round(struck.health) : '?'}/${struck ? struck.maxHealth : '?'})`);
+    await game.shot('sizes-edge', '가장자리를 베인 큰 슬라임');
+    await game.send('clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -657,7 +657,7 @@ namespace Game.Core
                 roster.Add(lead);
                 int minions = MinMinions + random.Next(MaxMinions - MinMinions + 1) + extra;
                 if ((affixes & RiftAffix.Swarm) != 0) minions = (int)MathF.Round(minions * SwarmShare);
-                var own = definition.Members.Select(m => m.Monster).Where(m => m != lead).ToList();
+                var own = definition.Members.Select(m => m.Monster).Where(m => m != lead && !m.Big).ToList();
                 for (int i = 0; i < minions; i++) roster.Add(own.Count > 0 ? own[random.Next(own.Count)] : MinionKind(definition, lead));
             }
             else if (room.Letter == 'M')
@@ -689,14 +689,27 @@ namespace Game.Core
             }
             var middle = room.Elite ?? room.Center;
             if (!Fits(middle)) middle = Spread(room.Center, new List<Vec2>(), 1, random, Fits).DefaultIfEmpty(room.Center).First();
+            // A big master (an XL mid-boss, Docs/BiomeRework.md 4-5) stands where it fits nearest the middle.
+            if (rank != EliteRank.None && roster.Count > 0 && roster[0].Big
+                && BigSpot(roster[0], middle, Math.Max(room.Box.W, room.Box.H), Fits, new List<(Vec2, float)>()) is Vec2 roomy) middle = roomy;
             var spots = new List<Vec2>();
             if (rank != EliteRank.None) spots.Add(middle);
+            if (rank == EliteRank.None && roster.Any(k => k.Big))
+            {
+                // An ordinary room's big bodies (L) first, where they fit; the rest round them (World.PlaceRoster).
+                var (placed, waiting) = PlaceRoster(roster, middle, Math.Max(room.Box.W, room.Box.H) / 2f, Fits, (count, away) =>
+                    Spread(middle, room.Monsters.Where(at => Fits(at) && away(at)).ToList(), count, random, at => Fits(at) && away(at)));
+                roster = placed.Select(p => p.Kind).Concat(waiting).ToList();
+                spots.AddRange(placed.Select(p => p.Spot));
+            }
             spots.AddRange(Spread(middle, room.Monsters.Where(Fits).ToList(), roster.Count - spots.Count, random,
                 at => Fits(at) && spots.All(s => Vec2.Distance(s, at) >= PackSpacingMin)));
             while (spots.Count < roster.Count) spots.Add(middle);
             for (int i = 0; i < roster.Count; i++)
             {
                 var enemy = Join(pack, roster[i], Collision.Resolve(Map, spots[i], roster[i].Radius, monster: true), -1, dungeon.Level, random);
+                // A big body keeps to its room of the dungeon.
+                Bind(enemy, room.Center, Math.Max(room.Box.W, room.Box.H) / 2f);
                 if (rank == EliteRank.Champion || rank == EliteRank.Leader && i == 0) MakeElite(enemy, rank, affixes);
                 if (room.Letter != 'B' || i != 0) continue;
                 // The master: BigEliteHealth in place of a leader's, and more for each player.

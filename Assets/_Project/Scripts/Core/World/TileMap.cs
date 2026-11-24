@@ -303,6 +303,7 @@ namespace Game.Core
             Array.Fill(tiles, TileType.Wall, _tiles.Length, Width * rows);
             _tiles = tiles;
             Rows = Height + rows;
+            Version++;
         }
 
         // Outside the map reads as wall, so nothing can walk off the edge.
@@ -313,10 +314,14 @@ namespace Game.Core
             {
                 if (!InBounds(x, y)) throw new ArgumentOutOfRangeException(nameof(x), $"({x}, {y}) is outside the map.");
                 _tiles[y * Width + x] = value;
+                Version++;
             }
         }
 
         public bool InBounds(int x, int y) => x >= 0 && y >= 0 && x < Width && y < Rows;
+
+        // Counts every change of a tile, so what is worked out from the tiles (Clearance) knows when to work it out again.
+        public int Version { get; private set; }
 
         public bool IsSolid(int x, int y)
         {

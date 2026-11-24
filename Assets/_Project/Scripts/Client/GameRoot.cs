@@ -99,6 +99,8 @@ namespace Game.Client
         internal int PoolsShown => _view?.PoolsShown ?? 0;
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;
+        // How a monster is drawn now: its picture's pixels, its health bar, its feet and its scale (the "sizes" playtest).
+        internal (int Width, int Height, float Bar, float Feet, float Scale)? MonsterDrawn(int id) => _view?.MonsterDrawn(id);
         internal int MonsterPoolsShown => _view?.MonsterPoolsShown ?? 0;
         // A dungeon's name cards shown, and the last name (WorldView.Dungeon.cs).
         internal int DungeonCardsShown => _view?.DungeonCardsShown ?? 0;

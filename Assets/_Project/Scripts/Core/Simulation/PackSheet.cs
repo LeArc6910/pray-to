@@ -131,10 +131,17 @@ namespace Game.Core
                 int min = SheetValues.ParseNumber(range[0].Trim(), "members의 수");
                 int max = range.Length > 1 ? SheetValues.ParseNumber(range[1].Trim(), "members의 수") : min;
                 if (range.Length > 2 || min < 0 || max < min || max == 0) throw new FormatException($"members '{part}'의 수는 1, 2-4처럼 적습니다.");
+                // The big bodies (Docs/BiomeRework.md 사람이 정한 것, 2026-11-24): the field's packs hold L at most, one or
+                // two; XL is a mid-boss's or a dungeon master's alone.
+                if (monster.Size == MonsterSize.XL) throw new FormatException($"'{monster.Id}'는 XL이라 무리에 넣지 않습니다(중간 보스·던전 주인만).");
+                if (monster.Big && max > MonsterSizes.Of(monster.Size).Most)
+                    throw new FormatException($"'{monster.Id}'는 {MonsterSizes.Name(monster.Size)} 등급이라 한 무리에 {MonsterSizes.Of(monster.Size).Most}마리까지입니다.");
                 members.Add(new PackMember(monster, min, max));
             }
             if (members.Count == 0) throw new FormatException("members 칸이 비어 있습니다.");
             if (members.Sum(m => m.Min) == 0) throw new FormatException("무리는 적어도 한 마리입니다.");
+            // The first kind is the one more players and the night bring more of: never a big body.
+            if (members[0].Monster.Big) throw new FormatException($"첫 종은 사람·밤에 더해지는 몫이라 큰 몸(L)이 아닙니다('{members[0].Monster.Id}').");
             return members;
         }
     }

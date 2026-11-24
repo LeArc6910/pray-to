@@ -159,7 +159,10 @@ namespace Game.Core
                 MonsterRole.None => 4,
                 _ => 5,
             };
-            return pack.Members.Select(m => m.Monster).OrderBy(m => Rank(m.Role)).First();
+            // Not a big body (L, XL) yet: an elite camp's and a dungeon's leaders stand where an M body does
+            // (Docs/BiomeRework.md B0b; the big elites come with the biomes' mid-bosses).
+            var members = pack.Members.Select(m => m.Monster).Where(m => !m.Big).DefaultIfEmpty(pack.Members[0].Monster);
+            return members.OrderBy(m => Rank(m.Role)).First();
         }
 
         static RiftAffix RollAffixes(RiftAffix[] from, int count, GameRandom random)
@@ -198,6 +201,7 @@ namespace Game.Core
                     int n = member.Min + random.Next(member.Max - member.Min + 1);
                     for (int i = 0; i < n; i++) ordinary.Add(member.Monster);
                 }
+                ordinary.RemoveAll(k => k.Big);
                 ordinary.Remove(lead);
                 for (int i = ordinary.Count - 1; i > 0; i--)
                 {
@@ -224,7 +228,7 @@ namespace Game.Core
         // What a leader's minions are when the pack's own run out, and what it calls: the pack's swarm (its first kind),
         // or another of the leader's own when that is all the pack is.
         static MonsterDefinition MinionKind(PackDefinition pack, MonsterDefinition lead) =>
-            pack.Members.Select(m => m.Monster).FirstOrDefault(m => m != lead) ?? lead;
+            pack.Members.Select(m => m.Monster).FirstOrDefault(m => m != lead && !m.Big) ?? lead;
 
         // An elite's body: as its zone made it, then its rank and its affixes.
         void MakeElite(Enemy enemy, EliteRank rank, RiftAffix affixes)

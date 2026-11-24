@@ -1132,6 +1132,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/Decor.cs`, `Client/PropAtlas.cs`, `Client/WorldView.Props.cs`, `Client/Art/StandArt.cs`, `Client/Art/PropArt.Fences.cs`, `Client/Art/DecorArt.cs`, `Tests/EditMode/DecorTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheStandingLayerJoinsSortsAndFades`(사진 `depth-pen`·`depth-tree`·`depth-house`·`depth-gate`)
   - (클라우드 웹 점검) `sweep.js --only depth,farm,base,story,pois,dungeon`
   - (사람) 울타리 모서리·T자·문이 자연스러운지, 나무·집 뒤에 섰을 때 흐려지는 손맛, [설정]의 "물체 뒤 흐리게", 사람·몬스터가 물체 앞뒤로 지날 때 순서가 어색하지 않은지, 웹·휴대폰에서 느려지지 않는지
+- [ ] 167단계: 몬스터 크기 등급, 큰 몸의 길·맞기·그림, 큰 슬라임과 슬라임 왕(`Docs/BiomeRework.md` B0b)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/MonsterSize.cs`, `Core/Simulation/World.Sizes.cs`, `Core/World/Clearance.cs`, `Client/Art/CreatureArt.Big.cs`, `Client/MonsterLook.cs`, `Tests/EditMode/MonsterSizeTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.100.0
+  - (클라우드 웹 점검) `sweep.js --only sizes,packs,monsterfx,combat`
+  - (사람) 큰 슬라임(2×2)과 슬라임 왕(3×3, 시험 명령으로만)이 실제 휴대폰에서 읽히는지, 큰 몸을 치고 갈라질 때의 손맛, 정예의 금빛 테가 1.3배 그림보다 나은지
 
 ## 결과 보고
 

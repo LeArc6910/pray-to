@@ -15,3 +15,4 @@ abyss_wisps,abyss,3,100,slime:3-4|void_wisp:1-2,,
 sand_swarm,sand,3,60,sand_scorpion:3|sand_worm:1,big,
 sand_nest,sand,2,100,slime:3-4|sand_scorpion:1|sand_worm:1,,
 nest_guard,,1,100,demon_soldier:3-5|demon_caster:1,,demon_nest
+cave_bigslime,,2,40,slime:3-4|big_slime:1,,

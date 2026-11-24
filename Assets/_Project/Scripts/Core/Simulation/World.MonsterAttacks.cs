@@ -151,9 +151,21 @@ namespace Game.Core
                 enemy.Rift = from.Rift;
                 enemy.ZoneLevels = from.ZoneLevels;
                 enemy.SpeedScale = from.SpeedScale;
-                enemy.Power = from.Power * (small ? SplitPower : 1);
-                enemy.MaxHealth = enemy.Health = small ? Math.Max(1, from.MaxHealth * SplitHealth) : from.MaxHealth;
+                enemy.Power = small ? from.Power * SplitPower : definition != from.Definition ? 1 + ZonePowerStep * from.ZoneLevels : from.Power;
+                // Of another kind (a big slime's halves): that kind's own health, as its zone makes it.
+                enemy.MaxHealth = enemy.Health = small ? Math.Max(1, from.MaxHealth * SplitHealth)
+                    : definition != from.Definition ? definition.Health * (1 + ZoneHealthStep * from.ZoneLevels)
+                    : from.MaxHealth;
                 enemy.Small = small;
+                // A big one's halves stay of its pack (its share of the reward, its room), one more than the roster.
+                if (!small && definition != from.Definition && from.PackId != 0)
+                {
+                    enemy.PackId = from.PackId;
+                    enemy.Home = spot;
+                }
+                // And its room's leash, when they are big too (a slime king's big slimes).
+                enemy.BoundCenter = from.BoundCenter;
+                enemy.BoundRadius = from.BoundRadius;
                 enemy.TargetId = from.TargetId;
                 if (FindPlayer(from.TargetId) != null) enemy.State = EnemyState.Chase;
             }
@@ -185,15 +197,19 @@ namespace Game.Core
         {
             var definition = enemy.Definition;
             var split = definition.Trait(MonsterTraitKind.Split);
-            // Not in the first zone: the first minutes stay simple (Docs/MonsterPatterns.md 슬라임).
-            if (split != null && !enemy.Small && (enemy.ZoneLevels > 0 || enemy.Rift != 0))
+            // split:n:kind (2026-11-24, a big slime): n of that smaller kind, whole, wherever it falls. Plain split:n: n
+            // small ones of its own, not in the first zone: the first minutes stay simple (Docs/MonsterPatterns.md 슬라임).
+            var into = split != null && split.Arguments.Count > 1 ? _monsters.Monsters.FirstOrDefault(m => m.Id == split.Arguments[1]) : null;
+            if (split != null && !enemy.Small && (into != null || enemy.ZoneLevels > 0 || enemy.Rift != 0))
             {
                 int count = (int)split.Number(0, 2);
                 var across = new Vec2(-enemy.Facing.Y, enemy.Facing.X);
+                // Out of its body: the halves stand where its edge was.
+                float apart = into != null ? Math.Max(0.5f, definition.Radius) : 0.5f;
                 for (int i = 0; i < count; i++)
                 {
-                    float side = count == 1 ? 0 : -0.5f + i / (float)(count - 1);
-                    _queuedMonsters.Add((definition, enemy.Position + across * side, enemy, true));
+                    float side = count == 1 ? 0 : -1 + 2 * i / (float)(count - 1);
+                    _queuedMonsters.Add((into ?? definition, enemy.Position + across * (side * apart), enemy, into == null));
                 }
                 _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxSplit, position: enemy.Position));
             }
@@ -341,6 +357,10 @@ namespace Game.Core
             // Its body goes there: not through what keeps monsters out (a door, a fence).
             if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
                 && !OpenToMonsters(enemy.Position, target.Position, enemy.Definition.Radius)) return false;
+            // A big body lands only where it fits, inside its room's leash (World.Sizes.cs).
+            if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
+                && enemy.Definition.Big
+                && (!Clearance.Fits(target.Position, enemy.Definition.Radius) || !InBound(enemy, target.Position))) return false;
             // Too many warnings on one player are not read: the others wait their turn.
             if (attack.MarksGround && _enemies.Count(e => e != enemy && e.State == EnemyState.Windup && e.Attack != null && e.Attack.MarksGround && e.TargetId == target.Id)
                 >= MaxMarksPerTarget) return false;
@@ -410,8 +430,8 @@ namespace Game.Core
                         facing = TurnToward(enemy.Facing, facing, turn.Number(0, 120) * TickSeconds);
                         if (gap > EngageGap(enemy) || !ClearLine(enemy.Position, target.Position, ThinLine))
                         {
-                            var way = gap < 1.5f ? toTarget.Normalized : _flow.DirectionFrom(enemy.Position);
-                            if (way.LengthSquared < 1e-6f) way = toTarget.Normalized;
+                            var way = gap < 1.5f ? toTarget.Normalized : WayFor(enemy);
+                            if (way.LengthSquared < 1e-6f) way = definition.Big ? Vec2.Zero : toTarget.Normalized;
                             enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, way * (enemy.Speed * TickSeconds), monster: true);
                         }
                         enemy.Facing = facing;
@@ -446,8 +466,18 @@ namespace Game.Core
                         enemy.State = EnemyState.Idle;
                         break;
                     }
-                    var direction = gap < 1.5f ? facing : _flow.DirectionFrom(enemy.Position);
-                    if (direction.LengthSquared < 1e-6f) direction = facing;
+                    var direction = gap < 1.5f ? facing : WayFor(enemy);
+                    if (direction.LengthSquared < 1e-6f)
+                    {
+                        // A big body with no way that fits it (a narrow mouth, the edge of its room) waits there, facing
+                        // its target, and uses what reaches from there.
+                        if (definition.Big)
+                        {
+                            enemy.Facing = facing;
+                            break;
+                        }
+                        direction = facing;
+                    }
                     enemy.Facing = direction;
                     enemy.Position = Collision.Move(Map, enemy.Position, definition.Radius, direction * (enemy.Speed * TickSeconds), monster: true);
                     break;
@@ -572,35 +602,37 @@ namespace Game.Core
             if (!again) enemy.RepeatsLeft = 0;
             enemy.Used[attack.Index] = true;
 
+            // The marks that start at its middle reach from a big body's edge (MonsterAttackSheet.MarkOf).
+            var (_, reach, width) = MonsterAttackSheet.MarkOf(definition, attack);
             switch (attack.Shape)
             {
                 case MonsterAttackShape.Strike:
-                    Lay(enemy, attack, HazardShape.Cone, enemy.Position, facing, attack.Length, attack.Angle, damage, resolve);
+                    Lay(enemy, attack, HazardShape.Cone, enemy.Position, facing, reach, width, damage, resolve);
                     break;
                 case MonsterAttackShape.Sweep:
                     for (int i = 0; i < attack.Count; i++)
                     {
                         float turn = attack.Count == 1 ? 0 : (i % 2 == 0 ? -1 : 1) * attack.Angle * SweepTurn * MathF.PI / 180f;
-                        Lay(enemy, attack, HazardShape.Cone, enemy.Position, Vec2.FromAngle(facing.Angle + turn), attack.Length, attack.Angle, damage, resolve + i * Ticks(SweepSeconds));
+                        Lay(enemy, attack, HazardShape.Cone, enemy.Position, Vec2.FromAngle(facing.Angle + turn), reach, width, damage, resolve + i * Ticks(SweepSeconds));
                     }
                     break;
                 case MonsterAttackShape.Thrust:
                 case MonsterAttackShape.Beam:
-                    Lay(enemy, attack, HazardShape.Line, enemy.Position, facing, attack.Length, attack.Width, damage, resolve);
+                    Lay(enemy, attack, HazardShape.Line, enemy.Position, facing, reach, width, damage, resolve);
                     break;
                 case MonsterAttackShape.Slam:
                 case MonsterAttackShape.Explode:
-                    Lay(enemy, attack, HazardShape.Circle, enemy.Position, facing, attack.Radius, 0, damage, resolve);
+                    Lay(enemy, attack, HazardShape.Circle, enemy.Position, facing, reach, 0, damage, resolve);
                     break;
                 case MonsterAttackShape.Nova:
-                    if (attack.Length > 0) Lay(enemy, attack, HazardShape.Ring, enemy.Position, facing, attack.Length, attack.Radius, damage, resolve);
-                    else Lay(enemy, attack, HazardShape.Circle, enemy.Position, facing, attack.Radius, 0, damage, resolve);
+                    if (attack.Length > 0) Lay(enemy, attack, HazardShape.Ring, enemy.Position, facing, reach, width, damage, resolve);
+                    else Lay(enemy, attack, HazardShape.Circle, enemy.Position, facing, reach, 0, damage, resolve);
                     break;
                 case MonsterAttackShape.Charge:
                 case MonsterAttackShape.Swoop:
                     enemy.ChargeDirection = facing;
                     if (!again) enemy.RepeatsLeft = attack.Shape == MonsterAttackShape.Charge ? attack.Count - 1 : 0;
-                    Lay(enemy, attack, HazardShape.Line, enemy.Position, facing, attack.Length, attack.Width, 0, resolve);
+                    Lay(enemy, attack, HazardShape.Line, enemy.Position, facing, reach, width, 0, resolve);
                     break;
                 case MonsterAttackShape.Leap:
                     // Onto where the target stands, but no further than the attack reaches.
@@ -627,8 +659,9 @@ namespace Game.Core
                 case MonsterAttackShape.Push:
                     // The circles walk out from the monster toward where the target stood, one after another.
                     float step = attack.Length / attack.Count;
+                    float edge = MonsterSizes.Beyond(definition.Radius);
                     for (int i = 0; i < attack.Count; i++)
-                        Lay(enemy, attack, HazardShape.Circle, enemy.Position + facing * (step * (i + 1)), facing, attack.Radius, 0, damage, resolve + Ticks(step * i / attack.Speed));
+                        Lay(enemy, attack, HazardShape.Circle, enemy.Position + facing * (edge + step * (i + 1)), facing, attack.Radius, 0, damage, resolve + Ticks(step * i / attack.Speed));
                     break;
                 case MonsterAttackShape.Mine:
                     var mines = _hazards.Where(h => h.Shape == HazardShape.Mine && h.Source == enemy.Id).OrderBy(h => h.StartTick).ToList();

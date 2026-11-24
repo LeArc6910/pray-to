@@ -291,7 +291,7 @@ namespace Game.Core
             pack.Fallen = Array.Empty<bool>();
             if (InSafePlace(room.Center)) return;
             var random = PackRandom(room, pack.Slot, pack.Day);
-            var choices = PackChoices(room.Center, room.Biome, BigRoom(room));
+            var choices = PackChoices(room.Center, room.Biome, BigRoom(room), room);
             if (choices.Count == 0) return;
             pack.Definition = random.PickWeighted(choices, p => p.Weight);
             // A camp of elites (묶음 2-2): its leader's pack or its champions, each day anew.
@@ -313,7 +313,16 @@ namespace Game.Core
             var marks = pack.Slot == 0 && _rooms != null
                 ? _rooms.Marks.Where(m => m.Room == room.Index && m.Kind == RoomMarkKind.Monster).Select(m => TileMap.Center(m.X, m.Y)).ToList()
                 : new List<Vec2>();
-            pack.Spots.AddRange(Spread(middle, marks, pack.Roster.Count, random, at => InRoom(room, at) && Clear(at) && !NearEntrance(room, at)));
+            bool Fits(Vec2 at) => InRoom(room, at) && Clear(at) && !NearEntrance(room, at);
+            // The big bodies (L, XL) first, where they fit; the rest round them (World.PlaceRoster).
+            var (placed, waiting) = PlaceRoster(pack.Roster.ToList(), middle, room.Radius, Fits, (count, away) => Spread(middle, marks, count, random, at => Fits(at) && away(at)));
+            pack.Roster.Clear();
+            foreach (var (kind, spot) in placed)
+            {
+                pack.Roster.Add(kind);
+                pack.Spots.Add(spot);
+            }
+            pack.Roster.AddRange(waiting);
             Crowd(pack, middle, random);
             // A room too cramped for all of them keeps those that found a spot.
             while (pack.Roster.Count > pack.Spots.Count) pack.Roster.RemoveAt(pack.Roster.Count - 1);
@@ -324,10 +333,16 @@ namespace Game.Core
         // The packs of packs.csv that come there: round a place some monsters keep to, its own packs; else the biome's
         // own from their zone, else those of the plain cave. Not a zone early as a biome's monsters come one by one
         // (World.Comes): a whole pack of a later biome on the first boss's way was too much (2026-11-22, --hour).
-        List<PackDefinition> PackChoices(Vec2 at, Biome biome, bool big)
+        // In a room, only the packs whose big bodies it holds (World.RoomHolds: L in a room of radius 5 or more, XL where
+        // 7×7 of floor is open).
+        // Out of a room (loose: the director's surges and ambushes, a trap's waves, a world of caves' clumps), only the
+        // packs with no big body, so a band is what the pack always was rather than a pack with its big one left out.
+        List<PackDefinition> PackChoices(Vec2 at, Biome biome, bool big, RoomNode room = null, bool loose = false)
         {
             var packs = PackSheetData?.Packs;
             if (packs == null) return new List<PackDefinition>();
+            if (room != null) packs = packs.Where(k => k.Members.All(m => RoomHolds(room, m.Monster))).ToList();
+            if (loose) packs = packs.Where(k => k.Members.All(m => !m.Monster.Big)).ToList();
             var haunt = Places.FirstOrDefault(p => Vec2.Distance(at, p.Center) <= p.Radius + HauntReach && packs.Any(k => k.Place == p.Definition.Id && k.Weight > 0));
             if (haunt != null) return packs.Where(k => k.Place == haunt.Definition.Id && k.Weight > 0 && (big || !k.Big)).ToList();
             int zone = ZoneLevelAt(at);
@@ -471,6 +486,8 @@ namespace Game.Core
             // More players and the night bring more of its first kind; of a leader's, more of its minions; champions
             // stay three.
             var more = pack.Elite == EliteRank.None ? pack.Roster[0] : pack.Elite == EliteRank.Leader && pack.Roster.Count > 1 ? pack.Roster[1] : null;
+            // Never more of a big body: they stand where they fit, one or two to a room.
+            if (more != null && more.Big) more = pack.Roster.FirstOrDefault(k => !k.Big);
             if (extra > 0 && pack.Spots.Count > 0 && more != null)
             {
                 var spots = Spread(pack.Spots[0], new List<Vec2>(), extra + 1, random, at => (pack.Room == null || InRoom(pack.Room, at)) && Clear(at)
@@ -489,6 +506,8 @@ namespace Game.Core
             enemy.PackSlot = slot;
             enemy.Home = spot;
             enemy.Facing = Vec2.FromAngle(random.NextFloat() * 2 * MathF.PI);
+            // A big body keeps to its room (World.WayFor).
+            if (pack.Room != null) Bind(enemy, pack.Room.Center, pack.Room.Radius);
             return enemy;
         }
 
@@ -515,7 +534,7 @@ namespace Game.Core
         // no pack comes there.
         bool TryClump(Vec2 position, Player near)
         {
-            var choices = PackChoices(position, Biomes.At(position), big: true);
+            var choices = PackChoices(position, Biomes.At(position), big: true, loose: true);
             if (choices.Count == 0) return false;
             var definition = _random.PickWeighted(choices, p => p.Weight);
             var parties = Parties();
@@ -528,6 +547,8 @@ namespace Game.Core
                 for (int i = 0; i < count; i++) roster.Add(member.Monster);
             }
             for (int i = 0; i < extra; i++) roster.Add(definition.Members[0].Monster);
+            // A world of caves has no rooms to hold a big body (L, XL): its clumps come without them.
+            LeaveOutBig(roster);
             if (FieldCount + roster.Count > EnemyTargetNow) return true;
             var spots = Spread(position, new List<Vec2>(), roster.Count, _random, at => Clear(at) && Vec2.Distance(at, near.Position) >= _config.SpawnDistance);
             if (spots.Count == 0) return true;
@@ -607,7 +628,9 @@ namespace Game.Core
             if (enemy.PackId == 0 || enemy.State == EnemyState.Idle) return false;
             Mark(enemy);
             var pack = PackOf(enemy);
-            if (enemy.State == EnemyState.Chase && pack != null && Vec2.Distance(enemy.Position, pack.Home) > PackLeash)
+            // A big body drawn out past its room's leash (by a blow, or after a target right at its edge) turns back too.
+            if (enemy.State == EnemyState.Chase && pack != null && (Vec2.Distance(enemy.Position, pack.Home) > PackLeash
+                || !InBound(enemy, enemy.Position) && Vec2.Distance(enemy.Position, enemy.BoundCenter) > enemy.BoundRadius + 1))
             {
                 TurnBack(enemy);
                 return true;

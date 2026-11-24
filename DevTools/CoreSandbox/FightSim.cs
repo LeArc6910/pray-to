@@ -48,7 +48,10 @@ namespace CoreSandbox
                     {
                         var at = player.Position + Vec2.FromAngle(bring.NextFloat() * 2 * MathF.PI) * (6 + bring.NextFloat() * 2);
                         if (!world.Map.InBounds(TileMap.Cell(at.X), TileMap.Cell(at.Y)) || Collision.Overlaps(world.Map, at, 0.5f, monster: true)) continue;
-                        world.SpawnEnemy(kindsOnly[bring.Next(kindsOnly.Count)], at);
+                        var kind = kindsOnly[bring.Next(kindsOnly.Count)];
+                        // A big body (L, XL) only where it fits (World.SpawnFitting, B0b).
+                        if (kind.Big && world.SpawnFitting(kind, at, reach: 2) == null) continue;
+                        if (!kind.Big) world.SpawnEnemy(kind, at);
                         break;
                     }
                 }

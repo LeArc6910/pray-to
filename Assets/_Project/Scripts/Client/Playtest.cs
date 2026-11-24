@@ -91,6 +91,13 @@ namespace Game.Client
     //   roll                      the dodge roll, as its key or button would (the way walked, or faced)
     //   rollhit <amount> <ticks>  a blow on the player that many host ticks into their next roll (its unhurt ticks)
     //   nav <target>   sense   botreport [name]   botreset      the bot by the Core's state (PlaytestBot.cs), with probe on
+    //   mob <id> spawn [dx dy]    (B0b) one of that kind where a body its size fits nearest the spot (three tiles ahead), with
+    //                             5000 health; "ok ... none" when no spot within six tiles holds it (an L or XL in a narrow way)
+    //   scene sizes               (B0b) a glow bat (S), a slime (M), a big slime (L) and a slime king (XL) east of the player
+    //                             where each fits, 5000 health each, the monsters held
+    //   sizes                     JSON (B0b): the monsters about the player: kind, size class, radius, where, the room at their
+    //                             tile and whether they fit it, whether they overlap rock, health, state, their leash; and how
+    //                             the screen draws each (picture pixels, health bar, feet, scale)
     static partial class Playtest
     {
         const string Name = "playtest";
@@ -301,6 +308,20 @@ namespace Game.Client
                     else if (words[2] == "sleep") world.ForceSleep(boss);
                     else if (words[2] == "enter" && !world.ForceEntrance(boss, words.Length > 3 && words[3] == "again")) throw new ArgumentException($"'{words[1]}' has no entrance (arenas.csv)");
                     return null;
+                case "mob" when words.Length > 2 && words[2] == "spawn":
+                {
+                    // mob <id> spawn [dx dy]: a new one where its size fits (World.SpawnFitting, B0b).
+                    var kind = root.MonsterSheet.Find(words[1]);
+                    var forward = player.Facing.LengthSquared > 0.01f ? player.Facing.Normalized : new Vec2(1, 0);
+                    var near = words.Length > 4 ? player.Position + new Vec2(Float(words[3]), Float(words[4])) : player.Position + forward * 3;
+                    var made = world.SpawnFitting(kind, near);
+                    // Not an error: a narrow way that holds no big body is what the sweep looks for.
+                    if (made == null) return $"ok mob {words[1]} spawn none: no room for a {MonsterSizes.Name(kind.Size)} body within six tiles";
+                    made.MaxHealth = made.Health = 5000;
+                    // Right on the spot asked when its body fits there (the sweep's swing at a big body's edge).
+                    if (world.Clearance.Fits(near, kind.Radius) && !Game.Core.Collision.Overlaps(world.Map, near, kind.Radius, monster: true)) made.Position = near;
+                    return FormattableString.Invariant($"ok mob {words[1]} spawn {made.Id} at {made.Position.X:0.00},{made.Position.Y:0.00}");
+                }
                 case "mob":
                 {
                     // mob <id> use <attack>: the nearest monster of that kind (one is put three tiles ahead if none is
@@ -357,6 +378,8 @@ namespace Game.Client
                     return "packs " + PacksJson(root);
                 case "elites":
                     return "elites " + ElitesJson(root);
+                case "sizes":
+                    return "sizes " + SizesJson(root);
                 // The things to find in the rooms (2026-11-22, Docs/WorldRework.md 묶음 3a·3b).
                 case "pois":
                     return "pois " + PoisJson(root);
@@ -1166,6 +1189,37 @@ namespace Game.Client
                 .Close('}');
         }
 
+        // The monsters about the player with their size classes (B0b, Docs/Playtest.md sizes): where each stands, the room
+        // there (World.Clearance) and whether it fits, whether its body overlaps rock, its health and state, its leash, and
+        // how the screen draws it.
+        static string SizesJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var list = new Json('[');
+            foreach (var monster in world.Enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) < 20).OrderBy(e => Vec2.Distance(e.Position, player.Position)))
+            {
+                var kind = monster.Definition;
+                int x = TileMap.Cell(monster.Position.X), y = TileMap.Cell(monster.Position.Y);
+                var drawn = root.MonsterDrawn(monster.Id);
+                list.Item(new RawJson(new Json('{')
+                    .Field("id", monster.Id).Field("kind", kind.Id).Field("size", MonsterSizes.Name(kind.Size)).Field("radius", kind.Radius)
+                    .Field("x", monster.Position.X).Field("y", monster.Position.Y)
+                    .Field("distance", Vec2.Distance(monster.Position, player.Position))
+                    .Field("gap", Vec2.Distance(monster.Position, player.Position) - kind.Radius - World.PlayerRadius)
+                    .Field("room", world.Clearance.At(x, y)).Field("need", MonsterSizes.ClearanceFor(kind.Radius))
+                    .Field("fits", world.Clearance.Fits(x, y, kind.Radius))
+                    .Field("inRock", Game.Core.Collision.Overlaps(world.Map, monster.Position, kind.Radius - 0.02f, monster: true))
+                    .Field("health", monster.Health).Field("maxHealth", monster.MaxHealth).Field("state", monster.State.ToString())
+                    .Field("leash", float.IsPositiveInfinity(monster.BoundRadius) ? -1 : monster.BoundRadius)
+                    .Field("drawn", drawn != null).Field("pixels", drawn?.Width ?? 0).Field("tall", drawn?.Height ?? 0)
+                    .Field("bar", drawn?.Bar ?? 0).Field("feet", drawn?.Feet ?? 0).Field("scale", drawn?.Scale ?? 0)
+                    .Close('}')));
+            }
+            int px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
+            return new Json('{').Field("monsters", list.Raw(']')).Field("here", world.Clearance.At(px, py)).Close('}');
+        }
+
         // The rooms of the world: which generator, how many of each role, how many have a chunk, the ways shut by a
         // cracked wall, and the tiles the rooms brought.
         static string Rooms(GameRoot root)
@@ -1290,6 +1344,15 @@ namespace Game.Client
                 // A field elite's camp in small (2026-11-22, Docs/WorldRework.md 들판 정예): a leader of mushroom
                 // soldiers with fire and guard, three slimes round it, six tiles east; three fierce champion beetles six
                 // tiles west. Under "monsters hold" they stand until let go.
+                // The size classes side by side (B0b): each where a body its size fits, east of the player.
+                case "sizes":
+                    world.MonstersHold = true;
+                    foreach (var (id, dx) in new[] { ("glow_bat", 2f), ("slime", 3.5f), ("big_slime", 5.5f), ("slime_king", 9f) })
+                    {
+                        var made = world.SpawnFitting(root.MonsterSheet.Find(id), player.Position + new Vec2(dx, 0));
+                        if (made != null) made.MaxHealth = made.Health = 5000;
+                    }
+                    break;
                 case "elite":
                     var spot = player.Position + new Vec2(6, 0);
                     world.MakeEliteHere(root.MonsterSheet.Find("myconid"), spot, EliteRank.Leader, RiftAffix.Fire | RiftAffix.Guard, root.MonsterSheet.Find("slime"), 3);

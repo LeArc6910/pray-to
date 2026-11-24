@@ -192,8 +192,9 @@ namespace Game.Core
             defense.Wave++;
             defense.WaveTicks = 0;
             int zone = Math.Max(ZoneLevelAt(defense.Center), 1 + (defense.Level - 1) / 3);
-            var kinds = _monsters.Monsters.Where(m => m.Level <= zone && m.Weight > 0).ToList();
-            if (kinds.Count == 0) kinds = _monsters.Monsters.ToList();
+            // Not the big bodies (L, XL): they would stick in a base's doors (World.Sizes.cs).
+            var kinds = _monsters.Monsters.Where(m => m.Level <= zone && m.Weight > 0 && !m.Big).ToList();
+            if (kinds.Count == 0) kinds = _monsters.Monsters.Where(m => !m.Big).ToList();
             float health = 1 + 0.3f * (defense.Level - 1) + 0.1f * (defense.Wave - 1);
             float power = 1 + 0.15f * (defense.Level - 1);
             int count = 3 + defense.Level + 2 * defense.Wave;
@@ -286,7 +287,7 @@ namespace Game.Core
 
         // The nearest monster in range a shot from here can reach (never a boss).
         Enemy TurretTarget(Vec2 at, float range, IEnumerable<Enemy> skip = null) => _enemies
-            .Where(e => !e.IsDead && !e.Away && Vec2.Distance(e.Position, at) <= range && (skip == null || !skip.Contains(e))
+            .Where(e => !e.IsDead && !e.Away && Vec2.Distance(e.Position, at) <= range + MonsterSizes.Beyond(e.Definition.Radius) && (skip == null || !skip.Contains(e))
                 && ClearLine(at + (e.Position - at).Normalized * 0.7f, e.Position, 0.2f))
             .OrderBy(e => Vec2.Distance(e.Position, at))
             .FirstOrDefault();
@@ -326,7 +327,7 @@ namespace Game.Core
                 TurretHit(from, target, TurretDamage * TeslaDamagePercent / 100f, SkillTag.Lightning, 3);
                 from = target.Position;
                 target = _enemies
-                    .Where(e => !e.IsDead && !e.Away && !struck.Contains(e) && Vec2.Distance(e.Position, from) <= TeslaLeap)
+                    .Where(e => !e.IsDead && !e.Away && !struck.Contains(e) && Vec2.Distance(e.Position, from) <= TeslaLeap + MonsterSizes.Beyond(e.Definition.Radius))
                     .OrderBy(e => Vec2.Distance(e.Position, from))
                     .FirstOrDefault();
             }
@@ -341,7 +342,7 @@ namespace Game.Core
                 position: from));
             int amount = Combat.Mitigate(damage * ElementFactor(target.Definition, tags), target.Definition.Armor);
             target.Health -= amount;
-            target.Knockback = toTarget.Normalized * KnockbackSpeed * 0.5f;
+            target.Knockback = Knock(target, toTarget.Normalized, KnockbackSpeed * 0.5f);
             _events.Add(new SimEvent(SimEventType.Hit, 0, target.Id, amount));
             if (!target.IsDead)
             {

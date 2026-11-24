@@ -3033,9 +3033,12 @@ namespace Game.Client
             bool barVisible = showHealth && !dead && (share < 0.999f || body.Elite != EliteRank.None);
             body.HealthBack.enabled = barVisible;
             body.HealthFill.enabled = barVisible;
+            // As wide as an ordinary body's, or most of a big one's (MonsterLook.BarWidth).
+            float bar = MonsterLook.BarWidth(body.Diameter);
+            body.HealthBack.transform.localScale = new Vector3(bar + 0.04f, 0.12f, 1);
             body.HealthBack.transform.localPosition = new Vector3(0, body.Top + 0.15f, 0);
-            body.HealthFill.transform.localScale = new Vector3(0.8f * share, 0.08f, 1);
-            body.HealthFill.transform.localPosition = new Vector3(-0.4f + 0.4f * share, body.Top + 0.15f, 0);
+            body.HealthFill.transform.localScale = new Vector3(bar * share, 0.08f, 1);
+            body.HealthFill.transform.localPosition = new Vector3(-bar / 2 + bar / 2 * share, body.Top + 0.15f, 0);
             body.HealthFill.color = share > 0.5f ? new Color(0.4f, 0.9f, 0.4f) : share > 0.25f ? new Color(0.95f, 0.8f, 0.3f) : new Color(0.95f, 0.3f, 0.25f);
             body.HealthBack.sortingOrder = order + 4;
             body.HealthFill.sortingOrder = order + 5;
@@ -3128,11 +3131,15 @@ namespace Game.Client
                     : body.StrikeTime > 0 ? MonsterPose.Strike
                     : body.EnemyState == EnemyState.Windup ? MonsterPose.Windup
                     : MonsterPose.Idle;
-                int monsterCode = 200000 + (((int)monsterPose * 4 + (int)monsterView) * 16 + frame) * 2 + (left ? 1 : 0);
+                // An elite leader wears a gold ring round its picture, not a bigger one (CreatureArt.Crowned, 2026-11-24).
+                bool crowned = body.Elite == EliteRank.Leader;
+                int monsterCode = 200000 + (crowned ? 100000 : 0) + (((int)monsterPose * 4 + (int)monsterView) * 16 + frame) * 2 + (left ? 1 : 0);
                 if (monsterCode == body.Frame) return;
                 body.Frame = monsterCode;
-                string monsterKey = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{monsterView}/{monsterPose}/{frame}";
-                Func<PixelImage> drawMonster = () => CreatureArt.Monster(body.Id, body.Color, frame, monsterView, monsterPose);
+                string monsterKey = $"{body.Kind}/{body.Id}/{Sprites.Key(body.Color)}/{monsterView}/{monsterPose}/{frame}" + (crowned ? "/leader" : "");
+                Func<PixelImage> drawMonster = () => crowned
+                    ? CreatureArt.Crowned(CreatureArt.Monster(body.Id, body.Color, frame, monsterView, monsterPose), Sprites.ToRgba(EliteGold))
+                    : CreatureArt.Monster(body.Id, body.Color, frame, monsterView, monsterPose);
                 body.Shape.sprite = Sprites.Standing(monsterKey, drawMonster);
                 body.Glow.sprite = Sprites.Standing(monsterKey + "/white", () => drawMonster().Silhouette());
                 body.Shape.flipX = left;
@@ -3389,8 +3396,9 @@ namespace Game.Client
                 Seed = seed,
                 Color = color,
                 Diameter = diameter,
-                // Bodies stand a little below their centre, so the round shape the game uses sits around their feet.
-                Feet = radius * 0.8f,
+                // Bodies stand a little below their centre, so the round shape the game uses sits around their feet
+                // (MonsterLook.FootOffset: where a body's picture stands, for sorting by the feet).
+                Feet = MonsterLook.FootOffset(radius),
                 Shape = Renderer(root, "Shape", null, Color.white),
                 Glow = Renderer(root, "Glow", null, Color.clear),
                 Shadow = Renderer(root, "Shadow", Sprites.Centered("shadow/" + shadowWidth, () => CreatureArt.Shadow(shadowWidth)), Color.white),

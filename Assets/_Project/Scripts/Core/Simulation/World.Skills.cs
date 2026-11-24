@@ -494,7 +494,7 @@ namespace Game.Core
             int amount = Combat.Mitigate(damage * ElementFactor(enemy.Definition, tags) * TakenShare(enemy, from), enemy.Definition.Armor);
             enemy.Health -= amount;
             enemy.LastTags = tags;
-            if (knockback) enemy.Knockback = (enemy.Position - from).Normalized * KnockbackSpeed * push;
+            if (knockback) enemy.Knockback = Knock(enemy, (enemy.Position - from).Normalized, KnockbackSpeed * push);
             _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
             Leech(player, cause, amount);
             // A pack's monster struck before it noticed anyone wakes its pack (World.Packs.cs).
