@@ -177,6 +177,8 @@ namespace Game.Client
             // Joined to their neighbours (PropArt.Fences.cs, Docs/BiomeRework.md 4-4).
             TileType.Fence => Fence(sides),
             TileType.IronWall => IronPlates(sides),
+            TileType.Grate => Railing(sides),
+            TileType.TapestryWall or TileType.ShieldWall => HungWall(type, sides),
             TileType.Flowerbed => Flowerbed(),
             TileType.Woodpile => Woodpile(),
             TileType.TrainingDummy => TrainingDummy(),
@@ -233,16 +235,19 @@ namespace Game.Client
             TileType.Assembler => AssemblerBody(),
             TileType.ArcFurnace => ArcFurnaceBody(),
             _ when RaisedMachines.Contains(type) => Raised(TileArt.Object(type), RaiseOf(type)),
-            _ => null,
+            // The side-on drawings stood on their foot (2026-11-25, PropArt.Stood.cs), or nothing.
+            _ => Stood(type),
         };
 
         // The machines that stand on the floor as blocks (2026-11-11): bodies their moving parts sit on top of
-        // (WorldView.DrawMachines draws those parts LiftOf higher and just in front). Belts, splitters, filters, arms,
-        // levers, poles, sprinklers, harvesters, water wheels and solar panels stay flat on the floor.
+        // (WorldView.DrawMachines draws those parts LiftOf higher and just in front). Belts, splitters and filters are
+        // walked over, so they stay on the floor (BeltArt); an arm and a harvester are low blocks (2026-11-25), and the
+        // levers, poles, sprinklers, water wheels and solar panels stand as they are drawn (PropArt.Stood.cs).
         static readonly HashSet<TileType> RaisedMachines = new HashSet<TileType>
         {
             TileType.Drill, TileType.Smelter, TileType.Generator, TileType.Turret, TileType.Keg, TileType.PreservesJar, TileType.Assembler,
             TileType.ArcFurnace, TileType.Coop, TileType.Barn, TileType.AlchemyTable, TileType.TeslaTower,
+            TileType.Arm, TileType.Harvester,
         };
 
         // The houses whose windows light up in the evening (2026-11-11, WorldView.DrawProps and AddNightLights).
@@ -269,7 +274,7 @@ namespace Game.Client
         static bool Same(Rgba a, Rgba b) => a.R == b.R && a.G == b.G && a.B == b.B && a.A == b.A;
 
         // How many pixels a raised machine's top stands above the floor (a big machine's, BigLift).
-        static int RaiseOf(TileType type) => type == TileType.Keg || type == TileType.PreservesJar ? 4 : 5;
+        static int RaiseOf(TileType type) => type == TileType.Arm ? 3 : type == TileType.Keg || type == TileType.PreservesJar || type == TileType.Harvester ? 4 : 5;
         public const int BigLift = 7;
 
         // How many pixels above the tile's middle a machine's moving part and load sit: the middle of its top.
@@ -444,6 +449,8 @@ namespace Game.Client
             || type == TileType.Pot || type == TileType.Banner || type == TileType.WardStone || type == TileType.RiftAltar
             // Fences and iron walls join their neighbours and stand too (묶음 B0, Docs/BiomeRework.md 4-4).
             || type == TileType.Fence || type == TileType.IronWall
+            // A trap's grate, the hung walls and the side-on drawings (2026-11-25, PropArt.Stood.cs).
+            || type == TileType.Grate || type == TileType.TapestryWall || type == TileType.ShieldWall || IsStood(type)
             // The biomes' own props (묶음 B1a, BiomeArt).
             || BiomeProps.Is(type)
             // And their landmarks (묶음 B1c, PropArt.Places.cs).
@@ -473,7 +480,7 @@ namespace Game.Client
 
         // A wall block: its top face over its tile (shifted up by its height, so a wall in front hides this one's foot)
         // and its face below. Edges where no wall goes on are outlined; a castle wall's open top edge is crenellated.
-        static PixelImage Wall(int sides, Ramp ramp, bool castle)
+        static PixelImage Wall(int sides, Ramp ramp, bool castle, bool merlons = true)
         {
             const int height = 8;
             var image = new PixelImage(T, T + height);
@@ -493,7 +500,7 @@ namespace Game.Client
                     image[x, y] = color;
                 }
             }
-            if (castle && !n)
+            if (castle && merlons && !n)
             {
                 // Merlons along the open edge: raised blocks with gaps.
                 for (int x = 0; x < T; x++)

@@ -15,9 +15,14 @@ namespace Game.Client
 
         // The kinds that are drawn joined.
         public static bool Joined(TileType type) => type == TileType.Fence || type == TileType.Hedge || type == TileType.IronWall
-            || type == TileType.CastleWall || type == TileType.TimberWall;
+            || type == TileType.CastleWall || type == TileType.TimberWall
+            // A trap's grate and the hung walls stand and join too (2026-11-25, PropArt.Stood.cs).
+            || type == TileType.Grate || Built(type) && type != TileType.IronWall;
 
-        static bool Wall(TileType type) => type == TileType.CastleWall || type == TileType.TimberWall || type == TileType.IronWall;
+        static bool Wall(TileType type) => type == TileType.CastleWall || type == TileType.TimberWall || Built(type);
+
+        // The walls players build: iron plates and the two hung with something. They run on into each other.
+        static bool Built(TileType type) => type == TileType.IronWall || type == TileType.TapestryWall || type == TileType.ShieldWall;
 
         // Which sides of the tile at (x, y) join: north 1, east 2, south 4, west 8.
         public static int Mask(TileMap map, int x, int y)
@@ -33,6 +38,9 @@ namespace Game.Client
             return here switch
             {
                 TileType.Fence => there == TileType.Fence || Wall(there) || TileMap.IsDoor(there) && Gate(map, x, y) != null,
+                // A grate closes a way through rock: it runs on into the rock either side.
+                TileType.Grate => there == TileType.Grate || TileArt.IsRock(there),
+                _ when Built(here) => Built(there),
                 _ => there == here,
             };
         }
@@ -45,6 +53,15 @@ namespace Game.Client
             if (map[x - 1, y] == TileType.Fence && map[x + 1, y] == TileType.Fence) return true;
             if (map[x, y - 1] == TileType.Fence && map[x, y + 1] == TileType.Fence) return false;
             return null;
+        }
+
+        // Which way a door that is not a fence's gate stands: true across an east-west run (walls east and west of it,
+        // or nothing to go by: seen from the front), false in a north-south one (walls north and south only).
+        public static bool DoorAlong(TileMap map, int x, int y)
+        {
+            bool Shut(int nx, int ny) => !map.InBounds(nx, ny) || map.IsSolid(nx, ny) && !TileMap.IsDoor(map[nx, ny]);
+            bool across = Shut(x, y + 1) && Shut(x, y - 1), along = Shut(x - 1, y) && Shut(x + 1, y);
+            return along || !across;
         }
 
         // How many of the four sides join.

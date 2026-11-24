@@ -217,6 +217,37 @@ namespace Game.Client
             return _rails[mask & (RailArt.Variants - 1)];
         }
 
+        static Tile[] _laid;
+        static Tile[] _blocks;
+
+        // A laid floor, carpet, soil bed or dock plank for its joined sides (FlatArt.Mask, 2026-11-25: what lies on the
+        // ground ends in an edge, not a square).
+        public static TileBase Laid(TileType type, int mask)
+        {
+            BuildAtlas();
+            return _laid[FlatArt.LaidIndex(type) * FlatArt.Variants + (mask & (FlatArt.Variants - 1))];
+        }
+
+        // A room's wall of obsidian or void stone for the sides that are rock (FlatArt.BlockMask).
+        public static TileBase Block(TileType type, int mask)
+        {
+            BuildAtlas();
+            return _blocks[FlatArt.BlockIndex(type) * FlatArt.Variants + (mask & (FlatArt.Variants - 1))];
+        }
+
+        static Tile[] _extras;
+
+        // The faint bed under a belt (BeltArt.Bed), and a splitter's and a filter's housing with its shadow.
+        public static TileBase BeltBed => Extra(0);
+
+        public static TileBase Housing(TileType kind) => Extra(kind == TileType.Filter ? 2 : 1);
+
+        static TileBase Extra(int index)
+        {
+            BuildAtlas();
+            return _extras[index];
+        }
+
         // The tile for a placed thing, or null for tiles that are only ground.
         public static TileBase Object(TileType type)
         {
@@ -227,10 +258,14 @@ namespace Game.Client
         static void BuildAtlas()
         {
             if (_atlas != null) return;
-            // The ground, the placed things, the open door, the roads, and the rails last.
+            // The ground, the placed things, the open door, the roads, the rails, and what is laid and the rooms' blocks last.
             int roads = TileArt.GroundCount + ObjectTypes.Length + 1;
             int rails = roads + TileArt.RoadVariants;
-            int count = rails + RailArt.Variants;
+            int laid = rails + RailArt.Variants;
+            int blocks = laid + FlatArt.Laid.Length * FlatArt.Variants;
+            int extras = blocks + FlatArt.Blocks.Length * FlatArt.Variants;
+            var extraImages = new[] { BeltArt.Bed, BeltArt.Housing(TileType.Splitter), BeltArt.Housing(TileType.Filter) };
+            int count = extras + extraImages.Length;
             int columns = Mathf.CeilToInt(Mathf.Sqrt(count));
             int size = Mathf.NextPowerOfTwo(columns * Cell);
             var atlas = new PixelImage(size, size);
@@ -240,6 +275,9 @@ namespace Game.Client
             images[roads - 1] = TileArt.OpenDoor;
             for (int i = 0; i < TileArt.RoadVariants; i++) images[roads + i] = TileArt.Road(i);
             for (int i = 0; i < RailArt.Variants; i++) images[rails + i] = RailArt.Rail(i);
+            for (int i = 0; i < FlatArt.Laid.Length * FlatArt.Variants; i++) images[laid + i] = FlatArt.Tile(FlatArt.Laid[i / FlatArt.Variants], i % FlatArt.Variants);
+            for (int i = 0; i < FlatArt.Blocks.Length * FlatArt.Variants; i++) images[blocks + i] = FlatArt.Block(FlatArt.Blocks[i / FlatArt.Variants], i % FlatArt.Variants);
+            for (int i = 0; i < extraImages.Length; i++) images[extras + i] = extraImages[i];
             for (int i = 0; i < count; i++) Extruded(atlas, images[i], i % columns * Cell, i / columns * Cell);
 
             _atlas = Texture(size, size);
@@ -265,6 +303,12 @@ namespace Game.Client
             for (int i = 0; i < TileArt.RoadVariants; i++) _roads[i] = MakeTile(roads + i);
             _rails = new Tile[RailArt.Variants];
             for (int i = 0; i < RailArt.Variants; i++) _rails[i] = MakeTile(rails + i);
+            _laid = new Tile[FlatArt.Laid.Length * FlatArt.Variants];
+            for (int i = 0; i < _laid.Length; i++) _laid[i] = MakeTile(laid + i);
+            _extras = new Tile[extraImages.Length];
+            for (int i = 0; i < _extras.Length; i++) _extras[i] = MakeTile(extras + i);
+            _blocks = new Tile[FlatArt.Blocks.Length * FlatArt.Variants];
+            for (int i = 0; i < _blocks.Length; i++) _blocks[i] = MakeTile(blocks + i);
         }
 
         // Draws the image into the atlas with its edge pixels repeated one pixel outward.

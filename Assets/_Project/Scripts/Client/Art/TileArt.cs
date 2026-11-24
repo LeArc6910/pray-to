@@ -42,7 +42,7 @@ namespace Game.Client
         public const int Right = 2;
         public const int Down = 4;
         public const int Left = 8;
-        const int FaceHeight = 6;
+        public const int FaceHeight = 6;
 
         public static int GroundCount => Biomes * Kinds * Masks * Variants;
 

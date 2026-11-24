@@ -1162,6 +1162,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.IceSand.cs`, `Core/World/WorldGenerator.IceSandDungeons.cs`, `Core/Simulation/World.IceSand.cs`, `Client/Art/BiomeArt.IceSand.cs`, `Client/Art/PropArt.IceSand.cs`, `Client/Art/CreatureArt.IceSand.cs`, `Tests/EditMode/IceSandLookTests.cs`, `Tests/EditMode/B2bTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheIceAndSandCavesStandTheirPropsAndThePlacesTakeTheirLooks`(사진 `biomes-ice`, `places-ice`, `biomes-sand`, `places-sand`). 통신 0.104.0. 새 월드는 생성기 5판, 4판 이전 월드는 그대로
   - (클라우드 웹 점검) `sweep.js --only biomes,places,b2mobs,dungeon,packs`
   - (사람) 얼음 동굴(하늘빛)과 모래 동굴(금빛)이 서로 다르게 느껴지고 빛 물이 과하지 않은지, 미끄러운 얼음 칸이 새 바닥과 구별되는지, 환경음 둘(바람·얼음 갈라짐, 모래), 흰 토끼·도마뱀이 휴대폰에서 적과 헷갈리지 않는지, 얼음 마을·모래 마을과 랜드마크(얼음 속 짐승, 얼음 성 기둥, 묻힌 신전 정면, 거대 두개골), 얼음 위에서 미끄러지는 돌진과 떨어지는 고드름(휴대폰에서 천장 그늘이 읽히는지), 흐르는 모래 아래에서 튀어나오는 것, 잠든 서리 매머드·신전 수호 석상이 깨어나는 맛, 얼어붙은 묘·묻힌 신전 한 판
+- [ ] 173단계: 납작한 칸 점검 — 벨트·문·기계·바닥·밭·양탄자·부두·벽을 서 있거나 이웃에 맞는 그림으로(사람 지적 "입체감 없이 타일 형태로 칸 꽉 채우는거 다 찾아서 점검", `Docs/BiomeRework.md` 납작한 칸 점검)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/FlatArt.cs`, `Client/Art/BeltArt.cs`, `Client/Art/MachineArt.cs`, `Client/Art/PropArt.Stood.cs`의 `.meta`가 생기면 커밋한다. 기존 PlayMode 시험이 문을 서 있는 층에서 찾게 바뀐 데 걸리면 Console 로그를 붙인다
+  - (클라우드 웹 점검) `sweep.js --only depth,base,farm,factory,life`
+  - (사람) 벨트가 굽는 곳과 방향이 자연스러운지, 문(벽 속·울타리 속)이 열고 닫힐 때 어색하지 않은지, 서 있는 전봇대·태양광판·허수아비·물레방아가 사람과 겹칠 때 앞뒤 순서, 바닥재·양탄자·밭 가장자리가 깔끔한지, 휴대폰에서 남북 문과 창살이 너무 가늘지 않은지
 
 ## 결과 보고
 

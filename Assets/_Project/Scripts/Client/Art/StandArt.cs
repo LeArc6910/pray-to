@@ -6,7 +6,7 @@ namespace Game.Client
     // (Docs/BiomeRework.md 4-3 그리는 규칙, 묶음 B0). WorldView draws by this and so does the preview tool (ArtPreview's
     // Scene and DepthPreview), so the pictures are the game's.
     //  - Everything that stands (the places' structures, what players build that stands, fences, hedges, walls, a gate
-    //    in a fence, the floor's decor, people, monsters) is its own sprite, sorted by its foot's y to the pixel
+    //    in a fence, a door, a trap's grate, the floor's decor, people, monsters) is its own sprite, sorted by its foot's y to the pixel
     //    (WorldView.FootOrder: lower on the screen is in front). At the same row: decor, then props, then bodies.
     //  - The foot is the bottom edge of the footprint (the tiles it blocks), in the middle; a fence sorts at its posts'
     //    feet, a hedge at its mass's. Only the footprint blocks: the picture rises above it (and a canopy or roof can be
@@ -32,13 +32,15 @@ namespace Game.Client
             Prop,
             Joined,
             Gate,
+            // A door in a wall or alone (2026-11-25, PropArt.Door): framed, seen from the front or the side.
+            Door,
         }
 
         public static Kind KindAt(TileMap map, int x, int y)
         {
             var type = map[x, y];
             if (type == TileType.StructurePart) return Kind.None;
-            if (TileMap.IsDoor(type)) return Joins.Gate(map, x, y) != null ? Kind.Gate : Kind.None;
+            if (TileMap.IsDoor(type)) return Joins.Gate(map, x, y) != null ? Kind.Gate : Kind.Door;
             if (Joins.Joined(type)) return Kind.Joined;
             return Structures.IsDecor(type) || PropArt.Stands(type) ? Kind.Prop : Kind.None;
         }
@@ -55,6 +57,7 @@ namespace Game.Client
             if (kind == Kind.Joined) return Joins.Mask(map, x, y);
             if (kind == Kind.Gate) return (Joins.Gate(map, x, y) == true ? 1 : 0) | (open ? 2 : 0);
             var type = map[x, y];
+            if (kind == Kind.Door) return PropArt.DoorShape(Joins.DoorAlong(map, x, y), open, type == TileType.LockedDoor);
             if (BiomeProps.Is(type)) return BiomeArt.Variant(type, x, y);
             // 3 in the ice cave (a frozen tree), 4 in the sand cave (a cave palm): 묶음 B2a.
             if (type == TileType.MushroomTree) return biome == Biome.Cave ? 1 : biome == Biome.Mushroom ? 2 : biome == Biome.Ice ? 3 : biome == Biome.Sand ? 4 : 0;
@@ -67,6 +70,7 @@ namespace Game.Client
         public static PixelImage Picture(TileType type, Kind kind, int shape, bool lit)
         {
             if (kind == Kind.Gate) return PropArt.FenceGate((shape & 1) != 0, (shape & 2) != 0);
+            if (kind == Kind.Door) return PropArt.Door(shape);
             if (BiomeProps.Is(type)) return BiomeArt.Prop(type, shape);
             if (type == TileType.MushroomTree && shape != 0) return BiomeArt.PlaceTree(shape == 2 ? Biome.Mushroom : shape == 3 ? Biome.Ice : shape == 4 ? Biome.Sand : Biome.Cave);
             if (type == TileType.RingCap) return BiomeArt.RingCap(shape);
@@ -83,12 +87,12 @@ namespace Game.Client
 
         // Where on its picture, from the left, a thing stands: the middle, but for an open gate in a north-south run,
         // whose leaf swings over the tile to the east.
-        public static int PivotX(Kind kind, int shape, PixelImage picture) => kind == Kind.Gate && (shape & 1) == 0 && (shape & 2) != 0
+        public static int PivotX(Kind kind, int shape, PixelImage picture) => (kind == Kind.Gate || kind == Kind.Door) && (shape & 1) == 0 && (shape & 2) != 0
             ? Pixels / 2 : picture.Width / 2;
 
         // How far above the bottom edge of its footprint a thing's foot line is, in tiles.
         public static float FootLift(TileType type, Kind kind) =>
-            kind == Kind.Gate || type == TileType.Fence ? PropArt.FenceFoot / (float)Pixels
+            kind == Kind.Gate || type == TileType.Fence || type == TileType.Grate ? PropArt.FenceFoot / (float)Pixels
             : type == TileType.Hedge ? PropArt.HedgeFoot / (float)Pixels
             : BiomeProps.Is(type) || type == TileType.IceColumn ? BiomeArt.FootRows / (float)Pixels
             : type == TileType.RingCap ? BiomeArt.RingFoot / (float)Pixels

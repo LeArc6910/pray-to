@@ -23,11 +23,6 @@ namespace Game.Client
             // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them; --only hero
             // the player's.
             // --only flat: every tile drawn flat on the object layer, and the rails as they join (out/flat/, FlatPreview).
-            if (args.Length == 2 && args[0] == "--only" && args[1] == "flat")
-            {
-                FlatPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"));
-                return 0;
-            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "skillfx")
             {
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).
@@ -81,6 +76,13 @@ namespace Game.Client
             }
 
             var lights = new WorldLights(tiles);
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "flat")
+            {
+                string flatOut = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out");
+                FlatPreview.Write(flatOut);
+                WriteFlatScenes(flatOut, npcs);
+                return 0;
+            }
             // --only arenas: just the arenas' pictures (arenas.png, arenas_unlit.png, arenas/).
             // --only map: just the generated map's pictures, three seeds for each generator version (out/map/, MapPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "map")
@@ -213,6 +215,9 @@ namespace Game.Client
             if (!WriteSizes(output)) return 1;
             // The biomes' looks (묶음 B1a): prop sheets, a real room of each unlit and lit, the critters.
             if (!WriteBiomes(output, lights, tiles, story, monsters)) return 1;
+            // The flat tiles' audit (2026-11-25): every object tile, the rails, and the scenes as the game draws them.
+            FlatPreview.Write(output);
+            WriteFlatScenes(output, npcs);
             // The pixel slips the eye misses at sheet size (ArtLint): fails only when a count goes up.
             if (!ArtLint.Run(loot, monsters, FindFolder(Path.Combine("DevTools", "ArtPreview")), output)) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;
@@ -799,10 +804,10 @@ namespace Game.Client
             Put(9, -3, TileType.Torch);
             scene.Places(null);
             scene.Machine(sx + 2, sy - 4, 2, ItemArt.DrillBit);
-            scene.Machine(sx + 3, sy - 4, 0, ItemArt.Belt(0));
-            scene.Machine(sx + 4, sy - 4, 0, ItemArt.Belt(0));
+            scene.Machine(sx + 3, sy - 4, 0, BeltArt.Belt(false, 0, BeltArt.Straight, 0));
+            scene.Machine(sx + 4, sy - 4, 0, BeltArt.Belt(false, 0, BeltArt.Straight, 0));
             scene.Machine(sx + 5, sy - 4, 0, ItemArt.Chevron);
-            scene.Machine(sx + 6, sy - 4, 0, ItemArt.Belt(0));
+            scene.Machine(sx + 6, sy - 4, 0, BeltArt.Belt(false, 0, BeltArt.Straight, 0));
             scene.Icon(sx + 3.5f, sy - 3.5f, ItemArt.Material(loot.FindMaterial("copper_ore")));
             scene.Icon(sx + 6.8f, sy - 3.5f, ItemArt.Material(loot.FindMaterial("copper_ore")));
 
@@ -1079,7 +1084,7 @@ namespace Game.Client
                         var kind = StandArt.KindAt(_map, x, y);
                         if (kind == StandArt.Kind.None) continue;
                         var type = _map[x, y];
-                        bool open = kind == StandArt.Kind.Gate && Open != null && Open(x, y);
+                        bool open = (kind == StandArt.Kind.Gate || kind == StandArt.Kind.Door) && Open != null && Open(x, y);
                         int shape = StandArt.ShapeAt(_map, x, y, open, BiomeAt?.Invoke(x, y));
                         var image = StandArt.Picture(type, kind, shape, Night);
                         if (image == null) continue;
@@ -1192,6 +1197,10 @@ namespace Game.Client
                                 : _map[x, y] == TileType.Road ? TileArt.Road(TileArt.RoadVariant(_map, x, y))
                                 : _map[x, y] == TileType.Rail ? RailArt.Rail(RailArt.Mask(_map, x, y))
                                 : RoomTileArt.IsPatch(_map[x, y]) ? RoomTileArt.Patch(_map[x, y], RoomTileArt.PatchMask(_map, x, y), RoomTileArt.Laying(x, y))
+                                : World.IsBelt(_map[x, y]) ? BeltArt.Bed
+                                : _map[x, y] == TileType.Splitter || _map[x, y] == TileType.Filter ? BeltArt.Housing(_map[x, y])
+                                : FlatArt.LaidIndex(_map[x, y]) >= 0 ? FlatArt.Tile(_map[x, y], FlatArt.Mask(_map, x, y))
+                                : FlatArt.BlockIndex(_map[x, y]) >= 0 ? FlatArt.Block(_map[x, y], FlatArt.BlockMask(_map, x, y))
                                 : TileArt.Object(_map[x, y]);
                             if (placed != null) image.Draw(placed, px, py);
                         }
@@ -1274,6 +1283,27 @@ namespace Game.Client
                 var (px, py) = Corner(x, y);
                 var crop = ItemArt.Crop(stage);
                 _overlays.Add(image => image.Draw(crop, px + (Px - crop.Width) / 2, py - crop.Height));
+            }
+
+            // A sprite standing from its foot at (x, foot), sorted by it (a big machine's body, a stall's keeper).
+            public void Stand(float x, float foot, PixelImage sprite, int tie)
+            {
+                var (px, py) = Corner(x, foot);
+                _bodies.Add((Key(foot, tie), image => image.Draw(sprite, px - sprite.Width / 2, py - sprite.Height)));
+            }
+
+            // A sprite centred on (x, y), sorted as if its foot were at `foot` (a machine's part on its raised body).
+            public void Centered(float x, float y, PixelImage sprite, float foot, int tie)
+            {
+                var (px, py) = Corner(x, y);
+                _bodies.Add((Key(foot, tie) - 0.00001f, image => image.Draw(sprite, px - sprite.Width / 2, py - sprite.Height / 2)));
+            }
+
+            // A sprite laid on the floor, centred on (x, y), under everything that stands.
+            public void Flat(float x, float y, PixelImage sprite)
+            {
+                var (px, py) = Corner(x, y);
+                _overlays.Add(image => image.Draw(sprite, px - sprite.Width / 2, py - sprite.Height / 2));
             }
 
             // Bodies stand with their feet a little below their centre, as in WorldView.Place.

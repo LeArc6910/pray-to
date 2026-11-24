@@ -444,20 +444,6 @@ namespace Game.Client
             _target.transform.localScale = new Vector3(size, size, 1);
             _target.color = open ? new Color(1, 1, 1, 0.6f + 0.25f * Mathf.Sin(Time.time * 4)) : new Color(1, 0.35f, 0.3f, 0.8f);
         }
-        // Scarecrows sway in a draught (2026-11-09): a few degrees each way about their foot, each a little out of step.
-        readonly HashSet<Vector3Int> _scarecrows = new HashSet<Vector3Int>();
-
-        void SwayScarecrows()
-        {
-            foreach (var cell in _scarecrows)
-            {
-                if (!Shown(cell.x, cell.y)) continue;
-                float degrees = Mathf.Sin(Time.time * 1.7f + cell.x * 0.9f + cell.y * 0.4f) * 6;
-                var sway = Matrix4x4.Translate(new Vector3(0, -0.45f, 0)) * Matrix4x4.Rotate(Quaternion.Euler(0, 0, degrees)) * Matrix4x4.Translate(new Vector3(0, 0.45f, 0));
-                _objects.SetTileFlags(cell, TileFlags.None);
-                _objects.SetTransformMatrix(cell, sway);
-            }
-        }
 
         // How far a glowing shot lights its way.
         const float ShotLight = 2.2f;
@@ -651,7 +637,6 @@ namespace Game.Client
             BeginSkillFx();
             DrawProjectiles(deltaTime);
             DrawTarget();
-            SwayScarecrows();
 
             foreach (var e in _client.TakeEvents()) Show(e);
             _rendered = 4;
@@ -1532,7 +1517,13 @@ namespace Game.Client
             int beltFrame = Mathf.FloorToInt(Time.time * 16) % ItemArt.BeltFrames;
             // A fast belt runs twice as fast, so its marks do too.
             int fastFrame = Mathf.FloorToInt(Time.time * 32) % ItemArt.BeltFrames;
-            foreach (var machine in _client.Machines())
+            var machines = _client.Machines();
+            // Which way each belt runs, for the belts beside it (a belt fed from the side is a curve, BeltArt.Feed).
+            _beltWays.Clear();
+            foreach (var machine in machines)
+                if (World.IsBelt(machine.Kind)) _beltWays[machine.Y * _client.Map.Width + machine.X] = (machine.Kind, machine.Direction);
+            _beltAt ??= (x, y) => _client.Map.InBounds(x, y) && _beltWays.TryGetValue(y * _client.Map.Width + x, out var way) ? way : ((TileType, int)?)null;
+            foreach (var machine in machines)
             {
                 int key = machine.Y * _client.Map.Width + machine.X;
                 _seen.Add(key);
@@ -1554,9 +1545,9 @@ namespace Game.Client
                 var step = Machine.Steps[machine.Direction];
                 var center = new Vector3(machine.X + 0.5f, machine.Y + 0.5f, 0);
                 parts.Part.sprite = machine.Kind == TileType.Drill ? DrillBitSprite
-                    : machine.Kind == TileType.Conveyor ? BeltSprites[machine.On ? beltFrame : 0]
-                    : machine.Kind == TileType.FastConveyor ? FastBeltSprites[machine.On ? fastFrame : 0]
-                    : machine.Kind == TileType.UndergroundBelt ? UndergroundSprites[machine.On ? beltFrame : 0]
+                    : machine.Kind == TileType.Conveyor ? BeltSprite(false, machine.Direction, BeltArt.Feed(_beltAt, machine.X, machine.Y, machine.Direction), machine.On ? beltFrame : 0)
+                    : machine.Kind == TileType.FastConveyor ? BeltSprite(true, machine.Direction, BeltArt.Feed(_beltAt, machine.X, machine.Y, machine.Direction), machine.On ? fastFrame : 0)
+                    : machine.Kind == TileType.UndergroundBelt ? HoodSprite(machine.Direction, machine.On ? beltFrame : 0)
                     : machine.Kind == TileType.PowerPole || machine.Kind == TileType.SolarPanel || machine.Kind == TileType.TeslaTower ? null
                     : machine.Kind == TileType.WaterWheel ? WheelSprite
                     : machine.Kind == TileType.Turret ? TurretBarrelSprite
@@ -1574,8 +1565,7 @@ namespace Game.Client
                     : ChevronSprite;
                 int size = World.SizeOf(machine.Kind);
                 // A machine standing as a block (2026-11-11, PropArt.Raises): its parts on its top, that much higher.
-                float lift = PropArt.Raises(machine.Kind) ? PropArt.LiftOf(machine.Kind) / (float)TileArt.Size
-                    : size > 1 ? PropArt.BigLift / (float)TileArt.Size : 0;
+                float lift = MachineArt.Lift(machine.Kind);
                 // A big machine's body stands from its foot; what it carries shows on its top.
                 if (size > 1) center = new Vector3(machine.X + size / 2f, machine.Y + size / 2f, 0);
                 parts.Part.transform.localPosition = size > 1 ? new Vector3(center.x, machine.Y, 0) : center + new Vector3(0, lift, 0);
@@ -1593,13 +1583,15 @@ namespace Game.Client
                     : machine.Kind == TileType.WaterWheel ? (machine.On && machine.Progress > 0 ? -Time.time * 90 % 360 : 0)
                     // A turret points where it last shot.
                     : machine.Kind == TileType.Turret ? _turretAim.GetValueOrDefault(key, 90)
-                    : size > 1 ? 0
+                    // A belt is drawn the way it lies (BeltArt), a big machine as it stands.
+                    : size > 1 || World.IsBelt(machine.Kind) ? 0
                     : machine.Direction * 90 + swing;
                 parts.Part.transform.localRotation = Quaternion.Euler(0, 0, turn);
                 // On a raised body or a big machine (a block itself), sorted by its foot just in front of the body, so people
                 // pass in front of and behind it; on a flat one, on the floor.
                 int body = FootOrder(machine.Y, StandArt.PropTie);
-                bool standing = lift > 0 || size > 1;
+                // So is the part of what stands as it is drawn (a lever's handle, a sprinkler's head, a water wheel).
+                bool standing = MachineArt.Stands(machine.Kind);
                 parts.Part.sortingOrder = standing ? body + 1 : machine.Kind == TileType.Arm ? -13 : -15;
                 parts.Load.sortingOrder = standing ? body + 2 : machine.Kind == TileType.Arm ? -12 : -14;
                 // A filter shows the material it picks out while it carries nothing; a generator's fuel is not shown.
@@ -1862,9 +1854,7 @@ namespace Game.Client
             {
                 var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
                 bool opened = _openDoors.Add(key);
-                // Also after the tiles round it were redrawn closed. A gate in a fence swings in the standing layer.
-                bool gate = Joins.Gate(map, cell.x, cell.y) != null;
-                if (!gate && _objects.GetTile(cell) != Sprites.OpenDoor) _objects.SetTile(cell, Sprites.OpenDoor);
+                // The door itself swings in the standing layer (StandArt.Kind.Door and Gate), which reads _openDoors.
                 if (opened) Hear(Sound.Door, cell + new Vector3(0.5f, 0.5f, 0));
             }
             _doorsShut.Clear();
@@ -1874,7 +1864,6 @@ namespace Game.Client
                 _openDoors.Remove(key);
                 var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
                 if (!TileMap.IsDoor(map[cell.x, cell.y]) || !Shown(cell.x, cell.y)) continue;
-                _objects.SetTile(cell, ObjectTileAt(map, cell.x, cell.y));
                 Hear(Sound.DoorShut, cell + new Vector3(0.5f, 0.5f, 0));
             }
         }
@@ -1916,14 +1905,15 @@ namespace Game.Client
                     if (used == _wires.Count)
                     {
                         var wire = Renderer(_root.transform, "Wire", Shapes.Square, WireColor);
-                        wire.sortingOrder = 30;
+                        // Overhead: over everything that stands, under the dark.
+                        wire.sortingOrder = DepthHighest + 5;
                         _wires.Add(wire);
                     }
                     var line = _wires[used++];
                     line.enabled = true;
                     // From the top of one pole to the other, where the insulators are.
-                    var from = new Vector3(a.X + 0.5f, a.Y + 0.85f, 0);
-                    var to = new Vector3(b.X + 0.5f, b.Y + 0.85f, 0);
+                    var from = new Vector3(a.X + 0.5f, a.Y + MachineArt.WireHeight(a.Kind), 0);
+                    var to = new Vector3(b.X + 0.5f, b.Y + MachineArt.WireHeight(b.Kind), 0);
                     var along = to - from;
                     line.transform.localPosition = (from + to) / 2;
                     line.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Atan2(along.y, along.x) * Mathf.Rad2Deg);
@@ -2075,25 +2065,29 @@ namespace Game.Client
         static readonly Color WireColor = new Color(0.78f, 0.45f, 0.2f, 0.85f);
         static readonly Color PowerLabel = new Color(1f, 0.85f, 0.45f);
 
-        static Sprite[] _beltSprites;
+        // The belts as they lie (BeltArt, 2026-11-25): kind, facing, how it is fed and the frame. Made when first seen.
+        readonly Dictionary<int, (TileType Kind, int Facing)> _beltWays = new Dictionary<int, (TileType, int)>();
+        MachineArt.Lookup _beltAt;
+        static readonly Sprite[] BeltSprites = new Sprite[2 * 4 * 3 * BeltArt.Frames];
+        static readonly Sprite[] HoodSprites = new Sprite[4 * BeltArt.Frames];
 
-        static Sprite[] BeltSprites => _beltSprites ??= new[]
+        static Sprite BeltSprite(bool fast, int facing, int feed, int frame)
         {
-            Sprites.Centered("machine/belt0", () => ItemArt.Belt(0)),
-            Sprites.Centered("machine/belt1", () => ItemArt.Belt(1)),
-            Sprites.Centered("machine/belt2", () => ItemArt.Belt(2)),
-            Sprites.Centered("machine/belt3", () => ItemArt.Belt(3)),
-        };
+            facing &= 3;
+            int index = (((fast ? 1 : 0) * 4 + facing) * 3 + feed) * BeltArt.Frames + frame;
+            var sprite = BeltSprites[index];
+            if (sprite != null) return sprite;
+            return BeltSprites[index] = Sprites.Centered($"machine/belt/{index}", () => BeltArt.Belt(fast, facing, feed, frame));
+        }
 
-        static Sprite[] _fastBeltSprites;
-
-        static Sprite[] FastBeltSprites => _fastBeltSprites ??= Enumerable.Range(0, ItemArt.BeltFrames)
-            .Select(frame => Sprites.Centered("machine/fastbelt" + frame, () => ItemArt.Belt(frame, fast: true))).ToArray();
-
-        static Sprite[] _undergroundSprites;
-
-        static Sprite[] UndergroundSprites => _undergroundSprites ??= Enumerable.Range(0, ItemArt.BeltFrames)
-            .Select(frame => Sprites.Centered("machine/underground" + frame, () => ItemArt.Underground(frame))).ToArray();
+        static Sprite HoodSprite(int facing, int frame)
+        {
+            facing &= 3;
+            int index = facing * BeltArt.Frames + frame;
+            var sprite = HoodSprites[index];
+            if (sprite != null) return sprite;
+            return HoodSprites[index] = Sprites.Centered($"machine/hood/{index}", () => BeltArt.Underground(facing, frame));
+        }
 
         void DrawProjectiles(float deltaTime)
         {
@@ -3509,7 +3503,6 @@ namespace Game.Client
 
             for (int y = 0; y < map.Height; y++)
                 for (int x = 0; x < map.Width; x++)
-                    if (map[x, y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(x, y, 0));
             StreamChunks(new Vector2(client.Position.X, client.Position.Y));
         }
 
@@ -3586,8 +3579,15 @@ namespace Game.Client
             : map[x, y] == TileType.Rail ? Sprites.Rail(RailArt.Mask(map, x, y))
             // Ice and quicksand, their edges matched to their neighbours (RoomTileArt.Patch).
             : RoomTileArt.IsPatch(map[x, y]) ? Sprites.Patch(map[x, y], RoomTileArt.PatchMask(map, x, y), RoomTileArt.Laying(x, y))
-            // A door in a fence is the fence's gate, standing (Joins.Gate, 묶음 B0).
-            : TileMap.IsDoor(map[x, y]) && Joins.Gate(map, x, y) != null ? null
+            // Floors, carpets, soil and planks end in an edge where they stop; the rooms' blocks follow the rock (FlatArt).
+            : FlatArt.LaidIndex(map[x, y]) >= 0 ? Sprites.Laid(map[x, y], FlatArt.Mask(map, x, y))
+            : FlatArt.BlockIndex(map[x, y]) >= 0 ? Sprites.Block(map[x, y], FlatArt.BlockMask(map, x, y))
+            // A door stands: a fence's gate (Joins.Gate, 묶음 B0) or a framed door (PropArt.Door, 2026-11-25).
+            : TileMap.IsDoor(map[x, y]) ? null
+            // Under a belt only a faint bed (the belt itself is its machine's part, BeltArt); a splitter's and a filter's
+            // housing with its shadow.
+            : World.IsBelt(map[x, y]) ? Sprites.BeltBed
+            : map[x, y] == TileType.Splitter || map[x, y] == TileType.Filter ? Sprites.Housing(map[x, y])
             : ObjectTile(map[x, y]);
 
         static Tilemap AddTilemap(Transform grid, string name, int order)
@@ -3700,8 +3700,6 @@ namespace Game.Client
                 if (Shown(change.X, change.Y)) _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTileAt(map, change.X, change.Y));
                 // What stands near it is listed again: a fence beside it may join on, a door become a gate, decor go.
                 StandsChanged(change.X, change.Y);
-                if (map[change.X, change.Y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(change.X, change.Y, 0));
-                else _scarecrows.Remove(new Vector3Int(change.X, change.Y, 0));
                 // The corners round by the neighbours and take the ground beside, which itself depends on its neighbours.
                 for (int dy = -2; dy <= 2; dy++)
                 {
@@ -3719,7 +3717,10 @@ namespace Game.Client
                     _ground.SetTile(new Vector3Int(x, y, 0), GroundAt(x, y));
                     _underlay.SetTile(new Vector3Int(x, y, 0), UnderlayAt(x, y));
                     // A road beside it may gain or lose a kerb, and a door become a fence's gate or stop being one.
-                    if (map[x, y] == TileType.Road || TileMap.IsDoor(map[x, y])) _objects.SetTile(new Vector3Int(x, y, 0), ObjectTileAt(map, x, y));
+                    // So may a rail, a laid floor, a carpet, a soil bed, a plank or a room's block (FlatArt).
+                    if (map[x, y] == TileType.Road || TileMap.IsDoor(map[x, y]) || map[x, y] == TileType.Rail
+                        || FlatArt.LaidIndex(map[x, y]) >= 0 || FlatArt.BlockIndex(map[x, y]) >= 0)
+                        _objects.SetTile(new Vector3Int(x, y, 0), ObjectTileAt(map, x, y));
                 }
             }
         }

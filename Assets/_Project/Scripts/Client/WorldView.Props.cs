@@ -209,6 +209,7 @@ namespace Game.Client
                 renderer.flipX = pick.Flip;
                 renderer.color = Color.white;
                 renderer.transform.localPosition = new Vector3(fx, fy - StandArt.DecorDrop, 0);
+                renderer.transform.localRotation = Quaternion.identity;
                 // What lies flat (moss, threads, a cobweb) is under everyone's feet; the rest sorts by its foot.
                 renderer.sortingOrder = Decor.Flat(pick.Kind) ? FlatDecorOrder : FootOrder(fy, StandArt.DecorTie);
                 decor++;
@@ -292,7 +293,7 @@ namespace Game.Client
         bool DrawStand(TileMap map, Stand stand, float deltaTime, int cap, ref int faded)
         {
             int cell = stand.Y * map.Width + stand.X;
-            bool open = stand.Kind == StandArt.Kind.Gate && _openDoors.Contains(cell);
+            bool open = (stand.Kind == StandArt.Kind.Gate || stand.Kind == StandArt.Kind.Door) && _openDoors.Contains(cell);
             int shape = StandArt.ShapeAt(map, stand.X, stand.Y, open, stand.Biome);
             bool lit = PropArt.LitAtNight(stand.Type) && _windowsLit;
             var type = stand.Type;
@@ -307,7 +308,11 @@ namespace Game.Client
             {
                 if (!PropAtlas.TryGet(key, out var whole)) whole = PropAtlas.Get(key, () => StandArt.Picture(type, kind, shape, lit), image => StandArt.PivotX(kind, shape, image));
                 if (whole == null) return false;
-                PlaceStand(NextStand(), whole, x, stand.Y, order, 1);
+                var renderer = NextStand();
+                PlaceStand(renderer, whole, x, stand.Y, order, 1);
+                // A scarecrow sways in a draught about its foot, each a little out of step (2026-11-09).
+                if (type == TileType.Scarecrow && !Settings.ReduceMotion)
+                    renderer.transform.localRotation = Quaternion.Euler(0, 0, Mathf.Sin(Time.time * 1.7f + stand.X * 0.9f + stand.Y * 0.4f) * 6);
                 return true;
             }
             if (!PropAtlas.TryGet(key | 2, out var under) || !PropAtlas.TryGet(key | 4, out var over))
@@ -337,6 +342,7 @@ namespace Game.Client
             renderer.flipX = false;
             renderer.color = alpha >= 1 ? Color.white : new Color(1, 1, 1, alpha);
             renderer.transform.localPosition = new Vector3(x, y, 0);
+            renderer.transform.localRotation = Quaternion.identity;
             renderer.sortingOrder = order;
         }
 
@@ -357,7 +363,7 @@ namespace Game.Client
             var map = _client.Map;
             var kind = StandArt.KindAt(map, x, y);
             if (kind == StandArt.Kind.None) return ("none", -1, 0);
-            bool open = kind == StandArt.Kind.Gate && _openDoors.Contains(y * map.Width + x);
+            bool open = (kind == StandArt.Kind.Gate || kind == StandArt.Kind.Door) && _openDoors.Contains(y * map.Width + x);
             return (kind.ToString(), StandArt.ShapeAt(map, x, y, open, _client.Biomes[x, y]), FootOrder(y + StandArt.FootLift(map[x, y], kind), StandArt.PropTie));
         }
 

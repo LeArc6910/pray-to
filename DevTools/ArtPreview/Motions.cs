@@ -584,7 +584,9 @@ namespace Game.Client
                 float x0 = -3f + MathF.Min(t, 5) * 1.6f;
                 walker.Moving = true;
                 bool open = MathF.Abs(x0 - 2.5f) <= 1.05f;
-                draws.Add(Sprite(open ? TileArt.OpenDoor : TileArt.Object(TileType.Door), 2.5f, 0.5f, 0.5f, 0.5f, 0));
+                // The door stands in a north-south wall (PropArt.Door): its leaf swings east while someone passes.
+                var door = PropArt.Door(PropArt.DoorShape(false, open, false));
+                draws.Add(Sprite(door, 2.5f, 0f, 8f / door.Width, 0f, 0));
                 foreach (var d in walker.Frame(time, step))
                 {
                     var moved = d;
