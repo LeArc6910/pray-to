@@ -5896,7 +5896,105 @@ async function hud(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud };
+// The standing layer (묶음 B0, Docs/BiomeRework.md 4-3·4-4), on a PC and a phone held upright: the pen of "scene depth"
+// joined at its corners, T's and cross with a gate across its south run and one in its east run (the shapes read from
+// the view), everything standing drawn from the atlas within the cap; behind the mushroom tree and the cottage their
+// cap and roof fade, and with [설정] 물체 뒤 흐리게 turned off (the real button) the roof stays solid; just behind a
+// fence run it is drawn over the player and just in front under; standing in the east gate opens it. Whether the fade
+// is pleasant to the eye and the hand is the person's.
+async function depth(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 서 있는 것의 깊이 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('probe on; depth fade on; monsters hold; goto wild; clear');
+    await game.wait(800);
+    await game.send('scene depth');
+    await game.wait(1500);
+    let d = await game.ask('depth');
+    const at = (dx, dy) => (d.cells || []).find(c => c.dx === dx && c.dy === dy) || {};
+    const shape = (dx, dy, kind, mask, what) => {
+      const c = at(dx, dy);
+      check(c.kind === kind && c.shape === mask, `${name}: ${what} (${dx},${dy}: ${c.kind || '없음'} ${c.shape})`);
+    };
+    shape(-6, 2, 'Joined', 6, '북서 모서리가 동·남으로 이어진다');
+    shape(0, 2, 'Joined', 12, '북동 모서리가 남·서로 이어진다');
+    shape(-3, 2, 'Joined', 14, '북쪽 줄의 T자');
+    shape(-3, -1, 'Joined', 15, '가운데 십자');
+    shape(-6, -1, 'Joined', 7, '서쪽 줄의 T자(북·동·남)');
+    shape(-4, 2, 'Joined', 10, '가로 줄은 동·서');
+    shape(-6, 1, 'Joined', 5, '세로 줄은 북·남');
+    shape(-6, -4, 'Joined', 3, '남서 모서리가 문으로 이어진다');
+    shape(-5, -4, 'Gate', 1, '남쪽 줄의 닫힌 가로 문');
+    shape(0, 0, 'Gate', 0, '동쪽 줄의 닫힌 세로 문');
+    check(d.props >= 40 && d.skipped === 0, `${name}: 서 있는 것을 다 그린다 (${d.props}개, 꾸밈 ${d.decor}, 뺀 것 ${d.skipped}, 그린 조각 ${d.renderers})`);
+    check(d.atlasPages >= 1 && d.atlasPages <= 2 && d.atlasSprites > 10, `${name}: 그림은 아틀라스 몇 장에 모였다 (${d.atlasPages}장, 그림 ${d.atlasSprites})`);
+    check(d.renderers <= (game.touch ? 250 : 400), `${name}: 상한 안 (${d.renderers})`);
+    await game.shot('depth-pen', '이어진 울타리: 모서리·T자·십자·끝, 가로·세로 문');
+
+    await game.send('depth at tree');
+    await game.wait(600);
+    d = await game.ask('depth');
+    check(at(3, 2).alpha < 0.5 && d.faded >= 1, `${name}: 버섯 나무 뒤에 서면 갓이 흐려진다 (알파 ${at(3, 2).alpha}, 흐린 것 ${d.faded})`);
+    await game.shot('depth-tree', '버섯 나무 뒤: 갓이 흐려진다');
+    await game.send('depth at beside');
+    await game.wait(600);
+    d = await game.ask('depth');
+    check(at(3, 2).alpha === 1, `${name}: 옆에 서면 갓은 그대로 (알파 ${at(3, 2).alpha})`);
+
+    await game.send('depth at house');
+    await game.wait(600);
+    d = await game.ask('depth');
+    check(at(2, -6).alpha < 0.5, `${name}: 집 뒤에 서면 지붕이 흐려진다 (알파 ${at(2, -6).alpha})`);
+    await game.shot('depth-house', '집 뒤: 지붕이 흐려진다');
+    // The setting by its real button: the game's menu, [설정], [물체 뒤 흐리게].
+    if (game.touch) await game.press('메뉴');
+    else await game.page.keyboard.press('Escape');
+    await game.wait(300);
+    check(await game.press('설정', '메뉴') && !!(await game.until(t => t.window === '설정', 2000)), `${name}: 메뉴의 [설정]`);
+    const toggle = (await game.find(/^물체 뒤 흐리게: /))[0];
+    check(!!toggle && /켜짐/.test(toggle.label), `${name}: [설정]에 [물체 뒤 흐리게: 켜짐] (${toggle ? toggle.label : '없음'})`);
+    if (toggle) await game.press(toggle.label);
+    await game.wait(300);
+    const after = (await game.find(/^물체 뒤 흐리게: /))[0];
+    check(!!after && /꺼짐/.test(after.label), `${name}: 누르면 꺼짐 (${after ? after.label : '없음'})`);
+    await game.shot('depth-setting', '[설정]의 [물체 뒤 흐리게]');
+    await game.page.keyboard.press('Escape');
+    await game.until(t => t.window === '' && t.playing, 2000);
+    await game.wait(400);
+    d = await game.ask('depth');
+    check(!d.fade && at(2, -6).alpha === 1 && d.faded === 0, `${name}: 끄면 집 뒤에서도 지붕이 그대로 (알파 ${at(2, -6).alpha})`);
+    await game.shot('depth-house-off', '흐림을 끈 집 뒤');
+    await game.send('depth fade on');
+
+    await game.send('depth at behind');
+    await game.wait(500);
+    d = await game.ask('depth');
+    check(d.selfOrder < at(-4, 2).order, `${name}: 울타리 바로 뒤에서는 울타리가 앞에 그려진다 (나 ${d.selfOrder}, 울타리 ${at(-4, 2).order})`);
+    await game.shot('depth-behind', '울타리 바로 뒤: 다리가 가려진다');
+    await game.send('depth at front');
+    await game.wait(500);
+    d = await game.ask('depth');
+    check(d.selfOrder > at(-4, -4).order, `${name}: 울타리 바로 앞에서는 사람이 앞에 (나 ${d.selfOrder}, 울타리 ${at(-4, -4).order})`);
+    await game.send('depth at gate');
+    await game.wait(700);
+    d = await game.ask('depth');
+    shape(0, 0, 'Gate', 2, '세로 문 안에 서면 열린다');
+    await game.shot('depth-gate', '세로 문 안: 문짝이 옆 칸 위로 열린다');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

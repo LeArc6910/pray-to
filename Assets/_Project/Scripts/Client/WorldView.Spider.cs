@@ -751,7 +751,7 @@ namespace Game.Client
             var (view, turned) = BossSectors[_spiderSector];
             var renderer = Renderer(_root.transform, "Fallen spider", null, Color.white);
             renderer.transform.localPosition = at;
-            renderer.sortingOrder = 10000 - Mathf.RoundToInt(at.y * 10);
+            renderer.sortingOrder = FootOrder(at.y);
             renderer.flipX = turned;
             _falls.Add(new Fall { Renderer = renderer, Since = Time.time, View = view, Turned = turned });
             // Its last screech; ichor and silk thrown out of it; the room jolts.

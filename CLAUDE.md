@@ -67,6 +67,8 @@ dotnet run --project DevTools/ArtPreview -- --only uimock
 dotnet run --project DevTools/ArtPreview -- --only ui
 # 생물군계 개편 시안(out/biomemock/: 이어지는 울타리 fences.png, 입체 규칙 depth.png, 생물군계마다 biome_<id>.png, 색 비교 compare_palettes.png, 크기 sizes.png, 한눈 비교 overview.png. Docs/BiomeRework.md)
 dotnet run --project DevTools/ArtPreview -- --only biomemock
+# 서 있는 층·이어지는 울타리만(out/depth/: joined.png 다섯 종류 16모양과 문, pen.png·pen_nofade.png 방목장과 흐려짐, place_*.png 장소의 정렬·흐려짐, biomes.png 생물군계 꾸밈. Docs/BiomeRework.md B0)
+dotnet run --project DevTools/ArtPreview -- --only depth
 # 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/)
 dotnet run --project DevTools/ArtPreview -- --only dungeons
 # 대화 초상만(out/portraits/: 인물마다 여섯 표정의 sheet.png, 4배 close_*.png, 대화 상자 시안 dialogue.png. Docs/UiRework.md 4-2)

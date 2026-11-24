@@ -41,6 +41,22 @@ namespace Game.Client
                 if (image != null) stills.Add(($"칸 {type}", image));
             }
 
+            // The standing layer's own (묶음 B0): the joined shapes, the gates and the floor's decor.
+            for (int mask = 0; mask < 16; mask++)
+            {
+                stills.Add(($"울타리 {mask}", PropArt.Prop(TileType.Fence, mask)));
+                stills.Add(($"산울타리 {mask}", PropArt.Prop(TileType.Hedge, mask)));
+                // A wall block does not show its south side (the wall in front covers it), so only the eight others.
+                if ((mask & Joins.S) == 0) stills.Add(($"철벽 {mask}", PropArt.Prop(TileType.IronWall, mask)));
+            }
+            foreach (bool along in new[] { true, false })
+                foreach (bool open in new[] { true, false })
+                    stills.Add(($"울타리 문 {(along ? "가로" : "세로")} {(open ? "열림" : "닫힘")}", PropArt.FenceGate(along, open)));
+            foreach (Biome biome in Enum.GetValues(typeof(Biome)))
+                foreach (var kind in Enumerable.Range(0, 100).Select(roll => Decor.KindOf(biome, roll)).Distinct())
+                    for (int variant = 0; variant < Decor.Variants; variant++)
+                        stills.Add(($"꾸밈 {biome} {kind} {variant}", DecorArt.Image(kind, biome, variant)));
+
             var loops = new List<(string Name, IReadOnlyList<PixelImage> Frames)>();
             foreach (var look in new[] { Look.Down, Look.DownSide, Look.Side, Look.UpSide, Look.Up })
                 loops.Add(($"플레이어 걷기 {look}", Enumerable.Range(0, HeroArt.WalkFrames).Select(f => HeroArt.Figure(HeroArt.Draw(look, HeroMove.Walk, f, HeroGear.None, Rgba.Hex("#3F7FD8")))).ToList()));

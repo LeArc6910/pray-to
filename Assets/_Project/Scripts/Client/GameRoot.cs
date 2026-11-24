@@ -85,6 +85,8 @@ namespace Game.Client
         WorldView _view;
         // Rounded-corner tiles within ten cells of the player (WorldView.CornersNear), for the playtests.
         // Boss marks on the ground and the warning sign, as drawn (WorldView.Bosses.cs), for the playtests.
+        // The view itself, for the playtests' looks at the standing layer (Playtest depth).
+        internal WorldView View => _view;
         internal int MarksShown => _view?.MarksShown ?? 0;
         // Skill effects running and their pieces on screen (WorldView.SkillFx), for the playtests.
         internal int SkillFxAlive => _view?.SkillFxAlive ?? 0;
@@ -2240,6 +2242,8 @@ namespace Game.Client
             if (Setting(Strings.T("menu.font", "글꼴"), Settings.PixelFont ? Strings.T("menu.font_pixel", "도트") : Strings.T("menu.font_smooth", "매끈"))) Settings.PixelFont = !Settings.PixelFont;
             if (Setting(Strings.T("menu.shake", "화면 흔들림"), Strings.OnOff(Settings.ScreenShake))) Settings.ScreenShake = !Settings.ScreenShake;
             if (Setting(Strings.T("menu.bossintro", "보스 등장 연출"), Strings.OnOff(Settings.BossIntro))) Settings.BossIntro = !Settings.BossIntro;
+            // Canopies and roofs fading while someone is behind them (WorldView's standing layer, 묶음 B0).
+            if (Setting(Strings.T("menu.fade", "물체 뒤 흐리게"), Strings.OnOff(Settings.FadeBehind))) Settings.FadeBehind = !Settings.FadeBehind;
             // Windows growing as they open, buttons sinking and shaking, counts popping (UiMotion); reduced, only fades.
             if (Setting(Strings.T("menu.motion", "움직임"), Settings.ReduceMotion ? Strings.T("menu.motion_reduced", "줄이기") : Strings.T("menu.motion_normal", "보통")))
                 Settings.ReduceMotion = !Settings.ReduceMotion;

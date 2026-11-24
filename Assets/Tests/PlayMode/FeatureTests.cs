@@ -1040,6 +1040,61 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The standing layer (묶음 B0, Docs/BiomeRework.md 4-3·4-4): the pen of "scene depth" joined at its corners, T's
+        // and cross, with a gate across its bottom run and one in its east run; behind the mushroom tree and the cottage
+        // their cap and roof fade (and stay solid with [물체 뒤 흐리게] off); just behind a fence run it is in front of
+        // the player, just in front of one behind; standing in the east gate opens it.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheStandingLayerJoinsSortsAndFades()
+        {
+            yield return Start();
+            bool fade = Settings.FadeBehind;
+            Settings.FadeBehind = true;
+            var (px, py) = Near(0, 0);
+            Playtest.Run(_root, "scene depth");
+            yield return new WaitForSecondsRealtime(1);
+            var view = _root.View;
+            void Shape(int dx, int dy, string kind, int shape, string what)
+            {
+                var stand = view.StandAt(px + dx, py + dy);
+                Assert.AreEqual((kind, shape), (stand.Kind, stand.Shape), what);
+            }
+            Shape(-6, 2, "Joined", 2 | 4, "the north-west corner joins east and south");
+            Shape(-3, 2, "Joined", 2 | 4 | 8, "a T on the north run");
+            Shape(-3, -1, "Joined", 15, "the cross in the middle");
+            Shape(-6, -4, "Joined", 1 | 2, "the south-west corner runs on into the gate");
+            Shape(-5, -4, "Gate", 1, "a shut gate across the south run");
+            Shape(0, 1, "Joined", 1 | 4, "the east run runs on into its gate");
+            Assert.Greater(view.PropsDrawn, 40, "the pen's pieces, the tree and the cottage stand");
+            yield return Screens.Take("depth-pen");
+
+            Playtest.Run(_root, "depth at tree");
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.Less(view.FadeOf(px + 3, py + 2), 0.5f, "behind the mushroom tree its cap fades");
+            yield return Screens.Take("depth-tree");
+            Playtest.Run(_root, "depth at house");
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.Less(view.FadeOf(px + 2, py - 6), 0.5f, "behind the cottage its roof fades");
+            Assert.AreEqual(1, view.FadeOf(px + 3, py + 2), 0.01f, "the tree's cap is solid again once the player has gone");
+            yield return Screens.Take("depth-house");
+            Settings.FadeBehind = false;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.AreEqual(1, view.FadeOf(px + 2, py - 6), 0.01f, "with the setting off the roof stays solid");
+            Settings.FadeBehind = fade;
+
+            Playtest.Run(_root, "depth at behind");
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.Less(view.SelfOrder, view.StandAt(px - 4, py + 2).Order, "just behind the north run the fence is in front of the player");
+            Playtest.Run(_root, "depth at front");
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.Greater(view.SelfOrder, view.StandAt(px - 4, py - 4).Order, "just in front of the south run the player is in front of it");
+            Playtest.Run(_root, "depth at gate");
+            yield return new WaitForSecondsRealtime(0.6f);
+            Shape(0, 0, "Gate", 2, "the east gate opens while the player stands in it");
+            yield return Screens.Take("depth-gate");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

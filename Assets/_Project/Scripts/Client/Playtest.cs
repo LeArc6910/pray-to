@@ -408,6 +408,24 @@ namespace Game.Client
                 // The pacing director and the trap rooms (2026-11-22, 묶음 4b). "director": the player's pace; "director
                 // <build|peak|relax|rest> [tension]": set as if it had come; "director ambush|raid": one now, where the player
                 // stands (an ambush only in a narrow way: "goto narrow" first). "traps": the nearest trap room.
+                // The standing layer (묶음 B0, Docs/BiomeRework.md 4-3·4-4): "depth" its state round the "scene depth" pen;
+                // "depth at <tree|house|behind|front|inside|gate>" the player to that spot of it; "depth fade on|off" the
+                // [설정] 물체 뒤 흐리게.
+                case "depth":
+                    if (words.Length == 1) return "depth " + DepthJson(root);
+                    if (words[1] == "fade")
+                    {
+                        Settings.FadeBehind = words[2] == "on";
+                        return $"ok depth fade {Settings.FadeBehind}";
+                    }
+                    if (words[1] == "at")
+                    {
+                        var (sx, sy) = DepthSpot(words[2]);
+                        player.Position = TileMap.Center(_depthAnchor.X + sx, _depthAnchor.Y + sy);
+                        player.Corrections++;
+                        return $"ok depth at {words[2]} {_depthAnchor.X + sx},{_depthAnchor.Y + sy}";
+                    }
+                    return $"error depth: no '{words[1]}'";
                 case "director":
                     if (words.Length == 1) return "director " + DirectorJson(root);
                     if (words[1] == "ambush") return world.Ambush(player) ? "ok director ambush" : "error director ambush: not in a narrow way with room before and behind";
@@ -1212,6 +1230,29 @@ namespace Game.Client
 
             switch (scene)
             {
+                // The standing layer's pen (묶음 B0): floor round the player; a pen of fence west of them with its corners,
+                // T's, a cross, a gate in its bottom run and one in its east run; a mushroom tree north-east and a cottage
+                // south-east to stand behind ("depth at").
+                case "depth":
+                    _depthAnchor = (px, py);
+                    for (int dx = -8; dx <= 7; dx++)
+                        for (int dy = -7; dy <= 5; dy++)
+                            if (dx != 0 || dy != 0) Lay((px + dx, py + dy, TileType.Floor));
+                    for (int row = 0; row < DepthPen.Length; row++)
+                    {
+                        for (int col = 0; col < DepthPen[row].Length; col++)
+                        {
+                            char c = DepthPen[row][col];
+                            if (c == '.') continue;
+                            Lay((px - 6 + col, py + 2 - row, c == 'G' ? TileType.Door : TileType.Fence));
+                        }
+                    }
+                    Lay((px + 3, py + 2, TileType.MushroomTree), (px + 2, py - 6, TileType.Cottage));
+                    for (int dx = 0; dx < 4; dx++)
+                        for (int dy = 0; dy < 3; dy++)
+                            if (dx != 0 || dy != 0) Lay((px + 2 + dx, py - 6 + dy, TileType.StructurePart));
+                    world.MonstersHold = true;
+                    break;
                 // The encounter windows' things (Docs/UiRework.md U3): floor round the player, a chest west, a workbench
                 // east, an anvil two tiles north, each with its [… 열기] over it; stone, copper ore, essence and iron bars
                 // in the bag to put away, make and refine with.
@@ -1324,6 +1365,60 @@ namespace Game.Client
                 default:
                     throw new ArgumentException($"no scene '{scene}'");
             }
+        }
+
+        // The pen of "scene depth", its first row the north (dy 2) and its first column dx -6: 'F' fence, 'G' a door
+        // (a gate: fences either side).
+        static readonly string[] DepthPen =
+        {
+            "FFFFFFF",
+            "F..F..F",
+            "F..F..G",
+            "FFFFFFF",
+            "F..F..F",
+            "F..F..F",
+            "FGFFFFF",
+        };
+
+        static (int X, int Y) _depthAnchor;
+
+        static (int X, int Y) DepthSpot(string name) => name switch
+        {
+            "tree" => (3, 3),
+            "house" => (3, -3),
+            "behind" => (-4, 3),
+            "front" => (-4, -5),
+            "inside" => (-5, 1),
+            "gate" => (0, 0),
+            "beside" => (5, 3),
+            _ => throw new ArgumentException($"no spot '{name}'"),
+        };
+
+        // The standing layer's numbers and every standing thing of the pen's area: where (from the anchor), its kind,
+        // shape (joined sides; a gate's 1 across, 2 open) and order, and its canopy's alpha.
+        static string DepthJson(GameRoot root)
+        {
+            var view = root.View;
+            var cells = new Json('[');
+            if (view != null)
+            {
+                for (int dy = 5; dy >= -7; dy--)
+                {
+                    for (int dx = -8; dx <= 7; dx++)
+                    {
+                        int x = _depthAnchor.X + dx, y = _depthAnchor.Y + dy;
+                        var (kind, shape, order) = view.StandAt(x, y);
+                        if (kind == "none") continue;
+                        cells.Item(new RawJson(new Json('{').Field("dx", dx).Field("dy", dy).Field("kind", kind).Field("shape", shape).Field("order", order)
+                            .Field("alpha", view.FadeOf(x, y)).Close('}')));
+                    }
+                }
+            }
+            return new Json('{').Field("props", view?.PropsDrawn ?? 0).Field("decor", view?.DecorDrawn ?? 0).Field("faded", view?.CanopiesFaded ?? 0)
+                .Field("skipped", view?.StandsSkipped ?? 0).Field("renderers", view?.StandRenderers ?? 0).Field("listed", view?.StandsListed ?? 0)
+                .Field("atlasPages", PropAtlas.Pages).Field("atlasSprites", PropAtlas.Count).Field("fade", Settings.FadeBehind)
+                .Field("selfOrder", view?.SelfOrder ?? 0).Field("ax", _depthAnchor.X).Field("ay", _depthAnchor.Y)
+                .Field("cells", cells.Raw(']')).Close('}');
         }
 
         // A small JSON writer for the answers.

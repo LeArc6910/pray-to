@@ -22,6 +22,7 @@ menu.rest_slow,느림,Slow
 menu.rumors_note,소문: 갈 곳을 방향과 생물군계로만 알려 주고 지도에는 옅은 원을 그린다. 느림: 쉬면 8초 뒤 초당 1.5% 찬다(예전은 6초 뒤 3%). 야영지·제단·물약으로 회복한다,Rumours: the way is told only as a direction and a biome and the map draws a faint circle. Slow: resting heals 1.5% a second after 8 seconds (before: 3% after 6). Camps and shrines and potions heal.
 menu.shake,화면 흔들림,Screen shake
 menu.bossintro,보스 등장 연출,Boss entrances
+menu.fade,물체 뒤 흐리게,Fade what hides you
 menu.motion,움직임,Motion
 menu.motion_normal,보통,Normal
 menu.motion_reduced,줄이기,Reduced

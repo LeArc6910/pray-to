@@ -28,6 +28,7 @@ namespace Game.Client
         static readonly Choice RumorsChoice = new Choice("settings.rumors", true);
         static readonly Choice QuickRestChoice = new Choice("settings.quickrest", false);
         static readonly Choice ReduceMotionChoice = new Choice("settings.reducemotion", false);
+        static readonly Choice FadeBehindChoice = new Choice("settings.fadebehind", true);
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness
@@ -154,6 +155,14 @@ namespace Game.Client
         {
             get => ReduceMotionChoice.Value;
             set => ReduceMotionChoice.Value = value;
+        }
+
+        // "물체 뒤 흐리게" (Docs/BiomeRework.md 4-3 흐려짐, the person's call 2026-11-24): a tall thing's canopy or a
+        // house's roof fades while a player's or a monster's feet are behind it. On unless chosen; off, they stay solid.
+        public static bool FadeBehind
+        {
+            get => FadeBehindChoice.Value;
+            set => FadeBehindChoice.Value = value;
         }
 
         // Resting heals as before 묶음 4c (World.QuickRest) in the worlds this player opens or hosts; joiners go by the

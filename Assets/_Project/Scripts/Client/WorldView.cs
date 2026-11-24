@@ -244,7 +244,7 @@ namespace Game.Client
             shown.Renderer.sprite = Sprites.Standing(key, () => CreatureArt.Monster(pet.Look, color, frame));
             shown.Renderer.flipX = shown.Left;
             shown.Renderer.transform.localPosition = shown.Position + new Vector3(0, lift, 0);
-            shown.Renderer.sortingOrder = 10000 - Mathf.RoundToInt(shown.Position.y * 10);
+            shown.Renderer.sortingOrder = FootOrder(shown.Position.y);
         }
 
         // Telegraphs just gone, by id, for the blast drawn when the boss's Impact for them comes (HazardLanded).
@@ -602,6 +602,8 @@ namespace Game.Client
             }
             _hitStop = 0;
             var selfPosition = Vec2.Lerp(_client.PreviousPosition, _client.Position, Mathf.Clamp01(tickFraction));
+            // Orders this frame are counted from near the player (FootOrder).
+            SetDepthOrigin(selfPosition.Y);
             var (selfTint, selfGlow) = StatusLook(_client.SelfStatus, Color.white, Color.clear);
             if (rolled)
             {
@@ -630,7 +632,7 @@ namespace Game.Client
             DrawMachines();
             DrawPeople();
             DrawStoryPeople();
-            DrawProps();
+            DrawStanding(deltaTime);
             AnnouncePlace();
             DrawChickens();
             SwingDoors();
@@ -1456,9 +1458,10 @@ namespace Game.Client
                 {
                     renderer = Renderer(_root.transform, "Crop", null, Color.white);
                     renderer.transform.localPosition = new Vector3(crop.X + 0.5f, crop.Y + 1f / Sprites.PixelsPerUnit, 0);
-                    renderer.sortingOrder = -20;
                     _crops[key] = renderer;
                 }
+                // Sorted by its foot like everything standing (묶음 B0): a ripe crop hides the feet of someone behind it.
+                renderer.sortingOrder = FootOrder(crop.Y + 1f / Sprites.PixelsPerUnit, StandArt.PropTie);
                 bool ripe = crop.IsRipe(now);
                 // Four steps, as the docs describe: sprout, young, growing, ripe.
                 int stage = ripe ? 3 : Mathf.Min(2, Mathf.FloorToInt(crop.Growth(now) * 3));
@@ -1558,7 +1561,7 @@ namespace Game.Client
                 parts.Part.transform.localRotation = Quaternion.Euler(0, 0, turn);
                 // On a raised body or a big machine (a block itself), sorted by its foot just in front of the body, so people
                 // pass in front of and behind it; on a flat one, on the floor.
-                int body = 10000 - Mathf.RoundToInt(machine.Y * 10);
+                int body = FootOrder(machine.Y, StandArt.PropTie);
                 bool standing = lift > 0 || size > 1;
                 parts.Part.sortingOrder = standing ? body + 1 : machine.Kind == TileType.Arm ? -13 : -15;
                 parts.Load.sortingOrder = standing ? body + 2 : machine.Kind == TileType.Arm ? -12 : -14;
@@ -1641,7 +1644,7 @@ namespace Game.Client
                         Renderer(_root.transform, "Awning", Sprites.Centered($"npc/awning/{tile}", () => TileArt.Awning(tile)), Color.white));
                     _people[key] = person;
                 }
-                int order = 10000 - Mathf.RoundToInt((y + 0.3f) * 10);
+                int order = FootOrder(y + 0.3f);
                 person.Figure.sprite = figure;
                 person.Figure.transform.localPosition = new Vector3(x + 0.5f, y + 0.3f, 0);
                 person.Figure.sortingOrder = order;
@@ -1701,7 +1704,7 @@ namespace Game.Client
                     if (walking) renderer.flipX = at.X < before.X - 0.005f;
                     float bob = walking ? Mathf.Abs(Mathf.Sin(Time.time * (character.Walk == "run" ? 16 : 10))) * 0.07f : 0;
                     renderer.transform.localPosition = new Vector3(at.X, at.Y - 0.3f + bob, 0);
-                    renderer.sortingOrder = 10000 - Mathf.RoundToInt((at.Y - 0.3f) * 10);
+                    renderer.sortingOrder = FootOrder(at.Y - 0.3f);
                 }
             }
             _storyGone.Clear();
@@ -1712,60 +1715,6 @@ namespace Game.Client
                 _storyGone.Add(pair.Key);
             }
             foreach (string id in _storyGone) _storyPeople.Remove(id);
-        }
-
-        // The structures of the story's places (PropArt, Docs/Story.md 장소 꾸밈) in view: each standing on its
-        // footprint's bottom edge, rising above its tiles, in front of or behind people by where its foot is. Walls
-        // join their neighbours (PropArt.Sides).
-        readonly Dictionary<int, SpriteRenderer> _props = new Dictionary<int, SpriteRenderer>();
-        readonly HashSet<int> _propsSeen = new HashSet<int>();
-        readonly List<int> _propsGone = new List<int>();
-        const int PropRange = 20;
-
-        bool _windowsLit;
-
-        void DrawProps()
-        {
-            var map = _client.Map;
-            var phase = Calendar.Phase(_client.Clock);
-            _windowsLit = phase == DayPhase.Evening || phase == DayPhase.Night;
-            _propsSeen.Clear();
-            int cx = Mathf.FloorToInt(_self.Position.x), cy = Mathf.FloorToInt(_self.Position.y);
-            for (int y = cy - PropRange; y <= cy + PropRange; y++)
-            {
-                for (int x = cx - PropRange - 3; x <= cx + PropRange; x++)
-                {
-                    if (!map.InBounds(x, y)) continue;
-                    var type = map[x, y];
-                    // The places' structures and the things players build that stand (PropArt.Stands, 2026-11-10).
-                    if (!(Structures.IsDecor(type) || PropArt.Stands(type)) || type == TileType.StructurePart) continue;
-                    int sides = PropArt.IsWall(type) ? PropArt.Sides(map, x, y) : 0;
-                    // Houses show their windows lit from the evening (2026-11-11), dark glass by day.
-                    bool lit = PropArt.LitAtNight(type) && _windowsLit;
-                    var sprite = PropArt.LitAtNight(type)
-                        ? Sprites.Standing($"prop/{type}/{(lit ? "lit" : "day")}", () => lit ? PropArt.Prop(type) : PropArt.Daylit(PropArt.Prop(type)))
-                        : Sprites.Standing($"prop/{type}/{sides}", () => PropArt.Prop(type, sides));
-                    int key = y * map.Width + x;
-                    _propsSeen.Add(key);
-                    if (!_props.TryGetValue(key, out var renderer))
-                    {
-                        renderer = Renderer(_root.transform, "Prop", null, Color.white);
-                        _props[key] = renderer;
-                    }
-                    var (w, _) = Structures.Footprint(type);
-                    renderer.sprite = sprite;
-                    renderer.transform.localPosition = new Vector3(x + w / 2f, y, 0);
-                    renderer.sortingOrder = 10000 - Mathf.RoundToInt(y * 10);
-                }
-            }
-            _propsGone.Clear();
-            foreach (var pair in _props)
-            {
-                if (_propsSeen.Contains(pair.Key)) continue;
-                Object.Destroy(pair.Value.gameObject);
-                _propsGone.Add(pair.Key);
-            }
-            foreach (int key in _propsGone) _props.Remove(key);
         }
 
         // Which of eight ways (y up is north).
@@ -1833,7 +1782,7 @@ namespace Game.Client
                     // Facing the way it is going: left while sin falls.
                     chicken.flipX = Mathf.Cos(t) > 0;
                     chicken.transform.localPosition = at;
-                    chicken.sortingOrder = 10000 - Mathf.RoundToInt(at.y * 10);
+                    chicken.sortingOrder = FootOrder(at.y);
                 }
             }
             for (int i = used; i < _chickens.Count; i++) _chickens[i].enabled = false;
@@ -1876,8 +1825,9 @@ namespace Game.Client
             {
                 var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
                 bool opened = _openDoors.Add(key);
-                // Also after the tiles round it were redrawn closed.
-                if (_objects.GetTile(cell) != Sprites.OpenDoor) _objects.SetTile(cell, Sprites.OpenDoor);
+                // Also after the tiles round it were redrawn closed. A gate in a fence swings in the standing layer.
+                bool gate = Joins.Gate(map, cell.x, cell.y) != null;
+                if (!gate && _objects.GetTile(cell) != Sprites.OpenDoor) _objects.SetTile(cell, Sprites.OpenDoor);
                 if (opened) Hear(Sound.Door, cell + new Vector3(0.5f, 0.5f, 0));
             }
             _doorsShut.Clear();
@@ -1887,7 +1837,7 @@ namespace Game.Client
                 _openDoors.Remove(key);
                 var cell = new Vector3Int(key % map.Width, key / map.Width, 0);
                 if (!TileMap.IsDoor(map[cell.x, cell.y]) || !Shown(cell.x, cell.y)) continue;
-                _objects.SetTile(cell, Sprites.Object(map[cell.x, cell.y]));
+                _objects.SetTile(cell, ObjectTileAt(map, cell.x, cell.y));
                 Hear(Sound.DoorShut, cell + new Vector3(0.5f, 0.5f, 0));
             }
         }
@@ -3024,7 +2974,8 @@ namespace Game.Client
             body.Faced = facing;
             body.Position = new Vector3(position.X, position.Y, 0);
             body.Root.localPosition = body.Position;
-            int order = 10000 - Mathf.RoundToInt(position.Y * 10);
+            // By the feet, not the middle (묶음 B0): the same line props and fences sort by.
+            int order = FootOrder(position.Y - body.Feet);
 
             bool dead = health <= 0;
             if (body.Kind == BodyKind.Player && (weapon != body.Held || body.Gear.Kind == HeroWeapon.None && weapon != null))
@@ -3550,11 +3501,12 @@ namespace Game.Client
             _corners.SetTilesBlock(bounds, corners);
             _underlay.SetTilesBlock(bounds, underlay);
             _objects.SetTilesBlock(bounds, objects);
+            StandsLaid(chunkX, chunkY, lay);
         }
 
         TileBase UnderlayAt(int x, int y) => PropArt.Underlay(_client.Map, _client.Places, x, y) is TileType floor ? Sprites.Object(floor) : null;
 
-        // The flat tile of a placed thing, or none for one that stands on the floor (PropArt.Stands, DrawProps).
+        // The flat tile of a placed thing, or none for one that stands on the floor (PropArt.Stands, the standing layer).
         static TileBase ObjectTile(TileType type) => PropArt.Stands(type) ? null : Sprites.Object(type);
 
         // The tile at x, y, a road matched to its neighbours (TileArt.RoadVariant).
@@ -3562,6 +3514,8 @@ namespace Game.Client
             map[x, y] == TileType.Road ? Sprites.Road(TileArt.RoadVariant(map, x, y))
             // Ice and quicksand, their edges matched to their neighbours (RoomTileArt.Patch).
             : RoomTileArt.IsPatch(map[x, y]) ? Sprites.Patch(map[x, y], RoomTileArt.PatchMask(map, x, y), RoomTileArt.Laying(x, y))
+            // A door in a fence is the fence's gate, standing (Joins.Gate, 묶음 B0).
+            : TileMap.IsDoor(map[x, y]) && Joins.Gate(map, x, y) != null ? null
             : ObjectTile(map[x, y]);
 
         static Tilemap AddTilemap(Transform grid, string name, int order)
@@ -3643,8 +3597,9 @@ namespace Game.Client
             {
                 renderer = Renderer(_root.transform, "Crack", null, Color.white);
                 renderer.transform.localPosition = new Vector3(x + 0.5f, y + 0.5f, 0);
-                // Over the rock and what is built on it, under everything standing in front.
-                renderer.sortingOrder = -85;
+                // Over the rock and what is built on it, under everything standing in front. On something that stands
+                // (an iron wall, 묶음 B0) just over it, so its cracks still show.
+                renderer.sortingOrder = PropArt.Stands(_client.Map[x, y]) ? FootOrder(y, StandArt.PropTie) + 1 : -85;
                 _cracks[key] = renderer;
             }
             int stage = Mathf.Clamp(1 + percent * TileArt.CrackStages / 100, 1, TileArt.CrackStages);
@@ -3671,6 +3626,8 @@ namespace Game.Client
                     _cracks.Remove(key);
                 }
                 if (Shown(change.X, change.Y)) _objects.SetTile(new Vector3Int(change.X, change.Y, 0), ObjectTileAt(map, change.X, change.Y));
+                // What stands near it is listed again: a fence beside it may join on, a door become a gate, decor go.
+                StandsChanged(change.X, change.Y);
                 if (map[change.X, change.Y] == TileType.Scarecrow) _scarecrows.Add(new Vector3Int(change.X, change.Y, 0));
                 else _scarecrows.Remove(new Vector3Int(change.X, change.Y, 0));
                 // The corners round by the neighbours and take the ground beside, which itself depends on its neighbours.
@@ -3689,8 +3646,8 @@ namespace Game.Client
                     if (!map.InBounds(x, y) || !Shown(x, y)) continue;
                     _ground.SetTile(new Vector3Int(x, y, 0), GroundAt(x, y));
                     _underlay.SetTile(new Vector3Int(x, y, 0), UnderlayAt(x, y));
-                    // A road beside it may gain or lose a kerb.
-                    if (map[x, y] == TileType.Road) _objects.SetTile(new Vector3Int(x, y, 0), ObjectTileAt(map, x, y));
+                    // A road beside it may gain or lose a kerb, and a door become a fence's gate or stop being one.
+                    if (map[x, y] == TileType.Road || TileMap.IsDoor(map[x, y])) _objects.SetTile(new Vector3Int(x, y, 0), ObjectTileAt(map, x, y));
                 }
             }
         }

@@ -1128,6 +1128,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only hud,basics,base,first,firstphone,touch,menu,save,screens,layout`
   - 클라우드 확인 (2026-11-23, `a37546f`·`a33e330`): [x] 처음 545개 중 24 실패 → 게임 셋(가로 휴대폰 가방 카드, 세 줄 레벨업 배너가 메뉴 판에 걸침, 쓰러짐 카드 밑 단추)과 낡은 점검을 고친 뒤 `menu,basics,first,firstphone,save` 모두 통과, `base,layout,touch,screens,hud` 408개 모두 통과. 사진: PC 가방(분류 칩, 주인공과 착용 칸, 격자, 고른 철 검 카드의 [장착]·[버리기]·퀵슬롯·"지금 낀 구리 검보다 피해 +8"), 가로 휴대폰 가방(왼쪽 탭 레일, 옆 카드), 세로 휴대폰에서 가방 위의 쓰러짐 카드와 [집에서 일어나기], PC 낮은 생명력의 붉은 가장자리
   - (사람) 가방의 분류 칩·카드·비교가 쓰기 편한지, 낮은 생명력의 붉은 가장자리와 하트 뜀이 거슬리지 않는지, 쓰러짐 카드와 [집에서 일어나기], PC에서 아무것도 안 열린 때 Esc가 메뉴를 여는 것이 괜찮은지(전에는 바로 나갔다)
+- [ ] 166단계: 서 있는 층, 발 정렬, 이어지는 울타리, 물체 뒤 흐려짐(`Docs/BiomeRework.md` B0)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/Decor.cs`, `Client/PropAtlas.cs`, `Client/WorldView.Props.cs`, `Client/Art/StandArt.cs`, `Client/Art/PropArt.Fences.cs`, `Client/Art/DecorArt.cs`, `Tests/EditMode/DecorTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheStandingLayerJoinsSortsAndFades`(사진 `depth-pen`·`depth-tree`·`depth-house`·`depth-gate`)
+  - (클라우드 웹 점검) `sweep.js --only depth,farm,base,story,pois,dungeon`
+  - (사람) 울타리 모서리·T자·문이 자연스러운지, 나무·집 뒤에 섰을 때 흐려지는 손맛, [설정]의 "물체 뒤 흐리게", 사람·몬스터가 물체 앞뒤로 지날 때 순서가 어색하지 않은지, 웹·휴대폰에서 느려지지 않는지
 
 ## 결과 보고
 

@@ -32,7 +32,7 @@ namespace Game.Client
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
                 return WriteMonsterFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
-            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui")
+            if (args.Length == 2 && args[0] == "--only" && args[1] != "arenas" && args[1] != "map" && args[1] != "uimock" && args[1] != "biomemock" && args[1] != "dungeons" && args[1] != "portraits" && args[1] != "ui" && args[1] != "depth")
             {
                 string anim = Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "anim");
                 Directory.CreateDirectory(anim);
@@ -94,6 +94,12 @@ namespace Game.Client
                 BiomeMockPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"));
                 return 0;
             }
+            // --only depth: the standing layer as the game draws it (out/depth/, DepthPreview, Docs/BiomeRework.md 묶음 B0).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "depth")
+            {
+                WriteDepth(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, lights);
+                return 0;
+            }
             // --only portraits: just the talk box's portraits, every person in every expression (out/portraits/, PortraitPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "portraits")
                 return PortraitPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story, npcs) ? 0 : 1;
@@ -150,6 +156,8 @@ namespace Game.Client
                 Path.Combine(pieces, "travel.png"), 6);
             Save(Row(new[] { 0, 2 | 8, 1 | 4, 1 | 2, 15 }.Select(sides => PropArt.Prop(TileType.CastleWall, sides)).ToList()), Path.Combine(pieces, "castle_walls.png"), 6);
             var storyWorld = WorldGenerator.Generate(7, story: story);
+            // The standing layer (묶음 B0): joined fences, gates, a pen, places with roofs fading, the biomes' decor.
+            WriteDepth(output, story, lights);
             foreach (var site in storyWorld.Places) Save(Place(storyWorld, site, lights), Path.Combine(pieces, $"place_{site.Definition.Id}.png"), 3);
             // A road between places with its lamps, signposts and rest spot (2026-11-11).
             Save(RoadView(storyWorld, lights), Path.Combine(pieces, "road.png"), 3);
@@ -1028,24 +1036,90 @@ namespace Game.Client
             readonly List<(float Y, Action<PixelImage> Draw)> _bodies = new List<(float, Action<PixelImage>)>();
             IReadOnlyList<PlaceSite> _places;
 
-            // The places of the story: their floors under things, and their structures standing (as WorldView.DrawProps).
+            // The places of the story: their floors under things, and what stands on the floor (structures, what players
+            // build that stands, fences, hedges, walls, gates), each by its foot (StandArt, as WorldView's standing layer).
             public void Places(IReadOnlyList<PlaceSite> places)
             {
                 _places = places;
-                for (int y = _bottom - 3; y < _bottom + _height + 1; y++)
+                for (int y = _bottom - 4; y < _bottom + _height + 1; y++)
                 {
-                    for (int x = _left - 3; x < _left + _width + 1; x++)
+                    for (int x = _left - 4; x < _left + _width + 1; x++)
                     {
                         if (!_map.InBounds(x, y)) continue;
+                        var kind = StandArt.KindAt(_map, x, y);
+                        if (kind == StandArt.Kind.None) continue;
                         var type = _map[x, y];
-                        var image = PropArt.Prop(type, PropArt.IsWall(type) ? PropArt.Sides(_map, x, y) : 0);
+                        bool open = kind == StandArt.Kind.Gate && Open != null && Open(x, y);
+                        int shape = StandArt.ShapeAt(_map, x, y, open);
+                        var image = StandArt.Picture(type, kind, shape, Night);
                         if (image == null) continue;
+                        int pivot = StandArt.PivotX(kind, shape, image);
                         var (w, _) = Structures.Footprint(type);
-                        var (px, py) = Corner(x + w / 2f, y);
-                        _bodies.Add((y, canvas => canvas.Draw(image, px - image.Width / 2, py - image.Height)));
+                        float cx = x + w / 2f;
+                        float foot = y + StandArt.FootLift(type, kind);
+                        int rows = StandArt.CanopyRows(type);
+                        var canopy = StandArt.Canopy(cx, y, image.Width, image.Height, rows);
+                        var (px, py) = Corner(cx, y);
+                        _bodies.Add((Key(foot, StandArt.PropTie), canvas =>
+                        {
+                            // A canopy or roof fades while someone stands behind it (StandArt.Hides), as in the game.
+                            bool faded = Fade && rows > 0 && _feet.Any(f => StandArt.Hides(f.X, f.Y, foot, canopy));
+                            if (faded) Faded++;
+                            for (int j = 0; j < image.Height; j++)
+                            {
+                                float alpha = faded && j < rows ? StandArt.FadeAlpha : 1;
+                                for (int i = 0; i < image.Width; i++)
+                                {
+                                    var c = image[i, j];
+                                    if (c.A > 0) canvas.Blend(px - pivot + i, py - image.Height + j, alpha >= 1 ? c : c.WithAlpha((int)(c.A * alpha)));
+                                }
+                            }
+                        }));
                     }
                 }
             }
+
+            // The floor's decor of a seed (Decor, StandArt.DecorAt), kept off the places as the game keeps it.
+            public void Decor(ulong seed, Func<int, int, Biome> biome)
+            {
+                for (int y = _bottom - 1; y < _bottom + _height + 1; y++)
+                {
+                    for (int x = _left - 1; x < _left + _width + 1; x++)
+                    {
+                        if (!_map.InBounds(x, y)) continue;
+                        var tileBiome = biome(x, y);
+                        var pick = StandArt.DecorAt(_map, seed, tileBiome, x, y, (cx, cy) => InPlace(cx, cy));
+                        if (!pick.Any) continue;
+                        var image = StandArt.DecorPicture(pick, tileBiome);
+                        var (fx, fy) = StandArt.DecorFoot(x, y, pick);
+                        var (px, py) = Corner(fx, fy - StandArt.DecorDrop);
+                        DecorShown++;
+                        _bodies.Add((Key(fy, StandArt.DecorTie), canvas => canvas.Draw(image, px - image.Width / 2, py - image.Height)));
+                    }
+                }
+            }
+
+            bool InPlace(int x, int y)
+            {
+                if (_places == null) return false;
+                foreach (var site in _places)
+                {
+                    int dx = x - site.X, dy = y - site.Y;
+                    if (dx * dx + dy * dy <= (site.Radius + 2) * (site.Radius + 2)) return true;
+                }
+                return false;
+            }
+
+            // Back to front: the higher the foot the further back, and at one row decor, then props, then bodies.
+            static float Key(float foot, int tie) => foot + (StandArt.Ties - tie) * 0.0001f;
+
+            // Whether a gate stands open, the houses' windows lit, canopies fading; how many faded and how much decor.
+            public Func<int, int, bool> Open;
+            public bool Night = true;
+            public bool Fade = true;
+            public int Faded;
+            public int DecorShown;
+            readonly List<(float X, float Y)> _feet = new List<(float, float)>();
             readonly List<Action<PixelImage>> _overlays = new List<Action<PixelImage>>();
             readonly List<Action<PixelImage>> _icons = new List<Action<PixelImage>>();
             readonly List<Action<PixelImage>> _shots = new List<Action<PixelImage>>();
@@ -1079,8 +1153,8 @@ namespace Game.Client
                             // The floor that runs under things (PropArt.Underlay), as WorldView's underlay layer draws it.
                             var under = PropArt.Underlay(_map, _places, x, y);
                             if (under != null) image.Draw(TileArt.Object(under.Value), px, py);
-                            // Things that stand (PropArt.Stands) are drawn with the bodies, as WorldView.DrawProps does.
-                            var placed = PropArt.Stands(_map[x, y]) ? null
+                            // Things that stand (StandArt.KindAt) are drawn with the bodies, as WorldView's standing layer does.
+                            var placed = StandArt.KindAt(_map, x, y) != StandArt.Kind.None || PropArt.Stands(_map[x, y]) ? null
                                 : _map[x, y] == TileType.Road ? TileArt.Road(TileArt.RoadVariant(_map, x, y))
                                 : RoomTileArt.IsPatch(_map[x, y]) ? RoomTileArt.Patch(_map[x, y], RoomTileArt.PatchMask(_map, x, y), RoomTileArt.Laying(x, y))
                                 : TileArt.Object(_map[x, y]);
@@ -1167,7 +1241,8 @@ namespace Game.Client
                 var (px, py) = Corner(x, y);
                 int feet = py + (int)MathF.Round(radius * 0.8f * Px);
                 var shadow = CreatureArt.Shadow(Math.Max(6, (int)MathF.Round(radius * 2 * Px * 0.9f)));
-                _bodies.Add((y, image =>
+                _feet.Add((x, y - radius * 0.8f));
+                _bodies.Add((Key(y - radius * 0.8f, StandArt.BodyTie), image =>
                 {
                     image.Draw(shadow, px - shadow.Width / 2, feet - shadow.Height / 2 - 1);
                     image.Draw(sprite, px - sprite.Width / 2, feet - sprite.Height);

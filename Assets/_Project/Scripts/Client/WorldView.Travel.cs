@@ -57,7 +57,7 @@ namespace Game.Client
                         _stationCarts[index] = cart;
                     }
                     cart.transform.localPosition = new Vector3(station.X + 0.5f, station.Y, 0);
-                    cart.sortingOrder = 10000 - Mathf.RoundToInt(station.Y * 10);
+                    cart.sortingOrder = FootOrder(station.Y, StandArt.PropTie);
                     bool broken = !_client.RailFixed(line.Index) && index == line.Broken;
                     _brokenRails.TryGetValue(index, out var rail);
                     if (broken && rail == null)
@@ -67,9 +67,9 @@ namespace Game.Client
                         if (index == line.StationA) (rx, ry) = line.Route[Math.Min(2, line.Route.Count - 1)];
                         rail = Renderer(_root.transform, "BrokenRail", BrokenRailSprite, Color.white);
                         rail.transform.localPosition = new Vector3(rx + 0.5f, ry, 0);
-                        rail.sortingOrder = 10000 - Mathf.RoundToInt(ry * 10);
                         _brokenRails[index] = rail;
                     }
+                    if (broken && rail != null) rail.sortingOrder = FootOrder(rail.transform.localPosition.y, StandArt.PropTie);
                     else if (!broken && rail != null)
                     {
                         Object.Destroy(rail.gameObject);
@@ -94,7 +94,7 @@ namespace Game.Client
                 var at = body.Position;
                 cart.transform.localPosition = new Vector3(at.x, at.y - 0.55f, 0);
                 cart.flipX = way.X < 0;
-                cart.sortingOrder = 10000 - Mathf.RoundToInt((at.y - 0.55f) * 10) + 2;
+                cart.sortingOrder = FootOrder(at.y - 0.55f) + 2;
             }
             Forget(_rideCarts, _travelSeen);
             _rattleClock += deltaTime;

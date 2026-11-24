@@ -172,7 +172,10 @@ namespace Game.Client
             TileType.Barrel => Barrel(),
             TileType.Signpost => Signpost(),
             TileType.Bench => Bench(),
-            TileType.Hedge => Hedge(),
+            TileType.Hedge => JoinedHedge(sides),
+            // Joined to their neighbours (PropArt.Fences.cs, Docs/BiomeRework.md 4-4).
+            TileType.Fence => Fence(sides),
+            TileType.IronWall => IronPlates(sides),
             TileType.Flowerbed => Flowerbed(),
             TileType.Woodpile => Woodpile(),
             TileType.TrainingDummy => TrainingDummy(),
@@ -438,6 +441,8 @@ namespace Game.Client
             || type >= TileType.WoodChest && type <= TileType.OpenChest || type == TileType.Waystone
             || type == TileType.Anvil || type == TileType.Bed || type == TileType.Table || type == TileType.Torch || type == TileType.Lamp
             || type == TileType.Pot || type == TileType.Banner || type == TileType.WardStone || type == TileType.RiftAltar
+            // Fences and iron walls join their neighbours and stand too (묶음 B0, Docs/BiomeRework.md 4-4).
+            || type == TileType.Fence || type == TileType.IronWall
             || RaisedMachines.Contains(type);
 
         // Whether a machine's body stands raised (its parts drawn LiftOf higher).
@@ -874,18 +879,6 @@ namespace Game.Client
             Box(body, 1, 8, 14, 3, 2, Wood);
             foreach (int x in new[] { 2, 12 }) Rect(body, x, 13, 2, 3, Wood.Dark);
             return Finish(body, ShadowLayer(T, 18, 9, 16, 7, 2));
-        }
-
-        // A clipped hedge: a leafy block, its top lit, its leaves picked out.
-        static PixelImage Hedge()
-        {
-            var body = new PixelImage(T, 22);
-            Box(body, 1, 3, 14, 6, 11, Leaf);
-            for (int y = 3; y < 20; y++)
-                for (int x = 1; x < 15; x++)
-                    if (PixelNoise.Value(x, y, 31) > 0.78f) body[x, y] = y < 9 ? Leaf.Main : Leaf.Shade;
-            Rect(body, 1, 2, 14, 1, Leaf.Light);
-            return Finish(body, ShadowLayer(T, 22, 9, 20, 7, 2));
         }
 
         static PixelImage Flowerbed()
@@ -1554,14 +1547,11 @@ namespace Game.Client
             return null;
         }
 
-        // Which of a wall's four sides meet the same wall: north 1, east 2, south 4, west 8.
-        public static int Sides(TileMap map, int x, int y)
-        {
-            var here = map[x, y];
-            return (map[x, y + 1] == here ? 1 : 0) | (map[x + 1, y] == here ? 2 : 0) | (map[x, y - 1] == here ? 4 : 0) | (map[x - 1, y] == here ? 8 : 0);
-        }
+        // Which of a wall's, fence's or hedge's four sides join on: north 1, east 2, south 4, west 8 (Joins.Mask).
+        public static int Sides(TileMap map, int x, int y) => Joins.Mask(map, x, y);
 
-        public static bool IsWall(TileType type) => type == TileType.CastleWall || type == TileType.TimberWall;
+        // The things drawn by which sides join (Joins).
+        public static bool IsWall(TileType type) => Joins.Joined(type);
 
         // The lights the structures give (WorldLights): radius and colour.
         public static readonly (TileType Type, float Radius, string Color)[] Lights =
