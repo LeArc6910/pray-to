@@ -4317,7 +4317,8 @@ async function pois(browser) {
     const before = await game.ask('pois');
     check(before.inReach !== '', `${name}: 상자가 손 닿는 곳에 있다 (${before.inReach})`);
     let opened = false;
-    const button = (await game.buttons()).find(b => /열기/.test(b.label));
+    // Not the folded goal line's [일지 열기] (2026-11-23): the chest's own button over it.
+    const button = (await game.buttons()).find(b => /열기/.test(b.label) && !/일지/.test(b.label));
     if (button) {
       await game.press(button.label);
       await game.wait(900);
@@ -4331,7 +4332,9 @@ async function pois(browser) {
     // A shrine blesses once a day.
     await game.send('hurt 40; goto poi shrine');
     await game.wait(1200);
-    const prayed = (await game.send('usepoi')).join(' ');
+    let prayed = (await game.send('usepoi')).join(' ');
+    // The screen can be a moment behind the host after a goto; one more try.
+    if (!/^ok/.test(prayed)) { await game.wait(1200); prayed = (await game.send('usepoi')).join(' '); }
     await game.wait(900);
     const blessed = await game.ask('pois');
     check(/^ok/.test(prayed) && blessed.blessing !== '' && blessed.clientBlessing === blessed.blessing,
@@ -5935,7 +5938,9 @@ async function depth(browser) {
     shape(-6, 1, 'Joined', 5, '세로 줄은 북·남');
     shape(-6, -4, 'Joined', 3, '남서 모서리가 문으로 이어진다');
     shape(-5, -4, 'Gate', 1, '남쪽 줄의 닫힌 가로 문');
-    shape(0, 0, 'Gate', 0, '동쪽 줄의 닫힌 세로 문');
+    // The east gate is the tile the scene stands the player on, so it may already stand open (bit 2): only its run
+    // (bit 1 clear, a north-south gate) is checked here; opening it by walking in is checked further down.
+    { const c = at(0, 0); check(c.kind === 'Gate' && (c.shape & 1) === 0, `${name}: 동쪽 줄의 세로 문 (0,0: ${c.kind || '없음'} ${c.shape})`); }
     check(d.props >= 40 && d.skipped === 0, `${name}: 서 있는 것을 다 그린다 (${d.props}개, 꾸밈 ${d.decor}, 뺀 것 ${d.skipped}, 그린 조각 ${d.renderers})`);
     check(d.atlasPages >= 1 && d.atlasPages <= 2 && d.atlasSprites > 10, `${name}: 그림은 아틀라스 몇 장에 모였다 (${d.atlasPages}장, 그림 ${d.atlasSprites})`);
     check(d.renderers <= (game.touch ? 250 : 400), `${name}: 상한 안 (${d.renderers})`);
