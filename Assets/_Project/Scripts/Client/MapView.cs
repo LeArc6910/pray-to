@@ -702,6 +702,9 @@ namespace Game.Client
             if (_map[x, y] == TileType.ObsidianWall) return new Color32(96, 60, 150, 255);
             if (_map[x, y] == TileType.VoidWall) return new Color32(170, 130, 245, 255);
             if (_map[x, y] == TileType.Grate) return new Color32(150, 160, 172, 255);
+            // A camp's trapdoor (B1c): brown shut, the dark of its hole once open.
+            if (_map[x, y] == TileType.Trapdoor) return new Color32(150, 104, 60, 255);
+            if (_map[x, y] == TileType.OpenTrapdoor) return new Color32(60, 40, 26, 255);
             if (_map[x, y] >= TileType.WoodChest && _map[x, y] <= TileType.GoldChest) return new Color32(255, 214, 90, 255);
             if (_map[x, y] == TileType.OpenChest) return new Color32(150, 126, 80, 255);
             if (_map[x, y] == TileType.Waystone) return new Color32(110, 190, 255, 255);
@@ -722,7 +725,7 @@ namespace Game.Client
             // The biomes' props (묶음 B1a): a lit lamp as a fire; the rest a speck between the floor's colour and rock's, so
             // a room strewn with them does not read as walled off.
             if (_map[x, y] == TileType.LitLamp) return Palette.Torch;
-            if (BiomeProps.Is(_map[x, y]) || BiomeProps.AnchorOf(_map, x, y) != null) return Color32.Lerp(BiomeFloor(_client.Biomes[x, y]), Wall, 0.4f);
+            if (BiomeProps.Is(_map[x, y]) || BiomeLandmarks.Is(_map[x, y]) || BiomeProps.AnchorOf(_map, x, y) != null) return Color32.Lerp(BiomeFloor(_client.Biomes[x, y]), Wall, 0.4f);
             if (Structures.IsDecor(_map[x, y])) return new Color32(140, 120, 100, 255);
             if (_map[x, y] == TileType.Table || _map[x, y] == TileType.Banner || _map[x, y] == TileType.Pot) return new Color32(200, 160, 110, 255);
             if (_map[x, y] == TileType.Lava) return new Color32(255, 110, 30, 255);

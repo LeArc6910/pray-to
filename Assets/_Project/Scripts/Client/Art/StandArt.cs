@@ -47,7 +47,8 @@ namespace Game.Client
         // east-west run and 0 in a north-south one, plus 2 open; 0 for anything else.
         // A biome's prop: which of its drawings and whether mirrored (BiomeArt.Variant). The places' tall tree: 1 in the
         // dirt cave (a mine timber with a lantern), 2 in the mushroom forest (the forest's great mushroom), 0 anywhere
-        // else or when the biome is not given (the old blue mushroom tree).
+        // else or when the biome is not given (the old blue mushroom tree). A place's building or dressing that has a
+        // biome look (PropArt.HasBiomeLook): PropArt.CaveLook, ForestLook or 0 the same way.
         public static int ShapeAt(TileMap map, int x, int y, bool open, Biome? biome = null)
         {
             var kind = KindAt(map, x, y);
@@ -56,7 +57,9 @@ namespace Game.Client
             var type = map[x, y];
             if (BiomeProps.Is(type)) return BiomeArt.Variant(type, x, y);
             if (type == TileType.MushroomTree) return biome == Biome.Cave ? 1 : biome == Biome.Mushroom ? 2 : 0;
-            return 0;
+            if (type == TileType.RingCap) return BiomeArt.Variant(type, x, y);
+            // The places' buildings and dressing in the look of the biome under them (묶음 B1c, PropArt.Places.cs).
+            return PropArt.BiomeLook(type, biome);
         }
 
         // The picture for a tile's kind and shape (ShapeAt); lit: a house's windows lit (evening and night).
@@ -65,6 +68,13 @@ namespace Game.Client
             if (kind == Kind.Gate) return PropArt.FenceGate((shape & 1) != 0, (shape & 2) != 0);
             if (BiomeProps.Is(type)) return BiomeArt.Prop(type, shape);
             if (type == TileType.MushroomTree && shape != 0) return BiomeArt.PlaceTree(shape == 2 ? Biome.Mushroom : Biome.Cave);
+            if (type == TileType.RingCap) return BiomeArt.RingCap(shape);
+            if (BiomeLandmarks.Is(type)) return PropArt.Landmark(type);
+            if (shape != 0 && PropArt.HasBiomeLook(type))
+            {
+                var look = PropArt.PlaceProp(type, shape);
+                return PropArt.LitAtNight(type) && !lit ? PropArt.Daylit(look) : look;
+            }
             if (PropArt.LitAtNight(type)) return lit ? PropArt.Prop(type) : PropArt.Daylit(PropArt.Prop(type));
             return PropArt.Prop(type, kind == Kind.Joined ? shape : 0);
         }
@@ -79,6 +89,7 @@ namespace Game.Client
             kind == Kind.Gate || type == TileType.Fence ? PropArt.FenceFoot / (float)Pixels
             : type == TileType.Hedge ? PropArt.HedgeFoot / (float)Pixels
             : BiomeProps.Is(type) ? BiomeArt.FootRows / (float)Pixels
+            : type == TileType.RingCap ? BiomeArt.RingFoot / (float)Pixels
             : 0;
 
         // The rows from the top of the picture that are its canopy or roof (fading when someone is behind), none for 0.
@@ -92,6 +103,7 @@ namespace Game.Client
             TileType.BigTent => 12,
             TileType.Lighthouse => 48,
             TileType.MineEntrance => 20,
+            TileType.MinerHut => PropArt.LandmarkCanopy(type),
             _ => BiomeArt.CanopyRows(type),
         };
 

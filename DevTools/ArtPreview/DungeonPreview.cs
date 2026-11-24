@@ -51,7 +51,7 @@ namespace Game.Client
             return map;
         }
 
-        static void Dungeons(TerrainData terrain, MonsterData monsters, WorldLights lights, string output)
+        static void Dungeons(TerrainData terrain, MonsterData monsters, WorldLights lights, string output, StoryData story = null)
         {
             var data = terrain.Dungeons;
             if (data.Dungeons.Count == 0) return;
@@ -64,7 +64,7 @@ namespace Game.Client
             for (int row = 0; row < data.Dungeons.Count; row++)
             {
                 var definition = data.Dungeons[row];
-                var biome = definition.Biome ?? Biome.Sand;
+                var biome = definition.Biome ?? (definition.Cellar ? Biome.Cave : Biome.Sand);
                 for (int i = 0; i < DungeonSeeds.Length; i++)
                 {
                     var map = DungeonMap();
@@ -101,6 +101,7 @@ namespace Game.Client
                 Save(rooms, Path.Combine(folder, definition.Id + "_rooms.png"), 1);
             }
             Save(sheet, Path.Combine(output, "dungeons.png"), 1);
+            report.AddRange(Gates(terrain, monsters, lights, folder, story));
             File.WriteAllLines(Path.Combine(folder, "report.txt"), report);
             foreach (string line in report) Console.WriteLine(line);
         }
@@ -125,9 +126,58 @@ namespace Game.Client
                 {
                     var lead = room.Letter == 'B' && boss != null ? boss : pack.Members[pack.Members.Count - 1].Monster;
                     var art = CreatureArt.Monster(lead.Id, Rgba.Hex(lead.Color), 0);
-                    scene.Body(at.X, at.Y, lead.Radius * 2, room.Letter == 'B' ? Scaled(art, 2) : art);
+                    // A mid-boss in person (B1c, an XL) is drawn its own size; a big elite twice its kind's.
+                    scene.Body(at.X, at.Y, lead.Radius * 2, room.Letter == 'B' && !lead.Big ? Scaled(art, 2) : art);
                 }
             }
+        }
+
+        // B1c: dungeons/gates.png. A world of the generator's version 4 (seed 1): the dirt cave's and the mushroom
+        // forest's gate rooms lit, their torches in the dungeon's light (dungeons.csv light, WorldLights.GateColors) beside
+        // the same rooms in plain torchlight; and a camp's trapdoor shut and thrown open (its cellar's way down).
+        static IEnumerable<string> Gates(TerrainData terrain, MonsterData monsters, WorldLights lights, string folder, StoryData story)
+        {
+            var world = WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.LandmarkVersion, terrain);
+            var gates = DungeonPocket.Gates(world.Rooms, world.Map);
+            var colours = WorldLights.GateColors(gates, terrain.Dungeons);
+            const int across = 22, high = 16;
+            var shots = new List<PixelImage>();
+            var lines = new List<string>();
+            PixelImage Shot(Vec2 at, Func<int, int, Rgba?> recolor)
+            {
+                int left = (int)at.X - across / 2, bottom = (int)at.Y - high / 2;
+                var scene = new Scene(world.Map, left, bottom, across, high, _ => false) { Night = true, BiomeAt = (x, y) => world.Biomes[x, y], Biome = world.Biomes[(int)at.X, (int)at.Y] };
+                scene.Places(world.Places);
+                scene.Player(at.X, at.Y - 2, HeroStanding(Look.Up, HeroMove.Stand, 0, "#3F7FD8"));
+                scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y]), recolor);
+                return scene.Image;
+            }
+            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom })
+            {
+                var gate = gates.FirstOrDefault(g => !g.Cellar && g.Biome == biome);
+                if (gate == null) continue;
+                var row = terrain.Dungeons.For(gate);
+                shots.Add(Shot(gate.Center, colours));
+                shots.Add(Shot(gate.Center, null));
+                lines.Add($"gate {gate.Index} ({biome}) at {gate.X},{gate.Y}: {row?.Id} light {row?.Light}");
+            }
+            var cellar = gates.FirstOrDefault(g => g.Cellar);
+            if (cellar != null)
+            {
+                shots.Add(Shot(cellar.Center, null));
+                world.Map[cellar.X, cellar.Y] = TileType.OpenTrapdoor;
+                shots.Add(Shot(cellar.Center, null));
+                world.Map[cellar.X, cellar.Y] = TileType.Trapdoor;
+                lines.Add($"cellars {gates.Count(g => g.Cellar)} of camps {world.Rooms.Nodes.Count(n => n.Role == RoomRole.Elite)}; first at {cellar.X},{cellar.Y} ({cellar.Biome})");
+            }
+            lines.Add($"lairs {world.Rooms.Lairs.Count}: " + string.Join(", ", world.Rooms.Lairs.Select(i => $"{world.Rooms.Nodes[i].Biome} {world.Rooms.Nodes[i].X},{world.Rooms.Nodes[i].Y} r{world.Rooms.Nodes[i].Radius}")));
+            if (shots.Count == 0) return lines;
+            int w = shots[0].Width, h = shots[0].Height;
+            var image = new PixelImage(2 * (w + 4) + 4, (shots.Count + 1) / 2 * (h + 4) + 4);
+            image.Fill(0, 0, image.Width, image.Height, Rgba.Hex("#30303A"));
+            for (int i = 0; i < shots.Count; i++) image.Draw(shots[i], 4 + i % 2 * (w + 4), 4 + i / 2 * (h + 4));
+            Save(image, Path.Combine(folder, "gates.png"), 1);
+            return lines;
         }
 
         static PixelImage Schematic(TileMap map, DungeonLayout layout, int scale)
@@ -147,6 +197,8 @@ namespace Game.Client
                         TileType.Grate => Rgba.Hex("#9AA4B0"),
                         TileType.CrackedWall => Rgba.Hex("#B89A6A"),
                         TileType.Torii => Rgba.Hex("#E03A3A"),
+                        // The biomes' props in the dungeons' chunks (B1c).
+                        _ when BiomeProps.Is(type) => Rgba.Hex("#A08060"),
                         TileType.Waystone => Rgba.Hex("#6EC0FF"),
                         TileType.Torch or TileType.Lantern => Rgba.Hex("#FFD23F"),
                         TileType.Campfire => Rgba.Hex("#FF9A3C"),

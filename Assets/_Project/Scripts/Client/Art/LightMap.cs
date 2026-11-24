@@ -236,7 +236,11 @@ namespace Game.Client
         public static LightSource Carried(Vec2 position) => new LightSource(position, CarriedRadius, CarriedIntensity, Rgba.White, tints: false);
 
         // Adds the burning tiles near the window, flickering with the time in seconds.
-        public void AddTiles(List<LightSource> lights, TileMap map, int left, int bottom, int size, float time)
+        // biomes: the places' lamps and houses that are redrawn by biome give that biome's light (PropArt.BiomeLight).
+        // recolor (B1c): a colour for the light of a tile in place of its own (a dungeon gate's torches burn the
+        // dungeon's light), or null to keep it; it wins over the biome's.
+        public void AddTiles(List<LightSource> lights, TileMap map, int left, int bottom, int size, float time, Func<int, int, Biome> biomes = null,
+            Func<int, int, Rgba?> recolor = null)
         {
             int margin = (int)Math.Ceiling(_reach);
             if (margin == 0) return;
@@ -248,7 +252,10 @@ namespace Game.Client
                     int index = (int)map[x, y];
                     if (index >= _radius.Length || _radius[index] <= 0) continue;
                     float flicker = 0.92f + 0.05f * (float)Math.Sin(time * 7.3 + x * 1.7) + 0.03f * (float)Math.Sin(time * 13.1 + y * 2.3);
-                    lights.Add(new LightSource(TileMap.Center(x, y), _radius[index] * (0.97f + 0.03f * flicker), flicker, _color[index], tints: true));
+                    var color = _color[index];
+                    if (biomes != null && y < map.Height && PropArt.BiomeLight(map[x, y], biomes(x, y)) is Rgba own) color = own;
+                    if (recolor?.Invoke(x, y) is Rgba gate) color = gate;
+                    lights.Add(new LightSource(TileMap.Center(x, y), _radius[index] * (0.97f + 0.03f * flicker), flicker, color, tints: true));
                 }
             }
         }
@@ -274,6 +281,30 @@ namespace Game.Client
             Biome.Mushroom => Rgba.Hex("#A8F06A"),
             _ => Rgba.Clear,
         };
+
+        // How far from a dungeon's gate its gate room's lights burn the dungeon's colour (Docs/BiomeRework.md 4-5 문 방의
+        // 색 불, dungeons.csv light).
+        public const float GateLightReach = 7;
+
+        // The dungeons' gates' colours for AddTiles' recolor: the light of a tile within GateLightReach of a gate (not a
+        // camp's trapdoor) whose dungeon has a light of its own; null elsewhere.
+        public static Func<int, int, Rgba?> GateColors(IReadOnlyList<DungeonGate> gates, DungeonData dungeons)
+        {
+            var lit = new List<(Vec2 At, Rgba Color)>();
+            foreach (var gate in gates ?? Array.Empty<DungeonGate>())
+            {
+                if (gate.Cellar || !(World.DungeonFor(dungeons, gate) is DungeonDefinition row) || row.Light.Length == 0) continue;
+                lit.Add((gate.Center, Rgba.Hex(row.Light)));
+            }
+            if (lit.Count == 0) return null;
+            return (x, y) =>
+            {
+                var at = TileMap.Center(x, y);
+                foreach (var (gate, color) in lit)
+                    if (Vec2.Distance(gate, at) <= GateLightReach) return color;
+                return null;
+            };
+        }
 
         public static Func<int, int, float> ArenaAmbient(IReadOnlyList<Vec2> arenas, float arenaRadius) =>
             (x, y) =>

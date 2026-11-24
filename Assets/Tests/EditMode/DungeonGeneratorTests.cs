@@ -39,14 +39,14 @@ namespace Game.Core.Tests
         {
             Assert.IsTrue(Sheet.Success, string.Join("\n", Sheet.Errors));
             Assert.GreaterOrEqual(Sheet.Dungeons.Count, 4);
-            Assert.AreEqual(3, Sheet.Graphs.Count);
+            Assert.AreEqual(4, Sheet.Graphs.Count);
             foreach (var dungeon in Sheet.Dungeons)
             {
                 if (dungeon.Boss != null) Assert.IsNotNull(Monsters.Shipped.Find(dungeon.Boss), $"{dungeon.Id}: its master {dungeon.Boss}");
                 Assert.AreEqual(PoiKind.Chest, Tiles.Shipped.Terrain.Pois.Find(dungeon.Chest).Kind, dungeon.Id);
             }
             // The design's two first: the dirt caves and the mushroom forest; every biome's gate leads somewhere.
-            Assert.AreEqual("slime_cellar", Sheet.For(Biome.Cave).Id);
+            Assert.AreEqual("abandoned_mine", Sheet.For(Biome.Cave).Id);
             Assert.AreEqual("spore_depths", Sheet.For(Biome.Mushroom).Id);
             foreach (Biome biome in Enum.GetValues(typeof(Biome))) Assert.IsNotNull(Sheet.For(biome), biome.ToString());
             Assert.AreEqual("deep_hollow@sand", Sheet.For(Biome.Sand).KeyFor(Biome.Sand));
@@ -65,7 +65,7 @@ namespace Game.Core.Tests
             Assert.IsEmpty(Error("a,가,cave,1,short,5-6,elite:slime,chest_iron,5\n"));
             StringAssert.Contains("graph", Error("a,가,cave,1,long,5-6,elite,chest_iron,5\n"));
             StringAssert.Contains("rooms", Error("a,가,cave,1,short,3-4,elite,chest_iron,5\n"));
-            StringAssert.Contains("boss", Error("a,가,cave,1,short,5,warden,chest_iron,5\n"));
+            StringAssert.Contains("boss", Error("a,가,cave,1,short,5,elite:Bad Id,chest_iron,5\n"));
             StringAssert.Contains("곁가지까지", Error("a,가,cave,1,short,17-18,elite,chest_iron,5\n"));
             StringAssert.Contains("E로 시작", Error("a,가,cave,1,short,5,elite,x,5\n", "id,spine,branches,loop\nshort,C R B X,,\n"));
             StringAssert.Contains("바로 앞", Error("a,가,cave,1,short,5,elite,x,5\n", "id,spine,branches,loop\nshort,E B C R X,,\n"));

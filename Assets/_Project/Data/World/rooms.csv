@@ -73,3 +73,12 @@ dungeon_rest_fire,rest,,dungeon,10,yes,?.........?/.t.......t./...h...h.../.....
 dungeon_shrine_runes,shrine,,dungeon,10,yes,?.......?/..=...=../....=..../...=S=.../....=..../..=...=../?.......?
 dungeon_treasure_nook,treasure,,dungeon,10,yes,?.......?/.t..C..t./..c...c../........./?.......?
 dungeon_hidden_cache,hidden,,dungeon,10,yes,?.....?/.B.C.B./......./.t...t./?.....?
+dungeon_mine_timbers,pack,cave,dungeon,12,yes,?.p...p...p.?/............./..M..M.M..M../RRRRRRRRRRRRR/..M.x...z.M../............./?.p...p...p.?
+dungeon_mine_cavein,pack,cave,dungeon,12,yes,?.g.....g.?/g..M...M..g/...r...r.../.M...y...M./.........../..g.M.M.g../.........../.M...z...M./...r...r.../g..M...M..g/?.g.....g.?
+dungeon_mine_ore,pack,cave,dungeon,12,yes,?..e...e..?/.z.......z./...M.M.M.../.p.......p./...M.x.M.../.p.......p./...M.M.M.../.z.......z./?..e...e..?
+dungeon_mine_foreman,elite,cave,dungeon,10,yes,?...........?/.p..y...y..p./...M.....M.../.....g.g...../......E....../.....g.g...../...M.....M.../.p.........p./?...........?
+dungeon_mine_pit,elite,cave,dungeon,10,no,?...............?/.p..p...y...p..p./................./..g...........g../.p.............p./.....M.....M...../................./.y......E......y./................./.....M.....M...../.p.............p./..g...........g../................./RRRRRRRRRRRRRRRRR/................./.p..p...x...p..p./?...............?
+dungeon_spore_sacs,pack,mushroom,dungeon,12,yes,?.A.....A.?/A..M...M..A/...K...K.../.M..Z.Z..M./.........../..M..H..M../.........../.M..Z.Z..M./...K...K.../A..M...M..A/?.A.....A.?
+dungeon_spore_stumps,pack,mushroom,dungeon,12,yes,?.H...m...H.?/............./..M..K.K..M../.A....M....A./..M..Z.Z..M../............./?.H...m...H.?
+dungeon_spore_ring,elite,mushroom,dungeon,10,yes,?...........?/.m..K...K..m./...M.....M.../.....A.A...../......E....../.....A.A...../...M.....M.../.m..K...K..m./?...........?
+dungeon_spore_heart,elite,mushroom,dungeon,10,no,?...............?/.A..m...K...m..A./................./..H...........H../.m.............m./.....M.....M...../................./.K......E......K./................./.....M.....M...../.m.............m./..H...........H../................./.Z.............Z./................./.A..m...K...m..A./?...............?

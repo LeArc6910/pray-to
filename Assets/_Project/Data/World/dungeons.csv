@@ -1,6 +1,7 @@
-id,name,biome,level,graph,rooms,boss,chest,minutes
-slime_cellar,끈적한 지하실,cave,2,cellar,6-8,elite:slime,chest_iron,5
-spore_depths,포자 굴,mushroom,3,branching,9-11,elite:myconid,chest_gold,9
-frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,elite:frost_wisp,chest_gold,10
-ember_forge,잿불 대장간,lava,3,locked,12-14,elite:magma_slime,chest_gold,13
-deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8
+id,name,biome,level,graph,rooms,boss,chest,minutes,entry,light,experience
+abandoned_mine,버려진 갱도,cave,2,mine,10-11,slime_mother,chest_iron,6,gate,#FFB060,75
+spore_depths,포자 굴,mushroom,3,branching,9-11,mycelium_mother,chest_gold,5,gate,#A8F06A,60
+frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,elite:frost_wisp,chest_gold,10,gate,#A8DCFF,
+ember_forge,잿불 대장간,lava,3,locked,12-14,elite:magma_slime,chest_gold,13,gate,#FF7A30,
+deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8,gate,,
+cellar,지하실,,2,cellar,6-7,elite,chest_iron,4,cellar,,

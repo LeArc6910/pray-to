@@ -515,6 +515,9 @@ namespace Game.Client
         LightMap _lightMap;
         readonly List<LightSource> _lights = new List<LightSource>();
         readonly WorldLights _worldLights;
+        System.Func<int, int, Biome> _biomeAt;
+        Func<int, int, Rgba?> _gateColors;
+        IReadOnlyList<DungeonGate> _gateColorsFor;
         readonly Func<int, int, float> _arenaGlow;
         readonly Func<int, int, Rgba> _biomeTint;
         Texture2D _darkTexture;
@@ -562,6 +565,7 @@ namespace Game.Client
             BuildTiles(client);
             AddLight();
             _worldLights = new WorldLights(client.Tiles);
+            _gateColorsFor = null;
             // The arenas are always dimly lit; the mushroom forest and the lava fields glow a little of themselves.
             var arenas = WorldLights.ArenaAmbient(client.Arenas, client.ArenaRadius);
             _arenaGlow = (x, y) => Mathf.Max(arenas(x, y), WorldLights.BiomeGlow(client.Biomes[x, y]));
@@ -3829,7 +3833,13 @@ namespace Game.Client
                 if (body.Kind == BodyKind.Player) _lights.Add(WorldLights.Carried(new Vec2(body.Position.x, body.Position.y)));
                 else if (body.Kind == BodyKind.Minion) _lights.Add(new LightSource(new Vec2(body.Position.x, body.Position.y), MinionLight, 0.7f, body.Color, tints: true));
             }
-            _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time);
+            // The dungeons' gate rooms burn their dungeon's colour (B1c), worked out again when the gates are found.
+            if (_gateColorsFor != _client.Gates)
+            {
+                _gateColorsFor = _client.Gates;
+                _gateColors = WorldLights.GateColors(_client.Gates, _client.DungeonSheet);
+            }
+            _worldLights.AddTiles(_lights, _client.Map, left, bottom, size, Time.time, _biomeAt ??= (x, y) => _client.Biomes[x, y], _gateColors);
             AddSkyLights(left, bottom, size);
             AddNightLights(left, bottom, size);
             AddPoiLights(left, bottom, size);

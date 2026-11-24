@@ -60,6 +60,9 @@ namespace Game.Core
         // drops a rare or better piece, a rune this often and a potion; a champion a magic or better piece this often.
         public const int LeaderExperience = 8;
         public const int ChampionExperience = 3;
+        // A mid-boss (XL) leading, a dungeon's master or a lair's (B1c): a body of its own already, so fewer times its
+        // kind's (Docs/BiomeRework.md 4-5: a run's experience a minute at 1.0~1.3 times the field's).
+        public const int MidBossExperience = 4;
         public const float LeaderRuneChance = 0.3f;
         public const float ChampionItemChance = 0.4f;
         // A MonsterFx event's Amount: an elite called its minions.
@@ -106,7 +109,8 @@ namespace Game.Core
             if (kind == null || rank == EliteRank.None) return null;
             var named = Each(affixes).LastOrDefault();
             string name = named == RiftAffix.None ? kind.Name : $"{AffixPrefix(named)} {kind.Name}";
-            return rank == EliteRank.Leader ? name + " 대장" : name;
+            // A mid-boss (XL) leads under its own name: "어미 슬라임", not "어미 슬라임 대장" (B1c).
+            return rank == EliteRank.Leader && kind.Size != MonsterSize.XL ? name + " 대장" : name;
         }
 
         // Under the name: every affix, "불길 · 단단함".
@@ -256,8 +260,11 @@ namespace Game.Core
             enemy.Elite = rank;
             enemy.Affixes = affixes;
             // A big leader (L, B1b) is already four times an M body: twice its own, not four times.
-            float health = rank == EliteRank.Leader ? enemy.Definition.Big ? BigLeaderHealth : LeaderHealth : ChampionHealth;
-            float power = rank == EliteRank.Leader ? LeaderPower : ChampionPower;
+            // A mid-boss (XL, a dungeon's master or a lair's, B1c) is a fight of its own already: its health and hits as
+            // they are, with the affixes on top.
+            bool xl = enemy.Definition.Size == MonsterSize.XL;
+            float health = rank == EliteRank.Leader ? xl ? 1 : enemy.Definition.Big ? BigLeaderHealth : LeaderHealth : ChampionHealth;
+            float power = rank == EliteRank.Leader ? xl ? 1 : LeaderPower : ChampionPower;
             if ((affixes & RiftAffix.Tough) != 0) health *= ToughShare;
             if ((affixes & RiftAffix.Fierce) != 0) power *= FierceShare;
             if ((affixes & RiftAffix.Swift) != 0) enemy.SpeedScale *= SwiftShare;
@@ -360,7 +367,8 @@ namespace Game.Core
         }
 
         static int EliteExperience(Enemy enemy) =>
-            enemy.Elite == EliteRank.Leader ? LeaderExperience : enemy.Elite == EliteRank.Champion ? ChampionExperience : 1;
+            enemy.Elite == EliteRank.Leader ? enemy.Definition.Size == MonsterSize.XL ? MidBossExperience : LeaderExperience
+            : enemy.Elite == EliteRank.Champion ? ChampionExperience : 1;
 
         // ---- The wire: an elite's rank and affixes (Docs/WorldRework.md 통신과 저장) ----
 

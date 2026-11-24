@@ -40,7 +40,7 @@ dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --
 dotnet run --project DevTools/CoreSandbox -- --farm 120 mushroom
 dotnet run --project DevTools/CoreSandbox -- --economy
 dotnet run --project DevTools/CoreSandbox -- --factory 30
-# 지도를 숫자로: 막힌 칸, 벽 덩어리, 열린 바닥, 생물군계마다, 방·통로, 걷는 걸음, 생성 시간(Docs/WorldRework.md). --gen 1|2|3으로 생성기 판 하나만(--flow와 --hour에도. 3판은 생물군계 소품과 꾸밈의 밀도도, Docs/BiomeRework.md B1a)
+# 지도를 숫자로: 막힌 칸, 벽 덩어리, 열린 바닥, 생물군계마다, 방·통로, 걷는 걸음, 생성 시간(Docs/WorldRework.md). --gen 1|2|3|4로 생성기 판 하나만(--flow와 --hour에도. 3판부터 생물군계 소품과 꾸밈의 밀도도, 4판은 랜드마크 수도. 새 월드는 4판, Docs/BiomeRework.md B1a·B1c)
 dotnet run --project DevTools/CoreSandbox -- --mapstats 1,2,3
 # 어느 시스템이 어느 시스템에 재료를 주는지, 고립된 재료(Docs/Systems.md)
 dotnet run --project DevTools/CoreSandbox -- --supply
@@ -53,7 +53,9 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 # 완급 감독의 긴장 곡선(쌓기·절정·풀기·쉬기, 보낸 것, 싸움 사이 시간. Docs/WorldRework.md 묶음 4b). --no-director로 감독 끄기
 dotnet run --project DevTools/CoreSandbox -- --pace 30 1,2,3
 # 인스턴스 던전 한 판(입구에서 주인과 끝 상자까지 봇이 돈다: 완주 시간, 분당 경험치·금화값, 쓰러짐. Docs/WorldRework.md 묶음 5b)
-dotnet run --project DevTools/CoreSandbox -- --dungeon slime_cellar 1,2,3
+dotnet run --project DevTools/CoreSandbox -- --dungeon abandoned_mine 1,2,3 --gear copper_sword,copper_armor --classes warrior --level 5
+# 함정 방마다 창살이 몇 칸 떨어지나(거리로 자른 것과 가장 좁은 곳, 2·3판 월드. Docs/BiomeRework.md B1c)
+dotnet run --project DevTools/CoreSandbox -- --traps 1,2,3
 
 # 도트 그림과 효과음·음악을 DevTools/ArtPreview/out/에 PNG와 WAV로 쓴다(sheet.png, player.png, bosses.png, anim/*.gif, cave.png, cave_unlit.png, arena.png, effects.png, sounds/, music/)
 dotnet run --project DevTools/ArtPreview
@@ -69,11 +71,11 @@ dotnet run --project DevTools/ArtPreview -- --only ui
 dotnet run --project DevTools/ArtPreview -- --only biomemock
 # 서 있는 층·이어지는 울타리만(out/depth/: joined.png 다섯 종류 16모양과 문, pen.png·pen_nofade.png 방목장과 흐려짐, place_*.png 장소의 정렬·흐려짐, biomes.png 생물군계 꾸밈. Docs/BiomeRework.md B0)
 dotnet run --project DevTools/ArtPreview -- --only depth
-# 생물군계의 모습만(out/biomes/: 생물군계마다 소품·꾸밈·작은 생물 표 props_<id>.png, 생성기 3판의 방 하나 room_<id>_unlit.png·room_<id>.png(빛 켠 것), 흙 동굴 마을 place_dawn_village.png, 오두막 울타리 place_hero_hut.png. Docs/BiomeRework.md B1a)
+# 생물군계의 모습만(out/biomes/: 생물군계마다 소품·꾸밈·작은 생물 표 props_<id>.png, 생성기 4판의 방 하나 room_<id>_unlit.png·room_<id>.png(빛 켠 것), 흙 동굴 마을 place_dawn_village.png, 오두막 울타리 place_hero_hut.png, 장소의 건물·꾸밈을 생물군계마다 place_props.png·place_<장소>_<cave|mushroom>[_lit].png, 랜드마크 landmarks.png·landmarks_lit.png·landmark_<종류>[_lit].png. Docs/BiomeRework.md B1a·B1c)
 dotnet run --project DevTools/ArtPreview -- --only biomes
 # 몬스터 크기 등급만(out/sizes/: lineup.png 사람 옆 S·M·L·XL, poses.png 큰 몸의 자세, leaders.png 정예 금빛 테, clearance.png 여유 지도와 길 너비, report.txt 종마다 그림 폭. Docs/BiomeRework.md B0b)
 dotnet run --project DevTools/ArtPreview -- --only sizes
-# 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/)
+# 인스턴스 던전의 깔린 모습만(out/dungeons.png, out/dungeons/, 문 방의 불 색과 야영지의 뚜껑 문 out/dungeons/gates.png)
 dotnet run --project DevTools/ArtPreview -- --only dungeons
 # 대화 초상만(out/portraits/: 인물마다 여섯 표정의 sheet.png, 4배 close_*.png, 대화 상자 시안 dialogue.png. Docs/UiRework.md 4-2)
 dotnet run --project DevTools/ArtPreview -- --only portraits

@@ -393,6 +393,24 @@ namespace Game.Client
                     return "sizes " + SizesJson(root);
                 case "b1":
                     return "b1 " + BiomeMonstersJson(root);
+                // The rest of B1 (묶음 B1c, Docs/BiomeRework.md): "b1c" the camp trapdoor nearest the player (shut or open on
+                // the host and the screen, its band, the button), the lairs (their mid-boss, awake or felled), the gates'
+                // dungeons and their light colours, and what a charge smashed; "b1c fell" fells the nearest camp's band (its
+                // trapdoor opens as when it falls by hand).
+                case "b1c":
+                    if (words.Length > 1 && words[1] == "fell")
+                    {
+                        var camp = NearestCellar(world, player) ?? throw new InvalidOperationException("no camp trapdoor: a world of version 3 has them");
+                        int felled = 0;
+                        var room = world.Rooms.Nodes[camp.Room];
+                        foreach (var foe in world.Enemies.Where(e => !e.IsDead && e.Elite != EliteRank.None && Vec2.Distance(e.Position, room.Center) <= room.Radius + 4).ToList())
+                        {
+                            foe.Health = 0;
+                            felled++;
+                        }
+                        return $"ok b1c fell {felled}";
+                    }
+                    return "b1c " + B1cJson(root);
                 // The things to find in the rooms (2026-11-22, Docs/WorldRework.md 묶음 3a·3b).
                 case "pois":
                     return "pois " + PoisJson(root);
@@ -434,7 +452,7 @@ namespace Game.Client
                         }
                         case "open":
                         {
-                            var nearestGate = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault()
+                            var nearestGate = world.Gates.Where(g => !g.Cellar).OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault()
                                 ?? throw new InvalidOperationException("no gate");
                             return words.Length > 2 && world.ChooseDungeon(nearestGate.Index, words[2]) ? $"ok dungeon open {words[2]} at gate {nearestGate.Index}"
                                 : $"error dungeon open: no row '{(words.Length > 2 ? words[2] : "")}' in dungeons.csv";
@@ -492,6 +510,34 @@ namespace Game.Client
                         return $"ok biomes at {words[2]} {TileMap.Cell(spot.Value.X)},{TileMap.Cell(spot.Value.Y)}";
                     }
                     return $"error biomes: no '{words[1]}'";
+                // The places' looks by biome and the landmarks (묶음 B1c, Docs/BiomeRework.md): "places" the state round the
+                // "scene places" set (the biome, each redrawn thing's look and its roof's alpha, the landmarks' tiles there,
+                // how many landmarks the world has, what is under the player); "places at behind" behind the set's cottage
+                // (its roof fades); "places at cap" onto a cap of the set's fairy ring (it is walked through); "places at
+                // hut|frame|ring" before the nearest landmark of that kind the generator laid.
+                case "places":
+                    if (words.Length == 1) return "places " + PlacesJson(root);
+                    if (words[1] == "at")
+                    {
+                        Vec2? spot = null;
+                        if (words[2] == "behind") spot = TileMap.Center(_placesAnchor.X - 7, _placesAnchor.Y + 6);
+                        else if (words[2] == "cap") spot = Nearest(world.Map, _placesAnchor.X, _placesAnchor.Y, (x, y) => world.Map[x, y] == TileType.RingCap);
+                        else
+                        {
+                            var kind = words[2] == "hut" ? BiomeLandmarkKind.MinerHut : words[2] == "frame" ? BiomeLandmarkKind.MineFrame : BiomeLandmarkKind.FairyRing;
+                            var marks = root.HostGenerated?.BiomeLandmarks.Where(l => l.Kind == kind).ToList();
+                            if (marks != null && marks.Count > 0)
+                            {
+                                var mark = marks.OrderBy(l => Vec2.Distance(TileMap.Center(l.StandX, l.StandY), player.Position)).First();
+                                spot = TileMap.Center(mark.StandX, mark.StandY);
+                            }
+                        }
+                        if (spot == null) return $"error places at {words[2]}: none";
+                        player.Position = spot.Value;
+                        player.Corrections++;
+                        return $"ok places at {words[2]} {TileMap.Cell(spot.Value.X)},{TileMap.Cell(spot.Value.Y)}";
+                    }
+                    return $"error places: no '{words[1]}'";
                 case "director":
                     if (words.Length == 1) return "director " + DirectorJson(root);
                     if (words[1] == "ambush") return world.Ambush(player) ? "ok director ambush" : "error director ambush: not in a narrow way with room before and behind";
@@ -748,12 +794,36 @@ namespace Game.Client
                         ?? station.Center;
                     break;
                 // On the nth nearest dungeon gate (묶음 5a): "gate [n]", on the floor between its posts.
+                // "gate <dungeon id>" (B1c): the nearest gate leading to that row of dungeons.csv.
                 case "gate":
-                    int nthGate = words.Length > 2 ? Int(words[2]) : 0;
-                    var gate = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).Skip(nthGate).FirstOrDefault()
-                        ?? throw new InvalidOperationException($"no gate {nthGate}: not a world of rooms, or no gate room");
+                    bool byNumber = words.Length <= 2 || int.TryParse(words[2], out _);
+                    int nthGate = byNumber && words.Length > 2 ? Int(words[2]) : 0;
+                    var gate = world.Gates.Where(g => !g.Cellar && (byNumber || world.DungeonFor(g)?.Id == words[2]))
+                        .OrderBy(g => Vec2.Distance(g.Center, player.Position)).Skip(nthGate).FirstOrDefault()
+                        ?? throw new InvalidOperationException($"no gate {(byNumber ? nthGate.ToString() : words[2])}: not a world of rooms, or no gate room");
                     to = Game.Core.Collision.Resolve(map, gate.Center, World.PlayerRadius);
                     break;
+                // Beside the nth nearest camp trapdoor (B1c), south of it (it stands, solid), within its button's reach.
+                case "trapdoor":
+                {
+                    int nthDoor = words.Length > 2 ? Int(words[2]) : 0;
+                    var trapdoor = world.Gates.Where(g => g.Cellar).OrderBy(g => Vec2.Distance(g.Center, player.Position)).Skip(nthDoor).FirstOrDefault()
+                        ?? throw new InvalidOperationException($"no camp trapdoor {nthDoor}: a world of version 3 has them");
+                    to = Nearest(map, trapdoor.X, trapdoor.Y - 1, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius)
+                        && Vec2.Distance(TileMap.Center(x, y), trapdoor.Center) <= World.GateReach - 0.5f) ?? trapdoor.Center;
+                    break;
+                }
+                // At the edge of the nth nearest lair (B1c), on the side nearest the player, outside the mid-boss's reach.
+                case "lair":
+                {
+                    int nthLair = words.Length > 2 ? Int(words[2]) : 0;
+                    var lair = world.Rooms?.Lairs.Select(i => world.Rooms.Nodes[i]).OrderBy(r => Vec2.Distance(r.Center, player.Position)).Skip(nthLair).FirstOrDefault()
+                        ?? throw new InvalidOperationException($"no lair {nthLair}: a world of version 3 has them");
+                    var away = player.Position - lair.Center;
+                    var rim = lair.Center + (away.LengthSquared > 1e-4f ? away.Normalized : new Vec2(0, -1)) * (lair.Radius + 2);
+                    to = Game.Core.Collision.Resolve(map, rim, World.PlayerRadius);
+                    break;
+                }
                 // In the dungeon the player is in, by a door out (its nth: 0 the entrance's, 1 the end's) or at its far end.
                 case "exit":
                     var inside = world.DungeonAt(player.Position) ?? throw new InvalidOperationException("not in a dungeon");
@@ -1017,7 +1087,7 @@ namespace Game.Client
                 for (int x = 0; x < map.Width && same; x++)
                     same = map[x, y] == client.Map[x, y];
             var gate = world.GateNear(player.Position);
-            var nearest = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault();
+            var nearest = world.Gates.Where(g => !g.Cellar).OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault();
             return new Json('{').Field("gates", world.Gates.Count).Field("slots", DungeonPocket.SlotsOf(map)).Field("rows", map.Rows).Field("height", map.Height)
                 .Field("dungeons", dungeons.Raw(']'))
                 .Field("inPocket", world.InPocket(player.Position)).Field("area", world.AreaOf(player.Position)).Field("slot", here?.Slot ?? -1)
@@ -1265,6 +1335,54 @@ namespace Game.Client
         // how the screen draws it.
         // The first two biomes' monsters and rules about the player (B1b): each monster near, whether a cloud fills it and
         // whether it stands in light; the clouds; the light round the player; the timber ambushes; the screen's haze.
+        static DungeonGate NearestCellar(World world, Player player) =>
+            world.Gates.Where(g => g.Cellar).OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault();
+
+        // B1c: the nearest camp trapdoor, the lairs, the gates' dungeons and their light, the props smashed near the player.
+        static string B1cJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var client = root.LocalClient;
+            var cellar = NearestCellar(world, player);
+            var camp = cellar == null ? null : world.Rooms.Nodes[cellar.Room];
+            var lairs = new Json('[');
+            foreach (int index in world.Rooms?.Lairs ?? (IReadOnlyList<int>)Array.Empty<int>())
+            {
+                var room = world.Rooms.Nodes[index];
+                var boss = world.LairBoss(room.Biome);
+                var standing = world.Enemies.FirstOrDefault(e => !e.IsDead && boss != null && e.Definition == boss && Vec2.Distance(e.Position, room.Center) <= room.Radius + 4);
+                lairs.Item(new RawJson(new Json('{').Field("room", index).Field("biome", room.Biome.ToString()).Field("x", room.X).Field("y", room.Y).Field("radius", room.Radius)
+                    .Field("boss", boss?.Id ?? "").Field("distance", Vec2.Distance(room.Center, player.Position)).Field("awake", standing != null)
+                    .Field("name", standing == null ? "" : World.EliteName(standing.Definition, standing.Elite, standing.Affixes))
+                    .Field("health", standing?.Health ?? 0).Field("maxHealth", standing?.MaxHealth ?? 0).Close('}')));
+            }
+            var gates = new Json('[');
+            foreach (var gate in world.Gates)
+            {
+                var row = world.DungeonFor(gate);
+                gates.Item(new RawJson(new Json('{').Field("index", gate.Index).Field("cellar", gate.Cellar).Field("biome", gate.Biome.ToString())
+                    .Field("dungeon", row?.Id ?? "").Field("master", row?.Boss ?? "").Field("light", row?.Light ?? "")
+                    .Field("distance", Vec2.Distance(gate.Center, player.Position)).Close('}')));
+            }
+            var smashable = 0;
+            for (int dy = -6; dy <= 6; dy++)
+                for (int dx = -6; dx <= 10; dx++)
+                    if (World.Smashed(world.Map[TileMap.Cell(player.Position.X) + dx, TileMap.Cell(player.Position.Y) + dy])) smashable++;
+            return new Json('{')
+                .Field("cellar", cellar?.Index ?? -1).Field("cellars", world.Gates.Count(g => g.Cellar))
+                .Field("cellarTile", cellar == null ? "" : world.Map[cellar.X, cellar.Y].ToString())
+                .Field("clientCellarTile", cellar == null || client?.Map == null ? "" : client.Map[cellar.X, cellar.Y].ToString())
+                .Field("cellarOpen", cellar != null && World.GateOpen(world.Map, cellar))
+                .Field("cellarName", cellar == null ? "" : client.DungeonNameOf(cellar))
+                .Field("campElites", camp == null ? 0 : world.Enemies.Count(e => !e.IsDead && e.Elite != EliteRank.None && Vec2.Distance(e.Position, camp.Center) <= camp.Radius + 4))
+                .Field("cellarDistance", cellar == null ? -1 : Vec2.Distance(cellar.Center, player.Position))
+                .Field("gateNear", world.GateNear(player.Position)?.Index ?? -1).Field("clientGateNear", client.GateNear()?.Index ?? -1)
+                .Field("lairs", lairs.Raw(']')).Field("gates", gates.Raw(']'))
+                .Field("smashable", smashable)
+                .Close('}');
+        }
+
         static string BiomeMonstersJson(GameRoot root)
         {
             var world = root.HostWorld;
@@ -1419,6 +1537,45 @@ namespace Game.Client
                     Lay((px - 5, py - 3, TileType.MushroomTree));
                     break;
                 }
+                // The places' things in the look of the biome the player stands in, and that biome's landmarks (묶음 B1c):
+                // open floor; a cottage and a cabin north-west, the well, lamp post, signpost, bench, flowerbed and crates
+                // north-east; south of the player the dirt cave's miner's hut with its yard and a drift's frame under
+                // three tiles of rock, or in the mushroom forest (and anywhere else) a wide fairy ring and a small one.
+                case "places":
+                {
+                    _placesAnchor = (px, py);
+                    for (int dx = -10; dx <= 10; dx++)
+                        for (int dy = -9; dy <= 7; dy++)
+                            if (dx != 0 || dy != 0) Lay((px + dx, py + dy, TileType.Floor));
+                    void Set((int X, int Y, TileType Type)[] things, int left, int bottom)
+                    {
+                        foreach (var (dx, dy, type) in things)
+                        {
+                            var (w, h) = Structures.Footprint(type);
+                            for (int j = 0; j < h; j++)
+                                for (int i = 0; i < w; i++)
+                                    Lay((left + dx + i, bottom + dy + j, i == 0 && j == 0 ? type : TileType.StructurePart));
+                        }
+                    }
+                    Set(new[]
+                    {
+                        (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (5, 3, TileType.Signpost),
+                        (7, 3, TileType.Bench), (1, 5, TileType.Flowerbed), (3, 5, TileType.Crates),
+                    }, px, py);
+                    if (root.HostGenerated.Biomes[px, py] == Biome.Cave)
+                    {
+                        Set(BiomeLandmarks.MinerHut, px - 9, py - 7);
+                        for (int dx = 3; dx <= 5; dx++) Lay((px + dx, py - 2, TileType.Wall));
+                        Set(BiomeLandmarks.MineFrame, px + 2, py - 7);
+                    }
+                    else
+                    {
+                        Set(BiomeLandmarks.FairyRing, px - 9, py - 8);
+                        Set(BiomeLandmarks.SmallRing, px + 3, py - 7);
+                    }
+                    world.MonstersHold = true;
+                    break;
+                }
                 case "depth":
                     _depthAnchor = (px, py);
                     for (int dx = -8; dx <= 7; dx++)
@@ -1456,7 +1613,7 @@ namespace Game.Client
                     break;
                 // On the nearest dungeon gate with the monsters held (묶음 5a): its button shows over it.
                 case "dungeon":
-                    var gate = world.Gates.OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault()
+                    var gate = world.Gates.Where(g => !g.Cellar).OrderBy(g => Vec2.Distance(g.Center, player.Position)).FirstOrDefault()
                         ?? throw new InvalidOperationException("no gate: not a world of rooms, or no gate room");
                     world.MonstersHold = true;
                     player.Position = Game.Core.Collision.Resolve(world.Map, gate.Center, World.PlayerRadius);
@@ -1485,6 +1642,32 @@ namespace Game.Client
                         if (made != null) made.MaxHealth = made.Health = 5000;
                     }
                     break;
+                // B1c: by the nearest camp trapdoor with the monsters held (its button says what opens it).
+                case "cellar":
+                {
+                    world.MonstersHold = true;
+                    var trapdoor = NearestCellar(world, player) ?? throw new InvalidOperationException("no camp trapdoor: a world of version 3 has them");
+                    var map = world.Map;
+                    var stand = Nearest(map, trapdoor.X, trapdoor.Y - 1, (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius)
+                        && Vec2.Distance(TileMap.Center(x, y), trapdoor.Center) <= World.GateReach - 0.5f) ?? trapdoor.Center;
+                    player.Position = Game.Core.Collision.Resolve(map, stand, World.PlayerRadius);
+                    player.Corrections++;
+                    break;
+                }
+                // B1c: a stalagmite three tiles east of the player and a big beetle three past it, ramming at once (its long
+                // warning first): its charge at the player runs into the stalagmite, smashes it and leaves it dazed.
+                case "smash":
+                {
+                    for (int dy = -2; dy <= 2; dy++)
+                        for (int dx = -1; dx <= 9; dx++) world.Build(px + dx, py + dy, TileType.Floor);
+                    world.Build(px + 3, py, TileType.Stalagmite);
+                    var beetle = world.SpawnFitting(root.MonsterSheet.Find("big_beetle"), TileMap.Center(px + 6, py), 1.5f);
+                    if (beetle == null) break;
+                    beetle.MaxHealth = beetle.Health = 5000;
+                    // Its ram at once, at the player (the monsters may be held).
+                    world.ForceAttack(beetle, "ram");
+                    break;
+                }
                 // The first two biomes' new kinds (B1b), each where a body its size fits, east of the player in a row.
                 case "b1monsters":
                     world.MonstersHold = true;
@@ -1606,6 +1789,43 @@ namespace Game.Client
 
         static (int X, int Y) _depthAnchor;
         static (int X, int Y) _biomesAnchor;
+        static (int X, int Y) _placesAnchor;
+
+        // The state "places" reads (묶음 B1c): the biome at the set, each thing there that is redrawn by biome or is a
+        // landmark's (its look or drawing, how it is drawn, its roof's alpha), the world's landmarks by kind, and the
+        // tile under the player (a fairy ring's cap is walked through).
+        static string PlacesJson(GameRoot root)
+        {
+            var view = root.View;
+            var seen = root.LocalClient;
+            var (ax, ay) = _placesAnchor;
+            var cells = new Json('[');
+            int looks = 0, marks = 0;
+            for (int dy = 9; dy >= -10; dy--)
+            {
+                for (int dx = -11; dx <= 11; dx++)
+                {
+                    int x = ax + dx, y = ay + dy;
+                    if (!seen.Map.InBounds(x, y)) continue;
+                    var type = seen.Map[x, y];
+                    bool look = PropArt.HasBiomeLook(type), mark = BiomeLandmarks.Is(type);
+                    if (!look && !mark) continue;
+                    if (look) looks++;
+                    else marks++;
+                    var (kind, shape, order) = view != null ? view.StandAt(x, y) : ("none", 0, 0);
+                    cells.Item(new RawJson(new Json('{').Field("dx", dx).Field("dy", dy).Field("type", type.ToString()).Field("kind", kind).Field("shape", shape)
+                        .Field("order", order).Field("alpha", view?.FadeOf(x, y) ?? 1).Close('}')));
+                }
+            }
+            var laid = root.HostGenerated?.BiomeLandmarks;
+            int Count(BiomeLandmarkKind kind) => laid?.Count(l => l.Kind == kind) ?? 0;
+            int ux = TileMap.Cell(seen.Position.X), uy = TileMap.Cell(seen.Position.Y);
+            return new Json('{').Field("biome", seen.Biomes[ax, ay].ToString()).Field("generator", root.HostGenerated?.Version ?? 0)
+                .Field("looks", looks).Field("marks", marks).Field("huts", Count(BiomeLandmarkKind.MinerHut)).Field("frames", Count(BiomeLandmarkKind.MineFrame))
+                .Field("rings", Count(BiomeLandmarkKind.FairyRing)).Field("under", seen.Map[ux, uy].ToString()).Field("solidUnder", seen.Map.IsSolid(ux, uy))
+                .Field("skipped", view?.StandsSkipped ?? 0).Field("renderers", view?.StandRenderers ?? 0)
+                .Field("selfOrder", view?.SelfOrder ?? 0).Field("ax", ax).Field("ay", ay).Field("cells", cells.Raw(']')).Close('}');
+        }
 
         // The biome's look round the "scene biomes" set: which biome and generator, its light colour and sound bed, the
         // biome props standing within nine tiles (by kind, and how the view draws each: kind, drawing), the lamps lit and

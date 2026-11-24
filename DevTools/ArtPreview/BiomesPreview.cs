@@ -27,13 +27,13 @@ namespace Game.Client
                 index.Append($"| `{name}` | {what} |\n");
             }
             bool ok = true;
-            var world = WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.PropVersion, tiles.Terrain);
+            var world = WorldGenerator.Generate(1, WorldGenerator.GameSize, WorldGenerator.GameSize, story, WorldArenaSheet(monsters), WorldGenerator.LandmarkVersion, tiles.Terrain);
             foreach (var (biome, id, name) in MadeBiomes)
             {
                 ok &= PropSheet(biome, name, out var sheet);
                 Write(sheet, $"props_{id}.png", 3, $"{BiomeMap.Name(biome)}의 소품: 칸 소품의 그림 셋씩(막는 것·깨는 것·큰 것), 꾸밈 층의 종류마다 그림 셋과 흔들림 두 프레임, 작은 생물 두 프레임, 입자");
                 var room = BestRoom(world, biome);
-                Write(BiomeRoom(world, room, biome, lights, false, 1), $"room_{id}_unlit.png", 2, $"{BiomeMap.Name(biome)}의 방 하나(시드 1, 생성기 3판, 방 {room.Index}): 소품·꾸밈·작은 생물, 어둠 없이");
+                Write(BiomeRoom(world, room, biome, lights, false, 1), $"room_{id}_unlit.png", 2, $"{BiomeMap.Name(biome)}의 방 하나(시드 1, 생성기 4판, 방 {room.Index}): 소품·꾸밈·작은 생물, 어둠 없이");
                 Write(BiomeRoom(world, room, biome, lights, true, 1), $"room_{id}.png", 2, "같은 방에 어둠과 빛(생물군계 빛 색, 등잔·빛 버섯의 빛, 사람이 든 빛)");
             }
             // The dirt cave's village with its timber lamps in place of the forest's trees, and a lamp lit beside one out.
@@ -55,9 +55,156 @@ namespace Game.Client
                 scene.Places(world.Places);
                 Write(scene.Image, "place_hero_hut.png", 3, "용사의 오두막(3판): 텃밭 울타리의 두 줄이 모서리 기둥에서 직각으로 만난다");
             }
+            // 묶음 B1c: the places' buildings and dressing in each biome's look, and the landmarks.
+            Write(PlaceLooks(), "place_props.png", 3, "장소의 건물·꾸밈을 생물군계마다: 줄마다 예전 그림 / 흙 동굴(광산 야영지) / 버섯 숲. 집은 밤(창에 불)과 낮");
+            foreach (var site in world.Places.Where(p => p.Definition.Id == "dawn_village" || p.Definition.Id == "hero_hut"))
+            {
+                foreach (var (biome, id, _) in MadeBiomes)
+                {
+                    foreach (bool lit in new[] { false, true })
+                    {
+                        int half = site.Radius + 3;
+                        var scene = new Scene(world.Map, site.X - half, site.Y - half, half * 2, half * 2, _ => false) { Biome = biome, Night = lit, BiomeAt = (x, y) => biome };
+                        scene.Places(world.Places);
+                        scene.Decor(1, (x, y) => biome);
+                        scene.Player(site.X + 1.5f, site.Y - 1.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+                        scene.Player(site.X - 5f, site.Y + 5.4f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#D8503F"));
+                        if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(biome), (x, y) => WorldLights.BiomeTint(biome));
+                        Write(scene.Image, $"place_{site.Definition.Id}_{id}{(lit ? "_lit" : "")}.png", 2,
+                            $"{site.Definition.Name}이 {BiomeMap.Name(biome)}에 섰을 때{(lit ? ", 밤(어둠과 빛)" : ", 어둠 없이")}. 지붕 뒤에 선 사람은 지붕이 흐려진다");
+                    }
+                }
+            }
+            foreach (bool lit in new[] { false, true })
+                Write(LandmarkSheet(lights, lit), lit ? "landmarks_lit.png" : "landmarks.png", 3, "랜드마크 셋(옛 광부 오두막과 울타리 마당, 갱도 입구 틀과 끊긴 선로, 요정 고리 큰 것·작은 것)" + (lit ? ", 어둠과 빛" : ", 어둠 없이"));
+            foreach (var kind in new[] { BiomeLandmarkKind.MinerHut, BiomeLandmarkKind.MineFrame, BiomeLandmarkKind.FairyRing })
+            {
+                if (!world.BiomeLandmarks.Any(l => l.Kind == kind))
+                {
+                    Console.WriteLine($"biomes: seed 1 has no {kind}.");
+                    continue;
+                }
+                var mark = world.BiomeLandmarks.First(l => l.Kind == kind);
+                var biome = kind == BiomeLandmarkKind.FairyRing ? Biome.Mushroom : Biome.Cave;
+                foreach (bool lit in new[] { false, true })
+                {
+                    var scene = new Scene(world.Map, mark.Left + mark.Width / 2 - 11, mark.Bottom + mark.Height / 2 - 8, 22, 16, _ => false)
+                        { Biome = biome, Night = true, BiomeAt = (x, y) => world.Biomes[x, y] };
+                    scene.Places(world.Places);
+                    scene.Decor(1, (x, y) => world.Biomes[x, y]);
+                    scene.Player(mark.StandX + 0.5f, mark.StandY + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+                    if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y]));
+                    Write(scene.Image, $"landmark_{kind.ToString().ToLowerInvariant()}{(lit ? "_lit" : "")}.png", 3,
+                        $"생성기 4판 시드 1의 실제 {kind}({mark.Left},{mark.Bottom}){(lit ? ", 어둠과 빛" : ", 어둠 없이")}");
+                }
+            }
+            foreach (var type in new[] { TileType.MinerHut, TileType.MineFrame })
+            {
+                var picture = StandArt.Picture(type, StandArt.Kind.Prop, 0, false);
+                int span = Structures.Footprint(type).W * 16;
+                if (picture == null || picture.Width > span + 2)
+                {
+                    Console.Error.WriteLine($"biomes: the landmark {type} has no picture or one wider than its footprint.");
+                    ok = false;
+                }
+            }
+            foreach (var type in PlaceLookTypes)
+            {
+                var old = PropArt.Prop(type);
+                foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook })
+                {
+                    var redrawn = PropArt.PlaceProp(type, look);
+                    if (redrawn != null && redrawn.Width == old.Width && redrawn.Height == old.Height) continue;
+                    Console.Error.WriteLine($"biomes: {type} in look {look} is not the size of the old drawing.");
+                    ok = false;
+                }
+            }
             File.WriteAllText(Path.Combine(folder, "index.md"), index.ToString());
             Console.WriteLine($"Wrote the biomes' looks to {folder}");
             return ok;
+        }
+
+        static readonly TileType[] PlaceLookTypes =
+        {
+            TileType.Cottage, TileType.Cabin, TileType.Well, TileType.LampPost, TileType.Signpost, TileType.Bench, TileType.Flowerbed, TileType.Crates,
+        };
+
+        // Each of the places' things that is redrawn by biome: the old drawing, the dirt cave's and the mushroom forest's
+        // side by side on their floors, the houses by night and by day.
+        static PixelImage PlaceLooks()
+        {
+            var looks = new[] { (0, Biome.Cave, "OLD"), (PropArt.CaveLook, Biome.Cave, "DIRT CAVE"), (PropArt.ForestLook, Biome.Mushroom, "MUSHROOM FOREST") };
+            const int colW = 150, pad = 6;
+            var g = new PixelImage(pad * 2 + colW * 3, 16 + 92 * 2 + 62);
+            g.Fill(0, 0, g.Width, g.Height, DepthBack);
+            for (int c = 0; c < looks.Length; c++)
+            {
+                var (look, biome, name) = looks[c];
+                int x0 = pad + c * colW;
+                g.Small(x0, 4, name, DepthText, DepthBack);
+                void Floor(int y0, int h)
+                {
+                    for (int y = 0; y < h; y += 16)
+                        for (int x = 0; x < colW - 8; x += 16)
+                            g.Draw(TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, (x / 16 + y / 16 * 3) % 4, biome)), x0 + x, y0 + y);
+                }
+                PixelImage Of(TileType type, bool lit) => StandArt.Picture(type, StandArt.Kind.Prop, look, lit);
+                int row = 0;
+                foreach (var house in new[] { TileType.Cottage, TileType.Cabin })
+                {
+                    int y0 = 16 + row++ * 92;
+                    Floor(y0, 80);
+                    g.Draw(Of(house, true), x0 + 2, y0 + 78 - 74);
+                    g.Draw(Of(house, false), x0 + 72, y0 + 78 - 74);
+                }
+                int y1 = 16 + 92 * 2;
+                Floor(y1, 48);
+                int dx = x0 + 2;
+                foreach (var type in PlaceLookTypes.Skip(2))
+                {
+                    var image = Of(type, true);
+                    g.Draw(image, dx, y1 + 46 - image.Height);
+                    dx += image.Width + 6;
+                }
+                // A person for scale.
+                var hero = HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8");
+                g.Draw(hero, dx, y1 + 46 - hero.Height);
+            }
+            return g;
+        }
+
+        // The three landmarks laid as the generator lays them, on a floor of their biome: the dirt cave's two side by
+        // side, then the mushroom forest's rings, someone standing in each.
+        static PixelImage LandmarkSheet(WorldLights lights, bool lit)
+        {
+            PixelImage Half(Biome biome, params ((int X, int Y, TileType Type)[] Things, int Left, int Bottom, int StandX, int StandY)[] sets)
+            {
+                var map = new TileMap(24, 13);
+                for (int y = 1; y < 10; y++)
+                    for (int x = 1; x < 23; x++)
+                        map[x, y] = TileType.Floor;
+                foreach (var (things, left, bottom, _, _) in sets)
+                    foreach (var (dx, dy, type) in things)
+                    {
+                        var (w, h) = Structures.Footprint(type);
+                        for (int j = 0; j < h; j++)
+                            for (int i = 0; i < w; i++)
+                                map[left + dx + i, bottom + dy + j] = i == 0 && j == 0 ? type : TileType.StructurePart;
+                    }
+                var scene = new Scene(map, 0, 0, 24, 13, _ => false) { Biome = biome, Night = true, BiomeAt = (x, y) => biome };
+                scene.Places(null);
+                scene.Decor(5, (x, y) => biome);
+                foreach (var (_, left, bottom, sx, sy) in sets) scene.Player(left + sx + 0.5f, bottom + sy + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+                if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(biome), (x, y) => WorldLights.BiomeTint(biome));
+                return scene.Image;
+            }
+            var cave = Half(Biome.Cave, (BiomeLandmarks.MinerHut, 2, 3, 1, 1), (BiomeLandmarks.MineFrame, 14, 5, 3, 2));
+            var forest = Half(Biome.Mushroom, (BiomeLandmarks.FairyRing, 3, 2, 3, 2), (BiomeLandmarks.SmallRing, 15, 3, 2, 3));
+            var g = new PixelImage(cave.Width, cave.Height + forest.Height + 2);
+            g.Fill(0, 0, g.Width, g.Height, DepthBack);
+            g.Draw(cave, 0, 0);
+            g.Draw(forest, 0, cave.Height + 2);
+            return g;
         }
 
         // The room of the biome with the most props standing round its middle, off the places.

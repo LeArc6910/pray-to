@@ -259,8 +259,8 @@ namespace Game.Client
                 for (int x = 0; x < day.Width; x++)
                 {
                     var c = day[x, y];
-                    if (Same(c, WindowLight)) day[x, y] = glass;
-                    else if (Same(c, WindowCore)) day[x, y] = glint;
+                    if (Same(c, WindowLight) || Same(c, SporeWindow)) day[x, y] = glass;
+                    else if (Same(c, WindowCore) || Same(c, SporeWindowCore)) day[x, y] = glint;
                 }
             }
             return day;
@@ -446,6 +446,8 @@ namespace Game.Client
             || type == TileType.Fence || type == TileType.IronWall
             // The biomes' own props (묶음 B1a, BiomeArt).
             || BiomeProps.Is(type)
+            // And their landmarks (묶음 B1c, PropArt.Places.cs).
+            || BiomeLandmarks.Is(type)
             || RaisedMachines.Contains(type);
 
         // Whether a machine's body stands raised (its parts drawn LiftOf higher).

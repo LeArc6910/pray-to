@@ -73,6 +73,8 @@ namespace Game.Core
         public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
         // The small places along the roads (CarveLandmarks); none without the story sheets.
         public IReadOnlyList<Landmark> Landmarks { get; internal set; } = new List<Landmark>();
+        // The biomes' own landmarks (WorldGenerator.BiomeLandmarks.cs, 묶음 B1c); none before version 4.
+        public IReadOnlyList<BiomeLandmark> BiomeLandmarks { get; internal set; } = new List<BiomeLandmark>();
         // In a world of rooms, the roads, by-ways and arena roads as laid along the rooms (WorldGenerator.Roads.cs);
         // none in the caves of version 1, whose roads are lines.
         public IReadOnlyList<RoadRoute> Roads { get; internal set; } = new List<RoadRoute>();
@@ -304,7 +306,10 @@ namespace Game.Core
                 EnsureCopper(world);
                 // The biomes' props (WorldGenerator.Props.cs, 묶음 B1a), only in a world of version 3 and after everything
                 // that decides what is reached: each stands on open floor with a way round it.
-                if (version >= PropVersion) LayProps(world, seed);
+                if (version >= PropVersion) LayProps(world, seed, version);
+                // The camps' trapdoors and the mid-bosses' lairs (WorldGenerator.Cellars.cs, 묶음 B1c), version 4 on: a world
+                // of version 3 keeps its camps as they were.
+                if (version >= LandmarkVersion) LayCellars(world, seed, terrain ?? TerrainSheet.Default);
                 // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
                 if (DungeonPocket.Fits(width)) world.Map.AddPocket(DungeonPocket.Rows);
             }

@@ -217,7 +217,7 @@ namespace Game.Core
 
         // What each letter of a chunk lays: a tile, and for some a mark kept on the room graph. '?' leaves the tile as
         // the generator made it, '%' is rock or floor by the toss of a coin, '+' a door.
-        public const string Letters = "#.?%+MECFSXGOVLWPtTBRDiqmbcnorlkasuejhw=~^";
+        public const string Letters = "#.?%+MECFSXGOVLWPtTBRDiqmbcnorlkasuejhw=~^gpxzyAHZK";
 
         // The tile a letter lays; null for '?', and for '%' and '+', which the generator decides.
         public static TileType? Tile(char letter) => letter switch
@@ -258,6 +258,17 @@ namespace Game.Core
             'w' => TileType.Well,
             '~' => TileType.Cobweb,
             '^' => TileType.Spire,
+            // The biomes' props (묶음 B1a) for the dungeons' chunks (B1c): the dirt cave's stalagmite, pit prop, tipped
+            // cart, ore sack and dead lamp; the mushroom forest's tall cap, shelf stump, spore sac and glowing caps.
+            'g' => TileType.Stalagmite,
+            'p' => TileType.PitProp,
+            'x' => TileType.TippedCart,
+            'z' => TileType.OreSack,
+            'y' => TileType.UnlitLamp,
+            'A' => TileType.PillarCap,
+            'H' => TileType.ShelfStump,
+            'Z' => TileType.SporeSac,
+            'K' => TileType.GlowCaps,
             _ => null,
         };
 

@@ -62,7 +62,7 @@ namespace Game.Core
         // The floor shut in: what is walked to from the chest within the room's radius and this much more, or one of
         // TrapReaches more, whichever has the fewest doorways.
         public const float TrapReach = 2.5f;
-        static readonly float[] TrapReaches = { TrapReach, 4, 6, 9, 12 };
+        public static readonly float[] TrapReaches = { TrapReach, 4, 6, 9, 12 };
         // The doors fall, and TrapFirstSeconds later the first band comes; the second TrapBetweenSeconds after the first
         // fell, one more than the first, each with PackExtraPerPlayer more for each player past the first.
         public const float TrapFirstSeconds = 1.5f;
@@ -124,6 +124,17 @@ namespace Game.Core
                 if (trap.DoorList.Count < fewest) (best, fewest) = (reach, trap.DoorList.Count);
             }
             ShutIn(trap, best);
+            // The room's ways in (B1c, Docs/BiomeRework.md 4-5 함정 방 창살): the narrowest cut just past the room, when
+            // that shuts it in with fewer grates than the cut by distance (2026-11-22: up to 86).
+            var ways = new HashSet<int>();
+            var wayDoors = new List<(int X, int Y)>();
+            if (CutByNarrows(Map, room, trap.Chest.X, trap.Chest.Y, ways, wayDoors) && wayDoors.Count < trap.DoorList.Count)
+            {
+                trap.Floor.Clear();
+                trap.Floor.UnionWith(ways);
+                trap.DoorList.Clear();
+                foreach (var (x, y) in wayDoors) trap.DoorList.Add((x, y, Map[x, y]));
+            }
             if (trap.Floor.Count == 0) return false;
             foreach (var other in _players)
                 if (!other.IsDead && trap.Floor.Contains(TileIndex(other.Position))) trap.InsideList.Add(other.Id);
@@ -155,18 +166,27 @@ namespace Game.Core
         // that touch it: the doorways the grates fall on.
         void ShutIn(Trap trap, float past)
         {
-            trap.Floor.Clear();
+            var doors = new List<(int X, int Y)>();
+            CutByReach(Map, trap.Room, trap.Chest.X, trap.Chest.Y, past, trap.Floor, doors);
             trap.DoorList.Clear();
-            var room = trap.Room;
+            foreach (var (x, y) in doors) trap.DoorList.Add((x, y, Map[x, y]));
+        }
+
+        // The floor walked to from the chest within the room's radius and past it, and the floor tiles just past it that
+        // touch it (the doorways the grates fall on), in index order (World.ShutIn, and --traps).
+        public static void CutByReach(TileMap map, RoomNode room, int chestX, int chestY, float past, HashSet<int> floor, List<(int X, int Y)> doorTiles)
+        {
+            floor.Clear();
+            doorTiles.Clear();
             float reach = room.Radius + past;
-            bool Open(int x, int y) => Map.InBounds(x, y) && !Map.IsEdge(x, y) && !Map.IsSolid(x, y);
+            bool Open(int x, int y) => map.InBounds(x, y) && !map.IsEdge(x, y) && !map.IsSolid(x, y);
             bool Within(int x, int y) => Vec2.Distance(TileMap.Center(x, y), room.Center) <= reach;
             var queue = new Queue<(int X, int Y)>();
             var doors = new HashSet<int>();
             foreach (var (dx, dy) in Around)
             {
-                int x = trap.Chest.X + dx, y = trap.Chest.Y + dy;
-                if (Open(x, y) && Within(x, y) && trap.Floor.Add(y * Map.Width + x)) queue.Enqueue((x, y));
+                int x = chestX + dx, y = chestY + dy;
+                if (Open(x, y) && Within(x, y) && floor.Add(y * map.Width + x)) queue.Enqueue((x, y));
             }
             while (queue.Count > 0)
             {
@@ -175,20 +195,235 @@ namespace Game.Core
                 {
                     int nx = x + dx, ny = y + dy;
                     if (!Open(nx, ny)) continue;
-                    int index = ny * Map.Width + nx;
+                    int index = ny * map.Width + nx;
                     if (!Within(nx, ny))
                     {
                         doors.Add(index);
                         continue;
                     }
-                    if (trap.Floor.Add(index)) queue.Enqueue((nx, ny));
+                    if (floor.Add(index)) queue.Enqueue((nx, ny));
                 }
             }
-            foreach (int index in doors.OrderBy(i => i))
-                trap.DoorList.Add((index % Map.Width, index / Map.Width, Map[index % Map.Width, index / Map.Width]));
+            foreach (int index in doors.OrderBy(i => i)) doorTiles.Add((index % map.Width, index / map.Width));
         }
 
         static readonly (int X, int Y)[] Around = { (1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (1, -1), (-1, 1), (-1, -1) };
+
+        // The narrowest cut is looked for this far past the room's radius (the floor further out is "out"), and a tile
+        // further past the radius costs a little more, so of two cuts nearly as narrow the nearer is taken.
+        public const float NarrowReach = 16;
+        const int NarrowCost = 32;
+        const int Unbounded = 1 << 28;
+
+        // The trap room shut in at its narrowest (B1c, Docs/BiomeRework.md 4-5 함정 방 창살: "방의 입구만"): the fewest
+        // floor tiles between NarrowReach past the room's radius and its radius whose shutting leaves the floor within its
+        // radius walked to from the chest (eight ways) cut off from the floor further out: a minimum vertex cut (each
+        // tile's in and out, max flow). Where a ragged cave room's rim is cut by distance in long rows of grates, this
+        // finds the mouths of its ways. floor gets the tiles shut in (by index), doors the tiles the grates fall on (by
+        // row, then column). False when there is no floor round the chest.
+        public static bool CutByNarrows(TileMap map, RoomNode room, int chestX, int chestY, HashSet<int> floor, List<(int X, int Y)> doors)
+        {
+            floor.Clear();
+            doors.Clear();
+            if (room == null) return false;
+            bool Open(int x, int y) => map.InBounds(x, y) && !map.IsEdge(x, y) && !map.IsSolid(x, y);
+            float inner = room.Radius, outer = room.Radius + NarrowReach;
+            float Away(int x, int y) => Vec2.Distance(TileMap.Center(x, y), room.Center);
+            // The floor within outer walked to from the chest; those touching floor further out lead out.
+            var index = new Dictionary<int, int>();
+            var tiles = new List<(int X, int Y)>();
+            var queue = new Queue<(int X, int Y)>();
+            void Add(int x, int y)
+            {
+                int key = y * map.Width + x;
+                if (index.ContainsKey(key)) return;
+                index[key] = tiles.Count;
+                tiles.Add((x, y));
+                queue.Enqueue((x, y));
+            }
+            foreach (var (dx, dy) in Around)
+                if (Open(chestX + dx, chestY + dy) && Away(chestX + dx, chestY + dy) <= outer) Add(chestX + dx, chestY + dy);
+            if (tiles.Count == 0) return false;
+            var leads = new List<int>();
+            while (queue.Count > 0)
+            {
+                var (x, y) = queue.Dequeue();
+                bool lead = false;
+                foreach (var (dx, dy) in Around)
+                {
+                    int nx = x + dx, ny = y + dy;
+                    if (!Open(nx, ny)) continue;
+                    if (Away(nx, ny) > outer) lead = true;
+                    else Add(nx, ny);
+                }
+                if (lead) leads.Add(index[y * map.Width + x]);
+            }
+            int n = tiles.Count, source = 2 * n, sink = 2 * n + 1;
+            var flow = new Flow(2 * n + 2);
+            for (int i = 0; i < n; i++)
+            {
+                var (x, y) = tiles[i];
+                float d = Away(x, y);
+                flow.Edge(2 * i, 2 * i + 1, d <= inner ? Unbounded : NarrowCost + (int)(d - inner));
+                if (d <= inner) flow.Edge(source, 2 * i, Unbounded);
+                foreach (var (dx, dy) in Around)
+                    if (index.TryGetValue((y + dy) * map.Width + x + dx, out int j)) flow.Edge(2 * i + 1, 2 * j, Unbounded);
+            }
+            foreach (int i in leads) flow.Edge(2 * i + 1, sink, Unbounded);
+            var cut = new HashSet<int>();
+            if (leads.Count > 0 && flow.Max(source, sink) < Unbounded)
+            {
+                var reached = flow.Reached(source);
+                for (int i = 0; i < n; i++)
+                    if (reached[2 * i] && !reached[2 * i + 1]) cut.Add(i);
+            }
+            else if (leads.Count > 0) return false;
+            // The floor shut in: walked to from the chest without crossing the cut.
+            var seen = new bool[n];
+            var walk = new Queue<int>();
+            foreach (var (dx, dy) in Around)
+                if (index.TryGetValue((chestY + dy) * map.Width + chestX + dx, out int first) && !cut.Contains(first) && !seen[first])
+                {
+                    seen[first] = true;
+                    walk.Enqueue(first);
+                }
+            while (walk.Count > 0)
+            {
+                int i = walk.Dequeue();
+                var (x, y) = tiles[i];
+                floor.Add(y * map.Width + x);
+                foreach (var (dx, dy) in Around)
+                    if (index.TryGetValue((y + dy) * map.Width + x + dx, out int j) && !seen[j] && !cut.Contains(j))
+                    {
+                        seen[j] = true;
+                        walk.Enqueue(j);
+                    }
+            }
+            foreach (int i in cut.OrderBy(i => tiles[i].Y).ThenBy(i => tiles[i].X)) doors.Add(tiles[i]);
+            return floor.Count > 0;
+        }
+
+        // A flow network of integer capacities (Dinic's way): the narrowest cut's max flow, and what the source reaches
+        // in what is left of it.
+        sealed class Flow
+        {
+            readonly List<int>[] _out;
+            readonly List<int> _to = new List<int>();
+            readonly List<int> _left = new List<int>();
+            int[] _level;
+            int[] _next;
+
+            public Flow(int nodes)
+            {
+                _out = new List<int>[nodes];
+                for (int i = 0; i < nodes; i++) _out[i] = new List<int>();
+            }
+
+            public void Edge(int from, int to, int capacity)
+            {
+                _out[from].Add(_to.Count);
+                _to.Add(to);
+                _left.Add(capacity);
+                _out[to].Add(_to.Count);
+                _to.Add(from);
+                _left.Add(0);
+            }
+
+            public long Max(int source, int sink)
+            {
+                long total = 0;
+                while (Levels(source, sink))
+                {
+                    _next = new int[_out.Length];
+                    int pushed;
+                    while ((pushed = Push(source, sink, Unbounded)) > 0)
+                    {
+                        total += pushed;
+                        if (total >= Unbounded) return total;
+                    }
+                }
+                return total;
+            }
+
+            bool Levels(int source, int sink)
+            {
+                _level = Enumerable.Repeat(-1, _out.Length).ToArray();
+                _level[source] = 0;
+                var queue = new Queue<int>();
+                queue.Enqueue(source);
+                while (queue.Count > 0)
+                {
+                    int at = queue.Dequeue();
+                    foreach (int e in _out[at])
+                    {
+                        if (_left[e] <= 0 || _level[_to[e]] >= 0) continue;
+                        _level[_to[e]] = _level[at] + 1;
+                        queue.Enqueue(_to[e]);
+                    }
+                }
+                return _level[sink] >= 0;
+            }
+
+            // One way of the levels from at to the sink, pushing at most limit (iterative, the ways are long).
+            int Push(int source, int sink, int limit)
+            {
+                var path = new List<int>();
+                int at = source;
+                while (true)
+                {
+                    if (at == sink)
+                    {
+                        int amount = limit;
+                        foreach (int e in path) amount = Math.Min(amount, _left[e]);
+                        foreach (int e in path)
+                        {
+                            _left[e] -= amount;
+                            _left[e ^ 1] += amount;
+                        }
+                        return amount;
+                    }
+                    bool moved = false;
+                    for (; _next[at] < _out[at].Count; _next[at]++)
+                    {
+                        int e = _out[at][_next[at]];
+                        if (_left[e] > 0 && _level[_to[e]] == _level[at] + 1)
+                        {
+                            path.Add(e);
+                            at = _to[e];
+                            moved = true;
+                            break;
+                        }
+                    }
+                    if (moved) continue;
+                    // A dead end: never again this round, and back a step.
+                    _level[at] = -1;
+                    if (path.Count == 0) return 0;
+                    int back = path[path.Count - 1];
+                    path.RemoveAt(path.Count - 1);
+                    at = _to[back ^ 1];
+                    _next[at]++;
+                }
+            }
+
+            public bool[] Reached(int source)
+            {
+                var seen = new bool[_out.Length];
+                var queue = new Queue<int>();
+                seen[source] = true;
+                queue.Enqueue(source);
+                while (queue.Count > 0)
+                {
+                    int at = queue.Dequeue();
+                    foreach (int e in _out[at])
+                    {
+                        if (_left[e] <= 0 || seen[_to[e]]) continue;
+                        seen[_to[e]] = true;
+                        queue.Enqueue(_to[e]);
+                    }
+                }
+                return seen;
+            }
+        }
 
         // Each tick: a band comes when its time comes, the next when one fell, the end when the second fell or no one is
         // left inside.

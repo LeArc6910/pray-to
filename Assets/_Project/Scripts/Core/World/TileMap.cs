@@ -240,6 +240,18 @@ namespace Game.Core
         GlowCaps,
         FallenLog,
         GiantCap,
+        // The biomes' landmarks (Docs/BiomeRework.md 묶음 B1c, WorldGenerator.BiomeLandmarks.cs), rare, in worlds from
+        // version 4: an old miner's hut (three tiles by two, its yard fenced) and the timber frame of a boarded-up
+        // drift set against the rock (three tiles wide) in the dirt cave, and the small caps of a fairy ring in the
+        // mushroom forest (walked through, picked like any glowing cap). The hut and the frame are never dug.
+        MinerHut,
+        MineFrame,
+        RingCap,
+        // A camp's trapdoor down to its cellar (2026-11-24, Docs/BiomeRework.md 묶음 B1c 지하실), laid by the generator's
+        // version 4 in some camps: shut until the camp's elites fall (World.OpenCellar), then open for good (a changed
+        // tile). Standing (solid, the step down is by its button), never dug or built on.
+        Trapdoor,
+        OpenTrapdoor,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -261,9 +273,9 @@ namespace Game.Core
         public static (int W, int H) Footprint(TileType type) => type switch
         {
             TileType.Cottage or TileType.Cabin => (4, 3),
-            TileType.Boat or TileType.MineEntrance => (3, 2),
+            TileType.Boat or TileType.MineEntrance or TileType.MinerHut => (3, 2),
             TileType.Tower or TileType.BigFountain or TileType.BigTent or TileType.Lighthouse => (2, 2),
-            TileType.Altar => (3, 1),
+            TileType.Altar or TileType.MineFrame => (3, 1),
             TileType.FallenColumn => (2, 1),
             // The biomes' wide props (묶음 B1a): pictures two tiles tall, standing on their lower row alone.
             TileType.Boulder or TileType.CaveIn or TileType.FallenLog => (2, 1),
@@ -352,7 +364,9 @@ namespace Game.Core
             var type = this[x, y];
             return type != TileType.Floor && !World.IsBelt(type) && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
                 && type != TileType.Door && !IsSoil(type) && !Structures.IsWay(type) && type != TileType.Waypoint
-                && type != TileType.IceFloor && type != TileType.Quicksand;
+                && type != TileType.IceFloor && type != TileType.Quicksand
+                // A fairy ring's small caps are walked through like the floor's cover (묶음 B1c).
+                && type != TileType.RingCap;
         }
 
         // The walls only the generator lays (version 2's rooms): rock to the eye and to light, each dug by its own rule.

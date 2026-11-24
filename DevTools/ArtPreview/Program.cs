@@ -120,7 +120,7 @@ namespace Game.Client
             // --only dungeons: just the instance dungeons as they are laid (dungeons.png, dungeons/, DungeonPreview).
             if (args.Length == 2 && args[0] == "--only" && args[1] == "dungeons")
             {
-                Dungeons(tiles.Terrain, monsters, lights, Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"));
+                Dungeons(tiles.Terrain, monsters, lights, Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out"), story);
                 return 0;
             }
             if (args.Length == 2 && args[0] == "--only")
@@ -188,7 +188,7 @@ namespace Game.Client
             WorldArenas(lights, output, monsters, story);
             // The generated map, one seed for each generator version (map/, MapPreview).
             MapPreview.Write(output, story, WorldArenaSheet(monsters), tiles.Terrain, new ulong[] { 1 }, rooms: world => RoomViews(world, lights, Path.Combine(output, "map")));
-            Dungeons(tiles.Terrain, monsters, lights, output);
+            Dungeons(tiles.Terrain, monsters, lights, output, story);
             string classFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
             var classes = ClassSheet.Parse(File.ReadAllText(Path.Combine(classFolder, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classFolder, ClassSheet.SkillsFile)));
             if (!classes.Success)
@@ -1200,15 +1200,18 @@ namespace Game.Client
 
             // Lights the scene the way WorldView does: every player carries a light, burning tiles light their
             // surroundings, and the ambient function (the arena's glow) adds to it.
-            public void Lit(WorldLights lights, Func<int, int, float> ambient, Func<int, int, Rgba> tint = null)
+            public void Lit(WorldLights lights, Func<int, int, float> ambient, Func<int, int, Rgba> tint = null, Func<int, int, Rgba?> recolor = null)
             {
                 _lit = true;
                 _lights = lights;
                 _ambient = ambient;
                 _tint = tint;
+                _recolor = recolor;
             }
 
             Func<int, int, Rgba> _tint;
+            // The lights burning another colour (a dungeon gate's, B1c: WorldLights.GateColors).
+            Func<int, int, Rgba?> _recolor;
 
             // The light map stretched over the scene with bilinear smoothing between tile centres, as the view's
             // texture is, then laid over it.
@@ -1219,7 +1222,7 @@ namespace Game.Client
                 int left = _left - margin;
                 int bottom = _bottom - margin;
                 var sources = _carriers.Select(WorldLights.Carried).ToList();
-                _lights.AddTiles(sources, _map, left, bottom, size, 0);
+                _lights.AddTiles(sources, _map, left, bottom, size, 0, BiomeAt, _recolor);
                 var lightMap = new LightMap(size);
                 lightMap.Compute(_map, left, bottom, sources, _ambient, _tint);
                 for (int py = 0; py < image.Height; py++)

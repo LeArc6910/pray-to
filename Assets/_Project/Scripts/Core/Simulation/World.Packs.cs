@@ -294,6 +294,8 @@ namespace Game.Core
             var choices = PackChoices(room.Center, room.Biome, BigRoom(room), room);
             if (choices.Count == 0) return;
             pack.Definition = random.PickWeighted(choices, p => p.Weight);
+            // A mid-boss's lair (B1c): the biome's mid-boss and a few of its pack, each day anew.
+            if (pack.Slot == 0 && _rooms != null && _rooms.Lairs.Contains(room.Index) && MusterLair(pack, random)) return;
             // A camp of elites (묶음 2-2): its leader's pack or its champions, each day anew.
             if (room.Role == RoomRole.Elite && pack.Slot == 0 && _rooms != null)
             {
@@ -524,7 +526,10 @@ namespace Game.Core
             foreach (var enemy in _enemies)
             {
                 if (!enemy.IsDead || enemy.PackId == 0 || enemy.PackSlot < 0) continue;
-                if (_packs.TryGetValue(enemy.PackId, out var pack) && enemy.PackSlot < pack.Fallen.Length) pack.Fallen[enemy.PackSlot] = true;
+                if (!_packs.TryGetValue(enemy.PackId, out var pack) || enemy.PackSlot >= pack.Fallen.Length) continue;
+                pack.Fallen[enemy.PackSlot] = true;
+                // A camp's band fell: its trapdoor, if it has one, opens (B1c).
+                if (pack.Room != null && pack.Room.Role == RoomRole.Elite && EliteFell(pack)) OpenCellar(pack.Room);
             }
         }
 

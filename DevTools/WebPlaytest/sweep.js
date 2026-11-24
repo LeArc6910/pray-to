@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4808,7 +4808,7 @@ async function dungeon(browser) {
     await game.send('goto droom B; heal');
     await game.wait(1800);
     const boss = await game.ask('dungeon');
-    check(boss.run && boss.run.room === 'B' && boss.run.master.length > 0 && boss.run.masterMax > 0 && /대장/.test(boss.run.master),
+    check(boss.run && boss.run.room === 'B' && boss.run.master.length > 0 && boss.run.masterMax > 0 && (/대장/.test(boss.run.master) || /어미/.test(boss.run.master)),
       `${name}: 보스 방에 던전의 주인 (${boss.run ? `${boss.run.master}, 생명력 ${Math.round(boss.run.masterMax)}` : '-'})`);
     await game.shot('dungeon-boss', '보스 방(아레나 무늬, 주인의 이름표와 막대)');
     await game.send('dungeon kill');
@@ -6322,7 +6322,202 @@ async function biomes(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes };
+// The places in each biome's look and the biomes' landmarks (2026-11-24, Docs/BiomeRework.md 묶음 B1c, Docs/Playtest.md
+// places), on a PC and a phone held upright: in a room of the dirt cave and one of the mushroom forest, "scene places"
+// lays a cottage, a cabin, a well, a lamp post, a signpost, a bench, a flowerbed and crates, and the biome's landmarks
+// (the miner's hut with its fenced yard and a drift's frame under rock; a wide fairy ring and a small one). Read from
+// the view: each redrawn thing is drawn in that biome's look as a standing thing, the landmarks stand, the cottage's
+// roof fades with the player behind it, a ring's cap is walked through, and the player is taken to the nearest hut,
+// frame and ring the generator itself laid. Whether the camp and the cap houses look their biomes' is the pictures'.
+const PlaceSets = {
+  cave: { name: '흙 동굴', id: 'Cave', room: 'cave', look: 1, marks: ['MinerHut', 'MineFrame'], real: [['hut', 'huts', '옛 광부 오두막'], ['frame', 'frames', '갱도 입구 틀']] },
+  mushroom: { name: '버섯 숲', id: 'Mushroom', room: 'mushroom', look: 2, marks: ['RingCap'], real: [['ring', 'rings', '요정 고리']] },
+};
+const PlaceLooks = ['Cottage', 'Cabin', 'Well', 'LampPost', 'Signpost', 'Bench', 'Flowerbed', 'Crates'];
+
+async function places(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 장소의 생물군계 모습과 랜드마크 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('probe on; monsters hold; heal');
+    for (const key of ['cave', 'mushroom']) {
+      const set = PlaceSets[key];
+      const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
+      await game.wait(2000);
+      await game.send('scene places');
+      await game.wait(2500);
+      let p = await game.ask('places');
+      check(p.biome === set.id, `${name}: ${set.name}의 방에 섰다 (${p.biome}, ${went})`);
+      check(p.generator >= 4, `${name}: 새 월드는 생성기 4판이다(랜드마크는 4판부터, ${p.generator})`);
+      const cells = p.cells || [];
+      const looks = cells.filter(c => PlaceLooks.includes(c.type));
+      const missing = PlaceLooks.filter(t => !looks.some(c => c.type === t));
+      check(missing.length === 0, `${name}: 장소의 건물·꾸밈 여덟이 서 있다 (없는 것: ${missing.join(', ') || '없음'})`);
+      const wrong = looks.filter(c => c.shape !== set.look || c.kind !== 'Prop');
+      check(looks.length >= PlaceLooks.length && wrong.length === 0,
+        `${name}: 모두 ${set.name}의 그림으로, 서 있는 물체로 그려진다 (${looks.length}개, 아닌 것: ${wrong.map(c => `${c.type}:${c.shape}/${c.kind}`).join(', ') || '없음'})`);
+      const marks = cells.filter(c => set.marks.includes(c.type));
+      const absent = set.marks.filter(t => !marks.some(c => c.type === t));
+      check(absent.length === 0 && marks.every(c => c.kind === 'Prop'), `${name}: ${set.name}의 랜드마크가 서 있다 (${marks.length}칸, 없는 것: ${absent.join(', ') || '없음'})`);
+      check(p.skipped === 0 && p.renderers <= (game.touch ? 250 : 400), `${name}: 서 있는 것을 상한 안에서 다 그린다 (조각 ${p.renderers}, 뺀 것 ${p.skipped})`);
+      await game.shot(`places-${key}`, `${set.name}: 장소의 건물·꾸밈과 랜드마크`);
+
+      // Behind the cottage its roof fades.
+      await game.send('places at behind');
+      await game.wait(900);
+      p = await game.ask('places');
+      const cottage = (p.cells || []).find(c => c.type === 'Cottage');
+      check(cottage && cottage.alpha < 0.9, `${name}: 집 뒤에 서면 지붕이 흐려진다 (${cottage ? cottage.alpha : '집 없음'})`);
+      await game.shot(`places-${key}-behind`, `${set.name}: 집 뒤에 섰다`);
+
+      if (key === 'mushroom') {
+        // A ring's cap is walked through: the player stands on its tile.
+        const at = (await game.send('places at cap')).join(' ');
+        await game.wait(600);
+        p = await game.ask('places');
+        check(/ok places at cap/.test(at) && p.under === 'RingCap' && p.solidUnder === false, `${name}: 요정 고리의 버섯은 지나간다 (${p.under}, 막힘 ${p.solidUnder}; ${at})`);
+        await game.shot('places-mushroom-cap', '요정 고리의 갓 위에 섰다');
+      }
+
+      // The ones the generator laid (worlds of version 4 on), when this world has any (they are rare).
+      for (const [word, count, label] of set.real) {
+        if (!(p[count] > 0)) {
+          note(`- ${name}: 이 월드에는 ${label}이(가) 없다 (${p[count]})`);
+          continue;
+        }
+        const at = (await game.send(`places at ${word}; clear`)).join(' ');
+        await game.wait(2500);
+        check(/ok places at/.test(at), `${name}: 생성기가 놓은 ${label}에 갔다 (월드에 ${p[count]}곳; ${at})`);
+        await game.shot(`places-${key}-${word}`, `생성기가 놓은 ${label}`);
+      }
+    }
+    await game.send('clear');
+    await game.context.close();
+  }
+}
+
+// The rest of B1 (2026-11-24, Docs/BiomeRework.md 묶음 B1c, Docs/Playtest.md b1c), on a PC and a phone held upright: a
+// camp's trapdoor shut (its button says what opens it and cannot be pressed), the camp's band felled and the trapdoor open,
+// its own button pressed for real and down into the cellar of its biome; the abandoned mine by the dirt cave's gate (its
+// torches in the mine's amber), a pack room with its big body and the slime mother in person in the boss room; a lair's
+// mid-boss under its own name; a big beetle's charge smashing a stalagmite. How the cellar, the mine and the lair feel to
+// play, and whether the gate's light reads, are the person's.
+async function b1c(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 지하실·갱도·굴·부수기 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; xp 3000');
+    const start = await game.ask('b1c');
+    const mineGate = (start.gates || []).find(g => !g.cellar && g.dungeon === 'abandoned_mine');
+    const denGate = (start.gates || []).find(g => !g.cellar && g.dungeon === 'spore_depths');
+    check(!!mineGate && mineGate.master === 'slime_mother' && mineGate.light === '#FFB060' && !!denGate && denGate.master === 'mycelium_mother' && denGate.light === '#A8F06A',
+      `${name}: 흙 동굴 문은 버려진 갱도(어미 슬라임), 버섯 숲 문은 포자 굴(균사 어미), 문 방의 불 색 (${mineGate ? mineGate.light : '-'}, ${denGate ? denGate.light : '-'})`);
+    check(start.cellars >= 1, `${name}: 새 월드의 정예 야영지에 뚜껑 문이 있다 (${start.cellars})`);
+    check((start.lairs || []).length >= 1, `${name}: 중간 보스의 굴이 있다 (${(start.lairs || []).map(l => `${l.biome} ${l.boss}`).join(', ')})`);
+
+    // A camp's trapdoor, shut: its button says what opens it.
+    await game.send('clear; scene cellar');
+    await game.wait(1500);
+    const shut = await game.ask('b1c');
+    const locked = (await game.buttons()).find(b => /잠긴 뚜껑 문/.test(b.label));
+    check(shut.cellarTile === 'Trapdoor' && shut.clientCellarTile === 'Trapdoor' && shut.clientGateNear === shut.cellar && !!locked,
+      `${name}: 닫힌 뚜껑 문 곁, 단추는 [${locked ? locked.label : '없음'}] (호스트 ${shut.cellarTile}, 화면 ${shut.clientCellarTile})`);
+    await game.shot('b1c-trapdoor', '정예 야영지의 닫힌 뚜껑 문과 잠긴 단추');
+    // Its band falls: the trapdoor opens on the host and the screen.
+    await game.send('monsters go');
+    await game.wait(600);
+    const fell = (await game.send('b1c fell')).join(' ');
+    const open = await game.until(b => b.cellarTile === 'OpenTrapdoor' && b.clientCellarTile === 'OpenTrapdoor', 4000, () => game.ask('b1c'));
+    check(!!open && open.cellarOpen, `${name}: 야영지의 대장이 쓰러지면 뚜껑 문이 열린다 (${fell}; ${open ? open.clientCellarTile : '그대로'})`);
+    await game.send('monsters hold; clear; heal');
+    await game.wait(400);
+    await game.shot('b1c-trapdoor-open', '열린 뚜껑 문과 [지하실 들어가기]');
+    const down = (await game.buttons()).find(b => /지하실 들어가기/.test(b.label));
+    check(!!down && await game.press(down.label), `${name}: [${down ? down.label : '지하실 단추 없음'}]를 누른다`);
+    const cellar = await game.until(d => d.inPocket && d.clientInPocket && d.run, 6000, () => game.ask('dungeon'));
+    check(!!cellar && cellar.run.id === 'cellar' && /지하실/.test(cellar.cardName),
+      `${name}: 지하실에 내려왔다 (${cellar ? `${cellar.cardName}, ${cellar.run.letters}` : '들어가지 못함'})`);
+    await game.wait(400);
+    await game.shot('b1c-cellar', '지하실의 입구 방');
+    await game.press('던전 나가기');
+    await game.until(d => !d.inPocket && !d.clientInPocket, 6000, () => game.ask('dungeon'));
+
+    // The abandoned mine: its gate's light, a pack room with a big body, the slime mother herself in the boss room.
+    const toMine = (await game.send('clear; goto gate abandoned_mine')).join(' ');
+    await game.wait(1500);
+    check(/ok goto gate/.test(toMine), `${name}: 버려진 갱도의 문으로 (${toMine})`);
+    await game.shot('b1c-mine-gate', '버려진 갱도의 문 방(호박색 불)');
+    await game.press(/버려진 갱도 들어가기/);
+    const mine = await game.until(d => d.inPocket && d.clientInPocket && d.run, 6000, () => game.ask('dungeon'));
+    check(!!mine && mine.run.id === 'abandoned_mine' && /K/.test(mine.run.letters) && /M/.test(mine.run.letters),
+      `${name}: 버려진 갱도에 들어왔다 (${mine ? `${mine.cardName}, ${mine.run.letters}` : '들어가지 못함'})`);
+    await game.send('goto droom C');
+    await game.wait(1500);
+    const pack = await game.ask('dungeon');
+    const kinds = await game.ask('b1');
+    const big = (kinds.monsters || []).filter(m => m.size === 'l' && m.distance < 16);
+    check(pack.run && pack.run.room === 'C' && pack.run.enemiesHere >= 5 && big.length >= 1,
+      `${name}: 갱도의 무리 방에 무리와 큰 몸 하나 (${pack.run ? pack.run.enemiesHere : '-'}, 큰 몸 ${big.map(m => m.kind).join(', ') || '없음'})`);
+    await game.shot('b1c-mine-pack', '갱도의 무리 방(갱목, 석순, 광차, 큰 몸)');
+    await game.send('goto droom B; heal');
+    await game.wait(1800);
+    const master = await game.ask('dungeon');
+    check(master.run && master.run.room === 'B' && /어미 슬라임/.test(master.run.master) && !/대장/.test(master.run.master),
+      `${name}: 갱도의 주인은 어미 슬라임 그 자신 (${master.run ? `${master.run.master}, 생명력 ${Math.round(master.run.masterMax)}` : '-'})`);
+    await game.shot('b1c-mine-master', '갱도의 주인 어미 슬라임과 막대');
+    await game.press('던전 나가기');
+    await game.until(d => !d.inPocket && !d.clientInPocket, 6000, () => game.ask('dungeon'));
+
+    // A lair: the mid-boss under its own name in a wide room.
+    await game.send('clear; heal; goto lair 0');
+    await game.wait(2500);
+    const lair = await game.ask('b1c');
+    const awake = (lair.lairs || []).sort((a, b) => a.distance - b.distance)[0];
+    check(!!awake && awake.awake && awake.name.length > 0 && !/대장/.test(awake.name),
+      `${name}: 굴에 중간 보스가 제 이름으로 서 있다 (${awake ? `${awake.biome} ${awake.name || awake.boss}, ${Math.round(awake.distance)}칸` : '없음'})`);
+    await game.shot('b1c-lair', '중간 보스의 굴');
+
+    // A big beetle's charge smashes a stalagmite.
+    await game.send('clear; heal; goto room pack cave 0');
+    await game.wait(1200);
+    const before = await game.ask('b1c');
+    await game.send('clear; scene smash');
+    await game.wait(300);
+    const built = await game.ask('b1c');
+    let after = built;
+    for (let n = 0; n < 16 && after.smashable >= built.smashable; n++) {
+      await game.wait(250);
+      after = await game.ask('b1c');
+    }
+    check(built.smashable > before.smashable - 1 && after.smashable < built.smashable,
+      `${name}: 큰 딱정벌레의 돌진이 석순을 부순다 (부술 수 있는 소품 ${built.smashable} → ${after.smashable})`);
+    await game.shot('b1c-smash', '돌진으로 부서진 석순과 비틀거리는 큰 딱정벌레');
+    await game.send('monsters hold; clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

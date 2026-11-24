@@ -162,7 +162,7 @@ namespace Game.Core
             type == TileType.Wall || type == TileType.CopperOre || type == TileType.IronOre || type == TileType.MithrilOre
             || type == TileType.ObsidianOre || type == TileType.VoidOre || TileMap.IsRoomWall(type)
             // The biomes' own props (and the right half of a wide one): cover grows up to their feet.
-            || BiomeProps.Is(type) || type == TileType.MushroomTree || type == TileType.StructurePart;
+            || BiomeProps.Is(type) || BiomeLandmarks.Is(type) || type == TileType.MushroomTree || type == TileType.StructurePart;
 
         static bool Passes(ulong seed, int x, int y, int rate)
         {

@@ -1147,7 +1147,12 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Props.cs`, `Core/World/TileLight.cs`, `Client/Art/BiomeArt.cs`, `Client/Art/CritterArt.cs`, `Client/WorldView.Ambience.cs`, `Tests/EditMode/BiomePropTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheDirtCaveStandsItsPropsAndALampIsLit`(사진 `biomes-cave`, `biomes-cave-lamp`). 통신 0.102.0(B1b와 합친 값). 새 월드는 생성기 3판, 이미 있는 월드는 그대로
   - (클라우드 웹 점검) `sweep.js --only biomes,b1mobs,monsterfx,depth,story,map`
   - 클라우드 확인 (2026-11-24, `59af220`): [x] 586/590 통과. 실패 넷은 시험 쪽: `map`의 "새 월드는 생성기 2판"(3판이 됐으니 2판 이상으로), `depth` PC의 "서 있는 것 40개 넘게"(39, 둘레가 달라졌을 뿐 울타리·나무·집·가로등 모두 그려짐 → 30), 휴대폰 버섯 숲 방이 흙 동굴 경계에 붙어 귀뚜라미·생쥐가 함께 보임(제 생물군계 칸에서 났는지로 바꿈. 함께 고친 게임 쪽: 등불 나방이 첫 등불의 생물군계만 보고 다른 생물군계의 횃불에도 나던 것). 사진: 흙 동굴(갱목·광차·광석 자루·등잔·큰 바위·무너진 갱목, 호박빛), 버섯 숲(파란 큰 버섯 나무, 연두 포자, 쓰러진 줄기), 휴대폰 거대 갓 뒤 흐려짐, 흙 동굴 마을의 등잔 건 갱목 기둥
+  - 클라우드 확인 (2026-11-24, `fe99e94`): [x] 고친 세 구역 `biomes,depth,map` 다시 240개 모두 통과(작은 생물 PC·휴대폰 모두 "다른 곳 0")
   - (사람) 흙 동굴과 버섯 숲이 서로 다르게 느껴지는지, 소품이 싸움·걷기에 거슬리지 않는지(막는 소품은 화살·마법도 막는다), 꺼진 등잔을 쳐서 켜는 손맛, 환경음 둘, 꾸밈이 스치면 흔들리는 손맛, 작은 생물(귀뚜라미·생쥐·나방·반딧불·달팽이)이 실제 휴대폰에서 적과 헷갈리지 않는지, 버섯 숲의 연두 빛 물이 과하지 않은지, 웹·휴대폰에서 느려지지 않는지
+- [ ] 170단계: 장소의 생물군계 모습, 랜드마크, 던전 둘, 야영지 지하실, 중간 보스의 굴, 생성기 4판(`Docs/BiomeRework.md` B1c 두 절)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.BiomeLandmarks.cs`, `Core/World/WorldGenerator.Cellars.cs`, `Core/Simulation/World.Lairs.cs`, `Client/Art/PropArt.Places.cs`, `Tests/EditMode/BiomeLandmarkTests.cs`, `Tests/EditMode/B1cTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.ThePlacesTakeTheDirtCavesLookAndItsLandmarksStand`(사진 `places-cave`, `places-cave-behind`). 통신 0.103.0. 새 월드는 생성기 4판, 오늘 만든 3판 월드와 그 전 월드는 그대로
+  - (클라우드 웹 점검) `sweep.js --only places,b1c,dungeon,biomes`
+  - (사람) 흙 동굴 마을(광산 야영지)과 버섯 숲 마을(버섯 갓 집)이 낯설지 않고 그 생물군계답게 느껴지는지, 랜드마크(광부 오두막·갱도 입구·요정 고리)를 만나는 맛, 싸우다 고리의 갓을 캐는 것이 거슬리지 않는지, 휴대폰에서 3칸 오두막이 읽히는지, 버려진 갱도·포자 굴 한 판의 길이와 주인(어미 슬라임·균사 어미)과의 싸움 손맛, 야영지 우두머리를 잡고 뚜껑 문으로 내려가는 흐름, 문 방의 색 불이 읽히는지, 굴의 중간 보스가 들판에서 억울하지 않은지, 큰 딱정벌레가 석순을 부수는 손맛
 
 ## 결과 보고
 

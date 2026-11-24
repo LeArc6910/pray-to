@@ -964,6 +964,8 @@ namespace Game.Core
             if (blocked && attack.Shape == MonsterAttackShape.Charge && definition.Has(MonsterTraitKind.Stagger))
             {
                 enemy.RepeatsLeft = 0;
+                // A big body smashes the stalagmite or pit prop it ran into, and is dazed all the same (B1c).
+                SmashAhead(enemy);
                 enemy.State = EnemyState.Stagger;
                 // stagger:seconds for its own (a big beetle's longer daze), else StaggerSeconds.
                 enemy.StateTicks = Ticks(definition.Trait(MonsterTraitKind.Stagger).Number(0, StaggerSeconds));

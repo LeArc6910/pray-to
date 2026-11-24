@@ -120,6 +120,13 @@ namespace Game.Core
         // The minecart lines between the stations (WorldGenerator.Rails.cs, 3c), in the order laid.
         public IReadOnlyList<RailLine> Lines => LineList;
         internal readonly List<RailLine> LineList = new List<RailLine>();
+        // The camps' trapdoors down to their cellars (B1c, WorldGenerator.Cellars.cs, version 3): the room and the tile.
+        public IReadOnlyList<(int Room, int X, int Y)> Cellars => CellarList;
+        internal readonly List<(int Room, int X, int Y)> CellarList = new List<(int, int, int)>();
+        // The rooms whose pack is a mid-boss in its lair (B1c, version 3): a pack room of a biome with a mid-boss of its
+        // own, with seven by seven of open floor (Docs/BiomeRework.md 사람이 정한 것: XL only there).
+        public IReadOnlyList<int> Lairs => LairList;
+        internal readonly List<int> LairList = new List<int>();
         // The rock of the chunks' walls (y * width + x): nothing that joins rooms digs through it.
         internal HashSet<int> Kept = new HashSet<int>();
 
@@ -179,7 +186,7 @@ namespace Game.Core
         public const int CaveVersion = 1;
         public const int RoomVersion = 2;
         // What the game makes a new world with. Tests and sims keep CaveVersion unless they ask.
-        public const int NewWorldVersion = PropVersion;
+        public const int NewWorldVersion = LandmarkVersion;
 
         const ulong RoomStream = 40;
         const ulong ShapeStream = 41;

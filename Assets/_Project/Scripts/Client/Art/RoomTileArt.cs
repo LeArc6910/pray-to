@@ -212,6 +212,83 @@ namespace Game.Client
             image[13, 2] = Rgba.White;
         });
 
+        // A camp's trapdoor down to its cellar (2026-11-24, Docs/BiomeRework.md B1c): planks in a stone frame, bound with
+        // iron, a ring to pull. Shut until the camp's band falls.
+        public static readonly PixelImage Trapdoor = Draw(image =>
+        {
+            var wood = Ramp.Of("#7A5634");
+            var iron = Ramp.Of("#7E8792");
+            var stone = Ramp.Of("#6E6458");
+            var outline = Rgba.Hex("#16100C");
+            Frame(image, stone, outline);
+            // Four planks, lit on the left, the seams dark.
+            for (int y = 3; y < 13; y++)
+            {
+                for (int x = 3; x < 13; x++)
+                {
+                    int seam = (x - 3) % 3;
+                    image[x, y] = x == 3 ? wood.Light : seam == 2 ? wood.Dark : (x + y * 3) % 7 == 0 ? wood.Shade : wood.Main;
+                }
+            }
+            // Two iron bands across with their rivets.
+            foreach (int y in new[] { 5, 10 })
+            {
+                for (int x = 3; x < 13; x++) image[x, y] = x == 3 ? iron.Light : iron.Main;
+                image[4, y] = Rgba.White;
+                image[11, y] = Rgba.White;
+            }
+            // The ring.
+            image[7, 7] = iron.Light;
+            image[8, 7] = iron.Main;
+            image[6, 8] = iron.Light;
+            image[9, 8] = iron.Shade;
+            image[7, 9] = iron.Shade;
+            image[8, 9] = iron.Dark;
+        });
+
+        // The same trapdoor thrown open: its lid stood up against the frame's top, the dark below with a ladder's top.
+        public static readonly PixelImage OpenTrapdoor = Draw(image =>
+        {
+            var wood = Ramp.Of("#7A5634");
+            var stone = Ramp.Of("#6E6458");
+            var outline = Rgba.Hex("#16100C");
+            var dark = Rgba.Hex("#0B0806");
+            Frame(image, stone, outline);
+            for (int y = 3; y < 13; y++)
+                for (int x = 3; x < 13; x++) image[x, y] = y < 6 ? dark : Rgba.Hex("#140E0A");
+            // The ladder's rails and rungs going down into the dark, fainter the deeper.
+            for (int y = 4; y < 13; y++)
+            {
+                var rail = y < 8 ? wood.Main : wood.Dark;
+                image[5, y] = rail;
+                image[10, y] = rail;
+                if (y % 3 == 1)
+                    for (int x = 6; x < 10; x++) image[x, y] = y < 8 ? wood.Light : wood.Shade;
+            }
+            // The lid, stood up behind the hole (its edge seen from the front), over the frame's top.
+            for (int x = 2; x < 14; x++)
+            {
+                image[x, 0] = outline;
+                image[x, 1] = x == 2 ? wood.Light : wood.Main;
+                image[x, 2] = wood.Shade;
+            }
+        });
+
+        // A trapdoor's frame: a ring of stone two pixels wide, outlined, lit top and left.
+        static void Frame(PixelImage image, Ramp stone, Rgba outline)
+        {
+            for (int y = 1; y < 15; y++)
+            {
+                for (int x = 1; x < 15; x++)
+                {
+                    bool rim = x == 1 || y == 1 || x == 14 || y == 14;
+                    bool ring = x <= 2 || y <= 2 || x >= 13 || y >= 13;
+                    if (rim) image[x, y] = outline;
+                    else if (ring) image[x, y] = x == 2 || y == 2 ? stone.Light : stone.Shade;
+                }
+            }
+        }
+
         static PixelImage Draw(System.Action<PixelImage> draw)
         {
             var image = new PixelImage(Size, Size);

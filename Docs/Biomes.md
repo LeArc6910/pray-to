@@ -116,7 +116,7 @@ lake,pond,8,2,any
 
 ## 방 조각 (rooms.csv)
 
-역할이 있는 방에는 글자로 그린 조각을 끼운다(`Assets/_Project/Data/World/rooms.csv`, `Core/World/RoomSheet.cs`). 지금 74개다(들판 58, 던전 16).
+역할이 있는 방에는 글자로 그린 조각을 끼운다(`Assets/_Project/Data/World/rooms.csv`, `Core/World/RoomSheet.cs`). 지금 83개다(들판 58, 던전 25: 어디나 16, 흙 동굴 5, 버섯 숲 4. 2026-11-24 B1c에서 갱도·포자 굴의 아홉을 더했다).
 
 | 열 | 내용 |
 |---|---|
@@ -144,6 +144,11 @@ lake,pond,8,2,any
 | `s` | 석상 | `u` | 부러진 기둥 | `e` | 광석 더미 |
 | `j` | 광차(표시, 수레 방의 볼거리) | `h` | 긴 의자 | `w` | 우물 |
 | `=` | 룬 바닥 | `~` | 거미줄 | `^` | 수정 첨탑 |
+| `g` | 석순(B1a 소품) | `p` | 갱목 버팀목 | `x` | 엎어진 광차 |
+| `z` | 광석 자루 | `y` | 꺼진 등잔 | `A` | 기둥 버섯 |
+| `H` | 선반 버섯 그루터기 | `Z` | 포자 주머니 | `K` | 빛 버섯 무리 |
+
+- 마지막 줄 아홉(2026-11-24, `Docs/BiomeRework.md` B1c)은 생물군계 소품 칸이다. 지금은 던전의 조각(`where = dungeon`)만 쓴다. 들판의 조각에 쓰면 2판 월드의 지도가 바뀌므로 들판에는 쓰지 않는다. 주머니(던전)의 칸은 캐지 못해서 던전 안의 꺼진 등잔은 켜지지 않고 포자 주머니도 깨지지 않는다(꾸밈)
 
 - 조각은 두 가지다. `+`가 있으면 **벽을 두른 건물**: 방 가운데에 놓고 둘레 2칸을 바닥으로 비운 뒤, 방의 통로 쪽을 보는 문만 연다(나머지 `+`는 벽). `+`가 없으면 **꾸밈**: 방의 바닥 위에 그대로 얹는다(가장자리는 `?`로 두어 방 모양에 섞이게 한다)
 - 조각은 방보다 조금 큰 것까지만 들어간다(가장 긴 변 + 둘레 ≤ 방 반지름 × 2 + 5). 가운데에 안 맞으면 반지름의 반만큼 옆으로 옮겨 본다. 길, 장소의 건물, 아레나, 다른 방의 가운데, 다른 조각 위에는 놓지 않는다. 맞는 조각이 없으면 그 방은 그 역할을 받지 않는다
@@ -212,24 +217,31 @@ cart,버려진 수레,cart,,10,forage:5-10|potions:1|coins:5-15,,no,once,glint,6
 
 | 열 | 내용 |
 |---|---|
-| id | 던전 id(저장의 열쇠). `biome`이 빈 줄은 `id@생물군계`가 열쇠다(`deep_hollow@sand`) |
+| id | 던전 id(저장의 열쇠). `biome`이 빈 줄은 `id@생물군계`가 열쇠다(`deep_hollow@sand`, `cellar@cave`) |
 | name | 화면 이름. `biome`이 빈 줄은 "그 생물군계 이름의 name"("모래 동굴의 깊은 굴") |
-| biome | 이 생물군계의 문이 여기로 온다. 비우면 줄이 없는 생물군계 모두(하나만) |
+| biome | 이 생물군계의 문이 여기로 온다. 비우면 줄이 없는 생물군계 모두(`entry`마다 하나만) |
 | level | 던전의 구역 레벨의 아래 끝(`World.ZoneLevelAt`의 수, `packs.csv`의 `zone`과 같은 자). 문 자리의 구역 레벨이 더 높으면 그것. 몬스터의 생명력·힘과 보상 레벨이 이것을 따른다 |
 | graph | `dungeon_graphs.csv`의 id |
 | rooms | 줄(spine)의 방 수 `6-8`. 그래프의 줄보다 많으면 남는 만큼 무리 방(`C`)을 `M`·`R`·`B` 앞에 끼운다. 곁가지까지 18개를 넘지 않는다 |
-| boss | `elite:몬스터 id`면 그 종의 큰 정예가 보스 방의 주인, `elite`면 그 던전 무리의 우두머리 종. 던전만의 보스(`bosses.csv`)는 아직 없다 |
+| boss | `elite:몬스터 id`면 그 종의 큰 정예가 보스 방의 주인, `elite`면 그 던전 무리의 우두머리 종. **몬스터 id만 적으면 그 종 그 자신**(B1c: 중간 보스 XL, 접사 하나, 생명력은 그 종의 것 그대로, 이름에 "대장"이 붙지 않는다). 그 생물군계의 굴(들판의 XL 자리)도 이 종을 쓴다 |
 | chest | 끝 상자의 `pois.csv` 줄(상자여야 한다, 시트 시험) |
 | minutes | 대강 몇 분(화면의 이름 띠에 "약 N분") |
+| entry | (B1c, 없어도 된다) `gate`면 들판의 던전 문으로(비워도 같다), `cellar`면 정예 야영지의 뚜껑 문으로 들어가는 지하실 |
+| light | (B1c, 없어도 된다) `#RRGGBB`. 들판의 그 문 방 불(문 7칸 안의 빛)이 이 색으로 탄다. 비우면 보통 불 |
+| experience | (B1c, 없어도 된다) 던전 안 몬스터가 주는 경험치의 몫(퍼센트, 10~200, 비우면 100). 나머지 보상은 끝 상자가 맡는다 |
 
 ```
-id,name,biome,level,graph,rooms,boss,chest,minutes
-slime_cellar,끈적한 지하실,cave,2,cellar,6-8,elite:slime,chest_iron,5
-spore_depths,포자 굴,mushroom,3,branching,9-11,elite:myconid,chest_gold,9
-frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,elite:frost_wisp,chest_gold,10
-ember_forge,잿불 대장간,lava,3,locked,12-14,elite:magma_slime,chest_gold,13
-deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8
+id,name,biome,level,graph,rooms,boss,chest,minutes,entry,light,experience
+abandoned_mine,버려진 갱도,cave,2,mine,10-11,slime_mother,chest_iron,6,gate,#FFB060,75
+spore_depths,포자 굴,mushroom,3,branching,9-11,mycelium_mother,chest_gold,5,gate,#A8F06A,60
+frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,elite:frost_wisp,chest_gold,10,gate,#A8DCFF,
+ember_forge,잿불 대장간,lava,3,locked,12-14,elite:magma_slime,chest_gold,13,gate,#FF7A30,
+deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8,gate,,
+cellar,지하실,,2,cellar,6-7,elite,chest_iron,4,cellar,,
 ```
+
+- 2026-11-24(B1c): 흙 동굴의 던전이 끈적한 지하실에서 **버려진 갱도**(주인 어미 슬라임)로 바뀌었고, 끈적한 지하실은 모든 생물군계가 함께 쓰는 **지하실**(`cellar`, 정예 야영지의 뚜껑 문)이 됐다. 이름은 "흙 동굴의 지하실"처럼 그 생물군계가 붙고, 무리·그림은 그 생물군계의 것이다. 옛 저장본의 `slime_cellar` 기록은 지워지지 않고 남지만 더 쓰이지 않는다
+- 정예 야영지의 뚜껑 문: 생성기 4판(`WorldGenerator.LandmarkVersion`, 새 월드) 월드에서 무리가 사는 야영지(길가·아레나 앞 빼고)의 30%(`WorldGenerator.CellarShare`)에, 우두머리 표시에서 2.5~6칸 떨어진 둘레가 모두 바닥인 칸에 `Trapdoor`(서 있는 칸)를 놓는다(`WorldGenerator.Cellars.cs`, 난수 흐름 58). 던전 문 목록(`DungeonPocket.Gates`)의 맨 뒤에 붙어서 문 번호가 그대로다. 야영지의 우두머리(챔피언이면 셋 다)가 쓰러지면 `OpenTrapdoor`로 바뀌고(바뀐 칸이라 저장·전송된다, 다시 닫히지 않는다) 그 위의 [○○의 지하실 들어가기]로 내려간다. 닫혀 있으면 단추가 "잠긴 뚜껑 문 · 야영지의 대장을 쓰러뜨리면 열린다"를 보이고 눌리지 않는다
 
 `dungeon_graphs.csv`(개념 그래프):
 
@@ -240,15 +252,17 @@ deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8
 | branches | 줄의 무리 방(`C`)에 붙는 곁가지: `T`(보물), `H`(숨은 방) |
 | loop | `shortcut`이면 쉼터(`R`)의 돌과 입구의 돌이 지름길이 된다(`R`이 있어야 한다). 비우면 없다 |
 
+그래프는 넷이다: `cellar`(E C C R B X, 곁가지 T), `branching`(E C C S C M R B X, T T, 지름길), `locked`(E C K C L C M R B X, T H, 지름길), `mine`(B1c: E C C K C L M R B X, T, 지름길).
+
 | 글자 | 방 | 하는 일 |
 |---|---|---|
 | `E` | 입구 | 들어오고 쓰러지면 일어나는 곳, 나가는 문. 몬스터가 들어오지 못한다 |
-| `C` | 무리 방 | 그 던전의 생물군계·레벨의 `packs.csv` 무리 하나(4~8, 사람마다 둘 더) |
+| `C` | 무리 방 | 그 던전의 생물군계·레벨의 `packs.csv` 무리 하나(4~8, 사람마다 둘 더). 큰 몸(L)이 없는 무리면 그 던전 무리들의 L 하나를 더한다(B1c) |
 | `K` | 열쇠 방 | 무리 방. 다 잡으면 열쇠 |
 | `L` | 잠긴 방 | 무리 방. 들어가는 길이 창살로 막혀 있고 열쇠를 얻은 뒤 곁에 서면 열린다 |
 | `M` | 챔피언 방 | 챔피언 셋(접사 하나) |
 | `R` | 쉼터 | 모닥불(곁 4칸에서 초당 10% 회복), 몬스터가 들어오지 못한다, 지름길의 돌 |
-| `B` | 보스 방 | 던전의 주인(큰 정예: 우두머리, 접사 둘, 생명력 12배, 사람마다 60% 더)과 부하 3~5. 바닥에 아레나 무늬 |
+| `B` | 보스 방 | 던전의 주인(큰 정예: 우두머리, 접사 둘, 생명력 12배, 사람마다 60% 더. 중간 보스 그 자신이면 접사 하나, 생명력 그대로, 사람마다 60% 더)과 부하 3~5. 바닥에 아레나 무늬 |
 | `X` | 끝 | 보상 상자와 나가는 문. 주인이 쓰러질 때까지 창살로 막힌다 |
 | `T` | 보물 방 | `pois.csv`의 `treasure` 상자 |
 | `H` | 숨은 방 | 들어가는 길이 금 간 벽(아무 무기로 한 번에 깨진다), `hidden` 상자 |

@@ -46,9 +46,9 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void ANewWorldIsVersionThreeAndVersionTwoHasNoProps()
+        public void VersionThreeHasPropsAndVersionTwoHasNone()
         {
-            Assert.AreEqual(WorldGenerator.PropVersion, WorldGenerator.NewWorldVersion);
+            Assert.GreaterOrEqual(WorldGenerator.NewWorldVersion, WorldGenerator.PropVersion, "a new world has the props (and from version 4 more)");
             Assert.Greater(WorldGenerator.PropVersion, WorldGenerator.RoomVersion);
             var old = Generated(3, WorldGenerator.RoomVersion);
             Assert.AreEqual(WorldGenerator.RoomVersion, old.Version);

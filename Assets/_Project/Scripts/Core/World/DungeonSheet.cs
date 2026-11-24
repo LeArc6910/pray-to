@@ -30,8 +30,12 @@ namespace Game.Core
     public sealed class DungeonDefinition
     {
         internal DungeonDefinition(int index, string id, string name, Biome? biome, int level, DungeonGraph graph, int minRooms, int maxRooms, string boss, string chest,
-            int minutes)
+            int minutes, bool master = false, bool cellar = false, string light = "", int experience = 100)
         {
+            Experience = experience;
+            Master = master;
+            Cellar = cellar;
+            Light = light ?? "";
             Index = index;
             Id = id;
             Name = name;
@@ -60,6 +64,17 @@ namespace Game.Core
         // The kind of monster whose big elite holds the boss room (monsters.csv id), or null for the leader of the
         // biome's own pack.
         public string Boss { get; }
+        // The boss room is held by Boss in person, a mid-boss of its own (an XL of monsters.csv, B1c: the slime mother,
+        // the mycelium mother), not a big elite made of an ordinary kind: no twelvefold health, its own name.
+        public bool Master { get; }
+        // Come into by a camp's trapdoor (dungeons.csv entry = cellar, Docs/BiomeRework.md 4-5 지하실), not by a gate.
+        public bool Cellar { get; }
+        // The colour of its light (#RRGGBB, the biome's light of 4-1): the torches of its gate room burn it. Empty: as
+        // any torch.
+        public string Light { get; }
+        // The share (percent) of their experience its monsters give (dungeons.csv experience, B1c; 100 when blank): a
+        // run gives its end chest, and its experience a minute stays near the field's (Docs/BiomeRework.md 4-5).
+        public int Experience { get; }
         // The end chest's row of pois.csv.
         public string Chest { get; }
         // About how long a run takes, for the screen.
@@ -69,6 +84,9 @@ namespace Game.Core
         public string KeyFor(Biome biome) => Biome == null ? $"{Id}@{biome.ToString().ToLowerInvariant()}" : Id;
 
         public string NameFor(Biome biome) => Biome == null ? $"{BiomeMap.Name(biome)}의 {Name}" : Name;
+
+        // The master's kind with the sheet's monsters: Boss (its big elite or itself), else null (a leader of the biome).
+        public MonsterDefinition MasterKind(MonsterData monsters) => Boss == null ? null : monsters?.Find(Boss);
     }
 
     public sealed class DungeonData
@@ -115,8 +133,17 @@ namespace Game.Core
         }
 
         // The dungeon a gate of the biome leads to: the first of the biome's own, else the first of any biome; null
-        // without either (then the gate leads to 5a's plain dungeon).
-        public DungeonDefinition For(Biome biome) => Dungeons.FirstOrDefault(d => d.Biome == biome) ?? Dungeons.FirstOrDefault(d => d.Biome == null);
+        // without either (then the gate leads to 5a's plain dungeon). A cellar is not come into by a gate.
+        public DungeonDefinition For(Biome biome) =>
+            Dungeons.FirstOrDefault(d => !d.Cellar && d.Biome == biome) ?? Dungeons.FirstOrDefault(d => !d.Cellar && d.Biome == null);
+
+        // The cellar under a camp's trapdoor in the biome (B1c): the biome's own, else the one of any biome (the frame
+        // all biomes share, with their packs and look); null without one.
+        public DungeonDefinition CellarFor(Biome biome) =>
+            Dungeons.FirstOrDefault(d => d.Cellar && d.Biome == biome) ?? Dungeons.FirstOrDefault(d => d.Cellar && d.Biome == null);
+
+        // What a gate leads to: a cellar's row for a trapdoor, else its biome's dungeon.
+        public DungeonDefinition For(DungeonGate gate) => gate == null ? null : gate.Cellar ? CellarFor(gate.Biome) : For(gate.Biome);
     }
 
     // Reads Assets/_Project/Data/World/dungeons.csv and dungeon_graphs.csv (Docs/Biomes.md 던전).
@@ -152,7 +179,12 @@ namespace Game.Core
                     if (dungeons.Any(d => d.Id == id)) throw new FormatException($"'{id}'가 두 번 있습니다.");
                     string name = row["name"].Length > 0 ? row["name"] : id;
                     Biome? biome = row["biome"].Length == 0 ? (Biome?)null : SheetValues.ParseEnum<Biome>(row["biome"], "biome");
-                    if (dungeons.Any(d => d.Biome == biome && biome == null)) throw new FormatException("biome이 빈 줄(어느 생물군계든)은 하나만 둡니다.");
+                    // entry (B1c, optional): gate (a dungeon's gate room) or cellar (a camp's trapdoor).
+                    string entry = row["entry"].ToLowerInvariant();
+                    if (entry != "" && entry != "gate" && entry != "cellar") throw new FormatException("entry는 gate 또는 cellar입니다.");
+                    bool cellar = entry == "cellar";
+                    if (dungeons.Any(d => d.Biome == biome && biome == null && d.Cellar == cellar))
+                        throw new FormatException("biome이 빈 줄(어느 생물군계든)은 entry마다 하나만 둡니다.");
                     int level = row["level"].Length == 0 ? 0 : SheetValues.ParseNumber(row["level"], "level");
                     if (level > 20) throw new FormatException("level은 구역 레벨(0~20)입니다.");
                     var graph = graphs.FirstOrDefault(g => g.Id == row["graph"]) ?? throw new FormatException($"graph '{row["graph"]}'가 {GraphsFile}에 없습니다.");
@@ -161,14 +193,22 @@ namespace Game.Core
                     int max = bounds.Length > 1 ? SheetValues.ParseNumber(bounds[1], "rooms") : min;
                     if (min < graph.Spine.Count || max < min) throw new FormatException($"rooms는 그래프의 줄({graph.Spine.Count}개) 이상, 작은 수부터입니다.");
                     if (max + graph.Branches.Count > MostRooms) throw new FormatException($"방은 곁가지까지 {MostRooms}개를 넘지 않습니다.");
+                    // boss: elite (the leader of the biome's pack), elite:<monster> (that kind's big elite) or <monster> (that
+                    // kind in person, a mid-boss of monsters.csv, B1c).
                     string boss = row["boss"];
-                    if (boss != "elite" && !boss.StartsWith("elite:")) throw new FormatException("boss는 elite 또는 elite:몬스터 id입니다(던전만의 보스는 아직 없다).");
-                    string kind = boss.Length > "elite:".Length ? boss.Substring("elite:".Length) : null;
-                    if (kind != null && !SheetValues.IsValidId(kind)) throw new FormatException($"boss의 몬스터 id '{kind}'가 올바르지 않습니다.");
+                    bool master = boss != "elite" && !boss.StartsWith("elite:");
+                    string kind = master ? boss : boss.Length > "elite:".Length ? boss.Substring("elite:".Length) : null;
+                    if (kind != null && !SheetValues.IsValidId(kind))
+                        throw new FormatException($"boss는 elite, elite:몬스터 id 또는 몬스터 id입니다('{boss}').");
+                    string light = row["light"];
+                    if (light.Length > 0 && !(light.Length == 7 && light[0] == '#' && light.Skip(1).All(Uri.IsHexDigit)))
+                        throw new FormatException($"light는 #RRGGBB입니다('{light}').");
                     string chest = row["chest"];
                     if (!SheetValues.IsValidId(chest)) throw new FormatException("chest는 pois.csv의 상자 id입니다.");
                     int minutes = row["minutes"].Length == 0 ? 0 : SheetValues.ParseNumber(row["minutes"], "minutes");
-                    dungeons.Add(new DungeonDefinition(dungeons.Count, id, name, biome, level, graph, min, max, kind, chest, minutes));
+                    int experience = row["experience"].Length == 0 ? 100 : SheetValues.ParseNumber(row["experience"], "experience");
+                    if (experience < 10 || experience > 200) throw new FormatException("experience는 10~200(퍼센트)입니다.");
+                    dungeons.Add(new DungeonDefinition(dungeons.Count, id, name, biome, level, graph, min, max, kind, chest, minutes, master, cellar, light, experience));
                 }
                 catch (FormatException e)
                 {

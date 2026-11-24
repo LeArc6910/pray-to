@@ -170,6 +170,8 @@ namespace Game.Core
         public const int DungeonShortcutTaken = 14;
         public const int DungeonUsed = 15;
         public const int DungeonCleared = 16;
+        // B1c: a camp's trapdoor opened (its band fell).
+        public const int DungeonCellarOpened = 17;
 
         // A room's pack comes when a living player is this near its box (so it stands there before they see in).
         public const float DungeonWakeReach = 12;
@@ -182,6 +184,14 @@ namespace Game.Core
         public const int BigEliteAffixes = 2;
         public const float BigEliteHealth = 12;
         public const float BigElitePerPlayer = 0.6f;
+        // A mid-boss in person (dungeons.csv boss = a monster id, B1c): its affixes, and its health as its zone made it
+        // times this (an XL is already twelve times an M body; MakeElite leaves an XL leader's health as it is).
+        public const int MasterAffixes = 1;
+        public const float MasterHealth = 1;
+
+        static bool InPerson(DungeonInstance dungeon, MonsterDefinition kind) =>
+            dungeon.Definition != null && dungeon.Definition.Master && kind != null && kind.Id == dungeon.Definition.Boss;
+
         // Nobody standing in the boss room this long: its master is whole again (the design's "보스는 가득 찬다").
         public const float BossResetSeconds = 3;
         // The shortcut's stones and the locked room's grate open to a player this near.
@@ -213,7 +223,11 @@ namespace Game.Core
         public static string GateKey(int gate) => $"gate{gate}";
 
         // The row a gate leads to with these sheets (DungeonData.For its biome), or null.
-        public static DungeonDefinition DungeonFor(DungeonData data, DungeonGate gate) => gate == null ? null : data?.For(gate.Biome);
+        public static DungeonDefinition DungeonFor(DungeonData data, DungeonGate gate) => gate == null ? null : data?.For(gate);
+
+        // Whether a gate may be gone through now: a camp's trapdoor once the camp's elites fell (TileType.OpenTrapdoor),
+        // any other always.
+        public static bool GateOpen(TileMap map, DungeonGate gate) => gate != null && (!gate.Cellar || map != null && map[gate.X, gate.Y] == TileType.OpenTrapdoor);
 
         public static string DungeonNameOf(DungeonData data, DungeonGate gate) => DungeonFor(data, gate)?.NameFor(gate.Biome) ?? DungeonName(gate.Biome);
 
@@ -351,7 +365,7 @@ namespace Game.Core
             var player = FindPlayer(playerId);
             if (player == null || player.IsDead || player.Riding || player.DungeonCharging || gateIndex < 0 || gateIndex >= _gates.Count) return false;
             var gate = _gates[gateIndex];
-            if (InPocket(player.Position) || Vec2.Distance(player.Position, gate.Center) > GateReach || _dungeons.Length == 0) return false;
+            if (InPocket(player.Position) || Vec2.Distance(player.Position, gate.Center) > GateReach || _dungeons.Length == 0 || !GateOpen(Map, gate)) return false;
             if (OpenDungeon(gate) == null)
             {
                 _events.Add(new SimEvent(SimEventType.Dungeon, player.Id, amount: DungeonFull, position: gate.Center));
@@ -651,9 +665,10 @@ namespace Game.Core
             var affixes = RiftAffix.None;
             if (room.Letter == 'B')
             {
-                var lead = (dungeon.Definition?.Boss is string id ? _monsters.Find(id) : null) ?? LeaderKind(definition);
+                var lead = dungeon.Definition?.MasterKind(_monsters) ?? LeaderKind(definition);
                 rank = EliteRank.Leader;
-                affixes = RollAffixes(LeaderAffixes, BigEliteAffixes, random);
+                // A mid-boss in person (B1c) brings its own fight: one affix, not two.
+                affixes = RollAffixes(LeaderAffixes, InPerson(dungeon, lead) ? MasterAffixes : BigEliteAffixes, random);
                 roster.Add(lead);
                 int minions = MinMinions + random.Next(MaxMinions - MinMinions + 1) + extra;
                 if ((affixes & RiftAffix.Swarm) != 0) minions = (int)MathF.Round(minions * SwarmShare);
@@ -676,6 +691,9 @@ namespace Game.Core
                 while (roster.Count < DungeonPackLeast) roster.Add(definition.Members[0].Monster);
                 while (roster.Count > DungeonPackMost) roster.RemoveAt(roster.Count - 1);
                 for (int i = 0; i < extra; i++) roster.Add(definition.Members[0].Monster);
+                // A big body of the biome (L) in every pack room that has none (B1c, Docs/BiomeRework.md 4-5 던전 균형:
+                // a room's fight from six to twenty seconds to half a minute and more).
+                if (!roster.Any(k => k.Big) && DungeonBig(choices, random) is MonsterDefinition big) roster.Insert(0, big);
             }
 
             var pack = new Pack(_nextPackId++, null, 0, room.Center) { Definition = definition, Active = true, Alerted = false, Day = Today, Shares = true, Elite = rank, Affixes = affixes };
@@ -712,12 +730,21 @@ namespace Game.Core
                 Bind(enemy, room.Center, Math.Max(room.Box.W, room.Box.H) / 2f);
                 if (rank == EliteRank.Champion || rank == EliteRank.Leader && i == 0) MakeElite(enemy, rank, affixes);
                 if (room.Letter != 'B' || i != 0) continue;
-                // The master: BigEliteHealth in place of a leader's, and more for each player.
-                enemy.MaxHealth = enemy.Health = enemy.MaxHealth * BigEliteHealth / LeaderHealth * (1 + BigElitePerPlayer * Math.Max(0, players - 1));
+                // The master: BigEliteHealth in place of a leader's (a mid-boss in person its own, MasterHealth), and more
+                // for each player.
+                float share = InPerson(dungeon, enemy.Definition) ? MasterHealth : BigEliteHealth / LeaderHealth;
+                enemy.MaxHealth = enemy.Health = enemy.MaxHealth * share * (1 + BigElitePerPlayer * Math.Max(0, players - 1));
                 dungeon.BossId = enemy.Id;
                 TellDungeon(dungeon, DungeonBossWoke, enemy.Position, enemy.Id);
             }
             DungeonVersion++;
+        }
+
+        // The big bodies (L) of a dungeon's packs, one picked; null without one.
+        static MonsterDefinition DungeonBig(List<PackDefinition> packs, GameRandom random)
+        {
+            var bigs = packs.SelectMany(p => p.Members).Select(m => m.Monster).Where(m => m.Size == MonsterSize.L).Distinct().OrderBy(m => m.Id, StringComparer.Ordinal).ToList();
+            return bigs.Count == 0 ? null : bigs[random.Next(bigs.Count)];
         }
 
         // The packs of packs.csv a dungeon's rooms hold: its biome's own up to its level, else the plain cave's.
@@ -830,6 +857,23 @@ namespace Game.Core
             TellDungeon(dungeon, DungeonDoorOpened, TileMap.Center(x, y));
             return true;
         }
+
+        // ---- The camps' cellars (B1c, Docs/BiomeRework.md 4-5 지하실) ----
+
+        // A camp's band fell (its leader, or all three champions): its trapdoor opens for good, a changed tile.
+        void OpenCellar(RoomNode room)
+        {
+            foreach (var gate in _gates)
+            {
+                if (!gate.Cellar || gate.Room != room.Index || Map[gate.X, gate.Y] != TileType.Trapdoor) continue;
+                SetTile(gate.X, gate.Y, TileType.OpenTrapdoor);
+                _events.Add(new SimEvent(SimEventType.Dungeon, 0, amount: DungeonCellarOpened, position: gate.Center));
+            }
+        }
+
+        // The camp's elites of today all fell: its leader (the first of a leader's roster) or every champion.
+        static bool EliteFell(Pack pack) =>
+            pack.Elite == EliteRank.Leader ? pack.Fallen.Length > 0 && pack.Fallen[0] : pack.Elite == EliteRank.Champion && pack.Fallen.Length > 0 && pack.Fallen.All(f => f);
 
         // Whether the tile is a dungeon's cracked wall still standing (World.DigTarget lets it be struck in the pocket).
         bool IsDungeonCrack(int x, int y) =>

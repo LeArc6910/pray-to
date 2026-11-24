@@ -80,6 +80,9 @@ namespace Game.Core
             if (share < 1) amount = Math.Max(1, (int)MathF.Round(amount * share));
             // An elite gives several times its kind's (World.EliteExperience).
             amount *= EliteExperience(enemy);
+            // A dungeon's monsters give its share (dungeons.csv experience, B1c): the rest of a run's worth is its chest.
+            if (Map.InPocket(enemy.Position) && DungeonAt(enemy.Position)?.Definition is DungeonDefinition dungeon && dungeon.Experience != 100)
+                amount = Math.Max(1, amount * dungeon.Experience / 100);
             if (FullMoonNight) amount = amount * FullMoonExperiencePercent / 100;
             foreach (var player in _players)
             {

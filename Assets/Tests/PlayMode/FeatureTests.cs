@@ -1145,6 +1145,37 @@ namespace Game.Client.Tests
             }
         }
 
+        // The places' looks and the landmarks (묶음 B1c, Docs/BiomeRework.md): in the dirt cave the set of "scene places"
+        // draws the cottage, the well and the rest in the mining camp's look, the miner's hut and the drift's frame stand
+        // as things apart from the floor, and the cottage's roof fades with the player behind it.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ThePlacesTakeTheDirtCavesLookAndItsLandmarksStand()
+        {
+            yield return Start();
+            var (px, py) = Near(0, 0);
+            Playtest.Run(_root, "monsters hold; scene places");
+            yield return new WaitForSecondsRealtime(1.5f);
+            var view = _root.View;
+            Assert.AreEqual(Biome.Cave, _root.LocalClient.Biomes[px, py], "the spawn is in the dirt cave");
+            foreach (var (dx, dy, type) in new[] { (-9, 3, TileType.Cottage), (-4, 3, TileType.Cabin), (1, 3, TileType.Well), (3, 3, TileType.LampPost), (3, 5, TileType.Crates) })
+            {
+                Assert.AreEqual(type, World.Map[px + dx, py + dy]);
+                var stand = view.StandAt(px + dx, py + dy);
+                Assert.AreEqual("Prop", stand.Kind, $"{type} stands apart from the floor");
+                Assert.AreEqual(PropArt.CaveLook, stand.Shape, $"{type} in the dirt cave's look");
+            }
+            Assert.AreEqual(TileType.MinerHut, World.Map[px - 9, py - 5]);
+            Assert.AreEqual("Prop", view.StandAt(px - 9, py - 5).Kind, "the miner's hut stands");
+            Assert.AreEqual("Prop", view.StandAt(px + 3, py - 3).Kind, "the drift's frame stands");
+            Assert.AreEqual("Joined", view.StandAt(px - 3, py - 4).Kind, "the yard's fence joins");
+            yield return Screens.Take("places-cave");
+            Playtest.Run(_root, "places at behind");
+            yield return new WaitForSecondsRealtime(0.6f);
+            if (Settings.FadeBehind) Assert.Less(view.FadeOf(px - 9, py + 3), 0.9f, "the cottage's roof fades with the player behind it");
+            yield return Screens.Take("places-cave-behind");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Open floor within reach of a thing to find, or null.
         Vec2? Beside(Poi poi)
         {

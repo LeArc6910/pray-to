@@ -529,6 +529,12 @@ namespace Game.Client
                             Hear(Sound.Daze, at);
                             if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.08f);
                             break;
+                        // B1c: a big body's charge smashed a stalagmite or a pit prop (the tile change takes the prop away).
+                        case World.MonsterFxSmash:
+                            AddMobFx(MobFx.Deathburst, at, new MobContext { Ramp = FxRamp.Plain, Tint = 0x19E8060u });
+                            Hear(Sound.Shatter, at, 0.9f);
+                            if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.12f);
+                            break;
                         case World.MonsterFxEmpower:
                             AddMobFx(MobFx.Rally, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0), new MobContext { Size = 2.5f * Ppu });
                             Hear(Sound.Buff, at, 0.7f);

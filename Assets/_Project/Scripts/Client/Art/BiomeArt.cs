@@ -47,7 +47,7 @@ namespace Game.Client
         }
 
         // What is near enough symmetric to mirror: plants and stones. Timber, carts and lamps keep their lit side.
-        static bool Mirrors(TileType type) => type == TileType.Stalagmite || type == TileType.Boulder || type == TileType.PillarCap || type == TileType.GlowCaps
+        static bool Mirrors(TileType type) => type == TileType.RingCap || type == TileType.Stalagmite || type == TileType.Boulder || type == TileType.PillarCap || type == TileType.GlowCaps
             || type == TileType.SporeSac || type == TileType.ShelfStump || type == TileType.OreSack || type == TileType.FallenLog;
 
         // How far above the bottom edge of its footprint a prop's foot line is, in pixels: the rows of shadow under it.
@@ -84,6 +84,51 @@ namespace Game.Client
                 _ => null,
             };
             return image != null && (shape & 4) != 0 ? image.FlippedX() : image;
+        }
+
+        // A cap of a fairy ring (묶음 B1c, TileType.RingCap): small, pink, a lime glow under it. Walked through, so it
+        // stands in the middle of its tile (RingFoot above the tile's bottom edge) and whoever is on the tile is in
+        // front of it or behind it by where their feet are. variant: Variant's bits.
+        public const int RingFoot = 8;
+
+        public static PixelImage RingCap(int shape)
+        {
+            int variant = shape & 3;
+            var k = new Kit(12, 13);
+            if (variant == 0)
+            {
+                k.Col(5, 6, 2, 7, Stem);
+                k.Dome(6f, 8, 5f, 6.5f, PinkCap);
+                k.Rect(2, 7, 8, 1, PinkCap.Dark);
+                k.Px(Rgba.Hex("#FFF0F6"), 4, 3, 7, 4, 6, 2);
+                k.Px(Lime, 4, 8, 7, 8);
+            }
+            else if (variant == 1)
+            {
+                // Two, a taller and a small one leaning from its foot.
+                k.Col(3, 5, 2, 8, Stem);
+                k.Dome(4f, 7, 4f, 5.5f, PinkCap);
+                k.Rect(1, 6, 6, 1, PinkCap.Dark);
+                k.Col(9, 9, 1, 4, Stem);
+                k.Dome(9.5f, 11, 2.5f, 3f, PinkCap);
+                k.Px(Rgba.Hex("#FFF0F6"), 3, 3, 5, 4, 9, 9);
+                k.Px(Lime, 3, 7);
+            }
+            else
+            {
+                // A flat old one, its rim turned up.
+                k.Col(5, 7, 2, 6, Stem);
+                k.Dome(6f, 8, 6f, 4.5f, PinkCap);
+                k.Rect(1, 7, 10, 1, PinkCap.Dark);
+                k.Px(PinkCap.Light, 0, 6, 11, 6);
+                k.Px(Rgba.Hex("#FFF0F6"), 3, 5, 6, 4, 8, 5);
+                k.Px(Lime, 4, 8, 8, 8).Px(LimeCore, 6, 8);
+            }
+            var stood = Stand(k, 8);
+            // Lifted to the middle of its tile.
+            var image = new PixelImage(stood.Width, stood.Height + RingFoot - FootRows);
+            image.Draw(stood, 0, 0);
+            return (shape & 4) != 0 ? image.FlippedX() : image;
         }
 
         // The place dressing's tall thing by the biome it stands in (Docs/BiomeRework.md 4-3 장소의 건물 3): in the

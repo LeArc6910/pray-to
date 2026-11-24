@@ -35,6 +35,8 @@ namespace CoreSandbox
             // large ones among them, open floor, and the client's decor on it (Decor.On); and of all tiles, props.
             public Dictionary<Biome, (int Props, int Big, int Floor, int Decor)> Props = new Dictionary<Biome, (int, int, int, int)>();
             public double PropShare;
+            // The biomes' landmarks laid (묶음 B1c).
+            public IReadOnlyList<BiomeLandmark> Landmarks = new List<BiomeLandmark>();
         }
 
         const int BigLump = 100;
@@ -43,7 +45,7 @@ namespace CoreSandbox
         {
             var map = world.Map;
             int width = map.Width, height = map.Height, total = width * height;
-            var numbers = new Numbers { Rooms = world.Rooms, Roads = world.Roads };
+            var numbers = new Numbers { Rooms = world.Rooms, Roads = world.Roads, Landmarks = world.BiomeLandmarks };
             // The minecart lines (3c): the ride against the walk between the same stations (eight ways, no digging).
             if (world.Rooms != null && world.Rooms.Lines.Count > 0)
             {
@@ -413,6 +415,14 @@ namespace CoreSandbox
                         Row($"{BiomeMap.Name(biome)}: 바닥 100칸에 막는·깨는 소품 / 큰 것 / 꾸밈", n => n.Props.TryGetValue(biome, out var p) && p.Floor > 0
                             ? $"{100.0 * p.Props / p.Floor:0.0} / {100.0 * p.Big / p.Floor:0.00} / {100.0 * p.Decor / p.Floor:0.0}" : "-");
                     }
+                }
+                if (version >= WorldGenerator.LandmarkVersion)
+                {
+                    Row("랜드마크: 광부 오두막 / 갱도 입구 틀 / 요정 고리(작은 것)", n => $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.MinerHut)} / "
+                        + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.MineFrame)} / {n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.FairyRing)}"
+                        + $"({n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.FairyRing && l.Width < 7)})");
+                    Row("흙 동굴 / 버섯 숲의 방(아레나 빼고)", n => $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Cave)} / "
+                        + $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Mushroom)}");
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();

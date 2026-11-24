@@ -117,7 +117,7 @@ namespace Game.Core.Tests
             Assert.IsFalse(Read("a,boss,,field,10,yes,?.?/.M./?.?\n").Success, "no such role");
             Assert.IsFalse(Read("a,pack,swamp,field,10,yes,?.?/.M./?.?\n").Success, "no such biome");
             Assert.IsFalse(Read("a,pack,,field,10,yes,?.?/.M/?.?\n").Success, "rows of different lengths");
-            Assert.IsFalse(Read("a,pack,,field,10,yes,?.?/.Z./?.?\n").Success, "a letter it does not know");
+            Assert.IsFalse(Read("a,pack,,field,10,yes,?.?/.Q./?.?\n").Success, "a letter it does not know");
             Assert.IsFalse(Read("a,pack,,field,10,yes,#####/#.+.#/#####\n").Success, "a door inside");
             Assert.IsFalse(Read("a,pack,,field,10,yes,+###/#..#/####\n").Success, "a door on a corner");
             Assert.IsFalse(Read("a,treasure,,field,10,yes,#####/#C#.+/#####\n").Success, "a chest no door leads to");

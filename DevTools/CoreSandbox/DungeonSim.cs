@@ -24,7 +24,7 @@ namespace CoreSandbox
                 Console.WriteLine($"dungeons.csv에 '{id}'가 없습니다.");
                 return;
             }
-            var biome = definition.Biome ?? Biome.Sand;
+            var biome = definition.Biome ?? (definition.Cellar ? Biome.Cave : Biome.Sand);
             Console.WriteLine($"== {definition.Name} ({definition.Id}, {biome}), 사람 {players}, 장비 {string.Join(", ", gear)}, 클래스 {FightSim.ClassNames(classes)}, 레벨 {SkillBot.Level?.ToString() ?? "-"} ==");
             Console.WriteLine("시드  방(글자)            완주   쓰러짐  금화값  분당  경험치  분당  장비(희귀+)  방마다 걸린 초");
             var totals = new List<(float Seconds, int Deaths, int Value, int Experience, bool Done)>();
@@ -49,7 +49,7 @@ namespace CoreSandbox
             // Loot at the first boss's step for anything past copper, as the gear says the player has gone that far.
             var firstBoss = sheets.Bosses?.Bosses.FirstOrDefault(b => b.Place == null);
             if (firstBoss != null && !gear.All(g => g.StartsWith("copper"))) world.Restore(Array.Empty<TileChange>(), Array.Empty<(CropDefinition, int, int, long, long)>(), firstBoss.DropLevel);
-            var gate = world.Gates.FirstOrDefault(g => g.Biome == biome) ?? world.Gates.First();
+            var gate = world.Gates.FirstOrDefault(g => !g.Cellar && g.Biome == biome) ?? world.Gates.First(g => !g.Cellar);
             world.ChooseDungeon(gate.Index, definition.Id);
             var random = new GameRandom(seed, 97);
             var generator = new LootGenerator(sheets.Loot);
@@ -82,6 +82,7 @@ namespace CoreSandbox
             }
             var toGoal = new FlowField(world.Map);
             var toEnemies = new FlowField(world.Map);
+            var toLeft = new FlowField(world.Map);
             int goal = 0, deaths = 0, felledFloor = 0;
             DungeonRoom builtFor = null;
             bool builtOpen = false;
@@ -107,10 +108,22 @@ namespace CoreSandbox
                 {
                     var near = world.Enemies.Where(e => !e.Away && !e.IsDead && world.DungeonAt(e.Position) == dungeon && Vec2.Distance(e.Position, player.Position) < 14
                         && (e.State != EnemyState.Idle && !e.Returning || Vec2.Distance(e.Position, player.Position) < 6)).ToList();
+                    // The last of the goal room's pack standing idle at its edge (a split slime, a rat out of the light),
+                    // once the bot stands in the room: gone after, so the room is cleared.
+                    var left = near.Count > 0 || room == null || !DungeonSheet.HasPack(room.Letter) || !dungeon.RoomWoken(room.Index) || !room.Contains(player.Position, 1)
+                        ? new List<Enemy>()
+                        : world.Enemies.Where(e => !e.Away && !e.IsDead && !e.Buried && world.DungeonAt(e.Position) == dungeon && room.Contains(e.Position, 4)).ToList();
                     if (near.Count > 0 || player.IsDead)
                     {
                         if (tick % 10 == 0) toEnemies.Build(world.Enemies.Where(e => !e.Away && world.DungeonAt(e.Position) == dungeon && Vec2.Distance(e.Position, player.Position) < 24).Select(e => e.Position), 40);
                         FightSim.Drive(world, player, toEnemies, dodge);
+                    }
+                    else if (left.Count > 0)
+                    {
+                        world.SetAttacking(player.Id, false);
+                        if (tick % 10 == 0) toLeft.Build(left.Select(e => e.Position), 60);
+                        var way = toLeft.DirectionFrom(player.Position);
+                        RollBot.Move(world, player, way, way, Vec2.Zero, dodge);
                     }
                     else
                     {
@@ -121,6 +134,8 @@ namespace CoreSandbox
                         if (World.ThingNear(dungeon, player.Position) is DungeonThing thing && thing.Kind == DungeonThingKind.Chest) world.UseDungeonThing(player.Id, thing.Index);
                     }
                     var nearest = near.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
+                    if (Environment.GetEnvironmentVariable("DUNGEON_DUMP") == "1" && tick % (20 * World.TicksPerSecond) == 0)
+                        Console.WriteLine($"        [{tick / World.TicksPerSecond}s] 봇 ({player.Position.X:0.0},{player.Position.Y:0.0}) 곁 {near.Count} 목표 {room?.Letter} 가장 가까운 {nearest?.Definition.Id} {(nearest == null ? 0 : Vec2.Distance(nearest.Position, player.Position)):0.0} 흐름 {toGoal.DirectionFrom(player.Position)} 생명력 {player.Health:0} 아래 {world.Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y) - 1]} 한걸음 {PlayerMotor.Step(world.Map, player.Position, toGoal.DirectionFrom(player.Position), player.MoveSpeed, world.DoorsFor(player))} 속도 {player.MoveSpeed}");
                     skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
                 }
                 world.Step();
@@ -159,6 +174,30 @@ namespace CoreSandbox
             float minutes = Math.Max(1, seconds) / 60f;
             Console.WriteLine($"{seed,4}  {letters,-18} {(done ? $"{(int)seconds / 60}:{(int)seconds % 60:00}" : "못 끝냄"),6}  {deaths,6}  {value,6}  {value / minutes,4:0}  {experience,6}  {experience / minutes,4:0}  {rares,9}    {rooms}"
                 + (done ? "" : $"  (멈춘 곳: {(goal < goals.Count ? goals[goal].Name : "상자")})"));
+            if (!done)
+            {
+                // What was left: the living monsters of the dungeon, and where the bots stood.
+                foreach (var e in world.Enemies.Where(e => !e.IsDead && world.DungeonAt(e.Position) == dungeon))
+                    Console.WriteLine($"        남은 것: {e.Definition.Id} ({e.Position.X:0.0}, {e.Position.Y:0.0}) {e.State}{(e.Away ? " 멀리" : "")} 생명력 {e.Health:0}/{e.MaxHealth:0}");
+                foreach (var (player, _) in bots) Console.WriteLine($"        봇: ({player.Position.X:0.0}, {player.Position.Y:0.0}){(player.IsDead ? " 쓰러짐" : "")}");
+                if (goal < goals.Count) Console.WriteLine($"        방 상자: {goals[goal].Box}");
+                if (Environment.GetEnvironmentVariable("DUNGEON_DUMP") == "1" && bots.Count > 0)
+                {
+                    int bx = TileMap.Cell(bots[0].Player.Position.X), by = TileMap.Cell(bots[0].Player.Position.Y);
+                    for (int y = by + 6; y >= by - 30; y--)
+                    {
+                        var line = new System.Text.StringBuilder("        ");
+                        for (int x = bx - 20; x <= bx + 20; x++)
+                        {
+                            char c = world.Map.IsSolid(x, y) ? '#' : '.';
+                            if (x == bx && y == by) c = '@';
+                            foreach (var e in world.Enemies) if (!e.IsDead && TileMap.Cell(e.Position.X) == x && TileMap.Cell(e.Position.Y) == y) c = 'm';
+                            line.Append(c);
+                        }
+                        Console.WriteLine(line);
+                    }
+                }
+            }
             return (seconds, deaths, value, experience, done);
         }
 

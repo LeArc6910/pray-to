@@ -824,7 +824,7 @@ namespace Game.Client
             if (_client.NpcNear() != null) return Meeting.Merchant;
             if (!_client.Riding && _storyScreen != null && _storyScreen.CanOpenWaypoints) return Meeting.Waypoint;
             if (!_client.Riding && _client.PoiNear() != null) return Meeting.Poi;
-            if (!_client.Riding && _client.DungeonChargeKind == 0 && (_client.DungeonThingNear() != null || _client.GateNear() != null || _client.ExitNear() != null)) return Meeting.Dungeon;
+            if (!_client.Riding && _client.DungeonChargeKind == 0 && (_client.DungeonThingNear() != null || _client.GateNear() is DungeonGate near && World.GateOpen(_client.Map, near) || _client.ExitNear() != null)) return Meeting.Dungeon;
             if (_client.Chest.IsOpen) return Meeting.Chest;
             if (_client.NearAnvil) return Meeting.Anvil;
             var map = _client.Map;
@@ -946,7 +946,7 @@ namespace Game.Client
                 SendToHost(_client.UseDungeonThingCommand(thing));
                 return true;
             }
-            if (_client.GateNear() is DungeonGate gate)
+            if (_client.GateNear() is DungeonGate gate && World.GateOpen(_client.Map, gate))
             {
                 Sounds.Play(Sound.Click);
                 SendToHost(_client.EnterDungeonCommand(gate));
@@ -985,7 +985,10 @@ namespace Game.Client
                 {
                     Vector2 point = Ui.FromScreen(screen);
                     string text;
-                    if (gate != null)
+                    // A camp's trapdoor still shut (B1c): it says what opens it, and cannot be pressed.
+                    bool shut = gate != null && !World.GateOpen(_client.Map, gate);
+                    if (shut) text = "잠긴 뚜껑 문 · 야영지의 대장을 쓰러뜨리면 열린다";
+                    else if (gate != null)
                     {
                         var standing = _client.DungeonOf(gate);
                         int inside = standing == null ? 0 : _client.PlayersIn(standing);
@@ -994,9 +997,9 @@ namespace Game.Client
                     else if (thing != null) text = DungeonThingLabel(thing);
                     else text = "던전 나가기";
                     if (going) text = gate != null ? "들어가는 중…" : "나가는 중…";
-                    else text += MeetHint(Meeting.Dungeon);
+                    else if (!shut) text += MeetHint(Meeting.Dungeon);
                     float width = Mathf.Min(Ui.Width - 16, 40 + 12 * text.Length);
-                    GUI.enabled = !going && !_client.IsDead;
+                    GUI.enabled = !going && !_client.IsDead && !shut;
                     if (Ui.WorldButton(point, text, width)) UseDungeon();
                     GUI.enabled = true;
                 }

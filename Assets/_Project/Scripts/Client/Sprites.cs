@@ -31,6 +31,7 @@ namespace Game.Client
             TileType.LockedDoor, TileType.Road, TileType.Waypoint, TileType.Dock, TileType.Rail, TileType.Water, TileType.RoyalStall, TileType.DemonStall, TileType.OreStall, TileType.WandererStall,
             TileType.ArenaInlay, TileType.RuneFloor, TileType.Cobweb, TileType.Petals, TileType.Fissure, TileType.ArenaCarpet,
             TileType.CrackedWall, TileType.Grate, TileType.ObsidianWall, TileType.VoidWall, TileType.IceFloor, TileType.Quicksand,
+            TileType.Trapdoor, TileType.OpenTrapdoor,
         };
 
         // A patch of ice or quicksand whose edges follow its neighbours (RoomTileArt.Patch), made the first time each

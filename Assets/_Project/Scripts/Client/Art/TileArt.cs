@@ -499,6 +499,9 @@ namespace Game.Client
             TileType.ObsidianWall => RoomTileArt.Obsidian,
             TileType.VoidWall => RoomTileArt.VoidStone,
             TileType.Grate => RoomTileArt.Grate,
+            // A camp's trapdoor, shut and open (B1c).
+            TileType.Trapdoor => RoomTileArt.Trapdoor,
+            TileType.OpenTrapdoor => RoomTileArt.OpenTrapdoor,
             // Alone on the floor; in the world its edges follow its neighbours (RoomTileArt.Patch).
             TileType.IceFloor or TileType.Quicksand => RoomTileArt.Patch(type, 0),
             TileType.Fold => FoldTile,

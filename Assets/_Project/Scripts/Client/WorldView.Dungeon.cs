@@ -85,6 +85,12 @@ namespace Game.Client
                 case World.DungeonBroken:
                     if (mine) ShowBanner("멈췄다: 맞거나 문에서 벗어나면 다시 해야 한다");
                     break;
+                // B1c: a camp's band fell and its trapdoor opened.
+                case World.DungeonCellarOpened:
+                    Hear(Sound.Door, at, 1);
+                    AddFlash(at, 2f, EliteKeyGold, FlashKind.Ring);
+                    if (Vector3.Distance(at, _self.Position) < 24) ShowBanner("야영지의 뚜껑 문이 열렸다: 지하실로 내려갈 수 있다");
+                    break;
                 case World.DungeonFull:
                     if (mine) ShowBanner("던전 자리가 모두 찼다: 다른 던전이 빌 때까지 기다려야 한다");
                     break;

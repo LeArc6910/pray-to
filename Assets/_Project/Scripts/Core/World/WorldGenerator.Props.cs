@@ -67,10 +67,15 @@ namespace Game.Core
         // props laid over them last of all, and the hero's hut's garden fenced round its corner. A world saved at
         // version 2 stays as it was made.
         public const int PropVersion = 3;
+        // The fourth (LandmarkVersion, 묶음 B1c) is in WorldGenerator.BiomeLandmarks.cs.
         // The props' own random stream, so nothing laid before them changes.
         public const ulong PropStream = 57;
-        // In a thousand tiles of floor fit for a prop, how many get one (before the clumps and the wall's pull).
-        const int PropsPerThousand = 55;
+        // In a thousand tiles of floor fit for a prop, how many get one (before the clumps and the wall's pull): 55, twice
+        // that in the mushroom forest, in a world of version 3; from version 4 (LandmarkVersion, 묶음 B1c) 70 and three
+        // times, which brings the dirt cave from 2.4 props in a hundred tiles of floor to 2.9 and the forest from 1.6 to
+        // 2.4. A version 3 world keeps the props it was made with.
+        const int PropsPerThousand = 55, DensePropsPerThousand = 70;
+        const float ForestProps = 2, DenseForestProps = 3;
         const int PropClump = 7;
         // Large props stand at least this far from each other, and nothing near the spawn.
         const int BigGap = 5;
@@ -84,7 +89,7 @@ namespace Game.Core
         // way under three tiles wide gets none. Kept clear besides: the spawn, the middle of each room, the middle three
         // tiles of every way between rooms, the chunks set into rooms, the dungeons' gates, the things to find and the
         // marks packs stand on, the places and the arenas.
-        static void LayProps(GeneratedWorld world, ulong seed)
+        static void LayProps(GeneratedWorld world, ulong seed, int version)
         {
             var map = world.Map;
             var biomes = world.Biomes;
@@ -118,6 +123,11 @@ namespace Game.Core
             foreach (var mark in graph.Marks) Keep(mark.X, mark.Y, 2);
             foreach (var site in world.Places) Keep(site.X, site.Y, site.Radius + 2);
             foreach (var arena in world.Arenas) Keep(TileMap.Cell(arena.X), TileMap.Cell(arena.Y), ArenaRadius + 3);
+            // The landmarks first, from version 4 (묶음 B1c): the scattered props keep off them.
+            bool dense = version >= LandmarkVersion;
+            if (dense) world.BiomeLandmarks = LayBiomeLandmarks(world, seed, kept);
+            int perThousand = dense ? DensePropsPerThousand : PropsPerThousand;
+            float forest = dense ? DenseForestProps : ForestProps;
 
             bool Bare(int x0, int y0, int x1, int y1)
             {
@@ -145,7 +155,7 @@ namespace Game.Core
                     if (kinds.Count == 0) continue;
                     uint roll = Decor.Hash(seed, x, y, 1, PropStream);
                     // The mushroom forest's ways are narrow and few tiles fit, so more of them roll.
-                    float chance = (biomes[x, y] == Biome.Mushroom ? 2 : 1) * PropsPerThousand / 1000f * Decor.Clump(seed, x, y, PropClump, PropStream);
+                    float chance = (biomes[x, y] == Biome.Mushroom ? forest : 1) * perThousand / 1000f * Decor.Clump(seed, x, y, PropClump, PropStream);
                     if ((roll & 0xFFFFFF) * (1f / 16777216f) >= chance * 2) continue;
                     // The cheap roll first, then the wall: twice as likely three tiles off one.
                     if ((roll & 0xFFFFFF) * (1f / 16777216f) >= chance && !WallAt(x, y, 2)) continue;

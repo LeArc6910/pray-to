@@ -67,6 +67,15 @@ namespace Game.Client
                 for (int variant = 0; variant < drawings; variant++) props.Add(($"소품 {type} {variant}", BiomeArt.Prop(type, variant)));
             }
             foreach (var biome in new[] { Biome.Cave, Biome.Mushroom }) props.Add(($"장소 나무 {biome}", BiomeArt.PlaceTree(biome)));
+            // The places' things in each biome's look and the landmarks (묶음 B1c), the same way.
+            foreach (TileType type in Enum.GetValues(typeof(TileType)))
+            {
+                if (PropArt.HasBiomeLook(type))
+                    foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook }) props.Add(($"장소 {type} 모습 {look}", PropArt.PlaceProp(type, look)));
+                if (type == TileType.RingCap)
+                    for (int variant = 0; variant < BiomeArt.Variants; variant++) props.Add(($"랜드마크 {type} {variant}", BiomeArt.RingCap(variant)));
+                else if (BiomeLandmarks.Is(type)) props.Add(($"랜드마크 {type}", PropArt.Landmark(type)));
+            }
 
             var loops = new List<(string Name, IReadOnlyList<PixelImage> Frames)>();
             foreach (var look in new[] { Look.Down, Look.DownSide, Look.Side, Look.UpSide, Look.Up })

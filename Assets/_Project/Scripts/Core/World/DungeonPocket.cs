@@ -9,8 +9,9 @@ namespace Game.Core
     // from the seed, so where they are is never sent or saved.
     public sealed class DungeonGate
     {
-        public DungeonGate(int index, int x, int y, Biome biome, int room = -1)
+        public DungeonGate(int index, int x, int y, Biome biome, int room = -1, bool cellar = false)
         {
+            Cellar = cellar;
             Index = index;
             X = x;
             Y = y;
@@ -24,6 +25,9 @@ namespace Game.Core
         public Biome Biome { get; }
         // The gate room's index in RoomGraph.Nodes, or -1 for one laid by hand (tests).
         public int Room { get; }
+        // A camp's trapdoor (B1c, Docs/BiomeRework.md 4-5 지하실): the tile itself (TileType.Trapdoor, shut until the camp's
+        // elites fall, then OpenTrapdoor) leads to its biome's cellar.
+        public bool Cellar { get; }
         public Vec2 Center => TileMap.Center(X, Y);
     }
 
@@ -250,6 +254,10 @@ namespace Game.Core
                 at ??= (room.AnchorX, room.AnchorY);
                 gates.Add(new DungeonGate(gates.Count, at.Value.X, at.Value.Y, room.Biome, room.Index));
             }
+            // The camps' trapdoors (generator version 3, WorldGenerator.Cellars.cs) after the gates, so the gates keep
+            // their numbers.
+            foreach (var (room, x, y) in rooms.Cellars)
+                gates.Add(new DungeonGate(gates.Count, x, y, rooms.Nodes[room].Biome, room, cellar: true));
             return gates;
         }
     }
