@@ -6269,9 +6269,13 @@ async function biomes(browser) {
           seenTints.add((await game.ask('biomes')).tintNow || '');
           await game.wait(900);
         }
+        // A reading is the pink or the sky dimmed (its channels in their proportions); anything else is a mix of the two,
+        // the lavender the decision keeps out. (The old test called pink itself violet: red and blue both high.)
         const violet = [...seenTints].filter(t => /^#[0-9A-F]{6}$/.test(t)).filter(t => {
           const r = parseInt(t.slice(1, 3), 16), g = parseInt(t.slice(3, 5), 16), bl = parseInt(t.slice(5, 7), 16);
-          return r > g * 1.25 && bl > g * 1.25 && Math.abs(r - bl) < 40 && g > 60;
+          const pink = r > 0 && Math.abs(g / r - 0x8A / 0xFF) < 0.08 && Math.abs(bl / r - 0xD8 / 0xFF) < 0.08;
+          const sky = bl > 0 && Math.abs(r / bl - 0x8A / 0xFF) < 0.08 && Math.abs(g / bl - 0xF0 / 0xFF) < 0.08;
+          return !pink && !sky;
         });
         check(b.tintOther === set.tintOther && seenTints.size >= 3 && violet.length === 0,
           `${name}: ${set.name}의 빛이 분홍과 하늘 사이로 숨 쉰다 (다른 쪽 ${b.tintOther}, 읽은 색 ${[...seenTints].join(' ')}, 보라 ${violet.length})`);
@@ -6418,11 +6422,18 @@ async function places(browser) {
     await game.send('probe on; monsters hold; heal');
     for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake']) {
       const set = PlaceSets[key];
-      const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
-      await game.wait(2000);
-      await game.send('scene places');
-      await game.wait(2500);
-      let p = await game.ask('places');
+      // A room whose whole scene stands in its biome: the laid things take the look of the biome under each, so a room by
+      // another biome's edge (the phone's crystal room touched the sand cave) shows that one's on some.
+      let went = '', p = null;
+      for (let n = 1; n <= 4; n++) {
+        went = (await game.send(`clear; goto room pack ${set.room} ${n}`)).join(' ');
+        await game.wait(2000);
+        await game.send('scene places');
+        await game.wait(2500);
+        p = await game.ask('places');
+        const laid = (p.cells || []).filter(c => PlaceLooks.includes(c.type));
+        if (laid.length >= PlaceLooks.length && laid.every(c => c.shape === set.look)) break;
+      }
       check(p.biome === set.id, `${name}: ${set.name}의 방에 섰다 (${p.biome}, ${went})`);
       check(p.generator >= (key === 'crystal' || key === 'lake' ? 6 : key === 'ice' || key === 'sand' ? 5 : 4),
         `${name}: 새 월드는 생성기 6판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, 수정·호수의 것은 6판부터, ${p.generator})`);
@@ -6855,8 +6866,11 @@ async function b3mobs(browser) {
       await game.wait(1000);
       if ((await game.ask('b3')).biome === 'Lake') break;
     }
-    await game.send('clear; heal; scene tentacles');
-    const under = await game.until(b => (b.monsters || []).some(m => m.kind === 'tentacle' && m.underWater) && b.ripplesShown > 0, 5000, () => game.ask('b3'))
+    // The scene lets it loose four tiles off, and it comes up at the player again and again: held at once, it stays
+    // under the water where it was laid, which is what this looks at (its strike is the person's to feel).
+    await game.send('clear; heal; scene tentacles; monsters hold');
+    // On a slow phone it may have come up at the player before the first look: it goes under again after its strike.
+    const under = await game.until(b => (b.monsters || []).some(m => m.kind === 'tentacle' && m.underWater) && b.ripplesShown > 0, 12000, () => game.ask('b3'))
       || await game.ask('b3');
     const tentacle = (under.monsters || []).find(m => m.kind === 'tentacle');
     check(!!tentacle && tentacle.underWater && under.ripplesShown > 0,

@@ -719,7 +719,7 @@ namespace Game.Client
             // The dressing of the story's places (Docs/Story.md): walls by what they are made of, the rest warm.
             if (_map[x, y] == TileType.TimberWall) return new Color32(150, 104, 58, 255);
             if (_map[x, y] == TileType.CastleWall || _map[x, y] == TileType.Pillar) return new Color32(190, 186, 176, 255);
-            if (_map[x, y] == TileType.Spire) return new Color32(170, 120, 240, 255);
+            if (_map[x, y] == TileType.Spire) return new Color32(120, 220, 236, 255);
             if (_map[x, y] == TileType.Campfire) return Palette.Torch;
             if (_map[x, y] == TileType.Cottage || _map[x, y] == TileType.Cabin) return new Color32(176, 72, 58, 255);
             if (_map[x, y] == TileType.Tower) return new Color32(74, 108, 192, 255);

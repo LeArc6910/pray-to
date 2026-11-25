@@ -1171,6 +1171,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 174단계: 수정 동굴·지하 호수 — 모습, 소품, 장소, 랜드마크, 새 몬스터 열, 규칙, 던전 둘, 생성기 6판(`Docs/BiomeRework.md` B3a·B3b)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.CrystalLake.cs`, `Core/World/WorldGenerator.CrystalLakeDungeons.cs`, `Core/Simulation/World.CrystalLake.cs`, `Client/Art/BiomeArt.CrystalLake.cs`, `Client/Art/PropArt.CrystalLake.cs`, `Client/Art/CreatureArt.CrystalLake.cs`, `Tests/EditMode/CrystalLakeLookTests.cs`, `Tests/EditMode/B3bTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheCrystalCaveAndTheLakeStandTheirPropsAndThePlacesTakeTheirLooks`. 통신 0.105.0. 새 월드는 생성기 6판, 5판 이전 월드는 그대로. 물 칸이 물건 층에 더는 그려지지 않아 모든 생물군계의 물가 테가 보인다
   - (클라우드 웹 점검) `sweep.js --only biomes,places,b3mobs,dungeon,packs`
+  - 클라우드 확인 (2026-11-25, `f5ff022`): [x] 처음 422개 중 418 통과. 실패 넷은 점검 쪽: 수정 빛 "보라" 판정이 분홍 자체를 보라로 셈(분홍·하늘의 비율로 보게), 휴대폰의 수정 방이 모래 동굴과 맞닿아 긴 의자 하나가 모래 모습(장면 전체가 그 생물군계에 드는 방을 고름), 촉수 장면이 촉수를 풀어 두어 계속 솟아오름(장면 직후 붙잡음). 고친 뒤 같은 배포로 `biomes,places,b3mobs` 모두 통과. 사진: 수정 동굴의 몬스터 열 종, 첨탑에 맞아 튕기는 화살, 결정으로 선 흉내쟁이와 깨어난 모습, 물속의 촉수 물결, 정동 속·잠긴 수로의 문 방·무리 방·보스 방. 사진에서 찾아 고친 것: 옛 수정 첨탑이 보라였음 → 하늘빛 결정에 분홍 끝(빛·지도 색도)
   - (사람) 수정 동굴이 보라가 아니라 회청 점판암에 분홍·하늘 결정으로 읽히는지, 14초마다 바뀌는 분홍·하늘 빛이 어지럽지 않은지, 환경음 둘(결정 울림, 물가), 호수 물가의 갈대·얕은 물이 자연스러운지, 얕은 물을 걷는 느낌(70% 걸음)과 물 튀는 소리, 개구리·물고기 그림자가 휴대폰에서 적과 헷갈리지 않는지, 수정 마을·호수 마을과 랜드마크(거대 정동, 결정 아치, 가라앉은 배, 옛 물레방아), 탄이 결정에서 튕겨 돌아오는 손맛, 결정 흉내쟁이가 깨어나는 맛과 휴대폰에서 두 눈이 보이는지, 수정 거북의 되돌림, 촉수의 물결이 "물속에 무언가"로 읽히는지, 정동 속·잠긴 수로 한 판
 
 ## 결과 보고

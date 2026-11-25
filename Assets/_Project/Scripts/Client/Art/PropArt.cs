@@ -985,6 +985,8 @@ namespace Game.Client
         }
 
         // A dark crystal spire of the demons: facets lit violet on the left, deep on the right, on a rock.
+        static readonly Ramp SpireSky = Ramp.Of("#5EC8DE"), SpirePink = Ramp.Of("#E878C4");
+
         static PixelImage Spire()
         {
             var body = new PixelImage(T, 42);
@@ -994,8 +996,10 @@ namespace Game.Client
                 float half = Math.Min(4.5f, (y - 1) * 0.3f + 0.5f);
                 for (int x = (int)Math.Round(8 - half); x <= (int)Math.Round(8 + half); x++)
                 {
-                    var color = x < 7 ? Violet.Light : x < 9 ? Violet.Main : x < 11 ? Violet.Shade : Violet.Dark;
-                    if ((y + x) % 9 == 0 && x < 9) color = Rgba.White.Mix(Violet.Light, 0.4f);
+                    // The crystal cave's own crystal (B3a: violet is the abyss's alone): sky, its tip blushing pink.
+                    var ramp = y < 9 ? SpirePink : SpireSky;
+                    var color = x < 7 ? ramp.Light : x < 9 ? ramp.Main : x < 11 ? ramp.Shade : ramp.Dark;
+                    if ((y + x) % 9 == 0 && x < 9) color = Rgba.White.Mix(ramp.Light, 0.4f);
                     body[x, y] = color;
                 }
             }
@@ -1569,7 +1573,7 @@ namespace Game.Client
         public static readonly (TileType Type, float Radius, string Color)[] Lights =
         {
             (TileType.Campfire, 6, "#FF9A3C"),
-            (TileType.Spire, 4.5f, "#B07AFF"),
+            (TileType.Spire, 4.5f, "#8AF0FF"),
             (TileType.Fountain, 2.5f, "#8AC8FF"),
             (TileType.BigFountain, 3.5f, "#8AC8FF"),
             (TileType.LampPost, 5.5f, "#FFD27A"),
