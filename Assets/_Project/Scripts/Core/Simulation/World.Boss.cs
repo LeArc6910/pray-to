@@ -217,13 +217,6 @@ namespace Game.Core
             return Math.Max(1, (int)MathF.Round(attack.Weight * 10 * factor));
         }
 
-        // The attacks that can be laid alongside another: marked areas only (no charge, spray, spiral or summons).
-        static bool LaysAreas(BossAttack attack) => attack.Shape switch
-        {
-            AttackShape.Circle or AttackShape.Cone or AttackShape.Line or AttackShape.Ring or AttackShape.Cross or AttackShape.Trail => true,
-            _ => false,
-        };
-
         void ChooseAttack(Boss boss, List<Player> fighters)
         {
             if (fighters.Count == 0) return;
@@ -302,14 +295,17 @@ namespace Game.Core
             int cause = Cause(boss, attack);
 
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
+            // Its follow-up (then column) is marked now too and lands a moment after: one roll does not clear both.
+            if (attack.FollowUp != null && !again)
+                LayHazards(boss, attack.FollowUp, target, fighters, boss.Facing, resolve + Ticks(attack.FollowDelay), Cause(boss, attack.FollowUp));
             if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;
             if (attack.GoesAway) boss.LandAt = LandingFor(boss, target.Position);
 
             // A later phase sometimes lays another area attack of this phase at once, on someone (else, when there is
             // anyone else), resolving a moment after.
-            if (LaysAreas(attack) && _random.NextFloat() < DoubleChance(boss.Phase))
+            if (attack.LaysAreas && _random.NextFloat() < DoubleChance(boss.Phase))
             {
-                var others = boss.Definition.Attacks.Where(a => a != attack && a.InPhase(boss.Phase) && a.Weight > 0 && LaysAreas(a)).ToList();
+                var others = boss.Definition.Attacks.Where(a => a != attack && a.InPhase(boss.Phase) && a.Weight > 0 && a.LaysAreas).ToList();
                 if (others.Count > 0)
                 {
                     var second = _random.PickWeighted(others, a => PhaseWeight(a, boss.Phase));

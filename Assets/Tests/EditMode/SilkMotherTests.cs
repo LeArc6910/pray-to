@@ -49,9 +49,11 @@ namespace Game.Core.Tests
             var mother = Bosses.Shipped.Find("silk_mother");
             Assert.AreEqual("old_temple:2", mother.Place);
             Assert.AreEqual(43, mother.Level);
-            // Its fangs are read from its body alone; the three heaviest blows carry the warning sign; the rest are marked.
+            // Its fangs are read from its body alone; the three heaviest blows carry the warning sign, and so does the
+            // ring that follows the thread drop (2026-11-25, B5b: it lands with it); the rest are marked.
             Assert.AreEqual(AttackWarning.Hidden, mother.Attacks.Single(a => a.Id == "fang").Warning);
-            CollectionAssert.AreEquivalent(new[] { "thread_drop", "eight_legs", "web_burst" }, mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Select(a => a.Id));
+            CollectionAssert.AreEquivalent(new[] { "thread_drop", "eight_legs", "web_burst", "silk_net" }, mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Select(a => a.Id));
+            Assert.AreEqual("silk_net", mother.Attacks.Single(a => a.Id == "thread_drop").FollowUp.Id);
             Assert.Greater(mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Min(a => a.Damage),
                 mother.Attacks.Where(a => a.Warning != AttackWarning.Strong).Max(a => a.Damage), "the warning is kept for what hurts most");
             Assert.Greater(mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Min(a => a.Telegraph),
