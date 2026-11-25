@@ -41,6 +41,9 @@ namespace CoreSandbox
             public int Islets;
             // B3b: the lake's shallows, and its open floor beside them.
             public int Shallows;
+            // 묶음 B4b: the lava fields' steam vents and the abyss's cracked plates.
+            public int Vents;
+            public int Plates;
         }
 
         const int BigLump = 100;
@@ -53,6 +56,8 @@ namespace CoreSandbox
             for (int y = 0; y < world.Map.Height; y++)
                 for (int x = 0; x < world.Map.Width; x++)
                     if (world.Map[x, y] == TileType.ShallowWater) numbers.Shallows++;
+                    if (world.Map[x, y] == TileType.SteamVent) numbers.Vents++;
+                    if (world.Map[x, y] == TileType.CrackedPlate) numbers.Plates++;
             // The minecart lines (3c): the ride against the walk between the same stations (eight ways, no digging).
             if (world.Rooms != null && world.Rooms.Lines.Count > 0)
             {
@@ -467,6 +472,12 @@ namespace CoreSandbox
                     // 묶음 B3b: the lake's shallows and the lairs of the crystal cave and the lake.
                     Row("지하 호수의 얕은 물 칸", n => $"{n.Shallows}");
                     Row("굴: 수정 동굴 / 지하 호수", n => $"{n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Crystal)} / {n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Lake)}");
+                }
+                if (version >= WorldGenerator.LavaVoidVersion)
+                {
+                    // 묶음 B4b: the lava fields' vents, the abyss's plates and the two biomes' lairs.
+                    Row("용암 지대의 김 뿜는 틈 / 공허의 심연의 금 간 판", n => $"{n.Vents} / {n.Plates}");
+                    Row("굴: 용암 지대 / 공허의 심연", n => $"{n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Lava)} / {n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Abyss)}");
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();
