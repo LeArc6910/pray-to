@@ -292,14 +292,18 @@ namespace Game.Client
 
         // ---- A field to type in ----
 
-        static GUIStyle _hint;
+        static GUIStyle _hint, _field;
 
         // A text field, known to the playtests by its name (they tap it as a person would), with a faint hint in it while
-        // it is empty.
+        // it is empty. Its words sit in the middle of its height (a phone's taller field had them at the top), and in a
+        // web build on a PC Korean is typed through the page's own box (WebText).
         public static string Field(Rect rect, string text, int max, string probe, string hint = "")
         {
             Ui.Probe(probe, rect);
-            string typed = GUI.TextField(rect, text ?? "", max);
+            var skinField = GUI.skin.textField;
+            if (_field == null || _field.font != skinField.font) _field = new GUIStyle(skinField) { alignment = TextAnchor.MiddleLeft };
+            _field.fontSize = skinField.fontSize;
+            string typed = WebText.Field(rect, text, max, probe, _field);
             if (string.IsNullOrEmpty(typed) && hint.Length > 0 && Event.current.type == EventType.Repaint)
             {
                 _hint ??= new GUIStyle(GUI.skin.label) { wordWrap = false, clipping = TextClipping.Clip, alignment = TextAnchor.MiddleLeft };

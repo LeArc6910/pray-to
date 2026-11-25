@@ -75,21 +75,25 @@ function helpers(game) {
 
   // Sends playtest commands and returns the [playtest] lines they answered with.
   // Each command answers with one line, so the wait ends as soon as all have.
-  h.send = async commands => {
+  // The [playtest] answers logged since the mark. An answer too long for one console line comes in pieces:
+  // "[playtest]+" lines join onto the one before.
+  const answeredSince = mark => {
+    const joined = [];
+    // A web build's Debug.Log ends each line with a newline, which would land inside the joined JSON.
+    for (const l of game.logs.slice(mark)) {
+      const text = l.replace(/\r?\n$/, '');
+      if (text.startsWith('[playtest] ')) joined.push(text.slice(11));
+      else if (text.startsWith('[playtest]+') && joined.length > 0) joined[joined.length - 1] += text.slice(11);
+    }
+    return joined;
+  };
+
+  h.send = async (commands, marked = null) => {
     const mark = game.logs.length;
+    if (marked) marked.mark = mark;
     const expected = commands.split(';').filter(c => c.trim()).length;
     await page.evaluate(text => window.unityInstance.SendMessage('Game', 'Playtest', text), commands);
-    // An answer too long for one console line comes in pieces: "[playtest]+" lines join onto the one before.
-    const answered = () => {
-      const joined = [];
-      // A web build's Debug.Log ends each line with a newline, which would land inside the joined JSON.
-      for (const l of game.logs.slice(mark)) {
-        const text = l.replace(/\r?\n$/, '');
-        if (text.startsWith('[playtest] ')) joined.push(text.slice(11));
-        else if (text.startsWith('[playtest]+') && joined.length > 0) joined[joined.length - 1] += text.slice(11);
-      }
-      return joined;
-    };
+    const answered = () => answeredSince(mark);
     const deadline = Date.now() + 3000;
     while (answered().length < expected && Date.now() < deadline) await page.waitForTimeout(15);
     // The pieces of a long answer come as separate console events: wait until no more come.
@@ -105,10 +109,23 @@ function helpers(game) {
   // A command answering with JSON after its name.
   h.ask = async command => {
     const word = command.split(' ')[0];
-    const lines = await h.send(command);
-    const line = lines.reverse().find(l => l.startsWith(word + ' '));
+    const marked = {};
+    let lines = await h.send(command, marked);
+    let line = lines.reverse().find(l => l.startsWith(word + ' '));
     if (!line) return {};
-    const text = line.slice(word.length + 1);
+    let text = line.slice(word.length + 1);
+    // The pieces of a long answer are logged at once but come here as separate console events, which a busy machine
+    // can space out past send's wait: the answer read so far would end mid-entry and lose the rest (the settings
+    // page's [움직임] was missing that way in the sweep of 2026-11-25). Wait for the rest while it does not parse.
+    for (const deadline = Date.now() + 4000; Date.now() < deadline; ) {
+      try {
+        return JSON.parse(text);
+      } catch (e) {
+        await page.waitForTimeout(60);
+        line = answeredSince(marked.mark).reverse().find(l => l.startsWith(word + ' '));
+        text = line ? line.slice(word.length + 1) : text;
+      }
+    }
     try {
       return JSON.parse(text);
     } catch (e) {
@@ -168,6 +185,7 @@ function helpers(game) {
   h.press = async (label, row, { quiet } = {}) => {
     // The bag scrolls about a row (30 points) a wheel step, so a row far down a long list takes many steps.
     let missing = 0;
+    let scrolled = false;
     for (let attempt = 0; attempt < 80; attempt++) {
       const all = await h.find(label, row);
       // Not drawn yet (a page just opened, a tab just changed): look again for a few seconds.
@@ -176,8 +194,18 @@ function helpers(game) {
         continue;
       }
       const shown = all.find(b => b.shown && b.enabled);
+      if (shown && scrolled) {
+        // Just scrolled to: pressed only once it stands still where it was drawn (a wheel step the game had not taken
+        // yet would move it from under the pointer, and the press would land on the row next to it).
+        await h.frames();
+        const again = (await h.find(label, row)).find(b => b.shown && b.enabled);
+        if (!again || Math.abs(again.cy - shown.cy) > 1 || Math.abs(again.cx - shown.cx) > 1) continue;
+      }
       if (shown) {
         await h.tapAt(shown.cx, shown.cy);
+        // The game takes the press in its next frame and draws what it opened in the one after: wait for those
+        // frames (a busy machine draws slowly), then as long as before.
+        await h.frames();
         await page.waitForTimeout(450);
         return true;
       }
@@ -188,11 +216,24 @@ function helpers(game) {
       const middle = box.top + box.height / 2;
       await page.mouse.move(hidden.cx, middle);
       await page.mouse.wheel(0, hidden.cy > middle ? 200 : -200);
+      scrolled = true;
+      await h.frames();
       await page.waitForTimeout(150);
     }
     if (!quiet) run.errors.push(`${profile.name}: no button "${label}"${row ? ` in row "${row}"` : ''} to press`);
     return false;
   };
+
+  // A few of the browser's frames: the game runs one frame in each, so input given before has been taken and drawn.
+  h.frames = (count = 3) =>
+    page.evaluate(
+      n =>
+        new Promise(done => {
+          const step = left => (left <= 0 ? done() : requestAnimationFrame(() => step(left - 1)));
+          step(n);
+        }),
+      count,
+    );
 
   h.tapAt = async (x, y) => {
     if (game.touch) {
@@ -244,6 +285,8 @@ function helpers(game) {
       return false;
     }
     await h.tapAt(f.cx, f.cy);
+    // In a web build on a PC the field hands the keys to a text box of the page in the game's next frame (WebText.cs).
+    await h.frames();
     await page.waitForTimeout(200);
     await page.keyboard.press('End');
     for (let i = 0; i < 26; i++) await page.keyboard.press('Backspace');

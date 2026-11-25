@@ -71,9 +71,26 @@ namespace Game.Client
         static float _lastTouch = float.NegativeInfinity;
 
         // A touch has been seen this run, or the game runs on a phone or tablet (a mobile browser, 2026-11-09: until the
-        // first touch a phone showed the PC screen, with no [가방] button to open the bag the first goal points to):
+        // first touch a phone showed the PC screen, with no [가방] button to open the bag the first goal points to), or
+        // the browser says its main pointer is a finger (an iPad's says it is a Mac; 2026-11-25: a phone sideways had its
+        // title laid out for a mouse until the first tap, which then moved the words under the finger and was lost):
         // the HUD shows touch buttons and hints.
-        public static bool UsingTouch { get; private set; } = Application.isMobilePlatform;
+        public static bool UsingTouch { get; private set; } = Application.isMobilePlatform || CoarsePointer();
+
+        static bool CoarsePointer()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return GetCoarsePointer() != 0;
+#else
+            return false;
+#endif
+        }
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        // Plugins/WebGL/Display.jslib
+        [System.Runtime.InteropServices.DllImport("__Internal")]
+        static extern int GetCoarsePointer();
+#endif
 
         // For the play mode tests: lay the screen out as for a touch screen, or not, without a finger.
         internal static void ForceTouch(bool touch) => UsingTouch = touch;

@@ -97,6 +97,7 @@ namespace Game.Client
             Scale = PixelRatio();
             GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1));
             StartProbe();
+            WebText.Frame();
             ProbeCover = Rect.zero;
             // Whether a mouse button or finger is down, and where it went down: a button shows itself pressed only while
             // the press that started on it lasts (UiMotion.Face).

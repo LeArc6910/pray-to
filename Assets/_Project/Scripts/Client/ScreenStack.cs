@@ -461,6 +461,9 @@ namespace Game.Client
             if (!HubOpen) return false;
             var (panel, cells) = HubLayout();
             Controls.Block(panel);
+            // Darker under the see-through panel than on the title: over the game the names over people and the clock
+            // showed through between the words (2026-11-25 sweep photos).
+            TitleDraw.Veil(panel, 0.5f);
             TitleDraw.Panel(panel);
             _hubText ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerCenter, padding = new RectOffset(0, 0, 0, 6), margin = new RectOffset(0, 0, 0, 0), wordWrap = false };
             Ui.Text(_hubText, 13);

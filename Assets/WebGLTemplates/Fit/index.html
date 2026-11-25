@@ -31,6 +31,23 @@
       window.addEventListener("keydown", function (e) {
         if (e.key === "Tab") e.preventDefault();
       });
+      // While the game's text box has the keys (a name being typed on a PC, Plugins/WebGL/Display.jslib), they are the
+      // box's: Unity's own key listener, added on the window after this one, would otherwise stop every letter
+      // reaching it. Enter, Esc and Tab end the typing; the game reads which (gameKey). Added before the game starts so
+      // it runs first.
+      ["keydown", "keypress", "keyup"].forEach(function (type) {
+        window.addEventListener(type, function (e) {
+          var box = document.activeElement;
+          if (!box || !box.hasAttribute || !box.hasAttribute("data-game-text")) return;
+          e.stopImmediatePropagation();
+          if (type !== "keydown" || e.isComposing) return;
+          var key = e.key === "Enter" ? 1 : e.key === "Escape" ? 2 : e.key === "Tab" ? 3 : 0;
+          if (key > 0) {
+            box.gameKey = key;
+            e.preventDefault();
+          }
+        }, true);
+      });
       canvas.addEventListener("pointerdown", function () {
         canvas.focus();
       });
