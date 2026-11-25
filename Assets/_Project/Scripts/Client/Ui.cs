@@ -303,12 +303,15 @@ namespace Game.Client
         }
 
         // The three kinds of button (Docs/UiRework.md 4-4 단추 세 가지): the usual one; the screen's one main action, in
-        // gold; and one that throws something away or cannot be taken back, red rimmed.
+        // gold; and one that throws something away or cannot be taken back, red rimmed. And the title's and the menus'
+        // words with no box (Docs/TitleRework.md 4-1, 묶음 T3): lit gold, grown a little, a mark at each side and a strip of
+        // light under them when pointed at or picked (TitleArt, drawn by TitleDraw.TextItem).
         public enum Look
         {
             Normal,
             Primary,
             Danger,
+            Text,
         }
 
         public static bool Button(Rect rect, string text) => Button(rect, text, GUI.skin.button, Look.Normal);
@@ -327,6 +330,28 @@ namespace Game.Client
             Temp.text = shown;
             Temp.tooltip = null;
             return Pressable(rect, Temp, GUI.skin.button, look, false);
+        }
+
+        // Shown one way, probed another, in a style and look (the title's setting rows, Ui.Look.Text).
+        public static bool Button(Rect rect, string shown, string probed, GUIStyle style, Look look, bool chosen)
+        {
+            Probe(probed, rect);
+            Temp.text = shown;
+            Temp.tooltip = null;
+            return Pressable(rect, Temp, style, look, chosen);
+        }
+
+        // A press over something drawn by its caller (a row of the title's lists), known to the playtests by the label: the
+        // pointer's tick and the press's sound as a button's.
+        public static bool Invisible(Rect rect, string probed)
+        {
+            Probe(probed, rect);
+            var e = Event.current;
+            if (!GUI.enabled && e.type == EventType.MouseDown && rect.Contains(e.mousePosition)) UiMotion.Refuse(probed, rect);
+            if (e.type == EventType.Repaint && GUI.enabled && rect.Contains(e.mousePosition) && (!Controls.UsingTouch || Held)) UiMotion.Hover(probed + rect.position);
+            bool pressed = GUI.Button(rect, GUIContent.none, GUIStyle.none);
+            if (pressed) UiMotion.Confirm();
+            return pressed;
         }
 
         public static bool Button(Rect rect, string text, GUIStyle style, Look look, bool chosen = false)
@@ -398,22 +423,33 @@ namespace Game.Client
                 float shake = UiMotion.Shake(key, rect);
                 bool hover = enabled && rect.Contains(e.mousePosition) && (!Controls.UsingTouch || Held);
                 bool down = hover && Held && rect.Contains(DownAt);
-                var face = UiMotion.Face(new Rect(rect.x + shake, rect.y, rect.width, rect.height), hover, down);
-                bool framed = style.normal.background != null;
-                if (framed)
+                if (look == Look.Text)
                 {
-                    var previous = GUI.color;
-                    if (!enabled) GUI.color = new Color(previous.r, previous.g, previous.b, previous.a * 0.55f);
-                    UiSkin.ButtonFrame(face, hover && !down, down, chosen || look == Look.Primary, look == Look.Danger);
-                    GUI.color = previous;
+                    TitleDraw.TextItem(new Rect(rect.x + shake, rect.y, rect.width, rect.height), content.text, style, enabled, hover, down, chosen);
+                    if (hover) UiMotion.Hover(key + rect.position);
                 }
-                var bare = framed ? UiSkin.Bare(style) : style;
-                bare.Draw(face, content, hover, down, chosen, false);
-                if (hover) UiMotion.Hover(key + rect.position);
+                else Framed(rect, content, style, look, chosen, enabled, shake, hover, down, key);
             }
             bool pressed = GUI.Button(rect, GUIContent.none, GUIStyle.none);
             if (pressed) UiMotion.Confirm();
             return pressed;
+        }
+
+        // A framed button's face (the three kinds), in a repaint.
+        static void Framed(Rect rect, GUIContent content, GUIStyle style, Look look, bool chosen, bool enabled, float shake, bool hover, bool down, string key)
+        {
+            var face = UiMotion.Face(new Rect(rect.x + shake, rect.y, rect.width, rect.height), hover, down);
+            bool framed = style.normal.background != null;
+            if (framed)
+            {
+                var previous = GUI.color;
+                if (!enabled) GUI.color = new Color(previous.r, previous.g, previous.b, previous.a * 0.55f);
+                UiSkin.ButtonFrame(face, hover && !down, down, chosen || look == Look.Primary, look == Look.Danger);
+                GUI.color = previous;
+            }
+            var bare = framed ? UiSkin.Bare(style) : style;
+            bare.Draw(face, content, hover, down, chosen, false);
+            if (hover) UiMotion.Hover(key + rect.position);
         }
 
         // ---- Buttons over things in the world ----

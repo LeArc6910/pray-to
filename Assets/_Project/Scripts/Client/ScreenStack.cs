@@ -104,6 +104,7 @@ namespace Game.Client
             }
             bool changed = HubOpen || Current != screen;
             HubOpen = false;
+            LeaveAsked = false;
             if (Current != screen)
             {
                 Current = screen;
@@ -124,12 +125,19 @@ namespace Game.Client
             if (Current == GameScreen.None && !HubOpen) return;
             Current = GameScreen.None;
             HubOpen = false;
+            LeaveAsked = false;
             Version++;
         }
 
         // Esc: one step back. False when nothing was open (the game then leaves, as before).
         public bool Back()
         {
+            if (LeaveAsked)
+            {
+                LeaveAsked = false;
+                Version++;
+                return true;
+            }
             if (HubOpen)
             {
                 HubOpen = false;
@@ -144,8 +152,14 @@ namespace Game.Client
         public void ToggleHub()
         {
             HubOpen = !HubOpen;
+            LeaveAsked = false;
             Version++;
         }
+
+        // [나가기] was pressed in the hub: it asks once more ("저장하고 나가기" or "남기", T3).
+        public bool LeaveAsked { get; private set; }
+        public const string LeaveConfirm = "저장하고 나가기";
+        public const string Stay = "남기";
 
         // ---- What each screen is ----
 
@@ -428,40 +442,45 @@ namespace Game.Client
             return new Vector2(columns * HubCellWidth + (columns - 1) * HubGap + 2 * HubPad, rows * HubCellHeight + (rows - 1) * HubGap + 2 * HubPad);
         }
 
-        static GUIStyle _hubText;
+        static GUIStyle _hubText, _askText;
 
-        // The hub over the game: a panel of big buttons, an icon over each name, a gold dot on the growth screens while
-        // there are points to spend. Pressing one opens its screen (and shuts the hub); pressing outside shuts it. True
-        // when [나가기] was pressed.
+        // The hub over the game in the title's look (Docs/TitleRework.md 4-3, 묶음 T3): the see-through panel with its thin
+        // gold rim, each screen a word with no box and its icon above it, lit gold when pointed at, a gold dot on the growth
+        // screens while there are points to spend. Pressing one opens its screen (and shuts the hub); pressing outside shuts
+        // it. [나가기] asks once more on the same panel: [저장하고 나가기] or [남기]. True when the game is to be left.
         public bool DrawHub(bool skillPoints, bool passivePoints)
         {
             if (!HubOpen) return false;
             var (panel, cells) = HubLayout();
             Controls.Block(panel);
-            UiSkin.Card(panel);
-            _hubText ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerCenter, padding = new RectOffset(0, 0, 0, 3), margin = new RectOffset(0, 0, 0, 0), wordWrap = false };
-            Ui.Text(_hubText, 12, bold: true);
-            _hubText.normal.textColor = new Color(0.97f, 0.93f, 0.85f);
+            TitleDraw.Panel(panel);
+            _hubText ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.LowerCenter, padding = new RectOffset(0, 0, 0, 6), margin = new RectOffset(0, 0, 0, 0), wordWrap = false };
+            Ui.Text(_hubText, 13);
             bool leave = false;
             Ui.Row(HubRow);
-            foreach (var (name, screen, rect) in cells)
+            if (LeaveAsked) leave = DrawLeaveAsk(panel);
+            else foreach (var (name, screen, rect) in cells)
             {
-                bool pressed = Ui.Button(rect, "", name);
+                var icon = IconOf(screen);
+                _hubText.alignment = icon != null ? TextAnchor.LowerCenter : TextAnchor.MiddleCenter;
+                bool pressed = Ui.Button(rect, name, name, _hubText, Ui.Look.Text, Current == screen);
                 if (Event.current.type == EventType.Repaint)
                 {
                     // An icon over each screen's name; [나가기] (no screen) is its word alone, in the middle.
-                    var icon = IconOf(screen);
                     if (icon != null)
                     {
                         var iconSize = UiSkin.IconSize(icon);
-                        UiSkin.Icon(new Rect(rect.x, rect.y + 4, rect.width, iconSize.y), icon, Current == screen ? UiSkin.Gold : new Color(0.9f, 0.78f, 0.55f));
+                        bool lit = Current == screen || rect.Contains(Event.current.mousePosition) && !Controls.UsingTouch;
+                        UiSkin.Icon(new Rect(rect.x, rect.y + 5, rect.width, iconSize.y), icon, lit ? UiSkin.Gold : new Color(0.78f, 0.68f, 0.52f));
                     }
-                    _hubText.alignment = icon != null ? TextAnchor.LowerCenter : TextAnchor.MiddleCenter;
-                    GUI.Label(rect, name, _hubText);
                     if (screen == GameScreen.Skills && skillPoints || screen == GameScreen.Passives && passivePoints) InventoryWindow.Badge(rect);
                 }
                 if (!pressed) continue;
-                if (screen == GameScreen.None) leave = true;
+                if (screen == GameScreen.None)
+                {
+                    LeaveAsked = true;
+                    Version++;
+                }
                 else Show(screen);
             }
             Ui.Row("");
@@ -471,6 +490,43 @@ namespace Game.Client
             if (HubOpen && GUI.Button(screenRect, GUIContent.none, GUIStyle.none))
             {
                 HubOpen = false;
+                LeaveAsked = false;
+                Version++;
+            }
+            return leave;
+        }
+
+        // The question in the hub's panel: what leaving does, and the two answers side by side (one above the other when
+        // the panel is narrow).
+        bool DrawLeaveAsk(Rect panel)
+        {
+            _askText ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = true };
+            Ui.Text(_askText, 13);
+            _askText.normal.textColor = new Color(0.94f, 0.9f, 0.84f);
+            var inner = new Rect(panel.x + HubPad, panel.y + HubPad, panel.width - 2 * HubPad, panel.height - 2 * HubPad);
+            bool stacked = inner.width < 2 * HubCellWidth + HubGap + 40;
+            float button = HubCellHeight;
+            float answers = stacked ? 2 * button + HubGap : button;
+            var question = new Rect(inner.x, inner.y, inner.width, Mathf.Max(24, inner.height - answers - HubGap));
+            if (Event.current.type == EventType.Repaint)
+                GUI.Label(question, Ui.Wrap(Strings.T("hub.leave_ask", "저장하고 시작 화면으로 나간다"), _askText, question.width), _askText);
+            Rect yes, no;
+            if (stacked)
+            {
+                yes = new Rect(inner.x, inner.yMax - answers, inner.width, button);
+                no = new Rect(inner.x, yes.yMax + HubGap, inner.width, button);
+            }
+            else
+            {
+                float half = (inner.width - HubGap) / 2;
+                yes = new Rect(inner.x, inner.yMax - button, half, button);
+                no = new Rect(yes.xMax + HubGap, yes.y, half, button);
+            }
+            _hubText.alignment = TextAnchor.MiddleCenter;
+            bool leave = Ui.Button(yes, LeaveConfirm, LeaveConfirm, _hubText, Ui.Look.Danger, false);
+            if (Ui.Button(no, Stay, Stay, _hubText, Ui.Look.Text, !Controls.UsingTouch))
+            {
+                LeaveAsked = false;
                 Version++;
             }
             return leave;
