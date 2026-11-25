@@ -55,9 +55,11 @@ namespace CoreSandbox
             var numbers = new Numbers { Rooms = world.Rooms, Roads = world.Roads, Landmarks = world.BiomeLandmarks };
             for (int y = 0; y < world.Map.Height; y++)
                 for (int x = 0; x < world.Map.Width; x++)
+                {
                     if (world.Map[x, y] == TileType.ShallowWater) numbers.Shallows++;
                     if (world.Map[x, y] == TileType.SteamVent) numbers.Vents++;
                     if (world.Map[x, y] == TileType.CrackedPlate) numbers.Plates++;
+                }
             // The minecart lines (3c): the ride against the walk between the same stations (eight ways, no digging).
             if (world.Rooms != null && world.Rooms.Lines.Count > 0)
             {

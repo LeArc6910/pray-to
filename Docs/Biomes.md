@@ -240,7 +240,7 @@ cellar,지하실,,2,cellar,6-7,elite,chest_iron,4,cellar,,
 buried_temple,묻힌 신전,sand,3,temple,11-12,temple_guardian,chest_gold,8,gate,#FFD28A,45
 geode_heart,정동 속,crystal,4,geode,11-12,geode_golem,chest_gold,8,gate,#FF8AD8,57
 sunken_aqueduct,잠긴 수로,lake,4,aqueduct,12-13,moss_turtle,chest_gold,6,gate,#70E6D8,47
-broken_gate,깨진 문 너머,abyss,5,shattered,13-14,gate_warden,chest_gold,8,gate,#6A30C0,45
+broken_gate,깨진 문 너머,abyss,5,shattered,13-14,gate_warden,chest_gold,8,gate,#6A30C0,50
 ```
 
 - 2026-11-24(B1c): 흙 동굴의 던전이 끈적한 지하실에서 **버려진 갱도**(주인 어미 슬라임)로 바뀌었고, 끈적한 지하실은 모든 생물군계가 함께 쓰는 **지하실**(`cellar`, 정예 야영지의 뚜껑 문)이 됐다. 이름은 "흙 동굴의 지하실"처럼 그 생물군계가 붙고, 무리·그림은 그 생물군계의 것이다. 옛 저장본의 `slime_cellar` 기록은 지워지지 않고 남지만 더 쓰이지 않는다
