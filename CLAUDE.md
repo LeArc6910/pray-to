@@ -54,11 +54,17 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 dotnet run --project DevTools/CoreSandbox -- --pace 30 1,2,3
 # 인스턴스 던전 한 판(입구에서 주인과 끝 상자까지 봇이 돈다: 완주 시간, 분당 경험치·금화값, 쓰러짐. Docs/WorldRework.md 묶음 5b)
 dotnet run --project DevTools/CoreSandbox -- --dungeon abandoned_mine 1,2,3 --gear copper_sword,copper_armor --classes warrior --level 5
+dotnet run --project DevTools/CoreSandbox -- --dungeon spore_depths 1,2,3 --gear iron_sword,iron_armor --classes warrior --level 8
 dotnet run --project DevTools/CoreSandbox -- --dungeon frozen_crypt 1,2,3 --gear iron_sword,iron_armor,iron_helmet,iron_boots --classes warrior --level 10
+dotnet run --project DevTools/CoreSandbox -- --dungeon buried_temple 1,2,3 --gear iron_sword,iron_armor,iron_helmet,iron_boots --classes warrior --level 10
 dotnet run --project DevTools/CoreSandbox -- --dungeon geode_heart 1,2,3 --gear iron_sword,iron_armor,iron_helmet,iron_boots --classes warrior --level 16
 dotnet run --project DevTools/CoreSandbox -- --dungeon sunken_aqueduct 1,2,3 --gear mithril_sword,mithril_armor,mithril_helmet,mithril_boots --classes warrior --level 20
 dotnet run --project DevTools/CoreSandbox -- --dungeon ember_forge 1,2,3 --gear mithril_sword,mithril_armor,mithril_helmet,mithril_boots --classes warrior --level 25
 dotnet run --project DevTools/CoreSandbox -- --dungeon broken_gate 1,2,3 --gear obsidian_sword,obsidian_armor,obsidian_helmet,obsidian_boots --classes warrior --level 32
+# 둘이서(--players 2, 봇마다 같은 장비·클래스, 줄 끝에 사람마다 분당 경험치)와 사람처럼 늦게 피하기(--reaction 0.5, --roll-miss 0.3). 들판은 --fight 300 <시드> --rooms <생물군계>(--players 2도). Docs/BiomeRework.md B5a
+dotnet run --project DevTools/CoreSandbox -- --dungeon abandoned_mine 1,2,3 --gear copper_sword,copper_armor --classes warrior --level 5 --players 2
+dotnet run --project DevTools/CoreSandbox -- --dungeon abandoned_mine 1,2,3 --gear copper_sword,copper_armor --classes warrior --level 5 --reaction 0.5
+dotnet run --project DevTools/CoreSandbox -- --fight 300 1 --rooms cave --gear copper_sword,copper_armor --classes warrior --level 5 --players 2
 # 함정 방마다 창살이 몇 칸 떨어지나(거리로 자른 것과 가장 좁은 곳, 2·3판 월드. Docs/BiomeRework.md B1c)
 dotnet run --project DevTools/CoreSandbox -- --traps 1,2,3
 
