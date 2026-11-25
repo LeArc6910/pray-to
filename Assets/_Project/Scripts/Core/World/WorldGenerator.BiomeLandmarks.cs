@@ -28,6 +28,13 @@ namespace Game.Core
         CrystalArch,
         SunkenBoat,
         OldWheel,
+        // The lava zone's and the void abyss's (묶음 B4a, WorldGenerator.LavaVoid.cs, worlds of version 7): the fallen
+        // chimney of a forge among its slag, a giant anvil on its block; a broken gate with its chain posts, a star
+        // altar ringed by shards of an obelisk.
+        FallenChimney,
+        GiantAnvil,
+        BrokenGate,
+        StarAltar,
     }
 
     // One landmark as laid: the box of tiles it took (its lower left and size) and a tile of open floor in front of it.
@@ -58,7 +65,7 @@ namespace Game.Core
     public static class BiomeLandmarks
     {
         // The tiles only a landmark lays.
-        public static bool Is(TileType type) => type >= TileType.MinerHut && type <= TileType.RingCap || IceSandProps.IsLandmark(type) || CrystalLakeProps.IsLandmark(type);
+        public static bool Is(TileType type) => type >= TileType.MinerHut && type <= TileType.RingCap || IceSandProps.IsLandmark(type) || CrystalLakeProps.IsLandmark(type) || LavaVoidProps.IsLandmark(type);
 
         // What each lays, from its box's lower left (y up). A wide thing's type is on its lower left tile; the generator
         // fills the rest of its footprint with StructurePart.

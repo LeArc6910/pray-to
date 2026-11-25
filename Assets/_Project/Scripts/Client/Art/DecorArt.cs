@@ -95,6 +95,22 @@ namespace Game.Client
                 case DecorKind.LilyPad:
                     LilyPad(g, variant);
                     break;
+                // The lava zone's and the abyss's (묶음 B4a).
+                case DecorKind.Ash:
+                    Ash(g, salt, variant);
+                    break;
+                case DecorKind.LavaBubble:
+                    LavaBubble(g, variant);
+                    break;
+                case DecorKind.CrustRaft:
+                    CrustRaft(g, salt, variant);
+                    break;
+                case DecorKind.StarDust:
+                    StarDust(g, salt, variant);
+                    break;
+                case DecorKind.FloatStones:
+                    FloatStones(g, salt, variant);
+                    break;
             }
             return g;
         }
@@ -349,13 +365,147 @@ namespace Game.Client
             }
         }
 
+        // A drift of ash on the basalt: a low pale-grey patch, flat, a darker cinder or two in it.
+        static void Ash(PixelImage g, int salt, int variant)
+        {
+            var ash = Rgba.Hex("#6A605C");
+            var pale = Rgba.Hex("#8A807A");
+            var cinder = Rgba.Hex("#2A2020");
+            float cx = 5.5f + variant % 2, cy = 6.5f, rx = 4.2f + variant * 0.4f, ry = 2.2f;
+            for (int y = 2; y < Height - 1; y++)
+                for (int x = 0; x < Width; x++)
+                {
+                    float dx = (x + 0.5f - cx) / rx, dy = (y + 0.5f - cy) / ry;
+                    float d = dx * dx + dy * dy + (PixelNoise.Value(x, y, salt) - 0.5f) * 0.5f;
+                    if (d > 1) continue;
+                    g[x, y] = (d < 0.35f && -dx - dy > 0 ? pale : ash).WithAlpha(d > 0.7f ? 150 : 225);
+                }
+            g[(int)cx + 1, (int)cy] = cinder;
+            if (variant != 0) g[(int)cx - 2, (int)cy + 1] = cinder;
+            if (variant == 2) g[(int)cx - 1, (int)cy - 1] = Rgba.Hex("#C8562A");
+        }
+
+        // A blister of cooled lava at the lava's edge: a low dome of dark crust, burst on one drawing, the glow of what
+        // is under it in a crack and round its foot.
+        static void LavaBubble(PixelImage g, int variant)
+        {
+            var crust = new Ramp(Rgba.Hex("#6A5450"), Rgba.Hex("#48383A"), Rgba.Hex("#30262A"), Rgba.Hex("#1E1618"));
+            var glow = Rgba.Hex("#FF7A1E");
+            var core = Rgba.Hex("#FFD24A");
+            Shadow(g, 6, 9);
+            int foot = Height - 3;
+            float cx = 6, rx = variant == 1 ? 3.2f : 4.2f, ry = variant == 1 ? 2.6f : 3.4f;
+            for (int y = 0; y <= foot; y++)
+                for (int x = 0; x < Width; x++)
+                {
+                    float dx = (x + 0.5f - cx) / rx, dy = (y + 0.5f - (foot + 0.5f)) / ry;
+                    if (dy > 0 || dx * dx + dy * dy > 1) continue;
+                    float t = -dx * 0.5f - dy * 1.2f - 0.5f;
+                    g[x, y] = t > 0.42f ? crust.Light : t > -0.1f ? crust.Main : crust.Shade;
+                }
+            for (int x = 1; x < 11; x++)
+                if (g[x, foot].A > 0) g[x, foot] = x % 3 == 0 ? glow : crust.Dark;
+            if (variant == 2)
+            {
+                // Burst: its top gone, the hollow glowing.
+                g[5, foot - 3] = Rgba.Clear;
+                g[6, foot - 3] = Rgba.Clear;
+                g[5, foot - 2] = core;
+                g[6, foot - 2] = glow;
+                g[7, foot - 2] = crust.Dark;
+            }
+            else
+            {
+                g[6, foot - 1] = glow;
+                g[7, foot - 2] = variant == 0 ? glow : core;
+            }
+            if (variant == 1)
+            {
+                // A second small one by it.
+                g[10, foot] = crust.Dark;
+                g[10, foot - 1] = crust.Main;
+                g[9, foot] = glow;
+            }
+            Outline(g, 0, 0, Width, foot + 1);
+        }
+
+        // A raft of dark crust lying on the lava: a ragged plate, its edge glowing where the lava laps it, a crack
+        // across it. Flat.
+        static void CrustRaft(PixelImage g, int salt, int variant)
+        {
+            var crust = Rgba.Hex("#3A2824");
+            var top = Rgba.Hex("#54403A");
+            var edge = Rgba.Hex("#FFB43C");
+            var dark = Rgba.Hex("#22161A");
+            float cx = 5.5f + variant % 2, cy = 6f, rx = 3.6f + variant * 0.5f, ry = 2.4f;
+            for (int y = 1; y < Height - 1; y++)
+                for (int x = 0; x < Width; x++)
+                {
+                    float dx = (x + 0.5f - cx) / rx, dy = (y + 0.5f - cy) / ry;
+                    float d = dx * dx + dy * dy + (PixelNoise.Value(x, y, salt + 5) - 0.5f) * 0.4f;
+                    if (d > 1.25f) continue;
+                    g[x, y] = d > 1 ? edge.WithAlpha(190) : -dx - dy > 0.5f ? top : d > 0.72f ? dark : crust;
+                }
+            // The crack.
+            int kx = (int)cx - 1 + variant;
+            g[kx, (int)cy - 1] = dark;
+            g[kx, (int)cy] = Rgba.Hex("#D8401A");
+            g[kx + 1, (int)cy + 1] = dark;
+        }
+
+        // Star dust on the abyss's floor: a scatter of grains, violet and pale, one a small four-pointed glint. Flat and
+        // half see-through.
+        static void StarDust(PixelImage g, int salt, int variant)
+        {
+            var violet = Rgba.Hex("#A050FF");
+            var pale = Rgba.Hex("#E6D6FF");
+            int grains = 4 + variant;
+            for (int i = 0; i < grains; i++)
+            {
+                int x = 1 + (int)(PixelNoise.Hash(i, 1, salt) % 9), y = 3 + (int)(PixelNoise.Hash(i, 2, salt) % 6);
+                bool bright = PixelNoise.Hash(i, 3, salt) % 3 == 0;
+                g[x, y] = bright ? pale.WithAlpha(230) : violet.WithAlpha(200);
+                if (g[x + 1, y].A == 0) g[x + 1, y] = violet.WithAlpha(90);
+            }
+            // The glint.
+            int gx = 3 + variant * 2, gy = 5 + variant % 2;
+            g[gx, gy] = pale;
+            foreach (var (dx, dy) in new[] { (1, 0), (-1, 0), (0, 1), (0, -1) }) g[gx + dx, gy + dy] = violet.WithAlpha(150);
+        }
+
+        // Stones hanging over the floor: two or three small dark ones a few pixels up, a violet rim under each, their
+        // shadow on the floor apart from them.
+        static void FloatStones(PixelImage g, int salt, int variant)
+        {
+            var stone = new Ramp(Rgba.Hex("#6E5E90"), Rgba.Hex("#4A3E66"), Rgba.Hex("#32284A"), Rgba.Hex("#1E1830"));
+            var rim = Rgba.Hex("#A050FF");
+            Shadow(g, 6, 7 + variant);
+            int count = 2 + variant % 2;
+            for (int i = 0; i < count; i++)
+            {
+                int w = 2 + (i == 0 ? 1 : 0);
+                int x = 1 + i * 4 - (i == 2 ? 1 : 0) + (int)(PixelNoise.Hash(i, 3, salt) % 2);
+                // Its underside's row: three to five rows over the floor.
+                int y = Height - 6 - (int)(PixelNoise.Hash(i, 4, salt) % 3);
+                for (int k = 0; k < w; k++)
+                {
+                    g[x + k, y] = k == w / 2 ? rim : stone.Dark;
+                    g[x + k, y - 1] = k == 0 ? stone.Main : stone.Shade;
+                    if (w > 2) g[x + k, y - 2] = k < w - 1 ? stone.Light : stone.Main;
+                }
+                // A crumb trailing under the largest.
+                if (i == 0) g[x + 1, y + 1] = stone.Shade;
+                Outline(g, x - 1, y - (w > 2 ? 3 : 2), w + 2, w > 2 ? 4 : 3);
+            }
+        }
+
         // The stone of the biome's floor, a step lighter so it shows on it.
         static Ramp StoneOf(Biome biome) => biome switch
         {
             Biome.Mushroom => Ramp.Of("#5E6248"),
             Biome.Ice => Ramp.Of("#7A8C9C"),
             Biome.Crystal => Ramp.Of("#70768C"),
-            Biome.Lava => Ramp.Of("#4E4440"),
+            Biome.Lava => Ramp.Of("#4A403E"),
             Biome.Abyss => Ramp.Of("#4A4058"),
             Biome.Lake => Ramp.Of("#5E7470"),
             Biome.Sand => Ramp.Of("#A88A62"),

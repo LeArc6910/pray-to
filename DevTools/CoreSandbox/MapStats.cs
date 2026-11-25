@@ -39,6 +39,7 @@ namespace CoreSandbox
             public IReadOnlyList<BiomeLandmark> Landmarks = new List<BiomeLandmark>();
             // The lake's islets, which stand on its pools' water (묶음 B3a): not counted among the props on its floor.
             public int Islets;
+            public int LavaRocks;
             // B3b: the lake's shallows, and its open floor beside them.
             public int Shallows;
         }
@@ -98,6 +99,11 @@ namespace CoreSandbox
                     if (type == TileType.MossIsle)
                     {
                         numbers.Islets++;
+                        continue;
+                    }
+                    if (type == TileType.LavaRock)
+                    {
+                        numbers.LavaRocks++;
                         continue;
                     }
                     bool prop = BiomeProps.Is(type);
@@ -467,6 +473,21 @@ namespace CoreSandbox
                     // 묶음 B3b: the lake's shallows and the lairs of the crystal cave and the lake.
                     Row("지하 호수의 얕은 물 칸", n => $"{n.Shallows}");
                     Row("굴: 수정 동굴 / 지하 호수", n => $"{n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Crystal)} / {n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Lake)}");
+                }
+                if (version >= WorldGenerator.LavaVoidVersion)
+                {
+                    // 묶음 B4a: the lava zone's and the abyss's props and landmarks.
+                    foreach (var biome in new[] { Biome.Lava, Biome.Abyss })
+                    {
+                        Row($"{BiomeMap.Name(biome)}: 바닥 100칸에 막는·깨는 소품 / 큰 것 / 꾸밈", n => n.Props.TryGetValue(biome, out var p) && p.Floor > 0
+                            ? $"{100.0 * p.Props / p.Floor:0.0} / {100.0 * p.Big / p.Floor:0.00} / {100.0 * p.Decor / p.Floor:0.0}" : "-");
+                    }
+                    Row("랜드마크: 쓰러진 굴뚝 / 거대 모루 / 깨진 문 / 별 제단", n => $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.FallenChimney)} / "
+                        + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.GiantAnvil)} / {n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.BrokenGate)} / "
+                        + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.StarAltar)}");
+                    Row("용암 속 바위(용암 위)", n => n.LavaRocks.ToString());
+                    Row("용암 지대 / 공허의 심연의 방(아레나 빼고)", n => $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Lava)} / "
+                        + $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Abyss)}");
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();

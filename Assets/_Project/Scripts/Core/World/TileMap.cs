@@ -307,6 +307,32 @@ namespace Game.Core
         // round its water (WorldGenerator.CrystalLakeDungeons.cs) and in the sunken aqueduct's rooms: walked on at
         // PlayerMotor.ShallowSlow, a splash at each step; never dug or built on. A tentacle keeps to it as to the water.
         ShallowWater,
+        // The lava zone's and the void abyss's own props (2026-11-25, Docs/BiomeRework.md 묶음 B4a), laid by the
+        // generator's version 7 (WorldGenerator.LavaVoid.cs). The lava zone's: a spike of obsidian (dug for its ore
+        // with the pickaxe its veins want), a bush that burns (picked, glowing), a heap of slag, a boulder of cooled
+        // lava whose cracks glow and a stand of basalt columns (both two tiles wide), and a rock standing in a pool of
+        // lava (on the lava's own tile).
+        ObsidianSpike,
+        FireBush,
+        SlagHeap,
+        CooledBoulder,
+        BasaltColumns,
+        LavaRock,
+        // The abyss's: a void crystal (dug for its ore with the pickaxe its veins want, glowing), a twisted vine, a
+        // shard of an obelisk hanging over the floor, a post with a broken chain, a rock that floats (its shadow apart
+        // from it) and a pillar broken through that has not fallen (both two tiles wide).
+        VoidCrystal,
+        TwistedVine,
+        ObeliskShard,
+        ChainPost,
+        FloatingRock,
+        ShatteredPillar,
+        // Their landmarks, rare and never dug: the fallen chimney of a forge and a giant anvil in the lava zone (three
+        // tiles by two each); a broken gate (three tiles wide) and a star altar (three by two) in the abyss.
+        FallenChimney,
+        GiantAnvil,
+        BrokenGate,
+        StarAltar,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -332,6 +358,10 @@ namespace Game.Core
             // The crystal cave's and the lake's (묶음 B3a).
             TileType.GiantGeode or TileType.SunkenBoat => (3, 2),
             TileType.OldWheel => (2, 2),
+            // The lava zone's and the abyss's (묶음 B4a).
+            TileType.FallenChimney or TileType.GiantAnvil or TileType.StarAltar => (3, 2),
+            TileType.BrokenGate => (3, 1),
+            TileType.CooledBoulder or TileType.BasaltColumns or TileType.FloatingRock or TileType.ShatteredPillar => (2, 1),
             TileType.CrystalMass or TileType.LeaningCrystal or TileType.Wreckage or TileType.MossIsle => (2, 1),
             TileType.Tower or TileType.BigFountain or TileType.BigTent or TileType.Lighthouse => (2, 2),
             TileType.Altar or TileType.MineFrame => (3, 1),

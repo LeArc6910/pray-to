@@ -34,6 +34,14 @@ namespace Game.Core
         Reeds,
         Shells,
         LilyPad,
+        // The lava zone's and the void abyss's own (묶음 B4a): a drift of ash (flat), a blister of cooled lava at the
+        // lava's edge, a raft of dark crust on the lava (flat, on the lava); star dust on the floor (flat), a few
+        // stones hanging over it.
+        Ash,
+        LavaBubble,
+        CrustRaft,
+        StarDust,
+        FloatStones,
     }
 
     // One tile's pick: what, which of its drawings, mirrored or not, and how far off the tile's middle it stands (in
@@ -69,8 +77,8 @@ namespace Game.Core
         // In a thousand tiles of open floor, before the one-tile spacing thins it a little (B0's low density; the biome
         // packages raise it toward 8 to 12 in a hundred).
         public const int PerThousand = 34;
-        // The biomes whose package is made (B1a: the dirt cave, the mushroom forest; B2a: the ice cave, the sand cave):
-        // eight to twelve in a hundred tiles of clear floor once thinned.
+        // The biomes whose package is made (B1a: the dirt cave, the mushroom forest; B2a: the ice cave, the sand cave;
+        // B3a, B4a: the other four): eight to twelve in a hundred tiles of clear floor once thinned.
         public const int DensePerThousand = 270;
         // The clumps: a smooth noise over cells this many tiles wide raises or lowers the chance, so things gather in
         // groups and leave bare floor between (Docs/BiomeRework.md 4-3 배치, Poisson in clumps rather than a grid).
@@ -109,8 +117,9 @@ namespace Game.Core
             Biome.Mushroom => roll < 32 ? DecorKind.GlowGrass : roll < 60 ? DecorKind.Caps : roll < 80 ? DecorKind.Threads : DecorKind.Moss,
             Biome.Ice => roll < 30 ? DecorKind.FrostGrass : roll < 60 ? DecorKind.Shards : roll < 85 ? DecorKind.Snow : DecorKind.Pebbles,
             Biome.Crystal => roll < 40 ? DecorKind.Shards : roll < 70 ? DecorKind.CrystalDust : DecorKind.Pebbles,
-            Biome.Lava => roll < 60 ? DecorKind.Embers : DecorKind.Pebbles,
-            Biome.Abyss => roll < 50 ? DecorKind.Shards : DecorKind.Pebbles,
+            // 묶음 B4a: the lava zone's embers, ash and basalt; the abyss's void shards, star dust and hanging stones.
+            Biome.Lava => roll < 36 ? DecorKind.Embers : roll < 70 ? DecorKind.Ash : DecorKind.Pebbles,
+            Biome.Abyss => roll < 32 ? DecorKind.Shards : roll < 62 ? DecorKind.StarDust : roll < 86 ? DecorKind.FloatStones : DecorKind.Pebbles,
             Biome.Lake => roll < 30 ? DecorKind.Tuft : roll < 52 ? DecorKind.Shells : roll < 75 ? DecorKind.Moss : DecorKind.Pebbles,
             Biome.Sand => roll < 35 ? DecorKind.DryGrass : roll < 60 ? DecorKind.Bones : DecorKind.Pebbles,
             _ => roll < 40 ? DecorKind.Pebbles : roll < 70 ? DecorKind.Tuft : DecorKind.Caps,
@@ -118,15 +127,17 @@ namespace Game.Core
 
         // How many in a thousand tiles roll a thing, by biome.
         public static int RateOf(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Sand
-            || biome == Biome.Crystal || biome == Biome.Lake ? DensePerThousand : PerThousand;
+            || biome == Biome.Crystal || biome == Biome.Lake || biome == Biome.Lava || biome == Biome.Abyss ? DensePerThousand : PerThousand;
 
         // The kinds that sway: drawn nudged for a moment when someone brushes past (the client's rustle).
         public static bool Sways(DecorKind kind) => kind == DecorKind.Tuft || kind == DecorKind.Caps || kind == DecorKind.GlowGrass || kind == DecorKind.FrostGrass
-            || kind == DecorKind.DryGrass || kind == DecorKind.Reeds;
+            || kind == DecorKind.DryGrass || kind == DecorKind.Reeds
+            // The abyss's hanging stones drift aside as someone passes and come back (묶음 B4a).
+            || kind == DecorKind.FloatStones;
 
         // The kinds that lie flat on the floor: no shadow, never in front of anyone's feet.
         public static bool Flat(DecorKind kind) => kind == DecorKind.Web || kind == DecorKind.Threads || kind == DecorKind.Moss || kind == DecorKind.Snow
-            || kind == DecorKind.CrystalDust || kind == DecorKind.LilyPad;
+            || kind == DecorKind.CrystalDust || kind == DecorKind.LilyPad || kind == DecorKind.Ash || kind == DecorKind.CrustRaft || kind == DecorKind.StarDust;
 
         // In a hundred corners of the dirt cave's rock (rock above and at a side), how many have a cobweb.
         public const int WebPercent = 30;
@@ -136,6 +147,7 @@ namespace Game.Core
         public static DecorPick On(TileMap map, ulong seed, Biome biome, int x, int y)
         {
             if (biome == Biome.Lake && Shore(map, seed, x, y) is DecorPick shore) return shore;
+            if (biome == Biome.Lava && LavaEdge(map, seed, x, y) is DecorPick edge) return edge;
             if (!Clear(map, x, y)) return default;
             if (biome == Biome.Cave && map[x, y + 1] == TileType.Wall)
             {
@@ -193,6 +205,52 @@ namespace Game.Core
             }
             if (percent >= ShoreReedPercent) return null;
             return new DecorPick(DecorKind.Reeds, variant, flip, towardX == 0 ? (int)((roll >> 13) % (Shift * 2 + 1)) - Shift : Math.Sign(towardX) * Shift,
+                towardY == 0 ? (int)((roll >> 20) % (Lift * 2 + 1)) - Lift : Math.Sign(towardY) * Lift);
+        }
+
+        // In a hundred tiles of the lava zone's floor with lava beside them, how many have a blister of cooled lava; of
+        // its lava with lava on all four sides, a raft of crust.
+        public const int LavaBubblePercent = 30, CrustRaftPercent = 12;
+
+        // The lava's edge (묶음 B4a): blisters of cooled lava on the floor beside a pool, pushed to the lava's side of
+        // their tile; rafts of dark crust lying on the lava away from its edge (the edge has its own crust, drawn with
+        // the lava). Null where the tile is neither, or the floor rolls none.
+        static DecorPick? LavaEdge(TileMap map, ulong seed, int x, int y)
+        {
+            var here = map[x, y];
+            if (here != TileType.Floor && here != TileType.Lava) return null;
+            bool pool = here == TileType.Lava;
+            int towardX = 0, towardY = 0, lava = 0;
+            foreach (var (dx, dy) in Sides)
+            {
+                if (map[x + dx, y + dy] != TileType.Lava) continue;
+                lava++;
+                towardX += dx;
+                towardY += dy;
+            }
+            if (!pool && lava == 0) return null;
+            // Only among the zone's own things: nothing built beside it, no way or door near.
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    var type = map[x + dx, y + dy];
+                    if (type != TileType.Floor && type != TileType.Lava && !Natural(type)) return pool ? default(DecorPick) : (DecorPick?)null;
+                }
+            for (int dy = -2; dy <= 2; dy++)
+                for (int dx = -2; dx <= 2; dx++)
+                    if (Structures.IsWay(map[x + dx, y + dy]) || TileMap.IsDoor(map[x + dx, y + dy])) return pool ? default(DecorPick) : (DecorPick?)null;
+            uint roll = Hash(seed, x, y, 7);
+            int variant = (int)(roll / 100 % Variants);
+            bool flip = (roll >> 12 & 1) == 1;
+            int percent = (int)(roll % 100);
+            if (pool)
+            {
+                if (lava == 4 && percent < CrustRaftPercent)
+                    return new DecorPick(DecorKind.CrustRaft, variant, flip, (int)((roll >> 13) % (Shift * 2 + 1)) - Shift, (int)((roll >> 20) % (Lift * 2 + 1)) - Lift);
+                return default(DecorPick);
+            }
+            if (percent >= LavaBubblePercent) return null;
+            return new DecorPick(DecorKind.LavaBubble, variant, flip, towardX == 0 ? (int)((roll >> 13) % (Shift * 2 + 1)) - Shift : Math.Sign(towardX) * Shift,
                 towardY == 0 ? (int)((roll >> 20) % (Lift * 2 + 1)) - Lift : Math.Sign(towardY) * Lift);
         }
 
