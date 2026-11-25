@@ -154,7 +154,8 @@ namespace Game.Client
             }
             // And the ice cave's frozen crypt (sky blue) and the sand cave's buried temple (gold), B2b.
             // And the crystal cave's geode (pink) and the lake's sunken aqueduct (teal), B3b.
-            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom, Biome.Ice, Biome.Sand, Biome.Crystal, Biome.Lake })
+            // And the lava fields' ember forge (orange) and the abyss's broken gate (violet), B4b.
+            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom, Biome.Ice, Biome.Sand, Biome.Crystal, Biome.Lake, Biome.Lava, Biome.Abyss })
             {
                 var gate = gates.FirstOrDefault(g => !g.Cellar && g.Biome == biome);
                 if (gate == null) continue;

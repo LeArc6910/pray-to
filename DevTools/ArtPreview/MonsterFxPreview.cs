@@ -485,6 +485,15 @@ namespace Game.Client
             rows.Add(Row(MobFx.Splash, new MobContext { Seed = 6 }, 0.4f, false));
             rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Violet, Seed = 4 }, 0.65f, false));
             rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Spirit, Seed = 4 }, 0.65f, false));
+            // The lava fields and the abyss (B4b): a steam vent bursting, a plate cracking under someone's feet (still, its
+            // progress shown by the frame's time), a plate giving way, a fall's coming up, and the smith and the warden
+            // breaking out of their cold iron and stone.
+            rows.Add(Row(MobFx.Vent, new MobContext { Size = 1.4f * 16, Seed = 7 }, 0.75f, false));
+            rows.Add(Row(MobFx.Crack, new MobContext { Progress = 0.3f, Seed = 7 }, 0.6f, true));
+            rows.Add(Row(MobFx.Crack, new MobContext { Progress = 0.9f, Seed = 7 }, 0.6f, true));
+            rows.Add(Row(MobFx.Crumble, new MobContext { Seed = 7 }, 0.65f, false));
+            rows.Add(Row(MobFx.Fall, new MobContext { Seed = 7 }, 0.65f, false));
+            rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Fire, Seed = 4 }, 0.65f, false));
             return (SkillFxPreview.Sheet(rows), fine);
         }
 

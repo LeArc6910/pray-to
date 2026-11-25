@@ -140,6 +140,19 @@ namespace Game.Client
     //                             dormant, elite, drawn pixels), shots glanced and turned on the host, the screen's glances,
     //                             turned shots, broken prism shots, ripples and splashes, the tile under the player and its
     //                             walking speed, and the dungeons the crystal and lake gates lead to
+    //   scene b4monsters          (B4b) the lava fields' and the abyss's kinds in a row east of the player where each fits
+    //                             (void mote, salamander, obsidian beetle, forge slime, abyss stalker, void eye, star slime,
+    //                             shadow stalker, magma hurler, void splitter, ember smith, gate warden), 5000 health each,
+    //                             awake, the monsters held
+    //   scene vents               (B4b) three steam vents in a row three tiles north on open floor, the middle one hissing
+    //   scene plates              (B4b) a strip of cracked plates three wide from the player's tile six tiles east
+    //   scene splitter            (B4b) a void splitter two tiles east at 20 health, held (a blow splits it)
+    //   b4                        JSON (B4b): the monsters about the player (kind, size, state, dormant, elite, drawn
+    //                             pixels), the tile under the player and its health, the vents, plates and holes within nine
+    //                             tiles, vents burst and burns, plates broken and falls on the host, how long the plate under
+    //                             the player has been stood on, the screen's hisses, bursts, crumbles, falls, plates back and
+    //                             cracks, the abyss's lights dimmed, the generator and the dungeons the lava and abyss gates
+    //                             lead to
     static partial class Playtest
     {
         const string Name = "playtest";
@@ -428,6 +441,8 @@ namespace Game.Client
                     return "b2 " + IceSandJson(root);
                 case "b3":
                     return "b3 " + CrystalLakeJson(root);
+                case "b4":
+                    return "b4 " + LavaVoidJson(root);
                 // The rest of B1 (묶음 B1c, Docs/BiomeRework.md): "b1c" the camp trapdoor nearest the player (shut or open on
                 // the host and the screen, its band, the button), the lairs (their mid-boss, awake or felled), the gates'
                 // dungeons and their light colours, and what a charge smashed; "b1c fell" fells the nearest camp's band (its
@@ -1614,6 +1629,8 @@ namespace Game.Client
         // The play mode scenes (FeatureTests), laid around the player.
         static void Scene(GameRoot root, string scene)
         {
+            // The lava fields' and the abyss's (Playtest.LavaVoid.cs, B4b).
+            if (LavaVoidScene(root, scene)) return;
             var world = root.HostWorld;
             var player = root.HostPlayer;
             var loot = root.LootSheet;

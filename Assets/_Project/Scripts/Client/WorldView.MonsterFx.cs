@@ -116,7 +116,8 @@ namespace Game.Client
         static FxRamp WakeRamp(string id) => id switch
         {
             "frost_mammoth" or "crystal_mimic" => FxRamp.Cold,
-            "geode_golem" => FxRamp.Violet,
+            "geode_golem" or "gate_warden" => FxRamp.Violet,
+            "forge_keeper" => FxRamp.Fire,
             "moss_turtle" => FxRamp.Spirit,
             _ => FxRamp.Dust,
         };
