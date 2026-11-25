@@ -83,6 +83,8 @@ namespace Game.Core
             // A dungeon's monsters give its share (dungeons.csv experience, B1c): the rest of a run's worth is its chest.
             if (Map.InPocket(enemy.Position) && DungeonAt(enemy.Position)?.Definition is DungeonDefinition dungeon && dungeon.Experience != 100)
                 amount = Math.Max(1, amount * dungeon.Experience / 100);
+            // A dungeon room's pack made for a party gives each more (B5a, World.DungeonParty).
+            if (PackOf(enemy) is Pack pack && pack.Players > 1) amount = (int)MathF.Round(amount * DungeonParty(DungeonExperiencePerPlayer, pack.Players));
             if (FullMoonNight) amount = amount * FullMoonExperiencePercent / 100;
             foreach (var player in _players)
             {

@@ -11,10 +11,13 @@ namespace CoreSandbox
     // nearest pack room not yet emptied today. Kills, experience and drops a minute, the hurt it took, and the seconds
     // each pack took from its alarm to its last fall. With --no-packs the same world brings its monsters one by one,
     // as before packs, for the numbers to set beside. With --camps (묶음 2-2) it goes from elite camp to elite camp
-    // instead, and says how the elites went (EliteWatch).
+    // instead, and says how the elites went (EliteWatch). With --players n (B5a) n−1 more bots like it come along: they
+    // fight what is near them and otherwise keep up with the first, so the packs come as for a party (World.Packs); the
+    // experience is the first bot's (each near a kill gets all of it), the falls are all of theirs.
     static class RoomFightSim
     {
-        public static void Run(BotSheets sheets, int seconds, ulong seed, string[] gear, ClassDefinition[] classes, bool dodge, string biomeName, bool camps = false)
+        public static void Run(BotSheets sheets, int seconds, ulong seed, string[] gear, ClassDefinition[] classes, bool dodge, string biomeName, bool camps = false,
+            int players = 1, float reaction = 0.25f)
         {
             Biome? biome = biomeName == "any" ? (Biome?)null : (Biome)Enum.Parse(typeof(Biome), biomeName, ignoreCase: true);
             var host = new WorldHost(seed, sheets.Monsters, sheets.Loot, bosses: sheets.Bosses, classes: sheets.Classes, tiles: sheets.Tiles,
@@ -32,6 +35,19 @@ namespace CoreSandbox
             }
             var player = world.AddPlayer("bot", equipment, classes);
             var skills = new SkillBot(player, sheets.Loot);
+            var companions = new List<(Player Player, SkillBot Skills, FlowField ToEnemies)>();
+            for (int i = 1; i < players; i++)
+            {
+                var their = new Equipment();
+                foreach (string id in gear)
+                {
+                    var itemBase = sheets.Loot.FindBase(id);
+                    their.Equip(generator.RollItem(itemBase, itemBase.Level, Rarity.Common, random));
+                }
+                var companion = world.AddPlayer("bot" + i, their, classes);
+                companions.Add((companion, new SkillBot(companion, sheets.Loot), new FlowField(world.Map)));
+            }
+            var toLeader = new FlowField(world.Map);
 
             // The camps of "any" are the plain cave's: the stage a copper sword is for.
             bool InBiome(RoomNode r) => biome == null ? !camps || r.Biome == Biome.Cave : r.Biome == biome;
@@ -47,6 +63,7 @@ namespace CoreSandbox
             var start = first.Edges.Select(i => rooms.Edges[i]).Select(e => rooms.Nodes[e.A == first.Index ? e.B : e.A])
                 .Where(n => n.Role != RoomRole.Pack && n.Role != RoomRole.Elite).OrderBy(n => n.Depth).FirstOrDefault() ?? first;
             player.Position = TileMap.Center(start.AnchorX, start.AnchorY);
+            foreach (var (companion, _, _) in companions) companion.Position = Collision.Resolve(world.Map, player.Position + new Vec2(0.8f, 0), World.PlayerRadius);
             // The zone levels of the biome's pack rooms (World.ZoneLevelAt), to set a dungeon's level beside (B4b).
             var zones = packRooms.Select(r => world.ZoneLevelAt(r.Center)).ToList();
             Console.WriteLine($"무리 방의 구역 레벨 {zones.Min()}~{zones.Max()} (가장 가까운 방 {world.ZoneLevelAt(first.Center)})");
@@ -84,7 +101,7 @@ namespace CoreSandbox
                 if (near.Count > 0 || player.IsDead)
                 {
                     if (tick % 10 == 0) toEnemies.Build(world.Enemies.Where(e => !e.Away && Vec2.Distance(e.Position, player.Position) < 24).Select(e => e.Position), 40);
-                    FightSim.Drive(world, player, toEnemies, dodge);
+                    FightSim.Drive(world, player, toEnemies, dodge, reaction);
                 }
                 else
                 {
@@ -106,12 +123,33 @@ namespace CoreSandbox
                     var way = goal == null ? Vec2.Zero : toRoom.DirectionFrom(player.Position);
                     // There, or no way on from here: that room is done with.
                     if (goal != null && (way.LengthSquared < 1e-6f || Vec2.Distance(player.Position, TileMap.Center(goal.AnchorX, goal.AnchorY)) < 2)) emptied.Add(goal.Index);
-                    var flee = dodge ? BossSim.Escape(world, player, World.Ticks(0.25f)) : Vec2.Zero;
+                    var flee = dodge ? BossSim.Escape(world, player, World.Ticks(reaction)) : Vec2.Zero;
                     RollBot.Move(world, player, flee.LengthSquared > 0 ? flee : way, way, flee, dodge);
                     idleTicks++;
                 }
                 var nearest = near.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
                 skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
+                // The others: what is after them or the first bot, else on after the first bot.
+                if (companions.Count > 0 && tick % 10 == 0) toLeader.Build(new[] { player.Position }, 200);
+                foreach (var (companion, theirSkills, theirEnemies) in companions)
+                {
+                    var theirNear = world.Enemies.Where(e => !e.Away && !e.IsDead && (Vec2.Distance(e.Position, companion.Position) < 16 || Vec2.Distance(e.Position, player.Position) < 10)
+                        && (e.State != EnemyState.Idle && !e.Returning || Vec2.Distance(e.Position, companion.Position) < 5)).ToList();
+                    if (theirNear.Count > 0 || companion.IsDead)
+                    {
+                        if (tick % 10 == 0) theirEnemies.Build(world.Enemies.Where(e => !e.Away && Vec2.Distance(e.Position, companion.Position) < 24).Select(e => e.Position), 40);
+                        FightSim.Drive(world, companion, theirEnemies, dodge, reaction);
+                    }
+                    else
+                    {
+                        world.SetAttacking(companion.Id, false);
+                        var way = Vec2.Distance(companion.Position, player.Position) > 2.5f ? toLeader.DirectionFrom(companion.Position) : Vec2.Zero;
+                        var flee = dodge ? BossSim.Escape(world, companion, World.Ticks(reaction)) : Vec2.Zero;
+                        RollBot.Move(world, companion, flee.LengthSquared > 0 ? flee : way, way, flee, dodge);
+                    }
+                    var theirNearest = theirNear.OrderBy(e => Vec2.Distance(e.Position, companion.Position)).FirstOrDefault();
+                    theirSkills.Use(world, theirNearest?.Position ?? companion.Position, theirNearest != null && Vec2.Distance(theirNearest.Position, companion.Position) < 8);
+                }
                 foreach (var enemy in world.Enemies) names[enemy.Id] = enemy.Definition.Name;
                 var packOf = world.Enemies.Where(e => e.PackId != 0).ToDictionary(e => e.Id, e => e.PackId);
                 world.Step();
@@ -120,6 +158,8 @@ namespace CoreSandbox
                 foreach (var e in events)
                 {
                     skills.Count(e);
+                    foreach (var (_, theirSkills, _) in companions) theirSkills.Count(e);
+                    if (companions.Any(c => c.Player.Id == e.Source) && e.Type == SimEventType.Died) deaths++;
                     if (e.Type == SimEventType.Alerted && packOf.TryGetValue(e.Source, out int alarm) && !alarmed.ContainsKey(alarm))
                     {
                         alarmed[alarm] = world.Tick;
@@ -155,7 +195,7 @@ namespace CoreSandbox
             float minutes = seconds / 60f;
             int experience = player.Experience - startExperience;
             Console.WriteLine($"seed = {seed}, {seconds}초, 방으로 된 지도({biomeName}{(camps ? ", 정예 야영지로" : "")}), 무리: {(sheets.Monsters.Packs != null ? "있음" : "없음(하나씩)")}, 장비: {string.Join(", ", gear)}, "
-                + $"클래스: {FightSim.ClassNames(classes)}, 피하기: {(dodge ? "켬" : "끔")}");
+                + $"클래스: {FightSim.ClassNames(classes)}, 피하기: {(dodge ? "켬" : "끔")}" + (players > 1 ? $", 사람 {players}(경험치는 한 사람 것)" : "") + (reaction != 0.25f ? $", 반응 {reaction}초" : ""));
             Console.WriteLine($"처치 {kills} (분당 {kills / minutes:0.0}), 경험치 {experience} (분당 {experience / minutes:0.0}), 떨어진 것 {drops} (분당 {drops / minutes:0.0}, 장비 {items}), 사망 {deaths}");
             Console.WriteLine($"받은 피해 {taken} (초당 {taken / (float)seconds:0.0}), 최대 생명력 {player.Stats.MaxHealth:0}, 레벨 {player.Level}, 마신 물약 {skills.Drunk}개");
             Console.WriteLine($"만난 무리 {packsMet}, 다 잡은 무리 {packSeconds.Count} (마리 {(packSizes.Count > 0 ? packSizes.Average() : 0):0.0}, 걸린 초 평균 {(packSeconds.Count > 0 ? packSeconds.Average() : 0):0.0}, "

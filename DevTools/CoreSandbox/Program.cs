@@ -152,6 +152,10 @@ namespace CoreSandbox
                 args = args.Where((_, i) => i != missFlag && i != missFlag + 1).ToArray();
             }
 
+            // TEMP B5 tuning
+            if (Environment.GetEnvironmentVariable("B5_H") is string b5h) World.DungeonHealthPerPlayer = float.Parse(b5h, System.Globalization.CultureInfo.InvariantCulture);
+            if (Environment.GetEnvironmentVariable("B5_E") is string b5e) World.DungeonExperiencePerPlayer = float.Parse(b5e, System.Globalization.CultureInfo.InvariantCulture);
+            if (Environment.GetEnvironmentVariable("B5_M") is string b5m) World.BigElitePerPlayer = float.Parse(b5m, System.Globalization.CultureInfo.InvariantCulture);
             var data = LoadLoot();
             switch (args.Length > 0 ? args[0] : "")
             {
@@ -165,7 +169,7 @@ namespace CoreSandbox
                     PrintProgression(data, Number(1, 2000), Seed(2));
                     break;
                 case "--fight" when roomsBiome != null:
-                    RoomFightSim.Run(LoadSheets(data), Number(1, 180), Seed(2), gear, LoadClasses(classIds), dodge, roomsBiome, camps);
+                    RoomFightSim.Run(LoadSheets(data), Number(1, 180), Seed(2), gear, LoadClasses(classIds), dodge, roomsBiome, camps, players, reaction);
                     break;
                 case "--fight":
                     FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge, onlyMonsters);
@@ -231,7 +235,7 @@ namespace CoreSandbox
                 // --dungeon <id> [seeds] (묶음 5b): bots run a dungeon of dungeons.csv to its end chest (DungeonSim).
                 case "--dungeon":
                     var dungeonSeeds = args.Length > 2 && !args[2].StartsWith("--") ? args[2].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 };
-                    DungeonSim.Run(LoadSheets(data), args.Length > 1 ? args[1] : "abandoned_mine", dungeonSeeds, players, gear, LoadClasses(classIds), dodge);
+                    DungeonSim.Run(LoadSheets(data), args.Length > 1 ? args[1] : "abandoned_mine", dungeonSeeds, players, gear, LoadClasses(classIds), dodge, reaction);
                     break;
                 // --traps [seeds] (묶음 B1c): the grates each trap room of the game's world falls with (TrapCuts).
                 case "--traps":

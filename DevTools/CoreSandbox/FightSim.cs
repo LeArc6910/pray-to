@@ -108,7 +108,8 @@ namespace CoreSandbox
 
         public static string ClassNames(ClassDefinition[] classes) => classes.Length == 0 ? "없음" : string.Join(" + ", classes.Select(c => c.Name));
 
-        internal static void Drive(World world, Player player, FlowField toEnemies, bool dodge)
+        // reaction: the seconds a telegraph is up before the bot steps out of it (--reaction, as --boss has it).
+        internal static void Drive(World world, Player player, FlowField toEnemies, bool dodge, float reaction = 0.25f)
         {
             if (player.IsDead) return;
             // One under the ground cannot be hit: the bot goes for what it can reach (and steps off marks meanwhile).
@@ -120,7 +121,7 @@ namespace CoreSandbox
             if (target == null)
             {
                 world.SetAttacking(player.Id, false);
-                var flee = dodge ? BossSim.Escape(world, player, World.Ticks(0.25f)) : Vec2.Zero;
+                var flee = dodge ? BossSim.Escape(world, player, World.Ticks(reaction)) : Vec2.Zero;
                 // Nothing to hit but mounds: toward the nearest, as a player who sees one goes to spring it.
                 var mound = world.Enemies.Where(e => e.Buried).OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
                 var go = flee.LengthSquared > 0 || mound == null ? flee : (mound.Position - player.Position).Normalized;
@@ -132,7 +133,7 @@ namespace CoreSandbox
             float gap = toTarget.Length - target.Definition.Radius - World.PlayerRadius;
             float reach = Reach(player);
             var input = Vec2.Zero;
-            var escape = dodge ? BossSim.Escape(world, player, World.Ticks(0.25f)) : Vec2.Zero;
+            var escape = dodge ? BossSim.Escape(world, player, World.Ticks(reaction)) : Vec2.Zero;
             if (escape.LengthSquared > 0)
             {
                 // Out of a charger's marked path or a shot's way.

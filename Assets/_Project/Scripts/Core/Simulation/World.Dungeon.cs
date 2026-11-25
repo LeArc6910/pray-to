@@ -183,11 +183,20 @@ namespace Game.Core
         // camp leader's LeaderHealth), and this share more for each player past the first, as the bosses have.
         public const int BigEliteAffixes = 2;
         public const float BigEliteHealth = 12;
-        public const float BigElitePerPlayer = 0.6f;
+        public static float BigElitePerPlayer = 0.6f;
         // A mid-boss in person (dungeons.csv boss = a monster id, B1c): its affixes, and its health as its zone made it
         // times this (an XL is already twelve times an M body; MakeElite leaves an XL leader's health as it is).
         public const int MasterAffixes = 1;
         public const float MasterHealth = 1;
+        // A party in a dungeon (B5a, Docs/BiomeRework.md B5a): for each player past the first that was inside when a room
+        // woke, its monsters have this share more health (the master BigElitePerPlayer, the rest DungeonHealthPerPlayer)
+        // and each gives this share more experience, so two take about as long as one and each gets about what the
+        // field gives two a minute. PackExtraPerPlayer more monsters come as in the field.
+        public static float DungeonHealthPerPlayer = 0.7f;
+        public static float DungeonExperiencePerPlayer = 0.6f;
+
+        // The health (or experience) a dungeon's monster is made with for that many players: 1 for one.
+        public static float DungeonParty(float perPlayer, int players) => 1 + perPlayer * Math.Max(0, players - 1);
 
         static bool InPerson(DungeonInstance dungeon, MonsterDefinition kind) =>
             dungeon.Definition != null && dungeon.Definition.Master && kind != null && kind.Id == dungeon.Definition.Boss;
@@ -696,7 +705,7 @@ namespace Game.Core
                 if (!roster.Any(k => k.Big) && DungeonBig(choices, random) is MonsterDefinition big) roster.Insert(0, big);
             }
 
-            var pack = new Pack(_nextPackId++, null, 0, room.Center) { Definition = definition, Active = true, Alerted = false, Day = Today, Shares = true, Elite = rank, Affixes = affixes };
+            var pack = new Pack(_nextPackId++, null, 0, room.Center) { Definition = definition, Active = true, Alerted = false, Day = Today, Shares = true, Elite = rank, Affixes = affixes, Players = Math.Max(1, players) };
             _packs[pack.Id] = pack;
             dungeon.PackIds[room.Index] = pack.Id;
             bool Fits(Vec2 at)
@@ -729,11 +738,16 @@ namespace Game.Core
                 // A big body keeps to its room of the dungeon.
                 Bind(enemy, room.Center, Math.Max(room.Box.W, room.Box.H) / 2f);
                 if (rank == EliteRank.Champion || rank == EliteRank.Leader && i == 0) MakeElite(enemy, rank, affixes);
-                if (room.Letter != 'B' || i != 0) continue;
+                if (room.Letter != 'B' || i != 0)
+                {
+                    // The rest of a room for a party: tougher (B5a).
+                    enemy.MaxHealth = enemy.Health = enemy.MaxHealth * DungeonParty(DungeonHealthPerPlayer, players);
+                    continue;
+                }
                 // The master: BigEliteHealth in place of a leader's (a mid-boss in person its own, MasterHealth), and more
                 // for each player.
                 float share = InPerson(dungeon, enemy.Definition) ? MasterHealth : BigEliteHealth / LeaderHealth;
-                enemy.MaxHealth = enemy.Health = enemy.MaxHealth * share * (1 + BigElitePerPlayer * Math.Max(0, players - 1));
+                enemy.MaxHealth = enemy.Health = enemy.MaxHealth * share * DungeonParty(BigElitePerPlayer, players);
                 dungeon.BossId = enemy.Id;
                 TellDungeon(dungeon, DungeonBossWoke, enemy.Position, enemy.Id);
             }

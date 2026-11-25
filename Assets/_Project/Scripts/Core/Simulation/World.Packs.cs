@@ -41,6 +41,9 @@ namespace Game.Core
         // affixes. None for an ordinary pack.
         public EliteRank Elite { get; internal set; }
         public RiftAffix Affixes { get; internal set; }
+        // The players a dungeon room's pack was made for (World.WakeRoom, B5a): its monsters are as much tougher and
+        // worth as much more as World.DungeonParty says. 1 everywhere else.
+        public int Players { get; internal set; } = 1;
         public int Size => Roster.Count;
         public int FallenCount => Fallen.Count(f => f);
         // Every one of today's roster fell: the room is empty until dawn.

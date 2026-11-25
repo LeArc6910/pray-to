@@ -16,7 +16,7 @@ namespace CoreSandbox
     {
         const int MostSeconds = 25 * 60;
 
-        public static void Run(BotSheets sheets, string id, IEnumerable<ulong> seeds, int players, string[] gear, ClassDefinition[] classes, bool dodge)
+        public static void Run(BotSheets sheets, string id, IEnumerable<ulong> seeds, int players, string[] gear, ClassDefinition[] classes, bool dodge, float reaction = 0.25f)
         {
             var definition = sheets.Tiles.Terrain.Dungeons.Find(id);
             if (definition == null)
@@ -25,22 +25,23 @@ namespace CoreSandbox
                 return;
             }
             var biome = definition.Biome ?? (definition.Cellar ? Biome.Cave : Biome.Sand);
-            Console.WriteLine($"== {definition.Name} ({definition.Id}, {biome}), 사람 {players}, 장비 {string.Join(", ", gear)}, 클래스 {FightSim.ClassNames(classes)}, 레벨 {SkillBot.Level?.ToString() ?? "-"} ==");
+            Console.WriteLine($"== {definition.Name} ({definition.Id}, {biome}), 사람 {players}, 장비 {string.Join(", ", gear)}, 클래스 {FightSim.ClassNames(classes)}, 레벨 {SkillBot.Level?.ToString() ?? "-"}{(reaction != 0.25f ? $", 반응 {reaction}초" : "")}{(RollBot.Miss > 0 ? $", 구르기 놓침 {RollBot.Miss}" : "")} ==");
             Console.WriteLine("시드  방(글자)            완주   쓰러짐  금화값  분당  경험치  분당  장비(희귀+)  방마다 걸린 초");
             var totals = new List<(float Seconds, int Deaths, int Value, int Experience, bool Done)>();
             foreach (ulong seed in seeds)
             {
-                var result = One(sheets, definition, biome, seed, players, gear, classes, dodge);
+                var result = One(sheets, definition, biome, seed, players, gear, classes, dodge, reaction);
                 totals.Add((result.Seconds, result.Deaths, result.Value, result.Experience, result.Done));
             }
             var done = totals.Where(t => t.Done).ToList();
             if (done.Count > 0)
                 Console.WriteLine($"평균(끝낸 {done.Count}/{totals.Count}): {done.Average(t => t.Seconds) / 60:0.0}분, 쓰러짐 {done.Average(t => t.Deaths):0.0}, 금화값 {done.Average(t => t.Value):0} (분당 {done.Average(t => t.Value / Math.Max(1, t.Seconds / 60)):0}), "
-                    + $"경험치 {done.Average(t => t.Experience):0} (분당 {done.Average(t => t.Experience / Math.Max(1, t.Seconds / 60)):0})");
+                    + $"경험치 {done.Average(t => t.Experience):0} (분당 {done.Average(t => t.Experience / Math.Max(1, t.Seconds / 60)):0}"
+                    + (players > 1 ? $", 사람마다 분당 {done.Average(t => t.Experience / Math.Max(1, t.Seconds / 60)) / players:0}" : "") + ")");
         }
 
         static (float Seconds, int Deaths, int Value, int Experience, bool Done) One(BotSheets sheets, DungeonDefinition definition, Biome biome, ulong seed, int players,
-            string[] gear, ClassDefinition[] classes, bool dodge)
+            string[] gear, ClassDefinition[] classes, bool dodge, float reaction)
         {
             var host = new WorldHost(seed, sheets.Monsters, sheets.Loot, bosses: sheets.Bosses, classes: sheets.Classes, tiles: sheets.Tiles,
                 guide: sheets.Guide, npcs: sheets.Npcs, config: new HostConfig { MapSize = WorldGenerator.GameSize, MapVersion = WorldGenerator.RoomVersion },
@@ -87,12 +88,22 @@ namespace CoreSandbox
             DungeonRoom builtFor = null;
             bool builtOpen = false;
             var woke = new Dictionary<int, long>();
+            // A bot that stood still and struck nothing this long with something "near" it (a monster bound to a room across the rock, chasing
+            // at its edge: B5a, the duo's 잠긴 수로) leaves those be until they come within StuckClose or the next goal.
+            const float StuckSeconds = 10, StuckClose = 3;
+            var ignored = new HashSet<int>();
+            var still = bots.ToDictionary(b => b.Player.Id, b => (At: b.Player.Position, Since: 0L));
+            var struck = new HashSet<int>();
             var roomSeconds = new List<(char Letter, float Seconds)>();
             var seenLoot = new HashSet<int>();
             int floorValue = 0, rares = 0;
             for (int tick = 0; tick < MostSeconds * World.TicksPerSecond && dungeon.State != DungeonState.Done; tick++)
             {
-                while (goal < goals.Count && Reached(world, dungeon, goals[goal], bots.Select(b => b.Player))) goal++;
+                while (goal < goals.Count && Reached(world, dungeon, goals[goal], bots.Select(b => b.Player)))
+                {
+                    goal++;
+                    ignored.Clear();
+                }
                 var room = goal < goals.Count ? goals[goal] : null;
                 // The way: to its middle, or, to a locked room still shut, to the grate.
                 bool open = room == null || room.Letter != 'L' || dungeon.Has(DungeonFlags.KeyDoorOpen);
@@ -107,7 +118,15 @@ namespace CoreSandbox
                 foreach (var (player, skills) in bots)
                 {
                     var near = world.Enemies.Where(e => !e.Away && !e.IsDead && world.DungeonAt(e.Position) == dungeon && Vec2.Distance(e.Position, player.Position) < 14
-                        && (e.State != EnemyState.Idle && !e.Returning || Vec2.Distance(e.Position, player.Position) < 6)).ToList();
+                        && (e.State != EnemyState.Idle && !e.Returning || Vec2.Distance(e.Position, player.Position) < 6)
+                        && (!ignored.Contains(e.Id) || Vec2.Distance(e.Position, player.Position) < StuckClose)).ToList();
+                    if (Vec2.Distance(still[player.Id].At, player.Position) > 0.05f || near.Count == 0 || player.IsDead || struck.Contains(player.Id)) still[player.Id] = (player.Position, world.Tick);
+                    else if (world.Tick - still[player.Id].Since > World.Ticks(StuckSeconds))
+                    {
+                        foreach (var e in near) ignored.Add(e.Id);
+                        still[player.Id] = (player.Position, world.Tick);
+                        near.Clear();
+                    }
                     // The last of the goal room's pack standing idle at its edge (a split slime, a rat out of the light),
                     // once the bot stands in the room: gone after, so the room is cleared.
                     var left = near.Count > 0 || room == null || !DungeonSheet.HasPack(room.Letter) || !dungeon.RoomWoken(room.Index) || !room.Contains(player.Position, 1)
@@ -116,7 +135,7 @@ namespace CoreSandbox
                     if (near.Count > 0 || player.IsDead)
                     {
                         if (tick % 10 == 0) toEnemies.Build(world.Enemies.Where(e => !e.Away && world.DungeonAt(e.Position) == dungeon && Vec2.Distance(e.Position, player.Position) < 24).Select(e => e.Position), 40);
-                        FightSim.Drive(world, player, toEnemies, dodge);
+                        FightSim.Drive(world, player, toEnemies, dodge, reaction);
                     }
                     else if (left.Count > 0)
                     {
@@ -139,8 +158,10 @@ namespace CoreSandbox
                     skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
                 }
                 world.Step();
+                struck.Clear();
                 foreach (var e in world.TakeEvents())
                 {
+                    if (e.Type == SimEventType.Hit) struck.Add(e.Source);
                     foreach (var (player, skills) in bots) skills.Count(e);
                     if (e.Type == SimEventType.Died && bots.Any(b => b.Player.Id == e.Source)) deaths++;
                     // DUNGEON_DUMP=2: each blow a bot takes, by whom and which attack (0: a burn, a pool, a vent).
