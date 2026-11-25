@@ -295,7 +295,7 @@ namespace Game.Core
             int cause = Cause(boss, attack);
 
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
-            // Its follow-up (then column) is marked now too and lands a moment after: one roll does not clear both.
+            // Its follow-up (follow column) is marked now too and lands a moment after: one roll does not clear both.
             if (attack.FollowUp != null && !again)
                 LayHazards(boss, attack.FollowUp, target, fighters, boss.Facing, resolve + Ticks(attack.FollowDelay), Cause(boss, attack.FollowUp));
             if (attack.Shape == AttackShape.Charge) boss.ChargeDirection = boss.Facing;

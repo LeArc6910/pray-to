@@ -168,7 +168,7 @@ namespace Game.Core
         public float Linger { get; }
 
         // Another attack of the same boss laid at the same moment on the same target, landing FollowDelay seconds
-        // after this one (2026-11-25, then column "attack:seconds"). The gap is longer than a roll's unhurt moment and
+        // after this one (2026-11-25, follow column "attack:seconds"). The gap is longer than a roll's unhurt moment and
         // shorter than its cooldown, so the roll that clears the first does not clear the second: the way out of one
         // is to walk, or to roll out of both at once.
         public BossAttack FollowUp { get; internal set; }
@@ -434,7 +434,7 @@ namespace Game.Core
                         pool.Seconds);
                     Validate(attack);
                     boss.Add(attack);
-                    if (row["then"].Length > 0) follows.Add((attack, boss, row["then"], row.Line));
+                    if (row["follow"].Length > 0) follows.Add((attack, boss, row["follow"], row.Line));
                 });
             }
             foreach (var (attack, boss, cell, line) in follows)
@@ -444,12 +444,12 @@ namespace Game.Core
                     var parts = cell.Split(':');
                     var next = boss.Attacks.FirstOrDefault(a => a.Id == parts[0].Trim());
                     if (parts.Length != 2 || next == null)
-                        throw new FormatException($"then은 '{boss.Id}'의 공격 id와 초를 :로 적습니다. 예: whirlpool:0.5('{cell}')");
-                    float delay = SheetValues.ParseDecimal(parts[1].Trim(), "then");
+                        throw new FormatException($"follow는 '{boss.Id}'의 공격 id와 초를 :로 적습니다. 예: whirlpool:0.5('{cell}')");
+                    float delay = SheetValues.ParseDecimal(parts[1].Trim(), "follow");
                     if (!(attack.LaysAreas || attack.GoesAway) || !next.LaysAreas || next == attack || next.FollowUp != null)
-                        throw new FormatException("then은 바닥에 떨어지는 공격(circle, cone, line, ring, cross, trail, 앞에는 burrow·leap도) 뒤에 다른 그런 공격 하나만 잇습니다.");
+                        throw new FormatException("follow는 바닥에 떨어지는 공격(circle, cone, line, ring, cross, trail, 앞에는 burrow·leap도) 뒤에 다른 그런 공격 하나만 잇습니다.");
                     if (delay < LeastFollowDelay || delay > MostFollowDelay)
-                        throw new FormatException($"then의 초는 {LeastFollowDelay.ToString(CultureInfo.InvariantCulture)}~{MostFollowDelay.ToString(CultureInfo.InvariantCulture)}초여야 합니다(구르기의 무적보다 길고 다시 쓰기보다 짧게).");
+                        throw new FormatException($"follow의 초는 {LeastFollowDelay.ToString(CultureInfo.InvariantCulture)}~{MostFollowDelay.ToString(CultureInfo.InvariantCulture)}초여야 합니다(구르기의 무적보다 길고 다시 쓰기보다 짧게).");
                     attack.FollowUp = next;
                     attack.FollowDelay = delay;
                 }
@@ -460,7 +460,7 @@ namespace Game.Core
             }
         }
 
-        // The gap a follow-up lands after the first (then column): past a roll's unhurt ticks with the host's slack
+        // The gap a follow-up lands after the first (follow column): past a roll's unhurt ticks with the host's slack
         // (World.DodgeSeconds + World.RollSlackTicks), and short of its cooldown (World.RollCooldownSeconds).
         public const float LeastFollowDelay = 0.3f;
         public const float MostFollowDelay = 0.8f;

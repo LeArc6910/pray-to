@@ -41,22 +41,22 @@ namespace Game.Core.Tests
             Assert.IsTrue(data.Errors.Any(e => e.Contains("boss_attacks.csv") && e.Contains(expected)), string.Join("\n", data.Errors));
         }
 
-        // The then column (2026-11-25): another attack of the same boss that lands a moment after, past a roll's unhurt
+        // The follow column (2026-11-25): another attack of the same boss that lands a moment after, past a roll's unhurt
         // ticks and short of its cooldown.
         [TestCase("b:0.5", null)]
         [TestCase("a:0.5", "바닥에 떨어지는")]
-        [TestCase("nobody:0.5", "then")]
-        [TestCase("b", "then")]
+        [TestCase("nobody:0.5", "follow")]
+        [TestCase("b", "follow")]
         [TestCase("b:0.1", "0.3~0.8")]
         [TestCase("b:1.0", "0.3~0.8")]
         [TestCase("c:0.5", "바닥에 떨어지는")]
-        public void ReadsWhatFollowsAnAttack(string then, string expected)
+        public void ReadsWhatFollowsAnAttack(string follow, string expected)
         {
             var data = Bosses.Parse(Bosses.BossesHeader + "dummy,허수아비,100,0,0,2,1,50,1,3,10\n",
-                Bosses.AttacksHeader.TrimEnd('\n') + ",warn,pool,then\n" +
+                Bosses.AttacksHeader.TrimEnd('\n') + ",warn,pool,follow\n" +
                 "dummy,b,나,,cone,nearest,1,5,,3,90,,,,,1,1,,,,\n" +
                 "dummy,c,다,,charge,nearest,1,5,,8,,2,,,10,1,1,,,,\n" +
-                $"dummy,a,가,,circle,nearest,1,5,2,,,,1,,,1,1,,,,{then}\n");
+                $"dummy,a,가,,circle,nearest,1,5,2,,,,1,,,1,1,,,,{follow}\n");
 
             if (expected == null)
             {

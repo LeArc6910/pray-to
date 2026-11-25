@@ -47,11 +47,11 @@ namespace Game.Core.Tests
             float cooldown = 1) =>
             $"dummy,a,공격,,{shape},{target},{telegraph},{damage},{radius},{length},{angle},{width},{count},{spread},{speed},{cooldown},1,{summon}\n";
 
-        // A slam with a ring that follows it (then column, 2026-11-25, Docs/BiomeRework.md B5b): the ring keeps clear
+        // A slam with a ring that follows it (follow column, 2026-11-25, Docs/BiomeRework.md B5b): the ring keeps clear
         // only the spot the slam marked.
         static BossDefinition SlamThenRing() => Bosses.Parse(
             Bosses.BossesHeader + "dummy,허수아비,1000,50,0,2,1,,1,3,10\n",
-            Bosses.AttacksHeader.TrimEnd('\n') + ",warn,pool,then\n" +
+            Bosses.AttacksHeader.TrimEnd('\n') + ",warn,pool,follow\n" +
             "dummy,slam,내려찍기,,circle,nearest,1,30,2,,,,1,,,5,1,,,,ripple:0.5\n" +
             "dummy,ripple,파문,,ring,nearest,1,20,2,7,,,,,,1,0,,,,\n").Find("dummy");
 
