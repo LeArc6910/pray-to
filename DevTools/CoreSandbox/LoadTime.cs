@@ -18,6 +18,7 @@ namespace CoreSandbox
             var longest = new Dictionary<string, double>();
             var before = new List<double>();
             var after = new List<double>();
+            var finish = new List<double>();
             foreach (ulong seed in seeds)
             {
                 // The stages one by one.
@@ -54,12 +55,14 @@ namespace CoreSandbox
                 clock.Restart();
                 var world = WorldGenerator.Generate(seed, size, size, sheets.Story, sheets.Bosses.Arenas, version, sheets.Tiles.Terrain);
                 var copy = world.Copy();
+                var built = Stopwatch.StartNew();
                 host = new WorldHost(seed, sheets.Monsters, sheets.Loot, new HostConfig { MapSize = size, MapVersion = version },
                     bosses: sheets.Bosses, classes: sheets.Classes, tiles: sheets.Tiles, guide: sheets.Guide, npcs: sheets.Npcs, story: sheets.Story, generated: world);
                 client = new WorldClient("a", "봇", sheets.Monsters, sheets.Bosses, sheets.Loot, sheets.Classes, null, sheets.Tiles) { Story = sheets.Story, Made = copy };
                 host.Receive(1, client.JoinMessage());
                 foreach (var outgoing in host.TakeOutgoing()) client.Receive(outgoing.Data);
                 after.Add(clock.Elapsed.TotalMilliseconds);
+                finish.Add(built.Elapsed.TotalMilliseconds);
                 if (client.Status != ClientStatus.Playing || !client.MapReused) throw new InvalidOperationException("The client did not take the host's map.");
             }
             int count = Math.Max(1, before.Count);
@@ -70,6 +73,7 @@ namespace CoreSandbox
                 Console.WriteLine($"{pair.Key,-10} {pair.Value / count,7:0} {longest[pair.Key],11:0}  {pair.Value / sum,5:P0}");
             Console.WriteLine($"generation {sum / count:0} ms a world");
             Console.WriteLine($"solo start before (made twice): {before.Average():0} ms, now (made once): {after.Average():0} ms");
+            Console.WriteLine($"now, after the world is made (the host built on it, the client on its copy, one frame): {finish.Average():0} ms, longest {finish.Max():0} ms");
         }
     }
 }

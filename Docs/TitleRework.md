@@ -68,6 +68,54 @@
 
 외형 고르기의 값은 `Core/Save/CharacterLook.cs`(이 문서와 함께 만듦)에 둔다. 색과 모양은 클라이언트 그림이 정한다.
 
+## T1 만든 것 (2026-11-25)
+
+T1(Core·저장·통신·로딩)이 T3 화면에 넘길 바탕. 화면은 아직 그대로이고, 로딩 동안만 임시로 메뉴 바탕 위에 단계 문구와 막대를 그린다(`GameRoot.DrawLoading`, T3가 바꾼다).
+
+### 저장본의 머리
+
+- **캐릭터 형식 20**: 외형(`CharacterLook`), 플레이한 초, 만든 때·마지막으로 한 때(유닉스 초, 클라이언트가 `DateTimeOffset`으로 넘긴다), 가 본 생물군계(`BiomeVisits` 비트). 옛 저장본은 기본 외형·0초·모름(0)·없음으로 읽는다. 만난 몬스터는 새로 적지 않고 도감의 처치 기록(`RecordKind.Kill`)에서 꺼낸다(많이 잡은 순 12종, 보스는 따로)
+- **월드 형식 17**: 머리의 `SavedAt`(= 마지막으로 한 때) 뒤에 만든 때, 호스트가 플레이한 초, 누구든 선 생물군계. 그래서 "가장 깊이 간 곳"을 보여 줄 수 있다(깊이 순서 `BiomeVisits.Order`: 흙 동굴 → 버섯 숲 → 얼음 → 모래 → 수정 → 지하 호수 → 용암 → 공허, 던전 레벨 순). 옛 월드는 다음 저장 때 그때를 만든 때로 적는다
+- 세는 곳: 캐릭터는 그 사람의 기기(`WorldClient`: `NotePlayed`, 걸음마다 `Visited`, `SaveCharacter(now)`), 월드는 호스트(`WorldHost`: `NotePlayed`, 틱마다 `NoteVisits`, `SaveWorld(now)`). `GameRoot`가 플레이 중 프레임마다 `Time.unscaledDeltaTime`을 넘긴다. 던전 주머니 안은 생물군계로 세지 않는다
+
+### 목록 (T3가 쓸 것)
+
+- `CharacterSave.ReadSummary(byte[] data, string name = "")` → `CharacterSummary`: `Name`, `Version`, `Look`, `Experience`, `Level`, `Classes`(id), `PlayedSeconds`, `CreatedAt`, `LastPlayedAt`, `Visited`, `VisitedBiomes`, `Monsters`(id, 12까지), `Bosses`(id), `JourneyStep`
+- `WorldSave.ReadSummary(byte[] data, string name = "")` → `WorldSummary`: `Name`, `Version`, `Seed`, `Width`, `Height`, `Generator`, `Clock`, `Day`, `CreatedAt`, `PlayedSeconds`, `LastPlayedAt`, `Visited`, `Deepest`(`Biome?`), `ProgressLevel`
+- 둘 다 깨진 저장본은 `InvalidDataException`. 시트 없이 읽고 월드를 만들지 않는다
+- `Client/SaveList.cs`: `SaveList.Characters()`·`SaveList.Worlds()` → `List<SaveList.Entry<T>>`(`Name`, `Key`, `Summary`, `Broken`, `IsBroken`, `LastPlayedAt`). 최근에 한 것부터, 모르는 옛 것은 그 뒤 이름순, 깨진 것은 맨 뒤(던지지 않는다). `SaveList.DeleteCharacter(name)`(캐릭터, 그 캐릭터의 모든 지도, `hotbar.`·`locks.`·`skillorder.`·`skillorder3.`·`guide.`·`guidepassed.` 설정), `SaveList.DeleteWorld(name)`, `SaveList.CharacterPrefs(name)`
+- `BiomeVisits`: `Order`, `Bit`, `Mark`, `Has`, `In(visited)`, `Deepest(visited)`. 시작화면 배경과 로딩 그림이 "가 본 곳만" 고를 때 쓴다
+- 고르기: 지금처럼 `GameRoot.PlayerName`·`WorldNameField`에 이름을 넣고 `StartSolo()`/`StartHost()`. 새 캐릭터의 외형은 시작 전에 `GameRoot.NewLook`(저장된 캐릭터는 제 외형을 쓴다)
+
+### 협동의 외형
+
+- 통신 0.108.0: `JoinMessage.Look`(참가하는 사람의 `CharacterLook.Packed`) → 호스트의 `Player.Look` → `RosterMessage.Looks`(이름과 같은 길)
+- 화면: `EntityView.Look`(다른 플레이어), `WorldClient.LookOf(playerId)`(나와 남 모두), `WorldClient.Look`(나). 명단이 오기 전에는 기본 외형. `WorldView`의 그리기는 그대로다(T2가 `HeroArt`로 외형을 그린 뒤 여기서 읽는다)
+
+### 로딩과 한 번만 만들기
+
+- `WorldGenerator.Steps(seed, width, height, story, arenas, version, terrain)` → `IEnumerable<GenerationStage>`(`Key`, `Fraction`, 마지막 `Done`에만 `World`). `Generate`는 이것을 끝까지 돌 뿐이라 결과가 같다(시험: 판 1~7, 시드 1~3, 256칸에서 지도 해시·아레나·장소·방·볼거리·랜드마크가 같다). 단계 열쇠는 `GenerationStage`의 상수(`caves`, `biomes`, `rooms`, `floors`, `ways`, `features`, `ore`, `pools`, `places`, `arenas`, `furnish`, `pois`, `rails`, `join`, `props`, `cellars`, `water`, `pocket`, `done`), 문구는 `GameRoot.LoadText(stage)`(`strings.csv`의 `load.*`, 한국어·영어)
+- `WorldGeneration`(한 단계씩: `Step()`, `Stage`, `Fraction`, `World`, `Done`), `Client/WorldLoader.cs`(프레임마다 12ms까지 단계를 돈다. 웹은 스레드가 없다)
+- 혼자·호스트: `StartHosting`은 저장본을 읽고 로더를 시작만 한다. 다 만들면 `FinishHosting`이 `WorldHost(..., generated: 만든 것)`을 세우고, 내 클라이언트는 만든 직후의 사본(`GeneratedWorld.Copy`, 지도만 복사)을 `WorldClient.Made`로 받아 다시 만들지 않는다(`MapReused`). 호스트를 만드는 동안 온 참가자의 메시지는 들고 있다가 넘긴다
+- 참가: `WorldClient.DeferMap = true`면 Welcome 뒤 지도를 `MapGeneration`으로 한 단계씩 만들고(`StepMap`), 그 사이 온 메시지(칸 바뀜, 명단, 스냅숏)를 들고 있다가 차례로 받는다. 같은 로딩 화면이 나온다
+- 화면이 읽을 것: `GameRoot.Loading`, `LoadStage`, `LoadFraction`. 플레이 시험 보고(`report`)에 `loading`, `loadStage`, `loadFraction`. 만드는 중에 `solo`를 다시 보내면 `error solo: still making the world`
+- PlayMode 시험은 시작 뒤 고정 1초 대신 `TestSaves.UntilPlaying(root, then, timeout = 15)`로 기다린다
+
+### 잰 값 (데스크톱 .NET, `CoreSandbox --loadtime 1,2,3,4,5`, 1024칸, 7판)
+
+| | 전 | 뒤 |
+|---|---|---|
+| 혼자 하기 시작(생성 + 호스트 + 내 클라이언트) | 1220 ms, 한 프레임 안에서 지도를 두 번 | 528 ms, 지도는 한 번 |
+| 가장 긴 한 프레임 | 1.2~1.8초 전부 | 데워진 뒤 단계 하나 약 0.1초(방 잇기 80~150ms, 장소 50~110ms, 선로 40~120ms). 처음 한 번(JIT)은 300~400ms까지 |
+| 다 만든 뒤 호스트와 클라이언트를 세우는 프레임 | — | 15 ms(가장 긴 21 ms) |
+
+1판 동굴(옛 월드)은 동굴 만들기가 한 단계라 350~500ms가 한 프레임이다(`--loadtime --gen 1`). 웹은 이 값의 몇 배다. 단계 무게(`GenerationStage.WeightOf`)는 위 값으로 정해서 막대가 고르게 간다.
+
+### T2·T3에 넘길 것
+
+- T2: 외형을 그릴 때 `EntityView.Look`·`WorldClient.LookOf`를 읽으면 된다. `CharacterLook.cs`의 상수(가짓수)는 T1이 바꾸지 않았다
+- T3: 로딩 화면은 `DrawLoading`을 바꾸면 된다(`DrawScreen`이 `Loading`일 때 부른다). 로딩 그림은 고른 캐릭터의 `CharacterSummary.VisitedBiomes`·`Monsters`로. 캐릭터·월드 목록은 `SaveList`, 지우기 확인 뒤 `SaveList.DeleteCharacter`/`DeleteWorld`. 지금의 [저장본] 화면(`SaveMenu`)의 지우기는 손대지 않았다(설정은 남긴다)
+
 ## 6. 자료 목록
 
 [1] Terraria Wiki, 1.4.0.1 — https://terraria.wiki.gg/wiki/1.4.0.1
