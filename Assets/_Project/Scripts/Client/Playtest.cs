@@ -19,6 +19,7 @@ namespace Game.Client
     //
     // Anywhere:
     //   solo [name] [keep]        start a solo game; a fresh world and character unless "keep"
+    //   title [page]              open the title's page (main characters make worlds newworld together saves settings keys)
     //   probe on|off              keep the drawn buttons (Ui.LastDrawn) for "buttons"
     //   buttons                   JSON: every button drawn last frame, with its rect in points; the skill and quick slots
     //   texts                     JSON: the HUD's lines, the corner lines, the banner, the menu's status line, the labels laid out with Ui.Wrap
@@ -206,8 +207,13 @@ namespace Game.Client
                     root.PlayerName = name;
                     root.WorldNameField = name;
                     root.ForgetCharacterClasses();
+                    // A character made here looks as every one did before looks (the title's making page is the "title" one).
+                    root.NewLook = CharacterLook.Default;
                     root.StartSolo();
                     return null;
+                case "title":
+                    // The title's pages by name (T3): main characters make worlds newworld together saves settings keys.
+                    return root.OpenTitle(words.Length > 1 ? words[1] : "main") ? null : $"error title: no page {(words.Length > 1 ? words[1] : "")} now";
                 case "touch":
                     Controls.ForceTouch(words[1] == "on");
                     return null;
@@ -2508,6 +2514,21 @@ namespace Game.Client
             json.Field("loading", root.Loading);
             json.Field("loadStage", root.LoadStage);
             json.Field("loadFraction", root.LoadFraction);
+            // The loading screen (T3): its tip, the biome of its picture and the monsters in it (ids).
+            json.Field("loadTip", root.LoadTip);
+            json.Field("loadBiome", root.LoadBiome);
+            json.Field("loadMonsters", root.LoadMonsters);
+            // The title (Docs/TitleRework.md, T3): the page ("main", "characters", "makecharacter", "worlds", "makeworld",
+            // "together", "saves", "settings", "keys"; "" while playing), the flow (solo, together), the character and world
+            // picked, those made but not played yet, the question over the page (deletecharacter, deleteworld, discard), the
+            // lists' rows as they write them ("name|Lv 3|12분 · 오늘|look hex", "name|day|time · ago"), the look on the making
+            // page (hex), and the drifting cave behind: the biomes in it (bits) and where its window is (pixels).
+            json.Field("title", new Json('{').Field("page", root.TitlePage).Field("flow", root.TitleFlow).Field("character", root.PlayerName)
+                .Field("world", root.PickedWorld).Field("newCharacter", root.NewCharacterName).Field("newWorld", root.NewWorldName).Field("ask", root.TitleAsk)
+                .Field("characters", Strings(root.CharacterRows)).Field("worlds", Strings(root.WorldRows)).Field("look", root.MakingLook.Packed.ToString("x6"))
+                .Field("backdrop", TitleBackdrop.Biomes).Field("pan", TitleBackdrop.Offset).Field("motion", !Settings.ReduceMotion).Raw('}'));
+            // The hub's question after [나가기] ([저장하고 나가기] / [남기], T3).
+            json.Field("leaveAsked", root.LeaveAsked);
             json.Field("screen", $"{Ui.Width:0}x{Ui.Height:0}");
             json.Field("touch", Controls.UsingTouch);
             json.Field("bag", root.BagOpen);

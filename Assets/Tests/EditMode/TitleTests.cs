@@ -229,6 +229,56 @@ namespace Game.Core.Tests
             var seen = bob.Others().Single(v => v.Id == alice.PlayerId);
             Assert.AreEqual(Picked, seen.Look);
             Assert.AreEqual(CharacterLook.Default, alice.Others().Single(v => v.Id == bob.PlayerId).Look);
+            Assert.IsTrue(bob.KnowsLookOf(alice.PlayerId));
+            Assert.IsTrue(alice.KnowsLookOf(bob.PlayerId), "a default look sent is still a look known");
+        }
+
+        // Until the host's roster carries a player's look the screen does not know it, and tells them apart by a tunic
+        // colour as before looks (T3).
+        [Test]
+        public void ALookIsUnknownUntilTheRosterBringsIt()
+        {
+            var client = Client();
+            Assert.IsTrue(client.KnowsLookOf(client.PlayerId), "its own");
+            Assert.IsFalse(client.KnowsLookOf(5));
+            Assert.AreEqual(CharacterLook.Default, client.LookOf(5));
+            client.Receive(new RosterMessage(new Dictionary<int, string> { [5] = "밥" }, null, new Dictionary<int, uint> { [5] = Picked.Packed }).Encode());
+            Assert.IsTrue(client.KnowsLookOf(5));
+            Assert.AreEqual(Picked, client.LookOf(5));
+        }
+
+        // ---- The new world page (T3) ----
+
+        [Test]
+        public void ASeedTypedMakesTheSameWorldEverywhere()
+        {
+            Assert.AreEqual(77UL, NewWorld.Seed("", 77), "empty: the random one");
+            Assert.AreEqual(77UL, NewWorld.Seed("   ", 77));
+            Assert.AreEqual(12345UL, NewWorld.Seed("12345", 1));
+            Assert.AreEqual(12345UL, NewWorld.Seed(" 12345 ", 1));
+            Assert.AreEqual(NewWorld.Seed("잠든 광산", 1), NewWorld.Seed("잠든 광산", 2), "text is hashed, not random");
+            Assert.AreNotEqual(NewWorld.Seed("잠든 광산", 1), NewWorld.Seed("잠든 광부", 1));
+            Assert.AreNotEqual(NewWorld.Seed("-5", 1), 1UL, "a sign is text");
+            Assert.AreEqual(unchecked((14695981039346656037UL ^ (ulong)'a') * 1099511628211UL), NewWorld.Seed("a", 0), "FNV-1a, the same on every device");
+        }
+
+        [Test]
+        public void RandomWorldNamesFitTheField()
+        {
+            var random = new GameRandom(3);
+            var names = new HashSet<string>();
+            for (int i = 0; i < 200; i++)
+            {
+                foreach (bool english in new[] { false, true })
+                {
+                    string name = NewWorld.RandomName(random, english);
+                    Assert.LessOrEqual(name.Length, NewWorld.NameLength, name);
+                    Assert.AreEqual(2, name.Split(' ').Length, name);
+                    Assert.IsTrue(SaveKeys.TryParse(SaveKeys.World(name), out var kind, out string parsed) && kind == SaveKind.World && parsed == name, name);
+                    names.Add(name);
+                }
+            }
+            Assert.Greater(names.Count, 100, "the dice give many");
         }
 
         // ---- Making the world ----

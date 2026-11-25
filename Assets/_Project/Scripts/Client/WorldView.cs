@@ -50,6 +50,11 @@ namespace Game.Client
             public string Id;
             // A player's tunic, a monster's sheet colour, the boss's stone.
             public Rgba Color;
+            // A player's look (CharacterLook, Docs/TitleRework.md): their own hair, skin and clothes. Null while it is not
+            // known (another player before the host's roster has carried it): then the tunic above, as before looks.
+            public CharacterLook? Style;
+            // The look the picture was last drawn in (its Packed plus one, 0 for the tunic).
+            public uint StyleShown;
             public int Seed;
             public float Diameter;
             // How far below its centre it stands, and how far above its centre the top of its sprite is.
@@ -607,6 +612,7 @@ namespace Game.Client
             Place(_self, selfPosition, _client.Facing, _client.Health, _client.MaxHealth, selfTint, selfGlow, deltaTime,
                 weapon: _client.Equipment[ItemSlot.Weapon]?.Base);
             _self.Name = _client.Name;
+            _self.Style = _client.Look;
             _self.Sleeping = _client.Sleeping;
             DrawPet(_client.PlayerId, _self, _client.Pet, deltaTime);
             ShowSnare();
@@ -1002,6 +1008,7 @@ namespace Game.Client
                     _others[view.Id] = body;
                 }
                 body.Name = view.IsPlayer ? view.Name : view.Kind == EntityKind.Boss && view.BossState != BossState.Dormant ? view.Boss.Name : null;
+                if (view.IsPlayer) body.Style = _client.KnowsLookOf(view.Id) ? view.Look : (CharacterLook?)null;
                 if (view.Kind == EntityKind.Boss) TrackBoss(body, view);
                 if (view.Kind == EntityKind.Monster)
                 {
@@ -3248,12 +3255,19 @@ namespace Game.Client
             // Down or drinking, the weapon is put away.
             var gear = dead || move == HeroMove.Rise || move == HeroMove.Drink ? HeroGear.None : body.Gear;
             int code = (((int)move * 8 + (int)look) * 128 + frame) * 4 + (left ? 1 : 0) + (blink ? 2 : 0);
-            if (code == body.Frame && gear.Key == body.GearShown) return;
+            var style = body.Style;
+            uint styleCode = style is CharacterLook known ? known.Packed + 1 : 0;
+            if (code == body.Frame && gear.Key == body.GearShown && styleCode == body.StyleShown) return;
             body.Frame = code;
             body.GearShown = gear.Key;
+            body.StyleShown = styleCode;
             var tunic = body.Color;
-            string key = $"hero/{gear.Key}/{Sprites.Key(tunic)}/{look}/{move}/{frame}{(blink ? "/blink" : "")}";
-            Func<PixelImage> draw = () => HeroArt.Draw(look, move, frame, gear, tunic, blink);
+            // Each look is its own sprite (HeroArt.Key); a player whose look is not known yet is the tunic's.
+            string paint = style is CharacterLook keyed ? HeroArt.Key(keyed) : Sprites.Key(tunic);
+            string key = $"hero/{gear.Key}/{paint}/{look}/{move}/{frame}{(blink ? "/blink" : "")}";
+            Func<PixelImage> draw = style is CharacterLook drawn
+                ? () => HeroArt.Draw(look, move, frame, gear, drawn, blink)
+                : () => HeroArt.Draw(look, move, frame, gear, tunic, blink);
             body.Shape.sprite = Sprites.Anchored(key, draw, HeroArt.FeetX, HeroArt.FeetY);
             body.White = () => Sprites.Anchored(key + "/white", () => draw().Silhouette(), HeroArt.FeetX, HeroArt.FeetY);
             body.Shape.flipX = left;

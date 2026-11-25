@@ -583,6 +583,10 @@ namespace Game.Client
                 DrawNote(note);
             }
             if (!any) PageLine("만난 사람에게 말을 걸면 그날의 부탁을 알려 준다", InkFaint);
+
+            // The loading screen's help again, all of it (Docs/TitleRework.md 4-4: tips can be read again in the journal).
+            PageHeading(Strings.T("journal.help", "도움말"));
+            for (int i = 0; i < Tips.Count; i++) PageLine("· " + Tips.Text(i), InkDark);
         }
 
         IReadOnlyList<NpcDefinition> People => _client.Npcs?.Npcs ?? (IReadOnlyList<NpcDefinition>)Array.Empty<NpcDefinition>();

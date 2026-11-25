@@ -1187,7 +1187,12 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(새 문자열 `load.*`). 새 파일 `Core/Save/CharacterLook.cs`, `Core/Save/SaveSummaries.cs`, `Core/World/GenerationStage.cs`, `Core/World/BiomeVisits.cs`, `Client/SaveList.cs`, `Client/WorldLoader.cs`, `Client/Art/HeroArt.Looks.cs`, `Client/Art/TitleArt.cs`, `Client/Art/LoadingArt.cs`, `Tests/EditMode/TitleTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.108.0, 캐릭터 저장 형식 20, 월드 저장 형식 17(옛 저장본은 그대로 열린다)
   - PlayMode 시험이 시작 뒤 1초가 아니라 `TestSaves.UntilPlaying`으로 들어갈 때까지 기다린다. 실패하면 Console 로그를 붙인다
   - (클라우드 웹 점검) `sweep.js --only menu,save,layout,basics`
+  - 클라우드 확인 (2026-11-25, `6d4b054`): [x] 130개 모두 통과(나눠 만드는 로딩과 새 저장 형식 뒤에도 PC·휴대폰 시작, 저장·불러오기, 내보내기 그대로)
   - (사람) 게임 시작이 전보다 빨라졌는지(혼자 하기가 지도를 한 번만 만든다), 들어가는 동안 임시 로딩 글이 보이는지. 화면 개편(T3)은 다음 단계
+- [ ] 178단계: 새 시작화면 — 흐르는 동굴 배경과 글자 단추, 캐릭터 목록·만들기(이름 + 외형), 월드 목록·만들기, 로딩 화면(가 본 곳의 장면·팁·막대), 메뉴·허브 새 모양, 협동에서 서로의 외형(`Docs/TitleRework.md` T3)
+  - 명령 한 줄을 다시 돌린다(문자열 `title.*`·`tip.*`). 새 파일 `Client/GameRoot.Title.cs`, `Client/GameRoot.Loading.cs`, `Client/TitleDraw.cs`, `Client/TitleBackdrop.cs`, `Client/Tips.cs`, `Core/Save/NewWorld.cs`, `Tests/PlayMode/TitleScreenTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 사진 `title`, `title-characters`, `title-make`, `title-worlds`, `title-newworld`, `title-settings`(각 `-touch`), `title-loading`, `title-hub`, `title-hub-ask`
+  - (클라우드 웹 점검) `sweep.js --only title,menu,save,layout,time,ui,touch`
+  - (사람) 배경이 흐르는 빠르기가 어지럽지 않은지, 글자 단추를 누르는 손맛과 틱 소리, 실제 휴대폰에서 이름 칸에 글쇠판으로 적기, 외형 고르기가 즐거운지(미리보기 크기), 도움말을 읽을 시간이 되는지, 협동할 때 서로의 외형이 보이는지, 게임 안 메뉴의 새 모양과 [나가기] 물음
 
 ## 결과 보고
 

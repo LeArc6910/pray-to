@@ -278,6 +278,17 @@ namespace Game.Client
 
         public static Vector2 SizeOf(PixelImage image) => new Vector2(image.Width * Pt, image.Height * Pt);
 
+        static readonly Dictionary<PixelImage, Piece> SlicedImages = new Dictionary<PixelImage, Piece>();
+
+        // Any picture of the UI art stretched over the rect by its middle, `border` pixels kept at each edge (the title's
+        // panel and list rows, TitleDraw). Keep the picture (one instance for one look), as its texture is kept by it.
+        public static void Sliced(Rect area, PixelImage image, int border)
+        {
+            if (image == null) return;
+            if (!SlicedImages.TryGetValue(image, out var piece)) SlicedImages[image] = piece = new Piece(image, border);
+            Slice(area, piece);
+        }
+
         // One of the small icons (UiIcons) in a colour, centred in the rect.
         public static void Icon(Rect area, string[] rows, Color color)
         {

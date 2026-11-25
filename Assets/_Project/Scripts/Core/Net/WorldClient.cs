@@ -1488,6 +1488,10 @@ namespace Game.Core
 
         readonly Dictionary<int, CharacterLook> _looks = new Dictionary<int, CharacterLook>();
 
+        // Whether the player's look is known: this player's own always, another's once the host's roster has carried it.
+        // Until then the screen tells the others apart by a tunic colour, as before looks (0.108.0).
+        public bool KnowsLookOf(int playerId) => playerId == PlayerId || _looks.ContainsKey(playerId);
+
         // Another player's classes as the host's roster has them, and the skill in one of their slots.
         public IReadOnlyList<ClassDefinition> ClassesOf(int playerId) =>
             playerId == PlayerId ? Classes
