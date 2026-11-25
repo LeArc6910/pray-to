@@ -108,7 +108,8 @@ namespace Game.Client
             float half = words.width * grow / 2, gap = 6;
             float markSize = TitleArt.MarkSize * pt;
             float markY = Mathf.Round(words.center.y - markSize / 2);
-            if (words.center.x - half - gap - markSize >= rect.x - 2)
+            // Only when both marks stay inside the item's own rect, so a narrow cell (the hub's) never spills onto the next.
+            if (words.center.x - half - gap - markSize >= rect.x - 2 && words.center.x + half + gap + markSize <= rect.xMax + 2)
             {
                 UiSkin.Image(new Vector2(Mathf.Round(words.center.x - half - gap - markSize), markY), mark);
                 UiSkin.Image(new Vector2(Mathf.Round(words.center.x + half + gap), markY), mark);
@@ -139,6 +140,7 @@ namespace Game.Client
             _plain ??= new GUIStyle(GUI.skin.label) { wordWrap = false, clipping = TextClipping.Clip, padding = new RectOffset(), margin = new RectOffset() };
             Ui.Text(_plain, size);
             _plain.alignment = anchor;
+            text = Fit(text, rect.width);
             if (shadow)
             {
                 _plain.normal.textColor = new Color(0, 0, 0, 0.75f * color.a);
@@ -146,6 +148,19 @@ namespace Game.Client
             }
             _plain.normal.textColor = color;
             GUI.Label(rect, text, _plain);
+        }
+
+        // The words cut to the width with an ellipsis rather than mid-letter at the rect's edge (_plain sized already).
+        static string Fit(string text, float width)
+        {
+            Words.text = text;
+            if (_plain.CalcSize(Words).x <= width) return text;
+            for (int length = text.Length - 1; length > 0; length--)
+            {
+                Words.text = text.Substring(0, length).TrimEnd() + "…";
+                if (_plain.CalcSize(Words).x <= width) return Words.text;
+            }
+            return "…";
         }
 
         public static float TextWidth(string text, int size)
