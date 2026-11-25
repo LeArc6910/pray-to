@@ -788,9 +788,11 @@ async function patterns(browser) {
     ['void_lord', 'void_cross', '공허 십자(대각선)'], ['void_lord', 'event_horizon', '사건의 지평선(고리)'],
     ['tide_serpent', 'whirlpool', '물살 뱀의 소용돌이(고리)'], ['tide_serpent', 'tidal_trail', '물살 뱀의 밀물(연쇄 폭발)'],
     ['antlion', 'pit', '개미귀신의 개미지옥(멀리 있는 사람 발밑)'], ['antlion', 'quicksand', '개미귀신의 모래늪(고리)'],
+    // Follow-ups (2026-11-25, B5b, the follow column): the second is marked with the first and lands 0.5 s after it.
+    ['tide_serpent', 'water_jet', '물살 뱀의 물줄기 → 역류(발밑만 안전한 고리가 0.5초 뒤)', 2], ['lava_titan', 'slam', '용암 거인의 내려찍기 → 여진(내려찍은 원만 안전한 고리)', 2],
   ];
   let woken = '';
-  for (const [id, attack, name] of uses) {
+  for (const [id, attack, name, least = 1] of uses) {
     if (woken !== id) {
       await game.send(`heal; goto boss ${id}`);
       await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
@@ -800,7 +802,7 @@ async function patterns(browser) {
     await game.send(`heal; boss ${id} use ${attack}`);
     await game.wait(attack.endsWith('spiral') ? 1200 : 450);
     const s = await game.state();
-    check(attack.endsWith('spiral') ? s.bossShots > 0 : s.hazards > 0, `${name}: 예고가 깔린다 (장판 ${s.hazards}, 탄 ${s.bossShots})`);
+    check(attack.endsWith('spiral') ? s.bossShots > 0 : s.hazards >= least, `${name}: 예고가 깔린다 (장판 ${s.hazards}, 탄 ${s.bossShots})`);
     await game.shot(`pattern-${attack}`, name);
     await game.wait(1200);
     await game.shot(`pattern-${attack}-land`, `${name}이 떨어진 자리`);
@@ -967,12 +969,13 @@ async function spider(browser) {
   await game.shot('spider-awake', '깨어난 아라네');
   // [attack, name, telegraph seconds, marked on the ground, warning sign, what it leaves on the floor]
   const uses = [
-    ['fang', '독니 찌르기(앞다리를 쳐들고 몸을 세움, 바닥 표시 없음)', 0.8, false, false, 0],
-    ['leg_stab', '앞다리 연타(앞다리를 머리 뒤로 젖힘)', 1.0, true, false, 0],
-    ['web_shot', '거미줄 뿜기(배를 등 위로 세움, 거미줄이 남는다)', 1.1, true, false, 3],
-    ['pounce', '덮치기(납작 엎드림)', 1.0, true, false, 0],
-    ['venom_spit', '독액 뿜기(몸을 빼고 배를 부풀림)', 1.0, false, false, 0],
-    ['venom_pool', '독 웅덩이(독액을 토해 던짐, 웅덩이가 남는다)', 1.3, true, false, 2],
+    // (2026-11-25, B5b: the unwarned ones 0.2 s shorter, Docs/Bosses.md 구르기 뒤 다시 맞추기)
+    ['fang', '독니 찌르기(앞다리를 쳐들고 몸을 세움, 바닥 표시 없음)', 0.6, false, false, 0],
+    ['leg_stab', '앞다리 연타(앞다리를 머리 뒤로 젖힘, 거미줄 파문이 이어진다)', 0.8, true, false, 0],
+    ['web_shot', '거미줄 뿜기(배를 등 위로 세움, 거미줄이 남는다)', 0.9, true, false, 3],
+    ['pounce', '덮치기(납작 엎드림)', 0.8, true, false, 0],
+    ['venom_spit', '독액 뿜기(몸을 빼고 배를 부풀림)', 0.8, false, false, 0],
+    ['venom_pool', '독 웅덩이(독액을 토해 던짐, 웅덩이가 남는다)', 1.1, true, false, 2],
     ['thread_drop', '실 타고 내려찍기(실을 타고 사라졌다 내려옴, 경고, 거미줄이 남는다)', 1.8, true, true, 1],
     ['brood', '알주머니 터뜨리기(새끼 거미 넷)', 1.0, false, false, 0],
     ['eight_legs', '여덟 다리 내려찍기(여덟 다리를 치켜듦, 경고)', 2.0, true, true, 0],
