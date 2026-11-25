@@ -986,6 +986,8 @@ async function spider(browser) {
     await game.send('heal; clear');
     // Long enough for what the last attack left on the floor to be gone.
     await game.wait(pools > 0 ? 1800 : 1500);
+    // And the ring a common attack now chains on (B5b follow) gone too, so a mark seen below is this attack's own.
+    await game.until(t => !((t.marksShown || 0) > 0), 3000, game.state);
     let laid = 0;
     if (attack === 'web_burst') {
       // Webs down first, and nothing clears them: the burst marks each of them.
