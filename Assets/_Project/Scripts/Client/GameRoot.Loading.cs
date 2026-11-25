@@ -77,7 +77,7 @@ namespace Game.Client
 
         void DrawLoading()
         {
-            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            var screen = Ui.FullScreen;
             if (Event.current.type == EventType.Repaint)
             {
                 var previous = GUI.color;

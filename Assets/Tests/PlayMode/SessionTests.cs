@@ -52,6 +52,30 @@ namespace Game.Client.Tests
             Assert.Greater(Object.FindObjectsByType<SpriteRenderer>().Length, 0, "Nothing was drawn.");
         }
 
+        // Leaving the app without [나가기] (a phone's home button, a closed window, a hidden tab, 2026-11-26) writes the
+        // character and the hosted world as they are, and the game goes on; focus flapping writes once in a while only.
+        [UnityTest]
+        public IEnumerator LeavingTheAppSavesAndPlaysOn()
+        {
+            _root.StartSolo();
+            yield return TestSaves.UntilPlaying(_root, Seconds);
+            Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
+            TestSaves.Forget(Name);
+            Assert.IsFalse(SaveStore.Exists(SaveStore.CharacterKey(Name)));
+            int before = _root.LeaveSaves;
+            // Quitting (or the editor's own focus coming and going while the tests run: the first always writes).
+            _root.SaveOnLeaving(true);
+            Assert.AreEqual(before + 1, _root.LeaveSaves);
+            Assert.IsTrue(SaveStore.Exists(SaveStore.CharacterKey(Name)), "the character is written");
+            Assert.IsTrue(SaveStore.Exists(SaveStore.WorldKey(Name)), "the hosted world is written");
+            _root.SaveOnLeaving(false);
+            Assert.AreEqual(before + 1, _root.LeaveSaves, "a focus loss just after writes nothing more");
+            _root.SaveOnLeaving(true);
+            Assert.AreEqual(before + 2, _root.LeaveSaves, "quitting always writes");
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsTrue(_root.Playing, "the game goes on");
+        }
+
         // A new character has no class (picked in the game, 2026-11-09); given two, it knows each one's first skill.
         // Taught the rest (as points would), the slots hold four: a nova, a buff, a projectile and a buff that adds
         // fire, which together draw every kind of skill effect.

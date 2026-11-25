@@ -11,6 +11,13 @@
 - **로컬에서 할 일**: 명령 한 줄을 다시 돌려야 하는지, 플레이로 확인할 것이 있는지. 없으면 "없음"
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
+## 2026-11-26 00:53 네이티브 빌드 준비(PC·휴대폰 앱)
+
+- **바뀐 것**: 웹 브라우저가 대신 해 주던 것을 앱이 스스로 하게(`Docs/NativeBuild.md`, 설계 원칙 7). (1) 프레임: 휴대폰 앱은 Unity 기본 30 대신 60, 설정 [프레임: 30]이면 30(휴대폰 앱에만 보임), PC 앱은 vSync(화면 주사율), 웹·에디터는 그대로(`Client/FrameRate.cs`, `GameRoot.Awake`). (2) UI 배율: 앱은 1이라 휴대폰 앱의 글자가 아주 작았다 → 휴대폰 앱은 dpi÷160(dpi를 모르면 짧은 변÷360), PC 앱은 dpi÷96(150% 화면이 1.5), 0.25 단위, 짧은 변 320점(PC 480점) 아래로 안 내려감. 웹은 `devicePixelRatio` 그대로, 에디터 게임 뷰는 1. 새 설정 [UI 크기: 100%](90·100·115·130%, 모든 판)(`Ui.PointScale`). (3) 안전 영역: 휴대폰 앱이 `Screen.safeArea`를 점으로 바꿔 GUI 행렬을 옮기고 `Ui.Width`·`Ui.Height`가 안전 영역 크기가 되어 모든 화면이 노치·둥근 모서리 안쪽에 놓인다. 화면 전체를 덮는 것(어둡게 하기, 시작화면 배경, 로딩, 붉은 가장자리, 번쩍임, 허브 밖 누르기)은 새 `Ui.FullScreen`에. 웹은 안전 영역 없음(그대로). 시험용 `Ui.InsetOverride`, Playtest 명령 `inset l t r b|off`, `buttons`는 단추를 화면 전체 기준으로 알리고 `safe`도. (4) 나갈 때 저장: `OnApplicationPause(true)`·`OnApplicationFocus(false)`·`OnApplicationQuit`에 캐릭터·지도·(호스트면) 월드를 쓰고 게임은 계속(5초에 한 번, 끌 때는 늘). 웹은 `index.html`이 탭을 숨기거나 페이지를 떠날 때 `GameRoot.PageHidden`. (5) 빌드: `Client/Editor/NativeBuild.cs`(메뉴 Game > Build Windows·Build Android, 배치 `RunBatchWindows`·`RunBatchAndroid`): Windows x64 Mono(Windows 에디터에 따로 깔 것 없음, IL2CPP는 모듈과 VS C++ 도구가 더 필요해 뺐다), Android APK IL2CPP ARM64·최소 API 26·자동 회전(거꾸로 세로 빼고)·인터넷 권한·노치 옆까지 그리기. Player Settings는 빌드할 때 스크립트가 정한다. 웹 글 상자의 위치는 UI 크기와 상관없이 페이지 픽셀로(`Ui.PageRatio`). 개발 정보에 목표 프레임·dpi·안전 영역. 시험 1139개, 에디터·웹 컴파일, 로컬 스크립트 확인
+- **요청 대조**: (1) 프레임 — 코드·설정·문서 됨, 휴대폰 앱에서만 보이는 줄이라 웹 점검은 "웹에는 [프레임]이 없다"만. (2) UI 배율 — 코드·설정 [UI 크기]·웹 점검(`menu`: 115%로 배율이 커지고 115→130→90→100으로 돈다)·문서 됨. (3) 안전 영역 — 코드·PlayMode 시험(`LayoutTests.TheFixedPartsKeepToTheSafeArea`)·사진(`combo-touch-safearea`)·웹 점검(`layout`: 세운 안전 영역 안에 HUD·가방 단추, 사진 `game-safearea`·`bag-safearea`)·문서 됨. 웹 데모의 `env(safe-area-inset)`는 하지 않았다(브라우저가 페이지를 노치 밖에 두고, 웹 동작을 그대로 두려고). (4) 나갈 때 저장 — 코드·PlayMode 시험(`SessionTests.LeavingTheAppSavesAndPlaysOn`)·웹 점검(`save`: 탭 숨기기로 저장, 바로 또 숨기면 안 씀)·문서 됨. (5) 빌드 스크립트 — 코드·문서·`LOCAL_TASKS` 179단계(깔 모듈과 명령) 됨, 클라우드에서는 실제 빌드를 못 돌렸다(Unity 에디터 없음, 컴파일만). 빠진 것: iOS 빌드(Mac·Xcode 필요), 실제 기기 확인(사람), 스토어용 서명 키
+- **로컬에서 할 일**: 179단계(명령 한 줄, 새 파일 둘의 `.meta`, PlayMode 시험·사진, 모듈이 있으면 Windows·Android 빌드)
+- **로컬 확인**: [ ]
+
 ## 2026-11-26 00:12 시작화면 웹 점검 끝(178단계)
 
 - **바뀐 것**: `9096bfb` 배포로 `title`을 다시 돌려 84개 모두 통과, 허브 사진에서 사람 이름과 시계가 판 밑으로 더는 비치지 않는다. `LOCAL_TASKS.md` 178단계에 클라우드 확인 줄

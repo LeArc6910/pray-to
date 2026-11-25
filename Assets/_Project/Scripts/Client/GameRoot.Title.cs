@@ -268,7 +268,7 @@ namespace Game.Client
             MenuKeys(e);
             MenuStyles();
             _navCounter = 0;
-            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            var screen = Ui.FullScreen;
             TitleBackdrop.Draw(screen, _visitedHere, _page == MenuPage.Main ? 0 : 0.3f);
             if (_page == MenuPage.Main) DrawMainMenu(ready);
             else DrawMenuPage(ready);
@@ -1088,7 +1088,7 @@ namespace Game.Client
 
         void DrawAsk()
         {
-            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            var screen = Ui.FullScreen;
             TitleDraw.Veil(screen, 0.55f);
             string question = _ask switch
             {
@@ -1224,6 +1224,10 @@ namespace Game.Client
             if (SettingRow(Strings.T("menu.darkness", "어둠과 빛"), Strings.OnOff(Settings.Darkness))) Later(() => Settings.Darkness = !Settings.Darkness);
             // The pixel font or the smooth one; the menu is drawn in the new one at once (Ui).
             if (SettingRow(Strings.T("menu.font", "글꼴"), Settings.PixelFont ? Strings.T("menu.font_pixel", "도트") : Strings.T("menu.font_smooth", "매끈"))) Later(() => Settings.PixelFont = !Settings.PixelFont);
+            // The words and windows bigger or smaller than the screen's own measure (Ui.PointScale), drawn so at once.
+            if (SettingRow(Strings.T("menu.ui_size", "UI 크기"), Settings.UiSize + "%")) Later(() => Settings.UiSize = Settings.NextUiSize());
+            // 60 or 30 frames a second, on a phone's own build only (FrameRate).
+            if (FrameRate.Choosable && SettingRow(Strings.T("menu.frames", "프레임"), Settings.SmoothFrames ? "60" : "30")) Later(() => Settings.SmoothFrames = !Settings.SmoothFrames);
             if (SettingRow(Strings.T("menu.shake", "화면 흔들림"), Strings.OnOff(Settings.ScreenShake))) Later(() => Settings.ScreenShake = !Settings.ScreenShake);
             if (SettingRow(Strings.T("menu.bossintro", "보스 등장 연출"), Strings.OnOff(Settings.BossIntro))) Later(() => Settings.BossIntro = !Settings.BossIntro);
             // Canopies and roofs fading while someone is behind them (WorldView's standing layer, 묶음 B0).

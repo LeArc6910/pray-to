@@ -203,6 +203,28 @@ async function menu(browser) {
   }
   await game.shot('menu-settings', '설정 화면');
 
+  // UI 크기 (2026-11-26): 100 → 115 draws the words and windows bigger, and it goes round back to 100.
+  const uiSize = (await game.find(/^UI 크기:/))[0];
+  check(uiSize && uiSize.label === 'UI 크기: 100%', `[설정]에 [UI 크기: 100%] (${uiSize && uiSize.label})`);
+  if (uiSize) {
+    const before = await game.state();
+    await game.press(uiSize.label);
+    await game.wait(400);
+    const bigger = await game.state();
+    check(bigger.uiSize === 115 && bigger.uiScale > before.uiScale * 1.1, `[UI 크기]를 누르면 115%로 커진다 (배율 ${before.uiScale} → ${bigger.uiScale}, 화면 ${before.screen} → ${bigger.screen}점)`);
+    await game.shot('menu-uisize', 'UI 크기 115%의 설정');
+    const sizes = [bigger.uiSize];
+    for (let i = 0; i < 3; i++) {
+      const b = (await game.find(/^UI 크기:/))[0];
+      if (!b) break;
+      await game.press(b.label);
+      await game.wait(300);
+      sizes.push((await game.state()).uiSize);
+    }
+    check(sizes.join(' ') === '115 130 90 100', `[UI 크기]가 115 → 130 → 90 → 100%로 돈다 (${sizes.join(' → ')})`);
+  }
+  check(!(await game.buttons()).some(b => /^프레임:/.test(b.label)), '웹에는 [프레임] 설정이 없다(휴대폰 앱에만)');
+
   // The sound volume goes round off, 25, 50, 75, 100.
   const volumes = [];
   for (let i = 0; i < 5; i++) {
@@ -1854,6 +1876,23 @@ async function save(browser) {
   const game = await open(browser, run, Profiles.pc, url);
   check(await game.startSolo('savetest'), '새 캐릭터 savetest');
   await game.wait(1200);
+  // Hiding the tab saves the game (index.html → GameRoot.PageHidden, 2026-11-26: a phone's browser may drop a hidden
+  // tab). Once more at once writes nothing more (at most once every 5 seconds), and the game goes on.
+  await game.wait(5200);
+  const hide = () => game.page.evaluate(() => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  });
+  const leaveBefore = (await game.state()).leaveSaves;
+  await hide();
+  await game.wait(300);
+  const leaveAfter = await game.state();
+  await hide();
+  await game.wait(300);
+  const leaveAgain = await game.state();
+  check(leaveAfter.leaveSaves === leaveBefore + 1 && leaveAgain.leaveSaves === leaveAfter.leaveSaves && leaveAgain.playing,
+    `탭을 숨기면 저장하고 게임은 이어진다, 바로 또 숨기면 다시 쓰지 않는다 (${leaveBefore} → ${leaveAfter.leaveSaves} → ${leaveAgain.leaveSaves})`);
   await clearRoom(game, 3, 2);
   await game.send('build Wall 2 0; give stone 7; xp 400; goto biome Mushroom');
   await game.wait(1500);
@@ -1972,6 +2011,26 @@ async function layout(browser) {
     const inside = (await game.buttons()).filter(b => /^(skill|potion|quick)/.test(b.label));
     const out = inside.filter(b => b.rect[0] < 0 || b.rect[1] < 0 || b.rect[0] + b.rect[2] > b.screen.width + 0.5 || b.rect[1] + b.rect[3] > b.screen.height + 0.5);
     check(out.length === 0, `스킬 칸·물약·퀵슬롯이 화면 안에 (${out.map(b => b.label).join(', ') || '모두'})`);
+    if (game.touch) {
+      // A notched phone (a phone's own build keeps to Screen.safeArea, 2026-11-26), stood in here: every button lies in
+      // the safe area, the world still fills the screen, and the bag keeps to it too.
+      const [l, t, r, btm] = width > height ? [44, 0, 44, 20] : [0, 44, 0, 30];
+      await game.send(`inset ${l} ${t} ${r} ${btm}`);
+      await game.wait(700);
+      const outsideSafe = async () => (await game.buttons()).filter(b => b.shown
+        && (b.rect[0] < l - 0.5 || b.rect[1] < t - 0.5 || b.rect[0] + b.rect[2] > b.screen.width - r + 0.5 || b.rect[1] + b.rect[3] > b.screen.height - btm + 0.5));
+      let away = await outsideSafe();
+      check(away.length === 0, `안전 영역(${l}·${t}·${r}·${btm}점)을 두면 HUD 단추가 모두 그 안에 (${away.map(b => b.label).slice(0, 5).join(', ') || '모두'})`);
+      await game.shot('game-safearea', '노치 휴대폰처럼 안전 영역을 둔 게임 화면');
+      await bagTab(game, '장비');
+      await game.wait(400);
+      away = await outsideSafe();
+      check(away.length === 0, `안전 영역을 두면 가방 단추도 그 안에 (${away.map(b => b.label).slice(0, 5).join(', ') || '모두'})`);
+      await game.shot('bag-safearea', '안전 영역을 둔 가방');
+      await closeBag(game);
+      await game.send('inset off');
+      await game.wait(300);
+    }
     for (const tab of ['장비', '재료·제작', '스킬', '특성', '캐릭터', '일지']) {
       await bagTab(game, tab);
       await game.wait(300);

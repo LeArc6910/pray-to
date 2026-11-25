@@ -38,6 +38,7 @@ namespace Game.Client.Tests
         public void PutBack()
         {
             Ui.SizeOverride = null;
+            Ui.InsetOverride = null;
             Ui.HudHeight = _hudHeight;
             Ui.LeftColumnBottom = _leftBottom;
             Controls.ForceTouch(false);
@@ -52,45 +53,79 @@ namespace Game.Client.Tests
         public void TheFixedPartsFitEveryScreen()
         {
             var problems = new List<string>();
-            foreach (var (name, width, height, touch) in Sizes)
-            {
-                foreach (int skills in new[] { 1, 2, 3, 4 })
-                {
-                    Ui.SizeOverride = new Vector2(width, height);
-                    Ui.HudHeight = 160;
-                    Controls.ForceTouch(touch);
-                    var keys = Enumerable.Range(0, skills + 1).Select(slot => ($"스킬 {slot}", SkillBar.Area(slot, skills))).ToList();
-                    keys.Add(("구르기", SkillBar.RollArea(skills)));
-                    var quick = Enumerable.Range(0, Hotbar.Slots).Select(slot => ($"퀵슬롯 {slot}", Hotbar.Area(slot, skills))).ToList();
-                    // The time and place lines: up to four small lines (an online room's code the fourth).
-                    var top = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea), ("HUD", Ui.HudArea), ("시간·장소 줄", Ui.InfoArea(60)) };
-                    if (touch) top.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
-                    string where = $"{name} {width}×{height}, 스킬 {skills}";
+            foreach (var (name, width, height, touch) in Sizes) problems.AddRange(FixedPartProblems(name, width, height, touch));
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
 
-                    foreach (var (part, rect) in keys.Concat(quick).Concat(top))
+        // A phone's notch, camera hole and rounded corners (Screen.safeArea, 2026-11-26): the screens lay themselves out
+        // in the safe area, so with its edges kept clear (as a notched phone's are, upright and sideways) the fixed parts
+        // still fit inside it and clear of one another, and the screen's size in points is the safe area's.
+        [Test]
+        public void TheFixedPartsKeepToTheSafeArea()
+        {
+            var problems = new List<string>();
+            var insets = new[]
+            {
+                ("휴대폰 세로", 390f, 844f, new Ui.Edges(0, 47, 0, 34)),
+                ("작은 휴대폰 세로", 360f, 640f, new Ui.Edges(0, 24, 0, 16)),
+                ("휴대폰 가로", 844f, 390f, new Ui.Edges(47, 0, 47, 21)),
+                ("작은 휴대폰 가로", 667f, 375f, new Ui.Edges(32, 0, 32, 16)),
+            };
+            foreach (var (name, width, height, inset) in insets)
+            {
+                Ui.InsetOverride = inset;
+                Ui.SizeOverride = new Vector2(width, height);
+                Assert.AreEqual(width - inset.Left - inset.Right, Ui.Width, 0.01f, name);
+                Assert.AreEqual(height - inset.Top - inset.Bottom, Ui.Height, 0.01f, name);
+                var full = Ui.FullScreen;
+                Assert.AreEqual(new Rect(-inset.Left, -inset.Top, width, height), full, name + ": the whole screen");
+                problems.AddRange(FixedPartProblems($"{name}(안전 영역 {inset})", width, height, true));
+            }
+            Assert.IsEmpty(problems, string.Join("\n", problems));
+        }
+
+        // The checks for one screen, at one to four skills: every fixed part inside the screen's safe area (Ui.Width ×
+        // Ui.Height) and clear of the others.
+        static List<string> FixedPartProblems(string name, float width, float height, bool touch)
+        {
+            var problems = new List<string>();
+            foreach (int skills in new[] { 1, 2, 3, 4 })
+            {
+                Ui.SizeOverride = new Vector2(width, height);
+                Ui.HudHeight = 160;
+                Controls.ForceTouch(touch);
+                float safeWidth = Ui.Width, safeHeight = Ui.Height;
+                var keys = Enumerable.Range(0, skills + 1).Select(slot => ($"스킬 {slot}", SkillBar.Area(slot, skills))).ToList();
+                keys.Add(("구르기", SkillBar.RollArea(skills)));
+                var quick = Enumerable.Range(0, Hotbar.Slots).Select(slot => ($"퀵슬롯 {slot}", Hotbar.Area(slot, skills))).ToList();
+                // The time and place lines: up to four small lines (an online room's code the fourth).
+                var top = new List<(string, Rect)> { ("미니맵", Ui.MinimapArea), ("HUD", Ui.HudArea), ("시간·장소 줄", Ui.InfoArea(60)) };
+                if (touch) top.AddRange(Enumerable.Range(0, 2).Select(i => ($"터치 단추 {i}", Ui.TouchButtonArea(i, 2))));
+                string where = $"{name} {width}×{height}, 스킬 {skills}";
+
+                foreach (var (part, rect) in keys.Concat(quick).Concat(top))
+                {
+                    if (!Inside(rect, safeWidth, safeHeight)) problems.Add($"{where}: 화면 밖 - {part} {rect}");
+                }
+                var bottom = keys.Concat(quick).ToList();
+                for (int i = 0; i < bottom.Count; i++)
+                {
+                    for (int j = i + 1; j < bottom.Count; j++)
                     {
-                        if (!Inside(rect, width, height)) problems.Add($"{where}: 화면 밖 - {part} {rect}");
+                        if (Overlap(bottom[i].Item2, bottom[j].Item2)) problems.Add($"{where}: 겹침 - {bottom[i].Item1} / {bottom[j].Item1}");
                     }
-                    var bottom = keys.Concat(quick).ToList();
-                    for (int i = 0; i < bottom.Count; i++)
+                }
+                // The top parts with one another, and each with everything along the bottom.
+                for (int i = 0; i < top.Count; i++)
+                {
+                    var others = top.Skip(i + 1).Concat(bottom);
+                    foreach (var (other, otherRect) in others)
                     {
-                        for (int j = i + 1; j < bottom.Count; j++)
-                        {
-                            if (Overlap(bottom[i].Item2, bottom[j].Item2)) problems.Add($"{where}: 겹침 - {bottom[i].Item1} / {bottom[j].Item1}");
-                        }
-                    }
-                    // The top parts with one another, and each with everything along the bottom.
-                    for (int i = 0; i < top.Count; i++)
-                    {
-                        var others = top.Skip(i + 1).Concat(bottom);
-                        foreach (var (other, otherRect) in others)
-                        {
-                            if (Overlap(top[i].Item2, otherRect)) problems.Add($"{where}: 겹침 - {top[i].Item1} / {other}");
-                        }
+                        if (Overlap(top[i].Item2, otherRect)) problems.Add($"{where}: 겹침 - {top[i].Item1} / {other}");
                     }
                 }
             }
-            Assert.IsEmpty(problems, string.Join("\n", problems));
+            return problems;
         }
 
         // Buttons over things in the world never sit on one spot (U0, 2026-11-22: on a phone a machine's [끄기] lay under

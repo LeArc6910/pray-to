@@ -77,10 +77,15 @@ namespace Game.Client
             _end = false;
             _readFrame = _drawnFrame = Time.frameCount;
             GUIUtility.keyboardControl = 0;
-            // GUI points are CSS pixels: the canvas fills the page from its top left at the device's pixel ratio (Ui.Scale).
+            // Where the field is in GUI points without the GUI matrix (GUIToScreenRect undoes the areas and scroll views
+            // the field is in, not the matrix: the playtests' button rects rest on the same, Ui.Probe), so to device
+            // pixels by the matrix (Ui.Scale, and the safe area's offset), and those over the page's pixel ratio are the
+            // page's CSS pixels; the canvas fills the page from its top left.
             var at = GUIUtility.GUIToScreenRect(rect);
-            float scale = Mathf.Max(0.01f, Ui.Scale);
-            TextInputOpen(text, max, at.x / scale, at.y / scale, at.width / scale, at.height / scale);
+            var inset = Ui.Inset;
+            float scale = Ui.Scale, ratio = Mathf.Max(0.01f, Ui.PageRatio);
+            float x = at.x * scale + Mathf.Round(inset.Left * scale), y = at.y * scale + Mathf.Round(inset.Top * scale);
+            TextInputOpen(text, max, x / ratio, y / ratio, at.width * scale / ratio, at.height * scale / ratio);
         }
 #endif
 

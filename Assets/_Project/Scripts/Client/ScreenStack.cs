@@ -496,7 +496,7 @@ namespace Game.Client
             }
             Ui.Row("");
             // A press anywhere else shuts the hub; the buttons above took theirs first.
-            var screenRect = new Rect(0, 0, Ui.Width, Ui.Height);
+            var screenRect = Ui.FullScreen;
             Controls.Block(screenRect);
             if (HubOpen && GUI.Button(screenRect, GUIContent.none, GUIStyle.none))
             {

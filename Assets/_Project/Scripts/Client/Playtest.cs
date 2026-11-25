@@ -217,6 +217,15 @@ namespace Game.Client
                 case "touch":
                     Controls.ForceTouch(words[1] == "on");
                     return null;
+                case "inset":
+                    // A phone's safe area stood in (points in from the left, top, right and bottom), or "inset off".
+                    if (words.Length >= 5 && float.TryParse(words[1], NumberStyles.Float, CultureInfo.InvariantCulture, out float left)
+                        && float.TryParse(words[2], NumberStyles.Float, CultureInfo.InvariantCulture, out float top)
+                        && float.TryParse(words[3], NumberStyles.Float, CultureInfo.InvariantCulture, out float right)
+                        && float.TryParse(words[4], NumberStyles.Float, CultureInfo.InvariantCulture, out float bottom))
+                        Ui.InsetOverride = new Ui.Edges(left, top, right, bottom);
+                    else Ui.InsetOverride = null;
+                    return $"ok inset {Ui.Inset}";
                 case "probe":
                     Ui.Probing = words[1] == "on";
                     return null;
@@ -2404,7 +2413,7 @@ namespace Game.Client
             var list = new Json('[');
             foreach (var drawn in Ui.LastDrawn)
             {
-                list.Item(new Json('{').Field("label", drawn.Label).Field("row", drawn.Row.Replace('\n', ' ')).Field("rect", Rect(drawn.Rect)).Field("enabled", drawn.Enabled).Field("shown", drawn.Shown).Raw('}'));
+                list.Item(new Json('{').Field("label", drawn.Label).Field("row", drawn.Row.Replace('\n', ' ')).Field("rect", Rect(OnScreen(drawn.Rect))).Field("enabled", drawn.Enabled).Field("shown", drawn.Shown).Raw('}'));
             }
             if (root.Playing && !root.BagOpen && !root.MapOpen && !root.Talking)
             {
@@ -2412,16 +2421,23 @@ namespace Game.Client
                 for (int slot = 0; slot <= skills; slot++)
                 {
                     string label = slot == skills ? "potion" : $"skill {slot}";
-                    list.Item(new Json('{').Field("label", label).Field("rect", Rect(SkillBar.Area(slot, skills))).Field("enabled", true).Field("shown", true).Raw('}'));
+                    list.Item(new Json('{').Field("label", label).Field("rect", Rect(OnScreen(SkillBar.Area(slot, skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
                 }
-                list.Item(new Json('{').Field("label", "roll").Field("rect", Rect(SkillBar.RollArea(skills))).Field("enabled", true).Field("shown", true).Raw('}'));
+                list.Item(new Json('{').Field("label", "roll").Field("rect", Rect(OnScreen(SkillBar.RollArea(skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
                 for (int slot = 0; slot < Hotbar.Slots; slot++)
                 {
-                    list.Item(new Json('{').Field("label", $"quick {slot}").Field("rect", Rect(Hotbar.Area(slot, skills))).Field("enabled", true).Field("shown", true).Raw('}'));
+                    list.Item(new Json('{').Field("label", $"quick {slot}").Field("rect", Rect(OnScreen(Hotbar.Area(slot, skills)))).Field("enabled", true).Field("shown", true).Raw('}'));
                 }
             }
-            return new Json('{').Field("width", Ui.Width).Field("height", Ui.Height).Field("buttons", list.Raw(']')).Close('}');
+            // The whole screen in points, and the safe area in it (left, top, width, height; the whole screen unless a
+            // test stands an inset in, "inset"): the buttons are where they show on the whole screen.
+            var inset = Ui.Inset;
+            return new Json('{').Field("width", Ui.FullWidth).Field("height", Ui.FullHeight)
+                .Field("safe", Rect(new Rect(inset.Left, inset.Top, Ui.Width, Ui.Height))).Field("buttons", list.Raw(']')).Close('}');
         }
+
+        // A rect the screens drew (in the safe area's points) where it shows on the whole screen.
+        static Rect OnScreen(Rect rect) => new Rect(rect.x + Ui.Inset.Left, rect.y + Ui.Inset.Top, rect.width, rect.height);
 
         static string Texts(GameRoot root) =>
             new Json('{')
@@ -2530,6 +2546,11 @@ namespace Game.Client
             // The hub's question after [나가기] ([저장하고 나가기] / [남기], T3).
             json.Field("leaveAsked", root.LeaveAsked);
             json.Field("screen", $"{Ui.Width:0}x{Ui.Height:0}");
+            // Device pixels a point and the menu's "UI 크기" (Ui.PointScale), and the safe area's edges in points (none
+            // in a browser; a test may stand one in, "inset" below).
+            json.Field("uiScale", Ui.Scale).Field("uiSize", Settings.UiSize).Field("inset", Ui.Inset.ToString());
+            // How many times leaving the page or app (a hidden tab, the window's focus) saved the game (GameRoot.SaveOnLeaving).
+            json.Field("leaveSaves", root.LeaveSaves);
             json.Field("touch", Controls.UsingTouch);
             json.Field("bag", root.BagOpen);
             json.Field("target", root.TargetShown);

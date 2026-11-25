@@ -201,7 +201,7 @@ namespace Game.Client
             if (_dungeonFade > 0)
             {
                 GUI.color = new Color(0, 0, 0, _dungeonFade / DungeonFadeSeconds);
-                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), Texture2D.whiteTexture);
+                GUI.DrawTexture(Ui.FullScreen, Texture2D.whiteTexture);
             }
             if (_dungeonCardAge >= DungeonCardSeconds)
             {

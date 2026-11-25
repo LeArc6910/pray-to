@@ -9,7 +9,11 @@ namespace Game.Client
 {
     // Shared setup for the IMGUI screens. Layout is done in points, not pixels: a browser draws the game at the
     // device's full pixel density (about 3 pixels per point on phones), which would leave 13-pixel text unreadably
-    // small, so the GUI matrix scales points up by that ratio. Elsewhere one point is one pixel.
+    // small, so the GUI matrix scales points up by that ratio. A phone's own build takes it from the screen's dots per
+    // inch (160 a point, as Android counts), a PC's from the system's (96 a point, so 1 unless the display is scaled
+    // up), and the menu's "UI 크기" multiplies it (NativeScale). The points also start inside the screen's safe area
+    // (Screen.safeArea: a phone's notch, camera hole and rounded corners), so every screen lays itself out there; what
+    // covers the whole screen draws over Ui.FullScreen (Docs/NativeBuild.md).
     // The font travels with the game because web builds cannot use the system's fonts (no Korean otherwise): the
     // pixel font Galmuri11 Bold, or the smooth Noto Sans KR when the menu says so (Settings.PixelFont). The pixel font
     // is drawn at its 12-pixel design size or a whole multiple, unsmoothed and sampled to the nearest pixel, so its
@@ -81,12 +85,50 @@ namespace Game.Client
 
         public static float Scale { get; private set; } = 1;
 
-        // Screen size in points: a test's stand-in size when there is one (SizeOverride), so the play mode tests can
-        // check the layout for a phone's screen on any machine.
-        public static float Width => SizeOverride?.x ?? Screen.width / Scale;
-        public static float Height => SizeOverride?.y ?? Screen.height / Scale;
+        // Device pixels per CSS pixel in a browser (Scale without the menu's "UI 크기"), for the page's own text box
+        // (WebText); 1 elsewhere.
+        public static float PageRatio { get; private set; } = 1;
+
+        // The size of the safe area in points, where every screen lays itself out: a test's stand-in screen when there
+        // is one (SizeOverride, the whole screen), so the play mode tests can check the layout for a phone's screen on
+        // any machine, less the edges kept clear (Inset).
+        public static float Width => FullWidth - Inset.Left - Inset.Right;
+        public static float Height => FullHeight - Inset.Top - Inset.Bottom;
+
+        // The whole screen in points, edges outside the safe area included.
+        public static float FullWidth => SizeOverride?.x ?? Screen.width / Scale;
+        public static float FullHeight => SizeOverride?.y ?? Screen.height / Scale;
+
+        // The whole screen in the points the screens draw in (its corner left of and above 0, 0 when there are insets):
+        // for what covers everything, a dimming, a backdrop or a press anywhere.
+        public static Rect FullScreen => new Rect(-Inset.Left, -Inset.Top, FullWidth, FullHeight);
 
         internal static Vector2? SizeOverride { get; set; }
+
+        // How far in from each edge, in points, the safe area starts: a test's stand-in (InsetOverride) or the device's
+        // (Screen.safeArea, read at the start of each OnGUI; none in a browser).
+        public static Edges Inset => InsetOverride ?? _deviceInset;
+
+        internal static Edges? InsetOverride { get; set; }
+
+        static Edges _deviceInset;
+
+        public readonly struct Edges
+        {
+            public readonly float Left, Top, Right, Bottom;
+
+            public Edges(float left, float top, float right, float bottom)
+            {
+                Left = left;
+                Top = top;
+                Right = right;
+                Bottom = bottom;
+            }
+
+            public bool Any => Left > 0 || Top > 0 || Right > 0 || Bottom > 0;
+
+            public override string ToString() => $"{Left:0} {Top:0} {Right:0} {Bottom:0}";
+        }
 
         // Call at the start of every OnGUI.
         public static void Begin()
@@ -94,8 +136,12 @@ namespace Game.Client
             if (_font == null || _fontChoice != Settings.PixelFont) LoadFont(Settings.PixelFont);
             GUI.skin = UiSkin.Get();
             if (_font != null) GUI.skin.font = _font;
-            Scale = PixelRatio();
-            GUI.matrix = Matrix4x4.Scale(new Vector3(Scale, Scale, 1));
+            PageRatio = PixelRatio();
+            Scale = PointScale(PageRatio, Screen.width, Screen.height, Screen.dpi, Application.isMobilePlatform, Settings.UiSize);
+            _deviceInset = DeviceInset();
+            // Moved to the safe area by whole device pixels, so the pixel art stays on the pixel grid.
+            var inset = Inset;
+            GUI.matrix = Matrix4x4.TRS(new Vector3(Mathf.Round(inset.Left * Scale), Mathf.Round(inset.Top * Scale), 0), Quaternion.identity, new Vector3(Scale, Scale, 1));
             StartProbe();
             WebText.Frame();
             ProbeCover = Rect.zero;
@@ -600,8 +646,57 @@ namespace Game.Client
             }
         }
 
-        // Screen pixels as cameras and touches give them (origin bottom left) to GUI points (origin top left).
-        public static Vector2 FromScreen(Vector2 pixels) => new Vector2(pixels.x / Scale, (Screen.height - pixels.y) / Scale);
+        // Screen pixels as cameras and touches give them (origin bottom left) to GUI points (origin top left of the safe
+        // area).
+        public static Vector2 FromScreen(Vector2 pixels) =>
+            new Vector2(pixels.x / Scale - Mathf.Round(Inset.Left * Scale) / Scale, (Screen.height - pixels.y) / Scale - Mathf.Round(Inset.Top * Scale) / Scale);
+
+        // The menu's "UI 크기" (Settings.UiSize), in percent.
+        public static readonly int[] UiSizes = { 90, 100, 115, 130 };
+
+        // Device pixels per point. In a browser the page's pixel ratio (as before); a phone's own build 160 dots per
+        // inch a point (Android's measure: 2.5 on a 400-dpi phone, as its browser gives), or its screen's short side over
+        // 360 when it does not say; a PC 96 dots a point, so 1 at 100 % and 1.5 on a display scaled to 150 %, rounded to
+        // quarters. Then times the menu's UI size, but a larger size only as far as the screen keeps 320 points across
+        // its short side (a phone's layouts are tested down to 360×640; a PC's own build 480).
+        internal static float PointScale(float pageRatio, int width, int height, float dpi, bool mobile, int uiSize)
+        {
+            float size = Mathf.Clamp(uiSize, 50, 200) / 100f;
+            float shortSide = Mathf.Min(width, height);
+#if UNITY_WEBGL && !UNITY_EDITOR
+            float natural = pageRatio;
+            float least = 320;
+#else
+            float natural = mobile ? (dpi > 0 ? dpi / 160f : shortSide / 360f) : dpi >= 120 ? dpi / 96f : 1;
+#if UNITY_EDITOR
+            // The editor's game view stays one pixel a point (the play mode tests' pictures), unless its device
+            // simulator plays a phone.
+            if (!mobile) natural = 1;
+#endif
+            natural = Mathf.Clamp(Mathf.Round(natural * 4) / 4, 1, 4);
+            float least = mobile ? 320 : 480;
+            // The base itself held too (a tablet saying an odd dpi), never below one pixel a point.
+            if (shortSide > 0) natural = Mathf.Max(1, Mathf.Min(natural, shortSide / least));
+#endif
+            float scale = natural * size;
+            if (size > 1 && shortSide > 0) scale = Mathf.Max(natural, Mathf.Min(scale, shortSide / least));
+            return Mathf.Max(0.5f, scale);
+        }
+
+        // Screen.safeArea as points in from each edge; none in a browser, whose page has no notch to keep clear of.
+        static Edges DeviceInset()
+        {
+#if UNITY_WEBGL && !UNITY_EDITOR
+            return default;
+#else
+            var safe = Screen.safeArea;
+            float width = Screen.width, height = Screen.height;
+            if (safe.width <= 0 || safe.height <= 0 || width <= 0 || height <= 0) return default;
+            // Unity's safe area has its origin at the bottom left.
+            return new Edges(Mathf.Ceil(Mathf.Max(0, safe.xMin) / Scale), Mathf.Ceil(Mathf.Max(0, height - safe.yMax) / Scale),
+                Mathf.Ceil(Mathf.Max(0, width - safe.xMax) / Scale), Mathf.Ceil(Mathf.Max(0, safe.yMin) / Scale));
+#endif
+        }
 
         static float PixelRatio()
         {

@@ -29,6 +29,38 @@ namespace Game.Client
         static readonly Choice QuickRestChoice = new Choice("settings.quickrest", false);
         static readonly Choice ReduceMotionChoice = new Choice("settings.reducemotion", false);
         static readonly Choice FadeBehindChoice = new Choice("settings.fadebehind", true);
+        const string UiSizeKey = "settings.uisize";
+        static int? _uiSize;
+        static readonly Choice SmoothFramesChoice = new Choice("settings.fps60", true);
+
+        // "UI 크기" in percent, one of Ui.UiSizes: how much bigger or smaller than the screen's own measure the words and
+        // windows are drawn (Ui.PointScale). 100 unless chosen.
+        public static int UiSize
+        {
+            get => _uiSize ??= Array.IndexOf(Ui.UiSizes, Prefs.Get(UiSizeKey, 100)) >= 0 ? Prefs.Get(UiSizeKey, 100) : 100;
+            set
+            {
+                if (Array.IndexOf(Ui.UiSizes, value) < 0) value = 100;
+                if (_uiSize == value) return;
+                _uiSize = value;
+                Prefs.Set(UiSizeKey, value);
+            }
+        }
+
+        // The next of Ui.UiSizes, from the largest back to the smallest.
+        public static int NextUiSize() => Ui.UiSizes[(Array.IndexOf(Ui.UiSizes, UiSize) + 1) % Ui.UiSizes.Length];
+
+        // "프레임: 60/30" on a phone's own build (FrameRate): 60 frames a second, or 30 to spare the battery. A browser
+        // goes by the page's frames and a PC by its display's refresh, so the menu shows it only on a phone.
+        public static bool SmoothFrames
+        {
+            get => SmoothFramesChoice.Value;
+            set
+            {
+                SmoothFramesChoice.Value = value;
+                FrameRate.Apply();
+            }
+        }
 
         // The dark of the caves and the lights in it. Off, everything is lit as before.
         public static bool Darkness

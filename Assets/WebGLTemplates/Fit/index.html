@@ -79,6 +79,15 @@
       }).then(function (instance) {
         // The cloud's playtests drive the game through this (Docs/Playtest.md).
         window.unityInstance = instance;
+        // The game saves when its tab is hidden or the page goes (GameRoot.PageHidden): a phone's browser may drop a
+        // hidden tab without another word.
+        var hidden = function () {
+          try { instance.SendMessage("Game", "PageHidden"); } catch (e) {}
+        };
+        document.addEventListener("visibilitychange", function () {
+          if (document.visibilityState === "hidden") hidden();
+        });
+        window.addEventListener("pagehide", hidden);
         loading.remove();
         canvas.focus();
         // Saves live in the site's storage, which a browser may clear for a site not opened in a while (phones

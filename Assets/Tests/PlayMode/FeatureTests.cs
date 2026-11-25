@@ -36,6 +36,7 @@ namespace Game.Client.Tests
         [UnityTearDown]
         public IEnumerator DestroyRoot()
         {
+            Ui.InsetOverride = null;
             _root.Leave();
             Object.Destroy(_root.gameObject);
             yield return null;
@@ -93,6 +94,12 @@ namespace Game.Client.Tests
             Controls.ForceTouch(true);
             yield return new WaitForSecondsRealtime(0.4f);
             yield return Screens.Take("combo-touch");
+            // A notched phone held sideways (Screen.safeArea stood in): the HUD, minimap, sticks and skill buttons keep
+            // inside the safe area, the world still fills the whole screen.
+            Ui.InsetOverride = new Ui.Edges(44, 16, 44, 20);
+            yield return new WaitForSecondsRealtime(0.4f);
+            yield return Screens.Take("combo-touch-safearea");
+            Ui.InsetOverride = null;
             Controls.ForceTouch(false);
             _root.HoldAttack = false;
             Assert.IsTrue(_root.Playing);

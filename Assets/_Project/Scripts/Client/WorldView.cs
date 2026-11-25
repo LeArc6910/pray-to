@@ -704,7 +704,7 @@ namespace Game.Client
             if (_lightning > 0)
             {
                 GUI.color = new Color(0.9f, 0.95f, 1f, Mathf.Clamp01(_lightning / 0.18f) * 0.45f);
-                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), Texture2D.whiteTexture);
+                GUI.DrawTexture(Ui.FullScreen, Texture2D.whiteTexture);
             }
             GUI.color = before;
         }
@@ -789,7 +789,7 @@ namespace Game.Client
                 _vignette ??= MakeVignette();
                 var before = GUI.color;
                 GUI.color = new Color(0.9f, 0.1f, 0.08f, _hurtGlowStrength * _hurtGlow / HurtGlowSeconds);
-                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), _vignette);
+                GUI.DrawTexture(Ui.FullScreen, _vignette);
                 GUI.color = before;
             }
             // In a spore cloud (B1b, the mushroom forest): a soft green haze round the edges, the screen a little
@@ -800,9 +800,9 @@ namespace Game.Client
                 var before = GUI.color;
                 float breath = 0.32f + 0.06f * Mathf.Sin(Time.time * 2.4f);
                 GUI.color = new Color(0.55f, 0.85f, 0.35f, breath);
-                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), _vignette);
+                GUI.DrawTexture(Ui.FullScreen, _vignette);
                 GUI.color = new Color(0.5f, 0.7f, 0.35f, 0.07f);
-                GUI.DrawTexture(new Rect(0, 0, Ui.Width, Ui.Height), Texture2D.whiteTexture);
+                GUI.DrawTexture(Ui.FullScreen, Texture2D.whiteTexture);
                 GUI.color = before;
             }
             // Centred on their spot and allowed past their box, so a tall font is never cut off at the bottom.

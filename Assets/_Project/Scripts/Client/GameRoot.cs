@@ -180,6 +180,8 @@ namespace Game.Client
         void Awake()
         {
             Application.runInBackground = true;
+            // 60 frames a second on a phone's own build (30 if the menu says), the display's refresh on a PC's.
+            FrameRate.Apply();
             Controls.HearKeysWithoutFocus();
             _camera = Camera.main;
             if (_camera == null)
@@ -1739,6 +1741,45 @@ namespace Game.Client
             BackToTitle();
         }
 
+        // ---- Saving when the game is left without [나가기] (Docs/NativeBuild.md): a phone sends the app to the background
+        // (home, a call, the screen off) and may close it there without a word, a PC's window can be closed, a browser's
+        // tab hidden. The character, its map of the world and the world when hosting are written then, as the timed saves
+        // do; the game goes on. Focus coming and going quickly (an alt-tab, the page's own text box on the web) writes at
+        // most once every LeaveSaveGap seconds; quitting always writes. ----
+
+        const float LeaveSaveGap = 5;
+        float _leaveSavedAt = float.NegativeInfinity;
+
+        internal int LeaveSaves { get; private set; }
+
+        void OnApplicationPause(bool paused)
+        {
+            if (paused) SaveOnLeaving(false);
+        }
+
+        void OnApplicationFocus(bool focused)
+        {
+            if (!focused) SaveOnLeaving(false);
+        }
+
+        void OnApplicationQuit() => SaveOnLeaving(true);
+
+        // The web page's tab hidden or the page leaving (Assets/WebGLTemplates/Fit/index.html, through SendMessage): a
+        // browser on a phone may drop a hidden tab without another word.
+        void PageHidden() => SaveOnLeaving(false);
+
+        internal void SaveOnLeaving(bool always)
+        {
+            if (_client == null || _client.Status != ClientStatus.Playing) return;
+            if (!always && Time.unscaledTime - _leaveSavedAt < LeaveSaveGap) return;
+            _leaveSavedAt = Time.unscaledTime;
+            LeaveSaves++;
+            Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter(Now()));
+            if (_map != null && _map.Changed) Save(MapKey, _map.Save());
+            if (_host != null) Save(_worldKey, _host.SaveWorld(Now()));
+            DevInfo.Note("나가며 저장");
+        }
+
         bool _ownCamera;
 
         void OnDestroy()
@@ -1819,7 +1860,7 @@ namespace Game.Client
             var window = side ? ScreenStack.AreaOf(_screens.Current) : default;
             _view?.DrawGui();
             // Low on health: the screen's edges glow red, pulsing slowly unless motion is reduced (U7).
-            if (!dead && _client.Status == ClientStatus.Playing && Feel.HurtGlow) UiSkin.RedEdges(new Rect(0, 0, Ui.Width, Ui.Height), UiMotion.LowHealthGlow(LowHealthShare));
+            if (!dead && _client.Status == ClientStatus.Playing && Feel.HurtGlow) UiSkin.RedEdges(Ui.FullScreen, UiMotion.LowHealthGlow(LowHealthShare));
             if (side && Ui.Short)
             {
                 var color = GUI.color;
@@ -1893,7 +1934,7 @@ namespace Game.Client
         // settings.
         void DrawFullScreen()
         {
-            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            var screen = Ui.FullScreen;
             Controls.Block(screen);
             if (_screens.Current == GameScreen.Map)
             {
@@ -1975,7 +2016,7 @@ namespace Game.Client
         // (World.GetUp: alone or with others).
         void DrawDeath(Rect card)
         {
-            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            var screen = Ui.FullScreen;
             Controls.Block(card);
             if (Event.current.type == EventType.Repaint)
             {

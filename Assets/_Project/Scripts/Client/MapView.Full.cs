@@ -189,7 +189,7 @@ namespace Game.Client
 
         public void DrawFull()
         {
-            var screen = new Rect(0, 0, Ui.Width, Ui.Height);
+            var screen = Ui.FullScreen;
             Controls.Block(screen);
             UiSkin.FullBackdrop(screen);
             var dungeon = _client.DungeonHere;

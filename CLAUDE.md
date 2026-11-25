@@ -106,6 +106,8 @@ node DevTools/WebPlaytest/playtest.js --wait
 # LOCAL_TASKS.md의 사람 확인을 차례로 해 보는 전체 점검(30~40분, 결과는 out/sweep/). --only로 일부만
 node DevTools/WebPlaytest/sweep.js --wait
 
+# Windows·Android 앱 빌드는 로컬 Unity에서(모듈과 명령은 Docs/NativeBuild.md): -executeMethod Game.Client.Editor.NativeBuild.RunBatchWindows / RunBatchAndroid
+
 # 로컬 명령 한 줄 스크립트 확인 (pwsh가 있으면 PowerShell 쪽도)
 bash DevTools/Local/test/run.sh
 ```
