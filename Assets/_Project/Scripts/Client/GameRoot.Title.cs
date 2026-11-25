@@ -159,7 +159,7 @@ namespace Game.Client
 
         // ---- Styles ----
 
-        GUIStyle _titleItem, _pageItem, _smallItem, _note;
+        GUIStyle _titleItem, _pageItem, _smallItem, _note, _mainButton;
 
         void MenuStyles()
         {
@@ -167,7 +167,11 @@ namespace Game.Client
             _pageItem ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
             _smallItem ??= new GUIStyle(GUI.skin.label) { alignment = TextAnchor.MiddleCenter, wordWrap = false };
             _note ??= new GUIStyle(GUI.skin.label) { wordWrap = false };
-            Ui.Text(_titleItem, Ui.Short ? 15 : 18);
+            // The page's one main action and a question's answer that cannot be taken back keep a frame (Ui.Look.Primary,
+            // Ui.Look.Danger): the skin's button style, which has one.
+            _mainButton ??= new GUIStyle(GUI.skin.button);
+            Ui.Text(_mainButton, 15);
+            Ui.Text(_titleItem, 18);
             Ui.Text(_pageItem, 15);
             Ui.Text(_smallItem, 13);
             Ui.Text(_note, 13);
@@ -344,6 +348,8 @@ namespace Game.Client
             TitleDraw.Text(new Rect(logo.center.x - 200, logo.yMax + 2, 400, tagHeight), Strings.T("menu.tagline", "동굴 아래, 무너진 왕국의 이야기"), 13,
                 TitleDraw.Faint, TextAnchor.MiddleCenter);
 
+            // A soft dark cloud behind the words, so they read over whatever of the cave drifts behind them.
+            TitleDraw.Halo(new Rect(items0.x - 70, items0.y - 30, items0.width + 140, column + 60));
             GUI.enabled = ready;
             var rect = items0;
             foreach (var (label, press) in items)
@@ -505,7 +511,7 @@ namespace Game.Client
                     bool can = ready && !_connecting && PickedWorldReady;
                     var was = GUI.enabled;
                     GUI.enabled = was && can;
-                    if (Item(main, StartLabel, _pageItem, Ui.Look.Primary)) Later(StartPicked);
+                    if (Item(main, StartLabel, _mainButton, Ui.Look.Primary)) Later(StartPicked);
                     GUI.enabled = was;
                     break;
                 }
@@ -515,11 +521,11 @@ namespace Game.Client
                     var dice = new Rect(Mathf.Round(foot.center.x - half - 6), foot.y, half, height);
                     var make = new Rect(Mathf.Round(foot.center.x + 6), foot.y, half, height);
                     if (Item(dice, Strings.T("title.dice", "주사위"), _pageItem)) Later(RollLook);
-                    if (Item(make, Strings.T("title.make", "만들기"), _pageItem, Ui.Look.Primary)) Later(MakeCharacter);
+                    if (Item(make, Strings.T("title.make", "만들기"), _mainButton, Ui.Look.Primary)) Later(MakeCharacter);
                     break;
                 }
                 case MenuPage.MakeWorld:
-                    if (Item(main, Strings.T("title.make", "만들기"), _pageItem, Ui.Look.Primary)) Later(MakeWorld);
+                    if (Item(main, Strings.T("title.make", "만들기"), _mainButton, Ui.Look.Primary)) Later(MakeWorld);
                     break;
             }
         }
@@ -588,7 +594,7 @@ namespace Game.Client
             return pressed;
         }
 
-        float ListRowHeight => Controls.UsingTouch ? 62 : 56;
+        float ListRowHeight => Controls.UsingTouch ? 66 : 60;
 
         // The dashed row that makes a new one.
         bool NewRow(string label)
@@ -1100,7 +1106,7 @@ namespace Game.Client
             var no = new Rect(area.xMax - 20 - half, yes.y, half, button);
             Ui.Row(_askName);
             bool focusKeys = !Controls.UsingTouch;
-            bool actPressed = Ui.Button(yes, act, act, _pageItem, Ui.Look.Danger, focusKeys && _askChoice == 0) || _askFire && _askChoice == 0;
+            bool actPressed = Ui.Button(yes, act, act, _mainButton, Ui.Look.Danger, focusKeys && _askChoice == 0) || _askFire && _askChoice == 0;
             bool keepPressed = Ui.Button(no, keep, keep, _pageItem, Ui.Look.Text, focusKeys && _askChoice == 1) || _askFire && _askChoice == 1;
             Ui.Row("");
             if (actPressed)

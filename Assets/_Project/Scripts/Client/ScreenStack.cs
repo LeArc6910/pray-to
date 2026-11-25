@@ -450,7 +450,7 @@ namespace Game.Client
             return new Vector2(columns * HubCellWidth + (columns - 1) * HubGap + 2 * HubPad, rows * HubCellHeight + (rows - 1) * HubGap + 2 * HubPad);
         }
 
-        static GUIStyle _hubText, _askText;
+        static GUIStyle _hubText, _askText, _leaveButton;
 
         // The hub over the game in the title's look (Docs/TitleRework.md 4-3, 묶음 T3): the see-through panel with its thin
         // gold rim, each screen a word with no box and its icon above it, lit gold when pointed at, a gold dot on the growth
@@ -531,7 +531,9 @@ namespace Game.Client
                 no = new Rect(yes.xMax + HubGap, yes.y, half, button);
             }
             _hubText.alignment = TextAnchor.MiddleCenter;
-            bool leave = Ui.Button(yes, LeaveConfirm, LeaveConfirm, _hubText, Ui.Look.Danger, false);
+            _leaveButton ??= new GUIStyle(GUI.skin.button);
+            Ui.Text(_leaveButton, 13);
+            bool leave = Ui.Button(yes, LeaveConfirm, LeaveConfirm, _leaveButton, Ui.Look.Danger, false);
             if (Ui.Button(no, Stay, Stay, _hubText, Ui.Look.Text, !Controls.UsingTouch))
             {
                 LeaveAsked = false;

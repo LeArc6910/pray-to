@@ -165,12 +165,38 @@ namespace Game.Client
         public static void Heading(Rect rect, string text)
         {
             if (Event.current.type != EventType.Repaint) return;
-            int size = Ui.Short ? 15 : 18;
+            // Smaller when the big words would run into [뒤로] at the head's left.
+            int size = Ui.Short || TextWidth(text, 18) > rect.width - 180 ? 15 : 18;
             Text(new Rect(rect.x, rect.y, rect.width, rect.height - 6), text, size, GoldInk, TextAnchor.MiddleCenter);
             float pt = UiSkin.Pt;
             int width = Mathf.Max(20, Mathf.RoundToInt(Mathf.Min(rect.width - 24, 360) / pt));
             var rule = Cached("title/divider/" + width, () => TitleArt.Divider(width));
             UiSkin.Image(new Vector2(Mathf.Round(rect.center.x - width * pt / 2), Mathf.Round(rect.yMax - TitleArt.DividerHeight * pt)), rule);
+        }
+
+        static Texture2D _halo;
+
+        // A soft dark cloud behind words laid straight on the cave (the title's column), so they read over a bright prop.
+        public static void Halo(Rect area, float strength = 0.55f)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            if (_halo == null)
+            {
+                const int size = 64;
+                _halo = new Texture2D(size, size, TextureFormat.RGBA32, false) { wrapMode = TextureWrapMode.Clamp, filterMode = FilterMode.Bilinear };
+                for (int y = 0; y < size; y++)
+                    for (int x = 0; x < size; x++)
+                    {
+                        float dx = (x + 0.5f) / size * 2 - 1, dy = (y + 0.5f) / size * 2 - 1;
+                        float t = Mathf.Clamp01(1 - Mathf.Sqrt(dx * dx + dy * dy));
+                        _halo.SetPixel(x, y, new Color(0.02f, 0.015f, 0.025f, Mathf.SmoothStep(0, 1, t)));
+                    }
+                _halo.Apply();
+            }
+            var previous = GUI.color;
+            GUI.color = new Color(1, 1, 1, strength);
+            GUI.DrawTexture(area, _halo, ScaleMode.StretchToFill);
+            GUI.color = previous;
         }
 
         // ---- The panel and the rows ----

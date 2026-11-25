@@ -24,6 +24,8 @@ namespace Game.Client
             LogoSheet(folder);
             Buttons(Path.Combine(folder, "buttons.png"));
             BiomeIcons(Path.Combine(folder, "biome_icons.png"));
+            // The screens as T3 lays them out (TitleScreensPreview).
+            TitleScreensPreview.Write(folder);
             foreach (var biome in TitleArt.BiomeOrder)
             {
                 // Each biome twice: its own monsters alone, and another seed with the default hero standing in it.
