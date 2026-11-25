@@ -180,10 +180,11 @@ namespace Game.Core
         public const int DungeonPackLeast = 4;
         public const int DungeonPackMost = 8;
         // The master: a leader of its kind with two affixes and BigEliteHealth times its zone's health (in place of a
-        // camp leader's LeaderHealth), and this share more for each player past the first, as the bosses have.
+        // camp leader's LeaderHealth), and this share more for each player past the first (0.6 as the bosses have until
+        // B5a: two then took half as long as one).
         public const int BigEliteAffixes = 2;
         public const float BigEliteHealth = 12;
-        public static float BigElitePerPlayer = 0.6f;
+        public const float BigElitePerPlayer = 1.2f;
         // A mid-boss in person (dungeons.csv boss = a monster id, B1c): its affixes, and its health as its zone made it
         // times this (an XL is already twelve times an M body; MakeElite leaves an XL leader's health as it is).
         public const int MasterAffixes = 1;
@@ -192,8 +193,8 @@ namespace Game.Core
         // woke, its monsters have this share more health (the master BigElitePerPlayer, the rest DungeonHealthPerPlayer)
         // and each gives this share more experience, so two take about as long as one and each gets about what the
         // field gives two a minute. PackExtraPerPlayer more monsters come as in the field.
-        public static float DungeonHealthPerPlayer = 0.7f;
-        public static float DungeonExperiencePerPlayer = 0.6f;
+        public const float DungeonHealthPerPlayer = 1;
+        public const float DungeonExperiencePerPlayer = 0.6f;
 
         // The health (or experience) a dungeon's monster is made with for that many players: 1 for one.
         public static float DungeonParty(float perPlayer, int players) => 1 + perPlayer * Math.Max(0, players - 1);

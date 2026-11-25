@@ -94,6 +94,9 @@ namespace CoreSandbox
             var ignored = new HashSet<int>();
             var still = bots.ToDictionary(b => b.Player.Id, b => (At: b.Player.Position, Since: 0L));
             var struck = new HashSet<int>();
+            // And one that stood still this long in its goal room with nothing near goes onto what lies in ambush there.
+            var idle = bots.ToDictionary(b => b.Player.Id, b => (At: b.Player.Position, Since: 0L));
+            bool mounds = false;
             var roomSeconds = new List<(char Letter, float Seconds)>();
             var seenLoot = new HashSet<int>();
             int floorValue = 0, rares = 0;
@@ -103,6 +106,7 @@ namespace CoreSandbox
                 {
                     goal++;
                     ignored.Clear();
+                    mounds = false;
                 }
                 var room = goal < goals.Count ? goals[goal] : null;
                 // The way: to its middle, or, to a locked room still shut, to the grate.
@@ -127,11 +131,17 @@ namespace CoreSandbox
                         still[player.Id] = (player.Position, world.Tick);
                         near.Clear();
                     }
+                    if (Vec2.Distance(idle[player.Id].At, player.Position) > 0.05f || near.Count > 0 || player.IsDead) idle[player.Id] = (player.Position, world.Tick);
                     // The last of the goal room's pack standing idle at its edge (a split slime, a rat out of the light),
                     // once the bot stands in the room: gone after, so the room is cleared.
                     var left = near.Count > 0 || room == null || !DungeonSheet.HasPack(room.Letter) || !dungeon.RoomWoken(room.Index) || !room.Contains(player.Position, 1)
                         ? new List<Enemy>()
                         : world.Enemies.Where(e => !e.Away && !e.IsDead && !e.Buried && world.DungeonAt(e.Position) == dungeon && room.Contains(e.Position, 4)).ToList();
+                    // Nothing left of it above the ground but one lying in ambush long enough: onto its mound, as a person
+                    // who sees it goes to spring it (B5a: a sand scorpion kept the duo's temple room from clearing).
+                    if (world.Tick - idle[player.Id].Since > World.Ticks(StuckSeconds)) mounds = true;
+                    if (left.Count == 0 && near.Count == 0 && mounds && room != null && DungeonSheet.HasPack(room.Letter) && dungeon.RoomWoken(room.Index))
+                        left = world.Enemies.Where(e => !e.IsDead && e.Buried && world.DungeonAt(e.Position) == dungeon && room.Contains(e.Position, 4)).ToList();
                     if (near.Count > 0 || player.IsDead)
                     {
                         if (tick % 10 == 0) toEnemies.Build(world.Enemies.Where(e => !e.Away && world.DungeonAt(e.Position) == dungeon && Vec2.Distance(e.Position, player.Position) < 24).Select(e => e.Position), 40);

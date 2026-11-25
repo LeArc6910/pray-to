@@ -152,10 +152,6 @@ namespace CoreSandbox
                 args = args.Where((_, i) => i != missFlag && i != missFlag + 1).ToArray();
             }
 
-            // TEMP B5 tuning
-            if (Environment.GetEnvironmentVariable("B5_H") is string b5h) World.DungeonHealthPerPlayer = float.Parse(b5h, System.Globalization.CultureInfo.InvariantCulture);
-            if (Environment.GetEnvironmentVariable("B5_E") is string b5e) World.DungeonExperiencePerPlayer = float.Parse(b5e, System.Globalization.CultureInfo.InvariantCulture);
-            if (Environment.GetEnvironmentVariable("B5_M") is string b5m) World.BigElitePerPlayer = float.Parse(b5m, System.Globalization.CultureInfo.InvariantCulture);
             var data = LoadLoot();
             switch (args.Length > 0 ? args[0] : "")
             {
