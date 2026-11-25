@@ -712,6 +712,10 @@ namespace Game.Client
             if (_map[x, y] == TileType.Quicksand) return new Color32(196, 160, 84, 255);
             // The lake's shallows (B3b): a paler teal than its deep water.
             if (_map[x, y] == TileType.ShallowWater) return new Color32(92, 186, 176, 255);
+            // The lava fields' steam vents and the abyss's cracked plates and holes (B4b).
+            if (_map[x, y] == TileType.SteamVent) return new Color32(255, 140, 60, 255);
+            if (_map[x, y] == TileType.CrackedPlate) return new Color32(132, 118, 160, 255);
+            if (_map[x, y] == TileType.BrokenPlate) return new Color32(8, 4, 16, 255);
             if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);
             if (_map[x, y] == TileType.Dock) return new Color32(168, 116, 68, 255);
             if (_map[x, y] == TileType.Rail) return new Color32(120, 110, 100, 255);

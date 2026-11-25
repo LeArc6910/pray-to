@@ -3850,10 +3850,10 @@ namespace Game.Client
             _lights.Clear();
             _lights.Add(WorldLights.Carried(self));
             foreach (var body in _others.Values)
-            {
                 if (body.Kind == BodyKind.Player) _lights.Add(WorldLights.Carried(new Vec2(body.Position.x, body.Position.y)));
-                else if (body.Kind == BodyKind.Minion) _lights.Add(new LightSource(new Vec2(body.Position.x, body.Position.y), MinionLight, 0.7f, body.Color, tints: true));
-            }
+            int carried = _lights.Count;
+            foreach (var body in _others.Values)
+                if (body.Kind == BodyKind.Minion) _lights.Add(new LightSource(new Vec2(body.Position.x, body.Position.y), MinionLight, 0.7f, body.Color, tints: true));
             // The dungeons' gate rooms burn their dungeon's colour (B1c), worked out again when the gates are found.
             if (_gateColorsFor != _client.Gates)
             {
@@ -3871,6 +3871,8 @@ namespace Game.Client
                 var at = shot.transform.localPosition;
                 _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, Sprites.ToRgba(shot.color), tints: true));
             }
+            // The abyss swallows light (B4b, LavaVoidLight).
+            AbyssLightsDimmed = LavaVoidLight.Dim(_lights, _biomeAt, carried);
             _lightMap.Compute(_client.Map, left, bottom, _lights, _arenaGlow, _biomeTint);
             for (int j = 0; j < size; j++)
             {

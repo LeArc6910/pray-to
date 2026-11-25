@@ -387,7 +387,8 @@ namespace Game.Client
             "tentacle" => Tentacle,
             "mud_slime" => MudSlime,
             "tide_chief" => TideChief,
-            _ => null,
+            // The lava fields' and the abyss's (CreatureArt.LavaVoid.cs, B4b).
+            _ => LavaVoidFrames(id),
         };
 
         // ---- The big ones ----
@@ -631,7 +632,7 @@ namespace Game.Client
             "great_crab" => Sides(GreatCrab(0), GreatCrab(1)),
             "geode_golem" => Sides(GeodeGolem(0), GeodeGolem(1)),
             "moss_turtle" => Sides(MossTurtle(0), MossTurtle(1)),
-            _ => null,
+            _ => LavaVoidBigFrames(id),
         };
 
         // The frames without the columns empty in all of them at either side (a part laid one short of the canvas's
@@ -649,6 +650,8 @@ namespace Game.Client
         // lights its band white-hot from frame to frame, and the tentacle's suckers redden.
         static void CrystalLakePose(string id, MonsterPose pose, int frame, Dictionary<char, Rgba> colors)
         {
+            // The lava fields' and the abyss's (B4b).
+            LavaVoidPose(id, pose, frame, colors);
             if (pose != MonsterPose.Windup) return;
             bool flare = frame % 2 == 0;
             switch (id)
@@ -670,7 +673,7 @@ namespace Game.Client
         // ---- Dormant ----
 
         // Whether a kind of these biomes is drawn still while it stands dormant (a mimic is crystals).
-        static bool CrystalLakeSleeps(string id) => Mimics(id) || id == "geode_golem" || id == "moss_turtle";
+        static bool CrystalLakeSleeps(string id) => Mimics(id) || id == "geode_golem" || id == "moss_turtle" || LavaVoidSleeps(id);
 
         // Whether a kind stands as something else while dormant (World.Mimics: an elite one does not).
         public static bool Mimics(string id) => id == "crystal_mimic";
@@ -681,6 +684,8 @@ namespace Game.Client
         // body), the golem grey stone with its geode's light out, the turtle an island of moss with its lamps dim.
         static PixelImage CrystalLakeDormant(string id, PixelImage image)
         {
+            // The ember smith's cold iron, the gate warden's grey stone (B4b).
+            if (LavaVoidDormant(id, image) is PixelImage cold) return cold;
             if (id == "crystal_mimic")
             {
                 var colors = RampColors(Ramp.Of(Rgba.Hex("#7C86A8")));

@@ -830,13 +830,15 @@ namespace Game.Client
             var ramp = Ramp.Of(color);
             var colors = RampColors(ramp);
             if (Extras.TryGetValue(id, out var extra) || BigExtras.TryGetValue(id, out extra) || BiomeExtras.TryGetValue(id, out extra) || IceSandExtras.TryGetValue(id, out extra)
-                || CrystalLakeExtras.TryGetValue(id, out extra))
+                || CrystalLakeExtras.TryGetValue(id, out extra) || LavaVoidExtras.TryGetValue(id, out extra))
             {
                 foreach (var pair in extra) colors[pair.Key] = pair.Value;
             }
             if (view == MonsterView.Back) colors['e'] = ramp.Main;
             else if (pose == MonsterPose.Windup) colors['e'] = AngryEye;
             else if (pose == MonsterPose.Hurt) colors['e'] = ramp.Dark;
+            // The void eye's white and iris go with its eye (CreatureArt.LavaVoid.cs, B4b).
+            LavaVoidView(id, view, colors);
             // A kind's own pose colours (a bomb scarab's fuse flaring, CreatureArt.IceSand.cs).
             IceSandPose(id, pose, frame, colors);
             // The big kinds (L, XL) are drawn at their own size, never stretched (CreatureArt.Big.cs).

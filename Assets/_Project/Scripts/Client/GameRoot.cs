@@ -111,6 +111,15 @@ namespace Game.Client
         // breaking and splashes in the shallows (B3b).
         internal int RipplesShown => _view?.RipplesShown ?? 0;
         internal int GlancesShown => _view?.GlancesShown ?? 0;
+        // B4b: steam vents seen hissing and bursting, plates giving way, falls, plates back, plates cracking now, and the
+        // abyss's lights dimmed (WorldView.LavaVoid.cs).
+        internal int VentsShown => _view?.VentsShown ?? 0;
+        internal int VentBurstsShown => _view?.VentBurstsShown ?? 0;
+        internal int CrumblesShown => _view?.CrumblesShown ?? 0;
+        internal int FallsShown => _view?.FallsShown ?? 0;
+        internal int PlatesBackShown => _view?.PlatesBackShown ?? 0;
+        internal int CracksShown => _view?.CracksShown ?? 0;
+        internal int AbyssLightsDimmed => _view?.AbyssLightsDimmed ?? 0;
         internal int ReflectsShown => _view?.ReflectsShown ?? 0;
         internal int RefractsShown => _view?.RefractsShown ?? 0;
         internal int SplashesShown => _view?.SplashesShown ?? 0;

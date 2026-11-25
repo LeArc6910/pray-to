@@ -325,6 +325,8 @@ namespace Game.Client
             if (_markLooks.TryGetValue(hazard.Id, out var look)) return look;
             // An icicle of the ice halls (Hazard.Icicle, B2b) is the cold's own, no monster's.
             if (hazard.MonsterShape + 1 == Hazard.Icicle) return (FxRamp.Cold, 0x1DCEFFAu, null, MobLook.Frost);
+            // A steam vent of the lava fields (Hazard.Steam, B4b) is the fire's own.
+            if (IsSteam(hazard)) return (FxRamp.Fire, 0x1FFB060u, null, MobLook.Ember);
             look = (FxRamp.Plain, 0x1D8D8D8u, null, MobLook.Plain);
             float best = 14;
             foreach (var body in _others.Values)
@@ -378,7 +380,10 @@ namespace Game.Client
                 IciclesShown++;
                 Hear(Sound.MobArea, at, 0.5f);
             }
-            var shape = flash ? MonsterAttackShape.Slam : icicle ? MonsterAttackShape.Lob : (MonsterAttackShape)shapeIndex;
+            // A steam vent hisses under a slam's ring at its own reach (B4b, WorldView.LavaVoid.cs).
+            bool steam = IsSteam(hazard);
+            if (steam) SteamArmed(mark, at);
+            var shape = flash || steam ? MonsterAttackShape.Slam : icicle ? MonsterAttackShape.Lob : (MonsterAttackShape)shapeIndex;
             bool blink = shape == MonsterAttackShape.Blink;
             var color = hazard.Harmful ? DangerColor : PathColor;
             if (Feel.MonsterFx)
@@ -439,6 +444,12 @@ namespace Game.Client
         void MonsterLanded(HazardState hazard)
         {
             if (!hazard.Harmful || IsMonsterPool(hazard.Shape) || hazard.MonsterShape + 1 == Hazard.DeathFlash) return;
+            // A vent's burst is its column of steam (B4b).
+            if (IsSteam(hazard))
+            {
+                SteamBurst(hazard);
+                return;
+            }
             var look = LookOf(hazard);
             MonsterBlow(hazard.MonsterShape + 1 == Hazard.Icicle ? MonsterAttackShape.Lob : (MonsterAttackShape)hazard.MonsterShape, hazard.Shape, new Vector3(hazard.Position.X, hazard.Position.Y, 0), hazard.Direction, hazard.Size, hazard.Width,
                 look.Ramp, look.Tint, look.Look);
@@ -553,6 +564,8 @@ namespace Game.Client
                     else _tethers.Remove(e.Source);
                     break;
                 case SimEventType.MonsterFx:
+                    // The abyss's plates giving way and the falls through them (B4b, WorldView.LavaVoid.cs).
+                    if (LavaVoidEvent(e, at)) break;
                     switch (e.Amount)
                     {
                         case World.MonsterFxBounce:
@@ -688,6 +701,8 @@ namespace Game.Client
                 }
                 EmitFx(fx.At, 1, null);
             }
+            // The abyss's plates cracking under the players' feet (B4b).
+            DrawPlateCracks();
             // Held where they stand (HitEffect.Root): a ring of ice at the player's own feet.
             if (Feel.MonsterFx && (_client.SelfStatus & StatusBits.Rooted) != 0)
             {

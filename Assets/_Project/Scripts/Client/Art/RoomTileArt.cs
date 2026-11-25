@@ -14,13 +14,22 @@ namespace Game.Client
         const int Top = 10;
 
         // And the lake's shallows (B3b), laid round its water.
-        public static bool IsPatch(TileType type) => type == TileType.IceFloor || type == TileType.Quicksand || type == TileType.ShallowWater;
+        public static bool IsPatch(TileType type) => type == TileType.IceFloor || type == TileType.Quicksand || type == TileType.ShallowWater
+            // The lava fields' steam vents and the abyss's cracked plates and the holes they leave (B4b).
+            || type == TileType.SteamVent || type == TileType.CrackedPlate || type == TileType.BrokenPlate;
 
         // Which sides of the patch at (x, y) meet more of it (N 1, E 2, S 4, W 8). Rock counts: a sheet of ice runs
         // under the wall rather than stopping a pixel short of it.
         public static int PatchMask(TileMap map, int x, int y)
         {
             var type = map[x, y];
+            // A vent is a spot of its own; a plate and a hole meet edge to edge (B4b).
+            if (type == TileType.SteamVent) return 0;
+            if (type == TileType.CrackedPlate || type == TileType.BrokenPlate)
+            {
+                bool Plate(int nx, int ny) => map.InBounds(nx, ny) && (map[nx, ny] == TileType.CrackedPlate || map[nx, ny] == TileType.BrokenPlate);
+                return (Plate(x, y + 1) ? 1 : 0) | (Plate(x + 1, y) ? 2 : 0) | (Plate(x, y - 1) ? 4 : 0) | (Plate(x - 1, y) ? 8 : 0);
+            }
             // Shallows run on into the deep water beside them.
             bool Joins(int nx, int ny) => !map.InBounds(nx, ny) || map[nx, ny] == type || TileArt.IsRock(map[nx, ny])
                 || type == TileType.ShallowWater && map[nx, ny] == TileType.Water;
@@ -30,6 +39,9 @@ namespace Game.Client
         static readonly PixelImage[] IceTiles = new PixelImage[32];
         static readonly PixelImage[] SandTiles = new PixelImage[32];
         static readonly PixelImage[] ShallowTiles = new PixelImage[32];
+        static readonly PixelImage[] VentTiles = new PixelImage[32];
+        static readonly PixelImage[] PlateTiles = new PixelImage[32];
+        static readonly PixelImage[] HoleTiles = new PixelImage[32];
 
         // The patch with these sides joined, in one of two layings picked by where the tile is.
         public static PixelImage Patch(TileType type, int mask, int laying = 0)
@@ -37,6 +49,9 @@ namespace Game.Client
             int index = (mask & 15) | (laying & 1) << 4;
             return type == TileType.Quicksand ? SandTiles[index] ??= Quicksand(mask & 15, laying & 1)
                 : type == TileType.ShallowWater ? ShallowTiles[index] ??= Shallow(mask & 15, laying & 1)
+                : type == TileType.SteamVent ? VentTiles[index] ??= Vent(laying & 1)
+                : type == TileType.CrackedPlate ? PlateTiles[index] ??= Plate(mask & 15, laying & 1)
+                : type == TileType.BrokenPlate ? HoleTiles[index] ??= Hole(mask & 15, laying & 1)
                 : IceTiles[index] ??= Ice(mask & 15, laying & 1);
         }
 
@@ -112,6 +127,97 @@ namespace Game.Client
                     image[x, y] = colour;
                 }
             }
+            return image;
+        }
+
+        // A steam vent of the lava fields (B4b): a crack in a low ring of basalt, its throat glowing orange, soot round
+        // it, a wisp of steam at its lip. Read at a glance as "something comes out of here".
+        static PixelImage Vent(int laying)
+        {
+            var image = new PixelImage(Size, Size);
+            var soot = Rgba.Hex("#141010");
+            var rim = Rgba.Hex("#4A3A34");
+            var rimLight = Rgba.Hex("#6E5A50");
+            var glow = Rgba.Hex("#FF7A30");
+            var hot = Rgba.Hex("#FFD060");
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    float dx = (x - 7.5f) / 6.5f, dy = (y - 8.5f) / 5f;
+                    float d = dx * dx + dy * dy;
+                    if (d > 1) continue;
+                    image[x, y] = d > 0.62f ? (y < 8 ? rimLight : rim) : soot;
+                }
+            }
+            // The throat: a jagged slit, glowing, hottest in its middle.
+            int[] slit = laying == 0 ? new[] { 8, 8, 9, 9, 8, 7, 7, 8 } : new[] { 7, 8, 8, 9, 9, 8, 8, 7 };
+            for (int i = 0; i < slit.Length; i++)
+            {
+                int x = 4 + i, y = slit[i];
+                image[x, y] = i >= 2 && i <= 5 ? hot : glow;
+                image[x, y + 1] = glow.Mix(soot, 0.5f);
+            }
+            // A wisp of steam at the lip.
+            image[6 + laying, 3] = Rgba.Hex("#C8C0C0");
+            image[7 + laying, 2] = Rgba.Hex("#A8A0A0");
+            image[8 + laying, 1] = Rgba.Hex("#887E80");
+            return image;
+        }
+
+        // A cracked plate of the abyss (B4b): a slab of pale grey-violet stone floating over the dark, lighter on its top
+        // edge, cracks across it with violet light seeping up through them, a dark gap where it meets a plate beside it
+        // that is not joined. It must read as "thin ice": lighter than the abyss's floor and plainly cracked.
+        static PixelImage Plate(int mask, int laying)
+        {
+            var stone = Ramp.Of("#6E6488");
+            var crack = Rgba.Hex("#1A1028");
+            var light = Rgba.Hex("#C8A0FF");
+            var image = new PixelImage(Size, Size);
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    if (!InPatch(x, y, mask)) continue;
+                    var colour = stone.Main;
+                    if ((x * 3 + y * 5 + laying) % 11 == 0) colour = stone.Shade;
+                    if (Edge(x, y, mask)) colour = y < 8 ? stone.Light : stone.Dark;
+                    image[x, y] = colour;
+                }
+            }
+            // The cracks: two jagged lines across, light in their widest places.
+            int[] across = laying == 0 ? new[] { 5, 5, 6, 7, 7, 8, 8, 9, 10, 10, 9, 9, 8, 8 } : new[] { 10, 9, 9, 8, 7, 7, 6, 6, 5, 5, 6, 7, 7, 8 };
+            for (int i = 0; i < across.Length; i++)
+            {
+                int x = 1 + i, y = across[i];
+                if (!InPatch(x, y, mask)) continue;
+                image[x, y] = i % 4 == 2 ? light : crack;
+            }
+            for (int y = 2; y < 8; y++)
+            {
+                int x = laying == 0 ? 10 + (y & 1) : 4 + (y & 1);
+                if (InPatch(x, y, mask)) image[x, y] = y == 5 ? light : crack;
+            }
+            return image;
+        }
+
+        // The hole a plate leaves (B4b): the void under it, black with a few far stars, its rim crumbled stone.
+        static PixelImage Hole(int mask, int laying)
+        {
+            var image = new PixelImage(Size, Size);
+            var dark = Rgba.Hex("#05030A");
+            var deep = Rgba.Hex("#120A22");
+            var rim = Rgba.Hex("#3A3050");
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    if (!InPatch(x, y, mask)) continue;
+                    image[x, y] = Edge(x, y, mask) ? rim : (x + y + laying) % 7 == 0 ? deep : dark;
+                }
+            }
+            foreach (var (sx, sy) in laying == 0 ? new[] { (4, 5), (11, 10) } : new[] { (9, 4), (5, 11) })
+                if (InPatch(sx, sy, mask) && !Edge(sx, sy, mask)) image[sx, sy] = Rgba.Hex("#E6D6FF");
             return image;
         }
 
