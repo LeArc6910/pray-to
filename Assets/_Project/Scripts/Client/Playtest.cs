@@ -531,8 +531,14 @@ namespace Game.Client
                             // 묶음 B3a: "cluster" before the crystal cave's cluster and "clam" before the lake's giant clam (a
                             // swing picks either), "leaning" behind the leaning crystal (its top fades).
                             : words[2] == "cluster" ? TileType.CrystalCluster : words[2] == "clam" ? TileType.GiantClam : words[2] == "leaning" ? TileType.LeaningCrystal
+                            // 묶음 B4a: "bush" before the lava zone's burning bush (a swing picks it) and "vine" before the
+                            // abyss's twisted vine (a swing breaks it), "columns" behind the basalt columns and "shattered"
+                            // behind the shattered pillar (their tops fade).
+                            : words[2] == "bush" ? TileType.FireBush : words[2] == "vine" ? TileType.TwistedVine : words[2] == "columns" ? TileType.BasaltColumns
+                            : words[2] == "shattered" ? TileType.ShatteredPillar
                             : TileType.UnlitLamp;
-                        bool behind = wanted == TileType.GiantCap || wanted == TileType.IcePillar || wanted == TileType.RibArch || wanted == TileType.LeaningCrystal;
+                        bool behind = wanted == TileType.GiantCap || wanted == TileType.IcePillar || wanted == TileType.RibArch || wanted == TileType.LeaningCrystal
+                            || wanted == TileType.BasaltColumns || wanted == TileType.ShatteredPillar;
                         Vec2? spot = null;
                         if (words[2] == "grass")
                         {
@@ -575,7 +581,10 @@ namespace Game.Client
                                 : words[2] == "temple" ? BiomeLandmarkKind.TempleFront : words[2] == "skull" ? BiomeLandmarkKind.GiantSkull
                                 // 묶음 B3a: the crystal cave's and the lake's.
                                 : words[2] == "geode" ? BiomeLandmarkKind.GiantGeode : words[2] == "arch" ? BiomeLandmarkKind.CrystalArch
-                                : words[2] == "boat" ? BiomeLandmarkKind.SunkenBoat : words[2] == "wheel" ? BiomeLandmarkKind.OldWheel : BiomeLandmarkKind.FairyRing;
+                                : words[2] == "boat" ? BiomeLandmarkKind.SunkenBoat : words[2] == "wheel" ? BiomeLandmarkKind.OldWheel
+                                // 묶음 B4a: the lava zone's and the abyss's.
+                                : words[2] == "chimney" ? BiomeLandmarkKind.FallenChimney : words[2] == "anvil" ? BiomeLandmarkKind.GiantAnvil
+                                : words[2] == "gate" ? BiomeLandmarkKind.BrokenGate : words[2] == "altar" ? BiomeLandmarkKind.StarAltar : BiomeLandmarkKind.FairyRing;
                             var marks = root.HostGenerated?.BiomeLandmarks.Where(l => l.Kind == kind).ToList();
                             if (marks != null && marks.Count > 0)
                             {
@@ -1648,7 +1657,8 @@ namespace Game.Client
                     var here = root.HostGenerated.Biomes[px, py];
                     // The ice cave's and the sand cave's too (묶음 B2a); a frozen fall under two tiles of rock, as it is laid.
                     // And the crystal cave's and the lake's (묶음 B3a); the lake's islet stands in a pool laid for it.
-                    var kinds = CrystalLakeProps.Any(here).Count > 0 ? CrystalLakeProps.Any(here) : BiomeProps.Of(Biome.Cave);
+                    // And the lava zone's and the abyss's (묶음 B4a); the lava zone's rock stands in a pool of lava laid for it.
+                    var kinds = LavaVoidProps.Any(here).Count > 0 ? LavaVoidProps.Any(here) : BiomeProps.Of(Biome.Cave);
                     int col = -7;
                     foreach (var kind in kinds)
                     {
@@ -1663,6 +1673,16 @@ namespace Game.Client
                             Lay((px + 4, py - 4, TileType.MossIsle), (px + 5, py - 4, TileType.StructurePart));
                             continue;
                         }
+                        if (kind.Type == TileType.LavaRock)
+                        {
+                            // A pool of lava south-east of the player, four tiles by three, the rock in its middle; its
+                            // edge (blisters, rafts of crust) is the client's cover.
+                            for (int dx = 3; dx <= 6; dx++)
+                                for (int dy = -5; dy <= -3; dy++)
+                                    Lay((px + dx, py + dy, TileType.Lava));
+                            Lay((px + 4, py - 4, TileType.LavaRock));
+                            continue;
+                        }
                         int w = Structures.Footprint(kind.Type).W;
                         Lay((px + col, py + 3, kind.Type));
                         if (w > 1) Lay((px + col + 1, py + 3, TileType.StructurePart));
@@ -1671,7 +1691,7 @@ namespace Game.Client
                         col += w + 1;
                     }
                     if (here == Biome.Mushroom) Lay((px + 5, py - 3, TileType.GiantCap));
-                    else if (here != Biome.Ice && here != Biome.Sand && here != Biome.Crystal && here != Biome.Lake) Lay((px - 4, py, TileType.LitLamp));
+                    else if (here != Biome.Ice && here != Biome.Sand && here != Biome.Crystal && here != Biome.Lake && here != Biome.Lava && here != Biome.Abyss) Lay((px - 4, py, TileType.LitLamp));
                     Lay((px - 5, py - 3, TileType.MushroomTree));
                     break;
                 }
@@ -1730,6 +1750,18 @@ namespace Game.Client
                             for (int dy = -7; dy <= -4; dy++)
                                 Lay((px + dx, py + dy, TileType.Water));
                         Set(CrystalLakeProps.OldWheel, px + 3, py - 7);
+                    }
+                    else if (root.HostGenerated.Biomes[px, py] == Biome.Lava)
+                    {
+                        // 묶음 B4a: the fallen chimney among its slag, and the giant anvil.
+                        Set(LavaVoidProps.FallenChimney, px - 9, py - 8);
+                        Set(LavaVoidProps.GiantAnvil, px + 2, py - 8);
+                    }
+                    else if (root.HostGenerated.Biomes[px, py] == Biome.Abyss)
+                    {
+                        // The broken gate with its chain posts, and the star altar in its ring of shards.
+                        Set(LavaVoidProps.BrokenGate, px - 9, py - 8);
+                        Set(LavaVoidProps.StarAltar, px + 2, py - 8);
                     }
                     else if (root.HostGenerated.Biomes[px, py] == Biome.Cave)
                     {
@@ -2141,7 +2173,10 @@ namespace Game.Client
                 .Field("temples", Count(BiomeLandmarkKind.TempleFront)).Field("skulls", Count(BiomeLandmarkKind.GiantSkull))
                 // 묶음 B3a: the crystal cave's and the lake's.
                 .Field("geodes", Count(BiomeLandmarkKind.GiantGeode)).Field("arches", Count(BiomeLandmarkKind.CrystalArch))
-                .Field("boats", Count(BiomeLandmarkKind.SunkenBoat)).Field("wheels", Count(BiomeLandmarkKind.OldWheel)).Field("under", seen.Map[ux, uy].ToString()).Field("solidUnder", seen.Map.IsSolid(ux, uy))
+                .Field("boats", Count(BiomeLandmarkKind.SunkenBoat)).Field("wheels", Count(BiomeLandmarkKind.OldWheel))
+                // 묶음 B4a: the lava zone's and the abyss's.
+                .Field("chimneys", Count(BiomeLandmarkKind.FallenChimney)).Field("anvils", Count(BiomeLandmarkKind.GiantAnvil))
+                .Field("gates", Count(BiomeLandmarkKind.BrokenGate)).Field("altars", Count(BiomeLandmarkKind.StarAltar)).Field("under", seen.Map[ux, uy].ToString()).Field("solidUnder", seen.Map.IsSolid(ux, uy))
                 .Field("skipped", view?.StandsSkipped ?? 0).Field("renderers", view?.StandRenderers ?? 0)
                 .Field("selfOrder", view?.SelfOrder ?? 0).Field("ax", ax).Field("ay", ay).Field("cells", cells.Raw(']')).Close('}');
         }
@@ -2180,16 +2215,21 @@ namespace Game.Client
             foreach (var pair in kinds) counts.Field(pair.Key, pair.Value);
             // 묶음 B3a: the lake's water's edge within nine tiles (reeds on the bank and in the shallows, lily pads), and
             // the pools' tiles there.
-            int reeds = 0, pads = 0, pools = 0;
+            // 묶음 B4a: the lava zone's lava's edge the same way (blisters of cooled lava on the bank, rafts of crust on
+            // the lava), and the lava's tiles there.
+            int reeds = 0, pads = 0, pools = 0, bubbles = 0, rafts = 0, lava = 0;
             for (int dy = -9; dy <= 9; dy++)
                 for (int dx = -9; dx <= 9; dx++)
                 {
                     int x = ax + dx, y = ay + dy;
                     if (!seen.Map.InBounds(x, y)) continue;
                     if (seen.Map[x, y] == TileType.Water) pools++;
+                    if (seen.Map[x, y] == TileType.Lava) lava++;
                     var pick = Decor.On(seen.Map, seen.Seed, seen.Biomes[x, y], x, y).Kind;
                     if (pick == DecorKind.Reeds) reeds++;
                     else if (pick == DecorKind.LilyPad) pads++;
+                    else if (pick == DecorKind.LavaBubble) bubbles++;
+                    else if (pick == DecorKind.CrustRaft) rafts++;
                 }
             var tint = WorldLights.BiomeTint(biome);
             int clouds = world.Hazards.Count(h => h.Shape == HazardShape.Balm);
@@ -2198,7 +2238,9 @@ namespace Game.Client
                 // The crystal cave's light breathes between its tint and this (WorldLights.CrystalSky); what it is now.
                 .Field("tintOther", biome == Biome.Crystal ? "#" + Sprites.Key(WorldLights.CrystalSky) : "")
                 .Field("tintNow", tint.A == 0 ? "" : "#" + Sprites.Key(WorldLights.BiomeTint(biome, Settings.ReduceMotion ? 0 : UnityEngine.Time.time, ax, ay)))
-                .Field("reeds", reeds).Field("pads", pads).Field("pools", pools).Field("glow", WorldLights.BiomeGlow(biome)).Field("ambience", Music.AmbienceNow)
+                .Field("reeds", reeds).Field("pads", pads).Field("pools", pools).Field("bubbles", bubbles).Field("rafts", rafts).Field("lava", lava)
+                // In the abyss every light reaches this much of its radius (1 anywhere else).
+                .Field("lightReach", biome == Biome.Abyss ? WorldLights.AbyssLightReach : 1).Field("glow", WorldLights.BiomeGlow(biome)).Field("ambience", Music.AmbienceNow)
                 .Field("kinds", new RawJson(counts.Close('}'))).Field("lit", lit).Field("unlit", unlit).Field("trees", trees).Field("clouds", clouds)
                 .Field("litHere", TileLight.Lit(seen.Map, seen.Tiles, seen.Position, 6))
                 .Field("props", view?.PropsDrawn ?? 0).Field("decor", view?.DecorDrawn ?? 0).Field("skipped", view?.StandsSkipped ?? 0)

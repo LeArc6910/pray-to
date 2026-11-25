@@ -567,7 +567,9 @@ namespace Game.Client
             // until their packages).
             var ambience = place != null ? PlaceAmbience(place.Definition.Style) : biome switch
             {
-                Biome.Lava => Ambience.Lava,
+                // The lava zone's and the abyss's (묶음 B4a; the lava zone had the lava's bare rumble).
+                Biome.Lava => Ambience.Forge,
+                Biome.Abyss => Ambience.Abyss,
                 Biome.Cave => Ambience.DirtCave,
                 Biome.Mushroom => Ambience.Spores,
                 // The ice cave's and the sand cave's (묶음 B2a).

@@ -6226,6 +6226,16 @@ const BiomeSets = {
   lake: { name: '지하 호수', id: 'Lake', room: 'lake', tint: '#70E6D8', ambience: 'Lakeside', pool: true,
     kinds: ['MossRock', 'Coral', 'GiantClam', 'ShellHeap', 'Wreckage', 'MossIsle'], critters: ['Frog', 'MarshFly', 'FishShadow'],
     hit: ['clam', 'GiantClam', '대왕 조개'] },
+  // 묶음 B4a: the lava zone and the void abyss (their props stand in worlds of version 7 on). flicker: the light is its
+  // tint dimmed and brightened (every reading in the tint's own proportions; steady: it may hold one value for a while);
+  // lavaPool: the set has a pool of lava with the rock in it and blisters of cooled lava at its edge; still: none of its
+  // decor sways; reach: every light reaches this much of its radius.
+  lava: { name: '용암 지대', id: 'Lava', room: 'lava', tint: '#FF7A30', flicker: [0xFF, 0x7A, 0x30], ambience: 'Forge', lavaPool: true, still: true,
+    kinds: ['ObsidianSpike', 'FireBush', 'SlagHeap', 'CooledBoulder', 'BasaltColumns', 'LavaRock'], critters: ['FireNewt', 'EmberMoth'],
+    hit: ['bush', 'FireBush', '불 피는 덤불'], behind: ['columns', 'BasaltColumns', '현무암 기둥 무리'] },
+  abyss: { name: '공허의 심연', id: 'Abyss', room: 'abyss', tint: '#401D73', flicker: [0x6A, 0x30, 0xC0], steady: true, ambience: 'Abyss', reach: 0.7,
+    kinds: ['VoidCrystal', 'TwistedVine', 'ObeliskShard', 'ChainPost', 'FloatingRock', 'ShatteredPillar'], critters: ['VoidJelly', 'ShadowMoth'],
+    hit: ['vine', 'TwistedVine', '뒤틀린 덩굴'], behind: ['shattered', 'ShatteredPillar', '부서진 공허 기둥'] },
 };
 
 async function biomes(browser) {
@@ -6243,7 +6253,7 @@ async function biomes(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake', 'lava', 'abyss']) {
       const set = BiomeSets[key];
       // The room as the generator made it first (a new world is version 3: its own props stand in it), then the set.
       const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
@@ -6280,6 +6290,30 @@ async function biomes(browser) {
         check(b.tintOther === set.tintOther && seenTints.size >= 3 && violet.length === 0,
           `${name}: ${set.name}의 빛이 분홍과 하늘 사이로 숨 쉰다 (다른 쪽 ${b.tintOther}, 읽은 색 ${[...seenTints].join(' ')}, 보라 ${violet.length})`);
       }
+      if (set.flicker) {
+        // 묶음 B4a: the lava zone's orange flickers and the abyss's violet ebbs: every reading over some seconds is the
+        // biome's colour dimmed (each channel in the colour's own proportion to its strongest, never another hue), and
+        // the lava zone's readings differ.
+        const readings = new Set();
+        for (let i = 0; i < 6; i++) {
+          readings.add((await game.ask('biomes')).tintNow || '');
+          await game.wait(900);
+        }
+        const top = Math.max(...set.flicker);
+        const off = [...readings].filter(t => {
+          if (!/^#[0-9A-F]{6}$/i.test(t)) return true;
+          const c = [parseInt(t.slice(1, 3), 16), parseInt(t.slice(3, 5), 16), parseInt(t.slice(5, 7), 16)];
+          const most = Math.max(...c);
+          return most === 0 || c.some((v, i) => Math.abs(v / most - set.flicker[i] / top) > 0.08);
+        });
+        check(off.length === 0 && (set.steady || readings.size >= 3),
+          `${name}: ${set.name}의 빛이 제 색 그대로 밝아졌다 어두워진다 (읽은 색 ${[...readings].join(' ')}, 다른 색 ${off.length})`);
+      }
+      if (set.lavaPool) {
+        // The set's pool of lava, the rock standing in it, and the client's cover on its edge.
+        check(b.lava >= 6 && b.bubbles + b.rafts >= 1, `${name}: 용암 가에 식은 용암 거품이 놓인다 (용암 ${b.lava}칸, 거품 ${b.bubbles}, 껍질 조각 ${b.rafts})`);
+      }
+      if (set.reach) check(Math.abs(b.lightReach - set.reach) < 0.01, `${name}: ${set.name}에서는 빛이 ${set.reach}배만 닿는다 (${b.lightReach})`);
       if (set.pool) {
         // 묶음 B3a: the set's pool, the islet standing in it, and the client's cover on its edge.
         check(b.pools >= 6 && b.reeds + b.pads >= 1, `${name}: 물가에 갈대·연잎이 놓인다 (물 ${b.pools}칸, 갈대 ${b.reeds}, 연잎 ${b.pads})`);
@@ -6363,7 +6397,8 @@ async function biomes(browser) {
           await game.shot('biomes-mushroom-cap', '거대 갓 뒤: 갓이 흐려진다');
         } else check(false, `${name}: 거대 갓이 없다`);
       }
-      // Brushing through what sways.
+      // Brushing through what sways (the lava zone's cover is ash, stone and crust: none of it sways).
+      if (set.still) continue;
       const still = await game.ask('biomes');
       const grass = (await game.send('biomes at grass')).join(' ');
       await game.wait(300);
@@ -6402,6 +6437,9 @@ const PlaceSets = {
   // 묶음 B3a (the landmarks are in worlds of version 6 on).
   crystal: { name: '수정 동굴', id: 'Crystal', room: 'crystal', look: 5, marks: ['GiantGeode', 'ArchPier', 'CrystalArch'], real: [['geode', 'geodes', '거대 정동'], ['arch', 'arches', '수정 아치']] },
   lake: { name: '지하 호수', id: 'Lake', room: 'lake', look: 6, marks: ['SunkenBoat', 'OldWheel'], real: [['boat', 'boats', '가라앉은 배'], ['wheel', 'wheels', '옛 물레방아']] },
+  // 묶음 B4a (the landmarks are in worlds of version 7 on).
+  lava: { name: '용암 지대', id: 'Lava', room: 'lava', look: 7, marks: ['FallenChimney', 'GiantAnvil'], real: [['chimney', 'chimneys', '쓰러진 대장간 굴뚝'], ['anvil', 'anvils', '거대 모루']] },
+  abyss: { name: '공허의 심연', id: 'Abyss', room: 'abyss', look: 8, marks: ['BrokenGate', 'StarAltar'], real: [['gate', 'gates', '깨진 문'], ['altar', 'altars', '별 제단']] },
 };
 const PlaceLooks = ['Cottage', 'Cabin', 'Well', 'LampPost', 'Signpost', 'Bench', 'Flowerbed', 'Crates'];
 
@@ -6420,7 +6458,7 @@ async function places(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake', 'lava', 'abyss']) {
       const set = PlaceSets[key];
       // A room whose whole scene stands in its biome: the laid things take the look of the biome under each, so a room by
       // another biome's edge (the phone's crystal room touched the sand cave) shows that one's on some.
@@ -6435,8 +6473,8 @@ async function places(browser) {
         if (laid.length >= PlaceLooks.length && laid.every(c => c.shape === set.look)) break;
       }
       check(p.biome === set.id, `${name}: ${set.name}의 방에 섰다 (${p.biome}, ${went})`);
-      check(p.generator >= (key === 'crystal' || key === 'lake' ? 6 : key === 'ice' || key === 'sand' ? 5 : 4),
-        `${name}: 새 월드는 생성기 6판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, 수정·호수의 것은 6판부터, ${p.generator})`);
+      check(p.generator >= (key === 'lava' || key === 'abyss' ? 7 : key === 'crystal' || key === 'lake' ? 6 : key === 'ice' || key === 'sand' ? 5 : 4),
+        `${name}: 새 월드는 생성기 7판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, 수정·호수의 것은 6판부터, 용암·심연의 것은 7판부터, ${p.generator})`);
       const cells = p.cells || [];
       const looks = cells.filter(c => PlaceLooks.includes(c.type));
       const missing = PlaceLooks.filter(t => !looks.some(c => c.type === t));

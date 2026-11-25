@@ -3871,6 +3871,8 @@ namespace Game.Client
                 var at = shot.transform.localPosition;
                 _lights.Add(new LightSource(new Vec2(at.x, at.y), ShotLight, 0.8f, Sprites.ToRgba(shot.color), tints: true));
             }
+            // In the abyss every light reaches less far (묶음 B4a, the screen alone).
+            WorldLights.Dim(_lights, _biomeAt, _client.Map.Width, _client.Map.Height);
             _lightMap.Compute(_client.Map, left, bottom, _lights, _arenaGlow, _biomeTint);
             for (int j = 0; j < size; j++)
             {

@@ -125,6 +125,8 @@ namespace Game.Client
                 TileType.ObsidianOre => GroundKind.ObsidianOre,
                 TileType.VoidOre => GroundKind.VoidOre,
                 TileType.Lava => GroundKind.Lava,
+                // A rock stands in a pool of lava (묶음 B4a): the lava runs under it.
+                TileType.LavaRock => GroundKind.Lava,
                 TileType.Water => GroundKind.Water,
                 // An islet or a sunken boat stands in a pool (묶음 B3a): the pool's water runs under it.
                 TileType.MossIsle or TileType.SunkenBoat => GroundKind.Water,
@@ -142,10 +144,10 @@ namespace Game.Client
             // Lava's edges are where it meets anything that is not lava.
             if (kind == GroundKind.Lava)
             {
-                mask = (map[x, y + 1] != TileType.Lava ? Up : 0)
-                    | (map[x + 1, y] != TileType.Lava ? Right : 0)
-                    | (map[x, y - 1] != TileType.Lava ? Down : 0)
-                    | (map[x - 1, y] != TileType.Lava ? Left : 0);
+                mask = (!LavaVoidProps.Molten(map, x, y + 1) ? Up : 0)
+                    | (!LavaVoidProps.Molten(map, x + 1, y) ? Right : 0)
+                    | (!LavaVoidProps.Molten(map, x, y - 1) ? Down : 0)
+                    | (!LavaVoidProps.Molten(map, x - 1, y) ? Left : 0);
             }
             if (kind == GroundKind.Arena) return ArenaIndex(arena, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants));
             return Index(kind, mask, (int)(PixelNoise.Hash(x, y, 7) % Variants), biome);
@@ -252,7 +254,9 @@ namespace Game.Client
         static readonly Rgba LavaCrust = Rgba.Hex("#5A2416");
         static readonly Rgba LavaCrustDark = Rgba.Hex("#2E120C");
 
-        // Molten rock: bright and wavy in the middle, cooling to a dark crust where it meets the ground.
+        // Molten rock: bright and wavy in the middle, cooling toward the ground it meets (묶음 B4a: the edge was two
+        // rows of crust): a dark crust at the bank, then plates of crust with the glow showing between them, then a
+        // row where the crust is only starting, a deeper red.
         static PixelImage Lava(int mask, int variant)
         {
             var image = new PixelImage(Size, Size);
@@ -265,20 +269,22 @@ namespace Game.Client
                     image[x, y] = n > 0.78f ? LavaHot : n > 0.42f ? LavaMain : n > 0.2f ? LavaDeep : LavaCrust;
                 }
             }
-            for (int i = 0; i < Size; i++)
+            for (int y = 0; y < Size; y++)
             {
-                if ((mask & Up) != 0) Crust(image, i, 0, i, 1);
-                if ((mask & Down) != 0) Crust(image, i, Size - 1, i, Size - 2);
-                if ((mask & Left) != 0) Crust(image, 0, i, 1, i);
-                if ((mask & Right) != 0) Crust(image, Size - 1, i, Size - 2, i);
+                for (int x = 0; x < Size; x++)
+                {
+                    int near = Size, along = 0;
+                    if ((mask & Up) != 0 && y < near) { near = y; along = x; }
+                    if ((mask & Down) != 0 && Size - 1 - y < near) { near = Size - 1 - y; along = x; }
+                    if ((mask & Left) != 0 && x < near) { near = x; along = y; }
+                    if ((mask & Right) != 0 && Size - 1 - x < near) { near = Size - 1 - x; along = y; }
+                    if (near == 0) image[x, y] = LavaCrustDark;
+                    else if (near == 1) image[x, y] = PixelNoise.Hash(along / 3, 1, salt) % 4 == 0 && along % 3 == 1 ? LavaMain : LavaCrust;
+                    else if (near == 2) image[x, y] = PixelNoise.Hash(along / 2, 2, salt) % 3 == 0 ? LavaCrust : LavaDeep;
+                    else if (near == 3 && (x + y) % 2 == 0 && image[x, y].R == LavaHot.R && image[x, y].G == LavaHot.G) image[x, y] = LavaMain;
+                }
             }
             return image;
-        }
-
-        static void Crust(PixelImage image, int x, int y, int innerX, int innerY)
-        {
-            image[x, y] = LavaCrustDark;
-            image[innerX, innerY] = LavaCrust;
         }
 
         // ---- Biomes ----
@@ -335,11 +341,13 @@ namespace Game.Client
 
         static readonly Rgba CrystalPink = Rgba.Hex("#FF7FD0");
 
+        // Near-black basalt (4-1 용암 지대, 묶음 B4a: darkened toward #1E1716; it was #2A2220), cracked, the cracks
+        // glowing. Decor is the seam's orange, DecorLight its hot core.
         static readonly FloorPalette LavaFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#2A2220"), Dark = Rgba.Hex("#231C1A"), Light = Rgba.Hex("#332926"),
-            Pebble = Rgba.Hex("#3E3230"), PebbleLight = Rgba.Hex("#4E3E3A"), PebbleShadow = Rgba.Hex("#181210"),
-            Decor = Rgba.Hex("#E0541E"), DecorLight = Rgba.Hex("#FFC04A"),
+            Base = Rgba.Hex("#231B1A"), Dark = Rgba.Hex("#1D1615"), Light = Rgba.Hex("#2B2220"),
+            Pebble = Rgba.Hex("#3A2E2C"), PebbleLight = Rgba.Hex("#4A3C38"), PebbleShadow = Rgba.Hex("#130E0D"),
+            Decor = Rgba.Hex("#FF6A20"), DecorLight = Rgba.Hex("#FFC040"),
         };
 
         static FloorPalette FloorOf(Biome biome) => biome switch
@@ -389,19 +397,26 @@ namespace Game.Client
             Contact = Rgba.Hex("#181A22"), Outline = Rgba.Hex("#0E0F16"),
         };
 
-        // The abyss: near-black stone with a violet cast, and specks of starlight.
+        // The abyss (4-1 공허의 심연, 묶음 B4a): violet-black plates (#110D1A, kept a step lighter so the rifts between
+        // them read as blacker still), specks of starlight. The only biome that is violet. Decor is the violet at a
+        // rift's lip, DecorLight a star.
         static readonly FloorPalette AbyssFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#16121F"), Dark = Rgba.Hex("#120F19"), Light = Rgba.Hex("#1C1727"),
-            Pebble = Rgba.Hex("#282036"), PebbleLight = Rgba.Hex("#362A48"), PebbleShadow = Rgba.Hex("#0B0910"),
-            Decor = Rgba.Hex("#9A7CFF"), DecorLight = Rgba.Hex("#F0E8FF"),
+            Base = Rgba.Hex("#17121F"), Dark = Rgba.Hex("#130F1A"), Light = Rgba.Hex("#1E1829"),
+            Pebble = Rgba.Hex("#2A2238"), PebbleLight = Rgba.Hex("#3A2E4E"), PebbleShadow = Rgba.Hex("#0A0810"),
+            Decor = Rgba.Hex("#A050FF"), DecorLight = Rgba.Hex("#E6D6FF"),
         };
 
+        // The dark between the abyss's plates.
+        static readonly Rgba AbyssRift = Rgba.Hex("#05030A");
+
+        // Sharp shards (4-1: wall #221830): a dark top, a face that is violet at its upper edge and goes down into
+        // black, starlight in it.
         static readonly RockPalette AbyssRock = new RockPalette
         {
-            Top = Rgba.Hex("#2A2238"), TopDark = Rgba.Hex("#241D30"), TopLight = Rgba.Hex("#342A46"), Rim = Rgba.Hex("#6A54A0"),
-            FaceTop = Rgba.Hex("#46386A"), FaceBottom = Rgba.Hex("#30264A"), Strata = Rgba.Hex("#5A3CA0"), FaceSpeck = Rgba.Hex("#C8B4FF"),
-            Contact = Rgba.Hex("#0E0B14"), Outline = Rgba.Hex("#08060C"),
+            Top = Rgba.Hex("#2A2238"), TopDark = Rgba.Hex("#221A30"), TopLight = Rgba.Hex("#362C4A"), Rim = Rgba.Hex("#7A5CC0"),
+            FaceTop = Rgba.Hex("#4A3A72"), FaceBottom = Rgba.Hex("#221830"), Strata = Rgba.Hex("#16102A"), FaceSpeck = Rgba.Hex("#E6D6FF"),
+            Contact = Rgba.Hex("#0A0810"), Outline = Rgba.Hex("#06040A"),
         };
 
         // The sand caves (2026-11-09): tan drifts with wind ripples and the odd bleached bone, sandstone in warm layers.
@@ -438,11 +453,13 @@ namespace Game.Client
             Contact = Rgba.Hex("#101A1C"), Outline = Rgba.Hex("#0A1214"),
         };
 
+        // Basalt (4-1 용암 지대: wall #362826, 묶음 B4a): a dark top jointed in many-sided blocks, its face in upright
+        // columns. Strata is the seam between two columns, FaceSpeck the glow in one.
         static readonly RockPalette LavaRock = new RockPalette
         {
-            Top = Rgba.Hex("#3A3232"), TopDark = Rgba.Hex("#322A2A"), TopLight = Rgba.Hex("#463C3A"), Rim = Rgba.Hex("#7A5A4A"),
-            FaceTop = Rgba.Hex("#5C4A44"), FaceBottom = Rgba.Hex("#403432"), Strata = Rgba.Hex("#9A3A1E"), FaceSpeck = Rgba.Hex("#FF8A3A"),
-            Contact = Rgba.Hex("#1A1212"), Outline = Rgba.Hex("#100A0A"),
+            Top = Rgba.Hex("#362C2A"), TopDark = Rgba.Hex("#2E2422"), TopLight = Rgba.Hex("#423634"), Rim = Rgba.Hex("#7A6258"),
+            FaceTop = Rgba.Hex("#64524C"), FaceBottom = Rgba.Hex("#3E302E"), Strata = Rgba.Hex("#241A1A"), FaceSpeck = Rgba.Hex("#FF7A30"),
+            Contact = Rgba.Hex("#160F0F"), Outline = Rgba.Hex("#0E0909"),
         };
 
         // The ice cave's and the sand cave's rock (4-1 바닥과 벽, 묶음 B2a). Ice: angled facets catching the light on
@@ -451,6 +468,7 @@ namespace Game.Client
         static PixelImage Faced(PixelImage rock, int mask, int variant, Biome biome)
         {
             if (biome == Biome.Crystal || biome == Biome.Lake) return CrystalLakeFaced(rock, mask, variant, biome);
+            if (biome == Biome.Lava || biome == Biome.Abyss) return LavaVoidFaced(rock, mask, variant, biome);
             if (biome != Biome.Ice && biome != Biome.Sand) return rock;
             bool openDown = (mask & Down) == 0, openLeft = (mask & Left) == 0, openRight = (mask & Right) == 0, openUp = (mask & Up) == 0;
             int top = openDown ? Size - FaceHeight : Size;
@@ -608,6 +626,103 @@ namespace Game.Client
             return rock;
         }
 
+        // The lava zone's and the abyss's rock (4-1 바닥과 벽, 묶음 B4a). Basalt: its top jointed into many-sided
+        // blocks, its face in upright columns a few pixels wide, each lit down its left edge, a seam glowing low
+        // between two of them on some drawings. The abyss's: slanting edges of shards on its top, a face that is violet
+        // at its upper edge and falls away into black (it does not seem to reach the ground), stars in it.
+        static PixelImage LavaVoidFaced(PixelImage rock, int mask, int variant, Biome biome)
+        {
+            bool openDown = (mask & Down) == 0, openLeft = (mask & Left) == 0, openRight = (mask & Right) == 0;
+            int top = openDown ? Size - FaceHeight : Size;
+            var colors = RockOf(biome);
+            int salt = 780 + variant;
+            bool Edge(int x) => x == 0 && openLeft || x == Size - 1 && openRight;
+            if (biome == Biome.Lava)
+            {
+                // The joints on the top: a short three-armed mark where three blocks meet.
+                for (int i = 0; i < 2; i++)
+                {
+                    int x = 3 + (int)(PixelNoise.Hash(i, 41, salt) % 9), y = 3 + (int)(PixelNoise.Hash(i, 42, salt) % (uint)System.Math.Max(1, top - 8));
+                    if (y + 3 >= top - 1) continue;
+                    rock[x, y] = colors.TopDark;
+                    rock[x, y + 1] = colors.TopDark;
+                    rock[x - 1, y + 2] = colors.TopDark;
+                    rock[x - 2, y + 3] = colors.TopDark;
+                    rock[x + 1, y + 2] = colors.TopDark;
+                    rock[x + 2, y + 2] = colors.TopDark;
+                    rock[x + 1, y + 1] = colors.TopLight;
+                }
+                if (!openDown) return rock;
+                // The face: columns.
+                int column = 0, left = 0;
+                for (int x = 0; x < Size; x++)
+                {
+                    if (x - left >= 3 + (int)(PixelNoise.Hash(column, 43, salt) % 2))
+                    {
+                        column++;
+                        left = x;
+                    }
+                    if (Edge(x)) continue;
+                    // Each column's head stands a pixel higher or lower than the next.
+                    int head = top + 1 + (int)(PixelNoise.Hash(column, 44, salt) % 2);
+                    for (int y = top + 1; y < Size - 1; y++)
+                    {
+                        var color = x == left ? colors.FaceTop : colors.FaceTop.Mix(colors.FaceBottom, 0.45f + 0.5f * (y - top) / 5f);
+                        if (x == left && x > 0 && y > head) color = colors.FaceTop.Mix(colors.FaceBottom, 0.2f);
+                        if (x == left + 2 || x - left >= 3) color = y < head ? colors.FaceBottom : colors.Strata;
+                        if (y < head && x != left) color = colors.FaceBottom;
+                        rock[x, y] = color;
+                    }
+                }
+                // The glow low in a seam, on one drawing in two.
+                if (variant % 2 == 0)
+                {
+                    int x = 2 + (int)(PixelNoise.Hash(mask, 45, salt) % 11);
+                    if (!Edge(x) && !Edge(x + 1))
+                    {
+                        rock[x, Size - 2] = colors.FaceSpeck;
+                        rock[x, Size - 3] = colors.FaceSpeck.Mix(colors.Strata, 0.35f);
+                        rock[x, Size - 4] = colors.FaceSpeck.Mix(colors.Strata, 0.65f);
+                    }
+                }
+                return rock;
+            }
+            // The abyss: the slanting edge of a shard or two on the top, light above dark.
+            for (int i = 0; i < 2; i++)
+            {
+                int x = 2 + (int)(PixelNoise.Hash(i, 51, salt) % 8), y = 3 + (int)(PixelNoise.Hash(i, 52, salt) % (uint)System.Math.Max(1, top - 9));
+                int length = 3 + (int)(PixelNoise.Hash(i, 53, salt) % 3);
+                for (int k = 0; k < length; k++)
+                {
+                    int px = x + k, py = y + length - k;
+                    if (py + 1 >= top - 1 || px >= Size - 2) continue;
+                    rock[px, py] = colors.TopLight;
+                    rock[px, py + 1] = colors.TopDark;
+                }
+            }
+            if (variant == 1 || variant == 2)
+            {
+                int x = 3 + (int)(PixelNoise.Hash(mask, 54, salt) % 9), y = 2 + (int)(PixelNoise.Hash(mask, 55, salt) % (uint)System.Math.Max(1, top - 6));
+                if (y < top - 2) rock[x, y] = colors.FaceSpeck.Mix(colors.Top, 0.3f);
+            }
+            if (!openDown) return rock;
+            for (int x = 0; x < Size; x++)
+            {
+                if (Edge(x)) continue;
+                // Facets: every few pixels the face turns, a step lighter or darker.
+                float turn = PixelNoise.Hash(x / 3, 56, salt) % 2 == 0 ? 0 : 0.18f;
+                for (int y = top + 1; y < Size; y++)
+                {
+                    float t = (y - top - 1) / 4f;
+                    rock[x, y] = colors.FaceTop.Mix(colors.FaceBottom, System.Math.Min(1, t + turn)).Mix(AbyssRift, System.Math.Max(0, (t - 0.45f) * 1.5f));
+                }
+                if (x % 3 == 0 && x > 0) rock[x, top + 1] = colors.Rim.Mix(colors.FaceTop, 0.4f);
+                uint star = PixelNoise.Hash(x, 57, salt) % 11;
+                if (star == 0) rock[x, top + 2 + (int)(PixelNoise.Hash(x, 58, salt) % 3)] = colors.FaceSpeck.Mix(colors.FaceTop, 0.25f);
+            }
+            return rock;
+        }
+
         // A biome's touch on the top of its rock: caps of mushrooms growing on it, frost, crystal points, glowing
         // seams. Only on some variants, so walls are not all alike.
         static PixelImage Decorated(PixelImage rock, int mask, int variant, Biome biome)
@@ -649,7 +764,8 @@ namespace Game.Client
                     break;
                 }
                 case Biome.Lava:
-                    for (int i = 0; i < 4; i++) rock[x + i, y + (i % 2)] = i % 2 == 0 ? floor.Decor : floor.DecorLight;
+                    // A crack in the top that glows (묶음 B4a: dimmer at its ends, one hot pixel).
+                    for (int i = 0; i < 4; i++) rock[x + i, y + (i % 2)] = i == 1 ? floor.DecorLight : floor.Decor.Mix(RockOf(biome).Top, i == 0 || i == 3 ? 0.55f : 0.2f);
                     break;
                 case Biome.Abyss:
                     // A star caught in the rock.
@@ -877,15 +993,58 @@ namespace Game.Client
                     }
                     break;
                 case Biome.Lava:
-                    image[x, y] = colors.Decor;
-                    if (variant % 2 == 0) image[x + 1, y] = colors.DecorLight;
-                    image[x - 3, y + 2] = colors.Decor.Scale(0.6f);
+                    // Cracked basalt (묶음 B4a; it was an ember or two on every tile): on one drawing a dark hairline
+                    // slanting across, three of its pixels glowing; on another the joint where three blocks of the
+                    // basalt meet. The embers that lie about are the decor layer's.
+                    if (variant == 0)
+                    {
+                        int cx = x - 3, cy = y - 2;
+                        for (int i = 0; i < 8; i++)
+                        {
+                            image[cx, cy] = i == 4 ? colors.Decor.Mix(colors.Base, 0.1f) : i == 3 || i == 5 ? colors.Decor.Mix(colors.Base, 0.55f) : colors.Dark.Scale(0.62f);
+                            cx++;
+                            if (i % 2 == 1) cy++;
+                        }
+                    }
+                    else if (variant == 2)
+                    {
+                        var joint = colors.Dark.Scale(0.68f);
+                        for (int i = 0; i < 3; i++)
+                        {
+                            image[x, y - i] = joint;
+                            image[x - 1 - i, y + 1 + i / 2] = joint;
+                            image[x + 1 + i, y + 1 + (i + 1) / 2] = joint;
+                        }
+                    }
                     break;
                 case Biome.Abyss:
-                    // Motes of light on the floor, one bright.
-                    image[x, y] = variant % 2 == 0 ? colors.DecorLight : colors.Decor;
-                    image[x - 3, y + 2] = colors.Decor.Scale(0.6f);
-                    if (variant == 3) image[x + 3, y - 2] = colors.Decor.Scale(0.8f);
+                    // Plates broken apart (묶음 B4a; it was motes of light on every tile): on one drawing a rift
+                    // between two plates slanting across the tile, black, two pixels wide in its middle, its upper lip
+                    // faintly violet, a star down in it; on another a short hairline; on a third a mote of starlight.
+                    if (variant == 0)
+                    {
+                        int cx = x - 3, cy = y - 3;
+                        for (int i = 0; i < 9; i++)
+                        {
+                            bool wide = i > 1 && i < 7;
+                            image[cx, cy] = AbyssRift;
+                            if (wide) image[cx, cy + 1] = AbyssRift;
+                            if (cy > 0) image[cx, cy - 1] = image[cx, cy - 1].Mix(colors.Decor, i % 3 == 1 ? 0.32f : 0.12f);
+                            cx++;
+                            if (i % 3 != 0) cy++;
+                        }
+                        image[x + 1, y + 1] = colors.DecorLight.Mix(AbyssRift, 0.3f);
+                    }
+                    else if (variant == 2)
+                    {
+                        for (int i = 0; i < 5; i++) image[x + 2 - i, y - 2 + i / 2 + i / 3] = AbyssRift.Mix(colors.Base, 0.25f);
+                        image[x + 3, y - 3] = image[x + 3, y - 3].Mix(colors.Decor, 0.22f);
+                    }
+                    else if (variant == 1)
+                    {
+                        image[x, y] = colors.DecorLight.Mix(colors.Base, 0.35f);
+                        image[x + 1, y] = colors.Decor.Mix(colors.Base, 0.6f);
+                    }
                     break;
                 case Biome.Sand:
                     // A wind ripple across the drift, or a small bleached bone.

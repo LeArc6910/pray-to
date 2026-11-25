@@ -118,9 +118,10 @@ namespace Game.Client
                         continue;
                     }
                     // The floor's cover, and on the lake's pools the reeds and lily pads (묶음 B3a).
-                    if (type != TileType.Floor && type != TileType.Water) continue;
+                    // On the lava zone's pools the rafts of crust (묶음 B4a).
+                    if (type != TileType.Floor && type != TileType.Water && type != TileType.Lava) continue;
                     var biome = _client.Biomes[x, y];
-                    if (type == TileType.Water && biome != Biome.Lake) continue;
+                    if (type == TileType.Water && biome != Biome.Lake || type == TileType.Lava && biome != Biome.Lava) continue;
                     var pick = StandArt.DecorAt(map, _client.Seed, biome, x, y, _keptClear);
                     if (pick.Any) list.Add(new Stand { X = x, Y = y, Type = type, Decor = pick, Biome = biome });
                 }

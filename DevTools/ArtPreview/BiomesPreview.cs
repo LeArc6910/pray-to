@@ -19,6 +19,7 @@ namespace Game.Client
         {
             (Biome.Cave, "cave", "DIRT CAVE"), (Biome.Mushroom, "mushroom", "MUSHROOM FOREST"), (Biome.Ice, "ice", "ICE CAVE"), (Biome.Sand, "sand", "SAND CAVE"),
             (Biome.Crystal, "crystal", "CRYSTAL CAVE"), (Biome.Lake, "lake", "UNDERGROUND LAKE"),
+            (Biome.Lava, "lava", "LAVA ZONE"), (Biome.Abyss, "abyss", "VOID ABYSS"),
         };
 
         static bool WriteBiomes(string output, WorldLights lights, TileData tiles, StoryData story, MonsterData monsters)
@@ -68,6 +69,9 @@ namespace Game.Client
             // 묶음 B3a: the crystal cave's and the lake's.
             Write(PlaceLooks((0, Biome.Cave, "OLD"), (PropArt.CrystalLook, Biome.Crystal, "CRYSTAL CAVE"), (PropArt.LakeLook, Biome.Lake, "UNDERGROUND LAKE")),
                 "place_props_crystal_lake.png", 3, "장소의 건물·꾸밈: 예전 그림 / 수정 동굴(점판암 벽과 지붕, 지붕을 뚫고 자란 결정, 결정 등) / 지하 호수(기둥 위 갈대 지붕 오두막, 그물, 청록 등). 집은 밤과 낮");
+            // 묶음 B4a: the lava zone's and the abyss's.
+            Write(PlaceLooks((0, Biome.Cave, "OLD"), (PropArt.LavaLook, Biome.Lava, "LAVA ZONE"), (PropArt.AbyssLook, Biome.Abyss, "VOID ABYSS")),
+                "place_props_lava_abyss.png", 3, "장소의 건물·꾸밈: 예전 그림 / 용암 지대(철판 지붕과 현무암 벽의 대장간 집, 불 붙은 굴뚝, 화로) / 공허의 심연(부서져 떠 있는 지붕의 폐허 집, 룬, 오벨리스크 등). 집은 밤과 낮");
             foreach (var site in world.Places.Where(p => p.Definition.Id == "dawn_village" || p.Definition.Id == "hero_hut"))
             {
                 foreach (var (biome, id, _) in MadeBiomes)
@@ -94,8 +98,12 @@ namespace Game.Client
             foreach (bool lit in new[] { false, true })
                 Write(CrystalLakeLandmarkSheet(lights, lit), lit ? "landmarks_crystal_lake_lit.png" : "landmarks_crystal_lake.png", 3,
                     "수정·호수의 랜드마크 넷(거대 정동, 수정 아치 / 가라앉은 배, 옛 물레방아)과 버섯 섬" + (lit ? ", 어둠과 빛" : ", 어둠 없이"));
+            foreach (bool lit in new[] { false, true })
+                Write(LavaVoidLandmarkSheet(lights, lit), lit ? "landmarks_lava_abyss_lit.png" : "landmarks_lava_abyss.png", 3,
+                    "용암·심연의 랜드마크 넷(쓰러진 대장간 굴뚝, 거대 모루 / 깨진 문, 별 제단)과 용암 속 바위" + (lit ? ", 어둠과 빛" : ", 어둠 없이"));
             foreach (var kind in new[] { BiomeLandmarkKind.MinerHut, BiomeLandmarkKind.MineFrame, BiomeLandmarkKind.FairyRing, BiomeLandmarkKind.FrozenBeast, BiomeLandmarkKind.IceRuin,
-                BiomeLandmarkKind.TempleFront, BiomeLandmarkKind.GiantSkull, BiomeLandmarkKind.GiantGeode, BiomeLandmarkKind.CrystalArch, BiomeLandmarkKind.SunkenBoat, BiomeLandmarkKind.OldWheel })
+                BiomeLandmarkKind.TempleFront, BiomeLandmarkKind.GiantSkull, BiomeLandmarkKind.GiantGeode, BiomeLandmarkKind.CrystalArch, BiomeLandmarkKind.SunkenBoat, BiomeLandmarkKind.OldWheel,
+                BiomeLandmarkKind.FallenChimney, BiomeLandmarkKind.GiantAnvil, BiomeLandmarkKind.BrokenGate, BiomeLandmarkKind.StarAltar })
             {
                 if (!world.BiomeLandmarks.Any(l => l.Kind == kind))
                 {
@@ -117,7 +125,8 @@ namespace Game.Client
                 }
             }
             foreach (var type in new[] { TileType.MinerHut, TileType.MineFrame, TileType.FrozenBeast, TileType.IceColumn, TileType.TempleFront, TileType.GiantSkull,
-                TileType.GiantGeode, TileType.ArchPier, TileType.CrystalArch, TileType.SunkenBoat, TileType.OldWheel })
+                TileType.GiantGeode, TileType.ArchPier, TileType.CrystalArch, TileType.SunkenBoat, TileType.OldWheel,
+                TileType.FallenChimney, TileType.GiantAnvil, TileType.BrokenGate, TileType.StarAltar })
             {
                 var picture = StandArt.Picture(type, StandArt.Kind.Prop, 0, false);
                 // The arch's span is five tiles wide over the one tile it stands on, pier to pier.
@@ -131,7 +140,7 @@ namespace Game.Client
             foreach (var type in PlaceLookTypes)
             {
                 var old = PropArt.Prop(type);
-                foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook, PropArt.IceLook, PropArt.SandLook, PropArt.CrystalLook, PropArt.LakeLook })
+                foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook, PropArt.IceLook, PropArt.SandLook, PropArt.CrystalLook, PropArt.LakeLook, PropArt.LavaLook, PropArt.AbyssLook })
                 {
                     var redrawn = PropArt.PlaceProp(type, look);
                     if (redrawn != null && redrawn.Width == old.Width && redrawn.Height == old.Height) continue;
@@ -320,6 +329,61 @@ namespace Game.Client
             return g;
         }
 
+        // The lava zone's and the abyss's landmarks laid as the generator lays them (묶음 B4a): the fallen chimney and the
+        // giant anvil on the basalt with a pool of lava and rocks in it between them, the broken gate and the star altar
+        // on the abyss's plates.
+        static PixelImage LavaVoidLandmarkSheet(WorldLights lights, bool lit)
+        {
+            PixelImage Half(Biome biome, bool pool, params (BiomeLandmarkKind Kind, int Left, int Bottom)[] sets)
+            {
+                var map = new TileMap(24, 13);
+                for (int y = 1; y < 10; y++)
+                    for (int x = 1; x < 23; x++)
+                        map[x, y] = TileType.Floor;
+                if (pool)
+                {
+                    // A pool between the two with rocks standing in it, and what gathers at its edge.
+                    for (int y = 4; y < 10; y++)
+                        for (int x = 9; x < 14; x++)
+                            map[x, y] = TileType.Lava;
+                    for (int x = 7; x < 16; x++) map[x, 9] = TileType.Lava;
+                    map[11, 6] = TileType.LavaRock;
+                    map[10, 8] = TileType.LavaRock;
+                    map[12, 8] = TileType.LavaRock;
+                    map[11, 2] = TileType.CooledBoulder;
+                    map[12, 2] = TileType.StructurePart;
+                    map[8, 2] = TileType.FireBush;
+                    map[15, 2] = TileType.BasaltColumns;
+                    map[16, 2] = TileType.StructurePart;
+                }
+                foreach (var (kind, left, bottom) in sets)
+                    foreach (var (dx, dy, type) in LavaVoidProps.Layout(kind))
+                    {
+                        var (w, h) = Structures.Footprint(type);
+                        for (int j = 0; j < h; j++)
+                            for (int i = 0; i < w; i++)
+                                map[left + dx + i, bottom + dy + j] = i == 0 && j == 0 ? type : TileType.StructurePart;
+                    }
+                var scene = new Scene(map, 0, 0, 24, 13, _ => false) { Biome = biome, Night = true, BiomeAt = (x, y) => biome };
+                scene.Places(null);
+                scene.Decor(5, (x, y) => biome);
+                foreach (var (kind, left, bottom) in sets)
+                {
+                    var box = LavaVoidProps.Box(kind);
+                    scene.Player(left + box.StandX + 0.5f, bottom + box.StandY + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+                }
+                if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(biome), (x, y) => WorldLights.BiomeTint(biome, 0, x, y));
+                return scene.Image;
+            }
+            var lava = Half(Biome.Lava, true, (BiomeLandmarkKind.FallenChimney, 1, 3), (BiomeLandmarkKind.GiantAnvil, 16, 3));
+            var abyss = Half(Biome.Abyss, false, (BiomeLandmarkKind.BrokenGate, 2, 4), (BiomeLandmarkKind.StarAltar, 14, 3));
+            var g = new PixelImage(lava.Width, lava.Height + abyss.Height + 2);
+            g.Fill(0, 0, g.Width, g.Height, DepthBack);
+            g.Draw(lava, 0, 0);
+            g.Draw(abyss, 0, lava.Height + 2);
+            return g;
+        }
+
         // The room of the biome with the most props standing round its middle, off the places.
         static RoomNode BestRoom(GeneratedWorld world, Biome biome)
         {
@@ -394,11 +458,13 @@ namespace Game.Client
         static bool PropSheet(Biome biome, string name, out PixelImage sheet)
         {
             bool ok = true;
-            var kinds = CrystalLakeProps.Any(biome).Select(k => k.Type).ToList();
+            var kinds = LavaVoidProps.Any(biome).Select(k => k.Type).ToList();
             if (biome == Biome.Cave) kinds.Insert(kinds.IndexOf(TileType.UnlitLamp) + 1, TileType.LitLamp);
             var decor = Enumerable.Range(0, 100).Select(roll => Decor.KindOf(biome, roll)).Distinct().ToList();
             // The lake's water's edge: reeds and lily pads (Decor.On).
             if (biome == Biome.Lake) decor.AddRange(new[] { DecorKind.Reeds, DecorKind.LilyPad });
+            // The lava's edge: blisters of cooled lava and rafts of crust.
+            if (biome == Biome.Lava) decor.AddRange(new[] { DecorKind.LavaBubble, DecorKind.CrustRaft });
             var floor = TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0, biome));
             const int cellW = 62, rowH = 62, leftPad = 6;
             int rows = (kinds.Count + 3) / 4;
@@ -421,6 +487,11 @@ namespace Game.Client
                     for (int y = 16; y < 48; y += 16)
                         for (int x = 0; x < cellW * 2 - 12; x += 16)
                             g.Draw(TileArt.Ground(TileArt.Index(GroundKind.Water, 0, (x / 16 + y / 16) % 4, biome)), x0 + x, y0 + y);
+                // A rock in the lava on its lava.
+                if (LavaVoidProps.InLava(type))
+                    for (int y = 16; y < 48; y += 16)
+                        for (int x = 0; x < cellW * 2 - 12; x += 16)
+                            g.Draw(TileArt.Ground(TileArt.Index(GroundKind.Lava, y == 16 ? 1 : 0, (x / 16 + y / 16) % 4, biome)), x0 + x, y0 + y);
                 g.Small(x0, y0 + 50, type.ToString().ToUpperInvariant(), DepthDim, DepthBack);
                 int span = Structures.Footprint(type).W * 16;
                 for (int v = 0; v < BiomeArt.Variants; v++)

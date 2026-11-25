@@ -62,7 +62,9 @@ namespace Game.Client
             // 3 in the ice cave (a frozen tree), 4 in the sand cave (a cave palm): 묶음 B2a.
             if (type == TileType.MushroomTree) return biome == Biome.Cave ? 1 : biome == Biome.Mushroom ? 2 : biome == Biome.Ice ? 3 : biome == Biome.Sand ? 4
                 // 5 in the crystal cave (a crystal growth), 6 by the lake (a willow): 묶음 B3a.
-                : biome == Biome.Crystal ? 5 : biome == Biome.Lake ? 6 : 0;
+                : biome == Biome.Crystal ? 5 : biome == Biome.Lake ? 6
+                // 7 in the lava zone (a charred tree still alight), 8 in the abyss (a tree of stars): 묶음 B4a.
+                : biome == Biome.Lava ? 7 : biome == Biome.Abyss ? 8 : 0;
             if (type == TileType.RingCap || type == TileType.IceColumn) return BiomeArt.Variant(type, x, y);
             // The places' buildings and dressing in the look of the biome under them (묶음 B1c, PropArt.Places.cs).
             return PropArt.BiomeLook(type, biome);
@@ -74,7 +76,7 @@ namespace Game.Client
             if (kind == Kind.Gate) return PropArt.FenceGate((shape & 1) != 0, (shape & 2) != 0);
             if (kind == Kind.Door) return PropArt.Door(shape);
             if (BiomeProps.Is(type)) return BiomeArt.Prop(type, shape);
-            if (type == TileType.MushroomTree && shape != 0) return BiomeArt.PlaceTree(shape == 2 ? Biome.Mushroom : shape == 3 ? Biome.Ice : shape == 4 ? Biome.Sand : shape == 5 ? Biome.Crystal : shape == 6 ? Biome.Lake : Biome.Cave);
+            if (type == TileType.MushroomTree && shape != 0) return BiomeArt.PlaceTree(shape == 2 ? Biome.Mushroom : shape == 3 ? Biome.Ice : shape == 4 ? Biome.Sand : shape == 5 ? Biome.Crystal : shape == 6 ? Biome.Lake : shape == 7 ? Biome.Lava : shape == 8 ? Biome.Abyss : Biome.Cave);
             if (type == TileType.RingCap) return BiomeArt.RingCap(shape);
             if (type == TileType.IceColumn) return BiomeArt.IceColumn(shape);
             if (BiomeLandmarks.Is(type)) return PropArt.Landmark(type);
@@ -113,6 +115,7 @@ namespace Game.Client
             TileType.MineEntrance => 20,
             TileType.MinerHut or TileType.FrozenBeast or TileType.GiantSkull => PropArt.LandmarkCanopy(type),
             TileType.GiantGeode or TileType.CrystalArch or TileType.SunkenBoat or TileType.OldWheel or TileType.ArchPier => PropArt.LandmarkCanopy(type),
+            TileType.FallenChimney or TileType.GiantAnvil or TileType.BrokenGate or TileType.StarAltar => PropArt.LandmarkCanopy(type),
             _ => BiomeArt.CanopyRows(type),
         };
 

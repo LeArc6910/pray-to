@@ -66,12 +66,12 @@ namespace Game.Client
                 int drawings = BiomeProps.IsLamp(type) || type == TileType.GiantCap ? 1 : BiomeArt.Variants;
                 for (int variant = 0; variant < drawings; variant++) props.Add(($"소품 {type} {variant}", BiomeArt.Prop(type, variant)));
             }
-            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom, Biome.Ice, Biome.Sand, Biome.Crystal, Biome.Lake }) props.Add(($"장소 나무 {biome}", BiomeArt.PlaceTree(biome)));
+            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom, Biome.Ice, Biome.Sand, Biome.Crystal, Biome.Lake, Biome.Lava, Biome.Abyss }) props.Add(($"장소 나무 {biome}", BiomeArt.PlaceTree(biome)));
             // The places' things in each biome's look and the landmarks (묶음 B1c), the same way.
             foreach (TileType type in Enum.GetValues(typeof(TileType)))
             {
                 if (PropArt.HasBiomeLook(type))
-                    foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook, PropArt.IceLook, PropArt.SandLook, PropArt.CrystalLook, PropArt.LakeLook }) props.Add(($"장소 {type} 모습 {look}", PropArt.PlaceProp(type, look)));
+                    foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook, PropArt.IceLook, PropArt.SandLook, PropArt.CrystalLook, PropArt.LakeLook, PropArt.LavaLook, PropArt.AbyssLook }) props.Add(($"장소 {type} 모습 {look}", PropArt.PlaceProp(type, look)));
                 if (type == TileType.RingCap)
                     for (int variant = 0; variant < BiomeArt.Variants; variant++) props.Add(($"랜드마크 {type} {variant}", BiomeArt.RingCap(variant)));
                 else if (type == TileType.IceColumn)

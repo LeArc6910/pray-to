@@ -46,6 +46,10 @@ namespace Game.Client
         // falling into it, frogs (묶음 B3a).
         Chimes,
         Lakeside,
+        // The lava zone: the lava's rumble and bubbles, steam hissing from a crack, a hammer ringing far off. The
+        // abyss: a low drone that beats, and a breath drawn the wrong way round (묶음 B4a).
+        Forge,
+        Abyss,
     }
 
     // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
@@ -795,6 +799,68 @@ namespace Game.Client
                         }
                     }
                     return Normalised(smooth, 0.4f);
+                }
+                case Ambience.Forge:
+                {
+                    // The lava's bed (its rumble, bubbles rising and popping), and over it steam let go from a crack
+                    // every several seconds (a hiss that opens fast and dies away) and, three times in the loop, a
+                    // hammer on an anvil far off: four strokes and their ring.
+                    float seconds = 32;
+                    var buffer = Wind(seconds, smoothing: 0.006f, volume: 0.9f, swell: 0.4f, seed: 61);
+                    var random = new Scramble(62);
+                    for (float t = 0.3f; t < seconds - 0.3f; t += 0.35f + random.Next() * 1.3f)
+                    {
+                        float from = 130 + random.Next() * 120;
+                        Sweep(buffer, Wave.Sine, t, 0.09f, from, from * 2.6f, 0.3f + random.Next() * 0.22f);
+                    }
+                    for (float t = 2.5f; t < seconds - 2.5f; t += 4.5f + random.Next() * 4f)
+                    {
+                        // Steam: bright noise in a burst, then thinner.
+                        Click(buffer, t, 0.5f + random.Next() * 0.3f, 0.5f, seed: 1000 + (int)(t * 10), hiss: true);
+                        Click(buffer, t + 0.3f, 0.7f, 0.25f, seed: 1100 + (int)(t * 10), hiss: true);
+                    }
+                    for (float t = 6f; t < seconds - 4; t += 9f + random.Next() * 3f)
+                    {
+                        for (int stroke = 0; stroke < 4; stroke++)
+                        {
+                            float at = t + stroke * 0.46f + (stroke == 3 ? 0.1f : 0);
+                            float volume = stroke == 0 ? 0.1f : 0.07f;
+                            Click(buffer, at, 0.006f, volume * 2, seed: 1200 + stroke + (int)(t * 10));
+                            Sweep(buffer, Wave.Sine, at, 0.35f, 1480, 1470, volume);
+                            Sweep(buffer, Wave.Sine, at, 0.2f, 2960 * 1.19f, 2950 * 1.19f, volume * 0.4f);
+                        }
+                    }
+                    return Normalised(buffer, 0.45f);
+                }
+                case Ambience.Abyss:
+                {
+                    // Almost no air: two low tones a little apart, so they beat slowly, under a faint high one; and
+                    // every several seconds a breath played backwards: puffs that grow from nothing and are cut off,
+                    // with a tone sliding up under them.
+                    float seconds = 32;
+                    var buffer = Wind(seconds, smoothing: 0.004f, volume: 0.22f, swell: 0.6f, seed: 63);
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        double t = i / (double)SampleRate;
+                        // 55 and 55.25 Hz beat once in four seconds; 32 seconds holds whole cycles of all three.
+                        double beat = Math.Sin(2 * Math.PI * 55 * t) + Math.Sin(2 * Math.PI * 55.25 * t);
+                        double high = Math.Sin(2 * Math.PI * 440.5 * t) * (0.5 + 0.5 * Math.Sin(2 * Math.PI * t / 16));
+                        buffer[i] += (float)(beat * 0.11 + high * 0.012);
+                    }
+                    var smooth = LowPass(buffer, 0.2f);
+                    var random = new Scramble(64);
+                    for (float t = 3f; t < seconds - 4; t += 6f + random.Next() * 5f)
+                    {
+                        float length = 1.6f + random.Next() * 0.8f;
+                        for (int step = 0; step < 8; step++)
+                        {
+                            float f = step / 7f;
+                            Click(smooth, t + f * length, length / 8f * (0.6f + f), 0.03f + 0.2f * f * f, seed: 1300 + step + (int)(t * 10), hiss: true);
+                        }
+                        float pitch = 150 + random.Next() * 50;
+                        Sweep(smooth, Wave.Sine, t, length, pitch, pitch * 1.5f, 0.06f);
+                    }
+                    return Normalised(smooth, 0.38f);
                 }
                 case Ambience.Hum:
                 {
