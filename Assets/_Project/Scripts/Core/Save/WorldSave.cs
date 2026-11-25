@@ -29,7 +29,10 @@ namespace Game.Core
         // The dungeons themselves are not kept: the pocket's rows are never written (World.SavedTiles holds the world's).
         // 16 (2026-11-22): each dungeon's record by its key (World.DungeonRecords, 묶음 5b) in place of 15's counts by gate:
         // how often it was entered, its fastest run in seconds, the day of its last run and how many runs, last.
-        const int FormatVersion = 16;
+        // 17 (2026-11-25, Docs/TitleRework.md 4-2): when it was made (seconds since 1970, from the caller), the seconds
+        // played in it, and the biomes its players have stood in (BiomeVisits), in the head after SavedAt, so the world
+        // list reads them without the rest (ReadSummary).
+        public const int FormatVersion = 17;
         // How long each crop took to grow before format 7, in seconds, so a crop from then comes back as far along.
         static readonly Dictionary<string, float> SecondsBeforeDays = new Dictionary<string, float>
         {
@@ -85,8 +88,14 @@ namespace Game.Core
         // Which generator made the map (WorldGenerator.CaveVersion, RoomVersion): a world saved before there were two
         // is the caves of version 1, and goes on as them.
         public int Generator { get; private set; } = WorldGenerator.CaveVersion;
-        // Seconds since 1970 when it was saved, as the caller counted them. Nothing grows by it: a closed world waits.
+        // Seconds since 1970 when it was saved, as the caller counted them: when it was last played. Nothing grows by it: a
+        // closed world waits.
         public long SavedAt { get; }
+        // When it was made (seconds since 1970, from the caller; 0 for a save from before format 17), the seconds played in
+        // it while hosted, and the biomes its players have stood in (BiomeVisits; none known before format 17).
+        public long CreatedAt { get; private set; }
+        public double PlayedSeconds { get; private set; }
+        public int Visited { get; private set; }
         // The world's clock (Calendar); 0, the first morning, for a save from before days.
         public long Clock { get; }
         // 1 for a save from before rifts.
@@ -155,7 +164,8 @@ namespace Game.Core
         }
         public IReadOnlyList<string> Warnings { get; }
 
-        public static byte[] Write(World world, ulong seed, long savedAt, int generator = WorldGenerator.CaveVersion)
+        public static byte[] Write(World world, ulong seed, long savedAt, int generator = WorldGenerator.CaveVersion, long createdAt = 0, double playedSeconds = 0,
+            int visited = 0)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -167,6 +177,9 @@ namespace Game.Core
                 w.Write(world.Map.Height);
                 w.Write((byte)generator);
                 w.Write(savedAt);
+                w.Write(createdAt);
+                w.Write(Math.Max(0, playedSeconds));
+                w.Write((ushort)visited);
                 w.Write(world.Clock);
                 w.Write(world.RiftTier);
                 w.Write(world.DefenseLevel);
@@ -282,6 +295,45 @@ namespace Game.Core
             return stream.ToArray();
         }
 
+        // What the world list shows (Docs/TitleRework.md 4-2): the head only, before the tiles. Throws InvalidDataException
+        // when it is not a world save this game can read.
+        public static WorldSummary ReadSummary(byte[] data, string name = "")
+        {
+            try
+            {
+                using var r = new BinaryReader(new MemoryStream(data ?? Array.Empty<byte>()), Encoding.UTF8);
+                var head = ReadHead(r);
+                return new WorldSummary(name ?? "", head.Version, head.Seed, head.Width, head.Height, head.Generator, head.Clock, head.CreatedAt, head.Played,
+                    head.SavedAt, head.Visited, head.Progress);
+            }
+            catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
+            {
+                throw new InvalidDataException("월드 저장본이 깨졌습니다.", e);
+            }
+        }
+
+        static (int Version, ulong Seed, int Width, int Height, int Generator, long SavedAt, long CreatedAt, double Played, int Visited, long Clock, int RiftTier,
+            int DefenseLevel, int DefenseDay, int Progress) ReadHead(BinaryReader r)
+        {
+            int version = SavedItems.ReadHeader(r, Magic, FormatVersion, "월드");
+            ulong seed = r.ReadUInt64();
+            int width = r.ReadInt32();
+            int height = r.ReadInt32();
+            if (width <= 0 || height <= 0 || width > 1 << 14 || height > 1 << 14) throw new InvalidDataException("월드 저장본의 크기가 이상합니다.");
+            int generator = version >= 12 ? r.ReadByte() : WorldGenerator.CaveVersion;
+            long savedAt = r.ReadInt64();
+            long createdAt = version >= 17 ? r.ReadInt64() : 0;
+            double played = version >= 17 ? r.ReadDouble() : 0;
+            if (double.IsNaN(played) || double.IsInfinity(played) || played < 0) played = 0;
+            int visited = version >= 17 ? r.ReadUInt16() : 0;
+            long clock = version >= 7 ? r.ReadInt64() : 0;
+            int riftTier = version >= 8 ? r.ReadInt32() : 1;
+            int defenseLevel = version >= 9 ? r.ReadInt32() : 1;
+            int defenseDay = version >= 9 ? r.ReadInt32() : 0;
+            int progress = r.ReadInt32();
+            return (version, seed, width, height, generator, savedAt, createdAt, played, visited, clock, riftTier, defenseLevel, defenseDay, Math.Max(1, progress));
+        }
+
         // Throws InvalidDataException when the data is not a world save this game can read. Chests need the loot
         // sheets to read their contents; without them chests come back empty.
         public static WorldSave Read(byte[] data, TileData tileData, LootData loot = null)
@@ -290,17 +342,7 @@ namespace Game.Core
             try
             {
                 using var r = new BinaryReader(new MemoryStream(data ?? Array.Empty<byte>()), Encoding.UTF8);
-                int version = SavedItems.ReadHeader(r, Magic, FormatVersion, "월드");
-                ulong seed = r.ReadUInt64();
-                int width = r.ReadInt32();
-                int height = r.ReadInt32();
-                int generator = version >= 12 ? r.ReadByte() : WorldGenerator.CaveVersion;
-                long savedAt = r.ReadInt64();
-                long clock = version >= 7 ? r.ReadInt64() : 0;
-                int riftTier = version >= 8 ? r.ReadInt32() : 1;
-                int defenseLevel = version >= 9 ? r.ReadInt32() : 1;
-                int defenseDay = version >= 9 ? r.ReadInt32() : 0;
-                int progress = r.ReadInt32();
+                var (version, seed, width, height, generator, savedAt, createdAt, played, visited, clock, riftTier, defenseLevel, defenseDay, progress) = ReadHead(r);
 
                 var names = new List<string>();
                 for (int count = r.ReadUInt16(); count > 0; count--) names.Add(r.ReadString());
@@ -349,7 +391,7 @@ namespace Game.Core
                     int items = r.ReadUInt16();
                     for (int i = 0; i < items; i++)
                     {
-                        var item = loot == null ? SkipItem(r) : SavedItems.Read(r, loot, warnings);
+                        var item = loot == null ? SavedItems.Skip(r) : SavedItems.Read(r, loot, warnings);
                         if (item != null) contents.TryAdd(item);
                     }
                     var runes = SavedItems.ReadCounts(r);
@@ -414,6 +456,7 @@ namespace Game.Core
                 return new WorldSave(seed, savedAt, clock, riftTier, Math.Max(1, progress), tiles, crops, chests, machines, warnings, beds,
                     defenseLevel, defenseDay, locks)
                 {
+                    CreatedAt = createdAt, PlayedSeconds = played, Visited = visited,
                     Width = width, Height = height, Generator = generator, OpenedPois = opened, Prayers = prayers, LastCamps = camps, FixedRails = rails, DungeonEntries = entries,
                     DungeonRecords = records,
                 };
@@ -428,23 +471,6 @@ namespace Game.Core
             {
                 throw new InvalidDataException("월드 저장본이 깨졌습니다.", e);
             }
-        }
-
-        // Reads past an item without the sheets to build it.
-        static Item SkipItem(BinaryReader r)
-        {
-            r.ReadString();
-            r.ReadInt16();
-            r.ReadByte();
-            for (int count = r.ReadByte(); count > 0; count--) r.ReadInt32();
-            for (int count = r.ReadByte(); count > 0; count--)
-            {
-                r.ReadString();
-                r.ReadByte();
-                r.ReadInt32();
-            }
-            for (int count = r.ReadByte(); count > 0; count--) r.ReadString();
-            return null;
         }
     }
 }

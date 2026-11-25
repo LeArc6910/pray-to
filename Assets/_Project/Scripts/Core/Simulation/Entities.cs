@@ -9,6 +9,9 @@ namespace Game.Core
         int[] _cooldowns;
         int[] _buffTicks;
 
+        // How the player's character looks (CharacterLook.Packed), as their client said on joining; only drawn, never a rule.
+        public uint Look { get; set; } = CharacterLook.Default.Packed;
+
         internal Player(int id, string name, Vec2 position, Equipment equipment, IReadOnlyList<ClassDefinition> classes, Inventory bag = null)
         {
             Id = id;

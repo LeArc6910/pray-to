@@ -43,7 +43,7 @@ namespace Game.Core
         public const int PhaseMask = 0x3F;
 
         // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.107.0";
+        public const string Version = "0.108.0";
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -159,8 +159,9 @@ namespace Game.Core
     public sealed class JoinMessage
     {
         public JoinMessage(string playerKey, string name, IReadOnlyList<string> classes = null, string version = Protocol.Version, byte[] character = null,
-            IReadOnlyList<int> skillOrder = null)
+            IReadOnlyList<int> skillOrder = null, uint? look = null)
         {
+            Look = look ?? CharacterLook.Default.Packed;
             SkillOrder = skillOrder ?? Array.Empty<int>();
             PlayerKey = playerKey ?? "";
             Name = name ?? "";
@@ -178,6 +179,8 @@ namespace Game.Core
         public byte[] Character { get; }
         // The order of the skills in the slots (ClassRules.SkillsFor), or empty for the classes' own order.
         public IReadOnlyList<int> SkillOrder { get; }
+        // How the character looks (CharacterLook.Packed), so the others draw it as its player made it (0.108.0).
+        public uint Look { get; }
 
         // Classes come after the version, so a host can still read an older client's version and say why it
         // refuses it.
@@ -191,6 +194,7 @@ namespace Game.Core
             w.Write(Character.Length);
             w.Write(Character);
             Protocol.WriteIndexes(w, SkillOrder);
+            w.Write(Look);
         });
 
         public static JoinMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Join, r =>
@@ -201,6 +205,7 @@ namespace Game.Core
             var classes = new List<string>();
             byte[] character = null;
             IReadOnlyList<int> order = null;
+            uint? look = null;
             if (version == Protocol.Version)
             {
                 for (int count = r.ReadByte(); count > 0; count--) classes.Add(r.ReadString());
@@ -208,8 +213,9 @@ namespace Game.Core
                 if (length < 0 || length > 1 << 20) throw new InvalidDataException("Character data too large.");
                 character = r.ReadBytes(length);
                 order = Protocol.ReadIndexes(r);
+                look = r.ReadUInt32();
             }
-            return new JoinMessage(key, name, classes, version, character, order);
+            return new JoinMessage(key, name, classes, version, character, order, look);
         });
     }
 
@@ -1010,17 +1016,21 @@ namespace Game.Core
             Protocol.Read(data, MessageType.Refused, r => new RefusedMessage(r.ReadString()));
     }
 
-    // Everyone in the game: their names, and their classes as indexes into the class sheet.
+    // Everyone in the game: their names, their classes as indexes into the class sheet, and their looks
+    // (CharacterLook.Packed, 0.108.0).
     public sealed class RosterMessage
     {
-        public RosterMessage(IReadOnlyDictionary<int, string> names, IReadOnlyDictionary<int, IReadOnlyList<int>> classes = null)
+        public RosterMessage(IReadOnlyDictionary<int, string> names, IReadOnlyDictionary<int, IReadOnlyList<int>> classes = null,
+            IReadOnlyDictionary<int, uint> looks = null)
         {
             Names = names;
             Classes = classes ?? new Dictionary<int, IReadOnlyList<int>>();
+            Looks = looks ?? new Dictionary<int, uint>();
         }
 
         public IReadOnlyDictionary<int, string> Names { get; }
         public IReadOnlyDictionary<int, IReadOnlyList<int>> Classes { get; }
+        public IReadOnlyDictionary<int, uint> Looks { get; }
 
         public byte[] Encode() => Protocol.Build(MessageType.Roster, w =>
         {
@@ -1030,6 +1040,7 @@ namespace Game.Core
                 w.Write(pair.Key);
                 w.Write(pair.Value);
                 Protocol.WriteIndexes(w, Classes.TryGetValue(pair.Key, out var classes) ? classes : Array.Empty<int>());
+                w.Write(Looks.TryGetValue(pair.Key, out uint look) ? look : CharacterLook.Default.Packed);
             }
         });
 
@@ -1038,13 +1049,15 @@ namespace Game.Core
             int count = r.ReadInt32();
             var names = new Dictionary<int, string>();
             var classes = new Dictionary<int, IReadOnlyList<int>>();
+            var looks = new Dictionary<int, uint>();
             for (int i = 0; i < count; i++)
             {
                 int id = r.ReadInt32();
                 names[id] = r.ReadString();
                 classes[id] = Protocol.ReadIndexes(r);
+                looks[id] = r.ReadUInt32();
             }
-            return new RosterMessage(names, classes);
+            return new RosterMessage(names, classes, looks);
         });
     }
 

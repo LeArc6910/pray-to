@@ -213,6 +213,13 @@ namespace CoreSandbox
                         generator > 0 ? new[] { generator } : new[] { WorldGenerator.CaveVersion, WorldGenerator.RoomVersion },
                         args.Length > 2 ? int.Parse(args[2]) : WorldGenerator.GameSize);
                     break;
+                // --loadtime [seeds] [map size] (Docs/TitleRework.md T1): each stage of making a world, and a solo start
+                // as it was (made twice) against now (made once).
+                case "--loadtime":
+                    var loadSeeds = args.Length > 1 && !args[1].StartsWith("--") ? args[1].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 };
+                    LoadTime.Run(LoadSheets(data), loadSeeds, generator > 0 ? generator : WorldGenerator.NewWorldVersion,
+                        args.Length > 2 && !args[2].StartsWith("--") ? int.Parse(args[2]) : WorldGenerator.GameSize);
+                    break;
                 case "--supply":
                     var supplyMonsters = LoadMonsters();
                     var supplyBosses = LoadBosses(supplyMonsters);
@@ -258,6 +265,7 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --factory [minutes]");
                     Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...] [map size] [--gen 1|2|3|4|5|6|7]");
                     Console.WriteLine("       dotnet run -- --flow [seeds] [--gen 1|2|3|4|5|6|7]");
+                    Console.WriteLine("       dotnet run -- --loadtime [seeds] [map size] [--gen 1|2|3|4|5|6|7]");
                     Console.WriteLine("       dotnet run -- --mapstats [seeds] [map size] [--gen 1|2|3|4|5|6|7]");
                     Console.WriteLine("       dotnet run -- --pace [minutes] [seeds] [--gear ...] [--classes ...] [--level 8] [--no-director]");
                     break;

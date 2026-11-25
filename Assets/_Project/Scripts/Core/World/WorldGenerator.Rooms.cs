@@ -206,8 +206,11 @@ namespace Game.Core
         // Copper is always within this many steps of the spawn (the guide's first goals).
         public const int CopperSteps = 35;
 
-        static GeneratedWorld GenerateRooms(ulong seed, int width, int height, TerrainData terrain)
+        // Version 2's map before the places, in the stages WorldGenerator.Steps announces (the keys returned): the frame and
+        // the biomes, the rooms and the ways between them, the ore, the water. The world goes in made[0] at the end.
+        static IEnumerable<string> RoomSteps(ulong seed, int width, int height, TerrainData terrain, GeneratedWorld[] made)
         {
+            yield return GenerationStage.Biomes;
             var map = new TileMap(width, height);
             int spawnX = width / 2;
             int spawnY = height / 2;
@@ -248,8 +251,11 @@ namespace Game.Core
             int lakeX = ClampX(spawnX + lakeCornerX * DeepArenaOffset * k), lakeY = ClampY(spawnY + lakeCornerY * DeepArenaOffset * k);
             var arenas = new[] { (arenaX, arenaY), (deepX, deepY), (lavaX, lavaY), (abyssX, abyssY), (lakeX, lakeY), (sandX, sandY) };
 
-            var graph = new RoomCarver(map, biomes, terrain, seed, arenas).Carve(spawnX, spawnY);
+            var carved = new RoomGraph[1];
+            foreach (string key in new RoomCarver(map, biomes, terrain, seed, arenas).Carve(spawnX, spawnY, carved)) yield return key;
+            var graph = carved[0];
 
+            yield return GenerationStage.Ore;
             // Ore, by version 1's counts and distances, but in the rock a few tiles behind the rooms' walls, where it is
             // seen and dug to, not lost in the middle of a mass.
             var rim = RimRock(map, OreDepth);
@@ -264,6 +270,7 @@ namespace Game.Core
                 (x, y) => biomes[x, y] == Biome.Lava && From(x, y, ObsidianDistance * k));
             PlaceRimVeins(map, abyss, rim, TileType.VoidOre, VoidVeins * area, (x, y) => biomes[x, y] == Biome.Abyss && !NearArena(x, y, 2));
 
+            yield return GenerationStage.Pools;
             // Pools to fish from, set into the rock beside the floor as before: not by the spawn or an arena, nor in
             // the lava fields or the dry sand caves. The lake has its own water (the islands' style) and more pools.
             bool Shore(int x, int y) => map[x, y] == TileType.Wall && biomes[x, y] != Biome.Lava && biomes[x, y] != Biome.Sand
@@ -271,7 +278,7 @@ namespace Game.Core
             PlaceWater(map, new GameRandom(seed, WaterStream), WaterPools * area, Shore);
             PlaceWater(map, new GameRandom(seed, LakeStream), WaterPools * area, (x, y) => Shore(x, y) && biomes[x, y] == Biome.Lake);
 
-            return new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY), (abyssX, abyssY), (lakeX, lakeY),
+            made[0] = new GeneratedWorld(map, spawnX, spawnY, arenaX, arenaY, ArenaRadius, deepX, deepY, biomes, (lavaX, lavaY), (abyssX, abyssY), (lakeX, lakeY),
                 (sandX, sandY))
             {
                 Version = RoomVersion,
@@ -556,8 +563,11 @@ namespace Game.Core
 
             static int Square(int dx, int dy) => dx * dx + dy * dy;
 
-            public RoomGraph Carve(int spawnX, int spawnY)
+            // In stages (WorldGenerator.Steps): the rooms and the ways between them, the rooms' floors, the rivers and ways,
+            // what stands in the rooms. The graph goes in graph[0] at the end.
+            public IEnumerable<string> Carve(int spawnX, int spawnY, RoomGraph[] graph)
             {
+                yield return GenerationStage.Rooms;
                 // The arenas first: each a round room in a ring of rock nothing else may open.
                 int keep = ArenaRadius + ArenaWall;
                 for (int i = 0; i < _arenas.Length; i++)
@@ -754,6 +764,7 @@ namespace Game.Core
 
                 // Carved in this order: the rooms; the lava rivers across them; the ways, which bridge whatever
                 // lava or water they cross; then what stands in the rooms.
+                yield return GenerationStage.Floors;
                 var shape = new GameRandom(_seed, ShapeStream);
                 var shapes = new List<Action>();
                 foreach (var node in _nodes)
@@ -763,12 +774,14 @@ namespace Game.Core
                     if (floor != null) shapes.Add(floor);
                 }
                 foreach (var floor in shapes) floor();
+                yield return GenerationStage.Ways;
                 Rivers(new GameRandom(_seed, RiverStream));
                 var way = new GameRandom(_seed, WayStream);
                 foreach (var edge in _edges) Way(edge, way);
+                yield return GenerationStage.Features;
                 Features(new GameRandom(_seed, FeatureStream));
                 Join(spawnX, spawnY);
-                return new RoomGraph(_cell, _nodes, _edges);
+                graph[0] = new RoomGraph(_cell, _nodes, _edges);
             }
 
             // Whether a straight way between the two points keeps out of every arena's rock (but the exempt one's).
