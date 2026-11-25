@@ -1199,11 +1199,13 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(문자열 `menu.ui_size`·`menu.frames`). 새 파일 `Client/FrameRate.cs`, `Client/Editor/NativeBuild.cs`의 `.meta`가 생기면 커밋한다. PlayMode `LayoutTests.TheFixedPartsKeepToTheSafeArea`, `SessionTests.LeavingTheAppSavesAndPlaysOn`, 사진 `combo-touch-safearea`(가로 휴대폰에 안전 영역 44·16·44·20점: HUD·미니맵·스틱·스킬 단추가 안쪽, 세계는 화면 전체)
   - 빌드해 보기(모듈이 있으면): Unity Hub > 설치 > 6000.6.3f1 > 모듈 추가에서 "Android Build Support"(그 아래 OpenJDK, Android SDK & NDK Tools 모두)를 깐다. Windows 빌드는 Windows 에디터면 따로 깔 것이 없다(Mac·Linux 에디터는 "Windows Build Support (Mono)"). 에디터를 닫고 저장소 맨 위에서 `& "<Unity.exe>" -batchmode -projectPath . -buildTarget Win64 -executeMethod Game.Client.Editor.NativeBuild.RunBatchWindows -logFile Logs/build-windows.log`, Android는 `-buildTarget Android -executeMethod Game.Client.Editor.NativeBuild.RunBatchAndroid -logFile Logs/build-android.log`(메뉴 Game > Build Windows·Build Android도 같다). 결과 `Builds/Windows/pray-to.exe`, `Builds/Android/pray-to.apk`(`Builds/`는 커밋하지 않는다). 종료 코드(0 성공, 1 실패, 2 모듈 없음)와 실패면 로그의 `Native build` 줄과 그 위 오류를 결과 보고에 적는다. 빌드가 `ProjectSettings/ProjectSettings.asset`을 바꾸면(스크립트가 빌드 때 정하는 값: 스크립팅 백엔드, Android 아이디·API·방향) 그대로 커밋한다
   - (클라우드 웹 점검) `sweep.js --only menu,layout,save`
+  - 클라우드 확인 (2026-11-26, `bd312c0`·`3317107`·`428918c`): [x] `menu` [UI 크기] 115%로 배율 1 → 1.15(1280×720 → 1113×626점), 115→130→90→100, 웹에 [프레임] 없음. `save` 탭 숨기기로 저장(0 → 1, 바로 또 숨기면 그대로, 게임 계속). `layout` 안전 영역을 세운 세로(0·44·0·30점)·가로(44·0·44·20점) 휴대폰에서 HUD·가방 단추가 모두 그 안: 처음 두 배포에서 가로가 실패했는데 화면은 맞았고 점검용 단추 좌표가 옮김을 두 번 센 것(`GUIToScreenPoint`가 GUI 행렬의 옮김을 기기 픽셀로 센다) → `Ui.ToPoints`를 고쳐 `428918c`에서 37개 모두 통과. 사진: 가로 휴대폰의 HUD·미니맵·가방이 양옆 44점 안쪽, 세계는 화면 전체. 남은 것: 실제 빌드와 실제 기기(사람)
   - (사람) 실제 휴대폰에 APK를 깔아(`adb install -r Builds/Android/pray-to.apk`) 글자 크기와 [UI 크기], 노치·둥근 모서리에 HUD가 가리지 않는지(세로·가로), 60프레임과 [프레임: 30], 홈으로 나갔다가 최근 앱에서 지우고 다시 열면 이어지는지. Windows 앱의 150% 배율 화면 글자 크기, 창을 닫았다 열면 이어지는지
 
 - [ ] 180단계: 시작화면 남은 것 — 펫 이름·클라우드 아이디·비밀번호 칸도 PC 웹에서 한글(웹 글 상자), 외형 선택지 이름의 영어, 아홉 자리 무작위 시드, 키보드로 고른 줄을 목록이 따라 굴러감(`Docs/TitleRework.md` "남은 것 마무리")
   - 명령 한 줄을 다시 돌린다(문자열 `look.*`). 새 파일 없음. PlayMode `TitleScreenTests`가 그대로 통과하는지
   - (클라우드 웹 점검) `sweep.js --only title,menu,npc,save`
+  - 클라우드 확인 (2026-11-26, `bd312c0`·`3317107`): [x] `title` 새 월드 시드가 휴대폰 아홉 자리(760473137, 580640660)·PC 적은 12345, `menu` 설정에서 ↑ 두 번으로 맨 아래 [키 바꾸기]까지 목록이 210점 내려가고 ↓ 두 번으로 0점(사진), `npc` 펫 이름 칸에 "보리떡"을 적고 Enter로 이름 짓기(사진), `save` 아이디 칸에 한글이 들어가 규칙 알림·아이디와 비밀번호가 들어가 비밀번호 길이 알림. 두 번째 배포(열린 칸을 다시 누르면 상자가 키를 되찾게)에서도 `title,npc,save` 모두 통과
   - (사람) PC 웹에서 한글 입력기로 펫 이름 적기(짜 맞추는 글자가 칸에 보이는지, Enter로 이름이 지어지는지), 영어 설정의 외형 이름이 자연스러운지, 키보드 ↑↓로 긴 캐릭터 목록을 내려갈 때 따라 굴러가는 느낌
 
 ## 결과 보고
