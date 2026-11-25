@@ -47,6 +47,71 @@ namespace Game.Core.Tests
             float cooldown = 1) =>
             $"dummy,a,공격,,{shape},{target},{telegraph},{damage},{radius},{length},{angle},{width},{count},{spread},{speed},{cooldown},1,{summon}\n";
 
+        // A slam with a ring that follows it (follow column, 2026-11-25, Docs/BiomeRework.md B5b): the ring keeps clear
+        // only the spot the slam marked.
+        static BossDefinition SlamThenRing() => Bosses.Parse(
+            Bosses.BossesHeader + "dummy,허수아비,1000,50,0,2,1,,1,3,10\n",
+            Bosses.AttacksHeader.TrimEnd('\n') + ",warn,pool,follow\n" +
+            "dummy,slam,내려찍기,,circle,nearest,1,30,2,,,,1,,,5,1,,,,ripple:0.5\n" +
+            "dummy,ripple,파문,,ring,nearest,1,20,2,7,,,,,,1,0,,,,\n").Find("dummy");
+
+        [Test]
+        public void AFollowUpIsMarkedWithItsAttackAndLandsAMomentAfter()
+        {
+            var world = Arena(out _, SlamThenRing());
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -5));
+
+            Run(world, 0.1f);
+            var slam = world.Hazards.Single(h => h.Shape == HazardShape.Circle);
+            var ring = world.Hazards.Single(h => h.Shape == HazardShape.Ring);
+            Assert.AreEqual(slam.Position, ring.Position, "around the same spot");
+            Assert.AreEqual(World.Ticks(0.5f), ring.ResolveTick - slam.ResolveTick);
+            Assert.Greater(ring.ResolveTick - slam.ResolveTick, World.DodgeTicks + World.RollSlackTicks, "past a roll's unhurt ticks");
+            Assert.Less(ring.ResolveTick - slam.ResolveTick, World.RollCooldownTicks, "before the next roll");
+        }
+
+        [Test]
+        public void OneRollDoesNotClearASlamAndItsRing()
+        {
+            var world = Arena(out _, SlamThenRing());
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -5));
+            Run(world, 0.1f);
+            var slam = world.Hazards.Single(h => h.Shape == HazardShape.Circle);
+            var east = new Vec2(1, 0);
+
+            while (world.Tick < slam.ResolveTick - 2) world.Step();
+            Assert.IsTrue(world.Roll(player.Id, east));
+            for (int i = 0; i < World.RollTicks; i++)
+            {
+                world.MovePlayer(player.Id, PlayerMotor.Roll(world.Map, player.Position, east), east, 1, rolling: true);
+                world.Step();
+            }
+            Assert.AreEqual(PlayerStats.BaseHealth, player.Health, "the roll clears the slam");
+            Run(world, 0.6f);
+
+            Assert.AreEqual(PlayerStats.BaseHealth - 20, player.Health, 0.01f, "and ends in the ring with the next roll still far off");
+        }
+
+        [Test]
+        public void SteppingOutAndBackInClearsASlamAndItsRing()
+        {
+            var world = Arena(out _, SlamThenRing());
+            var player = world.AddPlayer("a", null);
+            Walk(world, player, Home + new Vec2(0, -5));
+            Run(world, 0.1f);
+            var slam = world.Hazards.Single(h => h.Shape == HazardShape.Circle);
+            var spot = player.Position;
+
+            Walk(world, player, spot + new Vec2(2.5f, 0));
+            while (world.Tick <= slam.ResolveTick) world.Step();
+            Walk(world, player, spot);
+            Run(world, 0.6f);
+
+            Assert.AreEqual(PlayerStats.BaseHealth, player.Health);
+        }
+
         [Test]
         public void SleepsUntilAPlayerWalksIntoTheArena()
         {

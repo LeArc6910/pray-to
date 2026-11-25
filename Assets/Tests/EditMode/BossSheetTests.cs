@@ -41,6 +41,56 @@ namespace Game.Core.Tests
             Assert.IsTrue(data.Errors.Any(e => e.Contains("boss_attacks.csv") && e.Contains(expected)), string.Join("\n", data.Errors));
         }
 
+        // The follow column (2026-11-25): another attack of the same boss that lands a moment after, past a roll's unhurt
+        // ticks and short of its cooldown.
+        [TestCase("b:0.5", null)]
+        [TestCase("a:0.5", "바닥에 떨어지는")]
+        [TestCase("nobody:0.5", "follow")]
+        [TestCase("b", "follow")]
+        [TestCase("b:0.1", "0.3~0.8")]
+        [TestCase("b:1.0", "0.3~0.8")]
+        [TestCase("c:0.5", "바닥에 떨어지는")]
+        public void ReadsWhatFollowsAnAttack(string follow, string expected)
+        {
+            var data = Bosses.Parse(Bosses.BossesHeader + "dummy,허수아비,100,0,0,2,1,50,1,3,10\n",
+                Bosses.AttacksHeader.TrimEnd('\n') + ",warn,pool,follow\n" +
+                "dummy,b,나,,cone,nearest,1,5,,3,90,,,,,1,1,,,,\n" +
+                "dummy,c,다,,charge,nearest,1,5,,8,,2,,,10,1,1,,,,\n" +
+                $"dummy,a,가,,circle,nearest,1,5,2,,,,1,,,1,1,,,,{follow}\n");
+
+            if (expected == null)
+            {
+                Assert.IsTrue(data.Success, string.Join("\n", data.Errors));
+                var a = data.Find("dummy").Attacks.Single(x => x.Id == "a");
+                Assert.AreEqual("b", a.FollowUp.Id);
+                Assert.AreEqual(0.5f, a.FollowDelay, 1e-5f);
+                Assert.IsNull(data.Find("dummy").Attacks.Single(x => x.Id == "b").FollowUp);
+            }
+            else
+                Assert.IsTrue(data.Errors.Any(e => e.Contains("boss_attacks.csv") && e.Contains(expected)), string.Join("\n", data.Errors));
+        }
+
+        // The shipped follow-ups (B5b): each gap lies between a roll's unhurt ticks (with the host's slack) and its
+        // cooldown, and a row that is never chosen by itself (weight 0) is there to follow something.
+        [Test]
+        public void ShippedFollowUpsLandBetweenTwoRolls()
+        {
+            int follows = 0;
+            foreach (var boss in Bosses.Shipped.Bosses)
+            {
+                foreach (var attack in boss.Attacks.Where(a => a.FollowUp != null))
+                {
+                    follows++;
+                    int gap = World.Ticks(attack.FollowDelay);
+                    Assert.Greater(gap, World.DodgeTicks + World.RollSlackTicks, $"{boss.Id}.{attack.Id}");
+                    Assert.Less(gap, World.RollCooldownTicks, $"{boss.Id}.{attack.Id}");
+                }
+                foreach (var quiet in boss.Attacks.Where(a => a.Weight == 0))
+                    Assert.IsTrue(boss.Attacks.Any(a => a.FollowUp == quiet), $"{boss.Id}.{quiet.Id} follows something");
+            }
+            Assert.Greater(follows, 0);
+        }
+
         [Test]
         public void EveryPhaseNeedsAnAttack()
         {

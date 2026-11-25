@@ -52,7 +52,9 @@ namespace Game.Client
     //                             leads and to each arena is known, and the goal list's story line
     //   guidance rumor|arrow      the menu's [길 안내]     quickrest on|off   the menu's [쉴 때 회복], and the running world's
     //   director [build|peak|relax|rest [tension] | ambush | raid]   JSON: the pacing director for the player (state, tension,
-    //                             clocks, what it sent, the dust and howls the screen showed); or that state set, or one now
+    //                             clocks, what it sent, the dust and howls the screen showed, B5c: a raid's howl to its first
+    //                             reaching on the host, its monsters running in, the raid's dot on the screen's edge);
+    //                             or that state set, or one now
     //   goto narrow [n]           the middle of the nth nearest narrow way (two tiles or less) where an ambush can come
     //   goto gate [n]             on the nth nearest dungeon gate (묶음 5a);   goto exit [n] | far   in the dungeon: by its nth door
     //                             out (0 the entrance's), or the middle of its last room
@@ -1250,6 +1252,11 @@ namespace Game.Client
                 .Field("chasing", world.Enemies.Count(e => !e.IsDead && e.TargetId == player.Id && e.State != EnemyState.Idle))
                 .Field("near", world.Enemies.Count(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) < 12))
                 .Field("dustShown", shown.Dust).Field("howlsHeard", shown.Howls)
+                // B5c: the raids' howl to their first reaching someone on the host (World.RaidRunSeconds), the raids'
+                // monsters still running in, and the screen's dot on its edge (drawn now, raids pointed to, come on).
+                .Field("raidReaches", pace.RaidReaches.Count).Field("raidReach", pace.RaidReaches.Count == 0 ? -1 : pace.RaidReaches[pace.RaidReaches.Count - 1])
+                .Field("raidMisses", pace.RaidMisses).Field("raiding", world.RaidersRunning)
+                .Field("raidDots", root.RaidSigns.Dots).Field("raidDotsShown", root.RaidSigns.Shown).Field("raidsOnScreen", root.RaidSigns.OnScreen)
                 .Close('}');
         }
 

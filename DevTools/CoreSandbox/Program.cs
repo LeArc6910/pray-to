@@ -165,7 +165,7 @@ namespace CoreSandbox
                     PrintProgression(data, Number(1, 2000), Seed(2));
                     break;
                 case "--fight" when roomsBiome != null:
-                    RoomFightSim.Run(LoadSheets(data), Number(1, 180), Seed(2), gear, LoadClasses(classIds), dodge, roomsBiome, camps);
+                    RoomFightSim.Run(LoadSheets(data), Number(1, 180), Seed(2), gear, LoadClasses(classIds), dodge, roomsBiome, camps, players, reaction);
                     break;
                 case "--fight":
                     FightSim.Run(data, LoadMonsters(), Number(1, 120), Seed(2), gear, LoadClasses(classIds), dodge, onlyMonsters);
@@ -231,7 +231,7 @@ namespace CoreSandbox
                 // --dungeon <id> [seeds] (묶음 5b): bots run a dungeon of dungeons.csv to its end chest (DungeonSim).
                 case "--dungeon":
                     var dungeonSeeds = args.Length > 2 && !args[2].StartsWith("--") ? args[2].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 };
-                    DungeonSim.Run(LoadSheets(data), args.Length > 1 ? args[1] : "abandoned_mine", dungeonSeeds, players, gear, LoadClasses(classIds), dodge);
+                    DungeonSim.Run(LoadSheets(data), args.Length > 1 ? args[1] : "abandoned_mine", dungeonSeeds, players, gear, LoadClasses(classIds), dodge, reaction);
                     break;
                 // --traps [seeds] (묶음 B1c): the grates each trap room of the game's world falls with (TrapCuts).
                 case "--traps":

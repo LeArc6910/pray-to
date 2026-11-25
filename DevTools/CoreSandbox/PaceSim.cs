@@ -12,7 +12,8 @@ namespace CoreSandbox
     // it was most in under it; then the seconds in each state, the peaks and rests, what the director sent (wanderers,
     // ambushes, raids), the fights and the quiet between them, and the hits taken while resting (from wanderers and the
     // director's: these should be none; from the packs of rooms the bot walked into, apart). With --no-director the same
-    // world plays without the director acting (the tension is still measured), for the numbers to set beside.
+    // world plays without the director acting (the tension is still measured), for the numbers to set beside. B5c: each
+    // raid's howl to the first of it reaching the bot (World.RaidRunSeconds), and whether a raid howled before a fall.
     static class PaceSim
     {
         const string Bars = " ▁▂▃▄▅▆▇█";
@@ -24,9 +25,18 @@ namespace CoreSandbox
             Console.WriteLine();
             var rows = new List<string>();
             foreach (ulong seed in seeds) rows.Add(RunOne(sheets, minutes, seed, gear, classes, director, level));
-            Console.WriteLine("| 시드 | 쌓기 / 정점 / 내려오기 / 쉬기(초) | 정점 | 쉬기 | 보낸 떠돌이 | 매복 | 습격 | 싸움 | 싸움 사이 평균(가장 긴) | 싸운 몫 | 처치 | 쓰러짐 | 받은 피해 | 쉬기 동안 맞음: 떠돌이·감독 / 무리 방 |");
-            Console.WriteLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
+            Console.WriteLine("| 시드 | 쌓기 / 정점 / 내려오기 / 쉬기(초) | 정점 | 쉬기 | 보낸 떠돌이 | 매복 | 습격 | 울음소리 → 첫 닿음(초): 평균(가장 짧은~가장 긴) | 싸움 | 싸움 사이 평균(가장 긴) | 싸운 몫 | 처치 | 쓰러짐 | 받은 피해 | 쉬기 동안 맞음: 떠돌이·감독 / 무리 방 |");
+            Console.WriteLine("|---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|");
             foreach (string row in rows) Console.WriteLine(row);
+        }
+
+        // A raid's howl to the first of it reaching the player (World.RaidRunSeconds, B5c): the mean, the shortest and the
+        // longest, and the raids that never reached.
+        static string Reach(Pace pace)
+        {
+            var reaches = pace.RaidReaches;
+            string text = reaches.Count == 0 ? "-" : $"{reaches.Average():0.0}({reaches.Min():0.0}~{reaches.Max():0.0})";
+            return pace.RaidMisses > 0 ? $"{text}, 못 닿음 {pace.RaidMisses}" : text;
         }
 
         static string RunOne(BotSheets sheets, int minutes, ulong seed, string[] gear, ClassDefinition[] classes, bool director, int level)
@@ -72,6 +82,7 @@ namespace CoreSandbox
             int total = minutes * 60 * World.TicksPerSecond;
             int falls = player.Falls;
             var fallPlaces = new List<string>();
+            long lastHowl = long.MinValue / 2;
             for (int tick = 0; tick < total; tick++)
             {
                 var near = world.Enemies.Where(e => !e.Away && !e.IsDead && Vec2.Distance(e.Position, player.Position) < 16
@@ -131,6 +142,7 @@ namespace CoreSandbox
                         }
                     }
                     if (e.Type == SimEventType.Died && e.Source != player.Id && names.ContainsKey(e.Source)) kills++;
+                    if (e.Type == SimEventType.Ambush && e.Amount == World.RaidHowl) lastHowl = world.Tick;
                 }
                 if (player.Falls > falls)
                 {
@@ -138,7 +150,10 @@ namespace CoreSandbox
                     // Where it fell and what was about (B2b): to tell a new kind's doing from the run's luck.
                     var foes = world.Enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) <= 8)
                         .GroupBy(e => e.Definition.Id).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key} {g.Count()}");
-                    fallPlaces.Add($"{tick / World.TicksPerSecond / 60}:{tick / World.TicksPerSecond % 60:00} {world.Biomes.At(player.Position)} (곁 {string.Join(", ", foes)})");
+                    // And whether a raid howled within the half minute before (B5c).
+                    long sinceHowl = (world.Tick - lastHowl) / World.TicksPerSecond;
+                    fallPlaces.Add($"{tick / World.TicksPerSecond / 60}:{tick / World.TicksPerSecond % 60:00} {world.Biomes.At(player.Position)} (곁 {string.Join(", ", foes)})"
+                        + (sinceHowl <= 30 ? $" 습격 울음소리 {sinceHowl}초 뒤" : ""));
                 }
                 falls = player.Falls;
                 if (tick % World.TicksPerSecond != 0) continue;
@@ -175,9 +190,11 @@ namespace CoreSandbox
             Console.WriteLine("상태   " + under + "   (· 쌓기, ▲ 정점, ↘ 내려오기, _ 쉬기; 한 칸 30초)");
             Console.WriteLine("```");
             if (fallPlaces.Count > 0) Console.WriteLine("쓰러진 곳: " + string.Join(" / ", fallPlaces));
+            if (pace.RaidReaches.Count + pace.RaidMisses > 0)
+                Console.WriteLine($"습격마다 울음소리 → 첫 닿음: {string.Join(" / ", pace.RaidReaches.Select(s => $"{s:0.0}초"))}{(pace.RaidMisses > 0 ? $" (못 닿음 {pace.RaidMisses}: 닿기 전에 쉬기가 되어 돌아갔거나 다 쓰러졌다)" : "")}");
             Console.WriteLine();
             int S(PaceState s) => seconds.GetValueOrDefault(s);
-            return $"| {seed} | {S(PaceState.Build)} / {S(PaceState.Peak)} / {S(PaceState.Relax)} / {S(PaceState.Rest)} | {pace.Peaks} | {pace.Rests} | {pace.Sends} | {pace.Ambushes} | {pace.Raids} | {fights} "
+            return $"| {seed} | {S(PaceState.Build)} / {S(PaceState.Peak)} / {S(PaceState.Relax)} / {S(PaceState.Rest)} | {pace.Peaks} | {pace.Rests} | {pace.Sends} | {pace.Ambushes} | {pace.Raids} | {Reach(pace)} | {fights} "
                 + $"| {(gaps.Count > 0 ? gaps.Average() : 0):0}초({(gaps.Count > 0 ? gaps.Max() : 0):0}) | {fightingSeconds * 100 / Math.Max(1, tension.Count)}% | {kills} | {deaths} | {taken} | {restHitsLoose} / {restHitsRooms} |";
         }
     }

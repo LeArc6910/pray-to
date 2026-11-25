@@ -208,13 +208,114 @@ namespace Game.Core.Tests
             var howl = world.TakeEvents().Single(e => e.Type == SimEventType.Ambush && e.Amount == World.RaidHowl);
             Assert.That(Vec2.Distance(howl.Position, player.Position), Is.InRange(World.SurgeNear, World.SurgeFar + 1), "heard from far off");
             var raiders = world.Enemies.Skip(before).ToList();
-            Assert.That(raiders.Count, Is.InRange(World.RaidMin, World.RaidMax));
+            Assert.That(raiders.Count, Is.InRange(World.RaidLeast, World.RaidMax));
             Assert.IsTrue(raiders.All(e => Vec2.Distance(e.Position, player.Position) >= World.SurgeNear - 4.5f), "out of sight");
             Assert.AreEqual(1, raiders.Select(e => e.PackId).Distinct().Count());
             float far = raiders.Average(e => Vec2.Distance(e.Position, player.Position));
             world.MonstersHold = false;
             Run(world, 3);
             Assert.Less(raiders.Where(e => world.FindEnemy(e.Id) != null).Average(e => Vec2.Distance(e.Position, player.Position)), far - 6, "running in");
+        }
+
+        // B5c (Docs/BiomeRework.md 4-5 휴대폰 습격이 늦게 닿음): a raid is only the quick, the small swarms and the M
+        // bodies that charge, never an L, a shooter or a mender; a third chargers at most beside a swarm.
+        [Test]
+        public void ARaidIsOnlyTheSwarmAndTheChargers()
+        {
+            int chargers = 0, swarms = 0, rosters = 0;
+            foreach (ulong seed in new ulong[] { 1, 2, 3 })
+            {
+                var host = Host(seed);
+                var world = host.World;
+                foreach (var room in host.Generated.Rooms.Nodes.Where(n => n.Kind == RoomKind.Room))
+                {
+                    var at = TileMap.Center(room.AnchorX, room.AnchorY);
+                    var roster = world.RaidRoster(at, World.RaidMax);
+                    if (roster.Count == 0) continue;
+                    rosters++;
+                    Assert.IsFalse(roster.Any(k => k.Big), $"no L or XL ({room.Biome})");
+                    Assert.IsTrue(roster.All(k => k.Role == MonsterRole.Swarm && k.Size <= MonsterSize.M || World.RaidCharger(k)),
+                        $"only the swarm and the chargers ({room.Biome}: {string.Join(",", roster.Select(k => k.Id))})");
+                    Assert.IsFalse(roster.Any(k => k.Role == MonsterRole.Shooter || k.Role == MonsterRole.Support), "none that keeps off");
+                    var swarm = roster.Where(k => k.Role == MonsterRole.Swarm).ToList();
+                    if (swarm.Count > 0)
+                    {
+                        Assert.LessOrEqual(roster.Count(World.RaidCharger), Math.Max(1, (int)(roster.Count * World.RaidChargers)), $"a third chargers at most ({room.Biome})");
+                        swarms++;
+                    }
+                    else Assert.That(roster.Count, Is.InRange(World.RaidLeast, (World.RaidMax + 1) / 2), "chargers alone are half as many");
+                    chargers += roster.Count(World.RaidCharger);
+                    // The swarm is small where the biome's own packs come and have small swarms (bats, scarabs).
+                    if (roster.Any(k => k.Biome == room.Biome) && (room.Biome == Biome.Mushroom || room.Biome == Biome.Crystal || room.Biome == Biome.Sand || room.Biome == Biome.Lava))
+                        Assert.IsTrue(swarm.All(k => k.Size <= MonsterSize.S), $"the small swarm of {room.Biome}: {string.Join(",", roster.Select(k => k.Id))}");
+                }
+            }
+            Assert.Greater(rosters, 100);
+            Assert.Greater(swarms, 0);
+            Assert.Greater(chargers, 0, "some raids bring chargers");
+        }
+
+        // A raid's howl to its first reaching a player who stands where they heard it: about World.RaidRunSeconds, the
+        // design's 4~6 seconds, wherever it came from (18~26 tiles out of sight).
+        [Test]
+        public void ARaidReachesAStandingPlayerFourToSixSecondsAfterItsHowl()
+        {
+            var seconds = new List<float>();
+            foreach (ulong seed in new ulong[] { 5, 6, 7 })
+            {
+                var host = Host(seed);
+                var world = host.World;
+                var player = Strong(world);
+                player.Position = Open(host, r => r.Radius >= 7);
+                Run(world, 0.5f);
+                for (int raid = 0; raid < 2; raid++)
+                {
+                    var pace = world.PaceOf(player);
+                    int reached = pace.RaidReaches.Count;
+                    if (!world.Raid(player)) continue;
+                    var howl = world.TakeEvents().Single(e => e.Type == SimEventType.Ambush && e.Amount == World.RaidHowl);
+                    Assert.That(Vec2.Distance(howl.Position, player.Position), Is.InRange(World.SurgeNear, World.SurgeFar + 1));
+                    for (int tick = 0; tick < World.Ticks(10) && pace.RaidReaches.Count == reached; tick++)
+                    {
+                        world.Step();
+                        player.Health = player.Stats.MaxHealth;
+                    }
+                    Assert.AreEqual(reached + 1, pace.RaidReaches.Count, $"seed {seed}: reached within ten seconds");
+                    seconds.Add(pace.RaidReaches[reached]);
+                    // Every one of it slows to its own pace once it is there.
+                    Run(world, 8);
+                    foreach (var enemy in world.Enemies.Where(e => !e.IsDead).ToList()) world.Hurt(enemy, player, enemy.Health * 10 + 1000);
+                    Run(world, 1);
+                    world.TakeEvents();
+                }
+            }
+            TestContext.WriteLine("howl to the first reaching: " + string.Join(", ", seconds.Select(s => s.ToString("0.0"))));
+            Assert.GreaterOrEqual(seconds.Count, 4, "raids came");
+            Assert.IsTrue(seconds.All(s => s >= 4 && s <= 6), "howl to the first reaching: " + string.Join(", ", seconds.Select(s => s.ToString("0.0"))));
+        }
+
+        // Each runs in only until it is there: it slows to its own pace on reaching, on being hurt, or on its attack.
+        [Test]
+        public void ARaiderRunsOnlyUntilItReaches()
+        {
+            var host = Host(5);
+            var world = host.World;
+            var player = Strong(world);
+            player.Position = Open(host, r => r.Radius >= 7);
+            Run(world, 0.5f);
+            int before = world.Enemies.Count;
+            Assert.IsTrue(world.Raid(player));
+            var raiders = world.Enemies.Skip(before).ToList();
+            Run(world, 0.1f);
+            Assert.IsTrue(raiders.Any(e => Math.Abs(e.Speed - e.Definition.Speed * e.SpeedScale) > 0.05f), "running at the band's pace");
+            Assert.IsTrue(raiders.All(e => e.Speed <= World.RaidPaceMost + 1e-3f));
+            // Held (a playtest's scene), the clock stands.
+            world.MonstersHold = true;
+            Run(world, 20);
+            world.MonstersHold = false;
+            Assert.AreEqual(0, world.PaceOf(player).RaidReaches.Count + world.PaceOf(player).RaidMisses, "the run still on after a hold");
+            Run(world, World.RaidRushMost + 1);
+            Assert.IsTrue(raiders.Where(e => !e.IsDead).All(e => Math.Abs(e.Speed - e.Definition.Speed * e.SpeedScale) < 1e-3f), "back to its own pace");
         }
 
         [Test]

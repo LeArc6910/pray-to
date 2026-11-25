@@ -232,12 +232,12 @@ cart,버려진 수레,cart,,10,forage:5-10|potions:1|coins:5-15,,no,once,glint,6
 
 ```
 id,name,biome,level,graph,rooms,boss,chest,minutes,entry,light,experience
-abandoned_mine,버려진 갱도,cave,2,mine,10-11,slime_mother,chest_iron,6,gate,#FFB060,75
-spore_depths,포자 굴,mushroom,3,branching,9-11,mycelium_mother,chest_gold,5,gate,#A8F06A,60
+abandoned_mine,버려진 갱도,cave,2,mine,10-11,slime_mother,chest_iron,6,gate,#FFB060,85
+spore_depths,포자 굴,mushroom,3,branching,11-12,mycelium_mother,chest_gold,5,gate,#A8F06A,60
 frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,frost_mammoth,chest_gold,8,gate,#A8DCFF,60
 ember_forge,잿불 대장간,lava,4,forge,13-14,forge_keeper,chest_gold,8,gate,#FF7A30,64
 cellar,지하실,,2,cellar,6-7,elite,chest_iron,4,cellar,,
-buried_temple,묻힌 신전,sand,3,temple,11-12,temple_guardian,chest_gold,8,gate,#FFD28A,45
+buried_temple,묻힌 신전,sand,3,temple,11-12,temple_guardian,chest_gold,8,gate,#FFD28A,48
 geode_heart,정동 속,crystal,4,geode,11-12,geode_golem,chest_gold,8,gate,#FF8AD8,57
 sunken_aqueduct,잠긴 수로,lake,4,aqueduct,12-13,moss_turtle,chest_gold,6,gate,#70E6D8,47
 broken_gate,깨진 문 너머,abyss,5,shattered,13-14,gate_warden,chest_gold,8,gate,#6A30C0,50
@@ -268,7 +268,7 @@ broken_gate,깨진 문 너머,abyss,5,shattered,13-14,gate_warden,chest_gold,8,g
 | `L` | 잠긴 방 | 무리 방. 들어가는 길이 창살로 막혀 있고 열쇠를 얻은 뒤 곁에 서면 열린다 |
 | `M` | 챔피언 방 | 챔피언 셋(접사 하나) |
 | `R` | 쉼터 | 모닥불(곁 4칸에서 초당 10% 회복), 몬스터가 들어오지 못한다, 지름길의 돌 |
-| `B` | 보스 방 | 던전의 주인(큰 정예: 우두머리, 접사 둘, 생명력 12배, 사람마다 60% 더. 중간 보스 그 자신이면 접사 하나, 생명력 그대로, 사람마다 60% 더)과 부하 3~5. 바닥에 아레나 무늬 |
+| `B` | 보스 방 | 던전의 주인(큰 정예: 우두머리, 접사 둘, 생명력 12배, 사람마다 120% 더. 중간 보스 그 자신이면 접사 하나, 생명력 그대로, 사람마다 120% 더)과 부하 3~5. 바닥에 아레나 무늬. 무리·챔피언·부하는 둘째 사람부터 사람마다 생명력 100% 더, 방의 모든 몬스터가 사람마다 경험치 60% 더(B5a) |
 | `X` | 끝 | 보상 상자와 나가는 문. 주인이 쓰러질 때까지 창살로 막힌다 |
 | `T` | 보물 방 | `pois.csv`의 `treasure` 상자 |
 | `H` | 숨은 방 | 들어가는 길이 금 간 벽(아무 무기로 한 번에 깨진다), `hidden` 상자 |

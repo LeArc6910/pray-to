@@ -138,6 +138,8 @@ namespace Game.Client
         // What the screen showed of the trap rooms and the pacing director (WorldView.ShowPace), for the playtests.
         internal (int Banners, int Dust, int Howls, int Grates) PaceShown => _view == null ? (0, 0, 0, 0)
             : (_view.TrapBanners, _view.AmbushDustShown, _view.RaidHowlsHeard, _view.GratesDropped);
+        // A raid's dot on the screen's edge (WorldView.FollowRaids, B5c): drawn now, raids pointed to, raids that came on.
+        internal (int Dots, int Shown, int OnScreen) RaidSigns => _view == null ? (0, 0, 0) : (_view.RaidDots, _view.RaidDotsShown, _view.RaidsOnScreen);
         // Field elites' name tags drawn, the widest in points, and a guarding leader's lines (WorldView.MonsterFx).
         internal int EliteTagsShown => _view?.EliteTagsShown ?? 0;
         internal float EliteTagWidest => _view?.EliteTagWidest ?? 0;
