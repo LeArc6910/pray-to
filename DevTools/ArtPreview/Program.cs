@@ -223,6 +223,8 @@ namespace Game.Client
             // The flat tiles' audit (2026-11-25): every object tile, the rails, and the scenes as the game draws them.
             FlatPreview.Write(output);
             WriteFlatScenes(output, npcs);
+            // The title rework's art (out/title/): fails when the default look is not the old hero pixel for pixel.
+            if (!TitlePreview.Write(output)) return 1;
             // The pixel slips the eye misses at sheet size (ArtLint): fails only when a count goes up.
             if (!ArtLint.Run(loot, monsters, FindFolder(Path.Combine("DevTools", "ArtPreview")), output)) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;

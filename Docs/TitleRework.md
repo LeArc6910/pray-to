@@ -68,6 +68,36 @@
 
 외형 고르기의 값은 `Core/Save/CharacterLook.cs`(이 문서와 함께 만듦)에 둔다. 색과 모양은 클라이언트 그림이 정한다.
 
+## T2 만든 것 (2026-11-25)
+
+그림만 만들었고 화면에는 아무것도 걸지 않았다(T3가 쓴다). `dotnet run --project DevTools/ArtPreview -- --only title`이 `out/title/`에 시안을 쓴다.
+
+**주인공 외형** (`Client/Art/HeroArt.Looks.cs`, `HeroArt.cs`)
+
+- `HeroArt.Draw(Look, HeroMove, frame, HeroGear, CharacterLook, blink)`가 외형대로 그린다. 서기·걷기·세 공격·시전·찌르기·펼치기·마시기·맞기·쓰러짐·일어남·구르기, 다섯 무기 모두 같은 리그를 쓰므로 따로 손댄 모션은 없다
+- 머리 모양 8: 짧은 머리(지금 그림) · 긴 머리 · 묶은 머리 · 뾰족 머리 · 깎은 머리 · 양갈래 · 단발 · 올림머리. 모양마다 머리 그림을 다섯 방향으로 다시 그렸다. 긴 머리와 꼬리는 머리 여덟 줄 아래로 내려와 몸통 위에 덮이고, 뾰족 머리와 올림머리는 위로 두 줄 올라간다(머리와 함께 기울고 숙인다)
+- 머리색 9(갈색·검정·금빛·붉은빛·은빛·파랑·초록·분홍·보라), 피부 5, 눈 6(검정·갈색·파랑·초록·잿빛·붉은빛), 윗옷 12, 아랫옷 12. 윗옷은 `Ramp.Of`의 밝음·그늘·어둠 세 단계, 피부는 세 단계, 머리는 두 단계, 아랫옷은 먼 다리가 한 단계 어둡다
+- `CharacterLook.Default`는 지금 주인공과 픽셀까지 같다. 미리보기가 모든 모션·무기·방향의 5,545프레임을 옛 그림(`Rgba tunic` 오버로드, `#3F7FD8`)과 견주고 하나라도 다르면 실패한다. 그래서 아랫옷 0번(지금의 짙은 갈색)만 먼 다리를 어둡게 하지 않는다
+- 옛 `Draw(..., Rgba tunic, blink)`는 그대로 남아 "기본 외형 + 그 색 윗옷"을 그린다(외형을 모르는 다른 플레이어, 마을 사람 대신 그리는 자리)
+- 이름표: `HeroArt.HairNames`·`HairColorNames`·`SkinNames`·`EyeNames`·`ShirtNames`·`PantsNames`(한국어), 색 견본: `HairColor(i)`·`SkinColor(i)`·`EyeColor(i)`·`ShirtColor(i)`·`PantsColor(i)`. 스프라이트 키에 넣을 이름은 `HeroArt.Key(look)`. 물감(팔레트)은 외형마다 한 번 만들어 두고, 그린 그림은 지금처럼 부르는 쪽이 `Sprites`에 키로 묶어 둔다
+- 모자람: 머리가 위로 올라가는 두 모양에서 `Joints.Top`(이름표 자리)은 두 픽셀 낮게 나온다. 눈 색은 1×2픽셀이라 가까이 봐야 구별된다(만들기 화면의 미리보기는 3배 이상을 권한다)
+
+**제목 그림** (`Client/Art/TitleArt.cs`)
+
+- 로고 `TitleArt.Logo`(68×23): 두꺼운 금빛 글자 "pray◆to", 하이픈은 깎은 보석, 검은 테와 돌빛 그림자. 2배·3배에서 읽힌다. 반짝임은 `LogoGlint(frame)`(빛만 있는 덧그림, `GlintFrames` 12걸음)을 로고 위에 겹친다. 한글 부제는 글자로 쓴다
+- 글자 단추: 상자 없음. 글자색 `Ink(state)`(쉬는·올린·고른·누른)와 그림자 `InkShadow`, 못 고르는 글자 `InkOff`, 커지는 비율 `GrowHover`·`GrowSelected`. 양옆 표지 `Mark(state)`(◆ 7×7, 쉬면 null), 아래 빛 띠 `Strip(width, state)`(높이 5, 양끝이 사라진다), 값 줄의 화살표 `Arrow(left, state)`, 새긴 꺾쇠 `Bracket(left)`
+- 판 `Panel`(아홉 조각, 테 `PanelBorder` 6): 밤빛 반투명(`PanelAlpha` 178) 위에 얇은 금빛 테와 모서리 보석. 화면 이름 아래 줄 `Divider(width)`
+- 목록 줄 `Row(state)`(아홉 조각, 테 `RowBorder` 4): 쉬는 줄은 옅은 띠, 올리면 왼쪽 금빛 막대, 고르면 금빛 테. 새로 만들기 줄 `NewRow(width, height, state)`(점선 테, 크기대로 그린다)와 `Plus(state)`
+- 생물군계 아이콘 `BiomeIcon(biome)` 16×16 여덟(`BiomeOrder`: 흙 동굴·버섯 숲·얼음·모래·수정·호수·용암·심연)
+
+**로딩 장면** (`Client/Art/LoadingArt.cs`)
+
+- `LoadingArt.Scene(biome, seed, monsters, hero, width, height)`: 그 생물군계의 작은 굴을 지어(바닥·벽, 생물군계 소품 다섯까지, 꾸밈, 호수·용암은 웅덩이, 작은 생물) 게임 그림(`TileArt`·`StandArt`·`CreatureArt`·`CritterArt`)과 게임의 빛(`LightMap`, 생물군계 빛 색)으로 그리고 160×90으로 자른다. 같은 생물군계와 시드는 늘 같은 그림
+- `monsters`는 보여 줄 몬스터의 id와 색(셋까지). null이면 그 생물군계의 둘(`MonstersOf`), 빈 목록이면 없음. **만난 몬스터만 보이기는 화면이 정한다**: 이 함수는 받은 것만 그린다. `hero`를 주면 그 외형의 주인공이 서 있다
+- 한 장에 데스크톱 20~40밀리초쯤 걸리니 로딩에 들어갈 때 한 번 그려 스프라이트로 둔다
+
+**시안** (`out/title/`): `looks.png`(머리 모양 × 다섯 방향 × 세 색 조합, 선택지마다 색, 기본 외형과 옛 그림 비교), `looks_moves.png`(무작위 외형 여섯의 걷기·검·활·지팡이 공격·구르기·쓰러짐), `logo.png`·`logo_glint.png`, `buttons.png`(글자 단추 네 상태, 화살표·꺾쇠, 판·줄·새로 만들기), `biome_icons.png`, `loading_<생물군계>.png` 여덟(왼쪽 몬스터만, 오른쪽 주인공과 함께).
+
 ## 6. 자료 목록
 
 [1] Terraria Wiki, 1.4.0.1 — https://terraria.wiki.gg/wiki/1.4.0.1

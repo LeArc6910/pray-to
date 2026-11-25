@@ -92,6 +92,8 @@ dotnet run --project DevTools/ArtPreview -- --only flat
 dotnet run --project DevTools/ArtPreview -- --only dungeons
 # 대화 초상만(out/portraits/: 인물마다 여섯 표정의 sheet.png, 4배 close_*.png, 대화 상자 시안 dialogue.png. Docs/UiRework.md 4-2)
 dotnet run --project DevTools/ArtPreview -- --only portraits
+# 시작화면 개편의 그림만(out/title/: looks.png 주인공 외형(머리 모양·색·피부·눈·옷, 기본 외형과 옛 그림 비교), looks_moves.png 무작위 외형의 모션, logo.png·logo_glint.png 로고와 반짝임, buttons.png 글자 단추·판·목록 줄, biome_icons.png, loading_<생물군계>.png 로딩 장면. Docs/TitleRework.md T2)
+dotnet run --project DevTools/ArtPreview -- --only title
 
 # Unity 쪽 코드 컴파일 확인. fetch는 세션마다 한 번(몇 분, 에디터와 웹 플레이어의 엔진 DLL만 .unity/에 받는다)
 DevTools/UnityCompileCheck/fetch-unity.sh

@@ -21,7 +21,150 @@ namespace Game.Client
             string folder = Directory.CreateDirectory(Path.Combine(output, "title")).FullName;
             bool ok = Looks(Path.Combine(folder, "looks.png"));
             Moves(Path.Combine(folder, "looks_moves.png"));
+            LogoSheet(folder);
+            Buttons(Path.Combine(folder, "buttons.png"));
+            BiomeIcons(Path.Combine(folder, "biome_icons.png"));
+            foreach (var biome in TitleArt.BiomeOrder)
+            {
+                // Each biome twice: its own monsters alone, and another seed with the default hero standing in it.
+                var pair = new PixelImage(LoadingArt.Width * 2 + 4, LoadingArt.Height);
+                pair.Fill(0, 0, pair.Width, pair.Height, Back);
+                pair.Draw(LoadingArt.Scene(biome, 1), 0, 0);
+                pair.Draw(LoadingArt.Scene(biome, 2, hero: new CharacterLook(1 + (int)biome, (int)biome, (int)biome, 0, 2 + (int)biome, (int)biome)), LoadingArt.Width + 4, 0);
+                Png.Save(pair.Times(4), Path.Combine(folder, $"loading_{biome.ToString().ToLowerInvariant()}.png"));
+            }
             return ok;
+        }
+
+        // The logo at rest at one, two and three times its size on the cave, and every step of the glint.
+        static void LogoSheet(string folder)
+        {
+            var logo = TitleArt.Logo;
+            var back = Cave(LoadingArt.Width * 2, 150, 5);
+            var g = back.Times(1);
+            Over(g, logo, 8, 6);
+            Over(g, logo.Times(2), 8 + logo.Width + 10, 6);
+            Over(g, logo.Times(3), 40, 62);
+            Png.Save(g.Times(2), Path.Combine(folder, "logo.png"));
+            const int columns = 4;
+            int rows = (TitleArt.GlintFrames + columns - 1) / columns;
+            var sheet = new PixelImage(columns * (logo.Width + 6) + 6, rows * (logo.Height + 6) + 6);
+            sheet.Fill(0, 0, sheet.Width, sheet.Height, Back);
+            for (int f = 0; f < TitleArt.GlintFrames; f++) Over(sheet, TitleArt.LogoWithGlint(f), 6 + f % columns * (logo.Width + 6), 6 + f / columns * (logo.Height + 6));
+            Png.Save(sheet.Times(3), Path.Combine(folder, "logo_glint.png"));
+        }
+
+        // A dim cave to lay the menus' pieces on: a loading scene drawn wide and darkened.
+        static PixelImage Cave(int width, int height, int seed)
+        {
+            var image = LoadingArt.Scene(Biome.Cave, seed, new (string, Rgba)[0], null, width, height);
+            for (int y = 0; y < height; y++)
+                for (int x = 0; x < width; x++)
+                    image[x, y] = image[x, y].Scale(0.6f);
+            return image;
+        }
+
+        // An image stretched by its middle, its border kept (as the screens draw a panel or a row).
+        static void Nine(PixelImage g, PixelImage piece, int border, int left, int top, int width, int height)
+        {
+            for (int y = 0; y < height; y++)
+            {
+                int sy = y < border ? y : y >= height - border ? piece.Height - (height - y) : border + (y - border) % (piece.Height - border * 2);
+                for (int x = 0; x < width; x++)
+                {
+                    int sx = x < border ? x : x >= width - border ? piece.Width - (width - x) : border + (x - border) % (piece.Width - border * 2);
+                    g.Blend(left + x, top + y, piece[sx, sy]);
+                }
+            }
+        }
+
+        static readonly TitleState[] States = { TitleState.Normal, TitleState.Hover, TitleState.Selected, TitleState.Pressed };
+
+        // A text item as the title screen draws one: its words, the marks at its sides and the strip under it.
+        static void TextItem(PixelImage g, int middle, int y, string words, TitleState state)
+        {
+            int scale = 1;
+            int width = MockFont.Width(words, scale);
+            int x = middle - width / 2;
+            var strip = TitleArt.Strip(width + 28, state);
+            if (strip != null) Over(g, strip, middle - strip.Width / 2, y + 8);
+            g.Text(x, y + (state == TitleState.Pressed ? 1 : 0), words, TitleArt.Ink(state), TitleArt.InkShadow, scale);
+            var mark = TitleArt.Mark(state);
+            if (mark == null) return;
+            Over(g, mark, x - 6 - mark.Width, y);
+            Over(g, mark, x + width + 6, y);
+        }
+
+        static void Buttons(string path)
+        {
+            const int width = 420, height = 236;
+            var g = Cave(width, height, 3);
+            g.Small(6, 4, "TEXT BUTTONS: REST, POINTED AT, PICKED, PRESSED (NO BOX: INK, MARKS, STRIP)", Dim, Back);
+            Over(g, TitleArt.Logo.Times(2), 100 - TitleArt.LogoWidth, 16);
+            string[] words = { "GAME START", "PLAY TOGETHER", "SAVES", "SETTINGS" };
+            for (int i = 0; i < 4; i++) TextItem(g, 100, 74 + i * 18, words[i], States[i]);
+            TextItem(g, 100, 74 + 4 * 18, "FEEDBACK", TitleState.Normal);
+            g.Text(100 - MockFont.Width("QUIT") / 2, 74 + 5 * 18, "QUIT", TitleArt.InkOff, TitleArt.InkShadow);
+            // Arrows and brackets.
+            g.Small(6, 190, "ARROWS (REST, POINTED AT, PRESSED), BRACKETS, PLUS", Dim, Back);
+            int ax = 8;
+            foreach (var state in new[] { TitleState.Normal, TitleState.Hover, TitleState.Pressed })
+            {
+                Over(g, TitleArt.Arrow(true, state), ax, 202);
+                g.Text(ax + 10, 203, "LONG", TitleArt.Ink(state == TitleState.Normal ? TitleState.Normal : TitleState.Hover), TitleArt.InkShadow);
+                Over(g, TitleArt.Arrow(false, state), ax + 10 + MockFont.Width("LONG") + 4, 202);
+                ax += 54;
+            }
+            Over(g, TitleArt.Bracket(true), ax, 201);
+            g.Text(ax + 8, 203, "PAGE", TitleArt.Ink(TitleState.Hover), TitleArt.InkShadow);
+            Over(g, TitleArt.Bracket(false), ax + 8 + MockFont.Width("PAGE") + 3, 201);
+            ax += 50;
+            foreach (var state in States)
+            {
+                Over(g, TitleArt.Plus(state), ax, 202);
+                ax += 12;
+            }
+
+            // The panel with a page's name, the line under it, rows in each state and the row that makes a new one.
+            const int px = 200, py = 16, pw = 210, ph = 212;
+            Nine(g, TitleArt.Panel, TitleArt.PanelBorder, px, py, pw, ph);
+            string title = "CHARACTERS";
+            g.Text(px + pw / 2 - MockFont.Width(title) / 2, py + 10, title, TitleArt.Ink(TitleState.Selected), TitleArt.InkShadow);
+            Over(g, TitleArt.Divider(pw - 40), px + 20, py + 21);
+            var random = new GameRandom(7);
+            string[] names = { "MIRA", "DOLAN", "ASH", "YUNA" };
+            for (int i = 0; i < 4; i++)
+            {
+                int ry = py + 32 + i * 34;
+                Nine(g, TitleArt.Row(States[i]), TitleArt.RowBorder, px + 10, ry, pw - 20, 30);
+                var style = i == 0 ? CharacterLook.Default : CharacterLook.Random(random);
+                Over(g, HeroArt.Figure(HeroArt.Draw(Look.Down, HeroMove.Walk, i * 2, HeroGear.None, style)), px + 16, ry + 5);
+                g.Text(px + 38, ry + 6, names[i], TitleArt.Ink(States[i]), TitleArt.InkShadow);
+                g.Small(px + 38, ry + 18, $"LV {3 + i * 7}  WARRIOR  {2 + i * 5}H", Dim, default);
+                Over(g, TitleArt.BiomeIcon(TitleArt.BiomeOrder[i * 2]), px + pw - 34, ry + 7);
+            }
+            foreach (var (state, i) in new[] { (TitleState.Normal, 0), (TitleState.Hover, 1) })
+            {
+                int rx = px + 10 + i * 97, ry = py + 32 + 4 * 34, rw = 93;
+                Over(g, TitleArt.NewRow(rw, 26, state), rx, ry);
+                Over(g, TitleArt.Plus(state), rx + 8, ry + 9);
+                g.Text(rx + 22, ry + 10, "NEW", TitleArt.Ink(state), TitleArt.InkShadow);
+            }
+            Png.Save(g.Times(3), path);
+        }
+
+        static void BiomeIcons(string path)
+        {
+            var g = new PixelImage(8 * 22 + 6, 16 + 28);
+            g.Fill(0, 0, g.Width, g.Height, Back);
+            g.Small(4, 3, "CAVE MUSHROOM ICE SAND CRYSTAL LAKE LAVA ABYSS", Dim, Back);
+            for (int i = 0; i < TitleArt.BiomeOrder.Length; i++)
+            {
+                Over(g, TitleArt.BiomeIcon(TitleArt.BiomeOrder[i]), 6 + i * 22, 12);
+            }
+            // On a row, as a world's row shows one.
+            Nine(g, TitleArt.Row(TitleState.Selected), TitleArt.RowBorder, 4, 30, g.Width - 8, 12);
+            Png.Save(g.Times(6), path);
         }
 
         static void Over(PixelImage sheet, PixelImage image, int left, int top)
