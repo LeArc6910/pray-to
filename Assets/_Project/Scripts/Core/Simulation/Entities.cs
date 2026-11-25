@@ -383,7 +383,10 @@ namespace Game.Core
         // 0 for an ordinary monster, RiftMonster or RiftGuardian for one a rift brought.
         public int Rift { get; internal set; }
         public float Damage => Definition.Damage * Power * (Empowered ? 1 + EmpowerShare : 1);
-        public float Speed => Definition.Speed * SpeedScale * (Empowered ? 1 + EmpowerShare : 1);
+        public float Speed => Definition.Speed * SpeedScale * RushScale * (Empowered ? 1 + EmpowerShare : 1);
+        // A raid's monster running in until it reaches someone (World.Director.cs, B5c): its pace against its own, so
+        // the band reaches the player RaidRunSeconds after its howl. 1 otherwise; a split's young do not take it on.
+        internal float RushScale { get; set; } = 1;
         public Vec2 Position { get; internal set; }
         public Vec2 Facing { get; internal set; } = new Vec2(0, -1);
         public float Health { get; internal set; }

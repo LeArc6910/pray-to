@@ -17,8 +17,9 @@ namespace Game.Client
         readonly List<(SpriteRenderer Pole, SpriteRenderer Cloth)> _flags = new List<(SpriteRenderer, SpriteRenderer)>();
         // Where the elite camps fly their flags: by each camp's leader's mark (RoomMarkKind.Elite).
         List<Vec2> _campFlags;
-        // Signals in range but off the screen, for DrawGui to point to: where and the colour.
-        readonly List<(Vec2 At, Color Color)> _farSignals = new List<(Vec2, Color)>();
+        // Signals in range but off the screen, for DrawGui to point to: where, the colour, and whether it is a raid's
+        // (bigger, quicker).
+        readonly List<(Vec2 At, Color Color, bool Raid)> _farSignals = new List<(Vec2, Color, bool)>();
         float _puffClock, _glintClock, _dustClock, _drumClock, _windClock;
 
         const int SignalOrder = DarkOrder + 20;
@@ -80,6 +81,8 @@ namespace Game.Client
             var self = _client.Position;
             float halfHeight = _camera.orthographicSize, halfWidth = halfHeight * _camera.aspect;
             bool OnScreen(Vec2 at) => Mathf.Abs(at.X - _cameraTarget.x) <= halfWidth + 1 && Mathf.Abs(at.Y - _cameraTarget.y) <= halfHeight + 1;
+            // A raid is seen once it is well in (half a tile in from the edges).
+            FollowRaids(at => Mathf.Abs(at.X - _cameraTarget.x) <= halfWidth - 0.5f && Mathf.Abs(at.Y - _cameraTarget.y) <= halfHeight - 0.5f, deltaTime);
             _puffClock += deltaTime;
             _glintClock += deltaTime;
             bool puff = _puffClock >= 0.3f, glint = _glintClock >= 0.9f;
@@ -92,7 +95,7 @@ namespace Game.Client
                 if (!Signals(poi) || Vec2.Distance(self, poi.Center) > poi.Definition.SignalRange) continue;
                 if (!OnScreen(poi.Center))
                 {
-                    _farSignals.Add((poi.Center, SignalColor(signal)));
+                    _farSignals.Add((poi.Center, SignalColor(signal), false));
                     continue;
                 }
                 var at = new Vector3(poi.Center.X, poi.Center.Y, 0);
@@ -130,7 +133,7 @@ namespace Game.Client
                 if (distance > FlagRange) continue;
                 if (!OnScreen(at))
                 {
-                    _farSignals.Add((at, FlagColor));
+                    _farSignals.Add((at, FlagColor, false));
                     continue;
                 }
                 var (pole, cloth) = Flag(flags++);
@@ -248,7 +251,7 @@ namespace Game.Client
             if (_farSignals.Count == 0 || Event.current.type != EventType.Repaint) return;
             var center = new Vector2(Ui.Width / 2, Ui.Height / 2);
             float inset = 18;
-            foreach (var (at, color) in _farSignals)
+            foreach (var (at, color, raid) in _farSignals)
             {
                 var screen = _camera.WorldToScreenPoint(new Vector3(at.X, at.Y, 0));
                 var point = Ui.FromScreen(screen);
@@ -257,9 +260,21 @@ namespace Game.Client
                 float scale = Mathf.Min((Ui.Width / 2 - inset) / Mathf.Max(1e-3f, Mathf.Abs(way.x)), (Ui.Height / 2 - inset) / Mathf.Max(1e-3f, Mathf.Abs(way.y)));
                 var edge = center + way * Mathf.Min(1, scale);
                 var previous = GUI.color;
-                float breath = 0.6f + 0.4f * Mathf.Sin(Time.time * 3);
-                GUI.color = new Color(color.r, color.g, color.b, breath);
-                GUI.DrawTexture(new Rect(edge.x - 6, edge.y - 6, 12, 12), Shapes.Circle.texture);
+                float breath = 0.6f + 0.4f * Mathf.Sin(Time.time * (raid ? 8 : 3));
+                if (raid)
+                {
+                    // A raid's: a red dot half again as big, quick as a heartbeat, in a dark ring so it reads on light
+                    // ground too (B5c: a phone held upright sees few tiles across).
+                    GUI.color = new Color(0, 0, 0, 0.55f);
+                    GUI.DrawTexture(new Rect(edge.x - 11, edge.y - 11, 22, 22), Shapes.Circle.texture);
+                    GUI.color = new Color(color.r, color.g, color.b, 0.75f + 0.25f * breath);
+                    GUI.DrawTexture(new Rect(edge.x - 9, edge.y - 9, 18, 18), Shapes.Circle.texture);
+                }
+                else
+                {
+                    GUI.color = new Color(color.r, color.g, color.b, breath);
+                    GUI.DrawTexture(new Rect(edge.x - 6, edge.y - 6, 12, 12), Shapes.Circle.texture);
+                }
                 GUI.color = previous;
             }
         }
@@ -325,8 +340,10 @@ namespace Game.Client
                     _shake = Mathf.Max(_shake, 0.06f);
                     return true;
                 }
-                // A raid's howl from far off: heard, and a word on the side it came from.
+                // A raid's howl from far off: heard, a word on the side it came from, and a dot on the screen's edge
+                // that way until it is on the screen (FollowRaids).
                 RaidHowlsHeard++;
+                _raidSigns.Add(new RaidSign { At = e.Position, Since = Time.time });
                 Hear(Sound.Roar, at, 0.7f);
                 var toward = at - _self.Position;
                 var side = toward.sqrMagnitude > 1e-4f ? toward.normalized : Vector3.up;
@@ -374,6 +391,77 @@ namespace Game.Client
         {
             TrapBanners++;
             ShowBanner(text);
+        }
+
+        // ---- A raid pointed to from the screen's edge until it is on the screen (B5c) ----
+
+        // A raid heard: where it is thought to be now, when it howled, and whether its dot was drawn yet.
+        sealed class RaidSign
+        {
+            public Vec2 At;
+            public float Since;
+            public bool Pointed;
+        }
+
+        readonly List<RaidSign> _raidSigns = new List<RaidSign>();
+        // How long after its howl a raid may be pointed to (World.RaidRunSeconds and more), how far from where it was
+        // last its monsters are looked for, how fast it is thought to come while none of it is in the snapshot (the
+        // host sends what is within its view range), and how far off one is still pointed to.
+        const float RaidSignSeconds = 12;
+        const float RaidFollow = 6;
+        const float RaidGuessPace = 4;
+        const float RaidSignRange = 40;
+
+        // The raids' dots drawn this frame, the raids pointed to at all, and those that came on the screen while pointed
+        // to (or at once), for the playtests.
+        public int RaidDots { get; private set; }
+        public int RaidDotsShown { get; private set; }
+        public int RaidsOnScreen { get; private set; }
+
+        // Each frame: each raid heard follows its monsters (the one nearest the player leads) and is pointed to from the
+        // screen's edge until one of it is on the screen. The screen does not know which monsters are the raid's: those
+        // near where it was last are taken for it.
+        void FollowRaids(System.Func<Vec2, bool> onScreen, float deltaTime)
+        {
+            RaidDots = 0;
+            var self = _client.Position;
+            for (int i = _raidSigns.Count - 1; i >= 0; i--)
+            {
+                var sign = _raidSigns[i];
+                if (Time.time - sign.Since > RaidSignSeconds || Vec2.Distance(self, sign.At) > RaidSignRange || _client.InPocket)
+                {
+                    _raidSigns.RemoveAt(i);
+                    continue;
+                }
+                Vec2? lead = null;
+                bool seen = false;
+                float nearest = float.MaxValue;
+                foreach (var view in _client.Others())
+                {
+                    if (view.Kind != EntityKind.Monster || Vec2.Distance(view.Position, sign.At) > RaidFollow) continue;
+                    if (onScreen(view.Position)) seen = true;
+                    float distance = Vec2.Distance(view.Position, self);
+                    if (distance >= nearest) continue;
+                    nearest = distance;
+                    lead = view.Position;
+                }
+                if (lead is Vec2 at) sign.At = at;
+                else if (Vec2.Distance(sign.At, self) > 1)
+                    sign.At += (self - sign.At).Normalized * Mathf.Min(RaidGuessPace * deltaTime, Vec2.Distance(sign.At, self));
+                if (seen || onScreen(sign.At))
+                {
+                    RaidsOnScreen++;
+                    _raidSigns.RemoveAt(i);
+                    continue;
+                }
+                if (!sign.Pointed)
+                {
+                    sign.Pointed = true;
+                    RaidDotsShown++;
+                }
+                RaidDots++;
+                _farSignals.Add((sign.At, TrapColor, true));
+            }
         }
     }
 

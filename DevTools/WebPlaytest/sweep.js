@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -4679,6 +4679,60 @@ async function pace(browser) {
   }
 }
 
+// A raid reaching the player (B5c, Docs/BiomeRework.md 4-5 휴대폰 습격이 늦게 닿음), on a PC and a phone held upright:
+// the howl, and while the band is out of sight (held) a red dot on the screen's edge toward it; let go, it runs in, the
+// dot goes once it is on the screen, and its first reaches the player 4~6 seconds after the howl (the host's clock).
+// Whether the dot reads at a glance on a real phone, and how the rush feels, are the person's.
+async function raids(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 습격이 닿는 시간과 화면 가장자리의 점 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    // Held from the start (a scene's monsters must not move before the shot), past the director's level, tough.
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; xp 3000');
+    // A raid needs room out of sight to come from, so up to six plain rooms are tried.
+    let before = {}, raid = '', went = '';
+    for (let n = 0; n < 6 && !/^ok/.test(raid); n++) {
+      went = (await game.send(`clear; heal; goto room plain any ${n}`)).join(' ');
+      await game.wait(1500);
+      before = await game.ask('director');
+      raid = (await game.send('director raid')).join(' ');
+    }
+    check(/^ok/.test(raid), `${name}: 넓은 방에서 습격이 온다 (${went}, ${raid})`);
+    // The howl and the dot are short to come: polled, not read once.
+    const pointed = await game.until(d => d.howlsHeard > before.howlsHeard && (d.raidDotsShown > before.raidDotsShown || d.raidsOnScreen > before.raidsOnScreen),
+      4000, () => game.ask('director')) || await game.ask('director');
+    const dot = pointed.raidDotsShown > before.raidDotsShown;
+    check(pointed.howlsHeard > before.howlsHeard, `${name}: 멀리서 울음소리 (들은 것 ${pointed.howlsHeard - before.howlsHeard})`);
+    // A phone held upright sees few tiles across: a raid 18~26 tiles off is always off its screen.
+    if (name === 'phone') check(dot && pointed.raidDots >= 1, `${name}: 보이지 않는 습격 쪽 화면 가장자리에 붉은 점 (지금 ${pointed.raidDots}, 가리킨 습격 ${pointed.raidDotsShown - before.raidDotsShown})`);
+    else check(dot || pointed.raidsOnScreen > before.raidsOnScreen, `${name}: 화면 밖 습격은 가장자리의 붉은 점, 화면 안이면 점 없음 (점 ${pointed.raidDots}, 화면 안 ${pointed.raidsOnScreen - before.raidsOnScreen})`);
+    await game.shot('raids-dot', '습격: 울음소리와 화면 가장자리의 붉은 점(무리는 아직 화면 밖)');
+    const reachesBefore = pointed.raidReaches;
+    await game.send('monsters go');
+    // Running in: the dot goes once the band is on the screen, and the first reaches the player.
+    const seen = await game.until(d => d.raidsOnScreen > before.raidsOnScreen, 9000, () => game.ask('director'));
+    check(!!seen, `${name}: 무리가 화면에 들어오면 점이 사라진다 (${seen ? `점 ${seen.raidDots}, 달려오는 것 ${seen.raiding}` : '들어오지 않음'})`);
+    if (seen) await game.shot('raids-coming', '습격: 화면에 들어온 무리(점은 사라짐)');
+    const reached = await game.until(d => d.raidReaches > reachesBefore, 9000, () => game.ask('director'));
+    await game.send('monsters hold');
+    check(!!reached && reached.raidReach >= 3.5 && reached.raidReach <= 6.5,
+      `${name}: 울음소리에서 첫 닿음까지 4~6초 (${reached ? `${reached.raidReach.toFixed(1)}초` : '닿지 않음'})`);
+    await game.shot('raids-reached', '습격: 플레이어에게 닿은 무리');
+    await game.send('clear; heal');
+    await game.context.close();
+  }
+}
+
 // A dungeon (Docs/WorldRework.md 5단계, 묶음 5a), on a PC and a phone held upright: the gate room's own button (with a real
 // click or tap) and the bar filling, the dark and the dungeon's name, the screen laying the same pocket as the host,
 // the dungeon alone on the full map, a fight in its first room, a fall and getting up at its entrance, out by
@@ -7113,7 +7167,7 @@ async function b4mobs(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

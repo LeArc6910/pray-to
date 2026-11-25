@@ -857,7 +857,8 @@ namespace Game.Client.Tests
 
         // A trap room and the pacing director (2026-11-22, Docs/WorldRework.md 묶음 4b): the trap chest opened by its button's
         // path shuts the room with grates (on the screen too) and the first band comes; won, the grates lift and the
-        // chest is open; then an ambush's dust in a narrow way and the band out of the walls.
+        // chest is open; then an ambush's dust in a narrow way and the band out of the walls; then a raid's dot on the
+        // screen's edge and the band reaching the player (B5c).
         [UnityTest, Category(Screens.Category)]
         public IEnumerator TrapsShutTheRoomAndTheDirectorSendsAmbushes()
         {
@@ -911,6 +912,37 @@ namespace Game.Client.Tests
             yield return new WaitForSecondsRealtime(World.AmbushWarn + 0.3f);
             Assert.GreaterOrEqual(World.Enemies.Count(e => e.TargetId == Player.Id && e.State == EnemyState.Chase), World.AmbushMin);
             yield return Screens.Take("ambush");
+
+            // A raid (B5c): its howl and its dot on the screen's edge while it is out of sight (the monsters held), then
+            // the band running in and reaching the player about World.RaidRunSeconds after the howl.
+            foreach (var enemy in World.Enemies) enemy.Health = 0;
+            yield return new WaitForSecondsRealtime(0.3f);
+            bool raided = false;
+            foreach (var room in rooms.Nodes.Where(n => n.Kind == RoomKind.Room && n.Role == RoomRole.Plain && n.Radius >= 6)
+                .OrderBy(n => Vec2.Distance(n.Center, Player.Position)).Take(12))
+            {
+                Player.Position = TileMap.Center(room.AnchorX, room.AnchorY);
+                if (Game.Core.Collision.Overlaps(World.Map, Player.Position, World.PlayerRadius) || World.LeftAlone(Player)) continue;
+                Player.Corrections++;
+                if (!World.Raid(Player)) continue;
+                raided = true;
+                break;
+            }
+            Assert.IsTrue(raided, "No room with room for a raid out of sight.");
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.GreaterOrEqual(_root.RaidSigns.Shown + _root.RaidSigns.OnScreen, 1, "The raid's dot on the screen's edge, or the raid on the screen.");
+            yield return Screens.Take("raid-dot");
+            int reached = World.PaceOf(Player).RaidReaches.Count;
+            World.MonstersHold = false;
+            for (float waited = 0; waited < World.RaidRunSeconds + 3 && World.PaceOf(Player).RaidReaches.Count == reached; waited += 0.1f)
+            {
+                Player.Health = Player.Stats.MaxHealth;
+                yield return new WaitForSecondsRealtime(0.1f);
+            }
+            World.MonstersHold = true;
+            Assert.Greater(World.PaceOf(Player).RaidReaches.Count, reached, "The raid reached the player.");
+            Assert.LessOrEqual(World.PaceOf(Player).RaidReaches[reached], 6.5f, "Within the design's 4~6 seconds of its howl.");
+            yield return Screens.Take("raid");
             World.MonstersHold = false;
             Assert.IsTrue(_root.Playing);
         }

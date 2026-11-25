@@ -46,6 +46,11 @@ namespace Game.Core
         // Of the ambushes, those of rats out of the dirt cave's timbers (World.TimberAmbush, B1b).
         public int Timbers { get; internal set; }
         public int Raids { get; internal set; }
+        // Each raid's seconds from its howl to the first of it reaching someone (B5c, RaidRunSeconds), and the raids
+        // that never did (all felled from afar, or the player got away): for --pace and the tests.
+        public IReadOnlyList<float> RaidReaches => _raidReaches;
+        internal readonly List<float> _raidReaches = new List<float>();
+        public int RaidMisses { get; internal set; }
         // Where the player was each of the last few seconds: which way they came.
         internal readonly Vec2[] Track = new Vec2[4];
         internal int Tracked;
@@ -102,6 +107,23 @@ namespace Game.Core
         public const float SurgeNear = 18;
         public const float SurgeFar = 26;
         public const float RaidBehind = 0.75f;
+        // A raid reaches the player about RaidRunSeconds after its howl (B5c, Docs/BiomeRework.md 4-5 휴대폰 습격이 늦게
+        // 닿음: the design's 4~6 seconds; at their own pace from 18~26 tiles they took 9~17 and more). Only the quick
+        // come (RaidRoster): the small swarms and the M bodies that charge, never an L. The band runs together at a pace
+        // set every RaidPaceSeconds from the nearest one's way left, RaidPaceLeast~RaidPaceMost tiles a second (the
+        // player walks 5; it catches up with one walking off), each until it reaches someone (a gap of RaidTouch), is
+        // hurt, attacks, or RaidRushMost seconds pass. Its spot is at most RaidSteps steps away by the way. A raid of
+        // chargers alone (no swarm of the biome: the ice cave's wolves) is half as many, at least RaidLeast.
+        public const float RaidRunSeconds = 5;
+        public const float RaidPaceSeconds = 0.5f;
+        public const float RaidPaceLeast = 2;
+        public const float RaidPaceMost = 8;
+        public const float RaidTouch = 1;
+        public const float RaidRushMost = 12;
+        public const int RaidSteps = 34;
+        public const int RaidLeast = 3;
+        // Of a raid with a swarm, a share of chargers at most (and one at least when the biome has any).
+        public const float RaidChargers = 0.34f;
         // Left alone: within this of a boss's arena, round the places and the camps, a rift or a defense, and a
         // character under DirectorLevel (their first ten minutes: the design's level 3 is reached in a minute and a half by
         // the first-hour bot, level 5 in three to four; 2026-11-22, --hour). No ambush or raid comes before the world's
@@ -176,6 +198,7 @@ namespace Game.Core
             if (!SpawnsNearPlayers) return;
             if (_hunts.Count > 0) ForgetHunts();
             if (_lurking.Count > 0) ComeOut();
+            if (_raids.Count > 0) UpdateRaids();
             if (Tick % PaceTicks != 0) return;
             float seconds = PaceTicks * TickSeconds;
             foreach (var player in _players)
@@ -377,7 +400,7 @@ namespace Game.Core
         // Open floor SurgeNear~SurgeFar tiles from the player that no player sees (every one at least SurgeNear off),
         // walked to from the player within twice that, out of the quiet places and off the roads; toward a way when one
         // is given (within 50 degrees, then anywhere). Null when there is none.
-        Vec2? Unseen(Vec2 from, Vec2? toward)
+        Vec2? Unseen(Vec2 from, Vec2? toward, int most = (int)(SurgeFar * 2))
         {
             BuildHuntFlow(new[] { from });
             for (int attempt = 0; attempt < 40; attempt++)
@@ -393,7 +416,7 @@ namespace Game.Core
                 if (_players.Any(p => !p.IsDead && Vec2.Distance(p.Position, at) < SurgeNear)) continue;
                 if (Quiet(at) || InSafePlace(at) || !WandererSpot(x, y)) continue;
                 int steps = _huntFlow.DistanceAt(x, y);
-                if (steps == FlowField.Unreached || steps > SurgeFar * 2) continue;
+                if (steps == FlowField.Unreached || steps > most) continue;
                 return at;
             }
             return null;
@@ -721,6 +744,24 @@ namespace Game.Core
 
         // ---- The raid (습격): a pack from far off, running in ----
 
+        // A raid running in: when it howled, at whom, its monsters, and when the first reached someone (-1 not yet).
+        sealed class RaidRun
+        {
+            public long From;
+            public int Target;
+            public List<int> Members;
+            // Those still running in.
+            public HashSet<int> Rushing;
+            public long Reached = -1;
+            public float Pace;
+        }
+
+        readonly List<RaidRun> _raids = new List<RaidRun>();
+        FlowField _raidFlow;
+
+        // The raids' monsters running in now (for the playtests).
+        public int RaidersRunning => _raids.Sum(r => r.Rushing.Count);
+
         internal bool Raid(Player player, List<Player> party = null)
         {
             if (!RoomPacks) return false;
@@ -734,18 +775,130 @@ namespace Game.Core
             // Most from behind: the way the player came.
             var heading = Heading(PaceOf(player));
             Vec2? toward = heading.LengthSquared > 0 && PaceRandom.Chance(RaidBehind) ? heading * -1 : (Vec2?)null;
-            var spot = Unseen(player.Position, toward);
+            var spot = Unseen(player.Position, toward, RaidSteps);
             if (spot == null) return false;
-            var choices = PackChoices(spot.Value, Biomes.At(spot.Value), big: true, loose: true);
-            if (choices.Count == 0) return false;
-            var roster = Roster(PaceRandom.PickWeighted(choices, k => k.Weight), count);
+            var roster = RaidRoster(spot.Value, count);
+            if (roster.Count < RaidLeast) return false;
             var spots = Spread(spot.Value, new List<Vec2>(), roster.Count, PaceRandom,
                 at => Map.InBounds(TileMap.Cell(at.X), TileMap.Cell(at.Y)) && !Map.IsSolid(TileMap.Cell(at.X), TileMap.Cell(at.Y))
                     && !Collision.Overlaps(Map, at, 0.45f, monster: true) && !InSafePlace(at) && _players.All(p => Vec2.Distance(p.Position, at) >= SurgeNear - 4));
-            if (spots.Count < RaidMin) return false;
+            if (spots.Count < Math.Min(RaidLeast, roster.Count)) return false;
             _events.Add(new SimEvent(SimEventType.Ambush, player.Id, amount: RaidHowl, position: spot.Value));
+            int before = _enemies.Count;
             var band = Band(spots.Select((s, i) => (s, roster[i])).ToList(), player, ZoneLevelAt(spot.Value), player.Position);
-            return band != null;
+            if (band == null) return false;
+            var ids = _enemies.Skip(before).Where(e => e.PackId == band.Id).Select(e => e.Id).ToList();
+            var run = new RaidRun { From = Tick, Target = player.Id, Members = ids, Rushing = new HashSet<int>(ids) };
+            _raids.Add(run);
+            PaceRaid(run);
+            return true;
+        }
+
+        // Who comes on a raid (B5c): the quick of the biome's packs where it starts. The swarm is the small ones that come
+        // in swarms (XS and S: rats, bats, scarabs, motes), or the M swarm (slimes) where the biome has none; the chargers
+        // are the M bodies that rush (a charge attack, or the old charge behaviour), a third at most. Never L or XL, a
+        // shooter or a mender: none of them runs in.
+        internal List<MonsterDefinition> RaidRoster(Vec2 at, int count)
+        {
+            var kinds = PackChoices(at, Biomes.At(at), big: true)
+                .SelectMany(k => k.Members.Select(m => m.Monster)).Where(m => !m.Big).Distinct().ToList();
+            var swarm = kinds.Where(m => m.Role == MonsterRole.Swarm && m.Size <= MonsterSize.S).ToList();
+            if (swarm.Count == 0) swarm = kinds.Where(m => m.Role == MonsterRole.Swarm && m.Size == MonsterSize.M).ToList();
+            var chargers = kinds.Where(RaidCharger).ToList();
+            var roster = new List<MonsterDefinition>();
+            if (swarm.Count == 0 && chargers.Count == 0) return roster;
+            if (swarm.Count == 0) count = Math.Max(RaidLeast, (count + 1) / 2);
+            int charging = swarm.Count == 0 ? count : chargers.Count == 0 ? 0 : Math.Max(1, (int)(count * RaidChargers));
+            for (int i = 0; i < charging; i++) roster.Add(chargers[PaceRandom.Next(chargers.Count)]);
+            // The swarm of one kind, the way a swarm comes (two kinds where the biome has two, half and half).
+            var first = swarm.Count == 0 ? null : swarm[PaceRandom.Next(swarm.Count)];
+            var second = swarm.Count < 2 ? first : swarm.Where(m => m != first).ElementAt(PaceRandom.Next(swarm.Count - 1));
+            for (int i = 0; roster.Count < count && first != null; i++) roster.Add(i % 2 == 0 || !PaceRandom.Chance(0.5f) ? first : second);
+            return roster;
+        }
+
+        // An M body that rushes: a charge in its attacks, or the old charge behaviour.
+        public static bool RaidCharger(MonsterDefinition kind) => kind.Size == MonsterSize.M
+            && (kind.Behavior == MonsterBehavior.Charge || kind.Attacks.Any(a => a.Shape == MonsterAttackShape.Charge));
+
+        // Each tick while raids run in: the clock stands while the monsters are held (the playtests' scenes); every
+        // RaidPaceSeconds the band's pace again; the first to reach someone ends the run's clock; each stops rushing once
+        // it reached, was hurt or attacks.
+        void UpdateRaids()
+        {
+            for (int i = _raids.Count - 1; i >= 0; i--)
+            {
+                var run = _raids[i];
+                if (MonstersHold)
+                {
+                    run.From++;
+                    continue;
+                }
+                float seconds = (Tick - run.From) / (float)TicksPerSecond;
+                foreach (int id in run.Members)
+                {
+                    var enemy = FindEnemy(id);
+                    bool gone = enemy == null || enemy.IsDead;
+                    float near = gone ? float.MaxValue : _players.Where(p => !p.IsDead)
+                        .Select(p => Vec2.Distance(p.Position, enemy.Position) - enemy.Definition.Radius - PlayerRadius).DefaultIfEmpty(float.MaxValue).Min();
+                    if (near <= RaidTouch && run.Reached < 0)
+                    {
+                        run.Reached = Tick;
+                        if (FindPlayer(run.Target) is Player target) PaceOf(target)._raidReaches.Add(seconds);
+                    }
+                    if (!run.Rushing.Contains(id)) continue;
+                    if (gone || near <= RaidTouch || enemy.Health < enemy.MaxHealth || seconds >= RaidRushMost
+                        || enemy.State != EnemyState.Idle && enemy.State != EnemyState.Chase)
+                    {
+                        if (!gone) enemy.RushScale = 1;
+                        run.Rushing.Remove(id);
+                    }
+                }
+                if (run.Rushing.Count > 0 && (Tick - run.From) % Ticks(RaidPaceSeconds) == 0) PaceRaid(run);
+                // Kept until one reached someone and none runs in, or for RaidRushMost (then it never reached).
+                if (run.Rushing.Count > 0 || run.Reached < 0 && seconds < RaidRushMost && run.Members.Any(id => FindEnemy(id) is Enemy e && !e.IsDead)) continue;
+                _raids.RemoveAt(i);
+                if (run.Reached < 0 && FindPlayer(run.Target) is Player missed) PaceOf(missed).RaidMisses++;
+            }
+        }
+
+        // The band's pace: the nearest one's way left to the players (its steps, or the straight line when longer), over
+        // the seconds left to RaidRunSeconds (one at least), and the speed the player it is after goes away from it, or
+        // less the speed they come toward it (a raid comes mostly from behind, and the player walks on: 2026-11-25,
+        // --pace, the bot walked off at its own 5 tiles a second and was reached 7~10 seconds after the howl); each
+        // member's rush is that against its own pace.
+        void PaceRaid(RaidRun run)
+        {
+            var members = run.Rushing.Select(FindEnemy).Where(e => e != null && !e.IsDead).ToList();
+            var players = _players.Where(p => !p.IsDead).Select(p => p.Position).ToList();
+            if (members.Count == 0 || players.Count == 0) return;
+            _raidFlow ??= new FlowField(Map);
+            _raidFlow.Build(players, RaidSteps * 2);
+            float left = float.MaxValue;
+            Enemy lead = null;
+            foreach (var enemy in members)
+            {
+                int steps = _raidFlow.DistanceAt(TileMap.Cell(enemy.Position.X), TileMap.Cell(enemy.Position.Y));
+                float straight = players.Min(p => Vec2.Distance(p, enemy.Position));
+                float way = Math.Max(straight, steps == FlowField.Unreached ? straight : steps) - RaidTouch - enemy.Definition.Radius;
+                if (way >= left) continue;
+                left = way;
+                lead = enemy;
+            }
+            float away = 0;
+            if (FindPlayer(run.Target) is Player target && !target.IsDead && lead != null)
+            {
+                var pace = PaceOf(target);
+                var off = target.Position - lead.Position;
+                if (pace.Tracked >= 2 && off.LengthSquared > 1e-4f) away = Vec2.Dot(pace.Track[0] - pace.Track[1], off.Normalized);
+            }
+            float seconds = Math.Max(1, RaidRunSeconds - (Tick - run.From) / (float)TicksPerSecond);
+            run.Pace = Math.Clamp(left / seconds + away, RaidPaceLeast, RaidPaceMost);
+            foreach (var enemy in members)
+            {
+                float own = enemy.Definition.Speed * enemy.SpeedScale;
+                if (own > 0) enemy.RushScale = run.Pace / own;
+            }
         }
     }
 }

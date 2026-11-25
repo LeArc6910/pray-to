@@ -44,7 +44,7 @@ namespace CoreSandbox
                     var kinds = last.PoisUsed.GroupBy(p => p.Kind).Select(g => $"{g.Key} {g.Count()}");
                     // What the pacing director did (묶음 4b).
                     var pace = last.World.PaceOf(last.Player);
-                    paces.Add($"- 시드 {seed}: 보낸 떠돌이 {pace.Sends}, 매복 {pace.Ambushes}, 습격 {pace.Raids}, 정점 {pace.Peaks}, 쉬기 {pace.Rests}{(last.World.Directs ? "" : " (감독 끔)")}");
+                    paces.Add($"- 시드 {seed}: 보낸 떠돌이 {pace.Sends}, 매복 {pace.Ambushes}, 습격 {pace.Raids}{(pace.RaidReaches.Count > 0 ? $"(울음소리 → 첫 닿음 평균 {pace.RaidReaches.Average():0.0}초, 가장 긴 {pace.RaidReaches.Max():0.0}초)" : "")}{(pace.RaidMisses > 0 ? $"(못 닿음 {pace.RaidMisses})" : "")}, 정점 {pace.Peaks}, 쉬기 {pace.Rests}{(last.World.Directs ? "" : " (감독 끔)")}");
                     pois.Add($"- 시드 {seed}: {last.PoisUsed.Count}곳({string.Join(", ", kinds)}), 금화 {last.PoiCoins}(끝에 가진 금화 {held}), 장비 {last.PoiItems}");
                 }
                 runs.Add(run);
