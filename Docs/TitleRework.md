@@ -84,7 +84,7 @@
 
 **제목 그림** (`Client/Art/TitleArt.cs`)
 
-- 로고 `TitleArt.Logo`(68×23): 두꺼운 금빛 글자 "pray◆to", 하이픈은 깎은 보석, 검은 테와 돌빛 그림자. 2배·3배에서 읽힌다. 반짝임은 `LogoGlint(frame)`(빛만 있는 덧그림, `GlintFrames` 12걸음)을 로고 위에 겹친다. 한글 부제는 글자로 쓴다
+- 로고 `TitleArt.Logo`(69×23, `LogoWidth`×`LogoHeight`): 두꺼운 금빛 글자 "pray◆to", 하이픈은 깎은 보석, 검은 테와 돌빛 그림자. 2배·3배에서 읽힌다. 반짝임은 `LogoGlint(frame)`(빛만 있는 덧그림, `GlintFrames` 12걸음)을 로고 위에 겹친다. 한글 부제는 글자로 쓴다
 - 글자 단추: 상자 없음. 글자색 `Ink(state)`(쉬는·올린·고른·누른)와 그림자 `InkShadow`, 못 고르는 글자 `InkOff`, 커지는 비율 `GrowHover`·`GrowSelected`. 양옆 표지 `Mark(state)`(◆ 7×7, 쉬면 null), 아래 빛 띠 `Strip(width, state)`(높이 5, 양끝이 사라진다), 값 줄의 화살표 `Arrow(left, state)`, 새긴 꺾쇠 `Bracket(left)`
 - 판 `Panel`(아홉 조각, 테 `PanelBorder` 6): 밤빛 반투명(`PanelAlpha` 178) 위에 얇은 금빛 테와 모서리 보석. 화면 이름 아래 줄 `Divider(width)`
 - 목록 줄 `Row(state)`(아홉 조각, 테 `RowBorder` 4): 쉬는 줄은 옅은 띠, 올리면 왼쪽 금빛 막대, 고르면 금빛 테. 새로 만들기 줄 `NewRow(width, height, state)`(점선 테, 크기대로 그린다)와 `Plus(state)`
@@ -94,7 +94,7 @@
 
 - `LoadingArt.Scene(biome, seed, monsters, hero, width, height)`: 그 생물군계의 작은 굴을 지어(바닥·벽, 생물군계 소품 다섯까지, 꾸밈, 호수·용암은 웅덩이, 작은 생물) 게임 그림(`TileArt`·`StandArt`·`CreatureArt`·`CritterArt`)과 게임의 빛(`LightMap`, 생물군계 빛 색)으로 그리고 160×90으로 자른다. 같은 생물군계와 시드는 늘 같은 그림
 - `monsters`는 보여 줄 몬스터의 id와 색(셋까지). null이면 그 생물군계의 둘(`MonstersOf`), 빈 목록이면 없음. **만난 몬스터만 보이기는 화면이 정한다**: 이 함수는 받은 것만 그린다. `hero`를 주면 그 외형의 주인공이 서 있다
-- 한 장에 데스크톱 20~40밀리초쯤 걸리니 로딩에 들어갈 때 한 번 그려 스프라이트로 둔다
+- 부를 때마다 새로 그리니(빛 지도까지 계산한다, 걸리는 시간은 재지 않았다) 로딩에 들어갈 때 한 번 그려 스프라이트로 둔다
 
 **시안** (`out/title/`): `looks.png`(머리 모양 × 다섯 방향 × 세 색 조합, 선택지마다 색, 기본 외형과 옛 그림 비교), `looks_moves.png`(무작위 외형 여섯의 걷기·검·활·지팡이 공격·구르기·쓰러짐), `logo.png`·`logo_glint.png`, `buttons.png`(글자 단추 네 상태, 화살표·꺾쇠, 판·줄·새로 만들기), `biome_icons.png`, `loading_<생물군계>.png` 여덟(왼쪽 몬스터만, 오른쪽 주인공과 함께).
 
