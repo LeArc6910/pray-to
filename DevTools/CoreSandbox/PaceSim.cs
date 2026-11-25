@@ -12,7 +12,8 @@ namespace CoreSandbox
     // it was most in under it; then the seconds in each state, the peaks and rests, what the director sent (wanderers,
     // ambushes, raids), the fights and the quiet between them, and the hits taken while resting (from wanderers and the
     // director's: these should be none; from the packs of rooms the bot walked into, apart). With --no-director the same
-    // world plays without the director acting (the tension is still measured), for the numbers to set beside.
+    // world plays without the director acting (the tension is still measured), for the numbers to set beside. B5c: each
+    // raid's howl to the first of it reaching the bot (World.RaidRunSeconds), and whether a raid howled before a fall.
     static class PaceSim
     {
         const string Bars = " ▁▂▃▄▅▆▇█";
@@ -81,6 +82,7 @@ namespace CoreSandbox
             int total = minutes * 60 * World.TicksPerSecond;
             int falls = player.Falls;
             var fallPlaces = new List<string>();
+            long lastHowl = long.MinValue / 2;
             for (int tick = 0; tick < total; tick++)
             {
                 var near = world.Enemies.Where(e => !e.Away && !e.IsDead && Vec2.Distance(e.Position, player.Position) < 16
@@ -140,6 +142,7 @@ namespace CoreSandbox
                         }
                     }
                     if (e.Type == SimEventType.Died && e.Source != player.Id && names.ContainsKey(e.Source)) kills++;
+                    if (e.Type == SimEventType.Ambush && e.Amount == World.RaidHowl) lastHowl = world.Tick;
                 }
                 if (player.Falls > falls)
                 {
@@ -147,7 +150,10 @@ namespace CoreSandbox
                     // Where it fell and what was about (B2b): to tell a new kind's doing from the run's luck.
                     var foes = world.Enemies.Where(e => !e.IsDead && Vec2.Distance(e.Position, player.Position) <= 8)
                         .GroupBy(e => e.Definition.Id).OrderByDescending(g => g.Count()).ThenBy(g => g.Key, StringComparer.Ordinal).Select(g => $"{g.Key} {g.Count()}");
-                    fallPlaces.Add($"{tick / World.TicksPerSecond / 60}:{tick / World.TicksPerSecond % 60:00} {world.Biomes.At(player.Position)} (곁 {string.Join(", ", foes)})");
+                    // And whether a raid howled within the half minute before (B5c).
+                    long sinceHowl = (world.Tick - lastHowl) / World.TicksPerSecond;
+                    fallPlaces.Add($"{tick / World.TicksPerSecond / 60}:{tick / World.TicksPerSecond % 60:00} {world.Biomes.At(player.Position)} (곁 {string.Join(", ", foes)})"
+                        + (sinceHowl <= 30 ? $" 습격 울음소리 {sinceHowl}초 뒤" : ""));
                 }
                 falls = player.Falls;
                 if (tick % World.TicksPerSecond != 0) continue;

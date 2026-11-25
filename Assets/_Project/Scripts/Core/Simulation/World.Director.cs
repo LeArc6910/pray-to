@@ -108,9 +108,9 @@ namespace Game.Core
         public const float SurgeFar = 26;
         public const float RaidBehind = 0.75f;
         // A raid reaches the player about RaidRunSeconds after its howl (B5c, Docs/BiomeRework.md 4-5 휴대폰 습격이 늦게
-        // 닿음: the design's 4~6 seconds; at their own pace from 18~26 tiles they took 9~17 and more). Only the quick
-        // come (RaidRoster): the small swarms and the M bodies that charge, never an L. The band runs together at a pace
-        // set every RaidPaceSeconds from the nearest one's way left, RaidPaceLeast~RaidPaceMost tiles a second (the
+        // 닿음: the design's 4~6 seconds; at their own pace from 18~26 tiles they took 10~17 seconds, and a third never
+        // reached a bot walking on). Only the quick come (RaidRoster): the small swarms and the M bodies that charge,
+        // never an L. The band runs together at a pace set every RaidPaceSeconds from the nearest one's way left, RaidPaceLeast~RaidPaceMost tiles a second (the
         // player walks 5; it catches up with one walking off), each until it reaches someone (a gap of RaidTouch), is
         // hurt, attacks, or RaidRushMost seconds pass. Its spot is at most RaidSteps steps away by the way. A raid of
         // chargers alone (no swarm of the biome: the ice cave's wolves) is half as many, at least RaidLeast.
@@ -119,6 +119,8 @@ namespace Game.Core
         public const float RaidPaceLeast = 2;
         public const float RaidPaceMost = 8;
         public const float RaidTouch = 1;
+        // The most the band's pace is lowered for a player coming toward it, in tiles a second.
+        public const float RaidComing = -2.5f;
         public const float RaidRushMost = 12;
         public const int RaidSteps = 34;
         public const int RaidLeast = 3;
@@ -863,10 +865,10 @@ namespace Game.Core
         }
 
         // The band's pace: the nearest one's way left to the players (its steps, or the straight line when longer), over
-        // the seconds left to RaidRunSeconds (one at least), and the speed the player it is after goes away from it, or
-        // less the speed they come toward it (a raid comes mostly from behind, and the player walks on: 2026-11-25,
-        // --pace, the bot walked off at its own 5 tiles a second and was reached 7~10 seconds after the howl); each
-        // member's rush is that against its own pace.
+        // the seconds left to RaidRunSeconds (one at least), and the speed the player it is after goes away from it (a
+        // raid comes mostly from behind, and the player walks on: 2026-11-25, --pace, the bot walked off at its own 5
+        // tiles a second and was reached 7~10 seconds after the howl), or less the speed they come toward it, by
+        // RaidComing at most. Each member's rush is that against its own pace.
         void PaceRaid(RaidRun run)
         {
             var members = run.Rushing.Select(FindEnemy).Where(e => e != null && !e.IsDead).ToList();
@@ -890,7 +892,13 @@ namespace Game.Core
             {
                 var pace = PaceOf(target);
                 var off = target.Position - lead.Position;
-                if (pace.Tracked >= 2 && off.LengthSquared > 1e-4f) away = Vec2.Dot(pace.Track[0] - pace.Track[1], off.Normalized);
+                if (pace.Tracked >= 2 && off.LengthSquared > 1e-4f)
+                {
+                    // Over the last two seconds (one turn of the player's way is not their way), and less for one coming
+                    // toward it by half their walk at most (the band does not stop to wait).
+                    int back = Math.Min(2, pace.Tracked - 1);
+                    away = Math.Max(RaidComing, Vec2.Dot((pace.Track[0] - pace.Track[back]) / back, off.Normalized));
+                }
             }
             float seconds = Math.Max(1, RaidRunSeconds - (Tick - run.From) / (float)TicksPerSecond);
             run.Pace = Math.Clamp(left / seconds + away, RaidPaceLeast, RaidPaceMost);
