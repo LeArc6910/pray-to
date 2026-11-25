@@ -558,7 +558,10 @@ namespace Game.Client
                         if (words[2] == "grass")
                         {
                             var seen = root.LocalClient;
-                            spot = Nearest(world.Map, _biomesAnchor.X, _biomesAnchor.Y, (x, y) => Decor.Sways(Decor.On(world.Map, seen.Seed, seen.Biomes[x, y], x, y).Kind));
+                            // With two open tiles east of it, so the step east goes through it rather than into a wall (2026-11-25: a
+                            // crystal cave's tuft against a crystal stopped the step and nothing swayed).
+                            spot = Nearest(world.Map, _biomesAnchor.X, _biomesAnchor.Y, (x, y) => Decor.Sways(Decor.On(world.Map, seen.Seed, seen.Biomes[x, y], x, y).Kind)
+                                && !world.Map.IsSolid(x + 1, y) && !world.Map.IsSolid(x + 2, y));
                         }
                         else
                         {
