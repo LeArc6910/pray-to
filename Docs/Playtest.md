@@ -1,5 +1,21 @@
 # 웹 플레이 시험 (클라우드가 대신 해 보기)
 
+## 시작화면·캐릭터와 월드 고르기·로딩·허브 (`title`, 2026-11-25)
+
+`Docs/TitleRework.md` T3를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only title,menu`(시작 흐름이 바뀌었으니 `save`·`layout`·`time`도). PC, 휴대폰 세로, 휴대폰 가로에서:
+
+1. 시작 화면의 다섯 글자 단추(게임 시작·함께 하기·저장본·설정·의견 보내기)가 화면 안에 있고 휴대폰에서 줄마다 44점인지, 1.6초 사이 두 사진이 다르고 배경 창(`title.pan`)이 움직였는지, 처음 기기에서는 흙 동굴만(`title.backdrop` 1). 사진 `title`, PC는 마우스를 올린 `title-hover`와 화살표 `title-keys`, 그리고 화살표·Enter로 [게임 시작]
+2. 빈 캐릭터 목록 → [새 캐릭터] → [주사위]와 [머리 모양 ▶]가 외형(`title.look`)을 바꾸는지, PC는 [이름 칸]에 이름을 적는다. 만들던 중 [뒤로]는 "버린다"를 묻는다(`title.ask` `discard`). 사진 `title-make`
+3. [만들기] → 월드 목록 → [새 월드](PC는 [시드 칸]에 12345) → [만들기] → 그 월드가 골라진 채 목록. 사진 `title-newworld`, `title-worlds`
+4. [혼자 하기]를 누르자마자 로딩: 도움말·단계·막대(`loadTip`, `loadStage`, `loadFraction`), 새 캐릭터라 흙 동굴에 몬스터 없음(`loadBiome`, `loadMonsters`), 누르면 다음 도움말. 사진 `title-loading`(웹이 빨라 로딩을 놓치면 그렇다고 적는다)
+5. 게임(`title-game`), 허브(`title-hub`), [나가기] → 물음(`leaveAsked`, `title-hub-ask`) → [남기]면 남고, [저장하고 나가기]면 시작 화면
+6. 캐릭터 목록에 그 캐릭터가 레벨·플레이 시간·"오늘"·만든 외형으로(`title.characters`의 줄 `이름|Lv n|시간 · 오늘|외형`), 월드 목록에 "1일째"·"오늘"(`title-characters`). 줄의 [지우기]는 물음 뒤에만 지운다([남기기]면 남는다, `title-ask`)
+7. PC: 설정 [움직임: 줄이기]면 시작 화면의 두 사진이 같다(`title-still`)
+
+명령: `title [main|characters|make|worlds|newworld|together|saves|settings|keys]`(그 쪽을 연다. `make`·`newworld`는 만들기 쪽을 처음부터). 보고: `title`(`page`, `flow`, `character`, `world`, `newCharacter`, `newWorld`, `ask`, `characters`·`worlds`의 줄, `look`, `backdrop`, `pan`, `motion`), `loadTip`, `loadBiome`, `loadMonsters`, `leaveAsked`. 칸은 `이름 칸`·`월드 이름 칸`·`시드 칸`·`코드 칸`·`호스트 주소`라는 이름으로 단추 목록에 나와 진짜로 눌러 적는다(`lib.js`의 `typeInto`). 메뉴로 시작하는 점검은 모두 `lib.js`의 `startThroughMenu`(게임 시작 → 캐릭터 고르거나 만들기 → 월드 고르거나 만들기 → 혼자 하기)와 `toWorldList`를 쓴다. `solo` 명령은 그대로다(기본 외형).
+
+사람에게 남는 것: 흐르는 배경의 빠르기와 멀미, 글자 단추의 손맛(틱 소리, 커지는 정도), 진짜 휴대폰에서 이름 칸에 글을 적는 것(화면 글쇠판), 로딩 도움말을 읽을 시간.
+
 ## 습격이 닿는 시간과 화면 가장자리의 점 (`raids`, 2026-11-25)
 
 `Docs/BiomeRework.md` B5c를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only raids`(감독이 바뀌었으니 `pace`도). 장면은 처음부터 `monsters hold`로 세우고(잡아 둔 동안은 습격의 시계도 선다), 짧게 지나가는 것(울음소리, 점, 화면에 들어옴, 닿음)은 올 때까지 거듭 묻는다. 먼저 `xp 3000`과 흑요석 검·갑옷. PC와 휴대폰 세로에서:
@@ -209,7 +225,8 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 
 | 명령 | 하는 일 |
 |---|---|
-| `solo` | "playtest"라는 새 월드와 캐릭터로 혼자 하기를 시작한다 |
+| `solo` | "playtest"라는 새 월드와 캐릭터로 혼자 하기를 시작한다(기본 외형) |
+| `title [쪽]` | (2026-11-25, T3) 시작화면의 쪽을 연다: `main`, `characters`, `make`(새 캐릭터), `worlds`, `newworld`, `together`, `saves`, `settings`, `keys`. 보고의 `title`·`loadTip`·`loadBiome`·`loadMonsters`·`leaveAsked` |
 | `scene combo\|machines\|defense\|rift\|skylight\|set` | PlayMode 장면(`FeatureTests`)처럼 둘레를 꾸민다 |
 | `clock <날> <시>`, `weather clear\|rain\|storm\|fog` | 시계를 옮긴다 |
 | `give <재료> <개수>`, `potion <소모품> <개수>`, `drink <소모품>`, `mana <양>` | 가방과 마나 |

@@ -18,8 +18,8 @@
 ## 코드에서
 
 - Core: `StringSheet.Parse(csv)`가 `StringData`를 만든다. `Get(id, language, korean)`은 그 언어의 말을, 없으면 넘겨받은 한국어를 준다. 시트가 없어도 게임은 한국어로 돈다.
-- Client: `Strings.T("menu.name", "캐릭터 이름")`. 한국어를 코드 옆에 그대로 두어, 코드를 읽을 때 화면의 말이 보이고 시트가 빠져도 깨지지 않는다.
-- 언어 고르기: 메뉴의 [언어] 단추(`Settings.Language`, 저장 이름 `settings.language`). 한국어 말고 채워진 언어가 있을 때만 보인다. 지금 `en` 열은 메뉴 말만 채웠다.
+- Client: `Strings.T("menu.start", "게임 시작")`. 한국어를 코드 옆에 그대로 두어, 코드를 읽을 때 화면의 말이 보이고 시트가 빠져도 깨지지 않는다.
+- 언어 고르기: 메뉴의 [언어] 단추(`Settings.Language`, 저장 이름 `settings.language`). 한국어 말고 채워진 언어가 있을 때만 보인다. 지금 `en` 열은 메뉴 말과 시작화면·캐릭터와 월드 고르기·로딩 단계(`load.*`)·로딩 도움말(`tip.*`, `Client/Tips.cs`)·허브의 나가기 물음(`hub.*`)·생물군계 이름(`biome.*`)·외형 항목(`look.*`)을 채웠다(2026-11-25, `Docs/TitleRework.md` T3). 외형 선택지의 이름(`HeroArt.HairNames` 등)과 월드 이름 주사위의 낱말(`NewWorld`)은 코드에 두 언어로 있다(선택지 이름은 아직 한국어만).
 - 연결: `GameSheets.strings`, `SceneSetup`이 `Data/Strings/`를 넣는다. 로컬이 명령 한 줄을 다시 돌려야 씬에 들어간다.
 - 시험: `GuideTests.TheStringSheetGivesEachLanguageAndKeepsTheCodesKorean`이 시트 형식과, 코드의 `Strings.T` 호출마다 한국어가 시트의 `ko`와 같은지 본다.
 

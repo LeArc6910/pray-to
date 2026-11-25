@@ -67,6 +67,7 @@ namespace Game.Client
         List<SaveList.Entry<CharacterSummary>> _characterList = new List<SaveList.Entry<CharacterSummary>>();
         List<SaveList.Entry<WorldSummary>> _worldList = new List<SaveList.Entry<WorldSummary>>();
         int _visitedHere = -1;
+        readonly HashSet<string> _beenWorlds = new HashSet<string>();
         // A character made on the page but not yet played (it is saved once played), and a world likewise with its seed.
         string _newCharacter;
         CharacterLook _newCharacterLook = CharacterLook.Default;
@@ -201,6 +202,10 @@ namespace Game.Client
             // A character from before biomes were kept has been in the dirt cave at least.
             _visitedHere = visited == 0 ? BiomeVisits.Bit(Biome.Cave) : visited;
             if (_newCharacter != null && _characterList.Any(c => c.Name == _newCharacter)) _newCharacter = null;
+            // The worlds the picked character has a map of (it has been there), looked up once here, not every pass.
+            _beenWorlds.Clear();
+            foreach (var world in _worldList)
+                if (world.Summary != null && SaveStore.Exists(SaveStore.MapKey(world.Summary.Seed, world.Summary.Generator, CharacterName))) _beenWorlds.Add(world.Name);
             if (_newWorld != null && _worldList.Any(w => w.Name == _newWorld)) _newWorld = null;
         }
 
@@ -942,7 +947,7 @@ namespace Game.Client
                 {
                     line = string.Format(Strings.T("title.world_line", "{0}일째 · {1}"), summary.Day, TitleDraw.Played(summary.PlayedSeconds));
                     // This character's map of it: it has been there.
-                    been = SaveStore.Exists(SaveStore.MapKey(summary.Seed, summary.Generator, CharacterName));
+                    been = _beenWorlds.Contains(name);
                     more = TitleDraw.Ago(summary.LastPlayedAt) + (been ? " · " + Strings.T("title.been", "가 본 월드") : "");
                 }
                 var deepest = summary?.Deepest ?? Biome.Cave;
