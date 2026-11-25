@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -136,6 +136,8 @@ async function leaveGame(game) {
     await game.until(s => s.hub, 1500);
   }
   await game.press('나가기', '메뉴');
+  // [나가기] asks once more since T3 (Docs/TitleRework.md 4-3).
+  await game.press('저장하고 나가기', '메뉴');
 }
 
 // Floor all round the player, so building and walking have room.
@@ -153,7 +155,7 @@ const items = (inv, base) => (inv.items || []).filter(i => i.base === base).leng
 
 // The start screen's pages (2026-11-11): back to the first screen, then the page of that name (none: stay there).
 async function menuPage(game, page) {
-  for (let i = 0; i < 4 && (await game.find('게임 시작')).length === 0; i++) {
+  for (let i = 0; i < 6 && (await game.find('게임 시작')).length === 0; i++) {
     if (!(await game.press('뒤로', null, { quiet: true }))) await game.wait(400);
   }
   if (page) await game.press(page);
@@ -170,16 +172,29 @@ async function menu(browser) {
   check(labels.length <= 6, `시작 화면의 단추가 적다 (${labels.join(', ')})`);
   check(!labels.includes('혼자 하기'), '시작 화면에는 [혼자 하기]가 없다(게임 시작 안에)');
 
+  // [게임 시작] opens the character list since T3 (Docs/TitleRework.md 4-2), a new character's page says how classes go,
+  // the world list holds [혼자 하기], and the new world page the day's length (the [게임 시작] page held all of them).
   await menuPage(game, '게임 시작');
   labels = (await game.buttons()).map(b => b.label);
-  check(labels.includes('혼자 하기') && labels.includes('뒤로') && labels.some(l => l.startsWith('하루 길이:')), `[게임 시작]에 [혼자 하기]·[뒤로]·[하루 길이] (${labels.join(', ')})`);
-  // Classes are picked in the game (2026-11-09): the page says so and has no class buttons.
+  check(labels.includes('새 캐릭터') && labels.includes('뒤로') && !labels.includes('혼자 하기'), `[게임 시작]은 캐릭터 목록: [새 캐릭터]·[뒤로] (${labels.join(', ')})`);
+  await game.press('새 캐릭터');
+  labels = (await game.buttons()).map(b => b.label);
+  // Classes are picked in the game (2026-11-09): the making page says so and has no class buttons.
   check(labels.filter(l => /^\[[ \d]\] /.test(l)).length === 0, '클래스 단추가 없다');
-  check(/클래스는 게임 안에서 고른다/.test(await game.allText()), '"클래스는 게임 안에서 고른다: 가방의 [스킬] 탭에서…"라고 알린다');
-  await game.shot('menu-play', '게임 시작 화면');
-  await game.page.keyboard.press('Escape');
-  await game.wait(400);
-  check((await game.find('게임 시작')).length === 1, 'Esc로 시작 화면에 돌아온다');
+  check(/클래스는 게임 안에서 고른다/.test(await game.allText()), '새 캐릭터 만들기가 "클래스는 게임 안에서 고른다: [스킬] 화면에서…"라고 알린다');
+  check(labels.includes('만들기') && labels.includes('주사위') && labels.includes('이름 칸'), `새 캐릭터 만들기에 [이름 칸]·[주사위]·[만들기] (${labels.join(', ')})`);
+  await game.press('만들기');
+  labels = (await game.buttons()).map(b => b.label);
+  check(labels.includes('혼자 하기') && labels.includes('새 월드') && labels.includes('뒤로'), `월드 목록에 [혼자 하기]·[새 월드]·[뒤로] (${labels.join(', ')})`);
+  await game.press('새 월드');
+  labels = (await game.buttons()).map(b => b.label);
+  check(labels.some(l => l.startsWith('하루 길이:')) && labels.includes('시드 칸'), `새 월드 만들기에 [하루 길이]·[시드 칸] (${labels.join(', ')})`);
+  await game.shot('menu-play', '새 월드 만들기');
+  for (let i = 0; i < 3; i++) {
+    await game.page.keyboard.press('Escape');
+    await game.wait(400);
+  }
+  check((await game.find('게임 시작')).length === 1, 'Esc로 한 단계씩 시작 화면에 돌아온다');
 
   await menuPage(game, '설정');
   labels = (await game.buttons()).map(b => b.label);
@@ -291,10 +306,22 @@ async function menu(browser) {
   }
 
   // Online without a cloud project: a plain message.
+  // [함께 하기] picks a character first since T3, then [온라인 방 만들기] picks the world and [방 열기] opens it.
   await menuPage(game, '함께 하기');
+  const together = (await game.title()).characters || [];
+  if (together.length > 0) await game.press(together[0].split('|')[0]);
+  else {
+    await game.press('새 캐릭터');
+    await game.press('만들기');
+  }
   labels = (await game.buttons()).map(b => b.label);
-  check(labels.includes('온라인 방 만들기') && labels.includes('코드로 참가'), '[함께 하기]에 [온라인 방 만들기]·[코드로 참가]');
+  check(labels.includes('온라인 방 만들기') && labels.includes('코드로 참가'), '[함께 하기]에서 캐릭터를 고르면 [온라인 방 만들기]·[코드로 참가]');
   await game.press('온라인 방 만들기');
+  if (!(await game.title()).world) {
+    await game.press('새 월드');
+    await game.press('만들기');
+  }
+  await game.press('방 열기');
   await game.wait(6000);
   const said = (await game.texts()).status || '';
   check(said.length > 0, `[온라인 방 만들기]가 알림을 띄운다 ("${said.slice(0, 80)}")`);
@@ -309,17 +336,18 @@ async function menu(browser) {
   const fresh = await open(browser, run, Profiles.pc, url);
   // The menu may not be drawn yet with the probe on: look again for a few seconds.
   let solo = null;
-  for (let i = 0; i < 20 && !solo; i++) {
-    if ((await fresh.find('게임 시작')).length) await fresh.press('게임 시작');
+  for (let i = 0; i < 20 && !(await fresh.find('게임 시작')).length; i++) await fresh.wait(300);
+  if (await fresh.press('게임 시작')) {
+    // A new character named by typing into its field (T3: [새 캐릭터] → [이름 칸] → [만들기]), then a new world.
+    await fresh.press('새 캐릭터');
+    await fresh.typeInto('이름 칸', '탭시험');
+    await fresh.press('만들기');
+    await fresh.press('새 월드');
+    await fresh.press('만들기');
     solo = (await fresh.find('혼자 하기'))[0];
-    if (!solo) await fresh.wait(300);
+    check((await fresh.title()).character === '탭시험', `적은 이름으로 캐릭터를 만든다 (${(await fresh.title()).character})`);
   }
   if (solo) {
-    // The name field is the first thing on the page, just under its title bar.
-    const box = await fresh.canvas();
-    const back = (await fresh.find('뒤로'))[0];
-    await fresh.tapAt(box.left + box.width / 2, back.cy + 64);
-    await fresh.page.keyboard.type('탭시험');
     await fresh.press('혼자 하기');
     const started = await fresh.until(s => s.playing, 25000);
     check(!!started, '[혼자 하기]를 눌러 시작한다');
@@ -329,7 +357,7 @@ async function menu(browser) {
     check(!!opened, '시작한 뒤 처음 누른 Tab으로 가방이 열린다');
     await fresh.shot('first-tab', '첫 Tab으로 연 가방');
   } else {
-    check(false, '[게임 시작]에 [혼자 하기]');
+    check(false, '[게임 시작] → 새 캐릭터 → 새 월드에 [혼자 하기]');
   }
   await fresh.context.close();
 }
@@ -1836,11 +1864,15 @@ async function save(browser) {
   const level = (await game.state()).level;
   await leaveGame(game);
   await game.until(s => !s.playing, 8000);
-  // The menu remembers the character's classes (2026-11-09) instead of asking again: on the [게임 시작] page since the
-  // start screen has pages (2026-11-11).
+  // The menu remembers the character's classes (2026-11-09) instead of asking again: on the world list once the
+  // character is picked from the list (T3; on the [게임 시작] page from 2026-11-11). The list shows its time and day.
   await menuPage(game, '게임 시작');
   await game.wait(300);
-  await game.shot('menu-saved', '나간 뒤 [게임 시작](이어하기)');
+  const row = ((await game.title()).characters || []).find(r => r.startsWith('savetest|')) || '';
+  check(/\|Lv \d+\|.+ · 오늘\|/.test(row), `캐릭터 목록에 savetest의 레벨·플레이 시간·오늘 (${row})`);
+  await game.press('savetest');
+  await game.wait(300);
+  await game.shot('menu-saved', '나간 뒤 savetest의 월드 목록(이어하기)');
   const menuText = await game.allText();
   check(/savetest의 클래스: 전사 \+ 화염 마법사/.test(menuText), '메뉴가 저장된 캐릭터의 클래스를 보인다(savetest의 클래스: 전사 + 화염 마법사)');
   check((await game.find(/^\[[ \d]\] /)).length === 0, '저장된 캐릭터는 메뉴에서 클래스 단추가 없다(게임 안에서 바꾼다)');
@@ -1915,18 +1947,19 @@ async function layout(browser) {
     await game.shot('menu', '시작 화면');
     const first = (await game.buttons()).filter(b => !b.shown || b.rect[1] < 0 || b.rect[1] + b.rect[3] > b.screen.height + 0.5);
     check(first.length === 0, `시작 화면의 단추가 모두 화면 안에 (${first.map(b => b.label).join(', ') || '모두'})`);
-    await menuPage(game, '게임 시작');
-    await game.shot('menu-play', '게임 시작 화면');
+    // The world list (T3) keeps [혼자 하기] at its foot, in view however short the screen.
+    await game.toWorldList();
+    await game.shot('menu-play', '월드 목록');
     const solo = (await game.buttons()).find(b => b.label === '혼자 하기');
-    check(solo && solo.shown && solo.rect[1] + solo.rect[3] <= solo.screen.height, '[게임 시작]의 [혼자 하기]가 처음부터 화면 안에 보인다');
+    check(solo && solo.shown && solo.rect[1] + solo.rect[3] <= solo.screen.height, '월드 목록의 [혼자 하기]가 처음부터 화면 안에 보인다');
+    const rowsOut = (await game.buttons()).filter(b => b.shown && (b.rect[0] < -0.5 || b.rect[0] + b.rect[2] > b.screen.width + 0.5));
+    check(rowsOut.length === 0, `월드 목록이 옆으로 넘치지 않는다 (${rowsOut.map(b => b.label).join(', ') || '모두 안'})`);
     await menuPage(game, '설정');
     await game.shot('menu-settings', '설정 화면');
     const wide = (await game.buttons()).filter(b => b.shown && (b.rect[0] < -0.5 || b.rect[0] + b.rect[2] > b.screen.width + 0.5));
     check(wide.length === 0, `설정 단추가 옆으로 넘치지 않는다 (${wide.map(b => b.label).join(', ') || '모두 안'})`);
-    await menuPage(game, '게임 시작');
     if (game.touch) {
-      await game.press('혼자 하기');
-      await game.until(s => s.playing, 25000);
+      await game.startThroughMenu();
       await game.wait(800);
       await game.page.touchscreen.tap(width / 2, height / 3);
     } else {
@@ -1968,8 +2001,7 @@ async function touch(browser) {
     const { width, height } = profile.context.viewport;
     note(`\n## 휴대폰 터치 ${name} ${width}×${height}\n`);
     const game = await open(browser, run, profile, url);
-    check(await game.press('게임 시작'), '[게임 시작]을 탭한다');
-    check(await game.press('혼자 하기'), '[혼자 하기]를 탭한다');
+    check(await game.startThroughMenu(), '[게임 시작] → 캐릭터 → 월드 → [혼자 하기]를 탭한다');
     check(!!(await game.until(s => s.playing, 25000)), '탭으로 게임이 시작된다');
     await game.page.touchscreen.tap(width / 2, height / 3);
     await game.wait(800);
@@ -2278,8 +2310,7 @@ async function skillfx(browser) {
   // is what is looked at; tapping the skill buttons is the touch section's).
   note('\n## 스킬 이펙트 (휴대폰 세로)\n');
   const phone = await open(browser, run, Profiles.phone, url);
-  check(await phone.press('게임 시작'), '[게임 시작]을 탭한다');
-  check(await phone.press('혼자 하기'), '[혼자 하기]를 탭한다');
+  check(await phone.startThroughMenu(), '[게임 시작] → 캐릭터 → 월드 → [혼자 하기]를 탭한다');
   check(!!(await phone.until(s => s.playing, 25000)), '탭으로 게임이 시작된다');
   const { width, height } = Profiles.phone.context.viewport;
   await phone.page.touchscreen.tap(width / 2, height / 3);
@@ -3681,7 +3712,8 @@ async function firstRun(browser, profile, hourLong) {
 async function time(browser) {
   note('\n## 하루 길이 (PC)\n');
   const game = await open(browser, run, Profiles.pc, url);
-  await menuPage(game, '게임 시작');
+  // On the settings page and the new world page since T3 (it was on the [게임 시작] page).
+  await menuPage(game, '설정');
   const lengths = [];
   for (let i = 0; i < 4; i++) {
     const b = (await game.find(/^하루 길이:/))[0];
@@ -3803,8 +3835,7 @@ async function arenas(browser) {
     note(`\n## 입장 이름 카드 ${profile}\n`);
     const small = await open(browser, run, Profiles[profile], url);
     if (small.touch) {
-      await menuPage(small, '게임 시작');
-      await small.press('혼자 하기');
+      await small.startThroughMenu();
       await small.until(s => s.playing, 25000);
       await small.wait(800);
     } else {
@@ -3833,8 +3864,7 @@ async function hero(browser) {
     note(`\n## 주인공 무기별 모션 (${profile === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, Profiles[profile], url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -3895,8 +3925,7 @@ async function roll(browser) {
     note(`\n## 구르기 (${name === 'pc' ? 'PC, Shift' : name === 'phone' ? '휴대폰 세로, 단추' : '휴대폰 가로, 단추'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
       await game.send('classes warrior,fire_mage');
@@ -4016,8 +4045,7 @@ async function map(browser) {
     note(`\n## 방으로 된 지도 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
       await game.send('classes warrior,fire_mage');
@@ -4187,8 +4215,7 @@ async function packs(browser) {
     note(`\n## 무리 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -4292,8 +4319,7 @@ async function pois(browser) {
     note(`\n## 볼거리 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -4408,8 +4434,7 @@ async function travel(browser) {
     note(`\n## 광차·길잡이 돌·떠돌이 상인 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -4520,8 +4545,7 @@ async function guide(browser) {
     check((await game.find('길 안내: 화살표')).length === 1, `${name}: [길 안내: 소문]을 누르면 화살표`);
     await game.press('길 안내: 화살표');
     check((await game.find('길 안내: 소문')).length === 1, `${name}: 다시 누르면 소문`);
-    await menuPage(game, '게임 시작');
-    await game.press('혼자 하기');
+    await game.startThroughMenu();
     await game.until(s => s.playing, 25000);
     await game.wait(1500);
     await game.send('monsters hold; still; probe on');
@@ -4592,8 +4616,7 @@ async function pace(browser) {
     note(`\n## 함정 방과 완급 감독 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -4694,8 +4717,7 @@ async function raids(browser) {
     note(`\n## 습격이 닿는 시간과 화면 가장자리의 점 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -4750,8 +4772,7 @@ async function dungeon(browser) {
     note(`\n## 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -4928,8 +4949,8 @@ async function ui(browser) {
     const back = (await game.buttons()).find(b => b.label === '뒤로');
     check(!!back && back.rect[1] < 60 + (height - Math.min(520, height - 20)) / 2, `[뒤로]가 창 머리 띠 안에 (${back ? back.rect.map(Math.round).join(',') : '없음'})`);
     await game.shot('ui-settings', '설정(돌판 창, 머리 띠, [뒤로])');
-    await menuPage(game, '게임 시작');
-    await game.shot('ui-play', '게임 시작 화면(주 동작 [혼자 하기])');
+    await game.toWorldList();
+    await game.shot('ui-play', '월드 목록(주 동작 [혼자 하기])');
     await game.startSolo();
     await game.wait(1200);
     // A touch on the screen makes it a touch screen (sticks, the [가방] button, 40-point world buttons).
@@ -5158,8 +5179,7 @@ async function screens(browser) {
     const { width, height } = profile.context.viewport;
     note(`\n## 화면 나누기 ${profileName} ${width}×${height} (U2, [메뉴] 허브)\n`);
     const game = await open(browser, run, profile, url);
-    check(await game.press('게임 시작'), '[게임 시작]을 탭한다');
-    check(await game.press('혼자 하기'), '[혼자 하기]를 탭한다');
+    check(await game.startThroughMenu(), '[게임 시작] → 캐릭터 → 월드 → [혼자 하기]를 탭한다');
     check(!!(await game.until(t => t.playing, 25000)), '탭으로 게임이 시작된다');
     await game.page.touchscreen.tap(width / 2, height / 3);
     await game.wait(800);
@@ -5344,8 +5364,7 @@ async function encounter(browser) {
     const { width, height } = profile.context.viewport;
     note(`\n## 만남 화면 ${profileName} ${width}×${height} (U3)\n`);
     const game = await open(browser, run, profile, url);
-    check(await game.press('게임 시작'), '[게임 시작]을 탭한다');
-    check(await game.press('혼자 하기'), '[혼자 하기]를 탭한다');
+    check(await game.startThroughMenu(), '[게임 시작] → 캐릭터 → 월드 → [혼자 하기]를 탭한다');
     check(!!(await game.until(t => t.playing, 25000)), '탭으로 게임이 시작된다');
     await game.page.touchscreen.tap(width / 2, height / 3);
     await game.wait(800);
@@ -5980,8 +5999,7 @@ async function depth(browser) {
     note(`\n## 서 있는 것의 깊이 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -6082,8 +6100,7 @@ async function sizes(browser) {
     note(`\n## 크기 등급 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -6179,8 +6196,7 @@ async function b1mobs(browser) {
     note(`\n## 첫 두 생물군계의 몬스터 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -6303,8 +6319,7 @@ async function biomes(browser) {
     note(`\n## 생물군계의 모습 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -6510,8 +6525,7 @@ async function places(browser) {
     note(`\n## 장소의 생물군계 모습과 랜드마크 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -6604,8 +6618,7 @@ async function b1c(browser) {
     note(`\n## 지하실·갱도·굴·부수기 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -6717,8 +6730,7 @@ async function b2mobs(browser) {
     note(`\n## 얼음 동굴·모래 동굴의 몬스터와 규칙, 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -6877,8 +6889,7 @@ async function b3mobs(browser) {
     note(`\n## 수정 동굴·지하 호수의 몬스터와 규칙, 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -7043,8 +7054,7 @@ async function b4mobs(browser) {
     note(`\n## 용암 지대·공허의 심연의 몬스터와 규칙, 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
     const game = await open(browser, run, profile, url);
     if (game.touch) {
-      await menuPage(game, '게임 시작');
-      await game.press('혼자 하기');
+      await game.startThroughMenu();
       await game.until(s => s.playing, 25000);
       await game.wait(800);
     } else {
@@ -7172,7 +7182,184 @@ async function b4mobs(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+// ---------------------------------------------------------------- 시작화면·캐릭터와 월드 고르기·로딩·허브 (T3, Docs/TitleRework.md)
+// The title drifting over the caves, its words with no box (and the keys moving through them on a PC), a character made
+// with a look of its own and the dice, a world made with a seed, the loading screen (its picture, stage, bar and tip),
+// the game, the hub in the same look with [나가기] asking first, and back on the list the character with its time and
+// day, deleted only after a question. On a PC, a phone held upright and one held sideways.
+async function title(browser) {
+  for (const name of ['pc', 'phone', 'phone-wide']) {
+    const profile = Profiles[name];
+    const { width, height } = profile.context.viewport;
+    note(`\n## 시작화면과 고르기 ${name} ${width}×${height}\n`);
+    const game = await open(browser, run, profile, url);
+    for (let i = 0; i < 20 && !(await game.find('게임 시작')).length; i++) await game.wait(300);
+    let labels = (await game.buttons()).map(b => b.label);
+    for (const word of ['게임 시작', '함께 하기', '저장본', '설정', '의견 보내기']) check(labels.includes(word), `${name}: 시작 화면에 [${word}]`);
+    const outside = (await game.buttons()).filter(b => !b.shown || b.rect[1] < 0 || b.rect[1] + b.rect[3] > b.screen.height + 0.5 || b.rect[0] < 0 || b.rect[0] + b.rect[2] > b.screen.width + 0.5);
+    check(outside.length === 0, `${name}: 시작 화면의 글자 단추가 모두 화면 안에 (${outside.map(b => b.label).join(', ') || '모두'})`);
+    if (game.touch) {
+      const low = (await game.buttons()).filter(b => b.rect[3] < 43.5);
+      check(low.length === 0, `${name}: 휴대폰에서 글자 단추 줄이 44pt 높이 (${low.map(b => `${b.label} ${Math.round(b.rect[3])}`).join(', ') || '모두'})`);
+    }
+    // The cave behind drifts: two pictures a moment apart differ, and its window has moved.
+    await game.page.mouse.move(2, 2);
+    const t0 = await game.title();
+    const a = await game.page.screenshot();
+    await game.wait(1600);
+    const b = await game.page.screenshot();
+    const t1 = await game.title();
+    check(t0.motion === false || (!a.equals(b) && t1.pan !== t0.pan), `${name}: 뒤의 동굴이 흐른다 (창 ${Math.round(t0.pan)} → ${Math.round(t1.pan)}, 사진 ${a.equals(b) ? '같음' : '다름'})`);
+    check(t1.backdrop === 1, `${name}: 처음 기기에서는 흙 동굴만 (생물군계 ${t1.backdrop})`);
+    await game.shot('title', '시작 화면(흐르는 동굴, 로고, 글자 단추)');
+
+    if (!game.touch) {
+      // The keys: down and up move the lit word, Enter presses it; the mouse over a word lights it.
+      const settings = (await game.find('설정'))[0];
+      await game.page.mouse.move(settings.cx, settings.cy);
+      await game.wait(500);
+      await game.shot('title-hover', '[설정] 위의 마우스(금빛, 표지, 빛 띠)');
+      await game.page.mouse.move(2, 2);
+      for (const key of ['ArrowDown', 'ArrowDown', 'ArrowUp', 'ArrowUp', 'ArrowUp', 'ArrowDown']) await game.page.keyboard.press(key);
+      await game.wait(300);
+      await game.shot('title-keys', '화살표로 고른 단어');
+      // The mouse left [설정] (3) lit and the arrows went round back to it (down past the last comes to the first):
+      // up three to [게임 시작], then Enter.
+      for (let i = 0; i < 3; i++) await game.page.keyboard.press('ArrowUp');
+      await game.page.keyboard.press('Enter');
+      const keyed = await game.until(r => r.title && r.title.page === 'characters', 3000);
+      check(!!keyed, `${name}: 화살표와 Enter로 [게임 시작]을 누른다 (${(await game.title()).page})`);
+    } else {
+      check(await game.press('게임 시작'), `${name}: [게임 시작]을 탭한다`);
+    }
+    let t = await game.title();
+    check(t.page === 'characters' && (t.characters || []).length === 0, `${name}: 처음에는 캐릭터 목록이 비어 있다 (${t.page}, ${(t.characters || []).length})`);
+    await game.shot('title-characters-empty', '빈 캐릭터 목록과 [새 캐릭터]');
+
+    // A new character: the dice, an arrow, a name typed (a PC) or the one offered (a phone).
+    await game.press('새 캐릭터');
+    t = await game.title();
+    const plain = t.look;
+    await game.press('주사위');
+    const rolled = (await game.title()).look;
+    check(rolled !== plain, `${name}: [주사위]가 외형을 바꾼다 (${plain} → ${rolled})`);
+    await game.press('▶', '머리 모양');
+    const look = (await game.title()).look;
+    check(look !== rolled, `${name}: [머리 모양 ▶]이 머리 모양을 바꾼다 (${rolled} → ${look})`);
+    const hero = `t3${name.replace('-', '')}`;
+    if (!game.touch) await game.typeInto('이름 칸', hero);
+    await game.wait(400);
+    await game.shot('title-make', '새 캐릭터 만들기(돌며 걷는 미리보기, 외형 줄)');
+    // Back now asks first: the character being made would be thrown away.
+    await game.press('뒤로');
+    check((await game.title()).ask === 'discard', `${name}: 만들던 캐릭터에서 [뒤로]는 "버린다"를 묻는다`);
+    await game.press('계속 만들기');
+    await game.press('만들기');
+    t = (await game.until(r => r.title && r.title.page === 'worlds', 4000)) || {};
+    const made = ((t.title || {}).newCharacter) || '';
+    check(made.length > 0 && (game.touch || made === hero), `${name}: 캐릭터를 만들고 월드 목록으로 (${made})`);
+    // A new world with a seed typed (a PC) or none (random).
+    await game.press('새 월드');
+    if (!game.touch) await game.typeInto('시드 칸', '12345');
+    await game.shot('title-newworld', '새 월드 만들기(이름·주사위·시드·하루 길이)');
+    await game.press('만들기');
+    t = await game.title();
+    check(t.page === 'worlds' && t.world && t.world === t.newWorld, `${name}: 새 월드가 골라진 채 월드 목록 (${t.world})`);
+    await game.shot('title-worlds', '월드 목록(새 월드가 골라짐, [혼자 하기])');
+
+    // The loading screen: caught as soon as [혼자 하기] is pressed.
+    const start = (await game.find('혼자 하기'))[0];
+    await game.tapAt(start.cx, start.cy);
+    let loading = null;
+    for (let i = 0; i < 40 && !loading; i++) {
+      const r = await game.state();
+      if (r.loading) loading = r;
+      else if (r.playing) break;
+      else await game.wait(100);
+    }
+    if (loading) {
+      await game.shot('title-loading', '로딩(가 본 곳의 장면, 단계, 막대, 도움말)');
+      check(loading.loadTip.length > 0 && loading.loadStage.length > 0, `${name}: 로딩에 도움말과 단계 ("${loading.loadTip}", ${loading.loadStage} ${Math.round(loading.loadFraction * 100)}%)`);
+      check(loading.loadBiome === 'Cave' && loading.loadMonsters === '', `${name}: 새 캐릭터의 로딩 그림은 흙 동굴, 몬스터 없음 (${loading.loadBiome}, ${loading.loadMonsters || '없음'})`);
+      await game.press('다음 도움말', null, { quiet: true });
+      const next = await game.state();
+      if (next.loading) check(next.loadTip !== loading.loadTip, `${name}: 누르면 다음 도움말 (${next.loadTip})`);
+    } else {
+      note(`- ${name}: 로딩이 너무 빨리 끝나 사진을 찍지 못했다`);
+    }
+    check(!!(await game.until(r => r.playing, 30000)), `${name}: 고른 월드로 들어간다`);
+    await game.wait(1200);
+    if (game.touch) await game.page.touchscreen.tap(width / 2, height / 3);
+    await game.send('goto spawn');
+    await game.wait(800);
+    await game.shot('title-game', '만든 외형으로 들어온 게임');
+
+    // The hub in the title's look; [나가기] asks first.
+    if (game.touch) await game.press('메뉴');
+    else await game.page.keyboard.press('Escape');
+    await game.until(r => r.hub, 2000);
+    await game.wait(400);
+    await game.shot('title-hub', '허브(판과 글자 단추, 아이콘)');
+    await game.press('나가기', '메뉴');
+    check((await game.state()).leaveAsked, `${name}: [나가기]는 한 번 더 묻는다`);
+    await game.shot('title-hub-ask', '허브의 [저장하고 나가기]·[남기]');
+    await game.press('남기', '메뉴');
+    let r = await game.state();
+    check(!r.leaveAsked && r.playing, `${name}: [남기]면 게임에 남는다`);
+    if (!r.hub) {
+      if (game.touch) await game.press('메뉴');
+      else await game.page.keyboard.press('Escape');
+    }
+    await game.press('나가기', '메뉴');
+    await game.press('저장하고 나가기', '메뉴');
+    check(!!(await game.until(x => !x.playing && x.title && x.title.page === 'main', 8000)), `${name}: [저장하고 나가기]로 시작 화면에`);
+
+    // The list shows the character played, its time and the day, in its look.
+    await game.press('게임 시작');
+    t = await game.title();
+    const row = (t.characters || []).find(x => x.startsWith(made + '|')) || '';
+    check(/\|Lv \d+\|.+ · 오늘\|/.test(row) && row.endsWith('|' + look), `${name}: 목록에 그 캐릭터(레벨·플레이 시간·오늘·만든 외형) (${row})`);
+    await game.shot('title-characters', '캐릭터 목록(걷는 외형, 레벨·시간·마지막 날)');
+    await game.press(made);
+    t = await game.title();
+    const worldRow = (t.worlds || [])[0] || '';
+    check(/\|1\|.+ · 오늘$/.test(worldRow), `${name}: 월드 목록에 그 월드(1일째·시간·오늘) (${worldRow})`);
+    await game.press('뒤로');
+
+    // Deleting asks, names it, and only the answer that deletes does.
+    await game.press('지우기', made);
+    t = await game.title();
+    check(t.ask === 'deletecharacter', `${name}: [지우기]는 먼저 묻는다`);
+    check(/캐릭터를 지운다/.test(await game.allText()), `${name}: 물음이 캐릭터 이름과 되돌릴 수 없음을 말한다`);
+    await game.shot('title-ask', '지우기 물음([지우기]·[남기기])');
+    await game.press('남기기');
+    t = await game.title();
+    check(t.ask === '' && (t.characters || []).some(x => x.startsWith(made + '|')), `${name}: [남기기]면 남는다`);
+    await game.press('지우기', made);
+    await game.press('지우기', made);
+    t = await game.title();
+    check(!(t.characters || []).some(x => x.startsWith(made + '|')), `${name}: 물음의 [지우기]로 지운다 (${(t.characters || []).length}명 남음)`);
+
+    if (name === 'pc') {
+      // Less motion: the title stands still.
+      await menuPage(game, '설정');
+      await game.press('움직임: 보통');
+      await menuPage(game, null);
+      await game.page.mouse.move(2, 2);
+      await game.wait(400);
+      const c = await game.page.screenshot();
+      await game.wait(1600);
+      const d = await game.page.screenshot();
+      check(c.equals(d), '움직임: 줄이기면 시작 화면이 멈춘 한 장면');
+      await game.shot('title-still', '움직임 줄이기의 시작 화면');
+      await menuPage(game, '설정');
+      await game.press('움직임: 줄이기');
+    }
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, title, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

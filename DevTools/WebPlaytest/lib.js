@@ -235,6 +235,75 @@ function helpers(game) {
     return playing;
   };
 
+  // Typing into one of the game's fields (known to the probe by its name, TitleDraw.Field): a real tap on it, what was
+  // in it rubbed out, then the keys.
+  h.typeInto = async (field, text) => {
+    const f = (await h.find(field))[0];
+    if (!f) {
+      run.errors.push(`${profile.name}: no field "${field}" to type into`);
+      return false;
+    }
+    await h.tapAt(f.cx, f.cy);
+    await page.waitForTimeout(200);
+    await page.keyboard.press('End');
+    for (let i = 0; i < 26; i++) await page.keyboard.press('Backspace');
+    await page.keyboard.type(text, { delay: 30 });
+    await page.waitForTimeout(200);
+    return true;
+  };
+
+  // The title's report (Docs/TitleRework.md, T3): page, flow, character and world picked, the lists' rows.
+  h.title = async () => (await h.state()).title || {};
+
+  // From any page of the title back to its first screen ([뒤로] until [게임 시작] shows).
+  h.toTitle = async () => {
+    for (let i = 0; i < 6 && (await h.find('게임 시작')).length === 0; i++) {
+      if (!(await h.press('뒤로', null, { quiet: true }))) await page.waitForTimeout(400);
+    }
+  };
+
+  // Through the title as a person goes (T3): [게임 시작] → the character of that name in the list, or a new one made
+  // ([새 캐릭터], the name typed on a PC; a phone keeps the name offered) → the world of that name, the one picked, the
+  // first in the list, or a new one ([새 월드] → [만들기]). Stops on the world list, [혼자 하기] not pressed yet.
+  // Returns the title's report there.
+  h.toWorldList = async ({ name = null, world = null, newCharacter = false, newWorld = false } = {}) => {
+    await h.toTitle();
+    await h.press('게임 시작');
+    let t = (await h.until(r => r.title && r.title.page === 'characters', 5000)) || {};
+    const characters = ((t.title || {}).characters || []).map(r => r.split('|')[0]).filter(n => n);
+    const pick = name ? (characters.includes(name) ? name : null) : characters[0];
+    if (pick && !newCharacter) await h.press(pick);
+    else {
+      await h.press('새 캐릭터');
+      await h.until(r => r.title && r.title.page === 'makecharacter', 5000);
+      if (name && !game.touch) await h.typeInto('이름 칸', name);
+      await h.press('만들기');
+    }
+    t = (await h.until(r => r.title && r.title.page === 'worlds', 5000)) || {};
+    const title = t.title || {};
+    const worlds = (title.worlds || []).map(r => r.split('|')[0]).filter(n => n);
+    if (!newWorld && world && worlds.includes(world)) {
+      if (title.world !== world) await h.press(world);
+    } else if (!newWorld && !world && (title.world || worlds.length > 0)) {
+      if (!title.world) await h.press(worlds[0]);
+    } else {
+      await h.press('새 월드');
+      await h.until(r => r.title && r.title.page === 'makeworld', 5000);
+      if (world && !game.touch) await h.typeInto('월드 이름 칸', world);
+      await h.press('만들기');
+      await h.until(r => r.title && r.title.page === 'worlds', 5000);
+    }
+    return h.title();
+  };
+
+  // The same, then [혼자 하기] pressed for real; true once playing. One helper for every check that starts through the
+  // menu (the start used to be [게임 시작] → [혼자 하기] with the names in two fields).
+  h.startThroughMenu = async (options = {}) => {
+    await h.toWorldList(options);
+    await h.press('혼자 하기');
+    return !!(await h.until(r => r.playing, 30000));
+  };
+
   // A finger on the screen at (x, y) moved by (dx, dy) over a second, through the DevTools protocol.
   h.drag = async (x, y, dx, dy, hold = 800) => {
     const cdp = await game.context.newCDPSession(page);

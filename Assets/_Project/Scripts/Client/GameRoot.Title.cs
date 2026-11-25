@@ -211,7 +211,8 @@ namespace Game.Client
             if (page != _page) Sounds.Play(Sound.UiOpen, 0.5f);
             _page = page;
             _menuScroll = Vector2.zero;
-            _navIndex = 0;
+            // The keys start on the page's first word after [뒤로].
+            _navIndex = page == MenuPage.Main ? 0 : 1;
             _ask = MenuAsk.None;
             GUIUtility.keyboardControl = 0;
             if (page == MenuPage.Characters || page == MenuPage.Worlds) RefreshSaves();
@@ -475,7 +476,7 @@ namespace Game.Client
             float y = body.yMax + 4;
             if (statusHeight > 0)
             {
-                Note(new Rect(body.x, y, inner, statusHeight), wrapped, _status.Length > 0 ? TitleDraw.Warn : TitleDraw.Warn);
+                Note(new Rect(body.x, y, inner, statusHeight), wrapped, TitleDraw.Warn);
                 y += statusHeight;
             }
             if (action) DrawFoot(new Rect(body.x, y + 2, body.width, actionHeight), ready);
@@ -523,7 +524,7 @@ namespace Game.Client
             }
         }
 
-        // The small picture in a page's head (unused since T3: the name stands alone over its rule).
+        // A page's name at its head.
         static string PageName(MenuPage page) => page switch
         {
             MenuPage.Characters => Strings.T("title.characters", "캐릭터 고르기"),
@@ -1276,7 +1277,7 @@ namespace Game.Client
 
         // ---- For the playtests and the play mode tests ----
 
-        internal string TitlePage => _client != null && _page == MenuPage.Main ? "" : _page.ToString().ToLowerInvariant();
+        internal string TitlePage => _client != null && _screens.Current != GameScreen.Settings ? "" : _page.ToString().ToLowerInvariant();
         internal string TitleFlow => _flow.ToString().ToLowerInvariant();
         internal string PickedWorld => _pickedWorld;
         internal string NewCharacterName => _newCharacter ?? "";

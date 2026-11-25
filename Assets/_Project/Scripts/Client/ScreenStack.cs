@@ -158,6 +158,14 @@ namespace Game.Client
 
         // [나가기] was pressed in the hub: it asks once more ("저장하고 나가기" or "남기", T3).
         public bool LeaveAsked { get; private set; }
+        // Asks it as [나가기] does (the play mode tests' picture of the question).
+        public void AskLeave()
+        {
+            if (!HubOpen) HubOpen = true;
+            LeaveAsked = true;
+            Version++;
+        }
+
         public const string LeaveConfirm = "저장하고 나가기";
         public const string Stay = "남기";
 

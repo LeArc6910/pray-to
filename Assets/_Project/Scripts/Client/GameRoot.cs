@@ -1328,6 +1328,8 @@ namespace Game.Client
         internal string ScreenName => ScreenStack.NameOf(_screens.Current);
         internal GameScreen OpenScreen => _screens.Current;
         internal bool HubOpen => _screens.HubOpen;
+        internal bool LeaveAsked => _screens.LeaveAsked;
+        internal void AskLeave() => _screens.AskLeave();
         internal string BagPage => _inventory?.BagPage ?? "";
         // The bag's kind chip and the picked thing's card title (U6), for the playtests.
         internal string BagFilter => _inventory?.FilterName ?? "";
