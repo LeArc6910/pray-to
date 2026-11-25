@@ -683,7 +683,9 @@ namespace Game.Core
                     AfflictPlayer(player, hazard.Source, HurtPlayer(player, hazard.Source, damage, hazard.Cause));
                     Affect(player, hazard.Effect, hazard.EffectAmount, hazard.Position, hazard.Source, damage);
                 }
-                _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size)));
+                // Where it landed rides along, so a mark no one laid (an icicle, a vent's burst) still reaches those who can
+                // see it (WorldHost's events).
+                _events.Add(new SimEvent(SimEventType.Impact, hazard.Source, hazard.Id, (int)MathF.Ceiling(hazard.Size), position: hazard.Position));
             }
             // A plucked web bursts and is gone.
             if (plucked != null) _hazards.RemoveAll(h => h.Shape == HazardShape.Web && plucked.Contains(h.Id));

@@ -1159,5 +1159,29 @@ namespace Game.Core.Tests
             session.Tick((int)(1.1f * World.TicksPerSecond));
             Assert.AreEqual(100, alice.Machines().Count, "the refresh keeps them all in view");
         }
+
+        // A mark no one laid (a steam vent's burst, an icicle) landing reaches the client that sees it (2026-11-25, the
+        // B4 web check: the burst's Impact named no entity, so the host never sent it and the column of steam never
+        // showed).
+        [Test]
+        public void AVentsBurstReachesTheClientThatSeesIt()
+        {
+            var session = new Session();
+            var alice = session.Join(1, "앨리스");
+            session.Tick(2);
+            var world = session.Host.World;
+            var player = world.Players[0];
+            int px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
+            world.Build(px + 3, py, TileType.SteamVent);
+            var hazard = world.PuffVent(px + 3, py);
+            alice.TakeEvents();
+            var landed = new List<SimEvent>();
+            for (int i = 0; i < 2 * World.TicksPerSecond; i++)
+            {
+                session.Tick();
+                landed.AddRange(alice.TakeEvents().Where(e => e.Type == SimEventType.Impact));
+            }
+            Assert.IsTrue(landed.Any(e => e.Target == hazard.Id), $"impacts seen: {string.Join(", ", landed.Select(e => e.Source + ":" + e.Target))}");
+        }
     }
 }

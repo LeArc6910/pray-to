@@ -5,13 +5,13 @@
 `Docs/BiomeRework.md` B4b를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only b4mobs`(그리고 던전과 무리가 바뀌었으니 `dungeon`, `packs`). 새 월드(생성기 7판)여야 용암·심연의 굴, 들판의 김 뿜는 틈과 금 간 판이 있다(6판 월드는 그대로, 던전 안에는 어느 월드나 있다). b3mobs에서 배운 대로 장면은 그 생물군계의 무리 방에서 세우고, 장면 바로 뒤에 `monsters hold`, 줄의 먼 끝은 동쪽 12칸에서 다시 보고, 짧게 지나가는 상태는 올 때까지 거듭 묻는다. 먼저 `xp 6000`. PC와 휴대폰 세로에서:
 
 1. `b4`: 용암 문은 `ember_forge`(주인 `forge_keeper`, 빛 `#FF7A30`), 심연 문은 `broken_gate`(주인 `gate_warden`, 빛 `#6A30C0`)인지. `b1c`의 굴 목록에 용암이나 심연이 있는지
-2. 용암 지대의 무리 방(`goto room pack lava n`)에서 `scene b4monsters`: 공허 티끌(XS)·불도롱뇽·흑요석 딱정벌레·대장간 용암 슬라임·심연 추적자(새 그림)·공허의 눈·별빛 슬라임·그림자 추적자(M)·용암 투석꾼·분열체(L)·잿불 대장장이·공허의 문지기(XL)가 제 크기 폭으로 그려지는지. 사진 `b4mobs-lineup`
+2. 용암 지대의 무리 방(`goto room pack lava n`)에서 `scene b4monsters`(바닥을 비우고 작은·중간 몸은 한 줄, L·XL은 4칸 남쪽 둘째 줄): 공허 티끌(XS)·불도롱뇽·흑요석 딱정벌레·대장간 용암 슬라임·심연 추적자(새 그림)·공허의 눈·별빛 슬라임·그림자 추적자(M)·용암 투석꾼·분열체(L)·잿불 대장장이·공허의 문지기(XL)가 제 크기 폭으로 그려지는지. 사진 `b4mobs-lineup`
 3. `scene vents`(북쪽 3칸에 틈 셋, 가운데가 곧바로 쉭): 예고가 보이는지(`ventsShown`, 사진 `b4mobs-vent-hiss`), 분출하는지(`ventsBurst`, 화면 `burstsShown`, 사진 `b4mobs-vent-burst`)
-4. 심연의 무리 방에서 `scene plates; face off`(플레이어 칸부터 동쪽 6칸 판): 동쪽으로 걸어 건너면 꺼지지 않는지(`platesBroken` 0), 다시 `scene plates`로 서 있으면 판이 갈라지고(`cracksShown`, `stood`, 사진 `b4mobs-plate-crack`) 꺼져 떨어지는지(`plateFalls`, `fallsShown`, `holes`, 밑이 판이 아니고 생명력이 줄었는지, 사진 `b4mobs-plate-fall`). 심연에서 빛이 줄었는지(`abyssLightsDimmed`)
+4. 심연의 무리 방에서 `scene platewalk; face off`(플레이어 한 칸 앞부터 동쪽 6칸 판, 휴대폰 스틱이 움직이기 시작하기 전에 발밑 판이 꺼지지 않게): 동쪽으로 걸어 건너면 꺼지지 않는지(`platesBroken` 0), 다시 `scene plates`로 서 있으면 판이 갈라지고(`cracksShown`, `stood`, 사진 `b4mobs-plate-crack`) 꺼져 떨어지는지(`plateFalls`, `fallsShown`, `holes`, 밑이 판이 아니고 생명력이 줄었는지, 사진 `b4mobs-plate-fall`). 심연에서 빛이 줄었는지(`abyssLightsDimmed`)
 5. `scene splitter; attack on 1 0`(동쪽 2칸 생명력 20의 분열체): 공허 조각으로 갈라지는지. 사진 `b4mobs-splitter`
 6. `goto gate ember_forge`, `goto gate broken_gate`마다: 문 방 사진(`b4mobs-<id>-gate`), [잿불 대장간 들어가기]·[깨진 문 너머 들어가기]를 진짜 클릭·탭으로, `goto droom C`에서 큰 몸(L)과 김 뿜는 틈·금 간 판이 있는지(사진 `b4mobs-<id>-pack`), `goto droom B`의 주인이 잿불 대장장이·공허의 문지기 그 자신인지(사진 `b4mobs-<id>-master`)
 
-명령: `scene b4monsters|vents|plates|splitter`, `b4`(JSON: 24칸 안의 몬스터마다 종·크기·생명력·상태·잠듦·정예·그려진 폭, 밑의 칸과 생명력, 9칸 안의 틈·판·구멍 수, 호스트의 분출·화상·꺼진 판·떨어짐, 밑의 판에 선 초, 화면의 예고·분출·꺼짐·떨어짐·판 돌아옴·갈라짐 수, 심연에서 줄인 빛 수, 생성기 판, 용암·심연 문의 던전).
+명령: `scene b4monsters|vents|plates|platewalk|splitter`, `b4`(JSON: 24칸 안의 몬스터마다 종·크기·생명력·상태·잠듦·정예·그려진 폭, 밑의 칸과 생명력, 9칸 안의 틈·판·구멍 수, 호스트의 분출·화상·꺼진 판·떨어짐, 밑의 판에 선 초, 화면의 예고·분출·꺼짐·떨어짐·판 돌아옴·갈라짐 수, 심연에서 줄인 빛 수, 생성기 판, 용암·심연 문의 던전).
 
 사람에게 남는 것: 김 뿜는 틈의 쉭 소리와 박자가 읽히는지(휴대폰 세로에서 붉은 테가 보이는지), 판 위에서 1초가 억울하지 않은지, 떨어질 때의 손맛, 심연이 너무 어둡지 않은지, 대장간·깨진 문 너머 한 판의 길이.
 

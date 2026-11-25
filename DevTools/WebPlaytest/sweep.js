@@ -6351,6 +6351,8 @@ async function biomes(browser) {
       } else if (set.hit) {
         // 묶음 B2a: a swing breaks the biome's breakable prop, and a tall one's top fades with the player behind it.
         const [word, type, label] = set.hit;
+        // No monster in the way of the swing (sand scarabs crowded the urn once, 2026-11-25).
+        await game.send('monsters hold; clear');
         const before = await game.ask('biomes');
         const at = (await game.send(`biomes at ${word}`)).join(' ');
         await game.wait(500);
@@ -7037,8 +7039,9 @@ async function b4mobs(browser) {
     await game.shot('b4mobs-vent-hiss', '김 뿜는 틈: 1초 예고(붉은 테와 쉭 소리)');
     const burst = await game.until(b => b.ventsBurst > 0 && b.burstsShown > 0, 6000, () => game.ask('b4'));
     await game.shot('b4mobs-vent-burst', '김 뿜는 틈의 분출');
+    const ventsNow = burst || await game.ask('b4');
     check(!!hissing && !!burst && burst.vents >= 3,
-      `${name}: 김 뿜는 틈이 예고 뒤 분출한다 (틈 ${burst ? burst.vents : 0}, 호스트 분출 ${burst ? burst.ventsBurst : 0}, 화면 예고 ${hissing ? hissing.ventsShown : 0}·분출 ${burst ? burst.burstsShown : 0})`);
+      `${name}: 김 뿜는 틈이 예고 뒤 분출한다 (틈 ${ventsNow.vents}, 호스트 분출 ${ventsNow.ventsBurst}, 화면 예고 ${hissing ? hissing.ventsShown : 0}·분출 ${ventsNow.burstsShown})`);
 
     // Cracked plates in an abyss room: a walk across holds, standing gives way.
     let abyssRoom = '';
@@ -7047,7 +7050,7 @@ async function b4mobs(browser) {
       await game.wait(1000);
       if ((await game.ask('b4')).biome === 'Abyss') break;
     }
-    await game.send('clear; heal; scene plates; monsters hold; face off');
+    await game.send('clear; heal; scene platewalk; monsters hold; face off');
     if (game.touch) {
       const box = await game.canvas();
       await game.drag(box.left + box.width * 0.2, box.top + box.height * 0.75, 60, 0, 1400);
@@ -7083,10 +7086,16 @@ async function b4mobs(browser) {
       await game.press(new RegExp(`${gateLabel} 들어가기`));
       const inside = await game.until(d => d.inPocket && d.clientInPocket && d.run, 6000, () => game.ask('dungeon'));
       check(!!inside && inside.run.id === id, `${name}: ${gateLabel}에 들어왔다 (${inside ? `${inside.cardName}, ${inside.run.letters}` : '들어가지 못함'})`);
-      await game.send('goto droom C');
-      await game.wait(1500);
-      const pack = await game.ask('b4');
-      const bigs = (pack.monsters || []).filter(m => m.size === 'l' && m.distance < 16);
+      // The dungeon's own pack rooms have its rule; a shared piece may not, so look through the pack rooms.
+      let pack = {}, bigs = [];
+      for (let n = 0; n < 5; n++) {
+        const went = (await game.send(`goto droom C ${n}`)).join(' ');
+        if (!/^ok/.test(went)) break;
+        await game.wait(1500);
+        pack = await game.ask('b4');
+        bigs = (pack.monsters || []).filter(m => m.size === 'l' && m.distance < 16);
+        if (bigs.length >= 1 && (id === 'ember_forge' ? pack.vents > 0 : pack.plates > 0)) break;
+      }
       check(bigs.length >= 1, `${name}: ${gateLabel}의 무리 방에 큰 몸 (${bigs.map(m => m.kind).join(', ') || '없음'})`);
       check(id === 'ember_forge' ? pack.vents > 0 : pack.plates > 0, `${name}: ${gateLabel}의 방에 ${id === 'ember_forge' ? '김 뿜는 틈' : '금 간 판'} (${id === 'ember_forge' ? pack.vents : pack.plates})`);
       await game.shot(`b4mobs-${id}-pack`, `${gateLabel}의 무리 방`);

@@ -786,6 +786,8 @@ namespace Game.Core
                 .Where(e => shown.Contains(e.Source) || shown.Contains(e.Target) || e.Type == SimEventType.Morning || e.Type == SimEventType.Rift
                     || e.Type == SimEventType.Died && e.Position.LengthSquared > 0 && InView(e.Position)
                     || e.Type == SimEventType.MonsterFx && InView(e.Position)
+                    // A mark no one laid landing (an icicle, a steam vent's burst: Source 0) is told to whoever sees where.
+                    || e.Type == SimEventType.Impact && e.Source == 0 && InView(e.Position)
                     // A dungeon's own turns (room cleared, key, master down, door open) come from no one: told to
                     // everyone in that dungeon's part of the pocket, wherever in it they stand.
                     || e.Type == SimEventType.Dungeon && e.Source == 0 && World.AreaOf(e.Position) == area

@@ -4,7 +4,7 @@ using Game.Core;
 namespace Game.Client
 {
     // The lava fields' and the void abyss's monsters, rules and dungeons for the playtests (2026-11-25, Docs/BiomeRework.md
-    // B4b, Docs/Playtest.md b4mobs): the scenes "b4monsters", "vents", "plates" and "splitter", and the "b4" JSON.
+    // B4b, Docs/Playtest.md b4mobs): the scenes "b4monsters", "vents", "plates", "platewalk" and "splitter", and the "b4" JSON.
     static partial class Playtest
     {
         static readonly string[] LavaVoidLineup = { "void_mote", "salamander", "obsidian_beetle", "forge_slime", "abyss_stalker", "void_eye", "star_slime", "shadow_stalker",
@@ -25,17 +25,22 @@ namespace Game.Client
             }
             switch (scene)
             {
-                // The two biomes' kinds (B4b), each where a body its size fits, east of the player in a row, 5000 health,
-                // awake (the mid-bosses as themselves, not statues), the monsters held.
+                // The two biomes' kinds (B4b) on cleared floor east of the player, each where a body its size fits, 5000
+                // health, awake (the mid-bosses as themselves, not statues), the monsters held: the small and middle ones
+                // in a row level with the player, the large ones in a second row four tiles south (one row ran past what
+                // a small room fits on a phone's walk, 2026-11-25 web check).
                 case "b4monsters":
                 {
+                    Clear(-1, 16, -7, 2);
                     world.MonstersHold = true;
-                    float along = 1.5f;
+                    float small = 1.5f, large = 1.5f;
                     foreach (var id in LavaVoidLineup)
                     {
                         var kind = root.MonsterSheet.Find(id);
+                        bool big = kind.Size == MonsterSize.L || kind.Size == MonsterSize.XL;
+                        ref float along = ref big ? ref large : ref small;
                         along += kind.Radius;
-                        var made = world.SpawnFitting(kind, player.Position + new Vec2(along, 0));
+                        var made = world.SpawnFitting(kind, player.Position + new Vec2(along, big ? -4 : 0));
                         if (made != null)
                         {
                             made.MaxHealth = made.Health = 5000;
@@ -58,6 +63,13 @@ namespace Game.Client
                     Clear(-3, 9, -3, 3);
                     for (int dy = -1; dy <= 1; dy++)
                         for (int dx = 0; dx <= 5; dx++) world.Build(px + dx, py + dy, TileType.CrackedPlate);
+                    return true;
+                // The same strip a tile ahead of the player, so the walk across it starts on firm floor (a phone's
+                // stick takes a moment to get going, and the plate under the player gave way first, 2026-11-25).
+                case "platewalk":
+                    Clear(-3, 9, -3, 3);
+                    for (int dy = -1; dy <= 1; dy++)
+                        for (int dx = 1; dx <= 6; dx++) world.Build(px + dx, py + dy, TileType.CrackedPlate);
                     return true;
                 // A void splitter (B4b) two tiles east on open floor, held, low enough to fall to a few blows: it comes
                 // apart into two shards, and they into motes.
