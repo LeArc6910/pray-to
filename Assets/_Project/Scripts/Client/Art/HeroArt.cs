@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Game.Core;
 
 namespace Game.Client
 {
@@ -88,7 +89,7 @@ namespace Game.Client
     // (2026-11-19, the person: "the character is too big, make it about an NPC's size": the 32-pixel drawing was
     // redrawn by hand at two thirds its size, the same head, hair, tunic and belt, and the rig brought down with it:
     // the poses are still written at the drawing's first size and scaled where they are placed, Solve.)
-    static class HeroArt
+    static partial class HeroArt
     {
         public const int Size = 48;
         // The canvas pixel the feet stand on: the middle of the bottom of the outline under the boots.
@@ -1496,9 +1497,17 @@ namespace Game.Client
             public float RightAngle;
         }
 
-        public static PixelImage Draw(Look look, HeroMove move, int frame, HeroGear gear, Rgba tunic, bool blink = false) =>
-            move == HeroMove.Drink && gear.Kind != HeroWeapon.None ? Draw(look, move, frame, HeroGear.None, tunic, blink) :
-            Render(look, ClipOf(move, gear.Kind).Frames[Clamp(frame, move, gear.Kind)], gear, tunic, blink, out _);
+        // The hero as they were before looks were picked, in a tunic of the given colour (the people of the world, a
+        // player whose look is not known): CharacterLook.Default with that colour for its shirt.
+        public static PixelImage Draw(Look look, HeroMove move, int frame, HeroGear gear, Rgba tunic, bool blink = false) => Draw(look, move, frame, gear, PaintOf(tunic), blink);
+
+        // The hero in a look picked on the making screen (HeroArt.Looks.cs). Draws afresh each time: keep what it
+        // returns under Key(style) with the rest of a sprite's key (Sprites), as the tunic's colour was kept.
+        public static PixelImage Draw(Look look, HeroMove move, int frame, HeroGear gear, CharacterLook style, bool blink = false) => Draw(look, move, frame, gear, PaintOf(style), blink);
+
+        static PixelImage Draw(Look look, HeroMove move, int frame, HeroGear gear, Paint paint, bool blink) =>
+            move == HeroMove.Drink && gear.Kind != HeroWeapon.None ? Draw(look, move, frame, HeroGear.None, paint, blink) :
+            Render(look, ClipOf(move, gear.Kind).Frames[Clamp(frame, move, gear.Kind)], gear, paint, blink, out _);
 
         public static Joints JointsOf(Look look, HeroMove move, int frame, HeroGear gear) =>
             move == HeroMove.Drink && gear.Kind != HeroWeapon.None ? JointsOf(look, move, frame, HeroGear.None) :
@@ -1705,15 +1714,9 @@ namespace Game.Client
         // Things further from the viewer than this (pixels behind the body's middle) are drawn behind the body.
         const float Behind = 1;
 
-        static PixelImage Render(Look look, Pose pose, HeroGear gear, Rgba tunic, bool blink, out Joints joints)
+        static PixelImage Render(Look look, Pose pose, HeroGear gear, Paint paint, bool blink, out Joints joints)
         {
-            var ramp = Ramp.Of(tunic);
-            var colors = new Dictionary<char, Rgba>(Colors)
-            {
-                ['T'] = ramp.Main,
-                ['t'] = ramp.Shade,
-                ['d'] = ramp.Dark,
-            };
+            var colors = paint.Colors;
             bool shut = blink || pose.Shut > 0.5f;
             var rig = Solve(look, pose, gear.Kind);
             joints = rig.Joints;
@@ -1727,10 +1730,10 @@ namespace Game.Client
                 layers.Add((rig.WeaponDepth, 0, weapon));
             }
             var armR = new PixelImage(Size, Size);
-            Arm(armR, rig.ShoulderR.X, rig.ShoulderR.Y, rig.HandR.X, rig.HandR.Y);
+            Arm(armR, rig.ShoulderR.X, rig.ShoulderR.Y, rig.HandR.X, rig.HandR.Y, colors);
             layers.Add((ArmDepth(rig.ShoulderR, rig.HandR), 1, armR));
             var armL = new PixelImage(Size, Size);
-            Arm(armL, rig.ShoulderL.X, rig.ShoulderL.Y, rig.HandL.X, rig.HandL.Y);
+            Arm(armL, rig.ShoulderL.X, rig.ShoulderL.Y, rig.HandL.X, rig.HandL.Y, colors);
             layers.Add((ArmDepth(rig.ShoulderL, rig.HandL), 1, armL));
 
             // On each side of the body the weapon goes under the arms, so the hand closes over its grip; the arms far
@@ -1742,8 +1745,8 @@ namespace Game.Client
             // Legs: from the hips down to each foot, the far one first.
             var legs = new PixelImage(Size, Size);
             var (far, near) = rig.FootR.Depth > rig.FootL.Depth ? (rig.FootR, rig.FootL) : (rig.FootL, rig.FootR);
-            Leg(legs, far.Hip, rig.HipY, far.X, far.Y, rig.Toe);
-            Leg(legs, near.Hip, rig.HipY, near.X, near.Y, rig.Toe);
+            Leg(legs, far.Hip, rig.HipY, far.X, far.Y, rig.Toe, colors['q']);
+            Leg(legs, near.Hip, rig.HipY, near.X, near.Y, rig.Toe, colors['p']);
             Stamp(canvas, legs, false);
 
             // The trunk and the head, each in the view its own turn calls for.
@@ -1751,7 +1754,8 @@ namespace Game.Client
             Part(trunk, colors, TrunkRows(rig.TrunkLook), rig.TrunkFlip, TrunkX + rig.TrunkDx, TrunkY + rig.TrunkDy, false);
             Stamp(canvas, trunk, true);
             var head = new PixelImage(Size, Size);
-            Part(head, colors, HeadRows(rig.HeadLook), rig.HeadFlip, HeadX + rig.HeadDx, HeadY + rig.HeadDy, shut);
+            // The hair may stand above the head's eight rows and hang below them, over the trunk (HeroArt.Looks.cs).
+            Part(head, colors, HeadRows(paint.Hair, rig.HeadLook), rig.HeadFlip, HeadX + rig.HeadDx, HeadY + rig.HeadDy - HairUp(paint.Hair), shut);
             Stamp(canvas, head, false);
 
             foreach (var layer in layers)
@@ -1838,17 +1842,17 @@ namespace Game.Client
         }
 
         // A bare arm a pixel thick from under the sleeve to the hand (its outline makes it three), the hand in shade.
-        static void Arm(PixelImage image, float x0, float y0, float x1, float y1)
+        static void Arm(PixelImage image, float x0, float y0, float x1, float y1, Dictionary<char, Rgba> colors)
         {
-            Thin(image, x0, y0, x1, y1, Colors['s']);
-            Dot(image, x1, y1, Colors['S']);
+            Thin(image, x0, y0, x1, y1, colors['s']);
+            Dot(image, x1, y1, colors['S']);
         }
 
         // A leg from the hip to the foot: trousers two pixels wide, a boot under them with a toe the way they face.
-        static void Leg(PixelImage image, float hipX, float hipY, float footX, float footY, int toe)
+        static void Leg(PixelImage image, float hipX, float hipY, float footX, float footY, int toe, Rgba trousers)
         {
             int x = Round(footX), y = Round(footY), hx = Round(hipX), hy = Round(hipY);
-            if (y - 1 > hy) Line(image, hx, hy, x, y - 1, 0.95f, Colors['p']);
+            if (y - 1 > hy) Line(image, hx, hy, x, y - 1, 0.95f, trousers);
             image.Fill(x - 1, y - 1, 2, 1, Colors['O']);
             if (toe != 0 && image.Inside(x + (toe > 0 ? 0 : -1), y - 1)) image[x + (toe > 0 ? 0 : -1), y - 1] = Colors['o'];
         }

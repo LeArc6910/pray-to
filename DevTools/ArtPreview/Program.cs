@@ -23,6 +23,11 @@ namespace Game.Client
             // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them; --only hero
             // the player's.
             // --only flat: every tile drawn flat on the object layer, and the rails as they join (out/flat/, FlatPreview).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "title")
+            {
+                // --only title: the title rework's art (out/title/, TitlePreview, Docs/TitleRework.md 묶음 T2).
+                return TitlePreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "skillfx")
             {
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).
