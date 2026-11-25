@@ -80,7 +80,9 @@ namespace Game.Client
             {
                 if (rect.Contains(e.mousePosition))
                 {
-                    if (_open != key) Open(rect, text, max, key, password);
+                    // Pressed again while typed in: the page gave the canvas the keys as the press went down, so the box
+                    // takes them back, the words kept.
+                    Open(rect, _open == key ? _text : text, max, key, password);
                     e.Use();
                 }
                 else if (_open == key) Close();
@@ -115,15 +117,13 @@ namespace Game.Client
             _endKey = 0;
             _readFrame = _drawnFrame = Time.frameCount;
             GUIUtility.keyboardControl = 0;
-            // Where the field is in GUI points without the GUI matrix (GUIToScreenRect undoes the areas and scroll views
-            // the field is in, not the matrix: the playtests' button rects rest on the same, Ui.Probe), so to device
-            // pixels by the matrix (Ui.Scale, and the safe area's offset), and those over the page's pixel ratio are the
-            // page's CSS pixels; the canvas fills the page from its top left.
+            // Where the field is on the whole screen in points (GUIToScreenRect undoes the areas and scroll views it is
+            // in and the safe area's move, not the scale: the playtests' button rects rest on the same, Ui.Probe), so to
+            // device pixels by Ui.Scale, and those over the page's pixel ratio are the page's CSS pixels (Ui.Scale also
+            // has the menu's UI size in it); the canvas fills the page from its top left.
             var at = GUIUtility.GUIToScreenRect(rect);
-            var inset = Ui.Inset;
-            float scale = Ui.Scale, ratio = Mathf.Max(0.01f, Ui.PageRatio);
-            float x = at.x * scale + Mathf.Round(inset.Left * scale), y = at.y * scale + Mathf.Round(inset.Top * scale);
-            TextInputOpen(text, max, x / ratio, y / ratio, at.width * scale / ratio, at.height * scale / ratio, password ? 1 : 0);
+            float css = Ui.Scale / Mathf.Max(0.01f, Ui.PageRatio);
+            TextInputOpen(text, max, at.x * css, at.y * css, at.width * css, at.height * css, password ? 1 : 0);
         }
 #endif
 
