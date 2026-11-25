@@ -386,6 +386,8 @@ namespace Game.Core
         // 0 for an ordinary monster, RiftMonster or RiftGuardian for one a rift brought.
         public int Rift { get; internal set; }
         public float Damage => Definition.Damage * Power * (Empowered ? 1 + EmpowerShare : 1);
+        // The band of gear its hits are weighed against (Difficulty): its kind's, a rift's the last.
+        public int Band => Rift != 0 ? DamageBands.Bands : Definition.Band;
         public float Speed => Definition.Speed * SpeedScale * RushScale * (Empowered ? 1 + EmpowerShare : 1);
         // A raid's monster running in until it reaches someone (World.Director.cs, B5c): its pace against its own, so
         // the band reaches the player RaidRunSeconds after its howl. 1 otherwise; a split's young do not take it on.

@@ -41,7 +41,8 @@ namespace Game.Core.Tests
         public void MonstersDropAtTheirChance()
         {
             var world = Room();
-            var player = world.AddPlayer("a", Gear.Wearing("obsidian_sword"));
+            // Dressed well past the slimes' band, so the odd bite of one does not fell them (Docs/Difficulty.md).
+            var player = world.AddPlayer("a", Gear.Wearing("obsidian_sword", "obsidian_armor", "obsidian_helmet"));
 
             // Few enough that the ground never fills (World keeps 200 things lying about and drops the oldest).
             int kills = 250;

@@ -1,64 +1,64 @@
-id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight,drop_chance,rune_chance,potion_chance,material,material_chance,behavior,shot_speed,keep_distance,charge_speed,color,biome,resist,element,place,role,traits,pack,reward,size,base
-slime,슬라임,1,18,6,0,2.4,0.4,8,0.5,0.5,1.0,100,20,6,8,slime_gel,30,melee,,,,#8CD94D,,,,,swarm,split:2,always,45,m,
-spore_shooter,가시 버섯,2,19,8,0,1.6,0.35,9,6,0.8,2.0,60,20,6,8,mushroom_spore,25,ranged,7,4,,#B07CE0,,fire:-25,,,shooter,rooted,,40,s,
-cave_beetle,동굴 딱정벌레,2,60,14,15,2.2,0.42,8,4,0.7,2.2,50,25,8,8,copper_ore,40,charge,,,10,#A0703C,,,,,bruiser,guard:120|stagger,,65,m,
-crystal_bat,수정 박쥐,3,57,12,10,3.6,0.3,9,0.5,0.35,0.9,60,25,8,10,mithril_ore,30,melee,,,,#7CD2E2,crystal,,,,swarm,orbit:3|deathburst:4:50,always,45,s,
-crystal_wisp,수정 정령,3,60,22,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,mithril_ore,25,ranged,9,4.5,,#C8F4FF,crystal,lightning:50,,,shooter,,,65,s,
-myconid,버섯 병정,2,70,15,5,1.8,0.4,8,0.5,0.6,1.4,70,22,7,8,glow_spore,35,melee,,,,#C86ED8,mushroom,fire:-25,,,bruiser,deathcloud,,40,m,
-glow_bat,빛 박쥐,3,54,12,5,3.8,0.3,9,0.5,0.35,0.9,60,25,8,10,glow_spore,30,melee,,,,#5FE0C8,mushroom,,,,swarm,orbit:3,always,45,s,
-ice_slime,얼음 슬라임,2,90,15,10,1.8,0.42,8,0.5,0.6,1.2,70,22,7,8,ice_crystal,25,melee,,,,#8CC8F0,ice,cold:75|fire:-25,cold,,bruiser,deathburst:6:40:fire,,65,m,
-frost_wisp,서리 정령,3,60,21,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,ice_crystal,30,ranged,9,4.5,,#BFE8FF,ice,cold:75|fire:-25,cold,,shooter,,,65,s,
-magma_slime,용암 슬라임,3,160,27,15,2.0,0.42,8,0.5,0.55,1.1,60,25,8,10,obsidian_ore,30,melee,,,,#E0541E,lava,fire:75|cold:-25,fire,,bruiser,trail:fire:3,,65,m,
-fire_bat,불 박쥐,3,72,18,5,3.8,0.3,9,0.5,0.35,0.9,50,25,8,10,obsidian_ore,20,melee,,,,#FF8A3A,lava,fire:75,fire,,swarm,orbit:3,always,45,s,
-void_wisp,공허 정령,4,200,40,10,2.2,0.33,10,7,0.7,1.5,45,30,12,12,void_ore,25,ranged,10,4.5,,#A07CFF,abyss,lightning:50|cold:25,cold,,shooter,,,65,s,
-abyss_stalker,심연 추적자,4,355,50,25,3.0,0.45,10,0.6,0.5,1.0,55,30,12,12,void_ore,25,charge,,,14,#5E3E96,abyss,cold:50,,,heavy,,,,m,
-lake_crab,호수 게,3,240,27,25,2.0,0.42,8,0.55,0.5,1.0,55,25,8,10,pearl,30,melee,,,,#4AA0B4,lake,cold:50|fire:-25,,,bruiser,guard:140:50|turn:120,,65,m,
-tide_wisp,물살 정령,3,135,24,5,2.4,0.32,10,7,0.6,1.4,45,25,8,10,pearl,25,ranged,9,4.5,,#5AD2E6,lake,cold:50|lightning:-25,cold,,support,,,65,s,
-sand_scorpion,모래 전갈,2,140,20,20,2.3,0.42,8,0.6,0.55,1.1,55,25,8,10,amber,30,melee,,,,#D2A050,sand,,,,bruiser,,always,55,m,
-sand_worm,모래 지렁이,2,72,18,5,1.6,0.38,10,7,0.7,1.6,45,25,8,10,amber,25,ranged,8,4.5,,#C8965A,sand,,,,shooter,burrowed:2.5,,55,m,
-demon_soldier,마족 병사,4,72,14,12,2.6,0.42,8,0.6,0.5,1.0,100,25,8,8,void_ore,20,melee,,,,#8A2A3A,,fire:25|cold:-15,,demon_nest,swarm,guard:100:50|aura:guard:1.5:20,always,45,m,
-demon_caster,마족 주술사,4,75,16,4,2.0,0.38,10,7,0.8,2.2,60,25,10,10,void_essence,8,ranged,7,5,,#6A3A9A,,cold:-20,fire,demon_nest,support,,,65,m,
-silk_spiderling,새끼 거미,4,320,55,8,3.4,0.3,10,0.5,0.35,0.9,0,0,0,0,,,melee,,,,#4A3260,,,,,,,,,s,
-big_slime,큰 슬라임,2,80,12,5,1.7,0.75,8,0.6,0.8,1.6,0,30,8,10,slime_gel,60,melee,,,,#6FC23E,,,,,bruiser,split:2:slime,,65,l,slime
-slime_king,슬라임 왕,3,420,28,20,1.2,1.3,10,0.8,1.0,2.0,0,100,30,30,slime_gel,100,melee,,,,#5DBB3A,,,,,heavy,split:3:big_slime,,100,xl,big_slime
-cave_rat,동굴 쥐,1,8,5,0,3.2,0.22,9,0.4,0.45,0.8,0,8,3,4,cave_potato_seed,15,,,,,#9A8470,cave,,,,swarm,fearlight,always,25,xs,
-big_beetle,큰 딱정벌레,2,240,22,20,1.5,0.78,9,4,1.0,2.4,0,40,12,12,copper_ore,80,,,,,#8E5E34,cave,,,,heavy,stagger:2.5,,100,l,cave_beetle
-armored_beetle,철갑 딱정벌레,3,110,18,30,2.0,0.42,8,4,0.8,2.4,0,30,10,10,iron_ore,45,,,,,#6E7480,cave,,,,bruiser,guard:160:85|stagger,,80,m,
-slime_mother,어미 슬라임,3,600,26,15,1.1,1.3,10,0.8,1.0,2.0,0,100,30,30,slime_gel,100,,,,,#7FCB45,,,,,heavy,shed:slime:10|split:2:big_slime,,100,xl,
-puffball,포자 주머니,2,14,10,0,2.6,0.32,9,0.5,0.9,1.0,0,12,4,6,glow_spore,25,,,,,#D8D070,mushroom,fire:-50,,,swarm,deathcloud:1.2:3,,40,s,
-cap_giant,갓 거인,3,300,24,10,1.4,0.8,9,6,1.0,2.4,0,40,12,12,glow_spore,80,,,,,#4F86E8,mushroom,fire:-25,,,heavy,,,100,l,myconid
-glow_shooter,빛 가시 버섯,3,24,9,0,1.6,0.35,9,6,0.8,2.0,30,20,6,8,glow_spore,30,ranged,7,4,,#A8E860,mushroom,fire:-25,,,shooter,rooted,,40,s,
-myconid_captain,버섯 지휘관,3,120,18,8,1.8,0.42,8,0.5,0.6,1.4,0,30,10,10,glow_spore,45,,,,,#E070B8,mushroom,fire:-25,,,heavy,deathcloud,,80,m,
-mycelium_mother,균사 어미,4,600,24,10,1.0,1.3,11,7,1.0,2.2,0,100,30,30,glow_spore,100,,,,,#9AB46A,,fire:-25,,,heavy,,,100,xl,
-frost_wolf,서리 늑대,2,64,15,5,3.0,0.4,10,0.5,0.5,1.0,0,22,7,8,ice_crystal,25,,,,,#C4D8EA,ice,cold:50|fire:-25,,,bruiser,,always,55,m,
-yeti,눈 거인,3,320,24,10,1.4,0.8,9,6,1.0,2.4,0,40,12,12,ice_crystal,80,,,,,#E4EEF6,ice,cold:75|fire:-25,cold,,heavy,,,100,l,
-frost_beetle,서리 딱정벌레,2,70,15,15,2.2,0.42,8,4,0.7,2.2,0,25,8,8,ice_crystal,40,,,,,#8CC0DC,ice,cold:50|fire:-25,,,bruiser,guard:120|stagger,,65,m,
-frost_lord,서리 정령 군주,3,120,22,5,2.0,0.34,10,7,0.7,1.6,0,30,10,10,ice_crystal,45,,,,,#7FC4EC,ice,cold:75|fire:-25,cold,,heavy,,,80,s,
-frost_mammoth,서리 매머드,4,700,28,20,1.1,1.3,11,1,1.0,2.2,0,100,30,30,ice_crystal,100,,,,,#8CA4BC,,cold:75|fire:-25,,,heavy,stagger:3|dormant:3,,100,xl,
-bomb_scarab,자폭 풍뎅이,2,26,10,10,2.4,0.32,9,0.5,0.6,1.2,0,12,4,6,amber,25,,,,,#3E9A92,sand,,,,swarm,,,40,s,
-great_worm,큰 모래 지렁이,3,300,24,10,1.3,0.75,10,6,1.0,2.0,0,40,12,12,amber,80,,,,,#B4824E,sand,,,,heavy,burrowed:3,,100,l,sand_worm
-sandstone_beetle,사암 딱정벌레,2,70,15,20,2.2,0.42,8,4,0.7,2.2,0,25,8,8,amber,40,,,,,#B48C56,sand,,,,bruiser,guard:120|stagger|burrowed:3,,65,m,
-scorpion_queen,전갈 여왕,3,180,22,15,2.2,0.45,9,0.6,0.55,1.1,0,30,10,10,amber,45,,,,,#B4542C,sand,,,,heavy,,,80,m,
-temple_guardian,신전 수호 석상,4,660,28,20,1.0,1.3,11,1,1.0,2.2,0,100,30,30,amber,100,,,,,#C8B084,,fire:25|cold:25,,,heavy,turn:90|dormant:3,,100,xl,
-crystal_mimic,결정 흉내쟁이,3,170,24,20,2.4,0.42,8,0.6,0.55,1.1,0,25,8,10,mithril_ore,45,,,,,#7C86A8,crystal,lightning:50,,,bruiser,mimic:2,,65,m,
-crystal_tortoise,수정 거북,3,340,24,25,1.3,0.8,9,1.2,0.9,2.2,0,40,12,12,mithril_ore,80,,,,,#7FB8D8,crystal,lightning:50|cold:25,,,heavy,guard:150:85|turn:70|reflect|stagger:2,,100,l,
-crystal_shooter,수정 가시 버섯,3,26,10,5,1.6,0.35,9,6,0.8,2.0,0,20,6,8,mithril_ore,30,ranged,8,4,,#7FF2FF,crystal,lightning:25,,,shooter,rooted,,40,s,
-prism_wisp,프리즘 정령,3,110,24,5,2.0,0.34,10,7,0.7,1.6,0,30,10,10,mithril_ore,45,,,,,#F0B8FF,crystal,lightning:75,,,heavy,prism,,80,s,
-geode_golem,정동 골렘,4,520,28,25,1.0,1.3,11,1,1.0,2.6,0,100,30,30,mithril_ore,100,,,,,#7E7A8E,,lightning:50|cold:25,,,heavy,dormant:3,,100,xl,
-tentacle,촉수,3,150,24,5,2.4,0.4,9,2,0.7,1.4,0,25,8,10,pearl,30,,,,,#5A8C78,lake,cold:50|fire:-25,,,shooter,shore:1|burrowed:2.5,,65,m,
-great_crab,큰 게,3,420,28,30,1.4,0.8,9,1.5,0.9,2.2,0,40,12,12,pearl,80,,,,,#3E8AA0,lake,cold:50|fire:-25,,,heavy,guard:140:60|turn:90,,100,l,
-mud_slime,진흙 슬라임,3,80,18,5,2.0,0.42,8,0.5,0.55,1.1,0,22,7,8,pearl,25,,,,,#7A6A48,lake,cold:25,,,swarm,split:2|trail:sand:2,always,45,m,
-tide_chief,물살 정령 무리장,3,240,26,10,2.4,0.34,10,7,0.6,1.4,0,30,10,10,pearl,45,,,,,#3AE0D0,lake,cold:50|lightning:-25,cold,,heavy,,,80,s,
-moss_turtle,이끼등 거북,4,900,28,30,0.9,1.3,11,1,1.0,2.2,0,100,30,30,pearl,100,,,,,#5E7E4A,,cold:50|fire:-25,,,heavy,guard:120:60|dormant:3,,100,xl,
-salamander,불도롱뇽,3,150,26,10,2.6,0.4,9,0.5,0.55,1.1,0,25,8,10,obsidian_ore,30,,,,,#E8642A,lava,fire:75|cold:-25,fire,,bruiser,,,65,m,
-magma_hurler,용암 투석꾼,3,420,30,20,1.4,0.8,9,6,1.0,2.6,0,40,12,12,obsidian_ore,80,,,,,#5E3C34,lava,fire:75|cold:-25,fire,,heavy,stagger:2,,100,l,
-obsidian_beetle,흑요석 딱정벌레,3,90,18,25,2.2,0.42,8,4,0.7,2.2,0,25,8,8,obsidian_ore,40,,,,,#3E3248,lava,fire:75|cold:-25,,,bruiser,guard:120|stagger,,65,m,
-forge_slime,대장간 용암 슬라임,3,250,30,20,2.0,0.45,8,0.5,0.55,1.1,0,30,10,10,obsidian_ore,45,,,,,#D04A18,lava,fire:75|cold:-25,fire,,heavy,trail:fire:3,,80,m,
-forge_keeper,잿불 대장장이,4,950,30,30,1.0,1.3,11,1,1.0,2.4,0,100,30,30,obsidian_ore,100,,,,,#5A4A44,,fire:75|cold:-25,,,heavy,turn:90|dormant:4.5,,100,xl,
-void_eye,공허의 눈,4,170,44,5,1.2,0.4,11,9,0.8,1.8,0,30,12,12,void_ore,30,,,7,,#8A5ADA,abyss,lightning:50|cold:25,cold,,shooter,,,65,m,
-void_splitter,분열체,4,520,44,15,1.6,0.8,10,1.2,0.9,2.0,0,40,12,12,void_ore,80,,,,,#4A3088,abyss,lightning:50|cold:25,,,heavy,split:2:void_shard,,80,l,
-void_shard,공허 조각,4,130,32,10,2.2,0.4,9,0.5,0.6,1.2,0,15,4,4,void_ore,20,,,,,#6A48B0,abyss,lightning:50|cold:25,,,bruiser,split:2:void_mote,,30,m,
-void_mote,공허 티끌,4,52,20,0,3.0,0.24,9,0.4,0.45,0.8,0,8,2,2,void_ore,10,,,,,#A07AF0,abyss,lightning:50,,,swarm,,,12,xs,
-star_slime,별빛 슬라임,4,150,36,10,2.2,0.42,8,0.5,0.55,1.1,0,22,8,8,void_ore,25,,,,,#2E2A62,abyss,lightning:50|cold:25,cold,,swarm,deathburst:4:30,always,45,m,
-shadow_stalker,그림자 추적자,4,420,52,25,3.0,0.45,10,0.6,0.5,1.0,0,30,12,12,void_ore,45,,,,,#2C1C4E,abyss,cold:50,,,heavy,,,80,m,
-gate_warden,공허의 문지기,4,900,34,30,1.0,1.3,12,1,1.0,2.4,0,100,30,30,void_ore,100,,,,,#3E2E5E,,lightning:50|cold:25,cold,,heavy,dormant:4.5,,100,xl,
+id,name,level,health,damage,armor,speed,radius,aggro,reach,windup,cooldown,weight,drop_chance,rune_chance,potion_chance,material,material_chance,behavior,shot_speed,keep_distance,charge_speed,color,biome,resist,element,place,role,traits,pack,reward,size,base,band
+slime,슬라임,1,18,24,0,2.4,0.4,8,0.5,0.5,1.0,100,20,6,8,slime_gel,30,melee,,,,#8CD94D,,,,,swarm,split:2,always,45,m,,1
+spore_shooter,가시 버섯,2,19,35,0,1.6,0.35,9,6,0.8,2.0,60,20,6,8,mushroom_spore,25,ranged,7,4,,#B07CE0,,fire:-25,,,shooter,rooted,,40,s,,1
+cave_beetle,동굴 딱정벌레,2,60,29,15,2.2,0.42,8,4,0.7,2.2,50,25,8,8,copper_ore,40,charge,,,10,#A0703C,,,,,bruiser,guard:120|stagger,,65,m,,1
+crystal_bat,수정 박쥐,3,57,36,10,3.6,0.3,9,0.5,0.35,0.9,60,25,8,10,mithril_ore,30,melee,,,,#7CD2E2,crystal,,,,swarm,orbit:3|deathburst:4:50,always,45,s,,2
+crystal_wisp,수정 정령,3,60,41,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,mithril_ore,25,ranged,9,4.5,,#C8F4FF,crystal,lightning:50,,,shooter,,,65,s,,2
+myconid,버섯 병정,2,70,37,5,1.8,0.4,8,0.5,0.6,1.4,70,22,7,8,glow_spore,35,melee,,,,#C86ED8,mushroom,fire:-25,,,bruiser,deathcloud,,40,m,,2
+glow_bat,빛 박쥐,3,54,36,5,3.8,0.3,9,0.5,0.35,0.9,60,25,8,10,glow_spore,30,melee,,,,#5FE0C8,mushroom,,,,swarm,orbit:3,always,45,s,,2
+ice_slime,얼음 슬라임,2,90,50,10,1.8,0.42,8,0.5,0.6,1.2,70,22,7,8,ice_crystal,25,melee,,,,#8CC8F0,ice,cold:75|fire:-25,cold,,bruiser,deathburst:6:40:fire,,65,m,,2
+frost_wisp,서리 정령,3,60,54,0,2.0,0.33,10,7,0.7,1.6,45,25,10,10,ice_crystal,30,ranged,9,4.5,,#BFE8FF,ice,cold:75|fire:-25,cold,,shooter,,,65,s,,2
+magma_slime,용암 슬라임,3,160,64,15,2.0,0.42,8,0.5,0.55,1.1,60,25,8,10,obsidian_ore,30,melee,,,,#E0541E,lava,fire:75|cold:-25,fire,,bruiser,trail:fire:3,,65,m,,3
+fire_bat,불 박쥐,3,72,33,5,3.8,0.3,9,0.5,0.35,0.9,50,25,8,10,obsidian_ore,20,melee,,,,#FF8A3A,lava,fire:75,fire,,swarm,orbit:3,always,45,s,,3
+void_wisp,공허 정령,4,200,74,10,2.2,0.33,10,7,0.7,1.5,45,30,12,12,void_ore,25,ranged,10,4.5,,#A07CFF,abyss,lightning:50|cold:25,cold,,shooter,,,65,s,,4
+abyss_stalker,심연 추적자,4,355,69,25,3.0,0.45,10,0.6,0.5,1.0,55,30,12,12,void_ore,25,charge,,,14,#5E3E96,abyss,cold:50,,,heavy,,,,m,,4
+lake_crab,호수 게,3,240,64,25,2.0,0.42,8,0.55,0.5,1.0,55,25,8,10,pearl,30,melee,,,,#4AA0B4,lake,cold:50|fire:-25,,,bruiser,guard:140:50|turn:120,,65,m,,3
+tide_wisp,물살 정령,3,135,83,5,2.4,0.32,10,7,0.6,1.4,45,25,8,10,pearl,25,ranged,9,4.5,,#5AD2E6,lake,cold:50|lightning:-25,cold,,support,,,65,s,,3
+sand_scorpion,모래 전갈,2,140,56,20,2.3,0.42,8,0.6,0.55,1.1,55,25,8,10,amber,30,melee,,,,#D2A050,sand,,,,bruiser,,always,55,m,,2
+sand_worm,모래 지렁이,2,72,40,5,1.6,0.38,10,7,0.7,1.6,45,25,8,10,amber,25,ranged,8,4.5,,#C8965A,sand,,,,shooter,burrowed:2.5,,55,m,,2
+demon_soldier,마족 병사,4,72,36,12,2.6,0.42,8,0.6,0.5,1.0,100,25,8,8,void_ore,20,melee,,,,#8A2A3A,,fire:25|cold:-15,,demon_nest,swarm,guard:100:50|aura:guard:1.5:20,always,45,m,,2
+demon_caster,마족 주술사,4,75,41,4,2.0,0.38,10,7,0.8,2.2,60,25,10,10,void_essence,8,ranged,7,5,,#6A3A9A,,cold:-20,fire,demon_nest,support,,,65,m,,2
+silk_spiderling,새끼 거미,4,320,110,8,3.4,0.3,10,0.5,0.35,0.9,0,0,0,0,,,melee,,,,#4A3260,,,,,,,,,s,,5
+big_slime,큰 슬라임,2,80,41,5,1.7,0.75,8,0.6,0.8,1.6,0,30,8,10,slime_gel,60,melee,,,,#6FC23E,,,,,bruiser,split:2:slime,,65,l,slime,1
+slime_king,슬라임 왕,3,420,64,20,1.2,1.3,10,0.8,1.0,2.0,0,100,30,30,slime_gel,100,melee,,,,#5DBB3A,,,,,heavy,split:3:big_slime,,100,xl,big_slime,1
+cave_rat,동굴 쥐,1,8,26,0,3.2,0.22,9,0.4,0.45,0.8,0,8,3,4,cave_potato_seed,15,,,,,#9A8470,cave,,,,swarm,fearlight,always,25,xs,,1
+big_beetle,큰 딱정벌레,2,240,42,20,1.5,0.78,9,4,1.0,2.4,0,40,12,12,copper_ore,80,,,,,#8E5E34,cave,,,,heavy,stagger:2.5,,100,l,cave_beetle,1
+armored_beetle,철갑 딱정벌레,3,110,32,30,2.0,0.42,8,4,0.8,2.4,0,30,10,10,iron_ore,45,,,,,#6E7480,cave,,,,bruiser,guard:160:85|stagger,,80,m,,1
+slime_mother,어미 슬라임,3,600,59,15,1.1,1.3,10,0.8,1.0,2.0,0,100,30,30,slime_gel,100,,,,,#7FCB45,,,,,heavy,shed:slime:10|split:2:big_slime,,100,xl,,1
+puffball,포자 주머니,2,14,23,0,2.6,0.32,9,0.5,0.9,1.0,0,12,4,6,glow_spore,25,,,,,#D8D070,mushroom,fire:-50,,,swarm,deathcloud:1.2:3,,40,s,,2
+cap_giant,갓 거인,3,300,59,10,1.4,0.8,9,6,1.0,2.4,0,40,12,12,glow_spore,80,,,,,#4F86E8,mushroom,fire:-25,,,heavy,,,100,l,myconid,2
+glow_shooter,빛 가시 버섯,3,24,54,0,1.6,0.35,9,6,0.8,2.0,30,20,6,8,glow_spore,30,ranged,7,4,,#A8E860,mushroom,fire:-25,,,shooter,rooted,,40,s,,2
+myconid_captain,버섯 지휘관,3,120,37,8,1.8,0.42,8,0.5,0.6,1.4,0,30,10,10,glow_spore,45,,,,,#E070B8,mushroom,fire:-25,,,heavy,deathcloud,,80,m,,2
+mycelium_mother,균사 어미,4,600,115,10,1.0,1.3,11,7,1.0,2.2,0,100,30,30,glow_spore,100,,,,,#9AB46A,,fire:-25,,,heavy,,,100,xl,,2
+frost_wolf,서리 늑대,2,64,45,5,3.0,0.4,10,0.5,0.5,1.0,0,22,7,8,ice_crystal,25,,,,,#C4D8EA,ice,cold:50|fire:-25,,,bruiser,,always,55,m,,2
+yeti,눈 거인,3,320,59,10,1.4,0.8,9,6,1.0,2.4,0,40,12,12,ice_crystal,80,,,,,#E4EEF6,ice,cold:75|fire:-25,cold,,heavy,,,100,l,,2
+frost_beetle,서리 딱정벌레,2,70,45,15,2.2,0.42,8,4,0.7,2.2,0,25,8,8,ice_crystal,40,,,,,#8CC0DC,ice,cold:50|fire:-25,,,bruiser,guard:120|stagger,,65,m,,2
+frost_lord,서리 정령 군주,3,120,66,5,2.0,0.34,10,7,0.7,1.6,0,30,10,10,ice_crystal,45,,,,,#7FC4EC,ice,cold:75|fire:-25,cold,,heavy,,,80,s,,2
+frost_mammoth,서리 매머드,4,700,91,20,1.1,1.3,11,1,1.0,2.2,0,100,30,30,ice_crystal,100,,,,,#8CA4BC,,cold:75|fire:-25,,,heavy,stagger:3|dormant:3,,100,xl,,2
+bomb_scarab,자폭 풍뎅이,2,26,24,10,2.4,0.32,9,0.5,0.6,1.2,0,12,4,6,amber,25,,,,,#3E9A92,sand,,,,swarm,,,40,s,,2
+great_worm,큰 모래 지렁이,3,300,62,10,1.3,0.75,10,6,1.0,2.0,0,40,12,12,amber,80,,,,,#B4824E,sand,,,,heavy,burrowed:3,,100,l,sand_worm,2
+sandstone_beetle,사암 딱정벌레,2,70,45,20,2.2,0.42,8,4,0.7,2.2,0,25,8,8,amber,40,,,,,#B48C56,sand,,,,bruiser,guard:120|stagger|burrowed:3,,65,m,,2
+scorpion_queen,전갈 여왕,3,180,76,15,2.2,0.45,9,0.6,0.55,1.1,0,30,10,10,amber,45,,,,,#B4542C,sand,,,,heavy,,,80,m,,2
+temple_guardian,신전 수호 석상,4,660,79,20,1.0,1.3,11,1,1.0,2.2,0,100,30,30,amber,100,,,,,#C8B084,,fire:25|cold:25,,,heavy,turn:90|dormant:3,,100,xl,,2
+crystal_mimic,결정 흉내쟁이,3,170,41,20,2.4,0.42,8,0.6,0.55,1.1,0,25,8,10,mithril_ore,45,,,,,#7C86A8,crystal,lightning:50,,,bruiser,mimic:2,,65,m,,2
+crystal_tortoise,수정 거북,3,340,58,25,1.3,0.8,9,1.2,0.9,2.2,0,40,12,12,mithril_ore,80,,,,,#7FB8D8,crystal,lightning:50|cold:25,,,heavy,guard:150:85|turn:70|reflect|stagger:2,,100,l,,2
+crystal_shooter,수정 가시 버섯,3,26,49,5,1.6,0.35,9,6,0.8,2.0,0,20,6,8,mithril_ore,30,ranged,8,4,,#7FF2FF,crystal,lightning:25,,,shooter,rooted,,40,s,,2
+prism_wisp,프리즘 정령,3,110,47,5,2.0,0.34,10,7,0.7,1.6,0,30,10,10,mithril_ore,45,,,,,#F0B8FF,crystal,lightning:75,,,heavy,prism,,80,s,,2
+geode_golem,정동 골렘,4,520,94,25,1.0,1.3,11,1,1.0,2.6,0,100,30,30,mithril_ore,100,,,,,#7E7A8E,,lightning:50|cold:25,,,heavy,dormant:3,,100,xl,,2
+tentacle,촉수,3,150,57,5,2.4,0.4,9,2,0.7,1.4,0,25,8,10,pearl,30,,,,,#5A8C78,lake,cold:50|fire:-25,,,shooter,shore:1|burrowed:2.5,,65,m,,3
+great_crab,큰 게,3,420,92,30,1.4,0.8,9,1.5,0.9,2.2,0,40,12,12,pearl,80,,,,,#3E8AA0,lake,cold:50|fire:-25,,,heavy,guard:140:60|turn:90,,100,l,,3
+mud_slime,진흙 슬라임,3,80,53,5,2.0,0.42,8,0.5,0.55,1.1,0,22,7,8,pearl,25,,,,,#7A6A48,lake,cold:25,,,swarm,split:2|trail:sand:2,always,45,m,,3
+tide_chief,물살 정령 무리장,3,240,94,10,2.4,0.34,10,7,0.6,1.4,0,30,10,10,pearl,45,,,,,#3AE0D0,lake,cold:50|lightning:-25,cold,,heavy,,,80,s,,3
+moss_turtle,이끼등 거북,4,900,135,30,0.9,1.3,11,1,1.0,2.2,0,100,30,30,pearl,100,,,,,#5E7E4A,,cold:50|fire:-25,,,heavy,guard:120:60|dormant:3,,100,xl,,3
+salamander,불도롱뇽,3,150,64,10,2.6,0.4,9,0.5,0.55,1.1,0,25,8,10,obsidian_ore,30,,,,,#E8642A,lava,fire:75|cold:-25,fire,,bruiser,,,65,m,,3
+magma_hurler,용암 투석꾼,3,420,94,20,1.4,0.8,9,6,1.0,2.6,0,40,12,12,obsidian_ore,80,,,,,#5E3C34,lava,fire:75|cold:-25,fire,,heavy,stagger:2,,100,l,,3
+obsidian_beetle,흑요석 딱정벌레,3,90,64,25,2.2,0.42,8,4,0.7,2.2,0,25,8,8,obsidian_ore,40,,,,,#3E3248,lava,fire:75|cold:-25,,,bruiser,guard:120|stagger,,65,m,,3
+forge_slime,대장간 용암 슬라임,3,250,71,20,2.0,0.45,8,0.5,0.55,1.1,0,30,10,10,obsidian_ore,45,,,,,#D04A18,lava,fire:75|cold:-25,fire,,heavy,trail:fire:3,,80,m,,3
+forge_keeper,잿불 대장장이,4,950,126,30,1.0,1.3,11,1,1.0,2.4,0,100,30,30,obsidian_ore,100,,,,,#5A4A44,,fire:75|cold:-25,,,heavy,turn:90|dormant:4.5,,100,xl,,3
+void_eye,공허의 눈,4,170,53,5,1.2,0.4,11,9,0.8,1.8,0,30,12,12,void_ore,30,,,7,,#8A5ADA,abyss,lightning:50|cold:25,cold,,shooter,,,65,m,,4
+void_splitter,분열체,4,520,115,15,1.6,0.8,10,1.2,0.9,2.0,0,40,12,12,void_ore,80,,,,,#4A3088,abyss,lightning:50|cold:25,,,heavy,split:2:void_shard,,80,l,,4
+void_shard,공허 조각,4,130,88,10,2.2,0.4,9,0.5,0.6,1.2,0,15,4,4,void_ore,20,,,,,#6A48B0,abyss,lightning:50|cold:25,,,bruiser,split:2:void_mote,,30,m,,4
+void_mote,공허 티끌,4,52,78,0,3.0,0.24,9,0.4,0.45,0.8,0,8,2,2,void_ore,10,,,,,#A07AF0,abyss,lightning:50,,,swarm,,,12,xs,,4
+star_slime,별빛 슬라임,4,150,72,10,2.2,0.42,8,0.5,0.55,1.1,0,22,8,8,void_ore,25,,,,,#2E2A62,abyss,lightning:50|cold:25,cold,,swarm,deathburst:4:30,always,45,m,,4
+shadow_stalker,그림자 추적자,4,420,57,25,3.0,0.45,10,0.6,0.5,1.0,0,30,12,12,void_ore,45,,,,,#2C1C4E,abyss,cold:50,,,heavy,,,80,m,,4
+gate_warden,공허의 문지기,4,900,165,30,1.0,1.3,12,1,1.0,2.4,0,100,30,30,void_ore,100,,,,,#3E2E5E,,lightning:50|cold:25,cold,,heavy,dormant:4.5,,100,xl,,4

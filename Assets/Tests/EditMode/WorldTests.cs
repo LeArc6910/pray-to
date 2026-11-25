@@ -273,8 +273,11 @@ namespace Game.Core.Tests
 
             Run(world, 2 + World.Ticks(Slime.Windup));
 
-            // Copper armor's lowest rolls: Armor+6 and MaxHealth+5. The slime's bite × 100 / 106, rounded.
-            Assert.AreEqual(105 - Combat.Mitigate(Slime.Damage, 6), player.Health, 0.01f);
+            // Copper armor's lowest rolls: Armor+6 and MaxHealth+5. The slime's bite through 6 armor against the copper
+            // band's 13 (DamageBands): × 1 / (1 + 2.5 × (6 / 13)²), rounded.
+            Assert.AreEqual(1, Slime.Band);
+            Assert.AreEqual(105 - DamageBands.Taken(Slime.Damage, 6, 1), player.Health, 0.01f);
+            Assert.Less(DamageBands.Taken(Slime.Damage, 6, 1), Slime.Damage);
         }
 
         [Test]

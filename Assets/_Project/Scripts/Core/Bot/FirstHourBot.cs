@@ -84,6 +84,7 @@ namespace Game.Core
         {
             Memory.Observe();
             if (_world.Tick % ClaimEvery == 0) Claim();
+            if (_world.Tick % ClaimEvery == 2) WearBetter();
             if (_player.IsDead)
             {
                 _world.SetAttacking(_player.Id, false);
@@ -91,6 +92,7 @@ namespace Game.Core
                 return;
             }
             Drink();
+            if (Roll()) return;
             // A chest, cart or shrine it walks by it uses (Docs/WorldRework.md 3단계 확인: 봇이 지나며 연 볼거리).
             if (_world.Tick % ClaimEvery == 1 && _world.PoiNear(_player.Position, _player) is Poi poi && poi.Kind != PoiKind.Station) UsePoi(poi);
             // Shut in a trap room (World.Traps.cs): its bands are fought to the last before anything else.
@@ -142,6 +144,40 @@ namespace Game.Core
             }
         }
 
+        // The dodge roll (2026-11-25, Docs/Difficulty.md: a hit of a boss now takes two fifths of the health, and the
+        // guide tells a new player to roll): at the last moment through a blow about to land (BotRoll), away from the
+        // middle of a mark on the floor or across a shot or a charge; the roll's ticks taken as the client takes them.
+        Vec2 _rolling;
+
+        bool Roll()
+        {
+            if (!_player.Rolling) _rolling = Vec2.Zero;
+            if (_rolling.LengthSquared < 1e-6f && _player.RollCooldown == 0 && BotRoll.Threatened(_world, _player, out var away))
+            {
+                if (away.LengthSquared < 1e-6f) away = OutOfMarks();
+                if (away.LengthSquared < 1e-6f) away = _player.Facing;
+                if (_world.Roll(_player.Id, away)) _rolling = _player.RollDirection;
+            }
+            if (_rolling.LengthSquared < 1e-6f) return false;
+            _world.SetAttacking(_player.Id, false);
+            var to = PlayerMotor.Roll(_world.Map, _player.Position, _rolling, World.RollSlow(_player.Afflictions.Chilled, _player.Afflictions.Snared), _world.DoorsFor(_player));
+            _world.MovePlayer(_player.Id, to, _player.Facing, 1, rolling: true);
+            return true;
+        }
+
+        // Away from the middle of the marks about to land on the player.
+        Vec2 OutOfMarks()
+        {
+            var away = Vec2.Zero;
+            foreach (var hazard in _world.Hazards)
+            {
+                if (hazard.Lingers || hazard.Damage <= 0 || !hazard.Contains(_player.Position, World.PlayerRadius)) continue;
+                var off = _player.Position - hazard.Position;
+                if (off.LengthSquared > 1e-6f) away += off.Normalized;
+            }
+            return away.LengthSquared > 1e-6f ? away.Normalized : Vec2.Zero;
+        }
+
         void Drink()
         {
             if (_player.Health >= _player.Stats.MaxHealth * 0.4f || _player.ConsumableCooldown > 0) return;
@@ -179,6 +215,14 @@ namespace Game.Core
                         return;
                     case "have":
                         if (Have(goal, condition)) return;
+                        break;
+                    // A band's armor (2026-11-25): the first of the tier's helmet, chest and boots it has none of, made and worn.
+                    case "armor":
+                        var facts = GuideFacts.Of(_world, _player);
+                        var missing = GuideFacts.ArmorSlots.FirstOrDefault(slot => facts.GearLevel(slot) < condition.Count);
+                        string piece = condition.Id + (missing == ItemSlot.Helmet ? "_helmet" : missing == ItemSlot.Chest ? "_armor" : "_boots");
+                        Doing = $"{condition.Id} 방어구: {piece}";
+                        if (Obtain(goal, piece)) return;
                         break;
                 }
             }
@@ -315,6 +359,17 @@ namespace Game.Core
             recipe.Material != null ? _player.Inventory.CountOf(recipe.Material)
             : recipe.Consumable != null ? _player.Inventory.CountOf(recipe.Consumable)
             : _player.Inventory.Items.Count(i => i.Base == recipe.Item);
+
+        // Armor and jewellery in the bag it may wear, on a slot that has none or a lower tier's (2026-11-25: things made
+        // over time came into the bag after the bot had moved on, and it fought the first boss in no armor at all).
+        void WearBetter()
+        {
+            foreach (var item in _player.Inventory.Items.Where(i => i.Base.Slot != ItemSlot.Weapon && i.Base.RequiredLevel <= _player.Level).ToList())
+            {
+                var worn = _player.Equipment[item.Base.Slot];
+                if (worn == null || worn.Base.Level < item.Base.Level) _world.EquipItem(_player.Id, item.Id);
+            }
+        }
 
         void WearIfGear(string id)
         {

@@ -71,8 +71,10 @@ namespace Game.Core
         // A rift monster's health and hit against its sheet at tier 1, and how much more each tier adds.
         const float RiftHealth = 7f;
         const float RiftHealthPerTier = 2.2f;
-        const float RiftPower = 2.3f;
-        const float RiftPowerPerTier = 0.6f;
+        // Its hits (2026-11-25, Docs/Difficulty.md): a kind of any band is brought up to the void band's (DamageBands.HealthOf),
+        // then RiftPower at the first tier and RiftPowerPerTier more each tier after.
+        public const float RiftPower = 1;
+        public const float RiftPowerPerTier = 0.25f;
         // How far from the altar its monsters appear.
         const float RiftInner = 3;
         const float RiftOuter = 7;
@@ -144,19 +146,30 @@ namespace Game.Core
             float health = (RiftHealth + RiftHealthPerTier * (rift.Tier - 1)) * ((rift.Affixes & RiftAffix.Tough) != 0 ? 1.5f : 1);
             float power = (RiftPower + RiftPowerPerTier * (rift.Tier - 1)) * ((rift.Affixes & RiftAffix.Fierce) != 0 ? 1.3f : 1);
             float speed = (rift.Affixes & RiftAffix.Swift) != 0 ? 1.3f : 1;
-            // Only the deepest monsters come through: the rift opens after the last boss.
-            int deepest = _monsters.Monsters.Max(m => m.Level);
-            // Not the big bodies (L, XL): a rift's waves pour out of its mouth (World.Sizes.cs).
-            var kinds = _monsters.Monsters.Where(m => m.Level >= deepest - 1 && !m.Big).ToList();
+            var kinds = RiftKinds(_monsters.Monsters);
             if (rift.Wave > RiftWaves)
             {
                 var strongest = kinds.OrderByDescending(m => m.Health).First();
-                SpawnRiftMonster(strongest, health * (5 + rift.Tier), power * 1.5f, speed, RiftGuardian);
+                SpawnRiftMonster(strongest, health * (5 + rift.Tier), power * RiftGuardianPower, speed, RiftGuardian);
                 return;
             }
             int count = (5 + rift.Tier) * ((rift.Affixes & RiftAffix.Swarm) != 0 ? 3 : 2) / 2;
             for (int i = 0; i < count; i++) SpawnRiftMonster(kinds[_random.Next(kinds.Count)], health, power, speed, RiftMonster);
         }
+
+        public const float RiftGuardianPower = 1.5f;
+
+        // Only the deepest monsters come through: the rift opens after the last boss. Not the big bodies (L, XL): a
+        // rift's waves pour out of its mouth (World.Sizes.cs).
+        public static List<MonsterDefinition> RiftKinds(IReadOnlyList<MonsterDefinition> monsters)
+        {
+            int deepest = monsters.Max(m => m.Level);
+            return monsters.Where(m => m.Level >= deepest - 1 && !m.Big).ToList();
+        }
+
+        // A rift monster's hits against its sheet at a tier, before the fierce affix and a guardian's share.
+        public static float RiftPowerAt(int tier, MonsterDefinition kind) =>
+            (RiftPower + RiftPowerPerTier * (tier - 1)) * DamageBands.HealthOf(DamageBands.Bands) / DamageBands.HealthOf(kind.Band);
 
         void SpawnRiftMonster(MonsterDefinition kind, float health, float power, float speed, int rank)
         {
@@ -169,7 +182,7 @@ namespace Game.Core
                 if (!Map.InBounds(TileMap.Cell(at.X), TileMap.Cell(at.Y)) || Collision.Overlaps(Map, at, kind.Radius)) continue;
                 var enemy = SpawnEnemy(kind, at);
                 enemy.MaxHealth = enemy.Health = kind.Health * health;
-                enemy.Power = power;
+                enemy.Power = power * DamageBands.HealthOf(DamageBands.Bands) / DamageBands.HealthOf(kind.Band);
                 enemy.SpeedScale = speed;
                 enemy.Rift = rank;
                 rift.Monsters.Add(enemy);

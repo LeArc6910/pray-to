@@ -30,6 +30,8 @@ namespace CoreSandbox
     // dotnet run -- --economy                         coins an hour from each way of earning them, against what the shop asks
     // dotnet run -- --factory [minutes]               iron bars an hour from small factories, against digging by hand
     // dotnet run -- --hour [minutes] [seed,seed,...] [map size, 512]  a new character's first hour by the guide (FirstHourBot), a table of numbers per seed
+    // dotnet run -- --hits [band|all]               what one hit of every monster, elite and boss attack takes off a character
+    //                                                 of its band: no gear, the band below's gear, the band's (Docs/Difficulty.md)
     // dotnet run -- --supply                          which system supplies which, from the sheets (Docs/Systems.md)
     // dotnet run -- --flow [seeds]                    steps from the spawn to the first veins, arena and places (Docs/WorldFlow.md)
     // dotnet run -- --pace [minutes] [seeds]          the pacing director's rhythm: a bot roaming a world of rooms, its tension
@@ -250,6 +252,10 @@ namespace CoreSandbox
                     PaceSim.Run(LoadSheets(data), Number(1, 30), paceSeeds, gearFlag >= 0 ? gear : new[] { "iron_sword", "iron_armor", "iron_helmet", "iron_boots" },
                         LoadClasses(classIds.Length > 0 ? classIds : new[] { "warrior" }), Director, SkillBot.Level ?? 8);
                     break;
+                case "--hits":
+                    var hitMonsters = LoadMonsters();
+                    HitsSim.Run(data, hitMonsters, LoadBosses(hitMonsters), args.Length > 1 ? args[1] : "all");
+                    break;
                 case "--boss":
                     var monsters = LoadMonsters();
                     BossSim.Run(data, monsters, LoadBosses(monsters), Number(1, 300), Seed(2), players, gear, LoadClasses(classIds), reaction, dodge, bossId);
@@ -267,6 +273,7 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --flow [seeds] [--gen 1|2|3|4|5|6|7]");
                     Console.WriteLine("       dotnet run -- --loadtime [seeds] [map size] [--gen 1|2|3|4|5|6|7]");
                     Console.WriteLine("       dotnet run -- --mapstats [seeds] [map size] [--gen 1|2|3|4|5|6|7]");
+                    Console.WriteLine("       dotnet run -- --hits [1-5|copper|iron|mithril|obsidian|void|all]");
                     Console.WriteLine("       dotnet run -- --pace [minutes] [seeds] [--gear ...] [--classes ...] [--level 8] [--no-director]");
                     break;
             }

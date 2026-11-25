@@ -57,9 +57,13 @@ namespace Game.Core.Tests
             // Every phase brings attacks of its own.
             for (int phase = 2; phase <= eater.PhaseCount; phase++)
                 Assert.IsTrue(eater.Attacks.Any(a => a.Phases.Count > 0 && a.Phases.Min() == phase), $"phase {phase} brings something new");
-            // The bosses from before are announced as they always were.
+            // The bosses from before are announced as they always were but for their one finishing blow (2026-11-25,
+            // Docs/Difficulty.md): strongly warned, nearly all of the health.
             foreach (var boss in Bosses.Shipped.Bosses.Where(b => b.Id != "vein_eater" && b.Id != "shrine_samurai" && b.Id != "black_knight" && b.Id != "silk_mother"))
-                Assert.IsTrue(boss.Attacks.All(a => a.Warning == AttackWarning.Marked), boss.Id);
+            {
+                Assert.AreEqual(1, boss.Attacks.Count(a => a.Warning == AttackWarning.Strong), boss.Id);
+                Assert.IsTrue(boss.Attacks.All(a => a.Warning == AttackWarning.Marked || a.Warning == AttackWarning.Strong), boss.Id);
+            }
             var wrong = Bosses.Parse(Bosses.BossesHeader + "dummy,허수아비,1000,50,0,2,1,,1,3,10\n", Header + "dummy,a,공격,,circle,nearest,1,30,2,,,,1,,,1,1,,loud\n");
             Assert.IsFalse(wrong.Success);
             Assert.IsTrue(wrong.Errors.Any(e => e.Contains("warn")), string.Join(" / ", wrong.Errors));

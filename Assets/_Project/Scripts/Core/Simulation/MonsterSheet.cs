@@ -35,6 +35,14 @@ namespace Game.Core
         // a bigger or smaller make of (monsters.csv base: a big slime of the slime), whose numbers its own are held to.
         public MonsterSize Size { get; internal set; } = MonsterSize.M;
         public string Base { get; internal set; }
+        // The band of gear it is met in (monsters.csv band, Docs/Difficulty.md: 1 copper … 5 void; from its biome when
+        // the column is blank): a player's armor is weighed against it.
+        int? _band;
+        public int Band
+        {
+            get => _band ?? DamageBands.BandOf(Biome);
+            internal set => _band = DamageBands.Clamp(value);
+        }
         // L or XL: it needs room to walk, comes only in rooms and keeps to its own (World.Packs.cs, Clearance).
         public bool Big => MonsterSizes.IsBig(Size);
         readonly List<MonsterAttack> _attacks = new List<MonsterAttack>();
@@ -253,6 +261,12 @@ namespace Game.Core
                         Size = size,
                         Base = row["base"].Length == 0 ? null : row["base"],
                     });
+                    if (row["band"].Length > 0)
+                    {
+                        int band = SheetValues.ParseNumber(row["band"], "band");
+                        if (band < 1 || band > DamageBands.Bands) throw new FormatException($"band는 1~{DamageBands.Bands}입니다(1 구리 … 5 공허).");
+                        monsters[monsters.Count - 1].Band = band;
+                    }
                 }
                 catch (FormatException e)
                 {

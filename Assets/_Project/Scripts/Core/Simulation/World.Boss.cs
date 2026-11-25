@@ -721,7 +721,7 @@ namespace Game.Core
             {
                 if (player.IsDead || !pool.Contains(player.Position, PlayerRadius)) continue;
                 if (pool.Shape == HazardShape.Web) player.Afflictions.SnareTicks = Math.Max(player.Afflictions.SnareTicks, Ticks(SnareSeconds));
-                else HurtPlayer(player, pool.Source, pool.Damage, pool.Cause, armor: false);
+                else HurtPlayer(player, pool.Source, pool.Damage, pool.Cause);
             }
         }
 

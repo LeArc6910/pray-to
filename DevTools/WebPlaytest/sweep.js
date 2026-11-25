@@ -3501,6 +3501,32 @@ async function firstRun(browser, profile, hourLong) {
     await game.wait(800);
     await passed(at('level3'), '레벨 3 되기');
 
+    // The copper armor before the warden (2026-11-25, Docs/Difficulty.md: a band's blows are made against its full
+    // armor): the helmet, chest and boots not yet worn, made at the workbench and worn.
+    for (const [name, id, ore] of [['구리 투구', 'copper_helmet', 4], ['구리 갑옷', 'copper_armor', 8], ['구리 장화', 'copper_boots', 4]]) {
+      if (Object.values((await inv()).worn || {}).includes(id)) continue;
+      if (items(await inv(), id) === 0) {
+        await copperFor(ore);
+        await walkTo('Workbench', `${name}을 만들려고 작업대로`);
+        await stationTab(game, name);
+        await game.press('만들 수 있는 것만', undefined, { quiet: true });
+        await game.press('만들기', new RegExp('^' + name), { quiet: true });
+        for (let i = 0; i < 10 && items(await inv(), id) === 0; i++) await game.wait(500);
+        await game.press('모두 보기', undefined, { quiet: true });
+        await closeBag(game);
+      }
+      if (items(await inv(), id) > 0) {
+        await bagTab(game, '장비');
+        await pick(game, new RegExp(name));
+        await game.press('장착');
+        await closeBag(game);
+      }
+    }
+    await game.wait(800);
+    const armored = (await inv()).worn || {};
+    note(`- 수호자 앞 구리 방어구: ${['copper_helmet', 'copper_armor', 'copper_boots'].filter(id => Object.values(armored).includes(id)).join(', ') || '없음'}`);
+    await passed(at('copper_armor_set'), '구리 방어구 갖추기');
+
     // The cave warden, fought with what the bot has: up to eight tries in ten minutes, back to the arena after a
     // fall. Two levels more first (the bot dodges slower than a person; at level 3 it fell five times and at level 4
     // eight, at level 6 none, 2026-11-10).

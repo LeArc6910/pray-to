@@ -129,6 +129,11 @@ namespace Game.Core
             return true;
         }
 
+        // A monster's blow on what is built (a wall, a ward stone) is this share of its blow on a player: its hits were
+        // made to be weighed against armor (2026-11-25, Docs/Difficulty.md), stone has none, and the defense was set by
+        // the hits before that.
+        public const float StructureShare = 0.3f;
+
         // A monster's blow on a built tile: it cracks like a wall being dug, and gives way at its hardness ×
         // BarrierHealthPerHardness. What it was drops there, and whatever a machine held.
         internal void DamageBarrier(Enemy enemy, int x, int y)
@@ -138,7 +143,7 @@ namespace Game.Core
             var tile = Tiles?.Find(Map[x, y]);
             float hardness = Math.Max(1, tile?.Hardness ?? 1);
             int key = y * Map.Width + x;
-            float damage = _wallDamage.GetValueOrDefault(key) + enemy.Damage / BarrierHealthPerHardness;
+            float damage = _wallDamage.GetValueOrDefault(key) + enemy.Damage * StructureShare / BarrierHealthPerHardness;
             bool broken = damage >= hardness - 1e-4f;
             int dug = broken ? DugThrough : Math.Clamp((int)MathF.Round(damage / hardness * 100), 1, DugThrough - 1);
             _events.Add(new SimEvent(SimEventType.Dug, enemy.Id, amount: dug, position: TileMap.Center(x, y)));
@@ -235,7 +240,7 @@ namespace Game.Core
                     return true;
                 }
                 enemy.StateTicks = Ticks(enemy.Definition.Cooldown + enemy.Definition.Windup);
-                defense.StoneHealth = Math.Max(0, defense.StoneHealth - enemy.Damage);
+                defense.StoneHealth = Math.Max(0, defense.StoneHealth - enemy.Damage * StructureShare);
                 _events.Add(new SimEvent(SimEventType.Attack, enemy.Id, direction: enemy.Facing));
                 return true;
             }

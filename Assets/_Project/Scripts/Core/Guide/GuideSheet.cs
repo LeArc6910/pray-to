@@ -16,7 +16,8 @@ namespace Game.Core
         }
 
         // "have", "place", "plant", "boss", "pet", "rune", "request", "reach", "level", "passive", "life", "rift", "friend", "skills", "rank",
-        // "classes", or the things to find of 묶음 4c: "poi" (Id the kind), "stone", "rail" and "rarity" (Count the rarity).
+        // "classes", or the things to find of 묶음 4c: "poi" (Id the kind), "stone", "rail" and "rarity" (Count the rarity), or
+        // "armor" (Id the tier, Count the level of the tier's gear: a helmet, chest and boots of that tier or later).
         public string Kind { get; }
         // What to have: a material, consumable or item base id.
         public string Id { get; }
@@ -93,8 +94,10 @@ namespace Game.Core
         public GuideFacts(Func<string, int> countOf, Func<TileType, bool> hasTile, bool hasCrop, float distanceFromSpawn, int level = 1,
             int passives = 0, Func<LifeSkill, int> lifeLevel = null, int riftTier = 1, int hearts = 0, int skillsSpent = 0, int topRank = 0,
             int classes = 0, Func<string, int> bossesFelled = null, bool hasPet = false, bool hasRune = false, bool didRequest = false,
-            Func<string, bool> found = null, bool hasStone = false, bool railFixed = false, Rarity bestRarity = Rarity.Common)
+            Func<string, bool> found = null, bool hasStone = false, bool railFixed = false, Rarity bestRarity = Rarity.Common,
+            Func<ItemSlot, int> gearLevel = null)
         {
+            GearLevel = gearLevel ?? (_ => 0);
             Found = found ?? (_ => false);
             HasStone = hasStone;
             RailFixed = railFixed;
@@ -119,6 +122,20 @@ namespace Game.Core
 
         // How many of a material, consumable or item base (carried or worn) the player has.
         public Func<string, int> CountOf { get; }
+        // The highest level of the gear for the slot the player carries or wears (0 for none): "armor" (2026-11-25).
+        public Func<ItemSlot, int> GearLevel { get; }
+
+        // The slots "armor" asks for: the ones a band's armor is (Docs/Difficulty.md).
+        public static readonly ItemSlot[] ArmorSlots = { ItemSlot.Helmet, ItemSlot.Chest, ItemSlot.Boots };
+
+        // How many of the armor slots hold gear of at least the level.
+        public int ArmorPieces(int level) => ArmorSlots.Count(slot => GearLevel(slot) >= level);
+
+        static Func<ItemSlot, int> GearLevels(IEnumerable<Item> items)
+        {
+            var list = items.ToList();
+            return slot => list.Where(i => i.Base.Slot == slot).Select(i => i.Base.Level).DefaultIfEmpty(0).Max();
+        }
         // How many times the player has felled the boss with this id (the bestiary's records).
         public Func<string, int> BossesFelled { get; }
         // A pet hatched and following, a rune set in worn gear, a person's request done once (2026-11-11).
@@ -179,7 +196,8 @@ namespace Game.Core
                 id => client.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0,
                 client.Pet != null, client.Equipment.Items.Any(i => i.Sockets.Any(r => r != null)),
                 client.Friendships.Values.Any(f => f.RequestDay > 0),
-                Found, client.OpenStones.Any(), client.Lines.Any(l => client.RailFixed(l.Index)), BestOf(client.Bag.Items.Concat(client.Equipment.Items)));
+                Found, client.OpenStones.Any(), client.Lines.Any(l => client.RailFixed(l.Index)), BestOf(client.Bag.Items.Concat(client.Equipment.Items)),
+                GearLevels(client.Bag.Items.Concat(client.Equipment.Items)));
         }
 
         // What an opened thing to find counts as for "poi": a chest of a treasure or trap room "chest", of a hidden room
@@ -221,7 +239,8 @@ namespace Game.Core
                 id => player.Records.TryGetValue((RecordKind.Boss, id), out int felled) ? felled : 0,
                 player.Pet != null, player.Equipment.Items.Any(i => i.Sockets.Any(r => r != null)),
                 player.Friendships.Values.Any(f => f.RequestDay > 0),
-                Found, world.OpenStones(player).Any(), world.FixedRails.Any(), BestOf(player.Inventory.Items.Concat(player.Equipment.Items)));
+                Found, world.OpenStones(player).Any(), world.FixedRails.Any(), BestOf(player.Inventory.Items.Concat(player.Equipment.Items)),
+                GearLevels(player.Inventory.Items.Concat(player.Equipment.Items)));
         }
     }
 
@@ -250,6 +269,8 @@ namespace Game.Core
         {
             "life_mining", "merchant", "passive", "anvil", "assembler", "power_pole", "keg", "coop", "crab_pot", "friend", "rift_altar", "rift",
             "free_power", "arc_furnace", "skill", "rank3", "serpent", "antlion", "level3", "class", "second_class", "third_class", "mad_general",
+            // A full band of armor before the first boss (2026-11-25, Docs/Difficulty.md).
+            "copper_armor_set",
             // The things to find (묶음 4c).
             "camp", "shrine", "chest", "wanderer", "waystone", "minecart", "hidden", "elite", "vault",
         };
@@ -311,6 +332,7 @@ namespace Game.Core
                     "classes" => facts.Classes,
                     _ => -1,
                 };
+                if (condition.Kind == "armor") return $"{facts.ArmorPieces(condition.Count)}/{GuideFacts.ArmorSlots.Length}";
                 if (have >= 0 && condition.Count > 1) return $"{Math.Min(have, condition.Count)}/{condition.Count}";
             }
             return null;
@@ -319,6 +341,7 @@ namespace Game.Core
         public static bool IsMet(GoalCondition condition, GuideFacts facts) => condition.Kind switch
         {
             "have" => facts.CountOf(condition.Id) >= condition.Count,
+            "armor" => facts.ArmorPieces(condition.Count) >= GuideFacts.ArmorSlots.Length,
             "place" => facts.HasTile(condition.Tile),
             "plant" => facts.HasCrop,
             "boss" => facts.BossesFelled(condition.Id) >= 1,
@@ -398,6 +421,14 @@ namespace Game.Core
                     int count = parts.Length == 3 ? SheetValues.ParseNumber(parts[2], "개수") : 1;
                     if (count < 1) throw new FormatException("개수는 1 이상이어야 합니다.");
                     return new GoalCondition("have", id, count, default);
+                // armor:<tier>: a helmet, chest and boots of the tier or a later one carried or worn (2026-11-25,
+                // Docs/Difficulty.md: a band's hits are made against its full armor).
+                case "armor":
+                    int tier = parts.Length == 2 ? Array.IndexOf(DamageBands.TierNames, parts[1]) : -1;
+                    if (tier < 0) throw new FormatException($"'{text}'는 armor:<{string.Join("|", DamageBands.TierNames)}>로 적습니다.");
+                    var helmet = loot.Bases.FirstOrDefault(b => b.Id == parts[1] + "_helmet")
+                        ?? throw new FormatException($"'{parts[1]}_helmet'이 아이템에 없습니다.");
+                    return new GoalCondition("armor", parts[1], helmet.Level, default);
                 case "place":
                     if (parts.Length != 2) throw new FormatException($"'{text}'는 place:<칸 종류>로 적습니다.");
                     return new GoalCondition("place", null, 0, SheetValues.ParseEnum<TileType>(parts[1], "칸 종류"));
@@ -456,7 +487,7 @@ namespace Game.Core
                     if (lifeLevel < 1 || lifeLevel > LifeSkills.MaxLevel) throw new FormatException($"생활 기술 레벨은 1~{LifeSkills.MaxLevel}이어야 합니다.");
                     return new GoalCondition("life", parts[1].ToLowerInvariant(), lifeLevel, default);
                 default:
-                    throw new FormatException($"알 수 없는 조건 '{text}' (have, place, plant, boss, pet, rune, request, reach, level, passive, life, rift, friend, skills, rank, classes, poi, stone, rail, rarity 중 하나)");
+                    throw new FormatException($"알 수 없는 조건 '{text}' (have, armor, place, plant, boss, pet, rune, request, reach, level, passive, life, rift, friend, skills, rank, classes, poi, stone, rail, rarity 중 하나)");
             }
         }
 

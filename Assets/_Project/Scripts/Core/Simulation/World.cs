@@ -630,6 +630,9 @@ namespace Game.Core
         // land it, so falling, a boss's phases and its drops happen the usual way.
         internal int Hurt(Player player, float damage) => HurtPlayer(player, 0, damage, armor: false);
 
+        // For the tests: a blow of the monster's on the player, through their armor weighed against its band.
+        internal int Hurt(Player player, Enemy from, float damage) => HurtPlayer(player, from.Id, damage, dodge: false);
+
         // For the playtests and tests: the player's hit on the monster, as a blow of theirs would land.
         internal void Hurt(Enemy enemy, Player by, float damage, SkillTag tags = SkillTag.None) => HitEnemy(by, enemy, damage, false, by.Position, tags);
 
@@ -638,7 +641,8 @@ namespace Game.Core
             if (!boss.IsDead) DamageBoss(boss, 0, amount, false);
         }
 
-        // Returns the damage dealt. A burn's damage is not lessened by armor. A blow (dodge) passes through a player in
+        // Returns the damage dealt. A burn's damage is not lessened again by armor (a pool's burn and a poison are worked
+        // out from what got through, World.Through). A blow (dodge) passes through a player in
         // the unhurt ticks of a roll (World.Roll.cs); a burn already on them does not.
         int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true, bool dodge = true)
         {
@@ -646,7 +650,7 @@ namespace Game.Core
             // Nothing touches one riding a minecart (World.Travel.cs).
             if (player.Riding) return 0;
             if (dodge && Dodges(player, source)) return 0;
-            int amount = armor ? Combat.Mitigate(damage, player.Stats.Armor) : Math.Max(1, (int)MathF.Round(damage));
+            int amount = armor ? DamageBands.Taken(damage, player.Stats.Armor, BandOf(source, player)) : Math.Max(1, (int)MathF.Round(damage));
             BreakRecall(player);
             BreakDungeonCharge(player);
             EndFishing(player, FishingReeled);
@@ -671,6 +675,25 @@ namespace Game.Core
             _events.Add(new SimEvent(SimEventType.Died, player.Id));
             return amount;
         }
+
+        // The band of whatever dealt a hit (Difficulty): a monster's, a boss's by its level; a gone monster's shot or pool,
+        // or the ground itself (an icicle, a vent), the band of the biome the player stands in.
+        int BandOf(int source, Player player)
+        {
+            if (source != 0)
+            {
+                if (FindEnemy(source) is Enemy enemy) return enemy.Band;
+                foreach (var boss in _bosses) if (boss.Id == source) return DamageBands.BandOfLevel(boss.Definition.Level);
+            }
+            return BandAt(player.Position);
+        }
+
+        public int BandAt(Vec2 position) =>
+            DamageBands.BandOf(Biomes[Math.Clamp(TileMap.Cell(position.X), 0, Map.Width - 1), Math.Clamp(TileMap.Cell(position.Y), 0, Map.Height - 1)]);
+
+        // A hit of the band that comes as a burn or a poison's bites rather than a blow: as much as armor would let
+        // through, unrounded.
+        float Through(Player player, float damage, int source) => DamageBands.Through(damage, player.Stats.Armor, BandOf(source, player));
 
         static float Gap(Enemy enemy, Player player) =>
             Vec2.Distance(enemy.Position, player.Position) - enemy.Definition.Radius - PlayerRadius;
@@ -745,9 +768,10 @@ namespace Game.Core
         public const float DespawnReach = 64;
 
         // A field monster further out is tougher (2026-11-11, the owner's decision on the content audit's 4th point):
-        // each zone past the first adds half its health, a third of its hits and the experience of a level.
+        // each zone past the first adds half its health and the experience of a level. Its hits no longer grow with the
+        // zone (2026-11-25, Docs/Difficulty.md): how hard a hit lands is its band's, weighed against the player's armor.
         public const float ZoneHealthStep = 0.5f;
-        public const float ZonePowerStep = 0.35f;
+        public const float ZonePowerStep = 0;
 
         void ToughenForZone(Enemy enemy, int zone)
         {

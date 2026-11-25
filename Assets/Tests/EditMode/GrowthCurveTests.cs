@@ -21,9 +21,10 @@ namespace Game.Core.Tests
         // Sword hits to bring the boss down, through its armour.
         static float HitsToKill(BossDefinition boss, PlayerStats stats) => boss.Health * (100 + boss.Armor) / 100f / stats.Damage;
 
-        // The share of the character's health the boss's hardest blow takes, through their armour.
+        // The share of the character's health the boss's hardest blow takes, through their armour weighed against the
+        // boss's band (DamageBands).
         static float WorstHit(BossDefinition boss, PlayerStats stats) =>
-            Combat.Mitigate(boss.Attacks.Max(a => a.Damage), stats.Armor) / stats.MaxHealth;
+            DamageBands.Taken(boss.Attacks.Max(a => a.Damage), stats.Armor, DamageBands.BandOfLevel(boss.Level)) / stats.MaxHealth;
 
         [Test]
         public void EveryLevelAddsHealthAndDamageAndEveryTenthIsAStep()
@@ -128,10 +129,14 @@ namespace Game.Core.Tests
 
                 float slower = HitsToKill(boss, behind) / HitsToKill(boss, ready);
                 Assert.Greater(slower, 2f, $"{boss.Id}: the tier below takes over twice as long ({slower:0.00})");
-                float harder = WorstHit(boss, behind) / WorstHit(boss, ready);
-                Assert.Greater(harder, 1.4f, $"{boss.Id}: and its hardest blow takes a far bigger share of their health ({harder:0.00})");
-                // Dressed for it, no one blow takes half the character's health; the fight is not a coin toss.
-                Assert.Less(WorstHit(boss, ready), 0.5f, boss.Id);
+                // Its finishing blow (2026-11-25, Docs/Difficulty.md): dressed for it, nearly all of the health but not quite,
+                // so a full health bar lives through one; a tier down, well past all of it.
+                // The sets at the middle of their rolls (HitTable.Wearing): the lowest rolls of the tier do not live through it.
+                var middle = PlayerStats.From(HitTable.Wearing(Gear.Data, tier + 1), level: boss.Level + 1);
+                var middleBehind = PlayerStats.From(HitTable.Wearing(Gear.Data, tier), level: tier * 10 - 1);
+                Assert.That(WorstHit(boss, middle), Is.InRange(0.85f, 0.96f), boss.Id);
+                Assert.Greater(WorstHit(boss, ready), 0.96f, $"{boss.Id}: the tier's lowest rolls do not");
+                Assert.Greater(WorstHit(boss, middleBehind), 1.6f, $"{boss.Id}: a tier down its finishing blow kills outright");
             }
         }
 
@@ -159,12 +164,15 @@ namespace Game.Core.Tests
         public void ABiomesMonstersGrowWithTheGearThatReachesThem()
         {
             float Health(string id) => Monsters.Shipped.Find(id).Health;
-            float Hit(string id) => Monsters.Shipped.Find(id).Damage;
-            // Iron's crystal cave, mithril's lava, obsidian's abyss: each step hits harder and stands longer.
+            // Iron's crystal cave, mithril's lava, obsidian's abyss: each step stands longer.
             Assert.Greater(Health("magma_slime"), Health("crystal_bat") * 1.5f);
             Assert.Greater(Health("abyss_stalker"), Health("magma_slime") * 1.8f);
-            Assert.Greater(Hit("magma_slime"), Hit("crystal_bat") * 1.2f);
-            Assert.Greater(Hit("abyss_stalker"), Hit("magma_slime") * 1.5f);
+            // And hits harder: the usual hit of the ordinary (XS~M) monsters of each band, on average, well over the band
+            // below's (they are made against the band's health, DamageBands).
+            float Usual(int band) => Monsters.Shipped.Monsters.Where(m => m.Band == band && !m.Big)
+                .Average(m => m.Damage * DamageBands.UsualPercent(m) / 100f);
+            for (int band = 2; band <= 4; band++)
+                Assert.Greater(Usual(band), Usual(band - 1) * 1.3f, $"band {band}");
         }
     }
 }

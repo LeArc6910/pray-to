@@ -21,9 +21,9 @@ namespace Game.Core
         public const float VentTelegraph = 1;
         public const float VentBurst = 0.6f;
         public const float VentRadius = 1;
-        // A burst's damage at the first zone (more by the zone, as an icicle's), and the share of a monster's health it
-        // takes (less for a big body, its fire resistance besides).
-        public const float VentDamage = 20;
+        // A burst's damage (a hit of the band of the ground, Docs/Difficulty.md: about 5% of the health in mithril gear),
+        // and the share of a monster's health it takes (less for a big body, its fire resistance besides).
+        public const float VentDamage = 48;
         public const float VentMonsterShare = 0.15f;
         // Only the vents this near a player hiss: no one would see the rest.
         public const int VentReach = 14;
@@ -120,8 +120,7 @@ namespace Game.Core
         VentPuff Puff(int x, int y)
         {
             var at = TileMap.Center(x, y);
-            int zone = Math.Max(1, ZoneLevelAt(at));
-            int damage = Math.Max(1, (int)MathF.Round(VentDamage * (1 + ZonePowerStep * (zone - 1))));
+            int damage = (int)VentDamage;
             var hazard = new Hazard(_nextId++, 0, 0, HazardShape.Circle, at, new Vec2(0, 1), VentRadius, 0, damage, Tick, Tick + Ticks(VentTelegraph))
             {
                 Mark = Hazard.Steam,

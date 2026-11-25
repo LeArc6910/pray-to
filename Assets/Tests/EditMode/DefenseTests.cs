@@ -14,10 +14,10 @@ namespace Game.Core.Tests
         static readonly MaterialDefinition Coin = Gear.Data.FindMaterial(World.Coin);
 
         // A big room with a ward stone in the middle (20, 20) and the player beside it, below.
-        static World Base(out Player player, bool stone = true)
+        static World Base(out Player player, bool stone = true, Equipment gear = null)
         {
             var world = new World(Maps.Room(40), TileMap.Center(20, 18), Monsters.Shipped, 3, new WorldConfig { EnemyTarget = 0 }, Gear.Data, Tiles.Shipped);
-            player = world.AddPlayer("a", null);
+            player = world.AddPlayer("a", gear);
             if (stone) Place(world, player, StoneItem, 20, 20, new Vec2(0, 1));
             return world;
         }
@@ -231,7 +231,8 @@ namespace Game.Core.Tests
         [Test]
         public void ATeslaTowerRunsOnPowerAndItsBoltLeaps()
         {
-            var world = Base(out var player, stone: false);
+            // Dressed so the slimes the tower waits on cannot fell them meanwhile (Docs/Difficulty.md).
+            var world = Base(out var player, stone: false, gear: Gear.Wearing("obsidian_armor", "obsidian_helmet"));
             Place(world, player, Gear.Data.FindMaterial("tesla_tower"), 20, 20, new Vec2(0, 1));
             var slime = Monsters.Shipped.Monsters.First(m => m.Id == "slime");
             var near = new[] { new Vec2(24, 20.5f), new Vec2(25.5f, 20.5f), new Vec2(26.5f, 21.5f), new Vec2(30, 30) }

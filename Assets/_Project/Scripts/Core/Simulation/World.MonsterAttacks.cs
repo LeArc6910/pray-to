@@ -1032,7 +1032,7 @@ namespace Game.Core
                 case HitEffect.Venom:
                     int bites = Math.Max(1, Ticks(amount) / Ticks(VenomSeconds));
                     player.Afflictions.PoisonTicks = bites * Ticks(VenomSeconds);
-                    player.Afflictions.PoisonBite = Math.Max(1, blow * PoisonShare / bites);
+                    player.Afflictions.PoisonBite = Math.Max(1, Through(player, blow, source) * PoisonShare / bites);
                     player.Afflictions.PoisonSource = source;
                     break;
                 case HitEffect.Chill:
@@ -1127,7 +1127,7 @@ namespace Game.Core
                 switch (pool.Shape)
                 {
                     case HazardShape.Fire:
-                        player.Afflictions.Burn(pool.Damage, TicksPerSecond, pool.Source);
+                        player.Afflictions.Burn(Through(player, pool.Damage, pool.Source), TicksPerSecond, pool.Source);
                         break;
                     case HazardShape.Ice:
                         player.Afflictions.ChillTicks = Math.Max(player.Afflictions.ChillTicks, Ticks(SnareSeconds));
@@ -1136,7 +1136,7 @@ namespace Game.Core
                         player.Afflictions.SnareTicks = Math.Max(player.Afflictions.SnareTicks, Ticks(SnareSeconds));
                         break;
                     case HazardShape.Spore:
-                        if (bites) HurtPlayer(player, pool.Source, pool.Damage, pool.Cause, armor: false);
+                        if (bites) HurtPlayer(player, pool.Source, pool.Damage, pool.Cause);
                         break;
                 }
             }

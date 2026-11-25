@@ -32,9 +32,13 @@ namespace Game.Core
         // three minutes, five times a pack).
         public const float LeaderHealth = 4;
         public const float BigLeaderHealth = 2;
-        public const float LeaderPower = 1.5f;
+        // Hits (2026-11-25, Docs/Difficulty.md): a leader's and a champion's usual hit about 10% of the health of a player
+        // in the band's gear (35~40% with none), against an ordinary monster's 6%; a big (L) leader's a little over its
+        // own kind's 10%.
+        public const float LeaderPower = 1.7f;
+        public const float BigLeaderPower = 1.2f;
         public const float ChampionHealth = 2.5f;
-        public const float ChampionPower = 1.25f;
+        public const float ChampionPower = 1.7f;
         // The affixes' numbers: a third faster, half again the health, a third harder, half again the minions.
         public const float SwiftShare = 1.33f;
         public const float ToughShare = 1.5f;
@@ -264,7 +268,7 @@ namespace Game.Core
             // they are, with the affixes on top.
             bool xl = enemy.Definition.Size == MonsterSize.XL;
             float health = rank == EliteRank.Leader ? xl ? 1 : enemy.Definition.Big ? BigLeaderHealth : LeaderHealth : ChampionHealth;
-            float power = rank == EliteRank.Leader ? xl ? 1 : LeaderPower : ChampionPower;
+            float power = rank == EliteRank.Leader ? xl ? 1 : enemy.Definition.Big ? BigLeaderPower : LeaderPower : ChampionPower;
             if ((affixes & RiftAffix.Tough) != 0) health *= ToughShare;
             if ((affixes & RiftAffix.Fierce) != 0) power *= FierceShare;
             if ((affixes & RiftAffix.Swift) != 0) enemy.SpeedScale *= SwiftShare;

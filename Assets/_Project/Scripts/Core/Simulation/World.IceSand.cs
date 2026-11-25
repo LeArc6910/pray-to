@@ -37,7 +37,8 @@ namespace Game.Core
         // While a fight is on (a monster within IcicleFightReach is after them) and they stand in the ice cave in a wide
         // place (World.Wide) within IcicleWallReach of rock, an icicle falls near a player every IcicleMin~IcicleMax
         // seconds: its shadow on the floor IcicleTelegraph before, IcicleRadius wide, IcicleSpread at most from them. It
-        // hurts the player for IcicleDamage (more by the zone) and chills, and a monster under it for a share of its
+        // hurts the player for IcicleDamage (a hit of the band of the ground it falls on, Docs/Difficulty.md: about 5% of
+        // the health in iron gear) and chills, and a monster under it for a share of its
         // health (a big body less): luring them under is the hall's question.
         public const float IcicleWallReach = 2.5f;
         public const float IcicleFightReach = 12;
@@ -46,7 +47,7 @@ namespace Game.Core
         public const float IcicleTelegraph = 1f;
         public const float IcicleRadius = 0.8f;
         public const float IcicleSpread = 1.6f;
-        public const float IcicleDamage = 16;
+        public const float IcicleDamage = 34;
         public const float IcicleChill = 1.5f;
         public const float IcicleMonsterShare = 0.25f;
         const int IcicleCheckTicks = 6;
@@ -117,9 +118,7 @@ namespace Game.Core
                 if (marks >= MaxMarksPerTarget) continue;
                 var spot = IcicleSpot(player.Position);
                 if (spot == null) continue;
-                int zone = Math.Max(1, ZoneLevelAt(spot.Value));
-                int damage = Math.Max(1, (int)MathF.Round(IcicleDamage * (1 + ZonePowerStep * (zone - 1))));
-                var hazard = new Hazard(_nextId++, 0, 0, HazardShape.Circle, spot.Value, new Vec2(0, -1), IcicleRadius, 0, damage, Tick, Tick + Ticks(IcicleTelegraph))
+                var hazard = new Hazard(_nextId++, 0, 0, HazardShape.Circle, spot.Value, new Vec2(0, -1), IcicleRadius, 0, (int)IcicleDamage, Tick, Tick + Ticks(IcicleTelegraph))
                 {
                     Mark = Hazard.Icicle,
                     Effect = HitEffect.Chill,

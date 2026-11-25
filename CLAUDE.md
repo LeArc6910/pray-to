@@ -46,6 +46,8 @@ dotnet run --project DevTools/CoreSandbox -- --mapstats 1,2,3
 dotnet run --project DevTools/CoreSandbox -- --supply
 dotnet run --project DevTools/CoreSandbox -- --defense 6 42 --gear iron_sword,iron_helmet,iron_armor,iron_boots --classes warrior --turrets 3
 dotnet run --project DevTools/CoreSandbox -- --rift 7 42 --players 2 --gear void_sword,void_helmet,void_armor,void_boots --classes warrior,fire_mage
+# 한 방이 최대 생명력에서 가져가는 몫: 모든 몬스터·정예·보스 공격을 맨몸 / 앞 단계 장비 / 제 단계 장비로, 목표와 견준 ✓·✗(Docs/Difficulty.md, 시험 DifficultyTests가 같은 표를 잡는다). 단계 하나만은 --hits iron처럼
+dotnet run --project DevTools/CoreSandbox -- --hits
 dotnet run --project DevTools/CoreSandbox -- --skills 60 --gear iron_sword
 dotnet run --project DevTools/CoreSandbox -- --supports 60 --gear iron_sword
 # 새 캐릭터의 첫 한 시간을 안내대로(상태와 길찾기로 움직이는 봇, Docs/Playtest.md). 시드마다 지표 표와 막힘 보고서

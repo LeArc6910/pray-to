@@ -41,11 +41,12 @@ namespace Game.Core.Tests
         }
 
         [Test]
-        public void ShippedPotionHealsAThirdOverTwoSeconds()
+        // 2026-11-25 (Docs/Difficulty.md): two fifths at once-ish against hits of a fifth and more, and a longer wait.
+        public void ShippedPotionHealsTwoFifthsInASecond()
         {
-            Assert.AreEqual(35, Potion.Heal);
-            Assert.AreEqual(2, Potion.Seconds, 0.001f);
-            Assert.AreEqual(10, Potion.Cooldown, 0.001f);
+            Assert.AreEqual(40, Potion.Heal);
+            Assert.AreEqual(1, Potion.Seconds, 0.001f);
+            Assert.AreEqual(12, Potion.Cooldown, 0.001f);
         }
 
         [Test]
@@ -111,17 +112,18 @@ namespace Game.Core.Tests
 
             Assert.IsTrue(world.UseConsumable(player.Id, Potion));
             var healed = world.TakeEvents().Single(e => e.Type == SimEventType.Healed);
-            Assert.AreEqual(35, healed.Amount);
+            Assert.AreEqual(40, healed.Amount);
             Assert.AreEqual(1, player.Inventory.CountOf(Potion));
 
-            Run(world, 1);
-            Assert.AreEqual(77.5f, player.Health, 0.6f, "half of it after one second");
-            Run(world, 1);
-            Assert.AreEqual(95, player.Health, 0.01f);
+            Run(world, 0.5f);
+            Assert.AreEqual(80, player.Health, 0.7f, "half of it after half a second");
+            Run(world, 0.5f);
+            Assert.AreEqual(100, player.Health, 0.01f);
+            Assert.Greater(player.ConsumableCooldown, World.Ticks(10), "every consumable waits");
             Assert.IsFalse(world.UseConsumable(player.Id, Potion), "still waiting");
 
             Run(world, 11);
-            Assert.AreEqual(player.Stats.MaxHealth, player.Health, "rested the last of it back");
+            Assert.AreEqual(0, player.ConsumableCooldown);
             Assert.IsFalse(world.UseConsumable(player.Id, Potion), "nothing to heal");
             Assert.AreEqual(1, player.Inventory.CountOf(Potion));
         }
