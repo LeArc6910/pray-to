@@ -284,6 +284,21 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 
 사람에게 남는 것: 수정 동굴이 보라가 아니라 회청 돌에 분홍·하늘 결정으로 읽히는지, 숨 쉬는 빛이 어지럽지 않은지, 호수의 물가(얕은 가장자리, 갈대, 연잎)가 자연스러운지, 유리 종소리와 물결·개구리 소리, 점판암 마을과 기둥 위 오두막이 그 땅의 집으로 느껴지는지, 물고기 그림자와 개구리가 휴대폰에서 적과 헷갈리지 않는지.
 
+### 용암 지대와 공허의 심연 (묶음 B4a, 2026-11-25)
+
+`biomes`와 `places` 두 구역이 용암 지대와 공허의 심연도 돈다(`goto room pack lava 1`, `goto room pack abyss 1`). 위와 같은 확인에 더해:
+
+- `scene biomes`는 그 생물군계의 소품을 북쪽 줄에 세운다(용암: 흑요석 가시, 불 피는 덤불, 쇳물 찌꺼기 더미, 식은 용암 바위, 현무암 기둥 무리 / 심연: 공허 결정, 뒤틀린 덩굴, 떠 있는 오벨리스크 조각, 끊긴 사슬 말뚝, 떠 있는 바위, 부서진 공허 기둥). 용암 지대에서는 남동쪽에 용암 4×3칸을 깔고 그 가운데에 용암 속 바위를 세운다. 켜진 등잔은 놓지 않는다
+- 빛 색은 용암 `#FF7A30`, 심연 `#401D73`(보라 `#6A30C0`의 60%), 환경음은 `Forge`, `Abyss`, 작은 생물은 `FireNewt`·`EmberMoth`, `VoidJelly`·`ShadowMoth`
+- `biomes`의 `tintNow`를 0.9초 간격으로 여섯 번 읽어, 모든 색이 제 빛 색을 어둡게 한 것(채널의 비율이 같다)인지. 용암은 읽은 값이 셋 넘게 다른지(느린 깜박임). 심연은 어둠의 물결이 지나갈 때만 바뀌어 같은 값이어도 된다
+- 용암: `lava`(아홉 칸 안의 용암 칸)가 6 이상이고 `bubbles` + `rafts`(용암 가의 식은 용암 거품, 용암 위의 껍질 조각)가 1 이상인지
+- 심연: `lightReach`가 0.7인지(심연에서는 모든 빛이 반지름의 70%만 닿는다, 화면만)
+- `biomes at bush`(용암) / `biomes at vine`(심연) 뒤 휘두르면 그 소품이 하나 주는지(사진 `biomes-lava-hit`, `biomes-abyss-hit`), `biomes at columns` / `biomes at shattered`(현무암 기둥 무리 / 부서진 공허 기둥 바로 뒤)에서 위쪽이 흐려지는지(사진 `biomes-lava-behind`, `biomes-abyss-behind`). 용암 지대의 꾸밈은 흔들리는 것이 없어 스치기 확인을 건너뛴다(심연의 떠 있는 돌은 스치면 흔들린다)
+- `scene places`는 여덟 가지를 그 생물군계의 그림으로(`shape` 7은 용암, 8은 심연), 남쪽에 용암은 쓰러진 대장간 굴뚝과 거대 모루, 심연은 깨진 문과 별 제단을 놓는다. 새 월드가 생성기 7판인지도 본다
+- 생성기가 놓은 것: `chimneys`·`anvils`·`gates`·`altars`가 0보다 크면 `places at chimney|anvil|gate|altar`로 가서 한 장(사진 `places-lava-chimney`, `places-lava-anvil`, `places-abyss-gate`, `places-abyss-altar`)
+
+사람에게 남는 것: 용암 지대가 검은 현무암에 빛나는 틈으로, 심연이 보랏빛 검은 판과 별빛으로 읽히는지, 용암 빛의 깜박임과 심연의 어둠 물결이 어지럽지 않은지, 심연에서 줄어든 빛이 답답하지 않은지, 대장간 소리(김, 먼 망치)와 심연의 웅웅·거꾸로 숨소리, 대장간 마을과 떠 있는 폐허 마을이 그 땅의 집으로 느껴지는지, 불도롱뇽·빛 해파리가 휴대폰에서 적과 헷갈리지 않는지.
+
 ## 크기 등급 (`sizes`, 2026-11-24)
 
 `Docs/BiomeRework.md` B0b의 크기 틀을 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only sizes`. PC와 휴대폰 세로에서:
