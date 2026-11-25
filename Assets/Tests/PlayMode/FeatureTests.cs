@@ -48,7 +48,7 @@ namespace Game.Client.Tests
         IEnumerator Start()
         {
             _root.StartSolo();
-            yield return new WaitForSecondsRealtime(1);
+            yield return TestSaves.UntilPlaying(_root, 1);
             Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
             Assert.IsNotNull(_root.HostWorld, "A solo game hosts its own world.");
             Player.ChangeKit(new[] { "warrior", "fire_mage" }.Select(id => _root.ClassSheet.Classes.First(c => c.Id == id)).ToList(), null);
@@ -193,7 +193,7 @@ namespace Game.Client.Tests
         public IEnumerator ClassPickDraws()
         {
             _root.StartSolo();
-            yield return new WaitForSecondsRealtime(1);
+            yield return TestSaves.UntilPlaying(_root, 1);
             Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
             Assert.AreEqual(0, _root.SkillCount, "A new character starts with no class.");
             _root.ShowBag("스킬");

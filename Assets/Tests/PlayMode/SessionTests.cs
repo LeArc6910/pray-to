@@ -46,7 +46,7 @@ namespace Game.Client.Tests
         public IEnumerator SoloSessionRuns()
         {
             _root.StartSolo();
-            yield return new WaitForSecondsRealtime(Seconds);
+            yield return TestSaves.UntilPlaying(_root, Seconds);
             yield return Screens.Take("solo");
             Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
             Assert.Greater(Object.FindObjectsByType<SpriteRenderer>().Length, 0, "Nothing was drawn.");
@@ -59,7 +59,7 @@ namespace Game.Client.Tests
         public IEnumerator EverySkillCanBeUsed()
         {
             _root.StartSolo();
-            yield return new WaitForSecondsRealtime(1);
+            yield return TestSaves.UntilPlaying(_root, 1);
             Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
             Assert.AreEqual(0, _root.SkillCount, "Expected a new character to start with no class.");
             _root.HostPlayer.ChangeKit(new[] { "warrior", "fire_mage" }.Select(id => _root.ClassSheet.Classes.First(c => c.Id == id)).ToList(), null);
@@ -91,7 +91,7 @@ namespace Game.Client.Tests
             try
             {
                 _root.StartSolo();
-                yield return new WaitForSecondsRealtime(1);
+                yield return TestSaves.UntilPlaying(_root, 1);
                 Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
                 Assert.AreEqual("copper_sword", _root.HeldWeaponId);
 
@@ -124,14 +124,14 @@ namespace Game.Client.Tests
             try
             {
                 _root.StartSolo();
-                yield return new WaitForSecondsRealtime(2);
+                yield return TestSaves.UntilPlaying(_root, 2);
                 Assert.IsTrue(_root.Playing, "The solo session never started playing. " + _root.Status);
                 _root.Leave();
                 Assert.IsTrue(SaveStore.Exists(SaveStore.WorldKey(name)), "no world save");
                 Assert.IsTrue(SaveStore.Exists(SaveStore.CharacterKey(name)), "no character save");
 
                 _root.StartSolo();
-                yield return new WaitForSecondsRealtime(2);
+                yield return TestSaves.UntilPlaying(_root, 2);
                 Assert.IsTrue(_root.Playing, "The saved world did not load. " + _root.Status);
                 _root.Leave();
             }
@@ -146,7 +146,7 @@ namespace Game.Client.Tests
         public IEnumerator HostSessionRuns()
         {
             _root.StartHost();
-            yield return new WaitForSecondsRealtime(Seconds);
+            yield return TestSaves.UntilPlaying(_root, Seconds);
             Assert.IsTrue(_root.Playing, "The host session never started playing. " + _root.Status);
         }
     }
