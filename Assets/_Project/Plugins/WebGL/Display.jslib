@@ -18,7 +18,8 @@ mergeInto(LibraryManager.library, {
   // over the field so the input method's window opens beside it; the game draws its value. The page (index.html) keeps
   // Unity's key listener off the box and notes Enter, Esc and Tab on it (gameKey).
 
-  TextInputOpen: function (textPtr, max, x, y, width, height) {
+  // A password field gets a password box (its letters hidden, and no input method).
+  TextInputOpen: function (textPtr, max, x, y, width, height, password) {
     var input = document.getElementById("game-text");
     if (!input) {
       input = document.createElement("input");
@@ -30,6 +31,7 @@ mergeInto(LibraryManager.library, {
       input.style.cssText = "position:fixed;margin:0;padding:0;border:0;outline:none;opacity:0;background:transparent;font-size:16px;pointer-events:none;";
       document.body.appendChild(input);
     }
+    input.type = password ? "password" : "text";
     input.style.left = x + "px";
     input.style.top = y + "px";
     input.style.width = Math.max(1, width) + "px";

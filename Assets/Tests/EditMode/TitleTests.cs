@@ -262,6 +262,54 @@ namespace Game.Core.Tests
             Assert.AreEqual(unchecked((14695981039346656037UL ^ (ulong)'a') * 1099511628211UL), NewWorld.Seed("a", 0), "FNV-1a, the same on every device");
         }
 
+        // A random seed is nine digits (2026-11-26: the clock's ticks gave eighteen), far apart for close clock
+        // readings, the same for the same reading; typed back it makes the same world.
+        [Test]
+        public void RandomSeedsAreShortAndReadable()
+        {
+            var seen = new HashSet<ulong>();
+            ulong ticks = 638_999_000_000_000_000UL;
+            for (ulong i = 0; i < 2000; i++)
+            {
+                ulong seed = NewWorld.RandomSeed(ticks + i);
+                string text = seed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                Assert.AreEqual(9, text.Length, text);
+                Assert.AreEqual(seed, NewWorld.Seed(text, 1), "typed back, the same seed");
+                seen.Add(seed);
+            }
+            Assert.AreEqual(2000, seen.Count, "close clock readings give different seeds");
+            Assert.AreEqual(NewWorld.RandomSeed(42), NewWorld.RandomSeed(42));
+            Assert.AreEqual(NewWorld.RandomSeed(0) >= NewWorld.RandomSeedLeast, true);
+            Assert.AreEqual("123456789", NewWorld.SeedLabel("", 123456789));
+            Assert.AreEqual("12345", NewWorld.SeedLabel(" 12345 ", 12345));
+            Assert.AreEqual("잠든 광산", NewWorld.SeedLabel(" 잠든 광산 ", NewWorld.Seed("잠든 광산", 1)), "words show as typed");
+        }
+
+        // The look's choices have a line each in the string sheet (2026-11-26: Korean only before), with the Korean the
+        // code keeps (HeroArt.*Names) and an English one.
+        [Test]
+        public void EveryLookChoiceHasItsLineInTheStringSheet()
+        {
+            var sheet = StringSheet.Parse(File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Strings/" + StringSheet.File)));
+            string source = File.ReadAllText(RepoFile.Find("Assets/_Project/Scripts/Client/Art/HeroArt.Looks.cs"));
+            var keys = new Dictionary<string, string>
+            {
+                ["Hair"] = "look.hair", ["HairColor"] = "look.hair_color", ["Skin"] = "look.skin", ["Eye"] = "look.eyes", ["Shirt"] = "look.shirt", ["Pants"] = "look.pants",
+            };
+            var arrays = System.Text.RegularExpressions.Regex.Matches(source, "public static readonly string\\[\\] (\\w+)Names = \\{ (.*?) \\};");
+            Assert.AreEqual(keys.Count, arrays.Count, "six lists of names");
+            foreach (System.Text.RegularExpressions.Match array in arrays)
+            {
+                var names = System.Text.RegularExpressions.Regex.Matches(array.Groups[2].Value, "\"([^\"]*)\"").Select(m => m.Groups[1].Value).ToList();
+                for (int i = 0; i < names.Count; i++)
+                {
+                    string id = keys[array.Groups[1].Value] + "." + i;
+                    Assert.AreEqual(names[i], sheet.Get(id, "ko", "(시트에 없음)"), id);
+                    Assert.AreNotEqual("(없음)", sheet.Get(id, "en", "(없음)"), id + " in English");
+                }
+            }
+        }
+
         [Test]
         public void RandomWorldNamesFitTheField()
         {

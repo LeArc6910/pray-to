@@ -11,6 +11,13 @@
 - **로컬에서 할 일**: 명령 한 줄을 다시 돌려야 하는지, 플레이로 확인할 것이 있는지. 없으면 "없음"
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
+## 2026-11-26 00:55 시작화면 남은 것 마무리
+
+- **바뀐 것**: `Docs/TitleRework.md` "남은 것"과 웹 점검 뒤 남은 것. (1) PC 웹 한글: 플레이어가 적는 칸을 모두 찾아(`TextField`·`PasswordField` 셋) 시작화면 칸과 같은 페이지 글 상자로(`WebText`). 펫 이름 칸은 "펫 이름 칸"으로 이름 붙이고 Enter로 이름 짓기(`WebText.Submitted`), 클라우드 "아이디 칸"·"비밀번호 칸"은 GUILayout 줄에 맞춘 `WebText.LayoutField`(비밀번호는 페이지의 `password` 상자, 화면에는 *). `Ui.Probe`를 `WebText.Field` 안으로 옮겨 칸마다 웹 점검이 이름으로 찾는다. (2) 외형 선택지 이름 52개를 문자열 시트로(`look.hair.0`~`look.pants.11`, 한국어 그대로, 영어 더함). (3) 비운 시드는 시계 틱(18자리) 대신 그것을 섞은 아홉 자리(`NewWorld.RandomSeed`), 한 번 정하면 보통 숫자 시드, 적은 글·숫자는 전처럼. 글로 적은 시드는 목록 줄에 그 글로(`NewWorld.SeedLabel`). (4) ↑↓로 고른 단어가 쪽의 목록 밖이면 목록이 따라 굴러간다(`GameRoot.KeepInView`). Playtest `title`에 `newWorldSeed`·`scroll`. 시험 1141개(새 둘: 시드, 외형 이름 시트), 에디터·웹 컴파일
+- **요청 대조**: (6) 펫 이름·클라우드 아이디·비밀번호 칸 — 코드·웹 점검(`npc` 한글 펫 이름과 Enter, `save` 아이디 칸에 한글·아이디와 비밀번호)·문서 됨, 다른 `TextField`는 없다(grep). (7) 외형 이름 영어 — 시트·코드·시험·문서 됨, 웹 점검은 따로 없음(영어 화면 점검은 시작화면만 본다). (8) 짧은 시드 — Core·시험·Playtest·웹 점검(`title`: PC는 적은 12345 그대로, 휴대폰은 아홉 자리)·문서 됨. (9) 목록 따라 굴리기 — 코드·웹 점검(`menu` 설정의 ↑↓)·문서 됨. 빠진 것: 캐릭터·월드 목록 자체로 굴리기를 보는 웹 점검(캐릭터를 여럿 만들어야 해서 설정 목록으로 봤다, 같은 코드)
+- **로컬에서 할 일**: 180단계(명령 한 줄, 새 파일 없음)
+- **로컬 확인**: [ ]
+
 ## 2026-11-26 00:53 네이티브 빌드 준비(PC·휴대폰 앱)
 
 - **바뀐 것**: 웹 브라우저가 대신 해 주던 것을 앱이 스스로 하게(`Docs/NativeBuild.md`, 설계 원칙 7). (1) 프레임: 휴대폰 앱은 Unity 기본 30 대신 60, 설정 [프레임: 30]이면 30(휴대폰 앱에만 보임), PC 앱은 vSync(화면 주사율), 웹·에디터는 그대로(`Client/FrameRate.cs`, `GameRoot.Awake`). (2) UI 배율: 앱은 1이라 휴대폰 앱의 글자가 아주 작았다 → 휴대폰 앱은 dpi÷160(dpi를 모르면 짧은 변÷360), PC 앱은 dpi÷96(150% 화면이 1.5), 0.25 단위, 짧은 변 320점(PC 480점) 아래로 안 내려감. 웹은 `devicePixelRatio` 그대로, 에디터 게임 뷰는 1. 새 설정 [UI 크기: 100%](90·100·115·130%, 모든 판)(`Ui.PointScale`). (3) 안전 영역: 휴대폰 앱이 `Screen.safeArea`를 점으로 바꿔 GUI 행렬을 옮기고 `Ui.Width`·`Ui.Height`가 안전 영역 크기가 되어 모든 화면이 노치·둥근 모서리 안쪽에 놓인다. 화면 전체를 덮는 것(어둡게 하기, 시작화면 배경, 로딩, 붉은 가장자리, 번쩍임, 허브 밖 누르기)은 새 `Ui.FullScreen`에. 웹은 안전 영역 없음(그대로). 시험용 `Ui.InsetOverride`, Playtest 명령 `inset l t r b|off`, `buttons`는 단추를 화면 전체 기준으로 알리고 `safe`도. (4) 나갈 때 저장: `OnApplicationPause(true)`·`OnApplicationFocus(false)`·`OnApplicationQuit`에 캐릭터·지도·(호스트면) 월드를 쓰고 게임은 계속(5초에 한 번, 끌 때는 늘). 웹은 `index.html`이 탭을 숨기거나 페이지를 떠날 때 `GameRoot.PageHidden`. (5) 빌드: `Client/Editor/NativeBuild.cs`(메뉴 Game > Build Windows·Build Android, 배치 `RunBatchWindows`·`RunBatchAndroid`): Windows x64 Mono(Windows 에디터에 따로 깔 것 없음, IL2CPP는 모듈과 VS C++ 도구가 더 필요해 뺐다), Android APK IL2CPP ARM64·최소 API 26·자동 회전(거꾸로 세로 빼고)·인터넷 권한·노치 옆까지 그리기. Player Settings는 빌드할 때 스크립트가 정한다. 웹 글 상자의 위치는 UI 크기와 상관없이 페이지 픽셀로(`Ui.PageRatio`). 개발 정보에 목표 프레임·dpi·안전 영역. 시험 1139개, 에디터·웹 컴파일, 로컬 스크립트 확인

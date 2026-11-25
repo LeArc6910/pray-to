@@ -73,6 +73,10 @@ namespace Game.Client
         CharacterLook _newCharacterLook = CharacterLook.Default;
         string _newWorld;
         ulong _newWorldSeed;
+        string _newWorldSeedTyped = "";
+
+        // The new world's seed as its row shows it: the number, or the words typed for it.
+        internal string NewWorldSeedLabel => _newWorld == null ? "" : NewWorld.SeedLabel(_newWorldSeedTyped, _newWorldSeed);
         // The seed of the world being started when it is one made on the page (StartHosting).
         ulong? _startSeed;
         // The world picked on the list.
@@ -93,6 +97,10 @@ namespace Game.Client
 
         int _navIndex, _navCount, _navCounter, _navFire = -1;
         Vector2 _navMouse;
+        // The arrows moved the lit word and the page's list has not been scrolled to it yet; the list's height while it
+        // is being drawn (0 outside it).
+        bool _navMoved;
+        float _navView;
 
         bool NavSlot(Rect rect, out bool focused)
         {
@@ -101,8 +109,26 @@ namespace Game.Client
             bool touch = Controls.UsingTouch;
             if (e.type == EventType.Repaint && !touch && GUI.enabled && rect.Contains(e.mousePosition) && e.mousePosition != _navMouse) _navIndex = index;
             focused = !touch && GUI.enabled && index == _navIndex;
+            // A word the arrows came to in a long list (the characters, the worlds, the settings): the list scrolls so it
+            // shows (2026-11-26: it stayed below the fold). The rect is in the list's own space there.
+            if (_navMoved && index == _navIndex && e.type == EventType.Repaint)
+            {
+                _navMoved = false;
+                if (_navView > 0) KeepInView(rect);
+            }
             return GUI.enabled && index == _navFire;
         }
+
+        void KeepInView(Rect rect)
+        {
+            const float Margin = 4;
+            // Near the list's top it goes all the way up, so the first group's heading shows with it.
+            if (rect.yMin - Margin < _menuScroll.y) _menuScroll.y = rect.yMin < _navView / 2 ? 0 : rect.yMin - Margin;
+            else if (rect.yMax + Margin > _menuScroll.y + _navView) _menuScroll.y = rect.yMax + Margin - _navView;
+        }
+
+        // Where the page's list is scrolled to, for the playtests (points from its top).
+        internal float MenuScroll => _menuScroll.y;
 
         void MenuKeys(Event e)
         {
@@ -135,6 +161,7 @@ namespace Game.Client
             if (e.keyCode == KeyCode.UpArrow || e.keyCode == KeyCode.DownArrow)
             {
                 _navIndex = ((e.keyCode == KeyCode.UpArrow ? _navIndex - 1 : _navIndex + 1) % count + count) % count;
+                _navMoved = true;
                 Sounds.Play(Sound.UiHover, 0.35f);
                 e.Use();
             }
@@ -468,6 +495,7 @@ namespace Game.Client
             Ui.TouchScroll(body, ref _menuScroll);
             GUILayout.BeginArea(body);
             _menuScroll = Ui.BeginScrollView(_menuScroll, GUIStyle.none, GUI.skin.verticalScrollbar, GUILayout.ExpandHeight(true));
+            _navView = body.height;
             GUILayout.BeginVertical(GUILayout.Width(_menuColumn));
             switch (_page)
             {
@@ -482,6 +510,7 @@ namespace Game.Client
             }
             GUILayout.EndVertical();
             Ui.EndScrollView();
+            _navView = 0;
             GUILayout.EndArea();
 
             float y = body.yMax + 4;
@@ -769,14 +798,15 @@ namespace Game.Client
             part == 0 ? value : look.Hair, part == 1 ? value : look.HairColor, part == 2 ? value : look.Skin,
             part == 3 ? value : look.Eyes, part == 4 ? value : look.Shirt, part == 5 ? value : look.Pants);
 
+        // A choice's name from the string sheet ("look.hair.2": 묶은 머리 / Ponytail), the Korean in HeroArt the same.
         static string LookValueName(int part, int value) => part switch
         {
-            0 => HeroArt.HairNames[value],
-            1 => HeroArt.HairColorNames[value],
-            2 => HeroArt.SkinNames[value],
-            3 => HeroArt.EyeNames[value],
-            4 => HeroArt.ShirtNames[value],
-            _ => HeroArt.PantsNames[value],
+            0 => Strings.T("look.hair." + value, HeroArt.HairNames[value]),
+            1 => Strings.T("look.hair_color." + value, HeroArt.HairColorNames[value]),
+            2 => Strings.T("look.skin." + value, HeroArt.SkinNames[value]),
+            3 => Strings.T("look.eyes." + value, HeroArt.EyeNames[value]),
+            4 => Strings.T("look.shirt." + value, HeroArt.ShirtNames[value]),
+            _ => Strings.T("look.pants." + value, HeroArt.PantsNames[value]),
         };
 
         static Rgba? LookSwatch(int part, int value) => part switch
@@ -924,7 +954,7 @@ namespace Game.Client
             {
                 var rect = GUILayoutUtility.GetRect(_menuColumn, ListRowHeight);
                 string name = _newWorld;
-                string seed = _newWorldSeed.ToString(System.Globalization.CultureInfo.InvariantCulture);
+                string seed = NewWorldSeedLabel;
                 if (ListRow(rect, name, _pickedWorld == name, true, false, out _, (r, s) =>
                     WorldFace(r, s, name, Strings.T("title.new_world_line", "새 월드 · 아직 들어가지 않았다"), string.Format(Strings.T("title.seed_line", "시드 {0}"), seed), Biome.Cave, false)))
                     Later(() => PressWorld(name));
@@ -1072,7 +1102,9 @@ namespace Game.Client
             }
             _makeWorldError = "";
             _newWorld = name;
-            _newWorldSeed = NewWorld.Seed(_makeSeed, (ulong)DateTime.UtcNow.Ticks);
+            // Nine digits when left to chance (NewWorld.RandomSeed), what was typed otherwise.
+            _newWorldSeed = NewWorld.Seed(_makeSeed, NewWorld.RandomSeed((ulong)DateTime.UtcNow.Ticks));
+            _newWorldSeedTyped = _makeSeed;
             _pickedWorld = name;
             Open(MenuPage.Worlds);
         }

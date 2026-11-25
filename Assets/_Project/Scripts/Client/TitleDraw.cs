@@ -299,7 +299,6 @@ namespace Game.Client
         // web build on a PC Korean is typed through the page's own box (WebText).
         public static string Field(Rect rect, string text, int max, string probe, string hint = "")
         {
-            Ui.Probe(probe, rect);
             var skinField = GUI.skin.textField;
             if (_field == null || _field.font != skinField.font) _field = new GUIStyle(skinField) { alignment = TextAnchor.MiddleLeft };
             _field.fontSize = skinField.fontSize;

@@ -26,6 +26,30 @@ namespace Game.Core
             return firsts[random.Next(firsts.Length)] + " " + lasts[random.Next(lasts.Length)];
         }
 
+        // The smallest and largest random seed: nine digits, short enough to read out and type again (2026-11-26; the
+        // clock's ticks gave eighteen).
+        public const ulong RandomSeedLeast = 100_000_000;
+        public const ulong RandomSeedMost = 999_999_999;
+
+        // A random seed of nine digits from any number that differs each time (the caller's clock: Core reads none),
+        // mixed (SplitMix64) so close clock readings give far-apart seeds. Once picked it is an ordinary number seed.
+        public static ulong RandomSeed(ulong entropy)
+        {
+            ulong z = unchecked(entropy + 0x9E3779B97F4A7C15UL);
+            z = unchecked((z ^ (z >> 30)) * 0xBF58476D1CE4E5B9UL);
+            z = unchecked((z ^ (z >> 27)) * 0x94D049BB133111EBUL);
+            z ^= z >> 31;
+            return RandomSeedLeast + z % (RandomSeedMost - RandomSeedLeast + 1);
+        }
+
+        // How the world list shows the seed: what was typed when it was words ("잠든 광산"), else the number.
+        public static string SeedLabel(string typed, ulong seed)
+        {
+            string text = (typed ?? "").Trim();
+            if (text.Length > 0 && !ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out _)) return text;
+            return seed.ToString(CultureInfo.InvariantCulture);
+        }
+
         // The seed from what was typed: random when it is empty, the number when it is one, else the text hashed
         // (FNV-1a over its UTF-8 bytes, so every device makes the same of it).
         public static ulong Seed(string typed, ulong random)

@@ -149,7 +149,7 @@ namespace Game.Client
         public void Draw()
         {
             if (!Open) return;
-            _typing = GUI.GetNameOfFocusedControl() == PetNameControl;
+            _typing = GUI.GetNameOfFocusedControl() == PetNameControl || WebText.IsTyping(PetNameControl);
             // Only what the pointer is over in this frame. IMGUI's own GUI.tooltip fell back to the last description
             // the pointer had been over, even when set empty, so an iron sword's text picked up on [장비] stood beside
             // the skills page (the 2026-11-09 web check). The window keeps its own.

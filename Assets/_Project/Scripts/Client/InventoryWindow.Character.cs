@@ -330,8 +330,8 @@ namespace Game.Client
             var field = new Rect(row.x + 40, row.y + (row.height - 24) / 2, 140, 24);
             var name = new Rect(field.xMax + 4, row.y, 88, button);
             var suggest = new Rect(name.xMax + 4, row.y, 56, button);
-            GUI.SetNextControlName(PetNameControl);
-            _petName = GUI.TextField(field, _petName ?? "", Pets.NameMost);
+            // Through the page's own text box on a PC's browser, so a Korean name can be typed (WebText).
+            _petName = WebText.Field(field, _petName ?? "", Pets.NameMost, PetNameControl, GUI.skin.textField);
             bool typing = GUI.GetNameOfFocusedControl() == PetNameControl;
             // Esc lets go of the field (the game's own Esc waits while typing).
             if (typing && Event.current.type == EventType.KeyDown && Event.current.keyCode == KeyCode.Escape)
@@ -339,7 +339,7 @@ namespace Game.Client
                 GUIUtility.keyboardControl = 0;
                 Event.current.Use();
             }
-            bool enter = typing && Event.current.type == EventType.KeyDown && (Event.current.keyCode == KeyCode.Return || Event.current.keyCode == KeyCode.KeypadEnter);
+            bool enter = WebText.Submitted(PetNameControl);
             Ui.Row("펫");
             if (Ui.Button(name, "이름 짓기") || enter)
             {
@@ -355,7 +355,8 @@ namespace Game.Client
             }
         }
 
-        const string PetNameControl = "PetName";
+        // The field's name, as IMGUI and the playtests know it.
+        const string PetNameControl = "펫 이름 칸";
         string _petNameFor;
         string _petName;
 

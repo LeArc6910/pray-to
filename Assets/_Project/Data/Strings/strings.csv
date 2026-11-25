@@ -101,6 +101,59 @@ look.name,이름,Name
 look.pants,아랫옷,Trousers
 look.shirt,윗옷,Shirt
 look.skin,피부,Skin
+# The look's choices on the new character page (HeroArt.*Names keep the Korean too, 2026-11-26).
+look.hair.0,짧은 머리,Short
+look.hair.1,긴 머리,Long
+look.hair.2,묶은 머리,Ponytail
+look.hair.3,뾰족 머리,Spiky
+look.hair.4,깎은 머리,Shaved
+look.hair.5,양갈래,Pigtails
+look.hair.6,단발,Bob
+look.hair.7,올림머리,Bun
+look.hair_color.0,갈색,Brown
+look.hair_color.1,검정,Black
+look.hair_color.2,금빛,Golden
+look.hair_color.3,붉은빛,Red
+look.hair_color.4,은빛,Silver
+look.hair_color.5,파랑,Blue
+look.hair_color.6,초록,Green
+look.hair_color.7,분홍,Pink
+look.hair_color.8,보라,Purple
+look.skin.0,밝은 살빛,Fair
+look.skin.1,살빛,Light
+look.skin.2,볕에 탄 빛,Tanned
+look.skin.3,갈색,Brown
+look.skin.4,짙은 갈색,Dark brown
+look.eyes.0,검정,Black
+look.eyes.1,갈색,Brown
+look.eyes.2,파랑,Blue
+look.eyes.3,초록,Green
+look.eyes.4,잿빛,Grey
+look.eyes.5,붉은빛,Red
+look.shirt.0,파랑,Blue
+look.shirt.1,초록,Green
+look.shirt.2,주황,Orange
+look.shirt.3,보라,Purple
+look.shirt.4,청록,Teal
+look.shirt.5,빨강,Red
+look.shirt.6,노랑,Yellow
+look.shirt.7,분홍,Pink
+look.shirt.8,갈색,Brown
+look.shirt.9,흰색,White
+look.shirt.10,회색,Grey
+look.shirt.11,검정,Black
+look.pants.0,짙은 갈색,Dark brown
+look.pants.1,남색,Navy
+look.pants.2,숲빛,Forest
+look.pants.3,밤색,Chestnut
+look.pants.4,모래빛,Sand
+look.pants.5,회색,Grey
+look.pants.6,검정,Black
+look.pants.7,포도빛,Plum
+look.pants.8,벽돌빛,Brick
+look.pants.9,올리브,Olive
+look.pants.10,청록,Teal
+look.pants.11,흰색,White
 title.ago_unknown,언제인지 모름,Unknown
 title.ask_character,"「{0}」 캐릭터를 지운다. 가방과 레벨, 지도까지 모두 사라지고 되돌릴 수 없다","Delete the character 「{0}」? Its bag, level and maps all go, and it cannot be undone"
 title.ask_discard,만들던 캐릭터를 버린다,Throw away the character being made

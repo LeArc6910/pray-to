@@ -203,6 +203,20 @@ async function menu(browser) {
   }
   await game.shot('menu-settings', '설정 화면');
 
+  // The arrows keep the lit word in view (2026-11-26: a long list did not follow): from the first setting up past [뒤로]
+  // to the last one ([키 바꾸기], below the fold), the list scrolls down to it; down twice, back to the top.
+  await game.page.mouse.move(2, 2);
+  await game.wait(200);
+  for (const key of ['ArrowUp', 'ArrowUp']) await game.page.keyboard.press(key);
+  await game.wait(400);
+  const scrolled = (await game.title()).scroll;
+  const keysRow = (await game.find('키 바꾸기'))[0];
+  check(scrolled > 0 && keysRow && keysRow.shown, `↑로 맨 아래 설정에 가면 목록이 따라 내려간다 (위에서 ${Math.round(scrolled)}점, [키 바꾸기] ${keysRow && keysRow.shown ? '보임' : '안 보임'})`);
+  await game.shot('menu-settings-keys', '화살표로 맨 아래 [키 바꾸기]까지 내려간 설정');
+  for (const key of ['ArrowDown', 'ArrowDown']) await game.page.keyboard.press(key);
+  await game.wait(400);
+  check((await game.title()).scroll < 1, `↓로 맨 위로 돌아오면 목록도 위로 (${Math.round((await game.title()).scroll)}점)`);
+
   // UI 크기 (2026-11-26): 100 → 115 draws the words and windows bigger, and it goes round back to 100.
   const uiSize = (await game.find(/^UI 크기:/))[0];
   check(uiSize && uiSize.label === 'UI 크기: 100%', `[설정]에 [UI 크기: 100%] (${uiSize && uiSize.label})`);
@@ -1521,9 +1535,17 @@ async function npc(browser) {
     const moved = Math.abs(after.x - before.x) + Math.abs(after.y - before.y);
     check(moved < 0.2, `이름 칸에 글자를 치는 동안 W·D로 걷지 않는다 (${moved.toFixed(2)}칸)`);
   }
+  // A Korean name typed on a PC's browser (2026-11-26: the field took no input method's letters, WebText), named with
+  // Enter.
+  if (await game.typeInto('펫 이름 칸', '보리떡')) {
+    await game.page.keyboard.press('Enter');
+    const korean = await game.until(i => i.petName === '보리떡', 2000, game.inventory);
+    check(!!korean, `펫 이름 칸에 한글로 적고 Enter로 이름을 짓는다 (${korean ? korean.petName : (await game.inventory()).petName})`);
+    await game.shot('pet-korean', '한글로 지은 펫 이름');
+  }
   check(await game.press('추천'), '[캐릭터] 탭의 펫 줄에 [추천]');
   check(await game.press('이름 짓기'), '[이름 짓기]를 누른다');
-  const named = await game.until(i => i.petName && i.petName !== '말랑이', 2000, game.inventory);
+  const named = await game.until(i => i.petName && i.petName !== '말랑이' && i.petName !== '보리떡', 2000, game.inventory);
   check(!!named, `펫에 이름이 붙는다 (${named && named.petName})`);
   const doll = await game.find(/구리 검/, '캐릭터');
   check(doll.length === 1, `[캐릭터] 탭의 사람 모양 칸에 든 무기 (${doll.map(b => b.label).join(', ')})`);
@@ -1949,6 +1971,18 @@ async function save(browser) {
   check(await game.press('올리기'), '저장본 칸에 클라우드 저장 [올리기]·[받기]·[계정 만들기]');
   await game.wait(600);
   check((await game.allText()).includes('아이디는 3~20자'), '아이디 없이 [올리기]를 누르면 아이디 규칙을 알려 준다');
+  // The fields take what is typed through the page's own text box on a PC (2026-11-26): Korean in the name gets the
+  // name's rule, a name and a short password the password's.
+  if (await game.typeInto('아이디 칸', '한글이름')) {
+    await game.press('올리기');
+    await game.wait(500);
+    check((await game.allText()).includes('아이디에는 영문'), '아이디 칸에 한글이 들어간다(영문만 쓰라는 알림)');
+    await game.typeInto('아이디 칸', 'tester');
+    await game.typeInto('비밀번호 칸', 'abc');
+    await game.press('올리기');
+    await game.wait(500);
+    check((await game.allText()).includes('비밀번호는 8~30자'), '아이디·비밀번호 칸에 적은 것이 들어간다(비밀번호 길이 알림)');
+  } else check(false, '저장본 칸에 [아이디 칸]');
   await game.shot('cloud-save', '저장본 칸의 클라우드 저장');
   if (!download) return game.context.close();
   const file = path.join(out, 'saves.bundle');
@@ -7324,6 +7358,9 @@ async function title(browser) {
     await game.press('만들기');
     t = await game.title();
     check(t.page === 'worlds' && t.world && t.world === t.newWorld, `${name}: 새 월드가 골라진 채 월드 목록 (${t.world})`);
+    // The seed as its row shows it: what was typed, or nine digits when left to chance (2026-11-26: eighteen).
+    check(game.touch ? /^\d{9}$/.test(t.newWorldSeed || '') : t.newWorldSeed === '12345',
+      `${name}: 새 월드의 시드가 ${game.touch ? '아홉 자리 무작위' : '적은 그대로'} (${t.newWorldSeed})`);
     await game.shot('title-worlds', '월드 목록(새 월드가 골라짐, [혼자 하기])');
 
     // The loading screen: caught as soon as [혼자 하기] is pressed.

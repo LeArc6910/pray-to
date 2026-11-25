@@ -130,11 +130,12 @@ namespace Game.Client
             GUI.enabled = !busy;
             GUILayout.BeginHorizontal();
             GUILayout.Label("아이디", GUILayout.Width(76));
-            _cloudName = GUILayout.TextField(_cloudName, CloudAccount.NameMost);
+            // Through the page's own text box on a PC's browser like every field (WebText).
+            _cloudName = WebText.LayoutField(_cloudName, CloudAccount.NameMost, "아이디 칸");
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             GUILayout.Label("비밀번호", GUILayout.Width(76));
-            _cloudPassword = GUILayout.PasswordField(_cloudPassword, '*', CloudAccount.PasswordMost);
+            _cloudPassword = WebText.LayoutField(_cloudPassword, CloudAccount.PasswordMost, "비밀번호 칸", true);
             GUILayout.EndHorizontal();
             GUILayout.BeginHorizontal();
             if (Ui.LayoutButton("올리기")) Act(() => StartUpload(false));
