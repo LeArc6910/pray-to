@@ -2431,9 +2431,7 @@ namespace Game.Client
             }
             // The whole screen in points, and the safe area in it (left, top, width, height; the whole screen unless a
             // test stands an inset in, "inset"): the buttons are where they show on the whole screen. The drawn ones are
-            // so already (Ui.Probe's GUIToScreenPoint counts the GUI matrix's move to the safe area, in points: the
-            // 2026-11-26 sweep found them one inset too far when moved again); the skill and quick slots' areas are
-            // in the safe area's points and are moved here.
+            // so already (Ui.ToPoints); the skill and quick slots' areas are in the safe area's points and are moved here.
             var inset = Ui.Inset;
             return new Json('{').Field("width", Ui.FullWidth).Field("height", Ui.FullHeight)
                 .Field("safe", Rect(new Rect(inset.Left, inset.Top, Ui.Width, Ui.Height))).Field("buttons", list.Raw(']')).Close('}');

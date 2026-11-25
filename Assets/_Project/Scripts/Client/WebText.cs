@@ -117,11 +117,10 @@ namespace Game.Client
             _endKey = 0;
             _readFrame = _drawnFrame = Time.frameCount;
             GUIUtility.keyboardControl = 0;
-            // Where the field is on the whole screen in points (GUIToScreenRect undoes the areas and scroll views it is
-            // in and the safe area's move, not the scale: the playtests' button rects rest on the same, Ui.Probe), so to
+            // Where the field is on the whole screen in points (Ui.ToPoints, as the playtests' button rects), so to
             // device pixels by Ui.Scale, and those over the page's pixel ratio are the page's CSS pixels (Ui.Scale also
             // has the menu's UI size in it); the canvas fills the page from its top left.
-            var at = GUIUtility.GUIToScreenRect(rect);
+            var at = Ui.ToPoints(rect);
             float css = Ui.Scale / Mathf.Max(0.01f, Ui.PageRatio);
             TextInputOpen(text, max, at.x * css, at.y * css, at.width * css, at.height * css, password ? 1 : 0);
         }

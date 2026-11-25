@@ -142,6 +142,7 @@ namespace Game.Client
             // Moved to the safe area by whole device pixels, so the pixel art stays on the pixel grid.
             var inset = Inset;
             GUI.matrix = Matrix4x4.TRS(new Vector3(Mathf.Round(inset.Left * Scale), Mathf.Round(inset.Top * Scale), 0), Quaternion.identity, new Vector3(Scale, Scale, 1));
+            _rootOffset = GUIUtility.GUIToScreenPoint(Vector2.zero);
             StartProbe();
             WebText.Frame();
             ProbeCover = Rect.zero;
@@ -326,11 +327,20 @@ namespace Game.Client
         // the GUI matrix but adds the groups' and lists' offsets unscaled, so where the matrix is not 1 (a phone's
         // pixel ratio) its answer is neither pixels nor points. The offset alone is in points: the point (0, 0) of
         // the current group gives it.
-        static Rect ToPoints(Rect rect)
+        // A rect drawn here as points on the whole screen: the areas, groups and scroll views it is in undone
+        // (GUIToScreenPoint, in points), then the safe area's move. GUIToScreenPoint also counts the GUI matrix's move,
+        // but in device pixels and unscaled (the 2026-11-26 sweep: a notched phone's buttons were reported 88 points
+        // in for 44), so what it gives at the top (RootOffset, Begin) is taken off and the move added in points.
+        internal static Rect ToPoints(Rect rect)
         {
-            var offset = GUIUtility.GUIToScreenPoint(Vector2.zero);
-            return new Rect(rect.position + offset, rect.size);
+            var offset = GUIUtility.GUIToScreenPoint(Vector2.zero) - _rootOffset;
+            var inset = Inset;
+            var moved = new Vector2(Mathf.Round(inset.Left * Scale) / Scale, Mathf.Round(inset.Top * Scale) / Scale);
+            return new Rect(rect.position + offset + moved, rect.size);
         }
+
+        // GUIToScreenPoint at the top of the GUI, read once the matrix is set each OnGUI.
+        static Vector2 _rootOffset;
 
         internal static void Probe(string label, Rect rect)
         {
