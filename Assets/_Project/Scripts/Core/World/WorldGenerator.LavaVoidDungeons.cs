@@ -46,7 +46,8 @@ namespace Game.Core
                 foreach (var a in arenas) if (Vec2.Distance(at, a.Center) <= a.Reach) return true;
                 return NearWay(map, x, y, 1);
             }
-            bool Open(int x, int y) => map.InBounds(x, y) && map[x, y] == TileType.Floor && !Kept(x, y);
+            var biomes = world.Biomes;
+            bool Open(int x, int y, Biome biome) => map.InBounds(x, y) && map[x, y] == TileType.Floor && biomes[x, y] == biome && !Kept(x, y);
 
             foreach (var room in rooms.Nodes)
             {
@@ -55,7 +56,7 @@ namespace Game.Core
                 var floor = new List<(int X, int Y)>();
                 for (int y = room.Y - room.Radius; y <= room.Y + room.Radius; y++)
                     for (int x = room.X - room.Radius; x <= room.X + room.Radius; x++)
-                        if (Vec2.Distance(TileMap.Center(x, y), room.Center) <= room.Radius && Open(x, y)) floor.Add((x, y));
+                        if (Vec2.Distance(TileMap.Center(x, y), room.Center) <= room.Radius && Open(x, y, room.Biome)) floor.Add((x, y));
                 if (floor.Count < 12) continue;
                 if (room.Biome == Biome.Lava) LayVents(map, floor, random);
                 else LayPlates(map, room, floor, random);
