@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -6226,6 +6226,16 @@ const BiomeSets = {
   lake: { name: '지하 호수', id: 'Lake', room: 'lake', tint: '#70E6D8', ambience: 'Lakeside', pool: true,
     kinds: ['MossRock', 'Coral', 'GiantClam', 'ShellHeap', 'Wreckage', 'MossIsle'], critters: ['Frog', 'MarshFly', 'FishShadow'],
     hit: ['clam', 'GiantClam', '대왕 조개'] },
+  // 묶음 B4a: the lava zone and the void abyss (their props stand in worlds of version 7 on). flicker: the light is its
+  // tint dimmed and brightened (every reading in the tint's own proportions; steady: it may hold one value for a while);
+  // lavaPool: the set has a pool of lava with the rock in it and blisters of cooled lava at its edge; still: none of its
+  // decor sways; reach: every light reaches this much of its radius.
+  lava: { name: '용암 지대', id: 'Lava', room: 'lava', tint: '#FF7A30', flicker: [0xFF, 0x7A, 0x30], ambience: 'Forge', lavaPool: true, still: true,
+    kinds: ['ObsidianSpike', 'FireBush', 'SlagHeap', 'CooledBoulder', 'BasaltColumns', 'LavaRock'], critters: ['FireNewt', 'EmberMoth'],
+    hit: ['bush', 'FireBush', '불 피는 덤불'], behind: ['columns', 'BasaltColumns', '현무암 기둥 무리'] },
+  abyss: { name: '공허의 심연', id: 'Abyss', room: 'abyss', tint: '#401D73', flicker: [0x6A, 0x30, 0xC0], steady: true, ambience: 'Abyss', reach: 0.7,
+    kinds: ['VoidCrystal', 'TwistedVine', 'ObeliskShard', 'ChainPost', 'FloatingRock', 'ShatteredPillar'], critters: ['VoidJelly', 'ShadowMoth'],
+    hit: ['vine', 'TwistedVine', '뒤틀린 덩굴'], behind: ['shattered', 'ShatteredPillar', '부서진 공허 기둥'] },
 };
 
 async function biomes(browser) {
@@ -6243,7 +6253,7 @@ async function biomes(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake', 'lava', 'abyss']) {
       const set = BiomeSets[key];
       // The room as the generator made it first (a new world is version 3: its own props stand in it), then the set.
       const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
@@ -6280,6 +6290,30 @@ async function biomes(browser) {
         check(b.tintOther === set.tintOther && seenTints.size >= 3 && violet.length === 0,
           `${name}: ${set.name}의 빛이 분홍과 하늘 사이로 숨 쉰다 (다른 쪽 ${b.tintOther}, 읽은 색 ${[...seenTints].join(' ')}, 보라 ${violet.length})`);
       }
+      if (set.flicker) {
+        // 묶음 B4a: the lava zone's orange flickers and the abyss's violet ebbs: every reading over some seconds is the
+        // biome's colour dimmed (each channel in the colour's own proportion to its strongest, never another hue), and
+        // the lava zone's readings differ.
+        const readings = new Set();
+        for (let i = 0; i < 6; i++) {
+          readings.add((await game.ask('biomes')).tintNow || '');
+          await game.wait(900);
+        }
+        const top = Math.max(...set.flicker);
+        const off = [...readings].filter(t => {
+          if (!/^#[0-9A-F]{6}$/i.test(t)) return true;
+          const c = [parseInt(t.slice(1, 3), 16), parseInt(t.slice(3, 5), 16), parseInt(t.slice(5, 7), 16)];
+          const most = Math.max(...c);
+          return most === 0 || c.some((v, i) => Math.abs(v / most - set.flicker[i] / top) > 0.08);
+        });
+        check(off.length === 0 && (set.steady || readings.size >= 3),
+          `${name}: ${set.name}의 빛이 제 색 그대로 밝아졌다 어두워진다 (읽은 색 ${[...readings].join(' ')}, 다른 색 ${off.length})`);
+      }
+      if (set.lavaPool) {
+        // The set's pool of lava, the rock standing in it, and the client's cover on its edge.
+        check(b.lava >= 6 && b.bubbles + b.rafts >= 1, `${name}: 용암 가에 식은 용암 거품이 놓인다 (용암 ${b.lava}칸, 거품 ${b.bubbles}, 껍질 조각 ${b.rafts})`);
+      }
+      if (set.reach) check(Math.abs(b.lightReach - set.reach) < 0.01, `${name}: ${set.name}에서는 빛이 ${set.reach}배만 닿는다 (${b.lightReach})`);
       if (set.pool) {
         // 묶음 B3a: the set's pool, the islet standing in it, and the client's cover on its edge.
         check(b.pools >= 6 && b.reeds + b.pads >= 1, `${name}: 물가에 갈대·연잎이 놓인다 (물 ${b.pools}칸, 갈대 ${b.reeds}, 연잎 ${b.pads})`);
@@ -6363,7 +6397,8 @@ async function biomes(browser) {
           await game.shot('biomes-mushroom-cap', '거대 갓 뒤: 갓이 흐려진다');
         } else check(false, `${name}: 거대 갓이 없다`);
       }
-      // Brushing through what sways.
+      // Brushing through what sways (the lava zone's cover is ash, stone and crust: none of it sways).
+      if (set.still) continue;
       const still = await game.ask('biomes');
       const grass = (await game.send('biomes at grass')).join(' ');
       await game.wait(300);
@@ -6402,6 +6437,9 @@ const PlaceSets = {
   // 묶음 B3a (the landmarks are in worlds of version 6 on).
   crystal: { name: '수정 동굴', id: 'Crystal', room: 'crystal', look: 5, marks: ['GiantGeode', 'ArchPier', 'CrystalArch'], real: [['geode', 'geodes', '거대 정동'], ['arch', 'arches', '수정 아치']] },
   lake: { name: '지하 호수', id: 'Lake', room: 'lake', look: 6, marks: ['SunkenBoat', 'OldWheel'], real: [['boat', 'boats', '가라앉은 배'], ['wheel', 'wheels', '옛 물레방아']] },
+  // 묶음 B4a (the landmarks are in worlds of version 7 on).
+  lava: { name: '용암 지대', id: 'Lava', room: 'lava', look: 7, marks: ['FallenChimney', 'GiantAnvil'], real: [['chimney', 'chimneys', '쓰러진 대장간 굴뚝'], ['anvil', 'anvils', '거대 모루']] },
+  abyss: { name: '공허의 심연', id: 'Abyss', room: 'abyss', look: 8, marks: ['BrokenGate', 'StarAltar'], real: [['gate', 'gates', '깨진 문'], ['altar', 'altars', '별 제단']] },
 };
 const PlaceLooks = ['Cottage', 'Cabin', 'Well', 'LampPost', 'Signpost', 'Bench', 'Flowerbed', 'Crates'];
 
@@ -6420,7 +6458,7 @@ async function places(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake', 'lava', 'abyss']) {
       const set = PlaceSets[key];
       // A room whose whole scene stands in its biome: the laid things take the look of the biome under each, so a room by
       // another biome's edge (the phone's crystal room touched the sand cave) shows that one's on some.
@@ -6435,8 +6473,8 @@ async function places(browser) {
         if (laid.length >= PlaceLooks.length && laid.every(c => c.shape === set.look)) break;
       }
       check(p.biome === set.id, `${name}: ${set.name}의 방에 섰다 (${p.biome}, ${went})`);
-      check(p.generator >= (key === 'crystal' || key === 'lake' ? 6 : key === 'ice' || key === 'sand' ? 5 : 4),
-        `${name}: 새 월드는 생성기 6판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, 수정·호수의 것은 6판부터, ${p.generator})`);
+      check(p.generator >= (key === 'lava' || key === 'abyss' ? 7 : key === 'crystal' || key === 'lake' ? 6 : key === 'ice' || key === 'sand' ? 5 : 4),
+        `${name}: 새 월드는 생성기 7판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, 수정·호수의 것은 6판부터, 용암·심연의 것은 7판부터, ${p.generator})`);
       const cells = p.cells || [];
       const looks = cells.filter(c => PlaceLooks.includes(c.type));
       const missing = PlaceLooks.filter(t => !looks.some(c => c.type === t));
@@ -6927,7 +6965,146 @@ async function b3mobs(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs };
+// The lava fields and the void abyss's monsters, rules and dungeons (2026-11-25, Docs/BiomeRework.md B4b,
+// Docs/Playtest.md b4mobs), on a PC and a phone held upright: the new kinds in a row each drawn at its size (the abyss
+// stalker with its own body); a steam vent hissing under a red rim and bursting; cracked plates holding a walk across
+// and giving way under one who stands, the fall and the plate's crack drawn; a splitter coming apart; the abyss's
+// torches dimmed; the ember forge and the broken gate with a big body in a pack room and their mid-boss in person for
+// master; the new world's lairs of both. Learnt from b3mobs: the scenes are set in the biome's pack rooms, the row is
+// looked at again from its middle (the host sends 22 tiles), short-lived states are asked for until they come, and the
+// monsters are held right after a scene. How a vent's hiss and a fall feel are the person's.
+async function b4mobs(browser) {
+  const kinds = [['void_mote', 'xs', '공허 티끌'], ['salamander', 'm', '불도롱뇽'], ['obsidian_beetle', 'm', '흑요석 딱정벌레'], ['forge_slime', 'm', '대장간 용암 슬라임'],
+    ['abyss_stalker', 'm', '심연 추적자'], ['void_eye', 'm', '공허의 눈'], ['star_slime', 'm', '별빛 슬라임'], ['shadow_stalker', 'm', '그림자 추적자'],
+    ['magma_hurler', 'l', '용암 투석꾼'], ['void_splitter', 'l', '분열체'], ['forge_keeper', 'xl', '잿불 대장장이'], ['gate_warden', 'xl', '공허의 문지기']];
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 용암 지대·공허의 심연의 몬스터와 규칙, 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; xp 6000');
+    const start = await game.ask('b4');
+    const forge = (start.gates || []).find(g => g.dungeon === 'ember_forge');
+    const broken = (start.gates || []).find(g => g.dungeon === 'broken_gate');
+    check(!!forge && forge.master === 'forge_keeper' && forge.light === '#FF7A30' && !!broken && broken.master === 'gate_warden' && broken.light === '#6A30C0',
+      `${name}: 용암 문은 잿불 대장간(잿불 대장장이), 심연 문은 깨진 문 너머(공허의 문지기), 문 방의 불 색 (${forge ? forge.light : '-'}, ${broken ? broken.light : '-'}; 생성기 ${start.generator}판)`);
+    const lairs = (await game.ask('b1c')).lairs || [];
+    check(lairs.some(l => l.biome === 'Lava') || lairs.some(l => l.biome === 'Abyss'),
+      `${name}: 새 월드(7판)에 용암·심연 중간 보스의 굴이 있다 (${lairs.map(l => `${l.biome} ${l.boss}`).join(', ')})`);
+
+    // The new kinds in a row, in a lava pack room.
+    let seen = {}, room = '';
+    for (let n = 0; n < 6; n++) {
+      room = (await game.send(`clear; goto room pack lava ${n}`)).join(' ');
+      await game.wait(1200);
+      await game.send('clear; scene b4monsters; monsters hold');
+      await game.wait(900);
+      seen = await game.ask('b4');
+      if (kinds.every(([kind]) => (seen.monsters || []).some(m => m.kind === kind))) break;
+    }
+    const unseen = kinds.filter(([kind]) => !((seen.monsters || []).find(x => x.kind === kind) || {}).drawn);
+    if (unseen.length > 0) {
+      await game.send('goto 12 0');
+      await game.wait(1200);
+      const nearer = await game.ask('b4');
+      for (const [kind] of unseen) {
+        const again = (nearer.monsters || []).find(x => x.kind === kind);
+        const i = (seen.monsters || []).findIndex(x => x.kind === kind);
+        if (again && i >= 0) seen.monsters[i] = again;
+      }
+      await game.send('goto -12 0');
+      await game.wait(600);
+    }
+    for (const [kind, size, label] of kinds) {
+      const m = (seen.monsters || []).find(x => x.kind === kind);
+      const [least, most] = SizeBands[size];
+      check(!!m && m.size === size && m.drawn && m.pixels >= least && m.pixels <= most,
+        `${name}: ${label}(${size.toUpperCase()})가 제 크기로 그려진다 (${m ? `${m.pixels}px` : '없음'}, ${least}~${most}px, ${room})`);
+    }
+    await game.shot('b4mobs-lineup', '새 몬스터 줄: 공허 티끌, 불도롱뇽, 흑요석 딱정벌레, 대장간 용암 슬라임, 심연 추적자(새 그림), 공허의 눈, 별빛 슬라임, 그림자 추적자, 용암 투석꾼, 분열체, 잿불 대장장이, 공허의 문지기');
+
+    // A steam vent: its hiss under a red rim, then its burst.
+    await game.send('monsters hold; clear; heal; scene vents');
+    const hissing = await game.until(b => b.ventsShown > 0, 4000, () => game.ask('b4'));
+    await game.shot('b4mobs-vent-hiss', '김 뿜는 틈: 1초 예고(붉은 테와 쉭 소리)');
+    const burst = await game.until(b => b.ventsBurst > 0 && b.burstsShown > 0, 6000, () => game.ask('b4'));
+    await game.shot('b4mobs-vent-burst', '김 뿜는 틈의 분출');
+    check(!!hissing && !!burst && burst.vents >= 3,
+      `${name}: 김 뿜는 틈이 예고 뒤 분출한다 (틈 ${burst ? burst.vents : 0}, 호스트 분출 ${burst ? burst.ventsBurst : 0}, 화면 예고 ${hissing ? hissing.ventsShown : 0}·분출 ${burst ? burst.burstsShown : 0})`);
+
+    // Cracked plates in an abyss room: a walk across holds, standing gives way.
+    let abyssRoom = '';
+    for (let n = 0; n < 4; n++) {
+      abyssRoom = (await game.send(`monsters hold; clear; heal; goto room pack abyss ${n}`)).join(' ');
+      await game.wait(1000);
+      if ((await game.ask('b4')).biome === 'Abyss') break;
+    }
+    await game.send('clear; heal; scene plates; monsters hold; face off');
+    if (game.touch) {
+      const box = await game.canvas();
+      await game.drag(box.left + box.width * 0.2, box.top + box.height * 0.75, 60, 0, 1400);
+    } else {
+      await game.page.keyboard.down('d');
+      await game.wait(1400);
+      await game.page.keyboard.up('d');
+    }
+    const walked = await game.ask('b4');
+    check(walked.platesBroken === 0, `${name}: 금 간 판을 걸어 건너면 꺼지지 않는다 (꺼진 판 ${walked.platesBroken}; ${abyssRoom})`);
+    await game.send('heal; scene plates; monsters hold');
+    const cracking = await game.until(b => b.cracksShown > 0 && b.stood > 0.3, 3000, () => game.ask('b4'));
+    await game.shot('b4mobs-plate-crack', '서 있는 금 간 판이 갈라진다(붉은 테가 좁아진다)');
+    const fell = await game.until(b => b.plateFalls > 0 && b.fallsShown > 0, 4000, () => game.ask('b4'));
+    await game.shot('b4mobs-plate-fall', '판이 꺼지고 가까운 단단한 땅으로 올라온다');
+    check(!!cracking && !!fell && fell.holes > 0 && fell.under !== 'CrackedPlate' && fell.health < fell.maxHealth,
+      `${name}: 1초 넘게 선 판은 꺼지고 떨어진다 (갈라짐 ${cracking ? cracking.cracksShown : 0}, 떨어짐 ${fell ? fell.plateFalls : 0}, 구멍 ${fell ? fell.holes : 0}, 밑 ${fell ? fell.under : '-'})`);
+    check(start.abyssLightsDimmed >= 0 && (await game.ask('b4')).abyssLightsDimmed > 0, `${name}: 심연에서는 빛이 줄어든다`);
+
+    // A splitter comes apart.
+    await game.send('monsters hold; clear; heal; scene splitter; equip obsidian_sword; attack on 1 0');
+    const split = await game.until(b => (b.monsters || []).some(m => m.kind === 'void_shard'), 5000, () => game.ask('b4'));
+    await game.send('attack off; monsters hold');
+    await game.shot('b4mobs-splitter', '분열체가 공허 조각 둘로 갈라진다');
+    check(!!split, `${name}: 분열체가 공허 조각으로 갈라진다 (${split ? (split.monsters || []).map(m => m.kind).join(', ') : '없음'})`);
+
+    // The two dungeons: a pack room with a big body, the mid-boss in person.
+    for (const [id, gateLabel, master] of [['ember_forge', '잿불 대장간', '잿불 대장장이'], ['broken_gate', '깨진 문 너머', '공허의 문지기']]) {
+      const to = (await game.send(`monsters hold; clear; heal; goto gate ${id}`)).join(' ');
+      await game.wait(1500);
+      check(/ok goto gate/.test(to), `${name}: ${gateLabel}의 문으로 (${to})`);
+      await game.shot(`b4mobs-${id}-gate`, `${gateLabel}의 문 방`);
+      await game.press(new RegExp(`${gateLabel} 들어가기`));
+      const inside = await game.until(d => d.inPocket && d.clientInPocket && d.run, 6000, () => game.ask('dungeon'));
+      check(!!inside && inside.run.id === id, `${name}: ${gateLabel}에 들어왔다 (${inside ? `${inside.cardName}, ${inside.run.letters}` : '들어가지 못함'})`);
+      await game.send('goto droom C');
+      await game.wait(1500);
+      const pack = await game.ask('b4');
+      const bigs = (pack.monsters || []).filter(m => m.size === 'l' && m.distance < 16);
+      check(bigs.length >= 1, `${name}: ${gateLabel}의 무리 방에 큰 몸 (${bigs.map(m => m.kind).join(', ') || '없음'})`);
+      check(id === 'ember_forge' ? pack.vents > 0 : pack.plates > 0, `${name}: ${gateLabel}의 방에 ${id === 'ember_forge' ? '김 뿜는 틈' : '금 간 판'} (${id === 'ember_forge' ? pack.vents : pack.plates})`);
+      await game.shot(`b4mobs-${id}-pack`, `${gateLabel}의 무리 방`);
+      await game.send('goto droom B; heal');
+      await game.wait(1800);
+      const boss = await game.ask('dungeon');
+      check(boss.run && boss.run.room === 'B' && new RegExp(master).test(boss.run.master) && !/대장 /.test(boss.run.master),
+        `${name}: ${gateLabel}의 주인은 ${master} 그 자신 (${boss.run ? boss.run.master : '-'})`);
+      await game.shot(`b4mobs-${id}-master`, `${gateLabel}의 주인 ${master}`);
+      await game.press('던전 나가기');
+      await game.until(d => !d.inPocket && !d.clientInPocket, 6000, () => game.ask('dungeon'));
+    }
+    await game.send('monsters hold; clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

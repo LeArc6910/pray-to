@@ -21,7 +21,7 @@ namespace Game.Client
         static readonly Rgba Gold = Rgba.Hex("#FFC740");
 
         // The kinds shown, smallest first.
-        static readonly string[] Lineup = { "cave_rat", "puffball", "bomb_scarab", "glow_bat", "slime", "cave_beetle", "frost_wolf", "crystal_mimic", "tentacle", "big_slime", "big_beetle", "cap_giant", "yeti", "great_worm", "crystal_tortoise", "great_crab", "slime_king", "slime_mother", "mycelium_mother", "frost_mammoth", "temple_guardian", "geode_golem", "moss_turtle" };
+        static readonly string[] Lineup = { "cave_rat", "puffball", "bomb_scarab", "glow_bat", "slime", "cave_beetle", "frost_wolf", "crystal_mimic", "tentacle", "big_slime", "big_beetle", "cap_giant", "yeti", "great_worm", "crystal_tortoise", "great_crab", "slime_king", "slime_mother", "mycelium_mother", "frost_mammoth", "temple_guardian", "geode_golem", "moss_turtle", "salamander", "void_eye", "magma_hurler", "void_splitter", "forge_keeper", "gate_warden" };
 
         public static bool Write(string output, MonsterData monsters, PixelImage hero)
         {
@@ -48,8 +48,9 @@ namespace Game.Client
             Save(ClearancePicture(monsters, hero), Path.Combine(folder, "clearance.png"), 3);
             Save(Kinds(monsters, hero, IceSandKinds, "ICE AND SAND CAVE KINDS (B2B): FRAMES, POSES, BACK, DORMANT"), Path.Combine(folder, "icesand.png"), 6);
             Save(Kinds(monsters, hero, CrystalLakeKinds, "CRYSTAL CAVE AND LAKE KINDS (B3B): FRAMES, POSES, BACK, DORMANT"), Path.Combine(folder, "crystallake.png"), 6);
+            Save(Kinds(monsters, hero, LavaVoidKinds, "LAVA FIELDS AND VOID ABYSS KINDS (B4B): FRAMES, POSES, BACK, DORMANT"), Path.Combine(folder, "lavavoid.png"), 6);
             File.WriteAllText(Path.Combine(folder, "report.txt"), report.ToString());
-            Console.WriteLine($"Wrote sizes/lineup.png, poses.png, leaders.png, clearance.png, icesand.png, crystallake.png and report.txt to {folder}");
+            Console.WriteLine($"Wrote sizes/lineup.png, poses.png, leaders.png, clearance.png, icesand.png, crystallake.png, lavavoid.png and report.txt to {folder}");
             return fine;
         }
 
@@ -125,6 +126,9 @@ namespace Game.Client
         // clump of crystals.
         static readonly string[] CrystalLakeKinds = { "crystal_bat", "crystal_wisp", "crystal_mimic", "crystal_shooter", "prism_wisp", "crystal_tortoise", "geode_golem",
             "lake_crab", "tide_wisp", "tentacle", "mud_slime", "tide_chief", "great_crab", "moss_turtle" };
+        // B4b: the lava fields' six and the abyss's six (and the splitter's halves), smallest first in each.
+        static readonly string[] LavaVoidKinds = { "fire_bat", "magma_slime", "salamander", "obsidian_beetle", "forge_slime", "magma_hurler", "forge_keeper",
+            "void_mote", "void_wisp", "abyss_stalker", "void_eye", "star_slime", "void_shard", "shadow_stalker", "void_splitter", "gate_warden" };
 
         static PixelImage Kinds(MonsterData monsters, PixelImage hero, string[] ids, string title)
         {

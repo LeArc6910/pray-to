@@ -135,7 +135,7 @@ namespace CoreSandbox
                     }
                     var nearest = near.OrderBy(e => Vec2.Distance(e.Position, player.Position)).FirstOrDefault();
                     if (Environment.GetEnvironmentVariable("DUNGEON_DUMP") == "1" && tick % (20 * World.TicksPerSecond) == 0)
-                        Console.WriteLine($"        [{tick / World.TicksPerSecond}s] 봇 ({player.Position.X:0.0},{player.Position.Y:0.0}) 곁 {near.Count} 목표 {room?.Letter} 가장 가까운 {nearest?.Definition.Id} {(nearest == null ? 0 : Vec2.Distance(nearest.Position, player.Position)):0.0} 흐름 {toGoal.DirectionFrom(player.Position)} 생명력 {player.Health:0} 아래 {world.Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y) - 1]} 한걸음 {PlayerMotor.Step(world.Map, player.Position, toGoal.DirectionFrom(player.Position), player.MoveSpeed, world.DoorsFor(player))} 속도 {player.MoveSpeed}");
+                        Console.WriteLine($"        [{tick / World.TicksPerSecond}s] 봇 ({player.Position.X:0.0},{player.Position.Y:0.0}) 곁 {near.Count} 목표 {room?.Letter} 가장 가까운 {nearest?.Definition.Id} {(nearest == null ? 0 : Vec2.Distance(nearest.Position, player.Position)):0.0} 흐름 {toGoal.DirectionFrom(player.Position)} 생명력 {player.Health:0} 아래 {world.Map[TileMap.Cell(player.Position.X), TileMap.Cell(player.Position.Y) - 1]} 한걸음 {PlayerMotor.Step(world.Map, player.Position, toGoal.DirectionFrom(player.Position), player.MoveSpeed, world.DoorsFor(player))} 속도 {player.MoveSpeed} 장판 {string.Join(",", world.Hazards.Where(h => Vec2.Distance(h.Position, player.Position) < 12).Select(h => $"{h.Shape}{(h.Attached ? "*" : "")}"))} 고침 {player.Corrections}");
                     skills.Use(world, nearest?.Position ?? player.Position, nearest != null && Vec2.Distance(nearest.Position, player.Position) < 8);
                 }
                 world.Step();
@@ -143,6 +143,9 @@ namespace CoreSandbox
                 {
                     foreach (var (player, skills) in bots) skills.Count(e);
                     if (e.Type == SimEventType.Died && bots.Any(b => b.Player.Id == e.Source)) deaths++;
+                    // DUNGEON_DUMP=2: each blow a bot takes, by whom and which attack (0: a burn, a pool, a vent).
+                    if (Environment.GetEnvironmentVariable("DUNGEON_DUMP") == "2" && e.Type == SimEventType.Hit && bots.Any(b => b.Player.Id == e.Target))
+                        Console.WriteLine($"        [{world.Tick / (float)World.TicksPerSecond:0.0}s] 맞음 {e.Amount} 누구 {world.Enemies.FirstOrDefault(x => x.Id == e.Source)?.Definition.Id ?? e.Source.ToString()} 원인 {e.Cause}");
                 }
                 foreach (var node in layout.Nodes)
                 {
@@ -173,7 +176,7 @@ namespace CoreSandbox
             string rooms = string.Join(" ", roomSeconds.Select(r => $"{r.Letter}{r.Seconds:0}"));
             float minutes = Math.Max(1, seconds) / 60f;
             Console.WriteLine($"{seed,4}  {letters,-18} {(done ? $"{(int)seconds / 60}:{(int)seconds % 60:00}" : "못 끝냄"),6}  {deaths,6}  {value,6}  {value / minutes,4:0}  {experience,6}  {experience / minutes,4:0}  {rares,9}    {rooms}"
-                + (done ? "" : $"  (멈춘 곳: {(goal < goals.Count ? goals[goal].Name : "상자")})"));
+                + (done ? "" : $"  (멈춘 곳: {(goal < goals.Count ? goals[goal].Name : "상자")})") + $"  [구역 {dungeon.Level}]");
             if (!done)
             {
                 // What was left: the living monsters of the dungeon, and where the bots stood.

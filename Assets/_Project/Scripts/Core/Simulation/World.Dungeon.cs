@@ -777,9 +777,15 @@ namespace Game.Core
                     (Dist: p.Y - (b - edge), To: new Vec2(p.X, b - edge)),
                     (Dist: b + h + edge - p.Y, To: new Vec2(p.X, b + h + edge)),
                 };
-                var nearest = outs.OrderBy(o => o.Dist).First().To;
-                var put = Collision.Resolve(Map, nearest, radius, monster: true);
-                if (!Collision.Overlaps(Map, put, radius, monster: true)) enemy.Position = put;
+                // The nearest side out that it fits beyond (a side of the room may face rock: 묶음 B4b's forge laid one
+                // so, and a monster was left in its rest room).
+                foreach (var (_, to) in outs.OrderBy(o => o.Dist))
+                {
+                    var put = Collision.Resolve(Map, to, radius, monster: true);
+                    if (Collision.Overlaps(Map, put, radius, monster: true) || room.Contains(put, radius)) continue;
+                    enemy.Position = put;
+                    break;
+                }
                 if (enemy.State == EnemyState.Chase) enemy.State = EnemyState.Idle;
             }
         }

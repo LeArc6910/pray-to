@@ -16,7 +16,9 @@ namespace Game.Client
     // 묶음 B2a adds the ice cave's snowflakes, glints of frost, white hare and ice moths, and the sand cave's blown dust,
     // grains sifting down the rock, lizard and scarab. 묶음 B3a adds the crystal cave's sparkles, streaks of bent light,
     // crystal snail and glitter moths, and the lake's mist, drops and rings on the water, frog, marsh lights and the
-    // shadows of fish in its pools.
+    // shadows of fish in its pools. 묶음 B4a adds the lava zone's rising sparks, sinking ash and the shimmer over its
+    // lava, fire newt and ember moths, and the abyss's motes of starlight drawn upward, star glints, drifting jelly of
+    // light and shadow moths.
     partial class WorldView
     {
         struct Mote
@@ -185,6 +187,33 @@ namespace Game.Client
                             _motes.Add(new Mote { Kind = MoteKind.Mist, At = at, Speed = new Vector2(0.12f + UnityEngine.Random.value * 0.14f, 0.01f), Life = 4 + UnityEngine.Random.value * 3, Phase = UnityEngine.Random.value * 6.28f });
                     }
                 }
+                else if (biome == Biome.Lava)
+                {
+                    // Sparks rising, most of them off the lava (묶음 B4a); ash sinking through the air; over the lava
+                    // the air shimmers (not on a phone: 4-1 입자).
+                    var at = middle + new Vector2((UnityEngine.Random.value - 0.5f) * wide * 2, (UnityEngine.Random.value - 0.5f) * high * 2);
+                    int tx = Mathf.FloorToInt(at.x), ty = Mathf.FloorToInt(at.y);
+                    if (map.InBounds(tx, ty) && BiomeOf(at) == Biome.Lava && !LightMap.BlocksLight(map[tx, ty]))
+                    {
+                        bool molten = map[tx, ty] == TileType.Lava;
+                        if (molten && !SmallScreen && UnityEngine.Random.value < 0.3f)
+                            _motes.Add(new Mote { Kind = MoteKind.Haze, At = at, Speed = new Vector2(0, 0.35f), Life = 1.6f + UnityEngine.Random.value, Phase = UnityEngine.Random.value * 6.28f });
+                        else if (molten || UnityEngine.Random.value < 0.3f)
+                            _motes.Add(new Mote { Kind = MoteKind.Ember, At = at, Speed = new Vector2((UnityEngine.Random.value - 0.5f) * 0.3f, 0.5f + UnityEngine.Random.value * 0.5f), Life = 1.8f + UnityEngine.Random.value * 2, Phase = UnityEngine.Random.value * 6.28f });
+                        else if (_motes.Count < cap * 2 / 3 && UnityEngine.Random.value < 0.5f)
+                            _motes.Add(new Mote { Kind = MoteKind.AshFlake, At = at + new Vector2(0, 1), Speed = new Vector2(0.1f, -0.25f - UnityEngine.Random.value * 0.15f), Life = 4 + UnityEngine.Random.value * 3, Phase = UnityEngine.Random.value * 6.28f });
+                    }
+                }
+                else if (biome == Biome.Abyss)
+                {
+                    // Motes of starlight drawn upward off the floor, slowly and then faster; a star's glint now and then.
+                    var at = middle + new Vector2((UnityEngine.Random.value - 0.5f) * wide * 2, (UnityEngine.Random.value - 0.5f) * high * 2);
+                    if (Walkable(map, at) && BiomeOf(at) == Biome.Abyss)
+                    {
+                        if (UnityEngine.Random.value < 0.25f) _motes.Add(new Mote { Kind = MoteKind.StarGlint, At = at, Life = 0.5f + UnityEngine.Random.value * 0.5f });
+                        else _motes.Add(new Mote { Kind = MoteKind.StarMote, At = at, Speed = new Vector2(0, 0.15f), Life = 2.5f + UnityEngine.Random.value * 2, Phase = UnityEngine.Random.value * 6.28f });
+                    }
+                }
                 else if (biome == Biome.Cave && _motes.Count < cap * 3 / 4)
                 {
                     // Dust in a lamp's light, or failing a lamp in the light the player carries.
@@ -225,8 +254,11 @@ namespace Game.Client
                     else _motes.RemoveAt(i);
                     continue;
                 }
+                // A mote of starlight is pulled up faster the longer it rises.
+                if (mote.Kind == MoteKind.StarMote) mote.Speed.y += 1.1f * deltaTime;
                 mote.At += mote.Speed * deltaTime;
-                if (mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Dust || mote.Kind == MoteKind.Flake || mote.Kind == MoteKind.Mist) mote.At.x += Mathf.Sin(Time.time * 1.3f + mote.Phase) * (mote.Kind == MoteKind.Flake ? 0.3f : 0.12f) * deltaTime;
+                if (mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Dust || mote.Kind == MoteKind.Flake || mote.Kind == MoteKind.Mist || mote.Kind == MoteKind.Ember || mote.Kind == MoteKind.AshFlake || mote.Kind == MoteKind.Haze)
+                    mote.At.x += Mathf.Sin(Time.time * (mote.Kind == MoteKind.Haze ? 5f : 1.3f) + mote.Phase) * (mote.Kind == MoteKind.Flake || mote.Kind == MoteKind.AshFlake || mote.Kind == MoteKind.Haze ? 0.3f : 0.12f) * deltaTime;
                 _motes[i] = mote;
             }
             foreach (var mote in _motes)
@@ -248,7 +280,8 @@ namespace Game.Client
                 float size = mote.Kind == MoteKind.Ripple ? 0.6f + t * 0.9f : 1;
                 if (renderer.transform.localScale.x != size) renderer.transform.localScale = new Vector3(size, size, 1);
                 // A spore and a glint of frost shine over the dark; a snowflake, like dust, is seen where there is light.
-                bool glows = mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Glint || mote.Kind == MoteKind.Sparkle || mote.Kind == MoteKind.SkySparkle || mote.Kind == MoteKind.Prism;
+                bool glows = mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Glint || mote.Kind == MoteKind.Sparkle || mote.Kind == MoteKind.SkySparkle || mote.Kind == MoteKind.Prism
+                    || mote.Kind == MoteKind.Ember || mote.Kind == MoteKind.Haze || mote.Kind == MoteKind.StarMote || mote.Kind == MoteKind.StarGlint;
                 renderer.sortingOrder = glows ? GlowOrder : mote.Kind == MoteKind.Trail || mote.Kind == MoteKind.Ripple ? TrailOrder : DustOrder;
             }
             for (int i = used; i < _motePool.Count; i++)
@@ -355,13 +388,14 @@ namespace Game.Client
                 case CritterKind.Mouse:
                 case CritterKind.SnowHare:
                 case CritterKind.Lizard:
+                case CritterKind.FireNewt:
                     // Runs from whoever comes within three and a half tiles, fast, until well away. The ice cave's hare
                     // bolts from farther off; the sand cave's lizard lets one come nearer and then darts.
-                    if (near < (critter.Kind == CritterKind.SnowHare ? 4.5f : critter.Kind == CritterKind.Lizard ? 2.5f : 3.5f))
+                    if (near < (critter.Kind == CritterKind.SnowHare ? 4.5f : critter.Kind == CritterKind.Lizard || critter.Kind == CritterKind.FireNewt ? 2.5f : 3.5f))
                     {
                         critter.Fleeing = true;
-                        critter.Heading = away.normalized * (critter.Kind == CritterKind.Lizard ? 6f : 5f);
-                        critter.Busy = critter.Kind == CritterKind.Lizard ? 0.6f : 1.2f;
+                        critter.Heading = away.normalized * (critter.Kind == CritterKind.Lizard || critter.Kind == CritterKind.FireNewt ? 6f : 5f);
+                        critter.Busy = critter.Kind == CritterKind.Lizard || critter.Kind == CritterKind.FireNewt ? 0.6f : 1.2f;
                     }
                     else if (critter.Busy <= 0)
                     {
@@ -405,7 +439,7 @@ namespace Game.Client
                     {
                         critter.Think = 0.5f + UnityEngine.Random.value;
                         var home = critter.Home - critter.At;
-                        critter.Heading = UnityEngine.Random.insideUnitCircle * (critter.Kind == CritterKind.Firefly ? 0.5f : 1.1f) + (home.sqrMagnitude > 9 ? home.normalized * 0.6f : Vector2.zero);
+                        critter.Heading = UnityEngine.Random.insideUnitCircle * (critter.Kind == CritterKind.Firefly ? 0.5f : critter.Kind == CritterKind.VoidJelly ? 0.3f : 1.1f) + (home.sqrMagnitude > 9 ? home.normalized * 0.6f : Vector2.zero);
                     }
                     break;
             }
@@ -447,7 +481,8 @@ namespace Game.Client
             bool moving = critter.Heading.sqrMagnitude > 0.01f;
             bool flies = CritterArt.Flies(critter.Kind);
             // Wings beat fast; legs step while it moves; a firefly blinks slowly; a sitting thing keeps its first frame.
-            float rate = flies ? (critter.Kind == CritterKind.Firefly || critter.Kind == CritterKind.MarshFly ? 1.2f : critter.Kind == CritterKind.GlitterMoth ? 5f : 9f)
+            float rate = flies ? (critter.Kind == CritterKind.Firefly || critter.Kind == CritterKind.MarshFly || critter.Kind == CritterKind.VoidJelly ? 1.2f
+                    : critter.Kind == CritterKind.GlitterMoth || critter.Kind == CritterKind.EmberMoth ? 5f : 9f)
                 : critter.Kind == CritterKind.Snail || critter.Kind == CritterKind.CrystalSnail ? 1.5f : critter.Kind == CritterKind.FishShadow ? 3f : critter.Kind == CritterKind.Scarab ? 4f : 8f;
             int frame = flies || moving ? (int)((Time.time + critter.Phase) * rate) % CritterArt.Frames : 0;
             long key = 2L << 40 | (long)critter.Kind << 8 | (long)frame;
@@ -457,7 +492,7 @@ namespace Game.Client
             renderer.sprite = sprite;
             renderer.flipX = critter.Left;
             // A cricket's hop; a hare bounds while it runs.
-            float bob = flies ? 0.5f + Mathf.Sin((Time.time + critter.Phase) * 3) * 0.08f : (critter.Kind == CritterKind.Cricket || critter.Kind == CritterKind.Frog) && critter.Busy > 0 ? 0.18f
+            float bob = critter.Kind == CritterKind.VoidJelly ? 0.7f + Mathf.Sin((Time.time + critter.Phase) * 1.1f) * 0.3f : flies ? 0.5f + Mathf.Sin((Time.time + critter.Phase) * 3) * 0.08f : (critter.Kind == CritterKind.Cricket || critter.Kind == CritterKind.Frog) && critter.Busy > 0 ? 0.18f
                 : critter.Kind == CritterKind.SnowHare && moving ? Mathf.Abs(Mathf.Sin((Time.time + critter.Phase) * 9)) * 0.14f : 0;
             renderer.transform.localPosition = new Vector3(critter.At.x, critter.At.y + bob, 0);
             renderer.sortingOrder = CritterArt.Glows(critter.Kind) ? GlowOrder : flies ? FlyOrder : CritterArt.Swims(critter.Kind) ? TrailOrder : FootOrder(critter.At.y, StandArt.DecorTie);

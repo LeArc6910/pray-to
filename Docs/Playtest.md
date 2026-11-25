@@ -1,5 +1,20 @@
 # 웹 플레이 시험 (클라우드가 대신 해 보기)
 
+## 용암 지대·공허의 심연의 몬스터와 규칙, 던전 (`b4mobs`, 2026-11-25)
+
+`Docs/BiomeRework.md` B4b를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only b4mobs`(그리고 던전과 무리가 바뀌었으니 `dungeon`, `packs`). 새 월드(생성기 7판)여야 용암·심연의 굴, 들판의 김 뿜는 틈과 금 간 판이 있다(6판 월드는 그대로, 던전 안에는 어느 월드나 있다). b3mobs에서 배운 대로 장면은 그 생물군계의 무리 방에서 세우고, 장면 바로 뒤에 `monsters hold`, 줄의 먼 끝은 동쪽 12칸에서 다시 보고, 짧게 지나가는 상태는 올 때까지 거듭 묻는다. 먼저 `xp 6000`. PC와 휴대폰 세로에서:
+
+1. `b4`: 용암 문은 `ember_forge`(주인 `forge_keeper`, 빛 `#FF7A30`), 심연 문은 `broken_gate`(주인 `gate_warden`, 빛 `#6A30C0`)인지. `b1c`의 굴 목록에 용암이나 심연이 있는지
+2. 용암 지대의 무리 방(`goto room pack lava n`)에서 `scene b4monsters`: 공허 티끌(XS)·불도롱뇽·흑요석 딱정벌레·대장간 용암 슬라임·심연 추적자(새 그림)·공허의 눈·별빛 슬라임·그림자 추적자(M)·용암 투석꾼·분열체(L)·잿불 대장장이·공허의 문지기(XL)가 제 크기 폭으로 그려지는지. 사진 `b4mobs-lineup`
+3. `scene vents`(북쪽 3칸에 틈 셋, 가운데가 곧바로 쉭): 예고가 보이는지(`ventsShown`, 사진 `b4mobs-vent-hiss`), 분출하는지(`ventsBurst`, 화면 `burstsShown`, 사진 `b4mobs-vent-burst`)
+4. 심연의 무리 방에서 `scene plates; face off`(플레이어 칸부터 동쪽 6칸 판): 동쪽으로 걸어 건너면 꺼지지 않는지(`platesBroken` 0), 다시 `scene plates`로 서 있으면 판이 갈라지고(`cracksShown`, `stood`, 사진 `b4mobs-plate-crack`) 꺼져 떨어지는지(`plateFalls`, `fallsShown`, `holes`, 밑이 판이 아니고 생명력이 줄었는지, 사진 `b4mobs-plate-fall`). 심연에서 빛이 줄었는지(`abyssLightsDimmed`)
+5. `scene splitter; attack on 1 0`(동쪽 2칸 생명력 20의 분열체): 공허 조각으로 갈라지는지. 사진 `b4mobs-splitter`
+6. `goto gate ember_forge`, `goto gate broken_gate`마다: 문 방 사진(`b4mobs-<id>-gate`), [잿불 대장간 들어가기]·[깨진 문 너머 들어가기]를 진짜 클릭·탭으로, `goto droom C`에서 큰 몸(L)과 김 뿜는 틈·금 간 판이 있는지(사진 `b4mobs-<id>-pack`), `goto droom B`의 주인이 잿불 대장장이·공허의 문지기 그 자신인지(사진 `b4mobs-<id>-master`)
+
+명령: `scene b4monsters|vents|plates|splitter`, `b4`(JSON: 24칸 안의 몬스터마다 종·크기·생명력·상태·잠듦·정예·그려진 폭, 밑의 칸과 생명력, 9칸 안의 틈·판·구멍 수, 호스트의 분출·화상·꺼진 판·떨어짐, 밑의 판에 선 초, 화면의 예고·분출·꺼짐·떨어짐·판 돌아옴·갈라짐 수, 심연에서 줄인 빛 수, 생성기 판, 용암·심연 문의 던전).
+
+사람에게 남는 것: 김 뿜는 틈의 쉭 소리와 박자가 읽히는지(휴대폰 세로에서 붉은 테가 보이는지), 판 위에서 1초가 억울하지 않은지, 떨어질 때의 손맛, 심연이 너무 어둡지 않은지, 대장간·깨진 문 너머 한 판의 길이.
+
 ## 수정 동굴·지하 호수의 몬스터와 규칙, 던전 (`b3mobs`, 2026-11-25)
 
 `Docs/BiomeRework.md` B3b를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only b3mobs`(그리고 던전과 무리가 바뀌었으니 `dungeon`, `packs`). 새 월드(생성기 6판)여야 수정·호수의 굴과 얕은 물이 있다(5판 월드는 그대로). b2mobs에서 배운 대로 장면은 그 생물군계의 무리 방에서 세우고, 줄의 먼 끝은 가운데에서 다시 보고, 짧게 지나가는 상태는 올 때까지 거듭 묻는다. 먼저 `xp 3000`. PC와 휴대폰 세로에서:
@@ -283,6 +298,21 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 - 생성기가 놓은 것: `geodes`·`arches`·`boats`·`wheels`가 0보다 크면 `places at geode|arch|boat|wheel`로 가서 한 장(사진 `places-crystal-geode`, `places-crystal-arch`, `places-lake-boat`, `places-lake-wheel`)
 
 사람에게 남는 것: 수정 동굴이 보라가 아니라 회청 돌에 분홍·하늘 결정으로 읽히는지, 숨 쉬는 빛이 어지럽지 않은지, 호수의 물가(얕은 가장자리, 갈대, 연잎)가 자연스러운지, 유리 종소리와 물결·개구리 소리, 점판암 마을과 기둥 위 오두막이 그 땅의 집으로 느껴지는지, 물고기 그림자와 개구리가 휴대폰에서 적과 헷갈리지 않는지.
+
+### 용암 지대와 공허의 심연 (묶음 B4a, 2026-11-25)
+
+`biomes`와 `places` 두 구역이 용암 지대와 공허의 심연도 돈다(`goto room pack lava 1`, `goto room pack abyss 1`). 위와 같은 확인에 더해:
+
+- `scene biomes`는 그 생물군계의 소품을 북쪽 줄에 세운다(용암: 흑요석 가시, 불 피는 덤불, 쇳물 찌꺼기 더미, 식은 용암 바위, 현무암 기둥 무리 / 심연: 공허 결정, 뒤틀린 덩굴, 떠 있는 오벨리스크 조각, 끊긴 사슬 말뚝, 떠 있는 바위, 부서진 공허 기둥). 용암 지대에서는 남동쪽에 용암 4×3칸을 깔고 그 가운데에 용암 속 바위를 세운다. 켜진 등잔은 놓지 않는다
+- 빛 색은 용암 `#FF7A30`, 심연 `#401D73`(보라 `#6A30C0`의 60%), 환경음은 `Forge`, `Abyss`, 작은 생물은 `FireNewt`·`EmberMoth`, `VoidJelly`·`ShadowMoth`
+- `biomes`의 `tintNow`를 0.9초 간격으로 여섯 번 읽어, 모든 색이 제 빛 색을 어둡게 한 것(채널의 비율이 같다)인지. 용암은 읽은 값이 셋 넘게 다른지(느린 깜박임). 심연은 어둠의 물결이 지나갈 때만 바뀌어 같은 값이어도 된다
+- 용암: `lava`(아홉 칸 안의 용암 칸)가 6 이상이고 `bubbles` + `rafts`(용암 가의 식은 용암 거품, 용암 위의 껍질 조각)가 1 이상인지
+- 심연: `lightReach`가 0.7인지(심연에서는 모든 빛이 반지름의 70%만 닿는다, 화면만)
+- `biomes at bush`(용암) / `biomes at vine`(심연) 뒤 휘두르면 그 소품이 하나 주는지(사진 `biomes-lava-hit`, `biomes-abyss-hit`), `biomes at columns` / `biomes at shattered`(현무암 기둥 무리 / 부서진 공허 기둥 바로 뒤)에서 위쪽이 흐려지는지(사진 `biomes-lava-behind`, `biomes-abyss-behind`). 용암 지대의 꾸밈은 흔들리는 것이 없어 스치기 확인을 건너뛴다(심연의 떠 있는 돌은 스치면 흔들린다)
+- `scene places`는 여덟 가지를 그 생물군계의 그림으로(`shape` 7은 용암, 8은 심연), 남쪽에 용암은 쓰러진 대장간 굴뚝과 거대 모루, 심연은 깨진 문과 별 제단을 놓는다. 새 월드가 생성기 7판인지도 본다
+- 생성기가 놓은 것: `chimneys`·`anvils`·`gates`·`altars`가 0보다 크면 `places at chimney|anvil|gate|altar`로 가서 한 장(사진 `places-lava-chimney`, `places-lava-anvil`, `places-abyss-gate`, `places-abyss-altar`)
+
+사람에게 남는 것: 용암 지대가 검은 현무암에 빛나는 틈으로, 심연이 보랏빛 검은 판과 별빛으로 읽히는지, 용암 빛의 깜박임과 심연의 어둠 물결이 어지럽지 않은지, 심연에서 줄어든 빛이 답답하지 않은지, 대장간 소리(김, 먼 망치)와 심연의 웅웅·거꾸로 숨소리, 대장간 마을과 떠 있는 폐허 마을이 그 땅의 집으로 느껴지는지, 불도롱뇽·빛 해파리가 휴대폰에서 적과 헷갈리지 않는지.
 
 ## 크기 등급 (`sizes`, 2026-11-24)
 

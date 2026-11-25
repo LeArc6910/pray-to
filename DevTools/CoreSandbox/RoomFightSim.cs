@@ -47,6 +47,9 @@ namespace CoreSandbox
             var start = first.Edges.Select(i => rooms.Edges[i]).Select(e => rooms.Nodes[e.A == first.Index ? e.B : e.A])
                 .Where(n => n.Role != RoomRole.Pack && n.Role != RoomRole.Elite).OrderBy(n => n.Depth).FirstOrDefault() ?? first;
             player.Position = TileMap.Center(start.AnchorX, start.AnchorY);
+            // The zone levels of the biome's pack rooms (World.ZoneLevelAt), to set a dungeon's level beside (B4b).
+            var zones = packRooms.Select(r => world.ZoneLevelAt(r.Center)).ToList();
+            Console.WriteLine($"무리 방의 구역 레벨 {zones.Min()}~{zones.Max()} (가장 가까운 방 {world.ZoneLevelAt(first.Center)})");
 
             var toEnemies = new FlowField(world.Map);
             var toRoom = new FlowField(world.Map);

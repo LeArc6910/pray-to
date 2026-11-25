@@ -39,7 +39,7 @@ namespace Game.Core.Tests
         {
             Assert.IsTrue(Sheet.Success, string.Join("\n", Sheet.Errors));
             Assert.GreaterOrEqual(Sheet.Dungeons.Count, 4);
-            Assert.AreEqual(7, Sheet.Graphs.Count, "cellar, branching, locked, mine, (B2b) temple, (B3b) geode and aqueduct");
+            Assert.AreEqual(9, Sheet.Graphs.Count, "cellar, branching, locked, mine, (B2b) temple, (B3b) geode and aqueduct, (B4b) forge and shattered");
             foreach (var dungeon in Sheet.Dungeons)
             {
                 if (dungeon.Boss != null) Assert.IsNotNull(Monsters.Shipped.Find(dungeon.Boss), $"{dungeon.Id}: its master {dungeon.Boss}");
@@ -49,13 +49,16 @@ namespace Game.Core.Tests
             Assert.AreEqual("abandoned_mine", Sheet.For(Biome.Cave).Id);
             Assert.AreEqual("spore_depths", Sheet.For(Biome.Mushroom).Id);
             foreach (Biome biome in Enum.GetValues(typeof(Biome))) Assert.IsNotNull(Sheet.For(biome), biome.ToString());
-            // A biome with no dungeon of its own (the abyss; B2b gave the sand cave its buried temple, B3b the crystal cave
-            // its geode and the lake its sunken aqueduct) goes to the deep hollow.
+            // Every biome has a dungeon of its own (B2b gave the sand cave its buried temple, B3b the crystal cave its geode
+            // and the lake its sunken aqueduct, B4b the abyss the broken gate), so the deep hollow every biome without one
+            // shared is gone: no gate's row is of any biome.
             Assert.AreEqual("buried_temple", Sheet.For(Biome.Sand).KeyFor(Biome.Sand));
             Assert.AreEqual("geode_heart", Sheet.For(Biome.Crystal).KeyFor(Biome.Crystal));
             Assert.AreEqual("sunken_aqueduct", Sheet.For(Biome.Lake).KeyFor(Biome.Lake));
-            Assert.AreEqual("deep_hollow@abyss", Sheet.For(Biome.Abyss).KeyFor(Biome.Abyss));
-            Assert.AreEqual("공허의 심연의 깊은 굴", Sheet.For(Biome.Abyss).NameFor(Biome.Abyss));
+            Assert.AreEqual("broken_gate", Sheet.For(Biome.Abyss).KeyFor(Biome.Abyss));
+            Assert.AreEqual("ember_forge", Sheet.For(Biome.Lava).KeyFor(Biome.Lava));
+            foreach (Biome biome in Enum.GetValues(typeof(Biome))) Assert.AreEqual(biome, Sheet.For(biome).Biome, $"{biome} has its own");
+            Assert.IsNull(Sheet.Find("deep_hollow"));
             // The chunks made for dungeons stay out of the world's rooms.
             var rooms = Tiles.Shipped.Terrain.Rooms;
             Assert.IsTrue(rooms.Chunks.Any(c => c.Dungeon && !c.Field));
@@ -290,7 +293,9 @@ namespace Game.Core.Tests
             CollectionAssert.Contains(character.Records.ToList(), ("Dungeon", "frozen_crypt", 1));
             // On the wire by its row's index (RecordsMessage), and a row of any biome with its biome.
             Assert.AreEqual("frozen_crypt", Sheet.KeyOfIndex(Sheet.IndexOfKey("frozen_crypt")));
-            Assert.AreEqual("deep_hollow@abyss", Sheet.KeyOfIndex(Sheet.IndexOfKey("deep_hollow@abyss")));
+            Assert.AreEqual("cellar@abyss", Sheet.KeyOfIndex(Sheet.IndexOfKey("cellar@abyss")));
+            // A record of the deep hollow (retired in B4b) stays in an old save but has no row to be sent by.
+            Assert.AreEqual(-1, Sheet.IndexOfKey("deep_hollow@abyss"));
             Assert.AreEqual(-1, Sheet.IndexOfKey("gate3"));
 
             // The next run the same day: no more of the day's reward, and the next dungeon is another.

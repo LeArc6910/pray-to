@@ -72,10 +72,13 @@ namespace Game.Core.Tests
         [Test]
         public void ABadRowSaysWhatIsWrong()
         {
-            var monsters = MonsterSheet.Parse(File("monsters.csv"), File("monster_attacks.csv"));
+            // A kind that walks alone (pack solo) for the third row: the abyss stalker was the shipped one until B4b put it
+            // in the abyss's packs.
+            var monsters = MonsterSheet.Parse(File("monsters.csv").TrimEnd('\n') + "\nloner,외톨이,4,355,50,25,3.0,0.45,10,0.6,0.5,1.0,0,30,12,12,void_ore,25,,,,,#5E3E96,abyss,,,,heavy,,solo,,m,\n",
+                File("monster_attacks.csv") + "loner,cleave,베기,sweep,nearest,0.75,160,,2.2,120,,,,,2.5,100,0,1.5,,,,,,,\n");
             var data = PackSheet.Parse("id,biome,zone,weight,members,size,place\n"
                 + "a,,1,100,nobody:3,,\n"
-                + "b,,1,100,abyss_stalker:1|slime:3,,\n"
+                + "b,,1,100,loner:1|slime:3,,\n"
                 + "c,,1,100,slime:5-3,,\n"
                 + "d,,1,100,slime:6|cave_beetle:5,,\n"
                 + "e,,1,100,slime:4,huge,\n"

@@ -93,8 +93,8 @@ namespace Game.Core.Tests
             }
             foreach (BiomeLandmarkKind kind in Enum.GetValues(typeof(BiomeLandmarkKind)))
                 // The ice cave's and the sand cave's are version 5's (IceSandLookTests), the crystal cave's and the lake's
-                // version 6's (CrystalLakeLookTests).
-                if (!IceSandProps.Lays(kind) && !CrystalLakeProps.Lays(kind)) Assert.Greater(counts.GetValueOrDefault(kind), 0, $"{kind} in none of the seeds");
+                // version 6's (CrystalLakeLookTests), the lava zone's and the abyss's version 7's (LavaVoidLookTests).
+                if (!IceSandProps.Lays(kind) && !CrystalLakeProps.Lays(kind) && !LavaVoidProps.Lays(kind)) Assert.Greater(counts.GetValueOrDefault(kind), 0, $"{kind} in none of the seeds");
         }
 
         [Test]

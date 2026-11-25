@@ -40,7 +40,7 @@ dotnet run --project DevTools/CoreSandbox -- --boss 600 1 --boss-id void_lord --
 dotnet run --project DevTools/CoreSandbox -- --farm 120 mushroom
 dotnet run --project DevTools/CoreSandbox -- --economy
 dotnet run --project DevTools/CoreSandbox -- --factory 30
-# 지도를 숫자로: 막힌 칸, 벽 덩어리, 열린 바닥, 생물군계마다, 방·통로, 걷는 걸음, 생성 시간(Docs/WorldRework.md). --gen 1|2|3|4|5|6으로 생성기 판 하나만(--flow와 --hour에도. 3판부터 생물군계 소품과 꾸밈의 밀도도, 4판은 랜드마크 수도, 5판은 얼음·모래 동굴의 소품과 랜드마크, 중간 보스의 굴도, 6판은 수정 동굴·지하 호수의 소품과 랜드마크, 물 위의 섬, 굴과 얕은 물도. 새 월드는 6판, Docs/BiomeRework.md B1a·B1c·B2a·B2b·B3a·B3b)
+# 지도를 숫자로: 막힌 칸, 벽 덩어리, 열린 바닥, 생물군계마다, 방·통로, 걷는 걸음, 생성 시간(Docs/WorldRework.md). --gen 1|2|3|4|5|6|7로 생성기 판 하나만(--flow와 --hour에도. 3판부터 생물군계 소품과 꾸밈의 밀도도, 4판은 랜드마크 수도, 5판은 얼음·모래 동굴의 소품과 랜드마크, 중간 보스의 굴도, 6판은 수정 동굴·지하 호수의 소품과 랜드마크, 물 위의 섬, 굴과 얕은 물도, 7판은 용암 지대·공허의 심연의 소품과 랜드마크, 용암 속 바위, 김 뿜는 틈·금 간 판과 굴도. 새 월드는 7판, Docs/BiomeRework.md B1a·B1c·B2a·B2b·B3a·B3b·B4a·B4b)
 dotnet run --project DevTools/CoreSandbox -- --mapstats 1,2,3
 # 어느 시스템이 어느 시스템에 재료를 주는지, 고립된 재료(Docs/Systems.md)
 dotnet run --project DevTools/CoreSandbox -- --supply
@@ -57,6 +57,8 @@ dotnet run --project DevTools/CoreSandbox -- --dungeon abandoned_mine 1,2,3 --ge
 dotnet run --project DevTools/CoreSandbox -- --dungeon frozen_crypt 1,2,3 --gear iron_sword,iron_armor,iron_helmet,iron_boots --classes warrior --level 10
 dotnet run --project DevTools/CoreSandbox -- --dungeon geode_heart 1,2,3 --gear iron_sword,iron_armor,iron_helmet,iron_boots --classes warrior --level 16
 dotnet run --project DevTools/CoreSandbox -- --dungeon sunken_aqueduct 1,2,3 --gear mithril_sword,mithril_armor,mithril_helmet,mithril_boots --classes warrior --level 20
+dotnet run --project DevTools/CoreSandbox -- --dungeon ember_forge 1,2,3 --gear mithril_sword,mithril_armor,mithril_helmet,mithril_boots --classes warrior --level 25
+dotnet run --project DevTools/CoreSandbox -- --dungeon broken_gate 1,2,3 --gear obsidian_sword,obsidian_armor,obsidian_helmet,obsidian_boots --classes warrior --level 32
 # 함정 방마다 창살이 몇 칸 떨어지나(거리로 자른 것과 가장 좁은 곳, 2·3판 월드. Docs/BiomeRework.md B1c)
 dotnet run --project DevTools/CoreSandbox -- --traps 1,2,3
 
@@ -74,9 +76,9 @@ dotnet run --project DevTools/ArtPreview -- --only ui
 dotnet run --project DevTools/ArtPreview -- --only biomemock
 # 서 있는 층·이어지는 울타리만(out/depth/: joined.png 다섯 종류 16모양과 문, pen.png·pen_nofade.png 방목장과 흐려짐, place_*.png 장소의 정렬·흐려짐, biomes.png 생물군계 꾸밈. Docs/BiomeRework.md B0)
 dotnet run --project DevTools/ArtPreview -- --only depth
-# 생물군계의 모습만(out/biomes/: 생물군계마다(cave, mushroom, ice, sand, crystal, lake) 소품·꾸밈·작은 생물 표 props_<id>.png, 새 월드(생성기 6판)의 방 하나 room_<id>_unlit.png·room_<id>.png(빛 켠 것), 흙 동굴 마을 place_dawn_village.png, 오두막 울타리 place_hero_hut.png, 장소의 건물·꾸밈을 생물군계마다 place_props.png·place_props_ice_sand.png·place_props_crystal_lake.png·place_<장소>_<cave|mushroom|ice|sand|crystal|lake>[_lit].png, 랜드마크 landmarks.png·landmarks_ice_sand.png·landmarks_crystal_lake.png(_lit도)·landmark_<종류>[_lit].png. Docs/BiomeRework.md B1a·B1c·B2a·B3a)
+# 생물군계의 모습만(out/biomes/: 생물군계마다(cave, mushroom, ice, sand, crystal, lake, lava, abyss) 소품·꾸밈·작은 생물 표 props_<id>.png, 새 월드(생성기 7판)의 방 하나 room_<id>_unlit.png·room_<id>.png(빛 켠 것), 흙 동굴 마을 place_dawn_village.png, 오두막 울타리 place_hero_hut.png, 장소의 건물·꾸밈을 생물군계마다 place_props.png·place_props_ice_sand.png·place_props_crystal_lake.png·place_props_lava_abyss.png·place_<장소>_<cave|mushroom|ice|sand|crystal|lake|lava|abyss>[_lit].png, 랜드마크 landmarks.png·landmarks_ice_sand.png·landmarks_crystal_lake.png·landmarks_lava_abyss.png(_lit도)·landmark_<종류>[_lit].png. Docs/BiomeRework.md B1a·B1c·B2a·B3a·B4a)
 dotnet run --project DevTools/ArtPreview -- --only biomes
-# 몬스터 크기 등급만(out/sizes/: lineup.png 사람 옆 S·M·L·XL, poses.png 큰 몸의 자세, leaders.png 정예 금빛 테, clearance.png 여유 지도와 길 너비, icesand.png 얼음·모래 동굴의 새 종(자세·뒷모습·잠든 모습), crystallake.png 수정 동굴·지하 호수의 종(흉내쟁이의 결정 모습 포함), report.txt 종마다 그림 폭. Docs/BiomeRework.md B0b·B2b·B3b)
+# 몬스터 크기 등급만(out/sizes/: lineup.png 사람 옆 S·M·L·XL, poses.png 큰 몸의 자세, leaders.png 정예 금빛 테, clearance.png 여유 지도와 길 너비, icesand.png 얼음·모래 동굴의 새 종(자세·뒷모습·잠든 모습), crystallake.png 수정 동굴·지하 호수의 종(흉내쟁이의 결정 모습 포함), lavavoid.png 용암 지대·공허의 심연의 종(잠든 대장장이·문지기 포함), report.txt 종마다 그림 폭. Docs/BiomeRework.md B0b·B2b·B3b·B4b)
 dotnet run --project DevTools/ArtPreview -- --only sizes
 # 칸 그림 점검(out/flat/: objects.png 물건 층에 그리는 칸 전부를 지금 그리는 대로, 서 있는지(STANDS)·이웃에 맞추는지(JOINED)·벨트(BELT)·납작한지(FLAT), objects.txt 목록, 게임이 그리는 대로의 장면 scene_factory·scene_home·scene_farm·scene_rooms.png, 변형 표 laid_variants.png·stood_variants.png, rails.png·rail_variants.png 이어지는 철도. Docs/BiomeRework.md 납작한 칸 점검)
 dotnet run --project DevTools/ArtPreview -- --only flat

@@ -27,6 +27,8 @@ namespace Game.Core
         {
             Biome.Cave or Biome.Mushroom => true,
             Biome.Crystal or Biome.Lake => version >= CrystalLakeVersion,
+            // And version 7 the lava fields and the abyss (their dungeons' masters came with it, 묶음 B4).
+            Biome.Lava or Biome.Abyss => version >= LavaVoidVersion,
             _ => version >= IceSandVersion,
         };
 
@@ -34,7 +36,9 @@ namespace Game.Core
         // ice cave and the sand cave (their mid-bosses are of the third zone, and the sand cave holds the first boss's
         // arena in some worlds: the first hour's bot met a temple guardian there), and for the crystal cave and the
         // lake (the fourth zone's, past the crystal queen), one for the rest.
-        static int LairRingsOf(Biome biome) => biome == Biome.Ice || biome == Biome.Sand || biome == Biome.Crystal || biome == Biome.Lake ? 2 : 1;
+        static int LairRingsOf(Biome biome) => biome == Biome.Ice || biome == Biome.Sand || biome == Biome.Crystal || biome == Biome.Lake
+            // The lava fields' and the abyss's too (묶음 B4): the last zones', never on the first hour's way.
+            || biome == Biome.Lava || biome == Biome.Abyss ? 2 : 1;
 
         // The lake's shallows (4-1 지하 호수: "얕은 물, 걸을 수 있고 속도 70%"): its open floor beside water becomes
         // shallow water, and a share of the floor beside that. Only plain floor turns (not a road, a place's paving, a

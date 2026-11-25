@@ -1173,6 +1173,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only biomes,places,b3mobs,dungeon,packs`
   - 클라우드 확인 (2026-11-25, `f5ff022`): [x] 처음 422개 중 418 통과. 실패 넷은 점검 쪽: 수정 빛 "보라" 판정이 분홍 자체를 보라로 셈(분홍·하늘의 비율로 보게), 휴대폰의 수정 방이 모래 동굴과 맞닿아 긴 의자 하나가 모래 모습(장면 전체가 그 생물군계에 드는 방을 고름), 촉수 장면이 촉수를 풀어 두어 계속 솟아오름(장면 직후 붙잡음). 고친 뒤 같은 배포로 `biomes,places,b3mobs` 모두 통과. 사진: 수정 동굴의 몬스터 열 종, 첨탑에 맞아 튕기는 화살, 결정으로 선 흉내쟁이와 깨어난 모습, 물속의 촉수 물결, 정동 속·잠긴 수로의 문 방·무리 방·보스 방. 사진에서 찾아 고친 것: 옛 수정 첨탑이 보라였음 → 하늘빛 결정에 분홍 끝(빛·지도 색도)
   - (사람) 수정 동굴이 보라가 아니라 회청 점판암에 분홍·하늘 결정으로 읽히는지, 14초마다 바뀌는 분홍·하늘 빛이 어지럽지 않은지, 환경음 둘(결정 울림, 물가), 호수 물가의 갈대·얕은 물이 자연스러운지, 얕은 물을 걷는 느낌(70% 걸음)과 물 튀는 소리, 개구리·물고기 그림자가 휴대폰에서 적과 헷갈리지 않는지, 수정 마을·호수 마을과 랜드마크(거대 정동, 결정 아치, 가라앉은 배, 옛 물레방아), 탄이 결정에서 튕겨 돌아오는 손맛, 결정 흉내쟁이가 깨어나는 맛과 휴대폰에서 두 눈이 보이는지, 수정 거북의 되돌림, 촉수의 물결이 "물속에 무언가"로 읽히는지, 정동 속·잠긴 수로 한 판
+- [ ] 175단계: 용암 지대·공허의 심연 — 모습, 소품, 장소, 랜드마크, 새 몬스터, 김 뿜는 틈·무너지는 판·빛 줄이기, 던전 둘(잿불 대장간 주인, 깨진 문 너머), 생성기 7판(`Docs/BiomeRework.md` B4a·B4b)
+  - 명령 한 줄을 다시 돌린다(새 시트 줄: 몬스터·공격·무리·던전·던전 그래프·방 조각). 새 파일 `Core/World/WorldGenerator.LavaVoid.cs`, `Core/World/WorldGenerator.LavaVoidDungeons.cs`, `Core/Simulation/World.LavaVoid.cs`, `Client/Art/BiomeArt.LavaVoid.cs`, `Client/Art/PropArt.LavaVoid.cs`, `Client/Art/CreatureArt.LavaVoid.cs`, `Client/Art/LavaVoidLight.cs`, `Client/WorldView.LavaVoid.cs`, `Client/Playtest.LavaVoid.cs`, `Tests/EditMode/LavaVoidLookTests.cs`, `Tests/EditMode/B4bTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheLavaZoneAndTheAbyssStandTheirPropsAndThePlacesTakeTheirLooks`. 통신 0.106.0. 새 월드는 생성기 7판, 6판 이전 월드는 그대로. "깊은 굴" 던전 줄은 지웠다(옛 저장본의 기록은 남는다)
+  - (클라우드 웹 점검) `sweep.js --only biomes,places,b4mobs,dungeon,packs`
+  - (사람) 용암 지대(현무암과 깜박이는 주황 빛)와 공허의 심연(보랏빛 어둠, 줄어든 빛)이 서로 다르게 느껴지는지, 심연이 너무 어둡거나 답답하지 않은지(특히 휴대폰 세로), 환경음 둘(대장간, 심연), 불도롱뇽·빛 해파리가 휴대폰에서 적과 헷갈리지 않는지, 대장간 마을·심연 마을과 랜드마크(쓰러진 굴뚝, 거대 모루, 깨진 문, 별 제단), 김 뿜는 틈의 박자와 쉭 소리, 판 위의 1초가 억울하지 않은지와 떨어지는 손맛, 분열체가 갈라지는 맛, 잠든 잿불 대장장이·공허의 문지기가 깨어나는 맛, 잿불 대장간·깨진 문 너머 한 판의 길이
 
 ## 결과 보고
 

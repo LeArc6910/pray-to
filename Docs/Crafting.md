@@ -227,6 +227,25 @@ M4c에서 만든 규칙과 시트 작성법이다. 놓는 물건(작업대, 화�
 
 랜드마크의 칸 `GiantGeode`(거대 정동), `ArchPier`·`CrystalArch`(수정 아치의 기둥과 걸친 부분), `SunkenBoat`(가라앉은 배), `OldWheel`(옛 물레방아)은 줄이 없어 캘 수 없다. `CrystalArch`는 요정 고리의 갓처럼 지나가는 칸이다(`TileMap.IsSolid`).
 
+용암 지대와 공허의 심연의 소품(2026-11-25, `Docs/BiomeRework.md` 묶음 B4a)도 같은 방식이다. 생성기 7판 월드(`WorldGenerator.LavaVoidVersion`)에만 놓인다. 흑요석 가시와 공허 결정은 그 광맥과 같은 곡괭이(`pickaxe` 20, 30)가 있어야 캔다.
+
+| 칸 | 단단함 | 주는 것 | 비고 |
+|---|---|---|---|
+| `ObsidianSpike` 흑요석 가시 | 10 | 흑요석 원석 1 | 곡괭이 20 이상(흑요석 광맥과 같다) |
+| `FireBush` 불 피는 덤불 | 1 | 불꽃 고추 1, 30%로 불꽃 고추 씨앗 1 | 주황빛 2.5칸(`#FF7A30`). 용암 가에 더 많다 |
+| `SlagHeap` 쇳물 찌꺼기 더미 | 2 | 돌 1, 30%로 철 광석 1 | |
+| `CooledBoulder` 식은 용암 바위(2칸) | 6 | 돌 2, 20%로 흑요석 원석 1 | 주황빛 2칸(`#FF6A20`). 어느 칸을 쳐도 둘 다 사라진다. 용암 가에 더 많다 |
+| `BasaltColumns` 현무암 기둥 무리(2칸) | 6 | 돌 2 | 뒤에 서면 위쪽이 흐려진다 |
+| `LavaRock` 용암 속 바위 | 4 | 돌 1 | 용암 한 칸 위에 서고 둘레가 모두 용암이라 닿으려면 용암을 밟아야 한다 |
+| `VoidCrystal` 공허 결정 | 12 | 공허석 원석 1 | 보랏빛 2.5칸(`#A050FF`). 곡괭이 30 이상(공허석 광맥과 같다) |
+| `TwistedVine` 뒤틀린 덩굴 | 1 | 돌 1, 25%로 공허 콩 씨앗 1 | |
+| `ObeliskShard` 떠 있는 오벨리스크 조각 | 4 | 돌 1, 15%로 별 수박 씨앗 1 | 보랏빛 1.5칸 |
+| `ChainPost` 끊긴 사슬 말뚝 | 3 | 금화 3, 25%로 철 광석 1 | |
+| `FloatingRock` 떠 있는 바위(2칸) | 6 | 돌 2 | 그림자가 몸에서 떨어져 있다 |
+| `ShatteredPillar` 부서진 공허 기둥(2칸) | 6 | 돌 2 | 뒤에 서면 위쪽이 흐려진다 |
+
+랜드마크의 칸 `FallenChimney`(쓰러진 대장간 굴뚝), `GiantAnvil`(거대 모루), `BrokenGate`(깨진 문), `StarAltar`(별 제단)는 줄이 없어 캘 수 없다.
+
 ## materials.csv
 
 `Assets/_Project/Data/Loot/materials.csv`. `id, name, places, description`, 그리고 선택 열 `fish`, `fuel`. `places`는 [놓기]로 세우는 칸 종류이고, 비우면 세울 수 없는 재료다. `fish`는 그 생물군계(`cave`, `mushroom`, `ice`, `crystal`, `abyss`)의 물에서 낚이는 물고기라는 뜻이다(`Docs/Fishing.md`). `fuel`은 발전기가 그 재료 하나로 도는 초다(`Docs/Automation.md`).

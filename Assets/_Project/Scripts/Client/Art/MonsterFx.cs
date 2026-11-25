@@ -63,6 +63,14 @@ namespace Game.Client
         Reflect,
         Refract,
         Splash,
+        // The lava fields and the void abyss (2026-11-25, B4b). One-offs: a steam vent bursting (a column of steam
+        // and sparks, Hazard.Steam), a cracked plate giving way into the void (World.MonsterFxCrumble), and a player
+        // coming up on firm ground after a fall (World.MonsterFxFall). A loop: the cracks spreading in a plate under
+        // someone's feet, Progress how near it is to going (World.PlateHold).
+        Vent,
+        Crumble,
+        Fall,
+        Crack,
     }
 
     // What a kind's effects are made of besides its colours, so each reads as itself (Docs/MonsterPatterns.md): told
@@ -151,6 +159,9 @@ namespace Game.Client
             if (id == "mud_slime") return FxRamp.Dust;
             if (id == "crystal_mimic" || id == "crystal_tortoise" || id == "crystal_shooter" || id == "prism_wisp") return FxRamp.Cold;
             if (id == "geode_golem") return FxRamp.Violet;
+            // The lava fields' new kinds (B4b) burn whatever their element; the abyss's are the void's violet.
+            if (id == "salamander" || id == "magma_hurler" || id == "obsidian_beetle" || id == "forge_slime" || id == "forge_keeper") return FxRamp.Fire;
+            if (id == "star_slime" || id == "shadow_stalker" || id == "gate_warden") return FxRamp.Violet;
             if (element == SkillTag.Cold) return FxRamp.Cold;
             if (element == SkillTag.Fire) return FxRamp.Fire;
             return FxRamp.Plain;
@@ -188,6 +199,11 @@ namespace Game.Client
                     return MobLook.Frost;
                 case "magma_slime":
                 case "fire_bat":
+                case "salamander":
+                case "magma_hurler":
+                case "obsidian_beetle":
+                case "forge_slime":
+                case "forge_keeper":
                     return MobLook.Ember;
                 case "sand_scorpion":
                 case "sand_worm":
@@ -207,6 +223,13 @@ namespace Game.Client
                     return MobLook.Water;
                 case "abyss_stalker":
                 case "void_wisp":
+                case "void_eye":
+                case "void_splitter":
+                case "void_shard":
+                case "void_mote":
+                case "star_slime":
+                case "shadow_stalker":
+                case "gate_warden":
                     return MobLook.Shadow;
                 case "demon_soldier":
                     return MobLook.Iron;
@@ -427,6 +450,52 @@ namespace Game.Client
                     SkillFx.Fly(o, FxShape.Streak, FxRamp.Cold, 2, 2, 3, t, 0, 0.3f, 4, 14, c.Seed + 3, aimed: true);
                     SkillFx.Fly(o, FxShape.Streak, FxRamp.Gold, 2, 2, 3, t, 0, 0.3f, 4, 14, c.Seed + 7, aimed: true);
                     break;
+                case MobFx.Vent:
+                    // A burst of steam: a white flash at the vent, a column of steam rising and spreading, sparks thrown
+                    // up and a scald ring on the floor (red-rimmed: it hurt whoever stood there).
+                    life = 0.7f;
+                    if (t < 0.1f) Put(o, FxShape.Glint, FxRamp.Fire, 13, 2, 0, 4);
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float u = SkillFx.U(t, i * 0.06f, 0.6f);
+                        if (u <= 0 || u >= 1) continue;
+                        Put(o, FxShape.Smoke, FxRamp.Mist, SkillFxArt.Even(8 + 10 * u), Math.Min(3, (int)(u * 4)), ((i * 5 + c.Seed) % 5) - 2, 4 + 26 * u, 0.95f * (1 - u * u));
+                    }
+                    SkillFx.Fly(o, FxShape.Dot, FxRamp.Fire, 2, 2, 6, t, 0, 0.4f, 2, 10, c.Seed, hop: 12, cy: 4);
+                    SkillFx.Ring(o, FxRamp.Danger, t, 0, c.Size, 1, grow: 0.1f, life: 0.3f, ground: true);
+                    break;
+                case MobFx.Crumble:
+                    // A plate gives way: its pieces drop in and shrink into the dark, violet dust, a few stars pulled down.
+                    life = 0.6f;
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float a = i * 72 + c.Seed % 72, u = SkillFx.U(t, 0, 0.5f);
+                        Put(o, FxShape.Chunk, FxRamp.Violet, Math.Max(2, (int)(5 * (1 - u))), i & 1, SkillFx.Cos(a) * 5 * (1 - u), SkillFx.Sin(a) * 4 * (1 - u) - 4 * u, 1 - u, 0, true);
+                    }
+                    Put(o, FxShape.Shadow, FxRamp.Smoke, 18, 0, 0, 0, 0.7f, 0, true);
+                    SkillFx.Ring(o, FxRamp.Violet, t, 0, 12, 2, ground: true);
+                    SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 2, 2, 5, t, 0, life, 8, -6, c.Seed);
+                    break;
+                case MobFx.Fall:
+                    // Up out of the void: a swirl of stars round the feet and a violet puff.
+                    life = 0.6f;
+                    for (int i = 0; i < 6; i++)
+                    {
+                        float a = i * 60 + t * 540, u = t / life;
+                        Put(o, FxShape.Glint, FxRamp.Violet, 5, i & 1, SkillFx.Cos(a) * 9 * (1 - u), 6 + SkillFx.Sin(a) * 4 + 10 * u, 1 - u);
+                    }
+                    Put(o, FxShape.Smoke, FxRamp.Violet, 12, Math.Min(3, (int)(t / life * 4)), 0, 4, 0.8f * (1 - t / life));
+                    break;
+                case MobFx.Crack:
+                {
+                    // The plate under someone's feet cracking: a red rim at the plate's edge closing in as it nears giving
+                    // way, cracks spreading from the middle, and dust beginning to fall (the warning; red is danger).
+                    float p = Math.Clamp(c.Progress, 0, 1);
+                    Put(o, FxShape.Edge, FxRamp.Danger, SkillFxArt.Even(16 - 4 * p), p > 0.6f ? 2 : 1, 0, 0, 0.5f + 0.5f * p, 0, true);
+                    Put(o, FxShape.Broken, FxRamp.Violet, SkillFxArt.Even(6 + 10 * p), SkillFxArt.BrokenFrame(1, 4, (int)(p * 8)), 0, 0, 0.9f, c.Seed % 90, true);
+                    if (p > 0.5f) SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 1, 1, 3, t, 0, 0.6f, 6, -4, c.Seed);
+                    break;
+                }
                 case MobFx.Splash:
                     // A step in the shallows: a little ring and drops thrown up.
                     life = 0.35f;

@@ -837,6 +837,9 @@ namespace Game.Core
         // An icicle falling in the ice cave's halls (World.UpdateIcicles, B2): drawn as a thing coming down, with its
         // shadow on the floor, in the cold's colours.
         public const byte Icicle = 101;
+        // A steam vent of the lava fields about to burst (World.UpdateVents, 묶음 B4b): drawn as the vent hissing and
+        // glowing under a thin red rim, then a column of steam, in the fire's colours.
+        public const byte Steam = 102;
         // The web whose burst this marks (AttackShape.Pluck), taken away when it lands; 0 for none.
         public int Plucks { get; internal set; }
         // A web or a pool of venom: it does its work while it lies there, and nothing when its time is up.

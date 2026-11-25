@@ -286,9 +286,17 @@ namespace Game.Client
             // teal (묶음 B3a).
             Biome.Crystal => CrystalPink,
             Biome.Lake => Rgba.Hex("#70E6D8"),
+            // The lava zone's ember orange and the abyss's violet, which is faint (묶음 B4a; the overload below makes
+            // the one flicker and the other ebb).
+            Biome.Lava => Rgba.Hex("#FF7A30"),
+            Biome.Abyss => AbyssViolet.Scale(AbyssFaint),
             _ => Rgba.Clear,
         };
 
+        public static readonly Rgba AbyssViolet = Rgba.Hex("#6A30C0");
+        // How much of the abyss's violet shows at rest (the biome with the least light of its own), and at the bottom
+        // of one of the waves of dark that cross it.
+        public const float AbyssFaint = 0.6f, AbyssEbb = 0.2f;
         public static readonly Rgba CrystalPink = Rgba.Hex("#FF8AD8"), CrystalSky = Rgba.Hex("#8AF0FF");
         // How long the crystal cave's light takes to go from pink to sky and back, in seconds.
         public const float CrystalBreath = 14;
@@ -306,6 +314,18 @@ namespace Game.Client
             }
             if (biome == Biome.Lake)
                 return BiomeTint(biome).Scale(0.84f + 0.16f * (float)Math.Sin(time * 1.3 + x * 0.9 + y * 0.6));
+            // The lava zone's orange flickers slowly, as firelight on a wall: two slow waves that never line up, each
+            // tile a little out of step with the next.
+            if (biome == Biome.Lava)
+                return BiomeTint(biome).Scale(0.8f + 0.12f * (float)Math.Sin(time * 0.9 + x * 0.5 + y * 0.3) + 0.08f * (float)Math.Sin(time * 2.3 + x * 1.1 - y * 0.7));
+            // The abyss's violet is faint, and now and then a wave of dark crosses it: a band moving slowly over the
+            // tiles, in which the violet all but goes out.
+            if (biome == Biome.Abyss)
+            {
+                float wave = (float)Math.Sin(time * 0.45 - (x + y * 0.6) * 0.16);
+                float ebb = Math.Max(0, (wave - 0.55f) / 0.45f);
+                return AbyssViolet.Scale(AbyssFaint - (AbyssFaint - AbyssEbb) * ebb);
+            }
             return BiomeTint(biome);
         }
 
