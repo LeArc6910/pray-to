@@ -2,9 +2,9 @@ id,name,biome,level,graph,rooms,boss,chest,minutes,entry,light,experience
 abandoned_mine,버려진 갱도,cave,2,mine,10-11,slime_mother,chest_iron,6,gate,#FFB060,75
 spore_depths,포자 굴,mushroom,3,branching,9-11,mycelium_mother,chest_gold,5,gate,#A8F06A,60
 frozen_crypt,얼어붙은 묘,ice,3,locked,10-12,frost_mammoth,chest_gold,8,gate,#A8DCFF,60
-ember_forge,잿불 대장간,lava,3,locked,12-14,elite:magma_slime,chest_gold,13,gate,#FF7A30,
-deep_hollow,깊은 굴,,0,branching,9-11,elite,chest_gold,8,gate,,
+ember_forge,잿불 대장간,lava,4,forge,13-14,forge_keeper,chest_gold,8,gate,#FF7A30,64
 cellar,지하실,,2,cellar,6-7,elite,chest_iron,4,cellar,,
 buried_temple,묻힌 신전,sand,3,temple,11-12,temple_guardian,chest_gold,8,gate,#FFD28A,45
 geode_heart,정동 속,crystal,4,geode,11-12,geode_golem,chest_gold,8,gate,#FF8AD8,57
 sunken_aqueduct,잠긴 수로,lake,4,aqueduct,12-13,moss_turtle,chest_gold,6,gate,#70E6D8,47
+broken_gate,깨진 문 너머,abyss,5,shattered,12-13,gate_warden,chest_gold,8,gate,#6A30C0,45

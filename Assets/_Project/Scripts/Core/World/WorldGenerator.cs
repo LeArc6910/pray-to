@@ -312,6 +312,9 @@ namespace Game.Core
                 if (version >= LandmarkVersion) LayCellars(world, seed, terrain ?? TerrainSheet.Default, version);
                 // The underground lake's shallows round its water (WorldGenerator.CrystalLakeDungeons.cs, 묶음 B3), version 6 on.
                 if (version >= CrystalLakeVersion) LayShallows(world, seed);
+                // The lava fields' steam vents and the abyss's cracked plates (WorldGenerator.LavaVoidDungeons.cs, 묶음 B4),
+                // version 7 on.
+                if (version >= LavaVoidVersion) LayLavaVoid(world, seed);
                 // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
                 if (DungeonPocket.Fits(width)) world.Map.AddPocket(DungeonPocket.Rows);
             }

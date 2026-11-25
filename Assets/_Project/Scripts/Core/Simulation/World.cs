@@ -220,6 +220,9 @@ namespace Game.Core
             UpdateAfflictions();
             // The ice cave's falling icicles (World.IceSand.cs), laid before the hazards land this tick.
             UpdateIcicles();
+            // The lava fields' steam vents and the abyss's cracked plates (World.LavaVoid.cs, B4b).
+            UpdateVents();
+            UpdatePlates();
             UpdateHazards();
             UpdateProjectiles();
             UpdateForage();

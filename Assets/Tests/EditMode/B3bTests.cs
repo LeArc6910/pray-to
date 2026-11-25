@@ -312,7 +312,7 @@ namespace Game.Core.Tests
             Assert.GreaterOrEqual(chunks.Count(c => c.Role == RoomRole.Pack), 3, "pack rooms of its own");
             Assert.GreaterOrEqual(chunks.Count(c => c.Role == RoomRole.Elite), 2, "a champions' room and a master's");
             Assert.IsTrue(chunks.Any(c => c.Rows.Any(r => r.IndexOf(floor) >= 0)), $"its own ('{floor}')");
-            Assert.AreEqual("deep_hollow", Sheet.For(Biome.Abyss).Id, "the abyss's gate still leads to the deep hollow");
+            Assert.AreEqual("broken_gate", Sheet.For(Biome.Abyss).Id, "the abyss's gate leads beyond the broken gate (B4b)");
 
             var world = Hand(biome, out var gate, id);
             world.MonstersHold = true;

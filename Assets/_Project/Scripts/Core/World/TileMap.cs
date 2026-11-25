@@ -307,6 +307,14 @@ namespace Game.Core
         // round its water (WorldGenerator.CrystalLakeDungeons.cs) and in the sunken aqueduct's rooms: walked on at
         // PlayerMotor.ShallowSlow, a splash at each step; never dug or built on. A tentacle keeps to it as to the water.
         ShallowWater,
+        // The lava fields' and the abyss's rules (2026-11-25, Docs/BiomeRework.md 묶음 B4b), laid by the generator's
+        // version 7 (WorldGenerator.LavaVoidDungeons.cs) and in the ember forge's and the broken gate's rooms, never dug
+        // or built on: a steam vent, walked over, that hisses and bursts on its own rhythm (World.LavaVoid.cs); a cracked
+        // plate of the abyss, walked over, that gives way under whoever stands on it too long; and the hole it leaves,
+        // which no one walks, until the plate is back.
+        SteamVent,
+        CrackedPlate,
+        BrokenPlate,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -427,6 +435,8 @@ namespace Game.Core
             return type != TileType.Floor && !World.IsBelt(type) && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
                 && type != TileType.Door && !IsSoil(type) && !Structures.IsWay(type) && type != TileType.Waypoint
                 && type != TileType.IceFloor && type != TileType.Quicksand && type != TileType.ShallowWater
+                // A steam vent and a cracked plate are walked over (묶음 B4b); the hole a plate leaves is not.
+                && type != TileType.SteamVent && type != TileType.CrackedPlate
                 // A fairy ring's small caps are walked through like the floor's cover (묶음 B1c).
                 && type != TileType.RingCap
                 // A crystal arch's span stands over a tile that is walked (묶음 B3a).

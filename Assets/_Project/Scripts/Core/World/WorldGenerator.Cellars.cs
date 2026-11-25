@@ -62,6 +62,9 @@ namespace Game.Core
             // the world's version lays them in (LairsIn: version 4 the dirt cave and the mushroom forest, version 5 on the
             // ice cave and the sand cave too, version 6 on the crystal cave and the underground lake as well).
             var dungeons = terrain?.Dungeons ?? DungeonData.None;
+            // The lava fields' and the abyss's lairs (version 7) draw from their own stream, so the lairs of the biomes
+            // before them stay where version 6 laid them.
+            var lateRandom = new GameRandom(seed, LavaVoidLairStream);
             int ring = LairRing * ScaleOf(map.Width, map.Height);
             var spawn = TileMap.Center(world.SpawnX, world.SpawnY);
             foreach (Biome biome in Enum.GetValues(typeof(Biome)))
@@ -75,7 +78,7 @@ namespace Game.Core
                     && OpenSquare(map, n)).ToList();
                 for (int i = 0; i < LairsPerBiome && fit.Count > 0; i++)
                 {
-                    var pick = fit[random.Next(fit.Count)];
+                    var pick = fit[(LavaVoidLairs(biome) ? lateRandom : random).Next(fit.Count)];
                     rooms.LairList.Add(pick.Index);
                     // Not two lairs side by side.
                     fit.RemoveAll(n => Vec2.Distance(n.Center, pick.Center) < 4 * (pick.Radius + n.Radius));

@@ -85,7 +85,9 @@ namespace Game.Core.Tests
             Assert.IsEmpty(Monsters.Shipped.Find("silk_spiderling").Attacks);
             Assert.AreEqual(MonsterRole.Swarm, Monsters.Shipped.Find("slime").Role);
             Assert.IsTrue(Monsters.Shipped.Find("cave_beetle").Has(MonsterTraitKind.Guard));
-            Assert.AreEqual("solo", Monsters.Shipped.Find("abyss_stalker").Pack);
+            // The abyss stalker walked alone until B4b gave it its own body and put it in the abyss's packs.
+            Assert.AreNotEqual("solo", Monsters.Shipped.Find("abyss_stalker").Pack);
+            Assert.IsTrue(Monsters.Shipped.Packs.Packs.Any(p => p.Biome == Biome.Abyss && p.Members.Any(m => m.Monster.Id == "abyss_stalker")));
         }
 
         [Test]
