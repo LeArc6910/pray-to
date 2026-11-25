@@ -217,7 +217,7 @@ namespace Game.Core
 
         // What each letter of a chunk lays: a tile, and for some a mark kept on the room graph. '?' leaves the tile as
         // the generator made it, '%' is rock or floor by the toss of a coin, '+' a door.
-        public const string Letters = "#.?%+MECFSXGOVLWPtTBRDiqmbcnorlkasuejhw=~^gpxzyAHZK";
+        public const string Letters = "#.?%+MECFSXGOVLWPtTBRDiqmbcnorlkasuejhw=~^gpxzyAHZKf";
 
         // The tile a letter lays; null for '?', and for '%' and '+', which the generator decides.
         public static TileType? Tile(char letter) => letter switch
@@ -269,6 +269,8 @@ namespace Game.Core
             'H' => TileType.ShelfStump,
             'Z' => TileType.SporeSac,
             'K' => TileType.GlowCaps,
+            // The lake's shallows for the sunken aqueduct's rooms (묶음 B3b).
+            'f' => TileType.ShallowWater,
             _ => null,
         };
 
@@ -289,7 +291,7 @@ namespace Game.Core
 
         // Whether a letter's tile is walked on. '%' may be rock, so it is not counted on.
         public static bool Walked(char letter) => letter == '.' || letter == Door || letter == 'M' || letter == 'E' || letter == 'T' || letter == '=' || letter == 'R'
-            || letter == 'i' || letter == 'q' || letter == '~' || letter == '?';
+            || letter == 'i' || letter == 'q' || letter == '~' || letter == 'f' || letter == '?';
 
         // Dug through with the right pickaxe: what shuts a hidden room or a locked one.
         static bool DugThrough(char letter) => letter == 'X' || letter == 'O' || letter == 'V';

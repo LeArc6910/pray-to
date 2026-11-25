@@ -143,9 +143,21 @@ namespace Game.Core
         // drops off it at its edge, whole (a slime mother's slimes).
         Shed,
         // Dormant[:tiles] (2026-11-24, B2) — while it has no one to fight it stands as a statue or a beast in the ice: it
-        // notices no one further than that (World.DormantReach) until struck or its pack is roused, and the screen draws
+        // notices no one further than that (World.NoticeReach) until struck or its pack is roused, and the screen draws
         // it still and stone-grey or iced over (the temple guardian, the frost mammoth).
         Dormant,
+        // Mimic[:tiles] (2026-11-25, B3b) — while it has no one to fight it stands as a clump of crystals: it notices no
+        // one further than that (default 2), its pack's alarm does not wake it, a blow does, and its waking rings the
+        // mimics within World.MimicRing awake (the crystal mimic).
+        Mimic,
+        // Reflect (B3b) — a player's shot that strikes it from in front (its guard's arc) while its guard is up goes back
+        // as its own shot, mirrored off its shell (World.ReflectOff, the crystal tortoise).
+        Reflect,
+        // Prism (B3b) — its shots break into three the first time they come off rock or crystal (World.Refract).
+        Prism,
+        // Shore[:tiles] (B3b) — never steps further than that (default 1) from water or the shallows, and lands nowhere
+        // else (World.KeepToShore, the tentacle).
+        Shore,
     }
 
     public sealed class MonsterTrait
@@ -566,6 +578,12 @@ namespace Game.Core
                         break;
                     case MonsterTraitKind.Dormant:
                         if (pieces.Length > 1 && (trait.Number(0, 0) < 1 || trait.Number(0, 0) > 8)) throw new FormatException("dormant:칸의 칸은 1~8입니다.");
+                        break;
+                    case MonsterTraitKind.Mimic:
+                        if (pieces.Length > 1 && (trait.Number(0, 0) < 1 || trait.Number(0, 0) > 4)) throw new FormatException("mimic:칸의 칸은 1~4입니다.");
+                        break;
+                    case MonsterTraitKind.Shore:
+                        if (pieces.Length > 1 && (trait.Number(0, 0) < 1 || trait.Number(0, 0) > 3)) throw new FormatException("shore:칸의 칸은 1~3입니다.");
                         break;
                     case MonsterTraitKind.Shed:
                         if (pieces.Length != 3 || pieces[1].Trim().Length == 0 || trait.Number(1, 0) < 5 || trait.Number(1, 0) > 50)

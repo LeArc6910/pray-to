@@ -39,7 +39,7 @@ namespace Game.Core.Tests
         {
             Assert.IsTrue(Sheet.Success, string.Join("\n", Sheet.Errors));
             Assert.GreaterOrEqual(Sheet.Dungeons.Count, 4);
-            Assert.AreEqual(5, Sheet.Graphs.Count, "cellar, branching, locked, mine and (B2b) temple");
+            Assert.AreEqual(7, Sheet.Graphs.Count, "cellar, branching, locked, mine, (B2b) temple, (B3b) geode and aqueduct");
             foreach (var dungeon in Sheet.Dungeons)
             {
                 if (dungeon.Boss != null) Assert.IsNotNull(Monsters.Shipped.Find(dungeon.Boss), $"{dungeon.Id}: its master {dungeon.Boss}");
@@ -49,10 +49,13 @@ namespace Game.Core.Tests
             Assert.AreEqual("abandoned_mine", Sheet.For(Biome.Cave).Id);
             Assert.AreEqual("spore_depths", Sheet.For(Biome.Mushroom).Id);
             foreach (Biome biome in Enum.GetValues(typeof(Biome))) Assert.IsNotNull(Sheet.For(biome), biome.ToString());
-            // A biome with no dungeon of its own (the lake, B2b gave the sand cave its buried temple) goes to the deep hollow.
+            // A biome with no dungeon of its own (the abyss; B2b gave the sand cave its buried temple, B3b the crystal cave
+            // its geode and the lake its sunken aqueduct) goes to the deep hollow.
             Assert.AreEqual("buried_temple", Sheet.For(Biome.Sand).KeyFor(Biome.Sand));
-            Assert.AreEqual("deep_hollow@lake", Sheet.For(Biome.Lake).KeyFor(Biome.Lake));
-            Assert.AreEqual("지하 호수의 깊은 굴", Sheet.For(Biome.Lake).NameFor(Biome.Lake));
+            Assert.AreEqual("geode_heart", Sheet.For(Biome.Crystal).KeyFor(Biome.Crystal));
+            Assert.AreEqual("sunken_aqueduct", Sheet.For(Biome.Lake).KeyFor(Biome.Lake));
+            Assert.AreEqual("deep_hollow@abyss", Sheet.For(Biome.Abyss).KeyFor(Biome.Abyss));
+            Assert.AreEqual("공허의 심연의 깊은 굴", Sheet.For(Biome.Abyss).NameFor(Biome.Abyss));
             // The chunks made for dungeons stay out of the world's rooms.
             var rooms = Tiles.Shipped.Terrain.Rooms;
             Assert.IsTrue(rooms.Chunks.Any(c => c.Dungeon && !c.Field));

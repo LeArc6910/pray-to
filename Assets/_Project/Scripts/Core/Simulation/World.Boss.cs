@@ -739,7 +739,19 @@ namespace Game.Core
                 projectile.Position += projectile.Velocity * TickSeconds;
                 // A monster's shot may come off the wall or turn back there (World.MonsterAttacks.cs).
                 bool wall = Collision.Overlaps(Map, projectile.Position, projectile.Radius * 0.5f);
-                if (wall && !projectile.Friendly && Rebound(projectile)) wall = false;
+                // Crystal turns any shot, a player's too (World.CrystalLake.cs, B3b).
+                if (wall && Glance(projectile)) wall = false;
+                if (wall && !projectile.Friendly && Rebound(projectile))
+                {
+                    wall = false;
+                    Refract(projectile);
+                }
+                // A crystal tortoise's shell turns a player's shot back at them.
+                if (projectile.Friendly && ReflectOff(projectile))
+                {
+                    _projectiles.Remove(projectile);
+                    continue;
+                }
                 bool ended = --projectile.RemainingTicks <= 0 || wall || ComesBack(projectile);
                 bool gone = projectile.Friendly ? FlyFriendly(projectile, ended) : ended || StrikePlayer(projectile);
                 if (gone) _projectiles.Remove(projectile);

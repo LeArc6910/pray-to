@@ -92,8 +92,9 @@ namespace Game.Core.Tests
                 Assert.LessOrEqual(made.BiomeLandmarks.Count, Math.Max(3, rooms / 6), $"seed {seed}: landmarks are rare ({made.BiomeLandmarks.Count} in {rooms} rooms)");
             }
             foreach (BiomeLandmarkKind kind in Enum.GetValues(typeof(BiomeLandmarkKind)))
-                // The ice cave's and the sand cave's are version 5's (IceSandLookTests).
-                if (!IceSandProps.Lays(kind)) Assert.Greater(counts.GetValueOrDefault(kind), 0, $"{kind} in none of the seeds");
+                // The ice cave's and the sand cave's are version 5's (IceSandLookTests), the crystal cave's and the lake's
+                // version 6's (CrystalLakeLookTests).
+                if (!IceSandProps.Lays(kind) && !CrystalLakeProps.Lays(kind)) Assert.Greater(counts.GetValueOrDefault(kind), 0, $"{kind} in none of the seeds");
         }
 
         [Test]

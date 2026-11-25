@@ -408,6 +408,8 @@ namespace Game.Core
             MoveEnemy(enemy);
             // One that fears the light takes back a step into it, or goes out of it (World.BiomeMonsters.cs).
             if (enemy.Definition.Has(MonsterTraitKind.Fearlight)) ShunLight(enemy, before);
+            // A tentacle takes back a step away from the water (World.CrystalLake.cs).
+            if (enemy.Definition.Has(MonsterTraitKind.Shore)) KeepToShore(enemy, before);
         }
 
         void MoveEnemy(Enemy enemy)
@@ -444,7 +446,7 @@ namespace Game.Core
                     // for the stone and breaks in.
                     bool walledOut = enemy.Rift == DefenseMonster && _flow.DistanceAt(TileMap.Cell(enemy.Position.X), TileMap.Cell(enemy.Position.Y)) == FlowField.Unreached;
                     var nearest = walledOut ? null : _players
-                        .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= (DormantReach(definition) ?? definition.Aggro * AggroScale) && !InSafePlace(p.Position) && !Unheeded(enemy, p))
+                        .Where(p => !p.IsDead && Vec2.Distance(p.Position, enemy.Position) <= (NoticeReach(enemy) ?? definition.Aggro * AggroScale) && !InSafePlace(p.Position) && !Unheeded(enemy, p))
                         .OrderBy(p => Vec2.Distance(p.Position, enemy.Position))
                         .FirstOrDefault();
                     if (nearest == null)
@@ -856,11 +858,18 @@ namespace Game.Core
         public const float IceGrip = 4f;
         public const float IceDrag = 2.5f;
         public const float QuicksandSlow = 0.55f;
+        // The lake's shallows (B3b) are waded at this share of the speed.
+        public const float ShallowSlow = 0.7f;
 
         static TileType Under(TileMap map, Vec2 position) => map[TileMap.Cell(position.X), TileMap.Cell(position.Y)];
 
         // What share of their speed a player walks at on the floor under them.
-        public static float GroundSpeed(TileMap map, Vec2 position) => Under(map, position) == TileType.Quicksand ? QuicksandSlow : 1;
+        public static float GroundSpeed(TileMap map, Vec2 position) => Under(map, position) switch
+        {
+            TileType.Quicksand => QuicksandSlow,
+            TileType.ShallowWater => ShallowSlow,
+            _ => 1,
+        };
 
         public static bool OnIce(TileMap map, Vec2 position) => Under(map, position) == TileType.IceFloor;
 

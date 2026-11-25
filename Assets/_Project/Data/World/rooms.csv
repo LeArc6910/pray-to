@@ -92,3 +92,13 @@ dungeon_temple_colonnade,pack,sand,dungeon,12,yes,?.P...P...P.?/............./..
 dungeon_temple_ossuary,pack,sand,dungeon,12,yes,?.o.....o.?/b..M...M..b/...b.u.b.../.M..qqq..M./...b.u.b.../b..M...M..b/?.o.....o.?
 dungeon_temple_court,elite,sand,dungeon,10,yes,?.s.......s.?/.l.........l./...M.===.M.../....=...=..../.s..=.E.=..s./....=...=..../...M.===.M.../.l.........l./?.s.......s.?
 dungeon_temple_sanctum,elite,sand,dungeon,10,no,?.s...P...P...s.?/.l.............l./..qq.........qq../..q...........q../.....=======...../....=.......=..../..P.=.M...M.=.P../....=.......=..../....=...E...=..../....=.......=..../..P.=.M...M.=.P../....=.......=..../.....=======...../..q...........q../..qq.........qq../.l.............l./?.s...P...P...s.?
+dungeon_geode_spires,pack,crystal,dungeon,12,yes,?.^.....^.?/^..M...M..^/...^...^.../.M...^...M./...^...^.../^..M...M..^/?.^.....^.?
+dungeon_geode_clusters,pack,crystal,dungeon,12,yes,?.^^...^^.?/.^.......^./...M.=.M.../..=..^..=../.M.^...^.M./..=..^..=../...M.=.M.../.^.......^./?.^^...^^.?
+dungeon_geode_hall,pack,crystal,dungeon,12,yes,?.u.......u.?/............./..M.^...^.M../.^.........^./...M..^..M.../.^.........^./..M.^...^.M../............./?.u.......u.?
+dungeon_geode_vault,elite,crystal,dungeon,10,yes,?.^.......^.?/.l.........l./...M.===.M.../....=.^.=..../.^..=.E.=..^./....=.^.=..../...M.===.M.../.l.........l./?.^.......^.?
+dungeon_geode_heart,elite,crystal,dungeon,10,no,?.^...^...^...^.?/.l.............l./................./..^...........^../.....^.....^...../................./.^.....M.M.....^./................./........E......../................./.^.....M.M.....^./................./.....^.....^...../..^...........^../................./.l.............l./?.^...^...^...^.?
+dungeon_aqueduct_channel,pack,lake,dungeon,12,yes,?..fWWWf..?/...fWWWf.../.M.ff.ff.M./...M...M.../.ff.....ff./fWf..M..fWf/.ff.....ff./...M...M.../?.........?
+dungeon_aqueduct_pools,pack,lake,dungeon,12,yes,?.........?/.fff...fff./.fWf.M.fWf./.fff...fff./..M..f..M../.fff...fff./.fWf.M.fWf./.fff...fff./?.........?
+dungeon_aqueduct_arches,pack,lake,dungeon,12,yes,?.P...P...P.?/.ffff...ffff./.fWWf.M.fWWf./.ffff...ffff./..M...f...M../.ffff...ffff./.fWWf.M.fWWf./.ffff...ffff./?.P...P...P.?
+dungeon_aqueduct_cistern,elite,lake,dungeon,10,yes,?.l.......l.?/.fffff.fffff./.fWWWf.fWWWf./.ff...M...ff./.f...fEf...f./.ff...M...ff./.fWWWf.fWWWf./.fffff.fffff./?.l.......l.?
+dungeon_aqueduct_basin,elite,lake,dungeon,10,no,?.l...........l.?/.fff.........fff./.fWf.........fWf./.fff.........fff./....fffffffff..../..M.fffffffff.M../....ffMfffMff..../....fffffffff..../....ffffEffff..../....fffffffff..../....ffMfffMff..../..M.fffffffff.M../....fffffffff..../.fff.........fff./.fWf.........fWf./.fff.........fff./?.l...........l.?

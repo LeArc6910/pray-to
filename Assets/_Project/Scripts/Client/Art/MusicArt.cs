@@ -42,6 +42,10 @@ namespace Game.Client
         // as it runs, dry clicks (묶음 B2a).
         Frost,
         Dunes,
+        // The crystal cave: glass bells ringing far off over a clear held tone. The lake: water lapping the bank, drops
+        // falling into it, frogs (묶음 B3a).
+        Chimes,
+        Lakeside,
     }
 
     // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
@@ -721,6 +725,76 @@ namespace Game.Client
                             Click(buffer, t + tap * (0.09f + random.Next() * 0.08f), 0.008f, 0.3f + random.Next() * 0.3f, seed: 700 + tap + (int)(t * 10));
                     }
                     return Normalised(buffer, 0.4f);
+                }
+                case Ambience.Chimes:
+                {
+                    // A still, bright air: a faint clear tone that swells and sinks, and over it glass bells, one or
+                    // two at a time from a five-note scale, each struck and left to ring out with a fainter echo.
+                    float seconds = 30;
+                    var buffer = Wind(seconds, smoothing: 0.006f, volume: 0.16f, swell: 0.4f, seed: 51);
+                    for (int i = 0; i < buffer.Length; i++)
+                    {
+                        double t = i / (double)SampleRate;
+                        // 660 and 990 Hz, whole cycles in the loop; the swell's 10 and 15 second cycles close it too.
+                        double swell = 0.5 + 0.5 * Math.Sin(2 * Math.PI * t / 10);
+                        double shimmer = 0.5 + 0.5 * Math.Sin(2 * Math.PI * t / 15 + 1.1);
+                        buffer[i] += (float)(Math.Sin(2 * Math.PI * 660 * t) * 0.035 * swell * swell + Math.Sin(2 * Math.PI * 990 * t) * 0.02 * shimmer * shimmer);
+                    }
+                    float[] bells = { 1318.5f, 1568f, 1760f, 2093f, 2637f };
+                    var random = new Scramble(52);
+                    for (float t = 1.2f; t < seconds - 3; t += 1.8f + random.Next() * 3.4f)
+                    {
+                        int notes = random.Next() < 0.35f ? 2 : 1;
+                        for (int n = 0; n < notes; n++)
+                        {
+                            float pitch = bells[(int)(random.Next() * bells.Length) % bells.Length];
+                            float at = t + n * (0.22f + random.Next() * 0.2f);
+                            float volume = 0.2f + random.Next() * 0.22f;
+                            // The strike, the ring, a partial above it, and the echo off the far wall.
+                            Click(buffer, at, 0.004f, volume * 0.6f, seed: 800 + (int)(at * 20));
+                            Sweep(buffer, Wave.Sine, at, 1.4f, pitch, pitch * 0.997f, volume);
+                            Sweep(buffer, Wave.Sine, at, 0.5f, pitch * 2.76f, pitch * 2.75f, volume * 0.25f);
+                            Sweep(buffer, Wave.Sine, at + 0.37f, 0.9f, pitch, pitch * 0.997f, volume * 0.22f);
+                        }
+                    }
+                    return Normalised(buffer, 0.36f);
+                }
+                case Ambience.Lakeside:
+                {
+                    // Water lapping a stony bank in slow washes, drops falling into the pools with a round "plip" and
+                    // its echo, and frogs: two voices answering each other in short runs of croaks.
+                    float seconds = 30;
+                    var buffer = Wind(seconds, smoothing: 0.012f, volume: 0.4f, swell: 0.7f, seed: 53);
+                    var random = new Scramble(54);
+                    for (float t = 0.4f; t < seconds - 1.5f; t += 2.4f + random.Next() * 2f)
+                        Click(buffer, t, 0.8f + random.Next() * 0.5f, 0.2f + random.Next() * 0.14f, seed: 900 + (int)(t * 10));
+                    for (float t = 0.9f; t < seconds - 0.5f; t += 0.8f + random.Next() * 2.2f)
+                    {
+                        // A drop: a quick rise in pitch, as a bubble closing.
+                        float pitch = 700 + random.Next() * 700;
+                        float volume = 0.3f + random.Next() * 0.35f;
+                        Sweep(buffer, Wave.Sine, t, 0.05f, pitch, pitch * 1.9f, volume);
+                        Sweep(buffer, Wave.Sine, t + 0.21f, 0.05f, pitch, pitch * 1.9f, volume * 0.25f);
+                    }
+                    var smooth = LowPass(buffer, 0.34f);
+                    for (float t = 3.5f; t < seconds - 3; t += 5.5f + random.Next() * 5f)
+                    {
+                        // A frog: three to five croaks, each a low buzz falling a little; then, sometimes, another
+                        // answers lower.
+                        int voices = random.Next() < 0.5f ? 2 : 1;
+                        for (int v = 0; v < voices; v++)
+                        {
+                            float low = v == 0 ? 190 + random.Next() * 40 : 140 + random.Next() * 25;
+                            int croaks = 3 + (int)(random.Next() * 3);
+                            for (int c = 0; c < croaks; c++)
+                            {
+                                float at = t + v * 1.3f + c * 0.24f;
+                                Sweep(smooth, Wave.Square, at, 0.11f, low * 1.12f, low, v == 0 ? 0.07f : 0.05f);
+                                Sweep(smooth, Wave.Triangle, at, 0.11f, low * 2.24f, low * 2, v == 0 ? 0.09f : 0.06f);
+                            }
+                        }
+                    }
+                    return Normalised(smooth, 0.4f);
                 }
                 case Ambience.Hum:
                 {

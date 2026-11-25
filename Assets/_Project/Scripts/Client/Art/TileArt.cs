@@ -126,15 +126,18 @@ namespace Game.Client
                 TileType.VoidOre => GroundKind.VoidOre,
                 TileType.Lava => GroundKind.Lava,
                 TileType.Water => GroundKind.Water,
+                // An islet or a sunken boat stands in a pool (묶음 B3a): the pool's water runs under it.
+                TileType.MossIsle or TileType.SunkenBoat => GroundKind.Water,
+                TileType.StructurePart when CrystalLakeProps.Wet(map, x, y) => GroundKind.Water,
                 _ => inArena ? GroundKind.Arena : GroundKind.Floor,
             };
             // Water's edges are where it meets anything else, like lava's.
             if (kind == GroundKind.Water)
             {
-                mask = (map[x, y + 1] != TileType.Water ? Up : 0)
-                    | (map[x + 1, y] != TileType.Water ? Right : 0)
-                    | (map[x, y - 1] != TileType.Water ? Down : 0)
-                    | (map[x - 1, y] != TileType.Water ? Left : 0);
+                mask = (!CrystalLakeProps.Wet(map, x, y + 1) ? Up : 0)
+                    | (!CrystalLakeProps.Wet(map, x + 1, y) ? Right : 0)
+                    | (!CrystalLakeProps.Wet(map, x, y - 1) ? Down : 0)
+                    | (!CrystalLakeProps.Wet(map, x - 1, y) ? Left : 0);
             }
             // Lava's edges are where it meets anything that is not lava.
             if (kind == GroundKind.Lava)
@@ -189,7 +192,9 @@ namespace Game.Client
                 Biome.Mushroom => ("#1E4E5A", "#2E7A84", "#7CC8C0"),
                 Biome.Crystal => ("#22386E", "#3A5CA8", "#9AC0F0"),
                 Biome.Abyss => ("#1A1438", "#2E2460", "#8A74D8"),
-                Biome.Lake => ("#0E4A56", "#1E7A84", "#8AE8E0"),
+                // The lake's own teal (4-1 지하 호수: #4FD2C0 for its lit ripples, kept dim so the banks' shallows are the
+                // bright part).
+                Biome.Lake => ("#12525C", "#1A6C76", "#2F8E94"),
                 _ => ("#1C3A5C", "#2C5C8C", "#7CA8D8"),
             };
             var deepColor = Rgba.Hex(deep);
@@ -206,6 +211,29 @@ namespace Game.Client
                 }
             }
             var lip = deepColor.Scale(0.6f);
+            if (biome == Biome.Lake)
+            {
+                // The lake's pools shelve (묶음 B3a): where the water meets a bank it is shallow for three pixels, paler
+                // and clearer, a line of foam on it here and there. Top-left origin: Up is row 0.
+                var shallow = Rgba.Hex("#3AA8A4");
+                var shelf = Rgba.Hex("#2A8A8C");
+                lightColor = Rgba.Hex("#9AEADF");
+                for (int y = 0; y < Size; y++)
+                {
+                    for (int x = 0; x < Size; x++)
+                    {
+                        int near = Size;
+                        if ((mask & Up) != 0) near = System.Math.Min(near, y);
+                        if ((mask & Down) != 0) near = System.Math.Min(near, Size - 1 - y);
+                        if ((mask & Left) != 0) near = System.Math.Min(near, x);
+                        if ((mask & Right) != 0) near = System.Math.Min(near, Size - 1 - x);
+                        if (near == 1) image[x, y] = PixelNoise.Hash(x, y, salt + 9) % 6 == 0 ? lightColor : shallow;
+                        else if (near == 2) image[x, y] = shallow;
+                        else if (near == 3 && (x + y) % 2 == 0) image[x, y] = shelf;
+                    }
+                }
+                lip = Rgba.Hex("#16282A");
+            }
             for (int i = 0; i < Size; i++)
             {
                 if ((mask & Up) != 0) image[i, 0] = lip;
@@ -296,12 +324,16 @@ namespace Game.Client
             Decor = Rgba.Hex("#6E94AE"), DecorLight = Rgba.Hex("#DCEFFA"),
         };
 
+        // Flat blue-grey slate (4-1 수정 동굴, 묶음 B3a: a new palette, #2B2E38; it was the purple #262536, and purple is
+        // now the abyss's alone). Decor is a chip of sky crystal, DecorLight its glint; the pink chips are CrystalPink.
         static readonly FloorPalette CrystalFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#262536"), Dark = Rgba.Hex("#201F2E"), Light = Rgba.Hex("#2E2D42"),
-            Pebble = Rgba.Hex("#3C3A55"), PebbleLight = Rgba.Hex("#4C4A6A"), PebbleShadow = Rgba.Hex("#18172A"),
-            Decor = Rgba.Hex("#7CD2E2"), DecorLight = Rgba.Hex("#E0FAFF"),
+            Base = Rgba.Hex("#2B2E38"), Dark = Rgba.Hex("#252832"), Light = Rgba.Hex("#323642"),
+            Pebble = Rgba.Hex("#454A5C"), PebbleLight = Rgba.Hex("#5C6278"), PebbleShadow = Rgba.Hex("#191B24"),
+            Decor = Rgba.Hex("#7FF2FF"), DecorLight = Rgba.Hex("#F4F0FF"),
         };
+
+        static readonly Rgba CrystalPink = Rgba.Hex("#FF7FD0");
 
         static readonly FloorPalette LavaFloor = new FloorPalette
         {
@@ -349,11 +381,12 @@ namespace Game.Client
             Contact = Rgba.Hex("#22303C"), Outline = Rgba.Hex("#121A22"),
         };
 
+        // Sharp slate (4-1 수정 동굴: wall #4B5060): a dark top, a paler cleft face, sky glints in it.
         static readonly RockPalette CrystalRock = new RockPalette
         {
-            Top = Rgba.Hex("#3E3C58"), TopDark = Rgba.Hex("#36344E"), TopLight = Rgba.Hex("#4A4866"), Rim = Rgba.Hex("#7E7AA8"),
-            FaceTop = Rgba.Hex("#66628C"), FaceBottom = Rgba.Hex("#4C496C"), Strata = Rgba.Hex("#3E3B5A"), FaceSpeck = Rgba.Hex("#9AD8E8"),
-            Contact = Rgba.Hex("#1C1A2C"), Outline = Rgba.Hex("#100F1A"),
+            Top = Rgba.Hex("#3C4150"), TopDark = Rgba.Hex("#343846"), TopLight = Rgba.Hex("#474C5E"), Rim = Rgba.Hex("#8E94AC"),
+            FaceTop = Rgba.Hex("#687088"), FaceBottom = Rgba.Hex("#4B5060"), Strata = Rgba.Hex("#3A3E4C"), FaceSpeck = Rgba.Hex("#9ADCEC"),
+            Contact = Rgba.Hex("#181A22"), Outline = Rgba.Hex("#0E0F16"),
         };
 
         // The abyss: near-black stone with a violet cast, and specks of starlight.
@@ -391,15 +424,17 @@ namespace Game.Client
         // The underground lake: wet grey-green stone, glistening, with pale shells and weed at the water's edge.
         static readonly FloorPalette LakeFloor = new FloorPalette
         {
-            Base = Rgba.Hex("#22343A"), Dark = Rgba.Hex("#1C2C31"), Light = Rgba.Hex("#2A3F46"),
-            Pebble = Rgba.Hex("#34505A"), PebbleLight = Rgba.Hex("#46666E"), PebbleShadow = Rgba.Hex("#121C20"),
+            // 4-1 지하 호수, 묶음 B3a: the base kept (#22383A, it was #22343A), its stones wet cobbles.
+            Base = Rgba.Hex("#22383A"), Dark = Rgba.Hex("#1C3032"), Light = Rgba.Hex("#2A4446"),
+            Pebble = Rgba.Hex("#36545A"), PebbleLight = Rgba.Hex("#4A6C70"), PebbleShadow = Rgba.Hex("#122022"),
             Decor = Rgba.Hex("#E8E0D0"), DecorLight = Rgba.Hex("#5AD2B4"),
         };
 
         static readonly RockPalette LakeRock = new RockPalette
         {
-            Top = Rgba.Hex("#33494E"), TopDark = Rgba.Hex("#2C4045"), TopLight = Rgba.Hex("#3D5559"), Rim = Rgba.Hex("#6AA8A8"),
-            FaceTop = Rgba.Hex("#486A6E"), FaceBottom = Rgba.Hex("#344F54"), Strata = Rgba.Hex("#2E7A84"), FaceSpeck = Rgba.Hex("#BFF4EC"),
+            // Wet limestone (4-1 지하 호수: wall #3A5650), smooth, moss on its top and runs down its face (묶음 B3a).
+            Top = Rgba.Hex("#33504C"), TopDark = Rgba.Hex("#2C4642"), TopLight = Rgba.Hex("#3D5C56"), Rim = Rgba.Hex("#76B0A6"),
+            FaceTop = Rgba.Hex("#56807A"), FaceBottom = Rgba.Hex("#3A5650"), Strata = Rgba.Hex("#48706A"), FaceSpeck = Rgba.Hex("#BFF4EC"),
             Contact = Rgba.Hex("#101A1C"), Outline = Rgba.Hex("#0A1214"),
         };
 
@@ -415,6 +450,7 @@ namespace Game.Client
         // level bands of light and dark stone that waver a little, its top worn in streaks by the wind.
         static PixelImage Faced(PixelImage rock, int mask, int variant, Biome biome)
         {
+            if (biome == Biome.Crystal || biome == Biome.Lake) return CrystalLakeFaced(rock, mask, variant, biome);
             if (biome != Biome.Ice && biome != Biome.Sand) return rock;
             bool openDown = (mask & Down) == 0, openLeft = (mask & Left) == 0, openRight = (mask & Right) == 0, openUp = (mask & Up) == 0;
             int top = openDown ? Size - FaceHeight : Size;
@@ -477,11 +513,108 @@ namespace Game.Client
             return rock;
         }
 
+        // The crystal cave's and the lake's rock (4-1 바닥과 벽, 묶음 B3a). Slate: cleavage lines slanting across its top,
+        // its face split into sharp upright facets, a point of pink or sky crystal standing on its rim here and there.
+        // Limestone: smooth, moss in patches along the front of its top, dark runs down its face with a bright drop at
+        // the end of some.
+        static PixelImage CrystalLakeFaced(PixelImage rock, int mask, int variant, Biome biome)
+        {
+            bool openDown = (mask & Down) == 0, openLeft = (mask & Left) == 0, openRight = (mask & Right) == 0;
+            int top = openDown ? Size - FaceHeight : Size;
+            var colors = RockOf(biome);
+            int salt = 740 + variant;
+            bool Edge(int x) => x == 0 && openLeft || x == Size - 1 && openRight;
+            if (biome == Biome.Crystal)
+            {
+                // Cleavage: two thin slanted lines, light above dark.
+                for (int i = 0; i < 2; i++)
+                {
+                    int x = 2 + (int)(PixelNoise.Hash(i, 31, salt) % 7), y = 3 + (int)(PixelNoise.Hash(i, 32, salt) % (uint)System.Math.Max(1, top - 8));
+                    int length = 4 + (int)(PixelNoise.Hash(i, 33, salt) % 4);
+                    for (int k = 0; k < length; k++)
+                    {
+                        int px = x + k, py = y + k / 2;
+                        if (py + 1 >= top - 1 || px >= Size - 2) break;
+                        rock[px, py] = colors.TopLight;
+                        rock[px, py + 1] = colors.TopDark;
+                    }
+                }
+                if (!openDown) return rock;
+                // The face: upright facets, each a few pixels wide, alternately lit and shaded, their edges dark.
+                int facet = 0, left = 0;
+                for (int x = 0; x < Size; x++)
+                {
+                    if (x - left >= 3 + (int)(PixelNoise.Hash(facet, 34, salt) % 3))
+                    {
+                        facet++;
+                        left = x;
+                    }
+                    if (Edge(x)) continue;
+                    bool lit = facet % 2 == 0;
+                    for (int y = top + 1; y < Size - 1; y++)
+                    {
+                        var color = lit ? colors.FaceTop.Mix(colors.FaceBottom, (y - top) / 8f) : colors.FaceBottom.Mix(colors.Strata, (y - top) / 7f);
+                        if (x == left && x > 0) color = colors.Strata;
+                        rock[x, y] = color;
+                    }
+                    if (lit && x == left + 1 && PixelNoise.Hash(facet, 35, salt) % 5 == 0) rock[x, top + 2] = colors.FaceSpeck.Mix(colors.FaceTop, 0.4f);
+                }
+                // A crystal's point on the rim: pink on some drawings, sky on others.
+                if (variant == 3)
+                {
+                    int x = 3 + (int)(PixelNoise.Hash(mask, 36, salt) % 9);
+                    var crystal = PixelNoise.Hash(mask, 40, salt) % 2 == 0 ? CrystalPink : CrystalFloor.Decor;
+                    rock[x, top - 1] = crystal;
+                    rock[x, top - 2] = crystal;
+                    rock[x, top - 3] = CrystalFloor.DecorLight;
+                    rock[x + 1, top - 1] = crystal.Scale(0.7f);
+                    rock[x + 1, top] = crystal.Scale(0.7f);
+                    rock[x, top] = crystal;
+                    rock[x, top + 1] = crystal.Scale(0.7f);
+                }
+                return rock;
+            }
+            // Limestone: moss along the front of the top.
+            var moss = Rgba.Hex("#5E7A3A");
+            var mossLight = Rgba.Hex("#7A9440");
+            for (int x = 1; x < Size - 1; x++)
+            {
+                float n = Smooth(x, 2, 5, salt, 370);
+                if (n < 0.5f) continue;
+                int deep = n > 0.72f ? 3 : 2;
+                for (int k = 1; k <= deep; k++)
+                {
+                    int y = top - k;
+                    if (y < 2) break;
+                    rock[x, y] = k == deep ? moss.Scale(0.85f) : PixelNoise.Hash(x, y, salt + 3) % 4 == 0 ? mossLight : moss;
+                }
+                if (openDown && n > 0.72f) rock[x, top] = mossLight;
+            }
+            if (!openDown) return rock;
+            // The face, smoothed, and the runs down it.
+            for (int x = 0; x < Size; x++)
+            {
+                if (Edge(x)) continue;
+                for (int y = top + 1; y < Size - 1; y++) rock[x, y] = colors.FaceTop.Mix(colors.FaceBottom, (y - top - 1) / 4f);
+                uint hash = PixelNoise.Hash(x, 37, salt) % 6;
+                if (hash == 0)
+                {
+                    int length = 2 + (int)(PixelNoise.Hash(x, 38, salt) % 3);
+                    for (int k = 0; k < length; k++) rock[x, top + 1 + k] = colors.Strata.Scale(0.88f);
+                    if (top + 1 + length < Size - 1 && PixelNoise.Hash(x, 39, salt) % 2 == 0) rock[x, top + 1 + length] = colors.FaceSpeck;
+                }
+                else if (hash == 3) rock[x, top + 1] = mossLight.Mix(colors.FaceTop, 0.4f);
+            }
+            return rock;
+        }
+
         // A biome's touch on the top of its rock: caps of mushrooms growing on it, frost, crystal points, glowing
         // seams. Only on some variants, so walls are not all alike.
         static PixelImage Decorated(PixelImage rock, int mask, int variant, Biome biome)
         {
             if (biome == Biome.Cave || variant % 2 == 1) return rock;
+            // The slate's tops are bare but for one drawing in four (묶음 B3a: a crystal on every other read as confetti).
+            if (biome == Biome.Crystal && variant != 0) return rock;
             var floor = FloorOf(biome);
             int top = (mask & Down) == 0 ? Size - FaceHeight : Size;
             int salt = 500 + variant;
@@ -505,12 +638,16 @@ namespace Game.Client
                     rock[x + 3, y + 1] = floor.Decor;
                     break;
                 case Biome.Crystal:
+                {
+                    // A crystal grown on the rock's top, pink or sky by the drawing (묶음 B3a).
+                    var crystal = PixelNoise.Hash(mask, 16, salt) % 2 == 0 ? CrystalPink : floor.Decor;
                     rock[x + 1, y - 2] = floor.DecorLight;
-                    rock[x + 1, y - 1] = floor.Decor;
-                    rock[x, y] = floor.Decor.Scale(0.8f);
-                    rock[x + 1, y] = floor.Decor;
-                    rock[x + 2, y] = floor.Decor.Scale(0.7f);
+                    rock[x + 1, y - 1] = crystal;
+                    rock[x, y] = crystal.Scale(0.8f);
+                    rock[x + 1, y] = crystal;
+                    rock[x + 2, y] = crystal.Scale(0.7f);
                     break;
+                }
                 case Biome.Lava:
                     for (int i = 0; i < 4; i++) rock[x + i, y + (i % 2)] = i % 2 == 0 ? floor.Decor : floor.DecorLight;
                     break;
@@ -523,8 +660,12 @@ namespace Game.Client
                     rock[x + 1, y + 1] = floor.Decor.Scale(0.7f);
                     break;
                 case Biome.Lake:
-                    // Water running down the face in a thin bright line.
-                    for (int i = 0; i < 3; i++) rock[x + 1, y + i] = i == 0 ? floor.DecorLight : floor.DecorLight.Scale(0.75f);
+                    // A small pool held in a hollow of the top, a glint on it (묶음 B3a; it was a bright line).
+                    rock[x, y] = floor.DecorLight.Scale(0.55f);
+                    rock[x + 1, y] = floor.DecorLight.Scale(0.7f);
+                    rock[x + 2, y] = floor.DecorLight.Scale(0.55f);
+                    rock[x + 1, y - 1] = floor.DecorLight.Scale(0.5f);
+                    rock[x + 1, y + 1] = floor.Dark;
                     break;
                 case Biome.Sand:
                     // Sand trickling from a crack: a light grain over a short fall.
@@ -642,6 +783,8 @@ namespace Game.Client
             int pebbles = (int)(PixelNoise.Hash(variant, 1, salt) % 3);
             // The ice cave's floor is smooth: a stone on one drawing in four (묶음 B2a).
             if (biome == Biome.Ice) pebbles = variant == 3 ? 1 : 0;
+            // Slate lies in flat plates: a loose chip on one drawing (묶음 B3a).
+            if (biome == Biome.Crystal) pebbles = variant == 1 ? 1 : 0;
             for (int i = 0; i < pebbles; i++)
             {
                 int px = 1 + (int)(PixelNoise.Hash(i, 2, salt) % 13);
@@ -709,10 +852,29 @@ namespace Game.Client
                         image[x, y + 1] = colors.Decor.Mix(colors.Base, 0.5f);
                     }
                     break;
-                case Biome.Crystal when variant != 2:
-                    image[x, y - 1] = colors.DecorLight;
-                    image[x, y] = colors.Decor;
-                    image[x + 1, y] = colors.Decor.Scale(0.7f);
+                case Biome.Crystal:
+                    // Flat plates of slate (묶음 B3a): the joint between two of them stepping across the tile, and on
+                    // some a chip of crystal lying in it, sky or pink.
+                    if (variant != 1)
+                    {
+                        var joint = colors.Dark.Scale(0.82f);
+                        int step = 4 + (int)(PixelNoise.Hash(variant, 15, salt) % 7);
+                        for (int i = 0; i < Size; i++)
+                        {
+                            int jy = y + (i > step ? 2 : 0);
+                            if (variant == 3 && i > step + 4) break;
+                            image[i, jy] = joint;
+                            if (jy > 0) image[i, jy - 1] = image[i, jy - 1].Mix(colors.Light, 0.5f);
+                        }
+                        image[step, y + 1] = joint;
+                    }
+                    if (variant == 1)
+                    {
+                        // Dim: the crystals that stand on the floor are the bright ones.
+                        int cx = (x + 5) % 13 + 1, cy = (y + 6) % 11 + 2;
+                        image[cx, cy] = colors.Decor.Mix(colors.Base, 0.45f);
+                        image[cx + 1, cy] = CrystalPink.Mix(colors.Base, 0.55f);
+                    }
                     break;
                 case Biome.Lava:
                     image[x, y] = colors.Decor;
@@ -750,17 +912,34 @@ namespace Game.Client
                     }
                     break;
                 case Biome.Lake:
-                    // A pale shell, or a wisp of weed.
-                    if (variant % 2 == 0)
+                    // Wet cobbles and shallow puddles (묶음 B3a; it was a shell or a wisp of weed on every tile): the
+                    // round backs of two cobbles on one drawing, a puddle with a glint on another, weed on a third.
+                    if (variant == 0)
                     {
-                        image[x, y] = colors.Decor;
-                        image[x + 1, y] = colors.Decor.Scale(0.8f);
+                        foreach (var (cx, cy, w) in new[] { (x - 2, y, 4), (x + 3, y + 3, 3) })
+                        {
+                            for (int i = 0; i < w; i++)
+                            {
+                                image[cx + i, cy] = colors.Light;
+                                image[cx + i, cy + 2] = colors.Dark.Scale(0.85f);
+                            }
+                            image[cx - 1, cy + 1] = colors.Light;
+                            image[cx + w, cy + 1] = colors.Dark.Scale(0.85f);
+                        }
                     }
-                    else
+                    else if (variant == 2)
                     {
-                        image[x, y] = colors.DecorLight;
-                        image[x, y - 1] = colors.DecorLight.Scale(0.8f);
-                        image[x + 1, y - 2] = colors.DecorLight.Scale(0.6f);
+                        var puddle = Rgba.Hex("#1E5E66");
+                        for (int j = 0; j < 3; j++)
+                            for (int i = (j == 1 ? -3 : -2); i <= (j == 1 ? 3 : 1); i++)
+                                image[x + i, y + j] = j == 0 ? puddle.Scale(0.8f) : puddle;
+                        image[x - 1, y + 1] = colors.DecorLight.Mix(puddle, 0.55f);
+                    }
+                    else if (variant == 3)
+                    {
+                        image[x, y] = colors.DecorLight.Mix(colors.Base, 0.6f);
+                        image[x, y - 1] = colors.DecorLight.Mix(colors.Base, 0.7f);
+                        image[x + 1, y - 2] = colors.DecorLight.Mix(colors.Base, 0.8f);
                     }
                     break;
             }

@@ -130,7 +130,8 @@ namespace Game.Core.Tests
                     var pick = Decor.On(map, 1, biome, x, y);
                     if (!pick.Any) continue;
                     decor[biome] = decor.GetValueOrDefault(biome) + 1;
-                    Assert.IsTrue(Decor.Clear(map, x, y));
+                    // The lake's reeds stand at the water's edge, where nothing else does (묶음 B3a).
+                    Assert.IsTrue(Decor.Clear(map, x, y) || pick.Kind == DecorKind.Reeds);
                 }
             }
             foreach (var biome in new[] { Biome.Cave, Biome.Mushroom })

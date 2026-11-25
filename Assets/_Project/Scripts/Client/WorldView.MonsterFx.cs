@@ -73,6 +73,14 @@ namespace Game.Client
         public int ExplosionsShown { get; private set; }
         // Streams of falling sand drawn over the sand cave's buried, and icicles shown falling, since the game began (B2b).
         public int SandFallsShown { get; private set; }
+        // B3b: ripples drawn over the lake's ones under the water (a frame's worth, last frame), shots seen glancing off
+        // crystal, shots a shell turned back, prism shots breaking, and splashes in the shallows, since the game began.
+        public int RipplesShown { get; private set; }
+        int _ripples;
+        public int GlancesShown { get; private set; }
+        public int ReflectsShown { get; private set; }
+        public int RefractsShown { get; private set; }
+        public int SplashesShown { get; private set; }
         public int IciclesShown { get; private set; }
         // Mounds drawn last frame for monsters under the ground, and the lines between those that stand in a line.
         public int MonsterMoundsShown { get; private set; }
@@ -101,6 +109,23 @@ namespace Game.Client
             if (!Feel.MonsterFx || _mobFx.Count >= FxMostAlive) return;
             context.Seed = ++_fxSeed & 0xFFFF;
             _mobFx.Add(new MobEffect { Fx = fx, Context = context, At = at, Follow = follow });
+        }
+
+        // What a dormant one breaks out of when it wakes: ice, a mimic's crystals and the golem's geode, the turtle's moss
+        // and water, else stone and sand.
+        static FxRamp WakeRamp(string id) => id switch
+        {
+            "frost_mammoth" or "crystal_mimic" => FxRamp.Cold,
+            "geode_golem" => FxRamp.Violet,
+            "moss_turtle" => FxRamp.Spirit,
+            _ => FxRamp.Dust,
+        };
+
+        // A splash where someone wades the shallows (B3b, the footsteps of WorldView.cs).
+        void Splash(Vector3 feet)
+        {
+            AddMobFx(MobFx.Splash, feet, new MobContext());
+            SplashesShown++;
         }
 
         void QueueMob(MobFx fx, Vector3 at, MobContext context, float time)
@@ -136,9 +161,12 @@ namespace Game.Client
                 var went = body.Position - body.MobLast;
                 bool moving = went.sqrMagnitude > 1e-6f;
                 if (moving) body.MobDir = new Vec2(went.x, went.y).Normalized;
-                QueueMob(MobFx.Mound, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = body.MobDir.Angle, Armed = moving, Seed = view.Id & 0xFFFF, Look = body.MobKind },
-                    Time.time);
+                // In the lake it is under the water: rings and bubbles, not earth (World.UnderWater, B3b).
+                bool water = World.UnderWater(_client.Map, _client.Biomes, new Vec2(body.Position.x, body.Position.y), true);
+                QueueMob(water ? MobFx.Ripple : MobFx.Mound, feet,
+                    new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = body.MobDir.Angle, Armed = moving, Seed = view.Id & 0xFFFF, Look = body.MobKind }, Time.time);
                 _mounds++;
+                if (water) _ripples++;
                 // In the sand cave sand pours from the ceiling onto it (World.UnderFallingSand, B2b).
                 if (World.UnderFallingSand(_client.Biomes, new Vec2(body.Position.x, body.Position.y), true))
                 {
@@ -531,6 +559,25 @@ namespace Game.Client
                             AddMobFx(MobFx.Bounce, at, new MobContext { Ramp = ramp, Tint = tint });
                             Hear(Sound.Ricochet, at, 0.7f);
                             break;
+                        // B3b: a shot off crystal (whoever fired it), a shell turning a shot back, a prism's shot breaking.
+                        case World.MonsterFxGlance:
+                            AddMobFx(MobFx.Glance, at, new MobContext { Ramp = FxRamp.Cold });
+                            Hear(Sound.Ricochet, at, 0.8f);
+                            GlancesShown++;
+                            break;
+                        case World.MonsterFxReflect:
+                        {
+                            var face = body != null ? body.Faced : new Vec2(1, 0);
+                            AddMobFx(MobFx.Reflect, at, new MobContext { Dir = Mathf.Atan2(face.Y, face.X) });
+                            Hear(Sound.Ricochet, at, 1f);
+                            ReflectsShown++;
+                            break;
+                        }
+                        case World.MonsterFxRefract:
+                            AddMobFx(MobFx.Refract, at, new MobContext { Ramp = FxRamp.Violet });
+                            Hear(Sound.Ricochet, at, 0.6f);
+                            RefractsShown++;
+                            break;
                         case World.MonsterFxTurn:
                             AddMobFx(MobFx.Turn, at, new MobContext { Ramp = ramp, Tint = tint });
                             break;
@@ -562,7 +609,7 @@ namespace Game.Client
                             break;
                         case World.MonsterFxWake:
                             AddMobFx(MobFx.Rouse, at - new Vector3(0, body != null ? body.Feet : 0.3f, 0),
-                                new MobContext { Ramp = body != null && body.Id == "frost_mammoth" ? FxRamp.Cold : FxRamp.Dust, Seed = e.Source & 0xFFFF });
+                                new MobContext { Ramp = WakeRamp(body?.Id), Seed = e.Source & 0xFFFF });
                             Hear(Sound.Shatter, at, 1f);
                             if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.18f);
                             break;
@@ -658,6 +705,8 @@ namespace Game.Client
                 EmitFx(_self.Position - new Vector3(0, _self.Feet, 0), 1, null);
             }
             MonsterMoundsShown = _mounds;
+            RipplesShown = _ripples;
+            _ripples = 0;
             MonsterLinksShown = _links;
             EliteGuardLinksShown = _guardLinks;
             _mounds = 0;

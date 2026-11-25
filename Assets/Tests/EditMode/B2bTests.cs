@@ -362,7 +362,8 @@ namespace Game.Core.Tests
         public void AWorldOfVersionFourIsLaidAsBefore(ulong seed, ulong map, ulong lairs)
         {
             Assert.Greater(WorldGenerator.IceSandVersion, WorldGenerator.LandmarkVersion);
-            Assert.AreEqual(WorldGenerator.IceSandVersion, WorldGenerator.NewWorldVersion);
+            // A new world is of version 5 or after (B3b: version 6).
+            Assert.GreaterOrEqual(WorldGenerator.NewWorldVersion, WorldGenerator.IceSandVersion);
             var world = WorldGenerator.Generate(seed, WorldGenerator.GameSize, WorldGenerator.GameSize, Tales.Shipped, Bosses.Shipped.Arenas, WorldGenerator.LandmarkVersion,
                 Tiles.Shipped.Terrain);
             Assert.AreEqual(map, RoomMapTests.Hash(world.Map));

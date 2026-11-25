@@ -690,8 +690,9 @@ namespace Game.Core.Tests
                 var used = new HashSet<string>();
                 var monsters = new List<Enemy>();
                 for (int i = 0; i < 3; i++) monsters.Add(world.SpawnEnemy(kind, player.Position + Vec2.FromAngle(i * 0.5f) * (2.5f + i * 2.25f)));
-                // A dormant one (B2) notices only a player right by it: these are roused, as a struck one would be.
-                if (kind.Has(MonsterTraitKind.Dormant))
+                // A dormant one (B2) or a mimic (B3b) notices only a player right by it: these are roused, as a struck one
+                // would be.
+                if (kind.Has(MonsterTraitKind.Dormant) || kind.Has(MonsterTraitKind.Mimic))
                     foreach (var monster in monsters) (monster.TargetId, monster.State) = (player.Id, EnemyState.Chase);
                 Run(world, 20, () =>
                 {

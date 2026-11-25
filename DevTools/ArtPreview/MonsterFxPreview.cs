@@ -474,6 +474,17 @@ namespace Game.Client
             rows.Add(Row(MobFx.Slide, new MobContext { Dir = 0, Seed = 4 }, 0.45f, false));
             rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Cold, Seed = 4 }, 0.65f, false));
             rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Dust, Seed = 4 }, 0.65f, false));
+            // The crystal cave and the lake (B3b): ripples over one under the water (still, then travelling), a shot
+            // glancing off crystal, a shell turning a shot, a prism's shot breaking, a splash in the shallows, and a mimic,
+            // the golem and the turtle breaking out of their crystals, stone and moss.
+            rows.Add(Row(MobFx.Ripple, new MobContext { Seed = 5 }, 1.5f, true));
+            rows.Add(Row(MobFx.Ripple, new MobContext { Dir = 0, Armed = true, Seed = 5 }, 1.5f, true));
+            rows.Add(Row(MobFx.Glance, new MobContext { Ramp = FxRamp.Cold, Seed = 6 }, 0.35f, false));
+            rows.Add(Row(MobFx.Reflect, new MobContext { Dir = 3.14f, Seed = 6 }, 0.4f, false));
+            rows.Add(Row(MobFx.Refract, new MobContext { Ramp = FxRamp.Violet, Seed = 6 }, 0.4f, false));
+            rows.Add(Row(MobFx.Splash, new MobContext { Seed = 6 }, 0.4f, false));
+            rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Violet, Seed = 4 }, 0.65f, false));
+            rows.Add(Row(MobFx.Rouse, new MobContext { Ramp = FxRamp.Spirit, Seed = 4 }, 0.65f, false));
             return (SkillFxPreview.Sheet(rows), fine);
         }
 

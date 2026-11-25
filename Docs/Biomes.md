@@ -217,8 +217,8 @@ cart,버려진 수레,cart,,10,forage:5-10|potions:1|coins:5-15,,no,once,glint,6
 
 | 열 | 내용 |
 |---|---|
-| id | 던전 id(저장의 열쇠). `biome`이 빈 줄은 `id@생물군계`가 열쇠다(`deep_hollow@lake`, `cellar@cave`) |
-| name | 화면 이름. `biome`이 빈 줄은 "그 생물군계 이름의 name"("지하 호수의 깊은 굴") |
+| id | 던전 id(저장의 열쇠). `biome`이 빈 줄은 `id@생물군계`가 열쇠다(`deep_hollow@abyss`, `cellar@cave`) |
+| name | 화면 이름. `biome`이 빈 줄은 "그 생물군계 이름의 name"("공허의 심연의 깊은 굴") |
 | biome | 이 생물군계의 문이 여기로 온다. 비우면 줄이 없는 생물군계 모두(`entry`마다 하나만) |
 | level | 던전의 구역 레벨의 아래 끝(`World.ZoneLevelAt`의 수, `packs.csv`의 `zone`과 같은 자). 문 자리의 구역 레벨이 더 높으면 그것. 몬스터의 생명력·힘과 보상 레벨이 이것을 따른다 |
 | graph | `dungeon_graphs.csv`의 id |
@@ -243,6 +243,7 @@ buried_temple,묻힌 신전,sand,3,temple,11-12,temple_guardian,chest_gold,8,gat
 
 - 2026-11-24(B1c): 흙 동굴의 던전이 끈적한 지하실에서 **버려진 갱도**(주인 어미 슬라임)로 바뀌었고, 끈적한 지하실은 모든 생물군계가 함께 쓰는 **지하실**(`cellar`, 정예 야영지의 뚜껑 문)이 됐다. 이름은 "흙 동굴의 지하실"처럼 그 생물군계가 붙고, 무리·그림은 그 생물군계의 것이다. 옛 저장본의 `slime_cellar` 기록은 지워지지 않고 남지만 더 쓰이지 않는다
 - 2026-11-24(B2b, `Docs/BiomeRework.md`): 얼어붙은 묘의 주인이 서리 정령 큰 정예에서 **서리 매머드** 그 자신으로, 모래 동굴의 문이 깊은 굴에서 새 **묻힌 신전**(그래프 `temple`, 주인 신전 수호 석상)으로. 줄은 맨 뒤에 붙여 줄 번호(통신의 던전 번호)가 그대로다. 깊은 굴은 이제 수정 동굴·지하 호수·공허의 심연의 문만 간다. 생성기 5판(새 월드)에는 두 중간 보스의 굴도 선다
+- 2026-11-25(B3b, `Docs/BiomeRework.md`): 수정 동굴의 문이 깊은 굴에서 새 **정동 속**(그래프 `geode`: E C C S K C L M R B X, 주인 정동 골렘, 빛 분홍 `#FF8AD8`)으로, 지하 호수의 문이 새 **잠긴 수로**(그래프 `aqueduct`: E C C K C S C L M R B X, 주인 이끼등 거북, 빛 청록 `#70E6D8`, 방 조각의 얕은 물 `f`)로. 줄은 맨 뒤에 붙었다. 깊은 굴은 이제 공허의 심연의 문만 간다. 생성기 6판(새 월드)에는 두 중간 보스의 굴과 지하 호수의 얕은 물도 선다
 - 정예 야영지의 뚜껑 문: 생성기 4판(`WorldGenerator.LandmarkVersion`, 새 월드) 월드에서 무리가 사는 야영지(길가·아레나 앞 빼고)의 30%(`WorldGenerator.CellarShare`)에, 우두머리 표시에서 2.5~6칸 떨어진 둘레가 모두 바닥인 칸에 `Trapdoor`(서 있는 칸)를 놓는다(`WorldGenerator.Cellars.cs`, 난수 흐름 58). 던전 문 목록(`DungeonPocket.Gates`)의 맨 뒤에 붙어서 문 번호가 그대로다. 야영지의 우두머리(챔피언이면 셋 다)가 쓰러지면 `OpenTrapdoor`로 바뀌고(바뀐 칸이라 저장·전송된다, 다시 닫히지 않는다) 그 위의 [○○의 지하실 들어가기]로 내려간다. 닫혀 있으면 단추가 "잠긴 뚜껑 문 · 야영지의 대장을 쓰러뜨리면 열린다"를 보이고 눌리지 않는다
 
 `dungeon_graphs.csv`(개념 그래프):
@@ -254,7 +255,7 @@ buried_temple,묻힌 신전,sand,3,temple,11-12,temple_guardian,chest_gold,8,gat
 | branches | 줄의 무리 방(`C`)에 붙는 곁가지: `T`(보물), `H`(숨은 방) |
 | loop | `shortcut`이면 쉼터(`R`)의 돌과 입구의 돌이 지름길이 된다(`R`이 있어야 한다). 비우면 없다 |
 
-그래프는 다섯이다: `cellar`(E C C R B X, 곁가지 T), `branching`(E C C S C M R B X, T T, 지름길), `locked`(E C K C L C M R B X, T H, 지름길), `mine`(B1c: E C C K C L M R B X, T, 지름길), `temple`(B2b: E C C S K C L M R B X, T H, 지름길).
+그래프는 일곱이다: `cellar`(E C C R B X, 곁가지 T), `branching`(E C C S C M R B X, T T, 지름길), `locked`(E C K C L C M R B X, T H, 지름길), `mine`(B1c: E C C K C L M R B X, T, 지름길), `temple`(B2b: E C C S K C L M R B X, T H, 지름길), `geode`(B3b: E C C S K C L M R B X, T H, 지름길), `aqueduct`(B3b: E C C K C S C L M R B X, T H, 지름길).
 
 | 글자 | 방 | 하는 일 |
 |---|---|---|

@@ -107,6 +107,13 @@ namespace Game.Client
         // Streams of falling sand drawn over the sand cave's buried, and icicles shown falling (B2b).
         internal int SandFallsShown => _view?.SandFallsShown ?? 0;
         internal int IciclesShown => _view?.IciclesShown ?? 0;
+        // Ripples over the lake's ones under the water, shots glancing off crystal, shells turning shots, prism shots
+        // breaking and splashes in the shallows (B3b).
+        internal int RipplesShown => _view?.RipplesShown ?? 0;
+        internal int GlancesShown => _view?.GlancesShown ?? 0;
+        internal int ReflectsShown => _view?.ReflectsShown ?? 0;
+        internal int RefractsShown => _view?.RefractsShown ?? 0;
+        internal int SplashesShown => _view?.SplashesShown ?? 0;
         internal int MonsterPoolsShown => _view?.MonsterPoolsShown ?? 0;
         // A dungeon's name cards shown, and the last name (WorldView.Dungeon.cs).
         internal int DungeonCardsShown => _view?.DungeonCardsShown ?? 0;
@@ -566,6 +573,9 @@ namespace Game.Client
                 // The ice cave's and the sand cave's (묶음 B2a).
                 Biome.Ice => Ambience.Frost,
                 Biome.Sand => Ambience.Dunes,
+                // The crystal cave's and the lake's (묶음 B3a).
+                Biome.Crystal => Ambience.Chimes,
+                Biome.Lake => Ambience.Lakeside,
                 _ => Ambience.Cave,
             };
             Music.Update(song, ambience, 1 - nearest / MachineHearing, deltaTime);

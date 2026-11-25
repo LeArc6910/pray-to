@@ -36,7 +36,7 @@ namespace CoreSandbox
     //                                                 as a curve, the states, what was sent (--gear, --classes, --level; Docs/WorldRework.md)
     // add --no-director anywhere for the director not acting (as before it was made)
     // dotnet run -- --mapstats [seeds] [map size]     the map as numbers: rock, lumps, open floor, each biome, rooms, time (Docs/WorldRework.md)
-    // add --gen <1|2|3|4|5> to --flow, --hour or --mapstats for the generator's version (--mapstats shows both without it;
+    // add --gen <1|2|3|4|5|6> to --flow, --hour or --mapstats for the generator's version (--mapstats shows both without it;
     // the others play what a new world is made with, WorldGenerator.NewWorldVersion)
     static class Program
     {
@@ -256,9 +256,9 @@ namespace CoreSandbox
                     Console.WriteLine("       dotnet run -- --rift [tiers] [seed] [--players 2] [--gear ...] [--classes ...]");
                     Console.WriteLine("       dotnet run -- --economy");
                     Console.WriteLine("       dotnet run -- --factory [minutes]");
-                    Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...] [map size] [--gen 1|2|3|4|5]");
-                    Console.WriteLine("       dotnet run -- --flow [seeds] [--gen 1|2|3|4|5]");
-                    Console.WriteLine("       dotnet run -- --mapstats [seeds] [map size] [--gen 1|2|3|4|5]");
+                    Console.WriteLine("       dotnet run -- --hour [minutes] [seed,seed,...] [map size] [--gen 1|2|3|4|5|6]");
+                    Console.WriteLine("       dotnet run -- --flow [seeds] [--gen 1|2|3|4|5|6]");
+                    Console.WriteLine("       dotnet run -- --mapstats [seeds] [map size] [--gen 1|2|3|4|5|6]");
                     Console.WriteLine("       dotnet run -- --pace [minutes] [seeds] [--gear ...] [--classes ...] [--level 8] [--no-director]");
                     break;
             }

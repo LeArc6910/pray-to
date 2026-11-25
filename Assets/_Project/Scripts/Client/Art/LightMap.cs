@@ -282,8 +282,32 @@ namespace Game.Client
             // The ice cave's sky blue and the sand cave's gold (묶음 B2a).
             Biome.Ice => Rgba.Hex("#A8DCFF"),
             Biome.Sand => Rgba.Hex("#FFD28A"),
+            // The crystal cave's pink (it breathes between this and CrystalSky: the overload below) and the lake's
+            // teal (묶음 B3a).
+            Biome.Crystal => CrystalPink,
+            Biome.Lake => Rgba.Hex("#70E6D8"),
             _ => Rgba.Clear,
         };
+
+        public static readonly Rgba CrystalPink = Rgba.Hex("#FF8AD8"), CrystalSky = Rgba.Hex("#8AF0FF");
+        // How long the crystal cave's light takes to go from pink to sky and back, in seconds.
+        public const float CrystalBreath = 14;
+
+        // The biome's light colour at a tile at a time (seconds): the crystal cave's breathes slowly between pink and
+        // sky, dimming as it turns so the two never mix into the abyss's violet, the turn drifting across the cave so
+        // one room is pink while the next is sky; the lake's teal wavers a little, as light off water. The others'
+        // are still.
+        public static Rgba BiomeTint(Biome biome, float time, int x, int y)
+        {
+            if (biome == Biome.Crystal)
+            {
+                float wave = (float)Math.Sin(time * (2 * Math.PI / CrystalBreath) + (x + y) * 0.07);
+                return (wave >= 0 ? CrystalPink : CrystalSky).Scale(0.3f + 0.7f * Math.Min(1, Math.Abs(wave) * 1.6f));
+            }
+            if (biome == Biome.Lake)
+                return BiomeTint(biome).Scale(0.84f + 0.16f * (float)Math.Sin(time * 1.3 + x * 0.9 + y * 0.6));
+            return BiomeTint(biome);
+        }
 
         // How far from a dungeon's gate its gate room's lights burn the dungeon's colour (Docs/BiomeRework.md 4-5 문 방의
         // 색 불, dungeons.csv light).

@@ -13,25 +13,31 @@ namespace Game.Client
         // A wall's top is the upper ten rows; below it the front face shows where the tile below is open.
         const int Top = 10;
 
-        public static bool IsPatch(TileType type) => type == TileType.IceFloor || type == TileType.Quicksand;
+        // And the lake's shallows (B3b), laid round its water.
+        public static bool IsPatch(TileType type) => type == TileType.IceFloor || type == TileType.Quicksand || type == TileType.ShallowWater;
 
         // Which sides of the patch at (x, y) meet more of it (N 1, E 2, S 4, W 8). Rock counts: a sheet of ice runs
         // under the wall rather than stopping a pixel short of it.
         public static int PatchMask(TileMap map, int x, int y)
         {
             var type = map[x, y];
-            bool Joins(int nx, int ny) => !map.InBounds(nx, ny) || map[nx, ny] == type || TileArt.IsRock(map[nx, ny]);
+            // Shallows run on into the deep water beside them.
+            bool Joins(int nx, int ny) => !map.InBounds(nx, ny) || map[nx, ny] == type || TileArt.IsRock(map[nx, ny])
+                || type == TileType.ShallowWater && map[nx, ny] == TileType.Water;
             return (Joins(x, y + 1) ? 1 : 0) | (Joins(x + 1, y) ? 2 : 0) | (Joins(x, y - 1) ? 4 : 0) | (Joins(x - 1, y) ? 8 : 0);
         }
 
         static readonly PixelImage[] IceTiles = new PixelImage[32];
         static readonly PixelImage[] SandTiles = new PixelImage[32];
+        static readonly PixelImage[] ShallowTiles = new PixelImage[32];
 
         // The patch with these sides joined, in one of two layings picked by where the tile is.
         public static PixelImage Patch(TileType type, int mask, int laying = 0)
         {
             int index = (mask & 15) | (laying & 1) << 4;
-            return type == TileType.Quicksand ? SandTiles[index] ??= Quicksand(mask & 15, laying & 1) : IceTiles[index] ??= Ice(mask & 15, laying & 1);
+            return type == TileType.Quicksand ? SandTiles[index] ??= Quicksand(mask & 15, laying & 1)
+                : type == TileType.ShallowWater ? ShallowTiles[index] ??= Shallow(mask & 15, laying & 1)
+                : IceTiles[index] ??= Ice(mask & 15, laying & 1);
         }
 
         public static int Laying(int x, int y) => (int)(PixelNoise.Hash(x, y, 31) & 1);
@@ -79,6 +85,32 @@ namespace Game.Client
                 if (!InPatch(gx, gy, mask) || !InPatch(gx + 1, gy, mask)) continue;
                 image[gx, gy] = Rgba.White;
                 image[gx + 1, gy] = Rgba.Hex("#E8F7FF");
+            }
+            return image;
+        }
+
+        // The lake's shallows (B3b): clear teal water over the stones of the floor, the stones dim through it, slow
+        // light ripples lying one way, and a pale wet rim where it laps the dry floor.
+        static PixelImage Shallow(int mask, int laying)
+        {
+            var water = Ramp.Of("#3FA8A0");
+            var image = new PixelImage(Size, Size);
+            for (int y = 0; y < Size; y++)
+            {
+                for (int x = 0; x < Size; x++)
+                {
+                    if (!InPatch(x, y, mask)) continue;
+                    // Ripples: short bright dashes in rows, every row shifted, so a sheet of it reads as moving water.
+                    int row = (y + laying * 2) % 5;
+                    int dash = (x + y * 3 + laying * 4) % 9;
+                    var colour = water.Main.Mix(water.Shade, 0.35f);
+                    if (row == 0 && dash < 3) colour = water.Light;
+                    else if (row == 0 && dash == 3) colour = water.Light.Mix(water.Main, 0.5f);
+                    // A stone of the floor seen through the water.
+                    else if ((x * 5 + y * 3 + laying * 7) % 19 == 0) colour = water.Shade.Mix(water.Dark, 0.4f);
+                    if (Edge(x, y, mask)) colour = Rgba.Hex("#BFF2E8");
+                    image[x, y] = colour;
+                }
             }
             return image;
         }

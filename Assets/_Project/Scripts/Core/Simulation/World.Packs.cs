@@ -591,7 +591,9 @@ namespace Game.Core
             _events.Add(new SimEvent(SimEventType.Alerted, enemy.Id, player.Id));
             if (pack == null) return;
             pack.Alerted = true;
+            // A crystal mimic (B3b) is not woken by its pack's alarm: it stands as crystals until it is come to or struck.
             var rest = _enemies.Where(e => e != enemy && !e.IsDead && e.State == EnemyState.Idle && !e.Returning && e.AlertTicks == 0
+                && !Mimics(e)
                 && (e.PackId == pack.Id || e.PackId == 0 && e.Wanders && e.Rift == 0 && Vec2.Distance(e.Position, enemy.Position) <= WandererJoinReach)).ToList();
             int spread = Ticks(PackAlertSeconds);
             for (int i = 0; i < rest.Count; i++)
@@ -606,7 +608,7 @@ namespace Game.Core
         {
             // A dormant one (B2) wakes when struck whether or not it came with a pack: it notices no one further off.
             if (by == null || enemy.IsDead || enemy.State != EnemyState.Idle || enemy.Returning || enemy.Rift != 0
-                || enemy.PackId == 0 && !enemy.Definition.Has(MonsterTraitKind.Dormant)) return;
+                || enemy.PackId == 0 && !enemy.Definition.Has(MonsterTraitKind.Dormant) && !enemy.Definition.Has(MonsterTraitKind.Mimic)) return;
             enemy.TargetId = by.Id;
             enemy.State = EnemyState.Chase;
             Noticed(enemy, by);

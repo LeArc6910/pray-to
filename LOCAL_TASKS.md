@@ -1168,6 +1168,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only depth,base,farm,factory,life`
   - 클라우드 확인 (2026-11-25, `5795f54`): [x] PC·휴대폰 104개 모두 통과. 사진: 공장(방향 화살표가 있는 벨트, 서서 가로대 높이로 전선을 잇는 전봇대, 바닥 위에 선 기계), 기지의 문, 울타리 문·방목장·나무와 집 뒤 흐려짐
   - (사람) 벨트가 굽는 곳과 방향이 자연스러운지, 문(벽 속·울타리 속)이 열고 닫힐 때 어색하지 않은지, 서 있는 전봇대·태양광판·허수아비·물레방아가 사람과 겹칠 때 앞뒤 순서, 바닥재·양탄자·밭 가장자리가 깔끔한지, 휴대폰에서 남북 문과 창살이 너무 가늘지 않은지
+- [ ] 174단계: 수정 동굴·지하 호수 — 모습, 소품, 장소, 랜드마크, 새 몬스터 열, 규칙, 던전 둘, 생성기 6판(`Docs/BiomeRework.md` B3a·B3b)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.CrystalLake.cs`, `Core/World/WorldGenerator.CrystalLakeDungeons.cs`, `Core/Simulation/World.CrystalLake.cs`, `Client/Art/BiomeArt.CrystalLake.cs`, `Client/Art/PropArt.CrystalLake.cs`, `Client/Art/CreatureArt.CrystalLake.cs`, `Tests/EditMode/CrystalLakeLookTests.cs`, `Tests/EditMode/B3bTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `FeatureTests.TheCrystalCaveAndTheLakeStandTheirPropsAndThePlacesTakeTheirLooks`. 통신 0.105.0. 새 월드는 생성기 6판, 5판 이전 월드는 그대로. 물 칸이 물건 층에 더는 그려지지 않아 모든 생물군계의 물가 테가 보인다
+  - (클라우드 웹 점검) `sweep.js --only biomes,places,b3mobs,dungeon,packs`
+  - (사람) 수정 동굴이 보라가 아니라 회청 점판암에 분홍·하늘 결정으로 읽히는지, 14초마다 바뀌는 분홍·하늘 빛이 어지럽지 않은지, 환경음 둘(결정 울림, 물가), 호수 물가의 갈대·얕은 물이 자연스러운지, 얕은 물을 걷는 느낌(70% 걸음)과 물 튀는 소리, 개구리·물고기 그림자가 휴대폰에서 적과 헷갈리지 않는지, 수정 마을·호수 마을과 랜드마크(거대 정동, 결정 아치, 가라앉은 배, 옛 물레방아), 탄이 결정에서 튕겨 돌아오는 손맛, 결정 흉내쟁이가 깨어나는 맛과 휴대폰에서 두 눈이 보이는지, 수정 거북의 되돌림, 촉수의 물결이 "물속에 무언가"로 읽히는지, 정동 속·잠긴 수로 한 판
 
 ## 결과 보고
 

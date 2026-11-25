@@ -28,7 +28,7 @@ namespace Game.Client
         {
             Biome.Mushroom => new Color32(78, 96, 58, 255),
             Biome.Ice => new Color32(84, 108, 128, 255),
-            Biome.Crystal => new Color32(70, 70, 108, 255),
+            Biome.Crystal => new Color32(66, 72, 92, 255),
             Biome.Lava => new Color32(96, 64, 56, 255),
             Biome.Abyss => new Color32(48, 38, 72, 255),
             Biome.Lake => new Color32(40, 78, 84, 255),
@@ -710,6 +710,8 @@ namespace Game.Client
             if (_map[x, y] == TileType.Waystone) return new Color32(110, 190, 255, 255);
             if (_map[x, y] == TileType.IceFloor) return new Color32(200, 232, 248, 255);
             if (_map[x, y] == TileType.Quicksand) return new Color32(196, 160, 84, 255);
+            // The lake's shallows (B3b): a paler teal than its deep water.
+            if (_map[x, y] == TileType.ShallowWater) return new Color32(92, 186, 176, 255);
             if (_map[x, y] == TileType.Road) return new Color32(176, 150, 112, 255);
             if (_map[x, y] == TileType.Dock) return new Color32(168, 116, 68, 255);
             if (_map[x, y] == TileType.Rail) return new Color32(120, 110, 100, 255);

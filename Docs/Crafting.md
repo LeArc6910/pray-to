@@ -208,6 +208,25 @@ M4c에서 만든 규칙과 시트 작성법이다. 놓는 물건(작업대, 화�
 
 랜드마크의 칸 `FrozenBeast`(얼음 속 짐승), `IceColumn`(얼음 성 잔해의 기둥), `TempleFront`(묻힌 신전 정면), `GiantSkull`(거대 화석 두개골)은 줄이 없어 캘 수 없다.
 
+수정 동굴과 지하 호수의 소품(2026-11-25, `Docs/BiomeRework.md` 묶음 B3a)도 같은 방식이다. 생성기 6판 월드(`WorldGenerator.CrystalLakeVersion`)에만 놓인다.
+
+| 칸 | 단단함 | 주는 것 | 비고 |
+|---|---|---|---|
+| `CrystalCluster` 결정 무리 | 2 | 미스릴 광석 1, 20%로 수정 무 씨앗 1 | 분홍빛 3칸(`#FF8AD8`) |
+| `CrystalSpire` 수정 첨탑 | 3 | 돌 1, 20%로 미스릴 광석 1 | 하늘빛 2.5칸(`#8AF0FF`). 그림은 한 칸 반 높이 |
+| `ResonantCrystal` 공명 수정 | 2 | 돌 1, 15%로 미스릴 광석 1 | 하늘빛 2.5칸. 울리는 규칙은 없다(그림뿐) |
+| `CrackedGeode` 금 간 정동 | 1 | 금화 4, 35%로 미스릴 광석 1 | |
+| `CrystalMass` 큰 결정 덩이(2칸) | 6 | 돌 2, 30%로 미스릴 광석 1 | 분홍빛 3.5칸. 어느 칸을 쳐도 둘 다 사라진다 |
+| `LeaningCrystal` 기울어진 결정 기둥(2칸) | 6 | 돌 2, 30%로 미스릴 광석 1 | 하늘빛 3칸, 뒤에 서면 위쪽이 흐려진다 |
+| `MossRock` 이끼 낀 바위 | 3 | 돌 1, 15%로 동굴 달팽이 1 | |
+| `Coral` 산호 덩이 | 2 | 돌 1, 10%로 진주 1 | 물가에 더 많다 |
+| `GiantClam` 대왕 조개 | 2 | 진주 1 | 물가에 더 많다 |
+| `ShellHeap` 조개 무덤 | 1 | 금화 3, 25%로 진주 1 | |
+| `Wreckage` 난파선 조각(2칸) | 5 | 금화 5, 40%로 미끼 1 | |
+| `MossIsle` 버섯 섬(2칸) | 4 | 동굴 버섯 1, 30%로 연꽃 씨 1 | 청록빛 2.5칸(`#70E6D8`). 물 두 칸 위에 서고 둘레가 모두 물이라 물가에서는 닿지 않는다 |
+
+랜드마크의 칸 `GiantGeode`(거대 정동), `ArchPier`·`CrystalArch`(수정 아치의 기둥과 걸친 부분), `SunkenBoat`(가라앉은 배), `OldWheel`(옛 물레방아)은 줄이 없어 캘 수 없다. `CrystalArch`는 요정 고리의 갓처럼 지나가는 칸이다(`TileMap.IsSolid`).
+
 ## materials.csv
 
 `Assets/_Project/Data/Loot/materials.csv`. `id, name, places, description`, 그리고 선택 열 `fish`, `fuel`. `places`는 [놓기]로 세우는 칸 종류이고, 비우면 세울 수 없는 재료다. `fish`는 그 생물군계(`cave`, `mushroom`, `ice`, `crystal`, `abyss`)의 물에서 낚이는 물고기라는 뜻이다(`Docs/Fishing.md`). `fuel`은 발전기가 그 재료 하나로 도는 초다(`Docs/Automation.md`).

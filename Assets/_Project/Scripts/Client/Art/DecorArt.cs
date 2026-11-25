@@ -26,7 +26,7 @@ namespace Game.Client
         static PixelImage Swayed(PixelImage still, int way)
         {
             var g = new PixelImage(still.Width, still.Height);
-            int foot = Height - 4;
+            int foot = still.Height - 4;
             for (int y = 0; y < still.Height; y++)
             {
                 int shift = y >= foot ? 0 : y < foot - 4 ? way * 2 : way;
@@ -38,6 +38,8 @@ namespace Game.Client
 
         static PixelImage Still(DecorKind kind, Biome biome, int variant)
         {
+            // Reeds stand taller than the rest (묶음 B3a): their picture is ReedRise rows higher, its foot where the others' is.
+            if (kind == DecorKind.Reeds) return Reeds(variant, (int)kind * 31 + variant * 7);
             var g = new PixelImage(Width, Height);
             int salt = (int)kind * 31 + variant * 7 + (int)biome * 131;
             switch (kind)
@@ -82,6 +84,16 @@ namespace Game.Client
                     break;
                 case DecorKind.DryGrass:
                     DryGrass(g, salt, variant);
+                    break;
+                // The crystal cave's and the lake's (묶음 B3a).
+                case DecorKind.CrystalDust:
+                    CrystalDust(g, salt, variant);
+                    break;
+                case DecorKind.Shells:
+                    Shells(g, salt, variant);
+                    break;
+                case DecorKind.LilyPad:
+                    LilyPad(g, variant);
                     break;
             }
             return g;
@@ -231,12 +243,118 @@ namespace Game.Client
                 if (g[x, Height - 3].A > 0) g[x, Height - 3] = ramp.Dark;
         }
 
+        // Crystal dust on the slate: a scatter of single grains, pink and sky and a white one that catches the light,
+        // flat and half see-through.
+        static void CrystalDust(PixelImage g, int salt, int variant)
+        {
+            var pink = Rgba.Hex("#FF7FD0");
+            var sky = Rgba.Hex("#7FF2FF");
+            int grains = 5 + variant;
+            for (int i = 0; i < grains; i++)
+            {
+                int x = 1 + (int)(PixelNoise.Hash(i, 1, salt) % 9), y = 3 + (int)(PixelNoise.Hash(i, 2, salt) % 6);
+                uint tone = PixelNoise.Hash(i, 3, salt) % 5;
+                var grain = tone == 0 ? Rgba.Hex("#F4F0FF") : (tone % 2 == 1 ? pink : sky).WithAlpha(tone > 2 ? 150 : 215);
+                // Each grain two pixels: the bright one and its dimmer side, so none is a lone speck.
+                g[x, y] = grain;
+                if (g[x + 1, y].A == 0) g[x + 1, y] = (tone % 2 == 1 ? pink : sky).WithAlpha(90);
+            }
+        }
+
+        public const int ReedRise = 9;
+
+        // A stand of reeds at the water's edge: tall green stalks, brown heads on some, bent blades at their feet.
+        static PixelImage Reeds(int variant, int salt)
+        {
+            var g = new PixelImage(Width, Height + ReedRise);
+            var ramp = Ramp.Of("#7A9440");
+            var head = Ramp.Of("#8A5A3A");
+            int foot = g.Height - 3;
+            PropArt.Shade(g, 6, g.Height - 2, 8, 90);
+            int stalks = 4 + variant;
+            for (int i = 0; i < stalks; i++)
+            {
+                int x = 2 + i * 8 / stalks + (int)(PixelNoise.Hash(i, 1, salt) % 2);
+                int tall = 8 + (int)(PixelNoise.Hash(i, 2, salt) % 8);
+                int lean = i < stalks / 2 ? -1 : i > stalks / 2 ? 1 : 0;
+                bool headed = PixelNoise.Hash(i, 3, salt) % 3 != 0;
+                for (int k = 0; k < tall; k++)
+                {
+                    int bx = x + (k > tall * 2 / 3 ? lean : 0);
+                    g[bx, foot - k] = k < 2 ? ramp.Shade : headed && k >= tall - 3 ? (k == tall - 1 ? head.Light : head.Main) : k == tall - 1 ? ramp.Light : i % 2 == 0 ? ramp.Main : ramp.Light.Mix(ramp.Main, 0.5f);
+                }
+                // A blade bent out low down.
+                if (i % 2 == 0)
+                {
+                    g[x + (lean == 0 ? 1 : lean), foot - 3] = ramp.Main;
+                    g[x + (lean == 0 ? 2 : lean * 2), foot - 4] = ramp.Light;
+                }
+            }
+            for (int x = 0; x < Width; x++)
+                if (g[x, foot].A > 200) g[x, foot] = ramp.Dark;
+            return g;
+        }
+
+        // A few shells on the wet stone: a pale fan, a pink one, a whorl.
+        static void Shells(PixelImage g, int salt, int variant)
+        {
+            var pale = Ramp.Of("#E8E0CC");
+            var pink = Ramp.Of("#EC9A8A");
+            Shadow(g, 6, 7 + variant);
+            int foot = Height - 3;
+            int count = 2 + variant % 2;
+            for (int i = 0; i < count; i++)
+            {
+                int x = 1 + i * 4 + (int)(PixelNoise.Hash(i, 4, salt) % 2);
+                var ramp = (i + variant) % 3 == 1 ? pink : pale;
+                int y = foot - (i == 2 ? 2 : 0);
+                g[x, y] = ramp.Shade;
+                g[x + 1, y] = ramp.Dark;
+                g[x + 2, y] = ramp.Dark;
+                g[x, y - 1] = ramp.Light;
+                g[x + 1, y - 1] = ramp.Main;
+                g[x + 2, y - 1] = ramp.Shade;
+                if (i == 0) g[x + 1, y - 2] = ramp.Light;
+                Outline(g, x - 1, y - 3, 5, 5);
+            }
+        }
+
+        // A lily pad lying on the water: a round green leaf with a notch, a smaller one by it, a lotus bud on one drawing.
+        static void LilyPad(PixelImage g, int variant)
+        {
+            var leaf = Ramp.Of("#5E9A58");
+            void Pad(float cx, float cy, float rx, float ry, int notch)
+            {
+                for (int y = 0; y < Height; y++)
+                    for (int x = 0; x < Width; x++)
+                    {
+                        float dx = (x + 0.5f - cx) / rx, dy = (y + 0.5f - cy) / ry;
+                        if (dx * dx + dy * dy > 1) continue;
+                        g[x, y] = -dx * 0.5f - dy * 0.8f > 0.3f ? leaf.Light.Mix(leaf.Main, 0.5f) : dx * dx + dy * dy > 0.62f ? leaf.Shade : leaf.Main;
+                    }
+                // The notch, cut toward one side, and a vein.
+                g[(int)cx + notch, (int)cy] = Rgba.Clear;
+                g[(int)cx + notch * 2, (int)cy] = Rgba.Clear;
+                g[(int)cx - notch, (int)cy] = leaf.Shade;
+            }
+            Pad(variant == 1 ? 5 : 6, 6.5f, variant == 1 ? 3.2f : 4.2f, variant == 1 ? 2.2f : 2.8f, variant == 2 ? -1 : 1);
+            if (variant != 0) Pad(variant == 1 ? 9.5f : 2.5f, variant == 1 ? 4.5f : 4.0f, 2.1f, 1.5f, 1);
+            if (variant == 0)
+            {
+                // A lotus bud.
+                g[5, 5] = Rgba.Hex("#FFD2E4");
+                g[6, 5] = Rgba.Hex("#F090B4");
+                g[5, 6] = Rgba.Hex("#F090B4");
+                g[5, 4] = Rgba.Hex("#FFF0F6");
+            }
+        }
+
         // The stone of the biome's floor, a step lighter so it shows on it.
         static Ramp StoneOf(Biome biome) => biome switch
         {
             Biome.Mushroom => Ramp.Of("#5E6248"),
             Biome.Ice => Ramp.Of("#7A8C9C"),
-            Biome.Crystal => Ramp.Of("#6E7484"),
+            Biome.Crystal => Ramp.Of("#70768C"),
             Biome.Lava => Ramp.Of("#4E4440"),
             Biome.Abyss => Ramp.Of("#4A4058"),
             Biome.Lake => Ramp.Of("#5E7470"),
@@ -247,7 +365,7 @@ namespace Game.Client
         static Ramp ShardOf(Biome biome, int variant) => biome switch
         {
             Biome.Ice => Ramp.Of("#A8DCF4"),
-            Biome.Crystal => variant == 1 ? Ramp.Of("#7AC8F0") : Ramp.Of("#E88AC8"),
+            Biome.Crystal => variant == 1 ? Ramp.Of("#7FF2FF") : Ramp.Of("#FF7FD0"),
             Biome.Abyss => Ramp.Of("#9A6AE0"),
             _ => Ramp.Of("#8A9AB0"),
         };

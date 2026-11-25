@@ -48,7 +48,7 @@ namespace Game.Client
 
         // What is near enough symmetric to mirror: plants and stones. Timber, carts and lamps keep their lit side.
         static bool Mirrors(TileType type) => type == TileType.RingCap || type == TileType.Stalagmite || type == TileType.Boulder || type == TileType.PillarCap || type == TileType.GlowCaps
-            || type == TileType.SporeSac || type == TileType.ShelfStump || type == TileType.OreSack || type == TileType.FallenLog || IceSandMirrors(type);
+            || type == TileType.SporeSac || type == TileType.ShelfStump || type == TileType.OreSack || type == TileType.FallenLog || IceSandMirrors(type) || CrystalLakeMirrors(type);
 
         // How far above the bottom edge of its footprint a prop's foot line is, in pixels: the rows of shadow under it.
         public const int FootRows = 3;
@@ -58,7 +58,7 @@ namespace Game.Client
         {
             TileType.PillarCap => 12,
             TileType.GiantCap => 28,
-            _ => IceSandCanopy(type),
+            _ => Math.Max(IceSandCanopy(type), CrystalLakeCanopy(type)),
         };
 
         // The picture of a biome prop, or null for any other tile. shape: Variant's bits.
@@ -81,7 +81,7 @@ namespace Game.Client
                 TileType.GlowCaps => GlowCaps(variant),
                 TileType.FallenLog => FallenLog(variant),
                 TileType.GiantCap => GiantCap(),
-                _ => IceSandProp(type, variant),
+                _ => IceSandProp(type, variant) ?? CrystalLakeProp(type, variant),
             };
             return image != null && (shape & 4) != 0 ? image.FlippedX() : image;
         }
@@ -134,7 +134,8 @@ namespace Game.Client
         // The place dressing's tall thing by the biome it stands in (Docs/BiomeRework.md 4-3 장소의 건물 3): in the
         // mushroom forest the forest's own great mushroom, anywhere else underground a mine timber with a lantern hung
         // from it. Both the size of the old mushroom tree (32 by 44, the top 26 rows fading), so only the picture changes.
-        public static PixelImage PlaceTree(Biome biome) => biome == Biome.Mushroom ? GreatMushroom() : biome == Biome.Ice ? FrozenTree() : biome == Biome.Sand ? CavePalm() : TimberLamp();
+        public static PixelImage PlaceTree(Biome biome) => biome == Biome.Mushroom ? GreatMushroom() : biome == Biome.Ice ? FrozenTree() : biome == Biome.Sand ? CavePalm()
+            : biome == Biome.Crystal ? CrystalTree() : biome == Biome.Lake ? LakeWillow() : TimberLamp();
 
         // ---- The dirt cave ----
 

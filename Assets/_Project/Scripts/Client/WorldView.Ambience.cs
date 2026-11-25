@@ -14,7 +14,9 @@ namespace Game.Client
     // ten times a second; no tile is looked for (lamps come from the standing layer's list of what is in view). With
     // 움직임: 줄이기 the motes are off.
     // 묶음 B2a adds the ice cave's snowflakes, glints of frost, white hare and ice moths, and the sand cave's blown dust,
-    // grains sifting down the rock, lizard and scarab.
+    // grains sifting down the rock, lizard and scarab. 묶음 B3a adds the crystal cave's sparkles, streaks of bent light,
+    // crystal snail and glitter moths, and the lake's mist, drops and rings on the water, frog, marsh lights and the
+    // shadows of fish in its pools.
     partial class WorldView
     {
         struct Mote
@@ -157,6 +159,32 @@ namespace Game.Client
                             _motes.Add(new Mote { Kind = MoteKind.SandDust, At = at, Speed = new Vector2(0.5f + UnityEngine.Random.value * 0.5f, 0.02f), Life = 2.5f + UnityEngine.Random.value * 2, Phase = UnityEngine.Random.value * 6.28f });
                     }
                 }
+                else if (biome == Biome.Crystal)
+                {
+                    // A point of light flashing on the floor, pink or sky (묶음 B3a), and seldom a streak of bent light
+                    // hanging in the air for a moment.
+                    var at = middle + new Vector2((UnityEngine.Random.value - 0.5f) * wide * 2, (UnityEngine.Random.value - 0.5f) * high * 2);
+                    if (Walkable(map, at) && BiomeOf(at) == Biome.Crystal)
+                    {
+                        if (UnityEngine.Random.value < 0.06f)
+                            _motes.Add(new Mote { Kind = MoteKind.Prism, At = at + new Vector2(0, 0.6f), Speed = new Vector2(0.05f, 0.03f), Life = 1.2f + UnityEngine.Random.value * 0.8f });
+                        else
+                            _motes.Add(new Mote { Kind = UnityEngine.Random.value < 0.5f ? MoteKind.Sparkle : MoteKind.SkySparkle, At = at, Life = 0.45f + UnityEngine.Random.value * 0.5f });
+                    }
+                }
+                else if (biome == Biome.Lake)
+                {
+                    // A wisp of mist drifting low, more of it over the water; a ring opening on a pool now and then.
+                    var at = middle + new Vector2((UnityEngine.Random.value - 0.5f) * wide * 2, (UnityEngine.Random.value - 0.5f) * high * 2);
+                    int tx = Mathf.FloorToInt(at.x), ty = Mathf.FloorToInt(at.y);
+                    if (map.InBounds(tx, ty) && BiomeOf(at) == Biome.Lake)
+                    {
+                        bool pool = map[tx, ty] == TileType.Water;
+                        if (pool && UnityEngine.Random.value < 0.25f) _motes.Add(new Mote { Kind = MoteKind.Ripple, At = at, Life = 0.9f });
+                        else if ((pool || Walkable(map, at)) && _motes.Count < cap * 2 / 3 && (pool || UnityEngine.Random.value < 0.45f))
+                            _motes.Add(new Mote { Kind = MoteKind.Mist, At = at, Speed = new Vector2(0.12f + UnityEngine.Random.value * 0.14f, 0.01f), Life = 4 + UnityEngine.Random.value * 3, Phase = UnityEngine.Random.value * 6.28f });
+                    }
+                }
                 else if (biome == Biome.Cave && _motes.Count < cap * 3 / 4)
                 {
                     // Dust in a lamp's light, or failing a lamp in the light the player carries.
@@ -175,6 +203,15 @@ namespace Game.Client
                 if (Walkable(map, land) && BiomeOf(land) == Biome.Cave)
                     _motes.Add(new Mote { Kind = MoteKind.Drip, At = land + new Vector2(0, 1.5f), Speed = new Vector2(0, -5f), Life = 0.3f });
             }
+            // By the lake a drop falls from the roof (묶음 B3a): onto a pool it leaves a ring.
+            if (_dripClock <= 0 && biome == Biome.Lake && _motes.Count < cap)
+            {
+                _dripClock = 0.6f + UnityEngine.Random.value * 1.6f;
+                var land = middle + new Vector2((UnityEngine.Random.value - 0.5f) * wide * 1.6f, (UnityEngine.Random.value - 0.5f) * high * 1.6f);
+                int lx = Mathf.FloorToInt(land.x), ly = Mathf.FloorToInt(land.y);
+                if (map.InBounds(lx, ly) && BiomeOf(land) == Biome.Lake && (map[lx, ly] == TileType.Water || Walkable(map, land)))
+                    _motes.Add(new Mote { Kind = MoteKind.LakeDrip, At = land + new Vector2(0, 1.5f), Speed = new Vector2(0, -5f), Life = 0.3f });
+            }
             int used = 0;
             for (int i = _motes.Count - 1; i >= 0; i--)
             {
@@ -184,11 +221,12 @@ namespace Game.Client
                 {
                     // A drip ends in its splash.
                     if (mote.Kind == MoteKind.Drip && mote.Age >= mote.Life && cap > 0) _motes[i] = new Mote { Kind = MoteKind.Splash, At = mote.At, Life = 0.22f };
+                    else if (mote.Kind == MoteKind.LakeDrip && mote.Age >= mote.Life && cap > 0) _motes[i] = new Mote { Kind = MoteKind.Ripple, At = mote.At, Life = 0.7f };
                     else _motes.RemoveAt(i);
                     continue;
                 }
                 mote.At += mote.Speed * deltaTime;
-                if (mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Dust || mote.Kind == MoteKind.Flake) mote.At.x += Mathf.Sin(Time.time * 1.3f + mote.Phase) * (mote.Kind == MoteKind.Flake ? 0.3f : 0.12f) * deltaTime;
+                if (mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Dust || mote.Kind == MoteKind.Flake || mote.Kind == MoteKind.Mist) mote.At.x += Mathf.Sin(Time.time * 1.3f + mote.Phase) * (mote.Kind == MoteKind.Flake ? 0.3f : 0.12f) * deltaTime;
                 _motes[i] = mote;
             }
             foreach (var mote in _motes)
@@ -202,12 +240,16 @@ namespace Game.Client
                 renderer.sprite = sprite;
                 // Fading in and out over the first and last fifth of its life.
                 float t = mote.Age / mote.Life;
-                float alpha = mote.Kind == MoteKind.Drip || mote.Kind == MoteKind.Grain ? 0.85f : mote.Kind == MoteKind.Trail ? 0.55f * (1 - t)
+                float alpha = mote.Kind == MoteKind.Drip || mote.Kind == MoteKind.Grain || mote.Kind == MoteKind.LakeDrip ? 0.85f : mote.Kind == MoteKind.Ripple ? 0.8f * (1 - t) : mote.Kind == MoteKind.Trail ? 0.55f * (1 - t)
                     : Mathf.Clamp01(Mathf.Min(t, 1 - t) * 5) * (mote.Kind == MoteKind.Dust || mote.Kind == MoteKind.SandDust ? 0.6f : 0.9f);
                 renderer.color = new Color(1, 1, 1, alpha);
                 renderer.transform.localPosition = new Vector3(mote.At.x, mote.At.y, 0);
+                // A ring on the water opens as it fades.
+                float size = mote.Kind == MoteKind.Ripple ? 0.6f + t * 0.9f : 1;
+                if (renderer.transform.localScale.x != size) renderer.transform.localScale = new Vector3(size, size, 1);
                 // A spore and a glint of frost shine over the dark; a snowflake, like dust, is seen where there is light.
-                renderer.sortingOrder = mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Glint ? GlowOrder : mote.Kind == MoteKind.Trail ? TrailOrder : DustOrder;
+                bool glows = mote.Kind == MoteKind.Spore || mote.Kind == MoteKind.Glint || mote.Kind == MoteKind.Sparkle || mote.Kind == MoteKind.SkySparkle || mote.Kind == MoteKind.Prism;
+                renderer.sortingOrder = glows ? GlowOrder : mote.Kind == MoteKind.Trail || mote.Kind == MoteKind.Ripple ? TrailOrder : DustOrder;
             }
             for (int i = used; i < _motePool.Count; i++)
                 if (_motePool[i].enabled) _motePool[i].enabled = false;
@@ -241,6 +283,9 @@ namespace Game.Client
                     int wanted = biome == Biome.Mushroom && !night ? CritterCap * 2 / 3 : CritterCap;
                     if (Walkable(map, at) && CritterArt.Lives(biome) && _critters.Count < wanted && !InPlace(Mathf.FloorToInt(at.x), Mathf.FloorToInt(at.y)))
                         AddCritter(CritterArt.Pick(biome, UnityEngine.Random.Range(0, 100), night), at, at);
+                    // A fish's shadow in a pool of the lake (묶음 B3a), two at most.
+                    else if (biome == Biome.Lake && InPool(map, at) && _critters.Count < wanted && Swimmers() < 2)
+                        AddCritter(CritterKind.FishShadow, at, at);
                 }
             }
             _critterThink += deltaTime;
@@ -262,6 +307,20 @@ namespace Game.Client
                 }
                 ShowCritter(critter);
             }
+        }
+
+        static bool InPool(TileMap map, Vector2 at)
+        {
+            int x = Mathf.FloorToInt(at.x), y = Mathf.FloorToInt(at.y);
+            return map.InBounds(x, y) && map[x, y] == TileType.Water;
+        }
+
+        int Swimmers()
+        {
+            int count = 0;
+            foreach (var critter in _critters)
+                if (CritterArt.Swims(critter.Kind)) count++;
+            return count;
         }
 
         bool LampAt(TileMap map, Vector2 home)
@@ -315,7 +374,8 @@ namespace Game.Client
                     }
                     break;
                 case CritterKind.Cricket:
-                    // Sits, and hops: away when someone is near, anywhere otherwise.
+                case CritterKind.Frog:
+                    // Sits, and hops: away when someone is near, anywhere otherwise. (The lake's frog the same.)
                     if (critter.Busy <= 0 && (critter.Think <= 0 || near < 1.6f))
                     {
                         critter.Think = 1 + UnityEngine.Random.value * 2.5f;
@@ -325,6 +385,7 @@ namespace Game.Client
                     else if (critter.Busy <= 0) critter.Heading = Vector2.zero;
                     break;
                 case CritterKind.Snail:
+                case CritterKind.CrystalSnail:
                 case CritterKind.Scarab:
                     // The scarab rolls its ball a little faster than a snail goes, and turns as seldom.
                     if (critter.Think <= 0)
@@ -356,9 +417,19 @@ namespace Game.Client
             var next = critter.At + critter.Heading * deltaTime;
             // What walks keeps to open floor (it turns back at a wall); what flies goes over anything but rock.
             bool flies = CritterArt.Flies(critter.Kind);
-            if (flies ? !LightMap.BlocksLight(map[Mathf.FloorToInt(next.x), Mathf.FloorToInt(next.y)]) : Walkable(map, next)) critter.At = next;
+            if (CritterArt.Swims(critter.Kind) ? InPool(map, next) : flies ? !LightMap.BlocksLight(map[Mathf.FloorToInt(next.x), Mathf.FloorToInt(next.y)]) : Walkable(map, next)) critter.At = next;
             else critter.Heading = -critter.Heading;
             if (critter.Heading.x != 0) critter.Left = critter.Heading.x < 0;
+            // A fish breaks the water now and then: a ring where it was (묶음 B3a).
+            if (critter.Kind == CritterKind.FishShadow && !Settings.ReduceMotion)
+            {
+                critter.Trail -= deltaTime;
+                if (critter.Trail <= 0)
+                {
+                    critter.Trail = 3 + UnityEngine.Random.value * 5;
+                    if (_motes.Count < MoteCap) _motes.Add(new Mote { Kind = MoteKind.Ripple, At = critter.At, Life = 0.9f });
+                }
+            }
             // The snail's trail: a dab of glow every little while, fading.
             if (critter.Kind == CritterKind.Snail && critter.Heading != Vector2.zero && !Settings.ReduceMotion)
             {
@@ -376,7 +447,8 @@ namespace Game.Client
             bool moving = critter.Heading.sqrMagnitude > 0.01f;
             bool flies = CritterArt.Flies(critter.Kind);
             // Wings beat fast; legs step while it moves; a firefly blinks slowly; a sitting thing keeps its first frame.
-            float rate = flies ? (critter.Kind == CritterKind.Firefly ? 1.2f : 9f) : critter.Kind == CritterKind.Snail ? 1.5f : critter.Kind == CritterKind.Scarab ? 4f : 8f;
+            float rate = flies ? (critter.Kind == CritterKind.Firefly || critter.Kind == CritterKind.MarshFly ? 1.2f : critter.Kind == CritterKind.GlitterMoth ? 5f : 9f)
+                : critter.Kind == CritterKind.Snail || critter.Kind == CritterKind.CrystalSnail ? 1.5f : critter.Kind == CritterKind.FishShadow ? 3f : critter.Kind == CritterKind.Scarab ? 4f : 8f;
             int frame = flies || moving ? (int)((Time.time + critter.Phase) * rate) % CritterArt.Frames : 0;
             long key = 2L << 40 | (long)critter.Kind << 8 | (long)frame;
             var kind = critter.Kind;
@@ -385,10 +457,10 @@ namespace Game.Client
             renderer.sprite = sprite;
             renderer.flipX = critter.Left;
             // A cricket's hop; a hare bounds while it runs.
-            float bob = flies ? 0.5f + Mathf.Sin((Time.time + critter.Phase) * 3) * 0.08f : critter.Kind == CritterKind.Cricket && critter.Busy > 0 ? 0.18f
+            float bob = flies ? 0.5f + Mathf.Sin((Time.time + critter.Phase) * 3) * 0.08f : (critter.Kind == CritterKind.Cricket || critter.Kind == CritterKind.Frog) && critter.Busy > 0 ? 0.18f
                 : critter.Kind == CritterKind.SnowHare && moving ? Mathf.Abs(Mathf.Sin((Time.time + critter.Phase) * 9)) * 0.14f : 0;
             renderer.transform.localPosition = new Vector3(critter.At.x, critter.At.y + bob, 0);
-            renderer.sortingOrder = CritterArt.Glows(critter.Kind) ? GlowOrder : flies ? FlyOrder : FootOrder(critter.At.y, StandArt.DecorTie);
+            renderer.sortingOrder = CritterArt.Glows(critter.Kind) ? GlowOrder : flies ? FlyOrder : CritterArt.Swims(critter.Kind) ? TrailOrder : FootOrder(critter.At.y, StandArt.DecorTie);
         }
     }
 }

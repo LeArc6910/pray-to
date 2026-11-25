@@ -60,7 +60,7 @@ namespace Game.Core
 
             // The lairs: the biomes whose gate's dungeon has a mid-boss of its own for master (dungeons.csv boss), of those
             // the world's version lays them in (LairsIn: version 4 the dirt cave and the mushroom forest, version 5 on the
-            // ice cave and the sand cave too).
+            // ice cave and the sand cave too, version 6 on the crystal cave and the underground lake as well).
             var dungeons = terrain?.Dungeons ?? DungeonData.None;
             int ring = LairRing * ScaleOf(map.Width, map.Height);
             var spawn = TileMap.Center(world.SpawnX, world.SpawnY);

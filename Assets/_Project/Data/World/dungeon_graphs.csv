@@ -4,3 +4,5 @@ branching,E C C S C M R B X,T T,shortcut
 locked,E C K C L C M R B X,T H,shortcut
 mine,E C C K C L M R B X,T,shortcut
 temple,E C C S K C L M R B X,T H,shortcut
+geode,E C C S K C L M R B X,T H,shortcut
+aqueduct,E C C K C S C L M R B X,T H,shortcut

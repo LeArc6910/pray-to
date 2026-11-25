@@ -128,6 +128,8 @@ namespace Game.Client
             if (TileMap.IsSoil(type)) return Ground.Dirt;
             if (type == TileType.IceFloor) return Ground.Ice;
             if (type == TileType.Quicksand) return Ground.Sand;
+            // The lake's shallows splash underfoot (B3b).
+            if (type == TileType.ShallowWater) return Ground.Water;
             return biomes[x, y] switch
             {
                 Biome.Mushroom => Ground.Leaves,

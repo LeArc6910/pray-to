@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs
+// Sections: menu time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -6218,6 +6218,14 @@ const BiomeSets = {
     hit: ['crystal', 'IceCrystals', '얼음 결정 무리'], behind: ['pillar', 'IcePillar', '얼음 기둥'] },
   sand: { name: '모래 동굴', id: 'Sand', room: 'sand', tint: '#FFD28A', ambience: 'Dunes', kinds: ['CaveCactus', 'Skull', 'BrokenUrn', 'SandstonePillar', 'RibArch', 'BuriedColumn'], critters: ['Lizard', 'Scarab'],
     hit: ['urn', 'BrokenUrn', '깨진 항아리'], behind: ['ribs', 'RibArch', '화석 갈비뼈'] },
+  // 묶음 B3a: the crystal cave and the underground lake (their props stand in worlds of version 6 on). The crystal cave's
+  // light breathes between its tint and tintOther; the lake's set has a pool with the islet, reeds and lily pads.
+  crystal: { name: '수정 동굴', id: 'Crystal', room: 'crystal', tint: '#FF8AD8', tintOther: '#8AF0FF', ambience: 'Chimes',
+    kinds: ['CrystalCluster', 'CrystalSpire', 'ResonantCrystal', 'CrackedGeode', 'CrystalMass', 'LeaningCrystal'], critters: ['CrystalSnail', 'GlitterMoth'],
+    hit: ['cluster', 'CrystalCluster', '결정 무리'], behind: ['leaning', 'LeaningCrystal', '기울어진 결정 기둥'] },
+  lake: { name: '지하 호수', id: 'Lake', room: 'lake', tint: '#70E6D8', ambience: 'Lakeside', pool: true,
+    kinds: ['MossRock', 'Coral', 'GiantClam', 'ShellHeap', 'Wreckage', 'MossIsle'], critters: ['Frog', 'MarshFly', 'FishShadow'],
+    hit: ['clam', 'GiantClam', '대왕 조개'] },
 };
 
 async function biomes(browser) {
@@ -6235,7 +6243,7 @@ async function biomes(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom', 'ice', 'sand']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake']) {
       const set = BiomeSets[key];
       // The room as the generator made it first (a new world is version 3: its own props stand in it), then the set.
       const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
@@ -6253,6 +6261,25 @@ async function biomes(browser) {
       check((b.cells || []).length >= set.kinds.length && flat.length === 0, `${name}: 소품은 칸에 꽉 찬 타일이 아니라 서 있는 물체로 그려진다 (${(b.cells || []).length}개, 아닌 것 ${flat.length})`);
       check(b.props >= set.kinds.length && b.skipped === 0 && b.renderers <= (game.touch ? 250 : 400), `${name}: 서 있는 것을 상한 안에서 다 그린다 (소품 ${b.props}, 꾸밈 ${b.decor}, 조각 ${b.renderers}, 뺀 것 ${b.skipped})`);
       check((b.tint || '') === set.tint, `${name}: ${set.name}의 빛 색 (${b.tint || '없음'}, 기대 ${set.tint || '없음'})`);
+      if (set.tintOther) {
+        // 묶음 B3a: the crystal cave's light breathes between pink and sky, dimming as it turns: a few readings over
+        // some seconds differ, and none is the violet between the two (red and blue both high, green low).
+        const seenTints = new Set();
+        for (let i = 0; i < 6; i++) {
+          seenTints.add((await game.ask('biomes')).tintNow || '');
+          await game.wait(900);
+        }
+        const violet = [...seenTints].filter(t => /^#[0-9A-F]{6}$/.test(t)).filter(t => {
+          const r = parseInt(t.slice(1, 3), 16), g = parseInt(t.slice(3, 5), 16), bl = parseInt(t.slice(5, 7), 16);
+          return r > g * 1.25 && bl > g * 1.25 && Math.abs(r - bl) < 40 && g > 60;
+        });
+        check(b.tintOther === set.tintOther && seenTints.size >= 3 && violet.length === 0,
+          `${name}: ${set.name}의 빛이 분홍과 하늘 사이로 숨 쉰다 (다른 쪽 ${b.tintOther}, 읽은 색 ${[...seenTints].join(' ')}, 보라 ${violet.length})`);
+      }
+      if (set.pool) {
+        // 묶음 B3a: the set's pool, the islet standing in it, and the client's cover on its edge.
+        check(b.pools >= 6 && b.reeds + b.pads >= 1, `${name}: 물가에 갈대·연잎이 놓인다 (물 ${b.pools}칸, 갈대 ${b.reeds}, 연잎 ${b.pads})`);
+      }
       check(b.ambience === set.ambience, `${name}: ${set.name}의 환경음이 깔린다 (${b.ambience})`);
       check(b.trees >= 1, `${name}: 장소의 큰 나무 자리 (${b.trees})`);
       // Motes and critters come in over a few seconds; the caps are never passed.
@@ -6297,6 +6324,8 @@ async function biomes(browser) {
         check(new RegExp(`ok biomes at ${word}`).test(at) && ((after.kinds || {})[type] || 0) < ((before.kinds || {})[type] || 0),
           `${name}: ${label}을(를) 치면 부서진다 (${(before.kinds || {})[type] || 0}→${(after.kinds || {})[type] || 0}; ${at})`);
         await game.shot(`biomes-${key}-hit`, `${label}을(를) 친 뒤`);
+        // The lake has no tall prop on the floor (its islet stands in the water).
+        if (!set.behind) continue;
         const [tallWord, tallType, tallLabel] = set.behind;
         const went = (await game.send(`biomes at ${tallWord}`)).join(' ');
         await game.wait(700);
@@ -6366,6 +6395,9 @@ const PlaceSets = {
   // 묶음 B2a (the landmarks are in worlds of version 5 on).
   ice: { name: '얼음 동굴', id: 'Ice', room: 'ice', look: 3, marks: ['FrozenBeast', 'IceColumn'], real: [['beast', 'beasts', '얼음 속 짐승'], ['ruin', 'ruins', '얼음 성 잔해']] },
   sand: { name: '모래 동굴', id: 'Sand', room: 'sand', look: 4, marks: ['TempleFront', 'GiantSkull'], real: [['temple', 'temples', '묻힌 신전 정면'], ['skull', 'skulls', '거대 화석 두개골']] },
+  // 묶음 B3a (the landmarks are in worlds of version 6 on).
+  crystal: { name: '수정 동굴', id: 'Crystal', room: 'crystal', look: 5, marks: ['GiantGeode', 'ArchPier', 'CrystalArch'], real: [['geode', 'geodes', '거대 정동'], ['arch', 'arches', '수정 아치']] },
+  lake: { name: '지하 호수', id: 'Lake', room: 'lake', look: 6, marks: ['SunkenBoat', 'OldWheel'], real: [['boat', 'boats', '가라앉은 배'], ['wheel', 'wheels', '옛 물레방아']] },
 };
 const PlaceLooks = ['Cottage', 'Cabin', 'Well', 'LampPost', 'Signpost', 'Bench', 'Flowerbed', 'Crates'];
 
@@ -6384,7 +6416,7 @@ async function places(browser) {
     }
     await game.wait(1200);
     await game.send('probe on; monsters hold; heal');
-    for (const key of ['cave', 'mushroom', 'ice', 'sand']) {
+    for (const key of ['cave', 'mushroom', 'ice', 'sand', 'crystal', 'lake']) {
       const set = PlaceSets[key];
       const went = (await game.send(`clear; goto room pack ${set.room} 1`)).join(' ');
       await game.wait(2000);
@@ -6392,7 +6424,8 @@ async function places(browser) {
       await game.wait(2500);
       let p = await game.ask('places');
       check(p.biome === set.id, `${name}: ${set.name}의 방에 섰다 (${p.biome}, ${went})`);
-      check(p.generator >= (key === 'ice' || key === 'sand' ? 5 : 4), `${name}: 새 월드는 생성기 5판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, ${p.generator})`);
+      check(p.generator >= (key === 'crystal' || key === 'lake' ? 6 : key === 'ice' || key === 'sand' ? 5 : 4),
+        `${name}: 새 월드는 생성기 6판이다(랜드마크는 4판부터, 얼음·모래의 것은 5판부터, 수정·호수의 것은 6판부터, ${p.generator})`);
       const cells = p.cells || [];
       const looks = cells.filter(c => PlaceLooks.includes(c.type));
       const missing = PlaceLooks.filter(t => !looks.some(c => c.type === t));
@@ -6421,6 +6454,15 @@ async function places(browser) {
         p = await game.ask('places');
         check(/ok places at cap/.test(at) && p.under === 'RingCap' && p.solidUnder === false, `${name}: 요정 고리의 버섯은 지나간다 (${p.under}, 막힘 ${p.solidUnder}; ${at})`);
         await game.shot('places-mushroom-cap', '요정 고리의 갓 위에 섰다');
+      }
+
+      if (key === 'crystal') {
+        // 묶음 B3a: the arch's span stands over a tile that is walked: the player stands under it.
+        const at = (await game.send('places at under')).join(' ');
+        await game.wait(600);
+        p = await game.ask('places');
+        check(/ok places at under/.test(at) && p.under === 'CrystalArch' && p.solidUnder === false, `${name}: 수정 아치 아래로 지나간다 (${p.under}, 막힘 ${p.solidUnder}; ${at})`);
+        await game.shot('places-crystal-under', '수정 아치 아래에 섰다');
       }
 
       // The ones the generator laid (worlds of version 4 on), when this world has any (they are rare).
@@ -6707,7 +6749,171 @@ async function b2mobs(browser) {
   }
 }
 
-const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs };
+// The crystal cave and the underground lake's monsters, rules and dungeons (2026-11-25, Docs/BiomeRework.md B3b,
+// Docs/Playtest.md b3mobs), on a PC and a phone held upright: the new kinds in a row each drawn at its size; a shot
+// glancing off crystal spires; a crystal tortoise's shell turning a shot back; a prism wisp's shot breaking into three on
+// the spires; mimics standing as crystals through their pack's alarm and waking when come to; a tentacle under the water
+// (ripples) keeping to its edge in a lake room; a walk through the shallows (splashes, slower); the geode and the sunken
+// aqueduct with a big body in a pack room and their mid-boss in person for master; the new world's lairs of both. How
+// the glance, the shell and the mimics feel are the person's. Learnt from b2mobs: the scenes are set in the biome's pack
+// rooms, the row is looked at again from its middle (the host sends 22 tiles), and short-lived states are asked for
+// until they come (a phone's slow pictures).
+async function b3mobs(browser) {
+  const kinds = [['crystal_shooter', 's', '수정 가시 버섯'], ['prism_wisp', 's', '프리즘 정령'], ['tide_chief', 's', '물살 정령 무리장'], ['crystal_mimic', 'm', '결정 흉내쟁이'],
+    ['tentacle', 'm', '촉수'], ['mud_slime', 'm', '진흙 슬라임'], ['crystal_tortoise', 'l', '수정 거북'], ['great_crab', 'l', '큰 게'],
+    ['geode_golem', 'xl', '정동 골렘'], ['moss_turtle', 'xl', '이끼등 거북']];
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 수정 동굴·지하 호수의 몬스터와 규칙, 던전 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await menuPage(game, '게임 시작');
+      await game.press('혼자 하기');
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; equip obsidian_sword; equip obsidian_armor; heal; probe on; xp 3000');
+    const start = await game.ask('b3');
+    const geode = (start.gates || []).find(g => g.dungeon === 'geode_heart');
+    const aqueduct = (start.gates || []).find(g => g.dungeon === 'sunken_aqueduct');
+    check(!!geode && geode.master === 'geode_golem' && geode.light === '#FF8AD8' && !!aqueduct && aqueduct.master === 'moss_turtle' && aqueduct.light === '#70E6D8',
+      `${name}: 수정 문은 정동 속(정동 골렘), 호수 문은 잠긴 수로(이끼등 거북), 문 방의 불 색 (${geode ? geode.light : '-'}, ${aqueduct ? aqueduct.light : '-'}; 생성기 ${start.generator}판)`);
+    const lairs = (await game.ask('b1c')).lairs || [];
+    check(lairs.some(l => l.biome === 'Crystal') || lairs.some(l => l.biome === 'Lake'),
+      `${name}: 새 월드(6판)에 수정·호수 중간 보스의 굴이 있다 (${lairs.map(l => `${l.biome} ${l.boss}`).join(', ')})`);
+
+    // The new kinds in a row, in a crystal pack room.
+    let seen = {}, room = '';
+    for (let n = 0; n < 6; n++) {
+      room = (await game.send(`clear; goto room pack crystal ${n}`)).join(' ');
+      await game.wait(1200);
+      await game.send('clear; scene b3monsters');
+      await game.wait(900);
+      seen = await game.ask('b3');
+      if (kinds.every(([kind]) => (seen.monsters || []).some(m => m.kind === kind))) break;
+    }
+    const unseen = kinds.filter(([kind]) => !((seen.monsters || []).find(x => x.kind === kind) || {}).drawn);
+    if (unseen.length > 0) {
+      await game.send('goto 11 0');
+      await game.wait(1200);
+      const nearer = await game.ask('b3');
+      for (const [kind] of unseen) {
+        const again = (nearer.monsters || []).find(x => x.kind === kind);
+        const i = (seen.monsters || []).findIndex(x => x.kind === kind);
+        if (again && i >= 0) seen.monsters[i] = again;
+      }
+      await game.send('goto -11 0');
+      await game.wait(600);
+    }
+    for (const [kind, size, label] of kinds) {
+      const m = (seen.monsters || []).find(x => x.kind === kind);
+      const [least, most] = SizeBands[size];
+      check(!!m && m.size === size && m.drawn && m.pixels >= least && m.pixels <= most,
+        `${name}: ${label}(${size.toUpperCase()})가 제 크기로 그려진다 (${m ? `${m.pixels}px` : '없음'}, ${least}~${most}px, ${room})`);
+    }
+    await game.shot('b3mobs-lineup', '새 몬스터 줄: 수정 가시 버섯, 프리즘 정령, 물살 정령 무리장, 결정 흉내쟁이, 촉수, 진흙 슬라임, 수정 거북, 큰 게, 정동 골렘, 이끼등 거북');
+
+    // A shot off crystal spires: a bow's shots east come back.
+    await game.send('monsters hold; clear; heal; scene glance; equip copper_bow; attack on 1 0');
+    const glanced = await game.until(b => b.shotsGlanced > 0 && b.glancesShown > 0, 5000, () => game.ask('b3'));
+    await game.shot('b3mobs-glance', '수정 첨탑에서 튕겨 돌아오는 화살');
+    await game.send('attack off');
+    check(!!glanced, `${name}: 화살이 수정 첨탑에서 튕긴다 (호스트 ${glanced ? glanced.shotsGlanced : 0}, 화면 ${glanced ? glanced.glancesShown : 0})`);
+
+    // A tortoise's shell turns a shot back.
+    await game.send('clear; heal; scene reflect; attack on 1 0');
+    const turned = await game.until(b => b.shotsReflected > 0 && b.reflectsShown > 0, 5000, () => game.ask('b3'));
+    await game.shot('b3mobs-reflect', '수정 거북의 등껍질이 화살을 되돌린다');
+    await game.send('attack off; heal');
+    check(!!turned, `${name}: 수정 거북이 앞에서 온 화살을 되돌린다 (호스트 ${turned ? turned.shotsReflected : 0}, 화면 ${turned ? turned.reflectsShown : 0})`);
+
+    // A prism's shot breaks into three on the spires.
+    await game.send('equip obsidian_sword; clear; heal; scene prism');
+    const broke = await game.until(b => b.refractsShown > 0, 4000, () => game.ask('b3'));
+    await game.shot('b3mobs-prism', '첨탑에서 셋으로 갈라지는 프리즘 정령의 빛');
+    check(!!broke, `${name}: 프리즘 정령의 빛이 첨탑에서 셋으로 갈라진다 (화면 ${broke ? broke.refractsShown : 0})`);
+
+    // Mimics: crystals through their pack's alarm, awake when come to.
+    await game.send('monsters hold; clear; heal; scene mimics');
+    const alarmed = await game.until(b => (b.monsters || []).some(m => m.kind === 'crystal_bat' && m.state !== 'Idle'), 5000, () => game.ask('b3')) || await game.ask('b3');
+    const hidden = (alarmed.monsters || []).filter(m => m.kind === 'crystal_mimic');
+    check(hidden.length === 2 && hidden.every(m => m.dormant),
+      `${name}: 박쥐가 알아챈 뒤에도 흉내쟁이는 결정으로 서 있다 (${hidden.map(m => `${m.state}${m.dormant ? ' 잠듦' : ''}`).join(', ') || '없음'})`);
+    await game.shot('b3mobs-mimics', '결정 무리처럼 서 있는 흉내쟁이 둘과 덤비는 수정 박쥐');
+    await game.send('heal; goto 6 0');
+    const woke = await game.until(b => (b.monsters || []).filter(m => m.kind === 'crystal_mimic' && !m.dormant).length === 2, 4000, () => game.ask('b3'));
+    await game.shot('b3mobs-mimics-awake', '다가가자 깨어난 흉내쟁이 둘(하나가 깨면 곁의 것도 울려 깬다)');
+    check(!!woke, `${name}: 두 칸 안에 들면 흉내쟁이가 깨고 곁의 것도 깬다`);
+
+    // A tentacle under the water, keeping to its edge, in a lake room.
+    let lakeRoom = '';
+    for (let n = 0; n < 4; n++) {
+      lakeRoom = (await game.send(`monsters hold; clear; heal; goto room pack lake ${n}`)).join(' ');
+      await game.wait(1000);
+      if ((await game.ask('b3')).biome === 'Lake') break;
+    }
+    await game.send('clear; heal; scene tentacles');
+    const under = await game.until(b => (b.monsters || []).some(m => m.kind === 'tentacle' && m.underWater) && b.ripplesShown > 0, 5000, () => game.ask('b3'))
+      || await game.ask('b3');
+    const tentacle = (under.monsters || []).find(m => m.kind === 'tentacle');
+    check(!!tentacle && tentacle.underWater && under.ripplesShown > 0,
+      `${name}: 촉수가 물속에서 물결로 보인다 (${tentacle ? `${tentacle.state}${tentacle.buried ? ' 잠김' : ''}` : '없음'}, 화면 물결 ${under.ripplesShown}; ${lakeRoom})`);
+    await game.shot('b3mobs-tentacle', '물속의 촉수(물결과 거품)');
+    await game.wait(2500);
+    const after = await game.ask('b3');
+    const kept = (after.monsters || []).filter(m => m.kind === 'tentacle');
+    check(kept.length > 0 && kept.every(m => m.byWater), `${name}: 촉수는 물가 한 칸 밖으로 나오지 않는다 (${kept.map(m => m.byWater ? '물가' : '밖').join(', ') || '없음'})`);
+    await game.shot('b3mobs-tentacle-up', '솟아 휘두르는 촉수');
+
+    // A walk through the shallows: slower, splashes at each step.
+    await game.send('monsters hold; clear; heal; scene shallows; face off');
+    const wet = await game.ask('b3');
+    if (game.touch) {
+      const box = await game.canvas();
+      await game.drag(box.left + box.width * 0.2, box.top + box.height * 0.75, 60, 0, 1200);
+    } else {
+      await game.page.keyboard.down('d');
+      await game.wait(1200);
+      await game.page.keyboard.up('d');
+    }
+    const splashed = await game.until(b => b.splashesShown > 0, 3000, () => game.ask('b3')) || await game.ask('b3');
+    check(wet.under === 'ShallowWater' && Math.abs(wet.groundSpeed - 0.7) < 0.01 && splashed.splashesShown > 0,
+      `${name}: 얕은 물은 70% 빠르기로 걷고 걸음마다 물이 튄다 (밑 ${wet.under}, 빠르기 ${wet.groundSpeed}, 물보라 ${splashed.splashesShown})`);
+    await game.shot('b3mobs-shallows', '얕은 물을 걷는 물보라');
+
+    // The two dungeons: a pack room with a big body, the mid-boss in person.
+    for (const [id, gateLabel, master, big] of [['geode_heart', '정동 속', '정동 골렘', 'crystal_tortoise'], ['sunken_aqueduct', '잠긴 수로', '이끼등 거북', 'great_crab']]) {
+      const to = (await game.send(`monsters hold; clear; heal; goto gate ${id}`)).join(' ');
+      await game.wait(1500);
+      check(/ok goto gate/.test(to), `${name}: ${gateLabel}의 문으로 (${to})`);
+      await game.shot(`b3mobs-${id}-gate`, `${gateLabel}의 문 방`);
+      await game.press(new RegExp(`${gateLabel} 들어가기`));
+      const inside = await game.until(d => d.inPocket && d.clientInPocket && d.run, 6000, () => game.ask('dungeon'));
+      check(!!inside && inside.run.id === id, `${name}: ${gateLabel}에 들어왔다 (${inside ? `${inside.cardName}, ${inside.run.letters}` : '들어가지 못함'})`);
+      await game.send('goto droom C');
+      await game.wait(1500);
+      const pack = await game.ask('b3');
+      const bigs = (pack.monsters || []).filter(m => m.size === 'l' && m.distance < 16);
+      check(bigs.length >= 1, `${name}: ${gateLabel}의 무리 방에 큰 몸 (${bigs.map(m => m.kind).join(', ') || '없음'}; ${big}이 나올 수 있다)`);
+      await game.shot(`b3mobs-${id}-pack`, `${gateLabel}의 무리 방`);
+      await game.send('goto droom B; heal');
+      await game.wait(1800);
+      const boss = await game.ask('dungeon');
+      check(boss.run && boss.run.room === 'B' && new RegExp(master).test(boss.run.master) && !/대장/.test(boss.run.master),
+        `${name}: ${gateLabel}의 주인은 ${master} 그 자신 (${boss.run ? boss.run.master : '-'})`);
+      await game.shot(`b3mobs-${id}-master`, `${gateLabel}의 주인 ${master}`);
+      await game.press('던전 나가기');
+      await game.until(d => !d.inPocket && !d.clientInPocket, 6000, () => game.ask('dungeon'));
+    }
+    await game.send('monsters hold; clear');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

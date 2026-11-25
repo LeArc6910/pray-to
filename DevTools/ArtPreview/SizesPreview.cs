@@ -21,7 +21,7 @@ namespace Game.Client
         static readonly Rgba Gold = Rgba.Hex("#FFC740");
 
         // The kinds shown, smallest first.
-        static readonly string[] Lineup = { "cave_rat", "puffball", "bomb_scarab", "glow_bat", "slime", "cave_beetle", "frost_wolf", "big_slime", "big_beetle", "cap_giant", "yeti", "great_worm", "slime_king", "slime_mother", "mycelium_mother", "frost_mammoth", "temple_guardian" };
+        static readonly string[] Lineup = { "cave_rat", "puffball", "bomb_scarab", "glow_bat", "slime", "cave_beetle", "frost_wolf", "crystal_mimic", "tentacle", "big_slime", "big_beetle", "cap_giant", "yeti", "great_worm", "crystal_tortoise", "great_crab", "slime_king", "slime_mother", "mycelium_mother", "frost_mammoth", "temple_guardian", "geode_golem", "moss_turtle" };
 
         public static bool Write(string output, MonsterData monsters, PixelImage hero)
         {
@@ -46,9 +46,10 @@ namespace Game.Client
             Save(Poses(monsters), Path.Combine(folder, "poses.png"), 4);
             Save(Leaders(monsters), Path.Combine(folder, "leaders.png"), 4);
             Save(ClearancePicture(monsters, hero), Path.Combine(folder, "clearance.png"), 3);
-            Save(IceSand(monsters, hero), Path.Combine(folder, "icesand.png"), 6);
+            Save(Kinds(monsters, hero, IceSandKinds, "ICE AND SAND CAVE KINDS (B2B): FRAMES, POSES, BACK, DORMANT"), Path.Combine(folder, "icesand.png"), 6);
+            Save(Kinds(monsters, hero, CrystalLakeKinds, "CRYSTAL CAVE AND LAKE KINDS (B3B): FRAMES, POSES, BACK, DORMANT"), Path.Combine(folder, "crystallake.png"), 6);
             File.WriteAllText(Path.Combine(folder, "report.txt"), report.ToString());
-            Console.WriteLine($"Wrote sizes/lineup.png, poses.png, leaders.png, clearance.png, icesand.png and report.txt to {folder}");
+            Console.WriteLine($"Wrote sizes/lineup.png, poses.png, leaders.png, clearance.png, icesand.png, crystallake.png and report.txt to {folder}");
             return fine;
         }
 
@@ -120,9 +121,14 @@ namespace Game.Client
         // behind, and a mid-boss standing dormant (CreatureArt.Dormant) the way the game draws it before it wakes.
         static readonly string[] IceSandKinds = { "frost_wolf", "frost_beetle", "frost_lord", "yeti", "frost_mammoth", "bomb_scarab", "sandstone_beetle", "scorpion_queen", "great_worm", "temple_guardian" };
 
-        static PixelImage IceSand(MonsterData monsters, PixelImage hero)
+        // The crystal cave's and the underground lake's (B3b), after the kinds they had: a mimic's dormant picture is its
+        // clump of crystals.
+        static readonly string[] CrystalLakeKinds = { "crystal_bat", "crystal_wisp", "crystal_mimic", "crystal_shooter", "prism_wisp", "crystal_tortoise", "geode_golem",
+            "lake_crab", "tide_wisp", "tentacle", "mud_slime", "tide_chief", "great_crab", "moss_turtle" };
+
+        static PixelImage Kinds(MonsterData monsters, PixelImage hero, string[] ids, string title)
         {
-            var kinds = IceSandKinds.Select(monsters.Find).ToList();
+            var kinds = ids.Select(monsters.Find).ToList();
             var columns = new (string Label, int Frame, MonsterView View, MonsterPose Pose, bool Dormant)[]
             {
                 ("IDLE 1", 0, MonsterView.Side, MonsterPose.Idle, false), ("IDLE 2", 1, MonsterView.Side, MonsterPose.Idle, false),
@@ -135,7 +141,7 @@ namespace Game.Client
             var rows = kinds.Select(k => Math.Max(figure.Height, kinds.Where(o => o == k).Max(o => Picture(o, 0, MonsterView.Side, MonsterPose.Strike).Height)) + 14).ToList();
             var g = new PixelImage(8 + 24 + columns.Length * cellW, 18 + rows.Sum());
             g.Fill(0, 0, g.Width, g.Height, Back);
-            g.Small(6, 4, "ICE AND SAND CAVE KINDS (B2B): FRAMES, POSES, BACK, DORMANT", Text, Back);
+            g.Small(6, 4, title, Text, Back);
             int top = 16;
             for (int r = 0; r < kinds.Count; r++)
             {

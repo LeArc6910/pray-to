@@ -21,6 +21,13 @@ namespace Game.Core
         IceRuin,
         TempleFront,
         GiantSkull,
+        // The crystal cave's and the underground lake's (묶음 B3a, WorldGenerator.CrystalLake.cs, worlds of version 6): a
+        // giant geode split open with crystals grown round it, an arch of crystal walked under; a boat sunk in a pool,
+        // an old water wheel by the water.
+        GiantGeode,
+        CrystalArch,
+        SunkenBoat,
+        OldWheel,
     }
 
     // One landmark as laid: the box of tiles it took (its lower left and size) and a tile of open floor in front of it.
@@ -51,7 +58,7 @@ namespace Game.Core
     public static class BiomeLandmarks
     {
         // The tiles only a landmark lays.
-        public static bool Is(TileType type) => type >= TileType.MinerHut && type <= TileType.RingCap || IceSandProps.IsLandmark(type);
+        public static bool Is(TileType type) => type >= TileType.MinerHut && type <= TileType.RingCap || IceSandProps.IsLandmark(type) || CrystalLakeProps.IsLandmark(type);
 
         // What each lays, from its box's lower left (y up). A wide thing's type is on its lower left tile; the generator
         // fills the rest of its footprint with StructurePart.

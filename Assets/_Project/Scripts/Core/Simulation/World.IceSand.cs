@@ -166,18 +166,27 @@ namespace Game.Core
 
         // ---- Dormant mid-bosses (MonsterTraitKind.Dormant) ----
 
-        // How near a dormant one notices a player, or null for one that is not dormant.
-        static float? DormantReach(MonsterDefinition kind) => kind.Trait(MonsterTraitKind.Dormant)?.Number(0, 3);
+        // How near a dormant one notices a player is World.NoticeReach (with a crystal mimic's, B3b).
 
         // Whether a monster stands dormant now: one of that trait with no one to fight (the screen draws it as a statue).
-        public static bool IsDormant(MonsterDefinition kind, EnemyState state) => state == EnemyState.Idle && kind.Has(MonsterTraitKind.Dormant);
+        public static bool IsDormant(MonsterDefinition kind, EnemyState state) => state == EnemyState.Idle && (kind.Has(MonsterTraitKind.Dormant) || kind.Has(MonsterTraitKind.Mimic));
+
+        // The same for a monster in the world (an elite mimic leads its fight and stands as itself, World.Mimics).
+        public static bool IsDormant(Enemy enemy) => IsDormant(enemy.Definition, enemy.State) && (enemy.Definition.Has(MonsterTraitKind.Dormant) || Mimics(enemy));
 
         // A dormant one that has come to fight is told to the screen once (the stone cracks, the ice bursts).
         void WakeDormant(Enemy enemy)
         {
-            if (!enemy.Definition.Has(MonsterTraitKind.Dormant)) return;
+            bool mimic = Mimics(enemy);
+            if (!mimic && !enemy.Definition.Has(MonsterTraitKind.Dormant)) return;
+            if (mimic) WakeLastMimic(enemy);
             bool dormant = enemy.State == EnemyState.Idle;
-            if (enemy.Dormant && !dormant) _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxWake, position: enemy.Position));
+            if (enemy.Dormant && !dormant)
+            {
+                _events.Add(new SimEvent(SimEventType.MonsterFx, enemy.Id, amount: MonsterFxWake, position: enemy.Position));
+                // A mimic's crystals ring the others near it awake (B3b).
+                if (mimic) RingMimics(enemy);
+            }
             enemy.Dormant = dormant;
         }
 

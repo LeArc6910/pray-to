@@ -331,7 +331,8 @@ namespace Game.Client
             "sandstone_beetle" => SandBeetle,
             "frost_lord" => FrostLord,
             "scorpion_queen" => QueenScorpion,
-            _ => null,
+            // The crystal cave's and the underground lake's (CreatureArt.CrystalLake.cs, B3b).
+            _ => CrystalLakeFrames(id),
         };
 
         // ---- The big ones ----
@@ -559,13 +560,15 @@ namespace Game.Client
             "great_worm" => new[] { GreatWorm(0), GreatWorm(1) },
             "frost_mammoth" => new[] { FrostMammoth(0), FrostMammoth(1) },
             "temple_guardian" => new[] { TempleGuardian(0), TempleGuardian(1) },
-            _ => null,
+            _ => CrystalLakeBigFrames(id),
         };
 
         // What a pose changes in the two biomes' colours: a bomb scarab winding up to go off flares, its abdomen and
         // spark pulsing between white-hot and orange from frame to frame (its fuse is burning).
         static void IceSandPose(string id, MonsterPose pose, int frame, Dictionary<char, Rgba> colors)
         {
+            // The crystal cave's and the lake's (B3b).
+            CrystalLakePose(id, pose, frame, colors);
             if (id != "bomb_scarab" || pose != MonsterPose.Windup) return;
             bool flare = frame % 2 == 0;
             colors['g'] = Rgba.Hex(flare ? "#FFD060" : "#FF8A30");
@@ -576,7 +579,7 @@ namespace Game.Client
         // ---- Dormant (World.IsDormant) ----
 
         // Whether a kind is drawn as a statue while it stands dormant (MonsterTraitKind.Dormant).
-        public static bool Sleeps(string id) => id == "frost_mammoth" || id == "temple_guardian";
+        public static bool Sleeps(string id) => id == "frost_mammoth" || id == "temple_guardian" || CrystalLakeSleeps(id);
 
         static readonly Rgba Stone = Rgba.Hex("#8E8478"), Ice = Rgba.Hex("#BFE8FF"), Rime = Rgba.Hex("#F4FCFF");
 
@@ -584,6 +587,8 @@ namespace Game.Client
         // pale and blue with white rime on its upper edges.
         public static PixelImage Dormant(string id, PixelImage image)
         {
+            // A mimic's crystals, the golem's stone, the turtle's moss (CreatureArt.CrystalLake.cs, B3b).
+            if (CrystalLakeDormant(id, image) is PixelImage other) return other;
             var result = image.Copy();
             bool ice = id == "frost_mammoth";
             for (int y = 0; y < result.Height; y++)

@@ -829,7 +829,8 @@ namespace Game.Client
         {
             var ramp = Ramp.Of(color);
             var colors = RampColors(ramp);
-            if (Extras.TryGetValue(id, out var extra) || BigExtras.TryGetValue(id, out extra) || BiomeExtras.TryGetValue(id, out extra) || IceSandExtras.TryGetValue(id, out extra))
+            if (Extras.TryGetValue(id, out var extra) || BigExtras.TryGetValue(id, out extra) || BiomeExtras.TryGetValue(id, out extra) || IceSandExtras.TryGetValue(id, out extra)
+                || CrystalLakeExtras.TryGetValue(id, out extra))
             {
                 foreach (var pair in extra) colors[pair.Key] = pair.Value;
             }

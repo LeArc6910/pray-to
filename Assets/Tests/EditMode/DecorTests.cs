@@ -36,8 +36,12 @@ namespace Game.Core.Tests
         // A biome whose package is not made yet keeps B0's low density and two kinds; the dirt cave and the mushroom forest
         // (묶음 B1a) are dense, with three and four kinds (the cave's cobwebs hang only in corners: Decor.On). Either way no two things stand side by side.
         // The ice cave and the sand cave (묶음 B2a) are dense too, with four and three kinds.
-        [TestCase(1UL, Biome.Crystal, 1.5f, 5f, 2)]
-        [TestCase(42UL, Biome.Crystal, 1.5f, 5f, 2)]
+        // The crystal cave and the lake (묶음 B3a) too, with three and four (the lake's reeds and lily pads are its
+        // water's edge's: Decor.On).
+        [TestCase(1UL, Biome.Lava, 1.5f, 5f, 2)]
+        [TestCase(42UL, Biome.Abyss, 1.5f, 5f, 2)]
+        [TestCase(1UL, Biome.Crystal, 7f, 13f, 3)]
+        [TestCase(42UL, Biome.Lake, 7f, 13f, 4)]
         [TestCase(1UL, Biome.Ice, 7f, 13f, 4)]
         [TestCase(42UL, Biome.Sand, 7f, 13f, 3)]
         [TestCase(1UL, Biome.Cave, 7f, 13f, 3)]

@@ -1910,6 +1910,10 @@ locked,E C K C L C M R B X,T H,shortcut
 - `sweep.js --only dungeon`과 PlayMode 사진은 배포·로컬에서 처음 돌려 봐야 한다(이 묶음에서는 `node --check`와 컴파일만 했다)
 - 새 파일의 `.meta`는 로컬이 만든다: `Core/World/DungeonSheet.cs`, `Core/World/DungeonGenerator.cs`, `Data/World/dungeons.csv`, `Data/World/dungeon_graphs.csv`, `Tests/EditMode/DungeonGeneratorTests.cs`
 
+### 묶음 5c의 셋째 몫 (2026-11-25, `Docs/BiomeRework.md` B3b)
+
+수정 동굴의 문을 깊은 굴에서 새 **정동 속**(새 그래프 `geode`: E C C S K C L M R B X, 수정 첨탑이 빽빽한 조각 다섯, 주인 **정동 골렘** 그 자신, 빛 분홍 `#FF8AD8`)으로, 지하 호수의 문을 새 **잠긴 수로**(새 그래프 `aqueduct`: E C C K C S C L M R B X, 물길과 얕은 물의 조각 다섯, 주인 **이끼등 거북** 그 자신, 빛 청록 `#70E6D8`)로. 무리 방의 큰 몸은 수정 거북·큰 게. 깊은 굴은 이제 공허의 심연의 문만 간다. `--dungeon`(전사 혼자, 피하기 켬): 정동 속은 철 넷 레벨 16으로 평균 7.5분·분당 경험치 들판의 1.07배, 잠긴 수로는 미스릴 넷 레벨 20으로 6.4분·1.06배, 쓰러짐 0. 자세한 숫자는 `Docs/BiomeRework.md` B3b.
+
 ### 묶음 5c의 둘째 몫 (2026-11-24, `Docs/BiomeRework.md` B2b)
 
 얼어붙은 묘의 주인을 서리 정령 큰 정예에서 **서리 매머드** 그 자신으로(얼음 조각 다섯: 석상 무덤, 얼음 홀, 납골당, 얼음 금고, 가운데가 얼음인 보스 방), 모래 동굴의 문을 깊은 굴에서 새 **묻힌 신전**(새 그래프 `temple`: E C C S K C L M R B X, 모래 조각 다섯, 주인 **신전 수호 석상** 그 자신, 빛 금 `#FFD28A`)으로. 무리 방의 큰 몸은 눈 거인·큰 모래 지렁이. 깊은 굴은 이제 수정 동굴·지하 호수·공허의 심연의 문만 간다. `--dungeon`(전사 혼자, 철 넷, 레벨 10, 5b와 같다): 얼어붙은 묘 6.9분·분당 경험치 138(들판 얼음 동굴 119의 1.16배), 묻힌 신전 7.4분·79(들판 모래 동굴 77의 1.03배). 5b의 묘 3.3분·448보다 길고 들판에 가깝다. 생성기 5판 새 월드에는 두 중간 보스의 굴도 선다(4판은 그대로). 자세한 숫자는 `Docs/BiomeRework.md` B2b.

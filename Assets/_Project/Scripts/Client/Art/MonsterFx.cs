@@ -54,6 +54,15 @@ namespace Game.Client
         SandFall,
         Slide,
         Rouse,
+        // The crystal cave and the underground lake (2026-11-25, B3b). A loop: the rings and bubbles over one under the
+        // water (World.UnderWater) in place of a mound of earth. One-offs: a shot glancing off crystal (World.MonsterFxGlance),
+        // a shell turning a shot back (World.MonsterFxReflect), a prism's shot breaking into three (World.MonsterFxRefract),
+        // and a splash where someone wades the shallows.
+        Ripple,
+        Glance,
+        Reflect,
+        Refract,
+        Splash,
     }
 
     // What a kind's effects are made of besides its colours, so each reads as itself (Docs/MonsterPatterns.md): told
@@ -137,6 +146,11 @@ namespace Game.Client
             if (id == "bomb_scarab" || id == "great_worm" || id == "sandstone_beetle" || id == "temple_guardian") return FxRamp.Dust;
             if (id == "scorpion_queen") return FxRamp.Spirit;
             if (id == "frost_wolf" || id == "frost_beetle" || id == "frost_mammoth") return FxRamp.Cold;
+            // The lake's new kinds (B3b) are water; the crystal cave's are the crystals' sky blue, the golem's chest violet.
+            if (id == "tentacle" || id == "great_crab" || id == "tide_chief" || id == "moss_turtle") return FxRamp.Spirit;
+            if (id == "mud_slime") return FxRamp.Dust;
+            if (id == "crystal_mimic" || id == "crystal_tortoise" || id == "crystal_shooter" || id == "prism_wisp") return FxRamp.Cold;
+            if (id == "geode_golem") return FxRamp.Violet;
             if (element == SkillTag.Cold) return FxRamp.Cold;
             if (element == SkillTag.Fire) return FxRamp.Fire;
             return FxRamp.Plain;
@@ -158,6 +172,11 @@ namespace Game.Client
                     return MobLook.Spore;
                 case "crystal_bat":
                 case "crystal_wisp":
+                case "crystal_mimic":
+                case "crystal_tortoise":
+                case "crystal_shooter":
+                case "prism_wisp":
+                case "geode_golem":
                     return MobLook.Crystal;
                 case "ice_slime":
                 case "frost_wisp":
@@ -180,6 +199,11 @@ namespace Game.Client
                     return MobLook.Sand;
                 case "lake_crab":
                 case "tide_wisp":
+                case "tentacle":
+                case "great_crab":
+                case "mud_slime":
+                case "tide_chief":
+                case "moss_turtle":
                     return MobLook.Water;
                 case "abyss_stalker":
                 case "void_wisp":
@@ -353,6 +377,61 @@ namespace Game.Client
                     SkillFx.Fly(o, c.Ramp == FxRamp.Cold ? FxShape.Shard : FxShape.Chunk, c.Ramp, 5, 0, 12, t, 0, 0.45f, 6, 22, c.Seed, hop: 10, cy: Body * 2);
                     SkillFx.Ring(o, c.Ramp, t, 0, 24, 2, ground: true);
                     SkillFx.Float(o, FxShape.Smoke, c.Ramp == FxRamp.Cold ? FxRamp.Mist : FxRamp.Dust, 12, 1, 4, t, 0.05f, life, 8, 10, c.Seed, cy: Body);
+                    break;
+                case MobFx.Ripple:
+                {
+                    // Not a warning (no red): dark water over it, two rings widening out from it in turn, bubbles rising
+                    // and bursting; one that travels draws a wake of broken rings behind it. Tells the buried in the lake.
+                    Put(o, FxShape.Shadow, FxRamp.Smoke, 20, 0, 0, 0, 0.55f, 0, true);
+                    Put(o, FxShape.Broken, FxRamp.Cold, 16, SkillFxArt.BrokenFrame(1, 4, (int)(t * 3) & 3), 0, 1, 0.7f, 0, true);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float u = SkillFx.Frac(t * 0.7f + i / 3f + (c.Seed & 7) / 8f);
+                        Put(o, FxShape.Edge, FxRamp.Cold, SkillFxArt.Even(8 + 20 * u), u < 0.3f ? 2 : 1, 0, 1, 0.95f * (1 - u), 0, true);
+                    }
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float u = SkillFx.Frac(t * 1.3f + i / 4f + (c.Seed & 15) / 16f);
+                        if (u < 0.75f) Put(o, FxShape.Dot, FxRamp.Cold, u < 0.6f ? 2 : 1, 2, ((i * 7 + c.Seed) % 9) - 4, 1 + 7 * u, 1 - u * 0.8f);
+                    }
+                    if (c.Armed)
+                    {
+                        float back = c.Dir * Deg + 180;
+                        for (int i = 0; i < 3; i++)
+                        {
+                            float u = SkillFx.Frac(t * 1.6f + i / 3f);
+                            Put(o, FxShape.Broken, FxRamp.Cold, SkillFxArt.Even(8 + 10 * u), SkillFxArt.BrokenFrame(1, 4, i), SkillFx.Cos(back) * (4 + 10 * u), SkillFx.Sin(back) * (4 + 10 * u), 0.8f * (1 - u), 0, true);
+                        }
+                    }
+                    break;
+                }
+                case MobFx.Glance:
+                    // A shot off crystal: a white-pink flash at the crystal, a sky ring and splinters of light.
+                    life = 0.3f;
+                    if (t < 0.1f) Put(o, FxShape.Glint, FxRamp.Cold, 13, 2, 0, 0);
+                    Put(o, FxShape.Edge, FxRamp.Cold, SkillFxArt.Even(6 + 12 * t / life), 1, 0, 0, 1 - t / life);
+                    SkillFx.Fly(o, FxShape.Streak, FxRamp.Cold, 5, 1, 5, t, 0, 0.25f, 3, 11, c.Seed, aimed: true);
+                    break;
+                case MobFx.Reflect:
+                    // A shell turning a shot: a crescent of light on the shell's face and a bright glint.
+                    life = 0.35f;
+                    if (t < 0.12f) Put(o, FxShape.Glint, FxRamp.Steel, 15, 2, 0, Body);
+                    Put(o, FxShape.Crescent, FxRamp.Cold, 10, 90, 0, Body, 1 - t / life, c.Dir * Deg);
+                    SkillFx.Fly(o, FxShape.Shard, FxRamp.Cold, 4, 0, 4, t, 0, 0.3f, 3, 10, c.Seed, hop: 4, cy: Body);
+                    break;
+                case MobFx.Refract:
+                    // A prism's shot breaking: a bright burst and three streaks of colour fanning out.
+                    life = 0.35f;
+                    if (t < 0.1f) Put(o, FxShape.Glint, FxRamp.Gold, 13, 2, 0, 0);
+                    SkillFx.Fly(o, FxShape.Streak, FxRamp.Violet, 2, 2, 3, t, 0, 0.3f, 4, 14, c.Seed, aimed: true);
+                    SkillFx.Fly(o, FxShape.Streak, FxRamp.Cold, 2, 2, 3, t, 0, 0.3f, 4, 14, c.Seed + 3, aimed: true);
+                    SkillFx.Fly(o, FxShape.Streak, FxRamp.Gold, 2, 2, 3, t, 0, 0.3f, 4, 14, c.Seed + 7, aimed: true);
+                    break;
+                case MobFx.Splash:
+                    // A step in the shallows: a little ring and drops thrown up.
+                    life = 0.35f;
+                    Put(o, FxShape.Edge, FxRamp.Cold, SkillFxArt.Even(6 + 14 * t / life), 2, 0, 0, 0.9f * (1 - t / life), 0, true);
+                    SkillFx.Fly(o, FxShape.Dot, FxRamp.Cold, 2, 2, 5, t, 0, 0.3f, 3, 9, c.Seed, hop: 8);
                     break;
                 case MobFx.Dive:
                     // Back under: the ground closes over it, a puff and a few grains sliding in.

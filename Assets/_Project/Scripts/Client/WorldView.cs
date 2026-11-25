@@ -556,7 +556,8 @@ namespace Game.Client
             var arenas = WorldLights.ArenaAmbient(client.Arenas, client.ArenaRadius);
             _arenaGlow = (x, y) => Mathf.Max(arenas(x, y), WorldLights.BiomeGlow(client.Biomes[x, y]));
             // The biome's light colour (묶음 B1a), but in an arena, whose own glow is plain.
-            _biomeTint = (x, y) => arenas(x, y) > 0 ? Rgba.Clear : WorldLights.BiomeTint(client.Biomes[x, y]);
+            // The crystal cave's breathes and the lake's wavers (묶음 B3a); still with 움직임: 줄이기.
+            _biomeTint = (x, y) => arenas(x, y) > 0 ? Rgba.Clear : WorldLights.BiomeTint(client.Biomes[x, y], Settings.ReduceMotion ? 0 : Time.time, x, y);
             BuildDark(DarkSize);
             _self = MakeBody(BodyKind.Player, "나", 0, World.PlayerRadius, SelfTunic);
             var start = client.Position;
@@ -2800,6 +2801,9 @@ namespace Game.Client
             if (_stride < StepLength) return;
             _stride -= StepLength;
             Sounds.Step(GroundUnder(_self.Position), 0.3f);
+            // Wading the lake's shallows throws up a splash at each step (B3b).
+            if (_client.Map[Mathf.FloorToInt(_self.Position.x), Mathf.FloorToInt(_self.Position.y)] == TileType.ShallowWater)
+                Splash(_self.Position - new Vector3(0, _self.Feet, 0));
         }
 
         // A float where a line goes in; a splash and a "!" when a fish bites; a splash when one is landed; the float
@@ -3181,7 +3185,9 @@ namespace Game.Client
                 // An elite leader wears a gold ring round its picture, not a bigger one (CreatureArt.Crowned, 2026-11-24).
                 bool crowned = body.Elite == EliteRank.Leader;
                 // A mid-boss standing dormant (World.IsDormant, B2b) is a still statue: grey stone, or a beast in ice.
-                bool dormant = !dead && body.EnemyState == EnemyState.Idle && CreatureArt.Sleeps(body.Id);
+                // A crystal mimic stands as crystals (B3b), but not one made an elite: it leads its fight as itself.
+                bool dormant = !dead && body.EnemyState == EnemyState.Idle && CreatureArt.Sleeps(body.Id)
+                    && !(body.Elite != EliteRank.None && CreatureArt.Mimics(body.Id));
                 if (dormant)
                 {
                     frame = 0;
@@ -3574,7 +3580,10 @@ namespace Game.Client
 
         // The tile at x, y, a road or a rail matched to its neighbours (TileArt.RoadVariant, RailArt.Mask).
         static TileBase ObjectTileAt(TileMap map, int x, int y) =>
-            map[x, y] == TileType.Road ? Sprites.Road(TileArt.RoadVariant(map, x, y))
+            // A pool is its ground tile, coloured by its biome with its banks (TileArt.Water); the flat water tile of the
+            // objects' atlas is only the harbour boats' underlay, and laid here it hid the banks (묶음 B3a).
+            map[x, y] == TileType.Water ? null
+            : map[x, y] == TileType.Road ? Sprites.Road(TileArt.RoadVariant(map, x, y))
             // The mines' rails, straight, turning or branching with their neighbours (RailArt).
             : map[x, y] == TileType.Rail ? Sprites.Rail(RailArt.Mask(map, x, y))
             // Ice and quicksand, their edges matched to their neighbours (RoomTileArt.Patch).

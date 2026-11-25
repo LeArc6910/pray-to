@@ -1193,7 +1193,7 @@ namespace Game.Client
                             var under = PropArt.Underlay(_map, _places, x, y);
                             if (under != null) image.Draw(TileArt.Object(under.Value), px, py);
                             // Things that stand (StandArt.KindAt) are drawn with the bodies, as WorldView's standing layer does.
-                            var placed = StandArt.KindAt(_map, x, y) != StandArt.Kind.None || PropArt.Stands(_map[x, y]) ? null
+                            var placed = StandArt.KindAt(_map, x, y) != StandArt.Kind.None || PropArt.Stands(_map[x, y]) || _map[x, y] == TileType.Water ? null
                                 : _map[x, y] == TileType.Road ? TileArt.Road(TileArt.RoadVariant(_map, x, y))
                                 : _map[x, y] == TileType.Rail ? RailArt.Rail(RailArt.Mask(_map, x, y))
                                 : RoomTileArt.IsPatch(_map[x, y]) ? RoomTileArt.Patch(_map[x, y], RoomTileArt.PatchMask(_map, x, y), RoomTileArt.Laying(x, y))

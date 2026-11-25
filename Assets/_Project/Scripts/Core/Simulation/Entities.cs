@@ -449,6 +449,8 @@ namespace Game.Core
         internal int UnderTicks { get; set; }
         internal long UpUntil { get; set; }
         internal bool Dormant { get; set; }
+        // A tentacle set down away from any water has looked once for the nearest edge (World.KeepToShore, B3b).
+        internal bool ShoreSought { get; set; }
 
         // ---- Packs and wanderers (World.Packs.cs, Docs/WorldRework.md 무리) ----
 
@@ -983,6 +985,9 @@ namespace Game.Core
         internal int TurnTicks { get; set; }
         internal int PauseTicks { get; set; }
         internal float Pace { get; set; }
+        // How many times it has come off crystal (World.Glance, B3b), and whether a prism's shot has broken into three.
+        internal int Glanced { get; set; }
+        internal bool Refracted { get; set; }
         // What its hit does besides damage (MonsterAttack.Effect).
         internal HitEffect Effect { get; set; }
         internal float EffectAmount { get; set; }

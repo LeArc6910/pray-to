@@ -117,8 +117,10 @@ namespace Game.Client
                         list.Add(new Stand { X = x, Y = y, Type = type, Kind = kind, Biome = _client.Biomes[x, y] });
                         continue;
                     }
-                    if (type != TileType.Floor) continue;
+                    // The floor's cover, and on the lake's pools the reeds and lily pads (묶음 B3a).
+                    if (type != TileType.Floor && type != TileType.Water) continue;
                     var biome = _client.Biomes[x, y];
+                    if (type == TileType.Water && biome != Biome.Lake) continue;
                     var pick = StandArt.DecorAt(map, _client.Seed, biome, x, y, _keptClear);
                     if (pick.Any) list.Add(new Stand { X = x, Y = y, Type = type, Decor = pick, Biome = biome });
                 }

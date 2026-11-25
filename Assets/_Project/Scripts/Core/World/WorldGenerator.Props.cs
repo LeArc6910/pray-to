@@ -8,7 +8,7 @@ namespace Game.Core
     // what is broken or picked. The small cover that is only looked at is Decor, worked out on the client.
     public static class BiomeProps
     {
-        public static bool Is(TileType type) => type >= TileType.Stalagmite && type <= TileType.GiantCap || IceSandProps.Is(type);
+        public static bool Is(TileType type) => type >= TileType.Stalagmite && type <= TileType.GiantCap || IceSandProps.Is(type) || CrystalLakeProps.Is(type);
 
         // A lamp, out or lit.
         public static bool IsLamp(TileType type) => type == TileType.UnlitLamp || type == TileType.LitLamp;
@@ -208,6 +208,8 @@ namespace Game.Core
             }
             // The ice cave's and the sand cave's landmarks and props (WorldGenerator.IceSand.cs, 묶음 B2a), version 5 on.
             if (version >= IceSandVersion) LayIceSand(world, seed, kept);
+            // The crystal cave's and the lake's (WorldGenerator.CrystalLake.cs, 묶음 B3a), version 6 on.
+            if (version >= CrystalLakeVersion) LayCrystalLake(world, seed, kept);
         }
     }
 }

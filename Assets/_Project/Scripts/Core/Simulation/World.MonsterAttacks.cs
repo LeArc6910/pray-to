@@ -312,7 +312,8 @@ namespace Game.Core
         {
             var ambush = AmbushOf(enemy);
             var near = _players
-                .Where(p => !p.IsDead && Gap(enemy, p) <= ambush.RangeMax && !InSafePlace(p.Position) && OpenToMonsters(enemy.Position, p.Position, enemy.Definition.Radius))
+                .Where(p => !p.IsDead && Gap(enemy, p) <= ambush.RangeMax && !InSafePlace(p.Position) && OpenToMonsters(enemy.Position, p.Position, enemy.Definition.Radius)
+                    && !OffShore(enemy, p.Position))
                 .OrderBy(p => Vec2.Distance(p.Position, enemy.Position))
                 .FirstOrDefault();
             if (near == null) return;
@@ -382,6 +383,9 @@ namespace Game.Core
             // One that fears the light does not land in it (World.BiomeMonsters.cs).
             if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
                 && Shuns(enemy, target.Position)) return false;
+            // A tentacle comes up only by the water (World.CrystalLake.cs).
+            if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
+                && OffShore(enemy, target.Position)) return false;
             // A big body lands only where it fits, inside its room's leash (World.Sizes.cs).
             if ((attack.Shape == MonsterAttackShape.Leap || attack.Shape == MonsterAttackShape.Burrow || attack.Shape == MonsterAttackShape.Ambush)
                 && enemy.Definition.Big

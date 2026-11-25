@@ -186,7 +186,7 @@ namespace Game.Core
         public const int CaveVersion = 1;
         public const int RoomVersion = 2;
         // What the game makes a new world with. Tests and sims keep CaveVersion unless they ask.
-        public const int NewWorldVersion = IceSandVersion;
+        public const int NewWorldVersion = CrystalLakeVersion;
 
         const ulong RoomStream = 40;
         const ulong ShapeStream = 41;

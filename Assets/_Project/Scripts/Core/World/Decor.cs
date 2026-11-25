@@ -28,6 +28,12 @@ namespace Game.Core
         FrostGrass,
         Snow,
         DryGrass,
+        // The crystal cave's and the underground lake's own (묶음 B3a): crystal dust glittering on the slate (flat); a
+        // stand of reeds at the water's edge, a few shells, a lily pad on a pool (flat, on the water).
+        CrystalDust,
+        Reeds,
+        Shells,
+        LilyPad,
     }
 
     // One tile's pick: what, which of its drawings, mirrored or not, and how far off the tile's middle it stands (in
@@ -102,23 +108,25 @@ namespace Game.Core
         {
             Biome.Mushroom => roll < 32 ? DecorKind.GlowGrass : roll < 60 ? DecorKind.Caps : roll < 80 ? DecorKind.Threads : DecorKind.Moss,
             Biome.Ice => roll < 30 ? DecorKind.FrostGrass : roll < 60 ? DecorKind.Shards : roll < 85 ? DecorKind.Snow : DecorKind.Pebbles,
-            Biome.Crystal => roll < 70 ? DecorKind.Shards : DecorKind.Pebbles,
+            Biome.Crystal => roll < 40 ? DecorKind.Shards : roll < 70 ? DecorKind.CrystalDust : DecorKind.Pebbles,
             Biome.Lava => roll < 60 ? DecorKind.Embers : DecorKind.Pebbles,
             Biome.Abyss => roll < 50 ? DecorKind.Shards : DecorKind.Pebbles,
-            Biome.Lake => roll < 60 ? DecorKind.Tuft : DecorKind.Pebbles,
+            Biome.Lake => roll < 30 ? DecorKind.Tuft : roll < 52 ? DecorKind.Shells : roll < 75 ? DecorKind.Moss : DecorKind.Pebbles,
             Biome.Sand => roll < 35 ? DecorKind.DryGrass : roll < 60 ? DecorKind.Bones : DecorKind.Pebbles,
             _ => roll < 40 ? DecorKind.Pebbles : roll < 70 ? DecorKind.Tuft : DecorKind.Caps,
         };
 
         // How many in a thousand tiles roll a thing, by biome.
-        public static int RateOf(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Sand ? DensePerThousand : PerThousand;
+        public static int RateOf(Biome biome) => biome == Biome.Cave || biome == Biome.Mushroom || biome == Biome.Ice || biome == Biome.Sand
+            || biome == Biome.Crystal || biome == Biome.Lake ? DensePerThousand : PerThousand;
 
         // The kinds that sway: drawn nudged for a moment when someone brushes past (the client's rustle).
         public static bool Sways(DecorKind kind) => kind == DecorKind.Tuft || kind == DecorKind.Caps || kind == DecorKind.GlowGrass || kind == DecorKind.FrostGrass
-            || kind == DecorKind.DryGrass;
+            || kind == DecorKind.DryGrass || kind == DecorKind.Reeds;
 
         // The kinds that lie flat on the floor: no shadow, never in front of anyone's feet.
-        public static bool Flat(DecorKind kind) => kind == DecorKind.Web || kind == DecorKind.Threads || kind == DecorKind.Moss || kind == DecorKind.Snow;
+        public static bool Flat(DecorKind kind) => kind == DecorKind.Web || kind == DecorKind.Threads || kind == DecorKind.Moss || kind == DecorKind.Snow
+            || kind == DecorKind.CrystalDust || kind == DecorKind.LilyPad;
 
         // In a hundred corners of the dirt cave's rock (rock above and at a side), how many have a cobweb.
         public const int WebPercent = 30;
@@ -127,6 +135,7 @@ namespace Game.Core
         // have a cobweb instead, hung into the corner (the upper left, or mirrored into the upper right).
         public static DecorPick On(TileMap map, ulong seed, Biome biome, int x, int y)
         {
+            if (biome == Biome.Lake && Shore(map, seed, x, y) is DecorPick shore) return shore;
             if (!Clear(map, x, y)) return default;
             if (biome == Biome.Cave && map[x, y + 1] == TileType.Wall)
             {
@@ -136,6 +145,58 @@ namespace Game.Core
             }
             return At(seed, biome, x, y);
         }
+
+        // In a hundred tiles of the lake's floor with water beside them, how many have reeds; of its water with floor
+        // beside it, reeds standing in the shallows; of any of its water, a lily pad.
+        public const int ShoreReedPercent = 26, ShallowReedPercent = 20, LilyPercent = 9;
+
+        // The lake's water's edge (묶음 B3a): reeds on the floor beside a pool, pushed to the water's side of their tile,
+        // and in the pool's own edge; lily pads lying on the water. Null where the tile is neither, or rolls none.
+        static DecorPick? Shore(TileMap map, ulong seed, int x, int y)
+        {
+            var here = map[x, y];
+            // The lake's shallows (B3b, version 6) are its pools' edge: reeds stand in them as in the water.
+            static bool Wet(TileType t) => t == TileType.Water || t == TileType.ShallowWater;
+            if (here != TileType.Floor && !Wet(here)) return null;
+            bool pool = Wet(here);
+            int towardX = 0, towardY = 0;
+            bool beside = false;
+            foreach (var (dx, dy) in Sides)
+            {
+                var type = map[x + dx, y + dy];
+                if (pool ? type != TileType.Floor : !Wet(type)) continue;
+                beside = true;
+                towardX += dx;
+                towardY += dy;
+            }
+            if (!pool && !beside) return null;
+            // Only among the cave's own things: no pier, boat or built thing beside it, no way or door near.
+            for (int dy = -1; dy <= 1; dy++)
+                for (int dx = -1; dx <= 1; dx++)
+                {
+                    var type = map[x + dx, y + dy];
+                    if (type != TileType.Floor && !Wet(type) && !Natural(type)) return pool ? default(DecorPick) : (DecorPick?)null;
+                }
+            for (int dy = -2; dy <= 2; dy++)
+                for (int dx = -2; dx <= 2; dx++)
+                    if (Structures.IsWay(map[x + dx, y + dy]) || TileMap.IsDoor(map[x + dx, y + dy])) return pool ? default(DecorPick) : (DecorPick?)null;
+            uint roll = Hash(seed, x, y, 6);
+            int variant = (int)(roll / 100 % Variants);
+            bool flip = (roll >> 12 & 1) == 1;
+            int percent = (int)(roll % 100);
+            if (pool)
+            {
+                // Reeds in the shallows lean toward the bank; a pad lies anywhere on the water.
+                if (beside && percent < ShallowReedPercent) return new DecorPick(DecorKind.Reeds, variant, flip, Math.Sign(towardX) * 2, Math.Sign(towardY) * Lift);
+                if (percent >= 100 - LilyPercent) return new DecorPick(DecorKind.LilyPad, variant, flip, (int)((roll >> 13) % (Shift * 2 + 1)) - Shift, (int)((roll >> 20) % (Lift * 2 + 1)) - Lift);
+                return default(DecorPick);
+            }
+            if (percent >= ShoreReedPercent) return null;
+            return new DecorPick(DecorKind.Reeds, variant, flip, towardX == 0 ? (int)((roll >> 13) % (Shift * 2 + 1)) - Shift : Math.Sign(towardX) * Shift,
+                towardY == 0 ? (int)((roll >> 20) % (Lift * 2 + 1)) - Lift : Math.Sign(towardY) * Lift);
+        }
+
+        static readonly (int X, int Y)[] Sides = { (1, 0), (-1, 0), (0, 1), (0, -1) };
 
         // Whether the tile may hold a thing at all: open floor, with nothing round it but floor and cave rock (so not
         // on or beside a road, a door, a laid floor, a place's things, an arena's pattern, anything built, water or

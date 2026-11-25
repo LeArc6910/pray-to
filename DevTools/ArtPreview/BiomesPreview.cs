@@ -18,6 +18,7 @@ namespace Game.Client
         static readonly (Biome Biome, string Id, string Name)[] MadeBiomes =
         {
             (Biome.Cave, "cave", "DIRT CAVE"), (Biome.Mushroom, "mushroom", "MUSHROOM FOREST"), (Biome.Ice, "ice", "ICE CAVE"), (Biome.Sand, "sand", "SAND CAVE"),
+            (Biome.Crystal, "crystal", "CRYSTAL CAVE"), (Biome.Lake, "lake", "UNDERGROUND LAKE"),
         };
 
         static bool WriteBiomes(string output, WorldLights lights, TileData tiles, StoryData story, MonsterData monsters)
@@ -64,6 +65,9 @@ namespace Game.Client
             // 묶음 B2a: the ice cave's and the sand cave's.
             Write(PlaceLooks((0, Biome.Cave, "OLD"), (PropArt.IceLook, Biome.Ice, "ICE CAVE"), (PropArt.SandLook, Biome.Sand, "SAND CAVE")),
                 "place_props_ice_sand.png", 3, "장소의 건물·꾸밈: 예전 그림 / 얼음 동굴(눈 덮인 지붕, 얼음 벽돌, 서리 등) / 모래 동굴(흙벽돌 집, 차양, 항아리, 화로). 집은 밤과 낮");
+            // 묶음 B3a: the crystal cave's and the lake's.
+            Write(PlaceLooks((0, Biome.Cave, "OLD"), (PropArt.CrystalLook, Biome.Crystal, "CRYSTAL CAVE"), (PropArt.LakeLook, Biome.Lake, "UNDERGROUND LAKE")),
+                "place_props_crystal_lake.png", 3, "장소의 건물·꾸밈: 예전 그림 / 수정 동굴(점판암 벽과 지붕, 지붕을 뚫고 자란 결정, 결정 등) / 지하 호수(기둥 위 갈대 지붕 오두막, 그물, 청록 등). 집은 밤과 낮");
             foreach (var site in world.Places.Where(p => p.Definition.Id == "dawn_village" || p.Definition.Id == "hero_hut"))
             {
                 foreach (var (biome, id, _) in MadeBiomes)
@@ -87,8 +91,11 @@ namespace Game.Client
             foreach (bool lit in new[] { false, true })
                 Write(IceSandLandmarkSheet(lights, lit), lit ? "landmarks_ice_sand_lit.png" : "landmarks_ice_sand.png", 3,
                     "얼음·모래의 랜드마크 넷(얼음 속 짐승, 얼음 성 잔해 기둥 / 묻힌 신전 정면, 거대 화석 두개골과 갈비뼈)" + (lit ? ", 어둠과 빛" : ", 어둠 없이"));
+            foreach (bool lit in new[] { false, true })
+                Write(CrystalLakeLandmarkSheet(lights, lit), lit ? "landmarks_crystal_lake_lit.png" : "landmarks_crystal_lake.png", 3,
+                    "수정·호수의 랜드마크 넷(거대 정동, 수정 아치 / 가라앉은 배, 옛 물레방아)과 버섯 섬" + (lit ? ", 어둠과 빛" : ", 어둠 없이"));
             foreach (var kind in new[] { BiomeLandmarkKind.MinerHut, BiomeLandmarkKind.MineFrame, BiomeLandmarkKind.FairyRing, BiomeLandmarkKind.FrozenBeast, BiomeLandmarkKind.IceRuin,
-                BiomeLandmarkKind.TempleFront, BiomeLandmarkKind.GiantSkull })
+                BiomeLandmarkKind.TempleFront, BiomeLandmarkKind.GiantSkull, BiomeLandmarkKind.GiantGeode, BiomeLandmarkKind.CrystalArch, BiomeLandmarkKind.SunkenBoat, BiomeLandmarkKind.OldWheel })
             {
                 if (!world.BiomeLandmarks.Any(l => l.Kind == kind))
                 {
@@ -104,15 +111,17 @@ namespace Game.Client
                     scene.Places(world.Places);
                     scene.Decor(1, (x, y) => world.Biomes[x, y]);
                     scene.Player(mark.StandX + 0.5f, mark.StandY + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
-                    if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y]));
+                    if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y], 0, x, y));
                     Write(scene.Image, $"landmark_{kind.ToString().ToLowerInvariant()}{(lit ? "_lit" : "")}.png", 3,
                         $"생성기 {world.Version}판 시드 1의 실제 {kind}({mark.Left},{mark.Bottom}){(lit ? ", 어둠과 빛" : ", 어둠 없이")}");
                 }
             }
-            foreach (var type in new[] { TileType.MinerHut, TileType.MineFrame, TileType.FrozenBeast, TileType.IceColumn, TileType.TempleFront, TileType.GiantSkull })
+            foreach (var type in new[] { TileType.MinerHut, TileType.MineFrame, TileType.FrozenBeast, TileType.IceColumn, TileType.TempleFront, TileType.GiantSkull,
+                TileType.GiantGeode, TileType.ArchPier, TileType.CrystalArch, TileType.SunkenBoat, TileType.OldWheel })
             {
                 var picture = StandArt.Picture(type, StandArt.Kind.Prop, 0, false);
-                int span = Structures.Footprint(type).W * 16;
+                // The arch's span is five tiles wide over the one tile it stands on, pier to pier.
+                int span = type == TileType.CrystalArch ? 80 : Structures.Footprint(type).W * 16;
                 if (picture == null || picture.Width > span + (type == TileType.IceColumn ? 6 : 2))
                 {
                     Console.Error.WriteLine($"biomes: the landmark {type} has no picture or one wider than its footprint.");
@@ -122,7 +131,7 @@ namespace Game.Client
             foreach (var type in PlaceLookTypes)
             {
                 var old = PropArt.Prop(type);
-                foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook, PropArt.IceLook, PropArt.SandLook })
+                foreach (int look in new[] { PropArt.CaveLook, PropArt.ForestLook, PropArt.IceLook, PropArt.SandLook, PropArt.CrystalLook, PropArt.LakeLook })
                 {
                     var redrawn = PropArt.PlaceProp(type, look);
                     if (redrawn != null && redrawn.Width == old.Width && redrawn.Height == old.Height) continue;
@@ -256,6 +265,61 @@ namespace Game.Client
             return g;
         }
 
+        // The crystal cave's and the lake's landmarks laid as the generator lays them (묶음 B3a): the giant geode and the
+        // arch on the crystal cave's slate, the sunken boat in a pool with islets and the old wheel on its bank.
+        static PixelImage CrystalLakeLandmarkSheet(WorldLights lights, bool lit)
+        {
+            PixelImage Half(Biome biome, bool pool, params (BiomeLandmarkKind Kind, int Left, int Bottom)[] sets)
+            {
+                var map = new TileMap(24, 13);
+                for (int y = 1; y < 10; y++)
+                    for (int x = 1; x < 23; x++)
+                        map[x, y] = TileType.Floor;
+                if (pool)
+                {
+                    // A pool along the top with a bay, and a small one by the wheel.
+                    for (int y = 5; y < 10; y++)
+                        for (int x = 1; x < 13; x++)
+                            map[x, y] = TileType.Water;
+                    for (int y = 3; y < 8; y++)
+                        for (int x = 19; x < 23; x++)
+                            map[x, y] = TileType.Water;
+                    map[9, 7] = TileType.MossIsle;
+                    map[10, 7] = TileType.StructurePart;
+                    map[2, 8] = TileType.MossIsle;
+                    map[3, 8] = TileType.StructurePart;
+                    map[14, 2] = TileType.MossRock;
+                    map[13, 6] = TileType.Coral;
+                    map[8, 3] = TileType.GiantClam;
+                }
+                foreach (var (kind, left, bottom) in sets)
+                    foreach (var (dx, dy, type) in CrystalLakeProps.Layout(kind))
+                    {
+                        var (w, h) = Structures.Footprint(type);
+                        for (int j = 0; j < h; j++)
+                            for (int i = 0; i < w; i++)
+                                map[left + dx + i, bottom + dy + j] = i == 0 && j == 0 ? type : TileType.StructurePart;
+                    }
+                var scene = new Scene(map, 0, 0, 24, 13, _ => false) { Biome = biome, Night = true, BiomeAt = (x, y) => biome };
+                scene.Places(null);
+                scene.Decor(5, (x, y) => biome);
+                foreach (var (kind, left, bottom) in sets)
+                {
+                    var box = CrystalLakeProps.Box(kind);
+                    scene.Player(left + box.StandX + 0.5f, bottom + box.StandY + 0.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
+                }
+                if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(biome), (x, y) => WorldLights.BiomeTint(biome, 0, x, y));
+                return scene.Image;
+            }
+            var crystal = Half(Biome.Crystal, false, (BiomeLandmarkKind.GiantGeode, 2, 3), (BiomeLandmarkKind.CrystalArch, 14, 4));
+            var lake = Half(Biome.Lake, true, (BiomeLandmarkKind.SunkenBoat, 4, 4), (BiomeLandmarkKind.OldWheel, 16, 2));
+            var g = new PixelImage(crystal.Width, crystal.Height + lake.Height + 2);
+            g.Fill(0, 0, g.Width, g.Height, DepthBack);
+            g.Draw(crystal, 0, 0);
+            g.Draw(lake, 0, crystal.Height + 2);
+            return g;
+        }
+
         // The room of the biome with the most props standing round its middle, off the places.
         static RoomNode BestRoom(GeneratedWorld world, Biome biome)
         {
@@ -317,7 +381,7 @@ namespace Game.Client
                     critters++;
                 }
             }
-            if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y]));
+            if (lit) scene.Lit(lights, (x, y) => WorldLights.BiomeGlow(world.Biomes[x, y]), (x, y) => WorldLights.BiomeTint(world.Biomes[x, y], 0, x, y));
             int props = 0;
             for (int y = bottom; y < bottom + RoomHalfH * 2; y++)
                 for (int x = left; x < left + RoomHalfW * 2; x++)
@@ -330,9 +394,11 @@ namespace Game.Client
         static bool PropSheet(Biome biome, string name, out PixelImage sheet)
         {
             bool ok = true;
-            var kinds = IceSandProps.Any(biome).Select(k => k.Type).ToList();
+            var kinds = CrystalLakeProps.Any(biome).Select(k => k.Type).ToList();
             if (biome == Biome.Cave) kinds.Insert(kinds.IndexOf(TileType.UnlitLamp) + 1, TileType.LitLamp);
             var decor = Enumerable.Range(0, 100).Select(roll => Decor.KindOf(biome, roll)).Distinct().ToList();
+            // The lake's water's edge: reeds and lily pads (Decor.On).
+            if (biome == Biome.Lake) decor.AddRange(new[] { DecorKind.Reeds, DecorKind.LilyPad });
             var floor = TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0, biome));
             const int cellW = 62, rowH = 62, leftPad = 6;
             int rows = (kinds.Count + 3) / 4;
@@ -350,6 +416,11 @@ namespace Game.Client
                 var type = kinds[i];
                 int x0 = leftPad + i % 4 * cellW * 2, y0 = 16 + i / 4 * rowH;
                 Floor(x0, y0, cellW * 2 - 12, 48);
+                // What stands in a pool is shown on its water.
+                if (CrystalLakeProps.Floats(type))
+                    for (int y = 16; y < 48; y += 16)
+                        for (int x = 0; x < cellW * 2 - 12; x += 16)
+                            g.Draw(TileArt.Ground(TileArt.Index(GroundKind.Water, 0, (x / 16 + y / 16) % 4, biome)), x0 + x, y0 + y);
                 g.Small(x0, y0 + 50, type.ToString().ToUpperInvariant(), DepthDim, DepthBack);
                 int span = Structures.Footprint(type).W * 16;
                 for (int v = 0; v < BiomeArt.Variants; v++)
@@ -388,6 +459,16 @@ namespace Game.Client
             {
                 for (int v = 0; v < Decor.Variants; v++)
                 {
+                    // Reeds are taller than the rest: every picture stands on the same line.
+                    int rise = DecorArt.Image(kind, biome, v).Height - DecorArt.Height;
+                    if (rise > 0)
+                    {
+                        g.Draw(DecorArt.Image(kind, biome, v), dx, y1 + 24 - rise);
+                        dx += 14;
+                        g.Draw(DecorArt.Image(kind, biome, v, 1), dx, y1 + 24 - rise);
+                        dx += 14;
+                        continue;
+                    }
                     g.Draw(DecorArt.Image(kind, biome, v), dx, y1 + 8);
                     if (Decor.Sways(kind))
                     {

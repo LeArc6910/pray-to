@@ -153,7 +153,8 @@ namespace Game.Client
                 return scene.Image;
             }
             // And the ice cave's frozen crypt (sky blue) and the sand cave's buried temple (gold), B2b.
-            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom, Biome.Ice, Biome.Sand })
+            // And the crystal cave's geode (pink) and the lake's sunken aqueduct (teal), B3b.
+            foreach (var biome in new[] { Biome.Cave, Biome.Mushroom, Biome.Ice, Biome.Sand, Biome.Crystal, Biome.Lake })
             {
                 var gate = gates.FirstOrDefault(g => !g.Cellar && g.Biome == biome);
                 if (gate == null) continue;

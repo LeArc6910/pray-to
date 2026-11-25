@@ -277,6 +277,36 @@ namespace Game.Core
         IceColumn,
         TempleFront,
         GiantSkull,
+        // The crystal cave's and the underground lake's own props (2026-11-25, Docs/BiomeRework.md 묶음 B3a), laid by the
+        // generator's version 6 (WorldGenerator.CrystalLake.cs). The crystal cave's: a cluster of pink and sky crystals
+        // (picked, glowing), a spire taller than its tile, a crystal that rings, a small geode cracked open (broken for
+        // coins), a great mass of crystal and a pillar of it leaning (both two tiles wide).
+        CrystalCluster,
+        CrystalSpire,
+        ResonantCrystal,
+        CrackedGeode,
+        CrystalMass,
+        LeaningCrystal,
+        // The lake's: a mossy rock, a clump of coral, a giant clam (picked for its pearl), a heap of shells, the
+        // wreckage of a boat (two tiles wide) and an islet of moss and glowing caps in a pool (two tiles of its water).
+        MossRock,
+        Coral,
+        GiantClam,
+        ShellHeap,
+        Wreckage,
+        MossIsle,
+        // Their landmarks, rare and never dug: a giant geode split open (three tiles by two), the two piers of a
+        // crystal arch and the span between them (on the tile half way, walked under); a boat sunk in a pool (three
+        // by two, on its water) and an old water wheel by the water (two by two).
+        GiantGeode,
+        ArchPier,
+        CrystalArch,
+        SunkenBoat,
+        OldWheel,
+        // The underground lake's shallows (2026-11-25, Docs/BiomeRework.md 묶음 B3b), laid by the generator's version 6
+        // round its water (WorldGenerator.CrystalLakeDungeons.cs) and in the sunken aqueduct's rooms: walked on at
+        // PlayerMotor.ShallowSlow, a splash at each step; never dug or built on. A tentacle keeps to it as to the water.
+        ShallowWater,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -299,6 +329,10 @@ namespace Game.Core
         {
             TileType.Cottage or TileType.Cabin => (4, 3),
             TileType.Boat or TileType.MineEntrance or TileType.MinerHut or TileType.FrozenBeast or TileType.GiantSkull => (3, 2),
+            // The crystal cave's and the lake's (묶음 B3a).
+            TileType.GiantGeode or TileType.SunkenBoat => (3, 2),
+            TileType.OldWheel => (2, 2),
+            TileType.CrystalMass or TileType.LeaningCrystal or TileType.Wreckage or TileType.MossIsle => (2, 1),
             TileType.Tower or TileType.BigFountain or TileType.BigTent or TileType.Lighthouse => (2, 2),
             TileType.Altar or TileType.MineFrame => (3, 1),
             TileType.FallenColumn => (2, 1),
@@ -392,9 +426,11 @@ namespace Game.Core
             var type = this[x, y];
             return type != TileType.Floor && !World.IsBelt(type) && type != TileType.Splitter && type != TileType.Filter && type != TileType.Lava && !IsPaving(type)
                 && type != TileType.Door && !IsSoil(type) && !Structures.IsWay(type) && type != TileType.Waypoint
-                && type != TileType.IceFloor && type != TileType.Quicksand
+                && type != TileType.IceFloor && type != TileType.Quicksand && type != TileType.ShallowWater
                 // A fairy ring's small caps are walked through like the floor's cover (묶음 B1c).
-                && type != TileType.RingCap;
+                && type != TileType.RingCap
+                // A crystal arch's span stands over a tile that is walked (묶음 B3a).
+                && type != TileType.CrystalArch;
         }
 
         // The walls only the generator lays (version 2's rooms): rock to the eye and to light, each dug by its own rule.

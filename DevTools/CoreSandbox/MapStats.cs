@@ -37,6 +37,10 @@ namespace CoreSandbox
             public double PropShare;
             // The biomes' landmarks laid (묶음 B1c).
             public IReadOnlyList<BiomeLandmark> Landmarks = new List<BiomeLandmark>();
+            // The lake's islets, which stand on its pools' water (묶음 B3a): not counted among the props on its floor.
+            public int Islets;
+            // B3b: the lake's shallows, and its open floor beside them.
+            public int Shallows;
         }
 
         const int BigLump = 100;
@@ -46,6 +50,9 @@ namespace CoreSandbox
             var map = world.Map;
             int width = map.Width, height = map.Height, total = width * height;
             var numbers = new Numbers { Rooms = world.Rooms, Roads = world.Roads, Landmarks = world.BiomeLandmarks };
+            for (int y = 0; y < world.Map.Height; y++)
+                for (int x = 0; x < world.Map.Width; x++)
+                    if (world.Map[x, y] == TileType.ShallowWater) numbers.Shallows++;
             // The minecart lines (3c): the ride against the walk between the same stations (eight ways, no digging).
             if (world.Rooms != null && world.Rooms.Lines.Count > 0)
             {
@@ -88,6 +95,11 @@ namespace CoreSandbox
                 for (int x = 0; x < width; x++)
                 {
                     var type = map[x, y];
+                    if (type == TileType.MossIsle)
+                    {
+                        numbers.Islets++;
+                        continue;
+                    }
                     bool prop = BiomeProps.Is(type);
                     if (!prop && type != TileType.Floor) continue;
                     var biome = world.Biomes[x, y];
@@ -437,6 +449,24 @@ namespace CoreSandbox
                         + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.GiantSkull)}");
                     Row("얼음 동굴 / 모래 동굴의 방(아레나 빼고)", n => $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Ice)} / "
                         + $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Sand)}");
+                }
+                if (version >= WorldGenerator.CrystalLakeVersion)
+                {
+                    // 묶음 B3a: the crystal cave's and the lake's props and landmarks.
+                    foreach (var biome in new[] { Biome.Crystal, Biome.Lake })
+                    {
+                        Row($"{BiomeMap.Name(biome)}: 바닥 100칸에 막는·깨는 소품 / 큰 것 / 꾸밈", n => n.Props.TryGetValue(biome, out var p) && p.Floor > 0
+                            ? $"{100.0 * p.Props / p.Floor:0.0} / {100.0 * p.Big / p.Floor:0.00} / {100.0 * p.Decor / p.Floor:0.0}" : "-");
+                    }
+                    Row("랜드마크: 거대 정동 / 수정 아치 / 가라앉은 배 / 옛 물레방아", n => $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.GiantGeode)} / "
+                        + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.CrystalArch)} / {n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.SunkenBoat)} / "
+                        + $"{n.Landmarks.Count(l => l.Kind == BiomeLandmarkKind.OldWheel)}");
+                    Row("호수의 버섯 섬(물 위)", n => n.Islets.ToString());
+                    Row("수정 동굴 / 지하 호수의 방(아레나 빼고)", n => $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Crystal)} / "
+                        + $"{n.Rooms.Nodes.Count(r => r.Kind != RoomKind.Arena && r.Biome == Biome.Lake)}");
+                    // 묶음 B3b: the lake's shallows and the lairs of the crystal cave and the lake.
+                    Row("지하 호수의 얕은 물 칸", n => $"{n.Shallows}");
+                    Row("굴: 수정 동굴 / 지하 호수", n => $"{n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Crystal)} / {n.Rooms.Lairs.Count(i => n.Rooms.Nodes[i].Biome == Biome.Lake)}");
                 }
                 Row("생성 시간", n => $"{n.Milliseconds:0} ms");
                 Console.WriteLine();
