@@ -23,6 +23,11 @@ namespace Game.Client
             // --only spider: just that boss's motions (gif, frame strips, continuity report), for working on them; --only hero
             // the player's.
             // --only flat: every tile drawn flat on the object layer, and the rails as they join (out/flat/, FlatPreview).
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "title")
+            {
+                // --only title: the title rework's art (out/title/, TitlePreview, Docs/TitleRework.md 묶음 T2).
+                return TitlePreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "skillfx")
             {
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).
@@ -218,6 +223,8 @@ namespace Game.Client
             // The flat tiles' audit (2026-11-25): every object tile, the rails, and the scenes as the game draws them.
             FlatPreview.Write(output);
             WriteFlatScenes(output, npcs);
+            // The title rework's art (out/title/): fails when the default look is not the old hero pixel for pixel.
+            if (!TitlePreview.Write(output)) return 1;
             // The pixel slips the eye misses at sheet size (ArtLint): fails only when a count goes up.
             if (!ArtLint.Run(loot, monsters, FindFolder(Path.Combine("DevTools", "ArtPreview")), output)) return 1;
             if (!WriteSounds(Path.Combine(output, "sounds"))) return 1;

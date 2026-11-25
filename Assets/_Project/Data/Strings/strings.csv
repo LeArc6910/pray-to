@@ -70,3 +70,24 @@ menu.play_group,플레이,Play
 menu.sound_kind,소리 종류,Sound kind
 menu.sound_recorded,녹음,Recorded
 menu.sound_made,합성,Synth
+# The loading screen's line while the world is made (GameRoot.LoadText, Docs/TitleRework.md 4-4, 2026-11-25), by stage.
+load.start,월드를 만드는 중,Making the world
+load.caves,동굴을 파는 중,Digging the caves
+load.biomes,땅의 결을 나누는 중,Laying out the lands
+load.rooms,방과 길을 잇는 중,Joining rooms and ways
+load.floors,방바닥을 고르는 중,Levelling the floors
+load.ways,통로와 물길을 내는 중,Cutting tunnels and streams
+load.features,방을 채우는 중,Filling the rooms
+load.ore,광맥을 묻는 중,Burying the ore
+load.pools,웅덩이에 물을 채우는 중,Filling the pools
+load.places,마을을 세우는 중,Building the villages
+load.arenas,보스의 방을 꾸미는 중,Dressing the bosses' halls
+load.furnish,방마다 쓰임을 정하는 중,Giving each room its use
+load.pois,보물을 숨기는 중,Hiding the treasure
+load.rails,광차 선로를 놓는 중,Laying the rails
+load.join,막힌 길을 트는 중,Opening blocked ways
+load.props,동굴을 꾸미는 중,Dressing the caves
+load.cellars,굴과 지하실을 파는 중,Digging lairs and cellars
+load.water,얕은 물과 틈을 내는 중,Making shallows and vents
+load.pocket,던전 자리를 마련하는 중,Making room for dungeons
+load.done,들어가는 중,Going in

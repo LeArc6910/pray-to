@@ -1183,6 +1183,11 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only patterns,spider,raids,dungeon`
   - 클라우드 확인 (2026-11-25, `75eed27`): [x] 113개 중 112 통과. 실패 하나는 점검 쪽: 아라네 독니 찌르기의 "전조 동안 바닥 표시 없음"에서 앞 공격이 이어 깐 고리(B5b)가 아직 남아 표시 1 → 표시가 다 사라질 때까지 기다린 뒤 다음 공격. 같은 배포로 `spider` 40, `raids` 10 모두 통과(습격 첫 닿음 PC 4.7초·휴대폰 4.6초, 화면 밖이면 가장자리 붉은 점, 화면에 들어오면 사라짐). 사진: 휴대폰 세로 오른쪽 가장자리의 붉은 점, 달려오는 습격, 닿음
   - (사람) 보스의 이어지는 고리를 "나갔다 들어오기"로 읽는지, 억울하지 않은지, 휴대폰 세로에서 7~8.5칸 고리가 읽히는지. 구르지 않는 사람에게 그룸·개미귀신·공허의 군주가 너무 어렵지 않은지. 습격이 울음소리 뒤 5초쯤 닿는 것이 빠르거나 늦지 않은지, 최대 8칸/초로 달려오는 무리가 억울하지 않은지, 실제 휴대폰에서 가장자리 붉은 점이 읽히고 정예 야영지 깃발 점과 헷갈리지 않는지. 둘이서 던전 한 판의 길이와 보상
+- [ ] 177단계: 시작화면 개편의 바탕 — 저장본 정보, 외형, 나눠 만드는 로딩, 외형 그림·로고·글자 단추·로딩 장면(`Docs/TitleRework.md` T1·T2)
+  - 명령 한 줄을 다시 돌린다(새 문자열 `load.*`). 새 파일 `Core/Save/CharacterLook.cs`, `Core/Save/SaveSummaries.cs`, `Core/World/GenerationStage.cs`, `Core/World/BiomeVisits.cs`, `Client/SaveList.cs`, `Client/WorldLoader.cs`, `Client/Art/HeroArt.Looks.cs`, `Client/Art/TitleArt.cs`, `Client/Art/LoadingArt.cs`, `Tests/EditMode/TitleTests.cs`의 `.meta`가 생기면 커밋한다. 통신 0.108.0, 캐릭터 저장 형식 20, 월드 저장 형식 17(옛 저장본은 그대로 열린다)
+  - PlayMode 시험이 시작 뒤 1초가 아니라 `TestSaves.UntilPlaying`으로 들어갈 때까지 기다린다. 실패하면 Console 로그를 붙인다
+  - (클라우드 웹 점검) `sweep.js --only menu,save,layout,basics`
+  - (사람) 게임 시작이 전보다 빨라졌는지(혼자 하기가 지도를 한 번만 만든다), 들어가는 동안 임시 로딩 글이 보이는지. 화면 개편(T3)은 다음 단계
 
 ## 결과 보고
 

@@ -430,6 +430,15 @@ namespace Game.Core
         public bool InPocket(int y) => y >= Height && y < Rows;
         public bool InPocket(Vec2 position) => InPocket(Cell(position.Y));
 
+        // Another map with the same tiles, changed apart from this one (WorldClient.Made: the player's own client in a solo
+        // or hosted game takes the map as made, before the host's world changes it).
+        public TileMap Copy()
+        {
+            var copy = new TileMap(Width, Height) { Rows = Rows, Version = Version };
+            copy._tiles = (TileType[])_tiles.Clone();
+            return copy;
+        }
+
         // Adds that many rows of rock above the world, once (WorldGenerator.Generate, for a world of rooms wide enough).
         public void AddPocket(int rows)
         {

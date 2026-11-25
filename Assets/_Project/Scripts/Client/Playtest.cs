@@ -196,6 +196,7 @@ namespace Game.Client
             {
                 case "solo":
                     if (root.Playing) return "error solo: already playing";
+                    if (root.Loading) return "error solo: still making the world";
                     string name = words.Length > 1 ? words[1] : Name;
                     if (!words.Contains("keep"))
                     {
@@ -2503,6 +2504,10 @@ namespace Game.Client
         {
             var json = new Json('{');
             json.Field("playing", root.Playing);
+            // The world being made (Docs/TitleRework.md 4-4): whether, the stage's key and how far along.
+            json.Field("loading", root.Loading);
+            json.Field("loadStage", root.LoadStage);
+            json.Field("loadFraction", root.LoadFraction);
             json.Field("screen", $"{Ui.Width:0}x{Ui.Height:0}");
             json.Field("touch", Controls.UsingTouch);
             json.Field("bag", root.BagOpen);

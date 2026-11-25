@@ -33,8 +33,10 @@ namespace Game.Core
             MaterialDefinition dropMaterial = null,
             ItemBase weapon = null,
             SkillDefinition skill = null,
-            int elite = 0)
+            int elite = 0,
+            uint look = 0)
         {
+            Look = kind == EntityKind.Player ? CharacterLook.Unpack(look) : default;
             Elite = kind == EntityKind.Monster ? (EliteRank)(elite >> 8) : EliteRank.None;
             Affixes = kind == EntityKind.Monster ? (RiftAffix)(elite & 0xFF) : RiftAffix.None;
             Weapon = weapon;
@@ -67,6 +69,8 @@ namespace Game.Core
         public int Id { get; }
         public EntityKind Kind { get; }
         public bool IsPlayer => Kind == EntityKind.Player;
+        // A player's look as the host's roster has it (CharacterLook, 0.108.0); default for everything else.
+        public CharacterLook Look { get; }
         // Set for monsters and bosses respectively.
         public MonsterDefinition Monster { get; }
         public BossDefinition Boss { get; }
@@ -648,10 +652,49 @@ namespace Game.Core
         public bool IsDead => Status == ClientStatus.Playing && _snapshots.Count > 0 && Health <= 0;
         public IReadOnlyDictionary<int, string> Names => _names;
 
-        // The saved character (CharacterSave) to bring along when joining, or null for a new one.
-        public byte[] Character { get; set; }
+        // The saved character (CharacterSave) to bring along when joining, or null for a new one. Setting it takes its look,
+        // time played, when it was made and the biomes it has been to (format 20; the defaults for an older or new one).
+        public byte[] Character
+        {
+            get => _character;
+            set
+            {
+                _character = value;
+                if (value == null || value.Length == 0) return;
+                try
+                {
+                    var saved = CharacterSave.ReadSummary(value);
+                    Look = saved.Look;
+                    PlayedSeconds = saved.PlayedSeconds;
+                    CreatedAt = saved.CreatedAt;
+                    _lastPlayedAt = saved.LastPlayedAt;
+                    Visited |= saved.Visited;
+                }
+                catch (InvalidDataException)
+                {
+                }
+            }
+        }
 
-        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name, ChosenClasses, character: Character, skillOrder: JoinSkillOrder).Encode();
+        byte[] _character;
+
+        // How this player's character looks (CharacterLook): from the save, or set for a new one before joining. It goes
+        // to the host on joining and from there to everyone (RosterMessage).
+        public CharacterLook Look { get; set; } = CharacterLook.Default;
+        // Seconds played with this character, counting those of its save (the caller adds them, NotePlayed: Core reads no
+        // clock), and when it was made (seconds since 1970 from the caller; 0 until its first save, SaveCharacter).
+        public double PlayedSeconds { get; private set; }
+        public long CreatedAt { get; private set; }
+        // The biomes this character has stood in (BiomeVisits), its save's and those stood in since: each step of the
+        // player's own outside the dungeons' pocket (Step).
+        public int Visited { get; private set; }
+
+        public void NotePlayed(double seconds)
+        {
+            if (seconds > 0 && !double.IsInfinity(seconds) && Status == ClientStatus.Playing) PlayedSeconds += seconds;
+        }
+
+        public byte[] JoinMessage() => new JoinMessage(PlayerKey, Name, ChosenClasses, character: Character, skillOrder: JoinSkillOrder, look: Look.Packed).Encode();
 
         // Every class in the sheet, for choosing others in the game.
         public IReadOnlyList<ClassDefinition> AllClasses => _classes?.Classes ?? (IReadOnlyList<ClassDefinition>)Array.Empty<ClassDefinition>();
@@ -682,8 +725,19 @@ namespace Game.Core
         }
 
         // What to save as this player's character: gear and bag as of the host's last inventory message, or null
-        // before the first one.
-        public byte[] SaveCharacter() => InventoryVersion == 0 ? null : CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
+        // before the first one. now: the caller's clock in seconds since 1970, kept as when it was last played (and made,
+        // the first time); 0 leaves those as they were.
+        public byte[] SaveCharacter(long now = 0)
+        {
+            if (InventoryVersion == 0) return null;
+            if (CreatedAt == 0) CreatedAt = now;
+            if (now > 0) _lastPlayedAt = now;
+            return CharacterBytes();
+        }
+
+        long _lastPlayedAt;
+
+        byte[] CharacterBytes() => CharacterSave.Write(Equipment, Bag, Experience, ClaimedGoals, Passives.Select(p => p.Id),
             Friendships.Select(pair => (pair.Key, pair.Value.Points, pair.Value.TalkedDay, pair.Value.GiftedDay, pair.Value.RequestDay, pair.Value.HeartGifts)),
             LifeExperience, SkillRanks.Select(pair => (pair.Key.Id, pair.Value)), StorySteps.Select(pair => (pair.Key, pair.Value)),
             Supports.SelectMany(pair => pair.Value.Select(gem => (pair.Key.Id, gem.Id))),
@@ -691,7 +745,10 @@ namespace Game.Core
             PetExperience.Select(pair => (pair.Key, pair.Value)), LifePerks, PetNames.Select(pair => (pair.Key, pair.Value)),
             Classes.Select(c => c.Id), SkillOrder, JourneyStep, JourneyTaken,
             Waypoints.Select(i => Story?.Places[i].Id).Where(id => id != null).Concat(OpenStones.Select(s => World.StoneId(s.Biome))),
-            StoryChoices.Select(pair => (pair.Key, pair.Value)), SideStories());
+            StoryChoices.Select(pair => (pair.Key, pair.Value)), SideStories(), Look, PlayedSeconds, CreatedAt, LastPlayedAt, Visited);
+
+        // When this character was last played as of its last save: the save's, until SaveCharacter is given a clock.
+        public long LastPlayedAt => _lastPlayedAt;
 
         // Where each begun side story stands, as the save and the host keep it.
         IEnumerable<(string, int, bool)> SideStories() =>
@@ -1118,6 +1175,12 @@ namespace Game.Core
 
         public void Receive(byte[] data)
         {
+            // While the map is being made (DeferMap) the rest waits, in order, for it.
+            if (_welcome != null)
+            {
+                if (data != null) _held.Add(data);
+                return;
+            }
             try
             {
                 switch (Protocol.TypeOf(data))
@@ -1137,6 +1200,8 @@ namespace Game.Core
                         var roster = RosterMessage.Decode(data);
                         _names.Clear();
                         _rosterClasses.Clear();
+                        _looks.Clear();
+                        foreach (var pair in roster.Looks) _looks[pair.Key] = CharacterLook.Unpack(pair.Value);
                         foreach (var pair in roster.Names) _names[pair.Key] = pair.Value;
                         foreach (var pair in roster.Classes) _rosterClasses[pair.Key] = ClassesAt(pair.Value);
                         break;
@@ -1332,6 +1397,7 @@ namespace Game.Core
                     }
                 }
             }
+            if (!Map.InPocket(Position)) Visited = BiomeVisits.Mark(Visited, Biomes.At(Position));
             _sequence++;
             int age = Rolling ? World.RollTicks - RollTicks + 1 : 0;
             if (Rolling) RollTicks--;
@@ -1385,7 +1451,8 @@ namespace Game.Core
                     entity.Kind == EntityKind.Drop && entity.State == DropState.Material ? _loot.Materials[entity.Type] : null,
                     entity.IsPlayer && entity.Type > 0 ? _loot.Bases[entity.Type - 1] : null,
                     entity.Kind == EntityKind.Minion ? _classes.Skills[entity.Type] : null,
-                    entity.Elite));
+                    entity.Elite,
+                    entity.IsPlayer ? LookOf(entity.Id).Packed : 0));
             }
             return views;
         }
@@ -1414,6 +1481,12 @@ namespace Game.Core
             Mana -= ManaCost(Skills[slot]);
             return new SkillCommandMessage(slot, aim).Encode();
         }
+
+        // A player's look: this player's own, or another's as the host's roster has it (the default until it comes).
+        public CharacterLook LookOf(int playerId) =>
+            playerId == PlayerId ? Look : _looks.TryGetValue(playerId, out var look) ? look : CharacterLook.Default;
+
+        readonly Dictionary<int, CharacterLook> _looks = new Dictionary<int, CharacterLook>();
 
         // Another player's classes as the host's roster has them, and the skill in one of their slots.
         public IReadOnlyList<ClassDefinition> ClassesOf(int playerId) =>
@@ -1873,13 +1946,63 @@ namespace Game.Core
             }
         }
 
+        // ---- The map (Docs/TitleRework.md 4-4: made once in a solo game, a stage at a time when joining) ----
+
+        // The world made from the host's seed before joining, as made (GeneratedWorld.Copy, taken before the host's world
+        // changed it): the player's own client in a solo or hosted game starts from it instead of making the map again.
+        // Used when Welcome names its seed, size and generator; otherwise the map is made as before.
+        public GeneratedWorld Made { get; set; }
+        // Whether the map came from Made.
+        public bool MapReused { get; private set; }
+        // Make the map Welcome asks for a stage at a time (StepMap), so a loading screen can draw between stages; the
+        // messages that come meanwhile wait for it. Off, Welcome makes it at once, as the tests and sims expect.
+        public bool DeferMap { get; set; }
+        // While the map is being made (DeferMap): its stage and how far along; null otherwise.
+        public WorldGeneration MapGeneration { get; private set; }
+
+        WelcomeMessage _welcome;
+        readonly List<byte[]> _held = new List<byte[]>();
+
+        // Runs one stage of the map being made; at the last, starts playing and takes the messages held meanwhile. True
+        // while there is more to do.
+        public bool StepMap()
+        {
+            if (MapGeneration == null || _welcome == null) return false;
+            if (MapGeneration.Step()) return true;
+            var welcome = _welcome;
+            var generated = MapGeneration.World;
+            _welcome = null;
+            MapGeneration = null;
+            Settle(welcome, generated);
+            var held = _held.ToList();
+            _held.Clear();
+            foreach (byte[] data in held) Receive(data);
+            return false;
+        }
+
         void Welcome(WelcomeMessage welcome)
         {
             ApplyKit(welcome.Classes, welcome.SkillOrder);
             PlayerId = welcome.PlayerId;
             Seed = welcome.Seed;
             Generator = welcome.Generator;
-            var generated = WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story, _bosses?.Arenas, welcome.Generator, _tiles?.Terrain);
+            var made = Made;
+            Made = null;
+            if (made != null && made.Seed == welcome.Seed && made.Map.Width == welcome.Width && made.Map.Height == welcome.Height && made.Version == welcome.Generator)
+            {
+                MapReused = true;
+                Settle(welcome, made);
+            }
+            else if (DeferMap)
+            {
+                _welcome = welcome;
+                MapGeneration = new WorldGeneration(welcome.Seed, welcome.Width, welcome.Height, Story, _bosses?.Arenas, welcome.Generator, _tiles?.Terrain);
+            }
+            else Settle(welcome, WorldGenerator.Generate(welcome.Seed, welcome.Width, welcome.Height, Story, _bosses?.Arenas, welcome.Generator, _tiles?.Terrain));
+        }
+
+        void Settle(WelcomeMessage welcome, GeneratedWorld generated)
+        {
             Map = generated.Map;
             _builtTiles.Clear();
             Signposts = generated.Signposts;

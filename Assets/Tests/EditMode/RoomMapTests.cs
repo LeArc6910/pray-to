@@ -496,6 +496,8 @@ namespace Game.Core.Tests
 
             // A save from before the generator was written down (format 11: no byte after the size) is the caves.
             var old = data.ToList();
+            // Nor format 17's head after SavedAt (when made, seconds played, biomes been to).
+            old.RemoveRange(4 + 4 + 8 + 4 + 4 + 1 + 8, 18);
             old.RemoveAt(4 + 4 + 8 + 4 + 4);
             old[4] = 11;
             var read = WorldSave.Read(old.ToArray(), Tiles.Shipped);

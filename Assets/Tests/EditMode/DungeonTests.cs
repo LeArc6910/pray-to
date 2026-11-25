@@ -449,6 +449,8 @@ namespace Game.Core.Tests
             var fresh = Hand(out _, out _);
             var old = WorldSave.Write(fresh, 7, 5, WorldGenerator.RoomVersion).ToList();
             old.RemoveRange(old.Count - 4, 4);
+            // Format 17's head (when made, seconds played, biomes been to: 18 bytes after SavedAt) was not there either.
+            old.RemoveRange(4 + 4 + 8 + 4 + 4 + 1 + 8, 18);
             old[4] = 14;
             Assert.IsEmpty(WorldSave.Read(old.ToArray(), Tiles.Shipped).DungeonEntries);
             Assert.IsEmpty(WorldSave.Read(old.ToArray(), Tiles.Shipped).DungeonRecords);

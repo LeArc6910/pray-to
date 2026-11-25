@@ -24,7 +24,9 @@ namespace Game.Core
         // starts it with them (2026-11-09). 17: the main story's step, whether it was taken, and the waypoints open
         // to it by place id (Docs/Story.md, 2026-11-10). 18: the answers given where the story asked, by step index
         // (story.csv choices, 2026-11-10). 19: where each side story stands, by chain id (story.csv chain, 2026-11-11).
-        const int FormatVersion = 19;
+        // 20: how it looks (CharacterLook.Packed), the seconds played with it, when it was made and last played (seconds
+        // since 1970, from the caller) and the biomes it has stood in (BiomeVisits), last (Docs/TitleRework.md, 2026-11-25).
+        public const int FormatVersion = 20;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
             List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null,
@@ -100,6 +102,17 @@ namespace Game.Core
         public IReadOnlyList<(int Step, int Choice)> StoryChoices { get; }
         // Where each side story stands (Player.SideSteps and SideTaken): its chain id, the step index and whether taken.
         public IReadOnlyList<(string Chain, int Step, bool Taken)> SideStories { get; }
+        // How it looks; CharacterLook.Default for a save from before format 20.
+        public CharacterLook Look { get; private set; } = CharacterLook.Default;
+        // Seconds played with it, as its player's client counted them; 0 before format 20.
+        public double PlayedSeconds { get; private set; }
+        // When it was made and when last played, in seconds since 1970 as the caller counted them; 0 for unknown.
+        public long CreatedAt { get; private set; }
+        public long LastPlayedAt { get; private set; }
+        // The biomes it has stood in (BiomeVisits); none known before format 20.
+        public int Visited { get; private set; }
+        // The format it was written in.
+        public int Version { get; private set; }
         public IReadOnlyList<string> Warnings { get; }
 
         public static byte[] Write(Equipment equipment, Inventory bag, int experience = 0, IEnumerable<string> claimedGoals = null,
@@ -109,7 +122,8 @@ namespace Game.Core
             IEnumerable<string> achievements = null, string pet = null, IEnumerable<(string Pet, int Experience)> petExperience = null,
             IEnumerable<int> lifePerks = null, IEnumerable<(string Pet, string Name)> petNames = null, IEnumerable<string> classes = null,
             IEnumerable<int> skillOrder = null, int journeyStep = 0, bool journeyTaken = false, IEnumerable<string> waypoints = null,
-            IEnumerable<(int Step, int Choice)> storyChoices = null, IEnumerable<(string Chain, int Step, bool Taken)> sideStories = null)
+            IEnumerable<(int Step, int Choice)> storyChoices = null, IEnumerable<(string Chain, int Step, bool Taken)> sideStories = null,
+            CharacterLook? look = null, double playedSeconds = 0, long createdAt = 0, long lastPlayedAt = 0, int visited = 0)
         {
             using var stream = new MemoryStream();
             using (var w = new BinaryWriter(stream, Encoding.UTF8, leaveOpen: true))
@@ -221,12 +235,33 @@ namespace Game.Core
                     w.Write((ushort)at);
                     w.Write(begun);
                 }
+                w.Write((look ?? CharacterLook.Default).Packed);
+                w.Write(Math.Max(0, playedSeconds));
+                w.Write(createdAt);
+                w.Write(lastPlayedAt);
+                w.Write((ushort)visited);
             }
             return stream.ToArray();
         }
 
         // Throws InvalidDataException when the data is not a character save this game can read.
-        public static CharacterSave Read(byte[] data, LootData loot)
+        public static CharacterSave Read(byte[] data, LootData loot) => Parse(data, loot ?? throw new ArgumentNullException(nameof(loot)));
+
+        // What the character list shows (Docs/TitleRework.md 4-2), read without the sheets: nothing is built and items are
+        // only stepped over. Throws InvalidDataException as Read does.
+        public static CharacterSummary ReadSummary(byte[] data, string name = "")
+        {
+            var save = Parse(data, null);
+            // The monsters met: the kinds it has felled, the most felled first (the bestiary's records).
+            var felled = save.Records.Where(r => r.Kind == nameof(RecordKind.Kill) && r.Count > 0).OrderByDescending(r => r.Count).ThenBy(r => r.Id, StringComparer.Ordinal)
+                .Select(r => r.Id).Distinct().Take(CharacterSummary.MaxMonsters).ToList();
+            var bosses = save.Records.Where(r => r.Kind == nameof(RecordKind.Boss) && r.Count > 0).Select(r => r.Id).Distinct().ToList();
+            return new CharacterSummary(name ?? "", save.Version, save.Look, Math.Max(0, save.Experience), save.Classes, save.PlayedSeconds, save.CreatedAt,
+                save.LastPlayedAt, save.Visited, felled, bosses, save.JourneyStep);
+        }
+
+        // Without the sheets (loot null) items, runes and stacks are stepped over and the bag comes back empty.
+        static CharacterSave Parse(byte[] data, LootData loot)
         {
             var warnings = new List<string>();
             try
@@ -239,7 +274,7 @@ namespace Game.Core
                 int worn = r.ReadByte();
                 for (int i = 0; i < worn; i++)
                 {
-                    var item = SavedItems.Read(r, loot, warnings);
+                    var item = loot == null ? SavedItems.Skip(r) : SavedItems.Read(r, loot, warnings);
                     if (item == null) continue;
                     if (equipment[item.Base.Slot] == null) equipment.Equip(item);
                     else if (!bag.TryAdd(item)) warnings.Add($"가방이 가득 차서 {item.Base.Name}을(를) 버렸습니다.");
@@ -247,23 +282,26 @@ namespace Game.Core
                 int carried = r.ReadUInt16();
                 for (int i = 0; i < carried; i++)
                 {
-                    var item = SavedItems.Read(r, loot, warnings);
+                    var item = loot == null ? SavedItems.Skip(r) : SavedItems.Read(r, loot, warnings);
                     if (item != null && !bag.TryAdd(item)) warnings.Add($"가방이 가득 차서 {item.Base.Name}을(를) 버렸습니다.");
                 }
                 foreach (var (id, count) in SavedItems.ReadCounts(r))
                 {
+                    if (loot == null) continue;
                     var rune = loot.Runes.FirstOrDefault(x => x.Id == id);
                     if (rune != null) bag.AddRune(rune, count);
                     else warnings.Add($"없어진 룬 '{id}' {count}개를 건너뛰었습니다.");
                 }
                 foreach (var (id, count) in SavedItems.ReadCounts(r))
                 {
+                    if (loot == null) continue;
                     var consumable = loot.Consumables.FirstOrDefault(x => x.Id == id);
                     if (consumable != null) bag.AddConsumable(consumable, count);
                     else warnings.Add($"없어진 소모품 '{id}' {count}개를 건너뛰었습니다.");
                 }
                 foreach (var (id, count) in SavedItems.ReadCounts(r))
                 {
+                    if (loot == null) continue;
                     var material = loot.Materials.FirstOrDefault(x => x.Id == id);
                     if (material != null) bag.AddMaterial(material, count);
                     else warnings.Add($"없어진 재료 '{id}' {count}개를 건너뛰었습니다.");
@@ -313,8 +351,21 @@ namespace Game.Core
                 for (int count = version >= 18 ? r.ReadUInt16() : 0; count > 0; count--) answers.Add((r.ReadUInt16(), r.ReadByte()));
                 var sides = new List<(string, int, bool)>();
                 for (int count = version >= 19 ? r.ReadByte() : 0; count > 0; count--) sides.Add((r.ReadString(), r.ReadUInt16(), r.ReadBoolean()));
+                var look = version >= 20 ? CharacterLook.Unpack(r.ReadUInt32()) : CharacterLook.Default;
+                double played = version >= 20 ? r.ReadDouble() : 0;
+                long created = version >= 20 ? r.ReadInt64() : 0;
+                long lastPlayed = version >= 20 ? r.ReadInt64() : 0;
+                int visited = version >= 20 ? r.ReadUInt16() : 0;
                 return new CharacterSave(equipment, bag, experience, warnings, claimed, passives, friendships, life, ranks, stories, supports, records, achievements, pet,
-                    grown, perks, names, kit, order, journeyStep, journeyTaken, waypoints, answers, sides);
+                    grown, perks, names, kit, order, journeyStep, journeyTaken, waypoints, answers, sides)
+                {
+                    Look = look,
+                    PlayedSeconds = double.IsNaN(played) || double.IsInfinity(played) ? 0 : Math.Max(0, played),
+                    CreatedAt = created,
+                    LastPlayedAt = lastPlayed,
+                    Visited = visited,
+                    Version = version,
+                };
             }
             catch (Exception e) when (e is EndOfStreamException || e is IOException || e is ArgumentException)
             {
@@ -333,6 +384,23 @@ namespace Game.Core
             int saved = r.ReadInt32();
             if (saved > version) throw new InvalidDataException($"더 새 게임에서 만든 {what} 저장본입니다(형식 {saved}).");
             return saved;
+        }
+
+        // Reads past an item without the sheets to build it.
+        public static Item Skip(BinaryReader r)
+        {
+            r.ReadString();
+            r.ReadInt16();
+            r.ReadByte();
+            for (int count = r.ReadByte(); count > 0; count--) r.ReadInt32();
+            for (int count = r.ReadByte(); count > 0; count--)
+            {
+                r.ReadString();
+                r.ReadByte();
+                r.ReadInt32();
+            }
+            for (int count = r.ReadByte(); count > 0; count--) r.ReadString();
+            return null;
         }
 
         public static void Write(BinaryWriter w, Item item)

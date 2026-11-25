@@ -121,7 +121,8 @@ namespace Game.Core
         public GeneratedWorld Generated => _generated;
 
         // The first boss in the sheet waits in the arena; without boss data the caves have none. Without class data
-        // everyone plays classless.
+        // everyone plays classless. generated: the world already made from this seed, size and version (WorldGenerator.Steps,
+        // so the loading screen moves on as it is made, Docs/TitleRework.md 4-4); without it the host makes it here.
         public WorldHost(
             ulong seed,
             MonsterData monsters,
@@ -133,8 +134,11 @@ namespace Game.Core
             TileData tiles = null,
             GuideData guide = null,
             NpcData npcs = null,
-            StoryData story = null)
+            StoryData story = null,
+            GeneratedWorld generated = null)
         {
+            if (generated != null && (generated.Map.Width != (config ?? new HostConfig()).MapSize || generated.Map.Height != (config ?? new HostConfig()).MapSize))
+                throw new ArgumentException("The world made is not of the map size asked for.", nameof(generated));
             _npcs = npcs;
             _guide = guide;
             _seed = seed;
@@ -145,7 +149,7 @@ namespace Game.Core
             _loot = loot ?? throw new ArgumentNullException(nameof(loot));
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
-            _generated = WorldGenerator.Generate(seed, _config.MapSize, _config.MapSize, story, bosses?.Arenas, _config.MapVersion, tiles?.Terrain);
+            _generated = generated ?? WorldGenerator.Generate(seed, _config.MapSize, _config.MapSize, story, bosses?.Arenas, _config.MapVersion, tiles?.Terrain);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles, _generated.Biomes);
             // Each boss in its own arena, in sheet order: the first near the spawn, the next in the deep zone.
             // A boss with a place (bosses.csv place, 2026-11-10) waits in the arena beside it, when the world has it.
@@ -213,6 +217,7 @@ namespace Game.Core
         public void Tick()
         {
             World.Step();
+            NoteVisits();
             _pendingEvents.AddRange(World.TakeEvents());
 
             // Dug and built tiles go out before the snapshot, so nobody walks into a wall that is not there.
@@ -371,6 +376,7 @@ namespace Game.Core
             World.ChangeClasses(player.Id, player.Classes, join.SkillOrder);
             // Someone coming back to a world where they have a bed starts beside it (the client snaps there).
             World.SendHome(player);
+            player.Look = CharacterLook.Unpack(join.Look).Packed;
             _connections[connection] = new Connection { Player = player, SentKit = player.KitVersion };
 
             var map = _generated.Map;
@@ -449,14 +455,45 @@ namespace Game.Core
 
         DungeonsMessage DungeonsNow() => new DungeonsMessage(World.Dungeons.Select(DungeonStatus.Of).ToList());
 
-        // The world as a save file, stamped with the caller's clock (seconds since 1970).
-        public byte[] SaveWorld(long now) => WorldSave.Write(World, _seed, now, _generated.Version);
+        // The world as a save file, stamped with the caller's clock (seconds since 1970): saved now, made at CreatedAt (now,
+        // for a world first saved), played for PlayedSeconds, its players having stood in Visited.
+        public byte[] SaveWorld(long now)
+        {
+            if (CreatedAt == 0) CreatedAt = now;
+            return WorldSave.Write(World, _seed, now, _generated.Version, CreatedAt, PlayedSeconds, Visited);
+        }
+
+        // When the world was made, in seconds since 1970 as the caller counted them (0 until first saved or restored),
+        // and the seconds it has been played while hosted (the caller adds them, NotePlayed: Core reads no clock).
+        public long CreatedAt { get; private set; }
+        public double PlayedSeconds { get; private set; }
+
+        public void NotePlayed(double seconds)
+        {
+            if (seconds > 0 && !double.IsInfinity(seconds)) PlayedSeconds += seconds;
+        }
+
+        // The biomes any player has stood in here (BiomeVisits), outside the dungeons' pocket; kept in the save for the
+        // world list's deepest biome.
+        public int Visited { get; private set; }
+
+        void NoteVisits()
+        {
+            foreach (var player in World.Players)
+            {
+                if (World.Map.InPocket(player.Position)) continue;
+                Visited = BiomeVisits.Mark(Visited, _generated.Biomes.At(player.Position));
+            }
+        }
 
         // Puts a world save back into this freshly made host, which must have been made with the save's seed. The world
         // carries on where it was: while it was closed no time passed, for the clock or the crops (Docs/Time.md).
         public void Restore(WorldSave save)
         {
             if (save.Seed != _seed) throw new ArgumentException("The save is of a world with another seed.", nameof(save));
+            CreatedAt = save.CreatedAt;
+            PlayedSeconds = save.PlayedSeconds;
+            Visited |= save.Visited;
             World.Restore(save.Tiles, save.Crops.Select(c => (c.Crop, c.X, c.Y, c.Grown, c.WetLeft)), save.ProgressLevel, save.Chests, save.Beds, save.Locks);
             World.RestoreClock(save.Clock);
             World.RestoreRiftTier(save.RiftTier);
@@ -1002,7 +1039,8 @@ namespace Game.Core
             var players = _connections.Values.Where(c => c.Player != null).Select(c => c.Player).ToList();
             byte[] roster = new RosterMessage(
                 players.ToDictionary(p => p.Id, p => p.Name),
-                players.ToDictionary(p => p.Id, p => (IReadOnlyList<int>)ClassIndexes(p))).Encode();
+                players.ToDictionary(p => p.Id, p => (IReadOnlyList<int>)ClassIndexes(p)),
+                players.ToDictionary(p => p.Id, p => p.Look)).Encode();
             foreach (var pair in _connections)
             {
                 if (pair.Value.Player != null) Send(pair.Key, roster, reliable: true);

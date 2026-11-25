@@ -1,5 +1,7 @@
 using System;
+using System.Collections;
 using System.Linq;
+using UnityEngine;
 
 namespace Game.Client.Tests
 {
@@ -17,6 +19,16 @@ namespace Game.Client.Tests
                 SaveStore.Delete(key);
             Prefs.Delete("hotbar." + name);
             Prefs.Delete("skillorder3." + name);
+        }
+
+        // Waits until the game started is playing, at most timeout seconds (since 2026-11-25 the world is made over
+        // several frames behind a loading screen, Docs/TitleRework.md 4-4, so a fixed wait no longer fits), then lets it
+        // play for then seconds, as the fixed waits did.
+        public static IEnumerator UntilPlaying(GameRoot root, float then = 1, float timeout = 15)
+        {
+            float until = Time.realtimeSinceStartup + timeout;
+            while (!root.Playing && Time.realtimeSinceStartup < until) yield return null;
+            if (root.Playing && then > 0) yield return new WaitForSecondsRealtime(then);
         }
     }
 }

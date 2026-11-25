@@ -23,11 +23,40 @@ namespace Game.Core
             if (lakeArena is (int kx, int ky)) arenas.Add(TileMap.Center(kx, ky));
             if (sandArena is (int sx, int sy)) arenas.Add(TileMap.Center(sx, sy));
             _arenas = arenas;
+            _placeArenas = new Dictionary<string, Vec2>();
             CaveArenas = arenas.Count;
         }
 
+        // The same world on a copy of its map (TileMap.Copy); the rest, which nothing changes once made, is shared.
+        GeneratedWorld(GeneratedWorld from)
+        {
+            Map = from.Map.Copy();
+            Biomes = from.Biomes;
+            SpawnX = from.SpawnX;
+            SpawnY = from.SpawnY;
+            ArenaX = from.ArenaX;
+            ArenaY = from.ArenaY;
+            ArenaRadius = from.ArenaRadius;
+            _arenas = new List<Vec2>(from._arenas);
+            _placeArenas = new Dictionary<string, Vec2>(from._placeArenas);
+            CaveArenas = from.CaveArenas;
+            ArenaKinds = from.ArenaKinds;
+            Version = from.Version;
+            Seed = from.Seed;
+            Rooms = from.Rooms;
+            Places = from.Places;
+            Landmarks = from.Landmarks;
+            BiomeLandmarks = from.BiomeLandmarks;
+            Roads = from.Roads;
+            _signposts = new List<(int X, int Y, PlaceDefinition Toward)>(from._signposts);
+        }
+
+        // Taken as soon as it is made, before a host's world digs or builds on it (Docs/TitleRework.md 4-4: a solo game
+        // makes the world once, and the player's own client starts from this copy).
+        public GeneratedWorld Copy() => new GeneratedWorld(this);
+
         readonly List<Vec2> _arenas;
-        readonly Dictionary<string, Vec2> _placeArenas = new Dictionary<string, Vec2>();
+        readonly Dictionary<string, Vec2> _placeArenas;
 
         // A boss arena carved beside a place of the story (2026-11-10, the demon nest's): after the caves' own.
         internal void AddPlaceArena(string place, Vec2 center)
@@ -68,6 +97,8 @@ namespace Game.Core
         // Which generator made it (WorldGenerator.CaveVersion, RoomVersion), and for a world of rooms, the rooms and
         // the ways between them; null for the caves of version 1.
         public int Version { get; internal set; } = WorldGenerator.CaveVersion;
+        // The seed it was made from (WorldGenerator.Steps sets it).
+        public ulong Seed { get; internal set; }
         public RoomGraph Rooms { get; internal set; }
         // The places of the story (Docs/Story.md), in sheet order; none when made without the sheets.
         public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
@@ -284,41 +315,99 @@ namespace Game.Core
         public static GeneratedWorld Generate(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null, ArenaData arenas = null,
             int version = CaveVersion, TerrainData terrain = null)
         {
+            GeneratedWorld made = null;
+            foreach (var stage in Steps(seed, width, height, story, arenas, version, terrain)) made = stage.World ?? made;
+            return made;
+        }
+
+        // The same as Generate, a stage at a time (2026-11-25, Docs/TitleRework.md 4-4: the loading screen moves on between
+        // stages, and the web, which has no threads, draws a frame between them). Each stage is announced before it runs:
+        // its key (GenerationStage) and how much of the whole was done before it. The last one is "done" with the world.
+        // Generate runs exactly these, so the world made is the same to the tile.
+        public static IEnumerable<GenerationStage> Steps(ulong seed, int width = DefaultSize, int height = DefaultSize, StoryData story = null,
+            ArenaData arenas = null, int version = CaveVersion, TerrainData terrain = null)
+        {
             bool rooms = version >= RoomVersion;
-            var world = rooms ? GenerateRooms(seed, width, height, terrain ?? TerrainSheet.Default) : GenerateCaves(seed, width, height);
+            bool places = story != null && story.Places.Count > 0;
+            var keys = GenerationStage.KeysFor(version, places, rooms && DungeonPocket.Fits(width));
+            float total = keys.Sum(GenerationStage.WeightOf), done = 0;
+            GenerationStage Next(string key)
+            {
+                var stage = new GenerationStage(key, total <= 0 ? 0 : Math.Min(1, done / total));
+                done += GenerationStage.WeightOf(key);
+                return stage;
+            }
+
+            var made = new GeneratedWorld[1];
+            if (rooms)
+            {
+                foreach (string key in RoomSteps(seed, width, height, terrain ?? TerrainSheet.Default, made)) yield return Next(key);
+            }
+            else
+            {
+                yield return Next(GenerationStage.Caves);
+                made[0] = GenerateCaves(seed, width, height);
+            }
+            var world = made[0];
             if (rooms) world.Version = version;
-            if (story != null && story.Places.Count > 0) world.Places = CarvePlaces(world, seed, story);
+            if (places)
+            {
+                yield return Next(GenerationStage.Places);
+                world.Places = CarvePlaces(world, seed, story);
+            }
+            yield return Next(GenerationStage.Arenas);
             DressArenas(world, seed, arenas);
             if (rooms)
             {
                 // What each room is for, and the chunks set into them (WorldGenerator.Roles.cs): after the places and the
                 // roads, which decide where a pack may live.
+                yield return Next(GenerationStage.Furnish);
                 Furnish(world, seed, terrain ?? TerrainSheet.Default);
                 // The camps, shrines, chests and carts in them (WorldGenerator.Pois.cs, pois.csv).
+                yield return Next(GenerationStage.Pois);
                 LayPois(world, seed, terrain);
                 // The minecart lines between cart rooms and their stations, then a waystone by a camp of each biome
                 // (WorldGenerator.Rails.cs, 3c). Laid after the rest, so the things above are numbered as before.
+                yield return Next(GenerationStage.Rails);
                 LayRails(world, seed, terrain);
                 LayWaystones(world, seed, terrain);
                 // A place built across a way, or dressing set in an arena's door, must not shut a room off.
+                yield return Next(GenerationStage.Join);
                 JoinRooms(world.Map, world.Rooms.Nodes, world.Arenas.Take(world.CaveArenas).Select(a => (TileMap.Cell(a.X), TileMap.Cell(a.Y))).ToList(),
                     world.SpawnX, world.SpawnY, pockets: true, kept: world.Rooms.Kept);
                 EnsureCopper(world);
                 // The biomes' props (WorldGenerator.Props.cs, 묶음 B1a), only in a world of version 3 and after everything
                 // that decides what is reached: each stands on open floor with a way round it.
-                if (version >= PropVersion) LayProps(world, seed, version);
+                if (version >= PropVersion)
+                {
+                    yield return Next(GenerationStage.Props);
+                    LayProps(world, seed, version);
+                }
                 // The camps' trapdoors and the mid-bosses' lairs (WorldGenerator.Cellars.cs, 묶음 B1c), version 4 on: a world
                 // of version 3 keeps its camps as they were.
-                if (version >= LandmarkVersion) LayCellars(world, seed, terrain ?? TerrainSheet.Default, version);
+                if (version >= LandmarkVersion)
+                {
+                    yield return Next(GenerationStage.Cellars);
+                    LayCellars(world, seed, terrain ?? TerrainSheet.Default, version);
+                }
                 // The underground lake's shallows round its water (WorldGenerator.CrystalLakeDungeons.cs, 묶음 B3), version 6 on.
-                if (version >= CrystalLakeVersion) LayShallows(world, seed);
                 // The lava fields' steam vents and the abyss's cracked plates (WorldGenerator.LavaVoidDungeons.cs, 묶음 B4),
                 // version 7 on.
-                if (version >= LavaVoidVersion) LayVentsAndPlates(world, seed);
+                if (version >= CrystalLakeVersion)
+                {
+                    yield return Next(GenerationStage.Water);
+                    LayShallows(world, seed);
+                    if (version >= LavaVoidVersion) LayVentsAndPlates(world, seed);
+                }
                 // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
-                if (DungeonPocket.Fits(width)) world.Map.AddPocket(DungeonPocket.Rows);
+                if (DungeonPocket.Fits(width))
+                {
+                    yield return Next(GenerationStage.Pocket);
+                    world.Map.AddPocket(DungeonPocket.Rows);
+                }
             }
-            return world;
+            world.Seed = seed;
+            yield return new GenerationStage(GenerationStage.Done, 1, world);
         }
 
         // Each place round its plaza, in sheet order: at its distance from the spawn, of the sixteen ways the one

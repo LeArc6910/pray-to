@@ -244,9 +244,19 @@ namespace Game.Client
             }
             if (_client == null)
             {
+                // A solo or hosted world being made, a slice of time a frame (WorldLoader); the game starts once it is.
+                if (_loader != null)
+                {
+                    if (_loader.Advance()) FinishHosting();
+                    return;
+                }
                 _saveMenu?.Poll();
                 return;
             }
+            // A joined world's map being made after the host's Welcome (WorldClient.DeferMap), likewise.
+            if (_loader == null && _client.MapGeneration != null) _loader = new WorldLoader(_client.MapGeneration, _client.StepMap);
+            if (_loader != null && _client.MapGeneration == null && _loader.Done) _loader = null;
+            if (_loader != null && _loader.Advance()) _loader = null;
             NoteSteps(Time.unscaledDeltaTime);
             if (_map != null && Controls.MapPressed())
             {
@@ -291,6 +301,9 @@ namespace Game.Client
             if (ticks == MaxTicksPerFrame) _tickClock = 0;
 
             if (_client.Status != ClientStatus.Playing) return;
+            // Time played, for the lists (Docs/TitleRework.md 4-2): the character's on this device, the world's on its host.
+            _client.NotePlayed(Time.unscaledDeltaTime);
+            _host?.NotePlayed(Time.unscaledDeltaTime);
             // An encounter window shuts once its thing is out of reach (walked away from the stall, chest or station).
             if (ScreenStack.IsEncounter(_screens.Current) && _inventory != null && !_inventory.InReach(_screens.Current)) _screens.Close();
             SaveProgress(Time.deltaTime);
@@ -1355,7 +1368,7 @@ namespace Game.Client
         // Makes an online room and hosts in it; the code shows in the HUD for the others.
         async void StartOnlineHost()
         {
-            if (_connecting || _client != null) return;
+            if (_connecting || _client != null || _loader != null) return;
             _connecting = true;
             _status = "온라인 방을 만드는 중…";
             var (link, code, error) = await NetLink.HostOnline(OnlineGuests);
@@ -1366,7 +1379,7 @@ namespace Game.Client
                 return;
             }
             // Something else started while the room was being made.
-            if (_client != null)
+            if (_client != null || _loader != null)
             {
                 link.Dispose();
                 return;
@@ -1378,7 +1391,7 @@ namespace Game.Client
         async void StartOnlineJoin()
         {
             string code = _codeInput.Trim();
-            if (_connecting || _client != null || code.Length == 0) return;
+            if (_connecting || _client != null || _loader != null || code.Length == 0) return;
             _connecting = true;
             _status = "방을 찾는 중…";
             var (link, error) = await NetLink.JoinOnline(code);
@@ -1396,9 +1409,15 @@ namespace Game.Client
             StartJoining(link);
         }
 
-        // Solo, a LAN host on the port, or a host in an online room whose link is already started.
+        // Solo, a LAN host on the port, or a host in an online room whose link is already started. The world is made over
+        // the next frames (WorldLoader, Docs/TitleRework.md 4-4) and the game starts when it is (FinishHosting).
         void StartHosting(Mode mode, NetLink online = null)
         {
+            if (_loader != null || _client != null)
+            {
+                online?.Dispose();
+                return;
+            }
             // Saves are read first, so a broken one stops the start with a reason instead of being overwritten.
             if (!LoadCharacter(out byte[] character) || !ReadWorld(out var world))
             {
@@ -1415,18 +1434,49 @@ namespace Game.Client
                     _status = $"호스트를 시작하지 못했습니다. 포트 {NetLink.DefaultPort}를 다른 프로그램이 쓰고 있는지 확인하세요.";
                     return;
                 }
-                _net.Received += (sender, data) => _host?.Receive(sender, data);
-                _net.Disconnected += id => _host?.Disconnect(id);
+                // Whoever comes while the world is still being made waits for it (their Join is held, not lost).
+                _net.Received += (sender, data) =>
+                {
+                    if (_host != null) _host.Receive(sender, data);
+                    else _heldForHost.Add((sender, data));
+                };
+                _net.Disconnected += id =>
+                {
+                    if (_host != null) _host.Disconnect(id);
+                    else _heldForHost.Add((id, null));
+                };
             }
 
             ulong seed = world?.Seed ?? (ulong)DateTime.UtcNow.Ticks;
-
             // A new world is the game's big map; a saved one keeps the size it was made at (2026-11-11), and the
             // generator that made it (2026-11-21: a world from before rooms stays the caves it was).
+            int size = world?.Width ?? WorldGenerator.GameSize;
+            int version = world?.Generator ?? WorldGenerator.NewWorldVersion;
+            _starting = (mode, character, world, seed, size, version);
+            _loader = new WorldLoader(new WorldGeneration(seed, size, size, _story, _bosses?.Arenas, version, _tiles?.Terrain));
+            _status = "";
+        }
+
+        // The world being made for a solo or hosted game (StartHosting), and what the game starts with once it is.
+        WorldLoader _loader;
+        (Mode Mode, byte[] Character, WorldSave World, ulong Seed, int Size, int Version) _starting;
+        // What came over the network for the host before it was there.
+        readonly List<(ulong Sender, byte[] Data)> _heldForHost = new List<(ulong, byte[])>();
+
+        // The world is made: the host builds on it, and this player's own client starts from a copy of the map as made,
+        // so it is not made twice (2026-11-25).
+        void FinishHosting()
+        {
+            var (mode, character, world, seed, size, version) = _starting;
+            var generated = _loader.World;
+            _loader = null;
+            _starting = default;
+            var made = generated.Copy();
             _host = new WorldHost(seed, _monsters, _loot,
-                new HostConfig { MapSize = world?.Width ?? WorldGenerator.GameSize, MapVersion = world?.Generator ?? WorldGenerator.NewWorldVersion },
+                new HostConfig { MapSize = size, MapVersion = version },
                 bosses: _bosses, classes: _classes, tiles: _tiles, guide: _guide, npcs: _npcs,
-                worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes, QuickRest = Settings.QuickRest, Director = true }, story: _story);
+                worldConfig: new WorldConfig { Forage = true, DayMinutes = Settings.DayMinutes, QuickRest = Settings.QuickRest, Director = true }, story: _story,
+                generated: generated);
             if (world != null)
             {
                 _host.Restore(world);
@@ -1437,11 +1487,13 @@ namespace Game.Client
             SyncCharacterClasses();
             _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
             {
+                Look = NewLook,
                 Character = character,
                 JoinSkillOrder = KeptSkillOrder(),
                 Guide = _guide,
                 Npcs = _npcs,
                 Story = _story,
+                Made = made,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
@@ -1449,10 +1501,60 @@ namespace Game.Client
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens) { Map = () => _map };
             _storyScreen = new StoryScreen(_client, SendToHost, () => _map) { OpenShop = tab => _inventory?.ShowShop(tab) };
             _host.Receive(LocalConnection, _client.JoinMessage());
+            foreach (var (sender, data) in _heldForHost)
+            {
+                if (data != null) _host.Receive(sender, data);
+                else _host.Disconnect(sender);
+            }
+            _heldForHost.Clear();
             _mode = mode;
             _status = "";
             _dropFocus = true;
             StartGuide();
+        }
+
+        // How a new character looks (CharacterLook): set by the making screen before the game starts (T3). A saved
+        // character keeps its own.
+        internal CharacterLook NewLook { get; set; } = CharacterLook.Default;
+
+        // The world being made, for the loading screen (Docs/TitleRework.md 4-4): whether it is, the stage (GenerationStage's
+        // keys, LoadText for the words) and how far along, 0 to 1. A joined world counts from the host's Welcome.
+        internal bool Loading => _loader != null && !_loader.Done;
+        internal string LoadStage => _loader?.Stage ?? "";
+        internal float LoadFraction => _loader?.Fraction ?? 0;
+
+        // What the loading screen says while a stage is made.
+        internal static string LoadText(string stage) => stage switch
+        {
+            GenerationStage.Caves => Strings.T("load.caves", "동굴을 파는 중"),
+            GenerationStage.Biomes => Strings.T("load.biomes", "땅의 결을 나누는 중"),
+            GenerationStage.Rooms => Strings.T("load.rooms", "방과 길을 잇는 중"),
+            GenerationStage.Floors => Strings.T("load.floors", "방바닥을 고르는 중"),
+            GenerationStage.Ways => Strings.T("load.ways", "통로와 물길을 내는 중"),
+            GenerationStage.Features => Strings.T("load.features", "방을 채우는 중"),
+            GenerationStage.Ore => Strings.T("load.ore", "광맥을 묻는 중"),
+            GenerationStage.Pools => Strings.T("load.pools", "웅덩이에 물을 채우는 중"),
+            GenerationStage.Places => Strings.T("load.places", "마을을 세우는 중"),
+            GenerationStage.Arenas => Strings.T("load.arenas", "보스의 방을 꾸미는 중"),
+            GenerationStage.Furnish => Strings.T("load.furnish", "방마다 쓰임을 정하는 중"),
+            GenerationStage.Pois => Strings.T("load.pois", "보물을 숨기는 중"),
+            GenerationStage.Rails => Strings.T("load.rails", "광차 선로를 놓는 중"),
+            GenerationStage.Join => Strings.T("load.join", "막힌 길을 트는 중"),
+            GenerationStage.Props => Strings.T("load.props", "동굴을 꾸미는 중"),
+            GenerationStage.Cellars => Strings.T("load.cellars", "굴과 지하실을 파는 중"),
+            GenerationStage.Water => Strings.T("load.water", "얕은 물과 틈을 내는 중"),
+            GenerationStage.Pocket => Strings.T("load.pocket", "던전 자리를 마련하는 중"),
+            GenerationStage.Done => Strings.T("load.done", "들어가는 중"),
+            _ => Strings.T("load.start", "월드를 만드는 중"),
+        };
+
+        // Until the loading screen (T3): the stage and a bar on the menu's backdrop.
+        void DrawLoading()
+        {
+            UiSkin.Backdrop(new Rect(0, 0, Ui.Width, Ui.Height));
+            float width = Mathf.Min(Ui.Width - 32, 420);
+            UiSkin.Bar(new Rect((Ui.Width - width) / 2, Ui.Height / 2 - 12, width, 24), LoadFraction,
+                $"{LoadText(LoadStage)} {Mathf.RoundToInt(LoadFraction * 100)}%");
         }
 
         // The world save of this name, or null for a new world. False when there is one that cannot be read.
@@ -1491,11 +1593,14 @@ namespace Game.Client
             SyncCharacterClasses();
             _client = new WorldClient(Guid.NewGuid().ToString(), _playerName, _monsters, _bosses, _loot, _classes, _chosenClasses, _tiles)
             {
+                Look = NewLook,
                 Character = character,
                 JoinSkillOrder = KeptSkillOrder(),
                 Guide = _guide,
                 Npcs = _npcs,
                 Story = _story,
+                // The map is made a stage at a time after Welcome, behind the loading screen (Docs/TitleRework.md 4-4).
+                DeferMap = true,
             };
             _kitSeen = -1;
             _hotbar = new Hotbar(_client, _loot, CharacterName);
@@ -1565,7 +1670,7 @@ namespace Game.Client
                 _savedInventoryVersion = _client.InventoryVersion;
                 _savedExperience = _client.Experience;
                 _savedPetNames = _client.PetNamesVersion;
-                Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
+                Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter(Now()));
             }
             _worldSaveClock += deltaTime;
             if (_worldSaveClock < WorldSaveSeconds) return;
@@ -1607,8 +1712,12 @@ namespace Game.Client
 
         void EndSession(string status)
         {
-            if (_client != null) Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter());
+            if (_client != null) Save(SaveStore.CharacterKey(CharacterName), _client.SaveCharacter(Now()));
             if (_host != null) Save(_worldKey, _host.SaveWorld(Now()));
+            // A start still making its world is let go (nothing was played, nothing to save).
+            _loader = null;
+            _starting = default;
+            _heldForHost.Clear();
             if (_map != null && _client != null && _client.Status == ClientStatus.Playing) Save(MapKey, _map.Save());
             _worldKey = null;
             _savedInventoryVersion = 0;
@@ -1663,6 +1772,11 @@ namespace Game.Client
             }
             // The settings opened in the game ([메뉴] → [설정], U7) are the start menu's page: back to the first page once shut.
             if (_screens.Current != GameScreen.Settings && (_page == MenuPage.Settings || _page == MenuPage.Keys) && _client != null) _page = MenuPage.Main;
+            if (Loading)
+            {
+                DrawLoading();
+                return;
+            }
             if (_client == null)
             {
                 DrawMenu();
