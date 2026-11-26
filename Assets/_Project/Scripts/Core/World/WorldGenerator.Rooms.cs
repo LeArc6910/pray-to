@@ -127,6 +127,13 @@ namespace Game.Core
         // own, with seven by seven of open floor (Docs/BiomeRework.md 사람이 정한 것: XL only there).
         public IReadOnlyList<int> Lairs => LairList;
         internal readonly List<int> LairList = new List<int>();
+        // The generator version the rooms were made by (GeneratedWorld.Version): what the monsters about go by (World.Packs.cs).
+        public int Version { get; internal set; } = WorldGenerator.RoomVersion;
+        // The hunting grounds (2026-11-26, Docs/HuntingGrounds.md, version 8): rooms whose monsters keep coming, a few of
+        // each biome, by room index.
+        public IReadOnlyList<int> HuntingGrounds => HuntList;
+        internal readonly List<int> HuntList = new List<int>();
+        public bool IsHuntingGround(int room) => HuntList.Contains(room);
         // The rock of the chunks' walls (y * width + x): nothing that joins rooms digs through it.
         internal HashSet<int> Kept = new HashSet<int>();
 
@@ -186,7 +193,7 @@ namespace Game.Core
         public const int CaveVersion = 1;
         public const int RoomVersion = 2;
         // What the game makes a new world with. Tests and sims keep CaveVersion unless they ask.
-        public const int NewWorldVersion = LavaVoidVersion;
+        public const int NewWorldVersion = HuntVersion;
 
         const ulong RoomStream = 40;
         const ulong ShapeStream = 41;

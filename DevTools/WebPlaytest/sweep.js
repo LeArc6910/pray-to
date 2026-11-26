@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -7664,7 +7664,47 @@ async function testground(browser) {
   }
 }
 
-const Sections = { menu, title, testground, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+// Hunting grounds and monsters by the roads (version 8, Docs/HuntingGrounds.md): a new world has two hunting grounds
+// to a biome; standing at one, a crowd comes and keeps coming; the map shows it once seen.
+async function hunt(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 사냥터 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await game.startThroughMenu();
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('equip iron_sword; equip iron_armor; heal; xp 3000');
+    let h = await game.ask('hunt');
+    const biomes = new Set((h.grounds || []).map(g => g.biome));
+    check(h.generator >= 8 && (h.grounds || []).length >= 2 * biomes.size && biomes.size >= 4,
+      `${name}: 새 월드(${h.generator}판)에 생물군계마다 사냥터 둘 (${(h.grounds || []).length}곳, 생물군계 ${biomes.size})`);
+    await game.send('goto hunt 0');
+    h = await game.until(r => r.grounds && r.grounds[0] && r.grounds[0].living >= r.first, 8000, () => game.ask('hunt')) || await game.ask('hunt');
+    const first = (h.grounds || [])[0] || {};
+    check(h.inside && first.living >= h.first, `${name}: 사냥터에 서면 몬스터가 무리로 나온다 (${first.biome} 반지름 ${first.radius}, ${first.living}마리)`);
+    await game.send('monsters hold');
+    await game.shot(`hunt-ground-${name}`, '사냥터 안: 몬스터 무리');
+    check(await openScreen(game, '지도'), `${name}: [지도]가 열린다`);
+    await game.wait(600);
+    const legend = (await game.buttons()).filter(b => b.row === '범례').map(b => b.label);
+    check(legend.includes('사냥터'), `${name}: 지도 범례에 [사냥터] (${legend.join(', ')})`);
+    const marks = (await game.buttons()).filter(b => b.row === '지도 표시' && b.label === '사냥터');
+    check(marks.length > 0, `${name}: 지도에 본 사냥터의 표시 (${marks.length})`);
+    if (marks.length > 0) await game.press('사냥터', '지도 표시');
+    await game.wait(300);
+    check(has(await game.allText(), '몬스터가 계속 나온다'), `${name}: 사냥터 카드의 설명`);
+    await game.shot(`hunt-map-${name}`, '지도의 사냥터 표시와 카드');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, title, testground, hunt, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

@@ -257,6 +257,7 @@ namespace Game.Core
                 else if (_enemies.Count < EnemyTargetNow) TrySpawnEnemy();
             }
             UpdatePacks();
+            UpdateHunts();
             // The trap rooms' bands, and the pacing director (World.Traps.cs, World.Director.cs).
             UpdateTraps();
             UpdateDirector();

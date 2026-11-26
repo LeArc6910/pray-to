@@ -468,6 +468,9 @@ namespace Game.Client
                 // the host and the screen, its band, the button), the lairs (their mid-boss, awake or felled), the gates'
                 // dungeons and their light colours, and what a charge smashed; "b1c fell" fells the nearest camp's band (its
                 // trapdoor opens as when it falls by hand).
+                // The hunting grounds (version 8): where, how many in each now, the version.
+                case "hunt":
+                    return "hunt " + HuntJson(root);
                 case "b1c":
                     if (words.Length > 1 && words[1] == "fell")
                     {
@@ -853,6 +856,18 @@ namespace Game.Client
                     var onward = found.Edge.Path[found.Edge.Path.Count / 2 + 1];
                     root.AimHeld = true;
                     root.HeldAim = new Vec2(onward.X - found.Middle.X, onward.Y - found.Middle.Y);
+                    break;
+                }
+                // Just outside the nth nearest hunting ground (version 8, Docs/HuntingGrounds.md), on its spawn side.
+                case "hunt":
+                {
+                    int nthHunt = words.Length > 2 ? Int(words[2]) : 0;
+                    var ground = world.HuntingGrounds.OrderBy(g => Vec2.Distance(g.Center, player.Position)).Skip(nthHunt).FirstOrDefault()
+                        ?? throw new InvalidOperationException("no hunting ground: a world of version 8 has them");
+                    var side = (world.Spawn - ground.Center).LengthSquared > 1e-4f ? (world.Spawn - ground.Center).Normalized : new Vec2(0, 1);
+                    var rim = ground.Center + side * (ground.Radius - 2);
+                    to = Nearest(map, TileMap.Cell(rim.X), TileMap.Cell(rim.Y), (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius))
+                        ?? ground.Center;
                     break;
                 }
                 case "narrow":
@@ -1514,6 +1529,21 @@ namespace Game.Client
                 .Field("sandFallsShown", root.SandFallsShown).Field("iciclesShown", root.IciclesShown)
                 .Field("gates", gates.Raw(']'))
                 .Close('}');
+        }
+
+        static string HuntJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var grounds = new Json('[');
+            foreach (var ground in world.HuntingGrounds.OrderBy(g => Vec2.Distance(g.Center, player.Position)))
+            {
+                var pack = world.Packs.FirstOrDefault(p => p.Hunt && p.Room == ground);
+                grounds.Item(new RawJson(new Json('{').Field("biome", ground.Biome.ToString()).Field("x", ground.X).Field("y", ground.Y).Field("radius", ground.Radius)
+                    .Field("distance", Vec2.Distance(ground.Center, player.Position)).Field("living", pack == null ? 0 : world.MembersOf(pack).Count()).Close('}')));
+            }
+            return new Json('{').Field("generator", root.HostGenerated?.Version ?? 0).Field("cap", World.HuntCap).Field("first", World.HuntFirst)
+                .Field("inside", world.HuntingGroundAt(player.Position) != null).Field("grounds", new RawJson(grounds.Close(']'))).Close('}');
         }
 
         static string B1cJson(GameRoot root)

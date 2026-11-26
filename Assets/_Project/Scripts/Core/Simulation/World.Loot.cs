@@ -105,7 +105,7 @@ namespace Game.Core
                 return;
             }
             // One of a pack gives its share of each chance (monsters.csv reward, World.RewardShare).
-            float share = RewardShare(enemy);
+            float share = RewardShare(enemy, drops: true);
             if (_random.Chance(definition.DropChance / 100f * share))
             {
                 DropItem(_lootGenerator.RollItem(level, _random, (int)(killer?.Stats.ItemRarity ?? 0)), Scatter(enemy.Position));
@@ -135,7 +135,14 @@ namespace Game.Core
         // one that came alone (a wanderer, one a test or a rift put down, the caves of a small map) or in a clump of a
         // world of caves (Pack.Shares).
         // An elite gives all of its (and more, World.DropFromElite).
-        internal float RewardShare(Enemy enemy) => enemy.Elite == EliteRank.None && PackOf(enemy)?.Shares == true ? enemy.Definition.RewardPercent / 100f : 1;
+        // A hunting ground's monsters give less again (World.HuntExperienceShare, HuntDropShare): they keep coming.
+        internal float RewardShare(Enemy enemy, bool drops = false)
+        {
+            var pack = PackOf(enemy);
+            float share = enemy.Elite == EliteRank.None && pack?.Shares == true ? enemy.Definition.RewardPercent / 100f : 1;
+            if (pack?.Hunt == true) share *= drops ? HuntDropShare : HuntExperienceShare;
+            return share;
+        }
 
         // One of the consumables that drop at this level, by weight; null when there are none.
         ConsumableDefinition RollConsumable(int level)

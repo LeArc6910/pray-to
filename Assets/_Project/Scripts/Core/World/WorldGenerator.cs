@@ -349,7 +349,11 @@ namespace Game.Core
                 made[0] = GenerateCaves(seed, width, height);
             }
             var world = made[0];
-            if (rooms) world.Version = version;
+            if (rooms)
+            {
+                world.Version = version;
+                if (world.Rooms != null) world.Rooms.Version = version;
+            }
             if (places)
             {
                 yield return Next(GenerationStage.Places);

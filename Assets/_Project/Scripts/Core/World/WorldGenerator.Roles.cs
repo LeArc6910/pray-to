@@ -53,7 +53,7 @@ namespace Game.Core
             new Furnisher(world, seed, terrain).Run();
         }
 
-        sealed class Furnisher
+        sealed partial class Furnisher
         {
             readonly GeneratedWorld _world;
             readonly TileMap _map;
@@ -100,6 +100,7 @@ namespace Game.Core
                 Wayside(new GameRandom(_seed, WaysideStream));
                 Deal(new GameRandom(_seed, RoleStream));
                 Plug(new GameRandom(_seed, PlugStream));
+                if (_world.Version >= HuntVersion) HuntingGrounds(new GameRandom(_seed, HuntStream));
             }
 
             // Which rooms a road runs through, which something was built over, and how many rooms each is from the spawn's.

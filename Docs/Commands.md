@@ -92,3 +92,10 @@ bash DevTools/Local/test/run.sh
 
 GitHub Actions(`.github/workflows/core-tests.yml`)가 푸시마다 테스트, 도트 그림 그리기(결과는 실행의 `art-preview` 아티팩트), Unity 쪽 컴파일 확인, 로컬 스크립트 확인을 돌린다. Unity DLL은 Actions 캐시에 남겨 두고 저장소에는 넣지 않는다.
 
+```
+# 길만 걷는 봇의 분당 만남(7판·새 판)과 사냥터(생물군계마다 수, 서서 3분 싸우기). Docs/HuntingGrounds.md
+dotnet run --project DevTools/CoreSandbox -- --roadwalk 10 1,2,3,4
+# 웹 점검 구역 hunt: 새 월드의 사냥터, 몬스터 무리, 지도 표시
+node DevTools/WebPlaytest/sweep.js --wait <커밋> --only hunt
+```
+

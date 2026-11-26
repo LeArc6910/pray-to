@@ -36,6 +36,7 @@ namespace Game.Client
             Boss,
             Rumor,
             Ore,
+            Hunt,
             Door,
             Pack,
             Master,
@@ -53,6 +54,7 @@ namespace Game.Client
             (MarkKind.Gate, "던전 문", MapIcons.Gate, new Color(0.72f, 0.55f, 1f)),
             (MarkKind.Poi, "볼거리", MapIcons.Chest, new Color(1f, 0.84f, 0.3f)),
             (MarkKind.Boss, "보스", MapIcons.Arena, new Color(1f, 0.35f, 0.3f)),
+            (MarkKind.Hunt, "사냥터", MapIcons.Hunt, HuntMark),
             (MarkKind.Rumor, "소문", MapIcons.Rumor, new Color(1f, 0.84f, 0.3f)),
             (MarkKind.Ore, "광맥", MapIcons.Ore, new Color(0.85f, 0.55f, 0.3f)),
         };
@@ -65,6 +67,8 @@ namespace Game.Client
             (MarkKind.Things, "상자·모닥불", MapIcons.Chest, new Color(1f, 0.85f, 0.35f)),
             (MarkKind.Shortcut, "지름길 돌", MapIcons.Stone, new Color(0.43f, 0.75f, 1f)),
         };
+
+        static readonly Color HuntMark = new Color(1f, 0.55f, 0.25f);
 
         static (MarkKind Kind, string Name, string[] Icon, Color Color)[] LegendOf(bool dungeon) => dungeon ? DungeonLegend : WorldLegend;
 
@@ -700,6 +704,14 @@ namespace Game.Client
                 int inside = _client.DungeonOf(gate) is DungeonInstance standing ? _client.PlayersIn(standing) : 0;
                 _marks.Add(new Mark { At = gate.Center, Kind = MarkKind.Gate, Icon = MapIcons.Gate, Color = inside > 0 ? GateMark : new Color(0.62f, 0.5f, 0.85f), Name = _client.DungeonNameOf(gate), Info = (inside > 0 ? $"안에 {inside}명 · " : "던전 문 · ") + way(gate.Center) });
             }
+            // The hunting grounds once seen (version 8, Docs/HuntingGrounds.md).
+            if (_client.Rooms is RoomGraph rooms)
+                foreach (int index in rooms.HuntingGrounds)
+                {
+                    var ground = rooms.Nodes[index];
+                    if (!Seen(ground.X, ground.Y)) continue;
+                    _marks.Add(new Mark { At = ground.Center, Kind = MarkKind.Hunt, Icon = MapIcons.Hunt, Color = HuntMark, Name = "사냥터", Info = "몬스터가 계속 나온다 · " + way(ground.Center) });
+                }
             // The nearest veins (a prospector's feel, Sense).
             foreach (var (vein, color) in _veins)
                 _marks.Add(new Mark { At = vein, Kind = MarkKind.Ore, Icon = MapIcons.Ore, Color = color, Name = "가까운 광맥", Info = way(vein) });

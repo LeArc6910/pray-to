@@ -252,6 +252,10 @@ namespace CoreSandbox
                     PaceSim.Run(LoadSheets(data), Number(1, 30), paceSeeds, gearFlag >= 0 ? gear : new[] { "iron_sword", "iron_armor", "iron_helmet", "iron_boots" },
                         LoadClasses(classIds.Length > 0 ? classIds : new[] { "warrior" }), Director, SkillBot.Level ?? 8);
                     break;
+                // --roadwalk [minutes] [seeds] (Docs/HuntingGrounds.md): monsters met keeping to the roads, and the hunting grounds.
+                case "--roadwalk":
+                    RoadWalk.Run(LoadSheets(data), Number(1, 10), args.Length > 2 && !args[2].StartsWith("--") ? args[2].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 });
+                    break;
                 case "--hits":
                     var hitMonsters = LoadMonsters();
                     HitsSim.Run(data, hitMonsters, LoadBosses(hitMonsters), args.Length > 1 ? args[1] : "all");

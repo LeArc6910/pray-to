@@ -44,6 +44,9 @@ namespace Game.Core
         // The players a dungeon room's pack was made for (World.WakeRoom, B5a): its monsters are as much tougher and
         // worth as much more as World.DungeonParty says. 1 everywhere else.
         public int Players { get; internal set; } = 1;
+        // A hunting ground's (World.Hunt.cs): no roster, its monsters keep coming while someone is there.
+        public bool Hunt { get; internal set; }
+        internal long NextRefill;
         public int Size => Roster.Count;
         public int FallenCount => Fallen.Count(f => f);
         // Every one of today's roster fell: the room is empty until dawn.
@@ -121,6 +124,9 @@ namespace Game.Core
                     && !n.Edges.Any(i => rooms.Nodes[rooms.Edges[i].A == n.Index ? rooms.Edges[i].B : rooms.Edges[i].A].Kind == RoomKind.Arena)).ToList()
                 ?? new List<RoomNode>();
             _restRooms = rooms?.Nodes.Where(n => n.Role == RoomRole.Rest).ToList() ?? new List<RoomNode>();
+            // The hunting grounds (version 8) keep their own monsters, not a pack of the day's.
+            SetHunts(rooms);
+            _packRooms.RemoveAll(n => rooms.IsHuntingGround(n.Index));
             // The camps, shrines, chests and carts in them (World.Pois.cs).
             SetPois(rooms);
             // The dungeons' gates in their gate rooms (World.Dungeon.cs).
@@ -226,6 +232,7 @@ namespace Game.Core
             if (Tick % PackCheckTicks != 0) return;
             foreach (var pack in _packs.Values.ToList())
             {
+                if (pack.Hunt) continue;
                 if (pack.Room == null)
                 {
                     // A clump of a world of caves is gone with the last of it.
@@ -435,10 +442,10 @@ namespace Game.Core
             return !NearRoad(x, y) && !_restRooms.Any(r => Vec2.Distance(at, r.Center) <= r.Radius + RoadClearance);
         }
 
-        // A road, a dock, a rail, an arena's floor or a waypoint within RoadClearance.
-        bool NearRoad(int x, int y)
+        // A road, a dock, a rail, an arena's floor or a waypoint within RoadClearance (or reach).
+        bool NearRoad(int x, int y, float clearance = RoadClearance)
         {
-            int reach = (int)RoadClearance;
+            int reach = (int)clearance;
             for (int dy = -reach; dy <= reach; dy++)
             {
                 for (int dx = -reach; dx <= reach; dx++)
@@ -763,14 +770,32 @@ namespace Game.Core
         static bool Wanderable(RoomNode room) =>
             room.Kind == RoomKind.Room && !room.Roadside && (room.Role == RoomRole.Plain || room.Role == RoomRole.Ore || room.Role == RoomRole.Pond);
 
+        // Version 8 (2026-11-26, Docs/HuntingGrounds.md, the owner: "길로만 다니면 몬스터를 아예 만나지 않는다"): the
+        // monsters about walk the roads' rooms too and come into being beside a road, though never on it, nor in a camp
+        // or by a town.
+        bool Wayside => _rooms != null && _rooms.Version >= WorldGenerator.HuntVersion;
+        // Beside a road: nothing nearer it than this (the road is three wide, so a monster stands a tile or two off it).
+        public const float WaysideClearance = 2;
+        // Nor this near a town's plaza (past its edge).
+        public const float TownClearance = 8;
+        // Version 8's wanderers: a bigger share, more at least and at most.
+        public const float WaysideShare = 0.3f;
+        public const int WaysideMin = 7;
+        public const int WaysideMax = 14;
+
+        bool Walkable(RoomNode room) =>
+            Wanderable(room) || Wayside && room.Kind == RoomKind.Room && room.Roadside
+                && (room.Role == RoomRole.Plain || room.Role == RoomRole.Ore || room.Role == RoomRole.Pond || room.Role == RoomRole.Cart || room.Role == RoomRole.Shrine);
+
         // Whether a monster may come into being here in a world of rooms: in a room wanderers walk, or in a way between
         // rooms; never by a road or a camp.
-        bool WandererSpot(int x, int y)
+        internal bool WandererSpot(int x, int y)
         {
             var at = TileMap.Center(x, y);
             var room = _rooms.Nearest(x, y);
-            if (room != null && Vec2.Distance(at, room.Center) <= room.Radius + 2 && !Wanderable(room)) return false;
-            return !NearRoad(x, y) && !_restRooms.Any(r => Vec2.Distance(at, r.Center) <= r.Radius + RoadClearance);
+            if (room != null && Vec2.Distance(at, room.Center) <= room.Radius + 2 && !Walkable(room)) return false;
+            if (Wayside && Places.Any(p => Vec2.Distance(at, p.Center) <= p.Radius + TownClearance)) return false;
+            return !NearRoad(x, y, Wayside ? WaysideClearance : RoadClearance) && !_restRooms.Any(r => Vec2.Distance(at, r.Center) <= r.Radius + RoadClearance);
         }
 
         // How many wanderers the parties want: WandererShare of the monsters about, within its bounds, more at night.
@@ -782,7 +807,9 @@ namespace Game.Core
             var wandering = PartyCounts(parties, e => e.PackId == 0);
             int want = 0;
             for (int i = 0; i < parties.Count; i++)
-                want += Math.Clamp((int)MathF.Round(packed[i] * WandererShare / (1 - WandererShare)), MinWanderers, MaxWanderers);
+                want += Wayside
+                    ? Math.Clamp((int)MathF.Round(packed[i] * WaysideShare / (1 - WaysideShare)), WaysideMin, WaysideMax)
+                    : Math.Clamp((int)MathF.Round(packed[i] * WandererShare / (1 - WandererShare)), MinWanderers, MaxWanderers);
             if (Calendar.IsNight(Clock)) want = want * (FullMoonNight ? 200 : 150) / 100;
             var all = PartyCounts(parties);
             return wandering.Sum() < want && all.Max() < PartyCap && FieldCount < HostCap;
@@ -826,7 +853,7 @@ namespace Game.Core
             var ways = room.Edges.Where(i =>
             {
                 var e = _rooms.Edges[i];
-                return e.Kind == RoomEdgeKind.Way && e.Path != null && e.Path.Count > 1 && Wanderable(_rooms.Nodes[e.A == room.Index ? e.B : e.A]);
+                return e.Kind == RoomEdgeKind.Way && e.Path != null && e.Path.Count > 1 && Walkable(_rooms.Nodes[e.A == room.Index ? e.B : e.A]);
             }).ToList();
             if (ways.Count == 0) return false;
             int index = ways[_random.Next(ways.Count)];

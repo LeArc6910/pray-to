@@ -214,6 +214,8 @@ namespace Game.Client
         public static readonly string[] Cart = { ".......", "#######", "#ooooo#", "#ooooo#", "#######", ".x...x.", ".x...x." };
         // An elite camp or a dungeon's master: a skull.
         public static readonly string[] Skull = { ".#####.", "#######", "#..#..#", "#######", ".##.##.", ".#.#.#.", "......." };
+        // A hunting ground (Docs/HuntingGrounds.md): a claw's three marks.
+        public static readonly string[] Hunt = { "#..#..#", "#..#..#", "#o.#o.#", ".#o.#o.", ".#o.#o.", "..#..#.", "..#..#." };
         // A boss's arena: two swords crossed.
         public static readonly string[] Arena = { "#.....#", ".#...#.", "..#.#..", "...#...", "..#.#..", ".x#.#x.", "x.....x" };
         // The nearest vein of an ore: a cut stone.
