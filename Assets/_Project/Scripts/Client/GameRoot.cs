@@ -406,7 +406,8 @@ namespace Game.Client
             if (_biomeTime < BiomeBannerDelay || area == _areaAnnounced) return;
             _biomeAnnounced = biome;
             _areaAnnounced = area;
-            _view?.ShowBanner(AreaBanner(_client.Position, biome));
+            // Inside a place of the story its own name card says where (WorldView.AnnouncePlace): no zone's warning there.
+            if (_client.PlaceHere() == null) _view?.ShowBanner(AreaBanner(_client.Position, biome));
         }
 
         // Says so when night falls and when morning comes, whether by the clock or by everyone sleeping (Docs/Time.md).
