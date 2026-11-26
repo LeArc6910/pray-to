@@ -287,6 +287,7 @@ namespace Game.Client
                 if (Controls.BagPressed()) ToggleScreen(GameScreen.Bag);
                 foreach (var screen in new[] { GameScreen.Skills, GameScreen.Passives, GameScreen.Character, GameScreen.Journal })
                     if (Controls.ScreenPressed(screen)) ToggleScreen(screen);
+                TestGroundKeys();
             }
             ReadSkillPress();
 
@@ -508,7 +509,8 @@ namespace Game.Client
 
         void NoteSteps(float deltaTime)
         {
-            if (_client.Status != ClientStatus.Playing) return;
+            // The test ground counts for nothing kept on this device (Docs/TestGround.md).
+            if (_client.Status != ClientStatus.Playing || _testGround) return;
             Feedback.Tick(deltaTime);
             Feedback.Reach("load");
             _firstPosition ??= _client.Position;
@@ -652,7 +654,7 @@ namespace Game.Client
             _kitSeen = _client.KitVersion;
             _chosenClasses.Clear();
             _chosenClasses.AddRange(_client.Classes.Select(c => c.Id));
-            Prefs.Set(SkillOrderKey, string.Join(",", _chosenClasses) + "|" + string.Join(",", _client.SkillOrder));
+            if (!_testGround) Prefs.Set(SkillOrderKey, string.Join(",", _chosenClasses) + "|" + string.Join(",", _client.SkillOrder));
         }
 
         // "skillorder3": since 2026-11-08 each class has six skills (Docs/Classes.md, 스킬 포인트와 단계), so the
@@ -737,7 +739,7 @@ namespace Game.Client
                 if (goal.Rewards.Count > 0 && !_client.ClaimedGoals.Contains(goal.Id)) SendToHost(_client.ClaimGoalCommand(IndexOfGoal(goal)));
             }
             _goalShownAt = Time.time;
-            Prefs.Set(PassedKey, string.Join(",", _guideProgress.Passed));
+            if (!_testGround) Prefs.Set(PassedKey, string.Join(",", _guideProgress.Passed));
             // Turned off in the menu, goals still count and bring their rewards, but nothing is said.
             if (!Settings.Guide) return;
             if (_guideProgress.Current == null) _acquired.Add(("안내한 목표를 모두 마쳤습니다", 0));
@@ -1272,6 +1274,7 @@ namespace Game.Client
         internal WorldClient LocalClient => _client;
         internal Player HostPlayer => _client == null ? null : _host?.World.FindPlayer(_client.PlayerId);
         internal MonsterData MonsterSheet => _monsters;
+        internal BossData BossSheet => _bosses;
         internal LootData LootSheet => _loot;
         internal ClassData ClassSheet => _classes;
         // The guide's goals, for the playtest bot's numbers (PlaytestBot.cs).
@@ -1425,6 +1428,7 @@ namespace Game.Client
             {
                 online?.Dispose();
                 _roomCode = null;
+                EndTestGround();
                 return;
             }
 
@@ -1501,10 +1505,17 @@ namespace Game.Client
                 Made = made,
             };
             _kitSeen = -1;
-            _hotbar = new Hotbar(_client, _loot, CharacterName);
+            _hotbar = new Hotbar(_client, _loot, CharacterName) { Keep = !_testGround };
             _screens = NewScreens();
             _inventory = new InventoryWindow(_client, SendToHost, _hotbar, _screens) { Map = () => _map };
             _storyScreen = new StoryScreen(_client, SendToHost, () => _map) { OpenShop = tab => _inventory?.ShowShop(tab) };
+            // The test ground (Docs/TestGround.md): the host keeps the hit log and may keep a player from falling there.
+            if (_testGround)
+            {
+                _host.World.TestGround = true;
+                // Longer than the other lines (from 8 seconds before): it is the one thing to read on coming in.
+                _acquired.Add(($"시험장: 여기서 한 일은 저장되지 않는다. 시험판은 {(Controls.UsingTouch ? "[메뉴] → [시험판]" : TestGround.PanelKeyName + " 또는 Esc → [시험판]")}", -8));
+            }
             _host.Receive(LocalConnection, _client.JoinMessage());
             foreach (var (sender, data) in _heldForHost)
             {
@@ -1557,6 +1568,8 @@ namespace Game.Client
         bool ReadWorld(out WorldSave world)
         {
             world = null;
+            // The test ground is made new each time from its seed, whatever world of that name there may be.
+            if (_testGround) return true;
             byte[] worldData = SaveStore.Read(SaveStore.WorldKey(WorldName));
             if (worldData == null) return true;
             try
@@ -1679,9 +1692,10 @@ namespace Game.Client
         // Where this character's map of this world is kept, by the world's seed so a joined world has one too.
         string MapKey => SaveStore.MapKey(_client.Seed, _client.Generator, CharacterName);
 
-        static void Save(string key, byte[] data)
+        void Save(string key, byte[] data)
         {
-            if (key == null || data == null) return;
+            // Nothing of the test ground is written: not the character played there, its map, nor the world.
+            if (key == null || data == null || _testGround) return;
             try
             {
                 SaveStore.Write(key, data);
@@ -1738,6 +1752,7 @@ namespace Game.Client
             _mode = Mode.Menu;
             _status = status;
             _endReason = null;
+            EndTestGround();
             BackToTitle();
         }
 
@@ -1770,7 +1785,7 @@ namespace Game.Client
 
         internal void SaveOnLeaving(bool always)
         {
-            if (_client == null || _client.Status != ClientStatus.Playing) return;
+            if (_client == null || _client.Status != ClientStatus.Playing || _testGround) return;
             if (!always && Time.unscaledTime - _leaveSavedAt < LeaveSaveGap) return;
             _leaveSavedAt = Time.unscaledTime;
             LeaveSaves++;
@@ -1918,6 +1933,9 @@ namespace Game.Client
             if (_client.Status == ClientStatus.Playing && !side) _storyScreen?.DrawPanels();
             // Not where a window lies over it (an encounter window on a small screen reaches the column).
             if (!side || !window.Overlaps(Ui.MinimapArea)) _map?.DrawMinimap(Ui.MinimapArea);
+            // The test ground's badge and hit log, under the column's lines (not under a window or the hub).
+            if (!side && !_screens.HubOpen) DrawTestOverlay();
+            else if (Event.current.type == EventType.Repaint) TestGround.Hide();
             if (Controls.UsingTouch)
             {
                 DrawTouchButtons();
@@ -1951,6 +1969,12 @@ namespace Game.Client
                 DrawGameSettings();
                 return;
             }
+            // The test ground's panel (Docs/TestGround.md).
+            if (_screens.Current == GameScreen.Test)
+            {
+                DrawTestPanel();
+                return;
+            }
             _inventory?.Draw();
         }
 
@@ -1976,6 +2000,8 @@ namespace Game.Client
                 Rect.MinMaxRect(Ui.MinimapArea.x, Ui.MinimapArea.y, Ui.MinimapArea.xMax, Mathf.Max(Ui.RightColumnBottom, Ui.InfoBottom)),
             };
             if (hub is Rect panel) obstacles.Add(panel);
+            // The test ground's hit log (Docs/TestGround.md).
+            if (TestGround.Shown.width > 0) obstacles.Add(TestGround.Shown);
             // One that starts inside the banner's lower part (the [메뉴] panel on a low screen, under a banner over two or
             // three lines): the banner rises above it where the screen has the room, rather than run onto it.
             foreach (var o in obstacles)

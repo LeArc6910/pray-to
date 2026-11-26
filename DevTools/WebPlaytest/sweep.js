@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -7522,7 +7522,147 @@ async function title(browser) {
   }
 }
 
-const Sections = { menu, title, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+// The test ground (Docs/TestGround.md, 2026-11-26): the world list's [시험장] row starts the picked character, a copy,
+// in a world never saved; the panel ([시험판], T on a PC, [메뉴] on a phone) wears a band's set, sets a level, goes to a
+// boss's arena and calls an elite; the hit log on the screen shows each hit with its share of the health. Nothing of
+// it is saved: the new character is not in the list afterwards. PC and a phone held upright.
+async function testground(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    const { width, height } = profile.context.viewport;
+    note(`\n## 시험장 ${name} ${width}×${height}\n`);
+    const game = await open(browser, run, profile, url);
+    for (let i = 0; i < 20 && !(await game.find('게임 시작')).length; i++) await game.wait(300);
+    await game.toWorldList({ name: `tg${name}`, newCharacter: true });
+    const row = (await game.find('시험장'))[0];
+    check(!!row && row.shown, `${name}: 월드 목록에 [시험장] 줄`);
+    await game.press('시험장');
+    let t = await game.title();
+    check(t.world === 'testground', `${name}: [시험장]을 고르면 [시험장 들어가기] (${t.world})`);
+    check((await game.find('시험장 들어가기')).length > 0, `${name}: 아래 단추가 [시험장 들어가기]`);
+    await game.shot('testground-worlds', '월드 목록의 [시험장] 줄');
+    await game.press('시험장 들어가기');
+    const playing = await game.until(r => r.playing && r.testground, 45000);
+    check(!!playing, `${name}: 시험장에 들어간다`);
+    if (!playing) {
+      await game.context.close();
+      continue;
+    }
+    await game.wait(1500);
+    if (game.touch) await game.page.touchscreen.tap(width / 2, height / 3);
+    let tg = await game.ask('test');
+    check(tg.on === true && tg.showHits === true, `${name}: 시험장 표시와 맞은 기록 (켜짐 ${tg.on})`);
+    check((tg.overlayLines || []).length > 0 && tg.overlay && tg.overlay[2] > 0, `${name}: 화면에 맞은 기록 칸 (${(tg.overlayLines || []).join(' / ')})`);
+    const text = await game.allText();
+    check(has(text, '저장되지 않는다'), `${name}: 저장되지 않는다는 안내 줄`);
+
+    // The panel: T on a PC, [메뉴] → [시험판] on a phone.
+    const openPanel = async () => {
+      if (game.touch) {
+        await game.press('메뉴');
+        await game.until(r => r.hub, 2000);
+        await game.press('시험판', '메뉴');
+      } else {
+        await game.page.keyboard.press('t');
+      }
+      return !!(await game.until(r => r.window === '시험판', 3000));
+    };
+    check(await openPanel(), `${name}: 시험판이 열린다 (${game.touch ? '[메뉴] → [시험판]' : 'T'})`);
+    await game.shot('testground-level', '시험판: 레벨');
+    const fits = async what => {
+      const shown = (await game.buttons()).filter(b => b.shown);
+      const out = shown.filter(b => b.rect[0] < -0.5 || b.rect[1] < -0.5 || b.rect[0] + b.rect[2] > width + 0.5 || b.rect[1] + b.rect[3] > height + 0.5);
+      check(out.length === 0, `${name} ${what}: 단추가 화면 안 (${out.map(b => b.label).slice(0, 4).join(', ') || '모두'})`);
+      if (game.touch) {
+        const low = shown.filter(b => b.rect[3] < 43.5 && b.label !== '창 닫기');
+        check(low.length === 0, `${name} ${what}: 휴대폰 단추 44점 (${low.map(b => `${b.label} ${Math.round(b.rect[3])}`).slice(0, 4).join(', ') || '모두'})`);
+      }
+    };
+    await fits('레벨');
+    // A level with a defensive build.
+    await game.press('Lv 10', '레벨');
+    await game.press('방어 빌드', '레벨 포인트');
+    tg = await game.ask('test');
+    check(tg.level === 10, `${name}: [Lv 10] → [방어 빌드]로 레벨 10 (${tg.level}, "${tg.status}")`);
+    // The iron set, rare.
+    await game.press('장비', '시험판 쪽');
+    await game.press('철', '단계');
+    await game.press('희귀', '등급');
+    await game.shot('testground-gear', '시험판: 장비(철·희귀를 고름)');
+    await fits('장비');
+    await game.press('철 세트 입기', '장비 입기');
+    tg = await game.ask('test');
+    const worn = (tg.worn || []).filter(w => w.startsWith('iron_') && w.includes('|Rare|'));
+    check(worn.length === 6, `${name}: 철 세트 여섯 벌(희귀)을 입었다 (${(tg.worn || []).join(', ')})`);
+    check(/^철 세트/.test(tg.status || ''), `${name}: 답이 시험판에 ("${tg.status}")`);
+    const armor = tg.armor;
+    // Never felled while watching the hits.
+    await game.press('생존', '시험판 쪽');
+    await game.press('죽지 않기: 끔', '생존');
+    tg = await game.ask('test');
+    check(tg.undying === true, `${name}: [죽지 않기] 켬`);
+    await game.shot('testground-survive', '시험판: 생존');
+    // To the first boss's arena; the panel shuts.
+    await game.press('이동', '시험판 쪽');
+    await game.shot('testground-travel', '시험판: 이동(보스·던전·들판)');
+    await fits('이동');
+    await game.press('동굴 수호자', '보스');
+    const shut = await game.until(r => r.window === '', 3000);
+    check(!!shut, `${name}: 보스로 가면 시험판이 닫힌다`);
+    tg = await game.ask('test');
+    check(/동굴 수호자/.test(tg.status || ''), `${name}: 동굴 수호자의 방으로 ("${tg.status}")`);
+    await game.wait(1500);
+    await game.shot('testground-arena', '동굴 수호자의 방 앞');
+    // An elite called from the panel, which comes at the player.
+    check(await openPanel(), `${name}: 시험판을 다시 연다`);
+    await game.press('몬스터', '시험판 쪽');
+    await game.press('흙 동굴', '생물군계');
+    await game.press('우두머리', '몬스터 종류');
+    await game.shot('testground-monsters', '시험판: 몬스터(흙 동굴·우두머리)');
+    await fits('몬스터');
+    const kinds = (await game.buttons()).filter(b => b.row === '몬스터' && b.shown);
+    const kind = kinds.find(b => / M$/.test(b.label)) || kinds[0];
+    check(!!kind, `${name}: 흙 동굴 몬스터 목록 (${kinds.length}종)`);
+    if (kind) await game.press(kind.label, '몬스터');
+    await game.until(r => r.window === '', 3000);
+    tg = await game.ask('test');
+    check(/우두머리/.test(tg.status || ''), `${name}: 우두머리를 불렀다 ("${tg.status}")`);
+    // Wait for a hit (the elite, its two, or the boss).
+    const hit = await game.until(x => (x.hits || []).length > 0, 25000, () => game.ask('test'));
+    check(!!hit, `${name}: 맞았다`);
+    if (hit) {
+      const last = hit.hits[hit.hits.length - 1];
+      check(last.amount > 0 && last.pct > 0 && /%/.test(last.line), `${name}: 맞은 기록 줄 "${last.line}" (원래 ${last.raw}, 방어 ${last.armor}/${last.bandArmor}, ${Math.round(last.through)}% 들어옴)`);
+      check(Math.abs(last.armor - armor) < 1.5, `${name}: 기록의 방어가 입은 철 세트의 방어 (${last.armor} / ${armor})`);
+      await game.wait(600);
+      tg = await game.ask('test');
+      check((tg.overlayLines || []).some(l => l.includes('%')), `${name}: 화면의 맞은 기록에 % (${(tg.overlayLines || []).slice(0, 2).join(' / ')})`);
+    }
+    await game.shot('testground-hits', '맞은 기록(누가·무엇·몇 %)');
+    check(await openPanel(), `${name}: 시험판(맞은 기록 쪽)`);
+    await game.press('맞은 기록', '시험판 쪽');
+    await game.shot('testground-log', '시험판: 맞은 기록(방어 비와 목표)');
+    await game.press('창 닫기');
+    await game.until(r => r.window === '', 2000);
+
+    // Out: [시험장 나가기], and the new character is in no list (nothing was saved).
+    if (game.touch) await game.press('메뉴');
+    else await game.page.keyboard.press('Escape');
+    await game.until(r => r.hub, 2000);
+    await game.press('나가기', '메뉴');
+    check((await game.find('시험장 나가기', '메뉴')).length > 0, `${name}: 나가기는 [시험장 나가기]`);
+    await game.shot('testground-leave', '나가기 물음(저장 안 됨)');
+    await game.press('시험장 나가기', '메뉴');
+    check(!!(await game.until(x => !x.playing && x.title && x.title.page === 'main', 8000)), `${name}: 시작 화면으로`);
+    await game.press('게임 시작');
+    t = await game.title();
+    // A fresh browser: had the test ground saved the character, it would be in the list now.
+    check((t.characters || []).length === 0, `${name}: 시험장에서 한 캐릭터는 저장되지 않았다 (목록 ${(t.characters || []).length}명)`);
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, title, testground, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

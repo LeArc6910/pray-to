@@ -24,6 +24,7 @@ namespace Game.Client
     //   buttons                   JSON: every button drawn last frame, with its rect in points; the skill and quick slots
     //   texts                     JSON: the HUD's lines, the corner lines, the banner, the menu's status line, the labels laid out with Ui.Wrap
     //   touch on|off              report (JSON: the player, the time, the monsters, the machines, the screen)
+    //   test ...                  the test ground's panel (Playtest.TestGround.cs, Docs/TestGround.md), only there
     // In a solo game:
     //   scene combo|machines|defense|rift|skylight|set|roll   (roll: a lane of floor east of the player, a wall 8 tiles on)
     //   scene ice|quicksand       a lane of that floor east of the player, a wall 12 tiles on (PlayerMotor)
@@ -239,6 +240,8 @@ namespace Game.Client
             if (!root.Playing || !root.IsSolo || root.HostWorld == null) return $"error {words[0]}: not in a solo game";
 
             if (words[0] == "nav" || words[0] == "sense" || words[0] == "botreport" || words[0] == "botreset") return Bot(root, words);
+            // The test ground's panel and its checks (Playtest.TestGround.cs); refused in any other game.
+            if (words[0] == "test") return Test(root, words);
 
             var world = root.HostWorld;
             var player = root.HostPlayer;
@@ -2547,6 +2550,8 @@ namespace Game.Client
                 .Field("backdrop", TitleBackdrop.Biomes).Field("pan", TitleBackdrop.Offset).Field("motion", !Settings.ReduceMotion).Field("scroll", root.MenuScroll).Raw('}'));
             // The hub's question after [나가기] ([저장하고 나가기] / [남기], T3).
             json.Field("leaveAsked", root.LeaveAsked);
+            // The test ground (Docs/TestGround.md): whether this game is one; "test" answers the rest.
+            json.Field("testground", root.InTestGround);
             json.Field("screen", $"{Ui.Width:0}x{Ui.Height:0}");
             // Device pixels a point and the menu's "UI 크기" (Ui.PointScale), and the safe area's edges in points (none
             // in a browser; a test may stand one in, "inset" below).

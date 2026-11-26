@@ -275,7 +275,7 @@ namespace Game.Core
                 // At the entrance of the dungeon they fell in, however often (World.Dungeon.cs); else by the last camp
                 // rested at, or at home (World.Pois.cs).
                 var inDungeon = DungeonRising(player);
-                player.Position = inDungeon ?? RisingPlace(player);
+                player.Position = inDungeon ?? RisingOf(player.Id) ?? RisingPlace(player);
                 player.Health = player.Stats.MaxHealth;
                 player.Mana = player.Stats.MaxMana;
                 player.Corrections++;
@@ -644,7 +644,8 @@ namespace Game.Core
         // Returns the damage dealt. A burn's damage is not lessened again by armor (a pool's burn and a poison are worked
         // out from what got through, World.Through). A blow (dodge) passes through a player in
         // the unhurt ticks of a roll (World.Roll.cs); a burn already on them does not.
-        int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true, bool dodge = true)
+        // kind names a hit that is no attack (a burn, a poison's bite, a fall) for the test ground's log (World.TestGround.cs).
+        int HurtPlayer(Player player, int source, float damage, int cause = 0, bool armor = true, bool dodge = true, string kind = null)
         {
             if (player.IsDead) return 0;
             // Nothing touches one riding a minecart (World.Travel.cs).
@@ -659,6 +660,8 @@ namespace Game.Core
             player.RestingTicks = 0;
             Strain(player, amount);
             _events.Add(new SimEvent(SimEventType.Hit, source, player.Id, amount, cause: cause));
+            // The test ground's log, and "죽지 않기" keeping the player at 1 (nothing in an ordinary world).
+            NoteHitOnPlayer(player, source, cause, damage, amount, armor, kind);
             if (!player.IsDead) return amount;
 
             player.Health = 0;

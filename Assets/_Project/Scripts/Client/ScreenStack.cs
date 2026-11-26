@@ -26,6 +26,8 @@ namespace Game.Client
         Anvil,
         // The settings in the game ([메뉴] → [설정], U7): the start menu's page, a full screen.
         Settings,
+        // The test ground's panel (Docs/TestGround.md): only there, a full screen.
+        Test,
     }
 
     // Screens of one kind share a window: its head, its place, and tabs that switch between them.
@@ -167,6 +169,8 @@ namespace Game.Client
         }
 
         public const string LeaveConfirm = "저장하고 나가기";
+        // The test ground's (nothing is saved there).
+        public const string TestLeave = "시험장 나가기";
         public const string Stay = "남기";
 
         // ---- What each screen is ----
@@ -206,6 +210,7 @@ namespace Game.Client
             GameScreen.Station => "작업대",
             GameScreen.Anvil => "모루",
             GameScreen.Settings => "설정",
+            GameScreen.Test => "시험판",
             _ => "",
         };
 
@@ -224,6 +229,7 @@ namespace Game.Client
                 "상인" or "merchant" => GameScreen.Shop,
                 "화로" or "workbench" or "furnace" => GameScreen.Station,
                 "설정" or "settings" => GameScreen.Settings,
+                "시험판" or "test" => TestGround.Active ? GameScreen.Test : GameScreen.None,
                 _ => GameScreen.None,
             };
         }
@@ -252,6 +258,7 @@ namespace Game.Client
             GameScreen.Station => UiIcons.Hammer,
             GameScreen.Anvil => UiIcons.Hammer,
             GameScreen.Settings => UiIcons.Gear,
+            GameScreen.Test => UiIcons.Target,
             _ => null,
         };
 
@@ -267,7 +274,7 @@ namespace Game.Client
         };
 
         // The window's key for its opening tween: one per group, so going from tab to tab within it does not open it anew.
-        public static string MotionKey(GameScreen screen) => GroupOf(screen) switch
+        public static string MotionKey(GameScreen screen) => screen == GameScreen.Test ? "test" : GroupOf(screen) switch
         {
             ScreenGroup.Growth => "growth",
             ScreenGroup.Records => "records",
@@ -278,6 +285,7 @@ namespace Game.Client
         // The key that opens it, written after a name on a PC ("스킬 (K)"); nothing on a touch screen or without a key.
         public static string KeyHint(GameScreen screen)
         {
+            if (screen == GameScreen.Test) return Controls.UsingTouch ? "" : $" ({TestGround.PanelKeyName})";
             if (Controls.UsingTouch || KeyOf(screen) is not KeyAction action || KeyBindings.KeyFor(action) == UnityEngine.InputSystem.Key.None) return "";
             return $" ({KeyBindings.Name(action)})";
         }
@@ -390,7 +398,10 @@ namespace Game.Client
         // ---- The touch hub (Docs/UiRework.md 4-1 허브, 4-5 허브) ----
 
         // What the hub offers, in its order, then [나가기] (which [메뉴] took the place of). [설정] since U7.
-        static readonly GameScreen[] HubScreens = { GameScreen.Bag, GameScreen.Skills, GameScreen.Passives, GameScreen.Character, GameScreen.Journal, GameScreen.Map, GameScreen.Settings };
+        static readonly GameScreen[] OrdinaryHub = { GameScreen.Bag, GameScreen.Skills, GameScreen.Passives, GameScreen.Character, GameScreen.Journal, GameScreen.Map, GameScreen.Settings };
+        // In the test ground [시험판] comes first (Docs/TestGround.md); nowhere else.
+        static readonly GameScreen[] TestHub = new[] { GameScreen.Test }.Concat(OrdinaryHub).ToArray();
+        static GameScreen[] HubScreens => TestGround.Active ? TestHub : OrdinaryHub;
         public const string Leave = "나가기";
         public const string HubButton = "메뉴";
         // The row name the hub's buttons are probed under, apart from [가방] and the minimap's [지도] drawn before it.
@@ -520,7 +531,7 @@ namespace Game.Client
             float answers = stacked ? 2 * button + HubGap : button;
             var question = new Rect(inner.x, inner.y, inner.width, Mathf.Max(24, inner.height - answers - HubGap));
             if (Event.current.type == EventType.Repaint)
-                GUI.Label(question, Ui.Wrap(Strings.T("hub.leave_ask", "저장하고 시작 화면으로 나간다"), _askText, question.width), _askText);
+                GUI.Label(question, Ui.Wrap(TestGround.Active ? "시험장을 나간다. 여기서 한 일은 저장되지 않는다" : Strings.T("hub.leave_ask", "저장하고 시작 화면으로 나간다"), _askText, question.width), _askText);
             Rect yes, no;
             if (stacked)
             {
@@ -536,7 +547,8 @@ namespace Game.Client
             _hubText.alignment = TextAnchor.MiddleCenter;
             _leaveButton ??= new GUIStyle(GUI.skin.button);
             Ui.Text(_leaveButton, 13);
-            bool leave = Ui.Button(yes, LeaveConfirm, LeaveConfirm, _leaveButton, Ui.Look.Danger, false);
+            string confirm = TestGround.Active ? TestLeave : LeaveConfirm;
+            bool leave = Ui.Button(yes, confirm, confirm, _leaveButton, Ui.Look.Danger, false);
             if (Ui.Button(no, Stay, Stay, _hubText, Ui.Look.Text, !Controls.UsingTouch))
             {
                 LeaveAsked = false;

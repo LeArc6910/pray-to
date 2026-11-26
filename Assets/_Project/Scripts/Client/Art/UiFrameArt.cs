@@ -464,6 +464,11 @@ namespace Game.Client
         {
             "....###....", ".#..###..#.", ".###ooo###.", "..#o###o#..", "###o#.#o###", "###o#.#o###", "..#o###o#..", ".###ooo###.", ".#..###..#.", "....###....",
         };
+        // A target with a dummy's mark in the middle: the test ground's panel (TestPanel, Docs/TestGround.md).
+        public static readonly string[] Target =
+        {
+            "...#####...", "..#ooooo#..", ".#o#####o#.", "#o#ooooo#o#", "#o#o###o#o#", "#o#o#x#o#o#", "#o#o###o#o#", "#o#ooooo#o#", ".#o#####o#.", "..#ooooo#..", "...#####...",
+        };
         public static readonly string[] Coin = { "..###..", ".#ooo#.", "#oo#oo#", "#oo#oo#", "#oo#oo#", ".#ooo#.", "..###.." };
         public static readonly string[] Heart = { ".##.##.", "#o#####", "#######", ".#####.", "..###..", "...#..." };
         public static readonly string[] Lock = { "..###..", ".#...#.", ".#...#.", "#######", "###o###", "###o###", "#######" };

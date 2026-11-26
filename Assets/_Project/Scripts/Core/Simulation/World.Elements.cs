@@ -212,9 +212,9 @@ namespace Game.Core
                 var afflictions = player.Afflictions;
                 afflictions.TickBurn();
                 int amount = TakeOwed(afflictions, false);
-                if (amount > 0) HurtPlayer(player, afflictions.BurnSource, amount, armor: false, dodge: false);
+                if (amount > 0) HurtPlayer(player, afflictions.BurnSource, amount, armor: false, dodge: false, kind: "화상");
                 if (afflictions.PoisonTicks > 0 && --afflictions.PoisonTicks % Ticks(VenomSeconds) == 0 && !player.IsDead)
-                    HurtPlayer(player, afflictions.PoisonSource, afflictions.PoisonBite, armor: false, dodge: false);
+                    HurtPlayer(player, afflictions.PoisonSource, afflictions.PoisonBite, armor: false, dodge: false, kind: "독");
             }
         }
 

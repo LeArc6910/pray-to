@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Linq;
+using Game.Core;
 using NUnit.Framework;
 using UnityEngine;
 using UnityEngine.TestTools;
@@ -97,6 +99,60 @@ namespace Game.Client.Tests
             Controls.ForceTouch(false);
             _root.ShowHub(false);
             Assert.IsFalse(_root.LeaveAsked, "Shutting the hub lets the question go.");
+        }
+
+        // The test ground (Docs/TestGround.md): started from the world list's row, its badge and hit log after a few
+        // hits, its panel's six pages on a PC and a phone, and nothing written once it is left.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheTestGroundsPanelAndHitLogDraw()
+        {
+            Assert.IsTrue(_root.OpenTitle("worlds"));
+            yield return new WaitForSecondsRealtime(Settle);
+            yield return Screens.Take("testground-worlds");
+            _root.StartTestGroundNow();
+            yield return TestSaves.UntilPlaying(_root, 1, 60);
+            Assert.IsTrue(_root.Playing, "The test ground never started playing. " + _root.Status);
+            Assert.IsTrue(_root.InTestGround);
+            Assert.IsTrue(_root.HostWorld.TestGround);
+            var player = _root.HostPlayer;
+            StringAssert.StartsWith("철 세트", Playtest.Act(_root, "test gear 2 sword Rare High 3"));
+            yield return null;
+            StringAssert.Contains("동굴 수호자", Playtest.Act(_root, "test boss cave_warden"));
+            yield return null;
+            _root.HostWorld.MonstersHold = true;
+            Playtest.Act(_root, "test mob cave_beetle leader");
+            yield return null;
+            var leader = _root.HostWorld.Enemies.First(e => e.Elite == EliteRank.Leader);
+            _root.HostWorld.Hurt(player, leader, 40);
+            _root.HostWorld.Hurt(player, _root.HostWorld.Enemies.First(e => e.Elite == EliteRank.None), 30);
+            yield return new WaitForSecondsRealtime(Settle);
+            Assert.AreEqual(2, _root.HostWorld.HitsOn(player.Id).Count);
+            Assert.Greater(TestGround.ShownLines.Count, 1, "The hit log is on the screen.");
+            yield return Screens.Take("testground-hits");
+            foreach (bool touch in new[] { false, true })
+            {
+                Controls.ForceTouch(touch);
+                yield return new WaitForSecondsRealtime(Settle);
+                if (touch) yield return Screens.Take("testground-hits-touch");
+                foreach (string page in new[] { "레벨", "장비", "이동", "몬스터", "생존", "기록" })
+                {
+                    Playtest.Act(_root, "test panel " + page);
+                    yield return new WaitForSecondsRealtime(Settle);
+                    Assert.AreEqual("시험판", _root.ScreenName);
+                    yield return Screens.Take($"testground-panel-{page}{(touch ? "-touch" : "")}");
+                }
+                _root.ShowScreen(GameScreen.None);
+            }
+            Controls.ForceTouch(false);
+            _root.ShowHub(true);
+            yield return new WaitForSecondsRealtime(Settle);
+            yield return Screens.Take("testground-hub");
+            _root.ShowHub(false);
+            _root.Leave();
+            yield return null;
+            Assert.IsFalse(SaveStore.Exists(SaveStore.CharacterKey(Name)), "The character played in the test ground is not saved.");
+            Assert.IsFalse(SaveStore.Exists(SaveStore.WorldKey(TestGround.Name)), "Nor the world.");
+            Assert.IsFalse(TestGround.Active);
         }
     }
 }

@@ -83,7 +83,7 @@ namespace Game.Client
             }
         }
 
-        public static bool Draws(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Map && screen != GameScreen.Settings;
+        public static bool Draws(GameScreen screen) => screen != GameScreen.None && screen != GameScreen.Map && screen != GameScreen.Settings && screen != GameScreen.Test;
 
         // The bag's own pages (the rest are screens of their own; the chest's and the merchant's are encounter windows
         // since U3).

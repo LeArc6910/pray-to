@@ -923,7 +923,7 @@ namespace Game.Client
 
         // ---- The world list ----
 
-        string StartLabel => _hostKind switch
+        string StartLabel => _pickedWorld == TestGround.Row && _hostKind == HostKind.Solo ? "시험장 들어가기" : _hostKind switch
         {
             HostKind.Online => Strings.T("title.open_room", "방 열기"),
             HostKind.Lan => string.Format(Strings.T("menu.host_lan", "호스트 (포트 {0})"), NetLink.DefaultPort),
@@ -931,7 +931,7 @@ namespace Game.Client
         };
 
         bool PickedWorldReady => _pickedWorld.Length > 0
-            && (_pickedWorld == _newWorld || _worldList.Any(w => w.Name == _pickedWorld && !w.IsBroken));
+            && (_pickedWorld == _newWorld || _worldList.Any(w => w.Name == _pickedWorld && !w.IsBroken) || _pickedWorld == TestGround.Row && _hostKind == HostKind.Solo);
 
         void DrawWorldList()
         {
@@ -949,6 +949,16 @@ namespace Game.Client
             else PageNote(Strings.T("title.classes_later", "클래스는 게임 안 [스킬] 화면에서 고른다"));
             if (_hostKind != HostKind.Solo) PageNote(Strings.T("title.host_pick", "방에서 열 월드를 고른다"));
             GUILayout.Space(4);
+
+            // The test ground (Docs/TestGround.md): alone, never saved, the character played as a copy. Not for a room.
+            if (_hostKind == HostKind.Solo)
+            {
+                var rect = GUILayoutUtility.GetRect(_menuColumn, ListRowHeight);
+                if (ListRow(rect, TestGround.Name, _pickedWorld == TestGround.Row, true, false, out _, (r, s) =>
+                    WorldFace(r, s, TestGround.Name, "보스·던전·들판으로 바로 · 장비와 레벨을 마음대로", "저장되지 않는다 · 이 캐릭터의 복사본으로 한다", Biome.Crystal, false, true)))
+                    Later(() => PressWorld(TestGround.Row));
+                GUILayout.Space(4);
+            }
 
             if (_newWorld != null)
             {
@@ -1017,6 +1027,11 @@ namespace Game.Client
         void StartPicked()
         {
             if (!PickedWorldReady) return;
+            if (_pickedWorld == TestGround.Row)
+            {
+                StartTestGround();
+                return;
+            }
             _worldName = _pickedWorld;
             _startSeed = _pickedWorld == _newWorld ? _newWorldSeed : (ulong?)null;
             NewLook = CharacterName == _newCharacter ? _newCharacterLook : CharacterLook.Default;
@@ -1326,7 +1341,8 @@ namespace Game.Client
 
         internal string TitlePage => _client != null && _screens.Current != GameScreen.Settings ? "" : _page.ToString().ToLowerInvariant();
         internal string TitleFlow => _flow.ToString().ToLowerInvariant();
-        internal string PickedWorld => _pickedWorld;
+        // The test ground's row as "testground" (its key is no name a world can have).
+        internal string PickedWorld => _pickedWorld == TestGround.Row ? "testground" : _pickedWorld;
         internal string NewCharacterName => _newCharacter ?? "";
         internal string NewWorldName => _newWorld ?? "";
         internal string TitleAsk => _ask == MenuAsk.None ? "" : _ask.ToString().ToLowerInvariant();

@@ -70,6 +70,10 @@ namespace Game.Client
         static GUIStyle _countStyle;
         static GUIStyle _keyStyle;
 
+        // False in the test ground (Docs/TestGround.md): the slots and locks start as this device keeps them for the
+        // character, and nothing done to them there is kept.
+        public bool Keep { get; set; } = true;
+
         public Hotbar(WorldClient client, LootData loot, string character)
         {
             _client = client;
@@ -96,7 +100,7 @@ namespace Game.Client
         public void ToggleLock(MaterialDefinition material)
         {
             if (!_locked.Remove(material.Kind.Id)) _locked.Add(material.Kind.Id);
-            Prefs.Set(_lockKey, string.Join("\n", _locked));
+            if (Keep) Prefs.Set(_lockKey, string.Join("\n", _locked));
         }
 
         // What the last [퀵] press did when it could not, for the bag to show a moment.
@@ -362,6 +366,7 @@ namespace Game.Client
 
         void Save()
         {
+            if (!Keep) return;
             Prefs.Set(_key, string.Join("\n", _entries.Select(e => e.ToString())));
         }
 

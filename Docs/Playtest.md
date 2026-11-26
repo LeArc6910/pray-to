@@ -1,5 +1,18 @@
 # 웹 플레이 시험 (클라우드가 대신 해 보기)
 
+## 시험장 (`testground`, 2026-11-26)
+
+`Docs/TestGround.md`를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only testground,title`. PC와 휴대폰 세로에서, 새 캐릭터로:
+
+1. 월드 목록 맨 위에 [시험장] 줄이 있고, 누르면 아래 단추가 [시험장 들어가기]가 되는지(`title.world` = `testground`). 눌러 들어가면 보고 `testground`가 참, "저장되지 않는다" 안내 줄, 미니맵 아래 맞은 기록 칸(`test`의 `overlay`·`overlayLines`). 사진 `testground-worlds`
+2. 시험판이 PC는 T, 휴대폰은 [메뉴] → [시험판]으로 열리는지(`window` = `시험판`). 모든 단추가 화면 안이고 휴대폰에서 44점인지. 사진 `testground-level`
+3. [Lv 10] → [방어 빌드]로 레벨 10, [장비] → [철]·[희귀] → [철 세트 입기]로 `test`의 `worn`이 철 여섯 벌(희귀)이고 답 줄이 "철 세트…"인지. [생존] → [죽지 않기] 켬. 사진 `testground-gear`, `testground-survive`
+4. [이동] → [동굴 수호자]로 시험판이 닫히고 답이 "동굴 수호자의 방"인지. 사진 `testground-travel`, `testground-arena`
+5. [몬스터] → [흙 동굴]·[우두머리] → M 종 하나로 우두머리를 부르고(답에 "우두머리"), 맞을 때까지 기다려 기록의 마지막 줄에 % 가 있는지, 기록의 방어가 입은 철 세트의 방어와 같은지, 화면의 칸에도 % 줄이 있는지. 사진 `testground-monsters`, `testground-hits`, `testground-log`(시험판의 맞은 기록 쪽)
+6. 나가기 물음이 [시험장 나가기]이고, 나간 뒤 캐릭터 목록이 비어 있는지(새 브라우저라, 저장했다면 그 캐릭터가 있다). 사진 `testground-leave`
+
+명령(`Client/Playtest.TestGround.cs`, 시험장 밖에서는 거절): `test`(JSON: 켜짐, 죽지 않기, 일어나는 자리, 멈춤, 칸 보임, 쪽, 답, 레벨·방어·생명력, 입은 것 `base|rarity|+n|룬 수`, 기록 수, 칸의 자리와 줄, 기록마다 who·what·kind·amount·pct·raw·armored·armor·band·bandArmor·through·zone·saved·aim·line), `test level <n> [points|attack|defense]`, `test classes <id,id>`, `test gear <단계 1~5> [sword|bow|staff] [Common|Uncommon|Rare|Epic] [Low|Middle|High] [강화]`, `test piece <바탕> …`, `test bare`, `test rune <id>`, `test runes clear`, `test eat <음식>`, `test heal`, `test undying on|off`, `test rising here|off`, `test hits show|hide|clear`, `test home`, `test boss <id>`, `test revive <id>`, `test dungeon <id>`, `test field <생물군계> <구역>`, `test mob <id> [normal|leader|champion|pack]`, `test clear`, `test hold on|off`, `test panel open|close|<쪽>`. 사람에게는 맞은 무게의 손맛만 묻는다
+
 ## 시작화면·캐릭터와 월드 고르기·로딩·허브 (`title`, 2026-11-25)
 
 `Docs/TitleRework.md` T3를 웹에서 본다. `node DevTools/WebPlaytest/sweep.js --only title,menu`(시작 흐름이 바뀌었으니 `save`·`layout`·`time`도). PC, 휴대폰 세로, 휴대폰 가로에서:

@@ -92,7 +92,7 @@ namespace Game.Core
                     if (player.IsDead || player.Riding || puff.Burnt.Contains(player.Id) || Vec2.Distance(player.Position, puff.At) > VentRadius + PlayerRadius) continue;
                     puff.Burnt.Add(player.Id);
                     VentBurns++;
-                    AfflictPlayer(player, 0, HurtPlayer(player, 0, puff.Damage));
+                    AfflictPlayer(player, 0, HurtPlayer(player, 0, puff.Damage, kind: "김 뿜는 틈"));
                 }
                 ScaldMonsters(puff);
             }
@@ -276,7 +276,7 @@ namespace Game.Core
             player.Position = up;
             player.Corrections++;
             _events.Add(new SimEvent(SimEventType.MonsterFx, player.Id, y * Map.Width + x, MonsterFxFall, position: up));
-            HurtPlayer(player, 0, Math.Max(1, player.Stats.MaxHealth * FallShare), armor: false, dodge: false);
+            HurtPlayer(player, 0, Math.Max(1, player.Stats.MaxHealth * FallShare), armor: false, dodge: false, kind: "추락");
         }
 
         // The middle of the nearest tile within FallSeek of the hole that is walked and is not itself a plate, lava, a
