@@ -1,6 +1,6 @@
 # 녹음 효과음 출처 (2026-11-11)
 
-2차(2026-11-26, 효과음 더 많이와 배경음악·환경음)는 이 문서 아래 "2차" 절에 있다.
+2차(2026-11-26, 효과음 더 많이와 배경음악·환경음)와 3차(2026-11-27, 빈칸 채우기)는 이 문서 아래 "2차"·"3차" 절에 있다.
 
 사람 요청 "걷는 사운드가 너무 시끄럽고 걷는 것 같지가 않아. 바닥 타일에 따라 소리가 달라졌으면 좋겠어. 무료로 공개되어 있는 효과음을 다운로드 받아서 사용해도 좋고 (다른 사운드도 이런 식으로)".
 
@@ -331,3 +331,41 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | voice_golem_hurt_2.wav | item_stone_02.ogg | 80 CC0 RPG SFX | rubberduck | https://opengameart.org/content/80-cc0-rpg-sfx | CC0 1.0 |
 | Ambience/amb_lakeside.ogg | sfx100v2_loop_water_03.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
 | Ambience/amb_waves.ogg | sfx100v2_loop_water_02.ogg | 100 CC0 SFX #2 | rubberduck | https://opengameart.org/content/100-cc0-sfx-2 | CC0 1.0 |
+
+## 3차: 빈칸 채우기 (2026-11-27)
+
+사람 요청 "못 찾은 소리들도 다른 CC0 사이트에서 찾아서 넣어줘".
+
+- 효과음은 **Freesound**에서 라이선스를 'Creative Commons 0'으로 걸러 찾고, 소리 페이지마다 라이선스 링크가 publicdomain/zero/1.0인 것을 2026-11-27에 다시 확인했다. 원본 대신 Freesound가 공개로 내주는 미리듣기(HQ mp3, 박쥐 울음만 LQ)를 받아 가공했다(로그인 없이 받을 수 있는 것은 미리듣기뿐이다. 22050 Hz 모노로 줄이므로 차이가 거의 없다).
+- 곡은 1·2차처럼 OpenGameArt에서 라이선스가 CC0 하나뿐인 것만 받았다.
+- 가공: 긴 녹음(걸음 여러 번)은 소리가 시작하는 곳마다 잘라 큰 것부터 몇 개를 골랐다(앞 5 ms 여유, 길이 상한, 끝 페이드, 발소리 -14 dBFS, 그 밖 -8 dBFS). 곡은 2차와 같은 방법(60초 안쪽, 반복판은 그대로).
+- 코드: 바닥 종류에 벽돌(`BrickFloor`), 쇠 격자(`Grate`), 철벅이는 물(얕은 물 `ShallowWater`; 호수 맨바닥은 젖은 발 그대로)을 새로 나눴다. 얼음 바닥은 눈 발소리를 높여 쓰던 것을 얼음 녹음으로. 김(`Sizzle`), 용암 지대·용암 환경음(`Forge`, `Lava`), 박쥐·게·버섯 울음, 모든 장소 곡.
+- 그래도 못 넣은 것: 버섯 공격·맞음 울음, 게 맞음 울음(합성 그대로). Freesound의 으깸 소리 하나는 미리듣기 받기가 막혀(403) 뺐다.
+
+### 3차 배경음악 파일
+
+| 파일 | 원본 파일 | 곡·팩 | 작가 | 출처 페이지 | 쓰는 곳 | 반복 | 라이선스 |
+|---|---|---|---|---|---|---|---|
+| music_kingdom.ogg | CHIPTUNE_Loop_The_Bards_Tale.wav | Chiptune Medieval: The Bard's Tale (loop) | RandomMind | https://opengameart.org/content/chiptune-medieval-the-bards-tale | 왕국 | 전체(반복판) | CC0 1.0 |
+| music_hut.ogg | CHIPTUNE_Loop_The_Old_Tower_Inn.wav | Chiptune Medieval: The Old Tower Inn (loop) | RandomMind | https://opengameart.org/content/chiptune-medieval-the-old-tower-inn | 오두막 | 전체(반복판) | CC0 1.0 |
+| music_harbor.ogg | port_town_in_game.ogg | Port Town Loop | beardalaxy | https://opengameart.org/content/port-town-loop | 항구 | 전체(반복판) | CC0 1.0 |
+| music_ruins.ogg | Ruined City Theme.wav | Ruined City Theme | Cleyton Kauffman | https://opengameart.org/content/ruined-city-theme | 유적 | 0–60초, 3초 겹침 | CC0 1.0 |
+| music_nest.ogg | Evil4 - Witch's Lair.ogg | JRPG Music Pack #3 [Evil] | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/jrpg-pack-3-evil | 마족 둥지 | 0–60초, 2초 겹침 | CC0 1.0 |
+| music_mine.ogg | Evil2 - Catacombs.ogg | JRPG Music Pack #3 [Evil] | Juhani Junkala (SubspaceAudio) | https://opengameart.org/content/jrpg-pack-3-evil | 광산 | 0–60초, 3초 겹침 | CC0 1.0 |
+
+### 3차 효과음·환경음 파일 (Freesound)
+
+| 파일 | 원본 이름 | 저자 | 출처 페이지 | 쓰는 곳 | 라이선스 |
+|---|---|---|---|---|---|
+| footstep_ice_1~5 | footsteps - ice 09.wav | Anthousai | https://freesound.org/people/Anthousai/sounds/539683/ | 얼음 바닥 발소리 | CC0 1.0 |
+| footstep_brick_1~4 | Footsteps on concrete | florianreichelt | https://freesound.org/people/florianreichelt/sounds/459964/ | 벽돌 바닥 발소리 | CC0 1.0 |
+| footstep_grate_1~5 | Metal Grate Running | Oilcan03 | https://freesound.org/people/Oilcan03/sounds/786977/ | 쇠 격자 발소리 | CC0 1.0 |
+| footstep_splash_1~4 | Splashing Footsteps Shallow Water | ChristopherJngs | https://freesound.org/people/ChristopherJngs/sounds/861369/ | 얕은 물(철벅) 발소리 | CC0 1.0 |
+| sfx_sizzle_1~2 | G39-24-Steam Hiss.wav | craigsmith | https://freesound.org/people/craigsmith/sounds/438641/ | 김·불과 물(Sizzle) | CC0 1.0 |
+| sfx_sizzle_3 | Water Poured onto a Burning Fireplace – Hissing Steam and Sizzling Embers | bassimat | https://freesound.org/people/bassimat/sounds/870180/ | 김·불과 물(Sizzle) | CC0 1.0 |
+| Ambience/amb_lava.ogg | Lava Loop 1 | Fission9 | https://freesound.org/people/Fission9/sounds/474849/ | 용암 지대·용암 환경음(20초 반복) | CC0 1.0 |
+| voice_bat_cry_1~2 | Bat Screech | Yoyodaman234 | https://freesound.org/people/Yoyodaman234/sounds/667579/ | 박쥐 울음 | CC0 1.0 |
+| voice_bat_hurt_1 | Cartoon - Bat / Mouse Squeak | Breviceps | https://freesound.org/people/Breviceps/sounds/445958/ | 박쥐 맞음 | CC0 1.0 |
+| voice_crab_attack_1~3 | crab walking | stuniverso | https://freesound.org/people/stuniverso/sounds/761559/ | 게 공격(집게 딸깍) | CC0 1.0 |
+| voice_crab_cry_1~3 | Crab - Legs | Vrymaa | https://freesound.org/people/Vrymaa/sounds/770031/ | 게 알아챔(다리 소리) | CC0 1.0 |
+| voice_mushroom_cry_1~3 | puff.wav | Melilaura | https://freesound.org/people/Melilaura/sounds/531522/ | 버섯 알아챔(퍽) | CC0 1.0 |

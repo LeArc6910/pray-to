@@ -61,7 +61,7 @@ namespace Game.Client
             source.clip = clip;
             float gain = Recordings.StepGain(ground) * UnityEngine.Random.Range(0.8f, 1f);
             source.volume = Mathf.Clamp01(volume * gain) * Settings.Volume / Settings.MaxVolume;
-            source.pitch = 1 + UnityEngine.Random.Range(-0.05f, 0.05f) + (ground == Ground.Ice ? 0.15f : 0);
+            source.pitch = 1 + UnityEngine.Random.Range(-0.05f, 0.05f);
             source.Play();
         }
 

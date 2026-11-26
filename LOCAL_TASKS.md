@@ -1256,6 +1256,11 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only hud`
   - (사람) 판이 게임 화면을 너무 가리지 않는지(비치는 정도), 퀘스트 창의 막대·아이콘이 읽히는지
 
+- [ ] 190단계: 녹음 소리 3차(빈칸) — 얼음·벽돌·쇠 격자·철벅이는 물 발소리, 김, 용암 환경음, 박쥐·게·버섯 울음, 장소 곡 6개(왕국·오두막·둥지·항구·유적·광산)(`Docs/SoundCredits.md` "3차")
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Resources/Sfx`의 32개 wav, `Resources/Music`의 6개, `Resources/Ambience/amb_lava.ogg`의 `.meta`가 생기면 커밋한다(가져오기 설정은 `SoundImport`)
+  - (클라우드 웹 점검) `sweep.js --only menu`(녹음 세트 80개 넘게)
+  - (사람) `Docs/HumanChecklist.md` 190
+
 ## 결과 보고
 
 명령 한 줄이 실행할 때마다 아래에 결과를 덧붙인다. 플레이 확인 결과는 사람이(또는 로컬 세션이) 날짜와 함께 적는다.

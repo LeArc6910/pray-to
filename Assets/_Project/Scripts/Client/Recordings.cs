@@ -18,6 +18,10 @@ namespace Game.Client
         Metal,
         Water,
         Carpet,
+        // Laid bricks, an iron grate, and water deep enough to splash through (2026-11-27).
+        Brick,
+        Grate,
+        Splash,
     }
 
     // Recorded sound effects (2026-11-11, the owner: "steps too loud and not like walking; a sound for each floor; free
@@ -96,6 +100,7 @@ namespace Game.Client
             Sound.Shatter => "sfx_shatter",
             Sound.Nova => "sfx_spell",
             Sound.Plop => "sfx_plop",
+            Sound.Sizzle => "sfx_sizzle",
             Sound.Water => "sfx_bubble",
             Sound.Hammer or Sound.Clang => "sfx_anvil",
             Sound.Craft => "sfx_craft",
@@ -150,18 +155,15 @@ namespace Game.Client
         {
             if (song.Boss != null) return "music_boss";
             if (song.Scene != null) return "music_" + song.Scene;
-            return song.Tune switch
-            {
-                Tune.Cave or Tune.Mushroom or Tune.Ice or Tune.Crystal or Tune.Lava or Tune.Abyss or Tune.Lake or Tune.Sand or Tune.Village
-                    => "music_" + song.Tune.ToString().ToLowerInvariant(),
-                _ => null,
-            };
+            // Every place has one (2026-11-27: the kingdom, the hut, the nest, the harbour, the ruins and the mine too).
+            return "music_" + song.Tune.ToString().ToLowerInvariant();
         }
 
         public static string AmbienceName(Ambience ambience) => ambience switch
         {
             Ambience.Lakeside => "amb_lakeside",
             Ambience.Waves => "amb_waves",
+            Ambience.Lava or Ambience.Forge => "amb_lava",
             _ => null,
         };
 
@@ -203,7 +205,11 @@ namespace Game.Client
             Ground.Wood => "footstep_wood_alt",
             Ground.Rock => "footstep_rock",
             Ground.Sand => "footstep_sand",
-            Ground.Snow or Ground.Ice => "footstep_snow",
+            Ground.Snow => "footstep_snow",
+            Ground.Ice => "footstep_ice",
+            Ground.Brick => "footstep_brick",
+            Ground.Grate => "footstep_grate",
+            Ground.Splash => "footstep_splash",
             Ground.Leaves => "footstep_leaves",
             Ground.Metal => "footstep_metal",
             Ground.Water => "footstep_water",
@@ -218,6 +224,7 @@ namespace Game.Client
             Ground.Wood => 0.75f,
             Ground.Metal => 0.7f,
             Ground.Carpet => 1.2f,
+            Ground.Grate => 0.7f,
             _ => 1f,
         };
 
@@ -227,13 +234,15 @@ namespace Game.Client
             var type = map[x, y];
             if (type == TileType.RedCarpet || type == TileType.BlueCarpet || type == TileType.YellowCarpet) return Ground.Carpet;
             if (type == TileType.Dock) return Ground.Wood;
+            if (type == TileType.BrickFloor) return Ground.Brick;
+            if (type == TileType.Grate) return Ground.Grate;
             if (type == TileType.Rail || World.IsBelt(type) || type == TileType.Splitter || type == TileType.Filter) return Ground.Metal;
             if (type == TileType.Road || type == TileType.Waypoint || TileMap.IsPaving(type)) return Ground.Stone;
             if (TileMap.IsSoil(type)) return Ground.Dirt;
             if (type == TileType.IceFloor) return Ground.Ice;
             if (type == TileType.Quicksand) return Ground.Sand;
             // The lake's shallows splash underfoot (B3b).
-            if (type == TileType.ShallowWater) return Ground.Water;
+            if (type == TileType.ShallowWater) return Ground.Splash;
             return biomes[x, y] switch
             {
                 Biome.Mushroom => Ground.Leaves,
