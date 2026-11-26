@@ -7682,8 +7682,8 @@ async function hunt(browser) {
     await game.send('equip iron_sword; equip iron_armor; heal; xp 3000');
     let h = await game.ask('hunt');
     const biomes = new Set((h.grounds || []).map(g => g.biome));
-    check(h.generator >= 8 && (h.grounds || []).length >= 2 * biomes.size && biomes.size >= 4,
-      `${name}: 새 월드(${h.generator}판)에 생물군계마다 사냥터 둘 (${(h.grounds || []).length}곳, 생물군계 ${biomes.size})`);
+    check(h.generator >= 8 && (h.grounds || []).length >= biomes.size && (h.grounds || []).length <= 2 * biomes.size && biomes.size >= 4,
+      `${name}: 새 월드(${h.generator}판)에 생물군계마다 사냥터 한두 곳(알맞은 방이 있는 만큼) (${(h.grounds || []).length}곳, 생물군계 ${biomes.size})`);
     await game.send('goto hunt 0');
     h = await game.until(r => r.grounds && r.grounds[0] && r.grounds[0].living >= r.first, 8000, () => game.ask('hunt')) || await game.ask('hunt');
     const first = (h.grounds || [])[0] || {};

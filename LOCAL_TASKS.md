@@ -1236,6 +1236,7 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Hunting.cs`, `Core/Simulation/World.Hunt.cs`, `Tests/EditMode/HuntingGroundTests.cs`의 `.meta`가 생기면 커밋한다
   - (클라우드 웹 점검) `sweep.js --only hunt`
   - 클라우드 확인 (2026-11-27, `8656bd6`): [ ] 12개 중 8 통과(PC·휴대폰: 새 월드 사냥터 16곳·14곳, 다가가면 6마리, 범례 [사냥터]). 실패 넷: 지도에 사냥터 표시가 없음 — 사냥터 가운데 칸을 아직 보지 못하면 표시하지 않았다(점검은 가장자리로 옮김) → 일부라도 보면 표시, 점검은 반지름 절반 안쪽으로. 다시 돌림
+  - 클라우드 확인 (2026-11-27, `7b89a28`): [x] `hunt,harvest` 20개 중 18 통과: 지도의 사냥터 표시와 카드 됨, 수확 사진에서 버섯 무리가 플레이어 앞에 보임. 실패 둘은 점검 쪽(이 시드는 한 생물군계에 알맞은 방이 하나라 사냥터 15곳인데 꼭 둘씩을 요구) → "한두 곳"으로 고침(다시 돌리지 않음, 다시 고치기 두 번 씀)
   - (사람) 새 월드에서 길만 따라 걸을 때 만나는 몬스터가 적당한지(너무 귀찮지 않은지), 사냥터에서 몰려오는 수와 4초마다 하나씩이 사냥할 맛이 나는지, 보상(경험치 70%·드랍 40%)이 아깝지 않은지
 - [ ] 186단계: 수확 오브젝트 — 생성기 9판(새 월드만): 바닥 채집물 대신 생물군계마다 따거나 깨는 오브젝트(버섯 무리·빛 포자 덤불·서리 정동·미스릴 바위·불고추 덤불·공허 콩 꼬투리·조개 무더기·호박 바위), 다음 날 아침 다시 자람(`Docs/Harvest.md`). 통신 0.110.0
   - 명령 한 줄을 다시 돌린다(시트: `tiles.csv`에 여덟 줄). 새 파일 `Core/World/WorldGenerator.Harvest.cs`, `Core/Simulation/World.Harvest.cs`, `Client/Art/BiomeArt.Harvest.cs`, `Tests/EditMode/HarvestTests.cs`의 `.meta`가 생기면 커밋한다
