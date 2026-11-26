@@ -1226,15 +1226,15 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only testground`(맞은 기록의 몫이 새 곡선)
   - 클라우드 확인 (2026-11-27, `0f89fef`): [x] `testground` 62개 모두 통과. PC에서 철 희귀 세트(방어 57)로 동굴 수호자의 바위 줄기를 맞으면 "원래 161, 방어 57.4/13, 18% 들어옴 → -29(9%)"(예전 곡선은 2%): 보스 곡선의 바닥 18%가 들어온다. 휴대폰 세로의 슬라임 우두머리는 -9(3%)
   - (사람) 시험장에서 철 희귀 세트·방어 빌드로 동굴 수호자를 맞으면 내려찍기가 예전 1%가 아니라 바닥(18%대의 몫)만큼 들어오는지, 체력을 쌓은 캐릭터가 필살기를 버티고 방어만 쌓은 캐릭터는 거의 다 잃는지의 느낌
-- [ ] 184단계: 몬스터 분포와 사냥터 — 생성기 8판(새 월드만): 길 2칸 밖·길이 지나는 방에도 떠돌이(길만 걸어도 분당 1~2번 만남), 생물군계마다 사냥터 2곳(계속 나옴, 경험치 70%·드랍 40%), 지도의 [사냥터] 표시(`Docs/HuntingGrounds.md`)
-  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Hunting.cs`, `Core/Simulation/World.Hunt.cs`, `Tests/EditMode/HuntingGroundTests.cs`의 `.meta`가 생기면 커밋한다
-  - (클라우드 웹 점검) `sweep.js --only hunt`
-  - (사람) 새 월드에서 길만 따라 걸을 때 만나는 몬스터가 적당한지(너무 귀찮지 않은지), 사냥터에서 몰려오는 수와 4초마다 하나씩이 사냥할 맛이 나는지, 보상(경험치 70%·드랍 40%)이 아깝지 않은지
-
 - [ ] 184단계: 녹음 효과음 2차와 배경음악·환경음 — Kenney·rubberduck CC0 효과음 112개(전투·구르기·원소·몬스터 울음·UI·동전·상자·물·수확·제작·징글), CC0 배경음악 12곡(시작화면·마을·생물군계 8곳·던전·보스), 환경음 2개(`Docs/SoundCredits.md` "2차")
   - 명령 한 줄을 다시 돌린다. 새 파일 `Resources/Sfx/*.wav`(새 112개), 새 폴더 `Resources/Music`(12개 ogg), `Resources/Ambience`(2개 ogg), `Client/Editor/SoundImport.cs`의 `.meta`가 생기면 커밋한다. 가져오기 설정은 `SoundImport`(AssetPostprocessor)가 정하므로 손으로 고치지 않는다(모노, 22050 Hz, Vorbis, 음악·환경음은 압축한 채 품질 0.35). 이미 가져온 파일에 설정이 안 걸렸으면 `Resources/Sfx`·`Music`·`Ambience`를 오른쪽 클릭 → Reimport
   - (클라우드 웹 점검) `sweep.js --only menu`(녹음 세트 수, 들판에서 `music_` 녹음 곡)
   - (사람) `Docs/HumanChecklist.md` 184
+- [ ] 185단계: 몬스터 분포와 사냥터 — 생성기 8판(새 월드만): 길 2칸 밖·길이 지나는 방에도 떠돌이(길만 걸어도 분당 1~2번 만남), 생물군계마다 사냥터 2곳(계속 나옴, 경험치 70%·드랍 40%), 지도의 [사냥터] 표시(`Docs/HuntingGrounds.md`)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Hunting.cs`, `Core/Simulation/World.Hunt.cs`, `Tests/EditMode/HuntingGroundTests.cs`의 `.meta`가 생기면 커밋한다
+  - (클라우드 웹 점검) `sweep.js --only hunt`
+  - (사람) 새 월드에서 길만 따라 걸을 때 만나는 몬스터가 적당한지(너무 귀찮지 않은지), 사냥터에서 몰려오는 수와 4초마다 하나씩이 사냥할 맛이 나는지, 보상(경험치 70%·드랍 40%)이 아깝지 않은지
+
 
 ## 결과 보고
 
