@@ -1218,6 +1218,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 182단계: 시험장 — 월드 목록의 [시험장](고른 캐릭터의 복사본, 아무것도 저장 안 됨), 시험판(레벨·빌드, 단계 세트·등급·수치·강화·룬·음식, 보스 열둘·던전 여덟·구역 들판으로 바로, 몬스터·정예 부르기, 죽지 않기), 화면의 맞은 기록(누가·무엇·몇 %·방어 비)(`Docs/TestGround.md`)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/World.TestGround.cs`, `Core/Simulation/TestKit.cs`, `Client/GameRoot.TestGround.cs`, `Client/TestGround.cs`, `Client/TestPanel.cs`, `Client/Playtest.TestGround.cs`, `Tests/EditMode/TestGroundTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode `TitleScreenTests.TheTestGroundsPanelAndHitLogDraw`, 사진 `testground-worlds`, `testground-hits`(·`-touch`), `testground-panel-<레벨|장비|이동|몬스터|생존|기록>`(·`-touch`), `testground-hub`. 시험장을 나간 뒤 그 캐릭터·`시험장` 월드가 저장되지 않았는지를 시험이 본다. 실패하면 Console 로그를 붙인다
   - (클라우드 웹 점검) `sweep.js --only testground,title`
+  - 클라우드 확인 (2026-11-26, `480eae5`): [x] 149개 모두 통과(`title` 그대로, `testground` PC·휴대폰 세로). [시험장] 줄 → [시험장 들어가기], T·[메뉴] → [시험판], [Lv 10] → [방어 빌드], 철 희귀 세트(방어 57·생명력 306), [죽지 않기], [동굴 수호자]로 그 방 앞, 흙 동굴 슬라임 우두머리, 맞은 기록("동굴 수호자 · 내려찍기 · -4 (1%, 목표 40%)", 원래 184·방어 57/13(구리) → 2% 들어옴 — 철 장비로 구리 보스를 맞으면 이렇다), [시험장 나가기] 뒤 캐릭터 목록 0명(저장 안 됨). 사진에서 본 것 둘을 고침: 휴대폰 세로에서 맞은 기록 칸이 플레이어 이름표까지 내려옴 → 마지막 셋, 가운데에서 72점 위까지. PC 칸의 둘째 줄 끝("구역 +35%")이 잘림 → 칸 폭 400점. 등급 이름이 "일반"인데 안내가 "보통"이던 것, 던전 옆 숫자를 "Lv"에서 "구역"으로
   - (사람) 시험장에 들어가 시험판으로 레벨·장비를 맞추고 보스·던전·들판에서 맞아 보며 한 방의 무게를 판단한다(맞은 기록의 %와 목표). 시험판 단추를 누르는 손맛, 휴대폰 세로·가로에서 맞은 기록 칸이 싸움을 가리지 않는지, 나온 뒤 캐릭터가 그대로인지
 
 ## 결과 보고

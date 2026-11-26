@@ -118,7 +118,7 @@ namespace Game.Client
             }
             if (world == null || player == null) return;
             bool touch = Controls.UsingTouch;
-            float width = Mathf.Min(touch ? 300 : 330, Ui.Width - 20);
+            float width = Mathf.Min(touch ? 300 : 400, Ui.Width - 20);
             float x = Ui.Width - 10 - width;
             float top = Mathf.Max(Ui.InfoBottom, Ui.RightColumnBottom) + 6;
             // Below the status box and goal list where the two would meet (a phone held upright).
@@ -128,8 +128,9 @@ namespace Game.Client
             var quick = Hotbar.Bounds(skills);
             foreach (var r in new[] { keys, quick })
                 if (r.width > 0 && r.xMax > x && r.x < x + width) bottom = Mathf.Min(bottom, r.y - 6);
-            // Not over the player: the middle of the screen, where the camera keeps them, less a margin.
-            if (x < Ui.Width / 2 + 40) bottom = Mathf.Min(bottom, Ui.Height / 2 - 40);
+            // Not over the player: the middle of the screen, where the camera keeps them, less room for the name tags over
+            // their head (the 2026-11-26 sweep: on a phone held upright the log reached the player's tag).
+            if (x < Ui.Width / 2 + 40) bottom = Mathf.Min(bottom, Ui.Height / 2 - 72);
 
             _line ??= new GUIStyle(GUI.skin.label) { padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0), wordWrap = false, clipping = TextClipping.Clip };
             Ui.Text(_line, touch ? 12 : 12);
@@ -171,6 +172,8 @@ namespace Game.Client
                 }
             }
             int fit = Mathf.Max(0, Mathf.FloorToInt((bottom - head.yMax - 8) / line));
+            // A phone: the last three at most, so the world above the player stays in sight.
+            if (touch) fit = Mathf.Min(fit, 3);
             if (rows.Count > fit)
             {
                 // Whole hits only: a hit's armor line does not stand without its line above.

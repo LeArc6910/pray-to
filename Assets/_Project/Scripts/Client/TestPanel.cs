@@ -217,6 +217,7 @@ namespace Game.Client
         {
             string classes = player.Classes.Count > 0 ? string.Join(" + ", player.Classes.Select(c => c.Name)) : "클래스 없음";
             Note($"지금 Lv {player.Level} · {classes} · 스킬 포인트 {player.SkillPoints} · 특성 포인트 {player.PassivePoints}", width);
+            if (player.Classes.Count == 0) Note("클래스가 없으면 배울 스킬도 없다: 아래 클래스를 먼저 고른다.", width);
             Heading($"레벨 고르기: Lv {_level}");
             Grid("레벨", width, Controls.UsingTouch ? 56 : 52, Levels.Select(l => Cell($"Lv {l}", _level == l, () => _level = l))
                 .Concat(new[] { Cell("-1", false, () => _level = Math.Max(1, _level - 1)), Cell("+1", false, () => _level = Math.Min(Leveling.MaxLevel, _level + 1)) }));
@@ -271,7 +272,7 @@ namespace Game.Client
                 Cell($"{DamageBands.BandNames[_band - 1]} 세트 입기", false, () => Run(root, $"test gear {_band} {_weapon} {options}")),
                 Cell("맨몸", false, () => Run(root, "test bare")),
             }, Ui.Look.Primary);
-            Note("보통·가운데·+0 세트가 맞은 표(--hits)의 '제 단계 장비'와 같다. 홈은 모두 열려 있다.", width);
+            Note("일반·가운데·+0 세트가 한 방 표(--hits)의 '제 단계 장비'와 같다. 홈은 모두 열려 있다.", width);
 
             Heading("한 벌씩");
             var pieces = loot.Bases.Where(b => !b.IsLegendary && b.Weight > 0 && b.Level == BandBaseLevel(_band) && !b.Id.EndsWith("_pickaxe", StringComparison.Ordinal)).ToList();
@@ -318,7 +319,7 @@ namespace Game.Client
             Heading("던전 (문 앞에서 바로 들어간다)");
             var dungeons = world.Gates.Where(g => !g.Cellar).Select(g => (Gate: g, Definition: world.DungeonFor(g))).Where(d => d.Definition != null)
                 .GroupBy(d => d.Definition.Id).Select(g => g.First()).OrderBy(d => d.Definition.Level).ToList();
-            Grid("던전", width, 150, dungeons.Select(d => Cell($"{d.Definition.NameFor(d.Gate.Biome)} · Lv {d.Definition.Level}", false, () => Run(root, $"test dungeon {d.Definition.Id}", shut: true))));
+            Grid("던전", width, 150, dungeons.Select(d => Cell($"{d.Definition.NameFor(d.Gate.Biome)} · {d.Definition.Level}구역", false, () => Run(root, $"test dungeon {d.Definition.Id}", shut: true))));
             Heading($"들판 (구역마다 몬스터 피해 +{World.ZonePowerStep * 100:0}%)");
             _zones ??= TestGround.FieldZones(world);
             foreach (var (biome, zones) in _zones)
