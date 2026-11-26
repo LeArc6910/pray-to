@@ -204,7 +204,7 @@ namespace Game.Client
                 var area = Area(slot, skills);
                 Controls.Block(area);
                 Controls.HotbarButton(area, slot);
-                UiSkin.Panel(area);
+                UiSkin.HudPanel(area);
                 float inner = UiArt.PanelBorder * UiArt.Scale;
 
                 var (icon, count, usable, worn, name, does) = Describe(_entries[slot]);

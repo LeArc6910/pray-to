@@ -631,7 +631,7 @@ namespace Game.Client
         static void Framed(Rect area)
         {
             float frame = UiSkin.FrameEdge;
-            UiSkin.Panel(new Rect(area.x - frame, area.y - frame, area.width + frame * 2, area.height + frame * 2));
+            UiSkin.HudPanel(new Rect(area.x - frame, area.y - frame, area.width + frame * 2, area.height + frame * 2));
             Fill(area, Backdrop);
         }
 

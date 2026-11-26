@@ -314,6 +314,13 @@ namespace Game.Client
         // The ground of a window or a HUD box: dark stone in a thin gold rim.
         public static void Panel(Rect area) => Slice(area, _panel ??= new Piece(UiArt.Panel, UiArt.PanelBorder));
 
+        // The HUD's boxes (3a, 2026-11-27, Docs/HudLook.md): the start screen's see-through night with its gold rim and set
+        // stones, so the goal list, the bars, the quick slots, the minimap and the lines of what came all match it.
+        public static void HudPanel(Rect area)
+        {
+            if (Event.current.type == EventType.Repaint) TitleDraw.Panel(area);
+        }
+
         // A well inside a panel, darker, for slots, fields and lists.
         public static void Inset(Rect area) => Slice(area, _inset ??= new Piece(UiArt.Inset, UiArt.InsetBorder));
 

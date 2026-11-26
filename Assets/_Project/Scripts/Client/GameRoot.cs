@@ -2167,7 +2167,14 @@ namespace Game.Client
                 if (bag is Rect window && line.Overlaps(window)) continue;
                 // Nor over a banner or the fallen card (U7: the lines, banners and cards never on one another).
                 if (line.Overlaps(WorldView.BannerShown) || dead && line.Overlaps(DeathCardArea())) continue;
-                ShadowLabel(line, content.text, label, new Color(1, 1, 1, Mathf.Clamp01((AcquiredSeconds - age) / 1f)));
+                // Each on the HUD's panel (3a), fading with its line.
+                float fade = Mathf.Clamp01((AcquiredSeconds - age) / 1f);
+                var plate = GUI.color;
+                GUI.color = new Color(1, 1, 1, fade * plate.a);
+                float textWidth = Mathf.Min(width, label.CalcSize(new GUIContent(content.text)).x);
+                UiSkin.HudPanel(new Rect(line.x - 6, line.y - 2, textWidth + 12, line.height + 4));
+                GUI.color = plate;
+                ShadowLabel(line, content.text, label, new Color(1, 1, 1, fade));
                 shown = shown == Rect.zero ? line : Rect.MinMaxRect(Mathf.Min(shown.xMin, line.xMin), Mathf.Min(shown.yMin, line.yMin), Mathf.Max(shown.xMax, line.xMax), Mathf.Max(shown.yMax, line.yMax));
             }
             if (Event.current.type == EventType.Repaint) AcquiredArea = shown;
@@ -2287,7 +2294,7 @@ namespace Game.Client
             if (buffs.Count > 0) height += BuffSize + 6;
             Ui.HudHeight = Mathf.Ceil(height) + 2;
 
-            UiSkin.Panel(Ui.HudArea);
+            UiSkin.HudPanel(Ui.HudArea);
             GUILayout.BeginArea(Ui.HudArea, UiSkin.PanelArea);
             if (playing)
             {
@@ -2640,9 +2647,7 @@ namespace Game.Client
                 var (firstTitle, _) = entries[trackedAt >= 0 ? trackedAt : 0];
                 float lineHeight = _trackerTitle.CalcHeight(new GUIContent("가"), width);
                 var folded = FoldedTrackerArea(lineHeight + box.padding.vertical - 4);
-                GUI.color = new Color(1, 1, 1, 0.85f * previous.a);
-                UiSkin.Panel(folded);
-                GUI.color = previous;
+                UiSkin.HudPanel(folded);
                 // From the right: [목표 펴기] (when folded by hand), the book, "+N", then the title cut to what is left.
                 float right = folded.xMax - box.padding.right;
                 if (canFold)
@@ -2680,25 +2685,30 @@ namespace Game.Client
                 Ui.LeftColumnBottom = folded.yMax;
                 return shown;
             }
-            // Unfolded: [목표 접기] in the top right corner (not on a phone held upright, where it is always one line), the
-            // first entry kept clear of it.
-            var laid = new List<(string Title, string Text, float TitleHeight, float TextHeight, float Width)>();
+            // Unfolded (3a, 2026-11-27, Docs/HudLook.md): the start screen's see-through gold-rimmed panel; each entry an icon
+            // by its kind, its title in gold (a chapter's with a gold rule under it), its text, a bar where it counts
+            // something (the first "n/m"), and what it gives on a gold line with a chest. [목표 접기] in the top right
+            // corner (not on a phone held upright, where it is always one line), the first entry kept clear of it.
+            var laid = new List<(string Title, string Text, string Reward, float TitleHeight, float TextHeight, float RewardHeight, float Width, float Progress, string[] Icon)>();
+            float iconRoom = 18;
             float height = box.padding.vertical;
             for (int i = 0; i < entries.Count; i++)
             {
                 var (title, raw) = entries[i];
-                float room = i == 0 && canFold ? width - toggle - 2 : width;
-                string text = string.Join("\n", raw.Split('\n').Select(part => Ui.Wrap(part, style, room)));
-                float titleHeight = _trackerTitle.CalcHeight(new GUIContent(title), room);
-                float textHeight = style.CalcHeight(new GUIContent(text), room);
-                laid.Add((title, text, titleHeight, textHeight, room));
-                height += titleHeight + textHeight + 4;
+                float room = (i == 0 && canFold ? width - toggle - 2 : width) - iconRoom;
+                var (body, reward) = SplitReward(raw);
+                string text = string.Join("\n", body.Split('\n').Select(part => Ui.Wrap(part, style, room)));
+                string rewardText = reward == null ? null : Ui.Wrap(reward, style, room - 14);
+                float titleHeight = _trackerTitle.CalcHeight(new GUIContent(title), room) + (IsChapter(title) ? 5 : 0);
+                float textHeight = text.Length > 0 ? style.CalcHeight(new GUIContent(text), room) : 0;
+                float rewardHeight = rewardText != null ? style.CalcHeight(new GUIContent(rewardText), room - 14) : 0;
+                float progress = CountIn(body);
+                laid.Add((title, text, rewardText, titleHeight, textHeight, rewardHeight, room, progress, EntryIcon(title)));
+                height += titleHeight + textHeight + rewardHeight + (progress >= 0 ? TrackerBarHeight + 3 : 0) + 6;
             }
             if (canFold && Controls.UsingTouch) height = Mathf.Max(height, toggle + 4);
             var frame = new Rect(area.x, area.yMax + 6, area.width, Mathf.Ceil(height));
-            GUI.color = new Color(1, 1, 1, 0.85f * previous.a);
-            UiSkin.Panel(frame);
-            GUI.color = previous;
+            UiSkin.HudPanel(frame);
             if (canFold)
             {
                 var fold = new Rect(frame.xMax - toggle - 2, frame.y + 2, toggle, toggle);
@@ -2706,21 +2716,87 @@ namespace Game.Client
                 if (FoldButton(fold, "목표 접기", folds: true)) TrackerFoldedByHand = true;
             }
             float y = frame.y + box.padding.top;
+            float column = frame.x + box.padding.left;
             for (int i = 0; i < laid.Count; i++)
             {
-                var (title, text, titleHeight, textHeight, room) = laid[i];
-                ShadowLabel(new Rect(frame.x + box.padding.left, y, room, titleHeight), title, _trackerTitle, new Color(1f, 0.85f, 0.4f));
+                var (title, text, reward, titleHeight, textHeight, rewardHeight, room, progress, icon) = laid[i];
+                var iconSize = UiSkin.IconSize(icon);
+                UiSkin.Icon(new Rect(column + (iconRoom - 4 - iconSize.x) / 2, y + 2, iconSize.x, iconSize.y), icon, new Color(1f, 0.85f, 0.45f));
+                float x = column + iconRoom;
+                ShadowLabel(new Rect(x, y, room, titleHeight), title, _trackerTitle, new Color(1f, 0.85f, 0.4f));
+                if (IsChapter(title)) UiSkin.Divider(new Rect(x, y + titleHeight - 5, room, 4));
                 if (i == trackedAt)
                 {
                     var flag = UiSkin.IconSize(MapIcons.Pin);
-                    UiSkin.Icon(new Rect(frame.x + box.padding.left + room - flag.x + 2, y + 1, flag.x, flag.y), MapIcons.Pin, new Color(0.9f, 0.3f, 0.22f));
+                    UiSkin.Icon(new Rect(x + room - flag.x + 2, y + 1, flag.x, flag.y), MapIcons.Pin, new Color(0.9f, 0.3f, 0.22f));
                 }
                 y += titleHeight;
-                ShadowLabel(new Rect(frame.x + box.padding.left, y, room, textHeight), text, style, Color.white);
-                y += textHeight + 4;
+                if (textHeight > 0) ShadowLabel(new Rect(x, y, room, textHeight), text, style, Color.white);
+                y += textHeight;
+                if (progress >= 0)
+                {
+                    TrackerBar(new Rect(x, y + 2, room, TrackerBarHeight), progress);
+                    y += TrackerBarHeight + 3;
+                }
+                if (reward != null)
+                {
+                    var chest = UiSkin.IconSize(MapIcons.Chest);
+                    UiSkin.Icon(new Rect(x, y + 2, chest.x, chest.y), MapIcons.Chest, new Color(1f, 0.82f, 0.35f));
+                    ShadowLabel(new Rect(x + 14, y, room - 14, rewardHeight), reward, style, new Color(1f, 0.86f, 0.5f));
+                    y += rewardHeight;
+                }
+                y += 6;
             }
             Ui.LeftColumnBottom = frame.yMax;
             return shown;
+        }
+
+        // ---- The goal list's look (3a, Docs/HudLook.md) ----
+
+        const float TrackerBarHeight = 5;
+
+        // A story chapter's entry ("1장 · …").
+        static bool IsChapter(string title) => title.Length > 1 && char.IsDigit(title[0]) && title.Contains("장");
+
+        static string[] EntryIcon(string title) =>
+            IsChapter(title) ? UiIcons.Book
+            : title.StartsWith("이야기") ? MapIcons.Place
+            : title.StartsWith("부탁") ? MapIcons.Chest
+            : MapIcons.Lead;
+
+        // The text and, apart, what it gives ("보상: …", "보답: …"), or null.
+        static (string Body, string Reward) SplitReward(string raw)
+        {
+            var lines = raw.Split('\n').ToList();
+            int at = lines.FindIndex(l => l.StartsWith("보상:") || l.StartsWith("보답:"));
+            if (at < 0) return (raw, null);
+            string reward = lines[at].Substring(3).Trim();
+            lines.RemoveAt(at);
+            return (string.Join("\n", lines), reward);
+        }
+
+        static readonly System.Text.RegularExpressions.Regex Count = new System.Text.RegularExpressions.Regex(@"(\d+)\s*/\s*(\d+)");
+
+        // The share done of the first "n/m" in the text, or -1 when it counts nothing.
+        internal static float CountIn(string text)
+        {
+            var match = Count.Match(text ?? "");
+            if (!match.Success || !int.TryParse(match.Groups[1].Value, out int done) || !int.TryParse(match.Groups[2].Value, out int of) || of <= 0) return -1;
+            return Mathf.Clamp01(done / (float)of);
+        }
+
+        // A thin gold bar in a dark well with a gold rim, green when full.
+        static void TrackerBar(Rect rect, float share)
+        {
+            if (Event.current.type != EventType.Repaint) return;
+            var previous = GUI.color;
+            GUI.color = new Color(0.62f, 0.48f, 0.22f, previous.a);
+            GUI.DrawTexture(rect, Texture2D.whiteTexture);
+            GUI.color = new Color(0.08f, 0.06f, 0.1f, previous.a);
+            GUI.DrawTexture(new Rect(rect.x + 1, rect.y + 1, rect.width - 2, rect.height - 2), Texture2D.whiteTexture);
+            GUI.color = share >= 1 ? new Color(0.5f, 0.82f, 0.42f, previous.a) : new Color(0.95f, 0.76f, 0.32f, previous.a);
+            GUI.DrawTexture(new Rect(rect.x + 1, rect.y + 1, (rect.width - 2) * share, rect.height - 2), Texture2D.whiteTexture);
+            GUI.color = previous;
         }
 
         // The goal list folded by hand ([목표 접기], U7): this device's choice for this game, not saved.
