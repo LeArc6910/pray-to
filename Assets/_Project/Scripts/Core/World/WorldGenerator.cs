@@ -138,9 +138,10 @@ namespace Game.Core
     public sealed class PlaceSite
     {
         internal PlaceSite(PlaceDefinition definition, int x, int y, IReadOnlyList<(CharacterDefinition Character, Vec2 At)> people,
-            IReadOnlyDictionary<string, IReadOnlyList<Vec2>> rounds = null)
+            IReadOnlyDictionary<string, IReadOnlyList<Vec2>> rounds = null, int radius = 0)
         {
             Definition = definition;
+            Radius = radius > 0 ? radius : definition.Radius;
             X = x;
             Y = y;
             People = people;
@@ -201,7 +202,8 @@ namespace Game.Core
         public PlaceDefinition Definition { get; }
         public int X { get; }
         public int Y { get; }
-        public int Radius => Definition.Radius;
+        // The plaza's radius in this world: the sheet's, or a town's grown one from version 10 (RadiusOf).
+        public int Radius { get; }
         public Vec2 Center => TileMap.Center(X, Y);
         public IReadOnlyList<(CharacterDefinition Character, Vec2 At)> People { get; }
 
@@ -409,6 +411,11 @@ namespace Game.Core
                 // on what is still bare floor, so nothing laid before them moves.
                 if (version >= HarvestVersion && world.PropsKept != null) LayHarvest(world, seed, world.PropsKept);
                 world.PropsKept = null;
+                // The grown towns (version 10) once more opened to every road and person: the rooms' dressing round
+                // their edge may have shut a way in.
+                if (version >= TownVersion)
+                    foreach (var site in world.Places.Where(p => p.Radius != p.Definition.Radius))
+                        Open(world.Map, site.X, site.Y, site.Definition, site.People.Select(p => (TileMap.Cell(p.At.X), TileMap.Cell(p.At.Y))), site.Radius, rockOnly: true);
                 // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
                 if (DungeonPocket.Fits(width))
                 {
@@ -470,7 +477,7 @@ namespace Game.Core
             var children = new Dictionary<string, int>();
             foreach (var place in story.Places)
             {
-                int r = place.Radius;
+                int r = RadiusOf(place, world.Version);
                 int cx = world.SpawnX, cy = world.SpawnY;
                 if (place.Distance > 0)
                 {
@@ -487,7 +494,7 @@ namespace Game.Core
                     int rim = r + 3 + size / 20;
                     bool Fits(int x, int y) => x >= rim && y >= rim && x < map.Width - rim && y < map.Height - rim;
                     bool Clear(int x, int y, int apart) => Fits(x, y) && ClearOfArenas((x, y), r)
-                        && spots.All(s => Square(x - s.X, y - s.Y) >= System.Math.Max(apart, s.Place.Radius + r + 4) * System.Math.Max(apart, s.Place.Radius + r + 4));
+                        && spots.All(s => Square(x - s.X, y - s.Y) >= System.Math.Max(apart, RadiusOf(s.Place, world.Version) + r + 4) * System.Math.Max(apart, RadiusOf(s.Place, world.Version) + r + 4));
                     (int X, int Y)? found = null;
                     // Turned up to all the way round and pulled in up to three fifths, nearest the heading first.
                     for (int pull = 0; pull <= 6 && found == null; pull++)
@@ -522,7 +529,7 @@ namespace Game.Core
                 spots.Add((place, cx, cy));
             }
 
-            bool InPlaza(int x, int y) => spots.Any(s => Square(x - s.X, y - s.Y) <= s.Place.Radius * s.Place.Radius);
+            bool InPlaza(int x, int y) => spots.Any(s => Square(x - s.X, y - s.Y) <= RadiusOf(s.Place, world.Version) * RadiusOf(s.Place, world.Version));
             int ArenaTiles(List<(int X, int Y)> line) => line.Count(p => arenas.Any(a => Square(p.X - a.X, p.Y - a.Y) <= (ArenaRadius + 2) * (ArenaRadius + 2)));
             var roads = new List<(List<(int X, int Y)> Path, (PlaceDefinition Place, int X, int Y) From, (PlaceDefinition Place, int X, int Y) To)>();
             // A world of rooms (version 2) lays its roads along the rooms once the places' arenas are cut (RoadLayer,
@@ -582,7 +589,7 @@ namespace Game.Core
             foreach (var (place, cx, cy, nth) in spots.Where(s => s.Place.Arena).Select(s => (s.Place, s.X, s.Y, 1))
                 .Concat(spots.Where(s => s.Place.Arenas > 1).Select(s => (s.Place, s.X, s.Y, 2))).ToList())
             {
-                int r = place.Radius;
+                int r = RadiusOf(place, world.Version);
                 var from = spots.FirstOrDefault(s => s.Place.Id == place.Road);
                 int fromX = from.Place != null ? from.X : world.SpawnX, fromY = from.Place != null ? from.Y : world.SpawnY;
                 // Nearest the nest first, then furthest from where the road comes from.
@@ -598,9 +605,9 @@ namespace Game.Core
                     {
                         int ax = cx + way.X * reach / 1000, ay = cy + way.Y * reach / 1000;
                         if (ax < ArenaRadius + 1 || ay < ArenaRadius + 1 || ax > map.Width - ArenaRadius - 2 || ay > map.Height - ArenaRadius - 2) continue;
-                        if (spots.Any(s => s.Place != place && Square(ax - s.X, ay - s.Y) < (s.Place.Radius + ArenaRadius + 3) * (s.Place.Radius + ArenaRadius + 3))) continue;
+                        if (spots.Any(s => s.Place != place && Square(ax - s.X, ay - s.Y) < (RadiusOf(s.Place, world.Version) + ArenaRadius + 3) * (RadiusOf(s.Place, world.Version) + ArenaRadius + 3))) continue;
                         if (arenas.Any(a => Square(ax - a.X, ay - a.Y) < (2 * ArenaRadius + 2) * (2 * ArenaRadius + 2))) continue;
-                        if (pass == 0 && spots.Any(s => s.Place != place && SegmentDistance(cx, cy, ax, ay, s.X, s.Y) < s.Place.Radius + TunnelHalfWidth + 2)) continue;
+                        if (pass == 0 && spots.Any(s => s.Place != place && SegmentDistance(cx, cy, ax, ay, s.X, s.Y) < RadiusOf(s.Place, world.Version) + TunnelHalfWidth + 2)) continue;
                         int score = Square(ax - fromX, ay - fromY);
                         if (score > bestScore)
                         {
@@ -619,13 +626,13 @@ namespace Game.Core
                     continue;
                 }
                 // A road that would cut through another place bends once round it instead.
-                bool Crosses(int x0, int y0, int x1, int y1) => spots.Any(s => s.Place != place && SegmentDistance(x0, y0, x1, y1, s.X, s.Y) < s.Place.Radius + TunnelHalfWidth + 2);
+                bool Crosses(int x0, int y0, int x1, int y1) => spots.Any(s => s.Place != place && SegmentDistance(x0, y0, x1, y1, s.X, s.Y) < RadiusOf(s.Place, world.Version) + TunnelHalfWidth + 2);
                 var bends = new List<(int X, int Y)> { (cx, cy) };
-                var blocking = spots.FirstOrDefault(s => s.Place != place && SegmentDistance(cx, cy, bx, by, s.X, s.Y) < s.Place.Radius + TunnelHalfWidth + 2);
+                var blocking = spots.FirstOrDefault(s => s.Place != place && SegmentDistance(cx, cy, bx, by, s.X, s.Y) < RadiusOf(s.Place, world.Version) + TunnelHalfWidth + 2);
                 if (blocking.Place != null)
                 {
                     float dx = bx - cx, dy = by - cy, length = (float)System.Math.Sqrt(dx * dx + dy * dy);
-                    for (int off = blocking.Place.Radius + TunnelHalfWidth + 4; off <= blocking.Place.Radius + 30 && bends.Count == 1; off += 2)
+                    for (int off = RadiusOf(blocking.Place, world.Version) + TunnelHalfWidth + 4; off <= RadiusOf(blocking.Place, world.Version) + 30 && bends.Count == 1; off += 2)
                     {
                         foreach (int side in new[] { 1, -1 })
                         {
@@ -667,7 +674,7 @@ namespace Game.Core
             // shut a bit of floor off from the road, and the road itself stays clear.
             // Outside the square round each plaza too, so the plaza's own dressing is all that stands near it.
             bool Free(int x, int y) => IsInside(map, x, y) && (map[x, y] == TileType.Wall || map[x, y] == TileType.Floor)
-                && spots.All(p => System.Math.Abs(x - p.X) > p.Place.Radius + 1 || System.Math.Abs(y - p.Y) > p.Place.Radius + 1)
+                && spots.All(p => System.Math.Abs(x - p.X) > RadiusOf(p.Place, world.Version) + 1 || System.Math.Abs(y - p.Y) > RadiusOf(p.Place, world.Version) + 1)
                 && arenas.All(a => Square(x - a.X, y - a.Y) > (ArenaRadius + 2) * (ArenaRadius + 2));
             // Whether something solid at x, y would leave open floor beside it with no way to a road nearby.
             bool Shuts(int x, int y)
@@ -706,7 +713,7 @@ namespace Game.Core
             foreach (var (path, from, to) in roads)
             {
                 bool Clear(int i, (PlaceDefinition Place, int X, int Y) end, int margin) =>
-                    Square(path[i].X - end.X, path[i].Y - end.Y) > (end.Place.Radius + margin) * (end.Place.Radius + margin);
+                    Square(path[i].X - end.X, path[i].Y - end.Y) > (RadiusOf(end.Place, world.Version) + margin) * (RadiusOf(end.Place, world.Version) + margin);
                 bool Away(int i, int margin) => Clear(i, from, margin) && Clear(i, to, margin);
                 // Which way the road runs at path[i], and across it (to its left).
                 (int X, int Y) Along(int i)
@@ -795,19 +802,20 @@ namespace Game.Core
             }
 
             // In a world of rooms the rooms along the roads are its small places (WorldGenerator.Roles.cs, Wayside).
-            if (!rooms) world.Landmarks = CarveLandmarks(map, roads.Select(rd => rd.Path).ToList(), spots.Select(sp => (sp.X, sp.Y, sp.Place.Radius)).ToList(), arenas, new GameRandom(seed, LandmarkStream), size);
+            if (!rooms) world.Landmarks = CarveLandmarks(map, roads.Select(rd => rd.Path).ToList(), spots.Select(sp => (sp.X, sp.Y, RadiusOf(sp.Place, world.Version))).ToList(), arenas, new GameRandom(seed, LandmarkStream), size);
 
             var sites = new List<PlaceSite>();
             foreach (var (place, cx, cy) in spots)
             {
-                var wanted = Decorate(map, cx, cy, place, world.Version);
-                var people = Stand(map, cx, cy, place, story.Characters.Where(c => c.Place == place).ToList(), wanted);
-                Open(map, cx, cy, place, people.Select(p => (TileMap.Cell(p.Item2.X), TileMap.Cell(p.Item2.Y))));
-                Tidy(map, cx, cy, place);
-                sites.Add(new PlaceSite(place, cx, cy, people, Rounds(map, cx, cy, place, people)));
+                int grown = RadiusOf(place, world.Version);
+                var wanted = Decorate(map, cx, cy, place, world.Version, grown);
+                var people = Stand(map, cx, cy, place, story.Characters.Where(c => c.Place == place).ToList(), wanted, grown);
+                Open(map, cx, cy, place, people.Select(p => (TileMap.Cell(p.Item2.X), TileMap.Cell(p.Item2.Y))), grown);
+                Tidy(map, cx, cy, place, grown);
+                sites.Add(new PlaceSite(place, cx, cy, people, Rounds(map, cx, cy, place, people, grown), grown));
             }
             foreach (var site in sites.Where(s => s.Definition.Shops > 0))
-                site.Shops = CarveShops(map, site, spots.Select(p => (p.X, p.Y, p.Place.Radius)).ToList(), arenas);
+                site.Shops = CarveShops(map, site, spots.Select(p => (p.X, p.Y, RadiusOf(p.Place, world.Version))).ToList(), arenas);
             return sites;
         }
 
@@ -1009,9 +1017,9 @@ namespace Game.Core
         // characters.csv order (more people than that stand round a ring). Nothing goes on the waypoint or right
         // beside it, off the plaza, or on anything but the plaza's own floor; a structure of more than one tile goes
         // only where all of it fits.
-        static List<(int X, int Y)> Decorate(TileMap map, int cx, int cy, PlaceDefinition place, int version = CaveVersion)
+        static List<(int X, int Y)> Decorate(TileMap map, int cx, int cy, PlaceDefinition place, int version = CaveVersion, int radius = 0)
         {
-            int r = place.Radius;
+            int r = radius > 0 ? radius : place.Radius;
             bool Free(int dx, int dy)
             {
                 int x = cx + dx, y = cy + dy;
@@ -1167,6 +1175,14 @@ namespace Game.Core
                 foreach (int w in new[] { 2, 6, 10, 14 }) Put(Ways[w].X * (r - 1) / 1000, Ways[w].Y * (r - 1) / 1000, lamp);
             }
             var wanted = new List<(int X, int Y)>();
+            // The grown village and royal city of version 10 (WorldGenerator.Towns.cs, Docs/Towns.md).
+            if (version >= TownVersion && (place.Style == "village" || place.Style == "kingdom"))
+            {
+                var town = new TownDresser(map, cx, cy, r, place.Floor, Free, Put, Lay, gates, place.Style == "village" ? 15 : 22);
+                if (place.Style == "village") town.Village(wanted);
+                else town.Kingdom(wanted);
+                return wanted;
+            }
             switch (place.Style)
             {
                 case "village":
@@ -1349,9 +1365,9 @@ namespace Game.Core
 
         // After Open: a structure Open cut into is taken away whole, so none is left with tiles missing, nor tiles
         // standing for one no longer there.
-        static void Tidy(TileMap map, int cx, int cy, PlaceDefinition place)
+        static void Tidy(TileMap map, int cx, int cy, PlaceDefinition place, int radius = 0)
         {
-            int r = place.Radius;
+            int r = radius > 0 ? radius : place.Radius;
             var covered = new HashSet<(int, int)>();
             for (int y = cy - r; y <= cy + r; y++)
             {
@@ -1381,9 +1397,9 @@ namespace Game.Core
         // Each person on the open tile nearest where they would stand (their style's spot, else a ring round the
         // waypoint), with open floor below them to talk from, one to a tile.
         static List<(CharacterDefinition Character, Vec2 At)> Stand(TileMap map, int cx, int cy, PlaceDefinition place, List<CharacterDefinition> living,
-            List<(int X, int Y)> wanted)
+            List<(int X, int Y)> wanted, int radius = 0)
         {
-            int r = place.Radius;
+            int r = radius > 0 ? radius : place.Radius;
             var taken = new HashSet<(int, int)>();
             var people = new List<(CharacterDefinition, Vec2)>();
             bool Open(int x, int y) => IsInside(map, x, y) && !map.IsSolid(x, y) && map[x, y] != TileType.Waypoint && map[x, y] != TileType.Door;
@@ -1424,10 +1440,10 @@ namespace Game.Core
         // tiles off, on to another as far, and home, each leg a straight line over open floor, away from the other
         // people's homes. Spots are tried in an order fixed by the person and the tile, so it is the same every time.
         static Dictionary<string, IReadOnlyList<Vec2>> Rounds(TileMap map, int cx, int cy, PlaceDefinition place,
-            List<(CharacterDefinition Character, Vec2 At)> people)
+            List<(CharacterDefinition Character, Vec2 At)> people, int radius = 0)
         {
             var rounds = new Dictionary<string, IReadOnlyList<Vec2>>();
-            int r = place.Radius;
+            int r = radius > 0 ? radius : place.Radius;
             bool Walkable(Vec2 p) => !map.IsSolid(TileMap.Cell(p.X), TileMap.Cell(p.Y)) && map[TileMap.Cell(p.X), TileMap.Cell(p.Y)] != TileType.Water;
             bool Clear(Vec2 a, Vec2 b)
             {
@@ -1466,9 +1482,10 @@ namespace Game.Core
         // Whatever the dressing shut off is opened again: each person (and the tile below them) and each road that
         // comes up to the plaza, walked to from the waypoint over open tiles (doors too); one that cannot be gets a way
         // three wide straight to the middle, the dressing in it taken away.
-        static void Open(TileMap map, int cx, int cy, PlaceDefinition place, IEnumerable<(int X, int Y)> people)
+        static void Open(TileMap map, int cx, int cy, PlaceDefinition place, IEnumerable<(int X, int Y)> people, int radius = 0, bool rockOnly = false)
         {
-            int r = place.Radius;
+            int r = radius > 0 ? radius : place.Radius;
+            bool grown = r != place.Radius;
             int reach = r + 2;
             bool Near(int x, int y) => (x - cx) * (x - cx) + (y - cy) * (y - cy) <= reach * reach;
             var targets = new List<(int X, int Y)>();
@@ -1495,7 +1512,15 @@ namespace Game.Core
                         for (int tx = x - TunnelHalfWidth; tx <= x + TunnelHalfWidth; tx++)
                         {
                             if (!IsInside(map, tx, ty) || map[tx, ty] == TileType.Waypoint) continue;
-                            if ((tx - cx) * (tx - cx) + (ty - cy) * (ty - cy) <= r * r && map.IsSolid(tx, ty)) map[tx, ty] = place.Floor;
+                            int d = (tx - cx) * (tx - cx) + (ty - cy) * (ty - cy);
+                            // Last of all (rockOnly) only rock is cut: the town's buildings stand.
+                            if (rockOnly)
+                            {
+                                if (d <= reach * reach && (Natural(map[tx, ty]) || map[tx, ty] == TileType.TimberWall || map[tx, ty] == TileType.CastleWall) && map.IsSolid(tx, ty)) map[tx, ty] = place.Floor;
+                            }
+                            else if (d <= r * r && map.IsSolid(tx, ty)) map[tx, ty] = place.Floor;
+                            // A grown town (version 10) also cuts the rock between its edge and a road passing by it.
+                            else if (grown && d <= reach * reach && map[tx, ty] == TileType.Wall) map[tx, ty] = place.Floor;
                         }
                     }
                 }

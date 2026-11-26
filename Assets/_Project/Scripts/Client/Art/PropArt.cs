@@ -158,6 +158,8 @@ namespace Game.Client
             TileType.TimberWall => Wall(sides, Wood, castle: false),
             TileType.Cottage => Cottage(),
             TileType.Cabin => Cabin(),
+            // The towns' buildings of version 10 (PropArt.Towns.cs).
+            TileType.Inn or TileType.Smithy or TileType.Shop or TileType.Temple or TileType.Barracks or TileType.Stable or TileType.Palace or TileType.MarketStall => TownBuilding(type),
             TileType.Tower => Tower(),
             TileType.BigFountain => BigFountain(),
             TileType.Fountain => SmallFountain(),
@@ -251,7 +253,8 @@ namespace Game.Client
         };
 
         // The houses whose windows light up in the evening (2026-11-11, WorldView.DrawProps and AddNightLights).
-        public static bool LitAtNight(TileType type) => type == TileType.Cottage || type == TileType.Cabin || type == TileType.Tower;
+        public static bool LitAtNight(TileType type) => type == TileType.Cottage || type == TileType.Cabin || type == TileType.Tower
+            || Structures.IsTownBuilding(type) && type != TileType.MarketStall;
 
         // The drawing by day: its lit windows as dark glass with a sky glint.
         public static PixelImage Daylit(PixelImage lit)
@@ -463,7 +466,8 @@ namespace Game.Client
         // Every structure, for the preview tool.
         public static readonly TileType[] All =
         {
-            TileType.Cottage, TileType.Cabin, TileType.Tower, TileType.BigFountain, TileType.BigTent, TileType.MushroomTree,
+            TileType.Cottage, TileType.Cabin, TileType.Tower, TileType.BigFountain,
+            TileType.Inn, TileType.Smithy, TileType.Shop, TileType.Temple, TileType.Barracks, TileType.Stable, TileType.Palace, TileType.MarketStall, TileType.BigTent, TileType.MushroomTree,
             TileType.Statue, TileType.Pillar, TileType.LampPost, TileType.Throne, TileType.RoyalBanner, TileType.DemonBanner, TileType.Well,
             TileType.Crates, TileType.Barrel, TileType.Signpost, TileType.Bench, TileType.Hedge, TileType.Flowerbed, TileType.Woodpile,
             TileType.TrainingDummy, TileType.WeaponRack, TileType.Campfire, TileType.Bones, TileType.Spire, TileType.Totem, TileType.Cage,

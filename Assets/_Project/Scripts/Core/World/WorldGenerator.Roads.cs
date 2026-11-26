@@ -111,7 +111,7 @@ namespace Game.Core
                 }
                 foreach (var spot in _spots)
                 {
-                    int r = spot.Place.Radius;
+                    int r = RadiusOf(spot.Place, _world.Version);
                     for (int y = Math.Max(0, spot.Y - r); y <= Math.Min(_map.Height - 1, spot.Y + r); y++)
                         for (int x = Math.Max(0, spot.X - r); x <= Math.Min(_map.Width - 1, spot.X + r); x++)
                             if (Square(x - spot.X, y - spot.Y) <= r * r) _held[y * _map.Width + x] = Plaza;
@@ -295,7 +295,7 @@ namespace Game.Core
             // Which other place's plaza (and a little round it) a room is by, so a road does not run through a town it
             // does not go to.
             bool ByOtherPlace(RoomNode node, PlaceDefinition a, PlaceDefinition b) =>
-                _spots.Any(s => s.Place != a && s.Place != b && Square(node.X - s.X, node.Y - s.Y) <= (s.Place.Radius + 8) * (s.Place.Radius + 8));
+                _spots.Any(s => s.Place != a && s.Place != b && Square(node.X - s.X, node.Y - s.Y) <= (RadiusOf(s.Place, _world.Version) + 8) * (RadiusOf(s.Place, _world.Version) + 8));
 
             // As the crow flies from room to room (a way's own tiles step sideways and up, so a slanting way would count
             // longer than it is walked), a narrow way dearer.
@@ -342,7 +342,7 @@ namespace Game.Core
                 {
                     var from = _spots.FirstOrDefault(s => s.Place.Id == spot.Place.Road);
                     if (from.Place == null || from.Place == spot.Place) continue;
-                    var route = Find(RoadKind.Road, from.Place, spot.Place, (from.X, from.Y), from.Place.Radius + _reach, (spot.X, spot.Y), spot.Place.Radius + _reach,
+                    var route = Find(RoadKind.Road, from.Place, spot.Place, (from.X, from.Y), RadiusOf(from.Place, _world.Version) + _reach, (spot.X, spot.Y), RadiusOf(spot.Place, _world.Version) + _reach,
                         _ => true, (edge, _) => Way(edge), node => ByOtherPlace(node, from.Place, spot.Place) ? OtherPlace * WayCost : 0);
                     if (route == null) continue;
                     Pave(route.Tiles.ToList(), 2 * TunnelHalfWidth + 1, RoadShoulder, -1);
@@ -356,7 +356,7 @@ namespace Game.Core
             {
                 var (ax, ay) = _arenas[arena];
                 // An arena just off the plaza (most are) is reached straight, as in version 1.
-                if (Square(ax - px, ay - py) <= (place.Radius + ArenaRadius + RoomCell / 2) * (place.Radius + ArenaRadius + RoomCell / 2))
+                if (Square(ax - px, ay - py) <= (RadiusOf(place, _world.Version) + ArenaRadius + RoomCell / 2) * (RadiusOf(place, _world.Version) + ArenaRadius + RoomCell / 2))
                 {
                     var line = Line(px, py, ax, ay).ToList();
                     Pave(line, 2 * TunnelHalfWidth + 1, 0, arena);
@@ -364,7 +364,7 @@ namespace Game.Core
                     Routes.Add(straight);
                     return straight;
                 }
-                var route = Find(RoadKind.Arena, place, place, (px, py), place.Radius + _reach, (ax, ay), ArenaRadius + ArenaWall + _reach,
+                var route = Find(RoadKind.Arena, place, place, (px, py), RadiusOf(place, _world.Version) + _reach, (ax, ay), ArenaRadius + ArenaWall + _reach,
                     _ => true, (edge, _) => Way(edge), node => ByOtherPlace(node, place, null) ? OtherPlace * WayCost : 0);
                 if (route == null) return null;
                 Pave(route.Tiles.ToList(), 2 * TunnelHalfWidth + 1, 0, arena);
@@ -385,7 +385,7 @@ namespace Game.Core
                         if (other.Place == null || other.Place == spot.Place) continue;
                         var pair = (Math.Min(spot.Place.Index, other.Place.Index), Math.Max(spot.Place.Index, other.Place.Index));
                         if (!done.Add(pair)) continue;
-                        var route = Find(RoadKind.Link, spot.Place, other.Place, (spot.X, spot.Y), spot.Place.Radius + _reach, (other.X, other.Y), other.Place.Radius + _reach,
+                        var route = Find(RoadKind.Link, spot.Place, other.Place, (spot.X, spot.Y), RadiusOf(spot.Place, _world.Version) + _reach, (other.X, other.Y), RadiusOf(other.Place, _world.Version) + _reach,
                             _ => true, (edge, way) => Way(edge) * (_used[way] > 0 ? SharedWay : 1),
                             node => ByOtherPlace(node, spot.Place, other.Place) ? OtherPlace * WayCost : 0);
                         if (route == null) continue;

@@ -108,6 +108,7 @@ namespace Game.Client
             TileType.MushroomTree => 26,
             TileType.CherryTree => 26,
             TileType.Cottage => 46,
+            TileType.Inn or TileType.Smithy or TileType.Shop or TileType.Temple or TileType.Barracks or TileType.Stable or TileType.Palace or TileType.MarketStall => PropArt.TownCanopy(type),
             TileType.Cabin => 44,
             TileType.Tower => 30,
             TileType.BigTent => 12,

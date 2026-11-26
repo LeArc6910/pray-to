@@ -52,6 +52,16 @@ namespace Game.Client
                 scene.Player(village.X + 1.5f, village.Y - 1.5f, HeroStanding(Look.Down, HeroMove.Stand, 0, "#3F7FD8"));
                 Write(scene.Image, "place_dawn_village.png", 2, "여명 마을(흙 동굴): 파란 버섯 나무 자리에 갱목과 등잔, 건물의 날카로운 그림자");
             }
+            // The royal city of version 10 (Docs/Towns.md): the castle wall, the city, the moat and the court with the palace.
+            var city = world.Places.FirstOrDefault(p => p.Definition.Id == "royal_city");
+            if (city != null)
+            {
+                int half = city.Radius + 3;
+                var scene = new Scene(world.Map, city.X - half, city.Y - half, half * 2, half * 2, _ => false) { Night = false, BiomeAt = (x, y) => world.Biomes[x, y] };
+                scene.Places(world.Places);
+                scene.Decor(1, (x, y) => world.Biomes[x, y]);
+                Write(scene.Image, "place_royal_city.png", 1, "왕도 루미나(10판, 반지름 48): 성벽과 탑, 시장·여관·대장간·상점·병영·마구간·예배당·집, 해자와 안쪽 성벽, 정원·분수·기둥·양탄자·왕좌·왕궁");
+            }
             var hut = world.Places.FirstOrDefault(p => p.Definition.Id == "hero_hut");
             if (hut != null)
             {

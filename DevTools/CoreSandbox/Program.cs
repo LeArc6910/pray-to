@@ -253,6 +253,10 @@ namespace CoreSandbox
                         LoadClasses(classIds.Length > 0 ? classIds : new[] { "warrior" }), Director, SkillBot.Level ?? 8);
                     break;
                 // --roadwalk [minutes] [seeds] (Docs/HuntingGrounds.md): monsters met keeping to the roads, and the hunting grounds.
+                // --town [seed] (Docs/Towns.md): the grown village and royal city as text.
+                case "--town":
+                    TownMap.Run(LoadSheets(data), args.Length > 1 && !args[1].StartsWith("--") ? ulong.Parse(args[1]) : 1);
+                    break;
                 case "--roadwalk":
                     RoadWalk.Run(LoadSheets(data), Number(1, 10), args.Length > 2 && !args[2].StartsWith("--") ? args[2].Split(',').Select(ulong.Parse) : new ulong[] { 1, 2, 3 });
                     break;

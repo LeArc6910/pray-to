@@ -2690,7 +2690,9 @@ namespace Game.Client
             // something (the first "n/m"), and what it gives on a gold line with a chest. [목표 접기] in the top right
             // corner (not on a phone held upright, where it is always one line), the first entry kept clear of it.
             var laid = new List<(string Title, string Text, string Reward, float TitleHeight, float TextHeight, float RewardHeight, float Width, float Progress, string[] Icon)>();
-            float iconRoom = 18;
+            // As wide as the widest entry icon and a gap, so no icon covers the start of its title.
+            float iconRoom = new[] { UiIcons.Book, MapIcons.Place, MapIcons.Chest, MapIcons.Lead }.Max(i => UiSkin.IconSize(i).x) + 5;
+            float chestRoom = UiSkin.IconSize(MapIcons.Chest).x + 4;
             float height = box.padding.vertical;
             for (int i = 0; i < entries.Count; i++)
             {
@@ -2698,10 +2700,10 @@ namespace Game.Client
                 float room = (i == 0 && canFold ? width - toggle - 2 : width) - iconRoom;
                 var (body, reward) = SplitReward(raw);
                 string text = string.Join("\n", body.Split('\n').Select(part => Ui.Wrap(part, style, room)));
-                string rewardText = reward == null ? null : Ui.Wrap(reward, style, room - 14);
+                string rewardText = reward == null ? null : Ui.Wrap(reward, style, room - chestRoom);
                 float titleHeight = _trackerTitle.CalcHeight(new GUIContent(title), room) + (IsChapter(title) ? 5 : 0);
                 float textHeight = text.Length > 0 ? style.CalcHeight(new GUIContent(text), room) : 0;
-                float rewardHeight = rewardText != null ? style.CalcHeight(new GUIContent(rewardText), room - 14) : 0;
+                float rewardHeight = rewardText != null ? style.CalcHeight(new GUIContent(rewardText), room - chestRoom) : 0;
                 float progress = CountIn(body);
                 laid.Add((title, text, rewardText, titleHeight, textHeight, rewardHeight, room, progress, EntryIcon(title)));
                 height += titleHeight + textHeight + rewardHeight + (progress >= 0 ? TrackerBarHeight + 3 : 0) + 6;
@@ -2721,7 +2723,7 @@ namespace Game.Client
             {
                 var (title, text, reward, titleHeight, textHeight, rewardHeight, room, progress, icon) = laid[i];
                 var iconSize = UiSkin.IconSize(icon);
-                UiSkin.Icon(new Rect(column + (iconRoom - 4 - iconSize.x) / 2, y + 2, iconSize.x, iconSize.y), icon, new Color(1f, 0.85f, 0.45f));
+                UiSkin.Icon(new Rect(column + (iconRoom - 5 - iconSize.x) / 2, y + 2, iconSize.x, iconSize.y), icon, new Color(1f, 0.85f, 0.45f));
                 float x = column + iconRoom;
                 ShadowLabel(new Rect(x, y, room, titleHeight), title, _trackerTitle, new Color(1f, 0.85f, 0.4f));
                 if (IsChapter(title)) UiSkin.Divider(new Rect(x, y + titleHeight - 5, room, 4));
@@ -2742,7 +2744,7 @@ namespace Game.Client
                 {
                     var chest = UiSkin.IconSize(MapIcons.Chest);
                     UiSkin.Icon(new Rect(x, y + 2, chest.x, chest.y), MapIcons.Chest, new Color(1f, 0.82f, 0.35f));
-                    ShadowLabel(new Rect(x + 14, y, room - 14, rewardHeight), reward, style, new Color(1f, 0.86f, 0.5f));
+                    ShadowLabel(new Rect(x + chestRoom, y, room - chestRoom, rewardHeight), reward, style, new Color(1f, 0.86f, 0.5f));
                     y += rewardHeight;
                 }
                 y += 6;

@@ -361,6 +361,16 @@ namespace Game.Core
         VoidPodPicked,
         ClamBedEmpty,
         AmberRockBroken,
+        // The towns' buildings (2026-11-27, Docs/Towns.md), laid by the generator's version 10 in the grown village and
+        // royal city, never dug: an inn, a smithy, a shop, a temple, barracks, a stable, the royal palace and a stall.
+        Inn,
+        Smithy,
+        Shop,
+        Temple,
+        Barracks,
+        Stable,
+        Palace,
+        MarketStall,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -373,7 +383,11 @@ namespace Game.Core
         public const TileType LastMore = TileType.Lantern;
 
         // Laid by the generator round a place, never dug (no row in tiles.csv), drawn standing on the floor.
-        public static bool IsDecor(TileType type) => type >= First && type <= Last || type >= FirstMore && type <= LastMore || type >= TileType.Torii && type <= TileType.ArmorStand;
+        public static bool IsDecor(TileType type) => type >= First && type <= Last || type >= FirstMore && type <= LastMore || type >= TileType.Torii && type <= TileType.ArmorStand
+            || IsTownBuilding(type);
+
+        // The towns' buildings of version 10 (WorldGenerator.Towns.cs).
+        public static bool IsTownBuilding(TileType type) => type >= TileType.Inn && type <= TileType.MarketStall;
 
         // The floors the arenas are dressed with: walked like the road, never built on or dug.
         public static bool IsArenaFloor(TileType type) => type >= TileType.ArenaInlay && type <= TileType.ArenaCarpet;
@@ -399,6 +413,15 @@ namespace Game.Core
             // The ice cave's and the sand cave's (묶음 B2a).
             TileType.IcePillar or TileType.FrozenFall or TileType.RibArch or TileType.BuriedColumn => (2, 1),
             TileType.TempleFront => (5, 1),
+            // The towns' buildings (version 10).
+            TileType.Inn => (6, 3),
+            TileType.Smithy => (5, 3),
+            TileType.Shop => (4, 3),
+            TileType.Temple => (6, 4),
+            TileType.Barracks => (7, 3),
+            TileType.Stable => (6, 3),
+            TileType.Palace => (14, 5),
+            TileType.MarketStall => (2, 1),
             _ => (1, 1),
         };
 

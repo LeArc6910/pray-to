@@ -756,6 +756,7 @@ namespace Game.Client
             if (_map[x, y] == TileType.Spire) return new Color32(120, 220, 236, 255);
             if (_map[x, y] == TileType.Campfire) return Palette.Torch;
             if (_map[x, y] == TileType.Cottage || _map[x, y] == TileType.Cabin) return new Color32(176, 72, 58, 255);
+            if (Structures.IsTownBuilding(_map[x, y])) return _map[x, y] == TileType.Palace ? new Color32(230, 200, 90, 255) : new Color32(176, 72, 58, 255);
             if (_map[x, y] == TileType.Tower) return new Color32(74, 108, 192, 255);
             if (_map[x, y] == TileType.BigTent || _map[x, y] == TileType.Totem || _map[x, y] == TileType.Brazier) return new Color32(128, 40, 74, 255);
             // The biomes' props (묶음 B1a): a lit lamp as a fire; the rest a speck between the floor's colour and rock's, so

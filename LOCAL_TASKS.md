@@ -1254,13 +1254,18 @@ DevTools/Local/setup.sh --commit
 - [ ] 189단계: 퀘스트 창과 HUD 꾸미기 — HUD의 칸이 모두 시작화면의 반투명 금테 판, 퀘스트 창의 항목 아이콘·장 제목 줄·진행 막대·보상 줄(`Docs/HudLook.md`)
   - 명령 한 줄을 다시 돌린다(새 파일 없음). PlayMode 사진(`hud`, 퀘스트 창, 휴대폰 세로)이 바뀐다. 글이 판 밖으로 나가거나 겹치면 사진을 붙인다
   - (클라우드 웹 점검) `sweep.js --only hud`
+  - 클라우드 확인 (2026-11-27, `13b5527`): [x] 196개 모두 통과. 사진: 상태 칸·퀘스트 창·퀵슬롯·미니맵이 시작화면 판(비치는 밤색, 금테, 모서리 돌). PC 퀘스트 창에서 아이콘이 제목·보상의 첫 글자를 가려 아이콘 폭만큼 글을 밀게 고침(다시 돌리지 않음)
   - (사람) 판이 게임 화면을 너무 가리지 않는지(비치는 정도), 퀘스트 창의 막대·아이콘이 읽히는지
-
 - [ ] 190단계: 녹음 소리 3차(빈칸) — 얼음·벽돌·쇠 격자·철벅이는 물 발소리, 김, 용암 환경음, 박쥐·게·버섯 울음, 장소 곡 6개(왕국·오두막·둥지·항구·유적·광산)(`Docs/SoundCredits.md` "3차")
   - 명령 한 줄을 다시 돌린다. 새 파일 `Resources/Sfx`의 32개 wav, `Resources/Music`의 6개, `Resources/Ambience/amb_lava.ogg`의 `.meta`가 생기면 커밋한다(가져오기 설정은 `SoundImport`)
   - (클라우드 웹 점검) `sweep.js --only menu`(녹음 세트 80개 넘게)
   - 클라우드 확인 (2026-11-27, `3721b93`): [x] `menu` 53개 모두 통과(녹음 세트 83, 마을 `music_village`). 웹 데이터 19.22 → 24.62 MB
   - (사람) `Docs/HumanChecklist.md` 190
+- [ ] 191단계: 마을·성 다시 만들기(1) — 생성기 10판(새 월드만): 새벽 마을 반지름 30, 왕도 48, 새 건물 여덟(여관·대장간·상점·신전·병영·마구간·왕궁·노점)과 배치(`Docs/Towns.md`)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Towns.cs`, `Client/Art/PropArt.Towns.cs`, `Tests/EditMode/TownTests.cs`, `DevTools/CoreSandbox/TownMap.cs`(DevTools라 `.meta` 없음)의 `.meta`가 생기면 커밋한다. 통신 0.112.0
+  - (클라우드 웹 점검) `sweep.js --only places`
+  - (사람) 새 월드의 마을·왕도가 충분히 크고 풍성한지, 큰 건물 그림(특히 왕궁)이 괜찮은지, 길·벽 사이로 다니기 불편하지 않은지
+
 
 ## 결과 보고
 

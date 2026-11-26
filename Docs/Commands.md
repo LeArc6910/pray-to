@@ -99,3 +99,8 @@ dotnet run --project DevTools/CoreSandbox -- --roadwalk 10 1,2,3,4
 node DevTools/WebPlaytest/sweep.js --wait <커밋> --only hunt
 ```
 
+
+```
+# 새 월드의 새벽 마을·왕도를 글자로(Docs/Towns.md)
+dotnet run --project DevTools/CoreSandbox -- --town 1
+```
