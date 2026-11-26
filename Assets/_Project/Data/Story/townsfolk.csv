@@ -1,0 +1,11 @@
+id,name,place,look,color,count,walk
+villager,마을 사람,dawn_village,villager,#7A8A5A,6,wander
+farmer,농부,dawn_village,villager,#A0784A,2,wander
+child,아이,dawn_village,girl,#D07A8A,3,run
+guard,경비병,dawn_village,guard,#6A7A9A,4,gate
+merchant,상인,dawn_village,villager,#C89A3A,3,stall
+citizen,시민,royal_city,villager,#5A7AA0,10,wander
+noble,귀족,royal_city,queen,#8A3AA0,4,court
+guard,근위병,royal_city,guard,#B0343A,10,gate
+merchant,상인,royal_city,villager,#C89A3A,6,stall
+child,아이,royal_city,girl,#E0A040,4,run

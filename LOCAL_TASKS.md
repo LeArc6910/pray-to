@@ -1263,9 +1263,12 @@ DevTools/Local/setup.sh --commit
   - (사람) `Docs/HumanChecklist.md` 190
 - [ ] 191단계: 마을·성 다시 만들기(1) — 생성기 10판(새 월드만): 새벽 마을 반지름 30, 왕도 48, 새 건물 여덟(여관·대장간·상점·신전·병영·마구간·왕궁·노점)과 배치(`Docs/Towns.md`)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Towns.cs`, `Client/Art/PropArt.Towns.cs`, `Tests/EditMode/TownTests.cs`, `DevTools/CoreSandbox/TownMap.cs`(DevTools라 `.meta` 없음)의 `.meta`가 생기면 커밋한다. 통신 0.112.0
-  - (클라우드 웹 점검) `sweep.js --only places`
+  - (클라우드 웹 점검) `sweep.js --only towns`(192단계와 함께)
   - (사람) 새 월드의 마을·왕도가 충분히 크고 풍성한지, 큰 건물 그림(특히 왕궁)이 괜찮은지, 길·벽 사이로 다니기 불편하지 않은지
-
+- [ ] 192단계: 마을·성 다시 만들기(2) — 마을·왕도의 사람들(마을 사람·농부·아이·경비병·상인·시민·귀족·근위병), 시트 `townsfolk.csv`(`Docs/Towns.md` 사람들)
+  - 명령 한 줄을 다시 돌린다(새 시트가 `GameSheets`에 들어간다: `SceneSetup`). 새 파일 `Data/Story/townsfolk.csv`, `Core/World/Townsfolk.cs`의 `.meta`가 생기면 커밋한다
+  - (클라우드 웹 점검) `sweep.js --only towns`
+  - (사람) 사람들이 마을을 살아 있게 하는지, 수가 적당한지, 걸음이 어색하지 않은지(벽을 지나가는 사람은 없는지)
 
 ## 결과 보고
 

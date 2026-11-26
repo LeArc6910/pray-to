@@ -51,6 +51,7 @@ namespace Game.Client
         // The story: its places, people and steps (Docs/Story.md, 2026-11-10).
         public TextAsset places;
         public TextAsset characters;
+        public TextAsset townsfolk;
         public TextAsset story;
         // The words on screen in each language (Docs/Strings.md, 2026-11-11).
         public TextAsset strings;
@@ -88,7 +89,13 @@ namespace Game.Client
 
         // Without the sheets (an asset made before they existed) there is no one.
         public DayEventData LoadEvents() => DayEventSheet.Parse(Text(events));
-        public StoryData LoadStory(LootData loot, BossData bosses) => StorySheet.Parse(Text(places), Text(characters), Text(story), loot, bosses);
+        public StoryData LoadStory(LootData loot, BossData bosses)
+        {
+            var data = StorySheet.Parse(Text(places), Text(characters), Text(story), loot, bosses);
+            // The grown towns' people (Docs/Towns.md); a sheet set up before them has none.
+            if (townsfolk != null) data.WithTownsfolk(TownsfolkSheet.Parse(townsfolk.text));
+            return data;
+        }
 
         // Without the sheet every line shows the Korean the code keeps beside it.
         public StringData LoadStrings() => StringSheet.Parse(Text(strings));

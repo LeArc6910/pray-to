@@ -85,6 +85,7 @@ namespace Game.Client.Editor
             sheets.events = Sheet(WorldFolder + DayEventSheet.File);
             sheets.places = Sheet(StoryFolder + StorySheet.PlacesFile);
             sheets.characters = Sheet(StoryFolder + StorySheet.CharactersFile);
+            sheets.townsfolk = Sheet(StoryFolder + TownsfolkSheet.File);
             sheets.story = Sheet(StoryFolder + StorySheet.StoryFile);
             sheets.strings = Sheet(StringsFolder + StringSheet.File);
             EditorUtility.SetDirty(sheets);

@@ -468,6 +468,23 @@ namespace Game.Client
                 // the host and the screen, its band, the button), the lairs (their mid-boss, awake or felled), the gates'
                 // dungeons and their light colours, and what a charge smashed; "b1c fell" fells the nearest camp's band (its
                 // trapdoor opens as when it falls by hand).
+                // The grown towns (version 10, Docs/Towns.md): the nearest place's radius, its buildings, its people on the screen.
+                case "town":
+                {
+                    var here = world.Places.OrderBy(p => Vec2.Distance(p.Center, player.Position)).First();
+                    var counts = new Json('{');
+                    foreach (var building in new[] { TileType.Inn, TileType.Smithy, TileType.Shop, TileType.Temple, TileType.Barracks, TileType.Stable, TileType.Palace, TileType.MarketStall, TileType.Cottage })
+                    {
+                        int n = 0;
+                        for (int y = here.Y - here.Radius; y <= here.Y + here.Radius; y++)
+                            for (int x = here.X - here.Radius; x <= here.X + here.Radius; x++)
+                                if (world.Map.InBounds(x, y) && world.Map[x, y] == building) n++;
+                        counts.Field(building.ToString(), n);
+                    }
+                    return "town " + new Json('{').Field("place", here.Definition.Id).Field("radius", here.Radius).Field("sheetRadius", here.Definition.Radius)
+                        .Field("generator", root.HostGenerated?.Version ?? 0).Field("people", root.View?.TownsfolkShown ?? 0)
+                        .Field("buildings", new RawJson(counts.Close('}'))).Close('}');
+                }
                 // The harvest props (version 9): the one faced, what is spent, the forage on the floor.
                 case "harvest":
                     return "harvest " + HarvestJson(root);

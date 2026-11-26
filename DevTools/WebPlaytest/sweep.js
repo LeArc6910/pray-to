@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -7780,7 +7780,50 @@ async function zones(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+// The grown towns (version 10, Docs/Towns.md): the dawn village (radius 30) round the player at the start, its buildings
+// and people; the royal city (radius 48), its palace and court.
+async function towns(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 마을·왕도 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await game.startThroughMenu();
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1500);
+    await game.send('monsters hold; heal; clock 9');
+    await game.wait(1500);
+    let t = await game.ask('town');
+    const b = t.buildings || {};
+    check(t.generator >= 10 && t.place === 'dawn_village' && t.radius === 30, `${name}: 새 월드(${t.generator}판)의 새벽 마을 반지름 ${t.radius}(시트 ${t.sheetRadius})`);
+    check(b.Inn >= 1 && b.Smithy >= 1 && b.Shop >= 2 && b.Temple >= 1 && b.Stable >= 1 && b.Cottage >= 8,
+      `${name}: 마을의 건물 (여관 ${b.Inn}, 대장간 ${b.Smithy}, 상점 ${b.Shop}, 신전 ${b.Temple}, 마구간 ${b.Stable}, 오두막 ${b.Cottage}, 노점 ${b.MarketStall})`);
+    check(t.people > 0, `${name}: 화면에 마을 사람들 (${t.people}명)`);
+    await game.shot(`towns-village-${name}`, '새벽 마을 광장: 시장·우물·마을 사람들');
+    await game.send('goto 0 12');
+    await game.wait(1500);
+    await game.shot(`towns-village-north-${name}`, '새벽 마을 북쪽: 여관·대장간');
+    await game.send('goto place royal_city');
+    await game.wait(2500);
+    t = await game.ask('town');
+    const c = t.buildings || {};
+    check(t.place === 'royal_city' && t.radius === 48, `${name}: 왕도 반지름 ${t.radius}`);
+    check(c.Palace === 1 && c.Barracks === 1 && c.Temple >= 2 && c.Inn >= 1 && c.Cottage >= 10,
+      `${name}: 왕도의 건물 (왕궁 ${c.Palace}, 병영 ${c.Barracks}, 예배당 ${c.Temple}, 여관 ${c.Inn}, 상점 ${c.Shop}, 집 ${c.Cottage}, 노점 ${c.MarketStall})`);
+    check(t.people > 0, `${name}: 왕도에 사람들 (${t.people}명)`);
+    await game.shot(`towns-city-court-${name}`, '왕도 안뜰: 양탄자·기둥·왕좌·왕궁·근위병');
+    await game.send('goto 0 -32');
+    await game.wait(2000);
+    await game.shot(`towns-city-market-${name}`, '왕도 남쪽 시장 광장');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

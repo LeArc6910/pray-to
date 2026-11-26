@@ -86,5 +86,32 @@ namespace Game.Core.Tests
                 for (int x = 0; x < nine.Map.Width; x++)
                     Assert.IsFalse(Structures.IsTownBuilding(nine.Map[x, y]));
         }
+
+        [Test]
+        public void TheTownsPeopleWalkTheStreetsStandAtTheGatesAndTheStalls()
+        {
+            var kinds = TownsfolkSheet.Parse(System.IO.File.ReadAllText(RepoFile.Find("Assets/_Project/Data/Story/" + TownsfolkSheet.File)));
+            Assert.GreaterOrEqual(kinds.Count, 8);
+            var world = Make(2, WorldGenerator.TownVersion);
+            foreach (var site in world.Places.Where(p => p.Definition.Style == "village" || p.Definition.Style == "kingdom"))
+            {
+                var people = Townsfolk.Of(site, world.Map, kinds, 2);
+                Assert.AreEqual(kinds.Where(k => k.Place == site.Definition.Id).Sum(k => k.Count), people.Count, site.Definition.Id);
+                CollectionAssert.AreEqual(people.Select(p => p.Route.Count), Townsfolk.Of(site, world.Map, kinds, 2).Select(p => p.Route.Count), "the same on every client");
+                foreach (var person in people)
+                {
+                    foreach (long clock in new long[] { 100, 4000, 9000, 15000 })
+                    {
+                        var at = person.At(clock);
+                        Assert.LessOrEqual(Vec2.Distance(at, site.Center), site.Radius + 1, person.Kind.Id);
+                        Assert.IsFalse(world.Map.IsSolid(TileMap.Cell(at.X), TileMap.Cell(at.Y)), $"{person.Kind.Id} walks on open ground");
+                    }
+                    if (person.Kind.Walk == "wander") Assert.Greater(person.Route.Count, 2, "walks somewhere");
+                    if (person.Kind.Walk == "stall") Assert.AreEqual(1, person.Route.Count);
+                }
+            }
+            var nine = Make(2, WorldGenerator.HarvestVersion);
+            Assert.IsEmpty(Townsfolk.Of(nine.Places.First(p => p.Definition.Style == "village"), nine.Map, kinds, 2), "only the grown towns");
+        }
     }
 }

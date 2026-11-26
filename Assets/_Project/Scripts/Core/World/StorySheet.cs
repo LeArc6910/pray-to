@@ -225,6 +225,13 @@ namespace Game.Core
         }
 
         public IReadOnlyList<PlaceDefinition> Places { get; }
+        // The grown towns' people (townsfolk.csv, Townsfolk.cs): none when the sheet is not given.
+        public IReadOnlyList<TownsfolkKind> Townsfolk { get; private set; } = Array.Empty<TownsfolkKind>();
+        public StoryData WithTownsfolk(IReadOnlyList<TownsfolkKind> kinds)
+        {
+            Townsfolk = kinds ?? Array.Empty<TownsfolkKind>();
+            return this;
+        }
         public IReadOnlyList<CharacterDefinition> Characters { get; }
         public IReadOnlyList<StoryStep> Steps { get; }
         // The side stories, in the order of their first rows.

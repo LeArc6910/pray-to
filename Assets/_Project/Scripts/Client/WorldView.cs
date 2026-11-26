@@ -632,6 +632,7 @@ namespace Game.Client
             DrawMachines();
             DrawPeople();
             DrawStoryPeople();
+            DrawTownsfolk();
             DrawStanding(deltaTime);
             DrawAmbience(deltaTime);
             AnnouncePlace();
@@ -1753,6 +1754,49 @@ namespace Game.Client
             }
             foreach (string id in _storyGone) _storyPeople.Remove(id);
         }
+
+        // The grown towns' people (Docs/Towns.md, Core Townsfolk): worked out once a town is near, drawn like the people of
+        // the story (their look and colour, breathing, bobbing as they walk), no names.
+        readonly Dictionary<PlaceSite, List<TownPerson>> _townsfolk = new Dictionary<PlaceSite, List<TownPerson>>();
+        readonly List<SpriteRenderer> _townsfolkShown = new List<SpriteRenderer>();
+
+        void DrawTownsfolk()
+        {
+            int used = 0;
+            var self = new Vec2(_self.Position.x, _self.Position.y);
+            long clock = _client.Clock;
+            var kinds = _client.Story?.Townsfolk;
+            if (kinds != null && kinds.Count > 0)
+            {
+                foreach (var site in _client.Places)
+                {
+                    if (site.Radius == site.Definition.Radius || Vec2.Distance(self, site.Center) > PeopleRange + site.Radius) continue;
+                    if (!_townsfolk.TryGetValue(site, out var people)) _townsfolk[site] = people = Townsfolk.Of(site, _client.Map, kinds, _client.Seed);
+                    foreach (var person in people)
+                    {
+                        var at = person.At(clock, _client.DayMinutes);
+                        if (Vec2.Distance(self, at) > PeopleRange) continue;
+                        var before = person.At(clock - 6, _client.DayMinutes);
+                        bool walking = Vec2.Distance(at, before) > 0.01f;
+                        int frame = Mathf.FloorToInt(Time.time * PeopleArt.FramesPerSecond + person.Index * 5) % PeopleArt.Frames;
+                        var color = Rgba.Hex(person.Kind.Color);
+                        var figure = Sprites.Standing($"town/{person.Kind.Look}/{person.Kind.Color}/{frame}", () => PeopleArt.Look(person.Kind.Look, color, frame));
+                        if (used == _townsfolkShown.Count) _townsfolkShown.Add(Renderer(_root.transform, "Townsfolk", null, Color.white));
+                        var renderer = _townsfolkShown[used++];
+                        renderer.enabled = true;
+                        renderer.sprite = figure;
+                        if (walking) renderer.flipX = at.X < before.X - 0.005f;
+                        float bob = walking ? Mathf.Abs(Mathf.Sin(Time.time * (person.Kind.Walk == "run" ? 16 : 10) + person.Index)) * 0.07f : 0;
+                        renderer.transform.localPosition = new Vector3(at.X, at.Y - 0.3f + bob, 0);
+                        renderer.sortingOrder = FootOrder(at.Y - 0.3f);
+                    }
+                }
+            }
+            for (int i = used; i < _townsfolkShown.Count; i++) _townsfolkShown[i].enabled = false;
+        }
+
+        // How many of the towns' people are on the screen now (for the playtests).
+        internal int TownsfolkShown => _townsfolkShown.Count(r => r.enabled);
 
         // Which of eight ways (y up is north).
         static string Compass(float dx, float dy)
