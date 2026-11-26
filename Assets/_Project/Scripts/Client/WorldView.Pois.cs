@@ -289,7 +289,7 @@ namespace Game.Client
             bool mine = e.Source == _client.PlayerId;
             if (e.Type == SimEventType.PoiOpened)
             {
-                Hear(poi.Kind == PoiKind.Chest ? Sound.Victory : Sound.Pickup, at, mine ? 1 : 0.6f);
+                Hear(poi.Kind == PoiKind.Chest ? Sound.Chest : Sound.Pickup, at, mine ? 1 : 0.6f);
                 AddFlash(at + new Vector3(0, 0.4f, 0), 1.2f, GlintColor, FlashKind.Burst);
                 Burst(at + new Vector3(0, 0.4f, 0), GlintColor, 1.2f);
                 _floating.Add(new Floating { Position = at + new Vector3(0, 1.1f, 0), Text = poi.Definition.Name, Color = GlintColor, Big = mine });

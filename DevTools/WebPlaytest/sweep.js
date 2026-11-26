@@ -275,7 +275,9 @@ async function menu(browser) {
   await game.wait(1500);
   // The CC0 recordings (2026-11-11, Docs/SoundCredits.md): in the build, and the ground under the spawn named.
   const heard = await game.state();
-  check(heard.recordedSets >= 15, `녹음 효과음 세트가 빌드에 들어 있다 (${heard.recordedSets}세트, 발밑 ${heard.ground})`);
+  check(heard.recordedSets >= 50, `녹음 효과음 세트가 빌드에 들어 있다 (${heard.recordedSets}세트, 발밑 ${heard.ground})`);
+  // The recorded music (2026-11-26): the field plays its CC0 loop, not the one made in code.
+  check(/^music_/.test(heard.musicClip || ''), `녹음 배경음악이 나온다 (${heard.musicClip || '없음'})`);
   await game.shot('no-darkness-devinfo', '어둠 없이, 개발 정보 창(왼쪽 아래)');
   await leaveGame(game);
   await game.until(s => !s.playing, 8000);

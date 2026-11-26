@@ -11,7 +11,8 @@ namespace Game.Client
     // The music is as loud as the menu's music setting (Settings.MusicVolume); the ambience and the machine hum go
     // with the sound effects (Settings.Volume). Each loop is made the first time it is needed, or ahead of time
     // when Prepare says it soon will be, a part of a bar a frame (MusicArt.Making) so the making does not stall the
-    // game.
+    // game. Where there is a recorded loop for the song or the bed (Recordings.MusicName, AmbienceName, 2026-11-26) and
+    // the menu's sound kind is recorded, that plays instead; nothing is made for it.
     static class Music
     {
         const float FadeSeconds = 1.5f;
@@ -45,6 +46,9 @@ namespace Game.Client
         // For the playtests: the bed playing under the music now, or "" for none.
         public static string AmbienceNow => _ambienceKind?.ToString() ?? "";
 
+        // For the playtests: the clip the music plays now, a recording's file name (music_cave) or a made song's key.
+        public static string ClipNow => _tunes == null ? "" : _tunes[_current].clip != null ? _tunes[_current].clip.name : "";
+
         // The song playing, by its key (MusicArt Song.Key); null for none.
         public static string Playing => _song?.Key;
 
@@ -52,6 +56,7 @@ namespace Game.Client
         // one at a time.
         public static void Prepare(Song song)
         {
+            if (Recorded(song) != null) return;
             if (Songs.ContainsKey(song.Key)) Used[song.Key] = Time.unscaledTime;
             else if (!Wanted.Contains(song) && !Nullable.Equals(_makingSong, song)) Wanted.Add(song);
         }
@@ -88,21 +93,39 @@ namespace Game.Client
         public static void Update(Song? song, Ambience? ambience, float hum, float deltaTime)
         {
             Make();
+            // The menu's sound kind changed: the song and the bed are chosen again, recorded or made.
+            if (_recorded != Settings.RecordedSounds)
+            {
+                _recorded = Settings.RecordedSounds;
+                _song = null;
+                _ambienceKind = null;
+                _ambience.Stop();
+                _ambience.clip = null;
+            }
             if (!Nullable.Equals(song, _song) && !OnBarLine(song, deltaTime))
             {
                 // Waiting for the playing song's next bar line (OnBarLine); the volumes below go on as they were.
+            }
+            else if (!Nullable.Equals(song, _song) && song is Song same && Recorded(same) is AudioClip kept && kept == _tunes[_current].clip
+                && _tunes[_current].isPlaying)
+            {
+                // One recording for both (a field's calm and fight, a boss's phases): it goes on as it is.
+                _song = song;
             }
             else if (!Nullable.Equals(song, _song))
             {
                 _barWait = 0;
                 var before = _song;
                 var playing = _tunes[_current];
+                var clip = song is Song s ? Clip(s) : null;
                 _song = song;
                 _current = 1 - _current;
                 var next = _tunes[_current];
                 next.Stop();
+                // The recording faded out before this one is let go, unless it is still wanted.
+                if (next.clip != null && next.clip != playing.clip && next.clip != clip && Recordings.IsLoop(next.clip)) Recordings.Release(next.clip);
                 next.volume = 0;
-                next.clip = song is Song s ? Clip(s) : null;
+                next.clip = clip;
                 bool inStep = before is Song a && song is Song b && a.InStepWith(b) && playing.isPlaying && playing.clip != null && next.clip != null
                     && playing.clip.samples == next.clip.samples;
                 _fade = !inStep ? FadeSeconds : song.Value.Battle || song.Value.Phase > before.Value.Phase ? IntoFightSeconds : OutOfFightSeconds;
@@ -132,6 +155,7 @@ namespace Game.Client
             {
                 _ambienceKind = ambience;
                 _ambience.Stop();
+                if (Recordings.IsLoop(_ambience.clip)) Recordings.Release(_ambience.clip);
                 _ambience.clip = ambience is Ambience a ? Clip(a) : null;
             }
             Loop(_ambience, effects * AmbienceLevel);
@@ -151,6 +175,8 @@ namespace Game.Client
         {
             var playing = _tunes[_current];
             if (song == null || _song is not Song now || !playing.isPlaying || playing.clip == null) return true;
+            // A recording has no bars the game knows of.
+            if (Recordings.IsLoop(playing.clip)) return true;
             if (now.InStepWith(song.Value)) return true;
             _barWait += deltaTime;
             if (_barWait >= MostBarWait) return true;
@@ -190,6 +216,9 @@ namespace Game.Client
         // A browser only accepts a clip whose samples are all given at once, not streamed (Docs/ArtPipeline.md).
         static AudioClip Clip(Song song)
         {
+            if (Recorded(song) is AudioClip recorded) return recorded;
+            // Made in code, a song somewhere of its own is the field's tune.
+            if (song.Scene != null) song = song.In(null);
             if (Songs.TryGetValue(song.Key, out var clip))
             {
                 Used[song.Key] = Time.unscaledTime;
@@ -227,8 +256,14 @@ namespace Game.Client
             Used.Remove(oldest);
         }
 
+        static bool _recorded;
+
+        // The recorded loop for the song, when recordings are chosen and there is one.
+        static AudioClip Recorded(Song song) => Settings.RecordedSounds ? Recordings.Loop("Music", Recordings.MusicName(song)) : null;
+
         static AudioClip Clip(Ambience ambience)
         {
+            if (Settings.RecordedSounds && Recordings.Loop("Ambience", Recordings.AmbienceName(ambience)) is AudioClip recorded) return recorded;
             if (!Ambiences.TryGetValue(ambience, out var clip)) Ambiences[ambience] = clip = Create("ambience_" + ambience, MusicArt.Make(ambience));
             return clip;
         }

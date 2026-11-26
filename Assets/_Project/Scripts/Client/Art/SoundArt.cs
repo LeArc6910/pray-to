@@ -97,6 +97,10 @@ namespace Game.Client
         Sting,
         Puff,
         Chime,
+        // A purchase paid in coins, and a chest coming open (2026-11-26, recordings in Resources/Sfx; made in code they
+        // are the pickup's and the victory's).
+        Buy,
+        Chest,
         // The UI's own (Docs/UiRework.md 4-6 소리, U1): a window opening (a soft rising slide of stone and a lift),
         // closing (the same falling), the pointer coming onto a button (a tiny tick), a button pressed (a short
         // wooden knock with a bright top), going back or closing by its button (two notes down), and a press refused
@@ -119,6 +123,10 @@ namespace Game.Client
         Wisp,
         Crab,
         Worm,
+        // Furred and clawed things growl; stone things grind (2026-11-26: recorded voices; made in code they are the
+        // worm's and the crab's).
+        Beast,
+        Golem,
     }
 
     enum Voice
@@ -152,6 +160,8 @@ namespace Game.Client
 
         public static float[] Make(Sound sound)
         {
+            if (sound == Sound.Buy) return Make(Sound.Pickup);
+            if (sound == Sound.Chest) return Make(Sound.Victory);
             var parts = new List<Part>();
             float level = 1;
             switch (sound)
@@ -817,11 +827,15 @@ namespace Game.Client
             : monster.Contains("wisp") ? CreatureVoice.Wisp
             : monster.Contains("crab") ? CreatureVoice.Crab
             : monster.Contains("worm") || monster.Contains("demon") ? CreatureVoice.Worm
-            : monster.Contains("beetle") || monster.Contains("stalker") || monster.Contains("scorpion") || monster.Contains("spider") ? CreatureVoice.Bug
+            : monster.Contains("beetle") || monster.Contains("stalker") || monster.Contains("scorpion") || monster.Contains("spider") || monster.Contains("scarab") ? CreatureVoice.Bug
+            : monster.Contains("golem") || monster.Contains("guardian") || monster.Contains("warden") || monster.Contains("tortoise") || monster.Contains("turtle") || monster.Contains("keeper") || monster.Contains("mimic") ? CreatureVoice.Golem
+            : monster.Contains("rat") || monster.Contains("wolf") || monster.Contains("yeti") || monster.Contains("mammoth") || monster.Contains("salamander") ? CreatureVoice.Beast
             : CreatureVoice.Slime;
 
         public static float[] Creature(CreatureVoice creature, Voice voice)
         {
+            if (creature == CreatureVoice.Beast) creature = CreatureVoice.Worm;
+            if (creature == CreatureVoice.Golem) creature = CreatureVoice.Crab;
             var parts = new List<Part>();
             float level = 0.45f;
             switch (creature, voice)

@@ -1226,6 +1226,11 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only testground`(맞은 기록의 몫이 새 곡선)
   - (사람) 시험장에서 철 희귀 세트·방어 빌드로 동굴 수호자를 맞으면 내려찍기가 예전 1%가 아니라 바닥(18%대의 몫)만큼 들어오는지, 체력을 쌓은 캐릭터가 필살기를 버티고 방어만 쌓은 캐릭터는 거의 다 잃는지의 느낌
 
+- [ ] 184단계: 녹음 효과음 2차와 배경음악·환경음 — Kenney·rubberduck CC0 효과음 112개(전투·구르기·원소·몬스터 울음·UI·동전·상자·물·수확·제작·징글), CC0 배경음악 12곡(시작화면·마을·생물군계 8곳·던전·보스), 환경음 2개(`Docs/SoundCredits.md` "2차")
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Resources/Sfx/*.wav`(새 112개), 새 폴더 `Resources/Music`(12개 ogg), `Resources/Ambience`(2개 ogg), `Client/Editor/SoundImport.cs`의 `.meta`가 생기면 커밋한다. 가져오기 설정은 `SoundImport`(AssetPostprocessor)가 정하므로 손으로 고치지 않는다(모노, 22050 Hz, Vorbis, 음악·환경음은 압축한 채 품질 0.35). 이미 가져온 파일에 설정이 안 걸렸으면 `Resources/Sfx`·`Music`·`Ambience`를 오른쪽 클릭 → Reimport
+  - (클라우드 웹 점검) `sweep.js --only menu`(녹음 세트 수, 들판에서 `music_` 녹음 곡)
+  - (사람) `Docs/HumanChecklist.md` 184
+
 ## 결과 보고
 
 명령 한 줄이 실행할 때마다 아래에 결과를 덧붙인다. 플레이 확인 결과는 사람이(또는 로컬 세션이) 날짜와 함께 적는다.

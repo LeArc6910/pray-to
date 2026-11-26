@@ -55,8 +55,9 @@ namespace Game.Client
     // What the music plays (2026-11-09): a field's tune, calm or in a fight, or a boss's theme at a phase.
     readonly struct Song : IEquatable<Song>
     {
-        Song(Tune tune, bool battle, string boss, int phase, bool night = false)
+        Song(Tune tune, bool battle, string boss, int phase, bool night = false, string scene = null)
         {
+            Scene = scene;
             Night = night;
             Tune = tune;
             Battle = battle;
@@ -71,10 +72,19 @@ namespace Game.Client
         // The boss's id in bosses.csv, or null for a field's tune.
         public string Boss { get; }
         public int Phase { get; }
+        // Where it plays when that is not the field's tune: "title" for the menu, "dungeon" inside a dungeon, or null.
+        // Only a recording (Recordings.MusicName) tells them apart; made in code they are the field's tune.
+        public string Scene { get; }
 
         public static Song Field(Tune tune, bool battle = false, bool night = false) => new Song(tune, battle, null, 0, night && !battle);
 
         // Phases past the last theme play the last.
+        // The same song played somewhere of its own (Scene).
+        public Song In(string scene) => new Song(Tune, Battle, Boss, Phase, Night, scene);
+
+        // The menu's: the dirt cave's tune, or the title's own recording.
+        public static Song Title => Field(Tune.Cave).In("title");
+
         public static Song Of(string boss, int phase) => new Song(Tune.Boss, false, boss, Math.Clamp(phase, 1, MusicArt.BossPhases));
 
         public string Key => Boss != null ? $"boss_{Boss}_{Phase}" : Battle ? $"tune_{Tune}_battle" : Night ? $"tune_{Tune}_night" : $"tune_{Tune}";
@@ -85,7 +95,7 @@ namespace Game.Client
             Boss == null ? other.Boss == null && Tune == other.Tune && !Night && !other.Night
             : Boss == other.Boss && Math.Max(Phase, other.Phase) <= 2;
 
-        public bool Equals(Song other) => Tune == other.Tune && Battle == other.Battle && Boss == other.Boss && Phase == other.Phase && Night == other.Night;
+        public bool Equals(Song other) => Tune == other.Tune && Battle == other.Battle && Boss == other.Boss && Phase == other.Phase && Night == other.Night && Scene == other.Scene;
         public override bool Equals(object obj) => obj is Song other && Equals(other);
         public override int GetHashCode() => Key.GetHashCode();
         public override string ToString() => Key;

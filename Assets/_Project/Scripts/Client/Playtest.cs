@@ -2684,6 +2684,8 @@ namespace Game.Client
                 json.Field("dayMinutes", world.DayMinutes);
                 // The CC0 recordings loaded, and what the ground underfoot sounds like (Recordings, 2026-11-11).
                 json.Field("recordedSets", Recordings.SetCount);
+                // The recorded music (2026-11-26): the loop playing now, music_<place> when it is a recording.
+                json.Field("musicClip", Music.ClipNow);
                 // Timber walls round the player (a shop's, 2026-11-11, WorldGenerator.CarveShops).
                 int timber = 0, px = TileMap.Cell(player.Position.X), py = TileMap.Cell(player.Position.Y);
                 for (int ty = py - 4; ty <= py + 4; ty++)

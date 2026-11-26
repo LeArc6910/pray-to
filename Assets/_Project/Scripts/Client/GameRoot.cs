@@ -544,7 +544,7 @@ namespace Game.Client
         {
             if (_client == null || _client.Status != ClientStatus.Playing || _client.Map == null)
             {
-                Music.Update(Tune.Cave, null, 0, deltaTime);
+                Music.Update(Song.Title, null, 0, deltaTime);
                 return;
             }
             // The biome the player has settled in (UpdateBiome), so walking along a border does not keep switching; inside
@@ -576,6 +576,8 @@ namespace Game.Client
                 // A place's tune softens at night (2026-11-11, MusicArt.Night); a fight still wakes it.
                 bool night = place != null && PlaceTune(place.Definition.Style) == tune && Calendar.IsNight(_client.Clock);
                 song = Song.Field(tune, fight, night);
+                // Inside a dungeon its own recording, where there is one (2026-11-26, Recordings.MusicName).
+                if (_client.DungeonHere != null) song = song.In("dungeon");
                 Music.Prepare(Song.Field(tune, !fight, night));
             }
             float nearest = float.MaxValue;

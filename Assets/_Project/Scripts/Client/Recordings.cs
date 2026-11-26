@@ -67,18 +67,54 @@ namespace Game.Client
             foreach (var takes in _sets.Values) takes.Sort((a, b) => string.CompareOrdinal(a.name, b.name));
         }
 
-        // The recorded set for a sound made in code, or null for one that keeps its own.
+        // The recorded set for a sound made in code, or null for one that keeps its own (2026-11-26: the fight, the
+        // roll, the elements, the UI, chests and coins, water, crafting and the jingles; Docs/SoundCredits.md).
         public static string NameOf(Sound sound) => sound switch
         {
             Sound.Dig => "sfx_pickaxe",
             Sound.Break => "sfx_rockbreak",
             Sound.Swing => "sfx_swing",
             Sound.Hit => "sfx_hit",
+            Sound.Crit => "sfx_crit",
+            Sound.Hurt => "sfx_hurt",
+            Sound.Thump => "sfx_thump",
             Sound.Pickup => "sfx_pickup",
             Sound.Click => "sfx_ui_click",
             Sound.Door => "sfx_door_open",
             Sound.DoorShut => "sfx_door_close",
             Sound.Splash or Sound.Cast => "sfx_splash",
+            // A boss's wind-up and a finisher's warning: a gong; a monster calling for help: a bell.
+            Sound.Warning => "sfx_gong",
+            Sound.MobCall or Sound.Chime => "sfx_bell",
+            Sound.Roar => "sfx_roar",
+            Sound.Roll => "sfx_roll",
+            Sound.Dodge or Sound.Dash => "sfx_whoosh",
+            // The elements: fire, frost, lightning; ice and crystal breaking; a spell's burst.
+            Sound.Boom => "sfx_fire",
+            Sound.Ice => "sfx_ice",
+            Sound.Zap => "sfx_zap",
+            Sound.Shatter => "sfx_shatter",
+            Sound.Nova => "sfx_spell",
+            Sound.Plop => "sfx_plop",
+            Sound.Water => "sfx_bubble",
+            Sound.Hammer or Sound.Clang => "sfx_anvil",
+            Sound.Craft => "sfx_craft",
+            Sound.Place => "sfx_place",
+            Sound.Harvest => "sfx_harvest",
+            Sound.Eat => "sfx_eat",
+            Sound.Buy => "sfx_coin_buy",
+            Sound.Chest => "sfx_chest_open",
+            Sound.Victory => "jingle_victory",
+            Sound.LevelUp => "jingle_levelup",
+            Sound.Learn => "jingle_learn",
+            Sound.Story => "jingle_story",
+            Sound.Down => "jingle_down",
+            Sound.UiOpen => "sfx_ui_open",
+            Sound.UiClose => "sfx_ui_close",
+            Sound.UiHover => "sfx_ui_hover",
+            Sound.UiConfirm => "sfx_ui_confirm",
+            Sound.UiCancel => "sfx_ui_cancel",
+            Sound.UiFail => "sfx_ui_fail",
             _ => null,
         };
 
@@ -88,8 +124,76 @@ namespace Game.Client
             Sound.Click => 0.5f,
             Sound.Pickup => 0.6f,
             Sound.Swing or Sound.Hit => 0.75f,
+            Sound.UiHover => 0.4f,
+            Sound.UiOpen or Sound.UiClose or Sound.UiConfirm or Sound.UiCancel or Sound.UiFail => 0.55f,
+            Sound.Victory or Sound.LevelUp or Sound.Learn or Sound.Story or Sound.Down => 0.6f,
+            Sound.Crit or Sound.Roar or Sound.Warning => 0.85f,
             _ => 0.7f,
         };
+
+        // A skill's recorded set by its element (fire, frost, lightning), or null for one that keeps its own sound.
+        public static string SkillName(string id) => id switch
+        {
+            "fireball" or "flame_brand" or "fire_ring" or "meteor" or "flame_burst" or "inferno" or "explosive_arrow" => "sfx_fire",
+            "frost_ring" or "ice_lance" or "blizzard" => "sfx_ice",
+            "chain_lightning" or "thunderclap" or "storm_mantle" => "sfx_zap",
+            _ => null,
+        };
+
+        // A monster's recorded voice: voice_<kind>_<cry|attack|hurt>; the kinds without one keep the made-in-code voice.
+        public static string VoiceName(CreatureVoice creature, Voice voice) =>
+            "voice_" + creature.ToString().ToLowerInvariant() + "_" + voice.ToString().ToLowerInvariant();
+
+        // The recorded music (2026-11-26, Resources/Music, CC0 loops): the title, the village, the eight biomes, a
+        // dungeon, a boss. A field's fight and night play its one recording; the rest keep the music made in code.
+        public static string MusicName(Song song)
+        {
+            if (song.Boss != null) return "music_boss";
+            if (song.Scene != null) return "music_" + song.Scene;
+            return song.Tune switch
+            {
+                Tune.Cave or Tune.Mushroom or Tune.Ice or Tune.Crystal or Tune.Lava or Tune.Abyss or Tune.Lake or Tune.Sand or Tune.Village
+                    => "music_" + song.Tune.ToString().ToLowerInvariant(),
+                _ => null,
+            };
+        }
+
+        public static string AmbienceName(Ambience ambience) => ambience switch
+        {
+            Ambience.Lakeside => "amb_lakeside",
+            Ambience.Waves => "amb_waves",
+            _ => null,
+        };
+
+        static readonly Dictionary<string, AudioClip> Loops = new Dictionary<string, AudioClip>();
+
+        // A long recorded loop (Music/ or Ambience/), loaded when first wanted; null when there is none.
+        public static AudioClip Loop(string folder, string name)
+        {
+            if (name == null) return null;
+            string path = folder + "/" + name;
+            // Remembered also when there is none, so a song without one is not looked for every frame.
+            if (Loops.TryGetValue(path, out var clip)) return clip;
+            clip = Resources.Load<AudioClip>(path);
+            if (clip != null) clip.LoadAudioData();
+            Loops[path] = clip;
+            return clip;
+        }
+
+        public static bool IsLoop(AudioClip clip) => clip != null && Loops.ContainsValue(clip);
+
+        // A loop no longer playing is let go, so the music of every place visited does not pile up in memory.
+        public static void Release(AudioClip clip)
+        {
+            string key = null;
+            foreach (var pair in Loops)
+            {
+                if (pair.Value == clip) key = pair.Key;
+            }
+            if (key == null) return;
+            Loops.Remove(key);
+            Resources.UnloadAsset(clip);
+        }
 
         public static string StepName(Ground ground) => ground switch
         {

@@ -83,7 +83,9 @@ namespace Game.Client
         // A skill's own sound (SoundArt.Skill) at a place in the world; false when the skill has none.
         public static bool PlaySkillAt(string id, Vector3 at, Vector3 listener, float volume = 1)
         {
-            var clip = SkillClip(id);
+            // Fire, frost and lightning skills play their element's recording (2026-11-26).
+            var recorded = Settings.RecordedSounds ? Recordings.Pick(Recordings.SkillName(id)) : null;
+            var clip = recorded ?? SkillClip(id);
             if (clip == null) return false;
             float distance = Vector2.Distance(at, listener);
             if (!Settings.Sound || distance >= Hearing) return true;
@@ -92,7 +94,7 @@ namespace Game.Client
             SkillPlayed[id] = now;
             var source = NextSource();
             source.clip = clip;
-            source.volume = Mathf.Clamp01(volume * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume;
+            source.volume = Mathf.Clamp01(volume * (recorded != null ? 0.7f : 1) * (1 - distance / Hearing)) * Settings.Volume / Settings.MaxVolume;
             source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter) * 0.5f;
             source.Play();
             return true;
@@ -110,7 +112,9 @@ namespace Game.Client
             float now = Time.unscaledTime;
             if (CreaturePlayed.TryGetValue(key, out float last) && now - last < CreatureGap) return;
             CreaturePlayed[key] = now;
-            if (!CreatureClips.TryGetValue(key, out var clip))
+            // A recorded voice for the kind (2026-11-26) where there is one.
+            var clip = Settings.RecordedSounds ? Recordings.Pick(Recordings.VoiceName(creature, voice)) : null;
+            if (clip == null && !CreatureClips.TryGetValue(key, out clip))
             {
                 var samples = SoundArt.Creature(creature, voice);
                 clip = AudioClip.Create($"creature_{creature}_{voice}", samples.Length, 1, SoundArt.SampleRate, false);

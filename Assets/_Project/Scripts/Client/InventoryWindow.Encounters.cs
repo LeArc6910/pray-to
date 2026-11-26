@@ -418,9 +418,9 @@ namespace Game.Client
                     open ? (Color?)null : new Color(0.95f, 0.45f, 0.4f), description, dim: !open);
                 float x = 0;
                 GUI.enabled = enabled && open && coins >= price;
-                if (CardButton(room, ref x, 56, "사기", Ui.Look.Primary)) Send(_client.BuyCommand(entry, 1), Sound.Craft);
+                if (CardButton(room, ref x, 56, "사기", Ui.Look.Primary)) Send(_client.BuyCommand(entry, 1), Sound.Buy);
                 GUI.enabled = enabled && open && coins >= price * 5;
-                if (CardButton(room, ref x, 40, "×5")) Send(_client.BuyCommand(entry, 5), Sound.Craft);
+                if (CardButton(room, ref x, 40, "×5")) Send(_client.BuyCommand(entry, 5), Sound.Buy);
                 GUI.enabled = enabled;
             }
         }
@@ -458,8 +458,8 @@ namespace Game.Client
                         row, price, 108, left > 0 ? (Color?)null : new Color(0.95f, 0.45f, 0.4f), (material?.Description ?? entry.Consumable.Description));
                     float x = 0;
                     GUI.enabled = enabled && left > 0;
-                    if (CardButton(buttons, ref x, 56, "팔기")) Send(_client.SellCommand(thing, 1), Sound.Pickup);
-                    if (CardButton(buttons, ref x, 48, "모두")) Send(_client.SellCommand(thing, Math.Min(Math.Min(have, left), World.MaxTrade)), Sound.Pickup);
+                    if (CardButton(buttons, ref x, 56, "팔기")) Send(_client.SellCommand(thing, 1), Sound.Buy);
+                    if (CardButton(buttons, ref x, 48, "모두")) Send(_client.SellCommand(thing, Math.Min(Math.Min(have, left), World.MaxTrade)), Sound.Buy);
                     GUI.enabled = enabled;
                 }
             }
