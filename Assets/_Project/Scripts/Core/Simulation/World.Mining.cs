@@ -133,7 +133,9 @@ namespace Game.Core
             if (StrikeDungeonCrack(x, y, broken)) return;
             var machine = MachineAt(x, y);
             if (machine != null) Empty(machine, player);
-            ClearTile(x, y);
+            // A harvest prop leaves its spent form, to grow back at dawn (World.Harvest.cs).
+            if (HarvestProps.IsGrown(tile.Tile)) Spend(x, y, tile.Tile);
+            else ClearTile(x, y);
             // A wide prop goes with both its tiles; a spore sac bursts into the cloud a spore monster leaves (it fills
             // the monsters in it and does nothing to players: World.MonsterAttacks' Deathcloud).
             if (BiomeProps.Wide(tile.Tile) && Map[x + 1, y] == TileType.StructurePart) ClearTile(x + 1, y);

@@ -468,6 +468,9 @@ namespace Game.Client
                 // the host and the screen, its band, the button), the lairs (their mid-boss, awake or felled), the gates'
                 // dungeons and their light colours, and what a charge smashed; "b1c fell" fells the nearest camp's band (its
                 // trapdoor opens as when it falls by hand).
+                // The harvest props (version 9): the one faced, what is spent, the forage on the floor.
+                case "harvest":
+                    return "harvest " + HarvestJson(root);
                 // The hunting grounds (version 8): where, how many in each now, the version.
                 case "hunt":
                     return "hunt " + HuntJson(root);
@@ -856,6 +859,28 @@ namespace Game.Client
                     var onward = found.Edge.Path[found.Edge.Path.Count / 2 + 1];
                     root.AimHeld = true;
                     root.HeldAim = new Vec2(onward.X - found.Middle.X, onward.Y - found.Middle.Y);
+                    break;
+                }
+                // Beside the nearest grown harvest prop (version 9, Docs/Harvest.md), "harvest [n]", on open floor below or
+                // above it, facing it.
+                case "harvest":
+                {
+                    int nthProp = words.Length > 2 ? Int(words[2]) : 0;
+                    var here = player.Position;
+                    var props = new List<(int X, int Y, int Dy)>();
+                    int reachTiles = 60;
+                    for (int y = Math.Max(1, TileMap.Cell(here.Y) - reachTiles); y < Math.Min(map.Height - 1, TileMap.Cell(here.Y) + reachTiles); y++)
+                        for (int x = Math.Max(1, TileMap.Cell(here.X) - reachTiles); x < Math.Min(map.Width - 1, TileMap.Cell(here.X) + reachTiles); x++)
+                        {
+                            if (!HarvestProps.IsGrown(map[x, y])) continue;
+                            if (map[x, y - 1] == TileType.Floor) props.Add((x, y, -1));
+                            else if (map[x, y + 1] == TileType.Floor) props.Add((x, y, 1));
+                        }
+                    var prop = props.OrderBy(p => Vec2.Distance(TileMap.Center(p.X, p.Y), here)).Skip(nthProp).FirstOrDefault();
+                    if (prop == default) throw new InvalidOperationException("no harvest prop near: a world of version 9 has them");
+                    to = TileMap.Center(prop.X, prop.Y + prop.Dy);
+                    root.AimHeld = true;
+                    root.HeldAim = new Vec2(0, -prop.Dy);
                     break;
                 }
                 // Just outside the nth nearest hunting ground (version 8, Docs/HuntingGrounds.md), on its spawn side.
@@ -1529,6 +1554,27 @@ namespace Game.Client
                 .Field("sandFallsShown", root.SandFallsShown).Field("iciclesShown", root.IciclesShown)
                 .Field("gates", gates.Raw(']'))
                 .Close('}');
+        }
+
+        static string HarvestJson(GameRoot root)
+        {
+            var world = root.HostWorld;
+            var player = root.HostPlayer;
+            var (x, y) = World.DigAhead(player.Position, player.Facing);
+            var ahead = world.Map.InBounds(x, y) ? world.Map[x, y] : TileType.Wall;
+            int grown = 0, spent = 0;
+            for (int ty = 0; ty < world.Map.Height; ty++)
+                for (int tx = 0; tx < world.Map.Width; tx++)
+                {
+                    if (HarvestProps.IsGrown(world.Map[tx, ty])) grown++;
+                    else if (HarvestProps.IsSpent(world.Map[tx, ty])) spent++;
+                }
+            var bag = new Json('{');
+            foreach (string id in World.ForageOf.Values)
+                if (world.Loot.Materials.FirstOrDefault(m => m.Id == id) is MaterialDefinition material) bag.Field(id, player.Inventory.CountOfKind(material));
+            return new Json('{').Field("generator", root.HostGenerated?.Version ?? 0).Field("ahead", ahead.ToString()).Field("x", x).Field("y", y)
+                .Field("solid", world.Map.InBounds(x, y) && world.Map.IsSolid(x, y)).Field("grown", grown).Field("spent", spent)
+                .Field("forage", world.ForageIds.Count).Field("day", world.Today).Field("bag", new RawJson(bag.Close('}'))).Close('}');
         }
 
         static string HuntJson(GameRoot root)

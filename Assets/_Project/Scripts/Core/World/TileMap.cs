@@ -341,6 +341,26 @@ namespace Game.Core
         SteamVent,
         CrackedPlate,
         BrokenPlate,
+        // The biomes' things to pick or break for what they give (2026-11-27, Docs/Harvest.md), laid by the generator's
+        // version 9 in place of the forage that lay on the floor: picked with one swing (a patch of mushrooms, a herb bush,
+        // a pepper bush, a void pod) or broken with a few (a frost geode, a mithril rock, a bed of clams, an amber rock).
+        MushroomPatch,
+        HerbBush,
+        FrostGeode,
+        MithrilRock,
+        PepperBush,
+        VoidPod,
+        ClamBed,
+        AmberRock,
+        // Each picked or broken: walked over, never dug, until it grows back at the next dawn (World.Harvest.cs).
+        MushroomPatchPicked,
+        HerbBushPicked,
+        FrostGeodeBroken,
+        MithrilRockBroken,
+        PepperBushPicked,
+        VoidPodPicked,
+        ClamBedEmpty,
+        AmberRockBroken,
     }
 
     // The dressing of the story's places (Docs/Story.md, 장소 꾸밈): what it is, how many tiles it stands on.
@@ -479,7 +499,9 @@ namespace Game.Core
                 // A fairy ring's small caps are walked through like the floor's cover (묶음 B1c).
                 && type != TileType.RingCap
                 // A crystal arch's span stands over a tile that is walked (묶음 B3a).
-                && type != TileType.CrystalArch;
+                && type != TileType.CrystalArch
+                // What is left of a picked or broken harvest prop, until it grows back (Docs/Harvest.md).
+                && !HarvestProps.IsSpent(type);
         }
 
         // The walls only the generator lays (version 2's rooms): rock to the eye and to light, each dug by its own rule.

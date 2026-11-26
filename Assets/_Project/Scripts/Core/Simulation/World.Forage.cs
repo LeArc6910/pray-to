@@ -37,6 +37,8 @@ namespace Game.Core
         {
             int today = Calendar.Day(Clock);
             if (today == _forageDay || Loot == null || !_config.Forage) return;
+            // A world of version 9 has its harvest props instead (World.Harvest.cs).
+            if (Harvests) return;
             _forageDay = today;
             // Yesterday's left lying goes: today's is fresh.
             _groundLoot.RemoveAll(l => _forage.ContainsKey(l.Id));

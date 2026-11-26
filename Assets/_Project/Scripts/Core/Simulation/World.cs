@@ -226,6 +226,7 @@ namespace Game.Core
             UpdateHazards();
             UpdateProjectiles();
             UpdateForage();
+            UpdateHarvest();
             UpdateStory();
             UpdateStones();
             UpdateWanderer();

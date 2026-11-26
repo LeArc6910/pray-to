@@ -48,7 +48,7 @@ namespace Game.Client
 
         // What is near enough symmetric to mirror: plants and stones. Timber, carts and lamps keep their lit side.
         static bool Mirrors(TileType type) => type == TileType.RingCap || type == TileType.Stalagmite || type == TileType.Boulder || type == TileType.PillarCap || type == TileType.GlowCaps
-            || type == TileType.SporeSac || type == TileType.ShelfStump || type == TileType.OreSack || type == TileType.FallenLog || IceSandMirrors(type) || CrystalLakeMirrors(type) || LavaVoidMirrors(type);
+            || type == TileType.SporeSac || type == TileType.ShelfStump || type == TileType.OreSack || type == TileType.FallenLog || IceSandMirrors(type) || CrystalLakeMirrors(type) || LavaVoidMirrors(type) || HarvestMirrors(type);
 
         // How far above the bottom edge of its footprint a prop's foot line is, in pixels: the rows of shadow under it.
         public const int FootRows = 3;
@@ -81,7 +81,7 @@ namespace Game.Client
                 TileType.GlowCaps => GlowCaps(variant),
                 TileType.FallenLog => FallenLog(variant),
                 TileType.GiantCap => GiantCap(),
-                _ => IceSandProp(type, variant) ?? CrystalLakeProp(type, variant) ?? LavaVoidProp(type, variant),
+                _ => IceSandProp(type, variant) ?? CrystalLakeProp(type, variant) ?? LavaVoidProp(type, variant) ?? HarvestProp(type, variant),
             };
             return image != null && (shape & 4) != 0 ? image.FlippedX() : image;
         }

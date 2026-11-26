@@ -301,6 +301,13 @@ namespace Game.Core.Tests
             foreach (TileType type in Enum.GetValues(typeof(TileType)))
             {
                 if (!BiomeProps.Is(type)) continue;
+                // What is left of a harvest prop is walked over and never dug (Docs/Harvest.md).
+                if (HarvestProps.IsSpent(type))
+                {
+                    Assert.IsFalse(new TileMap(3, 3, type).IsSolid(1, 1), $"{type} is walked over");
+                    Assert.IsNull(Tiles.Shipped.Find(type), $"{type} is never dug");
+                    continue;
+                }
                 Assert.IsTrue(new TileMap(3, 3, type).IsSolid(1, 1), $"{type} blocks its tile");
                 if (type == TileType.GiantCap) Assert.IsNull(Tiles.Shipped.Find(type), "a landmark is never dug");
                 else Assert.IsNotNull(Tiles.Shipped.Find(type), $"{type} has a row in tiles.csv");

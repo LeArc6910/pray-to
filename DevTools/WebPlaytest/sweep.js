@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -7704,7 +7704,50 @@ async function hunt(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+// The harvest props (version 9, Docs/Harvest.md): a new world has them in place of the floor's forage; one swing picks
+// a patch of mushrooms, it leaves its stubs (walked over), and it is back after a night's sleep.
+async function harvest(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 수확 오브젝트 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await game.startThroughMenu();
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1200);
+    await game.send('monsters hold; heal');
+    let h = await game.ask('harvest');
+    check(h.generator >= 9 && h.grown > 300 && h.forage === 0, `${name}: 새 월드(${h.generator}판)에 수확 오브젝트 ${h.grown}개, 바닥 채집물 ${h.forage}개`);
+    await game.send('goto harvest');
+    await game.wait(900);
+    h = await game.ask('harvest');
+    check(/^(MushroomPatch|HerbBush|FrostGeode|MithrilRock|PepperBush|VoidPod|ClamBed|AmberRock)$/.test(h.ahead), `${name}: 앞에 수확 오브젝트 (${h.ahead})`);
+    const kind = h.ahead;
+    const before = Object.values(h.bag || {}).reduce((a, b) => a + b, 0);
+    await game.shot(`harvest-before-${name}`, `수확 오브젝트 앞(${kind})`);
+    for (let i = 0; i < 8 && /^(MushroomPatch|HerbBush|FrostGeode|MithrilRock|PepperBush|VoidPod|ClamBed|AmberRock)$/.test(h.ahead); i++) {
+      await game.send('attack on');
+      await game.wait(500);
+      await game.send('attack off');
+      h = await game.ask('harvest');
+    }
+    const after = Object.values(h.bag || {}).reduce((a, b) => a + b, 0);
+    check(/(Picked|Broken|Empty)$/.test(h.ahead) && !h.solid && after > before, `${name}: 치면 남은 것(${h.ahead}, 밟고 지나감)과 가방에 ${after - before}개`);
+    await game.shot(`harvest-after-${name}`, `딴 뒤(${h.ahead})`);
+    await game.send(`clock ${h.day + 1} 8`);
+    await game.wait(2500);
+    h = await game.ask('harvest');
+    check(h.ahead === kind, `${name}: 다음 날 아침이면 다시 자란다 (${h.ahead}, ${h.day}일)`);
+    await game.send('face off');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, title, testground, hunt, harvest, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

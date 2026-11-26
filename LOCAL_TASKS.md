@@ -1234,7 +1234,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Hunting.cs`, `Core/Simulation/World.Hunt.cs`, `Tests/EditMode/HuntingGroundTests.cs`의 `.meta`가 생기면 커밋한다
   - (클라우드 웹 점검) `sweep.js --only hunt`
   - (사람) 새 월드에서 길만 따라 걸을 때 만나는 몬스터가 적당한지(너무 귀찮지 않은지), 사냥터에서 몰려오는 수와 4초마다 하나씩이 사냥할 맛이 나는지, 보상(경험치 70%·드랍 40%)이 아깝지 않은지
-
+- [ ] 186단계: 수확 오브젝트 — 생성기 9판(새 월드만): 바닥 채집물 대신 생물군계마다 따거나 깨는 오브젝트(버섯 무리·빛 포자 덤불·서리 정동·미스릴 바위·불고추 덤불·공허 콩 꼬투리·조개 무더기·호박 바위), 다음 날 아침 다시 자람(`Docs/Harvest.md`). 통신 0.110.0
+  - 명령 한 줄을 다시 돌린다(시트: `tiles.csv`에 여덟 줄). 새 파일 `Core/World/WorldGenerator.Harvest.cs`, `Core/Simulation/World.Harvest.cs`, `Client/Art/BiomeArt.Harvest.cs`, `Tests/EditMode/HarvestTests.cs`의 `.meta`가 생기면 커밋한다
+  - (클라우드 웹 점검) `sweep.js --only harvest`
+  - (사람) 오브젝트가 다른 소품 사이에서 "칠 수 있는 것"으로 눈에 띄는지(작다면 알려 주기), 한 번에 따는 것과 여러 번 깨는 것의 손맛, 다음 날 다시 자라는 것이 어색하지 않은지
 
 ## 결과 보고
 

@@ -8,7 +8,7 @@ namespace Game.Core
     // what is broken or picked. The small cover that is only looked at is Decor, worked out on the client.
     public static class BiomeProps
     {
-        public static bool Is(TileType type) => type >= TileType.Stalagmite && type <= TileType.GiantCap || IceSandProps.Is(type) || CrystalLakeProps.Is(type) || LavaVoidProps.Is(type);
+        public static bool Is(TileType type) => type >= TileType.Stalagmite && type <= TileType.GiantCap || IceSandProps.Is(type) || CrystalLakeProps.Is(type) || LavaVoidProps.Is(type) || HarvestProps.Is(type);
 
         // A lamp, out or lit.
         public static bool IsLamp(TileType type) => type == TileType.UnlitLamp || type == TileType.LitLamp;
@@ -212,6 +212,8 @@ namespace Game.Core
             if (version >= CrystalLakeVersion) LayCrystalLake(world, seed, kept);
             // The lava zone's and the abyss's (WorldGenerator.LavaVoid.cs, 묶음 B4a), version 7 on.
             if (version >= LavaVoidVersion) LayLavaVoid(world, seed, kept);
+            // What the things to pick and break keep off (WorldGenerator.Harvest.cs): laid last of all, version 9 on.
+            world.PropsKept = kept;
         }
     }
 }

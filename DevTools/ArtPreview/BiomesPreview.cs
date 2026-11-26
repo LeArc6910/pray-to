@@ -460,6 +460,9 @@ namespace Game.Client
             bool ok = true;
             var kinds = LavaVoidProps.Any(biome).Select(k => k.Type).ToList();
             if (biome == Biome.Cave) kinds.Insert(kinds.IndexOf(TileType.UnlitLamp) + 1, TileType.LitLamp);
+            // Its thing to pick or break and what is left of it (Docs/Harvest.md, version 9).
+            kinds.Add(HarvestProps.Of(biome));
+            kinds.Add(HarvestProps.SpentOf(HarvestProps.Of(biome)));
             var decor = Enumerable.Range(0, 100).Select(roll => Decor.KindOf(biome, roll)).Distinct().ToList();
             // The lake's water's edge: reeds and lily pads (Decor.On).
             if (biome == Biome.Lake) decor.AddRange(new[] { DecorKind.Reeds, DecorKind.LilyPad });

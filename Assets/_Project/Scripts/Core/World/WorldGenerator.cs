@@ -100,6 +100,8 @@ namespace Game.Core
         // The seed it was made from (WorldGenerator.Steps sets it).
         public ulong Seed { get; internal set; }
         public RoomGraph Rooms { get; internal set; }
+        // While it is made: the tiles the props kept clear (WorldGenerator.LayProps), for the harvest props laid last.
+        internal bool[] PropsKept;
         // The places of the story (Docs/Story.md), in sheet order; none when made without the sheets.
         public IReadOnlyList<PlaceSite> Places { get; internal set; } = new List<PlaceSite>();
         // The small places along the roads (CarveLandmarks); none without the story sheets.
@@ -403,6 +405,10 @@ namespace Game.Core
                     LayShallows(world, seed);
                     if (version >= LavaVoidVersion) LayVentsAndPlates(world, seed);
                 }
+                // The things to pick and break in every room (WorldGenerator.Harvest.cs, Docs/Harvest.md), version 9 on: last,
+                // on what is still bare floor, so nothing laid before them moves.
+                if (version >= HarvestVersion && world.PropsKept != null) LayHarvest(world, seed, world.PropsKept);
+                world.PropsKept = null;
                 // The dungeons' pocket above the world (DungeonPocket, 묶음 5a), last of all: rock no step above lays or reads.
                 if (DungeonPocket.Fits(width))
                 {
