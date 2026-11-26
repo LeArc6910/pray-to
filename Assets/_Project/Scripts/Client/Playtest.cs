@@ -873,8 +873,9 @@ namespace Game.Client
                         for (int x = Math.Max(1, TileMap.Cell(here.X) - reachTiles); x < Math.Min(map.Width - 1, TileMap.Cell(here.X) + reachTiles); x++)
                         {
                             if (!HarvestProps.IsGrown(map[x, y])) continue;
-                            if (map[x, y - 1] == TileType.Floor) props.Add((x, y, -1));
-                            else if (map[x, y + 1] == TileType.Floor) props.Add((x, y, 1));
+                            // From above first: the prop is drawn in front of the player, not hidden behind them.
+                            if (map[x, y + 1] == TileType.Floor) props.Add((x, y, 1));
+                            else if (map[x, y - 1] == TileType.Floor) props.Add((x, y, -1));
                         }
                     var prop = props.OrderBy(p => Vec2.Distance(TileMap.Center(p.X, p.Y), here)).Skip(nthProp).FirstOrDefault();
                     if (prop == default) throw new InvalidOperationException("no harvest prop near: a world of version 9 has them");
@@ -890,7 +891,7 @@ namespace Game.Client
                     var ground = world.HuntingGrounds.OrderBy(g => Vec2.Distance(g.Center, player.Position)).Skip(nthHunt).FirstOrDefault()
                         ?? throw new InvalidOperationException("no hunting ground: a world of version 8 has them");
                     var side = (world.Spawn - ground.Center).LengthSquared > 1e-4f ? (world.Spawn - ground.Center).Normalized : new Vec2(0, 1);
-                    var rim = ground.Center + side * (ground.Radius - 2);
+                    var rim = ground.Center + side * (ground.Radius / 2f);
                     to = Nearest(map, TileMap.Cell(rim.X), TileMap.Cell(rim.Y), (x, y) => Walkable(map, x, y) && !Game.Core.Collision.Overlaps(map, TileMap.Center(x, y), World.PlayerRadius))
                         ?? ground.Center;
                     break;

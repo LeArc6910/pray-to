@@ -752,7 +752,15 @@ namespace Game.Client
                 foreach (int index in rooms.HuntingGrounds)
                 {
                     var ground = rooms.Nodes[index];
-                    if (!Seen(ground.X, ground.Y)) continue;
+                    // Any of it seen: its middle, or a point half way out or near its edge on eight sides.
+                    bool seen = Seen(ground.X, ground.Y);
+                    for (int a = 0; a < 8 && !seen; a++)
+                        foreach (float reach in new[] { ground.Radius * 0.5f, ground.Radius - 2f })
+                        {
+                            var point = ground.Center + Vec2.FromAngle(a * MathF.PI / 4) * reach;
+                            if (Seen(TileMap.Cell(point.X), TileMap.Cell(point.Y))) seen = true;
+                        }
+                    if (!seen) continue;
                     _marks.Add(new Mark { At = ground.Center, Kind = MarkKind.Hunt, Icon = MapIcons.Hunt, Color = HuntMark, Name = "사냥터", Info = "몬스터가 계속 나온다 · " + way(ground.Center) });
                 }
             // The nearest veins (a prospector's feel, Sense).
