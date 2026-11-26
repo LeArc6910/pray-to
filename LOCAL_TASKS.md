@@ -1229,6 +1229,8 @@ DevTools/Local/setup.sh --commit
 - [ ] 184단계: 녹음 효과음 2차와 배경음악·환경음 — Kenney·rubberduck CC0 효과음 112개(전투·구르기·원소·몬스터 울음·UI·동전·상자·물·수확·제작·징글), CC0 배경음악 12곡(시작화면·마을·생물군계 8곳·던전·보스), 환경음 2개(`Docs/SoundCredits.md` "2차")
   - 명령 한 줄을 다시 돌린다. 새 파일 `Resources/Sfx/*.wav`(새 112개), 새 폴더 `Resources/Music`(12개 ogg), `Resources/Ambience`(2개 ogg), `Client/Editor/SoundImport.cs`의 `.meta`가 생기면 커밋한다. 가져오기 설정은 `SoundImport`(AssetPostprocessor)가 정하므로 손으로 고치지 않는다(모노, 22050 Hz, Vorbis, 음악·환경음은 압축한 채 품질 0.35). 이미 가져온 파일에 설정이 안 걸렸으면 `Resources/Sfx`·`Music`·`Ambience`를 오른쪽 클릭 → Reimport
   - (클라우드 웹 점검) `sweep.js --only menu`(녹음 세트 수, 들판에서 `music_` 녹음 곡)
+  - 클라우드 확인 (2026-11-27, `8656bd6`): [x] `menu` 53개 모두 통과(녹음 세트 73, 마을에서 `music_village`). [ ] 웹 데이터 +13.6 MB(5.62 → 19.22 MB)로 기준을 넘어 사람 결정 대기
+  - 로컬: `Resources/Music`의 곡 하나의 Inspector 미리보기 크기(Imported size)와 WebGL 탭 설정을 결과에 적는다
   - (사람) `Docs/HumanChecklist.md` 184
 - [ ] 185단계: 몬스터 분포와 사냥터 — 생성기 8판(새 월드만): 길 2칸 밖·길이 지나는 방에도 떠돌이(길만 걸어도 분당 1~2번 만남), 생물군계마다 사냥터 2곳(계속 나옴, 경험치 70%·드랍 40%), 지도의 [사냥터] 표시(`Docs/HuntingGrounds.md`)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/World/WorldGenerator.Hunting.cs`, `Core/Simulation/World.Hunt.cs`, `Tests/EditMode/HuntingGroundTests.cs`의 `.meta`가 생기면 커밋한다
