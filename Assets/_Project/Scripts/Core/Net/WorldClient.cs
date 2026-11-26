@@ -1188,6 +1188,9 @@ namespace Game.Core
                     case MessageType.Welcome:
                         Welcome(WelcomeMessage.Decode(data));
                         break;
+                    case MessageType.MapData:
+                        TakeMapPart(MapDataMessage.Decode(data));
+                        break;
                     case MessageType.Refused:
                         Status = ClientStatus.Refused;
                         RefusedReason = RefusedMessage.Decode(data).Reason;
@@ -2023,6 +2026,37 @@ namespace Game.Core
             PreviousPosition = welcome.Spawn;
             Spawn = welcome.Spawn;
             Status = ClientStatus.Playing;
+            // Our map as made against the host's (Docs/CrossPlay.md 지도 일치): otherwise, ask for theirs.
+            if (welcome.MapPrint != 0 && MapPrint.Of(Map, Biomes) != welcome.MapPrint)
+            {
+                MapDiffers = true;
+                _askMap = true;
+            }
+        }
+
+        // The map came out other than the host's (its print in Welcome), and the host's has been taken in since.
+        public bool MapDiffers { get; private set; }
+        public bool MapFromHost { get; private set; }
+        bool _askMap;
+        byte[][] _mapParts;
+
+        // The one message asking the host for its map, once, or null.
+        public byte[] TakeMapRequest()
+        {
+            if (!_askMap) return null;
+            _askMap = false;
+            return new MapRequestMessage().Encode();
+        }
+
+        void TakeMapPart(MapDataMessage part)
+        {
+            if (Map == null || Biomes == null) return;
+            if (_mapParts == null || _mapParts.Length != part.Parts) _mapParts = new byte[part.Parts][];
+            _mapParts[part.Part] = part.Bytes;
+            if (_mapParts.Any(p => p == null)) return;
+            var packed = _mapParts.SelectMany(p => p).ToArray();
+            _mapParts = null;
+            if (MapPrint.Unpack(packed, Map, Biomes)) MapFromHost = true;
         }
 
         void Apply(SnapshotMessage snapshot)

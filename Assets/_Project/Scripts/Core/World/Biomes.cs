@@ -56,6 +56,9 @@ namespace Game.Core
 
         Biome[] _pocket;
 
+        // The host's biome for a tile, for a joiner whose own map came out otherwise (MapPrint.Unpack).
+        internal void Set(int x, int y, Biome biome) => _tiles[y * Width + x] = biome;
+
         // The biome of the dungeon in a slot of the pocket (Docs/WorldRework.md 지도와 화면: its light, music and tiles).
         public void SetPocket(int slot, Biome biome)
         {

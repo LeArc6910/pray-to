@@ -239,7 +239,11 @@ namespace Game.Client
             _camera.orthographicSize = ViewHalfHeight(Screen.width, Screen.height);
             if (_endReason != null)
             {
+                // A joiner of an online room dropped (a phone sent to the background, a tunnel): try the same code again a
+                // few times before giving up (Docs/CrossPlay.md).
+                bool rejoin = _mode == Mode.Join && _lastJoinCode != null && _endReason.StartsWith(LostHost) && _rejoinTries < RejoinTries;
                 EndSession(_endReason);
+                if (rejoin) Rejoin();
                 return;
             }
             if (_client == null)
@@ -1196,6 +1200,7 @@ namespace Game.Client
 
         void FixedTick()
         {
+            NoteJoined();
             var (move, aim, attack) = Controls.Read(_camera, _client.Position);
             // Clicking in the bag, on a screen or the hub should not swing the sword; a full screen also holds the walk
             // (Docs/UiRework.md U2: the world takes no input under it).
@@ -1415,8 +1420,10 @@ namespace Game.Client
             if (link == null)
             {
                 _status = "참가하지 못했습니다. " + error;
+                if (_rejoinTries > 0 && _rejoinTries < RejoinTries) Rejoin();
                 return;
             }
+            _lastJoinCode = code;
             if (_client != null)
             {
                 link.Dispose();
@@ -1637,7 +1644,7 @@ namespace Game.Client
             _net.Received += (sender, data) => _client?.Receive(data);
             _net.Disconnected += id =>
             {
-                if (id == _net.LocalClientId || id == NetworkManager.ServerClientId) _endReason = "호스트와 연결이 끊어졌습니다. " + _net.DisconnectReason;
+                if (id == _net.LocalClientId || id == NetworkManager.ServerClientId) _endReason = LostHost + _net.DisconnectReason;
             };
             if (online != null && !online.StartClient())
             {
@@ -2494,6 +2501,8 @@ namespace Game.Client
             if (_mode != Mode.Solo)
             {
                 string room = _mode == Mode.Host ? (_roomCode != null ? $"방 코드 {_roomCode}" : $"호스트 · 포트 {NetLink.DefaultPort}") : "참가 중";
+                // A room hosted on the web stops while its tab is hidden (Docs/CrossPlay.md).
+                if (_mode == Mode.Host && Application.platform == RuntimePlatform.WebGLPlayer) lines.Add(WebHostWarning);
                 lines.Add($"{room} · {_client.Names.Count}명");
             }
 

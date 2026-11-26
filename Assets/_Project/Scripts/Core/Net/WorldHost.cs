@@ -150,6 +150,8 @@ namespace Game.Core
             _config = config ?? new HostConfig();
             _gearRandom = new GameRandom(seed, stream: 3);
             _generated = generated ?? WorldGenerator.Generate(seed, _config.MapSize, _config.MapSize, story, bosses?.Arenas, _config.MapVersion, tiles?.Terrain);
+            // The map as made, before anything is dug or built: what a joiner's own should come out as (Docs/CrossPlay.md).
+            MapPrintMade = MapPrint.Of(_generated.Map, _generated.Biomes);
             World = new World(_generated.Map, _generated.Spawn, monsters, seed, worldConfig, loot, tiles, _generated.Biomes);
             // Each boss in its own arena, in sheet order: the first near the spawn, the next in the deep zone.
             // A boss with a place (bosses.csv place, 2026-11-10) waits in the arena beside it, when the world has it.
@@ -172,6 +174,9 @@ namespace Game.Core
         readonly NpcData _npcs;
 
         public World World { get; }
+        public ulong MapPrintMade { get; }
+        // How many joiners asked for the map (their own came out otherwise).
+        public int MapsSent { get; private set; }
         public int PlayerCount => _connections.Values.Count(c => c.Player != null);
 
         public void Receive(ulong connection, byte[] data)
@@ -182,6 +187,14 @@ namespace Game.Core
                 {
                     case MessageType.Join:
                         Join(connection, JoinMessage.Decode(data));
+                        break;
+                    // A joiner's map came out other than ours: the map as it is now, in parts (Docs/CrossPlay.md).
+                    case MessageType.MapRequest:
+                        if (_connections.TryGetValue(connection, out var asking) && asking.Player != null)
+                        {
+                            MapsSent++;
+                            foreach (var part in MapDataMessage.Split(MapPrint.Pack(World.Map, _generated.Biomes))) Send(connection, part, reliable: true);
+                        }
                         break;
                     case MessageType.Input:
                         if (_connections.TryGetValue(connection, out var sender)) ApplyInput(sender, InputMessage.Decode(data));
@@ -328,7 +341,7 @@ namespace Game.Core
             if (_connections.TryGetValue(connection, out var existing) && existing.Player != null) return;
             if (join.Version != Protocol.Version)
             {
-                Send(connection, new RefusedMessage($"버전이 다릅니다. 호스트 {Protocol.Version}, 내 게임 {join.Version}").Encode(), reliable: true);
+                Send(connection, new RefusedMessage(Protocol.VersionRefusal(join.Version)).Encode(), reliable: true);
                 return;
             }
             if (PlayerCount >= _config.MaxPlayers)
@@ -380,7 +393,7 @@ namespace Game.Core
             _connections[connection] = new Connection { Player = player, SentKit = player.KitVersion };
 
             var map = _generated.Map;
-            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, World.Spawn, ClassIndexes(player), player.SkillOrder, _generated.Version).Encode(),
+            Send(connection, new WelcomeMessage(player.Id, _seed, map.Width, map.Height, World.Spawn, ClassIndexes(player), player.SkillOrder, _generated.Version, MapPrintMade).Encode(),
                 reliable: true);
             foreach (byte[] message in TileChangesMessage.EncodeAll(World.ChangedTiles())) Send(connection, message, reliable: true);
             var crops = World.Crops.Select(c => CropEntry(new CropChange(c.X, c.Y, c))).ToList();

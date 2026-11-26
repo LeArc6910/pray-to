@@ -32,6 +32,9 @@ namespace Game.Core
         Journey = 26,
         Pois = 27,
         Dungeons = 28,
+        // A joiner whose map came out other than the host's asks for the host's (Docs/CrossPlay.md 지도 일치), and its parts.
+        MapRequest = 29,
+        MapData = 30,
     }
 
     // Every message is one byte of MessageType followed by little-endian fields, so host and clients read them the
@@ -42,8 +45,31 @@ namespace Game.Core
         public static int WithStatus(int phase, byte status) => (phase & PhaseMask) | ((status & 3) << 6);
         public const int PhaseMask = 0x3F;
 
-        // Host and client must run the same rules and sheets, so a different version is refused.
-        public const string Version = "0.110.0";
+        // Host and client must run the same rules and sheets, so a different version is refused (Docs/CrossPlay.md 버전 정책:
+        // every change to the rules, the sheets or a message goes up; PC, phone and web of the same version play together).
+        public const string Version = "0.111.0";
+
+        // Why a joiner of another version is refused, and who has to update: the older side.
+        public static string VersionRefusal(string theirs)
+        {
+            int order = CompareVersions(theirs, Version);
+            string who = order < 0 ? "내 게임을 업데이트하세요(웹은 새로고침, 앱은 새 버전 받기)" : order > 0 ? "호스트가 게임을 업데이트해야 합니다" : "같은 버전으로 맞추세요";
+            return $"버전이 다릅니다. 호스트 {Version}, 내 게임 {theirs}. {who}";
+        }
+
+        // -1, 0 or 1 by the dotted numbers (a missing or unreadable part counts as 0).
+        public static int CompareVersions(string a, string b)
+        {
+            var x = (a ?? "").Split('.');
+            var y = (b ?? "").Split('.');
+            for (int i = 0; i < Math.Max(x.Length, y.Length); i++)
+            {
+                int p = i < x.Length && int.TryParse(x[i], out int px) ? px : 0;
+                int q = i < y.Length && int.TryParse(y[i], out int qy) ? qy : 0;
+                if (p != q) return p < q ? -1 : 1;
+            }
+            return 0;
+        }
 
         public static MessageType TypeOf(byte[] data) => data != null && data.Length > 0 ? (MessageType)data[0] : 0;
 
@@ -939,8 +965,9 @@ namespace Game.Core
     public sealed class WelcomeMessage
     {
         public WelcomeMessage(int playerId, ulong seed, int width, int height, Vec2 spawn, IReadOnlyList<int> classes = null, IReadOnlyList<int> skillOrder = null,
-            int generator = WorldGenerator.CaveVersion)
+            int generator = WorldGenerator.CaveVersion, ulong mapPrint = 0)
         {
+            MapPrint = mapPrint;
             Generator = generator;
             SkillOrder = skillOrder ?? Array.Empty<int>();
             PlayerId = playerId;
@@ -957,6 +984,8 @@ namespace Game.Core
         public int Height { get; }
         // Which generator the host made the map with (WorldGenerator.CaveVersion, RoomVersion).
         public int Generator { get; }
+        // The host's map as made (Core MapPrint.Of), so a joiner whose own came out otherwise asks for it. 0: not said.
+        public ulong MapPrint { get; }
         public Vec2 Spawn { get; }
         // The classes the host accepted, as indexes into the class sheet.
         public IReadOnlyList<int> Classes { get; }
@@ -973,10 +1002,11 @@ namespace Game.Core
             Protocol.WriteIndexes(w, Classes);
             Protocol.WriteIndexes(w, SkillOrder);
             w.Write((byte)Generator);
+            w.Write(MapPrint);
         });
 
         public static WelcomeMessage Decode(byte[] data) => Protocol.Read(data, MessageType.Welcome, r =>
-            new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2(), Protocol.ReadIndexes(r), Protocol.ReadIndexes(r), r.ReadByte()));
+            new WelcomeMessage(r.ReadInt32(), r.ReadUInt64(), r.ReadInt32(), r.ReadInt32(), r.ReadVec2(), Protocol.ReadIndexes(r), Protocol.ReadIndexes(r), r.ReadByte(), r.ReadUInt64()));
     }
 
     // A player asking for other classes (indexes into the class sheet) or another order of their skills; and the

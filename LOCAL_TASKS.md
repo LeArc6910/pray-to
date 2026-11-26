@@ -1242,6 +1242,9 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/Zones.cs`, `Client/GameRoot.Zones.cs`, `Tests/EditMode/ZoneLevelTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 사진에서 미니맵 아래 지명 줄이 한 줄에 들어가는지 본다(휴대폰 세로)
   - (클라우드 웹 점검) `sweep.js --only zones`
   - (사람) 레벨 구간 숫자가 실제 체감과 맞는지(예: 흙 동굴 1구역 Lv 3~7, 얼음 동굴 2구역 Lv 13~17), 띠가 너무 자주 뜨지 않는지(구역 경계를 오갈 때)
+- [ ] 188단계: 크로스 플레이 준비 — 참가 때 지도 지문 비교·다르면 호스트 지도 받기, 버전이 다르면 누가 업데이트할지 안내, 웹 호스트 경고 줄, 끊긴 참가자 같은 방 다시 잇기(`Docs/CrossPlay.md`). 통신 0.111.0
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Net/MapPrint.cs`, `Client/GameRoot.CrossPlay.cs`, `Tests/EditMode/CrossPlayTests.cs`의 `.meta`가 생기면 커밋한다
+  - (사람) Unity 대시보드에서 Relay가 켜져 있는지(아래 "온라인 협동(Unity Relay)용"), PC 앱·휴대폰·웹 셋으로 한 방에 들어가 보기: 들어갈 때 "호스트의 지도를 받았다" 띠가 뜨는지(뜨면 그 기기 이름을 알려 주기), 휴대폰을 백그라운드로 보냈다가 돌아오면 "다시 잇는 중"으로 다시 들어오는지, 웹으로 방을 열면 경고 줄이 보이는지. iOS는 Mac이 있을 때
 
 ## 결과 보고
 
