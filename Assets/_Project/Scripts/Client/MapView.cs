@@ -298,6 +298,34 @@ namespace Game.Client
         }
 
         static Sprite _rim;
+
+        void DrawZoneEdges(Rect area, Rect window)
+        {
+            float ring = new WorldConfig().ZoneRing * WorldGenerator.ScaleOf(_map.Width, _map.Rows);
+            if (Event.current.type != EventType.Repaint || ring <= 0) return;
+            var previous = GUI.color;
+            GUI.BeginClip(area);
+            void Circle(Vec2 center, float radius, Color color)
+            {
+                float size = 2 * radius / window.width * area.width;
+                float x = (center.X - window.x) / window.width * area.width, y = area.height - (center.Y - window.y) / window.height * area.height;
+                GUI.color = color;
+                GUI.DrawTexture(new Rect(x - size / 2, y - size / 2, size, size), Rim.texture);
+            }
+            var spawn = _client.Spawn;
+            float near = Vec2.Distance(spawn, new Vec2(window.center.x, window.center.y));
+            for (int k = Mathf.Max(1, (int)((near - window.width) / ring)); k <= (near + window.width) / ring + 1; k++)
+                Circle(spawn, k * ring, new Color(0.95f, 0.8f, 0.45f, 0.5f * previous.a));
+            if (_client.Rooms is RoomGraph rooms)
+                foreach (int index in rooms.HuntingGrounds)
+                {
+                    var ground = rooms.Nodes[index];
+                    if (window.Overlaps(new Rect(ground.Center.X - ground.Radius, ground.Center.Y - ground.Radius, 2 * ground.Radius, 2 * ground.Radius)))
+                        Circle(ground.Center, ground.Radius, new Color(1f, 0.55f, 0.25f, 0.7f * previous.a));
+                }
+            GUI.EndClip();
+            GUI.color = previous;
+        }
         static Sprite Rim => _rim ??= Shapes.Donut(0.93f);
 
         // The thing a map scrap pointed to (SimEventType.MapRead, 3c), ringed on the map until it is seen; null for none.
@@ -404,6 +432,8 @@ namespace Game.Client
             // The rumours' faint circles (묶음 4c), over the tiles and under the marks; on the full map only, as a circle
             // is wider than the minimap's window.
             if (window.width >= _map.Width) DrawRumors(area, window);
+            // On the minimap, the zones' edges and the hunting grounds' rims passing through it (Docs/ZoneLevels.md).
+            else if (!_client.InPocket) DrawZoneEdges(area, window);
 
             for (int i = 0; i < _client.Arenas.Count; i++)
                 if (KnowledgeOfArena(i) == WayKnown.Known) Marker(area, window, _client.Arenas[i], Shapes.Ring, ArenaMark, MarkerSize * 2.2f);

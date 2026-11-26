@@ -1238,6 +1238,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다(시트: `tiles.csv`에 여덟 줄). 새 파일 `Core/World/WorldGenerator.Harvest.cs`, `Core/Simulation/World.Harvest.cs`, `Client/Art/BiomeArt.Harvest.cs`, `Tests/EditMode/HarvestTests.cs`의 `.meta`가 생기면 커밋한다
   - (클라우드 웹 점검) `sweep.js --only harvest`
   - (사람) 오브젝트가 다른 소품 사이에서 "칠 수 있는 것"으로 눈에 띄는지(작다면 알려 주기), 한 번에 따는 것과 여러 번 깨는 것의 손맛, 다음 날 다시 자라는 것이 어색하지 않은지
+- [ ] 187단계: 구역 레벨 표시 — 지명 옆 "Lv a~b"(모자라면 주황·빨강), 새 생물군계·구역·사냥터에 들어서면 띠, 큰 지도의 구역 고리와 "n구역 · Lv" 이름표(범례 [구역]), 미니맵의 구역 경계·사냥터 테두리(`Docs/ZoneLevels.md`)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Core/Simulation/Zones.cs`, `Client/GameRoot.Zones.cs`, `Tests/EditMode/ZoneLevelTests.cs`의 `.meta`가 생기면 커밋한다. PlayMode 사진에서 미니맵 아래 지명 줄이 한 줄에 들어가는지 본다(휴대폰 세로)
+  - (클라우드 웹 점검) `sweep.js --only zones`
+  - (사람) 레벨 구간 숫자가 실제 체감과 맞는지(예: 흙 동굴 1구역 Lv 3~7, 얼음 동굴 2구역 Lv 13~17), 띠가 너무 자주 뜨지 않는지(구역 경계를 오갈 때)
 
 ## 결과 보고
 

@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -7747,7 +7747,40 @@ async function harvest(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+// The levels a spot is for (Docs/ZoneLevels.md): by the place's name under the minimap, the banner of a new area (a
+// hunting ground here) with a warning for a character short of it, and the map's zone labels.
+async function zones(browser) {
+  for (const name of ['pc', 'phone']) {
+    const profile = Profiles[name];
+    note(`\n## 구역 레벨 (${name === 'pc' ? 'PC' : '휴대폰 세로'})\n`);
+    const game = await open(browser, run, profile, url);
+    if (game.touch) {
+      await game.startThroughMenu();
+      await game.until(s => s.playing, 25000);
+      await game.wait(800);
+    } else {
+      await game.startSolo();
+    }
+    await game.wait(1500);
+    await game.send('monsters hold; heal');
+    let t = await game.texts();
+    const line = (t.hud || []).find(l => /Lv \d+~\d+/.test(l)) || '';
+    check(!!line, `${name}: 미니맵 아래 지명 옆에 레벨 구간 (${line})`);
+    await game.send('goto hunt 1');
+    const banner = await game.until(x => has(x.banner, 'Lv'), 9000, game.texts);
+    check(!!banner && has(banner.banner, '사냥터 ·'), `${name}: 사냥터에 들어가면 "사냥터 · 생물군계 · Lv" 띠 (${banner ? banner.banner : '없음'})`);
+    check(!!banner && /위험/.test(banner.banner), `${name}: 레벨 1 캐릭터에게는 위험 표시 (${banner ? banner.banner : ''})`);
+    await game.shot(`zones-banner-${name}`, '사냥터 띠와 지명 옆 레벨(주황·빨강)');
+    check(await openScreen(game, '지도'), `${name}: [지도]가 열린다`);
+    await game.wait(600);
+    const legend = (await game.buttons()).filter(b => b.row === '범례').map(b => b.label);
+    check(legend.includes('구역'), `${name}: 지도 범례에 [구역] (${legend.join(', ')})`);
+    await game.shot(`zones-map-${name}`, '지도의 구역 고리와 "n구역 · Lv a~b" 이름표');
+    await game.context.close();
+  }
+}
+
+const Sections = { menu, title, testground, hunt, harvest, zones, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

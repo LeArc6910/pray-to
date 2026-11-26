@@ -379,22 +379,30 @@ namespace Game.Client
         {
             var biome = _client.Biomes.At(_client.Position);
             // In a dungeon its name card says where (WorldView.Dungeon.cs); its biome is the one settled in, for the music.
+            // An area is the biome, the zone and a hunting ground (GameRoot.Zones.cs): a new one of any of them has its banner
+            // with the levels it is for.
+            int area = AreaKey(_client.Position, biome);
             if (_client.InPocket)
             {
                 _biomeHere = _biomeAnnounced = biome;
+                _areaHere = _areaAnnounced = area;
                 _biomeTime = 0;
                 return;
             }
-            if (biome != _biomeHere)
+            // The first area of a session is where the player stands: no banner for it.
+            if (_areaAnnounced == NoArea) _areaHere = _areaAnnounced = area;
+            if (biome != _biomeHere || area != _areaHere)
             {
                 _biomeHere = biome;
+                _areaHere = area;
                 _biomeTime = 0;
                 return;
             }
             _biomeTime += deltaTime;
-            if (_biomeTime < BiomeBannerDelay || biome == _biomeAnnounced) return;
+            if (_biomeTime < BiomeBannerDelay || area == _areaAnnounced) return;
             _biomeAnnounced = biome;
-            _view?.ShowBanner(BiomeMap.Name(biome));
+            _areaAnnounced = area;
+            _view?.ShowBanner(AreaBanner(_client.Position, biome));
         }
 
         // Says so when night falls and when morning comes, whether by the clock or by everyone sleeping (Docs/Time.md).
@@ -768,6 +776,7 @@ namespace Game.Client
         void StartGuide()
         {
             _biomeHere = _biomeAnnounced = Biome.Cave;
+            _areaHere = _areaAnnounced = NoArea;
             _biomeTime = 0;
             if (_guide == null || _guide.Goals.Count == 0)
             {
@@ -2469,11 +2478,18 @@ namespace Game.Client
             long clock = _client.Clock;
             int today = Calendar.Day(clock);
             var lines = new List<string> { $"{Calendar.Text(clock)} {Calendar.PhaseName(Calendar.Phase(clock))}" };
+            int placeLine = -1;
             var weather = World.WeatherOf(today);
             string place = BiomeMap.Name(_client.Biomes.At(_client.Position));
             // In a dungeon its name and level, and no weather down there (묶음 5a).
             if (_client.DungeonHere is DungeonInstance dungeon) lines.Add(DungeonLine(dungeon));
-            else lines.Add(weather != Weather.Clear ? $"{World.WeatherName(weather)} · {place}" : place);
+            else
+            {
+                // The levels it is for beside its name, orange or red when the player is short of them (Docs/ZoneLevels.md).
+                place = $"{place} · {Zones.Text(RangeHere(_client.Position))}";
+                lines.Add(weather != Weather.Clear ? $"{World.WeatherName(weather)} · {place}" : place);
+                placeLine = lines.Count - 1;
+            }
             if (World.EventOf(today) != DayEvent.None) lines.Add(World.EventName(World.EventOf(today)));
             if (_mode != Mode.Solo)
             {
@@ -2485,10 +2501,11 @@ namespace Game.Client
             style.alignment = TextAnchor.UpperRight;
             var area = Ui.InfoArea(0);
             float y = area.y;
-            foreach (string line in lines)
+            for (int i = 0; i < lines.Count; i++)
             {
+                string line = lines[i];
                 float height = style.CalcHeight(new GUIContent(line), area.width);
-                ShadowLabel(new Rect(area.x, y, area.width, height), line, style, new Color(0.92f, 0.9f, 0.85f));
+                ShadowLabel(new Rect(area.x, y, area.width, height), line, style, i == placeLine ? DangerColor(Zones.Danger(_client.Level, RangeHere(_client.Position))) : new Color(0.92f, 0.9f, 0.85f));
                 y += height;
             }
             Ui.InfoBottom = y;

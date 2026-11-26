@@ -37,6 +37,7 @@ namespace Game.Client
             Rumor,
             Ore,
             Hunt,
+            Zone,
             Door,
             Pack,
             Master,
@@ -55,6 +56,7 @@ namespace Game.Client
             (MarkKind.Poi, "볼거리", MapIcons.Chest, new Color(1f, 0.84f, 0.3f)),
             (MarkKind.Boss, "보스", MapIcons.Arena, new Color(1f, 0.35f, 0.3f)),
             (MarkKind.Hunt, "사냥터", MapIcons.Hunt, HuntMark),
+            (MarkKind.Zone, "구역", MapIcons.Zone, new Color(0.95f, 0.8f, 0.45f)),
             (MarkKind.Rumor, "소문", MapIcons.Rumor, new Color(1f, 0.84f, 0.3f)),
             (MarkKind.Ore, "광맥", MapIcons.Ore, new Color(0.85f, 0.55f, 0.3f)),
         };
@@ -430,6 +432,8 @@ namespace Game.Client
             GUI.DrawTextureWithTexCoords(sheet, Sheet(), uv);
             // The rumours' faint rings (묶음 4c) under the marks.
             if (_client.DungeonHere == null && !_hidden.Contains(MarkKind.Rumor)) DrawRings(view);
+            // The zones' edges and the levels each is for (Docs/ZoneLevels.md).
+            if (_client.DungeonHere == null && !_hidden.Contains(MarkKind.Zone)) DrawZones(view);
             // The spot the journal asked to see: a ring that pulses for a few seconds.
             if (_focus is Vec2 focus && Time.unscaledTime - _focusAt < 4)
             {
@@ -467,6 +471,45 @@ namespace Game.Client
                 GUI.DrawTexture(new Rect(p.x - size / 2, p.y - size / 2, size, size), Rim.texture);
                 GUI.color = previous;
             }
+        }
+
+        // The zones round the spawn (World.ZoneLevelAt): a faint rim at each edge, and on the band between two edges, on the
+        // player's side of the spawn, "n구역 · Lv a~b" for the biome there, orange or red when the player is short of it.
+        void DrawZones(Rect view)
+        {
+            var spawn = _client.Spawn;
+            float ring = new WorldConfig().ZoneRing * WorldGenerator.ScaleOf(_map.Width, _map.Rows);
+            if (ring <= 0) return;
+            float reach = Mathf.Sqrt(_map.Width * _map.Width + _map.Rows * _map.Rows);
+            var toward = _client.Position - spawn;
+            var way = toward.LengthSquared > 1 ? toward.Normalized : new Vec2(0, 1);
+            var previous = GUI.color;
+            _nameStyle ??= new GUIStyle(GUI.skin.label) { wordWrap = false, clipping = TextClipping.Overflow, padding = new RectOffset(0, 0, 0, 0), margin = new RectOffset(0, 0, 0, 0), alignment = TextAnchor.MiddleLeft };
+            var spawnAt = ToScreen(view, spawn) - view.position;
+            for (int k = 1; k * ring < reach; k++)
+            {
+                float size = 2 * k * ring * _mapZoom;
+                GUI.color = new Color(0.95f, 0.8f, 0.45f, 0.45f * previous.a);
+                GUI.DrawTexture(new Rect(spawnAt.x - size / 2, spawnAt.y - size / 2, size, size), Rim.texture);
+            }
+            for (int k = 0; (k + 0.5f) * ring < reach; k++)
+            {
+                var at = spawn + way * ((k + 0.5f) * ring);
+                int cx = TileMap.Cell(at.X), cy = TileMap.Cell(at.Y);
+                if (!_map.InBounds(cx, cy)) continue;
+                int zone = Zones.ZoneAt(spawn, at, WorldGenerator.ScaleOf(_map.Width, _map.Rows));
+                var range = Zones.LevelRange(_client.Biomes[cx, cy], zone);
+                string text = $"{zone}구역 · {Zones.Text(range)}";
+                var p = ToScreen(view, at) - view.position;
+                var size = _nameStyle.CalcSize(new GUIContent(text));
+                var rect = new Rect(p.x - size.x / 2, p.y - size.y / 2, size.x, size.y);
+                GUI.color = previous;
+                _nameStyle.normal.textColor = new Color(0.1f, 0.06f, 0.03f, 0.9f);
+                foreach (var (dx, dy) in new[] { (1, 1), (-1, 1), (1, -1), (-1, -1) }) GUI.Label(new Rect(rect.x + dx, rect.y + dy, rect.width, rect.height), text, _nameStyle);
+                _nameStyle.normal.textColor = GameRoot.DangerColor(Zones.Danger(_client.Level, range));
+                GUI.Label(rect, text, _nameStyle);
+            }
+            GUI.color = previous;
         }
 
         // A rumour's ring is RumorRadius wide, PathRadius once the way is known (kept in the mark's info).
