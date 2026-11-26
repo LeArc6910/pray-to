@@ -3134,6 +3134,24 @@ async function firstRun(browser, profile, hourLong) {
   };
   // Mines a tunnel: the nearest wall beside, else a step toward open floor, until `enough` says stop.
   // With `prefer` (a tile type) it digs that first, and with none beside it goes to the next one (`onNone`).
+  // The dodge roll toward (dx, dy): the way held and the roll pressed (PC: left Shift; phone: the roll button).
+  const roll = async (dx, dy) => {
+    const d = Math.hypot(dx, dy) || 1;
+    if (game.touch) {
+      await hold('move', dx / d, dy / d);
+      await game.press('roll', undefined, { quiet: true });
+      await game.wait(350);
+      await lift();
+      return;
+    }
+    const keys = [];
+    if (Math.abs(dx) > d * 0.38) keys.push(key[`${Math.sign(dx)},0`]);
+    if (Math.abs(dy) > d * 0.38) keys.push(key[`0,${Math.sign(dy)}`]);
+    for (const k of keys) await game.page.keyboard.down(k);
+    await game.page.keyboard.press('ShiftLeft');
+    await game.wait(350);
+    for (const k of keys) await game.page.keyboard.up(k);
+  };
   const drink = async () => {
     if (game.touch) await game.press('potion', undefined, { quiet: true });
     else await game.page.keyboard.press('c');
@@ -3563,12 +3581,16 @@ async function firstRun(browser, profile, hourLong) {
     const wardenAt = Date.now();
     let falls = 0;
     let dodges = 0;
+    let rolls = 0;
+    let rolledAt = 0;
     let swings = 0;
     let closest = Infinity;
     let lowest = Infinity;
     await slot(1);
     await taken('boss cave_warden', '동굴 수호자에게 갈 때(HUD에 방향과 거리가 나온다)');
-    while (Date.now() - wardenAt < 600000 && (await goalNow()).n <= at('boss') && falls < 8) {
+    // Fifteen minutes since 2026-11-25 (Docs/Difficulty.md): in ten the web bot, one action a round trip, took the
+    // warden to 159 of 690 and fell twice; most of the time goes on the walk back.
+    while (Date.now() - wardenAt < 900000 && (await goalNow()).n <= at('boss') && falls < 8) {
       const s = await game.state();
       if (s.dead) {
         falls++;
@@ -3581,7 +3603,13 @@ async function firstRun(browser, profile, hourLong) {
       // (the nearest safe spot, diagonals too).
       const away = offset(s.danger);
       if (away && (away[0] || away[1])) {
-        await move(away[0], away[1]);
+        // Out of it by the dodge roll when it is ready, as the goal's hint says (2026-11-25, Docs/Difficulty.md: a
+        // warden's blow now takes two fifths of the health), else on foot.
+        if (Date.now() - rolledAt > 1000 && !s.rolling) {
+          await roll(away[0], away[1]);
+          rolledAt = Date.now();
+          rolls++;
+        } else await move(away[0], away[1]);
         dodges++;
         continue;
       }
@@ -3623,7 +3651,7 @@ async function firstRun(browser, profile, hourLong) {
     }
     await gather(5);
     const fought = await game.state();
-    note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번, 휘두름 ${swings}번, 가장 가까이 ${closest.toFixed(1)}칸, 가장 낮은 체력 ${lowest}, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
+    note(`- 동굴 수호자: ${Math.round((Date.now() - wardenAt) / 1000)}초, 쓰러짐 ${falls}번, 피하기 ${dodges}번(구르기 ${rolls}번), 휘두름 ${swings}번, 가장 가까이 ${closest.toFixed(1)}칸, 가장 낮은 체력 ${lowest}, 레벨 ${fought.level}, 무기 ${fought.weapon} (${fought.bosses.split(' ').find(b => b.startsWith('cave_warden')) || ''})`);
     await game.shot('hour-warden', '동굴 수호자와 싸운 뒤');
     if (!(await passed(at('boss'), '동굴 수호자 쓰러뜨리기'))) {
       // The guide waits at the warden; the later goals could not be told apart from it. Recorded as failed above,
