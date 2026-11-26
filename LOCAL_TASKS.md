@@ -1273,6 +1273,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 193단계: 동굴 수호자(첫 보스) 새 그림과 패턴 — Retro Diffusion 바위 골렘의 다섯 시점, 공격마다 몸 전체의 전조 자세와 착지 이펙트, 잠든 바위 더미에서 깨어나는 입장(`arenas.csv` `Awaken`)(`Docs/Bosses.md` 동굴 수호자)
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/WardenArt.cs`, `Client/WorldView.Warden.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/WardenMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `warden-asleep`·`entrance-warden`·`warden-slam-windup`·`warden-cave-in-windup`(`TheCaveWardenWakesAndWindsUp`)
   - (클라우드 웹 점검) `sweep.js --only warden`, `--only arenas`
+  - 클라우드 확인 (2026-11-27, `aaf51ac`): [x] `warden` 21개 모두 통과(입장 이름 카드, 공격 열의 바닥 표시, 천장 붕괴에만 경고 표지, 3페이즈). 사진에서 골렘·두 주먹 들기·팔 벌림·떨어지는 바위가 보인다. `arenas`는 돌리지 않음
   - (사람) `Docs/HumanChecklist.md` 193
 
 ## 결과 보고
