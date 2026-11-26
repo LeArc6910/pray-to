@@ -591,6 +591,36 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The cave warden (Docs/Bosses.md 동굴 수호자, 2026-11-26): asleep as a heap of mossy stone in the fallen shrine,
+        // waking (eyes and core lit, getting up), then mid wind-up of its slam (both fists overhead) and of its cave-in
+        // (arms spread, the core blazing, the warning sign).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheCaveWardenWakesAndWindsUp()
+        {
+            yield return Start();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "cave_warden");
+            Assert.IsNotNull(boss, "No cave warden.");
+            Assert.AreEqual(BossEntrance.Awaken, boss.Definition.Arena.Entrance, "arenas.csv gives the warden its own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("warden-asleep");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.2f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the warden comes in first.");
+            yield return Screens.Take("entrance-warden");
+            yield return new WaitForSecondsRealtime(4.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "slam"), "The slam can be forced once it fights.");
+            yield return new WaitForSecondsRealtime(0.7f);
+            yield return Screens.Take("warden-slam-windup");
+            yield return new WaitForSecondsRealtime(2.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "cave_in"));
+            yield return new WaitForSecondsRealtime(1.0f);
+            yield return Screens.Take("warden-cave-in-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Ordinary monsters' attacks from monster_attacks.csv (Docs/Combat.md 몬스터의 공격 시트, 2026-11-21): a slime's
         // pounce is marked where it will land, a frost wisp rings itself (a mark the screen makes from the monster's
         // state), and both draw their pieces; after they land nothing is left.

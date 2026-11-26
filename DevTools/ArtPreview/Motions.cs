@@ -18,7 +18,7 @@ namespace Game.Client
     //                            cast, hit
     //   anim/bosses.gif          a row a boss: turning through eight ways, then its pattern facing down-right and
     //                            facing up-left (idle, wind-up, strike, charge, roar)
-    static class Motions
+    static partial class Motions
     {
         const float Step = 0.02f;
         const int Ppu = TileArt.Size;
@@ -403,13 +403,16 @@ namespace Game.Client
                 case "vein_eater":
                     VeinEater(folder, arena);
                     return true;
+                case "warden":
+                    Warden(folder, arena);
+                    return true;
                 case "entrances":
                     Entrances(folder, arena);
                     return true;
                 case "hero":
                     return HeroPreview.Write(folder, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) == 0;
                 default:
-                    Console.Error.WriteLine($"--only {name}: spider, knight, samurai, vein_eater, hero, entrances or arenas");
+                    Console.Error.WriteLine($"--only {name}: warden, spider, knight, samurai, vein_eater, hero, entrances or arenas");
                     return false;
             }
         }
@@ -432,6 +435,7 @@ namespace Game.Client
             Samurai(folder, arena);
             Knight(Path.Combine(folder, "knight.gif"), arena);
             Spider(folder, arena);
+            Warden(folder, arena);
             Entrances(folder, arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
@@ -1239,6 +1243,8 @@ namespace Game.Client
                     (w, f) => SamuraiWay(ways[w].Sector, f), null),
                 ("knight", KnightArt.Width, KnightArt.Height, KnightArt.FramesOf(KnightPose.Enter), 4.6f,
                     (w, f) => Flip(KnightArt.Draw(ways[w].View, KnightPose.Enter, f, 1), ways[w].Flip), p => KnightArt.EnterFrameAt(p, false)),
+                ("warden", WardenArt.Width, WardenArt.Height, WardenArt.FramesOf(WardenPose.Enter), 4.0f,
+                    (w, f) => Flip(WardenArt.Draw(ways[w].View, WardenPose.Enter, f, 1), ways[w].Flip), p => WardenArt.EnterFrameAt(p, false)),
             };
             PixelImage Over(PixelImage image)
             {

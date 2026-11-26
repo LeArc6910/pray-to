@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1018,6 +1018,60 @@ async function knight(browser) {
   await game.send('heal; clear; boss black_knight hurt 0.36');
   await game.wait(800);
   await game.shot('knight-phase2', '2페이즈 포효');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 동굴 수호자 (첫 보스, 2026-11-26, Docs/Bosses.md)
+// The first boss teaches reading a boss: every attack has its own big wind-up of the whole golem (both fists overhead,
+// a fist drawn back, a foot lifted, the arms folded over a blazing core), the floor blows land as the mark fills, the
+// roof attacks punch the roof first. Only the cave-in (천장 붕괴) shows a warning sign. A picture mid wind-up and one
+// just as the blow lands, for each of its attacks, its entrance and its phases.
+async function warden(browser) {
+  note('\n## 동굴 수호자 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip copper_sword copper_helmet copper_armor copper_boots; heal');
+  await game.send('heal; goto boss cave_warden');
+  await game.wait(700);
+  await game.shot('warden-entrance', '입장: 바위 더미가 눈과 핵을 밝히며 일어난다');
+  const woke = await game.until(t => has(t.banner, '동굴 수호자') || has(t.entrance, '동굴 수호자'), 8000, game.texts);
+  check(!!woke, `무너진 신전 아레나에서 깨면 "동굴 수호자" 이름 카드나 배너 (${woke ? woke.banner || woke.entrance : '없음'})`);
+  await game.wait(4500);
+  await game.shot('warden-awake', '깨어난 동굴 수호자');
+  // [attack, name, telegraph seconds, strong]
+  const uses = [
+    ['slam', '내려찍기(두 주먹을 머리 위로)', 1.0, false],
+    ['sweep', '휩쓸기(한 주먹을 뒤로 젖힘)', 0.9, false],
+    ['rock_burst', '돌 파편(팔로 핵을 감쌈)', 0.6, false],
+    ['quake', '지진(한 발을 높이 듦)', 1.1, false],
+    ['charge', '돌진(머리를 낮춤)', 1.0, false],
+    ['shockwave', '충격파(두 주먹을 발밑에)', 1.2, false],
+    ['rock_trail', '바위 줄기(주먹을 낮게 끌어옴)', 0.8, false],
+    ['aftershock', '여진(한 주먹을 높이)', 1.1, false],
+    ['meteor', '낙석(천장을 올려침)', 1.2, false],
+    ['cave_in', '천장 붕괴(필살기, 경고)', 1.5, true],
+  ];
+  for (const [attack, name, telegraph, strong] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss cave_warden use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    if (attack !== 'rock_burst') check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`warden-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`warden-${attack}-hit`, `${name} 떨어진 순간`);
+  }
+  await game.send('heal; clear; boss cave_warden hurt 0.36');
+  await game.wait(800);
+  await game.shot('warden-phase2', '2페이즈 포효(팔을 활짝)');
+  await game.send('heal; clear; boss cave_warden hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('cave_warden') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('warden-phase3', '3페이즈(핵이 붉게 달아오른다)');
   await game.context.close();
 }
 
@@ -3921,6 +3975,7 @@ const ArenaList = [
 ];
 // [boss, whole entrance seconds, short seconds, what it does]
 const OwnEntrances = [
+  ['cave_warden', 4.2, 1.4, '바위 더미가 눈과 핵을 밝히고 일어나 두 주먹으로 바닥을 내려찍는다'],
   ['vein_eater', 3.2, 1.2, '흙더미가 들썩이다 바닥을 뚫고 솟는다'], ['silk_mother', 3.4, 1.2, '천장에서 실을 타고 내려와 다리를 편다'],
   ['shrine_samurai', 3.6, 1.2, '정좌에서 일어나 칼자루에 손을 얹는다'], ['black_knight', 4.6, 1.4, '무릎을 펴고 망치를 끌며 나와 바닥을 내려찍는다'],
 ];
@@ -7823,7 +7878,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

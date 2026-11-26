@@ -1270,6 +1270,10 @@ DevTools/Local/setup.sh --commit
   - (클라우드 웹 점검) `sweep.js --only towns`
   - 클라우드 확인 (2026-11-27, `aaa4c6b`): [x] 12개 모두 통과(PC·휴대폰: 새 월드 10판의 마을 반지름 30·건물(여관·대장간·상점 둘·신전·마구간·오두막 14~15·노점 6), 화면에 사람 7~9명; 왕도 반지름 48·왕궁·병영·예배당 둘·집 27~28, 사람 4~5명). 사진에서 본 것 둘을 고침: 귀족이 여왕과 같은 왕관 모습 → 보랏빛 옷의 평범한 모습, 왕도 안에서 "버섯 숲 · Lv 13~17 · 매우 위험" 띠 → 장소 안에서는 구역 띠를 띄우지 않음(다시 돌리지 않음)
   - (사람) 사람들이 마을을 살아 있게 하는지, 수가 적당한지, 걸음이 어색하지 않은지(벽을 지나가는 사람은 없는지)
+- [ ] 193단계: 동굴 수호자(첫 보스) 새 그림과 패턴 — Retro Diffusion 바위 골렘의 다섯 시점, 공격마다 몸 전체의 전조 자세와 착지 이펙트, 잠든 바위 더미에서 깨어나는 입장(`arenas.csv` `Awaken`)(`Docs/Bosses.md` 동굴 수호자)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/WardenArt.cs`, `Client/WorldView.Warden.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/WardenMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `warden-asleep`·`entrance-warden`·`warden-slam-windup`·`warden-cave-in-windup`(`TheCaveWardenWakesAndWindsUp`)
+  - (클라우드 웹 점검) `sweep.js --only warden`, `--only arenas`
+  - (사람) `Docs/HumanChecklist.md` 193
 
 ## 결과 보고
 

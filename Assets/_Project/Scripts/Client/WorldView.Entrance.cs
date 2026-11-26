@@ -237,6 +237,31 @@ namespace Game.Client
                     }
                     break;
 
+                case BossEntrance.Awaken:
+                    // Grit trickling off the sleeping stone; its eyes light, then its core; it gets up with a thud,
+                    // hauls its fists up and pounds the floor (WardenArt.Enter).
+                    if (frame < WardenArt.EnterEyes && puff)
+                    {
+                        body.DustAt = Time.time + 0.12f;
+                        Kick(feet + new Vector3(Random.Range(-0.8f, 0.8f), 1.2f, 0), Vector3.down * 0.4f, DustColor, 1);
+                    }
+                    if (Reached(2)) Hear(Sound.Break, feet, 0.5f);
+                    if (Reached(WardenArt.EnterEyes)) AddFlash(feet + new Vector3(0, 1.9f, 0), 0.6f, AmberColor, FlashKind.Impact);
+                    if (Reached(WardenArt.EnterCore))
+                    {
+                        AddFlash(feet + new Vector3(0, 1.3f, 0), 1.6f, AmberColor, FlashKind.Ring);
+                        Hear(Sound.Nova, feet, 0.6f);
+                    }
+                    if (Reached(WardenArt.EnterStood)) Thud(body, 0.06f, 0.6f);
+                    if (!body.EntersAgain && Reached(WardenArt.EnterStrike - 3)) Hear(Sound.Heavy, feet, 1);
+                    if (!body.EntersAgain && Reached(WardenArt.EnterStrike))
+                    {
+                        Impact(feet, 1);
+                        Cracks(feet, 2.6f, 7);
+                        Hear(Sound.Roar, feet, 0.8f);
+                    }
+                    break;
+
                 case BossEntrance.Stride:
                     // Up off its knee with a scrape; each stride a thud; the hammer comes down like a wall.
                     if (Reached(2)) Hear(Sound.Heavy, feet, 0.7f);

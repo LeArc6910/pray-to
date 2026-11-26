@@ -1,5 +1,5 @@
 boss,arena,appear,entrance,seconds,again,title
-cave_warden,Ruin,Wait,,2.2,1,무너진 신전의 파수꾼
+cave_warden,Ruin,Wait,Awaken,4.2,1.4,무너진 신전의 파수꾼
 crystal_queen,Nest,Descend,,2.2,1,수정 둥지의 여왕
 lava_titan,Caldera,Lurk,,2.2,1,끓는 분지의 거인
 void_lord,Altar,Summon,,2.4,1,제단이 부른 것

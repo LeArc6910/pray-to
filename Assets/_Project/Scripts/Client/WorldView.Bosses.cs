@@ -84,6 +84,7 @@ namespace Game.Client
             if (body.Id == "shrine_samurai") SamuraiExtras(body, view);
             if (body.Id == "black_knight") KnightExtras(body, view);
             if (body.Id == "silk_mother") SpiderExtras(body, view);
+            if (body.Id == "cave_warden") WardenExtras(body, view);
         }
 
         void ShowWarningSign(Body body, bool on)
@@ -390,8 +391,10 @@ namespace Game.Client
         void FallingRock(Mark mark, HazardState hazard, float progress)
         {
             var attack = AttackOf(hazard);
-            // The black knight's falling roof too (2026-11-12).
-            if (attack == null || attack.Shape != AttackShape.Circle || !(_bossInView.Id == "vein_eater" || _bossInView.Id == "black_knight" && attack.Target == AttackTarget.Each))
+            // The black knight's falling roof too (2026-11-12), and the cave warden's rocks punched loose from the roof
+            // and its cave-in (2026-11-26), which only start to fall once its fists have struck the roof.
+            bool warden = _bossInView?.Id == "cave_warden" && attack != null && (attack.Id == "meteor" || attack.Id == "cave_in");
+            if (attack == null || attack.Shape != AttackShape.Circle || !(warden || _bossInView.Id == "vein_eater" || _bossInView.Id == "black_knight" && attack.Target == AttackTarget.Each))
             {
                 if (mark.Rock != null) mark.Rock.enabled = false;
                 return;
@@ -402,7 +405,8 @@ namespace Game.Client
                 mark.Rock.sortingOrder = 20500;
             }
             // Out of sight above for the first part, then dropping faster and faster.
-            float fall = Mathf.Clamp01((progress - 0.35f) / 0.65f);
+            float start = warden ? WardenStrikeAt(attack) + 0.05f : 0.35f;
+            float fall = Mathf.Clamp01((progress - start) / (1 - start));
             mark.Rock.enabled = fall > 0;
             float height = 7 * (1 - fall * fall);
             mark.Rock.transform.localPosition = new Vector3(hazard.Position.X, hazard.Position.Y + height, 0);

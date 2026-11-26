@@ -64,6 +64,8 @@ namespace Game.Core
         Seated,
         // Walking out dragging its hammer, and the hammer brought down (the black knight).
         Stride,
+        // A heap of stone that wakes: eyes and core lit, up on its feet, the floor pounded (the cave warden).
+        Awaken,
     }
 
     public sealed class ArenaDefinition

@@ -941,6 +941,21 @@ namespace Game.Client
                 BossPose.Roar => SamuraiPose.Kiai,
                 _ => SamuraiPose.Idle,
             }, frame, 1),
+            // The cave warden of the fallen shrine (2026-11-26): likewise, a mossy stone golem (WardenPose in WorldView).
+            "cave_warden" => WardenArt.Draw(view, pose switch
+            {
+                BossPose.Windup => WardenPose.Raise,
+                BossPose.Strike => WardenPose.Slam,
+                BossPose.Charge => WardenPose.Charge,
+                BossPose.Roar => WardenPose.Roar,
+                _ => WardenPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => WardenArt.FramesOf(WardenPose.Raise) - 1,
+                BossPose.Strike => WardenArt.StrikeFrame(WardenPose.Slam),
+                BossPose.Roar => WardenArt.RoarRise + frame % 4,
+                _ => frame,
+            }, 1),
             // The black knight of the hero's hut (2026-11-12): likewise, its war hammer drawn in code (KnightPose in
             // WorldView).
             "black_knight" => KnightArt.Draw(view, pose switch

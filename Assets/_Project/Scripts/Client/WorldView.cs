@@ -1394,7 +1394,7 @@ namespace Game.Client
             }
             // A web or a pool of venom running out is no blow.
             if (!hazard.Harmful || IsPool(hazard)) return;
-            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard)) return;
+            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard)) return;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             switch (hazard.Shape)
@@ -3195,6 +3195,11 @@ namespace Game.Client
             if (body.Kind == BodyKind.Boss && body.Id == "silk_mother")
             {
                 AnimateSpider(body, facing, dead, moving);
+                return;
+            }
+            if (body.Kind == BodyKind.Boss && body.Id == "cave_warden")
+            {
+                AnimateWarden(body, facing, dead, moving);
                 return;
             }
 
