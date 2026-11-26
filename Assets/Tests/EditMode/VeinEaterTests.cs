@@ -53,7 +53,7 @@ namespace Game.Core.Tests
             // Only the few strongest carry a warning; the rest are read from the boss's wind-up.
             var strong = eater.Attacks.Where(a => a.Warning == AttackWarning.Strong).ToList();
             Assert.That(strong.Count, Is.InRange(2, 4));
-            Assert.That(strong.Min(a => a.Damage), Is.GreaterThan(eater.Attacks.Where(a => a.Warning == AttackWarning.Hidden).Max(a => a.Damage)));
+            Assert.That(strong.Min(a => BossHits.Takes(eater, a)), Is.GreaterThan(eater.Attacks.Where(a => a.Warning == AttackWarning.Hidden).Max(a => BossHits.Takes(eater, a))));
             // Every phase brings attacks of its own.
             for (int phase = 2; phase <= eater.PhaseCount; phase++)
                 Assert.IsTrue(eater.Attacks.Any(a => a.Phases.Count > 0 && a.Phases.Min() == phase), $"phase {phase} brings something new");

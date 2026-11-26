@@ -52,18 +52,59 @@ namespace Game.Core
             _ => 4,
         };
 
-        // The share of a hit of the band that gets through this much armor.
-        public static float Share(float armor, int band)
+        // How armor holds against a kind of hit (Docs/ArmorCurve.md, 2026-11-26): what gets through is
+        // floor + (1 - floor) / (1 + k × ratio^power), ratio the armor over the band's. k puts the band's own set (ratio 1)
+        // at AtBand: every kind but a finishing blow lets 1 / (1 + GearGuard) through there as before, so the band's
+        // numbers stay and only the gear around them moves. An ordinary monster's hit has no floor (armor can shut it out);
+        // an elite's, a big body's and a boss's keep a floor and fall off steeper, so armor past the band's helps less and
+        // armor short of it gives way faster. A finishing blow barely heeds armor: health is what lives through it.
+        public readonly struct Curve
         {
-            float share = Math.Max(0, armor) / ArmorOf(band);
-            return 1 / (1 + GearGuard * share * share);
+            public Curve(float floor, float atBand, float power)
+            {
+                Floor = floor;
+                AtBand = atBand;
+                Power = power;
+                K = (1 - floor) / (atBand - floor) - 1;
+            }
+
+            public float Floor { get; }
+            public float AtBand { get; }
+            public float Power { get; }
+            public float K { get; }
+
+            public float Share(float ratio) => Floor + (1 - Floor) / (1 + K * MathF.Pow(Math.Max(0, ratio), Power));
         }
 
+        static readonly float BandShare = 1 / (1 + GearGuard);
+        public static readonly Curve NormalCurve = new Curve(0, BandShare, 2);
+        public static readonly Curve EliteCurve = new Curve(0.10f, BandShare, 3);
+        public static readonly Curve HugeCurve = new Curve(0.14f, BandShare, 3);
+        public static readonly Curve BossCurve = new Curve(0.18f, BandShare, 4);
+        public static readonly Curve UltimateCurve = new Curve(0.60f, 0.75f, 2);
+
+        // A finishing blow's raw damage: this many times the band's health (DamageBands.HealthOf).
+        public const float UltimateHealth = 1.2f;
+
+        public static Curve CurveOf(HitKind kind) => kind switch
+        {
+            HitKind.None or HitKind.Normal => NormalCurve,
+            HitKind.Elite or HitKind.Large => EliteCurve,
+            HitKind.Huge => HugeCurve,
+            HitKind.Ultimate => UltimateCurve,
+            _ => BossCurve,
+        };
+
+        // The share of a hit of the band (and of the kind) that gets through this much armor.
+        public static float Share(float armor, int band, HitKind kind = HitKind.Normal) =>
+            CurveOf(kind).Share(Math.Max(0, armor) / ArmorOf(band));
+
         // A hit of the band through the armor: rounded, at least 1.
-        public static int Taken(float damage, float armor, int band) => Math.Max(1, (int)MathF.Round(damage * Share(armor, band)));
+        public static int Taken(float damage, float armor, int band, HitKind kind = HitKind.Normal) =>
+            Math.Max(1, (int)MathF.Round(damage * Share(armor, band, kind)));
 
         // The same, unrounded: what a burn or a pool's bite works from.
-        public static float Through(float damage, float armor, int band) => damage * Share(armor, band);
+        public static float Through(float damage, float armor, int band, HitKind kind = HitKind.Normal) => damage * Share(armor, band, kind);
 
         // ---- What a hit is for (the targets of Docs/Difficulty.md) ----
 
@@ -94,7 +135,7 @@ namespace Game.Core
             HitKind.Quick => new Target(0.40f, 0.35f, 0.45f),
             HitKind.Slow => new Target(0.55f, 0.45f, 0.65f),
             HitKind.Heavy => new Target(0.78f, 0.70f, 0.90f),
-            HitKind.Ultimate => new Target(0.92f, 0.89f, 0.95f),
+            HitKind.Ultimate => new Target(0.90f, 0.86f, 0.95f),
             HitKind.Barrage => new Target(0.12f, 0.09f, 0.16f),
             HitKind.Combo => new Target(0.25f, 0.20f, 0.30f),
             HitKind.FollowUp => new Target(0.18f, 0.14f, 0.24f),
@@ -198,25 +239,43 @@ namespace Game.Core
         // NaN in the first band (no gear below).
         public float Below { get; internal set; }
         public float Geared { get; internal set; }
+        // The band above's full set (NaN in the last band), and the band's set with health put in (HitTable.TankHealth).
+        public float Above { get; internal set; }
+        public float Tank { get; internal set; }
 
         public DamageBands.Target Target => DamageBands.TargetOf(Kind);
         public float Gate => float.IsNaN(Below) ? float.NaN : Below / Geared;
+        // A finishing blow's gate is death: a band behind, it kills a full bar outright.
+        public bool GateMet => float.IsNaN(Gate) || (Kind == HitKind.Ultimate ? Below >= 1 : Gate >= DamageBands.GateLow && Gate <= DamageBands.GateHigh);
 
         // Whether the row meets its target: in range, over the bare floor, and the gate where there is one.
         public bool Meets =>
             Checked
                 ? Geared >= Target.Low - 0.0005f && Geared <= Target.High + 0.0005f && Bare >= Target.Bare - 0.0005f
-                    && (float.IsNaN(Gate) || Gate >= DamageBands.GateLow && Gate <= DamageBands.GateHigh)
+                    && GateMet
                 : Geared <= Target.Aim * DamageBands.BigBlowCap;
     }
 
     public static class HitTable
     {
+        // The tank column: the band's set and this much of its health again (copper 125 → 200).
+        public const float TankHealth = 0.6f;
+
         // A field elite's hits (World.Elites.cs): a leader's, a big (L) leader's, a champion's.
         public static IReadOnlyList<HitRow> Build(LootData loot, MonsterData monsters, BossData bosses)
         {
             var rows = new List<HitRow>();
+            const int Bands = DamageBands.Bands;
             var players = new Dictionary<(int Level, int Gear), PlayerStats>();
+            var tanks = new Dictionary<(int Level, int Gear), PlayerStats>();
+            // The band's set with health put in: as much health again as TankHealth of the set's (a tank's build).
+            PlayerStats Tank(int level, int gear)
+            {
+                if (tanks.TryGetValue((level, gear), out var known)) return known;
+                int extra = (int)MathF.Round(Player(level, gear).MaxHealth * TankHealth);
+                return tanks[(level, gear)] = PlayerStats.From(Wearing(loot, gear), level: level,
+                    blessing: new[] { new Modifier(StatType.MaxHealth, ModifierKind.Flat, extra) });
+            }
             PlayerStats Player(int level, int gear)
             {
                 if (players.TryGetValue((level, gear), out var known)) return known;
@@ -228,6 +287,8 @@ namespace Game.Core
                 var bare = Player(level, 0);
                 var below = band > 1 ? Player(level, band - 1) : null;
                 var geared = Player(level, band);
+                var above = band < Bands ? Player(level, band + 1) : null;
+                var tank = Tank(level, band);
                 rows.Add(new HitRow
                 {
                     Band = band,
@@ -238,9 +299,11 @@ namespace Game.Core
                     Checked = check,
                     Raw = raw,
                     Level = level,
-                    Bare = DamageBands.Taken(raw, bare.Armor, band) / bare.MaxHealth,
-                    Below = below == null ? float.NaN : DamageBands.Taken(raw, below.Armor, band) / below.MaxHealth,
-                    Geared = DamageBands.Taken(raw, geared.Armor, band) / geared.MaxHealth,
+                    Bare = DamageBands.Taken(raw, bare.Armor, band, kind) / bare.MaxHealth,
+                    Below = below == null ? float.NaN : DamageBands.Taken(raw, below.Armor, band, kind) / below.MaxHealth,
+                    Geared = DamageBands.Taken(raw, geared.Armor, band, kind) / geared.MaxHealth,
+                    Above = above == null ? float.NaN : DamageBands.Taken(raw, above.Armor, band, kind) / above.MaxHealth,
+                    Tank = DamageBands.Taken(raw, tank.Armor, band, kind) / tank.MaxHealth,
                 });
             }
 

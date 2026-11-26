@@ -651,7 +651,7 @@ namespace Game.Core
             // Nothing touches one riding a minecart (World.Travel.cs).
             if (player.Riding) return 0;
             if (dodge && Dodges(player, source)) return 0;
-            int amount = armor ? DamageBands.Taken(damage, player.Stats.Armor, BandOf(source, player)) : Math.Max(1, (int)MathF.Round(damage));
+            int amount = armor ? DamageBands.Taken(damage, player.Stats.Armor, BandOf(source, player), HitKindOf(source, cause)) : Math.Max(1, (int)MathF.Round(damage));
             BreakRecall(player);
             BreakDungeonCharge(player);
             EndFishing(player, FishingReeled);
@@ -691,12 +691,27 @@ namespace Game.Core
             return BandAt(player.Position);
         }
 
+        // The kind of a hit by what dealt it (DamageBands.CurveOf): a monster's by its body and whether it leads or is a
+        // champion, a boss's attack by its place from 1 (0: a roar, or a burn it left), the ground's an ordinary one.
+        HitKind HitKindOf(int source, int cause)
+        {
+            if (source == 0) return HitKind.Normal;
+            if (FindEnemy(source) is Enemy enemy)
+                return enemy.Elite != EliteRank.None && enemy.Definition.Size != MonsterSize.XL ? HitKind.Elite : DamageBands.KindOf(enemy.Definition);
+            if (FindBoss(source) is Boss boss)
+            {
+                var attacks = boss.Definition.Attacks;
+                return cause >= 1 && cause <= attacks.Count ? DamageBands.KindOf(attacks[cause - 1]) : HitKind.Roar;
+            }
+            return HitKind.Normal;
+        }
+
         public int BandAt(Vec2 position) =>
             DamageBands.BandOf(Biomes[Math.Clamp(TileMap.Cell(position.X), 0, Map.Width - 1), Math.Clamp(TileMap.Cell(position.Y), 0, Map.Height - 1)]);
 
         // A hit of the band that comes as a burn or a poison's bites rather than a blow: as much as armor would let
         // through, unrounded.
-        float Through(Player player, float damage, int source) => DamageBands.Through(damage, player.Stats.Armor, BandOf(source, player));
+        float Through(Player player, float damage, int source) => DamageBands.Through(damage, player.Stats.Armor, BandOf(source, player), HitKindOf(source, 0));
 
         static float Gap(Enemy enemy, Player player) =>
             Vec2.Distance(enemy.Position, player.Position) - enemy.Definition.Radius - PlayerRadius;

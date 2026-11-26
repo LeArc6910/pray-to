@@ -54,8 +54,8 @@ namespace Game.Core.Tests
             Assert.AreEqual(AttackWarning.Hidden, mother.Attacks.Single(a => a.Id == "fang").Warning);
             CollectionAssert.AreEquivalent(new[] { "thread_drop", "eight_legs", "web_burst", "silk_net" }, mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Select(a => a.Id));
             Assert.AreEqual("silk_net", mother.Attacks.Single(a => a.Id == "thread_drop").FollowUp.Id);
-            Assert.Greater(mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Min(a => a.Damage),
-                mother.Attacks.Where(a => a.Warning != AttackWarning.Strong).Max(a => a.Damage), "the warning is kept for what hurts most");
+            Assert.Greater(mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Min(a => BossHits.Takes(mother, a)),
+                mother.Attacks.Where(a => a.Warning != AttackWarning.Strong).Max(a => BossHits.Takes(mother, a)), "the warning is kept for what hurts most");
             Assert.Greater(mother.Attacks.Where(a => a.Warning == AttackWarning.Strong).Min(a => a.Telegraph),
                 mother.Attacks.Where(a => a.Warning != AttackWarning.Strong).Max(a => a.Telegraph), "and for what gives longest to get clear");
             for (int phase = 2; phase <= mother.PhaseCount; phase++)

@@ -16,7 +16,12 @@ namespace CoreSandbox
             var rows = HitTable.Build(loot, monsters, bosses);
             int only = Band(which);
             Console.WriteLine("한 방이 최대 생명력에서 가져가는 몫(Docs/Difficulty.md). 맨몸 / 앞 단계 장비 / 제 단계 장비(보통 등급 여섯 부위, 가운데 값),");
-            Console.WriteLine($"몬스터는 단계의 기준 레벨, 보스는 보스 레벨 + 1. 방어: 피해 × 1 / (1 + {DamageBands.GearGuard} × (방어도 ÷ 단계 방어도)²). 클래스 없음(전사는 생명력 +20%)");
+            Console.WriteLine("몬스터는 단계의 기준 레벨, 보스는 보스 레벨 + 1. 클래스 없음(전사는 생명력 +20%)");
+            Console.WriteLine("방어: 받는 몫 = 바닥 + (1 − 바닥) / (1 + k × 비율^p), 비율 = 방어도 ÷ 단계 방어도 (Docs/ArmorCurve.md)");
+            foreach (var (name, curve) in new[] { ("일반", DamageBands.NormalCurve), ("정예·L", DamageBands.EliteCurve), ("XL", DamageBands.HugeCurve),
+                ("보스", DamageBands.BossCurve), ("필살기", DamageBands.UltimateCurve) })
+                Console.WriteLine($"  {Pad(name, 8)}바닥 {curve.Floor * 100:0}% · p {curve.Power} · k {curve.K:0.00} · 비율 0.5 {curve.Share(0.5f) * 100:0}% · 1 {curve.Share(1) * 100:0}% · 2 {curve.Share(2) * 100:0}%");
+            Console.WriteLine($"위 단계: 한 구간 위의 보통 세트. 체력 투자: 제 단계 세트에 생명력 +{HitTable.TankHealth * 100:0}%(구리 125 → 200)");
             Console.WriteLine($"✓ 목표 안(점검 줄: 제 단계가 범위 안, 맨몸이 바닥 넘게, 앞 단계가 제 단계의 {DamageBands.GateLow}~{DamageBands.GateHigh}배) · 큰 공격 줄은 목표의 {DamageBands.BigBlowCap}배 아래면 ✓");
             for (int band = 1; band <= DamageBands.Bands; band++)
             {
@@ -30,19 +35,19 @@ namespace CoreSandbox
                 foreach (var group in mine.GroupBy(r => r.Group))
                 {
                     Console.WriteLine($"-- {group.Key}");
-                    Console.WriteLine($"  {Pad("누구", 26)}{Pad("공격", 22)}{Pad("구분", 10)}{"원래",6}{"Lv",4}{"맨몸",7}{"앞 단계",8}{"제 단계",8}  {Pad("목표", 14)}{"배",5}");
+                    Console.WriteLine($"  {Pad("누구", 26)}{Pad("공격", 22)}{Pad("구분", 10)}{"원래",6}{"Lv",4}{"맨몸",7}{"앞 단계",8}{"제 단계",8}{"위 단계",8}{"체력",8}  {Pad("목표", 14)}{"배",5}");
                     foreach (var row in group)
                     {
                         var target = row.Target;
                         string aim = row.Checked ? $"{target.Low * 100:0}~{target.High * 100:0}%" : $"≤{target.Aim * DamageBands.BigBlowCap * 100:0}%";
                         Console.WriteLine($"  {Pad(row.Who, 26)}{Pad(row.What, 22)}{Pad(KindName(row.Kind), 10)}{row.Raw,6:0}{row.Level,4}" +
-                            $"{Percent(row.Bare),7}{Percent(row.Below),8}{Percent(row.Geared),8}  {Pad(aim, 14)}{(float.IsNaN(row.Gate) ? "" : $"{row.Gate:0.0}"),5} {(row.Meets ? "✓" : "✗")}");
+                            $"{Percent(row.Bare),7}{Percent(row.Below),8}{Percent(row.Geared),8}{Percent(row.Above),8}{Percent(row.Tank),8}  {Pad(aim, 14)}{(float.IsNaN(row.Gate) ? "" : $"{row.Gate:0.0}"),5} {(row.Meets ? "✓" : "✗")}");
                     }
                 }
             }
 
             Console.WriteLine();
-            Console.WriteLine("요약: 점검 줄의 구분마다 제 단계 / 앞 단계 / 맨몸(최소~최대)");
+            Console.WriteLine("요약: 점검 줄의 구분마다 제 단계 / 앞 단계 / 맨몸 / 위 단계 / 체력 투자(최소~최대)");
             foreach (var band in rows.Where(r => only == 0 || r.Band == only).GroupBy(r => r.Band))
             {
                 foreach (var kind in band.Where(r => r.Checked).GroupBy(r => r.Kind).OrderBy(g => g.Key))
@@ -50,7 +55,7 @@ namespace CoreSandbox
                     string Range(Func<HitRow, float> of) =>
                         kind.Any(r => !float.IsNaN(of(r))) ? $"{kind.Where(r => !float.IsNaN(of(r))).Min(of) * 100:0}~{kind.Where(r => !float.IsNaN(of(r))).Max(of) * 100:0}%" : "-";
                     Console.WriteLine($"  {band.Key}단계 {Pad(DamageBands.BandNames[band.Key - 1], 8)}{Pad(KindName(kind.Key), 10)}{kind.Count(),4}줄  " +
-                        $"{Pad(Range(r => r.Geared), 10)}{Pad(Range(r => r.Below), 11)}{Pad(Range(r => r.Bare), 11)}{(kind.All(r => r.Meets) ? "✓" : $"✗ {kind.Count(r => !r.Meets)}")}");
+                        $"{Pad(Range(r => r.Geared), 10)}{Pad(Range(r => r.Below), 11)}{Pad(Range(r => r.Bare), 11)}{Pad(Range(r => r.Above), 11)}{Pad(Range(r => r.Tank), 11)}{(kind.All(r => r.Meets) ? "✓" : $"✗ {kind.Count(r => !r.Meets)}")}");
                 }
             }
             var missed = rows.Where(r => (only == 0 || r.Band == only) && !r.Meets).ToList();

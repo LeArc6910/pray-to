@@ -24,7 +24,7 @@ namespace Game.Core.Tests
         // The share of the character's health the boss's hardest blow takes, through their armour weighed against the
         // boss's band (DamageBands).
         static float WorstHit(BossDefinition boss, PlayerStats stats) =>
-            DamageBands.Taken(boss.Attacks.Max(a => a.Damage), stats.Armor, DamageBands.BandOfLevel(boss.Level)) / stats.MaxHealth;
+            boss.Attacks.Max(a => DamageBands.Taken(a.Damage, stats.Armor, DamageBands.BandOfLevel(boss.Level), DamageBands.KindOf(a))) / stats.MaxHealth;
 
         [Test]
         public void EveryLevelAddsHealthAndDamageAndEveryTenthIsAStep()
@@ -135,8 +135,10 @@ namespace Game.Core.Tests
                 var middle = PlayerStats.From(HitTable.Wearing(Gear.Data, tier + 1), level: boss.Level + 1);
                 var middleBehind = PlayerStats.From(HitTable.Wearing(Gear.Data, tier), level: tier * 10 - 1);
                 Assert.That(WorstHit(boss, middle), Is.InRange(0.85f, 0.96f), boss.Id);
-                Assert.Greater(WorstHit(boss, ready), 0.96f, $"{boss.Id}: the tier's lowest rolls do not");
-                Assert.Greater(WorstHit(boss, middleBehind), 1.6f, $"{boss.Id}: a tier down its finishing blow kills outright");
+                // A finishing blow barely heeds armor (Docs/ArmorCurve.md): the lowest rolls take a little more, near all of it.
+                Assert.Greater(WorstHit(boss, ready), WorstHit(boss, middle), $"{boss.Id}: the tier's lowest rolls take more");
+                Assert.Greater(WorstHit(boss, ready), 0.93f, $"{boss.Id}: the tier's lowest rolls barely live");
+                Assert.Greater(WorstHit(boss, middleBehind), 1.1f, $"{boss.Id}: a tier down its finishing blow kills outright");
             }
         }
 

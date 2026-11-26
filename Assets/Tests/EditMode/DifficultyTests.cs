@@ -40,9 +40,9 @@ namespace Game.Core.Tests
             // Bosses: a quick blow about 40%, a big slow one most of the health, a finishing blow 90~95%.
             Assert.That(Mean(HitKind.Quick, r => r.Geared), Is.InRange(0.37f, 0.43f));
             Assert.That(Mean(HitKind.Heavy, r => r.Geared), Is.InRange(0.70f, 0.90f));
-            Assert.That(Mean(HitKind.Ultimate, r => r.Geared), Is.InRange(0.90f, 0.95f));
+            Assert.That(Mean(HitKind.Ultimate, r => r.Geared), Is.InRange(0.86f, 0.95f));
             Assert.IsTrue(Table.Where(r => r.Kind == HitKind.Ultimate).All(r => r.Geared < 1), "a full health bar lives through a finishing blow");
-            Assert.IsTrue(Table.Where(r => r.Kind == HitKind.Ultimate && r.Band > 1).All(r => r.Below > 1.5f), "a band behind, it kills outright");
+            Assert.IsTrue(Table.Where(r => r.Kind == HitKind.Ultimate && r.Band > 1).All(r => r.Below > 1.1f), "a band behind, it kills outright");
             // Every boss has its finishing blow, and the black knight's blows are the slow heavy kind.
             foreach (var boss in Bosses.Shipped.Bosses)
                 Assert.IsTrue(boss.Attacks.Any(a => DamageBands.KindOf(a) == HitKind.Ultimate), boss.Id);
@@ -54,10 +54,40 @@ namespace Game.Core.Tests
         [Test]
         public void TheGateBetweenBandsIsTwoToThreeTimes()
         {
-            foreach (var row in Table.Where(r => r.Checked && r.Band > 1))
+            foreach (var row in Table.Where(r => r.Checked && r.Band > 1 && r.Kind != HitKind.Ultimate))
                 Assert.That(row.Gate, Is.InRange(DamageBands.GateLow, DamageBands.GateHigh), $"{row.Who} {row.What}");
             // A band's ordinary monsters, a band behind: about 12~15% a hit.
             Assert.That(Table.Where(r => r.Checked && r.Kind == HitKind.Normal && r.Band > 1).Average(r => r.Below), Is.InRange(0.12f, 0.16f));
+        }
+
+        [Test]
+        public void EachKindOfHitHasItsOwnCurve()
+        {
+            // At the band's own set every kind but a finishing blow lets the same share through, so the band's column holds.
+            foreach (var kind in new[] { HitKind.Normal, HitKind.Elite, HitKind.Large, HitKind.Huge, HitKind.Quick, HitKind.Heavy, HitKind.Roar })
+                Assert.AreEqual(1 / (1 + DamageBands.GearGuard), DamageBands.Share(DamageBands.ArmorOf(2), 2, kind), 1e-5f, kind.ToString());
+            Assert.AreEqual(0.75f, DamageBands.Share(DamageBands.ArmorOf(2), 2, HitKind.Ultimate), 1e-5f);
+            // Floors: no armor ever shuts out an elite's, a big body's, a boss's or a finishing blow below its floor.
+            float lots = DamageBands.ArmorOf(2) * 50;
+            Assert.Less(DamageBands.Share(lots, 2, HitKind.Normal), 0.01f);
+            Assert.AreEqual(0.10f, DamageBands.Share(lots, 2, HitKind.Elite), 0.01f);
+            Assert.AreEqual(0.14f, DamageBands.Share(lots, 2, HitKind.Huge), 0.01f);
+            Assert.AreEqual(0.18f, DamageBands.Share(lots, 2, HitKind.Slow), 0.01f);
+            Assert.AreEqual(0.60f, DamageBands.Share(lots, 2, HitKind.Ultimate), 0.01f);
+            // Short of the band's armor a boss's blow gives way faster than an ordinary monster's; past it, holds less.
+            float half = DamageBands.ArmorOf(2) / 2, twice = DamageBands.ArmorOf(2) * 2;
+            Assert.Greater(DamageBands.Share(half, 2, HitKind.Quick), DamageBands.Share(half, 2, HitKind.Normal));
+            Assert.Greater(DamageBands.Share(twice, 2, HitKind.Quick), DamageBands.Share(twice, 2, HitKind.Elite));
+            Assert.Greater(DamageBands.Share(twice, 2, HitKind.Elite), DamageBands.Share(twice, 2, HitKind.Normal));
+            // A finishing blow is made against health: a tank's health holds it, its own gear barely.
+            foreach (var row in Table.Where(r => r.Kind == HitKind.Ultimate))
+            {
+                Assert.That(row.Tank, Is.InRange(0.45f, 0.65f), $"{row.Who} {row.What}");
+                Assert.Less(row.Above, row.Geared);
+            }
+            // A band ahead, an ordinary monster barely scratches; a boss's quick blow still does.
+            Assert.Less(Table.Where(r => r.Checked && r.Kind == HitKind.Normal && r.Band < DamageBands.Bands).Max(r => r.Above), 0.03f);
+            Assert.Greater(Table.Where(r => r.Checked && r.Kind == HitKind.Quick && r.Band < DamageBands.Bands).Min(r => r.Above), 0.15f);
         }
 
         [Test]
@@ -123,6 +153,16 @@ namespace Game.Core.Tests
             Assert.IsTrue(rows.All(r => r.Band == DamageBands.Bands && r.Meets));
             var wisp = Monsters.Shipped.Find("void_wisp");
             Assert.AreEqual(World.RiftPowerAt(1, wisp) * 2, World.RiftPowerAt(5, wisp), 0.001f, "twice as hard by the fifth tier");
+        }
+    }
+
+    // What a boss's attack takes off the band's own set: the sheet's damage through the curve of its kind.
+    static class BossHits
+    {
+        public static float Takes(BossDefinition boss, BossAttack attack)
+        {
+            int band = DamageBands.BandOfLevel(boss.Level);
+            return DamageBands.Through(attack.Damage, DamageBands.ArmorOf(band), band, DamageBands.KindOf(attack));
         }
     }
 }

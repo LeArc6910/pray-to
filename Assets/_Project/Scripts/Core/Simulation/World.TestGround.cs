@@ -115,7 +115,7 @@ namespace Game.Core
                 Armor = player.Stats.Armor,
                 Band = band,
                 BandArmor = DamageBands.ArmorOf(band),
-                Share = armor ? DamageBands.Share(player.Stats.Armor, band) : 1,
+                Share = armor ? DamageBands.Share(player.Stats.Armor, band, HitKindOf(source, cause)) : 1,
                 ZoneLevels = zone,
                 Saved = saved,
             });
