@@ -769,9 +769,11 @@ namespace Game.Core
 
         // A field monster further out is tougher (2026-11-11, the owner's decision on the content audit's 4th point):
         // each zone past the first adds half its health and the experience of a level. Its hits no longer grow with the
-        // zone (2026-11-25, Docs/Difficulty.md): how hard a hit lands is its band's, weighed against the player's armor.
+        // zone for a day (2026-11-25, Docs/Difficulty.md); the owner then chose to have the depths hurt more again
+        // (2026-11-26, "C로 해도 괜찮아"): each zone past the first adds 35% to its hits as before, on top of the band's
+        // weight, so a band-geared player feels the deep rooms and dungeons more than the edge of a biome.
         public const float ZoneHealthStep = 0.5f;
-        public const float ZonePowerStep = 0;
+        public const float ZonePowerStep = 0.35f;
 
         void ToughenForZone(Enemy enemy, int zone)
         {
