@@ -1259,6 +1259,7 @@ DevTools/Local/setup.sh --commit
 - [ ] 190단계: 녹음 소리 3차(빈칸) — 얼음·벽돌·쇠 격자·철벅이는 물 발소리, 김, 용암 환경음, 박쥐·게·버섯 울음, 장소 곡 6개(왕국·오두막·둥지·항구·유적·광산)(`Docs/SoundCredits.md` "3차")
   - 명령 한 줄을 다시 돌린다. 새 파일 `Resources/Sfx`의 32개 wav, `Resources/Music`의 6개, `Resources/Ambience/amb_lava.ogg`의 `.meta`가 생기면 커밋한다(가져오기 설정은 `SoundImport`)
   - (클라우드 웹 점검) `sweep.js --only menu`(녹음 세트 80개 넘게)
+  - 클라우드 확인 (2026-11-27, `3721b93`): [x] `menu` 53개 모두 통과(녹음 세트 83, 마을 `music_village`). 웹 데이터 19.22 → 24.62 MB
   - (사람) `Docs/HumanChecklist.md` 190
 
 ## 결과 보고
