@@ -263,6 +263,37 @@ namespace Game.Client
                     }
                     break;
 
+                case BossEntrance.Cocoon:
+                    // Light glinting in the cocoon of crystal; cracks running over it with a ringing; it bursts with a
+                    // flash and a shower of shards, the queen unfolds and rears, her crown blazing (CrystalQueenArt.Enter).
+                    if (frame < CrystalQueenArt.EnterBurst && puff)
+                    {
+                        body.DustAt = Time.time + 0.15f;
+                        Kick(feet + new Vector3(Random.Range(-1.2f, 1.2f), Random.Range(0.4f, 1.6f), 0), Vector3.up * 0.3f, Random.value < 0.5f ? CrystalPink : PrismWhite, 1);
+                    }
+                    foreach (int ring in new[] { 6, 11, 15 })
+                        if (Reached(ring)) Hear(Sound.Ice, feet, 0.4f + ring * 0.03f);
+                    if (Reached(CrystalQueenArt.EnterBurst - 4) && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.1f);
+                    if (Reached(CrystalQueenArt.EnterBurst))
+                    {
+                        AddFlash(feet + new Vector3(0, 0.8f, 0), 3f, PrismWhite, FlashKind.Burst);
+                        for (int i = 0; i < 12; i++)
+                        {
+                            var way = Quaternion.Euler(0, 0, i * 30 + Random.Range(-12f, 12f)) * Vector3.right;
+                            Kick(feet + way * 0.5f + new Vector3(0, 0.6f, 0), way + Vector3.up * 0.8f, i % 2 == 0 ? CrystalPink : CrystalBlue, 2);
+                        }
+                        if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.25f);
+                        Hear(Sound.Break, feet, 1);
+                        Hear(Sound.Ice, feet, 0.9f);
+                    }
+                    if (!body.EntersAgain && Reached(CrystalQueenArt.EnterCrown))
+                    {
+                        AddFlash(feet + new Vector3(0, 2.3f, 0), 1.6f, PrismWhite, FlashKind.Impact);
+                        Hear(Sound.Hiss, feet, 0.9f);
+                        Hear(Sound.Nova, feet, 0.6f);
+                    }
+                    break;
+
                 case BossEntrance.Ambush:
                     // Sand trickling down into its pit; the jaws flick sand out twice; it bursts up out of the sand,
                     // shakes it off and snaps its jaws (AntlionArt.Enter).

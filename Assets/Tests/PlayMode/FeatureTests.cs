@@ -651,6 +651,36 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The crystal spider queen (Docs/Bosses.md 수정 거미 여왕, 2026-11-27): asleep in a cocoon of crystal in its nest,
+        // the cocoon cracking and bursting as it wakes, then mid wind-up of its crystal cross (the crown gathering light,
+        // the front legs opened like a fan) and of its eggs (the abdomen lowered and glowing).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheCrystalQueenHatchesAndWindsUp()
+        {
+            yield return Start();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "crystal_queen");
+            Assert.IsNotNull(boss, "No crystal queen.");
+            Assert.AreEqual(BossEntrance.Cocoon, boss.Definition.Arena.Entrance, "arenas.csv gives the queen its own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("queen-cocoon");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.2f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the queen comes in first.");
+            yield return Screens.Take("entrance-queen");
+            yield return new WaitForSecondsRealtime(4.0f);
+            Assert.IsTrue(World.ForceAttack(boss, "crystal_cross"), "The cross can be forced once it fights.");
+            yield return new WaitForSecondsRealtime(0.7f);
+            yield return Screens.Take("queen-prism-windup");
+            yield return new WaitForSecondsRealtime(2.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "call_bats"));
+            yield return new WaitForSecondsRealtime(0.55f);
+            yield return Screens.Take("queen-brood-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Ordinary monsters' attacks from monster_attacks.csv (Docs/Combat.md 몬스터의 공격 시트, 2026-11-21): a slime's
         // pounce is marked where it will land, a frost wisp rings itself (a mark the screen makes from the monster's
         // state), and both draw their pieces; after they land nothing is left.

@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -854,7 +854,7 @@ async function patterns(browser) {
   await game.send('equip void_sword void_helmet void_armor void_boots; heal');
   const uses = [
     ['cave_warden', 'shockwave', '충격파(고리: 보스 곁은 안전)'], ['cave_warden', 'rock_trail', '바위 줄기(차례로 터지는 원)'],
-    ['crystal_queen', 'crystal_cross', '수정 십자'], ['crystal_queen', 'venom_share', '독 거미줄(나눠 맞기, 금색)'], ['crystal_queen', 'crystal_spiral', '수정 나선'],
+    ['crystal_queen', 'crystal_cross', '수정 십자'], ['crystal_queen', 'venom_share', '왕관의 빛(나눠 맞기, 금색)'], ['crystal_queen', 'crystal_spiral', '수정 나선'],
     ['void_lord', 'void_cross', '공허 십자(대각선)'], ['void_lord', 'event_horizon', '사건의 지평선(고리)'],
     ['tide_serpent', 'whirlpool', '물살 뱀의 소용돌이(고리)'], ['tide_serpent', 'tidal_trail', '물살 뱀의 밀물(연쇄 폭발)'],
     ['antlion', 'pit', '개미귀신의 개미지옥(멀리 있는 사람 발밑)'], ['antlion', 'quicksand', '개미귀신의 모래늪(고리)'],
@@ -1085,6 +1085,71 @@ async function warden(browser) {
   check(!/cave_warden:[1-9]/.test(after.bosses || ''), `쓰러뜨리면 체력 0 (${(after.bosses || '').split(' ')[0]})`);
   await game.wait(2500);
   await game.shot('warden-gone', '바위 더미가 바래 사라진 뒤');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 수정 거미 여왕 (2026-11-27, Docs/Bosses.md)
+// The third boss met, a spider of pink and sky-blue crystal with a crown: light and crystal where the silk mother has
+// silk and venom. Each attack has its own wind-up of the whole body (reared up with the front legs high for the bite,
+// the head raised and the crown filling with light while the front legs open like a fan for the beams, rain and the
+// crown's light, the legs drawn in round the bristling crystal for the shards, the front pair lifted for the ringing
+// stomp, the abdomen lowered for the eggs, pressed flat for the pounce). Only the shard hail (수정 우박) shows a warning
+// sign. A picture mid wind-up and one as the blow lands, for each attack, its entrance, its phases and its fall.
+async function queen(browser) {
+  note('\n## 수정 거미 여왕 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss crystal_queen');
+  await game.wait(700);
+  await game.shot('queen-entrance', '입장: 결정 고치에 빛이 번진다');
+  const woke = await game.until(t => has(t.banner, '수정 거미 여왕') || has(t.entrance, '수정 거미 여왕'), 8000, game.texts);
+  check(!!woke, `수정 둥지에서 깨면 "수정 거미 여왕" 이름 카드나 배너 (${woke ? woke.banner || woke.entrance : '없음'})`);
+  await game.wait(1100);
+  await game.shot('queen-entrance-burst', '입장: 고치가 깨지고 여왕이 몸을 편다');
+  await game.wait(3200);
+  await game.shot('queen-awake', '깨어난 수정 거미 여왕');
+  // [attack, name, telegraph seconds, marked, strong]
+  const uses = [
+    ['bite', '물어뜯기(몸을 세우고 앞다리를 쳐듦)', 0.7, true, false],
+    ['crystal_rain', '수정 비(왕관에 빛을 모아 천장으로)', 1.2, true, false],
+    ['shard_ring', '수정 가시(웅크려 결정을 세움)', 0.6, false, false],
+    ['pounce', '덮치기(납작 엎드림)', 0.9, true, false],
+    ['web_quake', '결정 공명(앞다리를 높이 듦)', 1.0, true, false],
+    ['crystal_cross', '수정 십자(왕관에 빛을 모음)', 1.0, true, false],
+    ['venom_share', '왕관의 빛(나눠 맞기)', 1.3, true, false],
+    ['call_bats', '알 낳기(배를 바닥에 내림)', 0.8, false, false],
+    ['shard_hail', '수정 우박(필살기, 경고)', 1.4, true, true],
+  ];
+  for (const [attack, name, telegraph, marked, strong] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss crystal_queen use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    if (marked) check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`queen-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`queen-${attack}-hit`, `${name} 떨어진 순간`);
+  }
+  await game.send('heal; clear; boss crystal_queen hurt 0.36');
+  await game.wait(800);
+  await game.shot('queen-phase2', '2페이즈 울부짖기(왕관이 타오른다)');
+  await game.send('heal; clear; boss crystal_queen hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('crystal_queen') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('queen-phase3', '3페이즈(무릎 보석이 달아오른다)');
+  // Its fall: the legs give way and fold over it, it lies a moment and the crystal shatters.
+  await game.send('heal; clear; boss crystal_queen hurt 1');
+  await game.wait(900);
+  await game.shot('queen-fall', '쓰러지는 여왕(다리가 풀려 오므라든다)');
+  await game.wait(1300);
+  await game.shot('queen-shatter', '결정이 깨져 흩어진다');
+  const after = await game.state();
+  check(!/crystal_queen:[1-9]/.test(after.bosses || ''), `쓰러뜨리면 체력 0 (${(after.bosses || '').split(' ')[0]})`);
   await game.context.close();
 }
 
@@ -4050,6 +4115,7 @@ const ArenaList = [
 // [boss, whole entrance seconds, short seconds, what it does]
 const OwnEntrances = [
   ['cave_warden', 4.2, 1.4, '바위 더미가 눈과 핵을 밝히고 일어나 두 주먹으로 바닥을 내려찍는다'],
+  ['crystal_queen', 3.6, 1.4, '결정 고치에 금빛이 번지다 깨지고, 다리를 펴고 일어나 왕관을 빛낸다'],
   ['antlion', 3.8, 1.3, '굴 바닥에 턱 끝만 내놓고 숨어 모래를 튕기다 솟아올라 턱을 닫는다'],
   ['vein_eater', 3.2, 1.2, '흙더미가 들썩이다 바닥을 뚫고 솟는다'], ['silk_mother', 3.4, 1.2, '천장에서 실을 타고 내려와 다리를 편다'],
   ['shrine_samurai', 3.6, 1.2, '정좌에서 일어나 칼자루에 손을 얹는다'], ['black_knight', 4.6, 1.4, '무릎을 펴고 망치를 끌며 나와 바닥을 내려찍는다'],
@@ -7953,7 +8019,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

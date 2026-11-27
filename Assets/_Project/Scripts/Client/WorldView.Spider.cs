@@ -744,6 +744,8 @@ namespace Game.Client
             public int Frame = -1;
             // The cave warden's fall (WorldView.Warden.cs) rather than the silk mother's.
             public bool Warden;
+            // The crystal queen's (WorldView.CrystalQueen.cs), and whether its crystal has shattered yet.
+            public bool Queen, Shattered;
         }
 
         readonly System.Collections.Generic.List<Fall> _falls = new System.Collections.Generic.List<Fall>();
@@ -776,6 +778,11 @@ namespace Game.Client
                 if (fall.Warden)
                 {
                     if (!UpdateWardenFall(fall)) _falls.RemoveAt(i);
+                    continue;
+                }
+                if (fall.Queen)
+                {
+                    if (!UpdateQueenFall(fall)) _falls.RemoveAt(i);
                     continue;
                 }
                 float age = Time.time - fall.Since;

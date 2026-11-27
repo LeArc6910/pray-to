@@ -421,17 +421,19 @@ namespace Game.Client
         sealed class Pose
         {
             public float Fwd, Up, Pitch, AbFwd, AbUp, Swell, Fang, Crown, Flare, Gem, Spike, Tuck, Curl;
+            // The crystal cocoon it sleeps in (0 gone, 1 whole) and the cracks of light running over it (0..1).
+            public float Shell, Crack;
             public readonly float[] F = new float[8], O = new float[8], U = new float[8];
             // The frame before a fast one, for the streaks its legs and body leave.
             public Pose Before;
         }
 
         static Pose P(float fwd = 0, float up = 0, float pitch = 0, float abFwd = 0, float abUp = 0, float swell = 0, float fang = 0, float crown = 0, float flare = 0,
-            float gem = 0, float spike = 0, float tuck = 0, float curl = 0,
+            float gem = 0, float spike = 0, float tuck = 0, float curl = 0, float shell = 0, float crack = 0,
             (float F, float O, float U)? p0 = null, (float F, float O, float U)? p1 = null, (float F, float O, float U)? p2 = null, (float F, float O, float U)? p3 = null,
             (float F, float O, float U)? l0 = null, (float F, float O, float U)? r0 = null)
         {
-            var pose = new Pose { Fwd = fwd, Up = up, Pitch = pitch, AbFwd = abFwd, AbUp = abUp, Swell = swell, Fang = fang, Crown = crown, Flare = flare, Gem = gem, Spike = spike, Tuck = tuck, Curl = curl };
+            var pose = new Pose { Fwd = fwd, Up = up, Pitch = pitch, AbFwd = abFwd, AbUp = abUp, Swell = swell, Fang = fang, Crown = crown, Flare = flare, Gem = gem, Spike = spike, Tuck = tuck, Curl = curl, Shell = shell, Crack = crack };
             void Set(int leg, (float F, float O, float U)? at)
             {
                 if (at is not (float f, float o, float u)) return;
@@ -456,7 +458,7 @@ namespace Game.Client
             var pose = new Pose
             {
                 Fwd = L(a.Fwd, b.Fwd), Up = L(a.Up, b.Up), Pitch = L(a.Pitch, b.Pitch), AbFwd = L(a.AbFwd, b.AbFwd), AbUp = L(a.AbUp, b.AbUp), Swell = L(a.Swell, b.Swell),
-                Fang = L(a.Fang, b.Fang), Crown = L(a.Crown, b.Crown), Flare = L(a.Flare, b.Flare), Gem = L(a.Gem, b.Gem), Spike = L(a.Spike, b.Spike), Tuck = L(a.Tuck, b.Tuck), Curl = L(a.Curl, b.Curl),
+                Fang = L(a.Fang, b.Fang), Crown = L(a.Crown, b.Crown), Flare = L(a.Flare, b.Flare), Gem = L(a.Gem, b.Gem), Spike = L(a.Spike, b.Spike), Tuck = L(a.Tuck, b.Tuck), Curl = L(a.Curl, b.Curl), Shell = L(a.Shell, b.Shell), Crack = L(a.Crack, b.Crack),
             };
             for (int i = 0; i < 8; i++)
             {
@@ -607,9 +609,19 @@ namespace Game.Client
             CrystalQueenPose.Screech => ScreechRise + 4,
             CrystalQueenPose.Flinch => 6,
             CrystalQueenPose.Die => 20,
-            CrystalQueenPose.Enter => 1,
+            CrystalQueenPose.Enter => EnterLength,
             _ => BlowOf(pose)?.Frames.Length ?? 1,
         };
+
+        // ---- The entrance (BossEntrance.Cocoon): asleep curled up inside a cluster of crystal; cracks of light run
+        // over it and the crown glows through; the cocoon bursts (EnterBurst), the legs unfold and it rises, rears with
+        // the crown blazing (EnterCrown) and comes down to rest. Seen before, only from just before the burst. ----
+        public const int EnterLength = 48;
+        public const int EnterBurst = 18;
+        public const int EnterCrown = 32;
+        public static (int From, int To) EnterFrames(bool again) => (again ? EnterBurst - 3 : 0, EnterLength - 1);
+
+        static readonly Pose Cocooned = P(up: -5, swell: -0.05f, curl: 0.7f, shell: 1);
 
         public static float FrameSeconds(CrystalQueenPose pose, int frame)
         {
@@ -747,6 +759,27 @@ namespace Game.Client
                         (0, Rest),
                         (0.3f, P(fwd: -3, up: -1, pitch: 7, swell: -0.04f, fang: 0.5f, crown: 0.4f, p0: (-2, 1, 4), p1: (-1, 0, 0), p3: (1, 0, 0))),
                         (1, Rest));
+                case CrystalQueenPose.Enter:
+                {
+                    if (f < EnterBurst)
+                    {
+                        // Inside: the cracks spread and the crown's light grows through the crystal; it trembles.
+                        float u = f / (float)(EnterBurst - 1);
+                        var p = Lerp(Cocooned, Cocooned, 0);
+                        p.Crack = System.Math.Max(0, (u - 0.25f) / 0.75f);
+                        p.Crown = 0.2f + 0.8f * u;
+                        p.Up += f >= EnterBurst - 6 && f % 2 == 0 ? 0.6f : 0;
+                        return p;
+                    }
+                    float t2 = (f - EnterBurst) / (float)(EnterLength - 1 - EnterBurst);
+                    return Keys(t2,
+                        (0, P(up: -4, curl: 0.45f, crown: 1, flare: 0.8f, p0: (2, 6, 3), p1: (0, 6, 3), p2: (0, 6, 3), p3: (-2, 6, 3))),
+                        (0.2f, P(up: -1, curl: 0.05f, crown: 0.7f, flare: 0.2f, p0: (3, 4, 1), p1: (0, 4, 1), p2: (0, 4, 1), p3: (-3, 4, 1))),
+                        (0.34f, P(fwd: -1, up: 1, pitch: 6, crown: 0.6f, p0: (-2, 4, 6), p1: (0, 3, 1), p3: (-1, 1, 0))),
+                        (0.6f, Screeching),
+                        (0.68f, P(fwd: -3, up: 8.3f, pitch: 29, swell: 0.08f, fang: 1, crown: 1, flare: 0.5f, p0: (-10, 12.5f, 33), p1: (-3, 9, 14), p2: (0, 2, 0), p3: (-3, 2, 0))),
+                        (1, Rest));
+                }
                 case CrystalQueenPose.Die:
                     return Keys(t,
                         (0, Rest),
@@ -1119,6 +1152,7 @@ namespace Game.Client
             }
             joints.Top = top;
             joints.Bottom = bottom;
+            if (p.Shell > 0.02f) Cocoon(image, (hdX + abX) / 2, (hdY + abY) / 2 + 6, p.Shell, p.Crack, frame);
 
             // The crown's light: a sparkle over it as it fills, rays when it flares.
             float lit = System.Math.Min(1, p.Crown + (phase >= 3 ? 0.3f : 0));
@@ -1136,6 +1170,53 @@ namespace Game.Client
                 Sparkle(image, cx, cy, 4, Glint);
             }
             return image;
+        }
+
+        // The cocoon: a cluster of crystal prisms over where it sleeps, pink and blue, cracks of white light across it.
+        static void Cocoon(PixelImage image, float cx, float cy, float size, float crack, int frame)
+        {
+            var prisms = new (float Dx, float Dy, float Lean, float Tall, float Wide, bool Pink)[]
+            {
+                (-14, 8, -0.5f, 18, 5, false), (14, 8, 0.5f, 18, 5, false), (-8, 6, -0.25f, 26, 6, true), (8, 6, 0.25f, 25, 6, true),
+                (0, 7, 0, 32, 7, false), (-19, 12, -0.7f, 11, 4, true), (19, 12, 0.7f, 11, 4, true), (-4, 12, -0.1f, 16, 5, true), (5, 12, 0.12f, 15, 5, false),
+            };
+            foreach (var (dx, dy, lean, tall, wide, pink) in prisms)
+            {
+                float bx = cx + dx * size, by = cy + dy, h = tall * size, half = wide * size;
+                // A prism: a slanted shaft with a pointed tip, lit on its left face.
+                float tx = bx + lean * h, ty = by - h;
+                for (int y = (int)(ty - 1); y <= (int)by + 1; y++)
+                {
+                    float v = (y - ty) / System.Math.Max(1, by - ty);
+                    if (v < 0 || v > 1) continue;
+                    float mid = tx + (bx - tx) * v;
+                    float w = half * System.Math.Min(1, v * 3.2f);
+                    for (int x = (int)(mid - w - 1); x <= (int)(mid + w + 1); x++)
+                    {
+                        if (!image.Inside(x, y)) continue;
+                        float across = (x - mid) / System.Math.Max(0.5f, w);
+                        if (System.Math.Abs(across) > 1.15f) continue;
+                        Rgba c;
+                        if (System.Math.Abs(across) > 0.85f || v > 0.96f) c = Ink;
+                        else if (pink) c = across < -0.3f ? Blush : across < 0.35f ? GemPink : GemDeep;
+                        else c = across < -0.3f ? IceLight : across < 0.35f ? IceMain : IceDark;
+                        if (!pink && across < -0.5f && (y + frame / 3) % 5 == 0) c = Glint;
+                        image[x, y] = c;
+                    }
+                }
+            }
+            if (crack <= 0) return;
+            // Cracks of light from the middle outward, longer as they spread.
+            for (int k = 0; k < 7; k++)
+            {
+                float a = -2.9f + k * 0.48f;
+                float len = 4 + 20 * crack * (0.6f + 0.4f * ((k * 37) % 5) / 4f);
+                float x0 = cx, y0 = cy - 6, x1 = x0 + len * (float)System.Math.Cos(a), y1 = y0 + len * 0.8f * (float)System.Math.Sin(a) + 6;
+                float kx = (x0 + x1) / 2 + (k % 2 == 0 ? 2 : -2), ky = (y0 + y1) / 2;
+                Line(image, x0, y0, kx, ky, Glint);
+                Line(image, kx, ky, x1, y1, crack > 0.6f ? Glint : Blush);
+            }
+            if (crack > 0.5f) Sparkle(image, cx, cy - 6, crack > 0.85f ? 4 : 2, Glint);
         }
 
         // Shards standing out of the abdomen's crystal, round its rim: the far ones behind it, the near ones in front.

@@ -12,7 +12,7 @@ namespace Game.Client
     // mouth and abdomen move from each frame to the next (crystal_queen_continuity.txt).
     static partial class Motions
     {
-        static readonly string[] QueenRows = { "walk", "idle", "bite", "pounce", "prism", "burst", "stomp", "lay", "screech", "flinch", "die" };
+        static readonly string[] QueenRows = { "walk", "idle", "bite", "pounce", "prism", "burst", "stomp", "lay", "screech", "flinch", "die", "enter" };
 
         static (CrystalQueenPose, int, float)[][] QueenSequences()
         {
@@ -41,6 +41,7 @@ namespace Game.Client
                     .Concat(Run(CrystalQueenPose.Screech, 0.1f, CrystalQueenArt.ScreechRise)).ToArray(),
                 rest.Concat(Run(CrystalQueenPose.Flinch, 0.05f)).ToArray(),
                 rest.Concat(Run(CrystalQueenPose.Die, 0.08f)).Concat(new[] { (CrystalQueenPose.Die, CrystalQueenArt.FramesOf(CrystalQueenPose.Die) - 1, 1.2f) }).ToArray(),
+                new[] { (CrystalQueenPose.Enter, 0, 0.6f) }.Concat(Run(CrystalQueenPose.Enter, 4.2f / CrystalQueenArt.EnterLength)).Concat(rest).ToArray(),
             };
         }
 
@@ -176,7 +177,7 @@ namespace Game.Client
                             d = Math.Max(d, Dist((a.AbdomenX, a.AbdomenY), (now.AbdomenX, now.AbdomenY)));
                             d = Math.Max(d, Math.Abs(a.Top - now.Top));
                             d = Math.Max(d, Math.Abs(a.Bottom - now.Bottom));
-                            float allowed = CrystalQueenArt.Swinging(pose, frame) || pose == CrystalQueenPose.Spring || pose == CrystalQueenPose.Rush ? 23 : 7;
+                            float allowed = CrystalQueenArt.Swinging(pose, frame) || pose == CrystalQueenPose.Spring || pose == CrystalQueenPose.Rush || pose == CrystalQueenPose.Enter && frame == CrystalQueenArt.EnterBurst ? 23 : 7;
                             if (d > allowed)
                             {
                                 jumps++;

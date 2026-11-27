@@ -30,7 +30,8 @@ namespace Game.Core.Tests
             Assert.AreEqual(BossEntrance.Thread, Bosses.Staged.Find("silk_mother").Arena.Entrance);
             Assert.AreEqual(BossEntrance.Awaken, Bosses.Staged.Find("cave_warden").Arena.Entrance);
             Assert.AreEqual(BossEntrance.Ambush, Bosses.Staged.Find("antlion").Arena.Entrance);
-            Assert.AreEqual(6, Bosses.Staged.Bosses.Count(b => b.Arena.Entrance == BossEntrance.Common));
+            Assert.AreEqual(BossEntrance.Cocoon, Bosses.Staged.Find("crystal_queen").Arena.Entrance);
+            Assert.AreEqual(5, Bosses.Staged.Bosses.Count(b => b.Arena.Entrance == BossEntrance.Common));
             // The sheet read without it leaves the bosses as they were.
             Assert.IsNull(Bosses.Shipped.Bosses[0].Arena);
         }

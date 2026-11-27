@@ -758,6 +758,12 @@ namespace Game.Client
                 ['K'] = Rgba.Hex("#140B1C"),
                 ['g'] = Rgba.Hex("#9FE35D"),
             },
+            // The crystal queen's brood (2026-11-27): the spiderling in pink crystal, its eyes sky blue.
+            ["crystal_hatchling"] = new Dictionary<char, Rgba>
+            {
+                ['K'] = Rgba.Hex("#7A2A5A"),
+                ['g'] = Rgba.Hex("#B6F0FF"),
+            },
             ["cave_beetle"] = new Dictionary<char, Rgba>
             {
                 ['K'] = Rgba.Hex("#58422E"),
@@ -863,6 +869,7 @@ namespace Game.Client
                 "demon_soldier" => DemonSoldier,
                 "demon_caster" => DemonCaster,
                 "silk_spiderling" => Spiderling,
+                "crystal_hatchling" => Spiderling,
                 _ => Slime,
             };
             var image = PixelImage.FromRows(colors, frames[frame % frames.Length]);
@@ -909,7 +916,21 @@ namespace Game.Client
         // charge's lean and a roar. The canvases have room round the body for raised or flung-out limbs.
         public static PixelImage Boss(string id, Rgba color, int frame, BossView view = BossView.Front, BossPose pose = BossPose.Idle) => id switch
         {
-            "crystal_queen" => Queen(frame, view, pose),
+            // The crystal spider queen (2026-11-27): its own picture posed in code (CrystalQueenPose in WorldView).
+            "crystal_queen" => CrystalQueenArt.Draw(view, pose switch
+            {
+                BossPose.Windup => CrystalQueenPose.Rear,
+                BossPose.Strike => CrystalQueenPose.Bite,
+                BossPose.Charge => CrystalQueenPose.Rush,
+                BossPose.Roar => CrystalQueenPose.Screech,
+                _ => CrystalQueenPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => CrystalQueenArt.FramesOf(CrystalQueenPose.Rear) - 1,
+                BossPose.Strike => CrystalQueenArt.StrikeFrame(CrystalQueenPose.Bite),
+                BossPose.Roar => CrystalQueenArt.ScreechRise + frame % 4,
+                _ => frame,
+            }, 1),
             // The lava titan: the warden's build in black basalt, its seams and core burning.
             "lava_titan" => Warden(Rgba.Hex("#4A3A36"), frame, view, pose, molten: true),
             "void_lord" => VoidLord(frame, view, pose),
@@ -1376,111 +1397,6 @@ namespace Game.Client
                 Line(image, nearArmX + 5 + ox + lean, 18 + bob - armUp + oy, new[] { (-1, 1), (0, 1), (-1, 1) }, Rgba.Hex("#FF7A1E"));
             }
             return image.Outlined(stone.Outline);
-        }
-
-        // The crystal spider queen: a dark round body grown over with crystals, a head with a row of pink eyes, and
-        // eight jointed legs. In the second frame her legs shift, pair by pair. She rears her front legs to wind up,
-        // lunges head first to strike or charge, and lifts every leg to roar. The head is toward the way she faces:
-        // below her body facing the viewer, hidden above it from behind, out to the side side on.
-        static PixelImage Queen(int frame, BossView view, BossPose pose)
-        {
-            const int width = 46;
-            const int height = 42;
-            const int ox = 2;
-            const int oy = 4;
-            var image = new PixelImage(width, height);
-            var body = Ramp.Of("#4E4062");
-            var leg = Ramp.Of("#6E5C88");
-            var crystal = Ramp.Of("#7CD2E2");
-            var eye = Rgba.Hex("#FF5C8A");
-            int shift = frame % 2;
-            bool behind = Behind(view);
-            int turn = Turn(view);
-            int lunge = pose == BossPose.Strike || pose == BossPose.Charge ? 3 : pose == BossPose.Windup ? -2 : 0;
-            // The body's centre and the head's, by the view.
-            int bx = 21 - turn * 2;
-            int by = behind ? 17 : 13;
-            int hx = 21 + turn * 5 + (turn > 0 ? lunge : 0);
-            int hy = (behind ? 7 : 25 - turn * 3) + (turn == 0 ? (behind ? -lunge : lunge) : 0);
-            void Leg(int x0, int y0, int x1, int y1, Rgba color, Rgba light)
-            {
-                Thick(image, x0 + ox, y0 + oy, x1 + ox, y1 + oy, color, light);
-            }
-
-            // Legs first, under the body: from the body's sides out to a knee and down to a foot. The front pair rears
-            // up to wind up; a roar lifts them all.
-            for (int i = 0; i < 4; i++)
-            {
-                int lift = (i + shift) % 2 == 0 ? -1 : 1;
-                if (pose == BossPose.Roar) lift -= 3;
-                if (pose == BossPose.Windup && i == 0) lift -= 6;
-                int startY = by + 4 + i * 3;
-                int kneeY = by - 5 + i * 5 + lift;
-                int footY = by + 2 + i * 5 + lift + (pose == BossPose.Windup && i == 0 ? -4 : 0);
-                foreach (int side in new[] { -1, 1 })
-                {
-                    // Side on, the far legs are shorter and darker.
-                    bool far = turn == 2 && side < 0;
-                    int spread = far ? 10 : 14;
-                    int startX = bx + side * 6;
-                    int kneeX = bx + side * (spread + i);
-                    int footX = bx + side * (spread + 5 + i / 2) + (pose == BossPose.Strike ? side * 2 : 0);
-                    Leg(startX, startY, kneeX, kneeY, far ? leg.Shade : leg.Main, far ? leg.Main : leg.Light);
-                    Leg(kneeX, kneeY, footX, footY, far ? leg.Dark : leg.Shade, far ? leg.Shade : leg.Main);
-                }
-            }
-
-            void Oval(int cx, int cy, int rx, int ry, Ramp ramp)
-            {
-                var part = new PixelImage(width, height);
-                Ellipse(part, cx + ox, cy + oy, rx, ry, ramp);
-                for (int y = 0; y < height; y++)
-                {
-                    for (int x = 0; x < width; x++)
-                    {
-                        if (part[x, y].A > 0) image[x, y] = part[x, y];
-                    }
-                }
-            }
-
-            // From behind the head is hidden past the body, so it goes first; otherwise after.
-            if (behind) Oval(hx, hy, 6, 4, Ramp.Of("#5C4C72"));
-            Oval(bx, by, turn == 2 ? 10 : 11, 9, body);
-            if (!behind) Oval(hx, hy, turn == 2 ? 6 : 7, 5, Ramp.Of("#5C4C72"));
-
-            // Crystals on her back.
-            foreach (var (x, y, h) in new[] { (-6, -4, 5), (-1, -7, 7), (5, -4, 5), (-3, 1, 4), (3, 1, 4) })
-            {
-                int cx = bx + x + ox;
-                int cy = by + y + oy;
-                for (int j = 0; j < h; j++)
-                {
-                    int half = (h - j) / 3;
-                    for (int dx = -half; dx <= half; dx++) image[cx + dx, cy - j + h / 2] = dx < 0 ? crystal.Light : dx > 0 ? crystal.Shade : crystal.Main;
-                }
-                image[cx, cy - h / 2] = Rgba.White;
-            }
-
-            if (!behind)
-            {
-                // Her eyes, a row of four and two above, and fangs below that part to strike or roar.
-                var bright = pose == BossPose.Windup || pose == BossPose.Roar ? Rgba.White : eye;
-                foreach (int x in turn == 2 ? new[] { 1, 3, 5 } : new[] { -4, -2, 2, 4 }) image[hx + x + ox, hy - 1 + oy] = bright;
-                if (turn < 2)
-                {
-                    image[hx - 1 + ox, hy - 2 + oy] = eye;
-                    image[hx + 1 + ox, hy - 2 + oy] = eye;
-                }
-                int part = pose == BossPose.Strike || pose == BossPose.Roar ? 1 : 0;
-                var fang = Rgba.Hex("#E8E0D0");
-                int fx = hx + (turn == 2 ? 4 : 0);
-                for (int dy = 0; dy < 2; dy++)
-                {
-                    image[fx - 2 - part + ox, hy + 4 + dy + oy] = fang;
-                    image[fx + 2 + part + ox, hy + 4 + dy + oy] = fang;
-                }
-            }
-            return image.Outlined(body.Outline);
         }
 
         // A filled oval lit from the top left.

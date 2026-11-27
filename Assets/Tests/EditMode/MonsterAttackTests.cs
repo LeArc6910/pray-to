@@ -75,14 +75,16 @@ namespace Game.Core.Tests
             }
             foreach (var monster in Monsters.Shipped.Monsters.Where(m => m.Attacks.Count > 0))
                 Assert.LessOrEqual(monster.Attacks.Count, 3, $"{monster.Id}: a kind has two or three patterns, so it is known by sight");
-            // Every ordinary kind fights from the sheet (2b-2); only the spider queen's brood keeps the old one blow.
-            foreach (var monster in Monsters.Shipped.Monsters.Where(m => m.Id != "silk_spiderling"))
+            // Every ordinary kind fights from the sheet (2b-2); only the broods the spider bosses call (the silk mother's
+            // and the crystal queen's) keep the old one blow.
+            foreach (var monster in Monsters.Shipped.Monsters.Where(m => m.Id != "silk_spiderling" && m.Id != "crystal_hatchling"))
             {
                 Assert.IsNotEmpty(monster.Attacks, monster.Id);
                 Assert.AreNotEqual(MonsterRole.None, monster.Role, monster.Id);
                 Assert.GreaterOrEqual(monster.Attacks.Count + monster.Traits.Count, 2, $"{monster.Id}: more than one thing to do");
             }
             Assert.IsEmpty(Monsters.Shipped.Find("silk_spiderling").Attacks);
+            Assert.IsEmpty(Monsters.Shipped.Find("crystal_hatchling").Attacks);
             Assert.AreEqual(MonsterRole.Swarm, Monsters.Shipped.Find("slime").Role);
             Assert.IsTrue(Monsters.Shipped.Find("cave_beetle").Has(MonsterTraitKind.Guard));
             // The abyss stalker walked alone until B4b gave it its own body and put it in the abyss's packs.

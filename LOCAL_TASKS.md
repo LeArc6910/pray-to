@@ -1284,6 +1284,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/AntlionArt.cs`, `Client/Art/AntlionArt.Rows.cs`, `Client/WorldView.Antlion.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/AntlionMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `antlion-buried`·`entrance-antlion`·`antlion-bite-windup`·`antlion-sinkholes-windup`(`TheAntlionBurstsUpAndWindsUp`)
   - (클라우드 웹 점검) `sweep.js --only antlion`, `--only arenas`
   - (사람) `Docs/HumanChecklist.md`의 개미귀신
+- [ ] 196단계: 수정 거미 여왕 새 그림과 패턴 — Retro Diffusion 결정 거미의 다섯 시점, 공격마다 몸 전체의 전조 자세와 결정 이펙트, 결정 고치가 깨지는 입장(`arenas.csv` `Cocoon`), 결정이 깨지는 쓰러짐, 새끼 수정 거미(`Docs/Bosses.md` 수정 거미 여왕 제 그림과 몸짓)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/CrystalQueenArt.cs`, `Client/WorldView.CrystalQueen.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/CrystalQueenMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `queen-cocoon`·`entrance-queen`·`queen-prism-windup`·`queen-brood-windup`(`TheCrystalQueenHatchesAndWindsUp`)
+  - (클라우드 웹 점검) `sweep.js --only queen`, `--only arenas`
+  - (사람) `Docs/HumanChecklist.md`의 수정 거미 여왕
 
 ## 결과 보고
 

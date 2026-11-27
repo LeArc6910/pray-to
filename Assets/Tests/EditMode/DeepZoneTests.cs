@@ -63,7 +63,7 @@ namespace Game.Core.Tests
         {
             Assert.AreEqual(20, Queen.DropLevel, "mithril gear is level 20");
             Assert.Greater(Queen.Health, Warden.Health);
-            Assert.IsTrue(Queen.Attacks.Any(a => a.Summon?.Id == "crystal_bat"));
+            Assert.IsTrue(Queen.Attacks.Any(a => a.Summon?.Id == "crystal_hatchling"));
             Assert.AreEqual("queen_heart", Queen.MaterialId);
 
             var mithrilOre = Tiles.Shipped.Find(TileType.MithrilOre);
