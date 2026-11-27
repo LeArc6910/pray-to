@@ -736,6 +736,7 @@ namespace Game.Client.Tests
         public IEnumerator TheTideSerpentSurfacesAndWindsUp()
         {
             yield return Start();
+            Toughen();
             var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "tide_serpent");
             Assert.IsNotNull(boss, "No tide serpent.");
             Assert.AreEqual(BossEntrance.Surface, boss.Definition.Arena.Entrance, "arenas.csv gives the tide serpent its own entrance.");
