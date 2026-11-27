@@ -1183,7 +1183,7 @@ async function queen(browser) {
     await game.send(`heal; boss crystal_queen use ${attack}`);
     await game.wait(Math.round(telegraph * 700));
     const s = await game.state();
-    if (marked) check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    if (marked) check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown}, ${(s.bosses || '').split(' ').find(b => b.startsWith('crystal_queen'))})`);
     check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
     await game.shot(`queen-${attack}`, `${name} 전조`);
     await game.wait(Math.round(telegraph * 300) + 160);
