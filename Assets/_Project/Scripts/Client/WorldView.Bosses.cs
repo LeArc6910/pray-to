@@ -425,49 +425,54 @@ namespace Game.Client
             if (attack == null || _bossInView.Id != "vein_eater") return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
+            var c = new BossContext { Ramp = FxRamp.Dust, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu, Width = hazard.Width };
             switch (attack.Shape)
             {
                 case AttackShape.Cone:
-                    // The drills strike across the wedge: three hits, sparks and grit off them (no blade's whirl).
+                    // The drills strike across the wedge: three hits, sparks of ore off them, dust off the arc (no
+                    // blade's whirl).
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
                     for (int i = -1; i <= 1; i++)
                     {
                         var turned = Quaternion.Euler(0, 0, i * attack.Angle * 0.3f) * along;
                         AddFlash(at + turned * (hazard.Size * 0.6f), 0.7f, SlashColor, FlashKind.Impact);
-                        Kick(at + turned * (hazard.Size * 0.6f), turned, OreColor, 3);
+                        Chips(at + turned * (hazard.Size * 0.6f), turned, FxRamp.Gold, 3, 18);
                     }
-                    AddFlash(at + along * (hazard.Size * 0.55f), hazard.Size * 0.4f, DirtColor, FlashKind.Burst);
-                    Burst(at + along * (hazard.Size * 0.6f), OreColor, 1);
+                    c.Plain = true;
+                    c.Size *= 0.4f;
+                    AddBossFx(BossFx.Slam, at + along * (hazard.Size * 0.6f), c);
                     return true;
                 case AttackShape.Burrow:
                     // Bursting up out of the floor.
-                    AddFlash(at, hazard.Size * 1.1f, DirtColor, FlashKind.Burst);
-                    AddFlash(at, hazard.Size * 1.6f, DirtColor, FlashKind.Ring);
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
                     AddFlash(at, 1.2f, Color.white, FlashKind.Impact);
-                    Burst(at, DirtColor, 2.5f);
-                    Burst(at, OreColor, 1);
+                    c.Big = true;
+                    c.Count = 10;
+                    AddBossFx(BossFx.Slam, at, c);
+                    Chips(at, Vector3.up, FxRamp.Gold, 4, 22, 160);
                     _shake = Mathf.Max(_shake, 0.4f);
                     return true;
                 case AttackShape.Leap:
                     // Coming down: a shockwave and the floor thrown up.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
                     AddFlash(at, hazard.Size * 2, SlashColor, FlashKind.Ring);
-                    AddFlash(at, hazard.Size * 1.3f, DirtColor, FlashKind.Ring);
-                    AddFlash(at, hazard.Size, DirtColor, FlashKind.Burst);
-                    Burst(at, DirtColor, 2.5f);
-                    Burst(at, RockColor, 1.5f);
+                    c.Big = true;
+                    c.Count = 10;
+                    AddBossFx(BossFx.Slam, at, c);
                     _shake = Mathf.Max(_shake, 0.45f);
                     return true;
                 case AttackShape.Circle:
                     // The rock from the roof smashing.
-                    AddFlash(at, hazard.Size, RockColor, FlashKind.Burst);
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
                     AddFlash(at, 0.8f, Color.white, FlashKind.Impact);
-                    Burst(at, RockColor, 1.4f);
+                    AddBossFx(BossFx.Slam, at, c);
                     _shake = Mathf.Max(_shake, 0.2f);
                     return true;
                 case AttackShape.Trail:
                     // A spike of rock bursting up through the floor.
-                    AddFlash(at, hazard.Size * 0.9f, RockColor, FlashKind.Burst);
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
                     AddFlash(at, 0.6f, Color.white, FlashKind.Impact);
-                    Kick(at, Vector3.up, RockColor, 5);
+                    AddBossFx(BossFx.Spike, at, c);
                     return true;
             }
             return false;

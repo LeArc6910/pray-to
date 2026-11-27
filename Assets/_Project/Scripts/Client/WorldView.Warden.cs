@@ -243,67 +243,54 @@ namespace Game.Client
             if (view.Phase >= 3 && puff && Random.value < 0.3f) Kick(core, Vector3.up, RageColor, 1);
         }
 
-        // Where one of its blows lands, a burst of its own; false for anyone else's.
+        // Where one of its blows lands, stone and dust of its own over the blow's shape; false for anyone else's.
         bool WardenLanded(HazardState hazard)
         {
-            var attack = AttackOf(hazard);
-            if (attack == null || _bossInView.Id != "cave_warden") return false;
+            var (boss, id) = BlowOf(hazard);
+            if (boss != "cave_warden") return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
-            var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
-            switch (attack.Id)
+            var c = new BossContext { Ramp = FxRamp.Dust, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu, Width = hazard.Width };
+            switch (id)
             {
                 case "slam":
-                    // Both fists into the floor: the circle breaks.
+                    // Both fists into the floor: the circle breaks (Impact cracks it), dust and stones thrown out.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
                     Impact(at, 1);
-                    AddFlash(at, hazard.Size, DustColor, FlashKind.Ring);
+                    c.Plain = true;
+                    AddBossFx(BossFx.Slam, at, c);
                     return true;
                 case "sweep":
-                {
-                    // Dust thrown along the arc, one heavy jolt.
-                    float half = attack.Angle / 2;
-                    for (float a = -half; a <= half; a += 20)
-                    {
-                        var dir = Quaternion.Euler(0, 0, a) * along;
-                        Kick(at + dir * hazard.Size * 0.8f, dir, DustColor, 2);
-                    }
-                    AddFlash(at + along * hazard.Size * 0.5f, hazard.Size * 0.9f, DustColor, FlashKind.Ring);
+                    // The arm through the wedge: a smear of dust, dust rolling off its arc, stones flung on, one heavy jolt.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
+                    AddBossFx(BossFx.Sweep, at, c);
                     if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.07f);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.3f);
                     Hear(Sound.Thump, at, 1);
                     return true;
-                }
                 case "quake":
                     // The floor bursting up under the feet it was stamped for.
-                    AddFlash(at, hazard.Size * 1.2f, DustColor, FlashKind.Burst);
-                    Kick(at, Vector3.up, RockColor, 5);
-                    Cracks(at, hazard.Size, 5);
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
+                    AddBossFx(BossFx.Slam, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.25f);
                     Hear(Sound.Boom, at, 0.6f);
                     return true;
                 case "shockwave":
                 case "aftershock":
-                {
-                    // A ring of broken floor rolling out: dust all round its edge.
-                    float inner = attack.Radius, outer = attack.Radius + 0.5f * (attack.Length - attack.Radius);
-                    for (int i = 0; i < 12; i++)
-                    {
-                        var dir = Quaternion.Euler(0, 0, i * 30 + Random.Range(-10f, 10f)) * Vector3.right;
-                        Kick(at + dir * Random.Range(inner, outer), dir + Vector3.up * 0.5f, i % 2 == 0 ? RockColor : DustColor, 1);
-                    }
-                    AddFlash(at, attack.Length, DustColor, FlashKind.Ring);
-                    if (attack.Id == "shockwave") Impact(at, 0.8f);
+                    // A ring of broken floor rolling out: dust and stones all round the band.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
+                    c.Inner = hazard.Width * Ppu;
+                    AddBossFx(BossFx.Rumble, at, c);
+                    if (id == "shockwave") Impact(at, 0.8f);
                     else
                     {
                         if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.25f);
                         Hear(Sound.Boom, at, 0.7f);
                     }
                     return true;
-                }
                 case "rock_trail":
-                    // Each burst of the gouged line: stone bursting up out of the floor.
-                    AddFlash(at, hazard.Size * 1.3f, DustColor, FlashKind.Burst);
-                    Kick(at, Vector3.up, RockColor, 4);
-                    Cracks(at, hazard.Size, 3);
+                    // Each burst of the gouged line: a spike of stone up through the floor.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
+                    AddBossFx(BossFx.Spike, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.15f);
                     Hear(Sound.Thump, at, 0.7f);
                     return true;
@@ -311,17 +298,19 @@ namespace Game.Client
                 case "cave_in":
                 {
                     // Rock from the roof shattering; the cave-in harder.
-                    bool hard = attack.Id == "cave_in";
-                    AddFlash(at, hazard.Size * 1.2f, RockColor, FlashKind.Burst);
-                    Kick(at, Vector3.up, RockColor, hard ? 7 : 5);
-                    Cracks(at, hazard.Size * 0.8f, hard ? 5 : 3);
+                    bool hard = id == "cave_in";
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
+                    c.Big = hard;
+                    AddBossFx(BossFx.Slam, at, c);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, hard ? 0.3f : 0.18f);
                     Hear(Sound.Break, at, 0.9f);
-                    if (hard) ScreenFlash(new Color(1, 0.92f, 0.8f, 0.25f), 0.1f);
+                    if (hard) ScreenFlash(new Color(1, 0.92f, 0.8f, 0.25f), 0.05f);
                     return true;
                 }
             }
-            return false;
+            // Any other of its blows: the shared landing, in dust.
+            BlastLanded(hazard, FxRamp.Dust, light: false);
+            return true;
         }
 
         // The way it last faced, for its fall.

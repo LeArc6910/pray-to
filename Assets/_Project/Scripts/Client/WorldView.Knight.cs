@@ -231,12 +231,9 @@ namespace Game.Client
             AddFlash(at, 0.9f + 0.6f * weight, Color.white, FlashKind.Impact);
             AddFlash(at, 1.6f + 1.4f * weight, DustColor, FlashKind.Ring);
             AddFlash(at, 1.2f + 0.8f * weight, DustColor, FlashKind.Burst);
-            for (int i = 0; i < 8; i++)
-            {
-                var way = Quaternion.Euler(0, 0, i * 45 + Random.Range(-15f, 15f)) * Vector3.right;
-                Kick(at, way + Vector3.up * 0.6f, i % 2 == 0 ? RockColor : DirtColor, 2);
-            }
-            Kick(at, Vector3.up, SparkColor, 3);
+            // Stones thrown out all round and sparks off the steel (pieces, not square dots: E6).
+            Chips(at, Vector3.up, FxRamp.Dust, 8, 20 + 8 * weight, 360);
+            Chips(at, Vector3.up, FxRamp.Gold, 3, 16, 120);
             Cracks(at, 1.2f + 0.8f * weight, 5 + Mathf.RoundToInt(weight * 2));
             Hear(Sound.Boom, at, 0.6f + 0.3f * weight);
             Hear(Sound.Thump, at, 1);
@@ -250,51 +247,43 @@ namespace Game.Client
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             bool strong = attack.Warning == AttackWarning.Strong;
+            var slam = new BossContext { Ramp = FxRamp.Dust, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu, Width = hazard.Width };
             switch (attack.Shape)
             {
                 case AttackShape.Cone when Sweeps(attack):
-                {
-                    // The sweep: dust thrown along the arc and one heavy jolt.
-                    float half = attack.Angle / 2;
-                    for (float a = -half; a <= half; a += 20)
-                    {
-                        var dir = Quaternion.Euler(0, 0, a) * along;
-                        Kick(at + dir * hazard.Size * 0.8f, dir, DustColor, 2);
-                    }
-                    AddFlash(at + along * hazard.Size * 0.5f, hazard.Size * 0.9f, DustColor, FlashKind.Ring);
+                    // The sweep: a smear of dust through the wedge, dust rolling off the arc, one heavy jolt.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
+                    AddBossFx(BossFx.Sweep, at, slam);
                     if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.09f);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.35f);
                     Hear(Sound.Thump, at, 1);
                     return true;
-                }
                 case AttackShape.Cone:
                     // The hammer comes down where the wedge ends.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
                     Impact(at + along * hazard.Size * 0.65f, 1);
                     return true;
                 case AttackShape.Trail:
                     // Each burst of the shockwave: stone bursting up out of the floor.
-                    AddFlash(at, hazard.Size * 1.3f, DustColor, FlashKind.Burst);
-                    Kick(at, Vector3.up, RockColor, 4);
-                    Cracks(at, hazard.Size, 3);
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
+                    AddBossFx(BossFx.Spike, at, slam);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.18f);
                     Hear(Sound.Thump, at, 0.7f);
                     return true;
                 case AttackShape.Cross:
-                    // The floor split along both arms.
-                    foreach (var arm in new[] { along, new Vector3(-along.y, along.x, 0) })
+                    // The floor split along this arm: cracks and stones thrown up all along it.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false);
+                    for (float d = 0.6f; d <= hazard.Size; d += 1.2f)
                     {
-                        for (float d = -hazard.Size; d <= hazard.Size; d += 1.2f)
-                        {
-                            Kick(at + arm * d, Vector3.up, d % 2.4f < 1.2f ? RockColor : DustColor, 1);
-                            Cracks(at + arm * d, 0.6f, 2);
-                        }
+                        Chips(at + along * d, Vector3.up, FxRamp.Dust, 1, 14, 120);
+                        Cracks(at + along * d, 0.6f, 2);
                     }
-                    Impact(at, 1.2f);
+                    Impact(at + along * hazard.Size * 0.5f, 1.2f);
                     return true;
                 case AttackShape.Circle when attack.Target == AttackTarget.Each:
-                    // Rock from the roof shattering.
-                    AddFlash(at, hazard.Size * 1.2f, RockColor, FlashKind.Burst);
-                    Kick(at, Vector3.up, RockColor, 5);
+                    // Rock from the roof shattering: dust, the floor split, stones over their shadows, a wave.
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
+                    AddBossFx(BossFx.Slam, at, slam);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.15f);
                     Hear(Sound.Break, at, 0.8f);
                     return true;
@@ -304,10 +293,14 @@ namespace Game.Client
                     // The hammer pounded into the floor at its feet (or the knight landing on its mark): the whole circle
                     // breaks, the heaviest blows whiten the screen.
                     float weight = strong ? 2.2f : 1.5f;
+                    BlastLanded(hazard, FxRamp.Dust, sparks: false, light: false, wave: false);
                     Impact(at, weight);
-                    AddFlash(at, hazard.Size, DustColor, FlashKind.Ring);
                     Cracks(at, hazard.Size * 0.9f, strong ? 10 : 7);
-                    if (strong) ScreenFlash(new Color(1, 0.95f, 0.85f, 0.4f), 0.14f);
+                    // A cloud of dust and stones over the cracks (which stay as they were).
+                    slam.Plain = true;
+                    slam.Big = strong;
+                    AddBossFx(BossFx.Slam, at, slam);
+                    if (strong) ScreenFlash(new Color(1, 0.95f, 0.85f, 0.4f), 0.05f);
                     return true;
                 }
             }

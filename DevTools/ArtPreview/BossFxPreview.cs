@@ -75,6 +75,14 @@ namespace Game.Client
             Add("mad_general", "flame_ring", BossFx.FireBand, HazardForm.Donut, 6f, 2.4f, 0, fire, r => { r.Context.Inner = 2.4f * T; r.Context.Dir = 90; (r.Wide, r.Tall, r.AtY) = (216, 216, 0.5f); });
             Add("mad_general", "ember_wake", BossFx.FireBand, HazardForm.Donut, 3.6f, 1.2f, 0, fire, r => { r.Context.Inner = 1.2f * T; r.Context.Dir = 90; (r.Wide, r.Tall, r.AtY) = (136, 136, 0.5f); });
             Add("mad_general", "cinders", BossFx.Cinders, HazardForm.Circle, 1, 0, 0, fire, r => { r.NoShape = true; r.Tall = 48; r.Context = new BossContext { Ramp = fire, Size = 18, Count = 3, Seed = 4 }; });
+            var dust = FxRamp.Dust;
+            Add("stone", "slam", BossFx.Slam, HazardForm.Circle, 2.5f, 0, 0, dust, r => r.Tall = 112);
+            Add("stone", "slam over cracks", BossFx.Slam, HazardForm.Circle, 2f, 0, 0, dust, r => r.Context.Plain = true);
+            Add("stone", "cave_in", BossFx.Slam, HazardForm.Circle, 1.6f, 0, 0, dust, r => r.Context.Big = true);
+            Add("stone", "sweep", BossFx.Sweep, HazardForm.Cone, 4f, 120, 0, dust, r => { r.Context.Width = 120; r.AtX = 0.2f; r.AtY = 0.5f; r.Tall = 144; });
+            Add("stone", "shockwave", BossFx.Rumble, HazardForm.Donut, 5f, 2f, 0, dust, r => { r.Context.Inner = 2 * T; (r.Wide, r.Tall, r.AtY) = (184, 184, 0.5f); });
+            Add("stone", "rock_trail", BossFx.Spike, HazardForm.Circle, 1.1f, 0, 0, dust);
+            Add("stone", "stones", BossFx.Cinders, HazardForm.Circle, 1, 0, 0, dust, r => { r.NoShape = true; r.Tall = 64; r.Context = new BossContext { Ramp = dust, Size = 28, Count = 8, Width = 360, Dir = 90, Seed = 4 }; });
             return rows;
         }
 

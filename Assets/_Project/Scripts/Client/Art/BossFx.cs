@@ -42,6 +42,19 @@ namespace Game.Client
         FireCall,
         // Ghostly spears thrust up along a line from its middle outward. Size the line's length, Dir its way.
         Spears,
+
+        // ---- the bosses of stone (the cave warden, the vein eater, the black knight) ----
+        // A blow into the floor or a rock come down on it: a cloud of dust, the floor split, stones thrown up over
+        // their shadows, a wave over the floor. Size its radius, Count how many stones (0: by its weight), Big the
+        // heavier; Plain leaves the splits out (where the floor is cracked another way).
+        Slam,
+        // An arm or a hammer swept through a wedge: a smear of dust across it, dust rolling off its arc, stones flung
+        // on. Size the reach, Width the wedge in degrees, Dir its middle.
+        Sweep,
+        // A ring of broken floor rolling out: dust and stones all round the band. Size its outer radius, Inner its inner.
+        Rumble,
+        // Stone bursting up through the floor: a spike that stands a moment and crumbles. Size its radius.
+        Spike,
     }
 
     // What one of the bosses' effects is told. Lengths in pixels, angles in degrees.
@@ -56,6 +69,8 @@ namespace Game.Client
         public int Seed;
         // The heavier of two blows that share an effect.
         public bool Big;
+        // Without the part of the effect something else already draws there.
+        public bool Plain;
         public FxRamp Ramp;
     }
 
@@ -99,6 +114,10 @@ namespace Game.Client
                 case BossFx.Cleave: life = Cleave(c, t, o); break;
                 case BossFx.FireCall: life = FireCall(c, t, o); break;
                 case BossFx.Spears: life = Spears(c, t, o); break;
+                case BossFx.Slam: life = Slam(c, t, o); break;
+                case BossFx.Sweep: life = Sweep(c, t, o); break;
+                case BossFx.Rumble: life = Rumble(c, t, o); break;
+                case BossFx.Spike: life = Spike(c, t, o); break;
                 default: return false;
             }
             return t < life;
@@ -476,6 +495,120 @@ namespace Game.Client
             }
             FxLayers.Embers(o, m, 8, t, 0, 20, c.Seed, dx * L / 2, dy * L / 2);
             return 0.25f * 0.5f + 0.5f;
+        }
+
+        // ---- the bosses of stone ----
+
+        // A piece in the air but under the warnings on the floor: dust never hides a warning.
+        static void PutLow(List<FxStamp> o, FxShape shape, FxRamp ramp, int size, int frame, float x, float y, float alpha)
+        {
+            if (alpha <= 0.03f || size <= 0) return;
+            o.Add(new FxStamp { Shape = shape, Ramp = ramp, Size = size, Frame = frame, X = x, Y = y, Alpha = Math.Min(1, alpha), Low = true });
+        }
+
+        // Puffs of dust rolling out from a circle of radius at (or, over a wedge, from its arc), thinning as they go.
+        static void Dust(List<FxStamp> o, FxRamp m, int count, float t, float from, float at, float roll, int seed, float dir = 0, float wide = 360, float life = 0.6f, float stagger = 0)
+        {
+            for (int i = 0; i < count; i++)
+            {
+                float turn = (i + 0.5f) / count, p = (t - from - stagger * turn - 0.03f * Rnd(seed, i, 21)) / life;
+                if (p < 0 || p >= 1) continue;
+                float angle = dir + (turn - 0.5f) * wide + (wide >= 360 ? 180 : 0) + 12 * (Rnd(seed, i, 22) - 0.5f), far = at + roll * Out(p);
+                PutLow(o, FxShape.Smoke, m, Even(9 + 7 * p + 3 * Rnd(seed, i, 23)), Math.Min(3, (int)(p * 4)), Cos(angle) * far, Sin(angle) * far * 0.92f + 3 * p, 0.85f * (1 - p));
+            }
+        }
+
+        static float Slam(in BossContext c, float t, List<FxStamp> o)
+        {
+            var m = c.Ramp;
+            float R = c.Size;
+            if (!c.Plain) FxLayers.Splits(o, FxRamp.Smoke, c.Big ? 9 : 6, t, 0, 1.1f, R * 0.95f, c.Seed);
+            if (R * 2.2f <= 160) FxLayers.Shock(o, m, t, 0, R * 1.1f, 0, 0, 0.32f, true);
+            // The cloud where it struck, swelling and thinning, and dust rolling away all round.
+            if (In(t, 0.03f, 0.4f))
+            {
+                float u = U(t, 0.03f, 0.4f);
+                PutLow(o, FxShape.Lump, m, Even(R * (0.9f + 0.7f * Out(u))), 4 * (u < 0.4f ? 1 : 2) + ((int)(t * 12) & 3), 0, 2 + 5 * u, 0.8f * (1 - u));
+            }
+            Dust(o, m, c.Big ? 10 : 8, t, 0.02f, R * 0.6f, R * 0.5f + 6, c.Seed);
+            if (t < 0.05f) Put(o, FxShape.Lump, m, Even(R * 0.9f), (int)(t * 40) & 3, 0, 0);
+            FxLayers.Rubble(o, m == FxRamp.Sand ? FxRamp.Sand : FxRamp.Dust, c.Count > 0 ? c.Count : c.Big ? 8 : 6, t, 0.02f, R * 0.9f, c.Seed + 1);
+            return c.Plain ? 0.8f : 1.1f;
+        }
+
+        static float Sweep(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float sweep = 0.12f;
+            var m = c.Ramp;
+            float R = c.Size, wide = Math.Clamp(c.Width, 20, 300), half = wide / 2, swept = U(t, 0, sweep);
+            if (t < 0.28f)
+            {
+                float fade = t < 0.14f ? 1 : (0.28f - t) / 0.14f;
+                int span = 10 * Math.Max(2, (int)Math.Round(wide * (0.25f + 0.75f * swept) / 10));
+                float head = c.Dir - half + wide * swept;
+                Put(o, FxShape.Smear, m, SkillFxArt.Even(R * 0.78f), span, 0, 0, fade * 0.7f, head - span / 2f);
+                Put(o, FxShape.Smear, m, SkillFxArt.Even(R), span, 0, 0, fade, head - span / 2f);
+            }
+            // Dust off the arc as the arm passes, and stones flung on past it.
+            Dust(o, m, 7, t, 0, R * 0.85f, 14, c.Seed, c.Dir, wide, 0.55f, sweep);
+            for (int i = 0; i < 6; i++)
+            {
+                float turn = (i + 0.5f) / 6, p = (t - sweep * turn) / (0.4f + 0.15f * Rnd(c.Seed, i, 24));
+                if (p < 0 || p >= 1) continue;
+                float dir = c.Dir - half + wide * turn, far = R * (0.85f + 0.5f * Out(p));
+                Put(o, FxShape.Chunk, FxRamp.Dust, 3 + (i & 1), 4 + (i & 3), Cos(dir) * far, Sin(dir) * far + 28 * p * (1 - p), 1 - p * p * p);
+            }
+            return 0.72f;
+        }
+
+        static float Rumble(in BossContext c, float t, List<FxStamp> o)
+        {
+            var m = c.Ramp;
+            float inner = c.Inner, outer = c.Size, mid = (inner + outer) / 2;
+            int count = Math.Clamp((int)(mid / 5), 8, 14);
+            Dust(o, m, count, t, 0, mid - 4, (outer - inner) * 0.4f + 6, c.Seed, 0, 360, 0.65f);
+            // Stones thrown up all round the band.
+            for (int i = 0; i < count; i++)
+            {
+                float own = 0.45f + 0.2f * Rnd(c.Seed, i, 25), p = (t - 0.02f) / own;
+                if (p < 0 || p >= 1) continue;
+                float dir = (i + 0.5f * Rnd(c.Seed, i, 26)) * 360f / count + 13, far = mid + (outer - mid) * 0.6f * p;
+                float x = Cos(dir) * far, y = Sin(dir) * far * 0.95f;
+                Put(o, FxShape.Shadow, FxRamp.Smoke, 4, 0, x, y - 1, 0.7f, 0, true);
+                Put(o, FxShape.Chunk, FxRamp.Dust, 3 + (i & 1), 4 + (i & 3), x, y + 4 * (9 + 8 * Rnd(c.Seed, i, 27)) * p * (1 - p));
+            }
+            return 0.75f;
+        }
+
+        static float Spike(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float hold = 0.34f, over = 0.7f;
+            var m = c.Ramp;
+            float R = c.Size;
+            FxLayers.Splits(o, FxRamp.Smoke, 4, t, 0, 1.0f, R * 0.9f, c.Seed);
+            Dust(o, m, 5, t, 0.02f, R * 0.35f, R * 0.5f + 4, c.Seed, 0, 360, 0.5f);
+            int tall = Even(Math.Clamp(R * 1.1f, 14, 30));
+            if (t < hold)
+            {
+                // Up through the floor in a moment, a smaller one either side.
+                float up = Out(U(t, 0, 0.07f));
+                for (int side = -1; side <= 1; side++)
+                {
+                    int size = Even(tall * (side == 0 ? 1 : 0.6f) * up);
+                    if (size < 4) continue;
+                    Put(o, FxShape.Shard, FxRamp.Dust, size, 2, side * R * 0.38f + Cos(90 + side * 14) * size * 0.4f, -2 + size * 0.45f, 1, 90 - side * 14);
+                }
+            }
+            else if (t < over)
+            {
+                float p = (t - hold) / (over - hold);
+                for (int i = 0; i < 6; i++)
+                {
+                    float dir = 20 + i * 28;
+                    Put(o, FxShape.Chunk, FxRamp.Dust, 3 + (i & 1), 4 + (i & 3), Cos(dir) * R * 0.7f * Out(p), tall * 0.5f * (1 - p) + Sin(dir) * 8 * Out(p) - 10 * p * p, 1 - p * p);
+                }
+            }
+            return 1.0f;
         }
     }
 }
