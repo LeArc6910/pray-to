@@ -141,6 +141,12 @@ namespace Game.Client
         // The bosses' own effects (WorldView.BossFx.cs, E6): how many run and the most pieces one laid last frame.
         internal int BossFxCount => _view?.BossFxCount ?? 0;
         internal int BossFxPieces => _view?.BossFxPieces ?? 0;
+        // Blows' effects on the bodies they land on and the damage numbers (WorldView.HitFx.cs, E7).
+        internal int HitFxCount => _view?.HitFxCount ?? 0;
+        internal int HitFxPieces => _view?.HitFxPieces ?? 0;
+        internal int HitFxAll => _view?.HitFxAll ?? 0;
+        internal int NumbersShown => _view?.NumbersShown ?? 0;
+        internal int NumberSlots => _view?.NumberSlots ?? 0;
         // The enemies' shots drawn in their element, the rings where they ended, and the dots of the aim lines (E2).
         internal int EnemyShots => _view?.EnemyShotCount ?? 0;
         internal int ShotEnds => _view?.ShotPopCount ?? 0;

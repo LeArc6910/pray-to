@@ -7,18 +7,9 @@
 - 마을·왕도의 새 건물을 생물군계마다 다른 모습으로(지금은 한 모습)
 - 생성기의 실수 계산을 정수로(크로스 플레이 지도 일치의 근본 해결, `Docs/CrossPlay.md`)
 
-## 이펙트 개편 적용 (2026-11-27 사람 확인: "시안 전체 다 마음에 들어")
+## 이펙트 개편 (끝남, 2026-11-27)
 
-`Docs/EffectsRework.md`의 3절(개선안)·4절(묶음과 정한 것)만 읽고, 시안 코드(`DevTools/ArtPreview/FxMockKit.cs`·`FxMockPreview.cs`, `--only fxmock`)를 본보기로 삼는다. 묶음 하나가 한 세션이다.
-
-- E1 보스 예고 도형과 공용 착지는 끝났다(2026-11-27, `Docs/EffectsRework.md` 6절). 본보기: `Client/Art/HazardArt.cs`, `WorldView.Hazards.cs`, `--only hazard`, `sweep.js --only hazards`
-- E2 적의 탄은 끝났다(2026-11-27, `Docs/EffectsRework.md` 7절). 본보기: `Client/Art/ShotArt.cs`, `WorldView.Shots.cs`, `--only shot`, `sweep.js --only shots`. 남은 것: 사방 사격·나선의 조준선(호스트가 쏠 때 각도를 정해 Core를 바꿔야 한다), 월광참·독액의 소멸(E6)
-- E3 공용 층 조각과 폭발은 끝났다(2026-11-27, `Docs/EffectsRework.md` 8절). 본보기: `Client/Art/FxLayers.cs`(`Blast`와 층 도우미), `SkillFxArt.Layers.cs`(새 조각, `Ramp5`), `--only skillfx`, 명령 `blast`, `sweep.js --only blast`. 실제로 바꾼 것은 화염구·유성뿐
-- E5 일반 몬스터의 예고·탄·장판은 끝났다(2026-11-27, `Docs/EffectsRework.md` 9절). 본보기: `Client/Art/MonsterFx.cs`(`Field`·`ShotOf`·`Burst`·`Pool`·`Rush`), `--only monsterfx`, `sweep.js --only mobwarn`. 남은 것: 한 발짜리 탄의 조준선(Core), 부채꼴·찌르기·광선의 착지 모양
-- E4 플레이어 스킬 30종과 구르기는 끝났다(2026-11-27, `Docs/EffectsRework.md` 10절, 스킬마다의 표는 `Docs/SkillEffects.md`). 본보기: `Client/Art/SkillFx.cs`(`Comet`·`Crystals`·`Floor`), 새 조각 `Lump`·`Wash`·`Smear`·번개 후광, 명령 `castfx`, `sweep.js --only layers`. 남은 것: 근접 스킬이 맞은 몸의 별(E7), 유성의 목표 지점 표시(어디서 터질지 미리 알려면 Core)
-- E6 보스 고유 이펙트는 끝났다(2026-11-27, `Docs/EffectsRework.md` 11절). 본보기: `Client/Art/BossFx.cs`(`BossEffects`), `WorldView.BossFx.cs`, `BlastLanded`의 원소 인자, `--only bossfx`, 명령 `warn … <보스> <공격>`, `sweep.js --only bossfx`. 남은 것: 탄을 쏘는 순간의 터짐, 예고 중의 자잘한 사각 점, 광맥 포식자·발두인을 공격 이름으로 놓아 보기
-- **E7 타격·숫자**(다음 차례, 마지막 묶음): 원소별 타격 모양(지금은 색만 다른 `EffectArt.Burst`), 피해 숫자, 근접 스킬이 맞은 몸의 별(E4에서 미룸)
-- 묶음마다: 한도(이펙트 72조각, 바닥 빛 3장, 흔적 24개) 확인, 흑백 표, Playtest 장면과 `sweep.js` 구역, PlayMode 사진
+E1~E7을 모두 적용했다(`Docs/EffectsRework.md` 6~12절). 하지 못한 것은 같은 문서 **13절 "개편 전체의 남은 것"**에 모았다: Core를 바꿔야 하는 조준선·목표 표시·스킬 타격의 원소, 그림만 더하면 되는 것, 확인이 덜 된 것. 사람이 고르면 그 줄만 한다.
 
 ## 정해진 것 (2026-11-27, 추천대로)
 

@@ -323,6 +323,17 @@ namespace Game.Client
                     if (root.View == null) return "no view";
                     root.View.StageBlast(words[1], player.Position + new Vec2(Float(words[2]), Float(words[3])), Float(words[4]));
                     return null;
+                case "hit":
+                    // hit <plain|fire|cold|bolt|poison|crystal|sand|stone|water|void> <dx> <dy> [degrees] [amount] [strong|added|mine]:
+                    // a blow's effect put beside the player as if one landed there travelling that way, with its number
+                    // (WorldView.StageHit, E7 of Docs/EffectsRework.md). strong: a crit. added: a weapon's added element
+                    // (no star, the number in the element's colour). mine: struck oneself. Hold its age with fxhold.
+                    if (root.View == null) return "no view";
+                    if (!Enum.TryParse<HitElement>(words[1], true, out var hitElement)) return $"no element '{words[1]}'";
+                    string hitHow = words.Length > 6 ? words[6] : "";
+                    root.View.StageHit(hitElement, player.Position + new Vec2(Float(words[2]), Float(words[3])), words.Length > 4 ? Float(words[4]) : 0,
+                        hitHow == "strong", words.Length > 5 ? Int(words[5]) : 0, hitHow == "added", hitHow == "mine");
+                    return null;
                 case "castfx":
                     // castfx <skill> <dx> <dy> <radius in tiles> [degrees]: that skill's own effect put beside the
                     // player as if cast there (WorldView.StageCast, E4 of Docs/EffectsRework.md). Hold its age with fxhold.
@@ -2931,6 +2942,11 @@ namespace Game.Client
                 json.Field("blastPieces", root.BlastPieces);
                 json.Field("bossFx", root.BossFxCount);
                 json.Field("bossFxPieces", root.BossFxPieces);
+                json.Field("hitFx", root.HitFxCount);
+                json.Field("hitFxPieces", root.HitFxPieces);
+                json.Field("hitFxAll", root.HitFxAll);
+                json.Field("numbers", root.NumbersShown);
+                json.Field("numberSlots", root.NumberSlots);
                 json.Field("floorScars", root.FloorScars);
                 json.Field("enemyShots", root.EnemyShots);
                 json.Field("shotEnds", root.ShotEnds);

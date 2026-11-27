@@ -37,6 +37,8 @@
 
 보스 고유 이펙트(2026-11-27, `Docs/EffectsRework.md` 11절, E6): 그림은 `Client/Art/BossFx.cs`(`BossEffects.Stamps`, 종류 `BossFx`, 인자 `BossContext`), 화면은 `WorldView.BossFx.cs`(`AddBossFx`·`DrawBossFx`·`BossWarnExtras`·`Chips`·`BlowOf`). 보스별 `*Landed`는 공용 착지 `BlastLanded(hazard, 원소, …)`를 깔고 그 위에 제 이펙트를 놓는다. 고유 코드가 없는 보스는 `ElementLanded`(`WorldView.Hazards.cs`). 미리보기 `DevTools/ArtPreview/BossFxPreview.cs`
 
+타격 이펙트와 피해 숫자(2026-11-27, `Docs/EffectsRework.md` 12절, E7): 그림은 `Client/Art/HitFx.cs`(`HitElement` 열 가지, `HitFx.Stamps`), 화면은 `WorldView.HitFx.cs`(`AddHitFx`·`UpdateHitFx`·`HitLookOf`, 숫자의 `AddNumber`·`NumberLabel`). 타격 사건(`SimEventType.Hit`)이 여기로 온다. 미리보기 `DevTools/ArtPreview/HitFxPreview.cs`
+
 일반 몬스터의 예고·탄·장판(2026-11-27, `Docs/EffectsRework.md` 9절, E5): 예고 그림은 `HazardArt.Warn`의 `light`·`arrows`(모양은 `MonsterFx.Field`·`Tone`·`WarnStep`), 화면은 `WorldView.MonsterFx.cs`의 `DrawMonsterMark`(표시마다 텍스처 하나, `Mark.WarnKey`). 탄은 `ShotArt`의 원소(`MonsterFx.ShotOf`)와 `DrawMonsterShot`, 조준선은 `LayAim`. 새 조각 `FxShape.Puddle`·`Dashes`(`SkillFxArt.Layers.cs`), 착지의 원소별 터짐 `MonsterFx.Burst`, 돌진 `MobFx.Rush`, 예고 아래에 그리는 연기 `FxStamp.Low`.
 
 공용 층 조각과 폭발(2026-11-27, `Docs/EffectsRework.md` 8절, E3): 조각 그림은 `Client/Art/SkillFxArt.Layers.cs`(`Burst`·`Pall`·`Plume`·`Ember`·`Shock`·`Glow`, 5색 `Ramp5`), 쌓는 법은 `Client/Art/FxLayers.cs`(`Blast`, `Embers`, `Plumes`, `Light` 등. 스킬·몬스터·보스 공용). 바닥 빛은 `FxShape.Light` 조각을 `WorldView.EmitFx`가 모아 빛 지도에 넣는다(이펙트당 3, 화면 12).

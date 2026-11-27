@@ -333,6 +333,12 @@ namespace Game.Client
             public float Age;
             // A crit's or a finisher's number, drawn larger (2026-11-19).
             public bool Big;
+            // A damage number (E7, WorldView.HitFx.cs): the body it came off, its place among that body's numbers
+            // and which way the blow went (-1 to 1 across the screen).
+            public bool Number;
+            public int Target;
+            public int Slot;
+            public float Side;
         }
 
         const float SwingSeconds = 0.15f;
@@ -668,8 +674,11 @@ namespace Game.Client
             for (int i = _floating.Count - 1; i >= 0; i--)
             {
                 _floating[i].Age += deltaTime;
+                // The playtest's fxhold stops the numbers too, for a picture.
+                if (_floating[i].Number && Feel.SkillFxHold >= 0) _floating[i].Age = Mathf.Min(_floating[i].Age, Feel.SkillFxHold);
                 if (_floating[i].Age > FloatSeconds) _floating.RemoveAt(i);
             }
+            CountNumbers();
             // A banner waits while there is no room for it (a window over the middle of the screen, a full screen: U7),
             // so it is seen once the window shuts rather than lost under it.
             if (!_bannerHeld) _bannerAge += deltaTime;
@@ -893,7 +902,8 @@ namespace Game.Client
                 var color = text.Color;
                 color.a = 1 - t * t;
                 // A big one pops in larger and settles (1.6 times, then 1.35).
-                if (text.Big) BigLabel(text.Position + new Vector3(0, 0.6f + t * 0.8f, 0), text.Text, color, text.Age < 0.08f ? 1.6f : 1.35f);
+                if (text.Number) NumberLabel(text, color);
+                else if (text.Big) BigLabel(text.Position + new Vector3(0, 0.6f + t * 0.8f, 0), text.Text, color, text.Age < 0.08f ? 1.6f : 1.35f);
                 else Label(text.Position + new Vector3(0, 0.6f + t * 0.8f, 0), text.Text, color);
             }
 
@@ -2200,7 +2210,7 @@ namespace Game.Client
                     bool heavy = hitter != null && hitter.Kind == BodyKind.Player && hitter.Combo == World.ComboSteps - 1 && hitter.StrikeTime > 0;
                     // A weapon's elemental hit (World.AddElements) in its element's colour, a little aside of the blow's own number.
                     var element = World.ElementOfCause(e.Cause);
-                    var color = hurtsMe ? new Color(1f, 0.35f, 0.3f) : element != SkillTag.None ? Palette.Of(element) : e.Critical ? new Color(1f, 0.85f, 0.2f) : Color.white;
+                    var color = hurtsMe ? HurtNumber : element != SkillTag.None ? Palette.Of(element) : e.Critical ? CritNumber : Color.white;
                     // A blow a guard turned (the Guarded event comes just before its hit): its number is grey and never big.
                     // (within a moment of it: on the web the two can be handled a frame apart)
                     bool guarded = !hurtsMe && e.Target == _guardedId && Time.unscaledTime - _guardedAt < GuardedWindow;
@@ -2209,12 +2219,11 @@ namespace Game.Client
                         color = GuardedColor;
                         GuardedNumbersShown++;
                     }
-                    var numberAt = element == SkillTag.None ? target.Position : target.Position + new Vector3(0.35f, 0.2f, 0);
-                    if (Feel.Numbers) _floating.Add(new Floating { Position = numberAt, Text = e.Critical && !guarded ? e.Amount + "!" : e.Amount.ToString(), Color = color, Big = (e.Critical || heavy) && !guarded });
-                    // And a burst of the element where it struck, for everyone to see (2026-11-09).
-                    if (element != SkillTag.None) AddFlash(target.Position + new Vector3(0, target.Diameter * 0.15f, 0), 0.5f, Palette.Of(element), FlashKind.Burst);
                     // Knocked back a little, away from whoever struck, and a star on its near side where the blow landed.
                     var away = hitter != null ? (Vector2)(target.Position - hitter.Position) : Vector2.zero;
+                    // The number pops, leans away from the blow and stands beside the others off the same body (E7).
+                    AddNumber(target.Position, e.Target, e.Critical && !guarded ? e.Amount + "!" : e.Amount.ToString(), color, (e.Critical || heavy) && !guarded,
+                        away.sqrMagnitude > 1e-4f ? away.normalized.x : 0);
                     if (away.sqrMagnitude > 1e-4f)
                     {
                         target.Knock = away.normalized;
@@ -2222,7 +2231,17 @@ namespace Game.Client
                         target.KnockReach = heavy ? 2.5f : e.Critical ? 1.6f : 1;
                     }
                     var landed = target.Position - (Vector3)(away.normalized * target.Diameter * 0.3f) + new Vector3(0, target.Diameter * 0.2f, 0);
-                    AddFlash(landed, heavy || e.Critical ? 0.55f : 0.38f, hurtsMe ? ImpactRed : e.Critical ? ImpactGold : ImpactWhite, FlashKind.Impact);
+                    // What the blow is made of, thrown on its way from where it landed (E7, HitFx): a weapon's added
+                    // element in that element's shape on the star of the blow itself, anything else with its own star
+                    // (white, gold for a crit, red on oneself), larger for a crit or a finisher. Others' blows are fainter.
+                    float blowWay = away.sqrMagnitude > 1e-4f ? Mathf.Atan2(away.y, away.x) * Mathf.Rad2Deg : 90;
+                    float blowAlpha = hurtsMe || e.Source == _client.PlayerId ? 1 : OthersFxAlpha + 0.2f;
+                    if (element != SkillTag.None) AddHitFx(landed, HitElementOf(element), HitFx.RampOf(HitElementOf(element)), null, blowWay, e.Critical, blowAlpha);
+                    else
+                    {
+                        var (made, ramp) = HitLookOf(e.Source, hitter);
+                        AddHitFx(landed, made, ramp, hurtsMe ? FxRamp.Danger : e.Critical ? FxRamp.Gold : FxRamp.Steel, blowWay, heavy || e.Critical, blowAlpha);
+                    }
                     if (hurtsMe)
                     {
                         // Who struck, for the fallen card (U7): a boss's or monster's name, another player's.
@@ -2694,6 +2713,7 @@ namespace Game.Client
             var skill = _client.SkillNamed(e.Target) ?? _client.SkillOf(e.Source, e.Amount);
             var caster = Find(e.Source);
             if (skill == null || caster == null) return;
+            _castTags[e.Source] = (skill.Tags | skill.Grants, Time.time);
             var color = Palette.Of(skill.Tags | skill.Grants | GrantedTags(e.Source));
             _floating.Add(new Floating { Position = caster.Position + new Vector3(0, 0.4f, 0), Text = skill.Name, Color = color });
             // Each skill its own sound (SoundArt.Skill). One without: its kind's, cold skills ringing like ice, and the

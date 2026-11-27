@@ -50,6 +50,12 @@ namespace Game.Client
                 return ShotPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "shot"),
                     TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "hitfx")
+            {
+                // --only hitfx: what a blow looks like on the body it lands on, by element (out/hitfx/, HitFxPreview, E7).
+                return HitFxPreview.Write(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out", "hitfx"),
+                    TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "bossfx")
             {
                 // --only bossfx: the bosses' own effects over their blows' shapes (out/bossfx/, BossFxPreview, E6).

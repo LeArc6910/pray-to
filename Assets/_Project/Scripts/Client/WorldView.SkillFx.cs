@@ -347,6 +347,7 @@ namespace Game.Client
                     if (pair.Value != 0 && _others.TryGetValue(pair.Key, out var body)) BuffCues(body, pair.Key, pair.Value, false);
                 }
             }
+            UpdateHitFx(deltaTime);
             for (int i = _fxUsed; i < _fxPool.Count; i++)
             {
                 if (_fxPool[i].enabled) _fxPool[i].enabled = false;

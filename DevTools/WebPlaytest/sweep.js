@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3094,6 +3094,88 @@ async function bossfx(browser) {
   check(small.bossFx >= 4 && small.bossFxPieces <= 72, `휴대폰 세로에서도 고유 이펙트가 놓인다 (${small.bossFx}개, 가장 많은 것 ${small.bossFxPieces}조각)`);
   await phone.shot('bossfx-phone', '휴대폰 세로: 여왕의 광선·결정, 모르그의 불 고리·베기 0.14초');
   await phone.send('fxhold off; warn clear; monsters go');
+  await phone.context.close();
+}
+
+// ---------------------------------------------------------------- 타격 이펙트와 피해 숫자 (이펙트 개편 E7, Docs/EffectsRework.md 12절)
+// Blows put beside the player by hand ('hit <element> ...', WorldView.HitFx.cs) and held at a moment for each picture:
+// every element's pieces (ordinary above, strong below), numbers off one body side by side, a crowd struck at once,
+// then real blows on slimes and the 'impact' switch.
+const HitElements = ['plain', 'fire', 'cold', 'bolt', 'poison', 'crystal', 'sand', 'stone', 'water', 'void'];
+const HitNumbers = 'hit plain -4 1.5 0 12; hit fire -4 1.5 0 5 added; hit plain -4 1.5 0 31 strong; hit cold -4 1.5 0 4 added; hit bolt -4 1.5 0 3 added';
+
+async function hits(browser) {
+  note('\n## 타격 이펙트와 피해 숫자 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 12, 7);
+  await game.send('monsters hold; heal; face 1 0');
+  const table = HitElements.map((e, i) => `hit ${e} ${-6.75 + i * 1.5} 2.5 0; hit ${e} ${-6.75 + i * 1.5} -2.5 0 0 strong`).join('; ');
+  await game.send('fxhold 0.08; ' + table);
+  await game.wait(300);
+  let st = await game.state();
+  check(st.hitFx === 20, `원소 열 가지의 타격이 보통·강하게 놓인다 (${st.hitFx}개)`);
+  check(st.hitFxPieces > 0 && st.hitFxPieces <= 12, `타격 하나의 조각이 한도 안 (${st.hitFxPieces}조각, 한도 12)`);
+  check(st.skillFxLights <= 12, `바닥 빛이 화면 한도 안 (${st.skillFxLights}개, 한도 12)`);
+  await game.shot('hits-elements-1', '원소별 타격 0.08초: 위 보통, 아래 강한 타격(금색 별). 왼쪽부터 ' + HitElements.join('·'));
+  await game.send('fxhold 0.2');
+  await game.wait(300);
+  await game.shot('hits-elements-2', '원소별 타격 0.2초');
+  await game.send('fxhold off');
+  check((await pollState(game, t => t.hitFx === 0, 2000)).hitFx === 0, '타격 이펙트는 멈춤을 풀면 곧 끝난다');
+
+  // Numbers: five off one body, one on oneself, a crit alone.
+  await game.send(`fxhold 0.2; ${HitNumbers}; hit plain 0 2 180 9 mine; hit plain 4 1.5 0 128 strong; hit plain 4 -1.5 0 7`);
+  await game.wait(300);
+  st = await game.state();
+  check(st.numbers === 8 && st.numberSlots === 5, `한 몸에서 나온 숫자 다섯이 옆으로 벌려 선다 (숫자 ${st.numbers}개, 자리 ${st.numberSlots})`);
+  await game.shot('hits-numbers', '피해 숫자 0.2초: 왼쪽 한 몸에서 다섯(보통·불·치명타·냉기·번개), 가운데 내가 맞음(빨강), 오른쪽 치명타와 보통');
+  await game.send('fxhold off');
+  await pollState(game, t => t.numbers === 0, 2500);
+
+  // A crowd struck at once.
+  const crowd = [];
+  for (let i = 0; i < 40; i++) crowd.push(`hit ${HitElements[i % 4]} ${-5.6 + (i % 8) * 1.6} ${3 - Math.floor(i / 8) * 1.5} 0 ${6 + i}${i % 7 === 0 ? ' strong' : ''}`);
+  await game.send('fxhold 0.1; ' + crowd.join('; '));
+  await game.wait(300);
+  st = await game.state();
+  check(st.hitFx > 0 && st.hitFx <= 36 && st.hitFxAll <= 420, `마흔 대가 한꺼번에 들어가도 한도 안 (이펙트 ${st.hitFx}개, 조각 ${st.hitFxAll}, 화면 한도 420)`);
+  check(st.skillFxLights <= 12, `한꺼번에 맞을 때의 바닥 빛 (${st.skillFxLights}개, 한도 12)`);
+  await game.shot('hits-crowd', '마흔 대가 한꺼번에 0.1초(뒤에 놓인 것은 조각이 절반)');
+  await game.send('fxhold off');
+  await pollState(game, t => t.hitFx === 0 && t.numbers === 0, 2500);
+
+  // Real blows.
+  await game.send('monsters go; spawn slime 1.3 0 5000; spawn slime 1.5 0.8 5000; spawn slime 1.5 -0.8 5000; attack on 1 0');
+  const struck = await pollState(game, t => t.hitFx > 0 && t.numbers > 0, 5000);
+  check(struck.hitFx > 0 && struck.numbers > 0, `슬라임을 치면 타격 이펙트와 숫자가 나온다 (이펙트 ${struck.hitFx}개, 숫자 ${struck.numbers}개)`);
+  await game.shot('hits-real', '슬라임 셋을 칼로 치는 중');
+  await game.send('feel impact off');
+  await game.wait(700);
+  st = await game.state();
+  check(st.hitFx === 0 && st.numbers > 0, `손맛 스위치 '별'을 끄면 타격 이펙트가 꺼지고 숫자는 남는다 (이펙트 ${st.hitFx}개, 숫자 ${st.numbers}개)`);
+  await game.send('feel impact on; feel numbers off');
+  await game.wait(1000);
+  st = await game.state();
+  check(st.numbers === 0, `'숫자'를 끄면 숫자가 꺼진다 (${st.numbers}개)`);
+  await game.send('feel numbers on; attack off; clear');
+  await game.context.close();
+
+  note('\n## 타격 이펙트와 피해 숫자 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 9, 6);
+  await phone.send('monsters hold; heal; face 1 0; fxhold 0.14; ' + HitElements.map((e, i) => `hit ${e} ${-2.4 + (i % 5) * 1.2} ${i < 5 ? 5 : 3.6} 0 0${i % 2 ? ' strong' : ''}`).join('; ') +
+    '; ' + HitNumbers.replace(/-4 1\.5/g, '0 -3') + '; hit plain -1.5 1.5 180 9 mine; hit plain 1.5 1.5 0 128 strong');
+  await phone.wait(300);
+  const small = await phone.state();
+  check(small.hitFx >= 10 && small.numberSlots === 5, `휴대폰 세로에서도 타격과 숫자가 놓인다 (이펙트 ${small.hitFx}개, 숫자 ${small.numbers}개, 자리 ${small.numberSlots})`);
+  await phone.shot('hits-phone', '휴대폰 세로: 위 원소별 타격 0.14초, 가운데 빨강(내가 맞음)과 치명타, 아래 한 몸의 숫자 다섯');
+  await phone.send('fxhold off; monsters go');
   await phone.context.close();
 }
 
@@ -8512,7 +8594,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

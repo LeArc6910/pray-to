@@ -972,6 +972,48 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Blows on the bodies they land on and their numbers (E7, Docs/EffectsRework.md 12): each element's own pieces
+        // within the pieces a blow may have, a crowd struck at once within the screen's, and numbers off one body
+        // standing side by side.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator BlowsLandInTheirElementAndNumbersStandApart()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var view = _root.View;
+            Feel.SkillFxHold = 0.08f;
+            for (int i = 0; i < HitFx.Elements; i++)
+            {
+                view.StageHit((HitElement)i, Player.Position + new Vec2(-6.75f + i * 1.5f, 2.5f), 0, false, 0, false, false);
+                view.StageHit((HitElement)i, Player.Position + new Vec2(-6.75f + i * 1.5f, -2.5f), 0, true, 0, false, false);
+            }
+            yield return new WaitForSecondsRealtime(0.25f);
+            Assert.AreEqual(2 * HitFx.Elements, _root.HitFxCount, "Each blow lays an effect.");
+            Assert.That(_root.HitFxPieces, Is.InRange(1, HitFx.Most), "A blow stays within its pieces.");
+            yield return Screens.Take("hits-elements");
+            Feel.SkillFxHold = -1;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.AreEqual(0, _root.HitFxCount, "The effects end.");
+            Feel.SkillFxHold = 0.2f;
+            var body = Player.Position + new Vec2(-3, 1.5f);
+            view.StageHit(HitElement.Plain, body, 0, false, 12, false, false);
+            view.StageHit(HitElement.Fire, body, 0, false, 5, true, false);
+            view.StageHit(HitElement.Plain, body, 0, true, 31, false, false);
+            view.StageHit(HitElement.Cold, body, 0, false, 4, true, false);
+            view.StageHit(HitElement.Bolt, body, 0, false, 3, true, false);
+            view.StageHit(HitElement.Plain, Player.Position + new Vec2(3, 1.5f), 180, false, 9, false, true);
+            for (int i = 0; i < 24; i++) view.StageHit(HitElement.Fire, Player.Position + new Vec2(-5.5f + i % 8 * 1.5f, -1.5f - i / 8 * 1.2f), 0, false, 7 + i, false, false);
+            yield return new WaitForSecondsRealtime(0.35f);
+            Assert.AreEqual(5, _root.NumberSlots, "Five numbers off one body take five places.");
+            Assert.That(_root.HitFxAll, Is.InRange(1, 420), "A crowd struck at once stays within the screen's pieces.");
+            yield return Screens.Take("hits-numbers");
+            Feel.SkillFxHold = -1;
+            yield return new WaitForSecondsRealtime(1f);
+            Assert.AreEqual(0, _root.NumbersShown, "The numbers end.");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // A pack notices together (2026-11-22, Docs/WorldRework.md 무리): five slimes as one pack, most further off than
         // they see; one notices the player and the rest come too, each with a mark over its head.
         [UnityTest, Category(Screens.Category)]
