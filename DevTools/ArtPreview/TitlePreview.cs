@@ -21,6 +21,7 @@ namespace Game.Client
             string folder = Directory.CreateDirectory(Path.Combine(output, "title")).FullName;
             bool ok = Looks(Path.Combine(folder, "looks.png"));
             Moves(Path.Combine(folder, "looks_moves.png"));
+            Genders(Path.Combine(folder, "gender.png"));
             LogoSheet(folder);
             Buttons(Path.Combine(folder, "buttons.png"));
             BiomeIcons(Path.Combine(folder, "biome_icons.png"));
@@ -290,6 +291,49 @@ namespace Game.Client
                     var (move, weapon, frame, view) = columns[c];
                     var image = HeroArt.Draw(view, move, frame, HeroGear.Plain(weapon), styles[row]);
                     Over(g, image, 4 + c * cell + cell / 2 - HeroArt.FeetX, 14 + row * cell + cell - 4 - HeroArt.FeetY);
+                }
+            }
+            Png.Save(g.Times(3), path);
+        }
+
+        // Man and woman side by side (Docs/Gender.md): each gender's start in the five views, the same colours both ways,
+        // each in the other's start hair, and both through a walk, the three weapons' blows, a roll and a fall.
+        static void Genders(string path)
+        {
+            const int cell = 40;
+            var looks = new[]
+            {
+                ("MAN, START", CharacterLook.DefaultOf(CharacterLook.Male)),
+                ("WOMAN, START", CharacterLook.DefaultOf(CharacterLook.Female)),
+                ("MAN, LONG HAIR", new CharacterLook(1, 0, 1, 0, 0, 0, CharacterLook.Male)),
+                ("WOMAN, SHORT HAIR", new CharacterLook(0, 0, 1, 0, 0, 0, CharacterLook.Female)),
+                ("MAN, SPIKY", new CharacterLook(3, 3, 3, 2, 5, 1, CharacterLook.Male)),
+                ("WOMAN, PIGTAILS", new CharacterLook(5, 3, 3, 2, 5, 1, CharacterLook.Female)),
+                ("MAN, TIED", new CharacterLook(2, 2, 0, 3, 1, 4, CharacterLook.Male)),
+                ("WOMAN, BUN", new CharacterLook(7, 2, 0, 3, 1, 4, CharacterLook.Female)),
+            };
+            var views = new[] { Look.Down, Look.DownSide, Look.Side, Look.UpSide, Look.Up };
+            var columns = new List<(HeroMove Move, HeroWeapon Weapon, int Frame, Look View)>();
+            foreach (var view in views) columns.Add((HeroMove.Stand, HeroWeapon.None, 0, view));
+            foreach (int f in new[] { 1, 4 }) columns.Add((HeroMove.Walk, HeroWeapon.None, f, Look.DownSide));
+            foreach (var weapon in new[] { HeroWeapon.Sword, HeroWeapon.Bow, HeroWeapon.Staff })
+                columns.Add((HeroMove.Attack1, weapon, Math.Max(0, HeroArt.StrikeFrame(HeroMove.Attack1, weapon)), Look.DownSide));
+            columns.Add((HeroMove.Attack3, HeroWeapon.Sword, Math.Max(0, HeroArt.StrikeFrame(HeroMove.Attack3, HeroWeapon.Sword)), Look.Side));
+            columns.Add((HeroMove.Roll, HeroWeapon.Sword, 5, Look.Side));
+            columns.Add((HeroMove.Fall, HeroWeapon.None, HeroArt.FramesOf(HeroMove.Fall, HeroWeapon.None) - 1, Look.Down));
+            var g = new PixelImage(columns.Count * cell + 8, looks.Length * (cell + 8) + 14);
+            g.Fill(0, 0, g.Width, g.Height, Back);
+            g.Small(4, 4, "GENDER: FIVE VIEWS, WALK x2, SWORD / BOW / STAFF BLOW, SWEEP, ROLL, DOWN", Text, Back);
+            for (int row = 0; row < looks.Length; row++)
+            {
+                int top = 14 + row * (cell + 8);
+                g.Small(4, top, looks[row].Item1, Dim, Back);
+                g.Fill(4, top + 8 + cell - 5, g.Width - 8, 3, Ground);
+                for (int c = 0; c < columns.Count; c++)
+                {
+                    var (move, weapon, frame, view) = columns[c];
+                    var image = HeroArt.Draw(view, move, frame, HeroGear.Plain(weapon), looks[row].Item2);
+                    Over(g, image, 4 + c * cell + cell / 2 - HeroArt.FeetX, top + 8 + cell - 4 - HeroArt.FeetY);
                 }
             }
             Png.Save(g.Times(3), path);
