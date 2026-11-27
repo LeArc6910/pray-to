@@ -721,9 +721,13 @@ namespace Game.Client
                     Gather(o, FxRamp.Spirit, t, A, circle * 0.5f, 6, seed, cy: 2);
                     // The rune circle opens on the ground, turns, and fades.
                     Ring(o, FxRamp.Spirit, t, 0.04f, circle / 2f, 1, 0.1f, 0.14f, ground: true);
+                    FxLayers.Shock(o, FxRamp.Spirit, t, 0.04f, circle / 2.6f, 0, 0, 0.24f, true);
+                    if (In(t, 0.08f, 0.9f)) FxLayers.Light(o, FxRamp.Spirit, circle * 0.9f, 0.7f * U(t, 0.08f, 0.16f) * (1 - U(t, 0.55f, 0.9f)));
                     if (In(t, 0.14f, 0.85f))
                     {
                         float alpha = 0.9f * (1 - U(t, 0.55f, 0.85f));
+                        // The floor inside the circle takes the spirits' colour while it is open.
+                        Put(o, FxShape.Wash, FxRamp.Spirit, SkillFxArt.Step4(circle), seed & 3, 0, 0, alpha, 0, true);
                         Put(o, FxShape.Rune, FxRamp.Spirit, circle, (int)(t * 16) % 16, 0, 0, alpha, 0, true);
                         if (skill == "guardian") Put(o, FxShape.Broken, FxRamp.Spirit, circle + 8, SkillFxArt.BrokenFrame(1, 6, (int)(t * 8)), 0, 0, alpha, 0, true);
                     }
@@ -743,6 +747,8 @@ namespace Game.Client
                         for (int i = 0; i < 6; i++) Put(o, FxShape.Streak, FxRamp.Spirit, 10, 1, Cos(i * 60 + 30) * 16, Sin(i * 60 + 30) * 10 + 26 * u, 1 - u, 90);
                     }
                     Float(o, FxShape.Dot, FxRamp.Spirit, 1, 2, 6 + 2 * count, t, 0.3f, 0.95f, circle * 0.45f, 16, seed);
+                    // Sparks where the wisps arrive.
+                    FxLayers.Embers(o, FxRamp.Spirit, 3 + count, t, 0.48f, 14, seed, 0, 10, life: 0.22f);
                     return 0.95f;
                 }
                 case "spirit_pact":
@@ -768,7 +774,9 @@ namespace Game.Client
                         if (In(t, A, 0.6f)) Put(o, FxShape.Rune, FxRamp.Spirit, 28, (int)(t * 16) % 16, 0, 0, 0.9f * (1 - U(t, 0.4f, 0.6f)), 0, true);
                     }
                     Ring(o, FxRamp.Spirit, t, A, 11, 1, 0.06f, 0.2f, cy: Body);
+                    FxLayers.Embers(o, FxRamp.Spirit, 4, t, A, 12, seed, 0, Body, life: 0.2f);
                     Float(o, FxShape.Dot, FxRamp.Spirit, 1, 2, 6, t, 0.35f, 0.8f, 10, 14, seed, cy: 4);
+                    if (In(t, A, 0.55f)) FxLayers.Light(o, FxRamp.Spirit, 32, 0.65f * (1 - U(t, 0.3f, 0.55f)), 0, Body);
                     return 0.8f;
                 }
                 case "life_spring":
@@ -776,6 +784,9 @@ namespace Game.Client
                     // A fountain: motes and plus signs thrown up from the feet, spreading as they slow, a ring on the ground.
                     Gather(o, FxRamp.Heal, t, A, 20, 6, seed, cy: 2);
                     Ring(o, FxRamp.Heal, t, A, 13, 2, 0.1f, 0.3f, ground: true);
+                    FxLayers.Shock(o, FxRamp.Heal, t, A, 12, 0, 0, 0.28f, true);
+                    if (In(t, A, 0.85f)) Put(o, FxShape.Wash, FxRamp.Heal, 32, seed & 3, 0, 0, U(t, A, A + 0.1f) * U(0.85f - t, 0, 0.3f), 0, true);
+                    if (In(t, A, 0.8f)) FxLayers.Light(o, FxRamp.Heal, 38, 0.7f * (1 - U(t, 0.45f, 0.8f)), 0, 4);
                     if (In(t, A, 0.62f))
                     {
                         for (int i = 0; i < 14; i++)
@@ -803,7 +814,14 @@ namespace Game.Client
                             Put(o, FxShape.Wisp, FxRamp.Spirit, 5, (int)(t * 12) + i, Cos(angle) * distance, 4 + Sin(angle) * distance, 0.5f + 0.5f * u, angle + 180 + 40);
                         }
                     }
-                    if (In(t, lead, 0.38f)) Put(o, FxShape.Blob, FxRamp.Spirit, 22, (int)(U(t, lead, 0.38f) * 5.99f), 0, 4);
+                    // The spirits' own blast: a ball that swells and hollows, a wave to the true reach, the floor left
+                    // in their colour a moment, sparks; no smoke and no soot.
+                    Floor(o, FxRamp.Spirit, 0, t, lead, 0.85f, R, seed);
+                    if (In(t, lead, lead + 0.08f)) FxLayers.Light(o, FxRamp.Spirit, R * 1.6f, 1, 0, 0, 3);
+                    if (In(t, lead, 0.7f)) FxLayers.Light(o, FxRamp.Spirit, R * 1.7f, 0.85f * (1 - U(t, 0.3f, 0.7f)));
+                    FxLayers.Ball(o, FxRamp.Spirit, t, lead, R * 0.4f, seed, 0, 4);
+                    FxLayers.Shock(o, FxRamp.Spirit, t, lead, R / 1.3f, life: 0.3f);
+                    FxLayers.Embers(o, FxRamp.Spirit, 10, t, lead, R * 0.8f, seed, life: 0.36f);
                     Ring(o, FxRamp.Spirit, t, lead, R, 3, 0.13f, 0.36f);
                     Fly(o, FxShape.Wisp, FxRamp.Spirit, 5, 0, 8, t, lead, 0.3f, 6, R * 1.05f, seed, aimed: true, cy: 2);
                     Float(o, FxShape.Dot, FxRamp.Spirit, 1, 2, 12, t, 0.34f, 0.85f, R * 0.9f, 12, seed);
