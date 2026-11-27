@@ -421,8 +421,8 @@ namespace Game.Client
         bool VeinEaterLanded(HazardState hazard)
         {
             if (SamuraiLanded(hazard)) return true;
-            var attack = AttackOf(hazard);
-            if (attack == null || _bossInView.Id != "vein_eater") return false;
+            var attack = BlowAttack(hazard, "vein_eater");
+            if (attack == null) return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             var c = new BossContext { Ramp = FxRamp.Dust, Dir = hazard.Direction.Angle * Mathf.Rad2Deg, Size = hazard.Size * Ppu, Width = hazard.Width };

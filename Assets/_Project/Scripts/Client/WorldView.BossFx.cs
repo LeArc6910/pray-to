@@ -39,6 +39,20 @@ namespace Game.Client
             return attack == null || _bossInView == null ? (null, null) : (_bossInView.Id, attack.Id);
         }
 
+        // The attack a blow is when it is this boss's, else null: the boss in view's, or what a staged warning was laid
+        // as (the playtest's 'warn … <boss> <attack>', so the vein eater's and the knight's blows can be laid by name
+        // with no boss about, F3).
+        BossAttack BlowAttack(HazardState hazard, string boss)
+        {
+            if (hazard.Id >= StagedIds)
+            {
+                var (staged, id) = BlowOf(hazard);
+                return staged == boss ? _client.BossAttackOf(staged, id) : null;
+            }
+            var attack = AttackOf(hazard);
+            return attack != null && _bossInView.Id == boss ? attack : null;
+        }
+
         void AddBossFx(BossFx fx, Vector3 at, BossContext context)
         {
             if (_bossFx.Count >= FxMostAlive) return;

@@ -242,8 +242,8 @@ namespace Game.Client
         // Where one of the knight's blows lands, a burst of its own; false for anyone else's.
         bool KnightLanded(HazardState hazard)
         {
-            var attack = AttackOf(hazard);
-            if (attack == null || _bossInView.Id != "black_knight") return false;
+            var attack = BlowAttack(hazard, "black_knight");
+            if (attack == null) return false;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             bool strong = attack.Warning == AttackWarning.Strong;

@@ -952,6 +952,10 @@ namespace Game.Core
         // The step the person gives this player now, if any.
         public (StoryStep Step, bool Taken)? StepGivenBy(CharacterDefinition who) =>
             who == null ? null : Story?.GivenBy(who, JourneyStep, JourneyTaken, SideSteps, SideTaken);
+        // A boss's attack by their ids in the sheet, or null.
+        public BossAttack BossAttackOf(string boss, string attack) =>
+            _bosses?.Bosses.FirstOrDefault(b => b.Id == boss)?.Attacks.FirstOrDefault(a => a.Id == attack);
+
         public string BossName(string id) => _bosses?.Bosses.FirstOrDefault(b => b.Id == id)?.Name ?? id;
         public PlaceSite SiteOf(PlaceDefinition place) => place == null ? null : Places.FirstOrDefault(p => p.Definition == place);
         public (CharacterDefinition Character, Vec2 At)? CharacterNear() => World.CharacterNear(Places, Position, Clock, dayMinutes: DayMinutes);
