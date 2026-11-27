@@ -47,7 +47,7 @@ namespace Game.Core
 
         // Host and client must run the same rules and sheets, so a different version is refused (Docs/CrossPlay.md 버전 정책:
         // every change to the rules, the sheets or a message goes up; PC, phone and web of the same version play together).
-        public const string Version = "0.112.0";
+        public const string Version = "0.113.0";
 
         // Why a joiner of another version is refused, and who has to update: the older side.
         public static string VersionRefusal(string theirs)
@@ -1175,8 +1175,10 @@ namespace Game.Core
     // or for a player which skill slots have a buff running (bit 0 for slot 0).
     public readonly struct EntityState
     {
-        public EntityState(int id, EntityKind kind, int type, Vec2 position, Vec2 facing, float health, float maxHealth, byte state, int phase = 0, int elite = 0)
+        public EntityState(int id, EntityKind kind, int type, Vec2 position, Vec2 facing, float health, float maxHealth, byte state, int phase = 0, int elite = 0,
+            int aim = 0)
         {
+            Aim = aim;
             Elite = elite;
             Id = id;
             Kind = kind;
@@ -1204,14 +1206,21 @@ namespace Game.Core
         public int Elite { get; }
         public bool IsDead => Health <= 0;
 
-        public EntityState WithElite(int elite) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, elite);
+        // Where its shots will go, known before they fly (0.113.0); 0 for none. A boss winding up a burst or spiral all
+        // the way round: the settled start plus one (World.BossAim, World.AimSteps to a turn). A monster about to
+        // loose single shots: the id of the player they are aimed at (World.EnemyAim).
+        public int Aim { get; }
+
+        public EntityState WithElite(int elite) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, elite, Aim);
+        public EntityState WithAim(int aim) => new EntityState(Id, Kind, Type, Position, Facing, Health, MaxHealth, State, Phase, Elite, aim);
     }
 
     // Clients move projectiles on by their velocity between snapshots, so they are drawn where they really are.
     public readonly struct ProjectileState
     {
-        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius, bool friendly = false, SkillTag tags = SkillTag.None)
+        public ProjectileState(int id, Vec2 position, Vec2 velocity, float radius, bool friendly = false, SkillTag tags = SkillTag.None, int ticksLeft = 0)
         {
+            TicksLeft = Math.Clamp(ticksLeft, 0, 255);
             Id = id;
             Position = position;
             Velocity = velocity;
@@ -1227,6 +1236,9 @@ namespace Game.Core
         // A player's, and the tags it hits with, which is all the screen needs to colour and shape it.
         public bool Friendly { get; }
         public SkillTag Tags { get; }
+        // A player's: the ticks of flight it has left (up to 255), so a client can work out where it will end
+        // (World.Landing); 0 for an enemy's.
+        public int TicksLeft { get; }
     }
 
     // A telegraphed area. TicksLeft counts from the snapshot's tick to when it lands, out of Duration in all.
@@ -1451,6 +1463,14 @@ namespace Game.Core
                 w.Write((byte)(Entities[i].Elite >> 8));
                 w.Write((byte)Entities[i].Elite);
             }
+            // And the few that are aiming (EntityState.Aim), the same way.
+            var aiming = Enumerable.Range(0, Entities.Count).Where(i => Entities[i].Aim != 0).ToList();
+            w.Write((byte)Math.Min(aiming.Count, 255));
+            foreach (int i in aiming.Take(255))
+            {
+                w.Write((ushort)i);
+                w.Write(Entities[i].Aim);
+            }
 
             w.Write((ushort)Projectiles.Count);
             foreach (var projectile in Projectiles)
@@ -1461,6 +1481,7 @@ namespace Game.Core
                 w.Write((byte)Math.Clamp((int)MathF.Round(projectile.Radius * 32), 0, 255));
                 // The seven tags fit under the top bit, which says whose it is.
                 w.Write((byte)((projectile.Friendly ? 0x80 : 0) | ((int)projectile.Tags & 0x7f)));
+                w.Write((byte)projectile.TicksLeft);
             }
 
             w.Write((ushort)Hazards.Count);
@@ -1488,9 +1509,11 @@ namespace Game.Core
                 if (SimEvent.HasPosition(e.Type)) w.WriteNear(e.Position, Self.Position);
                 else w.Write(e.Target);
                 w.Write((short)Math.Clamp(e.Amount, short.MinValue, short.MaxValue));
-                // A crit in the low bit; for a weapon's elemental hit (World.ElementalCause) the element's place + 1 above it.
+                // A crit in the low bit; for a weapon's elemental hit (World.ElementalCause) the element's place + 1 in
+                // the two bits above it; above those the elements a player's hit struck with (World.ElementBits).
                 int element = e.Type == SimEventType.Hit && World.ElementOfCause(e.Cause) != SkillTag.None ? e.Cause - World.ElementalCause + 1 : 0;
-                w.Write((byte)((e.Critical ? 1 : 0) | element << 1));
+                int struck = e.Type == SimEventType.Hit ? World.ElementBits(e.Tags) : 0;
+                w.Write((byte)((e.Critical ? 1 : 0) | (element & 3) << 1 | struck << 3));
                 w.Write(Protocol.PackDirection(e.Direction));
             }
         });
@@ -1552,6 +1575,12 @@ namespace Game.Core
                 int affixes = r.ReadByte();
                 if (index < entities.Count) entities[index] = entities[index].WithElite(rank << 8 | affixes);
             }
+            for (int aiming = r.ReadByte(); aiming > 0; aiming--)
+            {
+                int index = r.ReadUInt16();
+                int aim = r.ReadInt32();
+                if (index < entities.Count) entities[index] = entities[index].WithAim(aim);
+            }
 
             int projectileCount = r.ReadUInt16();
             var projectiles = new List<ProjectileState>(projectileCount);
@@ -1562,7 +1591,8 @@ namespace Game.Core
                 var velocity = r.ReadCompact();
                 float radius = r.ReadByte() / 32f;
                 byte owner = r.ReadByte();
-                projectiles.Add(new ProjectileState(id, at, velocity, radius, (owner & 0x80) != 0, (SkillTag)(owner & 0x7f)));
+                int ticksLeft = r.ReadByte();
+                projectiles.Add(new ProjectileState(id, at, velocity, radius, (owner & 0x80) != 0, (SkillTag)(owner & 0x7f), ticksLeft));
             }
 
             int hazardCount = r.ReadUInt16();
@@ -1595,8 +1625,9 @@ namespace Game.Core
                 int amount = r.ReadInt16();
                 int flags = r.ReadByte();
                 bool critical = (flags & 1) != 0;
-                int cause = flags >> 1 > 0 ? World.ElementalCause + (flags >> 1) - 1 : 0;
-                events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), cause, position: at));
+                int cause = (flags >> 1 & 3) > 0 ? World.ElementalCause + (flags >> 1 & 3) - 1 : 0;
+                events.Add(new SimEvent(type, source, target, amount, critical, Protocol.UnpackDirection(r.ReadByte()), cause, position: at,
+                    tags: World.ElementsFromBits(flags >> 3)));
             }
             return new SnapshotMessage(tick, self, entities, projectiles, hazards, events, clock, sleepers, rift, defense, dayMinutes);
         });

@@ -2239,8 +2239,13 @@ namespace Game.Client
                     if (element != SkillTag.None) AddHitFx(landed, HitElementOf(element), HitFx.RampOf(HitElementOf(element)), null, blowWay, e.Critical, blowAlpha);
                     else
                     {
-                        var (made, ramp) = HitLookOf(e.Source, hitter);
+                        var (made, ramp) = HitLookOf(e.Source, hitter, e.Tags);
                         AddHitFx(landed, made, ramp, hurtsMe ? FxRamp.Danger : e.Critical ? FxRamp.Gold : FxRamp.Steel, blowWay, heavy || e.Critical, blowAlpha);
+                        if (e.Tags != SkillTag.None)
+                        {
+                            LastHitElement = made;
+                            NamedHits++;
+                        }
                     }
                     if (hurtsMe)
                     {
@@ -2658,6 +2663,8 @@ namespace Game.Client
                     var burst = _client.SkillOf(e.Source, e.Amount);
                     if (burst == null) break;
                     var at = new Vector3(e.Position.X, e.Position.Y, 0);
+                    LastSkillBurst = e.Position;
+                    SkillBursts++;
                     if (HasSkillFx(burst)) ShowBurstFx(burst, at, e.Source == _client.PlayerId);
                     else AddFlash(at, Mathf.Max(0.4f, burst.Radius), Palette.Of(burst.Tags | GrantedTags(e.Source)), FlashKind.Burst);
                     if (Vector3.Distance(at, _self.Position) < ShakeRange) _shake = Mathf.Max(_shake, 0.08f);

@@ -27,6 +27,29 @@ namespace Game.Core
 
         // The boss's phase for the wire with the attack it is on (its place in the sheet, plus one) above it, so the
         // view can draw that attack's own wind-up (2026-11-12). An attack past the fifteenth is sent as none.
+        // A burst or a spiral all the way round starts at an angle no screen could know: it was rolled as the shots
+        // left. It is settled as the wind-up begins instead (StartTelegraph) and sent with the boss while it winds up,
+        // in AimSteps to a turn, so the lines drawn before the shots are the ways the shots go. The roll comes from a
+        // stream of its own (the world's seed, the tick and the boss), and Unleash still draws the number it used to
+        // draw there and throws it away, so nothing else in the world rolls differently for it.
+        public const int AimSteps = 1024;
+
+        public static float AimAngle(int step) => step * (2 * MathF.PI / AimSteps);
+
+        // Whether the attack's shots start at a rolled angle: all the way round, as a burst, a spiral, or the rocks a
+        // burrow or a leap flings.
+        public static bool AimsRound(BossAttack attack) =>
+            attack != null && attack.Count > 0 && (attack.Shape == AttackShape.Spiral
+                || attack.Shape == AttackShape.Burst && !(attack.Angle > 0 && attack.Angle < 360)
+                || attack.Shape == AttackShape.Burrow || attack.Shape == AttackShape.Leap);
+
+        // For the wire: the settled start plus one while the boss winds up a burst or a spiral all the way round; 0
+        // otherwise. (A burrow's or a leap's rocks leave from where it comes down, not from where it is seen winding
+        // up, so no lines are drawn for those and nothing is sent.)
+        public static int BossAim(Boss boss) =>
+            boss.State == BossState.Telegraph && AimsRound(boss.Attack) && (boss.Attack.Shape == AttackShape.Burst || boss.Attack.Shape == AttackShape.Spiral)
+                ? boss.AimStep + 1 : 0;
+
         public static int BossPhaseField(Boss boss)
         {
             // Coming in, the attack's place says which entrance it is: the whole one or the short one (EntranceWhole,
@@ -293,6 +316,7 @@ namespace Game.Core
             if (!again) boss.ChargesLeft = attack.Shape == AttackShape.Charge ? Math.Max(0, attack.Count - 1) : 0;
             long resolve = Tick + boss.StateTicks;
             int cause = Cause(boss, attack);
+            if (AimsRound(attack)) boss.AimStep = (int)(new GameRandom(_forageSeed + (ulong)Tick, stream: 40 + (ulong)boss.Id).NextUInt() % AimSteps);
 
             LayHazards(boss, attack, target, fighters, boss.Facing, resolve, cause);
             // Its follow-up (follow column) is marked now too and lands a moment after: one roll does not clear both.
@@ -448,7 +472,8 @@ namespace Game.Core
                     break;
                 case AttackShape.Spiral:
                     // The first volley now; the rest while the boss rests (UpdateBoss).
-                    boss.VolleyAngle = _random.NextFloat() * 2 * MathF.PI;
+                    _random.NextFloat();
+                    boss.VolleyAngle = AimAngle(boss.AimStep);
                     boss.VolleysLeft = Math.Max(1, (int)attack.Width) - 1;
                     boss.VolleyTicks = Ticks(SpiralSeconds);
                     Volley(boss, attack, boss.VolleyAngle);
@@ -497,7 +522,9 @@ namespace Game.Core
         {
             bool fan = attack.Angle > 0 && attack.Angle < 360;
             float spread = (fan ? attack.Angle : 360) * MathF.PI / 180f;
-            float start = fan ? boss.Facing.Angle - spread / 2 : _random.NextFloat() * 2 * MathF.PI;
+            // All the way round starts where the wind-up settled (AimStep); the roll once made here is still drawn.
+            if (!fan) _random.NextFloat();
+            float start = fan ? boss.Facing.Angle - spread / 2 : AimAngle(boss.AimStep);
             int gaps = fan ? Math.Max(1, attack.Count - 1) : attack.Count;
             for (int i = 0; i < attack.Count; i++)
             {
@@ -558,10 +585,10 @@ namespace Game.Core
             boss.Position = position;
         }
 
-        void DamageBoss(Boss boss, int source, int amount, bool critical, int cause = 0)
+        void DamageBoss(Boss boss, int source, int amount, bool critical, int cause = 0, SkillTag tags = SkillTag.None)
         {
             boss.Health -= amount;
-            _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical, cause: cause));
+            _events.Add(new SimEvent(SimEventType.Hit, source, boss.Id, amount, critical, cause: cause, tags: tags));
             if (boss.IsDead)
             {
                 ClearAttacksFrom(boss);

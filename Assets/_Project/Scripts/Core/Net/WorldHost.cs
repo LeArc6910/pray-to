@@ -777,7 +777,7 @@ namespace Game.Core
                 .Where(b => !b.IsDead && InView(b.Position, b.Definition.Radius))
                 .Select(b => new EntityState(
                     b.Id, EntityKind.Boss, IndexOf(_bosses?.Bosses, b.Definition), b.Position, b.Facing, b.Health, b.MaxHealth, World.BossStateByte(b),
-                    Protocol.WithStatus(World.BossPhaseField(b), b.Afflictions.Bits)));
+                    Protocol.WithStatus(World.BossPhaseField(b), b.Afflictions.Bits), aim: World.BossAim(b)));
             var minions = World.Minions
                 .Where(m => InView(m.Position))
                 .Select(m => new EntityState(
@@ -791,7 +791,7 @@ namespace Game.Core
                 .Take(Math.Max(0, _config.MaxEntitiesPerSnapshot - shownSoFar.Count))
                 .Select(e => new EntityState(
                     e.Id, EntityKind.Monster, IndexOf(_monsters.Monsters, e.Definition), e.Position, e.Facing, e.Health, e.MaxHealth, World.EnemyStateByte(e),
-                    Protocol.WithStatus(World.EnemyPhaseField(e), e.Afflictions.Bits), World.EliteField(e)));
+                    Protocol.WithStatus(World.EnemyPhaseField(e), e.Afflictions.Bits), World.EliteField(e), World.EnemyAim(e)));
             var drops = World.GroundLoot
                 .Where(l => InView(l.Position) && l.For(viewer.Id, World.Tick))
                 .OrderBy(l => Distance(l.Position))
@@ -814,7 +814,7 @@ namespace Game.Core
                 .Where(p => InView(p.Position))
                 .OrderBy(p => Distance(p.Position))
                 .Take(_config.MaxProjectilesPerSnapshot)
-                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly, p.Tags))
+                .Select(p => new ProjectileState(p.Id, p.Position, p.Velocity, p.Radius, p.Friendly, p.Tags, p.Friendly ? p.RemainingTicks : 0))
                 .ToList();
 
             // A monster's attack that starts at the monster is drawn from its state and the sheet, so its area is not

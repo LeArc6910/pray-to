@@ -388,3 +388,5 @@ dotnet run --project DevTools/CoreSandbox -- --hour 60 1,2,3,4,5,6,7,8
 ## 손맛 비교 GIF (2026-11-11)
 
 `node DevTools/WebPlaytest/feel.js --wait`는 배포된 웹 데모에서 슬라임을 때리는 장면을 손맛 조각(`Client/Feel.cs`)을 묶음마다 끄며 한 영상으로 찍고, ffmpeg로 잘라 `out/feel/`에 GIF로 남긴다(모두 켬, 흔들림·멈춤 끔, 별·번쩍임 끔, 밀림·내밀기 끔, 숫자 끔, 호 끔, 모두 끔, 켬과 끔을 나란히 한 `compare.gif`). 사람은 GIF로 조각마다 남길지 정한다(`Docs/Feel.md`).
+
+미리 알려 주는 것(2026-11-27, `Docs/EffectsRework.md` 14절)의 상태: `roundAim`(사방 조준선이 그려지는 동안 시작 각도, 없으면 -1)·`roundAimLast`, `enemyShotWays`(지금 그려진 적 탄의 방향들), `targetAims`·`targetAimWay`(한 발짜리 탄의 대상 조준선), `landingMark`(스킬 투사체가 떨어질 자리, 없으면 "-")·`lastBurst`·`skillBursts`, `namedHits`·`lastHitElement`(호스트가 원소를 알린 타격). `sweep.js`의 `shots`(보스 셋의 사방 조준선이 쏘기 전에 나오고 탄이 첫 줄을 따라간다, 사진 `shots-cave_warden-round-aim`·`shots-void_lord-round-aim`), `mobwarn`(수정 정령·공허 정령의 한 줄, 사진 `mobwarn-single-aim`), `layers`(유성이 표시한 자리에서 터진다, 벽 앞에 멈춘다, 사진 `layers-meteor-flight`·`layers-meteor-wall`), `hits`(8칸 밖 슬라임이 화염구에 맞으면 불 타격, 사진 `hits-skill-shot`)가 확인한다.

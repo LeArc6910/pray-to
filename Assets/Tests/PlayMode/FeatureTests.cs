@@ -770,6 +770,28 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // What the host says before it happens (0.113.0, Docs/EffectsRework.md 14절): a monster's single shot is aimed
+        // as it leaves, so the host names whom it is for and the dotted line goes to them while it winds up; once the
+        // shot is out the line is gone.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator ASingleShotIsLinedToItsTargetBeforeItFlies()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var wisp = Spawn("crystal_wisp", Player.Position + new Vec2(4, 1.5f));
+            wisp.MaxHealth = wisp.Health = 5000;
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.IsTrue(World.ForceAttack(wisp, "prism"));
+            yield return new WaitForSecondsRealtime(0.45f);
+            Assert.Greater(_root.View.TargetAimCount, 0, "A line to the player the shot is for.");
+            Assert.That(_root.AimDots, Is.InRange(1, 72));
+            yield return Screens.Take("foretold-single-aim");
+            yield return new WaitForSecondsRealtime(1f);
+            Assert.AreEqual(0, _root.View.TargetAimCount, "No line once the shot is out.");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // Ordinary monsters' warnings, shots and pools since the effects rework (E5 of Docs/EffectsRework.md,
         // WorldView.MonsterFx.cs): four wind up at once round the player. Each mark is a picture of its shape, the
         // fan of shots shows where it will fly, the shots fly as the enemy's shots do, the charge raises dust, and

@@ -146,20 +146,49 @@ namespace Game.Client
             }
         }
 
-        // Before a boss lets fly at someone, where each shot will go: only for a fan (boss_attacks.csv angle), which
-        // goes out round the way the boss faces from the moment it winds up (World.Burst). A burst or a spiral all
-        // round starts at an angle the host rolls as it fires, which no client can know; those get no lines.
+        // Before a boss lets fly, where each shot will go. A fan (boss_attacks.csv angle) goes out round the way the
+        // boss faces from the moment it winds up (World.Burst). A burst or a spiral all the way round starts at an
+        // angle the host settles as the wind-up begins and sends with the boss (EntityView.AimAngle, 0.113.0): one
+        // line a shot, evenly round from it. There can be thirty-two of those, so each line is as long as its share of
+        // the round's own dots allows (a storm's are short ticks at the boss's edge, a ring of eight reach far).
         void AimOf(Body body, EntityView view)
         {
             var attack = view.BossAttack;
-            if (view.BossState != BossState.Telegraph || attack == null || attack.Shape != AttackShape.Burst || attack.Angle <= 0 || attack.Angle >= 360) return;
+            if (view.BossState != BossState.Telegraph || attack == null) return;
             float progress = Mathf.Clamp01((Time.time - body.BossSince) / TelegraphOf(body, attack));
+            if (view.AimsRound && attack.Count > 0 && (attack.Shape == AttackShape.Burst || attack.Shape == AttackShape.Spiral))
+            {
+                // LayAim spreads count lines over the degrees given, centred on the way given: all round but the last gap.
+                float degrees = 360f * (attack.Count - 1) / attack.Count;
+                int each = Mathf.Clamp(MostRoundDots / attack.Count, 2, 8);
+                LayAim(view.Position, Vec2.FromAngle(view.AimAngle + degrees * Mathf.Deg2Rad / 2), view.Boss.Radius, degrees, attack.Count, progress,
+                    Mathf.Min(AimReach, 0.3f + each * AimStep), MostAimDots + MostRoundDots);
+                RoundAimDegrees = Mathf.Repeat(view.AimAngle * Mathf.Rad2Deg, 360);
+                _roundAimAt = Time.time;
+                return;
+            }
+            if (attack.Shape != AttackShape.Burst || attack.Angle <= 0 || attack.Angle >= 360) return;
             LayAim(view.Position, view.Facing, view.Boss.Radius, attack.Angle, attack.Count, progress);
+        }
+
+        // A burst all the way round has dots of its own past the others' (MostAimDots), so its lines never starve a fan's.
+        const int MostRoundDots = 96;
+        float _roundAimAt = -10;
+        // For the playtest: the angle (degrees, 0 to 360) the last round's first line was drawn at, and whether one is
+        // drawn now; and the ways (degrees) the enemy shots drawn now are flying.
+        public float RoundAimDegrees { get; private set; } = -1;
+        public bool RoundAimShown => Time.time - _roundAimAt < 0.1f;
+        public List<float> EnemyShotWays()
+        {
+            var ways = new List<float>();
+            foreach (var projectile in _client.Projectiles())
+                if (!projectile.Friendly && projectile.Velocity.LengthSquared > 0.01f) ways.Add(Mathf.Repeat(projectile.Velocity.Angle * Mathf.Rad2Deg, 360));
+            return ways;
         }
 
         // Dots out from the boss's edge, running outward and growing surer as the wind-up fills: unturned 3px dots, so
         // they stay crisp at any angle.
-        void LayAim(Vec2 at, Vec2 facing, float radius, float degrees, int count, float progress, float farthest = AimReach)
+        void LayAim(Vec2 at, Vec2 facing, float radius, float degrees, int count, float progress, float farthest = AimReach, int most = MostAimDots)
         {
             if (count <= 0 || facing.LengthSquared < 1e-6f) return;
             float spread = degrees * Mathf.Deg2Rad, start = facing.Angle - spread / 2;
@@ -170,7 +199,7 @@ namespace Game.Client
             for (int i = 0; i < count; i++)
             {
                 var way = Vec2.FromAngle(start + (count == 1 ? spread / 2 : spread * i / gaps));
-                for (float d = radius + 0.3f + march; d < radius + reach && _aimUsed < MostAimDots; d += AimStep)
+                for (float d = radius + 0.3f + march; d < radius + reach && _aimUsed < most; d += AimStep)
                 {
                     if (_aimUsed == _aimDots.Count)
                     {
@@ -195,6 +224,8 @@ namespace Game.Client
             for (int i = _aimUsed; i < _aimDots.Count; i++) _aimDots[i].enabled = false;
             AimDotCount = _aimUsed;
             _aimUsed = 0;
+            TargetAimCount = _targetAims;
+            _targetAims = 0;
         }
     }
 }

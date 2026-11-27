@@ -432,6 +432,33 @@ namespace Game.Core
             if (boss != null) HitBoss(owner, boss, damage, critical, tags, minion.Slot + 1);
         }
 
+        // Where a player's projectile will end as things stand: the same steps FlyFriendly and UpdateProjectiles take,
+        // run ahead from where it is, to the first wall, the first body it would touch where the bodies are now, or the
+        // end of its range. The host and every client call this one function (the client with the snapshot's own
+        // numbers), so the mark on the ground is where the host would burst it if nobody moved. A crystal that turns
+        // the shot (World.CrystalLake.cs) is not followed: the mark stops at it.
+        public static Vec2 Landing(TileMap map, Vec2 position, Vec2 velocity, float radius, int ticksLeft, IReadOnlyList<(Vec2 At, float Radius)> bodies)
+        {
+            for (int left = ticksLeft; left > 0; left--)
+            {
+                position += velocity * TickSeconds;
+                if (left == 1 || Collision.Overlaps(map, position, radius * 0.5f)) return position;
+                if (bodies == null) continue;
+                foreach (var body in bodies)
+                    if (Vec2.Distance(body.At, position) <= radius + body.Radius) return position;
+            }
+            return position;
+        }
+
+        // The bodies a player's projectile stops at, as they stand now (Landing).
+        public List<(Vec2 At, float Radius)> ShotStoppers()
+        {
+            var bodies = new List<(Vec2, float)>();
+            foreach (var enemy in _enemies) if (!enemy.IsDead && !enemy.Away) bodies.Add((enemy.Position, enemy.Definition.Radius));
+            foreach (var boss in _bosses) if (!boss.IsDead) bodies.Add((boss.Position, boss.Definition.Radius));
+            return bodies;
+        }
+
         // A player's projectile stops at the first enemy or boss it touches, at a wall, or at the end of its range,
         // and hits what it touches there; a skill's bursts and hits everything in its radius. Returns whether it is
         // gone.
@@ -497,7 +524,7 @@ namespace Game.Core
             enemy.Health -= amount;
             enemy.LastTags = tags;
             if (knockback) enemy.Knockback = Knock(enemy, (enemy.Position - from).Normalized, KnockbackSpeed * push);
-            _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause));
+            _events.Add(new SimEvent(SimEventType.Hit, player.Id, enemy.Id, amount, critical, cause: cause, tags: tags));
             Leech(player, cause, amount);
             // A pack's monster struck before it noticed anyone wakes its pack (World.Packs.cs).
             Provoked(enemy, player);
@@ -518,7 +545,7 @@ namespace Game.Core
             if (boss.IsDead || boss.Invulnerable) return;
             if (!thorns) damage *= GearDealt(player, boss.Health, boss.MaxHealth, boss.Afflictions);
             int amount = Combat.Mitigate(damage, boss.Definition.Armor);
-            DamageBoss(boss, player.Id, amount, critical, cause);
+            DamageBoss(boss, player.Id, amount, critical, cause, tags);
             if (boss.IsDead) GearKill(player);
             else if (!thorns) GearAfterHit(player, boss.Afflictions, amount, critical);
             Leech(player, cause, amount);

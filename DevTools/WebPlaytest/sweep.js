@@ -3161,6 +3161,20 @@ async function hits(browser) {
   st = await game.state();
   check(st.numbers === 0, `'숫자'를 끄면 숫자가 꺼진다 (${st.numbers}개)`);
   await game.send('feel numbers on; attack off; clear');
+  // A skill's projectile that lands long after the cast: the host's hit names its element (0.113.0), so the body
+  // struck by a fireball shows fire, not the steel star.
+  await game.send('monsters hold; classes fire_mage; xp 21300; teach 2; heal; mana 100');
+  await game.wait(800);
+  const fireSlot = (await game.inventory()).skills.split(',').indexOf('fireball');
+  check(fireSlot >= 0, '화염구가 칸에 있다');
+  const named = (await game.state()).namedHits;
+  await game.send(`spawn slime 8 0 5000; face 1 0; skill ${Math.max(0, fireSlot)}`);
+  const burned = await pollState(game, t => t.namedHits > named, 4000);
+  await game.send('speed 0');
+  check(burned.namedHits > named && burned.lastHitElement === 'Fire', `8칸 밖 슬라임이 화염구에 맞으면 불 타격이 나온다 (원소 ${burned.lastHitElement}, 호스트가 원소를 알린 타격 ${burned.namedHits - named}대)`);
+  await game.wait(200);
+  await game.shot('hits-skill-shot', '화염구가 8칸 밖 슬라임에 맞은 순간: 불 타격(불티와 불꽃 혀)');
+  await game.send('speed 1; clear');
   await game.context.close();
 
   note('\n## 타격 이펙트와 피해 숫자 (휴대폰 세로)\n');
@@ -3241,6 +3255,25 @@ async function mobwarn(browser) {
   check(st.mobFxPieces > 0 && st.mobFxPieces <= 420, `장판의 조각이 한도 안 (${st.mobFxPieces}/420)`);
   await game.shot('mobwarn-pools', '남은 것: 포자 웅덩이와 불 벽(붉은 점선 테, 바닥 빛)');
   await game.send('speed 1; clear');
+  // A single shot (a bouncing or a returning one) is aimed as it leaves: the host says whom it is for and the line
+  // goes to them through the wind-up (0.113.0, Docs/EffectsRework.md 14절); then the shot flies along it.
+  for (const [id, attack, name] of [['crystal_wisp', 'prism', '수정 정령의 튕기는 빛'], ['void_wisp', 'orb', '공허 정령의 돌아오는 구슬']]) {
+    await pollState(game, t => t.bossShots === 0, 5000);
+    await game.send(`clear; heal; monsters hold; face 1 0; spawn ${id} 4 1.5 5000; mob ${id} use ${attack}`);
+    const aimed = await pollState(game, t => t.targetAims > 0 && t.aimDots > 0, 2500);
+    check(aimed.targetAims > 0 && aimed.aimDots > 0 && aimed.bossShots === 0, `${name}: 쏘기 전에 나를 겨눈 조준선이 나온다 (${aimed.targetAims}줄, ${aimed.aimDots}점, 방향 ${aimed.targetAimWay}도, 아직 탄 ${aimed.bossShots}발)`);
+    if (id === 'crystal_wisp') {
+      await game.wait(200);
+      await game.shot('mobwarn-single-aim', `${name} 예고: 나를 따라오는 붉은 점선 한 줄`);
+    }
+    const shot = await pollState(game, t => String(t.enemyShotWays || '').length > 0, 3000);
+    const way = Number(String(shot.enemyShotWays || '').split(' ')[0]);
+    const off = Math.abs(((way - shot.targetAimWay + 540) % 360) - 180);
+    check(off < 6, `${name}: 탄이 조준선을 따라 난다 (선 ${shot.targetAimWay}도, 탄 ${way}도)`);
+    const after = await pollState(game, t => t.targetAims === 0, 2000);
+    check(after.targetAims === 0, `${name}: 쏜 뒤에는 조준선이 없다`);
+  }
+  await game.send('monsters go; clear');
   await game.context.close();
 
   note('\n## 일반 몬스터의 예고 (E5, 휴대폰 세로)\n');
@@ -3295,8 +3328,21 @@ async function shots(browser) {
     await game.until(t => has(t.banner, '등장') || has(t.entrance, '등장'), 6000, game.texts);
     await game.wait(1500);
     await game.send(`heal; boss ${id} use ${attack}`);
+    // Before the shots: the lines of a burst all the way round, at the angle the host settled as the wind-up began
+    // (0.113.0, Docs/EffectsRework.md 14절); then a shot flies along the first line.
+    const lined = await pollState(game, t => t.roundAim >= 0 && t.aimDots > 0, 2000);
+    check(lined.roundAim >= 0 && lined.aimDots > 0 && lined.enemyShots === 0, `${name}: 쏘기 전에 사방 조준선이 나온다 (시작 각도 ${lined.roundAim}도, ${lined.aimDots}점, 아직 탄 ${lined.enemyShots}발)`);
+    if (id === 'cave_warden' || id === 'void_lord') {
+      await game.wait(250);
+      await game.shot(`shots-${id}-round-aim`, `${name} 예고: 탄마다 붉은 점선(쏘기 전)`);
+    }
     const flying = await pollState(game, t => t.enemyShots >= least, 3000);
     check(flying.enemyShots >= least, `${name}: 탄이 원소 그림으로 난다 (화면 ${flying.enemyShots}발, 호스트 ${flying.bossShots}발)`);
+    const ways = String(flying.enemyShotWays || '').split(' ').filter(Boolean).map(Number);
+    const off = ways.length ? Math.min(...ways.map(w => Math.abs(((w - flying.roundAimLast + 540) % 360) - 180))) : 999;
+    check(off < 3, `${name}: 탄이 조준선을 따라 난다 (첫 줄 ${flying.roundAimLast}도, 가장 가까운 탄과 ${off.toFixed(1)}도 차이, 탄 ${ways.length}발)`);
+    const gone = await pollState(game, t => t.roundAim < 0, 1500);
+    check(gone.roundAim < 0, `${name}: 쏜 뒤에는 조준선이 없다`);
     await game.shot(`shots-${id}`, `${name}이 날아가는 중`);
     const ended = await pollState(game, t => t.shotEnds > 0, 5000);
     check(ended.shotEnds > 0, `${name}: 벽·수명에서 고리와 파편으로 사라진다 (${ended.shotEnds}개)`);
@@ -3436,9 +3482,47 @@ async function layers(browser) {
     const flying = await pollState(game, st => st.skillShots > 0 && st.skillFxLights > 0);
     check(flying.skillShots > 0 && flying.skillFxLights > 0, `${name}: 날아가는 동안 제 모습으로 그려지고 바닥을 밝힌다 (${flying.skillShots}발, 빛 ${flying.skillFxLights}개, 조각 ${flying.skillFxPieces}개)`);
     await game.shot(`layers-${id}-flight`, name);
+    // Where it will end is said while it flies (World.Landing, 0.113.0; the meteor draws it as a pale amber ring), and
+    // it bursts there. The slime it is thrown at walks, so the last word before the burst is the one held to.
+    const before = flying.skillBursts;
+    let said = flying.landingMark;
+    check(said !== '-', `${name}: 날아가는 동안 떨어질 자리를 안다 (${said})`);
     await game.send('speed 1');
+    for (const until = Date.now() + 5000; Date.now() < until;) {
+      const st = await game.state();
+      if (st.landingMark !== '-') said = st.landingMark;
+      if (st.projectiles === 0 && st.skillBursts > before) break;
+      await game.wait(30);
+    }
+    const ended = await pollState(game, st => st.skillBursts > before, 2000);
+    const [mx, my] = String(said).split(',').map(Number), [bx, by] = String(ended.lastBurst).split(',').map(Number);
+    const apart = Math.hypot(mx - bx, my - by);
+    check(ended.skillBursts > before && apart < 0.8, `${name}: 표시한 자리에서 터진다 (표시 ${said}, 터진 곳 ${ended.lastBurst}, ${apart.toFixed(2)}칸 차이)`);
     await pollState(game, st => st.projectiles === 0, 4000);
     await pollState(game, st => st.skillFx === 0, 3000);
+  }
+  // Thrown at a wall: the ring stops at the wall, short of its range.
+  await game.send('monsters hold; clear; heal; mana 100; teach 2');
+  await game.wait(300);
+  {
+    const order = (await game.inventory()).skills.split(',');
+    if (order.indexOf('meteor') < 0) {
+      await game.send('classes fire_mage 3,0,1,2; teach 2; heal; mana 100');
+      await game.wait(600);
+    }
+    const slot = (await game.inventory()).skills.split(',').indexOf('meteor');
+    await game.send('build Wall 4 -1; build Wall 4 0; build Wall 4 1; face 1 0');
+    await game.wait(300);
+    const from = await game.state();
+    await game.send(`skill ${Math.max(0, slot)}`);
+    const marked = await pollState(game, st => st.landingMark !== '-', 2500);
+    await game.send('speed 0');
+    await game.wait(250);
+    const [wx] = String(marked.landingMark).split(',').map(Number);
+    check(marked.landingMark !== '-' && wx - from.x < 5, `유성을 벽에 던지면 고리가 벽 앞에 멈춘다 (나 ${from.x}, 표시 ${marked.landingMark}, 사거리 끝이면 ${(from.x + 11).toFixed(1)})`);
+    await game.shot('layers-meteor-wall', '유성을 4칸 앞 벽에 던짐: 호박색 점선 고리가 벽 앞에');
+    await game.send('speed 1');
+    await pollState(game, st => st.projectiles === 0, 4000);
   }
   await game.context.close();
 

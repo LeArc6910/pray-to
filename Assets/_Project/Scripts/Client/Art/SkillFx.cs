@@ -59,6 +59,10 @@ namespace Game.Client
         // A projectile's whole flight when nothing stops it, in seconds (its range over its speed; Length its range
         // in pixels): what is drawn coming down from above (the meteor) lands as the flight ends. 0 when not known.
         public float Span;
+        // Where a projectile will end as things stand, in pixels from where it is, and the radius of what it does
+        // there (World.Landing, 0.113.0); Mark 0 when not known. The meteor shows it as a pale amber ring of dashes: the
+        // player's own mark, never the red of an enemy's.
+        public float MarkX, MarkY, Mark;
     }
 
     // Every skill's effect as a function of time (Docs/SkillEffects.md): for a moment after the skill is used it says
@@ -141,6 +145,9 @@ namespace Game.Client
             if (alpha <= 0.03f || size <= 0) return;
             o.Add(new FxStamp { Shape = shape, Ramp = ramp, Size = size, Frame = frame, X = x, Y = y, Alpha = Math.Min(1, alpha), Angle = angle, Ground = ground });
         }
+
+        // How strongly a landing mark shows by how far along the flight is: pale, never as strong as an enemy's warning.
+        internal static float MarkAlpha(float p) => 0.35f + 0.25f * Math.Clamp(p, 0, 1);
 
         internal static float U(float t, float from, float to) => Math.Clamp((t - from) / (to - from), 0, 1);
 
@@ -1006,6 +1013,9 @@ namespace Game.Client
                     if (speed < 0.01f) (vx, vy, speed) = (dx, dy, 1);
                     Put(o, FxShape.Shadow, FxRamp.Smoke, SkillFxArt.Even(8 + 10 * p), 0, 0, -3, 0.6f + 0.4f * p, 0, true);
                     FxLayers.Light(o, FxRamp.Fire, 22 + 26 * p, 0.35f + 0.55f * p, 0, -3);
+                    // Where it will come down: a ring of dashes the size of its burst, turning slowly, surer as it nears.
+                    if (c.Mark > 0)
+                        Put(o, FxShape.Broken, FxRamp.Gold, SkillFxArt.Even(2 * c.Mark), SkillFxArt.BrokenFrame(1, 8, (int)(t * 5)), c.MarkX, c.MarkY, MarkAlpha(p), 0, true);
                     float x = -dx * back, y = high - dy * back;
                     for (int k = 0; k < 3; k++)
                     {

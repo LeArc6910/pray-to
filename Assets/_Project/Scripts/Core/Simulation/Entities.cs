@@ -670,8 +670,10 @@ namespace Game.Core
 
     public readonly struct SimEvent
     {
-        public SimEvent(SimEventType type, int source, int target = 0, int amount = 0, bool critical = false, Vec2 direction = default, int cause = 0, Vec2 position = default)
+        public SimEvent(SimEventType type, int source, int target = 0, int amount = 0, bool critical = false, Vec2 direction = default, int cause = 0, Vec2 position = default,
+            SkillTag tags = SkillTag.None)
         {
+            Tags = tags;
             Type = type;
             Source = source;
             Target = target;
@@ -693,6 +695,9 @@ namespace Game.Core
         public int Cause { get; }
         // Only for events that happen somewhere rather than to someone (HasPosition).
         public Vec2 Position { get; }
+        // A player's hit: the tags it struck with. Its elements (World.ElementsOf) go to clients, so a body struck by a
+        // skill's projectile long after the cast still shows that skill's element.
+        public SkillTag Tags { get; }
 
         public static bool HasPosition(SimEventType type) =>
             type == SimEventType.Burst || type == SimEventType.Dug || type == SimEventType.Harvested || type == SimEventType.Watered
@@ -760,6 +765,9 @@ namespace Game.Core
         internal int VolleysLeft { get; set; }
         internal int VolleyTicks { get; set; }
         internal float VolleyAngle { get; set; }
+        // Where a burst or spiral all the way round will start (World.AimSteps to a turn), settled as its wind-up begins
+        // so every screen can show the way the shots will go before they fly (World.BossAim).
+        internal int AimStep { get; set; }
         // Ticks with nobody left to fight; the boss resets after a while.
         internal int EmptyTicks { get; set; }
         // Just past a roar: the next attack is one the new phase brought (World.Boss.cs, phases).

@@ -283,6 +283,11 @@ namespace Game.Client
                     context.Span = land;
                     float gone = Math.Min(t, land) * skill.Speed * Tile + World.PlayerRadius * Tile;
                     float x = (float)Math.Cos(angle) * gone, y = (float)Math.Sin(angle) * gone + 8;
+                    // Where it will end (the game works it out with World.Landing): here, the end of its reach.
+                    float end = scene.Reach + World.PlayerRadius * Tile;
+                    context.MarkX = (float)Math.Cos(angle) * end - x;
+                    context.MarkY = (float)Math.Sin(angle) * end + 8 - y;
+                    context.Mark = skill.Radius * Tile;
                     if (t < land) Take(FxProgram.Shot, context, t, x, y);
                     else Take(FxProgram.Hit, context, t - land, x, y);
                 }

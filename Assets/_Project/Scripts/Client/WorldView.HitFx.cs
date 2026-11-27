@@ -30,6 +30,10 @@ namespace Game.Client
         const int HitFxThinOver = 10;
         const int HitFxMostAlive = 36;
         int _hitSeed;
+        // For the playtest: how many blows so far came with their element named by the host (SimEvent.Tags), and what
+        // the last of those was drawn as.
+        public HitElement LastHitElement { get; private set; }
+        public int NamedHits { get; private set; }
 
         // Blows' effects running, the most pieces one of them laid last frame and all of theirs together, for the playtests.
         public int HitFxCount => _hitSparks.Count;
@@ -104,15 +108,17 @@ namespace Game.Client
 
         // What the striker's blows are made of: a player's by the element a buff lends or the skill just used, a
         // monster's by its kind and in its own colours, a boss's by its element.
-        (HitElement Element, FxRamp Ramp) HitLookOf(int source, Body hitter)
+        (HitElement Element, FxRamp Ramp) HitLookOf(int source, Body hitter, SkillTag struck = SkillTag.None)
         {
             if (hitter == null) return (HitElement.Plain, FxRamp.Steel);
             HitElement element;
             switch (hitter.Kind)
             {
                 case BodyKind.Player:
-                    var tags = GrantedTags(source);
-                    if (_castTags.TryGetValue(source, out var cast) && Time.time - cast.Time < CastTagSeconds) tags |= cast.Tags;
+                    // The element the hit itself struck with, when the host names one (SimEvent.Tags, 0.113.0): a
+                    // skill's projectile that lands long after the cast is still that skill's. Else as before.
+                    var tags = struck != SkillTag.None ? struck : GrantedTags(source);
+                    if (struck == SkillTag.None && _castTags.TryGetValue(source, out var cast) && Time.time - cast.Time < CastTagSeconds) tags |= cast.Tags;
                     element = HitElementOf(tags);
                     break;
                 case BodyKind.Monster:

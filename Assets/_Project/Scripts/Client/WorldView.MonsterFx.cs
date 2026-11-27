@@ -250,12 +250,25 @@ namespace Game.Client
                         Size = (doing.Radius + World.PlayerRadius) * Ppu, Seed = view.Id & 0xFFFF, Look = body.MobKind,
                     }, elapsed);
                     if (doing.Shape == MonsterAttackShape.Leap && Feel.MonsterFx) Hop(body, elapsed, body.MobTelegraph);
-                    // Where a fan's shots will go: a fan keeps the way it faced when it began (World.Unleash). A single
-                    // shot is aimed as it leaves, which no screen can know beforehand; those get no lines.
+                    // Where a fan's shots will go: a fan keeps the way it faced when it began (World.Unleash).
                     if (doing.Shape == MonsterAttackShape.Spread && Feel.MonsterFx)
                     {
                         LayAim(view.Position, body.MobDir, view.Monster.Radius, doing.Count > 1 ? doing.Angle : 0, Mathf.Max(1, doing.Count),
                             Mathf.Clamp01(elapsed / Mathf.Max(0.01f, body.MobTelegraph)), Mathf.Min(MobAimReach, doing.Length > 0 ? doing.Length : MobAimReach));
+                    }
+                }
+                // A single shot (a volley's, a bouncing or a returning one) is aimed as it leaves, at whoever the host
+                // says it is for (EntityView.AimTarget, 0.113.0): its line goes to where that player is drawn now, so it
+                // follows them through the wind-up and between a volley's shots, as the shot itself will.
+                if (view.AimTarget != 0 && Feel.MonsterFx && AimedAt(view.AimTarget) is Vector3 mark)
+                {
+                    var way = new Vec2(mark.x - view.Position.X, mark.y - view.Position.Y);
+                    if (way.LengthSquared > 1e-4f)
+                    {
+                        LayAim(view.Position, way.Normalized, view.Monster.Radius, 0, 1, winding ? Mathf.Clamp01(elapsed / Mathf.Max(0.01f, body.MobTelegraph)) : 1,
+                            Mathf.Min(MobAimReach, doing.Length > 0 ? doing.Length : MobAimReach));
+                        TargetAimDegrees = Mathf.Repeat(way.Angle * Mathf.Rad2Deg, 360);
+                        _targetAims++;
                     }
                 }
             }
@@ -330,6 +343,14 @@ namespace Game.Client
                     Mathf.Clamp01(elapsed / total)));
             }
         }
+
+        // Where the player a shot is for stands on this screen: oneself, or another as drawn. Null when not in sight.
+        Vector3? AimedAt(int id) => id == _client.PlayerId ? _self.Position : _others.TryGetValue(id, out var other) && other.Kind == BodyKind.Player ? other.Position : (Vector3?)null;
+
+        // For the playtest: lines drawn to a shot's target last frame, and the way (degrees) the last one went.
+        int _targetAims;
+        public int TargetAimCount { get; private set; }
+        public float TargetAimDegrees { get; private set; } = -1;
 
         // A monster's aim lines reach less far than a boss's: several may aim at once.
         const float MobAimReach = 5;

@@ -166,6 +166,8 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
 | **`mend`** | `length`칸 안의 가장 다친 동료에게 줄을 대고 `duration`초 동안 초당 그 동료 생명력의 `damage`%를 채운다. 예고나 줄 중에 맞으면 끊긴다 | length, duration, damage |
 | **`empower`** | `radius`칸 안의 다른 몬스터가 `duration`초 동안 피해와 걸음 +`damage`%. 예고 중에 맞으면 끊긴다 | radius, duration, damage |
 
+한 발짜리 탄(`volley`·`bounce`·`boomerang`)은 쏘는 순간 대상을 다시 겨눈다. 호스트가 겨누는 대상을 알려 화면이 예고 동안 대상을 따라가는 붉은 점선을 긋는다(조준은 고정하지 않는다, 통신 0.113.0, `Docs/EffectsRework.md` 14절). 보스의 사방 사격·나선은 시작 각도를 예고가 시작될 때 정해 탄마다 점선이 먼저 나온다.
+
 ### monster_attacks.csv
 
 `Assets/_Project/Data/Monsters/monster_attacks.csv`. 한 줄이 공격 하나, 한 종에 일곱까지다(통신에 세 비트). 열은 `boss_attacks.csv`와 같고 아래가 다르다.

@@ -215,6 +215,14 @@ namespace Game.Client
         // which keeps the plain look. A projectile is usually seen a moment before the event of the skill that fired it
         // is shown (projectiles are drawn before the frame's events), so one not yet known for a skill's is tried again
         // while it is young.
+        // For the playtest: where the last skill's projectile was said to end, whether that is being said now, and where
+        // the last skill's burst really was (the host's Burst event).
+        public Vec2 LandingMark { get; private set; }
+        public bool LandingMarkShown => Time.time - _landingMarkAt < 0.1f;
+        public Vec2 LastSkillBurst { get; private set; }
+        public int SkillBursts { get; private set; }
+        float _landingMarkAt = -10;
+
         bool DrawSkillShot(ProjectileView projectile, bool isNew, float deltaTime)
         {
             if (!projectile.Friendly) return false;
@@ -237,11 +245,24 @@ namespace Game.Client
             shot.Last = at;
             shot.Dir = dir;
             if (!Feel.SkillFx) return false;
+            // Where it will end as things stand (the first wall, the first body where it is now, or its range's end):
+            // the client runs the host's own steps from the snapshot's numbers (WorldClient.LandingOf).
+            float markX = 0, markY = 0, mark = 0;
+            if (shot.Skill.Radius > 0 && projectile.TicksLeft > 0)
+            {
+                var landing = _client.LandingOf(projectile);
+                markX = (landing.X - projectile.Position.X) * Sprites.PixelsPerUnit;
+                markY = (landing.Y - projectile.Position.Y) * Sprites.PixelsPerUnit;
+                mark = shot.Skill.Radius * Sprites.PixelsPerUnit;
+                LandingMark = landing;
+                _landingMarkAt = Time.time;
+            }
             _fxStamps.Clear();
             SkillFx.Stamps(FxProgram.Shot, shot.Skill.Id, new FxContext
             {
                 Dir = shot.Dir, Seed = shot.Seed, Main = shot.Main,
                 Length = shot.Skill.Range * Sprites.PixelsPerUnit, Span = shot.Skill.Speed > 0 ? shot.Skill.Range / shot.Skill.Speed : 0,
+                MarkX = markX, MarkY = markY, Mark = mark,
             }, shot.Age, _fxStamps);
             EmitFx(at, shot.Mine ? 1 : OthersFxAlpha, null);
             _skillShotsDrawn++;

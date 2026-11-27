@@ -131,6 +131,12 @@ namespace Game.Core
         public const int ElementalCause = 100;
         public static readonly SkillTag[] ElementOrder = { SkillTag.Fire, SkillTag.Cold, SkillTag.Lightning };
 
+        // The elements among a hit's tags, which is what the wire carries of them (three bits, ElementBits).
+        public const SkillTag ElementTags = SkillTag.Fire | SkillTag.Cold | SkillTag.Lightning;
+        public static SkillTag ElementsOf(SkillTag tags) => tags & ElementTags;
+        public static int ElementBits(SkillTag tags) => (int)ElementsOf(tags) >> 4;
+        public static SkillTag ElementsFromBits(int bits) => (SkillTag)((bits & 7) << 4);
+
         public static SkillTag ElementOfCause(int cause) =>
             cause >= ElementalCause && cause < ElementalCause + ElementOrder.Length ? ElementOrder[cause - ElementalCause] : SkillTag.None;
 

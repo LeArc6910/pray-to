@@ -2951,6 +2951,24 @@ namespace Game.Client
                 json.Field("enemyShots", root.EnemyShots);
                 json.Field("shotEnds", root.ShotEnds);
                 json.Field("aimDots", root.AimDots);
+                // What the host says before it happens (0.113.0, Docs/EffectsRework.md 14절). roundAim: the angle
+                // (degrees) the lines of a boss's burst or spiral all round start at while they are drawn, -1 when none
+                // is; roundAimLast: the last such angle. enemyShotWays: the ways the enemy shots drawn now fly.
+                // targetAims: lines drawn to the player a monster's single shot is for, targetAimWay the last one's way.
+                // landingMark: where a skill's projectile is said to end (while it is said, else "-"); lastBurst: where
+                // the last skill's burst was, skillBursts how many so far. namedHits: blows so far whose element the host
+                // named; lastHitElement: what the last of those was drawn as.
+                var view = root.View;
+                json.Field("roundAim", view != null && view.RoundAimShown ? Mathf.RoundToInt(view.RoundAimDegrees * 10) / 10f : -1);
+                json.Field("roundAimLast", view != null ? Mathf.RoundToInt(view.RoundAimDegrees * 10) / 10f : -1);
+                json.Field("enemyShotWays", view != null ? string.Join(" ", view.EnemyShotWays().Take(40).Select(w => FormattableString.Invariant($"{w:0.0}"))) : "");
+                json.Field("targetAims", view?.TargetAimCount ?? 0);
+                json.Field("targetAimWay", view != null ? Mathf.RoundToInt(view.TargetAimDegrees * 10) / 10f : -1);
+                json.Field("landingMark", view != null && view.LandingMarkShown ? FormattableString.Invariant($"{view.LandingMark.X:0.00},{view.LandingMark.Y:0.00}") : "-");
+                json.Field("lastBurst", view != null ? FormattableString.Invariant($"{view.LastSkillBurst.X:0.00},{view.LastSkillBurst.Y:0.00}") : "-");
+                json.Field("skillBursts", view?.SkillBursts ?? 0);
+                json.Field("lastHitElement", view != null ? view.LastHitElement.ToString() : "-");
+                json.Field("namedHits", view?.NamedHits ?? 0);
                 json.Field("mobShots", root.MonsterShotsDrawn);
                 // E5: monsters' marks drawn as pictures of their shape, and bodies drawn rushing (dust, lines of speed).
                 json.Field("mobWarnsShown", root.MonsterWarnsShown);

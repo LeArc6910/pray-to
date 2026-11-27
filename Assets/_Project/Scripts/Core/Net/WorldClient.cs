@@ -34,8 +34,10 @@ namespace Game.Core
             ItemBase weapon = null,
             SkillDefinition skill = null,
             int elite = 0,
-            uint look = 0)
+            uint look = 0,
+            int aim = 0)
         {
+            Aim = aim;
             Look = kind == EntityKind.Player ? CharacterLook.Unpack(look) : default;
             Elite = kind == EntityKind.Monster ? (EliteRank)(elite >> 8) : EliteRank.None;
             Affixes = kind == EntityKind.Monster ? (RiftAffix)(elite & 0xFF) : RiftAffix.None;
@@ -68,6 +70,13 @@ namespace Game.Core
 
         public int Id { get; }
         public EntityKind Kind { get; }
+        // Where its shots will go, as the host says before they fly (EntityState.Aim).
+        public int Aim { get; }
+        // A boss winding up a burst or a spiral all the way round: the angle its first shot leaves at (radians).
+        public bool AimsRound => Kind == EntityKind.Boss && Aim > 0;
+        public float AimAngle => World.AimAngle(Aim - 1);
+        // A monster about to loose single shots: the player they are aimed at (0 for none).
+        public int AimTarget => Kind == EntityKind.Monster ? Aim : 0;
         public bool IsPlayer => Kind == EntityKind.Player;
         // A player's look as the host's roster has it (CharacterLook, 0.108.0); default for everything else.
         public CharacterLook Look { get; }
@@ -86,7 +95,7 @@ namespace Game.Core
         public bool Empowered => Kind == EntityKind.Monster && (State & World.EnemyEmpoweredBit) != 0;
         public bool Small => Kind == EntityKind.Monster && (State & World.EnemySmallBit) != 0;
         // Under the ground between attacks or lying in wait (Enemy.Buried): drawn as a mound, not as itself.
-        public bool Buried => Kind == EntityKind.Monster && EnemyState != EnemyState.Windup && ((State >> World.EnemyTellShift) & 7) == World.EnemyBuriedTell;
+        public bool Buried => Kind == EntityKind.Monster && World.EnemyBuried(State);
         // The sheet attack a monster is winding up, making or resting from; null for one that fights the old way.
         public MonsterAttack MonsterAttack { get; }
         // A field elite's rank and affixes (World.Elites.cs), its name made from them, and how its attack is warned.
@@ -132,8 +141,10 @@ namespace Game.Core
 
     public readonly struct ProjectileView
     {
-        public ProjectileView(int id, Vec2 position, Vec2 velocity, float radius, bool friendly, SkillTag tags)
+        public ProjectileView(int id, Vec2 position, Vec2 velocity, float radius, bool friendly, SkillTag tags, Vec2 origin = default, int ticksLeft = 0)
         {
+            Origin = origin;
+            TicksLeft = ticksLeft;
             Id = id;
             Position = position;
             Velocity = velocity;
@@ -150,6 +161,10 @@ namespace Game.Core
         // A player's, and the tags it hits with; a boss's has none.
         public bool Friendly { get; }
         public SkillTag Tags { get; }
+        // A player's: where the host had it at the newest snapshot and the ticks of flight it had left then, which is
+        // what WorldClient.LandingOf runs ahead from.
+        public Vec2 Origin { get; }
+        public int TicksLeft { get; }
     }
 
     public readonly struct MachineView
@@ -1455,7 +1470,8 @@ namespace Game.Core
                     entity.IsPlayer && entity.Type > 0 ? _loot.Bases[entity.Type - 1] : null,
                     entity.Kind == EntityKind.Minion ? _classes.Skills[entity.Type] : null,
                     entity.Elite,
-                    entity.IsPlayer ? LookOf(entity.Id).Packed : 0));
+                    entity.IsPlayer ? LookOf(entity.Id).Packed : 0,
+                    shown.Aim));
             }
             return views;
         }
@@ -1554,9 +1570,27 @@ namespace Game.Core
             foreach (var projectile in latest.Projectiles)
             {
                 views.Add(new ProjectileView(
-                    projectile.Id, projectile.Position + projectile.Velocity * seconds, projectile.Velocity, projectile.Radius, projectile.Friendly, projectile.Tags));
+                    projectile.Id, projectile.Position + projectile.Velocity * seconds, projectile.Velocity, projectile.Radius, projectile.Friendly, projectile.Tags,
+                    projectile.Position, projectile.TicksLeft));
             }
             return views;
+        }
+
+        // Where a player's projectile will end as things stand (World.Landing): at the first wall, at the first monster
+        // or boss it would touch where the newest snapshot has them, or at the end of its range. The same function and
+        // the same numbers as the host's, so the mark is where the host bursts it if nothing moves.
+        public Vec2 LandingOf(ProjectileView projectile)
+        {
+            if (!projectile.Friendly || projectile.TicksLeft <= 0 || _snapshots.Count == 0) return projectile.Position;
+            var bodies = new List<(Vec2 At, float Radius)>();
+            foreach (var entity in _snapshots[_snapshots.Count - 1].Entities)
+            {
+                if (entity.IsDead) continue;
+                if (entity.Kind == EntityKind.Boss) bodies.Add((entity.Position, _bosses.Bosses[entity.Type].Radius));
+                // One under the ground cannot be struck (EntityView.Buried).
+                else if (entity.Kind == EntityKind.Monster && !World.EnemyBuried(entity.State)) bodies.Add((entity.Position, _monsters.Monsters[entity.Type].Radius));
+            }
+            return World.Landing(Map, projectile.Origin, projectile.Velocity, projectile.Radius, projectile.TicksLeft, bodies);
         }
 
         // Telegraphs with how far along they are right now; ones that have already landed are left out.

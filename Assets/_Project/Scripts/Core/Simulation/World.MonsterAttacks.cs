@@ -104,6 +104,25 @@ namespace Game.Core
                 | (enemy.Empowered ? EnemyEmpoweredBit : 0)
                 | (enemy.Small ? EnemySmallBit : 0));
 
+        // Whom a monster's single shots are aimed at, for the wire: a volley, a bouncing or a returning shot is aimed
+        // anew as it leaves (Unleash, Repeat), so the screen is told the target and draws its line to wherever the
+        // target is, following them through the wind-up exactly as the shot will. 0 for anything else (a fan keeps the
+        // way it faced, which the screen already knows).
+        public int EnemyAim(Enemy enemy)
+        {
+            var attack = enemy.Attack;
+            if (attack == null || attack.Tell != Tell.Barrage || attack.Shape == MonsterAttackShape.Spread) return 0;
+            bool aiming = enemy.State == EnemyState.Windup
+                || attack.Shape == MonsterAttackShape.Volley && enemy.State == EnemyState.Recover && enemy.RepeatsLeft > 0;
+            if (!aiming) return 0;
+            var target = FindPlayer(enemy.TargetId);
+            return target == null || target.IsDead ? 0 : target.Id;
+        }
+
+        // Whether a monster's state byte says it is under the ground (Enemy.Buried), where nothing reaches it.
+        public static bool EnemyBuried(byte state) =>
+            (EnemyState)(state & EnemyStateMask) != EnemyState.Windup && ((state >> EnemyTellShift) & 7) == EnemyBuriedTell;
+
         public static int EnemyPhaseField(Enemy enemy) =>
             (enemy.Rift & EnemyRiftMask) | (enemy.Attack != null && enemy.State != EnemyState.Idle && enemy.State != EnemyState.Chase ? enemy.Attack.Index << EnemyAttackShift : 0);
 
