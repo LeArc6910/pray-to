@@ -895,8 +895,8 @@ namespace Game.Client
                     for (int k = x + 1; k < w && right < 0; k++) if (Body(k)) right = k;
                     if (left >= 0 && right >= 0)
                     {
-                        var near = image[x - left <= right - x ? left : right, y];
-                        canvas[x + Margin, y + Headroom] = Luminance(near) < 20 ? Shade : near.Mix(Shade, 0.6f);
+                        // The body's own texture mirrored in from the nearer side (2026-11-27, not a flat shade).
+                        canvas[x + Margin, y + Headroom] = image.MirrorInto(x, y, x - left <= right - x ? left : right, Body);
                     }
                 }
             }

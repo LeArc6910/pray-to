@@ -493,11 +493,11 @@ namespace Game.Client
         // there (not the floor showing through the chest).
         static Box TrunkOf(BossView view) => view switch
         {
-            BossView.Front => new Box(17, 20, 47, 52),
-            BossView.FrontSide => new Box(16, 20, 45, 52),
-            BossView.Side => new Box(18, 20, 40, 52),
-            BossView.BackSide => new Box(17, 20, 47, 51),
-            _ => new Box(17, 22, 47, 51),
+            BossView.Front => new Box(20, 20, 44, 48),
+            BossView.FrontSide => new Box(19, 20, 42, 48),
+            BossView.Side => new Box(19, 20, 39, 48),
+            BossView.BackSide => new Box(20, 20, 44, 47),
+            _ => new Box(20, 22, 44, 47),
         };
 
         static readonly Dictionary<BossView, Part[,]> PartMaps = new Dictionary<BossView, Part[,]>();
@@ -1054,8 +1054,8 @@ namespace Game.Client
                     for (int k = x + 1; k < w && after < 0; k++) if (Body(k)) after = k;
                     if (before >= 0 && after >= 0 || trunk.Holds(x, y) && (before >= 0 || after >= 0))
                     {
-                        var near = image[before < 0 ? after : after < 0 ? before : x - before <= after - x ? before : after, y];
-                        canvas[x + Margin, y + Headroom] = Luminance(near) < 20 ? Shade : near.Mix(Shade, 0.6f);
+                        int edge = before < 0 ? after : after < 0 ? before : x - before <= after - x ? before : after;
+                        canvas[x + Margin, y + Headroom] = image.MirrorInto(x, y, edge, Body);
                     }
                 }
             }
@@ -1108,12 +1108,18 @@ namespace Game.Client
             Lay(Part.LegA, la, lay, 1);
             if (!armB.Empty) Arm(Part.ArmB, armB, bx, by, 1);
             Arm(Part.ArmA, armA, ax, ay, 1);
-            // A narrow gap left between a part and the body (a fist moved a little off the trunk), or the notch between
-            // hip and leg the hanging fist hid at rest, closed in shade.
+            // A narrow gap left between a part and the body where the part stood (a fist moved a little off the trunk)
+            // closed with the body's own pixels. Only there and only narrow: the room beside the hips once the arms
+            // are up is left open, or the golem looks fat from the front and back (2026-11-27).
+            canvas.CloseGaps(left, Shade, 3);
+            // And inside the trunk, only a crack (the notch beside the hip a hanging fist hid at rest, two pixels wide
+            // at most) is closed too.
+            var crack = new bool[canvas.Width, canvas.Height];
             for (int y = trunk.Y0; y <= trunk.Y1; y++)
                 for (int x = trunk.X0; x <= trunk.X1; x++)
-                    left[x + Margin, y + Headroom] = true;
-            canvas.CloseGaps(left, Shade, 6);
+                    crack[x + Margin, y + Headroom] = true;
+            canvas.CloseGaps(crack, Shade, 2);
+            canvas.FillHoles(40);
             return canvas;
         }
 

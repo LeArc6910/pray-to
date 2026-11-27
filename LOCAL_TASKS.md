@@ -1293,10 +1293,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/GeneralArt.cs`, `Client/WorldView.General.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/GeneralMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `general-kneeling`·`entrance-general`·`general-order-windup`·`general-banner-windup`(`TheMadGeneralRisesAndGivesOrders`)
   - (클라우드 웹 점검) `sweep.js --only general`, `--only arenas`
   - (사람) `Docs/HumanChecklist.md`의 모르그
-- [ ] 198단계: 몸의 틈 — 팔·배를 떼어 움직이는 보스(동굴 수호자·흑철 기사·개미귀신·모르그·그룸)에서 몸에 바탕이 비치던 틈을 그림자로 메움(`Docs/Bosses.md` 몸의 틈)
+- [ ] 198단계: 몸의 틈 — 팔·배를 떼어 움직이는 보스(동굴 수호자·흑철 기사·개미귀신·모르그·그룸)에서 몸에 바탕이 비치던 틈을 그 부위의 진짜 픽셀로 메움(필요한 곳만)(`Docs/Bosses.md` 몸의 틈)
   - 명령 한 줄을 다시 돌린다(새 파일 없음)
   - (클라우드 웹 점검) `sweep.js --only bosses,patterns`
-  - (사람) 동굴 수호자가 팔을 들 때(내려찍기·천장 붕괴·포효) 몸에 빈 곳이 더 보이지 않는지
+  - (사람) 동굴 수호자가 팔을 들 때(내려찍기·천장 붕괴·포효) 몸에 빈 곳이 더 보이지 않는지, 메운 곳이 어색하지 않고 뚱뚱해 보이지 않는지
 
 ## 결과 보고
 

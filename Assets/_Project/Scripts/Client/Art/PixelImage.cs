@@ -151,11 +151,29 @@ namespace Game.Client
             this[x, y] = under.Mix(color.WithAlpha(255), t).WithAlpha(Math.Max(under.A, color.A));
         }
 
+        // The body's own pixel for a spot just off its edge (2026-11-27, the person: a flat shade looked wrong, fill it
+        // like the real part): mirrored across the edge into the body along the row (or column), so the gap carries
+        // on the body's texture. The dark outline is skipped: further into the body until a pixel that is not.
+        public Rgba MirrorInto(int x, int y, int edge, System.Func<int, bool> body, bool down = false)
+        {
+            int dir = edge > (down ? y : x) ? 1 : -1;
+            int from = edge + (edge - (down ? y : x));
+            for (int k = 0; k < 10; k++)
+            {
+                int s = from + dir * k;
+                if (!body(s)) break;
+                var c = down ? this[x, s] : this[s, y];
+                if (0.3f * c.R + 0.59f * c.G + 0.11f * c.B >= 22) return c;
+            }
+            return down ? this[x, edge] : this[edge, y];
+        }
+
         // Where parts of a body posed in code have moved away (left), the floor must not show through a narrow gap
         // between them and the rest (2026-11-27, Docs/Bosses.md 몸의 틈): a see-through pixel there with the body within
-        // reach on both sides (left and right, or above and below) is filled with the nearest body colour in shade. Three
-        // passes, so a gap a little wider than the reach closes from its edges.
-        public void CloseGaps(bool[,] left, Rgba shade, int reach = 3)
+        // reach on both sides (left and right, or above and below) is filled with the body's own pixels mirrored in
+        // from the nearer side (MirrorInto); plain if nothing to mirror. Three passes, so a gap a little wider than the
+        // reach closes from its edges.
+        public void CloseGaps(bool[,] left, Rgba plain, int reach = 3)
         {
             bool Solid(int x, int y) => Inside(x, y) && this[x, y].A == 255;
             for (int pass = 0; pass < 3; pass++)
@@ -166,25 +184,66 @@ namespace Game.Client
                     for (int x = 0; x < Width; x++)
                     {
                         if (!left[x, y] || this[x, y].A > 0) continue;
-                        Rgba? Find(int dx, int dy)
+                        int Find(int dx, int dy)
                         {
                             for (int k = 1; k <= reach; k++)
-                                if (Solid(x + dx * k, y + dy * k)) return this[x + dx * k, y + dy * k];
-                            return null;
+                                if (Solid(x + dx * k, y + dy * k)) return k;
+                            return 0;
                         }
-                        var l = Find(-1, 0);
-                        var r = Find(1, 0);
-                        var u = Find(0, -1);
-                        var d = Find(0, 1);
-                        if (l != null && r != null || u != null && d != null)
-                        {
-                            var near = l ?? r ?? u ?? d ?? shade;
-                            fill.Add((x, y, near.Mix(shade, 0.6f)));
-                        }
+                        int l = Find(-1, 0), r = Find(1, 0), u = Find(0, -1), d = Find(0, 1);
+                        int row = y, column = x;
+                        if (l > 0 && r > 0)
+                            fill.Add((x, y, l <= r ? MirrorInto(x, y, x - l, s => Solid(s, row)) : MirrorInto(x, y, x + r, s => Solid(s, row))));
+                        else if (u > 0 && d > 0)
+                            fill.Add((x, y, u <= d ? MirrorInto(x, y, y - u, s => Solid(column, s), true) : MirrorInto(x, y, y + d, s => Solid(column, s), true)));
                     }
                 }
-                foreach (var (x, y, c) in fill) this[x, y] = c;
+                foreach (var (x, y, c) in fill) this[x, y] = c.A == 255 ? c : plain;
                 if (fill.Count == 0) break;
+            }
+        }
+
+        // A small hole the body closes all round (the outside cannot reach it, at most largest pixels) filled with the
+        // body's own pixels mirrored in from the nearer side, as CloseGaps does: a fist pressed against the trunk
+        // leaves one between them.
+        public void FillHoles(int largest)
+        {
+            bool Solid(int x, int y) => Inside(x, y) && this[x, y].A == 255;
+            var seen = new bool[Width, Height];
+            var queue = new Queue<(int, int)>();
+            for (int y0 = 0; y0 < Height; y0++)
+            {
+                for (int x0 = 0; x0 < Width; x0++)
+                {
+                    if (seen[x0, y0] || Solid(x0, y0)) continue;
+                    var group = new List<(int X, int Y)>();
+                    bool open = false;
+                    seen[x0, y0] = true;
+                    queue.Enqueue((x0, y0));
+                    while (queue.Count > 0)
+                    {
+                        var (x, y) = queue.Dequeue();
+                        group.Add((x, y));
+                        if (x == 0 || y == 0 || x == Width - 1 || y == Height - 1) open = true;
+                        foreach (var (nx, ny) in new[] { (x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1) })
+                        {
+                            if (!Inside(nx, ny) || seen[nx, ny] || Solid(nx, ny)) continue;
+                            seen[nx, ny] = true;
+                            queue.Enqueue((nx, ny));
+                        }
+                    }
+                    if (open || group.Count > largest) continue;
+                    var fill = new List<(int X, int Y, Rgba C)>();
+                    foreach (var (x, y) in group)
+                    {
+                        int l = 1, r = 1;
+                        while (x - l >= 0 && !Solid(x - l, y)) l++;
+                        while (x + r < Width && !Solid(x + r, y)) r++;
+                        int row = y;
+                        fill.Add((x, y, MirrorInto(x, y, l <= r ? x - l : x + r, s => Solid(s, row))));
+                    }
+                    foreach (var (x, y, c) in fill) this[x, y] = c.WithAlpha(255);
+                }
             }
         }
 
