@@ -20,7 +20,7 @@ namespace Game.Client
         const int MostStamps = 72;
         const float Longest = 1.4f;
 
-        sealed class Scene
+        internal sealed class Scene
         {
             public SkillDefinition Skill;
             public int Width, Height;
@@ -163,7 +163,7 @@ namespace Game.Client
             return fine;
         }
 
-        static Scene Make(SkillDefinition skill, Rgba slimeColor)
+        internal static Scene Make(SkillDefinition skill, Rgba slimeColor)
         {
             var weapon = skill.Class.Id == "warrior" ? HeroWeapon.Sword : skill.Class.Id == "archer" ? HeroWeapon.Bow : HeroWeapon.Staff;
             var scene = new Scene
@@ -276,7 +276,7 @@ namespace Game.Client
             return all;
         }
 
-        static PixelImage Render(Scene scene, PixelImage floor, float t)
+        internal static PixelImage Render(Scene scene, PixelImage floor, float t)
         {
             var image = new PixelImage(scene.Width, scene.Height);
             for (int y = 0; y < scene.Height; y += floor.Height)

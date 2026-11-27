@@ -16,7 +16,7 @@ namespace Game.Client
     {
         const int Tile = TileArt.Size;
         const int Columns = 12;
-        const int Wide = 10 * Tile, Tall = 8 * Tile;
+        internal const int Wide = 10 * Tile, Tall = 8 * Tile;
         const float After = 0.45f;
         // A body's feet are this far below where the host has it (its middle), in pixels.
         const int Feet = 5;
@@ -75,7 +75,7 @@ namespace Game.Client
         // One attack played out: the monster on the left, a player to its right, the marks where the host would lay
         // them (a sweep's wedges to either side, a push's circles walking out, a trap's runes round the player), what
         // the blow leaves on the floor, and for a call the ally it mends or rouses.
-        sealed class Scene
+        internal sealed class Scene
         {
             readonly MonsterDefinition _monster;
             readonly MonsterAttack _attack;
@@ -87,6 +87,8 @@ namespace Game.Client
             readonly MonsterDefinition _ally;
             // In pixels, y down, on the picture.
             readonly float _mx, _my, _px, _py, _ax, _ay;
+            public (float X, float Y) Monster => (_mx, _my);
+            public (float X, float Y) Player => (_px, _py);
             readonly List<(float Begins, float Lands, float X, float Y, float Dir)> _marks = new List<(float, float, float, float, float)>();
             public int MostMark, MostTell, MostLand, MostShot;
 
@@ -154,7 +156,7 @@ namespace Game.Client
             bool Under => _attack.Shape == MonsterAttackShape.Burrow || _attack.Shape == MonsterAttackShape.Ambush;
             bool Rushes => _attack.Shape == MonsterAttackShape.Charge || _attack.Shape == MonsterAttackShape.Swoop;
 
-            (HazardShape Area, float Size, float Width) Geometry()
+            public (HazardShape Area, float Size, float Width) Geometry()
             {
                 float r = World.PlayerRadius;
                 // A big body's marks reach from its edge, as the game lays them (MonsterAttackSheet.MarkOf).
@@ -331,7 +333,7 @@ namespace Game.Client
             // Where the monster's feet are at t (Lift under 0: not there to be seen): a leaper hops onto its mark in the
             // last moment, a blinker is at its mark once the telegraph is over, a rusher runs its path, a burrower is
             // under the ground until it comes up at its mark, a bomber flies at the player and is gone with its blast.
-            (float X, float Y, float Lift) Body(float t)
+            public (float X, float Y, float Lift) Body(float t)
             {
                 var (lx, ly) = _marks.Count > 0 ? (_marks[0].X, _marks[0].Y) : (_mx, _my);
                 float tele = _attack.Telegraph;

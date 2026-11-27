@@ -33,6 +33,11 @@ namespace Game.Client
                 // --only skillfx: just the skills' effects (out/skillfx/, SkillFxPreview).
                 return WriteSkillFx(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
             }
+            if (args.Length == 2 && args[0] == "--only" && args[1] == "fxmock")
+            {
+                // --only fxmock: the effects rework's now-and-new mock-ups (out/fxmock/, FxMockPreview, Docs/EffectsRework.md).
+                return WriteFxMock(Path.Combine(FindFolder(Path.Combine("DevTools", "ArtPreview")), "out")) ? 0 : 1;
+            }
             if (args.Length == 2 && args[0] == "--only" && args[1] == "monsterfx")
             {
                 // --only monsterfx: just the ordinary monsters' warnings and effects (out/monsterfx/, MonsterFxPreview).
@@ -264,6 +269,21 @@ namespace Game.Client
                 return false;
             }
             return SizesPreview.Write(output, monsters, HeroArt.Draw(Look.Side, HeroMove.Stand, 0, HeroGear.Plain(HeroWeapon.Sword), Rgba.Hex("#4D7FD9")));
+        }
+
+        static bool WriteFxMock(string output)
+        {
+            string classFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Classes"));
+            var classes = ClassSheet.Parse(File.ReadAllText(Path.Combine(classFolder, ClassSheet.ClassesFile)), File.ReadAllText(Path.Combine(classFolder, ClassSheet.SkillsFile)));
+            string monsterFolder = FindFolder(Path.Combine("Assets", "_Project", "Data", "Monsters"));
+            var monsters = MonsterSheet.Parse(File.ReadAllText(Path.Combine(monsterFolder, MonsterSheet.File)), File.ReadAllText(Path.Combine(monsterFolder, MonsterAttackSheet.File)));
+            if (!classes.Success || !monsters.Success)
+            {
+                foreach (string error in classes.Errors.Concat(monsters.Errors)) Console.Error.WriteLine(error);
+                return false;
+            }
+            return FxMockPreview.Write(Path.Combine(output, "fxmock"), classes, monsters, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0)),
+                HeroArt.Draw(Look.Side, HeroMove.Stand, 0, HeroGear.Plain(HeroWeapon.Sword), Rgba.Hex("#4D7FD9")));
         }
 
         static bool WriteSkillFx(string output)

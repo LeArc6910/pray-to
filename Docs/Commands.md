@@ -54,6 +54,8 @@ dotnet run --project DevTools/ArtPreview -- --only spider
 dotnet run --project DevTools/ArtPreview -- --only map
 # UI 개편 시안(out/uimock/: 양식 A·B·C와 추천 조합의 가방·대화·상점·성장 화면, 휴대폰 세로 가방·대화, compare_abc.png. Docs/UiRework.md 4-4)
 dotnet run --project DevTools/ArtPreview -- --only uimock
+# 이펙트 개편 시안(out/fxmock/: 이펙트 15개의 지금·개선안 프레임표와 GIF, all.png. Docs/EffectsRework.md)
+dotnet run --project DevTools/ArtPreview -- --only fxmock
 # 게임의 UI 스킨만(out/ui/: skin.png 조각 전부, windows.png 지금 화면에 입힌 모습, pixels.png 정수 배 틀, encounters.png·encounters_phone.png 상점·상자·작업대·모루·대화 창, growth.png·growth_phone.png 스킬·특성 트리·캐릭터 창, records.png·records_phone.png 일지·지도, bag_hud.png·bag_hud_phone.png 가방·HUD·쓰러짐 카드·메뉴. Docs/UiRework.md U1~U7)
 dotnet run --project DevTools/ArtPreview -- --only ui
 # 사냥 세트·정예 고유·보스 세트 아이콘과 사냥 재료(out/gear.png, Docs/Gear.md)
