@@ -148,7 +148,9 @@ namespace Game.Client
                 {
                     // The roll's slot on the PC bar can be clicked too.
                     foreach (var area in _rollButtons) _rollTapped |= area.Contains(point);
-                    foreach (var area in _swapButtons) _swapTapped |= area.Contains(point);
+                    // Not on a touch screen: a tap there also comes as a click a moment later, and a swap, which has no
+                    // wait, would undo itself (the roll's wait hid the same double).
+                    if (!UsingTouch) foreach (var area in _swapButtons) _swapTapped |= area.Contains(point);
                     foreach (var (area, slot) in _hotbarButtons)
                     {
                         if (area.Contains(point)) _hotbarTaps.Add(slot);
