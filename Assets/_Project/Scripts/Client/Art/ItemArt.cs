@@ -177,6 +177,8 @@ namespace Game.Client
             // A legendary is gold, with fiery stones.
             // Tinged with its boss's colour, so legendaries of one slot differ (LegendaryStones).
             var metal = item.IsLegendary ? Ramp.Of(Rgba.Hex("#E8B23A").Mix(LegendaryStones(item.Legendary).Light, 0.3f)) : Metal(item.Level);
+            // A set or unique piece is drawn in its sheet's colour (item_bases.csv tint, Docs/Gear.md).
+            if (item.Tint.Length > 0) metal = Ramp.Of(item.Tint);
             var stones = item.Slot == ItemSlot.Weapon ? (Rgba.Hex("#C88CFF"), Rgba.Hex("#7E46D0")) : (Rgba.Hex("#E8485A"), Rgba.Hex("#9A2234"));
             if (item.IsLegendary) stones = LegendaryStones(item.Legendary);
             // A weapon that adds an element's damage (2026-11-09) wears that element's stone: ember, frost or spark.

@@ -13,8 +13,8 @@
 
 ## 2026-11-27 13:30 장비 효과 틀(장비 확장 1단계, 데이터는 아직)
 
-- **바뀐 것**: 사람 요청 "장비 종류가 너무 부족해 … 세트 옵션·특이 기능·클래스 보너스". 설계안을 사람에게 보이고 확인을 기다리는 동안 그림이 필요 없는 Core 틀부터 넣었다. `item_bases.csv`에 `effects`·`class`·`class_bonus`·`tint` 칸, `sets.csv`에 `effects`·`class`·`class_bonus` 칸, `materials.csv`에 `drops` 칸(사냥 재료를 떨어뜨리는 몬스터와 확률)을 읽는다(모두 비워도 되는 칸이라 지금 시트는 그대로). 효과 열 가지(`Core/Items/GearEffects.cs`, 월드 규칙 `World.GearEffects.cs`): 처치 회복·마나, 구르면 보호막, 가시, 낮은 체력, 첫 타, 치명타 화상, 불타는·느려진 적 추가 피해, 보호막 중 피해. 클래스 보너스는 그 클래스일 때만 붙는다(`PlayerStats.From`). 정예는 그 단계의 고유 장비(`legendary`가 `elite`)를 그 줄의 확률로(챔피언은 절반) 떨군다. 툴팁에 효과(★), 클래스 보너스(적용/다른 클래스), 세트 진행(2/6, 적용) 표시(`ItemText.Describe`의 새 인자 `worn`·`classes`, 화면 연결은 다음 단계)
-- **요청 대조**: Core 틀 됨, 시험 `GearEffectTests` 9개 됨. **아직 안 함**: 새 장비·재료·제작법 데이터(설계안 확인 대기), 아이콘 색, 가방 툴팁 연결, 시험장 [장비], `--hits` 새 열, `Docs/Gear.md`
+- **바뀐 것**: 사람 요청 "장비 종류가 너무 부족해 … 세트 옵션·특이 기능·클래스 보너스". 설계안을 사람에게 보이고 확인을 기다리는 동안 그림이 필요 없는 Core 틀부터 넣었다. `item_bases.csv`에 `effects`·`class`·`class_bonus`·`tint` 칸, `sets.csv`에 `effects`·`class`·`class_bonus` 칸, `materials.csv`에 `drops` 칸(사냥 재료를 떨어뜨리는 몬스터와 확률)을 읽는다(모두 비워도 되는 칸이라 지금 시트는 그대로). 효과 열 가지(`Core/Items/GearEffects.cs`, 월드 규칙 `World.GearEffects.cs`): 처치 회복·마나, 구르면 보호막, 가시, 낮은 체력, 첫 타, 치명타 화상, 불타는·느려진 적 추가 피해, 보호막 중 피해. 클래스 보너스는 그 클래스일 때만 붙는다(`PlayerStats.From`). 정예는 그 단계의 고유 장비(`legendary`가 `elite`)를 그 줄의 확률로(챔피언은 절반) 떨군다. 툴팁에 효과(★), 클래스 보너스(적용/다른 클래스), 세트 진행(2/6, 적용) 표시(`ItemText.Describe`의 새 인자 `worn`·`classes`, 가방·모루 툴팁이 입은 장비와 클래스를 넘긴다). 아이콘은 `tint`가 있으면 그 색으로 칠한다(`ItemArt.GearColors`)
+- **요청 대조**: Core 틀 됨, 시험 `GearEffectTests` 9개 됨. **아직 안 함**: 새 장비·재료·제작법 데이터(설계안 확인 대기), 시험장 [장비], `--hits` 새 열, `Docs/Gear.md`
 - **로컬에서 할 일**: 없음(새 `.cs` 셋의 `.meta`만 Unity가 열 때 생긴다)
 - **로컬 확인**: [ ]
 

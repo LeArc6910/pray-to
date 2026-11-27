@@ -323,8 +323,11 @@ namespace Game.Client
                 .ToList();
         }
 
-        // The item's description for the pointer's box, as the old rows had it.
-        static string ItemTooltip(Item item) => string.Join("\n", ItemText.Describe(item));
+        // The item's description for the pointer's box, as the old rows had it: with how much of its set is worn and
+        // whether its class bonus counts (Docs/Gear.md).
+        string ItemTooltip(Item item) => string.Join("\n", Describe(item));
+
+        List<string> Describe(Item item) => ItemText.Describe(item, worn: _client.Equipment, classes: _client.Classes.Select(c => c.Id).ToList());
 
         const float CellGap = 4;
 
@@ -962,7 +965,7 @@ namespace Game.Client
             var previous = GUI.color;
             GUI.color = Palette.Of(item.Rarity);
             string sockets = item.Sockets.Count == 0 ? "" : " " + string.Concat(item.Sockets.Select(r => r == null ? "○" : "●"));
-            TipLabel(new GUIContent(Fit(ItemText.Name(item) + sockets, _nameWidth), string.Join("\n", ItemText.Describe(item))), GUILayout.Width(_nameWidth));
+            TipLabel(new GUIContent(Fit(ItemText.Name(item) + sockets, _nameWidth), string.Join("\n", Describe(item))), GUILayout.Width(_nameWidth));
             GUI.color = previous;
         }
 

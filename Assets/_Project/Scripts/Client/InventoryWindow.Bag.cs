@@ -451,7 +451,7 @@ namespace Game.Client
                 card.QuickAt = _hotbar.SlotOf(item);
                 card.Quick = slot => _hotbar.Put(item, slot);
             }
-            foreach (string line in ItemText.Describe(item).Skip(1)) card.Lines.Add((line.Trim(), Color.white));
+            foreach (string line in Describe(item).Skip(1)) card.Lines.Add((line.Trim(), Color.white));
             // Against what is worn in its slot: what putting it on would change, better in green, worse in red
             // (Docs/UiRework.md 4-4 비교는 기본으로 켠다).
             var worn = _client.Equipment[item.Base.Slot];
