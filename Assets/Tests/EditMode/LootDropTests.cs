@@ -244,7 +244,7 @@ namespace Game.Core.Tests
             foreach (string boss in new[] { "cave_warden", "crystal_queen", "lava_titan" })
             {
                 var legendaries = generator.LegendariesOf(boss).ToList();
-                Assert.AreEqual(2, legendaries.Count, boss);
+                Assert.AreEqual(3, legendaries.Count, boss + ": a three-piece set (Docs/Gear.md)");
                 Assert.IsTrue(legendaries.All(b => b.LegendaryChance > 0 && b.RequiredLevel == b.Level), boss);
             }
             for (int level = 1; level <= 40; level++) Assert.IsFalse(generator.BasesAt(level).Any(b => b.IsLegendary), $"level {level}");

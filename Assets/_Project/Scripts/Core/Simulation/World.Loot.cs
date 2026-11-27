@@ -131,6 +131,9 @@ namespace Game.Core
             if (_random.Chance(CoinChance * share)) DropCoins(1 + level / CoinLevels + _random.Next(level / CoinLevels + 1), Scatter(enemy.Position));
         }
 
+        // "rift" in a material's drops: any monster of a rift.
+        public const string RiftTrophy = "rift";
+
         // Hunting trophies for the crafted sets (materials.csv drops, Docs/Gear.md): each its own chance, shared out
         // like the rest. Only rolled for monsters that have one, so older sheets keep their random sequence.
         void DropTrophies(Enemy enemy, float share)
@@ -139,7 +142,7 @@ namespace Game.Core
             {
                 foreach (var (monster, chance) in material.Drops)
                 {
-                    if (monster == enemy.Definition.Id && _random.Chance(chance / 100f * share)) DropMaterial(material, Scatter(enemy.Position));
+                    if ((monster == enemy.Definition.Id || monster == RiftTrophy && enemy.Rift != 0) && _random.Chance(chance / 100f * share)) DropMaterial(material, Scatter(enemy.Position));
                 }
             }
         }

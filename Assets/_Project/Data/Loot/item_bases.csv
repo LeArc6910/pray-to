@@ -1,4 +1,4 @@
-id,name,slot,level,tags,implicit,sockets,weight,tool,legendary,chance,require,set
+id,name,slot,level,tags,implicit,sockets,weight,tool,legendary,chance,require,set,effects,class,class_bonus,tint
 # 1단계: 구리
 copper_sword,구리 검,weapon,1,melee,Damage+4~6,3,100,
 copper_bow,구리 활,weapon,1,ranged,Damage+3~5;AttackSpeed+5%,3,100,
@@ -54,18 +54,18 @@ void_boots,공허 장화,boots,40,,Armor+38~46,2,100,
 void_ring,공허 반지,ring,40,,MaxHealth+80~95,1,60,
 void_amulet,공허 목걸이,amulet,40,,Damage+18~22%,1,60,
 # 전설: 보스만 떨어뜨린다(legendary, chance%). 정해진 능력치, 소켓은 모두 열려 있다
-warden_maul,수호자의 바위망치,weapon,10,melee,Damage+15~18;Armor+8~10;AttackSpeed-10%,2,0,,cave_warden,25,,
-warden_heart,수호자의 심장석,amulet,10,,MaxHealth+20~25;HealthRegen+2;Armor+4~6,1,0,,cave_warden,25,,
-queen_fang,여왕의 독니,weapon,20,ranged,Damage+23~27;AttackSpeed+15%;CritChance+4,2,0,,crystal_queen,25,,
-queen_crown,수정 왕관,helmet,20,,Armor+18~22;Magic:Damage+20%;CritDamage+20,2,0,,crystal_queen,25,,
-titan_cinder,거인의 불씨,weapon,30,magic|fire,Damage+42~50;Magic:Damage+50%;Fire:Damage+25%;AttackSpeed-15%,3,0,,lava_titan,25,,
-titan_plate,용암 거인의 갑주,chest,30,,Armor+58~68;MaxHealth+52~62;HealthRegen+3,3,0,,lava_titan,25,,
-lord_scepter,공허 군주의 홀,weapon,40,magic|lightning,Damage+84~96;Magic:Damage+60%;Lightning:Damage+30%;AttackSpeed-15%,3,0,,void_lord,25,,
-void_band,공허의 고리,ring,40,,MaxHealth+75~90;Damage+15%;CritChance+5;AttackSpeed+8%,1,0,,void_lord,25,,
-general_blade,모르그의 불꽃 대검,weapon,15,melee,Damage+16~19;FireDamage+6~8;CritDamage+20;AttackSpeed-10%,2,0,,mad_general,25,,
-legion_mantle,군단장의 망토,chest,15,,Armor+20~24;MaxHealth+25~30;MoveSpeed+5%,2,0,,mad_general,25,,
-wraith_circlet,망령의 관,helmet,22,,Armor+20~24;MaxMana+30~36;Lightning:Damage+20%,2,0,,crown_wraith,25,,
-drowned_mantle,물에 젖은 왕의 망토,chest,22,,Armor+33~39;MaxHealth+32~38;HealthRegen+2,2,0,,crown_wraith,25,,
+warden_maul,수호자의 바위망치,weapon,10,melee,Damage+15~18;Armor+8~10;AttackSpeed-10%,2,0,,cave_warden,25,,warden
+warden_heart,수호자의 심장석,amulet,10,,MaxHealth+20~25;HealthRegen+2;Armor+4~6,1,0,,cave_warden,25,,warden
+queen_fang,여왕의 독니,weapon,20,ranged,Damage+28~33;AttackSpeed+15%;CritChance+4,2,0,,crystal_queen,25,,queen
+queen_crown,수정 왕관,helmet,20,,Armor+25~29;Magic:Damage+20%;CritDamage+20,2,0,,crystal_queen,25,,queen
+titan_cinder,거인의 불씨,weapon,30,magic|fire,Damage+57~67;Magic:Damage+50%;Fire:Damage+25%;AttackSpeed-15%,3,0,,lava_titan,25,,titan
+titan_plate,용암 거인의 갑주,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+3,3,0,,lava_titan,25,,titan
+lord_scepter,공허 군주의 홀,weapon,40,magic|lightning,Damage+113~133;Magic:Damage+60%;Lightning:Damage+30%;AttackSpeed-15%,3,0,,void_lord,25,,voidlord
+void_band,공허의 고리,ring,40,,MaxHealth+127~149;Damage+15%;CritChance+5;AttackSpeed+8%,1,0,,void_lord,25,,voidlord
+general_blade,모르그의 불꽃 대검,weapon,20,melee,Damage+34~40;FireDamage+13~17;CritDamage+20;AttackSpeed-10%,2,0,,mad_general,25,,general
+legion_mantle,군단장의 망토,chest,20,,Armor+43~51;MaxHealth+41~48;MoveSpeed+5%,2,0,,mad_general,25,,general
+wraith_circlet,망령의 관,helmet,30,,Armor+48~56;MaxMana+71~85;Lightning:Damage+20%,2,0,,crown_wraith,25,,wraith
+drowned_mantle,물에 젖은 왕의 망토,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+2,2,0,,crown_wraith,25,,wraith
 # 균열 전설(2026-11-04): 균열을 깨면 떨어진다(chance% + 단계마다 3%). 셋은 공허 순례자 세트(sets.csv)
 pilgrim_hood,공허 순례자의 두건,helmet,45,,Armor+62~72;MaxHealth+60~70;CritChance+3,2,0,,rift,4,,pilgrim
 pilgrim_robe,공허 순례자의 옷,chest,45,,Armor+105~120;MaxHealth+100~115;HealthRegen+3,3,0,,rift,4,,pilgrim
@@ -77,9 +77,112 @@ rift_band,균열 고리,ring,45,,SkillRank+1;MaxHealth+60~75,1,0,
 rift_charm,균열 부적,amulet,45,,CooldownRecovery+12~15%;Damage+10~12%,1,0,
 tide_amulet,물살의 목걸이,amulet,25,,MaxMana+30~40;ManaRegen+3~4,1,0,
 sandstride_boots,모래걸음 장화,boots,15,,Armor+7~9;MoveSpeed+6~8%,2,0,
-antlion_mandible,개미귀신의 턱칼,weapon,12,melee,Damage+13~15;CritChance+5;AttackSpeed+10%,2,0,,antlion,25,,
-sandwhirl_boots,모래 회오리 장화,boots,12,,Armor+7~9;MaxHealth+15~18;MoveSpeed+8%,2,0,,antlion,25,,
-abyssal_harpoon,심해의 작살,weapon,20,ranged,Damage+23~27;ColdDamage+7~9;CritChance+3,2,0,,tide_serpent,25,,
-scale_mail,뱀비늘 갑옷,chest,20,,Armor+30~36;MaxHealth+27~33;HealthRegen+2,2,0,,tide_serpent,25,,
+antlion_mandible,개미귀신의 턱칼,weapon,20,melee,Damage+34~40;CritChance+5;AttackSpeed+10%,2,0,,antlion,25,,antlion
+sandwhirl_boots,모래 회오리 장화,boots,20,,Armor+17~20;MaxHealth+35~42;MoveSpeed+8%,2,0,,antlion,25,,antlion
+abyssal_harpoon,심해의 작살,weapon,30,ranged,Damage+57~67;ColdDamage+17~22;CritChance+3,2,0,,tide_serpent,25,,serpent
+scale_mail,뱀비늘 갑옷,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+2,2,0,,tide_serpent,25,,serpent
 rift_scepter,끝없는 균열의 홀,weapon,48,magic,Damage+100~112;Magic:Damage+50%;CritChance+5,3,0,,rift,1,,
 rift_loop,끝없는 고리,ring,48,,Damage+15~18%;MaxHealth+80~95;CooldownRecovery+8~10%,1,0,,rift,1,,
+# 사냥 재료 세트(2026-11-27, Docs/Gear.md): 그 구간 광석 장비 × 1.15, 작업대에서 광석 제작법 + 사냥 재료
+beetle_weapon,딱정벌레 껍질 검,weapon,1,melee,Damage+5~6,3,0,,,,1,beetle,,,,#6E8A4A
+beetle_helmet,딱정벌레 껍질 투구,helmet,1,,Armor+4~5,2,0,,,,1,beetle,,,,#6E8A4A
+beetle_armor,딱정벌레 껍질 갑옷,chest,1,,Armor+8~9;MaxHealth+8~9,3,0,,,,1,beetle,,,,#6E8A4A
+beetle_boots,딱정벌레 껍질 장화,boots,1,,Armor+3,2,0,,,,1,beetle,,,,#6E8A4A
+beetle_ring,딱정벌레 껍질 반지,ring,1,,MaxHealth+7~8,1,0,,,,1,beetle,,,,#6E8A4A
+beetle_amulet,딱정벌레 껍질 목걸이,amulet,1,,Damage+4~5%,1,0,,,,1,beetle,,,,#6E8A4A
+slime_weapon,슬라임 젤 지팡이,weapon,1,magic,Damage+4~5;Magic:Damage+32%;AttackSpeed-15%,3,0,,,,1,slime,,,,#7CD94D
+slime_helmet,슬라임 젤 투구,helmet,1,,Armor+4~5,2,0,,,,1,slime,,,,#7CD94D
+slime_armor,슬라임 젤 갑옷,chest,1,,Armor+8~9;MaxHealth+8~9,3,0,,,,1,slime,,,,#7CD94D
+slime_boots,슬라임 젤 장화,boots,1,,Armor+3,2,0,,,,1,slime,,,,#7CD94D
+slime_ring,슬라임 젤 반지,ring,1,,MaxHealth+7~8,1,0,,,,1,slime,,,,#7CD94D
+slime_amulet,슬라임 젤 목걸이,amulet,1,,Damage+4~5%,1,0,,,,1,slime,,,,#7CD94D
+frostwolf_weapon,서리 늑대 활,weapon,10,ranged,Damage+9~11;AttackSpeed+5%,3,0,,,,5,frostwolf,,,,#C8E4F0
+frostwolf_helmet,서리 늑대 투구,helmet,10,,Armor+9~11,2,0,,,,5,frostwolf,,,,#C8E4F0
+frostwolf_armor,서리 늑대 갑옷,chest,10,,Armor+16~19;MaxHealth+16~19,3,0,,,,5,frostwolf,,,,#C8E4F0
+frostwolf_boots,서리 늑대 장화,boots,10,,Armor+6~7,2,0,,,,5,frostwolf,,,,#C8E4F0
+frostwolf_ring,서리 늑대 반지,ring,10,,MaxHealth+13~16,1,0,,,,5,frostwolf,,,,#C8E4F0
+frostwolf_amulet,서리 늑대 목걸이,amulet,10,,Damage+6~7%,1,0,,,,5,frostwolf,,,,#C8E4F0
+scorpion_weapon,전갈 독침 지팡이,weapon,10,magic|lightning,Damage+9~11;Magic:Damage+37%;AttackSpeed-15%,3,0,,,,5,scorpion,,,,#C8962E
+scorpion_helmet,전갈 독침 투구,helmet,10,,Armor+9~11,2,0,,,,5,scorpion,,,,#C8962E
+scorpion_armor,전갈 독침 갑옷,chest,10,,Armor+16~19;MaxHealth+16~19,3,0,,,,5,scorpion,,,,#C8962E
+scorpion_boots,전갈 독침 장화,boots,10,,Armor+6~7,2,0,,,,5,scorpion,,,,#C8962E
+scorpion_ring,전갈 독침 반지,ring,10,,MaxHealth+13~16,1,0,,,,5,scorpion,,,,#C8962E
+scorpion_amulet,전갈 독침 목걸이,amulet,10,,Damage+6~7%,1,0,,,,5,scorpion,,,,#C8962E
+crab_weapon,게 껍데기 검,weapon,20,melee,Damage+25~29,3,0,,,,15,crab,,,,#D2603C
+crab_helmet,게 껍데기 투구,helmet,20,,Armor+18~21,2,0,,,,15,crab,,,,#D2603C
+crab_armor,게 껍데기 갑옷,chest,20,,Armor+32~37;MaxHealth+30~35,3,0,,,,15,crab,,,,#D2603C
+crab_boots,게 껍데기 장화,boots,20,,Armor+13~15,2,0,,,,15,crab,,,,#D2603C
+crab_ring,게 껍데기 반지,ring,20,,MaxHealth+25~30,1,0,,,,15,crab,,,,#D2603C
+crab_amulet,게 껍데기 목걸이,amulet,20,,Damage+9~11%,1,0,,,,15,crab,,,,#D2603C
+salamander_weapon,불도롱뇽 비늘 지팡이,weapon,20,magic|fire,Damage+21~24;Magic:Damage+42%;AttackSpeed-15%,3,0,,,,15,salamander,,,,#E8502A
+salamander_helmet,불도롱뇽 비늘 투구,helmet,20,,Armor+18~21,2,0,,,,15,salamander,,,,#E8502A
+salamander_armor,불도롱뇽 비늘 갑옷,chest,20,,Armor+32~37;MaxHealth+30~35,3,0,,,,15,salamander,,,,#E8502A
+salamander_boots,불도롱뇽 비늘 장화,boots,20,,Armor+13~15,2,0,,,,15,salamander,,,,#E8502A
+salamander_ring,불도롱뇽 비늘 반지,ring,20,,MaxHealth+25~30,1,0,,,,15,salamander,,,,#E8502A
+salamander_amulet,불도롱뇽 비늘 목걸이,amulet,20,,Damage+9~11%,1,0,,,,15,salamander,,,,#E8502A
+shadow_weapon,그림자 비단 활,weapon,30,ranged,Damage+42~49;AttackSpeed+5%,3,0,,,,25,shadow,,,,#4A3A6E
+shadow_helmet,그림자 비단 투구,helmet,30,,Armor+35~41,2,0,,,,25,shadow,,,,#4A3A6E
+shadow_armor,그림자 비단 갑옷,chest,30,,Armor+60~71;MaxHealth+55~65,3,0,,,,25,shadow,,,,#4A3A6E
+shadow_boots,그림자 비단 장화,boots,30,,Armor+24~29,2,0,,,,25,shadow,,,,#4A3A6E
+shadow_ring,그림자 비단 반지,ring,30,,MaxHealth+50~58,1,0,,,,25,shadow,,,,#4A3A6E
+shadow_amulet,그림자 비단 목걸이,amulet,30,,Damage+13~16%,1,0,,,,25,shadow,,,,#4A3A6E
+voideye_weapon,공허 눈 지팡이,weapon,30,magic,Damage+42~49;Magic:Damage+47%;AttackSpeed-15%,3,0,,,,25,voideye,,,,#8C5AE8
+voideye_helmet,공허 눈 투구,helmet,30,,Armor+35~41,2,0,,,,25,voideye,,,,#8C5AE8
+voideye_armor,공허 눈 갑옷,chest,30,,Armor+60~71;MaxHealth+55~65,3,0,,,,25,voideye,,,,#8C5AE8
+voideye_boots,공허 눈 장화,boots,30,,Armor+24~29,2,0,,,,25,voideye,,,,#8C5AE8
+voideye_ring,공허 눈 반지,ring,30,,MaxHealth+50~58,1,0,,,,25,voideye,,,,#8C5AE8
+voideye_amulet,공허 눈 목걸이,amulet,30,,Damage+13~16%,1,0,,,,25,voideye,,,,#8C5AE8
+silk_weapon,거미 비단 지팡이,weapon,40,magic|fire,Damage+83~97;Magic:Damage+52%;AttackSpeed-15%,3,0,,,,35,silk,,,,#E8E0D0
+silk_helmet,거미 비단 투구,helmet,40,,Armor+65~76,2,0,,,,35,silk,,,,#E8E0D0
+silk_armor,거미 비단 갑옷,chest,40,,Armor+110~129;MaxHealth+101~118,3,0,,,,35,silk,,,,#E8E0D0
+silk_boots,거미 비단 장화,boots,40,,Armor+44~52,2,0,,,,35,silk,,,,#E8E0D0
+silk_ring,거미 비단 반지,ring,40,,MaxHealth+93~109,1,0,,,,35,silk,,,,#E8E0D0
+silk_amulet,거미 비단 목걸이,amulet,40,,Damage+19~24%,1,0,,,,35,silk,,,,#E8E0D0
+rift_weapon,균열 정수 지팡이,weapon,40,magic|cold,Damage+83~97;Magic:Damage+52%;AttackSpeed-15%,3,0,,,,35,rift,,,,#5AE8D2
+rift_helmet,균열 정수 투구,helmet,40,,Armor+65~76,2,0,,,,35,rift,,,,#5AE8D2
+rift_armor,균열 정수 갑옷,chest,40,,Armor+110~129;MaxHealth+101~118,3,0,,,,35,rift,,,,#5AE8D2
+rift_boots,균열 정수 장화,boots,40,,Armor+44~52,2,0,,,,35,rift,,,,#5AE8D2
+rift_ring,균열 정수 반지,ring,40,,MaxHealth+93~109,1,0,,,,35,rift,,,,#5AE8D2
+rift_amulet,균열 정수 목걸이,amulet,40,,Damage+19~24%,1,0,,,,35,rift,,,,#5AE8D2
+# 정예 고유(legendary=elite): 그 구간 정예가 떨군다. 광석 × 1.3과 특이 기능
+chief_fang,우두머리의 송곳니 목걸이,amulet,1,,Damage+4~5%,1,0,,elite,10,1,,kill_heal:5,,,#E8D2A0
+champion_spikes,챔피언의 가시 장화,boots,1,,Armor+3~4,2,0,,elite,10,1,,thorns:40,,,#A07050
+ratking_dagger,쥐왕의 단검,weapon,1,melee,Damage+6~7,3,0,,elite,10,1,,first_strike:50,,,#C8B090
+moss_ring,이끼 반지,ring,1,,MaxHealth+8~9,1,0,,elite,10,1,,low_health:35/25/15,,,#6EA050
+frostfang_bow,서리 송곳니 활,weapon,10,ranged|cold,Damage+10~12;AttackSpeed+5%,3,0,,elite,10,5,,vs_chilled:30,,,#A8E8FF
+stinger_ring,전갈 꼬리 반지,ring,10,,MaxHealth+15~18,1,0,,elite,10,5,,crit_burn:30,,,#E8A040
+spore_cloak,포자 망토,chest,10,,Armor+18~21;MaxHealth+18~21,3,0,,elite,10,5,,kill_heal:3,,,#B08CE8
+desertwind_boots,사막 바람 장화,boots,10,,Armor+7~8,2,0,,elite,10,5,,roll_ward:10/3/6,,,#E8C878
+magma_heart,용암 심장 목걸이,amulet,20,,Damage+9~11%,1,0,,elite,10,15,,vs_burning:30,,,#FF6A2A
+pearl_helm,진주 투구,helmet,20,,Armor+20~24,2,0,,elite,10,15,,kill_mana:6,,,#F0E8F8
+claw_blade,게 집게 검,weapon,20,melee,Damage+28~33,3,0,,elite,10,15,,low_health:40/40/0,,,#E86A4A
+ripple_ring,물결 반지,ring,20,,MaxHealth+29~34,1,0,,elite,10,15,,roll_ward:12/3/6;ward_damage:15,,,#5AC8E8
+abyss_eye,심연의 눈 목걸이,amulet,30,,Damage+14~17%,1,0,,elite,10,25,,first_strike:70,,,#6A44B8
+shadow_treads,그림자 장화,boots,30,,Armor+28~32,2,0,,elite,10,25,,roll_ward:12/3/5,,,#3A2E5A
+tentacle_staff,촉수 지팡이,weapon,30,magic,Damage+47~55;Magic:Damage+50%;AttackSpeed-15%,3,0,,elite,10,25,,kill_mana:8,,,#8C5AA8
+starlight_mail,별빛 갑옷,chest,30,,Armor+68~80;MaxHealth+62~73,3,0,,elite,10,25,,thorns:60,,,#C8C8FF
+riftfang_bow,균열 송곳니 활,weapon,40,ranged,Damage+93~110;AttackSpeed+5%,3,0,,elite,10,35,,crit_burn:40,,,#F0E8FF
+brink_ring,끝자락 반지,ring,40,,MaxHealth+105~123,1,0,,elite,10,35,,low_health:40/40/25,,,#B48CFF
+silk_hood,비단 두건,helmet,40,,Armor+73~86,2,0,,elite,10,35,,kill_heal:4,,,#E8E0D0
+rift_locket,균열 목걸이,amulet,40,,Damage+21~25%,1,0,,elite,10,35,,ward_damage:25;roll_ward:12/3/6,,,#8CE8FF
+# 보스 세트의 새 조각: 다음 구간 광석 × 1.575(마지막 구간 보스는 공허 × 1.65)
+warden_helm,수호자의 돌투구,helmet,10,,Armor+12~14;HealthRegen+1,2,0,,cave_warden,25,,warden
+antlion_carapace,개미귀신 껍질 갑옷,chest,20,,Armor+43~51;MaxHealth+41~48;MoveSpeed+4%,2,0,,antlion,25,,antlion
+queen_shroud,여왕의 실 망토,chest,20,,Armor+43~51;MaxHealth+41~48;CritChance+3,2,0,,crystal_queen,25,,queen
+general_greaves,장군의 군화,boots,20,,Armor+17~20;Fire:Damage+10%,2,0,,mad_general,25,,general
+serpent_helm,물살 비늘 투구,helmet,30,,Armor+48~56;Cold:Damage+10%,2,0,,tide_serpent,25,,serpent
+wraith_staff,망령의 홀,weapon,30,magic|lightning,Damage+57~67;Magic:Damage+54%;AttackSpeed-15%;MaxMana+20,2,0,,crown_wraith,25,,wraith
+titan_treads,거인의 용암 장화,boots,30,,Armor+33~39;Fire:Damage+10%,2,0,,lava_titan,25,,titan
+vein_staff,포식자의 광맥 지팡이,weapon,30,magic,Damage+57~67;Magic:Damage+54%;AttackSpeed-15%;MiningSpeed+40%,2,0,,vein_eater,25,,vein
+vein_plate,광맥 갑주,chest,30,,Armor+83~97;MaxHealth+75~88;HealthRegen+2,2,0,,vein_eater,25,,vein
+vein_ring,포식자의 턱 반지,ring,30,,MaxHealth+68~80;Armor+10,1,0,,vein_eater,25,,vein
+sakura_blade,벚꽃 검,weapon,40,melee,Damage+138~162;AttackSpeed+10%,2,0,,shrine_samurai,25,,samurai
+samurai_helm,검귀의 투구,helmet,40,,Armor+88~104;CritChance+3,2,0,,shrine_samurai,25,,samurai
+petal_boots,꽃잎 장화,boots,40,,Armor+61~71;MoveSpeed+6%,2,0,,shrine_samurai,25,,samurai
+lord_crown,군주의 왕관,helmet,40,,Armor+88~104;MaxMana+30,2,0,,void_lord,25,,voidlord
+knight_greatsword,흑철 대검,weapon,45,melee,Damage+144~169;AttackSpeed-10%,2,0,,black_knight,25,,knight
+knight_helm,흑철 투구,helmet,45,,Armor+93~109;HealthRegen+2,2,0,,black_knight,25,,knight
+knight_plate,흑철 갑옷,chest,45,,Armor+158~185;MaxHealth+144~169;HealthRegen+3,2,0,,black_knight,25,,knight
+mother_staff,실 잣는 지팡이,weapon,45,magic,Damage+118~139;Magic:Damage+61%;AttackSpeed-15%;MaxMana+30,2,0,,silk_mother,25,,mother
+mother_robe,거미 비단 옷,chest,45,,Armor+158~185;MaxHealth+144~169;HealthRegen+3,2,0,,silk_mother,25,,mother
+mother_ring,어미의 반지,ring,45,,MaxHealth+133~156;ManaRegen+3,1,0,,silk_mother,25,,mother

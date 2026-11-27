@@ -1,4 +1,4 @@
-id,name,places,description,fish,fuel,quality
+id,name,places,description,fish,fuel,quality,drops
 stone,돌,Wall,벽을 캐면 나온다. [놓기]로 돌벽을 세운다,,,
 copper_ore,구리 광석,,구리 광맥에서 캔다. 구리 장비의 재료,,,
 iron_ore,철 광석,,시작 지점에서 먼 철 광맥에서 캔다. 철 장비의 재료,,,
@@ -169,3 +169,14 @@ lotus_tea,연잎 차,,술통에서 호수 연근으로 만든다,,,
 cactus_seed,선인장 씨앗,,상인에게 산다. 모래 동굴에 심고 물을 주면 나흘 만에 열매가 열린다,,,
 cactus_fruit,선인장 열매,,모래 동굴의 선인장 열매. 따도 사흘마다 다시 열린다. 술통에 넣으면 선인장 주스,,,yes
 cactus_juice,선인장 주스,,술통에서 선인장 열매로 만든다,,,
+# 사냥 재료(2026-11-27, Docs/Gear.md): 몬스터가 제 재료와 따로 drops의 확률로 떨군다. 사냥 재료 세트의 재료
+beetle_shell,딱정벌레 껍질,,흙 동굴의 딱정벌레가 떨군다. 딱정벌레 껍질 세트의 재료,,,,cave_beetle:25|big_beetle:70|armored_beetle:35
+rat_pelt,쥐 가죽,,동굴 쥐가 떨군다. 슬라임 젤 세트의 재료,,,,cave_rat:30|big_slime:20|slime_king:100|slime_mother:100
+frost_pelt,서리 늑대 가죽,,얼음 동굴의 짐승이 떨군다. 서리 늑대 세트의 재료,,,,frost_wolf:30|yeti:70|frost_mammoth:100
+scorpion_stinger,전갈 독침,,모래 동굴의 전갈이 떨군다. 전갈 독침 세트의 재료,,,,sand_scorpion:30|scorpion_queen:70|bomb_scarab:15
+crab_shell,게 껍데기,,지하 호수의 게와 거북이 떨군다. 게 껍데기 세트의 재료,,,,lake_crab:30|great_crab:70|moss_turtle:100
+salamander_scale,도롱뇽 비늘,,용암 지대의 도롱뇽과 투석꾼이 떨군다. 불도롱뇽 비늘 세트의 재료,,,,salamander:30|magma_hurler:70|forge_keeper:100
+shadow_silk,그림자 비단,,공허의 심연의 추적자가 떨군다. 그림자 비단 세트의 재료,,,,abyss_stalker:30|shadow_stalker:60|void_mote:5
+void_lens,공허 수정체,,공허의 눈과 분열체가 떨군다. 공허 눈 세트의 재료,,,,void_eye:30|void_splitter:60|void_wisp:20
+spider_silk,거미 비단,,아라네의 새끼 거미가 떨군다. 거미 비단 세트의 재료,,,,silk_spiderling:20
+rift_ichor,균열 정수,,균열의 몬스터가 떨군다. 균열 정수 세트의 재료,,,,rift:12

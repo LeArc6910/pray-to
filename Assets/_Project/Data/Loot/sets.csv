@@ -1,3 +1,57 @@
-id,name,pieces,modifiers
+id,name,pieces,modifiers,effects,class,class_bonus
 pilgrim,공허 순례자,2,Damage+15%;MaxHealth+40
 pilgrim,,3,CritChance+6;CritDamage+40;MoveSpeed+8%
+beetle,딱정벌레 껍질,2,Armor+10%
+beetle,,4,,thorns:30
+beetle,,6,MaxHealth+8%,,warrior,Melee:Damage+20%;MaxHealth+10%
+slime,슬라임 젤,2,HealthRegen+1
+slime,,4,,kill_heal:3
+slime,,6,MaxMana+20,,summoner,Summon:Damage+30%
+frostwolf,서리 늑대,2,MoveSpeed+6%
+frostwolf,,4,,roll_ward:8/3/6
+frostwolf,,6,AttackSpeed+5%,,archer,Ranged:Damage+25%
+scorpion,전갈 독침,2,CritChance+4
+scorpion,,4,,crit_burn:30
+scorpion,,6,CritDamage+20,,storm_caller,Lightning:Damage+25%;Cold:Damage+25%
+crab,게 껍데기,2,Armor+12%
+crab,,4,,low_health:40/30/20
+crab,,6,HealthRegen+3,,warrior,Melee:Damage+20%;Armor+15%
+salamander,불도롱뇽 비늘,2,Fire:Damage+15%
+salamander,,4,,vs_burning:25
+salamander,,6,MaxMana+30,,fire_mage,Fire:Damage+30%
+shadow,그림자 비단,2,CritDamage+30
+shadow,,4,,first_strike:50
+shadow,,6,MoveSpeed+6%,,archer,Ranged:Damage+25%;CritChance+5
+voideye,공허 눈,2,MaxMana+30
+voideye,,4,,kill_mana:6
+voideye,,6,ManaRegen+3,,summoner,Summon:Damage+30%;MaxHealth+10%
+silk,거미 비단,2,Fire:Damage+15%;MaxHealth+5%
+silk,,4,,roll_ward:10/3/6;ward_damage:20
+silk,,6,MaxMana+40,,fire_mage,Fire:Damage+30%
+rift,균열 정수,2,Cold:Damage+15%;Lightning:Damage+15%
+rift,,4,,vs_chilled:25
+rift,,6,CooldownRecovery+10%,,storm_caller,Cold:Damage+25%;Lightning:Damage+25%
+warden,동굴 수호자,2,Armor+15%
+warden,,3,,roll_ward:15/3/6;ward_damage:25,warrior,MaxHealth+10%
+antlion,개미귀신,2,MoveSpeed+8%
+antlion,,3,,first_strike:60;kill_heal:4
+queen,수정 거미 여왕,2,CritChance+5
+queen,,3,,vs_chilled:30;first_strike:40,archer,Ranged:Damage+20%
+general,미쳐 버린 장군,2,Fire:Damage+20%
+general,,3,,crit_burn:40;low_health:40/30/20,warrior,Melee:Damage+20%
+serpent,물살 뱀,2,Cold:Damage+20%
+serpent,,3,,vs_chilled:35;roll_ward:12/3/6,archer,Ranged:Damage+20%;Cold:Damage+20%
+wraith,왕관의 망령,2,MaxMana+40
+wraith,,3,,kill_mana:8;ward_damage:20,summoner,Summon:Damage+30%
+titan,용암 거인,2,Fire:Damage+25%
+titan,,3,,vs_burning:35;thorns:40,fire_mage,Fire:Damage+30%
+vein,광맥 포식자,2,Armor+15%
+vein,,3,,thorns:60;kill_heal:3,summoner,Summon:Damage+30%;MaxHealth+10%
+samurai,벚꽃 검귀,2,AttackSpeed+10%
+samurai,,3,,first_strike:80;roll_ward:12/2/5,warrior,Melee:Damage+25%
+voidlord,공허의 군주,2,Lightning:Damage+25%
+voidlord,,3,,kill_mana:10;vs_chilled:30,storm_caller,Lightning:Damage+30%;Cold:Damage+30%
+knight,흑철 기사,2,Armor+15%
+knight,,3,,roll_ward:20/3/6;low_health:50/40/25,warrior,Melee:Damage+20%;MaxHealth+15%
+mother,실 잣는 어미,2,Summon:Damage+20%
+mother,,3,,kill_heal:4;kill_mana:6,summoner,Summon:Damage+30%;MaxHealth+10%

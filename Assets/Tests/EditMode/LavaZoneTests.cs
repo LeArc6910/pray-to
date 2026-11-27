@@ -134,8 +134,8 @@ namespace Game.Core.Tests
             Assert.AreEqual(30, Gear.Data.FindBase("obsidian_pickaxe").Level);
             Assert.IsTrue(Gear.Data.Recipes.Where(r => r.Item?.Level == 40).All(r => r.Ingredients.Any(i => i.Material.Id == "void_essence")),
                 "void gear takes the lord's essence");
-            Assert.AreEqual(6, Gear.Data.Recipes.Count(r => r.Item?.Level == 40));
-            Assert.AreEqual(2, new LootGenerator(Gear.Data).LegendariesOf("void_lord").Count());
+            Assert.AreEqual(6, Gear.Data.Recipes.Count(r => r.Item?.Level == 40 && r.Item.Set == null), "the ore pieces (the hunting sets come besides, Docs/Gear.md)");
+            Assert.AreEqual(3, new LootGenerator(Gear.Data).LegendariesOf("void_lord").Count());
             foreach (string id in new[] { "void_wisp", "abyss_stalker" }) Assert.AreEqual(Biome.Abyss, Monsters.Shipped.Find(id).Biome, id);
             Assert.AreEqual("공허의 심연", BiomeMap.Name(Biome.Abyss));
         }

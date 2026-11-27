@@ -308,7 +308,7 @@ namespace Game.Core.Tests
             var wraith = world.Bosses.Single(b => b.Definition.Id == "crown_wraith");
             Assert.Less(Vec2.Distance(wraith.Home, harbor.Center), harbor.Radius + WorldGenerator.ArenaRadius + 32, "beside the harbour");
             Assert.AreEqual("sunken_crown", wraith.Definition.MaterialId);
-            CollectionAssert.AreEquivalent(new[] { "wraith_circlet", "drowned_mantle" }, Gear.Data.Bases.Where(b => b.Legendary == "crown_wraith").Select(b => b.Id));
+            CollectionAssert.AreEquivalent(new[] { "wraith_circlet", "drowned_mantle", "wraith_staff" }, Gear.Data.Bases.Where(b => b.Legendary == "crown_wraith").Select(b => b.Id));
 
             // Monsters come over the whole map; round the nest only demons, and demons nowhere else.
             config.EnemyTarget = 400;
@@ -705,7 +705,7 @@ namespace Game.Core.Tests
             // The general drops his crest and his two legendaries, and the guide asks for the crest.
             var general = Bosses.Shipped.Bosses.Single(b => b.Id == "mad_general");
             Assert.AreEqual("general_crest", general.MaterialId);
-            CollectionAssert.AreEquivalent(new[] { "general_blade", "legion_mantle" }, Gear.Data.Bases.Where(b => b.Legendary == "mad_general").Select(b => b.Id));
+            CollectionAssert.AreEquivalent(new[] { "general_blade", "legion_mantle", "general_greaves" }, Gear.Data.Bases.Where(b => b.Legendary == "mad_general").Select(b => b.Id));
             Assert.IsTrue(Guide.Shipped.Goals.Any(g => g.Conditions.Any(c => c.Kind == "have" && c.Id == "general_crest")));
         }
 
