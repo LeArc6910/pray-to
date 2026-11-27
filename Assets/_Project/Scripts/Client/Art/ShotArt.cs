@@ -294,12 +294,29 @@ namespace Game.Client
         }
 
         // A dot of the line that shows where a shot will go before it goes: red, edged dark so it reads on any floor.
-        public static PixelImage AimDot()
+        // (F2: a step bolder and closer than it was, which read small and sparse: a red block of three pixels with a
+        // pale heart and dark tips, every AimStep tiles. thin: the dot as it was, for the preview's comparison.)
+        public const float AimStep = 0.5f;
+
+        public static PixelImage AimDot(bool thin = false)
         {
-            var image = new PixelImage(3, 3);
-            for (int y = 0; y < 3; y++)
-                for (int x = 0; x < 3; x++)
-                    image[x, y] = x == 1 && y == 1 ? Rgba.Hex("#FFE0D0") : x == 1 || y == 1 ? RimRed : EdgeDark.WithAlpha(200);
+            if (thin)
+            {
+                var small = new PixelImage(3, 3);
+                for (int y = 0; y < 3; y++)
+                    for (int x = 0; x < 3; x++)
+                        small[x, y] = x == 1 && y == 1 ? Rgba.Hex("#FFE0D0") : x == 1 || y == 1 ? RimRed : EdgeDark.WithAlpha(200);
+                return small;
+            }
+            var image = new PixelImage(5, 5);
+            for (int y = 0; y < 5; y++)
+                for (int x = 0; x < 5; x++)
+                {
+                    int dx = Math.Abs(x - 2), dy = Math.Abs(y - 2);
+                    if (dx == 0 && dy == 0) image[x, y] = Rgba.Hex("#FFE0D0");
+                    else if (dx <= 1 && dy <= 1) image[x, y] = RimRed;
+                    else if (dx + dy == 2) image[x, y] = EdgeDark.WithAlpha(210);
+                }
             return image;
         }
     }

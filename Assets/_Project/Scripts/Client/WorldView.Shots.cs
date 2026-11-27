@@ -39,7 +39,7 @@ namespace Game.Client
         // ends are held to this many at once, and the aim lines to this many dots.
         const int MostShotPops = 40;
         const int MostAimDots = 72;
-        const float AimStep = 0.6f;
+        const float AimStep = ShotArt.AimStep;
         const float AimReach = 7;
 
         // For the playtest and the tests: shots drawn here, ends playing, dots of the aim lines laid.
@@ -83,7 +83,7 @@ namespace Game.Client
             ? Sprites.Centered($"shot/pop/{(int)element}/{frame}", () => ShotArt.Pop(element, frame))
             : Sprites.Centered($"shot/pop/own{tint:X}/{frame}", () => ShotArt.Pop(element, frame, MonsterFx.OwnRamp(tint)));
 
-        static Sprite AimDotSprite => Sprites.Centered("shot/aim", ShotArt.AimDot);
+        static Sprite AimDotSprite => Sprites.Centered("shot/aim", () => ShotArt.AimDot());
 
         // An enemy's shot as it is first seen: what it is made of by the boss in view, drawn as large as it hits and
         // at the angle it flies. One that hangs still has no tail.
@@ -223,13 +223,14 @@ namespace Game.Client
         void AimOf(Body body, EntityView view)
         {
             var attack = view.BossAttack;
+            SpiralAim(view, attack);
             if (view.BossState != BossState.Telegraph || attack == null) return;
             float progress = Mathf.Clamp01((Time.time - body.BossSince) / TelegraphOf(body, attack));
             if (view.AimsRound && attack.Count > 0 && (attack.Shape == AttackShape.Burst || attack.Shape == AttackShape.Spiral))
             {
                 // LayAim spreads count lines over the degrees given, centred on the way given: all round but the last gap.
                 float degrees = 360f * (attack.Count - 1) / attack.Count;
-                int each = Mathf.Clamp(MostRoundDots / attack.Count, 2, 8);
+                int each = Mathf.Clamp(MostRoundDots / attack.Count, 2, 9);
                 LayAim(view.Position, Vec2.FromAngle(view.AimAngle + degrees * Mathf.Deg2Rad / 2), view.Boss.Radius, degrees, attack.Count, progress,
                     Mathf.Min(AimReach, 0.3f + each * AimStep), MostAimDots + MostRoundDots);
                 RoundAimDegrees = Mathf.Repeat(view.AimAngle * Mathf.Rad2Deg, 360);
@@ -238,6 +239,60 @@ namespace Game.Client
             }
             if (attack.Shape != AttackShape.Burst || attack.Angle <= 0 || attack.Angle >= 360) return;
             LayAim(view.Position, view.Facing, view.Boss.Radius, attack.Angle, attack.Count, progress);
+        }
+
+        // A spiral's later volleys (F2). The host sends the start only while the boss winds up, but the rest follows
+        // from what the screen already has: each later volley leaves SpiralSeconds after the last, turned on by the
+        // sheet's angle (World.UpdateBoss), for the sheet's width of volleys in all. So once the first has gone the
+        // lines step round to where the next will go and fill over the wait, and so on to the last.
+        const float SpiralSeconds = 0.3f;
+        int _spiralBoss = -1, _spiralLeft;
+        BossAttack _spiralAttack;
+        float _spiralAngle, _spiralSince = -1;
+        // For the playtest: later volleys whose lines were shown since the view was made.
+        public int SpiralAims { get; private set; }
+
+        void SpiralAim(EntityView view, BossAttack attack)
+        {
+            if (attack != null && attack.Shape == AttackShape.Spiral && view.BossState == BossState.Telegraph && view.AimsRound)
+            {
+                // Winding up: the start is known; the first volley's lines are AimOf's.
+                (_spiralBoss, _spiralAttack, _spiralAngle, _spiralSince) = (view.Id, attack, view.AimAngle, -1);
+                _spiralLeft = Mathf.Max(1, (int)attack.Width) - 1;
+                return;
+            }
+            if (_spiralBoss != view.Id) return;
+            if (attack != _spiralAttack || view.BossState != BossState.Recover || _spiralLeft <= 0)
+            {
+                _spiralBoss = -1;
+                return;
+            }
+            // The first volley left as the wind-up ended.
+            if (_spiralSince < 0)
+            {
+                _spiralSince = Time.time;
+                _spiralAngle += attack.Angle * Mathf.Deg2Rad;
+                SpiralAims++;
+            }
+            float progress = (Time.time - _spiralSince) / SpiralSeconds;
+            if (progress >= 1)
+            {
+                _spiralSince += SpiralSeconds;
+                _spiralAngle += attack.Angle * Mathf.Deg2Rad;
+                if (--_spiralLeft <= 0)
+                {
+                    _spiralBoss = -1;
+                    return;
+                }
+                SpiralAims++;
+                progress = Mathf.Clamp01((Time.time - _spiralSince) / SpiralSeconds);
+            }
+            float degrees = 360f * (attack.Count - 1) / attack.Count;
+            int each = Mathf.Clamp(MostRoundDots / attack.Count, 2, 9);
+            LayAim(view.Position, Vec2.FromAngle(_spiralAngle + degrees * Mathf.Deg2Rad / 2), view.Boss.Radius, degrees, attack.Count, 0.4f + 0.6f * progress,
+                Mathf.Min(AimReach, 0.3f + each * AimStep), MostAimDots + MostRoundDots);
+            RoundAimDegrees = Mathf.Repeat(_spiralAngle * Mathf.Rad2Deg, 360);
+            _roundAimAt = Time.time;
         }
 
         // A burst all the way round has dots of its own past the others' (MostAimDots), so its lines never starve a fan's.

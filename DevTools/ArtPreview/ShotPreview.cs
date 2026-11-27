@@ -32,7 +32,7 @@ namespace Game.Client
             }
             var others = new List<PixelImage>
             {
-                Over(floor, ItemArt.Spore), Over(floor, ItemArt.Orb), Over(floor, ItemArt.Arrow), Over(floor, Aim()),
+                Over(floor, ItemArt.Spore), Over(floor, ItemArt.Orb), Over(floor, ItemArt.Arrow), Over(floor, Aim(true)), Over(floor, Aim(false)),
             };
             rows.Add(others);
             var sheet = SkillFxPreview.Sheet(rows);
@@ -43,15 +43,17 @@ namespace Game.Client
             return true;
         }
 
-        // The aim line as the view lays it: a dot every 0.6 tiles.
-        static PixelImage Aim()
+        // The aim line as the view lays it: as it was (a 3px dot every 0.6 tiles) and as it is since F2 (a bolder
+        // dot every ShotArt.AimStep tiles), side by side to choose between.
+        static PixelImage Aim(bool thin)
         {
-            var image = new PixelImage(52, 21);
-            var dot = ShotArt.AimDot();
-            for (int i = 0; i < 5; i++)
-                for (int y = 0; y < 3; y++)
-                    for (int x = 0; x < 3; x++)
-                        image[2 + i * 10 + x, 14 - i * 2 + y] = dot[x, y];
+            var image = new PixelImage(60, 23);
+            var dot = ShotArt.AimDot(thin);
+            float step = (thin ? 0.6f : ShotArt.AimStep) * TileArt.Size;
+            for (int i = 0; i * step < 52; i++)
+                for (int y = 0; y < dot.Height; y++)
+                    for (int x = 0; x < dot.Width; x++)
+                        if (dot.IsSet(x, y)) image[2 + (int)(i * step) + x, 15 - (int)(i * step * 0.2f) + y] = dot[x, y];
             return image;
         }
 

@@ -254,8 +254,8 @@ namespace Game.Client
                         for (int i = 0; i < lines; i++)
                         {
                             float turn = lines == 1 ? 0 : (-_attack.Angle / 2 + _attack.Angle * i / (lines - 1)) * (float)Math.PI / 180;
-                            for (float d = (_monster.Radius + 0.3f) * Tile + t * 2.4f * Tile % (0.6f * Tile); d < _monster.Radius * Tile + far; d += 0.6f * Tile)
-                                _pictures.Add((dot, (int)Math.Round(_mx + d * Math.Cos(turn)) - 1, (int)Math.Round(_my - d * Math.Sin(turn)) - 1, 0.45f + 0.55f * p, 0));
+                            for (float d = (_monster.Radius + 0.3f) * Tile + t * 2.4f * Tile % (ShotArt.AimStep * Tile); d < _monster.Radius * Tile + far; d += ShotArt.AimStep * Tile)
+                                _pictures.Add((dot, (int)Math.Round(_mx + d * Math.Cos(turn)) - 2, (int)Math.Round(_my - d * Math.Sin(turn)) - 2, 0.45f + 0.55f * p, 0));
                         }
                     }
                     // The shot leaves when the telegraph ends; a returning one goes out, stands and comes back; a fan's

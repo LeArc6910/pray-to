@@ -1051,6 +1051,10 @@ namespace Game.Client
                 {
                     Trail(o, FxShape.Smoke, FxRamp.Smoke, t, c, 2, 8, 14, 3, 3, false);
                     Put(o, FxShape.Arrow, FxRamp.Steel, 11, 0, 0, 0, 1, face);
+                    // Where it will go off (F2, as the meteor's): its burst is wide, so a faint ring of dashes its size.
+                    // The quick, small ones (the fireball, the flame burst) show none: the screen would fill with rings.
+                    if (c.Mark > 0)
+                        Put(o, FxShape.Broken, FxRamp.Gold, SkillFxArt.Even(2 * c.Mark), SkillFxArt.BrokenFrame(1, 8, (int)(t * 5)), c.MarkX, c.MarkY, MarkAlpha(c.Span > 0 ? t / c.Span : 1) * 0.85f, 0, true);
                     // Its charge blinks.
                     bool lit = ((int)(t * 12) & 1) == 0;
                     Put(o, FxShape.Dot, FxRamp.Fire, lit ? 3 : 2, lit ? 3 : 1, dx * 5, dy * 5);
