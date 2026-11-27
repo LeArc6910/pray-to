@@ -936,7 +936,6 @@ namespace Game.Client
             "void_lord" => VoidLord(frame, view, pose),
             // The mad general of the demon nest (2026-11-10): the void lord's robed build in crimson and ember, a ball
             // of fire for the orb, horns through the hood.
-            "mad_general" => VoidLord(frame, view, pose, "#5A1A24", "#E86A3A", "#FF9A4A", "#FFD27A", horns: true),
             "tide_serpent" => Serpent(frame, view, pose),
             // The crown wraith under the harbour's lake (2026-11-11): the robed build drowned, sea-green and pale, a cold
             // orb, the sunken crown on its hood.
@@ -976,6 +975,22 @@ namespace Game.Client
                 BossPose.Roar => SamuraiPose.Kiai,
                 _ => SamuraiPose.Idle,
             }, frame, 1),
+            // The mad general of the demon nest (2026-11-27): a horned demon commander with a flaming greatsword and a war
+            // banner (GeneralPose in WorldView).
+            "mad_general" => GeneralArt.Draw(view, pose switch
+            {
+                BossPose.Windup => GeneralPose.Wind,
+                BossPose.Strike => GeneralPose.Cleave,
+                BossPose.Charge => GeneralPose.Charge,
+                BossPose.Roar => GeneralPose.Roar,
+                _ => GeneralPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => GeneralArt.FramesOf(GeneralPose.Wind) - 1,
+                BossPose.Strike => GeneralArt.StrikeFrame(GeneralPose.Cleave),
+                BossPose.Roar => GeneralArt.RoarRise + frame % 4,
+                _ => frame,
+            }, 1),
             // The cave warden of the fallen shrine (2026-11-26): likewise, a mossy stone golem (WardenPose in WorldView).
             "cave_warden" => WardenArt.Draw(view, pose switch
             {

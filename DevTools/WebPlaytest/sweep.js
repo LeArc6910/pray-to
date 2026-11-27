@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1018,6 +1018,61 @@ async function knight(browser) {
   await game.send('heal; clear; boss black_knight hurt 0.36');
   await game.wait(800);
   await game.shot('knight-phase2', '2페이즈 포효');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 미쳐 버린 장군 모르그 (2026-11-27, Docs/Bosses.md)
+// A commander gone mad: every attack is an order to an army that is no longer there. The sword thrust up and swept
+// down to point (fire falls there), the blade driven into the floor (ghostly spears cross), the banner pulled from his
+// back and planted (fire rings out), the banner waved to call soldiers, and his own greatsword (cleave, spin, a run).
+// Only the volley of burning arrows (불화살 일제 사격) shows a warning sign. A picture mid wind-up and one just as it
+// lands, for each attack, its entrance and its phases.
+async function general(browser) {
+  note('\n## 미쳐 버린 장군 모르그 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss mad_general');
+  await game.wait(700);
+  await game.shot('general-entrance', '입장: 꽂아 둔 대검 앞에 무릎 꿇은 장군');
+  const woke = await game.until(t => has(t.banner, '모르그') || has(t.entrance, '모르그'), 8000, game.texts);
+  check(!!woke, `붉은 고리 아레나에서 깨면 "모르그" 이름 카드나 배너 (${woke ? woke.banner || woke.entrance : '없음'})`);
+  await game.wait(1500);
+  await game.shot('general-rise', '일어나 칼을 뽑아 들고 포효');
+  await game.wait(2600);
+  await game.shot('general-awake', '깨어난 장군(등에 군기, 손에 불꽃 대검)');
+  // [attack, name, telegraph seconds, strong]
+  const uses = [
+    ['cleave', '베어 가르기(대검을 머리 뒤로)', 0.8, false],
+    ['hellfire', '불길 호령(칼을 하늘로, 전쟁 북)', 1.2, false],
+    ['dark_cross', '유령 창진(칼끝을 아래로 들어 올림)', 1.0, false],
+    ['war_charge', '군기 돌격(칼을 창처럼 겨눔)', 0.9, false],
+    ['flame_ring', '군기 꽂기(군기를 뽑아 높이)', 1.2, false],
+    ['ember_spiral', '광기의 회전(칼을 뒤로 끌어 웅크림)', 0.7, false],
+    ['call_soldiers', '병사 부르기(군기를 흔듦)', 0.8, false],
+    ['meteors', '불화살 일제 사격(필살기, 경고)', 1.4, true],
+  ];
+  for (const [attack, name, telegraph, strong] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss mad_general use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    if (attack !== 'ember_spiral' && attack !== 'call_soldiers') check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`general-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`general-${attack}-hit`, `${name} 떨어진 순간`);
+  }
+  await game.send('heal; clear; boss mad_general hurt 0.36');
+  await game.wait(800);
+  await game.shot('general-phase2', '2페이즈 포효(칼을 높이)');
+  await game.send('heal; clear; boss mad_general hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('mad_general') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('general-phase3', '3페이즈 광기(붉은 안개, 하얗게 달아오른 칼날)');
   await game.context.close();
 }
 
@@ -4117,6 +4172,7 @@ const OwnEntrances = [
   ['cave_warden', 4.2, 1.4, '바위 더미가 눈과 핵을 밝히고 일어나 두 주먹으로 바닥을 내려찍는다'],
   ['crystal_queen', 3.6, 1.4, '결정 고치에 금빛이 번지다 깨지고, 다리를 펴고 일어나 왕관을 빛낸다'],
   ['antlion', 3.8, 1.3, '굴 바닥에 턱 끝만 내놓고 숨어 모래를 튕기다 솟아올라 턱을 닫는다'],
+  ['mad_general', 3.8, 1.1, '꽂아 둔 대검 앞에 무릎 꿇었다가 일어나 칼을 뽑아 들고 포효한다'],
   ['vein_eater', 3.2, 1.2, '흙더미가 들썩이다 바닥을 뚫고 솟는다'], ['silk_mother', 3.4, 1.2, '천장에서 실을 타고 내려와 다리를 편다'],
   ['shrine_samurai', 3.6, 1.2, '정좌에서 일어나 칼자루에 손을 얹는다'], ['black_knight', 4.6, 1.4, '무릎을 펴고 망치를 끌며 나와 바닥을 내려찍는다'],
 ];
@@ -8019,7 +8075,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

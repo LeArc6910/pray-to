@@ -72,6 +72,9 @@ namespace Game.Core
         // Asleep in a cocoon of crystal that cracks with light and bursts; it unfolds and rears with its crown
         // blazing (the crystal spider queen).
         Cocoon,
+        // Kneeling before his planted sword: up on his feet, the sword pulled free and raised with a roar (the mad
+        // general).
+        Kneel,
     }
 
     public sealed class ArenaDefinition

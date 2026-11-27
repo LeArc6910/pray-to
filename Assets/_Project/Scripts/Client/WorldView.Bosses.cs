@@ -87,6 +87,7 @@ namespace Game.Client
             if (body.Id == "cave_warden") WardenExtras(body, view);
             if (body.Id == "antlion") AntlionExtras(body, view);
             if (body.Id == "crystal_queen") CrystalQueenExtras(body, view);
+            if (body.Id == "mad_general") GeneralExtras(body, view);
         }
 
         void ShowWarningSign(Body body, bool on)

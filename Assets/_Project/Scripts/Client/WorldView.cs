@@ -122,6 +122,8 @@ namespace Game.Client
             public bool EntersAgain;
             public float EnterSeconds = 1;
             public int EnterFrame = -1;
+            // When the mad general's war drum beats next (WorldView.General.cs).
+            public float DrumAt;
             public int EnterCue = -1;
             // Winding up straight out of a charge to charge again (a chain of dashes), in less time.
             public bool BossAgain;
@@ -1394,7 +1396,7 @@ namespace Game.Client
             }
             // A web or a pool of venom running out is no blow.
             if (!hazard.Harmful || IsPool(hazard)) return;
-            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || CrystalQueenLanded(hazard)) return;
+            if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
             var at = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
             var along = new Vector3(hazard.Direction.X, hazard.Direction.Y, 0);
             switch (hazard.Shape)
@@ -3200,6 +3202,11 @@ namespace Game.Client
             if (body.Kind == BodyKind.Boss && body.Id == "silk_mother")
             {
                 AnimateSpider(body, facing, dead, moving);
+                return;
+            }
+            if (body.Kind == BodyKind.Boss && body.Id == "mad_general")
+            {
+                AnimateGeneral(body, facing, dead, moving);
                 return;
             }
             if (body.Kind == BodyKind.Boss && body.Id == "cave_warden")

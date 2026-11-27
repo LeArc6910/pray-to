@@ -238,6 +238,30 @@ namespace Game.Client
                     }
                     break;
 
+                case BossEntrance.Kneel:
+                    // Embers drifting off the sword planted before him; up on his feet with a thud; the sword wrenched
+                    // from the floor in a burst of flame, raised, and a roar with the war drums.
+                    if (frame < GeneralArt.EnterStood && puff)
+                    {
+                        body.DustAt = Time.time + 0.15f;
+                        Kick(feet + new Vector3(0.4f, 0.4f, 0), Vector3.up * 0.5f, WarFireColor, 1);
+                    }
+                    if (Reached(GeneralArt.EnterStood)) Thud(body, 0.05f, 0.6f);
+                    if (Reached(GeneralArt.EnterDrawn))
+                    {
+                        AddFlash(feet + new Vector3(0.5f, 0.3f, 0), 1.2f, WarFireColor, FlashKind.Burst);
+                        Kick(feet + new Vector3(0.5f, 0.2f, 0), Vector3.up, WarFireColor, 5);
+                        Hear(Sound.Swing, feet, 1);
+                    }
+                    if (!body.EntersAgain && Reached(GeneralArt.EnterRoar))
+                    {
+                        Hear(Sound.Roar, feet, 1);
+                        Hear(Sound.Thump, feet, 0.9f);
+                        AddFlash(feet + new Vector3(0, 1.2f, 0), 2.4f, WarFireColor, FlashKind.Ring);
+                        if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
+                    }
+                    break;
+
                 case BossEntrance.Awaken:
                     // Grit trickling off the sleeping stone; its eyes light, then its core; it gets up with a thud,
                     // hauls its fists up and pounds the floor (WardenArt.Enter).

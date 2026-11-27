@@ -985,6 +985,7 @@ namespace Game.Client
             "shrine_samurai" => SamuraiArt.Draw(BossView.Front, SamuraiPose.Idle, 0, 1),
             "black_knight" => KnightArt.Draw(BossView.Front, KnightPose.Idle, 0, 1),
             "cave_warden" => WardenArt.Draw(BossView.Front, WardenPose.Idle, 0, 1),
+            "mad_general" => GeneralArt.Draw(BossView.Front, GeneralPose.Idle, 0, 1),
             "silk_mother" => SpiderArt.Draw(BossView.Front, SpiderPose.Idle, 0, 1),
             _ => CreatureArt.Boss(id, BossColor, 0),
         };

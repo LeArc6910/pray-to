@@ -412,13 +412,16 @@ namespace Game.Client
                 case "crystal_queen":
                     CrystalQueen(folder, arena);
                     return true;
+                case "general":
+                    General(folder, arena);
+                    return true;
                 case "entrances":
                     Entrances(folder, arena);
                     return true;
                 case "hero":
                     return HeroPreview.Write(folder, TileArt.Ground(TileArt.Index(GroundKind.Floor, 0, 0))) == 0;
                 default:
-                    Console.Error.WriteLine($"--only {name}: warden, antlion, crystal_queen, spider, knight, samurai, vein_eater, hero, entrances or arenas");
+                    Console.Error.WriteLine($"--only {name}: general, warden, antlion, crystal_queen, spider, knight, samurai, vein_eater, hero, entrances or arenas");
                     return false;
             }
         }
@@ -443,6 +446,7 @@ namespace Game.Client
             Spider(folder, arena);
             Warden(folder, arena);
             Antlion(folder, arena);
+            General(folder, arena);
             Entrances(folder, arena);
             Critters(Path.Combine(folder, "monsters.gif"), monsters, floor);
             People(Path.Combine(folder, "people.gif"), npcs, floor);
@@ -1254,6 +1258,8 @@ namespace Game.Client
                     (w, f) => Flip(WardenArt.Draw(ways[w].View, WardenPose.Enter, f, 1), ways[w].Flip), p => WardenArt.EnterFrameAt(p, false)),
                 ("antlion", AntlionArt.Width, AntlionArt.Height, AntlionArt.FramesOf(AntlionPose.Enter), 3.8f,
                     (w, f) => Flip(AntlionArt.Draw(ways[w].View, AntlionPose.Enter, f, 1), ways[w].Flip), p => AntlionArt.EnterFrameAt(p, false)),
+                ("general", GeneralArt.Width, GeneralArt.Height, GeneralArt.FramesOf(GeneralPose.Enter), 3.4f,
+                    (w, f) => Flip(GeneralArt.Draw(ways[w].View, GeneralPose.Enter, f, 1), ways[w].Flip), p => GeneralArt.EnterFrameAt(p, false)),
             };
             PixelImage Over(PixelImage image)
             {

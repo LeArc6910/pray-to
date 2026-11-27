@@ -591,6 +591,36 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The mad general (Docs/Bosses.md 미쳐 버린 장군 모르그, 2026-11-27): kneeling before his planted sword by the demon
+        // nest, rising with a roar, then mid wind-up of his order (the sword thrust up, the war drums) and of his
+        // banner planted (the banner pulled from his back and held high).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheMadGeneralRisesAndGivesOrders()
+        {
+            yield return Start();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "mad_general");
+            Assert.IsNotNull(boss, "No mad general.");
+            Assert.AreEqual(BossEntrance.Kneel, boss.Definition.Arena.Entrance, "arenas.csv gives the general his own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("general-kneeling");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.6f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the general comes in first.");
+            yield return Screens.Take("entrance-general");
+            yield return new WaitForSecondsRealtime(4f);
+            Assert.IsTrue(World.ForceAttack(boss, "hellfire"), "The order can be forced once he fights.");
+            yield return new WaitForSecondsRealtime(0.45f);
+            yield return Screens.Take("general-order-windup");
+            yield return new WaitForSecondsRealtime(2.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "flame_ring"));
+            yield return new WaitForSecondsRealtime(0.8f);
+            yield return Screens.Take("general-banner-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The cave warden (Docs/Bosses.md 동굴 수호자, 2026-11-26): asleep as a heap of mossy stone in the fallen shrine,
         // waking (eyes and core lit, getting up), then mid wind-up of its slam (both fists overhead) and of its cave-in
         // (arms spread, the core blazing, the warning sign).
