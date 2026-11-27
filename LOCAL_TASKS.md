@@ -1289,6 +1289,10 @@ DevTools/Local/setup.sh --commit
   - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/CrystalQueenArt.cs`, `Client/WorldView.CrystalQueen.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/CrystalQueenMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `queen-cocoon`·`entrance-queen`·`queen-prism-windup`·`queen-brood-windup`(`TheCrystalQueenHatchesAndWindsUp`)
   - (클라우드 웹 점검) `sweep.js --only queen`, `--only arenas`
   - (사람) `Docs/HumanChecklist.md`의 수정 거미 여왕
+- [ ] 197단계: 미쳐 버린 장군 모르그 새 그림과 지휘관 패턴 — Retro Diffusion 마족 장군의 다섯 시점, 코드로 그린 불꽃 대검과 등의 군기, 명령형 공격의 전조(칼을 하늘로·군기 뽑기·칼끝 꽂기)와 전쟁 북, 무릎 꿇은 입장(`arenas.csv` `Kneel`)(`Docs/Bosses.md` 지휘관 모르그)
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Client/Art/GeneralArt.cs`, `Client/WorldView.General.cs`의 `.meta`가 생기면 커밋한다(`DevTools/ArtPreview/GeneralMotions.cs`는 DevTools라 없음). 새 PlayMode 사진 `general-kneeling`·`entrance-general`·`general-order-windup`·`general-banner-windup`(`TheMadGeneralRisesAndGivesOrders`)
+  - (클라우드 웹 점검) `sweep.js --only general`, `--only arenas`
+  - (사람) `Docs/HumanChecklist.md`의 모르그
 
 ## 결과 보고
 
