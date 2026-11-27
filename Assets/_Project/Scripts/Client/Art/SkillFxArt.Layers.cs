@@ -392,7 +392,7 @@ namespace Game.Client
         // band narrowing behind it and breaking into dots at its tail.
         static PixelImage Smear(Rgba[] r, int radius, int degrees)
         {
-            float thick = Math.Clamp(radius * 0.2f, 4, 10);
+            float thick = Math.Clamp(radius * 0.26f, 5, 12);
             int size = 2 * (radius + 1) + 2;
             var image = new PixelImage(size, size);
             float centre = size / 2f, span = degrees / 2f;
@@ -405,7 +405,7 @@ namespace Game.Client
                     if (Math.Abs(angle) > span) continue;
                     float along = (angle + span) / (2 * span);
                     // Rounded off at the very head.
-                    float wide = thick * (float)Math.Pow(along, 1.4) * (along > 0.93f ? 0.35f + 0.65f * (1 - along) / 0.07f : 1);
+                    float wide = thick * (float)Math.Pow(along, 1.1) * (along > 0.93f ? 0.35f + 0.65f * (1 - along) / 0.07f : 1);
                     float off = (float)Math.Sqrt(u * u + v * v) - radius;
                     if (off > 0.5f || off < -wide - 0.5f) continue;
                     float across = -off / Math.Max(1, wide);

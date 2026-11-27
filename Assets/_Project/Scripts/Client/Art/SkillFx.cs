@@ -349,19 +349,42 @@ namespace Game.Client
                 // ---------------- warrior ----------------
                 case "whirlwind":
                 {
-                    // Steel crescents sweep round at the true reach, a turn and a quarter, slowing.
+                    // Two heavy smears sweep round at the true reach, a turn and a quarter, slowing: broad and pale
+                    // at the head, drawn out thin behind, shorter as they slow, with a lighter pair inside. Dust
+                    // lifts from the edge where a blade has just passed, sparks fly off along the cut.
+                    const float life = 0.62f;
                     Gather(o, m, t, A, R * 0.8f, 6, seed, cy: 5);
-                    if (In(t, A, 0.44f))
+                    if (In(t, A, life))
                     {
-                        float u = U(t, A, 0.44f), turn = face + 450 * Out(u), alpha = u < 0.6f ? 1 : 1 - (u - 0.6f) / 0.4f;
+                        float u = U(t, A, life), turn = face + 450 * Out(u), alpha = u < 0.75f ? 1 : 1 - (u - 0.75f) / 0.25f;
+                        int wide = 10 * (int)Math.Round((40 + 150 * (1 - u)) / 10), inner = 10 * (int)Math.Round(wide * 0.07f);
                         for (int k = 0; k < 2; k++)
                         {
-                            Put(o, FxShape.Crescent, m, (int)R - 1, 140, 0, 0, alpha, turn + k * 180);
+                            Put(o, FxShape.Smear, m, (int)R - 1, wide, 0, 0, alpha, turn + k * 180 - wide / 2f);
+                            Put(o, FxShape.Smear, m, (int)(R * 0.62f), inner, 0, 0, alpha * 0.6f, turn + 45 + k * 180 - inner / 2f);
                         }
+                        Put(o, FxShape.Edge, m, SkillFxArt.Even(2 * R), 1, 0, 0, 0.35f * alpha, 0, true);
                     }
                     Ring(o, m, t, A, R, 1, 0.08f, 0.2f);
-                    Puffs(o, FxRamp.Dust, 6, t, 0.26f, 0.72f, R * 0.7f, R * 0.95f, seed, 5, 0.5f);
-                    return 0.72f;
+                    for (int i = 0; i < 10; i++)
+                    {
+                        float swept = (i + 0.5f) * 36, born = A + (life - A) * (1 - (float)Math.Pow(1 - swept / 450, 1 / 3f)), p = (t - born) / 0.4f;
+                        if (p < 0 || p >= 1) continue;
+                        float angle = face + swept, far = R + 2 + 5 * p;
+                        Put(o, FxShape.Smoke, FxRamp.Dust, 5 + 2 * (int)(p * 2), p < 0.3f ? 0 : p < 0.6f ? 1 : 2, Cos(angle) * far, Sin(angle) * far + 3 * p, 0.55f * (1 - p));
+                    }
+                    for (int k = 0; k < 2; k++)
+                    {
+                        float at = A + 0.03f + k * 0.14f, turn = face + 450 * Out(U(at, A, life)) + k * 180;
+                        FxLayers.Embers(o, m, 4, t, at, 12, seed + k, Cos(turn) * R * 0.9f, Sin(turn) * R * 0.9f, 70, turn + 90, 0.22f);
+                    }
+                    // Glints where the blades stop.
+                    for (int i = 0; i < 5; i++)
+                    {
+                        float born = life - 0.1f + i * 0.03f;
+                        if (In(t, born, born + 0.2f)) Put(o, FxShape.Glint, m, t - born < 0.1f ? 7 : 3, 0, Cos(i * 72 + 40) * R, Sin(i * 72 + 40) * R);
+                    }
+                    return 0.75f;
                 }
                 case "war_cry":
                 {
@@ -384,6 +407,8 @@ namespace Game.Client
                         }
                     }
                     Float(o, FxShape.Dot, FxRamp.Gold, 1, 2, 6, t, 0.35f, 0.8f, 10, 18, seed, cy: 6);
+                    FxLayers.Shock(o, FxRamp.Gold, t, A, 20, 0, 2, 0.26f, true);
+                    if (In(t, A, 0.5f)) FxLayers.Light(o, FxRamp.Gold, 40, 0.7f * (1 - U(t, 0.25f, 0.5f)), 0, 6);
                     return 0.8f;
                 }
                 case "charge":
@@ -424,11 +449,17 @@ namespace Game.Client
                             }
                         }
                         Ring(o, FxRamp.Wind, t, 0, 11, 1, 0.08f, 0.22f);
+                        FxLayers.Shock(o, FxRamp.Wind, t, 0, 12, 0, 0, 0.24f, true);
                         return 0.8f;
                     }
                     // The blow at the end of it: a crescent ahead, the edge of its reach, dust.
-                    if (In(t, 0, 0.2f)) Put(o, FxShape.Crescent, m, 14, 100, (float)Math.Cos(c.Dir) * 4, Body + (float)Math.Sin(c.Dir) * 4, 1 - U(t, 0.1f, 0.2f), face);
+                    // The blow at the end of it: a heavy smear across the front, a wave over the floor at its true
+                    // reach, sparks thrown on ahead and dust left along the way.
+                    if (In(t, 0, 0.22f)) Put(o, FxShape.Smear, m, 19, 130, (float)Math.Cos(c.Dir) * 3, Body + (float)Math.Sin(c.Dir) * 3, 1 - U(t, 0.12f, 0.22f), face - 20);
                     Ring(o, m, t, 0, R, 2, 0.08f, 0.22f);
+                    FxLayers.Shock(o, m, t, 0, R / 1.3f, 0, 0, 0.24f, true);
+                    FxLayers.Embers(o, m, 6, t, 0, 16, seed, (float)Math.Cos(c.Dir) * 10, Body + (float)Math.Sin(c.Dir) * 10, 120, face, 0.24f);
+                    for (int i = 0; i < 3; i++) Puffs(o, FxRamp.Dust, 2, t, 0.02f * i, 0.4f, 1, 5, seed + i, 5, 0.45f, bx * L * (i + 0.5f) / 3.5f, by * L * (i + 0.5f) / 3.5f, 3);
                     Fly(o, FxShape.Dot, FxRamp.Dust, 2, 2, 6, t, 0.08f, 0.4f, 4, 16, seed, rise: 3);
                     return 0.55f;
                 }
@@ -486,22 +517,25 @@ namespace Game.Client
                 }
                 case "ground_slam":
                 {
+                    // The floor splits from the blow, a cloud of dust bursts up, a wave runs over the floor to the
+                    // true reach, rocks are thrown up over their shadows, and the splits stay a while.
                     Gather(o, FxRamp.Dust, t, A, R * 0.6f, 8, seed, cy: 2);
-                    // Cracks run out from the blow and stay a moment.
                     if (In(t, A, 0.95f))
                     {
-                        float grown = Math.Max(0.3f, Out(U(t, A, A + 0.08f))), alpha = t < 0.6f ? 0.9f : 0.9f * (1 - U(t, 0.6f, 0.95f));
-                        for (int i = 0; i < 7; i++)
+                        float grown = Math.Max(0.3f, Out(U(t, A, A + 0.1f))), alpha = t < 0.6f ? 1 : 1 - U(t, 0.6f, 0.95f);
+                        for (int i = 0; i < 8; i++)
                         {
-                            float angle = (i + Rnd(seed, i, 13) * 0.6f) / 7 * 360;
-                            int length = SkillFxArt.Step4(R * (0.5f + 0.3f * Rnd(seed, i, 14)) * grown);
-                            Put(o, FxShape.Crack, FxRamp.Dust, length, i & 3, Cos(angle) * (length / 2f + 2), Sin(angle) * (length / 2f + 2), alpha, angle, true);
+                            float angle = (i + Rnd(seed, i, 13) * 0.6f) / 8 * 360;
+                            int length = SkillFxArt.Step4(R * (0.6f + 0.3f * Rnd(seed, i, 14)) * grown);
+                            Put(o, FxShape.Crack, FxRamp.Dust, length, SkillFxArt.SplitFrame(i + seed, t < 0.2f ? 1 : 2), Cos(angle) * (length / 2f + 2), Sin(angle) * (length / 2f + 2), alpha, angle, true);
                         }
                     }
-                    if (In(t, A, 0.34f)) Put(o, FxShape.Blob, FxRamp.Dust, 22, (int)(U(t, A, 0.34f) * 5.99f), 0, 2);
+                    FxLayers.Ball(o, FxRamp.Dust, t, A, R * 0.36f, seed, 0, 2);
+                    FxLayers.Shock(o, FxRamp.Dust, t, A, R / 1.3f, 0, 0, 0.3f, true);
                     Ring(o, m, t, A, R, 3, 0.12f, 0.34f);
-                    Fly(o, FxShape.Chunk, FxRamp.Dust, 3, 0, 10, t, A, 0.42f, 6, R * 0.9f, seed, hop: 9);
-                    Puffs(o, FxRamp.Dust, 10, t, 0.22f, 0.85f, R * 0.82f, R, seed, 6, 0.5f);
+                    FxLayers.Rubble(o, FxRamp.Dust, 6, t, A, R * 0.75f, seed);
+                    Fly(o, FxShape.Chunk, FxRamp.Dust, 3, 0, 6, t, A, 0.42f, 6, R * 0.9f, seed, hop: 9);
+                    Puffs(o, FxRamp.Dust, 10, t, 0.2f, 0.85f, R * 0.8f, R, seed, 7, 0.55f);
                     return 0.95f;
                 }
                 case "iron_skin":
@@ -520,6 +554,8 @@ namespace Game.Client
                     }
                     Ring(o, FxRamp.Steel, t, 0.18f, 12, 1, 0.06f, 0.2f, cy: Body);
                     Fly(o, FxShape.Dot, FxRamp.Steel, 1, 2, 5, t, 0.36f, 0.3f, 10, 17, seed, cy: Body);
+                    FxLayers.Embers(o, FxRamp.Steel, 5, t, 0.2f, 13, seed, 0, Body, life: 0.22f);
+                    if (In(t, 0.14f, 0.4f)) FxLayers.Light(o, FxRamp.Steel, 28, 0.5f * (1 - U(t, 0.25f, 0.4f)), 0, Body, 3);
                     return 0.7f;
                 }
                 case "blade_storm":
@@ -537,11 +573,13 @@ namespace Game.Client
                         for (int i = 0; i < blades; i++)
                         {
                             float angle = turn + i * 60;
-                            Put(o, FxShape.Crescent, m, SkillFxArt.Step4(orbit), 52, 0, 0, alpha * 0.8f, angle - 26);
+                            Put(o, FxShape.Smear, m, SkillFxArt.Step4(orbit), 60, 0, 0, alpha * 0.85f, angle - 62);
                             Put(o, FxShape.Blade, m, 15, 0, Cos(angle) * (orbit - 2), Sin(angle) * (orbit - 2), alpha, angle + 90);
                         }
                     }
                     Ring(o, m, t, 0.12f, R, 2, 0.14f, 0.3f);
+                    FxLayers.Shock(o, m, t, 0.12f, R / 1.3f, 0, 0, 0.32f, true);
+                    FxLayers.Embers(o, m, 8, t, 0.56f, R * 0.25f, seed, life: 0.24f);
                     if (In(t, 0.58f, 0.95f))
                     {
                         float u = U(t, 0.58f, 0.95f);
