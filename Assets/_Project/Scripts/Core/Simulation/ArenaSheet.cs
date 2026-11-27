@@ -75,6 +75,9 @@ namespace Game.Core
         // Kneeling before his planted sword: up on his feet, the sword pulled free and raised with a roar (the mad
         // general).
         Kneel,
+        // Under the water of its flooded hall with only ripples showing: bubbles rising, the head breaking the
+        // surface, then up out of the water with the frills flared and a roar (the tide serpent).
+        Surface,
     }
 
     public sealed class ArenaDefinition

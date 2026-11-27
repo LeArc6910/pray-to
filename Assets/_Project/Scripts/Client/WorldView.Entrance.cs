@@ -156,7 +156,7 @@ namespace Game.Client
         {
             // Under the floor or up in the roof it casts no shadow: asleep, and under the floor until it breaks through.
             var entrance = view.Boss.Arena?.Entrance ?? BossEntrance.Common;
-            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush;
+            bool hidden = entrance == BossEntrance.Burrow || entrance == BossEntrance.Thread || entrance == BossEntrance.Ambush || entrance == BossEntrance.Surface;
             if (view.BossState == BossState.Dormant && hidden && !view.IsDead) body.Shadow.enabled = false;
             if (view.BossState != BossState.Enter)
             {
@@ -165,6 +165,7 @@ namespace Game.Client
             }
             if (entrance == BossEntrance.Burrow && body.EnterFrame < VeinEaterArt.EmergeBreak) body.Shadow.enabled = false;
             if (entrance == BossEntrance.Ambush && body.EnterFrame < AntlionArt.EnterBurst) body.Shadow.enabled = false;
+            if (entrance == BossEntrance.Surface && body.EnterFrame < SerpentArt.EnterBurst) body.Shadow.enabled = false;
             var feet = body.Position;
             float since = Time.time - body.BossSince;
             bool puff = Time.time >= body.DustAt;
@@ -350,6 +351,35 @@ namespace Game.Client
                     {
                         AddFlash(feet + new Vector3(0, 0.3f, 0), 1.2f, Color.white, FlashKind.Impact);
                         Hear(Sound.Bite, feet, 1);
+                    }
+                    break;
+
+                case BossEntrance.Surface:
+                    // Bubbles rising through the still water of its hall; the head breaks the surface and looks about;
+                    // it bursts up out of the water with its frills flared and roars (SerpentArt.Enter).
+                    if (frame < SerpentArt.EnterBurst && puff)
+                    {
+                        body.DustAt = Time.time + 0.14f;
+                        Bits(feet + (Vector3)(Random.insideUnitCircle * 1.2f), Vector3.up * 0.6f, TideColor, 1);
+                    }
+                    if (Reached(SerpentArt.EnterPeek))
+                    {
+                        Bits(feet + new Vector3(0, 0.6f, 0), Vector3.up, TideColor, 5);
+                        Hear(Sound.Splash, feet, 0.7f);
+                    }
+                    if (Reached(SerpentArt.EnterBurst - 5) && Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.12f);
+                    if (Reached(SerpentArt.EnterBurst))
+                    {
+                        AddFlash(feet, 3f, TideColor, FlashKind.Burst);
+                        AddBossFx(BossFx.Geyser, feet, new BossContext { Ramp = FxRamp.Cold, Size = 1.6f * Ppu, Big = true, Seed = 17 });
+                        Thud(body, 0.08f, 0.6f);
+                        Hear(Sound.Splash, feet, 1);
+                        Hear(Sound.Water, feet, 0.8f);
+                    }
+                    if (!body.EntersAgain && Reached(SerpentArt.EnterRoar))
+                    {
+                        AddFlash(feet + new Vector3(0, 2f, 0), 1.6f, TideColor, FlashKind.Ring);
+                        Hear(Sound.Roar, feet, 1);
                     }
                     break;
 

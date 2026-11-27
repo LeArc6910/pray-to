@@ -75,6 +75,14 @@ namespace Game.Client
             Add("mad_general", "flame_ring", BossFx.FireBand, HazardForm.Donut, 6f, 2.4f, 0, fire, r => { r.Context.Inner = 2.4f * T; r.Context.Dir = 90; (r.Wide, r.Tall, r.AtY) = (216, 216, 0.5f); });
             Add("mad_general", "ember_wake", BossFx.FireBand, HazardForm.Donut, 3.6f, 1.2f, 0, fire, r => { r.Context.Inner = 1.2f * T; r.Context.Dir = 90; (r.Wide, r.Tall, r.AtY) = (136, 136, 0.5f); });
             Add("mad_general", "cinders", BossFx.Cinders, HazardForm.Circle, 1, 0, 0, fire, r => { r.NoShape = true; r.Tall = 48; r.Context = new BossContext { Ramp = fire, Size = 18, Count = 3, Seed = 4 }; });
+            var water = FxRamp.Cold;
+            Add("tide_serpent", "tail_sweep", BossFx.Wave, HazardForm.Cone, 3.6f, 120, 0, water, r => { r.Context.Width = 120; r.AtX = 0.2f; r.AtY = 0.5f; r.Tall = 144; });
+            Add("tide_serpent", "water_jet", BossFx.Torrent, HazardForm.Band, 12f, 1.4f, 0, water, r => { r.Wide = 216; r.Tall = 64; r.AtX = 0.06f; r.AtY = 0.5f; });
+            Add("tide_serpent", "whirlpool", BossFx.Maelstrom, HazardForm.Donut, 6.5f, 2.4f, 0, water, r => { r.Context.Inner = 2.4f * T; (r.Wide, r.Tall, r.AtY) = (232, 232, 0.5f); });
+            Add("tide_serpent", "undertow", BossFx.Maelstrom, HazardForm.Donut, 7f, 1.2f, 0, water, r => { r.Context.Inner = 1.2f * T; (r.Wide, r.Tall, r.AtY) = (240, 240, 0.5f); });
+            Add("tide_serpent", "tidal_trail", BossFx.Geyser, HazardForm.Circle, 1.2f, 0, 0, water, r => { r.Tall = 128; r.AtY = 0.75f; });
+            Add("tide_serpent", "spray_rain", BossFx.Geyser, HazardForm.Circle, 1.4f, 0, 0, water, r => { r.Context.Big = true; r.Tall = 144; r.AtY = 0.78f; });
+            Add("tide_serpent", "deep_share", BossFx.Geyser, HazardForm.Circle, 1.8f, 0, 0, null, r => { r.Tone = WarnTone.Gather; r.Context.Ramp = water; r.Context.Big = true; r.Tall = 160; r.AtY = 0.78f; });
             var dust = FxRamp.Dust;
             Add("stone", "slam", BossFx.Slam, HazardForm.Circle, 2.5f, 0, 0, dust, r => r.Tall = 112);
             Add("stone", "slam over cracks", BossFx.Slam, HazardForm.Circle, 2f, 0, 0, dust, r => r.Context.Plain = true);

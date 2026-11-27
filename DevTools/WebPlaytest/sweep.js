@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion serpent queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards bossfx hits shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -1270,6 +1270,63 @@ async function antlion(browser) {
   const last = await game.state();
   check((last.bosses || '').includes('antlion') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
   await game.shot('antlion-phase3', '3페이즈(턱 끝이 붉게 물든다)');
+  await game.context.close();
+}
+
+// ---------------------------------------------------------------- 물살 뱀 (2026-11-28, Docs/Bosses.md)
+// A sea serpent coiled in three loops: every attack has its own wind-up of the whole body (the head drawn back low
+// before the lash, the head reared and the throat swelling before the jet, swelling all over before the bubbles, the
+// head dipped to the floor before the surge, the coils winding down before the whirlpool, towering before the crash,
+// the frills flared before the cross, rearing as high as it goes before the spout). Only the spray rain (물보라) shows a
+// warning sign. It comes in from under the water of its hall. A picture mid wind-up and one just as the blow lands,
+// for each attack, its entrance and its phases.
+async function serpent(browser) {
+  note('\n## 물살 뱀 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('equip void_sword void_helmet void_armor void_boots; heal');
+  await game.send('heal; goto boss tide_serpent');
+  await game.wait(700);
+  await game.shot('serpent-entrance', '입장: 물속에 잠겨 물결만 보인다');
+  const woke = await game.until(t => has(t.banner, '물살 뱀') || has(t.entrance, '물살 뱀'), 8000, game.texts);
+  check(!!woke, `수몰된 홀에서 깨면 "물살 뱀" 이름 카드나 배너 (${woke ? woke.banner || woke.entrance : '없음'})`);
+  await game.wait(1500);
+  await game.shot('serpent-surface', '입장: 머리를 내밀고 물 위로 솟는다');
+  await game.wait(2600);
+  await game.shot('serpent-awake', '깨어난 물살 뱀');
+  // [attack, name, telegraph seconds, strong, marked]
+  const uses = [
+    ['tail_sweep', '꼬리 휩쓸기(머리를 낮게 젖히고 똬리를 감음)', 0.6, false, true],
+    ['water_jet', '물줄기(머리를 젖히고 목이 부풂)', 0.7, false, true],
+    ['bubble_burst', '물방울(온몸이 부풂)', 0.5, false, false],
+    ['tidal_trail', '밀물(머리를 바닥에 박음)', 0.7, false, true],
+    ['whirlpool', '소용돌이(똬리를 감으며 가라앉음)', 1.0, false, true],
+    ['deep_share', '수압(높이 솟음)', 1.1, false, true],
+    ['tidal_cross', '물살 십자(볏을 펼침)', 1.0, false, true],
+    ['bubble_spiral', '물방울 나선(부풀어 돈다)', 0.5, false, false],
+    ['spray_rain', '물보라(필살기, 경고, 가장 높이 솟음)', 1.4, true, true],
+  ];
+  for (const [attack, name, telegraph, strong, marked] of uses) {
+    await game.send('heal; clear');
+    await game.wait(1500);
+    await game.send(`heal; boss tide_serpent use ${attack}`);
+    await game.wait(Math.round(telegraph * 700));
+    const s = await game.state();
+    if (marked) check((s.marksShown || 0) > 0, `${name}: 전조 동안 바닥 표시가 보인다 (표시 ${s.marksShown})`);
+    check(!!s.warningSign === strong, `${name}: 경고 표지 ${strong ? '있음' : '없음'} (${s.warningSign})`);
+    await game.shot(`serpent-${attack}`, `${name} 전조`);
+    await game.wait(Math.round(telegraph * 300) + 160);
+    await game.shot(`serpent-${attack}-hit`, `${name} 떨어진 순간`);
+  }
+  await game.send('heal; clear; boss tide_serpent hurt 0.36');
+  await game.wait(800);
+  await game.shot('serpent-phase2', '2페이즈 포효(볏을 펴고 머리를 높이)');
+  await game.send('heal; clear; boss tide_serpent hurt 0.33');
+  await game.wait(2500);
+  const last = await game.state();
+  check((last.bosses || '').includes('tide_serpent') && (last.bosses || '').includes(':p3:'), `체력을 깎으면 3페이즈 (${last.bosses})`);
+  await game.shot('serpent-phase3', '3페이즈(눈과 볏 끝이 보랏빛으로)');
   await game.context.close();
 }
 
@@ -3045,6 +3102,9 @@ const BossBlows = {
   elements: ['circle -7 3 2 0 0 F lava_titan slam', 'cone -4 2.6 3.6 80 0 F lava_titan fire_wave', 'circle 3 3.2 1.8 0 0 F void_lord star_fall', 'line 4.5 0.8 5 1.4 0 F void_lord beam',
     'circle -7 -3 1.6 0 0 F tide_serpent spray_rain', 'cone -4.6 -3.4 3.4 80 0 F tide_serpent tail_sweep', 'circle 1.4 -3.2 1.5 0 0 F crown_wraith lightning_fall',
     'cone 3.6 -3.4 3.2 80 0 F crown_wraith grasp'],
+  // The tide serpent's own water (2026-11-28): the wave, the jet, the whirl and the columns.
+  serpent: ['cone -8 2.6 3.6 120 0 F tide_serpent tail_sweep', 'circle -2.2 3 1.2 0 0 F tide_serpent tidal_trail', 'share 3 3.2 1.8 0 0 F tide_serpent deep_share',
+    'circle 7 3.2 1.4 0 0 F tide_serpent spray_rain', 'line -8 -3.4 8 1.4 0 F tide_serpent water_jet', 'ring 5 -2.4 3.4 1.4 0 F tide_serpent whirlpool'],
   // F3: the stone bosses' own attacks by their own names (E6 looked at them only as the warden's).
   vein: ['cone -8 2.6 3.6 120 0 F vein_eater claw', 'circle -2.6 3 1.5 0 0 F vein_eater cave_in', 'circle 2.4 2.6 2.6 0 0 F vein_eater burrow',
     'circle -6 -2.8 3.2 0 0 F vein_eater quake', 'circle 0.4 -3.4 1.2 0 0 F vein_eater spike_line', 'ring 5.6 -2.2 3.6 1.4 0 F vein_eater collapse_ring'],
@@ -3061,7 +3121,7 @@ async function bossfx(browser) {
   await game.send('goto wild');
   await clearRoom(game, 12, 7);
   await game.send('monsters hold; heal; face 1 0');
-  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', elements: '용암·공허·물·망령', vein: '광맥 포식자(제 공격 이름으로)', knight: '흑철 기사 발두인(제 공격 이름으로)' };
+  const Names = { queen: '수정 거미 여왕', general: '장군 모르그', stone: '돌 보스(수호자의 공격으로)', antlion: '개미귀신', serpent: '물살 뱀', elements: '용암·공허·물·망령', vein: '광맥 포식자(제 공격 이름으로)', knight: '흑철 기사 발두인(제 공격 이름으로)' };
   for (const [key, blows] of Object.entries(BossBlows)) {
     if (key === 'queen' || key === 'general') {
       // What falls onto the warnings before the blow.
@@ -4872,6 +4932,7 @@ const OwnEntrances = [
   ['cave_warden', 4.2, 1.4, '바위 더미가 눈과 핵을 밝히고 일어나 두 주먹으로 바닥을 내려찍는다'],
   ['crystal_queen', 3.6, 1.4, '결정 고치에 금빛이 번지다 깨지고, 다리를 펴고 일어나 왕관을 빛낸다'],
   ['antlion', 3.8, 1.3, '굴 바닥에 턱 끝만 내놓고 숨어 모래를 튕기다 솟아올라 턱을 닫는다'],
+  ['tide_serpent', 3.6, 1.2, '물속에 잠겨 물결만 보이다 머리를 내밀고, 볏을 펴며 솟아올라 포효한다'],
   ['mad_general', 3.8, 1.1, '꽂아 둔 대검 앞에 무릎 꿇었다가 일어나 칼을 뽑아 들고 포효한다'],
   ['vein_eater', 3.2, 1.2, '흙더미가 들썩이다 바닥을 뚫고 솟는다'], ['silk_mother', 3.4, 1.2, '천장에서 실을 타고 내려와 다리를 편다'],
   ['shrine_samurai', 3.6, 1.2, '정좌에서 일어나 칼자루에 손을 얹는다'], ['black_knight', 4.6, 1.4, '무릎을 펴고 망치를 끌며 나와 바닥을 내려찍는다'],
@@ -8783,7 +8844,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, serpent, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, bossfx, hits, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

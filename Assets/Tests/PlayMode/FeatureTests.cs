@@ -729,6 +729,36 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The tide serpent (Docs/Bosses.md 물살 뱀, 2026-11-28): under the water of its hall with only ripples showing,
+        // rising out of it, then mid wind-up of its water jet (the head reared, the throat swelling) and of its spray
+        // rain (rearing as high as it goes, the warning sign).
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator TheTideSerpentSurfacesAndWindsUp()
+        {
+            yield return Start();
+            var boss = World.Bosses.FirstOrDefault(b => b.Definition.Id == "tide_serpent");
+            Assert.IsNotNull(boss, "No tide serpent.");
+            Assert.AreEqual(BossEntrance.Surface, boss.Definition.Arena.Entrance, "arenas.csv gives the tide serpent its own entrance.");
+            World.BossesHold = true;
+            Player.Position = boss.Home + new Vec2(0, -4);
+            Player.Corrections++;
+            yield return new WaitForSecondsRealtime(SceneSeconds);
+            yield return Screens.Take("serpent-under");
+            World.BossesHold = false;
+            yield return new WaitForSecondsRealtime(2.6f);
+            Assert.AreEqual(BossState.Enter, boss.State, "Woken, the tide serpent comes in first.");
+            yield return Screens.Take("entrance-serpent");
+            yield return new WaitForSecondsRealtime(4f);
+            Assert.IsTrue(World.ForceAttack(boss, "water_jet"), "The water jet can be forced once it fights.");
+            yield return new WaitForSecondsRealtime(0.5f);
+            yield return Screens.Take("serpent-jet-windup");
+            yield return new WaitForSecondsRealtime(2.5f);
+            Assert.IsTrue(World.ForceAttack(boss, "spray_rain"));
+            yield return new WaitForSecondsRealtime(1.0f);
+            yield return Screens.Take("serpent-spray-windup");
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The crystal spider queen (Docs/Bosses.md 수정 거미 여왕, 2026-11-27): asleep in a cocoon of crystal in its nest,
         // the cocoon cracking and bursting as it wakes, then mid wind-up of its crystal cross (the crown gathering light,
         // the front legs opened like a fan) and of its eggs (the abdomen lowered and glowing).

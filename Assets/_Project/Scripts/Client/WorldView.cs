@@ -3177,6 +3177,11 @@ namespace Game.Client
                 AnimateCrystalQueen(body, facing, dead, moving);
                 return;
             }
+            if (body.Kind == BodyKind.Boss && body.Id == "tide_serpent")
+            {
+                AnimateSerpent(body, facing, dead, moving);
+                return;
+            }
 
             if (body.Kind == BodyKind.Boss)
             {

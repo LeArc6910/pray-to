@@ -409,6 +409,9 @@ namespace Game.Client
                 case "antlion":
                     Antlion(folder, arena);
                     return true;
+                case "serpent":
+                    Serpent(folder, arena);
+                    return true;
                 case "crystal_queen":
                     CrystalQueen(folder, arena);
                     return true;

@@ -936,7 +936,23 @@ namespace Game.Client
             "void_lord" => VoidLord(frame, view, pose),
             // The mad general of the demon nest (2026-11-10): the void lord's robed build in crimson and ember, a ball
             // of fire for the orb, horns through the hood.
-            "tide_serpent" => Serpent(frame, view, pose),
+            // The tide serpent of the underground lake (2026-11-28): its own picture posed in code (SerpentPose in
+            // WorldView).
+            "tide_serpent" => SerpentArt.Draw(view, pose switch
+            {
+                BossPose.Windup => SerpentPose.Draw,
+                BossPose.Strike => SerpentPose.Spit,
+                BossPose.Charge => SerpentPose.Surge,
+                BossPose.Roar => SerpentPose.Roar,
+                _ => SerpentPose.Idle,
+            }, pose switch
+            {
+                BossPose.Windup => SerpentArt.FramesOf(SerpentPose.Draw) - 1,
+                BossPose.Strike => SerpentArt.StrikeFrame(SerpentPose.Spit),
+                BossPose.Charge => SerpentArt.StrikeFrame(SerpentPose.Surge),
+                BossPose.Roar => SerpentArt.RoarRise + frame % 4,
+                _ => frame,
+            }, 1),
             // The crown wraith under the harbour's lake (2026-11-11): the robed build drowned, sea-green and pale, a cold
             // orb, the sunken crown on its hood.
             "crown_wraith" => VoidLord(frame, view, pose, "#1E4A4E", "#7AD8C8", "#A8F0FF", "#E8FFFF", crown: true),
@@ -1039,115 +1055,6 @@ namespace Game.Client
 
         // How far a view turns the face toward the right, in steps (0 front or back, 1 three-quarter, 2 side).
         static int Turn(BossView view) => view == BossView.Side ? 2 : view == BossView.FrontSide || view == BossView.BackSide ? 1 : 0;
-
-        // The tide serpent: a long teal body in three coils, a pale belly, its head reared up on a curving neck with a
-        // fin crest, gold eyes and fangs. Its head turns with the view; it rears back to wind up, lunges to strike and
-        // opens its jaws to roar.
-        static PixelImage Serpent(int frame, BossView view, BossPose pose)
-        {
-            const int width = 44;
-            const int height = 42;
-            var image = new PixelImage(width, height);
-            var skin = Ramp.Of("#2E8C9A");
-            var belly = Ramp.Of("#BFE8DC");
-            var fin = Ramp.Of("#5AD2E6");
-            var eye = Rgba.Hex("#FFE85A");
-            int sway = frame % 2 == 1 ? 1 : 0;
-            bool behind = Behind(view);
-            int turn = Turn(view);
-            void Set(int x, int y, Rgba c)
-            {
-                if (image.Inside(x, y)) image[x, y] = c;
-            }
-
-            // The coils, widest at the bottom, each a flattened ring with a light top and a dark underside; from behind
-            // no pale belly shows.
-            for (int ring = 0; ring < 3; ring++)
-            {
-                int cy = 37 - ring * 5;
-                int rx = 16 - ring * 4;
-                const int ry = 4;
-                for (int y = cy - ry; y <= cy + ry; y++)
-                {
-                    for (int x = 22 - rx; x <= 22 + rx; x++)
-                    {
-                        float dx = (x - 22) / (float)rx;
-                        float dy = (y - cy) / (float)ry;
-                        float d = dx * dx + dy * dy;
-                        if (d > 1) continue;
-                        var c = dy < -0.45f ? skin.Light : dy > 0.55f ? skin.Dark : (x * 3 + y) % 7 == 0 ? skin.Shade : skin.Main;
-                        if (!behind && dy > 0.1f && dy < 0.45f && d < 0.8f) c = x % 2 == 0 ? belly.Main : belly.Shade;
-                        Set(x, y, c);
-                    }
-                }
-            }
-            // Where the head goes: reared back and high to wind up, lunging forward and low to strike, up for a roar.
-            int reachX = pose switch { BossPose.Windup => -3, BossPose.Strike => 5, BossPose.Charge => 4, _ => 0 } + (turn == 0 ? 0 : sway);
-            int reachY = pose switch { BossPose.Windup => -3, BossPose.Strike => 6, BossPose.Charge => 4, BossPose.Roar => -2, _ => 0 } - (turn == 0 ? sway : 0);
-            // The neck curving up out of the top coil to the head, bending toward the side it faces.
-            int hx = 22 + turn * 2 + reachX;
-            int hy = 10 + reachY;
-            for (int i = 0; i <= 14; i++)
-            {
-                float t = i / 14f;
-                int nx = (int)System.Math.Round(22 + (hx - 22) * t + System.Math.Sin(t * System.Math.PI) * (turn == 0 ? 2 : 4));
-                int ny = (int)System.Math.Round(26 + (hy + 3 - 26) * t);
-                for (int w = -2; w <= 2; w++)
-                {
-                    var c = w == -2 ? skin.Light : w == 2 ? skin.Dark : w == 0 && !behind ? belly.Main : skin.Main;
-                    Set(nx + w, ny, c);
-                }
-                if (i % 2 == 0) Set(nx - 3, ny, fin.Main);
-            }
-            bool open = pose == BossPose.Roar || pose == BossPose.Strike;
-            if (turn == 0)
-            {
-                // Head on: a round head, the crest fanned behind it; facing the viewer, two eyes and fangs.
-                for (int y = -3; y <= 3; y++)
-                {
-                    for (int x = -4; x <= 4; x++)
-                    {
-                        if (x * x + y * y * 2 > 22) continue;
-                        Set(hx + x, hy + y, y <= -2 ? skin.Light : y >= 2 ? skin.Dark : skin.Main);
-                    }
-                }
-                for (int i = -5; i <= 5; i += 2) Set(hx + i, hy - 4 - (5 - System.Math.Abs(i)) / 2, fin.Light);
-                if (!behind)
-                {
-                    Set(hx - 2, hy - 1, eye);
-                    Set(hx + 2, hy - 1, eye);
-                    Set(hx - 1, hy + 2 + (open ? 1 : 0), Rgba.White);
-                    Set(hx + 1, hy + 2 + (open ? 1 : 0), Rgba.White);
-                    if (open) Set(hx, hy + 2, Rgba.Hex("#7A1E2E"));
-                }
-                return image.Outlined(Rgba.Hex("#0A1A1E"));
-            }
-            // Turned: a wedge pointing right, the crest behind it.
-            for (int y = -3; y <= 3; y++)
-            {
-                int reach = 5 - System.Math.Abs(y) / 2 + (turn == 2 ? 1 : 0);
-                for (int x = -4; x <= reach + 2; x++)
-                {
-                    var c = y <= -2 ? skin.Light : y >= 2 ? skin.Dark : skin.Main;
-                    if (!behind && y == 2 && x > 0) c = belly.Main;
-                    Set(hx + x, hy + y + (open && y >= 2 && x > 2 ? 1 : 0), c);
-                }
-            }
-            for (int i = 0; i < 4; i++)
-            {
-                Set(hx - 5 - i, hy - 3 + i, fin.Light);
-                Set(hx - 4 - i, hy - 4 + i, fin.Main);
-            }
-            if (!behind)
-            {
-                Set(hx + 3, hy - 1, eye);
-                if (turn == 1) Set(hx, hy - 1, eye);
-                Set(hx + 6, hy + 2 + (open ? 1 : 0), Rgba.White);
-                Set(hx + 4, hy + 3 + (open ? 1 : 0), Rgba.White);
-                if (open) Set(hx + 5, hy + 2, Rgba.Hex("#7A1E2E"));
-            }
-            return image.Outlined(Rgba.Hex("#0A1A1E"));
-        }
 
         // The void lord: a hooded shape in a long cloak that floats over the ground, two cold eyes in the dark of the
         // hood, an orb of the void held before it and stars turning round its head. It lifts the orb overhead to wind

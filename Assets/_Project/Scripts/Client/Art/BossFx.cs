@@ -78,7 +78,21 @@ namespace Game.Client
         // the fan is thrown along Dir over that many degrees instead of straight up.
         SandBurst,
 
-        // ---- the bosses with no effects of their own (the lava titan, the void lord, the tide serpent, the crown wraith) ----
+        // ---- the tide serpent (2026-11-28) ----
+        // Its body lashed through a wedge: a wall of water swept across it, foam left along its arc, drops flung on.
+        // Size the reach, Width the wedge in degrees, Dir its middle.
+        Wave,
+        // A jet of water along a line: lumps of water driven down it in three streams, spray off its sides, a splash
+        // where it ends. Size its length, Width how wide, Dir its way.
+        Torrent,
+        // Water churning round a ring's band: broken rings turning, foam running round, drops thrown off the outside.
+        // Size the band's outer radius, Inner its inner (0: a whole circle dragged round and in).
+        Maelstrom,
+        // A column of water bursting up out of the floor and falling back as rain over spreading ripples. Size its
+        // radius. Big: the heavier (taller, more of it).
+        Geyser,
+
+        // ---- the bosses with no effects of their own (the lava titan, the void lord, the crown wraith) ----
         // What the blow is made of, laid over the shared landing at a few places in its shape (Form): fire that
         // bursts and burns on (Ramp Fire), rings and scraps drawn into the middle (Violet), water thrown up in a
         // column over ripples (Cold), souls scattering (Spirit), a bolt come down (Bolt). Size the reach, Inner a
@@ -180,6 +194,10 @@ namespace Game.Client
                 case BossFx.SandJet: life = SandJet(c, t, o); break;
                 case BossFx.Whirl: life = Whirl(c, t, o); break;
                 case BossFx.SandBurst: life = SandBurst(c, t, o); break;
+                case BossFx.Wave: life = Wave(c, t, o); break;
+                case BossFx.Torrent: life = Torrent(c, t, o); break;
+                case BossFx.Maelstrom: life = Maelstrom(c, t, o); break;
+                case BossFx.Geyser: life = Geyser(c, t, o); break;
                 case BossFx.Element: life = Element(c, t, o); break;
                 default: return false;
             }
@@ -800,6 +818,140 @@ namespace Game.Client
             else Dust(o, m, 5, t, 0.02f, R * 0.4f, R * 0.5f + 4, c.Seed, 0, 360, 0.5f);
             if (!thrown && R * 2.2f <= 160) FxLayers.Shock(o, m, t, 0, R, 0, 0, 0.3f, true);
             return 0.56f;
+        }
+
+        // ---- the tide serpent ----
+
+        // A lump of water in shade (0 core to 4 darkest), wavering with the time.
+        static void Water(List<FxStamp> o, float size, int shade, float t, int i, float x, float y, float alpha = 1, bool low = false)
+        {
+            int frame = 4 * shade + (((int)(t * 14) + i) & 3);
+            if (low) PutLow(o, FxShape.Lump, FxRamp.Cold, Even(size), frame, x, y, alpha);
+            else Put(o, FxShape.Lump, FxRamp.Cold, Even(size), frame, x, y, alpha);
+        }
+
+        static float Wave(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float sweep = 0.14f;
+            float R = c.Size, wide = Math.Clamp(c.Width, 20, 300), half = wide / 2, swept = U(t, 0, sweep);
+            if (t < 0.3f)
+            {
+                // The wall of water: a pale crest over a deep body, swept across the wedge.
+                float fade = t < 0.16f ? 1 : (0.3f - t) / 0.14f;
+                int span = 10 * Math.Max(2, (int)Math.Round(wide * (0.25f + 0.75f * swept) / 10));
+                float head = c.Dir - half + wide * swept;
+                Put(o, FxShape.Smear, FxRamp.Cold, SkillFxArt.Even(R * 0.72f), span, 0, 0, fade * 0.8f, head - span / 2f);
+                Put(o, FxShape.Smear, FxRamp.Mist, SkillFxArt.Even(R), span, 0, 0, fade, head - span / 2f);
+            }
+            // Foam left lying along the arc where the wave passed, thinning.
+            for (int i = 0; i < 9; i++)
+            {
+                float turn = (i + 0.5f) / 9, p = (t - sweep * turn) / 0.55f;
+                if (p < 0 || p >= 1) continue;
+                float dir = c.Dir - half + wide * turn, far = R * (0.88f + 0.08f * Rnd(c.Seed, i, 41));
+                Water(o, 6 + 3 * (i & 1), 1 + (i & 1), t, i, Cos(dir) * far, Sin(dir) * far * 0.95f, 0.9f * (1 - p), true);
+            }
+            // Drops flung on past it, arcing down.
+            for (int i = 0; i < 8; i++)
+            {
+                float turn = (i + 0.5f) / 8, p = (t - sweep * turn) / (0.38f + 0.14f * Rnd(c.Seed, i, 42));
+                if (p < 0 || p >= 1) continue;
+                float dir = c.Dir - half + wide * turn, far = R * (0.9f + 0.45f * Out(p));
+                Put(o, FxShape.Ember, FxRamp.Cold, 3 + (i & 1), 0, Cos(dir) * far, Sin(dir) * far + 24 * p * (1 - p), 1 - p * p, dir);
+            }
+            return 0.75f;
+        }
+
+        static float Torrent(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float life = 0.62f;
+            float L = Math.Max(24, c.Size), W = Math.Max(8, c.Width), dx = Cos(c.Dir), dy = Sin(c.Dir), left = U(life - t, 0, 0.25f);
+            int each = Math.Clamp((int)(L / 36), 2, 6);
+            // Three streams side by side, lumps of water running down them, the middle the fullest.
+            for (int lane = -1; lane <= 1; lane++)
+            {
+                for (int k = 0; k < each; k++)
+                {
+                    float p = SkillFx.Frac(t * 2.4f + (k + 0.33f * (lane + 1)) / each), along = 8 + p * (L - 16), off = lane * W * 0.28f + 2 * Sin(p * 540 + k * 80);
+                    float a = left * Math.Min(1, 4 * p) * Math.Min(1, 4 - 4 * p);
+                    Water(o, lane == 0 ? 12 : 9, lane == 0 ? 0 : 1, t, k + lane + 1, dx * along - dy * off, dy * along + dx * off, a);
+                }
+            }
+            // Spray off its sides.
+            for (int i = 0; i < 8; i++)
+            {
+                float p = SkillFx.Frac(t * 2.2f + Rnd(c.Seed, i, 43)), along = Rnd(c.Seed, i, 44) * L, side = (i & 1) == 0 ? 1 : -1, off = side * (W / 2 + 9 * p);
+                Put(o, FxShape.Ember, FxRamp.Cold, 3, 0, dx * along - dy * off, dy * along + dx * off + 6 * p * (1 - p), left * (1 - p), c.Dir + side * 60);
+            }
+            // A splash where it runs out.
+            Puff(new BossContext { Ramp = FxRamp.Cold, Seed = c.Seed }, t - 0.06f, o, dx * L, dy * L, Math.Clamp(W * 0.8f, 10, 18), 1, false);
+            return life;
+        }
+
+        static float Maelstrom(in BossContext c, float t, List<FxStamp> o)
+        {
+            const float life = 0.9f;
+            float outer = c.Size, inner = c.Inner, mid = inner > 0 ? (inner + outer) / 2 : outer * 0.6f, left = U(life - t, 0, 0.3f);
+            int turn = (int)(t * 12);
+            // Broken rings turning at the band's edges (or closing on the middle of a whole circle).
+            Put(o, FxShape.Broken, FxRamp.Cold, SkillFxArt.Even(2 * outer * (inner > 0 ? 1 : 1 - 0.2f * t)), SkillFxArt.BrokenFrame(2, 5, turn), 0, 0, 0.85f * left, 0, true);
+            Put(o, FxShape.Broken, FxRamp.Mist, SkillFxArt.Even(2 * (inner > 0 ? inner : outer * 0.55f)), SkillFxArt.BrokenFrame(1, 4, turn + 3), 0, 0, 0.75f * left, 0, true);
+            if (inner <= 0)
+                Put(o, FxShape.Scorch, FxRamp.Smoke, SkillFxArt.Step4(outer * 0.6f), 4 + (c.Seed & 3), 0, 0, 0.45f * left, 0, true);
+            // Foam running round the band.
+            int foam = Math.Clamp((int)(mid / 6), 8, 14);
+            for (int i = 0; i < foam; i++)
+            {
+                float p = SkillFx.Frac(t * 1.2f + (i * 5 % foam) / (float)foam), angle = i * 360f / foam + 300 * t + 40 * p;
+                float far = inner > 0 ? mid + (outer - inner) * 0.35f * Sin(i * 97 + t * 400) : outer * (1 - 0.75f * p);
+                Water(o, 6 + 2 * (i & 1), 1 + (i % 3), t, i, Cos(angle) * far, Sin(angle) * far * 0.9f, left * Math.Min(1, 5 * p), true);
+            }
+            // Drops thrown off the outside, up and out.
+            for (int i = 0; i < 8; i++)
+            {
+                float p = (t - 0.04f * (i & 3)) / (0.4f + 0.15f * Rnd(c.Seed, i, 45));
+                if (p < 0 || p >= 1) continue;
+                float dir = i * 45 + 20, far = outer * (0.9f + 0.25f * Out(p));
+                Put(o, FxShape.Ember, FxRamp.Cold, 3, 0, Cos(dir) * far, Sin(dir) * far * 0.9f + 20 * p * (1 - p), 1 - p * p, dir + 90);
+            }
+            return life;
+        }
+
+        static float Geyser(in BossContext c, float t, List<FxStamp> o)
+        {
+            float R = c.Size, high = (c.Big ? 56 : 40) * Math.Min(1.4f, 0.6f + R / 40);
+            // Ripples spreading over the floor.
+            for (int ring = 0; ring < 3; ring++)
+            {
+                float p = (t - 0.1f * ring) / 0.6f;
+                if (p < 0 || p >= 1) continue;
+                Put(o, FxShape.Edge, ring == 0 ? FxRamp.Mist : FxRamp.Cold, SkillFxArt.Even(2 * R * (0.3f + 0.9f * Out(p))), 1, 0, 0, 0.85f * (1 - p), 0, true);
+            }
+            // The column: up fast, standing a moment, falling back.
+            float rise = t / 0.55f;
+            if (rise < 1)
+            {
+                float up = high * (rise < 0.25f ? Out(rise / 0.25f) : rise < 0.6f ? 1 : 1 - (rise - 0.6f) / 0.4f);
+                int lumps = c.Big ? 6 : 5;
+                for (int i = 0; i < lumps; i++)
+                {
+                    float at = up * (i + 0.5f) / lumps, wob = 2 * Sin(t * 900 + i * 70);
+                    Water(o, Math.Max(5, R * 0.7f * (1 - 0.45f * i / lumps)), i == lumps - 1 ? 0 : 1 + (i & 1), t, i, wob, 2 + at, 1 - 0.4f * rise * rise);
+                }
+                // A crown of foam on top.
+                if (up > 6) Water(o, Math.Max(6, R * 0.55f), 0, t, 7, 0, 2 + up + 3, 0.9f);
+            }
+            // Rain falling back round it.
+            int drops = c.Big ? 12 : 8;
+            for (int i = 0; i < drops; i++)
+            {
+                float p = (t - 0.18f - 0.03f * (i % 4)) / (0.45f + 0.15f * Rnd(c.Seed, i, 46));
+                if (p < 0 || p >= 1) continue;
+                float dir = (i + 0.5f) * 360f / drops, go = R * (0.4f + 0.8f * Rnd(c.Seed, i, 47));
+                Put(o, FxShape.Ember, FxRamp.Cold, 3, 0, Cos(dir) * go * Out(p), high * (1 - p) * (1 - p) + Sin(dir) * go * 0.5f * p, 1 - p * p * p, -90);
+            }
+            if (t < 0.5f) FxLayers.Light(o, FxRamp.Cold, R * 2.2f, 0.6f * (1 - t / 0.5f));
+            return 0.85f;
         }
 
         // ---- the bosses with no effects of their own ----

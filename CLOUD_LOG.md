@@ -11,6 +11,14 @@
 - **로컬에서 할 일**: 명령 한 줄을 다시 돌려야 하는지, 플레이로 확인할 것이 있는지. 없으면 "없음"
 - **로컬 확인**: 로컬 세션이 읽고 체크한다
 
+## 2026-11-28 02:10 물살 뱀: 로컬 AI 그림과 제 몸짓·물 이펙트 (로컬 세션이 코드까지)
+
+- **바뀐 것**: 사람 요청 "아직 개선 작업을 안한 보스 하나를 로컬 ai로 rd처럼 8방향 생성하고, 모션이나 이펙트는 너가". 사람이 물살 뱀을 고르고 로컬 세션이 `.cs`까지 고치는 것을 허락했다(이번만). 그림은 이 컴퓨터의 ComfyUI(Z-Image-Turbo + 도트 LoRA → Qwen-Image-Edit-2511 + 여러 각도 LoRA, 모두 Apache-2.0)로 만들어 다섯 시점을 64×64·24색 행과 부위 지도로 옮겼다(`Art/SerpentArt.Rows.cs`, 도구 `DevTools/ArtImport/LocalAi/`). 몸짓은 `Art/SerpentArt.cs`(목이 똬리에서 휘어 따라오고 볏·목·똬리가 부풀고 물속으로 가라앉는 자세 열아홉), 화면은 `WorldView.Serpent.cs`(공격 id마다 전조 자세, 예고 중 물방울·안개, 착지의 물 이펙트), 물 이펙트 넷(`BossFx.Wave`·`Torrent`·`Maelstrom`·`Geyser`), 새 입장 `Surface`(물속에서 솟기, `arenas.csv` 3.6초·1.2초). 옛 공용 뱀 그림(`CreatureArt.Serpent`)은 지웠다. 피해·체력·예고 시간은 그대로
+- **확인**: `dotnet test` 1207 통과, Unity 쪽 컴파일(로컬 Unity DLL, WebGL 포함) 오류 0, `--only serpent` 연속성 튀는 곳 0, 몸의 틈 18/1665장, `--only bossfx` 물살 뱀 일곱 줄 17~32조각(한도 72), 그림 검사 기준선 그대로
+- **요청 대조**: 보스 고르기 ○(사람이 물살 뱀) · 로컬 AI로 8방향 ○(시안 여덟 장 → 사람이 6번, 64px로 다시 보여 달라는 요청 ○, 부드러운 쪽 ○) · 모션 ○(공격 열하나·입장·포효) · 이펙트 ○(물 넷) · 전체 패턴 GIF ○(`anim/serpent_patterns.gif`, 사람 요청) · PlayMode 장면 ○(`TheTideSerpentSurfacesAndWindsUp`, 사진 넷) · 웹 점검 구역 ○(`sweep.js --only serpent`, `bossfx`에 `serpent` 줄, `arenas`의 입장 표) · 문서 ○(`Docs/Bosses.md` 물살 뱀 제 그림과 몸짓, `Docs/ArtSources.md` 로컬 AI로 보스 그림, `Commands.md`, `Codebase.md`, `HumanChecklist.md`) · 쓰러짐 연출 ✗(요청 없음, 다른 보스처럼 터진다) · 웹 점검 실행 ✗(이 컴퓨터에 node가 없다. 배포 뒤 클라우드가 `sweep.js --only serpent`)
+- **로컬에서 할 일**: 새 파일 `.meta`(`SerpentArt.cs`, `SerpentArt.Rows.cs`, `WorldView.Serpent.cs`) — 이 커밋 뒤 로컬 setup에서 생긴다
+- **로컬 확인**: [ ]
+
 ## 2026-11-28 01:50 F4 문서의 개수 바로잡음
 
 - **바뀐 것**: 문서만. F4가 PlayMode 실패 19개를 "고침 열하나, 남은 여덟"으로 적었는데 센 것이 틀렸다. 목록대로 세면 고친 것 **열둘**(몬스터 장면 5, 보스 장면 4, 흙 동굴 1, 얼음·심연 2), 남은 것 **일곱**(원인 미확인 4, 배치 3)이다. `CLOUD_LOG.md`·`Docs/EffectsRework.md` 17절·`Docs/NextTasks.md`·`LOCAL_TASKS.md` 200단계의 숫자를 고쳤다(커밋 `cd8021e`의 메시지에는 eleven으로 남아 있다)
