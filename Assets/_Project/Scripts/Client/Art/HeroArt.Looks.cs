@@ -80,6 +80,8 @@ namespace Game.Client
         {
             public Dictionary<char, Rgba> Colors;
             public int Hair;
+            // A woman's trunk and face (Docs/Gender.md).
+            public bool Female;
         }
 
         static readonly Dictionary<uint, Paint> LookPaints = new Dictionary<uint, Paint>();
@@ -107,6 +109,7 @@ namespace Game.Client
             return new Paint
             {
                 Hair = style.Hair,
+                Female = style.IsFemale,
                 Colors = new Dictionary<char, Rgba>(Colors)
                 {
                     ['H'] = hair.Light,
@@ -120,6 +123,8 @@ namespace Game.Client
                     ['d'] = ramp.Dark,
                     ['p'] = legs,
                     ['q'] = style.Pants == 0 ? legs : legs.Scale(0.8f),
+                    // A cheek's flush (a woman's face).
+                    ['k'] = skin.Main.Mix(Rgba.Hex("#E0606A"), 0.45f),
                 },
             };
         }
@@ -136,6 +141,54 @@ namespace Game.Client
         }
 
         static int HairUp(int hair) => hair == 0 ? 0 : Styles[hair].Up;
+
+        // A woman's face (Docs/Gender.md) on any hair's head rows: the chin a pixel narrower each side (what was beside it,
+        // hair or nothing, closes in) and a flush on the cheeks under the eyes. Only skin is changed, so every hair keeps
+        // its own lines; the views from behind show no face and are left as they are.
+        static readonly Dictionary<(int, Look), string[]> Faces = new Dictionary<(int, Look), string[]>();
+
+        static string[] FaceOf(string[] rows, Look look, int hair, bool female)
+        {
+            if (!female || look == Look.Up || look == Look.UpSide) return rows;
+            if (Faces.TryGetValue((hair, look), out var done)) return done;
+            int top = HairUp(hair);
+            var face = new char[rows.Length][];
+            for (int y = 0; y < rows.Length; y++) face[y] = rows[y].ToCharArray();
+            bool Skin(char c) => c == 's' || c == 'S' || c == 'r';
+            void Chin(int y, int x, int outward)
+            {
+                if (y >= face.Length || !Skin(face[y][x])) return;
+                char beside = face[y][x + outward];
+                face[y][x] = beside == 'H' || beside == 'h' ? beside : '.';
+            }
+            void Flush(int y, int x)
+            {
+                if (y < face.Length && Skin(face[y][x])) face[y][x] = 'k';
+            }
+            // The head's own rows start at top: the eyes are on its rows 5 and 6, the chin is its row 7.
+            int eyes = top + 6, chin = top + 7;
+            switch (look)
+            {
+                case Look.Down:
+                    Chin(chin, 3, -1);
+                    Chin(chin, 8, 1);
+                    Flush(eyes, 2);
+                    Flush(eyes, 9);
+                    break;
+                case Look.DownSide:
+                    Chin(chin, 8, 1);
+                    Flush(eyes, 9);
+                    break;
+                case Look.Side:
+                    Chin(chin, 9, 1);
+                    Flush(eyes, 7);
+                    break;
+            }
+            var result = new string[rows.Length];
+            for (int y = 0; y < rows.Length; y++) result[y] = new string(face[y]);
+            Faces[(hair, look)] = result;
+            return result;
+        }
 
         static string[] HeadRows(int hair, Look look) => hair == 0 ? HeadRows(look) : Styles[hair].Views[(int)ViewOf(look)];
 

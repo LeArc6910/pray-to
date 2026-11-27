@@ -223,6 +223,53 @@ namespace Game.Client
             "...dTTTTd...",
         };
 
+        // A woman's trunk (2026-11-28, Docs/Gender.md): the shoulders a pixel in on each side, the waist (the belt) a
+        // pixel in, and the tunic's hem a pixel out each side, so it hangs like a short dress over the trousers.
+        static readonly string[] TrunkDownF =
+        {
+            "...tdsSdt...",
+            "...TTddTT...",
+            "...TTTTTT...",
+            "....bOOb....",
+            "..ttTTTTtt..",
+        };
+
+        static readonly string[] TrunkDownSideF =
+        {
+            "....tdsdd...",
+            "...TTTddT...",
+            "...dTTTTT...",
+            "....bbOOb...",
+            "..tttTTTTT..",
+        };
+
+        static readonly string[] TrunkSideF =
+        {
+            "....tddd....",
+            "....TTTdT...",
+            "...tTTddT...",
+            "....bbbbO...",
+            "..ttTTTTTT..",
+        };
+
+        static readonly string[] TrunkUpSideF =
+        {
+            "...ddddT....",
+            "...dTTTTd...",
+            "...dTTTTd...",
+            "....bbbb....",
+            "..ttTTTTdd..",
+        };
+
+        static readonly string[] TrunkUpF =
+        {
+            "...tddddT...",
+            "...TdTTdT...",
+            "...dTTTTd...",
+            "....bbbb....",
+            "..ddTTTTdd..",
+        };
+
         // Where the parts' top left corners sit on the canvas at rest.
         const int HeadX = FeetX - 6, HeadY = FeetY - 17, TrunkX = FeetX - 6, TrunkY = FeetY - 9;
 
@@ -239,6 +286,11 @@ namespace Game.Client
         static string[] HeadRows(Look look) => look switch { Look.Down => HeadDown, Look.DownSide => HeadDownSide, Look.Side => HeadSide, Look.UpSide => HeadUpSide, _ => HeadUp };
 
         static string[] TrunkRows(Look look) => look switch { Look.Down => TrunkDown, Look.DownSide => TrunkDownSide, Look.Side => TrunkSide, Look.UpSide => TrunkUpSide, _ => TrunkUp };
+
+        static string[] TrunkRows(Look look, bool female) => !female ? TrunkRows(look) : look switch
+        {
+            Look.Down => TrunkDownF, Look.DownSide => TrunkDownSideF, Look.Side => TrunkSideF, Look.UpSide => TrunkUpSideF, _ => TrunkUpF,
+        };
 
         // ---- The rig ----
 
@@ -1772,11 +1824,11 @@ namespace Game.Client
 
             // The trunk and the head, each in the view its own turn calls for.
             var trunk = new PixelImage(Size, Size);
-            Part(trunk, colors, TrunkRows(rig.TrunkLook), rig.TrunkFlip, TrunkX + rig.TrunkDx, TrunkY + rig.TrunkDy, false);
+            Part(trunk, colors, TrunkRows(rig.TrunkLook, paint.Female), rig.TrunkFlip, TrunkX + rig.TrunkDx, TrunkY + rig.TrunkDy, false);
             Stamp(canvas, trunk, true);
             var head = new PixelImage(Size, Size);
             // The hair may stand above the head's eight rows and hang below them, over the trunk (HeroArt.Looks.cs).
-            Part(head, colors, HeadRows(paint.Hair, rig.HeadLook), rig.HeadFlip, HeadX + rig.HeadDx, HeadY + rig.HeadDy - HairUp(paint.Hair), shut);
+            Part(head, colors, FaceOf(HeadRows(paint.Hair, rig.HeadLook), rig.HeadLook, paint.Hair, paint.Female), rig.HeadFlip, HeadX + rig.HeadDx, HeadY + rig.HeadDy - HairUp(paint.Hair), shut);
             Stamp(canvas, head, false);
 
             foreach (var layer in layers)
