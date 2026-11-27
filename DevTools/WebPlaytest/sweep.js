@@ -2970,17 +2970,23 @@ async function hazards(browser) {
     check(st.warnsShown === WarnShapes.length, `예고 ${WarnShapes.length}개가 그려진다: 고리·원·모이기·부채꼴·선·돌진 길 (${st.warnsShown}개, ${text})`);
     await game.shot(`hazards-warn-${Math.round(filled * 100)}`, `예고 도형 여섯: ${text}`);
   }
-  await game.send('warn land');
-  await game.wait(90);
-  await game.shot('hazards-blast-1', '착지: 예고와 같은 모양으로 번쩍이고 타오름');
+  // The blow is held at an age for each picture (fxhold), as a skill's effect is.
+  await game.send('fxhold 0.03; warn land');
+  await game.wait(250);
+  await game.shot('hazards-blast-0', '착지 0.03초: 예고와 같은 모양의 흰 번쩍임');
   const hit = await game.state();
   check(hit.blastPieces > 0 && hit.blastPieces <= 72, `착지 하나의 조각이 한도 안 (${hit.blastPieces}조각, 한도 72)`);
   check(hit.floorScars === WarnShapes.length - 1, `해로운 예고마다 바닥 흔적 (${hit.floorScars}개, 돌진 길은 남기지 않는다)`);
   check(hit.warnsShown === 0, `착지하면 예고는 사라진다 (${hit.warnsShown}개)`);
-  await game.wait(160);
-  await game.shot('hazards-blast-2', '착지 0.3초: 불티·파편·먼지');
-  await game.wait(350);
-  await game.shot('hazards-scar', '착지 0.7초: 바닥 흔적(그을음·균열)');
+  await game.send('fxhold 0.11');
+  await game.wait(250);
+  await game.shot('hazards-blast-1', '착지 0.11초: 도형을 따라 타오르는 중');
+  await game.send('fxhold 0.24');
+  await game.wait(250);
+  await game.shot('hazards-blast-2', '착지 0.24초: 식어 가는 불');
+  await game.send('fxhold off; ' + WarnShapes.slice(0, 5).map(w => `${w} 0.9`).join('; ') + '; warn land');
+  await game.wait(60);
+  await game.shot('hazards-bits', '착지 직후: 불티·파편·먼지(멈추지 않은 모습)');
   const gone = await pollState(game, st => st.floorScars === 0, 3000);
   check(gone.floorScars === 0, `바닥 흔적은 1.6초 안에 사라진다 (${gone.floorScars}개)`);
 
@@ -3012,10 +3018,10 @@ async function hazards(browser) {
   await phone.wait(350);
   check((await phone.state()).warnsShown === 3, '휴대폰 세로에서도 예고가 그려진다');
   await phone.shot('hazards-phone-warn', '휴대폰 세로: 고리·부채꼴·선 예고');
-  await phone.send('warn land');
-  await phone.wait(110);
-  await phone.shot('hazards-phone-blast', '휴대폰 세로: 착지');
-  await phone.send('monsters go');
+  await phone.send('fxhold 0.11; warn land');
+  await phone.wait(250);
+  await phone.shot('hazards-phone-blast', '휴대폰 세로: 착지 0.11초');
+  await phone.send('fxhold off; monsters go');
   await phone.context.close();
 }
 

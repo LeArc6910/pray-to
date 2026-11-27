@@ -309,6 +309,8 @@ namespace Game.Client
         void UpdateBlast(Blast blast, float deltaTime)
         {
             blast.Age += deltaTime;
+            // Held at an age for a picture of one phase, as a skill's effect is (the playtest's 'fxhold').
+            if (Feel.SkillFxHold >= 0) blast.Age = Mathf.Min(blast.Age, Feel.SkillFxHold);
             // A picture every thirtieth of a second.
             int frame = Mathf.FloorToInt(blast.Age * 30);
             if (frame == blast.Frame) return;
@@ -329,7 +331,7 @@ namespace Game.Client
             for (int i = _scars.Count - 1; i >= 0; i--)
             {
                 var scar = _scars[i];
-                scar.Age += deltaTime;
+                scar.Age += Feel.SkillFxHold >= 0 ? 0 : deltaTime;
                 if (scar.Age >= scar.Life)
                 {
                     Free(scar.Layer);
