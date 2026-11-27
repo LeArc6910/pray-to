@@ -772,7 +772,10 @@ namespace Game.Client
         }
 
         // What the making page offers for each part of the look: its name, how many, its value and the names and colours.
-        static readonly string[] LookParts = { "머리 모양", "머리색", "피부", "눈", "윗옷", "아랫옷" };
+        // Part 6, the gender (2026-11-28, Docs/Gender.md), is the first row.
+        static readonly int[] LookParts = { GenderPart, 0, 1, 2, 3, 4, 5 };
+        const int GenderPart = 6;
+        static readonly string[] GenderNames = { "남자", "여자" };
 
         static string LookPartName(int part) => part switch
         {
@@ -781,6 +784,7 @@ namespace Game.Client
             2 => Strings.T("look.skin", "피부"),
             3 => Strings.T("look.eyes", "눈"),
             4 => Strings.T("look.shirt", "윗옷"),
+            GenderPart => Strings.T("look.gender", "성별"),
             _ => Strings.T("look.pants", "아랫옷"),
         };
 
@@ -791,12 +795,14 @@ namespace Game.Client
             2 => look.Skin,
             3 => look.Eyes,
             4 => look.Shirt,
+            GenderPart => look.Gender,
             _ => look.Pants,
         };
 
-        static CharacterLook WithPart(CharacterLook look, int part, int value) => new CharacterLook(
+        // The gender changes the hair too when it was the other's start (CharacterLook.WithGender).
+        static CharacterLook WithPart(CharacterLook look, int part, int value) => part == GenderPart ? look.WithGender(value) : new CharacterLook(
             part == 0 ? value : look.Hair, part == 1 ? value : look.HairColor, part == 2 ? value : look.Skin,
-            part == 3 ? value : look.Eyes, part == 4 ? value : look.Shirt, part == 5 ? value : look.Pants);
+            part == 3 ? value : look.Eyes, part == 4 ? value : look.Shirt, part == 5 ? value : look.Pants, look.Gender);
 
         // A choice's name from the string sheet ("look.hair.2": 묶은 머리 / Ponytail), the Korean in HeroArt the same.
         static string LookValueName(int part, int value) => part switch
@@ -806,12 +812,13 @@ namespace Game.Client
             2 => Strings.T("look.skin." + value, HeroArt.SkinNames[value]),
             3 => Strings.T("look.eyes." + value, HeroArt.EyeNames[value]),
             4 => Strings.T("look.shirt." + value, HeroArt.ShirtNames[value]),
+            GenderPart => Strings.T("look.gender." + value, GenderNames[value]),
             _ => Strings.T("look.pants." + value, HeroArt.PantsNames[value]),
         };
 
         static Rgba? LookSwatch(int part, int value) => part switch
         {
-            0 => null,
+            0 or GenderPart => null,
             1 => HeroArt.HairColor(value),
             2 => HeroArt.SkinColor(value),
             3 => HeroArt.EyeColor(value),
@@ -862,7 +869,7 @@ namespace Game.Client
             _makeName = TitleDraw.Field(new Rect(nameRow.x + label, nameRow.y + 3, width - label, nameRow.height - 6), _makeName, 16,
                 Strings.T("title.name_field", "이름 칸"), Strings.T("title.name_hint", "이름을 적는다"));
             GUILayout.Space(4);
-            for (int part = 0; part < LookParts.Length; part++) LookRow(part, width, row, label);
+            foreach (int part in LookParts) LookRow(part, width, row, label);
         }
 
         // "머리색  ◀ ■ 금빛 ▶": the arrows turn through the choices.
@@ -879,6 +886,7 @@ namespace Game.Client
                 2 => CharacterLook.Skins,
                 3 => CharacterLook.EyeColors,
                 4 => CharacterLook.ShirtColors,
+                GenderPart => CharacterLook.Genders,
                 _ => CharacterLook.PantsColors,
             };
             TitleDraw.Text(new Rect(rect.x, rect.y, label, rect.height), name, 13, TitleDraw.Ink);

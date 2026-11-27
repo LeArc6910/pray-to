@@ -24,6 +24,19 @@ namespace Game.Client
         Splash,
     }
 
+    // What a spell's burst is made of, for its sound (Recordings.NovaName).
+    enum SpellElement
+    {
+        None,
+        Fire,
+        Ice,
+        Lightning,
+        Poison,
+        Void,
+        Water,
+        Spirit,
+    }
+
     // Recorded sound effects (2026-11-11, the owner: "steps too loud and not like walking; a sound for each floor; free
     // public sounds may be used, and the other sounds too"): CC0 recordings in Resources/Sfx, each a set of takes
     // named name_1, name_2 and so on, played in place of the sounds made in code (Art/SoundArt.cs) where there is a
@@ -91,6 +104,9 @@ namespace Game.Client
             Sound.Warning => "sfx_gong",
             Sound.MobCall or Sound.Chime => "sfx_bell",
             Sound.Roar => "sfx_roar",
+            // A player's groan when struck, by the character's gender (2026-11-28; sets to come, Docs/SoundCredits.md 5차).
+            Sound.GruntMale => "voice_player_male_hurt",
+            Sound.GruntFemale => "voice_player_female_hurt",
             Sound.Roll => "sfx_roll",
             Sound.Dodge or Sound.Dash => "sfx_whoosh",
             // The elements: fire, frost, lightning; ice and crystal breaking; a spell's burst.
@@ -143,6 +159,87 @@ namespace Game.Client
             "frost_ring" or "ice_lance" or "blizzard" => "sfx_ice",
             "chain_lightning" or "thunderclap" or "storm_mantle" => "sfx_zap",
             _ => null,
+        };
+
+        // A spell's burst (Sound.Nova) by its element (2026-11-28, the owner: "a fire spell's burst should sound like
+        // fire burning"): the element's own set; poison, the void, water and spirits have sets of their own to come
+        // (Docs/SoundCredits.md 5차), and until then, like a burst of no element, the old spell burst.
+        public static string NovaName(SpellElement element) => element switch
+        {
+            SpellElement.Fire => "sfx_fire",
+            SpellElement.Ice => "sfx_ice",
+            SpellElement.Lightning => "sfx_zap",
+            SpellElement.Poison => "sfx_spell_poison",
+            SpellElement.Void => "sfx_spell_void",
+            SpellElement.Water => "sfx_spell_water",
+            SpellElement.Spirit => "sfx_spell_spirit",
+            _ => null,
+        };
+
+        // A boss's or a shot's element as a spell's.
+        public static SpellElement SpellOf(ShotElement element) => element switch
+        {
+            ShotElement.Fire or ShotElement.Lava or ShotElement.Ember => SpellElement.Fire,
+            ShotElement.Frost => SpellElement.Ice,
+            ShotElement.Spore => SpellElement.Poison,
+            ShotElement.Void or ShotElement.Hex => SpellElement.Void,
+            ShotElement.Water => SpellElement.Water,
+            ShotElement.Wraith or ShotElement.Mote => SpellElement.Spirit,
+            _ => SpellElement.None,
+        };
+
+        public static string RoarName(string boss) => boss == null ? null : "roar_" + boss;
+
+        // A harvest by what was picked (2026-11-28, the owner: "a different sound for each thing harvested"): the
+        // biomes' harvest props when picked or broken (Docs/Harvest.md) and the field's crops, in ten kinds by how
+        // they come off. Sets to come (Docs/SoundCredits.md 5차); until then the old harvest sound, or for what breaks
+        // (a geode, a rock of ore, a bed of clams) the rock breaking.
+        public static string HarvestName(TileType grown) => grown switch
+        {
+            TileType.MushroomPatch => "sfx_harvest_mushroom",
+            TileType.HerbBush or TileType.PepperBush => "sfx_harvest_bush",
+            TileType.VoidPod => "sfx_harvest_pod",
+            TileType.FrostGeode => "sfx_harvest_geode",
+            TileType.MithrilRock or TileType.AmberRock => "sfx_harvest_ore",
+            TileType.ClamBed => "sfx_harvest_clam",
+            _ => null,
+        };
+
+        // Broken rather than picked: it falls back on the rock breaking.
+        public static bool HarvestBreaks(TileType grown) =>
+            grown == TileType.FrostGeode || grown == TileType.MithrilRock || grown == TileType.AmberRock || grown == TileType.ClamBed;
+
+        public static string HarvestName(string crop) => crop switch
+        {
+            "mushroom" or "glow_cap" => "sfx_harvest_mushroom",
+            "fire_pepper" => "sfx_harvest_bush",
+            "cave_berry" or "frost_berry" or "moon_grape" or "cactus_fruit" => "sfx_harvest_berry",
+            "cave_potato" or "crystal_radish" or "lotus_root" => "sfx_harvest_root",
+            "snow_cabbage" or "ember_corn" => "sfx_harvest_leaf",
+            "void_bean" => "sfx_harvest_pod",
+            "star_melon" => "sfx_harvest_melon",
+            _ => null,
+        };
+
+        // What a boss's magic is made of (ShotArt.ElementOf names every other boss ember, which is no spell of theirs).
+        public static SpellElement SpellOfBoss(string boss) => boss switch
+        {
+            "lava_titan" or "mad_general" => SpellElement.Fire,
+            "void_lord" => SpellElement.Void,
+            "tide_serpent" => SpellElement.Water,
+            "crown_wraith" => SpellElement.Spirit,
+            _ => SpellElement.None,
+        };
+
+        // What a monster's attack is made of, as a spell's (its nova's sound).
+        public static SpellElement SpellOf(MobLook look) => look switch
+        {
+            MobLook.Ember => SpellElement.Fire,
+            MobLook.Frost => SpellElement.Ice,
+            MobLook.Spore => SpellElement.Poison,
+            MobLook.Shadow or MobLook.Hex => SpellElement.Void,
+            MobLook.Water => SpellElement.Water,
+            _ => SpellElement.None,
         };
 
         // A monster's recorded voice: voice_<kind>_<cry|attack|hurt>; the kinds without one keep the made-in-code voice.

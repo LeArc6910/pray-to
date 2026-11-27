@@ -329,7 +329,7 @@ namespace Game.Client
             renderer.sortingOrder = FootOrder(at.y);
             renderer.flipX = turned;
             _falls.Add(new Fall { Renderer = renderer, Since = Time.time, View = view, Turned = turned, Warden = true });
-            Hear(Sound.Roar, at, 0.7f);
+            HearRoar("cave_warden", at, 0.7f);
             Hear(Sound.Break, at, 0.6f);
             AddFlash(at + new Vector3(0, 1.3f, 0), 1.2f, AmberColor, FlashKind.Impact);
             if (Settings.ScreenShake && Feel.HitStop) _hitStop = Mathf.Max(_hitStop, 0.18f);

@@ -97,6 +97,10 @@ namespace Game.Client
         Sting,
         Puff,
         Chime,
+        // A player's short groan when struck (2026-11-28, by the character's gender, Docs/Gender.md): made in code a
+        // low and a higher voiced "uh" falling, until the recordings are in (voice_player_*_hurt).
+        GruntMale,
+        GruntFemale,
         // A purchase paid in coins, and a chest coming open (2026-11-26, recordings in Resources/Sfx; made in code they
         // are the pickup's and the victory's).
         Buy,
@@ -379,6 +383,17 @@ namespace Game.Client
                     parts.Add(Tone(Wave.Sine, 0.1f, 0.07f, 300, 800, 0.7f, decay: 3));
                     level = 0.8f;
                     break;
+                case Sound.GruntMale:
+                case Sound.GruntFemale:
+                {
+                    // A voiced "uh": a buzzing fold falling in pitch, its octave under it, a breath of air on top.
+                    float low = sound == Sound.GruntMale ? 1 : 1.9f;
+                    parts.Add(Tone(Wave.Saw, 0, 0.17f, 150 * low, 105 * low, 0.35f, attack: 0.015f, decay: 3, vibrato: 0.03f, vibratoRate: 30));
+                    parts.Add(Tone(Wave.Triangle, 0, 0.17f, 300 * low, 210 * low, 0.3f, attack: 0.015f, decay: 3));
+                    parts.Add(Noise(0, 0.1f, 0.15f, 0.4f, attack: 0.01f, decay: 4, seed: 41));
+                    level = 0.5f;
+                    break;
+                }
                 case Sound.Heavy:
                     parts.Add(Noise(0, 0.22f, 1, 0.3f, attack: 0.05f, decay: 2.5f, seed: 21));
                     parts.Add(Tone(Wave.Sine, 0, 0.2f, 220, 90, 0.4f, decay: 2.5f));

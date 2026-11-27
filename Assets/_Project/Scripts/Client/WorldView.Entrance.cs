@@ -199,7 +199,7 @@ namespace Game.Client
                         Hear(Sound.Break, feet, 1);
                         Hear(Sound.Boom, feet, 0.8f);
                     }
-                    if (Reached(26)) Hear(Sound.Roar, feet, 1);
+                    if (Reached(26)) HearRoar(body.Id, feet, 1);
                     break;
 
                 case BossEntrance.Thread:
@@ -217,7 +217,7 @@ namespace Game.Client
                     }
                     if (Reached(35))
                     {
-                        Hear(Sound.Roar, feet, 0.8f);
+                        HearRoar(body.Id, feet, 0.8f);
                         AddFlash(feet + new Vector3(0, 0.4f, 0), 1.6f, VenomColor, FlashKind.Ring);
                     }
                     break;
@@ -256,7 +256,7 @@ namespace Game.Client
                     }
                     if (!body.EntersAgain && Reached(GeneralArt.EnterRoar))
                     {
-                        Hear(Sound.Roar, feet, 1);
+                        HearRoar(body.Id, feet, 1);
                         Hear(Sound.Thump, feet, 0.9f);
                         AddFlash(feet + new Vector3(0, 1.2f, 0), 2.4f, WarFireColor, FlashKind.Ring);
                         if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
@@ -284,7 +284,7 @@ namespace Game.Client
                     {
                         Impact(feet, 1);
                         Cracks(feet, 2.6f, 7);
-                        Hear(Sound.Roar, feet, 0.8f);
+                        HearRoar(body.Id, feet, 0.8f);
                     }
                     break;
 
@@ -345,7 +345,7 @@ namespace Game.Client
                         }
                         Thud(body, 0.08f, 0.7f);
                         Hear(Sound.Break, feet, 0.8f);
-                        Hear(Sound.Roar, feet, 0.8f);
+                        HearRoar(body.Id, feet, 0.8f);
                     }
                     if (!body.EntersAgain && Reached(AntlionArt.EnterSnap))
                     {
@@ -435,7 +435,7 @@ namespace Game.Client
                         break;
                     case BossAppearance.Summon:
                         AddFlash(feet, body.Diameter * 1.3f, color, FlashKind.Vortex);
-                        Hear(Sound.Nova, feet, 0.7f);
+                        HearNova(feet, 0.7f, Recordings.SpellOfBoss(body.Id));
                         break;
                     case BossAppearance.March:
                         Thud(body, 0.08f, 0.7f);
@@ -452,7 +452,7 @@ namespace Game.Client
             }
             if (Reached(2))
             {
-                Hear(Sound.Roar, feet, 0.8f);
+                HearRoar(body.Id, feet, 0.8f);
                 if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.15f);
                 AddFlash(feet, body.Diameter * 2f, color, FlashKind.Ring);
             }

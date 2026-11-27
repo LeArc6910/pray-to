@@ -21,7 +21,7 @@ namespace Game.Client
     //   test rune <id> | runes clear    test eat <food>    test heal    test undying on|off    test rising here|off
     //   test hits show|hide|clear       test home        test boss <id> | revive <id>   test dungeon <id>
     //   test field <biome> <zone>       test mob <id> [normal|leader|champion|pack]   test clear   test hold on|off
-    //   test panel open|close|<section>
+    //   test panel open|close|<section>    test gender 0|1 (man, woman)
     static partial class Playtest
     {
         // A panel button: the command run as the harness would, its answer's words for the screen.
@@ -122,6 +122,14 @@ namespace Game.Client
                     player.InventoryVersion++;
                     if (!world.UseConsumable(player.Id, food)) throw new InvalidOperationException($"could not eat {food.Id}");
                     return Done("eat", $"{food.Name}을(를) 먹었다");
+                }
+                case "gender":
+                {
+                    // The character as a man or a woman (Docs/Gender.md): to see the figure and hear the groan when struck.
+                    var client = root.LocalClient;
+                    client.Look = client.Look.WithGender(words[2] == "1" || words[2] == "female" ? CharacterLook.Female : CharacterLook.Male);
+                    player.Look = client.Look.Packed;
+                    return Done("gender", client.Look.IsFemale ? "여자 캐릭터로" : "남자 캐릭터로");
                 }
                 case "heal":
                     world.RefillForTest(player, Consumable(loot, "healing_potion"), TestGround.Potions);

@@ -629,6 +629,8 @@ namespace Game.Client
                 MonsterAttackShape.Lob when kind == MobLook.Sand => Sound.Burrow,
                 _ when kind == MobLook.Crystal => Sound.Chime,
                 MonsterAttackShape.Leap => Sound.Plop,
+                // A burst of what it is made of sounds as that element's spell (2026-11-28); a plain one thumps.
+                MonsterAttackShape.Nova when Recordings.SpellOf(kind) != SpellElement.None => Sound.Nova,
                 MonsterAttackShape.Strike or MonsterAttackShape.Sweep => Sound.Swing,
                 MonsterAttackShape.Thrust => Sound.Heavy,
                 MonsterAttackShape.Pull => Sound.Implode,
@@ -637,7 +639,7 @@ namespace Game.Client
                 MonsterAttackShape.Nova or MonsterAttackShape.Lob when ramp == FxRamp.Cold => Sound.Shatter,
                 _ => Sound.Thump,
             };
-            Hear(sound, at, line || cone ? 0.6f : 0.8f);
+            Hear(sound, at, line || cone ? 0.6f : 0.8f, sound == Sound.Nova ? Recordings.NovaName(Recordings.SpellOf(kind)) : null);
         }
 
         // A monster's shot, known for its monster's by coming out beside one that has just fired: the enemy's shot

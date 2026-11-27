@@ -28,7 +28,9 @@ namespace Game.Client
         // still plays after it, so the two do not sound together (Docs/UiRework.md 4-6: 52 callers play the click).
         static float _uiSound = -10;
 
-        public static void Play(Sound sound, float volume = 1)
+        // set: a recorded set to play first in place of the sound's own (a fire spell's burst, a mushroom picked, a
+        // boss's own roar); the sound's own recording, or the sound made in code, while that set has no takes yet.
+        public static void Play(Sound sound, float volume = 1, string set = null)
         {
             if (!Settings.Sound || volume <= 0) return;
             float now = Time.unscaledTime;
@@ -38,7 +40,7 @@ namespace Game.Client
             if (now - LastPlayed[index] < MinGap && LastPlayed[index] > 0) return;
             LastPlayed[index] = now;
             var source = NextSource();
-            var recorded = Settings.RecordedSounds ? Recordings.Pick(Recordings.NameOf(sound)) : null;
+            var recorded = Settings.RecordedSounds ? Recordings.Pick(set) ?? Recordings.Pick(Recordings.NameOf(sound)) : null;
             source.clip = recorded ?? Clip(sound);
             source.volume = Mathf.Clamp01(volume * (recorded != null ? Recordings.GainOf(sound) : 1)) * Settings.Volume / Settings.MaxVolume;
             source.pitch = 1 + UnityEngine.Random.Range(-PitchJitter, PitchJitter);
@@ -73,11 +75,11 @@ namespace Game.Client
         }
 
         // A sound at a place in the world, heard from the listener's place.
-        public static void PlayAt(Sound sound, Vector3 at, Vector3 listener, float volume = 1)
+        public static void PlayAt(Sound sound, Vector3 at, Vector3 listener, float volume = 1, string set = null)
         {
             float distance = Vector2.Distance(at, listener);
             if (distance >= Hearing) return;
-            Play(sound, volume * (1 - distance / Hearing));
+            Play(sound, volume * (1 - distance / Hearing), set);
         }
 
         // A skill's own sound (SoundArt.Skill) at a place in the world; false when the skill has none.

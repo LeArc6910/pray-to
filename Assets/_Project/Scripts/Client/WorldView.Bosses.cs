@@ -102,9 +102,9 @@ namespace Game.Client
             {
                 body.Sign = Renderer(body.Root, "Warning", WarningSprite, Color.white);
                 body.Sign.sortingOrder = 21000;
-                Hear(Sound.Warning, body.Position, 1);
+                HearWarning(body.Position);
             }
-            else if (!body.Sign.enabled) Hear(Sound.Warning, body.Position, 1);
+            else if (!body.Sign.enabled) HearWarning(body.Position);
             body.Sign.enabled = true;
             float beat = Mathf.Abs(Mathf.Sin(Time.time * 9));
             body.Sign.transform.localPosition = new Vector3(0, body.Top + 0.5f + Mathf.Sin(Time.time * 10) * 0.06f, 0);

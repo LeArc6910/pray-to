@@ -502,6 +502,8 @@ namespace Game.Client
         // Which skill slots of each other player have a buff running, from their snapshot state.
         readonly Dictionary<int, byte> _buffBits = new Dictionary<int, byte>();
         readonly Dictionary<int, SpriteRenderer> _crops = new Dictionary<int, SpriteRenderer>();
+        // What last grew on each tile, kept after it is reaped, for the harvest's sound (Recordings.HarvestName).
+        readonly Dictionary<int, string> _cropAt = new Dictionary<int, string>();
         // Cracks over rock that has taken hits, by tile, until it breaks or changes.
         readonly Dictionary<int, SpriteRenderer> _cracks = new Dictionary<int, SpriteRenderer>();
         // Each player's float on the water while they fish, by player id.
@@ -1244,7 +1246,7 @@ namespace Game.Client
             else if (known && view.Phase > before.Phase)
             {
                 ShowBanner($"{view.Phase}페이즈!");
-                Sounds.Play(Sound.Roar);
+                Sounds.Play(Sound.Roar, 1, Recordings.RoarName(view.Boss?.Id));
                 // The boss flares up: a ring bursting out and blades of light whirling round it, and the ground shakes.
                 var boss = Find(view.Id);
                 if (boss != null)
@@ -1345,7 +1347,7 @@ namespace Game.Client
                     // What a blow left on the floor (a web, a pool of venom) is no warning: it is drawn as itself.
                     mark = IsPool(hazard) ? MakePool(hazard) : MakeWarn(hazard);
                     _marks[hazard.Id] = mark;
-                    if (hazard.Warning != AttackWarning.Hidden && !IsPool(hazard)) Hear(Sound.Warning, new Vector3(hazard.Position.X, hazard.Position.Y, 0));
+                    if (hazard.Warning != AttackWarning.Hidden && !IsPool(hazard)) HearWarning(new Vector3(hazard.Position.X, hazard.Position.Y, 0));
                 }
                 if (IsPool(hazard))
                 {
@@ -1403,6 +1405,7 @@ namespace Game.Client
             {
                 int key = crop.Y * _client.Map.Width + crop.X;
                 _seen.Add(key);
+                _cropAt[key] = crop.Definition.Id;
                 if (!_crops.TryGetValue(key, out var renderer))
                 {
                     renderer = Renderer(_root.transform, "Crop", null, Color.white);
@@ -2181,7 +2184,14 @@ namespace Game.Client
                     }
                     // A spirit just darts at what it strikes; the hit makes the sound.
                     if (attacker.Kind == BodyKind.Minion) break;
-                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : finisher ? Sound.Heavy : Sound.Swing, attacker.Position);
+                    // A call, a spell or a shot let go by a monster or boss is not a blade's swing: its own picture and
+                    // sound come where it lands (2026-11-28, the owner: the mycelium mother's call drew a sword's arc
+                    // and swished after its circle).
+                    if (NotABlade(attacker)) break;
+                    // The finisher's heavier whoosh as loud as the swings before it (2026-11-28, the owner: the last
+                    // swing was too loud; the made-in-code whoosh is longer and louder than the recorded swing).
+                    Hear(kind == BasicAttackKind.Arrow ? Sound.Shoot : kind == BasicAttackKind.Bolt ? Sound.Zap : finisher ? Sound.Heavy : Sound.Swing, attacker.Position,
+                        finisher && kind == BasicAttackKind.Swing ? FinisherSwingVolume : 1);
                     if (finisher && attacker == _self) _shake = Mathf.Max(_shake, 0.04f);
                     // Shots show as their projectile (a finisher's is bigger), with a puff where it leaves; only swings
                     // draw the arc. A bow is drawn and let go, a staff raised and thrust (the attack's own motion).
@@ -2272,6 +2282,7 @@ namespace Game.Client
                         _combatUntil = Time.time + CombatHold;
                     }
                     Hear(hurtsMe ? Sound.Hurt : heavy ? Sound.Thump : e.Critical ? Sound.Crit : Sound.Hit, target.Position);
+                    if (target.Kind == BodyKind.Player && !guarded) Groan(target, e, hurtsMe);
                     break;
                 case SimEventType.Rolled:
                     // Another player's roll; one's own began when it was pressed (Render).
@@ -2488,12 +2499,20 @@ namespace Game.Client
                     }
                     bool broke = e.Amount >= World.DugThrough;
                     AddFlash(struck, broke ? 0.7f : 0.35f, Palette.Dust, FlashKind.Burst);
-                    Hear(broke ? Sound.Break : Sound.Dig, struck);
+                    // A harvest prop picked or broken sounds as what it is (the map may show it spent already).
+                    var prop = _client.Map[TileMap.Cell(e.Position.X), TileMap.Cell(e.Position.Y)];
+                    if (HarvestProps.IsSpent(prop)) prop = HarvestProps.GrownOf(prop);
+                    if (broke && HarvestProps.IsGrown(prop))
+                        Hear(Recordings.HarvestBreaks(prop) ? Sound.Break : Sound.Harvest, struck, 1, Recordings.HarvestName(prop));
+                    else Hear(broke ? Sound.Break : Sound.Dig, struck);
                     if (!broke) Crack(TileMap.Cell(e.Position.X), TileMap.Cell(e.Position.Y), e.Amount);
                     break;
                 case SimEventType.Harvested:
                     AddFlash(new Vector3(e.Position.X, e.Position.Y, 0), 0.6f, Palette.Ripe, FlashKind.Sparkles);
-                    Hear(Sound.Harvest, new Vector3(e.Position.X, e.Position.Y, 0));
+                    {
+                        int reaped = TileMap.Cell(e.Position.Y) * _client.Map.Width + TileMap.Cell(e.Position.X);
+                        Hear(Sound.Harvest, new Vector3(e.Position.X, e.Position.Y, 0), 1, _cropAt.TryGetValue(reaped, out string cropId) ? Recordings.HarvestName(cropId) : null);
+                    }
                     break;
                 case SimEventType.Watered:
                     // A splash over the watered tiles. The one who poured already heard it when they pressed.
@@ -2884,7 +2903,58 @@ namespace Game.Client
         }
 
         // A sound where something happened, quieter the farther it is from the player (Sounds).
-        void Hear(Sound sound, Vector3 at, float volume = 1) => Sounds.PlayAt(sound, at, _self.Position, volume);
+        void Hear(Sound sound, Vector3 at, float volume = 1, string set = null) => Sounds.PlayAt(sound, at, _self.Position, volume, set);
+
+        // A player struck groans in their character's voice (2026-11-28, the owner: a short groan by the character's
+        // gender; the others' in theirs). Not every blow, or a fight is all groaning: not within GroanGap of their last,
+        // always for a blow of a tenth of their health or more (another's: a critical), else one blow in three or so.
+        const float GroanGap = 1.5f, GroanChance = 0.35f, GroanShare = 0.1f;
+        readonly Dictionary<int, float> _groanedAt = new Dictionary<int, float>();
+        public int GroansHeard { get; private set; }
+
+        void Groan(Body body, SimEvent e, bool mine)
+        {
+            if (e.Amount <= 0) return;
+            float now = Time.time;
+            if (_groanedAt.TryGetValue(e.Target, out float last) && now - last < GroanGap) return;
+            bool big = mine ? e.Amount >= _client.MaxHealth * GroanShare : e.Critical;
+            if (!big && UnityEngine.Random.value >= GroanChance) return;
+            _groanedAt[e.Target] = now;
+            GroansHeard++;
+            Hear(_client.LookOf(e.Target).IsFemale ? Sound.GruntFemale : Sound.GruntMale, body.Position, mine ? 0.8f : 0.55f);
+        }
+
+        // A boss's own roar (2026-11-28, the owner: each boss its own): roar_<boss id> where that set is in, else the
+        // roar every boss shares (Docs/SoundCredits.md 5차 has the twelve and what each should sound like).
+        void HearRoar(string boss, Vector3 at, float volume) => Hear(Sound.Roar, at, volume, Recordings.RoarName(boss));
+
+        // A spell's burst in its element's sound (2026-11-28, the owner: a fire spell's burst should sound like fire).
+        void HearNova(Vector3 at, float volume, SpellElement element) => Hear(Sound.Nova, at, volume, Recordings.NovaName(element));
+
+        // An attack's warning gong (a boss winding up, a marked area): off for now (2026-11-28, the owner: "is a warning
+        // sound needed at all; add it back later if it feels odd"). True brings it back; the pack's alarm and a
+        // defense starting keep their sounds.
+        public static readonly bool AttackWarningSound = false;
+
+        void HearWarning(Vector3 at)
+        {
+            if (AttackWarningSound) Hear(Sound.Warning, at);
+        }
+
+        // The finisher's whoosh against the recorded swings (Heavy is made in code, 0.22 s and 3 dB louder than them).
+        const float FinisherSwingVolume = 0.55f;
+
+        // A monster's or boss's attack event for what is no blade: a call, a mend, a spell, a shot, a leap. Melee
+        // monsters without sheet attacks and the blade shapes still swing.
+        static bool NotABlade(Body attacker)
+        {
+            if (attacker.Kind == BodyKind.Monster && attacker.MobAttack != null)
+                return attacker.MobAttack.Shape is not (MonsterAttackShape.Strike or MonsterAttackShape.Sweep or MonsterAttackShape.Thrust);
+            if (attacker.Kind == BodyKind.Boss && attacker.BossAttack != null)
+                return attacker.BossAttack.Shape is AttackShape.Summon or AttackShape.Burst or AttackShape.Spiral or AttackShape.Ring
+                    or AttackShape.Share or AttackShape.Pluck or AttackShape.Trail;
+            return false;
+        }
 
         // Tags a player's running buffs add to their attacks, for colouring what they do.
         SkillTag GrantedTags(int playerId)

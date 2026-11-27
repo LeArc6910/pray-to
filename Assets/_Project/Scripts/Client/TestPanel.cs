@@ -244,6 +244,13 @@ namespace Game.Client
                 Cell("특성 창", false, () => root.ShowScreen(GameScreen.Passives)),
                 Cell("캐릭터 창", false, () => root.ShowScreen(GameScreen.Character)),
             });
+            // The gender (Docs/Gender.md): the figure and the groan when struck.
+            bool woman = root.LocalClient?.Look.IsFemale == true;
+            Grid("성별", width, 76, new[]
+            {
+                Cell("남자", !woman, () => Run(root, "test gender 0")),
+                Cell("여자", woman, () => Run(root, "test gender 1")),
+            });
         }
 
         // ---- 장비 ----

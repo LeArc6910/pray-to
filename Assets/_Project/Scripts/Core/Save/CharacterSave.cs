@@ -26,7 +26,9 @@ namespace Game.Core
         // (story.csv choices, 2026-11-10). 19: where each side story stands, by chain id (story.csv chain, 2026-11-11).
         // 20: how it looks (CharacterLook.Packed), the seconds played with it, when it was made and last played (seconds
         // since 1970, from the caller) and the biomes it has stood in (BiomeVisits), last (Docs/TitleRework.md, 2026-11-25).
-        public const int FormatVersion = 20;
+        // 21: the look's gender in its bit 24 (CharacterLook.Gender, Docs/Gender.md); the same four bytes, so a save of
+        // format 20 opens as the man it was drawn as.
+        public const int FormatVersion = 21;
 
         CharacterSave(Equipment equipment, Inventory bag, int experience, List<string> warnings, List<string> claimed = null, List<string> passives = null,
             List<(string, int, int, int, int, int)> friendships = null, List<int> life = null, List<(string, int)> skills = null, List<(string, int)> stories = null, List<(string, string)> supports = null,

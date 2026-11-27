@@ -106,7 +106,7 @@ namespace Game.Client
                     break;
                 case World.DungeonBossWoke:
                 {
-                    Hear(Sound.Roar, at, 1);
+                    HearRoar(Find(e.Source)?.Id, at, 1);
                     var woke = _client.DungeonAt(e.Position);
                     string master = BodyName(e.Source);
                     ShowDungeonCard(master ?? "던전의 주인", $"{woke?.Name ?? "던전"}의 주인이 깨어났다 · 크게 휘두르기 전에 비켜서라");

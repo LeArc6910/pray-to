@@ -8418,6 +8418,11 @@ async function title(browser) {
     await game.press('▶', '머리 모양');
     const look = (await game.title()).look;
     check(look !== rolled, `${name}: [머리 모양 ▶]이 머리 모양을 바꾼다 (${rolled} → ${look})`);
+    // The gender row (2026-11-28, Docs/Gender.md): first among the look's rows, its arrow turns man and woman.
+    const sex = (await game.title()).gender;
+    await game.press('▶', '성별');
+    const turned = await game.title();
+    check(turned.gender !== sex && turned.look !== look, `${name}: [성별 ▶]이 성별을 바꾼다 (${sex} → ${turned.gender}, ${turned.look})`);
     const hero = `t3${name.replace('-', '')}`;
     if (!game.touch) await game.typeInto('이름 칸', hero);
     await game.wait(400);

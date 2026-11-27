@@ -157,7 +157,7 @@ namespace Game.Client
                 // The order given: a horn-like roar as the sword comes down to point.
                 if (pose == GeneralPose.Command && frame == GeneralArt.StrikeFrame(pose))
                 {
-                    Hear(Sound.Roar, body.Position, 0.5f);
+                    HearRoar(body.Id, body.Position, 0.5f);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.08f);
                 }
             }
@@ -276,7 +276,7 @@ namespace Game.Client
                     Cracks(at + along * hazard.Size * 0.5f, 1.4f, 4);
                     if (Settings.ScreenShake) _shake = Mathf.Max(_shake, 0.2f);
                     Hear(Sound.Hammer, at, 0.8f);
-                    Hear(Sound.Roar, at, 0.35f);
+                    HearRoar("mad_general", at, 0.35f);
                     return true;
                 }
                 case "flame_ring":
@@ -293,7 +293,7 @@ namespace Game.Client
                         Impact(at, 0.7f);
                         Hear(Sound.Boom, at, 0.8f);
                     }
-                    else Hear(Sound.Nova, at, 0.5f);
+                    else HearNova(at, 0.5f, SpellElement.Fire);
                     return true;
                 }
             }

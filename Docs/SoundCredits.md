@@ -496,3 +496,52 @@ OpenGameArt 페이지에 CC0 외의 라이선스가 함께 붙은 팩(예: OGA-B
 | jingle_down_1.wav | ACE-Step 1.5 turbo | sad game over music, slow low piano and cello and string ensemble, melancholic, minor key, low register (60 bpm, A minor), 5초 | A | 쓰러짐 | 2026-11-28 |
 | Music/music_boss.ogg | ACE-Step 1.5 turbo | fast hard rock boss battle music, heavy distorted electric guitar riffs, pounding double kick drums, driving bass (170 bpm, E minor, 67초 반복) | B | 보스전 | 2026-11-28 |
 | Music/music_hut.ogg | ACE-Step 1.5 turbo | calm cozy cottage music, gentle acoustic guitar fingerpicking, soft violin and cello (80 bpm, D major, 57초 반복) | A | 오두막 | 2026-11-28 |
+
+## 5차: 코드가 고르는 새 세트 (2026-11-28, 클라우드)
+
+4차에서 로컬이 부탁한 코드 일 일곱(`CLOUD_LOG.md` 2026-11-27 22:00 로컬 항목). 새 세트는 **파일이 없으면 저절로 지금 소리로** 난다(`Sounds.Play`의 `set`: 그 세트 → 원래 소리의 녹음 → 코드 합성). 로컬은 아래 이름으로 `Resources/Sfx/<세트>_1.wav`, `_2`, `_3`…을 넣기만 하면 되고 코드는 그대로다. 가공은 1차와 같게(모노 22050 Hz, 피크 -6 dBFS).
+
+| 일 | 코드 | 새 세트(로컬이 넣을 파일) | 지금 나는 소리 |
+|---|---|---|---|
+| 1 마지막 휘두르기가 큼 | 마무리 일격(`Heavy`, 코드 합성)을 0.55배(`WorldView.FinisherSwingVolume`). 합성 소리가 녹음 휘두르기보다 RMS 3 dB 크고 0.22초로 길었다 | 없음 | 같은 소리, 작게 |
+| 2 맞을 때 성별 신음 | `WorldView.Groan`: 같은 사람 1.5초 안 다시 없음, 최대 체력 10% 넘는 피해는 늘(다른 플레이어는 치명타면 늘), 그 밖에는 35%. 막아 낸 타격은 없음. 다른 플레이어는 그 사람의 성별로 0.55 크기 | `voice_player_male_hurt`, `voice_player_female_hurt` | 짧은 합성 "윽"(남 150→105 Hz, 여 1.9배) |
+| 3 보스 경고음 끔 | `WorldView.AttackWarningSound = false`(보스 감기·바닥 경고). true로 되돌린다. 무리의 알림(!)과 기지 방어 시작은 그대로 징 | 없음 | 없음 |
+| 4 부르기 때 칼 휘두름 | 원인: Core가 몬스터·보스의 모든 공격(부르기·회복·주문·탄 포함)에 `Attack` 사건을 내고, 화면은 그것을 평타로 읽어 궤적과 `sfx_swing`을 냈다. 몬스터는 Strike·Sweep·Thrust만, 보스는 부르기·폭발·나선·고리·나눔·튕기기·흔적이 아닐 때만 휘두름(`WorldView.NotABlade`) | 없음 | 착지 소리만 |
+| 5 원소별 마법 폭발 | `Recordings.NovaName`: 불 `sfx_fire`, 얼음 `sfx_ice`, 번개 `sfx_zap`, 그 밖은 새 세트. 모르그의 불 띠, 불·공허·물·망령 보스의 부르는 등장, 원소 있는 몬스터의 노바(몬스터 노바는 전에 `Thump`) | `sfx_spell_poison`, `sfx_spell_void`, `sfx_spell_water`, `sfx_spell_spirit` | `sfx_spell` |
+| 6 수확마다 다른 소리 | 수확 오브젝트는 따거나 깰 때 그 칸의 종류로, 밭 작물은 그 칸에 자라던 작물로(`Recordings.HarvestName`) | 아래 표 열 세트 | 따는 것은 `sfx_harvest`, 깨는 것(정동·광석·조개)은 `sfx_rockbreak` |
+| 7 보스마다 포효 | `roar_<보스 id>`(입장·페이즈·지휘·천장 붕괴·던전 주인 깨어남). 던전 주인은 몬스터 id로 같은 규칙 | 아래 표 열두 세트 | `sfx_roar` |
+
+### 수확 세트
+
+| 세트 | 무엇 | 소리(로컬이 만들 때) |
+|---|---|---|
+| `sfx_harvest_mushroom` | 버섯 무리, 밭의 동굴 버섯·빛 버섯 | 말랑한 갓을 똑 따는 소리, 축축하고 짧게 |
+| `sfx_harvest_bush` | 빛 포자 덤불·불고추 덤불, 밭의 불꽃 고추 | 잎이 바스락거리며 줄기를 톡 끊는 소리 |
+| `sfx_harvest_pod` | 공허 콩 꼬투리, 밭의 공허 콩 | 꼬투리가 퐁 터지며 콩이 구르는 소리 |
+| `sfx_harvest_geode` | 서리 정동(깨기) | 얼음 껍질이 쩍 갈라지고 결정이 짤랑 |
+| `sfx_harvest_ore` | 미스릴 바위·호박 바위(깨기) | 바위가 부서지고 광석 덩이가 쨍 하고 떨어짐 |
+| `sfx_harvest_clam` | 조개 무더기(깨기) | 젖은 조개껍데기가 딸깍 벌어지는 소리 |
+| `sfx_harvest_berry` | 밭의 동굴 딸기·서리 열매·달빛 포도·선인장 열매 | 작은 열매를 톡 따는 가벼운 소리 |
+| `sfx_harvest_root` | 밭의 동굴 감자·수정 무·호수 연근 | 흙에서 뿌리를 쑥 뽑는 소리, 흙 털림 |
+| `sfx_harvest_leaf` | 밭의 눈 배추·불씨 옥수수 | 아삭한 잎·껍질을 꺾는 소리 |
+| `sfx_harvest_melon` | 밭의 별 수박 | 묵직한 열매를 뚝 떼어 통 하고 내려놓는 소리 |
+
+### 보스 포효 세트
+
+프롬프트는 4차 2부처럼 Stable Audio Open에 넣을 요지다(1~2초, 끝은 꼬리 자르기).
+
+| 세트 | 보스 | 성격 | 프롬프트 예시 |
+|---|---|---|---|
+| `roar_cave_warden` | 동굴 수호자 | 바위 골렘, 느리고 무거움 | deep grinding stone golem roar, rocks scraping, low rumble |
+| `roar_crystal_queen` | 수정 거미 여왕 | 수정 거미, 날카롭고 반짝임 | giant spider queen shriek layered with ringing crystal shards, glassy hiss |
+| `roar_lava_titan` | 용암 거인 | 불타는 거인 | huge lava giant bellow, roaring fire and bubbling magma, deep and hot |
+| `roar_void_lord` | 공허의 군주 | 공허, 일그러진 목소리 | otherworldly void demon roar, reversed whoosh, distorted deep echo |
+| `roar_tide_serpent` | 물살 뱀 | 바다뱀 | sea serpent roar with water splashing and gurgling hiss |
+| `roar_antlion` | 개미귀신 | 모래 속 벌레 | insect monster screech with clicking mandibles and pouring sand |
+| `roar_mad_general` | 미쳐 버린 장군 모르그 | 마족 장군, 전장의 고함 | furious demon warlord war cry, gravelly shout, armor clank |
+| `roar_crown_wraith` | 왕관의 망령 | 왕의 유령 | ghostly king wail, echoing whisper and cold wind, eerie |
+| `roar_vein_eater` | 광맥 포식자 그룸 | 광석을 먹는 짐승 | burrowing beast growl, chewing rock, crunching stone, guttural |
+| `roar_shrine_samurai` | 벚꽃 검귀 시구레 | 검귀, 칼과 기합 | fierce samurai spirit battle cry (kiai) with a sword unsheathing ring |
+| `roar_black_knight` | 흑철 기사 발두인 | 갑옷 기사, 금속 울림 | armored knight roar inside a heavy iron helmet, metallic reverb |
+| `roar_silk_mother` | 실 잣는 어미 아라네 | 큰 거미 어미 | huge spider mother hiss, chittering legs, wet clicking |
+

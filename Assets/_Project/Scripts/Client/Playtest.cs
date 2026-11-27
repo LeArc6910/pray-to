@@ -2717,7 +2717,7 @@ namespace Game.Client
             // biomes in it (bits) and where its window is (pixels).
             json.Field("title", new Json('{').Field("page", root.TitlePage).Field("flow", root.TitleFlow).Field("character", root.PlayerName)
                 .Field("world", root.PickedWorld).Field("newCharacter", root.NewCharacterName).Field("newWorld", root.NewWorldName).Field("newWorldSeed", root.NewWorldSeedLabel).Field("ask", root.TitleAsk)
-                .Field("characters", Strings(root.CharacterRows)).Field("worlds", Strings(root.WorldRows)).Field("look", root.MakingLook.Packed.ToString("x6"))
+                .Field("characters", Strings(root.CharacterRows)).Field("worlds", Strings(root.WorldRows)).Field("look", root.MakingLook.Packed.ToString("x6")).Field("gender", root.MakingLook.Gender)
                 .Field("backdrop", TitleBackdrop.Biomes).Field("pan", TitleBackdrop.Offset).Field("motion", !Settings.ReduceMotion).Field("scroll", root.MenuScroll).Raw('}'));
             // The hub's question after [나가기] ([저장하고 나가기] / [남기], T3).
             json.Field("leaveAsked", root.LeaveAsked);

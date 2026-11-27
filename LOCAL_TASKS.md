@@ -1307,6 +1307,11 @@ DevTools/Local/setup.sh --commit
   - **실패하면 메시지만이 아니라 Console 로그(그 시험의 전체 메시지와 스택, 앞뒤의 경고·에러)까지** 결과 보고에 붙인다. 고치지 않은 일곱(`RumoursAndSlowRest`, `TheBagAndHudDraw`, `TheEncounterWindowsDraw`, 배치 셋, `TheTestGroundsPanelAndHitLogDraw`)도 실패하면 전체 메시지(여러 줄)와 Console 로그를 붙인다. 지난 보고는 첫 줄만 있어 원인을 다 볼 수 없었다(`Docs/NextTasks.md`)
   - 감시(`watch.ps1 -Install`)가 켜져 있는지 본다: 11-11 뒤 결과 보고가 11-27 손 실행 한 번뿐이고 `origin`에 `local-screens` 브랜치가 없다
 
+- [ ] 201단계: 소리 코드 일곱과 성별(2026-11-28) — `Docs/SoundCredits.md` 5차, `Docs/Gender.md`
+  - 명령 한 줄을 다시 돌린다. 새 파일 `Assets/Tests/EditMode/GenderTests.cs`의 `.meta`가 생기면 커밋한다
+  - 소리 파일 넣기(로컬 세션): 5차 표의 새 세트를 `Resources/Sfx/<세트>_1.wav`부터 넣는다(코드는 그대로, 없으면 지금 소리가 난다). 성별 신음 2(`voice_player_male_hurt`, `voice_player_female_hurt`), 원소 폭발 4(`sfx_spell_poison`·`_void`·`_water`·`_spirit`), 수확 10(`sfx_harvest_mushroom`·`bush`·`pod`·`geode`·`ore`·`clam`·`berry`·`root`·`leaf`·`melon`), 보스 포효 12(`roar_<보스 id>`, 프롬프트 예시는 5차 표). 넣으면 `Docs/SoundCredits.md`에 출처를 적는다
+  - (사람) 시험장 시험판 [성별]로 남·여를 바꿔 맞아 보고 신음이 너무 잦거나 드물지 않은지, 마지막 휘두르기가 이제 다른 단과 맞는지, 버섯 어미(포자 굴)가 포자를 부를 때 칼 궤적·휘두르기 소리가 없는지, 모르그의 불 띠가 불 소리인지
+
 ## 결과 보고
 
 명령 한 줄이 실행할 때마다 아래에 결과를 덧붙인다. 플레이 확인 결과는 사람이(또는 로컬 세션이) 날짜와 함께 적는다.
