@@ -48,6 +48,8 @@ namespace Game.Client
         public byte[] Fill, Sweep, Core;
         // How wide the filling's bright front is, in the same units as Fill.
         public int Front;
+        // The way the shape points (y up), for the arrowheads along a rush's path.
+        public float Cos = 1, Sin;
         // Where the floor cracks: a point, how far its cracks reach and how many there are.
         public readonly List<(float X, float Y, float Reach, int Count)> Spine = new List<(float, float, float, int)>();
 
@@ -249,6 +251,8 @@ namespace Game.Client
                 Sweep = Crop(sweep, side, minX, minY, w, h),
                 Core = Crop(core, side, minX, minY, w, h),
                 Front = (int)Math.Max(9, 255 * 1.6f / Math.Max(1, extent)),
+                Cos = cos,
+                Sin = sin,
             };
             float ox = field.OriginX, oy = field.OriginY;
             switch (form)
@@ -308,9 +312,13 @@ namespace Game.Client
 
         // A warning at a moment of its filling (0 to 1). blink: the bright half of its last blinking; lit: its edge
         // at its brightest (a place to gather pulses). flip: rows from the bottom up, as a texture wants them.
-        public static void Warn(HazardField field, WarnTone tone, float progress, bool blink, bool lit, byte[] buffer, bool flip)
+        // light: an ordinary monster's, fainter inside. arrows: for a rush's path, arrowheads marching the way it will
+        // run, this many pixels along (under 0 for none).
+        public static void Warn(HazardField field, WarnTone tone, float progress, bool blink, bool lit, byte[] buffer, bool flip, bool light = false, int arrows = -1)
         {
             var ramp = Tones[(int)tone];
+            // An ordinary monster's (E5): the same edge, a fainter inside, since several lie on one screen.
+            float wash = light ? 0.07f : 0.14f, stripe = light ? 0.3f : 0.42f, between = light ? 0.15f : 0.26f, head = light ? 0.55f : 0.7f, flare = light ? 0.36f : 0.5f;
             int w = field.Width, h = field.Height, filled = (int)(progress * 255), front = filled - field.Front;
             for (int y = 0; y < h; y++)
             {
@@ -322,15 +330,30 @@ namespace Game.Client
                     if (depth == 0) buffer[at + 3] = 0;
                     else if (depth == 1) Put(buffer, at, blink || lit ? ramp[0] : ramp[1], 0.95f);
                     else if (depth == 2) Put(buffer, at, ramp[3], 0.75f);
+                    else if (arrows >= 0 && Arrow(field, x, y, arrows, out bool bright)) Put(buffer, at, bright ? ramp[0] : ramp[3], bright ? 0.9f : 0.75f);
                     else if (field.Fill[i] <= filled && progress > 0)
                     {
                         // The filling's own front is a brighter line; behind it, stripes of the warning's colour.
-                        if (field.Fill[i] > front) Put(buffer, at, ramp[1], 0.7f);
-                        else Put(buffer, at, ramp[2], blink ? 0.5f : ((x + y) & 3) == 0 ? 0.42f : 0.26f);
+                        if (field.Fill[i] > front) Put(buffer, at, ramp[1], head);
+                        else Put(buffer, at, ramp[2], blink ? flare : ((x + y) & 3) == 0 ? stripe : between);
                     }
-                    else Put(buffer, at, ramp[2], 0.14f);
+                    else Put(buffer, at, ramp[2], wash);
                 }
             }
+        }
+
+        // Whether a pixel lies on one of the arrowheads along a band: one every 22 pixels, five pixels to each side
+        // of the middle line, a bright line with a dark one behind it.
+        static bool Arrow(HazardField field, int x, int y, int march, out bool bright)
+        {
+            float wx = x + 0.5f - field.OriginX, wy = field.OriginY - (y + 0.5f);
+            float u = wx * field.Cos + wy * field.Sin, v = Math.Abs(-wx * field.Sin + wy * field.Cos);
+            bright = false;
+            if (v > 5.5f) return false;
+            int along = (int)Math.Floor(u + v - march);
+            along = ((along % 22) + 22) % 22;
+            bright = along >= 2;
+            return along < 4;
         }
 
         // The blow at an age in seconds, in the colours given (bright to dark, five). False once it is over.

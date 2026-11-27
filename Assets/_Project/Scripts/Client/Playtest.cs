@@ -2923,6 +2923,9 @@ namespace Game.Client
                 json.Field("shotEnds", root.ShotEnds);
                 json.Field("aimDots", root.AimDots);
                 json.Field("mobShots", root.MonsterShotsDrawn);
+                // E5: monsters' marks drawn as pictures of their shape, and bodies drawn rushing (dust, lines of speed).
+                json.Field("mobWarnsShown", root.MonsterWarnsShown);
+                json.Field("mobRushes", root.MonsterRushesShown);
                 json.Field("rooted", player.Afflictions.Rooted);
                 // The rest of the kinds (2026-11-22): blows shown so far (a count that only grows), those under the
                 // ground near and their mounds drawn, lines between soldiers, bombers' blasts, grey numbers for blows a

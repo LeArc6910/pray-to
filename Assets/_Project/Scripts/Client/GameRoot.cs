@@ -98,6 +98,9 @@ namespace Game.Client
         internal int PoolsShown => _view?.PoolsShown ?? 0;
         // Ordinary monsters' marks, pools, one-off effects, pieces and shots as drawn (WorldView.MonsterFx).
         internal int MonsterMarksShown => _view?.MonsterMarksShown ?? 0;
+        // E5: monsters' marks drawn as a picture of their shape last frame, and bodies drawn rushing.
+        internal int MonsterWarnsShown => _view?.MonsterWarnsShown ?? 0;
+        internal int MonsterRushesShown => _view?.MonsterRushesShown ?? 0;
         // How a monster is drawn now: its picture's pixels, its health bar, its feet and its scale (the "sizes" playtest).
         internal (int Width, int Height, float Bar, float Feet, float Scale)? MonsterDrawn(int id) => _view?.MonsterDrawn(id);
         // Whether the screen shows my body in a spore cloud (its green haze, B1b).

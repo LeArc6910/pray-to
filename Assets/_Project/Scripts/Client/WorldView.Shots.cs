@@ -112,7 +112,7 @@ namespace Game.Client
             _enemyShots.TryGetValue(id, out var shot) && shot.Own ? ShotArt.Glow(shot.Element) : Sprites.ToRgba(renderer.color);
 
         // Where an enemy's shot ended (struck, stopped by a wall, or spent): a ring and bits of what it was made of.
-        // A monster's own shot (WorldView.MonsterFx) and the bosses' venom and crescents end their own way.
+        // The bosses' venom and crescents end their own way.
         void EnemyShotGone(int id, Vector3 at, bool plain)
         {
             if (!_enemyShots.TryGetValue(id, out var shot)) return;
@@ -159,12 +159,12 @@ namespace Game.Client
 
         // Dots out from the boss's edge, running outward and growing surer as the wind-up fills: unturned 3px dots, so
         // they stay crisp at any angle.
-        void LayAim(Vec2 at, Vec2 facing, float radius, float degrees, int count, float progress)
+        void LayAim(Vec2 at, Vec2 facing, float radius, float degrees, int count, float progress, float farthest = AimReach)
         {
             if (count <= 0 || facing.LengthSquared < 1e-6f) return;
             float spread = degrees * Mathf.Deg2Rad, start = facing.Angle - spread / 2;
             int gaps = Mathf.Max(1, count - 1);
-            float reach = AimReach * Mathf.Clamp01(1 - Mathf.Pow(1 - Mathf.Min(1, progress * 1.4f), 3));
+            float reach = farthest * Mathf.Clamp01(1 - Mathf.Pow(1 - Mathf.Min(1, progress * 1.4f), 3));
             float march = Settings.ReduceMotion ? 0 : Time.time * 2.4f % AimStep;
             var color = new Color(1, 1, 1, 0.45f + 0.55f * progress);
             for (int i = 0; i < count; i++)

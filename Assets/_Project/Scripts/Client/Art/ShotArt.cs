@@ -15,6 +15,13 @@ namespace Game.Client
         Void,
         Water,
         Wraith,
+        // Ordinary monsters' (E5, MonsterFx.ShotOf): a violet lump of spores and a teal one of the glowing wood, a
+        // splinter of ice, violet witch-fire, a ball of iron.
+        Spore,
+        Mote,
+        Frost,
+        Hex,
+        Iron,
     }
 
     // An enemy's shot (E2): a dark edge, a red rim, the element's shell and a bright core that beats, with a tail of
@@ -22,7 +29,7 @@ namespace Game.Client
     // tail in the same picture: one piece a shot, however many fly. And the ring and bits it leaves where it ends.
     static class ShotArt
     {
-        public const int Elements = (int)ShotElement.Wraith + 1;
+        public const int Elements = (int)ShotElement.Iron + 1;
         // The angles a shot is drawn at: a shot flies straight, so the nearest of these is its own for good.
         public const int Angles = 32;
         // The core's beat.
@@ -52,6 +59,11 @@ namespace Game.Client
             Ramp("#F0D8FF", "#B060FF", "#5A2A9C", "#180A30"),
             Ramp("#FFFFFF", "#C8F4FF", "#58B8F0", "#2A6AB8"),
             Ramp("#FFFFFF", "#D0FFE8", "#70D8C0", "#2A7A80"),
+            Ramp("#F6E0FF", "#D9A8FF", "#A86CE0", "#6A3FA8"),
+            Ramp("#F0FFF8", "#A8F0D8", "#4CC8B0", "#1F7A78"),
+            Ramp("#FFFFFF", "#C8F4FF", "#7AD0F5", "#3F86D6"),
+            Ramp("#FFE8FF", "#E090FF", "#9A48E0", "#4A1C8C"),
+            Ramp("#FFFFFF", "#DCE6F2", "#9FB2C8", "#5E6F8A"),
         };
 
         static Rgba[] Ramp(params string[] hex)
@@ -100,6 +112,7 @@ namespace Game.Client
             switch (element)
             {
                 case ShotElement.Stone:
+                case ShotElement.Iron:
                 {
                     // A chipped rock: a circle with five flat faces cut off it.
                     float depth = r - (float)Math.Sqrt(u * u + v * v);
@@ -111,9 +124,12 @@ namespace Game.Client
                     return depth;
                 }
                 case ShotElement.Crystal:
+                case ShotElement.Frost:
                     // A shard, point first: as wide as it hits, longer than wide.
                     return (1 - Math.Abs(u - r * 0.2f) / (r * 1.7f) - Math.Abs(v) / (r * 1.02f)) * r * 0.9f;
                 case ShotElement.Sand:
+                case ShotElement.Spore:
+                case ShotElement.Mote:
                 {
                     // A clod, its edge crumbling.
                     float bump = PixelNoise.Value((int)Math.Floor(u + 64), (int)Math.Floor(v + 64), seed) - 0.5f;
@@ -121,6 +137,7 @@ namespace Game.Client
                 }
                 case ShotElement.Fire:
                 case ShotElement.Wraith:
+                case ShotElement.Hex:
                 {
                     // Round in front, drawn out to a point behind.
                     if (u >= 0) return r - (float)Math.Sqrt(u * u + v * v);
@@ -144,10 +161,12 @@ namespace Game.Client
             switch (element)
             {
                 case ShotElement.Stone:
+                case ShotElement.Iron:
                     // Lit from above, a crack of the rim's red showing through.
                     if (Math.Abs(u * 0.5f + v) < 0.7f && frame == 0 && d < core) return c[0];
                     return wy > inner * 0.15f ? c[1] : wy > -inner * 0.35f ? c[2] : c[3];
                 case ShotElement.Crystal:
+                case ShotElement.Frost:
                     // A bright facet down its length, pale on the upper side.
                     if (Math.Abs(v) < (frame == 0 ? 1.1f : 0.6f)) return c[0];
                     return wy > 0 ? c[1] : c[2];
@@ -165,6 +184,12 @@ namespace Game.Client
                     if (d < hot) return c[0];
                     if (d < core) return c[3];
                     return d < core + 1.2f ? c[1] : c[2];
+                case ShotElement.Spore:
+                case ShotElement.Mote:
+                    // A soft lump: pale spots on it, a bright one near the front.
+                    if (d < hot) return c[0];
+                    if (PixelNoise.Value((int)Math.Floor(u * 0.8f + 64), (int)Math.Floor(v * 0.8f + 64), 23) > 0.7f) return c[frame == 0 ? 0 : 1];
+                    return d < core ? c[1] : depth < 3 ? c[3] : c[2];
                 case ShotElement.Water:
                 {
                     // A bubble: its glint up and to the left, wherever it flies.
@@ -205,7 +230,7 @@ namespace Game.Client
                     {
                         float scale = 0.62f - k * 0.12f, back = gap * (k + 0.55f + (frame % Frames) * 0.35f);
                         // (A flame is drawn out already, and a clod's crumbs are round.)
-                        var piece = element == ShotElement.Stone || element == ShotElement.Crystal ? element : ShotElement.Ember;
+                        var piece = element == ShotElement.Stone || element == ShotElement.Iron || element == ShotElement.Crystal || element == ShotElement.Frost ? element : ShotElement.Ember;
                         if (Depth(piece, (u + back) / scale, v / scale, r, 5) * scale < 0.4f) continue;
                         var c = Ramps[(int)element];
                         image[x, y] = k == 1 ? c[2] : k == 2 ? c[2].Mix(TailRed, 0.5f).WithAlpha(215) : TailRed.WithAlpha((byte)(k == 3 ? 170 : 110));

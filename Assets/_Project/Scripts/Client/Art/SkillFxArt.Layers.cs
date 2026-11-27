@@ -289,5 +289,59 @@ namespace Game.Client
             }
             return image;
         }
+
+        // ---- ordinary monsters' pieces (E5) ----
+
+        // A pool: its edge heaves with the frame, dark at the rim, the element's deep colour within, a lighter patch
+        // off its middle and a few pale flecks on that.
+        static PixelImage Puddle(Rgba[] r, int diameter, int frame)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float centre = diameter / 2f, reach = centre - 1, phase = (frame & 3) * 1.5708f;
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    float u = x + 0.5f - centre, v = y + 0.5f - centre;
+                    float d = (float)Math.Sqrt(u * u + v * v), a = (float)Math.Atan2(v, u);
+                    float edge = reach * (0.89f + 0.06f * (float)Math.Sin(a * 3 + phase) + 0.05f * (float)Math.Sin(a * 5 - phase + 1.3f));
+                    float depth = edge - d;
+                    if (depth < 0) continue;
+                    if (depth < 1.5f)
+                    {
+                        image[x, y] = A(r[4], 230);
+                        continue;
+                    }
+                    float du = u + reach * 0.12f, dv = v + reach * 0.1f, inner = reach * (0.52f + 0.07f * (float)Math.Sin(a * 4 - phase));
+                    float dd = (float)Math.Sqrt(du * du + dv * dv);
+                    if (dd < inner * 0.5f && Noise(x, y, 31 + (frame & 3)) > 0.82f) image[x, y] = r[1];
+                    else if (dd < inner) image[x, y] = A(r[2], 215);
+                    else image[x, y] = A(r[3], 215);
+                }
+            }
+            return image;
+        }
+
+        // Dots of a ring, each about four pixels long with as much between: red with a dark pixel inside it so it
+        // reads on any pool.
+        static PixelImage Dashes(Rgba[] r, int diameter, int frame)
+        {
+            var image = new PixelImage(diameter, diameter);
+            float centre = diameter / 2f, outer = centre - 0.5f;
+            int dots = Math.Max(6, (int)Math.Round(Math.PI * diameter / 8));
+            for (int y = 0; y < diameter; y++)
+            {
+                for (int x = 0; x < diameter; x++)
+                {
+                    float u = x + 0.5f - centre, v = y + 0.5f - centre;
+                    float depth = outer - (float)Math.Sqrt(u * u + v * v);
+                    if (depth < 0 || depth >= 2) continue;
+                    double along = (Math.Atan2(v, u) / (2 * Math.PI) + 1) * dots + (frame & 1) * 0.5;
+                    if (along - Math.Floor(along) > 0.5) continue;
+                    image[x, y] = depth < 1 ? r[2] : A(r[0], 190);
+                }
+            }
+            return image;
+        }
     }
 }

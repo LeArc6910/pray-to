@@ -134,7 +134,7 @@ M2에서 만든 월드, 이동, 전투 규칙이다. 코드는 `Assets/_Project/
 
 ## 몬스터의 공격 시트
 
-사람 말(2026-11-21): "일반 몬스터들의 패턴도 다양화해서 단순히 근접에서 한방, 원거리에서 투사체 한방이 아닌 독특한 이펙트와 공격수단을 가지게 해줘". 설계는 `Docs/WorldRework.md` 2b단계, 종마다의 패턴은 `Docs/MonsterPatterns.md`. 이 절은 만들어진 엔진이다(묶음 2b-1, 2026-11-21. 나머지 열다섯 종과 그에 필요한 조각은 2b-2, 2026-11-22). 코드는 `Core/Simulation/World.MonsterAttacks.cs`와 `MonsterAttackSheet.cs`, 화면은 `Client/Art/MonsterFx.cs`와 `Client/WorldView.MonsterFx.cs`.
+사람 말(2026-11-21): "일반 몬스터들의 패턴도 다양화해서 단순히 근접에서 한방, 원거리에서 투사체 한방이 아닌 독특한 이펙트와 공격수단을 가지게 해줘". 설계는 `Docs/WorldRework.md` 2b단계, 종마다의 패턴은 `Docs/MonsterPatterns.md`. 이 절은 만들어진 엔진이다(묶음 2b-1, 2026-11-21. 나머지 열다섯 종과 그에 필요한 조각은 2b-2, 2026-11-22). 코드는 `Core/Simulation/World.MonsterAttacks.cs`와 `MonsterAttackSheet.cs`, 화면은 `Client/Art/MonsterFx.cs`와 `Client/WorldView.MonsterFx.cs`. 2026-11-27(E5, `Docs/EffectsRework.md` 9절)부터 예고는 보스와 같은 도형 그림(2px 테, 차오르는 빗금, 끝의 깜빡임. 속만 더 옅다)이고 돌진 길에는 화살표, 탄은 적의 탄 그림(붉은 테·꼬리·소멸)을 종의 원소로, 부채 사격에는 조준선, 바닥에 남는 것은 웅덩이·불꽃에 붉은 점선 테다. 판정과 숫자는 그대로다.
 
 - **고르기.** 쫓는 중에 틱마다, 쓸 수 있는 공격(다시 쓸 때가 됐고, 틈이 `range_min`~`range_max` 사이고, `when`이 맞고, 벽에 가리지 않은 것) 가운데 `weight`로 하나를 뽑아 곧바로 예고한다. 쓸 것이 없으면 가장 가까이서 쓰는 공격의 사거리까지 다가가고(`keep_distance`가 있으면 그보다 가까이 가지 않고, 플레이어가 더 다가오면 물러난다), 거기서 기다린다
 - **예고 → 터짐 → 쉬기.** 보스와 같다. 예고(`telegraph`) 동안 바닥 표시가 보이고, 끝나면 터지고, 몬스터는 `monsters.csv`의 `cooldown`만큼 쉰다. 공격 자체는 제 `cooldown`이 지나야 다시 뽑힌다(점멸 6초처럼 공격마다 다르게)

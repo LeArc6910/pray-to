@@ -71,6 +71,9 @@ namespace Game.Client
         Crumble,
         Fall,
         Crack,
+        // The effects rework (E5, 2026-11-27). A loop on a body that runs at someone (a charge): dust kicked up behind
+        // its feet and lines of speed off its back (Dir the way it runs).
+        Rush,
     }
 
     // What a kind's effects are made of besides its colours, so each reads as itself (Docs/MonsterPatterns.md): told
@@ -124,14 +127,19 @@ namespace Game.Client
         public bool Harmless;
         // What the kind's effects are made of (MonsterFx.LookOf).
         public MobLook Look;
+        // A thrown thing's mark: where its thrower stands from the mark, in pixels (y up).
+        public bool Thrown;
+        public float FromX, FromY;
     }
 
     // Ordinary monsters' warnings and effects as functions of time (2026-11-21, Docs/Combat.md 몬스터의 공격 시트,
     // Docs/SkillEffects.md): like SkillFx it keeps no state and says which pieces are where at a moment, so the game
     // (WorldView.MonsterFx) and the preview (ArtPreview --only monsterfx) draw the same. The rules: three parts
-    // (gathering = the warning, the blow at its brightest and shortest, what thins out in 0.2 to 0.4 s); the rim at
-    // the real reach; anything of an enemy's on the ground wears a thin red rim, its inside the element's own shape;
-    // a monster's shot is its body's colour with a bright head and a dark rim; no more than Most pieces to an effect.
+    // (gathering = the warning, the blow at its brightest and shortest, what thins out); the rim at the real reach;
+    // no more than Most pieces to an effect. Since the effects rework (E5, Docs/EffectsRework.md 9) a warning's rim
+    // and filling are one picture of its shape (HazardArt.Warn, the boss's, fainter inside: Field and Tone say
+    // which), a shot is ShotArt's in what the kind is made of (ShotOf), what lies on the floor is a pool with a
+    // dotted red rim, and a thrown thing bursts as its element does (FxLayers).
     static class MonsterFx
     {
         public const int Most = 24;
@@ -240,6 +248,61 @@ namespace Game.Client
             }
         }
 
+        // What a kind's shot is made of (ShotArt, E2): by what the kind is made of and its colours. The plain kinds'
+        // is the ember every other enemy's is.
+        public static ShotElement ShotOf(MobLook look, FxRamp ramp)
+        {
+            switch (look)
+            {
+                case MobLook.Spore: return ramp == FxRamp.Spirit ? ShotElement.Mote : ShotElement.Spore;
+                case MobLook.Crystal: return ShotElement.Crystal;
+                case MobLook.Frost: return ShotElement.Frost;
+                case MobLook.Ember: return ShotElement.Fire;
+                case MobLook.Sand: return ShotElement.Sand;
+                case MobLook.Water: return ShotElement.Water;
+                case MobLook.Shadow: return ShotElement.Void;
+                case MobLook.Iron: return ShotElement.Iron;
+                case MobLook.Hex: return ShotElement.Hex;
+            }
+            return ramp == FxRamp.Cold ? ShotElement.Frost : ramp == FxRamp.Fire ? ShotElement.Fire : ramp == FxRamp.Violet ? ShotElement.Void
+                : ramp == FxRamp.Spirit ? ShotElement.Water : ramp == FxRamp.Dust ? ShotElement.Sand : ShotElement.Ember;
+        }
+
+        // A mark's picture (E5): its shape at the size it is judged at, on the pixel grid (sizes in pixels as the
+        // context has them, a cone's width in degrees).
+        public static HazardField Field(in MobContext c)
+        {
+            float tile = TileArt.Size;
+            switch (c.Area)
+            {
+                case HazardShape.Cone: return HazardArt.Field(HazardForm.Cone, c.Size / tile, c.Width, c.Dir);
+                case HazardShape.Line: return HazardArt.Field(HazardForm.Band, c.Size / tile, c.Width / tile, c.Dir);
+                case HazardShape.Ring: return HazardArt.Field(HazardForm.Donut, c.Size / tile, c.Width / tile, c.Dir);
+                default: return HazardArt.Field(HazardForm.Circle, c.Size / tile, 0, 0);
+            }
+        }
+
+        // A path or a place to come out at is yellow; anything that will hurt is red.
+        public static WarnTone Tone(in MobContext c) => Dash(c.Shape) ? WarnTone.Rush : WarnTone.Danger;
+
+        // How far a mark's picture has filled, in HazardArt.FillSteps: a trap fills while it is being set and then
+        // lies full; the rest fill to the moment they land.
+        public static int WarnStep(in MobContext c, float armsAt)
+        {
+            float p = Math.Clamp(c.Progress, 0, 1);
+            if (c.Area == HazardShape.Mine) p = c.Armed ? 1 : armsAt > 0 ? Math.Min(0.8f, p / armsAt * 0.8f) : 0;
+            // What harms nothing (where a blink comes out, the flash of the fallen) only shows its rim.
+            if (c.Harmless || c.Shape == MonsterAttackShape.Blink) p = 0;
+            return Math.Clamp((int)(p * HazardArt.FillSteps), 0, HazardArt.FillSteps);
+        }
+
+        // Whether it blinks whole: the last of its time (a trap never: it lies there for long).
+        public static bool WarnBlinks(in MobContext c) => c.Area != HazardShape.Mine && !c.Harmless && c.Progress > HazardArt.BlinkFrom;
+
+        // Arrowheads march along a rush's path, this many pixels on (under 0: none).
+        public static int WarnArrows(in MobContext c, float t, bool still) =>
+            c.Area == HazardShape.Line && Dash(c.Shape) ? (still ? 0 : (int)(t * 12) * 3 % 22) : -1;
+
         public static uint TintOf(Rgba color) => 0x1000000u | (uint)color.R << 16 | (uint)color.G << 8 | color.B;
 
         // Adds this moment's pieces. False once a one-off is over (a Mark, Pool, Shot or loop never is).
@@ -253,9 +316,10 @@ namespace Game.Client
                 case MobFx.Mark: Mark(c, t, o); break;
                 case MobFx.Tell: Tell(c, t, o); break;
                 case MobFx.Land:
-                    life = Land(c, t, o);
-                    if (t < life) LandLook(c, t, c.Size, o);
+                    life = Land(c, t, o, out bool whole);
+                    if (t < life && !whole) LandLook(c, t, c.Size, o);
                     break;
+                case MobFx.Rush: Rush(c, t, o); break;
                 case MobFx.Pool: Pool(c, t, o); break;
                 case MobFx.Shot: Shot(c, t, o); break;
                 case MobFx.Bounce:
@@ -568,12 +632,16 @@ namespace Game.Client
                     Put(o, FxShape.Broken, FxRamp.Heal, 14, SkillFxArt.BrokenFrame(1, 4, (int)(t * 4)), 0, 0, 0.5f, 0, true);
                     break;
             }
-            // Greys take the monster's own colour.
-            for (int i = from; c.Tint != 0 && i < o.Count; i++)
+            for (int i = from; i < o.Count; i++)
             {
-                if (o[i].Ramp != FxRamp.Plain) continue;
                 var stamp = o[i];
-                stamp.Tint = c.Tint;
+                // Smoke and dust in the air lie under the warnings on the floor, so they never hide one (E5).
+                bool low = !stamp.Ground && (stamp.Shape == FxShape.Smoke || stamp.Shape == FxShape.Plume || stamp.Shape == FxShape.Pall);
+                // Greys take the monster's own colour.
+                bool tinted = c.Tint != 0 && stamp.Ramp == FxRamp.Plain;
+                if (!low && !tinted) continue;
+                stamp.Low = low;
+                if (tinted) stamp.Tint = c.Tint;
                 o[i] = stamp;
             }
             return t < life;
@@ -586,109 +654,85 @@ namespace Game.Client
 
         // ---- The warning on the ground ----
 
+        // What goes with a mark's picture (the rim, the faint inside and the filling are HazardArt.Warn's, laid by the
+        // view from Field and Tone): what is coming down or up, the wisp where a blink will come out, a trap's rune.
         static void Mark(in MobContext c, float t, List<FxStamp> o)
         {
-            // A path or a place to come out at is yellow; anything that will hurt is red.
-            var ramp = Dash(c.Shape) ? FxRamp.Bolt : FxRamp.Danger;
             float p = Math.Clamp(c.Progress, 0, 1);
-            // The rim beats faster as the blow nears.
-            float beat = 0.72f + 0.28f * (float)Math.Sin(t * (8 + 26 * p));
-            float dir = c.Dir * Deg;
-            switch (c.Area)
+            if (c.Area == HazardShape.Cone || c.Area == HazardShape.Line || c.Area == HazardShape.Ring) return;
+            if (c.Shape == MonsterAttackShape.Blink)
             {
-                case HazardShape.Cone:
+                // Where it will come out: a wisp of what it is made of.
+                Put(o, FxShape.Smoke, c.Ramp, 8, 3 - Math.Min(3, (int)(p * 4)), 0, Body, 0.5f * p);
+                return;
+            }
+            if (c.Harmless)
+            {
+                // The flash of the fallen before its shards.
+                if (SkillFx.Frac(t * (6 + 10 * p)) < 0.5f) Put(o, FxShape.Glint, FxRamp.Steel, 9, 1, 0, 3);
+                return;
+            }
+            switch (c.Shape)
+            {
+                case MonsterAttackShape.Lob when c.Thrown:
                 {
-                    float half = c.Width / 2;
-                    for (int side = -1; side <= 1; side += 2)
+                    // The thrown thing itself, up and over from its thrower, its shadow sliding along the floor to
+                    // where it will fall.
+                    float x = c.FromX * (1 - p), y = c.FromY * (1 - p), up = 4 * 30 * p * (1 - p);
+                    Put(o, FxShape.Shadow, FxRamp.Smoke, 4 + 2 * (int)(3 * p), 0, x, y, 0.6f, 0, true);
+                    for (int k = 2; k >= 1; k--)
                     {
-                        float a = dir + half * side;
-                        Put(o, FxShape.Tether, ramp, SkillFxArt.Step4(c.Size), 0, SkillFx.Cos(a) * c.Size / 2, SkillFx.Sin(a) * c.Size / 2, beat, a, true);
+                        float q = Math.Max(0, p - k * 0.04f);
+                        Put(o, FxShape.Dot, c.Ramp, 4 - k, 1, c.FromX * (1 - q), c.FromY * (1 - q) + 4 * 30 * q * (1 - q) + Body, 0.65f - k * 0.2f);
                     }
-                    int dots = Math.Clamp((int)(c.Width / 12), 3, 12);
-                    for (int i = 0; i <= dots; i++)
-                    {
-                        float a = dir - half + c.Width * i / dots;
-                        Put(o, FxShape.Dot, ramp, 2, 2, SkillFx.Cos(a) * c.Size, SkillFx.Sin(a) * c.Size, beat, 0, true);
-                        // The inside fills outward, faintly.
-                        if (i % 2 == 0 && p > 0.1f) Put(o, FxShape.Dot, ramp, 2, 1, SkillFx.Cos(a) * c.Size * p, SkillFx.Sin(a) * c.Size * p, 0.5f, 0, true);
-                    }
+                    Lump(c, o, x, y + up + Body, t, (float)Math.Atan2(-c.FromY + 4 * 30 * (1 - 2 * p), -c.FromX) * Deg);
                     break;
                 }
-                case HazardShape.Line:
+                case MonsterAttackShape.Lob:
+                case MonsterAttackShape.Delayed:
+                case MonsterAttackShape.Leap:
+                    // What is coming down throws a growing shadow, and a thrown thing is seen falling at the end.
+                    Put(o, FxShape.Shadow, FxRamp.Smoke, Math.Max(4, (int)(c.Size * 1.3f * (0.3f + 0.7f * p))), 0, 0, 0, 0.7f, 0, true);
+                    if (c.Shape != MonsterAttackShape.Leap && p > 0.55f)
+                    {
+                        float u = (p - 0.55f) / 0.45f;
+                        Lump(c, o, 0, 60 * (1 - u * u) + 4, t, -90);
+                    }
+                    break;
+                case MonsterAttackShape.Burrow:
+                case MonsterAttackShape.Ambush:
+                    for (int i = 0; i < 4; i++)
+                        Put(o, FxShape.Chunk, FxRamp.Dust, 3, i, (SkillFx.Rnd(c.Seed, i, 1) - 0.5f) * c.Size, (SkillFx.Rnd(c.Seed, i, 2) - 0.5f) * c.Size * 0.6f + (float)Math.Abs(Math.Sin(t * 14 + i)) * 3, 0.9f);
+                    break;
+            }
+            if (c.Area == HazardShape.Pull)
+            {
+                // Motes drawn round and in toward the middle.
+                for (int i = 0; i < 8; i++)
                 {
-                    float side = c.Width / 2;
-                    int frame = Dash(c.Shape) ? (int)(t * 16) & 3 : 0;
-                    for (int s = -1; s <= 1; s += 2)
-                    {
-                        float x = SkillFx.Cos(dir) * c.Size / 2 - SkillFx.Sin(dir) * side * s, y = SkillFx.Sin(dir) * c.Size / 2 + SkillFx.Cos(dir) * side * s;
-                        Put(o, FxShape.Tether, ramp, SkillFxArt.Step4(c.Size), frame, x, y, beat, dir, true);
-                    }
-                    for (int i = -1; i <= 1; i++)
-                        Put(o, FxShape.Dot, ramp, 2, 2, SkillFx.Cos(dir) * c.Size - SkillFx.Sin(dir) * side * i, SkillFx.Sin(dir) * c.Size + SkillFx.Cos(dir) * side * i, beat, 0, true);
-                    // A thin line runs out along it: the aim of a beam, the way of a rush.
-                    float reach = Math.Max(4, c.Size * (Dash(c.Shape) ? 1 : p));
-                    Put(o, FxShape.Streak, ramp, SkillFxArt.Step4(reach), 1, SkillFx.Cos(dir) * reach / 2, SkillFx.Sin(dir) * reach / 2, 0.5f, dir, true);
-                    break;
+                    float u = SkillFx.Frac(t * 0.6f + i / 8f);
+                    float a = i * 45 + t * 150;
+                    Put(o, FxShape.Dot, c.Ramp, 2, u > 0.6f ? 3 : 2, SkillFx.Cos(a) * c.Size * (1 - u), SkillFx.Sin(a) * c.Size * (1 - u), 0.4f + 0.6f * u, 0, true);
                 }
-                case HazardShape.Ring:
-                    Put(o, FxShape.Edge, ramp, SkillFxArt.Even(2 * c.Size), 1, 0, 0, beat, 0, true);
-                    Put(o, FxShape.Edge, ramp, SkillFxArt.Even(2 * c.Width), 1, 0, 0, beat, 0, true);
-                    Put(o, FxShape.Broken, ramp, SkillFxArt.Even(2 * (c.Width + (c.Size - c.Width) * p)), SkillFxArt.BrokenFrame(1, 6, (int)(t * 6)), 0, 0, 0.5f, 0, true);
-                    break;
-                default:
-                    if (c.Shape == MonsterAttackShape.Blink)
-                    {
-                        // Where it will come out: a turning yellow ring and a wisp of what it is made of.
-                        Put(o, FxShape.Broken, FxRamp.Bolt, SkillFxArt.Even(2 * c.Size), SkillFxArt.BrokenFrame(1, 5, (int)(t * 14)), 0, 0, beat, 0, true);
-                        Put(o, FxShape.Smoke, c.Ramp, 8, 3 - Math.Min(3, (int)(p * 4)), 0, Body, 0.5f * p);
-                        break;
-                    }
-                    // A trap not yet armed is drawn faintly, rim and all (it does nothing yet if stepped on).
-                    bool waiting = c.Area == HazardShape.Mine && !c.Armed;
-                    Put(o, FxShape.Edge, ramp, SkillFxArt.Even(2 * c.Size), 1, 0, 0, waiting ? 0.45f : beat, 0, true);
-                    if (c.Harmless)
-                    {
-                        // The flash of the fallen before its shards.
-                        if (SkillFx.Frac(t * (6 + 10 * p)) < 0.5f) Put(o, FxShape.Glint, FxRamp.Steel, 9, 1, 0, 3);
-                        break;
-                    }
-                    if (p > 0.08f && !waiting) Put(o, FxShape.Broken, ramp, SkillFxArt.Even(2 * c.Size * p), SkillFxArt.BrokenFrame(1, 6, (int)(t * 6)), 0, 0, 0.5f, 0, true);
-                    switch (c.Shape)
-                    {
-                        case MonsterAttackShape.Lob:
-                        case MonsterAttackShape.Delayed:
-                        case MonsterAttackShape.Leap:
-                            // What is coming down throws a growing shadow, and a thrown thing is seen falling at the end.
-                            Put(o, FxShape.Shadow, FxRamp.Smoke, Math.Max(4, (int)(c.Size * 1.3f * (0.3f + 0.7f * p))), 0, 0, 0, 0.7f, 0, true);
-                            if (c.Shape != MonsterAttackShape.Leap && p > 0.55f)
-                            {
-                                float u = (p - 0.55f) / 0.45f;
-                                Put(o, FxShape.Shard, c.Ramp, 9, 1, 0, 60 * (1 - u * u) + 4, 1, -90);
-                            }
-                            break;
-                        case MonsterAttackShape.Burrow:
-                        case MonsterAttackShape.Ambush:
-                            for (int i = 0; i < 4; i++)
-                                Put(o, FxShape.Chunk, FxRamp.Dust, 3, i, (SkillFx.Rnd(c.Seed, i, 1) - 0.5f) * c.Size, (SkillFx.Rnd(c.Seed, i, 2) - 0.5f) * c.Size * 0.6f + (float)Math.Abs(Math.Sin(t * 14 + i)) * 3, 0.9f);
-                            break;
-                    }
-                    if (c.Area == HazardShape.Pull)
-                    {
-                        // Motes drawn round and in toward the middle.
-                        for (int i = 0; i < 8; i++)
-                        {
-                            float u = SkillFx.Frac(t * 0.6f + i / 8f);
-                            float a = i * 45 + t * 150;
-                            Put(o, FxShape.Dot, c.Ramp, 2, u > 0.6f ? 3 : 2, SkillFx.Cos(a) * c.Size * (1 - u), SkillFx.Sin(a) * c.Size * (1 - u), 0.4f + 0.6f * u, 0, true);
-                        }
-                        Put(o, FxShape.Glint, c.Ramp, 7, (int)(t * 8) & 1, 0, 0, 0.5f + 0.5f * p);
-                    }
-                    else if (c.Area == HazardShape.Mine)
-                    {
-                        // A rune drawn on the floor: faint until it is armed.
-                        Put(o, FxShape.Rune, FxRamp.Danger, SkillFxArt.Even(2 * c.Size * 0.8f), c.Armed ? (int)(t * 3) & 3 : 0, 0, 0, c.Armed ? 0.9f : 0.35f, 0, true);
-                    }
-                    break;
+                Put(o, FxShape.Glint, c.Ramp, 7, (int)(t * 8) & 1, 0, 0, 0.5f + 0.5f * p);
+            }
+            else if (c.Area == HazardShape.Mine)
+            {
+                // A rune drawn on the floor: faint until it is armed.
+                Put(o, FxShape.Rune, FxRamp.Danger, SkillFxArt.Even(2 * c.Size * 0.8f), c.Armed ? (int)(t * 3) & 3 : 0, 0, 0, c.Armed ? 0.9f : 0.35f, 0, true);
+            }
+        }
+
+        // A thrown thing in the air, as its kind makes it: a shard of crystal or ice, a ball of fire, else a lump
+        // with a pale spot.
+        static void Lump(in MobContext c, List<FxStamp> o, float x, float y, float t, float angle)
+        {
+            if (c.Look == MobLook.Crystal || c.Look == MobLook.Frost || c.Ramp == FxRamp.Cold) Put(o, FxShape.Shard, c.Ramp, 9, 1, x, y, 1, angle);
+            else if (c.Look == MobLook.Ember || c.Ramp == FxRamp.Fire) Put(o, FxShape.Fireball, FxRamp.Fire, 7, (int)(t * 14) % 3, x, y, 1, angle);
+            else
+            {
+                Put(o, FxShape.Blob, c.Ramp, 8, 1 + ((int)(t * 8) & 1), x, y);
+                Put(o, FxShape.Dot, c.Ramp, 2, 3, x - 1, y + 1);
             }
         }
 
@@ -876,10 +920,12 @@ namespace Game.Client
 
         // ---- Where it landed ----
 
-        static float Land(in MobContext c, float t, List<FxStamp> o)
+        static float Land(in MobContext c, float t, List<FxStamp> o, out bool whole)
         {
             float dir = c.Dir * Deg;
             float r = c.Size;
+            // Whether the kind's own touch (LandLook) is already in it.
+            whole = false;
             switch (c.Shape)
             {
                 case MonsterAttackShape.Strike:
@@ -914,8 +960,11 @@ namespace Game.Client
                 }
                 case MonsterAttackShape.Leap:
                 {
-                    // It comes down: a flash of itself, drops flung up and out, a ring, a puddle that sinks away.
+                    // It comes down: a flash of itself, drops flung up and out, a ring, a puddle that sinks away, and the
+                    // dust its weight throws out along the floor.
                     float life = 0.4f;
+                    for (int i = -1; i <= 1; i += 2)
+                        Put(o, FxShape.Smoke, FxRamp.Dust, 8, Math.Min(3, (int)(t / life * 4)), i * r * (0.5f + 0.5f * SkillFx.Out(t / life)), 2, 0.6f * (1 - t / life), 0, true);
                     if (t < 0.09f) Put(o, FxShape.Blob, c.Ramp, SkillFxArt.Even(r * 1.2f), t < 0.04f ? 0 : 1, 0, 2);
                     SkillFx.Ring(o, c.Ramp, t, 0, r, 2, ground: true);
                     SkillFx.Fly(o, FxShape.Dot, c.Ramp, 2, 2, 6, t, 0.02f, 0.3f, 3, r, c.Seed, hop: 8);
@@ -964,6 +1013,12 @@ namespace Game.Client
                 }
                 case MonsterAttackShape.Explode:
                 {
+                    float burst = Burst(c, t, o, true);
+                    if (burst > 0)
+                    {
+                        whole = true;
+                        return burst;
+                    }
                     // A white heart for a moment, then the ball of fire, balls of it thrown out, and smoke.
                     float life = 0.45f;
                     if (t < 0.06f) Put(o, FxShape.Glint, FxRamp.Steel, 17, 2, 0, Body);
@@ -994,6 +1049,12 @@ namespace Game.Client
                 }
                 default:
                 {
+                    float burst = Burst(c, t, o, false);
+                    if (burst > 0)
+                    {
+                        whole = true;
+                        return burst;
+                    }
                     // Something thrown or left has gone off: a ball from a bright heart to dark scraps, chips, smoke.
                     float life = 0.42f;
                     Put(o, FxShape.Blob, c.Ramp, SkillFxArt.Even(Math.Min(44, r * 1.5f)), Math.Min(5, (int)(t / 0.3f * 6)), 0, 3, t < 0.3f ? 1 : 1 - (t - 0.3f) / 0.12f);
@@ -1010,49 +1071,169 @@ namespace Game.Client
             }
         }
 
+        // Something thrown, left or carried goes off as what it is made of (E5, FxLayers): fire and the void's violet
+        // as a blast, spores and water as lumps thrown out with a cloud going up, ice and crystal as spikes that stand
+        // and break, earth as dust and stones. 0 for a kind with no element of its own (the shape's plain blow then).
+        static float Burst(in MobContext c, float t, List<FxStamp> o, bool big)
+        {
+            float r = c.Size;
+            int seed = c.Seed;
+            if (c.Look == MobLook.Ember || c.Ramp == FxRamp.Fire)
+                return Math.Min(1f, FxLayers.Blast(o, t, r, FxRamp.Fire, seed, big ? 8 : 6, big ? 2 : 0, true, 0.9f));
+            if (c.Look == MobLook.Shadow || c.Look == MobLook.Hex)
+            {
+                // Violet fire with no smoke, and stars going out in it.
+                for (int i = 0; i < 3; i++)
+                    if (SkillFx.In(t, 0.05f * i, 0.3f + 0.05f * i) && SkillFx.Frac(t * 12 + i * 0.4f) < 0.6f)
+                        Put(o, FxShape.Glint, FxRamp.Violet, 5, 1, SkillFx.Cos(i * 120 + seed % 90) * r * 0.5f, SkillFx.Sin(i * 120 + seed % 90) * r * 0.4f + 4);
+                return FxLayers.Blast(o, t, r, FxRamp.Violet, seed, big ? 8 : 6, 0, false, 0.6f);
+            }
+            if (c.Look == MobLook.Spore || c.Look == MobLook.Water)
+            {
+                float life = 0.8f;
+                bool wet = c.Look == MobLook.Water;
+                FxLayers.Light(o, c.Ramp, r * 1.8f, 0.6f * (1 - t / 0.4f));
+                if (t < 0.06f) Put(o, FxShape.Blob, c.Ramp, SkillFxArt.Even(r * 0.9f), 0, 0, 2);
+                FxLayers.Shock(o, c.Ramp, t, 0, r, ground: true);
+                // Lumps thrown up and out.
+                float p = SkillFx.U(t, 0, 0.3f);
+                for (int i = 0; i < 7 && p < 1; i++)
+                {
+                    float a = i * 360f / 7 + seed % 51, far = r * (0.3f + 0.9f * SkillFx.Out(p));
+                    Put(o, wet ? FxShape.Dot : FxShape.Blob, c.Ramp, wet ? 3 : 2 * (3 - (int)(2 * p)), wet ? 3 : 1, SkillFx.Cos(a) * far, SkillFx.Sin(a) * far * 0.8f + 4 * 7 * p * (1 - p));
+                }
+                // A cloud of it going up (spray, from water), and motes drifting after.
+                for (int i = 0; i < 4; i++)
+                {
+                    float q = (t - 0.1f - i * 0.06f) / 0.6f;
+                    if (q < 0 || q >= 1) continue;
+                    Put(o, FxShape.Smoke, wet ? FxRamp.Mist : c.Ramp, SkillFxArt.Even(8 + 6 * q), Math.Min(3, (int)(q * 4)), ((i * 2 + 1) % 4 - 1.5f) * r * 0.45f + (SkillFx.Rnd(seed, i, 51) - 0.5f) * 4, 2 + (i & 1) * 3 + q * 14, 0.55f * (1 - q));
+                }
+                SkillFx.Float(o, FxShape.Dot, c.Ramp, 2, 2, 5, t, 0.05f, life, r * 0.8f, 14, seed + 11);
+                return life;
+            }
+            if (c.Look == MobLook.Frost || c.Look == MobLook.Crystal || c.Ramp == FxRamp.Cold)
+            {
+                float life = 0.62f;
+                FxLayers.Light(o, FxRamp.Cold, r * 1.6f, 0.5f * (1 - t / 0.35f), 0, 0, 2);
+                if (t < 0.07f) Put(o, FxShape.Glint, FxRamp.Steel, 13, 2, 0, 4);
+                FxLayers.Shock(o, FxRamp.Cold, t, 0, r, ground: true);
+                // Spikes stand up round where it fell, hold a moment, and break.
+                float rise = SkillFx.Out(SkillFx.U(t, 0, 0.1f));
+                for (int i = 0; i < 6 && t < 0.3f; i++)
+                {
+                    float a = i * 60 + 20 + seed % 40;
+                    int tall = 5 + (int)((5 + 3 * (i & 1)) * rise);
+                    Put(o, FxShape.Shard, c.Ramp, tall, 0, SkillFx.Cos(a) * r * 0.6f, SkillFx.Sin(a) * r * 0.42f + tall / 2f, 1, 90 + (i - 2.5f) * 7);
+                }
+                SkillFx.Fly(o, FxShape.Shard, c.Ramp, 5, 0, 7, t, 0.28f, 0.28f, r * 0.4f, r * 1.25f, seed, hop: 7, aimed: true);
+                SkillFx.Float(o, FxShape.Smoke, FxRamp.Mist, 8, 2, 3, t, 0.28f, life, r * 0.5f, 6, seed);
+                return life;
+            }
+            if (c.Look == MobLook.Sand || c.Ramp == FxRamp.Dust)
+            {
+                float life = 0.75f;
+                FxLayers.Shock(o, FxRamp.Dust, t, 0, r, ground: true);
+                if (t < 0.08f) Put(o, FxShape.Blob, FxRamp.Dust, SkillFxArt.Even(r * 0.9f), 0, 0, 3);
+                FxLayers.Splits(o, FxRamp.Dust, 3, t, 0, life, r, seed);
+                FxLayers.Rubble(o, FxRamp.Dust, big ? 4 : 3, t, 0, r, seed);
+                // Dust rolling out low along the floor, under any warning.
+                for (int i = 0; i < 5; i++)
+                {
+                    float q = SkillFx.U(t, 0.02f * i, 0.5f + 0.04f * i);
+                    if (q <= 0 || q >= 1) continue;
+                    float a = i * 72 + seed % 72;
+                    Put(o, FxShape.Smoke, FxRamp.Dust, SkillFxArt.Even(7 + 5 * q), Math.Min(3, (int)(q * 4)), SkillFx.Cos(a) * r * (0.4f + 0.7f * q), SkillFx.Sin(a) * r * 0.6f * (0.4f + 0.7f * q) + 2, 0.7f * (1 - q), 0, true);
+                }
+                return life;
+            }
+            return 0;
+        }
+
+        // ---- A body that runs at someone ----
+
+        static void Rush(in MobContext c, float t, List<FxStamp> o)
+        {
+            float dir = c.Dir * Deg, bx = -SkillFx.Cos(dir), by = -SkillFx.Sin(dir);
+            // Lines of speed off its back.
+            for (int i = 0; i < 4; i++)
+            {
+                float lag = 12 + 8 * SkillFx.Rnd(c.Seed + (int)(t * 25), i, 61), side = (i - 1.5f) * 4;
+                Put(o, FxShape.Streak, c.Ramp, SkillFxArt.Step4(lag), 1, bx * (10 + lag / 2) - by * side, Body + by * (10 + lag / 2) + bx * side, 0.6f, dir);
+            }
+            // Dust kicked up behind its feet, on the floor; and what its kind is made of thrown up with it.
+            for (int i = 0; i < 5; i++)
+            {
+                float u = SkillFx.Frac(t * 3 + i / 5f), far = 8 + 22 * u, off = (SkillFx.Rnd(c.Seed, i, 62) - 0.5f) * 8;
+                float x = bx * far - by * off, y = 1 + by * far + bx * off;
+                Put(o, FxShape.Smoke, FxRamp.Dust, SkillFxArt.Even(6 + 5 * u), Math.Min(3, (int)(u * 4)), x, y, 0.75f * (1 - u), 0, true);
+                if ((i & 1) != 0) continue;
+                float hop = 4 * 8 * u * (1 - u);
+                if (c.Look == MobLook.Frost || c.Look == MobLook.Crystal) Put(o, FxShape.Shard, c.Ramp, 5 - (int)(2 * u), 0, x, y + 3 + hop, 1 - u, 60 + u * 400 + i * 50);
+                else if (c.Look == MobLook.Ember) Put(o, FxShape.Flame, FxRamp.Fire, 7 - (int)(3 * u), (int)(t * 12 + i) & 3, x, y + 3, 1 - u);
+                else Put(o, FxShape.Chunk, FxRamp.Dust, 3, i, x, y + 2 + hop, 1 - u);
+            }
+        }
+
         // ---- What lies on the floor ----
 
         static void Pool(in MobContext c, float t, List<FxStamp> o)
         {
             float fade = Math.Clamp(c.Progress, 0, 1);
             float r = c.Size;
-            // An enemy's, so it wears the thin red rim whatever it is made of; a cloud that only fills monsters does not.
-            if (c.Area != HazardShape.Balm) Put(o, FxShape.Edge, FxRamp.Danger, SkillFxArt.Even(2 * r), 1, 0, 0, 0.75f * fade, 0, true);
             int count = Math.Clamp((int)(r / 4) + 2, 3, 7);
             switch (c.Area)
             {
                 case HazardShape.Fire:
-                    // Low flames that flicker, and an ember or two going up.
+                    // Soot under it, tongues of flame that leap and lean, embers going up, its light on the floor.
+                    Put(o, FxShape.Scorch, FxRamp.Smoke, SkillFxArt.Step4(r * 1.7f), 4 + (c.Seed & 3), 0, 0, 0.75f * fade, 0, true);
+                    FxLayers.Light(o, FxRamp.Fire, r * 2.2f, (0.5f + 0.08f * (float)Math.Sin(t * 20 + c.Seed)) * fade);
                     for (int i = 0; i < count; i++)
                     {
                         float a = SkillFx.Rnd(c.Seed, i, 1) * 360, d = r * 0.7f * (float)Math.Sqrt(SkillFx.Rnd(c.Seed, i, 2));
-                        Put(o, FxShape.Flame, FxRamp.Fire, 6 + 2 * (i & 1), (int)(t * 9 + i * 1.7f) & 3, SkillFx.Cos(a) * d, SkillFx.Sin(a) * d * 0.7f + 3, fade);
+                        int tall = 8 + 3 * (i & 1) + (int)(2 * Math.Sin(t * 7 + i * 2.1f));
+                        Put(o, FxShape.Flame, FxRamp.Fire, tall, (int)(t * 9 + i * 1.7f) & 3, SkillFx.Cos(a) * d, SkillFx.Sin(a) * d * 0.7f + tall / 2f - 1, fade);
                     }
-                    Put(o, FxShape.Scorch, FxRamp.Fire, SkillFxArt.Even(r * 1.4f), 0, 0, 0, 0.5f * fade, 0, true);
-                    SkillFx.Float(o, FxShape.Dot, FxRamp.Fire, 1, 3, 3, SkillFx.Frac(t * 0.9f), 0, 1, r * 0.6f, 12, c.Seed, alpha: fade);
+                    for (int i = 0; i < 3; i++)
+                    {
+                        float u = SkillFx.Frac(t * 1.5f + SkillFx.Rnd(c.Seed, i, 6));
+                        Put(o, FxShape.Dot, FxRamp.Fire, 1, u < 0.5f ? 3 : 2, (SkillFx.Rnd(c.Seed, i, 7) - 0.5f) * r * 1.2f + (float)Math.Sin(u * 6) * 2, 6 + 20 * u, fade * (1 - u));
+                    }
                     break;
                 case HazardShape.Ice:
-                    // Crystals lying where they froze, one glinting now and then.
-                    for (int i = 0; i < count; i++)
+                    // A sheet of ice with crystals standing in it, one glinting now and then.
+                    Put(o, FxShape.Puddle, FxRamp.Cold, SkillFxArt.Even(2 * r), c.Seed & 3, 0, 0, 0.6f * fade, 0, true);
+                    FxLayers.Light(o, FxRamp.Cold, r * 1.5f, 0.25f * fade);
+                    for (int i = 0; i < count - 1; i++)
                     {
-                        float a = SkillFx.Rnd(c.Seed, i, 3) * 360, d = r * 0.72f * (float)Math.Sqrt(SkillFx.Rnd(c.Seed, i, 4));
-                        Put(o, FxShape.Shard, FxRamp.Cold, 5 + 2 * (i % 3), 0, SkillFx.Cos(a) * d, SkillFx.Sin(a) * d * 0.7f, 0.9f * fade, a * 3, true);
+                        float a = SkillFx.Rnd(c.Seed, i, 3) * 360, d = r * 0.6f * (float)Math.Sqrt(SkillFx.Rnd(c.Seed, i, 4));
+                        int tall = 5 + 2 * (i % 3);
+                        Put(o, FxShape.Shard, FxRamp.Cold, tall, 0, SkillFx.Cos(a) * d, SkillFx.Sin(a) * d * 0.7f + tall / 2f - 1, 0.95f * fade, 90 + (i - 2) * 9);
                     }
-                    if (SkillFx.Frac(t * 0.8f) < 0.25f) Put(o, FxShape.Glint, FxRamp.Cold, 7, 1, SkillFx.Cos(t * 40) * r * 0.3f, 2, fade);
+                    if (SkillFx.Frac(t * 0.8f) < 0.25f) Put(o, FxShape.Glint, FxRamp.Cold, 7, 1, SkillFx.Cos(t * 40) * r * 0.3f, 4, fade);
                     break;
                 case HazardShape.Spore:
-                    // Motes drifting up out of it.
-                    Put(o, FxShape.Smoke, FxRamp.Violet, SkillFxArt.Even(r * 1.2f), 2 + ((int)(t * 2) & 1), 0, 1, 0.35f * fade, 0, true);
-                    SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 2, 2, count + 2, SkillFx.Frac(t * 0.7f), 0, 1, r * 0.8f, 11, c.Seed, alpha: fade);
-                    SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 1, 3, 3, SkillFx.Frac(t * 0.7f + 0.5f), 0, 1, r * 0.8f, 13, c.Seed + 7, alpha: fade);
+                    // A pool that heaves: bubbles swell on it and pop, motes drift up out of it.
+                    Put(o, FxShape.Puddle, FxRamp.Violet, SkillFxArt.Even(2 * r), (int)(t * 1.5f) & 3, 0, 0, 0.8f * fade, 0, true);
+                    FxLayers.Light(o, FxRamp.Violet, r * 1.7f, 0.3f * fade);
+                    for (int i = 0; i < 4; i++)
+                    {
+                        float u = SkillFx.Frac(t * 1.1f + SkillFx.Rnd(c.Seed, i, 9));
+                        float a = SkillFx.Rnd(c.Seed, i, 10) * 360, d = r * 0.6f * SkillFx.Rnd(c.Seed, i, 11);
+                        float x = SkillFx.Cos(a) * d, y = SkillFx.Sin(a) * d * 0.8f;
+                        if (u < 0.75f) Put(o, FxShape.Edge, FxRamp.Violet, u < 0.4f ? 4 : 6, 1, x, y, fade, 0, true);
+                        else Put(o, FxShape.Broken, FxRamp.Violet, 8, SkillFxArt.BrokenFrame(1, 4, i), x, y, fade * (1 - u) * 4, 0, true);
+                    }
+                    SkillFx.Float(o, FxShape.Dot, FxRamp.Violet, 2, 3, 4, SkillFx.Frac(t * 0.7f), 0, 1, r * 0.75f, 13, c.Seed, alpha: fade);
                     break;
                 case HazardShape.Sand:
-                    // Grains turning round and down to its middle.
+                    // Loose sand, grains turning round and down to its middle.
+                    Put(o, FxShape.Puddle, FxRamp.Dust, SkillFxArt.Even(2 * r), (int)(t * 2) & 3, 0, 0, 0.6f * fade, 0, true);
                     for (int i = 0; i < count + 2; i++)
                     {
                         float u = SkillFx.Frac(t * 0.5f + i / (float)(count + 2));
                         float a = i * 360f / (count + 2) + t * 200;
-                        Put(o, FxShape.Dot, FxRamp.Dust, 2, u > 0.5f ? 0 : 2, SkillFx.Cos(a) * r * 0.85f * (1 - u), SkillFx.Sin(a) * r * 0.6f * (1 - u), fade, 0, true);
+                        Put(o, FxShape.Dot, FxRamp.Dust, 2, u > 0.5f ? 0 : 3, SkillFx.Cos(a) * r * 0.85f * (1 - u), SkillFx.Sin(a) * r * 0.6f * (1 - u), fade, 0, true);
                     }
                     break;
                 case HazardShape.Balm:
@@ -1066,39 +1247,18 @@ namespace Game.Client
                     }
                     break;
             }
+            // An enemy's, so while it hurts it wears a dotted red rim at its true reach whatever it is made of, its
+            // dots stepping round; a cloud that only fills monsters does not.
+            if (c.Area != HazardShape.Balm) Put(o, FxShape.Dashes, FxRamp.Danger, SkillFxArt.Even(2 * r), (int)(t * 4) & 1, 0, 0, 0.9f * fade, 0, true);
         }
 
-        // ---- A shot: the body's colour, a bright head, a dark rim ----
+        // ---- A shot ----
 
+        // The shot itself is ShotArt's picture in what its kind is made of (ShotOf: the view and the preview lay it);
+        // this is only what goes over it: a returning one blinks where it stands before it comes back.
         static void Shot(in MobContext c, float t, List<FxStamp> o)
         {
-            float dir = c.Dir * Deg;
-            float bx = -SkillFx.Cos(dir), by = -SkillFx.Sin(dir);
-            switch (c.Shape)
-            {
-                case MonsterAttackShape.Boomerang:
-                    // An orb with stars strung out behind it; it blinks where it stands before it comes back.
-                    if (c.Armed && SkillFx.Frac(t * 10) < 0.4f) Put(o, FxShape.Glint, c.Ramp, 13, 2, 0, 0);
-                    Put(o, FxShape.Dot, c.Ramp, 7, 0, 0, 0, 1, 45);
-                    Put(o, FxShape.Blob, c.Ramp, 8, 1, 0, 0);
-                    for (int i = 1; i <= 3 && !c.Armed; i++)
-                        Put(o, FxShape.Glint, c.Ramp, 5, (i + (int)(t * 12)) & 1, bx * i * 5, by * i * 5, 1 - i * 0.25f);
-                    break;
-                case MonsterAttackShape.Bounce:
-                    // A hard diamond of light.
-                    Put(o, FxShape.Dot, c.Ramp, 7, 0, 0, 0, 1, 45);
-                    Put(o, FxShape.Dot, c.Ramp, 5, 2, 0, 0, 1, 45);
-                    Put(o, FxShape.Glint, FxRamp.Steel, 5, 1, -bx * 2, -by * 2);
-                    for (int i = 1; i <= 2; i++) Put(o, FxShape.Dot, c.Ramp, 3 - i, 1, bx * i * 4, by * i * 4, 1 - i * 0.3f, 45);
-                    break;
-                default:
-                    // A thorn or a spat thing: pointed the way it flies.
-                    Put(o, FxShape.Dot, c.Ramp, 5, 0, 0, 0, 1, 45);
-                    Put(o, FxShape.Shard, c.Ramp, 8, 0, 0, 0, 1, dir);
-                    Put(o, FxShape.Dot, c.Ramp, 1, 3, -bx * 3, -by * 3);
-                    for (int i = 1; i <= 2; i++) Put(o, FxShape.Dot, c.Ramp, 2, 1, bx * (3 + i * 3), by * (3 + i * 3), 0.7f - i * 0.25f);
-                    break;
-            }
+            if (c.Shape == MonsterAttackShape.Boomerang && c.Armed && SkillFx.Frac(t * 10) < 0.4f) Put(o, FxShape.Glint, c.Ramp, 13, 2, 0, 0);
         }
     }
 }

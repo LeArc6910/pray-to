@@ -415,7 +415,7 @@ namespace Game.Client
                 }
                 place.localPosition = new Vector3(x, y, 0);
                 place.localRotation = stamp.Angle == 0 ? Quaternion.identity : Quaternion.Euler(0, 0, stamp.Angle);
-                renderer.sortingOrder = stamp.Ground ? FxGroundOrder : FxOverOrder + (_fxUsed & 511);
+                renderer.sortingOrder = stamp.Ground ? FxGroundOrder : stamp.Low ? BlastDustOrder : FxOverOrder + (_fxUsed & 511);
                 _fxUsed++;
             }
             return lights > 0;

@@ -60,7 +60,9 @@ dotnet run --project DevTools/ArtPreview -- --only fxmock
 dotnet run --project DevTools/ArtPreview -- --only hazard
 # 공용 폭발과 층 조각(E3): out/skillfx/pieces.png의 아래 세 줄(불·냉기·보라), fire_mage.png의 화염구·유성. 웹 점검은 sweep.js --only blast
 dotnet run --project DevTools/ArtPreview -- --only skillfx
-# 적의 탄(out/shot/: shots.png 원소 아홉의 맥동·각도·큰 것·멈춘 것·소멸 5프레임과 옛 공·플레이어 탄·조준선, 흑백 _gray, report.txt. Docs/EffectsRework.md 7절)
+# 일반 몬스터의 예고·탄·장판(E5): out/monsterfx/<종>.png·_gray, pieces.png(장판 다섯, 예고, 탄 열 줄, 돌진, 원소 터짐). 한 이펙트 24조각·빛 3개를 넘으면 실패. 웹 점검은 sweep.js --only mobwarn
+dotnet run --project DevTools/ArtPreview -- --only monsterfx
+# 적의 탄(out/shot/: shots.png 원소 열넷(보스 아홉 + 몬스터 다섯)의 맥동·각도·큰 것·멈춘 것·소멸 5프레임과 옛 공·플레이어 탄·조준선, 흑백 _gray, report.txt. Docs/EffectsRework.md 7절)
 dotnet run --project DevTools/ArtPreview -- --only shot
 # 게임의 UI 스킨만(out/ui/: skin.png 조각 전부, windows.png 지금 화면에 입힌 모습, pixels.png 정수 배 틀, encounters.png·encounters_phone.png 상점·상자·작업대·모루·대화 창, growth.png·growth_phone.png 스킬·특성 트리·캐릭터 창, records.png·records_phone.png 일지·지도, bag_hud.png·bag_hud_phone.png 가방·HUD·쓰러짐 카드·메뉴. Docs/UiRework.md U1~U7)
 dotnet run --project DevTools/ArtPreview -- --only ui

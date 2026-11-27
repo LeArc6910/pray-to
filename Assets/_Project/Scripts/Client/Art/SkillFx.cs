@@ -17,6 +17,9 @@ namespace Game.Client
         public float Alpha;
         // On the floor, under everyone (cracks, burns, rune circles, shadows); otherwise over everyone.
         public bool Ground;
+        // In the air but under the warnings on the floor (smoke and dust of the monsters' effects, E5): over the
+        // bodies, never over a mark.
+        public bool Low;
         // 0, or a colour (0x1RRGGBB) the view multiplies the piece by: a monster's own, over the Plain ramp (MonsterFx).
         public uint Tint;
 

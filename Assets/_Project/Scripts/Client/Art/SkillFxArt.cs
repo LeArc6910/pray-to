@@ -79,6 +79,15 @@ namespace Game.Client
         // No picture: a light for the light map, for this moment. Size its radius in pixels, Alpha how strong,
         // Frame which of the ramp's colours (0 to 3). At most three an effect, twelve on screen (FxLayers.Light).
         Light,
+
+        // ---- ordinary monsters' pieces (E5, Docs/EffectsRework.md 9; drawn in SkillFxArt.Layers) ----
+
+        // What a blow left lying on the floor: a lumpy pool with a dark edge, lighter within and a pale patch off
+        // its middle. Size its diameter, frames 0 to 3 its edge slowly heaving.
+        Puddle,
+        // A dotted ring at the true reach, for what still hurts where it lies: size its diameter, frames 0 and 1 the
+        // dots stepping round.
+        Dashes,
     }
 
     // An element's colours, dark to core.
@@ -171,6 +180,8 @@ namespace Game.Client
                 case FxShape.Ember: return Ember(Ramp5(ramp), size, frame);
                 case FxShape.Shock: return Shock(Ramp5(ramp), size, frame);
                 case FxShape.Glow: return Glow(r, size);
+                case FxShape.Puddle: return Puddle(Ramp5(ramp), size, frame);
+                case FxShape.Dashes: return Dashes(r, size, frame);
                 default: return null;
             }
         }

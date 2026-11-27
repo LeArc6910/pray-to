@@ -205,8 +205,10 @@ namespace Game.Client
             public SpriteRenderer Rock;
             // A monster's trap, once it has been heard arming (WorldView.MonsterFx.cs).
             public bool Armed;
-            // A boss's warning is one picture of its shape, drawn again as it fills (WorldView.Hazards.cs).
+            // A warning is one picture of its shape, drawn again as it fills (WorldView.Hazards.cs); an ordinary
+            // monster's too (E5), made anew when the shape under its id changes (WarnKey).
             public ShapeLayer Warn;
+            public long WarnKey;
         }
 
         // A player's pet (Pets.cs): its monster drawn small, trotting after them a little behind, hopping or bobbing.
@@ -1318,8 +1320,8 @@ namespace Game.Client
             {
                 var hazard = view.State;
                 _seen.Add(hazard.Id);
-                // An ordinary monster's mark is drawn its own way: a thin rim, a faint fill (a web or venom it left is
-                // drawn as a boss's is).
+                // An ordinary monster's mark is the same picture, fainter inside, with its own pieces over it (a web or
+                // venom it left is drawn as a boss's is).
                 if (hazard.FromMonster && !IsPool(hazard))
                 {
                     if (!_marks.TryGetValue(hazard.Id, out var own)) _marks[hazard.Id] = own = MakeMonsterMark(hazard);
@@ -1378,58 +1380,6 @@ namespace Game.Client
             if (!hazard.Harmful || IsPool(hazard)) return;
             if (VeinEaterLanded(hazard) || KnightLanded(hazard) || SpiderLanded(hazard) || WardenLanded(hazard) || AntlionLanded(hazard) || CrystalQueenLanded(hazard) || GeneralLanded(hazard)) return;
             BlastLanded(hazard);
-        }
-
-        // The smooth shapes of an ordinary monster's mark (WorldView.MonsterFx.cs); a boss's is MakeWarn.
-        Mark MakeMark(HazardState hazard)
-        {
-            var root = new GameObject("Telegraph").transform;
-            root.SetParent(_root.transform, false);
-            root.localPosition = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
-            root.localRotation = Quaternion.Euler(0, 0, hazard.Direction.Angle * Mathf.Rad2Deg);
-
-            Sprite edge;
-            Sprite fill;
-            switch (hazard.Shape)
-            {
-                case HazardShape.Circle:
-                case HazardShape.Share:
-                    edge = Shapes.Circle;
-                    fill = Shapes.Circle;
-                    break;
-                case HazardShape.Ring:
-                    edge = Shapes.Donut(hazard.Size > 0 ? hazard.Width / hazard.Size : 0);
-                    fill = edge;
-                    break;
-                case HazardShape.Cone:
-                    edge = Shapes.Wedge(hazard.Width);
-                    fill = edge;
-                    break;
-                default:
-                    edge = Shapes.Square;
-                    fill = Shapes.Square;
-                    break;
-            }
-
-            var mark = new Mark
-            {
-                Root = root,
-                Edge = Renderer(root, "Edge", edge, Color.clear),
-                Fill = Renderer(root, "Fill", fill, Color.clear),
-                State = hazard,
-            };
-            mark.Edge.sortingOrder = DarkOrder + 10;
-            mark.Fill.sortingOrder = DarkOrder + 11;
-            if (hazard.Shape == HazardShape.Line)
-            {
-                mark.Edge.transform.localScale = new Vector3(hazard.Size, hazard.Width, 1);
-                mark.Edge.transform.localPosition = new Vector3(hazard.Size * 0.5f, 0, 0);
-            }
-            else
-            {
-                mark.Edge.transform.localScale = Vector3.one * (hazard.Size * 2);
-            }
-            return mark;
         }
 
         // A crop grows through four drawings on its patch of soil, and sways a little once ripe.
@@ -2134,8 +2084,8 @@ namespace Game.Client
                 // A skill's projectile is drawn by the skill's own effect instead (WorldView.SkillFx); the plain one
                 // stays, unseen, for its light.
                 renderer.enabled = !DrawSkillShot(projectile, isNew, deltaTime);
-                // A monster's shot from the sheet likewise, in its monster's colours (WorldView.MonsterFx).
-                if (!projectile.Friendly && DrawMonsterShot(projectile, isNew)) renderer.enabled = false;
+                // A monster's shot from the sheet is the enemy's shot in what its monster is made of (WorldView.MonsterFx).
+                if (!projectile.Friendly) DrawMonsterShot(projectile, isNew, renderer);
                 if (!projectile.Friendly) BeatEnemyShot(projectile.Id, renderer);
                 // The silk mother's venom sheds drops as it flies.
                 if (!projectile.Friendly && _bossInView?.Id == "silk_mother" && UnityEngine.Random.value < 0.3f)
@@ -2149,8 +2099,8 @@ namespace Game.Client
             foreach (var pair in _projectiles)
             {
                 if (_seen.Contains(pair.Key)) continue;
-                // An enemy's ends in a ring and bits, the rocks too; venom, crescents and a monster's own end their way.
-                EnemyShotGone(pair.Key, pair.Value.transform.localPosition, !_mobShots.ContainsKey(pair.Key) && pair.Value.sprite != CrescentSprite && pair.Value.sprite != VenomGlobSprite);
+                // An enemy's ends in a ring and bits, the rocks and a monster's too; venom and crescents end their way.
+                EnemyShotGone(pair.Key, pair.Value.transform.localPosition, pair.Value.sprite != CrescentSprite && pair.Value.sprite != VenomGlobSprite);
                 Object.Destroy(pair.Value.gameObject);
                 _gone.Add(pair.Key);
             }

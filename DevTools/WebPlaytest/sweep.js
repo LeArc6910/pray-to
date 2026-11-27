@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards shots blast map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3023,6 +3023,82 @@ async function hazards(browser) {
   await phone.shot('hazards-phone-blast', '휴대폰 세로: 착지 0.11초');
   await phone.send('fxhold off; monsters go');
   await phone.context.close();
+}
+
+// ---------------------------------------------------------------- 일반 몬스터의 예고·탄·장판 (E5, Docs/EffectsRework.md 9절)
+// The four the mock-ups showed, all at once round the player: a fan of crystal shots (aim lines), a thrown sac of
+// spores (the pool it leaves), a trampling charge (arrowed path, dust) and a wall of fire (a line, then burning pools).
+const MobWarnRows = [
+  ['crystal_shooter', 'spray', -5, 2.6],
+  ['spore_shooter', 'spore_sac', -5, -2.6],
+  ['frost_mammoth', 'trample', 6, 3.2],
+  ['demon_caster', 'fire_wall', 5, -3],
+];
+
+async function mobWarnScene(game, tag, hold) {
+  await game.send('fxhold off; speed 1; clear; monsters hold; heal; face 1 0');
+  await game.wait(600);
+  for (const [id, , dx, dy] of MobWarnRows) await game.send(`mob ${id} spawn ${dx} ${dy}`);
+  await game.wait(300);
+  await game.send(MobWarnRows.map(([id]) => `mob ${id} face`).join('; '));
+  await game.send(MobWarnRows.map(([id, attack]) => `mob ${id} use ${attack}`).join('; '));
+  // All four winding up: looked at for a while, then held still for the picture.
+  let st = await pollState(game, t => t.mobWarnsShown >= 3 && t.aimDots > 0, 2500);
+  await game.wait(hold);
+  await game.send('speed 0');
+  await game.wait(250);
+  st = await pollState(game, t => t.mobWarnsShown >= 3 && t.aimDots > 0, 1500);
+  check(st.mobWarnsShown >= 3, `${tag}: 예고 셋(던지기 원, 돌진 길, 불 벽 선)이 도형 그림으로 그려진다 (${st.mobWarnsShown}개, ${st.mobs})`);
+  check(st.aimDots > 0 && st.aimDots <= 72, `${tag}: 부채 사격의 조준선이 깔린다 (${st.aimDots}점, 한도 72)`);
+  check(st.mobFxPieces <= 420, `${tag}: 넷이 함께 예고해도 화면 조각 한도 안 (${st.mobFxPieces}/420)`);
+  return st;
+}
+
+async function mobwarn(browser) {
+  note('\n## 일반 몬스터의 예고·탄·장판 (E5, PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 12, 7);
+  await mobWarnScene(game, 'PC', 350);
+  await game.shot('mobwarn-together', '넷이 함께 예고: 왼쪽 위 결정 부채(조준선), 왼쪽 아래 포자 주머니(원), 오른쪽 위 짓밟기 돌진(노란 길과 화살표), 오른쪽 아래 불 벽(붉은 선)');
+  // The shots leave, the charge runs, the sac and the wall land.
+  await game.send('speed 1');
+  let st = await pollState(game, t => t.mobShots > 0 || t.enemyShots > 0, 3000);
+  check(st.enemyShots > 0 && st.mobShots > 0, `결정 가시가 원소 그림(적의 탄)으로 난다 (${st.enemyShots}발, 몬스터 탄 ${st.mobShots})`);
+  await game.send('speed 0');
+  await game.wait(250);
+  await game.shot('mobwarn-shots', '결정 가시가 나는 순간(붉은 테, 꼬리)');
+  await game.send('speed 1');
+  st = await pollState(game, t => t.mobRushes > 0, 3000);
+  check(st.mobRushes > 0, `돌진하는 몸에 먼지와 속도 줄이 붙는다 (${st.mobRushes}마리)`);
+  await game.send('speed 0');
+  await game.wait(250);
+  await game.shot('mobwarn-rush', '짓밟으며 돌진: 발밑 먼지와 속도 줄');
+  await game.send('speed 1');
+  st = await pollState(game, t => t.mobPoolsShown >= 2, 4000);
+  check(st.mobPoolsShown >= 2, `포자 웅덩이와 불 벽이 바닥에 남는다 (${st.mobPoolsShown}개)`);
+  check(st.skillFxLights <= 12, `바닥 빛은 화면 12개까지 (${st.skillFxLights})`);
+  await game.wait(500);
+  await game.send('speed 0');
+  await game.wait(250);
+  st = await game.state();
+  check(st.mobFxPieces > 0 && st.mobFxPieces <= 420, `장판의 조각이 한도 안 (${st.mobFxPieces}/420)`);
+  await game.shot('mobwarn-pools', '남은 것: 포자 웅덩이와 불 벽(붉은 점선 테, 바닥 빛)');
+  await game.send('speed 1; clear');
+  await game.close();
+
+  note('\n## 일반 몬스터의 예고 (E5, 휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phonePortrait, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 12, 7);
+  await mobWarnScene(phone, '휴대폰', 350);
+  await phone.shot('mobwarn-phone', '휴대폰 세로: 넷이 함께 예고');
+  await phone.send('speed 1; clear');
+  await phone.close();
 }
 
 // ---------------------------------------------------------------- 적의 탄 (E2, Docs/EffectsRework.md 7절)
@@ -8300,7 +8376,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, shots, blast, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });

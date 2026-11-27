@@ -770,6 +770,51 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // Ordinary monsters' warnings, shots and pools since the effects rework (E5 of Docs/EffectsRework.md,
+        // WorldView.MonsterFx.cs): four wind up at once round the player. Each mark is a picture of its shape, the
+        // fan of shots shows where it will fly, the shots fly as the enemy's shots do, the charge raises dust, and
+        // what the sac and the wall of fire leave lies on the floor; all of it within the screen's pieces and lights.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator MonsterWarningsFillAsShapesAndLeavePools()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var shooter = Spawn("crystal_shooter", Player.Position + new Vec2(-5, 2.6f));
+            var spore = Spawn("spore_shooter", Player.Position + new Vec2(-5, -2.6f));
+            var mammoth = Spawn("frost_mammoth", Player.Position + new Vec2(6, 3.2f));
+            var caster = Spawn("demon_caster", Player.Position + new Vec2(5, -3));
+            foreach (var monster in new[] { shooter, spore, mammoth, caster })
+            {
+                monster.MaxHealth = monster.Health = 5000;
+                monster.Facing = (Player.Position - monster.Position).Normalized;
+            }
+            yield return new WaitForSecondsRealtime(0.5f);
+            Assert.IsTrue(World.ForceAttack(shooter, "spray"));
+            Assert.IsTrue(World.ForceAttack(spore, "spore_sac"));
+            Assert.IsTrue(World.ForceAttack(mammoth, "trample"));
+            Assert.IsTrue(World.ForceAttack(caster, "fire_wall"));
+            yield return new WaitForSecondsRealtime(0.45f);
+            Assert.GreaterOrEqual(_root.MonsterWarnsShown, 3, "The sac's circle, the charge's path and the wall's line are each a picture of their shape.");
+            Assert.That(_root.AimDots, Is.InRange(1, 72), "The fan of crystal shots shows where each will fly.");
+            Assert.LessOrEqual(_root.MonsterFxPieces, 420);
+            yield return Screens.Take("mobwarn-together");
+            int shots = 0, rushes = 0, pools = 0;
+            for (float waited = 0; waited < 5 && (shots == 0 || rushes == 0 || pools < 2); waited += 0.05f)
+            {
+                shots = Mathf.Max(shots, _root.MonsterShotsDrawn);
+                rushes = Mathf.Max(rushes, _root.MonsterRushesShown);
+                pools = Mathf.Max(pools, _root.MonsterPoolsShown);
+                yield return new WaitForSecondsRealtime(0.05f);
+            }
+            Assert.Greater(shots, 0, "The crystal shots fly in their monster's own picture.");
+            Assert.Greater(rushes, 0, "The charging body raises dust and lines of speed.");
+            Assert.GreaterOrEqual(pools, 2, "The sac's pool and the wall's fires lie on the floor.");
+            Assert.LessOrEqual(_root.SkillFxLights, 12, "The floor lights stay within the screen's twelve.");
+            yield return Screens.Take("mobwarn-pools");
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // The rework's blast (E3 of Docs/EffectsRework.md, FxLayers.Blast): a fireball's and a meteor's landings put
         // beside the player and held at the swelling ball, then at the smoke. Each stays within an effect's pieces and
         // lights the floor with no more than three lights of its own; both are over within 1.4 seconds.

@@ -9,9 +9,10 @@ namespace Game.Client
     // the monster (a wedge, a line, a circle round itself, a rush) comes over the wire only as the monster's state and
     // the attack's place in the sheet; its mark is laid here from the sheet and the way the monster faced. Marks away
     // from the monster (a landing, a trap, a pool) come as hazards, named as a monster's with the kind of attack. Both
-    // are drawn the same: a faint fill that grows, and MonsterFx's thin red rim at the real reach, the monster's own
-    // wind-up cue, the blow and what thins out. Nothing here decides anything about the game. Feel.MonsterFx off draws
-    // the marks the way a boss's are and nothing else.
+    // are drawn the same: the shape's own picture at the real reach as a boss's warning is (a two-pixel rim from the
+    // start, stripes over what has filled, blinking at the last; E5 of Docs/EffectsRework.md) but fainter inside, and
+    // MonsterFx's pieces: the monster's own wind-up cue, the blow and what thins out. Nothing here decides anything
+    // about the game. Feel.MonsterFx off draws the marks the way a boss's are and nothing else.
     sealed partial class WorldView
     {
         sealed class MobEffect
@@ -51,6 +52,8 @@ namespace Game.Client
         readonly List<HazardView> _attachedMarks = new List<HazardView>();
         // Whose colours a mark is drawn in and which attack laid it, by the mark's id.
         readonly Dictionary<int, (FxRamp Ramp, uint Tint, MonsterAttack Attack, MobLook Look)> _markLooks = new Dictionary<int, (FxRamp, uint, MonsterAttack, MobLook)>();
+        // Where the thrower of a mark away from it stood when the mark was first seen.
+        readonly Dictionary<int, Vector3> _markThrowers = new Dictionary<int, Vector3>();
         int _mobPieces;
         int _mobShotsDrawn;
         int _mobShotsShown;
@@ -87,6 +90,11 @@ namespace Game.Client
         public int MonsterLinksShown { get; private set; }
         int _mounds;
         int _links;
+        // E5: bodies drawn rushing last frame (dust and lines of speed), and marks drawn as a picture of their shape.
+        public int MonsterRushesShown { get; private set; }
+        public int MonsterWarnsShown { get; private set; }
+        int _rushes;
+        int _mobWarns;
 
         const float Ppu = Sprites.PixelsPerUnit;
 
@@ -202,6 +210,12 @@ namespace Game.Client
             // A swoop leaves afterimages behind it.
             if (state == EnemyState.Charge && body.MobAttack != null && body.MobAttack.Shape == MonsterAttackShape.Swoop)
                 QueueMob(MobFx.Wake, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = view.Facing.Angle, Look = body.MobKind }, Time.time);
+            // A charge throws up dust behind its feet and draws lines of speed off its back (E5).
+            if (state == EnemyState.Charge && body.MobAttack != null && body.MobAttack.Shape == MonsterAttackShape.Charge && !buried)
+            {
+                QueueMob(MobFx.Rush, feet, new MobContext { Ramp = body.MobRamp, Tint = body.MobTint, Dir = view.Facing.Angle, Look = body.MobKind, Seed = view.Id & 0xFFFF }, Time.time);
+                _rushes++;
+            }
             if (winding && (!body.MobWinding || body.MobAttack != attack))
             {
                 body.MobSince = MobNow;
@@ -235,6 +249,13 @@ namespace Game.Client
                         Size = (doing.Radius + World.PlayerRadius) * Ppu, Seed = view.Id & 0xFFFF, Look = body.MobKind,
                     }, elapsed);
                     if (doing.Shape == MonsterAttackShape.Leap && Feel.MonsterFx) Hop(body, elapsed, body.MobTelegraph);
+                    // Where a fan's shots will go: a fan keeps the way it faced when it began (World.Unleash). A single
+                    // shot is aimed as it leaves, which no screen can know beforehand; those get no lines.
+                    if (doing.Shape == MonsterAttackShape.Spread && Feel.MonsterFx)
+                    {
+                        LayAim(view.Position, body.MobDir, view.Monster.Radius, doing.Count > 1 ? doing.Angle : 0, Mathf.Max(1, doing.Count),
+                            Mathf.Clamp01(elapsed / Mathf.Max(0.01f, body.MobTelegraph)), Mathf.Min(MobAimReach, doing.Length > 0 ? doing.Length : MobAimReach));
+                    }
                 }
             }
 
@@ -309,15 +330,18 @@ namespace Game.Client
             }
         }
 
+        // A monster's aim lines reach less far than a boss's: several may aim at once.
+        const float MobAimReach = 5;
+
         Mark MakeMonsterMark(HazardState hazard)
         {
-            // Pools, pulls and traps are circles.
-            bool round = hazard.Shape != HazardShape.Cone && hazard.Shape != HazardShape.Line && hazard.Shape != HazardShape.Ring;
-            var mark = MakeMark(round
-                ? new HazardState(hazard.Id, HazardShape.Circle, hazard.Position, hazard.Direction, hazard.Size, hazard.Width, hazard.TicksLeft, hazard.Duration, hazard.Harmful)
-                : hazard);
-            mark.State = hazard;
-            return mark;
+            var root = new GameObject("Telegraph").transform;
+            root.SetParent(_root.transform, false);
+            root.localPosition = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
+            // The disc of what a blow left, for the plain look; a warning's picture is made when it is first drawn.
+            var fill = Renderer(root, "Fill", Shapes.Circle, Color.clear);
+            fill.sortingOrder = DarkOrder + 11;
+            return new Mark { Root = root, Edge = fill, Fill = fill, State = hazard };
         }
 
         // Whose colours a monster's mark away from it is drawn in: the nearest monster doing that kind of attack.
@@ -330,6 +354,7 @@ namespace Game.Client
             if (IsSteam(hazard)) return (FxRamp.Fire, 0x1FFB060u, null, MobLook.Ember);
             look = (FxRamp.Plain, 0x1D8D8D8u, null, MobLook.Plain);
             float best = 14;
+            Body thrower = null;
             foreach (var body in _others.Values)
             {
                 if (body.Kind != BodyKind.Monster || body.MobAttack == null || (int)body.MobAttack.Shape != hazard.MonsterShape) continue;
@@ -337,25 +362,29 @@ namespace Game.Client
                 if (distance >= best) continue;
                 best = distance;
                 look = (body.MobRamp, body.MobTint, body.MobAttack, body.MobKind);
+                thrower = body;
             }
-            if (_markLooks.Count > 96) _markLooks.Clear();
+            if (_markLooks.Count > 96)
+            {
+                _markLooks.Clear();
+                _markThrowers.Clear();
+            }
             _markLooks[hazard.Id] = look;
+            if (thrower != null) _markThrowers[hazard.Id] = thrower.Position;
             return look;
         }
 
-        // One of a monster's marks this frame: the faint fill on the mark's own sprites, and the rim and the rest as
-        // MonsterFx's pieces. What a blow left on the floor is all pieces.
+        // One of a monster's marks this frame: the picture of its shape (HazardArt.Warn, fainter inside than a boss's)
+        // and what goes with it as MonsterFx's pieces. What a blow left on the floor is all pieces.
         void DrawMonsterMark(Mark mark, HazardView view)
         {
             var hazard = view.State;
             mark.State = hazard;
             mark.Root.localPosition = new Vector3(hazard.Position.X, hazard.Position.Y, 0);
-            mark.Root.localRotation = Quaternion.Euler(0, 0, hazard.Direction.Angle * Mathf.Rad2Deg);
             var at = mark.Root.localPosition;
             float p = view.Progress;
             if (IsMonsterPool(hazard.Shape))
             {
-                mark.Edge.color = Color.clear;
                 mark.Fill.color = Color.clear;
                 if (!Feel.MonsterFx)
                 {
@@ -386,44 +415,18 @@ namespace Game.Client
             if (steam) SteamArmed(mark, at);
             var shape = flash || steam ? MonsterAttackShape.Slam : icicle ? MonsterAttackShape.Lob : (MonsterAttackShape)shapeIndex;
             bool blink = shape == MonsterAttackShape.Blink;
-            var color = hazard.Harmful ? DangerColor : PathColor;
-            if (Feel.MonsterFx)
-            {
-                // The rim is the pieces'; the fill only fills in, faintly.
-                mark.Edge.color = Color.clear;
-                mark.Fill.color = blink || flash ? Color.clear : new Color(color.r, color.g, color.b, 0.05f + 0.13f * p);
-            }
-            else
-            {
-                mark.Edge.color = new Color(color.r, color.g, color.b, 0.22f);
-                mark.Fill.color = new Color(color.r, color.g, color.b, 0.25f + 0.3f * p);
-            }
-            switch (hazard.Shape)
-            {
-                case HazardShape.Ring:
-                    mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2);
-                    break;
-                case HazardShape.Line:
-                    mark.Fill.transform.localScale = new Vector3(hazard.Size * p, hazard.Width, 1);
-                    mark.Fill.transform.localPosition = new Vector3(hazard.Size * p * 0.5f, 0, 0);
-                    break;
-                default:
-                    mark.Fill.transform.localScale = Vector3.one * (hazard.Size * 2 * p);
-                    break;
-            }
-            if (!Feel.MonsterFx) return;
 
             var look = LookOf(hazard);
             bool line = hazard.Shape == HazardShape.Line, cone = hazard.Shape == HazardShape.Cone;
             // A trap is armed once its attack's telegraph is over; the rest of its time it waits.
-            bool armed = hazard.Shape == HazardShape.Mine
-                && p >= (look.Attack != null ? look.Attack.Telegraph / (look.Attack.Telegraph + look.Attack.Duration) : 0.15f);
+            float armsAt = look.Attack != null ? look.Attack.Telegraph / (look.Attack.Telegraph + look.Attack.Duration) : 0.15f;
+            bool armed = hazard.Shape == HazardShape.Mine && p >= armsAt;
             if (armed && !mark.Armed)
             {
                 mark.Armed = true;
                 Hear(Sound.TrapSet, at, 0.7f);
             }
-            QueueMob(MobFx.Mark, at, new MobContext
+            var context = new MobContext
             {
                 Shape = shape,
                 Area = hazard.Shape,
@@ -438,7 +441,43 @@ namespace Game.Client
                 Armed = armed,
                 Harmless = flash,
                 Look = look.Look,
-            }, Time.time);
+            };
+            // A thrown thing is seen on its way over from its thrower.
+            if (shape == MonsterAttackShape.Lob && !icicle && _markThrowers.TryGetValue(hazard.Id, out var thrower))
+            {
+                context.Thrown = true;
+                context.FromX = (thrower.x - at.x) * Ppu;
+                context.FromY = (thrower.y - at.y) * Ppu;
+            }
+
+            // The shape's picture: made for this size and angle, and again if the mark under this id changes shape
+            // (a monster's next attack takes the same id).
+            long key = (long)hazard.Shape << 56 | (long)(Mathf.RoundToInt(context.Size) & 0xFFFF) << 36 | (long)(Mathf.RoundToInt(context.Width * 4) & 0xFFFFF) << 16
+                | (long)(Mathf.RoundToInt(context.Dir * Mathf.Rad2Deg) & 0xFFFF);
+            if (mark.Warn == null || mark.WarnKey != key)
+            {
+                Free(mark.Warn);
+                mark.Warn = MakeLayer(mark.Root, "Warn", MonsterFx.Field(context), DarkOrder + 10);
+                mark.WarnKey = key;
+            }
+            var layer = mark.Warn;
+            _mobWarns++;
+            int step = MonsterFx.WarnStep(context, armsAt);
+            // The last of its time it blinks whole (with motion reduced it stays at its brighter half).
+            bool lit = MonsterFx.WarnBlinks(context) && (Settings.ReduceMotion || (int)(Time.time * 25) % 2 == 0);
+            // An armed trap's rim pulses slowly.
+            bool pulse = armed && !Settings.ReduceMotion && Mathf.Sin(Time.time * 6) > 0;
+            int arrows = MonsterFx.WarnArrows(context, Time.time, Settings.ReduceMotion);
+            int shown = step | (lit ? 256 : 0) | (pulse ? 512 : 0) | (arrows + 1) << 10 | (Feel.MonsterFx ? 1 << 20 : 0);
+            if (shown != layer.Shown)
+            {
+                layer.Shown = shown;
+                HazardArt.Warn(layer.Field, MonsterFx.Tone(context), step / (float)HazardArt.FillSteps, lit, pulse, layer.Buffer, true, Feel.MonsterFx, arrows);
+                Upload(layer);
+            }
+            // A trap not yet armed is drawn faintly, rim and all (it does nothing yet if stepped on).
+            layer.Renderer.color = hazard.Shape == HazardShape.Mine && !armed ? new Color(1, 1, 1, 0.5f) : Color.white;
+            QueueMob(MobFx.Mark, at, context, Time.time);
         }
 
         // A monster's mark away from it has landed (the host's Impact): its blow, in its monster's colours.
@@ -497,13 +536,15 @@ namespace Game.Client
             Hear(sound, at, line || cone ? 0.6f : 0.8f);
         }
 
-        // A monster's shot in its own look: known for its monster's by coming out beside one that has just fired.
-        bool DrawMonsterShot(ProjectileView projectile, bool isNew)
+        // A monster's shot, known for its monster's by coming out beside one that has just fired: the enemy's shot
+        // (WorldView.Shots.cs, E2) in what its monster is made of, turned anew when it bounces or comes back. It
+        // ends in its element's ring and bits and lights the floor as every enemy's shot does.
+        void DrawMonsterShot(ProjectileView projectile, bool isNew, SpriteRenderer renderer)
         {
-            if (!Feel.MonsterFx) return false;
+            if (!Feel.MonsterFx) return;
             if (!_mobShots.TryGetValue(projectile.Id, out var shot))
             {
-                if (!isNew) return false;
+                if (!isNew) return;
                 Body from = null;
                 float best = 1.8f;
                 foreach (var body in _others.Values)
@@ -514,17 +555,41 @@ namespace Game.Client
                     best = distance;
                     from = body;
                 }
-                if (from == null) return false;
+                if (from == null) return;
                 shot = new MobShot { Shape = from.MobAttack.Shape, Ramp = from.MobRamp, Tint = from.MobTint, Seed = ++_fxSeed & 0xFFFF, Dir = projectile.Velocity.Angle };
                 _mobShots[projectile.Id] = shot;
+                if (_enemyShots.TryGetValue(projectile.Id, out var made))
+                {
+                    made.Element = MonsterFx.ShotOf(from.MobKind, from.MobRamp);
+                    made.Frame = -1;
+                    if (!made.Own)
+                    {
+                        // Beside a boss with a shot of its own: the monster's is still its own.
+                        made.Own = true;
+                        renderer.color = Color.white;
+                        renderer.transform.localScale = Vector3.one;
+                        renderer.transform.localRotation = Quaternion.identity;
+                    }
+                }
             }
             bool still = projectile.Velocity.LengthSquared < 0.25f;
             if (!still) shot.Dir = projectile.Velocity.Angle;
-            _fxStamps.Clear();
-            MonsterFx.Stamps(MobFx.Shot, new MobContext { Shape = shot.Shape, Ramp = shot.Ramp, Tint = shot.Tint, Dir = shot.Dir, Seed = shot.Seed, Armed = still }, Time.time, _fxStamps);
-            EmitFx(new Vector3(projectile.Position.X, projectile.Position.Y, 0), 1, null);
+            if (_enemyShots.TryGetValue(projectile.Id, out var drawn))
+            {
+                int step = still ? -1 : ShotArt.Step(projectile.Velocity.Angle);
+                if (step != drawn.Step)
+                {
+                    drawn.Step = step;
+                    drawn.Frame = -1;
+                }
+            }
+            if (still)
+            {
+                _fxStamps.Clear();
+                MonsterFx.Stamps(MobFx.Shot, new MobContext { Shape = shot.Shape, Ramp = shot.Ramp, Tint = shot.Tint, Dir = shot.Dir, Seed = shot.Seed, Armed = true }, Time.time, _fxStamps);
+                EmitFx(new Vector3(projectile.Position.X, projectile.Position.Y, 0), 1, null);
+            }
             _mobShotsDrawn++;
-            return true;
         }
 
         void MonsterShotGone(int id) => _mobShots.Remove(id);
@@ -727,6 +792,10 @@ namespace Game.Client
             EliteGuardLinksShown = _guardLinks;
             _mounds = 0;
             _links = 0;
+            MonsterRushesShown = _rushes;
+            MonsterWarnsShown = _mobWarns;
+            _rushes = 0;
+            _mobWarns = 0;
             _guardLinks = 0;
             _mobPieces = _fxUsed - before;
             _mobShotsShown = _mobShotsDrawn;
