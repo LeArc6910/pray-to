@@ -58,7 +58,7 @@ dotnet run --project DevTools/ArtPreview -- --only uimock
 dotnet run --project DevTools/ArtPreview -- --only fxmock
 # 보스 예고 도형과 공용 착지(out/hazard/: warn.png 차오름·깜빡임, blast.png 타격·바닥 흔적, 각각 흑백 _gray, pieces.png. Docs/EffectsRework.md 6절)
 dotnet run --project DevTools/ArtPreview -- --only hazard
-# 공용 폭발과 층 조각(E3): out/skillfx/pieces.png의 아래 세 줄(불·냉기·보라), fire_mage.png의 화염구·유성. 웹 점검은 sweep.js --only blast
+# 스킬 이펙트(E3 공용 폭발·층 조각, E4 스킬 30종): out/skillfx/<클래스>.png·_gray·report.txt(조각 수), pieces.png. 웹 점검은 sweep.js --only blast(폭발), layers(범위 스킬 여섯 나란히·유성 낙하), skillfx(서른 가지 하나씩)
 dotnet run --project DevTools/ArtPreview -- --only skillfx
 # 일반 몬스터의 예고·탄·장판(E5): out/monsterfx/<종>.png·_gray, pieces.png(장판 다섯, 예고, 탄 열 줄, 돌진, 원소 터짐). 한 이펙트 24조각·빛 3개를 넘으면 실패. 웹 점검은 sweep.js --only mobwarn
 dotnet run --project DevTools/ArtPreview -- --only monsterfx

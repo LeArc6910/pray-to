@@ -193,6 +193,15 @@ namespace Game.Client
         public void StageBlast(string skill, Vec2 at, float radius) =>
             AddFx(FxProgram.Hit, skill, new Vector3(at.X, at.Y, 0), new FxContext { Radius = radius * Sprites.PixelsPerUnit, Main = FxRamp.Fire }, mine: true, light: radius + 2.5f);
 
+        // A skill's own effect put on the floor by hand as if cast there, facing dir (radians), for the playtests'
+        // pictures (the command castfx, E4 of Docs/EffectsRework.md): several can be set side by side and held at an age.
+        public void StageCast(string skill, Vec2 at, float radius, float dir) =>
+            AddFx(FxProgram.Cast, skill, new Vector3(at.X, at.Y, 0), new FxContext
+            {
+                Radius = radius > 0 ? (radius + World.PlayerRadius) * Sprites.PixelsPerUnit : 0, Dir = dir, Length = 4.5f * Sprites.PixelsPerUnit,
+                Main = SkillFx.MainOf(skill, false, false, false),
+            }, mine: true);
+
         // Lightning's jump between two bodies.
         void ShowChainFx(Vector3 from, Vector3 to)
         {

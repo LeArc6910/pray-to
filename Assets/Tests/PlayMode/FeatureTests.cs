@@ -846,6 +846,39 @@ namespace Game.Client.Tests
             Assert.IsTrue(_root.Playing);
         }
 
+        // The players' skills in the rework's layers (E4 of Docs/EffectsRework.md 10): six area skills laid round the
+        // player as if cast there and held at the blow, then at what is left. Together they stay within the screen's
+        // pieces and its twelve lights, and all are over within 1.4 seconds.
+        [UnityTest, Category(Screens.Category)]
+        public IEnumerator SkillsLayerTheFloorTheEdgeAndLight()
+        {
+            yield return Start();
+            World.MonstersHold = true;
+            var view = _root.View;
+            Feel.SkillFxHold = 0.2f;
+            view.StageCast("frost_ring", Player.Position + new Vec2(-7, 2.8f), 2.55f, 0);
+            view.StageCast("thunderclap", Player.Position + new Vec2(0, 3), 2.95f, 0);
+            view.StageCast("fire_ring", Player.Position + new Vec2(7, 2.8f), 2.75f, 0);
+            view.StageCast("whirlwind", Player.Position + new Vec2(-7, -3), 2.15f, 0);
+            view.StageCast("ground_slam", Player.Position + new Vec2(0, -3.4f), 3.15f, 0);
+            view.StageCast("spirit_blast", Player.Position + new Vec2(7, -3), 2.95f, 0);
+            yield return new WaitForSecondsRealtime(0.4f);
+            Assert.AreEqual(6, _root.SkillFxAlive);
+            Assert.That(_root.SkillFxPieces, Is.InRange(60, 420), "Six effects, each within 72 pieces.");
+            Assert.That(_root.SkillFxLights, Is.InRange(4, 12), "The elements light the floor; steel and dust do not.");
+            yield return Screens.Take("skill-layers");
+            Feel.SkillFxHold = 0.55f;
+            yield return new WaitForSecondsRealtime(0.6f);
+            Assert.Greater(_root.SkillFxPieces, 0, "Frost, soot, splits and crystals breaking are still there.");
+            yield return Screens.Take("skill-layers-after");
+            Feel.SkillFxHold = -1;
+            yield return new WaitForSecondsRealtime(1.2f);
+            Assert.AreEqual(0, _root.SkillFxAlive, "All are over within 1.4 seconds.");
+            Assert.AreEqual(0, _root.SkillFxLights);
+            World.MonstersHold = false;
+            Assert.IsTrue(_root.Playing);
+        }
+
         // A boss's warnings and the blow that lands in their shape (E1 of Docs/EffectsRework.md, WorldView.Hazards.cs):
         // every shape laid beside the player and held part filled, then landed. The blow stays within its pieces, the
         // floor keeps a scar for each harmful one (a charge's path leaves none) and gives them up in time.

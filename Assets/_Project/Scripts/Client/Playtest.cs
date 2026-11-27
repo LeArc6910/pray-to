@@ -320,6 +320,12 @@ namespace Game.Client
                     if (root.View == null) return "no view";
                     root.View.StageBlast(words[1], player.Position + new Vec2(Float(words[2]), Float(words[3])), Float(words[4]));
                     return null;
+                case "castfx":
+                    // castfx <skill> <dx> <dy> <radius in tiles> [degrees]: that skill's own effect put beside the
+                    // player as if cast there (WorldView.StageCast, E4 of Docs/EffectsRework.md). Hold its age with fxhold.
+                    if (root.View == null) return "no view";
+                    root.View.StageCast(words[1], player.Position + new Vec2(Float(words[2]), Float(words[3])), Float(words[4]), words.Length > 5 ? Float(words[5]) * Mathf.Deg2Rad : 0);
+                    return null;
                 case "fxhold":
                     // fxhold <seconds|off>: skill effects stop at that age, for a picture of one phase (Docs/SkillEffects.md).
                     Feel.SkillFxHold = words[1] == "off" ? -1 : Float(words[1]);

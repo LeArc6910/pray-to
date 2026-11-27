@@ -6,7 +6,7 @@
 //
 //   node DevTools/WebPlaytest/sweep.js [--wait [SHA]] [--only menu,basics,...] [--url URL] [--out DIR]
 //
-// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx monsterfx hazards shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
+// Sections: menu title testground hunt harvest zones towns time basics first firstphone hour bag combat hero roll bosses patterns veineater samurai knight warden antlion queen general spider arenas world farm life npc factory defense gear skills skillfx layers monsterfx hazards shots blast mobwarn map packs pois travel guide pace raids dungeon base save deploysave layout touch ui screens encounter growth sizes b1mobs biomes places b1c b2mobs b3mobs b4mobs
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -3232,6 +3232,73 @@ async function blast(browser) {
   check(small.skillFxPieces > 0 && small.skillFxPieces <= 144, `휴대폰 세로: 두 폭발이 그려진다 (조각 ${small.skillFxPieces}개)`);
   await phone.wait(250);
   await phone.shot('blast-phone', '휴대폰 세로: 위 화염구, 아래 유성 0.12초');
+  await phone.send('fxhold off; monsters go');
+  await phone.context.close();
+}
+
+// The players' skills in the rework's layers (E4, Docs/EffectsRework.md 10): six area skills laid round the player
+// as if cast there (castfx) and held at each phase, within the screen's pieces and twelve lights; then real casts: a
+// meteor caught coming down over its shadow, a fireball in flight lighting the floor.
+async function layers(browser) {
+  note('\n## 스킬의 다섯 층: 범위 스킬 여섯 (PC)\n');
+  const game = await open(browser, run, Profiles.pc, url);
+  await game.startSolo();
+  await game.wait(1200);
+  await game.send('goto wild');
+  await clearRoom(game, 12, 7);
+  await game.send('monsters hold; heal; face 1 0');
+  const six = 'castfx frost_ring -7 2.8 2.55; castfx thunderclap 0 3 2.95; castfx fire_ring 7 2.8 2.75; castfx whirlwind -7 -3 2.15; castfx ground_slam 0 -3.4 3.15; castfx spirit_blast 7 -3 2.95';
+  for (const [age, what] of [[0.06, '모으기'], [0.2, '터짐: 파면·바닥·가장자리'], [0.45, '서 있는 결정·불꽃, 남는 번개'], [0.75, '깨지는 결정, 바닥 흔적']]) {
+    await game.send(`fxhold ${age}; ${six}`);
+    const s = await pollState(game, st => st.skillFx >= 6 && st.skillFxPieces > 0);
+    check(s.skillFx >= 6 && s.skillFxPieces > 0 && s.skillFxPieces <= 420, `${age}초(${what}): 여섯 이펙트가 화면 한도 안에서 그려진다 (효과 ${s.skillFx}개, 조각 ${s.skillFxPieces}개, 한도 420)`);
+    if (age === 0.2) {
+      const lit = await pollState(game, st => st.skillFxLights >= 4, 1500);
+      check(lit.skillFxLights >= 4 && lit.skillFxLights <= 12, `${age}초: 원소 스킬이 바닥 빛을 켠다, 화면 12개까지 (${lit.skillFxLights}개)`);
+    }
+    await game.wait(250);
+    await game.shot(`layers-${String(age).replace('.', '_')}`, `위: 서리 고리·천둥·화염 고리, 아래: 회전베기·대지 강타·정령 폭발 ${age}초: ${what}`);
+    await game.send('fxhold off');
+    await pollState(game, st => st.skillFx === 0, 3000);
+  }
+  const over = await pollState(game, st => st.skillFx === 0 && st.skillFxLights === 0, 3000);
+  check(over.skillFx === 0 && over.skillFxLights === 0, `1.4초 안에 모두 끝나고 빛도 꺼진다 (효과 ${over.skillFx}개, 빛 ${over.skillFxLights}개)`);
+  // Real casts: the meteor's picture comes down over its shadow, a fireball flies as a comet with a light under it.
+  await game.send('monsters go; classes fire_mage; xp 21300; teach 2; heal; clear');
+  await game.wait(800);
+  for (const [id, order, name] of [['meteor', '3,0,1,2', '유성: 그림자 위로 내려오는 바위'], ['fireball', null, '화염구: 혜성 꼬리와 바닥 빛']]) {
+    if (order) {
+      await game.send(`classes fire_mage ${order}; teach 2`);
+      await game.wait(600);
+    }
+    const slot = (await game.inventory()).skills.split(',').indexOf(id);
+    check(slot >= 0, `${id}가 칸에 있다`);
+    await game.send('fxhold off; speed 1; teach 2; heal; mana 100; clear; spawn slime 7 0 5000; face 1 0');
+    await game.wait(400);
+    await game.send(`skill ${Math.max(0, slot)}`);
+    await pollState(game, st => st.projectiles > 0, 2000);
+    await game.wait(id === 'meteor' ? 250 : 120);
+    await game.send('speed 0');
+    const flying = await pollState(game, st => st.skillShots > 0 && st.skillFxLights > 0);
+    check(flying.skillShots > 0 && flying.skillFxLights > 0, `${name}: 날아가는 동안 제 모습으로 그려지고 바닥을 밝힌다 (${flying.skillShots}발, 빛 ${flying.skillFxLights}개, 조각 ${flying.skillFxPieces}개)`);
+    await game.shot(`layers-${id}-flight`, name);
+    await game.send('speed 1');
+    await pollState(game, st => st.projectiles === 0, 4000);
+    await pollState(game, st => st.skillFx === 0, 3000);
+  }
+  await game.context.close();
+
+  note('\n## 스킬의 다섯 층 (휴대폰 세로)\n');
+  const phone = await open(browser, run, Profiles.phone, url);
+  await phone.startSolo();
+  await phone.wait(1200);
+  await phone.send('goto wild');
+  await clearRoom(phone, 9, 6);
+  await phone.send('monsters hold; heal; face 1 0; fxhold 0.2; castfx frost_ring 0 3.4 2.55; castfx thunderclap 0 -3.6 2.95');
+  const small = await pollState(phone, st => st.skillFx >= 2 && st.skillFxPieces > 0);
+  check(small.skillFxPieces > 0 && small.skillFxPieces <= 144, `휴대폰 세로: 두 이펙트가 그려진다 (조각 ${small.skillFxPieces}개)`);
+  await phone.wait(250);
+  await phone.shot('layers-phone', '휴대폰 세로: 위 서리 고리, 아래 천둥 0.2초');
   await phone.send('fxhold off; monsters go');
   await phone.context.close();
 }
@@ -8373,7 +8440,7 @@ async function towns(browser) {
   }
 }
 
-const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, monsterfx, hazards, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
+const Sections = { menu, title, testground, hunt, harvest, zones, towns, time, basics, first, firstphone, hour, bag, combat, hero, roll, bosses, patterns, veineater, samurai, knight, warden, antlion, queen, general, spider, arenas, world, farm, life, npc, factory, defense, gear, skills, skillfx, layers, monsterfx, hazards, shots, blast, mobwarn, map, packs, pois, travel, guide, pace, raids, depth, dungeon, base, save, story, deploysave, layout, touch, ui, screens, encounter, growth, records, hud, sizes, b1mobs, biomes, places, b1c, b2mobs, b3mobs, b4mobs };
 
 (async () => {
   fs.mkdirSync(out, { recursive: true });
